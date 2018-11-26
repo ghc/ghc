@@ -13,6 +13,11 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
+  -Wimplicit-kind-vars
+  -Wmissing-monadfail-instances
+  -Wsemigroup
+  -Wnoncanonical-monoid-instances
+  -Wstar-is-type
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
 base language is: Haskell2010

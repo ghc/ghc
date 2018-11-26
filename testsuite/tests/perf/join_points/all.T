@@ -17,7 +17,7 @@ test('join003',
 test('join004',
   [collect_stats('bytes allocated',5),],
   compile_and_run,
-  [''])
+  ['-fno-stg-lift-lams'])
 
 test('join005', normal, compile, [''])
 test('join006', normal, compile, [''])

@@ -640,6 +640,8 @@ instance Binary RuntimeRep where
 #if __GLASGOW_HASKELL__ >= 807
     put_ bh Int8Rep         = putByte bh 12
     put_ bh Word8Rep        = putByte bh 13
+    put_ bh Int16Rep        = putByte bh 14
+    put_ bh Word16Rep       = putByte bh 15
 #endif
 
     get bh = do
@@ -660,6 +662,8 @@ instance Binary RuntimeRep where
 #if __GLASGOW_HASKELL__ >= 807
           12 -> pure Int8Rep
           13 -> pure Word8Rep
+          14 -> pure Int16Rep
+          15 -> pure Word16Rep
 #endif
           _  -> fail "Binary.putRuntimeRep: invalid tag"
 
@@ -945,6 +949,17 @@ instance Binary LeftOrRight where
                    0 -> return CLeft
                    _ -> return CRight }
 
+instance Binary PromotionFlag where
+   put_ bh NotPromoted = putByte bh 0
+   put_ bh IsPromoted  = putByte bh 1
+
+   get bh = do
+       n <- getByte bh
+       case n of
+         0 -> return NotPromoted
+         1 -> return IsPromoted
+         _ -> fail "Binary(IsPromoted): fail)"
+
 instance Binary Fingerprint where
   put_ h (Fingerprint w1 w2) = do put_ h w1; put_ h w2
   get  h = do w1 <- get h; w2 <- get h; return (Fingerprint w1 w2)
@@ -1122,7 +1137,7 @@ instance Binary StringLiteral where
             fs <- get bh
             return (StringLiteral st fs)
 
-instance Binary a => Binary (GenLocated SrcSpan a) where
+instance Binary a => Binary (Located a) where
     put_ bh (L l x) = do
             put_ bh l
             put_ bh x

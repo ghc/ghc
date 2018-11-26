@@ -1544,7 +1544,7 @@ expr_ok primop_ok other_expr
   | (expr, args) <- collectArgs other_expr
   = case stripTicksTopE (not . tickishCounts) expr of
         Var f   -> app_ok primop_ok f args
-        -- 'RubbishLit' is the only literal that can occur in the head of an
+        -- 'LitRubbish' is the only literal that can occur in the head of an
         -- application and will not be matched by the above case (Var /= Lit).
         Lit lit -> ASSERT( lit == rubbishLit ) True
         _       -> False
@@ -1870,7 +1870,7 @@ exprIsTickedString = isJust . exprIsTickedString_maybe
 -- different shape.
 -- Used to "look through" Ticks in places that need to handle literal strings.
 exprIsTickedString_maybe :: CoreExpr -> Maybe ByteString
-exprIsTickedString_maybe (Lit (MachStr bs)) = Just bs
+exprIsTickedString_maybe (Lit (LitString bs)) = Just bs
 exprIsTickedString_maybe (Tick t e)
   -- we don't tick literals with CostCentre ticks, compare to mkTick
   | tickishPlace t == PlaceCostCentre = Nothing
@@ -2525,9 +2525,9 @@ rhsIsStatic platform is_dynamic_name cvt_literal rhs = is_static False rhs
   is_static in_arg (Lit (LitNumber nt i _)) = case cvt_literal nt i of
     Just e  -> is_static in_arg e
     Nothing -> True
-  is_static _      (Lit (MachLabel {}))   = False
+  is_static _      (Lit (LitLabel {}))    = False
   is_static _      (Lit _)                = True
-        -- A MachLabel (foreign import "&foo") in an argument
+        -- A LitLabel (foreign import "&foo") in an argument
         -- prevents a constructor application from being static.  The
         -- reason is that it might give rise to unresolvable symbols
         -- in the object file: under Linux, references to "weak"

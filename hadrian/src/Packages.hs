@@ -139,10 +139,14 @@ programName Context {..} = do
     return $ prefix ++ case package of
                               p | p == ghc    -> "ghc"
                                 | p == hpcBin -> "hpc"
-                                | p == iserv  ->
-                                    if Profiling `wayUnit` way
-                                      then "ghc-iserv-prof"
-                                      else "ghc-iserv"
+                                | p == iserv  -> "ghc-iserv" ++ concat [
+                                    if wayUnit' `wayUnit` way
+                                        then suffix
+                                        else ""
+                                    | (wayUnit', suffix) <- [
+                                        (Profiling, "-prof"),
+                                        (Dynamic,   "-dyn")
+                                    ]]
                               _               -> pkgName package
 
 -- | The 'FilePath' to a program executable in a given 'Context'.

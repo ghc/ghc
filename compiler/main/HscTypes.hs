@@ -6,6 +6,7 @@
 
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Types for the per-module compiler
 module HscTypes (
@@ -344,7 +345,7 @@ handleFlagWarnings dflags warns = do
       -- It would be nicer if warns :: [Located MsgDoc], but that
       -- has circular import problems.
       bag = listToBag [ mkPlainWarnMsg dflags loc (text warn)
-                      | Warn _ (L loc warn) <- warns' ]
+                      | Warn _ (dL->L loc warn) <- warns' ]
 
   printOrThrowWarnings dflags bag
 

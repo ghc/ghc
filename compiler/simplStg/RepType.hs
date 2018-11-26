@@ -37,7 +37,7 @@ import Util
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( anyTypeOfKind )
 
-import Data.List (foldl', sort)
+import Data.List (sort)
 import qualified Data.IntSet as IS
 
 {- **********************************************************************
@@ -259,9 +259,11 @@ primRepSlot LiftedRep   = PtrSlot
 primRepSlot UnliftedRep = PtrSlot
 primRepSlot IntRep      = WordSlot
 primRepSlot Int8Rep     = WordSlot
+primRepSlot Int16Rep    = WordSlot
 primRepSlot Int64Rep    = Word64Slot
 primRepSlot WordRep     = WordSlot
 primRepSlot Word8Rep    = WordSlot
+primRepSlot Word16Rep   = WordSlot
 primRepSlot Word64Rep   = Word64Slot
 primRepSlot AddrRep     = WordSlot
 primRepSlot FloatRep    = FloatSlot

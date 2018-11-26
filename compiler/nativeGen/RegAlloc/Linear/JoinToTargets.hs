@@ -27,13 +27,11 @@ import Unique
 import UniqFM
 import UniqSet
 
-import Data.Foldable (foldl')
-
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
 --
 joinToTargets
-        :: (FR freeRegs, Instruction instr)
+        :: (FR freeRegs, Instruction instr, Outputable instr)
         => BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
@@ -57,7 +55,7 @@ joinToTargets block_live id instr
 
 -----
 joinToTargets'
-        :: (FR freeRegs, Instruction instr)
+        :: (FR freeRegs, Instruction instr, Outputable instr)
         => BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
@@ -111,7 +109,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
 
 -- this is the first time we jumped to this block.
-joinToTargets_first :: (FR freeRegs, Instruction instr)
+joinToTargets_first :: (FR freeRegs, Instruction instr, Outputable instr)
                     => BlockMap RegSet
                     -> [NatBasicBlock instr]
                     -> BlockId
@@ -140,7 +138,7 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
 
 
 -- we've jumped to this block before
-joinToTargets_again :: (Instruction instr, FR freeRegs)
+joinToTargets_again :: (Instruction instr, FR freeRegs, Outputable instr)
                     => BlockMap RegSet
                     -> [NatBasicBlock instr]
                     -> BlockId
@@ -181,7 +179,8 @@ joinToTargets_again
                 --
                 let sccs  = stronglyConnCompFromEdgedVerticesOrdR graph
 
-{-              -- debugging
+              -- debugging
+                {-
                 pprTrace
                         ("joinToTargets: making fixup code")
                         (vcat   [ text "        in block: "     <> ppr block_id
@@ -192,7 +191,7 @@ joinToTargets_again
                                 , text "   sccs of graph: "     <> ppr sccs
                                 , text ""])
                         (return ())
--}
+                -}
                 delta           <- getDeltaR
                 fixUpInstrs_    <- mapM (handleComponent delta instr) sccs
                 let fixUpInstrs = concat fixUpInstrs_
@@ -200,16 +199,10 @@ joinToTargets_again
                 -- make a new basic block containing the fixup code.
                 --      A the end of the current block we will jump to the fixup one,
                 --      then that will jump to our original destination.
-                fixup_block_id <- getUniqueR
-                let block = BasicBlock (mkBlockId fixup_block_id)
+                fixup_block_id <- mkBlockId <$> getUniqueR
+                let block = BasicBlock fixup_block_id
                                 $ fixUpInstrs ++ mkJumpInstr dest
 
-{-              pprTrace
-                        ("joinToTargets: fixup code is:")
-                        (vcat   [ ppr block
-                                , text ""])
-                        (return ())
--}
                 -- if we didn't need any fixups, then don't include the block
                 case fixUpInstrs of
                  []     -> joinToTargets' block_live new_blocks block_id instr dests
@@ -217,11 +210,25 @@ joinToTargets_again
                  -- patch the original branch instruction so it goes to our
                  --     fixup block instead.
                  _      -> let  instr'  =  patchJumpInstr instr
-                                                (\bid -> if bid == dest
-                                                                then mkBlockId fixup_block_id
-                                                                else bid) -- no change!
+                                            (\bid -> if bid == dest
+                                                        then fixup_block_id
+                                                        else bid) -- no change!
 
-                           in   joinToTargets' block_live (block : new_blocks) block_id instr' dests
+                           in do
+                                {- --debugging
+                                pprTrace "FixUpEdge info:"
+                                    (
+                                    text "inBlock:" <> ppr block_id $$
+                                    text "instr:" <> ppr instr $$
+                                    text "instr':" <> ppr instr' $$
+                                    text "fixup_block_id':" <>
+                                        ppr fixup_block_id $$
+                                    text "dest:" <> ppr dest
+                                    ) (return ())
+                                -}
+                                recordFixupBlock block_id fixup_block_id dest
+                                joinToTargets' block_live (block : new_blocks)
+                                               block_id instr' dests
 
 
 -- | Construct a graph of register\/spill movements.

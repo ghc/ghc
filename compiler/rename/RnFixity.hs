@@ -1,3 +1,5 @@
+{-# LANGUAGE ViewPatterns #-}
+
 {-
 
 This module contains code which maintains and manipulates the
@@ -78,8 +80,8 @@ addLocalFixities mini_fix_env names thing_inside
   where
     find_fixity name
       = case lookupFsEnv mini_fix_env (occNameFS occ) of
-          Just (L _ fix) -> Just (name, FixItem occ fix)
-          Nothing        -> Nothing
+          Just lfix -> Just (name, FixItem occ (unLoc lfix))
+          Nothing   -> Nothing
       where
         occ = nameOccName name
 
@@ -171,7 +173,7 @@ lookupFixityRn_help' name occ
 
 ---------------
 lookupTyFixityRn :: Located Name -> RnM Fixity
-lookupTyFixityRn (L _ n) = lookupFixityRn n
+lookupTyFixityRn = lookupFixityRn . unLoc
 
 -- | Look up the fixity of a (possibly ambiguous) occurrence of a record field
 -- selector.  We use 'lookupFixityRn'' so that we can specifiy the 'OccName' as
@@ -179,9 +181,9 @@ lookupTyFixityRn (L _ n) = lookupFixityRn n
 -- 'Name' if @DuplicateRecordFields@ is in use (Trac #1173). If there are
 -- multiple possible selectors with different fixities, generate an error.
 lookupFieldFixityRn :: AmbiguousFieldOcc GhcRn -> RnM Fixity
-lookupFieldFixityRn (Unambiguous n (L _ rdr))
-  = lookupFixityRn' n (rdrNameOcc rdr)
-lookupFieldFixityRn (Ambiguous _ (L _ rdr)) = get_ambiguous_fixity rdr
+lookupFieldFixityRn (Unambiguous n lrdr)
+  = lookupFixityRn' n (rdrNameOcc (unLoc lrdr))
+lookupFieldFixityRn (Ambiguous _ lrdr) = get_ambiguous_fixity (unLoc lrdr)
   where
     get_ambiguous_fixity :: RdrName -> RnM Fixity
     get_ambiguous_fixity rdr_name = do

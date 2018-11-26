@@ -173,7 +173,7 @@ data Width   = W8 | W16 | W32 | W64
 instance Outputable Width where
    ppr rep = ptext (mrStr rep)
 
-mrStr :: Width -> LitString
+mrStr :: Width -> PtrString
 mrStr W8   = sLit("W8")
 mrStr W16  = sLit("W16")
 mrStr W32  = sLit("W32")

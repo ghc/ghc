@@ -5,7 +5,6 @@ import NameSet     ( FreeVars )
 import TcRnTypes
 import SrcLoc      ( Located )
 import Outputable  ( Outputable )
-import HsExtension ( GhcPs, GhcRn )
 
 rnLExpr :: LHsExpr GhcPs
         -> RnM (LHsExpr GhcRn, FreeVars)

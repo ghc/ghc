@@ -28,7 +28,6 @@ import Rules
 import CoreOpt          ( collectBindersPushingCo )
 import CoreUtils        ( exprIsTrivial, applyTypeToArgs, mkCast )
 import CoreFVs
-import FV               ( InterestingVarFun )
 import CoreArity        ( etaExpandToJoinPointRule )
 import UniqSupply
 import Name

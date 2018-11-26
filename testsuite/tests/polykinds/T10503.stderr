@@ -13,5 +13,5 @@ T10503.hs:8:6: error:
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature:
         h :: forall r.
-             (Proxy ( 'KProxy :: KProxy k) ~ Proxy ( 'KProxy :: KProxy *) => r)
+             (Proxy ('KProxy :: KProxy k) ~ Proxy ('KProxy :: KProxy *) => r)
              -> r

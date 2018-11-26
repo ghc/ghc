@@ -70,7 +70,7 @@ module Type (
 
         modifyJoinResTy, setJoinResTy,
 
-        etaExpandFamInstLHS,
+        etaExpandFamInst,
 
         -- Analyzing types
         TyCoMapper(..), mapType, mapCoercion,
@@ -213,7 +213,7 @@ module Type (
         pprType, pprParendType, pprPrecType,
         pprTypeApp, pprTyThingCategory, pprShortTyThing,
         pprTCvBndr, pprTCvBndrs, pprForAll, pprUserForAll,
-        pprSigmaType, ppSuggestExplicitKinds,
+        pprSigmaType, pprWithExplicitKindsWhen,
         pprTheta, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprSourceTyCon,
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
@@ -1632,6 +1632,8 @@ appTyArgFlags ty = fun_kind_arg_flags (typeKind ty)
 fun_kind_arg_flags :: Kind -> [Type] -> [ArgFlag]
 fun_kind_arg_flags = go emptyTCvSubst
   where
+    go subst ki arg_tys
+      | Just ki' <- coreView ki = go subst ki' arg_tys
     go _ _ [] = []
     go subst (ForAllTy (Bndr tv argf) res_ki) (arg_ty:arg_tys)
       = argf : go subst' res_ki arg_tys
@@ -3104,29 +3106,26 @@ setJoinResTy ar new_res_ty ty
 -- | Given a data or type family instance's type variables, left-hand side
 -- types, and right-hand side type, either:
 --
--- * Return the eta-expanded type variables and left-hand types (if dealing
---   with a data family instance). This function obtains the eta-reduced
---   variables from the right-hand type, which is expected to be of the form
---   @'mkTyConApp' rep_tc ('mkTyVarTys' tc_tvs)@.
+-- * Return the eta-expanded type variables, left-hand types, and right-hand
+--   type (if dealing with a data family instance). This function obtains the
+--   eta-reduced variables from the instance's representation 'TyCon' (which
+--   heads the right-hand type).
 --
--- * Just return the type variables and left-hand types (if dealing with a
---   type family instance).
+-- * Just return the type variables, left-hand types, and right-hand type
+--   (if dealing with a type family instance).
 --
--- For an explanation of why data family instances need to have their
--- left-hand sides eta-expanded, see
--- @Note [Eta reduction for data families]@ in "FamInstEnv". Because the
--- right-hand side is where the eta-reduced variables are obtained from, it
--- is not returned from this function (as there is never a need to modify it).
+-- For an explanation of why data family instances need to be eta expanded, see
+-- @Note [Eta reduction for data families]@ in "FamInstEnv".
 
 -- NB: In an ideal world, this would live in FamInstEnv, but this function
 -- is used in Coercion (which FamInstEnv imports), so doing so would lead to
 -- an import cycle.
-etaExpandFamInstLHS
+etaExpandFamInst
   :: [TyVar] -- ^ The type variables
   -> [Type]  -- ^ The left-hand side types
   -> Type    -- ^ The right-hand side type
-  -> ([TyVar], [Type])
-etaExpandFamInstLHS tvs lhs rhs
+  -> ([TyVar], [Type], Type)
+etaExpandFamInst tvs lhs rhs
   | Just (tycon, tc_args) <- splitTyConApp_maybe rhs
   , isFamInstTyCon tycon
   = let tc_tvs           = tyConTyVars tycon
@@ -3134,9 +3133,10 @@ etaExpandFamInstLHS tvs lhs rhs
         etad_tys         = mkTyVarTys etad_tvs
         eta_expanded_tvs = tvs `chkAppend` etad_tvs
         eta_expanded_lhs = lhs `chkAppend` etad_tys
-    in (eta_expanded_tvs, eta_expanded_lhs)
+        eta_expanded_rhs = mkAppTys rhs etad_tys
+    in (eta_expanded_tvs, eta_expanded_lhs, eta_expanded_rhs)
   | otherwise
-  = (tvs, lhs)
+  = (tvs, lhs, rhs)
 
 {-
 %************************************************************************

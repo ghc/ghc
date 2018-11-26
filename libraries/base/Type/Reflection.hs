@@ -16,8 +16,8 @@
 -- described by,
 --
 -- * Simon Peyton-Jones, Stephanie Weirich, Richard Eisenberg,
--- Dimitrios Vytiniotis. "A reflection on types." /Proc. Philip Wadler's 60th
--- birthday Festschrift/, Edinburgh (April 2016).
+-- Dimitrios Vytiniotis. "A reflection on types."
+-- /Proc. Philip Wadler's 60th birthday Festschrift/, Edinburgh (April 2016).
 --
 -- The interface provides 'I.TypeRep', a type representation which can
 -- be safely decomposed and composed. See "Data.Dynamic" for an example of this.

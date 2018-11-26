@@ -12,14 +12,13 @@ can be appended in linear time.
 module OrdList (
         OrdList,
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL, lastOL,
-        mapOL, fromOL, toOL, foldrOL, foldlOL
+        mapOL, fromOL, toOL, foldrOL, foldlOL, reverseOL
 ) where
 
 import GhcPrelude
 
 import Outputable
 
-import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 
 infixl 5  `appOL`
@@ -124,3 +123,11 @@ toOL :: [a] -> OrdList a
 toOL [] = None
 toOL [x] = One x
 toOL xs = Many xs
+
+reverseOL :: OrdList a -> OrdList a
+reverseOL None = None
+reverseOL (One x) = One x
+reverseOL (Cons a b) = Snoc (reverseOL b) a
+reverseOL (Snoc a b) = Cons b (reverseOL a)
+reverseOL (Two a b)  = Two (reverseOL b) (reverseOL a)
+reverseOL (Many xs)  = Many (reverse xs)

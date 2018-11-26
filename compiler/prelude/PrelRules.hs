@@ -363,18 +363,18 @@ mkFloatingRelOpRule nm cmp
 
 -- common constants
 zeroi, onei, zerow, onew :: DynFlags -> Literal
-zeroi dflags = mkMachInt  dflags 0
-onei  dflags = mkMachInt  dflags 1
-zerow dflags = mkMachWord dflags 0
-onew  dflags = mkMachWord dflags 1
+zeroi dflags = mkLitInt  dflags 0
+onei  dflags = mkLitInt  dflags 1
+zerow dflags = mkLitWord dflags 0
+onew  dflags = mkLitWord dflags 1
 
 zerof, onef, twof, zerod, oned, twod :: Literal
-zerof = mkMachFloat 0.0
-onef  = mkMachFloat 1.0
-twof  = mkMachFloat 2.0
-zerod = mkMachDouble 0.0
-oned  = mkMachDouble 1.0
-twod  = mkMachDouble 2.0
+zerof = mkLitFloat 0.0
+onef  = mkLitFloat 1.0
+twof  = mkLitFloat 2.0
+zerod = mkLitDouble 0.0
+oned  = mkLitDouble 1.0
+twod  = mkLitDouble 2.0
 
 cmpOp :: DynFlags -> (forall a . Ord a => a -> a -> Bool)
       -> Literal -> Literal -> Maybe CoreExpr
@@ -384,9 +384,9 @@ cmpOp dflags cmp = go
     done False = Just $ falseValInt dflags
 
     -- These compares are at different types
-    go (MachChar i1)   (MachChar i2)   = done (i1 `cmp` i2)
-    go (MachFloat i1)  (MachFloat i2)  = done (i1 `cmp` i2)
-    go (MachDouble i1) (MachDouble i2) = done (i1 `cmp` i2)
+    go (LitChar i1)   (LitChar i2)   = done (i1 `cmp` i2)
+    go (LitFloat i1)  (LitFloat i2)  = done (i1 `cmp` i2)
+    go (LitDouble i1) (LitDouble i2) = done (i1 `cmp` i2)
     go (LitNumber nt1 i1 _) (LitNumber nt2 i2 _)
       | nt1 /= nt2 = Nothing
       | otherwise  = done (i1 `cmp` i2)
@@ -395,10 +395,10 @@ cmpOp dflags cmp = go
 --------------------------
 
 negOp :: DynFlags -> Literal -> Maybe CoreExpr  -- Negate
-negOp _      (MachFloat 0.0)  = Nothing  -- can't represent -0.0 as a Rational
-negOp dflags (MachFloat f)    = Just (mkFloatVal dflags (-f))
-negOp _      (MachDouble 0.0) = Nothing
-negOp dflags (MachDouble d)   = Just (mkDoubleVal dflags (-d))
+negOp _      (LitFloat 0.0)  = Nothing  -- can't represent -0.0 as a Rational
+negOp dflags (LitFloat f)    = Just (mkFloatVal dflags (-f))
+negOp _      (LitDouble 0.0) = Nothing
+negOp dflags (LitDouble d)   = Just (mkDoubleVal dflags (-d))
 negOp dflags (LitNumber nt i t)
    | litNumIsSigned nt = Just (Lit (mkLitNumberWrap dflags nt (-i) t))
 negOp _      _                = Nothing
@@ -494,7 +494,7 @@ wordSizeInBits dflags = toInteger (platformWordSize (targetPlatform dflags) `shi
 floatOp2 :: (Rational -> Rational -> Rational)
          -> DynFlags -> Literal -> Literal
          -> Maybe (Expr CoreBndr)
-floatOp2 op dflags (MachFloat f1) (MachFloat f2)
+floatOp2 op dflags (LitFloat f1) (LitFloat f2)
   = Just (mkFloatVal dflags (f1 `op` f2))
 floatOp2 _ _ _ _ = Nothing
 
@@ -502,7 +502,7 @@ floatOp2 _ _ _ _ = Nothing
 doubleOp2 :: (Rational -> Rational -> Rational)
           -> DynFlags -> Literal -> Literal
           -> Maybe (Expr CoreBndr)
-doubleOp2 op dflags (MachDouble f1) (MachDouble f2)
+doubleOp2 op dflags (LitDouble f1) (LitDouble f2)
   = Just (mkDoubleVal dflags (f1 `op` f2))
 doubleOp2 _ _ _ _ = Nothing
 
@@ -574,7 +574,7 @@ mkRuleFn dflags Le _ (Lit lit) | isMaxBound dflags lit = Just $ trueValInt  dfla
 mkRuleFn _ _ _ _                                       = Nothing
 
 isMinBound :: DynFlags -> Literal -> Bool
-isMinBound _      (MachChar c)       = c == minBound
+isMinBound _      (LitChar c)        = c == minBound
 isMinBound dflags (LitNumber nt i _) = case nt of
    LitNumInt     -> i == tARGET_MIN_INT dflags
    LitNumInt64   -> i == toInteger (minBound :: Int64)
@@ -585,7 +585,7 @@ isMinBound dflags (LitNumber nt i _) = case nt of
 isMinBound _      _                  = False
 
 isMaxBound :: DynFlags -> Literal -> Bool
-isMaxBound _      (MachChar c)       = c == maxBound
+isMaxBound _      (LitChar c)       = c == maxBound
 isMaxBound dflags (LitNumber nt i _) = case nt of
    LitNumInt     -> i == tARGET_MAX_INT dflags
    LitNumInt64   -> i == toInteger (maxBound :: Int64)
@@ -601,7 +601,7 @@ intResult :: DynFlags -> Integer -> Maybe CoreExpr
 intResult dflags result = Just (intResult' dflags result)
 
 intResult' :: DynFlags -> Integer -> CoreExpr
-intResult' dflags result = Lit (mkMachIntWrap dflags result)
+intResult' dflags result = Lit (mkLitIntWrap dflags result)
 
 -- | Create an unboxed pair of an Int literal expression, ensuring the given
 -- Integer is in the target Int range and the corresponding overflow flag
@@ -610,7 +610,7 @@ intCResult :: DynFlags -> Integer -> Maybe CoreExpr
 intCResult dflags result = Just (mkPair [Lit lit, Lit c])
   where
     mkPair = mkCoreUbxTup [intPrimTy, intPrimTy]
-    (lit, b) = mkMachIntWrapC dflags result
+    (lit, b) = mkLitIntWrapC dflags result
     c = if b then onei dflags else zeroi dflags
 
 -- | Create a Word literal expression while ensuring the given Integer is in the
@@ -619,7 +619,7 @@ wordResult :: DynFlags -> Integer -> Maybe CoreExpr
 wordResult dflags result = Just (wordResult' dflags result)
 
 wordResult' :: DynFlags -> Integer -> CoreExpr
-wordResult' dflags result = Lit (mkMachWordWrap dflags result)
+wordResult' dflags result = Lit (mkLitWordWrap dflags result)
 
 -- | Create an unboxed pair of a Word literal expression, ensuring the given
 -- Integer is in the target Word range and the corresponding carry flag
@@ -628,7 +628,7 @@ wordCResult :: DynFlags -> Integer -> Maybe CoreExpr
 wordCResult dflags result = Just (mkPair [Lit lit, Lit c])
   where
     mkPair = mkCoreUbxTup [wordPrimTy, intPrimTy]
-    (lit, b) = mkMachWordWrapC dflags result
+    (lit, b) = mkLitWordWrapC dflags result
     c = if b then onei dflags else zeroi dflags
 
 inversePrimOp :: PrimOp -> RuleM CoreExpr
@@ -899,21 +899,21 @@ nonZeroLit n = getLiteral n >>= guard . not . isZeroLit
 -- Rational value to that of Float/Double. We confuse host architecture
 -- and target architecture here, but it's convenient (and wrong :-).
 convFloating :: DynFlags -> Literal -> Literal
-convFloating dflags (MachFloat  f) | not (gopt Opt_ExcessPrecision dflags) =
-   MachFloat  (toRational (fromRational f :: Float ))
-convFloating dflags (MachDouble d) | not (gopt Opt_ExcessPrecision dflags) =
-   MachDouble (toRational (fromRational d :: Double))
+convFloating dflags (LitFloat  f) | not (gopt Opt_ExcessPrecision dflags) =
+   LitFloat  (toRational (fromRational f :: Float ))
+convFloating dflags (LitDouble d) | not (gopt Opt_ExcessPrecision dflags) =
+   LitDouble (toRational (fromRational d :: Double))
 convFloating _ l = l
 
 guardFloatDiv :: RuleM ()
 guardFloatDiv = do
-  [Lit (MachFloat f1), Lit (MachFloat f2)] <- getArgs
+  [Lit (LitFloat f1), Lit (LitFloat f2)] <- getArgs
   guard $ (f1 /=0 || f2 > 0) -- see Note [negative zero]
        && f2 /= 0            -- avoid NaN and Infinity/-Infinity
 
 guardDoubleDiv :: RuleM ()
 guardDoubleDiv = do
-  [Lit (MachDouble d1), Lit (MachDouble d2)] <- getArgs
+  [Lit (LitDouble d1), Lit (LitDouble d2)] <- getArgs
   guard $ (d1 /=0 || d2 > 0) -- see Note [negative zero]
        && d2 /= 0            -- avoid NaN and Infinity/-Infinity
 -- Note [negative zero] Avoid (0 / -d), otherwise 0/(-1) reduces to
@@ -962,11 +962,11 @@ eqVal = Var ordEQDataConId
 gtVal = Var ordGTDataConId
 
 mkIntVal :: DynFlags -> Integer -> Expr CoreBndr
-mkIntVal dflags i = Lit (mkMachInt dflags i)
+mkIntVal dflags i = Lit (mkLitInt dflags i)
 mkFloatVal :: DynFlags -> Rational -> Expr CoreBndr
-mkFloatVal dflags f = Lit (convFloating dflags (MachFloat  f))
+mkFloatVal dflags f = Lit (convFloating dflags (LitFloat  f))
 mkDoubleVal :: DynFlags -> Rational -> Expr CoreBndr
-mkDoubleVal dflags d = Lit (convFloating dflags (MachDouble d))
+mkDoubleVal dflags d = Lit (convFloating dflags (LitDouble d))
 
 matchPrimOpId :: PrimOp -> Id -> RuleM ()
 matchPrimOpId op id = do
@@ -1343,11 +1343,11 @@ match_append_lit _ id_unf _
         ]
   | unpk `hasKey` unpackCStringFoldrIdKey &&
     c1 `cheapEqExpr` c2
-  , Just (MachStr s1) <- exprIsLiteral_maybe id_unf lit1
-  , Just (MachStr s2) <- exprIsLiteral_maybe id_unf lit2
+  , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
+  , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
   = ASSERT( ty1 `eqType` ty2 )
     Just (Var unpk `App` Type ty1
-                   `App` Lit (MachStr (s1 `BS.append` s2))
+                   `App` Lit (LitString (s1 `BS.append` s2))
                    `App` c1
                    `App` n)
 
@@ -1362,8 +1362,8 @@ match_eq_string _ id_unf _
         [Var unpk1 `App` lit1, Var unpk2 `App` lit2]
   | unpk1 `hasKey` unpackCStringIdKey
   , unpk2 `hasKey` unpackCStringIdKey
-  , Just (MachStr s1) <- exprIsLiteral_maybe id_unf lit1
-  , Just (MachStr s2) <- exprIsLiteral_maybe id_unf lit2
+  , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
+  , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
   = Just (if s1 == s2 then trueValBool else falseValBool)
 
 match_eq_string _ _ _ _ = Nothing
@@ -1640,7 +1640,7 @@ match_rationalTo _ _ _ _ _ = Nothing
 
 match_decodeDouble :: RuleFun
 match_decodeDouble dflags id_unf fn [xl]
-  | Just (MachDouble x) <- exprIsLiteral_maybe id_unf xl
+  | Just (LitDouble x) <- exprIsLiteral_maybe id_unf xl
   = case splitFunTy_maybe (idType fn) of
     Just (_, res)
       | Just [_lev1, _lev2, integerTy, intHashTy] <- tyConAppArgs_maybe res
@@ -1648,7 +1648,7 @@ match_decodeDouble dflags id_unf fn [xl]
            (y, z) ->
              Just $ mkCoreUbxTup [integerTy, intHashTy]
                                  [Lit (mkLitInteger y integerTy),
-                                  Lit (mkMachInt dflags (toInteger z))]
+                                  Lit (mkLitInt dflags (toInteger z))]
     _ ->
         pprPanic "match_decodeDouble: Id has the wrong type"
           (ppr fn <+> dcolon <+> ppr (idType fn))
@@ -2005,7 +2005,7 @@ tx_lit_con :: DynFlags -> (Integer -> Integer) -> AltCon -> Maybe AltCon
 tx_lit_con _      _      DEFAULT    = Just DEFAULT
 tx_lit_con dflags adjust (LitAlt l) = Just $ LitAlt (mapLitValue dflags adjust l)
 tx_lit_con _      _      alt        = pprPanic "caseRules" (ppr alt)
-   -- NB: mapLitValue uses mkMachIntWrap etc, to ensure that the
+   -- NB: mapLitValue uses mkLitIntWrap etc, to ensure that the
    -- literal alternatives remain in Word/Int target ranges
    -- (See Note [Word/Int underflow/overflow] in Literal and #13172).
 
@@ -2047,7 +2047,7 @@ tx_con_tte :: DynFlags -> AltCon -> Maybe AltCon
 tx_con_tte _      DEFAULT         = Just DEFAULT
 tx_con_tte _      alt@(LitAlt {}) = pprPanic "caseRules" (ppr alt)
 tx_con_tte dflags (DataAlt dc)  -- See Note [caseRules for tagToEnum]
-  = Just $ LitAlt $ mkMachInt dflags $ toInteger $ dataConTagZ dc
+  = Just $ LitAlt $ mkLitInt dflags $ toInteger $ dataConTagZ dc
 
 tx_con_dtt :: Type -> AltCon -> Maybe AltCon
 tx_con_dtt _  DEFAULT = Just DEFAULT

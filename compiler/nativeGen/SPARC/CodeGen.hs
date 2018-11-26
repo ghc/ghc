@@ -39,7 +39,7 @@ import SPARC.Regs
 import SPARC.Stack
 import Instruction
 import Format
-import NCGMonad
+import NCGMonad   ( NatM, getNewRegNat, getNewLabelNat )
 
 -- Our intermediate code:
 import BlockId

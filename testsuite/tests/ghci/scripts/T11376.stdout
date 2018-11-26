@@ -1,6 +1,6 @@
 bar @Int :: Int -> b -> Int
 bar @Int :: forall {b}. Int -> b -> Int
-prox :: forall {k} {a :: k}. Prox k a
-prox @Int :: Prox * Int
-Prox :: forall {k} {a :: k}. Prox k a
-Prox @Int :: Prox * Int
+prox :: forall {k} {a :: k}. Prox @{k} a
+prox @Int :: Prox @{*} Int
+Prox :: forall {k} {a :: k}. Prox @{k} a
+Prox @Int :: Prox @{*} Int

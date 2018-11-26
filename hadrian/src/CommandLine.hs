@@ -198,7 +198,7 @@ optDescrs =
     , Option [] ["test-compiler"] (OptArg readTestCompiler "TEST_COMPILER")
       "Use given compiler [Default=stage2]."
     , Option [] ["test-config-file"] (OptArg readTestConfigFile "CONFIG_FILE")
-      "congiguration file for testsuite. Default=testsuite/config/ghc"
+      "configuration file for testsuite. Default=testsuite/config/ghc"
     , Option [] ["config"] (OptArg readTestConfig "EXTRA_TEST_CONFIG")
       "Configurations to run test, in key=value format."
     , Option [] ["summary-junit"] (OptArg readTestJUnit "TEST_SUMMARY_JUNIT")

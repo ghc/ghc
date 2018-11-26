@@ -572,7 +572,7 @@ pprRI (RIImm r) = pprImm r
 
 
 -- | Pretty print a two reg instruction.
-pprFormatRegReg :: LitString -> Format -> Reg -> Reg -> SDoc
+pprFormatRegReg :: PtrString -> Format -> Reg -> Reg -> SDoc
 pprFormatRegReg name format reg1 reg2
   = hcat [
         char '\t',
@@ -589,7 +589,7 @@ pprFormatRegReg name format reg1 reg2
 
 
 -- | Pretty print a three reg instruction.
-pprFormatRegRegReg :: LitString -> Format -> Reg -> Reg -> Reg -> SDoc
+pprFormatRegRegReg :: PtrString -> Format -> Reg -> Reg -> Reg -> SDoc
 pprFormatRegRegReg name format reg1 reg2 reg3
   = hcat [
         char '\t',
@@ -607,7 +607,7 @@ pprFormatRegRegReg name format reg1 reg2 reg3
 
 
 -- | Pretty print an instruction of two regs and a ri.
-pprRegRIReg :: LitString -> Bool -> Reg -> RI -> Reg -> SDoc
+pprRegRIReg :: PtrString -> Bool -> Reg -> RI -> Reg -> SDoc
 pprRegRIReg name b reg1 ri reg2
   = hcat [
         char '\t',
@@ -621,7 +621,7 @@ pprRegRIReg name b reg1 ri reg2
     ]
 
 {-
-pprRIReg :: LitString -> Bool -> RI -> Reg -> SDoc
+pprRIReg :: PtrString -> Bool -> RI -> Reg -> SDoc
 pprRIReg name b ri reg1
   = hcat [
         char '\t',

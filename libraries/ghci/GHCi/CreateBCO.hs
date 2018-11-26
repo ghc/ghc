@@ -26,7 +26,7 @@ import Foreign hiding (newArray)
 import GHC.Arr          ( Array(..) )
 import GHC.Exts
 import GHC.IO
-import Control.Exception (throwIO, ErrorCall(..))
+import Control.Exception ( ErrorCall(..) )
 
 createBCOs :: [ResolvedBCO] -> IO [HValueRef]
 createBCOs bcos = do

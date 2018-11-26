@@ -20,7 +20,7 @@ replaceInBind (Rec bes) = Rec [(b, replaceInExpr e) | (b, e) <- bes]
 
 replaceInExpr :: CoreExpr -> CoreExpr
 replaceInExpr (Var x) = Var x
-replaceInExpr (Lit (MachStr _)) = mkStringLit "Hello From The Plugin" -- The payload
+replaceInExpr (Lit (LitString _)) = mkStringLit "Hello From The Plugin" -- The payload
 replaceInExpr (Lit l) = Lit l
 replaceInExpr (Lam b e) = Lam b (replaceInExpr e)
 replaceInExpr (App e1 e2) = App (replaceInExpr e1) (replaceInExpr e2)

@@ -1,0 +1,8 @@
+Pass: passing Int16# on the stack
+Pass: negateInt16#
+Pass: plusInt16#
+Pass: subInt16#
+Pass: timesInt16#
+Pass: remInt16#
+Pass: quotInt16#
+Pass: quotRemInt16#

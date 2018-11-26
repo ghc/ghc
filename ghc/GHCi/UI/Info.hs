@@ -2,6 +2,7 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 -- | Get information on modules, expressions, and identifiers
 module GHCi.UI.Info
@@ -311,7 +312,7 @@ processAllTypeCheckedModule tcm = do
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsBind's
     getTypeLHsBind :: LHsBind GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
-    getTypeLHsBind (L _spn FunBind{fun_id = pid,fun_matches = MG _ _ _})
+    getTypeLHsBind (dL->L _spn FunBind{fun_id = pid,fun_matches = MG _ _ _})
         = pure $ Just (Just (unLoc pid),getLoc pid,varType (unLoc pid))
     getTypeLHsBind _ = pure Nothing
 
@@ -323,25 +324,25 @@ processAllTypeCheckedModule tcm = do
         return $ fmap (\expr -> (mid, getLoc e, CoreUtils.exprType expr)) mbe
       where
         mid :: Maybe Id
-        mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i
-            | otherwise                              = Nothing
+        mid | HsVar _ (dL->L _ i) <- unwrapVar (unLoc e) = Just i
+            | otherwise                                  = Nothing
 
         unwrapVar (HsWrap _ _ var) = var
         unwrapVar e'               = e'
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LPats's
     getTypeLPat :: LPat GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
-    getTypeLPat (L spn pat) =
+    getTypeLPat (dL->L spn pat) =
         pure (Just (getMaybeId pat,spn,hsPatType pat))
       where
-        getMaybeId (VarPat _ (L _ vid)) = Just vid
-        getMaybeId _                    = Nothing
+        getMaybeId (VarPat _ (dL->L _ vid)) = Just vid
+        getMaybeId _                        = Nothing
 
     -- | Get ALL source spans in the source.
-    listifyAllSpans :: Typeable a => TypecheckedSource -> [Located a]
+    listifyAllSpans :: (HasSrcSpan a , Typeable a) => TypecheckedSource -> [a]
     listifyAllSpans = everythingAllSpans (++) [] ([] `mkQ` (\x -> [x | p x]))
       where
-        p (L spn _) = isGoodSrcSpan spn
+        p (dL->L spn _) = isGoodSrcSpan spn
 
     -- | Variant of @syb@'s @everything@ (which summarises all nodes
     -- in top-down, left-to-right order) with a stop-condition on 'NameSet's

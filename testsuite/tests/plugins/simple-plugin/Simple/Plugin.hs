@@ -67,11 +67,11 @@ changeBindPr anns mb_replacement b e = do
 
 changeExpr :: UniqFM [ReplaceWith] -> Maybe String -> CoreExpr -> CoreM CoreExpr
 changeExpr anns mb_replacement e = let go = changeExpr anns mb_replacement in case e of
-        Lit (MachStr _) -> case mb_replacement of
+        Lit (LitString _) -> case mb_replacement of
                 Nothing -> return e
                 Just replacement -> do
                         putMsgS "Performing Replacement"
-                        return $ Lit (MachStr (fastStringToByteString (mkFastString replacement)))
+                        return $ Lit (LitString (fastStringToByteString (mkFastString replacement)))
         App e1 e2 -> liftM2 App (go e1) (go e2)
         Lam b e -> liftM (Lam b) (go e)
         Let bind e -> liftM2 Let (changeBind anns mb_replacement bind) (go e)

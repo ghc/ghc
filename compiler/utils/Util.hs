@@ -28,7 +28,7 @@ module Util (
         mapAndUnzip, mapAndUnzip3, mapAccumL2,
         nOfThem, filterOut, partitionWith,
 
-        dropWhileEndLE, spanEnd,
+        dropWhileEndLE, spanEnd, last2,
 
         foldl1', foldl2, count, all2,
 
@@ -61,7 +61,7 @@ module Util (
         nTimes,
 
         -- * Sorting
-        sortWith, minWith, nubSort,
+        sortWith, minWith, nubSort, ordNub,
 
         -- * Comparisons
         isEqual, eqListBy, eqMaybeBy,
@@ -637,6 +637,18 @@ minWith get_key xs = ASSERT( not (null xs) )
 nubSort :: Ord a => [a] -> [a]
 nubSort = Set.toAscList . Set.fromList
 
+-- | Remove duplicates but keep elements in order.
+--   O(n * log n)
+ordNub :: Ord a => [a] -> [a]
+ordNub xs
+  = go Set.empty xs
+  where
+    go _ [] = []
+    go s (x:xs)
+      | Set.member x s = go s xs
+      | otherwise = x : go (Set.insert x s) xs
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -754,6 +766,12 @@ spanEnd p l = go l [] [] l
           | p x       = go yes (x : rev_yes) rev_no                  xs
           | otherwise = go xs  []            (x : rev_yes ++ rev_no) xs
 
+-- | Get the last two elements in a list. Partial!
+{-# INLINE last2 #-}
+last2 :: [a] -> (a,a)
+last2 = foldl' (\(_,x2) x -> (x2,x)) (partialError,partialError)
+  where
+    partialError = panic "last2 - list length less than two"
 
 snocView :: [a] -> Maybe ([a],a)
         -- Split off the last element

@@ -264,7 +264,10 @@ typedef enum {
 //
 typedef struct {
     SyncType type;              // The kind of synchronisation
-    bool *idle;
+    bool *idle;                 // Array of size n_capabilities. idle[i] is true
+                                // if capability i will be idle during this GC
+                                // cycle. Only available when doing GC (when
+                                // type is SYNC_GC_*).
     Task *task;                 // The Task performing the sync
 } PendingSync;
 

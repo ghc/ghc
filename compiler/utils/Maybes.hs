@@ -18,6 +18,7 @@ module Maybes (
         firstJust, firstJusts,
         whenIsJust,
         expectJust,
+        rightToMaybe,
 
         -- * MaybeT
         MaybeT(..), liftMaybeT, tryMaybeT
@@ -61,6 +62,10 @@ whenIsJust Nothing  _ = return ()
 -- | Flipped version of @fromMaybe@, useful for chaining.
 orElse :: Maybe a -> a -> a
 orElse = flip fromMaybe
+
+rightToMaybe :: Either a b -> Maybe b
+rightToMaybe (Left _)  = Nothing
+rightToMaybe (Right x) = Just x
 
 {-
 ************************************************************************

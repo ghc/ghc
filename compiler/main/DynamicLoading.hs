@@ -25,7 +25,6 @@ module DynamicLoading (
     ) where
 
 import GhcPrelude
-import HscTypes         ( HscEnv )
 import DynFlags
 
 #if defined(GHCI)
@@ -63,6 +62,7 @@ import GHC.Exts          ( unsafeCoerce# )
 
 #else
 
+import HscTypes         ( HscEnv )
 import Module           ( ModuleName, moduleNameString )
 import Panic
 
@@ -76,12 +76,13 @@ import Control.Monad    ( unless )
 -- actual compilation starts. Idempotent operation. Should be re-called if
 -- pluginModNames or pluginModNameOpts changes.
 initializePlugins :: HscEnv -> DynFlags -> IO DynFlags
-initializePlugins hsc_env df
 #if !defined(GHCI)
+initializePlugins _ df
   = do let pluginMods = pluginModNames df
        unless (null pluginMods) (pluginError pluginMods)
        return df
 #else
+initializePlugins hsc_env df
   | map lpModuleName (plugins df) == pluginModNames df -- plugins not changed
      && all (\p -> lpArguments p == argumentsForPlugin p (pluginModNameOpts df))
             (plugins df) -- arguments not changed

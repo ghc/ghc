@@ -17,7 +17,7 @@ import GhcPrelude
 import qualified Data.IntMap.Strict as M
 import qualified Data.IntSet as S
 
-import Data.List (foldl', foldl1')
+import Data.List (foldl1')
 
 class IsSet set where
   type ElemOf set
@@ -35,6 +35,7 @@ class IsSet set where
   setDifference :: set -> set -> set
   setIntersection :: set -> set -> set
   setIsSubsetOf :: set -> set -> Bool
+  setFilter :: (ElemOf set -> Bool) -> set -> set
 
   setFoldl :: (b -> ElemOf set -> b) -> b -> set -> b
   setFoldr :: (ElemOf set -> b -> b) -> b -> set -> b
@@ -69,6 +70,7 @@ class IsMap map where
   mapInsertWith :: (a -> a -> a) -> KeyOf map -> a -> map a -> map a
   mapDelete :: KeyOf map -> map a -> map a
   mapAlter :: (Maybe a -> Maybe a) -> KeyOf map -> map a -> map a
+  mapAdjust :: (a -> a) -> KeyOf map -> map a -> map a
 
   mapUnion :: map a -> map a -> map a
   mapUnionWithKey :: (KeyOf map -> a -> a -> a) -> map a -> map a -> map a
@@ -81,7 +83,10 @@ class IsMap map where
   mapFoldl :: (b -> a -> b) -> b -> map a -> b
   mapFoldr :: (a -> b -> b) -> b -> map a -> b
   mapFoldlWithKey :: (b -> KeyOf map -> a -> b) -> b -> map a -> b
+  mapFoldMapWithKey :: Monoid m => (KeyOf map -> a -> m) -> map a -> m
   mapFilter :: (a -> Bool) -> map a -> map a
+  mapFilterWithKey :: (KeyOf map -> a -> Bool) -> map a -> map a
+
 
   mapElems :: map a -> [a]
   mapKeys :: map a -> [KeyOf map]
@@ -104,7 +109,7 @@ mapUnions maps = foldl1' mapUnion maps
 -- Basic instances
 -----------------------------------------------------------------------------
 
-newtype UniqueSet = US S.IntSet deriving (Eq, Ord, Show)
+newtype UniqueSet = US S.IntSet deriving (Eq, Ord, Show, Semigroup, Monoid)
 
 instance IsSet UniqueSet where
   type ElemOf UniqueSet = Int
@@ -122,6 +127,7 @@ instance IsSet UniqueSet where
   setDifference (US x) (US y) = US (S.difference x y)
   setIntersection (US x) (US y) = US (S.intersection x y)
   setIsSubsetOf (US x) (US y) = S.isSubsetOf x y
+  setFilter f (US s) = US (S.filter f s)
 
   setFoldl k z (US s) = S.foldl' k z s
   setFoldr k z (US s) = S.foldr k z s
@@ -147,6 +153,7 @@ instance IsMap UniqueMap where
   mapInsertWith f k v (UM m) = UM (M.insertWith f k v m)
   mapDelete k (UM m) = UM (M.delete k m)
   mapAlter f k (UM m) = UM (M.alter f k m)
+  mapAdjust f k (UM m) = UM (M.adjust f k m)
 
   mapUnion (UM x) (UM y) = UM (M.union x y)
   mapUnionWithKey f (UM x) (UM y) = UM (M.unionWithKey f x y)
@@ -159,7 +166,9 @@ instance IsMap UniqueMap where
   mapFoldl k z (UM m) = M.foldl' k z m
   mapFoldr k z (UM m) = M.foldr k z m
   mapFoldlWithKey k z (UM m) = M.foldlWithKey' k z m
+  mapFoldMapWithKey f (UM m) = M.foldMapWithKey f m
   mapFilter f (UM m) = UM (M.filter f m)
+  mapFilterWithKey f (UM m) = UM (M.filterWithKey f m)
 
   mapElems (UM m) = M.elems m
   mapKeys (UM m) = M.keys m

@@ -21,8 +21,6 @@ import Var
 import Type (Type, typeSize)
 import Id (isJoinId)
 
-import Data.List (foldl')
-
 data CoreStats = CS { cs_tm :: !Int    -- Terms
                     , cs_ty :: !Int    -- Types
                     , cs_co :: !Int    -- Coercions

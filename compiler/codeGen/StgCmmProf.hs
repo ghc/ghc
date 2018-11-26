@@ -35,7 +35,6 @@ import Cmm
 import CmmUtils
 import CLabel
 
-import qualified Module
 import CostCentre
 import DynFlags
 import FastString

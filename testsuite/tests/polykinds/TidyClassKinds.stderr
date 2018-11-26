@@ -1,7 +1,7 @@
 
 TidyClassKinds.hs:12:10: error:
     • Illegal instance declaration for
-        ‘Poly (k -> *) (k -> *) (ProxySyn k) (ProxySyn k)’
+        ‘Poly @{k -> *} @{k -> *} (ProxySyn @{k}) (ProxySyn @{k})’
         (All instance types must be of the form (T t1 ... tn)
          where T is not a synonym.
          Use TypeSynonymInstances if you want to disable this.)

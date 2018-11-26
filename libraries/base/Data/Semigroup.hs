@@ -117,9 +117,6 @@ import           Data.Bifunctor
 import           Data.Bitraversable
 import           Data.Coerce
 import           Data.Data
-import           Data.Monoid         (All (..), Any (..), Dual (..), Endo (..),
-                                      Product (..), Sum (..))
--- import qualified Data.Monoid         as Monoid
 import           GHC.Generics
 
 -- | A generalization of 'Data.List.cycle' to an arbitrary 'Semigroup'.

@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -250,6 +252,10 @@ module GHC (
 
         -- *** Deconstructing Located
         getLoc, unLoc,
+        getRealSrcSpan, unRealSrcSpan,
+
+        -- ** HasSrcSpan
+        HasSrcSpan(..), SrcSpanLess, dL, cL,
 
         -- *** Combining and comparing Located values
         eqLocated, cmpLocated, combineLocs, addCLoc,
@@ -291,7 +297,6 @@ import GhcPrelude hiding (init)
 import ByteCodeTypes
 import InteractiveEval
 import InteractiveEvalTypes
-import TcRnDriver       ( runTcInteractive )
 import GHCi
 import GHCi.RemoteTypes
 
@@ -359,7 +364,6 @@ import Data.Set (Set)
 import qualified Data.Sequence as Seq
 import System.Directory ( doesFileExist )
 import Data.Maybe
-import Data.List        ( find )
 import Data.Time
 import Data.Typeable    ( Typeable )
 import Data.Word        ( Word8 )
@@ -1382,7 +1386,7 @@ getRichTokenStream mod = do
 addSourceToTokens :: RealSrcLoc -> StringBuffer -> [Located Token]
                   -> [(Located Token, String)]
 addSourceToTokens _ _ [] = []
-addSourceToTokens loc buf (t@(L span _) : ts)
+addSourceToTokens loc buf (t@(dL->L span _) : ts)
     = case span of
       UnhelpfulSpan _ -> (t,"") : addSourceToTokens loc buf ts
       RealSrcSpan s   -> (t,str) : addSourceToTokens newLoc newBuf ts
@@ -1408,7 +1412,7 @@ showRichTokenStream ts = go startLoc ts ""
           getFile (RealSrcSpan s : _) = srcSpanFile s
           startLoc = mkRealSrcLoc sourceFile 1 1
           go _ [] = id
-          go loc ((L span _, str):ts)
+          go loc ((dL->L span _, str):ts)
               = case span of
                 UnhelpfulSpan _ -> go loc ts
                 RealSrcSpan s

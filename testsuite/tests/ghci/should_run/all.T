@@ -27,6 +27,7 @@ test('T11328',     just_ghci, ghci_script, ['T11328.script'])
 test('T11825',     just_ghci, ghci_script, ['T11825.script'])
 test('T12128',     just_ghci, ghci_script, ['T12128.script'])
 test('T12456',     just_ghci, ghci_script, ['T12456.script'])
+test('T12525',     just_ghci, ghci_script, ['T12525.script'])
 test('T12549',     just_ghci, ghci_script, ['T12549.script'])
 test('BinaryArray', normal, compile_and_run, [''])
 test('T14125a',    just_ghci, ghci_script, ['T14125a.script'])
@@ -36,3 +37,21 @@ test('T14963b', just_ghci, ghci_script, ['T14963b.script'])
 test('T14963c', [extra_hc_opts("-fdefer-type-errors")], ghci_script, ['T14963c.script'])
 test('T15007', just_ghci, ghci_script, ['T15007.script'])
 test('T15806',     just_ghci, ghci_script, ['T15806.script'])
+
+test('T15633a',
+     [extra_files(['tc-plugin-ghci/']),
+      when(opsys('mingw32'), multi_cpu_race),
+      only_ways(['ghci']),
+      pre_cmd('$MAKE -s --no-print-directory -C tc-plugin-ghci package.plugins01 TOP={top}'),
+      extra_hc_opts("-package-db tc-plugin-ghci/pkg.plugins01/local.package.conf -fplugin TcPluginGHCi")
+      ],
+     ghci_script, ['T15633a.script'])
+
+test('T15633b',
+     [extra_files(['tc-plugin-ghci/']),
+      when(opsys('mingw32'), multi_cpu_race),
+      only_ways(['ghci']),
+      pre_cmd('$MAKE -s --no-print-directory -C tc-plugin-ghci package.plugins01 TOP={top}'),
+      extra_hc_opts("-package-db tc-plugin-ghci/pkg.plugins01/local.package.conf")
+      ],
+     ghci_script, ['T15633b.script'])

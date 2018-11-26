@@ -1,6 +1,6 @@
 module Rules.Generate (
     isGeneratedCmmFile, generatePackageCode, generateRules, copyRules,
-    includesDependencies, generatedDependencies
+    includesDependencies, generatedDependencies, ghcPrimDependencies
     ) where
 
 import Base

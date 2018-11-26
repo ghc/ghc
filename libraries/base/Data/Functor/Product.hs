@@ -26,10 +26,7 @@ import Control.Monad (MonadPlus(..))
 import Control.Monad.Fix (MonadFix(..))
 import Control.Monad.Zip (MonadZip(mzipWith))
 import Data.Data (Data)
-import Data.Foldable (Foldable(foldMap))
 import Data.Functor.Classes
-import Data.Monoid (mappend)
-import Data.Traversable (Traversable(traverse))
 import GHC.Generics (Generic, Generic1)
 import Text.Read (Read(..), readListDefault, readListPrecDefault)
 

@@ -41,7 +41,6 @@ import Util
 -- Standard libraries
 import Data.Array.Unboxed
 import Foreign.Ptr
-import GHC.IO           ( IO(..) )
 import GHC.Exts
 
 {-

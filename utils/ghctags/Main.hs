@@ -183,7 +183,7 @@ flagsFromCabal :: FilePath -> IO [String]
 flagsFromCabal distPref = do
   lbi <- getPersistBuildConfig distPref
   let pd = localPkgDescr lbi
-  case componentNameTargets' pd lbi CLibName of
+  case componentNameTargets' pd lbi (CLibName LMainLibName) of
     [target] ->
       let clbi = targetCLBI target
           CLib lib = getComponent pd (componentLocalName clbi)
@@ -270,7 +270,7 @@ boundValues mod group =
   in vals ++ tys ++ fors
   where found = foundOfLName mod
 
-startOfLocated :: Located a -> RealSrcLoc
+startOfLocated :: HasSrcSpan a => a -> RealSrcLoc
 startOfLocated lHs = case getLoc lHs of
                      RealSrcSpan l -> realSrcSpanStart l
                      UnhelpfulSpan _ -> panic "startOfLocated UnhelpfulSpan"

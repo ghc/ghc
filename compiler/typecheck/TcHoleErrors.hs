@@ -45,7 +45,6 @@ import HscTypes        ( ModIface(..) )
 import LoadIface       ( loadInterfaceForNameMaybe )
 
 import PrelInfo (knownKeyNames)
-import Name (isBuiltInSyntax)
 
 
 {-

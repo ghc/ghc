@@ -20,12 +20,13 @@
 -- from compiler to compiler (and version to version).
 --
 --   * Documentation for correct usage in GHC will be found under
---     'unsafeCoerce#' in GHC.Base (around which 'unsafeCoerce' is just a
+--     'unsafeCoerce#' in "GHC.Base" (around which 'unsafeCoerce' is just a
 --     trivial wrapper).
 --
---   * In nhc98, the only representation-safe coercions are between Enum
---     types with the same range (e.g. Int, Int32, Char, Word32),
---     or between a newtype and the type that it wraps.
+--   * In nhc98, the only representation-safe coercions are between
+--     'Prelude.Enum' types with the same range (e.g. 'Prelude.Int',
+--     'Data.Int.Int32', 'Prelude.Char', 'Data.Word.Word32'), or between a
+--     newtype and the type that it wraps.
 --
 -----------------------------------------------------------------------------
 

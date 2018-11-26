@@ -158,6 +158,9 @@ m32_allocator_init(void)
    // fragment the memory.
    size_t pgsz = getPageSize();
    char* bigchunk = mmapForLinker(pgsz * M32_MAX_PAGES,MAP_ANONYMOUS,-1,0);
+   if (bigchunk == NULL)
+       barf("m32_allocator_init: Failed to map");
+
    int i;
    for (i=0; i<M32_MAX_PAGES; i++) {
       alloc.pages[i].base_addr = bigchunk + i*pgsz;

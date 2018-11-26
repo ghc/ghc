@@ -25,8 +25,7 @@ export MAKE
 
 RUNTESTS     = $(TOP)/driver/runtests.py
 COMPILER     = ghc
-CONFIGDIR    = $(TOP)/config
-CONFIG       = $(CONFIGDIR)/$(COMPILER)
+CONFIG       = $(TOP)/config/$(COMPILER)
 
 ifeq "$(GhcUnregisterised)" "YES"
     # Otherwise C backend generates many warnings about
@@ -243,7 +242,6 @@ endif
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config-file=$(CONFIG) \
-	-e 'config.confdir="$(CONFIGDIR)"' \
 	-e 'config.platform="$(TARGETPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
 	-e 'config.arch="$(TargetARCH_CPP)"' \

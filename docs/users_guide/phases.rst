@@ -745,7 +745,7 @@ for example).
     However, assembling all the sections separately is expensive, so
     this is slower than compiling normally. Additionally, the size of
     the library itself (the ``.a`` file) can be a factor of 2 to 2.5
-    larger. We use this feature for building GHC's libraries.
+    larger.
 
 .. ghc-flag:: -split-sections
     :shortdesc: Split sections for link-time dead-code stripping

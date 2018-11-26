@@ -453,6 +453,7 @@ test('nursery-chunks1',
 test('keep-cafs-fail',
   [ extra_files(['KeepCafsBase.hs', 'KeepCafs1.hs',
                  'KeepCafs2.hs', 'KeepCafsMain.hs']),
+    when(opsys('mingw32'), expect_broken (5987)),
     filter_stdout_lines('Evaluated a CAF|exit.*'),
     ignore_stderr, # on OS X the shell emits an "Abort trap" message to stderr
   ],
@@ -462,7 +463,8 @@ test('keep-cafs-fail',
 # Test the -fkeep-cafs flag
 test('keep-cafs',
   [ extra_files(['KeepCafsBase.hs', 'KeepCafs1.hs',
-                 'KeepCafs2.hs', 'KeepCafsMain.hs'])
+                 'KeepCafs2.hs', 'KeepCafsMain.hs']),
+    when(opsys('mingw32'), expect_broken (5987)),
   ],
   run_command,
   ['$MAKE -s --no-print-directory KeepCafs'])

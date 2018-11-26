@@ -32,7 +32,6 @@ import Multiplicity
 import Kind ( isTYPEApp )
 import TyCon
 import DataCon
-import Name ( getOccName )
 import Module
 import HsSyn
 import DynFlags
