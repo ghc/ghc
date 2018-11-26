@@ -347,6 +347,7 @@ thread_stack(P_ p, P_ stack_end)
         case STOP_FRAME:
         case CATCH_FRAME:
         case RET_SMALL:
+        case WITH_FRAME:
         {
             W_ bitmap = BITMAP_BITS(info->i.layout.bitmap);
             W_ size   = BITMAP_SIZE(info->i.layout.bitmap);

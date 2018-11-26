@@ -31,6 +31,7 @@ import GHC.Types
 import GHC.Word (Word8)
 
 import GHC.Ptr (Ptr(..), plusPtr)
+import GHC.IO (IO(..), unIO)
 
 import Control.Concurrent
 import qualified Data.ByteString as ByteString
@@ -97,9 +98,7 @@ withSerializedCompact (Compact buffer root lock) func = withMVar lock $ \_ -> do
                     (# s', rootAddr #) -> (# s', Ptr rootAddr #) )
   blockList <- mkBlockList buffer
   let serialized = SerializedCompact blockList rootPtr
-  r <- func serialized
-  IO (\s -> case touch# buffer s of
-         s' -> (# s', r #) )
+  IO (with# buffer (unIO (func serialized)))
 
 fixupPointers :: Addr# -> Addr# -> State# RealWorld ->
                  (# State# RealWorld, Maybe (Compact a) #)
