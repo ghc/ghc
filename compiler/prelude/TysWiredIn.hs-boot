@@ -25,6 +25,7 @@ runtimeRepTy :: Type
 liftedRepDataConTyCon, vecRepDataConTyCon, tupleRepDataConTyCon :: TyCon
 
 liftedRepDataConTy, unliftedRepDataConTy, intRepDataConTy, int8RepDataConTy,
+  int16RepDataConTy, word16RepDataConTy,
   wordRepDataConTy, int64RepDataConTy, word8RepDataConTy, word64RepDataConTy,
   addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy :: Type
 
@@ -45,3 +46,4 @@ multiplicityTy :: Type
 oneDataConTy :: Type
 omegaDataConTy :: Type
 omegaDataConTyCon :: TyCon
+unrestrictedFunTyCon :: TyCon

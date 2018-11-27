@@ -1,6 +1,6 @@
 type family Foo (a :: k) :: k
   where Foo a = a
   	-- Defined at T15341.hs:5:1
-type family Foo k (a :: k) :: k
-  where Foo k a = a
+type family Foo @k (a :: k) :: k
+  where Foo @k a = a
   	-- Defined at T15341.hs:5:1

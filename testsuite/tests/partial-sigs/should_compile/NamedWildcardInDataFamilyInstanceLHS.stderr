@@ -4,7 +4,7 @@ TYPE CONSTRUCTORS
   Sing :: forall k. k -> *
 COERCION AXIOMS
   axiom NamedWildcardInDataFamilyInstanceLHS.D:R:SingMyKind_a0 ::
-    Sing _a = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a
+    Sing _a = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a _a
       -- Defined at NamedWildcardInDataFamilyInstanceLHS.hs:8:15
 DATA CONSTRUCTORS
   A :: MyKind

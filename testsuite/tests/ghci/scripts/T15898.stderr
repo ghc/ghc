@@ -1,0 +1,52 @@
+
+<interactive>:3:1: error:
+    • Couldn't match kind ‘()’ with ‘*’
+      When matching types
+        a0 :: *
+        '() :: ()
+    • In the expression: undefined :: '()
+      In an equation for ‘it’: it = undefined :: '()
+
+<interactive>:3:14: error:
+    • Expected a type, but ‘'()’ has kind ‘()’
+    • In an expression type signature: '()
+      In the expression: undefined :: '()
+      In an equation for ‘it’: it = undefined :: '()
+
+<interactive>:4:14: error:
+    • Expected kind ‘* -> *’, but ‘Proxy '()’ has kind ‘*’
+    • In an expression type signature: Proxy '() Int
+      In the expression: undefined :: Proxy '() Int
+      In an equation for ‘it’: it = undefined :: Proxy '() Int
+
+<interactive>:5:1: error:
+    • Couldn't match kind ‘[*]’ with ‘*’
+      When matching types
+        a0 :: *
+        '[(), ()] :: [*]
+    • In the expression: undefined :: [(), ()]
+      In an equation for ‘it’: it = undefined :: [(), ()]
+
+<interactive>:5:14: error:
+    • Expected a type, but ‘[(), ()]’ has kind ‘[*]’
+    • In an expression type signature: [(), ()]
+      In the expression: undefined :: [(), ()]
+      In an equation for ‘it’: it = undefined :: [(), ()]
+
+<interactive>:6:1: error:
+    • Couldn't match kind ‘([k0], [k1])’ with ‘*’
+      When matching types
+        a0 :: *
+        '( '[], '[]) :: ([k0], [k1])
+    • In the expression: undefined :: '( '[], '[])
+      In an equation for ‘it’: it = undefined :: '( '[], '[])
+    • Relevant bindings include
+        it :: '( '[], '[]) (bound at <interactive>:6:1)
+
+<interactive>:6:14: error:
+    • Expected a type, but ‘'( '[], '[])’ has kind ‘([k0], [k1])’
+    • In an expression type signature: '( '[], '[])
+      In the expression: undefined :: '( '[], '[])
+      In an equation for ‘it’: it = undefined :: '( '[], '[])
+    • Relevant bindings include
+        it :: '( '[], '[]) (bound at <interactive>:6:1)

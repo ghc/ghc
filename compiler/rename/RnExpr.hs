@@ -14,6 +14,7 @@ free variables.
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module RnExpr (
         rnLExpr, rnExpr, rnStmts
@@ -1412,7 +1413,7 @@ segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
   where
     (later_stmts, later_uses) = segsToStmts empty_rec_stmt segs fvs_later
     new_stmt | non_rec   = head ss
-             | otherwise = L (getLoc (head ss)) rec_stmt
+             | otherwise = cL (getLoc (head ss)) rec_stmt
     rec_stmt = empty_rec_stmt { recS_stmts     = ss
                               , recS_later_ids = nameSetElemsStable used_later
                               , recS_rec_ids   = nameSetElemsStable fwds }
@@ -1811,9 +1812,9 @@ parallel" in an ApplicativeStmt, but doesn't otherwise affect what we
 can do with the rest of the statements in the same "do" expression.
 -}
 
-isStrictPattern :: LPat id -> Bool
-isStrictPattern (L _ pat) =
-  case pat of
+isStrictPattern :: LPat (GhcPass p) -> Bool
+isStrictPattern lpat =
+  case unLoc lpat of
     WildPat{}       -> False
     VarPat{}        -> False
     LazyPat{}       -> False

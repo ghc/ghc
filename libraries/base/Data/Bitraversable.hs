@@ -44,14 +44,14 @@ import GHC.Generics (K1(..))
 --
 -- A definition of 'bitraverse' must satisfy the following laws:
 --
--- [/naturality/]
+-- [Naturality]
 --   @'bitraverse' (t . f) (t . g) ≡ t . 'bitraverse' f g@
 --   for every applicative transformation @t@
 --
--- [/identity/]
+-- [Identity]
 --   @'bitraverse' 'Identity' 'Identity' ≡ 'Identity'@
 --
--- [/composition/]
+-- [Composition]
 --   @'Data.Functor.Compose.Compose' .
 --    'fmap' ('bitraverse' g1 g2) .
 --    'bitraverse' f1 f2

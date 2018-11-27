@@ -1,11 +1,12 @@
 -- Type of data constructors are now linear
 ghci025
-T8958
--- See #42
-T14682
-
 # Typeable decomposition, currently not working
 T14236
+
+-- :i (->) not working after FUN change
+ghci020
+T8535
+T10145
 
 ### Polymorphism See #91
 
@@ -22,11 +23,8 @@ T14394
 T14773b
 T2110
 T5327
-T8274
 TH_reifyDecl1
-TestTypeableBinary
 ghci
-rule2
 spec001
 
 # Debugger
@@ -42,26 +40,7 @@ print014
 print019
 print034
 
-# Pattern synonyms + records
-
-records-compile
-records-poly
-records-prov-req
-records-req-only
-records-run
-
 # FunCo fallout
 
 readRun004
 EtaExpandLevPoly
-
-# Unknown, to be checked
-dynamic-paper
-
-# Hole suggestions
-T14273
-T14343
-T14343b
-type_in_type_hole_fits
-valid_hole_fits
-valid_hole_fits_interactions

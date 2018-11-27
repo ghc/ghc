@@ -14,6 +14,7 @@ Highlights
 The highlights, since the 8.6.1 release, are:
 
 - Many, many bug fixes.
+- A new code layout algorithm for x86.
 
 
 Full details
@@ -72,6 +73,11 @@ Compiler
 
 - The :ghc-flag:`-fllvm-pass-vectors-in-regs` flag is now deprecated as vector
   arguments are now passed in registers by default.
+
+- The :ghc-flag:`-fblock-layout-cfg` flag enables a new code layout algorithm on x86.
+  This is enabled by default at  :ghc-flag:`-O` and :ghc-flag:`-O2`.
+
+- The deprecated ghc-flag ``-Wamp`` has been removed.
 
 Runtime system
 ~~~~~~~~~~~~~~

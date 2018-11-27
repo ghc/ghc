@@ -7,6 +7,7 @@
 
 {-# LANGUAGE CPP, TupleSections, MultiWayIf, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcHsType (
         -- Type signatures
@@ -396,7 +397,7 @@ tcLHsTypeUnsaturated ty = addTypeCtxt ty (tc_infer_lhs_type mode ty)
   where
     mode = allowUnsaturated typeLevelMode
 
-tcMult :: HsMult GhcRn -> TcM Mult
+tcMult :: HsMult -> TcM Mult
 tcMult hc = tc_mult typeLevelMode hc
 
 {-
@@ -582,32 +583,32 @@ tc_lhs_type mode (L span ty) exp_kind
     tc_hs_type mode ty exp_kind
 
 ------------------------------------------
-tc_fun_type :: TcTyMode -> HsMult GhcRn -> LHsType GhcRn -> LHsType GhcRn -> TcKind -> TcM TcType
+tc_fun_type :: TcTyMode -> HsArrow GhcRn -> LHsType GhcRn -> LHsType GhcRn -> TcKind -> TcM TcType
 tc_fun_type mode mult ty1 ty2 exp_kind = case mode_level mode of
   TypeLevel ->
     do { arg_k <- newOpenTypeKind
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; mult' <- tc_mult mode mult
+       ; mult' <- tc_mult mode (arrowToMult mult)
        ; checkExpectedKind (HsFunTy noExt ty1 mult ty2) (mkFunTy mult' ty1' ty2') liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
-       ; mult' <- tc_mult mode mult
+       ; mult' <- tc_mult mode (arrowToMult mult)
        ; checkExpectedKind (HsFunTy noExt ty1 mult ty2) (mkFunTy mult' ty1' ty2') liftedTypeKind exp_kind }
 
-tc_mult :: TcTyMode -> HsMult GhcRn -> TcM Mult
+tc_mult :: TcTyMode -> HsMult -> TcM Mult
 tc_mult mode r = case r of
-                         HsZero -> return Zero
-                         HsOne  -> return One
-                         HsOmega -> return Omega
-                         HsMultTy ty -> do
+                         Zero -> return Zero
+                         One  -> return One
+                         Omega -> return Omega
+                         MultThing ty -> do
                           ty' <- tc_lhs_type mode ty multiplicityTy
                           case ty' of
                             t | isOneMultiplicity t -> return One
                             t | isOmegaMultiplicity t -> return Omega
-                            t -> return $ RigThing t
+                            t -> return $ MultThing t
 
 
 ------------------------------------------
@@ -650,14 +651,14 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
 
 ---------- Functions and applications
 tc_hs_type mode ty@(HsFunTy _ ty1 mult ty2) exp_kind
-  | mode_level mode == KindLevel && not (isHsOmega mult)
+  | mode_level mode == KindLevel && not (isHsOmega (arrowToMult mult))
     = failWithTc (text "Linear arrows disallowed in kinds:" <+> ppr ty)
   | otherwise
     = tc_fun_type mode mult ty1 ty2 exp_kind
 
 tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
-  = tc_fun_type mode HsOmega ty1 ty2 exp_kind
+  = tc_fun_type mode HsUnrestrictedArrow ty1 ty2 exp_kind
 
 --------- Foralls
 tc_hs_type mode forall@(HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind

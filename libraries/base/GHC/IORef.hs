@@ -34,10 +34,10 @@ import GHC.IO
 
 -- |A mutable variable in the 'IO' monad
 newtype IORef a = IORef (STRef RealWorld a)
-  deriving Eq -- ^ @since 4.2.0.0
+  deriving Eq
   -- ^ Pointer equality.
   --
-  -- @since 4.1.0.0
+  -- @since 4.0.0.0
 
 -- |Build a new 'IORef'
 newIORef    :: a -> IO (IORef a)

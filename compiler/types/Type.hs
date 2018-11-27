@@ -70,7 +70,7 @@ module Type (
 
         modifyJoinResTy, setJoinResTy,
 
-        etaExpandFamInstLHS,
+        etaExpandFamInst,
 
         -- Analyzing types
         TyCoMapper(..), mapType, mapCoercion,
@@ -109,7 +109,7 @@ module Type (
         tyConBindersTyCoBinders,
 
         -- ** Common type constructors
-        funTyCon,
+        funTyCon, unrestrictedFunTyCon,
 
         -- ** Predicates on types
         isTyVarTy, isFunTy, isDictTy, isPredTy, isCoercionTy,
@@ -153,7 +153,7 @@ module Type (
         closeOverKindsDSet, closeOverKindsFV, closeOverKindsList,
         closeOverKinds,
 
-        noFreeVarsOfType, noFreeVarsOfRig, noFreeVarsOfVarMult,
+        noFreeVarsOfType, noFreeVarsOfMult, noFreeVarsOfVarMult,
         splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
         typeSize, occCheckExpand,
@@ -207,13 +207,13 @@ module Type (
         substVarBndr, substVarBndrs,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
-        substRigUnchecked, substVarMult,
+        substMultUnchecked, substVarMult,
 
         -- * Pretty-printing
         pprType, pprParendType, pprPrecType,
         pprTypeApp, pprTyThingCategory, pprShortTyThing,
         pprTCvBndr, pprTCvBndrs, pprForAll, pprUserForAll,
-        pprSigmaType, ppSuggestExplicitKinds,
+        pprSigmaType, pprWithExplicitKindsWhen,
         pprTheta, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprSourceTyCon,
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
@@ -256,7 +256,7 @@ import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind, unitTy
                                  , typeSymbolKind, liftedTypeKind
-                                 , oneDataConTy, omegaDataConTy )
+                                 , oneDataConTy, omegaDataConTy, unrestrictedFunTyCon )
 import PrelNames
 import CoAxiom
 import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
@@ -566,7 +566,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go (TyConApp tc tys)
       = do { tc' <- tycon tc
            ; mktyconapp tc' <$> mapM go tys }
-    go (FunTy w arg res)   = FunTy <$> go_rig w <*> go arg <*> go res
+    go (FunTy w arg res)   = FunTy <$> go_mult w <*> go arg <*> go res
     go (ForAllTy (Bndr tv vis) inner)
       = do { (env', tv') <- tycobinder env tv vis
            ; inner' <- mapType mapper env' inner
@@ -575,8 +575,8 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go (CastTy ty co)  = mkcastty <$> go ty <*> mapCoercion mapper env co
     go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
 
-    go_rig (RigThing t) = toMult <$> go t
-    go_rig t = pure t
+    go_mult (MultThing t) = toMult <$> go t
+    go_mult t = pure t
 
     (mktyconapp, mkappty, mkcastty)
       | smart     = (mkTyConApp, mkAppTy, mkCastTy)
@@ -1632,6 +1632,8 @@ appTyArgFlags ty = fun_kind_arg_flags (typeKind ty)
 fun_kind_arg_flags :: Kind -> [Type] -> [ArgFlag]
 fun_kind_arg_flags = go emptyTCvSubst
   where
+    go subst ki arg_tys
+      | Just ki' <- coreView ki = go subst ki' arg_tys
     go _ _ [] = []
     go subst (ForAllTy (Bndr tv argf) res_ki) (arg_ty:arg_tys)
       = argf : go subst' res_ki arg_tys
@@ -2689,7 +2691,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
       | Just (s1, t1) <- repSplitAppTy_maybe ty1
       = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (FunTy w1 s1 t1) (FunTy w2 s2 t2)
-      = go_rig env w1 w2 `thenCmpTy`
+      = go_mult env w1 w2 `thenCmpTy`
         go env s1 s2 `thenCmpTy` go env t1 t2
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
@@ -2714,8 +2716,8 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
             get_rank (ForAllTy {})   = 7
 
 
-    go_rig :: RnEnv2 -> Mult -> Mult -> TypeOrdering
-    go_rig env r1 r2 =
+    go_mult :: RnEnv2 -> Mult -> Mult -> TypeOrdering
+    go_mult env r1 r2 =
       if r1 `eqMult` r2
         then TEQ
         else
@@ -2734,9 +2736,9 @@ eqMult :: Mult -> Mult -> Bool
 eqMult Zero Zero = True
 eqMult One One = True
 eqMult Omega Omega = True
-eqMult (RigThing ty) (RigThing ty') = eqType ty ty'
-eqMult (RigAdd r1 r2) (RigAdd r1' r2') = eqMult r1 r1' && eqMult r2 r2'
-eqMult (RigMul r1 r2) (RigMul r1' r2') = eqMult r1 r1' && eqMult r2 r2'
+eqMult (MultThing ty) (MultThing ty') = eqType ty ty'
+eqMult (MultAdd r1 r2) (MultAdd r1' r2') = eqMult r1 r1' && eqMult r2 r2'
+eqMult (MultMul r1 r2) (MultMul r1' r2') = eqMult r1 r1' && eqMult r2 r2'
 eqMult _ _ = False
 
 -------------
@@ -3104,29 +3106,26 @@ setJoinResTy ar new_res_ty ty
 -- | Given a data or type family instance's type variables, left-hand side
 -- types, and right-hand side type, either:
 --
--- * Return the eta-expanded type variables and left-hand types (if dealing
---   with a data family instance). This function obtains the eta-reduced
---   variables from the right-hand type, which is expected to be of the form
---   @'mkTyConApp' rep_tc ('mkTyVarTys' tc_tvs)@.
+-- * Return the eta-expanded type variables, left-hand types, and right-hand
+--   type (if dealing with a data family instance). This function obtains the
+--   eta-reduced variables from the instance's representation 'TyCon' (which
+--   heads the right-hand type).
 --
--- * Just return the type variables and left-hand types (if dealing with a
---   type family instance).
+-- * Just return the type variables, left-hand types, and right-hand type
+--   (if dealing with a type family instance).
 --
--- For an explanation of why data family instances need to have their
--- left-hand sides eta-expanded, see
--- @Note [Eta reduction for data families]@ in "FamInstEnv". Because the
--- right-hand side is where the eta-reduced variables are obtained from, it
--- is not returned from this function (as there is never a need to modify it).
+-- For an explanation of why data family instances need to be eta expanded, see
+-- @Note [Eta reduction for data families]@ in "FamInstEnv".
 
 -- NB: In an ideal world, this would live in FamInstEnv, but this function
 -- is used in Coercion (which FamInstEnv imports), so doing so would lead to
 -- an import cycle.
-etaExpandFamInstLHS
+etaExpandFamInst
   :: [TyVar] -- ^ The type variables
   -> [Type]  -- ^ The left-hand side types
   -> Type    -- ^ The right-hand side type
-  -> ([TyVar], [Type])
-etaExpandFamInstLHS tvs lhs rhs
+  -> ([TyVar], [Type], Type)
+etaExpandFamInst tvs lhs rhs
   | Just (tycon, tc_args) <- splitTyConApp_maybe rhs
   , isFamInstTyCon tycon
   = let tc_tvs           = tyConTyVars tycon
@@ -3134,9 +3133,10 @@ etaExpandFamInstLHS tvs lhs rhs
         etad_tys         = mkTyVarTys etad_tvs
         eta_expanded_tvs = tvs `chkAppend` etad_tvs
         eta_expanded_lhs = lhs `chkAppend` etad_tys
-    in (eta_expanded_tvs, eta_expanded_lhs)
+        eta_expanded_rhs = mkAppTys rhs etad_tys
+    in (eta_expanded_tvs, eta_expanded_lhs, eta_expanded_rhs)
   | otherwise
-  = (tvs, lhs)
+  = (tvs, lhs, rhs)
 
 {-
 %************************************************************************

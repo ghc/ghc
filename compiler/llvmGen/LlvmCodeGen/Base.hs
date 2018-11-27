@@ -474,8 +474,7 @@ generateExternDecls = do
 -- @$def@ suffix, and generate the appropriate alias.
 aliasify :: LMGlobal -> LlvmM [LMGlobal]
 aliasify (LMGlobal var val) = do
-    let i8Ptr = LMPointer (LMInt 8)
-        LMGlobalVar lbl ty link sect align const = var
+    let LMGlobalVar lbl ty link sect align const = var
 
         defLbl = lbl `appendFS` fsLit "$def"
         defVar = LMGlobalVar defLbl ty Internal sect align const

@@ -29,7 +29,6 @@ import qualified TrieMap as TM
 import UniqFM
 import Unique
 import Control.Arrow (first, second)
-import Data.List (foldl')
 
 -- -----------------------------------------------------------------------------
 -- Eliminate common blocks

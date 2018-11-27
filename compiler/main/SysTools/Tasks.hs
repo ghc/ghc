@@ -62,7 +62,9 @@ runCc :: DynFlags -> [Option] -> IO ()
 runCc dflags args =   do
   let (p,args0) = pgm_c dflags
       args1 = map Option (getOpts dflags opt_c)
-      args2 = args0 ++ args1 ++ args
+      args2 = args0 ++ args ++ args1
+      -- We take care to pass -optc flags in args1 last to ensure that the
+      -- user can override flags passed by GHC. See #14452.
   mb_env <- getGccEnv args2
   runSomethingResponseFile dflags cc_filter "C Compiler" p args2 mb_env
  where

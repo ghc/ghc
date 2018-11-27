@@ -2,7 +2,7 @@
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1998
 
-\section[Literal]{@Literal@: Machine literals (unboxed, of course)}
+\section[Literal]{@Literal@: literals}
 -}
 
 {-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
@@ -14,12 +14,12 @@ module Literal
         , LitNumType(..)
 
         -- ** Creating Literals
-        , mkMachInt, mkMachIntWrap, mkMachIntWrapC
-        , mkMachWord, mkMachWordWrap, mkMachWordWrapC
-        , mkMachInt64, mkMachInt64Wrap
-        , mkMachWord64, mkMachWord64Wrap
-        , mkMachFloat, mkMachDouble
-        , mkMachChar, mkMachString
+        , mkLitInt, mkLitIntWrap, mkLitIntWrapC
+        , mkLitWord, mkLitWordWrap, mkLitWordWrapC
+        , mkLitInt64, mkLitInt64Wrap
+        , mkLitWord64, mkLitWord64Wrap
+        , mkLitFloat, mkLitDouble
+        , mkLitChar, mkLitString
         , mkLitInteger, mkLitNatural
         , mkLitNumber, mkLitNumberWrap
 
@@ -84,59 +84,66 @@ import Numeric ( fromRat )
 
 -- | So-called 'Literal's are one of:
 --
--- * An unboxed (/machine/) literal ('MachInt', 'MachFloat', etc.),
---   which is presumed to be surrounded by appropriate constructors
---   (@Int#@, etc.), so that the overall thing makes sense.
+-- * An unboxed numeric literal or floating-point literal which is presumed
+--   to be surrounded by appropriate constructors (@Int#@, etc.), so that
+--   the overall thing makes sense.
 --
---   We maintain the invariant that the 'Integer' the Mach{Int,Word}*
---   constructors are actually in the (possibly target-dependent) range.
---   The mkMach{Int,Word}*Wrap smart constructors ensure this by applying
+--   We maintain the invariant that the 'Integer' in the 'LitNumber'
+--   constructor is actually in the (possibly target-dependent) range.
+--   The mkLit{Int,Word}*Wrap smart constructors ensure this by applying
 --   the target machine's wrapping semantics. Use these in situations
 --   where you know the wrapping semantics are correct.
 --
 -- * The literal derived from the label mentioned in a \"foreign label\"
---   declaration ('MachLabel')
+--   declaration ('LitLabel')
 --
--- * A 'RubbishLit' to be used in place of values of 'UnliftedRep'
+-- * A 'LitRubbish' to be used in place of values of 'UnliftedRep'
 --   (i.e. 'MutVar#') when the the value is never used.
+--
+-- * A character
+-- * A string
+-- * The NULL pointer
+--
 data Literal
-  =     ------------------
-        -- First the primitive guys
-    MachChar    Char            -- ^ @Char#@ - at least 31 bits. Create with 'mkMachChar'
+  = LitChar    Char             -- ^ @Char#@ - at least 31 bits. Create with
+                                -- 'mkLitChar'
 
   | LitNumber !LitNumType !Integer Type
-      --  ^ Any numeric literal that can be
-      -- internally represented with an Integer
+                                -- ^ Any numeric literal that can be
+                                -- internally represented with an Integer
 
-  | MachStr     ByteString      -- ^ A string-literal: stored and emitted
+  | LitString  ByteString       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
                                 -- at runtime.  Also emitted with a @'\0'@
-                                -- terminator. Create with 'mkMachString'
+                                -- terminator. Create with 'mkLitString'
 
-  | MachNullAddr                -- ^ The @NULL@ pointer, the only pointer value
+  | LitNullAddr                 -- ^ The @NULL@ pointer, the only pointer value
                                 -- that can be represented as a Literal. Create
                                 -- with 'nullAddrLit'
 
-  | RubbishLit                  -- ^ A nonsense value, used when an unlifted
+  | LitRubbish                  -- ^ A nonsense value, used when an unlifted
                                 -- binding is absent and has type
                                 -- @forall (a :: 'TYPE' 'UnliftedRep'). a@.
                                 -- May be lowered by code-gen to any possible
-                                -- value. Also see Note [RubbishLit]
+                                -- value. Also see Note [Rubbish literals]
 
-  | MachFloat   Rational        -- ^ @Float#@. Create with 'mkMachFloat'
-  | MachDouble  Rational        -- ^ @Double#@. Create with 'mkMachDouble'
+  | LitFloat   Rational         -- ^ @Float#@. Create with 'mkLitFloat'
+  | LitDouble  Rational         -- ^ @Double#@. Create with 'mkLitDouble'
 
-  | MachLabel   FastString
-                (Maybe Int)
-        FunctionOrData
-                -- ^ A label literal. Parameters:
-                --
-                -- 1) The name of the symbol mentioned in the declaration
-                --
-                -- 2) The size (in bytes) of the arguments
-                --    the label expects. Only applicable with
-                --    @stdcall@ labels. @Just x@ => @\<x\>@ will
-                --    be appended to label name when emitting assembly.
+  | LitLabel   FastString (Maybe Int) FunctionOrData
+                                -- ^ A label literal. Parameters:
+                                --
+                                -- 1) The name of the symbol mentioned in the
+                                --    declaration
+                                --
+                                -- 2) The size (in bytes) of the arguments
+                                --    the label expects. Only applicable with
+                                --    @stdcall@ labels. @Just x@ => @\<x\>@ will
+                                --    be appended to label name when emitting
+                                --    assembly.
+                                --
+                                -- 3) Flag indicating whether the symbol
+                                --    references a function or a data
   deriving Data
 
 -- | Numeric literal type
@@ -190,12 +197,12 @@ instance Binary LitNumType where
       return (toEnum (fromIntegral h))
 
 instance Binary Literal where
-    put_ bh (MachChar aa)     = do putByte bh 0; put_ bh aa
-    put_ bh (MachStr ab)      = do putByte bh 1; put_ bh ab
-    put_ bh (MachNullAddr)    = do putByte bh 2
-    put_ bh (MachFloat ah)    = do putByte bh 3; put_ bh ah
-    put_ bh (MachDouble ai)   = do putByte bh 4; put_ bh ai
-    put_ bh (MachLabel aj mb fod)
+    put_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
+    put_ bh (LitString ab)   = do putByte bh 1; put_ bh ab
+    put_ bh (LitNullAddr)    = do putByte bh 2
+    put_ bh (LitFloat ah)    = do putByte bh 3; put_ bh ah
+    put_ bh (LitDouble ai)   = do putByte bh 4; put_ bh ai
+    put_ bh (LitLabel aj mb fod)
         = do putByte bh 5
              put_ bh aj
              put_ bh mb
@@ -204,29 +211,29 @@ instance Binary Literal where
         = do putByte bh 6
              put_ bh nt
              put_ bh i
-    put_ bh (RubbishLit)      = do putByte bh 7
+    put_ bh (LitRubbish)     = do putByte bh 7
     get bh = do
             h <- getByte bh
             case h of
               0 -> do
                     aa <- get bh
-                    return (MachChar aa)
+                    return (LitChar aa)
               1 -> do
                     ab <- get bh
-                    return (MachStr ab)
+                    return (LitString ab)
               2 -> do
-                    return (MachNullAddr)
+                    return (LitNullAddr)
               3 -> do
                     ah <- get bh
-                    return (MachFloat ah)
+                    return (LitFloat ah)
               4 -> do
                     ai <- get bh
-                    return (MachDouble ai)
+                    return (LitDouble ai)
               5 -> do
                     aj <- get bh
                     mb <- get bh
                     fod <- get bh
-                    return (MachLabel aj mb fod)
+                    return (LitLabel aj mb fod)
               6 -> do
                     nt <- get bh
                     i  <- get bh
@@ -243,7 +250,7 @@ instance Binary Literal where
                               panic "Evaluated the place holder for mkNatural"
                     return (LitNumber nt i t)
               _ -> do
-                    return (RubbishLit)
+                    return (LitRubbish)
 
 instance Outputable Literal where
     ppr lit = pprLiteral (\d -> d) lit
@@ -322,96 +329,96 @@ mkLitNumber dflags nt i t =
   (LitNumber nt i t)
 
 -- | Creates a 'Literal' of type @Int#@
-mkMachInt :: DynFlags -> Integer -> Literal
-mkMachInt dflags x   = ASSERT2( inIntRange dflags x,  integer x )
-                       (mkMachIntUnchecked x)
+mkLitInt :: DynFlags -> Integer -> Literal
+mkLitInt dflags x   = ASSERT2( inIntRange dflags x,  integer x )
+                       (mkLitIntUnchecked x)
 
 -- | Creates a 'Literal' of type @Int#@.
 --   If the argument is out of the (target-dependent) range, it is wrapped.
 --   See Note [Word/Int underflow/overflow]
-mkMachIntWrap :: DynFlags -> Integer -> Literal
-mkMachIntWrap dflags i = wrapLitNumber dflags $ mkMachIntUnchecked i
+mkLitIntWrap :: DynFlags -> Integer -> Literal
+mkLitIntWrap dflags i = wrapLitNumber dflags $ mkLitIntUnchecked i
 
 -- | Creates a 'Literal' of type @Int#@ without checking its range.
-mkMachIntUnchecked :: Integer -> Literal
-mkMachIntUnchecked i = LitNumber LitNumInt i intPrimTy
+mkLitIntUnchecked :: Integer -> Literal
+mkLitIntUnchecked i = LitNumber LitNumInt i intPrimTy
 
 -- | Creates a 'Literal' of type @Int#@, as well as a 'Bool'ean flag indicating
 --   overflow. That is, if the argument is out of the (target-dependent) range
 --   the argument is wrapped and the overflow flag will be set.
 --   See Note [Word/Int underflow/overflow]
-mkMachIntWrapC :: DynFlags -> Integer -> (Literal, Bool)
-mkMachIntWrapC dflags i = (n, i /= i')
+mkLitIntWrapC :: DynFlags -> Integer -> (Literal, Bool)
+mkLitIntWrapC dflags i = (n, i /= i')
   where
-    n@(LitNumber _ i' _) = mkMachIntWrap dflags i
+    n@(LitNumber _ i' _) = mkLitIntWrap dflags i
 
 -- | Creates a 'Literal' of type @Word#@
-mkMachWord :: DynFlags -> Integer -> Literal
-mkMachWord dflags x   = ASSERT2( inWordRange dflags x, integer x )
-                        (mkMachWordUnchecked x)
+mkLitWord :: DynFlags -> Integer -> Literal
+mkLitWord dflags x   = ASSERT2( inWordRange dflags x, integer x )
+                        (mkLitWordUnchecked x)
 
 -- | Creates a 'Literal' of type @Word#@.
 --   If the argument is out of the (target-dependent) range, it is wrapped.
 --   See Note [Word/Int underflow/overflow]
-mkMachWordWrap :: DynFlags -> Integer -> Literal
-mkMachWordWrap dflags i = wrapLitNumber dflags $ mkMachWordUnchecked i
+mkLitWordWrap :: DynFlags -> Integer -> Literal
+mkLitWordWrap dflags i = wrapLitNumber dflags $ mkLitWordUnchecked i
 
 -- | Creates a 'Literal' of type @Word#@ without checking its range.
-mkMachWordUnchecked :: Integer -> Literal
-mkMachWordUnchecked i = LitNumber LitNumWord i wordPrimTy
+mkLitWordUnchecked :: Integer -> Literal
+mkLitWordUnchecked i = LitNumber LitNumWord i wordPrimTy
 
 -- | Creates a 'Literal' of type @Word#@, as well as a 'Bool'ean flag indicating
 --   carry. That is, if the argument is out of the (target-dependent) range
 --   the argument is wrapped and the carry flag will be set.
 --   See Note [Word/Int underflow/overflow]
-mkMachWordWrapC :: DynFlags -> Integer -> (Literal, Bool)
-mkMachWordWrapC dflags i = (n, i /= i')
+mkLitWordWrapC :: DynFlags -> Integer -> (Literal, Bool)
+mkLitWordWrapC dflags i = (n, i /= i')
   where
-    n@(LitNumber _ i' _) = mkMachWordWrap dflags i
+    n@(LitNumber _ i' _) = mkLitWordWrap dflags i
 
 -- | Creates a 'Literal' of type @Int64#@
-mkMachInt64 :: Integer -> Literal
-mkMachInt64  x = ASSERT2( inInt64Range x, integer x ) (mkMachInt64Unchecked x)
+mkLitInt64 :: Integer -> Literal
+mkLitInt64  x = ASSERT2( inInt64Range x, integer x ) (mkLitInt64Unchecked x)
 
 -- | Creates a 'Literal' of type @Int64#@.
 --   If the argument is out of the range, it is wrapped.
-mkMachInt64Wrap :: DynFlags -> Integer -> Literal
-mkMachInt64Wrap dflags i = wrapLitNumber dflags $ mkMachInt64Unchecked i
+mkLitInt64Wrap :: DynFlags -> Integer -> Literal
+mkLitInt64Wrap dflags i = wrapLitNumber dflags $ mkLitInt64Unchecked i
 
 -- | Creates a 'Literal' of type @Int64#@ without checking its range.
-mkMachInt64Unchecked :: Integer -> Literal
-mkMachInt64Unchecked i = LitNumber LitNumInt64 i int64PrimTy
+mkLitInt64Unchecked :: Integer -> Literal
+mkLitInt64Unchecked i = LitNumber LitNumInt64 i int64PrimTy
 
 -- | Creates a 'Literal' of type @Word64#@
-mkMachWord64 :: Integer -> Literal
-mkMachWord64 x = ASSERT2( inWord64Range x, integer x ) (mkMachWord64Unchecked x)
+mkLitWord64 :: Integer -> Literal
+mkLitWord64 x = ASSERT2( inWord64Range x, integer x ) (mkLitWord64Unchecked x)
 
 -- | Creates a 'Literal' of type @Word64#@.
 --   If the argument is out of the range, it is wrapped.
-mkMachWord64Wrap :: DynFlags -> Integer -> Literal
-mkMachWord64Wrap dflags i = wrapLitNumber dflags $ mkMachWord64Unchecked i
+mkLitWord64Wrap :: DynFlags -> Integer -> Literal
+mkLitWord64Wrap dflags i = wrapLitNumber dflags $ mkLitWord64Unchecked i
 
 -- | Creates a 'Literal' of type @Word64#@ without checking its range.
-mkMachWord64Unchecked :: Integer -> Literal
-mkMachWord64Unchecked i = LitNumber LitNumWord64 i word64PrimTy
+mkLitWord64Unchecked :: Integer -> Literal
+mkLitWord64Unchecked i = LitNumber LitNumWord64 i word64PrimTy
 
 -- | Creates a 'Literal' of type @Float#@
-mkMachFloat :: Rational -> Literal
-mkMachFloat = MachFloat
+mkLitFloat :: Rational -> Literal
+mkLitFloat = LitFloat
 
 -- | Creates a 'Literal' of type @Double#@
-mkMachDouble :: Rational -> Literal
-mkMachDouble = MachDouble
+mkLitDouble :: Rational -> Literal
+mkLitDouble = LitDouble
 
 -- | Creates a 'Literal' of type @Char#@
-mkMachChar :: Char -> Literal
-mkMachChar = MachChar
+mkLitChar :: Char -> Literal
+mkLitChar = LitChar
 
 -- | Creates a 'Literal' of type @Addr#@, which is appropriate for passing to
 -- e.g. some of the \"error\" functions in GHC.Err such as @GHC.Err.runtimeError@
-mkMachString :: String -> Literal
+mkLitString :: String -> Literal
 -- stored UTF-8 encoded
-mkMachString s = MachStr (fastStringToByteString $ mkFastString s)
+mkLitString s = LitString (fastStringToByteString $ mkFastString s)
 
 mkLitInteger :: Integer -> Type -> Literal
 mkLitInteger x ty = LitNumber LitNumInteger x ty
@@ -439,8 +446,8 @@ inCharRange c =  c >= '\0' && c <= chr tARGET_MAX_CHAR
 -- | Tests whether the literal represents a zero of whatever type it is
 isZeroLit :: Literal -> Bool
 isZeroLit (LitNumber _ 0 _) = True
-isZeroLit (MachFloat  0)    = True
-isZeroLit (MachDouble 0)    = True
+isZeroLit (LitFloat  0)     = True
+isZeroLit (LitDouble 0)     = True
 isZeroLit _                 = False
 
 -- | Returns the 'Integer' contained in the 'Literal', for when that makes
@@ -453,7 +460,7 @@ litValue l = case isLitValue_maybe l of
 -- | Returns the 'Integer' contained in the 'Literal', for when that makes
 -- sense, i.e. for 'Char' and numbers.
 isLitValue_maybe  :: Literal -> Maybe Integer
-isLitValue_maybe (MachChar   c)    = Just $ toInteger $ ord c
+isLitValue_maybe (LitChar   c)     = Just $ toInteger $ ord c
 isLitValue_maybe (LitNumber _ i _) = Just i
 isLitValue_maybe _                 = Nothing
 
@@ -463,7 +470,7 @@ isLitValue_maybe _                 = Nothing
 -- with the semantics of the target type.
 -- See Note [Word/Int underflow/overflow]
 mapLitValue  :: DynFlags -> (Integer -> Integer) -> Literal -> Literal
-mapLitValue _      f (MachChar   c)     = mkMachChar (fchar c)
+mapLitValue _      f (LitChar   c)      = mkLitChar (fchar c)
    where fchar = chr . fromInteger . f . toInteger . ord
 mapLitValue dflags f (LitNumber nt i t) = wrapLitNumber dflags
                                                         (LitNumber nt (f i) t)
@@ -488,13 +495,19 @@ narrow8IntLit, narrow16IntLit, narrow32IntLit,
 
 word2IntLit, int2WordLit :: DynFlags -> Literal -> Literal
 word2IntLit dflags (LitNumber LitNumWord w _)
-  | w > tARGET_MAX_INT dflags = mkMachInt dflags (w - tARGET_MAX_WORD dflags - 1)
-  | otherwise                 = mkMachInt dflags w
+  -- Map Word range [max_int+1, max_word]
+  -- to Int range   [min_int  , -1]
+  -- Range [0,max_int] has the same representation with both Int and Word
+  | w > tARGET_MAX_INT dflags = mkLitInt dflags (w - tARGET_MAX_WORD dflags - 1)
+  | otherwise                 = mkLitInt dflags w
 word2IntLit _ l = pprPanic "word2IntLit" (ppr l)
 
 int2WordLit dflags (LitNumber LitNumInt i _)
-  | i < 0     = mkMachWord dflags (1 + tARGET_MAX_WORD dflags + i)      -- (-1)  --->  tARGET_MAX_WORD
-  | otherwise = mkMachWord dflags i
+  -- Map Int range [min_int  , -1]
+  -- to Word range [max_int+1, max_word]
+  -- Range [0,max_int] has the same representation with both Int and Word
+  | i < 0     = mkLitWord dflags (1 + tARGET_MAX_WORD dflags + i)
+  | otherwise = mkLitWord dflags i
 int2WordLit _ l = pprPanic "int2WordLit" (ppr l)
 
 -- | Narrow a literal number (unchecked result range)
@@ -509,32 +522,32 @@ narrow8WordLit  = narrowLit (Proxy :: Proxy Word8)
 narrow16WordLit = narrowLit (Proxy :: Proxy Word16)
 narrow32WordLit = narrowLit (Proxy :: Proxy Word32)
 
-char2IntLit (MachChar c) = mkMachIntUnchecked (toInteger (ord c))
-char2IntLit l            = pprPanic "char2IntLit" (ppr l)
-int2CharLit (LitNumber _ i _) = MachChar (chr (fromInteger i))
+char2IntLit (LitChar c)       = mkLitIntUnchecked (toInteger (ord c))
+char2IntLit l                 = pprPanic "char2IntLit" (ppr l)
+int2CharLit (LitNumber _ i _) = LitChar (chr (fromInteger i))
 int2CharLit l                 = pprPanic "int2CharLit" (ppr l)
 
-float2IntLit (MachFloat f) = mkMachIntUnchecked (truncate f)
-float2IntLit l             = pprPanic "float2IntLit" (ppr l)
-int2FloatLit (LitNumber _ i _) = MachFloat (fromInteger i)
+float2IntLit (LitFloat f)      = mkLitIntUnchecked (truncate f)
+float2IntLit l                 = pprPanic "float2IntLit" (ppr l)
+int2FloatLit (LitNumber _ i _) = LitFloat (fromInteger i)
 int2FloatLit l                 = pprPanic "int2FloatLit" (ppr l)
 
-double2IntLit (MachDouble f) = mkMachIntUnchecked (truncate f)
-double2IntLit l              = pprPanic "double2IntLit" (ppr l)
-int2DoubleLit (LitNumber _ i _) = MachDouble (fromInteger i)
+double2IntLit (LitDouble f)     = mkLitIntUnchecked (truncate f)
+double2IntLit l                 = pprPanic "double2IntLit" (ppr l)
+int2DoubleLit (LitNumber _ i _) = LitDouble (fromInteger i)
 int2DoubleLit l                 = pprPanic "int2DoubleLit" (ppr l)
 
-float2DoubleLit (MachFloat  f) = MachDouble f
-float2DoubleLit l              = pprPanic "float2DoubleLit" (ppr l)
-double2FloatLit (MachDouble d) = MachFloat  d
-double2FloatLit l              = pprPanic "double2FloatLit" (ppr l)
+float2DoubleLit (LitFloat  f) = LitDouble f
+float2DoubleLit l             = pprPanic "float2DoubleLit" (ppr l)
+double2FloatLit (LitDouble d) = LitFloat  d
+double2FloatLit l             = pprPanic "double2FloatLit" (ppr l)
 
 nullAddrLit :: Literal
-nullAddrLit = MachNullAddr
+nullAddrLit = LitNullAddr
 
 -- | A nonsense literal of type @forall (a :: 'TYPE' 'UnliftedRep'). a@.
 rubbishLit :: Literal
-rubbishLit = RubbishLit
+rubbishLit = LitRubbish
 
 {-
         Predicates
@@ -576,7 +589,7 @@ rubbishLit = RubbishLit
 -- user code. One approach to this is described in #8472.
 litIsTrivial :: Literal -> Bool
 --      c.f. CoreUtils.exprIsTrivial
-litIsTrivial (MachStr _)      = False
+litIsTrivial (LitString _)      = False
 litIsTrivial (LitNumber nt _ _) = case nt of
   LitNumInteger -> False
   LitNumNatural -> False
@@ -584,12 +597,12 @@ litIsTrivial (LitNumber nt _ _) = case nt of
   LitNumInt64   -> True
   LitNumWord    -> True
   LitNumWord64  -> True
-litIsTrivial _                = True
+litIsTrivial _                  = True
 
 -- | True if code space does not go bad if we duplicate this literal
 litIsDupable :: DynFlags -> Literal -> Bool
 --      c.f. CoreUtils.exprIsDupable
-litIsDupable _      (MachStr _)      = False
+litIsDupable _      (LitString _)      = False
 litIsDupable dflags (LitNumber nt i _) = case nt of
   LitNumInteger -> inIntRange dflags i
   LitNumNatural -> inIntRange dflags i
@@ -597,7 +610,7 @@ litIsDupable dflags (LitNumber nt i _) = case nt of
   LitNumInt64   -> True
   LitNumWord    -> True
   LitNumWord64  -> True
-litIsDupable _      _                = True
+litIsDupable _      _                  = True
 
 litFitsInChar :: Literal -> Bool
 litFitsInChar (LitNumber _ i _) = i >= toInteger (ord minBound)
@@ -612,7 +625,7 @@ litIsLifted (LitNumber nt _ _) = case nt of
   LitNumInt64   -> False
   LitNumWord    -> False
   LitNumWord64  -> False
-litIsLifted _               = False
+litIsLifted _                  = False
 
 {-
         Types
@@ -621,34 +634,34 @@ litIsLifted _               = False
 
 -- | Find the Haskell 'Type' the literal occupies
 literalType :: Literal -> Type
-literalType MachNullAddr      = addrPrimTy
-literalType (MachChar _)      = charPrimTy
-literalType (MachStr  _)      = addrPrimTy
-literalType (MachFloat _)     = floatPrimTy
-literalType (MachDouble _)    = doublePrimTy
-literalType (MachLabel _ _ _) = addrPrimTy
+literalType LitNullAddr       = addrPrimTy
+literalType (LitChar _)       = charPrimTy
+literalType (LitString  _)    = addrPrimTy
+literalType (LitFloat _)      = floatPrimTy
+literalType (LitDouble _)     = doublePrimTy
+literalType (LitLabel _ _ _)  = addrPrimTy
 literalType (LitNumber _ _ t) = t
-literalType (RubbishLit)      = mkForAllTy a Inferred (mkTyVarTy a)
+literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep
 
 absentLiteralOf :: TyCon -> Maybe Literal
 -- Return a literal of the appropriate primitive
 -- TyCon, to use as a placeholder when it doesn't matter
--- RubbishLits are handled in WwLib, because
+-- Rubbish literals are handled in WwLib, because
 --  1. Looking at the TyCon is not enough, we need the actual type
 --  2. This would need to return a type application to a literal
 absentLiteralOf tc = lookupUFM absent_lits (tyConName tc)
 
 absent_lits :: UniqFM Literal
-absent_lits = listToUFM [ (addrPrimTyConKey,    MachNullAddr)
-                        , (charPrimTyConKey,    MachChar 'x')
-                        , (intPrimTyConKey,     mkMachIntUnchecked 0)
-                        , (int64PrimTyConKey,   mkMachInt64Unchecked 0)
-                        , (wordPrimTyConKey,    mkMachWordUnchecked 0)
-                        , (word64PrimTyConKey,  mkMachWord64Unchecked 0)
-                        , (floatPrimTyConKey,   MachFloat 0)
-                        , (doublePrimTyConKey,  MachDouble 0)
+absent_lits = listToUFM [ (addrPrimTyConKey,    LitNullAddr)
+                        , (charPrimTyConKey,    LitChar 'x')
+                        , (intPrimTyConKey,     mkLitIntUnchecked 0)
+                        , (int64PrimTyConKey,   mkLitInt64Unchecked 0)
+                        , (wordPrimTyConKey,    mkLitWordUnchecked 0)
+                        , (word64PrimTyConKey,  mkLitWord64Unchecked 0)
+                        , (floatPrimTyConKey,   LitFloat 0)
+                        , (doublePrimTyConKey,  LitDouble 0)
                         ]
 
 {-
@@ -657,29 +670,29 @@ absent_lits = listToUFM [ (addrPrimTyConKey,    MachNullAddr)
 -}
 
 cmpLit :: Literal -> Literal -> Ordering
-cmpLit (MachChar      a)     (MachChar       b)     = a `compare` b
-cmpLit (MachStr       a)     (MachStr        b)     = a `compare` b
-cmpLit (MachNullAddr)        (MachNullAddr)         = EQ
-cmpLit (MachFloat     a)     (MachFloat      b)     = a `compare` b
-cmpLit (MachDouble    a)     (MachDouble     b)     = a `compare` b
-cmpLit (MachLabel     a _ _) (MachLabel      b _ _) = a `compare` b
-cmpLit (LitNumber nt1 a _)   (LitNumber nt2  b _)
+cmpLit (LitChar      a)     (LitChar       b)     = a `compare` b
+cmpLit (LitString    a)     (LitString     b)     = a `compare` b
+cmpLit (LitNullAddr)        (LitNullAddr)         = EQ
+cmpLit (LitFloat     a)     (LitFloat      b)     = a `compare` b
+cmpLit (LitDouble    a)     (LitDouble     b)     = a `compare` b
+cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `compare` b
+cmpLit (LitNumber nt1 a _)  (LitNumber nt2  b _)
   | nt1 == nt2 = a   `compare` b
   | otherwise  = nt1 `compare` nt2
-cmpLit (RubbishLit)          (RubbishLit)           = EQ
+cmpLit (LitRubbish)         (LitRubbish)          = EQ
 cmpLit lit1 lit2
   | litTag lit1 < litTag lit2 = LT
   | otherwise                 = GT
 
 litTag :: Literal -> Int
-litTag (MachChar      _)   = 1
-litTag (MachStr       _)   = 2
-litTag (MachNullAddr)      = 3
-litTag (MachFloat     _)   = 4
-litTag (MachDouble    _)   = 5
-litTag (MachLabel _ _ _)   = 6
-litTag (LitNumber  {})     = 7
-litTag (RubbishLit)        = 8
+litTag (LitChar      _)   = 1
+litTag (LitString    _)   = 2
+litTag (LitNullAddr)      = 3
+litTag (LitFloat     _)   = 4
+litTag (LitDouble    _)   = 5
+litTag (LitLabel _ _ _)   = 6
+litTag (LitNumber  {})    = 7
+litTag (LitRubbish)       = 8
 
 {-
         Printing
@@ -688,11 +701,11 @@ litTag (RubbishLit)        = 8
 -}
 
 pprLiteral :: (SDoc -> SDoc) -> Literal -> SDoc
-pprLiteral _       (MachChar c)     = pprPrimChar c
-pprLiteral _       (MachStr s)      = pprHsBytes s
-pprLiteral _       (MachNullAddr)   = text "__NULL"
-pprLiteral _       (MachFloat f)    = float (fromRat f) <> primFloatSuffix
-pprLiteral _       (MachDouble d)   = double (fromRat d) <> primDoubleSuffix
+pprLiteral _       (LitChar c)     = pprPrimChar c
+pprLiteral _       (LitString s)   = pprHsBytes s
+pprLiteral _       (LitNullAddr)   = text "__NULL"
+pprLiteral _       (LitFloat f)    = float (fromRat f) <> primFloatSuffix
+pprLiteral _       (LitDouble d)   = double (fromRat d) <> primDoubleSuffix
 pprLiteral add_par (LitNumber nt i _)
    = case nt of
        LitNumInteger -> pprIntegerVal add_par i
@@ -701,11 +714,12 @@ pprLiteral add_par (LitNumber nt i _)
        LitNumInt64   -> pprPrimInt64 i
        LitNumWord    -> pprPrimWord i
        LitNumWord64  -> pprPrimWord64 i
-pprLiteral add_par (MachLabel l mb fod) = add_par (text "__label" <+> b <+> ppr fod)
+pprLiteral add_par (LitLabel l mb fod) =
+    add_par (text "__label" <+> b <+> ppr fod)
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
-pprLiteral _       (RubbishLit)     = text "__RUBBISH"
+pprLiteral _       (LitRubbish)     = text "__RUBBISH"
 
 pprIntegerVal :: (SDoc -> SDoc) -> Integer -> SDoc
 -- See Note [Printing of literals in Core].
@@ -716,7 +730,7 @@ pprIntegerVal add_par i | i < 0     = add_par (integer i)
 Note [Printing of literals in Core]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The function `add_par` is used to wrap parenthesis around negative integers
-(`LitInteger`) and labels (`MachLabel`), if they occur in a context requiring
+(`LitInteger`) and labels (`LitLabel`), if they occur in a context requiring
 an atomic thing (for example function application).
 
 Although not all Core literals would be valid Haskell, we are trying to stay
@@ -736,21 +750,21 @@ To that end:
 Literal         Output             Output if context requires
                                    an atom (if different)
 -------         -------            ----------------------
-MachChar        'a'#
-MachStr         "aaa"#
-MachNullAddr    "__NULL"
-MachInt         -1#
-MachInt64       -1L#
-MachWord         1##
-MachWord64       1L##
-MachFloat       -1.0#
-MachDouble      -1.0##
+LitChar         'a'#
+LitString       "aaa"#
+LitNullAddr     "__NULL"
+LitInt          -1#
+LitInt64        -1L#
+LitWord          1##
+LitWord64        1L##
+LitFloat        -1.0#
+LitDouble       -1.0##
 LitInteger      -1                 (-1)
-MachLabel       "__label" ...      ("__label" ...)
-RubbishLit      "__RUBBISH"
+LitLabel        "__label" ...      ("__label" ...)
+LitRubbish      "__RUBBISH"
 
-Note [RubbishLit]
-~~~~~~~~~~~~~~~~~
+Note [Rubbish literals]
+~~~~~~~~~~~~~~~~~~~~~~~
 During worker/wrapper after demand analysis, where an argument
 is unused (absent) we do the following w/w split (supposing that
 y is absent):
@@ -772,12 +786,12 @@ What is <absent value>?
 * But what about /unlifted/ but /boxed/ types like MutVar# or
   Array#?   We need a literal value of that type.
 
-That is 'RubbishLit'.  Since we need a rubbish literal for
-many boxed, unlifted types, we say that RubbishLit has type
-  RubbishLit :: forall (a :: TYPE UnliftedRep). a
+That is 'LitRubbish'.  Since we need a rubbish literal for
+many boxed, unlifted types, we say that LitRubbish has type
+  LitRubbish :: forall (a :: TYPE UnliftedRep). a
 
 So we might see a w/w split like
-  $wf x z = let y :: Array# Int = RubbishLit @(Array# Int)
+  $wf x z = let y :: Array# Int = LitRubbish @(Array# Int)
             in e
 
 Recall that (TYPE UnliftedRep) is the kind of boxed, unlifted
@@ -785,19 +799,19 @@ heap pointers.
 
 Here are the moving parts:
 
-* We define RubbishLit as a constructor in Literal.Literal
+* We define LitRubbish as a constructor in Literal.Literal
 
 * It is given its polymoprhic type by Literal.literalType
 
-* WwLib.mk_absent_let introduces a RubbishLit for absent
-  arguments of boxed, unliftd type.
+* WwLib.mk_absent_let introduces a LitRubbish for absent
+  arguments of boxed, unlifted type.
 
 * In CoreToSTG we convert (RubishLit @t) to just ().  STG is
   untyped, so it doesn't matter that it points to a lifted
   value. The important thing is that it is a heap pointer,
   which the garbage collector can follow if it encounters it.
 
-  We considered maintaining RubbishLit in STG, and lowering
+  We considered maintaining LitRubbish in STG, and lowering
   it in the code genreators, but it seems simpler to do it
   once and for all in CoreToSTG.
 

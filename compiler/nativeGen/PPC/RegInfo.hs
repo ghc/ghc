@@ -29,8 +29,13 @@ import Cmm
 import CLabel
 
 import Unique
+import Outputable (ppr, text, Outputable, (<>))
 
 data JumpDest = DestBlockId BlockId
+
+-- Debug Instance
+instance Outputable JumpDest where
+  ppr (DestBlockId bid) = text "jd<blk>:" <> ppr bid
 
 getJumpDestBlockId :: JumpDest -> Maybe BlockId
 getJumpDestBlockId (DestBlockId bid) = Just bid

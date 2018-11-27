@@ -30,9 +30,7 @@ import Type
 import Multiplicity
 import MkCore ( mkStringExprFS, mkNaturalExpr )
 
-import Unique ( hasKey )
 import Name   ( Name )
-import Var    ( DFunId )
 import DataCon
 import TyCon
 import Class

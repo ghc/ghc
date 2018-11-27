@@ -38,21 +38,21 @@ T15039d.hs:25:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
         ex3 :: Dict ((a :: *) ~~ (b :: k)) -> () (bound at T15039d.hs:25:1)
 
 T15039d.hs:33:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Dict (Coercible * a b)’
+    • Found type wildcard ‘_’ standing for ‘Dict (Coercible @* a b)’
       Where: ‘a’, ‘b’ are rigid type variables bound by
                the type signature for:
-                 ex6 :: forall a b. Dict (Coercible * a b) -> ()
+                 ex6 :: forall a b. Dict (Coercible @* a b) -> ()
                at T15039d.hs:32:1-53
     • In a pattern type signature: _
       In the pattern: Dict :: _
       In an equation for ‘ex6’: ex6 (Dict :: _) = ()
     • Relevant bindings include
-        ex6 :: Dict (Coercible * a b) -> () (bound at T15039d.hs:33:1)
+        ex6 :: Dict (Coercible @* a b) -> () (bound at T15039d.hs:33:1)
 
 T15039d.hs:35:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Coercible * a b’
+    • Found type wildcard ‘_’ standing for ‘Coercible @* a b’
       Where: ‘a’, ‘b’ are rigid type variables bound by
-               the inferred type of ex7 :: Coercible * a b => Coercion * a b
+               the inferred type of ex7 :: Coercible @* a b => Coercion @{*} a b
                at T15039d.hs:36:1-14
     • In the type signature:
         ex7 :: _ => Coercion (a :: Type) (b :: Type)

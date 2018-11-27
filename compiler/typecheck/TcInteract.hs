@@ -27,7 +27,7 @@ import Class
 import TyCon
 import FunDeps
 import FamInst
-import ClsInst( ClsInstResult(..), InstanceWhat(..), safeOverlap )
+import ClsInst( InstanceWhat(..), safeOverlap )
 import FamInstEnv
 import Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 
@@ -40,7 +40,7 @@ import Bag
 import MonadUtils ( concatMapM, foldlM )
 
 import CoreSyn
-import Data.List( partition, foldl', deleteFirstsBy )
+import Data.List( partition, deleteFirstsBy )
 import SrcLoc
 import VarEnv
 

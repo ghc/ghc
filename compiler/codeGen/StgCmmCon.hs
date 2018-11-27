@@ -214,7 +214,7 @@ buildDynCon' dflags platform binder _ _cc con [arg]
 buildDynCon' dflags platform binder _ _cc con [arg]
   | maybeCharLikeCon con
   , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
-  , NonVoid (StgLitArg (MachChar val)) <- arg
+  , NonVoid (StgLitArg (LitChar val)) <- arg
   , let val_int = ord val :: Int
   , val_int <= mAX_CHARLIKE dflags
   , val_int >= mIN_CHARLIKE dflags

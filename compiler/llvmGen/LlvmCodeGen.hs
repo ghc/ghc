@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TypeFamilies #-}
+{-# LANGUAGE CPP, TypeFamilies, ViewPatterns #-}
 
 -- -----------------------------------------------------------------------------
 -- | This is the top-level module in the LLVM code generator.
@@ -125,13 +125,13 @@ cmmDataLlvmGens :: [(Section,CmmStatics)] -> LlvmM ()
 cmmDataLlvmGens statics
   = do lmdatas <- mapM genLlvmData statics
 
-       let (gss, tss) = unzip lmdatas
+       let (concat -> gs, tss) = unzip lmdatas
 
        let regGlobal (LMGlobal (LMGlobalVar l ty _ _ _ _) _)
                         = funInsert l ty
-           regGlobal _  = return ()
-       mapM_ regGlobal (concat gss)
-       gss' <- mapM aliasify $ concat gss
+           regGlobal _  = pure ()
+       mapM_ regGlobal gs
+       gss' <- mapM aliasify $ gs
 
        renderLlvm $ pprLlvmData (concat gss', concat tss)
 

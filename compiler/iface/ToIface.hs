@@ -17,7 +17,7 @@ module ToIface
     , toIfaceTyCon
     , toIfaceTyCon_name
     , toIfaceTyLit
-    , toIfaceRig
+    , toIfaceMult
       -- * Tidying types
     , tidyToIfaceType
     , tidyToIfaceContext
@@ -90,7 +90,7 @@ toIfaceIdBndr :: Id -> IfaceIdBndr
 toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
 
 toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
-toIfaceIdBndrX fr covar = ( toIfaceRig (idWeight covar)  
+toIfaceIdBndrX fr covar = ( toIfaceMult (idWeight covar)  
                           , occNameFS (getOccName covar)
                           , toIfaceTypeX fr (varType covar)
                           )
@@ -145,7 +145,7 @@ toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
 toIfaceTypeX fr (FunTy w t1 t2)
   | isPredTy t1 && w `eqMult` Omega   = IfaceDFunTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
-  | otherwise                   = IfaceFunTy (toIfaceRig w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+  | otherwise                   = IfaceFunTy (toIfaceMult w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
 toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
 
@@ -153,7 +153,7 @@ toIfaceTypeX fr (TyConApp tc tys)
     -- tuples
   | Just sort <- tyConTuple_maybe tc
   , n_tys == arity
-  = IfaceTupleTy sort IsNotPromoted (toIfaceTcArgsX fr tc tys)
+  = IfaceTupleTy sort NotPromoted (toIfaceTcArgsX fr tc tys)
 
   | Just dc <- isPromotedDataCon_maybe tc
   , isTupleDataCon dc
@@ -162,7 +162,7 @@ toIfaceTypeX fr (TyConApp tc tys)
 
   | tc `elem` [ eqPrimTyCon, eqReprPrimTyCon, heqTyCon ]
   , (k1:k2:_) <- tys
-  = let info = IfaceTyConInfo IsNotPromoted sort
+  = let info = IfaceTyConInfo NotPromoted sort
         sort | k1 `eqType` k2 = IfaceEqualityTyCon
              | otherwise      = IfaceNormalTyCon
     in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgsX fr tc tys)
@@ -186,8 +186,8 @@ toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
 toIfaceForAllBndrX :: VarSet -> TyCoVarBinder -> IfaceForAllBndr
 toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
 
-toIfaceRig :: Mult -> IfaceRig
-toIfaceRig = toIfaceType . fromMult
+toIfaceMult :: Mult -> IfaceMult
+toIfaceMult = toIfaceType . fromMult
 
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon
@@ -197,7 +197,7 @@ toIfaceTyCon tc
     tc_name = tyConName tc
     info    = IfaceTyConInfo promoted sort
     promoted | isPromotedDataCon tc = IsPromoted
-             | otherwise            = IsNotPromoted
+             | otherwise            = NotPromoted
 
     tupleSort :: TyCon -> Maybe IfaceTyConSort
     tupleSort tc' =
@@ -223,7 +223,7 @@ toIfaceTyCon tc
 
 toIfaceTyCon_name :: Name -> IfaceTyCon
 toIfaceTyCon_name n = IfaceTyCon n info
-  where info = IfaceTyConInfo IsNotPromoted IfaceNormalTyCon
+  where info = IfaceTyConInfo NotPromoted IfaceNormalTyCon
   -- Used for the "rough-match" tycon stuff,
   -- where pretty-printing is not an issue
 
@@ -312,14 +312,13 @@ toIfaceAppArgsX fr kind ty_args
       | Just ty' <- coreView ty
       = go env ty' ts
     go env (ForAllTy (Bndr tv vis) res) (t:ts)
-      | isVisibleArgFlag vis = IA_Vis   t' ts'
-      | otherwise            = IA_Invis t' ts'
+      = IA_Arg t' vis ts'
       where
         t'  = toIfaceTypeX fr t
         ts' = go (extendTCvSubst env tv t) res ts
 
     go env (FunTy _ _ res) (t:ts) -- No type-class args in tycon apps
-      = IA_Vis (toIfaceTypeX fr t) (go env res ts)
+      = IA_Arg (toIfaceTypeX fr t) Required (go env res ts)
 
     go env ty ts@(t1:ts1)
       | not (isEmptyTCvSubst env)
@@ -333,7 +332,7 @@ toIfaceAppArgsX fr kind ty_args
         -- carry on as if it were FunTy.  Without the test for
         -- isEmptyTCvSubst we'd get an infinite loop (Trac #15473)
         WARN( True, ppr kind $$ ppr ty_args )
-        IA_Vis (toIfaceTypeX fr t1) (go env ty ts1)
+        IA_Arg (toIfaceTypeX fr t1) Required (go env ty ts1)
 
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
 tidyToIfaceType env ty = toIfaceType (tidyType env ty)

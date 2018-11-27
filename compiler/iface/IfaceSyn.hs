@@ -254,7 +254,7 @@ data IfaceConDecl
           -- See Note [DataCon user type variable binders] in DataCon
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
-        ifConArgTys  :: [(IfaceRig, IfaceType)],-- Arg types
+        ifConArgTys  :: [(IfaceMult, IfaceType)],-- Arg types
         ifConFields  :: [FieldLabel],  -- ...ditto... (field labels)
         ifConStricts :: [IfaceBang],
           -- Empty (meaning all lazy),
@@ -957,9 +957,7 @@ pprIfaceTyConParent :: IfaceTyConParent -> SDoc
 pprIfaceTyConParent IfNoParent
   = Outputable.empty
 pprIfaceTyConParent (IfDataInstance _ tc tys)
-  = sdocWithDynFlags $ \dflags ->
-    let ftys = stripInvisArgs dflags tys
-    in pprIfaceTypeApp topPrec tc ftys
+  = pprIfaceTypeApp topPrec tc tys
 
 pprIfaceDeclHead :: IfaceContext -> ShowSub -> Name
                  -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
@@ -1417,8 +1415,7 @@ freeNamesIfKind :: IfaceType -> NameSet
 freeNamesIfKind = freeNamesIfType
 
 freeNamesIfAppArgs :: IfaceAppArgs -> NameSet
-freeNamesIfAppArgs (IA_Vis   t ts) = freeNamesIfType t &&& freeNamesIfAppArgs ts
-freeNamesIfAppArgs (IA_Invis k ks) = freeNamesIfKind k &&& freeNamesIfAppArgs ks
+freeNamesIfAppArgs (IA_Arg t _ ts) = freeNamesIfType t &&& freeNamesIfAppArgs ts
 freeNamesIfAppArgs IA_Nil          = emptyNameSet
 
 freeNamesIfType :: IfaceType -> NameSet

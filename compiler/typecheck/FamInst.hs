@@ -894,8 +894,9 @@ conflictInjInstErr conflictingEqns errorBuilder tyfamEqn
 unusedInjectiveVarsErr :: Pair TyVarSet -> InjErrorBuilder -> CoAxBranch
                        -> (SDoc, SrcSpan)
 unusedInjectiveVarsErr (Pair invis_vars vis_vars) errorBuilder tyfamEqn
-  = errorBuilder (injectivityErrorHerald True $$ msg)
-                 [tyfamEqn]
+  = let (doc, loc) = errorBuilder (injectivityErrorHerald True $$ msg)
+                                  [tyfamEqn]
+    in (pprWithExplicitKindsWhen has_kinds doc, loc)
     where
       tvs = invis_vars `unionVarSet` vis_vars
       has_types = not $ isEmptyVarSet vis_vars
@@ -909,9 +910,7 @@ unusedInjectiveVarsErr (Pair invis_vars vis_vars) errorBuilder tyfamEqn
                (True, False)  -> text "Type"
                (False, True)  -> text "Kind"
                (False, False) -> pprPanic "mkUnusedInjectiveVarsErr" $ ppr tvs
-      print_kinds_info = ppWhen has_kinds ppSuggestExplicitKinds
-      msg = doc $$ print_kinds_info $$
-            text "In the type family equation:"
+      msg = doc $$ text "In the type family equation:"
 
 -- | Build error message for equation that has a type family call at the top
 -- level of RHS

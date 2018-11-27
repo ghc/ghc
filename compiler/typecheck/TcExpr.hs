@@ -511,7 +511,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
             w_ty  = mkTyVarTy multiplicityTyVar
        ; let actual_res_ty
                  =  mkForAllTys [w_tvb] $
-                    mkFunTys [ mkScaled (RigThing w_ty) ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
+                    mkFunTys [ mkScaled (MultThing w_ty) ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
                             (mkTupleTy boxity arg_tys)
 
        ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")
@@ -1370,8 +1370,9 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; case tcSplitForAllTy_maybe upsilon_ty of
                Just (tvb, inner_ty)
                  | binderArgFlag tvb == Specified ->
-                   -- It really can't be Inferred, because we've just instantiated those
-                   -- But, oddly, it might just be Required. See #15859.
+                   -- It really can't be Inferred, because we've justn
+                   -- instantiated those. But, oddly, it might just be Required.
+                   -- See Note [Required quantifiers in the type of a term]
                  do { let tv   = binderVar tvb
                           kind = tyVarKind tv
                     ; ty_arg <- tcHsTypeApp hs_ty_arg kind
@@ -1407,7 +1408,6 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; (inner_wrap, args', inner_res_ty)
                <- go (arg_ty : acc_args) (n+1) res_ty args
                -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
-           ; let w = scaledMult arg_ty
            ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty doc <.> wrap
                     , HsValArg arg' : args'
                     , inner_res_ty ) }
@@ -1421,8 +1421,27 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                text "Cannot apply expression of type" <+> quotes (ppr ty) $$
                text "to a visible type argument" <+> quotes (ppr arg) }
 
-{- Note [Visible type application zonk]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Required quantifiers in the type of a term]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #15859)
+
+  data A k :: k -> Type      -- A      :: forall k -> k -> Type
+  type KindOf (a :: k) = k   -- KindOf :: forall k. k -> Type
+  a = (undefind :: KindOf A) @Int
+
+With ImpredicativeTypes (thin ice, I know), we instantiate
+KindOf at type (forall k -> k -> Type), so
+  KindOf A = forall k -> k -> Type
+whose first argument is Required
+
+We want to reject this type application to Int, but in earlier
+GHCs we had an ASSERT that Required could not occur here.
+
+The ice is thin; c.f. Note [No Required TyCoBinder in terms]
+in TyCoRep.
+
+Note [Visible type application zonk]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Substitutions should be kind-preserving, so we need kind(tv) = kind(ty_arg).
 
 * tcHsTypeApp only guarantees that

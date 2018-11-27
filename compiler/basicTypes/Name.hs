@@ -6,6 +6,9 @@
 -}
 
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- |
 -- #name_types#
@@ -201,6 +204,12 @@ nameUnique  name = n_uniq name
 nameOccName name = n_occ  name
 nameSrcLoc  name = srcSpanStart (n_loc name)
 nameSrcSpan name = n_loc  name
+
+type instance SrcSpanLess Name = Name
+instance HasSrcSpan Name where
+  composeSrcSpan   (L sp  n) = n {n_loc = sp}
+  decomposeSrcSpan n         = L (n_loc n) n
+
 
 {-
 ************************************************************************
@@ -668,7 +677,7 @@ class NamedThing a where
 
     getOccName n = nameOccName (getName n)      -- Default method
 
-instance NamedThing e => NamedThing (GenLocated l e) where
+instance NamedThing e => NamedThing (Located e) where
     getName = getName . unLoc
 
 getSrcLoc           :: NamedThing a => a -> SrcLoc

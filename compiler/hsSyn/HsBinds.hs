@@ -44,7 +44,6 @@ import DynFlags
 import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )
 import Data.Ord
-import Data.Foldable ( Foldable(..) )
 
 {-
 ************************************************************************

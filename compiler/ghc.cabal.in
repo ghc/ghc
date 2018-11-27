@@ -433,6 +433,11 @@ Library
         SimplStg
         StgStats
         StgCse
+        StgLiftLams
+        StgLiftLams.Analysis
+        StgLiftLams.LiftM
+        StgLiftLams.Transformation
+        StgSubst
         UnariseStg
         RepType
         Rules
@@ -441,6 +446,7 @@ Library
         CoreToStg
         StgLint
         StgSyn
+        StgFVs
         CallArity
         DmdAnal
         Exitify
@@ -560,6 +566,8 @@ Library
             TargetReg
             NCGMonad
             Instruction
+            BlockLayout
+            CFG
             Format
             Reg
             RegClass

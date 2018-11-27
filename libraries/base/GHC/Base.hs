@@ -213,9 +213,9 @@ infixr 6 <>
 
 -- | The class of semigroups (types with an associative binary operation).
 --
--- Instances should satisfy the associativity law:
+-- Instances should satisfy the following:
 --
---  * @x '<>' (y '<>' z) = (x '<>' y) '<>' z@
+-- [Associativity] @x '<>' (y '<>' z) = (x '<>' y) '<>' z@
 --
 -- @since 4.9.0.0
 class Semigroup a where
@@ -247,15 +247,12 @@ class Semigroup a where
 
 
 -- | The class of monoids (types with an associative binary operation that
--- has an identity).  Instances should satisfy the following laws:
+-- has an identity).  Instances should satisfy the following:
 --
---  * @x '<>' 'mempty' = x@
---
---  * @'mempty' '<>' x = x@
---
---  * @x '<>' (y '<>' z) = (x '<>' y) '<>' z@ ('Semigroup' law)
---
---  * @'mconcat' = 'foldr' ('<>') 'mempty'@
+-- [Right identity] @x '<>' 'mempty' = x@
+-- [Left identity]  @'mempty' '<>' x = x@
+-- [Associativity]  @x '<>' (y '<>' z) = (x '<>' y) '<>' z@ ('Semigroup' law)
+-- [Concatenation]  @'mconcat' = 'foldr' ('<>') 'mempty'@
 --
 -- The method names refer to the monoid of lists under concatenation,
 -- but there are many other instances.
@@ -446,13 +443,13 @@ instance Monoid a => Monoid (IO a) where
 
 {- | A type @f@ is a Functor if it provides a function @fmap@ which, given any types @a@ and @b@
 lets you apply any function from @(a -> b)@ to turn an @f a@ into an @f b@, preserving the
-structure of @f@. Furthermore @f@ needs to adhere to the following laws:
+structure of @f@. Furthermore @f@ needs to adhere to the following:
 
-[/identity/]
-  @'fmap' 'id' = 'id'@
+[Identity]    @'fmap' 'id' == 'id'@
+[Composition] @'fmap' (f . g) == 'fmap' f . 'fmap' g@
 
-[/composition/]
-  @'fmap' (f . g) = 'fmap' f . 'fmap' g@
+Note, that the second law follows from the free theorem of the type 'fmap' and
+the first law, so you need only check that the former condition holds.
 -}
 
 class  Functor f  where
@@ -480,19 +477,19 @@ class  Functor f  where
 --
 -- Further, any definition must satisfy the following:
 --
--- [/identity/]
+-- [Identity]
 --
 --      @'pure' 'id' '<*>' v = v@
 --
--- [/composition/]
+-- [Composition]
 --
 --      @'pure' (.) '<*>' u '<*>' v '<*>' w = u '<*>' (v '<*>' w)@
 --
--- [/homomorphism/]
+-- [Homomorphism]
 --
 --      @'pure' f '<*>' 'pure' x = 'pure' (f x)@
 --
--- [/interchange/]
+-- [Interchange]
 --
 --      @u '<*>' 'pure' y = 'pure' ('$' y) '<*>' u@
 --
@@ -630,11 +627,11 @@ think of a monad as an /abstract datatype/ of actions.
 Haskell's @do@ expressions provide a convenient syntax for writing
 monadic expressions.
 
-Instances of 'Monad' should satisfy the following laws:
+Instances of 'Monad' should satisfy the following:
 
-* @'return' a '>>=' k  =  k a@
-* @m '>>=' 'return'  =  m@
-* @m '>>=' (\\x -> k x '>>=' h)  =  (m '>>=' k) '>>=' h@
+[Left identity]  @'return' a '>>=' k  =  k a@
+[Right identity] @m '>>=' 'return'  =  m@
+[Associativity]  @m '>>=' (\\x -> k x '>>=' h)  =  (m '>>=' k) '>>=' h@
 
 Furthermore, the 'Monad' and 'Applicative' operations should relate as follows:
 
@@ -1315,9 +1312,8 @@ flip f x y              =  f y x
 -- It is also useful in higher-order situations, such as @'map' ('$' 0) xs@,
 -- or @'Data.List.zipWith' ('$') fs xs@.
 --
--- Note that @($)@ is levity-polymorphic in its result type, so that
---     foo $ True    where  foo :: Bool -> Int#
--- is well-typed
+-- Note that @('$')@ is levity-polymorphic in its result type, so that
+-- @foo '$' True@ where @foo :: Bool -> Int#@ is well-typed.
 {-# INLINE ($) #-}
 ($) :: forall r a (b :: TYPE r). (a -> b) -> a -> b
 f $ x =  f x

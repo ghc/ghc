@@ -8,6 +8,7 @@
 
 {-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
+{-# LANGUAGE ViewPatterns #-}
 
 module DsMonad (
         DsM, mapM, mapAndUnzipM,
@@ -83,7 +84,7 @@ import ErrUtils
 import FastString
 import Var (EvVar)
 import UniqFM ( lookupWithDefaultUFM )
-import Literal ( mkMachString )
+import Literal ( mkLitString )
 import CostCentreState
 
 import Data.IORef
@@ -610,5 +611,5 @@ pprRuntimeTrace str doc expr = do
   dflags <- getDynFlags
   let message :: CoreExpr
       message = App (Var unpackCStringId) $
-                Lit $ mkMachString $ showSDoc dflags (hang (text str) 4 doc)
+                Lit $ mkLitString $ showSDoc dflags (hang (text str) 4 doc)
   return $ mkApps (Var traceId) [Type (exprType expr), message, expr]

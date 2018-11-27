@@ -29,18 +29,21 @@ buildProgram rs = do
             let allPackages = sPackages
                            ++ if stage == Stage1 then tPackages else []
             nameToCtxList <- fmap concat . forM allPackages $ \pkg -> do
-                -- the iserv pkg results in two different programs at
-                -- the moment, ghc-iserv (built the vanilla way)
-                -- and ghc-iserv-prof (built the profiling way), and
-                -- the testsuite requires both to be present, so we
+                -- the iserv pkg results in three different programs at
+                -- the moment, ghc-iserv (built the vanilla way),
+                -- ghc-iserv-prof (built the profiling way), and
+                -- ghc-iserv-dyn (built the dynamic way).
+                -- The testsuite requires all to be present, so we
                 -- make sure that we cover these
                 -- "prof-build-under-other-name" cases.
-                -- iserv gets its two names from Packages.hs:programName
-                let ctxV = vanillaContext stage pkg
-                    ctxProf = Context stage pkg profiling
-                nameV <- programName ctxV
-                nameProf <- programName ctxProf
-                return [ (nameV <.> exe, ctxV), (nameProf <.> exe, ctxProf) ]
+                -- iserv gets its names from Packages.hs:programName
+                let allCtxs = [ vanillaContext stage pkg
+                              , Context stage pkg profiling
+                              , Context stage pkg dynamic
+                              ]
+                forM allCtxs $ \ctx -> do
+                    name <- programName ctx
+                    return (name <.> exe, ctx)
 
             case lookup (takeFileName bin) nameToCtxList of
                 Nothing -> error $ "Unknown program " ++ show bin

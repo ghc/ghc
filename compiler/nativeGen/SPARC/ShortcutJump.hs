@@ -18,11 +18,16 @@ import BlockId
 import Cmm
 
 import Panic
-
+import Outputable
 
 data JumpDest
         = DestBlockId BlockId
         | DestImm Imm
+
+-- Debug Instance
+instance Outputable JumpDest where
+  ppr (DestBlockId bid) = text "blk:" <> ppr bid
+  ppr (DestImm _bid)    = text "imm:?"
 
 getJumpDestBlockId :: JumpDest -> Maybe BlockId
 getJumpDestBlockId (DestBlockId bid) = Just bid

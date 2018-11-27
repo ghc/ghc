@@ -13,7 +13,6 @@ import Platform
 
 import Data.Word
 import Data.Bits
-import Data.Foldable (foldl')
 
 newtype FreeRegs = FreeRegs Word32
     deriving Show

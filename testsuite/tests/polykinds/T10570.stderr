@@ -3,7 +3,6 @@ T10570.hs:10:10: error:
     • Illegal instance declaration for ‘ConsByIdx2 Int a Proxy cls’
         The coverage condition fails in class ‘ConsByIdx2’
           for functional dependency: ‘x -> m’
-        Reason: lhs type ‘Int’ does not determine rhs type ‘Proxy’
+        Reason: lhs type ‘Int’ does not determine rhs type ‘Proxy @{k}’
         Un-determined variable: k
-        Use -fprint-explicit-kinds to see the kind arguments
     • In the instance declaration for ‘ConsByIdx2 Int a Proxy cls’

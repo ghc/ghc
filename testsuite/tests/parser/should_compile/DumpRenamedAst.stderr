@@ -104,7 +104,7 @@
             (Nothing)
             (PrefixCon
              [(HsScaled
-               (HsOne)
+               (HsLinearArrow)
                ({ DumpRenamedAst.hs:8:26-30 }
                 (HsTyVar
                  (NoExt)
@@ -193,7 +193,7 @@
                [({ DumpRenamedAst.hs:12:10-12 }
                  (HsExplicitListTy
                   (NoExt)
-                  (Promoted)
+                  (IsPromoted)
                   []))]
                (Prefix)
                ({ DumpRenamedAst.hs:12:21-24 }
@@ -265,7 +265,7 @@
                (NotPromoted)
                ({ DumpRenamedAst.hs:14:20 }
                 {Name: k})))
-             (HsOmega)
+             (HsUnrestrictedArrow)
              ({ DumpRenamedAst.hs:14:25-33 }
               (HsFunTy
                (NoExt)
@@ -275,7 +275,7 @@
                  (NotPromoted)
                  ({ DumpRenamedAst.hs:14:25 }
                   {Name: k})))
-               (HsOmega)
+               (HsUnrestrictedArrow)
                ({ DumpRenamedAst.hs:14:30-33 }
                 (HsTyVar
                  (NoExt)
@@ -317,7 +317,7 @@
                     (NotPromoted)
                     ({ DumpRenamedAst.hs:17:28 }
                      {Name: k})))
-                  (HsOmega)
+                  (HsUnrestrictedArrow)
                   ({ DumpRenamedAst.hs:17:33-36 }
                    (HsTyVar
                     (NoExt)
@@ -347,14 +347,14 @@
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:17:43 }
                       {Name: k})))
-                   (HsOmega)
+                   (HsUnrestrictedArrow)
                    ({ DumpRenamedAst.hs:17:48-51 }
                     (HsTyVar
                      (NoExt)
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:17:48-51 }
                       {Name: GHC.Types.Type})))))))
-               (HsOmega)
+               (HsUnrestrictedArrow)
                ({ DumpRenamedAst.hs:17:57-60 }
                 (HsTyVar
                  (NoExt)
@@ -378,7 +378,7 @@
                (Nothing)
                (PrefixCon
                 [(HsScaled
-                  (HsOne)
+                  (HsLinearArrow)
                   ({ DumpRenamedAst.hs:18:10-34 }
                    (HsParTy
                     (NoExt)
@@ -408,7 +408,7 @@
                             (NotPromoted)
                             ({ DumpRenamedAst.hs:18:24-25 }
                              {Name: xx})))))
-                        (HsOmega)
+                        (HsUnrestrictedArrow)
                         ({ DumpRenamedAst.hs:18:30-33 }
                          (HsAppTy
                           (NoExt)

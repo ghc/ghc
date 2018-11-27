@@ -40,6 +40,8 @@ import StgSyn
 
 import DynFlags
 import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
+import BasicTypes       ( TopLevelFlag(..), isTopLevel )
+import CostCentre       ( isCurrentCCS )
 import Id               ( Id, idType, isLocalId, isJoinId )
 import VarSet
 import DataCon
@@ -84,7 +86,7 @@ lintStgTopBindings dflags unarised whodunnit binds
         addInScopeVars binders $
             lint_binds binds
 
-    lint_bind (StgTopLifted bind) = lintStgBinds bind
+    lint_bind (StgTopLifted bind) = lintStgBinds TopLevel bind
     lint_bind (StgTopStringLit v _) = return [v]
 
 lintStgArg :: StgArg -> LintM ()
@@ -94,25 +96,38 @@ lintStgArg (StgVarArg v) = lintStgVar v
 lintStgVar :: Id -> LintM ()
 lintStgVar id = checkInScope id
 
-lintStgBinds :: StgBinding -> LintM [Id] -- Returns the binders
-lintStgBinds (StgNonRec binder rhs) = do
-    lint_binds_help (binder,rhs)
+lintStgBinds :: TopLevelFlag -> StgBinding -> LintM [Id] -- Returns the binders
+lintStgBinds top_lvl (StgNonRec binder rhs) = do
+    lint_binds_help top_lvl (binder,rhs)
     return [binder]
 
-lintStgBinds (StgRec pairs)
+lintStgBinds top_lvl (StgRec pairs)
   = addInScopeVars binders $ do
-        mapM_ lint_binds_help pairs
+        mapM_ (lint_binds_help top_lvl) pairs
         return binders
   where
     binders = [b | (b,_) <- pairs]
 
-lint_binds_help :: (Id, StgRhs) -> LintM ()
-lint_binds_help (binder, rhs)
+lint_binds_help :: TopLevelFlag -> (Id, StgRhs) -> LintM ()
+lint_binds_help top_lvl (binder, rhs)
   = addLoc (RhsOf binder) $ do
+        when (isTopLevel top_lvl) (checkNoCurrentCCS rhs)
         lintStgRhs rhs
         -- Check binder doesn't have unlifted type or it's a join point
         checkL (isJoinId binder || not (isUnliftedType (idType binder)))
                (mkUnliftedTyMsg binder rhs)
+
+-- | Top-level bindings can't inherit the cost centre stack from their
+-- (static) allocation site.
+checkNoCurrentCCS :: StgRhs -> LintM ()
+checkNoCurrentCCS (StgRhsClosure _ ccs _ _ _)
+  | isCurrentCCS ccs
+  = addErrL (text "Top-level StgRhsClosure with CurrentCCS")
+checkNoCurrentCCS (StgRhsCon ccs _ _)
+  | isCurrentCCS ccs
+  = addErrL (text "Top-level StgRhsCon with CurrentCCS")
+checkNoCurrentCCS _
+  = return ()
 
 lintStgRhs :: StgRhs -> LintM ()
 
@@ -154,14 +169,14 @@ lintStgExpr (StgOpApp _ args _) =
 lintStgExpr lam@(StgLam _ _) =
     addErrL (text "Unexpected StgLam" <+> ppr lam)
 
-lintStgExpr (StgLet binds body) = do
-    binders <- lintStgBinds binds
+lintStgExpr (StgLet _ binds body) = do
+    binders <- lintStgBinds NotTopLevel binds
     addLoc (BodyOfLetRec binders) $
       addInScopeVars binders $
         lintStgExpr body
 
-lintStgExpr (StgLetNoEscape binds body) = do
-    binders <- lintStgBinds binds
+lintStgExpr (StgLetNoEscape _ binds body) = do
+    binders <- lintStgBinds NotTopLevel binds
     addLoc (BodyOfLetRec binders) $
       addInScopeVars binders $
         lintStgExpr body

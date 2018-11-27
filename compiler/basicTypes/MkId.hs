@@ -673,7 +673,7 @@ mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
     ev_ibangs    = map (const HsLazy) ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
-    w_ty = RigThing (mkTyVarTy multiplicityTyVar)
+    w_ty = MultThing (mkTyVarTy multiplicityTyVar)
     -- See Note [Wrapper multiplicities]
     wrap_arg_tys = (map unrestricted theta)
                     ++ (map (scaleScaled w_ty) orig_arg_tys)

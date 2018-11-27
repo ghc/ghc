@@ -6,7 +6,7 @@ TYPE CONSTRUCTORS
   Sing :: forall k. k -> *
 COERCION AXIOMS
   axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
-    Sing _ = DataFamilyInstanceLHS.R:SingMyKind_
+    Sing _1 = DataFamilyInstanceLHS.R:SingMyKind_ _1
       -- Defined at DataFamilyInstanceLHS.hs:8:15
 DATA CONSTRUCTORS
   A :: MyKind

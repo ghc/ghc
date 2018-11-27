@@ -15,6 +15,8 @@
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module HsPat (
         Pat(..), InPat, OutPat, LPat,
@@ -70,7 +72,7 @@ import Data.Data hiding (TyCon,Fixity)
 type InPat p  = LPat p        -- No 'Out' constructors
 type OutPat p = LPat p        -- No 'In' constructors
 
-type LPat p = Located (Pat p)
+type LPat p = Pat p
 
 -- | Pattern
 --
@@ -324,7 +326,34 @@ type instance XSigPat GhcRn = NoExt
 type instance XSigPat GhcTc = Type
 
 type instance XCoPat  (GhcPass _) = NoExt
-type instance XXPat   (GhcPass _) = NoExt
+type instance XXPat   (GhcPass p) = Located (Pat (GhcPass p))
+
+
+{-
+************************************************************************
+*                                                                      *
+*              HasSrcSpan Instance
+*                                                                      *
+************************************************************************
+-}
+
+type instance SrcSpanLess (LPat (GhcPass p)) = Pat (GhcPass p)
+instance HasSrcSpan (LPat (GhcPass p)) where
+  -- NB: The following chooses the behaviour of the outer location
+  --     wrapper replacing the inner ones.
+  composeSrcSpan (L sp p) =  if sp == noSrcSpan
+                             then p
+                             else XPat (L sp (stripSrcSpanPat p))
+
+  -- NB: The following only returns the top-level location, if any.
+  decomposeSrcSpan (XPat (L sp p)) = L sp (stripSrcSpanPat p)
+  decomposeSrcSpan p               = L noSrcSpan p
+
+stripSrcSpanPat :: LPat (GhcPass p) -> Pat (GhcPass p)
+stripSrcSpanPat (XPat (L _  p)) = stripSrcSpanPat p
+stripSrcSpanPat p               = p
+
+
 
 -- ---------------------------------------------------------------------
 
@@ -489,7 +518,7 @@ pprPatBndr var                  -- Print with type info if -dppr-debug is on
 
 pprParendLPat :: (OutputableBndrId (GhcPass p))
               => PprPrec -> LPat (GhcPass p) -> SDoc
-pprParendLPat p (L _ pat) = pprParendPat p pat
+pprParendLPat p = pprParendPat p . unLoc
 
 pprParendPat :: (OutputableBndrId (GhcPass p))
              => PprPrec -> Pat (GhcPass p) -> SDoc
@@ -507,7 +536,7 @@ pprParendPat p pat = sdocWithDynFlags $ \ dflags ->
       -- is the pattern inside that matters.  Sigh.
 
 pprPat :: (OutputableBndrId (GhcPass p)) => Pat (GhcPass p) -> SDoc
-pprPat (VarPat _ (L _ var))     = pprPatBndr var
+pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
 pprPat (BangPat _ pat)          = char '!' <> pprParendLPat appPrec pat
@@ -530,8 +559,11 @@ pprPat (TuplePat _ pats bx)     = tupleParens (boxityTupleSort bx)
                                               (pprWithCommas ppr pats)
 pprPat (SumPat _ pat alt arity) = sumParens (pprAlternative ppr pat alt arity)
 pprPat (ConPatIn con details)   = pprUserCon (unLoc con) details
-pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
-                    pat_binds = binds, pat_args = details })
+pprPat (ConPatOut { pat_con = con
+                  , pat_tvs = tvs
+                  , pat_dicts = dicts
+                  , pat_binds = binds
+                  , pat_args = details })
   = sdocWithDynFlags $ \dflags ->
        -- Tiresome; in TcBinds.tcRhs we print out a
        -- typechecked Pat in an error message,
@@ -581,14 +613,19 @@ instance (Outputable p, Outputable arg)
 ************************************************************************
 -}
 
-mkPrefixConPat :: DataCon -> [OutPat p] -> [Type] -> OutPat p
+mkPrefixConPat :: DataCon ->
+                  [OutPat (GhcPass p)] -> [Type] -> OutPat (GhcPass p)
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
-  = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon dc), pat_tvs = [], pat_dicts = [],
-                        pat_binds = emptyTcEvBinds, pat_args = PrefixCon pats,
-                        pat_arg_tys = tys, pat_wrap = idHsWrapper }
+  = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon dc)
+                      , pat_tvs = []
+                      , pat_dicts = []
+                      , pat_binds = emptyTcEvBinds
+                      , pat_args = PrefixCon pats
+                      , pat_arg_tys = tys
+                      , pat_wrap = idHsWrapper }
 
-mkNilPat :: Type -> OutPat p
+mkNilPat :: Type -> OutPat (GhcPass p)
 mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 
 mkCharLitPat :: SourceText -> Char -> OutPat (GhcPass p)
@@ -627,12 +664,15 @@ patterns are treated specially, of course.
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 -}
 
-isBangedLPat :: LPat p -> Bool
-isBangedLPat (L _ (ParPat _ p)) = isBangedLPat p
-isBangedLPat (L _ (BangPat {})) = True
-isBangedLPat _                  = False
+isBangedLPat :: LPat (GhcPass p) -> Bool
+isBangedLPat = isBangedPat . unLoc
 
-looksLazyPatBind :: HsBind p -> Bool
+isBangedPat :: Pat (GhcPass p) -> Bool
+isBangedPat (ParPat _ p) = isBangedLPat p
+isBangedPat (BangPat {}) = True
+isBangedPat _            = False
+
+looksLazyPatBind :: HsBind (GhcPass p) -> Bool
 -- Returns True of anything *except*
 --     a StrictHsBind (as above) or
 --     a VarPat
@@ -645,15 +685,18 @@ looksLazyPatBind (AbsBinds { abs_binds = binds })
 looksLazyPatBind _
   = False
 
-looksLazyLPat :: LPat p -> Bool
-looksLazyLPat (L _ (ParPat _ p))           = looksLazyLPat p
-looksLazyLPat (L _ (AsPat _ _ p))          = looksLazyLPat p
-looksLazyLPat (L _ (BangPat {}))           = False
-looksLazyLPat (L _ (VarPat {}))            = False
-looksLazyLPat (L _ (WildPat {}))           = False
-looksLazyLPat _                            = True
+looksLazyLPat :: LPat (GhcPass p) -> Bool
+looksLazyLPat = looksLazyPat . unLoc
 
-isIrrefutableHsPat :: (OutputableBndrId p) => LPat p -> Bool
+looksLazyPat :: Pat (GhcPass p) -> Bool
+looksLazyPat (ParPat _ p)  = looksLazyLPat p
+looksLazyPat (AsPat _ _ p) = looksLazyLPat p
+looksLazyPat (BangPat {})  = False
+looksLazyPat (VarPat {})   = False
+looksLazyPat (WildPat {})  = False
+looksLazyPat _             = True
+
+isIrrefutableHsPat :: (OutputableBndrId (GhcPass p)) => LPat (GhcPass p) -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
 -- in the sense of falling through to the next pattern.
 --      (NB: this is not quite the same as the (silly) defn
@@ -666,43 +709,47 @@ isIrrefutableHsPat :: (OutputableBndrId p) => LPat p -> Bool
 -- tuple patterns are considered irrefuable at the renamer stage.
 --
 -- But if it returns True, the pattern is definitely irrefutable
-isIrrefutableHsPat pat
-  = go pat
+isIrrefutableHsPat
+  = goL
   where
-    go (L _ pat) = go1 pat
+    goL = go . unLoc
 
-    go1 (WildPat {})        = True
-    go1 (VarPat {})         = True
-    go1 (LazyPat {})        = True
-    go1 (BangPat _ pat)     = go pat
-    go1 (CoPat _ _ pat _)   = go1 pat
-    go1 (ParPat _ pat)      = go pat
-    go1 (AsPat _ _ pat)     = go pat
-    go1 (ViewPat _ _ pat)   = go pat
-    go1 (SigPat _ pat _)    = go pat
-    go1 (TuplePat _ pats _) = all go pats
-    go1 (SumPat {})         = False
+    go (WildPat {})        = True
+    go (VarPat {})         = True
+    go (LazyPat {})        = True
+    go (BangPat _ pat)     = goL pat
+    go (CoPat _ _ pat _)   = go  pat
+    go (ParPat _ pat)      = goL pat
+    go (AsPat _ _ pat)     = goL pat
+    go (ViewPat _ _ pat)   = goL pat
+    go (SigPat _ pat _)    = goL pat
+    go (TuplePat _ pats _) = all goL pats
+    go (SumPat {})         = False
                     -- See Note [Unboxed sum patterns aren't irrefutable]
-    go1 (ListPat {})        = False
+    go (ListPat {})        = False
 
-    go1 (ConPatIn {})       = False     -- Conservative
-    go1 (ConPatOut{ pat_con = L _ (RealDataCon con), pat_args = details })
-        =  isJust (tyConSingleDataCon_maybe (dataConTyCon con))
-           -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because
-           -- the latter is false of existentials. See Trac #4439
-        && all go (hsConPatArgs details)
-    go1 (ConPatOut{ pat_con = L _ (PatSynCon _pat) })
-        = False -- Conservative
-
-    go1 (LitPat {})         = False
-    go1 (NPat {})           = False
-    go1 (NPlusKPat {})      = False
+    go (ConPatIn {})       = False     -- Conservative
+    go (ConPatOut
+        { pat_con  = (dL->L _ (RealDataCon con))
+        , pat_args = details })
+                           =
+      isJust (tyConSingleDataCon_maybe (dataConTyCon con))
+      -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because
+      -- the latter is false of existentials. See Trac #4439
+      && all goL (hsConPatArgs details)
+    go (ConPatOut
+        { pat_con = (dL->L _ (PatSynCon _pat)) })
+                           = False -- Conservative
+    go (ConPatOut{})       = panic "ConPatOut:Impossible Match" -- due to #15884
+    go (LitPat {})         = False
+    go (NPat {})           = False
+    go (NPlusKPat {})      = False
 
     -- We conservatively assume that no TH splices are irrefutable
     -- since we cannot know until the splice is evaluated.
-    go1 (SplicePat {})      = False
+    go (SplicePat {})      = False
 
-    go1 (XPat {})           = False
+    go (XPat {})           = False
 
 {- Note [Unboxed sum patterns aren't irrefutable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -731,25 +778,25 @@ is the only thing that could possibly be matched!
 patNeedsParens :: PprPrec -> Pat p -> Bool
 patNeedsParens p = go
   where
-    go (NPlusKPat {})         = p > opPrec
-    go (SplicePat {})         = False
-    go (ConPatIn _ ds)        = conPatNeedsParens p ds
-    go cp@(ConPatOut {})      = conPatNeedsParens p (pat_args cp)
-    go (SigPat {})            = p >= sigPrec
-    go (ViewPat {})           = True
-    go (CoPat _ _ p _)        = go p
-    go (WildPat {})           = False
-    go (VarPat {})            = False
-    go (LazyPat {})           = False
-    go (BangPat {})           = False
-    go (ParPat {})            = False
-    go (AsPat {})             = False
-    go (TuplePat {})          = False
-    go (SumPat {})            = False
-    go (ListPat {})           = False
-    go (LitPat _ l)           = hsLitNeedsParens p l
-    go (NPat _ (L _ ol) _ _)  = hsOverLitNeedsParens p ol
-    go (XPat {})              = True -- conservative default
+    go (NPlusKPat {})    = p > opPrec
+    go (SplicePat {})    = False
+    go (ConPatIn _ ds)   = conPatNeedsParens p ds
+    go cp@(ConPatOut {}) = conPatNeedsParens p (pat_args cp)
+    go (SigPat {})       = p >= sigPrec
+    go (ViewPat {})      = True
+    go (CoPat _ _ p _)   = go p
+    go (WildPat {})      = False
+    go (VarPat {})       = False
+    go (LazyPat {})      = False
+    go (BangPat {})      = False
+    go (ParPat {})       = False
+    go (AsPat {})        = False
+    go (TuplePat {})     = False
+    go (SumPat {})       = False
+    go (ListPat {})      = False
+    go (LitPat _ l)      = hsLitNeedsParens p l
+    go (NPat _ lol _ _)  = hsOverLitNeedsParens p (unLoc lol)
+    go (XPat {})         = True -- conservative default
 
 -- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@
 -- needs parentheses under precedence @p@.
@@ -763,8 +810,8 @@ conPatNeedsParens p = go
 -- | @'parenthesizePat' p pat@ checks if @'patNeedsParens' p pat@ is true, and
 -- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.
 parenthesizePat :: PprPrec -> LPat (GhcPass p) -> LPat (GhcPass p)
-parenthesizePat p lpat@(L loc pat)
-  | patNeedsParens p pat = L loc (ParPat NoExt lpat)
+parenthesizePat p lpat@(dL->L loc pat)
+  | patNeedsParens p pat = cL loc (ParPat NoExt lpat)
   | otherwise            = lpat
 
 {-
@@ -776,7 +823,7 @@ collectEvVarsPats :: [Pat GhcTc] -> Bag EvVar
 collectEvVarsPats = unionManyBags . map collectEvVarsPat
 
 collectEvVarsLPat :: LPat GhcTc -> Bag EvVar
-collectEvVarsLPat (L _ pat) = collectEvVarsPat pat
+collectEvVarsLPat = collectEvVarsPat . unLoc
 
 collectEvVarsPat :: Pat GhcTc -> Bag EvVar
 collectEvVarsPat pat =

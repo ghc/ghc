@@ -18,6 +18,6 @@ Executable ghctags
 
     Build-Depends: base       >= 4   && < 5,
                    containers,
-                   Cabal      >= 2.4 && <2.5,
+                   Cabal      >= 2.5 && <2.6,
                    ghc
 

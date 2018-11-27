@@ -22,6 +22,7 @@ HsTypes: Abstract syntax: user-defined types
 
 module HsTypes (
         Mult, HsMult(..), HsScaled(..),
+        HsArrow(..), arrowToMult,
         hsLinear, hsUnrestricted, isHsOmega,
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
@@ -30,7 +31,6 @@ module HsTypes (
         HsWildCardBndrs(..),
         LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
-        Promoted(..),
         HsContext, LHsContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
@@ -87,8 +87,9 @@ import RdrName ( RdrName )
 import NameSet ( NameSet, emptyNameSet )
 import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
-import TysPrim( funTyConName )
+import TysWiredIn( unrestrictedFunTyConName, omegaDataConName, oneDataConName )
 import Type
+import Multiplicity
 import HsDoc
 import BasicTypes
 import SrcLoc
@@ -97,7 +98,6 @@ import FastString
 import Maybes( isJust )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
-import Data.List ( foldl' )
 import Data.Maybe ( fromMaybe )
 
 {-
@@ -521,10 +521,10 @@ data HsType pass
       , hst_ctxt  :: LHsContext pass       -- Context C => blah
       , hst_body  :: LHsType pass }
 
-  | HsTyVar             (XTyVar pass)
-                        Promoted -- whether explicitly promoted, for the pretty
-                                 -- printer
-                        (Located (IdP pass))
+  | HsTyVar  (XTyVar pass)
+              PromotionFlag    -- Whether explicitly promoted,
+                               -- for the pretty printer
+             (Located (IdP pass))
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
                   -- See Note [Located RdrNames] in HsExpr
@@ -541,7 +541,7 @@ data HsType pass
 
   | HsFunTy             (XFunTy pass)
                         (LHsType pass)   -- function type
-                        (HsMult pass)
+                        (HsArrow pass)
                         (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
 
@@ -648,7 +648,7 @@ data HsType pass
 
   | HsExplicitListTy       -- A promoted explicit list
         (XExplicitListTy pass)
-        Promoted           -- whether explcitly promoted, for pretty printer
+        PromotionFlag      -- whether explcitly promoted, for pretty printer
         [LHsType pass]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'["@,
       --         'ApiAnnotation.AnnClose' @']'@
@@ -736,32 +736,75 @@ data HsTyLit
   | HsStrTy SourceText FastString
     deriving Data
 
-data HsMult pass = HsZero | HsOne | HsOmega | HsMultTy (LHsType pass)
+-- | Serves as an intermediate type in the conversion to an Type-level multiplicity
+type HsMult = GMult (LHsType GhcRn)
 
-instance
-      (OutputableBndrId (GhcPass pass)) =>
-      Outputable (HsMult (GhcPass pass)) where
-  ppr HsZero = text "0"
-  ppr HsOne = text "1"
-  ppr HsOmega = text "ω"
-  ppr (HsMultTy p) = ppr p
+oneDataConHsTy :: HsType GhcRn
+oneDataConHsTy = HsTyVar noExt NotPromoted (noLoc omegaDataConName)
 
-hsUnrestricted, hsLinear :: a -> HsScaled pass a
-hsUnrestricted = HsScaled HsOmega
-hsLinear = HsScaled HsOne
+omegaDataConHsTy :: HsType GhcRn
+omegaDataConHsTy = HsTyVar noExt NotPromoted (noLoc oneDataConName)
 
-isHsOmega :: HsMult pass -> Bool
-isHsOmega HsOmega = True
+instance Multable (LHsType GhcRn) where
+  fromMult One = noLoc oneDataConHsTy
+  fromMult Omega = noLoc omegaDataConHsTy
+  fromMult (MultThing ty) = ty
+  fromMult Zero =
+    pprPanic "HsTypes.fromMult" (text"A multiplicity 0 leaked into a type")
+  fromMult r =
+    pprPanic "HsTypes.fromMult" (text"TODO")
+
+  toMult ty
+    | L _ (HsTyVar _ _ (L _ n)) <- ty
+    , oneDataConName == n = One
+    | L _ (HsTyVar _ _ (L _ n)) <- ty
+    , omegaDataConName == n = Omega
+    | otherwise = unsafeMultThing ty
+
+isHsOmega :: HsMult -> Bool
+isHsOmega Omega = True
 isHsOmega _ = False
 
-data HsScaled pass a = HsScaled { hsMult :: HsMult pass, hsThing :: a }
+-- | Denotes the type of arrows in the surface language
+data HsArrow pass
+  = HsUnrestrictedArrow
+    -- ^ a -> b
+  | HsLinearArrow
+    -- ^ a ->. b
+  | HsExplicitMult (LHsType pass)
+    -- ^ a -->.(m) b (very much including `a -->.(Omega) b`! This is how the
+    -- programmer wrote it). It is stored as an `HsType` so as to preserve the
+    -- syntax as written in the program.
+
+-- | Convert an arrow into its corresponding multiplicity. In essence this
+-- erases the information of whether the programmer wrote an explicit
+-- multiplicity or a shorthand.
+arrowToMult :: HsArrow GhcRn -> HsMult
+arrowToMult HsUnrestrictedArrow = Omega
+arrowToMult HsLinearArrow = One
+arrowToMult (HsExplicitMult p) = MultThing p
+
+-- | This is used in the syntax. In constructor declaration. It must keep the
+-- arrow representation.
+data HsScaled pass a = HsScaled { hsMult :: HsArrow pass, hsThing :: a }
   deriving (Traversable, Functor, Foldable)
+
+-- | When creating syntax we use the shorthands. It's better for printing, also,
+-- the shorthands work trivially at each pass.
+hsUnrestricted, hsLinear :: a -> HsScaled pass a
+hsUnrestricted = HsScaled HsUnrestrictedArrow
+hsLinear = HsScaled HsLinearArrow
 
 instance Outputable a => Outputable (HsScaled pass a) where
    ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
                           ppr t
 
-
+instance
+      (OutputableBndrId (GhcPass pass)) =>
+      Outputable (HsArrow (GhcPass pass)) where
+  ppr HsUnrestrictedArrow = text "(->)"
+  ppr HsLinearArrow = text "(->.)"
+  ppr (HsExplicitMult p) = ppr p
 
 newtype HsWildCardInfo        -- See Note [The wildcard story for types]
     = AnonWildCard (Located Name)
@@ -887,12 +930,6 @@ data HsTupleSort = HsUnboxedTuple
                  | HsConstraintTuple
                  | HsBoxedOrConstraintTuple
                  deriving Data
-
-
--- | Promoted data types.
-data Promoted = Promoted
-              | NotPromoted
-              deriving (Data, Eq, Show)
 
 -- | Located Constructor Declaration Field
 type LConDeclField pass = Located (ConDeclField pass)
@@ -1024,14 +1061,14 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kvs }
 hsAllLTyVarNames (XLHsQTyVars _) = panic "hsAllLTyVarNames"
 
 hsLTyVarLocName :: LHsTyVarBndr pass -> Located (IdP pass)
-hsLTyVarLocName = fmap hsTyVarName
+hsLTyVarLocName = onHasSrcSpan hsTyVarName
 
 hsLTyVarLocNames :: LHsQTyVars pass -> [Located (IdP pass)]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 
 -- | Convert a LHsTyVarBndr to an equivalent LHsType.
 hsLTyVarBndrToType :: LHsTyVarBndr (GhcPass p) -> LHsType (GhcPass p)
-hsLTyVarBndrToType = fmap cvt
+hsLTyVarBndrToType = onHasSrcSpan cvt
   where cvt (UserTyVar _ n) = HsTyVar noExt NotPromoted n
         cvt (KindedTyVar _ (L name_loc n) kind)
           = HsKindSig noExt
@@ -1108,7 +1145,7 @@ splitHsFunType (L _ (HsFunTy _ x mult y))
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == funTyConName
+    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == unrestrictedFunTyConName
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
                                  = ((hsUnrestricted t1):args, res)
@@ -1435,11 +1472,9 @@ ppr_mono_ty (HsQualTy { hst_ctxt = L _ ctxt, hst_body = ty })
 
 ppr_mono_ty (HsBangTy _ b ty)   = ppr b <> ppr_mono_lty ty
 ppr_mono_ty (HsRecTy _ flds)      = pprConDeclFields flds
-ppr_mono_ty (HsTyVar _ NotPromoted (L _ name))= pprPrefixOcc name
-ppr_mono_ty (HsTyVar _ Promoted (L _ name))
-  = space <> quote (pprPrefixOcc name)
-                         -- We need a space before the ' above, so the parser
-                         -- does not attach it to the previous symbol
+ppr_mono_ty (HsTyVar _ prom (L _ name))
+  | isPromoted prom = quote (pprPrefixOcc name)
+  | otherwise       = pprPrefixOcc name
 ppr_mono_ty (HsFunTy _ ty1 mult ty2)   = ppr_fun_ty ty1 mult ty2
 ppr_mono_ty (HsTupleTy _ con tys) = tupleParens std_con (pprWithCommas ppr tys)
   where std_con = case con of
@@ -1452,11 +1487,11 @@ ppr_mono_ty (HsKindSig _ ty kind)
 ppr_mono_ty (HsListTy _ ty)       = brackets (ppr_mono_lty ty)
 ppr_mono_ty (HsIParamTy _ n ty)   = (ppr n <+> dcolon <+> ppr_mono_lty ty)
 ppr_mono_ty (HsSpliceTy _ s)      = pprSplice s
-ppr_mono_ty (HsExplicitListTy _ Promoted tys)
-  = quote $ brackets (interpp'SP tys)
-ppr_mono_ty (HsExplicitListTy _ NotPromoted tys)
-  = brackets (interpp'SP tys)
-ppr_mono_ty (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
+ppr_mono_ty (HsExplicitListTy _ prom tys)
+  | isPromoted prom = quote $ brackets (maybeAddSpace tys $ interpp'SP tys)
+  | otherwise       = brackets (interpp'SP tys)
+ppr_mono_ty (HsExplicitTupleTy _ tys)
+  = quote $ parens (maybeAddSpace tys $ interpp'SP tys)
 ppr_mono_ty (HsTyLit _ t)       = ppr_tylit t
 ppr_mono_ty (HsWildCardTy {})   = char '_'
 
@@ -1485,15 +1520,14 @@ ppr_mono_ty (XHsType t) = ppr t
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId (GhcPass p))
-           => LHsType (GhcPass p) -> HsMult (GhcPass p) -> LHsType (GhcPass p) -> SDoc
+           => LHsType (GhcPass p) -> HsArrow (GhcPass p) -> LHsType (GhcPass p) -> SDoc
 ppr_fun_ty ty1 mult ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
         arr = case mult of
-          HsZero -> text "->_0"
-          HsOne -> text "⊸"
-          HsOmega -> text "->"
-          HsMultTy ty -> text "->{" <> ppr_mono_lty ty <> text "}"
+          HsLinearArrow -> text "->."
+          HsUnrestrictedArrow -> text "->"
+          HsExplicitMult p -> text "->{" <> ppr p <> text "}"
     in
     sep [p1, arr <+> p2]
 
@@ -1529,6 +1563,46 @@ hsTypeNeedsParens p = go
     go (HsOpTy{})            = p >= opPrec
     go (HsParTy{})           = False
     go (HsDocTy _ (L _ t) _) = go t
+    go (XHsType{})           = False
+
+maybeAddSpace :: [LHsType pass] -> SDoc -> SDoc
+-- See Note [Printing promoted type constructors]
+-- in IfaceType.  This code implements the same
+-- logic for printing HsType
+maybeAddSpace tys doc
+  | (ty : _) <- tys
+  , lhsTypeHasLeadingPromotionQuote ty = space <> doc
+  | otherwise                          = doc
+
+lhsTypeHasLeadingPromotionQuote :: LHsType pass -> Bool
+lhsTypeHasLeadingPromotionQuote ty
+  = goL ty
+  where
+    goL (L _ ty) = go ty
+
+    go (HsForAllTy{})        = False
+    go (HsQualTy{ hst_ctxt = ctxt, hst_body = body})
+      | L _ (c:_) <- ctxt    = goL c
+      | otherwise            = goL body
+    go (HsBangTy{})          = False
+    go (HsRecTy{})           = False
+    go (HsTyVar _ p _)       = isPromoted p
+    go (HsFunTy _ arg _ _)   = goL arg
+    go (HsListTy{})          = False
+    go (HsTupleTy{})         = False
+    go (HsSumTy{})           = False
+    go (HsOpTy _ t1 _ _)     = goL t1
+    go (HsKindSig _ t _)     = goL t
+    go (HsIParamTy{})        = False
+    go (HsSpliceTy{})        = False
+    go (HsExplicitListTy _ p _) = isPromoted p
+    go (HsExplicitTupleTy{}) = True
+    go (HsTyLit{})           = False
+    go (HsWildCardTy{})      = False
+    go (HsStarTy{})          = False
+    go (HsAppTy _ t _)       = goL t
+    go (HsParTy{})           = False
+    go (HsDocTy _ t _)       = goL t
     go (XHsType{})           = False
 
 -- | @'parenthesizeHsType' p ty@ checks if @'hsTypeNeedsParens' p ty@ is

@@ -2,7 +2,7 @@ module TyCoRep where
 
 import GhcPrelude
 
-import Outputable ( SDoc )
+import Outputable ( Outputable, SDoc )
 import Data.Data  ( Data )
 import Multiplicity
 
@@ -33,3 +33,4 @@ instance Data Type
 type Mult = GMult Type
 type Scaled = GScaled Type
 instance Multable Type
+instance Outputable Type

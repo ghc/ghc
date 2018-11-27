@@ -7,6 +7,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 
 -- CmmNode type for representation using Hoopl graphs.
 
@@ -16,7 +18,7 @@ module CmmNode (
      ForeignConvention(..), ForeignTarget(..), foreignTargetHints,
      CmmReturnInfo(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
-     mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors,
+     mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors, mapCollectSuccessors,
 
      -- * Tick scopes
      CmmTickScope(..), isTickSubScope, combineTickScopes,
@@ -37,6 +39,7 @@ import qualified Unique as U
 
 import Hoopl.Block
 import Hoopl.Graph
+import Hoopl.Collections
 import Hoopl.Label
 import Data.Maybe
 import Data.List (tails,sortBy)
@@ -568,6 +571,24 @@ mapSuccessors f (CmmBranch bid)         = CmmBranch (f bid)
 mapSuccessors f (CmmCondBranch p y n l) = CmmCondBranch p (f y) (f n) l
 mapSuccessors f (CmmSwitch e ids)       = CmmSwitch e (mapSwitchTargets f ids)
 mapSuccessors _ n = n
+
+mapCollectSuccessors :: forall a. (Label -> (Label,a)) -> CmmNode O C
+                     -> (CmmNode O C, [a])
+mapCollectSuccessors f (CmmBranch bid)
+  = let (bid', acc) = f bid in (CmmBranch bid', [acc])
+mapCollectSuccessors f (CmmCondBranch p y n l)
+  = let (bidt, acct) = f y
+        (bidf, accf) = f n
+    in  (CmmCondBranch p bidt bidf l, [accf, acct])
+mapCollectSuccessors f (CmmSwitch e ids)
+  = let lbls = switchTargetsToList ids :: [Label]
+        lblMap = mapFromList $ zip lbls (map f lbls) :: LabelMap (Label, a)
+    in ( CmmSwitch e
+          (mapSwitchTargets
+            (\l -> fst $ mapFindWithDefault (error "impossible") l lblMap) ids)
+          , map snd (mapElems lblMap)
+        )
+mapCollectSuccessors _ n = (n, [])
 
 -- -----------------------------------------------------------------------------
 

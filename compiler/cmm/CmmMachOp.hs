@@ -2,7 +2,7 @@ module CmmMachOp
     ( MachOp(..)
     , pprMachOp, isCommutableMachOp, isAssociativeMachOp
     , isComparisonMachOp, maybeIntComparison, machOpResultType
-    , machOpArgReps, maybeInvertComparison
+    , machOpArgReps, maybeInvertComparison, isFloatComparison
 
     -- MachOp builders
     , mo_wordAdd, mo_wordSub, mo_wordEq, mo_wordNe,mo_wordMul, mo_wordSQuot
@@ -321,6 +321,17 @@ maybeIntComparison mop =
     MO_U_Gt w  -> Just w
     MO_U_Lt w  -> Just w
     _ -> Nothing
+
+isFloatComparison :: MachOp -> Bool
+isFloatComparison mop =
+  case mop of
+    MO_F_Eq {} -> True
+    MO_F_Ne {} -> True
+    MO_F_Ge {} -> True
+    MO_F_Le {} -> True
+    MO_F_Gt {} -> True
+    MO_F_Lt {} -> True
+    _other     -> False
 
 -- -----------------------------------------------------------------------------
 -- Inverting conditions

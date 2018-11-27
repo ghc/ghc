@@ -12,6 +12,11 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
+  -Wimplicit-kind-vars
+  -Wmissing-monadfail-instances
+  -Wsemigroup
+  -Wnoncanonical-monoid-instances
+  -Wstar-is-type
 Should fail, GADTs is not enabled
 options currently set: none.
 base language is: Haskell2010
@@ -30,6 +35,11 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
+  -Wimplicit-kind-vars
+  -Wmissing-monadfail-instances
+  -Wsemigroup
+  -Wnoncanonical-monoid-instances
+  -Wstar-is-type
 Should work, GADTs is in force from :set
 options currently set: none.
 base language is: Haskell2010
@@ -47,6 +57,11 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
+  -Wimplicit-kind-vars
+  -Wmissing-monadfail-instances
+  -Wsemigroup
+  -Wnoncanonical-monoid-instances
+  -Wstar-is-type
 Should fail, GADTs is now disabled
 base language is: Haskell2010
 with the following modifiers:
@@ -66,5 +81,10 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
+  -Wimplicit-kind-vars
+  -Wmissing-monadfail-instances
+  -Wsemigroup
+  -Wnoncanonical-monoid-instances
+  -Wstar-is-type
 Should fail, GADTs is only enabled at the prompt
 C :: T Int

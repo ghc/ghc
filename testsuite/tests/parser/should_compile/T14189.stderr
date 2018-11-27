@@ -45,7 +45,7 @@
             (Nothing)
             (PrefixCon
              [(HsScaled
-               (HsOne)
+               (HsLinearArrow)
                ({ T14189.hs:6:18-20 }
                 (HsTyVar
                  (NoExt)

@@ -1,3 +1,17 @@
+T8274.$WNegatives [InlPrag=INLINE[2]] :: Int# -> Float# -> Double# -> N
+         Tmpl= \ (@ (n :: GHC.Types.Multiplicity)) (dt [Occ=Once] :: Int#) (dt [Occ=Once] :: Float#) (dt [Occ=Once] :: Double#) ->
+  = \ (@ (n :: GHC.Types.Multiplicity)) (dt [Occ=Once] :: Int#) (dt [Occ=Once] :: Float#) (dt [Occ=Once] :: Double#) ->
+T8274.$WPositives [InlPrag=INLINE[2]] :: Int# -> Float# -> Double# -> Char# -> Word# -> P
+                 (dt [Occ=Once] :: Int#)
+                 (dt [Occ=Once] :: Float#)
+                 (dt [Occ=Once] :: Double#)
+                 (dt [Occ=Once] :: Char#)
+                 (dt [Occ=Once] :: Word#) ->
+      (dt [Occ=Once] :: Int#)
+      (dt [Occ=Once] :: Float#)
+      (dt [Occ=Once] :: Double#)
+      (dt [Occ=Once] :: Char#)
+      (dt [Occ=Once] :: Word#) ->
 p = T8274.Positives 42# 4.23# 4.23## '4'# 4##
 n = T8274.Negatives -4# -4.0# -4.0##
 T8274.$trModule4 :: Addr#

@@ -71,6 +71,7 @@ infixr 8  **
 --
 -- * @exp (a + b)@ = @exp a * exp b@
 -- * @exp (fromInteger 0)@ = @fromInteger 1@
+--
 class  (Fractional a) => Floating a  where
     pi                  :: a
     exp, log, sqrt      :: a -> a

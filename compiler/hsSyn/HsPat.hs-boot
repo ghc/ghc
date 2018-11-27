@@ -7,13 +7,12 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module HsPat where
-import SrcLoc( Located )
 
 import Outputable
 import HsExtension      ( OutputableBndrId, GhcPass )
 
 type role Pat nominal
 data Pat (i :: *)
-type LPat i = Located (Pat i)
+type LPat i = Pat i
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Pat p)

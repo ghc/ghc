@@ -108,6 +108,7 @@ module TysWiredIn (
         vecRepDataConTyCon, tupleRepDataConTyCon, sumRepDataConTyCon,
 
         liftedRepDataConTy, unliftedRepDataConTy, intRepDataConTy, int8RepDataConTy,
+        int16RepDataConTy, word16RepDataConTy,
         wordRepDataConTy, int64RepDataConTy, word8RepDataConTy, word64RepDataConTy,
         addrRepDataConTy,
         floatRepDataConTy, doubleRepDataConTy,
@@ -123,7 +124,9 @@ module TysWiredIn (
         -- * Multiplicity and friends
         multiplicityTyConName, oneDataConName, omegaDataConName, multiplicityTy,
         multiplicityTyCon, oneDataCon, omegaDataCon, oneDataConTy, omegaDataConTy,
-        omegaDataConTyCon
+        omegaDataConTyCon,
+
+        unrestrictedFunTyCon, unrestrictedFunTyConName
 
 
 
@@ -144,6 +147,7 @@ import {-# SOURCE #-} KnownUniques
 -- others:
 import CoAxiom
 import Id
+import Var (VarBndr (Bndr))
 import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import Module           ( Module )
 import Type
@@ -443,8 +447,10 @@ runtimeRepSimpleDataConNames
       , fsLit "IntRep"
       , fsLit "WordRep"
       , fsLit "Int8Rep"
+      , fsLit "Int16Rep"
       , fsLit "Int64Rep"
       , fsLit "Word8Rep"
+      , fsLit "Word16Rep"
       , fsLit "Word64Rep"
       , fsLit "AddrRep"
       , fsLit "FloatRep"
@@ -744,7 +750,8 @@ isBuiltInOcc_maybe occ =
       "~"    -> Just eqTyConName
 
       -- function tycon
-      "->"   -> Just funTyConName
+      "FUN"  -> Just funTyConName
+      "->"  -> Just unrestrictedFunTyConName
 
       -- boxed tuple data/tycon
       "()"    -> Just $ tup_name Boxed 0
@@ -1178,6 +1185,23 @@ omegaDataConTy = mkTyConTy omegaDataConTyCon
 omegaDataConTyCon :: TyCon
 omegaDataConTyCon = promoteDataCon omegaDataCon
 
+unrestrictedFunTy :: Type
+unrestrictedFunTy = functionWithMultiplicity omegaDataConTy
+
+unrestrictedFunTyCon :: TyCon
+unrestrictedFunTyCon = buildSynTyCon unrestrictedFunTyConName [] arrowKind [] unrestrictedFunTy
+  where arrowKind = mkTyConKind binders liftedTypeKind
+        -- See also funTyCon
+        binders = [ Bndr runtimeRep1TyVar (NamedTCB Inferred)
+                  , Bndr runtimeRep2TyVar (NamedTCB Inferred)
+                  ]
+                  ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
+                                                , tYPE runtimeRep2Ty
+                                                ]
+
+unrestrictedFunTyConName :: Name
+unrestrictedFunTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->") unrestrictedFunTyConKey unrestrictedFunTyCon
+
 {- *********************************************************************
 *                                                                      *
                 Kinds and RuntimeRep
@@ -1253,8 +1277,8 @@ runtimeRepSimpleDataCons :: [DataCon]
 liftedRepDataCon :: DataCon
 runtimeRepSimpleDataCons@(liftedRepDataCon : _)
   = zipWithLazy mk_runtime_rep_dc
-    [ LiftedRep, UnliftedRep, IntRep, WordRep, Int8Rep, Int64Rep
-    , Word8Rep, Word64Rep, AddrRep, FloatRep, DoubleRep ]
+    [ LiftedRep, UnliftedRep, IntRep, WordRep, Int8Rep, Int16Rep, Int64Rep
+    , Word8Rep, Word16Rep, Word64Rep, AddrRep, FloatRep, DoubleRep ]
     runtimeRepSimpleDataConNames
   where
     mk_runtime_rep_dc primrep name
@@ -1262,12 +1286,12 @@ runtimeRepSimpleDataCons@(liftedRepDataCon : _)
 
 -- See Note [Wiring in RuntimeRep]
 liftedRepDataConTy, unliftedRepDataConTy,
-  intRepDataConTy, int8RepDataConTy, wordRepDataConTy, int64RepDataConTy,
-  word8RepDataConTy, word64RepDataConTy, addrRepDataConTy,
+  intRepDataConTy, int8RepDataConTy, int16RepDataConTy, wordRepDataConTy, int64RepDataConTy,
+  word8RepDataConTy, word16RepDataConTy, word64RepDataConTy, addrRepDataConTy,
   floatRepDataConTy, doubleRepDataConTy :: Type
 [liftedRepDataConTy, unliftedRepDataConTy,
-   intRepDataConTy, wordRepDataConTy, int8RepDataConTy, int64RepDataConTy,
-   word8RepDataConTy, word64RepDataConTy,
+   intRepDataConTy, wordRepDataConTy, int8RepDataConTy, int16RepDataConTy, int64RepDataConTy,
+   word8RepDataConTy, word16RepDataConTy, word64RepDataConTy,
    addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy]
   = map (mkTyConTy . promoteDataCon) runtimeRepSimpleDataCons
 

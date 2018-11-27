@@ -108,7 +108,6 @@ import Panic
 import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
 
-import Control.Exception (finally)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Char
@@ -553,7 +552,7 @@ empty    :: SDoc
 char     :: Char       -> SDoc
 text     :: String     -> SDoc
 ftext    :: FastString -> SDoc
-ptext    :: LitString  -> SDoc
+ptext    :: PtrString  -> SDoc
 ztext    :: FastZString -> SDoc
 int      :: Int        -> SDoc
 integer  :: Integer    -> SDoc

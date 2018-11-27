@@ -164,7 +164,7 @@ dwarfSection name = sdocWithPlatform $ \plat ->
        -> text "\t.section .debug_" <> text name <> text ",\"dr\""
 
 -- * Dwarf section labels
-dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel :: LitString
+dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel :: PtrString
 dwarfInfoLabel   = sLit ".Lsection_info"
 dwarfAbbrevLabel = sLit ".Lsection_abbrev"
 dwarfLineLabel   = sLit ".Lsection_line"

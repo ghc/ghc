@@ -35,7 +35,7 @@ module VarSet (
         intersectDVarSet, dVarSetIntersectVarSet,
         intersectsDVarSet, disjointDVarSet,
         isEmptyDVarSet, delDVarSet, delDVarSetList,
-        minusDVarSet, foldDVarSet, filterDVarSet,
+        minusDVarSet, foldDVarSet, filterDVarSet, mapDVarSet,
         dVarSetMinusVarSet, anyDVarSet, allDVarSet,
         transCloDVarSet,
         sizeDVarSet, seqDVarSet,
@@ -294,6 +294,9 @@ anyDVarSet p = anyUDFM p . getUniqDSet
 
 allDVarSet :: (Var -> Bool) -> DVarSet -> Bool
 allDVarSet p = allUDFM p . getUniqDSet
+
+mapDVarSet :: Uniquable b => (a -> b) -> UniqDSet a -> UniqDSet b
+mapDVarSet = mapUniqDSet
 
 filterDVarSet :: (Var -> Bool) -> DVarSet -> DVarSet
 filterDVarSet = filterUniqDSet

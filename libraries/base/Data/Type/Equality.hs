@@ -23,8 +23,8 @@
 -- Stability   :  experimental
 -- Portability :  not portable
 --
--- Definition of propositional equality @(:~:)@. Pattern-matching on a variable
--- of type @(a :~: b)@ produces a proof that @a ~ b@.
+-- Definition of propositional equality @(':~:')@. Pattern-matching on a variable
+-- of type @(a ':~:' b)@ produces a proof that @a '~' b@.
 --
 -- @since 4.7.0.0
 -----------------------------------------------------------------------------

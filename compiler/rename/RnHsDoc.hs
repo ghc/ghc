@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 
 module RnHsDoc ( rnHsDoc, rnLHsDoc, rnMbLHsDoc ) where
 
@@ -16,10 +17,9 @@ rnMbLHsDoc mb_doc = case mb_doc of
   Nothing -> return Nothing
 
 rnLHsDoc :: LHsDocString -> RnM LHsDocString
-rnLHsDoc (L pos doc) = do
+rnLHsDoc (dL->L pos doc) = do
   doc' <- rnHsDoc doc
-  return (L pos doc')
+  return (cL pos doc')
 
 rnHsDoc :: HsDocString -> RnM HsDocString
 rnHsDoc = pure
-

@@ -282,11 +282,10 @@ unariseBinding rho (StgRec xrhss)
   = StgRec <$> mapM (\(x, rhs) -> (x,) <$> unariseRhs rho rhs) xrhss
 
 unariseRhs :: UnariseEnv -> StgRhs -> UniqSM StgRhs
-unariseRhs rho (StgRhsClosure ccs fvs update_flag args expr)
+unariseRhs rho (StgRhsClosure ext ccs update_flag args expr)
   = do (rho', args1) <- unariseFunArgBinders rho args
        expr' <- unariseExpr rho' expr
-       let fvs' = unariseFreeVars rho fvs
-       return (StgRhsClosure ccs fvs' update_flag args1 expr')
+       return (StgRhsClosure ext ccs update_flag args1 expr')
 
 unariseRhs rho (StgRhsCon ccs con args)
   = ASSERT(not (isUnboxedTupleCon con || isUnboxedSumCon con))
@@ -355,11 +354,11 @@ unariseExpr rho (StgCase scrut bndr alt_ty alts)
                        -- bndr may have a unboxed sum/tuple type but it will be
                        -- dead after unarise (checked in StgLint)
 
-unariseExpr rho (StgLet bind e)
-  = StgLet <$> unariseBinding rho bind <*> unariseExpr rho e
+unariseExpr rho (StgLet ext bind e)
+  = StgLet ext <$> unariseBinding rho bind <*> unariseExpr rho e
 
-unariseExpr rho (StgLetNoEscape bind e)
-  = StgLetNoEscape <$> unariseBinding rho bind <*> unariseExpr rho e
+unariseExpr rho (StgLetNoEscape ext bind e)
+  = StgLetNoEscape ext <$> unariseBinding rho bind <*> unariseExpr rho e
 
 unariseExpr rho (StgTick tick e)
   = StgTick tick <$> unariseExpr rho e
@@ -582,8 +581,8 @@ mkUbxSum dc ty_args args0
                          -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in MkCore
       slotRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0 wordPrimTy)
       slotRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0 word64PrimTy)
-      slotRubbishArg FloatSlot  = StgLitArg (MachFloat 0)
-      slotRubbishArg DoubleSlot = StgLitArg (MachDouble 0)
+      slotRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
+      slotRubbishArg DoubleSlot = StgLitArg (LitDouble 0)
     in
       tag_arg : mkTupArgs 0 sum_slots arg_idxs
 
@@ -723,24 +722,6 @@ unariseConArgBinders rho xs = second concat <$> mapAccumLM unariseConArgBinder r
 -- See DataCon applications case in Note [Post-unarisation invariants].
 unariseConArgBinder :: UnariseEnv -> Id -> UniqSM (UnariseEnv, [Id])
 unariseConArgBinder = unariseArgBinder True
-
-unariseFreeVars :: UnariseEnv -> [InId] -> [OutId]
-unariseFreeVars rho fvs
- = [ v | fv <- fvs, StgVarArg v <- unariseFreeVar rho fv ]
-   -- Notice that we filter out any StgLitArgs
-   -- e.g.   case e of (x :: (# Int | Bool #))
-   --           (# v | #) ->  ... let {g = \y. ..x...} in ...
-   --           (# | w #) -> ...
-   --     Here 'x' is free in g's closure, and the env will have
-   --       x :-> [1, v]
-   --     we want to capture 'v', but not 1, in the free vars
-
-unariseFreeVar :: UnariseEnv -> Id -> [StgArg]
-unariseFreeVar rho x =
-  case lookupVarEnv rho x of
-    Just (MultiVal args) -> args
-    Just (UnaryVal arg)  -> [arg]
-    Nothing              -> [StgVarArg x]
 
 --------------------------------------------------------------------------------
 

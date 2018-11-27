@@ -703,7 +703,7 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
     -- Remove recursive references from the SRT, except for (all but
     -- one of the) static functions. See Note [recursive SRTs].
     nonRec = cafs `Set.difference`
-      Set.fromList lbls `Set.difference` Set.fromList otherFunLabels
+      (Set.fromList lbls `Set.difference` Set.fromList otherFunLabels)
 
     -- First resolve all the CAFLabels to SRTEntries
     -- Implements the [Inline] optimisation.

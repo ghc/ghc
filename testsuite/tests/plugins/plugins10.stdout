@@ -5,14 +5,17 @@ interfacePlugin: Language.Haskell.TH.Quote
 interfacePlugin: GHC.Float
 interfacePlugin: GHC.Base
 interfacePlugin: Language.Haskell.TH.Syntax
-interfacePlugin: GHC.Types
 typeCheckPlugin (rn)
+interfacePlugin: GHC.Types
 typeCheckPlugin (tc)
 interfacePlugin: GHC.Integer.Type
+interfacePlugin: GHC.Natural
 parsePlugin(a)
+typeCheckPlugin (rn)
 interfacePlugin: Language.Haskell.TH.Lib.Internal
 metaPlugin: return []
 metaPlugin: quoteExp stringify "x"
 interfacePlugin: GHC.CString
+typeCheckPlugin (rn)
 typeCheckPlugin (rn)
 typeCheckPlugin (tc)

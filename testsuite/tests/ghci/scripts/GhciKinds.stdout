@@ -14,4 +14,4 @@ $(unboxedTupleT 2) :: forall (k0 :: RuntimeRep) (k1 :: RuntimeRep).
                       -> TYPE k1
                       -> TYPE
                            ('TupleRep
-                              ((':) RuntimeRep k0 ((':) RuntimeRep k1 ('[] RuntimeRep))))
+                              ((':) @RuntimeRep k0 ((':) @RuntimeRep k1 ('[] @RuntimeRep))))

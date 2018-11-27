@@ -161,17 +161,15 @@ section "The word size story."
 -- This type won't be exported directly (since there is no concrete
 -- syntax for this sort of export) so we'll have to manually patch
 -- export lists in both GHC and Haddock.
-primtype (->) a b
-  {The builtin function type, written in infix form as {\tt a -> b} and
-   in prefix form as {\tt (->) a b}. Values of this type are functions
-   taking inputs of type {\tt a} and producing outputs of type {\tt b}.
+primtype FUN m a b
+  {The builtin function type, written in infix form as {\tt a -->.(m) b}.
+   Values of this type are functions taking inputs of type {\tt a} and
+   producing outputs of type {\tt b}. The multiplicity of the input is
+   {\tt m}.
 
-   Note that {\tt a -> b} permits levity-polymorphism in both {\tt a} and
+   Note that {\tt FUN m a b} permits levity-polymorphism in both {\tt a} and
    {\tt b}, so that types like {\tt Int\# -> Int\#} can still be well-kinded.
   }
-  with fixity = infixr -1
-         -- This fixity is only the one picked up by Haddock. If you
-         -- change this, do update 'ghcPrimIface' in 'LoadIface.hs'.
 
 ------------------------------------------------------------------------
 section "Char#"
@@ -424,6 +422,88 @@ primop Word8GtOp "gtWord8#" Compare Word8# -> Word8# -> Int#
 primop Word8LeOp "leWord8#" Compare Word8# -> Word8# -> Int#
 primop Word8LtOp "ltWord8#" Compare Word8# -> Word8# -> Int#
 primop Word8NeOp "neWord8#" Compare Word8# -> Word8# -> Int#
+
+------------------------------------------------------------------------
+section "Int16#"
+        {Operations on 16-bit integers.}
+------------------------------------------------------------------------
+
+primtype Int16#
+
+primop Int16Extend "extendInt16#" GenPrimOp Int16# -> Int#
+primop Int16Narrow "narrowInt16#" GenPrimOp Int# -> Int16#
+
+primop Int16NegOp "negateInt16#" Monadic Int16# -> Int16#
+
+primop Int16AddOp "plusInt16#" Dyadic Int16# -> Int16# -> Int16#
+  with
+    commutable = True
+
+primop Int16SubOp "subInt16#" Dyadic Int16# -> Int16# -> Int16#
+
+primop Int16MulOp "timesInt16#" Dyadic Int16# -> Int16# -> Int16#
+  with
+    commutable = True
+
+primop Int16QuotOp "quotInt16#" Dyadic Int16# -> Int16# -> Int16#
+  with
+    can_fail = True
+
+primop Int16RemOp "remInt16#" Dyadic Int16# -> Int16# -> Int16#
+  with
+    can_fail = True
+
+primop Int16QuotRemOp "quotRemInt16#" GenPrimOp Int16# -> Int16# -> (# Int16#, Int16# #)
+  with
+    can_fail = True
+
+primop Int16EqOp "eqInt16#" Compare Int16# -> Int16# -> Int#
+primop Int16GeOp "geInt16#" Compare Int16# -> Int16# -> Int#
+primop Int16GtOp "gtInt16#" Compare Int16# -> Int16# -> Int#
+primop Int16LeOp "leInt16#" Compare Int16# -> Int16# -> Int#
+primop Int16LtOp "ltInt16#" Compare Int16# -> Int16# -> Int#
+primop Int16NeOp "neInt16#" Compare Int16# -> Int16# -> Int#
+
+------------------------------------------------------------------------
+section "Word16#"
+        {Operations on 16-bit unsigned integers.}
+------------------------------------------------------------------------
+
+primtype Word16#
+
+primop Word16Extend "extendWord16#" GenPrimOp Word16# -> Word#
+primop Word16Narrow "narrowWord16#" GenPrimOp Word# -> Word16#
+
+primop Word16NotOp "notWord16#" Monadic Word16# -> Word16#
+
+primop Word16AddOp "plusWord16#" Dyadic Word16# -> Word16# -> Word16#
+  with
+    commutable = True
+
+primop Word16SubOp "subWord16#" Dyadic Word16# -> Word16# -> Word16#
+
+primop Word16MulOp "timesWord16#" Dyadic Word16# -> Word16# -> Word16#
+  with
+    commutable = True
+
+primop Word16QuotOp "quotWord16#" Dyadic Word16# -> Word16# -> Word16#
+  with
+    can_fail = True
+
+primop Word16RemOp "remWord16#" Dyadic Word16# -> Word16# -> Word16#
+  with
+    can_fail = True
+
+primop Word16QuotRemOp "quotRemWord16#" GenPrimOp Word16# -> Word16# -> (# Word16#, Word16# #)
+  with
+    can_fail = True
+
+primop Word16EqOp "eqWord16#" Compare Word16# -> Word16# -> Int#
+primop Word16GeOp "geWord16#" Compare Word16# -> Word16# -> Int#
+primop Word16GtOp "gtWord16#" Compare Word16# -> Word16# -> Int#
+primop Word16LeOp "leWord16#" Compare Word16# -> Word16# -> Int#
+primop Word16LtOp "ltWord16#" Compare Word16# -> Word16# -> Int#
+primop Word16NeOp "neWord16#" Compare Word16# -> Word16# -> Int#
 
 ------------------------------------------------------------------------
 section "Word#"

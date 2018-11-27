@@ -46,11 +46,10 @@ import DynFlags
 import ForeignCall
 import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..) )
-import UniqFM
 import SrcLoc           ( mkGeneralSrcSpan )
 
 import Data.List.NonEmpty (nonEmpty, toList)
-import Data.Maybe    (isJust, fromMaybe)
+import Data.Maybe    (fromMaybe)
 import Control.Monad (liftM, ap)
 
 -- Note [Live vs free]
@@ -208,7 +207,7 @@ coreToStg :: DynFlags -> Module -> CoreProgram
 coreToStg dflags this_mod pgm
   = (pgm', final_ccs)
   where
-    (_, _, (local_ccs, local_cc_stacks), pgm')
+    (_, (local_ccs, local_cc_stacks), pgm')
       = coreTopBindsToStg dflags this_mod emptyVarEnv emptyCollectedCCs pgm
 
     prof = WayProf `elem` ways dflags
@@ -229,45 +228,41 @@ coreTopBindsToStg
     -> IdEnv HowBound           -- environment for the bindings
     -> CollectedCCs
     -> CoreProgram
-    -> (IdEnv HowBound, FreeVarsInfo, CollectedCCs, [StgTopBinding])
+    -> (IdEnv HowBound, CollectedCCs, [StgTopBinding])
 
 coreTopBindsToStg _      _        env ccs []
-  = (env, emptyFVInfo, ccs, [])
+  = (env, ccs, [])
 coreTopBindsToStg dflags this_mod env ccs (b:bs)
-  = (env2, fvs2, ccs2, b':bs')
+  = (env2, ccs2, b':bs')
   where
-        -- Notice the mutually-recursive "knot" here:
-        --   env accumulates down the list of binds,
-        --   fvs accumulates upwards
-        (env1, fvs2, ccs1, b' ) =
-          coreTopBindToStg dflags this_mod env fvs1 ccs b
-        (env2, fvs1, ccs2, bs') =
+        (env1, ccs1, b' ) =
+          coreTopBindToStg dflags this_mod env ccs b
+        (env2, ccs2, bs') =
           coreTopBindsToStg dflags this_mod env1 ccs1 bs
 
 coreTopBindToStg
         :: DynFlags
         -> Module
         -> IdEnv HowBound
-        -> FreeVarsInfo         -- Info about the body
         -> CollectedCCs
         -> CoreBind
-        -> (IdEnv HowBound, FreeVarsInfo, CollectedCCs, StgTopBinding)
+        -> (IdEnv HowBound, CollectedCCs, StgTopBinding)
 
-coreTopBindToStg _ _ env body_fvs ccs (NonRec id e)
+coreTopBindToStg _ _ env ccs (NonRec id e)
   | Just str <- exprIsTickedString_maybe e
   -- top-level string literal
   -- See Note [CoreSyn top-level string literals] in CoreSyn
   = let
         env' = extendVarEnv env id how_bound
         how_bound = LetBound TopLet 0
-    in (env', body_fvs, ccs, StgTopStringLit id str)
+    in (env', ccs, StgTopStringLit id str)
 
-coreTopBindToStg dflags this_mod env body_fvs ccs (NonRec id rhs)
+coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
   = let
         env'      = extendVarEnv env id how_bound
         how_bound = LetBound TopLet $! manifestArity rhs
 
-        (stg_rhs, fvs', ccs') =
+        (stg_rhs, ccs') =
             initCts env $
               coreToTopStgRhs dflags ccs this_mod (id,rhs)
 
@@ -278,9 +273,9 @@ coreTopBindToStg dflags this_mod env body_fvs ccs (NonRec id rhs)
       --     as well as 'id', but that led to a black hole
       --     where printing the assertion error tripped the
       --     assertion again!
-    (env', fvs' `unionFVInfo` body_fvs, ccs', bind)
+    (env', ccs', bind)
 
-coreTopBindToStg dflags this_mod env body_fvs ccs (Rec pairs)
+coreTopBindToStg dflags this_mod env ccs (Rec pairs)
   = ASSERT( not (null pairs) )
     let
         binders = map fst pairs
@@ -289,28 +284,27 @@ coreTopBindToStg dflags this_mod env body_fvs ccs (Rec pairs)
                      | (b, rhs) <- pairs ]
         env' = extendVarEnvList env extra_env'
 
-        -- generate StgTopBindings, accumulate body_fvs and CAF cost centres
-        -- created for CAFs
-        ((fvs', ccs'), stg_rhss)
+        -- generate StgTopBindings and CAF cost centres created for CAFs
+        (ccs', stg_rhss)
           = initCts env' $ do
-               mapAccumLM (\(fvs, ccs) rhs -> do
-                            (rhs', fvs', ccs') <-
+               mapAccumLM (\ccs rhs -> do
+                            (rhs', ccs') <-
                               coreToTopStgRhs dflags ccs this_mod rhs
-                            return ((fvs' `unionFVInfo` fvs, ccs'), rhs'))
-                          (body_fvs, ccs)
+                            return (ccs', rhs'))
+                          ccs
                           pairs
 
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)
     in
     ASSERT2(consistentCafInfo (head binders) bind, ppr binders)
-    (env', fvs' `unionFVInfo` body_fvs, ccs', bind)
+    (env', ccs', bind)
 
 
 -- Assertion helper: this checks that the CafInfo on the Id matches
 -- what CoreToStg has figured out about the binding's SRT.  The
 -- CafInfo will be exact in all cases except when CorePrep has
 -- floated out a binding, in which case it will be approximate.
-consistentCafInfo :: Id -> GenStgTopBinding Var Id -> Bool
+consistentCafInfo :: Id -> StgTopBinding -> Bool
 consistentCafInfo id bind
   = WARN( not (exact || is_sat_thing) , ppr id <+> ppr id_marked_caffy <+> ppr binding_is_caffy )
     safe
@@ -326,18 +320,17 @@ coreToTopStgRhs
         -> CollectedCCs
         -> Module
         -> (Id,CoreExpr)
-        -> CtsM (StgRhs, FreeVarsInfo, CollectedCCs)
+        -> CtsM (StgRhs, CollectedCCs)
 
 coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
-  = do { (new_rhs, rhs_fvs) <- coreToStgExpr rhs
+  = do { new_rhs <- coreToStgExpr rhs
 
        ; let (stg_rhs, ccs') =
-               mkTopStgRhs dflags this_mod ccs rhs_fvs bndr new_rhs
+               mkTopStgRhs dflags this_mod ccs bndr new_rhs
              stg_arity =
                stgRhsArity stg_rhs
 
        ; return (ASSERT2( arity_ok stg_arity, mk_arity_msg stg_arity) stg_rhs,
-                 rhs_fvs,
                  ccs') }
   where
         -- It's vital that the arity on a top-level Id matches
@@ -365,8 +358,7 @@ coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
 
 coreToStgExpr
         :: CoreExpr
-        -> CtsM (StgExpr,       -- Decorated STG expr
-                 FreeVarsInfo)  -- Its free vars (NB free, not live)
+        -> CtsM StgExpr
 
 -- The second and third components can be derived in a simple bottom up pass, not
 -- dependent on any decisions about which variables will be let-no-escaped or
@@ -378,9 +370,9 @@ coreToStgExpr
 -- CorePrep should have converted them all to a real core representation.
 coreToStgExpr (Lit (LitNumber LitNumInteger _ _)) = panic "coreToStgExpr: LitInteger"
 coreToStgExpr (Lit (LitNumber LitNumNatural _ _)) = panic "coreToStgExpr: LitNatural"
-coreToStgExpr (Lit l)      = return (StgLit l, emptyFVInfo)
-coreToStgExpr (App (Lit RubbishLit) _some_unlifted_type)
-  -- We lower 'RubbishLit' to @()@ here, which is much easier than doing it in
+coreToStgExpr (Lit l)      = return (StgLit l)
+coreToStgExpr (App (Lit LitRubbish) _some_unlifted_type)
+  -- We lower 'LitRubbish' to @()@ here, which is much easier than doing it in
   -- a STG to Cmm pass.
   = coreToStgExpr (Var unitDataConId)
 coreToStgExpr (Var v)      = coreToStgApp Nothing v               [] []
@@ -397,14 +389,13 @@ coreToStgExpr expr@(Lam _ _)
         args'        = filterStgBinders args
     in
     extendVarEnvCts [ (a, LambdaBound) | a <- args' ] $ do
-    (body, body_fvs) <- coreToStgExpr body
+    body' <- coreToStgExpr body
     let
-        fvs         = args' `minusFVBinders` body_fvs
         result_expr = case nonEmpty args' of
-          Nothing     -> body
-          Just args'' -> StgLam args'' body
+          Nothing     -> body'
+          Just args'' -> StgLam args'' body'
 
-    return (result_expr, fvs)
+    return result_expr
 
 coreToStgExpr (Tick tick expr)
   = do case tick of
@@ -412,8 +403,8 @@ coreToStgExpr (Tick tick expr)
          ProfNote{}   -> return ()
          SourceNote{} -> return ()
          Breakpoint{} -> panic "coreToStgExpr: breakpoint should not happen"
-       (expr2, fvs) <- coreToStgExpr expr
-       return (StgTick tick expr2, fvs)
+       expr2 <- coreToStgExpr expr
+       return (StgTick tick expr2)
 
 coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
@@ -433,31 +424,9 @@ coreToStgExpr (Case scrut _ _ [])
 
 
 coreToStgExpr (Case scrut bndr _ alts) = do
-    (alts2, alts_fvs)
-       <- extendVarEnvCts [(bndr, LambdaBound)] $ do
-            (alts2, fvs_s) <- mapAndUnzipM vars_alt alts
-            return ( alts2,
-                     unionFVInfos fvs_s )
-    let
-        -- Determine whether the default binder is dead or not
-        -- This helps the code generator to avoid generating an assignment
-        -- for the case binder (is extremely rare cases) ToDo: remove.
-        bndr' | bndr `elementOfFVInfo` alts_fvs = bndr
-              | otherwise                       = bndr `setIdOccInfo` IAmDead
-
-        -- Don't consider the default binder as being 'live in alts',
-        -- since this is from the point of view of the case expr, where
-        -- the default binder is not free.
-        alts_fvs_wo_bndr  = bndr `minusFVBinder` alts_fvs
-
-        -- We tell the scrutinee that everything
-        -- live in the alts is live in it, too.
-    (scrut2, scrut_fvs) <- coreToStgExpr scrut
-
-    return (
-      StgCase scrut2 bndr' (mkStgAltType bndr alts) alts2,
-      scrut_fvs `unionFVInfo` alts_fvs_wo_bndr
-      )
+    alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
+    scrut2 <- coreToStgExpr scrut
+    return (StgCase scrut2 bndr (mkStgAltType bndr alts) alts2)
   where
     vars_alt (con, binders, rhs)
       | DataAlt c <- con, c == unboxedUnitDataCon
@@ -465,16 +434,15 @@ coreToStgExpr (Case scrut bndr _ alts) = do
         -- See Note [Nullary unboxed tuple] in Type.hs
         -- where a nullary tuple is mapped to (State# World#)
         ASSERT( null binders )
-        do { (rhs2, rhs_fvs) <- coreToStgExpr rhs
-           ; return ((DEFAULT, [], rhs2), rhs_fvs) }
+        do { rhs2 <- coreToStgExpr rhs
+           ; return (DEFAULT, [], rhs2)  }
       | otherwise
       = let     -- Remove type variables
             binders' = filterStgBinders binders
         in
         extendVarEnvCts [(b, LambdaBound) | b <- binders'] $ do
-        (rhs2, rhs_fvs) <- coreToStgExpr rhs
-        return ( (con, binders', rhs2),
-                 binders' `minusFVBinders` rhs_fvs )
+        rhs2 <- coreToStgExpr rhs
+        return (con, binders', rhs2)
 
 coreToStgExpr (Let bind body) = do
     coreToStgLet bind body
@@ -533,19 +501,15 @@ coreToStgApp
         -> Id                           -- Function
         -> [CoreArg]                    -- Arguments
         -> [Tickish Id]                 -- Debug ticks
-        -> CtsM (StgExpr, FreeVarsInfo)
+        -> CtsM StgExpr
 
 
 coreToStgApp _ f args ticks = do
-    (args', args_fvs, ticks') <- coreToStgArgs args
+    (args', ticks') <- coreToStgArgs args
     how_bound <- lookupVarCts f
 
     let
         n_val_args       = valArgCount args
-        fun_fvs = singletonFVInfo f how_bound
-            -- e.g. (f :: a -> int) (x :: a)
-            -- Here the free variables are "f", "x" AND the type variable "a"
-            -- coreToStgArgs will deal with the arguments recursively
 
         -- Mostly, the arity info of a function is in the fn's IdInfo
         -- But new bindings introduced by CoreSat may not have no
@@ -579,45 +543,39 @@ coreToStgApp _ f args ticks = do
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
                 _other           -> StgApp f args'
-        fvs = fun_fvs  `unionFVInfo` args_fvs
 
         tapp = foldr StgTick app (ticks ++ ticks')
 
     -- Forcing these fixes a leak in the code generator, noticed while
     -- profiling for trac #4367
-    app `seq` fvs `seq` return (
-        tapp,
-        fvs
-     )
+    app `seq` return tapp
 
 -- ---------------------------------------------------------------------------
 -- Argument lists
 -- This is the guy that turns applications into A-normal form
 -- ---------------------------------------------------------------------------
 
-coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], FreeVarsInfo, [Tickish Id])
+coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [Tickish Id])
 coreToStgArgs []
-  = return ([], emptyFVInfo, [])
+  = return ([], [])
 
 coreToStgArgs (Type _ : args) = do     -- Type argument
-    (args', fvs, ts) <- coreToStgArgs args
-    return (args', fvs, ts)
+    (args', ts) <- coreToStgArgs args
+    return (args', ts)
 
 coreToStgArgs (Coercion _ : args)  -- Coercion argument; replace with place holder
-  = do { (args', fvs, ts) <- coreToStgArgs args
-       ; return (StgVarArg coercionTokenId : args', fvs, ts) }
+  = do { (args', ts) <- coreToStgArgs args
+       ; return (StgVarArg coercionTokenId : args', ts) }
 
 coreToStgArgs (Tick t e : args)
   = ASSERT( not (tickishIsCode t) )
-    do { (args', fvs, ts) <- coreToStgArgs (e : args)
-       ; return (args', fvs, t:ts) }
+    do { (args', ts) <- coreToStgArgs (e : args)
+       ; return (args', t:ts) }
 
 coreToStgArgs (arg : args) = do         -- Non-type argument
-    (stg_args, args_fvs, ticks) <- coreToStgArgs args
-    (arg', arg_fvs) <- coreToStgExpr arg
+    (stg_args, ticks) <- coreToStgArgs args
+    arg' <- coreToStgExpr arg
     let
-        fvs = args_fvs `unionFVInfo` arg_fvs
-
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
         stg_arg = case arg'' of
                        StgApp v []        -> StgVarArg v
@@ -646,7 +604,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         -- We also want to check if a pointer is cast to a non-ptr etc
 
     WARN( bad_args, text "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" $$ ppr arg )
-     return (stg_arg : stg_args, fvs, ticks ++ aticks)
+     return (stg_arg : stg_args, ticks ++ aticks)
 
 
 -- ---------------------------------------------------------------------------
@@ -654,56 +612,43 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
 -- ---------------------------------------------------------------------------
 
 coreToStgLet
-         :: CoreBind    -- bindings
-         -> CoreExpr    -- body
-         -> CtsM (StgExpr,      -- new let
-                  FreeVarsInfo) -- variables free in the whole let
+         :: CoreBind     -- bindings
+         -> CoreExpr     -- body
+         -> CtsM StgExpr -- new let
 
 coreToStgLet bind body = do
-    (bind2, bind_fvs,
-     body2, body_fvs)
+    (bind2, body2)
        <- do
 
-          ( bind2, bind_fvs, env_ext)
+          ( bind2, env_ext)
                 <- vars_bind bind
 
           -- Do the body
           extendVarEnvCts env_ext $ do
-             (body2, body_fvs) <- coreToStgExpr body
+             body2 <- coreToStgExpr body
 
-             return (bind2, bind_fvs,
-                     body2, body_fvs)
+             return (bind2, body2)
 
         -- Compute the new let-expression
     let
-        new_let | isJoinBind bind = StgLetNoEscape bind2 body2
-                | otherwise       = StgLet bind2 body2
+        new_let | isJoinBind bind = StgLetNoEscape noExtSilent bind2 body2
+                | otherwise       = StgLet noExtSilent bind2 body2
 
-        free_in_whole_let
-          = binders `minusFVBinders` (bind_fvs `unionFVInfo` body_fvs)
-
-    return (
-        new_let,
-        free_in_whole_let
-      )
+    return new_let
   where
-    binders        = bindersOf bind
-
     mk_binding binder rhs
         = (binder, LetBound NestedLet (manifestArity rhs))
 
     vars_bind :: CoreBind
               -> CtsM (StgBinding,
-                       FreeVarsInfo,
                        [(Id, HowBound)])  -- extension to environment
 
     vars_bind (NonRec binder rhs) = do
-        (rhs2, bind_fvs) <- coreToStgRhs (binder,rhs)
+        rhs2 <- coreToStgRhs (binder,rhs)
         let
             env_ext_item = mk_binding binder rhs
 
-        return (StgNonRec binder rhs2,
-                bind_fvs, [env_ext_item])
+        return (StgNonRec binder rhs2, [env_ext_item])
 
     vars_bind (Rec pairs)
       =    let
@@ -712,32 +657,26 @@ coreToStgLet bind body = do
                           | (b,rhs) <- pairs ]
            in
            extendVarEnvCts env_ext $ do
-              (rhss2, fvss)
-                     <- mapAndUnzipM coreToStgRhs pairs
-              let
-                        bind_fvs = unionFVInfos fvss
-
-              return (StgRec (binders `zip` rhss2),
-                      bind_fvs, env_ext)
+              rhss2 <- mapM coreToStgRhs pairs
+              return (StgRec (binders `zip` rhss2), env_ext)
 
 coreToStgRhs :: (Id,CoreExpr)
-             -> CtsM (StgRhs, FreeVarsInfo)
+             -> CtsM StgRhs
 
 coreToStgRhs (bndr, rhs) = do
-    (new_rhs, rhs_fvs) <- coreToStgExpr rhs
-    return (mkStgRhs rhs_fvs bndr new_rhs, rhs_fvs)
+    new_rhs <- coreToStgExpr rhs
+    return (mkStgRhs bndr new_rhs)
 
 -- Generate a top-level RHS. Any new cost centres generated for CAFs will be
 -- appended to `CollectedCCs` argument.
 mkTopStgRhs :: DynFlags -> Module -> CollectedCCs
-            -> FreeVarsInfo -> Id -> StgExpr
-            -> (StgRhs, CollectedCCs)
+            -> Id -> StgExpr -> (StgRhs, CollectedCCs)
 
-mkTopStgRhs dflags this_mod ccs rhs_fvs bndr rhs
+mkTopStgRhs dflags this_mod ccs bndr rhs
   | StgLam bndrs body <- rhs
   = -- StgLam can't have empty arguments, so not CAF
-    ( StgRhsClosure dontCareCCS
-                    (getFVs rhs_fvs)
+    ( StgRhsClosure noExtSilent
+                    dontCareCCS
                     ReEntrant
                     (toList bndrs) body
     , ccs )
@@ -752,14 +691,14 @@ mkTopStgRhs dflags this_mod ccs rhs_fvs bndr rhs
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | gopt Opt_AutoSccsOnIndividualCafs dflags
-  = ( StgRhsClosure caf_ccs
-                    (getFVs rhs_fvs)
+  = ( StgRhsClosure noExtSilent
+                    caf_ccs
                     upd_flag [] rhs
     , collectCC caf_cc caf_ccs ccs )
 
   | otherwise
-  = ( StgRhsClosure all_cafs_ccs
-                    (getFVs rhs_fvs)
+  = ( StgRhsClosure noExtSilent
+                    all_cafs_ccs
                     upd_flag [] rhs
     , ccs )
 
@@ -783,18 +722,18 @@ mkTopStgRhs dflags this_mod ccs rhs_fvs bndr rhs
 
 -- Generate a non-top-level RHS. Cost-centre is always currentCCS,
 -- see Note [Cost-centre initialzation plan].
-mkStgRhs :: FreeVarsInfo -> Id -> StgExpr -> StgRhs
-mkStgRhs rhs_fvs bndr rhs
+mkStgRhs :: Id -> StgExpr -> StgRhs
+mkStgRhs bndr rhs
   | StgLam bndrs body <- rhs
-  = StgRhsClosure currentCCS
-                  (getFVs rhs_fvs)
+  = StgRhsClosure noExtSilent
+                  currentCCS
                   ReEntrant
                   (toList bndrs) body
 
   | isJoinId bndr -- must be a nullary join point
   = ASSERT(idJoinArity bndr == 0)
-    StgRhsClosure currentCCS
-                  (getFVs rhs_fvs)
+    StgRhsClosure noExtSilent
+                  currentCCS
                   ReEntrant -- ignored for LNE
                   [] rhs
 
@@ -802,8 +741,8 @@ mkStgRhs rhs_fvs bndr rhs
   = StgRhsCon currentCCS con args
 
   | otherwise
-  = StgRhsClosure currentCCS
-                  (getFVs rhs_fvs)
+  = StgRhsClosure noExtSilent
+                  currentCCS
                   upd_flag [] rhs
   where
     (_, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
@@ -891,11 +830,6 @@ data LetInfo
   | NestedLet
   deriving (Eq)
 
-topLevelBound :: HowBound -> Bool
-topLevelBound ImportBound         = True
-topLevelBound (LetBound TopLet _) = True
-topLevelBound _                   = False
-
 -- For a let(rec)-bound variable, x, we record LiveInfo, the set of
 -- variables that are live if x is live.  This LiveInfo comprises
 --         (a) dynamic live variables (ones with a non-top-level binding)
@@ -960,63 +894,6 @@ getAllCAFsCC this_mod =
       all_cafs_ccs = mkSingletonCCS all_cafs_cc
     in
       (all_cafs_cc, all_cafs_ccs)
-
--- ---------------------------------------------------------------------------
--- Free variable information
--- ---------------------------------------------------------------------------
-
-type FreeVarsInfo = VarEnv (Var, HowBound)
-        -- The Var is so we can gather up the free variables
-        -- as a set.
-        --
-        -- The HowBound info just saves repeated lookups;
-        -- we look up just once when we encounter the occurrence.
-        -- INVARIANT: Any ImportBound Ids are HaveCafRef Ids
-        --            Imported Ids without CAF refs are simply
-        --            not put in the FreeVarsInfo for an expression.
-        --            See singletonFVInfo and freeVarsToLiveVars
-
-emptyFVInfo :: FreeVarsInfo
-emptyFVInfo = emptyVarEnv
-
-singletonFVInfo :: Id -> HowBound -> FreeVarsInfo
--- Don't record non-CAF imports at all, to keep free-var sets small
-singletonFVInfo id ImportBound
-   | mayHaveCafRefs (idCafInfo id) = unitVarEnv id (id, ImportBound)
-   | otherwise                     = emptyVarEnv
-singletonFVInfo id how_bound = unitVarEnv id (id, how_bound)
-
-unionFVInfo :: FreeVarsInfo -> FreeVarsInfo -> FreeVarsInfo
-unionFVInfo fv1 fv2 = plusVarEnv_C plusFVInfo fv1 fv2
-
-unionFVInfos :: [FreeVarsInfo] -> FreeVarsInfo
-unionFVInfos fvs = foldr unionFVInfo emptyFVInfo fvs
-
-minusFVBinders :: [Id] -> FreeVarsInfo -> FreeVarsInfo
-minusFVBinders vs fv = foldr minusFVBinder fv vs
-
-minusFVBinder :: Id -> FreeVarsInfo -> FreeVarsInfo
-minusFVBinder v fv = fv `delVarEnv` v
-        -- When removing a binder, remember to add its type variables
-        -- c.f. CoreFVs.delBinderFV
-
-elementOfFVInfo :: Id -> FreeVarsInfo -> Bool
-elementOfFVInfo id fvs = isJust (lookupVarEnv fvs id)
-
--- Non-top-level things only, both type variables and ids
-getFVs :: FreeVarsInfo -> [Var]
-getFVs fvs = [id | (id, how_bound) <- nonDetEltsUFM fvs,
-  -- It's OK to use nonDetEltsUFM here because we're not aiming for
-  -- bit-for-bit determinism.
-  -- See Note [Unique Determinism and code generation]
-                    not (topLevelBound how_bound) ]
-
-plusFVInfo :: (Var, HowBound)
-           -> (Var, HowBound)
-           -> (Var, HowBound)
-plusFVInfo (id1,hb1) (id2,hb2)
-  = ASSERT(id1 == id2 && hb1 == hb2)
-    (id1, hb1)
 
 -- Misc.
 

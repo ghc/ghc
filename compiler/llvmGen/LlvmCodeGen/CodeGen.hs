@@ -38,7 +38,6 @@ import Util
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 
-import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 import Data.List ( nub )
 import Data.Maybe ( catMaybes )
