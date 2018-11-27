@@ -83,6 +83,7 @@ module Data.Typeable.Internal (
     typeSymbolTypeRep, typeNatTypeRep,
   ) where
 
+import GHC.Prim ( FUN )
 import GHC.Base
 import qualified GHC.Arr as A
 import GHC.Types ( TYPE, Multiplicity (Omega) )
@@ -476,9 +477,8 @@ splitApp :: forall k (a :: k). ()
          -> AppOrCon a
 splitApp TrType = IsApp trTYPE trLiftedRep
 splitApp (TrApp {trAppFun = f, trAppArg = x}) = IsApp f x
-splitApp rep@(TrFun {trFunArg=a, trFunRes=b, trFunMul = (eqTypeRep trOmega -> Just HRefl)}) = IsApp (mkTrApp arr a) b
-  where arr = bareArrow rep  -- TODO handle multiplicity
-splitApp (TrFun {}) = error "Data.Typeable.Internal.splitApp: Only unrestricted functions are supported"
+splitApp rep@(TrFun {trFunArg=a, trFunRes=b}) = IsApp (mkTrApp arr a) b
+  where arr = bareArrow rep
 splitApp (TrTyCon{trTyCon = con, trKindVars = kinds})
   = case unsafeCoerce Refl :: IsApplication a :~: "" of
       Refl -> IsCon con kinds
@@ -716,12 +716,12 @@ vecElemTypeRep e =
     rep :: forall (a :: VecElem). Typeable a => SomeKindedTypeRep VecElem
     rep = kindedTypeRep @VecElem @a
 
-bareArrow :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+bareArrow :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                     (a :: TYPE r1) (b :: TYPE r2). ()
-          => TypeRep (a -> b)
-          -> TypeRep ((->) :: TYPE r1 -> TYPE r2 -> Type)
-bareArrow (TrFun _ _ a b) =
-    mkTrCon funTyCon [SomeTypeRep trOmega, SomeTypeRep rep1, SomeTypeRep rep2]
+          => TypeRep (a -->.(m) b)
+          -> TypeRep (FUN m :: TYPE r1 -> TYPE r2 -> Type)
+bareArrow (TrFun _ m a b) =
+    mkTrCon funTyCon [SomeTypeRep m, SomeTypeRep rep1, SomeTypeRep rep2]
   where
     rep1 = getRuntimeRep $ typeRepKind a :: TypeRep r1
     rep2 = getRuntimeRep $ typeRepKind b :: TypeRep r2
