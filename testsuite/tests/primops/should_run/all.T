@@ -28,3 +28,6 @@ test('CmpInt16', normal, compile_and_run, [''])
 test('CmpWord16', normal, compile_and_run, [''])
 test('ShrinkSmallMutableArrayA', normal, compile_and_run, [''])
 test('ShrinkSmallMutableArrayB', normal, compile_and_run, [''])
+
+test('T14375', normal, compile_and_run, ['-threaded'])
+test('T14375-2', normal, compile_and_run, [''])
