@@ -721,7 +721,7 @@ bareArrow :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
           => TypeRep (a -> b)
           -> TypeRep ((->) :: TYPE r1 -> TYPE r2 -> Type)
 bareArrow (TrFun _ _ a b) =
-    mkTrCon funTyCon [SomeTypeRep rep1, SomeTypeRep rep2]
+    mkTrCon funTyCon [SomeTypeRep trOmega, SomeTypeRep rep1, SomeTypeRep rep2]
   where
     rep1 = getRuntimeRep $ typeRepKind a :: TypeRep r1
     rep2 = getRuntimeRep $ typeRepKind b :: TypeRep r2
