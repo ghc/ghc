@@ -2013,7 +2013,7 @@ pmcheckGuards (gv:gvs) vva = do
 -- | Worker function: Implements all cases described in the paper for all three
 -- functions (`covered`, `uncovered` and `divergent`) apart from the `Guard`
 -- cases which are handled by `pmcheck`
-pmcheckHd :: HasCallStack => Pattern -> PatVec -> [PatVec] -> ValAbs -> ValVec
+pmcheckHd :: Pattern -> PatVec -> [PatVec] -> ValAbs -> ValVec
           -> PmM PartialResult
 
 -- Var

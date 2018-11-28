@@ -293,8 +293,7 @@ lkE (D env expr) cm = go expr cm
     go (Cast e c)           = cm_cast >.> lkG (D env e) >=> lkG (D env c)
     go (Tick tickish e)     = cm_tick >.> lkG (D env e) >=> lkTickish tickish
     go (App e1 e2)          = cm_app  >.> lkG (D env e2) >=> lkG (D env e1)
-    go (Lam v e)
-      | otherwise          = cm_lam  >.> lkG (D (extendCME env v) e)
+    go (Lam v e)            = cm_lam  >.> lkG (D (extendCME env v) e)
                               >=> lkBndr env v
     go (Let (NonRec b r) e) = cm_letn >.> lkG (D env r)
                               >=> lkG (D (extendCME env b) e) >=> lkBndr env b
@@ -324,8 +323,8 @@ xtE (D env (Tick t e))           f m = m { cm_tick = cm_tick m |> xtG (D env e)
 xtE (D env (App e1 e2))          f m = m { cm_app = cm_app m |> xtG (D env e2)
                                                  |>> xtG (D env e1) f }
 xtE (D env (Lam v e))            f m = m { cm_lam = cm_lam m
-                                          |> xtG (D (extendCME env v) e)
-                                          |>> xtBndr env v f }
+                                                 |> xtG (D (extendCME env v) e)
+                                                 |>> xtBndr env v f }
 xtE (D env (Let (NonRec b r) e)) f m = m { cm_letn = cm_letn m
                                                  |> xtG (D (extendCME env b) e)
                                                  |>> xtG (D env r)

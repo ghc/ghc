@@ -406,7 +406,7 @@ splitAppCo_maybe co
 splitAppCo_maybe _ = Nothing
 
 -- Only used in specialise/Rules
-splitFunCo_maybe :: HasCallStack => Coercion -> Maybe (Coercion, Coercion)
+splitFunCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
 splitFunCo_maybe (FunCo _ _ arg res) = Just (arg, res)
 splitFunCo_maybe _ = Nothing
 

@@ -95,7 +95,6 @@ import GhcPrelude
 import TyCoRep
 import TcType
 import Type
-import Multiplicity ( pattern Omega )
 import TyCon
 import Coercion
 import Class

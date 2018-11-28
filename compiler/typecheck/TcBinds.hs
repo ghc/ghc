@@ -501,7 +501,9 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
 
     go :: [SCC (LHsBind GhcRn)] -> TcM (LHsBinds GhcTcId, thing)
     go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc
-                        ; (binds2, thing) <- tcExtendLetEnv top_lvl sig_fn closed (map unrestricted ids1) -- recursive bindings must be unrestricted (the ids added to the environment here are the name of the recursive definitions).
+                         -- recursive bindings must be unrestricted
+                         -- (the ids added to the environment here are the name of the recursive definitions).
+                        ; (binds2, thing) <- tcExtendLetEnv top_lvl sig_fn closed (map unrestricted ids1)
                                                             (go sccs)
                         ; return (binds1 `unionBags` binds2, thing) }
     go []         = do  { thing <- thing_inside; return (emptyBag, thing) }
@@ -540,7 +542,9 @@ tc_single top_lvl sig_fn prag_fn lbind closed thing_inside
                                       NonRecursive NonRecursive
                                       closed
                                       [lbind]
-       ; thing <- tcExtendLetEnv top_lvl sig_fn closed (map unrestricted ids) thing_inside -- since we are defining a non-recursive binding, it is not necessary here to define an unrestricted binding. But we do so until toplevel linear bindings are supported.
+         -- since we are defining a non-recursive binding, it is not necessary here
+         -- to define an unrestricted binding. But we do so until toplevel linear bindings are supported.
+       ; thing <- tcExtendLetEnv top_lvl sig_fn closed (map unrestricted ids) thing_inside
        ; return (binds1, thing) }
 
 ------------------------
@@ -678,7 +682,7 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
 *                                                                      *
 ********************************************************************* -}
 
-tcPolyCheck :: HasCallStack => TcPragEnv
+tcPolyCheck :: TcPragEnv
             -> TcIdSigInfo     -- Must be a complete signature
             -> LHsBind GhcRn   -- Must be a FunBind
             -> TcM (LHsBinds GhcTcId, [TcId])

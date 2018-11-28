@@ -207,8 +207,7 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
     match_group :: [(PatGroup,EquationInfo)] -> DsM MatchResult
     match_group [] = panic "match_group"
     match_group eqns@((group,_) : _)
-        =
-          case group of
+        = case group of
             PgCon {}  -> matchConFamily  vars ty (subGroupUniq [(c,e) | (PgCon c, e) <- eqns])
             PgSyn {}  -> matchPatSyn     vars ty (dropGroup eqns)
             PgLit {}  -> matchLiterals   vars ty (subGroupOrd [(l,e) | (PgLit l, e) <- eqns])
@@ -236,7 +235,7 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
           maybeWarn $ (map (\g -> text "Putting these view expressions into the same case:" <+> (ppr g))
                        (filter (not . null) gs))
 
-matchEmpty :: HasCallStack => MatchId -> Type -> DsM [MatchResult]
+matchEmpty :: MatchId -> Type -> DsM [MatchResult]
 -- See Note [Empty case expressions]
 matchEmpty var res_ty
   = return [MatchResult CanFail mk_seq]
@@ -257,7 +256,7 @@ matchBangs (var:vars) ty eqns
         ; return (mkEvalMatchResult var ty match_result) }
 matchBangs [] _ _ = panic "matchBangs"
 
-matchCoercion :: HasCallStack => [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchCoercion :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Apply the coercion to the match variable and then match that
 matchCoercion (var:vars) ty (eqns@(eqn1:_))
   = do  { let CoPat _ co pat _ = firstPat eqn1
@@ -270,7 +269,7 @@ matchCoercion (var:vars) ty (eqns@(eqn1:_))
         ; return (mkCoLetMatchResult bind match_result) }
 matchCoercion _ _ _ = panic "matchCoercion"
 
-matchView :: HasCallStack => [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchView :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Apply the view function to the match variable and then match that
 matchView (var:vars) ty (eqns@(eqn1:_))
   = do  { -- we could pass in the expr from the PgView,
@@ -289,7 +288,7 @@ matchView (var:vars) ty (eqns@(eqn1:_))
                     match_result) }
 matchView _ _ _ = panic "matchView"
 
-matchOverloadedList :: HasCallStack => [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchOverloadedList :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
 matchOverloadedList (var:vars) ty (eqns@(eqn1:_))
 -- Since overloaded list patterns are treated as view patterns,
 -- the code is roughly the same as for matchView

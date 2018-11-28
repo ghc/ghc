@@ -332,7 +332,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
  = do { tvs_var      <- newIORef emptyVarSet
       ; lie_var      <- newIORef emptyWC
       ; errs_var     <- newIORef (emptyBag, emptyBag)
-      ; usage_var    <- newIORef zeroUE ;
+      ; usage_var    <- newIORef zeroUE
       ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
                 tcl_loc        = loc,     -- Should be over-ridden very soon!
