@@ -780,7 +780,7 @@ data ConCont = CC [CoreExpr] Coercion
 -- data constructor wrappers] in MkId.
 exprIsConApp_maybe :: InScopeEnv -> CoreExpr -> Maybe ([FloatBind], DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe (in_scope, id_unf) expr
-  = go (Left in_scope) expr (CC [] (mkRepReflCo (exprType expr)))
+  = go (Left in_scope) [] expr (CC [] (mkRepReflCo (exprType expr)))
 
   where
     go :: Either InScopeSet Subst
