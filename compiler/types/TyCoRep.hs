@@ -548,7 +548,7 @@ type KnotTied ty = ty
 -- not. See Note [TyCoBinders]
 data TyCoBinder
   = Named TyCoVarBinder -- A type-lambda binder
-  | Anon (Scaled Type)           -- A term-lambda binder. Type here can be CoercionTy.
+  | Anon (Scaled Type)  -- A term-lambda binder. Type here can be CoercionTy.
                         -- Visibility is determined by the type (Constraint vs. *)
   deriving Data.Data
 
@@ -1762,9 +1762,9 @@ tyCoVarsOfTypes :: [Type] -> TyCoVarSet
 tyCoVarsOfTypes tys = ty_co_vars_of_types tys emptyVarSet emptyVarSet
 
 ty_co_vars_of_mult :: Mult -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-ty_co_vars_of_mult Zero         is acc = acc
-ty_co_vars_of_mult One          is acc = acc
-ty_co_vars_of_mult Omega        is acc = acc
+ty_co_vars_of_mult Zero          _  acc = acc
+ty_co_vars_of_mult One           _  acc = acc
+ty_co_vars_of_mult Omega         _  acc = acc
 ty_co_vars_of_mult (MultAdd x y) is acc = ty_co_vars_of_mult x is (ty_co_vars_of_mult y is acc)
 ty_co_vars_of_mult (MultMul x y) is acc = ty_co_vars_of_mult x is (ty_co_vars_of_mult y is acc)
 ty_co_vars_of_mult (MultThing x) is acc = ty_co_vars_of_type x is acc
@@ -2034,10 +2034,6 @@ getCoVarSet fv = snd (fv isCoVar emptyVarSet ([], emptyVarSet))
 
 coVarsOfType :: Type -> CoVarSet
 coVarsOfType ty = getCoVarSet (tyCoFVsOfType ty)
-
-coVarsOfRig :: Mult -> CoVarSet
-coVarsOfRig (MultThing t) = coVarsOfType t
-coVarsOfRig _ = emptyVarSet
 
 coVarsOfTypes :: [Type] -> TyCoVarSet
 coVarsOfTypes tys = getCoVarSet (tyCoFVsOfTypes tys)
@@ -2800,7 +2796,7 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 
 -- | This checks if the substitution satisfies the invariant from
 -- Note [The substitution invariant].
-checkValidSubst :: (HasCallStack) => TCvSubst -> [Type] -> [Coercion] -> a -> a
+checkValidSubst :: HasCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
 -- TODO (RAE): Change back to ASSERT
   = WARN( not (isValidTCvSubst subst),

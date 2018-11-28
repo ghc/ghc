@@ -55,7 +55,8 @@ module IfaceType (
 import GhcPrelude
 
 import {-# SOURCE #-} TysWiredIn ( coercibleTyCon, heqTyCon
-                                 , liftedRepDataConTyCon, omegaDataConTyCon )
+                                 , liftedRepDataConTyCon, omegaDataConTyCon
+                                 , oneDataConTyCon )
 import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy, isMultiplicityTy )
 
 import DynFlags
@@ -786,7 +787,9 @@ ppr_ty ctxt_prec (IfaceFunTy w ty1 ty2)
     ppr_fun_arrow w
       | (IfaceTyConApp tc _) <- w
       , tc `ifaceTyConHasKey` (getUnique omegaDataConTyCon) = arrow
-      | otherwise = arrow <> text "@" <> brackets (pprIfaceType w)
+      | (IfaceTyConApp tc _) <- w
+      , tc `ifaceTyConHasKey` (getUnique oneDataConTyCon) = lollipop
+      | otherwise = mulArrow (pprIfaceType w)
 
 ppr_ty ctxt_prec (IfaceAppTy t ts)
   = if_print_coercions

@@ -380,7 +380,7 @@ data DataCon
                 -- the wrapper Id, because that makes it harder to use the wrap-id
                 -- to rebuild values after record selection or in generics.
 
-        dcOrigArgTys :: [Scaled Type],-- Original argument types
+        dcOrigArgTys :: [Scaled Type],  -- Original argument types
                                         -- (before unboxing and flattening of strict fields)
         dcOrigResTy :: Type,            -- Original result type, as seen by the user
                 -- NB: for a data instance, the original user result type may
@@ -576,7 +576,7 @@ data DataConRep
 
         , dcr_boxer   :: DataConBoxer
 
-        , dcr_arg_tys :: [Scaled Type]  -- Final, representation argument types,
+        , dcr_arg_tys :: [Scaled Type]    -- Final, representation argument types,
                                           -- after unboxing and flattening,
                                           -- and *including* all evidence args
 
@@ -945,7 +945,7 @@ mkDataCon name declared_infix prom_info
     rep_ty =
       case rep of
         -- If the DataCon has no wrapper, then the worker's type *is* the
-        -- user-facing type, so we can simply use dataConUserType
+        -- user-facing type, so we can simply use dataConUserType.
         NoDataConRep -> dataConUserType con
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
@@ -1341,8 +1341,7 @@ dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
 -- | Returns just the instantiated /value/ argument types of a 'DataCon',
 -- (excluding dictionary args)
 dataConInstOrigArgTys
-        :: HasCallStack
-        => DataCon      -- Works for any DataCon
+        :: DataCon      -- Works for any DataCon
         -> [Type]       -- Includes existential tyvar args, but NOT
                         -- equality constraints or dicts
         -> [Scaled Type]
@@ -1484,7 +1483,7 @@ splitDataProductType_maybe
         -> Maybe (TyCon,                -- The type constructor
                   [Type],               -- Type args of the tycon
                   DataCon,              -- The data constructor
-                  [Scaled Type])      -- Its /representation/ arg types
+                  [Scaled Type])        -- Its /representation/ arg types
 
         -- Rejecting existentials is conservative.  Maybe some things
         -- could be made to work with them, but I'm not going to sweat

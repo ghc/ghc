@@ -378,7 +378,7 @@ pprUntypedBinder binder
   | isTyVar binder = text "@" <+> ppr binder    -- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
-pprTypedLamBinder :: HasCallStack => BindingSite -> Bool -> Var -> SDoc
+pprTypedLamBinder :: BindingSite -> Bool -> Var -> SDoc
 -- For lambda and case binders, show the unfolding info (usually none)
 pprTypedLamBinder bind_site debug_on var
   = sdocWithDynFlags $ \dflags ->
@@ -403,7 +403,7 @@ pprTypedLamBinder bind_site debug_on var
       | isTyVar var  -> parens (pprKindedTyVarBndr var)
 
       | otherwise    -> parens (hang (pprIdBndr var)
-                                   2 (vcat [  dcolon
+                                   2 (vcat [ dcolon
                                                 -- <> brackets (ppr (idWeight var))
                                                 <+> pprType (idType var)
                                            , pp_unf]))

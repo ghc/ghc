@@ -191,9 +191,8 @@ idUnique  = Var.varUnique
 idType   :: Id -> Kind
 idType    = Var.varType
 
-idWeight :: HasCallStack => Id -> Mult
+idWeight :: Id -> Mult
 idWeight x =
- -- pprTrace "idWeight" (ppr x <+> ppr (Var.varWeightMaybe x) <+> callStackDoc) $
   Var.varWeight x
 
 idMult :: Id -> VarMult
@@ -213,7 +212,7 @@ setIdUnique = Var.setVarUnique
 
 -- | Not only does this set the 'Id' 'Type', it also evaluates the type to try and
 -- reduce space usage
-setIdType :: HasCallStack => Id -> Type -> Id
+setIdType :: Id -> Type -> Id
 setIdType id ty = seqType ty `seq` Var.setVarType id ty
 
 setIdExported :: Id -> Id
@@ -222,7 +221,7 @@ setIdExported = Var.setIdExported
 setIdNotExported :: Id -> Id
 setIdNotExported = Var.setIdNotExported
 
-localiseId :: HasCallStack => Id -> Id
+localiseId :: Id -> Id
 -- Make an Id with the same unique and type as the
 -- incoming Id, but with an *Internal* Name and *LocalId* flavour
 localiseId id

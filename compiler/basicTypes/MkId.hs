@@ -835,7 +835,7 @@ So the arguments end up with the right multiplicity all very elegantly.
 -------------------------
 newLocal :: Scaled Type -> UniqSM Var
 newLocal (Scaled w ty) = do { uniq <- getUniqueM
-                              ; return (mkSysLocalOrCoVar (fsLit "dt") uniq (Regular w) ty) }
+                            ; return (mkSysLocalOrCoVar (fsLit "dt") uniq (Regular w) ty) }
 
 -- | Unpack/Strictness decisions from source module
 dataConSrcToImplBang
@@ -1096,7 +1096,7 @@ because Int is non-recursive.
 ************************************************************************
 -}
 
-wrapNewTypeBody :: HasCallStack => TyCon -> [Type] -> CoreExpr -> CoreExpr
+wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- The wrapper for the data constructor for a newtype looks like this:
 --      newtype T a = MkT (a,Int)
 --      MkT :: forall a. (a,Int) -> T a
@@ -1121,7 +1121,7 @@ wrapNewTypeBody tycon args result_expr
 -- computing the right type arguments for the coercion requires more than just
 -- a spliting operation (cf, TcPat.tcConPat).
 
-unwrapNewTypeBody :: HasCallStack => TyCon -> [Type] -> CoreExpr -> CoreExpr
+unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
   = ASSERT( isNewTyCon tycon )
     mkCast result_expr (mkUnbranchedAxInstCo Representational (newTyConCo tycon) args [])
@@ -1131,7 +1131,7 @@ unwrapNewTypeBody tycon args result_expr
 -- instance of the representation type, to the corresponding instance of the
 -- family instance type.
 -- See Note [Wrappers for data instance tycons]
-wrapFamInstBody :: HasCallStack => TyCon -> [Type] -> CoreExpr -> CoreExpr
+wrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 wrapFamInstBody tycon args body
   | Just co_con <- tyConFamilyCoercion_maybe tycon
   = mkCast body (mkSymCo (mkUnbranchedAxInstCo Representational co_con args []))

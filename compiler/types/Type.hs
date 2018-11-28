@@ -754,7 +754,6 @@ splitAppTy_maybe ty | Just ty' <- coreView ty
                     = splitAppTy_maybe ty'
 splitAppTy_maybe ty = repSplitAppTy_maybe ty
 
-
 -------------
 repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
@@ -972,7 +971,7 @@ See #11714.
 isFunTy :: Type -> Bool
 isFunTy ty = isJust (splitFunTy_maybe ty)
 
-splitFunTy :: HasCallStack => Type -> (Scaled Type, Type)
+splitFunTy :: Type -> (Scaled Type, Type)
 -- ^ Attempts to extract the argument and result types from a type, and
 -- panics if that is not possible. See also 'splitFunTy_maybe'
 splitFunTy ty | Just ty' <- coreView ty = splitFunTy ty'
@@ -1395,7 +1394,7 @@ mkLamType  :: Var -> Type -> Type
 -- on whether it is given a type variable or a term variable.
 -- This is used, for example, when producing the type of a lambda.
 -- Always uses Inferred binders.
-mkLamTypes :: HasCallStack => [Var] -> Type -> Type
+mkLamTypes :: [Var] -> Type -> Type
 -- ^ 'mkLamType' for multiple type or value arguments
 
 mkLamType v ty
@@ -1703,7 +1702,7 @@ binderRelevantType_maybe (Anon ty)  = Just (scaledThing ty)
 -- | Like 'maybe', but for binders.
 caseBinder :: TyCoBinder           -- ^ binder to scrutinize
            -> (TyCoVarBinder -> a) -- ^ named case
-           -> (Scaled Type -> a) -- ^ anonymous case
+           -> (Scaled Type -> a)   -- ^ anonymous case
            -> a
 caseBinder (Named v) f _ = f v
 caseBinder (Anon t)  _ d = d t
