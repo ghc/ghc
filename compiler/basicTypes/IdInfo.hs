@@ -176,7 +176,7 @@ instance Outputable RecSelParent where
             RecSelPatSyn ps   -> ppr ps
 
 -- | Just a synonym for 'CoVarId'. Written separately so it can be
--- exported in the hs-boot file.
+-- exported in the hs-boot file. (FIXME: not mentioned there at all!)
 coVarDetails :: IdDetails
 coVarDetails = CoVarId
 
