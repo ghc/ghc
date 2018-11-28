@@ -25,7 +25,6 @@ T2110
 T5327
 TH_reifyDecl1
 ghci
-spec001
 
 # Debugger
 
