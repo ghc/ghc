@@ -305,7 +305,7 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
   = do { tag_expr <- do_enum_primop op args
 
        -- If the binder is not dead, convert the tag to a constructor
-       -- and assign it.
+       -- and assign it. See Note [Dead case binders in -O0]
        ; unless (isDeadBinder bndr) $ do
             { dflags <- getDynFlags
             ; tmp_reg <- bindArgToReg (NonVoid bndr)
@@ -385,6 +385,18 @@ Now the trouble is that 's' has VoidRep, and we do not bind void
 arguments in the environment; they don't live anywhere.  See the
 calls to nonVoidIds in various places.  So we must not look up
 's' in the environment.  Instead, just evaluate the RHS!  Simple.
+
+Note [Dead case binders in -O0]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before CmmSink came to eliminate dead assignments, omitting assignment of dead
+case binders was a cheap and worthwhile optimisation. This probably also was the
+reason for occurrence hacks such as in Phab:D5339 to exist, because the
+occurrence information preserved by 'CoreTidy.tidyIdBndr' was insufficient.
+
+Nowadays, with CmmSink there's little reason to complicate the code by checking
+for dead case binders, except that CmmSink won't run with -O0. Since the
+majority of case binders are dead, this optimisation probably still has a great
+benefit-cost ratio and we want to keep it for -O0. See also Phab:D5358.
 -}
 
 cgCase (StgApp v []) _ (PrimAlt _) alts
