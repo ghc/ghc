@@ -208,7 +208,7 @@ mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
 nlHsTyApp :: (XVar p ~ NoExt
-             ,XWrap p ~ NoExt ) => IdP p-> [Type] -> LHsExpr p
+             ,XWrap p ~ NoExt ) => IdP p -> [Type] -> LHsExpr p
 nlHsTyApp fun_id tys
   = noLoc (mkHsWrap (mkWpTyApps tys) (HsVar noExt (noLoc fun_id)))
 
