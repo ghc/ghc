@@ -771,9 +771,7 @@ data ConCont = CC [CoreExpr] Coercion
 -- where t1..tk are the *universally-quantified* type args of 'dc'
 exprIsConApp_maybe :: InScopeEnv -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe (in_scope, id_unf) expr
-  = let res = go (Left in_scope) expr (CC [] (mkRepReflCo (exprType expr)))
---    in pprTrace "exprIsConApp_maybe" (ppr expr $$ ppr res) res
-    in res
+  = go (Left in_scope) expr (CC [] (mkRepReflCo (exprType expr)))
 
   where
     go :: Either InScopeSet Subst

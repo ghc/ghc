@@ -60,7 +60,6 @@ ifeq "$$(TargetOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	$$(call build-dll,$1,$2,$3,-L$1/$2/build,,$$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),"$$@","NO","$$($1_PACKAGE)","$$($1_$2_VERSION)")
 
-
 else # ifneq "$$(TargetOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_GHC_LD_OPTS) $$($1_$2_$3_ALL_OBJS) \
