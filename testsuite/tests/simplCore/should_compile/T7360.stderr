@@ -66,9 +66,7 @@ T7360.fun4 :: Int
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.fun4
-  = src<libraries/base/GHC/List.hs:141:1-13>
-    src<libraries/base/GHC/Base.hs:1254:1-28> GHC.Types.I# 0#
+T7360.fun4 = GHC.Types.I# 0#
 
 -- RHS size: {terms: 16, types: 13, coercions: 0, joins: 0/0}
 fun2 :: forall a. [a] -> ((), Int)
