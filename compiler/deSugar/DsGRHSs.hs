@@ -122,7 +122,6 @@ matchGuards (LetStmt _ binds : stmts) ctx rhs rhs_ty = do
 matchGuards (BindStmt _ pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
     let upat = unLoc pat
         dicts = collectEvVarsPat upat
-    -- TODO Krzysztof Omega?
     match_var <- selectMatchVar Omega upat
     tm_cs <- genCaseTmCs2 (Just bind_rhs) [upat] [match_var]
     match_result <- addDictsDs dicts $

@@ -997,10 +997,6 @@ mkNthCo r n co
       --    resk_co :: sk2 ~ tk2  =  mkNthCo 0 (mkKindCo res_co)
       --                             i.e. mkRuntimeRepCo
       = case n of
-          -- TODO: MattP, There may be comments to update.
-          -- Include this list here to that grepping for a list of exactly
-          -- length 5 points to here.
-          -- [w, r1, r2, a1, a2]
           0 -> ASSERT( r == r0 )      w
           1 -> ASSERT( r == Nominal ) mkRuntimeRepCo arg
           2 -> ASSERT( r == Nominal ) mkRuntimeRepCo res

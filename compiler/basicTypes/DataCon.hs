@@ -592,27 +592,25 @@ data DataConRep
 -- may or may not have a wrapper, depending on whether
 -- the wrapper does anything.
 --
+-- For simple data type the only purpose of the wrapper is to make them
+-- polymorphic in the multiplicity of their fields.
+--
 -- Data types have a worker with no unfolding
--- Newtypes just have a worker, which has a compulsory unfolding (just a cast)
+-- Newtypes have a worker with a compulsory unfolding (just a cast)
 
 -- _Neither_ the worker _nor_ the wrapper take the dcStupidTheta dicts as arguments
 
--- The wrapper (if it exists) takes dcOrigArgTys as its arguments
+-- The wrapper (if it exists) takes dcOrigArgTys as its arguments, as well as
+-- the additional multiplicity arguments.
 -- The worker takes dataConRepArgTys as its arguments
 -- If the worker is absent, dataConRepArgTys is the same as dcOrigArgTys
 
--- The 'NoDataConRep' case is important
--- Not only is this efficient,
--- but it also ensures that the wrapper is replaced
--- by the worker (because it *is* the worker)
--- even when there are no args. E.g. in
---              f (:) x
--- the (:) *is* the worker.
--- This is really important in rule matching,
--- (We could match on the wrappers,
--- but that makes it less likely that rules will match
--- when we bring bits of unfoldings together.)
--- TODO: arnaud: revise this comment in view of the new wrapper policy
+-- The 'NoDataConRep' case is important because not every data constructor can
+-- have a wrapper. Specifically levity-polymorphic data constructors (unboxed
+-- tuples and unboxed sums) can't be eta-expanded, as this would not respect the
+-- levity-polymorphism restriction. Type-class dictionaries don't have a
+-- wrapper, they don't need one, and wrappers seem to cause problems with `(~#)`
+-- constraints.
 
 -------------------------
 
@@ -952,7 +950,6 @@ mkDataCon name declared_infix prom_info
         _ -> mkInvForAllTys univ_tvs $ mkTyCoInvForAllTys ex_tvs $
                  mkFunTys rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
-        -- See Note [All data constructors have wrappers]
 
       -- See Note [Promoted data constructors] in TyCon
     prom_tv_bndrs = [ mkNamedTyConBinder vis tv
@@ -967,19 +964,6 @@ mkDataCon name declared_infix prom_info
     roles = map (\tv -> if isTyVar tv then Nominal else Phantom)
                 (univ_tvs ++ ex_tvs)
             ++ map (const Representational) orig_arg_tys
-
-{- Note [All data constructors have wrappers]
-
-All data constructors should have a wrapper. The reason for this is that
-all data constructors have an unused multiplicity argument which is taken and
-thrown away by the wrapper.
-
-If we reverse this
-decision then this line will need to be restored. It is
-commented out to make it easy to add back with the correct
-information.
--}
--- TODO: arnaud: validate or invalidate this note
 
 mkCleanAnonTyConBinders :: [TyConBinder] -> [Type] -> [TyConBinder]
 -- Make sure that the "anonymous" tyvars don't clash in
@@ -1246,7 +1230,7 @@ dataConInstSig con@(MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs
                univ_tys
   = ( ex_tvs'
     , substTheta subst (dataConTheta con)
-    , substTys subst (map scaledThing arg_tys)) -- arnaud: TODO: we will eventually want to return linearity annotations. But this function is only used in template Haskell, so not critical for the proof of concept
+    , substTys subst (map scaledThing arg_tys))
   where
     univ_subst = zipTvSubst univ_tvs univ_tys
     (subst, ex_tvs') = Type.substVarBndrs univ_subst ex_tvs

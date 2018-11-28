@@ -100,7 +100,7 @@ recoverPSB (PSB { psb_id = (dL->L _ name)
        where
          -- The matcher_id is used only by the desugarer, so actually
          -- and error-thunk would probably do just as well here.
-         matcher_id = mkLocalId matcher_name Alias $  -- todo Krzysztof is Alias right?
+         matcher_id = mkLocalId matcher_name (Regular Omega) $
                       mkSpecForAllTys [alphaTyVar] alphaTy
 
 recoverPSB (XPatSynBind {}) = panic "recoverPSB"

@@ -1330,7 +1330,7 @@ cvtTypeKind ty_str ty
              -> mk_apps (HsTyVar noExt NotPromoted
                                               (noLoc (getRdrName (sumTyCon n))))
                         tys'
-           ArrowT -- TODO: arnaud: linear syntax for template haskell.
+           ArrowT
              | [x',y'] <- tys' -> do
                  x'' <- case unLoc x' of
                           HsFunTy{}    -> returnL (HsParTy noExt x')
@@ -1507,7 +1507,6 @@ mk_arr_apps tys return_ty = foldrM go return_ty tys >>= returnL
     where go :: LHsType GhcPs -> HsType GhcPs -> CvtM (HsType GhcPs)
           go arg ret_ty = do { ret_ty_l <- returnL ret_ty
                              ; return (HsFunTy noExt arg HsUnrestrictedArrow ret_ty_l) }
-            -- TODO: arnaud: linear syntax for template haskell
 
 split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsType GhcPs])
 split_ty_app ty = go ty []

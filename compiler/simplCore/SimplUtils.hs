@@ -2206,8 +2206,7 @@ mkCase2 dflags scrut bndr alts_ty alts
       = -- For non-nullary data cons we must invent some fake binders
         -- See Note [caseRules for dataToTag] in PrelRules
         do { us <- getUniquesM
-             -- TODO Krzysztof is Omega right?
-           ; let (ex_tvs, arg_ids) = dataConRepInstPat us Omega dc
+           ; let (ex_tvs, arg_ids) = dataConRepInstPat us (idWeight new_bndr) dc
                                         (tyConAppArgs (idType new_bndr))
            ; return (ex_tvs ++ arg_ids) }
     mk_new_bndrs _ _ = return []

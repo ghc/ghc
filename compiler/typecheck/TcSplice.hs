@@ -1307,7 +1307,7 @@ tcLookupTh :: Name -> TcM TcTyThing
 tcLookupTh name
   = do  { (gbl_env, lcl_env) <- getEnvs
         ; case lookupNameEnv (tcl_env lcl_env) name of {
-                Just (Scaled _ thing) -> return thing; -- TODO: arnaud: tcLookUpTh should probably return a scaled type as well
+                Just (Scaled _ thing) -> return thing;
                 Nothing    ->
 
           case lookupNameEnv (tcg_type_env gbl_env) name of {
@@ -1758,7 +1758,7 @@ reifyType ty@(AppTy {})     = do
     filter_out_invisible_args ty_head ty_args =
       filterByList (map isVisibleArgFlag $ appTyArgFlags ty_head ty_args)
                    ty_args
-reifyType ty@(FunTy _ t1 t2) -- TODO: arnaud: linear arrows in template haskell
+reifyType ty@(FunTy _ t1 t2)
   | isPredTy t1 = reify_for_all ty  -- Types like ((?x::Int) => Char -> Char)
   | otherwise   = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
