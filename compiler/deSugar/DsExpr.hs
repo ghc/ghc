@@ -183,7 +183,7 @@ ds_val_bind (is_rec, binds) body
         --    only have to deal with lifted ones now; so Rec is ok
 
 ------------------
-dsUnliftedBind :: HasCallStack => HsBind GhcTc -> CoreExpr -> DsM CoreExpr
+dsUnliftedBind :: HsBind GhcTc -> CoreExpr -> DsM CoreExpr
 dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
                , abs_exports = exports
                , abs_ev_binds = ev_binds
@@ -231,7 +231,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 ************************************************************************
 -}
 
-dsLExpr :: HasCallStack => LHsExpr GhcTc -> DsM CoreExpr
+dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 
 dsLExpr (dL->L loc e)
   = putSrcSpanDs loc $
@@ -247,17 +247,17 @@ dsLExpr (dL->L loc e)
 -- be an argument to some other function.
 -- See Note [Levity polymorphism checking] in DsMonad
 -- See Note [Levity polymorphism invariants] in CoreSyn
-dsLExprNoLP :: HasCallStack => LHsExpr GhcTc -> DsM CoreExpr
+dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExprNoLP (dL->L loc e)
   = putSrcSpanDs loc $
     do { e' <- dsExpr e
        ; dsNoLevPolyExpr e' (text "In the type of expression:" <+> ppr e)
        ; return e' }
 
-dsExpr :: HasCallStack => HsExpr GhcTc -> DsM CoreExpr
+dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr e = ds_expr False e
 
-ds_expr :: HasCallStack => Bool   -- are we directly inside an HsWrap?
+ds_expr :: Bool   -- are we directly inside an HsWrap?
                   -- See Wrinkle in Note [Detecting forced eta expansion]
         -> HsExpr GhcTc -> DsM CoreExpr
 ds_expr _ (HsPar _ e)            = dsLExpr e
@@ -620,7 +620,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }
   where
-    ds_field :: HasCallStack => LHsRecUpdField GhcTc -> DsM (Name, Id, CoreExpr)
+    ds_field :: LHsRecUpdField GhcTc -> DsM (Name, Id, CoreExpr)
       -- Clone the Id in the HsRecField, because its Name is that
       -- of the record selector, and we must not make that a local binder
       -- else we shadow other uses of the record selector

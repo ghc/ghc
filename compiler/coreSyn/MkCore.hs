@@ -2,44 +2,44 @@
 
 -- | Handy functions for creating much Core syntax
 module MkCore (
-      -- * Constructing normal syntax
-      mkCoreLet, mkCoreLets,
-      mkCoreApp, mkCoreApps, mkCoreConApps,
-      mkCoreLams, mkWildCase, mkIfThenElse,
-      mkWildValBinder, mkWildEvBinder,
-      sortQuantVars, castBottomExpr,
+        -- * Constructing normal syntax
+        mkCoreLet, mkCoreLets,
+        mkCoreApp, mkCoreApps, mkCoreConApps,
+        mkCoreLams, mkWildCase, mkIfThenElse,
+        mkWildValBinder, mkWildEvBinder,
+        sortQuantVars, castBottomExpr,
 
-      -- * Constructing boxed literals
-      mkWordExpr, mkWordExprWord,
-      mkIntExpr, mkIntExprInt,
-      mkIntegerExpr, mkNaturalExpr,
-      mkFloatExpr, mkDoubleExpr,
-      mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
+        -- * Constructing boxed literals
+        mkWordExpr, mkWordExprWord,
+        mkIntExpr, mkIntExprInt,
+        mkIntegerExpr, mkNaturalExpr,
+        mkFloatExpr, mkDoubleExpr,
+        mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
 
-      -- * Floats
-      FloatBind(..), wrapFloat,
+        -- * Floats
+        FloatBind(..), wrapFloat,
 
-      -- * Constructing small tuples
-      mkCoreVarTup, mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup,
-      mkCoreTupBoxity, unitExpr,
+        -- * Constructing small tuples
+        mkCoreVarTup, mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup,
+        mkCoreTupBoxity, unitExpr,
 
-      -- * Constructing big tuples
-      mkBigCoreVarTup, mkBigCoreVarTup1,
-      mkBigCoreVarTupTy, mkBigCoreTupTy,
-      mkBigCoreTup,
+        -- * Constructing big tuples
+        mkBigCoreVarTup, mkBigCoreVarTup1,
+        mkBigCoreVarTupTy, mkBigCoreTupTy,
+        mkBigCoreTup,
 
-      -- * Deconstructing small tuples
-      mkSmallTupleSelector, mkSmallTupleCase,
+        -- * Deconstructing small tuples
+        mkSmallTupleSelector, mkSmallTupleCase,
 
-      -- * Deconstructing big tuples
-      mkTupleSelector, mkTupleSelector1, mkTupleCase,
+        -- * Deconstructing big tuples
+        mkTupleSelector, mkTupleSelector1, mkTupleCase,
 
-      -- * Constructing list expressions
-      mkNilExpr, mkConsExpr, mkListExpr,
-      mkFoldrExpr, mkBuildExpr,
+        -- * Constructing list expressions
+        mkNilExpr, mkConsExpr, mkListExpr,
+        mkFoldrExpr, mkBuildExpr,
 
-      -- * Constructing Maybe expressions
-      mkNothingExpr, mkJustExpr,
+        -- * Constructing Maybe expressions
+        mkNothingExpr, mkJustExpr,
 
         -- * Error Ids
         mkRuntimeErrorApp, mkImpossibleExpr, mkAbsentErrorApp, errorIds,
@@ -123,7 +123,7 @@ mkCoreLets binds body = foldr mkCoreLet body binds
 -- 'mkCoreApps'.
 -- Respects the let/app invariant by building a case expression where necessary
 --   See CoreSyn Note [CoreSyn let/app invariant]
-mkCoreAppTyped :: HasCallStack => SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
+mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
 mkCoreAppTyped _ (fun, fun_ty) (Type ty)
   = (App fun (Type ty), piResultTy fun_ty ty)
 mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
@@ -140,7 +140,7 @@ mkCoreAppTyped d (fun, fun_ty) arg
 -- to the other
 -- Respects the let/app invariant by building a case expression where necessary
 --   See CoreSyn Note [CoreSyn let/app invariant]
-mkCoreApp :: HasCallStack => SDoc -> CoreExpr -> CoreExpr -> CoreExpr
+mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
 mkCoreApp s fun arg
   = fst $ mkCoreAppTyped s (fun, exprType fun) arg
 
@@ -148,7 +148,7 @@ mkCoreApp s fun arg
 -- expressions to another. The leftmost expression in the list is applied first
 -- Respects the let/app invariant by building a case expression where necessary
 --   See CoreSyn Note [CoreSyn let/app invariant]
-mkCoreApps :: HasCallStack => CoreExpr -> [CoreExpr] -> CoreExpr
+mkCoreApps :: CoreExpr -> [CoreExpr] -> CoreExpr
 mkCoreApps fun args
   = fst $
     foldl' (mkCoreAppTyped doc_string) (fun, fun_ty) args

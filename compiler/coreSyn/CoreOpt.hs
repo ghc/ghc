@@ -499,7 +499,7 @@ subst_opt_bndr env bndr
     (subst_tv, tv') = substTyVarBndr subst bndr
     (subst_cv, cv') = substCoVarBndr subst bndr
 
-subst_opt_id_bndr :: HasCallStack => SimpleOptEnv -> InId -> (SimpleOptEnv, OutId)
+subst_opt_id_bndr :: SimpleOptEnv -> InId -> (SimpleOptEnv, OutId)
 -- Nuke all fragile IdInfo, unfolding, and RULES;
 --    it gets added back later by add_info
 -- Rather like SimplEnv.substIdBndr
@@ -1105,7 +1105,7 @@ pushCoercionIntoLambda in_scope x e co
     = pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
       Nothing
 
-pushCoDataCon :: HasCallStack => DataCon -> [CoreExpr] -> Coercion
+pushCoDataCon :: DataCon -> [CoreExpr] -> Coercion
               -> Maybe (DataCon
                        , [Type]      -- Universal type args
                        , [CoreExpr]) -- All other args incl existentials
@@ -1166,7 +1166,7 @@ pushCoDataCon dc dc_args co
   where
     Pair from_ty to_ty = coercionKind co
 
-collectBindersPushingCo :: HasCallStack => CoreExpr -> ([Var], CoreExpr)
+collectBindersPushingCo :: CoreExpr -> ([Var], CoreExpr)
 -- Collect lambda binders, pushing coercions inside if possible
 -- E.g.   (\x.e) |> g         g :: <Int> -> blah
 --        = (\x. e |> Nth 1 g)

@@ -548,7 +548,7 @@ type KnotTied ty = ty
 -- not. See Note [TyCoBinders]
 data TyCoBinder
   = Named TyCoVarBinder -- A type-lambda binder
-  | Anon (Scaled Type)           -- A term-lambda binder. Type here can be CoercionTy.
+  | Anon (Scaled Type)  -- A term-lambda binder. Type here can be CoercionTy.
                         -- Visibility is determined by the type (Constraint vs. *)
   deriving Data.Data
 
@@ -2800,7 +2800,7 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 
 -- | This checks if the substitution satisfies the invariant from
 -- Note [The substitution invariant].
-checkValidSubst :: (HasCallStack) => TCvSubst -> [Type] -> [Coercion] -> a -> a
+checkValidSubst :: HasCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
 -- TODO (RAE): Change back to ASSERT
   = WARN( not (isValidTCvSubst subst),

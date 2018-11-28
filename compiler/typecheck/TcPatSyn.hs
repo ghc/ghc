@@ -761,7 +761,8 @@ tcPatSynMatcher (dL->L loc name) lpat
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
              mg = MG{ mg_alts = cL (getLoc match) [match]
                     , mg_ext = MatchGroupTc [] res_ty
-                    , mg_origin = Generated }
+                    , mg_origin = Generated
+                    }
 
        ; let bind = FunBind{ fun_ext = emptyNameSet
                            , fun_id = cL loc matcher_id

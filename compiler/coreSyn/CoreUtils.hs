@@ -109,7 +109,7 @@ import UniqSet
 ************************************************************************
 -}
 
-exprType :: HasCallStack => CoreExpr -> Type
+exprType :: CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
 -- applied to the actual 'CoreSyn.Type' expression as it cannot
 -- really be said to have a type
@@ -221,7 +221,7 @@ Note that there might be existentially quantified coercion variables, too.
 -}
 
 -- Not defined with applyTypeToArg because you can't print from CoreSyn.
-applyTypeToArgs :: HasCallStack => CoreExpr -> Type -> [CoreExpr] -> Type
+applyTypeToArgs :: CoreExpr -> Type -> [CoreExpr] -> Type
 -- ^ A more efficient version of 'applyTypeToArg' when we have several arguments.
 -- The first argument is just for debugging, and gives some context
 applyTypeToArgs e op_ty args
@@ -260,7 +260,7 @@ applyTypeToArgs e op_ty args
 
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
-mkCast :: HasCallStack => CoreExpr -> CoercionR -> CoreExpr
+mkCast :: CoreExpr -> CoercionR -> CoreExpr
 mkCast e co
   | ASSERT2( coercionRole co == Representational
            , text "coercion" <+> ppr co <+> ptext (sLit "passed to mkCast")
@@ -1029,7 +1029,7 @@ also CoreArity.exprBotStrictness_maybe, but that's a bit more
 expensive.
 -}
 
-exprIsBottom :: HasCallStack => CoreExpr -> Bool
+exprIsBottom :: CoreExpr -> Bool
 -- See Note [Bottoming expressions]
 exprIsBottom e
   | isEmptyTy (exprType e)
@@ -2326,7 +2326,7 @@ But the simplifier pushes those casts outwards, so we don't
 need to address that here.
 -}
 
-tryEtaReduce :: HasCallStack => [Var] -> CoreExpr -> Maybe CoreExpr
+tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
 tryEtaReduce bndrs body
   =   -- pprTrace "tryEtaReduce" (ppr bndrs $$ ppr body $$ ppr (exprType body)) $
       go (reverse bndrs) body (mkRepReflCo (exprType body))
@@ -2339,7 +2339,6 @@ tryEtaReduce bndrs body
        -> Maybe CoreExpr   -- Of type a1 -> a2 -> a3 -> ts
     -- See Note [Eta reduction with casted arguments]
     -- for why we have an accumulating coercion
-    -- go vs fs co | pprTrace "go_tryEtaReduce" (ppr vs $$ ppr fs $$ ppr (coercionKind co)) False = undefined
     go [] fun co
       | ok_fun fun
       , let used_vars = exprFreeVars fun `unionVarSet` tyCoVarsOfCo co
@@ -2385,7 +2384,7 @@ tryEtaReduce bndrs body
     ok_lam v = isTyVar v || isEvVar v
 
     ---------------
-    ok_arg :: HasCallStack => Var              -- Of type bndr_t
+    ok_arg :: Var              -- Of type bndr_t
            -> CoreExpr         -- Of type arg_t
            -> Coercion         -- Of kind (t1~t2)
            -> Type             -- Type of the function to which the argument is applied

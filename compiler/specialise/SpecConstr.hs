@@ -593,7 +593,6 @@ To implement this, we count the number of times we have gone round the
 "specialise recursively" loop ('go' in 'specRec').  Once have gone round
 more than N times (controlled by -fspec-constr-recursive=N) we check
 
-
   - If sc_force is off, and sc_count is (Just max) then we don't
     need to do anything: trim_pats will limit the number of specs
 

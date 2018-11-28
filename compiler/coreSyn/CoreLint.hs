@@ -888,7 +888,7 @@ lintVarOcc var nargs
 
         ; usage <- varCallSiteUsage var'
 
-        ; return ((idType var'), usage) }
+        ; return (idType var', usage) }
 
 lintCoreFun :: CoreExpr
             -> Int        -- Number of arguments (type or val) being passed
@@ -903,7 +903,7 @@ lintCoreFun (Lam var body) nargs
   = addLoc (LambdaBodyOf var) $
     lintBinder LambdaBind var $ \ var' ->
     do { (body_ty, ue) <- lintCoreFun body (nargs - 1)
-       ; return $ (mkLamType var' body_ty, ue) }
+       ; return (mkLamType var' body_ty, ue) }
 
 lintCoreFun expr nargs
   = markAllJoinsBadIf (nargs /= 0) $
@@ -955,22 +955,11 @@ checkLinearity body_ue lam_var =
       ensureEqMults (lookupUE body_ue lam_var) mult (err_msg mult)
       return $ deleteUE body_ue lam_var
     Just Alias -> return body_ue -- aliases do not generate multiplicity constraints
-    Nothing   -> return body_ue -- A type variable
+    Nothing    -> return body_ue -- A type variable
   where
     lhs = lookupUE body_ue lam_var
     err_msg mult = text "Linearity failure in lambda:" <+> ppr lam_var
                 $$ ppr lhs <+> text "⊈" <+> ppr mult
-
--- Checks that both UsageEnv are equal. This is used to check that alias-like
--- binders have the correct UsageEnv annotation. The variable is only here for
--- error messages.
-checkSubUE :: Var -> UsageEnv -> UsageEnv -> LintM ()
-checkSubUE var ue1 ue2 =
-  lintL (ue1 `submultUE` ue2) $
-  text "Alias-like variable" <+> ppr var
-  <+> text "doesn't have the same usage environment as its right-hand side"
-  $$ text "Recorded (var's) environment:" <+> ppr ue2
-  $$ text "Computed (rhs's) environment:" <+> ppr ue1
 
 {-
 Note [No alternatives lint check]

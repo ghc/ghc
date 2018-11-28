@@ -410,7 +410,7 @@ patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Scaled Type], T
 patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
                     , psProvTheta = prov, psReqTheta = req
                     , psArgs = arg_tys, psResultTy = res_ty })
-  = (binderVars univ_tvs, req, binderVars ex_tvs, prov, (map unrestricted arg_tys), res_ty)
+  = (binderVars univ_tvs, req, binderVars ex_tvs, prov, map unrestricted arg_tys, res_ty)
 
 patSynMatcher :: PatSyn -> (Id,Bool)
 patSynMatcher = psMatcher

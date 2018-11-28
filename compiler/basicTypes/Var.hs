@@ -245,7 +245,7 @@ data Var
         varName    :: !Name,
         realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
-        varMult  :: VarMult,
+        varMult    :: VarMult,
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
@@ -382,16 +382,11 @@ setVarName var new_name
   = var { realUnique = getKey (getUnique new_name),
           varName = new_name }
 
-{-# NOINLINE setVarType #-}
-setVarType :: HasCallStack => Id -> Type -> Id
-setVarType id ty =
--- pprTrace "setVarType" (vcat [ppr id, pprType (varType id), pprType ty, callStackDoc]) $
-    id { varType = ty }
+setVarType :: Id -> Type -> Id
+setVarType id ty = id { varType = ty }
 
 updateVarType :: (Type -> Type) -> Id -> Id
-updateVarType f id =
-  pprTrace "updateVarType" (ppr id <+> pprType (f $ varType id)) $
-    id { varType = f (varType id) }
+updateVarType f id = id { varType = f (varType id) }
 
 updateVarTypeM :: Monad m => (Type -> m Type) -> Id -> m Id
 updateVarTypeM f id = do { ty' <- f (varType id)
@@ -678,7 +673,7 @@ mk_id :: Name -> VarMult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
 mk_id name w ty scope details info
   = Id { varName    = name,
          realUnique = getKey (nameUnique name),
-         varMult  = w,
+         varMult    = w,
          varType    = ty,
          idScope    = scope,
          id_details = details,
