@@ -1,7 +1,5 @@
 -- Type of data constructors are now linear
 ghci025
-# Typeable decomposition, currently not working
-T14236
 
 -- :i (->) not working after FUN change
 ghci020
