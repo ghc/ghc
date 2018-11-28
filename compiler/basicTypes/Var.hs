@@ -88,7 +88,7 @@ module Var (
 
 import GhcPrelude
 
-import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind, pprType, Mult )
+import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind, Mult )
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )

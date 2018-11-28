@@ -1227,7 +1227,7 @@ lintCoreAlt _scrut scrut_ty _ alt_ty (LitAlt lit, args, rhs)
   where
     lit_ty = literalType lit
 
-lintCoreAlt scrut scrut_ty scrut_mult alt_ty alt@(DataAlt con, args, rhs)
+lintCoreAlt scrut scrut_ty _scrut_mult alt_ty alt@(DataAlt con, args, rhs)
   | isNewTyCon (dataConTyCon con)
   = zeroUE <$ addErrL (mkNewTyDataConAltMsg scrut_ty alt)
   | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty

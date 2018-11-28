@@ -1762,9 +1762,9 @@ tyCoVarsOfTypes :: [Type] -> TyCoVarSet
 tyCoVarsOfTypes tys = ty_co_vars_of_types tys emptyVarSet emptyVarSet
 
 ty_co_vars_of_mult :: Mult -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-ty_co_vars_of_mult Zero         is acc = acc
-ty_co_vars_of_mult One          is acc = acc
-ty_co_vars_of_mult Omega        is acc = acc
+ty_co_vars_of_mult Zero          _  acc = acc
+ty_co_vars_of_mult One           _  acc = acc
+ty_co_vars_of_mult Omega         _  acc = acc
 ty_co_vars_of_mult (MultAdd x y) is acc = ty_co_vars_of_mult x is (ty_co_vars_of_mult y is acc)
 ty_co_vars_of_mult (MultMul x y) is acc = ty_co_vars_of_mult x is (ty_co_vars_of_mult y is acc)
 ty_co_vars_of_mult (MultThing x) is acc = ty_co_vars_of_type x is acc
@@ -2034,10 +2034,6 @@ getCoVarSet fv = snd (fv isCoVar emptyVarSet ([], emptyVarSet))
 
 coVarsOfType :: Type -> CoVarSet
 coVarsOfType ty = getCoVarSet (tyCoFVsOfType ty)
-
-coVarsOfRig :: Mult -> CoVarSet
-coVarsOfRig (MultThing t) = coVarsOfType t
-coVarsOfRig _ = emptyVarSet
 
 coVarsOfTypes :: [Type] -> TyCoVarSet
 coVarsOfTypes tys = getCoVarSet (tyCoFVsOfTypes tys)
