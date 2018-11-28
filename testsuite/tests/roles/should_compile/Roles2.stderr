@@ -1,7 +1,7 @@
 TYPE CONSTRUCTORS
-  T1 :: * -> *
+  T1{1} :: * -> *
   type role T2 phantom
-  T2 :: * -> *
+  T2{1} :: * -> *
 DATA CONSTRUCTORS
   K2 :: forall a. FunPtr a -> T2 a
   K1 :: forall a. IO a -> T1 a

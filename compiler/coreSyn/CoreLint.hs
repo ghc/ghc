@@ -1958,11 +1958,12 @@ lintCoercion co@(AxiomInstCo con ind cos)
                                       (zip3 (ktvs ++ cvs) roles cos)
        ; let lhs' = substTys subst_l lhs
              rhs' = substTy  subst_r rhs
+             fam_tc = coAxiomTyCon con
        ; case checkAxInstCo co of
            Just bad_branch -> bad_ax $ text "inconsistent with" <+>
-                                       pprCoAxBranch con bad_branch
+                                       pprCoAxBranch fam_tc bad_branch
            Nothing -> return ()
-       ; let s2 = mkTyConApp (coAxiomTyCon con) lhs'
+       ; let s2 = mkTyConApp fam_tc lhs'
        ; return (typeKind s2, typeKind rhs', s2, rhs', coAxiomRole con) }
   where
     bad_ax what = addErrL (hang (text  "Bad axiom application" <+> parens what)

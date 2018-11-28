@@ -1,6 +1,6 @@
 
 BadTelescope3.hs:9:1: error:
-    • These kind and type variables: a k (b :: k)
-      are out of dependency order. Perhaps try this ordering:
-        k (a :: k) (b :: k)
+    • The kind of ‘S’ is ill-scoped
+        Inferred kind: S :: k -> forall k -> k -> *
+        Perhaps try this order instead: k (a :: k) (b :: k)
     • In the type synonym declaration for ‘S’

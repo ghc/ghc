@@ -1,6 +1,7 @@
 
 T10817.hs:9:3: error:
-    The type family application ‘F a’
-      is no smaller than the instance head ‘F a’
-    (Use UndecidableInstances to permit this)
-    In the class declaration for ‘C’
+    • The type family application ‘F a’
+        is no smaller than the instance head ‘F a’
+      (Use UndecidableInstances to permit this)
+    • In the default type instance declaration for ‘F’
+      In the class declaration for ‘C’

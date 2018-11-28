@@ -37,7 +37,8 @@ module HsDecls (
   -- ** Instance declarations
   InstDecl(..), LInstDecl, FamilyInfo(..),
   TyFamInstDecl(..), LTyFamInstDecl, instDeclDataFamInsts,
-  DataFamInstDecl(..), LDataFamInstDecl, pprDataFamInstFlavour, pprFamInstLHS,
+  DataFamInstDecl(..), LDataFamInstDecl,
+  pprDataFamInstFlavour, pprHsFamInstLHS,
   FamInstEqn, LFamInstEqn, FamEqn(..),
   TyFamInstEqn, LTyFamInstEqn, TyFamDefltEqn, LTyFamDefltEqn,
   HsTyPats,
@@ -701,7 +702,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (TyClDecl p) where
     ppr (SynDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
                  , tcdRhs = rhs })
       = hang (text "type" <+>
-              pp_vanilla_decl_head ltycon tyvars fixity [] <+> equals)
+              pp_vanilla_decl_head ltycon tyvars fixity noLHsContext <+> equals)
           4 (ppr rhs)
 
     ppr (DataDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
@@ -723,8 +724,9 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (TyClDecl p) where
                                      pprLHsBindsForUser methods sigs) ]
       where
         top_matter = text "class"
-                    <+> pp_vanilla_decl_head lclas tyvars fixity (unLoc context)
+                    <+> pp_vanilla_decl_head lclas tyvars fixity context
                     <+> pprFundeps (map unLoc fds)
+
     ppr (XTyClDecl x) = ppr x
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
@@ -743,10 +745,10 @@ pp_vanilla_decl_head :: (OutputableBndrId (GhcPass p))
    => Located (IdP (GhcPass p))
    -> LHsQTyVars (GhcPass p)
    -> LexicalFixity
-   -> HsContext (GhcPass p)
+   -> LHsContext (GhcPass p)
    -> SDoc
 pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) fixity context
- = hsep [pprHsContext context, pp_tyvars tyvars]
+ = hsep [pprLHsContext context, pp_tyvars tyvars]
   where
     pp_tyvars (varl:varsr)
       | fixity == Infix && length varsr > 1
@@ -1109,7 +1111,7 @@ pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
                                     , fdResultSig = L _ result
                                     , fdInjectivityAnn = mb_inj })
   = vcat [ pprFlavour info <+> pp_top_level <+>
-           pp_vanilla_decl_head ltycon tyvars fixity [] <+>
+           pp_vanilla_decl_head ltycon tyvars fixity noLHsContext <+>
            pp_kind <+> pp_inj <+> pp_where
          , nest 2 $ pp_eqns ]
   where
@@ -1399,10 +1401,10 @@ hsConDeclTheta Nothing            = []
 hsConDeclTheta (Just (L _ theta)) = theta
 
 pp_data_defn :: (OutputableBndrId (GhcPass p))
-                  => (HsContext (GhcPass p) -> SDoc)   -- Printing the header
+                  => (LHsContext (GhcPass p) -> SDoc)   -- Printing the header
                   -> HsDataDefn (GhcPass p)
                   -> SDoc
-pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = L _ context
+pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = context
                                 , dd_cType = mb_ct
                                 , dd_kindSig = mb_sig
                                 , dd_cons = condecls, dd_derivs = derivings })
@@ -1453,7 +1455,7 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                                    : map (pprHsType . unLoc) tys)
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
-    cxt = fromMaybe (noLoc []) mcxt
+    cxt = fromMaybe noLHsContext mcxt
 
 pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
                         , con_mb_cxt = mcxt, con_args = args
@@ -1466,7 +1468,7 @@ pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
     get_args (RecCon fields)  = [pprConDeclFields (unLoc fields)]
     get_args (InfixCon {})    = pprPanic "pprConDecl:GADT" (ppr cons)
 
-    cxt = fromMaybe (noLoc []) mcxt
+    cxt = fromMaybe noLHsContext mcxt
 
     ppr_arrow_chain (a:as) = sep (a : map (arrow <+>) as)
     ppr_arrow_chain []     = empty
@@ -1704,12 +1706,12 @@ ppr_instance_keyword NotTopLevel = empty
 
 ppr_fam_inst_eqn :: (OutputableBndrId (GhcPass p))
                  => TyFamInstEqn (GhcPass p) -> SDoc
-ppr_fam_inst_eqn (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
+ppr_fam_inst_eqn (HsIB { hsib_body = FamEqn { feqn_tycon  = L _ tycon
                                             , feqn_bndrs  = bndrs
                                             , feqn_pats   = pats
                                             , feqn_fixity = fixity
                                             , feqn_rhs    = rhs }})
-    = pprFamInstLHS tycon bndrs pats fixity [] Nothing <+> equals <+> ppr rhs
+    = pprHsFamInstLHS tycon bndrs pats fixity noLHsContext <+> equals <+> ppr rhs
 ppr_fam_inst_eqn (HsIB { hsib_body = XFamEqn x }) = ppr x
 ppr_fam_inst_eqn (XHsImplicitBndrs x) = ppr x
 
@@ -1719,7 +1721,7 @@ ppr_fam_deflt_eqn (L _ (FamEqn { feqn_tycon  = tycon
                                , feqn_pats   = tvs
                                , feqn_fixity = fixity
                                , feqn_rhs    = rhs }))
-    = text "type" <+> pp_vanilla_decl_head tycon tvs fixity []
+    = text "type" <+> pp_vanilla_decl_head tycon tvs fixity noLHsContext
                   <+> equals <+> ppr rhs
 ppr_fam_deflt_eqn (L _ (XFamEqn x)) = ppr x
 
@@ -1730,7 +1732,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
 pprDataFamInstDecl :: (OutputableBndrId (GhcPass p))
                    => TopLevelFlag -> DataFamInstDecl (GhcPass p) -> SDoc
 pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-                             FamEqn { feqn_tycon  = tycon
+                             FamEqn { feqn_tycon  = L _ tycon
                                     , feqn_bndrs  = bndrs
                                     , feqn_pats   = pats
                                     , feqn_fixity = fixity
@@ -1738,10 +1740,9 @@ pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
   = pp_data_defn pp_hdr defn
   where
     pp_hdr ctxt = ppr_instance_keyword top_lvl
-              <+> pprFamInstLHS tycon bndrs pats fixity ctxt Nothing
-                    -- No need to pass an explicit kind signature to
-                    -- pprFamInstLHS here, since pp_data_defn already
-                    -- pretty-prints that. See #14817.
+              <+> pprHsFamInstLHS tycon bndrs pats fixity ctxt
+                  -- pp_data_defn pretty-prints the kind sig. See #14817.
+
 pprDataFamInstDecl _ (DataFamInstDecl (HsIB _ (XFamEqn x)))
   = ppr x
 pprDataFamInstDecl _ (DataFamInstDecl (XHsImplicitBndrs x))
@@ -1759,34 +1760,27 @@ pprDataFamInstFlavour (DataFamInstDecl (HsIB _ (XFamEqn x)))
 pprDataFamInstFlavour (DataFamInstDecl (XHsImplicitBndrs x))
   = ppr x
 
-pprFamInstLHS :: (OutputableBndrId (GhcPass p))
-   => Located (IdP (GhcPass p))
+pprHsFamInstLHS :: (OutputableBndrId (GhcPass p))
+   => IdP (GhcPass p)
    -> Maybe [LHsTyVarBndr (GhcPass p)]
    -> HsTyPats (GhcPass p)
    -> LexicalFixity
-   -> HsContext (GhcPass p)
-   -> Maybe (LHsKind (GhcPass p))
+   -> LHsContext (GhcPass p)
    -> SDoc
-pprFamInstLHS thing bndrs typats fixity context mb_kind_sig
-                                              -- explicit type patterns
-   = hsep [ pprHsContext context, pprHsExplicitForAll bndrs
-          , pp_pats typats, pp_kind_sig ]
+pprHsFamInstLHS thing bndrs typats fixity mb_ctxt
+   = hsep [ pprHsExplicitForAll bndrs
+          , pprLHsContext mb_ctxt
+          , pp_pats typats ]
    where
      pp_pats (patl:patr:pats)
        | Infix <- fixity
-       = let pp_op_app = hsep [ ppr patl, pprInfixOcc (unLoc thing), ppr patr ] in
+       = let pp_op_app = hsep [ ppr patl, pprInfixOcc thing, ppr patr ] in
          case pats of
            [] -> pp_op_app
            _  -> hsep (parens pp_op_app : map ppr pats)
 
-     pp_pats pats = hsep [ pprPrefixOcc (unLoc thing)
+     pp_pats pats = hsep [ pprPrefixOcc thing
                          , hsep (map ppr pats)]
-
-     pp_kind_sig
-       | Just k <- mb_kind_sig
-       = dcolon <+> ppr k
-       | otherwise
-       = empty
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (ClsInstDecl p) where

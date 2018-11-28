@@ -1,5 +1,6 @@
 
-T7536.hs:8:15:
-    Family instance purports to bind type variable ‘a’
-      but the real LHS (expanding synonyms) is: TF Int = ...
-    In the type instance declaration for ‘TF’
+T7536.hs:8:21: error:
+    • Type variable ‘a’ is mentioned in the RHS,
+        but not bound on the LHS of the family instance
+        The real LHS (expanding synonyms) is: TF Int
+    • In the type instance declaration for ‘TF’

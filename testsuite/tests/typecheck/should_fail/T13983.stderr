@@ -5,4 +5,4 @@ T13983.hs:7:1: error:
       of its type variables. Perhaps you meant
       to bind it explicitly somewhere?
       Type variables with inferred kinds: (k :: *)
-    • In the type declaration for ‘Wat’
+    • In the type synonym declaration for ‘Wat’

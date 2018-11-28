@@ -1,16 +1,15 @@
 
 T15743d.hs:10:1: error:
-    • These kind and type variables: k
-                                     (c :: k)
-                                     (a :: Proxy c)
-                                     (b :: Proxy d)
-                                     (x :: SimilarKind a b)
-      are out of dependency order. Perhaps try this ordering:
+    • The kind of ‘T2’ is ill-scoped
+        Inferred kind: T2 :: forall (d :: k).
+                             forall k (c :: k) (a :: Proxy c) (b :: Proxy d) ->
+                             SimilarKind a b -> *
+      NB: Specified variables (namely: (d :: k)) always come first
+      Perhaps try this order instead:
         k
         (d :: k)
         (c :: k)
         (a :: Proxy c)
         (b :: Proxy d)
         (x :: SimilarKind a b)
-      NB: Implicitly declared variables come before others.
     • In the data type declaration for ‘T2’

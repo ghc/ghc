@@ -62,7 +62,8 @@ import SrcLoc
 import TyCon
 import TcEnv
 import TcType
-import TcValidity ( checkValidTyFamEqn )
+import TcValidity ( checkValidCoAxBranch )
+import CoAxiom    ( coAxiomSingleBranch )
 import TysPrim
 import TysWiredIn
 import Type
@@ -1867,11 +1868,10 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
     mk_atf_inst fam_tc = do
         rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc))
                                            rep_lhs_tys
-        let axiom = mkSingleCoAxiom Nominal rep_tc_name rep_tvs' rep_cvs'
+        let axiom = mkSingleCoAxiom Nominal rep_tc_name rep_tvs' [] rep_cvs'
                                     fam_tc rep_lhs_tys rep_rhs_ty
         -- Check (c) from Note [GND and associated type families] in TcDeriv
-        checkValidTyFamEqn (Just (cls, cls_tvs, lhs_env)) fam_tc rep_tvs'
-                           rep_cvs' rep_lhs_tys rep_rhs_ty pp_lhs loc
+        checkValidCoAxBranch fam_tc (coAxiomSingleBranch axiom)
         newFamInst SynFamilyInst axiom
       where
         cls_tvs     = classTyVars cls
@@ -1888,7 +1888,6 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         (rep_tvs, rep_cvs) = partition isTyVar rep_tcvs
         rep_tvs'    = scopedSort rep_tvs
         rep_cvs'    = scopedSort rep_cvs
-        pp_lhs      = ppr (mkTyConApp fam_tc rep_lhs_tys)
 
     -- Same as inst_tys, but with the last argument type replaced by the
     -- representation type.

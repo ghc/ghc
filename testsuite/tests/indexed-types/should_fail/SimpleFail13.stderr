@@ -1,5 +1,5 @@
 
-SimpleFail13.hs:9:1: error:
+SimpleFail13.hs:9:15: error:
     • Illegal type synonym family application ‘C a’ in instance:
         D [C a]
     • In the data instance declaration for ‘D’

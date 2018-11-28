@@ -436,7 +436,7 @@ tc_mkRepFamInsts gk tycon inst_tys =
            (tv', cv') = partition isTyVar tcv'
            tvs'       = scopedSort tv'
            cvs'       = scopedSort cv'
-           axiom      = mkSingleCoAxiom Nominal rep_name tvs' cvs'
+           axiom      = mkSingleCoAxiom Nominal rep_name tvs' [] cvs'
                                         fam_tc inst_tys repTy'
 
      ; newFamInst SynFamilyInst axiom  }

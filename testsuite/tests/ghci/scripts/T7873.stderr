@@ -5,4 +5,4 @@
       of its type variables. Perhaps you meant
       to bind it explicitly somewhere?
       Type variables with inferred kinds: (k :: *)
-    • In the data declaration for ‘D1’
+    • In the data type declaration for ‘D1’

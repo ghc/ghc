@@ -40,7 +40,8 @@ module TcHsSyn (
         zonkTyVarOcc,
         zonkCoToCo,
         zonkEvBinds, zonkTcEvBinds,
-        zonkTcMethInfoToMethInfoX
+        zonkTcMethInfoToMethInfoX,
+        lookupTyVarOcc
   ) where
 
 #include "HsVersions.h"
@@ -1770,9 +1771,9 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
 
     zonk_meta mtv_env ref Flexi
       = do { kind <- zonkTcTypeToTypeX env (tyVarKind tv)
-           ; let ty = commitFlexi flexi tv kind
+           ; ty <- commitFlexi flexi tv kind
            ; writeMetaTyVarRef tv ref ty  -- Belt and braces
-           ; finish_meta mtv_env (commitFlexi flexi tv kind) }
+           ; finish_meta mtv_env ty }
 
     zonk_meta mtv_env _ (Indirect ty)
       = do { zty <- zonkTcTypeToTypeX env ty
@@ -1783,17 +1784,27 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
            ; writeTcRef mtv_env_ref mtv_env'
            ; return ty }
 
-commitFlexi :: ZonkFlexi -> TcTyVar -> Kind -> Type
+lookupTyVarOcc :: ZonkEnv -> TcTyVar -> Maybe TyVar
+lookupTyVarOcc (ZonkEnv { ze_tv_env = tv_env }) tv
+  = lookupVarEnv tv_env tv
+
+commitFlexi :: ZonkFlexi -> TcTyVar -> Kind -> TcM Type
+-- Only monadic so we can do tc-tracing
 commitFlexi flexi tv zonked_kind
   = case flexi of
-      SkolemiseFlexi  -> mkTyVarTy (mkTyVar name zonked_kind)
+      SkolemiseFlexi  -> return (mkTyVarTy (mkTyVar name zonked_kind))
 
-      DefaultFlexi    | isRuntimeRepTy zonked_kind
-                      -> liftedRepTy
-                      | otherwise
-                      -> anyTypeOfKind zonked_kind
+      DefaultFlexi
+        | isRuntimeRepTy zonked_kind
+        -> do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVar tv)
+              ; return liftedRepTy }
+        | otherwise
+        -> do { traceTc "Defaulting flexi tyvar to Any:" (pprTyVar tv)
+              ; return (anyTypeOfKind zonked_kind) }
 
-      RuntimeUnkFlexi -> mkTyVarTy (mkTcTyVar name zonked_kind RuntimeUnk)
+      RuntimeUnkFlexi
+        -> do { traceTc "Defaulting flexi tyvar to RuntimeUnk:" (pprTyVar tv)
+              ; return (mkTyVarTy (mkTcTyVar name zonked_kind RuntimeUnk)) }
                         -- This is where RuntimeUnks are born:
                         -- otherwise-unconstrained unification variables are
                         -- turned into RuntimeUnks as they leave the

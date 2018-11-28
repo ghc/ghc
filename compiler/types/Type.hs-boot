@@ -11,8 +11,8 @@ import Util
 isPredTy     :: Type -> Bool
 isCoercionTy :: Type -> Bool
 
-mkAppTy :: Type -> Type -> Type
-mkCastTy :: Type -> Coercion -> Type
+mkAppTy    :: Type -> Type -> Type
+mkCastTy   :: Type -> Coercion -> Type
 piResultTy :: HasDebugCallStack => Type -> Type -> Type
 
 eqType :: Type -> Type -> Bool

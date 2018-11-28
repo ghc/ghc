@@ -7,7 +7,6 @@
 module FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
-        etaExpandFamInst,
         pprFamInst, pprFamInsts,
         mkImportedFamInst,
 
@@ -168,60 +167,6 @@ Why can we allow such flexibility for data families but not for type families?
 Because data families can be decomposed -- that is, they are generative and
 injective. A Type family is neither and so always must be applied to all its
 arguments.
-
-Note [Eta reduction for data families]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this
-   data family T a b :: *
-   newtype instance T Int a = MkT (IO a) deriving( Monad )
-We'd like this to work.
-
-From the 'newtype instance' you might think we'd get:
-   newtype TInt a = MkT (IO a)
-   axiom ax1 a :: T Int a ~ TInt a   -- The newtype-instance part
-   axiom ax2 a :: TInt a ~ IO a      -- The newtype part
-
-But now what can we do?  We have this problem
-   Given:   d  :: Monad IO
-   Wanted:  d' :: Monad (T Int) = d |> ????
-What coercion can we use for the ???
-
-Solution: eta-reduce both axioms, thus:
-   axiom ax1 :: T Int ~ TInt
-   axiom ax2 :: TInt ~ IO
-Now
-   d' = d |> Monad (sym (ax2 ; ax1))
-
------ Bottom line ------
-
-For a FamInst with fi_flavour = DataFamilyInst rep_tc,
-
-  - fi_tvs (and cab_tvs of its CoAxiom) may be shorter
-    than tyConTyVars of rep_tc.
-
-  - fi_tys may be shorter than tyConArity of the family tycon
-       i.e. LHS is unsaturated
-
-  - fi_rhs will be (rep_tc fi_tvs)
-       i.e. RHS is un-saturated
-
-  - This eta reduction happens for data instances as well
-    as newtype instances. Here we want to eta-reduce the data family axiom.
-
-  - This eta-reduction is done in TcInstDcls.tcDataFamInstDecl.
-
-But when fi_flavour = SynFamilyInst,
-  - fi_tys has the exact arity of the family tycon
-
-There are certain situations (e.g., pretty-printing) where it is necessary to
-deal with eta-expanded data family instances. For these situations, the
-etaExpandFamInstLHS function exists as a convenient way to perform this eta
-expansion. (See #9692, #14179, and #15845 for examples of what can go wrong if
-etaExpandFamInstLHS isn't used).
-
-(See also Note [Newtype eta] in TyCon.  This is notionally separate
-and deals with the axiom connecting a newtype with its representation
-type; but it too is eta-reduced.)
 -}
 
 -- Obtain the axiom of a family instance
@@ -272,55 +217,28 @@ instance NamedThing FamInst where
 instance Outputable FamInst where
    ppr = pprFamInst
 
--- Prints the FamInst as a family instance declaration
--- NB: FamInstEnv.pprFamInst is used only for internal, debug printing
---     See pprTyThing.pprFamInst for printing for the user
 pprFamInst :: FamInst -> SDoc
-pprFamInst famInst
-  = hang (pprFamInstHdr famInst) 2 (whenPprDebug debug_stuff)
+-- Prints the FamInst as a family instance declaration
+-- NB: This function, FamInstEnv.pprFamInst, is used only for internal,
+--     debug printing. See PprTyThing.pprFamInst for printing for the user
+pprFamInst (FamInst { fi_flavor = flavor, fi_axiom = ax
+                    , fi_tvs = tvs, fi_tys = tys, fi_rhs = rhs })
+  = hang (ppr_tc_sort <+> text "instance"
+             <+> pprCoAxBranch (coAxiomTyCon ax) (coAxiomSingleBranch ax))
+       2 (whenPprDebug debug_stuff)
   where
-    ax = fi_axiom famInst
-    debug_stuff = vcat [ text "Coercion axiom:" <+> ppr ax
-                       , text "Tvs:" <+> ppr (fi_tvs famInst)
-                       , text "LHS:" <+> ppr (fi_tys famInst)
-                       , text "RHS:" <+> ppr (fi_rhs famInst) ]
-
-pprFamInstHdr :: FamInst -> SDoc
-pprFamInstHdr fi@(FamInst {fi_flavor = flavor})
-  = pprTyConSort <+> pp_instance <+> pp_head
-  where
-    -- For *associated* types, say "type T Int = blah"
-    -- For *top level* type instances, say "type instance T Int = blah"
-    pp_instance
-      | isTyConAssoc fam_tc = empty
-      | otherwise           = text "instance"
-
-    (fam_tc, etad_lhs_tys) = famInstSplitLHS fi
-    vanilla_pp_head = pprTypeApp fam_tc etad_lhs_tys
-
-    pp_head | DataFamilyInst rep_tc <- flavor
-            , isAlgTyCon rep_tc
-            , let extra_tvs = dropList etad_lhs_tys (tyConTyVars rep_tc)
-            , not (null extra_tvs)
-            = getPprStyle $ \ sty ->
-              if debugStyle sty
-              then vanilla_pp_head   -- With -dppr-debug just show it as-is
-              else pprTypeApp fam_tc (etad_lhs_tys ++ mkTyVarTys extra_tvs)
-                     -- Without -dppr-debug, eta-expand
-                     -- See Trac #8674
-                     -- (This is probably over the top now that we use this
-                     --  only for internal debug printing; PprTyThing.pprFamInst
-                     --  is used for user-level printing.)
-            | otherwise
-            = vanilla_pp_head
-
-    pprTyConSort = case flavor of
-                     SynFamilyInst        -> text "type"
+    ppr_tc_sort = case flavor of
+                     SynFamilyInst             -> text "type"
                      DataFamilyInst tycon
                        | isDataTyCon     tycon -> text "data"
                        | isNewTyCon      tycon -> text "newtype"
                        | isAbstractTyCon tycon -> text "data"
                        | otherwise             -> text "WEIRD" <+> ppr tycon
+
+    debug_stuff = vcat [ text "Coercion axiom:" <+> ppr ax
+                       , text "Tvs:" <+> ppr tvs
+                       , text "LHS:" <+> ppr tys
+                       , text "RHS:" <+> ppr rhs ]
 
 pprFamInsts :: [FamInst] -> SDoc
 pprFamInsts finsts = vcat (map pprFamInst finsts)
@@ -668,31 +586,77 @@ computeAxiomIncomps branches
 
 Note [Tidy axioms when we build them]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We print out axioms and don't want to print stuff like
+Like types and classes, we build axioms fully quantified over all
+their variables, and tidy them when we build them. For example,
+we print out axioms and don't want to print stuff like
     F k k a b = ...
 Instead we must tidy those kind variables.  See Trac #7524.
+
+We could instead tidy when we print, but that makes it harder to get
+things like injectivity errors to come out right. Danger of
+     Type family equation violates injectivity annotation.
+     Kind variable ‘k’ cannot be inferred from the right-hand side.
+     In the type family equation:
+        PolyKindVars @[k1] @[k2] ('[] @k1) = '[] @k2
+
+Note [Always number wildcard types in CoAxBranch]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following example (from the DataFamilyInstanceLHS test case):
+
+  data family Sing (a :: k)
+  data instance Sing (_ :: MyKind) where
+      SingA :: Sing A
+      SingB :: Sing B
+
+If we're not careful during tidying, then when this program is compiled with
+-ddump-types, we'll get the following information:
+
+  COERCION AXIOMS
+    axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
+      Sing _ = DataFamilyInstanceLHS.R:SingMyKind_ _
+
+Its misleading to have a wildcard type appearing on the RHS like
+that. To avoid this issue, during tidying, we always opt to add a
+numeric suffix to types that are simply `_`. That way, you instead end
+up with:
+
+  COERCION AXIOMS
+    axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
+      Sing _1 = DataFamilyInstanceLHS.R:SingMyKind_ _1
+
+Which is at least legal syntax.
+
+See also Note [CoAxBranch type variables] in CoAxiom
 -}
 
 -- all axiom roles are Nominal, as this is only used with type families
 mkCoAxBranch :: [TyVar] -- original, possibly stale, tyvars
+             -> [TyVar] -- Extra eta tyvars
              -> [CoVar] -- possibly stale covars
              -> [Type]  -- LHS patterns
              -> Type    -- RHS
              -> [Role]
              -> SrcSpan
              -> CoAxBranch
-mkCoAxBranch tvs cvs lhs rhs roles loc
-  = CoAxBranch { cab_tvs     = tvs1
-               , cab_cvs     = cvs1
+mkCoAxBranch tvs eta_tvs cvs lhs rhs roles loc
+  = CoAxBranch { cab_tvs     = tvs'
+               , cab_eta_tvs = eta_tvs'
+               , cab_cvs     = cvs'
                , cab_lhs     = tidyTypes env lhs
                , cab_roles   = roles
-               , cab_rhs     = tidyType  env rhs
+               , cab_rhs     = tidyType env rhs
                , cab_loc     = loc
                , cab_incomps = placeHolderIncomps }
   where
-    (env1, tvs1) = tidyVarBndrs emptyTidyEnv tvs
-    (env,  cvs1) = tidyVarBndrs env1         cvs
+    (env1, tvs')     = tidyVarBndrs init_tidy_env tvs
+    (env2, eta_tvs') = tidyVarBndrs env1          eta_tvs
+    (env,  cvs')     = tidyVarBndrs env2          cvs
     -- See Note [Tidy axioms when we build them]
+    -- See also Note [CoAxBranch type variables] in CoAxiom
+
+    init_occ_env = initTidyOccEnv [mkTyVarOcc "_"]
+    init_tidy_env = mkEmptyTidyEnv init_occ_env
+    -- See Note [Always number wildcard types in CoAxBranch]
 
 -- all of the following code is here to avoid mutual dependencies with
 -- Coercion
@@ -715,12 +679,13 @@ mkUnbranchedCoAxiom ax_name fam_tc branch
             , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
 
 mkSingleCoAxiom :: Role -> Name
-                -> [TyVar] -> [CoVar] -> TyCon -> [Type] -> Type
+                -> [TyVar] -> [TyVar] -> [CoVar]
+                -> TyCon -> [Type] -> Type
                 -> CoAxiom Unbranched
 -- Make a single-branch CoAxiom, incluidng making the branch itself
 -- Used for both type family (Nominal) and data family (Representational)
 -- axioms, hence passing in the Role
-mkSingleCoAxiom role ax_name tvs cvs fam_tc lhs_tys rhs_ty
+mkSingleCoAxiom role ax_name tvs eta_tvs cvs fam_tc lhs_tys rhs_ty
   = CoAxiom { co_ax_unique   = nameUnique ax_name
             , co_ax_name     = ax_name
             , co_ax_tc       = fam_tc
@@ -728,7 +693,7 @@ mkSingleCoAxiom role ax_name tvs cvs fam_tc lhs_tys rhs_ty
             , co_ax_implicit = False
             , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
   where
-    branch = mkCoAxBranch tvs cvs lhs_tys rhs_ty
+    branch = mkCoAxBranch tvs eta_tvs cvs lhs_tys rhs_ty
                           (map (const Nominal) tvs)
                           (getSrcSpan ax_name)
 
@@ -746,7 +711,7 @@ mkNewTypeCoAxiom name tycon tvs roles rhs_ty
             , co_ax_tc       = tycon
             , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
   where
-    branch = mkCoAxBranch tvs [] (mkTyVarTys tvs) rhs_ty
+    branch = mkCoAxBranch tvs [] [] (mkTyVarTys tvs) rhs_ty
                           roles (getSrcSpan name)
 
 {-

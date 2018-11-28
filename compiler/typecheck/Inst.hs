@@ -484,17 +484,28 @@ no longer cut it, but it seems fine for now.
 -}
 
 ---------------------------
--- | This is used to instantiate binders when type-checking *types* only.
--- The @VarEnv Kind@ gives some known instantiations.
+-- | Instantantiate the TyConBinders of a forall type,
+--   given its decomposed form (tvs, ty)
+tcInstTyBinders :: HasDebugCallStack
+              => ([TyCoBinder], TcKind)   -- ^ The type (forall bs. ty)
+              -> TcM ([TcType], TcKind)   -- ^ Instantiated bs, substituted ty
+-- Takes a pair because that is what splitPiTysInvisible returns
 -- See also Note [Bidirectional type checking]
-tcInstTyBinders :: TCvSubst -> Maybe (VarEnv Kind)
-                -> [TyBinder] -> TcM (TCvSubst, [TcType])
-tcInstTyBinders subst mb_kind_info bndrs
-  = do { (subst, args) <- mapAccumLM (tcInstTyBinder mb_kind_info) subst bndrs
-       ; traceTc "instantiating tybinders:"
-           (vcat $ zipWith (\bndr arg -> ppr bndr <+> text ":=" <+> ppr arg)
-                           bndrs args)
-       ; return (subst, args) }
+tcInstTyBinders (bndrs, ty)
+  | null bndrs        -- It's fine for bndrs to be empty e.g.
+  = return ([], ty)   -- Check that (Maybe :: forall {k}. k->*),
+                      --       and see the call to instTyBinders in checkExpectedKind
+                      -- A user bug to be reported as such; it is not a compiler crash!
+
+  | otherwise
+  = do { (subst, args) <- mapAccumLM (tcInstTyBinder Nothing) empty_subst bndrs
+       ; ty' <- zonkTcType (substTy subst ty)
+                   -- Why zonk the result? So that tcTyVar can
+                   -- obey (IT6) of Note [The tcType invariant] in TcHsType
+                   -- ToDo: SLPJ: I don't think this is needed
+       ; return (args, ty') }
+  where
+     empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
 
 -- | Used only in *types*
 tcInstTyBinder :: Maybe (VarEnv Kind)

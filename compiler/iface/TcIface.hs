@@ -857,17 +857,24 @@ tc_ax_branches if_branches = foldlM tc_ax_branch [] if_branches
 
 tc_ax_branch :: [CoAxBranch] -> IfaceAxBranch -> IfL [CoAxBranch]
 tc_ax_branch prev_branches
-             (IfaceAxBranch { ifaxbTyVars = tv_bndrs, ifaxbCoVars = cv_bndrs
+             (IfaceAxBranch { ifaxbTyVars = tv_bndrs
+                            , ifaxbEtaTyVars = eta_tv_bndrs
+                            , ifaxbCoVars = cv_bndrs
                             , ifaxbLHS = lhs, ifaxbRHS = rhs
                             , ifaxbRoles = roles, ifaxbIncomps = incomps })
   = bindIfaceTyConBinders_AT
       (map (\b -> Bndr (IfaceTvBndr b) (NamedTCB Inferred)) tv_bndrs) $ \ tvs ->
          -- The _AT variant is needed here; see Note [CoAxBranch type variables] in CoAxiom
     bindIfaceIds cv_bndrs $ \ cvs -> do
-    { tc_lhs <- tcIfaceAppArgs lhs
-    ; tc_rhs <- tcIfaceType rhs
-    ; let br = CoAxBranch { cab_loc     = noSrcSpan
+    { tc_lhs   <- tcIfaceAppArgs lhs
+    ; tc_rhs   <- tcIfaceType rhs
+    ; eta_tvs  <- bindIfaceTyVars eta_tv_bndrs return
+    ; this_mod <- getIfModule
+    ; let loc = mkGeneralSrcSpan (fsLit "module " `appendFS`
+                                  moduleNameFS (moduleName this_mod))
+          br = CoAxBranch { cab_loc     = loc
                           , cab_tvs     = binderVars tvs
+                          , cab_eta_tvs = eta_tvs
                           , cab_cvs     = cvs
                           , cab_lhs     = tc_lhs
                           , cab_roles   = roles
@@ -1767,6 +1774,13 @@ bindIfaceTyVar (occ,kind) thing_inside
   = do  { name <- newIfaceName (mkTyVarOccFS occ)
         ; tyvar <- mk_iface_tyvar name kind
         ; extendIfaceTyVarEnv [tyvar] (thing_inside tyvar) }
+
+bindIfaceTyVars :: [IfaceTvBndr] -> ([TyVar] -> IfL a) -> IfL a
+bindIfaceTyVars [] thing_inside = thing_inside []
+bindIfaceTyVars (bndr:bndrs) thing_inside
+  = bindIfaceTyVar bndr   $ \tv  ->
+    bindIfaceTyVars bndrs $ \tvs ->
+    thing_inside (tv : tvs)
 
 mk_iface_tyvar :: Name -> IfaceKind -> IfL TyVar
 mk_iface_tyvar name ifKind

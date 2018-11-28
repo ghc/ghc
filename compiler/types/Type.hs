@@ -62,14 +62,14 @@ module Type (
         coAxNthLHS,
         stripCoercionTy, splitCoercionType_maybe,
 
-        splitPiTysInvisible, filterOutInvisibleTypes, filterOutInferredTypes,
+        splitPiTysInvisible, splitPiTysInvisibleN,
+        invisibleTyBndrCount,
+        filterOutInvisibleTypes, filterOutInferredTypes,
         partitionInvisibleTypes, partitionInvisibles,
         tyConArgFlags, appTyArgFlags,
         synTyConResKind,
 
         modifyJoinResTy, setJoinResTy,
-
-        etaExpandFamInst,
 
         -- Analyzing types
         TyCoMapper(..), mapType, mapCoercion,
@@ -104,7 +104,8 @@ module Type (
         tyCoBinderType, tyCoBinderVar_maybe,
         tyBinderType,
         binderRelevantType_maybe, caseBinder,
-        isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder, isInvisibleBinder,
+        isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder,
+        isInvisibleBinder, isNamedBinder,
         tyConBindersTyCoBinders,
 
         -- ** Common type constructors
@@ -138,7 +139,7 @@ module Type (
         liftedTypeKind,
 
         -- * Type free variables
-        tyCoFVsOfType, tyCoFVsBndr,
+        tyCoFVsOfType, tyCoFVsBndr, tyCoFVsVarBndr, tyCoFVsVarBndrs,
         tyCoVarsOfType, tyCoVarsOfTypes,
         tyCoVarsOfTypeDSet,
         coVarsOfType,
@@ -1338,8 +1339,7 @@ interfaces.  Notably this plays a role in tcTySigs in TcBinds.hs.
                                 ~~~~~~~~
 -}
 
--- | Make a dependent forall over an Inferred (as opposed to Specified)
--- variable
+-- | Make a dependent forall over an Inferred variablem
 mkTyCoInvForAllTy :: TyCoVar -> Type -> Type
 mkTyCoInvForAllTy tv ty
   | isCoVar tv
@@ -1362,7 +1362,7 @@ mkTyCoInvForAllTys tvs ty = foldr mkTyCoInvForAllTy ty tvs
 mkInvForAllTys :: [TyVar] -> Type -> Type
 mkInvForAllTys tvs ty = foldr mkInvForAllTy ty tvs
 
--- | Like mkForAllTys, but assumes all variables are dependent and specified,
+-- | Like mkForAllTys, but assumes all variables are dependent and Specified,
 -- a common case
 mkSpecForAllTys :: [TyVar] -> Type -> Type
 mkSpecForAllTys tvs = ASSERT( all isTyVar tvs )
@@ -1401,12 +1401,12 @@ mkLamTypes vs ty = foldr mkLamType ty vs
 -- We want (k:*) Named, (b:k) Anon, (c:k) Anon
 --
 -- All non-coercion binders are /visible/.
-mkTyConBindersPreferAnon :: [TyVar] -> Type -> [TyConBinder]
-mkTyConBindersPreferAnon vars inner_ty = ASSERT( all isTyVar vars)
-                                               fst (go vars)
+mkTyConBindersPreferAnon :: [TyVar] -> TyCoVarSet -> [TyConBinder]
+mkTyConBindersPreferAnon vars inner_tkvs = ASSERT( all isTyVar vars)
+                                           fst (go vars)
   where
     go :: [TyVar] -> ([TyConBinder], VarSet) -- also returns the free vars
-    go [] = ([], tyCoVarsOfType inner_ty)
+    go [] = ([], inner_tkvs)
     go (v:vs) | v `elemVarSet` fvs
               = ( Bndr v (NamedTCB Required) : binders
                 , fvs `delVarSet` v `unionVarSet` kind_vars )
@@ -1436,15 +1436,6 @@ splitTyVarForAllTys ty = split ty ty []
     split orig_ty ty tvs | Just ty' <- coreView ty     = split orig_ty ty' tvs
     split _ (ForAllTy (Bndr tv _) ty) tvs | isTyVar tv = split ty ty (tv:tvs)
     split orig_ty _                   tvs              = (reverse tvs, orig_ty)
-
--- | Like 'splitPiTys' but split off only /named/ binders.
-splitForAllVarBndrs :: Type -> ([TyCoVarBinder], Type)
-splitForAllVarBndrs ty = split ty ty []
-  where
-    split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
-    split _       (ForAllTy b res) bs = split res res (b:bs)
-    split orig_ty _                bs = (reverse bs, orig_ty)
-{-# INLINE splitForAllVarBndrs #-}
 
 -- | Checks whether this is a proper forall (with a named binder)
 isForAllTy :: Type -> Bool
@@ -1529,26 +1520,59 @@ splitPiTy ty
 -- | Split off all TyCoBinders to a type, splitting both proper foralls
 -- and functions
 splitPiTys :: Type -> ([TyCoBinder], Type)
-splitPiTys ty = split ty ty
+splitPiTys ty = split ty ty []
   where
-    split orig_ty ty | Just ty' <- coreView ty = split orig_ty ty'
-    split _       (ForAllTy b res) = let (bs, ty) = split res res
-                                     in  (Named b : bs, ty)
-    split _       (FunTy arg res)  = let (bs, ty) = split res res
-                                     in  (Anon arg : bs, ty)
-    split orig_ty _                = ([], orig_ty)
+    split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
+    split _       (ForAllTy b res) bs = split res res (Named b  : bs)
+    split _       (FunTy arg res)  bs = split res res (Anon arg : bs)
+    split orig_ty _                bs = (reverse bs, orig_ty)
+
+-- | Like 'splitPiTys' but split off only /named/ binders
+--   and returns TyCoVarBinders rather than TyCoBinders
+splitForAllVarBndrs :: Type -> ([TyCoVarBinder], Type)
+splitForAllVarBndrs ty = split ty ty []
+  where
+    split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
+    split _       (ForAllTy b res) bs = split res res (b:bs)
+    split orig_ty _                bs = (reverse bs, orig_ty)
+{-# INLINE splitForAllVarBndrs #-}
+
+invisibleTyBndrCount :: Type -> Int
+-- Returns the number of leading invisible forall'd binders in the type
+-- Includes invisible predicate arguments; e.g. for
+--    e.g.  forall {k}. (k ~ *) => k -> k
+-- returns 2 not 1
+invisibleTyBndrCount ty = length (fst (splitPiTysInvisible ty))
 
 -- Like splitPiTys, but returns only *invisible* binders, including constraints
 -- Stops at the first visible binder
 splitPiTysInvisible :: Type -> ([TyCoBinder], Type)
 splitPiTysInvisible ty = split ty ty []
    where
-    split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
-    split _       (ForAllTy b@(Bndr _ vis) res) bs
-      | isInvisibleArgFlag vis         = split res res (Named b  : bs)
-    split _       (FunTy arg res)  bs
-      | isPredTy arg                   = split res res (Anon arg : bs)
-    split orig_ty _                bs  = (reverse bs, orig_ty)
+    split orig_ty ty bs
+      | Just ty' <- coreView ty  = split orig_ty ty' bs
+    split _ (ForAllTy b res) bs
+      | Bndr _ vis <- b
+      , isInvisibleArgFlag vis   = split res res (Named b  : bs)
+    split _ (FunTy arg res)  bs
+      | isPredTy arg             = split res res (Anon arg : bs)
+    split orig_ty _          bs  = (reverse bs, orig_ty)
+
+splitPiTysInvisibleN :: Int -> Type -> ([TyCoBinder], Type)
+-- Same as splitPiTysInvisible, but stop when
+--   - you have found 'n' TyCoBinders,
+--   - or you run out of invisible binders
+splitPiTysInvisibleN n ty = split n ty ty []
+   where
+    split n orig_ty ty bs
+      | n == 0                  = (reverse bs, orig_ty)
+      | Just ty' <- coreView ty = split n orig_ty ty' bs
+      | ForAllTy b res <- ty
+      , Bndr _ vis <- b
+      , isInvisibleArgFlag vis  = split (n-1) res res (Named b  : bs)
+      | FunTy arg res <- ty
+      , isPredTy arg            = split (n-1) res res (Anon arg : bs)
+      | otherwise               = (reverse bs, orig_ty)
 
 -- | Given a 'TyCon' and a list of argument types, filter out any invisible
 -- (i.e., 'Inferred' or 'Specified') arguments.
@@ -3053,40 +3077,6 @@ setJoinResTy :: Int  -- Number of binders to skip
 setJoinResTy ar new_res_ty ty
   = modifyJoinResTy ar (const new_res_ty) ty
 
--- | Given a data or type family instance's type variables, left-hand side
--- types, and right-hand side type, either:
---
--- * Return the eta-expanded type variables, left-hand types, and right-hand
---   type (if dealing with a data family instance). This function obtains the
---   eta-reduced variables from the instance's representation 'TyCon' (which
---   heads the right-hand type).
---
--- * Just return the type variables, left-hand types, and right-hand type
---   (if dealing with a type family instance).
---
--- For an explanation of why data family instances need to be eta expanded, see
--- @Note [Eta reduction for data families]@ in "FamInstEnv".
-
--- NB: In an ideal world, this would live in FamInstEnv, but this function
--- is used in Coercion (which FamInstEnv imports), so doing so would lead to
--- an import cycle.
-etaExpandFamInst
-  :: [TyVar] -- ^ The type variables
-  -> [Type]  -- ^ The left-hand side types
-  -> Type    -- ^ The right-hand side type
-  -> ([TyVar], [Type], Type)
-etaExpandFamInst tvs lhs rhs
-  | Just (tycon, tc_args) <- splitTyConApp_maybe rhs
-  , isFamInstTyCon tycon
-  = let tc_tvs           = tyConTyVars tycon
-        etad_tvs         = dropList tc_args tc_tvs
-        etad_tys         = mkTyVarTys etad_tvs
-        eta_expanded_tvs = tvs `chkAppend` etad_tvs
-        eta_expanded_lhs = lhs `chkAppend` etad_tys
-        eta_expanded_rhs = mkAppTys rhs etad_tys
-    in (eta_expanded_tvs, eta_expanded_lhs, eta_expanded_rhs)
-  | otherwise
-  = (tvs, lhs, rhs)
 
 {-
 %************************************************************************

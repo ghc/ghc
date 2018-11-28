@@ -1,11 +1,10 @@
 TYPE CONSTRUCTORS
-  MyKind :: *
+  MyKind{0} :: *
   type role Sing nominal nominal
-  Sing :: forall k. k -> *
+  Sing{2} :: forall k. k -> *
 COERCION AXIOMS
   axiom NamedWildcardInDataFamilyInstanceLHS.D:R:SingMyKind_a0 ::
-    Sing _a = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a _a
-      -- Defined at NamedWildcardInDataFamilyInstanceLHS.hs:8:15
+      Sing = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a
 DATA CONSTRUCTORS
   A :: MyKind
   B :: MyKind
@@ -13,6 +12,8 @@ DATA CONSTRUCTORS
   SingB :: Sing 'B
 FAMILY INSTANCES
   data instance Sing
+                  _a = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a _a
+                  -- Defined at NamedWildcardInDataFamilyInstanceLHS.hs:8:15
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

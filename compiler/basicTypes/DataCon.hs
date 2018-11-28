@@ -74,6 +74,7 @@ import Class
 import Name
 import PrelNames
 import Var
+import VarSet( emptyVarSet )
 import Outputable
 import Util
 import BasicTypes
@@ -1487,7 +1488,7 @@ buildAlgTyCon tc_name ktvs roles cType stupid_theta rhs
   = mkAlgTyCon tc_name binders liftedTypeKind roles cType stupid_theta
                rhs parent gadt_syn
   where
-    binders = mkTyConBindersPreferAnon ktvs liftedTypeKind
+    binders = mkTyConBindersPreferAnon ktvs emptyVarSet
 
 buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
               -> [Role] -> KnotTied Type -> TyCon

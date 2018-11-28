@@ -42,8 +42,6 @@ import Type( mkTyVarBinders )
 
 import DynFlags
 import Var      ( TyVar, tyVarKind )
-import VarSet
-import VarEnv   ( mkInScopeSet )
 import Id       ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import PrelNames( mkUnboundName )
 import BasicTypes
@@ -311,7 +309,7 @@ equalites, rather than leaving them in the ambient constraints
 to be solved later.  Pattern synonyms are top-level, so there's
 no problem with completely solving them.
 
-(NB: this solveEqualities wraps tcImplicitTKBndrs, which itself
+(NB: this solveEqualities wraps newImplicitTKBndrs, which itself
 does a solveLocalEqualities; so solveEqualities isn't going to
 make any further progress; it'll just report any unsolved ones,
 and fail, as it should.)
@@ -327,11 +325,11 @@ tcPatSynSig name sig_ty
   , (ex_hs_tvs,   hs_prov, hs_body_ty) <- splitLHsSigmaTy hs_ty1
   = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
        ; (implicit_tvs, (univ_tvs, (ex_tvs, (req, prov, body_ty))))
-           <- solveEqualities                             $
-                -- See Note [solveEqualities in tcPatSynSig]
-              tcImplicitTKBndrs skol_info implicit_hs_tvs $
-              tcExplicitTKBndrs skol_info univ_hs_tvs     $
-              tcExplicitTKBndrs skol_info ex_hs_tvs       $
+           <- pushTcLevelM_   $
+              solveEqualities $ -- See Note [solveEqualities in tcPatSynSig]
+              bindImplicitTKBndrs_Skol implicit_hs_tvs $
+              bindExplicitTKBndrs_Skol univ_hs_tvs     $
+              bindExplicitTKBndrs_Skol ex_hs_tvs       $
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
                  ; body_ty <- tcHsOpenType hs_body_ty
@@ -349,7 +347,7 @@ tcPatSynSig name sig_ty
        -- These are /signatures/ so we zonk to squeeze out any kind
        -- unification variables.  Do this after kindGeneralize which may
        -- default kind variables to *.
-       ; implicit_tvs <- mapM zonkTyCoVarKind implicit_tvs
+       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
        ; univ_tvs     <- mapM zonkTyCoVarKind univ_tvs
        ; ex_tvs       <- mapM zonkTyCoVarKind ex_tvs
        ; req          <- zonkTcTypes req
@@ -359,6 +357,7 @@ tcPatSynSig name sig_ty
        -- Skolems have TcLevels too, though they're used only for debugging.
        -- If you don't do this, the debugging checks fail in TcPatSyn.
        -- Test case: patsyn/should_compile/T13441
+{-
        ; tclvl <- getTcLevel
        ; let env0                  = mkEmptyTCvSubst $ mkInScopeSet $ mkVarSet kvs
              (env1, implicit_tvs') = promoteSkolemsX tclvl env0 implicit_tvs
@@ -367,6 +366,13 @@ tcPatSynSig name sig_ty
              req'                  = substTys env3 req
              prov'                 = substTys env3 prov
              body_ty'              = substTy  env3 body_ty
+-}
+      ; let implicit_tvs' = implicit_tvs
+            univ_tvs'     = univ_tvs
+            ex_tvs'       = ex_tvs
+            req'          = req
+            prov'         = prov
+            body_ty'      = body_ty
 
        -- Now do validity checking
        ; checkValidType ctxt $
@@ -395,7 +401,6 @@ tcPatSynSig name sig_ty
                       , patsig_body_ty        = body_ty' }) }
   where
     ctxt = PatSynCtxt name
-    skol_info = SigTypeSkol ctxt
 
     build_patsyn_type kvs imp univ req ex prov body
       = mkInvForAllTys kvs $
@@ -432,11 +437,12 @@ tcInstSig sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
                       , sig_inst_theta = theta
                       , sig_inst_tau   = tau }) }
 
-tcInstSig sig@(PartialSig { psig_hs_ty = hs_ty
-                          , sig_ctxt = ctxt
-                          , sig_loc = loc })
+tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
+                             , sig_ctxt = ctxt
+                             , sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
-    do { (wcs, wcx, tv_names, tvs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
+    do { traceTc "Staring partial sig {" (ppr hs_sig)
+       ; (wcs, wcx, tv_names, tvs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
 
         -- Clone the quantified tyvars
         -- Reason: we might have    f, g :: forall a. a -> _ -> a
@@ -445,31 +451,18 @@ tcInstSig sig@(PartialSig { psig_hs_ty = hs_ty
         --         the easiest way to do so, and is very similar to
         --         the tcInstType in the CompleteSig case
         -- See Trac #14643
-       ; let in_scope = mkInScopeSet $ closeOverKinds $ unionVarSets
-                          [ mkVarSet (map snd wcs)
-                          , maybe emptyVarSet tyCoVarsOfType wcx
-                          , mkVarSet tvs
-                          , tyCoVarsOfTypes theta
-                          , tyCoVarsOfType tau ]
-               -- the in_scope is a bit bigger than nec'y, but too big is always
-               -- safe
-             empty_subst = mkEmptyTCvSubst in_scope
-       ; (subst, tvs') <- instSkolTyCoVarsX mk_sig_tv empty_subst tvs
+       ; (subst, tvs') <- newMetaTyVarTyVars tvs
+                         -- Why newMetaTyVarTyVars?  See TcBinds
+                         -- Note [Quantified variables in partial type signatures]
        ; let tv_prs = tv_names `zip` tvs'
-
-       ; return (TISI { sig_inst_sig   = sig
-                      , sig_inst_skols = tv_prs
-                      , sig_inst_wcs   = wcs
-                      , sig_inst_wcx   = wcx
-                      , sig_inst_theta = substTys subst theta
-                      , sig_inst_tau   = substTy  subst tau
-                }) }
-  where
-    mk_sig_tv old_name kind
-      = do { uniq <- newUnique
-           ; newTyVarTyVar (setNameUnique old_name uniq) kind }
-      -- Why newTyVarTyVar?  See TcBinds
-      -- Note [Quantified variables in partial type signatures]
+             inst_sig = TISI { sig_inst_sig   = hs_sig
+                             , sig_inst_skols = tv_prs
+                             , sig_inst_wcs   = wcs
+                             , sig_inst_wcx   = wcx
+                             , sig_inst_theta = substTys subst theta
+                             , sig_inst_tau   = substTy  subst tau }
+       ; traceTc "End partial sig }" (ppr inst_sig)
+       ; return inst_sig }
 
 
 {- Note [Pattern bindings and complete signatures]

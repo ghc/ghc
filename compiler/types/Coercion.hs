@@ -98,7 +98,8 @@ module Coercion (
 
         -- * Pretty-printing
         pprCo, pprParendCo,
-        pprCoAxiom, pprCoAxBranch, pprCoAxBranchHdr,
+        pprCoAxiom, pprCoAxBranch, pprCoAxBranchLHS, pprCoAxBranchUser,
+        etaExpandCoAxBranch,
 
         -- * Tidying
         tidyCo, tidyCos,
@@ -136,6 +137,7 @@ import UniqFM
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
+import Data.Char( isDigit )
 
 {-
 %************************************************************************
@@ -170,60 +172,102 @@ Defined here to avoid module loops. CoAxiom is loaded very early on.
 
 -}
 
+etaExpandCoAxBranch :: CoAxBranch -> ([TyVar], [Type], Type)
+-- Return the (tvs,lhs,rhs) after eta-expanding,
+-- to the way in which the axiom was originally written
+-- See Note [Eta reduction for data families] in CoAxiom
+etaExpandCoAxBranch (CoAxBranch { cab_tvs = tvs
+                                , cab_eta_tvs = eta_tvs
+                                , cab_lhs = lhs
+                                , cab_rhs = rhs })
+  -- ToDo: what about eta_cvs?
+  = (tvs ++ eta_tvs, lhs ++ eta_tys, mkAppTys rhs eta_tys)
+ where
+    eta_tys = mkTyVarTys eta_tvs
+
 pprCoAxiom :: CoAxiom br -> SDoc
-pprCoAxiom ax@(CoAxiom { co_ax_branches = branches })
+-- Used in debug-printing only
+pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
   = hang (text "axiom" <+> ppr ax <+> dcolon)
-       2 (vcat (map (ppr_co_ax_branch (\env _ ty ->
-                      equals <+> pprPrecTypeX env topPrec ty) ax) $
-                    fromBranches branches))
+       2 (vcat (map (pprCoAxBranch tc) (fromBranches branches)))
 
-pprCoAxBranch :: CoAxiom br -> CoAxBranch -> SDoc
-pprCoAxBranch = ppr_co_ax_branch pprRhs
+pprCoAxBranchUser :: TyCon -> CoAxBranch -> SDoc
+-- Used when printing injectivity errors (FamInst.makeInjectivityErrors)
+-- and inaccessible branches (TcValidity.inaccessibleCoAxBranch)
+-- This happens in error messages: don't print the RHS of a data
+--   family axiom, which is meaningless to a user
+pprCoAxBranchUser tc br
+  | isDataFamilyTyCon tc = pprCoAxBranchLHS tc br
+  | otherwise            = pprCoAxBranch    tc br
+
+pprCoAxBranchLHS :: TyCon -> CoAxBranch -> SDoc
+-- Print the family-instance equation when reporting
+--   a conflict between equations (FamInst.conflictInstErr)
+-- For type families the RHS is important; for data families not so.
+--   Indeed for data families the RHS is a mysterious internal
+--   type constructor, so we suppress it (Trac #14179)
+-- See FamInstEnv Note [Family instance overlap conflicts]
+pprCoAxBranchLHS = ppr_co_ax_branch pp_rhs
   where
-    pprRhs _ fam_tc rhs
-      | isDataFamilyTyCon fam_tc
-      = empty -- Don't bother printing anything for the RHS of a data family
-              -- instance...
+    pp_rhs _ _ = empty
 
-      | otherwise
-      = equals <+> ppr rhs
-              -- ...but for a type family instance, do print out the RHS, since
-              -- it might be needed to disambiguate between duplicate instances
-              -- (#14179)
+pprCoAxBranch :: TyCon -> CoAxBranch -> SDoc
+pprCoAxBranch = ppr_co_ax_branch ppr_rhs
+  where
+    ppr_rhs env rhs = equals <+> pprPrecTypeX env topPrec rhs
 
-pprCoAxBranchHdr :: CoAxiom br -> BranchIndex -> SDoc
-pprCoAxBranchHdr ax index = pprCoAxBranch ax (coAxiomNthBranch ax index)
-
-ppr_co_ax_branch :: (TidyEnv -> TyCon -> Type -> SDoc)
-                 -> CoAxiom br -> CoAxBranch -> SDoc
-ppr_co_ax_branch ppr_rhs
-              (CoAxiom { co_ax_tc = fam_tc, co_ax_name = name })
-              (CoAxBranch { cab_tvs = tvs
-                          , cab_cvs = cvs
-                          , cab_lhs = lhs
-                          , cab_rhs = rhs
-                          , cab_loc = loc })
+ppr_co_ax_branch :: (TidyEnv -> Type -> SDoc)
+                 -> TyCon -> CoAxBranch -> SDoc
+ppr_co_ax_branch ppr_rhs fam_tc branch
   = foldr1 (flip hangNotEmpty 2)
-        [ pprUserForAll (mkTyCoVarBinders Inferred (ee_tvs' ++ cvs))
-        , pp_lhs <+> ppr_rhs env fam_tc ee_rhs
-        , text "-- Defined" <+> pprLoc loc ]
+    [ pprUserForAll (mkTyCoVarBinders Inferred bndrs')
+         -- See Note [Printing foralls in type family instances] in IfaceType
+    , pp_lhs <+> ppr_rhs tidy_env ee_rhs
+    , text "-- Defined" <+> pp_loc ]
   where
-        pprLoc loc
-          | isGoodSrcSpan loc
-          = text "at" <+> ppr (srcSpanStart loc)
+    loc = coAxBranchSpan branch
+    pp_loc | isGoodSrcSpan loc = text "at" <+> ppr (srcSpanStart loc)
+           | otherwise         = text "in" <+> ppr loc
 
-          | otherwise
-          = text "in" <+>
-              quotes (ppr (nameModule name))
+    -- Eta-expand LHS and RHS types, because sometimes data family
+    -- instances are eta-reduced.
+    -- See Note [Eta reduction for data families] in FamInstEnv.
+    (ee_tvs, ee_lhs, ee_rhs) = etaExpandCoAxBranch branch
 
-        -- Eta-expand LHS and RHS types, because sometimes data family
-        -- instances are eta-reduced.
-        -- See Note [Eta reduction for data families] in FamInstEnv.
-        (ee_tvs, ee_lhs, ee_rhs) = etaExpandFamInst tvs lhs rhs
+    pp_lhs = pprIfaceTypeApp topPrec (toIfaceTyCon fam_tc)
+                             (tidyToIfaceTcArgs tidy_env fam_tc ee_lhs)
 
-        (env, ee_tvs') = tidyVarBndrs emptyTidyEnv ee_tvs
-        pp_lhs = pprIfaceTypeApp topPrec (toIfaceTyCon fam_tc)
-                                         (tidyToIfaceTcArgs env fam_tc ee_lhs)
+    (tidy_env, bndrs') = tidyCoAxBndrs ee_tvs
+
+tidyCoAxBndrs :: [Var] -> (TidyEnv, [Var])
+-- Tidy wildcards "_1", "_2" to "_", and do not return them
+-- in the list of binders to be printed
+-- This is so that in error messages we see
+--     forall a. F _ [a] _ = ...
+-- rather than
+--     forall a _1 _2. F _1 [a] _2 = ...
+--
+-- This is a rather disgusting function
+tidyCoAxBndrs tcvs
+  = (tidy_env, reverse tidy_bndrs)
+  where
+    (tidy_env, tidy_bndrs) = foldl tidy_one (empty_env, []) tcvs
+    empty_env = mkEmptyTidyEnv (initTidyOccEnv [mkTyVarOcc "_"])
+
+    tidy_one (env@(occ_env, subst), rev_bndrs') bndr
+      | is_wildcard bndr = (env_wild, rev_bndrs')
+      | otherwise        = (env',     bndr' : rev_bndrs')
+      where
+        (env', bndr') = tidyVarBndr env bndr
+        env_wild = (occ_env, extendVarEnv subst bndr wild_bndr)
+        wild_bndr = setVarName bndr $
+                    tidyNameOcc (varName bndr) (mkTyVarOcc "_")
+                    -- Tidy the binder to "_"
+
+    is_wildcard :: Var -> Bool
+    is_wildcard tv = case occNameString (getOccName tv) of
+                       ('_' : rest) -> all isDigit rest
+                       _            -> False
 
 {-
 %************************************************************************
@@ -935,8 +979,8 @@ mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
 mkTransCo co1 co2                 = TransCo co1 co2
 
 mkNthCo :: HasDebugCallStack
-        => Role  -- the role of the coercion you're creating
-        -> Int
+        => Role  -- The role of the coercion you're creating
+        -> Int   -- Zero-indexed
         -> Coercion
         -> Coercion
 mkNthCo r n co

@@ -211,12 +211,13 @@ data IfaceAT = IfaceAT  -- See Class.ClassATItem
 
 
 -- This is just like CoAxBranch
-data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars   :: [IfaceTvBndr]
-                                   , ifaxbCoVars   :: [IfaceIdBndr]
-                                   , ifaxbLHS      :: IfaceAppArgs
-                                   , ifaxbRoles    :: [Role]
-                                   , ifaxbRHS      :: IfaceType
-                                   , ifaxbIncomps  :: [BranchIndex] }
+data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars    :: [IfaceTvBndr]
+                                   , ifaxbEtaTyVars :: [IfaceTvBndr]
+                                   , ifaxbCoVars    :: [IfaceIdBndr]
+                                   , ifaxbLHS       :: IfaceAppArgs
+                                   , ifaxbRoles     :: [Role]
+                                   , ifaxbRHS       :: IfaceType
+                                   , ifaxbIncomps   :: [BranchIndex] }
                                      -- See Note [Storing compatibility] in CoAxiom
 
 data IfaceConDecls
@@ -556,11 +557,19 @@ pprAxBranch :: SDoc -> IfaceAxBranch -> SDoc
 -- The TyCon might be local (just an OccName), or this might
 -- be a branch for an imported TyCon, so it would be an ExtName
 -- So it's easier to take an SDoc here
+--
+-- This function is used
+--    to print interface files,
+--    in debug messages
+--    in :info F for GHCi, which goes via toConToIfaceDecl on the family tycon
+-- For user error messages we use Coercion.pprCoAxiom and friends
 pprAxBranch pp_tc (IfaceAxBranch { ifaxbTyVars = tvs
+                                 , ifaxbCoVars = _cvs
                                  , ifaxbLHS = pat_tys
                                  , ifaxbRHS = rhs
                                  , ifaxbIncomps = incomps })
-  = hang ppr_binders 2 (hang pp_lhs 2 (equals <+> ppr rhs))
+  = WARN( not (null _cvs), pp_tc $$ ppr _cvs )
+    hang ppr_binders 2 (hang pp_lhs 2 (equals <+> ppr rhs))
     $+$
     nest 2 maybe_incomps
   where
@@ -890,9 +899,8 @@ pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
 
 pprIfaceDecl _ (IfaceAxiom { ifName = name, ifTyCon = tycon
                            , ifAxBranches = branches })
-  = hang (text "axiom" <+> ppr name <> dcolon)
+  = hang (text "axiom" <+> ppr name <+> dcolon)
        2 (vcat $ map (pprAxBranch (ppr tycon)) branches)
-
 
 pprCType :: Maybe CType -> SDoc
 pprCType Nothing      = Outputable.empty
@@ -1073,13 +1081,14 @@ instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
                    ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
                    ifRuleOrph = orph })
-    = sep [hsep [pprRuleName name,
-                 if isOrphan orph then text "[orphan]" else Outputable.empty,
-                 ppr act,
-                 text "forall" <+> pprIfaceBndrs bndrs],
-           nest 2 (sep [ppr fn <+> sep (map pprParendIfaceExpr args),
-                        text "=" <+> ppr rhs])
-      ]
+    = sep [ hsep [ pprRuleName name
+                 , if isOrphan orph then text "[orphan]" else Outputable.empty
+                 , ppr act
+                 , pp_foralls ]
+          , nest 2 (sep [ppr fn <+> sep (map pprParendIfaceExpr args),
+                        text "=" <+> ppr rhs]) ]
+    where
+      pp_foralls = ppUnless (null bndrs) $ forAllLit <+> pprIfaceBndrs bndrs <> dot
 
 instance Outputable IfaceClsInst where
   ppr (IfaceClsInst { ifDFun = dfun_id, ifOFlag = flag
@@ -1856,13 +1865,14 @@ instance Binary IfaceAT where
         return (IfaceAT dec defs)
 
 instance Binary IfaceAxBranch where
-    put_ bh (IfaceAxBranch a1 a2 a3 a4 a5 a6) = do
+    put_ bh (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7) = do
         put_ bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
         put_ bh a5
         put_ bh a6
+        put_ bh a7
     get bh = do
         a1 <- get bh
         a2 <- get bh
@@ -1870,7 +1880,8 @@ instance Binary IfaceAxBranch where
         a4 <- get bh
         a5 <- get bh
         a6 <- get bh
-        return (IfaceAxBranch a1 a2 a3 a4 a5 a6)
+        a7 <- get bh
+        return (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7)
 
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon  = putByte bh 0

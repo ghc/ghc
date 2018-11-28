@@ -1,16 +1,16 @@
 TYPE CONSTRUCTORS
   type role T1 nominal
-  T1 :: * -> *
-  T2 :: * -> *
+  T1{1} :: * -> *
+  T2{1} :: * -> *
   type role T3 nominal phantom
-  T3 :: forall k. k -> *
+  T3{2} :: forall k. k -> *
   type role T4 nominal nominal
-  T4 :: (* -> *) -> * -> *
-  T5 :: * -> *
+  T4{2} :: (* -> *) -> * -> *
+  T5{1} :: * -> *
   type role T6 nominal phantom
-  T6 :: forall {k}. k -> *
+  T6{2} :: forall {k}. k -> *
   type role T7 nominal phantom representational
-  T7 :: forall {k}. k -> * -> *
+  T7{3} :: forall {k}. k -> * -> *
 DATA CONSTRUCTORS
   K7 :: forall {k} (a :: k) b. b -> T7 a b
   K6 :: forall {k} (a :: k). T6 a

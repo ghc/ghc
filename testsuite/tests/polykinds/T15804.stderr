@@ -1,0 +1,4 @@
+
+T15804.hs:5:12: error:
+    • Expected a type, but ‘a :: k’ has kind ‘k’
+    • In the kind ‘(a :: k) -> *’

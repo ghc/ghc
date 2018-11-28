@@ -6,8 +6,8 @@ T14179.hs:7:15: error:
 
 T14179.hs:11:15: error:
     Conflicting family instance declarations:
-      Foo2 a -- Defined at T14179.hs:11:15
-      Foo2 a -- Defined at T14179.hs:12:15
+      Foo2 -- Defined at T14179.hs:11:15
+      Foo2 -- Defined at T14179.hs:12:15
 
 T14179.hs:15:15: error:
     Conflicting family instance declarations:

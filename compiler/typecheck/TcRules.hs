@@ -83,11 +83,11 @@ tcRule (HsRule { rd_ext  = ext
     do { traceTc "---- Rule ------" (pprFullRuleName rname)
 
         -- Note [Typechecking rules]
-       ; (stuff,_) <- pushTcLevelM $
-                      generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
+       ; (tc_lvl, stuff) <- pushTcLevelM $
+                            generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
 
        ; let (tv_bndrs, id_bndrs, lhs', lhs_wanted
-                                , rhs', rhs_wanted, rule_ty, tc_lvl) = stuff
+                                , rhs', rhs_wanted, rule_ty) = stuff
 
        ; traceTc "tcRule 1" (vcat [ pprFullRuleName rname
                                   , ppr lhs_wanted
@@ -112,7 +112,7 @@ tcRule (HsRule { rd_ext  = ext
        ; let tpl_ids = lhs_evs ++ id_bndrs
        ; gbls  <- tcGetGlobalTyCoVars -- Even though top level, there might be top-level
                                       -- monomorphic bindings from the MR; test tc111
-       ; forall_tkvs <- candidateQTyVarsOfTypes gbls $
+       ; forall_tkvs <- candidateQTyVarsOfTypes $
                         map (mkSpecForAllTys tv_bndrs) $  -- don't quantify over lexical tyvars
                         rule_ty : map idType tpl_ids
        ; qtkvs <- quantifyTyVars gbls forall_tkvs
@@ -152,40 +152,34 @@ generateRuleConstraints :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]
                                , [TcId]
                                , LHsExpr GhcTc, WantedConstraints
                                , LHsExpr GhcTc, WantedConstraints
-                               , TcType
-                               , TcLevel )
+                               , TcType )
 generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
-  = do { ((tv_bndrs, id_bndrs, lvl), bndr_wanted) <- captureConstraints $
-                                                     tcRuleBndrs ty_bndrs tm_bndrs
+  = do { ((tv_bndrs, id_bndrs), bndr_wanted) <- captureConstraints $
+                                                tcRuleBndrs ty_bndrs tm_bndrs
               -- bndr_wanted constraints can include wildcard hole
               -- constraints, which we should not forget about.
               -- It may mention the skolem type variables bound by
               -- the RULE.  c.f. Trac #10072
 
-       ; setTcLevel lvl $
-         tcExtendTyVarEnv tv_bndrs $
+       ; tcExtendTyVarEnv tv_bndrs $
          tcExtendIdEnv    id_bndrs $
     do { -- See Note [Solve order for RULES]
          ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
        ; (rhs',            rhs_wanted) <- captureConstraints $
                                           tcMonoExpr rhs (mkCheckExpType rule_ty)
        ; let all_lhs_wanted = bndr_wanted `andWC` lhs_wanted
-       ; return (tv_bndrs, id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty, lvl) } }
+       ; return (tv_bndrs, id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty) } }
 
 -- See Note [TcLevel in type checking rules]
 tcRuleBndrs :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]
-            -> TcM ([TcTyVar],[Id],TcLevel)
+            -> TcM ([TcTyVar], [Id])
 tcRuleBndrs (Just bndrs) xs
-  = do { (tys1,(tys2,tms,lvl)) <- tcExplicitTKBndrs
-                                  (ForAllSkol (pprHsExplicitForAll (Just bndrs)))
-                                  bndrs $ do { lvl <- getTcLevel
-                                             ; (tys,tms) <- tcRuleTmBndrs xs
-                                             ; return (tys,tms,lvl) }
-       ; return (tys1 ++ tys2, tms, lvl) }
+  = do { (tys1,(tys2,tms)) <- bindExplicitTKBndrs_Skol bndrs $
+                              tcRuleTmBndrs xs
+       ; return (tys1 ++ tys2, tms) }
+
 tcRuleBndrs Nothing xs
-  = do { lvl <- getTcLevel
-       ; (tys,tms) <- tcRuleTmBndrs xs
-       ; return (tys,tms,lvl) }
+  = tcRuleTmBndrs xs
 
 -- See Note [TcLevel in type checking rules]
 tcRuleTmBndrs :: [LRuleBndr GhcRn] -> TcM ([TcTyVar],[Id])

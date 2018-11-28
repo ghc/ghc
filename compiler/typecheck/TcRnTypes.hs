@@ -1984,8 +1984,12 @@ tyCoFVsOfImplic :: Implication -> FV
 tyCoFVsOfImplic (Implic { ic_skols = skols
                         , ic_given = givens
                         , ic_wanted = wanted })
-  = FV.delFVs (mkVarSet skols `unionVarSet` mkVarSet givens)
-      (tyCoFVsOfWC wanted `unionFV` tyCoFVsOfTypes (map evVarPred givens))
+  | isEmptyWC wanted
+  = emptyFV
+  | otherwise
+  = tyCoFVsVarBndrs skols  $
+    tyCoFVsVarBndrs givens $
+    tyCoFVsOfWC wanted
 
 tyCoFVsOfBag :: (a -> FV) -> Bag a -> FV
 tyCoFVsOfBag tvs_of = foldrBag (unionFV . tvs_of) emptyFV
@@ -3507,8 +3511,10 @@ data CtOrigin
   | NegateOrigin                        -- Occurrence of syntactic negation
 
   | ArithSeqOrigin (ArithSeqInfo GhcRn) -- [x..], [x..y] etc
+  | AssocFamPatOrigin   -- When matching the patterns of an associated
+                        -- family instance with that of its parent class
   | SectionOrigin
-  | TupleOrigin                        -- (..,..)
+  | TupleOrigin         -- (..,..)
   | ExprSigOrigin       -- e :: ty
   | PatSigOrigin        -- p :: ty
   | PatOrigin           -- Instantiating a polytyped pattern at a constructor
@@ -3726,6 +3732,9 @@ pprCtOrigin (KindEqOrigin t1 (Just t2) _ _)
   = hang (ctoHerald <+> text "a kind equality arising from")
        2 (sep [ppr t1, char '~', ppr t2])
 
+pprCtOrigin AssocFamPatOrigin
+  = text "when matching a family LHS with its class instance head"
+
 pprCtOrigin (KindEqOrigin t1 Nothing _ _)
   = hang (ctoHerald <+> text "a kind equality when matching")
        2 (ppr t1)
@@ -3797,6 +3806,7 @@ pprCtO IfOrigin              = text "an if expression"
 pprCtO (LiteralOrigin lit)   = hsep [text "the literal", quotes (ppr lit)]
 pprCtO (ArithSeqOrigin seq)  = hsep [text "the arithmetic sequence", quotes (ppr seq)]
 pprCtO SectionOrigin         = text "an operator section"
+pprCtO AssocFamPatOrigin     = text "the LHS of a famly instance"
 pprCtO TupleOrigin           = text "a tuple"
 pprCtO NegateOrigin          = text "a use of syntactic negation"
 pprCtO (ScOrigin n)          = text "the superclasses of an instance declaration"

@@ -1,15 +1,16 @@
 
 BadTelescope4.hs:9:1: error:
-    • These kind and type variables: a
-                                     (c :: Proxy b)
-                                     (d :: Proxy a)
-                                     (x :: SameKind b d)
-      are out of dependency order. Perhaps try this ordering:
+    • The kind of ‘Bad’ is ill-scoped
+        Inferred kind: Bad :: forall k (b :: Proxy a). forall (a :: k) ->
+                              Proxy b -> forall (d :: Proxy a) -> SameKind b d -> *
+      NB: Inferred variables
+        (namely: k) always come first
+        then Specified variables (namely: (b :: Proxy a))
+      Perhaps try this order instead:
         k
         (a :: k)
         (b :: Proxy a)
         (c :: Proxy b)
         (d :: Proxy a)
         (x :: SameKind b d)
-      NB: Implicitly declared variables come before others.
     • In the data type declaration for ‘Bad’

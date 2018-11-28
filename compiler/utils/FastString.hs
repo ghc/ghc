@@ -71,6 +71,7 @@ module FastString
         concatFS,
         consFS,
         nilFS,
+        isUnderscoreFS,
 
         -- ** Outputing
         hPutFS,
@@ -602,6 +603,9 @@ uniqueOfFS (FastString u _ _ _) = u
 
 nilFS :: FastString
 nilFS = mkFastString ""
+
+isUnderscoreFS :: FastString -> Bool
+isUnderscoreFS fs = fs == fsLit "_"
 
 -- -----------------------------------------------------------------------------
 -- Stats

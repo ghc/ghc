@@ -14,7 +14,7 @@ module TcUnify (
   tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS,
   tcSubTypeDS_NC_O, tcSubTypeET,
   checkConstraints, checkTvConstraints,
-  buildImplicationFor,
+  buildImplicationFor, emitResidualTvConstraint,
 
   -- Various unifications
   unifyType, unifyKind,
@@ -1167,20 +1167,27 @@ checkTvConstraints skol_info m_telescope thing_inside
   = do { (tclvl, wanted, (skol_tvs, result))
              <- pushLevelAndCaptureConstraints thing_inside
 
-       ; if isEmptyWC wanted
-         then return ()
-         else do { ev_binds <- newNoTcEvBinds
-                 ; implic   <- newImplication
-                 ; emitImplication $
-                   implic { ic_tclvl     = tclvl
-                          , ic_skols     = skol_tvs
-                          , ic_no_eqs    = True
-                          , ic_telescope = m_telescope
-                          , ic_wanted    = wanted
-                          , ic_binds     = ev_binds
-                          , ic_info      = skol_info } }
+       ; emitResidualTvConstraint skol_info m_telescope
+                                  skol_tvs tclvl wanted
+
        ; return (skol_tvs, result) }
 
+emitResidualTvConstraint :: SkolemInfo -> Maybe SDoc -> [TcTyVar]
+                         -> TcLevel -> WantedConstraints -> TcM ()
+emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
+  | isEmptyWC wanted
+  = return ()
+  | otherwise
+  = do { ev_binds <- newNoTcEvBinds
+       ; implic   <- newImplication
+       ; emitImplication $
+         implic { ic_tclvl     = tclvl
+                , ic_skols     = skol_tvs
+                , ic_no_eqs    = True
+                , ic_telescope = m_telescope
+                , ic_wanted    = wanted
+                , ic_binds     = ev_binds
+                , ic_info      = skol_info } }
 
 implicationNeeded :: SkolemInfo -> [TcTyVar] -> [EvVar] -> TcM Bool
 -- See Note [When to build an implication]

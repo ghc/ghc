@@ -92,8 +92,8 @@ T12593.hs:14:6: error:
     • In the pattern: Free cat
       In an equation for ‘run’: run (Free cat) = cat
     • Relevant bindings include
-        run :: Free k6 k7 k8 p a b
-               -> (forall (c :: k6) (d :: k7). p c d -> q c d) -> q a b
+        run :: Free k k4 k8 p a b
+               -> (forall (c :: k) (d :: k4). p c d -> q c d) -> q a b
           (bound at T12593.hs:14:1)
 
 T12593.hs:14:18: error:
@@ -111,6 +111,6 @@ T12593.hs:14:18: error:
                k2 q =>
                (forall (c :: k0) (d :: k1). p0 c d -> q c d) -> q a b
           (bound at T12593.hs:14:11)
-        run :: Free k6 k7 k8 p a b
-               -> (forall (c :: k6) (d :: k7). p c d -> q c d) -> q a b
+        run :: Free k k4 k8 p a b
+               -> (forall (c :: k) (d :: k4). p c d -> q c d) -> q a b
           (bound at T12593.hs:14:1)

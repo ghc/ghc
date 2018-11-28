@@ -7,13 +7,12 @@
 
 module TcValidity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
-  ContextKind(..), expectedKindInCtxt,
   checkValidTheta, checkValidFamPats,
   checkValidInstance, checkValidInstHead, validDerivPred,
   checkTySynRhs,
-  ClsInstInfo, checkValidCoAxiom, checkValidCoAxBranch,
-  checkValidTyFamEqn,
-  arityErr, badATErr,
+  checkValidCoAxiom, checkValidCoAxBranch,
+  checkValidTyFamEqn, checkConsistentFamInst,
+  badATErr, arityErr,
   checkValidTelescope,
   allDistinctTyVars
   ) where
@@ -27,18 +26,21 @@ import Maybes
 -- friends:
 import TcUnify    ( tcSubType_NC )
 import TcSimplify ( simplifyAmbiguityCheck )
-import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..) )
+import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocInstInfo(..) )
 import TyCoRep
 import TcType hiding ( sizeType, sizeTypes )
 import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName )
 import PrelNames
 import Type
+import Unify      ( tcMatchTyX_BM, BindFlag(..) )
 import Coercion
 import CoAxiom
 import Class
 import TyCon
 
 -- others:
+import IfaceType( pprIfaceType )
+import ToIface( toIfaceType )
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
 import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )
@@ -49,16 +51,17 @@ import FamInst     ( makeInjectivityErrors )
 import Name
 import VarEnv
 import VarSet
-import Id          ( idType, idName )
 import Var         ( VarBndr(..), mkTyVar )
+import Id          ( idType, idName )
+import FV
 import ErrUtils
 import DynFlags
 import Util
 import ListSetOps
 import SrcLoc
 import Outputable
-import Bag         ( emptyBag )
 import Unique      ( mkAlphaTyVarUnique )
+import Bag         ( emptyBag )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -366,10 +369,13 @@ checkValidType ctxt ty
 
        ; env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
 
-        -- Check the internal validity of the type itself
-       ; check_type env ctxt rank ty
-
-       ; checkUserTypeError ty
+       -- Check the internal validity of the type itself
+       -- Fail if bad things happen, else we misleading
+       -- (and more complicated) errors in checkAmbiguity
+       ; checkNoErrs $
+         do { check_type env ctxt rank ty
+            ; checkUserTypeError ty
+            ; traceTc "done ct" (ppr ty) }
 
        -- Check for ambiguous types.  See Note [When to call checkAmbiguity]
        -- NB: this will happen even for monotypes, but that should be cheap;
@@ -398,26 +404,6 @@ checkTySynRhs ctxt ty
   = return ()
   where
     actual_kind = typeKind ty
-
--- | The kind expected in a certain context.
-data ContextKind = TheKind Kind   -- ^ a specific kind
-                 | AnythingKind   -- ^ any kind will do
-                 | OpenKind       -- ^ something of the form @TYPE _@
-
--- Depending on the context, we might accept any kind (for instance, in a TH
--- splice), or only certain kinds (like in type signatures).
-expectedKindInCtxt :: UserTypeCtxt -> ContextKind
-expectedKindInCtxt (TySynCtxt _)   = AnythingKind
-expectedKindInCtxt ThBrackCtxt     = AnythingKind
-expectedKindInCtxt GhciCtxt        = AnythingKind
--- The types in a 'default' decl can have varying kinds
--- See Note [Extended defaults]" in TcEnv
-expectedKindInCtxt DefaultDeclCtxt     = AnythingKind
-expectedKindInCtxt TypeAppCtxt         = AnythingKind
-expectedKindInCtxt (ForSigCtxt _)      = TheKind liftedTypeKind
-expectedKindInCtxt (InstDeclCtxt {})   = TheKind constraintKind
-expectedKindInCtxt SpecInstCtxt        = TheKind constraintKind
-expectedKindInCtxt _                   = OpenKind
 
 {-
 Note [Higher rank types]
@@ -456,6 +442,14 @@ forAllAllowed ArbitraryRank             = True
 forAllAllowed (LimitedRank forall_ok _) = forall_ok
 forAllAllowed _                         = False
 
+constraintsAllowed :: UserTypeCtxt -> Bool
+-- We don't allow constraints in kinds
+constraintsAllowed (TyVarBndrKindCtxt {}) = False
+constraintsAllowed (DataKindCtxt {})      = False
+constraintsAllowed (TySynKindCtxt {})     = False
+constraintsAllowed (TyFamResKindCtxt {})  = False
+constraintsAllowed _ = True
+
 ----------------------------------------
 check_type :: TidyEnv -> UserTypeCtxt -> Rank -> Type -> TcM ()
 -- The args say what the *type context* requires, independent
@@ -470,6 +464,11 @@ check_type env ctxt rank ty
         ; checkTcM (forAllAllowed rank) (forAllTyErr env rank ty)
                 -- Reject e.g. (Maybe (?x::Int => Int)),
                 -- with a decent error message
+
+        ; checkTcM (null theta || constraintsAllowed ctxt)
+                   (constraintTyErr env ty)
+                -- Reject forall (a :: Eq b => b). blah
+                -- In a kind signature we don't allow constraints
 
         ; check_valid_theta env' SigmaCtxt theta
                 -- Allow     type T = ?x::Int => Int -> Int
@@ -629,6 +628,10 @@ ubxArgTyErr env ty
   = ( env, vcat [ sep [ text "Illegal unboxed tuple type as function argument:"
                       , ppr_tidy env ty ]
                 , text "Perhaps you intended to use UnboxedTuples" ] )
+
+constraintTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+constraintTyErr env ty
+  = (env, text "Illegal constraint in a kind:" <+> ppr_tidy env ty)
 
 {-
 Note [Liberal type synonyms]
@@ -1461,8 +1464,7 @@ and we /really/ don't want that.  So we carefully do /not/ expand
 synonyms, by matching on TyConApp directly.
 -}
 
-checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type
-                   -> TcM ([TyVar], ThetaType, Class, [Type])
+checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
 checkValidInstance ctxt hs_type ty
   | not is_tc_app
   = failWithTc (hang (text "Instance head is not headed by a class:")
@@ -1507,9 +1509,9 @@ checkValidInstance ctxt hs_type ty
 
         ; traceTc "End checkValidInstance }" empty
 
-        ; return (tvs, theta, clas, inst_tys) }
+        ; return () }
   where
-    (tvs, theta, tau)    = tcSplitSigmaTy ty
+    (_tvs, theta, tau)   = tcSplitSigmaTy ty
     is_tc_app            = case tau of { TyConApp {} -> True; _ -> False }
     TyConApp tc inst_tys = tau   -- See Note [Instances and constraint synonyms]
     mb_cls               = tyConClass_maybe tc
@@ -1619,22 +1621,380 @@ arbitrarily large type, depending on how 'a' is instantiated.
 So we require UndecidableInstances if we have a type family
 in the instance head.  Trac #15172.
 
-Note [Associated type instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We allow this:
-  class C a where
-    type T x a
-  instance C Int where
-    type T (S y) Int = y
-    type T Z     Int = Char
+Note [Invisible arguments and termination]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When checking the ​Paterson conditions for termination an instance
+declaration, we check for the number of "constructors and variables"
+in the instance head and constraints. Question: Do we look at
 
-Note that
-  a) The variable 'x' is not bound by the class decl
-  b) 'x' is instantiated to a non-type-variable in the instance
-  c) There are several type instance decls for T in the instance
+ * All the arguments, visible or invisible?
+ * Just the visible arguments?
 
-All this is fine.  Of course, you can't give any *more* instances
-for (T ty Int) elsewhere, because it's an *associated* type.
+I think both will ensure termination, provided we are consistent.
+Currently we are /not/ consistent, which is really a bug.  It's
+described in Trac #15177, which contains a number of examples.
+The suspicious bits are the calls to filterOutInvisibleTypes.
+-}
+
+
+{-
+************************************************************************
+*                                                                      *
+        Checking type instance well-formedness and termination
+*                                                                      *
+************************************************************************
+-}
+
+checkValidCoAxiom :: CoAxiom Branched -> TcM ()
+checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
+  = do { mapM_ (checkValidCoAxBranch fam_tc) branch_list
+       ; foldlM_ check_branch_compat [] branch_list }
+  where
+    branch_list = fromBranches branches
+    injectivity = tyConInjectivityInfo fam_tc
+
+    check_branch_compat :: [CoAxBranch]    -- previous branches in reverse order
+                        -> CoAxBranch      -- current branch
+                        -> TcM [CoAxBranch]-- current branch : previous branches
+    -- Check for
+    --   (a) this branch is dominated by previous ones
+    --   (b) failure of injectivity
+    check_branch_compat prev_branches cur_branch
+      | cur_branch `isDominatedBy` prev_branches
+      = do { addWarnAt NoReason (coAxBranchSpan cur_branch) $
+             inaccessibleCoAxBranch fam_tc cur_branch
+           ; return prev_branches }
+      | otherwise
+      = do { check_injectivity prev_branches cur_branch
+           ; return (cur_branch : prev_branches) }
+
+     -- Injectivity check: check whether a new (CoAxBranch) can extend
+     -- already checked equations without violating injectivity
+     -- annotation supplied by the user.
+     -- See Note [Verifying injectivity annotation] in FamInstEnv
+    check_injectivity prev_branches cur_branch
+      | Injective inj <- injectivity
+      = do { let conflicts =
+                     fst $ foldl' (gather_conflicts inj prev_branches cur_branch)
+                                 ([], 0) prev_branches
+           ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err)
+                   (makeInjectivityErrors ax cur_branch inj conflicts) }
+      | otherwise
+      = return ()
+
+    gather_conflicts inj prev_branches cur_branch (acc, n) branch
+               -- n is 0-based index of branch in prev_branches
+      = case injectiveBranches inj cur_branch branch of
+          InjectivityUnified ax1 ax2
+            | ax1 `isDominatedBy` (replace_br prev_branches n ax2)
+                -> (acc, n + 1)
+            | otherwise
+                -> (branch : acc, n + 1)
+          InjectivityAccepted -> (acc, n + 1)
+
+    -- Replace n-th element in the list. Assumes 0-based indexing.
+    replace_br :: [CoAxBranch] -> Int -> CoAxBranch -> [CoAxBranch]
+    replace_br brs n br = take n brs ++ [br] ++ drop (n+1) brs
+
+
+-- Check that a "type instance" is well-formed (which includes decidability
+-- unless -XUndecidableInstances is given).
+--
+checkValidCoAxBranch :: TyCon -> CoAxBranch -> TcM ()
+checkValidCoAxBranch fam_tc
+                    (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
+                                , cab_lhs = typats
+                                , cab_rhs = rhs, cab_loc = loc })
+  = setSrcSpan loc $
+    checkValidTyFamEqn fam_tc (tvs++cvs) typats rhs
+
+-- | Do validity checks on a type family equation, including consistency
+-- with any enclosing class instance head, termination, and lack of
+-- polytypes.
+checkValidTyFamEqn :: TyCon   -- ^ of the type family
+                   -> [Var]   -- ^ Bound variables in the equation
+                   -> [Type]  -- ^ Type patterns
+                   -> Type    -- ^ Rhs
+                   -> TcM ()
+checkValidTyFamEqn fam_tc qvs typats rhs
+  = do { checkValidFamPats fam_tc qvs typats rhs
+
+         -- The argument patterns, and RHS, are all boxed tau types
+         -- E.g  Reject type family F (a :: k1) :: k2
+         --             type instance F (forall a. a->a) = ...
+         --             type instance F Int#             = ...
+         --             type instance F Int              = forall a. a->a
+         --             type instance F Int              = Int#
+         -- See Trac #9357
+       ; checkValidMonoType rhs
+
+         -- We have a decidable instance unless otherwise permitted
+       ; undecidable_ok <- xoptM LangExt.UndecidableInstances
+       ; traceTc "checkVTFE" (ppr fam_tc $$ ppr rhs $$ ppr (tcTyFamInsts rhs))
+       ; unless undecidable_ok $
+         mapM_ addErrTc (checkFamInstRhs fam_tc typats (tcTyFamInsts rhs)) }
+
+-- Make sure that each type family application is
+--   (1) strictly smaller than the lhs,
+--   (2) mentions no type variable more often than the lhs, and
+--   (3) does not contain any further type family instances.
+--
+checkFamInstRhs :: TyCon -> [Type]         -- LHS
+                -> [(TyCon, [Type])]       -- type family calls in RHS
+                -> [MsgDoc]
+checkFamInstRhs lhs_tc lhs_tys famInsts
+  = mapMaybe check famInsts
+  where
+   lhs_size  = sizeTyConAppArgs lhs_tc lhs_tys
+   inst_head = pprType (TyConApp lhs_tc lhs_tys)
+   lhs_fvs   = fvTypes lhs_tys
+   check (tc, tys)
+      | not (all isTyFamFree tys) = Just (nestedMsg what)
+      | not (null bad_tvs)        = Just (noMoreMsg bad_tvs what inst_head)
+      | lhs_size <= fam_app_size  = Just (smallerMsg what inst_head)
+      | otherwise                 = Nothing
+      where
+        what = text "type family application"
+               <+> quotes (pprType (TyConApp tc tys))
+        fam_app_size = sizeTyConAppArgs tc tys
+        bad_tvs      = fvTypes tys \\ lhs_fvs
+                       -- The (\\) is list difference; e.g.
+                       --   [a,b,a,a] \\ [a,a] = [b,a]
+                       -- So we are counting repetitions
+
+checkValidFamPats :: TyCon -> [Var]
+                  -> [Type]   -- ^ patterns
+                  -> Type     -- ^ RHS
+                  -> TcM ()
+-- Patterns in a 'type instance' or 'data instance' decl should
+-- a) Shoule contain no type family applications
+--    (vanilla synonyms are fine, though)
+-- b) For associated types, are consistently instantiated
+checkValidFamPats fam_tc qvs pats rhs
+  = do { checkValidTypePats fam_tc pats
+
+         -- Check for things used on the right but not bound on the left
+       ; checkFamPatBinders fam_tc qvs pats rhs
+
+       ; traceTc "checkValidFamPats" (ppr fam_tc <+> ppr pats)
+       }
+
+-----------------
+checkFamPatBinders :: TyCon
+                   -> [TcTyVar]   -- Bound on LHS of family instance
+                   -> [TcType]    -- LHS patterns
+                   -> Type        -- RHS
+                   -> TcM ()
+-- We do these binder checks now, in tcFamTyPatsAndGen, rather
+-- than later, in checkValidFamEqn, for two reasons:
+--   - We have the implicitly and explicitly
+--     bound type variables conveniently to hand
+--   - If implicit variables are out of scope it may
+--     cause a crash; notably in tcConDecl in tcDataFamInstDecl
+checkFamPatBinders fam_tc qtvs pats rhs
+  = do { traceTc "checkFamPatBinders" $
+         vcat [ debugPprType (mkTyConApp fam_tc pats)
+              , ppr (mkTyConApp fam_tc pats)
+              , text "qtvs:" <+> ppr qtvs
+              , text "rhs_tvs:" <+> ppr (fvVarSet rhs_fvs)
+              , text "pat_tvs:" <+> ppr pat_tvs
+              , text "exact_pat_tvs:" <+> ppr exact_pat_tvs ]
+
+         -- Check for implicitly-bound tyvars, mentioned on the
+         -- RHS but not bound on the LHS
+         --    data T            = MkT (forall (a::k). blah)
+         --    data family D Int = MkD (forall (a::k). blah)
+         -- In both cases, 'k' is not bound on the LHS, but is used on the RHS
+         -- We catch the former in kcLHsQTyVars, and the latter right here
+       ; check_tvs bad_rhs_tvs (text "mentioned in the RHS")
+                               (text "bound on the LHS of")
+
+         -- Check for explicitly forall'd variable that is not bound on LHS
+         --    data instance forall a.  T Int = MkT Int
+         -- See Note [Unused explicitly bound variables in a family pattern]
+       ; check_tvs bad_qtvs (text "bound by a forall")
+                            (text "used in") }
+  where
+    pat_tvs       = tyCoVarsOfTypes pats
+    exact_pat_tvs = exactTyCoVarsOfTypes pats
+    rhs_fvs       = tyCoFVsOfType rhs
+    used_tvs      = pat_tvs `unionVarSet` fvVarSet rhs_fvs
+    bad_qtvs      = filterOut (`elemVarSet` used_tvs) qtvs
+                    -- Bound but not used at all
+    bad_rhs_tvs   = filterOut (`elemVarSet` exact_pat_tvs) (fvVarList rhs_fvs)
+                    -- Used on RHS but not bound on LHS
+    dodgy_tvs     = pat_tvs `minusVarSet` exact_pat_tvs
+
+    check_tvs tvs what what2
+      = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $
+        hang (text "Type variable" <> plural tvs <+> pprQuotedList tvs
+              <+> isOrAre tvs <+> what <> comma)
+           2 (vcat [ text "but not" <+> what2 <+> text "the family instance"
+                   , mk_extra tvs ])
+
+    -- mk_extra: Trac #7536: give a decent error message for
+    --         type T a = Int
+    --         type instance F (T a) = a
+    mk_extra tvs = ppWhen (any (`elemVarSet` dodgy_tvs) tvs) $
+                   hang (text "The real LHS (expanding synonyms) is:")
+                      2 (pprTypeApp fam_tc (map expandTypeSynonyms pats))
+
+
+-- | Checks for occurrences of type families in class instances and type/data
+-- family instances.
+checkValidTypePats :: TyCon -> [Type] -> TcM ()
+checkValidTypePats tc pat_ty_args = do
+  -- Check that each of pat_ty_args is a monotype.
+  -- One could imagine generalising to allow
+  --      instance C (forall a. a->a)
+  -- but we don't know what all the consequences might be.
+  traverse_ checkValidMonoType pat_ty_args
+
+  -- Ensure that no type family instances occur a type pattern
+  case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
+    [] -> pure ()
+    ((tf_is_invis_arg, tf_tc, tf_args):_) -> failWithTc $
+      ty_fam_inst_illegal_err tf_is_invis_arg (mkTyConApp tf_tc tf_args)
+  where
+    inst_ty = mkTyConApp tc pat_ty_args
+
+    ty_fam_inst_illegal_err :: Bool -> Type -> SDoc
+    ty_fam_inst_illegal_err invis_arg ty
+      = pprWithExplicitKindsWhen invis_arg $
+        hang (text "Illegal type synonym family application"
+                <+> quotes (ppr ty) <+> text "in instance" <> colon)
+           2 (ppr inst_ty)
+
+-- Error messages
+
+inaccessibleCoAxBranch :: TyCon -> CoAxBranch -> SDoc
+inaccessibleCoAxBranch fam_tc cur_branch
+  = text "Type family instance equation is overlapped:" $$
+    nest 2 (pprCoAxBranchUser fam_tc cur_branch)
+
+nestedMsg :: SDoc -> SDoc
+nestedMsg what
+  = sep [ text "Illegal nested" <+> what
+        , parens undecidableMsg ]
+
+badATErr :: Name -> Name -> SDoc
+badATErr clas op
+  = hsep [text "Class", quotes (ppr clas),
+          text "does not have an associated type", quotes (ppr op)]
+
+
+-------------------------
+checkConsistentFamInst :: AssocInstInfo
+                       -> TyCon     -- ^ Family tycon
+                       -> CoAxBranch
+                       -> TcM ()
+-- See Note [Checking consistent instantiation]
+
+checkConsistentFamInst NotAssociated _ _
+  = return ()
+
+checkConsistentFamInst (InClsInst { ai_class = clas
+                                  , ai_tyvars = inst_tvs
+                                  , ai_inst_env = mini_env })
+                       fam_tc branch
+  = do { traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
+                                                , ppr arg_triples
+                                                , ppr mini_env ])
+       -- Check that the associated type indeed comes from this class
+       -- See [Mismatched class methods and associated type families]
+       -- in TcInstDecls.
+       ; checkTc (Just (classTyCon clas) == tyConAssoc_maybe fam_tc)
+                 (badATErr (className clas) (tyConName fam_tc))
+
+       ; check_match arg_triples
+       }
+  where
+    CoAxBranch { cab_eta_tvs = eta_tvs, cab_lhs = pats } = branch
+    at_arg_tys = pats ++ mkTyVarTys eta_tvs
+
+    arg_triples :: [(Type,Type, ArgFlag)]
+    arg_triples = [ (cls_arg_ty, at_arg_ty, vis)
+                  | (fam_tc_tv, vis, at_arg_ty)
+                       <- zip3 (tyConTyVars fam_tc)
+                               (tyConArgFlags fam_tc at_arg_tys)
+                               at_arg_tys
+                  , Just cls_arg_ty <- [lookupVarEnv mini_env fam_tc_tv] ]
+
+    pp_wrong_at_arg vis
+      = pprWithExplicitKindsWhen (isInvisibleArgFlag vis) $
+        vcat [ text "Type indexes must match class instance head"
+             , text "Expected:" <+> pp_expected_ty
+             , text "  Actual:" <+> pp_actual_ty ]
+
+    -- Fiddling around to arrange that wildcards unconditionally print as "_"
+    -- We only need to print the LHS, not the RHS at all
+    expected_args = [ lookupVarEnv mini_env at_tv `orElse` mk_wildcard at_tv
+                    | at_tv <- tyConTyVars fam_tc ]
+    mk_wildcard at_tv = mkTyVarTy (mkTyVar tv_name (tyVarKind at_tv))
+    tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOcc "_") noSrcSpan
+    pp_expected_ty = pprIfaceType (toIfaceType (mkTyConApp fam_tc expected_args))
+                     -- Do /not/ tidy, because that will rename all those "_"
+                     -- variables we have put in.  And (I think) the intance type
+                     --  is already tidy
+
+--    actual_ty   = mkTyConApp fam_tc at_arg_tys
+--    (tidy_env, bndrs) = tidyCoAxBndrs (tyCoVarsOfTypesList [expected_ty, actual_ty])
+--    pp_actual_ty pprPrecTypeX tidy_env topPrec actual_ty
+    pp_actual_ty = pprCoAxBranchLHS fam_tc branch
+
+    -- For check_match, bind_me, see
+    -- Note [Matching in the consistent-instantation check]
+    check_match :: [(Type,Type,ArgFlag)] -> TcM ()
+    check_match triples = go emptyTCvSubst emptyTCvSubst triples
+
+    go _ _ [] = return ()
+    go lr_subst rl_subst ((ty1,ty2,vis):triples)
+      | Just lr_subst1 <- tcMatchTyX_BM bind_me lr_subst ty1 ty2
+      , Just rl_subst1 <- tcMatchTyX_BM bind_me rl_subst ty2 ty1
+      = go lr_subst1 rl_subst1 triples
+      | otherwise
+      = addErrTc (pp_wrong_at_arg vis)
+
+    -- The scoped type variables from the class-instance header
+    -- should not be alpha-raenamed.
+    no_bind_set = mkVarSet inst_tvs
+    bind_me tv | tv `elemVarSet` no_bind_set = Skolem
+               | otherwise                   = BindMe
+
+
+{- Note [Matching in the consistent-instantation check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Matching the class-instance header to family-instance tyvars is
+tricker than it sounds.  Consider (Trac #13972)
+    class C (a :: k) where
+      type T k :: Type
+    instance C Left where
+      type T (a -> Either a b) = Int
+
+Here there are no lexically-scoped variables from (C Left).
+Yet the real class-instance header is   C @(p -> Either @p @q)) (Left @p @q)
+while the type-family instance is       T (a -> Either @a @b)
+So we allow alpha-renaming of variables that don't come
+from the class-instance header.
+
+We track the lexically-scoped type variables from the
+class-instance header in ai_tyvars.
+
+Here's another example (Trac #14045a)
+    class C (a :: k) where
+      data S (a :: k)
+    instance C (z :: Bool) where
+      data S :: Bool -> Type where
+
+Again, there is no lexical connection, but we will get
+   class-instance header:   C @Bool (z::Bool)
+   family instance          S @Bool (a::Bool)
+
+When looking for mis-matches, we check left-to-right,
+kinds first.  If we look at types first, we'll fail to
+suggest -fprint-explicit-kinds for a mis-match with
+      T @k    vs    T @Type
+somewhere deep inside the type
 
 Note [Checking consistent instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1731,319 +2091,28 @@ Here the instance is kind-indexed and really looks like
 But if the 'b' didn't scope, we would make F's instance too
 poly-kinded.
 
-Note [Invisible arguments and termination]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When checking the ​Paterson conditions for termination an instance
-declaration, we check for the number of "constructors and variables"
-in the instance head and constraints. Question: Do we look at
 
- * All the arguments, visible or invisible?
- * Just the visible arguments?
+Note [Unused explicitly bound variables in a family pattern]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-I think both will ensure termination, provided we are consistent.
-Currently we are /not/ consistent, which is really a bug.  It's
-described in Trac #15177, which contains a number of examples.
-The suspicious bits are the calls to filterOutInvisibleTypes.
--}
+Why is 'unusedExplicitForAllErr' not just a warning?
 
--- | Extra information about the parent instance declaration, needed
--- when type-checking associated types. The 'Class' is the enclosing
--- class, the [TyVar] are the type variable of the instance decl,
--- and and the @VarEnv Type@ maps class variables to their instance
--- types.
-type ClsInstInfo = (Class, [TyVar], VarEnv Type)
+Consider the following examples:
 
-type AssocInstArgShape = (Maybe Type, Type)
-  -- AssocInstArgShape is used only for associated family instances
-  --    (mb_exp, actual)
-  -- mb_exp = Just ty  => this arg corresponds to a class variable
-  --        = Nothing  => it doesn't correspond to a class variable
-  -- e.g.  class C b where
-  --          type F a b c
-  --       instance C [x] where
-  --          type F p [x] q
-  -- We get [AssocInstArgShape] = [ (Nothing,  p)
-  --                              , (Just [x], [x])
-  --                              , (Nothing,  q)]
+  type instance F a = Maybe b
+  type instance forall b. F a = Bool
+  type instance forall b. F a = Maybe b
 
-checkConsistentFamInst
-               :: Maybe ClsInstInfo
-               -> TyCon              -- ^ Family tycon
-               -> [Type]             -- ^ Type patterns from instance
-               -> SDoc               -- ^ pretty-printed user-written instance head
-               -> TcM ()
--- See Note [Checking consistent instantiation]
-
-checkConsistentFamInst Nothing _ _ _ = return ()
-checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys pp_hs_pats
-  = do { -- Check that the associated type indeed comes from this class
-         -- See [Mismatched class methods and associated type families]
-         -- in TcInstDecls.
-
-         checkTc (Just (classTyCon clas) == tyConAssoc_maybe fam_tc)
-                 (badATErr (className clas) (tyConName fam_tc))
-
-       -- Check type args first (more comprehensible)
-       ; checkTc (all check_arg type_shapes)   pp_wrong_at_arg
-
-       -- And now kind args
-       ; checkTcM (all check_arg kind_shapes)
-                  (tidy_env2, pprWithExplicitKindsWhen True pp_wrong_at_arg)
-
-       ; traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
-                                                , ppr arg_shapes
-                                                , ppr mini_env ]) }
-  where
-    arg_shapes :: [AssocInstArgShape]
-    arg_shapes = [ (lookupVarEnv mini_env fam_tc_tv, at_ty)
-                 | (fam_tc_tv, at_ty) <- tyConTyVars fam_tc `zip` at_tys ]
-
-    kind_shapes, type_shapes :: [AssocInstArgShape]
-    (kind_shapes, type_shapes) = partitionInvisibles $
-                                 arg_shapes `zip` tyConArgFlags fam_tc at_tys
-
-    check_arg :: AssocInstArgShape -> Bool
-    check_arg (Just exp_ty, at_ty) = exp_ty `tcEqType` at_ty
-    check_arg (Nothing,     _    ) = True -- Arg position does not correspond
-                                          -- to a class variable
-
-    pp_wrong_at_arg
-      = vcat [ text "Type indexes must match class instance head"
-             , pp_exp_act ]
-
-    pp_exp_act
-      = vcat [ text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
-             , text "  Actual:" <+> pp_hs_pats
-             , sdocWithDynFlags $ \dflags ->
-               ppWhen (has_poly_args dflags) $
-               vcat [ text "where the `<tv>' arguments are type variables,"
-                    , text "distinct from each other and from the instance variables" ] ]
-
-    -- We need to tidy, since it's possible that expected_args will contain
-    -- inferred kind variables with names identical to those in at_tys. If we
-    -- don't, we'll end up with horrible messages like this one (#13972):
-    --
-    --   Expected: T (a -> Either a b)
-    --     Actual: T (a -> Either a b)
-    (tidy_env1, _) = tidyOpenTypes emptyTidyEnv at_tys
-    (tidy_env2, expected_args)
-      = tidyOpenTypes tidy_env1 [ exp_ty `orElse` mk_tv at_ty
-                                | (exp_ty, at_ty) <- arg_shapes ]
-    mk_tv at_ty   = mkTyVarTy (mkTyVar tv_name (typeKind at_ty))
-    tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOcc "<tv>") noSrcSpan
-
-    has_poly_args dflags = any (isNothing . fst) shapes
-      where
-        shapes | gopt Opt_PrintExplicitKinds dflags = arg_shapes
-               | otherwise                          = type_shapes
-
-badATErr :: Name -> Name -> SDoc
-badATErr clas op
-  = hsep [text "Class", quotes (ppr clas),
-          text "does not have an associated type", quotes (ppr op)]
+In every case, b is a type variable not determined by the LHS pattern. The
+first is caught by the renamer, but we catch the last two here. Perhaps one
+could argue that the second should be accepted, albeit with a warning, but
+consider the fact that in a type family instance, there is no way to interact
+with such a varable. At least with @x :: forall a. Int@ we can use visibile
+type application, like @x \@Bool 1@. (Of course it does nothing, but it is
+permissible.) In the type family case, the only sensible explanation is that
+the user has made a mistake -- thus we throw an error.
 
 
-{-
-************************************************************************
-*                                                                      *
-        Checking type instance well-formedness and termination
-*                                                                      *
-************************************************************************
--}
-
-checkValidCoAxiom :: CoAxiom Branched -> TcM ()
-checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
-  = do { mapM_ (checkValidCoAxBranch Nothing fam_tc) branch_list
-       ; foldlM_ check_branch_compat [] branch_list }
-  where
-    branch_list = fromBranches branches
-    injectivity = tyConInjectivityInfo fam_tc
-
-    check_branch_compat :: [CoAxBranch]    -- previous branches in reverse order
-                        -> CoAxBranch      -- current branch
-                        -> TcM [CoAxBranch]-- current branch : previous branches
-    -- Check for
-    --   (a) this branch is dominated by previous ones
-    --   (b) failure of injectivity
-    check_branch_compat prev_branches cur_branch
-      | cur_branch `isDominatedBy` prev_branches
-      = do { addWarnAt NoReason (coAxBranchSpan cur_branch) $
-             inaccessibleCoAxBranch ax cur_branch
-           ; return prev_branches }
-      | otherwise
-      = do { check_injectivity prev_branches cur_branch
-           ; return (cur_branch : prev_branches) }
-
-     -- Injectivity check: check whether a new (CoAxBranch) can extend
-     -- already checked equations without violating injectivity
-     -- annotation supplied by the user.
-     -- See Note [Verifying injectivity annotation] in FamInstEnv
-    check_injectivity prev_branches cur_branch
-      | Injective inj <- injectivity
-      = do { let conflicts =
-                     fst $ foldl' (gather_conflicts inj prev_branches cur_branch)
-                                 ([], 0) prev_branches
-           ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err)
-                   (makeInjectivityErrors ax cur_branch inj conflicts) }
-      | otherwise
-      = return ()
-
-    gather_conflicts inj prev_branches cur_branch (acc, n) branch
-               -- n is 0-based index of branch in prev_branches
-      = case injectiveBranches inj cur_branch branch of
-          InjectivityUnified ax1 ax2
-            | ax1 `isDominatedBy` (replace_br prev_branches n ax2)
-                -> (acc, n + 1)
-            | otherwise
-                -> (branch : acc, n + 1)
-          InjectivityAccepted -> (acc, n + 1)
-
-    -- Replace n-th element in the list. Assumes 0-based indexing.
-    replace_br :: [CoAxBranch] -> Int -> CoAxBranch -> [CoAxBranch]
-    replace_br brs n br = take n brs ++ [br] ++ drop (n+1) brs
-
-
--- Check that a "type instance" is well-formed (which includes decidability
--- unless -XUndecidableInstances is given).
---
-checkValidCoAxBranch :: Maybe ClsInstInfo
-                     -> TyCon -> CoAxBranch -> TcM ()
-checkValidCoAxBranch mb_clsinfo fam_tc
-                    (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
-                                , cab_lhs = typats
-                                , cab_rhs = rhs, cab_loc = loc })
-  = checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs pp_lhs loc
-  where
-    pp_lhs = ppr (mkTyConApp fam_tc typats)
-
--- | Do validity checks on a type family equation, including consistency
--- with any enclosing class instance head, termination, and lack of
--- polytypes.
-checkValidTyFamEqn :: Maybe ClsInstInfo
-                   -> TyCon   -- ^ of the type family
-                   -> [TyVar] -- ^ bound tyvars in the equation
-                   -> [CoVar] -- ^ bound covars in the equation
-                   -> [Type]  -- ^ type patterns
-                   -> Type    -- ^ rhs
-                   -> SDoc    -- ^ user-written LHS
-                   -> SrcSpan
-                   -> TcM ()
-checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs pp_lhs loc
-  = setSrcSpan loc $
-    do { checkValidFamPats mb_clsinfo fam_tc tvs cvs typats [] pp_lhs
-
-         -- The argument patterns, and RHS, are all boxed tau types
-         -- E.g  Reject type family F (a :: k1) :: k2
-         --             type instance F (forall a. a->a) = ...
-         --             type instance F Int#             = ...
-         --             type instance F Int              = forall a. a->a
-         --             type instance F Int              = Int#
-         -- See Trac #9357
-       ; checkValidMonoType rhs
-
-         -- We have a decidable instance unless otherwise permitted
-       ; undecidable_ok <- xoptM LangExt.UndecidableInstances
-       ; traceTc "checkVTFE" (pp_lhs $$ ppr rhs $$ ppr (tcTyFamInsts rhs))
-       ; unless undecidable_ok $
-           mapM_ addErrTc (checkFamInstRhs fam_tc typats (tcTyFamInsts rhs)) }
-
--- Make sure that each type family application is
---   (1) strictly smaller than the lhs,
---   (2) mentions no type variable more often than the lhs, and
---   (3) does not contain any further type family instances.
---
-checkFamInstRhs :: TyCon -> [Type]         -- LHS
-                -> [(TyCon, [Type])]       -- type family calls in RHS
-                -> [MsgDoc]
-checkFamInstRhs lhs_tc lhs_tys famInsts
-  = mapMaybe check famInsts
-  where
-   lhs_size  = sizeTyConAppArgs lhs_tc lhs_tys
-   inst_head = pprType (TyConApp lhs_tc lhs_tys)
-   lhs_fvs   = fvTypes lhs_tys
-   check (tc, tys)
-      | not (all isTyFamFree tys) = Just (nestedMsg what)
-      | not (null bad_tvs)        = Just (noMoreMsg bad_tvs what inst_head)
-      | lhs_size <= fam_app_size  = Just (smallerMsg what inst_head)
-      | otherwise                 = Nothing
-      where
-        what = text "type family application"
-               <+> quotes (pprType (TyConApp tc tys))
-        fam_app_size = sizeTyConAppArgs tc tys
-        bad_tvs      = fvTypes tys \\ lhs_fvs
-                       -- The (\\) is list difference; e.g.
-                       --   [a,b,a,a] \\ [a,a] = [b,a]
-                       -- So we are counting repetitions
-
-checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar]
-                  -> [Type]   -- ^ patterns the user wrote
-                  -> [Type]   -- ^ "extra" patterns from a data instance kind sig
-                  -> SDoc     -- ^ pretty-printed user-written instance head
-                  -> TcM ()
--- Patterns in a 'type instance' or 'data instance' decl should
--- a) contain no type family applications
---    (vanilla synonyms are fine, though)
--- b) properly bind all their free type variables
---    e.g. we disallow (Trac #7536)
---         type T a = Int
---         type instance F (T a) = a
--- c) For associated types, are consistently instantiated
-checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats pp_hs_pats
-  = do { checkValidTypePats fam_tc user_ty_pats
-
-       ; let unbound_tcvs = filterOut (`elemVarSet` exactTyCoVarsOfTypes user_ty_pats)
-                                      (tvs ++ cvs)
-       ; checkTc (null unbound_tcvs) (famPatErr fam_tc unbound_tcvs user_ty_pats)
-
-         -- Check that type patterns match the class instance head
-       ; checkConsistentFamInst mb_clsinfo fam_tc (user_ty_pats `chkAppend` extra_ty_pats) pp_hs_pats }
-
--- | Checks for occurrences of type families in class instances and type/data
--- family instances.
-checkValidTypePats :: TyCon -> [Type] -> TcM ()
-checkValidTypePats tc pat_ty_args = do
-  -- Check that each of pat_ty_args is a monotype.
-  -- One could imagine generalising to allow
-  --      instance C (forall a. a->a)
-  -- but we don't know what all the consequences might be.
-  traverse_ checkValidMonoType pat_ty_args
-
-  -- Ensure that no type family instances occur a type pattern
-  case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
-    [] -> pure ()
-    ((tf_is_invis_arg, tf_tc, tf_args):_) -> failWithTc $
-      ty_fam_inst_illegal_err tf_is_invis_arg (mkTyConApp tf_tc tf_args)
-  where
-    inst_ty = mkTyConApp tc pat_ty_args
-
-    ty_fam_inst_illegal_err :: Bool -> Type -> SDoc
-    ty_fam_inst_illegal_err invis_arg ty
-      = pprWithExplicitKindsWhen invis_arg $
-        hang (text "Illegal type synonym family application"
-                <+> quotes (ppr ty) <+> text "in instance" <> colon)
-           2 (ppr inst_ty)
-
--- Error messages
-
-inaccessibleCoAxBranch :: CoAxiom br -> CoAxBranch -> SDoc
-inaccessibleCoAxBranch fi_ax cur_branch
-  = text "Type family instance equation is overlapped:" $$
-    nest 2 (pprCoAxBranch fi_ax cur_branch)
-
-nestedMsg :: SDoc -> SDoc
-nestedMsg what
-  = sep [ text "Illegal nested" <+> what
-        , parens undecidableMsg ]
-
-famPatErr :: TyCon -> [TyVar] -> [Type] -> SDoc
-famPatErr fam_tc tvs pats
-  = hang (text "Family instance purports to bind type variable" <> plural tvs
-          <+> pprQuotedList tvs)
-       2 (hang (text "but the real LHS (expanding synonyms) is:")
-             2 (pprTypeApp fam_tc (map expandTypeSynonyms pats) <+>
-                text "= ..."))
-
-{-
 ************************************************************************
 *                                                                      *
    Telescope checking
@@ -2092,39 +2161,53 @@ check works for `forall x y z.` written in a type.
 --     data type declarations
 -- and Note [Keeping scoped variables in order: Explicit] in TcHsType
 --     for foralls
-checkValidTelescope :: [TyConBinder]   -- explicit vars (zonked)
-                    -> SDoc            -- original, user-written telescope
-                    -> TcM ()
-checkValidTelescope tvbs user_tyvars
-  = unless (null bad_tvbs) $ addErr $
-    vcat [ hang (text "These kind and type variables:" <+> user_tyvars $$
-                 text "are out of dependency order. Perhaps try this ordering:")
-              2 (pprTyVars sorted_tidied_tvs)
-         , extra ]
+checkValidTelescope :: TyCon -> TcM ()
+checkValidTelescope tc
+  = unless (null bad_tcbs) $ addErr $
+    vcat [ hang (text "The kind of" <+> quotes (ppr tc) <+> text "is ill-scoped")
+              2 (text "Inferred kind:" <+> ppr tc <+> dcolon <+> ppr_untidy (tyConKind tc))
+         , extra
+         , hang (text "Perhaps try this order instead:")
+              2 (pprTyVars sorted_tidied_tvs) ]
   where
-    tvs = binderVars tvbs
+    ppr_untidy ty = pprIfaceType (toIfaceType ty)
+    tcbs = tyConBinders tc
+    tvs = binderVars tcbs
     (_, sorted_tidied_tvs) = tidyVarBndrs emptyTidyEnv (scopedSort tvs)
 
-    (_, bad_tvbs) = foldl add_one (mkVarSet tvs, []) tvbs
+    (_, bad_tcbs) = foldl add_one (mkVarSet tvs, []) tcbs
 
     add_one :: (TyVarSet, [TyConBinder])
-            -> TyConBinder
-            -> (TyVarSet, [TyConBinder])
+            -> TyConBinder -> (TyVarSet, [TyConBinder])
     add_one (bad_bndrs, acc) tvb
-      | fkvs `intersectsVarSet` bad_bndrs
-      = (bad', tvb : acc)
-      | otherwise
-      = (bad', acc)
+      | fkvs `intersectsVarSet` bad_bndrs = (bad', tvb : acc)
+      | otherwise                         = (bad', acc)
       where
         tv = binderVar tvb
         fkvs = tyCoVarsOfType (tyVarKind tv)
         bad' = bad_bndrs `delVarSet` tv
 
+    inferred_tvs  = [ binderVar tcb
+                    | tcb <- tcbs, Inferred == tyConBinderArgFlag tcb ]
+    specified_tvs = [ binderVar tcb
+                    | tcb <- tcbs, Specified == tyConBinderArgFlag tcb ]
+
+    pp_inf  = parens (text "namely:" <+> pprTyVars inferred_tvs)
+    pp_spec = parens (text "namely:" <+> pprTyVars specified_tvs)
+
     extra
-      | any isInvisibleTyConBinder tvbs
-      = text "NB: Implicitly declared variables come before others."
-      | otherwise
+      | null inferred_tvs && null specified_tvs
       = empty
+      | null inferred_tvs
+      = hang (text "NB: Specified variables")
+           2 (sep [pp_spec, text "always come first"])
+      | null specified_tvs
+      = hang (text "NB: Inferred variables")
+           2 (sep [pp_inf, text "always come first"])
+      | otherwise
+      = hang (text "NB: Inferred variables")
+           2 (vcat [ sep [ pp_inf, text "always come first"]
+                   , sep [text "then Specified variables", pp_spec]])
 
 {-
 ************************************************************************

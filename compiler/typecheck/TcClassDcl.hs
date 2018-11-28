@@ -198,9 +198,6 @@ tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 
         ; let tc_item = tcDefMeth clas clas_tyvars this_dict
                                   default_binds sig_fn prag_fn
-                   -- tcExtendTyVarEnv here (instead of scopeTyVars) is OK:
-                   -- the tcDefMeth calls checkConstraints to bump the TcLevel
-                   -- and make the implication constraint
         ; dm_binds <- tcExtendTyVarEnv clas_tyvars $
                       mapM tc_item op_items
 
@@ -517,7 +514,7 @@ tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
              tvs'     = scopedSort tv'
              cvs'     = scopedSort cv'
        ; rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc)) pat_tys'
-       ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' cvs'
+       ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' [] cvs'
                                      fam_tc pat_tys' rhs'
            -- NB: no validity check. We check validity of default instances
            -- in the class definition. Because type instance arguments cannot

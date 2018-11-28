@@ -2,4 +2,4 @@
 T13092c_4.hs:7:15: error:
     Conflicting family instance declarations:
       F (a, Char) = String -- Defined at T13092c_4.hs:7:15
-      F (T13092c_2.X, b) = Bool -- Defined in ‘T13092c_2’
+      F (T13092c_2.X, b) = Bool -- Defined in module T13092c_2
