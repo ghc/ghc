@@ -10,5 +10,4 @@ myAp f x = f x
 
 foo = myAp (,()) ()
 
-
-
+qux = ("go2",) $ ()
