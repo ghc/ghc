@@ -27,7 +27,7 @@ module Outputable (
         doubleQuotes, angleBrackets,
         semi, comma, colon, dcolon, space, equals, dot, vbar,
         arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
-        lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
+        lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore, mulArrow,
         blankLine, forAllLit, kindType, bullet,
         (<>), (<+>), hcat, hsep,
         ($$), ($+$), vcat,
@@ -642,6 +642,10 @@ lbrack     = docToSDoc $ Pretty.lbrack
 rbrack     = docToSDoc $ Pretty.rbrack
 lbrace     = docToSDoc $ Pretty.lbrace
 rbrace     = docToSDoc $ Pretty.rbrace
+
+mulArrow :: SDoc -> SDoc
+mulArrow d = text "-->." <> parens d
+
 
 forAllLit :: SDoc
 forAllLit = unicodeSyntax (char '∀') (text "forall")
