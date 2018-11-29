@@ -425,7 +425,6 @@ evacuate_compact (StgPtr p)
     StgCompactNFData *str;
     bdescr *bd;
     generation *gen, *new_gen;
-    uint32_t gen_no, new_gen_no;
 
     // We need to find the Compact# corresponding to this pointer, because it
     // will give us the first block in the compact chain, which is the one we
@@ -434,7 +433,7 @@ evacuate_compact (StgPtr p)
     ASSERT(get_itbl((StgClosure*)str)->type == COMPACT_NFDATA);
 
     bd = Bdescr((StgPtr)str);
-    gen_no = bd->gen_no;
+    const uint32_t gen_no = bd->gen_no;
 
     if (bd->flags & BF_NONMOVING) {
         // We may have evacuated the block to the nonmoving generation. If so
@@ -460,7 +459,6 @@ evacuate_compact (StgPtr p)
     }
 
     gen = bd->gen;
-    gen_no = bd->gen_no;
     ACQUIRE_SPIN_LOCK(&gen->sync);
 
     // already evacuated?
@@ -481,7 +479,7 @@ evacuate_compact (StgPtr p)
 
     /* link it on to the evacuated compact object list of the destination gen
      */
-    new_gen_no = bd->dest_no;
+    uint32_t new_gen_no = bd->dest_no;
 
     if (new_gen_no < gct->evac_gen_no) {
         if (gct->eager_promotion) {
