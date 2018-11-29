@@ -361,7 +361,7 @@ split_block_high (bdescr *bd, W_ n)
 
     bdescr* ret = bd + bd->blocks - n; // take n blocks off the end
     ret->blocks = n;
-    ret->start = ret->free = bdescr_start(bd) + (bd->blocks - n)*BLOCK_SIZE_W;
+    ret->free = bdescr_start(bd) + (bd->blocks - n)*BLOCK_SIZE_W;
     ret->link = NULL;
 
     bd->blocks -= n;
@@ -382,7 +382,7 @@ split_block_low (bdescr *bd, W_ n)
 
     bdescr* bd_ = bd + n;
     bd_->blocks = bd->blocks - n;
-    bd_->start = bd_->free = bdescr_start(bd) + (bd->blocks - n)*BLOCK_SIZE_W;
+    bd_->free = bdescr_start(bd) + (bd->blocks - n)*BLOCK_SIZE_W;
 
     bd->blocks = n;
 
@@ -403,7 +403,6 @@ split_block_high_no_free (bdescr *bd, W_ n)
 
     bdescr* ret = bd + bd->blocks - n; // take n blocks off the end
     ret->blocks = n;
-    ret->start = ret->free = bdescr_start(bd) + (bd->blocks - n)*BLOCK_SIZE_W;
     ret->link = NULL;
 
     bd->blocks -= n;
@@ -1095,20 +1094,14 @@ freeChain_lock(bdescr *bd)
 static void
 initMBlock(void *mblock, uint32_t node)
 {
-    bdescr *bd;
-    StgWord8 *block;
-
     /* the first few Bdescr's in a block are unused, so we don't want to
      * put them all on the free list.
      */
-    block = FIRST_BLOCK(mblock);
-    bd    = FIRST_BDESCR(mblock);
+    bdescr *bd = FIRST_BDESCR(mblock);
 
-    /* Initialise the start field of each block descriptor
+    /* Initialise the node field of each block descriptor
      */
-    for (; block <= (StgWord8*)LAST_BLOCK(mblock); bd += 1,
-             block += BLOCK_SIZE) {
-        bd->start = (void*)block;
+    for (; bd <= LAST_BDESCR(mblock); bd += 1) {
         bd->node = node;
     }
 }
