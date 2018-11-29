@@ -675,7 +675,7 @@ allocNursery (uint32_t node, bdescr *tail, W_ blocks)
                 }
             }
 
-            bd[i].free = bd[i].start;
+            bd[i].free = bdescr_start(&bd[i]);
         }
 
         tail = &bd[0];
@@ -746,7 +746,7 @@ resetNurseries (void)
             ASSERT(bd->gen_no == 0);
             ASSERT(bd->gen == g0);
             ASSERT(bd->node == capNoToNumaNode(n));
-            IF_DEBUG(zero_on_gc, memset(bd->start, 0xaa, BLOCK_SIZE));
+            IF_DEBUG(zero_on_gc, memset(bdescr_start(bd), 0xaa, BLOCK_SIZE));
         }
     }
 #endif
@@ -986,16 +986,16 @@ allocateMightFail (Capability *cap, W_ n)
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
         bd->flags = BF_LARGE;
-        bd->free = bd->start + n;
+        bd->free = bdescr_start(bd) + n;
         cap->total_allocated += n;
-        return bd->start;
+        return bdescr_start(bd);
     }
 
     /* small allocation (<LARGE_OBJECT_THRESHOLD) */
 
     accountAllocation(cap, n);
     bd = cap->r.rCurrentAlloc;
-    if (RTS_UNLIKELY(bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W)) {
+    if (RTS_UNLIKELY(bd == NULL || bd->free + n > bdescr_start(bd) + BLOCK_SIZE_W)) {
 
         if (bd) finishedNurseryBlock(cap,bd);
 
@@ -1106,7 +1106,7 @@ allocatePinned (Capability *cap, W_ n)
 
     // If we don't have a block of pinned objects yet, or the current
     // one isn't large enough to hold the new object, get a new one.
-    if (bd == NULL || (bd->free + n) > (bd->start + BLOCK_SIZE_W)) {
+    if (bd == NULL || (bd->free + n) > (bdescr_start(bd) + BLOCK_SIZE_W)) {
 
         // stash the old block on cap->pinned_object_blocks.  On the
         // next GC cycle these objects will be moved to
@@ -1397,8 +1397,8 @@ W_ countOccupied (bdescr *bd)
 
     words = 0;
     for (; bd != NULL; bd = bd->link) {
-        ASSERT(bd->free <= bd->start + bd->blocks * BLOCK_SIZE_W);
-        words += bd->free - bd->start;
+        ASSERT(bd->free <= bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W);
+        words += bd->free - bdescr_start(bd);
     }
     return words;
 }
@@ -1687,11 +1687,11 @@ AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
     }
 
     if (exec_block == NULL ||
-        exec_block->free + n + 1 > exec_block->start + BLOCK_SIZE_W) {
+        exec_block->free + n + 1 > bdescr_start(exec_block) + BLOCK_SIZE_W) {
         bdescr *bd;
         W_ pagesize = getPageSize();
         bd = allocGroup(stg_max(1, pagesize / BLOCK_SIZE));
-        debugTrace(DEBUG_gc, "allocate exec block %p", bd->start);
+        debugTrace(DEBUG_gc, "allocate exec block %p", bdescr_start(bd));
         bd->gen_no = 0;
         bd->flags = BF_EXEC;
         bd->link = exec_block;
@@ -1699,7 +1699,7 @@ AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
             exec_block->u.back = bd;
         }
         bd->u.back = NULL;
-        setExecutable(bd->start, bd->blocks * BLOCK_SIZE, true);
+        setExecutable(bdescr_start(bd), bd->blocks * BLOCK_SIZE, true);
         exec_block = bd;
     }
     *(exec_block->free) = n;  // store the size of this chunk
@@ -1734,12 +1734,12 @@ void freeExec (void *addr)
         // Free the block if it is empty, but not if it is the block at
         // the head of the queue.
         if (bd != exec_block) {
-            debugTrace(DEBUG_gc, "free exec block %p", bd->start);
+            debugTrace(DEBUG_gc, "free exec block %p", bdescr_start(bd));
             dbl_link_remove(bd, &exec_block);
-            setExecutable(bd->start, bd->blocks * BLOCK_SIZE, false);
+            setExecutable(bdescr_start(bd), bd->blocks * BLOCK_SIZE, false);
             freeGroup(bd);
         } else {
-            bd->free = bd->start;
+            bd->free = bdescr_start(bd);
         }
     }
 

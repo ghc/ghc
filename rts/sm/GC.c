@@ -358,7 +358,7 @@ GarbageCollect (uint32_t collect_gen,
       mark_stack_top_bd = mark_stack_bd;
       mark_stack_bd->link = NULL;
       mark_stack_bd->u.back = NULL;
-      mark_sp           = mark_stack_bd->start;
+      mark_sp           = bdescr_start(mark_stack_bd);
   } else {
       mark_stack_bd     = NULL;
       mark_stack_top_bd = NULL;
@@ -620,7 +620,7 @@ GarbageCollect (uint32_t collect_gen,
                     }
                     else
                     {
-                        gen->n_words += bd->free - bd->start;
+                        gen->n_words += bd->free - bdescr_start(bd);
 
                         // NB. this step might not be compacted next
                         // time, so reset the BF_MARKED flags.
@@ -677,7 +677,7 @@ GarbageCollect (uint32_t collect_gen,
          */
         for (bd = gen->compact_objects; bd; bd = next) {
             next = bd->link;
-            compactFree(((StgCompactNFDataBlock*)bd->start)->owner);
+            compactFree(((StgCompactNFDataBlock*)bdescr_start(bd))->owner);
         }
         gen->compact_objects = gen->live_compact_objects;
         gen->n_compact_blocks = gen->n_live_compact_blocks;
@@ -691,7 +691,7 @@ GarbageCollect (uint32_t collect_gen,
         for (bd = gen->scavenged_large_objects; bd; bd = next) {
             next = bd->link;
             dbl_link_onto(bd, &gen->large_objects);
-            gen->n_large_words += bd->free - bd->start;
+            gen->n_large_words += bd->free - bdescr_start(bd);
         }
 
         // And same for compacts
@@ -999,11 +999,11 @@ new_gc_thread (uint32_t n, gc_thread *t)
                 // no lock, locks aren't initialised yet
             initBdescr(bd, ws->gen, ws->gen->to);
             bd->flags = BF_EVACUATED;
-            bd->u.scan = bd->free = bd->start;
+            bd->u.scan = bd->free = bdescr_start(bd);
 
             ws->todo_bd = bd;
             ws->todo_free = bd->free;
-            ws->todo_lim = bd->start + BLOCK_SIZE_W;
+            ws->todo_lim = bdescr_start(bd) + BLOCK_SIZE_W;
         }
 
         ws->todo_q = newWSDeque(128);
@@ -1475,7 +1475,7 @@ prepare_collected_gen (generation *gen)
         ASSERT(ws->n_scavd_blocks == 0);
         ASSERT(ws->n_scavd_words == 0);
 
-        if (ws->todo_free != ws->todo_bd->start) {
+        if (ws->todo_free != bdescr_start(ws->todo_bd)) {
             ws->todo_bd->free = ws->todo_free;
             ws->todo_bd->link = gen->old_blocks;
             gen->old_blocks = ws->todo_bd;
@@ -1511,7 +1511,7 @@ prepare_collected_gen (generation *gen)
             bitmap_bdescr = allocGroup((StgWord)BLOCK_ROUND_UP(bitmap_size)
                                        / BLOCK_SIZE);
             gen->bitmap = bitmap_bdescr;
-            bitmap = bitmap_bdescr->start;
+            bitmap = bdescr_start(bitmap_bdescr);
 
             debugTrace(DEBUG_gc, "bitmap_size: %d, bitmap: %p",
                        bitmap_size, bitmap);
@@ -1644,7 +1644,7 @@ collect_pinned_object_blocks (void)
                 bd->flags |= BF_NONMOVING;
                 bd->gen = oldest_gen;
                 bd->gen_no = oldest_gen->no;
-                oldest_gen->n_large_words += bd->free - bd->start;
+                oldest_gen->n_large_words += bd->free - bdescr_start(bd);
                 oldest_gen->n_large_blocks += bd->blocks;
                 last = bd;
             }

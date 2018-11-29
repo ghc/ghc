@@ -141,8 +141,8 @@ STATIC_INLINE void
 newStackBlock( traverseState *ts, bdescr *bd )
 {
     ts->currentStack = bd;
-    ts->stackTop     = (stackElement *)(bd->start + BLOCK_SIZE_W * bd->blocks);
-    ts->stackBottom  = (stackElement *)bd->start;
+    ts->stackTop     = (stackElement *)(bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
+    ts->stackBottom  = (stackElement *)bdescr_start(bd);
     ts->stackLimit   = (stackElement *)ts->stackTop;
     bd->free     = (StgPtr)ts->stackLimit;
 }
@@ -157,8 +157,8 @@ returnToOldStack( traverseState *ts, bdescr *bd )
 {
     ts->currentStack = bd;
     ts->stackTop = (stackElement *)bd->free;
-    ts->stackBottom = (stackElement *)bd->start;
-    ts->stackLimit = (stackElement *)(bd->start + BLOCK_SIZE_W * bd->blocks);
+    ts->stackBottom = (stackElement *)bdescr_start(bd);
+    ts->stackLimit = (stackElement *)(bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
     bd->free = (StgPtr)ts->stackLimit;
 }
 
@@ -1111,7 +1111,7 @@ resetMutableObjects(void)
         // visited during heap traversal.
         for (n = 0; n < n_capabilities; n++) {
           for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
-            for (ml = bd->start; ml < bd->free; ml++) {
+            for (ml = bdescr_start(bd); ml < bd->free; ml++) {
 
                 traverseMaybeInitClosureData((StgClosure *)*ml);
             }
