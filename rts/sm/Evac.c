@@ -389,7 +389,6 @@ evacuate_compact (StgPtr p)
         return;
     }
 
-    gen_no = bd->gen_no;
     gen = &generations[gen_no];
     ACQUIRE_SPIN_LOCK(&gen->sync);
 
