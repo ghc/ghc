@@ -429,7 +429,7 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
             bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
             bd->link = q->blocks;
             q->blocks = bd;
-            q->top = (MarkQueueBlock *) bd->start;
+            q->top = (MarkQueueBlock *) bdescr_start(bd);
             q->top->head = 0;
             RELEASE_SM_LOCK;
         }
@@ -460,7 +460,7 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
         bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
         bd->link = q->blocks;
         q->blocks = bd;
-        q->top = (MarkQueueBlock *) bd->start;
+        q->top = (MarkQueueBlock *) bdescr_start(bd);
         q->top->head = 0;
         RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
     }
@@ -806,7 +806,7 @@ again:
             // No, unwind to the previous block and try popping again...
             bdescr *old_block = q->blocks;
             q->blocks = old_block->link;
-            q->top = (MarkQueueBlock*)q->blocks->start;
+            q->top = (MarkQueueBlock*) bdescr_start(q->blocks);
             ACQUIRE_SM_LOCK;
             freeGroup(old_block); // TODO: hold on to a block to avoid repeated allocation/deallocation?
             RELEASE_SM_LOCK;
@@ -869,7 +869,7 @@ static void init_mark_queue_ (MarkQueue *queue)
 {
     bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
     queue->blocks = bd;
-    queue->top = (MarkQueueBlock *) bd->start;
+    queue->top = (MarkQueueBlock *) bdescr_start(bd);
     queue->top->head = 0;
 #if MARK_PREFETCH_QUEUE_DEPTH > 0
     memset(&queue->prefetch_queue, 0, sizeof(queue->prefetch_queue));
@@ -910,7 +910,7 @@ markQueueLength (MarkQueue *q)
 {
     uint32_t n = 0;
     for (bdescr *block = q->blocks; block; block = block->link) {
-        MarkQueueBlock *queue = (MarkQueueBlock*)block->start;
+        MarkQueueBlock *queue = (MarkQueueBlock*) bdescr_start(block);
         n += queue->head;
     }
     return n;
@@ -1704,7 +1704,7 @@ nonmovingMark (MarkQueue *queue)
                 ACQUIRE_LOCK(&upd_rem_set_lock);
                 bdescr *old = queue->blocks;
                 queue->blocks = upd_rem_set_block_list;
-                queue->top = (MarkQueueBlock *) queue->blocks->start;
+                queue->top = (MarkQueueBlock *) bdescr_start(queue->blocks);
                 upd_rem_set_block_list = NULL;
                 RELEASE_LOCK(&upd_rem_set_lock);
 
@@ -1954,7 +1954,7 @@ void printMarkQueue (MarkQueue *q)
 {
     debugBelch("======== MARK QUEUE ========\n");
     for (bdescr *block = q->blocks; block; block = block->link) {
-        MarkQueueBlock *queue = (MarkQueueBlock*)block->start;
+        MarkQueueBlock *queue = (MarkQueueBlock*) bdescr_start(block);
         for (uint32_t i = 0; i < queue->head; ++i) {
             printMarkQueueEntry(&queue->entries[i]);
         }
