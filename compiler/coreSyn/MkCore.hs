@@ -17,7 +17,7 @@ module MkCore (
         mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
 
         -- * Floats
-        FloatBind(..), wrapFloat,
+        FloatBind(..), wrapFloat, wrapFloats, floatBindings,
 
         -- * Constructing small tuples
         mkCoreVarTup, mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup,
@@ -560,6 +560,19 @@ instance Outputable FloatBind where
 wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
 wrapFloat (FloatLet defns)       body = Let defns body
 wrapFloat (FloatCase e b con bs) body = Case e b (exprType body) [(con, bs, body)]
+
+-- | Applies the floats from left to right. That is @wrapFloats [b1, b2, …, bn]
+-- u = let bn in … in let b2 in let b1 u@
+wrapFloats :: [FloatBind] -> CoreExpr -> CoreExpr
+wrapFloats floats expr = foldl (flip wrapFloat) expr floats
+
+bindBindings :: CoreBind -> [Var]
+bindBindings (NonRec b _) = [b]
+bindBindings (Rec bnds) = map fst bnds
+
+floatBindings :: FloatBind -> [Var]
+floatBindings (FloatLet bnd) = bindBindings bnd
+floatBindings (FloatCase _ b _ bs) = b:bs
 
 {-
 ************************************************************************

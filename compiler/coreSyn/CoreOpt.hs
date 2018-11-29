@@ -28,6 +28,7 @@ import CoreSyn
 import CoreSubst
 import CoreUtils
 import CoreFVs
+import MkCore ( FloatBind(..) )
 import PprCore  ( pprCoreBindings, pprRules )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import Literal  ( Literal(LitString) )
@@ -232,7 +233,8 @@ simple_opt_expr env expr
     go (Case e b ty as)
        -- See Note [Getting the map/coerce RULE to work]
       | isDeadBinder b
-      , Just (con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
+      , Just ([], con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
+        -- We don't need to be concerned about floats when looking for coerce.
       , Just (altcon, bs, rhs) <- findAlt (DataAlt con) as
       = case altcon of
           DEFAULT -> go rhs
@@ -766,48 +768,73 @@ Hence the use of pushCoArgs.
 data ConCont = CC [CoreExpr] Coercion
                   -- Substitution already applied
 
--- | Returns @Just (dc, [t1..tk], [x1..xn])@ if the argument expression is
--- a *saturated* constructor application of the form @dc t1..tk x1 .. xn@,
--- where t1..tk are the *universally-quantified* type args of 'dc'
-exprIsConApp_maybe :: InScopeEnv -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
+-- | Returns @Just ([b1..bp], dc, [t1..tk], [x1..xn])@ if the argument
+-- expression is a *saturated* constructor application of the form @let bp in
+-- .. let b1 in dc t1..tk x1 .. xn@, where t1..tk are the
+-- *universally-quantified* type args of 'dc'. Note that the floats are in
+-- reversed dependency order. Floats can also be single-alternative case
+-- expressions. We're looking through lets and cases so that we can detect early
+-- that we are in the presence of a data constructor wrappers. Data constructor
+-- wrappers are unfolded late, but we really want to trigger
+-- case-of-known-constructor as early as possible. See also Note [Activation for
+-- data constructor wrappers] in MkId.
+exprIsConApp_maybe :: InScopeEnv -> CoreExpr -> Maybe ([FloatBind], DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe (in_scope, id_unf) expr
-  = go (Left in_scope) expr (CC [] (mkRepReflCo (exprType expr)))
+  = go (Left in_scope) [] expr (CC [] (mkRepReflCo (exprType expr)))
 
   where
     go :: Either InScopeSet Subst
              -- Left in-scope  means "empty substitution"
              -- Right subst    means "apply this substitution to the CoreExpr"
-       -> CoreExpr -> ConCont
-       -> Maybe (DataCon, [Type], [CoreExpr])
-    go subst (Tick t expr) cont
-       | not (tickishIsCode t) = go subst expr cont
-    go subst (Cast expr co1) (CC args co2)
+       -> [FloatBind] -> CoreExpr -> ConCont
+       -> Maybe ([FloatBind], DataCon, [Type], [CoreExpr])
+    go subst floats (Tick t expr) cont
+       | not (tickishIsCode t) = go subst floats expr cont
+    go subst floats (Cast expr co1) (CC args co2)
        | Just (args', m_co1') <- pushCoArgs (subst_co subst co1) args
             -- See Note [Push coercions in exprIsConApp_maybe]
        = case m_co1' of
-           MCo co1' -> go subst expr (CC args' (co1' `mkTransCo` co2))
-           MRefl    -> go subst expr (CC args' co2)
-    go subst (App fun arg) (CC args co)
-       = go subst fun (CC (subst_arg subst arg : args) co)
-    go subst (Lam var body) (CC (arg:args) co)
+           MCo co1' -> go subst floats expr (CC args' (co1' `mkTransCo` co2))
+           MRefl    -> go subst floats expr (CC args' co2)
+    go subst floats (App fun arg) (CC args co)
+       = go subst floats fun (CC (subst_arg subst arg : args) co)
+    go subst floats (Lam var body) (CC (arg:args) co)
        | exprIsTrivial arg          -- Don't duplicate stuff!
-       = go (extend subst var arg) body (CC args co)
-    go (Right sub) (Var v) cont
+       = go (extend subst var arg) floats body (CC args co)
+    go subst floats (Let bndr@(NonRec b _) expr) cont
+       = let (subst', bndr') = subst_bind subst bndr in
+           go subst' (FloatLet bndr' : floats) expr cont
+    go subst floats (Case scrut b _ [(con, vars, expr)]) cont
+       = let
+          (subst', b') = subst_bndr subst b
+          (subst'', vars') = subst_bndrs subst' vars
+         in
+           go subst'' (FloatCase (subst_arg subst scrut) b' con vars' : floats) expr cont
+    go (Right sub) floats (Var v) cont
        = go (Left (substInScope sub))
+            floats
             (lookupIdSubst (text "exprIsConApp" <+> ppr expr) sub v)
             cont
 
-    go (Left in_scope) (Var fun) cont@(CC args co)
+    go (Left in_scope) floats (Var fun) cont@(CC args co)
 
         | Just con <- isDataConWorkId_maybe fun
         , count isValArg args == idArity fun
-        = pushCoDataCon con args co
+        = pushFloats floats $ pushCoDataCon con args co
+
+        -- Look through data constructor wrappers: they inline late (See Note
+        -- [Activation for data constructor wrappers]) but we want to do
+        -- case-of-known-constructor optimisation eagerly.
+        | isDataConWrapId fun
+        , let rhs = uf_tmpl (realIdUnfolding fun)
+        = go (Left in_scope) floats rhs cont
 
         -- Look through dictionary functions; see Note [Unfolding DFuns]
         | DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = dfun_args } <- unfolding
         , bndrs `equalLength` args    -- See Note [DFun arity check]
         , let subst = mkOpenSubst in_scope (bndrs `zip` args)
-        = pushCoDataCon con (map (substExpr (text "exprIsConApp1") subst) dfun_args) co
+        = pushFloats floats $
+          pushCoDataCon con (map (substExpr (text "exprIsConApp1") subst) dfun_args) co
 
         -- Look through unfoldings, but only arity-zero one;
         -- if arity > 0 we are effectively inlining a function call,
@@ -817,18 +844,23 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         | idArity fun == 0
         , Just rhs <- expandUnfolding_maybe unfolding
         , let in_scope' = extendInScopeSetSet in_scope (exprFreeVars rhs)
-        = go (Left in_scope') rhs cont
+        = go (Left in_scope') floats rhs cont
 
         -- See Note [exprIsConApp_maybe on literal strings]
         | (fun `hasKey` unpackCStringIdKey) ||
           (fun `hasKey` unpackCStringUtf8IdKey)
         , [arg]                <- args
         , Just (LitString str) <- exprIsLiteral_maybe (in_scope, id_unf) arg
-        = dealWithStringLiteral fun str co
+        = pushFloats floats $ dealWithStringLiteral fun str co
         where
           unfolding = id_unf fun
 
-    go _ _ _ = Nothing
+    go _ _ _ _ = Nothing
+
+    pushFloats :: [FloatBind] -> Maybe (DataCon, [Type], [CoreExpr]) -> Maybe ([FloatBind], DataCon, [Type], [CoreExpr])
+    pushFloats floats x = do
+      (c, tys, args) <- x
+      return (floats, c, tys, args)
 
     ----------------------------
     -- Operations on the (Either InScopeSet CoreSubst)
@@ -838,6 +870,22 @@ exprIsConApp_maybe (in_scope, id_unf) expr
 
     subst_arg (Left {}) e = e
     subst_arg (Right s) e = substExpr (text "exprIsConApp2") s e
+
+    subst_bind (Left in_scope) bndr@(NonRec b _) =
+      (Left (extendInScopeSet in_scope b), bndr)
+    subst_bind (Left _) _ =
+      error "CoreOpt.exprIsConApp_maybe: recursive float."
+    subst_bind (Right subst) bndr =
+      let (subst', bndr') = substBind subst bndr in
+      (Right subst', bndr')
+
+    subst_bndr (Left in_scope) b =
+      (Left (extendInScopeSet in_scope b), b)
+    subst_bndr (Right subst) b =
+      let (subst', b') = substBndr subst b in
+      (Right subst', b')
+
+    subst_bndrs subst bs = mapAccumL subst_bndr subst bs
 
     extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
     extend (Right s)       v e = Right (extendSubst s v e)

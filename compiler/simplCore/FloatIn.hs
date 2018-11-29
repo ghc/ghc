@@ -22,7 +22,7 @@ module FloatIn ( floatInwards ) where
 import GhcPrelude
 
 import CoreSyn
-import MkCore
+import MkCore hiding    ( wrapFloats )
 import HscTypes         ( ModGuts(..) )
 import CoreUtils
 import CoreFVs
