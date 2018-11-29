@@ -106,7 +106,7 @@ import TcEvidence
 import RdrName
 import Var
 import TyCoRep
-import Multiplicity ( pattern Zero, pattern One, pattern Omega, pattern MultThing )
+import Multiplicity ( pattern One, pattern Omega, pattern MultThing )
 import Type   ( filterOutInvisibleTypes )
 import TysWiredIn ( unitTy, omegaDataConTy )
 import TcType
@@ -708,7 +708,7 @@ multToHsArrow :: Mult -> HsArrow GhcPs
 multToHsArrow One = HsLinearArrow
 multToHsArrow Omega = HsUnrestrictedArrow
 multToHsArrow (MultThing ty) = HsExplicitMult (typeToLHsType ty)
-multToHsMult _ = panic "multToHsArrow: polymorphism not yet implemented"
+multToHsArrow _ = panic "multToHsArrow: polymorphism not yet implemented"
 
 {-
 Note [Kind signatures in typeToLHsType]

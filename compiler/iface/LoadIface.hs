@@ -52,7 +52,6 @@ import PrelNames
 import PrelInfo
 import PrimOp   ( allThePrimOps, primOpFixity, primOpOcc )
 import MkId     ( seqId )
-import TysWiredIn  ( unrestrictedFunTyConName )
 import Rules
 import TyCon
 import Annotations
