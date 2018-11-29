@@ -32,6 +32,14 @@ Dumping out compiler intermediate structures
     output from :ghc-flag:`-ddump-simpl` will end up in
     :file:`{module}.dump-simpl`.
 
+.. ghc-flag:: -ddump-file-prefix=⟨str⟩
+    :shortdesc: Set the prefix of the filenames used for debugging output.
+    :type: dynamic
+
+    Set the prefix of the filenames used for debugging output. For example,
+    ``-ddump-file-prefix=Foo`` will cause the output from
+    :ghc-flag:`-ddump-simpl` to be dumped to :file:`Foo.dump-simpl`.
+
 .. ghc-flag:: -ddump-json
     :shortdesc: Dump error messages as JSON documents
     :type: dynamic
@@ -575,7 +583,41 @@ These flags dump various bits of information from other backends.
 
     Dump foreign export stubs.
 
+.. ghc-flag:: -ddump-ticked
+    :shortdesc: Dump the code instrumented by HPC (:ref:`hpc`).
+    :type: dynamic
 
+    Dump the code instrumented by HPC (:ref:`hpc`).
+
+.. ghc-flag:: -ddump-hpc
+    :shortdesc: An alias for :ghc-flag:`-ddump-ticked`.
+    :type: dynamic
+
+    An alias for :ghc-flag:`-ddump-ticked`.
+
+.. ghc-flag:: -ddump-mod-map
+    :shortdesc: Dump the state of the module mapping database.
+    :type: dynamic
+
+    Dump a mapping of modules to where they come from, and how:
+
+    - ``(hidden module)``: Module is hidden, and thus will never be available for
+      import.
+
+    - ``(unusable module)``: Module is unavailable because the package is unusable.
+
+    - ``(hidden package)``: This module is in someone's exported-modules list,
+      but that package is hidden.
+
+    - ``(exposed package)``: Module is available for import.
+
+    - ``(reexport by <PACKAGES>)``: This module is available from a reexport
+      of some set of exposed packages.
+
+    - ``(hidden reexport by <PACKAGES>)``: This module is available from a reexport
+      of some set of hidden packages.
+
+    - ``(package flag)``: This module export comes from a package flag.
 
 .. _formatting dumps:
 

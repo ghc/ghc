@@ -34,10 +34,10 @@ import CoreMonad
 import Outputable
 import FastString
 import MonadUtils
-import ErrUtils
+import ErrUtils as Err
 import Panic (throwGhcExceptionIO, GhcException (..))
 import BasicTypes          ( IntWithInf, treatZeroAsInf, mkIntWithInf )
-import Control.Monad       ( when, liftM, ap )
+import Control.Monad       ( liftM, ap )
 
 {-
 ************************************************************************
@@ -140,9 +140,8 @@ thenSmpl_ m k
 traceSmpl :: String -> SDoc -> SimplM ()
 traceSmpl herald doc
   = do { dflags <- getDynFlags
-       ; when (dopt Opt_D_dump_simpl_trace dflags) $ liftIO $
-         printOutputForUser dflags alwaysQualify $
-         hang (text herald) 2 doc }
+       ; liftIO $ Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_trace "Simpl Trace"
+           (hang (text herald) 2 doc) }
 
 {-
 ************************************************************************
