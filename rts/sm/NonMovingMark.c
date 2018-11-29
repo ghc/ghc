@@ -527,7 +527,7 @@ void push_closure (MarkQueue *q,
                    StgClosure **origin)
 {
 #if defined(DEBUG)
-    ASSERT(!HEAP_ALLOCED_GC(p) || (Bdescr((StgPtr) p)->gen == oldest_gen));
+    ASSERT(!HEAP_ALLOCED_GC(p) || (&generations[Bdescr((StgPtr) p)->gen_no] == oldest_gen));
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     // Commenting out: too slow
     // if (RtsFlags.DebugFlags.sanity) {
@@ -557,7 +557,7 @@ void push_array (MarkQueue *q,
                  StgWord start_index)
 {
     // TODO: Push this into callers where they already have the Bdescr
-    if (HEAP_ALLOCED_GC(array) && (Bdescr((StgPtr) array)->gen != oldest_gen))
+    if (HEAP_ALLOCED_GC(array) && (&generations[Bdescr((StgPtr) array)->gen_no] != oldest_gen))
         return;
 
     MarkQueueEnt ent = {
@@ -722,7 +722,7 @@ STATIC_INLINE bool needs_upd_rem_set_mark(StgClosure *p)
 {
     // TODO: Deduplicate with mark_closure
     bdescr *bd = Bdescr((StgPtr) p);
-    if (bd->gen != oldest_gen) {
+    if (&generations[bd->gen_no] != oldest_gen) {
         return false;
     } else if (bd->flags & BF_LARGE) {
         if (! (bd->flags & BF_NONMOVING_SWEEPING)) {
@@ -1356,10 +1356,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
 
     bd = Bdescr((StgPtr) p);
 
-    // This must be a relaxed load since the object may be a large object,
-    // in which case evacuation by the moving collector will result in
-    // mutation.
-    if (RELAXED_LOAD(&bd->gen) != oldest_gen) {
+    if (&generations[RELAXED_LOAD(&bd->gen_no)] != oldest_gen) {
         // Here we have an object living outside of the non-moving heap. While
         // we likely evacuated nearly everything to the nonmoving heap during
         // preparation there are nevertheless a few ways in which we might trace

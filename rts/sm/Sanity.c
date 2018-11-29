@@ -948,7 +948,7 @@ checkNurserySanity (nursery *nursery)
 
     prev = NULL;
     for (bd = nursery->blocks; bd != NULL; bd = bd->link) {
-        ASSERT(bd->gen == g0);
+        ASSERT(bd->gen_no == 0);
         ASSERT(bd->u.back == prev);
         prev = bd;
         blocks += bd->blocks;

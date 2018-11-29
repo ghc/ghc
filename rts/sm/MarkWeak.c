@@ -338,7 +338,7 @@ static bool tidyWeakList(generation *gen)
                 // Find out which generation this weak ptr is in, and
                 // move it onto the weak ptr list of that generation.
 
-                new_gen = Bdescr((P_)w)->gen;
+                new_gen = &generations[Bdescr((P_)w)->gen_no];
                 gct->evac_gen_no = new_gen->no;
                 gct->failed_to_evac = false;
 
@@ -431,7 +431,7 @@ static void tidyThreadList (generation *gen)
             *prev = next;
 
             // move this thread onto the correct threads list.
-            generation *new_gen = Bdescr((P_)t)->gen;
+            generation *new_gen = &generations[Bdescr((P_)t)->gen_no];
             t->global_link = new_gen->threads;
             new_gen->threads = t;
         }

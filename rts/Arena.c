@@ -85,7 +85,6 @@ arenaAlloc( Arena *arena, size_t size )
         arena_blocks += bd->blocks;
 
         bd->gen_no  = 0;
-        bd->gen     = NULL;
         bd->dest_no = 0;
         bd->flags   = 0;
         bd->free    = bdescr_start(bd);

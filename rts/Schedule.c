@@ -3292,7 +3292,7 @@ resurrectThreads (StgTSO *threads)
     for (tso = threads; tso != END_TSO_QUEUE; tso = next) {
         next = tso->global_link;
 
-        gen = Bdescr((P_)tso)->gen;
+        gen = &generations[Bdescr((P_)tso)->gen_no];
         tso->global_link = gen->threads;
         gen->threads = tso;
 

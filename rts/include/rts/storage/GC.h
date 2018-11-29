@@ -251,7 +251,6 @@ extern bool keepCAFs;
 
 INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
 {
-    RELAXED_STORE(&bd->gen, gen);
     RELAXED_STORE(&bd->gen_no, gen->no);
     RELAXED_STORE(&bd->dest_no, dest->no);
 

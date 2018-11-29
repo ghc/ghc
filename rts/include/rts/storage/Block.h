@@ -121,8 +121,6 @@ typedef struct bdescr_ {
         StgPtr  scan;          // scan pointer for copying GC
     } u;
 
-    struct generation_ *gen;   // generation
-
     StgWord16 gen_no;          // gen->no, cached
     StgWord16 dest_no;         // number of destination generation
     StgWord16 node;            // which memory node does this block live on?
@@ -133,9 +131,9 @@ typedef struct bdescr_ {
                                // (if group head, 0 otherwise)
 
 #if SIZEOF_VOID_P == 8
-    StgWord32 _padding[5];
+    StgWord32 _padding[7];
 #else
-    StgWord32 _padding[1];
+    StgWord32 _padding[2];
 #endif
 } bdescr;
 #endif

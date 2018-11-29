@@ -881,7 +881,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads, bool c
     // nonmoving heap
 #if defined(DEBUG)
     for (StgWeak *w = *dead_weaks; w; w = w->link) {
-        ASSERT(Bdescr((StgPtr) w)->gen != oldest_gen);
+        ASSERT(Bdescr((StgPtr) w)->gen_no != oldest_gen->no);
     }
 #endif
 

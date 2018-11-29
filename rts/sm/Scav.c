@@ -469,7 +469,7 @@ scavenge_block (bdescr *bd)
   // Sanity check: See Note [Deadlock detection under the nonmoving collector].
 #if defined(DEBUG)
   if (RtsFlags.GcFlags.useNonmoving && deadlock_detect_gc) {
-      ASSERT(bd->gen == oldest_gen);
+      ASSERT(bd->gen_no == oldest_gen->no);
   }
 #endif
 

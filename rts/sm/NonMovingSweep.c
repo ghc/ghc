@@ -169,7 +169,7 @@ static bool is_closure_clean(StgClosure *p)
 {
     const StgInfoTable *info = get_itbl(p);
 
-#define CLEAN(ptr) (!HEAP_ALLOCED((StgClosure*) ptr) || Bdescr((StgPtr) ptr)->gen == oldest_gen)
+#define CLEAN(ptr) (!HEAP_ALLOCED((StgClosure*) ptr) || &generations[Bdescr((StgPtr) ptr)->gen_no] == oldest_gen)
 
     switch (info->type) {
     case MVAR_CLEAN:
@@ -288,7 +288,7 @@ void nonmovingSweepMutLists(void)
         for (bdescr *bd = old_mut_list; bd; bd = bd->link) {
             for (StgPtr p = bdescr_start(bd); p < bd->free; p++) {
                 StgClosure **q = (StgClosure**)p;
-                ASSERT(Bdescr((StgPtr) *q)->gen == oldest_gen);
+                ASSERT(Bdescr((StgPtr) *q)->gen_no == oldest_gen->no);
                 if (nonmovingIsAlive(*q) && !is_closure_clean(*q)) {
                     recordMutableCap(*q, cap, oldest_gen->no);
                 }

@@ -143,7 +143,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
 {
     ASSERT(bd != NULL);
     ASSERT(bd->link == NULL);
-    ASSERT(bd->gen == ws->gen);
+    ASSERT(bd->gen_no == ws->gen->no);
     ASSERT(bd->u.scan == bd->free);
 
     if (bd->blocks == 1 &&
@@ -246,7 +246,7 @@ todo_block_full (uint32_t size, gen_workspace *ws)
 
     ASSERT(bd != NULL);
     ASSERT(bd->link == NULL);
-    ASSERT(bd->gen == ws->gen);
+    ASSERT(bd->gen_no == ws->gen->no);
 
     // We intentionally set ws->todo_lim lower than the full size of
     // the block, so that we can push out some work to the global list

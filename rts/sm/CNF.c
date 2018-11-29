@@ -194,7 +194,7 @@ compactAllocateBlockInternal(Capability            *cap,
     // wrong and crash in Sanity)
     if (first != NULL) {
         block = Bdescr((P_)first);
-        g = block->gen;
+        g = &generations[block->gen_no];
     } else {
         g = g0;
     }
@@ -1163,7 +1163,7 @@ compactFixupPointers(StgCompactNFData *str,
     total_blocks = str->totalW / BLOCK_SIZE_W;
 
     ACQUIRE_SM_LOCK;
-    ASSERT(bd->gen == g0);
+    ASSERT(bd->gen_no == 0);
     ASSERT(g0->n_compact_blocks_in_import >= total_blocks);
     g0->n_compact_blocks_in_import -= total_blocks;
     g0->n_compact_blocks += total_blocks;
