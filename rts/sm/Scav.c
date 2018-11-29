@@ -434,7 +434,7 @@ scavenge_block (bdescr *bd)
   saved_eager_promotion = gct->eager_promotion;
   gct->failed_to_evac = false;
 
-  ws = &gct->gens[bd->gen->no];
+  ws = &gct->gens[bd->gen_no];
 
   p = bd->u.scan;
 

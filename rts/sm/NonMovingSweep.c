@@ -166,7 +166,7 @@ static bool is_closure_clean(StgClosure *p)
 {
     const StgInfoTable *info = get_itbl(p);
 
-#define CLEAN(ptr) (!HEAP_ALLOCED((StgClosure*) ptr) || Bdescr((StgPtr) ptr)->gen == oldest_gen)
+#define CLEAN(ptr) (!HEAP_ALLOCED((StgClosure*) ptr) || &generations[Bdescr((StgPtr) ptr)->gen_no] == oldest_gen)
 
     switch (info->type) {
     case MVAR_CLEAN:
