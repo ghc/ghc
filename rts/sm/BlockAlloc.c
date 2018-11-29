@@ -56,7 +56,6 @@ static void  initMBlock(void *mblock, uint32_t node);
    The following fields are not used by the allocator:
      bd->flags
      bd->gen_no
-     bd->gen
      bd->dest
 
   Exceptions: we don't maintain invariants for all the blocks within a
@@ -792,7 +791,6 @@ freeGroup(bdescr *p)
   node = p->node;
 
   p->free = (void *)-1;  /* indicates that this block is free */
-  p->gen = NULL;
   p->gen_no = 0;
   /* fill the block group with garbage if sanity checking is on */
   IF_DEBUG(zero_on_gc, memset(bdescr_start(p), 0xaa, (W_)p->blocks * BLOCK_SIZE));
