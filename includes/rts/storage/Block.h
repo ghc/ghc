@@ -86,8 +86,6 @@
 #if !defined(CMINUSMINUS)
 typedef struct bdescr_ {
 
-    StgPtr start;              // [READ ONLY] start addr of memory
-
     union {
         StgPtr free;               // First free byte of memory.
                                    // allocGroup() sets this to the value of start.
@@ -126,9 +124,9 @@ typedef struct bdescr_ {
                                // (if group head, 0 otherwise)
 
 #if SIZEOF_VOID_P == 8
-    StgWord32 _padding[3];
+    StgWord32 _padding[5];
 #else
-    StgWord32 _padding[0];
+    StgWord32 _padding[1];
 #endif
 } bdescr;
 #endif
@@ -179,6 +177,10 @@ typedef struct bdescr_ {
     ((((p) &  MBLOCK_MASK & ~BLOCK_MASK) >> (BLOCK_SHIFT-BDESCR_SHIFT)) \
      | ((p) & ~MBLOCK_MASK))
 
+#define bdescr_start(bd) \
+    ((((bd) & MBLOCK_MASK) << (BLOCK_SHIFT-BDESCR_SHIFT)) \
+     | ((bd) & ~MBLOCK_MASK))
+
 #else
 
 EXTERN_INLINE bdescr *Bdescr(StgPtr p);
@@ -190,10 +192,13 @@ EXTERN_INLINE bdescr *Bdescr(StgPtr p)
      );
 }
 
-EXTERN_INLINE StgPtr bdescr_start(bdescr* bd);
-EXTERN_INLINE StgPtr bdescr_start(bdescr* bd)
+EXTERN_INLINE StgPtr bdescr_start(bdescr *bd);
+EXTERN_INLINE StgPtr bdescr_start(bdescr *bd)
 {
-    return bd->start;
+    return (StgPtr)
+        ((((W_)bd & MBLOCK_MASK) << (BLOCK_SHIFT-BDESCR_SHIFT))
+        | ((W_)bd & ~MBLOCK_MASK)
+        );
 }
 
 #endif
