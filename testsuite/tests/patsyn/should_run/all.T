@@ -11,7 +11,7 @@ test('T9783', normal, compile_and_run, [''])
 test('match-unboxed', normal, compile_and_run, [''])
 test('unboxed-wrapper', normal, compile_and_run, [''])
 test('records-run', normal, compile_and_run, [''])
-test('ghci', just_ghci, ghci_script, ['ghci.script'])
+test('ghci', [just_ghci, expect_broken(238)], ghci_script, ['ghci.script'])
 test('T11985', just_ghci, ghci_script, ['T11985.script'])
 test('T11224', normal, compile_and_run, [''])
 # we omit profasm/profthreaded because it doesn't bring much to the table but
