@@ -7,7 +7,6 @@
            , TypeSynonymInstances
            , FlexibleInstances
   #-}
-{-# OPTIONS_GHC -O0 #-}
 
 -- |
 -- The event manager supports event notification on fds. Each fd may
