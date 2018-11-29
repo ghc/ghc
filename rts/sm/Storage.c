@@ -646,7 +646,6 @@ resetNurseries (void)
     for (n = 0; n < n_nurseries; n++) {
         for (bd = nurseries[n].blocks; bd; bd = bd->link) {
             ASSERT(bd->gen_no == 0);
-            ASSERT(bd->gen == g0);
             ASSERT(bd->node == capNoToNumaNode(n));
             IF_DEBUG(sanity, memset(bdescr_start(bd), 0xaa, BLOCK_SIZE));
         }

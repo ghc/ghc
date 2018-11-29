@@ -242,7 +242,6 @@ extern bool keepCAFs;
 
 INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
 {
-    bd->gen     = gen;
     bd->gen_no  = gen->no;
     bd->dest_no = dest->no;
 }

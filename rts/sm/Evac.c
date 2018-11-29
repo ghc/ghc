@@ -260,8 +260,8 @@ evacuate_large(StgPtr p)
   gen_workspace *ws;
 
   bd = Bdescr(p);
-  gen = bd->gen;
   gen_no = bd->gen_no;
+  gen = &generations[gen_no];
   ACQUIRE_SPIN_LOCK(&gen->sync);
 
   // already evacuated?
@@ -389,8 +389,8 @@ evacuate_compact (StgPtr p)
         return;
     }
 
-    gen = bd->gen;
     gen_no = bd->gen_no;
+    gen = &generations[gen_no];
     ACQUIRE_SPIN_LOCK(&gen->sync);
 
     // already evacuated?
