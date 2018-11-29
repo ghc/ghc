@@ -978,7 +978,7 @@ static void
 heapCensusCompactList(Census *census, bdescr *bd)
 {
     for (; bd != NULL; bd = bd->link) {
-        StgCompactNFDataBlock *block = (StgCompactNFDataBlock*)bd->start;
+        StgCompactNFDataBlock *block = (StgCompactNFDataBlock*)bdescr_start(bd);
         StgCompactNFData *str = block->owner;
         heapProfObject(census, (StgClosure*)str,
                        compact_nfdata_full_sizeW(str), true);
@@ -1009,7 +1009,7 @@ heapCensusChain( Census *census, bdescr *bd )
             continue;
         }
 
-        p = bd->start;
+        p = bdescr_start(bd);
 
         // When we shrink a large ARR_WORDS, we do not adjust the free pointer
         // of the associated block descriptor, thus introducing slop at the end
