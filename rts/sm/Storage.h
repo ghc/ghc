@@ -85,11 +85,11 @@ bool doYouWantToGC(Capability *cap)
 // allocated in cap->total_allocated.
 //
 INLINE_HEADER void finishedNurseryBlock (Capability *cap, bdescr *bd) {
-    cap->total_allocated += bd->free - bd->start;
+    cap->total_allocated += bd->free - bdescr_start(bd);
 }
 
 INLINE_HEADER void newNurseryBlock (bdescr *bd) {
-    bd->free = bd->start;
+    bd->free = bdescr_start(bd);
 }
 
 void    updateNurseriesStats (void);

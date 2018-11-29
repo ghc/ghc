@@ -175,6 +175,12 @@ EXTERN_INLINE bdescr *Bdescr(StgPtr p)
      );
 }
 
+EXTERN_INLINE StgPtr bdescr_start(bdescr* bd);
+EXTERN_INLINE StgPtr bdescr_start(bdescr* bd)
+{
+    return bd->start;
+}
+
 #endif
 
 /* Useful Macros ------------------------------------------------------------ */

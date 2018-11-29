@@ -449,7 +449,7 @@ void checkHeapChain (bdescr *bd)
 
     for (; bd != NULL; bd = bd->link) {
         if(!(bd->flags & BF_SWEPT)) {
-            p = bd->start;
+            p = bdescr_start(bd);
             while (p < bd->free) {
                 uint32_t size = checkClosure((StgClosure *)p);
                 /* This is the smallest size of closure that can live in the heap */
@@ -483,7 +483,7 @@ checkLargeObjects(bdescr *bd)
 {
   while (bd != NULL) {
     if (!(bd->flags & BF_PINNED)) {
-      checkClosure((StgClosure *)bd->start);
+      checkClosure((StgClosure *)bdescr_start(bd));
     }
     bd = bd->link;
   }
@@ -503,7 +503,7 @@ checkCompactObjects(bdescr *bd)
 
         ASSERT(bd->flags & BF_COMPACT);
 
-        block = (StgCompactNFDataBlock*)bd->start;
+        block = (StgCompactNFDataBlock*)bdescr_start(bd);
         str = block->owner;
         ASSERT((W_)str == (W_)block + sizeof(StgCompactNFDataBlock));
 
@@ -629,7 +629,7 @@ checkMutableList( bdescr *mut_bd, uint32_t gen )
     StgClosure *p;
 
     for (bd = mut_bd; bd != NULL; bd = bd->link) {
-        for (q = bd->start; q < bd->free; q++) {
+        for (q = bdescr_start(bd); q < bd->free; q++) {
             p = (StgClosure *)*q;
             ASSERT(!HEAP_ALLOCED(p) || Bdescr((P_)p)->gen_no == gen);
             checkClosure(p);
@@ -790,7 +790,7 @@ static void
 markCompactBlocks(bdescr *bd)
 {
     for (; bd != NULL; bd = bd->link) {
-        compactMarkKnown(((StgCompactNFDataBlock*)bd->start)->owner);
+        compactMarkKnown(((StgCompactNFDataBlock*)bdescr_start(bd))->owner);
     }
 }
 
@@ -873,10 +873,10 @@ void findSlop(bdescr *bd)
     W_ slop;
 
     for (; bd != NULL; bd = bd->link) {
-        slop = (bd->blocks * BLOCK_SIZE_W) - (bd->free - bd->start);
+        slop = (bd->blocks * BLOCK_SIZE_W) - (bd->free - bdescr_start(bd));
         if (slop > (1024/sizeof(W_))) {
             debugBelch("block at %p (bdescr %p) has %" FMT_Word "KB slop\n",
-                       bd->start, bd, slop / (1024/(W_)sizeof(W_)));
+                       bdescr_start(bd), bd, slop / (1024/(W_)sizeof(W_)));
         }
     }
 }

@@ -162,8 +162,8 @@ typedef struct {
     object (or byte) in the whole stack. Thus, it is only when the whole stack
     is empty that stackTop == stackLimit (not during the execution of push()
     and pop()).
-    stackBottom == currentStack->start.
-    stackLimit == currentStack->start + BLOCK_SIZE_W * currentStack->blocks.
+    stackBottom == bdescr_start(currentStack).
+    stackLimit == bdescr_start(currentStack) + BLOCK_SIZE_W * currentStack->blocks.
   Note:
     When a current stack becomes empty, stackTop is set to point to
     the topmost element on the previous block group so as to satisfy
@@ -209,8 +209,8 @@ static INLINE void
 newStackBlock( bdescr *bd )
 {
     currentStack = bd;
-    stackTop     = (stackElement *)(bd->start + BLOCK_SIZE_W * bd->blocks);
-    stackBottom  = (stackElement *)bd->start;
+    stackTop     = (stackElement *)(bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
+    stackBottom  = (stackElement *)bdescr_start(bd);
     stackLimit   = (stackElement *)stackTop;
     bd->free     = (StgPtr)stackLimit;
 }
@@ -225,8 +225,8 @@ returnToOldStack( bdescr *bd )
 {
     currentStack = bd;
     stackTop = (stackElement *)bd->free;
-    stackBottom = (stackElement *)bd->start;
-    stackLimit = (stackElement *)(bd->start + BLOCK_SIZE_W * bd->blocks);
+    stackBottom = (stackElement *)bdescr_start(bd);
+    stackLimit = (stackElement *)(bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
     bd->free = (StgPtr)stackLimit;
 }
 
@@ -637,7 +637,7 @@ popOffReal(void)
 #endif
 
     ASSERT(stackTop + 1 == stackLimit);
-    ASSERT(stackBottom == (stackElement *)currentStack->start);
+    ASSERT(stackBottom == (stackElement *)bdescr_start(currentStack));
 
     if (firstStack == currentStack) {
         // The stack is completely empty.
@@ -1709,7 +1709,7 @@ computeRetainerSet( void )
         // visited during retainer profiling.
         for (n = 0; n < n_capabilities; n++) {
           for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
-            for (ml = bd->start; ml < bd->free; ml++) {
+            for (ml = bdescr_start(bd); ml < bd->free; ml++) {
 
                 maybeInitRetainerSet((StgClosure *)*ml);
 
@@ -2001,7 +2001,7 @@ heapCheck( bdescr *bd )
 
     costSum = 0;
     while (bd != NULL) {
-        p = bd->start;
+        p = bdescr_start(bd);
         while (p < bd->free) {
             size = sanityCheckHeapClosure((StgClosure *)p);
             sumOfCostLinear += size;
@@ -2010,7 +2010,7 @@ heapCheck( bdescr *bd )
             // no need for slop check; I think slops are not used currently.
         }
         ASSERT(p == bd->free);
-        costSum += bd->free - bd->start;
+        costSum += bd->free - bdescr_start(bd);
         bd = bd->link;
     }
 
@@ -2031,7 +2031,7 @@ smallObjectPoolCheck(void)
     if (bd == NULL)
         return costSum;
 
-    p = bd->start;
+    p = bdescr_start(bd);
     while (p < alloc_Hp) {
         size = sanityCheckHeapClosure((StgClosure *)p);
         sumOfCostLinear += size;
@@ -2039,11 +2039,11 @@ smallObjectPoolCheck(void)
         p += size;
     }
     ASSERT(p == alloc_Hp);
-    costSum += alloc_Hp - bd->start;
+    costSum += alloc_Hp - bdescr_start(bd);
 
     bd = bd->link;
     while (bd != NULL) {
-        p = bd->start;
+        p = bdescr_start(bd);
         while (p < bd->free) {
             size = sanityCheckHeapClosure((StgClosure *)p);
             sumOfCostLinear += size;
@@ -2051,7 +2051,7 @@ smallObjectPoolCheck(void)
             p += size;
         }
         ASSERT(p == bd->free);
-        costSum += bd->free - bd->start;
+        costSum += bd->free - bdescr_start(bd);
         bd = bd->link;
     }
 
@@ -2065,12 +2065,12 @@ chainCheck(bdescr *bd)
 
     costSum = 0;
     while (bd != NULL) {
-        // bd->free - bd->start is not an accurate measurement of the
+        // bd->free - bdescr_start(bd) is not an accurate measurement of the
         // object size.  Actually it is always zero, so we compute its
         // size explicitly.
-        size = sanityCheckHeapClosure((StgClosure *)bd->start);
+        size = sanityCheckHeapClosure((StgClosure *)bdescr_start(bd));
         sumOfCostLinear += size;
-        costArrayLinear[get_itbl((StgClosure *)bd->start)->type] += size;
+        costArrayLinear[get_itbl((StgClosure *)bdescr_start(bd))->type] += size;
         costSum += size;
         bd = bd->link;
     }
@@ -2129,7 +2129,7 @@ findPointer(StgPtr p)
             // if (g == 0 && s == 0) continue;
             bd = generations[g].steps[s].blocks;
             for (; bd; bd = bd->link) {
-                for (q = bd->start; q < bd->free; q++) {
+                for (q = bdescr_start(bd); q < bd->free; q++) {
                     if (*q == (StgWord)p) {
                         r = q;
                         while (!LOOKS_LIKE_GHC_INFO(*r)) r--;
@@ -2140,8 +2140,8 @@ findPointer(StgPtr p)
             }
             bd = generations[g].steps[s].large_objects;
             for (; bd; bd = bd->link) {
-                e = bd->start + cost((StgClosure *)bd->start);
-                for (q = bd->start; q < e; q++) {
+                e = bdescr_start(bd) + cost((StgClosure *)bdescr_start(bd));
+                for (q = bdescr_start(bd); q < e; q++) {
                     if (*q == (StgWord)p) {
                         r = q;
                         while (*r == 0 || !LOOKS_LIKE_GHC_INFO(*r)) r--;
@@ -2165,15 +2165,15 @@ belongToHeap(StgPtr p)
             // if (g == 0 && s == 0) continue;
             bd = generations[g].steps[s].blocks;
             for (; bd; bd = bd->link) {
-                if (bd->start <= p && p < bd->free) {
+                if (bdescr_start(bd) <= p && p < bd->free) {
                     debugBelch("Belongs to gen[%d], step[%d]", g, s);
                     return;
                 }
             }
             bd = generations[g].steps[s].large_objects;
             for (; bd; bd = bd->link) {
-                if (bd->start <= p && p < bd->start + getHeapClosureSize((StgClosure *)bd->start)) {
-                    debugBelch("Found in gen[%d], large_objects: %p\n", g, bd->start);
+                if (bdescr_start(bd) <= p && p < bdescr_start(bd) + getHeapClosureSize((StgClosure *)bdescr_start(bd))) {
+                    debugBelch("Found in gen[%d], large_objects: %p\n", g, bdescr_start(bd));
                     return;
                 }
             }

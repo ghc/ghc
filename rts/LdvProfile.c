@@ -161,7 +161,7 @@ processHeapForDead( bdescr *bd )
     StgPtr p;
 
     while (bd != NULL) {
-        p = bd->start;
+        p = bdescr_start(bd);
         while (p < bd->free) {
             p += processHeapClosureForDead((StgClosure *)p);
             while (p < bd->free && !*p)   // skip slop
@@ -185,7 +185,7 @@ processNurseryForDead( void )
         return;
 
     for (bd = MainCapability.r.rNursery->blocks; bd != NULL; bd = bd->link) {
-        p = bd->start;
+        p = bdescr_start(bd);
         while (p < bd->free) {
             while (p < bd->free && !*p) p++; // skip slop
             if (p >= bd->free) break;
@@ -204,7 +204,7 @@ processChainForDead( bdescr *bd )
     // Any object still in the chain is dead!
     while (bd != NULL) {
         if (!(bd->flags & BF_PINNED)) {
-            processHeapClosureForDead((StgClosure *)bd->start);
+            processHeapClosureForDead((StgClosure *)bdescr_start(bd));
         }
         bd = bd->link;
     }

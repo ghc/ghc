@@ -44,8 +44,8 @@ newArena( void )
     arena = stgMallocBytes(sizeof(Arena), "newArena");
     arena->current = allocBlock_lock();
     arena->current->link = NULL;
-    arena->free = arena->current->start;
-    arena->lim  = arena->current->start + BLOCK_SIZE_W;
+    arena->free = bdescr_start(arena->current);
+    arena->lim  = bdescr_start(arena->current) + BLOCK_SIZE_W;
     arena_blocks++;
 
     return arena;
@@ -88,12 +88,12 @@ arenaAlloc( Arena *arena, size_t size )
         bd->gen     = NULL;
         bd->dest_no = 0;
         bd->flags   = 0;
-        bd->free    = bd->start;
+        bd->free    = bdescr_start(bd);
         bd->link    = arena->current;
         arena->current = bd;
         arena->free = bd->free + size_w;
         arena->lim = bd->free + bd->blocks * BLOCK_SIZE_W;
-        return bd->start;
+        return bdescr_start(bd);
     }
 }
 

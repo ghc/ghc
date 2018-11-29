@@ -408,7 +408,7 @@ recordMutableCap (const StgClosure *p, Capability *cap, uint32_t gen)
     //    ASSERT(cap->running_task == myTask());
     // NO: assertion is violated by performPendingThrowTos()
     bd = cap->mut_lists[gen];
-    if (bd->free >= bd->start + BLOCK_SIZE_W) {
+    if (bd->free >= bdescr_start(bd) + BLOCK_SIZE_W) {
         bdescr *new_bd;
         new_bd = allocBlockOnNode_lock(cap->node);
         new_bd->link = bd;
