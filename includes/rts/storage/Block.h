@@ -86,6 +86,20 @@
 #if !defined(CMINUSMINUS)
 typedef struct bdescr_ {
 
+    struct bdescr_ *link;      // used for chaining blocks together
+
+    union {
+        struct bdescr_ *back;  // used (occasionally) for doubly-linked lists
+        StgWord *bitmap;       // bitmap for marking GC
+        StgPtr  scan;          // scan pointer for copying GC
+    } u;
+
+    StgWord16 gen_no;          // gen->no, cached
+    StgWord16 dest_no;         // number of destination generation
+    StgWord16 node;            // which memory node does this block live on?
+
+    StgWord16 flags;           // block flags, see below
+
     union {
         StgWord32 free_off;    // Offset to the first free byte of memory.
                                // allocGroup() sets this to the value of start.
@@ -101,35 +115,21 @@ typedef struct bdescr_ {
         } nonmoving_segment;
     };
 
-    struct bdescr_ *link;      // used for chaining blocks together
-
-    union {
-        struct bdescr_ *back;  // used (occasionally) for doubly-linked lists
-        StgWord *bitmap;       // bitmap for marking GC
-        StgPtr  scan;          // scan pointer for copying GC
-    } u;
-
-    StgWord16 gen_no;          // gen->no, cached
-    StgWord16 dest_no;         // number of destination generation
-    StgWord16 node;            // which memory node does this block live on?
-
-    StgWord16 flags;           // block flags, see below
-
     StgWord32 blocks;          // [READ ONLY] no. of blocks in a group
                                // (if group head, 0 otherwise)
 
 #if SIZEOF_VOID_P == 8
-    StgWord32 _padding[7];
+    StgWord32 _padding[0];
 #else
-    StgWord32 _padding[2];
+    StgWord32 _padding[1];
 #endif
 } bdescr;
 #endif
 
 #if SIZEOF_VOID_P == 8
-#define BDESCR_SIZE  0x40
-#define BDESCR_MASK  0x3f
-#define BDESCR_SHIFT 6
+#define BDESCR_SIZE  0x20
+#define BDESCR_MASK  0x1f
+#define BDESCR_SHIFT 5
 #else
 #define BDESCR_SIZE  0x20
 #define BDESCR_MASK  0x1f
