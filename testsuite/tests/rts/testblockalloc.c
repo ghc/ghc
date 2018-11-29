@@ -26,14 +26,14 @@ static void test_random_alloc(void)
         {
             if (i > 0)
             {
-                IF_DEBUG(block_alloc, debugBelch("A%d: freeing %p, %d blocks @ %p\n", j, a[j], a[j]->blocks, a[j]->start));
+                IF_DEBUG(block_alloc, debugBelch("A%d: freeing %p, %d blocks @ %p\n", j, a[j], a[j]->blocks, bdescr_start(a[j])));
                 freeGroup_lock(a[j]);
                 DEBUG_ONLY(checkFreeListSanity());
             }
 
             int b = (rand() % MAXALLOC) + 1;
             a[j] = allocGroup_lock(b);
-            IF_DEBUG(block_alloc, debugBelch("A%d: allocated %p, %d blocks @ %p\n", j, a[j], b, a[j]->start));
+            IF_DEBUG(block_alloc, debugBelch("A%d: allocated %p, %d blocks @ %p\n", j, a[j], b, bdescr_start(a[j])));
             // allocating zero blocks isn't allowed
             DEBUG_ONLY(checkFreeListSanity());
         }
@@ -57,12 +57,12 @@ static void test_sequential_alloc(void)
         {
             int b = (rand() % MAXALLOC) + 1;
             a[j] = allocGroup_lock(b);
-            IF_DEBUG(block_alloc, debugBelch("B%d,%d: allocated %p, %d blocks @ %p\n", i, j, a[j], b, a[j]->start));
+            IF_DEBUG(block_alloc, debugBelch("B%d,%d: allocated %p, %d blocks @ %p\n", i, j, a[j], b, bdescr_start(a[j])));
             DEBUG_ONLY(checkFreeListSanity());
         }
         for (int j=ARRSIZE-1; j >= 0; j--)
         {
-            IF_DEBUG(block_alloc, debugBelch("B%d,%d: freeing %p, %d blocks @ %p\n", i, j, a[j], a[j]->blocks, a[j]->start));
+            IF_DEBUG(block_alloc, debugBelch("B%d,%d: freeing %p, %d blocks @ %p\n", i, j, a[j], a[j]->blocks, bdescr_start(a[j])));
             freeGroup_lock(a[j]);
             DEBUG_ONLY(checkFreeListSanity());
         }
@@ -84,16 +84,16 @@ static void test_aligned_alloc(void)
             int b = rand() % (BLOCKS_PER_MBLOCK / 2);
             if (b == 0) { b = 1; }
             a[j] = allocAlignedGroupOnNode(0, b);
-            if ((((W_)(a[j]->start)) % (b*BLOCK_SIZE)) != 0)
+            if ((((W_)(bdescr_start(a[j]))) % (b*BLOCK_SIZE)) != 0)
             {
                 barf("%p is not aligned to allocation size %d", a[j], b);
             }
-            IF_DEBUG(block_alloc, debugBelch("B%d,%d: allocated %p, %d blocks @ %p\n", i, j, a[j], b, a[j]->start));
+            IF_DEBUG(block_alloc, debugBelch("B%d,%d: allocated %p, %d blocks @ %p\n", i, j, a[j], b, bdescr_start(a[j])));
             DEBUG_ONLY(checkFreeListSanity());
         }
         for (int j=ARRSIZE-1; j >= 0; j--)
         {
-            IF_DEBUG(block_alloc, debugBelch("B%d,%d: freeing %p, %d blocks @ %p\n", i, j, a[j], a[j]->blocks, a[j]->start));
+            IF_DEBUG(block_alloc, debugBelch("B%d,%d: freeing %p, %d blocks @ %p\n", i, j, a[j], a[j]->blocks, bdescr_start(a[j])));
             freeGroup_lock(a[j]);
             DEBUG_ONLY(checkFreeListSanity());
         }
