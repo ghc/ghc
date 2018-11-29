@@ -600,8 +600,6 @@ mkDataConRepX :: Monad m =>
              -> DataCon
              -> m DataConRep
 mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
--- See Note [All data constructors have wrappers]
--- TODO: arnaud: ^ update this
  | not wrapper_reqd
  = return NoDataConRep
 
@@ -816,7 +814,7 @@ being called, but the inliner should make swift work of that.
 Note [Wrapper multiplicities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When we made the wrapper for a data type of different multiplicity fields,
+When we make the wrapper for a data type with fields of different multiplicities,
 we only want to make the ones which are linear multiplicity polymorphic. If we
 do not do this then the wrapper will not be well-typed.
 
@@ -826,11 +824,9 @@ variable. This works because..
 1 * p = p
 ω * p = ω
 
-So the arguments end up with the right multiplicity all very elegantly.
+This is only temporary as this strategy is already incorrect with multiplicity
+polymorphic fields.
 -}
-
--- TODO: arnaud: we've changed what data constructors have wrappers. So we will
--- need to update the notes in this file.
 
 -------------------------
 newLocal :: Scaled Type -> UniqSM Var

@@ -575,7 +575,7 @@ tcNormalise given_ids ty
     mk_wanted_ct = do
       let occ = mkVarOcc "$tcNorm"
       name <- newSysName occ
-      let ev = mkLocalId name (Regular Omega) ty -- TODO Krzysztof check
+      let ev = mkLocalId name (Regular Omega) ty -- evidences are always unrestricted
           hole = ExprHole $ OutOfScope occ emptyGlobalRdrEnv
       newHoleCt hole ev ty
 

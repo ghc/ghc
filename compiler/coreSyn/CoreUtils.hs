@@ -1960,7 +1960,6 @@ dataConInstPat fss uniqs mult con inst_tys
 
       -- Make value vars, instantiating types
     arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
-      -- Ignore the multiplicities above, as there are Core ignores linearity at the moment.
     mk_id_var uniq fs (Scaled m ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
         mkLocalIdOrCoVar name (Regular $ mult * m) (Type.substTy full_subst ty)

@@ -855,7 +855,8 @@ mkTyCoForAllTy tv vis ty
   | isCoVar tv
   , not (tv `elemVarSet` tyCoVarsOfType ty)
   = ASSERT( vis == Inferred )
-    mkFunTyOm (varType tv) ty  -- TODO Krzysztof should this be Om?
+    mkFunTyOm (varType tv) ty
+     -- Note: coercion variables are always unrestricted
   | otherwise
   = ForAllTy (Bndr tv vis) ty
 

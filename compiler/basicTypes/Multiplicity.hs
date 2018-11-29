@@ -1,5 +1,3 @@
--- TODO: arnaud: copyright notice
-
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# OPTIONS -Wno-missing-methods #-}

@@ -1048,7 +1048,7 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
                --   lambda \co:ty. e co. In this case we generate a new variable
                --   of the coercion type, update the scope, and reduce n by 1.
                | isTyVar tcv = ((subst', tcv'), n)
-               | otherwise  = (freshEtaId n subst' (unrestricted $ varType tcv'), n-1) -- TODO Krzysztof unrestricted?
+               | otherwise  = (freshEtaId n subst' (Scaled (varWeight tcv') (varType tcv')), n-1)
            -- Avoid free vars of the original expression
          in go n_n n_subst ty' (EtaVar n_tcv : eis)
 

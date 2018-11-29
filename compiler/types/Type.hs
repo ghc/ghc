@@ -1358,7 +1358,8 @@ mkTyCoInvForAllTy :: TyCoVar -> Type -> Type
 mkTyCoInvForAllTy tv ty
   | isCoVar tv
   , not (tv `elemVarSet` tyCoVarsOfType ty)
-  = mkFunTyOm (varType tv) ty -- TODO Krzysztof is this correct?
+  = mkFunTyOm (varType tv) ty
+    -- Coercion variables are always unrestricted
   | otherwise
   = ForAllTy (Bndr tv Inferred) ty
 
