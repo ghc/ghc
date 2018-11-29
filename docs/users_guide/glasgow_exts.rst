@@ -7577,9 +7577,9 @@ the left hand side can be explicitly bound. For example: ::
   
     data instance forall a (b :: Proxy a). F (Proxy b) = FProxy Bool
 
-When an explicit ``forall`` is present, all *type* variables mentioned must
-be bound by the ``forall``. Kind variables will be implicitly bound if
-necessary, for example: ::
+When an explicit ``forall`` is present, all *type* variables mentioned which
+are not already in scope must be bound by the ``forall``. Kind variables will
+be implicitly bound if necessary, for example: ::
   
     data instance forall (a :: k). F a = FOtherwise
 
