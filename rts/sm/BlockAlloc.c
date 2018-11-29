@@ -40,7 +40,7 @@ static void  initMBlock(void *mblock, uint32_t node);
 
    Invariants on block descriptors
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   bd->start always points to the start of the block.
+   bdescr_start(bd) always points to the start of the block.
 
    bd->free is either:
       - zero for a non-group-head; bd->link points to the head
@@ -110,7 +110,7 @@ static void  initMBlock(void *mblock, uint32_t node);
   into blocks or allocate them directly (when very large contiguous regions
   of memory).  mblocks have a different set of invariants than blocks:
 
-  bd->start points to the start of the block IF the block is in the first mblock
+  bdescr_start(bd) points to the start of the block IF the block is in the first mblock
   bd->blocks and bd->link are only valid IF this block is the first block
     of the first mblock
   No other fields are used (in particular, free is not used, meaning that
@@ -219,7 +219,7 @@ tail_of (bdescr *bd)
 STATIC_INLINE void
 initGroup(bdescr *head)
 {
-  head->free   = head->start;
+  head->free   = bdescr_start(head);
   head->link   = NULL;
 
   // If this is a block group (but not a megablock group), we
@@ -333,7 +333,7 @@ split_block_high (bdescr *bd, W_ n)
 
     bdescr* ret = bd + bd->blocks - n; // take n blocks off the end
     ret->blocks = n;
-    ret->start = ret->free = bd->start + (bd->blocks - n)*BLOCK_SIZE_W;
+    ret->start = ret->free = bdescr_start(bd) + (bd->blocks - n)*BLOCK_SIZE_W;
     ret->link = NULL;
 
     bd->blocks -= n;
@@ -354,7 +354,7 @@ split_block_low (bdescr *bd, W_ n)
 
     bdescr* bd_ = bd + n;
     bd_->blocks = bd->blocks - n;
-    bd_->start = bd_->free = bd->start + n*BLOCK_SIZE_W;
+    bd_->start = bd_->free = bdescr_start(bd) + (bd->blocks - n)*BLOCK_SIZE_W;
 
     bd->blocks = n;
 
@@ -496,7 +496,7 @@ allocGroupOnNode (uint32_t node, W_ n)
     }
 
 finish:
-    IF_DEBUG(zero_on_gc, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
+    IF_DEBUG(zero_on_gc, memset(bdescr_start(bd), 0xaa, bd->blocks * BLOCK_SIZE));
     IF_DEBUG(sanity, checkFreeListSanity());
     return bd;
 }
@@ -548,8 +548,8 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
 
     // slop on the low side
     W_ slop_low = 0;
-    if ((uintptr_t)bd->start % group_size != 0) {
-        slop_low = group_size - ((uintptr_t)bd->start % group_size);
+    if ((uintptr_t)bdescr_start(bd) % group_size != 0) {
+        slop_low = group_size - ((uintptr_t)bdescr_start(bd) % group_size);
     }
 
     W_ slop_high = (num_blocks * BLOCK_SIZE) - group_size - slop_low;
@@ -578,7 +578,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
 #endif
 
     // At this point the bd should be aligned, but we may have slop on the high side
-    ASSERT((uintptr_t)bd->start % group_size == 0);
+    ASSERT((uintptr_t)bdescr_start(bd) % group_size == 0);
 
 #if defined(DEBUG)
     free_before = countFreeList();
@@ -595,10 +595,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
 #endif
 
     // Should still be aligned
-    ASSERT((uintptr_t)bd->start % group_size == 0);
-
-    // Just to make sure I get this right
-    ASSERT(Bdescr(bd->start) == bd);
+    ASSERT((uintptr_t)bdescr_start(bd) % group_size == 0);
 
     return bd;
 }
@@ -673,7 +670,7 @@ bdescr* allocLargeChunkOnNode (uint32_t node, W_ min, W_ max)
 
     recordAllocatedBlocks(node, bd->blocks);
 
-    IF_DEBUG(zero_on_gc, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
+    IF_DEBUG(zero_on_gc, memset(bdescr_start(bd), 0xaa, bd->blocks * BLOCK_SIZE));
     IF_DEBUG(sanity, checkFreeListSanity());
     return bd;
 }
@@ -757,7 +754,7 @@ free_mega_group (bdescr *mg)
     prev = NULL;
     node = mg->node;
     bd = free_mblock_list[node];
-    while (bd && bd->start < mg->start) {
+    while (bd && bdescr_start(bd) < bdescr_start(mg)) {
         prev = bd;
         bd = bd->link;
     }
@@ -798,7 +795,7 @@ freeGroup(bdescr *p)
   p->gen = NULL;
   p->gen_no = 0;
   /* fill the block group with garbage if sanity checking is on */
-  IF_DEBUG(zero_on_gc, memset(p->start, 0xaa, (W_)p->blocks * BLOCK_SIZE));
+  IF_DEBUG(zero_on_gc, memset(bdescr_start(p), 0xaa, (W_)p->blocks * BLOCK_SIZE));
 
   if (p->blocks == 0) barf("freeGroup: block size is zero");
 
@@ -959,14 +956,14 @@ void returnMemoryToOS(uint32_t n /* megablocks */)
             size = BLOCKS_TO_MBLOCKS(bd->blocks);
             if (size > n) {
                 StgWord newSize = size - n;
-                char *freeAddr = MBLOCK_ROUND_DOWN(bd->start);
+                char *freeAddr = MBLOCK_ROUND_DOWN(bdescr_start(bd));
                 freeAddr += newSize * MBLOCK_SIZE;
                 bd->blocks = MBLOCK_GROUP_BLOCKS(newSize);
                 freeMBlocks(freeAddr, n);
                 n = 0;
             }
             else {
-                char *freeAddr = MBLOCK_ROUND_DOWN(bd->start);
+                char *freeAddr = MBLOCK_ROUND_DOWN(bdescr_start(bd));
                 n -= size;
                 bd = bd->link;
                 freeMBlocks(freeAddr, size);
@@ -1028,7 +1025,7 @@ checkFreeListSanity(void)
             {
                 IF_DEBUG(block_alloc,
                          debugBelch("group at %p, length %ld blocks\n",
-                                    bd->start, (long)bd->blocks));
+                                    bdescr_start(bd), (long)bd->blocks));
                 ASSERT(bd->free == (P_)-1);
                 ASSERT(bd->blocks > 0 && bd->blocks < BLOCKS_PER_MBLOCK);
                 ASSERT(bd->blocks >= min && bd->blocks <= (min*2 - 1));
@@ -1059,14 +1056,14 @@ checkFreeListSanity(void)
         {
             IF_DEBUG(block_alloc,
                      debugBelch("mega group at %p, length %ld blocks\n",
-                                bd->start, (long)bd->blocks));
+                                bdescr_start(bd), (long)bd->blocks));
 
             ASSERT(bd->link != bd); // catch easy loops
 
             if (bd->link != NULL)
             {
                 // make sure the list is sorted
-                ASSERT(bd->start < bd->link->start);
+                ASSERT(bdescr_start(bd) < bdescr_start(bd->link));
             }
 
             ASSERT(bd->blocks >= BLOCKS_PER_MBLOCK);

@@ -44,8 +44,8 @@ newArena( void )
     arena = stgMallocBytes(sizeof(Arena), "newArena");
     arena->current = allocBlock_lock();
     arena->current->link = NULL;
-    arena->free = arena->current->start;
-    arena->lim  = arena->current->start + BLOCK_SIZE_W;
+    arena->free = bdescr_start(arena->current);
+    arena->lim  = bdescr_start(arena->current) + BLOCK_SIZE_W;
     arena_blocks++;
 
     return arena;
@@ -88,12 +88,12 @@ arenaAlloc( Arena *arena, size_t size )
         bd->gen     = NULL;
         bd->dest_no = 0;
         bd->flags   = 0;
-        bd->free    = bd->start;
+        bd->free    = bdescr_start(bd);
         bd->link    = arena->current;
         arena->current = bd;
         arena->free = bd->free + size_w;
         arena->lim = bd->free + bd->blocks * BLOCK_SIZE_W;
-        return bd->start;
+        return bdescr_start(bd);
     }
 }
 
@@ -123,7 +123,7 @@ void checkPtrInArena( StgPtr p, Arena *arena )
 {
     // We don't update free pointers of arena blocks, so we have to check cached
     // free pointer for the first block.
-    if (p >= arena->current->start && p < arena->free) {
+    if (p >= bdescr_start(arena->current) && p < arena->free) {
         return;
     }
 
@@ -131,7 +131,8 @@ void checkPtrInArena( StgPtr p, Arena *arena )
     // slop at the end). Again, free pointers are not updated so we can't use
     // those.
     for (bdescr *bd = arena->current->link; bd; bd = bd->link) {
-        if (p >= bd->start && p < bd->start + (bd->blocks*BLOCK_SIZE_W)) {
+        StgPtr start = bdescr_start(bd);
+        if (p >= start && p < start + (bd->blocks*BLOCK_SIZE_W)) {
             return;
         }
     }
