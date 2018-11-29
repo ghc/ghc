@@ -23,10 +23,20 @@
 # If you don't want to wait for `:load Main`, since you want to load some other
 # module, then you can use `Ctrl+C` to cancel the initial load.
 
+# Look in two common locations for a GHC installation (the results of using
+# the make- and Hadrian-based build systems, respectively).
+if [ -d ./inplace/lib ]; then
+  GHC_BIN=./inplace/bin/ghc-stage2
+  _GHC_TOP_DIR=./inplace/lib
+elif [ -d ./_build/stage1/lib ]; then
+  GHC_BIN=./_build/stage1/bin/ghc
+  _GHC_TOP_DIR=./_build/stage1/lib
+else
+  echo "Could not find GHC installation"
+  exit 1
+fi
 
-export _GHC_TOP_DIR=./inplace/lib
-
-exec ./inplace/bin/ghc-stage2 \
+exec ${GHC_BIN} \
     --interactive \
     -ghci-script ./utils/ghc-in-ghci/settings.ghci \
     -ghci-script ./utils/ghc-in-ghci/load-main.ghci \
