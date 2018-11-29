@@ -190,6 +190,12 @@ EXTERN_INLINE bdescr *Bdescr(StgPtr p)
      );
 }
 
+EXTERN_INLINE StgPtr bdescr_start(const bdescr *bd);
+EXTERN_INLINE StgPtr bdescr_start(const bdescr *bd)
+{
+    return bd->start;
+}
+
 #endif
 
 /* Useful Macros ------------------------------------------------------------ */
@@ -308,7 +314,7 @@ bdescr *allocGroupOnNode(uint32_t node, W_ n);
 // Allocate n blocks, aligned at n-block boundary. The returned bdescr will
 // have this invariant
 //
-//     bdescr->start % BLOCK_SIZE*n == 0
+//     bdescr_start(bdescr) % BLOCK_SIZE*n == 0
 //
 bdescr *allocAlignedGroupOnNode(uint32_t node, W_ n);
 
