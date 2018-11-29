@@ -44,6 +44,7 @@ import Outputable
 import UniqSupply
 import BasicTypes
 
+import Data.Bits (complement)
 import Control.Monad
 
 -----------------------------------------------------------------------------
@@ -436,12 +437,15 @@ openNursery df tso = do
   -- stg_returnToStackTop in rts/StgStartup.cmm.
   pure $ catAGraphs [
      mkAssign cnreg currentNurseryExpr,
+
+     -- free = CurrentNursery->free
      mkAssign bdfreereg  (CmmLoad (nursery_bdescr_free df cnreg)  (bWord df)),
 
      -- Hp = CurrentNursery->free - 1;
      mkAssign hpReg (cmmOffsetW df (CmmReg bdfreereg) (-1)),
 
-     mkAssign bdstartreg (CmmLoad (nursery_bdescr_start df cnreg) (bWord df)),
+     -- start = bdescr_start(CurrentNursery)
+     mkAssign bdstartreg (nursery_bdescr_start df cnreg),
 
      -- HpLim = CurrentNursery->start +
      --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;
@@ -458,7 +462,7 @@ openNursery df tso = do
              )
          ),
 
-     -- alloc = bd->free - bd->start
+     -- alloc = bd->free - start
      let alloc =
            CmmMachOp (mo_wordSub df) [CmmReg bdfreereg, CmmReg bdstartreg]
 
@@ -477,7 +481,17 @@ nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks
 nursery_bdescr_free   dflags cn =
   cmmOffset dflags (CmmReg cn) (oFFSET_bdescr_free dflags)
 nursery_bdescr_start  dflags cn =
-  cmmOffset dflags (CmmReg cn) (oFFSET_bdescr_start dflags)
+  ((bd `mkAnd` intLit (mBLOCK_MASK dflags))
+   `mkShl` intLit (bLOCK_SHIFT dflags - bDESCR_SHIFT dflags))
+  `mkOr` (bd `mkAnd` intLit (complement $ mBLOCK_MASK dflags))
+  where
+    intLit :: Int -> CmmExpr
+    intLit = CmmLit . mkIntCLit dflags
+
+    bd = CmmReg cn
+    mkOr x y  = CmmMachOp (MO_Or (wordWidth dflags))  [x, y]
+    mkAnd x y = CmmMachOp (MO_And (wordWidth dflags)) [x, y]
+    mkShl x y = CmmMachOp (MO_Shl (wordWidth dflags)) [x, y]
 nursery_bdescr_blocks dflags cn =
   cmmOffset dflags (CmmReg cn) (oFFSET_bdescr_blocks dflags)
 

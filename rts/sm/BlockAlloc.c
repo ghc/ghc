@@ -750,20 +750,14 @@ freeChain_lock(bdescr *bd)
 static void
 initMBlock(void *mblock, uint32_t node)
 {
-    bdescr *bd;
-    StgWord8 *block;
-
     /* the first few Bdescr's in a block are unused, so we don't want to
      * put them all on the free list.
      */
-    block = FIRST_BLOCK(mblock);
-    bd    = FIRST_BDESCR(mblock);
+    bdescr *bd = FIRST_BDESCR(mblock);
 
     /* Initialise the node field of each block descriptor
      */
-    for (; block <= (StgWord8*)LAST_BLOCK(mblock); bd += 1,
-             block += BLOCK_SIZE) {
-        bd->start = (void*) block;
+    for (; bd <= LAST_BDESCR(mblock); bd += 1) {
         bd->node = node;
     }
 }

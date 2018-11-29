@@ -308,8 +308,12 @@ wanteds os = concat
           ,constantWord Both "PROF_HDR_SIZE" "sizeofW(StgProfHeader)"
 
            -- Size of a storage manager block (in bytes).
-          ,constantWord Both "BLOCK_SIZE"  "BLOCK_SIZE"
-          ,constantWord C    "MBLOCK_SIZE" "MBLOCK_SIZE"
+          ,constantWord Both    "BLOCK_SIZE"   "BLOCK_SIZE"
+          ,constantWord Haskell "BLOCK_SHIFT"  "BLOCK_SHIFT"
+          ,constantWord Haskell "BLOCK_MASK"   "BLOCK_MASK"
+          ,constantWord Both    "MBLOCK_SIZE"  "MBLOCK_SIZE"
+          ,constantWord Haskell "MBLOCK_MASK"  "MBLOCK_MASK"
+          ,constantWord Haskell "BDESCR_SHIFT" "BDESCR_SHIFT"
            -- blocks that fit in an MBlock, leaving space for the block
            -- descriptors
           ,constantWord Both "BLOCKS_PER_MBLOCK" "BLOCKS_PER_MBLOCK"
@@ -386,7 +390,6 @@ wanteds os = concat
           ,structField C    "Capability" "weak_ptr_list_hd"
           ,structField C    "Capability" "weak_ptr_list_tl"
 
-          ,structField Both "bdescr" "start"
           ,structField Both "bdescr" "free"
           ,structField Both "bdescr" "blocks"
           ,structField C    "bdescr" "gen_no"
