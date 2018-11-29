@@ -98,18 +98,6 @@ struct NonmovingSegmentInfo {
 
 typedef struct bdescr_ {
 
-    union {
-        StgWord32 free_off;    // Offset to the first free byte of memory.
-                               // allocGroup() sets this to the value of start.
-                               // NB. during use this value should lie
-                               // between 0 and blocks * BLOCK_SIZE. Values
-                               // outside this range are reserved for use by the
-                               // block allocator. In particular, the value
-                               // (StgPtr)(-1) is used to indicate that a block
-                               // is unallocated.
-        struct NonmovingSegmentInfo nonmoving_segment;
-    };
-
     struct bdescr_ *link;      // used for chaining blocks together
 
     union {
@@ -124,21 +112,33 @@ typedef struct bdescr_ {
 
     StgWord16 flags;           // block flags, see below
 
+    union {
+        StgWord32 free_off;    // Offset to the first free byte of memory.
+                               // allocGroup() sets this to the value of start.
+                               // NB. during use this value should lie
+                               // between 0 and blocks * BLOCK_SIZE. Values
+                               // outside this range are reserved for use by the
+                               // block allocator. In particular, the value
+                               // (StgPtr)(-1) is used to indicate that a block
+                               // is unallocated.
+        struct NonmovingSegmentInfo nonmoving_segment;
+    };
+
     StgWord32 blocks;          // [READ ONLY] no. of blocks in a group
                                // (if group head, 0 otherwise)
 
 #if SIZEOF_VOID_P == 8
-    StgWord32 _padding[7];
+    StgWord32 _padding[0];
 #else
-    StgWord32 _padding[2];
+    StgWord32 _padding[1];
 #endif
 } bdescr;
 #endif
 
 #if SIZEOF_VOID_P == 8
-#define BDESCR_SIZE  0x40
-#define BDESCR_MASK  0x3f
-#define BDESCR_SHIFT 6
+#define BDESCR_SIZE  0x20
+#define BDESCR_MASK  0x1f
+#define BDESCR_SHIFT 5
 #else
 #define BDESCR_SIZE  0x20
 #define BDESCR_MASK  0x1f
