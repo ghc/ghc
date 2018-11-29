@@ -457,7 +457,7 @@ update_fwd_large( bdescr *bd )
     // at the beginning.
     if (bd->flags & BF_PINNED) continue;
 
-    P_ p = bd->start;
+    P_ p = bdescr_start(bd);
     const StgInfoTable *info = get_itbl((StgClosure *)p);
 
     switch (info->type) {
@@ -722,7 +722,7 @@ update_fwd( bdescr *blocks )
 
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
-        P_ p = bd->start;
+        P_ p = bdescr_start(bd);
 
         // linearly scan the objects in this block
         while (p < bd->free) {
@@ -738,11 +738,11 @@ update_fwd_compact( bdescr *blocks )
 {
     bdescr *bd = blocks;
     bdescr *free_bd = blocks;
-    P_ free = free_bd->start;
+    P_ free = bdescr_start(free_bd);
 
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
-        P_ p = bd->start;
+        P_ p = bdescr_start(bd);
 
         while (p < bd->free ) {
 
@@ -770,7 +770,7 @@ update_fwd_compact( bdescr *blocks )
             p = thread_obj(info, p);
 
             W_ size = p - q;
-            if (free + size > free_bd->start + BLOCK_SIZE_W) {
+            if (free + size > bdescr_start(free_bd) + BLOCK_SIZE_W) {
                 // set the next bit in the bitmap to indicate that this object
                 // needs to be pushed into the next block.  This saves us having
                 // to run down the threaded info pointer list twice during the
@@ -778,7 +778,7 @@ update_fwd_compact( bdescr *blocks )
                 // Compact.h.
                 mark(q+1,bd);
                 free_bd = free_bd->link;
-                free = free_bd->start;
+                free = bdescr_start(free_bd);
             } else {
                 ASSERT(!is_marked(q+1,bd));
             }
@@ -795,12 +795,12 @@ update_bkwd_compact( generation *gen )
     bdescr *bd, *free_bd;
     bd = free_bd = gen->old_blocks;
 
-    P_ free = free_bd->start;
+    P_ free = bdescr_start(free_bd);
     W_ free_blocks = 1;
 
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
-        P_ p = bd->start;
+        P_ p = bdescr_start(bd);
 
         while (p < bd->free ) {
 
@@ -815,7 +815,7 @@ update_bkwd_compact( generation *gen )
                 // don't forget to update the free ptr in the block desc.
                 free_bd->free = free;
                 free_bd = free_bd->link;
-                free = free_bd->start;
+                free = bdescr_start(free_bd);
                 free_blocks++;
             }
 
@@ -875,7 +875,7 @@ compact(StgClosure *static_objects,
         for (W_ n = 0; n < n_capabilities; n++) {
             for (bdescr *bd = capabilities[n]->mut_lists[g];
                  bd != NULL; bd = bd->link) {
-                for (P_ p = bd->start; p < bd->free; p++) {
+                for (P_ p = bdescr_start(bd); p < bd->free; p++) {
                     thread((StgClosure **)p);
                 }
             }

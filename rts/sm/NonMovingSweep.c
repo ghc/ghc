@@ -282,7 +282,7 @@ void nonmovingSweepMutLists()
         bdescr *old_mut_list = cap->mut_lists[oldest_gen->no];
         cap->mut_lists[oldest_gen->no] = allocBlockOnNode_sync(cap->node);
         for (bdescr *bd = old_mut_list; bd; bd = bd->link) {
-            for (StgPtr p = bd->start; p < bd->free; p++) {
+            for (StgPtr p = bdescr_start(bd); p < bd->free; p++) {
                 StgClosure **q = (StgClosure**)p;
                 if (nonmovingIsAlive(*q) && !is_closure_clean(*q)) {
                     recordMutableCap(*q, cap, oldest_gen->no);
@@ -334,7 +334,7 @@ void nonmovingSweepCompactObjects()
     ACQUIRE_SM_LOCK;
     for (bdescr *bd = nonmoving_compact_objects; bd; bd = next) {
         next = bd->link;
-        compactFree(((StgCompactNFDataBlock*)bd->start)->owner);
+        compactFree(((StgCompactNFDataBlock*) bdescr_start(bd))->owner);
     }
     RELEASE_SM_LOCK;
     nonmoving_compact_objects = nonmoving_marked_compact_objects;
