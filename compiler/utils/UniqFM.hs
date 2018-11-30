@@ -22,7 +22,6 @@ of arguments of combining function.
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module UniqFM (
@@ -77,11 +76,6 @@ import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
 
 import qualified Data.IntMap as M
-#if MIN_VERSION_containers(0,5,9)
-import qualified Data.IntMap.Merge.Lazy as M
-import Control.Applicative (Const (..))
-import qualified Data.Monoid as Mon
-#endif
 import qualified Data.IntSet as S
 import Data.Data
 import qualified Data.Semigroup as Semi
