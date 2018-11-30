@@ -1,7 +1,7 @@
 TYPE SIGNATURES
   bar :: Int -> Foo Bool () Int
 TYPE CONSTRUCTORS
-  Foo :: * -> * -> * -> *
+  Foo{3} :: * -> * -> * -> *
 DATA CONSTRUCTORS
   Foo :: forall x y z. x -> y -> z -> Foo x y z
 Dependent modules: []

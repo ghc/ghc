@@ -30,7 +30,7 @@ module Util (
 
         dropWhileEndLE, spanEnd, last2,
 
-        foldl1', foldl2, count, all2,
+        foldl1', foldl2, count, countWhile, all2,
 
         lengthExceeds, lengthIs, lengthIsNot,
         lengthAtLeast, lengthAtMost, lengthLessThan,
@@ -704,6 +704,12 @@ count p = go 0
   where go !n [] = n
         go !n (x:xs) | p x       = go (n+1) xs
                      | otherwise = go n xs
+
+countWhile :: (a -> Bool) -> [a] -> Int
+-- Length of an /initial prefix/ of the list satsifying p
+countWhile p = go 0
+  where go !n (x:xs) | p x = go (n+1) xs
+        go !n _            = n
 
 {-
 @splitAt@, @take@, and @drop@ but with length of another

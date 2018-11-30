@@ -1,7 +1,7 @@
 
-T12041.hs:12:15: error:
-    • Expected kind ‘i -> Constraint’,
-        but ‘(~) Int’ has kind ‘* -> Constraint’
-    • In the type ‘(~) Int’
-      In the type instance declaration for ‘Ob’
+T12041.hs:12:3: error:
+    • Type indexes must match class instance head
+      Expected: Ob @i (I @{i} @{i})
+        Actual: Ob @* (I @{*} @{*}) -- Defined at T12041.hs:12:8
+    • In the type instance declaration for ‘Ob’
       In the instance declaration for ‘Category I’

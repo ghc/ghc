@@ -871,12 +871,12 @@ equalsDots = text "= ..."
 
 checkDatatypeContext :: Maybe (LHsContext GhcPs) -> P ()
 checkDatatypeContext Nothing = return ()
-checkDatatypeContext (Just (dL->L loc c))
+checkDatatypeContext (Just c)
     = do allowed <- extension datatypeContextsEnabled
          unless allowed $
-             parseErrorSDoc loc
-                 (text "Illegal datatype context (use DatatypeContexts):" <+>
-                  pprHsContext c)
+             parseErrorSDoc (getLoc c)
+                 (text "Illegal datatype context (use DatatypeContexts):"
+                  <+> pprLHsContext c)
 
 type LRuleTyTmVar = Located RuleTyTmVar
 data RuleTyTmVar = RuleTyTmVar (Located RdrName) (Maybe (LHsType GhcPs))

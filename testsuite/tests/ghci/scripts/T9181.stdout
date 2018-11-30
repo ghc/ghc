@@ -21,7 +21,7 @@ data GHC.TypeLits.SomeSymbol
     GHC.TypeLits.KnownSymbol n =>
     GHC.TypeLits.SomeSymbol (Data.Proxy.Proxy n)
 type family GHC.TypeLits.TypeError (a :: GHC.TypeLits.ErrorMessage)
-            :: b
+            :: b where
 GHC.TypeLits.natVal ::
   GHC.TypeNats.KnownNat n => proxy n -> Integer
 GHC.TypeLits.natVal' ::

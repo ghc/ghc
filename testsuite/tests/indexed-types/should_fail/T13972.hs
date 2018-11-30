@@ -8,5 +8,11 @@ import Data.Kind
 class C (a :: k) where
   type T k :: Type
 
+-- This used to fail, with a mysterious error messate
+--    Type indexes must match class instance head
+--      Expected: T (a1 -> Either a1 b1)
+--      Actual: T (a -> Either a b)
+-- but now it succeeds fine
+
 instance C Left where
   type T (a -> Either a b) = Int

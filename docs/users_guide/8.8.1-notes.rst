@@ -176,6 +176,7 @@ for further change information.
     libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
     libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
     libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
     libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
     libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
     libraries/process/process.cabal:         Dependency of ``ghc`` library

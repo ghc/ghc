@@ -2,9 +2,11 @@
 T2688.hs:8:14: error:
     • Couldn't match expected type ‘v’ with actual type ‘s’
       ‘s’ is a rigid type variable bound by
-        the class declaration for ‘VectorSpace’ at T2688.hs:5:21
+        the class declaration for ‘VectorSpace’
+        at T2688.hs:(5,1)-(8,23)
       ‘v’ is a rigid type variable bound by
-        the class declaration for ‘VectorSpace’ at T2688.hs:5:19
+        the class declaration for ‘VectorSpace’
+        at T2688.hs:(5,1)-(8,23)
     • In the expression: v *^ (1 / s)
       In an equation for ‘^/’: v ^/ s = v *^ (1 / s)
     • Relevant bindings include

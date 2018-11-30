@@ -1,0 +1,6 @@
+
+T15870.hs:32:34: error:
+    • Expected kind ‘Optic a’, but ‘g2’ has kind ‘Optic b’
+    • In the second argument of ‘Get’, namely ‘g2’
+      In the type ‘Get a g2’
+      In the type instance declaration for ‘Get’

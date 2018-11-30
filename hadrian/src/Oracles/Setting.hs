@@ -218,4 +218,4 @@ libsuf way
         extension <- setting DynamicExtension -- e.g., .dll or .so
         version   <- setting ProjectVersion   -- e.g., 7.11.20141222
         let suffix = waySuffix (removeWayUnit Dynamic way)
-        return ("-ghc" ++ version ++ suffix ++ extension)
+        return (suffix ++ "-ghc" ++ version ++ extension)

@@ -7,6 +7,7 @@ import Flavour
 import Packages
 import Settings.Builders.Common
 import Settings.Warnings
+import qualified Context as Context
 
 ghcBuilderArgs :: Args
 ghcBuilderArgs = mconcat [compileAndLinkHs, compileC, findHsDependencies]
@@ -41,13 +42,30 @@ compileC = builder (Ghc CompileCWithGhc) ? do
 
 ghcLinkArgs :: Args
 ghcLinkArgs = builder (Ghc LinkHs) ? do
-    way     <- getWay
     pkg     <- getPackage
     libs    <- pkg == hp2ps ? pure ["m"]
     intLib  <- getIntegerPackage
     gmpLibs <- notStage0 ? intLib == integerGmp ? pure ["gmp"]
-    mconcat [ (Dynamic `wayUnit` way) ?
-              pure [ "-shared", "-dynamic", "-dynload", "deploy" ]
+    dynamic <- requiresDynamic
+
+    -- Relative path from the output (rpath $ORIGIN).
+    originPath <- dropFileName <$> getOutput
+    context <- getContext
+    libPath' <- expr (libPath context)
+    distDir <- expr Context.distDir
+    let
+        distPath = libPath' -/- distDir
+        originToLibsDir = makeRelativeNoSysLink originPath distPath
+
+    mconcat [ dynamic ? mconcat
+                [ arg "-dynamic"
+                -- TODO what about windows / OSX?
+                , notStage0 ? pure
+                    [ "-optl-Wl,-rpath"
+                    , "-optl-Wl," ++ ("$ORIGIN" -/- originToLibsDir) ]
+                ]
+            , (dynamic && isLibrary pkg) ?
+                pure [ "-shared", "-dynload", "deploy" ]
             , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
             , not (nonHsMainPackage pkg) ? arg "-rtsopts"
@@ -96,9 +114,10 @@ commonGhcArgs = do
 wayGhcArgs :: Args
 wayGhcArgs = do
     way <- getWay
-    mconcat [ if (Dynamic `wayUnit` way)
-              then pure ["-fPIC", "-dynamic"]
-              else arg "-static"
+    dynamic <- requiresDynamic
+    mconcat [ if dynamic
+                then pure ["-fPIC", "-dynamic"]
+                else arg "-static"
             , (Threaded  `wayUnit` way) ? arg "-optc-DTHREADED_RTS"
             , (Debug     `wayUnit` way) ? arg "-optc-DDEBUG"
             , (Profiling `wayUnit` way) ? arg "-prof"
@@ -132,3 +151,17 @@ includeGhcArgs = do
             , arg $      "-I" ++ root -/- generatedDir
             , arg $ "-optc-I" ++ root -/- generatedDir
             , pure ["-optP-include", "-optP" ++ autogen -/- "cabal_macros.h"] ]
+
+-- Check if building dynamically is required. GHC is a special case that needs
+-- to be built dynamically if any of the RTS ways is dynamic.
+requiresDynamic :: Expr Bool
+requiresDynamic = do
+    pkg <- getPackage
+    way <- getWay
+    rtsWays <- getRtsWays
+    let
+        dynRts = any (Dynamic `wayUnit`) rtsWays
+        dynWay = Dynamic `wayUnit` way
+    return $ if pkg == ghc
+                then dynRts || dynWay
+                else dynWay

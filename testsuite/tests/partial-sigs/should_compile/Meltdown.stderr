@@ -5,7 +5,7 @@ TYPE SIGNATURES
     NukeMonad param1 param2 () -> NukeMonad param1 param2 ()
 TYPE CONSTRUCTORS
   type role NukeMonad phantom phantom phantom
-  NukeMonad :: * -> * -> * -> *
+  NukeMonad{3} :: * -> * -> * -> *
 CLASS INSTANCES
   instance Functor (NukeMonad a b) -- Defined at Meltdown.hs:8:10
   instance Applicative (NukeMonad a b)

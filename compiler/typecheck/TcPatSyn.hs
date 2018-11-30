@@ -147,23 +147,29 @@ tcInferPatSynDecl (PSB { psb_id = lname@(dL->L _ name), psb_args = details
                tcPat PatSyn lpat (unrestricted exp_ty) $
                mapM tcLookupId arg_names
 
-       ; let named_taus = (name, pat_ty) : map (\arg -> (getName arg, varType arg)) args
+       ; let (ex_tvs, prov_dicts) = tcCollectEx lpat'
 
-       ; (qtvs, req_dicts, ev_binds, residual, _)
+             named_taus = (name, pat_ty) : map mk_named_tau args
+             mk_named_tau arg
+               = (getName arg, mkSpecForAllTys ex_tvs (varType arg))
+               -- The mkSpecForAllTys is important (Trac #14552), albeit
+               -- slightly artifical (there is no variable with this funny type).
+               -- We do not want to quantify over variable (alpha::k)
+               -- that mention the existentially-bound type variables
+               -- ex_tvs in its kind k.
+               -- See Note [Type variables whose kind is captured]
+
+       ; (univ_tvs, req_dicts, ev_binds, residual, _)
                <- simplifyInfer tclvl NoRestrictions [] named_taus wanted
        ; top_ev_binds <- checkNoErrs (simplifyTop residual)
        ; addTopEvBinds top_ev_binds $
 
-    do { let (ex_tvs, prov_dicts) = tcCollectEx lpat'
-             ex_tv_set  = mkVarSet ex_tvs
-             univ_tvs   = filterOut (`elemVarSet` ex_tv_set) qtvs
-             req_theta  = map evVarPred req_dicts
-
-       ; prov_dicts <- mapM zonkId prov_dicts
+    do { prov_dicts <- mapM zonkId prov_dicts
        ; let filtered_prov_dicts = mkMinimalBySCs evVarPred prov_dicts
              -- Filtering: see Note [Remove redundant provided dicts]
              (prov_theta, prov_evs)
                  = unzip (mapMaybe mkProvEvidence filtered_prov_dicts)
+             req_theta = map evVarPred req_dicts
 
        -- Report coercions that esacpe
        -- See Note [Coercions that escape]
@@ -227,7 +233,37 @@ dependentArgErr (arg, bad_cos)
   where
     bad_co_list = dVarSetElems bad_cos
 
-{- Note [Remove redundant provided dicts]
+{- Note [Type variables whose kind is captured]
+~~-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data AST a = Sym [a]
+  class Prj s where { prj :: [a] -> Maybe (s a)
+  pattern P x <= Sym (prj -> Just x)
+
+Here we get a matcher with this type
+  $mP :: forall s a. Prj s => AST a -> (s a -> r) -> r -> r
+
+No problem.  But note that 's' is not fixed by the type of the
+pattern (AST a), nor is it existentially bound.  It's really only
+fixed by the type of the continuation.
+
+Trac #14552 showed that this can go wrong if the kind of 's' mentions
+existentially bound variables.  We obviously can't make a type like
+  $mP :: forall (s::k->*) a. Prj s => AST a -> (forall k. s a -> r)
+                                   -> r -> r
+But neither is 's' itself existentially bound, so the forall (s::k->*)
+can't go in the inner forall either.  (What would the matcher apply
+the continuation to?)
+
+Solution: do not quantiify over any unification variable whose kind
+mentions the existentials.  We can conveniently do that by making the
+"taus" passed to simplifyInfer look like
+   forall ex_tvs. arg_ty
+
+After that, Note [Naughty quantification candidates] in TcMType takes
+over, and zonks any such naughty variables to Any.
+
+Note [Remove redundant provided dicts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Recall that
    HRefl :: forall k1 k2 (a1:k1) (a2:k2). (k1 ~ k2, a1 ~ a2)

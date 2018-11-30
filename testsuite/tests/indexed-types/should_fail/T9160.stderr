@@ -1,7 +1,7 @@
 
-T9160.hs:19:12: error:
-    Expecting one more argument to ‘Maybe’
-    Expected a type, but ‘Maybe’ has kind ‘* -> *’
-    In the type ‘Maybe’
-    In the type instance declaration for ‘F’
-    In the instance declaration for ‘C (a :: *)’
+T9160.hs:19:3: error:
+    • Type indexes must match class instance head
+      Expected: F @*
+        Actual: F @(* -> *) -- Defined at T9160.hs:19:8
+    • In the type instance declaration for ‘F’
+      In the instance declaration for ‘C (a :: *)’

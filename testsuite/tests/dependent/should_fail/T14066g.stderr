@@ -1,7 +1,9 @@
 
 T14066g.hs:9:1: error:
-    • These kind and type variables: a (b :: a) (d :: SameKind c b)
-      are out of dependency order. Perhaps try this ordering:
+    • The kind of ‘Q’ is ill-scoped
+        Inferred kind: Q :: forall (c :: a). forall a (b :: a) ->
+                            SameKind c b -> *
+      NB: Specified variables (namely: (c :: a)) always come first
+      Perhaps try this order instead:
         a (c :: a) (b :: a) (d :: SameKind c b)
-      NB: Implicitly declared variables come before others.
     • In the data type declaration for ‘Q’

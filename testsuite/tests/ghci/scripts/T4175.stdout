@@ -11,10 +11,9 @@ class C a where
   	-- Defined at T4175.hs:16:5
 type instance D () () = Bool 	-- Defined at T4175.hs:22:10
 type instance D Int () = String 	-- Defined at T4175.hs:19:10
-type family E a :: *
-  where
-      E () = Bool
-      E Int = String
+type family E a :: * where
+    E () = Bool
+    E Int = String
   	-- Defined at T4175.hs:24:1
 data () = () 	-- Defined in ‘GHC.Tuple’
 instance [safe] C () -- Defined at T4175.hs:21:10

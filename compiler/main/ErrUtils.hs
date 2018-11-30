@@ -40,7 +40,8 @@ module ErrUtils (
 
         -- * Dump files
         dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_printer,
-        mkDumpDoc, dumpSDoc,
+        mkDumpDoc, dumpSDoc, dumpSDocForUser,
+        dumpSDocWithStyle,
 
         -- * Issuing messages during compilation
         putMsg, printInfoForUser, printOutputForUser,
@@ -480,6 +481,20 @@ withDumpFileHandle dflags flag action = do
             action (Just handle)
       Nothing -> action Nothing
 
+
+dumpSDoc, dumpSDocForUser
+  :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
+
+-- | A wrapper around 'dumpSDocWithStyle' which uses 'PprDump' style.
+dumpSDoc dflags print_unqual
+  = dumpSDocWithStyle dump_style dflags
+  where dump_style = mkDumpStyle dflags print_unqual
+
+-- | A wrapper around 'dumpSDocWithStyle' which uses 'PprUser' style.
+dumpSDocForUser dflags print_unqual
+  = dumpSDocWithStyle user_style dflags
+  where user_style = mkUserStyle dflags print_unqual AllTheWay
+
 -- | Write out a dump.
 -- If --dump-to-file is set then this goes to a file.
 -- otherwise emit to stdout.
@@ -489,12 +504,10 @@ withDumpFileHandle dflags flag action = do
 --
 -- The 'DumpFlag' is used only to choose the filename to use if @--dump-to-file@
 -- is used; it is not used to decide whether to dump the output
-dumpSDoc :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
-dumpSDoc dflags print_unqual flag hdr doc =
+dumpSDocWithStyle :: PprStyle -> DynFlags -> DumpFlag -> String -> SDoc -> IO ()
+dumpSDocWithStyle sty dflags flag hdr doc =
     withDumpFileHandle dflags flag writeDump
   where
-    dump_style = mkDumpStyle dflags print_unqual
-
     -- write dump to file
     writeDump (Just handle) = do
         doc' <- if null hdr
@@ -507,14 +520,14 @@ dumpSDoc dflags print_unqual flag hdr doc =
                                 $$ blankLine
                                 $$ doc
                         return $ mkDumpDoc hdr d
-        defaultLogActionHPrintDoc dflags handle doc' dump_style
+        defaultLogActionHPrintDoc dflags handle doc' sty
 
     -- write the dump to stdout
     writeDump Nothing = do
         let (doc', severity)
               | null hdr  = (doc, SevOutput)
               | otherwise = (mkDumpDoc hdr doc, SevDump)
-        putLogMsg dflags NoReason severity noSrcSpan dump_style doc'
+        putLogMsg dflags NoReason severity noSrcSpan sty doc'
 
 
 -- | Choose where to put a dump file based on DynFlags

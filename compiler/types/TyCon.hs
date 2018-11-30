@@ -565,7 +565,7 @@ They fit together like so:
   Note that that are three binders here, including the
   kind variable k.
 
-- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep
+* See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep
   for what the visibility flag means.
 
 * Each TyConBinder tyConBinders has a TyVar (sometimes it is TyCoVar), and
@@ -585,10 +585,15 @@ They fit together like so:
 
   tyConKind is the full kind of the TyCon, not just the result kind
 
-* tyConArity is the arguments this TyCon must be applied to, to be
-  considered saturated.  Here we mean "applied to in the actual Type",
-  not surface syntax; i.e. including implicit kind variables.
-  So it's just (length tyConBinders)
+* For type families, tyConArity is the arguments this TyCon must be
+  applied to, to be considered saturated.  Here we mean "applied to in
+  the actual Type", not surface syntax; i.e. including implicit kind
+  variables.  So it's just (length tyConBinders)
+
+* For an algebraic data type, or data instance, the tyConResKind is
+  always (TYPE r); that is, the tyConBinders are enough to saturate
+  the type constructor.  I'm not quite sure why we have this invariant,
+  but it's enforced by etaExpandAlgTyCon
 -}
 
 instance Outputable tv => Outputable (VarBndr tv TyConBndrVis) where

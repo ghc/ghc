@@ -1,6 +1,7 @@
 
 BadTelescope.hs:9:1: error:
-    • These kind and type variables: a k (b :: k) (c :: SameKind a b)
-      are out of dependency order. Perhaps try this ordering:
-        k (a :: k) (b :: k) (c :: SameKind a b)
+    • The kind of ‘X’ is ill-scoped
+        Inferred kind: X :: forall (a :: k) k (b :: k) -> SameKind a b -> *
+        Perhaps try this order instead:
+          k (a :: k) (b :: k) (c :: SameKind a b)
     • In the data type declaration for ‘X’

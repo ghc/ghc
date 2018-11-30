@@ -22,6 +22,7 @@ module MkIface (
         RecompileRequired(..), recompileRequired,
         mkIfaceExports,
 
+        coAxiomToIfaceDecl,
         tyThingToIfaceDecl -- Converting things to their Iface equivalents
  ) where
 
@@ -1635,18 +1636,16 @@ coAxBranchToIfaceBranch tc lhs_s
 -- use this one for standalone branches without incompatibles
 coAxBranchToIfaceBranch' :: TyCon -> CoAxBranch -> IfaceAxBranch
 coAxBranchToIfaceBranch' tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
+                                        , cab_eta_tvs = eta_tvs
                                         , cab_lhs = lhs
                                         , cab_roles = roles, cab_rhs = rhs })
-  = IfaceAxBranch { ifaxbTyVars  = toIfaceTvBndrs tidy_tvs
-                  , ifaxbCoVars  = map toIfaceIdBndr cvs
-                  , ifaxbLHS     = tidyToIfaceTcArgs env1 tc lhs
-                  , ifaxbRoles   = roles
-                  , ifaxbRHS     = tidyToIfaceType env1 rhs
-                  , ifaxbIncomps = [] }
-  where
-    (env1, tidy_tvs) = tidyVarBndrs emptyTidyEnv tvs
-    -- Don't re-bind in-scope tyvars
-    -- See Note [CoAxBranch type variables] in CoAxiom
+  = IfaceAxBranch { ifaxbTyVars    = toIfaceTvBndrs tvs
+                  , ifaxbCoVars    = map toIfaceIdBndr cvs
+                  , ifaxbEtaTyVars = toIfaceTvBndrs eta_tvs
+                  , ifaxbLHS       = toIfaceTcArgs tc lhs
+                  , ifaxbRoles     = roles
+                  , ifaxbRHS       = toIfaceType rhs
+                  , ifaxbIncomps   = [] }
 
 -----------------
 tyConToIfaceDecl :: TidyEnv -> TyCon -> (TidyEnv, IfaceDecl)
@@ -1709,6 +1708,7 @@ tyConToIfaceDecl env tycon
     (tc_env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
     tc_tyvars      = binderVars tc_binders
     if_binders     = toIfaceTyCoVarBinders tc_binders
+                     -- No tidying of the binders; they are already tidy
     if_res_kind    = tidyToIfaceType tc_env1 (tyConResKind tycon)
     if_syn_type ty = tidyToIfaceType tc_env1 ty
     if_res_var     = getOccFS `fmap` tyConFamilyResVar_maybe tycon
@@ -1719,19 +1719,16 @@ tyConToIfaceDecl env tycon
                                                    (tidyToIfaceTcArgs tc_env1 tc ty)
                Nothing           -> IfNoParent
 
-    to_if_fam_flav OpenSynFamilyTyCon        = IfaceOpenSynFamilyTyCon
+    to_if_fam_flav OpenSynFamilyTyCon             = IfaceOpenSynFamilyTyCon
+    to_if_fam_flav AbstractClosedSynFamilyTyCon   = IfaceAbstractClosedSynFamilyTyCon
+    to_if_fam_flav (DataFamilyTyCon {})           = IfaceDataFamilyTyCon
+    to_if_fam_flav (BuiltInSynFamTyCon {})        = IfaceBuiltInSynFamTyCon
+    to_if_fam_flav (ClosedSynFamilyTyCon Nothing) = IfaceClosedSynFamilyTyCon Nothing
     to_if_fam_flav (ClosedSynFamilyTyCon (Just ax))
       = IfaceClosedSynFamilyTyCon (Just (axn, ibr))
       where defs = fromBranches $ coAxiomBranches ax
             ibr  = map (coAxBranchToIfaceBranch' tycon) defs
             axn  = coAxiomName ax
-    to_if_fam_flav (ClosedSynFamilyTyCon Nothing)
-      = IfaceClosedSynFamilyTyCon Nothing
-    to_if_fam_flav AbstractClosedSynFamilyTyCon = IfaceAbstractClosedSynFamilyTyCon
-    to_if_fam_flav (DataFamilyTyCon {})         = IfaceDataFamilyTyCon
-    to_if_fam_flav (BuiltInSynFamTyCon {})      = IfaceBuiltInSynFamTyCon
-
-
 
     ifaceConDecls (NewTyCon { data_con = con })    = IfNewTyCon  (ifaceConDecl con)
     ifaceConDecls (DataTyCon { data_cons = cons }) = IfDataTyCon (map ifaceConDecl cons)

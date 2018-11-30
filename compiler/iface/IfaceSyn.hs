@@ -64,12 +64,11 @@ import SrcLoc
 import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
-import Var( VarBndr(..) )
+import Var( VarBndr(..), binderVar )
 import TyCon ( Role (..), Injectivity(..) )
 import Util( dropList, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
-import DynFlags
 import FastString
 
 import Control.Monad
@@ -213,12 +212,13 @@ data IfaceAT = IfaceAT  -- See Class.ClassATItem
 
 
 -- This is just like CoAxBranch
-data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars   :: [IfaceTvBndr]
-                                   , ifaxbCoVars   :: [IfaceIdBndr]
-                                   , ifaxbLHS      :: IfaceAppArgs
-                                   , ifaxbRoles    :: [Role]
-                                   , ifaxbRHS      :: IfaceType
-                                   , ifaxbIncomps  :: [BranchIndex] }
+data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars    :: [IfaceTvBndr]
+                                   , ifaxbEtaTyVars :: [IfaceTvBndr]
+                                   , ifaxbCoVars    :: [IfaceIdBndr]
+                                   , ifaxbLHS       :: IfaceAppArgs
+                                   , ifaxbRoles     :: [Role]
+                                   , ifaxbRHS       :: IfaceType
+                                   , ifaxbIncomps   :: [BranchIndex] }
                                      -- See Note [Storing compatibility] in CoAxiom
 
 data IfaceConDecls
@@ -558,25 +558,24 @@ pprAxBranch :: SDoc -> IfaceAxBranch -> SDoc
 -- The TyCon might be local (just an OccName), or this might
 -- be a branch for an imported TyCon, so it would be an ExtName
 -- So it's easier to take an SDoc here
+--
+-- This function is used
+--    to print interface files,
+--    in debug messages
+--    in :info F for GHCi, which goes via toConToIfaceDecl on the family tycon
+-- For user error messages we use Coercion.pprCoAxiom and friends
 pprAxBranch pp_tc (IfaceAxBranch { ifaxbTyVars = tvs
-                                 , ifaxbCoVars = cvs
+                                 , ifaxbCoVars = _cvs
                                  , ifaxbLHS = pat_tys
                                  , ifaxbRHS = rhs
                                  , ifaxbIncomps = incomps })
-  = hang ppr_binders 2 (hang pp_lhs 2 (equals <+> ppr rhs))
+  = WARN( not (null _cvs), pp_tc $$ ppr _cvs )
+    hang ppr_binders 2 (hang pp_lhs 2 (equals <+> ppr rhs))
     $+$
     nest 2 maybe_incomps
   where
-    ppr_binders = sdocWithDynFlags $ \dflags ->
-                  ppWhen (gopt Opt_PrintExplicitForalls dflags) ppr_binders'
-
-    ppr_binders'
-      | null tvs && null cvs = empty
-      | null cvs
-      = brackets (pprWithCommas (pprIfaceTvBndr True) tvs)
-      | otherwise
-      = brackets (pprWithCommas (pprIfaceTvBndr True) tvs <> semi <+>
-                  pprWithCommas pprIfaceIdBndr cvs)
+    -- See Note [Printing foralls in type family instances] in IfaceType
+    ppr_binders = pprUserIfaceForAll $ map (mkIfaceForAllTvBndr Specified) tvs
     pp_lhs = hang pp_tc 2 (pprParendIfaceAppArgs pat_tys)
     maybe_incomps = ppUnless (null incomps) $ parens $
                     text "incompatible indices:" <+> ppr incomps
@@ -719,6 +718,12 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                      , nest 2 $ ppShowIface ss pp_extra ]
   where
     is_data_instance = isIfaceDataInstance parent
+    -- See Note [Printing foralls in type family instances] in IfaceType
+    pp_data_inst_forall :: SDoc
+    pp_data_inst_forall = pprUserIfaceForAll forall_bndrs
+
+    forall_bndrs :: [IfaceForAllBndr]
+    forall_bndrs = [Bndr (binderVar tc_bndr) Specified | tc_bndr <- binders]
 
     cons       = visibleIfConDecls condecls
     pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
@@ -729,7 +734,9 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
 
     pp_lhs = case parent of
                IfNoParent -> pprIfaceDeclHead context ss tycon binders Nothing
-               _          -> text "instance" <+> pprIfaceTyConParent parent
+               IfDataInstance{}
+                          -> text "instance" <+> pp_data_inst_forall
+                                             <+> pprIfaceTyConParent parent
 
     pp_roles
       | is_data_instance = empty
@@ -822,11 +829,16 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
   = text "data family" <+> pprIfaceDeclHead [] ss tycon binders Nothing
 
   | otherwise
-  = hang (text "type family" <+> pprIfaceDeclHead [] ss tycon binders (Just res_kind))
+  = hang (text "type family"
+            <+> pprIfaceDeclHead [] ss tycon binders (Just res_kind)
+            <+> ppShowRhs ss (pp_where rhs))
        2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
     $$
     nest 2 (ppShowRhs ss (pp_branches rhs))
   where
+    pp_where (IfaceClosedSynFamilyTyCon {}) = text "where"
+    pp_where _                              = empty
+
     pp_inj Nothing    _   = empty
     pp_inj (Just res) inj
        | Injective injectivity <- inj = hsep [ equals, ppr res
@@ -849,13 +861,12 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
       = ppShowIface ss (text "built-in")
 
     pp_branches (IfaceClosedSynFamilyTyCon (Just (ax, brs)))
-      = hang (text "where")
-           2 (vcat (map (pprAxBranch
-                           (pprPrefixIfDeclBndr
-                             (ss_how_much ss)
-                             (occName tycon))
-                        ) brs)
-              $$ ppShowIface ss (text "axiom" <+> ppr ax))
+      = vcat (map (pprAxBranch
+                     (pprPrefixIfDeclBndr
+                       (ss_how_much ss)
+                       (occName tycon))
+                  ) brs)
+        $$ ppShowIface ss (text "axiom" <+> ppr ax)
     pp_branches _ = Outputable.empty
 
 pprIfaceDecl _ (IfacePatSyn { ifName = name,
@@ -891,9 +902,8 @@ pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
 
 pprIfaceDecl _ (IfaceAxiom { ifName = name, ifTyCon = tycon
                            , ifAxBranches = branches })
-  = hang (text "axiom" <+> ppr name <> dcolon)
+  = hang (text "axiom" <+> ppr name <+> dcolon)
        2 (vcat $ map (pprAxBranch (ppr tycon)) branches)
-
 
 pprCType :: Maybe CType -> SDoc
 pprCType Nothing      = Outputable.empty
@@ -1074,13 +1084,14 @@ instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
                    ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
                    ifRuleOrph = orph })
-    = sep [hsep [pprRuleName name,
-                 if isOrphan orph then text "[orphan]" else Outputable.empty,
-                 ppr act,
-                 text "forall" <+> pprIfaceBndrs bndrs],
-           nest 2 (sep [ppr fn <+> sep (map pprParendIfaceExpr args),
-                        text "=" <+> ppr rhs])
-      ]
+    = sep [ hsep [ pprRuleName name
+                 , if isOrphan orph then text "[orphan]" else Outputable.empty
+                 , ppr act
+                 , pp_foralls ]
+          , nest 2 (sep [ppr fn <+> sep (map pprParendIfaceExpr args),
+                        text "=" <+> ppr rhs]) ]
+    where
+      pp_foralls = ppUnless (null bndrs) $ forAllLit <+> pprIfaceBndrs bndrs <> dot
 
 instance Outputable IfaceClsInst where
   ppr (IfaceClsInst { ifDFun = dfun_id, ifOFlag = flag
@@ -1857,13 +1868,14 @@ instance Binary IfaceAT where
         return (IfaceAT dec defs)
 
 instance Binary IfaceAxBranch where
-    put_ bh (IfaceAxBranch a1 a2 a3 a4 a5 a6) = do
+    put_ bh (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7) = do
         put_ bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
         put_ bh a5
         put_ bh a6
+        put_ bh a7
     get bh = do
         a1 <- get bh
         a2 <- get bh
@@ -1871,7 +1883,8 @@ instance Binary IfaceAxBranch where
         a4 <- get bh
         a5 <- get bh
         a6 <- get bh
-        return (IfaceAxBranch a1 a2 a3 a4 a5 a6)
+        a7 <- get bh
+        return (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7)
 
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon  = putByte bh 0

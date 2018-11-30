@@ -13,18 +13,18 @@ Roles13.$WMkWrap [InlPrag=INLINE[0]] :: forall a. a -> Wrap a
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
          Tmpl= \ (@ (n :: GHC.Types.Multiplicity))
-                 (@ a[sk:0])
-                 (dt [Occ=Once] :: a[sk:0]) ->
+                 (@ a[sk:1])
+                 (dt [Occ=Once] :: a[sk:1]) ->
                  dt
-                 `cast` (Sym (Roles13.N:Wrap[0] <a[sk:0]>_R)
-                         :: a[sk:0] ~R# Wrap a[sk:0])}]
+                 `cast` (Sym (Roles13.N:Wrap[0] <a[sk:1]>_R)
+                         :: a[sk:1] ~R# Wrap a[sk:1])}]
 Roles13.$WMkWrap
   = \ (@ (n :: GHC.Types.Multiplicity))
-      (@ a[sk:0])
-      (dt [Occ=Once] :: a[sk:0]) ->
+      (@ a[sk:1])
+      (dt [Occ=Once] :: a[sk:1]) ->
       dt
-      `cast` (Sym (Roles13.N:Wrap[0] <a[sk:0]>_R)
-              :: a[sk:0] ~R# Wrap a[sk:0])
+      `cast` (Sym (Roles13.N:Wrap[0] <a[sk:1]>_R)
+              :: a[sk:1] ~R# Wrap a[sk:1])
 
 -- RHS size: {terms: 3, types: 2, coercions: 2, joins: 0/0}
 Roles13.$WMkAge [InlPrag=INLINE[0]] :: Int -> Age
