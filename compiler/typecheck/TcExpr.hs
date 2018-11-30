@@ -411,7 +411,6 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; op_id  <- tcLookupId op_name
        ; res_ty <- readExpType res_ty
 
-       ; _ <- zonkTcType arg1_ty
        ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep res_ty
                                                , scaledThing arg2_sigma
                                                , res_ty])
