@@ -577,7 +577,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
      -- on the other hand, always unrestricted (constraint arguments occur, in
      -- particular, in @Eq#@)
     assign_mult ty | isPredTy ty = unrestricted ty
-    assign_mult ty | otherwise = linear ty
+                   | otherwise = linear ty
 
     no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 

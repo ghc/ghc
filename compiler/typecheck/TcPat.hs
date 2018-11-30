@@ -753,7 +753,7 @@ to express the local scope of GADT refinements.
 --       with scrutinee of type (T ty)
 
 tcConPat :: PatEnv -> Located Name
-         -> Scaled ExpSigmaType           -- Type of the pattern
+         -> Scaled ExpSigmaType    -- Type of the pattern
          -> HsConPatDetails GhcRn -> TcM a
          -> TcM (Pat GhcTcId, a)
 tcConPat penv con_lname@(dL->L _ con_name) pat_ty arg_pats thing_inside
@@ -766,7 +766,7 @@ tcConPat penv con_lname@(dL->L _ con_name) pat_ty arg_pats thing_inside
         }
 
 tcDataConPat :: PatEnv -> Located Name -> DataCon
-             -> Scaled ExpSigmaType               -- Type of the pattern
+             -> Scaled ExpSigmaType        -- Type of the pattern
              -> HsConPatDetails GhcRn -> TcM a
              -> TcM (Pat GhcTcId, a)
 tcDataConPat penv (dL->L con_span con_name) data_con pat_ty_scaled
@@ -864,7 +864,7 @@ tcDataConPat penv (dL->L con_span con_name) data_con pat_ty_scaled
         } }
 
 tcPatSynPat :: PatEnv -> Located Name -> PatSyn
-            -> Scaled ExpSigmaType                -- Type of the pattern
+            -> Scaled ExpSigmaType         -- Type of the pattern
             -> HsConPatDetails GhcRn -> TcM a
             -> TcM (Pat GhcTcId, a)
 tcPatSynPat penv (dL->L con_span _) pat_syn pat_ty arg_pats thing_inside
@@ -939,8 +939,8 @@ matchExpectedConTy :: PatEnv
                                  -- In the case of a data family this is
                                  -- the /representation/ TyCon
                    -> Scaled ExpSigmaType  -- The type of the pattern; in the
-                                             -- case of a data family this would
-                                             -- mention the /family/ TyCon
+                                           -- case of a data family this would
+                                           -- mention the /family/ TyCon
                    -> TcM (HsWrapper, [TcSigmaType])
 -- See Note [Matching constructor patterns]
 -- Returns a wrapper : pat_ty "->" T ty1 ... tyn

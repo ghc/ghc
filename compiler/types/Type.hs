@@ -2328,7 +2328,6 @@ isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 
 isOneMultiplicity, isOmegaMultiplicity :: Type -> Bool
 isOneMultiplicity ty = ty `eqType` oneDataConTy
-
 isOmegaMultiplicity ty = ty `eqType` omegaDataConTy
 
 {-
