@@ -90,8 +90,8 @@ arenaAlloc( Arena *arena, size_t size )
         bd->free    = bdescr_start(bd);
         bd->link    = arena->current;
         arena->current = bd;
-        arena->free = bd->free + size_w;
-        arena->lim = bd->free + bd->blocks * BLOCK_SIZE_W;
+        arena->free = bdescr_start(bd) + size_w;
+        arena->lim = bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W;
         return bdescr_start(bd);
     }
 }

@@ -1701,9 +1701,9 @@ AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
         setExecutable(bdescr_start(bd), bd->blocks * BLOCK_SIZE, true);
         exec_block = bd;
     }
-    *(exec_block->free) = n;  // store the size of this chunk
+    *bdescr_free(exec_block) = n;  // store the size of this chunk
     exec_block->gen_no += n;  // gen_no stores the number of words allocated
-    ret = exec_block->free + 1;
+    ret = bdescr_free(exec_block) + 1;
     exec_block->free += n + 1;
 
     RELEASE_SM_LOCK

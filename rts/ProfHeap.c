@@ -1011,7 +1011,7 @@ heapCensusChain( Census *census, bdescr *bd )
 
         p = bdescr_start(bd);
 
-        while (p < bd->free) {
+        while (p < bdescr_free(bd)) {
             info = get_itbl((const StgClosure *)p);
             prim = false;
 
@@ -1161,7 +1161,7 @@ heapCensusChain( Census *census, bdescr *bd )
 
             p += size;
             /* skip over slop */
-            while (p < bd->free && !*p) p++; // skip slop
+            while (p < bdescr_free(bd) && !*p) p++; // skip slop
         }
     }
 }

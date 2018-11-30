@@ -201,7 +201,7 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
         }
 
         p = bdescr_start(bd);
-        while (p < bd->free) {
+        while (p < bdescr_free(bd)) {
             info = get_itbl((StgClosure *)p);
             prim = false;
 
