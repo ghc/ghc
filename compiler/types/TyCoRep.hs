@@ -343,9 +343,9 @@ instance Multable Type where
   fromMult Omega = omegaDataConTy
   fromMult (MultThing ty) = ty
   fromMult Zero =
-    pprPanic "Type.fromMult" (text"A multiplicity 0 leaked into a type")
-  fromMult r =
-    pprPanic "Type.fromMult" (text"TODO:" <+> ppr r)
+    pprPanic "Type.fromMult" (text "A multiplicity 0 leaked into a type")
+  fromMult _ =
+    pprPanic "Type.fromMult" (text "Full support for multiplicity polymorphism is not implemented yet")
 
   toMult ty
     | oneDataConTy `eqType` ty = One

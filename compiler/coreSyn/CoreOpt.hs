@@ -801,7 +801,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
     go subst floats (Lam var body) (CC (arg:args) co)
        | exprIsTrivial arg          -- Don't duplicate stuff!
        = go (extend subst var arg) floats body (CC args co)
-    go subst floats (Let bndr@(NonRec b _) expr) cont
+    go subst floats (Let bndr@(NonRec _ _) expr) cont
        = let (subst', bndr') = subst_bind subst bndr in
            go subst' (FloatLet bndr' : floats) expr cont
     go subst floats (Case scrut b _ [(con, vars, expr)]) cont

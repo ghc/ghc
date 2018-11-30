@@ -53,6 +53,7 @@ import UsageEnv
 import RepType
 import TyCoRep       -- checks validity of types/coercions
 import TyCon
+import TysWiredIn ( multiplicityTy )
 import CoAxiom
 import BasicTypes
 import ErrUtils as Err
@@ -1860,6 +1861,8 @@ lintCoercion co@(FunCo r w co1 co2)
        ; (k3, k'3, s3, t3, r3) <- lintCoercion w
        ; k <- lintArrow (text "coercion" <+> quotes (ppr co)) k1 k2
        ; k' <- lintArrow (text "coercion" <+> quotes (ppr co)) k'1 k'2
+       ; ensureEqTys k3 multiplicityTy (text "coercion" <> quotes (ppr co))
+       ; ensureEqTys k'3 multiplicityTy (text "coercion" <> quotes (ppr co))
        ; lintRole co1 r r1
        ; lintRole co2 r r2
        ; lintRole w Nominal r3

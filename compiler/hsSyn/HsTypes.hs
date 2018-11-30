@@ -756,9 +756,9 @@ instance Multable (LHsType GhcRn) where
   fromMult Omega = noLoc omegaDataConHsTy
   fromMult (MultThing ty) = ty
   fromMult Zero =
-    pprPanic "HsTypes.fromMult" (text"A multiplicity 0 leaked into a type")
-  fromMult r =
-    pprPanic "HsTypes.fromMult" (text"TODO")
+    pprPanic "HsTypes.fromMult" (text "A multiplicity 0 leaked into a type")
+  fromMult _ =
+    pprPanic "HsTypes.fromMult" (text "Full support for multiplicity polymorphism is not implemented yet")
 
   toMult ty
     | L _ (HsTyVar _ _ (L _ n)) <- ty

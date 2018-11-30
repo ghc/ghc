@@ -411,8 +411,6 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; op_id  <- tcLookupId op_name
        ; res_ty <- readExpType res_ty
 
-       ;
-       ; arg1_ty_read <- zonkTcType arg1_ty
        ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep res_ty
                                                , scaledThing arg2_sigma
                                                , res_ty])
@@ -1559,7 +1557,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
            ; return (result, mkWpCastN list_co) }
 
     go rho_ty (SynFun mult_shape arg_shape res_shape)
-      = do { ( ( ( (result, arg_ty, res_ty, op_mult, res_mult)
+      = do { ( ( ( (result, arg_ty, res_ty, op_mult, _res_mult)
                  , res_wrapper )                   -- :: res_ty_out "->" res_ty
                , arg_wrapper1, [], arg_wrapper2 )  -- :: arg_ty "->" arg_ty_out
              , match_wrapper )         -- :: (arg_ty -> res_ty) "->" rho_ty
