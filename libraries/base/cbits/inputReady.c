@@ -28,7 +28,6 @@
 #include "Rts.h"
 #if !defined(_WIN32)
 #include <poll.h>
-#include <sys/time.h>
 #endif
 
 /*

@@ -25,10 +25,10 @@ import TcEnv
 import TcUnify( buildImplicationFor )
 import TcEvidence( mkTcCoVarCo )
 import Type
+import TyCon( isTypeFamilyTyCon )
 import Multiplicity
 import Id
 import Var( EvVar )
-import TyCon( isTypeFamilyTyCon )
 import VarSet
 import BasicTypes       ( RuleName )
 import SrcLoc

@@ -21,7 +21,7 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE FlexibleInstances #-}
 
 module HsTypes (
-        Mult, HsMult(..), HsScaled(..),
+        Mult, HsMult, HsScaled(..),
         HsArrow(..), arrowToMult,
         hsLinear, hsUnrestricted, isHsOmega,
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,

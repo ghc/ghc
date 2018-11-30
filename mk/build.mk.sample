@@ -92,8 +92,8 @@ endif
 # This is necessary, for instance, to get DWARF stack traces out of programs
 # built by the produced compiler. You must also pass --enable-dwarf-unwind to
 # `configure` to enable the runtime system's builtin unwinding support.
-GhcLibHcOpts += -g3
-GhcRtsHcOpts += -g3
+#GhcLibHcOpts += -g3
+#GhcRtsHcOpts += -g3
 
 # Build the "extra" packages (see ./packages). This enables more tests. See:
 # https://ghc.haskell.org/trac/ghc/wiki/Building/RunningTests/Running#AdditionalPackages

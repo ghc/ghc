@@ -58,7 +58,6 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
         -- -fprof-auto etc.
         prof = if gopt Opt_SccProfilingOn dflags then fromEnum profAuto else 0
 
-
         flags = (mainis, safeHs, lang, cpp, paths, prof)
 
     in -- pprTrace "flags" (ppr flags) $
@@ -96,7 +95,8 @@ fingerprintHpcFlags dflags@DynFlags{..} nameio =
         -- hpcDir is output-only, so we should recompile if it changes
         hpc = if gopt Opt_Hpc dflags then Just hpcDir else Nothing
 
-    in computeFingerprint nameio hpc
+      in computeFingerprint nameio hpc
+
 
 {- Note [path flags and recompilation]
 

@@ -128,8 +128,6 @@ module TysWiredIn (
 
         unrestrictedFunTyCon, unrestrictedFunTyConName
 
-
-
     ) where
 
 #include "HsVersions.h"
@@ -552,7 +550,6 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
   = data_con
   where
     tag_map = mkTyConTagMap tycon
-
     -- This constructs the constructor Name to ConTag map once per
     -- constructor, which is quadratic. It's OK here, because it's
     -- only called for wired in data types that don't have a lot of

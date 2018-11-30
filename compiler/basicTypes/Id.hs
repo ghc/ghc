@@ -495,6 +495,7 @@ isDataConWorkId_maybe id = case Var.idDetails id of
                         DataConWorkId con -> Just con
                         _                 -> Nothing
 
+isDataConWrapId :: Id -> Bool
 isDataConWrapId id = case Var.idDetails id of
                        DataConWrapId _ -> True
                        _               -> False

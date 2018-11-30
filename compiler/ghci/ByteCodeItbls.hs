@@ -19,7 +19,7 @@ import Name             ( Name, getName )
 import NameEnv
 import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
-import Multiplicity           ( scaledThing )
+import Multiplicity     ( scaledThing )
 import RepType
 import StgCmmLayout     ( mkVirtConstrSizes )
 import StgCmmClosure    ( tagForCon, NonVoid (..) )

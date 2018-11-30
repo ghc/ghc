@@ -183,6 +183,7 @@ isExprLevPoly = go
    go_app e@(Type {})     = pprPanic "isExprLevPoly app ty" (ppr e)
    go_app e@(Coercion {}) = pprPanic "isExprLevPoly app co" (ppr e)
 
+
 {-
 Note [Type bindings]
 ~~~~~~~~~~~~~~~~~~~~

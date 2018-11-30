@@ -538,8 +538,8 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '|'            { L _ ITvbar }
  '<-'           { L _ (ITlarrow _) }
  '->'           { L _ (ITrarrow _) }
- '⊸'           { L _ (ITlolly _) }
- '->@{'           { L _ (ITlolly2) }
+ '⊸'            { L _ (ITlolly _) }
+ '->@{'         { L _ (ITlolly2) }
  '@'            { L _ ITat }
  '~'            { L _ ITtilde }
  '=>'           { L _ (ITdarrow _) }
