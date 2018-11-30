@@ -670,7 +670,7 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
 
         )
         binders0
-    go _ = markAllJoinsBad (lintCoreExpr rhs)
+    go _ = markAllJoinsBad $ lintCoreExpr rhs
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty uf

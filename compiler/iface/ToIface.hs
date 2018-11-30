@@ -90,7 +90,7 @@ toIfaceIdBndr :: Id -> IfaceIdBndr
 toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
 
 toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
-toIfaceIdBndrX fr covar = ( toIfaceMult (idWeight covar)  
+toIfaceIdBndrX fr covar = ( toIfaceMult (idWeight covar)
                           , occNameFS (getOccName covar)
                           , toIfaceTypeX fr (varType covar)
                           )

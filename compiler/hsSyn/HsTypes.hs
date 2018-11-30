@@ -1140,7 +1140,7 @@ splitHsFunType (L _ (HsParTy _ ty))
 
 splitHsFunType (L _ (HsFunTy _ x mult y))
   | (args, res) <- splitHsFunType y
-  = ((HsScaled mult x):args, res)
+  = (HsScaled mult x:args, res)
 
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
@@ -1148,7 +1148,7 @@ splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
     go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == unrestrictedFunTyConName
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
-                                 = ((hsUnrestricted t1):args, res)
+                                 = (hsUnrestricted t1:args, res)
     go (L _ (HsAppTy _ t1 t2)) tys = go t1 (t2:tys)
     go (L _ (HsParTy _ ty))    tys = go ty tys
     go _                     _   = ([], orig_ty)  -- Failure to match
