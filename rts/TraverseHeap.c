@@ -144,7 +144,7 @@ newStackBlock( traverseState *ts, bdescr *bd )
     ts->stackTop     = (stackElement *)(bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
     ts->stackBottom  = (stackElement *)bdescr_start(bd);
     ts->stackLimit   = (stackElement *)ts->stackTop;
-    bd->free     = (StgPtr)ts->stackLimit;
+    bdescr_set_free(bd, (StgPtr)ts->stackLimit);
 }
 
 /* -----------------------------------------------------------------------------
@@ -156,10 +156,10 @@ STATIC_INLINE void
 returnToOldStack( traverseState *ts, bdescr *bd )
 {
     ts->currentStack = bd;
-    ts->stackTop = (stackElement *)bd->free;
+    ts->stackTop = (stackElement *)bdescr_free(bd);
     ts->stackBottom = (stackElement *)bdescr_start(bd);
     ts->stackLimit = (stackElement *)(bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
-    bd->free = (StgPtr)ts->stackLimit;
+    bdescr_set_free(bd, (StgPtr)ts->stackLimit);
 }
 
 /**
@@ -311,7 +311,7 @@ pushStackElement(traverseState *ts, const stackElement se)
 
         // currentStack->free is updated when the active stack is switched
         // to the next stack.
-        ts->currentStack->free = (StgPtr)ts->stackTop;
+        bdescr_set_free(ts->currentStack, (StgPtr)ts->stackTop);
 
         if (ts->currentStack->link == NULL) {
             nbd = allocGroup(BLOCKS_IN_STACK);
@@ -632,7 +632,7 @@ popStackElement(traverseState *ts) {
 
     // currentStack->free is updated when the active stack is switched back
     // to the previous stack.
-    ts->currentStack->free = (StgPtr)ts->stackLimit;
+    bdescr_set_free(ts->currentStack, (StgPtr)ts->stackLimit);
 
     // find the previous block descriptor
     pbd = ts->currentStack->u.back;
@@ -1111,7 +1111,7 @@ resetMutableObjects(void)
         // visited during heap traversal.
         for (n = 0; n < n_capabilities; n++) {
           for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
-            for (ml = bdescr_start(bd); ml < bd->free; ml++) {
+            for (ml = bdescr_start(bd); ml < bdescr_free(bd); ml++) {
 
                 traverseMaybeInitClosureData((StgClosure *)*ml);
             }
