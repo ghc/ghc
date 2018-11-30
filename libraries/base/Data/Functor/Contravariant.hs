@@ -255,7 +255,7 @@ instance Num a => Num (Op a b) where
   Op f - Op g = Op $ \a -> f a - g a
   abs (Op f) = Op $ abs . f
   signum (Op f) = Op $ signum . f
-  fromInteger = (\x -> Op x) . const . fromInteger
+  fromInteger = Op . const . fromInteger
 
 instance Fractional a => Fractional (Op a b) where
   Op f / Op g = Op $ \a -> f a / g a

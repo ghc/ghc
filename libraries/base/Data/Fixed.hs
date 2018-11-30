@@ -72,8 +72,8 @@ conMkFixed = mkConstr tyFixed "MkFixed" [] Prefix
 
 -- | @since 4.1.0.0
 instance (Typeable a) => Data (Fixed a) where
-    gfoldl k z (MkFixed a) = k (z (\x -> MkFixed x)) a
-    gunfold k z _ = k (z (\x -> MkFixed x))
+    gfoldl k z (MkFixed a) = k (z MkFixed) a
+    gunfold k z _ = k (z MkFixed)
     dataTypeOf _ = tyFixed
     toConstr _ = conMkFixed
 

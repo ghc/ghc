@@ -1137,7 +1137,7 @@ instance Data a => Data [a] where
   toConstr (_:_) = consConstr
   gunfold k z c = case constrIndex c of
                     1 -> z []
-                    2 -> k (k (z (\x y -> (:) x y)))
+                    2 -> k (k (z (:)))
                     _ -> errorWithoutStackTrace "Data.Data.gunfold(List)"
   dataTypeOf _ = listDataType
   dataCast1 f  = gcast1 f
