@@ -620,7 +620,7 @@ GarbageCollect (uint32_t collect_gen,
                     }
                     else
                     {
-                        gen->n_words += bdescr_free(bd) - bdescr_start(bd);
+                        gen->n_words += bd->free_off / sizeof(StgWord);
 
                         // NB. this step might not be compacted next
                         // time, so reset the BF_MARKED flags.
@@ -691,7 +691,7 @@ GarbageCollect (uint32_t collect_gen,
         for (bd = gen->scavenged_large_objects; bd; bd = next) {
             next = bd->link;
             dbl_link_onto(bd, &gen->large_objects);
-            gen->n_large_words += bdescr_free(bd) - bdescr_start(bd);
+            gen->n_large_words += bd->free_off / sizeof(StgWord);
         }
 
         // And same for compacts
@@ -996,14 +996,16 @@ new_gc_thread (uint32_t n, gc_thread *t)
         // Hence, allocate a block for todo_bd manually:
         {
             bdescr *bd = allocBlockOnNode(capNoToNumaNode(n));
+            const StgPtr start = bdescr_start(bd);
                 // no lock, locks aren't initialised yet
             initBdescr(bd, ws->gen, ws->gen->to);
             bd->flags = BF_EVACUATED;
-            bd->u.scan = bd->free = bdescr_start(bd);
+            bd->u.scan = start;
+            bd->free_off = 0;
 
             ws->todo_bd = bd;
             ws->todo_free = bdescr_free(bd);
-            ws->todo_lim = bdescr_start(bd) + BLOCK_SIZE_W;
+            ws->todo_lim = start + BLOCK_SIZE_W;
         }
 
         ws->todo_q = newWSDeque(128);
@@ -1643,7 +1645,7 @@ collect_pinned_object_blocks (void)
             for (bdescr *bd = capabilities[n]->pinned_object_blocks; bd != NULL; bd = bd->link) {
                 bd->flags |= BF_NONMOVING;
                 bd->gen_no = oldest_gen->no;
-                oldest_gen->n_large_words += bdescr_free(bd) - bdescr_start(bd);
+                oldest_gen->n_large_words += bd->free_off / sizeof(StgWord);
                 oldest_gen->n_large_blocks += bd->blocks;
                 last = bd;
             }
