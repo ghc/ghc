@@ -1402,7 +1402,8 @@ freeNamesIfConDecl (IfCon { ifConExTCvs  = ex_tvs, ifConCtxt = ctxt
                           , ifConStricts = bangs })
   = fnList freeNamesIfBndr ex_tvs &&&
     freeNamesIfContext ctxt &&&
-    fnList freeNamesIfType (map snd arg_tys) &&& -- TODO: rig types have free vars
+    fnList freeNamesIfType (map fst arg_tys) &&& -- these are multiplicities, represented as types
+    fnList freeNamesIfType (map snd arg_tys) &&&
     mkNameSet (map flSelector flds) &&&
     fnList freeNamesIfType (map snd eq_spec) &&& -- equality constraints
     fnList freeNamesIfBang bangs

@@ -59,11 +59,6 @@ class Multable a where
   -- that @m@ is a subtree of @toMult . fromMult m@.
   toMult :: a -> GMult a
 
-  -- | A way to check the order of two values of @a@ seen as atomic multiplicity
-  -- (that is, all the multiplicity structure has been reified)
-
-  -- XXX:TODO
-
 -- Note that pattern synonyms for One, Omega, and Zero are not necessary: we could just
 -- export them as constructors. They are defined as pattern synonym for
 -- symmetry. Following the principle of least surprise.

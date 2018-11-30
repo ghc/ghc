@@ -307,7 +307,7 @@ tcDerivStrategy user_ctxt mds thing_inside
              tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) ty cls_kind
       ty' <- zonkTcTypeToType ty'
       let (via_tvs, via_pred) = splitForAllTys ty'
-      tcExtendTyVarEnv (map unrestricted via_tvs) $ do   -- TODO: is this correct?
+      tcExtendTyVarEnv (map unrestricted via_tvs) $ do
         (thing_tvs, thing) <- thing_inside
         pure (ViaStrategy via_pred, via_tvs ++ thing_tvs, thing)
 
