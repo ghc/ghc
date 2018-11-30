@@ -825,8 +825,8 @@
   W_ __bd;                                                              \
   W_ mut_list;                                                          \
   mut_list = Capability_mut_lists(MyCapability()) + WDS(gen);           \
- __bd = W_[mut_list];                                                   \
-  if (bdescr_free(__bd) >= bdescr_start(__bd) + BLOCK_SIZE) {           \
+  __bd = W_[mut_list];                                                  \
+  if (TO_W_(bdescr_free_off(__bd)) >= BLOCK_SIZE) {                     \
       W_ __new_bd;                                                      \
       ("ptr" __new_bd) = foreign "C" allocBlock_lock();                 \
       bdescr_link(__new_bd) = __bd;                                     \
@@ -836,7 +836,7 @@
   W_ free;                                                              \
   free = bdescr_free(__bd);                                             \
   W_[free] = p;                                                         \
-  bdescr_free(__bd) = free + WDS(1);
+  bdescr_free_off(__bd) = %lobits32(TO_W_(bdescr_free_off(__bd)) + WDS(1));
 
 #define recordMutable(p)                                        \
       P_ __p;                                                   \

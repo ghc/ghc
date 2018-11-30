@@ -126,10 +126,9 @@ stg_gc_noregs
             CLOSE_NURSERY();
             Capability_total_allocated(MyCapability()) =
               Capability_total_allocated(MyCapability()) +
-              %zx64(BYTES_TO_WDS(bdescr_free(CurrentNursery) -
-                                 bdescr_start(CurrentNursery)));
+              BYTES_TO_WDS(TO_W_(bdescr_free_off(CurrentNursery)));
             CurrentNursery = bdescr_link(CurrentNursery);
-            bdescr_free(CurrentNursery) = bdescr_start(CurrentNursery);
+            bdescr_free_off(CurrentNursery) = 0;
             OPEN_NURSERY();
 
             CInt context_switch, interrupt;

@@ -65,7 +65,7 @@ allocBlocks_sync(uint32_t n, bdescr **hd)
     for (i = 0; i < n; i++) {
         bd[i].blocks = 1;
         bd[i].link = &bd[i+1];
-        bd[i].free = bdescr_start(&bd[i]);
+        bd[i].free_off = 0;
     }
     bd[n-1].link = NULL;
     // We have to hold the lock until we've finished fiddling with the metadata,
@@ -297,7 +297,7 @@ todo_block_full (uint32_t size, gen_workspace *ws)
         // push it on to the scanned list.
         if (bd->u.scan == bdescr_free(bd))
         {
-            if (bdescr_free(bd) == bdescr_start(bd)) {
+            if (bd->free_off == 0) {
                 // Normally the block would not be empty, because then
                 // there would be enough room to copy the current
                 // object.  However, if the object we're copying is

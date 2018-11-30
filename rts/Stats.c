@@ -1655,7 +1655,7 @@ statDescribeGens(void)
           // Add the pinned object block.
           bd = getCapability(i)->pinned_object_block;
           if (bd != NULL) {
-              gen_live   += bd->free - bdescr_start(bd);
+              gen_live   += bd->free_off / sizeof(W_);
               gen_blocks += bd->blocks;
           }
 

@@ -774,7 +774,7 @@ allocNursery (uint32_t node, bdescr *tail, W_ blocks)
                 }
             }
 
-            bd[i].free = bdescr_start(&bd[i]);
+            bd[i].free_off = 0;
         }
 
         tail = &bd[0];
@@ -1143,7 +1143,7 @@ allocateMightFail (Capability *cap, W_ n)
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
         RELAXED_STORE(&bd->flags, BF_LARGE);
-        bdescr_set_free(bd, bdescr_start(bd) + n);
+        bd->free_off = n * sizeof(W_);
         cap->total_allocated += n;
         return bdescr_start(bd);
     }
@@ -1210,7 +1210,7 @@ allocateMightFail (Capability *cap, W_ n)
         IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery));
     }
     p = bdescr_free(bd);
-    bdescr_set_free(bd, p + n);
+    bd->free_off += n * sizeof(W_);
 
     IF_DEBUG(sanity, ASSERT(*((StgWord8*)p) == 0xaa));
     return p;
@@ -1638,8 +1638,8 @@ W_ countOccupied (bdescr *bd)
 
     words = 0;
     for (; bd != NULL; bd = bd->link) {
-        ASSERT(bdescr_free(bd) <= bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W);
-        words += bdescr_free(bd) - bdescr_start(bd);
+        ASSERT(bd->free_off <= bd->blocks * BLOCK_SIZE);
+        words += bd->free_off / sizeof(W_);
     }
     return words;
 }

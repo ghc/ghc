@@ -448,16 +448,16 @@ recordMutableCap (const StgClosure *p, Capability *cap, uint32_t gen)
     //    ASSERT(cap->running_task == myTask());
     // NO: assertion is violated by performPendingThrowTos()
     bd = cap->mut_lists[gen];
-    if (bdescr_free(bd) >= bdescr_start(bd) + BLOCK_SIZE_W) {
+    if (bd->free_off >= BLOCK_SIZE_W) {
         bdescr *new_bd;
         new_bd = allocBlockOnNode_lock(cap->node);
         new_bd->link = bd;
-        new_bd->free = bdescr_start(new_bd);
+        new_bd->free_off = 0;
         bd = new_bd;
         cap->mut_lists[gen] = bd;
     }
-    RELAXED_STORE(bd->free, (StgWord) p);
-    NONATOMIC_ADD(&bd->free, 1);
+    *bdescr_free(bd) = (StgWord)p;
+    bd->free_off += sizeof(StgWord);
 }
 
 EXTERN_INLINE void

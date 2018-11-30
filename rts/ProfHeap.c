@@ -1119,14 +1119,15 @@ static void
 heapCensusBlock(Census *census, bdescr *bd)
 {
     StgPtr p = bdescr_start(bd);
+    const StgPtr free = bdescr_free(bd);
 
     // In the case of PINNED blocks there can be (zeroed) slop at the beginning
     // due to object alignment.
     if (bd->flags & BF_PINNED) {
-        while (p < bd->free && !*p) p++;
+        while (p < free && !*p) p++;
     }
 
-    while (p < bd->free) {
+    while (p < free) {
         const StgInfoTable *info = get_itbl((const StgClosure *)p);
         bool prim = false;
         size_t size;
@@ -1260,7 +1261,7 @@ heapCensusBlock(Census *census, bdescr *bd)
         p += size;
 
         /* skip over slop, see Note [slop on the heap] */
-        while (p < bd->free && !*p) p++;
+        while (p < free && !*p) p++;
         /* Note [skipping slop in the heap profiler]
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
          * We make sure to zero slop that can remain after a major GC so

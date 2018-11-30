@@ -1002,7 +1002,7 @@ findPtr(P_ p, int follow)
 
 #if 0
   // We can't search the nursery, because we don't know which blocks contain
-  // valid data, because the bd->free pointers in the nursery are only reset
+  // valid data, because the bd->free_off fields in the nursery are only reset
   // just before a block is used.
   for (n = 0; n < getNumCapabilities(); n++) {
       bd = nurseries[i].blocks;

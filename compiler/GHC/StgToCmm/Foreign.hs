@@ -487,10 +487,10 @@ Closing the nursery corresponds to the following code:
   // check to see whether it has overflowed at this point, that check is
   // made when we run out of space in the current heap block (stg_gc_noregs)
   // and in the scheduler when context switching (schedulePostRunThread).
-  tso->alloc_limit -= Hp + WDS(1) - cn->start;
+  tso->alloc_limit -= Hp + WDS(1) - bdescr_start(cn);
 
-  // Set cn->free to the next unoccupied word in the block
-  cn->free = Hp + WDS(1);
+  // Set cn->free_off to the next unoccupied word in the block
+  cn->free_off = Hp - bdescr_start(cn) + WDS(1);
 @
 -}
 closeNursery :: MonadUnique m => Profile -> LocalReg -> m CmmAGraph
@@ -498,23 +498,26 @@ closeNursery profile tso = do
   let tsoreg   = CmmLocal tso
       platform = profilePlatform profile
   cnreg      <- CmmLocal <$> newTemp (bWord platform)
+  startreg   <- CmmLocal <$> newTemp (bWord platform)
+
+  -- alloc = (Hp + WDS(1)) - bdescr_start(CurrentNursery);
+  let alloc =
+          cmmSubWord platform
+            (cmmOffsetW platform (hpExpr platform) 1)
+            (CmmReg startreg)
+
   pure $ catAGraphs [
     mkAssign cnreg (currentNurseryExpr platform),
 
-    -- CurrentNursery->free = Hp+1;
-    mkStore (nursery_bdescr_free platform cnreg) (cmmOffsetW platform (hpExpr platform) 1),
+    mkAssign startreg (nurseryStart platform cnreg),
 
-    let alloc =
-           CmmMachOp (mo_wordSub platform)
-              [ cmmOffsetW platform (hpExpr platform) 1
-              , nurseryStart platform cnreg
-              ]
-
-        alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
-    in
+    -- CurrentNursery->free_off = (StgWord32) alloc;
+    mkStore (nursery_bdescr_free_off platform cnreg)
+      (CmmMachOp (mo_WordTo32 platform) [alloc]),
 
     -- tso->alloc_limit += alloc
-    mkStore alloc_limit (CmmMachOp (MO_Sub W64)
+    let alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
+    in mkStore alloc_limit (CmmMachOp (MO_Sub W64)
                                [ CmmLoad alloc_limit b64 NaturallyAligned
                                , CmmMachOp (mo_WordTo64 platform) [alloc] ])
    ]
@@ -572,19 +575,19 @@ Opening the nursery corresponds to the following code:
 @
    tso = CurrentTSO;
    cn = CurrentNursery;
-   bdfree = CurrentNursery->free;
-   bdstart = CurrentNursery->start;
+   bdfree_off = bdescr_free_off(CurrentNursery);
+   bdstart = bdescr_start(CurrentNursery);
 
    // We *add* the currently occupied portion of the nursery block to
    // the allocation limit, because we will subtract it again in
    // closeNursery.
-   tso->alloc_limit += bdfree - bdstart;
+   tso->alloc_limit += bdfree_off;
 
    // Set Hp to the last occupied word of the heap block.  Why not the
    // next unoccupied word?  Doing it this way means that we get to use
    // an offset of zero more often, which might lead to slightly smaller
    // code on some architectures.
-   Hp = bdfree - WDS(1);
+   Hp = bdstart + bdfree_off - WDS(1);
 
    // Set HpLim to the end of the current nursery block (note that this block
    // might be a block group, consisting of several adjacent blocks.
@@ -605,12 +608,18 @@ openNursery profile tso = do
   -- stg_returnToStackTop in rts/StgStartup.cmm.
   pure $ catAGraphs [
      mkAssign cnreg (currentNurseryExpr platform),
-     mkAssign bdfreereg  (cmmLoadBWord platform (nursery_bdescr_free platform cnreg)),
 
-     -- Hp = CurrentNursery->free - 1;
-     mkAssign (hpReg platform) (cmmOffsetW platform (CmmReg bdfreereg) (-1)),
+     -- free = CurrentNursery->free_off;
+     mkAssign bdfreereg
+       (CmmMachOp (MO_UU_Conv W32 (wordWidth platform))
+                  [CmmLoad (nursery_bdescr_free_off platform cnreg) b32 NaturallyAligned]),
 
      mkAssign bdstartreg (nurseryStart platform cnreg),
+
+     -- Hp = CurrentNursery->free - WDS(1);
+     let hp = CmmMachOp (mo_wordAdd platform)
+                [CmmReg bdstartreg, CmmReg bdfreereg]
+     in mkAssign (hpReg platform) (cmmOffsetW platform hp (-1)),
 
      -- HpLim = CurrentNursery->start +
      --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;
@@ -627,14 +636,13 @@ openNursery profile tso = do
              )
          ),
 
-     -- alloc = bd->free - bdescr_start(start)
-     let alloc =
-           CmmMachOp (mo_wordSub platform) [CmmReg bdfreereg, CmmReg bdstartreg]
+     -- alloc = free_off;
+     let alloc = CmmReg bdfreereg
 
          alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
      in
 
-     -- tso->alloc_limit += alloc
+     -- tso->alloc_limit += alloc;
      mkStore alloc_limit (CmmMachOp (MO_Add W64)
                                [ CmmLoad alloc_limit b64 NaturallyAligned
                                , CmmMachOp (mo_WordTo64 platform) [alloc] ])
@@ -659,15 +667,15 @@ nurseryStart platform cnreg =
     mkAnd x y = CmmMachOp (MO_And (wordWidth platform)) [x, y]
     mkShl x y = CmmMachOp (MO_Shl (wordWidth platform)) [x, y]
 
--- | The address of the @free@ field of a nursery block descriptor pointed to by @cn@
-nursery_bdescr_free :: Platform -> CmmReg -> CmmExpr
-nursery_bdescr_free   platform cn =
-  cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_free (platformConstants platform))
-
--- | The address of the @start@ field of a nursery block descriptor pointed to by @cn@
+-- | The address of the @blocks@ field of a nursery block's @bdescr@.
 nursery_bdescr_blocks :: Platform -> CmmReg -> CmmExpr
 nursery_bdescr_blocks platform cn =
   cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_blocks (platformConstants platform))
+
+-- | The address of the @free_off@ field of a nursery block's @bdescr@.
+nursery_bdescr_free_off :: Platform -> CmmReg -> CmmExpr
+nursery_bdescr_free_off platform cn =
+  cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_free_off (platformConstants platform))
 
 tso_stackobj, tso_CCCS, tso_alloc_limit, stack_STACK, stack_SP :: Profile -> ByteOff
 tso_stackobj    profile = closureField profile (pc_OFFSET_StgTSO_stackobj    (profileConstants profile))

@@ -87,7 +87,7 @@ arenaAlloc( Arena *arena, size_t size )
         bd->gen_no  = 0;
         bd->dest_no = 0;
         bd->flags   = 0;
-        bd->free    = bdescr_start(bd);
+        bd->free_off= 0;
         bd->link    = arena->current;
         arena->current = bd;
         arena->free = bdescr_start(bd) + size_w;
