@@ -48,7 +48,7 @@ bdescr *steal_todo_block       (uint32_t s);
 INLINE_HEADER bool
 isPartiallyFull(bdescr *bd)
 {
-    return (bd->free + WORK_UNIT_WORDS < bdescr_start(bd) + BLOCK_SIZE_W);
+    return (bd->free_off + WORK_UNIT_WORDS < BLOCK_SIZE);
 }
 
 // Version of recordMutableGen for use during GC.  This uses the
@@ -60,14 +60,15 @@ recordMutableGen_GC (StgClosure *p, uint32_t gen_no)
     bdescr *bd;
 
     bd = gct->mut_lists[gen_no];
-    if (bd->free >= bdescr_start(bd) + BLOCK_SIZE_W) {
+    if (bd->free_off >= BLOCK_SIZE) {
         bdescr *new_bd;
         new_bd = allocBlock_sync();
         new_bd->link = bd;
         bd = new_bd;
         gct->mut_lists[gen_no] = bd;
     }
-    *bd->free++ = (StgWord)p;
+    *bdescr_free(bd) = (StgWord)p;
+    bd->free_off += sizeof(StgWord);
 }
 
 #include "EndPrivate.h"

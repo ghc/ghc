@@ -329,31 +329,34 @@ Closing the nursery corresponds to the following code:
   // and in the scheduler when context switching (schedulePostRunThread).
   tso->alloc_limit -= Hp + WDS(1) - cn->start;
 
-  // Set cn->free to the next unoccupied word in the block
-  cn->free = Hp + WDS(1);
+  // Set cn->free_off to the next unoccupied word in the block
+  cn->free_off = Hp - cn->start + WDS(1);
 @
 -}
 closeNursery :: MonadUnique m => DynFlags -> LocalReg -> m CmmAGraph
 closeNursery df tso = do
   let tsoreg  = CmmLocal tso
   cnreg      <- CmmLocal <$> newTemp (bWord df)
+  startreg   <- CmmLocal <$> newTemp (bWord df)
+
+  -- alloc = (Hp + 1) - CurrentNursery->start;
+  let alloc =
+          cmmSubWord df
+            (cmmOffsetW df hpExpr 1)
+            (CmmReg startreg)
+
   pure $ catAGraphs [
     mkAssign cnreg currentNurseryExpr,
 
-    -- CurrentNursery->free = Hp+1;
-    mkStore (nursery_bdescr_free df cnreg) (cmmOffsetW df hpExpr 1),
+    mkAssign startreg (CmmLoad (nursery_bdescr_start df cnreg) (bWord df)),
 
-    let alloc =
-           CmmMachOp (mo_wordSub df)
-              [ cmmOffsetW df hpExpr 1
-              , CmmLoad (nursery_bdescr_start df cnreg) (bWord df)
-              ]
-
-        alloc_limit = cmmOffset df (CmmReg tsoreg) (tso_alloc_limit df)
-    in
+    -- CurrentNursery->free_off = (StgWord32) alloc;
+    mkStore (nursery_bdescr_free_off df cnreg)
+      (CmmMachOp (mo_WordTo32 df) [alloc]),
 
     -- tso->alloc_limit += alloc
-    mkStore alloc_limit (CmmMachOp (MO_Sub W64)
+    let alloc_limit = cmmOffset df (CmmReg tsoreg) (tso_alloc_limit df)
+    in mkStore alloc_limit (CmmMachOp (MO_Sub W64)
                                [ CmmLoad alloc_limit b64
                                , CmmMachOp (mo_WordTo64 df) [alloc] ])
    ]
@@ -410,19 +413,19 @@ Opening the nursery corresponds to the following code:
 @
    tso = CurrentTSO;
    cn = CurrentNursery;
-   bdfree = CurrentNursery->free;
-   bdstart = CurrentNursery->start;
+   bdfree_off = bdescr_free_off(CurrentNursery);
+   bdstart = bdescr_start(CurrentNursery);
 
    // We *add* the currently occupied portion of the nursery block to
    // the allocation limit, because we will subtract it again in
    // closeNursery.
-   tso->alloc_limit += bdfree - bdstart;
+   tso->alloc_limit += bdfree_off;
 
    // Set Hp to the last occupied word of the heap block.  Why not the
    // next unocupied word?  Doing it this way means that we get to use
    // an offset of zero more often, which might lead to slightly smaller
    // code on some architectures.
-   Hp = bdfree - WDS(1);
+   Hp = bdstart + bdfree_off - WDS(1);
 
    // Set HpLim to the end of the current nursery block (note that this block
    // might be a block group, consisting of several adjacent blocks.
@@ -443,14 +446,18 @@ openNursery df tso = do
   pure $ catAGraphs [
      mkAssign cnreg currentNurseryExpr,
 
-     -- free = CurrentNursery->free
-     mkAssign bdfreereg  (CmmLoad (nursery_bdescr_free df cnreg)  (bWord df)),
-
-     -- Hp = CurrentNursery->free - 1;
-     mkAssign hpReg (cmmOffsetW df (CmmReg bdfreereg) (-1)),
+     -- free = CurrentNursery->free_off;
+     mkAssign bdfreereg
+       (CmmMachOp (MO_UU_Conv W32 (wordWidth df))
+                  [CmmLoad (nursery_bdescr_free_off df cnreg) b32]),
 
      -- start = bdescr_start(CurrentNursery)
      mkAssign bdstartreg (nursery_bdescr_start df cnreg),
+
+     -- Hp = CurrentNursery->free - 1;
+     let hp = CmmMachOp (mo_wordAdd df)
+                [CmmReg bdstartreg, CmmReg bdfreereg]
+     in mkAssign hpReg (cmmOffsetW df hp (-1)),
 
      -- HpLim = CurrentNursery->start +
      --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;
@@ -467,24 +474,23 @@ openNursery df tso = do
              )
          ),
 
-     -- alloc = bd->free - start
-     let alloc =
-           CmmMachOp (mo_wordSub df) [CmmReg bdfreereg, CmmReg bdstartreg]
+     -- alloc = free_off;
+     let alloc = CmmReg bdfreereg
 
          alloc_limit = cmmOffset df (CmmReg tsoreg) (tso_alloc_limit df)
      in
 
-     -- tso->alloc_limit += alloc
+     -- tso->alloc_limit += alloc;
      mkStore alloc_limit (CmmMachOp (MO_Add W64)
                                [ CmmLoad alloc_limit b64
                                , CmmMachOp (mo_WordTo64 df) [alloc] ])
 
    ]
 
-nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks
+nursery_bdescr_free_off, nursery_bdescr_start, nursery_bdescr_blocks
   :: DynFlags -> CmmReg -> CmmExpr
-nursery_bdescr_free   dflags cn =
-  cmmOffset dflags (CmmReg cn) (oFFSET_bdescr_free dflags)
+nursery_bdescr_free_off dflags cn =
+  cmmOffset dflags (CmmReg cn) (oFFSET_bdescr_free_off dflags)
 nursery_bdescr_start  dflags cn =
   ((bd `mkAnd` intLit (mBLOCK_MASK dflags))
    `mkShl` intLit (bLOCK_SHIFT dflags - bDESCR_SHIFT dflags))
