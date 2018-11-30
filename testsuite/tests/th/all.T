@@ -59,7 +59,7 @@ test('TH_spliceD1', [], multimod_compile_fail,
 
 test('TH_spliceD2', [], multimod_compile, ['TH_spliceD2', '-v0'])
 
-test('TH_reifyDecl1', normal, compile, ['-v0'])
+test('TH_reifyDecl1', expect_broken(242), compile, ['-v0'])
 test('TH_reifyDecl2', normal, compile, ['-v0'])
 test('TH_reifyLocalDefs', normal, compile, ['-v0'])
 test('TH_reifyLocalDefs2', normal, compile, ['-v0'])
@@ -307,7 +307,7 @@ test('T8624', only_ways(['normal']),
               ['$MAKE -s --no-print-directory T8624'])
 test('TH_Lift', normal, compile, ['-v0'])
 test('T10047', only_ways(['ghci']), ghci_script, ['T10047.script'])
-test('T10019', only_ways(['ghci']), ghci_script, ['T10019.script'])
+test('T10019',[ only_ways(['ghci']), expect_broken(242)], ghci_script, ['T10019.script'])
 test('T10267', [], multimod_compile_fail,
      ['T10267', '-fno-max-valid-hole-fits -dsuppress-uniques -v0 ' + config.ghc_th_way_flags])
 test('T10279', normal, compile_fail, ['-v0'])
@@ -343,7 +343,7 @@ test('T10819', [], multimod_compile,
      ['T10819.hs', '-v0 ' + config.ghc_th_way_flags])
 test('T10820', normal, compile_and_run, ['-v0'])
 test('T11341', normal, compile, ['-v0 -dsuppress-uniques'])
-test('T11345', normal, compile_and_run, ['-v0 -dsuppress-uniques'])
+test('T11345', expect_broken(242), compile_and_run, ['-v0 -dsuppress-uniques'])
 test('TH_finalizer', normal, compile, ['-v0'])
 test('TH_finalizer2',
      normal, multimod_compile_and_run,
@@ -354,7 +354,7 @@ test('T9022', normal, compile_and_run, ['-v0'])
 test('T11145', normal, compile_fail, ['-v0 -dsuppress-uniques'])
 test('T11463', normal, compile_and_run, ['-v0 -dsuppress-uniques'])
 test('T11680', normal, compile_fail, ['-v0'])
-test('T11721_TH', normal, compile, ['-v0'])
+test('T11721_TH', expect_broken(236), compile, ['-v0'])
 test('T11809', normal, compile, ['-v0'])
 test('T11797', normal, compile, ['-v0 -dsuppress-uniques'])
 test('T11941', normal, compile_fail, ['-v0'])
