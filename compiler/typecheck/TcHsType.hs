@@ -627,6 +627,8 @@ tc_mult mode r = case r of
                          Zero -> return Zero
                          One  -> return One
                          Omega -> return Omega
+                         MultAdd x y -> liftM2 MultAdd (tc_mult mode x) (tc_mult mode y)
+                         MultMul x y -> liftM2 MultMul (tc_mult mode x) (tc_mult mode y)
                          MultThing ty -> do
                           ty' <- tc_lhs_type mode ty multiplicityTy
                           case ty' of
