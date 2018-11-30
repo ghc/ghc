@@ -2404,7 +2404,7 @@ tryEtaReduce bndrs body
          in Just (mkFunCo Representational (multToCo mult) reflCo co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (Scaled fun_mult _, _) <- splitFunTy_maybe fun_ty -- TODO: see above
+       , Just (Scaled fun_mult _, _) <- splitFunTy_maybe fun_ty
        , bndr == v
        , fun_mult `eqMult` idWeight v
        = Just (mkFunCo Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)

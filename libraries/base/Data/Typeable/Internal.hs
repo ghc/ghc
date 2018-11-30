@@ -432,7 +432,7 @@ mkTrAppChecked rep@(TrApp {trAppFun = p, trAppArg = x :: TypeRep x})
   , Just (IsTYPE (ry :: TypeRep ry)) <- isTYPE (typeRepKind y)
   , Just HRefl <- withTypeable x $ withTypeable rx $ withTypeable ry
                   $ typeRep @((->) x :: TYPE ry -> Type) `eqTypeRep` rep
-  = mkTrFun trOmega x y -- TODO handle multiplicity
+  = mkTrFun trOmega x y
 mkTrAppChecked a b = mkTrApp a b
 
 -- | A type application.
@@ -823,7 +823,6 @@ splitApps = go []
     go [] (TrFun {trFunArg = a, trFunRes = b, trFunMul = mul})
       | Just HRefl <- eqTypeRep trOmega mul = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
       | otherwise = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Only unrestricted functions are supported"
-    -- TODO handle multiplicity
     go _  (TrFun {})
       = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Impossible 1"
     go [] TrType = (tyConTYPE, [SomeTypeRep trLiftedRep])

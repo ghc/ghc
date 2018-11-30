@@ -329,7 +329,7 @@ resultWrapper result_ty
   , tc `hasKey` boolTyConKey
   = do { dflags <- getDynFlags
        ; let marshal_bool e
-               = mkWildCase e (unrestricted intPrimTy) boolTy -- TODO: if I find a solution to the equality of Int# this may become linear. Should this be factored with the code for equality by the way (litEq in PrelRules)?
+               = mkWildCase e (unrestricted intPrimTy) boolTy
                    [ (DEFAULT                   ,[],Var trueDataConId )
                    , (LitAlt (mkLitInt dflags 0),[],Var falseDataConId)]
        ; return (Just intPrimTy, marshal_bool) }

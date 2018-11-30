@@ -432,9 +432,9 @@ dsFExportDynamic id co0 cconv = do
     stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
-        export_ty     = mkFunTy Omega stable_ptr_ty arg_ty -- TODO: not sure about Omega here
+        export_ty     = mkFunTy Omega stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
-    stbl_value <- newSysLocalDs Omega stable_ptr_ty -- TODO: not sure about Omega here
+    stbl_value <- newSysLocalDs Omega stable_ptr_ty
     (h_code, c_code, typestring, args_size) <- dsFExport id (mkRepReflCo export_ty) fe_nm cconv True
     let
          {-

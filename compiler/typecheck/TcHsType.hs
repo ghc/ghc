@@ -333,7 +333,7 @@ tcDerivStrategy mds thing_inside
       ty' <- checkNoErrs $
              tcTopLHsType ty AnyKind
       let (via_tvs, via_pred) = splitForAllTys ty'
-      tcExtendTyVarEnv (map unrestricted via_tvs) $ do   -- TODO: is this correct?
+      tcExtendTyVarEnv (map unrestricted via_tvs) $ do
         (thing_tvs, thing) <- thing_inside
         pure (ViaStrategy via_pred, via_tvs ++ thing_tvs, thing)
 
