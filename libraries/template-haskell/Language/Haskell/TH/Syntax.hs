@@ -34,6 +34,8 @@ import Control.Monad.IO.Class (MonadIO (..))
 import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper )
 import Data.Int
+import Data.List.NonEmpty ( NonEmpty(..) )
+import Data.Void        ( Void, absurd )
 import Data.Word
 import Data.Ratio
 import GHC.Generics     ( Generic )
@@ -701,6 +703,17 @@ liftString :: String -> Q Exp
 -- Used in TcExpr to short-circuit the lifting for strings
 liftString s = return (LitE (StringL s))
 
+-- | @since 2.15.0.0
+instance Lift a => Lift (NonEmpty a) where
+  lift (x :| xs) = do
+    x' <- lift x
+    xs' <- lift xs
+    return (InfixE (Just x') (ConE nonemptyName) (Just xs'))
+
+-- | @since 2.15.0.0
+instance Lift Void where
+  lift = pure . absurd
+
 instance Lift () where
   lift () = return (ConE (tupleDataName 0))
 
@@ -751,6 +764,9 @@ justName    = mkNameG DataName "base" "GHC.Maybe" "Just"
 leftName, rightName :: Name
 leftName  = mkNameG DataName "base" "Data.Either" "Left"
 rightName = mkNameG DataName "base" "Data.Either" "Right"
+
+nonemptyName :: Name
+nonemptyName = mkNameG DataName "base" "GHC.Base" ":|"
 
 -----------------------------------------------------
 --

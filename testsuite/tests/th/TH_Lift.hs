@@ -9,6 +9,7 @@ import Data.Ratio
 import Data.Word
 import Data.Int
 import Numeric.Natural
+import Data.List.NonEmpty
 
 a :: Integer
 a = $( (\x -> [| x |]) (5 :: Integer) )
@@ -76,4 +77,6 @@ n = $( (\x -> [| x |]) () )
 o :: (Bool, Char, Int)
 o = $( (\x -> [| x |]) (True, 'x', 4 :: Int) )
 
+p :: NonEmpty Char
+p = $( (\x -> [| x |])  ('a' :| "bcde") )
 
