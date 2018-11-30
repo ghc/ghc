@@ -576,9 +576,9 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                                            ++ "improvement for a type")) hsc_env
                Just subst -> do
                  let dflags = hsc_dflags hsc_env
-                 when (dopt Opt_D_dump_rtti dflags) $
-                      printInfoForUser dflags alwaysQualify $
-                      fsep [text "RTTI Improvement for", ppr id, equals, ppr subst]
+                 dumpIfSet_dyn dflags Opt_D_dump_rtti "RTTI"
+                   (fsep [text "RTTI Improvement for", ppr id, equals,
+                          ppr subst])
 
                  let ic' = substInteractiveContext ic subst
                  return hsc_env{hsc_IC=ic'}

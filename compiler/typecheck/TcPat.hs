@@ -443,7 +443,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
 tc_pat penv (SigPat _ pat sig_ty) pat_ty thing_inside
   = do  { (inner_ty, tv_binds, wcs, wrap) <- tcPatSig (inPatBind penv)
                                                             sig_ty pat_ty
-                -- Using tcExtendNameTyVarEnv is appropriate here (not scopeTyVars2)
+                -- Using tcExtendNameTyVarEnv is appropriate here
                 -- because we're not really bringing fresh tyvars into scope.
                 -- We're *naming* existing tyvars. Note that it is OK for a tyvar
                 -- from an outer scope to mention one of these tyvars in its kind.

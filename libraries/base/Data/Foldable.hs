@@ -159,6 +159,7 @@ class Foldable t where
     -- | Right-associative fold of a structure, but with strict application of
     -- the operator.
     --
+    -- @since 4.6.0.0
     foldr' :: (a -> b -> b) -> b -> t a -> b
     foldr' f z0 xs = foldl f' id xs z0
       where f' k x z = k $! f x z
@@ -206,6 +207,7 @@ class Foldable t where
     --
     -- @foldl f z = 'List.foldl'' f z . 'toList'@
     --
+    -- @since 4.6.0.0
     foldl' :: (b -> a -> b) -> b -> t a -> b
     foldl' f z0 xs = foldr f' id xs z0
       where f' x k z = k $! f z x
@@ -235,6 +237,8 @@ class Foldable t where
                          Just x  -> f x y)
 
     -- | List of elements of a structure, from left to right.
+    --
+    -- @since 4.8.0.0
     toList :: t a -> [a]
     {-# INLINE toList #-}
     toList t = build (\ c n -> foldr c n t)
@@ -242,35 +246,49 @@ class Foldable t where
     -- | Test whether the structure is empty. The default implementation is
     -- optimized for structures that are similar to cons-lists, because there
     -- is no general way to do better.
+    --
+    -- @since 4.8.0.0
     null :: t a -> Bool
     null = foldr (\_ _ -> False) True
 
     -- | Returns the size/length of a finite structure as an 'Int'.  The
     -- default implementation is optimized for structures that are similar to
     -- cons-lists, because there is no general way to do better.
+    --
+    -- @since 4.8.0.0
     length :: t a -> Int
     length = foldl' (\c _ -> c+1) 0
 
     -- | Does the element occur in the structure?
+    --
+    -- @since 4.8.0.0
     elem :: Eq a => a -> t a -> Bool
     elem = any . (==)
 
     -- | The largest element of a non-empty structure.
+    --
+    -- @since 4.8.0.0
     maximum :: forall a . Ord a => t a -> a
     maximum = fromMaybe (errorWithoutStackTrace "maximum: empty structure") .
        getMax . foldMap (Max #. (Just :: a -> Maybe a))
 
     -- | The least element of a non-empty structure.
+    --
+    -- @since 4.8.0.0
     minimum :: forall a . Ord a => t a -> a
     minimum = fromMaybe (errorWithoutStackTrace "minimum: empty structure") .
        getMin . foldMap (Min #. (Just :: a -> Maybe a))
 
     -- | The 'sum' function computes the sum of the numbers of a structure.
+    --
+    -- @since 4.8.0.0
     sum :: Num a => t a -> a
     sum = getSum #. foldMap Sum
 
     -- | The 'product' function computes the product of the numbers of a
     -- structure.
+    --
+    -- @since 4.8.0.0
     product :: Num a => t a -> a
     product = getProduct #. foldMap Product
 

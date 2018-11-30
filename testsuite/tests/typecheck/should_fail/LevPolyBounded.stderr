@@ -3,3 +3,8 @@ LevPolyBounded.hs:10:15: error:
     • Expected a type, but ‘a’ has kind ‘TYPE r’
     • In the type signature: LevPolyBounded.minBound :: a
       In the class declaration for ‘XBounded’
+
+LevPolyBounded.hs:11:15: error:
+    • Expected a type, but ‘a’ has kind ‘TYPE r’
+    • In the type signature: LevPolyBounded.maxBound :: a
+      In the class declaration for ‘XBounded’

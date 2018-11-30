@@ -1,1 +1,1 @@
-F :: forall k k2. k -> k2 -> *
+F :: forall {k} k2. k -> k2 -> *

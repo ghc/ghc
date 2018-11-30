@@ -8,6 +8,7 @@ This module defines interface types and binders
 
 {-# LANGUAGE CPP, FlexibleInstances, BangPatterns #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TupleSections #-}
     -- FlexibleInstances for Binary (DefMethSpec IfaceType)
 
 module IfaceType (
@@ -22,6 +23,7 @@ module IfaceType (
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr,
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
         IfaceForAllBndr, ArgFlag(..), ShowForAllFlag(..),
+        mkIfaceForAllTvBndr,
 
         ifForAllBndrVar, ifForAllBndrName,
         ifTyConBinderVar, ifTyConBinderName,
@@ -161,6 +163,10 @@ data IfaceTyLit
 
 type IfaceTyConBinder = VarBndr IfaceBndr TyConBndrVis
 type IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag
+
+-- | Make an 'IfaceForAllBndr' from an 'IfaceTvBndr'.
+mkIfaceForAllTvBndr :: ArgFlag -> IfaceTvBndr -> IfaceForAllBndr
+mkIfaceForAllTvBndr vis var = Bndr (IfaceTvBndr var) vis
 
 -- | Stores the arguments in a type application as a list.
 -- See @Note [Suppressing invisible arguments]@.
@@ -1189,6 +1195,54 @@ criteria are met:
 
 N.B. Until now (Aug 2018) we didn't check anything for coercion variables.
 
+Note [Printing foralls in type family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We use the same criteria as in Note [When to print foralls] to determine
+whether a type family instance should be pretty-printed with an explicit
+`forall`. Example:
+
+  type family Foo (a :: k) :: k where
+    Foo Maybe       = []
+    Foo (a :: Type) = Int
+    Foo a           = a
+
+Without -fprint-explicit-foralls enabled, this will be pretty-printed as:
+
+type family Foo (a :: k) :: k where
+  Foo Maybe = []
+  Foo a = Int
+  forall k (a :: k). Foo a = a
+
+Note that only the third equation has an explicit forall, since it has a type
+variable with a non-Type kind. (If -fprint-explicit-foralls were enabled, then
+the second equation would be preceded with `forall a.`.)
+
+There is one tricky point in the implementation: what visibility
+do we give the type variables in a type family instance? Type family instances
+only store type *variables*, not type variable *binders*, and only the latter
+has visibility information. We opt to default the visibility of each of these
+type variables to Specified because users can't ever instantiate these
+variables manually, so the choice of visibility is only relevant to
+pretty-printing. (This is why the `k` in `forall k (a :: k). ...` above is
+printed the way it is, even though it wasn't written explicitly in the
+original source code.)
+
+We adopt the same strategy for data family instances. Example:
+
+  data family DF (a :: k)
+  data instance DF '[a, b] = DFList
+
+That data family instance is pretty-printed as:
+
+  data instance forall j (a :: j) (b :: j). DF '[a, b] = DFList
+
+This is despite that the representation tycon for this data instance (call it
+$DF:List) actually has different visibilities for its binders.
+However, the visibilities of these binders are utterly irrelevant to the
+programmer, who cares only about the specificity of variables in `DF`'s type,
+not $DF:List's type. Therefore, we opt to pretty-print all variables in data
+family instances as Specified.
+
 Note [Printing promoted type constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this GHCi session (Trac #14343)
@@ -1384,9 +1438,23 @@ ppr_equality ctxt_prec tc args
 
 
 pprIfaceCoTcApp :: PprPrec -> IfaceTyCon -> [IfaceCoercion] -> SDoc
-pprIfaceCoTcApp ctxt_prec tc tys = ppr_iface_tc_app ppr_co ctxt_prec tc tys
+pprIfaceCoTcApp ctxt_prec tc tys =
+  ppr_iface_tc_app (\prec (co, _) -> ppr_co prec co) ctxt_prec tc
+    (map (, Required) tys)
+    -- We are trying to re-use ppr_iface_tc_app here, which requires its
+    -- arguments to be accompanied by visibilities. But visibility is
+    -- irrelevant when printing coercions, so just default everything to
+    -- Required.
 
-ppr_iface_tc_app :: (PprPrec -> a -> SDoc) -> PprPrec -> IfaceTyCon -> [a] -> SDoc
+-- | Pretty-prints an application of a type constructor to some arguments
+-- (whose visibilities are known). This is polymorphic (over @a@) since we use
+-- this function to pretty-print two different things:
+--
+-- 1. Types (from `pprTyTcApp'`)
+--
+-- 2. Coercions (from 'pprIfaceCoTcApp')
+ppr_iface_tc_app :: (PprPrec -> (a, ArgFlag) -> SDoc)
+                 -> PprPrec -> IfaceTyCon -> [(a, ArgFlag)] -> SDoc
 ppr_iface_tc_app pp _ tc [ty]
   | tc `ifaceTyConHasKey` listTyConKey = pprPromotionQuote tc <> brackets (pp topPrec ty)
 
@@ -1397,8 +1465,11 @@ ppr_iface_tc_app pp ctxt_prec tc tys
   | not (isSymOcc (nameOccName (ifaceTyConName tc)))
   = pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)
 
-  | [ty1,ty2] <- tys  -- Infix, two arguments;
-                      -- we know nothing of precedence though
+  | [ ty1@(_, Required)
+    , ty2@(_, Required) ] <- tys
+      -- Infix, two visible arguments (we know nothing of precedence though).
+      -- Don't apply this special case if one of the arguments is invisible,
+      -- lest we print something like (@LiftedRep -> @LiftedRep) (#15941).
   = pprIfaceInfixApp ctxt_prec (ppr tc)
                      (pp opPrec ty1) (pp opPrec ty2)
 

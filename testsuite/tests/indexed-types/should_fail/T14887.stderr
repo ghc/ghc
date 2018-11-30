@@ -1,0 +1,12 @@
+
+T14887.hs:13:1: error:
+    • The kind of ‘Foo2’ is ill-scoped
+        Inferred kind: Foo2 :: forall (a :: k). forall k -> (a :~: a) -> *
+      NB: Specified variables (namely: (a :: k)) always come first
+      Perhaps try this order instead: k (a :: k) (e :: a :~: a)
+    • In the type family declaration for ‘Foo2’
+
+T14887.hs:14:11: error:
+    • Expected kind ‘a0 :~: a0’, but ‘e :: a :~: a’ has kind ‘a :~: a’
+    • In the second argument of ‘Foo2’, namely ‘(e :: a :~: a)’
+      In the type family declaration for ‘Foo2’

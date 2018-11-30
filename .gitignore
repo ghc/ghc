@@ -153,6 +153,7 @@ _darcs/
 /libraries/hslogo-16.png
 /libraries/index-frames.html
 /libraries/index.html
+/libraries/libiserv/libiserv.cabal
 /libraries/minus.gif
 /libraries/ocean.css
 /libraries/plus.gif
@@ -178,6 +179,8 @@ _darcs/
 /testsuite_summary*.txt
 /testsuite*.xml
 /testlog*
+/utils/iserv/iserv.cabal
+/utils/iserv-proxy/iserv-proxy.cabal
 /utils/mkUserGuidePart/mkUserGuidePart.cabal
 /utils/runghc/runghc.cabal
 /utils/gen-dll/gen-dll.cabal

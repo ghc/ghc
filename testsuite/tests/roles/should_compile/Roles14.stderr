@@ -2,9 +2,9 @@ TYPE SIGNATURES
   meth2 :: forall a. C2 a => a -> a
 TYPE CONSTRUCTORS
   type role C2 representational
-  C2 :: * -> Constraint
+  C2{1} :: * -> Constraint
 COERCION AXIOMS
-  axiom Roles12.N:C2 :: C2 a = a -> a -- Defined at Roles14.hs:6:1
+  axiom Roles12.N:C2 :: C2 a = a -> a
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

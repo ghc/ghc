@@ -8,7 +8,7 @@ module Context (
     -- * Paths
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
     pkgHaddockFile, pkgLibraryFile, pkgGhciLibraryFile, pkgConfFile, objectPath,
-    contextPath, getContextPath, libDir, libPath
+    contextPath, getContextPath, libDir, libPath, distDir
     ) where
 
 import Base
@@ -46,9 +46,18 @@ getStagedSettingList f = getSettingList . f =<< getStage
 libDir :: Context -> FilePath
 libDir Context {..} = stageString stage -/- "lib"
 
--- | Path to the directory containg the final artifact in a given 'Context'
+-- | Path to the directory containg the final artifact in a given 'Context'.
 libPath :: Context -> Action FilePath
 libPath context = buildRoot <&> (-/- libDir context)
+
+-- | Get the directory name for binary distribution files
+-- <arch>-<os>-ghc-<version>.
+distDir :: Action FilePath
+distDir = do
+    version        <- setting ProjectVersion
+    hostOs         <- setting BuildOs
+    hostArch       <- setting BuildArch
+    return $ hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
 
 pkgFile :: Context -> String -> String -> Action FilePath
 pkgFile context@Context {..} prefix suffix = do

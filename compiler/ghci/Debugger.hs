@@ -88,9 +88,11 @@ pprintClosureCommand bindThings force str = do
        hsc_env <- getSession
        case (improveRTTIType hsc_env (idType id) (reconstructed_type)) of
          Nothing     -> return (subst, term')
-         Just subst' -> do { traceOptIf Opt_D_dump_rtti
-                               (fsep $ [text "RTTI Improvement for", ppr id,
-                                text "is the substitution:" , ppr subst'])
+         Just subst' -> do { dflags <- GHC.getSessionDynFlags
+                           ; liftIO $
+                               dumpIfSet_dyn dflags Opt_D_dump_rtti "RTTI"
+                                 (fsep $ [text "RTTI Improvement for", ppr id,
+                                  text "is the substitution:" , ppr subst'])
                            ; return (subst `unionTCvSubst` subst', term')}
 
    tidyTermTyVars :: GhcMonad m => Term -> m Term
@@ -228,11 +230,3 @@ pprTypeAndContents id = do
                                             text (show (exn :: SomeException)))
       return $ pprdId <+> equals <+> docs_term
     else return pprdId
-
---------------------------------------------------------------
--- Utils
-
-traceOptIf :: GhcMonad m => DumpFlag -> SDoc -> m ()
-traceOptIf flag doc = do
-  dflags <- GHC.getSessionDynFlags
-  when (dopt flag dflags) $ liftIO $ printInfoForUser dflags alwaysQualify doc

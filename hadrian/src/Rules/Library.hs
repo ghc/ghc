@@ -134,7 +134,7 @@ data LibA = LibA String [Integer] Way deriving (Eq, Show)
 -- | > <so or dylib>
 data DynLibExt = So | Dylib deriving (Eq, Show)
 
--- | > libHS<pkg name>-<pkg version>-ghc<ghc version>[_<way suffix>].<so or dylib>
+-- | > libHS<pkg name>-<pkg version>[_<way suffix>]-ghc<ghc version>.<so|dylib>
 data LibDyn = LibDyn String [Integer] Way DynLibExt deriving (Eq, Show)
 
 -- | > HS<pkg name>-<pkg version>[_<way suffix>].o
@@ -231,8 +231,8 @@ parseLibDynFilename :: String -> Parsec.Parsec String () LibDyn
 parseLibDynFilename ext = do
     _ <- Parsec.string "libHS"
     (pkgname, pkgver) <- parsePkgId
-    _ <- optional $ Parsec.string "-ghc" *> parsePkgVersion
     way <- addWayUnit Dynamic <$> parseWaySuffix dynamic
+    _ <- optional $ Parsec.string "-ghc" *> parsePkgVersion
     _ <- Parsec.string ("." ++ ext)
     return (LibDyn pkgname pkgver way $ if ext == "so" then So else Dylib)
 

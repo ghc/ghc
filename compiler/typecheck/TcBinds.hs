@@ -1471,7 +1471,6 @@ tcExtendTyVarEnvForRhs (Just sig) thing_inside
 tcExtendTyVarEnvFromSig :: TcIdSigInst -> TcM a -> TcM a
 tcExtendTyVarEnvFromSig sig_inst thing_inside
   | TISI { sig_inst_skols = skol_prs, sig_inst_wcs = wcs } <- sig_inst
-  -- Note [Use tcExtendTyVar not scopeTyVars in tcRhs]
   = tcExtendNameTyVarEnv (map (fmap unrestricted) wcs) $
     tcExtendNameTyVarEnv (map (fmap unrestricted) skol_prs) $
     thing_inside
@@ -1611,29 +1610,6 @@ Example for (E2), we generate
 The beta is untoucable, but floats out of the constraint and can
 be solved absolutely fine.
 
-Note [Use tcExtendTyVar not scopeTyVars in tcRhs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Normally, any place that corresponds to Λ or ∀ in Core should be flagged
-with a call to scopeTyVars, which arranges for an implication constraint
-to be made, bumps the TcLevel, and (crucially) prevents a unification
-variable created outside the scope of a local skolem to unify with that
-skolem.
-
-We do not need to do this here, however.
-
-- Note that this happens only in the case of a partial signature.
-  Complete signatures go via tcPolyCheck, not tcPolyInfer.
-
-- The TcLevel is incremented in tcPolyInfer, right outside the call
-  to tcMonoBinds. We thus don't have to worry about outer metatvs unifying
-  with local skolems.
-
-- The other potential concern is that we need SkolemInfo associated with
-  the skolems. This, too, is OK, though: the constraints pass through
-  simplifyInfer (which doesn't report errors), at the end of which
-  the skolems will get quantified and put into an implication constraint.
-  Thus, by the time any errors are reported, the SkolemInfo will be
-  in place.
 
 ************************************************************************
 *                                                                      *

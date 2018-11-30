@@ -2,5 +2,5 @@ instance [orphan] GHC.Exts.IsList [GHC.Types.Bool] = $fIsListBool
 instance GHC.Exts.IsList [X] = $fIsListX
 family instance GHC.Exts.Item [X] = D:R:ItemX
 family instance [orphan] GHC.Exts.Item [GHC.Types.Bool]
-"myrule1" [orphan] forall @ a
-"myrule2" forall GHC.Base.id @ (X -> X) f = f
+"myrule1" [orphan] forall @ a.
+"myrule2" GHC.Base.id @ (X -> X) f = f

@@ -3,12 +3,8 @@ T14846.hs:38:8: error:
     • Couldn't match type ‘ríki’ with ‘Hom riki’
       ‘ríki’ is a rigid type variable bound by
         the type signature for:
-          i :: forall k5 k6 (cls2 :: k6
-                                     -> Constraint) (xx :: k5) (a :: Struct cls2) (ríki :: Struct
-                                                                                             cls2
-                                                                                           -> Struct
-                                                                                                cls2
-                                                                                           -> *).
+          i :: forall k5 k6 (cls2 :: k6 -> Constraint) (xx :: k5)
+                      (a :: Struct cls2) (ríki :: Struct cls2 -> Struct cls2 -> *).
                StructI xx a =>
                ríki a a
         at T14846.hs:38:8-48
@@ -16,20 +12,30 @@ T14846.hs:38:8: error:
         Actual type: Hom riki a a
     • When checking that instance signature for ‘i’
         is more general than its signature in the class
-        Instance sig: forall k1 k2 (cls :: k2
-                                           -> Constraint) (xx :: k1) (a :: Struct cls).
+        Instance sig: forall k1 k2 (cls :: k2 -> Constraint) (xx :: k1)
+                             (a :: Struct cls).
                       StructI xx a =>
                       Hom riki a a
-           Class sig: forall k1 k2 (cls :: k2
-                                           -> Constraint) (xx :: k1) (a :: Struct
-                                                                             cls) (ríki :: Struct
-                                                                                             cls
-                                                                                           -> Struct
-                                                                                                cls
-                                                                                           -> *).
+           Class sig: forall k1 k2 (cls :: k2 -> Constraint) (xx :: k1)
+                             (a :: Struct cls) (ríki :: Struct cls -> Struct cls -> *).
                       StructI xx a =>
                       ríki a a
       In the instance declaration for ‘Category (Hom riki)’
+
+T14846.hs:39:12: error:
+    • Couldn't match kind ‘k3’ with ‘Struct cls2’
+      ‘k3’ is a rigid type variable bound by
+        the instance declaration
+        at T14846.hs:37:10-65
+      When matching kinds
+        cls0 :: Struct cls -> Constraint
+        cls1 :: k3 -> Constraint
+    • In the expression: struct :: AStruct (Structured a cls)
+      In the expression: case struct :: AStruct (Structured a cls) of
+      In an equation for ‘i’:
+          i = case struct :: AStruct (Structured a cls) of
+    • Relevant bindings include
+        i :: Hom riki a a (bound at T14846.hs:39:3)
 
 T14846.hs:39:31: error:
     • Couldn't match kind ‘k3’ with ‘Struct cls2’

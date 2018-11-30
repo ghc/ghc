@@ -93,7 +93,7 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
                       , density      = mkDensity tickish dflags
                       , this_mod     = mod
                       , tickishType  = tickish
-}
+                      }
                 (binds',_,st') = unTM (addTickLHsBinds binds) env st
             in (binds', st')
 
@@ -109,9 +109,7 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
      hashNo <- writeMixEntries dflags mod tickCount entries orig_file2
      modBreaks <- mkModBreaks hsc_env mod tickCount entries
 
-     when (dopt Opt_D_dump_ticked dflags) $
-         putLogMsg dflags NoReason SevDump noSrcSpan
-             (defaultDumpStyle dflags) (pprLHsBinds binds1)
+     dumpIfSet_dyn dflags Opt_D_dump_ticked "HPC" (pprLHsBinds binds1)
 
      return (binds1, HpcInfo tickCount hashNo, Just modBreaks)
 

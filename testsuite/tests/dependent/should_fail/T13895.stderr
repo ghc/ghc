@@ -1,38 +1,7 @@
 
-T13895.hs:8:14: error:
-    • Could not deduce (Typeable (t dict))
-      from the context: (Data a, Typeable (t dict))
-        bound by the type signature for:
-                   dataCast1 :: forall k1 a (c :: * -> *) (t :: forall k2.
-                                                                Typeable k2 =>
-                                                                k2 -> *).
-                                (Data a, Typeable (t dict)) =>
-                                (forall d. Data d => c (t dict1 d)) -> Maybe (c a)
-        at T13895.hs:(8,14)-(14,24)
-      The type variable ‘k0’ is ambiguous
-    • In the ambiguity check for ‘dataCast1’
-      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-      In the type signature:
-        dataCast1 :: forall (a :: Type).
-                     Data a =>
-                     forall (c :: Type -> Type)
-                            (t :: forall (k :: Type). Typeable k => k -> Type).
-                     Typeable t => (forall d. Data d => c (t d)) -> Maybe (c a)
-
-T13895.hs:12:23: error:
-    • Illegal constraint in a kind: Typeable k0
-    • In the first argument of ‘Typeable’, namely ‘t’
-      In the type signature:
-        dataCast1 :: forall (a :: Type).
-                     Data a =>
-                     forall (c :: Type -> Type)
-                            (t :: forall (k :: Type). Typeable k => k -> Type).
-                     Typeable t => (forall d. Data d => c (t d)) -> Maybe (c a)
-
-T13895.hs:13:38: error:
-    • Illegal constraint in a kind: Typeable k0
-    • In the first argument of ‘c’, namely ‘(t d)’
-      In the type signature:
+T13895.hs:10:14: error:
+    • Illegal constraint in a kind: forall k. Typeable k => k -> *
+    • In the type signature:
         dataCast1 :: forall (a :: Type).
                      Data a =>
                      forall (c :: Type -> Type)

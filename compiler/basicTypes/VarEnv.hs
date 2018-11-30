@@ -70,7 +70,7 @@ module VarEnv (
 
         -- * TidyEnv and its operation
         TidyEnv,
-        emptyTidyEnv
+        emptyTidyEnv, mkEmptyTidyEnv
     ) where
 
 import GhcPrelude
@@ -401,6 +401,9 @@ type TidyEnv = (TidyOccEnv, VarEnv Var)
 
 emptyTidyEnv :: TidyEnv
 emptyTidyEnv = (emptyTidyOccEnv, emptyVarEnv)
+
+mkEmptyTidyEnv :: TidyOccEnv -> TidyEnv
+mkEmptyTidyEnv occ_env = (occ_env, emptyVarEnv)
 
 {-
 ************************************************************************

@@ -8,7 +8,7 @@ module Unify (
         tcMatchTy, tcMatchTyKi,
         tcMatchTys, tcMatchTyKis,
         tcMatchTyX, tcMatchTysX, tcMatchTyKisX,
-        ruleMatchTyKiX,
+        tcMatchTyX_BM, ruleMatchTyKiX,
 
         -- * Rough matching
         roughMatchTcs, instanceCantMatch,
@@ -116,11 +116,17 @@ How do you choose between them?
 tcMatchTy :: Type -> Type -> Maybe TCvSubst
 tcMatchTy ty1 ty2 = tcMatchTys [ty1] [ty2]
 
+tcMatchTyX_BM :: (TyVar -> BindFlag) -> TCvSubst
+              -> Type -> Type -> Maybe TCvSubst
+tcMatchTyX_BM bind_me subst ty1 ty2
+  = tc_match_tys_x bind_me False subst [ty1] [ty2]
+
 -- | Like 'tcMatchTy', but allows the kinds of the types to differ,
 -- and thus matches them as well.
 -- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTyKi :: Type -> Type -> Maybe TCvSubst
-tcMatchTyKi ty1 ty2 = tcMatchTyKis [ty1] [ty2]
+tcMatchTyKi ty1 ty2
+  = tc_match_tys (const BindMe) True [ty1] [ty2]
 
 -- | This is similar to 'tcMatchTy', but extends a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -128,7 +134,8 @@ tcMatchTyX :: TCvSubst            -- ^ Substitution to extend
            -> Type                -- ^ Template
            -> Type                -- ^ Target
            -> Maybe TCvSubst
-tcMatchTyX subst ty1 ty2 = tcMatchTysX subst [ty1] [ty2]
+tcMatchTyX subst ty1 ty2
+  = tc_match_tys_x (const BindMe) False subst [ty1] [ty2]
 
 -- | Like 'tcMatchTy' but over a list of types.
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -137,9 +144,7 @@ tcMatchTys :: [Type]         -- ^ Template
            -> Maybe TCvSubst -- ^ One-shot; in principle the template
                              -- variables could be free in the target
 tcMatchTys tys1 tys2
-  = tcMatchTysX (mkEmptyTCvSubst in_scope) tys1 tys2
-  where
-    in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
+  = tc_match_tys (const BindMe) False tys1 tys2
 
 -- | Like 'tcMatchTyKi' but over a list of types.
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -147,9 +152,7 @@ tcMatchTyKis :: [Type]         -- ^ Template
              -> [Type]         -- ^ Target
              -> Maybe TCvSubst -- ^ One-shot substitution
 tcMatchTyKis tys1 tys2
-  = tcMatchTyKisX (mkEmptyTCvSubst in_scope) tys1 tys2
-  where
-    in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
+  = tc_match_tys (const BindMe) True tys1 tys2
 
 -- | Like 'tcMatchTys', but extending a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -158,7 +161,7 @@ tcMatchTysX :: TCvSubst       -- ^ Substitution to extend
             -> [Type]         -- ^ Target
             -> Maybe TCvSubst -- ^ One-shot substitution
 tcMatchTysX subst tys1 tys2
-  = tc_match_tys_x False subst tys1 tys2
+  = tc_match_tys_x (const BindMe) False subst tys1 tys2
 
 -- | Like 'tcMatchTyKis', but extending a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -167,16 +170,28 @@ tcMatchTyKisX :: TCvSubst        -- ^ Substitution to extend
               -> [Type]          -- ^ Target
               -> Maybe TCvSubst  -- ^ One-shot substitution
 tcMatchTyKisX subst tys1 tys2
-  = tc_match_tys_x True subst tys1 tys2
+  = tc_match_tys_x (const BindMe) True subst tys1 tys2
+
+-- | Same as tc_match_tys_x, but starts with an empty substitution
+tc_match_tys :: (TyVar -> BindFlag)
+               -> Bool          -- ^ match kinds?
+               -> [Type]
+               -> [Type]
+               -> Maybe TCvSubst
+tc_match_tys bind_me match_kis tys1 tys2
+  = tc_match_tys_x bind_me match_kis (mkEmptyTCvSubst in_scope) tys1 tys2
+  where
+    in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
 
 -- | Worker for 'tcMatchTysX' and 'tcMatchTyKisX'
-tc_match_tys_x :: Bool          -- ^ match kinds?
+tc_match_tys_x :: (TyVar -> BindFlag)
+               -> Bool          -- ^ match kinds?
                -> TCvSubst
                -> [Type]
                -> [Type]
                -> Maybe TCvSubst
-tc_match_tys_x match_kis (TCvSubst in_scope tv_env cv_env) tys1 tys2
-  = case tc_unify_tys (const BindMe)
+tc_match_tys_x bind_me match_kis (TCvSubst in_scope tv_env cv_env) tys1 tys2
+  = case tc_unify_tys bind_me
                       False  -- Matching, not unifying
                       False  -- Not an injectivity check
                       match_kis

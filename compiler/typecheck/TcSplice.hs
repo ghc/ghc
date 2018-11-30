@@ -47,6 +47,7 @@ import SrcLoc
 import THNames
 import TcUnify
 import TcEnv
+import Coercion( etaExpandCoAxBranch )
 import FileCleanup ( newTempName, TempFileLifetime(..) )
 
 import Control.Monad
@@ -1190,8 +1191,9 @@ reifyInstances th_nm th_tys
                do { (rn_ty, fvs) <- rnLHsType doc rdr_ty
                   ; return ((tv_names, rn_ty), fvs) }
         ; (_tvs, ty)
-            <- failIfEmitsConstraints $  -- avoid error cascade if there are unsolved
-               tcImplicitTKBndrs ReifySkol tv_names $
+            <- pushTcLevelM_   $
+               solveEqualities $ -- Avoid error cascade if there are unsolved
+               bindImplicitTKBndrs_Skol tv_names $
                fst <$> tcLHsType rn_ty
         ; ty <- zonkTcTypeToType ty
                 -- Substitute out the meta type variables
@@ -1693,15 +1695,16 @@ reifyFamilyInstances fam_tc fam_insts
 reifyFamilyInstance :: [Bool] -- True <=> the corresponding tv is poly-kinded
                               -- includes only *visible* tvs
                     -> FamInst -> TcM TH.Dec
-reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
-                                              , fi_fam = fam
-                                              , fi_tvs = fam_tvs
-                                              , fi_tys = lhs
-                                              , fi_rhs = rhs })
+reifyFamilyInstance is_poly_tvs (FamInst { fi_flavor = flavor
+                                         , fi_axiom = ax
+                                         , fi_fam = fam })
+  | let fam_tc = coAxiomTyCon ax
+        branch = coAxiomSingleBranch ax
+  , CoAxBranch { cab_tvs = tvs, cab_lhs = lhs, cab_rhs = rhs } <- branch
   = case flavor of
       SynFamilyInst ->
                -- remove kind patterns (#8884)
-        do { th_tvs <- reifyTyVarsToMaybe fam_tvs
+        do { th_tvs <- reifyTyVarsToMaybe tvs
            ; let lhs_types_only = filterOutInvisibleTypes fam_tc lhs
            ; th_lhs <- reifyTypes lhs_types_only
            ; annot_th_lhs <- zipWith3M annotThType is_poly_tvs lhs_types_only
@@ -1714,10 +1717,10 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
         do { let -- eta-expand lhs types, because sometimes data/newtype
                  -- instances are eta-reduced; See Trac #9692
                  -- See Note [Eta reduction for data families] in FamInstEnv
-                 (ee_tvs, ee_lhs, _) = etaExpandFamInst fam_tvs lhs rhs
-                 fam'                = reifyName fam
-                 dataCons            = tyConDataCons rep_tc
-                 isGadt              = isGadtSyntaxTyCon rep_tc
+                 (ee_tvs, ee_lhs, _) = etaExpandCoAxBranch branch
+                 fam'     = reifyName fam
+                 dataCons = tyConDataCons rep_tc
+                 isGadt   = isGadtSyntaxTyCon rep_tc
            ; th_tvs <- reifyTyVarsToMaybe ee_tvs
            ; cons <- mapM (reifyDataCon isGadt (mkTyVarTys ee_tvs)) dataCons
            ; let types_only = filterOutInvisibleTypes fam_tc ee_lhs
@@ -1728,8 +1731,6 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
                then TH.NewtypeInstD [] fam' th_tvs annot_th_tys Nothing (head cons) []
                else TH.DataInstD    [] fam' th_tvs annot_th_tys Nothing       cons  []
            }
-  where
-    fam_tc = famInstTyCon inst
 
 ------------------------------
 reifyType :: TyCoRep.Type -> TcM TH.Type

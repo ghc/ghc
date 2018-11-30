@@ -3,7 +3,8 @@
 module ClsInst (
      matchGlobalInst,
      ClsInstResult(..),
-     InstanceWhat(..), safeOverlap
+     InstanceWhat(..), safeOverlap,
+     AssocInstInfo(..), isNotAssociated
   ) where
 
 #include "HsVersions.h"
@@ -31,6 +32,7 @@ import Multiplicity
 import MkCore ( mkStringExprFS, mkNaturalExpr )
 
 import Name   ( Name )
+import VarEnv ( VarEnv )
 import DataCon
 import TyCon
 import Class
@@ -38,6 +40,30 @@ import DynFlags
 import Outputable
 import Util( splitAtList, fstOf3 )
 import Data.Maybe
+
+{- *******************************************************************
+*                                                                    *
+              A helper for associated types within
+              class instance declarations
+*                                                                    *
+**********************************************************************-}
+
+-- | Extra information about the parent instance declaration, needed
+-- when type-checking associated types. The 'Class' is the enclosing
+-- class, the [TyVar] are the /scoped/ type variable of the instance decl.
+-- The @VarEnv Type@ maps class variables to their instance types.
+data AssocInstInfo
+  = NotAssociated
+  | InClsInst { ai_class    :: Class
+              , ai_tyvars   :: [TyVar]      -- ^ The /scoped/ tyvars of the instance
+              , ai_inst_env :: VarEnv Type  -- ^ Maps /class/ tyvars to their instance types
+                -- See Note [Matching in the consistent-instantation check]
+    }
+
+isNotAssociated :: AssocInstInfo -> Bool
+isNotAssociated NotAssociated  = True
+isNotAssociated (InClsInst {}) = False
+
 
 {- *******************************************************************
 *                                                                    *

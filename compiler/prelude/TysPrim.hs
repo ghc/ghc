@@ -258,12 +258,17 @@ mkTemplateKindVars :: [Kind] -> [TyVar]
 -- k0  with unique (mkAlphaTyVarUnique 0)
 -- k1  with unique (mkAlphaTyVarUnique 1)
 -- ... etc
+mkTemplateKindVars [kind]
+  = [mkTyVar (mk_tv_name 0 "k") kind]
+    -- Special case for one kind: just "k"
+
 mkTemplateKindVars kinds
-  = [ mkTyVar name kind
-    | (kind, u) <- kinds `zip` [0..]
-    , let occ = mkTyVarOccFS (mkFastString ('k' : show u))
-          name = mkInternalName (mkAlphaTyVarUnique u) occ noSrcSpan
-    ]
+  = [ mkTyVar (mk_tv_name u ('k' : show u)) kind
+    | (kind, u) <- kinds `zip` [0..] ]
+mk_tv_name :: Int -> String -> Name
+mk_tv_name u s = mkInternalName (mkAlphaTyVarUnique u)
+                                (mkTyVarOccFS (mkFastString s))
+                                noSrcSpan
 
 mkTemplateTyVarsFrom :: Int -> [Kind] -> [TyVar]
 -- a  with unique (mkAlphaTyVarUnique n)
@@ -278,9 +283,7 @@ mkTemplateTyVarsFrom n kinds
       let ch_ord = index + ord 'a'
           name_str | ch_ord <= ord 'z' = [chr ch_ord]
                    | otherwise         = 't':show index
-          uniq = mkAlphaTyVarUnique (index + n)
-          name = mkInternalName uniq occ noSrcSpan
-          occ  = mkTyVarOccFS (mkFastString name_str)
+          name = mk_tv_name (index + n) name_str
     ]
 
 mkTemplateTyVars :: [Kind] -> [TyVar]

@@ -79,13 +79,14 @@ import TcRnExports
 import TcEvidence
 import qualified BooleanFormula as BF
 import PprTyThing( pprTyThingInContext )
-import Coercion( pprCoAxiom )
 import CoreFVs( orphNamesOfFamInst )
 import FamInst
 import InstEnv
-import FamInstEnv
+import FamInstEnv( FamInst, pprFamInst, famInstsRepTyCons
+                 , famInstEnvElts, extendFamInstEnvList, normaliseType )
 import TcAnnotations
 import TcBinds
+import MkIface          ( coAxiomToIfaceDecl )
 import HeaderInfo       ( mkPrelImports )
 import TcDefaults
 import TcEnv
@@ -1890,7 +1891,7 @@ However the GHCi debugger creates top-level bindings for Ids whose
 types have free RuntimeUnk skolem variables, standing for unknown
 types.  If we don't register these free TyVars as global TyVars then
 the typechecker will try to quantify over them and fall over in
-zonkQuantifiedTyVar. so we must add any free TyVars to the
+skolemiseQuantifiedTyVar. so we must add any free TyVars to the
 typechecker's global TyVar set.  That is most conveniently by using
 tcExtendLocalTypeEnv, which automatically extends the global TyVar
 set.
@@ -2664,7 +2665,7 @@ tcDump env
 
         -- Dump short output if -ddump-types or -ddump-tc
         when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
-             (printForUserTcRn short_dump) ;
+          (traceTcRnForUser Opt_D_dump_types short_dump) ;
 
         -- Dump bindings if -ddump-tc
         traceOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump);
@@ -2731,7 +2732,7 @@ ppr_types debug type_env
 ppr_tycons :: Bool -> [FamInst] -> TypeEnv -> SDoc
 ppr_tycons debug fam_insts type_env
   = vcat [ ppr_things "TYPE CONSTRUCTORS" ppr_tc tycons
-         , ppr_things "COERCION AXIOMS" pprCoAxiom
+         , ppr_things "COERCION AXIOMS" ppr_ax
                       (typeEnvCoAxioms type_env) ]
   where
     fi_tycons = famInstsRepTyCons fam_insts
@@ -2747,7 +2748,7 @@ ppr_tycons debug fam_insts type_env
        = vcat [ ppWhen show_roles $
                 hang (text "type role" <+> ppr tc)
                    2 (hsep (map ppr roles))
-              , hang (ppr tc <+> dcolon)
+              , hang (ppr tc <> braces (ppr (tyConArity tc)) <+> dcolon)
                    2 (ppr (tidyTopType (tyConKind tc))) ]
        where
          show_roles = debug || not (all (== boring_role) roles)
@@ -2755,6 +2756,8 @@ ppr_tycons debug fam_insts type_env
          boring_role | isClassTyCon tc = Nominal
                      | otherwise       = Representational
             -- Matches the choice in IfaceSyn, calls to pprRoles
+
+    ppr_ax ax = ppr (coAxiomToIfaceDecl ax)
 
 ppr_datacons :: Bool -> TypeEnv -> SDoc
 ppr_datacons debug type_env
