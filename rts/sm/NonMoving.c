@@ -1283,13 +1283,13 @@ void locate_object(P_ obj)
     for (uint32_t g = 0; g < RtsFlags.GcFlags.generations - 1; ++g) {
         generation *gen = &generations[g];
         for (bdescr *blk = gen->blocks; blk; blk = blk->link) {
-            if (obj >= bdescr_start(blk) && obj < blk->free) {
+            if (obj >= bdescr_start(blk) && obj < bdescr_free(blk)) {
                 debugBelch("%p is in generation %" FMT_Word32 " blocks\n", obj, g);
                 return;
             }
         }
         for (bdescr *blk = gen->old_blocks; blk; blk = blk->link) {
-            if (obj >= bdescr_start(blk) && obj < blk->free) {
+            if (obj >= bdescr_start(blk) && obj < bdescr_free(blk)) {
                 debugBelch("%p is in generation %" FMT_Word32 " old blocks\n", obj, g);
                 return;
             }
@@ -1326,19 +1326,19 @@ void locate_object(P_ obj)
     for (uint32_t g = 0; g < RtsFlags.GcFlags.generations - 1; ++ g) {
         gen_workspace *ws = &gct->gens[g];
         for (bdescr *blk = ws->todo_bd; blk; blk = blk->link) {
-            if (obj >= bdescr_start(blk) && obj < blk->free) {
+            if (obj >= bdescr_start(blk) && obj < bdescr_free(blk)) {
                 debugBelch("%p is in generation %" FMT_Word32 " todo bds\n", obj, g);
                 return;
             }
         }
         for (bdescr *blk = ws->scavd_list; blk; blk = blk->link) {
-            if (obj >= bdescr_start(blk) && obj < blk->free) {
+            if (obj >= bdescr_start(blk) && obj < bdescr_free(blk)) {
                 debugBelch("%p is in generation %" FMT_Word32 " scavd bds\n", obj, g);
                 return;
             }
         }
         for (bdescr *blk = ws->todo_large_objects; blk; blk = blk->link) {
-            if (obj >= bdescr_start(blk) && obj < blk->free) {
+            if (obj >= bdescr_start(blk) && obj < bdescr_free(blk)) {
                 debugBelch("%p is in generation %" FMT_Word32 " todo large bds\n", obj, g);
                 return;
             }
@@ -1361,7 +1361,7 @@ void check_in_mut_list(StgClosure *p)
 {
     for (uint32_t cap_n = 0; cap_n < n_capabilities; ++cap_n) {
         for (bdescr *bd = capabilities[cap_n]->mut_lists[oldest_gen->no]; bd; bd = bd->link) {
-            for (StgPtr q = bdescr_start(bd); q < bd->free; ++q) {
+            for (StgPtr q = bdescr_start(bd); q < bdescr_free(bd); ++q) {
                 if (*((StgPtr**)q) == (StgPtr*)p) {
                     debugBelch("Object is in mut list of cap %d: %p\n", cap_n, capabilities[cap_n]->mut_lists[oldest_gen->no]);
                     return;
