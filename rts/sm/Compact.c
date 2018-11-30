@@ -757,7 +757,7 @@ update_fwd( bdescr *blocks )
         p = bdescr_start(bd);
 
         // linearly scan the objects in this block
-        while (p < bd->free) {
+        while (p < bdescr_free(bd)) {
             ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
             info = get_itbl((StgClosure *)p);
             p = thread_obj(info, p);
@@ -785,12 +785,12 @@ update_fwd_compact( bdescr *blocks )
     for (; bd != NULL; bd = bd->link) {
         p = bdescr_start(bd);
 
-        while (p < bd->free ) {
+        while (p < bdescr_free(bd)) {
 
-            while ( p < bd->free && !is_marked(p,bd) ) {
+            while ( p < bdescr_free(bd) && !is_marked(p,bd) ) {
                 p++;
             }
-            if (p >= bd->free) {
+            if (p >= bdescr_free(bd)) {
                 break;
             }
 
@@ -799,7 +799,7 @@ update_fwd_compact( bdescr *blocks )
         m = * ((StgPtr)bd->u.bitmap + ((p - bdescr_start(bd)) / (BITS_IN(StgWord))));
         m >>= ((p - bdescr_start(bd)) & (BITS_IN(StgWord) - 1));
 
-        while ( p < bd->free ) {
+        while ( p < bdescr_free(bd) ) {
 
             if ((m & 1) == 0) {
                 m >>= 1;
@@ -871,12 +871,12 @@ update_bkwd_compact( generation *gen )
     for (; bd != NULL; bd = bd->link) {
         p = bdescr_start(bd);
 
-        while (p < bd->free ) {
+        while (p < bdescr_free(bd) ) {
 
-            while ( p < bd->free && !is_marked(p,bd) ) {
+            while ( p < bdescr_free(bd) && !is_marked(p,bd) ) {
                 p++;
             }
-            if (p >= bd->free) {
+            if (p >= bdescr_free(bd)) {
                 break;
             }
 
@@ -885,7 +885,7 @@ update_bkwd_compact( generation *gen )
         m = * ((StgPtr)bd->u.bitmap + ((p - bdescr_start(bd)) / (BITS_IN(StgWord))));
         m >>= ((p - bdescr_start(bd)) & (BITS_IN(StgWord) - 1));
 
-        while ( p < bd->free ) {
+        while ( p < bdescr_free(bd) ) {
 
             if ((m & 1) == 0) {
                 m >>= 1;
@@ -900,7 +900,7 @@ update_bkwd_compact( generation *gen )
 
             if (is_marked(p+1,bd)) {
                 // don't forget to update the free ptr in the block desc.
-                free_bd->free = free;
+                bdescr_set_free(free_bd, free);
                 free_bd = free_bd->link;
                 free = bdescr_start(free_bd);
                 free_blocks++;
@@ -930,7 +930,7 @@ update_bkwd_compact( generation *gen )
     }
 
     // free the remaining blocks and count what's left.
-    free_bd->free = free;
+    bdescr_set_free(free_bd, free);
     if (free_bd->link != NULL) {
         freeChain(free_bd->link);
         free_bd->link = NULL;
@@ -968,7 +968,7 @@ compact(StgClosure *static_objects)
         for (n = 0; n < n_capabilities; n++) {
             for (bd = capabilities[n]->mut_lists[g];
                  bd != NULL; bd = bd->link) {
-                for (p = bdescr_start(bd); p < bd->free; p++) {
+                for (p = bdescr_start(bd); p < bdescr_free(bd); p++) {
                     thread((StgClosure **)p);
                 }
             }

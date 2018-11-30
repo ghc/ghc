@@ -156,7 +156,7 @@ typedef struct {
   Invariants:
     firstStack points to the first block group.
     currentStack points to the block group currently being used.
-    currentStack->free == stackLimit.
+    bdescr_free(currentStack) == stackLimit.
     stackTop points to the topmost byte in the stack of currentStack.
     Unless the whole stack is empty, stackTop must point to the topmost
     object (or byte) in the whole stack. Thus, it is only when the whole stack
@@ -224,7 +224,7 @@ static INLINE void
 returnToOldStack( bdescr *bd )
 {
     currentStack = bd;
-    stackTop = (stackElement *)bd->free;
+    stackTop = (stackElement *)bdescr_free(bd);
     stackBottom = (stackElement *)bdescr_start(bd);
     stackLimit = (stackElement *)(bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
     bd->free = (StgPtr)stackLimit;
@@ -579,7 +579,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 #endif
         // currentStack->free is updated when the active stack is switched
         // to the next stack.
-        currentStack->free = (StgPtr)stackTop;
+        bdescr_set_free(currentStack, (StgPtr)stackTop);
 
         if (currentStack->link == NULL) {
             nbd = allocGroup(BLOCKS_IN_STACK);
@@ -656,7 +656,7 @@ popOffReal(void)
 
     // currentStack->free is updated when the active stack is switched back
     // to the previous stack.
-    currentStack->free = (StgPtr)stackLimit;
+    bdescr_set_free(currentStack, (StgPtr)stackLimit);
 
     // find the previous block descriptor
     pbd = currentStack->u.back;
@@ -1709,7 +1709,7 @@ computeRetainerSet( void )
         // visited during retainer profiling.
         for (n = 0; n < n_capabilities; n++) {
           for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
-            for (ml = bdescr_start(bd); ml < bd->free; ml++) {
+            for (ml = bdescr_start(bd); ml < bdescr_free(bd); ml++) {
 
                 maybeInitRetainerSet((StgClosure *)*ml);
 
@@ -1996,21 +1996,21 @@ sanityCheckHeapClosure( StgClosure *c )
 static uint32_t
 heapCheck( bdescr *bd )
 {
-    StgPtr p;
     static uint32_t costSum, size;
 
     costSum = 0;
     while (bd != NULL) {
-        p = bdescr_start(bd);
-        while (p < bd->free) {
+        StgPtr p = bdescr_start(bd);
+        const StgPtr free = bdescr_free(bd);
+        while (p < free) {
             size = sanityCheckHeapClosure((StgClosure *)p);
             sumOfCostLinear += size;
             costArrayLinear[get_itbl((StgClosure *)p)->type] += size;
             p += size;
             // no need for slop check; I think slops are not used currently.
         }
-        ASSERT(p == bd->free);
-        costSum += bd->free - bdescr_start(bd);
+        ASSERT(p == free);
+        costSum += free - bdescr_start(bd);
         bd = bd->link;
     }
 
@@ -2044,14 +2044,15 @@ smallObjectPoolCheck(void)
     bd = bd->link;
     while (bd != NULL) {
         p = bdescr_start(bd);
-        while (p < bd->free) {
+        const StgPtr free = bdescr_free(bd);
+        while (p < free) {
             size = sanityCheckHeapClosure((StgClosure *)p);
             sumOfCostLinear += size;
             costArrayLinear[get_itbl((StgClosure *)p)->type] += size;
             p += size;
         }
-        ASSERT(p == bd->free);
-        costSum += bd->free - bdescr_start(bd);
+        ASSERT(p == free);
+        costSum += free - bdescr_start(bd);
         bd = bd->link;
     }
 
@@ -2065,7 +2066,7 @@ chainCheck(bdescr *bd)
 
     costSum = 0;
     while (bd != NULL) {
-        // bd->free - bdescr_start(bd) is not an accurate measurement of the
+        // bdescr_free(bd) - bdescr_start(bd) is not an accurate measurement of the
         // object size.  Actually it is always zero, so we compute its
         // size explicitly.
         size = sanityCheckHeapClosure((StgClosure *)bdescr_start(bd));
@@ -2129,7 +2130,7 @@ findPointer(StgPtr p)
             // if (g == 0 && s == 0) continue;
             bd = generations[g].steps[s].blocks;
             for (; bd; bd = bd->link) {
-                for (q = bdescr_start(bd); q < bd->free; q++) {
+                for (q = bdescr_start(bd); q < bdescr_free(bd); q++) {
                     if (*q == (StgWord)p) {
                         r = q;
                         while (!LOOKS_LIKE_GHC_INFO(*r)) r--;
@@ -2165,7 +2166,7 @@ belongToHeap(StgPtr p)
             // if (g == 0 && s == 0) continue;
             bd = generations[g].steps[s].blocks;
             for (; bd; bd = bd->link) {
-                if (bdescr_start(bd) <= p && p < bd->free) {
+                if (bdescr_start(bd) <= p && p < bdescr_free(bd)) {
                     debugBelch("Belongs to gen[%d], step[%d]", g, s);
                     return;
                 }

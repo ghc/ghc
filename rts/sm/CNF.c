@@ -382,8 +382,8 @@ compactNew (Capability *cap, StgWord size)
     block->owner = self;
 
     bd = Bdescr((P_)block);
-    bd->free = (StgPtr)((W_)self + sizeof(StgCompactNFData));
-    self->hp = bd->free;
+    self->hp = (StgPtr)((W_)self + sizeof(StgCompactNFData));
+    bdescr_set_free(bd, self->hp);
     self->hpLim = bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W;
 
     self->totalW = bd->blocks * BLOCK_SIZE_W;
@@ -412,8 +412,8 @@ compactAppendBlock (Capability       *cap,
     str->last = block;
 
     bd = Bdescr((P_)block);
-    bd->free = (StgPtr)((W_)block + sizeof(StgCompactNFDataBlock));
-    ASSERT(bd->free == (StgPtr)block + sizeofW(StgCompactNFDataBlock));
+    bdescr_set_free(bd, (StgPtr)((W_)block + sizeof(StgCompactNFDataBlock)));
+    ASSERT(bdescr_free(bd) == (StgPtr)block + sizeofW(StgCompactNFDataBlock));
 
     str->totalW += bd->blocks * BLOCK_SIZE_W;
 
@@ -483,7 +483,7 @@ allocateForCompact (Capability *cap,
     }
 
     bd = Bdescr((P_)str->nursery);
-    bd->free = str->hp;
+    bdescr_set_free(bd, str->hp);
 
     // We know it doesn't fit in the nursery
     // if it is a large object, allocate a new block
@@ -508,7 +508,7 @@ allocateForCompact (Capability *cap,
                                               str->autoBlockW * sizeof(W_));
         }
         bd = Bdescr((P_)str->nursery);
-        str->hp = bd->free;
+        str->hp = bdescr_free(bd);
         str->hpLim = bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W;
         goto retry;
     }
@@ -606,7 +606,7 @@ compactAllocateBlock(Capability            *cap,
         previous->next = block;
 
     bd = Bdescr((P_)block);
-    bd->free = (P_)((W_)bdescr_start(bd) + size);
+    bdescr_set_free(bd, (P_)((W_)bdescr_start(bd) + size));
 
     return block;
 }
@@ -680,7 +680,7 @@ verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
 
     p = (P_)firstBlockGetCompact(block);
     bd = Bdescr((P_)block);
-    while (p < bd->free) {
+    while (p < bdescr_free(bd)) {
         q = (StgClosure*)p;
 
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
@@ -922,7 +922,7 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
 
     bd = Bdescr((P_)block);
     p = bdescr_start(bd) + sizeofW(StgCompactNFDataBlock);
-    while (p < bd->free) {
+    while (p < bdescr_free(bd)) {
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
         info = get_itbl((StgClosure*)p);
 
@@ -1104,7 +1104,7 @@ fixup_late(StgCompactNFData *str, StgCompactNFDataBlock *block)
         totalW += bd->blocks * BLOCK_SIZE_W;
 
         if (block->owner != NULL) {
-            if (bd->free != bdescr_start(bd))
+            if (bdescr_free(bd) != bdescr_start(bd))
                 nursery = block;
             block->owner = str;
         }
@@ -1114,7 +1114,7 @@ fixup_late(StgCompactNFData *str, StgCompactNFDataBlock *block)
 
     str->nursery = nursery;
     bd = Bdescr((P_)nursery);
-    str->hp = bd->free;
+    str->hp = bdescr_free(bd);
     str->hpLim = bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W;
 
     str->totalW = totalW;

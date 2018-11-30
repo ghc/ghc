@@ -142,17 +142,17 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
     ASSERT(bd != NULL);
     ASSERT(bd->link == NULL);
     ASSERT(bd->gen_no == ws->gen->no);
-    ASSERT(bd->u.scan == bd->free);
+    ASSERT(bd->u.scan == bdescr_free(bd));
 
     if (bd->blocks == 1 &&
-        bdescr_start(bd) + BLOCK_SIZE_W - bd->free > WORK_UNIT_WORDS)
+        bdescr_start(bd) + BLOCK_SIZE_W - bdescr_free(bd) > WORK_UNIT_WORDS)
     {
         // A partially full block: put it on the part_list list.
         // Only for single objects - see Note [big objects]
         bd->link = ws->part_list;
         ws->part_list = bd;
         ws->n_part_blocks += bd->blocks;
-        ws->n_part_words += bd->free - bdescr_start(bd);
+        ws->n_part_words += bdescr_free(bd) - bdescr_start(bd);
         IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->part_list) == ws->n_part_blocks));
     }
@@ -162,7 +162,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
         bd->link = ws->scavd_list;
         ws->scavd_list = bd;
         ws->n_scavd_blocks += bd->blocks;
-        ws->n_scavd_words += bd->free - bdescr_start(bd);
+        ws->n_scavd_words += bdescr_free(bd) - bdescr_start(bd);
         IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks));
     }
@@ -249,10 +249,10 @@ todo_block_full (uint32_t size, gen_workspace *ws)
         return p;
     }
 
-    gct->copied += ws->todo_free - bd->free;
-    bd->free = ws->todo_free;
+    gct->copied += ws->todo_free - bdescr_free(bd);
+    bdescr_set_free(bd, ws->todo_free);
 
-    ASSERT(bd->u.scan >= bdescr_start(bd) && bd->u.scan <= bd->free);
+    ASSERT(bd->u.scan >= bdescr_start(bd) && bd->u.scan <= bdescr_free(bd));
 
     // If this block is not the scan block, we want to push it out and
     // make room for a new todo block.
@@ -261,7 +261,7 @@ todo_block_full (uint32_t size, gen_workspace *ws)
         // If this block does not have enough space to allocate the
         // current object, but it also doesn't have any work to push, then
         // push it on to the scanned list.
-        if (bd->u.scan == bd->free)
+        if (bd->u.scan == bdescr_free(bd))
         {
             if (bd->free == bdescr_start(bd)) {
                 // Normally the block would not be empty, because then
@@ -280,7 +280,7 @@ todo_block_full (uint32_t size, gen_workspace *ws)
             DEBUG_ONLY( generation *gen );
             DEBUG_ONLY( gen = ws->gen );
             debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld",
-                  bdescr_start(bd), (unsigned long)(bd->free - bd->u.scan),
+                  bdescr_start(bd), (unsigned long)(bdescr_free(bd) - bd->u.scan),
                   gen->no, dequeElements(ws->todo_q));
 
             if (!pushWSDeque(ws->todo_q, bd)) {
@@ -310,11 +310,11 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
     // Grab a part block if we have one, and it has enough room
     bd = ws->part_list;
     if (bd != NULL &&
-        bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W - bd->free > (int)size)
+        bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W - bdescr_free(bd) > (int)size)
     {
         ws->part_list = bd->link;
         ws->n_part_blocks -= bd->blocks;
-        ws->n_part_words -= bd->free - bdescr_start(bd);
+        ws->n_part_words -= bdescr_free(bd) - bdescr_start(bd);
     }
     else
     {
@@ -339,13 +339,13 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
     bd->link = NULL;
 
     ws->todo_bd = bd;
-    ws->todo_free = bd->free;
+    ws->todo_free = bdescr_free(bd);
     ws->todo_lim  = stg_min(bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W,
-                            bd->free + stg_max(WORK_UNIT_WORDS,size));
+                            bdescr_free(bd) + stg_max(WORK_UNIT_WORDS,size));
                      // See Note [big objects]
 
     debugTrace(DEBUG_gc, "alloc new todo block %p for gen  %d",
-               bd->free, ws->gen->no);
+               bdescr_free(bd), ws->gen->no);
 
     return ws->todo_free;
 }

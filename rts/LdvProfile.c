@@ -158,16 +158,15 @@ processHeapClosureForDead( const StgClosure *c )
 static void
 processHeapForDead( bdescr *bd )
 {
-    StgPtr p;
-
     while (bd != NULL) {
-        p = bdescr_start(bd);
-        while (p < bd->free) {
+        StgPtr p = bdescr_start(bd);
+        const StgPtr free = bdescr_free(bd);
+        while (p < free) {
             p += processHeapClosureForDead((StgClosure *)p);
-            while (p < bd->free && !*p)   // skip slop
+            while (p < free && !*p)   // skip slop
                 p++;
         }
-        ASSERT(p == bd->free);
+        ASSERT(p == free);
         bd = bd->link;
     }
 }
@@ -178,17 +177,17 @@ processHeapForDead( bdescr *bd )
 static void
 processNurseryForDead( void )
 {
-    StgPtr p;
     bdescr *bd;
 
     if (MainCapability.r.rNursery == NULL)
         return;
 
     for (bd = MainCapability.r.rNursery->blocks; bd != NULL; bd = bd->link) {
-        p = bdescr_start(bd);
-        while (p < bd->free) {
-            while (p < bd->free && !*p) p++; // skip slop
-            if (p >= bd->free) break;
+        StgPtr p = bdescr_start(bd);
+        const StgPtr free = bdescr_free(bd);
+        while (p < free) {
+            while (p < free && !*p) p++; // skip slop
+            if (p >= free) break;
             p += processHeapClosureForDead((StgClosure *)p);
         }
     }

@@ -184,6 +184,18 @@ EXTERN_INLINE StgPtr bdescr_start(bdescr *bd)
         );
 }
 
+EXTERN_INLINE StgPtr bdescr_free(bdescr *bd);
+EXTERN_INLINE StgPtr bdescr_free(bdescr *bd)
+{
+    return bd->free;
+}
+
+EXTERN_INLINE void bdescr_set_free(bdescr *bd, void *free);
+EXTERN_INLINE void bdescr_set_free(bdescr *bd, void *free)
+{
+    bd->free = free;
+}
+
 #endif
 
 /* Useful Macros ------------------------------------------------------------ */
