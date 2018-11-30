@@ -727,9 +727,7 @@ freeVars = go
       where
         body'@(body_fvs, _) = go body
         b_ty  = idType b
-        b_w   = idWeight b
         b_fvs = tyCoVarsOfTypeDSet b_ty
-        w_fvs = tyCoVarsOfMultDSet b_w
                 -- See Note [The FVAnn invariant]
 
     go (App fun arg)

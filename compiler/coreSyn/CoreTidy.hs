@@ -31,7 +31,6 @@ import Name hiding (tidyNameOcc)
 import SrcLoc
 import Maybes
 import Data.List
-import GHC.Stack
 
 {-
 ************************************************************************
