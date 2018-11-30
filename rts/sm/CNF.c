@@ -442,8 +442,8 @@ compactResize (Capability *cap, StgCompactNFData *str, StgWord new_size)
 STATIC_INLINE bool
 has_room_for  (bdescr *bd, StgWord sizeW)
 {
-    return (bd->free < bdescr_start(bd) + BLOCK_SIZE_W * BLOCKS_PER_MBLOCK
-            && bd->free + sizeW <= bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
+    return (bd->free_off < BLOCK_SIZE * BLOCKS_PER_MBLOCK
+            && bd->free_off + sizeW * sizeof(StgWord) <= BLOCK_SIZE * bd->blocks);
 }
 
 static bool
@@ -494,8 +494,8 @@ allocateForCompact (Capability *cap,
         next_size = BLOCK_ROUND_UP(sizeW*sizeof(W_) + sizeof(StgCompactNFDataBlock));
         block = compactAppendBlock(cap, str, next_size);
         bd = Bdescr((P_)block);
-        to = bd->free;
-        bd->free += sizeW;
+        to = bdescr_free(bd);
+        bd->free_off += sizeW * sizeof(StgWord);
         return to;
     }
 
@@ -519,8 +519,8 @@ allocateForCompact (Capability *cap,
     for (block = str->nursery->next; block != NULL; block = block->next) {
         bd = Bdescr((P_)block);
         if (has_room_for(bd,sizeW)) {
-            to = bd->free;
-            bd->free += sizeW;
+            to = bdescr_free(bd);
+            bd->free_off += sizeW * sizeof(StgWord);
             return to;
         }
     }
@@ -532,8 +532,8 @@ allocateForCompact (Capability *cap,
 
     block = compactAppendBlock(cap, str, next_size);
     bd = Bdescr((P_)block);
-    to = bd->free;
-    bd->free += sizeW;
+    to = bdescr_free(bd);
+    bd->free_off += sizeW * sizeof(StgWord);
     return to;
 }
 
@@ -813,7 +813,7 @@ spew_failing_pointer(StgWord *fixup_table, uint32_t count, StgWord address)
 
         block = (StgCompactNFDataBlock*)value;
         bd = Bdescr((P_)block);
-        size = (W_)bd->free - (W_)bdescr_start(bd);
+        size = bd->free_off;
 
         debugBelch("%" FMT_Word32 ": was 0x%" FMT_HexWord "-0x%" FMT_HexWord
                    ", now 0x%" FMT_HexWord "-0x%" FMT_HexWord "\n", i, key,
