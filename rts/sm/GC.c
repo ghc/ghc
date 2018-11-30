@@ -999,7 +999,8 @@ new_gc_thread (uint32_t n, gc_thread *t)
                 // no lock, locks aren't initialised yet
             initBdescr(bd, ws->gen, ws->gen->to);
             bd->flags = BF_EVACUATED;
-            bd->u.scan = bd->free = bdescr_start(bd);
+            bd->u.scan = bdescr_start(bd);
+            bd->free_off = 0;
 
             ws->todo_bd = bd;
             ws->todo_free = bdescr_free(bd);
