@@ -212,7 +212,7 @@ newStackBlock( bdescr *bd )
     stackTop     = (stackElement *)(bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
     stackBottom  = (stackElement *)bdescr_start(bd);
     stackLimit   = (stackElement *)stackTop;
-    bd->free     = (StgPtr)stackLimit;
+    bd->free_off = BLOCK_SIZE * bd->blocks;
 }
 
 /* -----------------------------------------------------------------------------
@@ -227,7 +227,7 @@ returnToOldStack( bdescr *bd )
     stackTop = (stackElement *)bdescr_free(bd);
     stackBottom = (stackElement *)bdescr_start(bd);
     stackLimit = (stackElement *)(bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
-    bd->free = (StgPtr)stackLimit;
+    bd->free_off = BLOCK_SIZE * bd->blocks;
 }
 
 /* -----------------------------------------------------------------------------
@@ -577,7 +577,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 #if defined(DEBUG_RETAINER)
         // debugBelch("push() to the next stack.\n");
 #endif
-        // currentStack->free is updated when the active stack is switched
+        // currentStack->free_off is updated when the active stack is switched
         // to the next stack.
         bdescr_set_free(currentStack, (StgPtr)stackTop);
 
@@ -654,7 +654,7 @@ popOffReal(void)
         return;
     }
 
-    // currentStack->free is updated when the active stack is switched back
+    // currentStack->free_off is updated when the active stack is switched back
     // to the previous stack.
     bdescr_set_free(currentStack, (StgPtr)stackLimit);
 

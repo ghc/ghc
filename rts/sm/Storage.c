@@ -577,7 +577,7 @@ allocNursery (uint32_t node, bdescr *tail, W_ blocks)
                 }
             }
 
-            bd[i].free = bdescr_start(&bd[i]);
+            bd[i].free_off = 0;
         }
 
         tail = &bd[0];
@@ -887,7 +887,7 @@ allocateMightFail (Capability *cap, W_ n)
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
         bd->flags = BF_LARGE;
-        bd->free = bdescr_start(bd) + n;
+        bd->free_off = n * sizeof(W_);
         cap->total_allocated += n;
         return bdescr_start(bd);
     }
@@ -896,7 +896,7 @@ allocateMightFail (Capability *cap, W_ n)
 
     accountAllocation(cap, n);
     bd = cap->r.rCurrentAlloc;
-    if (bd == NULL || bd->free + n > bdescr_start(bd) + BLOCK_SIZE_W) {
+    if (bd == NULL || (bd->free_off + n*sizeof(W_)) > BLOCK_SIZE) {
 
         if (bd) finishedNurseryBlock(cap,bd);
 
@@ -953,8 +953,8 @@ allocateMightFail (Capability *cap, W_ n)
         cap->r.rCurrentAlloc = bd;
         IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery));
     }
-    p = bd->free;
-    bd->free += n;
+    p = bdescr_free(bd);
+    bd->free_off += n * sizeof(W_);
 
     IF_DEBUG(sanity, ASSERT(*((StgWord8*)p) == 0xaa));
     return p;
@@ -1007,7 +1007,7 @@ allocatePinned (Capability *cap, W_ n)
 
     // If we don't have a block of pinned objects yet, or the current
     // one isn't large enough to hold the new object, get a new one.
-    if (bd == NULL || (bd->free + n) > (bdescr_start(bd) + BLOCK_SIZE_W)) {
+    if (bd == NULL || (bd->free_off + n*sizeof(W_)) > BLOCK_SIZE) {
 
         // stash the old block on cap->pinned_object_blocks.  On the
         // next GC cycle these objects will be moved to
@@ -1061,8 +1061,8 @@ allocatePinned (Capability *cap, W_ n)
         // live).
     }
 
-    p = bd->free;
-    bd->free += n;
+    p = bdescr_free(bd);
+    bd->free_off += n * sizeof(W_);
     return p;
 }
 
@@ -1217,8 +1217,8 @@ W_ countOccupied (bdescr *bd)
 
     words = 0;
     for (; bd != NULL; bd = bd->link) {
-        ASSERT(bd->free <= bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W);
-        words += bd->free - bdescr_start(bd);
+        ASSERT(bd->free_off <= bd->blocks * BLOCK_SIZE);
+        words += bd->free_off / sizeof(W_);
     }
     return words;
 }
@@ -1504,7 +1504,7 @@ AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
     }
 
     if (exec_block == NULL ||
-        exec_block->free + n + 1 > bdescr_start(exec_block) + BLOCK_SIZE_W) {
+        (exec_block->free_off + (n + 1)*sizeof(W_)) > BLOCK_SIZE) {
         bdescr *bd;
         W_ pagesize = getPageSize();
         bd = allocGroup(stg_max(1, pagesize / BLOCK_SIZE));
@@ -1519,10 +1519,10 @@ AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
         setExecutable(bdescr_start(bd), bd->blocks * BLOCK_SIZE, true);
         exec_block = bd;
     }
-    *(exec_block->free) = n;  // store the size of this chunk
+    *bdescr_free(exec_block) = n;  // store the size of this chunk
     exec_block->gen_no += n;  // gen_no stores the number of words allocated
-    ret = exec_block->free + 1;
-    exec_block->free += n + 1;
+    ret = exec_block->free_off + 1;
+    exec_block->free_off += (n + 1) * sizeof(W_);
 
     RELEASE_SM_LOCK
     *exec_ret = ret;
@@ -1556,7 +1556,7 @@ void freeExec (void *addr)
             setExecutable(bdescr_start(bd), bd->blocks * BLOCK_SIZE, false);
             freeGroup(bd);
         } else {
-            bd->free = bdescr_start(bd);
+            bd->free_off = 0;
         }
     }
 

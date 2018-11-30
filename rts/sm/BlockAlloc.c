@@ -42,10 +42,10 @@ static void  initMBlock(void *mblock, uint32_t node);
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    bdescr_start(bd) always points to the start of the block.
 
-   bd->free is either:
+   bd->free_off is either:
       - zero for a non-group-head; bd->link points to the head
       - (-1) for the head of a free block group
-      - or it points within the block (group)
+      - or it is an offset within the block (group)
 
    bd->blocks is either:
       - zero for a non-group-head; bd->link points to the head
@@ -218,8 +218,8 @@ tail_of (bdescr *bd)
 STATIC_INLINE void
 initGroup(bdescr *head)
 {
-  head->free   = bdescr_start(head);
-  head->link   = NULL;
+  head->free_off = 0;
+  head->link     = NULL;
 
   // If this is a block group (but not a megablock group), we
   // make the last block of the group point to the head.  This is used
@@ -300,7 +300,7 @@ setup_tail (bdescr *bd)
     tail = tail_of(bd);
     if (tail != bd) {
         tail->blocks = 0;
-        tail->free = 0;
+        tail->free_off = 0;
         tail->link = bd;
     }
 }
@@ -646,11 +646,11 @@ freeGroup(bdescr *p)
   // not true in multithreaded GC:
   // ASSERT_SM_LOCK();
 
-  ASSERT(p->free != (P_)-1);
+  ASSERT(p->free_off != (StgWord32) -1);
 
   node = p->node;
 
-  p->free = (void *)-1;  /* indicates that this block is free */
+  p->free_off = (StgWord32) -1;  /* indicates that this block is free */
   p->gen_no = 0;
   /* fill the block group with garbage if sanity checking is on */
   IF_DEBUG(sanity,memset(bdescr_start(p), 0xaa, (W_)p->blocks * BLOCK_SIZE));
@@ -677,7 +677,8 @@ freeGroup(bdescr *p)
   {
       bdescr *next;
       next = p + p->blocks;
-      if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(p)) && next->free == (P_)-1)
+      if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(p))
+          && next->free_off == (StgWord32) -1)
       {
           p->blocks += next->blocks;
           ln = log_2(next->blocks);
@@ -698,7 +699,7 @@ freeGroup(bdescr *p)
       prev = p - 1;
       if (prev->blocks == 0) prev = prev->link; // find the head
 
-      if (prev->free == (P_)-1)
+      if (prev->free_off == (StgWord32) -1)
       {
           ln = log_2(prev->blocks);
           dbl_link_remove(prev, &free_list[node][ln]);
@@ -854,7 +855,7 @@ check_tail (bdescr *bd)
     if (tail != bd)
     {
         ASSERT(tail->blocks == 0);
-        ASSERT(tail->free == 0);
+        ASSERT(tail->free_off == 0);
         ASSERT(tail->link == bd);
     }
 }
@@ -878,7 +879,7 @@ checkFreeListSanity(void)
                 IF_DEBUG(block_alloc,
                          debugBelch("group at %p, length %ld blocks\n",
                                     bdescr_start(bd), (long)bd->blocks));
-                ASSERT(bd->free == (P_)-1);
+                ASSERT(bd->free_off == (StgWord32) -1);
                 ASSERT(bd->blocks > 0 && bd->blocks < BLOCKS_PER_MBLOCK);
                 ASSERT(bd->blocks >= min && bd->blocks <= (min*2 - 1));
                 ASSERT(bd->link != bd); // catch easy loops
@@ -896,7 +897,7 @@ checkFreeListSanity(void)
                     next = bd + bd->blocks;
                     if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(bd)))
                     {
-                        ASSERT(next->free != (P_)-1);
+                        ASSERT(next->free_off != (StgWord32) -1);
                     }
                 }
             }
@@ -977,7 +978,7 @@ reportUnmarkedBlocks (void)
     for (mblock = getFirstMBlock(&state); mblock != NULL;
          mblock = getNextMBlock(&state, mblock)) {
         for (bd = FIRST_BDESCR(mblock); bd <= LAST_BDESCR(mblock); ) {
-            if (!(bd->flags & BF_KNOWN) && bd->free != (P_)-1) {
+            if (!(bd->flags & BF_KNOWN) && bd->free_off != (StgWord32) -1) {
                 debugBelch("  %p\n",bd);
             }
             if (bd->blocks >= BLOCKS_PER_MBLOCK) {

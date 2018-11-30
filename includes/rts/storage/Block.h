@@ -86,15 +86,14 @@
 #if !defined(CMINUSMINUS)
 typedef struct bdescr_ {
 
-    StgPtr free;               // First free byte of memory.
+    StgWord32 free_off;        // Offset to the first free byte of memory.
                                // allocGroup() sets this to the value of start.
                                // NB. during use this value should lie
-                               // between start and start + blocks *
-                               // BLOCK_SIZE.  Values outside this
-                               // range are reserved for use by the
-                               // block allocator.  In particular, the
-                               // value (StgPtr)(-1) is used to
-                               // indicate that a block is unallocated.
+                               // between 0 and blocks * BLOCK_SIZE. Values
+                               // outside this range are reserved for use by the
+                               // block allocator. In particular, the value
+                               // (StgPtr)(-1) is used to indicate that a block
+                               // is unallocated.
 
     struct bdescr_ *link;      // used for chaining blocks together
 
@@ -164,6 +163,9 @@ typedef struct bdescr_ {
     ((((bd) & MBLOCK_MASK) << (BLOCK_SHIFT-BDESCR_SHIFT)) \
      | ((bd) & ~MBLOCK_MASK))
 
+#define bdescr_free(bd)                                   \
+    (bdescr_start(bd) + TO_W_(bdescr_free_off(bd)))
+
 #else
 
 EXTERN_INLINE bdescr *Bdescr(StgPtr p);
@@ -187,13 +189,13 @@ EXTERN_INLINE StgPtr bdescr_start(bdescr *bd)
 EXTERN_INLINE StgPtr bdescr_free(bdescr *bd);
 EXTERN_INLINE StgPtr bdescr_free(bdescr *bd)
 {
-    return bd->free;
+    return ((StgPtr) ((W_) bdescr_start(bd) + bd->free_off));
 }
 
 EXTERN_INLINE void bdescr_set_free(bdescr *bd, void *free);
 EXTERN_INLINE void bdescr_set_free(bdescr *bd, void *free)
 {
-    bd->free = free;
+    bd->free_off = (uint8_t *) free - (uint8_t *) bdescr_start(bd);
 }
 
 #endif

@@ -390,7 +390,7 @@ wanteds os = concat
           ,structField C    "Capability" "weak_ptr_list_hd"
           ,structField C    "Capability" "weak_ptr_list_tl"
 
-          ,structField Both "bdescr" "free"
+          ,structField Both "bdescr" "free_off"
           ,structField Both "bdescr" "blocks"
           ,structField C    "bdescr" "gen_no"
           ,structField C    "bdescr" "link"
