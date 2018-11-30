@@ -845,8 +845,6 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_errs :: TcRef Messages              -- Place to accumulate errors
     }
 
-type TcTypeEnv = NameEnv (Scaled TcTyThing)
-
 type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
         -- Monadic so that we have a chance
         -- to deal with bound type variables just before error
@@ -854,6 +852,8 @@ type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
 
         -- Bool:  True <=> this is a landmark context; do not
         --                 discard it when trimming for display
+
+type TcTypeEnv = NameEnv (Scaled TcTyThing)
 
 type ThBindEnv = NameEnv (TopLevelFlag, ThLevel)
    -- Domain = all Ids bound in this module (ie not imported)

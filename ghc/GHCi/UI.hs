@@ -1523,7 +1523,7 @@ defineMacro overwrite s = do
   handleSourceError GHC.printException $ do
     step <- getGhciStepIO
     expr <- GHC.parseExpr definition
-    -- > ghciStepIO . definition :: StringstringTy  -> IO String
+    -- > ghciStepIO . definition :: String -> IO String
     let stringTy = nlHsTyVar stringTy_RDR
         ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
         body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)

@@ -55,7 +55,6 @@ import Util
 import ErrUtils
 import Module          ( moduleName, pprModuleName )
 import Multiplicity
-
 import PrimOp          ( PrimOp (SeqOp) )
 
 
@@ -892,7 +891,6 @@ simplExprF1 env (App fun arg) cont
                 simplExprF env fun $
                  ApplyToVal { sc_arg = arg, sc_env = env
                             , sc_dup = NoDup, sc_cont = cont, sc_mult = m }
-
 
 simplExprF1 env expr@(Lam {}) cont
   = {-#SCC "simplExprF1-Lam" #-}

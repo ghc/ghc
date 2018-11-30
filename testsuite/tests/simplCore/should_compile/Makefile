@@ -228,6 +228,7 @@ str-rules:
 T13340:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13340.hs -ddump-simpl -dsuppress-all | grep -c '\+#'
 
+
 # We expect to see all dictionaries specialized away.
 .PHONY: T11272
 T11272:

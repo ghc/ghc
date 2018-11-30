@@ -3,11 +3,11 @@ module Main (main) where
 data T = MkT !Bool
 
 f :: Bool -> IO ()
-f _ = print "The rule triggered before case-of-known-constructor could take effect (bad!)"
+f _ = putStrLn "The rule triggered before case-of-known-constructor could take effect (bad!)"
 {-# NOINLINE f #-}
 
 g :: IO ()
-g = print "Case-of-known-constructor triggered (good!)"
+g = putStrLn "Case-of-known-constructor triggered (good!)"
 
 {-# RULES "non-det" [~0] f True = g #-}
 

@@ -18,7 +18,8 @@ module Kind (
 
 import GhcPrelude
 
-import {-# SOURCE #-} Type    ( coreView, splitTyConApp_maybe )
+import {-# SOURCE #-} Type    ( coreView
+                              , splitTyConApp_maybe )
 import {-# SOURCE #-} DataCon ( DataCon )
 
 import TyCoRep

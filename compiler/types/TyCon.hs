@@ -649,7 +649,7 @@ data TyCon
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
 
-        tcRepName   :: TyConRepName
+        tcRepName :: TyConRepName
     }
 
   -- | Algebraic data types, from

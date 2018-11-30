@@ -49,7 +49,7 @@ fromToInteger:
 
 .PHONY: IntegerConversionRules
 IntegerConversionRules:
-	'$(TEST_HC)' -Wall -v0 -O -c $@.hs -fforce-recomp -dno-debug-output -ddump-simpl > $@.simpl
+	'$(TEST_HC)' -Wall -v0 -O -c $@.hs -fforce-recomp -ddump-simpl > $@.simpl
 	-grep -q smallInteger      $@.simpl && echo "smallInteger present"
 	-grep -q doubleFromInteger $@.simpl && echo "doubleFromInteger present"
 	-grep -q int2Double        $@.simpl || echo "int2Double absent"

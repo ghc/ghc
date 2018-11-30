@@ -196,7 +196,6 @@ newJoinId bndrs body_ty
 
        ; return (mkLocalVar details name Alias join_id_ty id_info) }
 
-
 {-
 ************************************************************************
 *                                                                      *

@@ -35,6 +35,7 @@ module CoreSubst (
 
 #include "HsVersions.h"
 
+
 import GhcPrelude
 
 import CoreSyn
@@ -473,7 +474,6 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
     (Subst (in_scope `extendInScopeSet` new_id) new_env tvs cvs, new_id)
   where
     id1 = uniqAway in_scope old_id      -- id1 is cloned if necessary
-    -- Why is this not substIdType???
     id2 | no_type_change = id1
         | otherwise      =  setIdWeight
                               (setIdType id1
@@ -609,12 +609,9 @@ substIdType subst@(Subst _ _ tv_env cv_env) id
   | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
     || (noFreeVarsOfType old_ty && noFreeVarsOfMult old_w) = id
   | otherwise   =
-
       setIdWeight
-        (setIdType id
-          (substTy subst old_ty))
-          (substRig subst old_w)
-
+        (setIdType id (substTy subst old_ty))
+        (substRig subst old_w)
                 -- The tyCoVarsOfType is cheaper than it looks
                 -- because we cache the free tyvars of the type
                 -- in a Note in the id's type itself
@@ -770,3 +767,4 @@ analyser, so it's possible that the worker is not even in scope any more.
 In all all these cases we simply drop the special case, returning to
 InlVanilla.  The WARN is just so I can see if it happens a lot.
 -}
+

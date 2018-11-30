@@ -3391,10 +3391,10 @@ debug_ppr_ty _ (TyVarTy tv)
 debug_ppr_ty prec (FunTy mult arg res)
   =
     let arr = case mult of
-                Zero -> text "->0"
-                One -> text "⊸"
+                Zero -> mulArrow (text "0")
+                One -> lollipop
                 Omega -> arrow
-                w -> ppr w
+                w -> mulArrow (ppr w)
     in
       maybeParen prec funPrec $
       sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]

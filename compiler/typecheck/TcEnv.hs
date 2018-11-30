@@ -117,10 +117,9 @@ import Util
 import Maybes( MaybeErr(..), orElse )
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad
 import Data.IORef
 import Data.List
-
+import Control.Monad
 
 {- *********************************************************************
 *                                                                      *

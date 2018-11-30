@@ -255,7 +255,7 @@ dsLExprNoLP (dL->L loc e)
        ; return e' }
 
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
-dsExpr e = ds_expr False e
+dsExpr = ds_expr False
 
 ds_expr :: Bool   -- are we directly inside an HsWrap?
                   -- See Wrinkle in Note [Detecting forced eta expansion]

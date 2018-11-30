@@ -343,7 +343,7 @@ foreign import ccall "&RtsFlags" rtsFlagsPtr :: Ptr RTSFlags
 
 getRTSFlags :: IO RTSFlags
 getRTSFlags = do
-  (\a1 a2 a3 a4 a5 a6 a7 a8 a9 -> RTSFlags a1 a2 a3 a4 a5 a6 a7 a8 a9) <$> getGCFlags
+  RTSFlags <$> getGCFlags
            <*> getConcFlags
            <*> getMiscFlags
            <*> getDebugFlags
@@ -364,16 +364,10 @@ peekCStringOpt ptr
   | ptr == nullPtr = return Nothing
   | otherwise      = Just <$> peekCString ptr
 
-
 getGCFlags :: IO GCFlags
 getGCFlags = do
   let ptr = (#ptr RTS_FLAGS, GcFlags) rtsFlagsPtr
-  (\a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15
-    a16 a17 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27
-    -> GCFlags
-        a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15
-        a16 a17 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27)
-        <$> (peekFilePath =<< #{peek GC_FLAGS, statsFile} ptr)
+  GCFlags <$> (peekFilePath =<< #{peek GC_FLAGS, statsFile} ptr)
           <*> (toEnum . fromIntegral <$>
                 (#{peek GC_FLAGS, giveStats} ptr :: IO Word32))
           <*> #{peek GC_FLAGS, maxStkSize} ptr
@@ -412,8 +406,7 @@ getGCFlags = do
 getParFlags :: IO ParFlags
 getParFlags = do
   let ptr = (#ptr RTS_FLAGS, ParFlags) rtsFlagsPtr
-  (\a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 ->
-    ParFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
+  ParFlags
     <$> #{peek PAR_FLAGS, nCapabilities} ptr
     <*> (toBool <$>
           (#{peek PAR_FLAGS, migrate} ptr :: IO CBool))
@@ -432,16 +425,13 @@ getParFlags = do
 getConcFlags :: IO ConcFlags
 getConcFlags = do
   let ptr = (#ptr RTS_FLAGS, ConcFlags) rtsFlagsPtr
-  (\a1 a2 -> ConcFlags a1 a2)
-            <$> #{peek CONCURRENT_FLAGS, ctxtSwitchTime} ptr
+  ConcFlags <$> #{peek CONCURRENT_FLAGS, ctxtSwitchTime} ptr
             <*> #{peek CONCURRENT_FLAGS, ctxtSwitchTicks} ptr
 
 getMiscFlags :: IO MiscFlags
 getMiscFlags = do
   let ptr = (#ptr RTS_FLAGS, MiscFlags) rtsFlagsPtr
-  (\a1 a2 a3 a4 a5 a6 a7 a8 ->
-      MiscFlags a1 a2 a3 a4 a5 a6 a7 a8)
-            <$> #{peek MISC_FLAGS, tickInterval} ptr
+  MiscFlags <$> #{peek MISC_FLAGS, tickInterval} ptr
             <*> (toBool <$>
                   (#{peek MISC_FLAGS, install_signal_handlers} ptr :: IO CBool))
             <*> (toBool <$>
@@ -459,10 +449,7 @@ getMiscFlags = do
 getDebugFlags :: IO DebugFlags
 getDebugFlags = do
   let ptr = (#ptr RTS_FLAGS, DebugFlags) rtsFlagsPtr
-  (\a1 a2 a3 a4 a5 a6 a7 a8 a9 a10
-    a11 a12 a13 a14 a15 ->
-    DebugFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15)
-             <$> (toBool <$>
+  DebugFlags <$> (toBool <$>
                    (#{peek DEBUG_FLAGS, scheduler} ptr :: IO CBool))
              <*> (toBool <$>
                    (#{peek DEBUG_FLAGS, interpreter} ptr :: IO CBool))
@@ -496,8 +483,7 @@ getDebugFlags = do
 getCCFlags :: IO CCFlags
 getCCFlags = do
   let ptr = (#ptr RTS_FLAGS, GcFlags) rtsFlagsPtr
-  (\a1 a2 a3 ->
-      CCFlags a1 a2 a3) <$> (toEnum . fromIntegral
+  CCFlags <$> (toEnum . fromIntegral
                 <$> (#{peek COST_CENTRE_FLAGS, doCostCentres} ptr :: IO Word32))
           <*> #{peek COST_CENTRE_FLAGS, profilerTicks} ptr
           <*> #{peek COST_CENTRE_FLAGS, msecsPerTick} ptr
@@ -505,10 +491,7 @@ getCCFlags = do
 getProfFlags :: IO ProfFlags
 getProfFlags = do
   let ptr = (#ptr RTS_FLAGS, ProfFlags) rtsFlagsPtr
-  (\a1 a2 a3 a4 a5 a6 a7 a8 a9 a10
-    a11 a12 a13 a14 ->
-    ProfFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14)
-            <$> (toEnum <$> #{peek PROFILING_FLAGS, doHeapProfile} ptr)
+  ProfFlags <$> (toEnum <$> #{peek PROFILING_FLAGS, doHeapProfile} ptr)
             <*> #{peek PROFILING_FLAGS, heapProfileInterval} ptr
             <*> #{peek PROFILING_FLAGS, heapProfileIntervalTicks} ptr
             <*> (toBool <$>
@@ -528,8 +511,7 @@ getProfFlags = do
 getTraceFlags :: IO TraceFlags
 getTraceFlags = do
   let ptr = (#ptr RTS_FLAGS, TraceFlags) rtsFlagsPtr
-  (\a1 a2 a3 a4 a5 a6 a7 ->
-      TraceFlags a1 a2 a3 a4 a5 a6 a7) <$> (toEnum . fromIntegral
+  TraceFlags <$> (toEnum . fromIntegral
                    <$> (#{peek TRACE_FLAGS, tracing} ptr :: IO CInt))
              <*> (toBool <$>
                    (#{peek TRACE_FLAGS, timestamp} ptr :: IO CBool))
@@ -547,6 +529,6 @@ getTraceFlags = do
 getTickyFlags :: IO TickyFlags
 getTickyFlags = do
   let ptr = (#ptr RTS_FLAGS, TickyFlags) rtsFlagsPtr
-  (\a1 a2 -> TickyFlags a1 a2) <$> (toBool <$>
+  TickyFlags <$> (toBool <$>
                    (#{peek TICKY_FLAGS, showTickyStats} ptr :: IO CBool))
              <*> (peekFilePath =<< #{peek TICKY_FLAGS, tickyFile} ptr)

@@ -395,7 +395,7 @@ tyConRepNameUnique  u = incrUnique u
 --    * u: the DataCon itself
 --    * u+1: its worker Id
 --    * u+2: the TyConRepName of the promoted TyCon
---    * u+3:
+--    * u+3: its wrapper Id
 -- Prelude data constructors are too simple to need wrappers.
 
 mkPreludeDataConUnique i              = mkUnique '6' (4*i)    -- Must be alphabetic

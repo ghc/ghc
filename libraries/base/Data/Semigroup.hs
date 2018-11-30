@@ -318,7 +318,7 @@ instance Bifoldable Arg where
 
 -- | @since 4.10.0.0
 instance Bitraversable Arg where
-  bitraverse f g (Arg a b) = (\a b -> Arg a b) <$> f a <*> g b
+  bitraverse f g (Arg a b) = Arg <$> f a <*> g b
 
 -- | Use @'Option' ('First' a)@ to get the behavior of
 -- 'Data.Monoid.First' from "Data.Monoid".

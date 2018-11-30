@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Arrow may never fire
     -- e.g. compose/arr;  see Trac #10528
@@ -279,7 +278,7 @@ class Arrow a => ArrowChoice a where
 instance ArrowChoice (->) where
     left f = f +++ id
     right f = id +++ f
-    f +++ g = ((.) @(->) Left f) ||| ((.) @(->) Right g)
+    f +++ g = (Left . f) ||| (Right . g)
     (|||) = either
 
 -- | @since 2.01
