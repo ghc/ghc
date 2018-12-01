@@ -25,7 +25,7 @@ import subprocess
 
 from testutil import getStdout, Watcher, str_warn, str_info
 from testglobals import getConfig, ghc_env, getTestRun, TestOptions, brokens
-from perf_notes import MetricChange, can_git_status
+from perf_notes import MetricChange, inside_git_repo
 from junit import junit
 
 # Readline sometimes spews out ANSI escapes for some values of TERM,
@@ -118,10 +118,10 @@ if args.threads:
 if args.verbose is not None:
     config.verbose = args.verbose
 
-# Note force skip perf tests: skip if this is not a git repo (estimated with can_git_status)
+# Note force skip perf tests: skip if this is not a git repo (estimated with inside_git_repo)
 # and no metrics file is given. In this case there is no way to read the previous commit's
 # perf test results, nor a way to store new perf test results.
-canGitStatus = can_git_status()
+canGitStatus = inside_git_repo()
 forceSkipPerfTests = not hasMetricsFile and not canGitStatus
 config.skip_perf_tests = args.skip_perf_tests or forceSkipPerfTests
 config.only_perf_tests = args.only_perf_tests

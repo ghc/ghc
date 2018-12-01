@@ -20,11 +20,12 @@ from math import ceil, trunc
 from testutil import passed, failBecause
 
 
-# Check if "git status" can be run successfully.
+# Check if "git rev-parse" can be run successfully.
 # True implies the current directory is a git repo.
-def can_git_status():
+def inside_git_repo():
     try:
-        subprocess.check_call(['git', 'status'])
+        subprocess.check_call(['git', 'rev-parse', 'HEAD'],
+                              stdout=subprocess.DEVNULL)
         return True
     except subprocess.CalledProcessError:
         return False
