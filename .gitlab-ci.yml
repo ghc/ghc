@@ -43,7 +43,7 @@ before_script:
     - ./configure
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make V=0 -j$THREADS HADDOCK_DOCS=NO
+      make V=0 -j$THREADS
     - |
       make binary-dist TAR_COMP_OPTS="-1"
       mv ghc-*.tar.xz ghc.tar.xz
