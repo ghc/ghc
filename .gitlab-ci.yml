@@ -24,7 +24,7 @@ before_script:
       - cabal-cache
   image: ghcci/x86_64-linux:0.0.8
 
-validate-x86_64-linux-hadrian:
+.validate-x86_64-linux-hadrian:
   extends: .validate-hadrian
   before_script:
     # workaround for docker permissions
@@ -59,7 +59,7 @@ validate-x86_64-linux-hadrian:
       - ghc.tar.xz
       - junit.xml
 
-validate-x86_64-darwin:
+.validate-x86_64-darwin:
   extends: .validate
   tags:
     - x86_64-darwin
@@ -111,7 +111,7 @@ validate-x86_64-linux:
 # Validation via Pipelines (make, Windows)
 ############################################################
 
-validate-x86_64-windows:
+.validate-x86_64-windows:
   variables:
     GHC_VERSION: "8.6.2"
   script:
