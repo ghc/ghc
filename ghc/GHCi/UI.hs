@@ -51,10 +51,12 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              GetDocsFailure(..),
              getModuleGraph, handleSourceError )
 import HscMain (hscParseDeclsWithLocation, hscParseStmtWithLocation)
+import HeaderInfo (getImports)
 import HsImpExp
 import HsSyn
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
-                  setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc )
+                  setInteractivePrintName, hsc_dflags, msObjFilePath, hsc_HPT,
+                  runInteractiveHsc, hm_linkable, hm_iface, mi_globals, linkableTime )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
@@ -65,6 +67,7 @@ import PrelNames
 import RdrName ( getGRE_NameQualifier_maybes, getRdrName )
 import SrcLoc
 import qualified Lexer
+import UniqDFM
 
 import StringBuffer
 import Outputable hiding ( printForUser, printForUserPartWay )
@@ -106,6 +109,8 @@ import qualified Data.Set as S
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as M
+import Data.Time.Clock ( UTCTime(..), secondsToDiffTime )
+import Data.Time.Calendar ( Day(..) )
 import Data.Time.LocalTime ( getZonedTime )
 import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
@@ -1797,6 +1802,42 @@ loadModule' files = do
     liftIO $ checkLeakIndicators dflags leak_indicators
   return success
 
+-- With -fminimal-bindings-retention flag on, we don't retain all the bindings
+-- of compiled modules. Hence, whenever the user wants to access local bindings
+-- of a module by adding it to the hsc_env target set, we'd have to mark
+-- them for recompilation.
+markTargetsForRecompilation :: GHC.GhcMonad m => [Target] -> m ()
+markTargetsForRecompilation targets = do
+  hsc_env <- GHC.getSession
+  let !hpt = hsc_HPT hsc_env
+  hpt' <- foldM (makeTargetStale (hsc_dflags hsc_env)) hpt targets
+  let !hsc_env' = hsc_env { hsc_HPT = hpt' }
+  GHC.setSession hsc_env'
+  where
+    beginningOfTime = UTCTime (ModifiedJulianDay 0) (secondsToDiffTime 0)
+    makeTargetStale dflags hpt (Target tid _ _) = do
+      eitherModName <- liftIO $ findTargetModuleName dflags tid
+      return $ case eitherModName of
+        (Right modName) -> adjustUDFM makeHomeModStale hpt modName
+        Left _err -> hpt
+    makeHomeModStale hmi =
+      -- If mi_globals is Nothing, we don't have all bindings of this module
+      -- so, we mark it as stale to trigger recompilation
+      case (mi_globals . hm_iface) hmi of
+        Just _ -> hmi
+        Nothing -> case hm_linkable hmi of
+          Just linkable ->
+            let newLinkable = linkable { linkableTime = beginningOfTime }
+            in hmi { hm_linkable = Just newLinkable }
+          _ -> hmi
+    findTargetModuleName _ (TargetModule name) = return $ Right name
+    findTargetModuleName dflags (TargetFile fp _) = do
+      buf <- hGetStringBuffer fp
+      imports <- getImports dflags buf fp fp
+      return $ case imports of
+        (Right (_, _, GHC.L _ mname)) -> Right mname
+        Left err -> Left err
+
 -- | @:add@ command
 addModule :: [FilePath] -> InputT GHCi ()
 addModule files = do
@@ -1807,6 +1848,11 @@ addModule files = do
   -- remove old targets with the same id; e.g. for :add *M
   mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets' ]
   mapM_ GHC.addTarget targets'
+  dflags <- hsc_dflags <$> GHC.getSession
+  case bindingsRetentionMode dflags of
+     -- local bindings are not kept in this mode, so recompile targets
+     Minimal -> markTargetsForRecompilation targets'
+     _ -> return ()
   _ <- doLoadAndCollectInfo False LoadAllTargets
   return ()
   where
