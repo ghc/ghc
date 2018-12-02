@@ -44,7 +44,7 @@ infix  4 `elem`, `notElem`
 -- List-manipulation functions
 --------------------------------------------------------------
 
--- | Extract the first element of a list, which must be non-empty.
+-- | /O(1)/. Extract the first element of a list, which must be non-empty.
 head                    :: [a] -> a
 head (x:_)              =  x
 head []                 =  badHead
@@ -62,7 +62,7 @@ badHead = errorEmptyList "head"
                 head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
 
--- | Decompose a list into its head and tail. If the list is empty,
+-- | /O(1)/. Decompose a list into its head and tail. If the list is empty,
 -- returns 'Nothing'. If the list is non-empty, returns @'Just' (x, xs)@,
 -- where @x@ is the head of the list and @xs@ its tail.
 --
@@ -71,12 +71,14 @@ uncons                  :: [a] -> Maybe (a, [a])
 uncons []               = Nothing
 uncons (x:xs)           = Just (x, xs)
 
--- | Extract the elements after the head of a list, which must be non-empty.
+-- | /O(1)/. Extract the elements after the head of a list, which must be
+-- non-empty.
 tail                    :: [a] -> [a]
 tail (_:xs)             =  xs
 tail []                 =  errorEmptyList "tail"
 
--- | Extract the last element of a list, which must be finite and non-empty.
+-- | /O(n)/. Extract the last element of a list, which must be finite and
+-- non-empty.
 last                    :: [a] -> a
 #if defined(USE_REPORT_PRELUDE)
 last [x]                =  x
@@ -94,7 +96,7 @@ lastError :: a
 lastError = errorEmptyList "last"
 #endif
 
--- | Return all the elements of a list except the last one.
+-- | /O(n)/. Return all the elements of a list except the last one.
 -- The list must be non-empty.
 init                    :: [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
@@ -109,7 +111,7 @@ init (x:xs)             =  init' x xs
         init' y (z:zs) = y : init' z zs
 #endif
 
--- | Test whether a list is empty.
+-- | /O(1)/. Test whether a list is empty.
 null                    :: [a] -> Bool
 null []                 =  True
 null (_:_)              =  False
