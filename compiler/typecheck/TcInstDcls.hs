@@ -799,7 +799,12 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
                   ; lhs_ty <- checkExpectedKindX pp_lhs lhs_ty lhs_kind res_kind
                   ; return (stupid_theta, lhs_ty, res_kind) }
 
-       -- See Note [Generalising in tcFamTyPatsAndThen]
+       -- See TcTyClsDecls Note [Generalising in tcFamTyPatsGuts]
+       -- This code (and the stuff immediately above) is very similar
+       -- to that in tcFamTyInstEqnGuts.  Maybe we should abstract the
+       -- common code; but for the moment I concluded that it's
+       -- clearer to duplicate it.  Still, if you fix a bug here,
+       -- check there too!
        ; let scoped_tvs = imp_tvs ++ exp_tvs
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
        ; qtvs <- quantifyTyVars emptyVarSet dvs
@@ -901,7 +906,7 @@ There are several fiddly subtleties lurking here
       data family X a :: forall k. * -> *   -- Note: a forall that is not used
       data instance X Int b = MkX
 
-  So the data intance is really
+  So the data instance is really
       data istance X Int @k b = MkX
 
   The axiom will look like

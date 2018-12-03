@@ -1817,8 +1817,8 @@ indexed-types/should_compile/T12369 for an example.
 So, the kind-checker must return the new skolems and args (that is, Type
 or (Type -> Type) for the equations above) and the instantiated kind.
 
-Note [Generalising in tcFamTyPatsAndThen]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Generalising in tcFamTyPatsGuts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have something like
   type instance forall (a::k) b. F t1 t2 = rhs
 
@@ -1872,7 +1872,12 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
                      ; rhs_ty <- tcCheckLHsType hs_rhs_ty rhs_kind
                      ; return (lhs_ty, rhs_ty) }
 
-       -- See Note [Generalising in tcFamTyPatsAndThen]
+       -- See Note [Generalising in tcFamTyPatsGuts]
+       -- This code (and the stuff immediately above) is very similar
+       -- to that in tcDataFamHeader.  Maybe we should abstract the
+       -- common code; but for the moment I concluded that it's
+       -- clearer to duplicate it.  Still, if you fix a bug here,
+       -- check there too!
        ; let scoped_tvs = imp_tvs ++ exp_tvs
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
        ; qtvs <- quantifyTyVars emptyVarSet dvs
@@ -1882,6 +1887,9 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        ; rhs_ty     <- zonkTcTypeToTypeX ze rhs_ty
 
        ; let pats = unravelFamInstPats lhs_ty
+             -- Note that we do this after solveEqualities
+             -- so that any strange coercions inside lhs_ty
+             -- have been solved before we attempt to unravel it
        ; traceTc "tcTyFamInstEqnGuts }" (ppr fam_tc <+> pprTyVars qtvs)
        ; return (qtvs, pats, rhs_ty) }
   where
@@ -1963,6 +1971,10 @@ unravelFamInstPats fam_app
   = case splitTyConApp_maybe fam_app of
       Just (_, pats) -> pats
       Nothing        -> WARN( True, bad_lhs fam_app ) []
+        -- The Nothing case cannot happen for type families, because
+        -- we don't call unravelFamInstPats until we've solved the
+        -- equalities.  For data families I wasn't quite as convinced
+        -- so I've let it as a warning rather than a panic.
   where
     bad_lhs fam_app
       = hang (text "Ill-typed LHS of family instance")
