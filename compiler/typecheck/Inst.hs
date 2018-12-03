@@ -305,7 +305,7 @@ instTyVarsWith orig tvs tys
            ; go (extendTCvSubst subst tv (ty `mkCastTy` co)) tvs tys }
       where
         tv_kind = substTy subst (tyVarKind tv)
-        ty_kind = typeKind ty
+        ty_kind = tcTypeKind ty
 
     go _ _ _ = pprPanic "instTysWith" (ppr tvs $$ ppr tys)
 
@@ -581,15 +581,15 @@ mkHEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
 mkHEqBoxTy co ty1 ty2
   = return $
     mkTyConApp (promoteDataCon heqDataCon) [k1, k2, ty1, ty2, mkCoercionTy co]
-  where k1 = typeKind ty1
-        k2 = typeKind ty2
+  where k1 = tcTypeKind ty1
+        k2 = tcTypeKind ty2
 
 -- | This takes @a ~# b@ and returns @a ~ b@.
 mkEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
 mkEqBoxTy co ty1 ty2
   = return $
     mkTyConApp (promoteDataCon eqDataCon) [k, ty1, ty2, mkCoercionTy co]
-  where k = typeKind ty1
+  where k = tcTypeKind ty1
 
 {-
 ************************************************************************

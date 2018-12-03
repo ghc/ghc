@@ -187,8 +187,8 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
                          , fi_rhs      = rhs'
                          , fi_axiom    = axiom }) }
   where
-    lhs_kind = typeKind (mkTyConApp fam_tc lhs)
-    rhs_kind = typeKind rhs
+    lhs_kind = tcTypeKind (mkTyConApp fam_tc lhs)
+    rhs_kind = tcTypeKind rhs
     tcv_set  = mkVarSet (tvs ++ cvs)
     pp_ax    = pprCoAxiom axiom
     CoAxBranch { cab_tvs = tvs

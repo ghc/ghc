@@ -1700,7 +1700,7 @@ data Ct
        --   * tv not in tvs(rhs)   (occurs check)
        --   * If tv is a TauTv, then rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
-       --   * typeKind ty `tcEqKind` typeKind tv; Note [Ct kind invariant]
+       --   * tcTypeKind ty `tcEqKind` tcTypeKind tv; Note [Ct kind invariant]
        --   * rhs may have at most one top-level cast
        --   * rhs (perhaps under the one cast) is not necessarily function-free,
        --       but it has no top-level function.
@@ -1723,7 +1723,7 @@ data Ct
   | CFunEqCan {  -- F xis ~ fsk
        -- Invariants:
        --   * isTypeFamilyTyCon cc_fun
-       --   * typeKind (F xis) = tyVarKind fsk; Note [Ct kind invariant]
+       --   * tcTypeKind (F xis) = tyVarKind fsk; Note [Ct kind invariant]
        --   * always Nominal role
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function

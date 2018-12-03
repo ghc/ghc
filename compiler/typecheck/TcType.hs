@@ -122,7 +122,7 @@ module TcType (
 
   --------------------------------
   -- Rexported from Kind
-  Kind, typeKind,
+  Kind, typeKind, tcTypeKind,
   liftedTypeKind,
   constraintKind,
   isLiftedTypeKind, isUnliftedTypeKind, classifiesTypeWithValues,
@@ -1296,7 +1296,7 @@ See also Note [The tcType invariant] in TcHsType.
 
 During type inference, we maintain this invariant
 
-   (INV-TK): it is legal to call 'typeKind' on any Type ty,
+   (INV-TK): it is legal to call 'tcTypeKind' on any Type ty,
              /without/ zonking ty
 
 For example, suppose
@@ -1306,12 +1306,12 @@ For example, suppose
     a :: kappa
 then consider the type
     (a Int)
-If we call typeKind on that, we'll crash, because the (un-zonked)
+If we call tcTypeKind on that, we'll crash, because the (un-zonked)
 kind of 'a' is just kappa, not an arrow kind.  If we zonk first
 we'd be fine, but that is too tiresome, so instead we maintain
 (INV-TK).  So we do not form (a Int); instead we form
     (a |> co) Int
-and typeKind has no problem with that.
+and tcTypeKind has no problem with that.
 
 Bottom line: we want to keep that 'co' /even though it is Refl/.
 
@@ -1563,7 +1563,7 @@ tcSplitFunTy_maybe :: Type -> Maybe (Type, Type)
 tcSplitFunTy_maybe ty | Just ty' <- tcView ty         = tcSplitFunTy_maybe ty'
 tcSplitFunTy_maybe (FunTy arg res) | not (isPredTy arg) = Just (arg, res)
 tcSplitFunTy_maybe _                                    = Nothing
-        -- Note the typeKind guard
+        -- Note the tcTypeKind guard
         -- Consider     (?x::Int) => Bool
         -- We don't want to treat this as a function type!
         -- A concrete example is test tc230:
@@ -1714,8 +1714,8 @@ tcEqType ty1 ty2
   = isNothing (tc_eq_type tcView ki1 ki2) &&
     isNothing (tc_eq_type tcView ty1 ty2)
   where
-    ki1 = typeKind ty1
-    ki2 = typeKind ty2
+    ki1 = tcTypeKind ty1
+    ki2 = tcTypeKind ty2
 
 -- | Just like 'tcEqType', but will return True for types of different kinds
 -- as long as their non-coercion structure is identical.
@@ -1732,8 +1732,8 @@ tcEqTypeVis :: TcType -> TcType -> Maybe Bool
 tcEqTypeVis ty1 ty2
   = tc_eq_type tcView ty1 ty2 <!> invis (tc_eq_type tcView ki1 ki2)
   where
-    ki1 = typeKind ty1
-    ki2 = typeKind ty2
+    ki1 = tcTypeKind ty1
+    ki2 = tcTypeKind ty2
 
       -- convert Just True to Just False
     invis :: Maybe Bool -> Maybe Bool
@@ -1970,8 +1970,8 @@ boxEqPred eq_rel ty1 ty2
                                     --       so we can't abstract over it
                                     -- Nothing fundamental: we could add it
  where
-   k1 = typeKind ty1
-   k2 = typeKind ty2
+   k1 = tcTypeKind ty1
+   k2 = tcTypeKind ty2
    homo_kind = k1 `tcEqType` k2
 
 pickCapturedPreds

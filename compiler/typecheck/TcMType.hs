@@ -684,7 +684,7 @@ newFskTyVar fam_ty
                               , mtv_ref   = ref
                               , mtv_tclvl = tclvl }
              name = mkMetaTyVarName uniq (fsLit "fsk")
-       ; return (mkTcTyVar name (typeKind fam_ty) details) }
+       ; return (mkTcTyVar name (tcTypeKind fam_ty) details) }
 
 newFmvTyVar :: TcType -> TcM TcTyVar
 -- Very like newMetaTyVar, except sets mtv_tclvl to one less
@@ -697,7 +697,7 @@ newFmvTyVar fam_ty
                               , mtv_ref   = ref
                               , mtv_tclvl = tclvl }
              name = mkMetaTyVarName uniq (fsLit "s")
-       ; return (mkTcTyVar name (typeKind fam_ty) details) }
+       ; return (mkTcTyVar name (tcTypeKind fam_ty) details) }
 
 newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
 newMetaDetails info
@@ -785,8 +785,8 @@ writeMetaTyVarRef tyvar ref ty
        -- Zonk kinds to allow the error check to work
        ; zonked_tv_kind <- zonkTcType tv_kind
        ; zonked_ty      <- zonkTcType ty
-       ; let zonked_ty_kind = typeKind zonked_ty  -- need to zonk even before typeKind;
-                                                  -- otherwise, we can panic in piResultTy
+       ; let zonked_ty_kind = tcTypeKind zonked_ty  -- Need to zonk even before typeKind;
+                                                    -- otherwise, we can panic in piResultTy
              kind_check_ok = tcIsConstraintKind zonked_tv_kind
                           || tcEqKind zonked_ty_kind zonked_tv_kind
              -- Hack alert! tcIsConstraintKind: see TcHsType
@@ -2190,4 +2190,4 @@ formatLevPolyErr ty
                , text "Kind:" <+> pprWithTYPE tidy_ki ])
   where
     (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
-    tidy_ki             = tidyType tidy_env (typeKind ty)
+    tidy_ki             = tidyType tidy_env (tcTypeKind ty)

@@ -1199,7 +1199,7 @@ reifyInstances th_nm th_tys
                 -- In particular, the type might have kind
                 -- variables inside it (Trac #7477)
 
-        ; traceTc "reifyInstances" (ppr ty $$ ppr (typeKind ty))
+        ; traceTc "reifyInstances" (ppr ty $$ ppr (tcTypeKind ty))
         ; case splitTyConApp_maybe ty of   -- This expands any type synonyms
             Just (tc, tys)                 -- See Trac #7910
                | Just cls <- tyConClass_maybe tc
@@ -1639,7 +1639,7 @@ annotThType :: Bool   -- True <=> annotate
 annotThType _    _  th_ty@(TH.SigT {}) = return th_ty
 annotThType True ty th_ty
   | not $ isEmptyVarSet $ filterVarSet isTyVar $ tyCoVarsOfType ty
-  = do { let ki = typeKind ty
+  = do { let ki = tcTypeKind ty
        ; th_ki <- reifyKind ki
        ; return (TH.SigT th_ty th_ki) }
 annotThType _    _ th_ty = return th_ty
@@ -1944,7 +1944,7 @@ reify_tc_app tc tys
     -- See Note [Kind annotations on TyConApps]
     maybe_sig_t th_type
       | needs_kind_sig
-      = do { let full_kind = typeKind (mkTyConApp tc tys)
+      = do { let full_kind = tcTypeKind (mkTyConApp tc tys)
            ; th_full_kind <- reifyKind full_kind
            ; return (TH.SigT th_type th_full_kind) }
       | otherwise

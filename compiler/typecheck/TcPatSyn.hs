@@ -193,8 +193,8 @@ mkProvEvidence :: EvId -> Maybe (PredType, EvTerm)
 -- See Note [Equality evidence in pattern synonyms]
 mkProvEvidence ev_id
   | EqPred r ty1 ty2 <- classifyPredType pred
-  , let k1 = typeKind ty1
-        k2 = typeKind ty2
+  , let k1 = tcTypeKind ty1
+        k2 = tcTypeKind ty2
         is_homo = k1 `tcEqType` k2
         homo_tys   = [k1, ty1, ty2]
         hetero_tys = [k1, k2, ty1, ty2]

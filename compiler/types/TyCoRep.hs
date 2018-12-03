@@ -44,8 +44,10 @@ module TyCoRep (
         mkForAllTy,
         mkTyCoPiTy, mkTyCoPiTys,
         mkPiTys,
-        isTYPE,
+
+        kindRep_maybe, kindRep,
         isLiftedTypeKind, isUnliftedTypeKind,
+        isLiftedRuntimeRep, isUnliftedRuntimeRep,
         isRuntimeRepTy, isRuntimeRepVar,
         sameVis,
 
@@ -857,40 +859,61 @@ mkTyConTy tycon = TyConApp tycon []
 Some basic functions, put here to break loops eg with the pretty printer
 -}
 
--- | If a type is @'TYPE' r@ for some @r@, run the predicate argument on @r@.
--- Otherwise, return 'False'.
---
--- This function does not distinguish between 'Constraint' and 'Type'. For a
--- version which does distinguish between the two, see 'tcIsTYPE'.
-isTYPE :: (   Type    -- the single argument to TYPE; not a synonym
-           -> Bool )  -- what to return
-       -> Kind -> Bool
-isTYPE f ki | Just ki' <- coreView ki = isTYPE f ki'
-isTYPE f (TyConApp tc [arg])
-  | tc `hasKey` tYPETyConKey
-  = go arg
-    where
-      go ty | Just ty' <- coreView ty = go ty'
-      go ty = f ty
-isTYPE _ _ = False
+-- | Extract the RuntimeRep classifier of a type from its kind. For example,
+-- @kindRep * = LiftedRep@; Panics if this is not possible.
+-- Treats * and Constraint as the same
+kindRep :: HasDebugCallStack => Kind -> Type
+kindRep k = case kindRep_maybe k of
+              Just r  -> r
+              Nothing -> pprPanic "kindRep" (ppr k)
+
+-- | Given a kind (TYPE rr), extract its RuntimeRep classifier rr.
+-- For example, @kindRep_maybe * = Just LiftedRep@
+-- Returns 'Nothing' if the kind is not of form (TYPE rr)
+-- Treats * and Constraint as the same
+kindRep_maybe :: HasDebugCallStack => Kind -> Maybe Type
+kindRep_maybe kind
+  | Just kind' <- coreView kind = kindRep_maybe kind'
+  | TyConApp tc [arg] <- kind
+  , tc `hasKey` tYPETyConKey    = Just arg
+  | otherwise                   = Nothing
 
 -- | This version considers Constraint to be the same as *. Returns True
 -- if the argument is equivalent to Type/Constraint and False otherwise.
 -- See Note [Kind Constraint and kind Type]
 isLiftedTypeKind :: Kind -> Bool
-isLiftedTypeKind = isTYPE is_lifted
-  where
-    is_lifted (TyConApp lifted_rep []) = lifted_rep `hasKey` liftedRepDataConKey
-    is_lifted _                        = False
+isLiftedTypeKind kind
+  = case kindRep_maybe kind of
+      Just rep -> isLiftedRuntimeRep rep
+      Nothing  -> False
 
 -- | Returns True if the kind classifies unlifted types and False otherwise.
 -- Note that this returns False for levity-polymorphic kinds, which may
 -- be specialized to a kind that classifies unlifted types.
 isUnliftedTypeKind :: Kind -> Bool
-isUnliftedTypeKind = isTYPE is_unlifted
-  where
-    is_unlifted (TyConApp rr _args) = elem (getUnique rr) unliftedRepDataConKeys
-    is_unlifted _                   = False
+isUnliftedTypeKind kind
+  = case kindRep_maybe kind of
+      Just rep -> isUnliftedRuntimeRep rep
+      Nothing  -> False
+
+isLiftedRuntimeRep, isUnliftedRuntimeRep :: Type -> Bool
+-- isLiftedRuntimeRep is true of LiftedRep :: RuntimeRep
+-- Similarly isUnliftedRuntimeRep
+isLiftedRuntimeRep rep
+  | Just rep' <- coreView rep          = isLiftedRuntimeRep rep'
+  | TyConApp rr_tc args <- rep
+  , rr_tc `hasKey` liftedRepDataConKey = ASSERT( null args ) True
+  | otherwise                          = False
+
+isUnliftedRuntimeRep rep
+  | Just rep' <- coreView rep          = isUnliftedRuntimeRep rep'
+  | TyConApp rr_tc args <- rep
+  , isUnliftedRuntimeRepTyCon rr_tc    = ASSERT( null args ) True
+  | otherwise                          = False
+
+isUnliftedRuntimeRepTyCon :: TyCon -> Bool
+isUnliftedRuntimeRepTyCon rr_tc
+  = elem (getUnique rr_tc) unliftedRepDataConKeys
 
 -- | Is this the type 'RuntimeRep'?
 isRuntimeRepTy :: Type -> Bool

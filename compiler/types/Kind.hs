@@ -7,7 +7,6 @@ module Kind (
 
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind,
-        isTYPEApp,
         isConstraintKindCon,
 
         classifiesTypeWithValues,
@@ -18,9 +17,7 @@ module Kind (
 
 import GhcPrelude
 
-import {-# SOURCE #-} Type    ( coreView
-                              , splitTyConApp_maybe )
-import {-# SOURCE #-} DataCon ( DataCon )
+import {-# SOURCE #-} Type    ( coreView )
 
 import TyCoRep
 import TyCon
@@ -28,6 +25,7 @@ import PrelNames
 
 import Outputable
 import Util
+import Data.Maybe( isJust )
 
 {-
 ************************************************************************
@@ -64,15 +62,6 @@ during type inference.
 isConstraintKindCon :: TyCon -> Bool
 isConstraintKindCon tc = tyConUnique tc == constraintKindTyConKey
 
-isTYPEApp :: Kind -> Maybe DataCon
-isTYPEApp (TyConApp tc args)
-  | tc `hasKey` tYPETyConKey
-  , [arg] <- args
-  , Just (tc, []) <- splitTyConApp_maybe arg
-  , Just dc <- isPromotedDataCon_maybe tc
-  = Just dc
-isTYPEApp _ = Nothing
-
 -- | Tests whether the given kind (which should look like @TYPE x@)
 -- is something other than a constructor tree (that is, constructors at every node).
 -- E.g.  True of   TYPE k, TYPE (F Int)
@@ -92,12 +81,7 @@ isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
     go CastTy{}          = True
     go CoercionTy{}      = True
 
-    _is_type
-      | TyConApp typ [_] <- k
-      = typ `hasKey` tYPETyConKey
-      | otherwise
-      = False
-
+    _is_type = classifiesTypeWithValues k
 
 -----------------------------------------
 --              Subkinding
@@ -110,4 +94,4 @@ isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
 -- like *, #, TYPE Lifted, TYPE v, Constraint.
 classifiesTypeWithValues :: Kind -> Bool
 -- ^ True of any sub-kind of OpenTypeKind
-classifiesTypeWithValues = isTYPE (const True)
+classifiesTypeWithValues k = isJust (kindRep_maybe k)

@@ -1319,8 +1319,8 @@ can_eq_app ev s1 t1 s2 t2
        ; canEqNC evar_s NomEq s1 s2 }
 
   where
-    s1k = typeKind s1
-    s2k = typeKind s2
+    s1k = tcTypeKind s1
+    s2k = tcTypeKind s2
 
     k1 `mismatches` k2
       =  isForAllTy k1 && not (isForAllTy k2)
@@ -1790,9 +1790,9 @@ canCFunEqCan ev fn tys fsk
                         vcat [ text "Kind co:" <+> ppr kind_co
                              , text "RHS:" <+> ppr fsk <+> dcolon <+> ppr (tyVarKind fsk)
                              , text "LHS:" <+> hang (ppr (mkTyConApp fn tys))
-                                                  2 (dcolon <+> ppr (typeKind (mkTyConApp fn tys)))
+                                                  2 (dcolon <+> ppr (tcTypeKind (mkTyConApp fn tys)))
                              , text "New LHS" <+> hang (ppr new_lhs)
-                                                     2 (dcolon <+> ppr (typeKind new_lhs)) ]
+                                                     2 (dcolon <+> ppr (tcTypeKind new_lhs)) ]
                       ; (ev', new_co, new_fsk)
                           <- newFlattenSkolem flav (ctEvLoc ev) fn tys'
                       ; let xi = mkTyVarTy new_fsk `mkCastTy` kind_co
@@ -1882,7 +1882,7 @@ canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
     xi1 = mkTyVarTy tv1
 
     k1 = tyVarKind tv1
-    k2 = typeKind xi2
+    k2 = tcTypeKind xi2
 
     loc  = ctEvLoc ev
     flav = ctEvFlavour ev
@@ -1936,7 +1936,7 @@ canEqTyVarHetero ev eq_rel tv1 co1 ki1 ps_tv1 xi2 ki2 ps_xi2
     loc  = ctev_loc ev
     role = eqRelRole eq_rel
 
--- guaranteed that typeKind lhs == typeKind rhs
+-- guaranteed that tcTypeKind lhs == tcTypeKind rhs
 canEqTyVarHomo :: CtEvidence
                -> EqRel -> SwapFlag
                -> TcTyVar                -- lhs: tv1
@@ -2288,7 +2288,7 @@ rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swap
                                         --              or orhs ~ olhs (swapped)
                   -> SwapFlag
                   -> TcType -> TcType   -- New predicate  nlhs ~ nrhs
-                                        -- Should be zonked, because we use typeKind on nlhs/nrhs
+                                        -- Should be zonked, because we use tcTypeKind on nlhs/nrhs
                   -> TcCoercion         -- lhs_co, of type :: nlhs ~ olhs
                   -> TcCoercion         -- rhs_co, of type :: nrhs ~ orhs
                   -> TcS CtEvidence     -- Of type nlhs ~ nrhs
@@ -2364,7 +2364,7 @@ unifyWanted :: CtLoc -> Role
 -- See Note [unifyWanted and unifyDerived]
 -- The returned coercion's role matches the input parameter
 unifyWanted loc Phantom ty1 ty2
-  = do { kind_co <- unifyWanted loc Nominal (typeKind ty1) (typeKind ty2)
+  = do { kind_co <- unifyWanted loc Nominal (tcTypeKind ty1) (tcTypeKind ty2)
        ; return (mkPhantomCo kind_co ty1 ty2) }
 
 unifyWanted loc role orig_ty1 orig_ty2

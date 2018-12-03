@@ -388,7 +388,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        -- The *result* type can have any kind (Trac #8739),
        -- so we don't need to check anything for that
        ; _ <- unifyKind (Just (XHsType $ NHsCoreTy arg2_sigma))
-                        (typeKind arg2_sigma) liftedTypeKind
+                        (tcTypeKind arg2_sigma) liftedTypeKind
            -- ignore the evidence. arg2_sigma must have type * or #,
            -- because we know arg2_sigma -> or_res_ty is well-kinded
            -- (because otherwise matchActualFunTys would fail)
@@ -1347,7 +1347,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                                       --     substitution is kind-respecting
                     ; traceTc "VTA" (vcat [ppr tv, debugPprType kind
                                           , debugPprType ty_arg
-                                          , debugPprType (typeKind ty_arg)
+                                          , debugPprType (tcTypeKind ty_arg)
                                           , debugPprType inner_ty
                                           , debugPprType insted_ty ])
 

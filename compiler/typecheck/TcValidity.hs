@@ -319,7 +319,7 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Assumes argument is fully zonked
 -- Not used for instance decls; checkValidInstance instead
 checkValidType ctxt ty
-  = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
+  = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty))
        ; rankn_flag  <- xoptM LangExt.RankNTypes
        ; impred_flag <- xoptM LangExt.ImpredicativeTypes
        ; let gen_rank :: Rank -> Rank
@@ -382,7 +382,7 @@ checkValidType ctxt ty
        --     and there may be nested foralls for the subtype test to examine
        ; checkAmbiguity ctxt ty
 
-       ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (typeKind ty)) }
+       ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty)) }
 
 checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
@@ -403,7 +403,7 @@ checkTySynRhs ctxt ty
   | otherwise
   = return ()
   where
-    actual_kind = typeKind ty
+    actual_kind = tcTypeKind ty
 
 {-
 Note [Higher rank types]
@@ -506,7 +506,7 @@ check_type env ctxt rank ty
     tvs          = binderVars tvbs
     (env', _)    = tidyVarBndrs env tvs
 
-    tau_kind              = typeKind tau
+    tau_kind              = tcTypeKind tau
     phi_kind | null theta = tau_kind
              | otherwise  = liftedTypeKind
         -- If there are any constraints, the kind is *. (#11405)

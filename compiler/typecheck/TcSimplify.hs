@@ -2121,7 +2121,7 @@ to ensure that instance declarations match.  For example consider
      foo x = show (\_ -> True)
 
 Then we'll get a constraint (Show (p ->q)) where p has kind (TYPE r),
-and that won't match the typeKind (*) in the instance decl.  See tests
+and that won't match the tcTypeKind (*) in the instance decl.  See tests
 tc217 and tc175.
 
 We look only at touchable type variables. No further constraints
@@ -2335,7 +2335,7 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
     is_float_eq_candidate ct
       | pred <- ctPred ct
       , EqPred NomEq ty1 ty2 <- classifyPredType pred
-      , typeKind ty1 `tcEqType` typeKind ty2
+      , tcTypeKind ty1 `tcEqType` tcTypeKind ty2
       = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
           (Just tv1, _) -> float_tv_eq_candidate tv1 ty2
           (_, Just tv2) -> float_tv_eq_candidate tv2 ty1

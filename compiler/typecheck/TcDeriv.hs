@@ -629,8 +629,8 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mbl_deriv_strat overlap_mode))
              -- Perform an additional unification with the kind of the `via`
              -- type and the result of the previous kind unification.
              Just (ViaStrategy via_ty) -> do
-               let via_kind     = typeKind via_ty
-                   inst_ty_kind = typeKind inst_ty'
+               let via_kind     = tcTypeKind via_ty
+                   inst_ty_kind = tcTypeKind inst_ty'
                    mb_match     = tcUnifyTy inst_ty_kind via_kind
 
                checkTc (isJust mb_match)
@@ -788,7 +788,7 @@ deriveTyData tvs tc tc_args mb_deriv_strat deriv_pred
                                 -- See Note [tc_args and tycon arity]
               (tc_args_to_keep, args_to_drop)
                               = splitAt n_args_to_keep tc_args
-              inst_ty_kind    = typeKind (mkTyConApp tc tc_args_to_keep)
+              inst_ty_kind    = tcTypeKind (mkTyConApp tc tc_args_to_keep)
 
               -- Match up the kinds, and apply the resulting kind substitution
               -- to the types.  See Note [Unify kinds in deriving]
@@ -828,9 +828,9 @@ deriveTyData tvs tc tc_args mb_deriv_strat deriv_pred
               -- type and the result of the previous kind unification.
               Just (ViaStrategy via_ty) -> do
                 let final_via_ty   = via_ty
-                    final_via_kind = typeKind final_via_ty
+                    final_via_kind = tcTypeKind final_via_ty
                     final_inst_ty_kind
-                              = typeKind (mkTyConApp tc final_tc_args')
+                              = tcTypeKind (mkTyConApp tc final_tc_args')
                     via_match = tcUnifyTy final_inst_ty_kind final_via_kind
 
                 checkTc (isJust via_match)
