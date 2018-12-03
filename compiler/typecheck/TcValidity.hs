@@ -458,6 +458,26 @@ check_type :: TidyEnv -> UserTypeCtxt -> Rank -> Type -> TcM ()
 -- Rank is allowed rank for function args
 -- Rank 0 means no for-alls anywhere
 
+check_type _ _ _ (TyVarTy _) = return ()
+
+check_type env ctxt rank (AppTy ty1 ty2)
+  = do  { check_type env ctxt rank ty1
+        ; check_arg_type env ctxt rank ty2 }
+
+check_type env ctxt rank ty@(TyConApp tc tys)
+  | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
+  = check_syn_tc_app env ctxt rank ty tc tys
+  | isUnboxedTupleTyCon tc = check_ubx_tuple  env ctxt      ty    tys
+  | otherwise              = mapM_ (check_arg_type env ctxt rank) tys
+
+check_type _ _ _ (LitTy {}) = return ()
+
+check_type env ctxt rank (CastTy ty _) = check_type env ctxt rank ty
+
+-- Check for rank-n types, such as (forall x. x -> x) or (Show x => x).
+--
+-- Critically, this case must come *after* the case for TyConApp.
+-- See Note [Liberal type synonyms].
 check_type env ctxt rank ty
   | not (null tvbs && null theta)
   = do  { traceTc "check_type" (ppr ty $$ ppr (forAllAllowed rank))
@@ -491,27 +511,11 @@ check_type env ctxt rank ty
              | otherwise  = liftedTypeKind
         -- If there are any constraints, the kind is *. (#11405)
 
-check_type _ _ _ (TyVarTy _) = return ()
-
 check_type env ctxt rank (FunTy arg_ty res_ty)
   = do  { check_type env ctxt arg_rank arg_ty
         ; check_type env ctxt res_rank res_ty }
   where
     (arg_rank, res_rank) = funArgResRank rank
-
-check_type env ctxt rank (AppTy ty1 ty2)
-  = do  { check_type env ctxt rank ty1
-        ; check_arg_type env ctxt rank ty2 }
-
-check_type env ctxt rank ty@(TyConApp tc tys)
-  | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
-  = check_syn_tc_app env ctxt rank ty tc tys
-  | isUnboxedTupleTyCon tc = check_ubx_tuple  env ctxt      ty    tys
-  | otherwise              = mapM_ (check_arg_type env ctxt rank) tys
-
-check_type _ _ _ (LitTy {}) = return ()
-
-check_type env ctxt rank (CastTy ty _) = check_type env ctxt rank ty
 
 check_type _ _ _ ty = pprPanic "check_type" (ppr ty)
 
@@ -537,7 +541,10 @@ check_syn_tc_app env ctxt rank ty tc tys
 
           else  -- In the liberal case (only for closed syns), expand then check
           case tcView ty of
-             Just ty' -> check_type env ctxt rank ty'
+             Just ty' -> let syn_tc = fst $ tcRepSplitTyConApp ty
+                             err_ctxt = text "In the expansion of type synonym"
+                                        <+> quotes (ppr syn_tc)
+                         in addErrCtxt err_ctxt $ check_type env ctxt rank ty'
              Nothing  -> pprPanic "check_tau_type" (ppr ty)  }
 
   | GhciCtxt <- ctxt  -- Accept under-saturated type synonyms in
@@ -662,6 +669,31 @@ If we do both, we get exponential behaviour!!
   type TIACons4 t x = TIACons2 t (TIACons2 t x)
   type TIACons7 t x = TIACons4 t (TIACons3 t x)
 
+The order in which you do validity checking is also somewhat delicate. Consider
+the `check_type` function, which drives the validity checking for unsaturated
+uses of type synonyms. There is a special case for rank-n types, such as
+(forall x. x -> x) or (Show x => x), since those require at least one language
+extension to use. It used to be the case that this case came before every other
+case, but this can lead to bugs. Imagine you have this scenario (from #15954):
+
+  type A a = Int
+  type B (a :: Type -> Type) = forall x. x -> x
+  type C = B A
+
+If the rank-n case came first, then in the process of checking for `forall`s
+or contexts, we would expand away `B A` to `forall x. x -> x`. This is because
+the functions that split apart `forall`s/contexts
+(tcSplitForAllVarBndrs/tcSplitPhiTy) expand type synonyms! If `B A` is expanded
+away to `forall x. x -> x` before the actually validity checks occur, we will
+have completely obfuscated the fact that we had an unsaturated application of
+the `A` type synonym.
+
+We have since learned from our mistakes and now put this rank-n case /after/
+the case for TyConApp, which ensures that an unsaturated `A` TyConApp will be
+caught properly. But be careful! We can't make the rank-n case /last/ either,
+as the FunTy case must came after the rank-n case. Otherwise, something like
+(Eq a => Int) would be treated as a function type (FunTy), which just
+wouldn't do.
 
 ************************************************************************
 *                                                                      *

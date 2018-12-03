@@ -32,7 +32,7 @@ module Type (
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
         splitTyConApp_maybe, splitTyConApp, tyConAppArgN, nextRole,
-        tcRepSplitTyConApp_maybe, tcSplitTyConApp_maybe,
+        tcRepSplitTyConApp_maybe, tcRepSplitTyConApp, tcSplitTyConApp_maybe,
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
 
@@ -797,6 +797,14 @@ tcRepSplitTyConApp_maybe (FunTy arg res)
 
 tcRepSplitTyConApp_maybe _
   = Nothing
+
+-- | Like 'tcSplitTyConApp' but doesn't look through type synonyms.
+tcRepSplitTyConApp :: HasCallStack => Type -> (TyCon, [Type])
+-- Defined here to avoid module loops between Unify and TcType.
+tcRepSplitTyConApp ty =
+  case tcRepSplitTyConApp_maybe ty of
+    Just stuff -> stuff
+    Nothing    -> pprPanic "tcRepSplitTyConApp" (ppr ty)
 
 -------------
 splitAppTy :: Type -> (Type, Type)
