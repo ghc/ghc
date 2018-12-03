@@ -19,6 +19,7 @@ import GhcPrelude
 
 import {-#SOURCE#-} DsExpr (dsLExpr, dsSyntaxExpr)
 
+import BasicTypes ( Origin(..) )
 import DynFlags
 import HsSyn
 import TcHsSyn
@@ -160,11 +161,11 @@ See also Note [Localise pattern binders] in DsUtils
 
 type MatchId = Id   -- See Note [Match Ids]
 
-match :: [MatchId]        -- Variables rep\'ing the exprs we\'re matching with
-                          -- See Note [Match Ids]
-      -> Type             -- Type of the case expression
-      -> [EquationInfo]   -- Info about patterns, etc. (type synonym below)
-      -> DsM MatchResult  -- Desugared result!
+match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
+                          -- ^ See Note [Match Ids]
+      -> Type             -- ^ Type of the case expression
+      -> [EquationInfo]   -- ^ Info about patterns, etc. (type synonym below)
+      -> DsM MatchResult  -- ^ Desugared result!
 
 match [] ty eqns
   = ASSERT2( not (null eqns), ppr ty )
@@ -387,11 +388,12 @@ tidyEqnInfo :: Id -> EquationInfo
 tidyEqnInfo _ (EqnInfo { eqn_pats = [] })
   = panic "tidyEqnInfo"
 
-tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats })
-  = do { (wrap, pat') <- tidy1 v pat
+tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats, eqn_orig = orig })
+  = do { (wrap, pat') <- tidy1 v orig pat
        ; return (wrap, eqn { eqn_pats = do pat' : pats }) }
 
 tidy1 :: Id                  -- The Id being scrutinised
+      -> Origin              -- Was this a pattern the user wrote?
       -> Pat GhcTc           -- The pattern against which it is to be matched
       -> DsM (DsWrapper,     -- Extra bindings to do before the match
               Pat GhcTc)     -- Equivalent pattern
@@ -402,20 +404,20 @@ tidy1 :: Id                  -- The Id being scrutinised
 -- It eliminates many pattern forms (as-patterns, variable patterns,
 -- list patterns, etc) and returns any created bindings in the wrapper.
 
-tidy1 v (ParPat _ pat)          = tidy1 v (unLoc pat)
-tidy1 v (SigPat _ pat _)        = tidy1 v (unLoc pat)
-tidy1 _ (WildPat ty)            = return (idDsWrapper, WildPat ty)
-tidy1 v (BangPat _ (dL->L l p)) = tidy_bang_pat v l p
+tidy1 v o (ParPat _ pat)      = tidy1 v o (unLoc pat)
+tidy1 v o (SigPat _ pat _)    = tidy1 v o (unLoc pat)
+tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
+tidy1 v o (BangPat _ (dL->L l p)) = tidy_bang_pat v o l p
 
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
-tidy1 v (VarPat _ (dL->L _ var))
+tidy1 v _ (VarPat _ (dL->L _ var))
   = return (wrapBind var v, WildPat (idType var))
 
         -- case v of { x@p -> mr[] }
         -- = case v of { p -> let x=v in mr[] }
-tidy1 v (AsPat _ (dL->L _ var) pat)
-  = do  { (wrap, pat') <- tidy1 v (unLoc pat)
+tidy1 v o (AsPat _ (dL->L _ var) pat)
+  = do  { (wrap, pat') <- tidy1 v o (unLoc pat)
         ; return (wrapBind var v . wrap, pat') }
 
 {- now, here we handle lazy patterns:
@@ -429,7 +431,7 @@ tidy1 v (AsPat _ (dL->L _ var) pat)
     The case expr for v_i is just: match [v] [(p, [], \ x -> Var v_i)] any_expr
 -}
 
-tidy1 v (LazyPat _ pat)
+tidy1 v _ (LazyPat _ pat)
     -- This is a convenient place to check for unlifted types under a lazy pattern.
     -- Doing this check during type-checking is unsatisfactory because we may
     -- not fully know the zonked types yet. We sure do here.
@@ -445,65 +447,79 @@ tidy1 v (LazyPat _ pat)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
         ; return (mkCoreLets sel_binds, WildPat (idType v)) }
 
-tidy1 _ (ListPat (ListPatTc ty Nothing) pats )
+tidy1 _ _ (ListPat (ListPatTc ty Nothing) pats )
   = return (idDsWrapper, unLoc list_ConPat)
   where
     list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] [ty])
                         (mkNilPat ty)
                         pats
 
-tidy1 _ (TuplePat tys pats boxity)
+tidy1 _ _ (TuplePat tys pats boxity)
   = return (idDsWrapper, unLoc tuple_ConPat)
   where
     arity = length pats
     tuple_ConPat = mkPrefixConPat (tupleDataCon boxity arity) pats tys
 
-tidy1 _ (SumPat tys pat alt arity)
+tidy1 _ _ (SumPat tys pat alt arity)
   = return (idDsWrapper, unLoc sum_ConPat)
   where
     sum_ConPat = mkPrefixConPat (sumDataCon alt arity) [pat] tys
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
-tidy1 _ (LitPat _ lit)
-  = return (idDsWrapper, tidyLitPat lit)
+tidy1 _ o (LitPat _ lit)
+  = do { unless (isGenerated o) $
+           warnAboutOverflowedLit lit
+       ; return (idDsWrapper, tidyLitPat lit) }
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 _ (NPat ty (dL->L _ lit) mb_neg eq)
-  = return (idDsWrapper, tidyNPat lit mb_neg eq ty)
+tidy1 _ o (NPat ty (dL->L _ lit@OverLit { ol_val = v }) mb_neg eq)
+  = do { unless (isGenerated o) $
+           let lit' | Just _ <- mb_neg = lit{ ol_val = negateOverLitVal v }
+                    | otherwise = lit
+           in warnAboutOverflowedOverLit lit'
+       ; return (idDsWrapper, tidyNPat lit mb_neg eq ty) }
+
+-- NPlusKPat: we may want to warn about the literals
+tidy1 _ o n@(NPlusKPat _ _ (dL->L _ lit1) lit2 _ _)
+  = do { unless (isGenerated o) $ do
+           warnAboutOverflowedOverLit lit1
+           warnAboutOverflowedOverLit lit2
+       ; return (idDsWrapper, n) }
 
 -- Everything else goes through unchanged...
-
-tidy1 _ non_interesting_pat
+tidy1 _ _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
 
 --------------------
-tidy_bang_pat :: Id -> SrcSpan -> Pat GhcTc -> DsM (DsWrapper, Pat GhcTc)
+tidy_bang_pat :: Id -> Origin -> SrcSpan -> Pat GhcTc
+              -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
-tidy_bang_pat v _ (ParPat _ (dL->L l p)) = tidy_bang_pat v l p
-tidy_bang_pat v _ (SigPat _ (dL->L l p) _) = tidy_bang_pat v l p
+tidy_bang_pat v o _ (ParPat _ (dL->L l p)) = tidy_bang_pat v o l p
+tidy_bang_pat v o _ (SigPat _ (dL->L l p) _) = tidy_bang_pat v o l p
 
 -- Push the bang-pattern inwards, in the hope that
 -- it may disappear next time
-tidy_bang_pat v l (AsPat x v' p) = tidy1 v (AsPat x v' (cL l (BangPat noExt p)))
-tidy_bang_pat v l (CoPat x w p t)
-  = tidy1 v (CoPat x w (BangPat noExt (cL l p)) t)
+tidy_bang_pat v o l (AsPat x v' p)
+  = tidy1 v o (AsPat x v' (cL l (BangPat noExt p)))
+tidy_bang_pat v o l (CoPat x w p t)
+  = tidy1 v o (CoPat x w (BangPat noExt (cL l p)) t)
 
 -- Discard bang around strict pattern
-tidy_bang_pat v _ p@(LitPat {})    = tidy1 v p
-tidy_bang_pat v _ p@(ListPat {})   = tidy1 v p
-tidy_bang_pat v _ p@(TuplePat {})  = tidy1 v p
-tidy_bang_pat v _ p@(SumPat {})    = tidy1 v p
+tidy_bang_pat v o _ p@(LitPat {})    = tidy1 v o p
+tidy_bang_pat v o _ p@(ListPat {})   = tidy1 v o p
+tidy_bang_pat v o _ p@(TuplePat {})  = tidy1 v o p
+tidy_bang_pat v o _ p@(SumPat {})    = tidy1 v o p
 
 -- Data/newtype constructors
-tidy_bang_pat v l p@(ConPatOut { pat_con = (dL->L _ (RealDataCon dc))
-                               , pat_args = args
-                               , pat_arg_tys = arg_tys })
+tidy_bang_pat v o l p@(ConPatOut { pat_con = (dL->L _ (RealDataCon dc))
+                                 , pat_args = args
+                                 , pat_arg_tys = arg_tys })
   -- Newtypes: push bang inwards (Trac #9844)
   =
     if isNewTyCon (dataConTyCon dc)
-      then tidy1 v (p { pat_args = push_bang_into_newtype_arg l ty args })
-      else tidy1 v p  -- Data types: discard the bang
+      then tidy1 v o (p { pat_args = push_bang_into_newtype_arg l ty args })
+      else tidy1 v o p  -- Data types: discard the bang
     where
       (ty:_) = dataConInstArgTys dc arg_tys
 
@@ -522,7 +538,7 @@ tidy_bang_pat v l p@(ConPatOut { pat_con = (dL->L _ (RealDataCon dc))
 --
 -- NB: SigPatIn, ConPatIn should not happen
 
-tidy_bang_pat _ l p = return (idDsWrapper, BangPat noExt (cL l p))
+tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noExt (cL l p))
 
 -------------------
 push_bang_into_newtype_arg :: SrcSpan
@@ -672,10 +688,11 @@ Call @match@ with all of this information!
 \end{enumerate}
 -}
 
-matchWrapper :: HsMatchContext Name    -- For shadowing warning messages
-             -> Maybe (LHsExpr GhcTc)  -- The scrutinee, if we check a case expr
-             -> MatchGroup GhcTc (LHsExpr GhcTc)   -- Matches being desugared
-             -> DsM ([Id], CoreExpr)   -- Results
+matchWrapper
+  :: HsMatchContext Name               -- ^ For shadowing warning messages
+  -> Maybe (LHsExpr GhcTc)             -- ^ Scrutinee, if we check a case expr
+  -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
+  -> DsM ([Id], CoreExpr)              -- ^ Results (usually passed to 'match')
 
 {-
  There is one small problem with the Lambda Patterns, when somebody
@@ -732,7 +749,9 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
            ; match_result <- addDictsDs dicts $ -- See Note [Type and Term Equality Propagation]
                              addTmCsDs tm_cs  $ -- See Note [Type and Term Equality Propagation]
                              dsGRHSs ctxt grhss rhs_ty
-           ; return (EqnInfo { eqn_pats = upats, eqn_rhs = match_result}) }
+           ; return (EqnInfo { eqn_pats = upats
+                             , eqn_orig = FromSource
+                             , eqn_rhs = match_result }) }
     mk_eqn_info _ (dL->L _ (XMatch _)) = panic "matchWrapper"
     mk_eqn_info _ _  = panic "mk_eqn_info: Impossible Match" -- due to #15884
 
@@ -764,11 +783,11 @@ situation where we want to match a single expression against a single
 pattern. It returns an expression.
 -}
 
-matchSimply :: CoreExpr                 -- Scrutinee
-            -> HsMatchContext Name      -- Match kind
-            -> LPat GhcTc               -- Pattern it should match
-            -> CoreExpr                 -- Return this if it matches
-            -> CoreExpr                 -- Return this if it doesn't
+matchSimply :: CoreExpr                 -- ^ Scrutinee
+            -> HsMatchContext Name      -- ^ Match kind
+            -> LPat GhcTc               -- ^ Pattern it should match
+            -> CoreExpr                 -- ^ Return this if it matches
+            -> CoreExpr                 -- ^ Return this if it doesn't
             -> DsM CoreExpr
 -- Do not warn about incomplete patterns; see matchSinglePat comments
 matchSimply scrut hs_ctx pat result_expr fail_expr = do
@@ -809,6 +828,7 @@ matchSinglePatVar var ctx pat ty match_result
        ; checkSingle dflags (DsMatchContext ctx locn) var (unLoc pat)
 
        ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]
+                                , eqn_orig = FromSource
                                 , eqn_rhs  = match_result }
        ; match [var] ty [eqn_info] }
 

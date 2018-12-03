@@ -64,6 +64,11 @@ Language
   For instance, it is now permissible to write ``Proxy '(a :: A, b :: B)``
   (previous GHC versions required extra parens: ``Proxy '((a :: A), (b :: B))``).
 
+- :ghc-flag:`-Woverflowed-literals` checks all literals. Previously, it would
+  only inspect boxed expression literals.
+
+- :ghc-flag:`-Wempty-enumerations` now also works for ``Numeric.Natural``.
+
 Compiler
 ~~~~~~~~
 

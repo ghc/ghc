@@ -213,6 +213,7 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
        ; checkGuardMatches PatBindGuards grhss
        ; let upat = unLoc pat
              eqn = EqnInfo { eqn_pats = [upat],
+                             eqn_orig = FromSource,
                              eqn_rhs = cantFailMatchResult body }
        ; var    <- selectMatchVar upat
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
@@ -264,8 +265,14 @@ ds_expr _ (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker e
 ds_expr w (HsConLikeOut _ con)   = dsConLike w con
 ds_expr _ (HsIPVar {})           = panic "dsExpr: HsIPVar"
 ds_expr _ (HsOverLabel{})        = panic "dsExpr: HsOverLabel"
-ds_expr _ (HsLit _ lit)          = dsLit (convertLit lit)
-ds_expr _ (HsOverLit _ lit)      = dsOverLit lit
+
+ds_expr _ (HsLit _ lit)
+  = do { warnAboutOverflowedLit lit
+       ; dsLit (convertLit lit) }
+
+ds_expr _ (HsOverLit _ lit)
+  = do { warnAboutOverflowedOverLit lit
+       ; dsOverLit lit }
 
 ds_expr _ (HsWrap _ co_fn e)
   = do { e' <- ds_expr True e    -- This is the one place where we recurse to
@@ -282,10 +289,9 @@ ds_expr _ (NegApp _ (dL->L loc
                       (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))
                   neg_expr)
   = do { expr' <- putSrcSpanDs loc $ do
-          { dflags <- getDynFlags
-          ; warnAboutOverflowedLiterals dflags
-                                        (lit { ol_val = HsIntegral (negateIntegralLit i) })
-          ; dsOverLit' dflags lit }
+          { warnAboutOverflowedOverLit
+              (lit { ol_val = HsIntegral (negateIntegralLit i) })
+          ; dsOverLit lit }
        ; dsSyntaxExpr neg_expr [expr'] }
 
 ds_expr _ (NegApp _ expr neg_expr)

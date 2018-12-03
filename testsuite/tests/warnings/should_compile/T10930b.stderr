@@ -1,0 +1,15 @@
+
+T10930b.hs:6:6: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -10 is negative but Natural only supports positive numbers
+
+T10930b.hs:6:13: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -3 is negative but Natural only supports positive numbers
+
+T10930b.hs:7:5: warning: [-Wempty-enumerations (in -Wdefault)]
+    Enumeration is empty
+
+T10930b.hs:7:6: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -3 is negative but Natural only supports positive numbers
+
+T10930b.hs:7:12: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -10 is negative but Natural only supports positive numbers

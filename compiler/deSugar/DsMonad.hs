@@ -66,6 +66,7 @@ import PrelNames
 import RdrName
 import HscTypes
 import Bag
+import BasicTypes ( Origin )
 import DataCon
 import ConLike
 import TyCon
@@ -104,14 +105,27 @@ instance Outputable DsMatchContext where
   ppr (DsMatchContext hs_match ss) = ppr ss <+> pprMatchContext hs_match
 
 data EquationInfo
-  = EqnInfo { eqn_pats :: [Pat GhcTc],  -- The patterns for an eqn
-                -- NB: We have /already/ applied decideBangHood to
-                -- these patterns.  See Note [decideBangHood] in DsUtils
+  = EqnInfo { eqn_pats :: [Pat GhcTc]
+              -- ^ The patterns for an equation
+              --
+              -- NB: We have /already/ applied 'decideBangHood' to
+              -- these patterns.  See Note [decideBangHood] in "DsUtils"
 
-              eqn_rhs  :: MatchResult } -- What to do after match
+            , eqn_orig :: Origin
+              -- ^ Was this equation present in the user source?
+              --
+              -- This helps us avoid warnings on patterns that GHC elaborated.
+              --
+              -- For instance, the pattern @-1 :: Word@ gets desugared into
+              -- @W# -1## :: Word@, but we shouldn't warn about an overflowed
+              -- literal for /both/ of these cases.
+
+            , eqn_rhs  :: MatchResult
+              -- ^ What to do after match
+            }
 
 instance Outputable EquationInfo where
-    ppr (EqnInfo pats _) = ppr pats
+    ppr (EqnInfo pats _ _) = ppr pats
 
 type DsWrapper = CoreExpr -> CoreExpr
 idDsWrapper :: DsWrapper
