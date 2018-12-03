@@ -12,6 +12,8 @@
     `Maybe [TyVarBndrQ]` argument. Non-API-breaking versions of these
     functions can be found in `Language.Haskell.TH.Lib`.
 
+  * Add `Lift` instances for `NonEmpty` and `Void`
+
 ## 2.14.0.0 *TBA*
 
   * Introduce an `addForeignFilePath` function, as well as a corresponding

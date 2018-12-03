@@ -136,7 +136,7 @@ import TyCon
 
 import Data.Maybe
 import qualified Data.Char
-import Control.Monad ( unless, when )
+import Control.Monad ( when )
 
 -----------------------------------------------------------------------------
 --
@@ -161,6 +161,11 @@ withNewTickyCounterLNE nm args code = do
   b <- tickyLNEIsOn
   if not b then code else withNewTickyCounter TickyLNE nm args code
 
+thunkHasCounter :: Bool -> FCode Bool
+thunkHasCounter isStatic = do
+  b <- tickyDynThunkIsOn
+  pure (not isStatic && b)
+
 withNewTickyCounterThunk
   :: Bool -- ^ static
   -> Bool -- ^ updateable
@@ -168,8 +173,8 @@ withNewTickyCounterThunk
   -> FCode a
   -> FCode a
 withNewTickyCounterThunk isStatic isUpdatable name code = do
-    b <- tickyDynThunkIsOn
-    if isStatic || not b -- ignore static thunks
+    has_ctr <- thunkHasCounter isStatic
+    if not has_ctr
       then code
       else withNewTickyCounter (TickyThunk isUpdatable False) name [] code
 
@@ -179,8 +184,8 @@ withNewTickyCounterStdThunk
   -> FCode a
   -> FCode a
 withNewTickyCounterStdThunk isUpdatable name code = do
-    b <- tickyDynThunkIsOn
-    if not b
+    has_ctr <- thunkHasCounter False
+    if not has_ctr
       then code
       else withNewTickyCounter (TickyThunk isUpdatable True) name [] code
 
@@ -189,8 +194,8 @@ withNewTickyCounterCon
   -> FCode a
   -> FCode a
 withNewTickyCounterCon name code = do
-    b <- tickyDynThunkIsOn
-    if not b
+    has_ctr <- thunkHasCounter False
+    if not has_ctr
       then code
       else withNewTickyCounter TickyCon name [] code
 
@@ -277,7 +282,8 @@ tickyEnterThunk :: ClosureInfo -> FCode ()
 tickyEnterThunk cl_info
   = ifTicky $ do
     { bumpTickyCounter ctr
-    ; unless static $ do
+    ; has_ctr <- thunkHasCounter static
+    ; when has_ctr $ do
       ticky_ctr_lbl <- getTickyCtrLabel
       registerTickyCtrAtEntryDyn ticky_ctr_lbl
       bumpTickyEntryCount ticky_ctr_lbl }

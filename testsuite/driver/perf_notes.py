@@ -20,6 +20,15 @@ from math import ceil, trunc
 from testutil import passed, failBecause
 
 
+# Check if "git status" can be run successfully.
+# True implies the current directory is a git repo.
+def can_git_status():
+    try:
+        subprocess.check_call(['git', 'status'])
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
 #
 # Some data access functions. A the moment this uses git notes.
 #
