@@ -40,5 +40,3 @@ linear-tests/Arity2.hs:21:7: error:
 21 | foo = Q <$> Id () <*> Id ()
    |       ^^^^^^^^^^^
 -}
-
-

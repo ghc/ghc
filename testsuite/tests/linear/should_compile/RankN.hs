@@ -50,4 +50,3 @@ fooTest2 = let f = Just in foo2 f
 data Identity a = Identity { runIdentity :: a }
 
 extraTest = (id Identity) :: a -> Identity a
-

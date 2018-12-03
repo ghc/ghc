@@ -22,4 +22,3 @@ data QU = QU ()
 test = QU $ ()
 
 qux = Q $ ()
-

@@ -10,7 +10,3 @@ minimal x = x
 
 maximal :: a -> a
 maximal x = x
-
-
-
-

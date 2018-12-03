@@ -7,4 +7,3 @@ incorrectLCase :: Int ⊸ Bool -> Int
 incorrectLCase n = \case
   True -> n
   False -> 0
-

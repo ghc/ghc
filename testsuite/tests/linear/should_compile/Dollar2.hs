@@ -19,5 +19,3 @@ foo = id $ ((if qux then A else B) $ ())
 {-
 
 -}
-
-

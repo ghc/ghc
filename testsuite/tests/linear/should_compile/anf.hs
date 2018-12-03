@@ -19,5 +19,3 @@ data S a = MkS a a
 f :: T -> T     -- Takes apart the thing and puts it
                 -- back together differently
 f (MkT x y (a,b) (MkS p q)) = MkT a b (p,q) (MkS x y)
-
-

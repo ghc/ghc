@@ -43,5 +43,3 @@ instance ArrowChoice (->) where
 -- This shouldn't work
 foo :: a ⊸ a
 foo = iden
-
-
