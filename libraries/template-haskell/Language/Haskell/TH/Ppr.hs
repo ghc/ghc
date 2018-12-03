@@ -739,7 +739,9 @@ pprParendType tuple | (TupleT n, args) <- split tuple
                     , length args == n
                     = parens (commaSep args)
 pprParendType (ImplicitParamT n t)= text ('?':n) <+> text "::" <+> ppr t
-pprParendType other               = parens (ppr other)
+pprParendType EqualityT           = text "(~)"
+pprParendType t@(ForallT {})      = parens (ppr t)
+pprParendType t@(AppT {})         = parens (ppr t)
 
 pprUInfixT :: Type -> Doc
 pprUInfixT (UInfixT x n y) = pprUInfixT x <+> pprName' Infix n <+> pprUInfixT y
