@@ -1790,7 +1790,7 @@ instance Binary IfaceCoercion where
        = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
   put_ _  (IfaceHoleCo cv)
        = pprPanic "Can't serialise IfaceHoleCo" (ppr cv)
-          -- See Note [Holes in IfaceUnivCoProv]
+          -- See Note [Holes in IfaceCoercion]
 
   get bh = do
       tag <- getByte bh
