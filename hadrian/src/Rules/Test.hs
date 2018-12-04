@@ -26,13 +26,13 @@ testRules :: Rules ()
 testRules = do
     root <- buildRootRules
 
-    -- | Using program shipped with testsuite to generate ghcconfig file.
+    -- Using program shipped with testsuite to generate ghcconfig file.
     root -/- ghcConfigProgPath ~> do
         ghc <- builderPath $ Ghc CompileHs Stage0
         createDirectory $ takeDirectory (root -/- ghcConfigProgPath)
         cmd ghc [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
 
-    -- | TODO : Use input test compiler and not just stage2 compiler.
+    -- TODO : Use input test compiler and not just stage2 compiler.
     root -/- ghcConfigPath ~> do
         ghcPath <- needFile Stage1 ghc
         need [root -/- ghcConfigProgPath]
