@@ -1467,7 +1467,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    /* Copy exported symbols into the ObjectCode. */
 
    oc->n_symbols = info->numberOfSymbols;
-   oc->symbols   = stgCallocBytes(sizeof(SymbolName*), oc->n_symbols,
+   oc->symbols   = stgCallocBytes(sizeof(Symbol_t), oc->n_symbols,
                                   "ocGetNames_PEi386(oc->symbols)");
 
    /* Work out the size of the global BSS section */
@@ -1623,8 +1623,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          /* debugBelch("addSymbol %p `%s' Weak:%lld \n", addr, sname, isWeak); */
          IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname));
          ASSERT(i < (uint32_t)oc->n_symbols);
-         /* cstring_from_COFF_symbol_name always succeeds. */
-         oc->symbols[i] = (SymbolName*)sname;
+         oc->symbols[i].name = sname;
+         oc->symbols[i].addr = addr;
          if (isWeak) {
              setWeakSymbol(oc, sname);
          }
@@ -1637,7 +1637,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       } else {
           /* We're skipping the symbol, but if we ever load this
           object file we'll want to skip it then too. */
-          oc->symbols[i] = NULL;
+          oc->symbols[i].name = NULL;
+          oc->symbols[i].addr = NULL;
 
 #        if 0
          debugBelch(
@@ -2202,7 +2203,7 @@ resolveSymbolAddr_PEi386 (pathchar* buffer, int size,
                                    "resolveSymbolAddr");
       int blanks = 0;
       for (int i = 0; i < obj->n_symbols; i++) {
-          SymbolName* sym = obj->symbols[i];
+          SymbolName* sym = obj->symbols[i].name;
           if (sym == NULL)
             {
                blanks++;

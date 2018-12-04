@@ -1608,7 +1608,7 @@ ocGetNames_MachO(ObjectCode* oc)
      */
     IF_DEBUG(linker, debugBelch("ocGetNames_MachO: %d external symbols\n",
                                 oc->n_symbols));
-    oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(SymbolName*),
+    oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(Symbol_t),
                                    "ocGetNames_MachO(oc->symbols)");
 
     if (oc->info->symCmd) {
@@ -1639,7 +1639,8 @@ ocGetNames_MachO(ObjectCode* oc)
                                                  , HS_BOOL_FALSE
                                                  , oc);
 
-                            oc->symbols[curSymbol] = nm;
+                            oc->symbols[curSymbol].name = nm;
+                            oc->symbols[curSymbol].addr = addr;
                             curSymbol++;
                     }
                 }
@@ -1676,7 +1677,8 @@ ocGetNames_MachO(ObjectCode* oc)
                 IF_DEBUG(linker, debugBelch("ocGetNames_MachO: inserting common symbol: %s\n", nm));
                 ghciInsertSymbolTable(oc->fileName, symhash, nm,
                                        (void*)commonCounter, HS_BOOL_FALSE, oc);
-                oc->symbols[curSymbol] = nm;
+                oc->symbols[curSymbol].name = nm;
+                oc->symbols[curSymbol].addr = oc->info->macho_symbols[i].addr;
                 curSymbol++;
 
                 commonCounter += sz;
