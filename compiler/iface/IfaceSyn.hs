@@ -884,7 +884,7 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                              , ex_msg
                              , pprIfaceContextArr prov_ctxt
                              , pprIfaceType $ foldr
-                                                (IfaceFunTy (IfaceTyVar (mkFastString "Omega")))
+                                                (IfaceFunTy (IfaceTyConApp omega_ty IA_Nil))
                                                 pat_ty arg_tys ])
       where
         univ_msg = pprUserIfaceForAll univ_bndrs
