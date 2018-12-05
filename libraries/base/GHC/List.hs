@@ -142,10 +142,13 @@ lengthFB _ r = \ !a -> r (a + 1)
 idLength :: Int -> Int
 idLength = id
 
--- | 'filter', applied to a predicate and a list, returns the list of
+-- | /O(n)/. 'filter', applied to a predicate and a list, returns the list of
 -- those elements that satisfy the predicate; i.e.,
 --
 -- > filter p xs = [ x | x <- xs, p x]
+--
+-- >>> filter odd [1,2,3]
+-- [1,3]
 
 {-# NOINLINE [1] filter #-}
 filter :: (a -> Bool) -> [a] -> [a]
