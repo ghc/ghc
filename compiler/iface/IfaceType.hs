@@ -770,10 +770,11 @@ pprIfaceType       = pprPrecIfaceType topPrec
 pprParendIfaceType = pprPrecIfaceType appPrec
 
 pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
--- We still need `eliminateRuntimeRep`, since the `pprPrecIfaceType` maybe
--- called from other places, besides `:type` and `:info`.
+-- We still need `eliminateRuntimeRep` and `eliminateMultiplicity`
+-- since the `pprPrecIfaceType` may be called from other places, besides
+-- `:type` and `:info`.
 pprPrecIfaceType prec ty =
-  eliminateRuntimeRep (\ty -> eliminateMultiplicity (ppr_ty prec) ty) ty
+  eliminateRuntimeRep (eliminateMultiplicity (ppr_ty prec)) ty
 
 ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
@@ -1143,7 +1144,7 @@ data ShowForAllFlag = ShowForAllMust | ShowForAllWhen
 
 pprIfaceSigmaType :: ShowForAllFlag -> IfaceType -> SDoc
 pprIfaceSigmaType show_forall ty
-  = eliminateRuntimeRep ppr_fn ty
+  = eliminateRuntimeRep (eliminateMultiplicity ppr_fn) ty
   where
     ppr_fn iface_ty =
       let (tvs, theta, tau) = splitIfaceSigmaTy iface_ty

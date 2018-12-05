@@ -59,7 +59,7 @@ test('T9367',
      [req_interp, when(fast() or config.os != 'mingw32', skip)],
      run_command,
      ['$MAKE -s --no-print-directory T9367'])
-test('ghci025', [extra_files(['Ghci025B.hs', 'Ghci025C.hs', 'Ghci025D.hs']), expect_broken(239)], ghci_script, ['ghci025.script'])
+test('ghci025', extra_files(['Ghci025B.hs', 'Ghci025C.hs', 'Ghci025D.hs']), ghci_script, ['ghci025.script'])
 test('ghci026', extra_files(['../prog002']), ghci_script, ['ghci026.script'])
 
 test('ghci027', [], ghci_script, ['ghci027.script'])
@@ -252,7 +252,7 @@ test('T11376', normal, ghci_script, ['T11376.script'])
 test('T12007', normal, ghci_script, ['T12007.script'])
 test('T11975', normal, ghci_script, ['T11975.script'])
 test('T10963', normal, ghci_script, ['T10963.script'])
-test('T11721', expect_broken(239), ghci_script, ['T11721.script'])
+test('T11721', normal, ghci_script, ['T11721.script'])
 test('T12005', normal, ghci_script, ['T12005.script'])
 test('T12023', normal, run_command,
                ['$MAKE -s --no-print-directory T12023'])
@@ -274,7 +274,7 @@ test('T13466', normal, ghci_script, ['T13466.script'])
 test('GhciCurDir', normal, ghci_script, ['GhciCurDir.script'])
 test('T13591', expect_broken(13591), ghci_script, ['T13591.script'])
 test('T13699', normal, ghci_script, ['T13699.script'])
-test('T13988', expect_broken(239), ghci_script, ['T13988.script'])
+test('T13988', normal, ghci_script, ['T13988.script'])
 test('T13407', normal, ghci_script, ['T13407.script'])
 test('T13963', normal, ghci_script, ['T13963.script'])
 test('T14342', [extra_hc_opts("-XOverloadedStrings -XRebindableSyntax")],
