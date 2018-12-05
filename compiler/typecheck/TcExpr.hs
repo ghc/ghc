@@ -10,6 +10,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module TcExpr ( tcPolyExpr, tcMonoExpr, tcMonoExprNC,
                 tcInferSigma, tcInferSigmaNC, tcInferRho, tcInferRhoNC,
                 tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 -- | Expand out synthetic instructions into single machine instrs.
 module SPARC.CodeGen.Expand (
         expandTop

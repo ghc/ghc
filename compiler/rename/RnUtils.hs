@@ -6,6 +6,8 @@ This module contains miscellaneous functions related to renaming.
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module RnUtils (
         checkDupRdrNames, checkShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, dupNamesErr,

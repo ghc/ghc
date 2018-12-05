@@ -4,6 +4,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module ExtractDocs (extractDocs) where
 
 import GhcPrelude

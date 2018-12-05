@@ -10,6 +10,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-} -- See Trac #15656
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module RnSource (
         rnSrcDecls, addTcgDUs, findSplice
     ) where

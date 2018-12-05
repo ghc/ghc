@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 -- | Handy functions for creating much Core syntax
 module MkCore (
         -- * Constructing normal syntax

@@ -11,6 +11,8 @@ mutable type variables
 
 {-# LANGUAGE CPP, TupleSections, MultiWayIf #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module TcMType (
   TcTyVar, TcKind, TcType, TcTauType, TcThetaType, TcTyVarSet,
 

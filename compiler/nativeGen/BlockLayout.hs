@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies, ScopedTypeVariables, CPP #-}
 
 {-# OPTIONS_GHC -fprof-auto #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
 --{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -ddump-cmm #-}
 
 module BlockLayout

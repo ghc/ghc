@@ -192,6 +192,8 @@ STG programs after unarisation have these invariants:
 
 {-# LANGUAGE CPP, TupleSections #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module UnariseStg (unarise) where
 
 #include "HsVersions.h"

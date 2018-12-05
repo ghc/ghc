@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module CmmMachOp
     ( MachOp(..)
     , pprMachOp, isCommutableMachOp, isAssociativeMachOp

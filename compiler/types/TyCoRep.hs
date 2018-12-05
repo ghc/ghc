@@ -17,6 +17,8 @@ Note [The Type-related module hierarchy]
 
 -- We expose the relevant stuff from this module via the Type module
 {-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 {-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf #-}
 
 module TyCoRep (

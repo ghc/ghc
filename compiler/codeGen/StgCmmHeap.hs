@@ -6,6 +6,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module StgCmmHeap (
         getVirtHp, setVirtHp, setRealHp,
         getHpRelOffset,

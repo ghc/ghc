@@ -3,6 +3,7 @@
 -- The default iteration limit is a bit too low for the definitions
 -- in this module.
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
 
 -----------------------------------------------------------------------------
 --

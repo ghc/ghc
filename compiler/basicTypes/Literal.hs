@@ -7,6 +7,8 @@
 
 {-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module Literal
         (
         -- * Main data type

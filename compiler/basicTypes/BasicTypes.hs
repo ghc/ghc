@@ -16,6 +16,8 @@ types that
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module BasicTypes(
         Version, bumpVersion, initialVersion,
 

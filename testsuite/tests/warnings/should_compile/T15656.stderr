@@ -1,0 +1,7 @@
+T15656.hs:4:10: warning: [-Wincomplete-uni-patterns (in -Wall)]
+    Pattern match(es) are non-exhaustive
+    In a lambda abstraction: Patterns not matched: []
+
+T15656.hs:11:20: warning: [-Wincomplete-record-updates (in -Wall)]
+    Pattern match(es) are non-exhaustive
+    In a record-update construct: Patterns not matched: Baz

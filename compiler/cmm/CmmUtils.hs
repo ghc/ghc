@@ -1,5 +1,7 @@
 {-# LANGUAGE GADTs, RankNTypes #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 -----------------------------------------------------------------------------
 --
 -- Cmm utilities.

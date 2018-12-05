@@ -50,6 +50,9 @@
 -}
 
 {-# LANGUAGE CPP, MultiWayIf #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module SetLevels (
         setLevels,
 

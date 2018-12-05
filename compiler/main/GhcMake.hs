@@ -5,6 +5,8 @@
 -- deprecated, although it became un-deprecated later. As a result, using 7.6
 -- as your bootstrap compiler throws annoying warnings.
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 2011

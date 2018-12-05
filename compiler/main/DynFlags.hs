@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 -------------------------------------------------------------------------------
 --
 -- | Dynamic flags
@@ -4762,7 +4764,9 @@ minusWallOpts
         Opt_WarnUnusedDoBind,
         Opt_WarnTrustworthySafe,
         Opt_WarnUntickedPromotedConstructors,
-        Opt_WarnMissingPatternSynonymSignatures
+        Opt_WarnMissingPatternSynonymSignatures,
+        Opt_WarnIncompletePatternsRecUpd,
+        Opt_WarnIncompleteUniPatterns
       ]
 
 -- | Things you get with -Weverything, i.e. *all* known warnings flags

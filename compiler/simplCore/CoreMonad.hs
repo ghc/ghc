@@ -6,6 +6,8 @@
 
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module CoreMonad (
     -- * Configuration of the core-to-core passes
     CoreToDo(..), runWhen, runMaybe,

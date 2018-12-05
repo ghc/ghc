@@ -7,6 +7,8 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module Coverage (addTicksToBinds, hpcInitCode) where
 
 import GhcPrelude as Prelude

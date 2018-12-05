@@ -9,6 +9,8 @@ Handles @deriving@ clauses on @data@ declarations.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module TcDeriv ( tcDeriving, DerivInfo(..), mkDerivInfos ) where
 
 #include "HsVersions.h"

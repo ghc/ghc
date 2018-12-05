@@ -1,5 +1,8 @@
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module TcInteract (
      solveSimpleGivens,   -- Solves [Ct]
      solveSimpleWanteds,  -- Solves Cts

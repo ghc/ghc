@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 -- | Graph Coloring.
 --      This is a generic graph coloring library, abstracted over the type of
 --      the node keys, nodes and colors.
@@ -368,6 +370,3 @@ selectColor colors graph u
                 = Nothing
 
    in   chooseColor
-
-
-

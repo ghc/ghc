@@ -15,7 +15,9 @@ TcSplice: Template Haskell splices
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
 
 module TcSplice(
      tcSpliceExpr, tcTypedBracket, tcUntypedBracket,

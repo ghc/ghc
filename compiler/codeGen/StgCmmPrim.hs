@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 -- emitPrimOp is quite large
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=4000000 #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
 
 ----------------------------------------------------------------------------
 --

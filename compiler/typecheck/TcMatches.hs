@@ -13,6 +13,8 @@ TcMatches: Typecheck some @Matches@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
                    TcMatchCtxt(..), TcStmtChecker, TcExprStmtChecker, TcCmdStmtChecker,
                    tcStmts, tcStmtsAndThen, tcDoStmts, tcBody,

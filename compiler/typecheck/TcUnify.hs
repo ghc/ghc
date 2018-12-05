@@ -8,6 +8,8 @@ Type subsumption and unification
 
 {-# LANGUAGE CPP, MultiWayIf, TupleSections, ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,

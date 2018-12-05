@@ -6,6 +6,8 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TupleSections #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 -- | Highly random utility functions
 --
 module Util (

@@ -17,6 +17,8 @@ find, unsurprisingly, a Core expression.
 
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module CoreUnfold (
         Unfolding, UnfoldingGuidance,   -- Abstract types
 

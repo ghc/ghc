@@ -10,6 +10,7 @@ Functions for working with the typechecker environment (setters, getters...).
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
 
 module TcRnMonad(
   -- * Initalisation

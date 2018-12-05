@@ -144,6 +144,8 @@ Note [Wired-in packages] in Module. This is done in Packages.findWiredInPackages
 
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module PrelNames (
         Unique, Uniquable(..), hasKey,  -- Re-exported for convenience
 

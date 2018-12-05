@@ -16,6 +16,8 @@ This is where we do all the grimy bindings' generation.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module TcGenDeriv (
         BagDerivStuff, DerivStuff(..),
 

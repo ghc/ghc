@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module RnSplice (
         rnTopSpliceDecls,
         rnSpliceType, rnSpliceExpr, rnSplicePat, rnSpliceDecl,

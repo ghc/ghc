@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 -- | Basic operations on graphs.
 --
 
@@ -677,4 +679,3 @@ adjustUFM_C f k map
  = case lookupUFM map k of
         Nothing -> map
         Just a  -> addToUFM map k (f a)
-

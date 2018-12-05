@@ -8,6 +8,8 @@
 
 {-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, UnboxedTuples #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module AsmCodeGen (
                     -- * Module entry point
                     nativeCodeGen

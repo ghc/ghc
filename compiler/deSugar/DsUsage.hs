@@ -2,6 +2,8 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module DsUsage (
     -- * Dependency/fingerprinting code (used by MkIface)
     mkUsageInfo, mkUsedNames, mkDependencies

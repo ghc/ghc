@@ -1,6 +1,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE BangPatterns #-}
+
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module CmmContFlowOpt
     ( cmmCfgOpts
     , cmmCfgOptsProc

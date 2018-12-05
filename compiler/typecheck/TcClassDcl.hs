@@ -8,6 +8,7 @@ Typechecking class declarations
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
 
 module TcClassDcl ( tcClassSigs, tcClassDecl2,
                     findMethodBind, instantiateMethod,

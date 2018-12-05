@@ -19,6 +19,8 @@ which deal with the instantiated versions are located elsewhere:
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module HsUtils(
   -- Terms
   mkHsPar, mkHsApp, mkHsAppType, mkHsAppTypes, mkHsCaseAlt,

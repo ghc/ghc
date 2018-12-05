@@ -10,6 +10,9 @@ TcInstDecls: Typechecking instance declarations
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module TcInstDcls ( tcInstDecls1, tcInstDeclsDeriv, tcInstDecls2 ) where
 
 #include "HsVersions.h"

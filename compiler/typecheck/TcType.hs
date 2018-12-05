@@ -17,6 +17,8 @@ is the principal client.
 
 {-# LANGUAGE CPP, ScopedTypeVariables, MultiWayIf, FlexibleContexts #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module TcType (
   --------------------------------
   -- Types

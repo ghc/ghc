@@ -7,6 +7,8 @@
 
 {-# LANGUAGE CPP, FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 -- |
 -- #name_types#
 -- GHC uses several kinds of name internally:

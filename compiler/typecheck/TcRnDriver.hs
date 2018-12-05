@@ -17,6 +17,8 @@ https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module TcRnDriver (
         tcRnStmt, tcRnExpr, TcRnExprMode(..), tcRnType,
         tcRnImportDecls,

@@ -9,6 +9,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-} -- See Trac #15656
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
 
 -- CmmNode type for representation using Hoopl graphs.
 

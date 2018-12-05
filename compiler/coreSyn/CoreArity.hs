@@ -8,6 +8,8 @@
 
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 -- | Arity and eta expansion
 module CoreArity (
         manifestArity, joinRhsArity, exprArity, typeArity,

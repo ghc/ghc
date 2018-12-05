@@ -8,6 +8,7 @@
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
 
 -----------------------------------------------------------------------------
 -- |
@@ -946,4 +947,3 @@ decodeByteBuf h_@Handle__{..} cbuf = do
 
   writeIORef haByteBuffer bbuf2
   return cbuf'
-

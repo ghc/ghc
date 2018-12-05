@@ -19,6 +19,8 @@ of the stack mechanism), you should use a TcRef (= IORef) to store them.
 {-# LANGUAGE CPP, ExistentialQuantification, GeneralizedNewtypeDeriving,
              ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module TcRnTypes(
         TcRnIf, TcRn, TcM, RnM, IfM, IfL, IfG, -- The monad is opaque outside this module
         TcRef,

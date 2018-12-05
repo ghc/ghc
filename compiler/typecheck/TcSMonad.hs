@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP, TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 -- Type definitions for the constraint solver
 module TcSMonad (
 

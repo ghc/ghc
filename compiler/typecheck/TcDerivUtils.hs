@@ -8,6 +8,8 @@ Error-checking and other utilities for @deriving@ clauses or declarations.
 
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module TcDerivUtils (
         DerivM, DerivEnv(..),
         DerivSpec(..), pprDerivSpec,

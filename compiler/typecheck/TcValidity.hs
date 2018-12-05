@@ -5,6 +5,8 @@
 
 {-# LANGUAGE CPP, TupleSections, ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module TcValidity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   checkValidTheta, checkValidFamPats,

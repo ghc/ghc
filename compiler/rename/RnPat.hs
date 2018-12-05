@@ -17,6 +17,9 @@ free variables.
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 module RnPat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
 

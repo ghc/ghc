@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 -- ----------------------------------------------------------------------------
 --
 --  (c) The University of Glasgow 2006

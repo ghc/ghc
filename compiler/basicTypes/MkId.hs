@@ -14,6 +14,8 @@ have a standard form, namely:
 
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module MkId (
         mkDictFunId, mkDictFunTy, mkDictSelId, mkDictSelRhs,
 

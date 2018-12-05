@@ -8,6 +8,8 @@ Pattern Matching Coverage Checking.
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns  #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module Check (
         -- Checking and printing
         checkSingle, checkMatches, checkGuardMatches, isAnyPmCheckEnabled,

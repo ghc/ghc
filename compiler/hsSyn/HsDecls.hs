@@ -12,6 +12,8 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 -- | Abstract syntax of global declarations.
 --
 -- Definitions for: @SynDecl@ and @ConDecl@, @ClassDecl@,

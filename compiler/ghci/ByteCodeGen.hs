@@ -1,6 +1,9 @@
 {-# LANGUAGE CPP, MagicHash, RecordWildCards, BangPatterns #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 {-# OPTIONS_GHC -fprof-auto-top #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 --
 --  (c) The University of Glasgow 2002-2006
 --

@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- See Trac #15656
+
 module X86.RegInfo (
         mkVirtualReg,
         regDotColor

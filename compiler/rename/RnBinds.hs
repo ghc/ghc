@@ -1,6 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-} -- See Trac #15656
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-} -- See Trac #15656
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
