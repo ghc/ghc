@@ -364,7 +364,7 @@ tc_pat penv (LazyPat x pat) pat_ty thing_inside
     where
       checkLinearity =
         when (not $ submult Omega (scaledMult pat_ty)) $
-          addErrTc $ text "Lazy patterns are only allowed at multiplicity ω"
+          addErrTc $ text "Lazy patterns are only allowed at multiplicity Omega"
 
 tc_pat _ (WildPat _) pat_ty thing_inside
   = do  { checkLinearity
@@ -397,12 +397,12 @@ tc_pat penv (AsPat x (dL->L nm_loc name) pat) pat_ty thing_inside
     where
       checkLinearity =
         when (not $ submult Omega (scaledMult pat_ty)) $
-          addErrTc $ text "@-patterns are only allowed at multiplicity ω"
+          addErrTc $ text "@-patterns are only allowed at multiplicity Omega"
 
 tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
   = do  { checkLinearity
           -- It should be possible to have view patterns at linear (or otherwise
-          -- non-ω) multiplicity. But it is not clear at the moment what
+          -- non-Omega) multiplicity. But it is not clear at the moment what
           -- restriction need to be put in place, if any, for linear view
           -- patterns to desugar to type-correct Core.
 
@@ -436,7 +436,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
     where
       checkLinearity =
         when (not $ submult Omega (scaledMult overall_pat_ty)) $
-          addErrTc $ text "View patterns are only allowed at multiplicity ω"
+          addErrTc $ text "View patterns are only allowed at multiplicity Omega"
 
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
@@ -580,7 +580,7 @@ tc_pat _ (NPat _ (dL->L l over_lit) mb_neg eq) pat_ty thing_inside
     where
       checkLinearity =
         when (not $ submult Omega (scaledMult pat_ty)) $
-          addErrTc $ text "Literal patterns are only allowed at multiplicity ω"
+          addErrTc $ text "Literal patterns are only allowed at multiplicity Omega"
 
 
 {-
@@ -648,7 +648,7 @@ tc_pat penv (NPlusKPat _ (dL->L nm_loc name) (dL->L loc lit) _ ge minus) pat_ty_
     where
       checkLinearity =
         when (not $ submult Omega (scaledMult pat_ty_scaled)) $
-          addErrTc $ text "N+K patterns are only allowed at multiplicity ω"
+          addErrTc $ text "N+K patterns are only allowed at multiplicity Omega"
 
 
 -- HsSpliced is an annotation produced by 'RnSplice.rnSplicePat'.
@@ -883,7 +883,7 @@ tcPatSynPat penv (dL->L con_span _) pat_syn pat_ty arg_pats thing_inside
               req_theta'  = substTheta tenv req_theta
 
         ; when (not $ submult Omega pat_mult) $
-            addErrTc $ text "Pattern synonyms are only allowed at multiplicity ω"
+            addErrTc $ text "Pattern synonyms are only allowed at multiplicity Omega"
 
         ; wrap <- tcSubTypePat penv (scaledThing pat_ty) ty'
         ; traceTc "tcPatSynPat" (ppr pat_syn $$
