@@ -1,5 +1,5 @@
 
-T13659.hs:14:27: error:
+T13659.hs:14:34: error:
     • Expected a type, but ‘a’ has kind ‘[*]’
     • In the first argument of ‘Format’, namely ‘'[Int, a]’
       In the type ‘Format '[Int, a]’

@@ -1785,7 +1785,8 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                                       imp_vars (mb_expl_bndrs `orElse` [])
                                       hs_pats hs_rhs_ty
 
-       ; traceTc "tcTyFamInstEqn" (ppr fam_tc $$ ppr qtvs $$ ppr pats $$ ppr rhs_ty)
+         -- Don't print results they may be knot-tied
+         -- (tcFamInstEqnGuts zonks to Type)
        ; return (mkCoAxBranch qtvs [] [] pats rhs_ty
                               (map (const Nominal) qtvs)
                               loc) }
@@ -1930,28 +1931,23 @@ tcFamTyPats :: TyCon -> AssocInstInfo
 -- Used for both type and data families
 tcFamTyPats fam_tc mb_clsinfo hs_pats
   = do { traceTc "tcFamTyPats {" $
-         vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
-              , text "arity:" <+> ppr fam_arity
-              , text "kind:" <+> ppr fam_kind ]
+         vcat [ ppr fam_tc <+> dcolon <+> ppr (tyConKind fam_tc)
+              , text "arity:" <+> ppr fam_arity ]
 
-       ; let fun_ty = mkTyConApp fam_tc []
+       ; fam_app <- tcInferApps typeLevelMode lhs_fun fun_ty hs_pats
 
-       ; (fam_app, res_kind) <- tcInferApps typeLevelMode lhs_fun fun_ty
-                                            fam_kind hs_pats
-
-       ; traceTc "End tcFamTyPats }" $
-         vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
-              , text "res_kind:" <+> ppr res_kind ]
+       ; traceTc "End tcFamTyPats }" (ppr fam_app)
 
        -- Ensure that the instance is consistent its parent class
        ; addConsistencyConstraints mb_clsinfo fam_app
 
-       ; return (fam_app, res_kind) }
+       ; return (fam_app, tcTypeKind fam_app) }
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    fam_kind  = tyConKind fam_tc
     lhs_fun   = noLoc (HsTyVar noExt NotPromoted (noLoc fam_name))
+    fun_ty    = mkTyConApp fam_tc []
+
 
 unravelFamInstPats :: TcType -> [TcType]
 -- Decompose fam_app to get the argument patterns

@@ -2393,16 +2393,14 @@ tcRnType hsc_env normalise rdr_type
         -- It can have any rank or kind
         -- First bring into scope any wildcards
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
-       ; ((ty, kind), lie)  <-
-                       captureConstraints $
-                       tcWildCardBinders wcs $ \ wcs' ->
-                       do { emitWildCardHoleConstraints wcs'
-                          ; tcLHsTypeUnsaturated rn_type }
+       ; (ty, lie) <- captureConstraints $
+                      tcWildCardBinders wcs $ \ wcs' ->
+                      do { emitWildCardHoleConstraints wcs'
+                         ; tcLHsTypeUnsaturated rn_type }
        ; _ <- checkNoErrs (simplifyInteractive lie)
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
-       ; kind <- zonkTcType kind
-       ; kvs <- kindGeneralize kind
+       ; kvs <- kindGeneralize (tcTypeKind ty)
        ; ty  <- zonkTcTypeToType ty
 
        -- Do validity checking on type

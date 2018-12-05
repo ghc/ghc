@@ -71,8 +71,8 @@ tcDefaults (L _ (XDefaultDecl _):_) = panic "tcDefaults"
 
 tc_default_ty :: [Class] -> LHsType GhcRn -> TcM Type
 tc_default_ty deflt_clss hs_ty
- = do   { (ty, _kind) <- solveEqualities $
-                         tcLHsType hs_ty
+ = do   { ty <- solveEqualities $
+                tcLHsType hs_ty
         ; ty <- zonkTcTypeToType ty   -- establish Type invariants
         ; checkValidType DefaultDeclCtxt ty
 
