@@ -1691,7 +1691,8 @@ tcDataDefn roles_info
                                   stupid_theta tc_rhs
                                   (VanillaAlgTyCon tc_rep_nm)
                                   gadt_syntax) }
-       ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
+       ; traceTc "tcDataDefn" (vcat [ ppr tc_name, ppr tycon_binders
+                                    , ppr extra_bndrs, ppr final_res_kind ])
        ; return tycon }
   where
     -- Abstract data types in hsig files can have arbitrary kinds,

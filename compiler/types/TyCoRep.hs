@@ -907,8 +907,9 @@ isLiftedRuntimeRep rep
 
 isUnliftedRuntimeRep rep
   | Just rep' <- coreView rep          = isUnliftedRuntimeRep rep'
-  | TyConApp rr_tc args <- rep
-  , isUnliftedRuntimeRepTyCon rr_tc    = ASSERT( null args ) True
+  | TyConApp rr_tc _ <- rep   -- NB: args might be non-empty
+                              --     e.g. TupleRep
+  , isUnliftedRuntimeRepTyCon rr_tc    = True
   | otherwise                          = False
 
 isUnliftedRuntimeRepTyCon :: TyCon -> Bool

@@ -499,7 +499,8 @@ tcInstTyBinders (bndrs, ty)
 
   | otherwise
   = do { (subst, args) <- mapAccumLM (tcInstTyBinder Nothing) empty_subst bndrs
-       ; ty' <- zonkTcType (substTy subst ty)
+       ; let ty' = substTy subst ty
+--       ; ty' <- zonkTcType ty'
                    -- Why zonk the result? So that tcTyVar can
                    -- obey (IT6) of Note [The tcType invariant] in TcHsType
                    -- ToDo: SLPJ: I don't think this is needed

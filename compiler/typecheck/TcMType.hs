@@ -1504,15 +1504,14 @@ defaultTyVar default_kind tv
        ; writeMetaTyVar tv liftedRepTy
        ; return True }
 
-  | default_kind                 -- -XNoPolyKinds and this is a kind var
-  = do { default_kind_var tv     -- so default it to * if possible
-       ; return True }
+  | default_kind            -- -XNoPolyKinds and this is a kind var
+  = default_kind_var tv     -- so default it to * if possible
 
   | otherwise
   = return False
 
   where
-    default_kind_var :: TyVar -> TcM ()
+    default_kind_var :: TyVar -> TcM Bool
        -- defaultKindVar is used exclusively with -XNoPolyKinds
        -- See Note [Defaulting with -XNoPolyKinds]
        -- It takes an (unconstrained) meta tyvar and defaults it.
@@ -1520,11 +1519,21 @@ defaultTyVar default_kind tv
     default_kind_var kv
       | isLiftedTypeKind (tyVarKind kv)
       = do { traceTc "Defaulting a kind var to *" (ppr kv)
-           ; writeMetaTyVar kv liftedTypeKind }
+           ; writeMetaTyVar kv liftedTypeKind
+           ; return True }
       | otherwise
-      = addErr (vcat [ text "Cannot default kind variable" <+> quotes (ppr kv')
-                     , text "of kind:" <+> ppr (tyVarKind kv')
-                     , text "Perhaps enable PolyKinds or add a kind signature" ])
+      = do { addErr (vcat [ text "Cannot default kind variable" <+> quotes (ppr kv')
+                          , text "of kind:" <+> ppr (tyVarKind kv')
+                          , text "Perhaps enable PolyKinds or add a kind signature" ])
+
+           -- We failed to default it, so return False to say so.
+           -- Hence, it'll get skolemised.  That might seem odd, but we must either
+           -- promote, skolemise, or zap-to-Any, to satisfy TcHsType
+           --    Note [Recipe for checking a signature]
+           -- Otherwise we get level-number assertion failures. It doesn't matter much
+           -- because we are in an error siutation anyway.
+           ; return False
+        }
       where
         (_, kv') = tidyOpenTyCoVar emptyTidyEnv kv
 

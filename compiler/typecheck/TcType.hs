@@ -122,7 +122,7 @@ module TcType (
 
   --------------------------------
   -- Rexported from Kind
-  Kind, typeKind, tcTypeKind,
+  Kind, tcTypeKind,
   liftedTypeKind,
   constraintKind,
   isLiftedTypeKind, isUnliftedTypeKind, classifiesTypeWithValues,
