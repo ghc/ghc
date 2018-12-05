@@ -14,8 +14,6 @@ module CoreArity (
         exprEtaExpandArity, findRhsArity, etaExpand,
         etaExpandToJoinPoint, etaExpandToJoinPointRule,
         exprBotStrictness_maybe,
-
-        mkArityWorker, mkArityWrapper
     ) where
 
 #include "HsVersions.h"
@@ -37,7 +35,6 @@ import Predicate ( isDictTy )
 import Coercion
 import BasicTypes
 import Unique
-import UniqSupply
 import DynFlags ( DynFlags, GeneralFlag(..), gopt )
 import Outputable
 import FastString
