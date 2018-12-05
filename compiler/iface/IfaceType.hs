@@ -49,7 +49,9 @@ module IfaceType (
         stripIfaceInvisVars,
         stripInvisArgs,
 
-        mkIfaceTySubst, substIfaceTyVar, substIfaceAppArgs, inDomIfaceTySubst
+        mkIfaceTySubst, substIfaceTyVar, substIfaceAppArgs, inDomIfaceTySubst,
+
+        omega_ty
     ) where
 
 #include "HsVersions.h"
@@ -1011,16 +1013,16 @@ defaultMultiplicityVars sty = go emptyFsEnv
     go_args _ IA_Nil = IA_Nil
     go_args subs (IA_Arg ty vis args)   = IA_Arg (go subs ty) vis (go_args subs args)
 
-    omega_ty :: IfaceTyCon
-    omega_ty =
-        IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
-      where dc_name = getName omegaDataConTyCon
 
     isMultiplicity :: IfaceType -> Bool
     isMultiplicity (IfaceTyConApp tc _) =
         tc `ifaceTyConHasKey` multiplicityTyConKey
     isMultiplicity _ = False
 
+omega_ty :: IfaceTyCon
+omega_ty =
+    IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
+  where dc_name = getName omegaDataConTyCon
 
 eliminateRuntimeRep :: (IfaceType -> SDoc) -> IfaceType -> SDoc
 eliminateRuntimeRep f ty = sdocWithDynFlags $ \dflags ->
