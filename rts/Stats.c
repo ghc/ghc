@@ -717,7 +717,7 @@ static void report_summary(const RTSSummaryStats* sum)
                 n_capabilities);
 
     statsPrintf("  SPARKS: %" FMT_Word64
-                "(%" FMT_Word " converted, %" FMT_Word " overflowed, %"
+                " (%" FMT_Word " converted, %" FMT_Word " overflowed, %"
                 FMT_Word " dud, %" FMT_Word " GC'd, %" FMT_Word " fizzled)\n\n",
                 sum->sparks_count,
                 sum->sparks.converted, sum->sparks.overflowed,
