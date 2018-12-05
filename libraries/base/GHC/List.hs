@@ -147,7 +147,7 @@ idLength = id
 --
 -- > filter p xs = [ x | x <- xs, p x]
 --
--- >>> filter odd [1,2,3]
+-- >>> filter odd [1, 2, 3]
 -- [1,3]
 
 {-# NOINLINE [1] filter #-}
@@ -850,11 +850,14 @@ notElem x (y:ys)=  x /= y && notElem x ys
  #-}
 #endif
 
--- | 'lookup' @key assocs@ looks up a key in an association list.
+-- | /O(n)/. 'lookup' @key assocs@ looks up a key in an association list.
+--
+-- >>> lookup 2 [(1, "first"), (2, "second"), (3, "third")]
+-- Just "second"
 lookup                  :: (Eq a) => a -> [(a,b)] -> Maybe b
 lookup _key []          =  Nothing
 lookup  key ((x,y):xys)
-    | key == x          =  Just y
+    | key == x           =  Just y
     | otherwise         =  lookup key xys
 
 -- | Map a function over a list and concatenate the results.
