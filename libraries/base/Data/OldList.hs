@@ -431,8 +431,8 @@ elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
 #endif
 
 
--- | 'delete' @x@ removes the first occurrence of @x@ from its list argument.
--- For example,
+-- | /O(n)/. 'delete' @x@ removes the first occurrence of @x@ from its list
+-- argument. For example,
 --
 -- >>> delete 'a' "banana"
 -- "bnana"
@@ -442,7 +442,7 @@ elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
 delete                  :: (Eq a) => a -> [a] -> [a]
 delete                  =  deleteBy (==)
 
--- | The 'deleteBy' function behaves like 'delete', but takes a
+-- | /O(n)/. The 'deleteBy' function behaves like 'delete', but takes a
 -- user-supplied equality predicate.
 --
 -- >>> deleteBy (<=) 4 [1..10]
@@ -618,19 +618,18 @@ mapAccumR f s (x:xs)    =  (s'', y:ys)
                            where (s'',y ) = f s' x
                                  (s', ys) = mapAccumR f s xs
 
--- | The 'insert' function takes an element and a list and inserts the
--- element into the list at the first position where it is less
--- than or equal to the next element.  In particular, if the list
--- is sorted before the call, the result will also be sorted.
--- It is a special case of 'insertBy', which allows the programmer to
--- supply their own comparison function.
+-- | /O(n)/. The 'insert' function takes an element and a list and inserts the
+-- element into the list at the first position where it is less than or equal to
+-- the next element. In particular, if the list is sorted before the call, the
+-- result will also be sorted. It is a special case of 'insertBy', which allows
+-- the programmer to supply their own comparison function.
 --
 -- >>> insert 4 [1,2,3,5,6,7]
 -- [1,2,3,4,5,6,7]
 insert :: Ord a => a -> [a] -> [a]
 insert e ls = insertBy (compare) e ls
 
--- | The non-overloaded version of 'insert'.
+-- | /O(n)/. The non-overloaded version of 'insert'.
 insertBy :: (a -> a -> Ordering) -> a -> [a] -> [a]
 insertBy _   x [] = [x]
 insertBy cmp x ys@(y:ys')
@@ -670,9 +669,14 @@ minimumBy cmp xs        =  foldl1 minBy xs
                                        GT -> y
                                        _  -> x
 
--- | The 'genericLength' function is an overloaded version of 'length'.  In
--- particular, instead of returning an 'Int', it returns any type which is
--- an instance of 'Num'.  It is, however, less efficient than 'length'.
+-- | /O(n)/. The 'genericLength' function is an overloaded version of 'length'.
+-- In particular, instead of returning an 'Int', it returns any type which is an
+-- instance of 'Num'. It is, however, less efficient than 'length'.
+--
+-- >>> genericLength [1, 2, 3] :: Int
+-- 3
+-- >>> genericLength [1, 2, 3] :: Float
+-- 3.0
 genericLength           :: (Num i) => [a] -> i
 {-# NOINLINE [1] genericLength #-}
 genericLength []        =  0
