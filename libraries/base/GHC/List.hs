@@ -926,6 +926,28 @@ foldr2_left  k _z  x  r (y:ys) = k x y (r ys)
 "foldr2/left"   forall k z ys (g::forall b.(a->b->b)->b->b) .
                   foldr2 k z (build g) ys = g (foldr2_left  k z) (\_ -> z) ys
  #-}
+
+foldr3 :: (a -> b -> c -> d -> d) -> d -> [a] -> [b] -> [c] -> d
+foldr3 k z = go
+  where
+    go  []    _      _      = z
+    go  _     []     _      = z
+    go  _     _      []     = z
+    go (a:as) (b:bs) (c:cs) = k a b c (go as bs cs)
+{-# INLINE [0] foldr3 #-}
+
+
+foldr3_left :: (a -> b -> c -> d -> e) -> e -> a ->
+               ([b] -> [c] -> d) -> [b] -> [c] -> e
+foldr3_left k _z a r (b:bs) (c:cs) = k a b c (r bs cs)
+foldr3_left _  z _ _  _      _     = z
+
+-- foldr3 k n xs ys zs = foldr (foldr3_left k n) (\_ _ -> n) xs ys zs
+{-# RULES
+"foldr3/left"   forall k z (g::forall b.(a->b->b)->b->b).
+                  foldr3 k z (build g) = g (foldr3_left k z) (\_ _ -> z)
+ #-}
+
 -- There used to be a foldr2/right rule, allowing foldr2 to fuse with a build
 -- form on the right. However, this causes trouble if the right list ends in
 -- a bottom that is only avoided by the left list ending at that spot. That is,
@@ -959,6 +981,9 @@ foldr2_left  k _z  x  r (y:ys) = k x y (r ys)
 --
 -- > zip [] _|_ = []
 -- > zip _|_ [] = _|_
+--
+-- 'zip' is capable of list fusion, but it is restricted to its
+-- first list argument and its resulting list.
 {-# NOINLINE [1] zip #-}
 zip :: [a] -> [b] -> [(a,b)]
 zip []     _bs    = []
@@ -977,12 +1002,23 @@ zipFB c = \x y r -> (x,y) `c` r
 ----------------------------------------------
 -- | 'zip3' takes three lists and returns a list of triples, analogous to
 -- 'zip'.
+-- It is capable of list fusion, but it is restricted to its
+-- first list argument and its resulting list.
+{-# NOINLINE [1] zip3 #-}
 zip3 :: [a] -> [b] -> [c] -> [(a,b,c)]
 -- Specification
 -- zip3 =  zipWith3 (,,)
 zip3 (a:as) (b:bs) (c:cs) = (a,b,c) : zip3 as bs cs
 zip3 _      _      _      = []
 
+{-# INLINE [0] zip3FB #-} -- See Note [Inline FB functions]
+zip3FB :: ((a,b,c) -> xs -> xs') -> a -> b -> c -> xs -> xs'
+zip3FB cons = \a b c r -> (a,b,c) `cons` r
+
+{-# RULES
+"zip3"       [~1] forall as bs cs. zip3 as bs cs = build (\c n -> foldr3 (zip3FB c) n as bs cs)
+"zip3List"   [1]          foldr3 (zip3FB (:)) [] = zip3
+ #-}
 
 -- The zipWith family generalises the zip family by zipping with the
 -- function given as the first argument, instead of a tupling function.
@@ -996,6 +1032,9 @@ zip3 _      _      _      = []
 -- 'zipWith' is right-lazy:
 --
 -- > zipWith f [] _|_ = []
+--
+-- 'zipWith' is capable of list fusion, but it is restricted to its
+-- first list argument and its resulting list.
 {-# NOINLINE [1] zipWith #-}
 zipWith :: (a->b->c) -> [a]->[b]->[c]
 zipWith f = go
@@ -1018,11 +1057,23 @@ zipWithFB c f = \x y r -> (x `f` y) `c` r
 -- | The 'zipWith3' function takes a function which combines three
 -- elements, as well as three lists and returns a list of their point-wise
 -- combination, analogous to 'zipWith'.
+-- It is capable of list fusion, but it is restricted to its
+-- first list argument and its resulting list.
+{-# NOINLINE [1] zipWith3 #-}
 zipWith3                :: (a->b->c->d) -> [a]->[b]->[c]->[d]
 zipWith3 z = go
   where
     go (a:as) (b:bs) (c:cs) = z a b c : go as bs cs
     go _ _ _                = []
+
+{-# INLINE [0] zipWith3FB #-} -- See Note [Inline FB functions]
+zipWith3FB :: (d -> xs -> xs') -> (a -> b -> c -> d) -> a -> b -> c -> xs -> xs'
+zipWith3FB cons func = \a b c r -> (func a b c) `cons` r
+
+{-# RULES
+"zipWith3"      [~1] forall f as bs cs.   zipWith3 f as bs cs = build (\c n -> foldr3 (zipWith3FB c f) n as bs cs)
+"zipWith3List"  [1]  forall f.   foldr3 (zipWith3FB (:) f) [] = zipWith3 f
+ #-}
 
 -- | 'unzip' transforms a list of pairs into a list of first components
 -- and a list of second components.

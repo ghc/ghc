@@ -351,6 +351,13 @@ test('T15226a',
     compile_and_run,
     ['-O'])
 
+test('T15263',
+    [stats_num_field('bytes allocated',
+                    [(wordsize(64), 1382184, 4)]),
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O'])
+
 test('T15426',
     [collect_stats('bytes allocated', 20),
     only_ways(['normal'])],

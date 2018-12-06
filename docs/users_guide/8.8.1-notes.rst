@@ -149,6 +149,10 @@ Template Haskell
   a representational one. There is really no reason to care about the
   type of the underlying object.
 
+- The functions ``zipWith3`` and ``zip3`` in ``Prelude`` can now fuse,
+  together with ``zipWith4`` to ``zipWith7`` as well as their
+  tuple counterparts in ``Data.List``.
+
 Build system
 ~~~~~~~~~~~~
 
