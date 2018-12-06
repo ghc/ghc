@@ -27,13 +27,13 @@ AC_ARG_WITH([gmp-libraries],
     [GMP_LIB_DIRS=$withval; LDFLAGS="-L$withval"],
     [GMP_LIB_DIRS=])
 
-AC_ARG_WITH([gmp-framework-preferred],
+AC_ARG_ENABLE([gmp-framework-preferred],
   [AC_HELP_STRING([--with-gmp-framework-preferred],
     [on OSX, prefer the GMP framework to the gmp lib])],
     [GMP_PREFER_FRAMEWORK=YES],
     [GMP_PREFER_FRAMEWORK=NO])
 
-AC_ARG_WITH([intree-gmp],
+AC_ARG_ENABLE([intree-gmp],
   [AC_HELP_STRING([--with-intree-gmp],
     [force using the in-tree GMP])],
     [GMP_FORCE_INTREE=YES],
