@@ -13,6 +13,8 @@ data Flag = ArSupportsAtFile
           | CrossCompiling
           | GccIsClang
           | GhcUnregisterised
+          | GmpInTree
+          | GmpFrameworkPref
           | LeadingUnderscore
           | SolarisBrokenShld
           | SplitObjectsBroken
@@ -29,6 +31,8 @@ flag f = do
             CrossCompiling     -> "cross-compiling"
             GccIsClang         -> "gcc-is-clang"
             GhcUnregisterised  -> "ghc-unregisterised"
+            GmpInTree          -> "intree-gmp"
+            GmpFrameworkPref   -> "gmp-framework-preferred"
             LeadingUnderscore  -> "leading-underscore"
             SolarisBrokenShld  -> "solaris-broken-shld"
             SplitObjectsBroken -> "split-objects-broken"
