@@ -73,7 +73,6 @@ import BasicTypes
 import Binary
 import Outputable
 import FastString
-import FastStringEnv
 import Util
 
 import Data.Maybe( isJust )
@@ -771,11 +770,11 @@ pprIfaceType       = pprPrecIfaceType topPrec
 pprParendIfaceType = pprPrecIfaceType appPrec
 
 pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
--- We still need `eliminateRuntimeRep` and `eliminateMultiplicity`
+-- We still need `eliminateRuntimeRepAndMultiplicity`
 -- since the `pprPrecIfaceType` may be called from other places, besides
 -- `:type` and `:info`.
 pprPrecIfaceType prec ty =
-  eliminateRuntimeRep (eliminateMultiplicity (ppr_ty prec)) ty
+  eliminateRuntimeRepAndMultiplicity (ppr_ty prec) ty
 
 ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
@@ -860,50 +859,56 @@ overhead.
 
 For this reason it was decided that we would hide RuntimeRep variables for now
 (see #11549). We do this by defaulting all type variables of kind RuntimeRep to
-LiftedRep. This is done in a pass right before pretty-printing
-(defaultRuntimeRepVars, controlled by -fprint-explicit-runtime-reps)
-The same is done with multiplicities (defaultMultiplicityVars, controlled
-by -XLinearTypes)
+LiftedRep. Likewise, we default all Multiplicity variables to Omega.
+This is done in a pass right before pretty-printing
+(defaultRuntimeRepAndMultiplicitVars, controlled by -fprint-explicit-runtime-reps
+and -XLinearTypes)
 -}
 
--- | Default 'RuntimeRep' variables to 'LiftedPtr'. e.g.
+-- | Default 'RuntimeRep' variables to 'LiftedPtr', and 'Multiplicity'
+--   variables to 'Omega'. For example:
 --
 -- @
 -- ($) :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPE r).
 --        (a -> b) -> a -> b
+-- Just :: forall (k :: Multiplicity) a. a ->@{k} Maybe a
 -- @
 --
 -- turns in to,
 --
 -- @ ($) :: forall a (b :: *). (a -> b) -> a -> b @
+-- @ Just :: forall a . a -> Maybe a @
 --
--- We do this to prevent RuntimeRep variables from incurring a significant
--- syntactic overhead in otherwise simple type signatures (e.g. ($)). See
--- Note [Defaulting RuntimeRep variables] and #11549 for further discussion.
-defaultRuntimeRepVars :: PprStyle -> IfaceType -> IfaceType
-defaultRuntimeRepVars sty = go emptyFsEnv
+-- We do this to prevent RuntimeRep and Multiplicity variables from
+-- incurring a significant -- syntactic overhead in otherwise simple
+-- type signatures (e.g. ($)). See Note [Defaulting RuntimeRep variables]
+-- and #11549 for further discussion.
+defaultRuntimeRepAndMultiplicityVars :: Bool -> Bool -> PprStyle -> IfaceType -> IfaceType
+defaultRuntimeRepAndMultiplicityVars do_runtimereps do_multiplicities sty =
+    go emptyFsEnv
   where
-    go :: FastStringEnv () -> IfaceType -> IfaceType
+    go :: FastStringEnv IfaceType -> IfaceType -> IfaceType
     go subs (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
-      | isRuntimeRep var_kind
-      , isInvisibleArgFlag argf -- don't default *visible* quantification
+      | isInvisibleArgFlag argf -- don't default *visible* quantification
                                 -- or we get the mess in #13963
-      = let subs' = extendFsEnv subs var ()
+      , Just substituted_ty <- check_substitution var_kind
+      = let subs' = extendFsEnv subs var substituted_ty
         in go subs' ty
 
     go subs (IfaceForAllTy bndr ty)
       = IfaceForAllTy (go_ifacebndr subs bndr) (go subs ty)
 
-    go subs ty@(IfaceTyVar tv)
-      | tv `elemFsEnv` subs
-      = IfaceTyConApp liftedRep IA_Nil
-      | otherwise
-      = ty
+    go subs ty@(IfaceTyVar tv) = case lookupFsEnv subs tv of
+      Just s -> s
+      Nothing -> ty
 
     go _ ty@(IfaceFreeTyVar tv)
-      | userStyle sty && TyCoRep.isRuntimeRepTy (tyVarKind tv)
+      | userStyle sty && do_runtimereps && TyCoRep.isRuntimeRepTy (tyVarKind tv)
          -- don't require -fprint-explicit-runtime-reps for good debugging output
-      = IfaceTyConApp liftedRep IA_Nil
+      = liftedRep_ty
+      | userStyle sty && do_multiplicities && TyCoRep.isMultiplicityTy (tyVarKind tv)
+         -- don't require -XLinearTypes for good debugging output
+      = omega_ty
       | otherwise
       = ty
 
@@ -914,7 +919,7 @@ defaultRuntimeRepVars sty = go emptyFsEnv
       = IfaceTupleTy sort is_prom (go_args subs tc_args)
 
     go subs (IfaceFunTy w arg res)
-      = IfaceFunTy w (go subs arg) (go subs res)
+      = IfaceFunTy (go subs w) (go subs arg) (go subs res)
 
     go subs (IfaceAppTy t ts)
       = IfaceAppTy (go subs t) (go_args subs ts)
@@ -928,119 +933,41 @@ defaultRuntimeRepVars sty = go emptyFsEnv
     go _ ty@(IfaceLitTy {}) = ty
     go _ ty@(IfaceCoercionTy {}) = ty
 
-    go_ifacebndr :: FastStringEnv () -> IfaceForAllBndr -> IfaceForAllBndr
+    go_ifacebndr :: FastStringEnv IfaceType -> IfaceForAllBndr -> IfaceForAllBndr
     go_ifacebndr subs (Bndr (IfaceIdBndr (w, n, t)) argf)
       = Bndr (IfaceIdBndr (w, n, go subs t)) argf
     go_ifacebndr subs (Bndr (IfaceTvBndr (n, t)) argf)
       = Bndr (IfaceTvBndr (n, go subs t)) argf
 
-    go_args :: FastStringEnv () -> IfaceAppArgs -> IfaceAppArgs
+    go_args :: FastStringEnv IfaceType -> IfaceAppArgs -> IfaceAppArgs
     go_args _ IA_Nil = IA_Nil
     go_args subs (IA_Arg ty argf args)
                      = IA_Arg (go subs ty) argf (go_args subs args)
 
-    liftedRep :: IfaceTyCon
-    liftedRep =
-        IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
-      where dc_name = getName liftedRepDataConTyCon
+    check_substitution :: IfaceType -> Maybe IfaceType
+    check_substitution (IfaceTyConApp tc _)
+        | do_runtimereps, tc `ifaceTyConHasKey` runtimeRepTyConKey = Just liftedRep_ty
+        | do_multiplicities, tc `ifaceTyConHasKey` multiplicityTyConKey = Just omega_ty
+    check_substitution _ = Nothing
 
-    isRuntimeRep :: IfaceType -> Bool
-    isRuntimeRep (IfaceTyConApp tc _) =
-        tc `ifaceTyConHasKey` runtimeRepTyConKey
-    isRuntimeRep _ = False
+liftedRep_ty :: IfaceType
+liftedRep_ty =
+    IfaceTyConApp (IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon))
+                  IA_Nil
+  where dc_name = getName liftedRepDataConTyCon
 
--- | Default 'Multiplicity' variables to 'Omega'. e.g.
---
--- @
--- Just :: forall (k :: Multiplicity) a. a ->@{k} Maybe a
--- @
---
--- turns in to,
---
--- @ Just :: forall a . a -> Maybe a
---
-defaultMultiplicityVars :: PprStyle -> IfaceType -> IfaceType
-defaultMultiplicityVars sty = go emptyFsEnv
-  where
-    go :: FastStringEnv () -> IfaceType -> IfaceType
-    go subs (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
-      | isMultiplicity var_kind
-      , isInvisibleArgFlag argf -- don't default *visible* quantification
-                                -- or we get the mess in #13963
-      = let subs' = extendFsEnv subs var ()
-        in go subs' ty
-
-    go subs (IfaceForAllTy bndr ty)
-      = IfaceForAllTy (go_ifacebndr subs bndr) (go subs ty)
-
-    go subs ty@(IfaceTyVar tv)
-      | tv `elemFsEnv` subs
-      = IfaceTyConApp omega_ty IA_Nil
-      | otherwise
-      = ty
-
-    go _ ty@(IfaceFreeTyVar tv)
-      | userStyle sty && TyCoRep.isMultiplicityTy (tyVarKind tv)
-         -- don't require -XLinearTypes for good debugging output
-      = IfaceTyConApp omega_ty IA_Nil
-      | otherwise
-      = ty
-
-    go subs (IfaceTyConApp tc tc_args)
-      = IfaceTyConApp tc (go_args subs tc_args)
-
-    go subs (IfaceTupleTy sort is_prom tc_args)
-      = IfaceTupleTy sort is_prom (go_args subs tc_args)
-
-    go subs (IfaceFunTy w arg res)
-      = IfaceFunTy (go subs w) (go subs arg) (go subs res)
-
-    go subs (IfaceAppTy x y)
-      = IfaceAppTy (go subs x) (go_args subs y)
-
-    go subs (IfaceDFunTy x y)
-      = IfaceDFunTy (go subs x) (go subs y)
-
-    go subs (IfaceCastTy x co)
-      = IfaceCastTy (go subs x) co
-
-    go _ ty@(IfaceLitTy {}) = ty
-    go _ ty@(IfaceCoercionTy {}) = ty
-
-    go_ifacebndr :: FastStringEnv () -> IfaceForAllBndr -> IfaceForAllBndr
-    go_ifacebndr subs (Bndr (IfaceIdBndr (w, n, t)) argf)
-      = Bndr (IfaceIdBndr (w, n, go subs t)) argf
-    go_ifacebndr subs (Bndr (IfaceTvBndr (n, t)) argf)
-      = Bndr (IfaceTvBndr (n, go subs t)) argf
-
-    go_args :: FastStringEnv () -> IfaceAppArgs -> IfaceAppArgs
-    go_args _ IA_Nil = IA_Nil
-    go_args subs (IA_Arg ty vis args)   = IA_Arg (go subs ty) vis (go_args subs args)
-
-
-    isMultiplicity :: IfaceType -> Bool
-    isMultiplicity (IfaceTyConApp tc _) =
-        tc `ifaceTyConHasKey` multiplicityTyConKey
-    isMultiplicity _ = False
-
-omega_ty :: IfaceTyCon
+omega_ty :: IfaceType
 omega_ty =
-    IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
+    IfaceTyConApp (IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon))
+                  IA_Nil
   where dc_name = getName omegaDataConTyCon
 
-eliminateRuntimeRep :: (IfaceType -> SDoc) -> IfaceType -> SDoc
-eliminateRuntimeRep f ty = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_PrintExplicitRuntimeReps dflags
-      then f ty
-      else getPprStyle $ \sty -> f (defaultRuntimeRepVars sty ty)
-
-eliminateMultiplicity :: (IfaceType -> SDoc) -> IfaceType -> SDoc
-eliminateMultiplicity f ty = sdocWithDynFlags $ \dflags ->
-    -- For the time being, printing multiplicities piggybacks on the
-    -- print-explicit-runtime-reps flag. But will eventually get its own flag.
-    if xopt LangExt.LinearTypes dflags
-      then f ty
-      else getPprStyle $ \sty -> f (defaultMultiplicityVars sty ty)
+eliminateRuntimeRepAndMultiplicity :: (IfaceType -> SDoc) -> IfaceType -> SDoc
+eliminateRuntimeRepAndMultiplicity f ty = sdocWithDynFlags $ \dflags ->
+    let do_runtimerep = not (gopt Opt_PrintExplicitRuntimeReps dflags)
+        do_multiplicity = not (xopt LangExt.LinearTypes dflags)
+    in getPprStyle $ \sty ->
+        f (defaultRuntimeRepAndMultiplicityVars do_runtimerep do_multiplicity sty ty)
 
 instance Outputable IfaceAppArgs where
   ppr tca = pprIfaceAppArgs tca
@@ -1147,7 +1074,7 @@ data ShowForAllFlag = ShowForAllMust | ShowForAllWhen
 
 pprIfaceSigmaType :: ShowForAllFlag -> IfaceType -> SDoc
 pprIfaceSigmaType show_forall ty
-  = eliminateRuntimeRep (eliminateMultiplicity ppr_fn) ty
+  = eliminateRuntimeRepAndMultiplicity ppr_fn ty
   where
     ppr_fn iface_ty =
       let (tvs, theta, tau) = splitIfaceSigmaTy iface_ty
