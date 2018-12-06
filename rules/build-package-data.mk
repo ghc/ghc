@@ -90,6 +90,14 @@ ifneq "$$(GMP_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-gmp-libraries="$$(GMP_LIB_DIRS)"
 endif
 
+ifneq "$$(GMP_PREFER_FRAMEWORK)" ""
+$1_$2_CONFIGURE_OPTS += --configure-option=--with-gmp-framework-preferred="$$(GMP_PREFER_FRAMEWORK)"
+endif
+
+ifneq "$$(GMP_FORCE_INTREE)" ""
+$1_$2_CONFIGURE_OPTS += --configure-option=--with-intree-gmp="$$(GMP_FORCE_INTREE)"
+endif
+
 ifneq "$$(CURSES_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-curses-libraries="$$(CURSES_LIB_DIRS)"
 endif

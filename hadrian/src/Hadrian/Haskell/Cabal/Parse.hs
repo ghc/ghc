@@ -280,7 +280,8 @@ resolveContextData context@Context {..} = do
           , depIncludeDirs  = forDeps Installed.includeDirs
           , depCcOpts       = forDeps Installed.ccOptions
           , depLdOpts       = forDeps Installed.ldOptions
-          , buildGhciLib    = C.withGHCiLib lbi' }
+          , buildGhciLib    = C.withGHCiLib lbi'
+          , frameworks      = C.frameworks buildInfo }
 
 -- | Look for a @.buildinfo@ in all of the specified directories, stopping on
 -- the first one we find.
