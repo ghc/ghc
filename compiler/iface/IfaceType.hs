@@ -78,6 +78,7 @@ import Util
 
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
+import qualified GHC.LanguageExtensions as LangExt
 
 {-
 ************************************************************************
@@ -861,6 +862,8 @@ For this reason it was decided that we would hide RuntimeRep variables for now
 (see #11549). We do this by defaulting all type variables of kind RuntimeRep to
 LiftedRep. This is done in a pass right before pretty-printing
 (defaultRuntimeRepVars, controlled by -fprint-explicit-runtime-reps)
+The same is done with multiplicities (defaultMultiplicityVars, controlled
+by -XLinearTypes)
 -}
 
 -- | Default 'RuntimeRep' variables to 'LiftedPtr'. e.g.
@@ -978,7 +981,7 @@ defaultMultiplicityVars sty = go emptyFsEnv
 
     go _ ty@(IfaceFreeTyVar tv)
       | userStyle sty && TyCoRep.isMultiplicityTy (tyVarKind tv)
-         -- don't require -fprint-explicit-runtime-reps for good debugging output
+         -- don't require -XLinearTypes for good debugging output
       = IfaceTyConApp omega_ty IA_Nil
       | otherwise
       = ty
@@ -1035,7 +1038,7 @@ eliminateMultiplicity :: (IfaceType -> SDoc) -> IfaceType -> SDoc
 eliminateMultiplicity f ty = sdocWithDynFlags $ \dflags ->
     -- For the time being, printing multiplicities piggybacks on the
     -- print-explicit-runtime-reps flag. But will eventually get its own flag.
-    if gopt Opt_PrintExplicitRuntimeReps dflags
+    if xopt LangExt.LinearTypes dflags
       then f ty
       else getPprStyle $ \sty -> f (defaultMultiplicityVars sty ty)
 
