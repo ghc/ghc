@@ -118,8 +118,10 @@ curses-lib-dir    = @CURSES_LIB_DIRS@
 iconv-include-dir = @ICONV_INCLUDE_DIRS@
 iconv-lib-dir     = @ICONV_LIB_DIRS@
 
-gmp-include-dir   = @GMP_INCLUDE_DIRS@
-gmp-lib-dir       = @GMP_LIB_DIRS@
+intree-gmp              = @GMP_FORCE_INTREE@
+gmp-framework-preferred = @GMP_PREFER_FRAMEWORK@
+gmp-include-dir         = @GMP_INCLUDE_DIRS@
+gmp-lib-dir             = @GMP_LIB_DIRS@
 
 use-system-ffi    = @UseSystemLibFFI@
 ffi-include-dir   = @FFIIncludeDir@
