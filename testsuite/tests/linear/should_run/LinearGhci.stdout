@@ -1,0 +1,2 @@
+MkT :: a -> T a
+MkT :: a -->.(n) T a
