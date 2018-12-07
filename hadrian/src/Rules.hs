@@ -94,18 +94,7 @@ packageRules = do
     let readPackageDb  = [(packageDb, 1)]
         writePackageDb = [(packageDb, maxConcurrentReaders)]
 
-    let contexts        = liftM3 Context        allStages knownPackages allWays
-        vanillaContexts = liftM2 vanillaContext allStages knownPackages
-
-    -- TODO: we might want to look into converting more and more
-    --       rules to the style introduced in Rules.Library in
-    --       https://github.com/snowleopard/hadrian/pull/571,
-    --       where "catch-all" rules are used to "catch" the need
-    --       for library files, and we then use parsec parsers to
-    --       extract all sorts of information needed to build them, like
-    --       the package, the stage, the way, etc.
-
-    forM_ contexts (Rules.Compile.compilePackage readPackageDb)
+    Rules.Compile.compilePackage readPackageDb
 
     Rules.Program.buildProgram readPackageDb
 
@@ -115,6 +104,12 @@ packageRules = do
         -- need to be set properly. @undefined@ is not an option as it ends up
         -- being forced.
         Rules.Register.registerPackage writePackageDb (Context stage dummyPackage vanilla)
+
+    -- TODO: Can we get rid of this enumeration of contexts? Since we iterate
+    --       over it to generate all 4 types of rules below, all the time, we
+    --       might want to see whether the parse-and-extract approach of
+    --       Rules.Compile and Rules.Library could save us some time there.
+    let vanillaContexts = liftM2 vanillaContext allStages knownPackages
 
     forM_ vanillaContexts $ mconcat
         [ Rules.Register.configurePackage
