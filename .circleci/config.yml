@@ -351,9 +351,6 @@ workflows:
     - validate-x86_64-fedora:
         *trigger_on_tags
 
-    branches:
-      ignore: /gitlab\/.*/
-
   nightly:
     triggers:
       - schedule:
