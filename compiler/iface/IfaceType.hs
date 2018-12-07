@@ -770,11 +770,10 @@ pprIfaceType       = pprPrecIfaceType topPrec
 pprParendIfaceType = pprPrecIfaceType appPrec
 
 pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
--- We still need `eliminateRuntimeRepAndMultiplicity`
--- since the `pprPrecIfaceType` may be called from other places, besides
--- `:type` and `:info`.
+-- We still need `hideNonStandardTypes`, since the `pprPrecIfaceType` may be
+-- called from other places, besides `:type` and `:info`.
 pprPrecIfaceType prec ty =
-  eliminateRuntimeRepAndMultiplicity (ppr_ty prec) ty
+  hideNonStandardTypes (ppr_ty prec) ty
 
 ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
@@ -861,7 +860,7 @@ For this reason it was decided that we would hide RuntimeRep variables for now
 (see #11549). We do this by defaulting all type variables of kind RuntimeRep to
 LiftedRep. Likewise, we default all Multiplicity variables to Omega.
 This is done in a pass right before pretty-printing
-(defaultRuntimeRepAndMultiplicitVars, controlled by -fprint-explicit-runtime-reps
+(defaultNonStandardVars, controlled by -fprint-explicit-runtime-reps
 and -XLinearTypes)
 -}
 
@@ -883,8 +882,8 @@ and -XLinearTypes)
 -- incurring a significant -- syntactic overhead in otherwise simple
 -- type signatures (e.g. ($)). See Note [Defaulting RuntimeRep variables]
 -- and #11549 for further discussion.
-defaultRuntimeRepAndMultiplicityVars :: Bool -> Bool -> PprStyle -> IfaceType -> IfaceType
-defaultRuntimeRepAndMultiplicityVars do_runtimereps do_multiplicities sty =
+defaultNonStandardVars :: Bool -> Bool -> PprStyle -> IfaceType -> IfaceType
+defaultNonStandardVars do_runtimereps do_multiplicities sty =
     go emptyFsEnv
   where
     go :: FastStringEnv IfaceType -> IfaceType -> IfaceType
@@ -962,12 +961,12 @@ omega_ty =
                   IA_Nil
   where dc_name = getName omegaDataConTyCon
 
-eliminateRuntimeRepAndMultiplicity :: (IfaceType -> SDoc) -> IfaceType -> SDoc
-eliminateRuntimeRepAndMultiplicity f ty = sdocWithDynFlags $ \dflags ->
+hideNonStandardTypes :: (IfaceType -> SDoc) -> IfaceType -> SDoc
+hideNonStandardTypes f ty = sdocWithDynFlags $ \dflags ->
     let do_runtimerep = not (gopt Opt_PrintExplicitRuntimeReps dflags)
         do_multiplicity = not (xopt LangExt.LinearTypes dflags)
     in getPprStyle $ \sty ->
-        f (defaultRuntimeRepAndMultiplicityVars do_runtimerep do_multiplicity sty ty)
+        f (defaultNonStandardVars do_runtimerep do_multiplicity sty ty)
 
 instance Outputable IfaceAppArgs where
   ppr tca = pprIfaceAppArgs tca
@@ -1074,7 +1073,7 @@ data ShowForAllFlag = ShowForAllMust | ShowForAllWhen
 
 pprIfaceSigmaType :: ShowForAllFlag -> IfaceType -> SDoc
 pprIfaceSigmaType show_forall ty
-  = eliminateRuntimeRepAndMultiplicity ppr_fn ty
+  = hideNonStandardTypes ppr_fn ty
   where
     ppr_fn iface_ty =
       let (tvs, theta, tau) = splitIfaceSigmaTy iface_ty
