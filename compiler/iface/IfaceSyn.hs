@@ -69,7 +69,6 @@ import TyCon ( Role (..), Injectivity(..) )
 import Util( dropList, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
-import FastString
 
 import Control.Monad
 import System.IO.Unsafe
@@ -883,9 +882,7 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                              , ppWhen insert_empty_ctxt $ parens empty <+> darrow
                              , ex_msg
                              , pprIfaceContextArr prov_ctxt
-                             , pprIfaceType $ foldr
-                                                (IfaceFunTy (IfaceTyConApp omega_ty IA_Nil))
-                                                pat_ty arg_tys ])
+                             , pprIfaceType $ foldr (IfaceFunTy omega_ty) pat_ty arg_tys ])
       where
         univ_msg = pprUserIfaceForAll univ_bndrs
         ex_msg   = pprUserIfaceForAll ex_bndrs
