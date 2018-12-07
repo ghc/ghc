@@ -304,7 +304,7 @@ addCastTo ai co = ai { ai_args = CastBy co : ai_args ai
 argInfoAppArgs :: [ArgSpec] -> [OutExpr]
 argInfoAppArgs []                              = []
 argInfoAppArgs (CastBy {}                : _)  = []  -- Stop at a cast
-argInfoAppArgs (ValArg _ e                 : as) = e       : argInfoAppArgs as
+argInfoAppArgs (ValArg _ e               : as) = e       : argInfoAppArgs as
 argInfoAppArgs (TyArg { as_arg_ty = ty } : as) = Type ty : argInfoAppArgs as
 
 pushSimplifiedArgs :: SimplEnv -> [ArgSpec] -> SimplCont -> SimplCont

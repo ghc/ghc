@@ -2260,7 +2260,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
        ; (ze, user_tvs) <- zonkTyBndrsX ze user_tvs
        ; Compose arg_tys <- zonkTcTypesToTypesX ze (Compose arg_tys)
        ; ctxt    <- zonkTcTypesToTypesX ze ctxt
-       ; res_ty  <- zonkTcTypeToTypeX ze res_ty
+       ; res_ty  <- zonkTcTypeToTypeX   ze res_ty
 
        ; let (univ_tvs, ex_tvs, tkvs', user_tvs', eq_preds, arg_subst)
                = rejigConRes tmpl_bndrs res_tmpl tkvs user_tvs res_ty

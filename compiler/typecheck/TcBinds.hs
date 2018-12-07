@@ -950,9 +950,6 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                                       , sig_inst_wcx   = wcx
                                       , sig_inst_theta = annotated_theta
                                       , sig_inst_skols = annotated_tvs }))
-
-
-
   = -- Choose quantifiers for a partial type signature
     do { psig_qtv_prs <- zonkTyVarTyVarPairs annotated_tvs
 

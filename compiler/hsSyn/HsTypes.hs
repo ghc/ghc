@@ -1157,7 +1157,7 @@ splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
                                  = (hsUnrestricted t1:args, res)
     go (L _ (HsAppTy _ t1 t2)) tys = go t1 (t2:tys)
     go (L _ (HsParTy _ ty))    tys = go ty tys
-    go _                     _   = ([], orig_ty)  -- Failure to match
+    go _                       _   = ([], orig_ty)  -- Failure to match
 
 splitHsFunType other = ([], other)
 
