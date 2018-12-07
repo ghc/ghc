@@ -549,7 +549,7 @@ data FloatBind
   = FloatLet  CoreBind
   | FloatCase CoreExpr Id AltCon [Var]
       -- case e of y { C ys -> ... }
-      -- See Note [Floating cases] in SetLevels
+      -- See Note [Floating single-alternative cases] in SetLevels
 
 instance Outputable FloatBind where
   ppr (FloatLet b) = text "LET" <+> ppr b

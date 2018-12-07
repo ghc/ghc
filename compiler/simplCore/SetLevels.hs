@@ -460,13 +460,12 @@ lvlCase :: LevelEnv             -- Level of in-scope names/tyvars
         -> [CoreAltWithFVs]     -- Input alternatives
         -> LvlM LevelledExpr    -- Result expression
 lvlCase env scrut_fvs scrut' case_bndr ty alts
+  -- See Note [Floating single-alternative cases]
   | [(con@(DataAlt {}), bs, body)] <- alts
-  , exprOkForSpeculation (deTagExpr scrut')
-                                  -- See Note [Check the output scrutinee for okForSpec]
+  , exprIsHNF (deTagExpr scrut')  -- See Note [Check the output scrutinee for okForSpec]
   , not (isTopLvl dest_lvl)       -- Can't have top-level cases
   , not (floatTopLvlOnly env)     -- Can float anywhere
-  =     -- See Note [Floating cases]
-        -- Always float the case if possible
+  =     -- Always float the case if possible
         -- Unlike lets we don't insist that it escapes a value lambda
     do { (env1, (case_bndr' : bs')) <- cloneCaseBndrs env dest_lvl (case_bndr : bs)
        ; let rhs_env = extendCaseBndrEnv env1 case_bndr scrut'
@@ -492,15 +491,15 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
       where
         (new_env, bs') = substAndLvlBndrs NonRecursive alts_env incd_lvl bs
 
-{-
-Note [Floating cases]
-~~~~~~~~~~~~~~~~~~~~~
+{- Note [Floating single-alternative cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this:
   data T a = MkT !a
   f :: T Int -> blah
   f x vs = case x of { MkT y ->
              let f vs = ...(case y of I# w -> e)...f..
              in f vs
+
 Here we can float the (case y ...) out, because y is sure
 to be evaluated, to give
   f x vs = case x of { MkT y ->
@@ -512,13 +511,28 @@ That saves unboxing it every time round the loop.  It's important in
 some DPH stuff where we really want to avoid that repeated unboxing in
 the inner loop.
 
-Things to note
+Things to note:
+
+ * The test we perform is exprIsHNF, and /not/ exprOkForSpeculation.
+
+     - exrpIsHNF catches the key case of an evaluated variable
+
+     - exprOkForSpeculaion is /false/ of an evaluated varaible;
+       See Note [exprOkForSpeculation and evaluated variables] in CoreUtils
+       So we'd actually miss the key case!
+
+     - Nothing is gained from the extra generality of exprOkForSpeculation
+       since we only consider floating a case whose single alternative
+       is a DataAlt   K a b -> rhs
+
  * We can't float a case to top level
+
  * It's worth doing this float even if we don't float
    the case outside a value lambda.  Example
      case x of {
        MkT y -> (case y of I# w2 -> ..., case y of I# w2 -> ...)
    If we floated the cases out we could eliminate one of them.
+
  * We only do this with a single-alternative case
 
 Note [Check the output scrutinee for okForSpec]
@@ -535,7 +549,7 @@ speculation here, but the former is not -- and indeed we can't float
 the inner case out, at least not unless x is also evaluated at its
 binding site.  See Trac #5453.
 
-That's why we apply exprOkForSpeculation to scrut' and not to scrut.
+That's why we apply exprIsHNF to scrut' and not to scrut.
 -}
 
 lvlNonTailMFE :: LevelEnv             -- Level of in-scope names/tyvars

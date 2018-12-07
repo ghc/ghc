@@ -1556,25 +1556,28 @@ app_ok primop_ok fun args
               -- Often there is a literal divisor, and this
               -- can get rid of a thunk in an inner loop
 
-        | SeqOp <- op    -- See Note [seq# and expr_ok]
-        -> all (expr_ok primop_ok) args
+        | SeqOp <- op  -- See Note [exprOkForSpeculation and SeqOp/DataToTagOp]
+        -> False       --     for the special cases for SeqOp and DataToTagOp
+        | DataToTagOp <- op
+        -> False
 
         | otherwise
         -> primop_ok op  -- Check the primop itself
-        && and (zipWith arg_ok arg_tys args)  -- Check the arguments
+        && and (zipWith primop_arg_ok arg_tys args)  -- Check the arguments
 
       _other -> isUnliftedType (idType fun)          -- c.f. the Var case of exprIsHNF
              || idArity fun > n_val_args             -- Partial apps
-             || (n_val_args == 0 &&
-                 isEvaldUnfolding (idUnfolding fun)) -- Let-bound values
+             -- NB: even in the nullary case, do /not/ check
+             --     for evaluated-ness of the fun;
+             --     see Note [exprOkForSpeculation and evaluated variables]
              where
                n_val_args = valArgCount args
   where
     (arg_tys, _) = splitPiTys (idType fun)
 
-    arg_ok :: TyBinder -> CoreExpr -> Bool
-    arg_ok (Named _) _ = True   -- A type argument
-    arg_ok (Anon ty) arg        -- A term argument
+    primop_arg_ok :: TyBinder -> CoreExpr -> Bool
+    primop_arg_ok (Named _) _ = True   -- A type argument
+    primop_arg_ok (Anon ty) arg        -- A term argument
        | isUnliftedType ty = expr_ok primop_ok arg
        | otherwise         = True  -- See Note [Primops with lifted arguments]
 
@@ -1638,23 +1641,8 @@ But we restrict it sharply:
   arise.
 
 * We restrict it to exhaustive alternatives. A non-exhaustive
-  case manifestly isn't ok-for-speculation. Consider
-    case e of x { DEAFULT ->
-      ...(case x of y
-            A -> ...
-            _ -> ...(case (case x of { B -> p; C -> p }) of
-                       I# r -> blah)...
-  If SetLevesls considers the inner nested case as ok-for-speculation
-  it can do case-floating (see Note [Floating cases] in SetLevels).
-  So we'd float to:
-    case e of x { DEAFULT ->
-    case (case x of { B -> p; C -> p }) of I# r ->
-    ...(case x of y
-            A -> ...
-            _ -> ...blah...)...
-  which is utterly bogus (seg fault); see Trac #5453.
-
-  Similarly, this is a valid program (albeit a slightly dodgy one)
+  case manifestly isn't ok-for-speculation. for example,
+  this is a valid program (albeit a slightly dodgy one)
     let v = case x of { B -> ...; C -> ... }
     in case x of
          A -> ...
@@ -1666,6 +1654,28 @@ But we restrict it sharply:
   Now, all this is for lifted types, but it'd be the same for any
   finite unlifted type. We don't have many of them, but we might
   add unlifted algebraic types in due course.
+
+
+----- Historical note: Trac #15696: --------
+  Previously SetLevels used exprOkForSpeculation to guide
+  floating of single-alternative cases; it now uses exprIsHNF
+  Note [Floating single-alternative cases].
+
+  But in those days, consider
+    case e of x { DEAFULT ->
+      ...(case x of y
+            A -> ...
+            _ -> ...(case (case x of { B -> p; C -> p }) of
+                       I# r -> blah)...
+  If SetLevels considers the inner nested case as
+  ok-for-speculation it can do case-floating (in SetLevels).
+  So we'd float to:
+    case e of x { DEAFULT ->
+    case (case x of { B -> p; C -> p }) of I# r ->
+    ...(case x of y
+            A -> ...
+            _ -> ...blah...)...
+  which is utterly bogus (seg fault); see Trac #5453.
 
 ----- Historical note: Trac #3717: --------
     foo :: Int -> Int
@@ -1699,27 +1709,54 @@ evaluate them.  Indeed, in general primops are, well, primitive
 and do not perform evaluation.
 
 Bottom line:
-  * in exprOkForSpeculation we simply ignore all lifted arguments.
-  * except see Note [seq# and expr_ok] for an exception
+  * In exprOkForSpeculation we simply ignore all lifted arguments.
+  * In the rare case of primops that /do/ evaluate their arguments,
+    (namely DataToTagOp and SeqOp) return False; see
+    Note [exprOkForSpeculation and evaluated variables]
 
+Note [exprOkForSpeculation and SeqOp/DataToTagOp]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Most primops with lifted arguments don't evaluate them
+(see Note [Primops with lifted arguments]), so we can ignore
+that argument entirely when doing exprOkForSpeculation.
 
-Note [seq# and expr_ok]
-~~~~~~~~~~~~~~~~~~~~~~~
+But DataToTagOp and SeqOp are exceptions to that rule.
+For reasons described in Note [exprOkForSpeculation and
+evaluated variables], we simply return False for them.
+
+Not doing this made #5129 go bad.
+Lots of discussion in #15696.
+
+Note [exprOkForSpeculation and evaluated variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Recall that
-   seq# :: forall a s . a -> State# s -> (# State# s, a #)
-must always evaluate its first argument.  So it's really a
-counter-example to Note [Primops with lifted arguments]. In
-the case of seq# we must check the argument to seq#.  Remember
-item (d) of the specification of exprOkForSpeculation:
+  seq#       :: forall a s. a -> State# s -> (# State# s, a #)
+  dataToTag# :: forall a.   a -> Int#
+must always evaluate their first argument.
 
-  -- Precisely, it returns @True@ iff:
-  --  a) The expression guarantees to terminate,
-         ...
-  --  d) without throwing a Haskell exception
+Now consider these examples:
+ * case x of y { DEFAULT -> ....y.... }
+   Should 'y' (alone) be considered ok-for-speculation?
 
-The lack of this special case caused Trac #5129 to go bad again.
-See comment:24 and following
+ * case x of y { DEFAULT -> ....f (dataToTag# y)... }
+   Should (dataToTag# y) be considered ok-for-spec?
 
+You could argue 'yes', because in the case alternative we know that
+'y' is evaluated.  But the binder-swap transformation, which is
+extremely useful for float-out, changes these expressions to
+   case x of y { DEFAULT -> ....x.... }
+   case x of y { DEFAULT -> ....f (dataToTag# x)... }
+
+And now the expression does not obey the let/app invariant!  Yikes!
+Moreover we really might float (f (dataToTag# x)) outside the case,
+and then it really, really doesn't obey the let/app invariant.
+
+The solution is simple: exprOkForSpeculation does not try to take
+advantage of the evaluated-ness of (lifted) varaibles.  And it returns
+False (always) for DataToTagOp and SeqOp.
+
+Note that exprIsHNF /can/ and does take advantage of evaluated-ness;
+it doesn't have the trickiness of the let/app invariant to worry about.
 
 ************************************************************************
 *                                                                      *
@@ -1781,6 +1818,8 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
                              -- and (e.g.) primops that don't have unfoldings
       || is_con_unf (idUnfolding v)
         -- Check the thing's unfolding; it might be bound to a value
+        --   or to a guaranteed-evaluated variable (isEvaldUnfolding)
+        --   Contrast with Note [exprOkForSpeculation and evaluated variables]
         -- We don't look through loop breakers here, which is a bit conservative
         -- but otherwise I worry that if an Id's unfolding is just itself,
         -- we could get an infinite loop
@@ -1800,8 +1839,8 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     is_hnf_like (Let _ e)        = is_hnf_like e  -- Lazy let(rec)s don't affect us
     is_hnf_like _                = False
 
-    -- There is at least one value argument
-    -- 'n' is number of value args to which the expression is applied
+    -- 'n' is the number of value args to which the expression is applied
+    -- And n>0: there is at least one value argument
     app_is_value :: CoreExpr -> Int -> Bool
     app_is_value (Var f)    nva = id_app_is_value f nva
     app_is_value (Tick _ f) nva = app_is_value f nva
@@ -1809,7 +1848,7 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     app_is_value (App f a)  nva
       | isValArg a              = app_is_value f (nva + 1)
       | otherwise               = app_is_value f nva
-    app_is_value _ _ = False
+    app_is_value _          _   = False
 
     id_app_is_value id n_val_args
        = is_con id

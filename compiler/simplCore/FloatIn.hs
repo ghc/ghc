@@ -142,7 +142,8 @@ fiExpr :: DynFlags
        -> CoreExprWithFVs   -- Input expr
        -> CoreExpr          -- Result
 
-fiExpr _ to_drop (_, AnnLit lit)     = ASSERT( null to_drop ) Lit lit
+fiExpr _ to_drop (_, AnnLit lit)     = wrapFloats to_drop (Lit lit)
+                                       -- See Note [Dead bindings]
 fiExpr _ to_drop (_, AnnType ty)     = ASSERT( null to_drop ) Type ty
 fiExpr _ to_drop (_, AnnVar v)       = wrapFloats to_drop (Var v)
 fiExpr _ to_drop (_, AnnCoercion co) = wrapFloats to_drop (Coercion co)
@@ -202,7 +203,15 @@ fiExpr dflags to_drop ann_expr@(_,AnnApp {})
       where
        (arg_ty, res_ty) = splitFunTy fun_ty
 
-{-
+{- Note [Dead bindings]
+~~~~~~~~~~~~~~~~~~~~~~~
+At a literal we won't usually have any floated bindings; the
+only way that can happen is if the binding wrapped the literal
+/in the original input program/.  e.g.
+   case x of { DEFAULT -> 1# }
+But, while this may be unusual it is not actually wrong, and it did
+once happen (Trac #15696).
+
 Note [Do not destroy the let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Watch out for
