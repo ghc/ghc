@@ -458,6 +458,7 @@ data DumpFlag
    | Opt_D_dump_stg_unarised -- STG after unarise
    | Opt_D_dump_stg_final -- STG after stg2stg
    | Opt_D_dump_call_arity
+   | Opt_D_dump_eta_arity
    | Opt_D_dump_exitify
    | Opt_D_dump_stranal
    | Opt_D_dump_str_signatures
@@ -530,6 +531,7 @@ data GeneralFlag
 
    -- optimisation opts
    | Opt_CallArity
+   | Opt_EtaArity
    | Opt_Exitification
    | Opt_Strictness
    | Opt_LateDmdAnal                    -- #6087
@@ -744,6 +746,7 @@ data GeneralFlag
 optimisationFlags :: EnumSet GeneralFlag
 optimisationFlags = EnumSet.fromList
    [ Opt_CallArity
+   , Opt_EtaArity
    , Opt_Strictness
    , Opt_LateDmdAnal
    , Opt_KillAbsence
@@ -3403,6 +3406,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_stg_final)
   , make_ord_flag defGhcFlag "ddump-call-arity"
         (setDumpFlag Opt_D_dump_call_arity)
+  , make_ord_flag defGhcFlag "ddump-eta-arity"
+        (setDumpFlag Opt_D_dump_eta_arity)
   , make_ord_flag defGhcFlag "ddump-exitify"
         (setDumpFlag Opt_D_dump_exitify)
   , make_ord_flag defGhcFlag "ddump-stranal"
@@ -4186,6 +4191,7 @@ fFlagsDeps = [
   flagGhciSpec "break-on-exception"           Opt_BreakOnException,
   flagSpec "building-cabal-package"           Opt_BuildingCabalPackage,
   flagSpec "call-arity"                       Opt_CallArity,
+  flagSpec "eta-arity"                        Opt_EtaArity,
   flagSpec "exitification"                    Opt_Exitification,
   flagSpec "case-merge"                       Opt_CaseMerge,
   flagSpec "case-folding"                     Opt_CaseFolding,

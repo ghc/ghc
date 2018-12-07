@@ -26,7 +26,6 @@ import CoreUtils        (rhsIsStatic)
 import CoreStats        (coreBindsStats, CoreStats(..))
 import CoreSeq          (seqBinds)
 import CoreLint
-import CoreEta
 import Literal
 import Rules
 import PatSyn

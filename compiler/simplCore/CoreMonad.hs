@@ -103,6 +103,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoPrintCore
   | CoreDoStaticArgs
   | CoreDoCallArity
+  | CoreDoEtaArity
   | CoreDoExitify
   | CoreDoStrictness
   | CoreDoWorkerWrapper
@@ -130,6 +131,7 @@ instance Outputable CoreToDo where
   ppr CoreLiberateCase         = text "Liberate case"
   ppr CoreDoStaticArgs         = text "Static argument"
   ppr CoreDoCallArity          = text "Called arity analysis"
+  ppr CoreDoEtaArity           = text "Eta-Arity worker/wrapper tranformation"
   ppr CoreDoExitify            = text "Exitification transformation"
   ppr CoreDoStrictness         = text "Demand analysis"
   ppr CoreDoWorkerWrapper      = text "Worker Wrapper binds"

@@ -10,6 +10,7 @@ import GhcPrelude
 
 import BasicTypes
 import CoreSyn
+import CoreArity
 import FastString
 import Id
 import Name
@@ -40,7 +41,7 @@ arityWorkerWrapper (Rec binds)
 -- a wrapper.
 arityWorkerWrapper' :: CoreBndr -> CoreExpr -> [(CoreBndr,CoreExpr)]
 arityWorkerWrapper' name expr
-  = let arity  = idArity name in
+  = let arity = idArity name in
       case arity >= 1 of
         True -> [ mkArityWrapper name expr arity
                 , mkArityWorker  name expr arity ]
@@ -60,8 +61,6 @@ mkWorkerName bndr
                  (mkOccName OccName.varName
                             (occNameString (nameOccName (Var.varName bndr))
                              ++ "worker"))
-  -- let name = varName bndr in
-  --   setVarName bndr (mkSystemVarName undefined (mkFastString "worker"))
 
 -- ^ Given an expression and it's name, generate a new expression with a
 -- tilde-lambda type. For expressions that are not functions, we do not generate

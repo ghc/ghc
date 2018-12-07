@@ -46,6 +46,7 @@ import Specialise       ( specProgram)
 import SpecConstr       ( specConstrProgram)
 import DmdAnal          ( dmdAnalProgram )
 import CallArity        ( callArityAnalProgram )
+import EtaWorkerWrapper ( etaArityWorkerWrapperProgram )
 import Exitify          ( exitifyProgram )
 import WorkWrap         ( wwTopBinds )
 import SrcLoc
@@ -121,6 +122,7 @@ getCoreToDo dflags
     max_iter      = maxSimplIterations dflags
     rule_check    = ruleCheck          dflags
     call_arity    = gopt Opt_CallArity                    dflags
+    eta_arity     = gopt Opt_EtaArity                     dflags
     exitification = gopt Opt_Exitification                dflags
     strictness    = gopt Opt_Strictness                   dflags
     full_laziness = gopt Opt_FullLaziness                 dflags
@@ -200,6 +202,7 @@ getCoreToDo dflags
         ]
 
     core_todo =
+     [runWhen eta_arity $ CoreDoPasses [ CoreDoCallArity, CoreDoEtaArity ]] ++
      if opt_level == 0 then
        [ static_ptrs_float_outwards,
          CoreDoSimplify max_iter
@@ -440,6 +443,9 @@ doCorePass CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
 
 doCorePass CoreDoCallArity           = {-# SCC "CallArity" #-}
                                        doPassD callArityAnalProgram
+
+doCorePass CoreDoEtaArity            = {-# SCC "EtaArity" #-}
+                                       doPassD etaArityWorkerWrapperProgram
 
 doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
                                        doPass exitifyProgram
