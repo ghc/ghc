@@ -3608,13 +3608,21 @@ tidyTypes :: TidyEnv -> [Type] -> [Type]
 tidyTypes env tys = map (tidyType env) tys
 
 ---------------
+tidyMult :: TidyEnv -> Mult -> Mult
+tidyMult _   Zero  = Zero
+tidyMult _   One   = One
+tidyMult _   Omega = Omega
+tidyMult env (MultThing x) = MultThing (tidyType env x)
+tidyMult env (MultAdd x y) = MultAdd (tidyMult env x) (tidyMult env y)
+tidyMult env (MultMul x y) = MultMul (tidyMult env x) (tidyMult env y)
+
 tidyType :: TidyEnv -> Type -> Type
 tidyType _   (LitTy n)            = LitTy n
 tidyType env (TyVarTy tv)         = TyVarTy (tidyTyCoVarOcc env tv)
 tidyType env (TyConApp tycon tys) = let args = tidyTypes env tys
                                     in args `seqList` TyConApp tycon args
 tidyType env (AppTy fun arg)      = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env (FunTy w fun arg)    = ((FunTy $! w) $! (tidyType env fun)) $! (tidyType env arg)
+tidyType env (FunTy w fun arg)    = ((FunTy $! (tidyMult env w)) $! (tidyType env fun)) $! (tidyType env arg)
 tidyType env (ty@(ForAllTy{}))    = mkForAllTys' (zip tvs' vis) $! tidyType env' body_ty
   where
     (tvs, vis, body_ty) = splitForAllTys' ty
