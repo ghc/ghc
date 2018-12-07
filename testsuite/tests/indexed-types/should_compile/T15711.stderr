@@ -1,7 +1,7 @@
 TYPE CONSTRUCTORS
-  C{1} :: * -> Constraint
-  type role F nominal nominal
-  F{2} :: forall a. Maybe a -> *
+  class C{1} :: * -> Constraint
+  associated type family F{2} :: forall a. Maybe a -> *
+    roles nominal nominal
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

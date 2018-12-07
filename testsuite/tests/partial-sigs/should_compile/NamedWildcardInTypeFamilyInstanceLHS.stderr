@@ -1,6 +1,6 @@
 TYPE CONSTRUCTORS
-  type role F nominal
-  F{1} :: * -> *
+  type family F{1} :: * -> *
+    roles nominal
 COERCION AXIOMS
   axiom NamedWildcardInTypeFamilyInstanceLHS.D:R:F :: F _t = Int
 Dependent modules: []

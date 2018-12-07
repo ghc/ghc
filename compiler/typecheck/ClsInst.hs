@@ -55,6 +55,8 @@ data AssocInstInfo
   = NotAssociated
   | InClsInst { ai_class    :: Class
               , ai_tyvars   :: [TyVar]      -- ^ The /scoped/ tyvars of the instance
+                                            -- Why scoped?  See bind_me in
+                                            -- TcValidity.checkConsistentFamInst
               , ai_inst_env :: VarEnv Type  -- ^ Maps /class/ tyvars to their instance types
                 -- See Note [Matching in the consistent-instantation check]
     }

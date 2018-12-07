@@ -224,7 +224,7 @@ pprFamInst :: FamInst -> SDoc
 pprFamInst (FamInst { fi_flavor = flavor, fi_axiom = ax
                     , fi_tvs = tvs, fi_tys = tys, fi_rhs = rhs })
   = hang (ppr_tc_sort <+> text "instance"
-             <+> pprCoAxBranch (coAxiomTyCon ax) (coAxiomSingleBranch ax))
+             <+> pprCoAxBranchUser (coAxiomTyCon ax) (coAxiomSingleBranch ax))
        2 (whenPprDebug debug_stuff)
   where
     ppr_tc_sort = case flavor of

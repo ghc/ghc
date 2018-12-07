@@ -39,8 +39,8 @@ import Class
 import TyCon
 
 -- others:
-import IfaceType( pprIfaceType )
-import ToIface( toIfaceType )
+import IfaceType( pprIfaceType, pprIfaceTypeApp )
+import ToIface( toIfaceType, toIfaceTyCon, toIfaceTcArgs )
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
 import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )
@@ -1931,7 +1931,10 @@ checkConsistentFamInst (InClsInst { ai_class = clas
                        fam_tc branch
   = do { traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
                                                 , ppr arg_triples
-                                                , ppr mini_env ])
+                                                , ppr mini_env
+                                                , ppr ax_tvs
+                                                , ppr ax_arg_tys
+                                                , ppr arg_triples ])
        -- Check that the associated type indeed comes from this class
        -- See [Mismatched class methods and associated type families]
        -- in TcInstDecls.
@@ -1941,15 +1944,14 @@ checkConsistentFamInst (InClsInst { ai_class = clas
        ; check_match arg_triples
        }
   where
-    CoAxBranch { cab_eta_tvs = eta_tvs, cab_lhs = pats } = branch
-    at_arg_tys = pats ++ mkTyVarTys eta_tvs
+    (ax_tvs, ax_arg_tys, _) = etaExpandCoAxBranch branch
 
     arg_triples :: [(Type,Type, ArgFlag)]
     arg_triples = [ (cls_arg_ty, at_arg_ty, vis)
                   | (fam_tc_tv, vis, at_arg_ty)
                        <- zip3 (tyConTyVars fam_tc)
-                               (tyConArgFlags fam_tc at_arg_tys)
-                               at_arg_tys
+                               (tyConArgFlags fam_tc ax_arg_tys)
+                               ax_arg_tys
                   , Just cls_arg_ty <- [lookupVarEnv mini_env fam_tc_tv] ]
 
     pp_wrong_at_arg vis
@@ -1960,19 +1962,23 @@ checkConsistentFamInst (InClsInst { ai_class = clas
 
     -- Fiddling around to arrange that wildcards unconditionally print as "_"
     -- We only need to print the LHS, not the RHS at all
-    expected_args = [ lookupVarEnv mini_env at_tv `orElse` mk_wildcard at_tv
-                    | at_tv <- tyConTyVars fam_tc ]
+    -- See Note [Printing conflicts with class header]
+    (tidy_env1, _) = tidyVarBndrs emptyTidyEnv inst_tvs
+    (tidy_env2, _) = tidyCoAxBndrsForUser tidy_env1 (ax_tvs \\ inst_tvs)
+
+    pp_expected_ty = pprIfaceTypeApp topPrec (toIfaceTyCon fam_tc) $
+                     toIfaceTcArgs fam_tc $
+                     [ case lookupVarEnv mini_env at_tv of
+                         Just cls_arg_ty -> tidyType tidy_env2 cls_arg_ty
+                         Nothing         -> mk_wildcard at_tv
+                     | at_tv <- tyConTyVars fam_tc ]
+
+    pp_actual_ty = pprIfaceTypeApp topPrec (toIfaceTyCon fam_tc) $
+                   toIfaceTcArgs fam_tc $
+                   tidyTypes tidy_env2 ax_arg_tys
+
     mk_wildcard at_tv = mkTyVarTy (mkTyVar tv_name (tyVarKind at_tv))
     tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOcc "_") noSrcSpan
-    pp_expected_ty = pprIfaceType (toIfaceType (mkTyConApp fam_tc expected_args))
-                     -- Do /not/ tidy, because that will rename all those "_"
-                     -- variables we have put in.  And (I think) the intance type
-                     --  is already tidy
-
---    actual_ty   = mkTyConApp fam_tc at_arg_tys
---    (tidy_env, bndrs) = tidyCoAxBndrs (tyCoVarsOfTypesList [expected_ty, actual_ty])
---    pp_actual_ty pprPrecTypeX tidy_env topPrec actual_ty
-    pp_actual_ty = pprCoAxBranchLHS fam_tc branch
 
     -- For check_match, bind_me, see
     -- Note [Matching in the consistent-instantation check]
@@ -1987,8 +1993,8 @@ checkConsistentFamInst (InClsInst { ai_class = clas
       | otherwise
       = addErrTc (pp_wrong_at_arg vis)
 
-    -- The scoped type variables from the class-instance header
-    -- should not be alpha-raenamed.
+    -- The /scoped/ type variables from the class-instance header
+    -- should not be alpha-renamed.  Inferred ones can be.
     no_bind_set = mkVarSet inst_tvs
     bind_me tv | tv `elemVarSet` no_bind_set = Skolem
                | otherwise                   = BindMe
@@ -2123,6 +2129,46 @@ Here the instance is kind-indexed and really looks like
 But if the 'b' didn't scope, we would make F's instance too
 poly-kinded.
 
+Note [Printing conflicts with class header]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's remarkably painful to give a decent error message for conflicts
+with the class header.  Consider
+   clase C b where
+     type F a b c
+   instance C [b] where
+     type F x Int _ _ = ...
+
+Here we want to report a conflict between
+    Expected: F _ [b] _
+    Actual:   F x Int _ _
+
+But if the type instance shadows the class variable like this
+(rename/should_fail/T15828):
+   instance C [b] where
+     type forall b. F x (Tree b) _ _ = ...
+
+then we must use a fresh variable name
+    Expected: F _ [b] _
+    Actual:   F x [b1] _ _
+
+Notice that:
+  - We want to print an underscore in the "Expected" type in
+    positions where the class header has no influence over the
+    parameter.  Hence the fancy footwork in pp_expected_ty
+
+  - Although the binders in the axiom are aready tidy, we must
+    re-tidy them to get a fresh variable name when we shadow
+
+  - The (ax_tvs \\ inst_tvs) is to avoid tidying one of the
+    class-instance variables a second time, from 'a' to 'a1' say.
+    Remember, the ax_tvs of the axiom share identity with the
+    class-instance variables, inst_tvs..
+
+  - We use tidyCoAxBndrsForUser to get underscores rather than
+    _1, _2, etc in the axiom tyvars; see the definition of
+    tidyCoAxBndrsForUser
+
+This all seems absurdly complicated.
 
 Note [Unused explicitly bound variables in a family pattern]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

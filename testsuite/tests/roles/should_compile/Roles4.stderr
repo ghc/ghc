@@ -2,9 +2,9 @@ TYPE SIGNATURES
   meth1 :: forall a. C1 a => a -> a
   meth3 :: forall a. C3 a => a -> Syn1 a
 TYPE CONSTRUCTORS
-  C1{1} :: * -> Constraint
-  C3{1} :: * -> Constraint
-  Syn1{1} :: * -> *
+  class C1{1} :: * -> Constraint
+  class C3{1} :: * -> Constraint
+  type synonym Syn1{1} :: * -> *
 COERCION AXIOMS
   axiom Roles4.N:C1 :: C1 a = a -> a
   axiom Roles4.N:C3 :: C3 a = a -> Syn1 a
