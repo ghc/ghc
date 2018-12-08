@@ -431,8 +431,8 @@ elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
 #endif
 
 
--- | 'delete' @x@ removes the first occurrence of @x@ from its list argument.
--- For example,
+-- | /O(n)/. 'delete' @x@ removes the first occurrence of @x@ from its list
+-- argument. For example,
 --
 -- >>> delete 'a' "banana"
 -- "bnana"
@@ -442,7 +442,7 @@ elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
 delete                  :: (Eq a) => a -> [a] -> [a]
 delete                  =  deleteBy (==)
 
--- | The 'deleteBy' function behaves like 'delete', but takes a
+-- | /O(n)/. The 'deleteBy' function behaves like 'delete', but takes a
 -- user-supplied equality predicate.
 --
 -- >>> deleteBy (<=) 4 [1..10]
