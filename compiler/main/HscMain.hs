@@ -743,10 +743,10 @@ finish summary tc_result mb_old_hash = do
                 (_, HsBootFile) -> HscUpdateBoot
                 (_, HsigFile) -> HscUpdateSig
                 _ -> panic "finish"
-        (iface, changed, details) <- liftIO $
+        (iface, no_change, details) <- liftIO $
           hscSimpleIface hsc_env tc_result mb_old_hash
-        return (iface, changed, details, hsc_status)
-  (iface, changed, details, hsc_status) <-
+        return (iface, no_change, details, hsc_status)
+  (iface, no_change, details, hsc_status) <-
     -- we usually desugar even when we are not generating code, otherwise
     -- we would miss errors thrown by the desugaring (see #10600). The only
     -- exceptions are when the Module is Ghc.Prim or when
@@ -761,25 +761,25 @@ finish summary tc_result mb_old_hash = do
           else do
             plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
             desugared_guts <- hscSimplify' plugins desugared_guts0
-            (iface, changed, details, cgguts) <-
+            (iface, no_change, details, cgguts) <-
               liftIO $ hscNormalIface hsc_env desugared_guts mb_old_hash
-            return (iface, changed, details, HscRecomp cgguts summary)
+            return (iface, no_change, details, HscRecomp cgguts summary)
       else mk_simple_iface
-  liftIO $ hscMaybeWriteIface dflags iface changed summary
+  liftIO $ hscMaybeWriteIface dflags iface no_change summary
   return
     ( hsc_status
     , HomeModInfo
       {hm_details = details, hm_iface = iface, hm_linkable = Nothing})
 
 hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModSummary -> IO ()
-hscMaybeWriteIface dflags iface changed summary =
+hscMaybeWriteIface dflags iface no_change summary =
     let force_write_interface = gopt Opt_WriteInterface dflags
         write_interface = case hscTarget dflags of
                             HscNothing      -> False
                             HscInterpreted  -> False
                             _               -> True
     in when (write_interface || force_write_interface) $
-            hscWriteIface dflags iface changed summary
+            hscWriteIface dflags iface no_change summary
 
 --------------------------------------------------------------
 -- NoRecomp handlers
