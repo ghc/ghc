@@ -1,54 +1,75 @@
-module Rules.Register (configurePackage, registerPackage) where
-
-import Distribution.ParseUtils
-import Distribution.Version (Version)
-import qualified Distribution.Compat.ReadP   as Parse
-import qualified Hadrian.Haskell.Cabal.Parse as Cabal
-import Hadrian.Expression
-import qualified System.Directory            as IO
+module Rules.Register (configurePackageRules, registerPackageRules) where
 
 import Base
 import Context
+import Hadrian.BuildPath
+import Hadrian.Expression
 import Packages
 import Settings
+import Settings.Default
 import Target
 import Utilities
 
-parseCabalName :: String -> Maybe (String, Version)
-parseCabalName = readPToMaybe parse
-  where
-    parse = (,) <$> (parsePackageName <* Parse.char '-') <*> parseOptVersion
+import Distribution.ParseUtils
+import Distribution.Version (Version)
+
+import qualified Distribution.Compat.ReadP   as Parse
+import qualified Hadrian.Haskell.Cabal.Parse as Cabal
+import qualified System.Directory            as IO
+import qualified Text.Parsec                 as Parsec
+
+-- * Configuring
 
 -- | Configure a package and build its @setup-config@ file.
-configurePackage :: Context -> Rules ()
-configurePackage context@Context {..} = do
+configurePackageRules :: Rules ()
+configurePackageRules = do
     root <- buildRootRules
-    root -/- contextDir context -/- "setup-config" %> \_ ->
-        Cabal.configurePackage context
+    root -/- "**/setup-config" %> \path ->
+        parsePath (parseSetupConfig root) "<setup config path parser>" path
+          >>= configurePackage
+
+parseSetupConfig :: FilePath -> Parsec.Parsec String () (Stage, FilePath)
+parseSetupConfig root = do
+  _ <- Parsec.string root *> Parsec.optional (Parsec.char '/')
+  stage <- parseStage
+  _ <- Parsec.char '/'
+  pkgPath <- Parsec.manyTill Parsec.anyChar
+    (Parsec.try $ Parsec.string "/setup-config")
+  return (stage, pkgPath)
+
+configurePackage :: (Stage, FilePath) -> Action ()
+configurePackage (stage, pkgpath) = do
+  pkg <- getPackageByPath pkgpath
+  Cabal.configurePackage (Context stage pkg vanilla)
+
+-- * Registering
 
 -- | Register a package and initialise the corresponding package database if
 -- need be. Note that we only register packages in 'Stage0' and 'Stage1'.
-registerPackage :: [(Resource, Int)] -> Context -> Rules ()
-registerPackage rs context@Context {..} = when (stage < Stage2) $ do
+registerPackageRules :: [(Resource, Int)] -> Stage -> Rules ()
+registerPackageRules rs stage = do
     root <- buildRootRules
 
     -- Initialise the package database.
     root -/- relativePackageDbPath stage -/- packageDbStamp %> \stamp ->
         writeFileLines stamp []
 
-    -- TODO: Add proper error handling for partial functions.
     -- Register a package.
     root -/- relativePackageDbPath stage -/- "*.conf" %> \conf -> do
-        settings <- libPath context <&> (-/- "settings")
-        platformConstants <- libPath context <&> (-/- "platformConstants")
+        let libpath = takeDirectory (takeDirectory conf)
+            settings = libpath -/- "settings"
+            platformConstants = libpath -/- "platformConstants"
+
         need [settings, platformConstants]
-        let Just pkgName | takeBaseName conf == "rts" = Just "rts"
-                         | otherwise = fst <$> parseCabalName (takeBaseName conf)
-        let Just pkg = findPackageByName pkgName
+
+        pkgName <- getPackageNameFromConfFile conf
+        pkg <- getPackageByName pkgName
         isBoot <- (pkg `notElem`) <$> stagePackages Stage0
+
+        let ctx = Context stage pkg vanilla
         case stage of
-            Stage0 | isBoot -> copyConf  rs (context { package = pkg }) conf
-            _               -> buildConf rs (context { package = pkg }) conf
+            Stage0 | isBoot -> copyConf  rs ctx conf
+            _               -> buildConf rs ctx conf
 
 buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildConf _ context@Context {..} _conf = do
@@ -101,3 +122,20 @@ copyConf rs context@Context {..} conf = do
   where
     stdOutToPkgIds :: String -> [String]
     stdOutToPkgIds = drop 1 . concatMap words . lines
+
+getPackageNameFromConfFile :: FilePath -> Action String
+getPackageNameFromConfFile conf
+  | takeBaseName conf == "rts" = return "rts"
+  | otherwise = case parseCabalName (takeBaseName conf) of
+      Nothing -> error $ "getPackageNameFromConfFile: couldn't parse " ++ conf
+      Just (name, _) -> return name
+
+parseCabalName :: String -> Maybe (String, Version)
+parseCabalName = readPToMaybe parse
+  where
+    parse = (,) <$> (parsePackageName <* Parse.char '-') <*> parseOptVersion
+
+getPackageByName :: String -> Action Package
+getPackageByName n = case findPackageByName n of
+  Nothing -> error $ "getPackageByName: couldn't find " ++ n
+  Just p  -> return p

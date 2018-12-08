@@ -95,15 +95,12 @@ packageRules = do
         writePackageDb = [(packageDb, maxConcurrentReaders)]
 
     Rules.Compile.compilePackage readPackageDb
+    Rules.Dependencies.buildPackageDependencies readPackageDb
+    Rules.Documentation.buildPackageDocumentation
+    Rules.Program.buildProgramRules readPackageDb
+    Rules.Register.configurePackageRules
 
-    Rules.Program.buildProgram readPackageDb
-
-    forM_ [Stage0 .. ] $ \stage ->
-        -- we create a dummy context, that has the correct state, but contains
-        -- @dummyPackage@ as a... dummy package. The package isn't accessed but the record
-        -- need to be set properly. @undefined@ is not an option as it ends up
-        -- being forced.
-        Rules.Register.registerPackage writePackageDb (Context stage dummyPackage vanilla)
+    forM_ [Stage0, Stage1] (Rules.Register.registerPackageRules writePackageDb)
 
     -- TODO: Can we get rid of this enumeration of contexts? Since we iterate
     --       over it to generate all 4 types of rules below, all the time, we
@@ -111,11 +108,7 @@ packageRules = do
     --       Rules.Compile and Rules.Library could save us some time there.
     let vanillaContexts = liftM2 vanillaContext allStages knownPackages
 
-    forM_ vanillaContexts $ mconcat
-        [ Rules.Register.configurePackage
-        , Rules.Dependencies.buildPackageDependencies readPackageDb
-        , Rules.Documentation.buildPackageDocumentation
-        , Rules.Generate.generatePackageCode ]
+    forM_ vanillaContexts Rules.Generate.generatePackageCode
 
 buildRules :: Rules ()
 buildRules = do
