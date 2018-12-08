@@ -669,9 +669,14 @@ minimumBy cmp xs        =  foldl1 minBy xs
                                        GT -> y
                                        _  -> x
 
--- | The 'genericLength' function is an overloaded version of 'length'.  In
--- particular, instead of returning an 'Int', it returns any type which is
--- an instance of 'Num'.  It is, however, less efficient than 'length'.
+-- | /O(n)/. The 'genericLength' function is an overloaded version of 'length'.
+-- In particular, instead of returning an 'Int', it returns any type which is an
+-- instance of 'Num'. It is, however, less efficient than 'length'.
+--
+-- >>> genericLength [1, 2, 3] :: Int
+-- 3
+-- >>> genericLength [1, 2, 3] :: Float
+-- 3.0
 genericLength           :: (Num i) => [a] -> i
 {-# NOINLINE [1] genericLength #-}
 genericLength []        =  0
