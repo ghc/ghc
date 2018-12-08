@@ -2045,25 +2045,37 @@ genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] b
 
   | otherwise = do
     code_src <- getAnyReg src
-    src_r <- getNewRegNat format
-    tmp_r <- getNewRegNat format
     let dst_r = getRegisterReg platform False (CmmLocal dst)
-
-    -- The following insn sequence makes sure 'clz 0' has a defined value.
-    -- starting with Haswell, one could use the LZCNT insn instead.
-    return $ code_src src_r `appOL` toOL
-             ([ MOVZxL  II8    (OpReg src_r) (OpReg src_r) | width == W8 ] ++
-              [ BSR     format (OpReg src_r) tmp_r
-              , MOV     II32   (OpImm (ImmInt (2*bw-1))) (OpReg dst_r)
-              , CMOV NE format (OpReg tmp_r) dst_r
-              , XOR     format (OpImm (ImmInt (bw-1))) (OpReg dst_r)
-              ]) -- NB: We don't need to zero-extend the result for the
-                 -- W8/W16 cases because the 'MOV' insn already
-                 -- took care of implicitly clearing the upper bits
+    if isBmi2Enabled dflags
+        then do
+            src_r <- getNewRegNat (intFormat width)
+            return $ appOL (code_src src_r) $ case width of
+                W8 -> toOL
+                    [ MOVZxL II8  (OpReg src_r)       (OpReg src_r) -- zero-extend to 32 bit
+                    , LZCNT  II32 (OpReg src_r)       dst_r         -- lzcnt with extra 24 zeros
+                    , SUB    II32 (OpImm (ImmInt 24)) (OpReg dst_r) -- compensate for extra zeros
+                    ]
+                W16 -> toOL
+                    [ LZCNT  II16 (OpReg src_r) dst_r
+                    , MOVZxL II16 (OpReg dst_r) (OpReg dst_r) -- zero-extend from 16 bit
+                    ]
+                _ -> unitOL (LZCNT (intFormat width) (OpReg src_r) dst_r)
+        else do
+            let format = if width == W8 then II16 else intFormat width
+            src_r <- getNewRegNat format
+            tmp_r <- getNewRegNat format
+            return $ code_src src_r `appOL` toOL
+                     ([ MOVZxL  II8    (OpReg src_r) (OpReg src_r) | width == W8 ] ++
+                      [ BSR     format (OpReg src_r) tmp_r
+                      , MOV     II32   (OpImm (ImmInt (2*bw-1))) (OpReg dst_r)
+                      , CMOV NE format (OpReg tmp_r) dst_r
+                      , XOR     format (OpImm (ImmInt (bw-1))) (OpReg dst_r)
+                      ]) -- NB: We don't need to zero-extend the result for the
+                         -- W8/W16 cases because the 'MOV' insn already
+                         -- took care of implicitly clearing the upper bits
   where
     bw = widthInBits width
     platform = targetPlatform dflags
-    format = if width == W8 then II16 else intFormat width
     lbl = mkCmmCodeLabel primUnitId (fsLit (clzLabel width))
 
 genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
@@ -2073,6 +2085,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
           dst_r   = getRegisterReg platform False (CmmLocal dst)
       lbl1 <- getBlockIdNat
       lbl2 <- getBlockIdNat
+      let format = if width == W8 then II16 else intFormat width
       tmp_r <- getNewRegNat format
 
       -- New CFG Edges:
@@ -2109,24 +2122,38 @@ genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
 
   | otherwise = do
     code_src <- getAnyReg src
-    src_r <- getNewRegNat format
-    tmp_r <- getNewRegNat format
     let dst_r = getRegisterReg platform False (CmmLocal dst)
 
-    -- The following insn sequence makes sure 'ctz 0' has a defined value.
-    -- starting with Haswell, one could use the TZCNT insn instead.
-    return $ code_src src_r `appOL` toOL
-             ([ MOVZxL  II8    (OpReg src_r) (OpReg src_r) | width == W8 ] ++
-              [ BSF     format (OpReg src_r) tmp_r
-              , MOV     II32   (OpImm (ImmInt bw)) (OpReg dst_r)
-              , CMOV NE format (OpReg tmp_r) dst_r
-              ]) -- NB: We don't need to zero-extend the result for the
-                 -- W8/W16 cases because the 'MOV' insn already
-                 -- took care of implicitly clearing the upper bits
+    if isBmi2Enabled dflags
+    then do
+        src_r <- getNewRegNat (intFormat width)
+        return $ appOL (code_src src_r) $ case width of
+            W8 -> toOL
+                [ OR    II32 (OpImm (ImmInt 0xFFFFFF00)) (OpReg src_r)
+                , TZCNT II32 (OpReg src_r)        dst_r
+                ]
+            W16 -> toOL
+                [ TZCNT  II16 (OpReg src_r) dst_r
+                , MOVZxL II16 (OpReg dst_r) (OpReg dst_r)
+                ]
+            _ -> unitOL $ TZCNT (intFormat width) (OpReg src_r) dst_r
+    else do
+        -- The following insn sequence makes sure 'ctz 0' has a defined value.
+        -- starting with Haswell, one could use the TZCNT insn instead.
+        let format = if width == W8 then II16 else intFormat width
+        src_r <- getNewRegNat format
+        tmp_r <- getNewRegNat format
+        return $ code_src src_r `appOL` toOL
+                 ([ MOVZxL  II8    (OpReg src_r) (OpReg src_r) | width == W8 ] ++
+                  [ BSF     format (OpReg src_r) tmp_r
+                  , MOV     II32   (OpImm (ImmInt bw)) (OpReg dst_r)
+                  , CMOV NE format (OpReg tmp_r) dst_r
+                  ]) -- NB: We don't need to zero-extend the result for the
+                     -- W8/W16 cases because the 'MOV' insn already
+                     -- took care of implicitly clearing the upper bits
   where
     bw = widthInBits width
     platform = targetPlatform dflags
-    format = if width == W8 then II16 else intFormat width
 
 genCCall dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
     targetExpr <- cmmMakeDynamicReference dflags
