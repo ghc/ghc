@@ -2046,20 +2046,32 @@ genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] b
   | otherwise = do
     code_src <- getAnyReg src
     src_r <- getNewRegNat format
-    tmp_r <- getNewRegNat format
     let dst_r = getRegisterReg platform False (CmmLocal dst)
-
-    -- The following insn sequence makes sure 'clz 0' has a defined value.
-    -- starting with Haswell, one could use the LZCNT insn instead.
-    return $ code_src src_r `appOL` toOL
-             ([ MOVZxL  II8    (OpReg src_r) (OpReg src_r) | width == W8 ] ++
-              [ BSR     format (OpReg src_r) tmp_r
-              , MOV     II32   (OpImm (ImmInt (2*bw-1))) (OpReg dst_r)
-              , CMOV NE format (OpReg tmp_r) dst_r
-              , XOR     format (OpImm (ImmInt (bw-1))) (OpReg dst_r)
-              ]) -- NB: We don't need to zero-extend the result for the
-                 -- W8/W16 cases because the 'MOV' insn already
-                 -- took care of implicitly clearing the upper bits
+    if isBmi2Enabled dflags
+        then do
+            return $ code_src src_r `appOL`
+                (if width == W8 then
+                     -- The LZCNT instruction doesn't take a r/m8
+                     unitOL (MOVZxL II8 (OpReg src_r) (OpReg src_r)) `appOL`
+                     unitOL (LZCNT II16 (OpReg src_r) dst_r)
+                 else
+                     unitOL (LZCNT format (OpReg src_r) dst_r)) `appOL`
+                (if width == W8 || width == W16 then
+                     -- We used a 16-bit destination register above,
+                     -- so zero-extend
+                     unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
+                 else nilOL)
+        else do
+            tmp_r <- getNewRegNat format
+            return $ code_src src_r `appOL` toOL
+                     ([ MOVZxL  II8    (OpReg src_r) (OpReg src_r) | width == W8 ] ++
+                      [ BSR     format (OpReg src_r) tmp_r
+                      , MOV     II32   (OpImm (ImmInt (2*bw-1))) (OpReg dst_r)
+                      , CMOV NE format (OpReg tmp_r) dst_r
+                      , XOR     format (OpImm (ImmInt (bw-1))) (OpReg dst_r)
+                      ]) -- NB: We don't need to zero-extend the result for the
+                         -- W8/W16 cases because the 'MOV' insn already
+                         -- took care of implicitly clearing the upper bits
   where
     bw = widthInBits width
     platform = targetPlatform dflags
