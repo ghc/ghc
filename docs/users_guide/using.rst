@@ -1088,6 +1088,16 @@ Some flags only make sense for particular target platforms.
     SSE4.2 if your processor supports it but detects this automatically
     so no flag is required.
 
+.. ghc-flag:: -mbmi2
+    :shortdesc: (x86 only) Use BMI2 for bit manipulation operations
+    :type: dynamic
+    :category: platform-options
+
+    (x86 only, added in GHC 7.4.1) Use the BMI2 instruction set to
+    implement some bit operations when using the
+    :ref:`native code generator <native-code-gen>`. The resulting compiled
+    code will only run on processors that support BMI2 (Intel Haswell and newer, AMD Excavator, Zen and newer).
+
 Miscellaneous flags
 -------------------
 
