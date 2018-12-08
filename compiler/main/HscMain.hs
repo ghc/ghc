@@ -1002,7 +1002,7 @@ checkSafeImports tcg_env
     pkgTrustReqs :: DynFlags -> Set InstalledUnitId -> Set InstalledUnitId ->
           Bool -> ImportAvails
     pkgTrustReqs dflags req inf infPassed | safeInferOn dflags
-                                  && safeHaskell dflags == Sf_None && infPassed
+                                  && not (safeHaskellModeEnabled dflags) && infPassed
                                    = emptyImportAvails {
                                        imp_trust_pkgs = req `S.union` inf
                                    }
@@ -1095,6 +1095,7 @@ hscCheckSafe' m l = do
     -- otherwise we check the package trust flag.
     packageTrusted :: DynFlags -> SafeHaskellMode -> Bool -> Module -> Bool
     packageTrusted _ Sf_None      _ _ = False -- shouldn't hit these cases
+    packageTrusted _ Sf_Ignore    _ _ = False -- shouldn't hit these cases
     packageTrusted _ Sf_Unsafe    _ _ = False -- prefer for completeness.
     packageTrusted dflags _ _ _
         | not (packageTrustOn dflags) = True
@@ -1163,7 +1164,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
     -- NOTE: Only wipe trust when not in an explicitly safe haskell mode. Other
     -- times inference may be on but we are in Trustworthy mode -- so we want
     -- to record safe-inference failed but not wipe the trust dependencies.
-    case safeHaskell dflags == Sf_None of
+    case not (safeHaskellModeEnabled dflags) of
       True  -> return $ tcg_env { tcg_imports = wiped_trust }
       False -> return tcg_env
 
