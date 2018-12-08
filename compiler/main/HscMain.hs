@@ -1488,7 +1488,7 @@ myCoreToStg dflags this_mod prepd_binds = do
 
     stg_binds2
         <- {-# SCC "Stg2Stg" #-}
-           stg2stg dflags stg_binds
+           stg2stg dflags this_mod stg_binds
 
     return (stg_binds2, cost_centre_info)
 
