@@ -1,5 +1,5 @@
 setTestOpts([extra_run_opts('-ignore-dot-ghci'),
-             extra_ways(['ghci-ext']), # test with -fexternal-interpreter
+             when(config.have_ext_interp, extra_ways(['ghci-ext'])), # test with -fexternal-interpreter
              normalise_slashes])
 
 test('print001', normal, ghci_script, ['print001.script'])
