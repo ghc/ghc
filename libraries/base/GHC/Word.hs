@@ -168,6 +168,7 @@ instance Bits Word8 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
+    {-# INLINE popCount #-}
 
     (W8# x#) .&.   (W8# y#)   = W8# (x# `and#` y#)
     (W8# x#) .|.   (W8# y#)   = W8# (x# `or#`  y#)
@@ -201,6 +202,8 @@ instance Bits Word8 where
 
 -- | @since 4.6.0.0
 instance FiniteBits Word8 where
+    {-# INLINE countLeadingZeros #-}
+    {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 8
     countLeadingZeros  (W8# x#) = I# (word2Int# (clz8# x#))
     countTrailingZeros (W8# x#) = I# (word2Int# (ctz8# x#))
@@ -356,6 +359,7 @@ instance Bits Word16 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
+    {-# INLINE popCount #-}
 
     (W16# x#) .&.   (W16# y#)  = W16# (x# `and#` y#)
     (W16# x#) .|.   (W16# y#)  = W16# (x# `or#`  y#)
@@ -389,6 +393,8 @@ instance Bits Word16 where
 
 -- | @since 4.6.0.0
 instance FiniteBits Word16 where
+    {-# INLINE countLeadingZeros #-}
+    {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 16
     countLeadingZeros  (W16# x#) = I# (word2Int# (clz16# x#))
     countTrailingZeros (W16# x#) = I# (word2Int# (ctz16# x#))
@@ -590,6 +596,7 @@ instance Bits Word32 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
+    {-# INLINE popCount #-}
 
     (W32# x#) .&.   (W32# y#)  = W32# (x# `and#` y#)
     (W32# x#) .|.   (W32# y#)  = W32# (x# `or#`  y#)
@@ -623,6 +630,8 @@ instance Bits Word32 where
 
 -- | @since 4.6.0.0
 instance FiniteBits Word32 where
+    {-# INLINE countLeadingZeros #-}
+    {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 32
     countLeadingZeros  (W32# x#) = I# (word2Int# (clz32# x#))
     countTrailingZeros (W32# x#) = I# (word2Int# (ctz32# x#))
@@ -762,6 +771,7 @@ instance Bits Word64 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
+    {-# INLINE popCount #-}
 
     (W64# x#) .&.   (W64# y#)  = W64# (x# `and64#` y#)
     (W64# x#) .|.   (W64# y#)  = W64# (x# `or64#`  y#)
@@ -914,6 +924,7 @@ instance Bits Word64 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
+    {-# INLINE popCount #-}
 
     (W64# x#) .&.   (W64# y#)  = W64# (x# `and#` y#)
     (W64# x#) .|.   (W64# y#)  = W64# (x# `or#`  y#)
@@ -959,6 +970,8 @@ uncheckedShiftRL64# = uncheckedShiftRL#
 
 -- | @since 4.6.0.0
 instance FiniteBits Word64 where
+    {-# INLINE countLeadingZeros #-}
+    {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 64
     countLeadingZeros  (W64# x#) = I# (word2Int# (clz64# x#))
     countTrailingZeros (W64# x#) = I# (word2Int# (ctz64# x#))
