@@ -8,6 +8,6 @@
 :all-types
 :l *T15369.hs
 :all-types
-:! sed -i 's/Int/Double/g' T15369.hs
+:! sed -i -e 's/Int/Double/g' T15369.hs
 :l *T15369.hs
 :all-types
