@@ -27,7 +27,8 @@ module Multiplicity
   , scaledSet
   , scaleScaled
   , IsSubmult(..)
-  , submultMaybe ) where
+  , submultMaybe
+  , multThingList ) where
 
 import GhcPrelude
 
@@ -197,3 +198,11 @@ submultMaybe r1 r2 = go r1 r2
     go One   _     = Smaller
 --    go (MultThing t) (MultThing t') = Unknown
     go _     _     = Unknown
+
+multThingList :: Multable t => GMult t -> [t]
+multThingList Zero = []
+multThingList One = []
+multThingList Omega = []
+multThingList (MultThing t) = [t]
+multThingList (MultAdd x y) = multThingList x ++ multThingList y
+multThingList (MultMul x y) = multThingList x ++ multThingList y

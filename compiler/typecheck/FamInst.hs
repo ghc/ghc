@@ -816,7 +816,9 @@ injTyVarsOfType (TyConApp tc tys)
 injTyVarsOfType (LitTy {})
   = emptyVarSet
 injTyVarsOfType (FunTy w arg res)
-  = injTyVarsOfMult w `unionVarSet` injTyVarsOfType arg `unionVarSet` injTyVarsOfType res
+  = unionVarSets (map injTyVarsOfType $ multThingList w) `unionVarSet`
+    injTyVarsOfType arg `unionVarSet`
+    injTyVarsOfType res
 injTyVarsOfType (AppTy fun arg)
   = injTyVarsOfType fun `unionVarSet` injTyVarsOfType arg
 -- No forall types in the RHS of a type family
@@ -824,14 +826,6 @@ injTyVarsOfType (CastTy ty _)   = injTyVarsOfType ty
 injTyVarsOfType (CoercionTy {}) = emptyVarSet
 injTyVarsOfType (ForAllTy {})    =
     panic "unusedInjTvsInRHS.injTyVarsOfType"
-
-injTyVarsOfMult :: Mult -> TcTyVarSet
-injTyVarsOfMult Zero = emptyVarSet
-injTyVarsOfMult One = emptyVarSet
-injTyVarsOfMult Omega = emptyVarSet
-injTyVarsOfMult (MultThing ty) = injTyVarsOfType ty
-injTyVarsOfMult (MultAdd x y) = injTyVarsOfMult x `unionVarSet` injTyVarsOfMult y
-injTyVarsOfMult (MultMul x y) = injTyVarsOfMult x `unionVarSet` injTyVarsOfMult y
 
 injTyVarsOfTypes :: [Type] -> VarSet
 injTyVarsOfTypes tys = mapUnionVarSet injTyVarsOfType tys

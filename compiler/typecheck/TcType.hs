@@ -984,15 +984,10 @@ exactTyCoVarsOfType ty
     go (TyConApp _ tys)     = exactTyCoVarsOfTypes tys
     go (LitTy {})           = emptyVarSet
     go (AppTy fun arg)      = go fun `unionVarSet` go arg
-    go (FunTy w arg res)    = go_mult w `unionVarSet` go arg `unionVarSet` go res
+    go (FunTy w arg res)    = unionVarSets (map go $ multThingList w) `unionVarSet` go arg `unionVarSet` go res
     go (ForAllTy bndr ty)   = delBinderVar (go ty) bndr `unionVarSet` go (binderType bndr)
     go (CastTy ty co)       = go ty `unionVarSet` goCo co
     go (CoercionTy co)      = goCo co
-
-    go_mult (MultThing ty)       = go ty
-    go_mult (MultAdd m1 m2)   = go_mult m1 `unionVarSet` go_mult m2
-    go_mult (MultMul m1 m2)   = go_mult m1 `unionVarSet` go_mult m2
-    go_mult _                = emptyVarSet
 
     goMCo MRefl    = emptyVarSet
     goMCo (MCo co) = goCo co
@@ -1047,15 +1042,10 @@ anyRewritableTyVar ignore_cos role pred ty
     go _ _     (LitTy {})       = False
     go rl bvs (TyConApp tc tys) = go_tc rl bvs tc tys
     go rl bvs (AppTy fun arg)   = go rl bvs fun || go NomEq bvs arg
-    go rl bvs (FunTy w arg res) = go_mult rl bvs w || go rl bvs arg || go rl bvs res
+    go rl bvs (FunTy w arg res) = any (go rl bvs) (multThingList w) || go rl bvs arg || go rl bvs res
     go rl bvs (ForAllTy tv ty)  = go rl (bvs `extendVarSet` binderVar tv) ty
     go rl bvs (CastTy ty co)    = go rl bvs ty || go_co rl bvs co
     go rl bvs (CoercionTy co)   = go_co rl bvs co  -- ToDo: check
-
-    go_mult rl bvs (MultThing ty) = go rl bvs ty
-    go_mult rl bvs (MultAdd m1 m2) = go_mult rl bvs m1 || go_mult rl bvs m2
-    go_mult rl bvs (MultMul m1 m2) = go_mult rl bvs m1 || go_mult rl bvs m2
-    go_mult _ _ _ = False
 
     go_tc NomEq  bvs _  tys = any (go NomEq bvs) tys
     go_tc ReprEq bvs tc tys = any (go_arg bvs)

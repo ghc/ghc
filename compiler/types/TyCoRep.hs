@@ -2240,10 +2240,7 @@ noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
 
 noFreeVarsOfMult :: Mult -> Bool
-noFreeVarsOfMult (MultThing ty) = noFreeVarsOfType ty
-noFreeVarsOfMult (MultAdd m1 m2) = noFreeVarsOfMult m1 && noFreeVarsOfMult m2
-noFreeVarsOfMult (MultMul m1 m2) = noFreeVarsOfMult m1 && noFreeVarsOfMult m2
-noFreeVarsOfMult _ = True
+noFreeVarsOfMult w = all noFreeVarsOfType (multThingList w)
 
 noFreeVarsOfVarMult :: VarMult -> Bool
 noFreeVarsOfVarMult (Regular w) = noFreeVarsOfMult w
