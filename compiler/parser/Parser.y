@@ -539,7 +539,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '<-'           { L _ (ITlarrow _) }
  '->'           { L _ (ITrarrow _) }
  '⊸'            { L _ (ITlolly _) }
- '->@{'         { L _ (ITlolly2) }
+ '-->.'         { L _ (ITlolly2) }
  '@'            { L _ ITat }
  '~'            { L _ ITtilde }
  '=>'           { L _ (ITdarrow _) }
@@ -1952,7 +1952,7 @@ type :: { LHsType GhcPs }
         | btype '⊸' ctype             {% hintLinear (getLoc $1) >>
                                          ams (sLL $1 $> $ HsFunTy noExt $1 HsLinearArrow $3)
                                              [mu AnnRarrow $2] }
-        | btype '->@{' '(' mult ')' ctype  {% hintLinear (getLoc $1) >>
+        | btype '-->.' '(' mult ')' ctype  {% hintLinear (getLoc $1) >>
                                               ams (sLL $1 $> $ HsFunTy noExt $1 (HsExplicitMult $4) $6)
                                                   [mu AnnRarrow $2] }
 
@@ -1981,7 +1981,7 @@ typedoc :: { LHsType GhcPs }
                                                          HsLinearArrow
                                                          $4)
                                                 [mu AnnRarrow $3] }
-        | btype '->@{' '(' mult ')' ctypedoc  {% hintLinear (getLoc $1) >>
+        | btype '-->.' '(' mult ')' ctypedoc  {% hintLinear (getLoc $1) >>
                                                  ams (sLL $1 $> $ HsFunTy noExt $1 (HsExplicitMult $4) $6)
                                                      [mu AnnRarrow $2] }
         | docnext btype '->' ctypedoc    {% ams $2 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
