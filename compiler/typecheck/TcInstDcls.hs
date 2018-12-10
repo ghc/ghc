@@ -784,8 +784,8 @@ tcDataFamHeader :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr GhcRn
                 -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
                 -> TcM ([TyVar], [Type], Kind, ThetaType)
 -- The "header" is the part other than the data constructors themselves
--- e.g.  data instance D [a] :: * -> * = ...
--- Here the "header" is the bit before the "=" sign
+-- e.g.  data instance D [a] :: * -> * where ...
+-- Here the "header" is the bit before the "where"
 tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksig hs_cons
   = do { (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, res_kind)))
             <- pushTcLevelM_                                $
