@@ -2,7 +2,7 @@ TYPE SIGNATURES
   f :: Int -> ()
   m :: forall a. C a => a -> ()
 TYPE CONSTRUCTORS
-  C{1} :: * -> Constraint
+  class C{1} :: * -> Constraint
 COERCION AXIOMS
   axiom T12763.N:C :: C a = a -> ()
 CLASS INSTANCES

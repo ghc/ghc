@@ -1,6 +1,7 @@
 {-# Language PolyKinds          #-}
 {-# Language TypeApplications   #-}
 {-# Language ImpredicativeTypes #-}
+{-# Language LiberalTypeSynonyms #-}
 
 module T15859 where
 

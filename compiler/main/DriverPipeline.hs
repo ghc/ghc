@@ -1339,6 +1339,11 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
                        (local_includes ++ global_includes
                        -- See Note [-fPIC for assembler]
                        ++ map SysTools.Option pic_c_flags
+                       -- See Note [Produce big objects on Windows]
+                       ++ [ SysTools.Option "-Wa,-mbig-obj"
+                          | platformOS (targetPlatform dflags) == OSMinGW32
+                          , not $ target32Bit (targetPlatform dflags)
+                          ]
 
         -- We only support SparcV9 and better because V8 lacks an atomic CAS
         -- instruction so we have to make sure that the assembler accepts the
@@ -2151,6 +2156,32 @@ generateMacros prefix name version =
 -- ---------------------------------------------------------------------------
 -- join object files into a single relocatable object file, using ld -r
 
+{-
+Note [Produce big objects on Windows]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Windows Portable Executable object format has a limit of 32k sections, which
+we tend to blow through pretty easily. Thankfully, there is a "big object"
+extension, which raises this limit to 2^32. However, it must be explicitly
+enabled in the toolchain:
+
+ * the assembler accepts the -mbig-obj flag, which causes it to produce a
+   bigobj-enabled COFF object.
+
+ * the linker accepts the --oformat pe-bigobj-x86-64 flag. Despite what the name
+   suggests, this tells the linker to produce a bigobj-enabled COFF object, no a
+   PE executable.
+
+We must enable bigobj output in a few places:
+
+ * When merging object files (DriverPipeline.joinObjectFiles)
+
+ * When assembling (DriverPipeline.runPhase (RealPhase As ...))
+
+Unfortunately the big object format is not supported on 32-bit targets so
+none of this can be used in that case.
+-}
+
 joinObjectFiles :: DynFlags -> [FilePath] -> FilePath -> IO ()
 joinObjectFiles dflags o_files output_fn = do
   let mySettings = settings dflags
@@ -2160,7 +2191,7 @@ joinObjectFiles dflags o_files output_fn = do
                        SysTools.Option "-nostdlib",
                        SysTools.Option "-Wl,-r"
                      ]
-                        -- See Note [No PIE while linking] in SysTools
+                        -- See Note [No PIE while linking] in DynFlags
                      ++ (if sGccSupportsNoPie mySettings
                           then [SysTools.Option "-no-pie"]
                           else [])
@@ -2179,6 +2210,11 @@ joinObjectFiles dflags o_files output_fn = do
                          && ldIsGnuLd
                             then [SysTools.Option "-Wl,-no-relax"]
                             else [])
+                        -- See Note [Produce big objects on Windows]
+                     ++ [ SysTools.Option "-Wl,--oformat,pe-bigobj-x86-64"
+                        | OSMinGW32 == osInfo
+                        , not $ target32Bit (targetPlatform dflags)
+                        ]
                      ++ map SysTools.Option ld_build_id
                      ++ [ SysTools.Option "-o",
                           SysTools.FileOption "" output_fn ]

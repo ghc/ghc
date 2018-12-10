@@ -1,0 +1,11 @@
+
+T10930.hs:6:5: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -123 is out of the Word range 0..18446744073709551615
+
+T10930.hs:7:5: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -123 is negative but Natural only supports positive numbers
+
+T10930.hs:9:5: warning: [-Wempty-enumerations (in -Wdefault)] Enumeration is empty
+
+T10930.hs:10:5: warning: [-Wempty-enumerations (in -Wdefault)]
+    Enumeration is empty

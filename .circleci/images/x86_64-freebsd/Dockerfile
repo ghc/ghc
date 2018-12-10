@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   software-properties-common \
   sudo \
   wget \
+  jq \
   xz-utils
 
 COPY build-toolchain.sh /tmp/

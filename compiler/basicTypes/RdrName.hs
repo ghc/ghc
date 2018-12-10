@@ -88,7 +88,7 @@ import Util
 import NameEnv
 
 import Data.Data
-import Data.List( sortBy, nub )
+import Data.List( sortBy )
 
 {-
 ************************************************************************
@@ -696,17 +696,26 @@ greParent_maybe gre = case gre_par gre of
 -- uniqueness assumption.
 gresToAvailInfo :: [GlobalRdrElt] -> [AvailInfo]
 gresToAvailInfo gres
-  = ASSERT( nub gres == gres ) nameEnvElts avail_env
+  = nameEnvElts avail_env
   where
-    avail_env :: NameEnv AvailInfo -- keyed by the parent
-    avail_env = foldl' add emptyNameEnv gres
+    avail_env :: NameEnv AvailInfo -- Keyed by the parent
+    (avail_env, _) = foldl' add (emptyNameEnv, emptyNameSet) gres
 
-    add :: NameEnv AvailInfo -> GlobalRdrElt -> NameEnv AvailInfo
-    add env gre = extendNameEnv_Acc comb availFromGRE env
-                    (fromMaybe (gre_name gre)
-                               (greParent_maybe gre)) gre
-
+    add :: (NameEnv AvailInfo, NameSet)
+        -> GlobalRdrElt
+        -> (NameEnv AvailInfo, NameSet)
+    add (env, done) gre
+      | name `elemNameSet` done
+      = (env, done)  -- Don't insert twice into the AvailInfo
+      | otherwise
+      = ( extendNameEnv_Acc comb availFromGRE env key gre
+        , done `extendNameSet` name )
       where
+        name = gre_name gre
+        key = case greParent_maybe gre of
+                 Just parent -> parent
+                 Nothing     -> gre_name gre
+
         -- We want to insert the child `k` into a list of children but
         -- need to maintain the invariant that the parent is first.
         --
@@ -718,13 +727,12 @@ gresToAvailInfo gres
           | otherwise = n:k:ns
 
         comb :: GlobalRdrElt -> AvailInfo -> AvailInfo
-        comb _ (Avail n) = Avail n -- Duplicated name
-        comb gre (AvailTC m ns fls) =
-          let n = gre_name gre
-          in case gre_par gre of
-              NoParent -> AvailTC m (n:ns) fls -- Not sure this ever happens
-              ParentIs {} -> AvailTC m (insertChildIntoChildren m ns n) fls
-              FldParent _ mb_lbl ->  AvailTC m ns (mkFieldLabel n mb_lbl : fls)
+        comb _ (Avail n) = Avail n -- Duplicated name, should not happen
+        comb gre (AvailTC m ns fls)
+          = case gre_par gre of
+              NoParent    -> AvailTC m (name:ns) fls -- Not sure this ever happens
+              ParentIs {} -> AvailTC m (insertChildIntoChildren m ns name) fls
+              FldParent _ mb_lbl -> AvailTC m ns (mkFieldLabel name mb_lbl : fls)
 
 availFromGRE :: GlobalRdrElt -> AvailInfo
 availFromGRE (GRE { gre_name = me, gre_par = parent })

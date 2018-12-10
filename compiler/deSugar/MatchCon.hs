@@ -21,6 +21,7 @@ import {-# SOURCE #-} Match     ( match )
 import HsSyn
 import DsBinds
 import ConLike
+import BasicTypes ( Origin(..) )
 import TcType
 import Multiplicity
 import Type ( Scaled )
@@ -159,7 +160,8 @@ matchOneConLike vars ty mult (eqn1 : eqns)   -- All eqns for a single constructo
                      return ( wrapBinds (tvs `zip` tvs1)
                             . wrapBinds (ds  `zip` dicts1)
                             . mkCoreLets ds_bind
-                            , eqn { eqn_pats = conArgPats val_arg_tys args ++ pats }
+                            , eqn { eqn_orig = Generated
+                                  , eqn_pats = conArgPats val_arg_tys args ++ pats }
                             )
               shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
         ; let scaled_arg_tys = map (scaleScaled mult) val_arg_tys

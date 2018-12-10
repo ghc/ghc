@@ -4,7 +4,7 @@ TYPE SIGNATURES
   skipMany' ::
     forall tok st a. GenParser tok st a -> GenParser tok st ()
 TYPE CONSTRUCTORS
-  GenParser{3} :: * -> * -> * -> *
+  data type GenParser{3} :: * -> * -> * -> *
 DATA CONSTRUCTORS
   GenParser :: forall tok st a. tok -> st -> a -> GenParser tok st a
 Dependent modules: []

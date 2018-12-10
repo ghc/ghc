@@ -27,11 +27,16 @@ T3449:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -Wall -c T3449.hs
 
 T4239:
-	$(RM) T4239A.hi T4239A.o
+	$(RM) TT4239A.hi T4239A.o
 	$(RM) T4239.hi  T4239.o T4239.imports
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T4239A.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T4239.hs -ddump-minimal-imports
 	cat T4239.imports
+
+T15994:
+	$(RM) T15994.hi T15994.o T15994.imports
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T15994.hs -ddump-minimal-imports
+	cat T15994.imports
 
 T4240:
 	$(RM) T4240A.hi T4240A.o

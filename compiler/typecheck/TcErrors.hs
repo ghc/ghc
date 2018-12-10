@@ -38,7 +38,7 @@ import HsBinds ( PatSynBind(..) )
 import Name
 import RdrName ( lookupGlobalRdrEnv, lookupGRE_Name, GlobalRdrEnv
                , mkRdrUnqual, isLocalGRE, greSrcSpan )
-import PrelNames ( typeableClassName, hasKey, liftedRepDataConKey, tYPETyConKey )
+import PrelNames ( typeableClassName )
 import Id
 import Var
 import VarSet
@@ -603,7 +603,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
 
     is_user_type_error ct _ = isUserTypeErrorCt ct
 
-    is_homo_equality _ (EqPred _ ty1 ty2) = typeKind ty1 `tcEqType` typeKind ty2
+    is_homo_equality _ (EqPred _ ty1 ty2) = tcTypeKind ty1 `tcEqType` tcTypeKind ty2
     is_homo_equality _ _                  = False
 
     is_equality _ (EqPred {}) = True
@@ -1177,7 +1177,7 @@ mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
   where
     occ       = holeOcc hole
     hole_ty   = ctEvPred (ctEvidence ct)
-    hole_kind = typeKind hole_ty
+    hole_kind = tcTypeKind hole_ty
     tyvars    = tyCoVarsOfTypeList hole_ty
 
     hole_msg = case hole of
@@ -1500,9 +1500,9 @@ mkEqErr1 ctxt ct   -- Wanted or derived;
                          || not (cty1 `pickyEqType` cty2)
                          -> hang (text "When matching" <+> sub_what)
                                2 (vcat [ ppr cty1 <+> dcolon <+>
-                                         ppr (typeKind cty1)
+                                         ppr (tcTypeKind cty1)
                                        , ppr cty2 <+> dcolon <+>
-                                         ppr (typeKind cty2) ])
+                                         ppr (tcTypeKind cty2) ])
                        _ -> text "When matching the kind of" <+> quotes (ppr cty1)
               msg2 = case sub_o of
                        TypeEqOrigin {}
@@ -1750,7 +1750,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
         -- Not an occurs check, because F is a type function.
   where
     Pair _ k1 = tcCoercionKind co1
-    k2        = typeKind ty2
+    k2        = tcTypeKind ty2
 
     ty1 = mkTyVarTy tv1
     occ_check_expand       = occCheckForErrors dflags tv1 ty2
@@ -1919,12 +1919,10 @@ misMatchMsg ct oriented ty1 ty2
   -- These next two cases are when we're about to report, e.g., that
   -- 'LiftedRep doesn't match 'VoidRep. Much better just to say
   -- lifted vs. unlifted
-  | Just (tc1, []) <- splitTyConApp_maybe ty1
-  , tc1 `hasKey` liftedRepDataConKey
+  | isLiftedRuntimeRep ty1
   = lifted_vs_unlifted
 
-  | Just (tc2, []) <- splitTyConApp_maybe ty2
-  , tc2 `hasKey` liftedRepDataConKey
+  | isLiftedRuntimeRep ty2
   = lifted_vs_unlifted
 
   | otherwise  -- So now we have Nothing or (Just IsSwapped)
@@ -2060,14 +2058,13 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
         kind_desc | tcIsConstraintKind exp = text "a constraint"
 
                     -- TYPE t0
-                  | Just (tc, [arg]) <- tcSplitTyConApp_maybe exp
-                  , tc `hasKey` tYPETyConKey
-                  , tcIsTyVarTy arg      = sdocWithDynFlags $ \dflags ->
-                                           if gopt Opt_PrintExplicitRuntimeReps dflags
-                                           then text "kind" <+> quotes (ppr exp)
-                                           else text "a type"
+                  | Just arg <- kindRep_maybe exp
+                  , tcIsTyVarTy arg = sdocWithDynFlags $ \dflags ->
+                                      if gopt Opt_PrintExplicitRuntimeReps dflags
+                                      then text "kind" <+> quotes (ppr exp)
+                                      else text "a type"
 
-                  | otherwise            = text "kind" <+> quotes (ppr exp)
+                  | otherwise       = text "kind" <+> quotes (ppr exp)
 
     num_args_msg = case level of
       KindLevel
@@ -2520,7 +2517,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                , not (isTypeFamilyTyCon tc)
                = hang (text "GHC can't yet do polykinded")
                     2 (text "Typeable" <+>
-                       parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
+                       parens (ppr ty <+> dcolon <+> ppr (tcTypeKind ty)))
                | otherwise
                = empty
 

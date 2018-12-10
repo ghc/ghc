@@ -1,0 +1,6 @@
+
+T12102.hs:15:1: error:
+    • Illegal constraint in a kind: forall a.
+                                    (IsTypeLit a ~ 'True) =>
+                                    a -> *
+    • In the data type declaration for ‘T’

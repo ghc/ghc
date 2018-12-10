@@ -7574,13 +7574,13 @@ can be any number.
 
 When :extension:`ExplicitForAll` is enabled, type or kind variables used on
 the left hand side can be explicitly bound. For example: ::
-  
+
     data instance forall a (b :: Proxy a). F (Proxy b) = FProxy Bool
 
 When an explicit ``forall`` is present, all *type* variables mentioned which
 are not already in scope must be bound by the ``forall``. Kind variables will
 be implicitly bound if necessary, for example: ::
-  
+
     data instance forall (a :: k). F a = FOtherwise
 
 When the flag :ghc-flag:`-Wunused-type-patterns` is enabled, type
@@ -8099,13 +8099,13 @@ Note the following points:
    cannot give any *subsequent* instances for ``(GMap Flob ...)``, this
    facility is most useful when the free indexed parameter is of a kind
    with a finite number of alternatives (unlike ``Type``).
-   
+
 -  When :extension:`ExplicitForAll` is enabled, type and kind variables can be
    explicily bound in associated data or type family instances in the same way
    (and with the same restrictions) as :ref:`data-instance-declarations` or
    :ref:`type-instance-declarations`. For example, adapting the above, the
    following is accepted: ::
-     
+
      instance Eq (Elem [e]) => Collects [e] where
        type forall e. Elem [e] = e
 
@@ -8144,7 +8144,7 @@ Note the following points:
    variables that are explicitly bound on the left hand side. This restriction
    is relaxed for *kind* variables, however, as the right hand side is allowed
    to mention kind variables that are implicitly bound on the left hand side.
-   
+
    Because of this, unlike :ref:`assoc-inst`, explicit binding of type/kind
    variables in default declarations is not permitted by
    :extension:`ExplicitForAll`.
@@ -8932,7 +8932,7 @@ Such variables are written in braces with
 The general principle is this:
 
   * Variables not available for type application come first.
-    
+
   * Then come variables the user has written, implicitly brought into scope
     in a type variable's kind.
 
@@ -8944,7 +8944,7 @@ The general principle is this:
 With the ``T`` example above, we could bind ``k`` *after* ``a``; doing so
 would not violate dependency concerns. However, it would violate our general
 principle, and so ``k`` comes first.
-    
+
 Sometimes, this ordering does not respect dependency. For example::
 
   data T2 k (a :: k) (c :: Proxy '[a, b])
@@ -9273,29 +9273,6 @@ variable ``k`` is to be inferred, not specified by the user. (See
 distinction). GHC does not consider ``forall k. k -> Type`` and
 ``forall {k}. k -> Type`` to be equal at the kind level, and thus rejects
 ``Foo Proxy`` as ill-kinded.
-
-Constraints in kinds
---------------------
-
-As kinds and types are the same, kinds can (with :extension:`PolyKinds`)
-contain type constraints. Only equality constraints are currently supported,
-however. We expect this to extend to other constraints in the future.
-
-Here is an example of a constrained kind: ::
-
-  type family IsTypeLit a where
-    IsTypeLit Nat    = 'True
-    IsTypeLit Symbol = 'True
-    IsTypeLit a      = 'False
-
-  data T :: forall a. (IsTypeLit a ~ 'True) => a -> Type where
-    MkNat    :: T 42
-    MkSymbol :: T "Don't panic!"
-
-The declarations above are accepted. However, if we add ``MkOther :: T Int``,
-we get an error that the equality constraint is not satisfied; ``Int`` is
-not a type literal. Note that explicitly quantifying with ``forall a`` is
-not necessary here.
 
 The kind ``Type``
 -----------------
@@ -10889,7 +10866,7 @@ the rules in the subtler cases:
 
 The section in this manual on kind polymorphism describes how variables
 in type and class declarations are ordered (:ref:`inferring-variable-order`).
-  
+
 .. _implicit-parameters:
 
 Implicit parameters
@@ -15148,7 +15125,7 @@ field of the constructor ``T`` is not unpacked.
 
     :where: after ``import`` statement
 
-    Import a module by ``hs-boot`` file to break a module loop. 
+    Import a module by ``hs-boot`` file to break a module loop.
 
 The ``{-# SOURCE #-}`` pragma is used only in ``import`` declarations,
 to break a module loop. It is described in detail in
@@ -15403,21 +15380,21 @@ From a syntactic point of view:
 
 -  If :extension:`ExplicitForAll` is enabled, type/kind variables can also be
    explicitly bound. For example: ::
-     
+
        {-# RULES "id" forall a. forall (x :: a). id @a x = x #-}
-   
+
    When a type-level explicit ``forall`` is present, each type/kind variable
    mentioned must now also be either in scope or bound by the ``forall``. In
    particular, unlike some other places in Haskell, this means free kind
    variables will not be implicitly bound. For example: ::
-     
+
        "this_is_bad" forall (c :: k). forall (x :: Proxy c) ...
        "this_is_ok"  forall k (c :: k). forall (x :: Proxy c) ...
 
    When bound type/kind variables are needed, both foralls must always be
    included, though if no pattern variables are needed, the second can be left
    empty. For example: ::
-   
+
        {-# RULES "map/id" forall a. forall. map (id @a) = id @[a] #-}
 
 -  The left hand side of a rule must consist of a top-level variable

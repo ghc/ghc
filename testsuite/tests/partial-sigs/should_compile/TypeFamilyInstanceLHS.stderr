@@ -1,8 +1,8 @@
 TYPE SIGNATURES
   foo :: F Int Char -> Int
 TYPE CONSTRUCTORS
-  type role F nominal nominal
-  F{2} :: * -> * -> *
+  type family F{2} :: * -> * -> *
+    roles nominal nominal
 COERCION AXIOMS
   axiom TypeFamilyInstanceLHS.D:R:FBool_1 :: F Bool _1 = Bool
   axiom TypeFamilyInstanceLHS.D:R:FInt_1 :: F Int _1 = Int

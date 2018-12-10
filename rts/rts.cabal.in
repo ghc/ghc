@@ -28,6 +28,8 @@ flag leading-underscore
   default: @CabalLeadingUnderscore@
 flag smp
   default: True
+flag find-ptr
+  default: False
 -- Some cabal flags used to control the flavours we want to produce
 -- for libHSrts in hadrian. By default, we just produce vanilla and
 -- threaded. The flags "compose": if you enable debug and profiling,
@@ -268,9 +270,8 @@ library
          "-Wl,-u,_hs_atomicwrite8"
          "-Wl,-u,_hs_atomicwrite16"
          "-Wl,-u,_hs_atomicwrite32"
-         "-Wl,-u,_findPtr"
 
-      if flag(debug)
+      if flag(find-ptr)
         -- This symbol is useful in gdb, but not referred to anywhere,
         -- so we need to force it to be included in the binary.
         ld-options: "-Wl,-u,_findPtr"
@@ -346,10 +347,10 @@ library
          "-Wl,-u,hs_atomicwrite16"
          "-Wl,-u,hs_atomicwrite32"
 
-      if flag(debug)
+      if flag(find-ptr)
         -- This symbol is useful in gdb, but not referred to anywhere,
         -- so we need to force it to be included in the binary.
-        ld-options: "-Wl,-u,_findPtr"
+        ld-options: "-Wl,-u,findPtr"
 
     if os(osx)
       ld-options: "-Wl,-search_paths_first"

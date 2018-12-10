@@ -37,6 +37,7 @@ test('T14963b', just_ghci, ghci_script, ['T14963b.script'])
 test('T14963c', [extra_hc_opts("-fdefer-type-errors")], ghci_script, ['T14963c.script'])
 test('T15007', just_ghci, ghci_script, ['T15007.script'])
 test('T15806',     just_ghci, ghci_script, ['T15806.script'])
+test('T15369',     just_ghci, ghci_script, ['T15369.script'])
 
 test('T15633a',
      [extra_files(['tc-plugin-ghci/']),

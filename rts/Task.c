@@ -220,6 +220,7 @@ newTask (bool worker)
 #if defined(THREADED_RTS)
     initCondition(&task->cond);
     initMutex(&task->lock);
+    task->id = 0;
     task->wakeup = false;
     task->node = 0;
 #endif

@@ -98,7 +98,8 @@ module Coercion (
 
         -- * Pretty-printing
         pprCo, pprParendCo,
-        pprCoAxiom, pprCoAxBranch, pprCoAxBranchLHS, pprCoAxBranchUser,
+        pprCoAxiom, pprCoAxBranch, pprCoAxBranchLHS,
+        pprCoAxBranchUser, tidyCoAxBndrsForUser,
         etaExpandCoAxBranch,
 
         -- * Tidying
@@ -192,7 +193,7 @@ pprCoAxiom :: CoAxiom br -> SDoc
 -- Used in debug-printing only
 pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
   = hang (text "axiom" <+> ppr ax <+> dcolon)
-       2 (vcat (map (pprCoAxBranch tc) (fromBranches branches)))
+       2 (vcat (map (pprCoAxBranchUser tc) (fromBranches branches)))
 
 pprCoAxBranchUser :: TyCon -> CoAxBranch -> SDoc
 -- Used when printing injectivity errors (FamInst.makeInjectivityErrors)
@@ -240,9 +241,9 @@ ppr_co_ax_branch ppr_rhs fam_tc branch
     pp_lhs = pprIfaceTypeApp topPrec (toIfaceTyCon fam_tc)
                              (tidyToIfaceTcArgs tidy_env fam_tc ee_lhs)
 
-    (tidy_env, bndrs') = tidyCoAxBndrs ee_tvs
+    (tidy_env, bndrs') = tidyCoAxBndrsForUser emptyTidyEnv ee_tvs
 
-tidyCoAxBndrs :: [Var] -> (TidyEnv, [Var])
+tidyCoAxBndrsForUser :: TidyEnv -> [Var] -> (TidyEnv, [Var])
 -- Tidy wildcards "_1", "_2" to "_", and do not return them
 -- in the list of binders to be printed
 -- This is so that in error messages we see
@@ -251,11 +252,10 @@ tidyCoAxBndrs :: [Var] -> (TidyEnv, [Var])
 --     forall a _1 _2. F _1 [a] _2 = ...
 --
 -- This is a rather disgusting function
-tidyCoAxBndrs tcvs
+tidyCoAxBndrsForUser init_env tcvs
   = (tidy_env, reverse tidy_bndrs)
   where
-    (tidy_env, tidy_bndrs) = foldl tidy_one (empty_env, []) tcvs
-    empty_env = mkEmptyTidyEnv (initTidyOccEnv [mkTyVarOcc "_"])
+    (tidy_env, tidy_bndrs) = foldl tidy_one (init_env, []) tcvs
 
     tidy_one (env@(occ_env, subst), rev_bndrs') bndr
       | is_wildcard bndr = (env_wild, rev_bndrs')

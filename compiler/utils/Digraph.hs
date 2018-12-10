@@ -87,15 +87,23 @@ data Graph node = Graph {
 
 data Edge node = Edge node node
 
+{-| Representation for nodes of the Graph.
+
+ * The @payload@ is user data, just carried around in this module
+
+ * The @key@ is the node identifier.
+   Key has an Ord instance for performance reasons.
+
+ * The @[key]@ are the dependencies of the node;
+   it's ok to have extra keys in the dependencies that
+   are not the key of any Node in the graph
+-}
 data Node key payload = DigraphNode {
-      node_payload :: payload,
-      node_key :: key,
-      node_dependencies :: [key] }
-     -- The payload is user data, just carried around in this module
-     -- The keys are ordered
-     -- The [key] are the dependencies of the node;
-     --    it's ok to have extra keys in the dependencies that
-     --    are not the key of any Node in the graph
+      node_payload :: payload, -- ^ User data
+      node_key :: key, -- ^ User defined node id
+      node_dependencies :: [key] -- ^ Dependencies/successors of the node
+  }
+
 
 instance (Outputable a, Outputable b) => Outputable (Node  a b) where
   ppr (DigraphNode a b c) = ppr (a, b, c)

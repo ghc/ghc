@@ -816,7 +816,7 @@ ocGetNames_ELF ( ObjectCode* oc )
           oc->n_symbols += symTab->n_symbols;
       }
 
-      oc->symbols = stgCallocBytes(oc->n_symbols, sizeof(SymbolName*),
+      oc->symbols = stgCallocBytes(oc->n_symbols, sizeof(Symbol_t),
                                    "ocGetNames_ELF(oc->symbols)");
       // Note calloc: if we fail partway through initializing symbols, we need
       // to undo the additions to the symbol table so far. We know which ones
@@ -927,7 +927,8 @@ ocGetNames_ELF ( ObjectCode* oc )
                            ) {
                            goto fail;
                        }
-                       oc->symbols[curSymbol++] = nm;
+                       oc->symbols[curSymbol++].name = nm;
+                       oc->symbols[curSymbol].addr = symbol->addr;
                    }
                } else {
                    /* Skip. */

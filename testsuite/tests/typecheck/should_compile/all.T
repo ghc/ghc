@@ -401,6 +401,7 @@ test('type_in_type_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-v
 test('T15370', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -funclutter-valid-hole-fits'])
 test('T7408', normal, compile, [''])
 test('UnboxStrictPrimitiveFields', normal, compile, [''])
+test('T7503a', normal, compile, [''])
 test('T7541', normal, compile, [''])
 test('T7562', normal, compile, [''])
 test('T7641', normal, compile, [''])
@@ -596,6 +597,7 @@ test('T14396', [extra_files(['T14396.hs', 'T14396.hs-boot', 'T14396a.hs', 'T1439
 test('T14434', [], run_command, ['$MAKE -s --no-print-directory T14434'])
 test('MissingExportList01', normal, compile, [''])
 test('MissingExportList02', normal, compile, [''])
+test('T14451', normal, compile, [''])
 test('T14488', normal, compile, [''])
 test('T14590', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits'])
 # We omit the hpc/profasm ways because this test checks the

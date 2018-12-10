@@ -142,7 +142,9 @@ getLinkerInfo' dflags = do
           return (GnuGold [Option "-Wl,--no-as-needed"])
 
         | any ("LLD" `isPrefixOf`) stdo =
-          return (LlvmLLD [])
+          return (LlvmLLD $ map Option [
+                                      -- see Note [ELF needed shared libs]
+                                      "-Wl,--no-as-needed"])
 
          -- Unknown linker.
         | otherwise = fail "invalid --version output, or linker is unsupported"

@@ -29,7 +29,6 @@ import Name
 import Id
 import Type
 import Multiplicity
-import Kind ( isTYPEApp )
 import TyCon
 import DataCon
 import Module
@@ -435,7 +434,7 @@ typeIsTypeable :: Type -> Bool
 typeIsTypeable ty
   | Just ty' <- coreView ty         = typeIsTypeable ty'
 typeIsTypeable ty
-  | Just _ <- isTYPEApp ty          = True
+  | isJust (kindRep_maybe ty)       = True
 typeIsTypeable (TyVarTy _)          = True
 typeIsTypeable (AppTy a b)          = typeIsTypeable a && typeIsTypeable b
 typeIsTypeable (FunTy _ a b)        = typeIsTypeable a && typeIsTypeable b
@@ -554,11 +553,15 @@ mkKindRepRhs :: TypeableStuff
 mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
   where
     new_kind_rep k
-        -- We handle TYPE separately to make it clear to consumers
-        -- (e.g. serializers) that there is a loop here (as
-        -- TYPE :: RuntimeRep -> TYPE 'LiftedRep)
-      | Just rr <- isTYPEApp k
-      = return $ dataConOmega kindRepTYPEDataCon `nlHsApp` dataConOmega rr
+        -- We handle (TYPE LiftedRep) etc separately to make it
+        -- clear to consumers (e.g. serializers) that there is
+        -- a loop here (as TYPE :: RuntimeRep -> TYPE 'LiftedRep)
+      | not (tcIsConstraintKind k)    -- Typeable respects the Constraint/* distinction
+                                      -- so do not follow the special case here
+      , Just arg <- kindRep_maybe k
+      , Just (tc, []) <- splitTyConApp_maybe arg
+      , Just dc <- isPromotedDataCon_maybe tc
+      = return $ dataConOmega kindRepTYPEDataCon `nlHsApp` dataConOmega dc
 
     new_kind_rep (TyVarTy v)
       | Just idx <- lookupCME in_scope v

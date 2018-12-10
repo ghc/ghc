@@ -1,0 +1,176 @@
+variables:
+  GIT_SSL_NO_VERIFY: "1"
+
+before_script:
+  - python .gitlab/fix-submodules.py
+  - git submodule sync --recursive
+  - git submodule update --init --recursive
+  - git checkout .gitmodules
+
+############################################################
+# Validation via Pipelines (hadrian)
+############################################################
+
+.validate-hadrian:
+  script:
+    - bash .circleci/prepare-system.sh
+    - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
+    - ./boot
+    - ./configure
+    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh`
+  cache:
+    key: hadrian
+    paths:
+      - cabal-cache
+  image: ghcci/x86_64-linux:0.0.8
+
+.validate-x86_64-linux-hadrian:
+  extends: .validate-hadrian
+  before_script:
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
+  tags:
+    - x86_64-linux
+
+############################################################
+# Validation via Pipelines (make)
+############################################################
+
+.validate:
+  script:
+    - make clean || true
+    - ./boot
+    - ./configure
+    - |
+      THREADS=`mk/detect-cpu-count.sh`
+      make V=0 -j$THREADS HADDOCK_DOCS=NO
+    - |
+      make binary-dist TAR_COMP_OPTS="-1"
+      mv ghc-*.tar.xz ghc.tar.xz
+    - |
+      THREADS=`mk/detect-cpu-count.sh`
+      make test THREADS=$THREADS JUNIT_FILE=../../junit.xml
+  image: ghcci/x86_64-linux:0.0.8
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+    paths:
+      - ghc.tar.xz
+      - junit.xml
+
+.validate-x86_64-darwin:
+  extends: .validate
+  tags:
+    - x86_64-darwin
+  variables:
+    GHC_VERSION: 8.6.2
+    MACOSX_DEPLOYMENT_TARGET: "10.7"
+    # Only Sierra and onwards supports clock_gettime. See #12858
+    ac_cv_func_clock_gettime: "no"
+  before_script:
+    - python .gitlab/fix-submodules.py
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+
+    - bash .gitlab/darwin-init.sh
+    - PATH="`pwd`/toolchain/bin:$PATH"
+      # Disable sphinx PDF output as MacTeX apparently doesn't provide xelatex
+    - echo "BUILD_SPHINX_PDF=NO" >> mk/build.mk
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+  cache:
+    key: darwin
+    paths:
+      - cabal-cache
+      - toolchain
+
+validate-x86_64-linux:
+  extends: .validate
+  tags:
+    - x86_64-linux
+  before_script:
+    - python .gitlab/fix-submodules.py
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+
+    - bash .circleci/prepare-system.sh
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+  cache:
+    key: darwin
+    paths:
+      - cabal-cache
+      - toolchain
+
+############################################################
+# Validation via Pipelines (make, Windows)
+############################################################
+
+.validate-x86_64-windows:
+  variables:
+    GHC_VERSION: "8.6.2"
+  script:
+    - bash -e .gitlab/win32-init.sh
+    - |
+      set MSYSTEM=MINGW64
+      python boot
+      bash -c './configure --with-ghc=`pwd`/toolchain/bin/ghc --enable-tarballs-autodownload HappyCmd=`pwd`/toolchain/bin/happy AlexCmd=`pwd`/toolchain/bin/alex'
+      mkdir -p _build
+      cp -R inplace/mingw _build/mingw
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh binary-dist"
+    - mv ghc-*.tar.xz ghc.tar.xz
+    - bash -c 'make V=0 -j`mk/detect-cpu-count.sh` HADDOCK_DOCS=NO test THREADS=$THREADS JUNIT_FILE=../../junit.xml'
+    - cp -Rf $APPDATA/cabal cabal-cache
+  cache:
+    key: windows
+    paths:
+      - cabal-cache
+      - ghc-8.6.2
+      - ghc-tarballs
+  tags:
+    - x86_64-windows
+
+
+############################################################
+# Validation via CircleCI
+############################################################
+
+.circleci:
+  image: ghcci/x86_64-linux:0.0.8
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+    paths:
+      - ghc.tar.xz
+      - junit.xml
+  tags:
+    - circleci
+
+# All validation jobs keep the bindists and test results are artifacts,
+# when we get far enough to generate them.
+#
+# This requires updating the maximum artifacts size limit in Gitlab to
+# something like 200MB.
+
+circleci-validate-x86_64-linux:
+  extends: .circleci
+  script: ".gitlab/circle-ci-job.sh validate-x86_64-linux"
+
+circleci-validate-i386-linux:
+  extends: .circleci
+  script: ".gitlab/circle-ci-job.sh validate-i386-linux"
+
+# circleci-validate-x86_64-freebsd:
+#   extends: .circleci
+#   script: ".gitlab/circle-ci-job.sh validate-x86_64-freebsd"
+
+circleci-validate-x86_64-darwin:
+  extends: .circleci
+  script: ".gitlab/circle-ci-job.sh validate-x86_64-darwin"

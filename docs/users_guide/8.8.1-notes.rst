@@ -64,6 +64,11 @@ Language
   For instance, it is now permissible to write ``Proxy '(a :: A, b :: B)``
   (previous GHC versions required extra parens: ``Proxy '((a :: A), (b :: B))``).
 
+- :ghc-flag:`-Woverflowed-literals` checks all literals. Previously, it would
+  only inspect boxed expression literals.
+
+- :ghc-flag:`-Wempty-enumerations` now also works for ``Numeric.Natural``.
+
 Compiler
 ~~~~~~~~
 
@@ -143,6 +148,10 @@ Template Haskell
 - The ``StableName`` type parameter now has a phantom role instead of
   a representational one. There is really no reason to care about the
   type of the underlying object.
+
+- The functions ``zipWith3`` and ``zip3`` in ``Prelude`` can now fuse,
+  together with ``zipWith4`` to ``zipWith7`` as well as their
+  tuple counterparts in ``Data.List``.
 
 Build system
 ~~~~~~~~~~~~

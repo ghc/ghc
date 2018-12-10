@@ -6,6 +6,7 @@ module Rules.Documentation (
     haddockDependencies
     ) where
 
+import Hadrian.BuildPath
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 
@@ -21,6 +22,7 @@ import Target
 import Utilities
 
 import Data.List (union)
+import qualified Text.Parsec as Parsec
 
 docRoot :: FilePath
 docRoot = "docs"
@@ -138,26 +140,28 @@ allHaddocks :: Action [FilePath]
 allHaddocks = do
     pkgs <- stagePackages Stage1
     sequence [ pkgHaddockFile $ vanillaContext Stage1 pkg
-             | pkg <- pkgs, isLibrary pkg ]
+             | pkg <- pkgs, isLibrary pkg, pkgName pkg /= "rts" ]
 
 -- Note: this build rule creates plenty of files, not just the .haddock one.
 -- All of them go into the 'docRoot' subdirectory. Pedantically tracking all
 -- built files in the Shake database seems fragile and unnecessary.
-buildPackageDocumentation :: Context -> Rules ()
-buildPackageDocumentation context@Context {..} = when (stage == Stage1 && package /= rts) $ do
+buildPackageDocumentation :: Rules ()
+buildPackageDocumentation = do
     root <- buildRootRules
 
     -- Per-package haddocks
-    root -/- htmlRoot -/- "libraries" -/- pkgName package -/- "haddock-prologue.txt" %> \file -> do
+    root -/- htmlRoot -/- "libraries/*/haddock-prologue.txt" %> \file -> do
+        ctx <- getPkgDocTarget root file >>= pkgDocContext
         need [root -/- haddockHtmlLib]
         -- This is how @ghc-cabal@ used to produces "haddock-prologue.txt" files.
-        syn  <- pkgSynopsis    package
-        desc <- pkgDescription package
+        syn  <- pkgSynopsis    (Context.package ctx)
+        desc <- pkgDescription (Context.package ctx)
         let prologue = if null desc then syn else desc
         liftIO $ writeFile file prologue
 
-    root -/- htmlRoot -/- "libraries" -/- pkgName package -/- pkgName package <.> "haddock" %> \file -> do
-        need [root -/- htmlRoot -/- "libraries" -/- pkgName package -/- "haddock-prologue.txt"]
+    root -/- htmlRoot -/- "libraries/*/*.haddock" %> \file -> do
+        context <- getPkgDocTarget root file >>= pkgDocContext
+        need [ takeDirectory file  -/- "haddock-prologue.txt"]
         haddocks <- haddockDependencies context
 
         -- `ghc-prim` has a source file for 'GHC.Prim' which is generated just
@@ -175,6 +179,35 @@ buildPackageDocumentation context@Context {..} = when (stage == Stage1 && packag
         dynamicPrograms <- dynamicGhcPrograms =<< flavour
         let haddockWay = if dynamicPrograms then dynamic else vanilla
         build $ target (context {way = haddockWay}) (Haddock BuildPackage) srcs [file]
+
+data PkgDocTarget = DotHaddock PackageName | HaddockPrologue PackageName
+  deriving (Eq, Show)
+
+pkgDocContext :: PkgDocTarget -> Action Context
+pkgDocContext target = case findPackageByName pkgname of
+  Nothing -> error $ "pkgDocContext: couldn't find package " ++ pkgname
+  Just p  -> return (Context Stage1 p vanilla)
+
+  where pkgname = case target of
+          DotHaddock n      -> n
+          HaddockPrologue n -> n
+
+parsePkgDocTarget :: FilePath -> Parsec.Parsec String () PkgDocTarget
+parsePkgDocTarget root = do
+  _ <- Parsec.string root *> Parsec.optional (Parsec.char '/')
+  _ <- Parsec.string (htmlRoot ++ "/")
+  _ <- Parsec.string "libraries/"
+  pkgname <- Parsec.manyTill Parsec.anyChar (Parsec.char '/')
+  Parsec.choice
+    [ Parsec.try (Parsec.string "haddock-prologue.txt")
+        *> pure (HaddockPrologue pkgname)
+    , Parsec.string (pkgname <.> "haddock")
+        *> pure (DotHaddock pkgname)
+    ]
+
+getPkgDocTarget :: FilePath -> FilePath -> Action PkgDocTarget
+getPkgDocTarget root path =
+  parsePath (parsePkgDocTarget root) "<doc target>" path
 
 -------------------------------------- PDF -------------------------------------
 

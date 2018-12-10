@@ -512,10 +512,10 @@ CLOSURE(stg_NO_TREC_closure,stg_NO_TREC);
    See Note [SRTs] in compiler/cmm/CmmBuildInfoTable.hs
    ------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_SRT_1, 1, 0, 0, CONSTR, "SRT_1", "SRT_1")
+INFO_TABLE_CONSTR(stg_SRT_1, 1, 0, 0, CONSTR_1_0, "SRT_1", "SRT_1")
 { foreign "C" barf("SRT_1 object (%p) entered!", R1) never returns; }
 
-INFO_TABLE_CONSTR(stg_SRT_2, 2, 0, 0, CONSTR, "SRT_2", "SRT_2")
+INFO_TABLE_CONSTR(stg_SRT_2, 2, 0, 0, CONSTR_2_0, "SRT_2", "SRT_2")
 { foreign "C" barf("SRT_2 object (%p) entered!", R1) never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_3, 3, 0, 0, CONSTR, "SRT_3", "SRT_3")

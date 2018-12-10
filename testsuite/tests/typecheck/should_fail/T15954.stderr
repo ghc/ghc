@@ -1,0 +1,8 @@
+
+T15954.hs:10:1: error:
+    • The type synonym ‘A’ should have 1 argument, but has been given none
+    • In the type synonym declaration for ‘C1’
+
+T15954.hs:14:1: error:
+    • The type synonym ‘A’ should have 1 argument, but has been given none
+    • In the type synonym declaration for ‘C2’

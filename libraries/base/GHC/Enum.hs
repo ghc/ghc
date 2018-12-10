@@ -632,9 +632,9 @@ instance Bounded Word where
     -- use unboxed literals for maxBound, because GHC doesn't optimise
     -- (fromInteger 0xffffffff :: Word).
 #if WORD_SIZE_IN_BITS == 32
-    maxBound = W# (int2Word# 0xFFFFFFFF#)
+    maxBound = W# 0xFFFFFFFF##
 #elif WORD_SIZE_IN_BITS == 64
-    maxBound = W# (int2Word# 0xFFFFFFFFFFFFFFFF#)
+    maxBound = W# 0xFFFFFFFFFFFFFFFF##
 #else
 #error Unhandled value for WORD_SIZE_IN_BITS
 #endif
