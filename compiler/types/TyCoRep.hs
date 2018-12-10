@@ -1897,7 +1897,7 @@ tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
 tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
 
 tyCoVarsOfMultDSet :: Mult -> DTyCoVarSet
-tyCoVarsOfMultDSet r = fvDVarSet $ tyCoFVsOfRig r
+tyCoVarsOfMultDSet r = fvDVarSet $ tyCoFVsOfMult r
 
 -- | `tyCoFVsOfType` that returns free variables of a type in deterministic
 -- order. For explanation of why using `VarSet` is not deterministic see
@@ -1950,16 +1950,16 @@ tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
 tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_vars acc
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
 tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
-tyCoFVsOfType (FunTy w arg res)  f bound_vars acc = (tyCoFVsOfRig w `unionFV` tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
+tyCoFVsOfType (FunTy w arg res)  f bound_vars acc = (tyCoFVsOfMult w `unionFV` tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
 tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
 tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
 tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
 
-tyCoFVsOfRig :: Mult -> FV
-tyCoFVsOfRig (MultThing t) a b c = (tyCoFVsOfType t) a b c
-tyCoFVsOfRig (MultAdd m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
-tyCoFVsOfRig (MultMul m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
-tyCoFVsOfRig _ a b c = emptyFV a b c
+tyCoFVsOfMult :: Mult -> FV
+tyCoFVsOfMult (MultThing t) a b c = (tyCoFVsOfType t) a b c
+tyCoFVsOfMult (MultAdd m1 m2) a b c = (tyCoFVsOfMult m1 `unionFV` tyCoFVsOfMult m2) a b c
+tyCoFVsOfMult (MultMul m1 m2) a b c = (tyCoFVsOfMult m1 `unionFV` tyCoFVsOfMult m2) a b c
+tyCoFVsOfMult _ a b c = emptyFV a b c
 
 tyCoFVsBndr :: TyCoVarBinder -> FV -> FV
 -- Free vars of (forall b. <thing with fvs>)
