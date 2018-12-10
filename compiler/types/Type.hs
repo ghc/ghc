@@ -280,7 +280,7 @@ import Unique ( nonDetCmpUnique )
 
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust )
-import Control.Monad    ( guard )
+import Control.Monad    ( guard, liftM2 )
 
 -- $type_classification
 -- #type_classification#
@@ -576,6 +576,8 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go (CastTy ty co)  = mkcastty <$> go ty <*> mapCoercion mapper env co
     go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
 
+    go_mult (MultAdd x y) = liftM2 MultAdd (go_mult x) (go_mult y)
+    go_mult (MultMul x y) = liftM2 MultMul (go_mult x) (go_mult y)
     go_mult (MultThing t) = toMult <$> go t
     go_mult t = pure t
 

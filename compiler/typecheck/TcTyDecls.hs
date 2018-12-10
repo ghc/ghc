@@ -87,7 +87,7 @@ synonymTyConsOfType ty
      go (LitTy _)                 = emptyNameEnv
      go (TyVarTy _)               = emptyNameEnv
      go (AppTy a b)               = go a `plusNameEnv` go b
-     go (FunTy _ a b)             = go a `plusNameEnv` go b
+     go (FunTy w a b)             = go_mult w `plusNameEnv` go a `plusNameEnv` go b
      go (ForAllTy _ ty)           = go ty
      go (CastTy ty co)            = go ty `plusNameEnv` go_co co
      go (CoercionTy co)           = go_co co
@@ -139,6 +139,13 @@ synonymTyConsOfType ty
      go_prov (PhantomProv co)     = go_co co
      go_prov (ProofIrrelProv co)  = go_co co
      go_prov (PluginProv _)       = emptyNameEnv
+
+     go_mult Zero                 = emptyNameEnv
+     go_mult One                  = emptyNameEnv
+     go_mult Omega                = emptyNameEnv
+     go_mult (MultThing ty)       = go ty
+     go_mult (MultAdd x y)        = go_mult x `plusNameEnv` go_mult y
+     go_mult (MultMul x y)        = go_mult x `plusNameEnv` go_mult y
 
      go_tc tc | isTypeSynonymTyCon tc = unitNameEnv (tyConName tc) tc
               | otherwise             = emptyNameEnv
