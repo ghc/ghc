@@ -917,7 +917,8 @@ tcTyFamInstsAndVisX = go
     go _            (LitTy {})         = []
     go is_invis_arg (ForAllTy bndr ty) = go is_invis_arg (binderType bndr)
                                          ++ go is_invis_arg ty
-    go is_invis_arg (FunTy _ ty1 ty2)  = go is_invis_arg ty1
+    go is_invis_arg (FunTy w ty1 ty2)  = concatMap (go is_invis_arg) (multThingList w)
+                                         ++ go is_invis_arg ty1
                                          ++ go is_invis_arg ty2
     go is_invis_arg ty@(AppTy _ _)     =
       let (ty_head, ty_args) = splitAppTys ty
@@ -2098,7 +2099,7 @@ isInsolubleOccursCheck eq_rel tv ty
     go (AppTy t1 t2) = case eq_rel of  -- See Note [AppTy and ReprEq]
                          NomEq  -> go t1 || go t2
                          ReprEq -> go t1
-    go (FunTy _ t1 t2) = go t1 || go t2
+    go (FunTy w t1 t2) = any go (multThingList w) || go t1 || go t2
     go (ForAllTy (Bndr tv' _) inner_ty)
       | tv' == tv = False
       | otherwise = go (varType tv') || go inner_ty
@@ -2667,7 +2668,7 @@ sizeType = go
                                    -- size ordering is sound, but why is this better?
                                    -- I came across this when investigating #14010.
     go (LitTy {})                = 1
-    go (FunTy _ arg res)         = go arg + go res + 1
+    go (FunTy w arg res)         = sum (map go $ multThingList w) + go arg + go res + 1
     go (AppTy fun arg)           = go fun + go arg
     go (ForAllTy (Bndr tv vis) ty)
         | isVisibleArgFlag vis   = go (tyVarKind tv) + go ty + 1

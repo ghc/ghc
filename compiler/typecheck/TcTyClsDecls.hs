@@ -3594,8 +3594,9 @@ checkValidRoles tc
       =  check_ty_roles env role    ty1
       >> check_ty_roles env Nominal ty2
 
-    check_ty_roles env role (FunTy _ ty1 ty2)
-      =  check_ty_roles env role ty1
+    check_ty_roles env role (FunTy w ty1 ty2)
+      =  mapM_ (check_ty_roles env role) (multThingList w)
+      >> check_ty_roles env role ty1
       >> check_ty_roles env role ty2
 
     check_ty_roles env role (ForAllTy (Bndr tv _) ty)

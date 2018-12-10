@@ -601,7 +601,8 @@ irType = go
                                           lcls' = extendVarSet lcls tv
                                     ; markNominal lcls (tyVarKind tv)
                                     ; go lcls' ty }
-    go lcls (FunTy _ arg res)  = go lcls arg >> go lcls res
+    go lcls (FunTy w arg res)  = mapM_ (go lcls) (multThingList w) >>
+                                 go lcls arg >> go lcls res
     go _    (LitTy {})         = return ()
       -- See Note [Coercions in role inference]
     go lcls (CastTy ty _)      = go lcls ty
@@ -637,7 +638,8 @@ markNominal lcls ty = let nvars = fvVarList (FV.delFVs lcls $ get_ty_vars ty) in
     get_ty_vars :: Type -> FV
     get_ty_vars (TyVarTy tv)      = unitFV tv
     get_ty_vars (AppTy t1 t2)     = get_ty_vars t1 `unionFV` get_ty_vars t2
-    get_ty_vars (FunTy _ t1 t2)   = get_ty_vars t1 `unionFV` get_ty_vars t2
+    get_ty_vars (FunTy w t1 t2)   = unionsFV (map get_ty_vars $ multThingList w)
+                                    `unionFV` get_ty_vars t1 `unionFV` get_ty_vars t2
     get_ty_vars (TyConApp _ tys)  = mapUnionFV get_ty_vars tys
     get_ty_vars (ForAllTy tvb ty) = tyCoFVsBndr tvb (get_ty_vars ty)
     get_ty_vars (LitTy {})        = emptyFV

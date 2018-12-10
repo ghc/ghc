@@ -53,6 +53,7 @@ import VarEnv
 import VarSet
 import Var         ( VarBndr(..), mkTyVar )
 import Id          ( idType, idName )
+import Multiplicity
 import FV
 import ErrUtils
 import DynFlags
@@ -2310,7 +2311,8 @@ fvType (TyVarTy tv)          = [tv]
 fvType (TyConApp _ tys)      = fvTypes tys
 fvType (LitTy {})            = []
 fvType (AppTy fun arg)       = fvType fun ++ fvType arg
-fvType (FunTy _ arg res)     = fvType arg ++ fvType res
+fvType (FunTy w arg res)     = concatMap fvType (multThingList w) ++
+                               fvType arg ++ fvType res
 fvType (ForAllTy (Bndr tv _) ty)
   = fvType (tyVarKind tv) ++
     filter (/= tv) (fvType ty)
@@ -2327,7 +2329,7 @@ sizeType (TyVarTy {})      = 1
 sizeType (TyConApp tc tys) = 1 + sizeTyConAppArgs tc tys
 sizeType (LitTy {})        = 1
 sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
-sizeType (FunTy _ arg res) = sizeType arg + sizeType res + 1
+sizeType (FunTy w arg res) = sum (map sizeType $ multThingList w) + sizeType arg + sizeType res + 1
 sizeType (ForAllTy _ ty)   = sizeType ty
 sizeType (CastTy ty _)     = sizeType ty
 sizeType (CoercionTy _)    = 0

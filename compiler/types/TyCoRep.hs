@@ -2209,7 +2209,8 @@ injectiveVarsOfType = go
                          = go ty'
     go (TyVarTy v)       = unitFV v `unionFV` go (tyVarKind v)
     go (AppTy f a)       = go f `unionFV` go a
-    go (FunTy _ ty1 ty2)   = go ty1 `unionFV` go ty2
+    go (FunTy w ty1 ty2) = unionsFV (map go $ multThingList w) `unionFV`
+                           go ty1 `unionFV` go ty2
     go (TyConApp tc tys) =
       case tyConInjectivityInfo tc of
         NotInjective  -> emptyFV
