@@ -1,0 +1,18 @@
+
+Overflow.hs:8:15: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 10000000000000000000000000000000 is out of the Int# range -9223372036854775808..9223372036854775807
+
+Overflow.hs:13:1: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 100000000000000000000000000 is out of the Int# range -9223372036854775808..9223372036854775807
+
+Overflow.hs:18:5: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 1000000000000000000000000000000 is out of the Int range -9223372036854775808..9223372036854775807
+
+Overflow.hs:22:1: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 100000000000000000000000000000000 is out of the Int range -9223372036854775808..9223372036854775807
+
+Overflow.hs:27:6: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -1 is out of the Word range 0..18446744073709551615
+
+Overflow.hs:31:1: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -1 is out of the Word range 0..18446744073709551615

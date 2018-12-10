@@ -2,11 +2,11 @@
 T8958.hs:1:31: warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 TYPE CONSTRUCTORS
-  type role Map nominal representational
-  Map{2} :: * -> * -> *
-  Nominal{1} :: * -> Constraint
-  type role Representational representational
-  Representational{1} :: * -> Constraint
+  newtype Map{2} :: * -> * -> *
+    roles nominal representational
+  class Nominal{1} :: * -> Constraint
+  class Representational{1} :: * -> Constraint
+    roles representational
 COERCION AXIOMS
   axiom T8958.N:Map :: Map k v = [(k, v)]
 DATA CONSTRUCTORS

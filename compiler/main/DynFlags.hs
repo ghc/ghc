@@ -74,7 +74,8 @@ module DynFlags (
 
         -- ** Safe Haskell
         SafeHaskellMode(..),
-        safeHaskellOn, safeImportsOn, safeLanguageOn, safeInferOn,
+        safeHaskellOn, safeHaskellModeEnabled,
+        safeImportsOn, safeLanguageOn, safeInferOn,
         packageTrustOn,
         safeDirectImpsReq, safeImplicitImpsReq,
         unsafeFlags, unsafeFlagsForInfer,
@@ -844,6 +845,7 @@ data SafeHaskellMode
    | Sf_Unsafe
    | Sf_Trustworthy
    | Sf_Safe
+   | Sf_Ignore
    deriving (Eq)
 
 instance Show SafeHaskellMode where
@@ -851,6 +853,7 @@ instance Show SafeHaskellMode where
     show Sf_Unsafe       = "Unsafe"
     show Sf_Trustworthy  = "Trustworthy"
     show Sf_Safe         = "Safe"
+    show Sf_Ignore       = "Ignore"
 
 instance Outputable SafeHaskellMode where
     ppr = text . show
@@ -2391,7 +2394,12 @@ packageTrustOn = gopt Opt_PackageTrust
 
 -- | Is Safe Haskell on in some way (including inference mode)
 safeHaskellOn :: DynFlags -> Bool
-safeHaskellOn dflags = safeHaskell dflags /= Sf_None || safeInferOn dflags
+safeHaskellOn dflags = safeHaskellModeEnabled dflags || safeInferOn dflags
+
+safeHaskellModeEnabled :: DynFlags -> Bool
+safeHaskellModeEnabled dflags = safeHaskell dflags `elem` [Sf_Unsafe, Sf_Trustworthy
+                                                   , Sf_Safe ]
+
 
 -- | Is the Safe Haskell safe language in use
 safeLanguageOn :: DynFlags -> Bool
@@ -2440,6 +2448,7 @@ safeImplicitImpsReq d = safeLanguageOn d
 combineSafeFlags :: SafeHaskellMode -> SafeHaskellMode -> DynP SafeHaskellMode
 combineSafeFlags a b | a == Sf_None         = return b
                      | b == Sf_None         = return a
+                     | a == Sf_Ignore || b == Sf_Ignore = return Sf_Ignore
                      | a == b               = return a
                      | otherwise            = addErr errm >> pure a
     where errm = "Incompatible Safe Haskell flags! ("
@@ -2776,7 +2785,7 @@ safeFlagCheck cmdl dflags =
     -- dynflags and warn for when -fpackage-trust by itself with no safe
     -- haskell flag
     (dflags', warn)
-      | safeHaskell dflags == Sf_None && not cmdl && packageTrustOn dflags
+      | not (safeHaskellModeEnabled dflags) && not cmdl && packageTrustOn dflags
       = (gopt_unset dflags Opt_PackageTrust, pkgWarnMsg)
       | otherwise = (dflags, [])
 
@@ -3643,6 +3652,7 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fpackage-trust"   (NoArg setPackageTrust)
   , make_ord_flag defFlag "fno-safe-infer"   (noArg (\d ->
                                                     d { safeInfer = False }))
+  , make_ord_flag defFlag "fno-safe-haskell" (NoArg (setSafeHaskell Sf_Ignore))
   , make_ord_flag defGhcFlag "fPIC"          (NoArg (setGeneralFlag Opt_PIC))
   , make_ord_flag defGhcFlag "fno-PIC"       (NoArg (unSetGeneralFlag Opt_PIC))
   , make_ord_flag defGhcFlag "fPIE"          (NoArg (setGeneralFlag Opt_PIC))

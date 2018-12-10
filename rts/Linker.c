@@ -964,7 +964,7 @@ void ghci_enquire(SymbolAddr* addr)
 
    for (oc = objects; oc; oc = oc->next) {
       for (i = 0; i < oc->n_symbols; i++) {
-         sym = oc->symbols[i];
+         sym = oc->symbols[i].name;
          if (sym == NULL) continue;
          a = NULL;
          if (a == NULL) {
@@ -1106,8 +1106,8 @@ static void removeOcSymbols (ObjectCode *oc)
     // Remove all the mappings for the symbols within this object..
     int i;
     for (i = 0; i < oc->n_symbols; i++) {
-        if (oc->symbols[i] != NULL) {
-            ghciRemoveSymbolTable(symhash, oc->symbols[i], oc);
+        if (oc->symbols[i].name != NULL) {
+            ghciRemoveSymbolTable(symhash, oc->symbols[i].name, oc);
         }
     }
 
@@ -1576,18 +1576,21 @@ int ocTryLoad (ObjectCode* oc) {
         are to be loaded by this call.
 
         This call is intended to have no side-effects when a non-duplicate
-        symbol is re-inserted.
+        symbol is re-inserted.  A symbol is only a duplicate if the object file
+        it is defined in has had it's relocations resolved.  A resolved object
+        file means the symbols inside it are required.
 
-        We set the Address to NULL since that is not used to distinguish
-        symbols. Duplicate symbols are distinguished by name and oc.
+        The symbol address is not used to distinguish symbols. Duplicate symbols
+        are distinguished by name, oc and attributes (weak symbols etc).
     */
     int x;
-    SymbolName* symbol;
+    Symbol_t symbol;
     for (x = 0; x < oc->n_symbols; x++) {
         symbol = oc->symbols[x];
-        if (   symbol
-            && !ghciInsertSymbolTable(oc->fileName, symhash, symbol, NULL,
-                                      isSymbolWeak(oc, symbol), oc)) {
+        if (   symbol.name
+            && !ghciInsertSymbolTable(oc->fileName, symhash, symbol.name,
+                                      symbol.addr,
+                                      isSymbolWeak(oc, symbol.name), oc)) {
             return 0;
         }
     }

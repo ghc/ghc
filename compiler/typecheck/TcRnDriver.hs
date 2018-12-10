@@ -2415,7 +2415,7 @@ tcRnType hsc_env normalise rdr_type
                         ; return ty' }
                 else return ty ;
 
-       ; return (ty', mkInvForAllTys kvs (typeKind ty')) }
+       ; return (ty', mkInvForAllTys kvs (tcTypeKind ty')) }
 
 {- Note [TcRnExprMode]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -2745,11 +2745,12 @@ ppr_tycons debug fam_insts type_env
                      | otherwise  = isExternalName (tyConName tycon) &&
                                     not (tycon `elem` fi_tycons)
     ppr_tc tc
-       = vcat [ ppWhen show_roles $
-                hang (text "type role" <+> ppr tc)
-                   2 (hsep (map ppr roles))
-              , hang (ppr tc <> braces (ppr (tyConArity tc)) <+> dcolon)
-                   2 (ppr (tidyTopType (tyConKind tc))) ]
+       = vcat [ hang (ppr (tyConFlavour tc) <+> ppr tc
+                      <> braces (ppr (tyConArity tc)) <+> dcolon)
+                   2 (ppr (tidyTopType (tyConKind tc)))
+              , nest 2 $
+                ppWhen show_roles $
+                text "roles" <+> (sep (map ppr roles)) ]
        where
          show_roles = debug || not (all (== boring_role) roles)
          roles = tyConRoles tc
@@ -2758,6 +2759,9 @@ ppr_tycons debug fam_insts type_env
             -- Matches the choice in IfaceSyn, calls to pprRoles
 
     ppr_ax ax = ppr (coAxiomToIfaceDecl ax)
+      -- We go via IfaceDecl rather than using pprCoAxiom
+      -- This way we get the full axiom (both LHS and RHS) with
+      -- wildcard binders tidied to _1, _2, etc.
 
 ppr_datacons :: Bool -> TypeEnv -> SDoc
 ppr_datacons debug type_env

@@ -1047,7 +1047,36 @@ dataToTagRule = a `mplus` b
       ASSERT( not (isNewTyCon (dataConTyCon dc)) ) return ()
       return $ mkIntVal dflags (toInteger (dataConTagZ dc))
 
-{-
+{- Note [dataToTag# magic]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The primop dataToTag# is unusual because it evaluates its argument.
+Only `SeqOp` shares that property.  (Other primops do not do anything
+as fancy as argument evaluation.)  The special handling for dataToTag#
+is:
+
+* CoreUtils.exprOkForSpeculation has a special case for DataToTagOp,
+  (actually in app_ok).  Most primops with lifted arguments do not
+  evaluate those arguments, but DataToTagOp and SeqOp are two
+  exceptions.  We say that they are /never/ ok-for-speculation,
+  regardless of the evaluated-ness of their argument.
+  See CoreUtils Note [exprOkForSpeculation and SeqOp/DataToTagOp]
+
+* There is a special case for DataToTagOp in StgCmmExpr.cgExpr,
+  that evaluates its argument and then extracts the tag from
+  the returned value.
+
+* An application like (dataToTag# (Just x)) is optimised by
+  dataToTagRule in PrelRules.
+
+* A case expression like
+     case (dataToTag# e) of <alts>
+  gets transformed t
+     case e of <transformed alts>
+  by PrelRules.caseRules; see Note [caseRules for dataToTag]
+
+See Trac #15696 for a long saga.
+
+
 ************************************************************************
 *                                                                      *
 \subsection{Rules for seq# and spark#}
@@ -1102,7 +1131,7 @@ Implementing seq#.  The compiler has magic for SeqOp in
 - StgCmmExpr.cgExpr, and cgCase: special case for seq#
 
 - CoreUtils.exprOkForSpeculation;
-  see Note [seq# and expr_ok] in CoreUtils
+  see Note [exprOkForSpeculation and SeqOp/DataToTagOp] in CoreUtils
 
 - Simplify.addEvals records evaluated-ness for the result; see
   Note [Adding evaluatedness info to pattern-bound variables]

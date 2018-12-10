@@ -739,12 +739,13 @@ displayed.
     import HsDoc
 
     plugin :: Plugin
-    plugin = defaultPlugin { parsedResultAction = parsedPlugin
-                           , renamedResultAction = Just renamedAction
-                           , typeCheckResultAction = typecheckPlugin
-                           , spliceRunAction = metaPlugin
-                           , interfaceLoadAction = interfaceLoadPlugin
-                           }
+    plugin = defaultPlugin
+      { parsedResultAction = parsedPlugin
+      , renamedResultAction = renamedAction
+      , typeCheckResultAction = typecheckPlugin
+      , spliceRunAction = metaPlugin
+      , interfaceLoadAction = interfaceLoadPlugin
+      }
 
     parsedPlugin :: [CommandLineOption] -> ModSummary -> HsParsedModule -> Hsc HsParsedModule
     parsedPlugin _ _ pm
@@ -752,13 +753,11 @@ displayed.
            liftIO $ putStrLn $ "parsePlugin: \n" ++ (showSDoc dflags $ ppr $ hpm_module pm)
            return pm
 
-    renamedAction :: [CommandLineOption] -> ModSummary
-                        -> ( HsGroup GhcRn, [LImportDecl GhcRn]
-                           , Maybe [(LIE GhcRn, Avails)], Maybe LHsDocString )
-                        -> TcM ()
-    renamedAction _ _ ( gr, _, _, _ )
-      = do dflags <- getDynFlags
-           liftIO $ putStrLn $ "typeCheckPlugin (rn): " ++ (showSDoc dflags $ ppr gr)
+    renamedAction :: [CommandLineOption] -> TcGblEnv -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
+    renamedAction _ tc gr = do
+      dflags <- getDynFlags
+      liftIO $ putStrLn $ "typeCheckPlugin (rn): " ++ (showSDoc dflags $ ppr gr)
+      return (tc, gr)
 
     typecheckPlugin :: [CommandLineOption] -> ModSummary -> TcGblEnv -> TcM TcGblEnv
     typecheckPlugin _ _ tc
@@ -783,12 +782,13 @@ When you compile a simple module that contains Template Haskell splice
 
 ::
 
+    {-# OPTIONS_GHC -fplugin SourcePlugin #-}
     {-# LANGUAGE TemplateHaskell #-}
     module A where
 
     a = ()
 
-    $(return [])
+$(return [])
 
 with the compiler flags ``-fplugin SourcePlugin`` it will give the following
 output:

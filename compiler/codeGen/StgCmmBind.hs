@@ -311,6 +311,7 @@ mkRhsClosure    dflags bndr _cc
                          -- not when profiling: we don't want to
                          -- lose information about this particular
                          -- thunk (e.g. its type) (#949)
+  , idArity fun_id == unknownArity -- don't spoil a known call
 
           -- Ha! an Ap thunk
   = cgRhsStdThunk bndr lf_info payload

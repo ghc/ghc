@@ -56,6 +56,8 @@ data AssocInstInfo
   = NotAssociated
   | InClsInst { ai_class    :: Class
               , ai_tyvars   :: [TyVar]      -- ^ The /scoped/ tyvars of the instance
+                                            -- Why scoped?  See bind_me in
+                                            -- TcValidity.checkConsistentFamInst
               , ai_inst_env :: VarEnv Type  -- ^ Maps /class/ tyvars to their instance types
                 -- See Note [Matching in the consistent-instantation check]
     }
@@ -460,7 +462,7 @@ doTyApp :: Class -> Type -> Type -> KindOrType -> TcM ClsInstResult
 --    (Typeable f, Typeable Int, Typeable Char)  --> (after some simp. steps)
 --    Typeable f
 doTyApp clas ty f tk
-  | isForAllTy (typeKind f)
+  | isForAllTy (tcTypeKind f)
   = return NoInstance -- We can't solve until we know the ctr.
   | otherwise
   = return $ OneInst { cir_new_theta = map (mk_typeable_pred clas) [f, tk]
@@ -473,7 +475,7 @@ doTyApp clas ty f tk
 
 -- Emit a `Typeable` constraint for the given type.
 mk_typeable_pred :: Class -> Type -> PredType
-mk_typeable_pred clas ty = mkClassPred clas [ typeKind ty, ty ]
+mk_typeable_pred clas ty = mkClassPred clas [ tcTypeKind ty, ty ]
 
   -- Typeable is implied by KnownNat/KnownSymbol. In the case of a type literal
   -- we generate a sub-goal for the appropriate class.

@@ -33,7 +33,7 @@ module Type (
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
         splitTyConApp_maybe, splitTyConApp, tyConAppArgN, nextRole,
-        tcRepSplitTyConApp_maybe, tcSplitTyConApp_maybe,
+        tcRepSplitTyConApp_maybe, tcRepSplitTyConApp, tcSplitTyConApp_maybe,
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
 
@@ -54,7 +54,7 @@ module Type (
         mkStrLitTy, isStrLitTy,
         isLitTy,
 
-        getRuntimeRep_maybe, getRuntimeRepFromKind_maybe,
+        getRuntimeRep_maybe, kindRep_maybe, kindRep,
 
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
 
@@ -127,7 +127,7 @@ module Type (
         isPrimitiveType, isStrictType,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
         dropRuntimeRepArgs,
-        getRuntimeRep, getRuntimeRepFromKind,
+        getRuntimeRep,
 
         -- Multiplicity
 
@@ -139,7 +139,7 @@ module Type (
         Kind,
 
         -- ** Finding the kind of a type
-        typeKind, isTypeLevPoly, resultIsLevPoly,
+        typeKind, tcTypeKind, isTypeLevPoly, resultIsLevPoly,
         tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
 
         -- ** Common Kind
@@ -257,6 +257,7 @@ import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind, unitTy
                                  , typeSymbolKind, liftedTypeKind
+                                 , constraintKind
                                  , oneDataConTy, omegaDataConTy, unrestrictedFunTyCon )
 import PrelNames
 import CoAxiom
@@ -348,12 +349,14 @@ import Control.Monad    ( guard, liftM2 )
 
 Note [coreView vs tcView]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-So far as the typechecker is concerned, 'Constraint' and 'TYPE LiftedRep' are distinct kinds.
+So far as the typechecker is concerned, 'Constraint' and 'TYPE
+LiftedRep' are distinct kinds.
 
 But in Core these two are treated as identical.
 
-We implement this by making 'coreView' convert 'Constraint' to 'TYPE LiftedRep' on the fly.
-The function tcView (used in the type checker) does not do this.
+We implement this by making 'coreView' convert 'Constraint' to 'TYPE
+LiftedRep' on the fly.  The function tcView (used in the type checker)
+does not do this.
 
 See also Trac #11715, which tracks removing this inconsistency.
 
@@ -814,6 +817,14 @@ tcRepSplitTyConApp_maybe (FunTy w arg res)
 tcRepSplitTyConApp_maybe _
   = Nothing
 
+-- | Like 'tcSplitTyConApp' but doesn't look through type synonyms.
+tcRepSplitTyConApp :: HasCallStack => Type -> (TyCon, [Type])
+-- Defined here to avoid module loops between Unify and TcType.
+tcRepSplitTyConApp ty =
+  case tcRepSplitTyConApp_maybe ty of
+    Just stuff -> stuff
+    Nothing    -> pprPanic "tcRepSplitTyConApp" (ppr ty)
+
 -------------
 splitAppTy :: Type -> (Type, Type)
 -- ^ Attempts to take a type application apart, as in 'splitAppTy_maybe',
@@ -1248,22 +1259,6 @@ newTyConInstRhs tycon tys
                            CastTy
                            ~~~~~~
 A casted type has its *kind* casted into something new.
-
-Note [Weird typing rule for ForAllTy]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here is the (truncated) typing rule for the dependent ForAllTy:
-
-inner : kind
-------------------------------------
-ForAllTy (Bndr tyvar vis) inner : kind
-
-inner : TYPE r
-------------------------------------
-ForAllTy (Bndr covar vis) inner : TYPE
-
-Note that when inside the binder is a tyvar, neither the inner type nor for
-ForAllTy itself have to have kind *! But, it means that we should push any kind
-casts through the ForAllTy. The only trouble is avoiding capture.
 -}
 
 splitCastTy_maybe :: Type -> Maybe (Type, Coercion)
@@ -1774,27 +1769,6 @@ When treated as a user type, predicates are invisible and are
 implicitly instantiated; but coercion types, and non-pred evidence
 types, are just regular old types.
 
-Note [isPredTy complications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-You would think that we could define
-  isPredTy ty = isConstraintKind (typeKind ty)
-But there are a number of complications:
-
-* isPredTy is used when printing types, which can happen in debug
-  printing during type checking of not-fully-zonked types.  So it's
-  not cool to say isConstraintKind (typeKind ty) because, absent
-  zonking, the type might be ill-kinded, and typeKind crashes. Hence the
-  rather tiresome story here
-
-* isPredTy must return "True" to *unlifted* coercions, such as (t1 ~# t2)
-  and (t1 ~R# t2), which are not of kind Constraint!  Currently they are
-  of kind #.
-
-* If we do form the type '(C a => C [a]) => blah', then we'd like to
-  print it as such. But that means that isPredTy must return True for
-  (C a => C [a]).  Admittedly that type is illegal in Haskell, but we
-  want to print it nicely in error messages.
-
 Note [Evidence for quantified constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The superclass mechanism in TcCanonical.makeSuperClasses risks
@@ -1840,11 +1814,9 @@ tcIsConstraintKind ty
 -- treats them as the same type, see 'isLiftedTypeKind'.
 tcIsLiftedTypeKind :: Kind -> Bool
 tcIsLiftedTypeKind ty
-  | Just (type_tc, [arg]) <- tcSplitTyConApp_maybe ty
-  , type_tc `hasKey` tYPETyConKey
-  , Just (lifted_rep_tc, args) <- tcSplitTyConApp_maybe arg
-  , lifted_rep_tc `hasKey` liftedRepDataConKey
-  = ASSERT2( null args, ppr ty ) True
+  | Just (tc, [arg]) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
+  , tc `hasKey` tYPETyConKey
+  = isLiftedRuntimeRep arg
   | otherwise
   = False
 
@@ -1877,57 +1849,6 @@ isCoVarType ty
   , tys `lengthIs` 4
   = True
 isCoVarType _ = False
-
--- | Is the type suitable to classify a given/wanted in the typechecker?
-isPredTy :: Type -> Bool
--- See Note [isPredTy complications]
--- NB: /not/ true of (t1 ~# t2) or (t1 ~R# t2)
---     See Note [Types for coercions, predicates, and evidence]
-isPredTy ty = go ty []
-  where
-    go :: Type -> [KindOrType] -> Bool
-    -- Since we are looking at the kind,
-    -- no need to look through type synonyms
-    go (AppTy ty1 ty2)   args       = go ty1 (ty2 : args)
-    go (TyVarTy tv)      args       = go_k (tyVarKind tv) args
-    go (TyConApp tc tys) args       = ASSERT( null args )  -- TyConApp invariant
-                                      go_k (tyConKind tc) tys
-    go (FunTy _ arg res) []
-      | isPredTy arg                = isPredTy res   -- (Eq a => C a)
-      | otherwise                   = False          -- (Int -> Bool)
-    go (ForAllTy _ ty) []           = go ty []
-    go (CastTy _ co) args           = go_k (pSnd (coercionKind co)) args
-    go _ _ = False
-
-    go_k :: Kind -> [KindOrType] -> Bool
-    -- True <=> ('k' applied to 'kts') = Constraint
-    go_k k [] = tcIsConstraintKind k
-    go_k k (arg:args) = case piResultTy_maybe k arg of
-                          Just k' -> go_k k' args
-                          Nothing -> WARN( True, text "isPredTy" <+> ppr ty )
-                                     False
-       -- This last case shouldn't happen under most circumstances. It can
-       -- occur if we call isPredTy during kind checking, especially if one
-       -- of the following happens:
-       --
-       -- 1. There is actually a kind error.  Example in which this showed up:
-       --    polykinds/T11399
-       --
-       -- 2. A type constructor application appears to be oversaturated. An
-       --    example of this occurred in GHC Trac #13187:
-       --
-       --      {-# LANGUAGE PolyKinds #-}
-       --      type Const a b = b
-       --      f :: Const Int (,) Bool Char -> Char
-       --
-       --    We call isPredTy (Const k1 k2 Int (,) Bool Char
-       --    where k1,k2 are unification variables that have been
-       --    unified to *, and (*->*->*) resp, /but not zonked/.
-       --    This shows that isPredTy can report a false negative
-       --    if a constraint is similarly oversaturated, but
-       --    it's hard to do better than isPredTy currently does without
-       --    zonking, so we punt on such cases for now.  This only happens
-       --    during debug-printing, so it doesn't matter.
 
 isClassPred, isEqPred, isNomEqPred, isIPPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
@@ -2372,10 +2293,9 @@ isLiftedType_maybe :: HasDebugCallStack => Type -> Maybe Bool
 isLiftedType_maybe ty = go (getRuntimeRep ty)
   where
     go rr | Just rr' <- coreView rr = go rr'
-    go (TyConApp lifted_rep [])
-      | lifted_rep `hasKey` liftedRepDataConKey = Just True
-    go (TyConApp {}) = Just False -- everything else is unlifted
-    go _             = Nothing    -- levity polymorphic
+          | isLiftedRuntimeRep rr  = Just True
+          | TyConApp {} <- rr      = Just False  -- Everything else is unlifted
+          | otherwise              = Nothing     -- levity polymorphic
 
 -- | See "Type#type_classification" for what an unlifted type is.
 -- Panics on levity polymorphic types.
@@ -2407,7 +2327,7 @@ dropRuntimeRepArgs = dropWhile isRuntimeRepKindedTy
 -- possible.
 getRuntimeRep_maybe :: HasDebugCallStack
                     => Type -> Maybe Type
-getRuntimeRep_maybe = getRuntimeRepFromKind_maybe . typeKind
+getRuntimeRep_maybe = kindRep_maybe . typeKind
 
 -- | Extract the RuntimeRep classifier of a type. For instance,
 -- @getRuntimeRep_maybe Int = LiftedRep@. Panics if this is not possible.
@@ -2416,30 +2336,6 @@ getRuntimeRep ty
   = case getRuntimeRep_maybe ty of
       Just r  -> r
       Nothing -> pprPanic "getRuntimeRep" (ppr ty <+> dcolon <+> ppr (typeKind ty))
-
--- | Extract the RuntimeRep classifier of a type from its kind. For example,
--- @getRuntimeRepFromKind * = LiftedRep@; Panics if this is not possible.
-getRuntimeRepFromKind :: HasDebugCallStack
-                      => Type -> Type
-getRuntimeRepFromKind k =
-    case getRuntimeRepFromKind_maybe k of
-      Just r  -> r
-      Nothing -> pprPanic "getRuntimeRepFromKind"
-                           (ppr k <+> dcolon <+> ppr (typeKind k))
-
--- | Extract the RuntimeRep classifier of a type from its kind. For example,
--- @getRuntimeRepFromKind * = LiftedRep@; Returns 'Nothing' if this is not
--- possible.
-getRuntimeRepFromKind_maybe :: HasDebugCallStack
-                            => Type -> Maybe Type
-getRuntimeRepFromKind_maybe = go
-  where
-    go k | Just k' <- coreView k = go k'
-    go k
-      | Just (_tc, [arg]) <- splitTyConApp_maybe k
-      = ASSERT2( _tc `hasKey` tYPETyConKey, ppr k )
-        Just arg
-    go _ = Nothing
 
 isUnboxedTupleType :: Type -> Bool
 isUnboxedTupleType ty
@@ -2795,34 +2691,130 @@ nonDetCmpTc tc1 tc2
         The kind of a type
 *                                                                      *
 ************************************************************************
+
+Note [typeKind vs tcTypeKind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have two functions to get the kind of a type
+
+  * typeKind   ignores  the distinction between Constraint and *
+  * tcTypeKind respects the distinction between Constraint and *
+
+tcTypeKind is used by the type inference engine, for which Constraint
+and * are different; after that we use typeKind.
+
+See also Note [coreView vs tcView]
+
+Note [Kinding rules for types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In typeKind we consider Constraint and (TYPE LiftedRep) to be identical.
+We then have
+
+         t1 : TYPE rep1
+         t2 : TYPE rep2
+   (FUN) ----------------
+         t1 -> t2 : Type
+
+         ty : TYPE rep
+         `a` is not free in rep
+(FORALL) -----------------------
+         forall a. ty : TYPE rep
+
+In tcTypeKind we consider Constraint and (TYPE LiftedRep) to be distinct:
+
+          t1 : TYPE rep1
+          t2 : TYPE rep2
+    (FUN) ----------------
+          t1 -> t2 : Type
+
+          t1 : Constraint
+          t2 : TYPE rep
+  (PRED1) ----------------
+          t1 => t2 : Type
+
+          t1 : Constraint
+          t2 : Constraint
+  (PRED2) ---------------------
+          t1 => t2 : Constraint
+
+          ty : TYPE rep
+          `a` is not free in rep
+(FORALL1) -----------------------
+          forall a. ty : TYPE rep
+
+          ty : Constraint
+(FORALL2) -------------------------
+          forall a. ty : Constraint
+
+Note that:
+* The only way we distinguish '->' from '=>' is by the fact
+  that the argument is a PredTy.  Both are FunTys
 -}
 
+-----------------------------
 typeKind :: HasDebugCallStack => Type -> Kind
 typeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
-typeKind (AppTy fun arg)   = typeKind_apps fun [arg]
 typeKind (LitTy l)         = typeLiteralKind l
 typeKind (FunTy {})        = liftedTypeKind
 typeKind (TyVarTy tyvar)   = tyVarKind tyvar
 typeKind (CastTy _ty co)   = pSnd $ coercionKind co
 typeKind (CoercionTy co)   = coercionType co
-typeKind ty@(ForAllTy (Bndr tv _) _)
-  | isTyVar tv                     -- See Note [Weird typing rule for ForAllTy].
-  = case occCheckExpand tvs k of   -- We must make sure tv does not occur in kind
-      Just k' -> k'                -- As it is already out of scope!
+
+typeKind (AppTy fun arg)
+  = go fun [arg]
+  where
+    -- Accumulate the type arugments, so we can call piResultTys,
+    -- rather than a succession of calls to piResultTy (which is
+    -- asymptotically costly as the number of arguments increases)
+    go (AppTy fun arg) args = go fun (arg:args)
+    go fun             args = piResultTys (typeKind fun) args
+
+typeKind ty@(ForAllTy {})
+  = case occCheckExpand tvs body_kind of   -- We must make sure tv does not occur in kind
+      Just k' -> k'                        -- As it is already out of scope!
       Nothing -> pprPanic "typeKind"
-                  (ppr ty $$ ppr k $$ ppr tvs $$ ppr body)
+                  (ppr ty $$ ppr tvs $$ ppr body <+> dcolon <+> ppr body_kind)
   where
     (tvs, body) = splitTyVarForAllTys ty
-    k           = typeKind body
-typeKind (ForAllTy {})     = liftedTypeKind
+    body_kind   = typeKind body
 
-typeKind_apps :: HasDebugCallStack => Type -> [Type] -> Kind
--- The sole purpose of the function is to accumulate
--- the type arugments, so we can call piResultTys, rather than
--- a succession of calls to piResultTy (which is asymptotically
--- less efficient as the number of arguments increases)
-typeKind_apps (AppTy fun arg) args = typeKind_apps fun (arg:args)
-typeKind_apps fun             args = piResultTys (typeKind fun) args
+-----------------------------
+tcTypeKind :: HasDebugCallStack => Type -> Kind
+tcTypeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
+tcTypeKind (LitTy l)         = typeLiteralKind l
+tcTypeKind (TyVarTy tyvar)   = tyVarKind tyvar
+tcTypeKind (CastTy _ty co)   = pSnd $ coercionKind co
+tcTypeKind (CoercionTy co)   = coercionType co
+
+tcTypeKind (FunTy _ arg res)
+  | isPredTy arg && isPredTy res = constraintKind
+  | otherwise                    = liftedTypeKind
+
+tcTypeKind (AppTy fun arg)
+  = go fun [arg]
+  where
+    -- Accumulate the type arugments, so we can call piResultTys,
+    -- rather than a succession of calls to piResultTy (which is
+    -- asymptotically costly as the number of arguments increases)
+    go (AppTy fun arg) args = go fun (arg:args)
+    go fun             args = piResultTys (tcTypeKind fun) args
+
+tcTypeKind ty@(ForAllTy {})
+  | tcIsConstraintKind body_kind
+  = constraintKind
+
+  | otherwise
+  = case occCheckExpand tvs body_kind of   -- We must make sure tv does not occur in kind
+      Just k' -> k'                        -- As it is already out of scope!
+      Nothing -> pprPanic "tcTypeKind"
+                  (ppr ty $$ ppr tvs $$ ppr body <+> dcolon <+> ppr body_kind)
+  where
+    (tvs, body) = splitTyVarForAllTys ty
+    body_kind = tcTypeKind body
+
+
+isPredTy :: Type -> Bool
+-- See Note [Types for coercions, predicates, and evidence]
+isPredTy ty = tcIsConstraintKind (tcTypeKind ty)
 
 --------------------------
 typeLiteralKind :: TyLit -> Kind

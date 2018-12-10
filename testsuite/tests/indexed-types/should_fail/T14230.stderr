@@ -2,6 +2,6 @@
 T14230.hs:11:3: error:
     • Type indexes must match class instance head
       Expected: CD @(Maybe a)
-        Actual: CD @(k -> *) -- Defined at T14230.hs:11:8
+        Actual: CD @(k -> *)
     • In the data instance declaration for ‘CD’
       In the instance declaration for ‘C (Maybe a)’

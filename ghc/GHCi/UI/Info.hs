@@ -58,6 +58,7 @@ data ModInfo = ModInfo
       -- ^ Again, useful from GHC for accessing information
       -- (exports, instances, scope) from a module.
     , modinfoLastUpdate :: !UTCTime
+      -- ^ The timestamp of the file used to generate this record.
     }
 
 -- | Type of some span of source code. Most of these fields are
@@ -277,14 +278,23 @@ collectInfo ms loaded = do
     cacheInvalid name = case M.lookup name ms of
         Nothing -> return True
         Just mi -> do
-            let src_fp = ml_hs_file (ms_location (modinfoSummary mi))
-                obj_fp = ml_obj_file (ms_location (modinfoSummary mi))
-                fp     = fromMaybe obj_fp src_fp
+            let fp = srcFilePath (modinfoSummary mi)
                 last' = modinfoLastUpdate mi
+            current <- getModificationTime fp
             exists <- doesFileExist fp
             if exists
-                then (> last') <$> getModificationTime fp
+                then return $ current /= last'
                 else return True
+
+-- | Get the source file path from a ModSummary.
+-- If the .hs file is missing, and the .o file exists,
+-- we return the .o file path.
+srcFilePath :: ModSummary -> FilePath
+srcFilePath modSum = fromMaybe obj_fp src_fp
+    where
+        src_fp = ml_hs_file ms_loc
+        obj_fp = ml_obj_file ms_loc
+        ms_loc = ms_location modSum
 
 -- | Get info about the module: summary, types, etc.
 getModInfo :: (GhcMonad m) => ModuleName -> m ModInfo
@@ -294,8 +304,8 @@ getModInfo name = do
     typechecked <- typecheckModule p
     allTypes <- processAllTypeCheckedModule typechecked
     let i = tm_checked_module_info typechecked
-    now <- liftIO getCurrentTime
-    return (ModInfo m allTypes i now)
+    ts <- liftIO $ getModificationTime $ srcFilePath m
+    return (ModInfo m allTypes i ts)
 
 -- | Get ALL source spans in the module.
 processAllTypeCheckedModule :: forall m . GhcMonad m => TypecheckedModule

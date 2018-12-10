@@ -485,7 +485,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                            fst $ splitForAllVarBndrs dfun_ty
               visible_skol_tvs = drop n_inferred skol_tvs
 
-        ; traceTc "tcLocalInstDecl 1" (ppr dfun_ty $$ ppr (invisibleTyBndrCount dfun_ty) $$ ppr skol_tvs $$ ppr visible_skol_tvs)
+        ; traceTc "tcLocalInstDecl 1" (ppr dfun_ty $$ ppr (invisibleTyBndrCount dfun_ty) $$ ppr skol_tvs)
 
         -- Next, process any associated types.
         ; (datafam_stuff, tyfam_insts)
@@ -785,8 +785,8 @@ tcDataFamHeader :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr GhcRn
                 -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
                 -> TcM ([TyVar], [Type], Kind, ThetaType)
 -- The "header" is the part other than the data constructors themselves
--- e.g.  data instance D [a] :: * -> * = ...
--- Here the "header" is the bit before the "=" sign
+-- e.g.  data instance D [a] :: * -> * where ...
+-- Here the "header" is the bit before the "where"
 tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksig hs_cons
   = do { (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, res_kind)))
             <- pushTcLevelM_                                $
@@ -800,7 +800,12 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
                   ; lhs_ty <- checkExpectedKindX pp_lhs lhs_ty lhs_kind res_kind
                   ; return (stupid_theta, lhs_ty, res_kind) }
 
-       -- See Note [Generalising in tcFamTyPatsAndThen]
+       -- See TcTyClsDecls Note [Generalising in tcFamTyPatsGuts]
+       -- This code (and the stuff immediately above) is very similar
+       -- to that in tcFamTyInstEqnGuts.  Maybe we should abstract the
+       -- common code; but for the moment I concluded that it's
+       -- clearer to duplicate it.  Still, if you fix a bug here,
+       -- check there too!
        ; let scoped_tvs = imp_tvs ++ exp_tvs
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
        ; qtvs <- quantifyTyVars emptyVarSet dvs
@@ -902,7 +907,7 @@ There are several fiddly subtleties lurking here
       data family X a :: forall k. * -> *   -- Note: a forall that is not used
       data instance X Int b = MkX
 
-  So the data intance is really
+  So the data instance is really
       data istance X Int @k b = MkX
 
   The axiom will look like

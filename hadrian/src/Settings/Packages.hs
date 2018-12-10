@@ -286,6 +286,7 @@ rtsPackageArgs = package rts ? do
           , any (wayUnit Debug) rtsWays ? arg "debug"
           , any (wayUnit Logging) rtsWays ? arg "logging"
           , any (wayUnit Dynamic) rtsWays ? arg "dynamic"
+          , Debug `wayUnit` way           ? arg "find-ptr"
           ]
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs

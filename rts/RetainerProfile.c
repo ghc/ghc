@@ -36,13 +36,27 @@
 
 /* Note [What is a retainer?]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~
-The definition of what sorts of things are counted as retainers is a bit hard to
-pin down. Intuitively, we want to identify closures which will help the user
-identify memory leaks due to thunks. In practice we also end up lumping mutable
-objects in this group for reasons that have been lost to time.
+Retainer profiling is a profiling technique that gives information why
+objects can't be freed and lists the consumers that hold pointers to
+the heap objects. It does not list all the objects that keeps references
+to the other, because then we would keep too much information that will
+make the report unusable, for example the cons element of the list would keep
+all the tail cells. As a result we are keeping only the objects of the
+certain types, see 'isRetainer()' function for more discussion.
 
-The definition of retainer is implemented in isRetainer(), defined later in this
-file.
+More formal definition of the retainer can be given the following way.
+
+An object p is a retainer object of the object l, if all requirements
+hold:
+
+  1. p can be a retainer (see `isRetainer()`)
+  2. l is reachable from p
+  3. There are no other retainers on the path from p to l.
+
+Exact algorithm and additional information can be found the historical
+document 'docs/storage-mgt/rp.tex'. Details that are related to the
+RTS implementation may be out of date, but the general
+information about the retainers is still applicable.
 */
 
 
@@ -84,6 +98,7 @@ static void retainClosure(StgClosure *, StgClosure *, retainer);
 #if defined(DEBUG_RETAINER)
 static void belongToHeap(StgPtr p);
 #endif
+static void retainPushClosure( StgClosure *p, StgClosure *c, retainer c_child_r);
 
 #if defined(DEBUG_RETAINER)
 /*
@@ -118,9 +133,17 @@ uint32_t costArrayLinear[N_CLOSURE_TYPES];
  * -------------------------------------------------------------------------- */
 
 typedef enum {
+    // Object with fixed layout. Keeps an information about that
+    // element was processed. (stackPos.next.step)
     posTypeStep,
+    // Description of the pointers-first heap object. Keeps information
+    // about layout. (stackPos.next.ptrs)
     posTypePtrs,
+    // Keeps SRT bitmap (stackPos.next.srt)
     posTypeSRT,
+    // Keeps a new object that was not inspected yet. Keeps a parent
+    // element (stackPos.next.parent)
+    posTypeFresh
 } nextPosType;
 
 typedef union {
@@ -139,18 +162,28 @@ typedef union {
     struct {
         StgClosure *srt;
     } srt;
+
+    // parent of the current object, used
+    // when posTypeFresh is set
+    StgClosure *parent;
 } nextPos;
 
+// Tagged stack element, that keeps information how to process
+// the next element in the traverse stack.
 typedef struct {
     nextPosType type;
     nextPos next;
 } stackPos;
 
+// Element in the traverse stack, keeps the element, information
+// how to continue processing the element, and it's retainer set.
 typedef struct {
     StgClosure *c;
     retainer c_child_r;
     stackPos info;
 } stackElement;
+
+static void retainActualPush( stackElement *se);
 
 /*
   Invariants:
@@ -360,6 +393,67 @@ find_srt( stackPos *info )
 }
 
 /* -----------------------------------------------------------------------------
+ * Pushes an element onto traverse stack
+ * -------------------------------------------------------------------------- */
+static void
+retainActualPush(stackElement *se) {
+    bdescr *nbd;      // Next Block Descriptor
+    if (stackTop - 1 < stackBottom) {
+#if defined(DEBUG_RETAINER)
+        // debugBelch("push() to the next stack.\n");
+#endif
+        // currentStack->free is updated when the active stack is switched
+        // to the next stack.
+        currentStack->free = (StgPtr)stackTop;
+
+        if (currentStack->link == NULL) {
+            nbd = allocGroup(BLOCKS_IN_STACK);
+            nbd->link = NULL;
+            nbd->u.back = currentStack;
+            currentStack->link = nbd;
+        } else
+            nbd = currentStack->link;
+
+        newStackBlock(nbd);
+    }
+
+    // adjust stackTop (acutal push)
+    stackTop--;
+    // If the size of stackElement was huge, we would better replace the
+    // following statement by either a memcpy() call or a switch statement
+    // on the type of the element. Currently, the size of stackElement is
+    // small enough (5 words) that this direct assignment seems to be enough.
+    *stackTop = *se;
+
+#if defined(DEBUG_RETAINER)
+    stackSize++;
+    if (stackSize > maxStackSize) maxStackSize = stackSize;
+    // ASSERT(stackSize >= 0);
+    // debugBelch("stackSize = %d\n", stackSize);
+#endif
+}
+
+/* Push an object onto traverse stack. This method can be used anytime
+ * instead of calling retainClosure(), it exists in order to use an
+ * explicit stack instead of direct recursion.
+ *
+ *  *p - object's parent
+ *  *c - closure
+ *  c_child_r - closure retainer.
+ */
+static INLINE void
+retainPushClosure( StgClosure *c, StgClosure *p, retainer c_child_r) {
+    stackElement se;
+
+    se.c = c;
+    se.c_child_r = c_child_r;
+    se.info.next.parent = p;
+    se.info.type = posTypeFresh;
+
+    retainActualPush(&se);
+};
+
+/* -----------------------------------------------------------------------------
  *  push() pushes a stackElement representing the next child of *c
  *  onto the traverse stack. If *c has no child, *first_child is set
  *  to NULL and nothing is pushed onto the stack. If *c has only one
@@ -428,8 +522,8 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
         // need to push a stackElement, but nothing to store in se.info
     case CONSTR_2_0:
         *first_child = c->payload[0];         // return the first pointer
-        // se.info.type = posTypeStep;
-        // se.info.next.step = 2;            // 2 = second
+        se.info.type = posTypeStep;
+        se.info.next.step = 2;            // 2 = second
         break;
 
         // three children (fixed), no SRT
@@ -439,14 +533,14 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
         // head must be TSO and the head of a linked list of TSOs.
         // Shoule it be a child? Seems to be yes.
         *first_child = (StgClosure *)((StgMVar *)c)->head;
-        // se.info.type = posTypeStep;
+        se.info.type = posTypeStep;
         se.info.next.step = 2;            // 2 = second
         break;
 
         // three children (fixed), no SRT
     case WEAK:
         *first_child = ((StgWeak *)c)->key;
-        // se.info.type = posTypeStep;
+        se.info.type = posTypeStep;
         se.info.next.step = 2;
         break;
 
@@ -547,6 +641,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
     case TREC_CHUNK:
         *first_child = (StgClosure *)((StgTRecChunk *)c)->prev_chunk;
+        se.info.type = posTypeStep;
         se.info.next.step = 0;  // entry no.
         break;
 
@@ -573,45 +668,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
         return;
     }
 
-    if (stackTop - 1 < stackBottom) {
-#if defined(DEBUG_RETAINER)
-        // debugBelch("push() to the next stack.\n");
-#endif
-        // currentStack->free is updated when the active stack is switched
-        // to the next stack.
-        currentStack->free = (StgPtr)stackTop;
-
-        if (currentStack->link == NULL) {
-            nbd = allocGroup(BLOCKS_IN_STACK);
-            nbd->link = NULL;
-            nbd->u.back = currentStack;
-            currentStack->link = nbd;
-        } else
-            nbd = currentStack->link;
-
-        newStackBlock(nbd);
-    }
-
-    // adjust stackTop (acutal push)
-    stackTop--;
-    // If the size of stackElement was huge, we would better replace the
-    // following statement by either a memcpy() call or a switch statement
-    // on the type of the element. Currently, the size of stackElement is
-    // small enough (5 words) that this direct assignment seems to be enough.
-
-    // ToDo: The line below leads to the warning:
-    //    warning: 'se.info.type' may be used uninitialized in this function
-    // This is caused by the fact that there are execution paths through the
-    // large switch statement above where some cases do not initialize this
-    // field. Is this really harmless? Can we avoid the warning?
-    *stackTop = se;
-
-#if defined(DEBUG_RETAINER)
-    stackSize++;
-    if (stackSize > maxStackSize) maxStackSize = stackSize;
-    // ASSERT(stackSize >= 0);
-    // debugBelch("stackSize = %d\n", stackSize);
-#endif
+    retainActualPush(&se);
 }
 
 /* -----------------------------------------------------------------------------
@@ -703,7 +760,9 @@ popOff(void) {
 /* -----------------------------------------------------------------------------
  *  Finds the next object to be considered for retainer profiling and store
  *  its pointer to *c.
- *  Test if the topmost stack element indicates that more objects are left,
+ *  If the unprocessed object was stored in the stack (posTypeFresh), the
+ *  this object is returned as-is. Otherwise Test if the topmost stack
+ *  element indicates that more objects are left,
  *  and if so, retrieve the first object and store its pointer to *c. Also,
  *  set *cp and *r appropriately, both of which are stored in the stack element.
  *  The topmost stack element then is overwritten so as for it to now denote
@@ -732,6 +791,15 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
         }
 
         se = stackTop;
+
+        // If this is a top-level element, you should pop that out.
+        if (se->info.type == posTypeFresh) {
+            *cp = se->info.next.parent;
+            *c = se->c;
+            *r = se->c_child_r;
+            popOff();
+            return;
+        }
 
         switch (get_itbl(se->c)->type) {
             // two children (fixed), no SRT
@@ -953,6 +1021,12 @@ maybeInitRetainerSet( StgClosure *c )
 
 /* -----------------------------------------------------------------------------
  * Returns true if *c is a retainer.
+ * In general the retainers are the objects that may be the roots of the
+ * collection. Basically this roots represents programmers threads
+ * (TSO) with their stack and thunks.
+ *
+ * In addition we mark all mutable objects as a retainers, the reason for
+ * that decision is lost in time.
  * -------------------------------------------------------------------------- */
 static INLINE bool
 isRetainer( StgClosure *c )
@@ -1104,7 +1178,7 @@ associate( StgClosure *c, RetainerSet *s )
 }
 
 /* -----------------------------------------------------------------------------
-   Call retainClosure for each of the closures covered by a large bitmap.
+   Call retainPushClosure for each of the closures covered by a large bitmap.
    -------------------------------------------------------------------------- */
 
 static void
@@ -1118,7 +1192,7 @@ retain_large_bitmap (StgPtr p, StgLargeBitmap *large_bitmap, uint32_t size,
     bitmap = large_bitmap->bitmap[b];
     for (i = 0; i < size; ) {
         if ((bitmap & 1) == 0) {
-            retainClosure((StgClosure *)*p, c, c_child_r);
+            retainPushClosure((StgClosure *)*p, c, c_child_r);
         }
         i++;
         p++;
@@ -1137,7 +1211,7 @@ retain_small_bitmap (StgPtr p, uint32_t size, StgWord bitmap,
 {
     while (size > 0) {
         if ((bitmap & 1) == 0) {
-            retainClosure((StgClosure *)*p, c, c_child_r);
+            retainPushClosure((StgClosure *)*p, c, c_child_r);
         }
         p++;
         bitmap = bitmap >> 1;
@@ -1162,7 +1236,7 @@ retain_small_bitmap (StgPtr p, uint32_t size, StgWord bitmap,
  *    which means that its stack is ready to process.
  *  Note:
  *    This code was almost plagiarzied from GC.c! For each pointer,
- *    retainClosure() is invoked instead of evacuate().
+ *    retainPushClosure() is invoked instead of evacuate().
  * -------------------------------------------------------------------------- */
 static void
 retainStack( StgClosure *c, retainer c_child_r,
@@ -1201,7 +1275,7 @@ retainStack( StgClosure *c, retainer c_child_r,
         switch(info->i.type) {
 
         case UPDATE_FRAME:
-            retainClosure(((StgUpdateFrame *)p)->updatee, c, c_child_r);
+            retainPushClosure(((StgUpdateFrame *)p)->updatee, c, c_child_r);
             p += sizeofW(StgUpdateFrame);
             continue;
 
@@ -1219,7 +1293,7 @@ retainStack( StgClosure *c, retainer c_child_r,
 
         follow_srt:
             if (info->i.srt) {
-                retainClosure(GET_SRT(info),c,c_child_r);
+                retainPushClosure(GET_SRT(info), c, c_child_r);
             }
             continue;
 
@@ -1227,7 +1301,7 @@ retainStack( StgClosure *c, retainer c_child_r,
             StgBCO *bco;
 
             p++;
-            retainClosure((StgClosure *)*p, c, c_child_r);
+            retainPushClosure((StgClosure*)*p, c, c_child_r);
             bco = (StgBCO *)*p;
             p++;
             size = BCO_BITMAP_SIZE(bco);
@@ -1250,7 +1324,7 @@ retainStack( StgClosure *c, retainer c_child_r,
             StgRetFun *ret_fun = (StgRetFun *)p;
             const StgFunInfoTable *fun_info;
 
-            retainClosure(ret_fun->fun, c, c_child_r);
+            retainPushClosure(ret_fun->fun, c, c_child_r);
             fun_info = get_fun_itbl(UNTAG_CONST_CLOSURE(ret_fun->fun));
 
             p = (P_)&ret_fun->payload;
@@ -1293,7 +1367,7 @@ retainStack( StgClosure *c, retainer c_child_r,
 }
 
 /* ----------------------------------------------------------------------------
- * Call retainClosure for each of the children of a PAP/AP
+ * Call retainPushClosure for each of the children of a PAP/AP
  * ------------------------------------------------------------------------- */
 
 static INLINE StgPtr
@@ -1306,7 +1380,7 @@ retain_PAP_payload (StgClosure *pap,    /* NOT tagged */
     StgWord bitmap;
     const StgFunInfoTable *fun_info;
 
-    retainClosure(fun, pap, c_child_r);
+    retainPushClosure(fun, pap, c_child_r);
     fun = UNTAG_CLOSURE(fun);
     fun_info = get_fun_itbl(fun);
     ASSERT(fun_info->i.type != PAP);
@@ -1365,6 +1439,7 @@ retainClosure( StgClosure *c0, StgClosure *cp0, retainer r0 )
     RetainerSet *s, *retainerSetOfc;
     retainer r, c_child_r;
     StgWord typeOfc;
+    retainPushClosure(c0, cp0, r0);
 
 #if defined(DEBUG_RETAINER)
     // StgPtr oldStackTop;
@@ -1375,14 +1450,8 @@ retainClosure( StgClosure *c0, StgClosure *cp0, retainer r0 )
     // debugBelch("retainClosure() called: c0 = 0x%x, cp0 = 0x%x, r0 = 0x%x\n", c0, cp0, r0);
 #endif
 
-    // (c, cp, r) = (c0, cp0, r0)
-    c = c0;
-    cp = cp0;
-    r = r0;
-    goto inner_loop;
-
 loop:
-    //debugBelch("loop");
+    //debugBelch("loop")
     // pop to (c, cp, r);
     pop(&c, &cp, &r);
 
@@ -1569,16 +1638,16 @@ inner_loop:
     {
         StgTSO *tso = (StgTSO *)c;
 
-        retainClosure((StgClosure*) tso->stackobj,           c, c_child_r);
-        retainClosure((StgClosure*) tso->blocked_exceptions, c, c_child_r);
-        retainClosure((StgClosure*) tso->bq,                 c, c_child_r);
-        retainClosure((StgClosure*) tso->trec,               c, c_child_r);
+        retainPushClosure((StgClosure *) tso->stackobj, c, c_child_r);
+        retainPushClosure((StgClosure *) tso->blocked_exceptions, c, c_child_r);
+        retainPushClosure((StgClosure *) tso->bq, c, c_child_r);
+        retainPushClosure((StgClosure *) tso->trec, c, c_child_r);
         if (   tso->why_blocked == BlockedOnMVar
                || tso->why_blocked == BlockedOnMVarRead
                || tso->why_blocked == BlockedOnBlackHole
                || tso->why_blocked == BlockedOnMsgThrowTo
             ) {
-            retainClosure(tso->block_info.closure, c, c_child_r);
+            retainPushClosure(tso->block_info.closure, c, c_child_r);
         }
         goto loop;
     }
@@ -1586,9 +1655,9 @@ inner_loop:
     case BLOCKING_QUEUE:
     {
         StgBlockingQueue *bq = (StgBlockingQueue *)c;
-        retainClosure((StgClosure*) bq->link,           c, c_child_r);
-        retainClosure((StgClosure*) bq->bh,             c, c_child_r);
-        retainClosure((StgClosure*) bq->owner,          c, c_child_r);
+        retainPushClosure((StgClosure *) bq->link,            c, c_child_r);
+        retainPushClosure((StgClosure *) bq->bh,              c, c_child_r);
+        retainPushClosure((StgClosure *) bq->owner,           c, c_child_r);
         goto loop;
     }
 
@@ -1607,7 +1676,7 @@ inner_loop:
     }
 
     case AP_STACK:
-        retainClosure(((StgAP_STACK *)c)->fun, c, c_child_r);
+        retainPushClosure(((StgAP_STACK *)c)->fun, c, c_child_r);
         retainStack(c, c_child_r,
                     (StgPtr)((StgAP_STACK *)c)->payload,
                     (StgPtr)((StgAP_STACK *)c)->payload +

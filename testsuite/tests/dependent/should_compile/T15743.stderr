@@ -1,6 +1,7 @@
 TYPE CONSTRUCTORS
-  type role T nominal nominal nominal phantom phantom phantom
-  T{6} :: forall {k1} k2 (k3 :: k2). Proxy k3 -> k1 -> k2 -> *
+  data type T{6} ::
+    forall {k1} k2 (k3 :: k2). Proxy k3 -> k1 -> k2 -> *
+    roles nominal nominal nominal phantom phantom phantom
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

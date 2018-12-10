@@ -32,6 +32,7 @@ executable hadrian
                        , Hadrian.Builder.Ar
                        , Hadrian.Builder.Sphinx
                        , Hadrian.Builder.Tar
+                       , Hadrian.BuildPath
                        , Hadrian.Expression
                        , Hadrian.Haskell.Cabal
                        , Hadrian.Haskell.Cabal.Type

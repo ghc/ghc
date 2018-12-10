@@ -20,6 +20,14 @@
 typedef void SymbolAddr;
 typedef char SymbolName;
 
+/* Hold extended information about a symbol in case we need to resolve it at a
+   late stage.  */
+typedef struct _Symbol
+{
+    SymbolName *name;
+    SymbolAddr *addr;
+} Symbol_t;
+
 /* Indication of section kinds for loaded objects.  Needed by
    the GC for deciding whether or not a pointer on the stack
    is a code pointer.
@@ -148,7 +156,7 @@ typedef struct _ObjectCode {
        this object into the global symbol hash table.  This is so that
        we know which parts of the latter mapping to nuke when this
        object is removed from the system. */
-    char** symbols;
+    Symbol_t *symbols;
     int    n_symbols;
 
     /* ptr to mem containing the object file image */

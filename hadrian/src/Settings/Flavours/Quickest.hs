@@ -11,7 +11,8 @@ quickestFlavour = defaultFlavour
     { name        = "quickest"
     , args        = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
     , libraryWays = pure [vanilla]
-    , rtsWays     = pure [vanilla, threaded] }
+    , rtsWays     = pure [vanilla, threaded]
+    , dynamicGhcPrograms = return False }
 
 quickestArgs :: Args
 quickestArgs = sourceArgs SourceArgs

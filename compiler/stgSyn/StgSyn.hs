@@ -26,6 +26,7 @@ module StgSyn (
 
         StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
         NoExtSilent, noExtSilent,
+        OutputablePass,
 
         UpdateFlag(..), isUpdatable,
 
@@ -52,7 +53,7 @@ module StgSyn (
         stripStgTicksTop,
         stgCaseBndrInScope,
 
-        pprStgBinding, pprStgTopBindings
+        pprStgBinding, pprGenStgTopBindings, pprStgTopBindings
     ) where
 
 #include "HsVersions.h"
@@ -731,12 +732,16 @@ pprGenStgBinding (StgRec pairs)
       = hang (hsep [pprBndr LetBind bndr, equals])
              4 (ppr expr <> semi)
 
+pprGenStgTopBindings
+  :: (OutputablePass pass) => [GenStgTopBinding pass] -> SDoc
+pprGenStgTopBindings binds
+  = vcat $ intersperse blankLine (map pprGenStgTopBinding binds)
+
 pprStgBinding :: StgBinding -> SDoc
-pprStgBinding  bind  = pprGenStgBinding bind
+pprStgBinding = pprGenStgBinding
 
 pprStgTopBindings :: [StgTopBinding] -> SDoc
-pprStgTopBindings binds
-  = vcat $ intersperse blankLine (map pprGenStgTopBinding binds)
+pprStgTopBindings = pprGenStgTopBindings
 
 instance Outputable StgArg where
     ppr = pprStgArg

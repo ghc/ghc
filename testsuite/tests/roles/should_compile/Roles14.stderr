@@ -1,8 +1,8 @@
 TYPE SIGNATURES
   meth2 :: forall a. C2 a => a -> a
 TYPE CONSTRUCTORS
-  type role C2 representational
-  C2{1} :: * -> Constraint
+  class C2{1} :: * -> Constraint
+    roles representational
 COERCION AXIOMS
   axiom Roles12.N:C2 :: C2 a = a -> a
 Dependent modules: []

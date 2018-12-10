@@ -1786,7 +1786,8 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                                       imp_vars (mb_expl_bndrs `orElse` [])
                                       hs_pats hs_rhs_ty
 
-       ; traceTc "tcTyFamInstEqn" (ppr fam_tc $$ ppr qtvs $$ ppr pats $$ ppr rhs_ty)
+       -- Don't print results they may be knot-tied
+       -- (tcFamInstEqnGuts zonks to Type)
        ; return (mkCoAxBranch qtvs [] [] pats rhs_ty
                               (map (const Nominal) qtvs)
                               loc) }
@@ -1819,8 +1820,8 @@ indexed-types/should_compile/T12369 for an example.
 So, the kind-checker must return the new skolems and args (that is, Type
 or (Type -> Type) for the equations above) and the instantiated kind.
 
-Note [Generalising in tcFamTyPatsAndThen]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Generalising in tcFamTyPatsGuts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have something like
   type instance forall (a::k) b. F t1 t2 = rhs
 
@@ -1874,7 +1875,12 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
                      ; rhs_ty <- tcCheckLHsType hs_rhs_ty rhs_kind
                      ; return (lhs_ty, rhs_ty) }
 
-       -- See Note [Generalising in tcFamTyPatsAndThen]
+       -- See Note [Generalising in tcFamTyPatsGuts]
+       -- This code (and the stuff immediately above) is very similar
+       -- to that in tcDataFamHeader.  Maybe we should abstract the
+       -- common code; but for the moment I concluded that it's
+       -- clearer to duplicate it.  Still, if you fix a bug here,
+       -- check there too!
        ; let scoped_tvs = imp_tvs ++ exp_tvs
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
        ; qtvs <- quantifyTyVars emptyVarSet dvs
@@ -1884,6 +1890,9 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        ; rhs_ty     <- zonkTcTypeToTypeX ze rhs_ty
 
        ; let pats = unravelFamInstPats lhs_ty
+             -- Note that we do this after solveEqualities
+             -- so that any strange coercions inside lhs_ty
+             -- have been solved before we attempt to unravel it
        ; traceTc "tcTyFamInstEqnGuts }" (ppr fam_tc <+> pprTyVars qtvs)
        ; return (qtvs, pats, rhs_ty) }
   where
@@ -1965,6 +1974,10 @@ unravelFamInstPats fam_app
   = case splitTyConApp_maybe fam_app of
       Just (_, pats) -> pats
       Nothing        -> WARN( True, bad_lhs fam_app ) []
+        -- The Nothing case cannot happen for type families, because
+        -- we don't call unravelFamInstPats until we've solved the
+        -- equalities.  For data families I wasn't quite as convinced
+        -- so I've let it as a warning rather than a panic.
   where
     bad_lhs fam_app
       = hang (text "Ill-typed LHS of family instance")
@@ -2444,8 +2457,8 @@ rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
         -- So we return ( [a,b,z], [x,y]
         --              , [], [x,y,z]
         --              , [a~(x,y),b~z], <arg-subst> )
-  | Just subst <- ASSERT( isLiftedTypeKind (typeKind res_ty) )
-                  ASSERT( isLiftedTypeKind (typeKind res_tmpl) )
+  | Just subst <- ASSERT( isLiftedTypeKind (tcTypeKind res_ty) )
+                  ASSERT( isLiftedTypeKind (tcTypeKind res_tmpl) )
                   tcMatchTy res_tmpl res_ty
   = let (univ_tvs, raw_eqs, kind_subst) = mkGADTVars tmpl_tvs dc_tvs subst
         raw_ex_tvs = dc_tvs `minusList` univ_tvs
@@ -2965,8 +2978,8 @@ checkValidDataCon dflags existential_ok tc con
               orig_res_ty = dataConOrigResTy con
         ; traceTc "checkValidDataCon" (vcat
               [ ppr con, ppr tc, ppr tc_tvs
-              , ppr res_ty_tmpl <+> dcolon <+> ppr (typeKind res_ty_tmpl)
-              , ppr orig_res_ty <+> dcolon <+> ppr (typeKind orig_res_ty)])
+              , ppr res_ty_tmpl <+> dcolon <+> ppr (tcTypeKind res_ty_tmpl)
+              , ppr orig_res_ty <+> dcolon <+> ppr (tcTypeKind orig_res_ty)])
 
 
         ; checkTc (isJust (tcMatchTy res_ty_tmpl

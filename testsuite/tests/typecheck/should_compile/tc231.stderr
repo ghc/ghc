@@ -6,9 +6,9 @@ TYPE SIGNATURES
   huh :: forall s a b chain. Zork s a b => Q s a chain -> ST s ()
   s :: forall t t1. Q t (Z [Char]) t1 -> Q t (Z [Char]) t1
 TYPE CONSTRUCTORS
-  Q{3} :: * -> * -> * -> *
-  Z{1} :: * -> *
-  Zork{3} :: * -> * -> * -> Constraint
+  data type Q{3} :: * -> * -> * -> *
+  data type Z{1} :: * -> *
+  class Zork{3} :: * -> * -> * -> Constraint
 COERCION AXIOMS
   axiom N:Zork :: Zork s a b = forall chain. Q s a chain -> ST s ()
 DATA CONSTRUCTORS
