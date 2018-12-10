@@ -462,7 +462,7 @@ lvlCase :: LevelEnv             -- Level of in-scope names/tyvars
 lvlCase env scrut_fvs scrut' case_bndr ty alts
   -- See Note [Floating single-alternative cases]
   | [(con@(DataAlt {}), bs, body)] <- alts
-  , exprIsHNF (deTagExpr scrut')  -- See Note [Check the output scrutinee for okForSpec]
+  , exprIsHNF (deTagExpr scrut')  -- See Note [Check the output scrutinee for exprIsHNF]
   , not (isTopLvl dest_lvl)       -- Can't have top-level cases
   , not (floatTopLvlOnly env)     -- Can float anywhere
   =     -- Always float the case if possible
@@ -535,21 +535,25 @@ Things to note:
 
  * We only do this with a single-alternative case
 
-Note [Check the output scrutinee for okForSpec]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Check the output scrutinee for exprIsHNF]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this:
   case x of y {
     A -> ....(case y of alts)....
   }
+
 Because of the binder-swap, the inner case will get substituted to
-(case x of ..).  So when testing whether the scrutinee is
-okForSpeculation we must be careful to test the *result* scrutinee ('x'
-in this case), not the *input* one 'y'.  The latter *is* ok for
-speculation here, but the former is not -- and indeed we can't float
-the inner case out, at least not unless x is also evaluated at its
-binding site.  See Trac #5453.
+(case x of ..).  So when testing whether the scrutinee is in HNF we
+must be careful to test the *result* scrutinee ('x' in this case), not
+the *input* one 'y'.  The latter *is* in HNF here (because y is
+evaluated), but the former is not -- and indeed we can't float the
+inner case out, at least not unless x is also evaluated at its binding
+site.  See Trac #5453.
 
 That's why we apply exprIsHNF to scrut' and not to scrut.
+
+See Note [Floating single-alternative cases] for why
+we use exprIsHNF in the first place.
 -}
 
 lvlNonTailMFE :: LevelEnv             -- Level of in-scope names/tyvars

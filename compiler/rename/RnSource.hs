@@ -698,7 +698,7 @@ rnFamInstEqn :: HsDocContext
              -> Maybe (Name, [Name]) -- Nothing => not associated
                                      -- Just (cls,tvs) => associated,
                                      --   and gives class and tyvars of the
-                                     --   parent instance delc
+                                     --   parent instance decl
              -> [Located RdrName]    -- Kind variables from the equation's RHS
              -> FamInstEqn GhcPs rhs
              -> (HsDocContext -> rhs -> RnM (rhs', FreeVars))
@@ -801,7 +801,9 @@ rnFamInstEqn doc mb_cls rhs_kvars
 rnFamInstEqn _ _ _ (HsIB _ (XFamEqn _)) _ = panic "rnFamInstEqn"
 rnFamInstEqn _ _ _ (XHsImplicitBndrs _) _ = panic "rnFamInstEqn"
 
-rnTyFamInstDecl :: Maybe (Name, [Name])
+rnTyFamInstDecl :: Maybe (Name, [Name]) -- Just (cls,tvs) => associated,
+                                        --   and gives class and tyvars of
+                                        --   the parent instance decl
                 -> TyFamInstDecl GhcPs
                 -> RnM (TyFamInstDecl GhcRn, FreeVars)
 rnTyFamInstDecl mb_cls (TyFamInstDecl { tfid_eqn = eqn })
