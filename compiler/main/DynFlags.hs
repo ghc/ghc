@@ -807,6 +807,7 @@ data WarningFlag =
    | Opt_WarnAllMissedSpecs
    | Opt_WarnUnsupportedCallingConventions
    | Opt_WarnUnsupportedLlvmVersion
+   | Opt_WarnMissedExtraSharedLib
    | Opt_WarnInlineRuleShadowing
    | Opt_WarnTypedHoles
    | Opt_WarnPartialTypeSignatures
@@ -3985,6 +3986,7 @@ wWarningFlagsDeps = [
   flagSpec "unsupported-calling-conventions"
                                          Opt_WarnUnsupportedCallingConventions,
   flagSpec "unsupported-llvm-version"    Opt_WarnUnsupportedLlvmVersion,
+  flagSpec "missed-extra-shared-lib"     Opt_WarnMissedExtraSharedLib,
   flagSpec "unticked-promoted-constructors"
                                          Opt_WarnUntickedPromotedConstructors,
   flagSpec "unused-do-bind"              Opt_WarnUnusedDoBind,
@@ -4707,6 +4709,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnInlineRuleShadowing,
         Opt_WarnAlternativeLayoutRuleTransitional,
         Opt_WarnUnsupportedLlvmVersion,
+        Opt_WarnMissedExtraSharedLib,
         Opt_WarnTabs,
         Opt_WarnUnrecognisedWarningFlags,
         Opt_WarnSimplifiableClassConstraints,
