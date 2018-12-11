@@ -129,14 +129,14 @@ runTestBuilderArgs = builder RunTest ? do
 -- | Command line arguments for running GHC's test script.
 getTestArgs :: Args
 getTestArgs = do
+    -- targets specified in the TEST env var
+    testEnvTargets <- maybe [] words <$> expr (liftIO $ lookupEnv "TEST")
     args            <- expr $ userSetting defaultTestArgs
     bindir          <- expr $ setBinaryDirectory (testCompiler args)
     compiler        <- expr $ setCompiler (testCompiler args)
     globalVerbosity <- shakeVerbosity <$> expr getShakeOptions
     let configFileArg= ["--config-file=" ++ (testConfigFile args)]
-        testOnlyArg  = case testOnly args of
-                           Just cases -> map ("--only=" ++) (words cases)
-                           Nothing -> []
+        testOnlyArg  =  map ("--only=" ++) (testOnly args ++ testEnvTargets)
         onlyPerfArg  = if testOnlyPerf args
                            then Just "--only-perf-tests"
                            else Nothing
