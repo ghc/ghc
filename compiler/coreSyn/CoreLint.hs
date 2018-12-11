@@ -53,7 +53,6 @@ import UsageEnv
 import RepType
 import TyCoRep       -- checks validity of types/coercions
 import TyCon
-import TysWiredIn ( multiplicityTy )
 import CoAxiom
 import BasicTypes
 import ErrUtils as Err
