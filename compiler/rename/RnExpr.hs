@@ -63,6 +63,8 @@ import Data.Ord
 import Data.Array
 import qualified Data.List.NonEmpty as NE
 
+import Unique           ( mkVarOccUnique )
+
 {-
 ************************************************************************
 *                                                                      *
@@ -859,23 +861,7 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat body _ _)) thing_inside
                 -- The binders do not scope over the expression
         ; (bind_op, fvs1) <- lookupStmtName ctxt bindMName
 
-        ; xMonadFailEnabled <- fmap (xopt LangExt.MonadFailDesugaring) getDynFlags
-        ; let getFailFunction
-                -- If the pattern is irrefutable (e.g.: wildcard, tuple,
-                -- ~pat, etc.) we should not need to fail.
-                | isIrrefutableHsPat pat
-                = return (noSyntaxExpr, emptyFVs)
-
-                -- For non-monadic contexts (e.g. guard patterns, list
-                -- comprehensions, etc.) we should not need to fail.
-                -- See Note [Failing pattern matches in Stmts]
-                | not (isMonadFailStmtContext ctxt)
-                = return (noSyntaxExpr, emptyFVs)
-
-                | xMonadFailEnabled = lookupSyntaxName failMName
-                | otherwise         = lookupSyntaxName failMName_preMFP
-
-        ; (fail_op, fvs2) <- getFailFunction
+        ; (fail_op, fvs2) <- monadFailOp pat ctxt
 
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
         { (thing, fvs3) <- thing_inside (collectPatBinders pat')
@@ -1211,10 +1197,7 @@ rn_rec_stmt rnBody _ (L loc (BindStmt _ pat' body _ _), fv_pat)
   = do { (body', fv_expr) <- rnBody body
        ; (bind_op, fvs1) <- lookupSyntaxName bindMName
 
-       ; xMonadFailEnabled <- fmap (xopt LangExt.MonadFailDesugaring) getDynFlags
-       ; let failFunction | xMonadFailEnabled = failMName
-                          | otherwise         = failMName_preMFP
-       ; (fail_op, fvs2) <- lookupSyntaxName failFunction
+       ; (fail_op, fvs2) <- getMonadFailOp
 
        ; let bndrs = mkNameSet (collectPatBinders pat')
              fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
@@ -2120,3 +2103,74 @@ badIpBinds :: Outputable a => SDoc -> a -> SDoc
 badIpBinds what binds
   = hang (text "Implicit-parameter bindings illegal in" <+> what)
          2 (ppr binds)
+
+---------
+
+lookupSyntaxMonadFailOpName :: Bool -> RnM (SyntaxExpr GhcRn, FreeVars)
+lookupSyntaxMonadFailOpName monadFailEnabled
+  | monadFailEnabled = lookupSyntaxName failMName
+  | otherwise        = lookupSyntaxName failMName_preMFP
+
+monadFailOp :: LPat GhcPs
+            -> HsStmtContext Name
+            -> RnM (SyntaxExpr GhcRn, FreeVars)
+monadFailOp pat ctxt
+  -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
+  -- we should not need to fail.
+  | isIrrefutableHsPat pat = return (noSyntaxExpr, emptyFVs)
+
+  -- For non-monadic contexts (e.g. guard patterns, list
+  -- comprehensions, etc.) we should not need to fail.  See Note
+  -- [Failing pattern matches in Stmts]
+  | not (isMonadFailStmtContext ctxt) = return (noSyntaxExpr, emptyFVs)
+
+  | otherwise = getMonadFailOp
+
+{-
+Note [Monad fail : Rebindable syntax, overloaded strings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Given the code
+  foo x = do { Just y <- x; return y }
+
+we expect it to desugar as
+  foo x = x >>= \r -> case r of
+                        Just y  -> return y
+                        Nothing -> fail "Pattern match error"
+
+But with RebindableSyntax and OverloadedStrings, we really want
+it to desugar thus:
+  foo x = x >>= \r -> case r of
+                        Just y  -> return y
+                        Nothing -> fail (fromString "Patterm match error")
+
+So, in this case, we synthesize the function
+  \x -> fail (fromString x)
+
+(rather than plain 'fail') for the 'fail' operation. This is done in
+'getMonadFailOp'.
+-}
+getMonadFailOp :: RnM (SyntaxExpr GhcRn, FreeVars) -- Syntax expr fail op
+getMonadFailOp
+ = do { xMonadFailEnabled <- fmap (xopt LangExt.MonadFailDesugaring) getDynFlags
+      ; xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
+      ; xRebindableSyntax <- fmap (xopt LangExt.RebindableSyntax) getDynFlags
+      ; reallyGetMonadFailOp xRebindableSyntax xOverloadedStrings xMonadFailEnabled }
+  where
+    reallyGetMonadFailOp rebindableSyntax overloadedStrings monadFailEnabled
+      | rebindableSyntax && overloadedStrings = do
+        (failExpr, failFvs) <- lookupSyntaxMonadFailOpName monadFailEnabled
+        (fromStringExpr, fromStringFvs) <- lookupSyntaxName fromStringName
+        let arg_lit = fsLit "arg"
+            arg_name = mkSystemVarName (mkVarOccUnique arg_lit) arg_lit
+            arg_syn_expr = mkRnSyntaxExpr arg_name
+        let body :: LHsExpr GhcRn =
+              nlHsApp (noLoc $ syn_expr failExpr)
+                      (nlHsApp (noLoc $ syn_expr fromStringExpr)
+                                (noLoc $ syn_expr arg_syn_expr))
+        let failAfterFromStringExpr :: HsExpr GhcRn =
+              unLoc $ mkHsLam [noLoc $ VarPat noExt $ noLoc arg_name] body
+        let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
+              mkSyntaxExpr failAfterFromStringExpr
+        return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
+      | otherwise = lookupSyntaxMonadFailOpName monadFailEnabled

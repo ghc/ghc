@@ -1642,8 +1642,11 @@ not the Prelude versions:
 -  An integer literal ``368`` means "``fromInteger (368::Integer)``",
    rather than "``Prelude.fromInteger (368::Integer)``".
 
--  Fractional literals are handed in just the same way, except that the
+-  Fractional literals are handled in just the same way, except that the
    translation is ``fromRational (3.68::Rational)``.
+
+-  String literals are also handled the same way, except that the
+   translation is ``fromString ("368"::String)``.
 
 -  The equality test in an overloaded numeric pattern uses whatever
    ``(==)`` is in scope.

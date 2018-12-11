@@ -118,12 +118,16 @@ noSyntaxExpr = SyntaxExpr { syn_expr      = HsLit noExt (HsString NoSourceText
                           , syn_arg_wraps = []
                           , syn_res_wrap  = WpHole }
 
+-- | Make a 'SyntaxExpr (HsExpr _)', missing its HsWrappers.
+mkSyntaxExpr :: HsExpr (GhcPass p) -> SyntaxExpr (GhcPass p)
+mkSyntaxExpr expr = SyntaxExpr { syn_expr      = expr
+                               , syn_arg_wraps = []
+                               , syn_res_wrap  = WpHole }
+
 -- | Make a 'SyntaxExpr Name' (the "rn" is because this is used in the
 -- renamer), missing its HsWrappers.
 mkRnSyntaxExpr :: Name -> SyntaxExpr GhcRn
-mkRnSyntaxExpr name = SyntaxExpr { syn_expr      = HsVar noExt $ noLoc name
-                                 , syn_arg_wraps = []
-                                 , syn_res_wrap  = WpHole }
+mkRnSyntaxExpr name = mkSyntaxExpr $ HsVar noExt $ noLoc name
   -- don't care about filling in syn_arg_wraps because we're clearly
   -- not past the typechecker
 
