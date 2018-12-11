@@ -132,8 +132,7 @@ module Type (
         -- Multiplicity
 
         isMultiplicityTy, isMultiplicityVar,
-
-        isLinearType, isOneMultiplicity, isOmegaMultiplicity,
+        isLinearType,
 
         -- * Main data types representing Kinds
         Kind,
@@ -258,7 +257,7 @@ import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind, unitTy
                                  , typeSymbolKind, liftedTypeKind
                                  , constraintKind
-                                 , oneDataConTy, omegaDataConTy, unrestrictedFunTyCon )
+                                 , unrestrictedFunTyCon )
 import PrelNames
 import CoAxiom
 import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
@@ -2265,18 +2264,6 @@ isFamFreeTy (FunTy w a b)     = and (multThingList isFamFreeTy w) &&
 isFamFreeTy (ForAllTy _ ty)   = isFamFreeTy ty
 isFamFreeTy (CastTy ty _)     = isFamFreeTy ty
 isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Multiplicity}
-*                                                                      *
-************************************************************************
--}
-
-isOneMultiplicity, isOmegaMultiplicity :: Type -> Bool
-isOneMultiplicity ty = ty `eqType` oneDataConTy
-isOmegaMultiplicity ty = ty `eqType` omegaDataConTy
 
 {-
 ************************************************************************
