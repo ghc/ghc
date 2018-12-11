@@ -617,8 +617,8 @@ getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_S_Quot rep -> divCode rep True x y
       MO_U_Quot rep -> divCode rep False x y
 
-      MO_S_Rem rep -> remainderCode rep True x y
-      MO_U_Rem rep -> remainderCode rep False x y
+      MO_S_Rem rep -> remainder rep True x y
+      MO_U_Rem rep -> remainder rep False x y
 
       MO_And rep   -> case y of
         (CmmLit (CmmInt imm _)) | imm == -8 || imm == -4
@@ -641,6 +641,14 @@ getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
   where
     triv_float :: Width -> (Format -> Reg -> Reg -> Reg -> Instr) -> NatM Register
     triv_float width instr = trivialCodeNoImm (floatFormat width) instr x y
+
+    remainder :: Width -> Bool -> CmmExpr -> CmmExpr -> NatM Register
+    remainder rep sgn x y = do
+      let fmt = intFormat rep
+      tmp <- getNewRegNat fmt
+      code <- remainderCode rep sgn tmp x y
+      return (Any fmt code)
+
 
 getRegister' _ (CmmLit (CmmInt i rep))
   | Just imm <- makeImmediate rep True i
@@ -1300,14 +1308,8 @@ genCCall target dest_regs argsAndHints
         where divOp1 platform signed width [res_q, res_r] [arg_x, arg_y]
                 = do let reg_q = getRegisterReg platform (CmmLocal res_q)
                          reg_r = getRegisterReg platform (CmmLocal res_r)
-                         fmt   = intFormat width
-                     (x_reg, x_code) <- getSomeReg arg_x
-                     (y_reg, y_code) <- getSomeReg arg_y
-                     return $       y_code `appOL` x_code
-                            `appOL` toOL [ DIV fmt signed reg_q x_reg y_reg
-                                         , MULL fmt reg_r reg_q (RIReg y_reg)
-                                         , SUBF reg_r reg_r x_reg
-                                         ]
+                     remainderCode width signed reg_q arg_x arg_y
+                       <*> pure reg_r
 
               divOp1 _ _ _ _ _
                 = panic "genCCall: Wrong number of arguments for divOp1"
@@ -2271,19 +2273,20 @@ trivialUCode rep instr x = do
 -- it the hard way.
 -- The "sgn" parameter is the signedness for the division instruction
 
-remainderCode :: Width -> Bool -> CmmExpr -> CmmExpr -> NatM Register
-remainderCode rep sgn x y = do
+remainderCode :: Width -> Bool -> Reg -> CmmExpr -> CmmExpr
+               -> NatM (Reg -> InstrBlock)
+remainderCode rep sgn reg_q arg_x arg_y = do
   let op_len = max W32 rep
-      ins_fmt = intFormat op_len
+      fmt    = intFormat op_len
       extend = if sgn then extendSExpr else extendUExpr
-  (src1, code1) <- getSomeReg (extend rep op_len x)
-  (src2, code2) <- getSomeReg (extend rep op_len y)
-  let code dst = code1 `appOL` code2 `appOL` toOL [
-                 DIV ins_fmt sgn dst src1 src2,
-                 MULL ins_fmt dst dst (RIReg src2),
-                 SUBF dst dst src1
-                 ]
-  return (Any (intFormat rep) code)
+  (x_reg, x_code) <- getSomeReg (extend rep op_len arg_x)
+  (y_reg, y_code) <- getSomeReg (extend rep op_len arg_y)
+  return $ \reg_r -> y_code `appOL` x_code
+                     `appOL` toOL [ DIV fmt sgn reg_q x_reg y_reg
+                                  , MULL fmt reg_r reg_q (RIReg y_reg)
+                                  , SUBF reg_r reg_r x_reg
+                                  ]
+
 
 coerceInt2FP :: Width -> Width -> CmmExpr -> NatM Register
 coerceInt2FP fromRep toRep x = do
