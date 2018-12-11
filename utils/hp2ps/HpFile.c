@@ -398,45 +398,42 @@ GetIdent(FILE *infp)
 
 
 /*
- *      Read a sequence of characters that make up a string and
- *      assign the result to "thestring".
+ * Read a sequence of characters that make up a string and assign the result to
+ * "thestring". A string is surrounded by double quotes, with a double quote
+ * itself escaped as two contiguous double quotes.
  */
 
 void
 GetString(FILE *infp)
 {
-    unsigned int i;
-    char *stringbuffer;
-    size_t stringbuffersize;
-
     ASSERT(ch == '\"');
 
-    stringbuffersize = 5000;
-    stringbuffer = xmalloc(stringbuffersize);
+    size_t stringbuffersize = 5000;
+    char *stringbuffer = xmalloc(stringbuffersize);
 
     ch = getc(infp);    /* skip the '\"' that begins the string */
 
-    i = 0;
-    while (ch != '\"') {
+    for (size_t i = 0; ; ++i) {
         if (ch == EOF) {
-                Error("%s, line %d: EOF when expecting \"", hpfile, linenum, ch);
+            Error("%s, line %d: EOF when expecting \"", hpfile, linenum, ch);
         }
-        else if (i == stringbuffersize - 1) {
-            stringbuffersize = 2 * stringbuffersize;
+        if (i == stringbuffersize) {
+            stringbuffersize *= 2;
             stringbuffer = xrealloc(stringbuffer, stringbuffersize);
         }
-        stringbuffer[ i++ ] = ch;
+        if (ch == '\"') {
+            ch = getc(infp);
+            if (ch != '\"') {
+                stringbuffer[i] = '\0';
+                break;
+            }
+        }
+        stringbuffer[i] = ch;
         ch = getc(infp);
     }
 
-    stringbuffer[i] = '\0';
     thestring = copystring(stringbuffer);
-
     free(stringbuffer);
-
-    ASSERT(ch == '\"');
-
-    ch = getc(infp);      /* skip the '\"' that terminates the string */
 }
 
 boolish
