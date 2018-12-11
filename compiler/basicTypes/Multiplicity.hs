@@ -29,7 +29,8 @@ module Multiplicity
   , IsSubmult(..)
   , submultMaybe
   , traverseMult
-  , multThingList ) where
+  , multThingList
+  , mapMult ) where
 
 import GhcPrelude
 
@@ -217,3 +218,12 @@ multThingList _ Omega = []
 multThingList f (MultThing t) = [f t]
 multThingList f (MultAdd x y) = multThingList f x ++ multThingList f y
 multThingList f (MultMul x y) = multThingList f x ++ multThingList f y
+
+-- Not a Functor, since MultThing calls 'fromMult'.
+mapMult :: (Multable t, Multable u) => (t -> u) -> GMult t -> GMult u
+mapMult _ Zero = Zero
+mapMult _ One = One
+mapMult _ Omega = Omega
+mapMult f (MultThing t) = MultThing (f t)
+mapMult f (MultAdd x y) = MultAdd (mapMult f x) (mapMult f y)
+mapMult f (MultMul x y) = MultMul (mapMult f x) (mapMult f y)

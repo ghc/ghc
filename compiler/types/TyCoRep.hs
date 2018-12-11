@@ -2940,10 +2940,7 @@ subst_ty subst ty
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
 subst_mult :: TCvSubst -> Mult -> Mult
-subst_mult subst (MultThing t) = MultThing (subst_ty subst t)
-subst_mult subst (MultAdd m1 m2) = MultAdd (subst_mult subst m1) (subst_mult subst m2)
-subst_mult subst (MultMul m1 m2) = MultMul (subst_mult subst m1) (subst_mult subst m2)
-subst_mult _ r = r
+subst_mult subst = mapMult (subst_ty subst)
 
 substTyVar :: TCvSubst -> TyVar -> Type
 substTyVar (TCvSubst _ tenv _) tv
@@ -3621,12 +3618,7 @@ tidyTypes env tys = map (tidyType env) tys
 
 ---------------
 tidyMult :: TidyEnv -> Mult -> Mult
-tidyMult _   Zero  = Zero
-tidyMult _   One   = One
-tidyMult _   Omega = Omega
-tidyMult env (MultThing x) = MultThing (tidyType env x)
-tidyMult env (MultAdd x y) = MultAdd (tidyMult env x) (tidyMult env y)
-tidyMult env (MultMul x y) = MultMul (tidyMult env x) (tidyMult env y)
+tidyMult env = mapMult (tidyType env)
 
 tidyType :: TidyEnv -> Type -> Type
 tidyType _   (LitTy n)            = LitTy n
