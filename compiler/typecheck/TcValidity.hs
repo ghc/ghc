@@ -1344,7 +1344,7 @@ dropCasts :: Type -> Type
 -- To consider: drop only HoleCo casts
 dropCasts (CastTy ty _)     = dropCasts ty
 dropCasts (AppTy t1 t2)     = mkAppTy (dropCasts t1) (dropCasts t2)
-dropCasts (FunTy w t1 t2)   = mkFunTy w (dropCasts t1) (dropCasts t2)
+dropCasts (FunTy w t1 t2)   = mkFunTy (mapMult dropCasts w) (dropCasts t1) (dropCasts t2)
 dropCasts (TyConApp tc tys) = mkTyConApp tc (map dropCasts tys)
 dropCasts (ForAllTy b ty)   = ForAllTy (dropCastsB b) (dropCasts ty)
 dropCasts ty                = ty  -- LitTy, TyVarTy, CoercionTy

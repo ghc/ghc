@@ -2884,9 +2884,10 @@ occCheckExpand vs_to_avoid ty
     go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1
                                 ; ty2' <- go cxt ty2
                                 ; return (mkAppTy ty1' ty2') }
-    go cxt (FunTy w ty1 ty2) = do { ty1' <- go cxt ty1
-                                ; ty2' <- go cxt ty2
-                                ; return (mkFunTy w ty1' ty2') }
+    go cxt (FunTy w ty1 ty2) = do { w' <- traverseMult (go cxt) w
+                                  ; ty1' <- go cxt ty1
+                                  ; ty2' <- go cxt ty2
+                                  ; return (mkFunTy w' ty1' ty2') }
     go cxt@(as, env) (ForAllTy (Bndr tv vis) body_ty)
        = do { ki' <- go cxt (varType tv)
             ; let tv' = setVarType tv ki'
