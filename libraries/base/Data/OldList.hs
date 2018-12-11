@@ -221,7 +221,7 @@ import GHC.Real
 import GHC.List
 import GHC.Base
 
-infix 5 \\ -- comment to fool cpp: https://www.haskell.org/ghc/docs/latest/html/users_guide/options-phases.html#cpp-string-gaps
+infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/phases.html#cpp-and-string-gaps
 
 -- -----------------------------------------------------------------------------
 -- List functions
