@@ -67,6 +67,7 @@ executable hadrian
                        , Rules.Program
                        , Rules.Register
                        , Rules.Selftest
+                       , Rules.SimpleTargets
                        , Rules.SourceDist
                        , Rules.Test
                        , Settings
