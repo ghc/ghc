@@ -119,7 +119,8 @@ import Data.Ord
 import Data.IORef
 import System.Directory
 import System.FilePath
-import Plugins ( PluginRecompile(..), Plugin(..), LoadedPlugin(..))
+import Plugins ( PluginRecompile(..), PluginWithArgs(..), LoadedPlugin(..),
+                 pluginRecompile', plugins )
 
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
@@ -189,7 +190,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
   = do
           let used_names = mkUsedNames tc_result
           let pluginModules =
-                map lpModule (plugins (hsc_dflags hsc_env))
+                map lpModule (cachedPlugins (hsc_dflags hsc_env))
           deps <- mkDependencies
                     (thisInstalledUnitId (hsc_dflags hsc_env))
                     (map mi_module pluginModules) tc_result
@@ -1324,17 +1325,16 @@ checkPlugins :: HscEnv -> ModIface -> IfG RecompileRequired
 checkPlugins hsc iface = liftIO $ do
   -- [(ModuleName, Plugin, [Opts])]
   let old_fingerprint = mi_plugin_hash iface
-      loaded_plugins = plugins (hsc_dflags hsc)
-  res <- mconcat <$> mapM checkPlugin loaded_plugins
+  res <- mconcat <$> mapM pluginRecompile' (plugins (hsc_dflags hsc))
   return (pluginRecompileToRecompileRequired old_fingerprint res)
 
 fingerprintPlugins :: HscEnv -> IO Fingerprint
 fingerprintPlugins hsc_env = do
-  fingerprintPlugins' (plugins (hsc_dflags hsc_env))
+  fingerprintPlugins' $ plugins(hsc_dflags hsc_env)
 
-fingerprintPlugins' :: [LoadedPlugin] -> IO Fingerprint
+fingerprintPlugins' :: [PluginWithArgs] -> IO Fingerprint
 fingerprintPlugins' plugins = do
-  res <- mconcat <$> mapM checkPlugin plugins
+  res <- mconcat <$> mapM pluginRecompile' plugins
   return $ case res of
       NoForceRecompile ->  fingerprintString "NoForceRecompile"
       ForceRecompile   -> fingerprintString "ForceRecompile"
@@ -1343,10 +1343,6 @@ fingerprintPlugins' plugins = do
       -- "maybeRecompile", fp]
       (MaybeRecompile fp) -> fp
 
-
-
-checkPlugin :: LoadedPlugin -> IO PluginRecompile
-checkPlugin (LoadedPlugin plugin _ opts) = pluginRecompile plugin opts
 
 pluginRecompileToRecompileRequired :: Fingerprint -> PluginRecompile -> RecompileRequired
 pluginRecompileToRecompileRequired old_fp pr =

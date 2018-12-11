@@ -2832,8 +2832,7 @@ withTcPlugins hsc_env m =
        return (solve s, stop s)
 
 getTcPlugins :: DynFlags -> [TcRnMonad.TcPlugin]
-getTcPlugins dflags = catMaybes $ map get_plugin (plugins dflags)
-  where get_plugin p = tcPlugin (lpPlugin p) (lpArguments p)
+getTcPlugins dflags = catMaybes $ mapPlugins dflags (\p args -> tcPlugin p args)
 
 runRenamerPlugin :: TcGblEnv
                  -> HsGroup GhcRn

@@ -83,13 +83,15 @@ initializePlugins _ df
        return df
 #else
 initializePlugins hsc_env df
-  | map lpModuleName (plugins df) == pluginModNames df -- plugins not changed
-     && all (\p -> lpArguments p == argumentsForPlugin p (pluginModNameOpts df))
-            (plugins df) -- arguments not changed
+  | map lpModuleName (cachedPlugins df)
+         == pluginModNames df -- plugins not changed
+     && all (\p -> paArguments (lpPlugin p)
+                       == argumentsForPlugin p (pluginModNameOpts df))
+            (cachedPlugins df) -- arguments not changed
   = return df -- no need to reload plugins
   | otherwise
   = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
-       return $ df { plugins = loadedPlugins }
+       return $ df { cachedPlugins = loadedPlugins }
   where argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
 #endif
 
@@ -106,7 +108,8 @@ loadPlugins hsc_env
     dflags  = hsc_dflags hsc_env
     to_load = pluginModNames dflags
 
-    attachOptions mod_nm (plug, mod) = LoadedPlugin plug mod (reverse options)
+    attachOptions mod_nm (plug, mod) =
+        LoadedPlugin (PluginWithArgs plug (reverse options)) mod
       where
         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]

@@ -984,12 +984,18 @@ data DynFlags = DynFlags {
   frontendPluginOpts    :: [String],
     -- ^ the @-ffrontend-opt@ flags given on the command line, in *reverse*
     -- order that they're specified on the command line.
-  plugins               :: [LoadedPlugin],
-    -- ^ plugins loaded after processing arguments. What will be loaded here
-    -- is directed by pluginModNames. Arguments are loaded from
+  cachedPlugins         :: [LoadedPlugin],
+    -- ^ plugins dynamically loaded after processing arguments. What will be
+    -- loaded here is directed by pluginModNames. Arguments are loaded from
     -- pluginModNameOpts. The purpose of this field is to cache the plugins so
-    -- they don't have to be loaded each time they are needed.
-    -- See 'DynamicLoading.initializePlugins'.
+    -- they don't have to be loaded each time they are needed.  See
+    -- 'DynamicLoading.initializePlugins'.
+  staticPlugins            :: [StaticPlugin],
+    -- ^ staic plugins which do not need dynamic loading. These plugins are
+    -- intended to be added by GHC API users directly to this list.
+    --
+    -- To add dynamically loaded plugins through the GHC API see
+    -- 'addPluginModuleName' instead.
 
   -- GHC API hooks
   hooks                 :: Hooks,
@@ -1917,7 +1923,8 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         pluginModNames          = [],
         pluginModNameOpts       = [],
         frontendPluginOpts      = [],
-        plugins                 = [],
+        cachedPlugins           = [],
+        staticPlugins           = [],
         hooks                   = emptyHooks,
 
         outputFile              = Nothing,
