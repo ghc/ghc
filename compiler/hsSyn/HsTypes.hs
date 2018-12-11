@@ -1523,9 +1523,9 @@ ppr_fun_ty ty1 mult ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
         arr = case mult of
-          HsLinearArrow -> text "->."
-          HsUnrestrictedArrow -> text "->"
-          HsExplicitMult p -> text "->{" <> ppr p <> text "}"
+          HsLinearArrow -> lollipop
+          HsUnrestrictedArrow -> arrow
+          HsExplicitMult p -> mulArrow (ppr p)
     in
     sep [p1, arr <+> p2]
 

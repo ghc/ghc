@@ -1214,7 +1214,7 @@ zonkStmt env _ (LetStmt x (dL->L l binds))
 
 zonkStmt env zBody (BindStmt (w, bind_ty) pat body bind_op fail_op)
   = do  { (env1, new_bind) <- zonkSyntaxExpr env bind_op
-        ; new_w <- zonkRigX env1 w
+        ; new_w <- zonkMultX env1 w
         ; new_bind_ty <- zonkTcTypeToTypeX env1 bind_ty
         ; new_body <- zBody env1 body
         ; (env2, new_pat) <- zonkPat env1 pat
@@ -1876,14 +1876,14 @@ zonkTcTypesToTypes :: [TcType] -> TcM [Type]
 zonkTcTypesToTypes = initZonkEnv zonkTcTypesToTypesX
 
 zonkScaledTcTypeToTypeX :: ZonkEnv -> Scaled TcType -> TcM (Scaled TcType)
-zonkScaledTcTypeToTypeX env (Scaled r ty) = Scaled <$> zonkRigX env r
+zonkScaledTcTypeToTypeX env (Scaled r ty) = Scaled <$> zonkMultX env r
                                                          <*> zonkTcTypeToTypeX env ty
 
-zonkRigX :: ZonkEnv -> Mult -> TcM Mult
-zonkRigX env (MultThing t) = MultThing <$> zonkTcTypeToTypeX env t
-zonkRigX env (MultAdd m1 m2) = MultAdd <$> zonkRigX env m1 <*> zonkRigX env m2
-zonkRigX env (MultMul m1 m2) = MultMul <$> zonkRigX env m1 <*> zonkRigX env m2
-zonkRigX _env r = return r
+zonkMultX :: ZonkEnv -> Mult -> TcM Mult
+zonkMultX env (MultThing t) = MultThing <$> zonkTcTypeToTypeX env t
+zonkMultX env (MultAdd m1 m2) = MultAdd <$> zonkMultX env m1 <*> zonkMultX env m2
+zonkMultX env (MultMul m1 m2) = MultMul <$> zonkMultX env m1 <*> zonkMultX env m2
+zonkMultX _env r = return r
 
 zonkTcTypesToTypesX :: Traversable t => ZonkEnv -> (t TcType) -> TcM (t Type)
 zonkTcTypesToTypesX env tys = mapM (zonkTcTypeToTypeX env) tys

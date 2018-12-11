@@ -870,7 +870,7 @@ and -XLinearTypes)
 -- @
 -- ($) :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPE r).
 --        (a -> b) -> a -> b
--- Just :: forall (k :: Multiplicity) a. a ->@{k} Maybe a
+-- Just :: forall (k :: Multiplicity) a. a -->.(k) Maybe a
 -- @
 --
 -- turns in to,

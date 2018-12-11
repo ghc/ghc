@@ -1079,7 +1079,7 @@ collectAnonWildCards lty = go lty
     go lty = case unLoc lty of
       HsWildCardTy (AnonWildCard wc) -> [unLoc wc]
       HsAppTy _ ty1 ty2              -> go ty1 `mappend` go ty2
-      HsFunTy _ ty1 _ ty2            -> go ty1 `mappend` go ty2
+      HsFunTy _ ty1 w ty2            -> go ty1 `mappend` go ty2 `mappend` go_arr w
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
       HsSumTy _ tys                  -> gos tys
@@ -1103,6 +1103,10 @@ collectAnonWildCards lty = go lty
       HsTyVar{} -> mempty
       HsStarTy{} -> mempty
       XHsType{} -> mempty
+
+    go_arr HsLinearArrow = mempty
+    go_arr HsUnrestrictedArrow = mempty
+    go_arr (HsExplicitMult ty) = go ty
 
     gos = mconcat . map go
 
