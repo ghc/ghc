@@ -30,6 +30,10 @@ def inside_git_repo():
     except subprocess.CalledProcessError:
         return False
 
+# Check if the worktree is dirty.
+def is_worktree_dirty():
+    return subprocess.check_output(['git', 'status', '--porcelain']) != b''
+
 #
 # Some data access functions. A the moment this uses git notes.
 #
