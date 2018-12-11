@@ -155,13 +155,16 @@ includeGhcArgs = do
 -- Check if building dynamically is required. GHC is a special case that needs
 -- to be built dynamically if any of the RTS ways is dynamic.
 requiresDynamic :: Expr Bool
-requiresDynamic = do
-    pkg <- getPackage
-    way <- getWay
-    rtsWays <- getRtsWays
-    let
-        dynRts = any (Dynamic `wayUnit`) rtsWays
-        dynWay = Dynamic `wayUnit` way
-    return $ if pkg == ghc
-                then dynRts || dynWay
-                else dynWay
+requiresDynamic = wayUnit Dynamic <$> getWay
+    -- TODO This logic has been reverted as the dynamic build is broken.
+    --      See #15837.
+    --
+    -- pkg <- getPackage
+    -- way <- getWay
+    -- rtsWays <- getRtsWays
+    -- let
+    --     dynRts = any (Dynamic `wayUnit`) rtsWays
+    --     dynWay = Dynamic `wayUnit` way
+    -- return $ if pkg == ghc
+    --             then dynRts || dynWay
+    --             else dynWay
