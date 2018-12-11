@@ -2147,17 +2147,8 @@ almost_devoid_co_var_of_prov UnsafeCoerceProv _ = True
 almost_devoid_co_var_of_prov (PluginProv _) _ = True
 
 almost_devoid_co_var_of_mult :: Mult -> CoVar -> Bool
-almost_devoid_co_var_of_mult Zero _ = False
-almost_devoid_co_var_of_mult One _ = False
-almost_devoid_co_var_of_mult Omega _ = False
-almost_devoid_co_var_of_mult (MultAdd x y) cv
-  = almost_devoid_co_var_of_mult x cv
-  && almost_devoid_co_var_of_mult y cv
-almost_devoid_co_var_of_mult (MultMul x y) cv
-  = almost_devoid_co_var_of_mult x cv
-  && almost_devoid_co_var_of_mult y cv
-almost_devoid_co_var_of_mult (MultThing x) cv
-  = almost_devoid_co_var_of_type x cv
+almost_devoid_co_var_of_mult m cv =
+  and $ multThingList (\x -> almost_devoid_co_var_of_type x cv) m
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
 almost_devoid_co_var_of_type (TyVarTy _) _ = True
