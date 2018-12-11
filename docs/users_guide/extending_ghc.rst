@@ -193,10 +193,11 @@ with ``-fexternal-interpreter`` let GHC developers know in :ghc-ticket:`14335`.
 Using compiler plugins
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Plugins can be specified on the command line with the
-:ghc-flag:`-fplugin=⟨module⟩` option where ⟨module⟩ is a
-module in a registered package that exports a plugin. Arguments can be given to
-plugins with the :ghc-flag:`-fplugin-opt=⟨module⟩:⟨args⟩` option.
+Plugins can be added on the command line with the :ghc-flag:`-fplugin=⟨module⟩`
+option where ⟨module⟩ is a module in a registered package that exports the
+plugin. Arguments can be passed to the plugins with the
+:ghc-flag:`-fplugin-opt=⟨module⟩:⟨args⟩` option. The list of enabled plugins can
+be reset with the :ghc-flag:`-fclear-plugins` option.
 
 .. ghc-flag:: -fplugin=⟨module⟩
     :shortdesc: Load a plugin exported by a given module
@@ -214,6 +215,16 @@ plugins with the :ghc-flag:`-fplugin-opt=⟨module⟩:⟨args⟩` option.
 
     Give arguments to a plugin module; module must be specified with
     :ghc-flag:`-fplugin=⟨module⟩`.
+
+.. ghc-flag:: -fclear-plugins
+    :shortdesc: Clear the list of active plugins
+    :type: dynamic
+    :category: plugins
+
+    Clear the list of plugins previously specified with
+    :ghc-flag:`-fplugin`. This is useful in GHCi where simply removing the
+    :ghc-flag:`-fplugin` options from the command line is not possible. Instead
+    `:set -fclear-plugins` can be used.
 
 
 As an example, in order to load the plugin exported by ``Foo.Plugin`` in

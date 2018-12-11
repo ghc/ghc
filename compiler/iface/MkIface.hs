@@ -1325,14 +1325,15 @@ checkVersions hsc_env mod_summary iface
 -- | Check if any plugins are requesting recompilation
 checkPlugins :: HscEnv -> ModIface -> IfG RecompileRequired
 checkPlugins hsc iface = liftIO $ do
-  -- [(ModuleName, Plugin, [Opts])]
+  new_fingerprint <- fingerprintPlugins hsc
   let old_fingerprint = mi_plugin_hash iface
-  res <- mconcat <$> mapM pluginRecompile' (plugins (hsc_dflags hsc))
-  return (pluginRecompileToRecompileRequired old_fingerprint res)
+  pr <- mconcat <$> mapM pluginRecompile' (plugins (hsc_dflags hsc))
+  return $
+    pluginRecompileToRecompileRequired old_fingerprint new_fingerprint pr
 
 fingerprintPlugins :: HscEnv -> IO Fingerprint
 fingerprintPlugins hsc_env = do
-  fingerprintPlugins' $ plugins(hsc_dflags hsc_env)
+  fingerprintPlugins' $ plugins (hsc_dflags hsc_env)
 
 fingerprintPlugins' :: [PluginWithArgs] -> IO Fingerprint
 fingerprintPlugins' plugins = do
@@ -1346,13 +1347,49 @@ fingerprintPlugins' plugins = do
       (MaybeRecompile fp) -> fp
 
 
-pluginRecompileToRecompileRequired :: Fingerprint -> PluginRecompile -> RecompileRequired
-pluginRecompileToRecompileRequired old_fp pr =
-  case pr of
-    NoForceRecompile -> UpToDate
-    ForceRecompile   -> RecompBecause "Plugin forced recompilation"
-    MaybeRecompile fp  -> if fp == old_fp then UpToDate
-                                          else RecompBecause "Plugin fingerprint changed"
+pluginRecompileToRecompileRequired
+    :: Fingerprint -> Fingerprint -> PluginRecompile -> RecompileRequired
+pluginRecompileToRecompileRequired old_fp new_fp pr
+  | old_fp == new_fp =
+    case pr of
+      NoForceRecompile  -> UpToDate
+
+      -- we already checked the fingerprint above so a mismatch is not possible
+      -- here, remember that: `fingerprint (MaybeRecomp x) == x`.
+      MaybeRecompile _  -> UpToDate
+
+      -- when we have an impure plugin in the stack we have to unconditionally
+      -- recompile since it might integrate all sorts of crazy IO results into
+      -- its compilation output.
+      ForceRecompile    -> RecompBecause "Impure plugin forced recompilation"
+
+  | old_fp `elem` magic_fingerprints ||
+    new_fp `elem` magic_fingerprints
+    -- The fingerprints do not match either the old or new one is a magic
+    -- fingerprint. This happens when non-pure plugins are added for the first
+    -- time or when we go from one recompilation strategy to another: (force ->
+    -- no-force, maybe-recomp -> no-force, no-force -> maybe-recomp etc.)
+    --
+    -- For example when we go from from ForceRecomp to NoForceRecomp
+    -- recompilation is triggered since the old impure plugins could have
+    -- changed the build output which is now back to normal.
+    = RecompBecause "Plugins changed"
+
+  | otherwise =
+    let reason = "Plugin fingerprint changed" in
+    case pr of
+      -- even though a plugin is forcing recompilation the fingerprint changed
+      -- which would cause recompilation anyways so we report the fingerprint
+      -- change instead.
+      ForceRecompile   -> RecompBecause reason
+
+      _                -> RecompBecause reason
+
+ where
+   magic_fingerprints =
+       [ fingerprintString "NoForceRecompile"
+       , fingerprintString "ForceRecompile"
+       ]
 
 
 -- | Check if an hsig file needs recompilation because its

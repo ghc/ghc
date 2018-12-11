@@ -199,3 +199,11 @@ test('static-plugins',
       extra_run_opts('"' + config.libdir + '"')],
      compile_and_run,
      ['-package ghc -isimple-plugin/'])
+
+test('T15858',
+     [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
+#      only_ways([config.ghc_plugin_way]),
+      pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}'),
+      extra_hc_opts("-package-db plugin-recomp/pkg.plugins01/local.package.conf ")
+      ],
+     ghci_script, ['T15858.script'])
