@@ -61,6 +61,7 @@ test('TH_spliceD2', [], multimod_compile, ['TH_spliceD2', '-v0'])
 
 test('TH_reifyDecl1', expect_broken(242), compile, ['-v0'])
 test('TH_reifyDecl2', normal, compile, ['-v0'])
+test('TH_reifyLinear', normal, compile_fail, ['-v0'])
 test('TH_reifyLocalDefs', normal, compile, ['-v0'])
 test('TH_reifyLocalDefs2', normal, compile, ['-v0'])
 

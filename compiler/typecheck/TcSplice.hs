@@ -1759,9 +1759,10 @@ reifyType ty@(AppTy {})     = do
     filter_out_invisible_args ty_head ty_args =
       filterByList (map isVisibleArgFlag $ appTyArgFlags ty_head ty_args)
                    ty_args
-reifyType ty@(FunTy _ t1 t2)
+reifyType ty@(FunTy Omega t1 t2)
   | isPredTy t1 = reify_for_all ty  -- Types like ((?x::Int) => Char -> Char)
   | otherwise   = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
+reifyType ty@(FunTy _ t1 t2) = noTH (sLit "non-Omega multiplicity") (ppr ty)
 reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
 reifyType ty@(CoercionTy {})= noTH (sLit "coercions in types") (ppr ty)
 
