@@ -28,12 +28,14 @@ module Multiplicity
   , scaleScaled
   , IsSubmult(..)
   , submultMaybe
+  , traverseMult
   , multThingList ) where
 
 import GhcPrelude
 
 import Data.Data
 import Outputable
+import Control.Applicative
 
 --
 -- * Core properties of multiplicities
@@ -198,6 +200,15 @@ submultMaybe r1 r2 = go r1 r2
     go One   _     = Smaller
 --    go (MultThing t) (MultThing t') = Unknown
     go _     _     = Unknown
+
+
+traverseMult :: (Multable t, Multable u, Applicative f) => (t -> f u) -> GMult t -> f (GMult u)
+traverseMult _ Zero = pure Zero
+traverseMult _ One = pure One
+traverseMult _ Omega = pure Omega
+traverseMult f (MultThing t) = MultThing <$> f t
+traverseMult f (MultAdd x y) = MultAdd <$> traverseMult f x <*> traverseMult f y
+traverseMult f (MultMul x y) = MultMul <$> traverseMult f x <*> traverseMult f y
 
 multThingList :: Multable t => (t -> a) -> GMult t -> [a]
 multThingList _ Zero = []

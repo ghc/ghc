@@ -623,13 +623,7 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_level mode of
        ; checkExpectedKind (HsFunTy noExt ty1 mult ty2) (mkFunTy mult' ty1' ty2') liftedTypeKind exp_kind }
 
 tc_mult :: TcTyMode -> HsMult -> TcM Mult
-tc_mult mode r = case r of
-                         Zero -> return Zero
-                         One  -> return One
-                         Omega -> return Omega
-                         MultAdd x y -> liftM2 MultAdd (tc_mult mode x) (tc_mult mode y)
-                         MultMul x y -> liftM2 MultMul (tc_mult mode x) (tc_mult mode y)
-                         MultThing ty -> MultThing <$> tc_lhs_type mode ty multiplicityTy
+tc_mult mode = traverseMult (\ty -> tc_lhs_type mode ty multiplicityTy)
 
 
 ------------------------------------------

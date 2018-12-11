@@ -569,7 +569,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go (TyConApp tc tys)
       = do { tc' <- tycon tc
            ; mktyconapp tc' <$> mapM go tys }
-    go (FunTy w arg res)   = FunTy <$> go_mult w <*> go arg <*> go res
+    go (FunTy w arg res)   = FunTy <$> traverseMult go w <*> go arg <*> go res
     go (ForAllTy (Bndr tv vis) inner)
       = do { (env', tv') <- tycobinder env tv vis
            ; inner' <- mapType mapper env' inner
@@ -577,11 +577,6 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go ty@(LitTy {})   = return ty
     go (CastTy ty co)  = mkcastty <$> go ty <*> mapCoercion mapper env co
     go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
-
-    go_mult (MultAdd x y) = liftM2 MultAdd (go_mult x) (go_mult y)
-    go_mult (MultMul x y) = liftM2 MultMul (go_mult x) (go_mult y)
-    go_mult (MultThing t) = toMult <$> go t
-    go_mult t = pure t
 
     (mktyconapp, mkappty, mkcastty)
       | smart     = (mkTyConApp, mkAppTy, mkCastTy)
