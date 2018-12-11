@@ -1,0 +1,75 @@
+x86_64-fedora	T3924	normal	bytes allocated	50616
+x86_64-fedora	haddock.base	normal	bytes allocated	22506892072
+x86_64-fedora	haddock.Cabal	normal	bytes allocated	23745399592
+x86_64-fedora	haddock.compiler	normal	bytes allocated	61378504048
+x86_64-fedora	join004	optasm	bytes allocated	16050576
+x86_64-fedora	join003	optasm	bytes allocated	2000050712
+x86_64-fedora	T12791	normal	max_bytes_used	44408
+x86_64-fedora	T5835	normal	max_bytes_used	44408
+x86_64-fedora	join007	optasm	bytes allocated	50896
+x86_64-fedora	T4830	normal	bytes allocated	97936
+x86_64-fedora	T10359	normal	bytes allocated	450680
+x86_64-fedora	join002	optasm	bytes allocated	2000050712
+x86_64-fedora	T14955	normal	bytes allocated	48050592
+x86_64-fedora	T876	normal	bytes allocated	57400
+x86_64-fedora	lazy-bs-alloc	normal	peak_megabytes_allocated	2
+x86_64-fedora	lazy-bs-alloc	normal	bytes allocated	428688
+x86_64-fedora	MethSharing	normal	peak_megabytes_allocated	2
+x86_64-fedora	MethSharing	normal	bytes allocated	480097920
+x86_64-fedora	T3586	normal	peak_megabytes_allocated	18
+x86_64-fedora	T3586	normal	bytes allocated	16102016
+x86_64-fedora	T3738	normal	peak_megabytes_allocated	2
+x86_64-fedora	T3738	normal	bytes allocated	50376
+x86_64-fedora	T4978	normal	bytes allocated	10136416
+x86_64-fedora	T5113	normal	bytes allocated	8058464
+x86_64-fedora	Conversions	normal	bytes allocated	107512
+x86_64-fedora	T7797	normal	bytes allocated	480050408
+x86_64-fedora	T5949	normal	bytes allocated	200920
+x86_64-fedora	T5205	normal	bytes allocated	54224
+x86_64-fedora	T7436	normal	max_bytes_used	60272
+x86_64-fedora	T7954	normal	bytes allocated	1280050896
+x86_64-fedora	T5237	normal	bytes allocated	104280
+x86_64-fedora	T4267	normal	bytes allocated	40904
+x86_64-fedora	InlineByteArrayAlloc	normal	bytes allocated	1440040904
+x86_64-fedora	T4474a	normal	bytes allocated	4831889872
+x86_64-fedora	T5536	normal	bytes allocated	890357192
+x86_64-fedora	T7257	normal	bytes allocated	1297292304
+x86_64-fedora	T7257	normal	peak_megabytes_allocated	228
+x86_64-fedora	T4474b	normal	bytes allocated	4831889872
+x86_64-fedora	T7619	normal	bytes allocated	40904
+x86_64-fedora	T9203	normal	bytes allocated	46371696
+x86_64-fedora	InlineArrayAlloc	normal	bytes allocated	1600040904
+x86_64-fedora	InlineCloneArrayAlloc	normal	bytes allocated	1600041064
+x86_64-fedora	T9339	normal	bytes allocated	50632
+x86_64-fedora	T8472	normal	bytes allocated	50640
+x86_64-fedora	T5549	normal	bytes allocated	5793139976
+x86_64-fedora	T13001	normal	bytes allocated	50520
+x86_64-fedora	T4474c	normal	bytes allocated	4831889872
+x86_64-fedora	T12996	normal	bytes allocated	78904
+x86_64-fedora	T12990	normal	bytes allocated	20840920
+x86_64-fedora	T8763	normal	bytes allocated	40904
+x86_64-fedora	DeriveNull	normal	bytes allocated	112050712
+x86_64-fedora	T13218	normal	bytes allocated	82005432
+x86_64-fedora	T13218	normal	max_bytes_used	332488
+x86_64-fedora	T15226a	normal	bytes allocated	40928
+x86_64-fedora	T15426	normal	bytes allocated	41168
+x86_64-fedora	T15263	normal	bytes allocated	1302032
+x86_64-fedora	T15226	normal	bytes allocated	40928
+x86_64-fedora	T14936	normal	bytes allocated	51072
+x86_64-fedora	T4334	normal	peak_megabytes_allocated	3
+x86_64-fedora	T13623	normal	bytes allocated	50704
+x86_64-fedora	T2762	normal	peak_megabytes_allocated	2
+x86_64-fedora	T14052	ghci	bytes allocated	2296712280
+x86_64-fedora	space_leak_001	normal	peak_megabytes_allocated	4
+x86_64-fedora	space_leak_001	normal	bytes allocated	11315396232
+x86_64-fedora	space_leak_001	normal	max_bytes_used	441848
+x86_64-fedora	T15578	normal	bytes allocated	800041224
+x86_64-fedora	T7850	normal	peak_megabytes_allocated	5
+x86_64-fedora	T10678	normal	bytes allocated	64041352
+x86_64-fedora	T4029	ghci	peak_megabytes_allocated	72
+x86_64-fedora	T4029	ghci	max_bytes_used	21120480
+x86_64-fedora	T13536a	optasm	bytes allocated	86576
+x86_64-fedora	T8766	normal	bytes allocated	16827928
+x86_64-fedora	T9848	normal	bytes allocated	51616
+x86_64-fedora	T13191	normal	bytes allocated	185942592
+x86_64-fedora	T3474	normal	max_bytes_used	44408
