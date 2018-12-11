@@ -280,7 +280,7 @@ import Unique ( nonDetCmpUnique )
 
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust )
-import Control.Monad    ( guard, liftM2 )
+import Control.Monad    ( guard )
 
 -- $type_classification
 -- #type_classification#
