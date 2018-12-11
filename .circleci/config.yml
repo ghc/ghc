@@ -182,6 +182,29 @@ jobs:
       - *store_test_artifacts
       - *push_perf_note
 
+  "validate-x86_64-linux-deb9-integer-simple":
+    resource_class: xlarge
+    docker:
+      - image: ghcci/x86_64-linux-deb9:0.1
+    environment:
+      <<: *buildenv
+      INTEGER_LIBRARY: integer-simple
+      GHC_COLLECTOR_FLAVOR: x86_64-linux-deb9
+    steps:
+      - checkout
+      - *set_git_identity
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *bindist
+      - *store_bindist
+      - *test
+      - *store_test_results
+      - *store_test_artifacts
+      - *push_perf_note
+
   "validate-x86_64-linux-deb9":
     resource_class: xlarge
     docker:
@@ -189,7 +212,7 @@ jobs:
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-linux-deb9
-      TEST_ENV: x86_64-linux
+      TEST_ENV: x86_64-linux-deb9
     steps:
       - checkout
       - *set_git_identity
@@ -441,6 +464,8 @@ workflows:
     - validate-x86_64-linux-deb8-unreg
     - validate-x86_64-linux-deb8-llvm
     - validate-x86_64-linux-deb8-debug
+    - validate-x86_64-linux-deb9
+    - validate-x86_64-linux-deb9-integer-simple
     - slow-validate-x86_64-linux-deb8
 
 notify:
