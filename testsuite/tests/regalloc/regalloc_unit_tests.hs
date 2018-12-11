@@ -143,7 +143,7 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
           thisMod = mkModule
                         (stringToUnitId . show . uniqFromSupply $ usc)
                         (mkModuleName . show . uniqFromSupply $ usd)
-          thisModLoc = ModLocation Nothing (cmmFile ++ ".hi") (cmmFile ++ ".o")
+          thisModLoc = ModLocation Nothing (cmmFile ++ ".hi") (cmmFile ++ ".o") (cmmFile ++ ".hie")
 
 
 -- | The register allocator should be able to see that each variable only

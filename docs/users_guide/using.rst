@@ -203,6 +203,9 @@ the "right thing" to happen to those files.
 ``.hi``
     A Haskell interface file, probably compiler-generated.
 
+``.hie``
+    An extended Haskell interface file, produced by the Haskell compiler.
+
 ``.hc``
     Intermediate C file produced by the Haskell compiler.
 

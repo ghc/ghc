@@ -677,6 +677,7 @@ summariseRequirement pn mod_name = do
     env <- getBkpEnv
     time <- liftIO $ getModificationUTCTime (bkp_filename env)
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
+    hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
     mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location
@@ -690,6 +691,7 @@ summariseRequirement pn mod_name = do
         ms_hs_date = time,
         ms_obj_date = Nothing,
         ms_iface_date = hi_timestamp,
+        ms_hie_date = hie_timestamp,
         ms_srcimps = [],
         ms_textual_imps = extra_sig_imports,
         ms_parsed_mod = Just (HsParsedModule {
@@ -765,12 +767,13 @@ hsModuleToModSummary pn hsc_src modname
                                 HsSrcFile -> "hs")
     -- DANGEROUS: bootifying can POISON the module finder cache
     let location = case hsc_src of
-                        HsBootFile -> addBootSuffixLocn location0
+                        HsBootFile -> addBootSuffixLocnOut location0
                         _ -> location0
     -- This duplicates a pile of logic in GhcMake
     env <- getBkpEnv
     time <- liftIO $ getModificationUTCTime (bkp_filename env)
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
+    hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
 
     -- Also copied from 'getImports'
     let (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
@@ -815,7 +818,8 @@ hsModuleToModSummary pn hsc_src modname
                 }),
             ms_hs_date = time,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
-            ms_iface_date = hi_timestamp
+            ms_iface_date = hi_timestamp,
+            ms_hie_date = hie_timestamp
         }
 
 -- | Create a new, externally provided hashed unit id from

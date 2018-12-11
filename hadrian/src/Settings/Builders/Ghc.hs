@@ -106,9 +106,7 @@ commonGhcArgs = do
             , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
             , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
             , map ("-optP" ++) <$> getContextData cppOpts
-            , arg "-odir"    , arg path
-            , arg "-hidir"   , arg path
-            , arg "-stubdir" , arg path ]
+            , arg "-outputdir", arg path ]
 
 -- TODO: Do '-ticky' in all debug ways?
 wayGhcArgs :: Args

@@ -1,0 +1,7 @@
+first run
+[1 of 3] Compiling B                ( B.hs, B.o )
+[2 of 3] Compiling C                ( C.hs, C.o )
+[3 of 3] Compiling A                ( A.hs, A.o )
+second run
+[1 of 3] Compiling B                ( B.hs, B.o ) [HIE file is missing]
+[3 of 3] Compiling A                ( A.hs, A.o ) [HIE file is missing]

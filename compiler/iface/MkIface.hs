@@ -1291,6 +1291,8 @@ checkVersions hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- checkHsig mod_summary iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; recomp <- checkHie mod_summary
+       ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Just iface) else do {
        ; recomp <- checkPlugins hsc_env iface
@@ -1313,7 +1315,7 @@ checkVersions hsc_env mod_summary iface
        ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
        ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
        ; return (recomp, Just iface)
-    }}}}}}}}}
+    }}}}}}}}}}
   where
     this_pkg = thisPackage (hsc_dflags hsc_env)
     -- This is a bit of a hack really
@@ -1364,6 +1366,22 @@ checkHsig mod_summary iface = do
     case inner_mod == mi_semantic_module iface of
         True -> up_to_date (text "implementing module unchanged")
         False -> return (RecompBecause "implementing module changed")
+
+-- | Check if @.hie@ file is out of date or missing.
+checkHie :: ModSummary -> IfG RecompileRequired
+checkHie mod_summary = do
+    dflags <- getDynFlags
+    let hie_date_opt = ms_hie_date mod_summary
+        hs_date = ms_hs_date mod_summary
+    pure $ case gopt Opt_WriteHie dflags of
+               False -> UpToDate
+               True -> case hie_date_opt of
+                           Nothing -> RecompBecause "HIE file is missing"
+                           Just hie_date
+                               | hie_date < hs_date
+                               -> RecompBecause "HIE file is out of date"
+                               | otherwise
+                               -> UpToDate
 
 -- | Check the flags haven't changed
 checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired

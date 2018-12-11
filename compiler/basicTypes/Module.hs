@@ -112,7 +112,8 @@ module Module
 
         -- * The ModuleLocation type
         ModLocation(..),
-        addBootSuffix, addBootSuffix_maybe, addBootSuffixLocn,
+        addBootSuffix, addBootSuffix_maybe,
+        addBootSuffixLocn, addBootSuffixLocnOut,
 
         -- * Module mappings
         ModuleEnv,
@@ -267,11 +268,12 @@ data ModLocation
                 -- yet.  Always of form foo.hi, even if there is an
                 -- hi-boot file (we add the -boot suffix later)
 
-        ml_obj_file  :: FilePath
+        ml_obj_file  :: FilePath,
                 -- Where the .o file is, whether or not it exists yet.
                 -- (might not exist either because the module hasn't
                 -- been compiled yet, or because it is part of a
                 -- package with a .a file)
+        ml_hie_file  :: FilePath
   } deriving Show
 
 instance Outputable ModLocation where
@@ -302,7 +304,16 @@ addBootSuffixLocn :: ModLocation -> ModLocation
 addBootSuffixLocn locn
   = locn { ml_hs_file  = fmap addBootSuffix (ml_hs_file locn)
          , ml_hi_file  = addBootSuffix (ml_hi_file locn)
-         , ml_obj_file = addBootSuffix (ml_obj_file locn) }
+         , ml_obj_file = addBootSuffix (ml_obj_file locn)
+         , ml_hie_file = addBootSuffix (ml_hie_file locn) }
+
+addBootSuffixLocnOut :: ModLocation -> ModLocation
+-- ^ Add the @-boot@ suffix to all output file paths associated with the
+-- module, not including the input file itself
+addBootSuffixLocnOut locn
+  = locn { ml_hi_file  = addBootSuffix (ml_hi_file locn)
+         , ml_obj_file = addBootSuffix (ml_obj_file locn)
+         , ml_hie_file = addBootSuffix (ml_hie_file locn) }
 
 {-
 ************************************************************************
