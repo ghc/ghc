@@ -197,7 +197,11 @@
 #endif
 
 /* Used to mark a switch case that falls-through */
-#if (defined(__GNUC__) && __GNUC__ >= 7) || defined(__clang__)
+#if (defined(__GNUC__) && __GNUC__ >= 7)
+// N.B. Don't enable fallthrough annotations when compiling with Clang.
+// Apparently clang doesn't enable implicitly fallthrough warnings by default
+// http://llvm.org/viewvc/llvm-project?revision=167655&view=revision
+// when compiling C and the attribute cause warnings of their own (#16019).
 #define FALLTHROUGH GNU_ATTRIBUTE(fallthrough)
 #else
 #define FALLTHROUGH ((void)0)
