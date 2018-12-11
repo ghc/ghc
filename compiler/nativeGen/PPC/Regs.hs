@@ -37,9 +37,9 @@ module PPC.Regs (
         fits16Bits,
         makeImmediate,
         fReg,
-        r0, sp, toc, r3, r4, r11, r12, r27, r28, r30,
+        r0, sp, toc, r3, r4, r11, r12, r30,
         tmpReg,
-        f1, f20, f21,
+        f1,
 
         allocatableRegs
 
@@ -306,7 +306,7 @@ point registers.
 fReg :: Int -> RegNo
 fReg x = (32 + x)
 
-r0, sp, toc, r3, r4, r11, r12, r27, r28, r30, f1, f20, f21 :: Reg
+r0, sp, toc, r3, r4, r11, r12, r30, f1 :: Reg
 r0      = regSingle 0
 sp      = regSingle 1
 toc     = regSingle 2
@@ -314,12 +314,8 @@ r3      = regSingle 3
 r4      = regSingle 4
 r11     = regSingle 11
 r12     = regSingle 12
-r27     = regSingle 27
-r28     = regSingle 28
 r30     = regSingle 30
 f1      = regSingle $ fReg 1
-f20     = regSingle $ fReg 20
-f21     = regSingle $ fReg 21
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
@@ -335,4 +331,4 @@ tmpReg platform =
        case platformArch platform of
        ArchPPC      -> regSingle 13
        ArchPPC_64 _ -> regSingle 30
-       _            -> panic "PPC.Regs.tmpReg: unknowm arch"
+       _            -> panic "PPC.Regs.tmpReg: unknown arch"
