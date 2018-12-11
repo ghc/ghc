@@ -199,10 +199,10 @@ submultMaybe r1 r2 = go r1 r2
 --    go (MultThing t) (MultThing t') = Unknown
     go _     _     = Unknown
 
-multThingList :: Multable t => GMult t -> [t]
-multThingList Zero = []
-multThingList One = []
-multThingList Omega = []
-multThingList (MultThing t) = [t]
-multThingList (MultAdd x y) = multThingList x ++ multThingList y
-multThingList (MultMul x y) = multThingList x ++ multThingList y
+multThingList :: Multable t => (t -> a) -> GMult t -> [a]
+multThingList _ Zero = []
+multThingList _ One = []
+multThingList _ Omega = []
+multThingList f (MultThing t) = [f t]
+multThingList f (MultAdd x y) = multThingList f x ++ multThingList f y
+multThingList f (MultMul x y) = multThingList f x ++ multThingList f y

@@ -2234,7 +2234,7 @@ preCheck dflags ty_fam_ok tv ty
       | bad_tc tc              = OC_Bad
       | otherwise              = mapM fast_check tys >> ok
     fast_check (LitTy {})      = ok
-    fast_check (FunTy w a r)   = mapM_ fast_check (multThingList w) >>
+    fast_check (FunTy w a r)   = sequence_ (multThingList fast_check w) >>
                                  fast_check a   >> fast_check r
     fast_check (AppTy fun arg) = fast_check fun >> fast_check arg
     fast_check (CastTy ty co)  = fast_check ty  >> fast_check_co co

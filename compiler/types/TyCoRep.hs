@@ -2209,7 +2209,7 @@ injectiveVarsOfType = go
                          = go ty'
     go (TyVarTy v)       = unitFV v `unionFV` go (tyVarKind v)
     go (AppTy f a)       = go f `unionFV` go a
-    go (FunTy w ty1 ty2) = unionsFV (map go $ multThingList w) `unionFV`
+    go (FunTy w ty1 ty2) = unionsFV (multThingList go w) `unionFV`
                            go ty1 `unionFV` go ty2
     go (TyConApp tc tys) =
       case tyConInjectivityInfo tc of
@@ -2241,7 +2241,7 @@ noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
 
 noFreeVarsOfMult :: Mult -> Bool
-noFreeVarsOfMult w = all noFreeVarsOfType (multThingList w)
+noFreeVarsOfMult w = and (multThingList noFreeVarsOfType w)
 
 noFreeVarsOfVarMult :: VarMult -> Bool
 noFreeVarsOfVarMult (Regular w) = noFreeVarsOfMult w
