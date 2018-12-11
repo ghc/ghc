@@ -102,10 +102,12 @@ aliases:
   - &store_bindist
     store_artifacts:
       path: ghc.tar.xz
-  - &trigger_on_tags
-    filters:
-      tags:
-        only: /^ghc-.*/
+  - &only_release_tags
+    tags:
+      only: /^ghc-.*/
+  - &ignore_gitlab_branches
+    branches:
+      ignore: /^gitlab\/.*/
 
 jobs:
   "validate-x86_64-freebsd":
@@ -434,23 +436,34 @@ workflows:
   validate:
     jobs:
     - validate-x86_64-linux-deb8:
-        *trigger_on_tags
+        filters:
+          <<: [*only_release_tags, *ignore_gitlab_branches]
     # FreeBSD disabled: https://github.com/haskell/unix/issues/102
     # - validate-x86_64-freebsd
     - validate-x86_64-darwin:
-        *trigger_on_tags
-    - validate-x86_64-linux-deb8-llvm
+        filters:
+          <<: [*only_release_tags, *ignore_gitlab_branches]
+    - validate-x86_64-linux-deb8-llvm:
+        filters:
+          <<: *ignore_gitlab_branches
     - validate-i386-linux-deb8:
-        *trigger_on_tags
+        filters:
+          <<: [*only_release_tags, *ignore_gitlab_branches]
     - validate-x86_64-linux-deb9:
-        *trigger_on_tags
+        filters:
+          <<: [*only_release_tags, *ignore_gitlab_branches]
     - validate-i386-linux-deb9:
-        *trigger_on_tags
+        filters:
+          <<: [*only_release_tags, *ignore_gitlab_branches]
     - validate-x86_64-linux-centos7:
-        *trigger_on_tags
-    - validate-hadrian-x86_64-linux-deb8
+        filters:
+          <<: [*only_release_tags, *ignore_gitlab_branches]
+    - validate-hadrian-x86_64-linux-deb8:
+        filters:
+          <<: *ignore_gitlab_branches
     - validate-x86_64-linux-fedora27:
-        *trigger_on_tags
+        filters:
+          <<: [*only_release_tags, *ignore_gitlab_branches]
 
   nightly:
     triggers:
