@@ -1092,11 +1092,11 @@ lintAltBinders rhs_ue scrut scrut_ty con_ty ((var_w, bndr):bndrs)
 checkCaseLinearity :: UsageEnv -> Var ->  Mult -> Var -> LintM UsageEnv
 checkCaseLinearity ue scrut var_w bndr = do
   ensureEqMults lhs rhs err_msg
-  lintLinearBinder (ppr bndr) (scrut_w * var_w) (varWeight bndr)
+  lintLinearBinder (ppr bndr) (scrut_w `MultMul` var_w) (varWeight bndr)
   return $ deleteUE ue bndr
   where
-    lhs = bndr_usage + (scrut_usage * var_w)
-    rhs = scrut_w * var_w
+    lhs = bndr_usage `MultAdd` (scrut_usage `MultMul` var_w)
+    rhs = scrut_w `MultMul` var_w
     err_msg  = (text "Linearity failure in variable:" <+> ppr bndr
                 $$ ppr lhs <+> text "⊈" <+> ppr rhs
                 $$ text "Computed by:"

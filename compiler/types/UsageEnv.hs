@@ -44,14 +44,14 @@ emptyUE = zeroUE
 
 addUE :: UsageEnv -> UsageEnv -> UsageEnv
 addUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $
-  plusNameEnv_C (+) e1 e2
+  plusNameEnv_C MultAdd e1 e2
 
 addUEs :: Foldable t => t UsageEnv -> UsageEnv
 addUEs = foldr addUE zeroUE
 
 scaleUE :: Mult -> UsageEnv -> UsageEnv
 scaleUE w (UsageEnv e) = UsageEnv $
-  mapNameEnv (w*) e
+  mapNameEnv (MultMul w) e
 
 supUE :: UsageEnv -> UsageEnv -> UsageEnv
 supUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $

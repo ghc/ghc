@@ -418,7 +418,7 @@ varWeight id = case varWeightMaybe id of
 
 scaleVarBy :: Id -> Mult -> Id
 scaleVarBy id@(Id { varMult = Regular w }) r =
-  id { varMult = Regular (r * w) }
+  id { varMult = Regular (r `MultMul` w) }
   -- Note that alias-like variables are preserved by scaling. Consider the
   -- transformation `let x_π = let y_ue = u in v in e ==> let y_ue = u in let
   -- x_π = v in e` if `y` were regular it would need to be scaled (by a factor
