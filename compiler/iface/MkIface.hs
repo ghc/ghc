@@ -460,8 +460,18 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
        -- See also Note [Identity versus semantic module]
        declABI decl = (this_mod, decl, extras)
         where extras = declExtras fix_fn ann_fn non_orph_rules non_orph_insts
-                                  non_orph_fis decl
+                                  non_orph_fis top_lvl_name_env decl
 
+       -- This is used for looking up the Name of a default method
+       -- from its OccName. See Note [default method Name]
+       top_lvl_name_env =
+         mkOccEnv [ (nameOccName nm, nm)
+                  | IfaceId { ifName = nm } <- new_decls ]
+
+       -- Dependency edges between declarations in the current module.
+       -- This is computed by finding the free external names of each
+       -- declaration, including IfaceDeclExtras (things that a
+       -- declaration implicitly depends on).
        edges :: [ Node Unique IfaceDeclABI ]
        edges = [ DigraphNode abi (getUnique (getOccName decl)) out
                | decl <- new_decls
@@ -858,6 +868,12 @@ data IfaceDeclExtras
                                 -- See Note [Orphans] in InstEnv
        [AnnPayload]             -- Annotations of the type itself
        [IfaceIdExtras]          -- For each class method: fixity, RULES and annotations
+       [IfExtName]              -- Default methods. If a module
+                                -- mentions a class, then it can
+                                -- instantiate the class and thereby
+                                -- use the default methods, so we must
+                                -- include these in the fingerprint of
+                                -- a class.
 
   | IfaceSynonymExtras (Maybe Fixity) [AnnPayload]
 
@@ -893,8 +909,9 @@ freeNamesDeclExtras (IfaceIdExtras id_extras)
   = freeNamesIdExtras id_extras
 freeNamesDeclExtras (IfaceDataExtras  _ insts _ subs)
   = unionNameSets (mkNameSet insts : map freeNamesIdExtras subs)
-freeNamesDeclExtras (IfaceClassExtras _ insts _ subs)
-  = unionNameSets (mkNameSet insts : map freeNamesIdExtras subs)
+freeNamesDeclExtras (IfaceClassExtras _ insts _ subs defms)
+  = unionNameSets $
+      mkNameSet insts : mkNameSet defms : map freeNamesIdExtras subs
 freeNamesDeclExtras (IfaceSynonymExtras _ _)
   = emptyNameSet
 freeNamesDeclExtras (IfaceFamilyExtras _ insts _)
@@ -912,8 +929,9 @@ instance Outputable IfaceDeclExtras where
   ppr (IfaceFamilyExtras fix finsts anns) = vcat [ppr fix, ppr finsts, ppr anns]
   ppr (IfaceDataExtras fix insts anns stuff) = vcat [ppr fix, ppr_insts insts, ppr anns,
                                                 ppr_id_extras_s stuff]
-  ppr (IfaceClassExtras fix insts anns stuff) = vcat [ppr fix, ppr_insts insts, ppr anns,
-                                                 ppr_id_extras_s stuff]
+  ppr (IfaceClassExtras fix insts anns stuff defms) =
+    vcat [ppr fix, ppr_insts insts, ppr anns,
+          ppr_id_extras_s stuff, ppr defms]
 
 ppr_insts :: [IfaceInstABI] -> SDoc
 ppr_insts _ = text "<insts>"
@@ -931,8 +949,13 @@ instance Binary IfaceDeclExtras where
    putByte bh 1; put_ bh extras
   put_ bh (IfaceDataExtras fix insts anns cons) = do
    putByte bh 2; put_ bh fix; put_ bh insts; put_ bh anns; put_ bh cons
-  put_ bh (IfaceClassExtras fix insts anns methods) = do
-   putByte bh 3; put_ bh fix; put_ bh insts; put_ bh anns; put_ bh methods
+  put_ bh (IfaceClassExtras fix insts anns methods defms) = do
+   putByte bh 3
+   put_ bh fix
+   put_ bh insts
+   put_ bh anns
+   put_ bh methods
+   put_ bh defms
   put_ bh (IfaceSynonymExtras fix anns) = do
    putByte bh 4; put_ bh fix; put_ bh anns
   put_ bh (IfaceFamilyExtras fix finsts anns) = do
@@ -948,10 +971,11 @@ declExtras :: (OccName -> Maybe Fixity)
            -> OccEnv [IfaceRule]
            -> OccEnv [IfaceClsInst]
            -> OccEnv [IfaceFamInst]
+           -> OccEnv IfExtName          -- lookup default method names
            -> IfaceDecl
            -> IfaceDeclExtras
 
-declExtras fix_fn ann_fn rule_env inst_env fi_env decl
+declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env decl
   = case decl of
       IfaceId{} -> IfaceIdExtras (id_extras n)
       IfaceData{ifCons=cons} ->
@@ -961,13 +985,18 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env decl
                         (ann_fn n)
                         (map (id_extras . occName . ifConName) (visibleIfConDecls cons))
       IfaceClass{ifBody = IfConcreteClass { ifSigs=sigs, ifATs=ats }} ->
-                     IfaceClassExtras (fix_fn n)
-                        (map ifDFun $ (concatMap at_extras ats)
+                     IfaceClassExtras (fix_fn n) insts (ann_fn n) meths defms
+          where
+            insts = (map ifDFun $ (concatMap at_extras ats)
                                     ++ lookupOccEnvL inst_env n)
                            -- Include instances of the associated types
                            -- as well as instances of the class (Trac #5147)
-                        (ann_fn n)
-                        [id_extras (getOccName op) | IfaceClassOp op _ _ <- sigs]
+            meths = [id_extras (getOccName op) | IfaceClassOp op _ _ <- sigs]
+            -- Names of all the default methods (see Note [default method Name])
+            defms = [ dmName
+                    | IfaceClassOp bndr _ (Just _) <- sigs
+                    , let dmOcc = mkDefaultMethodOcc (nameOccName bndr)
+                    , Just dmName <- [lookupOccEnv dm_env dmOcc] ]
       IfaceSynonym{} -> IfaceSynonymExtras (fix_fn n)
                                            (ann_fn n)
       IfaceFamily{} -> IfaceFamilyExtras (fix_fn n)
@@ -979,6 +1008,29 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env decl
         id_extras occ = IdExtras (fix_fn occ) (lookupOccEnvL rule_env occ) (ann_fn occ)
         at_extras (IfaceAT decl _) = lookupOccEnvL inst_env (getOccName decl)
 
+
+{- Note [default method Name] (see also #15970)
+
+The Names for the default methods aren't available in the IfaceSyn.
+
+* We originally start with a DefMethInfo from the class, contain a
+  Name for the default method
+
+* We turn that into IfaceSyn as a DefMethSpec which lacks a Name
+  entirely. Why? Because the Name can be derived from the method name
+  (in TcIface), so doesn't need to be serialised into the interface
+  file.
+
+But now we have to get the Name back, because the class declaration's
+fingerprint needs to depend on it (this was the bug in #15970).  This
+is done in a slightly convoluted way:
+
+* Then, in addFingerprints we build a map that maps OccNames to Names
+
+* We pass that map to declExtras which laboriously looks up in the map
+  (using the derived occurrence name) to recover the Name we have just
+  thrown away.
+-}
 
 lookupOccEnvL :: OccEnv [v] -> OccName -> [v]
 lookupOccEnvL env k = lookupOccEnv env k `orElse` []
