@@ -2002,7 +2002,7 @@ dataConInstPat fss uniqs mult con inst_tys
     arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
     mk_id_var uniq fs (Scaled m ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
-        mkLocalIdOrCoVar name (Regular $ mult * m) (Type.substTy full_subst ty)
+        mkLocalIdOrCoVar name (Regular $ mult `MultMul` m) (Type.substTy full_subst ty)
       where
         name = mkInternalName uniq (mkVarOccFS fs) noSrcSpan
 

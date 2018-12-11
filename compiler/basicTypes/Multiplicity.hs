@@ -107,10 +107,6 @@ pattern MultThing a <- MultThing_ a where
 unsafeMultThing :: a -> GMult a
 unsafeMultThing = MultThing_
 
-instance Num (GMult a) where
-  (*) = MultMul
-  (+) = MultAdd
-
 instance (Outputable a, Multable a) => Outputable (GMult a) where
   ppr Zero = text "0"
   ppr One = text "1"
@@ -164,7 +160,7 @@ scaledSet x b = fmap (\_->b) x
 
 scaleScaled :: GMult t -> GScaled t a -> GScaled t a
 scaleScaled w x =
-  x { scaledMult = w * scaledMult x }
+  x { scaledMult = w `MultMul` scaledMult x }
 
 --
 -- * Multiplicity ordering
