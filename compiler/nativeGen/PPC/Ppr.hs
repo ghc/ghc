@@ -548,7 +548,7 @@ pprInstr (BCCFAR cond blockid prediction) = vcat [
             Just True  -> char '-'
             Just False -> char '+'
 
-pprInstr (JMP lbl)
+pprInstr (JMP lbl _)
   -- We never jump to ForeignLabels; if we ever do, c.f. handling for "BL"
   | isForeignLabel lbl = panic "PPC.Ppr.pprInstr: JMP to ForeignLabel"
   | otherwise =
@@ -565,7 +565,7 @@ pprInstr (MTCTR reg) = hcat [
         char '\t',
         pprReg reg
     ]
-pprInstr (BCTR _ _) = hcat [
+pprInstr (BCTR _ _ _) = hcat [
         char '\t',
         text "bctr"
     ]

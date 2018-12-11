@@ -151,12 +151,12 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
             -- "labeled-goto" we use JMP, and for "computed-goto" we
             -- use MTCTR followed by BCTR. See 'PPC.CodeGen.genJump'.
             = case insn of
-                JMP _           -> dealloc ++ (insn : r)
-                BCTR [] Nothing -> dealloc ++ (insn : r)
-                BCTR ids label  -> BCTR (map (fmap retarget) ids) label : r
-                BCCFAR cond b p -> BCCFAR cond (retarget b) p : r
-                BCC    cond b p -> BCC    cond (retarget b) p : r
-                _               -> insn : r
+                JMP _ _           -> dealloc ++ (insn : r)
+                BCTR [] Nothing _ -> dealloc ++ (insn : r)
+                BCTR ids label rs -> BCTR (map (fmap retarget) ids) label rs : r
+                BCCFAR cond b p   -> BCCFAR cond (retarget b) p : r
+                BCC    cond b p   -> BCC    cond (retarget b) p : r
+                _                 -> insn : r
             -- BL and BCTRL are call-like instructions rather than
             -- jumps, and are used only for C calls.
 
@@ -223,10 +223,13 @@ data Instr
                                     --    Just True:  branch likely taken
                                     --    Just False: branch likely not taken
                                     --    Nothing:    no hint
-    | JMP     CLabel                -- same as branch,
+    | JMP     CLabel [Reg]          -- same as branch,
                                     -- but with CLabel instead of block ID
+                                    -- and live global registers
     | MTCTR   Reg
-    | BCTR    [Maybe BlockId] (Maybe CLabel) -- with list of local destinations, and jump table location if necessary
+    | BCTR    [Maybe BlockId] (Maybe CLabel) [Reg]
+                                    -- with list of local destinations, and
+                                    -- jump table location if necessary
     | BL      CLabel [Reg]          -- with list of argument regs
     | BCTRL   [Reg]
 
@@ -324,8 +327,9 @@ ppc_regUsageOfInstr platform instr
     CMPL    _ reg ri         -> usage (reg : regRI ri,[])
     BCC     _ _ _            -> noUsage
     BCCFAR  _ _ _            -> noUsage
+    JMP     _ regs           -> usage (regs, [])
     MTCTR   reg              -> usage ([reg],[])
-    BCTR    _ _              -> noUsage
+    BCTR    _ _ regs         -> usage (regs, [])
     BL      _ params         -> usage (params, callClobberedRegs platform)
     BCTRL   params           -> usage (params, callClobberedRegs platform)
 
@@ -416,8 +420,9 @@ ppc_patchRegsOfInstr instr env
     CMPL    fmt reg ri      -> CMPL fmt (env reg) (fixRI ri)
     BCC     cond lbl p      -> BCC cond lbl p
     BCCFAR  cond lbl p      -> BCCFAR cond lbl p
+    JMP     l regs          -> JMP l regs -- global regs will not be remapped
     MTCTR   reg             -> MTCTR (env reg)
-    BCTR    targets lbl     -> BCTR targets lbl
+    BCTR    targets lbl rs  -> BCTR targets lbl rs
     BL      imm argRegs     -> BL imm argRegs    -- argument regs
     BCTRL   argRegs         -> BCTRL argRegs     -- cannot be remapped
     ADD     reg1 reg2 ri    -> ADD (env reg1) (env reg2) (fixRI ri)
@@ -506,10 +511,10 @@ ppc_isJumpishInstr instr
 ppc_jumpDestsOfInstr :: Instr -> [BlockId]
 ppc_jumpDestsOfInstr insn
   = case insn of
-        BCC _ id _      -> [id]
-        BCCFAR _ id _   -> [id]
-        BCTR targets _  -> [id | Just id <- targets]
-        _               -> []
+        BCC _ id _       -> [id]
+        BCCFAR _ id _    -> [id]
+        BCTR targets _ _ -> [id | Just id <- targets]
+        _                -> []
 
 
 -- | Change the destination of this jump instruction.
@@ -520,7 +525,7 @@ ppc_patchJumpInstr insn patchF
   = case insn of
         BCC cc id p     -> BCC cc (patchF id) p
         BCCFAR cc id p  -> BCCFAR cc (patchF id) p
-        BCTR ids lbl    -> BCTR (map (fmap patchF) ids) lbl
+        BCTR ids lbl rs -> BCTR (map (fmap patchF) ids) lbl rs
         _               -> insn
 
 
