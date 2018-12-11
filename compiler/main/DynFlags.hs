@@ -5510,7 +5510,9 @@ picCCOpts dflags = pieOpts ++ picOpts
       -- http://ghc.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
        | gopt Opt_PIC dflags || WayDyn `elem` ways dflags ->
           ["-fPIC", "-U__PIC__", "-D__PIC__"]
-       | otherwise                             -> []
+      -- gcc may be configured to have PIC on by default, let's be
+      -- explicit here, see Trac #15847
+       | otherwise -> ["-fno-PIC"]
 
     pieOpts
       | gopt Opt_PICExecutable dflags       = ["-pie"]
