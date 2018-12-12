@@ -100,6 +100,8 @@ import UniqDFM
 import FV
 import Data.Maybe
 import MonadUtils       ( mapAccumLM )
+import Unique (hasKey)
+import PrelNames (noinlineIdKey)
 
 {-
 ************************************************************************
@@ -962,6 +964,8 @@ notWorthFloating :: CoreExpr -> [Var] -> Bool
 -- One big goal is that floating should be idempotent.  Eg if
 -- we replace e with (lvl79 x y) and then run FloatOut again, don't want
 -- to replace (lvl79 x y) with (lvl83 x y)!
+
+notWorthFloating (App (App (Var v) Type{}) Var{}) _ | v `hasKey` noinlineIdKey = True
 
 notWorthFloating e abs_vars
   = go e (count isId abs_vars)
