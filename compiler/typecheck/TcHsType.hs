@@ -83,7 +83,7 @@ import TcErrors ( reportAllUnsolved )
 import TcType
 import Multiplicity
 import Inst   ( tcInstTyBinders, tcInstTyBinder )
-import TyCoRep( TyCoBinder(..), TyBinder, Type )  -- Used in etaExpandAlgTyCon
+import TyCoRep( TyCoBinder(..), TyBinder )  -- Used in etaExpandAlgTyCon
 import Type
 import Coercion
 import RdrName( lookupLocalRdrOcc )

@@ -27,7 +27,6 @@ import THNames( liftStringName, liftName )
 import HsSyn
 import TcHsSyn
 import TcRnMonad
-import TcEnv            ( tcEmitBindingUsage )
 import TcUnify
 import BasicTypes
 import Inst
