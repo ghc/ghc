@@ -511,6 +511,7 @@ data GeneralFlag
    | Opt_OmitInterfacePragmas
    | Opt_ExposeAllUnfoldings
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
+   | Opt_WriteHie -- generate .hie files
 
    -- profiling opts
    | Opt_AutoSccsOnIndividualCafs
@@ -544,6 +545,7 @@ data GeneralFlag
    | Opt_GhciSandbox
    | Opt_GhciHistory
    | Opt_GhciLeakCheck
+   | Opt_ValidateHie
    | Opt_LocalGhciHistory
    | Opt_NoIt
    | Opt_HelpfulErrors
@@ -807,6 +809,7 @@ data WarningFlag =
    | Opt_WarnAllMissedSpecs
    | Opt_WarnUnsupportedCallingConventions
    | Opt_WarnUnsupportedLlvmVersion
+   | Opt_WarnMissedExtraSharedLib
    | Opt_WarnInlineRuleShadowing
    | Opt_WarnTypedHoles
    | Opt_WarnPartialTypeSignatures
@@ -941,12 +944,14 @@ data DynFlags = DynFlags {
   objectDir             :: Maybe String,
   dylibInstallName      :: Maybe String,
   hiDir                 :: Maybe String,
+  hieDir                :: Maybe String,
   stubDir               :: Maybe String,
   dumpDir               :: Maybe String,
 
   objectSuf             :: String,
   hcSuf                 :: String,
   hiSuf                 :: String,
+  hieSuf                :: String,
 
   canGenerateDynamicToo :: IORef Bool,
   dynObjectSuf          :: String,
@@ -984,12 +989,18 @@ data DynFlags = DynFlags {
   frontendPluginOpts    :: [String],
     -- ^ the @-ffrontend-opt@ flags given on the command line, in *reverse*
     -- order that they're specified on the command line.
-  plugins               :: [LoadedPlugin],
-    -- ^ plugins loaded after processing arguments. What will be loaded here
-    -- is directed by pluginModNames. Arguments are loaded from
+  cachedPlugins         :: [LoadedPlugin],
+    -- ^ plugins dynamically loaded after processing arguments. What will be
+    -- loaded here is directed by pluginModNames. Arguments are loaded from
     -- pluginModNameOpts. The purpose of this field is to cache the plugins so
-    -- they don't have to be loaded each time they are needed.
-    -- See 'DynamicLoading.initializePlugins'.
+    -- they don't have to be loaded each time they are needed.  See
+    -- 'DynamicLoading.initializePlugins'.
+  staticPlugins            :: [StaticPlugin],
+    -- ^ staic plugins which do not need dynamic loading. These plugins are
+    -- intended to be added by GHC API users directly to this list.
+    --
+    -- To add dynamically loaded plugins through the GHC API see
+    -- 'addPluginModuleName' instead.
 
   -- GHC API hooks
   hooks                 :: Hooks,
@@ -1903,12 +1914,14 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         objectDir               = Nothing,
         dylibInstallName        = Nothing,
         hiDir                   = Nothing,
+        hieDir                  = Nothing,
         stubDir                 = Nothing,
         dumpDir                 = Nothing,
 
         objectSuf               = phaseInputExt StopLn,
         hcSuf                   = phaseInputExt HCc,
         hiSuf                   = "hi",
+        hieSuf                  = "hie",
 
         canGenerateDynamicToo   = panic "defaultDynFlags: No canGenerateDynamicToo",
         dynObjectSuf            = "dyn_" ++ phaseInputExt StopLn,
@@ -1917,7 +1930,8 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         pluginModNames          = [],
         pluginModNameOpts       = [],
         frontendPluginOpts      = [],
-        plugins                 = [],
+        cachedPlugins           = [],
+        staticPlugins           = [],
         hooks                   = emptyHooks,
 
         outputFile              = Nothing,
@@ -2485,10 +2499,10 @@ getVerbFlags dflags
   | verbosity dflags >= 4 = ["-v"]
   | otherwise             = []
 
-setObjectDir, setHiDir, setStubDir, setDumpDir, setOutputDir,
+setObjectDir, setHiDir, setHieDir, setStubDir, setDumpDir, setOutputDir,
          setDynObjectSuf, setDynHiSuf,
          setDylibInstallName,
-         setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
+         setObjectSuf, setHiSuf, setHieSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, addOptl, addOptc, addOptP,
          addCmdlineFramework, addHaddockOpts, addGhciScript,
          setInteractivePrint
@@ -2498,18 +2512,24 @@ setOutputFile, setDynOutputFile, setOutputHi, setDumpPrefixForce
 
 setObjectDir  f d = d { objectDir  = Just f}
 setHiDir      f d = d { hiDir      = Just f}
+setHieDir     f d = d { hieDir     = Just f}
 setStubDir    f d = d { stubDir    = Just f
                       , includePaths = addGlobalInclude (includePaths d) [f] }
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
   -- \#included from the .hc file when compiling via C (i.e. unregisterised
   -- builds).
 setDumpDir    f d = d { dumpDir    = Just f}
-setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f . setDumpDir f
+setOutputDir  f = setObjectDir f
+                . setHieDir f
+                . setHiDir f
+                . setStubDir f
+                . setDumpDir f
 setDylibInstallName  f d = d { dylibInstallName = Just f}
 
 setObjectSuf    f d = d { objectSuf    = f}
 setDynObjectSuf f d = d { dynObjectSuf = f}
 setHiSuf        f d = d { hiSuf        = f}
+setHieSuf       f d = d { hieSuf       = f}
 setDynHiSuf     f d = d { dynHiSuf     = f}
 setHcSuf        f d = d { hcSuf        = f}
 
@@ -3054,8 +3074,10 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "dynosuf"           (hasArg setDynObjectSuf)
   , make_ord_flag defGhcFlag "hcsuf"             (hasArg setHcSuf)
   , make_ord_flag defGhcFlag "hisuf"             (hasArg setHiSuf)
+  , make_ord_flag defGhcFlag "hiesuf"            (hasArg setHieSuf)
   , make_ord_flag defGhcFlag "dynhisuf"          (hasArg setDynHiSuf)
   , make_ord_flag defGhcFlag "hidir"             (hasArg setHiDir)
+  , make_ord_flag defGhcFlag "hiedir"            (hasArg setHieDir)
   , make_ord_flag defGhcFlag "tmpdir"            (hasArg setTmpDir)
   , make_ord_flag defGhcFlag "stubdir"           (hasArg setStubDir)
   , make_ord_flag defGhcFlag "dumpdir"           (hasArg setDumpDir)
@@ -3978,6 +4000,7 @@ wWarningFlagsDeps = [
   flagSpec "unsupported-calling-conventions"
                                          Opt_WarnUnsupportedCallingConventions,
   flagSpec "unsupported-llvm-version"    Opt_WarnUnsupportedLlvmVersion,
+  flagSpec "missed-extra-shared-lib"     Opt_WarnMissedExtraSharedLib,
   flagSpec "unticked-promoted-constructors"
                                          Opt_WarnUntickedPromotedConstructors,
   flagSpec "unused-do-bind"              Opt_WarnUnusedDoBind,
@@ -4079,6 +4102,7 @@ fFlagsDeps = [
   flagSpec "gen-manifest"                     Opt_GenManifest,
   flagSpec "ghci-history"                     Opt_GhciHistory,
   flagSpec "ghci-leak-check"                  Opt_GhciLeakCheck,
+  flagSpec "validate-ide-info"                Opt_ValidateHie,
   flagGhciSpec "local-ghci-history"           Opt_LocalGhciHistory,
   flagGhciSpec "no-it"                        Opt_NoIt,
   flagSpec "ghci-sandbox"                     Opt_GhciSandbox,
@@ -4134,6 +4158,7 @@ fFlagsDeps = [
   flagSpec "strictness"                       Opt_Strictness,
   flagSpec "use-rpaths"                       Opt_RPath,
   flagSpec "write-interface"                  Opt_WriteInterface,
+  flagSpec "write-ide-info"                   Opt_WriteHie,
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
   flagSpec "version-macros"                   Opt_VersionMacros,
@@ -4701,6 +4726,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnInlineRuleShadowing,
         Opt_WarnAlternativeLayoutRuleTransitional,
         Opt_WarnUnsupportedLlvmVersion,
+        Opt_WarnMissedExtraSharedLib,
         Opt_WarnTabs,
         Opt_WarnUnrecognisedWarningFlags,
         Opt_WarnSimplifiableClassConstraints,
@@ -5485,7 +5511,9 @@ picCCOpts dflags = pieOpts ++ picOpts
       -- http://ghc.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
        | gopt Opt_PIC dflags || WayDyn `elem` ways dflags ->
           ["-fPIC", "-U__PIC__", "-D__PIC__"]
-       | otherwise                             -> []
+      -- gcc may be configured to have PIC on by default, let's be
+      -- explicit here, see Trac #15847
+       | otherwise -> ["-fno-PIC"]
 
     pieOpts
       | gopt Opt_PICExecutable dflags       = ["-pie"]

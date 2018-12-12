@@ -250,7 +250,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
-        scrut_dmd          = mkProdDmd (addDataConStrictness dc id_dmds)
+        scrut_dmd          = mkProdDmd id_dmds
         (scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
         res_ty             = alt_ty3 `bothDmdType` toBothDmdArg scrut_ty
         case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
@@ -1214,17 +1214,6 @@ extendEnvForProdAlt env scrut case_bndr dc bndrs
     is_var (Var v)    = isLocalId v
     is_var _          = False
 
-addDataConStrictness :: DataCon -> [Demand] -> [Demand]
--- See Note [Add demands for strict constructors]
-addDataConStrictness con ds
-  = ASSERT2( equalLength strs ds, ppr con $$ ppr strs $$ ppr ds )
-    zipWith add ds strs
-  where
-    strs = dataConRepStrictness con
-    add dmd str | isMarkedStrict str
-                , not (isAbsDmd dmd) = strictifyDmd dmd
-                | otherwise          = dmd
-
 findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Demand])
 -- Return the demands on the Ids in the [Var]
 findBndrsDmds env dmd_ty bndrs
@@ -1308,8 +1297,8 @@ binders the CPR property.  Specifically
                    | otherwise = x
 
    For $wf2 we are going to unbox the MkT *and*, since it is strict, the
-   first argument of the MkT; see Note [Add demands for strict constructors].
-   But then we don't want box it up again when returning it!  We want
+   first argument of the MkT; see Note [Add demands for strict constructors]
+   in WwLib. But then we don't want box it up again when returning it! We want
    'f2' to have the CPR property, so we give 'x' the CPR property.
 
  * It's a bit delicate because if this case is scrutinising something other
@@ -1324,50 +1313,6 @@ binders the CPR property.  Specifically
    might not be a onre of the arguments to the original function, or a
    sub-component thereof.  But it's simple, and nothing terrible
    happens if we get it wrong.  e.g. Trac #10694.
-
-Note [Add demands for strict constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this program (due to Roman):
-
-    data X a = X !a
-
-    foo :: X Int -> Int -> Int
-    foo (X a) n = go 0
-     where
-       go i | i < n     = a + go (i+1)
-            | otherwise = 0
-
-We want the worker for 'foo' too look like this:
-
-    $wfoo :: Int# -> Int# -> Int#
-
-with the first argument unboxed, so that it is not eval'd each time
-around the 'go' loop (which would otherwise happen, since 'foo' is not
-strict in 'a').  It is sound for the wrapper to pass an unboxed arg
-because X is strict, so its argument must be evaluated.  And if we
-*don't* pass an unboxed argument, we can't even repair it by adding a
-`seq` thus:
-
-    foo (X a) n = a `seq` go 0
-
-because the seq is discarded (very early) since X is strict!
-
-We achieve the effect using addDataConStrictness.  It is called at a
-case expression, such as the pattern match on (X a) in the example
-above.  After computing how 'a' is used in the alternatives, we add an
-extra 'seqDmd' to it.  The case alternative isn't itself strict in the
-sub-components, but simply evaluating the scrutinee to HNF does force
-those sub-components.
-
-If the argument is not used at all in the alternative (i.e. it is
-Absent), then *don't* add a 'seqDmd'.  If we do, it makes it look used
-and hence it'll be passed to the worker when it doesn't need to be.
-Hence the isAbsDmd test in addDataConStrictness.
-
-There is the usual danger of reboxing, which as usual we ignore. But
-if X is monomorphic, and has an UNPACK pragma, then this optimisation
-is even more important.  We don't want the wrapper to rebox an unboxed
-argument, and pass an Int to $wfoo!
 
 
 Note [Initial CPR for strict binders]

@@ -361,6 +361,18 @@ void endProfiling( void )
 #endif /* !PROFILING */
 
 static void
+printEscapedString(const char* string)
+{
+    for (const char* p = string; *p != '\0'; ++p) {
+        if (*p == '\"') {
+            // Escape every " as ""
+            fputc('"', hp_file);
+        }
+        fputc(*p, hp_file);
+    }
+}
+
+static void
 printSample(bool beginSample, StgDouble sampleValue)
 {
     fprintf(hp_file, "%s %f\n",
@@ -428,16 +440,18 @@ initHeapProfiling(void)
     initEra( &censuses[era] );
 
     /* initProfilingLogFile(); */
-    fprintf(hp_file, "JOB \"%s", prog_name);
+    fprintf(hp_file, "JOB \"");
+    printEscapedString(prog_name);
 
 #if defined(PROFILING)
-    {
-        int count;
-        for(count = 1; count < prog_argc; count++)
-            fprintf(hp_file, " %s", prog_argv[count]);
-        fprintf(hp_file, " +RTS");
-        for(count = 0; count < rts_argc; count++)
-            fprintf(hp_file, " %s", rts_argv[count]);
+    for (int i = 1; i < prog_argc; ++i) {
+        fputc(' ', hp_file);
+        printEscapedString(prog_argv[i]);
+    }
+    fprintf(hp_file, " +RTS");
+    for (int i = 0; i < rts_argc; ++i) {
+        fputc(' ', hp_file);
+        printEscapedString(rts_argv[i]);
     }
 #endif /* PROFILING */
 

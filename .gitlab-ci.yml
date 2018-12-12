@@ -22,7 +22,7 @@ before_script:
     key: hadrian
     paths:
       - cabal-cache
-  image: ghcci/x86_64-linux:0.0.8
+  image: ghcci/x86_64-linux-deb8:0.1
 
 .validate-x86_64-linux-hadrian:
   extends: .validate-hadrian
@@ -50,7 +50,7 @@ before_script:
     - |
       THREADS=`mk/detect-cpu-count.sh`
       make test THREADS=$THREADS JUNIT_FILE=../../junit.xml
-  image: ghcci/x86_64-linux:0.0.8
+  image: ghcci/x86_64-linux-deb8:0.1
   artifacts:
     when: always
     reports:
@@ -142,7 +142,7 @@ validate-x86_64-linux:
 ############################################################
 
 .circleci:
-  image: ghcci/x86_64-linux:0.0.8
+  image: ghcci/x86_64-linux-deb8:0.1
   artifacts:
     when: always
     reports:

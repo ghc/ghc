@@ -18,7 +18,7 @@ module TcTyClsDecls (
         kcConDecl, tcConDecls, dataDeclChecks, checkValidTyCon,
         tcFamTyPats, tcTyFamInstEqn,
         tcAddTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
-        unravelFamInstPats,
+        unravelFamInstPats, addConsistencyConstraints,
         wrongKindOfFamily
     ) where
 
@@ -1743,7 +1743,7 @@ kcTyFamInstEqn tc_fam_tc
        ; discardResult $
          bindImplicitTKBndrs_Q_Tv imp_vars $
          bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
-         do { (_, res_kind) <- tcFamTyPats tc_fam_tc NotAssociated hs_pats
+         do { (_, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsType hs_rhs_ty res_kind }
              -- Why "_Tv" here?  Consider (Trac #14066
              --  type family Bar x y where
@@ -1872,6 +1872,9 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
                   bindImplicitTKBndrs_Q_Skol imp_vars          $
                   bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
                   do { (lhs_ty, rhs_kind) <- tc_lhs
+                       -- Ensure that the instance is consistent with its
+                       -- parent class (#16008)
+                     ; addConsistencyConstraints mb_clsinfo lhs_ty
                      ; rhs_ty <- tcCheckLHsType hs_rhs_ty rhs_kind
                      ; return (lhs_ty, rhs_ty) }
 
@@ -1902,7 +1905,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
                                                            (tyConKind  fam_tc)
                 ; return (mkTyConApp fam_tc args, rhs_kind) }
            | otherwise
-           = tcFamTyPats fam_tc mb_clsinfo hs_pats
+           = tcFamTyPats fam_tc hs_pats
 
 {- Note [Apparently-nullary families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1934,11 +1937,11 @@ Inferred quantifiers always come first.
 
 
 -----------------
-tcFamTyPats :: TyCon -> AssocInstInfo
+tcFamTyPats :: TyCon
             -> HsTyPats GhcRn                -- Patterns
             -> TcM (TcType, TcKind)          -- (lhs_type, lhs_kind)
 -- Used for both type and data families
-tcFamTyPats fam_tc mb_clsinfo hs_pats
+tcFamTyPats fam_tc hs_pats
   = do { traceTc "tcFamTyPats {" $
          vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
               , text "arity:" <+> ppr fam_arity
@@ -1952,9 +1955,6 @@ tcFamTyPats fam_tc mb_clsinfo hs_pats
        ; traceTc "End tcFamTyPats }" $
          vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
               , text "res_kind:" <+> ppr res_kind ]
-
-       -- Ensure that the instance is consistent its parent class
-       ; addConsistencyConstraints mb_clsinfo fam_app
 
        ; return (fam_app, res_kind) }
   where

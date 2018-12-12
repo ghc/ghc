@@ -1,0 +1,25 @@
+==pure.0
+parsePlugin()
+interfacePlugin: Prelude
+interfacePlugin: GHC.Float
+interfacePlugin: GHC.Base
+interfacePlugin: System.IO
+typeCheckPlugin (rn)
+interfacePlugin: GHC.Prim
+interfacePlugin: GHC.Show
+interfacePlugin: GHC.Types
+interfacePlugin: GHC.TopHandler
+typeCheckPlugin (tc)
+interfacePlugin: GHC.CString
+interfacePlugin: GHC.Integer.Type
+interfacePlugin: GHC.Natural
+==pure.1
+==fp0.0
+parsePlugin()
+typeCheckPlugin (rn)
+typeCheckPlugin (tc)
+==fp0.1
+==fp1
+parsePlugin()
+typeCheckPlugin (rn)
+typeCheckPlugin (tc)

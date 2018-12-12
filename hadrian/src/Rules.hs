@@ -20,6 +20,7 @@ import qualified Rules.Libffi
 import qualified Rules.Library
 import qualified Rules.Program
 import qualified Rules.Register
+import qualified Rules.SimpleTargets
 import Settings
 import Target
 import UserSettings
@@ -109,6 +110,7 @@ packageRules = do
     let vanillaContexts = liftM2 vanillaContext allStages knownPackages
 
     forM_ vanillaContexts Rules.Generate.generatePackageCode
+    Rules.SimpleTargets.simplePackageTargets
 
 buildRules :: Rules ()
 buildRules = do

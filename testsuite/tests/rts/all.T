@@ -303,6 +303,7 @@ test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], c
 test('T9078', only_ways(['threaded1']), compile_and_run, [''])
 
 test('T10017', [ when(opsys('mingw32'), skip)
+               , when(unregisterised(), skip)
                , req_smp
                , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
@@ -397,7 +398,7 @@ test('T10296a', [req_smp], run_command,
 
 test('T10296b', [only_ways('threaded2')], compile_and_run, [''])
 
-test('numa001', [ extra_run_opts('8'), extra_ways(['debug_numa']) ]
+test('numa001', [ extra_run_opts('8'), unless(unregisterised(), extra_ways(['debug_numa'])) ]
                 , compile_and_run, [''])
 
 test('T12497', [ unless(opsys('mingw32'), skip)
@@ -423,6 +424,7 @@ test('T14497', [omit_ways(['profasm']), multi_cpu_race], compile_and_run, ['-O']
 test('T14695', [normal, ignore_stderr]
              , run_command, ['$MAKE -s --no-print-directory T14695'])
 test('T14702', [ ignore_stdout
+               , when(unregisterised(), skip)
                , only_ways(['threaded1', 'threaded2'])
                , extra_run_opts('+RTS -A32m -N8 -T -RTS')
                ]
@@ -455,6 +457,7 @@ test('keep-cafs-fail',
                  'KeepCafs2.hs', 'KeepCafsMain.hs']),
     when(opsys('mingw32'), expect_broken (5987)),
     when(platform('powerpc64le-unknown-linux'), expect_broken(11261)),
+    when(opsys('freebsd'), expect_broken(16035)),
     filter_stdout_lines('Evaluated a CAF|exit.*'),
     ignore_stderr, # on OS X the shell emits an "Abort trap" message to stderr
   ],
@@ -466,7 +469,8 @@ test('keep-cafs',
   [ extra_files(['KeepCafsBase.hs', 'KeepCafs1.hs',
                  'KeepCafs2.hs', 'KeepCafsMain.hs']),
     when(opsys('mingw32'), expect_broken (5987)),
-    when(platform('powerpc64le-unknown-linux'), expect_broken(11261))
+    when(platform('powerpc64le-unknown-linux'), expect_broken(11261)),
+    when(opsys('freebsd'), expect_broken(16035)),
   ],
   run_command,
   ['$MAKE -s --no-print-directory KeepCafs'])

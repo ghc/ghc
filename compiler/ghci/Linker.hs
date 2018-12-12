@@ -1262,8 +1262,9 @@ linkPackage hsc_env pkg
    = do
         let dflags    = hsc_dflags hsc_env
             platform  = targetPlatform dflags
-            dirs | interpreterDynamic dflags = Packages.libraryDynDirs pkg
-                 | otherwise                 = Packages.libraryDirs pkg
+            is_dyn = interpreterDynamic dflags
+            dirs | is_dyn    = Packages.libraryDynDirs pkg
+                 | otherwise = Packages.libraryDirs pkg
 
         let hs_libs   =  Packages.hsLibraries pkg
             -- The FFI GHCi import lib isn't needed as
@@ -1313,8 +1314,12 @@ linkPackage hsc_env pkg
         -- See comments with partOfGHCi
         when (packageName pkg `notElem` partOfGHCi) $ do
             loadFrameworks hsc_env platform pkg
-            mapM_ (load_dyn hsc_env)
-              (known_dlls ++ map (mkSOName platform) dlls)
+            -- See Note [Crash early load_dyn and locateLib]
+            -- Crash early if can't load any of `known_dlls`
+            mapM_ (load_dyn hsc_env True) known_dlls
+            -- For remaining `dlls` crash early only when there is surely
+            -- no package's DLL around ... (not is_dyn)
+            mapM_ (load_dyn hsc_env (not is_dyn) . mkSOName platform) dlls
 
         -- After loading all the DLLs, we can load the static objects.
         -- Ordering isn't important here, because we do one final link
@@ -1337,18 +1342,72 @@ linkPackage hsc_env pkg
                              ++ sourcePackageIdString pkg ++ "'"
                  in throwGhcExceptionIO (InstallationError errmsg)
 
+{-
+Note [Crash early load_dyn and locateLib]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a package is "normal" (exposes it's code from more than zero Haskell
+modules, unlike e.g. that in ghcilink004) and is built "dyn" way, then
+it has it's code compiled and linked into the DLL, which GHCi linker picks
+when loading the package's code (see the big comment in the beginning of
+`locateLib`).
+
+When loading DLLs, GHCi linker simply calls the system's `dlopen` or
+`LoadLibrary` APIs. This is quite different from the case when GHCi linker
+loads an object file or static library. When loading an object file or static
+library GHCi linker parses them and resolves all symbols "manually".
+These object file or static library may reference some external symbols
+defined in some external DLLs. And GHCi should know which these
+external DLLs are.
+
+But when GHCi loads a DLL, it's the *system* linker who manages all
+the necessary dependencies, and it is able to load this DLL not having
+any extra info. Thus we don't *have to* crash in this case even if we
+are unable to load any supposed dependencies explicitly.
+
+Suppose during GHCi session a client of the package wants to
+`foreign import` a symbol which isn't exposed by the package DLL, but
+is exposed by such an external (dependency) DLL.
+If the DLL isn't *explicitly* loaded because `load_dyn` failed to do
+this, then the client code eventually crashes because the GHCi linker
+isn't able to locate this symbol (GHCi linker maintains a list of
+explicitly loaded DLLs it looks into when trying to find a symbol).
+
+This is why we still should try to load all the dependency DLLs
+even though we know that the system linker loads them implicitly when
+loading the package DLL.
+
+Why we still keep the `crash_early` opportunity then not allowing such
+a permissive behaviour for any DLLs? Well, we, perhaps, improve a user
+experience in some cases slightly.
+
+But if it happens there exist other corner cases where our current
+usage of `crash_early` flag is overly restrictive, we may lift the
+restriction very easily.
+-}
+
 -- we have already searched the filesystem; the strings passed to load_dyn
 -- can be passed directly to loadDLL.  They are either fully-qualified
 -- ("/usr/lib/libfoo.so"), or unqualified ("libfoo.so").  In the latter case,
 -- loadDLL is going to search the system paths to find the library.
---
-load_dyn :: HscEnv -> FilePath -> IO ()
-load_dyn hsc_env dll = do
+load_dyn :: HscEnv -> Bool -> FilePath -> IO ()
+load_dyn hsc_env crash_early dll = do
   r <- loadDLL hsc_env dll
   case r of
     Nothing  -> return ()
-    Just err -> cmdLineErrorIO ("can't load .so/.DLL for: "
-                                ++ dll ++ " (" ++ err ++ ")")
+    Just err ->
+      if crash_early
+        then cmdLineErrorIO err
+        else let dflags = hsc_dflags hsc_env in
+          when (wopt Opt_WarnMissedExtraSharedLib dflags)
+            $ putLogMsg dflags
+                (Reason Opt_WarnMissedExtraSharedLib) SevWarning
+                  noSrcSpan (defaultUserStyle dflags)(note err)
+  where
+    note err = vcat $ map text
+      [ err
+      , "It's OK if you don't want to use symbols from it directly."
+      , "(the package DLL is loaded by the system linker"
+      , " which manages dependencies by itself)." ]
 
 loadFrameworks :: HscEnv -> Platform -> PackageConfig -> IO ()
 loadFrameworks hsc_env platform pkg

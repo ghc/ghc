@@ -193,3 +193,9 @@ test('plugin-recomp-change-prof',
       when(not config.have_profiling,skip)
       ],
      run_command, ['$MAKE -s --no-print-directory plugin-recomp-change-prof'])
+
+test('static-plugins',
+     [extra_files(['simple-plugin/']),
+      extra_run_opts('"' + config.libdir + '"')],
+     compile_and_run,
+     ['-package ghc -isimple-plugin/'])

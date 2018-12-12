@@ -75,6 +75,8 @@ import Data.Maybe
 import Data.Version
 import Data.Either      ( partitionEithers )
 
+import Data.Time        ( UTCTime )
+
 -- ---------------------------------------------------------------------------
 -- Pre-process
 
@@ -1016,6 +1018,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
         let o_file = ml_obj_file location -- The real object file
             hi_file = ml_hi_file location
+            hie_file = ml_hie_file location
             dest_file | writeInterfaceOnlyMode dflags
                             = hi_file
                       | otherwise
@@ -1023,7 +1026,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
   -- Figure out if the source has changed, for recompilation avoidance.
   --
-  -- Setting source_unchanged to True means that M.o seems
+  -- Setting source_unchanged to True means that M.o (or M.hie) seems
   -- to be up to date wrt M.hs; so no need to recompile unless imports have
   -- changed (which the compiler itself figures out).
   -- Setting source_unchanged to False tells the compiler that M.o is out of
@@ -1037,13 +1040,14 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                 --      (b) we aren't going all the way to .o file (e.g. ghc -S)
              then return SourceModified
                 -- Otherwise look at file modification dates
-             else do dest_file_exists <- doesFileExist dest_file
-                     if not dest_file_exists
-                        then return SourceModified       -- Need to recompile
-                        else do t2 <- getModificationUTCTime dest_file
-                                if t2 > src_timestamp
-                                  then return SourceUnmodified
-                                  else return SourceModified
+             else do dest_file_mod <- sourceModified dest_file src_timestamp
+                     hie_file_mod <- if gopt Opt_WriteHie dflags
+                                        then sourceModified hie_file
+                                                            src_timestamp
+                                        else pure False
+                     if dest_file_mod || hie_file_mod
+                        then return SourceModified
+                        else return SourceUnmodified
 
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
@@ -1062,6 +1066,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                                         ms_obj_date  = Nothing,
                                         ms_parsed_mod   = Nothing,
                                         ms_iface_date   = Nothing,
+                                        ms_hie_date     = Nothing,
                                         ms_textual_imps = imps,
                                         ms_srcimps      = src_imps }
 
@@ -1634,8 +1639,9 @@ getLocation src_flavour mod_name = do
         location1 <- liftIO $ mkHomeModLocation2 dflags mod_name basename suff
 
         -- Boot-ify it if necessary
-        let location2 | HsBootFile <- src_flavour = addBootSuffixLocn location1
-                      | otherwise                 = location1
+        let location2
+              | HsBootFile <- src_flavour = addBootSuffixLocnOut location1
+              | otherwise                 = location1
 
 
         -- Take -ohi into account if present
@@ -2250,6 +2256,18 @@ writeInterfaceOnlyMode :: DynFlags -> Bool
 writeInterfaceOnlyMode dflags =
  gopt Opt_WriteInterface dflags &&
  HscNothing == hscTarget dflags
+
+-- | Figure out if a source file was modified after an output file (or if we
+-- anyways need to consider the source file modified since the output is gone).
+sourceModified :: FilePath -- ^ destination file we are looking for
+               -> UTCTime  -- ^ last time of modification of source file
+               -> IO Bool  -- ^ do we need to regenerate the output?
+sourceModified dest_file src_timestamp = do
+  dest_file_exists <- doesFileExist dest_file
+  if not dest_file_exists
+    then return True       -- Need to recompile
+     else do t2 <- getModificationUTCTime dest_file
+             return (t2 <= src_timestamp)
 
 -- | What phase to run after one of the backend code generators has run
 hscPostBackendPhase :: DynFlags -> HscSource -> HscTarget -> Phase

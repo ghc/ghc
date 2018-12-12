@@ -153,7 +153,7 @@ $1_$2_$3_MOST_HC_OPTS = \
 
 $1_$2_$3_MOST_DIR_HC_OPTS = \
  $$($1_$2_$3_MOST_HC_OPTS) \
- -odir $1/$2/build -hidir $1/$2/build -stubdir $1/$2/build
+ -outputdir $1/$2/build
 
 # NB. CONF_HC_OPTS_STAGE$4 has to be late enough to override $1_$2_HC_OPTS, so
 # that -O0 is effective (see #5484)

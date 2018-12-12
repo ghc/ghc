@@ -110,6 +110,36 @@ by Shake oracles.
 The Make-based build system uses `mk/build.mk` to specify user build settings. We
 use `hadrian/UserSettings.hs` for the same purpose, see [documentation](doc/user-settings.md).
 
+#### Building libraries and executables
+
+You can build a specific library or executable for a given stage by doing
+`build stage<N>:<lib|exe>:<package name>`. Examples:
+
+``` sh
+# build the stage 1 GHC compiler (the executable), the binary will be placed
+# under _build/stage0/bin/ghc (because it is built by the stage0 compiler).
+build stage1:exe:ghc-bin
+
+# build the stage 2 GHC compiler, the binary will be placed under
+# _build/stage1/bin/ghc (because it is built by the stage1 compiler).
+build stage2:exe:ghc-bin
+
+# build the ghc library with the boot compiler, and register it
+# in the package database under _build/stage0/lib.
+build stage0:lib:ghc
+
+# build the Cabal library with the stage 1 compiler and register it
+# in the package database under _build/stage1/lib.
+
+# build the text library with the stage 2 compiler and register it
+# in the package database under _build/stage2/lib.
+build stage2:lib:text
+
+# build the stage 2 haddock executable and place the program under
+# _build/stage1/haddock.
+build stage2:exe:haddock
+```
+
 #### Clean and full rebuild
 
 * `build clean` removes all build artefacts.
@@ -140,16 +170,12 @@ workflow, for now.
 
 #### Testing
 
-* `build validate` runs GHC tests by simply executing `make fast` in `testsuite/tests`
-directory. This can be used instead of `sh validate --fast --no-clean` in the existing
-build system. Note: this will rebuild Stage2 GHC, `ghc-pkg` and `hpc` if they are out of date.
+To run GHC's testsuite, use `build test`. See
+[doc/testsuite.md](doc/testsuite.md) to learn about all the options
+you can use to mimic what the Make build system offers.
 
-* `build test` runs GHC tests by calling the `testsuite/driver/runtests.py` python
-script with appropriate flags. The current implementation is limited and cannot
-replace the `validate` script (see [#187][validation-issue]).
-
-* `build selftest` runs tests of the build system. Current test coverage is close to
-zero (see [#197][test-issue]).
+`build selftest` runs tests of the build system. Current test coverage
+is close to zero (see [#197][test-issue]).
 
 Troubleshooting
 ---------------

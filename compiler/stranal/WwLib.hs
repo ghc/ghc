@@ -617,7 +617,9 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
   = do { (uniq1:uniqs) <- getUniquesM
         ; let   scale = scaleScaled (idWeight arg)
                 scaled_inst_con_arg_tys = map (\(t,s) -> (scale t, s)) inst_con_arg_tys
-                unpk_args = zipWith3 mk_ww_arg uniqs scaled_inst_con_arg_tys cs
+                -- See Note [Add demands for strict constructors]
+                cs'       = addDataConStrictness data_con cs
+                unpk_args = zipWith3 mk_ww_arg uniqs scaled_inst_con_arg_tys cs'
                 unbox_fn  = mkUnpackCase (Var arg) co (idWeight arg) uniq1
                                          data_con unpk_args
                 arg_no_unf = zapStableUnfolding arg
@@ -641,7 +643,82 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
 nop_fn :: CoreExpr -> CoreExpr
 nop_fn body = body
 
+addDataConStrictness :: DataCon -> [Demand] -> [Demand]
+-- See Note [Add demands for strict constructors]
+addDataConStrictness con ds
+  = ASSERT2( equalLength strs ds, ppr con $$ ppr strs $$ ppr ds )
+    zipWith add ds strs
+  where
+    strs = dataConRepStrictness con
+    add dmd str | isMarkedStrict str
+                , not (isAbsDmd dmd) = dmd `bothDmd` seqDmd
+                | otherwise          = dmd
+
 {-
+Note [Add demands for strict constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this program (due to Roman):
+
+    data X a = X !a
+
+    foo :: X Int -> Int -> Int
+    foo (X a) n = go 0
+     where
+       go i | i < n     = a + go (i+1)
+            | otherwise = 0
+
+We want the worker for 'foo' too look like this:
+
+    $wfoo :: Int# -> Int# -> Int#
+
+with the first argument unboxed, so that it is not eval'd each time
+around the 'go' loop (which would otherwise happen, since 'foo' is not
+strict in 'a').  It is sound for the wrapper to pass an unboxed arg
+because X is strict, so its argument must be evaluated.  And if we
+*don't* pass an unboxed argument, we can't even repair it by adding a
+`seq` thus:
+
+    foo (X a) n = a `seq` go 0
+
+So here's what we do
+
+* We leave the demand-analysis alone. The demand on 'a' in the definition of
+  'foo' is <L, U(U)>; the strictness info is Lazy because foo's body may or may
+  not evaluate 'a'; but the usage info says that 'a' is unpacked and its content
+  is used.
+
+* During worker/wrapper, if we unpack a strict constructor (as we do for 'foo'),
+  we use 'strictifyDemand' to bump up the strictness on the strict arguments of
+  the data constructor. That in turn means that, if the usage info supports
+  doing so (i.e. splitProdDmd_maybe returns Just), we will unpack that argument
+  -- even though the original demand (e.g. on 'a') was lazy.
+
+The net effect is that the w/w transformation is more aggressive about unpacking
+the strict arguments of a data constructor, when that eagerness is supported by
+the usage info.
+
+This works in nested situations like
+
+    data family Bar a
+    data instance Bar (a, b) = BarPair !(Bar a) !(Bar b)
+    newtype instance Bar Int = Bar Int
+
+    foo :: Bar ((Int, Int), Int) -> Int -> Int
+    foo f k =
+      case f of
+        BarPair x y -> case burble of
+                         True -> case x of
+                                   BarPair p q -> ...
+                         False -> ...
+
+The extra eagerness lets us produce a worker of type:
+
+    $wfoo :: Int# -> Int# -> Int# -> Int -> Int
+    $wfoo p# q# y# = ...
+
+even though the `case x` is only lazily evaluated
+
+
 Note [mkWWstr and unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 By using unsafeCoerce, it is possible to make the number of demands fail to

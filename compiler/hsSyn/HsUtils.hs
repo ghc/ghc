@@ -189,7 +189,8 @@ mkHsAppType e t = addCLoc e t_body (HsAppType noExt e paren_wct)
 mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
 mkHsAppTypes = foldl' mkHsAppType
 
-mkHsLam :: [LPat GhcPs] -> LHsExpr GhcPs -> LHsExpr GhcPs
+mkHsLam :: (XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ NoExt) =>
+  [LPat (GhcPass p)] -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
 mkHsLam pats body = mkHsPar (cL (getLoc body) (HsLam noExt matches))
   where
     matches = mkMatchGroup Generated

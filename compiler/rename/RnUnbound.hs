@@ -105,7 +105,8 @@ unknownNameSuggestions_ :: WhereLooking -> DynFlags
 unknownNameSuggestions_ where_look dflags hpt curr_mod global_env local_env
                           imports tried_rdr_name =
     similarNameSuggestions where_look dflags global_env local_env tried_rdr_name $$
-    importSuggestions where_look hpt curr_mod imports tried_rdr_name $$
+    importSuggestions where_look global_env hpt
+                      curr_mod imports tried_rdr_name $$
     extensionSuggestions tried_rdr_name
 
 
@@ -165,26 +166,20 @@ similarNameSuggestions where_look dflags global_env
                         , let occ = nameOccName name
                         , correct_name_space occ]
 
-    gre_ok :: GlobalRdrElt -> Bool
-    gre_ok = case where_look of
-                   WL_LocalTop  -> isLocalGRE
-                   WL_LocalOnly -> const False
-                   _            -> const True
-
     global_possibilities :: GlobalRdrEnv -> [(RdrName, (RdrName, HowInScope))]
     global_possibilities global_env
       | tried_is_qual = [ (rdr_qual, (rdr_qual, how))
                         | gre <- globalRdrEnvElts global_env
-                        , gre_ok gre
+                        , isGreOk where_look gre
                         , let name = gre_name gre
                               occ  = nameOccName name
                         , correct_name_space occ
-                        , (mod, how) <- quals_in_scope gre
+                        , (mod, how) <- qualsInScope gre
                         , let rdr_qual = mkRdrQual mod occ ]
 
       | otherwise = [ (rdr_unqual, pair)
                     | gre <- globalRdrEnvElts global_env
-                    , gre_ok gre
+                    , isGreOk where_look gre
                     , let name = gre_name gre
                           occ  = nameOccName name
                           rdr_unqual = mkRdrUnqual occ
@@ -212,15 +207,6 @@ similarNameSuggestions where_look dflags global_env
                     | i <- is, let ispec = is_decl i
                     , not (is_qual ispec) ]
 
-    --------------------
-    quals_in_scope :: GlobalRdrElt -> [(ModuleName, HowInScope)]
-    -- Ones for which the qualified version is in scope
-    quals_in_scope (GRE { gre_name = n, gre_lcl = lcl, gre_imp = is })
-      | lcl = case nameModule_maybe n of
-                Nothing -> []
-                Just m  -> [(moduleName m, Left (nameSrcSpan n))]
-      | otherwise = [ (is_as ispec, Right ispec)
-                    | i <- is, let ispec = is_decl i ]
 
     --------------------
     quals_only :: GlobalRdrElt -> [(RdrName, HowInScope)]
@@ -231,9 +217,10 @@ similarNameSuggestions where_look dflags global_env
 
 -- | Generate helpful suggestions if a qualified name Mod.foo is not in scope.
 importSuggestions :: WhereLooking
+                  -> GlobalRdrEnv
                   -> HomePackageTable -> Module
                   -> ImportAvails -> RdrName -> SDoc
-importSuggestions where_look hpt currMod imports rdr_name
+importSuggestions where_look global_env hpt currMod imports rdr_name
   | WL_LocalOnly <- where_look                 = Outputable.empty
   | not (isQual rdr_name || isUnqual rdr_name) = Outputable.empty
   | null interesting_imports
@@ -344,8 +331,7 @@ importSuggestions where_look hpt currMod imports rdr_name
   -- See note [When to show/hide the module-not-imported line]
   show_not_imported_line :: ModuleName -> Bool                    -- #15611
   show_not_imported_line modnam
-      | modnam `elem`
-          fmap moduleName (moduleEnvKeys (imp_mods imports)) = False   -- 1
+      | modnam `elem` globMods                = False    -- #14225     -- 1
       | moduleName currMod == modnam          = False                  -- 2.1
       | is_last_loaded_mod modnam hpt_uniques = False                  -- 2.2
       | otherwise                             = True
@@ -353,6 +339,11 @@ importSuggestions where_look hpt currMod imports rdr_name
       hpt_uniques = map fst (udfmToList hpt)
       is_last_loaded_mod _ []         = False
       is_last_loaded_mod modnam uniqs = last uniqs == getUnique modnam
+      globMods = nub [ mod
+                     | gre <- globalRdrEnvElts global_env
+                     , isGreOk where_look gre
+                     , (mod, _) <- qualsInScope gre
+                     ]
 
 extensionSuggestions :: RdrName -> SDoc
 extensionSuggestions rdrName
@@ -365,6 +356,21 @@ perhapsForallMsg :: SDoc
 perhapsForallMsg
   = vcat [ text "Perhaps you intended to use ExplicitForAll or similar flag"
          , text "to enable explicit-forall syntax: forall <tvs>. <type>"]
+
+qualsInScope :: GlobalRdrElt -> [(ModuleName, HowInScope)]
+-- Ones for which the qualified version is in scope
+qualsInScope GRE { gre_name = n, gre_lcl = lcl, gre_imp = is }
+      | lcl = case nameModule_maybe n of
+                Nothing -> []
+                Just m  -> [(moduleName m, Left (nameSrcSpan n))]
+      | otherwise = [ (is_as ispec, Right ispec)
+                    | i <- is, let ispec = is_decl i ]
+
+isGreOk :: WhereLooking -> GlobalRdrElt -> Bool
+isGreOk where_look = case where_look of
+                         WL_LocalTop  -> isLocalGRE
+                         WL_LocalOnly -> const False
+                         _            -> const True
 
 {- Note [When to show/hide the module-not-imported line]           -- #15611
 For the error message:

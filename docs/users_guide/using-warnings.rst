@@ -39,6 +39,7 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Wdodgy-foreign-imports`
     * :ghc-flag:`-Winline-rule-shadowing`
     * :ghc-flag:`-Wunsupported-llvm-version`
+    * :ghc-flag:`-Wmissed-extra-shared-lib`
     * :ghc-flag:`-Wtabs`
     * :ghc-flag:`-Wunrecognised-warning-flags`
     * :ghc-flag:`-Winaccessible-code`
@@ -1325,6 +1326,16 @@ of ``-W(no-)*``.
     :category:
 
     Warn when using :ghc-flag:`-fllvm` with an unsupported version of LLVM.
+
+.. ghc-flag:: -Wmissed-extra-shared-lib
+    :shortdesc: Warn when GHCi can't load a shared lib.
+    :type: dynamic
+    :reverse: -Wno-missed-extra-shared-lib
+    :category:
+
+    Warn when GHCi can't load a shared lib it deduced it should load
+    when loading a package and analyzing the extra-libraries stanza
+    of the target package description.
 
 .. ghc-flag:: -Wunticked-promoted-constructors
     :shortdesc: warn if promoted constructors are not ticked

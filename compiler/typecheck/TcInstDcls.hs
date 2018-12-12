@@ -794,7 +794,10 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
                bindImplicitTKBndrs_Q_Skol imp_vars          $
                bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
                do { stupid_theta <- tcHsContext hs_ctxt
-                  ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc mb_clsinfo hs_pats
+                  ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
+                    -- Ensure that the instance is consistent with its
+                    -- parent class
+                  ; addConsistencyConstraints mb_clsinfo lhs_ty
                   ; mapM_ (wrapLocM_ kcConDecl) hs_cons
                   ; res_kind <- tc_kind_sig m_ksig
                   ; lhs_ty <- checkExpectedKindX pp_lhs lhs_ty lhs_kind res_kind

@@ -25,7 +25,7 @@ import subprocess
 
 from testutil import getStdout, Watcher, str_warn, str_info
 from testglobals import getConfig, ghc_env, getTestRun, TestOptions, brokens
-from perf_notes import MetricChange, inside_git_repo
+from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty
 from junit import junit
 
 # Readline sometimes spews out ANSI escapes for some values of TERM,
@@ -394,7 +394,12 @@ else:
         with open(config.metrics_file, 'a') as file:
             file.write("\n" + Perf.format_perf_stat(stats))
     elif canGitStatus and any(stats):
-        Perf.append_perf_stat(stats)
+        if is_worktree_dirty():
+            print()
+            print(str_warn('Working Tree is Dirty') + ' performance metrics will not be saved.' + \
+                                    ' Commit changes or use --metrics-file to save metrics to a file.')
+        else:
+            Perf.append_perf_stat(stats)
 
     # Write summary
     if config.summary_file:
