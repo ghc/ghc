@@ -1539,8 +1539,9 @@ coreFlattenTy = go
         (env', mkTyConApp tc tys')
 
     go env (FunTy mult ty1 ty2) = let (env1, ty1') = go env  ty1
-                                      (env2, ty2') = go env1 ty2 in
-                                  (env2, mkFunTy mult ty1' ty2')
+                                      (env2, ty2') = go env1 ty2
+                                      (env3, mult') = go_mult env2 mult in
+                                  (env3, mkFunTy mult' ty1' ty2')
 
     go env (ForAllTy (Bndr tv vis) ty)
       = let (env1, tv') = coreFlattenVarBndr env tv
@@ -1555,6 +1556,19 @@ coreFlattenTy = go
 
     go env (CoercionTy co) = let (env', co') = coreFlattenCo env co in
                              (env', CoercionTy co')
+
+    go_mult env Zero = (env, Zero)
+    go_mult env One = (env, One)
+    go_mult env Omega = (env, Omega)
+    go_mult env (MultThing t) = let (env', t') = go env t
+                                in (env', MultThing t')
+    go_mult env (MultAdd m1 m2) = let (env1, m1') = go_mult env m1
+                                      (env2, m2') = go_mult env1 m2 in
+                                  (env2, MultAdd m1' m2')
+    go_mult env (MultMul m1 m2) = let (env1, m1') = go_mult env m1
+                                      (env2, m2') = go_mult env1 m2 in
+                                  (env2, MultMul m1' m2')
+
 
 -- when flattening, we don't care about the contents of coercions.
 -- so, just return a fresh variable of the right (flattened) type

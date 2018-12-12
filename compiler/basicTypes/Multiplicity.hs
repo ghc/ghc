@@ -36,7 +36,6 @@ import GhcPrelude
 
 import Data.Data
 import Outputable
-import Control.Applicative
 
 --
 -- * Core properties of multiplicities

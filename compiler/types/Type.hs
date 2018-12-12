@@ -2441,7 +2441,7 @@ seqType :: Type -> ()
 seqType (LitTy n)                   = n `seq` ()
 seqType (TyVarTy tv)                = tv `seq` ()
 seqType (AppTy t1 t2)               = seqType t1 `seq` seqType t2
-seqType (FunTy w t1 t2)             = w `seq` seqType t1 `seq` seqType t2
+seqType (FunTy w t1 t2)             = seqMult w `seq` seqType t1 `seq` seqType t2
 seqType (TyConApp tc tys)           = tc `seq` seqTypes tys
 seqType (ForAllTy (Bndr tv _) ty)   = seqType (varType tv) `seq` seqType ty
 seqType (CastTy ty co)              = seqType ty `seq` seqCo co
@@ -2450,6 +2450,14 @@ seqType (CoercionTy co)             = seqCo co
 seqTypes :: [Type] -> ()
 seqTypes []       = ()
 seqTypes (ty:tys) = seqType ty `seq` seqTypes tys
+
+seqMult :: Mult -> ()
+seqMult Zero = ()
+seqMult One = ()
+seqMult Omega = ()
+seqMult (MultThing t) = seqType t
+seqMult (MultAdd x y) = seqMult x `seq` seqMult y
+seqMult (MultMul x y) = seqMult x `seq` seqMult y
 
 {-
 ************************************************************************
