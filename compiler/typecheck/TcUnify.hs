@@ -813,9 +813,12 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
 tcEqMult :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Mult -> Mult -> TcM ()
 tcEqMult eq_orig inst_orig ctxt w_actual w_expected = do
-  { -- Note that here we do not call to `submultMaybe`, so we check
-    -- for strict equality.
-  ; _wrap <- tc_sub_type_ds eq_orig inst_orig ctxt (fromMult w_actual) (fromMult w_expected)
+  { let w_actual' = case w_actual of
+                       Zero -> Omega  -- Approximate Zero by Omega (see test LinearPolyType)
+                       _ -> w_actual
+  -- Note that here we do not call to `submultMaybe`, so we check
+  -- for strict equality.
+  ; _wrap <- tc_sub_type_ds eq_orig inst_orig ctxt (fromMult w_actual') (fromMult w_expected)
   -- I don't know why, but `_wrap` need not be an identity wrapper. At any rate,
   -- the wrapper isn't significant for multiplicities, so it is safe to drop
   -- it. But maybe there is a better way to implement this function.
