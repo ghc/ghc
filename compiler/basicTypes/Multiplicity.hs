@@ -212,12 +212,13 @@ traverseMult f (MultAdd x y) = MultAdd <$> traverseMult f x <*> traverseMult f y
 traverseMult f (MultMul x y) = MultMul <$> traverseMult f x <*> traverseMult f y
 
 multThingList :: Multable t => (t -> a) -> GMult t -> [a]
-multThingList _ Zero = []
-multThingList _ One = []
-multThingList _ Omega = []
-multThingList f (MultThing t) = [f t]
-multThingList f (MultAdd x y) = multThingList f x ++ multThingList f y
-multThingList f (MultMul x y) = multThingList f x ++ multThingList f y
+multThingList f = go []
+  where go acc Zero = acc
+        go acc One = acc
+        go acc Omega = acc
+        go acc (MultThing t) = f t : acc
+        go acc (MultAdd x y) = go (go acc y) x
+        go acc (MultMul x y) = go (go acc y) x
 
 -- Not a Functor, since MultThing calls 'fromMult'.
 mapMult :: (Multable t, Multable u) => (t -> u) -> GMult t -> GMult u
