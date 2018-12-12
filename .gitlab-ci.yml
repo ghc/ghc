@@ -159,13 +159,13 @@ validate-x86_64-linux:
 # This requires updating the maximum artifacts size limit in Gitlab to
 # something like 200MB.
 
-circleci-validate-x86_64-linux:
+circleci-validate-x86_64-linux-deb8:
   extends: .circleci
-  script: ".gitlab/circle-ci-job.sh validate-x86_64-linux"
+  script: ".gitlab/circle-ci-job.sh validate-x86_64-linux-deb8"
 
-circleci-validate-i386-linux:
+circleci-validate-i386-linux-deb8:
   extends: .circleci
-  script: ".gitlab/circle-ci-job.sh validate-i386-linux"
+  script: ".gitlab/circle-ci-job.sh validate-i386-linux-deb8"
 
 # circleci-validate-x86_64-freebsd:
 #   extends: .circleci
