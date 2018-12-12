@@ -71,7 +71,6 @@ include-dirs:           TOP"/rts/dist/build" TOP"/includes" TOP"/includes/dist-d
 #endif
 
 includes:               Stg.h
-hugs-options:
 cc-options:
 
 ld-options:
