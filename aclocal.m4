@@ -2408,7 +2408,11 @@ AC_DEFUN([FIND_LD],[
                    FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
               "GNU gold"*)
                    FP_CC_LINKER_FLAG_TRY(gold, $2)
-                   LD_NO_GOLD=ld
+                   if test "$cross_compiling" = "yes"; then
+                       AC_MSG_NOTICE([Using ld.gold and assuming that it is not affected by binutils issue 22266]);
+                   else
+                       LD_NO_GOLD=ld;
+                   fi
                    ;;
               "LLD"*)
                    FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
