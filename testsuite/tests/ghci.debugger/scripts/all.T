@@ -2,22 +2,23 @@ setTestOpts([extra_run_opts('-ignore-dot-ghci'),
              when(config.have_ext_interp, extra_ways(['ghci-ext'])), # test with -fexternal-interpreter
              normalise_slashes])
 
-test('print001', normal, ghci_script, ['print001.script'])
-test('print002', extra_files(['../Test.hs']), ghci_script, ['print002.script'])
-test('print003', extra_files(['../Test.hs']), ghci_script, ['print003.script'])
-test('print004', normal, ghci_script, ['print004.script'])
-test('print005', extra_files(['../QSort.hs']), ghci_script, ['print005.script'])
-test('print006', extra_files(['../Test.hs']), ghci_script, ['print006.script'])
+
+test('print001', broken_without_gmp, ghci_script, ['print001.script'])
+test('print002', [broken_without_gmp, extra_files(['../Test.hs'])], ghci_script, ['print002.script'])
+test('print003', [broken_without_gmp, extra_files(['../Test.hs'])], ghci_script, ['print003.script'])
+test('print004', broken_without_gmp, ghci_script, ['print004.script'])
+test('print005', [broken_without_gmp, extra_files(['../QSort.hs'])], ghci_script, ['print005.script'])
+test('print006', [broken_without_gmp, extra_files(['../Test.hs'])], ghci_script, ['print006.script'])
 test('print007', extra_files(['../Test.hs']), ghci_script, ['print007.script'])
-test('print008', extra_files(['../Test.hs']), ghci_script, ['print008.script'])
+test('print008', [broken_without_gmp, extra_files(['../Test.hs'])], ghci_script, ['print008.script'])
 test('print009', normal, ghci_script, ['print009.script'])
-test('print010', extra_files(['../Test.hs']), ghci_script, ['print010.script'])
+test('print010', [broken_without_gmp, extra_files(['../Test.hs'])], ghci_script, ['print010.script'])
 test('print011', extra_files(['../Test.hs']), ghci_script, ['print011.script'])
-test('print012', extra_files(['../GADT.hs', '../Test.hs']), ghci_script, ['print012.script'])
-test('print013', extra_files(['../GADT.hs']), ghci_script, ['print013.script'])
-test('print014', extra_files(['../GADT.hs']), ghci_script, ['print014.script'])
-test('print016', extra_files(['../Test.hs']), ghci_script, ['print016.script'])
-test('print017', extra_files(['../Test.hs']), ghci_script, ['print017.script'])
+test('print012', [broken_without_gmp, extra_files(['../GADT.hs', '../Test.hs'])], ghci_script, ['print012.script'])
+test('print013', [broken_without_gmp, extra_files(['../GADT.hs'])], ghci_script, ['print013.script'])
+test('print014', [broken_without_gmp, extra_files(['../GADT.hs'])], ghci_script, ['print014.script'])
+test('print016', [broken_without_gmp, extra_files(['../Test.hs'])], ghci_script, ['print016.script'])
+test('print017', [broken_without_gmp, extra_files(['../Test.hs'])], ghci_script, ['print017.script'])
 test('print018', extra_files(['../Test.hs']), ghci_script, ['print018.script'])
 test('print019', extra_files(['../Test.hs']), ghci_script, ['print019.script'])
 
@@ -30,12 +31,12 @@ test('print021', normal, ghci_script, ['print021.script'])
 test('print022',
      [when(arch('powerpc64'), expect_broken(14455))],
      ghci_script, ['print022.script'])
-test('print023', extra_files(['../Test.hs']), ghci_script, ['print023.script'])
-test('print024', extra_files(['../Test.hs']), ghci_script, ['print024.script'])
+test('print023', [broken_without_gmp, extra_files(['../Test.hs'])], ghci_script, ['print023.script'])
+test('print024', [broken_without_gmp, extra_files(['../Test.hs'])], ghci_script, ['print024.script'])
 test('print025', normal, ghci_script, ['print025.script'])
 test('print026', normal, ghci_script, ['print026.script'])
 test('print027', normal, ghci_script, ['print027.script'])
-test('print028', normal, ghci_script, ['print028.script'])
+test('print028', broken_without_gmp, ghci_script, ['print028.script'])
 test('print029', normal, ghci_script, ['print029.script'])
 test('print030', extra_files(['print029.hs']), ghci_script, ['print030.script'])
 test('print031', normal, ghci_script, ['print031.script'])
@@ -45,12 +46,12 @@ test('print034', extra_files(['../GADT.hs', '../Test.hs']), ghci_script, ['print
 test('print035', extra_files(['../Unboxed.hs']), ghci_script, ['print035.script'])
 test('print036', expect_broken(9046), ghci_script, ['print036.script'])
 
-test('break001', extra_files(['../Test2.hs']), ghci_script, ['break001.script'])
+test('break001', [broken_without_gmp, extra_files(['../Test2.hs'])], ghci_script, ['break001.script'])
 test('break002', extra_files(['../Test2.hs']), ghci_script, ['break002.script'])
 test('break003', extra_files(['../Test3.hs']), ghci_script, ['break003.script'])
-test('break005', extra_files(['../QSort.hs']), ghci_script, ['break005.script'])
-test('break006', extra_files(['../Test3.hs']), ghci_script, ['break006.script'])
-test('break007', [extra_files(['Break007.hs'])], ghci_script, ['break007.script'])
+test('break005', [broken_without_gmp, extra_files(['../QSort.hs'])], ghci_script, ['break005.script'])
+test('break006', [broken_without_gmp, extra_files(['../Test3.hs'])], ghci_script, ['break006.script'])
+test('break007', extra_files(['Break007.hs']), ghci_script, ['break007.script'])
 test('break008', extra_files(['../Test3.hs']), ghci_script, ['break008.script'])
 test('break009', [extra_files(['../Test6.hs']),
                   combined_output], ghci_script, ['break009.script'])
@@ -72,12 +73,12 @@ test('break020', extra_files(['Break020b.hs']), ghci_script, ['break020.script']
 test('break021', extra_files(['Break020b.hs', 'break020.hs']), ghci_script, ['break021.script'])
 test('break024', combined_output, ghci_script, ['break024.script'])
 test('break025', normal, ghci_script, ['break025.script'])
-test('break026', normal, ghci_script, ['break026.script'])
-test('break027', extra_files(['../QSort.hs']), ghci_script, ['break027.script'])
+test('break026', broken_without_gmp, ghci_script, ['break026.script'])
+test('break027', [broken_without_gmp, extra_files(['../QSort.hs'])], ghci_script, ['break027.script'])
 test('break028', normal, ghci_script, ['break028.script'])
 
 test('dynbrk001', extra_files(['../QSort.hs']), ghci_script, ['dynbrk001.script'])
-test('dynbrk002', extra_files(['../QSort.hs']), ghci_script, ['dynbrk002.script'])
+test('dynbrk002', [broken_without_gmp, extra_files(['../QSort.hs'])], ghci_script, ['dynbrk002.script'])
 test('dynbrk003', normal, ghci_script, ['dynbrk003.script'])
 test('dynbrk004', extra_files(['../mdo.hs']), ghci_script, ['dynbrk004.script'])
 test('dynbrk005', [extra_files(['TupleN.hs']), expect_broken(1530)],
@@ -92,12 +93,12 @@ test('listCommand001', [extra_files(['../Test3.hs']),
                         combined_output], ghci_script, ['listCommand001.script'])
 test('listCommand002', normal, ghci_script, ['listCommand002.script'])
 
-test('hist001', [extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
+test('hist001', [broken_without_gmp, extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
      ghci_script, ['hist001.script'])
-test('hist002', [extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
+test('hist002', [broken_without_gmp, extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
      ghci_script, ['hist002.script'])
 
-test('T2740', normal, ghci_script, ['T2740.script'])
+test('T2740', broken_without_gmp, ghci_script, ['T2740.script'])
 
 test('getargs', extra_files(['../getargs.hs']), ghci_script, ['getargs.script'])
 test('T7386', normal, ghci_script, ['T7386.script'])
