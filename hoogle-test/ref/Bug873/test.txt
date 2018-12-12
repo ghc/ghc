@@ -18,8 +18,9 @@ module Bug873
 --   It is also useful in higher-order situations, such as <tt><a>map</a>
 --   (<a>$</a> 0) xs</tt>, or <tt><a>zipWith</a> (<a>$</a>) fs xs</tt>.
 --   
---   Note that <tt>($)</tt> is levity-polymorphic in its result type, so
---   that foo $ True where foo :: Bool -&gt; Int# is well-typed
+--   Note that <tt>(<a>$</a>)</tt> is levity-polymorphic in its result
+--   type, so that <tt>foo <a>$</a> True</tt> where <tt>foo :: Bool -&gt;
+--   Int#</tt> is well-typed.
 ($) :: () => (a -> b) -> a -> b
 infixr 0 $
 ($$) :: (a -> b) -> a -> b

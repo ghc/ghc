@@ -32,8 +32,6 @@ import GHC
 import Class
 import DynFlags
 
-import HsTypes (HsType(..))
-
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName

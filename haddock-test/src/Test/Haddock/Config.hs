@@ -241,7 +241,7 @@ baseDependencies ghcPath = do
     unsetEnv "GHC_PACKAGE_PATH"
 
     (comp, _, cfg) <- configure normal (Just ghcPath) Nothing
-        defaultProgramConfiguration
+        defaultProgramDb
 #if MIN_VERSION_Cabal(1,23,0)
     pkgIndex <- getInstalledPackages normal comp [GlobalPackageDB] cfg
 #else

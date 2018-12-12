@@ -61,7 +61,6 @@ import TcRnTypes
 import FastString ( unpackFS, fastStringToByteString)
 import BasicTypes ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
 import qualified Outputable as O
-import HsDecls ( getConArgs )
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
@@ -117,7 +116,7 @@ createInterface tm flags modMap instIfaceMap = do
 
   let declsWithDocs = topDecls group_
 
-      exports0 = fmap (reverse . map (first unLoc)) mayExports
+      exports0 = fmap (map (first unLoc)) mayExports
       exports
         | OptIgnoreExports `elem` opts = Nothing
         | otherwise = exports0

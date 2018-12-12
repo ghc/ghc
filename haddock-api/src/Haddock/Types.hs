@@ -42,7 +42,6 @@ import DynFlags (Language)
 import qualified GHC.LanguageExtensions as LangExt
 import OccName
 import Outputable
-import Control.Applicative (Applicative(..))
 import Control.Monad (ap)
 
 import Haddock.Backends.Hyperlinker.Types

@@ -58,7 +58,6 @@ import Exception
 import GHC hiding (verbosity)
 import HscTypes
 import FastString (unpackFS)
-import MonadUtils (liftIO)
 import TcRnTypes (tcg_rdr_env)
 import Name (nameIsFromExternalPackage, nameOccName)
 import OccName (isTcOcc)

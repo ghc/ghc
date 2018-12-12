@@ -25,7 +25,6 @@ import Haddock.GhcUtils
 import Haddock.Types hiding (Version)
 import Haddock.Utils hiding (out)
 
-import HsBinds (emptyLHsBinds)
 import GHC
 import Outputable
 import NameSet
