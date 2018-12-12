@@ -140,12 +140,7 @@ synonymTyConsOfType ty
      go_prov (ProofIrrelProv co)  = go_co co
      go_prov (PluginProv _)       = emptyNameEnv
 
-     go_mult Zero                 = emptyNameEnv
-     go_mult One                  = emptyNameEnv
-     go_mult Omega                = emptyNameEnv
-     go_mult (MultThing ty)       = go ty
-     go_mult (MultAdd x y)        = go_mult x `plusNameEnv` go_mult y
-     go_mult (MultMul x y)        = go_mult x `plusNameEnv` go_mult y
+     go_mult m                    = foldr plusNameEnv emptyNameEnv (multThingList go m)
 
      go_tc tc | isTypeSynonymTyCon tc = unitNameEnv (tyConName tc) tc
               | otherwise             = emptyNameEnv
@@ -606,7 +601,8 @@ irType = go
                                           lcls' = extendVarSet lcls tv
                                     ; markNominal lcls (tyVarKind tv)
                                     ; go lcls' ty }
-    go lcls (FunTy _ arg res)  = go lcls arg >> go lcls res
+    go lcls (FunTy w arg res)  = sequence_ (multThingList (go lcls) w) >>
+                                 go lcls arg >> go lcls res
     go _    (LitTy {})         = return ()
       -- See Note [Coercions in role inference]
     go lcls (CastTy ty _)      = go lcls ty
@@ -642,7 +638,8 @@ markNominal lcls ty = let nvars = fvVarList (FV.delFVs lcls $ get_ty_vars ty) in
     get_ty_vars :: Type -> FV
     get_ty_vars (TyVarTy tv)      = unitFV tv
     get_ty_vars (AppTy t1 t2)     = get_ty_vars t1 `unionFV` get_ty_vars t2
-    get_ty_vars (FunTy _ t1 t2)   = get_ty_vars t1 `unionFV` get_ty_vars t2
+    get_ty_vars (FunTy w t1 t2)   = unionsFV (multThingList get_ty_vars w)
+                                    `unionFV` get_ty_vars t1 `unionFV` get_ty_vars t2
     get_ty_vars (TyConApp _ tys)  = mapUnionFV get_ty_vars tys
     get_ty_vars (ForAllTy tvb ty) = tyCoFVsBndr tvb (get_ty_vars ty)
     get_ty_vars (LitTy {})        = emptyFV

@@ -917,7 +917,8 @@ tcTyFamInstsAndVisX = go
     go _            (LitTy {})         = []
     go is_invis_arg (ForAllTy bndr ty) = go is_invis_arg (binderType bndr)
                                          ++ go is_invis_arg ty
-    go is_invis_arg (FunTy _ ty1 ty2)  = go is_invis_arg ty1
+    go is_invis_arg (FunTy w ty1 ty2)  = concat (multThingList (go is_invis_arg) w)
+                                         ++ go is_invis_arg ty1
                                          ++ go is_invis_arg ty2
     go is_invis_arg ty@(AppTy _ _)     =
       let (ty_head, ty_args) = splitAppTys ty
@@ -984,15 +985,10 @@ exactTyCoVarsOfType ty
     go (TyConApp _ tys)     = exactTyCoVarsOfTypes tys
     go (LitTy {})           = emptyVarSet
     go (AppTy fun arg)      = go fun `unionVarSet` go arg
-    go (FunTy w arg res)    = go_mult w `unionVarSet` go arg `unionVarSet` go res
+    go (FunTy w arg res)    = unionVarSets (multThingList go w) `unionVarSet` go arg `unionVarSet` go res
     go (ForAllTy bndr ty)   = delBinderVar (go ty) bndr `unionVarSet` go (binderType bndr)
     go (CastTy ty co)       = go ty `unionVarSet` goCo co
     go (CoercionTy co)      = goCo co
-
-    go_mult (MultThing ty)       = go ty
-    go_mult (MultAdd m1 m2)   = go_mult m1 `unionVarSet` go_mult m2
-    go_mult (MultMul m1 m2)   = go_mult m1 `unionVarSet` go_mult m2
-    go_mult _                = emptyVarSet
 
     goMCo MRefl    = emptyVarSet
     goMCo (MCo co) = goCo co
@@ -1047,15 +1043,10 @@ anyRewritableTyVar ignore_cos role pred ty
     go _ _     (LitTy {})       = False
     go rl bvs (TyConApp tc tys) = go_tc rl bvs tc tys
     go rl bvs (AppTy fun arg)   = go rl bvs fun || go NomEq bvs arg
-    go rl bvs (FunTy w arg res) = go_mult rl bvs w || go rl bvs arg || go rl bvs res
+    go rl bvs (FunTy w arg res) = or (multThingList (go rl bvs) w) || go rl bvs arg || go rl bvs res
     go rl bvs (ForAllTy tv ty)  = go rl (bvs `extendVarSet` binderVar tv) ty
     go rl bvs (CastTy ty co)    = go rl bvs ty || go_co rl bvs co
     go rl bvs (CoercionTy co)   = go_co rl bvs co  -- ToDo: check
-
-    go_mult rl bvs (MultThing ty) = go rl bvs ty
-    go_mult rl bvs (MultAdd m1 m2) = go_mult rl bvs m1 || go_mult rl bvs m2
-    go_mult rl bvs (MultMul m1 m2) = go_mult rl bvs m1 || go_mult rl bvs m2
-    go_mult _ _ _ = False
 
     go_tc NomEq  bvs _  tys = any (go NomEq bvs) tys
     go_tc ReprEq bvs tc tys = any (go_arg bvs)
@@ -2108,7 +2099,7 @@ isInsolubleOccursCheck eq_rel tv ty
     go (AppTy t1 t2) = case eq_rel of  -- See Note [AppTy and ReprEq]
                          NomEq  -> go t1 || go t2
                          ReprEq -> go t1
-    go (FunTy _ t1 t2) = go t1 || go t2
+    go (FunTy w t1 t2) = or (multThingList go w) || go t1 || go t2
     go (ForAllTy (Bndr tv' _) inner_ty)
       | tv' == tv = False
       | otherwise = go (varType tv') || go inner_ty
@@ -2677,7 +2668,7 @@ sizeType = go
                                    -- size ordering is sound, but why is this better?
                                    -- I came across this when investigating #14010.
     go (LitTy {})                = 1
-    go (FunTy _ arg res)         = go arg + go res + 1
+    go (FunTy w arg res)         = sum (multThingList go w) + go arg + go res + 1
     go (AppTy fun arg)           = go fun + go arg
     go (ForAllTy (Bndr tv vis) ty)
         | isVisibleArgFlag vis   = go (tyVarKind tv) + go ty + 1

@@ -1880,10 +1880,7 @@ zonkScaledTcTypeToTypeX env (Scaled r ty) = Scaled <$> zonkMultX env r
                                                          <*> zonkTcTypeToTypeX env ty
 
 zonkMultX :: ZonkEnv -> Mult -> TcM Mult
-zonkMultX env (MultThing t) = MultThing <$> zonkTcTypeToTypeX env t
-zonkMultX env (MultAdd m1 m2) = MultAdd <$> zonkMultX env m1 <*> zonkMultX env m2
-zonkMultX env (MultMul m1 m2) = MultMul <$> zonkMultX env m1 <*> zonkMultX env m2
-zonkMultX _env r = return r
+zonkMultX env = traverseMult (zonkTcTypeToTypeX env)
 
 zonkTcTypesToTypesX :: Traversable t => ZonkEnv -> (t TcType) -> TcM (t Type)
 zonkTcTypesToTypesX env tys = mapM (zonkTcTypeToTypeX env) tys

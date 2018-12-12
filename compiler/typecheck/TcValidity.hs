@@ -53,6 +53,7 @@ import VarEnv
 import VarSet
 import Var         ( VarBndr(..), mkTyVar )
 import Id          ( idType, idName )
+import Multiplicity
 import FV
 import ErrUtils
 import DynFlags
@@ -1343,7 +1344,7 @@ dropCasts :: Type -> Type
 -- To consider: drop only HoleCo casts
 dropCasts (CastTy ty _)     = dropCasts ty
 dropCasts (AppTy t1 t2)     = mkAppTy (dropCasts t1) (dropCasts t2)
-dropCasts (FunTy w t1 t2)   = mkFunTy w (dropCasts t1) (dropCasts t2)
+dropCasts (FunTy w t1 t2)   = mkFunTy (mapMult dropCasts w) (dropCasts t1) (dropCasts t2)
 dropCasts (TyConApp tc tys) = mkTyConApp tc (map dropCasts tys)
 dropCasts (ForAllTy b ty)   = ForAllTy (dropCastsB b) (dropCasts ty)
 dropCasts ty                = ty  -- LitTy, TyVarTy, CoercionTy
@@ -2310,7 +2311,8 @@ fvType (TyVarTy tv)          = [tv]
 fvType (TyConApp _ tys)      = fvTypes tys
 fvType (LitTy {})            = []
 fvType (AppTy fun arg)       = fvType fun ++ fvType arg
-fvType (FunTy _ arg res)     = fvType arg ++ fvType res
+fvType (FunTy w arg res)     = concat (multThingList fvType w) ++
+                               fvType arg ++ fvType res
 fvType (ForAllTy (Bndr tv _) ty)
   = fvType (tyVarKind tv) ++
     filter (/= tv) (fvType ty)
@@ -2327,7 +2329,7 @@ sizeType (TyVarTy {})      = 1
 sizeType (TyConApp tc tys) = 1 + sizeTyConAppArgs tc tys
 sizeType (LitTy {})        = 1
 sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
-sizeType (FunTy _ arg res) = sizeType arg + sizeType res + 1
+sizeType (FunTy w arg res) = sum (multThingList sizeType w) + sizeType arg + sizeType res + 1
 sizeType (ForAllTy _ ty)   = sizeType ty
 sizeType (CastTy ty _)     = sizeType ty
 sizeType (CoercionTy _)    = 0

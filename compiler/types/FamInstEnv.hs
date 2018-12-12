@@ -1621,7 +1621,8 @@ allTyCoVarsInTy = go
     go (TyVarTy tv)      = unitVarSet tv
     go (TyConApp _ tys)  = allTyCoVarsInTys tys
     go (AppTy ty1 ty2)   = (go ty1) `unionVarSet` (go ty2)
-    go (FunTy _ ty1 ty2) = (go ty1) `unionVarSet` (go ty2)
+    go (FunTy w ty1 ty2) = unionVarSets (multThingList go w) `unionVarSet`
+                           (go ty1) `unionVarSet` (go ty2)
     go (ForAllTy (Bndr tv _) ty) = unitVarSet tv     `unionVarSet`
                                    go (tyVarKind tv) `unionVarSet`
                                    go ty

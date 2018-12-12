@@ -22,6 +22,7 @@ import {-# SOURCE #-} Type    ( coreView )
 import TyCoRep
 import TyCon
 import PrelNames
+import Multiplicity
 
 import Outputable
 import Util
@@ -76,7 +77,7 @@ isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
     go AppTy{}           = True  -- it can't be a TyConApp
     go (TyConApp tc tys) = isFamilyTyCon tc || any go tys
     go ForAllTy{}        = True
-    go (FunTy _ t1 t2)   = go t1 || go t2
+    go (FunTy w t1 t2)   = or (multThingList go w) || go t1 || go t2
     go LitTy{}           = False
     go CastTy{}          = True
     go CoercionTy{}      = True

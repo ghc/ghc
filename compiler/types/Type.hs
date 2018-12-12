@@ -132,8 +132,7 @@ module Type (
         -- Multiplicity
 
         isMultiplicityTy, isMultiplicityVar,
-
-        isLinearType, isOneMultiplicity, isOmegaMultiplicity,
+        isLinearType,
 
         -- * Main data types representing Kinds
         Kind,
@@ -258,7 +257,7 @@ import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind, unitTy
                                  , typeSymbolKind, liftedTypeKind
                                  , constraintKind
-                                 , oneDataConTy, omegaDataConTy, unrestrictedFunTyCon )
+                                 , unrestrictedFunTyCon )
 import PrelNames
 import CoAxiom
 import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
@@ -281,7 +280,7 @@ import Unique ( nonDetCmpUnique )
 
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust )
-import Control.Monad    ( guard, liftM2 )
+import Control.Monad    ( guard )
 
 -- $type_classification
 -- #type_classification#
@@ -570,7 +569,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go (TyConApp tc tys)
       = do { tc' <- tycon tc
            ; mktyconapp tc' <$> mapM go tys }
-    go (FunTy w arg res)   = FunTy <$> go_mult w <*> go arg <*> go res
+    go (FunTy w arg res)   = FunTy <$> traverseMult go w <*> go arg <*> go res
     go (ForAllTy (Bndr tv vis) inner)
       = do { (env', tv') <- tycobinder env tv vis
            ; inner' <- mapType mapper env' inner
@@ -578,11 +577,6 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go ty@(LitTy {})   = return ty
     go (CastTy ty co)  = mkcastty <$> go ty <*> mapCoercion mapper env co
     go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
-
-    go_mult (MultAdd x y) = liftM2 MultAdd (go_mult x) (go_mult y)
-    go_mult (MultMul x y) = liftM2 MultMul (go_mult x) (go_mult y)
-    go_mult (MultThing t) = toMult <$> go t
-    go_mult t = pure t
 
     (mktyconapp, mkappty, mkcastty)
       | smart     = (mkTyConApp, mkAppTy, mkCastTy)
@@ -1673,7 +1667,7 @@ isTauTy (TyVarTy _)           = True
 isTauTy (LitTy {})            = True
 isTauTy (TyConApp tc tys)     = all isTauTy tys && isTauTyCon tc
 isTauTy (AppTy a b)           = isTauTy a && isTauTy b
-isTauTy (FunTy _ a b)         = isTauTy a && isTauTy b
+isTauTy (FunTy w a b)         = and (multThingList isTauTy w) && isTauTy a && isTauTy b
 isTauTy (ForAllTy {})         = False
 isTauTy (CastTy ty _)         = isTauTy ty
 isTauTy (CoercionTy _)        = False  -- Not sure about this
@@ -2260,22 +2254,11 @@ isFamFreeTy (TyVarTy _)       = True
 isFamFreeTy (LitTy {})        = True
 isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc
 isFamFreeTy (AppTy a b)       = isFamFreeTy a && isFamFreeTy b
-isFamFreeTy (FunTy _ a b)     = isFamFreeTy a && isFamFreeTy b
+isFamFreeTy (FunTy w a b)     = and (multThingList isFamFreeTy w) &&
+                                isFamFreeTy a && isFamFreeTy b
 isFamFreeTy (ForAllTy _ ty)   = isFamFreeTy ty
 isFamFreeTy (CastTy ty _)     = isFamFreeTy ty
 isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Multiplicity}
-*                                                                      *
-************************************************************************
--}
-
-isOneMultiplicity, isOmegaMultiplicity :: Type -> Bool
-isOneMultiplicity ty = ty `eqType` oneDataConTy
-isOmegaMultiplicity ty = ty `eqType` omegaDataConTy
 
 {-
 ************************************************************************
@@ -2901,9 +2884,10 @@ occCheckExpand vs_to_avoid ty
     go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1
                                 ; ty2' <- go cxt ty2
                                 ; return (mkAppTy ty1' ty2') }
-    go cxt (FunTy w ty1 ty2) = do { ty1' <- go cxt ty1
-                                ; ty2' <- go cxt ty2
-                                ; return (mkFunTy w ty1' ty2') }
+    go cxt (FunTy w ty1 ty2) = do { w' <- traverseMult (go cxt) w
+                                  ; ty1' <- go cxt ty1
+                                  ; ty2' <- go cxt ty2
+                                  ; return (mkFunTy w' ty1' ty2') }
     go cxt@(as, env) (ForAllTy (Bndr tv vis) body_ty)
        = do { ki' <- go cxt (varType tv)
             ; let tv' = setVarType tv ki'
@@ -3081,7 +3065,8 @@ splitVisVarsOfType orig_ty = Pair invis_vars vis_vars
     go (TyVarTy tv)      = Pair (tyCoVarsOfType $ tyVarKind tv) (unitVarSet tv)
     go (AppTy t1 t2)     = go t1 `mappend` go t2
     go (TyConApp tc tys) = go_tc tc tys
-    go (FunTy _ t1 t2)     = go t1 `mappend` go t2
+    go (FunTy w t1 t2)   = mconcat (multThingList go w) `mappend`
+                           go t1 `mappend` go t2
     go (ForAllTy (Bndr tv _) ty)
       = ((`delVarSet` tv) <$> go ty) `mappend`
         (invisible (tyCoVarsOfType $ varType tv))

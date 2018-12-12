@@ -2147,17 +2147,8 @@ almost_devoid_co_var_of_prov UnsafeCoerceProv _ = True
 almost_devoid_co_var_of_prov (PluginProv _) _ = True
 
 almost_devoid_co_var_of_mult :: Mult -> CoVar -> Bool
-almost_devoid_co_var_of_mult Zero _ = False
-almost_devoid_co_var_of_mult One _ = False
-almost_devoid_co_var_of_mult Omega _ = False
-almost_devoid_co_var_of_mult (MultAdd x y) cv
-  = almost_devoid_co_var_of_mult x cv
-  && almost_devoid_co_var_of_mult y cv
-almost_devoid_co_var_of_mult (MultMul x y) cv
-  = almost_devoid_co_var_of_mult x cv
-  && almost_devoid_co_var_of_mult y cv
-almost_devoid_co_var_of_mult (MultThing x) cv
-  = almost_devoid_co_var_of_type x cv
+almost_devoid_co_var_of_mult m cv =
+  and $ multThingList (\x -> almost_devoid_co_var_of_type x cv) m
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
 almost_devoid_co_var_of_type (TyVarTy _) _ = True
@@ -2209,7 +2200,8 @@ injectiveVarsOfType = go
                          = go ty'
     go (TyVarTy v)       = unitFV v `unionFV` go (tyVarKind v)
     go (AppTy f a)       = go f `unionFV` go a
-    go (FunTy _ ty1 ty2)   = go ty1 `unionFV` go ty2
+    go (FunTy w ty1 ty2) = unionsFV (multThingList go w) `unionFV`
+                           go ty1 `unionFV` go ty2
     go (TyConApp tc tys) =
       case tyConInjectivityInfo tc of
         NotInjective  -> emptyFV
@@ -2240,10 +2232,7 @@ noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
 
 noFreeVarsOfMult :: Mult -> Bool
-noFreeVarsOfMult (MultThing ty) = noFreeVarsOfType ty
-noFreeVarsOfMult (MultAdd m1 m2) = noFreeVarsOfMult m1 && noFreeVarsOfMult m2
-noFreeVarsOfMult (MultMul m1 m2) = noFreeVarsOfMult m1 && noFreeVarsOfMult m2
-noFreeVarsOfMult _ = True
+noFreeVarsOfMult w = and (multThingList noFreeVarsOfType w)
 
 noFreeVarsOfVarMult :: VarMult -> Bool
 noFreeVarsOfVarMult (Regular w) = noFreeVarsOfMult w
@@ -2951,10 +2940,7 @@ subst_ty subst ty
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
 subst_mult :: TCvSubst -> Mult -> Mult
-subst_mult subst (MultThing t) = MultThing (subst_ty subst t)
-subst_mult subst (MultAdd m1 m2) = MultAdd (subst_mult subst m1) (subst_mult subst m2)
-subst_mult subst (MultMul m1 m2) = MultMul (subst_mult subst m1) (subst_mult subst m2)
-subst_mult _ r = r
+subst_mult subst = mapMult (subst_ty subst)
 
 substTyVar :: TCvSubst -> TyVar -> Type
 substTyVar (TCvSubst _ tenv _) tv
@@ -3632,12 +3618,7 @@ tidyTypes env tys = map (tidyType env) tys
 
 ---------------
 tidyMult :: TidyEnv -> Mult -> Mult
-tidyMult _   Zero  = Zero
-tidyMult _   One   = One
-tidyMult _   Omega = Omega
-tidyMult env (MultThing x) = MultThing (tidyType env x)
-tidyMult env (MultAdd x y) = MultAdd (tidyMult env x) (tidyMult env y)
-tidyMult env (MultMul x y) = MultMul (tidyMult env x) (tidyMult env y)
+tidyMult env = mapMult (tidyType env)
 
 tidyType :: TidyEnv -> Type -> Type
 tidyType _   (LitTy n)            = LitTy n

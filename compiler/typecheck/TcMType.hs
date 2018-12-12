@@ -2146,16 +2146,9 @@ tidySigSkol env cx ty tv_prs
         (env', tv') = tidy_tv_bndr env tv
 
     tidy_ty env (FunTy w arg res)
-      = FunTy (tidyMult env w) (tidyType env arg) (tidy_ty env res)
+      = FunTy (mapMult (tidy_ty env) w) (tidyType env arg) (tidy_ty env res)
 
     tidy_ty env ty = tidyType env ty
-
-    tidyMult _   Zero = Zero
-    tidyMult _   One = One
-    tidyMult _   Omega = Omega
-    tidyMult env (MultThing ty) = MultThing (tidy_ty env ty)
-    tidyMult env (MultAdd x y) = MultAdd (tidyMult env x) (tidyMult env y)
-    tidyMult env (MultMul x y) = MultMul (tidyMult env x) (tidyMult env y)
 
     tidy_tv_bndr :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
     tidy_tv_bndr env@(occ_env, subst) tv
