@@ -1739,8 +1739,14 @@ def normalise_errmsg( str ):
     # collisions, so we need to normalise that to just "ghc"
     str = re.sub('ghc-stage[123]', 'ghc', str)
 
-    # Error messages simetimes contain integer implementation package
+    # Error messages sometimes contain integer implementation package
     str = re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', str)
+
+    # Error messages sometimes contain this blurb which can vary
+    # spuriously depending upon build configuration (e.g. based on integer
+    # backend)
+    str = re.sub('...plus [a-z]+ instances involving out-of-scope types',
+                 '...plus N instances involving out-of-scope types', str)
 
     # Also filter out bullet characters.  This is because bullets are used to
     # separate error sections, and tests shouldn't be sensitive to how the
