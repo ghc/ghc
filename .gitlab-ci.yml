@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
 before_script:
-  - python .gitlab/fix-submodules.py
+  - python3 .gitlab/fix-submodules.py
   - git submodule sync --recursive
   - git submodule update --init --recursive
   - git checkout .gitmodules
@@ -12,20 +12,21 @@ before_script:
 ############################################################
 
 .validate-hadrian:
+  allow_failure: true
   script:
     - bash .circleci/prepare-system.sh
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
-    - ./configure
+    - ./configure $CONFIGURE_ARGS
     - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh`
   cache:
     key: hadrian
     paths:
       - cabal-cache
-  image: ghcci/x86_64-linux-deb8:0.1
 
-.validate-x86_64-linux-hadrian:
+validate-x86_64-linux-deb8-hadrian:
   extends: .validate-hadrian
+  image: ghcci/x86_64-linux-deb8:0.1
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -37,10 +38,11 @@ before_script:
 ############################################################
 
 .validate:
+  allow_failure: true
   script:
     - make clean || true
     - ./boot
-    - ./configure
+    - ./configure $CONFIGURE_ARGS
     - |
       THREADS=`mk/detect-cpu-count.sh`
       make V=0 -j$THREADS
@@ -50,7 +52,6 @@ before_script:
     - |
       THREADS=`mk/detect-cpu-count.sh`
       make test THREADS=$THREADS JUNIT_FILE=../../junit.xml
-  image: ghcci/x86_64-linux-deb8:0.1
   artifacts:
     when: always
     reports:
@@ -86,12 +87,13 @@ before_script:
       - cabal-cache
       - toolchain
 
-validate-x86_64-linux:
+
+.validate-linux:
   extends: .validate
   tags:
     - x86_64-linux
   before_script:
-    - python .gitlab/fix-submodules.py
+    - python3 .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
@@ -102,10 +104,44 @@ validate-x86_64-linux:
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
   cache:
-    key: darwin
+    key: linux
     paths:
       - cabal-cache
       - toolchain
+
+validate-x86_64-linux-deb9:
+  extends: .validate-linux
+  image: ghcci/x86_64-linux-deb9:0.1
+  cache:
+    key: linux-x86_64-deb9
+
+validate-x86_64-linux-deb8:
+  extends: .validate-linux
+  image: ghcci/x86_64-linux-deb8:0.1
+  cache:
+    key: linux-x86_64-deb8
+
+validate-x86_64-linux-fedora27:
+  extends: .validate-linux
+  image: ghcci/x86_64-linux-fedora27:0.1
+  cache:
+    key: linux-x86_64-fedora27
+
+validate-x86_64-linux-deb9-integer-simple:
+  extends: .validate-linux
+  variables:
+    INTEGER_LIBRARY: integer-simple
+  image: ghcci/x86_64-linux-deb9:0.1
+  cache:
+    key: linux-x86_64-deb9
+
+validate-x86_64-linux-deb9-unreg:
+  extends: .validate-linux
+  variables:
+    CONFIGURE_ARGS: --enable-unregisterised
+  image: ghcci/x86_64-linux-deb9:0.1
+  cache:
+    key: linux-x86_64-deb9
 
 ############################################################
 # Validation via Pipelines (make, Windows)
