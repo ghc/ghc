@@ -1183,20 +1183,6 @@ mk_absent_let dflags arg
               -- See also Note [Unique Determinism] in Unique
     unlifted_rhs = mkTyApps (Lit rubbishLit) [arg_ty]
 
-mk_seq_case :: Id -> CoreExpr -> CoreExpr
-mk_seq_case arg body = Case (Var arg) (sanitiseCaseBndr arg) (exprType body) [(DEFAULT, [], body)]
-
-sanitiseCaseBndr :: Id -> Id
--- The argument we are scrutinising has the right type to be
--- a case binder, so it's convenient to re-use it for that purpose.
--- But we *must* throw away all its IdInfo.  In particular, the argument
--- will have demand info on it, and that demand info may be incorrect for
--- the case binder.  e.g.       case ww_arg of ww_arg { I# x -> ... }
--- Quite likely ww_arg isn't used in '...'.  The case may get discarded
--- if the case binder says "I'm demanded".  This happened in a situation
--- like         (x+y) `seq` ....
-sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
-
 mk_ww_local :: Unique -> (Type, StrictnessMark) -> Id
 -- The StrictnessMark comes form the data constructor and says
 -- whether this field is strict
