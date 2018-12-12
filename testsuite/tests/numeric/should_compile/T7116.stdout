@@ -52,7 +52,7 @@ dr :: Double -> Double
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=<S(S),1*U(U)>m,
+ Str=<S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
@@ -69,7 +69,7 @@ dl [InlPrag=NOUSERINLINE[2]] :: Double -> Double
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=<S(S),1*U(U)>m,
+ Str=<S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
@@ -82,7 +82,7 @@ fr :: Float -> Float
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=<S(S),1*U(U)>m,
+ Str=<S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
@@ -101,7 +101,7 @@ fl [InlPrag=NOUSERINLINE[2]] :: Float -> Float
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=<S(S),1*U(U)>m,
+ Str=<S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)

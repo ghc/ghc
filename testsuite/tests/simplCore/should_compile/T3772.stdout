@@ -61,7 +61,7 @@ end Rec }
 
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
 T3772.$wfoo [InlPrag=NOINLINE] :: GHC.Prim.Int# -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>, Unf=OtherCon []]
+[GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>, Unf=OtherCon []]
 T3772.$wfoo
   = \ (ww :: GHC.Prim.Int#) ->
       case GHC.Prim.<# 0# ww of {
@@ -74,7 +74,7 @@ foo [InlPrag=NOUSERINLINE[0]] :: Int -> ()
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=<S(S),1*U(U)>,
+ Str=<S,1*U(U)>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)

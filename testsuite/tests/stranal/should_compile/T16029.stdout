@@ -1,0 +1,11 @@
+T16029.$WMkT [InlPrag=INLINE[2]] :: Int -> Int -> T
+         Tmpl= \ (dt [Occ=Once!] :: Int) (dt [Occ=Once!] :: Int) ->
+  = \ (dt [Occ=Once!] :: Int) (dt [Occ=Once!] :: Int) ->
+  :: GHC.Prim.Int# -> GHC.Prim.Int#
+  = \ (ww :: GHC.Prim.Int#) ->
+g2 [InlPrag=NOUSERINLINE[2]] :: T -> Int -> Int
+         Tmpl= \ (w [Occ=Once!] :: T) (w1 [Occ=Once!] :: Int) ->
+  = \ (w :: T) (w1 :: Int) ->
+g1 [InlPrag=NOUSERINLINE[2]] :: S -> Int -> Int
+         Tmpl= \ (w [Occ=Once!] :: S) (w1 [Occ=Once!] :: Int) ->
+  = \ (w :: S) (w1 :: Int) ->
