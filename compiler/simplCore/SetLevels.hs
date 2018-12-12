@@ -965,7 +965,7 @@ notWorthFloating :: CoreExpr -> [Var] -> Bool
 -- we replace e with (lvl79 x y) and then run FloatOut again, don't want
 -- to replace (lvl79 x y) with (lvl83 x y)!
 
-notWorthFloating (App (App (Var v) Type{}) Var{}) _ | v `hasKey` noinlineIdKey = True
+--notWorthFloating (App (App (Var v) Type{}) Var{}) _ | v `hasKey` noinlineIdKey = True
 
 notWorthFloating e abs_vars
   = go e (count isId abs_vars)
@@ -978,6 +978,9 @@ notWorthFloating e abs_vars
     go (App e arg) n
        | Type {}     <- arg = go e n
        | Coercion {} <- arg = go e n
+       | App (Var v) Type {} <- e
+       , v `hasKey` noinlineIdKey
+       , is_triv arg        = True
        | n==0               = False
        | is_triv arg        = go e (n-1)
        | otherwise          = False
