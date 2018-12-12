@@ -484,7 +484,7 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
     if (task->wakeup == false) {
         task->wakeup = true;
         // the wakeup flag is needed because signalCondition() doesn't
-        // flag the condition if the thread is already runniing, but we want
+        // flag the condition if the thread is already running, but we want
         // it to be sticky.
         signalCondition(&task->cond);
     }
