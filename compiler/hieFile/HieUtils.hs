@@ -10,6 +10,7 @@ import CoreMap
 import DynFlags                   ( DynFlags )
 import FastString                 ( FastString, mkFastString )
 import IfaceType
+import Multiplicity
 import Name hiding (varName)
 import Outputable                 ( renderWithStyle, ppr, defaultUserStyle )
 import SrcLoc
@@ -63,8 +64,11 @@ resolveVisibility kind ty_args
       where
         ts' = go (extendTvSubst env tv t) res ts
 
-    go env (FunTy _ res) (t:ts) -- No type-class args in tycon apps
+    go env (FunTy Omega _ res) (t:ts) -- No type-class args in tycon apps
       = (True,t) : (go env res ts)
+
+    go _env (FunTy _ _ _) _ -- No type-class args in tycon apps
+      = error "Functions with non-Omega multiplicity are not yet supported"
 
     go env (TyVarTy tv) ts
       | Just ki <- lookupTyVar env tv = go env ki ts
@@ -81,7 +85,7 @@ hieTypeToIface = foldType go
     go (HLitTy l) = IfaceLitTy l
     go (HForAllTy ((n,k),af) t) = let b = (occNameFS $ getOccName n, k)
                                   in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
-    go (HFunTy a b) = IfaceFunTy a b
+    go (HFunTy a b) = IfaceFunTy omega_ty a b
     go (HQualTy pred b) = IfaceDFunTy pred b
     go (HCastTy a) = a
     go HCoercionTy = IfaceTyVar "<coercion type>"
@@ -158,12 +162,13 @@ getTypeIndex t
       k <- getTypeIndex (varType v)
       i <- getTypeIndex t
       return $ HForAllTy ((varName v,k),a) i
-    go (FunTy a b) = do
+    go (FunTy Omega a b) = do
       ai <- getTypeIndex a
       bi <- getTypeIndex b
       return $ if isPredTy a
                   then HQualTy ai bi
                   else HFunTy ai bi
+    go (FunTy _ _ _) = error "Functions with non-Omega multiplicity are not yet supported"
     go (LitTy a) = return $ HLitTy $ toIfaceTyLit a
     go (CastTy t _) = do
       i <- getTypeIndex t
