@@ -34,6 +34,7 @@ TARGETS=(
 
     # FreeBSD amd64
     "amd64-portbld-freebsd"
+    "x86_64-unknown-freebsd" # See #15718
 
     # QNX
     "arm-unknown-nto-qnx-eabi"
