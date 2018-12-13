@@ -342,7 +342,7 @@ rhsDmdShell bndr
   where
     is_thunk = idArity bndr == 0
     -- Let's pray idDemandInfo is still OK after unarise...
-    (ds, cd) = toCleanDmd (idDemandInfo bndr) (idType bndr)
+    (ds, cd) = toCleanDmd (idDemandInfo bndr)
 
 tagSkeletonAlt :: CgStgAlt -> (Skeleton, IdSet, LlStgAlt)
 tagSkeletonAlt (con, bndrs, rhs)

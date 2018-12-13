@@ -158,15 +158,15 @@ stmtToInstrs stmt = do
       | isFloatType ty -> assignReg_FltCode format reg src
       | target32Bit (targetPlatform dflags) &&
         isWord64 ty    -> assignReg_I64Code      reg src
-      | otherwise        -> assignReg_IntCode format reg src
+      | otherwise      -> assignReg_IntCode format reg src
         where ty = cmmRegType dflags reg
               format = cmmTypeFormat ty
 
     CmmStore addr src
       | isFloatType ty -> assignMem_FltCode format addr src
       | target32Bit (targetPlatform dflags) &&
-        isWord64 ty      -> assignMem_I64Code      addr src
-      | otherwise        -> assignMem_IntCode format addr src
+        isWord64 ty    -> assignMem_I64Code      addr src
+      | otherwise      -> assignMem_IntCode format addr src
         where ty = cmmExprType dflags src
               format = cmmTypeFormat ty
 
@@ -465,7 +465,15 @@ getRegister' _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
+getRegister' _ (CmmMachOp (MO_XX_Conv W8 W32) [CmmLoad mem _]) = do
+    Amode addr addr_code <- getAmode D mem
+    return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
+
 getRegister' _ (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad mem _]) = do
+    Amode addr addr_code <- getAmode D mem
+    return (Any II64 (\dst -> addr_code `snocOL` LD II8 dst addr))
+
+getRegister' _ (CmmMachOp (MO_XX_Conv W8 W64) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
@@ -510,40 +518,15 @@ getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
       MO_SF_Conv from to -> coerceInt2FP from to x
 
       MO_SS_Conv from to
-        | from == to    -> conversionNop (intFormat to) x
-
-        -- narrowing is a nop: we treat the high bits as undefined
-      MO_SS_Conv W64 to
-        | arch32    -> panic "PPC.CodeGen.getRegister no 64 bit int register"
-        | otherwise -> conversionNop (intFormat to) x
-      MO_SS_Conv W32 to
-        | arch32    -> conversionNop (intFormat to) x
-        | otherwise -> case to of
-            W64 -> triv_ucode_int to (EXTS II32)
-            W16 -> conversionNop II16 x
-            W8  -> conversionNop II8 x
-            _   -> panic "PPC.CodeGen.getRegister: no match"
-      MO_SS_Conv W16 W8 -> conversionNop II8 x
-      MO_SS_Conv W8  to -> triv_ucode_int to (EXTS II8)
-      MO_SS_Conv W16 to -> triv_ucode_int to (EXTS II16)
+        | from >= to -> conversionNop (intFormat to) x
+        | otherwise  -> triv_ucode_int to (EXTS (intFormat from))
 
       MO_UU_Conv from to
-        | from == to -> conversionNop (intFormat to) x
-        -- narrowing is a nop: we treat the high bits as undefined
-      MO_UU_Conv W64 to
-        | arch32    -> panic "PPC.CodeGen.getRegister no 64 bit target"
-        | otherwise -> conversionNop (intFormat to) x
-      MO_UU_Conv W32 to
-        | arch32    -> conversionNop (intFormat to) x
-        | otherwise ->
-          case to of
-           W64 -> trivialCode to False AND x (CmmLit (CmmInt 4294967295 W64))
-           W16 -> conversionNop II16 x
-           W8  -> conversionNop II8 x
-           _   -> panic "PPC.CodeGen.getRegister: no match"
-      MO_UU_Conv W16 W8 -> conversionNop II8 x
-      MO_UU_Conv W8 to  -> trivialCode to False AND x (CmmLit (CmmInt 255 W32))
-      MO_UU_Conv W16 to -> trivialCode to False AND x (CmmLit (CmmInt 65535 W32))
+        | from >= to -> conversionNop (intFormat to) x
+        | otherwise  -> clearLeft from to
+
+      MO_XX_Conv _ to -> conversionNop (intFormat to) x
+
       _ -> panic "PPC.CodeGen.getRegister: no match"
 
     where
@@ -553,9 +536,17 @@ getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
         conversionNop new_format expr
             = do e_code <- getRegister' dflags expr
                  return (swizzleRegisterRep e_code new_format)
-        arch32 = target32Bit $ targetPlatform dflags
 
-getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
+        clearLeft from to
+            = do (src1, code1) <- getSomeReg x
+                 let arch_fmt  = intFormat (wordWidth dflags)
+                     arch_bits = widthInBits (wordWidth dflags)
+                     size      = widthInBits from
+                     code dst  = code1 `snocOL`
+                                 CLRLI arch_fmt dst src1 (arch_bits - size)
+                 return (Any (intFormat to) code)
+
+getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
   = case mop of
       MO_F_Eq _ -> condFltReg EQQ x y
       MO_F_Ne _ -> condFltReg NE  x y
@@ -564,28 +555,18 @@ getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_F_Lt _ -> condFltReg LTT x y
       MO_F_Le _ -> condFltReg LE  x y
 
-      MO_Eq rep -> condIntReg EQQ  (extendUExpr dflags rep x)
-                                   (extendUExpr dflags rep y)
-      MO_Ne rep -> condIntReg NE   (extendUExpr dflags rep x)
-                                   (extendUExpr dflags rep y)
+      MO_Eq rep -> condIntReg EQQ rep x y
+      MO_Ne rep -> condIntReg NE  rep x y
 
-      MO_S_Gt rep -> condIntReg GTT  (extendSExpr dflags rep x)
-                                     (extendSExpr dflags rep y)
-      MO_S_Ge rep -> condIntReg GE   (extendSExpr dflags rep x)
-                                     (extendSExpr dflags rep y)
-      MO_S_Lt rep -> condIntReg LTT  (extendSExpr dflags rep x)
-                                     (extendSExpr dflags rep y)
-      MO_S_Le rep -> condIntReg LE   (extendSExpr dflags rep x)
-                                     (extendSExpr dflags rep y)
+      MO_S_Gt rep -> condIntReg GTT rep x y
+      MO_S_Ge rep -> condIntReg GE  rep x y
+      MO_S_Lt rep -> condIntReg LTT rep x y
+      MO_S_Le rep -> condIntReg LE  rep x y
 
-      MO_U_Gt rep -> condIntReg GU   (extendUExpr dflags rep x)
-                                     (extendUExpr dflags rep y)
-      MO_U_Ge rep -> condIntReg GEU  (extendUExpr dflags rep x)
-                                     (extendUExpr dflags rep y)
-      MO_U_Lt rep -> condIntReg LU   (extendUExpr dflags rep x)
-                                     (extendUExpr dflags rep y)
-      MO_U_Le rep -> condIntReg LEU  (extendUExpr dflags rep x)
-                                     (extendUExpr dflags rep y)
+      MO_U_Gt rep -> condIntReg GU  rep x y
+      MO_U_Ge rep -> condIntReg GEU rep x y
+      MO_U_Lt rep -> condIntReg LU  rep x y
+      MO_U_Le rep -> condIntReg LEU rep x y
 
       MO_F_Add w  -> triv_float w FADD
       MO_F_Sub w  -> triv_float w FSUB
@@ -633,15 +614,11 @@ getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
                                     ]
         return (Any format code)
 
-      MO_S_Quot rep -> trivialCodeNoImmSign (intFormat rep) True DIV
-                (extendSExpr dflags rep x) (extendSExpr dflags rep y)
-      MO_U_Quot rep -> trivialCodeNoImmSign (intFormat rep) False DIV
-                (extendUExpr dflags rep x) (extendUExpr dflags rep y)
+      MO_S_Quot rep -> divCode rep True x y
+      MO_U_Quot rep -> divCode rep False x y
 
-      MO_S_Rem rep -> remainderCode rep True (extendSExpr dflags rep x)
-                                             (extendSExpr dflags rep y)
-      MO_U_Rem rep -> remainderCode rep False (extendUExpr dflags rep x)
-                                              (extendUExpr dflags rep y)
+      MO_S_Rem rep -> remainder rep True x y
+      MO_U_Rem rep -> remainder rep False x y
 
       MO_And rep   -> case y of
         (CmmLit (CmmInt imm _)) | imm == -8 || imm == -4
@@ -657,13 +634,21 @@ getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_Xor rep   -> trivialCode rep False XOR x y
 
       MO_Shl rep   -> shiftMulCode rep False SL x y
-      MO_S_Shr rep -> shiftMulCode rep False SRA (extendSExpr dflags rep x) y
-      MO_U_Shr rep -> shiftMulCode rep False SR (extendUExpr dflags rep x) y
+      MO_S_Shr rep -> srCode rep True SRA x y
+      MO_U_Shr rep -> srCode rep False SR x y
       _         -> panic "PPC.CodeGen.getRegister: no match"
 
   where
     triv_float :: Width -> (Format -> Reg -> Reg -> Reg -> Instr) -> NatM Register
     triv_float width instr = trivialCodeNoImm (floatFormat width) instr x y
+
+    remainder :: Width -> Bool -> CmmExpr -> CmmExpr -> NatM Register
+    remainder rep sgn x y = do
+      let fmt = intFormat rep
+      tmp <- getNewRegNat fmt
+      code <- remainderCode rep sgn tmp x y
+      return (Any fmt code)
+
 
 getRegister' _ (CmmLit (CmmInt i rep))
   | Just imm <- makeImmediate rep True i
@@ -707,31 +692,13 @@ getRegister' dflags (CmmLit lit)
 
 getRegister' _ other = pprPanic "getRegister(ppc)" (pprExpr other)
 
-    -- extend?Rep: wrap integer expression of type rep
-    -- in a conversion to II32 or II64 resp.
-extendSExpr :: DynFlags -> Width -> CmmExpr -> CmmExpr
-extendSExpr dflags W32 x
- | target32Bit (targetPlatform dflags) = x
+    -- extend?Rep: wrap integer expression of type `from`
+    -- in a conversion to `to`
+extendSExpr :: Width -> Width -> CmmExpr -> CmmExpr
+extendSExpr from to x = CmmMachOp (MO_SS_Conv from to) [x]
 
-extendSExpr dflags W64 x
- | not (target32Bit (targetPlatform dflags)) = x
-
-extendSExpr dflags rep x =
-    let size = if target32Bit $ targetPlatform dflags
-               then W32
-               else W64
-    in CmmMachOp (MO_SS_Conv rep size) [x]
-
-extendUExpr :: DynFlags -> Width -> CmmExpr -> CmmExpr
-extendUExpr dflags W32 x
- | target32Bit (targetPlatform dflags) = x
-extendUExpr dflags W64 x
- | not (target32Bit (targetPlatform dflags)) = x
-extendUExpr dflags rep x =
-    let size = if target32Bit $ targetPlatform dflags
-               then W32
-               else W64
-    in CmmMachOp (MO_UU_Conv rep size) [x]
+extendUExpr :: Width -> Width -> CmmExpr -> CmmExpr
+extendUExpr from to x = CmmMachOp (MO_UU_Conv from to) [x]
 
 -- -----------------------------------------------------------------------------
 --  The 'Amode' type: Memory addressing modes passed up the tree.
@@ -900,7 +867,6 @@ getCondCode :: CmmExpr -> NatM CondCode
 
 getCondCode (CmmMachOp mop [x, y])
   = do
-    dflags <- getDynFlags
     case mop of
       MO_F_Eq W32 -> condFltCode EQQ x y
       MO_F_Ne W32 -> condFltCode NE  x y
@@ -916,28 +882,18 @@ getCondCode (CmmMachOp mop [x, y])
       MO_F_Lt W64 -> condFltCode LTT x y
       MO_F_Le W64 -> condFltCode LE  x y
 
-      MO_Eq rep -> condIntCode EQQ  (extendUExpr dflags rep x)
-                                    (extendUExpr dflags rep y)
-      MO_Ne rep -> condIntCode NE   (extendUExpr dflags rep x)
-                                    (extendUExpr dflags rep y)
+      MO_Eq rep -> condIntCode EQQ rep x y
+      MO_Ne rep -> condIntCode NE  rep x y
 
-      MO_S_Gt rep -> condIntCode GTT  (extendSExpr dflags rep x)
-                                      (extendSExpr dflags rep y)
-      MO_S_Ge rep -> condIntCode GE   (extendSExpr dflags rep x)
-                                      (extendSExpr dflags rep y)
-      MO_S_Lt rep -> condIntCode LTT  (extendSExpr dflags rep x)
-                                      (extendSExpr dflags rep y)
-      MO_S_Le rep -> condIntCode LE   (extendSExpr dflags rep x)
-                                      (extendSExpr dflags rep y)
+      MO_S_Gt rep -> condIntCode GTT rep x y
+      MO_S_Ge rep -> condIntCode GE  rep x y
+      MO_S_Lt rep -> condIntCode LTT rep x y
+      MO_S_Le rep -> condIntCode LE  rep x y
 
-      MO_U_Gt rep -> condIntCode GU   (extendSExpr dflags rep x)
-                                      (extendSExpr dflags rep y)
-      MO_U_Ge rep -> condIntCode GEU  (extendSExpr dflags rep x)
-                                      (extendSExpr dflags rep y)
-      MO_U_Lt rep -> condIntCode LU   (extendSExpr dflags rep x)
-                                      (extendSExpr dflags rep y)
-      MO_U_Le rep -> condIntCode LEU  (extendSExpr dflags rep x)
-                                      (extendSExpr dflags rep y)
+      MO_U_Gt rep -> condIntCode GU  rep x y
+      MO_U_Ge rep -> condIntCode GEU rep x y
+      MO_U_Lt rep -> condIntCode LU  rep x y
+      MO_U_Le rep -> condIntCode LEU rep x y
 
       _ -> pprPanic "getCondCode(powerpc)" (pprMachOp mop)
 
@@ -947,11 +903,11 @@ getCondCode _ = panic "getCondCode(2)(powerpc)"
 -- @cond(Int|Flt)Code@: Turn a boolean expression into a condition, to be
 -- passed back up the tree.
 
-condIntCode, condFltCode :: Cond -> CmmExpr -> CmmExpr -> NatM CondCode
+condIntCode :: Cond -> Width -> CmmExpr -> CmmExpr -> NatM CondCode
 
 -- optimize pointer tag checks. Operation andi. sets condition register
 -- so cmpi ..., 0 is redundant.
-condIntCode cond (CmmMachOp (MO_And _) [x, CmmLit (CmmInt imm rep)])
+condIntCode cond _ (CmmMachOp (MO_And _) [x, CmmLit (CmmInt imm rep)])
                  (CmmLit (CmmInt 0 _))
   | not $ condUnsigned cond,
     Just src2 <- makeImmediate rep False imm
@@ -960,25 +916,29 @@ condIntCode cond (CmmMachOp (MO_And _) [x, CmmLit (CmmInt imm rep)])
       let code' = code `snocOL` AND r0 src1 (RIImm src2)
       return (CondCode False cond code')
 
-condIntCode cond x (CmmLit (CmmInt y rep))
+condIntCode cond width x (CmmLit (CmmInt y rep))
   | Just src2 <- makeImmediate rep (not $ condUnsigned cond) y
   = do
-        (src1, code) <- getSomeReg x
-        dflags <- getDynFlags
-        let format = archWordFormat $ target32Bit $ targetPlatform dflags
-            code' = code `snocOL`
-              (if condUnsigned cond then CMPL else CMP) format src1 (RIImm src2)
-        return (CondCode False cond code')
+      let op_len = max W32 width
+      let extend = extendSExpr width op_len
+      (src1, code) <- getSomeReg (extend x)
+      let format = intFormat op_len
+          code' = code `snocOL`
+            (if condUnsigned cond then CMPL else CMP) format src1 (RIImm src2)
+      return (CondCode False cond code')
 
-condIntCode cond x y = do
-    (src1, code1) <- getSomeReg x
-    (src2, code2) <- getSomeReg y
-    dflags <- getDynFlags
-    let format = archWordFormat $ target32Bit $ targetPlatform dflags
-        code' = code1 `appOL` code2 `snocOL`
-          (if condUnsigned cond then CMPL else CMP) format src1 (RIReg src2)
-    return (CondCode False cond code')
+condIntCode cond width x y = do
+  let op_len = max W32 width
+  let extend = if condUnsigned cond then extendUExpr width op_len
+               else extendSExpr width op_len
+  (src1, code1) <- getSomeReg (extend x)
+  (src2, code2) <- getSomeReg (extend y)
+  let format = intFormat op_len
+      code' = code1 `appOL` code2 `snocOL`
+        (if condUnsigned cond then CMPL else CMP) format src1 (RIReg src2)
+  return (CondCode False cond code')
 
+condFltCode :: Cond -> CmmExpr -> CmmExpr -> NatM CondCode
 condFltCode cond x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
@@ -1348,14 +1308,8 @@ genCCall target dest_regs argsAndHints
         where divOp1 platform signed width [res_q, res_r] [arg_x, arg_y]
                 = do let reg_q = getRegisterReg platform (CmmLocal res_q)
                          reg_r = getRegisterReg platform (CmmLocal res_r)
-                         fmt   = intFormat width
-                     (x_reg, x_code) <- getSomeReg arg_x
-                     (y_reg, y_code) <- getSomeReg arg_y
-                     return $       y_code `appOL` x_code
-                            `appOL` toOL [ DIV fmt signed reg_q x_reg y_reg
-                                         , MULL fmt reg_r reg_q (RIReg y_reg)
-                                         , SUBF reg_r reg_r x_reg
-                                         ]
+                     remainderCode width signed reg_q arg_x arg_y
+                       <*> pure reg_r
 
               divOp1 _ _ _ _ _
                 = panic "genCCall: Wrong number of arguments for divOp1"
@@ -2131,7 +2085,7 @@ generateJumpTableForInstr _ _ = Nothing
 -- Turn those condition codes into integers now (when they appear on
 -- the right hand side of an assignment).
 
-condIntReg, condFltReg :: Cond -> CmmExpr -> CmmExpr -> NatM Register
+
 
 condReg :: NatM CondCode -> NatM Register
 condReg getCond = do
@@ -2166,7 +2120,9 @@ condReg getCond = do
         format = archWordFormat $ target32Bit $ targetPlatform dflags
     return (Any format code)
 
-condIntReg cond x y = condReg (condIntCode cond x y)
+condIntReg :: Cond -> Width -> CmmExpr -> CmmExpr -> NatM Register
+condIntReg cond width x y = condReg (condIntCode cond width x y)
+condFltReg :: Cond -> CmmExpr -> CmmExpr -> NatM Register
 condFltReg cond x y = condReg (condFltCode cond x y)
 
 
@@ -2245,14 +2201,17 @@ shiftMulCode width sign instr x (CmmLit (CmmInt y _))
     = do
         (src1, code1) <- getSomeReg x
         let format = intFormat width
-        let code dst = code1 `snocOL` instr format dst src1 (RIImm imm)
+        let ins_fmt = intFormat (max W32 width)
+        let code dst = code1 `snocOL` instr ins_fmt dst src1 (RIImm imm)
         return (Any format code)
 
 shiftMulCode width _ instr x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     let format = intFormat width
-    let code dst = code1 `appOL` code2 `snocOL` instr format dst src1 (RIReg src2)
+    let ins_fmt = intFormat (max W32 width)
+    let code dst = code1 `appOL` code2
+                   `snocOL` instr ins_fmt dst src1 (RIReg src2)
     return (Any format code)
 
 trivialCodeNoImm' :: Format -> (Reg -> Reg -> Reg -> Instr)
@@ -2265,20 +2224,46 @@ trivialCodeNoImm' format instr x y = do
 
 trivialCodeNoImm :: Format -> (Format -> Reg -> Reg -> Reg -> Instr)
                  -> CmmExpr -> CmmExpr -> NatM Register
-trivialCodeNoImm format instr x y = trivialCodeNoImm' format (instr format) x y
+trivialCodeNoImm format instr x y
+  = trivialCodeNoImm' format (instr format) x y
 
-trivialCodeNoImmSign :: Format -> Bool
-                     -> (Format -> Bool -> Reg -> Reg -> Reg -> Instr)
-                     -> CmmExpr -> CmmExpr -> NatM Register
-trivialCodeNoImmSign  format sgn instr x y
-  = trivialCodeNoImm' format (instr format sgn) x y
+srCode :: Width -> Bool -> (Format-> Reg -> Reg -> RI -> Instr)
+       -> CmmExpr -> CmmExpr -> NatM Register
+srCode width sgn instr x (CmmLit (CmmInt y _))
+    | Just imm <- makeImmediate width sgn y
+    = do
+        let op_len = max W32 width
+            extend = if sgn then extendSExpr else extendUExpr
+        (src1, code1) <- getSomeReg (extend width op_len x)
+        let code dst = code1 `snocOL`
+                       instr (intFormat op_len) dst src1 (RIImm imm)
+        return (Any (intFormat width) code)
+
+srCode width sgn instr x y = do
+  let op_len = max W32 width
+      extend = if sgn then extendSExpr else extendUExpr
+  (src1, code1) <- getSomeReg (extend width op_len x)
+  (src2, code2) <- getSomeReg (extendUExpr width op_len y)
+  -- Note: Shift amount `y` is unsigned
+  let code dst = code1 `appOL` code2 `snocOL`
+                 instr (intFormat op_len) dst src1 (RIReg src2)
+  return (Any (intFormat width) code)
+
+divCode :: Width -> Bool -> CmmExpr -> CmmExpr -> NatM Register
+divCode width sgn x y = do
+  let op_len = max W32 width
+      extend = if sgn then extendSExpr else extendUExpr
+  (src1, code1) <- getSomeReg (extend width op_len x)
+  (src2, code2) <- getSomeReg (extend width op_len y)
+  let code dst = code1 `appOL` code2 `snocOL`
+                 DIV (intFormat op_len) sgn dst src1 src2
+  return (Any (intFormat width) code)
 
 
-trivialUCode
-        :: Format
-        -> (Reg -> Reg -> Instr)
-        -> CmmExpr
-        -> NatM Register
+trivialUCode :: Format
+             -> (Reg -> Reg -> Instr)
+             -> CmmExpr
+             -> NatM Register
 trivialUCode rep instr x = do
     (src, code) <- getSomeReg x
     let code' dst = code `snocOL` instr dst src
@@ -2288,17 +2273,20 @@ trivialUCode rep instr x = do
 -- it the hard way.
 -- The "sgn" parameter is the signedness for the division instruction
 
-remainderCode :: Width -> Bool -> CmmExpr -> CmmExpr -> NatM Register
-remainderCode rep sgn x y = do
-    let fmt = intFormat rep
-    (src1, code1) <- getSomeReg x
-    (src2, code2) <- getSomeReg y
-    let code dst = code1 `appOL` code2 `appOL` toOL [
-                DIV fmt sgn dst src1 src2,
-                MULL fmt dst dst (RIReg src2),
-                SUBF dst dst src1
-            ]
-    return (Any (intFormat rep) code)
+remainderCode :: Width -> Bool -> Reg -> CmmExpr -> CmmExpr
+               -> NatM (Reg -> InstrBlock)
+remainderCode rep sgn reg_q arg_x arg_y = do
+  let op_len = max W32 rep
+      fmt    = intFormat op_len
+      extend = if sgn then extendSExpr else extendUExpr
+  (x_reg, x_code) <- getSomeReg (extend rep op_len arg_x)
+  (y_reg, y_code) <- getSomeReg (extend rep op_len arg_y)
+  return $ \reg_r -> y_code `appOL` x_code
+                     `appOL` toOL [ DIV fmt sgn reg_q x_reg y_reg
+                                  , MULL fmt reg_r reg_q (RIReg y_reg)
+                                  , SUBF reg_r reg_r x_reg
+                                  ]
+
 
 coerceInt2FP :: Width -> Width -> CmmExpr -> NatM Register
 coerceInt2FP fromRep toRep x = do

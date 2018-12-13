@@ -1,0 +1,5 @@
+
+T15270B.hs:8:7:
+     Illegal variable name: ‘Just’
+      When splicing a TH expression: GHC.Maybe.Just
+     In the untyped splice: $(varE 'Just)

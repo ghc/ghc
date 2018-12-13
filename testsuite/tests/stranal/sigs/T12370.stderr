@@ -1,14 +1,14 @@
 
 ==================== Strictness signatures ====================
 T12370.$trModule: m
-T12370.bar: <S(S),1*U(U)><S(S),1*U(U)>m
-T12370.foo: <S(S(S)S(S)),1*U(1*U(U),1*U(U))>m
+T12370.bar: <S,1*U(U)><S,1*U(U)>m
+T12370.foo: <S(SS),1*U(1*U(U),1*U(U))>m
 
 
 
 ==================== Strictness signatures ====================
 T12370.$trModule: m
-T12370.bar: <S(S),1*U(U)><S(S),1*U(U)>m
-T12370.foo: <S(S(S)S(S)),1*U(1*U(U),1*U(U))>m
+T12370.bar: <S,1*U(U)><S,1*U(U)>m
+T12370.foo: <S(SS),1*U(1*U(U),1*U(U))>m
 
 

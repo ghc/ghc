@@ -169,7 +169,7 @@ deSugar hsc_env
 
         ; let used_names = mkUsedNames tcg_env
               pluginModules =
-                map lpModule (plugins (hsc_dflags hsc_env))
+                map lpModule (cachedPlugins (hsc_dflags hsc_env))
         ; deps <- mkDependencies (thisInstalledUnitId (hsc_dflags hsc_env))
                                  (map mi_module pluginModules) tcg_env
 

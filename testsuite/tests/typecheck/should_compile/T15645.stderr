@@ -1,0 +1,4 @@
+T15645.hs:8:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)]
+    The failable pattern ‘Just y’
+      is used together with -XRebindableSyntax. If this is intentional,
+      compile with -Wno-missing-monadfail-instances.

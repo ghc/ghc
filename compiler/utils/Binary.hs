@@ -409,6 +409,15 @@ instance Binary a => Binary [a] where
             loop n = do a <- get bh; as <- loop (n-1); return (a:as)
         loop len
 
+instance (Ix a, Binary a, Binary b) => Binary (Array a b) where
+    put_ bh arr = do
+        put_ bh $ bounds arr
+        put_ bh $ elems arr
+    get bh = do
+        bounds <- get bh
+        xs <- get bh
+        return $ listArray bounds xs
+
 instance (Binary a, Binary b) => Binary (a,b) where
     put_ bh (a,b) = do put_ bh a; put_ bh b
     get bh        = do a <- get bh
@@ -1147,14 +1156,27 @@ instance Binary a => Binary (Located a) where
             x <- get bh
             return (L l x)
 
+instance Binary RealSrcSpan where
+  put_ bh ss = do
+            put_ bh (srcSpanFile ss)
+            put_ bh (srcSpanStartLine ss)
+            put_ bh (srcSpanStartCol ss)
+            put_ bh (srcSpanEndLine ss)
+            put_ bh (srcSpanEndCol ss)
+
+  get bh = do
+            f <- get bh
+            sl <- get bh
+            sc <- get bh
+            el <- get bh
+            ec <- get bh
+            return (mkRealSrcSpan (mkRealSrcLoc f sl sc)
+                                  (mkRealSrcLoc f el ec))
+
 instance Binary SrcSpan where
   put_ bh (RealSrcSpan ss) = do
           putByte bh 0
-          put_ bh (srcSpanFile ss)
-          put_ bh (srcSpanStartLine ss)
-          put_ bh (srcSpanStartCol ss)
-          put_ bh (srcSpanEndLine ss)
-          put_ bh (srcSpanEndCol ss)
+          put_ bh ss
 
   put_ bh (UnhelpfulSpan s) = do
           putByte bh 1
@@ -1163,13 +1185,8 @@ instance Binary SrcSpan where
   get bh = do
           h <- getByte bh
           case h of
-            0 -> do f <- get bh
-                    sl <- get bh
-                    sc <- get bh
-                    el <- get bh
-                    ec <- get bh
-                    return (mkSrcSpan (mkSrcLoc f sl sc)
-                                      (mkSrcLoc f el ec))
+            0 -> do ss <- get bh
+                    return (RealSrcSpan ss)
             _ -> do s <- get bh
                     return (UnhelpfulSpan s)
 

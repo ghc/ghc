@@ -28,7 +28,7 @@ make_args = 'VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn
 # and can be changed correctly
 test('safePkg01',
      [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
-      normalise_errmsg_fun(ignoreLdOutput),
+      normalise_errmsg_fun(ignoreLdOutput, normalise_errmsg),
       normalise_version("array", "integer-gmp", "integer-simple", "bytestring",
                         "base", "deepseq", "ghc-prim")],
      run_command, ['$MAKE -s --no-print-directory safePkg01 ' + make_args])

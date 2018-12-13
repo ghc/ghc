@@ -8,6 +8,8 @@
 :all-types
 :l *T15369.hs
 :all-types
-:! sed -i 's/Int/Double/g' T15369.hs
+-- Note: BSD sed doesn't allow use of -i here due to symlinks
+:! sed -e 's/Int/Double/g' T15369.hs > Temp.hs
+:! mv Temp.hs T15369.hs
 :l *T15369.hs
 :all-types

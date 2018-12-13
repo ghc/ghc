@@ -170,6 +170,7 @@ Library
         typecheck
         types
         utils
+        hieFile
 
     -- we use an explicit Prelude
     Default-Extensions:
@@ -179,6 +180,11 @@ Library
         GhcPrelude
 
     Exposed-Modules:
+        HieTypes
+        HieDebug
+        HieBin
+        HieUtils
+        HieAst
         Ar
         FileCleanup
         DriverBkp

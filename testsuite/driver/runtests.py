@@ -25,7 +25,7 @@ import subprocess
 
 from testutil import getStdout, Watcher, str_warn, str_info
 from testglobals import getConfig, ghc_env, getTestRun, TestOptions, brokens
-from perf_notes import MetricChange, inside_git_repo
+from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty
 from junit import junit
 
 # Readline sometimes spews out ANSI escapes for some values of TERM,
@@ -245,6 +245,9 @@ if config.timeout == -1:
     config.timeout = int(read_no_crs(config.top + '/timeout/calibrate.out'))
 
 print('Timeout is ' + str(config.timeout))
+print('Known ways: ' + ', '.join(config.other_ways))
+print('Run ways: ' + ', '.join(config.run_ways))
+print('Compile ways: ' + ', '.join(config.compile_ways))
 
 # Try get allowed performance changes from the git commit.
 try:
@@ -252,7 +255,7 @@ try:
 except subprocess.CalledProcessError:
     print('Failed to get allowed metric changes from the HEAD git commit message.')
 
-print(len(config.allowed_perf_changes))
+print('Allowing performance changes in: ' + ', '.join(config.allowed_perf_changes.keys()))
 
 # -----------------------------------------------------------------------------
 # The main dude
@@ -394,7 +397,12 @@ else:
         with open(config.metrics_file, 'a') as file:
             file.write("\n" + Perf.format_perf_stat(stats))
     elif canGitStatus and any(stats):
-        Perf.append_perf_stat(stats)
+        if is_worktree_dirty():
+            print()
+            print(str_warn('Working Tree is Dirty') + ' performance metrics will not be saved.' + \
+                                    ' Commit changes or use --metrics-file to save metrics to a file.')
+        else:
+            Perf.append_perf_stat(stats)
 
     # Write summary
     if config.summary_file:

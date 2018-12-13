@@ -1,0 +1,33 @@
+:set -fobject-code
+-- ^ Without this no recompilation happens at all in ghci, but that's a bug for
+-- another ticket.
+
+:l plugin-recomp-test.hs
+
+-- switching to an impure plugin triggers recomp.
+:! echo ==ImpurePlugin.0 >&2
+:set -fclear-plugins -fplugin ImpurePlugin
+:l plugin-recomp-test.hs
+
+-- ..forever, this also triggers recomp.
+:! echo ==ImpurePlugin.1 >&2
+:l plugin-recomp-test.hs
+
+-- switching from impure to pure plugin triggers recomp.
+:! echo ==PurePlugin.0 >&2
+:set -fclear-plugins -fplugin PurePlugin
+:l plugin-recomp-test.hs
+
+-- switching to a fingerprint plugin triggers recomp.
+:! echo ==FingerprintPlugin.0 >&2
+:set -fclear-plugins -fplugin FingerprintPlugin
+:l plugin-recomp-test.hs
+
+-- same fingerprint plugin doesn't trigger recomp.
+:! echo ==FingerprintPlugin.1 >&2
+:l plugin-recomp-test.hs
+
+-- switching from fingerprint to pure plugin triggers recomp.
+:! echo ==PurePlugin.1 >&2
+:set -fclear-plugins -fplugin PurePlugin
+:l plugin-recomp-test.hs

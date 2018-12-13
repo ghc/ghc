@@ -7,3 +7,4 @@ import GhcPrelude ()
 data Plugin
 
 data LoadedPlugin
+data StaticPlugin

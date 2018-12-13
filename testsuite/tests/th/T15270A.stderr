@@ -1,0 +1,5 @@
+
+T15270A.hs:8:7:
+     Illegal data constructor name: ‘id’
+      When splicing a TH expression: GHC.Base.id
+     In the untyped splice: $(conE 'id)

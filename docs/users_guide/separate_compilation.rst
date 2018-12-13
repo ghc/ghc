@@ -288,6 +288,14 @@ Redirecting the compilation output(s)
     Redirects all generated interface files into ⟨dir⟩, instead of the
     default.
 
+.. ghc-flag:: -hiedir ⟨dir⟩
+    :shortdesc: set directory for extended interface files
+    :type: dynamic
+    :category:
+
+    Redirects all generated extended interface files into ⟨dir⟩, instead of
+    the default.
+
 .. ghc-flag:: -stubdir ⟨dir⟩
     :shortdesc: redirect FFI stub files
     :type: dynamic
@@ -351,6 +359,12 @@ Redirecting the compilation output(s)
 
     to get the profiled version.
 
+.. ghc-flag:: -hiesuf ⟨suffix⟩
+    :shortdesc: set the suffix to use for extended interface files
+    :type: dynamic
+
+    The ``-hiesuf`` ⟨suffix⟩ will change the ``.hie`` file suffix for
+    extended interface files to whatever you specify.
 
 .. ghc-flag:: -hcsuf ⟨suffix⟩
     :shortdesc: set the suffix to use for intermediate C files
@@ -533,6 +547,46 @@ Other options related to interface files
 
     where ⟨file⟩ is the name of an interface file, dumps the contents of
     that interface in a human-readable format. See :ref:`modes`.
+
+.. _hie-options:
+
+Options related to extended interface files
+-------------------------------------------
+
+.. index::
+   single: extended interface files, options
+
+GHC builds up a wealth of information about a Haskell source file as it compiles
+it. Extended interface files are a way of persisting some of this information to
+disk so that external tools, such as IDE's, can avoid parsing, typechecking, and
+renaming all over again. These files contain
+
+  * a simplified AST
+
+       * nodes are annotated with source positions and types
+       * identifiers are annotated with scope information
+
+  * the raw bytes of the initial Haskell source
+
+The GHC API exposes functions for reading and writing these files.
+
+.. ghc-flag:: -fwrite-ide-info
+    :shortdesc: Write out extended interface files
+    :type: dynamic
+    :category: extended-interface-files
+
+    Writes out extended interface files alongisde regular enterface files.
+    Just like regular interface files, GHC has a recompilation check to detect
+    out of date or missing extended interface files.
+
+.. ghc-flag:: -fvalidate-ide-info
+    :shortdesc: Perform some sanity checks on the extended interface files
+    :type: dynamic
+    :category: extended-interface-files
+
+    Runs a series of sanity checks and lints on the extended interface files
+    that are being written out. These include testing things properties such as
+    variables not occuring outside of their expected scopes.
 
 .. _recomp:
 

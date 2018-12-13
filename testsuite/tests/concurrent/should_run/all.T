@@ -36,7 +36,7 @@ test('T3279', normal, compile_and_run, [''])
 
 # This test takes a long time with the default context switch interval
 test('T3429', [ extra_run_opts('+RTS -C0.001 -RTS'),
-                extra_ways(['debug_numa']) ],
+                unless(unregisterised(), extra_ways(['debug_numa'])) ],
      compile_and_run, [''])
 
 # without -O, goes into an infinite loop

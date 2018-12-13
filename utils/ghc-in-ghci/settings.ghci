@@ -5,6 +5,7 @@
 :set -icompiler/coreSyn
 :set -icompiler/deSugar
 :set -icompiler/ghci
+:set -icompiler/hiefile
 :set -icompiler/hsSyn
 :set -icompiler/iface
 :set -icompiler/llvmGen

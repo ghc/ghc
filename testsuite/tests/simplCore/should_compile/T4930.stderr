@@ -51,7 +51,7 @@ Rec {
 -- RHS size: {terms: 17, types: 3, coercions: 0, joins: 0/0}
 T4930.$wfoo [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>, Unf=OtherCon []]
+[GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>, Unf=OtherCon []]
 T4930.$wfoo
   = \ (ww :: GHC.Prim.Int#) ->
       case GHC.Prim.<# ww 5# of {
@@ -65,7 +65,7 @@ foo [InlPrag=NOUSERINLINE[2]] :: Int -> Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=<S(S),1*U(U)>m,
+ Str=<S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)

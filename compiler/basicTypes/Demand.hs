@@ -74,7 +74,7 @@ import BasicTypes
 import Binary
 import Maybes           ( orElse )
 
-import Type            ( Type, isUnliftedType )
+import Type            ( Type )
 import TyCon           ( isNewTyCon, isClassTyCon )
 import DataCon         ( splitDataProductType_maybe )
 import Multiplicity    ( scaledThing )
@@ -394,10 +394,15 @@ data UseDmd
                          -- (in that case, use UHead)
 
   | UHead                -- ^ May be used but its sub-components are
-                         -- definitely *not* used.  Roughly U(AAA)
-                         -- e.g. the usage of @x@ in @x `seq` e@
-                         -- A polymorphic demand: used for values of all types,
-                         --                       including a type variable
+                         -- definitely *not* used.  For product types, UHead
+                         -- is equivalent to U(AAA); see mkUProd.
+                         --
+                         -- UHead is needed only to express the demand
+                         -- of 'seq' and 'case' which are polymorphic;
+                         -- i.e. the scrutinised value is of type 'a'
+                         -- rather than a product type. That's why we
+                         -- can't use UProd [A,A,A]
+                         --
                          -- Since (UCall _ Abs) is ill-typed, UHead doesn't
                          -- make sense for lambdas
 
@@ -1101,81 +1106,6 @@ different:
    unused, so we can use absDmd there.
  * Further arguments *can* be used, of course. Hence topDmd is used.
 
-Note [Worthy functions for Worker-Wrapper split]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For non-bottoming functions a worker-wrapper transformation takes into
-account several possibilities to decide if the function is worthy for
-splitting:
-
-1. The result is of product type and the function is strict in some
-(or even all) of its arguments. The check that the argument is used is
-more of sanity nature, since strictness implies usage. Example:
-
-f :: (Int, Int) -> Int
-f p = (case p of (a,b) -> a) + 1
-
-should be splitted to
-
-f :: (Int, Int) -> Int
-f p = case p of (a,b) -> $wf a
-
-$wf :: Int -> Int
-$wf a = a + 1
-
-2. Sometimes it also makes sense to perform a WW split if the
-strictness analysis cannot say for sure if the function is strict in
-components of its argument. Then we reason according to the inferred
-usage information: if the function uses its product argument's
-components, the WW split can be beneficial. Example:
-
-g :: Bool -> (Int, Int) -> Int
-g c p = case p of (a,b) ->
-          if c then a else b
-
-The function g is strict in is argument p and lazy in its
-components. However, both components are used in the RHS. The idea is
-since some of the components (both in this case) are used in the
-right-hand side, the product must presumable be taken apart.
-
-Therefore, the WW transform splits the function g to
-
-g :: Bool -> (Int, Int) -> Int
-g c p = case p of (a,b) -> $wg c a b
-
-$wg :: Bool -> Int -> Int -> Int
-$wg c a b = if c then a else b
-
-3. If an argument is absent, it would be silly to pass it to a
-function, hence the worker with reduced arity is generated.
-
-
-Note [Worker-wrapper for bottoming functions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We used not to split if the result is bottom.
-[Justification:  there's no efficiency to be gained.]
-
-But it's sometimes bad not to make a wrapper.  Consider
-        fw = \x# -> let x = I# x# in case e of
-                                        p1 -> error_fn x
-                                        p2 -> error_fn x
-                                        p3 -> the real stuff
-The re-boxing code won't go away unless error_fn gets a wrapper too.
-[We don't do reboxing now, but in general it's better to pass an
-unboxed thing to f, and have it reboxed in the error cases....]
-
-However we *don't* want to do this when the argument is not actually
-taken apart in the function at all.  Otherwise we risk decomposing a
-massive tuple which is barely used.  Example:
-
-        f :: ((Int,Int) -> String) -> (Int,Int) -> a
-        f g pr = error (g pr)
-
-        main = print (f fst (1, error "no"))
-
-Here, f does not take 'pr' apart, and it's stupid to do so.
-Imagine that it had millions of fields. This actually happened
-in GHC itself where the tuple was DynFlags
-
 
 ************************************************************************
 *                                                                      *
@@ -1407,25 +1337,20 @@ type DmdShell   -- Describes the "outer shell"
                 -- of a Demand
    = JointDmd (Str ()) (Use ())
 
-toCleanDmd :: Demand -> Type -> (DmdShell, CleanDemand)
+toCleanDmd :: Demand -> (DmdShell, CleanDemand)
 -- Splits a Demand into its "shell" and the inner "clean demand"
-toCleanDmd (JD { sd = s, ud = u }) expr_ty
+toCleanDmd (JD { sd = s, ud = u })
   = (JD { sd = ss, ud = us }, JD { sd = s', ud = u' })
     -- See Note [Analyzing with lazy demand and lambdas]
+    -- See Note [Analysing with absent demand]
   where
     (ss, s') = case s of
-                Str x s'           -> (Str x      (), s')
-                Lazy | is_unlifted -> (Str VanStr (), HeadStr)
-                     | otherwise   -> (Lazy,          HeadStr)
+                Str x s' -> (Str x (), s')
+                Lazy     -> (Lazy,     HeadStr)
 
     (us, u') = case u of
-                 Use c u'          -> (Use c   (), u')
-                 Abs | is_unlifted -> (Use One (), Used)
-                     | otherwise   -> (Abs,        Used)
-
-    is_unlifted = isUnliftedType expr_ty
-    -- See Note [Analysing with absent demand]
-
+                 Use c u' -> (Use c (), u')
+                 Abs      -> (Abs,      Used)
 
 -- This is used in dmdAnalStar when post-processing
 -- a function's argument demand. So we only care about what
@@ -1647,9 +1572,9 @@ There are several wrinkles:
   But we can post-process the results to ignore all the usage
   demands coming back. This is done by postProcessDmdType.
 
-* But in the case of an *unlifted type* we must be extra careful,
-  because unlifted values are evaluated even if they are not used.
-  Example (see Trac #9254):
+* In a previous incarnation of GHC we needed to be extra careful in the
+  case of an *unlifted type*, because unlifted values are evaluated
+  even if they are not used.  Example (see Trac #9254):
      f :: (() -> (# Int#, () #)) -> ()
           -- Strictness signature is
           --    <C(S(LS)), 1*C1(U(A,1*U()))>
@@ -1669,10 +1594,11 @@ There are several wrinkles:
   usage of 'y', else 'g' will say 'y' is absent, and will w/w so that
   'y' is bound to an aBSENT_ERROR thunk.
 
-  An alternative would be to replace the 'case y of ...' with (say) 0#,
-  but I have not tried that. It's not a common situation, but it is
-  not theoretical: unsafePerformIO's implementation is very very like
-  'f' above.
+  However, the argument of toCleanDmd always satisfies the let/app
+  invariant; so if it is unlifted it is also okForSpeculation, and so
+  can be evaluated in a short finite time -- and that rules out nasty
+  cases like the one above.  (I'm not quite sure why this was a
+  problem in an earlier version of GHC, but it isn't now.)
 
 
 ************************************************************************
