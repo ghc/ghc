@@ -7,11 +7,34 @@ before_script:
   - git submodule update --init --recursive
   - git checkout .gitmodules
 
+stages:
+  - lint
+  - build
+
+############################################################
+# Linting
+############################################################
+
+ghc-linters:
+  stage: lint
+  image: ghcci/linters:0.1
+  script:
+    - |
+      if [ -n "$CI_MERGE_REQUEST_ID" ]; then
+        base="$(git merge-base $CI_MERGE_REQUEST_BRANCH_NAME HEAD)"
+        validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
+        submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
+        validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
+        .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
+        .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
+      fi
+
 ############################################################
 # Validation via Pipelines (hadrian)
 ############################################################
 
 .validate-hadrian:
+  stage: build
   allow_failure: true
   script:
     - bash .circleci/prepare-system.sh
@@ -38,7 +61,7 @@ validate-x86_64-linux-deb8-hadrian:
 ############################################################
 
 .validate:
-  allow_failure: true
+  stage: build
   script:
     - make clean || true
     - ./boot
@@ -61,6 +84,7 @@ validate-x86_64-linux-deb8-hadrian:
 
 validate-x86_64-darwin:
   extends: .validate
+  allow_failure: true
   tags:
     - x86_64-darwin
   variables:
@@ -120,6 +144,7 @@ validate-x86_64-linux-deb9:
 
 validate-x86_64-linux-deb9-llvm:
   extends: .validate-linux
+  allow_failure: true
   image: ghcci/x86_64-linux-deb9:0.2
   variables:
     BUILD_FLAVOUR: perf-llvm
@@ -144,6 +169,7 @@ validate-x86_64-linux-fedora27:
 
 validate-x86_64-linux-deb9-integer-simple:
   extends: .validate-linux
+  allow_failure: true
   variables:
     INTEGER_LIBRARY: integer-simple
   image: ghcci/x86_64-linux-deb9:0.2
@@ -163,6 +189,7 @@ validate-x86_64-linux-deb9-unreg:
 ############################################################
 
 .validate-x86_64-windows:
+  stage: build
   variables:
     GHC_VERSION: "8.6.2"
   script:
@@ -193,6 +220,7 @@ validate-x86_64-linux-deb9-unreg:
 ############################################################
 
 .circleci:
+  stage: build
   image: ghcci/x86_64-linux-deb8:0.1
   artifacts:
     when: always
