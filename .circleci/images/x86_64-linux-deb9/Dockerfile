@@ -22,6 +22,15 @@ RUN apt-get install -qy cabal-install-2.2 ghc-8.4.2
 
 ENV PATH /home/ghc/.local/bin:/opt/cabal/2.2/bin:/opt/ghc/8.4.2/bin:$PATH
 
+# LLVM
+ENV LLVM_TARBALL http://releases.llvm.org/7.0.0/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+ENV PATH /opt/llvm/bin:$PATH
+RUN curl $LLVM_TARBALL | tar -xJC ..; \
+    mkdir /opt/llvm; \
+    cp -R clang+llvm*/* /opt/llvm; \
+    rm -R clang+llvm*; \
+    llc --version
+
 # Create a normal user.
 RUN adduser ghc --gecos "GHC builds" --disabled-password
 RUN echo "ghc ALL = NOPASSWD : ALL" > /etc/sudoers.d/ghc

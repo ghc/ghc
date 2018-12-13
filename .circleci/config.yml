@@ -25,13 +25,6 @@ aliases:
       name: Boot
       command: |
         ./boot
-
-        cat <<EOF >> mk/build.mk
-        BuildFlavour=$BUILD_FLAVOUR
-        ifneq "\$(BuildFlavour)" ""
-        include mk/flavours/\$(BuildFlavour).mk
-        endif
-        EOF
   - &set_git_identity
       run:
         name: Set Git Identity
@@ -187,7 +180,7 @@ jobs:
   "validate-x86_64-linux-deb9-integer-simple":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux-deb9:0.1
+      - image: ghcci/x86_64-linux-deb9:0.2
     environment:
       <<: *buildenv
       INTEGER_LIBRARY: integer-simple
@@ -277,7 +270,6 @@ jobs:
       - run:
           name: Install LLVM
           command: |
-            curl http://releases.llvm.org/6.0.0/clang+llvm-6.0.0-x86_64-linux-gnu-debian8.tar.xz | tar -xJC ..
             echo "export PATH=`pwd`/../clang+llvm-6.0.0-x86_64-linux-gnu-debian8/bin:\$PATH" >> $BASH_ENV
       - run:
           name: Verify that llc works
@@ -320,7 +312,7 @@ jobs:
   "validate-i386-linux-deb9":
     resource_class: xlarge
     docker:
-      - image: ghcci/i386-linux-deb9:0.1
+      - image: ghcci/i386-linux-deb9:0.2
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: i386-linux-deb9

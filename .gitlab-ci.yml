@@ -112,7 +112,17 @@ validate-x86_64-darwin:
 
 validate-x86_64-linux-deb9:
   extends: .validate-linux
-  image: ghcci/x86_64-linux-deb9:0.1
+  image: ghcci/x86_64-linux-deb9:0.2
+  artifacts:
+    when: always
+  cache:
+    key: linux-x86_64-deb9
+
+validate-x86_64-linux-deb9-llvm:
+  extends: .validate-linux
+  image: ghcci/x86_64-linux-deb9:0.2
+  variables:
+    BUILD_FLAVOUR: perf-llvm
   cache:
     key: linux-x86_64-deb9
 
@@ -136,7 +146,7 @@ validate-x86_64-linux-deb9-integer-simple:
   extends: .validate-linux
   variables:
     INTEGER_LIBRARY: integer-simple
-  image: ghcci/x86_64-linux-deb9:0.1
+  image: ghcci/x86_64-linux-deb9:0.2
   cache:
     key: linux-x86_64-deb9
 
@@ -144,7 +154,7 @@ validate-x86_64-linux-deb9-unreg:
   extends: .validate-linux
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
-  image: ghcci/x86_64-linux-deb9:0.1
+  image: ghcci/x86_64-linux-deb9:0.2
   cache:
     key: linux-x86_64-deb9
 

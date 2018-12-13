@@ -30,4 +30,5 @@ docker push $repo/$name:$version
 
 repo_name="$repo/$name"
 sed -i -E -e "s%$repo_name"':[0-9]+(\.[0-9]+)*%'"$repo_name:$version%" ../config.yml
+sed -i -E -e "s%$repo_name"':[0-9]+(\.[0-9]+)*%'"$repo_name:$version%" ../../.gitlab-ci.yml
 echo "Built, pushed, and bumped $name:$version"

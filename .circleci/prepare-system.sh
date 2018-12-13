@@ -12,6 +12,7 @@ hackage_index_state="@1522046735"
 if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
 if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
 if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
+if [[ -z ${BUILD_FLAVOUR:-} ]]; then BUILD_FLAVOUR=perf; fi
 
 cat > mk/build.mk <<EOF
 V=1
@@ -22,6 +23,13 @@ BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
 BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
 BeConservative=YES
 INTEGER_LIBRARY=$INTEGER_LIBRARY
+EOF
+
+cat <<EOF >> mk/build.mk
+BuildFlavour=$BUILD_FLAVOUR
+ifneq "\$(BuildFlavour)" ""
+include mk/flavours/\$(BuildFlavour).mk
+endif
 EOF
 
 case "$(uname)" in
