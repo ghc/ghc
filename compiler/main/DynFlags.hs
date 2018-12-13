@@ -2590,6 +2590,12 @@ setComponentId s d =
 addPluginModuleName :: String -> DynFlags -> DynFlags
 addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }
 
+clearPluginModuleNames :: DynFlags -> DynFlags
+clearPluginModuleNames d =
+    d { pluginModNames = []
+      , pluginModNameOpts = []
+      , cachedPlugins = [] }
+
 addPluginModuleNameOption :: String -> DynFlags -> DynFlags
 addPluginModuleNameOption optflag d = d { pluginModNameOpts = (mkModuleName m, option) : (pluginModNameOpts d) }
   where (m, rest) = break (== ':') optflag
@@ -3488,6 +3494,7 @@ dynamic_flags_deps = [
         ------ Plugin flags ------------------------------------------------
   , make_ord_flag defGhcFlag "fplugin-opt" (hasArg addPluginModuleNameOption)
   , make_ord_flag defGhcFlag "fplugin"     (hasArg addPluginModuleName)
+  , make_ord_flag defGhcFlag "fclear-plugins" (noArg clearPluginModuleNames)
   , make_ord_flag defGhcFlag "ffrontend-opt" (hasArg addFrontendPluginOption)
 
         ------ Optimisation flags ------------------------------------------

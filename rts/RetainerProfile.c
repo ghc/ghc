@@ -97,6 +97,7 @@ static void retainStack(StgClosure *, retainer, StgPtr, StgPtr);
 static void retainClosure(StgClosure *, StgClosure *, retainer);
 #if defined(DEBUG_RETAINER)
 static void belongToHeap(StgPtr p);
+static uint32_t checkHeapSanityForRetainerProfiling( void );
 #endif
 static void retainPushClosure( StgClosure *p, StgClosure *c, retainer c_child_r);
 
@@ -214,6 +215,7 @@ static stackElement *stackBottom, *stackTop, *stackLimit;
  */
 static stackElement *currentStackBoundary;
 
+#if defined(DEBUG_RETAINER)
 /*
   stackSize records the current size of the stack.
   maxStackSize records its high water mark.
@@ -226,7 +228,6 @@ static stackElement *currentStackBoundary;
     retainer profiling, maxStackSize + maxCStackSize is some value no greater
     than the actual depth of the graph.
  */
-#if defined(DEBUG_RETAINER)
 static int stackSize, maxStackSize;
 #endif
 
@@ -428,9 +429,10 @@ retainActualPush(stackElement *se) {
 #if defined(DEBUG_RETAINER)
     stackSize++;
     if (stackSize > maxStackSize) maxStackSize = stackSize;
-    // ASSERT(stackSize >= 0);
-    // debugBelch("stackSize = %d\n", stackSize);
+    ASSERT(stackSize >= 0);
+    debugBelch("stackSize = %d\n", stackSize);
 #endif
+
 }
 
 /* Push an object onto traverse stack. This method can be used anytime
@@ -475,7 +477,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     bdescr *nbd;      // Next Block Descriptor
 
 #if defined(DEBUG_RETAINER)
-    // debugBelch("push(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
+    debugBelch("push(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
 #endif
 
     ASSERT(get_itbl(c)->type != TSO);
@@ -690,7 +692,7 @@ popOffReal(void)
     bdescr *pbd;    // Previous Block Descriptor
 
 #if defined(DEBUG_RETAINER)
-    // debugBelch("pop() to the previous stack.\n");
+    debugBelch("pop() to the previous stack.\n");
 #endif
 
     ASSERT(stackTop + 1 == stackLimit);
@@ -703,10 +705,8 @@ popOffReal(void)
 #if defined(DEBUG_RETAINER)
         stackSize--;
         if (stackSize > maxStackSize) maxStackSize = stackSize;
-        /*
-          ASSERT(stackSize >= 0);
-          debugBelch("stackSize = %d\n", stackSize);
-        */
+        ASSERT(stackSize >= 0);
+        debugBelch("stackSize = %d\n", stackSize);
 #endif
         return;
     }
@@ -724,17 +724,15 @@ popOffReal(void)
 #if defined(DEBUG_RETAINER)
     stackSize--;
     if (stackSize > maxStackSize) maxStackSize = stackSize;
-    /*
-      ASSERT(stackSize >= 0);
-      debugBelch("stackSize = %d\n", stackSize);
-    */
+    ASSERT(stackSize >= 0);
+    debugBelch("stackSize = %d\n", stackSize);
 #endif
 }
 
 static INLINE void
 popOff(void) {
 #if defined(DEBUG_RETAINER)
-    // debugBelch("\tpopOff(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
+    debugBelch("\tpopOff(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
 #endif
 
     ASSERT(stackTop != stackLimit);
@@ -746,10 +744,8 @@ popOff(void) {
 #if defined(DEBUG_RETAINER)
         stackSize--;
         if (stackSize > maxStackSize) maxStackSize = stackSize;
-        /*
-          ASSERT(stackSize >= 0);
-          debugBelch("stackSize = %d\n", stackSize);
-        */
+        ASSERT(stackSize >= 0);
+        debugBelch("stackSize = %d\n", stackSize);
 #endif
         return;
     }
@@ -781,7 +777,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
     stackElement *se;
 
 #if defined(DEBUG_RETAINER)
-    // debugBelch("pop(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
+    debugBelch("pop(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
 #endif
 
     do {
@@ -1263,7 +1259,8 @@ retainStack( StgClosure *c, retainer c_child_r,
     currentStackBoundary = stackTop;
 
 #if defined(DEBUG_RETAINER)
-    // debugBelch("retainStack() called: oldStackBoundary = 0x%x, currentStackBoundary = 0x%x\n", oldStackBoundary, currentStackBoundary);
+    debugBelch("retainStack() called: oldStackBoundary = 0x%x, currentStackBoundary = 0x%x\n",
+        oldStackBoundary, currentStackBoundary);
 #endif
 
     ASSERT(get_itbl(c)->type == STACK);
@@ -1358,7 +1355,8 @@ retainStack( StgClosure *c, retainer c_child_r,
     // restore currentStackBoundary
     currentStackBoundary = oldStackBoundary;
 #if defined(DEBUG_RETAINER)
-    // debugBelch("retainStack() finished: currentStackBoundary = 0x%x\n", currentStackBoundary);
+    debugBelch("retainStack() finished: currentStackBoundary = 0x%x\n",
+        currentStackBoundary);
 #endif
 
 #if defined(DEBUG_RETAINER)
@@ -1442,27 +1440,33 @@ retainClosure( StgClosure *c0, StgClosure *cp0, retainer r0 )
     retainPushClosure(c0, cp0, r0);
 
 #if defined(DEBUG_RETAINER)
-    // StgPtr oldStackTop;
+    StgPtr oldStackTop;
 #endif
 
 #if defined(DEBUG_RETAINER)
-    // oldStackTop = stackTop;
-    // debugBelch("retainClosure() called: c0 = 0x%x, cp0 = 0x%x, r0 = 0x%x\n", c0, cp0, r0);
+    oldStackTop = stackTop;
+    debugBelch("retainClosure() called: c0 = 0x%x, cp0 = 0x%x, r0 = 0x%x\n"
+        , c0, cp0, r0);
 #endif
 
 loop:
-    //debugBelch("loop")
+#if defined(DEBUG_RETAINER)
+    debugBelch("loop");
+#endif
     // pop to (c, cp, r);
     pop(&c, &cp, &r);
 
     if (c == NULL) {
 #if defined(DEBUG_RETAINER)
-        // debugBelch("retainClosure() ends: oldStackTop = 0x%x, stackTop = 0x%x\n", oldStackTop, stackTop);
+        debugBelch("retainClosure() ends: oldStackTop = 0x%x,stackTop = 0x%x\n",
+            oldStackTop, stackTop);
 #endif
         return;
     }
 
-    //debugBelch("inner_loop");
+#if defined(DEBUG_RETAINER)
+    debugBelch("inner_loop");
+#endif
 
 inner_loop:
     c = UNTAG_CLOSURE(c);
@@ -1785,9 +1789,6 @@ computeRetainerSet( void )
 #if defined(DEBUG_RETAINER)
                 rtl = retainerSetOf((StgClosure *)*ml);
                 if (rtl == NULL) {
-                    // first visit to *ml
-                    // This is a violation of the interface rule!
-                    RSET(ml) = (RetainerSet *)((StgWord)(&tmpRetainerSet) | flip);
 
                     switch (get_itbl((StgClosure *)ml)->type) {
                     case IND_STATIC:
@@ -1881,7 +1882,7 @@ resetStaticObjectForRetainerProfiling( StgClosure *static_objects )
         }
     }
 #if defined(DEBUG_RETAINER)
-    // debugBelch("count in scavenged_static_objects = %d\n", count);
+    debugBelch("count in scavenged_static_objects = %d\n", count);
 #endif
 }
 
@@ -2053,7 +2054,13 @@ sanityCheckHeapClosure( StgClosure *c )
             debugBelch(
                     "Unvisited object: flip = %d, c = %p(%d, %s, %s), rs = %p\n",
                     flip, c, get_itbl(c)->type,
-                    get_itbl(c)->prof.closure_type, GET_PROF_DESC(get_itbl(c)),
+#if !defined(TABLES_NEXT_TO_CODE)
+                    get_itbl(c)->prof.closure_type,
+                    GET_PROF_DESC(get_itbl(c)),
+#else
+                    get_itbl(c)->prof.closure_type_off,
+                    GET_PROF_DESC(get_itbl(c)),
+#endif
                     RSET(c));
     } else {
         // debugBelch("sanityCheckHeapClosure) S: flip = %d, c = %p(%d), rs = %p\n", flip, c, get_itbl(c)->type, RSET(c));
@@ -2087,47 +2094,6 @@ heapCheck( bdescr *bd )
 }
 
 static uint32_t
-smallObjectPoolCheck(void)
-{
-    bdescr *bd;
-    StgPtr p;
-    static uint32_t costSum, size;
-
-    bd = g0s0->blocks;
-    costSum = 0;
-
-    // first block
-    if (bd == NULL)
-        return costSum;
-
-    p = bd->start;
-    while (p < alloc_Hp) {
-        size = sanityCheckHeapClosure((StgClosure *)p);
-        sumOfCostLinear += size;
-        costArrayLinear[get_itbl((StgClosure *)p)->type] += size;
-        p += size;
-    }
-    ASSERT(p == alloc_Hp);
-    costSum += alloc_Hp - bd->start;
-
-    bd = bd->link;
-    while (bd != NULL) {
-        p = bd->start;
-        while (p < bd->free) {
-            size = sanityCheckHeapClosure((StgClosure *)p);
-            sumOfCostLinear += size;
-            costArrayLinear[get_itbl((StgClosure *)p)->type] += size;
-            p += size;
-        }
-        ASSERT(p == bd->free);
-        costSum += bd->free - bd->start;
-        bd = bd->link;
-    }
-
-    return costSum;
-}
-
-static uint32_t
 chainCheck(bdescr *bd)
 {
     uint32_t costSum, size;
@@ -2150,37 +2116,33 @@ chainCheck(bdescr *bd)
 static uint32_t
 checkHeapSanityForRetainerProfiling( void )
 {
-    uint32_t costSum, g, s;
+    uint32_t costSum, g;
 
     costSum = 0;
     debugBelch("START: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
     if (RtsFlags.GcFlags.generations == 1) {
-        costSum += heapCheck(g0s0->to_blocks);
+        costSum += heapCheck(g0->to);
         debugBelch("heapCheck: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
-        costSum += chainCheck(g0s0->large_objects);
+        costSum += chainCheck(g0->large_objects);
         debugBelch("chainCheck: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
     } else {
         for (g = 0; g < RtsFlags.GcFlags.generations; g++)
-        for (s = 0; s < generations[g].n_steps; s++) {
             /*
               After all live objects have been scavenged, the garbage
               collector may create some objects in
               scheduleFinalizers(). These objects are created through
               allocate(), so the small object pool or the large object
-              pool of the g0s0 may not be empty.
+              pool of the g0 may not be empty.
             */
-            if (g == 0 && s == 0) {
-                costSum += smallObjectPoolCheck();
-                debugBelch("smallObjectPoolCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
-                costSum += chainCheck(generations[g].steps[s].large_objects);
+            if (g == 0) {
+                costSum += chainCheck(generations[g].large_objects);
                 debugBelch("chainCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
             } else {
-                costSum += heapCheck(generations[g].steps[s].blocks);
+                costSum += heapCheck(generations[g].blocks);
                 debugBelch("heapCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
-                costSum += chainCheck(generations[g].steps[s].large_objects);
+                costSum += chainCheck(generations[g].large_objects);
                 debugBelch("chainCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
             }
-        }
     }
 
     return costSum;
@@ -2191,32 +2153,30 @@ findPointer(StgPtr p)
 {
     StgPtr q, r, e;
     bdescr *bd;
-    uint32_t g, s;
+    uint32_t g;
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        for (s = 0; s < generations[g].n_steps; s++) {
-            // if (g == 0 && s == 0) continue;
-            bd = generations[g].steps[s].blocks;
-            for (; bd; bd = bd->link) {
-                for (q = bd->start; q < bd->free; q++) {
-                    if (*q == (StgWord)p) {
-                        r = q;
-                        while (!LOOKS_LIKE_GHC_INFO(*r)) r--;
-                        debugBelch("Found in gen[%d], step[%d]: q = %p, r = %p\n", g, s, q, r);
-                        // return;
-                    }
+        // if (g == 0 && s == 0) continue;
+        bd = generations[g].blocks;
+        for (; bd; bd = bd->link) {
+            for (q = bd->start; q < bd->free; q++) {
+                if (*q == (StgWord)p) {
+                    r = q;
+                    while (!LOOKS_LIKE_GHC_INFO(*r)) r--;
+                    debugBelch("Found in gen[%d]: q = %p, r = %p\n", g, q, r);
+                    // return;
                 }
             }
-            bd = generations[g].steps[s].large_objects;
-            for (; bd; bd = bd->link) {
-                e = bd->start + cost((StgClosure *)bd->start);
-                for (q = bd->start; q < e; q++) {
-                    if (*q == (StgWord)p) {
-                        r = q;
-                        while (*r == 0 || !LOOKS_LIKE_GHC_INFO(*r)) r--;
-                        debugBelch("Found in gen[%d], large_objects: %p\n", g, r);
-                        // return;
-                    }
+        }
+        bd = generations[g].large_objects;
+        for (; bd; bd = bd->link) {
+            e = bd->start + cost((StgClosure *)bd->start);
+            for (q = bd->start; q < e; q++) {
+                if (*q == (StgWord)p) {
+                    r = q;
+                    while (*r == 0 || !LOOKS_LIKE_GHC_INFO(*r)) r--;
+                    debugBelch("Found in gen[%d], large_objects: %p\n", g, r);
+                    // return;
                 }
             }
         }
@@ -2227,26 +2187,26 @@ static void
 belongToHeap(StgPtr p)
 {
     bdescr *bd;
-    uint32_t g, s;
+    uint32_t g;
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        for (s = 0; s < generations[g].n_steps; s++) {
-            // if (g == 0 && s == 0) continue;
-            bd = generations[g].steps[s].blocks;
-            for (; bd; bd = bd->link) {
-                if (bd->start <= p && p < bd->free) {
-                    debugBelch("Belongs to gen[%d], step[%d]", g, s);
-                    return;
-                }
-            }
-            bd = generations[g].steps[s].large_objects;
-            for (; bd; bd = bd->link) {
-                if (bd->start <= p && p < bd->start + getHeapClosureSize((StgClosure *)bd->start)) {
-                    debugBelch("Found in gen[%d], large_objects: %p\n", g, bd->start);
-                    return;
-                }
-            }
-        }
+       // if (g == 0 && s == 0) continue;
+       bd = generations[g].blocks;
+       for (; bd; bd = bd->link) {
+           if (bd->start <= p && p < bd->free) {
+               debugBelch("Belongs to gen[%d]", g);
+               return;
+           }
+       }
+       bd = generations[g].large_objects;
+       for (; bd; bd = bd->link) {
+           if (bd->start <= p
+               && p < bd->start + getHeapClosureSize((StgClosure *)bd->start)) {
+               debugBelch("Found in gen[%d], large_objects: %p\n",
+                   g, bd->start);
+               return;
+           }
+       }
     }
 }
 #endif /* DEBUG_RETAINER */

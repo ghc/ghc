@@ -1,9 +1,9 @@
 callMemcpy:
+        subq
         movq  ; Move arguments into place
         movq
         movl
-        subq
-        movl
+        xorl
         call memcpy
         addq
         jmp

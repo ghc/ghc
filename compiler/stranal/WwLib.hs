@@ -568,6 +568,7 @@ as-yet-un-filled-in pkgState files.
 --        brings into scope work_args (via cases)
 --   * work_fn assumes work_args are in scope, a
 --        brings into scope wrap_arg (via lets)
+-- See Note [How to do the worker/wrapper split]
 mkWWstr_one :: DynFlags -> FamInstEnvs
             -> Bool    -- True <=> INLINEABLE pragama on this function defn
                        -- See Note [Do not unpack class dictionaries]
@@ -577,43 +578,42 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
   | isTyVar arg
   = return (False, [arg],  nop_fn, nop_fn)
 
-  -- See Note [Worker-wrapper for bottoming functions]
   | isAbsDmd dmd
   , Just work_fn <- mk_absent_let dflags arg
      -- Absent case.  We can't always handle absence for arbitrary
      -- unlifted types, so we need to choose just the cases we can
-     --- (that's what mk_absent_let does)
+     -- (that's what mk_absent_let does)
   = return (True, [], nop_fn, work_fn)
-
-  -- See Note [Worthy functions for Worker-Wrapper split]
-  | isSeqDmd dmd  -- `seq` demand; evaluate in wrapper in the hope
-                  -- of dropping seqs in the worker
-  = let arg_w_unf = arg `setIdUnfolding` evaldUnfolding
-          -- Tell the worker arg that it's sure to be evaluated
-          -- so that internal seqs can be dropped
-    in return (True, [arg_w_unf], mk_seq_case arg, nop_fn)
-                -- Pass the arg, anyway, even if it is in theory discarded
-                -- Consider
-                --      f x y = x `seq` y
-                -- x gets a (Eval (Poly Abs)) demand, but if we fail to pass it to the worker
-                -- we ABSOLUTELY MUST record that x is evaluated in the wrapper.
-                -- Something like:
-                --      f x y = x `seq` fw y
-                --      fw y = let x{Evald} = error "oops" in (x `seq` y)
-                -- If we don't pin on the "Evald" flag, the seq doesn't disappear, and
-                -- we end up evaluating the absent thunk.
-                -- But the Evald flag is pretty weird, and I worry that it might disappear
-                -- during simplification, so for now I've just nuked this whole case
 
   | isStrictDmd dmd
   , Just cs <- splitProdDmd_maybe dmd
       -- See Note [Unpacking arguments with product and polymorphic demands]
   , not (has_inlineable_prag && isClassPred arg_ty)
       -- See Note [Do not unpack class dictionaries]
-  , Just (data_con, inst_tys, inst_con_arg_tys, co)
-             <- deepSplitProductType_maybe fam_envs arg_ty
+  , Just stuff@(_, _, inst_con_arg_tys, _) <- deepSplitProductType_maybe fam_envs arg_ty
   , cs `equalLength` inst_con_arg_tys
       -- See Note [mkWWstr and unsafeCoerce]
+  = unbox_one dflags fam_envs arg cs stuff
+
+  | isSeqDmd dmd   -- For seqDmd, splitProdDmd_maybe will return Nothing, but
+                   -- it should behave like <S, U(AAAA)>, for some suitable arity
+  , Just stuff@(_, _, inst_con_arg_tys, _) <- deepSplitProductType_maybe fam_envs arg_ty
+  , let abs_dmds = map (const absDmd) inst_con_arg_tys
+  = unbox_one dflags fam_envs arg abs_dmds stuff
+
+  | otherwise   -- Other cases
+  = return (False, [arg], nop_fn, nop_fn)
+
+  where
+    arg_ty = idType arg
+    dmd    = idDemandInfo arg
+
+unbox_one :: DynFlags -> FamInstEnvs -> Var
+          -> [Demand]
+          -> (DataCon, [Type], [(Scaled Type, StrictnessMark)], Coercion)
+          -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
+unbox_one dflags fam_envs arg cs
+          (data_con, inst_tys, inst_con_arg_tys, co)
   = do { (uniq1:uniqs) <- getUniquesM
         ; let   scale = scaleScaled (idWeight arg)
                 scaled_inst_con_arg_tys = map (\(t,s) -> (scale t, s)) inst_con_arg_tys
@@ -630,13 +630,7 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
          ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False unpk_args
          ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
                            -- Don't pass the arg, rebox instead
-
-  | otherwise   -- Other cases
-  = return (False, [arg], nop_fn, nop_fn)
-
   where
-    arg_ty = idType arg
-    dmd    = idDemandInfo arg
     mk_ww_arg uniq ty sub_dmd = setIdDemandInfo (mk_ww_local uniq ty) sub_dmd
 
 ----------------------
@@ -650,11 +644,76 @@ addDataConStrictness con ds
     zipWith add ds strs
   where
     strs = dataConRepStrictness con
-    add dmd str | isMarkedStrict str
-                , not (isAbsDmd dmd) = dmd `bothDmd` seqDmd
+    add dmd str | isMarkedStrict str = strictifyDmd dmd
                 | otherwise          = dmd
 
-{-
+{- Note [How to do the worker/wrapper split]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The worker-wrapper transformation, mkWWstr_one, takes into account
+several possibilities to decide if the function is worthy for
+splitting:
+
+1. If an argument is absent, it would be silly to pass it to
+   the worker.  Hence the isAbsDmd case.  This case must come
+   first because a demand like <S,A> or <B,A> is possible.
+   E.g. <B,A> comes from a function like
+       f x = error "urk"
+   and <S,A> can come from Note [Add demands for strict constructors]
+
+2. If the argument is evaluated strictly, and we can split the
+   product demand (splitProdDmd_maybe), then unbox it and w/w its
+   pieces.  For example
+
+    f :: (Int, Int) -> Int
+    f p = (case p of (a,b) -> a) + 1
+  is split to
+    f :: (Int, Int) -> Int
+    f p = case p of (a,b) -> $wf a
+
+    $wf :: Int -> Int
+    $wf a = a + 1
+
+  and
+    g :: Bool -> (Int, Int) -> Int
+    g c p = case p of (a,b) ->
+               if c then a else b
+  is split to
+   g c p = case p of (a,b) -> $gw c a b
+   $gw c a b = if c then a else b
+
+2a But do /not/ split if the components are not used; that is, the
+   usage is just 'Used' rather than 'UProd'. In this case
+   splitProdDmd_maybe returns Nothing.  Otherwise we risk decomposing
+   a massive tuple which is barely used.  Example:
+
+        f :: ((Int,Int) -> String) -> (Int,Int) -> a
+        f g pr = error (g pr)
+
+        main = print (f fst (1, error "no"))
+
+   Here, f does not take 'pr' apart, and it's stupid to do so.
+   Imagine that it had millions of fields. This actually happened
+   in GHC itself where the tuple was DynFlags
+
+3. A plain 'seqDmd', which is head-strict with usage UHead, can't
+   be split by splitProdDmd_maybe.  But we want it to behave just
+   like U(AAAA) for suitable number of absent demands. So we have
+   a special case for it, with arity coming from the data constructor.
+
+Note [Worker-wrapper for bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used not to split if the result is bottom.
+[Justification:  there's no efficiency to be gained.]
+
+But it's sometimes bad not to make a wrapper.  Consider
+        fw = \x# -> let x = I# x# in case e of
+                                        p1 -> error_fn x
+                                        p2 -> error_fn x
+                                        p3 -> the real stuff
+The re-boxing code won't go away unless error_fn gets a wrapper too.
+[We don't do reboxing now, but in general it's better to pass an
+unboxed thing to f, and have it reboxed in the error cases....]
+
 Note [Add demands for strict constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this program (due to Roman):
@@ -680,24 +739,60 @@ because X is strict, so its argument must be evaluated.  And if we
 
     foo (X a) n = a `seq` go 0
 
+because the seq is discarded (very early) since X is strict!
+
 So here's what we do
 
-* We leave the demand-analysis alone. The demand on 'a' in the definition of
-  'foo' is <L, U(U)>; the strictness info is Lazy because foo's body may or may
-  not evaluate 'a'; but the usage info says that 'a' is unpacked and its content
-  is used.
+* We leave the demand-analysis alone.  The demand on 'a' in the
+  definition of 'foo' is <L, U(U)>; the strictness info is Lazy
+  because foo's body may or may not evaluate 'a'; but the usage info
+  says that 'a' is unpacked and its content is used.
 
-* During worker/wrapper, if we unpack a strict constructor (as we do for 'foo'),
-  we use 'strictifyDemand' to bump up the strictness on the strict arguments of
-  the data constructor. That in turn means that, if the usage info supports
-  doing so (i.e. splitProdDmd_maybe returns Just), we will unpack that argument
+* During worker/wrapper, if we unpack a strict constructor (as we do
+  for 'foo'), we use 'addDataConStrictness' to bump up the strictness on
+  the strict arguments of the data constructor.
+
+* That in turn means that, if the usage info supports doing so
+  (i.e. splitProdDmd_maybe returns Just), we will unpack that argument
   -- even though the original demand (e.g. on 'a') was lazy.
 
-The net effect is that the w/w transformation is more aggressive about unpacking
-the strict arguments of a data constructor, when that eagerness is supported by
-the usage info.
+* What does "bump up the strictness" mean?  Just add a head-strict
+  demand to the strictness!  Even for a demand like <L,A> we can
+  safely turn it into <S,A>; remember case (1) of
+  Note [How to do the worker/wrapper split].
+
+The net effect is that the w/w transformation is more aggressive about
+unpacking the strict arguments of a data constructor, when that
+eagerness is supported by the usage info.
+
+There is the usual danger of reboxing, which as usual we ignore. But
+if X is monomorphic, and has an UNPACK pragma, then this optimisation
+is even more important.  We don't want the wrapper to rebox an unboxed
+argument, and pass an Int to $wfoo!
 
 This works in nested situations like
+
+    data family Bar a
+    data instance Bar (a, b) = BarPair !(Bar a) !(Bar b)
+    newtype instance Bar Int = Bar Int
+
+    foo :: Bar ((Int, Int), Int) -> Int -> Int
+    foo f k = case f of BarPair x y ->
+              case burble of
+                 True -> case x of
+                           BarPair p q -> ...
+                 False -> ...
+
+The extra eagerness lets us produce a worker of type:
+     $wfoo :: Int# -> Int# -> Int# -> Int -> Int
+     $wfoo p# q# y# = ...
+
+even though the `case x` is only lazily evaluated.
+
+--------- Historical note ------------
+We used to add data-con strictness demands when demand analysing case
+expression. However, it was noticed in #15696 that this misses some cases. For
+instance, consider the program (from T10482)
 
     data family Bar a
     data instance Bar (a, b) = BarPair !(Bar a) !(Bar b)
@@ -707,16 +802,38 @@ This works in nested situations like
     foo f k =
       case f of
         BarPair x y -> case burble of
-                         True -> case x of
-                                   BarPair p q -> ...
-                         False -> ...
+                          True -> case x of
+                                    BarPair p q -> ...
+                          False -> ...
 
-The extra eagerness lets us produce a worker of type:
+We really should be able to assume that `p` is already evaluated since it came
+from a strict field of BarPair. This strictness would allow us to produce a
+worker of type:
 
     $wfoo :: Int# -> Int# -> Int# -> Int -> Int
     $wfoo p# q# y# = ...
 
 even though the `case x` is only lazily evaluated
+
+Indeed before we fixed #15696 this would happen since we would float the inner
+`case x` through the `case burble` to get:
+
+    foo f k =
+      case f of
+        BarPair x y -> case x of
+                          BarPair p q -> case burble of
+                                          True -> ...
+                                          False -> ...
+
+However, after fixing #15696 this could no longer happen (for the reasons
+discussed in ticket:15696#comment:76). This means that the demand placed on `f`
+would then be significantly weaker (since the False branch of the case on
+`burble` is not strict in `p` or `q`).
+
+Consequently, we now instead account for data-con strictness in mkWWstr_one,
+applying the strictness demands to the final result of DmdAnal. The result is
+that we get the strict demand signature we wanted even if we can't float
+the case on `x` up through the case on `burble`.
 
 
 Note [mkWWstr and unsafeCoerce]
@@ -1087,20 +1204,6 @@ mk_absent_let dflags arg
               -- the inliner leading to different inlining.
               -- See also Note [Unique Determinism] in Unique
     unlifted_rhs = mkTyApps (Lit rubbishLit) [arg_ty]
-
-mk_seq_case :: Id -> CoreExpr -> CoreExpr
-mk_seq_case arg body = Case (Var arg) (sanitiseCaseBndr arg) (exprType body) [(DEFAULT, [], body)]
-
-sanitiseCaseBndr :: Id -> Id
--- The argument we are scrutinising has the right type to be
--- a case binder, so it's convenient to re-use it for that purpose.
--- But we *must* throw away all its IdInfo.  In particular, the argument
--- will have demand info on it, and that demand info may be incorrect for
--- the case binder.  e.g.       case ww_arg of ww_arg { I# x -> ... }
--- Quite likely ww_arg isn't used in '...'.  The case may get discarded
--- if the case binder says "I'm demanded".  This happened in a situation
--- like         (x+y) `seq` ....
-sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
 
 mk_ww_local :: Unique -> (Scaled Type, StrictnessMark) -> Id
 -- The StrictnessMark comes form the data constructor and says

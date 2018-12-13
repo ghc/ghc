@@ -26,7 +26,7 @@ import BasicTypes
 import Data.List
 import DataCon
 import Id
-import CoreUtils        ( exprIsHNF, exprType, exprIsTrivial )
+import CoreUtils        ( exprIsHNF, exprType, exprIsTrivial, exprOkForSpeculation )
 import TyCon
 import Type
 import Coercion         ( Coercion, coVarsOfCo )
@@ -140,11 +140,15 @@ dmdTransformThunkDmd e
 -- See ↦* relation in the Cardinality Analysis paper
 dmdAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
-            -> CoreExpr -> (BothDmdArg, CoreExpr)
+            -> CoreExpr -- Should obey the let/app invariatn
+            -> (BothDmdArg, CoreExpr)
 dmdAnalStar env dmd e
-  | (defer_and_use, cd) <- toCleanDmd dmd (exprType e)
-  , (dmd_ty, e')        <- dmdAnal env cd e
-  = (postProcessDmdType defer_and_use dmd_ty, e')
+  | (dmd_shell, cd) <- toCleanDmd dmd
+  , (dmd_ty, e')    <- dmdAnal env cd e
+  = ASSERT2( not (isUnliftedType (exprType e)) || exprOkForSpeculation e, ppr e )
+    -- The argument 'e' should satisfy the let/app invariant
+    -- See Note [Analysing with absent demand] in Demand.hs
+    (postProcessDmdType dmd_shell dmd_ty, e')
 
 -- Main Demand Analsysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
@@ -169,19 +173,6 @@ dmdAnal' env dmd (Cast e co)
   = (dmd_ty `bothDmdType` mkBothDmdArg (coercionDmdEnv co), Cast e' co)
   where
     (dmd_ty, e') = dmdAnal env dmd e
-
-{-       ----- I don't get this, so commenting out -------
-    to_co        = pSnd (coercionKind co)
-    dmd'
-      | Just tc <- tyConAppTyCon_maybe to_co
-      , isRecursiveTyCon tc = cleanEvalDmd
-      | otherwise           = dmd
-        -- This coerce usually arises from a recursive
-        -- newtype, and we don't want to look inside them
-        -- for exactly the same reason that we don't look
-        -- inside recursive products -- we might not reach
-        -- a fixpoint.  So revert to a vanilla Eval demand
--}
 
 dmdAnal' env dmd (Tick t e)
   = (dmd_ty, Tick t e')
@@ -259,6 +250,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
 --                                   , text "case_bndr_dmd" <+> ppr (idDemandInfo case_bndr')
+--                                   , text "id_dmds" <+> ppr id_dmds
 --                                   , text "scrut_dmd" <+> ppr scrut_dmd
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_ty" <+> ppr alt_ty2

@@ -245,6 +245,9 @@ if config.timeout == -1:
     config.timeout = int(read_no_crs(config.top + '/timeout/calibrate.out'))
 
 print('Timeout is ' + str(config.timeout))
+print('Known ways: ' + ', '.join(config.other_ways))
+print('Run ways: ' + ', '.join(config.run_ways))
+print('Compile ways: ' + ', '.join(config.compile_ways))
 
 # Try get allowed performance changes from the git commit.
 try:
@@ -252,7 +255,7 @@ try:
 except subprocess.CalledProcessError:
     print('Failed to get allowed metric changes from the HEAD git commit message.')
 
-print(len(config.allowed_perf_changes))
+print('Allowing performance changes in: ' + ', '.join(config.allowed_perf_changes.keys()))
 
 # -----------------------------------------------------------------------------
 # The main dude

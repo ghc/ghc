@@ -725,8 +725,9 @@ pprGenStgBinding (StgNonRec bndr rhs)
         4 (ppr rhs <> semi)
 
 pprGenStgBinding (StgRec pairs)
-  = vcat $ whenPprDebug (text "{- StgRec (begin) -}") :
-           map (ppr_bind) pairs ++ [whenPprDebug (text "{- StgRec (end) -}")]
+  = vcat [ text "Rec {"
+         , vcat (map ppr_bind pairs)
+         , text "end Rec }" ]
   where
     ppr_bind (bndr, expr)
       = hang (hsep [pprBndr LetBind bndr, equals])
