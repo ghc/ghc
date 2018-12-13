@@ -53,7 +53,6 @@ validate-x86_64-linux-deb8-hadrian:
       THREADS=`mk/detect-cpu-count.sh`
       make test THREADS=$THREADS JUNIT_FILE=../../junit.xml
   artifacts:
-    when: always
     reports:
       junit: junit.xml
     paths:
@@ -81,6 +80,8 @@ validate-x86_64-linux-deb8-hadrian:
     - echo "BUILD_SPHINX_PDF=NO" >> mk/build.mk
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
+  artifacts:
+    when: always
   cache:
     key: darwin
     paths:
@@ -120,12 +121,16 @@ validate-x86_64-linux-deb8:
   image: ghcci/x86_64-linux-deb8:0.1
   cache:
     key: linux-x86_64-deb8
+  artifacts:
+    when: always
 
 validate-x86_64-linux-fedora27:
   extends: .validate-linux
   image: ghcci/x86_64-linux-fedora27:0.1
   cache:
     key: linux-x86_64-fedora27
+  artifacts:
+    when: always
 
 validate-x86_64-linux-deb9-integer-simple:
   extends: .validate-linux
