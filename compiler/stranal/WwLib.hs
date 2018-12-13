@@ -18,7 +18,7 @@ import GhcPrelude
 import CoreSyn
 import CoreUtils        ( exprType, mkCast )
 import Id
-import IdInfo           ( JoinArity, vanillaIdInfo )
+import IdInfo           ( JoinArity )
 import DataCon
 import Demand
 import MkCore           ( mkAbsentErrorApp, mkCoreUbxTup
