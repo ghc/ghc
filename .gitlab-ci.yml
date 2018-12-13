@@ -59,7 +59,7 @@ validate-x86_64-linux-deb8-hadrian:
       - ghc.tar.xz
       - junit.xml
 
-.validate-x86_64-darwin:
+validate-x86_64-darwin:
   extends: .validate
   tags:
     - x86_64-darwin
