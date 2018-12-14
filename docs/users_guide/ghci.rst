@@ -37,7 +37,7 @@ command ``ghci``:
 .. code-block:: none
 
     $ ghci
-    GHCi, version 8.y.z: http://www.haskell.org/ghc/  :? for help
+    GHCi, version 8.y.z: https://www.haskell.org/ghc/  :? for help
     Prelude>
 
 There may be a short pause while GHCi loads the prelude and standard
@@ -2052,7 +2052,7 @@ by using the :ghc-flag:`-package ⟨pkg⟩` flag:
 .. code-block:: none
 
     $ ghci -package readline
-    GHCi, version 8.y.z: http://www.haskell.org/ghc/  :? for help
+    GHCi, version 8.y.z: https://www.haskell.org/ghc/  :? for help
     Loading package base ... linking ... done.
     Loading package readline-1.0 ... linking ... done.
     Prelude>

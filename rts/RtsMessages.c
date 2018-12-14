@@ -172,7 +172,7 @@ rtsFatalInternalErrorFn(const char *s, va_list ap)
 #endif
      fprintf(stderr, "\n");
      fprintf(stderr, "    (GHC version %s for %s)\n", ProjectVersion, xstr(HostPlatform_TYPE));
-     fprintf(stderr, "    Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n");
+     fprintf(stderr, "    Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug\n");
      fflush(stderr);
   }
 #if defined(mingw32_HOST_OS)

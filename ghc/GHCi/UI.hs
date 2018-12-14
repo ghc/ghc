@@ -162,7 +162,7 @@ defaultGhciSettings =
 
 ghciWelcomeMsg :: String
 ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
-                 ": http://www.haskell.org/ghc/  :? for help"
+                 ": https://www.haskell.org/ghc/  :? for help"
 
 ghciCommands :: [Command]
 ghciCommands = map mkCmd [

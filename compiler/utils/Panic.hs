@@ -168,7 +168,7 @@ showGhcException exception
         showString "panic! (the 'impossible' happened)\n"
       . showString ("  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t")
       . s . showString "\n\n"
-      . showString "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n"
+      . showString "Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug\n"
 
 
 throwGhcException :: GhcException -> a

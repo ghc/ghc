@@ -3609,7 +3609,7 @@ checkValidRoles tc
     report_error doc
       = addErrTc $ vcat [text "Internal error in role inference:",
                          doc,
-                         text "Please report this as a GHC bug: http://www.haskell.org/ghc/reportabug"]
+                         text "Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug"]
 
 {-
 ************************************************************************
