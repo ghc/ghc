@@ -559,8 +559,8 @@ lvlNonTailMFE :: LevelEnv             -- Level of in-scope names/tyvars
                                       --   or let]
               -> CoreExprWithFVs      -- input expression
               -> LvlM LevelledExpr    -- Result expression
-lvlNonTailMFE env strict_ctxt ann_expr
-  = lvlMFE (placeJoinCeiling env) strict_ctxt ann_expr
+lvlNonTailMFE env
+  = lvlMFE (placeJoinCeiling env)
 
 lvlMFE ::  LevelEnv             -- Level of in-scope names/tyvars
         -> Bool                 -- True <=> strict context [body of case or let]
