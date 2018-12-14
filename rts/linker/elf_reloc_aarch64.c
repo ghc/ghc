@@ -125,18 +125,23 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
             // 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
             // ...   imm12     ] [     Rn     ] [    Rd      ]
 
-            /* fall through */
+            FALLTHROUGH;
         }
         case COMPAT_R_AARCH64_LDST8_ABS_LO12_NC:
             if(exp_shift == -1) exp_shift = 0;
+            FALLTHROUGH;
         case COMPAT_R_AARCH64_LDST16_ABS_LO12_NC:
             if(exp_shift == -1) exp_shift = 1;
+            FALLTHROUGH;
         case COMPAT_R_AARCH64_LDST32_ABS_LO12_NC:
             if(exp_shift == -1) exp_shift = 2;
+            FALLTHROUGH;
         case COMPAT_R_AARCH64_LDST64_ABS_LO12_NC:
             if(exp_shift == -1) exp_shift = 3;
+            FALLTHROUGH;
         case COMPAT_R_AARCH64_LDST128_ABS_LO12_NC:
             if(exp_shift == -1) exp_shift = 4;
+            FALLTHROUGH;
         case COMPAT_R_AARCH64_LD64_GOT_LO12_NC: {
             if(exp_shift == -1) {
                 assert( (addend & 7) == 0 );
