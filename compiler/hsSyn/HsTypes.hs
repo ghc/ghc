@@ -746,10 +746,10 @@ data HsTyLit
 type HsMult = GMult (LHsType GhcRn)
 
 oneDataConHsTy :: HsType GhcRn
-oneDataConHsTy = HsTyVar noExt NotPromoted (noLoc omegaDataConName)
+oneDataConHsTy = HsTyVar noExt NotPromoted (noLoc oneDataConName)
 
 omegaDataConHsTy :: HsType GhcRn
-omegaDataConHsTy = HsTyVar noExt NotPromoted (noLoc oneDataConName)
+omegaDataConHsTy = HsTyVar noExt NotPromoted (noLoc omegaDataConName)
 
 instance Multable (LHsType GhcRn) where
   fromMult One = noLoc oneDataConHsTy
@@ -808,9 +808,9 @@ instance Outputable a => Outputable (HsScaled pass a) where
 instance
       (OutputableBndrId (GhcPass pass)) =>
       Outputable (HsArrow (GhcPass pass)) where
-  ppr HsUnrestrictedArrow = text "(->)"
-  ppr HsLinearArrow = text "(->.)"
-  ppr (HsExplicitMult p) = ppr p
+  ppr HsUnrestrictedArrow = parens arrow
+  ppr HsLinearArrow = parens lollipop
+  ppr (HsExplicitMult p) = parens (mulArrow (ppr p))
 
 newtype HsWildCardInfo        -- See Note [The wildcard story for types]
     = AnonWildCard (Located Name)

@@ -1143,7 +1143,7 @@ repTy (HsFunTy _ f (arrowToMult -> Omega) a) = do
                                 a1   <- repLTy a
                                 tcon <- repArrowTyCon
                                 repTapps tcon [f1, a1]
-repTy (HsFunTy _ _ w _) = notHandled "Function with non-Omega multiplicity" (ppr w)
+repTy ty@(HsFunTy _ _ w _) = notHandled "Function with non-Omega multiplicity" (ppr ty)
 repTy (HsListTy _ t)        = do
                                 t1   <- repLTy t
                                 tcon <- repListTyCon
