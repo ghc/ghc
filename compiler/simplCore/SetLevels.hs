@@ -390,8 +390,7 @@ lvlExpr env (_, AnnCase scrut case_bndr ty alts)
 lvlNonTailExpr :: LevelEnv             -- Context
                -> CoreExprWithFVs      -- Input expression
                -> LvlM LevelledExpr    -- Result expression
-lvlNonTailExpr env expr
-  = lvlExpr (placeJoinCeiling env) expr
+lvlNonTailExpr = lvlExpr . placeJoinCeiling
 
 -------------------------------------------
 lvlApp :: LevelEnv
@@ -559,8 +558,7 @@ lvlNonTailMFE :: LevelEnv             -- Level of in-scope names/tyvars
                                       --   or let]
               -> CoreExprWithFVs      -- input expression
               -> LvlM LevelledExpr    -- Result expression
-lvlNonTailMFE env
-  = lvlMFE (placeJoinCeiling env)
+lvlNonTailMFE = lvlMFE . placeJoinCeiling
 
 lvlMFE ::  LevelEnv             -- Level of in-scope names/tyvars
         -> Bool                 -- True <=> strict context [body of case or let]
