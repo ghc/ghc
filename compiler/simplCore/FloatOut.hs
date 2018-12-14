@@ -7,7 +7,6 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module FloatOut ( floatOutwards ) where
 
