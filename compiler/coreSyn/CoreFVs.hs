@@ -71,7 +71,7 @@ import Name
 import VarSet
 import Var
 import Type
-import Multiplicity (Multable(..))
+import Multiplicity (Multable(..), multThingList)
 import TyCoRep
 import TyCon
 import CoAxiom
@@ -355,7 +355,7 @@ orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
 orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderType bndr)
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (FunTy w arg res)    = unitNameSet funTyConName    -- NB!  See Trac #8535
-                                       `unionNameSet` orphNamesOfType (fromMult w)
+                                       `unionNameSet` unionNameSets (multThingList orphNamesOfType w)
                                        `unionNameSet` orphNamesOfType arg
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
