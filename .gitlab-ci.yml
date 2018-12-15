@@ -134,6 +134,17 @@ validate-x86_64-darwin:
       - cabal-cache
       - toolchain
 
+validate-aarch64-linux-deb9:
+  extends: .validate-linux
+  image: ghcci/aarch64-linux-deb9:0.1
+  allow_failure: true
+  artifacts:
+    when: always
+  cache:
+    key: linux-aarch64-deb9
+  tags:
+    - aarch64-linux
+
 validate-x86_64-linux-deb9:
   extends: .validate-linux
   image: ghcci/x86_64-linux-deb9:0.2
