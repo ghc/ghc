@@ -88,8 +88,10 @@ path component, excluding any separators.
 ## Packages
 
 Users can add and remove packages from particular build stages. As an example,
-below we add package `base` to Stage0 and remove package `haskeline` from Stage1:
+we stop building `haskeline` in Stage1:
 ```haskell
+import Packages
+
 userFlavour :: Flavour
 userFlavour = defaultFlavour { name = "user", packages = modifiedPackages }
 
@@ -97,7 +99,6 @@ modifiedPackages :: Stage -> Action [Package]
 modifiedPackages stage = do
     packages <- defaultPackages stage
     return $ case stage of
-        Stage0 -> packages ++ [base]
         Stage1 -> packages \\ [haskeline]
         _      -> packages
 ```
