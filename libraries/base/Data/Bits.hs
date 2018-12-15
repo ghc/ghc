@@ -469,6 +469,7 @@ instance Bits Int where
     bitSize i              = finiteBitSize i
 
     popCount (I# x#) = I# (word2Int# (popCnt# (int2Word# x#)))
+    {-# INLINE popCount #-} -- we want popCnt# to be inlined in user code so that `ghc -msse4.2` can compile it down to a popcnt instruction
 
     isSigned _             = True
 
@@ -476,7 +477,9 @@ instance Bits Int where
 instance FiniteBits Int where
     finiteBitSize _ = WORD_SIZE_IN_BITS
     countLeadingZeros  (I# x#) = I# (word2Int# (clz# (int2Word# x#)))
+    {-# INLINE countLeadingZeros #-}
     countTrailingZeros (I# x#) = I# (word2Int# (ctz# (int2Word# x#)))
+    {-# INLINE countTrailingZeros #-}
 
 -- | @since 2.01
 instance Bits Word where
@@ -506,6 +509,7 @@ instance Bits Word where
     bitSize i                = finiteBitSize i
     isSigned _               = False
     popCount (W# x#)         = I# (word2Int# (popCnt# x#))
+    {-# INLINE popCount #-}
     bit                      = bitDefault
     testBit                  = testBitDefault
 
@@ -513,7 +517,9 @@ instance Bits Word where
 instance FiniteBits Word where
     finiteBitSize _ = WORD_SIZE_IN_BITS
     countLeadingZeros  (W# x#) = I# (word2Int# (clz# x#))
+    {-# INLINE countLeadingZeros #-}
     countTrailingZeros (W# x#) = I# (word2Int# (ctz# x#))
+    {-# INLINE countTrailingZeros #-}
 
 -- | @since 2.01
 instance Bits Integer where
