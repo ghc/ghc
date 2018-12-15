@@ -189,7 +189,7 @@ Laws for oneLiner
 <o1>    oneLiner (nest k p) = nest k (oneLiner p)
 <o2>    oneLiner (x <> y)   = oneLiner x <> oneLiner y
 
-You might think that the following verion of <m1> would
+You might think that the following version of <m1> would
 be neater:
 
 <3 NO>  (text s <> x) $$ y = text s <> ((empty <> x)) $$

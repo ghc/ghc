@@ -541,7 +541,7 @@ dsGetFamInstEnvs
 dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
 dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }
 
--- | The @COMPLETE@ pragams provided by the user for a given `TyCon`.
+-- | The @COMPLETE@ pragmas provided by the user for a given `TyCon`.
 dsGetCompleteMatches :: TyCon -> DsM [CompleteMatch]
 dsGetCompleteMatches tc = do
   eps <- getEps

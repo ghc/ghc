@@ -1752,7 +1752,7 @@ Moreover we really might float (f (dataToTag# x)) outside the case,
 and then it really, really doesn't obey the let/app invariant.
 
 The solution is simple: exprOkForSpeculation does not try to take
-advantage of the evaluated-ness of (lifted) varaibles.  And it returns
+advantage of the evaluated-ness of (lifted) variables.  And it returns
 False (always) for DataToTagOp and SeqOp.
 
 Note that exprIsHNF /can/ and does take advantage of evaluated-ness;

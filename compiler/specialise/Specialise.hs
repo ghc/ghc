@@ -940,7 +940,7 @@ specCase env scrut' case_bndr [(con, args, rhs)]
                        | sc_arg' <- sc_args' ]
 
              -- Extend the substitution for RHS to map the *original* binders
-             -- to their floated verions.
+             -- to their floated versions.
              mb_sc_flts :: [Maybe DictId]
              mb_sc_flts = map (lookupVarEnv clone_env) args'
              clone_env  = zipVarEnv sc_args' sc_args_flt
@@ -1721,7 +1721,7 @@ This doesn't always work.  One example I came across was this:
 
         oneof = choose (1::Int)
 
-It's a silly exapmle, but we get
+It's a silly example, but we get
         choose = /\a. g `cast` co
 where choose doesn't have any dict arguments.  Thus far I have not
 tried to fix this (wait till there's a real example).
@@ -2176,9 +2176,9 @@ dumpUDs bndrs uds@(MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
 
 dumpBindUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, Bag DictBind, Bool)
 -- Used at a let(rec) binding.
--- We return a boolean indicating whether the binding itself is mentioned
--- is mentioned, directly or indirectly, by any of the ud_calls; in that
--- case we want to float the binding itself;
+-- We return a boolean indicating whether the binding itself is mentioned,
+-- directly or indirectly, by any of the ud_calls; in that case we want to
+-- float the binding itself;
 -- See Note [Floated dictionary bindings]
 dumpBindUDs bndrs (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
   = -- pprTrace "dumpBindUDs" (ppr bndrs $$ ppr free_uds $$ ppr dump_dbs) $
