@@ -1112,8 +1112,8 @@ want PreInlineUnconditionally to second-guess it.  A live example is
 Trac #3736.
     c.f. Note [Stable unfoldings and postInlineUnconditionally]
 
-NB: if the pragama is INLINEABLE, then we don't want to behave int
-this special way -- an INLINEABLE pragam just says to GHC "inline this
+NB: if the pragma is INLINEABLE, then we don't want to behave in
+this special way -- an INLINEABLE pragma just says to GHC "inline this
 if you like".  But if there is a unique occurrence, we want to inline
 the stable unfolding, not the RHS.
 

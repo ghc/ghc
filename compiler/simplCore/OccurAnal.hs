@@ -1307,7 +1307,7 @@ nodeScore env old_bndr new_bndr bind_rhs lb_deps
   = (0, 0, True)                   -- See Note [Self-recursion and loop breakers]
 
   | not (occ_unf_act env old_bndr) -- A binder whose inlining is inactive (e.g. has
-  = (0, 0, True)                   -- a NOINLINE pragam) makes a great loop breaker
+  = (0, 0, True)                   -- a NOINLINE pragma) makes a great loop breaker
 
   | exprIsTrivial rhs
   = mk_score 10  -- Practically certain to be inlined

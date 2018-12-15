@@ -167,7 +167,7 @@ out at all.  See notes with lvlMFE below.
 
 But, check this out:
 
--- At one time I tried the effect of not float anything out of an InlineMe,
+-- At one time I tried the effect of not floating anything out of an InlineMe,
 -- but it sometimes works badly.  For example, consider PrelArr.done.  It
 -- has the form         __inline (\d. e)
 -- where e doesn't mention d.  If we float this to
@@ -366,7 +366,7 @@ lvlExpr env expr@(_, AnnLam {})
     (bndrs, body)        = collectAnnBndrs expr
     (env1, bndrs1)       = substBndrsSL NonRecursive env bndrs
     (new_env, new_bndrs) = lvlLamBndrs env1 (le_ctxt_lvl env) bndrs1
-        -- At one time we called a special verion of collectBinders,
+        -- At one time we called a special version of collectBinders,
         -- which ignored coercions, because we don't want to split
         -- a lambda like this (\x -> coerce t (\s -> ...))
         -- This used to happen quite a bit in state-transformer programs,
@@ -517,7 +517,7 @@ Things to note:
 
      - exrpIsHNF catches the key case of an evaluated variable
 
-     - exprOkForSpeculaion is /false/ of an evaluated varaible;
+     - exprOkForSpeculation is /false/ of an evaluated variable;
        See Note [exprOkForSpeculation and evaluated variables] in CoreUtils
        So we'd actually miss the key case!
 
@@ -1117,7 +1117,7 @@ lvlBind env (AnnRec pairs)
         -- this, allocation rises significantly on some programs
         --
         -- We could elaborate it for the case where there are several
-        -- mutually functions, but it's quite a bit more complicated
+        -- mutually recursive functions, but it's quite a bit more complicated
         --
         -- This all seems a bit ad hoc -- sigh
     let (rhs_env, abs_vars_w_lvls) = lvlLamBndrs env dest_lvl abs_vars
@@ -1226,7 +1226,7 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
 
 {- Note [Floating from a RHS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When float the RHS of a let-binding, we don't always want to apply
+When floating the RHS of a let-binding, we don't always want to apply
 lvlMFE to the body of a lambda, as we usually do, because the entire
 binding body is already going to the right place (dest_lvl).
 
@@ -1696,7 +1696,7 @@ cloneLetVars is_rec
           | otherwise = v
 
     zap_join | isTopLvl dest_lvl = zapJoinId
-             | otherwise         = \v -> v
+             | otherwise         = id
 
 add_id :: IdEnv ([Var], LevelledExpr) -> (Var, Var) -> IdEnv ([Var], LevelledExpr)
 add_id id_env (v, v1)

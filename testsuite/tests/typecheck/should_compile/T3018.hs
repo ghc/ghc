@@ -11,7 +11,7 @@ import Control.Monad
 -- minimal Data/Rep classes
 data Rep (ctx :: * -> *) a
 
-class Data (ctx :: * -> *) a where rep :: Rep ctx a 
+class Data (ctx :: * -> *) a where rep :: Rep ctx a
 
 class Sat a where dict :: a
 
@@ -23,7 +23,7 @@ class Subst_A a t t' where
 
 data SubstD_A a t t' = SubstD_A {substD_A:: forall m. (Monad m) => a -> t -> t' -> m t'}
 
--- Allow override dictionary verion with implementation of type class Subst
+-- Allow override dictionary version with implementation of type class Subst
 instance Subst_A a t t' => Sat (SubstD_A a t t') where
     dict = SubstD_A {substD_A = subst_A}
 
@@ -39,7 +39,7 @@ class Subst_B a t t' where
 
 data SubstD_B a t t' = SubstD_B {substD_B :: a -> t -> t' -> t'}
 
--- allow override dictionary verion with implementation of type class Subst
+-- allow override dictionary version with implementation of type class Subst
 instance Subst_B a t t' => Sat (SubstD_B a t t') where
     dict = SubstD_B {substD_B = subst_B}
 
@@ -55,7 +55,7 @@ Here are the key lines of code:
     class Subst a t t' where
         subst :: (Monad m) => a -> t -> t' -> m t'
 
-    data SubstD a t t' 
+    data SubstD a t t'
       = SubstD (forall m. Monad m => a -> t -> t' -> m t')
 
     instance Data (SubstD a t) t' => Subst a t t'          -- (1)
@@ -67,7 +67,7 @@ The call to 'subst' on the last line gives rise to a constraint (Subst
 a t t'). But that constraint can be satisfied in two different ways:
 
     Using the instance declaration for Subst (which matches anything!)
-    Using the context of the Sat (SubstD ..) instance declaration itself 
+    Using the context of the Sat (SubstD ..) instance declaration itself
 
 If GHC uses (1) it gets into a corner it can't get out of, because now
 it needs (Data (SubstD a t) t'), and that it can't get. The error

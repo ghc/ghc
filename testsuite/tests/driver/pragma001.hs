@@ -23,7 +23,6 @@
 
 module Pragma001 () where
 
--- This will make a warning if the pragam isn't picked up
+-- This will make a warning if the pragma isn't picked up
 foo _ = ()
 foo _ = ()
-

@@ -1185,7 +1185,7 @@ zonk_eq_types = go
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   newtype N m a = MkN (m a)
-Then N will get a conservative, Nominal role for its second paramter 'a',
+Then N will get a conservative, Nominal role for its second parameter 'a',
 because it appears as an argument to the unknown 'm'. Now consider
   [W] N Maybe a  ~R#  N Maybe b
 

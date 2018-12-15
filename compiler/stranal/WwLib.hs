@@ -506,7 +506,7 @@ To avoid this:
 
 mkWWstr :: DynFlags
         -> FamInstEnvs
-        -> Bool    -- True <=> INLINEABLE pragama on this function defn
+        -> Bool    -- True <=> INLINEABLE pragma on this function defn
                    -- See Note [Do not unpack class dictionaries]
         -> [Var]                                -- Wrapper args; have their demand info on them
                                                 --  *Includes type variables*
@@ -569,7 +569,7 @@ as-yet-un-filled-in pkgState files.
 --        brings into scope wrap_arg (via lets)
 -- See Note [How to do the worker/wrapper split]
 mkWWstr_one :: DynFlags -> FamInstEnvs
-            -> Bool    -- True <=> INLINEABLE pragama on this function defn
+            -> Bool    -- True <=> INLINEABLE pragma on this function defn
                        -- See Note [Do not unpack class dictionaries]
             -> Var
             -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
