@@ -196,6 +196,7 @@ test('plugin-recomp-change-prof',
 
 test('static-plugins',
      [extra_files(['simple-plugin/']),
+      unless(config.have_ext_interp, skip),
       extra_run_opts('"' + config.libdir + '"')],
      compile_and_run,
      ['-package ghc -isimple-plugin/'])
