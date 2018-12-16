@@ -58,7 +58,7 @@ compilerDependencies = do
     isGmp   <- (== integerGmp) <$> getIntegerPackage
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
     gmpPath <- expr gmpBuildPath
-    rtsPath <- expr rtsBuildPath
+    rtsPath <- expr (rtsBuildPath stage)
     mconcat [ return [root -/- platformH stage]
             , return ((root -/-) <$> includesDependencies)
             , return ((root -/-) <$> derivedConstantsDependencies)
@@ -84,7 +84,8 @@ compilerDependencies = do
 generatedDependencies :: Expr [FilePath]
 generatedDependencies = do
     root    <- getBuildRoot
-    rtsPath <- expr rtsBuildPath
+    stage   <- getStage
+    rtsPath <- expr (rtsBuildPath stage)
     mconcat [ package compiler ? compilerDependencies
             , package ghcPrim  ? ghcPrimDependencies
             , package rts      ? return (fmap (rtsPath -/-) libffiDependencies
@@ -186,9 +187,10 @@ generateRules = do
             makeExecutable path
 
     -- TODO: simplify, get rid of fake rts context
-    root -/- generatedDir ++ "//*" %> \file -> do
-        withTempDir $ \dir -> build $
-            target rtsContext DeriveConstants [] [file, dir]
+    forM_ [Stage1 ..] $ \stage ->
+      root -/- generatedDir ++ "//*" %> \file -> do
+          withTempDir $ \dir -> build $
+              target (rtsContext stage) DeriveConstants [] [file, dir]
   where
     file <~ gen = file %> \out -> generate out emptyTarget gen
 
