@@ -61,9 +61,8 @@ packageDatabaseArgs = do
     stage <- getStage
     dbPath <- expr (packageDbPath stage)
     expr (need [dbPath -/- packageDbStamp])
-    root <- getBuildRoot
     prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")
-    arg $ prefix ++ root -/- relativePackageDbPath stage
+    arg $ prefix ++ dbPath
 
 bootPackageDatabaseArgs :: Args
 bootPackageDatabaseArgs = do
