@@ -30,24 +30,21 @@ askWithResources rs target = H.askWithResources rs target getArgs
 
 -- TODO: Cache the computation.
 -- | Given a 'Context' this 'Action' looks up the package dependencies and wraps
--- the results in appropriate contexts. The only subtlety here is that we never
--- depend on packages built in 'Stage2' or later, therefore the stage of the
--- resulting dependencies is bounded from above at 'Stage1'. To compute package
--- dependencies we transitively scan Cabal files using 'pkgDependencies' defined
--- in "Hadrian.Haskell.Cabal".
+-- the results in appropriate contexts.
+-- To compute package dependencies we transitively scan Cabal files using
+-- 'pkgDependencies' defined in "Hadrian.Haskell.Cabal".
 contextDependencies :: Context -> Action [Context]
 contextDependencies Context {..} = do
     depPkgs <- go [package]
-    return [ Context depStage pkg way | pkg <- depPkgs, pkg /= package ]
+    return [ Context stage pkg way | pkg <- depPkgs, pkg /= package ]
   where
-    depStage = min stage Stage1
     go pkgs  = do
         deps <- concatMapM step pkgs
         let newPkgs = nubOrd $ sort (deps ++ pkgs)
         if pkgs == newPkgs then return pkgs else go newPkgs
     step pkg = do
         deps   <- pkgDependencies pkg
-        active <- sort <$> stagePackages depStage
+        active <- sort <$> stagePackages stage
         return $ intersectOrd (compare . pkgName) active deps
 
 cabalDependencies :: Context -> Action [String]
