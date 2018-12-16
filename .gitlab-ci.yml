@@ -199,7 +199,7 @@ validate-x86_64-linux-deb9-unreg:
 # Validation via Pipelines (make, Windows)
 ############################################################
 
-.validate-x86_64-windows:
+validate-x86_64-windows:
   stage: build
   variables:
     GHC_VERSION: "8.6.2"
