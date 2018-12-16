@@ -62,6 +62,8 @@ validate-x86_64-linux-deb8-hadrian:
 
 .validate:
   stage: build
+  variables:
+    TEST_TYPE: test
   script:
     - make clean || true
     - ./boot
@@ -74,7 +76,7 @@ validate-x86_64-linux-deb8-hadrian:
       mv ghc-*.tar.xz ghc.tar.xz
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make test THREADS=$THREADS JUNIT_FILE=../../junit.xml
+      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml
   artifacts:
     reports:
       junit: junit.xml
@@ -147,6 +149,16 @@ validate-aarch64-linux-deb9:
   tags:
     - aarch64-linux
 
+nightly-aarch64-linux-deb9:
+  extends: validate-aarch64-linux-deb9
+  artifacts:
+    expire_in: 2 year
+  variables:
+    TEST_TYPE: slowtest
+  only:
+    variables:
+      - $NIGHTLY
+
 validate-x86_64-linux-deb9:
   extends: .validate-linux
   image: ghcci/x86_64-linux-deb9:0.2
@@ -155,6 +167,16 @@ validate-x86_64-linux-deb9:
     expire_in: 2 week
   cache:
     key: linux-x86_64-deb9
+
+nightly-x86_64-linux-deb9:
+  extends: validate-x86_64-linux-deb9
+  artifacts:
+    expire_in: 2 year
+  variables:
+    TEST_TYPE: slowtest
+  only:
+    variables:
+      - $NIGHTLY
 
 validate-x86_64-linux-deb9-llvm:
   extends: .validate-linux
@@ -191,6 +213,16 @@ validate-x86_64-linux-deb9-integer-simple:
   image: ghcci/x86_64-linux-deb9:0.2
   cache:
     key: linux-x86_64-deb9
+
+nightly-x86_64-linux-deb9-integer-simple:
+  extends: validate-x86_64-linux-deb9-integer-simple
+  artifacts:
+    expire_in: 2 year
+  variables:
+    TEST_TYPE: slowtest
+  only:
+    variables:
+      - $NIGHTLY
 
 validate-x86_64-linux-deb9-unreg:
   extends: .validate-linux
