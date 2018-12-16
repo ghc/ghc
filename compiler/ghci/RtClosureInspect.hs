@@ -327,9 +327,7 @@ cPprTermBase y =
   , ifTerm' (isTyCon charTyCon   . ty) ppr_char
   , ifTerm' (isTyCon floatTyCon  . ty) ppr_float
   , ifTerm' (isTyCon doubleTyCon . ty) ppr_double
-#if defined(INTEGER_GMP)
   , ifTerm' (isIntegerTy         . ty) ppr_integer
-#endif
   ]
  where
    ifTerm :: (Term -> Bool)
