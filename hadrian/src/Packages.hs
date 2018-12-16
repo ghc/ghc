@@ -191,7 +191,7 @@ rtsContext stage = vanillaContext stage rts
 rtsBuildPath :: Stage -> Action FilePath
 rtsBuildPath stage = buildPath (rtsContext stage)
 
--- | Libffi is considered a Stage1 package. This determines its build directory.
+-- | Build directory for libffi
 libffiContext :: Stage -> Context
 libffiContext stage = vanillaContext stage libffi
 
