@@ -40,7 +40,7 @@ contextDependencies Context {..} = do
     depPkgs <- go [package]
     return [ Context depStage pkg way | pkg <- depPkgs, pkg /= package ]
   where
-    depStage = min stage Stage1
+    depStage = stage
     go pkgs  = do
         deps <- concatMapM step pkgs
         let newPkgs = nubOrd $ sort (deps ++ pkgs)
