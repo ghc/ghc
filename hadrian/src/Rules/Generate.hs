@@ -187,7 +187,7 @@ generateRules = do
             makeExecutable path
 
     -- TODO: simplify, get rid of fake rts context
-    forM_ [Stage1 ..] $ \stage ->
+    forM_ [Stage1] $ \stage ->
       root -/- generatedDir ++ "//*" %> \file -> do
           withTempDir $ \dir -> build $
               target (rtsContext stage) DeriveConstants [] [file, dir]
