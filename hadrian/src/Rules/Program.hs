@@ -88,7 +88,7 @@ buildBinary rs bin context@Context {..} = do
     needLibrary =<< contextDependencies context
     when (stage > Stage0) $ do
         ways <- interpretInContext context (getLibraryWays <> getRtsWays)
-        needLibrary [ rtsContext { way = w } | w <- ways ]
+        needLibrary [ (rtsContext stage) { way = w } | w <- ways ]
     cSrcs  <- interpretInContext context (getContextData cSrcs)
     cObjs  <- mapM (objectPath context) cSrcs
     hsObjs <- hsObjects context
