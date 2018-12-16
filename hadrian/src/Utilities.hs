@@ -41,7 +41,7 @@ contextDependencies Context {..} = do
     -- Not sure this is exactly right but bounding it to Stage1 as it was
     -- before is definitely wrong. Perhaps it should resolve to the
     -- previous stage?
-    depStage = stage
+    depStage = stageLibraries stage
     go pkgs  = do
         deps <- concatMapM step pkgs
         let newPkgs = nubOrd $ sort (deps ++ pkgs)
