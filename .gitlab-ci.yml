@@ -78,6 +78,7 @@ validate-x86_64-linux-deb8-hadrian:
   artifacts:
     reports:
       junit: junit.xml
+    expire_in: 2 week
     paths:
       - ghc.tar.xz
       - junit.xml
@@ -106,12 +107,12 @@ validate-x86_64-darwin:
     - cp -Rf $HOME/.cabal cabal-cache
   artifacts:
     when: always
+    expire_in: 2 week
   cache:
     key: darwin
     paths:
       - cabal-cache
       - toolchain
-
 
 .validate-linux:
   extends: .validate
@@ -140,6 +141,7 @@ validate-aarch64-linux-deb9:
   allow_failure: true
   artifacts:
     when: always
+    expire_in: 2 week
   cache:
     key: linux-aarch64-deb9
   tags:
@@ -150,6 +152,7 @@ validate-x86_64-linux-deb9:
   image: ghcci/x86_64-linux-deb9:0.2
   artifacts:
     when: always
+    expire_in: 2 week
   cache:
     key: linux-x86_64-deb9
 
@@ -169,6 +172,7 @@ validate-x86_64-linux-deb8:
     key: linux-x86_64-deb8
   artifacts:
     when: always
+    expire_in: 2 week
 
 validate-x86_64-linux-fedora27:
   extends: .validate-linux
@@ -177,6 +181,7 @@ validate-x86_64-linux-fedora27:
     key: linux-x86_64-fedora27
   artifacts:
     when: always
+    expire_in: 2 week
 
 validate-x86_64-linux-deb9-integer-simple:
   extends: .validate-linux
@@ -235,6 +240,7 @@ validate-x86_64-windows:
   image: ghcci/x86_64-linux-deb8:0.1
   artifacts:
     when: always
+    expire_in: 2 week
     reports:
       junit: junit.xml
     paths:
