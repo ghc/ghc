@@ -183,21 +183,23 @@ autogenPath context@Context {..}
   where
     autogen dir = contextPath context <&> (-/- dir -/- "autogen")
 
--- | RTS is considered a Stage1 package.
-rtsContext :: Context
-rtsContext = vanillaContext Stage1 rts
+-- | RTS is considered a Stage1 package. This determines RTS build directory.
+rtsContext :: Stage -> Context
+rtsContext stage = vanillaContext stage rts
 
 -- | Path to the RTS build directory.
-rtsBuildPath :: Action FilePath
-rtsBuildPath = buildPath rtsContext
+rtsBuildPath :: Stage -> Action FilePath
+rtsBuildPath stage = buildPath (rtsContext stage)
 
--- | The 'libffi' library is considered a 'Stage1' package.
-libffiContext :: Context
-libffiContext = vanillaContext Stage1 libffi
+-- | Build directory for libffi
+-- This probably doesn't need to be stage dependent but it is for
+-- consistency for now.
+libffiContext :: Stage -> Context
+libffiContext stage = vanillaContext stage libffi
 
 -- | Build directory for in-tree 'libffi' library.
-libffiBuildPath :: Action FilePath
-libffiBuildPath = buildPath libffiContext
+libffiBuildPath :: Stage -> Action FilePath
+libffiBuildPath stage = buildPath (libffiContext stage)
 
 -- | Name of the 'libffi' library.
 libffiLibraryName :: Action FilePath

@@ -118,9 +118,9 @@ bindistRules = do
         need ["docs"]
         copyDirectory (root -/- "docs") bindistFilesDir
 
-        -- We copy the binary (<build root>/stage2/bin/haddock) to
+        -- We copy the binary (<build root>/stage1/bin/haddock) to
         -- the bindist's bindir (<build root>/bindist/ghc-.../bin/).
-        haddockPath <- programPath (vanillaContext Stage2 haddock)
+        haddockPath <- programPath (vanillaContext Stage1 haddock)
         copyFile haddockPath (bindistFilesDir -/- "bin" -/- "haddock")
 
         -- We then 'need' all the files necessary to configure and install

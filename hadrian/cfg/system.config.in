@@ -93,18 +93,22 @@ project-git-commit-id = @ProjectGitCommitId@
 conf-cc-args-stage0         = @CONF_CC_OPTS_STAGE0@
 conf-cc-args-stage1         = @CONF_CC_OPTS_STAGE1@
 conf-cc-args-stage2         = @CONF_CC_OPTS_STAGE2@
+conf-cc-args-stage3         = @CONF_CC_OPTS_STAGE3@
 
 conf-cpp-args-stage0        = @CONF_CPP_OPTS_STAGE0@
 conf-cpp-args-stage1        = @CONF_CPP_OPTS_STAGE1@
 conf-cpp-args-stage2        = @CONF_CPP_OPTS_STAGE2@
+conf-cpp-args-stage3        = @CONF_CPP_OPTS_STAGE3@
 
 conf-gcc-linker-args-stage0 = @CONF_GCC_LINKER_OPTS_STAGE0@
 conf-gcc-linker-args-stage1 = @CONF_GCC_LINKER_OPTS_STAGE1@
 conf-gcc-linker-args-stage2 = @CONF_GCC_LINKER_OPTS_STAGE2@
+conf-gcc-linker-args-stage3 = @CONF_GCC_LINKER_OPTS_STAGE3@
 
 conf-ld-linker-args-stage0  = @CONF_LD_LINKER_OPTS_STAGE0@
 conf-ld-linker-args-stage1  = @CONF_LD_LINKER_OPTS_STAGE1@
 conf-ld-linker-args-stage2  = @CONF_LD_LINKER_OPTS_STAGE2@
+conf-ld-linker-args-stage3  = @CONF_LD_LINKER_OPTS_STAGE3@
 
 # Include and library directories:
 #=================================

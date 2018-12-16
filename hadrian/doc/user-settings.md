@@ -138,6 +138,22 @@ You can choose which integer library to use when builing GHC using the
 userFlavour :: Flavour
 userFlavour = defaultFlavour { name = "user", integerLibrary = integerSimple }
 ```
+
+### Specifying the final stage to build
+
+The `finalStage` variable can be set to indicate after which stage we should
+stop the compilation pipeline. By default it is set to `Stage2` which indicates
+that we will build everything which uses the `Stage1` `ghc` and then stop.
+
+```
+finalStage :: Stage
+finalStage = Stage2
+```
+
+Using this mechanism we can also build a `Stage3` compiler by setting
+`finalStage = Stage3` or just a `Stage1` compiler by setting
+`finalStage = Stage1`.
+
 ## Build ways
 
 Packages can be built in a number of ways, such as `vanilla`, `profiling` (with
@@ -201,10 +217,6 @@ verboseCommand = return True
 ```
 
 ## Miscellaneous
-
-By setting `stage1Only = True` you can disable building Stage2 GHC and Stage2
-utilities such as `haddock`. Note that all Stage0 and Stage1 libraries will
-still be built.
 
 To change the default behaviour of Hadrian with respect to building split
 objects, override the `splitObjects` setting of the `Flavour` record:

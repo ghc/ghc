@@ -103,9 +103,9 @@ pkgGhciLibraryFile context@Context {..} = do
 -- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath
 pkgConfFile Context {..} = do
-    root <- buildRoot
     pid  <- pkgIdentifier package
-    return $ root -/- relativePackageDbPath stage -/- pid <.> "conf"
+    dbPath <- packageDbPath stage
+    return $ dbPath -/- pid <.> "conf"
 
 -- | Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
 -- to its object file. For example:

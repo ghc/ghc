@@ -7,7 +7,8 @@ import Settings.Builders.Common
 configureBuilderArgs :: Args
 configureBuilderArgs = do
     gmpPath    <- expr gmpBuildPath
-    libffiPath <- expr libffiBuildPath
+    stage      <- getStage
+    libffiPath <- expr (libffiBuildPath stage)
     mconcat [ builder (Configure gmpPath) ? do
                 hostPlatform  <- getSetting HostPlatform
                 buildPlatform <- getSetting BuildPlatform
