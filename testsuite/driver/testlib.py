@@ -830,6 +830,20 @@ def test_common_work(watcher: testutil.Watcher,
             else:
                 all_ways = []
         else:
+            if getTestOpts().only_ways is not None and getTestOpts().only_ways != ['normal']:
+                # This is all a bit unfortunate: We use the test's func to determine
+                # whether it is a compile-time or a run-time test. This means that
+                # run_command tests and the like are considered to be neither
+                # run-time nor compile-time tests and only get run in the normal way.
+                # This is quite surprising (see #16042) and has meant that some
+                # tests have gone silently un-run in the past. Warn when this happens.
+                err = '''
+                this test is neither a run-time nor a compile-time test and
+                consequently can only run in the 'normal' testsuite way.
+                However, it is configured to run only in the %s ways.
+                ''' % getTestOpts().only_ways
+                framework_fail(name, WayName('whole-test'), err)
+
             all_ways = [WayName('normal')]
 
         # A test itself can request extra ways by setting opts.extra_ways
