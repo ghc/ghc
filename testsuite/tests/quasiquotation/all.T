@@ -6,5 +6,7 @@ test('T7918',
       only_ways([config.ghc_th_way]), unless(have_dynamic(), skip)],
      compile_and_run, ['-package ghc ' + config.ghc_th_way_flags])
 test('T14028',
-     [req_interp, only_ways([config.ghc_th_way])],
+     [req_interp,
+      only_ways([config.ghc_th_way]),
+      when(opsys('linux') and arch('x86_64'), expect_broken_for(17300, ['dyn']))],
      makefile_test, ['T14028'])
