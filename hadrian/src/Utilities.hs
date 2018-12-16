@@ -30,16 +30,17 @@ askWithResources rs target = H.askWithResources rs target getArgs
 
 -- TODO: Cache the computation.
 -- | Given a 'Context' this 'Action' looks up the package dependencies and wraps
--- the results in appropriate contexts. The only subtlety here is that we never
--- depend on packages built in 'Stage2' or later, therefore the stage of the
--- resulting dependencies is bounded from above at 'Stage1'. To compute package
--- dependencies we transitively scan Cabal files using 'pkgDependencies' defined
--- in "Hadrian.Haskell.Cabal".
+-- the results in appropriate contexts.
+-- To compute package dependencies we transitively scan Cabal files using
+-- 'pkgDependencies' defined in "Hadrian.Haskell.Cabal".
 contextDependencies :: Context -> Action [Context]
 contextDependencies Context {..} = do
     depPkgs <- go [package]
     return [ Context depStage pkg way | pkg <- depPkgs, pkg /= package ]
   where
+    -- Not sure this is exactly right but bounding it to Stage1 as it was
+    -- before is definitely wrong. Perhaps it should resolve to the
+    -- previous stage?
     depStage = stage
     go pkgs  = do
         deps <- concatMapM step pkgs
