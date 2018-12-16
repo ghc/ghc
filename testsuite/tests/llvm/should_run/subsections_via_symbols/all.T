@@ -13,4 +13,6 @@ setTestOpts(f)
 # Please refer to https://gitlab.haskell.org/ghc/ghc/issues/5019
 # for the subsections_via_symbols.stderr
 
-test('subsections_via_symbols', [only_darwin], makefile_test, [])
+test('subsections_via_symbols',
+     [only_darwin, extra_files(['SubsectionsViaSymbols.hs'])],
+     makefile_test, [])
