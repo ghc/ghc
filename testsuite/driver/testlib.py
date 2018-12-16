@@ -829,6 +829,11 @@ def test_common_work(watcher: testutil.Watcher,
                 all_ways = [WayName('ghci')]
             else:
                 all_ways = []
+        elif func in [makefile_test, run_command]:
+            # makefile tests aren't necessarily runtime or compile-time
+            # specific. Assume we can run them in all ways. See #16042 for what
+            # happened previously.
+            all_ways = config.compile_ways + config.run_ways
         else:
             all_ways = [WayName('normal')]
 
