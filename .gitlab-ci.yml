@@ -233,10 +233,10 @@ validate-x86_64-linux-deb9-unreg:
     key: linux-x86_64-deb9
 
 ############################################################
-# Validation via Pipelines (make, Windows)
+# Validation via Pipelines (Windows)
 ############################################################
 
-validate-x86_64-windows:
+validate-x86_64-windows-hadrian:
   stage: build
   variables:
     GHC_VERSION: "8.6.2"
@@ -255,7 +255,7 @@ validate-x86_64-windows:
     - bash -c 'make V=0 -j`mk/detect-cpu-count.sh` HADDOCK_DOCS=NO test THREADS=$THREADS JUNIT_FILE=../../junit.xml'
     - cp -Rf $APPDATA/cabal cabal-cache
   cache:
-    key: windows
+    key: windows-hadrian
     paths:
       - cabal-cache
       - ghc-8.6.2
@@ -263,6 +263,28 @@ validate-x86_64-windows:
   tags:
     - x86_64-windows
 
+validate-x86_64-windows:
+  stage: build
+  variables:
+    GHC_VERSION: "8.6.2"
+  script:
+    - bash -e .gitlab/win32-init.sh
+    - |
+      set MSYSTEM=MINGW64
+      python boot
+      bash -c './configure --with-ghc=`pwd`/toolchain/bin/ghc --enable-tarballs-autodownload HappyCmd=`pwd`/toolchain/bin/happy AlexCmd=`pwd`/toolchain/bin/alex'
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
+    - mv ghc-*.tar.xz ghc.tar.xz
+    - bash -c 'make V=0 -j`mk/detect-cpu-count.sh` HADDOCK_DOCS=NO test THREADS=$THREADS JUNIT_FILE=../../junit.xml'
+    - cp -Rf $APPDATA/cabal cabal-cache
+  cache:
+    key: windows
+    paths:
+      - cabal-cache
+      - ghc-8.6.2
+      - ghc-tarballs
+  tags:
+    - x86_64-windows
 
 ############################################################
 # Validation via CircleCI
