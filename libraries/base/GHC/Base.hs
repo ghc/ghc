@@ -1095,11 +1095,14 @@ augment g xs = g (:) xs
 --              map
 ----------------------------------------------
 
--- | 'map' @f xs@ is the list obtained by applying @f@ to each element
+-- | /O(n)/. 'map' @f xs@ is the list obtained by applying @f@ to each element
 -- of @xs@, i.e.,
 --
 -- > map f [x1, x2, ..., xn] == [f x1, f x2, ..., f xn]
 -- > map f [x1, x2, ...] == [f x1, f x2, ...]
+--
+-- >>> map (+1) [1, 2, 3]
+--- [2,3,4]
 
 map :: (a -> b) -> [a] -> [b]
 {-# NOINLINE [0] map #-}

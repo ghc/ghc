@@ -241,9 +241,9 @@ infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/doc
 dropWhileEnd :: (a -> Bool) -> [a] -> [a]
 dropWhileEnd p = foldr (\x xs -> if p x && null xs then [] else x : xs) []
 
--- | The 'stripPrefix' function drops the given prefix from a list.
--- It returns 'Nothing' if the list did not start with the prefix
--- given, or 'Just' the list after the prefix, if it does.
+-- | /O(min(m,n))/. The 'stripPrefix' function drops the given prefix from a
+-- list. It returns 'Nothing' if the list did not start with the prefix given,
+-- or 'Just' the list after the prefix, if it does.
 --
 -- >>> stripPrefix "foo" "foobar"
 -- Just "bar"
@@ -319,7 +319,7 @@ findIndices p ls = build $ \c n ->
   in foldr go (\_ -> n) ls 0#
 #endif  /* USE_REPORT_PRELUDE */
 
--- | The 'isPrefixOf' function takes two lists and returns 'True'
+-- | /O(min(m,n))/. The 'isPrefixOf' function takes two lists and returns 'True'
 -- iff the first list is a prefix of the second.
 --
 -- >>> "Hello" `isPrefixOf` "Hello World!"
@@ -509,7 +509,7 @@ intersectBy _  [] _     =  []
 intersectBy _  _  []    =  []
 intersectBy eq xs ys    =  [x | x <- xs, any (eq x) ys]
 
--- | The 'intersperse' function takes an element and a list and
+-- | /O(n)/. The 'intersperse' function takes an element and a list and
 -- \`intersperses\' that element between the elements of the list.
 -- For example,
 --
@@ -1001,7 +1001,7 @@ inits                   = map toListSB . scanl' snocSB emptySB
 -- if it fuses with a consumer, and it would generally lead to serious
 -- loss of sharing if allowed to fuse with a producer.
 
--- | The 'tails' function returns all final segments of the argument,
+-- | /O(n)/. The 'tails' function returns all final segments of the argument,
 -- longest first.  For example,
 --
 -- >>> tails "abc"
