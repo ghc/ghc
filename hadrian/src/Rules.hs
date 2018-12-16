@@ -30,18 +30,22 @@ allStages :: [Stage]
 allStages = [minBound .. maxBound]
 
 -- | This rule calls 'need' on all top-level build targets that Hadrian builds
--- by default, respecting the 'stage1Only' flag.
+-- by default, respecting the 'finalStage' flag.
 topLevelTargets :: Rules ()
 topLevelTargets = action $ do
     verbosity <- getVerbosity
-    when (verbosity >= Loud) $ do
-        (libraries, programs) <- partition isLibrary <$> stagePackages Stage1
-        libNames <- mapM (name Stage1) libraries
-        pgmNames <- mapM (name Stage1) programs
+    forM_ [ Stage1 ..] $ \stage -> do
+      when (verbosity >= Loud) $ do
+        (libraries, programs) <- partition isLibrary <$> stagePackages stage
+        libNames <- mapM (name stage) libraries
+        pgmNames <- mapM (name stage) programs
+        let stageHeader t ps =
+              "| Building " ++ show stage ++ " "
+                            ++ t ++ ": " ++ intercalate ", " ps
         putNormal . unlines $
-            [ "| Building Stage1 libraries: " ++ intercalate ", " libNames
-            , "| Building Stage1 programs : " ++ intercalate ", " pgmNames ]
-    let buildStages = [Stage0, Stage1] ++ [Stage2 | not stage1Only]
+            [ stageHeader "libraries" libNames
+            , stageHeader "programs" pgmNames ]
+    let buildStages = [ s | s <- [Stage0 ..], s < finalStage ]
     targets <- concatForM buildStages $ \stage -> do
         packages <- stagePackages stage
         mapM (path stage) packages
@@ -101,7 +105,7 @@ packageRules = do
     Rules.Program.buildProgramRules readPackageDb
     Rules.Register.configurePackageRules
 
-    forM_ [Stage0, Stage1] (Rules.Register.registerPackageRules writePackageDb)
+    forM_ [Stage0 ..] (Rules.Register.registerPackageRules writePackageDb)
 
     -- TODO: Can we get rid of this enumeration of contexts? Since we iterate
     --       over it to generate all 4 types of rules below, all the time, we

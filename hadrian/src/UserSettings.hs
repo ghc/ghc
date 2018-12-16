@@ -4,7 +4,7 @@
 -- accidentally commit them.
 module UserSettings (
     userFlavours, userPackages, userDefaultFlavour,
-    verboseCommand, buildProgressColour, successColour, stage1Only
+    verboseCommand, buildProgressColour, successColour, finalStage
     ) where
 
 import Flavour
@@ -50,10 +50,9 @@ buildProgressColour = mkBuildProgressColour (Dull Magenta)
 successColour :: SuccessColour
 successColour = mkSuccessColour (Dull Green)
 
--- TODO: Set this flag from the command line.
--- | Set this flag to 'True' to disable building Stage2 GHC and Stage2 utilities
--- such as @haddock@. All Stage0 and Stage1 libraries will still be built.
--- Also see Note [No stage2 packages when CrossCompiling or Stage1Only] in the
--- top-level @ghc.mk@.
-stage1Only :: Bool
-stage1Only = False
+-- | Stop after building the StageN compiler.
+-- For example, setting the 'finalStage' to 'Stage1' will just build the
+-- 'Stage1' compiler. Setting it to 'Stage3' will build the 'Stage3'
+-- compiler. Setting it to 'Stage0' will mean nothing gets built at all.
+finalStage :: Stage
+finalStage = Stage2
