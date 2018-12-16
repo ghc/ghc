@@ -18,3 +18,10 @@ data Context = Context
 instance Binary   Context
 instance Hashable Context
 instance NFData   Context
+
+-- | Which libraries we need to use when building a certain stage.
+stageLibraries :: Stage -> Stage
+stageLibraries Stage0 = Stage0
+stageLibraries Stage1 = Stage1
+stageLibraries Stage2 = Stage1
+stageLibraries Stage3 = Stage2
