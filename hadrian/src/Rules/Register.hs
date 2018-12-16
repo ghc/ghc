@@ -51,11 +51,11 @@ registerPackageRules rs stage = do
     root <- buildRootRules
 
     -- Initialise the package database.
-    root -/- relativePackageDbPath stage -/- packageDbStamp %> \stamp ->
+    root -/- rawRelativePackageDbPath stage -/- packageDbStamp %> \stamp ->
         writeFileLines stamp []
 
     -- Register a package.
-    root -/- relativePackageDbPath stage -/- "*.conf" %> \conf -> do
+    root -/- rawRelativePackageDbPath stage -/- "*.conf" %> \conf -> do
         let libpath = takeDirectory (takeDirectory conf)
             settings = libpath -/- "settings"
             platformConstants = libpath -/- "platformConstants"
