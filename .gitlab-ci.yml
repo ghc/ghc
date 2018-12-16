@@ -248,7 +248,8 @@ validate-x86_64-windows:
       bash -c './configure --with-ghc=`pwd`/toolchain/bin/ghc --enable-tarballs-autodownload HappyCmd=`pwd`/toolchain/bin/happy AlexCmd=`pwd`/toolchain/bin/alex'
       mkdir -p _build
       cp -R inplace/mingw _build/mingw
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick"
+    # FIXME: --no-lint due to #15950
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --no-lint"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh binary-dist"
     - mv ghc-*.tar.xz ghc.tar.xz
     - bash -c 'make V=0 -j`mk/detect-cpu-count.sh` HADDOCK_DOCS=NO test THREADS=$THREADS JUNIT_FILE=../../junit.xml'
