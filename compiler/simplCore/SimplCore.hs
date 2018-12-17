@@ -445,7 +445,7 @@ doCorePass CoreDoCallArity           = {-# SCC "CallArity" #-}
                                        doPassD callArityAnalProgram
 
 doCorePass CoreDoEtaArity            = {-# SCC "EtaArity" #-}
-                                       doPassD etaArityWorkerWrapperProgram
+                                       doPassDU etaArityWorkerWrapperProgram
 
 doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
                                        doPass exitifyProgram

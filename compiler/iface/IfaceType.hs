@@ -147,6 +147,7 @@ data IfaceType
                              -- an explanation of why the second field isn't
                              -- IfaceType, analogous to AppTy.
   | IfaceFunTy     AnonArgFlag IfaceType IfaceType
+  | IfaceFunTildeTy IfaceType IfaceType
   | IfaceForAllTy  IfaceForAllBndr IfaceType
   | IfaceTyConApp  IfaceTyCon IfaceAppArgs  -- Not necessarily saturated
                                             -- Includes newtypes, synonyms, tuples
@@ -329,6 +330,7 @@ data IfaceCoercion
   = IfaceReflCo       IfaceType
   | IfaceGReflCo      Role IfaceType (IfaceMCoercion)
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion
+  | IfaceFunTildeCo   Role IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceBndr IfaceCoercion IfaceCoercion
@@ -458,6 +460,7 @@ ifTypeIsVarFree ty = go ty
     go (IfaceFreeTyVar {})     = False
     go (IfaceAppTy fun args)   = go fun && go_args args
     go (IfaceFunTy _ arg res)  = go arg && go res
+    go (IfaceFunTildeTy arg res) = go arg && go res
     go (IfaceForAllTy {})      = False
     go (IfaceTyConApp _ args)  = go_args args
     go (IfaceTupleTy _ _ args) = go_args args
@@ -493,6 +496,7 @@ substIfaceType env ty
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
     go (IfaceFunTy af t1 t2)  = IfaceFunTy af (go t1) (go t2)
+    go (IfaceFunTildeTy t1 t2) = IfaceFunTildeTy  (go t1) (go t2)
     go ty@(IfaceLitTy {})     = ty
     go (IfaceTyConApp tc tys) = IfaceTyConApp tc (substIfaceAppArgs env tys)
     go (IfaceTupleTy s i tys) = IfaceTupleTy s i (substIfaceAppArgs env tys)
@@ -506,6 +510,7 @@ substIfaceType env ty
     go_co (IfaceReflCo ty)           = IfaceReflCo (go ty)
     go_co (IfaceGReflCo r ty mco)    = IfaceGReflCo r (go ty) (go_mco mco)
     go_co (IfaceFunCo r c1 c2)       = IfaceFunCo r (go_co c1) (go_co c2)
+    go_co (IfaceFunTildeCo r c1 c2)  = IfaceFunTildeCo r (go_co c1) (go_co c2)
     go_co (IfaceTyConAppCo r tc cos) = IfaceTyConAppCo r tc (go_cos cos)
     go_co (IfaceAppCo c1 c2)         = IfaceAppCo (go_co c1) (go_co c2)
     go_co (IfaceForAllCo {})         = pprPanic "substIfaceCoercion" (ppr ty)
@@ -977,6 +982,9 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
 
     go ink subs (IfaceFunTy af arg res)
       = IfaceFunTy af (go ink subs arg) (go ink subs res)
+
+    go ink subs (IfaceFunTildeTy arg res)
+      = IfaceFunTildeTy (go ink subs arg) (go ink subs res)
 
     go ink subs (IfaceAppTy t ts)
       = IfaceAppTy (go ink subs t) (go_args ink subs ts)
@@ -1750,6 +1758,10 @@ instance Binary IfaceType where
       = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
     put_ bh (IfaceLitTy n)
       = do { putByte bh 9; put_ bh n }
+    put_ bh (IfaceFunTildeTy ag ah) = do
+            putByte bh 10
+            put_ bh ag
+            put_ bh ah
 
     get bh = do
             h <- getByte bh
@@ -1775,6 +1787,9 @@ instance Binary IfaceType where
 
               8 -> do { s <- get bh; i <- get bh; tys <- get bh
                       ; return (IfaceTupleTy s i tys) }
+              10 -> do ag <- get bh
+                       ah <- get bh
+                       return (IfaceFunTildeTy ag ah)
               _  -> do n <- get bh
                        return (IfaceLitTy n)
 

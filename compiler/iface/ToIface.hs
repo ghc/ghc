@@ -170,6 +170,7 @@ toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
 toIfaceTypeX fr (FunTy { ft_arg = t1, ft_res = t2, ft_af = af })
   = IfaceFunTy af (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+toIfaceTypeX fr (FunTildeTy t1 t2) = IfaceFunTildeTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
 toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
 
@@ -291,6 +292,8 @@ toIfaceCoercionX fr co
       , [_,_,_,_] <- cos         = pprPanic "toIfaceCoercion" (ppr co)
       | otherwise                = IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
     go (FunCo r co1 co2)   = IfaceFunCo r (go co1) (go co2)
+
+    go (FunTildeCo r co1 co2) = IfaceFunTildeCo r (go co1) (go co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceBndr tv)
                                           (toIfaceCoercionX fr' k)

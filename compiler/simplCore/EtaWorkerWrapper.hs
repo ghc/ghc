@@ -5,6 +5,9 @@ import GhcPrelude
 import CoreEta
 import CoreSyn
 import DynFlags ( DynFlags )
+import UniqSupply
 
-etaArityWorkerWrapperProgram :: DynFlags -> CoreProgram -> CoreProgram
-etaArityWorkerWrapperProgram _dflags binds = concatMap arityWorkerWrapper binds
+etaArityWorkerWrapperProgram
+  :: DynFlags -> UniqSupply -> CoreProgram -> CoreProgram
+etaArityWorkerWrapperProgram _dflags us binds
+  = initUs_ us $ concat <$> mapM arityWorkerWrapper binds
