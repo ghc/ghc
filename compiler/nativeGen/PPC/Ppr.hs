@@ -892,24 +892,6 @@ pprInstr LWSYNC = text "\tlwsync"
 
 pprInstr NOP = text "\tnop"
 
-pprInstr (UPDATE_SP fmt amount@(ImmInt offset))
-   | fits16Bits offset = vcat [
-       pprInstr (LD fmt r0 (AddrRegImm sp (ImmInt 0))),
-       pprInstr (STU fmt r0 (AddrRegImm sp amount))
-     ]
-
-pprInstr (UPDATE_SP fmt amount)
-   = sdocWithPlatform $ \platform ->
-       let tmp = tmpReg platform in
-         vcat [
-           pprInstr (LD fmt r0 (AddrRegImm sp (ImmInt 0))),
-           pprInstr (ADDIS tmp sp (HA amount)),
-           pprInstr (ADD tmp tmp (RIImm (LO amount))),
-           pprInstr (STU fmt r0 (AddrRegReg sp tmp))
-         ]
-
--- pprInstr _ = panic "pprInstr (ppc)"
-
 
 pprLogic :: PtrString -> Reg -> Reg -> RI -> SDoc
 pprLogic op reg1 reg2 ri = hcat [
