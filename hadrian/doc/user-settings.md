@@ -34,7 +34,7 @@ data Flavour = Flavour {
     -- | Build GHC with debug information.
     ghcDebugged :: Bool }
 ```
-Hadrian provides several built-in flavours (`defaultFlavour`, `quickFlavour`, and a few
+Hadrian provides several built-in flavours (`default`, `quick`, and a few
 others; see `hadrian/doc/flavours.md`), which can be activated from the command line,
 e.g. by passing `--flavour=quick`. Users can define new build flavours by adding them
 to `userFlavours` list:
@@ -48,7 +48,24 @@ userFlavours = [userFlavour] -- Add more build flavours if need be.
 userFlavour :: Flavour
 userFlavour = defaultFlavour { name = "user" } -- Modify other settings here.
 ```
-Now `--flavour=user` will run Hadrian with `userFlavour` settings. In the
+Now `--flavour=user` will run Hadrian with `userFlavour` settings.
+
+When no `--flavour` argument is passed to hadrian, it will use the
+`default` one. You can however change this, and for example make
+the "fallback" flavour be `user`, by changing `userDefaultFlavour`:
+
+``` haskell
+userDefaultFlavour :: String
+-- before:
+-- userDefaultFlavour = "default"
+-- now:
+userDefaultFlavour = "user"
+```
+
+This saves you from having to type `build --flavour=user [...]`
+every time, allowing you to _persist_ the choice of flavour.
+
+In the
 following sections we look at specific fields of the `Flavour` record in
 more detail. Note: `defaultFlavour`, as well as its individual fields such
 as `defaultArgs`, `defaultPackages`, etc. that we use below, are defined in module

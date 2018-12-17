@@ -3,8 +3,8 @@
 -- If you don't copy the file your changes will be tracked by git and you can
 -- accidentally commit them.
 module UserSettings (
-    userFlavours, userPackages, verboseCommand, buildProgressColour,
-    successColour, stage1Only
+    userFlavours, userPackages, userDefaultFlavour,
+    verboseCommand, buildProgressColour, successColour, stage1Only
     ) where
 
 import Flavour
@@ -13,6 +13,11 @@ import {-# SOURCE #-} Settings.Default
 
 -- See doc/user-settings.md for instructions.
 -- Please update doc/user-settings.md when committing changes to this file.
+
+-- | Name of the default flavour, i.e the one used when no --flavour=<name>
+--   argument is passed to Hadrian.
+userDefaultFlavour :: String
+userDefaultFlavour = "default"
 
 -- | User-defined build flavours. See 'userFlavour' as an example.
 userFlavours :: [Flavour]

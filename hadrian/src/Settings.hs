@@ -8,7 +8,7 @@ import CommandLine
 import Expression
 import Flavour
 import Packages
-import UserSettings
+import UserSettings (userFlavours, userPackages, userDefaultFlavour)
 
 import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Development
@@ -40,7 +40,7 @@ hadrianFlavours =
 
 flavour :: Action Flavour
 flavour = do
-    flavourName <- fromMaybe "default" <$> cmdFlavour
+    flavourName <- fromMaybe userDefaultFlavour <$> cmdFlavour
     let unknownFlavour = error $ "Unknown build flavour: " ++ flavourName
         flavours       = hadrianFlavours ++ userFlavours
     return $ fromMaybe unknownFlavour $ find ((== flavourName) . name) flavours
