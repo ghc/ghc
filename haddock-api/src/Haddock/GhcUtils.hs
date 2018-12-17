@@ -25,7 +25,6 @@ import Exception
 import Outputable
 import Name
 import NameSet
-import Lexeme
 import Module
 import HscTypes
 import GHC
@@ -38,14 +37,6 @@ moduleString = moduleNameString . moduleName
 
 isNameSym :: Name -> Bool
 isNameSym = isSymOcc . nameOccName
-
-
-isVarSym :: OccName -> Bool
-isVarSym = isLexVarSym . occNameFS
-
-isConSym :: OccName -> Bool
-isConSym = isLexConSym . occNameFS
-
 
 getMainDeclBinder :: (SrcSpanLess (LPat p) ~ Pat p , HasSrcSpan (LPat p)) =>
                      HsDecl p -> [IdP p]
@@ -140,12 +131,6 @@ isClassD _ = False
 isValD :: HsDecl a -> Bool
 isValD (ValD _ _) = True
 isValD _ = False
-
-
-declATs :: HsDecl a -> [IdP a]
-declATs (TyClD _ d) | isClassDecl d = map (unL . fdLName . unL) $ tcdATs d
-declATs _ = []
-
 
 pretty :: Outputable a => DynFlags -> a -> String
 pretty = showPpr

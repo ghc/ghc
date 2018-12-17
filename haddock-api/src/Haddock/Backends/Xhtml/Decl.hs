@@ -696,7 +696,7 @@ instanceId origin no orphan ihd = concat $
     [ "o:" | orphan ] ++
     [ qual origin
     , ":" ++ getOccString origin
-    , ":" ++ (occNameString . getOccName . ihdClsName) ihd
+    , ":" ++ getOccString (ihdClsName ihd)
     , ":" ++ show no
     ]
   where

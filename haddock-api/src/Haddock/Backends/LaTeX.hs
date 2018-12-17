@@ -1049,8 +1049,8 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode
 ppr_mono_ty (HsOpTy _ ty1 op ty2) unicode
   = ppr_mono_lty ty1 unicode <+> ppr_op <+> ppr_mono_lty ty2 unicode
   where
-    ppr_op = if not (isSymOcc occName) then char '`' <> ppLDocName op <> char '`' else ppLDocName op
-    occName = nameOccName . getName . unLoc $ op
+    ppr_op | isSymOcc (getOccName op) = ppLDocName op
+           | otherwise = char '`' <> ppLDocName op <> char '`'
 
 ppr_mono_ty (HsParTy _ ty) unicode
   = parens (ppr_mono_lty ty unicode)
@@ -1079,16 +1079,13 @@ ppr_tylit (HsStrTy _ s) _ = text (show s)
 
 ppBinder :: OccName -> LaTeX
 ppBinder n
-  | isInfixName n = parens $ ppOccName n
-  | otherwise     = ppOccName n
+  | isSymOcc n = parens $ ppOccName n
+  | otherwise  = ppOccName n
 
 ppBinderInfix :: OccName -> LaTeX
 ppBinderInfix n
-  | isInfixName n = ppOccName n
-  | otherwise     = cat [ char '`', ppOccName n, char '`' ]
-
-isInfixName :: OccName -> Bool
-isInfixName n = isVarSym n || isConSym n
+  | isSymOcc n = ppOccName n
+  | otherwise  = cat [ char '`', ppOccName n, char '`' ]
 
 ppSymName :: Name -> LaTeX
 ppSymName name

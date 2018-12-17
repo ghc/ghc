@@ -39,7 +39,7 @@ import Haddock.GhcUtils
 import Control.Monad         ( when, unless )
 import qualified Data.ByteString.Builder as Builder
 import Data.Char             ( toUpper, isSpace )
-import Data.List             ( sortBy, isPrefixOf, intercalate, intersperse )
+import Data.List             ( sortBy, isPrefixOf, intersperse )
 import Data.Maybe
 import System.Directory
 import System.FilePath hiding ( (</>) )
@@ -388,7 +388,7 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces = d
       | Just item_html <- processExport True links_info unicode pkg qual item
       = [ Object
             [ "display_html" .= String (showHtmlFragment item_html)
-            , "name"         .= String (intercalate " " (map nameString names))
+            , "name"         .= String (unwords (map getOccString names))
             , "module"       .= String (moduleString mdl)
             , "link"         .= String (fromMaybe "" (listToMaybe (map (nameLink mdl) names)))
             ]
@@ -405,9 +405,6 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces = d
     exportName ExportDecl { expItemDecl } = getMainDeclBinder (unLoc expItemDecl)
     exportName ExportNoDecl { expItemName } = [expItemName]
     exportName _ = []
-
-    nameString :: NamedThing name => name -> String
-    nameString = occNameString . nameOccName . getName
 
     nameLink :: NamedThing name => Module -> name -> String
     nameLink mdl = moduleNameUrl' (moduleName mdl) . nameOccName . getName

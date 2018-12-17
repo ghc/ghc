@@ -15,6 +15,8 @@ import Haddock.Types
 import GHC
 import Name
 import FastString
+import TysPrim ( funTyConName )
+import TysWiredIn ( listTyConName )
 
 import Control.Monad
 import Control.Monad.Trans.State
@@ -110,10 +112,7 @@ sugar = sugarOperators . sugarTuples . sugarLists
 
 sugarLists :: NamedThing (IdP (GhcPass p)) => HsType (GhcPass p) -> HsType (GhcPass p)
 sugarLists (HsAppTy _ (L _ (HsTyVar _ _ (L _ name))) ltyp)
-    | isBuiltInSyntax name' && strName == "[]" = HsListTy NoExt ltyp
-  where
-    name' = getName name
-    strName = occNameString . nameOccName $ name'
+    | getName name == listTyConName = HsListTy NoExt ltyp
 sugarLists typ = typ
 
 
@@ -127,7 +126,7 @@ sugarTuples typ =
         | isBuiltInSyntax name' && suitable = HsTupleTy NoExt HsBoxedTuple apps
       where
         name' = getName name
-        strName = occNameString . nameOccName $ name'
+        strName = getOccString name
         suitable = case parseTupleArity strName of
             Just arity -> arity == length apps
             Nothing -> False
@@ -137,7 +136,7 @@ sugarTuples typ =
 sugarOperators :: NamedThing (IdP (GhcPass p)) => HsType (GhcPass p) -> HsType (GhcPass p)
 sugarOperators (HsAppTy _ (L _ (HsAppTy _ (L _ (HsTyVar _ _ (L l name))) la)) lb)
     | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
-    | isBuiltInSyntax name' && getOccString name == "(->)" = HsFunTy NoExt la lb
+    | funTyConName == name' = HsFunTy NoExt la lb
   where
     name' = getName name
 sugarOperators typ = typ
@@ -182,7 +181,7 @@ parseTupleArity _ = Nothing
 type NameRep = FastString
 
 getNameRep :: NamedThing name => name -> NameRep
-getNameRep = occNameFS . getOccName
+getNameRep = getOccFS
 
 nameRepString :: NameRep -> String
 nameRepString = unpackFS

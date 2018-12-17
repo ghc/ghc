@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, MagicHash, BangPatterns #-}
+{-# LANGUAGE MagicHash, BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -32,7 +32,6 @@ import DynFlags
 import CoreSyn (isOrphan)
 import ErrUtils
 import FamInstEnv
-import FastString
 import GHC
 import InstEnv
 import Module ( ModuleSet, moduleSetElts )
@@ -40,13 +39,11 @@ import MonadUtils (liftIO)
 import Name
 import NameEnv
 import Outputable (text, sep, (<+>))
-import PrelNames
 import SrcLoc
 import TyCon
 import TyCoRep
-import TysPrim( funTyCon )
+import TysPrim( funTyConName )
 import Var hiding (varName)
-#define FSLIT(x) (mkFastString# (x#))
 
 type ExportedNames = Set.Set Name
 type Modules = Set.Set Module
@@ -223,13 +220,6 @@ instFam :: FamInst -> ([Int], Name, [SimpleType], Int, SimpleType)
 instFam FamInst { fi_fam = n, fi_tys = ts, fi_rhs = t }
   = (map argCount ts, n, map simplify ts, argCount t, simplify t)
 
-
-funTyConName :: Name
-funTyConName = mkWiredInName gHC_PRIM
-                        (mkOccNameFS tcName FSLIT("(->)"))
-                        funTyConKey
-                        (ATyCon funTyCon)       -- Relevant TyCon
-                        BuiltInSyntax
 
 --------------------------------------------------------------------------------
 -- Filtering hidden instances
