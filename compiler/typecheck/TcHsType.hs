@@ -623,7 +623,7 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_level mode of
        ; checkExpectedKind (HsFunTy noExt ty1 mult ty2) (mkFunTy mult' ty1' ty2') liftedTypeKind exp_kind }
 
 tc_mult :: TcTyMode -> HsMult -> TcM Mult
-tc_mult mode = traverseMult (\ty -> tc_lhs_type mode ty multiplicityTy)
+tc_mult mode ty = fmap toMult (tc_lhs_type mode (fromMult ty) multiplicityTy)
 
 
 ------------------------------------------
