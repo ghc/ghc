@@ -1079,6 +1079,8 @@ tc_lhs_pred mode pred = tc_lhs_type mode pred constraintKind
 tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
 -- See Note [Type checking recursive type and class declarations]
 -- in TcTyClsDecls
+tcTyVar _mode name | name == oneDataConName = return (oneDataConTy, multiplicityTy)
+tcTyVar _mode name | name == omegaDataConName = return (omegaDataConTy, multiplicityTy)
 tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
