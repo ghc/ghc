@@ -87,11 +87,21 @@ ppc_mkStackDeallocInstr platform amount
 
 ppc_mkStackAllocInstr' :: Platform -> Int -> [Instr]
 ppc_mkStackAllocInstr' platform amount
-  = case platformArch platform of
-    ArchPPC      -> [UPDATE_SP II32 (ImmInt amount)]
-    ArchPPC_64 _ -> [UPDATE_SP II64 (ImmInt amount)]
-    _            -> panic $ "ppc_mkStackAllocInstr' "
-                            ++ show (platformArch platform)
+  | fits16Bits amount
+  = [ LD fmt r0 (AddrRegImm sp zero)
+    , STU fmt r0 (AddrRegImm sp immAmount)
+    ]
+  | otherwise
+  = [ LD fmt r0 (AddrRegImm sp zero)
+    , ADDIS tmp sp (HA immAmount)
+    , ADD tmp tmp (RIImm (LO immAmount))
+    , STU fmt r0 (AddrRegReg sp tmp)
+    ]
+  where
+    fmt = intFormat $ widthFromBytes ((platformWordSize platform) `quot` 8)
+    zero = ImmInt 0
+    tmp = tmpReg platform
+    immAmount = ImmInt amount
 
 --
 -- See note [extra spill slots] in X86/Instr.hs
@@ -289,8 +299,6 @@ data Instr
     | NOP                       -- no operation, PowerPC 64 bit
                                 -- needs this as place holder to
                                 -- reload TOC pointer
-    | UPDATE_SP Format Imm      -- expand/shrink spill area on C stack
-                                -- pseudo-instruction
 
 -- | Get the registers that are being used by this instruction.
 -- regUsage doesn't need to do any trickery for jumps and such.
@@ -370,7 +378,6 @@ ppc_regUsageOfInstr platform instr
     MFCR    reg             -> usage ([], [reg])
     MFLR    reg             -> usage ([], [reg])
     FETCHPC reg             -> usage ([], [reg])
-    UPDATE_SP _ _           -> usage ([], [sp])
     _                       -> noUsage
   where
     usage (src, dst) = RU (filter (interesting platform) src)
