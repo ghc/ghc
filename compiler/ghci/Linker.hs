@@ -1469,13 +1469,8 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
     findDynObject `orElse`
     assumeDll
 
-  | loading_profiled_hs_libs -- only a libHSfoo_p.a archive will do.
-  = findArchive `orElse`
-    assumeDll
-
   | otherwise
-    -- HSfoo.o is the best, but only works for the normal way
-    -- libHSfoo.a is the backup option.
+    -- use HSfoo.{o,p_o} if it exists, otherwise fallback to libHSfoo{,_p}.a
   = findObject  `orElse`
     findArchive `orElse`
     assumeDll
@@ -1486,7 +1481,9 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
      gcc    = False
      user   = True
 
-     obj_file     = lib <.> "o"
+     obj_file
+       | is_hs && loading_profiled_hs_libs = lib <.> "p_o"
+       | otherwise = lib <.> "o"
      dyn_obj_file = lib <.> "dyn_o"
      arch_files = [ "lib" ++ lib ++ lib_tag <.> "a"
                   , lib <.> "a" -- native code has no lib_tag
