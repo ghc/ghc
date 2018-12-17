@@ -62,10 +62,10 @@ pprCoreBindingsWithSize = pprTopBinds sizeAnn
 pprCoreBindingWithSize = pprTopBind sizeAnn
 
 instance OutputableBndr b => Outputable (Bind b) where
-    ppr bind = ppr_bind noAnn bind
+    ppr = ppr_bind noAnn
 
 instance OutputableBndr b => Outputable (Expr b) where
-    ppr expr = pprCoreExpr expr
+    ppr = pprCoreExpr
 
 {-
 ************************************************************************
@@ -357,9 +357,9 @@ instance OutputableBndr Var where
   bndrIsJoin_maybe = isJoinId_maybe
 
 instance Outputable b => OutputableBndr (TaggedBndr b) where
-  pprBndr _    b = ppr b   -- Simple
-  pprInfixOcc  b = ppr b
-  pprPrefixOcc b = ppr b
+  pprBndr _    = ppr   -- Simple
+  pprInfixOcc  = ppr
+  pprPrefixOcc = ppr
   bndrIsJoin_maybe (TB b _) = isJoinId_maybe b
 
 pprCoreBinder :: BindingSite -> Var -> SDoc
