@@ -24,6 +24,8 @@ module GHCi.UI.Monad (
 
         printForUserNeverQualify, printForUserModInfo,
         printForUser, printForUserPartWay, prettyLocations,
+
+        compileGHCiExpr,
         initInterpBuffering,
         turnOffBuffering, turnOffBuffering_,
         flushInterpBuffers,

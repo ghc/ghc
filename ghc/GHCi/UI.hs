@@ -1430,8 +1430,11 @@ changeDirectory dir = do
   dflags <- getDynFlags
   -- With -fexternal-interpreter, we have to change the directory of the subprocess too.
   -- (this gives consistent behaviour with and without -fexternal-interpreter)
-  when (gopt Opt_ExternalInterpreter dflags) $
-    lift $ enqueueCommands ["System.Directory.setCurrentDirectory " ++ show dir']
+  when (gopt Opt_ExternalInterpreter dflags) $ do
+    hsc_env <- GHC.getSession
+    fhv <- compileGHCiExpr $
+      "System.Directory.setCurrentDirectory " ++ show dir'
+    liftIO $ evalIO hsc_env fhv
 
 trySuccess :: GHC.GhcMonad m => m SuccessFlag -> m SuccessFlag
 trySuccess act =
