@@ -100,7 +100,7 @@ rawRelativePackageDbPath stage = stageString stage -/- "lib/package.conf.d"
 --   a package database.
 packageDbPath :: Stage -> Action FilePath
 packageDbPath stage =
-  buildRoot <&> (-/- rawRelativePackageDbPath (stageLibraries stage))
+  buildRoot <&> (-/- rawRelativePackageDbPath stage)
 
 -- | We use a stamp file to track the existence of a package database.
 packageDbStamp :: FilePath
