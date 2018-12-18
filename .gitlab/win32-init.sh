@@ -3,7 +3,7 @@
 set -e
 
 toolchain=`pwd`/toolchain
-PATH="$toolchain/bin:$PATH"
+PATH="$toolchain/bin:/mingw64/bin:$PATH"
 
 if [ -d "`pwd`/cabal-cache" ]; then
     cp -Rf cabal-cache $APPDATA/cabal

@@ -227,7 +227,7 @@ validate-x86_64-windows-hadrian:
   variables:
     GHC_VERSION: "8.6.2"
   script:
-    - bash -e .gitlab/win32-init.sh
+    - bash .gitlab/win32-init.sh
     - |
       set MSYSTEM=MINGW64
       python boot
