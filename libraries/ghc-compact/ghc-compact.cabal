@@ -37,7 +37,7 @@ library
     CPP
 
   build-depends: ghc-prim   == 0.5.3.*,
-                 base       >= 4.9.0 && < 4.13,
+                 base       >= 4.9.0 && < 4.14,
                  bytestring >= 0.10.6.0
   ghc-options: -Wall
 

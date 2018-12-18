@@ -1215,7 +1215,9 @@ instance Applicative UM where
       (<*>)  = ap
 
 instance Monad UM where
+#if !MIN_VERSION_base(4,13,0)
   fail     = MonadFail.fail
+#endif
   m >>= k  = UM (\state ->
                   do { (state', v) <- unUM m state
                      ; unUM (k v) state' })

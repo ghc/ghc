@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -----------------------------------------------------------------------------
 -- A Parser monad with access to the 'DynFlags'.
 --
@@ -31,7 +33,9 @@ instance Applicative PD where
 
 instance Monad PD where
   (>>=) = thenPD
+#if !MIN_VERSION_base(4,13,0)
   fail = MonadFail.fail
+#endif
 
 instance MonadFail.MonadFail PD where
   fail = failPD

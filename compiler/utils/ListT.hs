@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -67,9 +68,11 @@ instance Alternative (ListT f) where
 
 instance Monad (ListT m) where
     m >>= f = ListT $ \sk fk -> unListT m (\a fk' -> unListT (f a) sk fk') fk
+#if !MIN_VERSION_base(4,13,0)
     fail = MonadFail.fail
+#endif
 
-instance MonadFail (ListT m) where
+instance MonadFail.MonadFail (ListT m) where
     fail _ = ListT $ \_ fk -> fk
 
 instance MonadPlus (ListT m) where

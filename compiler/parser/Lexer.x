@@ -41,6 +41,7 @@
 -- Alex "Haskell code fragment top"
 
 {
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 
@@ -2018,9 +2019,11 @@ instance Applicative P where
 
 instance Monad P where
   (>>=) = thenP
+#if !MIN_VERSION_base(4,13,0)
   fail = MonadFail.fail
+#endif
 
-instance MonadFail P where
+instance MonadFail.MonadFail P where
   fail = failP
 
 returnP :: a -> P a
