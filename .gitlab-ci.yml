@@ -53,6 +53,10 @@ validate-x86_64-linux-deb8-hadrian:
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
+    - python3 .gitlab/fix-submodules.py
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
   tags:
     - x86_64-linux
 
