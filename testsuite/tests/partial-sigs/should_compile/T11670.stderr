@@ -1,18 +1,17 @@
 
 T11670.hs:10:42: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘CLong’
-    • In an expression type signature: IO _
-      In the expression: peekElemOff undefined 0 :: IO _
-      In an equation for ‘T11670.peek’:
-          T11670.peek ptr = peekElemOff undefined 0 :: IO _
+    • In the first argument of ‘IO’, namely ‘_’
+      In the type ‘IO _’
+      In an expression type signature: IO _
     • Relevant bindings include
         ptr :: Ptr a (bound at T11670.hs:10:6)
         peek :: Ptr a -> IO CLong (bound at T11670.hs:10:1)
 
 T11670.hs:13:40: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Storable w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of <expression> :: Storable w => IO w
+    • Found type wildcard ‘_’ standing for ‘Storable _’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of <expression> :: Storable _ => IO _
                at T11670.hs:13:40-48
     • In an expression type signature: _ => IO _
       In the expression: peekElemOff undefined 0 :: _ => IO _
@@ -23,14 +22,13 @@ T11670.hs:13:40: warning: [-Wpartial-type-signatures (in -Wdefault)]
         peek2 :: Ptr a -> IO CLong (bound at T11670.hs:13:1)
 
 T11670.hs:13:48: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of <expression> :: Storable w => IO w
+    • Found type wildcard ‘_’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of <expression> :: Storable _ => IO _
                at T11670.hs:13:40-48
-    • In an expression type signature: _ => IO _
-      In the expression: peekElemOff undefined 0 :: _ => IO _
-      In an equation for ‘peek2’:
-          peek2 ptr = peekElemOff undefined 0 :: _ => IO _
+    • In the first argument of ‘IO’, namely ‘_’
+      In the type ‘IO _’
+      In an expression type signature: _ => IO _
     • Relevant bindings include
         ptr :: Ptr a (bound at T11670.hs:13:7)
         peek2 :: Ptr a -> IO CLong (bound at T11670.hs:13:1)

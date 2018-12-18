@@ -12,11 +12,11 @@
 module RnTypes (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
-        rnHsKind, rnLHsKind,
+        rnHsKind, rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType,
         HsSigWcTypeScoping(..), rnHsSigWcType, rnHsSigWcTypeScoped,
         rnLHsInstType,
-        newTyVarNameRn, collectAnonWildCards,
+        newTyVarNameRn,
         rnConDeclFields,
         rnLTyVar,
 
@@ -32,7 +32,7 @@ module RnTypes (
         extractHsTyRdrTyVarsDups, extractHsTysRdrTyVars,
         extractHsTysRdrTyVarsDups, rmDupsInRdrTyVars,
         extractRdrKindSigVars, extractDataDefnKindVars,
-        extractHsTvBndrs,
+        extractHsTvBndrs, extractHsTyArgRdrKiTyVarsDup,
         freeKiTyVarsAllVars, freeKiTyVarsKindVars, freeKiTyVarsTypeVars,
         elemRdr
   ) where
@@ -166,8 +166,7 @@ rnWcBody ctxt nwc_rdrs hs_ty
                         , rtke_ctxt  = ctxt }
        ; (hs_ty', fvs) <- bindLocalNamesFV nwcs $
                           rn_lty env hs_ty
-       ; let awcs = collectAnonWildCards hs_ty'
-       ; return (nwcs ++ awcs, hs_ty', fvs) }
+       ; return (nwcs, hs_ty', fvs) }
   where
     rn_lty env (dL->L loc hs_ty)
       = setSrcSpan loc $
@@ -187,10 +186,8 @@ rnWcBody ctxt nwc_rdrs hs_ty
       | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
       , (dL->L lx (HsWildCardTy _))  <- ignoreParens hs_ctxt_last
       = do { (hs_ctxt1', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt1
-           ; wc' <- setSrcSpan lx $
-                    do { checkExtraConstraintWildCard env hs_ctxt1
-                       ; rnAnonWildCard }
-           ; let hs_ctxt' = hs_ctxt1' ++ [cL lx (HsWildCardTy wc')]
+           ; setSrcSpan lx $ checkExtraConstraintWildCard env hs_ctxt1
+           ; let hs_ctxt' = hs_ctxt1' ++ [cL lx (HsWildCardTy noExt)]
            ; (hs_ty', fvs2) <- rnLHsTyKi env hs_ty
            ; return (HsQualTy { hst_xqual = noExt
                               , hst_ctxt = cL cx hs_ctxt', hst_body = hs_ty' }
@@ -490,6 +487,22 @@ rnLHsKind ctxt kind = rnLHsTyKi (mkTyKiEnv ctxt KindLevel RnTypeBody) kind
 rnHsKind  :: HsDocContext -> HsKind GhcPs -> RnM (HsKind GhcRn, FreeVars)
 rnHsKind ctxt kind = rnHsTyKi  (mkTyKiEnv ctxt KindLevel RnTypeBody) kind
 
+-- renaming a type only, not a kind
+rnLHsTypeArg :: HsDocContext -> LHsTypeArg GhcPs
+                -> RnM (LHsTypeArg GhcRn, FreeVars)
+rnLHsTypeArg ctxt (HsValArg ty)
+   = do { (tys_rn, fvs) <- rnLHsType ctxt ty
+        ; return (HsValArg tys_rn, fvs) }
+rnLHsTypeArg ctxt (HsTypeArg ki)
+   = do { (kis_rn, fvs) <- rnLHsKind ctxt ki
+        ; return (HsTypeArg kis_rn, fvs) }
+rnLHsTypeArg _ (HsArgPar sp)
+   = return (HsArgPar sp, emptyFVs)
+
+rnLHsTypeArgs :: HsDocContext -> [LHsTypeArg GhcPs]
+                 -> RnM ([LHsTypeArg GhcRn], FreeVars)
+rnLHsTypeArgs doc args = mapFvRn (rnLHsTypeArg doc) args
+
 --------------
 rnTyKiContext :: RnTyKiEnv -> LHsContext GhcPs
               -> RnM (LHsContext GhcRn, FreeVars)
@@ -630,6 +643,13 @@ rnHsTyKi env (HsAppTy _ ty1 ty2)
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
        ; return (HsAppTy noExt ty1' ty2', fvs1 `plusFV` fvs2) }
 
+rnHsTyKi env (HsAppKindTy _ ty k)
+  = do { kind_app <- xoptM LangExt.TypeApplications
+       ; unless kind_app (addErr (typeAppErr k))
+       ; (ty', fvs1) <- rnLHsTyKi env ty
+       ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
+       ; return (HsAppKindTy noExt ty' k', fvs1 `plusFV` fvs2) }
+
 rnHsTyKi env t@(HsIParamTy _ n ty)
   = do { notInKinds env t
        ; (ty', fvs) <- rnLHsTyKi env ty
@@ -667,11 +687,7 @@ rnHsTyKi env ty@(HsExplicitTupleTy _ tys)
 
 rnHsTyKi env (HsWildCardTy _)
   = do { checkAnonWildCard env
-       ; wc' <- rnAnonWildCard
-       ; return (HsWildCardTy wc', emptyFVs) }
-         -- emptyFVs: this occurrence does not refer to a
-         --           user-written binding site, so don't treat
-         --           it as a free variable
+       ; return (HsWildCardTy noExt, emptyFVs) }
 
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
@@ -760,12 +776,7 @@ wildCardsAllowed env
        HsTypeCtx {}        -> True
        _                   -> False
 
-rnAnonWildCard :: RnM HsWildCardInfo
-rnAnonWildCard
-  = do { loc <- getSrcSpanM
-       ; uniq <- newUnique
-       ; let name = mkInternalName uniq (mkTyVarOcc "_") loc
-       ; return (AnonWildCard (cL loc name)) }
+
 
 ---------------
 -- | Ensures either that we're in a type or that -XPolyKinds is set
@@ -1051,49 +1062,6 @@ newTyVarNameRn mb_assoc (dL->L loc rdr)
               -- Use the same Name as the parent class decl
 
            _                -> newLocalBndrRn (cL loc rdr) }
-
----------------------
-collectAnonWildCards :: LHsType GhcRn -> [Name]
--- | Extract all wild cards from a type.
-collectAnonWildCards lty = go lty
-  where
-    go lty = case unLoc lty of
-      HsWildCardTy (AnonWildCard wc) -> [unLoc wc]
-      HsAppTy _ ty1 ty2              -> go ty1 `mappend` go ty2
-      HsFunTy _ ty1 ty2              -> go ty1 `mappend` go ty2
-      HsListTy _ ty                  -> go ty
-      HsTupleTy _ _ tys              -> gos tys
-      HsSumTy _ tys                  -> gos tys
-      HsOpTy _ ty1 _ ty2             -> go ty1 `mappend` go ty2
-      HsParTy _ ty                   -> go ty
-      HsIParamTy _ _ ty              -> go ty
-      HsKindSig _ ty kind            -> go ty `mappend` go kind
-      HsDocTy _ ty _                 -> go ty
-      HsBangTy _ _ ty                -> go ty
-      HsRecTy _ flds                 -> gos $ map (cd_fld_type . unLoc) flds
-      HsExplicitListTy _ _ tys       -> gos tys
-      HsExplicitTupleTy _ tys        -> gos tys
-      HsForAllTy { hst_bndrs = bndrs
-                 , hst_body  = ty }  -> collectAnonWildCardsBndrs bndrs
-                                        `mappend` go ty
-      HsQualTy { hst_ctxt = ctxt
-               , hst_body = ty }     -> gos (unLoc ctxt) `mappend` go ty
-      HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)) -> go $ cL noSrcSpan ty
-      HsSpliceTy{} -> mempty
-      HsTyLit{} -> mempty
-      HsTyVar{} -> mempty
-      HsStarTy{} -> mempty
-      XHsType{} -> mempty
-
-    gos = mconcat . map go
-
-collectAnonWildCardsBndrs :: [LHsTyVarBndr GhcRn] -> [Name]
-collectAnonWildCardsBndrs ltvs = concatMap (go . unLoc) ltvs
-  where
-    go (UserTyVar _ _)      = []
-    go (KindedTyVar _ _ ki) = collectAnonWildCards ki
-    go (XTyVarBndr{})       = []
-
 {-
 *********************************************************
 *                                                       *
@@ -1509,6 +1477,10 @@ opTyErr op overall_ty
           | otherwise
           = text "Use TypeOperators to allow operators in types"
 
+typeAppErr :: LHsKind GhcPs -> SDoc
+typeAppErr (L _ k)
+  = hang (text "Illegal visible kind application" <+> quotes (ppr k))
+       2 (text "Perhaps you intended to use TypeApplications")
 {-
 ************************************************************************
 *                                                                      *
@@ -1667,6 +1639,19 @@ inScope rdr_env rdr = rdr `elemLocalRdrEnv` rdr_env
 -- When the same name occurs multiple times in the types, only the first
 -- occurrence is returned.
 -- See Note [Kind and type-variable binders]
+
+
+extract_tyarg :: LHsTypeArg GhcPs -> FreeKiTyVarsWithDups -> FreeKiTyVarsWithDups
+extract_tyarg (HsValArg ty) acc = extract_lty TypeLevel ty acc
+extract_tyarg (HsTypeArg ki) acc = extract_lty KindLevel ki acc
+extract_tyarg (HsArgPar _) acc = acc
+
+extract_tyargs :: [LHsTypeArg GhcPs] -> FreeKiTyVarsWithDups -> FreeKiTyVarsWithDups
+extract_tyargs args acc = foldr extract_tyarg acc args
+
+extractHsTyArgRdrKiTyVarsDup :: [LHsTypeArg GhcPs] -> FreeKiTyVarsWithDups
+extractHsTyArgRdrKiTyVarsDup args = extract_tyargs args emptyFKTV
+
 extractHsTyRdrTyVars :: LHsType GhcPs -> FreeKiTyVarsNoDups
 extractHsTyRdrTyVars ty
   = rmDupsInRdrTyVars (extractHsTyRdrTyVarsDups ty)
@@ -1808,6 +1793,8 @@ extract_lty t_or_k (dL->L _ ty) acc
                                            flds
       HsAppTy _ ty1 ty2           -> extract_lty t_or_k ty1 $
                                      extract_lty t_or_k ty2 acc
+      HsAppKindTy _ ty k          -> extract_lty t_or_k ty $
+                                     extract_lty KindLevel k acc
       HsListTy _ ty               -> extract_lty t_or_k ty acc
       HsTupleTy _ _ tys           -> extract_ltys t_or_k tys acc
       HsSumTy _ tys               -> extract_ltys t_or_k tys acc

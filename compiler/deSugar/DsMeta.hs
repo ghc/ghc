@@ -352,7 +352,7 @@ repRoleD _ = panic "repRoleD"
 repDataDefn :: Core TH.Name
             -> Either (Core [TH.TyVarBndrQ])
                         -- the repTyClD case
-                      (Core (Maybe [TH.TyVarBndrQ]), Core [TH.TypeQ])
+                      (Core (Maybe [TH.TyVarBndrQ]), Core TH.TypeQ)
                         -- the repDataFamInstD case
             -> HsDataDefn GhcRn
             -> DsM (Core TH.DecQ)
@@ -465,17 +465,27 @@ repAssocTyFamDefaults = mapM rep_deflt
     rep_deflt (dL->L _ (FamEqn { feqn_tycon = tc
                                , feqn_bndrs = bndrs
                                , feqn_pats  = tys
+                               , feqn_fixity = fixity
                                , feqn_rhs   = rhs }))
       = addTyClTyVarBinds tys $ \ _ ->
         do { tc1  <- lookupLOcc tc
            ; no_bndrs <- ASSERT( isNothing bndrs )
                          coreNothingList tyVarBndrQTyConName
            ; tys1 <- repLTys (hsLTyVarBndrsToTypes tys)
-           ; tys2 <- coreList typeQTyConName tys1
+           ; lhs <- case fixity of
+                      Prefix -> do { head_ty <- repNamedTyCon tc1
+                                   ; repTapps head_ty tys1 }
+                      Infix -> do { (t1:t2:args) <- checkTys tys1
+                                  ; head_ty <- repTInfix t1 tc1 t2
+                                  ; repTapps head_ty args }
            ; rhs1 <- repLTy rhs
-           ; eqn1 <- repTySynEqn no_bndrs tys2 rhs1
-           ; repTySynInst tc1 eqn1 }
+           ; eqn1 <- repTySynEqn no_bndrs lhs rhs1
+           ; repTySynInst eqn1 }
     rep_deflt _ = panic "repAssocTyFamDefaults"
+
+    checkTys :: [Core TH.TypeQ] -> DsM [Core TH.TypeQ]
+    checkTys tys@(_:_:_) = return tys
+    checkTys _ = panic "repAssocTyFamDefaults:checkTys"
 
 -------------------------
 -- represent fundeps
@@ -547,18 +557,19 @@ repStandaloneDerivD (dL->L loc (DerivDecl { deriv_strategy = strat
 repStandaloneDerivD _ = panic "repStandaloneDerivD"
 
 repTyFamInstD :: TyFamInstDecl GhcRn -> DsM (Core TH.DecQ)
-repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
-  = do { let tc_name = tyFamInstDeclLName decl
-       ; tc <- lookupLOcc tc_name          -- See note [Binders and occurrences]
-       ; eqn1 <- repTyFamEqn eqn
-       ; repTySynInst tc eqn1 }
+repTyFamInstD (TyFamInstDecl { tfid_eqn = eqn })
+  = do { eqn1 <- repTyFamEqn eqn
+       ; repTySynInst eqn1 }
 
 repTyFamEqn :: TyFamInstEqn GhcRn -> DsM (Core TH.TySynEqnQ)
 repTyFamEqn (HsIB { hsib_ext = var_names
-                  , hsib_body = FamEqn { feqn_bndrs = mb_bndrs
+                  , hsib_body = FamEqn { feqn_tycon = tc_name
+                                       , feqn_bndrs = mb_bndrs
                                        , feqn_pats = tys
+                                       , feqn_fixity = fixity
                                        , feqn_rhs  = rhs }})
-  = do { let hs_tvs = HsQTvs { hsq_ext = HsQTvsRn
+  = do { tc <- lookupLOcc tc_name     -- See note [Binders and occurrences]
+       ; let hs_tvs = HsQTvs { hsq_ext = HsQTvsRn
                                { hsq_implicit = var_names
                                , hsq_dependent = emptyNameSet }   -- Yuk
                              , hsq_explicit = fromMaybe [] mb_bndrs }
@@ -566,12 +577,29 @@ repTyFamEqn (HsIB { hsib_ext = var_names
          do { mb_bndrs1 <- repMaybeList tyVarBndrQTyConName
                                         repTyVarBndr
                                         mb_bndrs
-            ; tys1 <- repLTys tys
-            ; tys2 <- coreList typeQTyConName tys1
+            ; tys1 <- case fixity of
+                        Prefix -> repTyArgs (repNamedTyCon tc) tys
+                        Infix  -> do { (HsValArg t1: HsValArg t2: args) <- checkTys tys
+                                     ; t1' <- repLTy t1
+                                     ; t2'  <- repLTy t2
+                                     ; repTyArgs (repTInfix t1' tc t2') args }
             ; rhs1 <- repLTy rhs
-            ; repTySynEqn mb_bndrs1 tys2 rhs1 } }
+            ; repTySynEqn mb_bndrs1 tys1 rhs1 } }
+     where checkTys :: [LHsTypeArg GhcRn] -> DsM [LHsTypeArg GhcRn]
+           checkTys tys@(HsValArg _:HsValArg _:_) = return tys
+           checkTys _ = panic "repTyFamEqn:checkTys"
 repTyFamEqn (XHsImplicitBndrs _) = panic "repTyFamEqn"
 repTyFamEqn (HsIB _ (XFamEqn _)) = panic "repTyFamEqn"
+
+repTyArgs :: DsM (Core TH.TypeQ) -> [LHsTypeArg GhcRn] -> DsM (Core TH.TypeQ)
+repTyArgs f [] = f
+repTyArgs f (HsValArg ty : as) = do { f' <- f
+                                    ; ty' <- repLTy ty
+                                    ; repTyArgs (repTapp f' ty') as }
+repTyArgs f (HsTypeArg ki : as) = do { f' <- f
+                                     ; ki' <- repLTy ki
+                                     ; repTyArgs (repTappKind f' ki') as }
+repTyArgs f (HsArgPar _ : as) = repTyArgs f as
 
 repDataFamInstD :: DataFamInstDecl GhcRn -> DsM (Core TH.DecQ)
 repDataFamInstD (DataFamInstDecl { dfid_eqn =
@@ -579,8 +607,9 @@ repDataFamInstD (DataFamInstDecl { dfid_eqn =
                         , hsib_body = FamEqn { feqn_tycon = tc_name
                                              , feqn_bndrs = mb_bndrs
                                              , feqn_pats  = tys
+                                             , feqn_fixity = fixity
                                              , feqn_rhs   = defn }})})
-  = do { tc <- lookupLOcc tc_name          -- See note [Binders and occurrences]
+  = do { tc <- lookupLOcc tc_name         -- See note [Binders and occurrences]
        ; let hs_tvs = HsQTvs { hsq_ext = HsQTvsRn
                                  { hsq_implicit = var_names
                                  , hsq_dependent = emptyNameSet }   -- Yuk
@@ -589,8 +618,18 @@ repDataFamInstD (DataFamInstDecl { dfid_eqn =
          do { mb_bndrs1 <- repMaybeList tyVarBndrQTyConName
                                         repTyVarBndr
                                         mb_bndrs
-            ; tys1 <- repList typeQTyConName repLTy tys
+            ; tys1 <- case fixity of
+                        Prefix -> repTyArgs (repNamedTyCon tc) tys
+                        Infix  -> do { (HsValArg t1: HsValArg t2: args) <- checkTys tys
+                                     ; t1' <- repLTy t1
+                                     ; t2'  <- repLTy t2
+                                     ; repTyArgs (repTInfix t1' tc t2') args }
             ; repDataDefn tc (Right (mb_bndrs1, tys1)) defn } }
+
+      where checkTys :: [LHsTypeArg GhcRn] -> DsM [LHsTypeArg GhcRn]
+            checkTys tys@(HsValArg _: HsValArg _: _) = return tys
+            checkTys _ = panic "repDataFamInstD:checkTys"
+
 repDataFamInstD (DataFamInstDecl (XHsImplicitBndrs _))
   = panic "repDataFamInstD"
 repDataFamInstD (DataFamInstDecl (HsIB _ (XFamEqn _)))
@@ -1136,6 +1175,10 @@ repTy (HsAppTy _ f a)       = do
                                 f1 <- repLTy f
                                 a1 <- repLTy a
                                 repTapp f1 a1
+repTy (HsAppKindTy _ ty ki) = do
+                                ty1 <- repLTy ty
+                                ki1 <- repLTy ki
+                                repTappKind ty1 ki1
 repTy (HsFunTy _ f a)       = do
                                 f1   <- repLTy f
                                 a1   <- repLTy a
@@ -1174,7 +1217,7 @@ repTy (HsExplicitTupleTy _ tys) = do
 repTy (HsTyLit _ lit) = do
                           lit' <- repTyLit lit
                           repTLit lit'
-repTy (HsWildCardTy (AnonWildCard _)) = repTWildCard
+repTy (HsWildCardTy _) = repTWildCard
 repTy (HsIParamTy _ n t) = do
                              n' <- rep_implicit_param_name (unLoc n)
                              t' <- repLTy t
@@ -2191,26 +2234,26 @@ repFun (MkC nm) (MkC b) = rep2 funDName [nm, b]
 
 repData :: Core TH.CxtQ -> Core TH.Name
         -> Either (Core [TH.TyVarBndrQ])
-                  (Core (Maybe [TH.TyVarBndrQ]), Core [TH.TypeQ])
+                  (Core (Maybe [TH.TyVarBndrQ]), Core TH.TypeQ)
         -> Core (Maybe TH.KindQ) -> Core [TH.ConQ] -> Core [TH.DerivClauseQ]
         -> DsM (Core TH.DecQ)
 repData (MkC cxt) (MkC nm) (Left (MkC tvs)) (MkC ksig) (MkC cons) (MkC derivs)
   = rep2 dataDName [cxt, nm, tvs, ksig, cons, derivs]
-repData (MkC cxt) (MkC nm) (Right (MkC mb_bndrs, MkC tys)) (MkC ksig)
-        (MkC cons) (MkC derivs)
-  = rep2 dataInstDName [cxt, nm, mb_bndrs, tys, ksig, cons, derivs]
+repData (MkC cxt) (MkC _) (Right (MkC mb_bndrs, MkC ty)) (MkC ksig) (MkC cons)
+        (MkC derivs)
+  = rep2 dataInstDName [cxt, mb_bndrs, ty, ksig, cons, derivs]
 
 repNewtype :: Core TH.CxtQ -> Core TH.Name
            -> Either (Core [TH.TyVarBndrQ])
-                     (Core (Maybe [TH.TyVarBndrQ]), Core [TH.TypeQ])
+                     (Core (Maybe [TH.TyVarBndrQ]), Core TH.TypeQ)
            -> Core (Maybe TH.KindQ) -> Core TH.ConQ -> Core [TH.DerivClauseQ]
            -> DsM (Core TH.DecQ)
 repNewtype (MkC cxt) (MkC nm) (Left (MkC tvs)) (MkC ksig) (MkC con)
            (MkC derivs)
   = rep2 newtypeDName [cxt, nm, tvs, ksig, con, derivs]
-repNewtype (MkC cxt) (MkC nm) (Right (MkC mb_bndrs, MkC tys)) (MkC ksig)
-           (MkC con) (MkC derivs)
-  = rep2 newtypeInstDName [cxt, nm, mb_bndrs, tys, ksig, con, derivs]
+repNewtype (MkC cxt) (MkC _) (Right (MkC mb_bndrs, MkC ty)) (MkC ksig) (MkC con)
+           (MkC derivs)
+  = rep2 newtypeInstDName [cxt, mb_bndrs, ty, ksig, con, derivs]
 
 repTySyn :: Core TH.Name -> Core [TH.TyVarBndrQ]
          -> Core TH.TypeQ -> DsM (Core TH.DecQ)
@@ -2309,9 +2352,9 @@ repPragRule (MkC nm) (MkC ty_bndrs) (MkC tm_bndrs) (MkC lhs) (MkC rhs) (MkC phas
 repPragAnn :: Core TH.AnnTarget -> Core TH.ExpQ -> DsM (Core TH.DecQ)
 repPragAnn (MkC targ) (MkC e) = rep2 pragAnnDName [targ, e]
 
-repTySynInst :: Core TH.Name -> Core TH.TySynEqnQ -> DsM (Core TH.DecQ)
-repTySynInst (MkC nm) (MkC eqn)
-    = rep2 tySynInstDName [nm, eqn]
+repTySynInst :: Core TH.TySynEqnQ -> DsM (Core TH.DecQ)
+repTySynInst (MkC eqn)
+    = rep2 tySynInstDName [eqn]
 
 repDataFamilyD :: Core TH.Name -> Core [TH.TyVarBndrQ]
                -> Core (Maybe TH.KindQ) -> DsM (Core TH.DecQ)
@@ -2336,7 +2379,7 @@ repClosedFamilyD (MkC nm) (MkC tvs) (MkC res) (MkC inj) (MkC eqns)
     = rep2 closedTypeFamilyDName [nm, tvs, res, inj, eqns]
 
 repTySynEqn :: Core (Maybe [TH.TyVarBndrQ]) ->
-               Core [TH.TypeQ] -> Core TH.TypeQ -> DsM (Core TH.TySynEqnQ)
+               Core TH.TypeQ -> Core TH.TypeQ -> DsM (Core TH.TySynEqnQ)
 repTySynEqn (MkC mb_bndrs) (MkC lhs) (MkC rhs)
   = rep2 tySynEqnName [mb_bndrs, lhs, rhs]
 
@@ -2429,6 +2472,9 @@ repTvar (MkC s) = rep2 varTName [s]
 repTapp :: Core TH.TypeQ -> Core TH.TypeQ -> DsM (Core TH.TypeQ)
 repTapp (MkC t1) (MkC t2) = rep2 appTName [t1, t2]
 
+repTappKind :: Core TH.TypeQ -> Core TH.KindQ -> DsM (Core TH.TypeQ)
+repTappKind (MkC ty) (MkC ki) = rep2 appKindTName [ty,ki]
+
 repTapps :: Core TH.TypeQ -> [Core TH.TypeQ] -> DsM (Core TH.TypeQ)
 repTapps f []     = return f
 repTapps f (t:ts) = do { f1 <- repTapp f t; repTapps f1 ts }
@@ -2466,6 +2512,10 @@ repTConstraint = rep2 constraintKName []
 
 repNamedTyCon :: Core TH.Name -> DsM (Core TH.TypeQ)
 repNamedTyCon (MkC s) = rep2 conTName [s]
+
+repTInfix :: Core TH.TypeQ -> Core TH.Name -> Core TH.TypeQ
+             -> DsM (Core TH.TypeQ)
+repTInfix (MkC t1) (MkC name) (MkC t2) = rep2 infixTName [t1,name,t2]
 
 repTupleTyCon :: Int -> DsM (Core TH.TypeQ)
 -- Note: not Core Int; it's easier to be direct here

@@ -1,0 +1,5 @@
+
+T15816.hs:8:1: error:
+    • Cannot apply function of kind ‘*’
+      to visible kind argument ‘Int’
+    • In the data instance declaration for ‘U’

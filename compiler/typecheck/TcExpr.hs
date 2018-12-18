@@ -1093,24 +1093,7 @@ arithSeqEltType (Just fl) res_ty
 ************************************************************************
 -}
 
-data HsArg tm ty
-  = HsValArg tm   -- Argument is an ordinary expression     (f arg)
-  | HsTypeArg  ty -- Argument is a visible type application (f @ty)
-  | HsArgPar SrcSpan -- See Note [HsArgPar]
-
-{-
-Note [HsArgPar]
-A HsArgPar indicates that everything to the left of this in the argument list is
-enclosed in parentheses together with the function itself. It is necessary so
-that we can recreate the parenthesis structure in the original source after
-typechecking the arguments.
-
-The SrcSpan is the span of the original HsPar
-
-((f arg1) arg2 arg3) results in an input argument list of
-[HsValArg arg1, HsArgPar span1, HsValArg arg2, HsValArg arg3, HsArgPar span2]
-
--}
+-- HsArg is defined in HsTypes.hs
 
 wrapHsArgs :: (NoGhcTc (GhcPass id) ~ GhcRn)
            => LHsExpr (GhcPass id)
@@ -1120,11 +1103,6 @@ wrapHsArgs f []                   = f
 wrapHsArgs f (HsValArg  a : args) = wrapHsArgs (mkHsApp f a)     args
 wrapHsArgs f (HsTypeArg t : args) = wrapHsArgs (mkHsAppType f t) args
 wrapHsArgs f (HsArgPar sp : args) = wrapHsArgs (L sp $ HsPar noExt f) args
-
-instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
-  ppr (HsValArg tm)  = text "HsValArg"  <+> ppr tm
-  ppr (HsTypeArg ty) = text "HsTypeArg" <+> ppr ty
-  ppr (HsArgPar sp)  = text "HsArgPar"  <+> ppr sp
 
 isHsValArg :: HsArg tm ty -> Bool
 isHsValArg (HsValArg {})  = True
@@ -1340,8 +1318,8 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
 
                     ; inner_ty <- zonkTcType inner_ty
                           -- See Note [Visible type application zonk]
-
                     ; let in_scope  = mkInScopeSet (tyCoVarsOfTypes [upsilon_ty, ty_arg])
+
                           insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
                                       -- NB: tv and ty_arg have the same kind, so this
                                       --     substitution is kind-respecting

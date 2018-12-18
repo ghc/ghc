@@ -1,24 +1,30 @@
 
 T14265.hs:7:12: error:
-    • Found type wildcard ‘_’ standing for ‘w :: k’
-      Where: ‘k’, ‘w’ are rigid type variables bound by
-               the inferred type of f :: proxy w -> ()
+    • Found type wildcard ‘_’ standing for ‘_ :: k’
+      Where: ‘k’, ‘_’ are rigid type variables bound by
+               the inferred type of f :: proxy _ -> ()
                at T14265.hs:8:1-8
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: f :: proxy _ -> ()
+    • In the first argument of ‘proxy’, namely ‘_’
+      In the type ‘proxy _ -> ()’
+      In the type signature: f :: proxy _ -> ()
 
 T14265.hs:10:15: error:
-    • Found type wildcard ‘_’ standing for ‘w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of foo :: StateT w w1 ()
+    • Found type wildcard ‘_’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of foo :: StateT _ _1 ()
                at T14265.hs:11:1-15
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: foo :: StateT _ _ ()
+    • In the first argument of ‘StateT’, namely ‘_’
+      In the type ‘StateT _ _ ()’
+      In the type signature: foo :: StateT _ _ ()
 
 T14265.hs:10:17: error:
-    • Found type wildcard ‘_’ standing for ‘w1 :: * -> *’
-      Where: ‘w1’ is a rigid type variable bound by
-               the inferred type of foo :: StateT w w1 ()
+    • Found type wildcard ‘_’ standing for ‘_1 :: * -> *’
+      Where: ‘_1’ is a rigid type variable bound by
+               the inferred type of foo :: StateT _ _1 ()
                at T14265.hs:11:1-15
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: foo :: StateT _ _ ()
+    • In the second argument of ‘StateT’, namely ‘_’
+      In the type ‘StateT _ _ ()’
+      In the type signature: foo :: StateT _ _ ()

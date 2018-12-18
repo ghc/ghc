@@ -916,6 +916,7 @@ type family XForAllTy        x
 type family XQualTy          x
 type family XTyVar           x
 type family XAppTy           x
+type family XAppKindTy       x
 type family XFunTy           x
 type family XListTy          x
 type family XTupleTy         x
@@ -942,6 +943,7 @@ type ForallXType (c :: * -> Constraint) (x :: *) =
        , c (XQualTy          x)
        , c (XTyVar           x)
        , c (XAppTy           x)
+       , c (XAppKindTy       x)
        , c (XFunTy           x)
        , c (XListTy          x)
        , c (XTupleTy         x)

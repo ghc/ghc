@@ -1,5 +1,5 @@
 
-T12845.hs:18:70: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T12845.hs:18:11: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘()’
     • In the type signature:
         broken :: forall r r' rngs.

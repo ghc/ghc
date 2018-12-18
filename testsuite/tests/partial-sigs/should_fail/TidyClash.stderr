@@ -1,16 +1,18 @@
 
 TidyClash.hs:8:19: error:
-    • Found type wildcard ‘_’ standing for ‘w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of bar :: w_ -> (w_, w -> w1)
+    • Found type wildcard ‘_’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of bar :: w_ -> (w_, _ -> _1)
                at TidyClash.hs:9:1-28
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: bar :: w_ -> (w_, _ -> _)
+    • In the type ‘w_ -> (w_, _ -> _)’
+      In the type signature: bar :: w_ -> (w_, _ -> _)
 
 TidyClash.hs:8:24: error:
-    • Found type wildcard ‘_’ standing for ‘w1’
-      Where: ‘w1’ is a rigid type variable bound by
-               the inferred type of bar :: w_ -> (w_, w -> w1)
+    • Found type wildcard ‘_’ standing for ‘_1’
+      Where: ‘_1’ is a rigid type variable bound by
+               the inferred type of bar :: w_ -> (w_, _ -> _1)
                at TidyClash.hs:9:1-28
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: bar :: w_ -> (w_, _ -> _)
+    • In the type ‘w_ -> (w_, _ -> _)’
+      In the type signature: bar :: w_ -> (w_, _ -> _)

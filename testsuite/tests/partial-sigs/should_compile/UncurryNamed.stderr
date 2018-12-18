@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  unc :: forall a b w. (a -> b -> w) -> (a, b) -> w
+  unc :: forall a b _. (a -> b -> _) -> (a, b) -> _
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

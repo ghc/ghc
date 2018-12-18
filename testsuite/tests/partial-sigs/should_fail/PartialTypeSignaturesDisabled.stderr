@@ -2,9 +2,11 @@
 PartialTypeSignaturesDisabled.hs:4:8: error:
     • Found type wildcard ‘_’ standing for ‘Bool’
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: foo :: _ -> _
+    • In the type ‘_ -> _’
+      In the type signature: foo :: _ -> _
 
 PartialTypeSignaturesDisabled.hs:4:13: error:
     • Found type wildcard ‘_’ standing for ‘Bool’
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: foo :: _ -> _
+    • In the type ‘_ -> _’
+      In the type signature: foo :: _ -> _

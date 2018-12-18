@@ -1,5 +1,10 @@
 
-TH_TyInstWhere2.hs:7:4: Warning:
+TH_TyInstWhere2.hs:8:4: warning:
     type family F_0 (a_1 :: k_2) (b_3 :: k_2) :: GHC.Types.Bool where
     F_0 a_4 a_4 = 'GHC.Types.True
     F_0 a_5 b_6 = 'GHC.Types.False
+
+TH_TyInstWhere2.hs:14:4: warning:
+    type family F1_0 (a_1 :: k_2) :: * where
+    F1_0 @* GHC.Types.Int = GHC.Types.Bool
+    F1_0 @GHC.Types.Bool 'GHC.Types.False = GHC.Types.Char

@@ -677,8 +677,15 @@ simplifyInfer :: TcLevel               -- Used when generating the constraints
 
 simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
   | isEmptyWC wanteds
-  = do { gbl_tvs <- tcGetGlobalTyCoVars
-       ; dep_vars <- candidateQTyVarsOfTypes (map snd name_taus)
+   = do { -- When quantifying, we want to preserve any order of variables as they
+          -- appear in partial signatures. cf. decideQuantifiedTyVars
+          let psig_tv_tys = [ mkTyVarTy tv | sig <- partial_sigs
+                                          , (_,tv) <- sig_inst_skols sig ]
+              psig_theta  = [ pred | sig <- partial_sigs
+                                   , pred <- sig_inst_theta sig ]
+
+       ; gbl_tvs <- tcGetGlobalTyCoVars
+       ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
        ; qtkvs <- quantifyTyVars gbl_tvs dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, emptyWC, False) }
@@ -692,8 +699,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
              , text "(unzonked) wanted =" <+> ppr wanteds
              ]
 
-       ; let partial_sigs = filter isPartialSig sigs
-             psig_theta   = concatMap sig_inst_theta partial_sigs
+       ; let psig_theta = concatMap sig_inst_theta partial_sigs
 
        -- First do full-blown solving
        -- NB: we must gather up all the bindings from doing
@@ -768,7 +774,8 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        ; return ( qtvs, bound_theta_vars, TcEvBinds ev_binds_var
                 , residual_wanted, definite_error ) }
          -- NB: bound_theta_vars must be fully zonked
-
+  where
+    partial_sigs = filter isPartialSig sigs
 
 --------------------
 mkResidualConstraints :: TcLevel -> Env TcGblEnv TcLclEnv -> EvBindsVar

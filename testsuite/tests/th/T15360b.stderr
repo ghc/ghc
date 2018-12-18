@@ -1,20 +1,20 @@
 
 T15360b.hs:10:14: error:
-    • Expected kind ‘* -> k4’, but ‘Type’ has kind ‘*’
+    • Expected kind ‘* -> k3’, but ‘Type’ has kind ‘*’
     • In the first argument of ‘Proxy’, namely ‘(Type Double)’
       In the type signature: x :: Proxy (Type Double)
 
 T15360b.hs:13:14: error:
-    • Expected kind ‘* -> k3’, but ‘1’ has kind ‘GHC.Types.Nat’
+    • Expected kind ‘* -> k2’, but ‘1’ has kind ‘GHC.Types.Nat’
     • In the first argument of ‘Proxy’, namely ‘(1 Int)’
       In the type signature: y :: Proxy (1 Int)
 
 T15360b.hs:16:14: error:
-    • Expected kind ‘* -> k2’, but ‘Constraint’ has kind ‘*’
+    • Expected kind ‘* -> k1’, but ‘Constraint’ has kind ‘*’
     • In the first argument of ‘Proxy’, namely ‘(Constraint Bool)’
       In the type signature: z :: Proxy (Constraint Bool)
 
 T15360b.hs:19:14: error:
-    • Expected kind ‘* -> k1’, but ‘'[]’ has kind ‘[k0]’
+    • Expected kind ‘* -> k0’, but ‘'[]’ has kind ‘[a0]’
     • In the first argument of ‘Proxy’, namely ‘('[] Int)’
       In the type signature: w :: Proxy ('[] Int)

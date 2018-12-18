@@ -1,11 +1,11 @@
 
 NamedExtraConstraintsWildcard.hs:5:1: error:
-    • Could not deduce: w0
-      from the context: (Eq a, w)
+    • Could not deduce: _0
+      from the context: (Eq a, _)
         bound by the inferred type for ‘foo’:
-                   forall a (w :: Constraint). (Eq a, w) => a -> a
+                   forall a (_ :: Constraint). (Eq a, _) => a -> a
         at NamedExtraConstraintsWildcard.hs:5:1-15
     • In the ambiguity check for the inferred type for ‘foo’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
-        foo :: forall a (w :: Constraint). (Eq a, w) => a -> a
+        foo :: forall a (_ :: Constraint). (Eq a, _) => a -> a

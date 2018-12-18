@@ -40,7 +40,7 @@ import Outputable
 import MonadUtils ( foldrM )
 
 import qualified Data.ByteString as BS
-import Control.Monad( unless, liftM, ap, (<=<) )
+import Control.Monad( unless, liftM, ap )
 
 import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
@@ -296,8 +296,8 @@ cvtDec (DataFamilyD tc tvs kind)
        ; returnJustL $ TyClD noExt $ FamDecl noExt $
          FamilyDecl noExt DataFamily tc' tvs' Prefix result Nothing }
 
-cvtDec (DataInstD ctxt tc bndrs tys ksig constrs derivs)
-  = do { (ctxt', tc', bndrs', typats') <- cvt_tyinst_hdr ctxt tc bndrs tys
+cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
+  = do { (ctxt', tc', bndrs', typats') <- cvt_datainst_hdr ctxt bndrs tys
        ; ksig' <- cvtKind `traverse` ksig
        ; cons' <- mapM cvtConstr constrs
        ; derivs' <- cvtDerivs derivs
@@ -317,8 +317,8 @@ cvtDec (DataInstD ctxt tc bndrs tys ksig constrs derivs)
                                   , feqn_rhs = defn
                                   , feqn_fixity = Prefix } }}}
 
-cvtDec (NewtypeInstD ctxt tc bndrs tys ksig constr derivs)
-  = do { (ctxt', tc', bndrs', typats') <- cvt_tyinst_hdr ctxt tc bndrs tys
+cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
+  = do { (ctxt', tc', bndrs', typats') <- cvt_datainst_hdr ctxt bndrs tys
        ; ksig' <- cvtKind `traverse` ksig
        ; con' <- cvtConstr constr
        ; derivs' <- cvtDerivs derivs
@@ -337,9 +337,8 @@ cvtDec (NewtypeInstD ctxt tc bndrs tys ksig constr derivs)
                                   , feqn_rhs = defn
                                   , feqn_fixity = Prefix } }}}
 
-cvtDec (TySynInstD tc eqn)
-  = do  { tc' <- tconNameL tc
-        ; (dL->L _ eqn') <- cvtTySynEqn tc' eqn
+cvtDec (TySynInstD eqn)
+  = do  { (dL->L _ eqn') <- cvtTySynEqn eqn
         ; returnJustL $ InstD noExt $ TyFamInstD
             { tfid_ext = noExt
             , tfid_inst = TyFamInstDecl { tfid_eqn = eqn' } } }
@@ -352,7 +351,7 @@ cvtDec (OpenTypeFamilyD head)
 
 cvtDec (ClosedTypeFamilyD head eqns)
   = do { (tc', tyvars', result', injectivity') <- cvt_tyfam_head head
-       ; eqns' <- mapM (cvtTySynEqn tc') eqns
+       ; eqns' <- mapM cvtTySynEqn eqns
        ; returnJustL $ TyClD noExt $ FamDecl noExt $
          FamilyDecl noExt (ClosedTypeFamily (Just eqns')) tc' tyvars' Prefix
                            result' injectivity' }
@@ -412,18 +411,35 @@ cvtDec (TH.ImplicitParamBindD _ _)
   = failWith (text "Implicit parameter binding only allowed in let or where")
 
 ----------------
-cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn GhcPs)
-cvtTySynEqn tc (TySynEqn mb_bndrs lhs rhs)
-  = do  { mb_bndrs' <- traverse (mapM cvt_tv) mb_bndrs
-        ; lhs' <- mapM (wrap_apps <=< cvtType) lhs
-        ; rhs' <- cvtType rhs
-        ; returnL $ mkHsImplicitBndrs
-                  $ FamEqn { feqn_ext    = noExt
-                           , feqn_tycon  = tc
-                           , feqn_bndrs  = mb_bndrs'
-                           , feqn_pats   = lhs'
-                           , feqn_fixity = Prefix
-                           , feqn_rhs    = rhs' } }
+cvtTySynEqn :: TySynEqn -> CvtM (LTyFamInstEqn GhcPs)
+cvtTySynEqn (TySynEqn mb_bndrs lhs rhs)
+  = do { mb_bndrs' <- traverse (mapM cvt_tv) mb_bndrs
+       ; (head_ty, args) <- split_ty_app lhs
+       ; case head_ty of
+           ConT nm -> do { nm' <- tconNameL nm
+                         ; rhs' <- cvtType rhs
+                         ; args' <- mapM wrap_tyargs args
+                         ; returnL $ mkHsImplicitBndrs
+                            $ FamEqn { feqn_ext    = noExt
+                                     , feqn_tycon  = nm'
+                                     , feqn_bndrs  = mb_bndrs'
+                                     , feqn_pats   = args'
+                                     , feqn_fixity = Prefix
+                                     , feqn_rhs    = rhs' } }
+           InfixT t1 nm t2 -> do { nm' <- tconNameL nm
+                                 ; args' <- mapM cvtType [t1,t2]
+                                 ; rhs' <- cvtType rhs
+                                 ; returnL $ mkHsImplicitBndrs
+                                      $ FamEqn { feqn_ext    = noExt
+                                               , feqn_tycon  = nm'
+                                               , feqn_bndrs  = mb_bndrs'
+                                               , feqn_pats   =
+                                                (map HsValArg args') ++ args
+                                               , feqn_fixity = Hs.Infix
+                                               , feqn_rhs    = rhs' } }
+           _ -> failWith $ text "Invalid type family instance LHS:"
+                          <+> text (show lhs)
+        }
 
 ----------------
 cvt_ci_decs :: MsgDoc -> [TH.Dec]
@@ -458,17 +474,25 @@ cvt_tycl_hdr cxt tc tvs
        ; return (cxt', tc', tvs')
        }
 
-cvt_tyinst_hdr :: TH.Cxt -> TH.Name -> Maybe [TH.TyVarBndr] -> [TH.Type]
+cvt_datainst_hdr :: TH.Cxt -> Maybe [TH.TyVarBndr] -> TH.Type
                -> CvtM ( LHsContext GhcPs
                        , Located RdrName
                        , Maybe [LHsTyVarBndr GhcPs]
                        , HsTyPats GhcPs)
-cvt_tyinst_hdr cxt tc bndrs tys
-  = do { cxt'   <- cvtContext cxt
-       ; tc'    <- tconNameL tc
+cvt_datainst_hdr cxt bndrs tys
+  = do { cxt' <- cvtContext cxt
        ; bndrs' <- traverse (mapM cvt_tv) bndrs
-       ; tys'   <- mapM (wrap_apps <=< cvtType) tys
-       ; return (cxt', tc', bndrs', tys') }
+       ; (head_ty, args) <- split_ty_app tys
+       ; case head_ty of
+          ConT nm -> do { nm' <- tconNameL nm
+                        ; args' <- mapM wrap_tyargs args
+                        ; return (cxt', nm', bndrs', args') }
+          InfixT t1 nm t2 -> do { nm' <- tconNameL nm
+                                ; args' <- mapM cvtType [t1,t2]
+                                ; return (cxt', nm', bndrs',
+                                         ((map HsValArg args') ++ args)) }
+          _ -> failWith $ text "Invalid type instance header:"
+                          <+> text (show tys) }
 
 ----------------
 cvt_tyfam_head :: TypeFamilyHead
@@ -1299,54 +1323,67 @@ cvtType = cvtTypeKind "type"
 cvtTypeKind :: String -> TH.Type -> CvtM (LHsType GhcPs)
 cvtTypeKind ty_str ty
   = do { (head_ty, tys') <- split_ty_app ty
+       ; let m_normals = mapM extract_normal tys'
+                                where extract_normal (HsValArg ty) = Just ty
+                                      extract_normal _ = Nothing
+
        ; case head_ty of
            TupleT n
-             | tys' `lengthIs` n         -- Saturated
-             -> if n==1 then return (head tys') -- Singleton tuples treated
-                                                -- like nothing (ie just parens)
-                        else returnL (HsTupleTy noExt
-                                                  HsBoxedOrConstraintTuple tys')
-             | n == 1
-             -> failWith (ptext (sLit ("Illegal 1-tuple " ++ ty_str ++ " constructor")))
-             | otherwise
-             -> mk_apps (HsTyVar noExt NotPromoted
-                               (noLoc (getRdrName (tupleTyCon Boxed n)))) tys'
+            | Just normals <- m_normals
+            , normals `lengthIs` n         -- Saturated
+               -> if n==1 then return (head normals) -- Singleton tuples treated
+                                                     -- like nothing (ie just parens)
+                          else returnL (HsTupleTy noExt
+                                        HsBoxedOrConstraintTuple normals)
+            | n == 1
+               -> failWith (ptext (sLit ("Illegal 1-tuple " ++ ty_str ++ " constructor")))
+            | otherwise
+            -> mk_apps
+               (HsTyVar noExt NotPromoted (noLoc (getRdrName (tupleTyCon Boxed n))))
+               tys'
            UnboxedTupleT n
-             | tys' `lengthIs` n         -- Saturated
-             -> returnL (HsTupleTy noExt HsUnboxedTuple tys')
+             | Just normals <- m_normals
+             , normals `lengthIs` n               -- Saturated
+             -> returnL (HsTupleTy noExt HsUnboxedTuple normals)
              | otherwise
-             -> mk_apps (HsTyVar noExt NotPromoted
-                             (noLoc (getRdrName (tupleTyCon Unboxed n)))) tys'
+             -> mk_apps
+                (HsTyVar noExt NotPromoted (noLoc (getRdrName (tupleTyCon Unboxed n))))
+                tys'
            UnboxedSumT n
              | n < 2
             -> failWith $
                    vcat [ text "Illegal sum arity:" <+> text (show n)
                         , nest 2 $
                             text "Sums must have an arity of at least 2" ]
-             | tys' `lengthIs` n -- Saturated
-             -> returnL (HsSumTy noExt tys')
+             | Just normals <- m_normals
+             , normals `lengthIs` n -- Saturated
+             -> returnL (HsSumTy noExt normals)
              | otherwise
-             -> mk_apps (HsTyVar noExt NotPromoted
-                                              (noLoc (getRdrName (sumTyCon n))))
-                        tys'
+             -> mk_apps
+                (HsTyVar noExt NotPromoted (noLoc (getRdrName (sumTyCon n))))
+                tys'
            ArrowT
-             | [x',y'] <- tys' -> do
+             | Just normals <- m_normals
+             , [x',y'] <- normals -> do
                  x'' <- case unLoc x' of
                           HsFunTy{}    -> returnL (HsParTy noExt x')
                           HsForAllTy{} -> returnL (HsParTy noExt x') -- #14646
                           HsQualTy{}   -> returnL (HsParTy noExt x') -- #15324
                           _            -> return x'
                  returnL (HsFunTy noExt x'' y')
-             | otherwise ->
-                  mk_apps (HsTyVar noExt NotPromoted
-                           (noLoc (getRdrName funTyCon)))
-                          tys'
+             | otherwise
+             -> mk_apps
+                (HsTyVar noExt NotPromoted (noLoc (getRdrName funTyCon)))
+                tys'
            ListT
-             | [x']    <- tys' -> returnL (HsListTy noExt x')
-             | otherwise ->
-                  mk_apps (HsTyVar noExt NotPromoted
-                           (noLoc (getRdrName listTyCon)))
-                           tys'
+             | Just normals <- m_normals
+             , [x'] <- normals -> do
+                returnL (HsListTy noExt x')
+             | otherwise
+             -> mk_apps
+                (HsTyVar noExt NotPromoted (noLoc (getRdrName listTyCon)))
+                tys'
+
            VarT nm -> do { nm' <- tNameL nm
                          ; mk_apps (HsTyVar noExt NotPromoted nm') tys' }
            ConT nm -> do { nm' <- tconName nm
@@ -1387,15 +1424,16 @@ cvtTypeKind ty_str ty
              -> do { s'  <- tconName s
                    ; t1' <- cvtType t1
                    ; t2' <- cvtType t2
-                   ; mk_apps (HsTyVar noExt NotPromoted (noLoc s'))
-                             (t1' : t2' : tys')
+                   ; mk_apps
+                      (HsTyVar noExt NotPromoted (noLoc s'))
+                      ([HsValArg t1', HsValArg t2'] ++ tys')
                    }
 
            UInfixT t1 s t2
              -> do { t2' <- cvtType t2
-                   ; t <- cvtOpAppT t1 s t2' -- Note [Converting UInfix]
+                   ; t <- cvtOpAppT t1 s t2'
                    ; mk_apps (unLoc t) tys'
-                   }
+                   } -- Note [Converting UInfix]
 
            ParensT t
              -> do { t' <- cvtType t
@@ -1403,45 +1441,48 @@ cvtTypeKind ty_str ty
                    }
 
            PromotedT nm -> do { nm' <- cName nm
-                              ; let hs_ty = HsTyVar noExt IsPromoted (noLoc nm')
-                              ; mk_apps hs_ty tys' }
+                              ; mk_apps (HsTyVar noExt IsPromoted (noLoc nm'))
+                                        tys' }
                  -- Promoted data constructor; hence cName
 
            PromotedTupleT n
-             | n == 1
-             -> failWith (ptext (sLit ("Illegal promoted 1-tuple " ++ ty_str)))
-             | m == n   -- Saturated
-             -> returnL (HsExplicitTupleTy noExt tys')
-             | otherwise
-             -> mk_apps (HsTyVar noExt IsPromoted
-                               (noLoc (getRdrName (tupleDataCon Boxed n)))) tys'
-             where
-               m = length tys'
+              | n == 1
+              -> failWith (ptext (sLit ("Illegal promoted 1-tuple " ++ ty_str)))
+              | Just normals <- m_normals
+              , normals `lengthIs` n   -- Saturated
+              -> returnL (HsExplicitTupleTy noExt normals)
+              | otherwise
+              -> mk_apps
+                 (HsTyVar noExt IsPromoted (noLoc (getRdrName (tupleDataCon Boxed n))))
+                 tys'
 
            PromotedNilT
              -> mk_apps (HsExplicitListTy noExt IsPromoted []) tys'
 
            PromotedConsT  -- See Note [Representing concrete syntax in types]
                           -- in Language.Haskell.TH.Syntax
-             | [ty1, dL->L _ (HsExplicitListTy _ ip tys2)] <- tys'
-             -> returnL (HsExplicitListTy noExt ip (ty1:tys2))
-             | otherwise
-             -> mk_apps (HsTyVar noExt IsPromoted
-                         (noLoc (getRdrName consDataCon)))
-                        tys'
+              | Just normals <- m_normals
+              , [ty1, dL->L _ (HsExplicitListTy _ ip tys2)] <- normals
+              -> do
+                  returnL (HsExplicitListTy noExt ip (ty1:tys2))
+              | otherwise
+              -> mk_apps
+                 (HsTyVar noExt IsPromoted (noLoc (getRdrName consDataCon)))
+                 tys'
 
            StarT
-             -> mk_apps (HsTyVar noExt NotPromoted
-                              (noLoc (getRdrName liftedTypeKindTyCon)))
-                        tys'
+             -> mk_apps
+                (HsTyVar noExt NotPromoted (noLoc (getRdrName liftedTypeKindTyCon)))
+                tys'
 
            ConstraintT
-             -> mk_apps (HsTyVar noExt NotPromoted
-                              (noLoc (getRdrName constraintKindTyCon)))
-                        tys'
+             -> mk_apps
+                (HsTyVar noExt NotPromoted (noLoc (getRdrName constraintKindTyCon)))
+                tys'
 
            EqualityT
-             | [x',y'] <- tys' ->
+             | Just normals <- m_normals
+             , [x',y'] <- normals ->
                    let px = parenthesizeHsType opPrec x'
                        py = parenthesizeHsType opPrec y'
                    in returnL (HsOpTy noExt px (noLoc eqTyCon_RDR) py)
@@ -1462,21 +1503,35 @@ cvtTypeKind ty_str ty
     }
 
 -- | Constructs an application of a type to arguments passed in a list.
-mk_apps :: HsType GhcPs -> [LHsType GhcPs] -> CvtM (LHsType GhcPs)
+mk_apps :: HsType GhcPs -> [LHsTypeArg GhcPs] -> CvtM (LHsType GhcPs)
 mk_apps head_ty []       = returnL head_ty
-mk_apps head_ty (ty:tys) =
+mk_apps head_ty (arg:args) =
   do { head_ty' <- returnL head_ty
-     ; p_ty      <- add_parens ty
-     ; mk_apps (HsAppTy noExt head_ty' p_ty) tys }
-  where
+     ; case arg of
+       HsValArg ty  -> do { p_ty      <- add_parens ty
+                          ; mk_apps (HsAppTy noExt head_ty' p_ty) args }
+       HsTypeArg ki -> do { p_ki      <- add_parens ki
+                          ; mk_apps (HsAppKindTy noExt head_ty' p_ki) args }
+       HsArgPar _   -> mk_apps (HsParTy noExt head_ty') args
+     }
+   where
     -- See Note [Adding parens for splices]
     add_parens lt@(dL->L _ t)
       | hsTypeNeedsParens appPrec t = returnL (HsParTy noExt lt)
       | otherwise                   = return lt
 
+-- See Note [Adding parens for splices]
 wrap_apps  :: LHsType GhcPs -> CvtM (LHsType GhcPs)
-wrap_apps t@(dL->L _ HsAppTy {}) = returnL (HsParTy noExt t)
-wrap_apps t                      = return t
+wrap_apps t@(dL->L _ HsAppTy {})     = returnL (HsParTy noExt t)
+wrap_apps t@(dL->L _ HsAppKindTy {}) = returnL (HsParTy noExt t)
+wrap_apps t                          = return t
+
+wrap_tyargs :: LHsTypeArg GhcPs -> CvtM (LHsTypeArg GhcPs)
+wrap_tyargs (HsValArg ty) = do { ty' <- wrap_apps ty
+                                  ; return $ HsValArg ty'}
+wrap_tyargs (HsTypeArg ki) = do { ki' <- wrap_apps ki
+                               ; return $ HsTypeArg ki'}
+wrap_tyargs argPar = return argPar
 
 -- ---------------------------------------------------------------------
 -- Note [Adding parens for splices]
@@ -1508,10 +1563,12 @@ mk_arr_apps tys return_ty = foldrM go return_ty tys >>= returnL
           go arg ret_ty = do { ret_ty_l <- returnL ret_ty
                              ; return (HsFunTy noExt arg ret_ty_l) }
 
-split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsType GhcPs])
+split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsTypeArg GhcPs])
 split_ty_app ty = go ty []
   where
-    go (AppT f a) as' = do { a' <- cvtType a; go f (a':as') }
+    go (AppT f a) as' = do { a' <- cvtType a; go f (HsValArg a':as') }
+    go (AppKindT ty ki) as' = do { ki' <- cvtKind ki; go ty (HsTypeArg ki':as') }
+    go (ParensT t) as' = do { loc <- getL; go t (HsArgPar loc: as') }
     go f as           = return (f,as)
 
 cvtTyLit :: TH.TyLit -> HsTyLit

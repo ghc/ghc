@@ -1,4 +1,4 @@
 
-SuperCls.hs:4:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+SuperCls.hs:4:6: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘()’
     • In the type signature: f :: (Ord a, _) => a -> Bool

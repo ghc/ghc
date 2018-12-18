@@ -3,7 +3,8 @@ T10615.hs:4:7: error:
     • Found type wildcard ‘_’ standing for ‘a1’
       Where: ‘a1’ is an ambiguous type variable
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: f1 :: _ -> f
+    • In the type ‘_ -> f’
+      In the type signature: f1 :: _ -> f
 
 T10615.hs:5:6: error:
     • Couldn't match type ‘f’ with ‘b1 -> a1’
@@ -20,7 +21,8 @@ T10615.hs:7:7: error:
     • Found type wildcard ‘_’ standing for ‘a0’
       Where: ‘a0’ is an ambiguous type variable
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: f2 :: _ -> _f
+    • In the type ‘_ -> _f’
+      In the type signature: f2 :: _ -> _f
 
 T10615.hs:8:6: error:
     • Couldn't match type ‘_f’ with ‘b0 -> a0’

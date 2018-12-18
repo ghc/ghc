@@ -1402,8 +1402,9 @@ reifyAxBranch fam_tc (CoAxBranch { cab_tvs = tvs
        ; lhs' <- reifyTypes lhs_types_only
        ; annot_th_lhs <- zipWith3M annotThType (mkIsPolyTvs fam_tvs)
                                    lhs_types_only lhs'
+       ; let lhs_type = mkThAppTs (TH.ConT $ reifyName fam_tc) annot_th_lhs
        ; rhs'  <- reifyType rhs
-       ; return (TH.TySynEqn tvs' annot_th_lhs rhs') }
+       ; return (TH.TySynEqn tvs' lhs_type rhs') }
   where
     fam_tvs = tyConVisibleTyVars fam_tc
 
@@ -1617,7 +1618,8 @@ reifyClass cls
 
     reifyDefImpl :: TH.Name -> [TH.Name] -> Type -> TcM TH.Dec
     reifyDefImpl n args ty =
-      TH.TySynInstD n . TH.TySynEqn Nothing (map TH.VarT args) <$> reifyType ty
+      TH.TySynInstD . TH.TySynEqn Nothing (mkThAppTs (TH.ConT n) (map TH.VarT args))
+                                  <$> reifyType ty
 
     tfNames :: TH.Dec -> (TH.Name, [TH.Name])
     tfNames (TH.OpenTypeFamilyD (TH.TypeFamilyHead n args _ _))
@@ -1708,9 +1710,9 @@ reifyFamilyInstance is_poly_tvs (FamInst { fi_flavor = flavor
            ; th_lhs <- reifyTypes lhs_types_only
            ; annot_th_lhs <- zipWith3M annotThType is_poly_tvs lhs_types_only
                                                    th_lhs
+           ; let lhs_type = mkThAppTs (TH.ConT $ reifyName fam) annot_th_lhs
            ; th_rhs <- reifyType rhs
-           ; return (TH.TySynInstD (reifyName fam)
-                                   (TH.TySynEqn th_tvs annot_th_lhs th_rhs)) }
+           ; return (TH.TySynInstD (TH.TySynEqn th_tvs lhs_type th_rhs)) }
 
       DataFamilyInst rep_tc ->
         do { let -- eta-expand lhs types, because sometimes data/newtype
@@ -1725,10 +1727,11 @@ reifyFamilyInstance is_poly_tvs (FamInst { fi_flavor = flavor
            ; let types_only = filterOutInvisibleTypes fam_tc ee_lhs
            ; th_tys <- reifyTypes types_only
            ; annot_th_tys <- zipWith3M annotThType is_poly_tvs types_only th_tys
+           ; let lhs_type = mkThAppTs (TH.ConT fam') annot_th_tys
            ; return $
                if isNewTyCon rep_tc
-               then TH.NewtypeInstD [] fam' th_tvs annot_th_tys Nothing (head cons) []
-               else TH.DataInstD    [] fam' th_tvs annot_th_tys Nothing       cons  []
+               then TH.NewtypeInstD [] th_tvs lhs_type Nothing (head cons) []
+               else TH.DataInstD    [] th_tvs lhs_type Nothing       cons  []
            }
 
 ------------------------------

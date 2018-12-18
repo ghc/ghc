@@ -1,12 +1,12 @@
 
 NamedWildcardsNotInMonotype.hs:5:1: error:
-    • Could not deduce (Eq w0)
-      from the context: (Show a, Eq w, Eq a)
+    • Could not deduce (Eq _0)
+      from the context: (Show a, Eq _, Eq a)
         bound by the inferred type for ‘foo’:
-                   forall a w. (Show a, Eq w, Eq a) => a -> a -> String
+                   forall a _. (Show a, Eq _, Eq a) => a -> a -> String
         at NamedWildcardsNotInMonotype.hs:5:1-33
-      The type variable ‘w0’ is ambiguous
+      The type variable ‘_0’ is ambiguous
     • In the ambiguity check for the inferred type for ‘foo’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
-        foo :: forall a w. (Show a, Eq w, Eq a) => a -> a -> String
+        foo :: forall a _. (Show a, Eq _, Eq a) => a -> a -> String

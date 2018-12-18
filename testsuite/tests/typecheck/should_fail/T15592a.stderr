@@ -1,0 +1,8 @@
+
+T15592a.hs:8:22: error:
+    • Cannot apply function of kind ‘Proxy j
+                                     -> Proxy k -> k2 -> Constraint’
+      to visible kind argument ‘j’
+    • In the type signature:
+        meth1 :: forall z. D @j @k a b z => z -> Proxy '(a, b)
+      In the class declaration for ‘D’

@@ -1,3 +1,3 @@
 deferEither @(_ ~ _)
-  :: (Typeable w1, Typeable w2) =>
-     proxy (w1 ~ w2) -> ((w1 ~ w2) => r) -> Either String r
+  :: (Typeable _1, Typeable _2) =>
+     proxy (_1 ~ _2) -> ((_1 ~ _2) => r) -> Either String r

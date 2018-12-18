@@ -13,7 +13,8 @@ T10999.hs:5:17: error:
                the inferred type of f :: Ord a => () -> Set.Set a
                at T10999.hs:6:1-28
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: f :: _ => () -> _
+    • In the type ‘() -> _’
+      In the type signature: f :: _ => () -> _
 
 T10999.hs:8:28: error:
     • Ambiguous type variable ‘b0’ arising from a use of ‘f’

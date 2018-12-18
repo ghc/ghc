@@ -249,8 +249,52 @@ completeSigFromId ctxt id
 
 isCompleteHsSig :: LHsSigWcType GhcRn -> Bool
 -- ^ If there are no wildcards, return a LHsSigType
-isCompleteHsSig (HsWC { hswc_ext = wcs }) = null wcs
+isCompleteHsSig (HsWC { hswc_ext  = wcs
+                      , hswc_body = HsIB { hsib_body = hs_ty } })
+   = null wcs && no_anon_wc hs_ty
+isCompleteHsSig (HsWC _ (XHsImplicitBndrs _)) = panic "isCompleteHsSig"
 isCompleteHsSig (XHsWildCardBndrs _) = panic "isCompleteHsSig"
+
+no_anon_wc :: LHsType GhcRn -> Bool
+no_anon_wc lty = go lty
+  where
+    go (L _ ty) = case ty of
+      HsWildCardTy _                 -> False
+      HsAppTy _ ty1 ty2              -> go ty1 && go ty2
+      HsAppKindTy _ ty ki            -> go ty && go ki
+      HsFunTy _ ty1 ty2              -> go ty1 && go ty2
+      HsListTy _ ty                  -> go ty
+      HsTupleTy _ _ tys              -> gos tys
+      HsSumTy _ tys                  -> gos tys
+      HsOpTy _ ty1 _ ty2             -> go ty1 && go ty2
+      HsParTy _ ty                   -> go ty
+      HsIParamTy _ _ ty              -> go ty
+      HsKindSig _ ty kind            -> go ty && go kind
+      HsDocTy _ ty _                 -> go ty
+      HsBangTy _ _ ty                -> go ty
+      HsRecTy _ flds                 -> gos $ map (cd_fld_type . unLoc) flds
+      HsExplicitListTy _ _ tys       -> gos tys
+      HsExplicitTupleTy _ tys        -> gos tys
+      HsForAllTy { hst_bndrs = bndrs
+                 , hst_body = ty } -> no_anon_wc_bndrs bndrs
+                                        && go ty
+      HsQualTy { hst_ctxt = L _ ctxt
+               , hst_body = ty }  -> gos ctxt && go ty
+      HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)) -> go $ L noSrcSpan ty
+      HsSpliceTy{} -> True
+      HsTyLit{} -> True
+      HsTyVar{} -> True
+      HsStarTy{} -> True
+      XHsType{} -> True      -- Core type, which does not have any wildcard
+
+    gos = all go
+
+no_anon_wc_bndrs :: [LHsTyVarBndr GhcRn] -> Bool
+no_anon_wc_bndrs ltvs = all (go . unLoc) ltvs
+  where
+    go (UserTyVar _ _)      = True
+    go (KindedTyVar _ _ ki) = no_anon_wc ki
+    go (XTyVarBndr{})       = panic "no_anon_wc_bndrs"
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

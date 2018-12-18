@@ -91,7 +91,7 @@ import GhcPrelude
 import qualified GHC.LanguageExtensions as LangExt
 }
 
-%expect 236 -- shift/reduce conflicts
+%expect 237 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -134,13 +134,13 @@ state 60 contains 1 shift/reduce conflict.
 
 -------------------------------------------------------------------------------
 
-state 61 contains 46 shift/reduce conflicts.
+state 61 contains 47 shift/reduce conflicts.
 
     *** btype -> tyapps .
         tyapps -> tyapps . tyapp
 
-    Conflicts: '_' ':' '~' '!' '.' '`' '{' '[' '[:' '(' '(#' '`' SIMPLEQUOTE
-      VARID CONID VARSYM CONSYM QCONID QVARSYM QCONSYM
+    Conflicts: '_' ':' '~' '!' '.' '`' '{' '[' '[:' '(' '(#' '`' TYPEAPP
+      SIMPLEQUOTE VARID CONID VARSYM CONSYM QCONID QVARSYM QCONSYM
       STRING INTEGER TH_ID_SPLICE '$(' TH_QUASIQUOTE TH_QQUASIQUOTE
       and all the special ids.
 
@@ -1990,6 +1990,7 @@ tyapps :: { [Located TyEl] } -- NB: This list is reversed
 
 tyapp :: { Located TyEl }
         : atype                         { sL1 $1 $ TyElOpd (unLoc $1) }
+        | TYPEAPP atype                 { sLL $1 $> $ (TyElKindApp (getLoc $1) $2) }
         | qtyconop                      { sL1 $1 $ TyElOpr (unLoc $1) }
         | tyvarop                       { sL1 $1 $ TyElOpr (unLoc $1) }
         | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
@@ -2554,17 +2555,16 @@ infixexp :: { LHsExpr GhcPs }
                  -- AnnVal annotation for NPlusKPat, which discards the operator
 
 infixexp_top :: { LHsExpr GhcPs }
-        : exp10_top               { $1 }
-        | infixexp_top qop exp10_top
-                                  {% do { when (srcSpanEnd (getLoc $2)
-                                            == srcSpanStart (getLoc $3)
-                                            && checkIfBang $2) $
-                                            warnSpaceAfterBang (comb2 $2 $3);
-                                          ams (sLL $1 $> (OpApp noExt $1 $2 $3))
-                                               [mj AnnVal $2]
-                                        }
-                                  }
-
+            : exp10_top               { $1 }
+            | infixexp_top qop exp10_top
+                                      {% do { when (srcSpanEnd (getLoc $2)
+                                                == srcSpanStart (getLoc $3)
+                                                && checkIfBang $2) $
+                                                warnSpaceAfterBang (comb2 $2 $3);
+                                              ams (sLL $1 $> (OpApp noExt $1 $2 $3))
+                                                   [mj AnnVal $2]
+                                            }
+                                      }
 
 exp10_top :: { LHsExpr GhcPs }
         : '-' fexp                      {% ams (sLL $1 $> $ NegApp noExt $2 noSyntaxExpr)

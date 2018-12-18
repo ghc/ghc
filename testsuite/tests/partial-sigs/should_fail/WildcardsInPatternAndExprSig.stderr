@@ -1,34 +1,34 @@
 
 WildcardsInPatternAndExprSig.hs:4:18: error:
-    • Found type wildcard ‘_a’ standing for ‘w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of bar :: Maybe [w] -> w -> [w]
+    • Found type wildcard ‘_a’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of bar :: Maybe [_] -> _ -> [_]
                at WildcardsInPatternAndExprSig.hs:4:1-68
       To use the inferred type, enable PartialTypeSignatures
     • In a pattern type signature: _a
       In the pattern: x :: _a
       In the pattern: [x :: _a]
     • Relevant bindings include
-        bar :: Maybe [w] -> w -> [w]
+        bar :: Maybe [_] -> _ -> [_]
           (bound at WildcardsInPatternAndExprSig.hs:4:1)
 
 WildcardsInPatternAndExprSig.hs:4:25: error:
-    • Found type wildcard ‘_’ standing for ‘[w]’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of bar :: Maybe [w] -> w -> [w]
+    • Found type wildcard ‘_’ standing for ‘[_]’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of bar :: Maybe [_] -> _ -> [_]
                at WildcardsInPatternAndExprSig.hs:4:1-68
       To use the inferred type, enable PartialTypeSignatures
     • In a pattern type signature: _
       In the pattern: [x :: _a] :: _
       In the pattern: Just ([x :: _a] :: _)
     • Relevant bindings include
-        bar :: Maybe [w] -> w -> [w]
+        bar :: Maybe [_] -> _ -> [_]
           (bound at WildcardsInPatternAndExprSig.hs:4:1)
 
 WildcardsInPatternAndExprSig.hs:4:38: error:
-    • Found type wildcard ‘_b’ standing for ‘w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of bar :: Maybe [w] -> w -> [w]
+    • Found type wildcard ‘_b’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of bar :: Maybe [_] -> _ -> [_]
                at WildcardsInPatternAndExprSig.hs:4:1-68
       To use the inferred type, enable PartialTypeSignatures
     • In a pattern type signature: Maybe [_b]
@@ -37,13 +37,13 @@ WildcardsInPatternAndExprSig.hs:4:38: error:
           bar (Just ([x :: _a] :: _) :: Maybe [_b]) (z :: _c)
             = [x, z] :: [_d]
     • Relevant bindings include
-        bar :: Maybe [w] -> w -> [w]
+        bar :: Maybe [_] -> _ -> [_]
           (bound at WildcardsInPatternAndExprSig.hs:4:1)
 
 WildcardsInPatternAndExprSig.hs:4:49: error:
-    • Found type wildcard ‘_c’ standing for ‘w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of bar :: Maybe [w] -> w -> [w]
+    • Found type wildcard ‘_c’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of bar :: Maybe [_] -> _ -> [_]
                at WildcardsInPatternAndExprSig.hs:4:1-68
       To use the inferred type, enable PartialTypeSignatures
     • In a pattern type signature: _c
@@ -52,14 +52,14 @@ WildcardsInPatternAndExprSig.hs:4:49: error:
           bar (Just ([x :: _a] :: _) :: Maybe [_b]) (z :: _c)
             = [x, z] :: [_d]
     • Relevant bindings include
-        x :: w (bound at WildcardsInPatternAndExprSig.hs:4:13)
-        bar :: Maybe [w] -> w -> [w]
+        x :: _ (bound at WildcardsInPatternAndExprSig.hs:4:13)
+        bar :: Maybe [_] -> _ -> [_]
           (bound at WildcardsInPatternAndExprSig.hs:4:1)
 
 WildcardsInPatternAndExprSig.hs:4:66: error:
-    • Found type wildcard ‘_d’ standing for ‘w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of bar :: Maybe [w] -> w -> [w]
+    • Found type wildcard ‘_d’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of bar :: Maybe [_] -> _ -> [_]
                at WildcardsInPatternAndExprSig.hs:4:1-68
       To use the inferred type, enable PartialTypeSignatures
     • In an expression type signature: [_d]
@@ -68,7 +68,7 @@ WildcardsInPatternAndExprSig.hs:4:66: error:
           bar (Just ([x :: _a] :: _) :: Maybe [_b]) (z :: _c)
             = [x, z] :: [_d]
     • Relevant bindings include
-        z :: w (bound at WildcardsInPatternAndExprSig.hs:4:44)
-        x :: w (bound at WildcardsInPatternAndExprSig.hs:4:13)
-        bar :: Maybe [w] -> w -> [w]
+        z :: _ (bound at WildcardsInPatternAndExprSig.hs:4:44)
+        x :: _ (bound at WildcardsInPatternAndExprSig.hs:4:13)
+        bar :: Maybe [_] -> _ -> [_]
           (bound at WildcardsInPatternAndExprSig.hs:4:1)

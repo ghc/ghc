@@ -1,0 +1,6 @@
+
+T15797.hs:26:9: error:
+    • Expecting two more arguments to ‘EQ @ob’
+      Expected a type, but ‘EQ @ob’ has kind ‘ob -> ob -> *’
+    • In the first argument of ‘Ríki’, namely ‘(EQ @ob)’
+      In the instance declaration for ‘Ríki (EQ @ob)’

@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, TypeFamilies, PolyKinds #-}
+{-# LANGUAGE TemplateHaskell, TypeFamilies, PolyKinds, TypeApplications #-}
 
 module ClosedFam2 where
 
@@ -12,12 +12,12 @@ $( return [ ClosedTypeFamilyD
                 ( TyVarSig (KindedTV (mkName "r") (VarT (mkName "k"))))
                 Nothing)
               [ TySynEqn Nothing
-                         [ (VarT (mkName "a"))
-                         , (VarT (mkName "a")) ]
+                         (AppT (AppT (ConT (mkName "Equals")) (VarT (mkName "a")))
+                               (VarT (mkName "a")))
                          (ConT (mkName "Int"))
               , TySynEqn Nothing
-                         [ (VarT (mkName "a"))
-                         , (VarT (mkName "b")) ]
+                         (AppT (AppT (ConT (mkName "Equals")) (VarT (mkName "a")))
+                               (VarT (mkName "b")))
                          (ConT (mkName "Bool")) ] ])
 
 a :: Equals b b
@@ -25,3 +25,25 @@ a = (5 :: Int)
 
 b :: Equals Int Bool
 b = False
+
+$( return [ ClosedTypeFamilyD
+               (TypeFamilyHead
+                (mkName "Foo")
+                [ KindedTV (mkName "a") (VarT (mkName "k"))]
+                (KindSig StarT ) Nothing )
+                [ TySynEqn Nothing
+                           (AppT (AppKindT (ConT (mkName "Foo")) StarT)
+                                 (VarT (mkName "a")))
+                           (ConT (mkName "Int"))
+                , TySynEqn Nothing
+                           (AppT (AppKindT (ConT (mkName "Foo")) (AppT (AppT ArrowT StarT) (StarT)))
+                                 (VarT (mkName "a")))
+                           (ConT (mkName "Bool")) ] ])
+c :: Foo Int
+c = 5
+
+d :: Foo Bool
+d = 6
+
+e :: Foo Maybe
+e = False

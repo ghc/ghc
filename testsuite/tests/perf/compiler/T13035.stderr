@@ -1,4 +1,6 @@
 
 T13035.hs:144:28: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘'[ 'Author] :: [Fields]’
-    • In the type signature: g :: MyRec RecipeFormatter _
+    • In the second argument of ‘MyRec’, namely ‘_’
+      In the type ‘MyRec RecipeFormatter _’
+      In the type signature: g :: MyRec RecipeFormatter _

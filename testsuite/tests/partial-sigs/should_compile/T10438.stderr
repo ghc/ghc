@@ -2,7 +2,8 @@
 T10438.hs:7:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘p2’
       Where: ‘p2’ is a rigid type variable bound by
-               the inferred type of g :: p2 -> p2 at T10438.hs:(6,9)-(8,21)
+               the inferred type of g :: p2 -> p2
+               at T10438.hs:(6,9)-(8,21)
     • In the type signature: x :: _
       In an equation for ‘g’:
           g r

@@ -1,5 +1,5 @@
 
-T11016.hs:5:19: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T11016.hs:5:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘()’
     • In the type signature: f1 :: (?x :: Int, _) => Int
 

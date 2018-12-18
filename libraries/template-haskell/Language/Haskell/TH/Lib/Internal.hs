@@ -491,35 +491,35 @@ pragLineD line file = return $ PragmaD $ LineP line file
 pragCompleteD :: [Name] -> Maybe Name -> DecQ
 pragCompleteD cls mty = return $ PragmaD $ CompleteP cls mty
 
-dataInstD :: CxtQ -> Name -> (Maybe [TyVarBndrQ]) -> [TypeQ] -> Maybe KindQ
-          -> [ConQ] -> [DerivClauseQ] -> DecQ
-dataInstD ctxt tc mb_bndrs tys ksig cons derivs =
+dataInstD :: CxtQ -> (Maybe [TyVarBndrQ]) -> TypeQ -> Maybe KindQ -> [ConQ]
+          -> [DerivClauseQ] -> DecQ
+dataInstD ctxt mb_bndrs ty ksig cons derivs =
   do
-    ctxt1     <- ctxt
+    ctxt1   <- ctxt
     mb_bndrs1 <- traverse sequence mb_bndrs
-    tys1      <- sequenceA tys
-    ksig1     <- sequenceA ksig
-    cons1     <- sequenceA cons
-    derivs1   <- sequenceA derivs
-    return (DataInstD ctxt1 tc mb_bndrs1 tys1 ksig1 cons1 derivs1)
+    ty1    <- ty
+    ksig1   <- sequenceA ksig
+    cons1   <- sequenceA cons
+    derivs1 <- sequenceA derivs
+    return (DataInstD ctxt1 mb_bndrs1 ty1 ksig1 cons1 derivs1)
 
-newtypeInstD :: CxtQ -> Name -> (Maybe [TyVarBndrQ]) -> [TypeQ] -> Maybe KindQ
-             -> ConQ -> [DerivClauseQ] -> DecQ
-newtypeInstD ctxt tc mb_bndrs tys ksig con derivs =
+newtypeInstD :: CxtQ -> (Maybe [TyVarBndrQ]) -> TypeQ -> Maybe KindQ -> ConQ
+             -> [DerivClauseQ] -> DecQ
+newtypeInstD ctxt mb_bndrs ty ksig con derivs =
   do
-    ctxt1     <- ctxt
+    ctxt1   <- ctxt
     mb_bndrs1 <- traverse sequence mb_bndrs
-    tys1      <- sequenceA tys
-    ksig1     <- sequenceA ksig
-    con1      <- con
-    derivs1   <- sequence derivs
-    return (NewtypeInstD ctxt1 tc mb_bndrs1 tys1 ksig1 con1 derivs1)
+    ty1    <- ty
+    ksig1   <- sequenceA ksig
+    con1    <- con
+    derivs1 <- sequence derivs
+    return (NewtypeInstD ctxt1 mb_bndrs1 ty1 ksig1 con1 derivs1)
 
-tySynInstD :: Name -> TySynEqnQ -> DecQ
-tySynInstD tc eqn =
+tySynInstD :: TySynEqnQ -> DecQ
+tySynInstD eqn =
   do
     eqn1 <- eqn
-    return (TySynInstD tc eqn1)
+    return (TySynInstD eqn1)
 
 dataFamilyD :: Name -> [TyVarBndrQ] -> Maybe KindQ -> DecQ
 dataFamilyD tc tvs kind =
@@ -584,11 +584,11 @@ implicitParamBindD n e =
     e' <- e
     return $ ImplicitParamBindD n e'
 
-tySynEqn :: (Maybe [TyVarBndrQ]) -> [TypeQ] -> TypeQ -> TySynEqnQ
+tySynEqn :: (Maybe [TyVarBndrQ]) -> TypeQ -> TypeQ -> TySynEqnQ
 tySynEqn mb_bndrs lhs rhs =
   do
     mb_bndrs1 <- traverse sequence mb_bndrs
-    lhs1 <- sequence lhs
+    lhs1 <- lhs
     rhs1 <- rhs
     return (TySynEqn mb_bndrs1 lhs1 rhs1)
 
@@ -671,6 +671,12 @@ appT t1 t2 = do
            t1' <- t1
            t2' <- t2
            return $ AppT t1' t2'
+
+appKindT :: TypeQ -> KindQ -> TypeQ
+appKindT ty ki = do
+               ty' <- ty
+               ki' <- ki
+               return $ AppKindT ty' ki'
 
 arrowT :: TypeQ
 arrowT = return ArrowT
