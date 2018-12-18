@@ -647,12 +647,23 @@ commaSepApplied :: [Name] -> Doc
 commaSepApplied = commaSepWith (pprName' Applied)
 
 pprForall :: [TyVarBndr] -> Cxt -> Doc
-pprForall tvs cxt
+pprForall = pprForall' ForallInvis
+
+pprForallVis :: [TyVarBndr] -> Cxt -> Doc
+pprForallVis = pprForall' ForallVis
+
+pprForall' :: ForallVisFlag -> [TyVarBndr] -> Cxt -> Doc
+pprForall' fvf tvs cxt
   -- even in the case without any tvs, there could be a non-empty
   -- context cxt (e.g., in the case of pattern synonyms, where there
   -- are multiple forall binders and contexts).
   | [] <- tvs = pprCxt cxt
-  | otherwise = text "forall" <+> hsep (map ppr tvs) <+> char '.' <+> pprCxt cxt
+  | otherwise = text "forall" <+> hsep (map ppr tvs)
+                              <+> separator <+> pprCxt cxt
+  where
+    separator = case fvf of
+                  ForallVis   -> text "->"
+                  ForallInvis -> char '.'
 
 pprRecFields :: [(Name, Strict, Type)] -> Type -> Doc
 pprRecFields vsts ty
@@ -750,6 +761,7 @@ pprParendType tuple | (TupleT n, args) <- split tuple
 pprParendType (ImplicitParamT n t)= text ('?':n) <+> text "::" <+> ppr t
 pprParendType EqualityT           = text "(~)"
 pprParendType t@(ForallT {})      = parens (ppr t)
+pprParendType t@(ForallVisT {})   = parens (ppr t)
 pprParendType t@(AppT {})         = parens (ppr t)
 pprParendType t@(AppKindT {})     = parens (ppr t)
 
@@ -759,6 +771,7 @@ pprUInfixT t               = ppr t
 
 instance Ppr Type where
     ppr (ForallT tvars ctxt ty) = sep [pprForall tvars ctxt, ppr ty]
+    ppr (ForallVisT tvars ty)   = sep [pprForallVis tvars [], ppr ty]
     ppr ty = pprTyApp (split ty)
        -- Works, in a degnerate way, for SigT, and puts parens round (ty :: kind)
        -- See Note [Pretty-printing kind signatures]
@@ -791,9 +804,14 @@ pprTyApp (fun, args) = pprParendType fun <+> sep (map pprParendTypeArg args)
 pprFunArgType :: Type -> Doc    -- Should really use a precedence argument
 -- Everything except forall and (->) binds more tightly than (->)
 pprFunArgType ty@(ForallT {})                 = parens (ppr ty)
+pprFunArgType ty@(ForallVisT {})              = parens (ppr ty)
 pprFunArgType ty@((ArrowT `AppT` _) `AppT` _) = parens (ppr ty)
 pprFunArgType ty@(SigT _ _)                   = parens (ppr ty)
 pprFunArgType ty                              = ppr ty
+
+data ForallVisFlag = ForallVis   -- forall a -> {...}
+                   | ForallInvis -- forall a.   {...}
+  deriving Show
 
 data TypeArg = TANormal Type
              | TyArg Kind

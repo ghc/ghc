@@ -9170,6 +9170,8 @@ GHC reports an error, saying that the kind of ``a`` should be a kind variable
 restricted to be ``Type``. The function definition is then rejected for being
 more specific than its type signature.
 
+.. _explicit-kind-quantification:
+
 Explicit kind quantification
 ----------------------------
 
@@ -9252,6 +9254,53 @@ Closed type family instances are subject to the same rules: ::
 
   type family F :: Maybe (Maybe k) where
     F @k = 'Just ('Nothing :: Maybe k) -- accepted
+
+Kind variables can also be quantified in *visible* positions. Consider the
+following two examples: ::
+
+  data ProxyKInvis (a :: k)
+  data ProxyKVis k (a :: k)
+
+In the first example, the kind variable ``k`` is an *invisible* argument to
+``ProxyKInvis``. In other words, a user does not need to instantiate ``k``
+explicitly, as kind inference automatically determines what ``k`` should be.
+For instance, in ``ProxyKInvis True``, ``k`` is inferred to be ``Bool``.
+This is reflected in the kind of ``ProxyKInvis``: ::
+
+  ProxyKInvis :: forall k. k -> Type
+
+In the second example, ``k`` is a *visible* argument to ``ProxyKVis``. That is
+to say, ``k`` is an argument that users must provide explicitly when applying
+``ProxyKVis``. For example, ``ProxyKVis Bool True`` is a well formed type.
+
+What is the kind of ``ProxyKVis``? One might say
+``forall k. Type -> k -> Type``, but this isn't quite right, since this would
+allow incorrect things like ``ProxyKVis Bool Int``, which should be rejected
+due to the fact that ``Int`` is not of kind ``Bool``. The key observation is that
+the kind of the second argument *depend* on the first argument. GHC indicates
+this dependency in the syntax that it gives for the kind of ``ProxyKVis``: ::
+
+  ProxyKVis :: forall k -> k -> Type
+
+This kind is similar to the kind of ``ProxyKInvis``, but with a key difference:
+the type variables quantified by the ``forall`` are followed by an arrow
+(``->``), not a dot (``.``). This is a visible, dependent quantifier. It is
+visible in that it the user must pass in a type for ``k`` explicitly, and it is
+dependent in the sense that ``k`` appears later in the kind of ``ProxyKVis``.
+As a counterpart, the ``k`` binder in ``forall k. k -> Type`` can be thought
+of as an *invisible*, dependent quantifier.
+
+GHC permits writing kinds with this syntax, provided that the
+``ExplicitForAll`` and ``PolyKinds`` language extensions are enabled. Just
+like the invisible ``forall``, one can put explicit kind signatures on visibly
+bound kind variables, so the following is syntactically valid: ::
+
+  ProxyKVis :: forall (k :: Type) -> k -> Type
+
+Currently, the ability to write visible, dependent quantifiers is limited to
+kinds. Consequently, visible dependent quantifiers are rejected in any context
+that is unambiguously the type of a term. They are also rejected in the types
+of data constructors.
 
 Kind-indexed GADTs
 ------------------
