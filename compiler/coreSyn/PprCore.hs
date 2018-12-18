@@ -62,10 +62,10 @@ pprCoreBindingsWithSize = pprTopBinds sizeAnn
 pprCoreBindingWithSize = pprTopBind sizeAnn
 
 instance OutputableBndr b => Outputable (Bind b) where
-    ppr bind = ppr_bind noAnn bind
+    ppr = ppr_bind noAnn
 
 instance OutputableBndr b => Outputable (Expr b) where
-    ppr expr = pprCoreExpr expr
+    ppr = pprCoreExpr
 
 {-
 ************************************************************************

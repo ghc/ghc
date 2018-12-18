@@ -1,6 +1,4 @@
 {-# LANGUAGE Safe #-}
-{-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -41,7 +39,7 @@ import Data.Maybe
 --
 -- is safe; it never loses any of the resource.
 --
-data QSemN = QSemN !(MVar (Int, [(Int, MVar ())], [(Int, MVar ())]))
+newtype QSemN = QSemN (MVar (Int, [(Int, MVar ())], [(Int, MVar ())]))
 
 -- The semaphore state (i, xs, ys):
 --

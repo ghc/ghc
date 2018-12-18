@@ -2,3 +2,7 @@
 <interactive>:1:1: error:
     Not in scope: ‘System.IO.hPutStrLn’
     No module named ‘System.IO’ is imported.
+
+<interactive>:1:1: error:
+    Not in scope: ‘System.IO.hPutStrLn’
+    No module named ‘System.IO’ is imported.

@@ -21,7 +21,7 @@ if [ ! -e $toolchain/bin/ghc ]; then
 fi
 
 if [ ! -e $toolchain/bin/cabal ]; then
-    cabal_tarball="https://www.haskell.org/cabal/release/cabal-install-2.2.0.0/cabal-install-2.2.0.0-x86_64-apple-darwin-sierra.tar.gz"
+    cabal_tarball="https://downloads.haskell.org/~cabal/cabal-install-latest/cabal-install-2.4.1.0-x86_64-apple-darwin-sierra.tar.xz"
     curl $cabal_tarball | tar -xz
     mv cabal $toolchain/bin
 fi

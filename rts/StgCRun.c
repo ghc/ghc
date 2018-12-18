@@ -405,9 +405,13 @@ StgRunIsImplementedInAssembler(void)
         "movq %%xmm15,136(%%rax)\n\t"
 #endif
 
+#if !defined(darwin_HOST_OS)
         /*
          * Let the unwinder know where we saved the registers
          * See Note [Unwinding foreign exports on x86-64].
+         *
+         * N.B. We don't support unwinding on Darwin due to
+         * various toolchain insanity.
          */
         ".cfi_def_cfa rsp, 0\n\t"
         ".cfi_offset rbx, %c2\n\t"
@@ -440,6 +444,7 @@ StgRunIsImplementedInAssembler(void)
 #error "RSP_DELTA too big"
 #endif
           "\n\t"
+#endif /* !defined(darwin_HOST_OS) */
 
         /*
          * Set BaseReg
@@ -512,8 +517,10 @@ StgRunIsImplementedInAssembler(void)
           "i"(RESERVED_C_STACK_BYTES + 32 /* r14 relative to cfa (rsp) */),
           "i"(RESERVED_C_STACK_BYTES + 40 /* r15 relative to cfa (rsp) */),
           "i"(RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE
-            /* rip relative to cfa */),
-          "i"((RSP_DELTA & 127) | (128 * ((RSP_DELTA >> 7) > 0)))
+              /* rip relative to cfa */)
+
+#if !defined(darwin_HOST_OS)
+          , "i"((RSP_DELTA & 127) | (128 * ((RSP_DELTA >> 7) > 0)))
             /* signed LEB128-encoded delta from rsp - byte 1 */
 #if (RSP_DELTA >> 7) > 0
           , "i"(((RSP_DELTA >> 7) & 127) | (128 * ((RSP_DELTA >> 14) > 0)))
@@ -530,6 +537,9 @@ StgRunIsImplementedInAssembler(void)
             /* signed LEB128-encoded delta from rsp - byte 4 */
 #endif
 #undef RSP_DELTA
+
+#endif /* !defined(darwin_HOST_OS) */
+
         );
         /*
          * See Note [Stack Alignment on X86]

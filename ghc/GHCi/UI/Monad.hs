@@ -458,15 +458,16 @@ mkEvalWrapper progname args =
     "(System.Environment.withArgs " ++ show args ++ " m)"
 
 compileGHCiExpr :: GhcMonad m => String -> m ForeignHValue
-compileGHCiExpr expr = do
-  hsc_env <- getSession
-  let dflags = hsc_dflags hsc_env
-      -- RebindableSyntax can wreak havoc with GHCi in several ways
-      -- (see #13385 and #14342 for examples), so we take care to disable it
-      -- for the duration of running expressions that are internal to GHCi.
-      no_rb_hsc_env =
-        hsc_env { hsc_dflags = xopt_unset dflags LangExt.RebindableSyntax }
-  setSession no_rb_hsc_env
-  res <- GHC.compileExprRemote expr
-  setSession hsc_env
-  pure res
+compileGHCiExpr expr =
+  withTempSession mkTempSession $ GHC.compileExprRemote expr
+  where
+    mkTempSession hsc_env = hsc_env
+      { hsc_dflags = (hsc_dflags hsc_env)
+          -- RebindableSyntax can wreak havoc with GHCi in several ways
+          -- (see #13385 and #14342 for examples), so we take care to disable it
+          -- for the duration of running expressions that are internal to GHCi.
+          `xopt_unset` LangExt.RebindableSyntax
+          -- We heavily depend on -fimplicit-import-qualified to compile expr
+          -- with fully qualified names without imports.
+          `gopt_set` Opt_ImplicitImportQualified
+      }

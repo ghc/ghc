@@ -104,7 +104,6 @@ aliases:
 
 jobs:
   "validate-x86_64-freebsd":
-    resource_class: xlarge
     docker:
       - image: ghcci/x86_64-freebsd
     environment:
@@ -155,7 +154,6 @@ jobs:
       - *push_perf_note
 
   "validate-x86_64-linux-deb8":
-    resource_class: xlarge
     docker:
       - image: ghcci/x86_64-linux-deb8:0.1
     environment:
@@ -178,7 +176,6 @@ jobs:
       - *push_perf_note
 
   "validate-x86_64-linux-deb9-integer-simple":
-    resource_class: xlarge
     docker:
       - image: ghcci/x86_64-linux-deb9:0.2
     environment:
@@ -201,7 +198,6 @@ jobs:
       - *push_perf_note
 
   "validate-x86_64-linux-deb9":
-    resource_class: xlarge
     docker:
       - image: ghcci/x86_64-linux-deb9:0.1
     environment:
@@ -224,7 +220,6 @@ jobs:
       - *push_perf_note
 
   "validate-hadrian-x86_64-linux-deb8":
-    resource_class: xlarge
     docker:
       - image: ghcci/x86_64-linux-deb8:0.1
     environment:
@@ -239,7 +234,6 @@ jobs:
       - *build_hadrian
 
   "validate-x86_64-linux-deb8-unreg":
-    resource_class: xlarge
     docker:
       - image: ghcci/x86_64-linux-deb8:0.1
     environment:
@@ -259,7 +253,6 @@ jobs:
       - *store_test_artifacts
 
   "validate-x86_64-linux-deb8-llvm":
-    resource_class: xlarge
     docker:
       - image: ghcci/x86_64-linux-deb8:0.1
     environment:
@@ -288,7 +281,6 @@ jobs:
 
   # Nightly build with -DDEBUG using devel2 flavour
   "validate-x86_64-linux-deb8-debug":
-    resource_class: xlarge
     docker:
       - image: ghcci/x86_64-linux-deb8:0.1
     environment:
@@ -310,7 +302,6 @@ jobs:
       - *push_perf_note
 
   "validate-i386-linux-deb9":
-    resource_class: xlarge
     docker:
       - image: ghcci/i386-linux-deb9:0.2
     environment:
@@ -333,7 +324,6 @@ jobs:
       - *push_perf_note
 
   "validate-i386-linux-deb8":
-    resource_class: xlarge
     docker:
       - image: ghcci/i386-linux-deb8:0.1
     environment:
@@ -356,7 +346,6 @@ jobs:
       - *push_perf_note
 
   "validate-x86_64-linux-centos7":
-    resource_class: xlarge
     docker:
       - image: ghcci/x86_64-linux-centos7:0.1
     environment:
@@ -382,7 +371,6 @@ jobs:
       - *push_perf_note
 
   "validate-x86_64-linux-fedora27":
-    resource_class: xlarge
     docker:
       - image: ghcci/x86_64-linux-fedora27:0.1
     environment:
@@ -405,7 +393,6 @@ jobs:
       - *push_perf_note
 
   "slow-validate-x86_64-linux-deb8":
-    resource_class: xlarge
     docker:
       - image: ghcci/x86_64-linux-deb8:0.1
     environment:

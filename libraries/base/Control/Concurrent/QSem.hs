@@ -1,6 +1,5 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -39,7 +38,7 @@ import Data.Maybe
 --
 -- is safe; it never loses a unit of the resource.
 --
-data QSem = QSem !(MVar (Int, [MVar ()], [MVar ()]))
+newtype QSem = QSem (MVar (Int, [MVar ()], [MVar ()]))
 
 -- The semaphore state (i, xs, ys):
 --

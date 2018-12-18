@@ -1,2 +1,5 @@
+:t System.IO.hPutStrLn
+:set -fimplicit-import-qualified
+:t System.IO.hPutStrLn
 :set -fno-implicit-import-qualified
 :t System.IO.hPutStrLn
