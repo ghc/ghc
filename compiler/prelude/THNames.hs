@@ -96,9 +96,9 @@ templateHaskellNames = [
     -- PatSynArgs (for pattern synonyms)
     prefixPatSynName, infixPatSynName, recordPatSynName,
     -- Type
-    forallTName, varTName, conTName, infixTName, appTName, appKindTName,
-    equalityTName, tupleTName, unboxedTupleTName, unboxedSumTName,
-    arrowTName, listTName, sigTName, litTName,
+    forallTName, forallVisTName, varTName, conTName, infixTName, appTName,
+    appKindTName, equalityTName, tupleTName, unboxedTupleTName,
+    unboxedSumTName, arrowTName, listTName, sigTName, litTName,
     promotedTName, promotedTupleTName, promotedNilTName, promotedConsTName,
     wildCardTName, implicitParamTName,
     -- TyLit
@@ -429,12 +429,13 @@ infixPatSynName  = libFun (fsLit "infixPatSyn")  infixPatSynIdKey
 recordPatSynName = libFun (fsLit "recordPatSyn") recordPatSynIdKey
 
 -- data Type = ...
-forallTName, varTName, conTName, infixTName, tupleTName, unboxedTupleTName,
-    unboxedSumTName, arrowTName, listTName, appTName, appKindTName,
-    sigTName, equalityTName, litTName, promotedTName,
+forallTName, forallVisTName, varTName, conTName, infixTName, tupleTName,
+    unboxedTupleTName, unboxedSumTName, arrowTName, listTName, appTName,
+    appKindTName, sigTName, equalityTName, litTName, promotedTName,
     promotedTupleTName, promotedNilTName, promotedConsTName,
     wildCardTName, implicitParamTName :: Name
 forallTName         = libFun (fsLit "forallT")        forallTIdKey
+forallVisTName      = libFun (fsLit "forallVisT")     forallVisTIdKey
 varTName            = libFun (fsLit "varT")           varTIdKey
 conTName            = libFun (fsLit "conT")           conTIdKey
 tupleTName          = libFun (fsLit "tupleT")         tupleTIdKey
@@ -950,79 +951,80 @@ infixPatSynIdKey  = mkPreludeMiscIdUnique 381
 recordPatSynIdKey = mkPreludeMiscIdUnique 382
 
 -- data Type = ...
-forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey,
-    unboxedSumTIdKey, arrowTIdKey, listTIdKey, appTIdKey, appKindTIdKey,
-    sigTIdKey, equalityTIdKey, litTIdKey, promotedTIdKey,
+forallTIdKey, forallVisTIdKey, varTIdKey, conTIdKey, tupleTIdKey,
+    unboxedTupleTIdKey, unboxedSumTIdKey, arrowTIdKey, listTIdKey, appTIdKey,
+    appKindTIdKey, sigTIdKey, equalityTIdKey, litTIdKey, promotedTIdKey,
     promotedTupleTIdKey, promotedNilTIdKey, promotedConsTIdKey,
     wildCardTIdKey, implicitParamTIdKey, infixTIdKey :: Unique
 forallTIdKey        = mkPreludeMiscIdUnique 390
-varTIdKey           = mkPreludeMiscIdUnique 391
-conTIdKey           = mkPreludeMiscIdUnique 392
-tupleTIdKey         = mkPreludeMiscIdUnique 393
-unboxedTupleTIdKey  = mkPreludeMiscIdUnique 394
-unboxedSumTIdKey    = mkPreludeMiscIdUnique 395
-arrowTIdKey         = mkPreludeMiscIdUnique 396
-listTIdKey          = mkPreludeMiscIdUnique 397
-appTIdKey           = mkPreludeMiscIdUnique 398
-appKindTIdKey       = mkPreludeMiscIdUnique 399
-sigTIdKey           = mkPreludeMiscIdUnique 400
-equalityTIdKey      = mkPreludeMiscIdUnique 401
-litTIdKey           = mkPreludeMiscIdUnique 402
-promotedTIdKey      = mkPreludeMiscIdUnique 403
-promotedTupleTIdKey = mkPreludeMiscIdUnique 404
-promotedNilTIdKey   = mkPreludeMiscIdUnique 405
-promotedConsTIdKey  = mkPreludeMiscIdUnique 406
-wildCardTIdKey      = mkPreludeMiscIdUnique 407
-implicitParamTIdKey = mkPreludeMiscIdUnique 408
-infixTIdKey         = mkPreludeMiscIdUnique 409
+forallVisTIdKey     = mkPreludeMiscIdUnique 391
+varTIdKey           = mkPreludeMiscIdUnique 392
+conTIdKey           = mkPreludeMiscIdUnique 393
+tupleTIdKey         = mkPreludeMiscIdUnique 394
+unboxedTupleTIdKey  = mkPreludeMiscIdUnique 395
+unboxedSumTIdKey    = mkPreludeMiscIdUnique 396
+arrowTIdKey         = mkPreludeMiscIdUnique 397
+listTIdKey          = mkPreludeMiscIdUnique 398
+appTIdKey           = mkPreludeMiscIdUnique 399
+appKindTIdKey       = mkPreludeMiscIdUnique 400
+sigTIdKey           = mkPreludeMiscIdUnique 401
+equalityTIdKey      = mkPreludeMiscIdUnique 402
+litTIdKey           = mkPreludeMiscIdUnique 403
+promotedTIdKey      = mkPreludeMiscIdUnique 404
+promotedTupleTIdKey = mkPreludeMiscIdUnique 405
+promotedNilTIdKey   = mkPreludeMiscIdUnique 406
+promotedConsTIdKey  = mkPreludeMiscIdUnique 407
+wildCardTIdKey      = mkPreludeMiscIdUnique 408
+implicitParamTIdKey = mkPreludeMiscIdUnique 409
+infixTIdKey         = mkPreludeMiscIdUnique 410
 
 -- data TyLit = ...
 numTyLitIdKey, strTyLitIdKey :: Unique
-numTyLitIdKey = mkPreludeMiscIdUnique 410
-strTyLitIdKey = mkPreludeMiscIdUnique 411
+numTyLitIdKey = mkPreludeMiscIdUnique 411
+strTyLitIdKey = mkPreludeMiscIdUnique 412
 
 -- data TyVarBndr = ...
 plainTVIdKey, kindedTVIdKey :: Unique
-plainTVIdKey       = mkPreludeMiscIdUnique 412
-kindedTVIdKey      = mkPreludeMiscIdUnique 413
+plainTVIdKey       = mkPreludeMiscIdUnique 413
+kindedTVIdKey      = mkPreludeMiscIdUnique 414
 
 -- data Role = ...
 nominalRIdKey, representationalRIdKey, phantomRIdKey, inferRIdKey :: Unique
-nominalRIdKey          = mkPreludeMiscIdUnique 414
-representationalRIdKey = mkPreludeMiscIdUnique 415
-phantomRIdKey          = mkPreludeMiscIdUnique 416
-inferRIdKey            = mkPreludeMiscIdUnique 417
+nominalRIdKey          = mkPreludeMiscIdUnique 415
+representationalRIdKey = mkPreludeMiscIdUnique 416
+phantomRIdKey          = mkPreludeMiscIdUnique 417
+inferRIdKey            = mkPreludeMiscIdUnique 418
 
 -- data Kind = ...
 varKIdKey, conKIdKey, tupleKIdKey, arrowKIdKey, listKIdKey, appKIdKey,
   starKIdKey, constraintKIdKey :: Unique
-varKIdKey         = mkPreludeMiscIdUnique 418
-conKIdKey         = mkPreludeMiscIdUnique 419
-tupleKIdKey       = mkPreludeMiscIdUnique 420
-arrowKIdKey       = mkPreludeMiscIdUnique 421
-listKIdKey        = mkPreludeMiscIdUnique 422
-appKIdKey         = mkPreludeMiscIdUnique 423
-starKIdKey        = mkPreludeMiscIdUnique 424
-constraintKIdKey  = mkPreludeMiscIdUnique 425
+varKIdKey         = mkPreludeMiscIdUnique 419
+conKIdKey         = mkPreludeMiscIdUnique 420
+tupleKIdKey       = mkPreludeMiscIdUnique 421
+arrowKIdKey       = mkPreludeMiscIdUnique 422
+listKIdKey        = mkPreludeMiscIdUnique 423
+appKIdKey         = mkPreludeMiscIdUnique 424
+starKIdKey        = mkPreludeMiscIdUnique 425
+constraintKIdKey  = mkPreludeMiscIdUnique 426
 
 -- data FamilyResultSig = ...
 noSigIdKey, kindSigIdKey, tyVarSigIdKey :: Unique
-noSigIdKey        = mkPreludeMiscIdUnique 426
-kindSigIdKey      = mkPreludeMiscIdUnique 427
-tyVarSigIdKey     = mkPreludeMiscIdUnique 428
+noSigIdKey        = mkPreludeMiscIdUnique 427
+kindSigIdKey      = mkPreludeMiscIdUnique 428
+tyVarSigIdKey     = mkPreludeMiscIdUnique 429
 
 -- data InjectivityAnn = ...
 injectivityAnnIdKey :: Unique
-injectivityAnnIdKey = mkPreludeMiscIdUnique 429
+injectivityAnnIdKey = mkPreludeMiscIdUnique 430
 
 -- data Callconv = ...
 cCallIdKey, stdCallIdKey, cApiCallIdKey, primCallIdKey,
   javaScriptCallIdKey :: Unique
-cCallIdKey          = mkPreludeMiscIdUnique 430
-stdCallIdKey        = mkPreludeMiscIdUnique 431
-cApiCallIdKey       = mkPreludeMiscIdUnique 432
-primCallIdKey       = mkPreludeMiscIdUnique 433
-javaScriptCallIdKey = mkPreludeMiscIdUnique 434
+cCallIdKey          = mkPreludeMiscIdUnique 431
+stdCallIdKey        = mkPreludeMiscIdUnique 432
+cApiCallIdKey       = mkPreludeMiscIdUnique 433
+primCallIdKey       = mkPreludeMiscIdUnique 434
+javaScriptCallIdKey = mkPreludeMiscIdUnique 435
 
 -- data Safety = ...
 unsafeIdKey, safeIdKey, interruptibleIdKey :: Unique

@@ -666,14 +666,18 @@ tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
   = tc_fun_type mode ty1 ty2 exp_kind
 
 --------- Foralls
-tc_hs_type mode forall@(HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind
+tc_hs_type mode forall@(HsForAllTy { hst_fvf = fvf, hst_bndrs = hs_tvs
+                                   , hst_body = ty }) exp_kind
   = do { (tclvl, wanted, (tvs', ty'))
             <- pushLevelAndCaptureConstraints $
                bindExplicitTKBndrs_Skol hs_tvs $
                tc_lhs_type mode ty exp_kind
     -- Do not kind-generalise here!  See Note [Kind generalisation]
     -- Why exp_kind?  See Note [Body kind of HsForAllTy]
-       ; let bndrs       = mkTyVarBinders Specified tvs'
+       ; let argf        = case fvf of
+                             ForallVis   -> Required
+                             ForallInvis -> Specified
+             bndrs       = mkTyVarBinders argf tvs'
              skol_info   = ForAllSkol (ppr forall)
              m_telescope = Just (sep (map ppr hs_tvs))
 

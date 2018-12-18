@@ -646,6 +646,9 @@ forallT tvars ctxt ty = do
     ty1    <- ty
     return $ ForallT tvars1 ctxt1 ty1
 
+forallVisT :: [TyVarBndrQ] -> TypeQ -> TypeQ
+forallVisT tvars ty = ForallVisT <$> sequenceA tvars <*> ty
+
 varT :: Name -> TypeQ
 varT = return . VarT
 
