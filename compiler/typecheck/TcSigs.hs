@@ -366,8 +366,8 @@ tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
 tcPatSynSig name sig_ty
   | HsIB { hsib_ext = implicit_hs_tvs
          , hsib_body = hs_ty }  <- sig_ty
-  , (univ_hs_tvs, hs_req,  hs_ty1)     <- splitLHsSigmaTy hs_ty
-  , (ex_hs_tvs,   hs_prov, hs_body_ty) <- splitLHsSigmaTy hs_ty1
+  , (univ_hs_tvs, hs_req,  hs_ty1)     <- splitLHsSigmaTyInvis hs_ty
+  , (ex_hs_tvs,   hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
   = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
        ; (implicit_tvs, (univ_tvs, (ex_tvs, (req, prov, body_ty))))
            <- pushTcLevelM_   $
