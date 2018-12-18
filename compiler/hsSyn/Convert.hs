@@ -1405,10 +1405,17 @@ cvtTypeKind ty_str ty
                    ; let pcxt = parenthesizeHsContext funPrec cxt'
                    ; ty'  <- cvtType ty
                    ; loc <- getL
-                   ; let hs_ty  = mkHsForAllTy tvs loc tvs' rho_ty
+                   ; let hs_ty  = mkHsForAllTy tvs loc ForallInvis tvs' rho_ty
                          rho_ty = mkHsQualTy cxt loc pcxt ty'
 
                    ; return hs_ty }
+
+           ForallVisT tvs ty
+             | null tys'
+             -> do { tvs' <- cvtTvs tvs
+                   ; ty'  <- cvtType ty
+                   ; loc  <- getL
+                   ; pure $ mkHsForAllTy tvs loc ForallVis tvs' ty' }
 
            SigT ty ki
              -> do { ty' <- cvtType ty
@@ -1638,7 +1645,8 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                ; univs' <- hsQTvExplicit <$> cvtTvs univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
                                ; let forTy = HsForAllTy
-                                              { hst_bndrs = univs'
+                                              { hst_fvf = ForallInvis
+                                              , hst_bndrs = univs'
                                               , hst_xforall = noExt
                                               , hst_body = cL l cxtTy }
                                      cxtTy = HsQualTy { hst_ctxt = cL l []
@@ -1692,15 +1700,19 @@ mkHsForAllTy :: [TH.TyVarBndr]
              -> SrcSpan
              -- ^ The location of the returned 'LHsType' if it needs an
              --   explicit forall
+             -> ForallVisFlag
+             -- ^ Whether this is @forall@ is visible (e.g., @forall a ->@)
+             --   or invisible (e.g., @forall a.@)
              -> LHsQTyVars GhcPs
              -- ^ The converted type variable binders
              -> LHsType GhcPs
              -- ^ The converted rho type
              -> LHsType GhcPs
              -- ^ The complete type, quantified with a forall if necessary
-mkHsForAllTy tvs loc tvs' rho_ty
+mkHsForAllTy tvs loc fvf tvs' rho_ty
   | null tvs  = rho_ty
-  | otherwise = cL loc $ HsForAllTy { hst_bndrs = hsQTvExplicit tvs'
+  | otherwise = cL loc $ HsForAllTy { hst_fvf = fvf
+                                    , hst_bndrs = hsQTvExplicit tvs'
                                     , hst_xforall = noExt
                                     , hst_body = rho_ty }
 

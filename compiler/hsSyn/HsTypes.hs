@@ -19,7 +19,7 @@ HsTypes: Abstract syntax: user-defined types
 
 module HsTypes (
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
-        HsTyVarBndr(..), LHsTyVarBndr,
+        HsTyVarBndr(..), LHsTyVarBndr, ForallVisFlag(..),
         LHsQTyVars(..), HsQTvsRn(..),
         HsImplicitBndrs(..),
         HsWildCardBndrs(..),
@@ -56,7 +56,8 @@ module HsTypes (
         hsLTyVarName, hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
-        splitLHsForAllTy, splitLHsQualTy, splitLHsSigmaTy,
+        splitLHsForAllTy, splitLHsForAllTyInvis,
+        splitLHsQualTy, splitLHsSigmaTy, splitLHsSigmaTyInvis,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType,
@@ -142,12 +143,17 @@ is a bit complicated.  Here's how it works.
 
 * In a HsType,
      HsForAllTy   represents an /explicit, user-written/ 'forall'
-                   e.g.   forall a b. ...
+                   e.g.   forall a b.   {...} or
+                          forall a b -> {...}
      HsQualTy     represents an /explicit, user-written/ context
                    e.g.   (Eq a, Show a) => ...
                   The context can be empty if that's what the user wrote
   These constructors represent what the user wrote, no more
   and no less.
+
+* The ForallVisFlag field of HsForAllTy represents whether a forall is
+  invisible (e.g., forall a b. {...}, with a dot) or visible
+  (e.g., forall a b -> {...}, with an arrow).
 
 * HsTyVarBndr describes a quantified type variable written by the
   user.  For example
@@ -512,8 +518,10 @@ hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvExplicit
 -- | Haskell Type
 data HsType pass
   = HsForAllTy   -- See Note [HsType binders]
-      { hst_xforall :: XForAllTy pass,
-        hst_bndrs   :: [LHsTyVarBndr pass]
+      { hst_xforall :: XForAllTy pass
+      , hst_fvf     :: ForallVisFlag -- Is this `forall a -> {...}` or
+                                     --         `forall a. {...}`?
+      , hst_bndrs   :: [LHsTyVarBndr pass]
                                        -- Explicit, user-supplied 'forall a b c'
       , hst_body    :: LHsType pass      -- body type
       }
@@ -1145,9 +1153,9 @@ splitLHsPatSynTy :: LHsType pass
                     , LHsType pass)          -- body type
 splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
   where
-    (univs, ty1) = splitLHsForAllTy ty
+    (univs, ty1) = splitLHsForAllTyInvis ty
     (reqs,  ty2) = splitLHsQualTy ty1
-    (exis,  ty3) = splitLHsForAllTy ty2
+    (exis,  ty3) = splitLHsForAllTyInvis ty2
     (provs, ty4) = splitLHsQualTy ty3
 
 splitLHsSigmaTy :: LHsType pass
@@ -1157,10 +1165,42 @@ splitLHsSigmaTy ty
   , (ctxt, ty2) <- splitLHsQualTy ty1
   = (tvs, ctxt, ty2)
 
+-- | Like 'splitLHsSigmaTy', but only splits type variable binders that were
+-- quantified invisibly (e.g., @forall a.@, with a dot).
+splitLHsSigmaTyInvis :: LHsType pass
+                     -> ([LHsTyVarBndr pass], LHsContext pass, LHsType pass)
+splitLHsSigmaTyInvis = splitLHsSigmaTySameVis ForallInvis
+
+-- | Like 'splitLHsSigmaTy', but only splits type variable binders that match
+-- the visibility of the supplied 'ForallVisFlag'.
+splitLHsSigmaTySameVis :: ForallVisFlag -> LHsType pass
+                       -> ([LHsTyVarBndr pass], LHsContext pass, LHsType pass)
+splitLHsSigmaTySameVis fvf ty
+  | (tvs, ty1)  <- splitLHsForAllTySameVis fvf ty
+  , (ctxt, ty2) <- splitLHsQualTy ty1
+  = (tvs, ctxt, ty2)
+
 splitLHsForAllTy :: LHsType pass -> ([LHsTyVarBndr pass], LHsType pass)
 splitLHsForAllTy (L _ (HsParTy _ ty)) = splitLHsForAllTy ty
 splitLHsForAllTy (L _ (HsForAllTy { hst_bndrs = tvs, hst_body = body })) = (tvs, body)
 splitLHsForAllTy body              = ([], body)
+
+-- | Like 'splitLHsForAllTy', but only splits type variable binders that
+-- were quantified invisibly (e.g., @forall a.@, with a dot).
+splitLHsForAllTyInvis :: LHsType pass -> ([LHsTyVarBndr pass], LHsType pass)
+splitLHsForAllTyInvis = splitLHsForAllTySameVis ForallInvis
+
+-- | Like 'splitLHsForAllTy', but only splits type variable binders that match
+-- the visibility of the supplied 'ForallVisFlag'.
+splitLHsForAllTySameVis :: ForallVisFlag
+                        -> LHsType pass -> ([LHsTyVarBndr pass], LHsType pass)
+splitLHsForAllTySameVis fvf lty@(L _ ty) =
+  case ty of
+    HsParTy _ ty' -> splitLHsForAllTySameVis fvf ty'
+    HsForAllTy { hst_fvf = fvf', hst_bndrs = tvs', hst_body = body' }
+      |  fvf == fvf'
+      -> (tvs', body')
+    _ -> ([], lty)
 
 splitLHsQualTy :: LHsType pass -> (LHsContext pass, LHsType pass)
 splitLHsQualTy (L _ (HsParTy _ ty)) = splitLHsQualTy ty
@@ -1172,7 +1212,7 @@ splitLHsInstDeclTy :: LHsSigType GhcRn
 -- Split up an instance decl type, returning the pieces
 splitLHsInstDeclTy (HsIB { hsib_ext = itkvs
                          , hsib_body = inst_ty })
-  | (tvs, cxt, body_ty) <- splitLHsSigmaTy inst_ty
+  | (tvs, cxt, body_ty) <- splitLHsSigmaTyInvis inst_ty
   = (itkvs ++ map hsLTyVarName tvs, cxt, body_ty)
          -- Return implicitly bound type and kind vars
          -- For an instance decl, all of them are in scope
@@ -1180,7 +1220,7 @@ splitLHsInstDeclTy (XHsImplicitBndrs _) = panic "splitLHsInstDeclTy"
 
 getLHsInstDeclHead :: LHsSigType pass -> LHsType pass
 getLHsInstDeclHead inst_ty
-  | (_tvs, _cxt, body_ty) <- splitLHsSigmaTy (hsSigType inst_ty)
+  | (_tvs, _cxt, body_ty) <- splitLHsSigmaTyInvis (hsSigType inst_ty)
   = body_ty
 
 getLHsInstDeclClass_maybe :: LHsSigType (GhcPass p)
@@ -1326,10 +1366,11 @@ instance (p ~ GhcPass pass,Outputable thing)
 pprAnonWildCard :: SDoc
 pprAnonWildCard = char '_'
 
--- | Prints a forall; When passed an empty list, prints @forall.@ only when
--- @-dppr-debug@
+-- | Prints a forall; When passed an empty list, prints @forall .@/@forall ->@
+-- only when @-dppr-debug@ is enabled.
 pprHsForAll :: (OutputableBndrId (GhcPass p))
-            => [LHsTyVarBndr (GhcPass p)] -> LHsContext (GhcPass p) -> SDoc
+            => ForallVisFlag -> [LHsTyVarBndr (GhcPass p)]
+            -> LHsContext (GhcPass p) -> SDoc
 pprHsForAll = pprHsForAllExtra Nothing
 
 -- | Version of 'pprHsForAll' that can also print an extra-constraints
@@ -1340,20 +1381,31 @@ pprHsForAll = pprHsForAllExtra Nothing
 -- from the actual context and type, and stored in a separate field, thus just
 -- printing the type will not print the extra-constraints wildcard.
 pprHsForAllExtra :: (OutputableBndrId (GhcPass p))
-                 => Maybe SrcSpan -> [LHsTyVarBndr (GhcPass p)]
+                 => Maybe SrcSpan -> ForallVisFlag
+                 -> [LHsTyVarBndr (GhcPass p)]
                  -> LHsContext (GhcPass p) -> SDoc
-pprHsForAllExtra extra qtvs cxt
+pprHsForAllExtra extra fvf qtvs cxt
   = pp_forall <+> pprLHsContextExtra (isJust extra) cxt
   where
-    pp_forall | null qtvs = whenPprDebug (forAllLit <> dot)
-              | otherwise = forAllLit <+> interppSP qtvs <> dot
+    pp_forall | null qtvs = whenPprDebug (forAllLit <> separator)
+              | otherwise = forAllLit <+> interppSP qtvs <> separator
 
--- | Version of 'pprHsForall' or 'pprHsForallExtra' that will always print
+    separator = ppr_forall_separator fvf
+
+-- | Version of 'pprHsForAll' or 'pprHsForAllExtra' that will always print
 -- @forall.@ when passed @Just []@. Prints nothing if passed 'Nothing'
 pprHsExplicitForAll :: (OutputableBndrId (GhcPass p))
-               => Maybe [LHsTyVarBndr (GhcPass p)] -> SDoc
-pprHsExplicitForAll (Just qtvs) = forAllLit <+> interppSP qtvs <> dot
-pprHsExplicitForAll Nothing     = empty
+                    => ForallVisFlag
+                    -> Maybe [LHsTyVarBndr (GhcPass p)] -> SDoc
+pprHsExplicitForAll fvf (Just qtvs) = forAllLit <+> interppSP qtvs
+                                                 <> ppr_forall_separator fvf
+pprHsExplicitForAll _   Nothing     = empty
+
+-- | Prints an arrow for visible @forall@s (e.g., @forall a ->@) and a dot for
+-- invisible @forall@s (e.g., @forall a.@).
+ppr_forall_separator :: ForallVisFlag -> SDoc
+ppr_forall_separator ForallVis   = space <> arrow
+ppr_forall_separator ForallInvis = dot
 
 pprLHsContext :: (OutputableBndrId (GhcPass p))
               => LHsContext (GhcPass p) -> SDoc
@@ -1413,8 +1465,8 @@ ppr_mono_lty :: (OutputableBndrId (GhcPass p)) => LHsType (GhcPass p) -> SDoc
 ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
 ppr_mono_ty :: (OutputableBndrId (GhcPass p)) => HsType (GhcPass p) -> SDoc
-ppr_mono_ty (HsForAllTy { hst_bndrs = tvs, hst_body = ty })
-  = sep [pprHsForAll tvs noLHsContext, ppr_mono_lty ty]
+ppr_mono_ty (HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs, hst_body = ty })
+  = sep [pprHsForAll fvf tvs noLHsContext, ppr_mono_lty ty]
 
 ppr_mono_ty (HsQualTy { hst_ctxt = ctxt, hst_body = ty })
   = sep [pprLHsContextAlways ctxt, ppr_mono_lty ty]

@@ -1857,10 +1857,18 @@ ktypedoc :: { LHsType GhcPs }
 ctype   :: { LHsType GhcPs }
         : 'forall' tv_bndrs '.' ctype   {% hintExplicitForall $1 >>
                                            ams (sLL $1 $> $
-                                                HsForAllTy { hst_bndrs = $2
+                                                HsForAllTy { hst_fvf = ForallInvis
+                                                           , hst_bndrs = $2
                                                            , hst_xforall = noExt
                                                            , hst_body = $4 })
                                                [mu AnnForall $1, mj AnnDot $3] }
+        | 'forall' tv_bndrs '->' ctype  {% hintExplicitForall $1 *>
+                                           ams (sLL $1 $> $
+                                                HsForAllTy { hst_fvf = ForallVis
+                                                           , hst_bndrs = $2
+                                                           , hst_xforall = noExt
+                                                           , hst_body = $4 })
+                                               [mu AnnForall $1,mj AnnRarrow $3] }
         | context '=>' ctype          {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
@@ -1884,10 +1892,19 @@ ctype   :: { LHsType GhcPs }
 ctypedoc :: { LHsType GhcPs }
         : 'forall' tv_bndrs '.' ctypedoc {% hintExplicitForall $1 >>
                                             ams (sLL $1 $> $
-                                                 HsForAllTy { hst_bndrs = $2
+                                                 HsForAllTy { hst_fvf = ForallInvis
+                                                            , hst_bndrs = $2
                                                             , hst_xforall = noExt
                                                             , hst_body = $4 })
                                                 [mu AnnForall $1,mj AnnDot $3] }
+        | 'forall' tv_bndrs '->' ctypedoc
+                                         {% hintExplicitForall $1 *>
+                                            ams (sLL $1 $> $
+                                                 HsForAllTy { hst_fvf = ForallVis
+                                                            , hst_bndrs = $2
+                                                            , hst_xforall = noExt
+                                                            , hst_body = $4 })
+                                                [mu AnnForall $1,mj AnnRarrow $3] }
         | context '=>' ctypedoc       {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
