@@ -28,7 +28,7 @@ module TyCoRep (
         KindOrType, Kind,
         KnotTied,
         PredType, ThetaType,      -- Synonyms
-        ArgFlag(..),
+        ArgFlag(..), ForallVisFlag(..),
 
         -- * Coercions
         Coercion(..),

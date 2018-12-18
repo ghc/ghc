@@ -14,7 +14,8 @@ module Type (
         -- $type_classification
 
         -- $representation_types
-        TyThing(..), Type, ArgFlag(..), KindOrType, PredType, ThetaType,
+        TyThing(..), Type, ArgFlag(..), ForallVisFlag(..),
+        KindOrType, PredType, ThetaType,
         Var, TyVar, isTyVar, TyCoVar, TyCoBinder, TyCoVarBinder, TyVarBinder,
         KnotTied,
 
@@ -40,7 +41,7 @@ module Type (
         mkSpecForAllTy, mkSpecForAllTys,
         mkVisForAllTys, mkTyCoInvForAllTy,
         mkInvForAllTy, mkInvForAllTys,
-        splitForAllTys, splitForAllVarBndrs,
+        splitForAllTys, splitForAllTysSameVis, splitForAllVarBndrs,
         splitForAllTy_maybe, splitForAllTy,
         splitForAllTy_ty_maybe, splitForAllTy_co_maybe,
         splitPiTy_maybe, splitPiTy, splitPiTys,
@@ -1429,6 +1430,18 @@ splitForAllTys ty = split ty ty []
   where
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split _       (ForAllTy (Bndr tv _) ty)    tvs = split ty ty (tv:tvs)
+    split orig_ty _                            tvs = (reverse tvs, orig_ty)
+
+-- | Like 'splitForAllTys', but only splits a 'ForAllTy' if
+-- @'sameVis' argf supplied_argf@ is 'True', where @argf@ is the visibility
+-- of the @ForAllTy@'s binder and @supplied_argf@ is the visibility provided
+-- as an argument to this function.
+splitForAllTysSameVis :: ArgFlag -> Type -> ([TyCoVar], Type)
+splitForAllTysSameVis supplied_argf ty = split ty ty []
+  where
+    split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
+    split _       (ForAllTy (Bndr tv argf) ty) tvs
+      | argf `sameVis` supplied_argf               = split ty ty (tv:tvs)
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
 
 -- | Like splitForAllTys, but split only for tyvars.

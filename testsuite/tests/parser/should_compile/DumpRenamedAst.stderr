@@ -379,6 +379,7 @@
                    ({ DumpRenamedAst.hs:19:11-33 }
                     (HsForAllTy
                      (NoExt)
+                     (ForallInvis)
                      [({ DumpRenamedAst.hs:19:18-19 }
                        (UserTyVar
                         (NoExt)
