@@ -108,7 +108,8 @@ test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
 		ghci_script, ['ghci062.script'])
 test('ghci063', normal, ghci_script, ['ghci063.script'])
 
-test('T2452', normal, ghci_script, ['T2452.script'])
+test('T2452', [extra_hc_opts("-fno-implicit-import-qualified")],
+    ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
 
 test('T1914', [], ghci_script, ['T1914.script'])
