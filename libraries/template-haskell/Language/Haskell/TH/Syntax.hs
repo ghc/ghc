@@ -2099,6 +2099,7 @@ data PatSynArgs
   deriving( Show, Eq, Ord, Data, Generic )
 
 data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> => \<type\>@
+          | ForallVisT [TyVarBndr] Type   -- ^ @forall \<vars\> -> \<type\>@
           | AppT Type Type                -- ^ @T a b@
           | AppKindT Type Kind            -- ^ @T \@k t@
           | SigT Type Kind                -- ^ @t :: k@

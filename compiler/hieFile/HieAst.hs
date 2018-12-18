@@ -1386,7 +1386,7 @@ instance ToHie (LHsType GhcRn) where
 
 instance ToHie (TScoped (LHsType GhcRn)) where
   toHie (TS tsc (L span t)) = concatM $ makeNode t span : case t of
-      HsForAllTy _ bndrs body ->
+      HsForAllTy _ _ bndrs body ->
         [ toHie $ tvScopes tsc (mkScope $ getLoc body) bndrs
         , toHie body
         ]
