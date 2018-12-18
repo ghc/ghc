@@ -27,6 +27,10 @@
 #include <shfolder.h> /* SHGetFolderPathW */
 #endif
 
+#if defined(openbsd_HOST_OS)
+#include <elf.h> /* _DYNAMIC */
+#endif
+
 /* -----------------------------------------------------------------------------
  * Symbols to be inserted into the RTS symbol table.
  */
@@ -280,7 +284,7 @@
 #if defined(openbsd_HOST_OS)
 #define RTS_OPENBSD_ONLY_SYMBOLS                            \
      SymE_NeedsProto(__guard_local)                         \
-     SymE_NeedsProto(_DYNAMIC)
+     SymE_HasProto(_DYNAMIC)
 #else
 #define RTS_OPENBSD_ONLY_SYMBOLS
 #endif
