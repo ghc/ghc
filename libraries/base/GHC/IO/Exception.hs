@@ -413,9 +413,10 @@ userError str   =  IOError Nothing UserError "" str Nothing Nothing
 -- ---------------------------------------------------------------------------
 -- Showing IOErrors
 
--- | @since 4.1.0.0
+-- | @since 4.1.0.0. In @4.14.0.0@ and newer, this instance
+--   includes the error code if it is present.
 instance Show IOException where
-    showsPrec p (IOError hdl iot loc s _ fn) =
+    showsPrec p (IOError hdl iot loc s err fn) =
       (case fn of
          Nothing -> case hdl of
                         Nothing -> id
@@ -425,6 +426,9 @@ instance Show IOException where
          "" -> id
          _  -> showString loc . showString ": ") .
       showsPrec p iot .
+      (case err of
+         Nothing -> id
+         Just i -> showString " (" . shows i . showString ")") .
       (case s of
          "" -> id
          _  -> showString " (" . showString s . showString ")")
