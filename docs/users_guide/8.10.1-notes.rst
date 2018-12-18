@@ -44,6 +44,16 @@ Language
     type T = Just (Nothing :: Maybe a)         -- no longer accepted
     type T = Just Nothing :: Maybe (Maybe a)   -- still accepted
 
+- GHC now parses visible, dependent quantifiers (as proposed in
+  `GHC proposal 35
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0035-forall-arrow.rst>`__),
+  such as the following: ::
+
+    data Proxy :: forall k -> k -> Type
+
+  See the `section on explicit kind quantification
+  <#explicit-kind-quantification>`__ for more details.
+
 Compiler
 ~~~~~~~~
 
