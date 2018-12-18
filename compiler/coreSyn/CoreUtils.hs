@@ -62,7 +62,7 @@ module CoreUtils (
 import GhcPrelude
 
 import CoreSyn
-import PrelNames ( makeStaticName )
+import PrelNames ( makeStaticName, absentErrorIdKey, noinlineIdKey )
 import PprCore
 import CoreFVs( exprFreeVars )
 import Var
@@ -75,7 +75,6 @@ import DataCon
 import PrimOp
 import Id
 import IdInfo
-import PrelNames( absentErrorIdKey )
 import Type
 import TyCoRep( TyCoBinder(..), TyBinder )
 import Coercion
@@ -98,7 +97,6 @@ import Data.Ord            ( comparing )
 import OrdList
 import qualified Data.Set as Set
 import UniqSet
-import PrelNames           (noinlineIdKey)
 
 {-
 ************************************************************************
