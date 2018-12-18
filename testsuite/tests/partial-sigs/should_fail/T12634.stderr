@@ -1,5 +1,5 @@
 
-T12634.hs:14:37: error:
+T12634.hs:14:19: error:
     • Found type wildcard ‘_’ standing for ‘()’
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature:

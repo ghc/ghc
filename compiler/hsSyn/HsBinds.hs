@@ -901,13 +901,13 @@ data Sig pass
       --
       -- > f :: Num a => a -> a
       --
-      -- After renaming, this list of Names contains the named and unnamed
+      -- After renaming, this list of Names contains the named
       -- wildcards brought into scope by this signature. For a signature
-      -- @_ -> _a -> Bool@, the renamer will give the unnamed wildcard @_@
-      -- a freshly generated name, e.g. @_w@. @_w@ and the named wildcard @_a@
-      -- are then both replaced with fresh meta vars in the type. Their names
-      -- are stored in the type signature that brought them into scope, in
-      -- this third field to be more specific.
+      -- @_ -> _a -> Bool@, the renamer will leave the unnamed wildcard @_@
+      -- untouched, and the named wildcard @_a@ is then replaced with
+      -- fresh meta vars in the type. Their names are stored in the type
+      -- signature that brought them into scope, in this third field to be
+      -- more specific.
       --
       --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon',
       --          'ApiAnnotation.AnnComma'

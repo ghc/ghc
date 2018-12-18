@@ -1,13 +1,13 @@
 
 ExtraConstraintsWildcardInPatternSplice.hs:5:8: error:
-    • Found type wildcard ‘_’ standing for ‘w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of foo :: w -> ()
+    • Found type wildcard ‘_’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of foo :: _ -> ()
                at ExtraConstraintsWildcardInPatternSplice.hs:5:1-29
       To use the inferred type, enable PartialTypeSignatures
     • In a pattern type signature: _
       In the pattern: _ :: _
       In an equation for ‘foo’: foo (_ :: _) = ()
     • Relevant bindings include
-        foo :: w -> ()
+        foo :: _ -> ()
           (bound at ExtraConstraintsWildcardInPatternSplice.hs:5:1)

@@ -57,18 +57,6 @@ ExplicitForAllFams4b.hs:23:17: error:
     • In the type instance declaration for ‘CT’
       In the instance declaration for ‘C Int’
 
-ExplicitForAllFams4b.hs:23:20: error:
-    Conflicting family instance declarations:
-      CT [a] (a, a) = Float -- Defined at ExplicitForAllFams4b.hs:23:20
-      CT _ _ = Maybe b -- Defined at ExplicitForAllFams4b.hs:24:20
-
-ExplicitForAllFams4b.hs:24:3: error:
-    • Type indexes must match class instance head
-      Expected: CT Int _
-        Actual: CT _ _
-    • In the type instance declaration for ‘CT’
-      In the instance declaration for ‘C Int’
-
 ExplicitForAllFams4b.hs:24:15: error:
     • Type variable ‘b’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
@@ -85,18 +73,6 @@ ExplicitForAllFams4b.hs:26:3: error:
 ExplicitForAllFams4b.hs:26:17: error:
     • Type variable ‘b’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
-    • In the data instance declaration for ‘CD’
-      In the instance declaration for ‘C Int’
-
-ExplicitForAllFams4b.hs:26:20: error:
-    Conflicting family instance declarations:
-      CD [a] (a, a) -- Defined at ExplicitForAllFams4b.hs:26:20
-      CD _ _ -- Defined at ExplicitForAllFams4b.hs:27:20
-
-ExplicitForAllFams4b.hs:27:3: error:
-    • Type indexes must match class instance head
-      Expected: CD Int _
-        Actual: CD _ _
     • In the data instance declaration for ‘CD’
       In the instance declaration for ‘C Int’
 

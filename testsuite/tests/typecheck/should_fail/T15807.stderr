@@ -1,0 +1,16 @@
+
+T15807.hs:12:24: error:
+    • Expecting one more argument to ‘f’
+      Expected a type, but ‘f’ has kind ‘k0 -> *’
+    • In the first argument of ‘App’, namely ‘f’
+      In the type ‘App @f a’
+      In the definition of data constructor ‘MkApp’
+
+T15807.hs:12:26: error:
+    • Couldn't match kind ‘*’ with ‘k0 -> *’
+      When matching kinds
+        k0 :: *
+        f :: k0 -> *
+    • In the second argument of ‘App’, namely ‘a’
+      In the type ‘App @f a’
+      In the definition of data constructor ‘MkApp’

@@ -717,7 +717,7 @@ tcStandaloneDerivInstType ctxt
                                        , hsib_body   = deriv_ty_body })})
   | (tvs, theta, rho) <- splitLHsSigmaTy deriv_ty_body
   , L _ [wc_pred] <- theta
-  , L _ (HsWildCardTy (AnonWildCard (L wc_span _))) <- ignoreParens wc_pred
+  , L wc_span (HsWildCardTy _) <- ignoreParens wc_pred
   = do dfun_ty <- tcHsClsInstType ctxt $
                   HsIB { hsib_ext = vars
                        , hsib_body

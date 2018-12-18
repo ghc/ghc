@@ -799,7 +799,7 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
                   ; addConsistencyConstraints mb_clsinfo lhs_ty
                   ; mapM_ (wrapLocM_ kcConDecl) hs_cons
                   ; res_kind <- tc_kind_sig m_ksig
-                  ; lhs_ty <- checkExpectedKindX pp_lhs lhs_ty lhs_kind res_kind
+                  ; lhs_ty <- checkExpectedKind YesSaturation pp_lhs lhs_ty lhs_kind res_kind
                   ; return (stupid_theta, lhs_ty, res_kind) }
 
        -- See TcTyClsDecls Note [Generalising in tcFamTyPatsGuts]

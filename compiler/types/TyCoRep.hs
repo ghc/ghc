@@ -58,6 +58,7 @@ module TyCoRep (
         isInvisibleArgFlag, isVisibleArgFlag,
         isInvisibleBinder, isVisibleBinder,
         isTyBinder, isNamedBinder,
+        tyCoBinderArgFlag,
 
         -- * Functions over coercions
         pickLR,
@@ -553,6 +554,12 @@ isNamedBinder (Anon {})  = False
 isTyBinder :: TyCoBinder -> Bool
 isTyBinder (Named bnd) = isTyVarBinder bnd
 isTyBinder _ = True
+
+tyCoBinderArgFlag :: TyCoBinder -> ArgFlag
+tyCoBinderArgFlag (Named (Bndr _ flag)) = flag
+tyCoBinderArgFlag (Anon ty)
+ | isPredTy ty = Inferred
+ | otherwise = Required
 
 {- Note [TyCoBinders]
 ~~~~~~~~~~~~~~~~~~~

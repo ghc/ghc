@@ -15,11 +15,11 @@ $(return [])
 main :: IO ()
 main = print
   $(do FamilyI (DataFamilyD _ _ _) insts <- reify ''DF
-       lift $ all (\case DataInstD _ _ _ [AppT _ (VarT v1)] _
-                                         [NormalC _ [(_, VarT v2)]] _
+       lift $ all (\case DataInstD _ _ (AppT (ConT _) (AppT _ (VarT v1))) _
+                                       [NormalC _ [(_, VarT v2)]] _
                            -> v1 == v2
-                         NewtypeInstD _ _ _ [AppT _ (VarT v1)] _
-                                            (NormalC _ [(_, VarT v2)]) _
+                         NewtypeInstD _ _ (AppT (ConT _) (AppT _ (VarT v1))) _
+                                          (NormalC _ [(_, VarT v2)]) _
                            -> v1 == v2
                          _ -> error "Not a data or newtype instance")
               insts)

@@ -1428,7 +1428,7 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
                  (wrongNumberOfParmsErr fam_arity)
 
        -- Typecheck RHS
-       ; let hs_pats = map hsLTyVarBndrToType exp_vars
+       ; let hs_pats = map (HsValArg . hsLTyVarBndrToType) exp_vars
 
           -- NB: Use tcFamTyPats, not bindTyClTyVars. The latter expects to get
           -- the LHsQTyVars used for declaring a tycon, but the names here
@@ -1734,7 +1734,8 @@ kcTyFamInstEqn tc_fam_tc
            , text "feqn_bndrs =" <+> ppr mb_expl_bndrs
            , text "feqn_pats ="  <+> ppr hs_pats ])
           -- this check reports an arity error instead of a kind error; easier for user
-       ; checkTc (hs_pats `lengthIs` vis_arity) $
+       ; let vis_pats = numVisibleArgs hs_pats
+       ; checkTc (vis_pats == vis_arity) $
                   wrongNumberOfParmsErr vis_arity
        ; discardResult $
          bindImplicitTKBndrs_Q_Tv imp_vars $
@@ -1774,7 +1775,8 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        -- If we wait until validity checking, we'll get kind errors
        -- below when an arity error will be much easier to understand.
        ; let vis_arity = length (tyConVisibleTyVars fam_tc)
-       ; checkTc (hs_pats `lengthIs` vis_arity) $
+             vis_pats  = numVisibleArgs hs_pats
+       ; checkTc (vis_pats == vis_arity) $
          wrongNumberOfParmsErr vis_arity
 
        ; (qtvs, pats, rhs_ty) <- tcTyFamInstEqnGuts fam_tc mb_clsinfo
@@ -1944,7 +1946,11 @@ tcFamTyPats fam_tc hs_pats
 
        ; let fun_ty = mkTyConApp fam_tc []
 
-       ; (fam_app, res_kind) <- tcInferApps typeLevelMode lhs_fun fun_ty
+       ; (fam_app, res_kind) <- unsetWOptM Opt_WarnPartialTypeSignatures $
+                                setXOptM LangExt.PartialTypeSignatures $
+                                -- See Note [Wildcards in family instances] in
+                                -- RnSource.hs
+                                tcInferApps typeLevelMode lhs_fun fun_ty
                                             fam_kind hs_pats
 
        ; traceTc "End tcFamTyPats }" $

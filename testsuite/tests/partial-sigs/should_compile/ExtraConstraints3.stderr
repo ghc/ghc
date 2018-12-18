@@ -125,12 +125,12 @@ TYPE SIGNATURES
     (P.Foldable t, Monad m) =>
     (a -> m b) -> t a -> m ()
   max :: forall a. Ord a => a -> a -> a
-  maxBound :: forall w. Bounded w => w
+  maxBound :: forall _. Bounded _ => _
   maximum ::
     forall (t :: * -> *) a. (P.Foldable t, Ord a) => t a -> a
   maybe :: forall b a. b -> (a -> b) -> Maybe a -> b
   min :: forall a. Ord a => a -> a -> a
-  minBound :: forall w. Bounded w => w
+  minBound :: forall _. Bounded _ => _
   minimum ::
     forall (t :: * -> *) a. (P.Foldable t, Ord a) => t a -> a
   mod :: forall a. Integral a => a -> a -> a
@@ -142,7 +142,7 @@ TYPE SIGNATURES
   odd :: forall a. Integral a => a -> Bool
   or :: forall (t :: * -> *). P.Foldable t => t Bool -> Bool
   otherwise :: Bool
-  pi :: forall w. Floating w => w
+  pi :: forall _. Floating _ => _
   pred :: forall a. Enum a => a -> a
   print :: forall a. Show a => a -> IO ()
   product ::
@@ -212,7 +212,7 @@ TYPE SIGNATURES
   toRational :: forall a. Real a => a -> Rational
   truncate :: forall a b. (RealFrac a, Integral b) => a -> b
   uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
-  undefined :: forall w. w
+  undefined :: forall _. _
   unlines :: [String] -> String
   until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
   unwords :: [String] -> String

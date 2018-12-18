@@ -1,0 +1,5 @@
+
+T12045c.hs:8:3: error:
+    • Cannot apply function of kind ‘k0 -> k1’
+      to visible kind argument ‘Type’
+    • In the type family declaration for ‘F’

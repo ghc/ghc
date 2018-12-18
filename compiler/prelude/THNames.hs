@@ -96,8 +96,8 @@ templateHaskellNames = [
     -- PatSynArgs (for pattern synonyms)
     prefixPatSynName, infixPatSynName, recordPatSynName,
     -- Type
-    forallTName, varTName, conTName, appTName, equalityTName,
-    tupleTName, unboxedTupleTName, unboxedSumTName,
+    forallTName, varTName, conTName, infixTName, appTName, appKindTName,
+    equalityTName, tupleTName, unboxedTupleTName, unboxedSumTName,
     arrowTName, listTName, sigTName, litTName,
     promotedTName, promotedTupleTName, promotedNilTName, promotedConsTName,
     wildCardTName, implicitParamTName,
@@ -429,9 +429,9 @@ infixPatSynName  = libFun (fsLit "infixPatSyn")  infixPatSynIdKey
 recordPatSynName = libFun (fsLit "recordPatSyn") recordPatSynIdKey
 
 -- data Type = ...
-forallTName, varTName, conTName, tupleTName, unboxedTupleTName,
-    unboxedSumTName, arrowTName, listTName, appTName, sigTName,
-    equalityTName, litTName, promotedTName,
+forallTName, varTName, conTName, infixTName, tupleTName, unboxedTupleTName,
+    unboxedSumTName, arrowTName, listTName, appTName, appKindTName,
+    sigTName, equalityTName, litTName, promotedTName,
     promotedTupleTName, promotedNilTName, promotedConsTName,
     wildCardTName, implicitParamTName :: Name
 forallTName         = libFun (fsLit "forallT")        forallTIdKey
@@ -443,6 +443,7 @@ unboxedSumTName     = libFun (fsLit "unboxedSumT")    unboxedSumTIdKey
 arrowTName          = libFun (fsLit "arrowT")         arrowTIdKey
 listTName           = libFun (fsLit "listT")          listTIdKey
 appTName            = libFun (fsLit "appT")           appTIdKey
+appKindTName        = libFun (fsLit "appKindT")       appKindTIdKey
 sigTName            = libFun (fsLit "sigT")           sigTIdKey
 equalityTName       = libFun (fsLit "equalityT")      equalityTIdKey
 litTName            = libFun (fsLit "litT")           litTIdKey
@@ -451,6 +452,7 @@ promotedTupleTName  = libFun (fsLit "promotedTupleT") promotedTupleTIdKey
 promotedNilTName    = libFun (fsLit "promotedNilT")   promotedNilTIdKey
 promotedConsTName   = libFun (fsLit "promotedConsT")  promotedConsTIdKey
 wildCardTName       = libFun (fsLit "wildCardT")      wildCardTIdKey
+infixTName          = libFun (fsLit "infixT")         infixTIdKey
 implicitParamTName  = libFun (fsLit "implicitParamT") implicitParamTIdKey
 
 -- data TyLit = ...
@@ -949,19 +951,20 @@ recordPatSynIdKey = mkPreludeMiscIdUnique 382
 
 -- data Type = ...
 forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey,
-    unboxedSumTIdKey, arrowTIdKey, listTIdKey, appTIdKey, sigTIdKey,
-    equalityTIdKey, litTIdKey, promotedTIdKey,
+    unboxedSumTIdKey, arrowTIdKey, listTIdKey, appTIdKey, appKindTIdKey,
+    sigTIdKey, equalityTIdKey, litTIdKey, promotedTIdKey,
     promotedTupleTIdKey, promotedNilTIdKey, promotedConsTIdKey,
-    wildCardTIdKey, implicitParamTIdKey :: Unique
-forallTIdKey        = mkPreludeMiscIdUnique 391
-varTIdKey           = mkPreludeMiscIdUnique 392
-conTIdKey           = mkPreludeMiscIdUnique 393
-tupleTIdKey         = mkPreludeMiscIdUnique 394
-unboxedTupleTIdKey  = mkPreludeMiscIdUnique 395
-unboxedSumTIdKey    = mkPreludeMiscIdUnique 396
-arrowTIdKey         = mkPreludeMiscIdUnique 397
-listTIdKey          = mkPreludeMiscIdUnique 398
-appTIdKey           = mkPreludeMiscIdUnique 399
+    wildCardTIdKey, implicitParamTIdKey, infixTIdKey :: Unique
+forallTIdKey        = mkPreludeMiscIdUnique 390
+varTIdKey           = mkPreludeMiscIdUnique 391
+conTIdKey           = mkPreludeMiscIdUnique 392
+tupleTIdKey         = mkPreludeMiscIdUnique 393
+unboxedTupleTIdKey  = mkPreludeMiscIdUnique 394
+unboxedSumTIdKey    = mkPreludeMiscIdUnique 395
+arrowTIdKey         = mkPreludeMiscIdUnique 396
+listTIdKey          = mkPreludeMiscIdUnique 397
+appTIdKey           = mkPreludeMiscIdUnique 398
+appKindTIdKey       = mkPreludeMiscIdUnique 399
 sigTIdKey           = mkPreludeMiscIdUnique 400
 equalityTIdKey      = mkPreludeMiscIdUnique 401
 litTIdKey           = mkPreludeMiscIdUnique 402
@@ -971,6 +974,7 @@ promotedNilTIdKey   = mkPreludeMiscIdUnique 405
 promotedConsTIdKey  = mkPreludeMiscIdUnique 406
 wildCardTIdKey      = mkPreludeMiscIdUnique 407
 implicitParamTIdKey = mkPreludeMiscIdUnique 408
+infixTIdKey         = mkPreludeMiscIdUnique 409
 
 -- data TyLit = ...
 numTyLitIdKey, strTyLitIdKey :: Unique

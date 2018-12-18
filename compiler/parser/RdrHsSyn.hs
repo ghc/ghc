@@ -114,7 +114,7 @@ import DynFlags ( WarningFlag(..) )
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
-
+import qualified Data.Monoid as Monoid
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 
 #include "HsVersions.h"
@@ -804,7 +804,7 @@ to make setRdrNameSpace partial, so we just make an Unqual name instead. It
 really doesn't matter!
 -}
 
-checkTyVarsP :: SDoc -> SDoc -> Located RdrName -> [LHsType GhcPs]
+checkTyVarsP :: SDoc -> SDoc -> Located RdrName -> [LHsTypeArg GhcPs]
              -> P (LHsQTyVars GhcPs)
 -- Same as checkTyVars, but in the P monad
 checkTyVarsP pp_what equals_or_where tc tparms
@@ -818,7 +818,7 @@ eitherToP :: Either (SrcSpan, SDoc) a -> P a
 eitherToP (Left (loc, doc)) = parseErrorSDoc loc doc
 eitherToP (Right thing)     = return thing
 
-checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsType GhcPs]
+checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsTypeArg GhcPs]
             -> Either (SrcSpan, SDoc)
                       ( LHsQTyVars GhcPs  -- the synthesized type variables
                       , P () )            -- action which adds annotations
@@ -827,9 +827,17 @@ checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsType GhcPs]
 -- We use the Either monad because it's also called (via 'mkATDefault') from
 -- "Convert".
 checkTyVars pp_what equals_or_where tc tparms
-  = do { (tvs, anns) <- fmap unzip $ mapM (chkParens []) tparms
+  = do { (tvs, anns) <- fmap unzip $ mapM check tparms
        ; return (mkHsQTvs tvs, sequence_ anns) }
   where
+    check (HsTypeArg ki@(L loc _)) = Left (loc,
+                                      vcat [ text "Unexpected type application" <+>
+                                            text "@" <> ppr ki
+                                          , text "In the" <+> pp_what <+>
+                                            ptext (sLit "declaration for") <+> quotes (ppr tc)])
+    check (HsValArg ty) = chkParens [] ty
+    check (HsArgPar sp) = Left (sp, vcat [text "Malformed" <+> pp_what
+                           <+> text "declaration for" <+> quotes (ppr tc)])
         -- Keep around an action for adjusting the annotations of extra parens
     chkParens :: [AddAnn] -> LHsType GhcPs
               -> Either (SrcSpan, SDoc) (LHsTyVarBndr GhcPs, P ())
@@ -936,7 +944,7 @@ checkTyClHdr :: Bool               -- True  <=> class header
                                    -- False <=> type header
              -> LHsType GhcPs
              -> P (Located RdrName,      -- the head symbol (type or class name)
-                   [LHsType GhcPs],      -- parameters of head symbol
+                   [LHsTypeArg GhcPs],      -- parameters of head symbol
                    LexicalFixity,        -- the declaration is in infix format
                    [AddAnn]) -- API Annotation for HsParTy when stripping parens
 -- Well-formedness check and decomposition of type and class heads.
@@ -957,12 +965,12 @@ checkTyClHdr is_cls ty
     go l (HsTyVar _ _ (dL->L _ tc)) acc ann fix
       | isRdrTc tc               = return (cL l tc, acc, fix, ann)
     go _ (HsOpTy _ t1 ltc@(dL->L _ tc) t2) acc ann _fix
-      | isRdrTc tc               = return (ltc, t1:t2:acc, Infix, ann)
+      | isRdrTc tc               = return (ltc, HsValArg t1:HsValArg t2:acc, Infix, ann)
     go l (HsParTy _ ty)    acc ann fix = goL ty acc (ann ++mkParensApiAnn l) fix
-    go _ (HsAppTy _ t1 t2) acc ann fix = goL t1 (t2:acc) ann fix
-
+    go _ (HsAppTy _ t1 t2) acc ann fix = goL t1 (HsValArg t2:acc) ann fix
+    go _ (HsAppKindTy _ ty ki) acc ann fix = goL ty (HsTypeArg ki:acc) ann fix
     go l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ann fix
-      = return (cL l (nameRdrName tup_name), ts, fix, ann)
+      = return (cL l (nameRdrName tup_name), map HsValArg ts, fix, ann)
       where
         arity = length ts
         tup_name | is_cls    = cTupleTyConName arity
@@ -1029,6 +1037,7 @@ checkContext (dL->L l orig_t)
 checkNoDocs :: SDoc -> LHsType GhcPs -> P ()
 checkNoDocs msg ty = go ty
   where
+    go (dL->L _ (HsAppKindTy _ ty ki)) = go ty *> go ki
     go (dL->L _ (HsAppTy _ t1 t2)) = go t1 *> go t2
     go (dL->L l (HsDocTy _ t ds)) = parseErrorSDoc l $ hsep
                                   [ text "Unexpected haddock", quotes (ppr ds)
@@ -1366,6 +1375,7 @@ isFunLhs e = go e [] []
 
 -- | Either an operator or an operand.
 data TyEl = TyElOpr RdrName | TyElOpd (HsType GhcPs)
+          | TyElKindApp SrcSpan (LHsType GhcPs)
           | TyElTilde | TyElBang
           | TyElUnpackedness ([AddAnn], SourceText, SrcUnpackedness)
           | TyElDocPrev HsDocString
@@ -1373,6 +1383,7 @@ data TyEl = TyElOpr RdrName | TyElOpd (HsType GhcPs)
 instance Outputable TyEl where
   ppr (TyElOpr name) = ppr name
   ppr (TyElOpd ty) = ppr ty
+  ppr (TyElKindApp _ ki) = text "@" <> ppr ki
   ppr TyElTilde = text "~"
   ppr TyElBang = text "!"
   ppr (TyElUnpackedness (_, _, unpk)) = ppr unpk
@@ -1449,10 +1460,12 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
     -- handle (NO)UNPACK pragmas
     go k acc ops_acc ((dL->L l (TyElUnpackedness (anns, unpkSrc, unpk))):xs) =
       if not (null acc) && null xs
-      then do { let a = ops_acc (mergeAcc acc)
+      then do { (addAccAnns, acc') <- eitherToP $ mergeOpsAcc acc
+              ; let a = ops_acc acc'
                     strictMark = HsSrcBang unpkSrc unpk NoSrcStrict
                     bl = combineSrcSpans l (getLoc a)
                     bt = HsBangTy noExt strictMark a
+              ; addAccAnns
               ; addAnnsAt bl anns
               ; return (cL bl bt) }
       else parseErrorSDoc l unpkError
@@ -1479,6 +1492,7 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
       , let guess [] = True
             guess ((dL->L _ (TyElOpd _)):_) = False
             guess ((dL->L _ (TyElOpr _)):_) = True
+            guess ((dL->L _ (TyElKindApp _ _)):_) = False
             guess ((dL->L _ (TyElTilde)):_) = True
             guess ((dL->L _ (TyElBang)):_) = True
             guess ((dL->L _ (TyElUnpackedness _)):_) = True
@@ -1487,7 +1501,9 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
                       -- due to #15884
         in guess xs
       = if not (null acc) && (k > 1 || length acc > 1)
-        then failOpStrictnessCompound (cL l str) (ops_acc (mergeAcc acc))
+        then do { (_, a) <- eitherToP (mergeOpsAcc acc)
+               -- no need to add annotations since it fails anyways!
+                ; failOpStrictnessCompound (cL l str) (ops_acc a) }
         else failOpStrictnessPosition (cL l str)
 
     -- clause [opr]:
@@ -1497,8 +1513,9 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
     go k acc ops_acc ((dL->L l (TyElOpr op)):xs) =
       if null acc || null (filter isTyElOpd xs)
         then failOpFewArgs (cL l op)
-        else do { let a = mergeAcc acc
-                ; go (k + 1) [] (\c -> mkLHsOpTy c (cL l op) (ops_acc a)) xs }
+        else do { (addAccAnns, acc') <- eitherToP (mergeOpsAcc acc)
+                ; addAccAnns
+                ; go (k + 1) [] (\c -> mkLHsOpTy c (cL l op) (ops_acc acc')) xs }
       where
         isTyElOpd (dL->L _ (TyElOpd _)) = True
         isTyElOpd _ = False
@@ -1515,20 +1532,38 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
 
     -- clause [opd]:
     -- whenever an operand is encountered, it is added to the accumulator
-    go k acc ops_acc ((dL->L l (TyElOpd a)):xs) = go k (cL l a:acc) ops_acc xs
+    go k acc ops_acc ((dL->L l (TyElOpd a)):xs) = go k (HsValArg (cL l a):acc) ops_acc xs
 
-    -- clause [end]:
+    -- clause [tyapp]:
+    -- whenever a type application is encountered, it is added to the accumulator
+    go k acc ops_acc ((dL->L _ (TyElKindApp l a)):xs) = go k (HsTypeArg (l, a):acc) ops_acc xs
+
+    -- clause [end]
     -- See Note [Non-empty 'acc' in mergeOps clause [end]]
-    go _ acc ops_acc [] =
-      return (ops_acc (mergeAcc acc))
+    go _ acc ops_acc [] = do { (addAccAnns, acc') <- eitherToP (mergeOpsAcc acc)
+                             ; addAccAnns
+                             ; return (ops_acc acc') }
 
     go _ _ _ _ = panic "mergeOps.go: Impossible Match"
                         -- due to #15884
 
-
-    mergeAcc [] = panic "mergeOps.mergeAcc: empty input"
-    mergeAcc (x:xs) = mkHsAppTys x xs
-
+mergeOpsAcc :: [HsArg (LHsType GhcPs) (SrcSpan, LHsKind GhcPs)]
+         -> Either (SrcSpan, SDoc) (P (), LHsType GhcPs)
+mergeOpsAcc [] = panic "mergeOpsAcc: empty input"
+mergeOpsAcc (HsTypeArg (_, L loc ki):_)
+  = Left (loc, text "Unexpected type application:" <+> ppr ki)
+mergeOpsAcc (HsValArg ty : xs) = go1 (pure ()) ty xs
+  where
+    go1 :: P () -> LHsType GhcPs
+        -> [HsArg (LHsType GhcPs) (SrcSpan, LHsKind GhcPs)]
+        -> Either (SrcSpan, SDoc) (P (), LHsType GhcPs)
+    go1 anns lhs []     = Right (anns, lhs)
+    go1 anns lhs (x:xs) = case x of
+        HsValArg ty -> go1 anns (mkHsAppTy lhs ty) xs
+        HsTypeArg (loc, ki) -> let ty = mkHsAppKindTy lhs ki
+                               in go1 (addAnnotation (getLoc ty) AnnAt loc >> anns) ty xs
+        HsArgPar _ -> go1 anns lhs xs
+mergeOpsAcc (HsArgPar _: xs) = mergeOpsAcc xs
 
 {- Note [Impossible case in mergeOps clause [unpk]]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1586,13 +1621,24 @@ pInfixSide :: [Located TyEl] -> Maybe (LHsType GhcPs, P (), [Located TyEl])
 pInfixSide ((dL->L l (TyElOpd t)):xs)
   | (True, t', addAnns, xs') <- pBangTy (cL l t) xs
   = Just (t', addAnns, xs')
-pInfixSide ((dL->L l1 (TyElOpd t1)):xs1) = go [cL l1 t1] xs1
-  where
-    go acc ((dL->L l (TyElOpd t)):xs) = go (cL l t:acc) xs
-    go acc xs = Just (mergeAcc acc, pure (), xs)
-    mergeAcc [] = panic "pInfixSide.mergeAcc: empty input"
-    mergeAcc (x:xs) = mkHsAppTys x xs
+pInfixSide (el:xs1)
+  | Just t1 <- pLHsTypeArg el
+  = go [t1] xs1
+   where
+     go :: [HsArg (LHsType GhcPs) (SrcSpan, LHsKind GhcPs)]
+        -> [Located TyEl] -> Maybe (LHsType GhcPs, P (), [Located TyEl])
+     go acc (el:xs)
+       | Just t <- pLHsTypeArg el
+       = go (t:acc) xs
+     go acc xs = case mergeOpsAcc acc of
+       Left _ -> Nothing
+       Right (addAnns, acc') -> Just (acc', addAnns, xs)
 pInfixSide _ = Nothing
+
+pLHsTypeArg :: Located TyEl -> Maybe (HsArg (LHsType GhcPs) (SrcSpan, LHsKind GhcPs))
+pLHsTypeArg (dL->L l (TyElOpd a)) = Just (HsValArg (L l a))
+pLHsTypeArg (dL->L _ (TyElKindApp l a)) = Just (HsTypeArg (l,a))
+pLHsTypeArg _ = Nothing
 
 pDocPrev :: [Located TyEl] -> (Maybe LHsDocString, [Located TyEl])
 pDocPrev = go Nothing
@@ -1735,8 +1781,10 @@ mergeDataCon all_xs =
     goFirst ((dL->L l (TyElOpd t)):xs)
       | (_, t', addAnns, xs') <- pBangTy (cL l t) xs
       = go addAnns Nothing [mkLHsDocTyMaybe t' trailingFieldDoc] xs'
-    goFirst xs =
-      go (pure ()) mTrailingDoc [] xs
+    goFirst (L l (TyElKindApp _ _):_)
+      = goInfix Monoid.<> Left (l, kindAppErr)
+    goFirst xs
+      = go (pure ()) mTrailingDoc [] xs
 
     go addAnns mLastDoc ts [ dL->L l (TyElOpd (HsTyVar _ _ (dL->L _ tc))) ]
       = do { data_con <- tyConToDataCon l tc
@@ -1751,6 +1799,7 @@ mergeDataCon all_xs =
       -- Encountered an operator: backtrack to the beginning and attempt
       -- to parse as an infix definition.
       goInfix
+    go _ _ _ (L l (TyElKindApp _ _):_) =  goInfix Monoid.<> Left (l, kindAppErr)
     go _ _ _ _ = Left malformedErr
       where
         malformedErr =
@@ -1781,6 +1830,11 @@ mergeDataCon all_xs =
           , text "Cannot parse an infix data constructor" <+>
             text "in a data/newtype declaration:" $$
             nest 2 (hsep . reverse $ map ppr all_xs'))
+
+    kindAppErr =
+      text "Unexpected kind application" <+>
+      text "in a data/newtype declaration:" $$
+      nest 2 (hsep . reverse $ map ppr all_xs')
 
 ---------------------------------------------------------------------------
 -- Check for monad comprehensions

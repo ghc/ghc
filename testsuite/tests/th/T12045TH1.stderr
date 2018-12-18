@@ -1,0 +1,18 @@
+T12045TH1.hs:(8,3)-(10,52): Splicing declarations
+    [d| type family F (a :: k) :: Type where
+          F @Type Int = Bool
+          F @(Type -> Type) Maybe = Char |]
+  ======>
+    type family F (a :: k) :: Type where
+      F @Type Int = Bool
+      F @Type -> Type Maybe = Char
+T12045TH1.hs:13:3-31: Splicing declarations
+    [d| data family D (a :: k) |] ======> data family D (a :: k)
+T12045TH1.hs:15:3-40: Splicing declarations
+    [d| data instance D @Type a = DBool |]
+  ======>
+    data instance D @Type a = DBool
+T12045TH1.hs:17:3-50: Splicing declarations
+    [d| data instance D @(Type -> Type) b = DChar |]
+  ======>
+    data instance D @Type -> Type b = DChar

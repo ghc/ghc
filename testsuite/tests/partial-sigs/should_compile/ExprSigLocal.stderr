@@ -4,14 +4,16 @@ ExprSigLocal.hs:9:35: warning: [-Wpartial-type-signatures (in -Wdefault)]
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of <expression> :: a -> a
                at ExprSigLocal.hs:9:20-35
-    • In an expression type signature: forall a. a -> _
+    • In the type ‘a -> _’
+      In an expression type signature: forall a. a -> _
       In the expression: ((\ x -> x) :: forall a. a -> _)
-      In an equation for ‘y’: y = ((\ x -> x) :: forall a. a -> _)
     • Relevant bindings include
         y :: b -> b (bound at ExprSigLocal.hs:9:1)
 
 ExprSigLocal.hs:11:21: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘a’
       Where: ‘a’ is a rigid type variable bound by
-               the inferred type of g :: a -> a at ExprSigLocal.hs:12:1-7
-    • In the type signature: g :: forall a. a -> _
+               the inferred type of g :: a -> a
+               at ExprSigLocal.hs:12:1-7
+    • In the type ‘a -> _’
+      In the type signature: g :: forall a. a -> _

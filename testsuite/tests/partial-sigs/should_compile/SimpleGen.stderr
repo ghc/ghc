@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  bar :: forall w. w -> Bool
+  bar :: forall _. _ -> Bool
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

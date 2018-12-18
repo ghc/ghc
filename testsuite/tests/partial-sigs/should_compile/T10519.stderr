@@ -1,5 +1,5 @@
 
-T10519.hs:5:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T10519.hs:5:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Eq a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of foo :: Eq a => a -> a -> Bool

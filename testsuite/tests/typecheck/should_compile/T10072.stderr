@@ -2,7 +2,9 @@
 T10072.hs:3:31: error:
     • Found type wildcard ‘_’ standing for ‘b’
       Where: ‘b’ is a rigid type variable bound by
-               the RULE "map/empty" at T10072.hs:3:1-47
+               the RULE "map/empty"
+               at T10072.hs:3:1-47
       To use the inferred type, enable PartialTypeSignatures
-    • In a RULE for ‘f’: a -> _
+    • In the type ‘a -> _’
+      In a RULE for ‘f’: a -> _
       When checking the transformation rule "map/empty"

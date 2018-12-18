@@ -1,14 +1,14 @@
 
-WildcardInstantiations.hs:5:14: error:
-    • Found type wildcard ‘_a’ standing for ‘a’
+WildcardInstantiations.hs:5:8: error:
+    • Found type wildcard ‘_’ standing for ‘Enum a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of foo :: (Show a, Enum a) => a -> String
                at WildcardInstantiations.hs:6:1-21
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: foo :: (Show _a, _) => _a -> _
 
-WildcardInstantiations.hs:5:18: error:
-    • Found type wildcard ‘_’ standing for ‘Enum a’
+WildcardInstantiations.hs:5:14: error:
+    • Found type wildcard ‘_a’ standing for ‘a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of foo :: (Show a, Enum a) => a -> String
                at WildcardInstantiations.hs:6:1-21
@@ -18,28 +18,32 @@ WildcardInstantiations.hs:5:18: error:
 WildcardInstantiations.hs:5:30: error:
     • Found type wildcard ‘_’ standing for ‘String’
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: foo :: (Show _a, _) => _a -> _
+    • In the type ‘_a -> _’
+      In the type signature: foo :: (Show _a, _) => _a -> _
 
 WildcardInstantiations.hs:8:8: error:
     • Found type wildcard ‘_’ standing for ‘t’
       Where: ‘t’ is a rigid type variable bound by
-               the inferred type of bar :: t -> (t -> w) -> w
+               the inferred type of bar :: t -> (t -> _) -> _
                at WildcardInstantiations.hs:9:1-13
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: bar :: _ -> _ -> _
+    • In the type ‘_ -> _ -> _’
+      In the type signature: bar :: _ -> _ -> _
 
 WildcardInstantiations.hs:8:13: error:
-    • Found type wildcard ‘_’ standing for ‘t -> w’
-      Where: ‘t’, ‘w’ are rigid type variables bound by
-               the inferred type of bar :: t -> (t -> w) -> w
+    • Found type wildcard ‘_’ standing for ‘t -> _’
+      Where: ‘t’, ‘_’ are rigid type variables bound by
+               the inferred type of bar :: t -> (t -> _) -> _
                at WildcardInstantiations.hs:9:1-13
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: bar :: _ -> _ -> _
+    • In the type ‘_ -> _ -> _’
+      In the type signature: bar :: _ -> _ -> _
 
 WildcardInstantiations.hs:8:18: error:
-    • Found type wildcard ‘_’ standing for ‘w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of bar :: t -> (t -> w) -> w
+    • Found type wildcard ‘_’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of bar :: t -> (t -> _) -> _
                at WildcardInstantiations.hs:9:1-13
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: bar :: _ -> _ -> _
+    • In the type ‘_ -> _ -> _’
+      In the type signature: bar :: _ -> _ -> _

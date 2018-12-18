@@ -8,6 +8,7 @@ HsTypes: Abstract syntax: user-defined types
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
@@ -27,6 +28,8 @@ module HsTypes (
         HsContext, LHsContext, noLHsContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
+        HsArg(..), numVisibleArgs,
+        LHsTypeArg,
 
         LBangType, BangType,
         HsSrcBang(..), HsImplBang(..),
@@ -42,8 +45,7 @@ module HsTypes (
         rdrNameAmbiguousFieldOcc, selectorAmbiguousFieldOcc,
         unambiguousFieldOcc, ambiguousFieldOcc,
 
-        HsWildCardInfo(..), mkAnonWildCardTy, pprAnonWildCard,
-        wildCardName, sameWildCard,
+        mkAnonWildCardTy, pprAnonWildCard,
 
         mkHsImplicitBndrs, mkHsWildCardBndrs, hsImplicitBody,
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
@@ -57,7 +59,7 @@ module HsTypes (
         splitLHsForAllTy, splitLHsQualTy, splitLHsSigmaTy,
         splitHsFunType,
         splitHsAppTys, hsTyGetAppHead_maybe,
-        mkHsOpTy, mkHsAppTy, mkHsAppTys,
+        mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType,
         hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
 
@@ -88,6 +90,7 @@ import SrcLoc
 import Outputable
 import FastString
 import Maybes( isJust )
+import Util ( count )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 
@@ -187,8 +190,8 @@ A wildcard in a type can be
   * An anonymous wildcard,
         written '_'
     In HsType this is represented by HsWildCardTy.
-    After the renamer, this contains a Name which uniquely
-    identifies this particular occurrence.
+    The renamer leaves it untouched, and it is later given fresh meta tyvars in
+    the typechecker.
 
   * A named wildcard,
         written '_a', '_foo', etc
@@ -208,9 +211,13 @@ Note carefully:
   Here _a is an ordinary forall'd binder, but (With NamedWildCards)
   _b is a named wildcard.  (See the comments in Trac #10982)
 
-* All wildcards, whether named or anonymous, are bound by the
-  HsWildCardBndrs construct, which wraps types that are allowed
-  to have wildcards.
+* Named wildcards are bound by the HsWildCardBndrs construct, which wraps
+  types that are allowed to have wildcards. Unnamed wildcards however are left
+  unchanged until typechecking, where we give them fresh wild tyavrs and
+  determine whether or not to emit hole constraints on each wildcard
+  (we don't if it's a visible type/kind argument or a type family pattern).
+  See related notes Note [Wildcards in visible kind application]
+  and Note [Wildcards in visible type application] in TcHsType.hs
 
 * After type checking is done, we report what types the wildcards
   got unified with.
@@ -371,7 +378,8 @@ data HsWildCardBndrs pass thing
     -- See Note [The wildcard story for types]
   = HsWC { hswc_ext :: XHsWC pass thing
                 -- after the renamer
-                -- Wild cards, both named and anonymous
+                -- Wild cards, only named
+                -- See Note [Wildcards in visible kind application]
 
          , hswc_body :: thing
                 -- Main payload (type or list of types)
@@ -537,6 +545,10 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
+  | HsAppKindTy         (XAppKindTy pass) -- type level type app
+                        (LHsType pass)
+                        (LHsKind pass)
+
   | HsFunTy             (XFunTy pass)
                         (LHsType pass)   -- function type
                         (LHsType pass)
@@ -667,8 +679,6 @@ data HsType pass
 
   | HsWildCardTy (XWildCardTy pass)  -- A type wildcard
       -- See Note [The wildcard story for types]
-      -- A anonymous wild card ('_'). A fresh Name is generated for
-      -- each individual anonymous wildcard during renaming
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in ApiAnnotation
@@ -700,6 +710,8 @@ type instance XIParamTy        (GhcPass _) = NoExt
 type instance XStarTy          (GhcPass _) = NoExt
 type instance XKindSig         (GhcPass _) = NoExt
 
+type instance XAppKindTy       (GhcPass _) = NoExt
+
 type instance XSpliceTy        GhcPs = NoExt
 type instance XSpliceTy        GhcRn = NoExt
 type instance XSpliceTy        GhcTc = Kind
@@ -718,9 +730,7 @@ type instance XExplicitTupleTy GhcTc = [Kind]
 
 type instance XTyLit           (GhcPass _) = NoExt
 
-type instance XWildCardTy      GhcPs = NoExt
-type instance XWildCardTy      GhcRn = HsWildCardInfo
-type instance XWildCardTy      GhcTc = HsWildCardInfo
+type instance XWildCardTy      (GhcPass _) = NoExt
 
 type instance XXType         (GhcPass _) = NewHsTypeX
 
@@ -733,11 +743,6 @@ data HsTyLit
   | HsStrTy SourceText FastString
     deriving Data
 
-newtype HsWildCardInfo        -- See Note [The wildcard story for types]
-    = AnonWildCard (Located Name)
-      deriving Data
-      -- A anonymous wild card ('_'). A fresh Name is generated for
-      -- each individual anonymous wildcard during renaming
 
 {-
 Note [HsForAllTy tyvar binders]
@@ -1009,13 +1014,6 @@ hsLTyVarBndrsToTypes (HsQTvs { hsq_explicit = tvbs }) = map hsLTyVarBndrToType t
 hsLTyVarBndrsToTypes (XLHsQTyVars _) = panic "hsLTyVarBndrsToTypes"
 
 ---------------------
-wildCardName :: HsWildCardInfo -> Name
-wildCardName (AnonWildCard  (L _ n)) = n
-
--- Two wild cards are the same when they have the same location
-sameWildCard :: Located HsWildCardInfo -> Located HsWildCardInfo -> Bool
-sameWildCard (L l1 (AnonWildCard _))   (L l2 (AnonWildCard _))   = l1 == l2
-
 ignoreParens :: LHsType pass -> LHsType pass
 ignoreParens (L _ (HsParTy _ ty)) = ignoreParens ty
 ignoreParens ty                   = ty
@@ -1047,6 +1045,11 @@ mkHsAppTys :: LHsType (GhcPass p) -> [LHsType (GhcPass p)]
            -> LHsType (GhcPass p)
 mkHsAppTys = foldl' mkHsAppTy
 
+mkHsAppKindTy :: LHsType (GhcPass p) -> LHsType (GhcPass p)
+              -> LHsType (GhcPass p)
+mkHsAppKindTy ty k
+  = addCLoc ty k (HsAppKindTy noExt ty k)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1068,7 +1071,9 @@ splitHsFunType (L _ (HsParTy _ ty))
 splitHsFunType (L _ (HsFunTy _ x y))
   | (args, res) <- splitHsFunType y
   = (x:args, res)
-
+{- This is not so correct, because it won't work with visible kind app, in case
+  someone wants to write '(->) @k1 @k2 t1 t2'. Fixing this would require changing
+  ConDeclGADT abstract syntax -}
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
@@ -1087,22 +1092,59 @@ splitHsFunType other = ([], other)
 -- used to examine the result of a GADT-like datacon, so it doesn't handle
 -- *all* cases (like lists, tuples, (~), etc.)
 hsTyGetAppHead_maybe :: LHsType (GhcPass p)
-                     -> Maybe (Located (IdP (GhcPass p)), [LHsType (GhcPass p)])
-hsTyGetAppHead_maybe = go []
+                     -> Maybe (Located (IdP (GhcPass p)))
+hsTyGetAppHead_maybe = go
   where
-    go tys (L _ (HsTyVar _ _ ln))          = Just (ln, tys)
-    go tys (L _ (HsAppTy _ l r))           = go (r : tys) l
-    go tys (L _ (HsOpTy _ l (L loc n) r))  = Just (L loc n, l : r : tys)
-    go tys (L _ (HsParTy _ t))             = go tys t
-    go tys (L _ (HsKindSig _ t _))         = go tys t
-    go _   _                             = Nothing
+    go (L _ (HsTyVar _ _ ln))          = Just ln
+    go (L _ (HsAppTy _ l _))           = go l
+    go (L _ (HsAppKindTy _ t _))       = go t
+    go (L _ (HsOpTy _ _ (L loc n) _))  = Just (L loc n)
+    go (L _ (HsParTy _ t))             = go t
+    go (L _ (HsKindSig _ t _))         = go t
+    go _                               = Nothing
 
-splitHsAppTys :: LHsType GhcRn -> [LHsType GhcRn]
-              -> (LHsType GhcRn, [LHsType GhcRn])
-splitHsAppTys (L _ (HsAppTy _ f a)) as = splitHsAppTys f (a:as)
-splitHsAppTys (L _ (HsParTy _ f))   as = splitHsAppTys f as
-splitHsAppTys f                     as = (f,as)
+------------------------------------------------------------
+-- Arguments in an expression/type after splitting
+data HsArg tm ty
+  = HsValArg tm   -- Argument is an ordinary expression     (f arg)
+  | HsTypeArg  ty -- Argument is a visible type application (f @ty)
+  | HsArgPar SrcSpan -- See Note [HsArgPar]
 
+numVisibleArgs :: [HsArg tm ty] -> Arity
+numVisibleArgs = count is_vis
+  where is_vis (HsValArg _) = True
+        is_vis _            = False
+
+-- type level equivalent
+type LHsTypeArg p = HsArg (LHsType p) (LHsKind p)
+
+instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
+  ppr (HsValArg tm)  = ppr tm
+  ppr (HsTypeArg ty) = char '@' <> ppr ty
+  ppr (HsArgPar sp)  = text "HsArgPar"  <+> ppr sp
+{-
+Note [HsArgPar]
+A HsArgPar indicates that everything to the left of this in the argument list is
+enclosed in parentheses together with the function itself. It is necessary so
+that we can recreate the parenthesis structure in the original source after
+typechecking the arguments.
+
+The SrcSpan is the span of the original HsPar
+
+((f arg1) arg2 arg3) results in an input argument list of
+[HsValArg arg1, HsArgPar span1, HsValArg arg2, HsValArg arg3, HsArgPar span2]
+
+-}
+
+splitHsAppTys :: HsType GhcRn -> (LHsType GhcRn, [LHsTypeArg GhcRn])
+splitHsAppTys e = go (noLoc e) []
+  where
+    go :: LHsType GhcRn -> [LHsTypeArg GhcRn]
+       -> (LHsType GhcRn, [LHsTypeArg GhcRn])
+    go (L _ (HsAppTy _ f a))      as = go f (HsValArg a : as)
+    go (L _ (HsAppKindTy _ ty k)) as = go ty (HsTypeArg k : as)
+    go (L sp (HsParTy _ f))       as = go f (HsArgPar sp : as)
+    go f                          as = (f,as)
 --------------------------------
 splitLHsPatSynTy :: LHsType pass
                  -> ( [LHsTyVarBndr pass]    -- universals
@@ -1155,7 +1197,7 @@ getLHsInstDeclClass_maybe :: LHsSigType (GhcPass p)
 -- Works on (HsSigType RdrName)
 getLHsInstDeclClass_maybe inst_ty
   = do { let head_ty = getLHsInstDeclHead inst_ty
-       ; (cls, _) <- hsTyGetAppHead_maybe head_ty
+       ; cls <- hsTyGetAppHead_maybe head_ty
        ; return cls }
 
 {-
@@ -1290,9 +1332,6 @@ instance (p ~ GhcPass pass,Outputable thing)
     ppr (HsWC { hswc_body = ty }) = ppr ty
     ppr (XHsWildCardBndrs x) = ppr x
 
-instance Outputable HsWildCardInfo where
-    ppr (AnonWildCard _)  = char '_'
-
 pprAnonWildCard :: SDoc
 pprAnonWildCard = char '_'
 
@@ -1418,7 +1457,8 @@ ppr_mono_ty (HsStarTy _ isUni)  = char (if isUni then '★' else '*')
 
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty)
   = hsep [ppr_mono_lty fun_ty, ppr_mono_lty arg_ty]
-
+ppr_mono_ty (HsAppKindTy _ ty k)
+  = ppr_mono_lty ty <+> char '@' <> ppr_mono_lty k
 ppr_mono_ty (HsOpTy _ ty1 (L _ op) ty2)
   = sep [ ppr_mono_lty ty1
         , sep [pprInfixOcc op, ppr_mono_lty ty2 ] ]
@@ -1475,6 +1515,7 @@ hsTypeNeedsParens p = go
     go (HsWildCardTy{})      = False
     go (HsStarTy{})          = False
     go (HsAppTy{})           = p >= appPrec
+    go (HsAppKindTy{})       = p >= appPrec
     go (HsOpTy{})            = p >= opPrec
     go (HsParTy{})           = False
     go (HsDocTy _ (L _ t) _) = go t
@@ -1516,6 +1557,7 @@ lhsTypeHasLeadingPromotionQuote ty
     go (HsWildCardTy{})      = False
     go (HsStarTy{})          = False
     go (HsAppTy _ t _)       = goL t
+    go (HsAppKindTy _ t _)   = goL t
     go (HsParTy{})           = False
     go (HsDocTy _ t _)       = goL t
     go (XHsType{})           = False

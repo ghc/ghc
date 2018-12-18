@@ -1,0 +1,7 @@
+
+T15799.hs:46:62: error:
+    • Expected kind ‘Op Nat’, but ‘UnOp b’ has kind ‘Nat’
+    • In the first argument of ‘(<=)’, namely ‘UnOp b’
+
+T15799.hs:46:62: error:
+    Expected a constraint, but ‘UnOp b <= a’ has kind ‘*’

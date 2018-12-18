@@ -38,13 +38,14 @@
               (Unqual
                {OccName: Foo}))
              (Nothing)
-             [({ KindSigs.hs:12:7 }
-               (HsTyVar
-                (NoExt)
-                (NotPromoted)
-                ({ KindSigs.hs:12:7 }
-                 (Unqual
-                  {OccName: a}))))]
+             [(HsValArg
+               ({ KindSigs.hs:12:7 }
+                (HsTyVar
+                 (NoExt)
+                 (NotPromoted)
+                 ({ KindSigs.hs:12:7 }
+                  (Unqual
+                   {OccName: a})))))]
              (Prefix)
              ({ KindSigs.hs:12:11-21 }
               (HsKindSig

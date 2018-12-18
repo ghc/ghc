@@ -1,5 +1,5 @@
 
-T11515.hs:7:20: error:
+T11515.hs:7:8: error:
     • Found type wildcard ‘_’ standing for ‘()’
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: foo :: (ShowSyn a, _) => a -> String

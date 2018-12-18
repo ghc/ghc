@@ -1,8 +1,8 @@
 
-T14643.hs:5:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T14643.hs:5:11: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘()’
     • In the type signature: af :: (Num a, _) => a -> a
 
-T14643.hs:5:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T14643.hs:5:11: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘()’
     • In the type signature: ag :: (Num a, _) => a -> a

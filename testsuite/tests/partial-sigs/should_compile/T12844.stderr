@@ -1,5 +1,5 @@
 
-T12844.hs:12:9: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T12844.hs:12:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’
         standing for ‘(Foo rngs, Head rngs ~ '(r, r'))’
       Where: ‘rngs’, ‘k’, ‘r’, ‘k1’, ‘r'’

@@ -1,0 +1,6 @@
+
+T15801.hs:52:10: error:
+    • Couldn't match representation of type ‘UnOp op_a -> UnOp b’
+                               with that of ‘op_a --> b’
+        arising from the superclasses of an instance declaration
+    • In the instance declaration for ‘OpRíki (Op *)’

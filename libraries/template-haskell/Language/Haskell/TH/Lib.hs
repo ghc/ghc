@@ -52,9 +52,10 @@ module Language.Haskell.TH.Lib (
     bindS, letS, noBindS, parS, recS,
 
     -- *** Types
-        forallT, varT, conT, appT, arrowT, infixT, uInfixT, parensT, equalityT,
-        listT, tupleT, unboxedTupleT, unboxedSumT, sigT, litT, wildCardT,
-        promotedT, promotedTupleT, promotedNilT, promotedConsT, implicitParamT,
+        forallT, varT, conT, appT, appKindT, arrowT, infixT, uInfixT, parensT,
+        equalityT, listT, tupleT, unboxedTupleT, unboxedSumT, sigT, litT,
+        wildCardT, promotedT, promotedTupleT, promotedNilT, promotedConsT,
+        implicitParamT,
     -- **** Type literals
     numTyLit, strTyLit,
     -- **** Strictness
@@ -207,20 +208,20 @@ dataInstD :: CxtQ -> Name -> [TypeQ] -> Maybe Kind -> [ConQ] -> [DerivClauseQ]
 dataInstD ctxt tc tys ksig cons derivs =
   do
     ctxt1 <- ctxt
-    tys1  <- sequence tys
+    ty1 <- foldl appT (conT tc) tys
     cons1 <- sequence cons
     derivs1 <- sequence derivs
-    return (DataInstD ctxt1 tc Nothing tys1 ksig cons1 derivs1)
+    return (DataInstD ctxt1 Nothing ty1 ksig cons1 derivs1)
 
 newtypeInstD :: CxtQ -> Name -> [TypeQ] -> Maybe Kind -> ConQ -> [DerivClauseQ]
              -> DecQ
 newtypeInstD ctxt tc tys ksig con derivs =
   do
     ctxt1 <- ctxt
-    tys1  <- sequence tys
+    ty1 <- foldl appT (conT tc) tys
     con1  <- con
     derivs1 <- sequence derivs
-    return (NewtypeInstD ctxt1 tc Nothing tys1 ksig con1 derivs1)
+    return (NewtypeInstD ctxt1 Nothing ty1 ksig con1 derivs1)
 
 dataFamilyD :: Name -> [TyVarBndr] -> Maybe Kind -> DecQ
 dataFamilyD tc tvs kind
@@ -237,12 +238,12 @@ closedTypeFamilyD tc tvs result injectivity eqns =
   do eqns1 <- sequence eqns
      return (ClosedTypeFamilyD (TypeFamilyHead tc tvs result injectivity) eqns1)
 
-tySynEqn :: [TypeQ] -> TypeQ -> TySynEqnQ
-tySynEqn lhs rhs =
+tySynEqn :: (Maybe [TyVarBndr]) -> TypeQ -> TypeQ -> TySynEqnQ
+tySynEqn tvs lhs rhs =
   do
-    lhs1 <- sequence lhs
+    lhs1 <- lhs
     rhs1 <- rhs
-    return (TySynEqn Nothing lhs1 rhs1)
+    return (TySynEqn tvs lhs1 rhs1)
 
 forallC :: [TyVarBndr] -> CxtQ -> ConQ -> ConQ
 forallC ns ctxt con = liftM2 (ForallC ns) ctxt con

@@ -1,8 +1,9 @@
 -- test reification of data declarations
 
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, TypeApplications, PolyKinds #-}
 module TH_reifyDecl1 where
 
+import Data.Kind as K
 import System.IO
 import Language.Haskell.TH
 import Text.PrettyPrint.HughesPJ
@@ -60,6 +61,10 @@ data family DF1 a
 data family DF2 a
 data instance DF2 Bool = DBool
 
+data family DF3 (a :: k)
+data instance DF3 @K.Type a = DF3Bool
+data instance DF3 @(K.Type -> K.Type) b = DF3Char
+
 $(return [])
 
 test :: ()
@@ -83,4 +88,5 @@ test = $(let
           ; display ''TF2
           ; display ''DF1
           ; display ''DF2
+          ; display ''DF3
           ; [| () |] })

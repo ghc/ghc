@@ -1,6 +1,6 @@
 Proxy _ :: *
 Proxy (Maybe :: _) :: *
-Dependent _ :: w -> *
+Dependent _ :: _ -> *
 Proxy _ :: *
 Proxy (Maybe :: _) :: *
-Dependent _ :: w -> *
+Dependent _ :: _ -> *

@@ -19,23 +19,18 @@ $( return
        (Just $ InjectivityAnn (mkName "result")
                              [(mkName "a"), (mkName "b"), (mkName "c") ]))
    , TySynInstD
-       (mkName "F")
-       (TySynEqn Nothing
-                 [ ConT (mkName "Int"), ConT (mkName "Char")
-                 , ConT (mkName "Bool")]
-                 ( ConT (mkName "Bool")))
+       (TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "F")) (ConT (mkName "Int")))
+                       (ConT (mkName "Char"))) (ConT (mkName "Bool")))
+                 (ConT (mkName "Bool")))
+
    , TySynInstD
-       (mkName "F")
-       (TySynEqn Nothing
-                 [ ConT (mkName "Char"), ConT (mkName "Bool")
-                 , ConT (mkName "Int")]
-                 ( ConT (mkName "Int")))
+       (TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "F")) (ConT (mkName "Char")))
+                       (ConT (mkName "Bool"))) (ConT (mkName "Int")))
+                 (ConT (mkName "Int")))
    , TySynInstD
-       (mkName "F")
-       (TySynEqn Nothing
-                 [ ConT (mkName "Bool"), ConT (mkName "Int")
-                 , ConT (mkName "Char")]
-                 ( ConT (mkName "Char")))
+       (TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "F")) (ConT (mkName "Bool")))
+                       (ConT (mkName "Int"))) (ConT (mkName "Char")))
+                 (ConT (mkName "Char")))
    ] )
 
 -- this is injective - a type variables mentioned on LHS is not mentioned on RHS
@@ -50,10 +45,9 @@ $( return
        (TyVarSig (PlainTV (mkName "r")))
        (Just $ InjectivityAnn (mkName "r") [mkName "a"]))
    , TySynInstD
-       (mkName "J")
-       (TySynEqn Nothing
-                 [ ConT (mkName "Int"), VarT (mkName "b") ]
-                 ( ConT (mkName "Int")))
+       (TySynEqn Nothing (AppT (AppT (ConT (mkName "J")) (ConT (mkName "Int")))
+                       (VarT (mkName "b")))
+                 (ConT (mkName "Char")))
    ] )
 
 -- Closed type families
@@ -70,18 +64,18 @@ $( return
        , KindedTV (mkName "c") StarT ]
        (TyVarSig (PlainTV (mkName "r")))
        (Just $ InjectivityAnn (mkName "r") [(mkName "a"), (mkName "b")]))
-       [ TySynEqn Nothing
-                  [ ConT (mkName "Int"), ConT (mkName "Char")
-                  , ConT (mkName "Bool")]
-                  ( ConT (mkName "Bool"))
-       , TySynEqn Nothing
-                  [ ConT (mkName "Int"), ConT (mkName "Char")
-                  , ConT (mkName "Int")]
-                  ( ConT (mkName "Bool"))
-       , TySynEqn Nothing
-                  [ ConT (mkName "Bool"), ConT (mkName "Int")
-                  , ConT (mkName "Int")]
-                  ( ConT (mkName "Int"))
+
+       [ TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "I")) (ConT (mkName "Int")))
+                                      (ConT (mkName "Char"))) (ConT (mkName "Bool")))
+                          (ConT (mkName "Bool"))
+
+       , TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "I")) (ConT (mkName "Int")))
+                                      (ConT (mkName "Char"))) (ConT (mkName "Int")))
+                          (ConT (mkName "Bool"))
+
+       , TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "I")) (ConT (mkName "Bool")))
+                                      (ConT (mkName "Int"))) (ConT (mkName "Int")))
+                          (ConT (mkName "Int"))
        ]
    ] )
 
@@ -108,22 +102,19 @@ $( return
        (TyVarSig (PlainTV (mkName "r")))
        (Just $ InjectivityAnn (mkName "r")
                              [(mkName "a"), (mkName "b") ]))
+
    , TySynInstD
-       (mkName "H")
-       (TySynEqn Nothing
-                 [ ConT (mkName "Int"), ConT (mkName "Char")
-                 , ConT (mkName "Bool")]
-                 ( ConT (mkName "Bool")))
+         (TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "H")) (ConT (mkName "Int")))
+                                       (ConT (mkName "Char"))) (ConT (mkName "Bool")))
+                           (ConT (mkName "Bool")))
+
    , TySynInstD
-       (mkName "H")
-       (TySynEqn Nothing
-                 [ ConT (mkName "Int"), ConT (mkName "Int")
-                 , ConT (mkName "Int")]
-                 ( ConT (mkName "Bool")))
+         (TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "H")) (ConT (mkName "Int")))
+                                       (ConT (mkName "Int"))) (ConT (mkName "Int")))
+                           (ConT (mkName "Bool")))
+
    , TySynInstD
-       (mkName "H")
-       (TySynEqn Nothing
-                 [ ConT (mkName "Bool"), ConT (mkName "Int")
-                 , ConT (mkName "Int")]
-                 ( ConT (mkName "Int")))
+         (TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "H")) (ConT (mkName "Bool")))
+                                       (ConT (mkName "Int"))) (ConT (mkName "Int")))
+                           (ConT (mkName "Int")))
    ] )

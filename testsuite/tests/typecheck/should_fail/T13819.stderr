@@ -1,8 +1,8 @@
 
 T13819.hs:12:10: error:
-    • Couldn't match type ‘w0 -> A w0’ with ‘A a’
+    • Couldn't match type ‘_0 -> A _0’ with ‘A a’
       Expected type: a -> A a
-        Actual type: (w1 -> WrappedMonad A w2) (w0 -> A w0)
+        Actual type: (_1 -> WrappedMonad A _2) (_0 -> A _0)
     • In the expression: pure @(_ -> WrappedMonad A _) @(_ -> A _) pure
       In an equation for ‘pure’:
           pure = pure @(_ -> WrappedMonad A _) @(_ -> A _) pure

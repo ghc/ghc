@@ -1,0 +1,5 @@
+
+T12045b.hs:7:6: error:
+    • Cannot apply function of kind ‘*’
+      to visible kind argument ‘Type’
+    • In the type signature: x :: Int @Type

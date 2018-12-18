@@ -1,25 +1,23 @@
 
 T10403.hs:15:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Functor f’
-      Where: ‘f’ is a rigid type variable
-               bound by the inferred type of
-                        h1 :: Functor f => (a -> b) -> f a -> H f
+      Where: ‘f’ is a rigid type variable bound by
+               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:17:1-41
     • In the type signature: h1 :: _ => _
 
 T10403.hs:15:12: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
-      Where: ‘b’, ‘a’, ‘f’ are rigid type variables
-               bound by the inferred type of
-                        h1 :: Functor f => (a -> b) -> f a -> H f
+      Where: ‘b’, ‘a’, ‘f’ are rigid type variables bound by
+               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:17:1-41
     • In the type signature: h1 :: _ => _
 
 T10403.hs:19:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘(a -> b) -> f0 a -> H f0’
       Where: ‘f0’ is an ambiguous type variable
-             ‘b’, ‘a’ are rigid type variables
-               bound by the inferred type of h2 :: (a -> b) -> f0 a -> H f0
+             ‘b’, ‘a’ are rigid type variables bound by
+               the inferred type of h2 :: (a -> b) -> f0 a -> H f0
                at T10403.hs:22:1-41
     • In the type signature: h2 :: _
 

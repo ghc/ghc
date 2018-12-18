@@ -1727,24 +1727,20 @@ data Dec
                (Maybe Kind)
          -- ^ @{ data family T a b c :: * }@
 
-  | DataInstD Cxt Name
-             (Maybe [TyVarBndr])  -- Quantified type vars
-             [Type]
+  | DataInstD Cxt (Maybe [TyVarBndr]) Type
              (Maybe Kind)         -- Kind signature
              [Con] [DerivClause]  -- ^ @{ data instance Cxt x => T [x]
                                   --       = A x | B (T x)
                                   --       deriving (Z,W)
                                   --       deriving stock Eq }@
 
-  | NewtypeInstD Cxt Name
-                 (Maybe [TyVarBndr])  -- Quantified type vars
-                 [Type]
+  | NewtypeInstD Cxt (Maybe [TyVarBndr]) Type -- Quantified type vars
                  (Maybe Kind)      -- Kind signature
                  Con [DerivClause] -- ^ @{ newtype instance Cxt x => T [x]
                                    --        = A (B x)
                                    --        deriving (Z,W)
                                    --        deriving stock Eq }@
-  | TySynInstD Name TySynEqn       -- ^ @{ type instance ... }@
+  | TySynInstD TySynEqn            -- ^ @{ type instance ... }@
 
   -- | open type families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
   | OpenTypeFamilyD TypeFamilyHead
@@ -1855,9 +1851,23 @@ data TypeFamilyHead =
   deriving( Show, Eq, Ord, Data, Generic )
 
 -- | One equation of a type family instance or closed type family. The
--- arguments are the left-hand-side type patterns and the right-hand-side
--- result.
-data TySynEqn = TySynEqn (Maybe [TyVarBndr]) [Type] Type
+-- arguments are the left-hand-side type and the right-hand-side result.
+--
+-- For instance, if you had the following type family:
+--
+-- @
+-- type family Foo (a :: k) :: k where
+--   forall k (a :: k). Foo \@k a = a
+-- @
+--
+-- The @Foo \@k a = a@ equation would be represented as follows:
+--
+-- @
+-- 'TySynEqn' ('Just' ['PlainTV' k, 'KindedTV' a ('VarT' k)])
+--            ('AppT' ('AppKindT' ('ConT' ''Foo) ('VarT' k)) ('VarT' a))
+--            ('VarT' a)
+-- @
+data TySynEqn = TySynEqn (Maybe [TyVarBndr]) Type Type
   deriving( Show, Eq, Ord, Data, Generic )
 
 data FunDep = FunDep [Name] [Name]
@@ -2037,6 +2047,7 @@ data PatSynArgs
 
 data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> => \<type\>@
           | AppT Type Type                -- ^ @T a b@
+          | AppKindT Type Kind            -- ^ @T \@k t@
           | SigT Type Kind                -- ^ @t :: k@
           | VarT Name                     -- ^ @a@
           | ConT Name                     -- ^ @T@

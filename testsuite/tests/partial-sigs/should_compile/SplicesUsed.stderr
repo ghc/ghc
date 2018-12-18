@@ -3,12 +3,13 @@
 
 SplicesUsed.hs:7:16: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Maybe Bool’
-    • In the type signature: maybeBool :: (_)
+    • In the type ‘_’
+      In the type signature: maybeBool :: (_)
 
 SplicesUsed.hs:8:15: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_a’ standing for ‘w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of <expression> :: w -> w
+    • Found type wildcard ‘_a’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of <expression> :: _ -> _
                at SplicesUsed.hs:8:15-22
     • In an expression type signature: _a -> _a
       In the expression: id :: _a -> _a
@@ -18,10 +19,9 @@ SplicesUsed.hs:8:15: warning: [-Wpartial-type-signatures (in -Wdefault)]
 
 SplicesUsed.hs:8:27: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Bool’
-    • In an expression type signature: Maybe _
-      In the first argument of ‘id :: _a -> _a’, namely
-        ‘(Just True :: Maybe _)’
-      In the expression: (id :: _a -> _a) (Just True :: Maybe _)
+    • In the first argument of ‘Maybe’, namely ‘_’
+      In the type ‘Maybe _’
+      In an expression type signature: Maybe _
     • Relevant bindings include
         maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
 
@@ -30,28 +30,32 @@ SplicesUsed.hs:10:17: warning: [-Wpartial-type-signatures (in -Wdefault)]
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of charA :: a -> (Char, a)
                at SplicesUsed.hs:11:1-18
-    • In the type signature: charA :: a -> (_)
+    • In the type ‘a -> (_)’
+      In the type signature: charA :: a -> (_)
 
 SplicesUsed.hs:13:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘a -> Bool’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of filter' :: (a -> Bool) -> [a] -> [a]
                at SplicesUsed.hs:14:1-16
-    • In the type signature: filter' :: (_ -> _ -> _)
+    • In the type ‘_ -> _ -> _’
+      In the type signature: filter' :: (_ -> _ -> _)
 
 SplicesUsed.hs:13:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘[a]’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of filter' :: (a -> Bool) -> [a] -> [a]
                at SplicesUsed.hs:14:1-16
-    • In the type signature: filter' :: (_ -> _ -> _)
+    • In the type ‘_ -> _ -> _’
+      In the type signature: filter' :: (_ -> _ -> _)
 
 SplicesUsed.hs:13:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘[a]’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of filter' :: (a -> Bool) -> [a] -> [a]
                at SplicesUsed.hs:14:1-16
-    • In the type signature: filter' :: (_ -> _ -> _)
+    • In the type ‘_ -> _ -> _’
+      In the type signature: filter' :: (_ -> _ -> _)
 
 SplicesUsed.hs:16:3: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Eq a’
@@ -72,8 +76,8 @@ SplicesUsed.hs:18:3: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • In the type signature: bar :: _a -> _b -> (_a, _b)
 
 SplicesUsed.hs:18:3: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_b’ standing for ‘w’
-      Where: ‘w’ is a rigid type variable bound by
-               the inferred type of bar :: Bool -> w -> (Bool, w)
+    • Found type wildcard ‘_b’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred type of bar :: Bool -> _ -> (Bool, _)
                at SplicesUsed.hs:18:3-10
     • In the type signature: bar :: _a -> _b -> (_a, _b)
