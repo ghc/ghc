@@ -1,0 +1,8 @@
+
+T16326_Fail9.hs:11:5: error:
+    • Illegal visible, dependent quantification in the type of a term:
+        forall a -> a -> a
+      (GHC does not yet support this)
+    • In the expression: lol @(forall a -> a -> a) undefined True
+      In an equation for ‘t’:
+          t = lol @(forall a -> a -> a) undefined True

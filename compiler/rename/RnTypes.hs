@@ -170,11 +170,13 @@ rnWcBody ctxt nwc_rdrs hs_ty
 
     rn_ty :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
     -- A lot of faff just to allow the extra-constraints wildcard to appear
-    rn_ty env hs_ty@(HsForAllTy { hst_bndrs = tvs, hst_body = hs_body })
+    rn_ty env hs_ty@(HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs
+                                , hst_body = hs_body })
       = bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc hs_ty) Nothing tvs $ \ tvs' ->
         do { (hs_body', fvs) <- rn_lty env hs_body
-           ; return (HsForAllTy { hst_xforall = noExt, hst_bndrs = tvs'
-                                , hst_body = hs_body' }, fvs) }
+           ; return (HsForAllTy { hst_fvf = fvf, hst_xforall = noExt
+                                , hst_bndrs = tvs', hst_body = hs_body' }
+                    , fvs) }
 
     rn_ty env (HsQualTy { hst_ctxt = dL->L cx hs_ctxt
                         , hst_body = hs_ty })
@@ -479,13 +481,14 @@ rnLHsTyKi env (dL->L loc ty)
 
 rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
 
-rnHsTyKi env ty@(HsForAllTy { hst_bndrs = tyvars, hst_body  = tau })
+rnHsTyKi env ty@(HsForAllTy { hst_fvf = fvf, hst_bndrs = tyvars
+                            , hst_body = tau })
   = do { checkPolyKinds env ty
        ; bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc ty)
                            Nothing tyvars $ \ tyvars' ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
-       ; return ( HsForAllTy { hst_xforall = noExt, hst_bndrs = tyvars'
-                             , hst_body =  tau' }
+       ; return ( HsForAllTy { hst_fvf = fvf, hst_xforall = noExt
+                             , hst_bndrs = tyvars' , hst_body =  tau' }
                 , fvs) } }
 
 rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })

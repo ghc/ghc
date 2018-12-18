@@ -62,7 +62,7 @@ module Var (
 
         -- * ArgFlags
         ArgFlag(..), isVisibleArgFlag, isInvisibleArgFlag, sameVis,
-        AnonArgFlag(..),
+        AnonArgFlag(..), ForallVisFlag(..), argToForallVisFlag,
 
         -- * TyVar's
         VarBndr(..), TyCoVarBinder, TyVarBinder,
@@ -425,15 +425,17 @@ instance Binary ArgFlag where
       1 -> return Specified
       _ -> return Inferred
 
--- The non-dependent version of ArgFlag, namely AnonArgFlag,
--- appears here partly so that it's together with its friend ArgFlag,
+-- | The non-dependent version of 'ArgFlag'.
+
+-- Appears here partly so that it's together with its friend ArgFlag,
 -- but also because it is used in IfaceType, rather early in the
 -- compilation chain
+-- See Note [AnonArgFlag vs. ForallVisFlag]
 data AnonArgFlag
-  = VisArg    -- Used for (->): an ordinary non-dependent arrow
-              -- The argument is visible in source code
-  | InvisArg  -- Used for (=>): a non-dependent predicate arrow
-              -- The argument is invisible in source code
+  = VisArg    -- ^ Used for @(->)@: an ordinary non-dependent arrow.
+              --   The argument is visible in source code.
+  | InvisArg  -- ^ Used for @(=>)@: a non-dependent predicate arrow.
+              --   The argument is invisible in source code.
   deriving (Eq, Ord, Data)
 
 instance Outputable AnonArgFlag where
@@ -449,6 +451,47 @@ instance Binary AnonArgFlag where
     case h of
       0 -> return VisArg
       _ -> return InvisArg
+
+-- | Is a @forall@ invisible (e.g., @forall a b. {...}@, with a dot) or visible
+-- (e.g., @forall a b -> {...}@, with an arrow)?
+
+-- See Note [AnonArgFlag vs. ForallVisFlag]
+data ForallVisFlag
+  = ForallVis   -- ^ A visible @forall@ (with an arrow)
+  | ForallInvis -- ^ An invisible @forall@ (with a dot)
+  deriving (Eq, Ord, Data)
+
+instance Outputable ForallVisFlag where
+  ppr f = text $ case f of
+                   ForallVis   -> "ForallVis"
+                   ForallInvis -> "ForallInvis"
+
+-- | Convert an 'ArgFlag' to its corresponding 'ForallVisFlag'.
+argToForallVisFlag :: ArgFlag -> ForallVisFlag
+argToForallVisFlag Required  = ForallVis
+argToForallVisFlag Specified = ForallInvis
+argToForallVisFlag Inferred  = ForallInvis
+
+{-
+Note [AnonArgFlag vs. ForallVisFlag]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The AnonArgFlag and ForallVisFlag data types are quite similar at a first
+glance:
+
+  data AnonArgFlag   = VisArg    | InvisArg
+  data ForallVisFlag = ForallVis | ForallInvis
+
+Both data types keep track of visibility of some sort. AnonArgFlag tracks
+whether a FunTy has a visible argument (->) or an invisible predicate argument
+(=>). ForallVisFlag tracks whether a `forall` quantifier is visible
+(forall a -> {...}) or invisible (forall a. {...}).
+
+Given their similarities, it's tempting to want to combine these two data types
+into one, but they actually represent distinct concepts. AnonArgFlag reflects a
+property of *Core* types, whereas ForallVisFlag reflects a property of the GHC
+AST. In other words, AnonArgFlag is all about internals, whereas ForallVisFlag
+is all about surface syntax. Therefore, they are kept as separate data types.
+-}
 
 {- *********************************************************************
 *                                                                      *

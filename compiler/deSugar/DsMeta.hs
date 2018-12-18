@@ -1144,18 +1144,21 @@ repLTys tys = mapM repLTy tys
 repLTy :: LHsType GhcRn -> DsM (Core TH.TypeQ)
 repLTy ty = repTy (unLoc ty)
 
-repForall :: HsType GhcRn -> DsM (Core TH.TypeQ)
+repForall :: ForallVisFlag -> HsType GhcRn -> DsM (Core TH.TypeQ)
 -- Arg of repForall is always HsForAllTy or HsQualTy
-repForall ty
+repForall fvf ty
  | (tvs, ctxt, tau) <- splitLHsSigmaTy (noLoc ty)
  = addHsTyVarBinds tvs $ \bndrs ->
    do { ctxt1  <- repLContext ctxt
       ; ty1    <- repLTy tau
-      ; repTForall bndrs ctxt1 ty1 }
+      ; case fvf of
+          ForallVis   -> repTForallVis bndrs ty1    -- forall a      -> {...}
+          ForallInvis -> repTForall bndrs ctxt1 ty1 -- forall a. C a => {...}
+      }
 
 repTy :: HsType GhcRn -> DsM (Core TH.TypeQ)
-repTy ty@(HsForAllTy {}) = repForall ty
-repTy ty@(HsQualTy {})   = repForall ty
+repTy ty@(HsForAllTy {hst_fvf = fvf}) = repForall fvf         ty
+repTy ty@(HsQualTy {})                = repForall ForallInvis ty
 
 repTy (HsTyVar _ _ (dL->L _ n))
   | isLiftedTypeKindTyConName n       = repTStar
@@ -2466,6 +2469,10 @@ repTForall :: Core [TH.TyVarBndrQ] -> Core TH.CxtQ -> Core TH.TypeQ
            -> DsM (Core TH.TypeQ)
 repTForall (MkC tvars) (MkC ctxt) (MkC ty)
     = rep2 forallTName [tvars, ctxt, ty]
+
+repTForallVis :: Core [TH.TyVarBndrQ] -> Core TH.TypeQ
+              -> DsM (Core TH.TypeQ)
+repTForallVis (MkC tvars) (MkC ty) = rep2 forallVisTName [tvars, ty]
 
 repTvar :: Core TH.Name -> DsM (Core TH.TypeQ)
 repTvar (MkC s) = rep2 varTName [s]

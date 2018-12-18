@@ -13,7 +13,7 @@ if config.have_ext_interp :
        setTestOpts(extra_ways(['ext-interp']))
        setTestOpts(only_ways(['normal','ghci','ext-interp']))
 
-broken_tests = ["ClosedFam1TH","T10620","T10828","T11721_TH","T11797","T12045TH2","T12478_1","T12646","T13642","T14060","T15502","T15738","T15792","T15845","T16180","T1835","T3920","T4135","T4188","T5037","T5362","T7477","T7910","T8761","T8884","T8953","T9262","T9692","T9738","TH_Lift","TH_RichKinds","TH_RichKinds2","TH_Roles3","TH_TyInstWhere2","TH_implicitParams","TH_recursiveDo","TH_reifyDecl1","TH_reifyExplicitForAllFams","TH_reifyInstances","TH_reifyMkName","TH_repE2","TH_repGuard","TH_repPrim","TH_repPrim2","TH_repUnboxedTuples","TH_spliceE6"]
+broken_tests = ["ClosedFam1TH","T10620","T10828","T11721_TH","T11797","T12045TH2","T12478_1","T12646","T13642","T14060","T15502","T15738","T15792","T15845","T16180","T1835","T3920","T4135","T4188","T5037","T5362","T7477","T7910","T8761","T8884","T8953","T9262","T9692","T9738","TH_Lift","TH_RichKinds","TH_RichKinds2","TH_Roles3","TH_TyInstWhere2","TH_implicitParams","TH_recursiveDo","TH_reifyDecl1","TH_reifyExplicitForAllFams","TH_reifyInstances","TH_reifyMkName","TH_repE2","TH_repGuard","TH_repPrim","TH_repPrim2","TH_repUnboxedTuples","TH_spliceE6","T16326_TH"]
 # ext-interp, integer-gmp and llvm is broken see #16087
 def broken_ext_interp(name, opts):
 	if name in broken_tests and config.ghc_built_by_llvm:
@@ -471,3 +471,4 @@ test('T16180', normal, compile_and_run, ['-package ghc'])
 test('T16183', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T16195', normal, multimod_compile, ['T16195.hs', '-v0'])
 test('T16293b', normal, compile, [''])
+test('T16326_TH', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])

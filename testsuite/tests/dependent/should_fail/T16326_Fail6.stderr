@@ -1,0 +1,7 @@
+
+T16326_Fail6.hs:9:3: error:
+    • GADT constructor type signature cannot contain nested ‘forall’s or contexts
+      Suggestion: instead use this type signature:
+        MkFoo :: forall a. a -> Foo a
+    • In the definition of data constructor ‘MkFoo’
+      In the data type declaration for ‘Foo’

@@ -1852,6 +1852,10 @@ unpackedness :: { Located ([AddAnn], SourceText, SrcUnpackedness) }
         : '{-# UNPACK' '#-}'   { sLL $1 $> ([mo $1, mc $2], getUNPACK_PRAGs $1, SrcUnpack) }
         | '{-# NOUNPACK' '#-}' { sLL $1 $> ([mo $1, mc $2], getNOUNPACK_PRAGs $1, SrcNoUnpack) }
 
+forall_vis_flag :: { (AddAnn, ForallVisFlag) }
+        : '.'  { (mj AnnDot $1,    ForallInvis) }
+        | '->' { (mj AnnRarrow $1, ForallVis)   }
+
 -- A ktype/ktypedoc is a ctype/ctypedoc, possibly with a kind annotation
 ktype :: { LHsType GhcPs }
         : ctype                { $1 }
@@ -1865,12 +1869,15 @@ ktypedoc :: { LHsType GhcPs }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType GhcPs }
-        : 'forall' tv_bndrs '.' ctype   {% hintExplicitForall $1 >>
+        : 'forall' tv_bndrs forall_vis_flag ctype
+                                        {% let (fv_ann, fv_flag) = $3 in
+                                           hintExplicitForall $1 *>
                                            ams (sLL $1 $> $
-                                                HsForAllTy { hst_bndrs = $2
+                                                HsForAllTy { hst_fvf = fv_flag
+                                                           , hst_bndrs = $2
                                                            , hst_xforall = noExt
                                                            , hst_body = $4 })
-                                               [mu AnnForall $1, mj AnnDot $3] }
+                                               [mu AnnForall $1,fv_ann] }
         | context '=>' ctype          {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
@@ -1892,12 +1899,15 @@ ctype   :: { LHsType GhcPs }
 -- to 'field' or to 'Int'. So we must use `ctype` to describe the type.
 
 ctypedoc :: { LHsType GhcPs }
-        : 'forall' tv_bndrs '.' ctypedoc {% hintExplicitForall $1 >>
+        : 'forall' tv_bndrs forall_vis_flag ctypedoc
+                                         {% let (fv_ann, fv_flag) = $3 in
+                                            hintExplicitForall $1 *>
                                             ams (sLL $1 $> $
-                                                 HsForAllTy { hst_bndrs = $2
+                                                 HsForAllTy { hst_fvf = fv_flag
+                                                            , hst_bndrs = $2
                                                             , hst_xforall = noExt
                                                             , hst_body = $4 })
-                                                [mu AnnForall $1,mj AnnDot $3] }
+                                                [mu AnnForall $1,fv_ann] }
         | context '=>' ctypedoc       {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1

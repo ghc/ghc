@@ -52,10 +52,10 @@ module Language.Haskell.TH.Lib (
     bindS, letS, noBindS, parS, recS,
 
     -- *** Types
-        forallT, varT, conT, appT, appKindT, arrowT, infixT, uInfixT, parensT,
-        equalityT, listT, tupleT, unboxedTupleT, unboxedSumT, sigT, litT,
-        wildCardT, promotedT, promotedTupleT, promotedNilT, promotedConsT,
-        implicitParamT,
+        forallT, forallVisT, varT, conT, appT, appKindT, arrowT, infixT,
+        uInfixT, parensT, equalityT, listT, tupleT, unboxedTupleT, unboxedSumT,
+        sigT, litT, wildCardT, promotedT, promotedTupleT, promotedNilT,
+        promotedConsT, implicitParamT,
     -- **** Type literals
     numTyLit, strTyLit,
     -- **** Strictness

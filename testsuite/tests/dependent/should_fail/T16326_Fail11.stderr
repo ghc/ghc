@@ -1,0 +1,7 @@
+
+T16326_Fail11.hs:9:11: error:
+    • Illegal visible, dependent quantification in the type of a term:
+        forall x -> x
+      (GHC does not yet support this)
+    • When checking the class method: m :: forall a b. C a => b -> a
+      In the class declaration for ‘C’

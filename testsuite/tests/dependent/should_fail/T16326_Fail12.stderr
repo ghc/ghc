@@ -1,0 +1,8 @@
+
+T16326_Fail12.hs:6:1: error:
+    • Illegal visible, dependent quantification in the type of a term:
+        forall a -> Show a
+      (GHC does not yet support this)
+    • In the context: forall a -> Show a
+      While checking the super-classes of class ‘C’
+      In the class declaration for ‘C’

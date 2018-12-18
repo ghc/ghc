@@ -1,6 +1,8 @@
 
-T15859.hs:14:5: error:
-    • Cannot apply expression of type ‘forall k -> k -> *’
-      to a visible type argument ‘Int’
-    • In the expression: (undefined :: KindOf A) @Int
-      In an equation for ‘a’: a = (undefined :: KindOf A) @Int
+T15859.hs:14:19: error:
+    • Illegal visible, dependent quantification in the type of a term:
+      forall k -> k -> *
+      (GHC does not yet support this)
+    • In the expansion of type synonym ‘KindOf’
+      In an expression type signature: KindOf A
+      In the expression: undefined :: KindOf A

@@ -1,0 +1,5 @@
+
+T16326_Fail3.hs:6:1: error:
+    Illegal visible, dependent quantification in the type of a term:
+      forall a -> [a]
+    (GHC does not yet support this)

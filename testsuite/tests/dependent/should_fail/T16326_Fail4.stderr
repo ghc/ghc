@@ -1,0 +1,11 @@
+
+T16326_Fail4.hs:6:30: error:
+    • Illegal visible, dependent quantification in the type of a term:
+        forall a1 -> Maybe a1 -> Maybe a1 -> Maybe a1
+      (GHC does not yet support this)
+    • In an expression type signature:
+        forall a -> Maybe a -> Maybe a -> Maybe a
+      In the first argument of ‘zipWith’, namely
+        ‘((<>) :: forall a -> Maybe a -> Maybe a -> Maybe a)’
+      In the expression:
+        zipWith ((<>) :: forall a -> Maybe a -> Maybe a -> Maybe a) xs ys

@@ -1,0 +1,8 @@
+
+T16326_Fail2.hs:6:37: error:
+    • Illegal visible, dependent quantification in the type of a term:
+        forall a -> a -> IO ()
+      (GHC does not yet support this)
+    • In the type signature: blah :: forall a -> a -> IO ()
+      When checking declaration:
+        foreign import ccall safe "blah" blah :: forall a -> a -> IO ()

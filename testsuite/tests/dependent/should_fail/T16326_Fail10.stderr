@@ -1,0 +1,7 @@
+
+T16326_Fail10.hs:12:18: error:
+    • Illegal visible, dependent quantification in the type of a term:
+        forall a -> a -> a
+      (GHC does not yet support this)
+    • In a RULE for ‘x’: forall a -> a -> a
+      When checking the transformation rule "flurmp"
