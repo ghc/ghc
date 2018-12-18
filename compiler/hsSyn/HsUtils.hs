@@ -652,11 +652,15 @@ typeToLHsType ty
                         , hst_xqual = noExt
                         , hst_body = go tau })
     go (FunTy arg res) = nlHsFunTy (go arg) (go res)
-    go ty@(ForAllTy {})
-      | (tvs, tau) <- tcSplitForAllTys ty
-      = noLoc (HsForAllTy { hst_bndrs = map go_tv tvs
+    go ty@(ForAllTy tvb _)
+      | (tvs, tau) <- tcSplitForAllTysSameVis fvf ty
+      = noLoc (HsForAllTy { hst_fvf = fvf
+                          , hst_bndrs = map go_tv tvs
                           , hst_xforall = noExt
                           , hst_body = go tau })
+      where
+        fvf :: ForallVisFlag
+        fvf = argToForallVisFlag $ binderArgFlag tvb
     go (TyVarTy tv)         = nlHsTyVar (getRdrName tv)
     go (AppTy t1 t2)        = nlHsAppTy (go t1) (go t2)
     go (LitTy (NumTyLit n))

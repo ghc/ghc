@@ -61,9 +61,11 @@ module Var (
         mustHaveLocalBinding,
 
         -- * TyVar's
-        VarBndr(..), ArgFlag(..), TyCoVarBinder, TyVarBinder,
+        VarBndr(..), ArgFlag(..), ForallVisFlag(..),
+        TyCoVarBinder, TyVarBinder,
         binderVar, binderVars, binderArgFlag, binderType,
         isVisibleArgFlag, isInvisibleArgFlag, sameVis,
+        argToForallVisFlag,
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinder, mkTyVarBinders,
         isTyVarBinder,
@@ -421,6 +423,30 @@ instance Binary ArgFlag where
       0 -> return Required
       1 -> return Specified
       _ -> return Inferred
+
+{- *********************************************************************
+*                                                                      *
+*                   ForallVisFlag
+*                                                                      *
+********************************************************************* -}
+
+-- | Is a @forall@ invisible (e.g., @forall a b. {...}@, with a dot) or visible
+-- (e.g., @forall a b -> {...}@, with an arrow)?
+data ForallVisFlag
+  = ForallVis   -- ^ A visible @forall@ (with an arrow)
+  | ForallInvis -- ^ An invisible @forall@ (with a dot)
+  deriving (Eq, Ord, Data)
+
+instance Outputable ForallVisFlag where
+  ppr f = text $ case f of
+                   ForallVis   -> "ForallVis"
+                   ForallInvis -> "ForallInvis"
+
+-- | Convert an 'ArgFlag' to its corresponding 'ForallVisFlag'.
+argToForallVisFlag :: ArgFlag -> ForallVisFlag
+argToForallVisFlag Required  = ForallVis
+argToForallVisFlag Specified = ForallInvis
+argToForallVisFlag Inferred  = ForallInvis
 
 {- *********************************************************************
 *                                                                      *

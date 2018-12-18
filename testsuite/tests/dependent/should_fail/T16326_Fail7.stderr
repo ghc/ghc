@@ -1,0 +1,5 @@
+
+T16326_Fail7.hs:8:13: error:
+    Illegal symbol ‘forall’ in type
+    Perhaps you intended to use RankNTypes or a similar language
+    extension to enable explicit-forall syntax: forall <tvs>. <type>

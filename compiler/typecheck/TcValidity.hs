@@ -464,6 +464,41 @@ constraintsAllowed (TySynKindCtxt {})     = False
 constraintsAllowed (TyFamResKindCtxt {})  = False
 constraintsAllowed _ = True
 
+-- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
+-- context for the type of a term, where visible, dependent quantification is
+-- currently disallowed.
+vdqAllowed :: UserTypeCtxt -> Bool
+-- Currently allowed in the kinds of types...
+vdqAllowed (KindSigCtxt {}) = True
+vdqAllowed (TySynCtxt {}) = True
+vdqAllowed (ThBrackCtxt {}) = True
+vdqAllowed (GhciCtxt {}) = True
+vdqAllowed (TyVarBndrKindCtxt {}) = True
+vdqAllowed (DataKindCtxt {}) = True
+vdqAllowed (TySynKindCtxt {}) = True
+vdqAllowed (TyFamResKindCtxt {}) = True
+-- ...but not in the types of terms.
+vdqAllowed (ConArgCtxt {}) = False
+vdqAllowed (FunSigCtxt {}) = False
+vdqAllowed (InfSigCtxt {}) = False
+vdqAllowed (ExprSigCtxt {}) = False
+vdqAllowed (TypeAppCtxt {}) = False
+vdqAllowed (PatSynCtxt {}) = False
+vdqAllowed (PatSigCtxt {}) = False
+vdqAllowed (RuleSigCtxt {}) = False
+vdqAllowed (ResSigCtxt {}) = False
+vdqAllowed (ForSigCtxt {}) = False
+vdqAllowed (DefaultDeclCtxt {}) = False
+-- We count class constraints as "types of terms". All of the cases below deal
+-- with class constraints.
+vdqAllowed (InstDeclCtxt {}) = False
+vdqAllowed (SpecInstCtxt {}) = False
+vdqAllowed (GenSigCtxt {}) = False
+vdqAllowed (ClassSCCtxt {}) = False
+vdqAllowed (SigmaCtxt {}) = False
+vdqAllowed (DataTyCtxt {}) = False
+vdqAllowed (DerivClauseCtxt {}) = False
+
 {-
 Note [Correctness and performance of type synonym validity checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -627,6 +662,12 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                    (constraintTyErr env ty)
                 -- Reject forall (a :: Eq b => b). blah
                 -- In a kind signature we don't allow constraints
+
+        ; checkTcM (all (isInvisibleArgFlag . binderArgFlag) tvbs
+                         || vdqAllowed ctxt)
+                   (illegalVDQTyErr env ty)
+                -- Reject visible, dependent quantification in the type of a
+                -- term (e.g., `f :: forall a -> a -> Maybe a`)
 
         ; check_valid_theta env' SigmaCtxt expand theta
                 -- Allow     type T = ?x::Int => Int -> Int
@@ -839,6 +880,15 @@ ubxArgTyErr env ty
 constraintTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
 constraintTyErr env ty
   = (env, text "Illegal constraint in a kind:" <+> ppr_tidy env ty)
+
+-- | Reject a use of visible, dependent quantification in the type of a term.
+illegalVDQTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+illegalVDQTyErr env ty =
+  (env, vcat
+  [ hang (text "Illegal visible, dependent quantification" <+>
+          text "in the type of a term:")
+       2 (ppr_tidy env ty)
+  , text "(GHC does not yet support this)" ] )
 
 {-
 Note [Liberal type synonyms]

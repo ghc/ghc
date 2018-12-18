@@ -21,7 +21,7 @@ module IfaceType (
         IfaceTyLit(..), IfaceAppArgs(..),
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr,
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
-        IfaceForAllBndr, ArgFlag(..), ShowForAllFlag(..),
+        IfaceForAllBndr, ArgFlag(..), ForallVisFlag(..), ShowForAllFlag(..),
         mkIfaceForAllTvBndr,
 
         ifForAllBndrVar, ifForAllBndrName, ifaceBndrName,
