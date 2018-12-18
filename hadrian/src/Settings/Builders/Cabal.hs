@@ -136,7 +136,7 @@ withBuilderArgs :: Builder -> Args
 withBuilderArgs b = case b of
     GhcPkg _ stage -> do
       top   <- expr topDirectory
-      pkgDb <- expr $ packageDbPath stage
+      pkgDb <- expr $ packageDbPath (stageLibraries stage)
       notStage0 ? arg ("--ghc-pkg-option=--global-package-db=" ++ top -/- pkgDb)
     _          -> return [] -- no arguments
 

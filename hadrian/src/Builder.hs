@@ -152,7 +152,7 @@ builderProvenance = \case
     Ghc _ Stage0     -> Nothing
     Ghc _ stage      -> context (pred stage) ghc
     GhcPkg _ Stage0  -> Nothing
-    GhcPkg _ _       -> context Stage0 ghcPkg
+    GhcPkg _ s       -> context (pred s) ghcPkg
     Haddock _        -> context Stage2 haddock
     Hpc              -> context Stage1 hpcBin
     Hp2Ps            -> context Stage0 hp2ps
