@@ -1444,7 +1444,7 @@ ppr_fun_ty ty1 ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
     in
-    sep [p1, text "->" <+> p2]
+    sep [p1, arrow <+> p2]
 
 --------------------------
 ppr_tylit :: HsTyLit -> SDoc

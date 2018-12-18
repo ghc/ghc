@@ -12,5 +12,5 @@ T8959b.hs:8:7: error:
 T8959b.hs:10:7: error:
     • Couldn't match expected type ‘(∀ a2. a2 → a2) → a1’
                   with actual type ‘()’
-    • In the expression: () ∷ (∀ a. a -> a) -> a
-      In an equation for ‘baz’: baz = () ∷ (∀ a. a -> a) -> a
+    • In the expression: () ∷ (∀ a. a → a) → a
+      In an equation for ‘baz’: baz = () ∷ (∀ a. a → a) → a
