@@ -252,18 +252,14 @@ jobs:
       - *push_perf_note
       - *store_test_artifacts
 
-  "validate-x86_64-linux-deb8-llvm":
+  "validate-x86_64-linux-deb9-llvm":
     docker:
-      - image: ghcci/x86_64-linux-deb8:0.1
+      - image: ghcci/x86_64-linux-deb9:0.2
     environment:
       <<: *buildenv
       BUILD_FLAVOUR: perf-llvm
-      TEST_ENV: x86_64-linux-deb8-llvm
+      TEST_ENV: x86_64-linux-deb9-llvm
     steps:
-      - run:
-          name: Install LLVM
-          command: |
-            echo "export PATH=`pwd`/../clang+llvm-6.0.0-x86_64-linux-gnu-debian8/bin:\$PATH" >> $BASH_ENV
       - run:
           name: Verify that llc works
           command: llc
