@@ -1,11 +1,6 @@
 variables:
   GIT_SSL_NO_VERIFY: "1"
-
-before_script:
-  - python3 .gitlab/fix-submodules.py
-  - git submodule sync --recursive
-  - git submodule update --init --recursive
-  - git checkout .gitmodules
+  GIT_SUBMODULES_STRATEGY: "recursive"
 
 stages:
   - lint
@@ -53,10 +48,6 @@ validate-x86_64-linux-deb8-hadrian:
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
-    - python3 .gitlab/fix-submodules.py
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
   tags:
     - x86_64-linux
 
@@ -100,11 +91,6 @@ validate-x86_64-darwin:
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
   before_script:
-    - python .gitlab/fix-submodules.py
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-
     - bash .gitlab/darwin-init.sh
     - PATH="`pwd`/toolchain/bin:$PATH"
       # Disable sphinx PDF output as MacTeX apparently doesn't provide xelatex
@@ -125,11 +111,6 @@ validate-x86_64-darwin:
   tags:
     - x86_64-linux
   before_script:
-    - python3 .gitlab/fix-submodules.py
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-
     - bash .circleci/prepare-system.sh
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
