@@ -59,7 +59,8 @@ module TcType (
   -- These are important because they do not look through newtypes
   getTyVar,
   tcSplitForAllTy_maybe,
-  tcSplitForAllTys, tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllVarBndrs,
+  tcSplitForAllTys, tcSplitForAllTysSameVis,
+  tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllVarBndrs,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcFunResultTyN,
   tcSplitFunTysN,
@@ -128,7 +129,8 @@ module TcType (
 
   --------------------------------
   -- Rexported from Type
-  Type, PredType, ThetaType, TyCoBinder, ArgFlag(..), AnonArgFlag(..),
+  Type, PredType, ThetaType, TyCoBinder,
+  ArgFlag(..), AnonArgFlag(..), ForallVisFlag(..),
 
   mkForAllTy, mkForAllTys, mkTyCoInvForAllTys, mkSpecForAllTys, mkTyCoInvForAllTy,
   mkInvForAllTy, mkInvForAllTys,
@@ -1353,6 +1355,14 @@ tcSplitForAllTys :: Type -> ([TyVar], Type)
 tcSplitForAllTys ty
   = ASSERT( all isTyVar (fst sty) ) sty
   where sty = splitForAllTys ty
+
+-- | Like 'tcSplitForAllTys', but only splits a 'ForAllTy' if
+-- @'sameVis' argf supplied_argf@ is 'True', where @argf@ is the visibility
+-- of the @ForAllTy@'s binder and @supplied_argf@ is the visibility provided
+-- as an argument to this function.
+tcSplitForAllTysSameVis :: ArgFlag -> Type -> ([TyVar], Type)
+tcSplitForAllTysSameVis supplied_argf ty = ASSERT( all isTyVar (fst sty) ) sty
+  where sty = splitForAllTysSameVis supplied_argf ty
 
 -- | Like 'tcSplitForAllTys', but splits off only named binders.
 tcSplitForAllVarBndrs :: Type -> ([TyVarBinder], Type)
