@@ -1,0 +1,13 @@
+
+T16326_Fail1.hs:5:8: error:
+    • Illegal visible, dependent quantification in the type of a term:
+        forall a -> a -> a
+      (GHC does not yet support this)
+    • In the type signature: id1 :: forall a -> a -> a
+
+T16326_Fail1.hs:9:8: error:
+    • Illegal visible, dependent quantification in the type of a term:
+        forall a -> a -> a
+      (GHC does not yet support this)
+    • In the expansion of type synonym ‘Foo’
+      In the type signature: id2 :: Foo

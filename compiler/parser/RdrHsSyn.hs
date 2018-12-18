@@ -692,7 +692,7 @@ mkGadtDecl names ty
     , anns1 ++ anns2)
   where
     (ty'@(dL->L l _),anns1) = peel_parens ty []
-    (tvs, rho) = splitLHsForAllTy ty'
+    (tvs, rho) = splitLHsForAllTyInvis ty'
     (mcxt, tau, anns2) = split_rho rho []
 
     split_rho (dL->L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau })) ann
