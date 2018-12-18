@@ -62,7 +62,7 @@ module CoreUtils (
 import GhcPrelude
 
 import CoreSyn
-import PrelNames ( makeStaticName )
+import PrelNames ( makeStaticName, absentErrorIdKey, noinlineIdKey )
 import PprCore
 import CoreFVs( exprFreeVars )
 import Var
@@ -75,7 +75,6 @@ import DataCon
 import PrimOp
 import Id
 import IdInfo
-import PrelNames( absentErrorIdKey )
 import Type
 import TyCoRep( TyCoBinder(..), TyBinder )
 import Coercion
@@ -1239,6 +1238,9 @@ exprIsCheapX ok_app e
                     | otherwise       = go n e
     go n (Lam x e)  | isRuntimeVar x  = n==0 || go (n-1) e
                     | otherwise       = go n e
+    go n (App f e)  | App (Var v) Type {} <- f
+                    , v `hasKey` noinlineIdKey
+                    , isRuntimeArg e  = go n e
     go n (App f e)  | isRuntimeArg e  = go (n+1) f && ok e
                     | otherwise       = go n f
     go n (Let (NonRec _ r) e)         = go n e && ok r
