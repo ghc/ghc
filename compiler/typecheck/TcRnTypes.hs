@@ -3844,7 +3844,9 @@ instance Applicative TcPluginM where
   (<*>) = ap
 
 instance Monad TcPluginM where
+#if !MIN_VERSION_base(4,13,0)
   fail = MonadFail.fail
+#endif
   TcPluginM m >>= k =
     TcPluginM (\ ev -> do a <- m ev
                           runTcPluginM (k a) ev)

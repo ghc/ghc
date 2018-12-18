@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 --
 -- (c) The University of Glasgow 2002-2006
 --
@@ -58,7 +59,9 @@ unIOEnv (IOEnv m) = m
 instance Monad (IOEnv m) where
     (>>=)  = thenM
     (>>)   = (*>)
+#if !MIN_VERSION_base(4,13,0)
     fail   = MonadFail.fail
+#endif
 
 instance MonadFail.MonadFail (IOEnv m) where
     fail _ = failM -- Ignore the string

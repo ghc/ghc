@@ -522,7 +522,7 @@ checkBrokenTablesNextToCode dflags
   = do { broken <- checkBrokenTablesNextToCode' dflags
        ; when broken
          $ do { _ <- liftIO $ throwIO $ mkApiErr dflags invalidLdErr
-              ; fail "unsupported linker"
+              ; liftIO $ fail "unsupported linker"
               }
        }
   where

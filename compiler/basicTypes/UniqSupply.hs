@@ -40,7 +40,7 @@ import MonadUtils
 import Control.Monad
 import Data.Bits
 import Data.Char
-import Control.Monad.Fail
+import Control.Monad.Fail as Fail
 
 #include "Unique.h"
 
@@ -150,7 +150,7 @@ instance Applicative UniqSM where
     (*>) = thenUs_
 
 -- TODO: try to get rid of this instance
-instance MonadFail UniqSM where
+instance Fail.MonadFail UniqSM where
     fail = panic
 
 -- | Run the 'UniqSM' action, returning the final 'UniqSupply'

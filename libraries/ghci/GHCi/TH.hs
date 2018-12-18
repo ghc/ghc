@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, StandaloneDeriving, DeriveGeneric,
-    TupleSections, RecordWildCards, InstanceSigs #-}
+    TupleSections, RecordWildCards, InstanceSigs, CPP #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- |
@@ -144,7 +144,9 @@ instance Monad GHCiQ where
     do (m', s')  <- runGHCiQ m s
        (a,  s'') <- runGHCiQ (f m') s'
        return (a, s'')
+#if !MIN_VERSION_base(4,13,0)
   fail = Fail.fail
+#endif
 
 instance Fail.MonadFail GHCiQ where
   fail err  = GHCiQ $ \s -> throwIO (GHCiQException s err)

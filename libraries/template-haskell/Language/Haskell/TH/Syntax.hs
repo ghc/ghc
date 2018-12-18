@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable,
+{-# LANGUAGE CPP, DeriveDataTypeable,
              DeriveGeneric, FlexibleInstances, DefaultSignatures,
              RankNTypes, RoleAnnotations, ScopedTypeVariables,
              Trustworthy #-}
@@ -178,7 +178,9 @@ runQ (Q m) = m
 instance Monad Q where
   Q m >>= k  = Q (m >>= \x -> unQ (k x))
   (>>) = (*>)
+#if !MIN_VERSION_base(4,13,0)
   fail       = Fail.fail
+#endif
 
 instance Fail.MonadFail Q where
   fail s     = report True s >> Q (Fail.fail "Q monad failure")

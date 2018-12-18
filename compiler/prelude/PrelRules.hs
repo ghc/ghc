@@ -749,7 +749,9 @@ instance Monad RuleM where
   RuleM f >>= g = RuleM $ \dflags iu e -> case f dflags iu e of
     Nothing -> Nothing
     Just r -> runRuleM (g r) dflags iu e
+#if !MIN_VERSION_base(4,13,0)
   fail = MonadFail.fail
+#endif
 
 instance MonadFail.MonadFail RuleM where
     fail _ = mzero

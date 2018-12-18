@@ -2160,7 +2160,9 @@ instance Applicative LintM where
       (<*>) = ap
 
 instance Monad LintM where
+#if !MIN_VERSION_base(4,13,0)
   fail = MonadFail.fail
+#endif
   m >>= k  = LintM (\ env errs ->
                        let (res, errs') = unLintM m env errs in
                          case res of
