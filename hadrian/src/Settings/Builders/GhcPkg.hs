@@ -32,8 +32,7 @@ ghcPkgBuilderArgs = mconcat
         pkgDb     <- expr $ packageDbPath stage
         mconcat [ notStage0 ? arg "--global-package-db"
                 , notStage0 ? arg pkgDb
-                , arg "update"
-                , arg "--force"
+                , arg "register"
                 , verbosity < Chatty ? arg "-v0"
                 , bootPackageDatabaseArgs
                 , arg config ] ]
