@@ -257,6 +257,8 @@ validate-x86_64-windows-hadrian:
   stage: full-build
   variables:
     GHC_VERSION: "8.6.2"
+  # due to #16073
+  allow_failure: true
   script:
     - PATH=C:\msys64\usr\bin;%PATH%
     - bash .gitlab/win32-init.sh
