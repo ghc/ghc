@@ -24,7 +24,7 @@ module Base (
     -- * Paths
     hadrianPath, configPath, configFile, sourcePath, shakeFilesDir,
     generatedDir, generatedPath, stageBinPath, stageLibPath, templateHscPath,
-    ghcDeps, rawRelativePackageDbPath, packageDbPath, packageDbStamp, ghcSplitPath
+    ghcDeps, relativePackageDbPath, packageDbPath, packageDbStamp, ghcSplitPath
     ) where
 
 import Control.Applicative
@@ -83,24 +83,15 @@ generatedPath :: Action FilePath
 generatedPath = buildRoot <&> (-/- generatedDir)
 
 -- | Path to the package database for a given build stage, relative to the build
--- root. It is raw as we don't call stageLibraries in order to find
--- where the PackageDb should point to. This is mainly used when defining
--- rules to build the package database whilst the unprefixed version
--- are used when depending on a package database.
-rawRelativePackageDbPath :: Stage -> FilePath
-rawRelativePackageDbPath stage = stageString stage -/- "lib/package.conf.d"
+-- root.
+relativePackageDbPath :: Stage -> FilePath
+relativePackageDbPath stage = stageString stage -/- "lib/package.conf.d"
 
 -- | Path to the package database used in a given 'Stage', including
---   the build root. For StageN this resolves which libraries we want
---   to use to build things in StageN, for example, Stage2 uses libraries
---   built in Stage1 so calling this function will return the package
---   database from stage1.
---
---   You want to use this when writing rules which need to depend on
---   a package database.
+--   the build root.
 packageDbPath :: Stage -> Action FilePath
 packageDbPath stage =
-  buildRoot <&> (-/- rawRelativePackageDbPath stage)
+  buildRoot <&> (-/- relativePackageDbPath stage)
 
 -- | We use a stamp file to track the existence of a package database.
 packageDbStamp :: FilePath
