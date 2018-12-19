@@ -1,6 +1,7 @@
 variables:
   GIT_SSL_NO_VERIFY: "1"
   GIT_SUBMODULE_STRATEGY: "recursive"
+  LANG: "en_US.UTF-8"
 
 stages:
   - lint
