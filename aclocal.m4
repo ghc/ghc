@@ -693,15 +693,6 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 
     esac
 
-    # If gcc knows about the stack protector, turn it off.
-    # Otherwise the stack-smash handler gets triggered.
-    echo 'int main(void) {return 0;}' > conftest.c
-    if $CC -c conftest.c -fno-stack-protector > /dev/null 2>&1
-    then
-        $2="$$2 -fno-stack-protector"
-    fi
-
-    rm -f conftest.c conftest.o
     AC_MSG_RESULT([done])
 ])
 
