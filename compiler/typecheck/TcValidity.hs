@@ -427,7 +427,7 @@ data Rank = ArbitraryRank         -- Any rank ok
 
 
 rankZeroMonoType, tyConArgMonoType, synArgMonoType, constraintMonoType :: Rank
-rankZeroMonoType   = MonoType (text "Perhaps you intended to use RankNTypes or Rank2Types")
+rankZeroMonoType   = MonoType (text "Perhaps you intended to use RankNTypes")
 tyConArgMonoType   = MonoType (text "GHC doesn't yet support impredicative polymorphism")
 synArgMonoType     = MonoType (text "Perhaps you intended to use LiberalTypeSynonyms")
 constraintMonoType = MonoType (vcat [ text "A constraint must be a monotype"
@@ -618,7 +618,7 @@ forAllTyErr env rank ty
     herald | null tvs  = text "Illegal qualified type:"
            | otherwise = text "Illegal polymorphic type:"
     suggestion = case rank of
-                   LimitedRank {} -> text "Perhaps you intended to use RankNTypes or Rank2Types"
+                   LimitedRank {} -> text "Perhaps you intended to use RankNTypes"
                    MonoType d     -> d
                    _              -> Outputable.empty -- Polytype is always illegal
 

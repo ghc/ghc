@@ -1,6 +1,6 @@
 
 T5957.hs:3:9: error:
     • Illegal qualified type: Show a => a -> String
-      Perhaps you intended to use RankNTypes or Rank2Types
+      Perhaps you intended to use RankNTypes
     • In the type signature:
         flex :: Int -> Show a => a -> String

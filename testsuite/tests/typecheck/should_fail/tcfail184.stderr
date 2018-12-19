@@ -1,6 +1,6 @@
 
 tcfail184.hs:8:19: error:
     • Illegal polymorphic type: forall a. Ord a => [a] -> [a]
-      Perhaps you intended to use RankNTypes or Rank2Types
+      Perhaps you intended to use RankNTypes
     • In the definition of data constructor ‘MkSwizzle’
       In the newtype declaration for ‘Swizzle’

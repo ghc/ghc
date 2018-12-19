@@ -1,5 +1,5 @@
 
 SimpleFail15.hs:5:8: error:
     • Illegal qualified type: (a ~ b) => t
-      Perhaps you intended to use RankNTypes or Rank2Types
+      Perhaps you intended to use RankNTypes
     • In the type signature: foo :: (a, b) -> (a ~ b => t) -> (a, b)

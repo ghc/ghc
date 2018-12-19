@@ -1,7 +1,7 @@
 
 T12083a.hs:5:1: error:
     • Illegal qualified type: Num a => a
-      Perhaps you intended to use RankNTypes or Rank2Types
+      Perhaps you intended to use RankNTypes
     • In the type synonym declaration for ‘Constrd’
 
 T12083a.hs:9:26: error:
