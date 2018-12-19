@@ -65,7 +65,7 @@ import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( VarBndr(..), binderVar )
-import TyCon ( Role (..), Injectivity(..) )
+import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
@@ -1029,30 +1029,59 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     ppr_bang (IfUnpackCo co) = text "! {-# UNPACK #-}" <>
                                pprParendIfaceCoercion co
 
-    pprParendBangTy (bang, ty) = ppr_bang bang <> pprParendIfaceType ty
-    pprBangTy       (bang, ty) = ppr_bang bang <> ppr_banged_ty ty
-      where
-        -- The presence of bang patterns or UNPACK annotations requires
-        -- surrounding the type with parentheses, if needed (#13699)
-        ppr_banged_ty = case bang of
-                          IfNoBang     -> ppr
-                          IfStrict     -> pprParendIfaceType
-                          IfUnpack     -> pprParendIfaceType
-                          IfUnpackCo{} -> pprParendIfaceType
+    pprFieldArgTy, pprArgTy :: (IfaceBang, IfaceType) -> SDoc
+    -- If using record syntax, the only reason one would need to parenthesize
+    -- a compound field type is if it's preceded by a bang pattern.
+    pprFieldArgTy (bang, ty) = ppr_arg_ty (bang_prec bang) bang ty
+    -- If not using record syntax, a compound field type might need to be
+    -- parenthesize if one of the following holds:
+    --
+    -- 1. We're using Haskell98 syntax.
+    -- 2. The field type is preceded with a bang pattern.
+    pprArgTy (bang, ty) = ppr_arg_ty (max gadt_prec (bang_prec bang)) bang ty
 
-    pp_args :: [SDoc]  -- With parens, e.g  (Maybe a)  or  !(Maybe a)
-    pp_args = map pprParendBangTy tys_w_strs
+    ppr_arg_ty :: PprPrec -> IfaceBang -> IfaceType -> SDoc
+    ppr_arg_ty prec bang ty = ppr_bang bang <> pprPrecIfaceType prec ty
 
-    pp_field_args :: SDoc  -- Braces form:  { x :: !Maybe a, y :: Int }
+    -- If we're displaying the fields GADT-style, e.g.,
+    --
+    --   data Foo a where
+    --     MkFoo :: Maybe a -> Foo
+    --
+    -- Then there is no inherent need to parenthesize compound fields like
+    -- `Maybe a` (bang patterns notwithstanding). If we're displaying the
+    -- fields Haskell98-style, e.g.,
+    --
+    --   data Foo a = MkFoo (Maybe a)
+    --
+    -- Then we *must* parenthesize compound fields like (Maybe a).
+    gadt_prec :: PprPrec
+    gadt_prec
+      | gadt_style = topPrec
+      | otherwise  = appPrec
+
+    -- The presence of bang patterns or UNPACK annotations requires
+    -- surrounding the type with parentheses, if needed (#13699)
+    bang_prec :: IfaceBang -> PprPrec
+    bang_prec IfNoBang     = topPrec
+    bang_prec IfStrict     = appPrec
+    bang_prec IfUnpack     = appPrec
+    bang_prec IfUnpackCo{} = appPrec
+
+    pp_args :: [SDoc] -- No records, e.g., `  Maybe a  ->  Int -> ...` or
+                      --                   `!(Maybe a) -> !Int -> ...`
+    pp_args = map pprArgTy tys_w_strs
+
+    pp_field_args :: SDoc -- Records, e.g., { x ::   Maybe a,  y ::  Int } or
+                          --                { x :: !(Maybe a), y :: !Int }
     pp_field_args = braces $ sep $ punctuate comma $ ppr_trim $
                     zipWith maybe_show_label fields tys_w_strs
 
     maybe_show_label :: FieldLabel -> (IfaceBang, IfaceType) -> Maybe SDoc
     maybe_show_label lbl bty
-      | showSub ss sel =
-          Just (pprPrefixIfDeclBndr how_much occ <+> dcolon <+> pprBangTy bty)
-      | otherwise      =
-          Nothing
+      | showSub ss sel = Just (pprPrefixIfDeclBndr how_much occ
+                                <+> dcolon <+> pprFieldArgTy bty)
+      | otherwise      = Nothing
       where
         sel = flSelector lbl
         occ = mkVarOccFS (flLabel lbl)
@@ -1063,19 +1092,31 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
       | IfDataInstance _ tc tys <- parent
       = pprIfaceType (IfaceTyConApp tc (substIfaceAppArgs gadt_subst tys))
       | otherwise
-      = sdocWithDynFlags (ppr_tc_app gadt_subst)
+      = ppr_tc_app gadt_subst
       where
         gadt_subst = mkIfaceTySubst eq_spec
 
-    ppr_tc_app gadt_subst dflags
-       = pprPrefixIfDeclBndr how_much (occName tycon)
-         <+> sep [ pprParendIfaceType (substIfaceTyVar gadt_subst tv)
-                 | IfaceTvBndr (tv,_kind)
-                   -- Coercions variables are invisible, see Note
-                   -- [VarBndrs, TyCoVarBinders, TyConBinders, and visibility]
-                   -- in TyCoRep
-                     <- map (ifTyConBinderVar) $
-                        suppressIfaceInvisibles dflags tc_binders tc_binders ]
+    -- When pretty-printing a GADT return type, we:
+    --
+    -- 1. Take the data tycon binders, extract their variable names and
+    --    visibilities, and construct suitable arguments from them. (This is
+    --    the role of mk_tc_app_args.)
+    -- 2. Apply the GADT substitution constructed from the eq_spec.
+    --    (See Note [Result type of a data family GADT].)
+    -- 3. Pretty-print the data type constructor applied to its arguments.
+    --    This process will omit any invisible arguments, such as coercion
+    --    variables, if necessary. (See Note
+    --    [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.)
+    ppr_tc_app gadt_subst =
+      pprPrefixIfDeclBndr how_much (occName tycon)
+      <+> pprIfaceAppArgs
+            (substIfaceAppArgs gadt_subst (mk_tc_app_args tc_binders))
+
+    mk_tc_app_args :: [IfaceTyConBinder] -> IfaceAppArgs
+    mk_tc_app_args [] = IA_Nil
+    mk_tc_app_args (Bndr bndr vis:tc_bndrs) =
+      IA_Arg (IfaceTyVar (ifaceBndrName bndr)) (tyConBndrVisArgFlag vis)
+             (mk_tc_app_args tc_bndrs)
 
 instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
