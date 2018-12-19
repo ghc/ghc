@@ -960,7 +960,11 @@ exprIsTrivial (Var _)          = True        -- See Note [Variables are trivial]
 exprIsTrivial (Type _)         = True
 exprIsTrivial (Coercion _)     = True
 exprIsTrivial (Lit lit)        = litIsTrivial lit
-exprIsTrivial (App e arg)      = not (isRuntimeArg arg) && exprIsTrivial e
+exprIsTrivial (App e arg)
+ | App (Var f) Type {} <- e
+ , f `hasKey` noinlineIdKey    = pprTrace "exprIsTrivial" (ppr arg) exprIsTrivial arg
+ | not (isRuntimeArg arg)      = exprIsTrivial e
+ | otherwise                   = False
 exprIsTrivial (Lam b e)        = not (isRuntimeVar b) && exprIsTrivial e
 exprIsTrivial (Tick t e)       = not (tickishIsCode t) && exprIsTrivial e
                                  -- See Note [Tick trivial]
@@ -1240,7 +1244,7 @@ exprIsCheapX ok_app e
                     | otherwise       = go n e
     go n (App f e)  | App (Var v) Type {} <- f
                     , v `hasKey` noinlineIdKey
-                    , isRuntimeArg e  = go n e
+                    , isRuntimeArg e  = pprTrace "exprIsCheapX" (ppr e) go n e
     go n (App f e)  | isRuntimeArg e  = go (n+1) f && ok e
                     | otherwise       = go n f
     go n (Let (NonRec _ r) e)         = go n e && ok r
