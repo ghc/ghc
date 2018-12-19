@@ -6,6 +6,7 @@ variables:
 stages:
   - lint
   - build
+  - full-build
 
 ############################################################
 # Linting
@@ -30,7 +31,6 @@ ghc-linters:
 ############################################################
 
 .validate-hadrian:
-  stage: build
   allow_failure: true
   script:
     - bash .circleci/prepare-system.sh
@@ -45,6 +45,7 @@ ghc-linters:
 
 validate-x86_64-linux-deb8-hadrian:
   extends: .validate-hadrian
+  stage: build
   image: ghcci/x86_64-linux-deb8:0.1
   before_script:
     # workaround for docker permissions
@@ -57,7 +58,6 @@ validate-x86_64-linux-deb8-hadrian:
 ############################################################
 
 .validate:
-  stage: build
   variables:
     TEST_TYPE: test
   script:
@@ -83,6 +83,7 @@ validate-x86_64-linux-deb8-hadrian:
 
 validate-x86_64-darwin:
   extends: .validate
+  stage: full-build
   allow_failure: true
   tags:
     - x86_64-darwin
@@ -127,6 +128,7 @@ validate-x86_64-darwin:
 
 validate-aarch64-linux-deb9:
   extends: .validate-linux
+  stage: full-build
   image: ghcci/aarch64-linux-deb9:0.1
   allow_failure: true
   artifacts:
@@ -139,6 +141,7 @@ validate-aarch64-linux-deb9:
 
 nightly-aarch64-linux-deb9:
   extends: validate-aarch64-linux-deb9
+  stage: full-build
   artifacts:
     expire_in: 2 year
   variables:
@@ -149,6 +152,7 @@ nightly-aarch64-linux-deb9:
 
 validate-x86_64-linux-deb9:
   extends: .validate-linux
+  stage: build
   image: ghcci/x86_64-linux-deb9:0.2
   artifacts:
     when: always
@@ -158,6 +162,7 @@ validate-x86_64-linux-deb9:
 
 nightly-x86_64-linux-deb9:
   extends: validate-x86_64-linux-deb9
+  stage: build
   artifacts:
     expire_in: 2 year
   variables:
@@ -168,6 +173,7 @@ nightly-x86_64-linux-deb9:
 
 validate-x86_64-linux-deb9-llvm:
   extends: .validate-linux
+  stage: full-build
   allow_failure: true
   image: ghcci/x86_64-linux-deb9:0.2
   variables:
@@ -177,6 +183,7 @@ validate-x86_64-linux-deb9-llvm:
 
 validate-x86_64-linux-deb8:
   extends: .validate-linux
+  stage: full-build
   image: ghcci/x86_64-linux-deb8:0.1
   cache:
     key: linux-x86_64-deb8
@@ -186,6 +193,7 @@ validate-x86_64-linux-deb8:
 
 validate-x86_64-linux-fedora27:
   extends: .validate-linux
+  stage: full-build
   image: ghcci/x86_64-linux-fedora27:0.1
   cache:
     key: linux-x86_64-fedora27
@@ -195,6 +203,7 @@ validate-x86_64-linux-fedora27:
 
 validate-x86_64-linux-deb9-integer-simple:
   extends: .validate-linux
+  stage: full-build
   allow_failure: true
   variables:
     INTEGER_LIBRARY: integer-simple
@@ -204,6 +213,7 @@ validate-x86_64-linux-deb9-integer-simple:
 
 nightly-x86_64-linux-deb9-integer-simple:
   extends: validate-x86_64-linux-deb9-integer-simple
+  stage: full-build
   artifacts:
     expire_in: 2 year
   variables:
@@ -214,6 +224,7 @@ nightly-x86_64-linux-deb9-integer-simple:
 
 validate-x86_64-linux-deb9-unreg:
   extends: .validate-linux
+  stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
   image: ghcci/x86_64-linux-deb9:0.2
@@ -225,7 +236,7 @@ validate-x86_64-linux-deb9-unreg:
 ############################################################
 
 validate-x86_64-windows-hadrian:
-  stage: build
+  stage: full-build
   variables:
     GHC_VERSION: "8.6.2"
   script:
@@ -253,7 +264,7 @@ validate-x86_64-windows-hadrian:
     - x86_64-windows
 
 validate-x86_64-windows:
-  stage: build
+  stage: full-build
   variables:
     GHC_VERSION: "8.6.2"
   script:
