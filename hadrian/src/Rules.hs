@@ -106,7 +106,7 @@ packageRules = do
     Rules.Program.buildProgramRules readPackageDb
     Rules.Register.configurePackageRules
 
-    forM_ [Stage0, Stage1, Stage2] (Rules.Register.registerPackageRules writePackageDb)
+    forM_ [Stage0 ..] (Rules.Register.registerPackageRules writePackageDb)
 
     -- TODO: Can we get rid of this enumeration of contexts? Since we iterate
     --       over it to generate all 4 types of rules below, all the time, we
