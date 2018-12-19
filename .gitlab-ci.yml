@@ -13,6 +13,18 @@ stages:
   - full-build
 
 ############################################################
+# Tags
+############################################################
+#
+# * x86_64-linux: Any Docker-capable x86_64 Linux machine
+# * aarch64-linux: Any Docker-capable AArch64 Linux machine
+# * x86_64-windows: A x86_64 Windows machine
+# * lint: Any Docker-capable x86_64 Linux machine; distinct from
+#         x86_64-linux to ensure low-latency availability.
+#
+
+
+############################################################
 # Linting
 ############################################################
 
@@ -29,6 +41,8 @@ ghc-linters:
         .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
         .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
       fi
+  tags:
+    - lint
 
 ############################################################
 # Validation via Pipelines (hadrian)
