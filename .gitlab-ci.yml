@@ -91,6 +91,7 @@ validate-x86_64-darwin:
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
+    LANG: "en_US.UTF-8"
   before_script:
     - bash .gitlab/darwin-init.sh
     - PATH="`pwd`/toolchain/bin:$PATH"
