@@ -242,15 +242,23 @@ validate-x86_64-linux-deb9-unreg:
 # Validation via Pipelines (Windows)
 ############################################################
 
+.validate-windows:
+  before_script:
+    - PATH=C:\msys64\usr\bin;%PATH%
+    - python .gitlab/fix-submodules.py
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+    - bash .gitlab/win32-init.sh
+
 validate-x86_64-windows-hadrian:
+  extends: .validate-windows
   stage: build
   variables:
     GHC_VERSION: "8.6.2"
   # due to #16073
   allow_failure: true
   script:
-    - PATH=C:\msys64\usr\bin;%PATH%
-    - bash .gitlab/win32-init.sh
     - |
       set MSYSTEM=MINGW64
       python boot
@@ -273,12 +281,11 @@ validate-x86_64-windows-hadrian:
     - x86_64-windows
 
 validate-x86_64-windows:
+  extends: .validate-windows
   stage: build
   variables:
     GHC_VERSION: "8.6.2"
   script:
-    - PATH=C:\msys64\usr\bin;%PATH%
-    - bash .gitlab/win32-init.sh
     - |
       set MSYSTEM=MINGW64
       python boot
