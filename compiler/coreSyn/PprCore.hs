@@ -147,11 +147,11 @@ ppr_binding ann (val_bdr, expr)
         lhs_bndrs = take join_arity bndrs
         rhs       = mkLams (drop join_arity bndrs) body
 
-pprParendExpr expr = ppr_expr parens expr
-pprCoreExpr   expr = ppr_expr noParens expr
+pprParendExpr = ppr_expr parens
+pprCoreExpr = ppr_expr noParens
 
 noParens :: SDoc -> SDoc
-noParens pp = pp
+noParens = id
 
 pprOptCo :: Coercion -> SDoc
 -- Print a coercion optionally; i.e. honouring -dsuppress-coercions
