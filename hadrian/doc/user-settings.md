@@ -165,8 +165,8 @@ After modifying the flavour, `stage3` targets will be built as normal.
 ```
 userFlavour :: Flavour
 userFlavour = defaultFlavour { name = "user"
-														 , packages = buildStage3 (packages defaultFlavour)
-														 }
+                             , packages = buildStage3 (packages defaultFlavour)
+                             }
 ```
 
 
