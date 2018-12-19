@@ -42,9 +42,9 @@ function reset_append_note_push {
 # Push the metrics file as a git note. This may fail if another task pushes a note first. In that case
 # the latest note is fetched and appended.
 MAX_RETRY=20
-until reset_append_note_push || [ MAX_RETRY = 0 ]
+until reset_append_note_push || [ $MAX_RETRY -le 0 ]
 do
   ((MAX_RETRY--))
   echo ""
-  echo "Failed to push git notes. Fetching, appending, and retrying..."
+  echo "Failed to push git notes. Fetching, appending, and retrying... $MAX_RETRY retries left."
 done
