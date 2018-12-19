@@ -1242,7 +1242,7 @@ exprIsCheapX ok_app e
                     | otherwise       = go n e
     go n (Lam x e)  | isRuntimeVar x  = n==0 || go (n-1) e
                     | otherwise       = go n e
-    go n (App f e)  | App (Var v) Type {} <- f
+    go n@0 (App f e)  | App (Var v) Type {} <- f
                     , v `hasKey` noinlineIdKey
                     , isRuntimeArg e  = pprTrace "exprIsCheapX" (ppr e) go n e
     go n (App f e)  | isRuntimeArg e  = go (n+1) f && ok e
