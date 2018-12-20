@@ -6,6 +6,7 @@ before_script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
   - git checkout .gitmodules
+  - git fetch origin refs/notes/perf:refs/notes/ci/perf
 
 stages:
   - lint
@@ -73,6 +74,7 @@ validate-x86_64-linux-deb8-hadrian:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
+    - git fetch origin refs/notes/perf:refs/notes/ci/perf
   tags:
     - x86_64-linux
 
@@ -94,9 +96,11 @@ validate-x86_64-linux-deb8-hadrian:
     - |
       make binary-dist TAR_COMP_OPTS="-1"
       mv ghc-*.tar.xz ghc.tar.xz
+    - METRICS_FILE=$(mktemp)
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml
+      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE
+    - .gitlab/push-test-metrics.sh
   artifacts:
     reports:
       junit: junit.xml
@@ -117,12 +121,14 @@ validate-x86_64-darwin:
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
+    TEST_ENV: "x86_64-darwin"
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
     - python .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
+    - git fetch origin refs/notes/perf:refs/notes/ci/perf
 
     - bash .gitlab/darwin-init.sh
     - PATH="`pwd`/toolchain/bin:$PATH"
@@ -150,6 +156,7 @@ validate-x86_64-darwin:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
+    - git fetch origin refs/notes/perf:refs/notes/ci/perf
 
     - bash .circleci/prepare-system.sh
     # workaround for docker permissions
@@ -167,6 +174,8 @@ validate-aarch64-linux-deb9:
   stage: full-build
   image: ghcci/aarch64-linux-deb9:0.1
   allow_failure: true
+  variables:
+    TEST_ENV: "aarch64-linux-deb9"
   artifacts:
     when: always
     expire_in: 2 week
@@ -191,6 +200,8 @@ validate-i386-linux-deb9:
   stage: full-build
   image: ghcci/i386-linux-deb9:0.1
   allow_failure: true
+  variables:
+    TEST_ENV: "i386-linux-deb9"
   artifacts:
     when: always
     expire_in: 2 week
@@ -204,6 +215,7 @@ nightly-i386-linux-deb9:
   allow_failure: true
   variables:
     TEST_TYPE: slowtest
+    TEST_ENV: "i386-linux-deb9"
   artifacts:
     when: always
     expire_in: 2 week
@@ -217,6 +229,8 @@ validate-x86_64-linux-deb9:
   extends: .validate-linux
   stage: build
   image: ghcci/x86_64-linux-deb9:0.2
+  variables:
+    TEST_ENV: "x86_64-linux-deb9"
   artifacts:
     when: always
     expire_in: 2 week
@@ -241,6 +255,7 @@ validate-x86_64-linux-deb9-llvm:
   image: ghcci/x86_64-linux-deb9:0.2
   variables:
     BUILD_FLAVOUR: perf-llvm
+    TEST_ENV: "x86_64-linux-deb9-llvm"
   cache:
     key: linux-x86_64-deb9
 
@@ -248,6 +263,8 @@ validate-x86_64-linux-deb8:
   extends: .validate-linux
   stage: full-build
   image: ghcci/x86_64-linux-deb8:0.1
+  variables:
+    TEST_ENV: "x86_64-linux-deb8"
   cache:
     key: linux-x86_64-deb8
   artifacts:
@@ -258,6 +275,8 @@ validate-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
   image: ghcci/x86_64-linux-fedora27:0.1
+  variables:
+    TEST_ENV: "x86_64-linux-fedora27"
   cache:
     key: linux-x86_64-fedora27
   artifacts:
@@ -269,6 +288,7 @@ validate-x86_64-linux-deb9-integer-simple:
   stage: full-build
   variables:
     INTEGER_LIBRARY: integer-simple
+    TEST_ENV: "x86_64-linux-deb9-integer-simple"
   image: ghcci/x86_64-linux-deb9:0.2
   cache:
     key: linux-x86_64-deb9
@@ -289,6 +309,7 @@ validate-x86_64-linux-deb9-unreg:
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
+    TEST_ENV: "x86_64-linux-deb9-unreg"
   image: ghcci/x86_64-linux-deb9:0.2
   cache:
     key: linux-x86_64-deb9
@@ -314,6 +335,7 @@ validate-x86_64-linux-deb9-unreg:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
+    - git fetch origin refs/notes/perf:refs/notes/ci/perf
     - bash .gitlab/win32-init.sh
   after_script:
     - rd /s /q tmp
