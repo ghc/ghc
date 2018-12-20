@@ -2323,7 +2323,11 @@ tcHsPatSigType ctxt sig_ty
   = addSigCtxt ctxt hs_ty $
     do { sig_tkvs <- mapM new_implicit_tv sig_vars
        ; (wcs, sig_ty)
-            <- tcWildCardBinders sig_wcs  $ \ wcs ->
+            <- solveLocalEqualities "tcHsPatSigType" $
+                 -- Always solve local equalities if possible,
+                 -- else casts get in the way of deep skolemisation
+                 -- (Trac #16033)
+               tcWildCardBinders sig_wcs  $ \ wcs ->
                tcExtendTyVarEnv sig_tkvs                           $
                do { sig_ty <- tcHsOpenType hs_ty
                   ; return (wcs, sig_ty) }
