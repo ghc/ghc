@@ -36,16 +36,15 @@ askWithResources rs target = H.askWithResources rs target getArgs
 contextDependencies :: Context -> Action [Context]
 contextDependencies Context {..} = do
     depPkgs <- go [package]
-    return [ Context depStage pkg way | pkg <- depPkgs, pkg /= package ]
+    return [ Context stage pkg way | pkg <- depPkgs, pkg /= package ]
   where
-    depStage = stage
     go pkgs  = do
         deps <- concatMapM step pkgs
         let newPkgs = nubOrd $ sort (deps ++ pkgs)
         if pkgs == newPkgs then return pkgs else go newPkgs
     step pkg = do
         deps   <- pkgDependencies pkg
-        active <- sort <$> stagePackages depStage
+        active <- sort <$> stagePackages stage
         return $ intersectOrd (compare . pkgName) active deps
 
 cabalDependencies :: Context -> Action [String]

@@ -187,7 +187,7 @@ workflow, for now.
 
 It is possible to define a flavour which builds a `stage3` compiler, which is a
 compiler built using `stage2`. This is useful for cross-compilation. Detailed
-instructions can be found in the user settings part of the manual.
+instructions can be found in the [user settings part of the manual](doc/user-settings.md).
 
 #### Testing
 
