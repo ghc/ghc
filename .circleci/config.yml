@@ -34,7 +34,7 @@ aliases:
   - &configure_unix
     run:
       name: Configure
-      command: ./configure 
+      command: ./configure
   - &configure_unix_32
     run:
       name: Configure
