@@ -822,15 +822,14 @@ ppr_ty ctxt_prec (IfaceCoercionTy co)
 ppr_ty ctxt_prec ty -- IfaceForAllTy
   = maybeParen ctxt_prec funPrec (pprIfaceSigmaType ShowForAllMust ty)
 
-{-
-Note [Defaulting RuntimeRep variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-RuntimeRep variables are considered by many (most?) users to be little more than
-syntactic noise. When the notion was introduced there was a signficant and
-understandable push-back from those with pedagogy in mind, which argued that
-RuntimeRep variables would throw a wrench into nearly any teach approach since
-they appear in even the lowly ($) function's type,
+{- Note [Defaulting RuntimeRep variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+RuntimeRep variables are considered by many (most?) users to be little
+more than syntactic noise. When the notion was introduced there was a
+signficant and understandable push-back from those with pedagogy in
+mind, which argued that RuntimeRep variables would throw a wrench into
+nearly any teach approach since they appear in even the lowly ($)
+function's type,
 
     ($) :: forall (w :: RuntimeRep) a (b :: TYPE w). (a -> b) -> a -> b
 
@@ -838,14 +837,30 @@ which is significantly less readable than its non RuntimeRep-polymorphic type of
 
     ($) :: (a -> b) -> a -> b
 
-Moreover, unboxed types don't appear all that often in run-of-the-mill Haskell
-programs, so it makes little sense to make all users pay this syntactic
-overhead.
+Moreover, unboxed types don't appear all that often in run-of-the-mill
+Haskell programs, so it makes little sense to make all users pay this
+syntactic overhead.
 
-For this reason it was decided that we would hide RuntimeRep variables for now
-(see #11549). We do this by defaulting all type variables of kind RuntimeRep to
-LiftedRep. This is done in a pass right before pretty-printing
-(defaultRuntimeRepVars, controlled by -fprint-explicit-runtime-reps)
+For this reason it was decided that we would hide RuntimeRep variables
+for now (see #11549). We do this by defaulting all type variables of
+kind RuntimeRep to LiftedRep. This is done in a pass right before
+pretty-printing (defaultRuntimeRepVars, controlled by
+-fprint-explicit-runtime-reps)
+
+This applies to /quantified/ variables like 'w' above.  What about
+variables that are /free/ in the type being printed, which certainly
+happens in error messages.  Suppose (Trac #16074) we are reporting a
+mismatch between two skolems
+          (a :: RuntimeRep) ~ (b :: RuntimeRep)
+We certainly don't want to say "Can't match LiftedRep ~ LiftedRep"!
+
+But if we are printing the type
+    (forall (a :: Type r). blah
+we do want to turn that (free) r into LiftedRep, so it prints as
+    (forall a. blah)
+
+Conclusion: keep track of whether we we are in the kind of a
+binder; ohly if so, convert free RuntimeRep variables to LiftedRep.
 -}
 
 -- | Default 'RuntimeRep' variables to 'LiftedPtr'. e.g.
@@ -863,68 +878,72 @@ LiftedRep. This is done in a pass right before pretty-printing
 -- syntactic overhead in otherwise simple type signatures (e.g. ($)). See
 -- Note [Defaulting RuntimeRep variables] and #11549 for further discussion.
 --
-defaultRuntimeRepVars :: PprStyle -> IfaceType -> IfaceType
-defaultRuntimeRepVars sty = go emptyFsEnv
+defaultRuntimeRepVars :: IfaceType -> IfaceType
+defaultRuntimeRepVars ty = go False emptyFsEnv ty
   where
-    go :: FastStringEnv () -> IfaceType -> IfaceType
-    go subs (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
-      | isRuntimeRep var_kind
-      , isInvisibleArgFlag argf -- don't default *visible* quantification
+    go :: Bool              -- True <=> Inside the kind of a binder
+       -> FastStringEnv ()  -- Set of enclosing forall-ed RuntimeRep variables
+       -> IfaceType         --  (replace them with LiftedRep)
+       -> IfaceType
+    go ink subs (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
+     | isRuntimeRep var_kind
+      , isInvisibleArgFlag argf -- Don't default *visible* quantification
                                 -- or we get the mess in #13963
       = let subs' = extendFsEnv subs var ()
-        in go subs' ty
+            -- Record that we should replace it with LiftedRep,
+            -- and recurse, discarding the forall
+        in go ink subs' ty
 
-    go subs (IfaceForAllTy bndr ty)
-      = IfaceForAllTy (go_ifacebndr subs bndr) (go subs ty)
+    go ink subs (IfaceForAllTy bndr ty)
+      = IfaceForAllTy (go_ifacebndr subs bndr) (go ink subs ty)
 
-    go subs ty@(IfaceTyVar tv)
+    go _ subs ty@(IfaceTyVar tv)
       | tv `elemFsEnv` subs
       = IfaceTyConApp liftedRep IA_Nil
       | otherwise
       = ty
 
-    go _ ty@(IfaceFreeTyVar tv)
-      | userStyle sty && TyCoRep.isRuntimeRepTy (tyVarKind tv)
-         -- don't require -fprint-explicit-runtime-reps for good debugging output
+    go in_kind _ ty@(IfaceFreeTyVar tv)
+      -- See Note [Defaulting RuntimeRep variables], about free vars
+      | in_kind && TyCoRep.isRuntimeRepTy (tyVarKind tv)
       = IfaceTyConApp liftedRep IA_Nil
       | otherwise
       = ty
 
-    go subs (IfaceTyConApp tc tc_args)
-      = IfaceTyConApp tc (go_args subs tc_args)
+    go ink subs (IfaceTyConApp tc tc_args)
+      = IfaceTyConApp tc (go_args ink subs tc_args)
 
-    go subs (IfaceTupleTy sort is_prom tc_args)
-      = IfaceTupleTy sort is_prom (go_args subs tc_args)
+    go ink subs (IfaceTupleTy sort is_prom tc_args)
+      = IfaceTupleTy sort is_prom (go_args ink subs tc_args)
 
-    go subs (IfaceFunTy arg res)
-      = IfaceFunTy (go subs arg) (go subs res)
+    go ink subs (IfaceFunTy arg res)
+      = IfaceFunTy (go ink subs arg) (go ink subs res)
 
-    go subs (IfaceAppTy t ts)
-      = IfaceAppTy (go subs t) (go_args subs ts)
+    go ink subs (IfaceAppTy t ts)
+      = IfaceAppTy (go ink subs t) (go_args ink subs ts)
 
-    go subs (IfaceDFunTy x y)
-      = IfaceDFunTy (go subs x) (go subs y)
+    go ink subs (IfaceDFunTy x y)
+      = IfaceDFunTy (go ink subs x) (go ink subs y)
 
-    go subs (IfaceCastTy x co)
-      = IfaceCastTy (go subs x) co
+    go ink subs (IfaceCastTy x co)
+      = IfaceCastTy (go ink subs x) co
 
-    go _ ty@(IfaceLitTy {}) = ty
-    go _ ty@(IfaceCoercionTy {}) = ty
+    go _ _ ty@(IfaceLitTy {}) = ty
+    go _ _ ty@(IfaceCoercionTy {}) = ty
 
     go_ifacebndr :: FastStringEnv () -> IfaceForAllBndr -> IfaceForAllBndr
     go_ifacebndr subs (Bndr (IfaceIdBndr (n, t)) argf)
-      = Bndr (IfaceIdBndr (n, go subs t)) argf
+      = Bndr (IfaceIdBndr (n, go True subs t)) argf
     go_ifacebndr subs (Bndr (IfaceTvBndr (n, t)) argf)
-      = Bndr (IfaceTvBndr (n, go subs t)) argf
+      = Bndr (IfaceTvBndr (n, go True subs t)) argf
 
-    go_args :: FastStringEnv () -> IfaceAppArgs -> IfaceAppArgs
-    go_args _ IA_Nil = IA_Nil
-    go_args subs (IA_Arg ty argf args)
-                     = IA_Arg (go subs ty) argf (go_args subs args)
+    go_args :: Bool -> FastStringEnv () -> IfaceAppArgs -> IfaceAppArgs
+    go_args _ _ IA_Nil = IA_Nil
+    go_args ink subs (IA_Arg ty argf args)
+      = IA_Arg (go ink subs ty) argf (go_args ink subs args)
 
     liftedRep :: IfaceTyCon
-    liftedRep =
-        IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
+    liftedRep = IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
       where dc_name = getName liftedRepDataConTyCon
 
     isRuntimeRep :: IfaceType -> Bool
@@ -933,10 +952,12 @@ defaultRuntimeRepVars sty = go emptyFsEnv
     isRuntimeRep _ = False
 
 eliminateRuntimeRep :: (IfaceType -> SDoc) -> IfaceType -> SDoc
-eliminateRuntimeRep f ty = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_PrintExplicitRuntimeReps dflags
-      then f ty
-      else getPprStyle $ \sty -> f (defaultRuntimeRepVars sty ty)
+eliminateRuntimeRep f ty
+  = sdocWithDynFlags $ \dflags ->
+    getPprStyle      $ \sty    ->
+    if userStyle sty && not (gopt Opt_PrintExplicitRuntimeReps dflags)
+      then f (defaultRuntimeRepVars ty)
+      else f ty
 
 instance Outputable IfaceAppArgs where
   ppr tca = pprIfaceAppArgs tca

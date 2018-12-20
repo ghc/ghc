@@ -492,3 +492,4 @@ test('T15648', [extra_files(['T15648a.hs'])], multimod_compile_fail, ['T15648', 
 test('T15796', normal, compile_fail, [''])
 test('T15954', normal, compile_fail, [''])
 test('T15962', normal, compile_fail, [''])
+test('T16074', normal, compile_fail, [''])
