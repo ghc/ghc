@@ -64,6 +64,7 @@ import Name (nameIsFromExternalPackage, nameOccName)
 import OccName (isTcOcc)
 import RdrName (unQualOK, gre_name, globalRdrEnvElts)
 import ErrUtils (withTiming)
+import DynamicLoading (initializePlugins)
 
 #if defined(mingw32_HOST_OS)
 import System.IO
@@ -177,7 +178,13 @@ createIfaces verbosity flags instIfaceMap mods = do
 processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> Ghc (Maybe (Interface, ModuleSet))
 processModule verbosity modsum flags modMap instIfaceMap = do
   out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modsum) ++ "..."
-  tm <- {-# SCC "parse/typecheck/load" #-} loadModule =<< typecheckModule =<< parseModule modsum
+
+  -- Since GHC 8.6, plugins are initialized on a per module basis
+  hsc_env' <- getSession
+  dynflags' <- liftIO (initializePlugins hsc_env' (GHC.ms_hspp_opts modsum))
+  let modsum' = modsum { ms_hspp_opts = dynflags' }
+
+  tm <- {-# SCC "parse/typecheck/load" #-} loadModule =<< typecheckModule =<< parseModule modsum'
 
   if not $ isBootSummary modsum then do
     out verbosity verbose "Creating interface..."
