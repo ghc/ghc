@@ -34,7 +34,7 @@ getProgramContexts stage = do
   tPackages <- testsuitePackages
   -- TODO: Shall we use Stage2 for testsuite packages instead?
   let allPackages = sPackages
-                ++ tPackages
+                ++ if stage == Stage1 then tPackages else []
   fmap concat . forM allPackages $ \pkg -> do
     -- the iserv pkg results in three different programs at
     -- the moment, ghc-iserv (built the vanilla way),
@@ -88,8 +88,6 @@ buildBinary rs bin context@Context {..} = do
     needLibrary =<< contextDependencies context
     when (stage > Stage0) $ do
         ways <- interpretInContext context (getLibraryWays <> getRtsWays)
-        -- This should surely be stage and we should support building the
-        -- rts at any stage?
         needLibrary [ (rtsContext stage) { way = w } | w <- ways ]
     cSrcs  <- interpretInContext context (getContextData cSrcs)
     cObjs  <- mapM (objectPath context) cSrcs

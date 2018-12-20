@@ -90,8 +90,7 @@ relativePackageDbPath stage = stageString stage -/- "lib/package.conf.d"
 -- | Path to the package database used in a given 'Stage', including
 --   the build root.
 packageDbPath :: Stage -> Action FilePath
-packageDbPath stage =
-  buildRoot <&> (-/- relativePackageDbPath stage)
+packageDbPath stage = buildRoot <&> (-/- relativePackageDbPath stage)
 
 -- | We use a stamp file to track the existence of a package database.
 packageDbStamp :: FilePath
