@@ -2041,12 +2041,15 @@ lintUnliftedCoVar cv
 data LintEnv
   = LE { le_flags :: LintFlags       -- Linting the result of this pass
        , le_loc   :: [LintLocInfo]   -- Locations
-       , le_subst :: TCvSubst        -- Current type substitution; we also use this
-                                     -- to keep track of all the variables in scope,
-                                     -- both Ids and TyVars
-       , le_joins :: IdSet           -- Join points in scope that are valid
-                                     -- A subset of teh InScopeSet in le_subst
-                                     -- See Note [Join points]
+
+       , le_subst :: TCvSubst  -- Current type substitution
+                               -- We also use le_subst to keep track of
+                               -- /all variables/ in scope, both Ids and TyVars
+
+       , le_joins :: IdSet     -- Join points in scope that are valid
+                               -- A subset of the InScopeSet in le_subst
+                               -- See Note [Join points]
+
        , le_dynflags :: DynFlags     -- DynamicFlags
        }
 
@@ -2304,17 +2307,30 @@ applySubstCo :: InCoercion -> LintM OutCoercion
 applySubstCo co = do { subst <- getTCvSubst; return (substCo subst co) }
 
 lookupIdInScope :: Id -> LintM Id
-lookupIdInScope id
-  | not (mustHaveLocalBinding id)
-  = return id   -- An imported Id
-  | otherwise
-  = do  { subst <- getTCvSubst
-        ; case lookupInScope (getTCvInScope subst) id of
-                Just v  -> return v
-                Nothing -> do { addErrL out_of_scope
-                              ; return id } }
+lookupIdInScope id_occ
+  = do { subst <- getTCvSubst
+       ; case lookupInScope (getTCvInScope subst) id_occ of
+           Just id_bnd  -> do { checkL (not (bad_global id_bnd)) global_in_scope
+                              ; return id_bnd }
+           Nothing -> do { checkL (not is_local) local_out_of_scope
+                         ; return id_occ } }
   where
-    out_of_scope = pprBndr LetBind id <+> text "is out of scope"
+    is_local = mustHaveLocalBinding id_occ
+    local_out_of_scope = text "Out of scope:" <+> pprBndr LetBind id_occ
+    global_in_scope    = hang (text "Occurrence is GlobalId, but binding is LocalId")
+                            2 (pprBndr LetBind id_occ)
+    bad_global id_bnd = isGlobalId id_occ
+                     && isLocalId id_bnd
+                     && not (isWiredInName (idName id_occ))
+       -- 'bad_global' checks for the case where an /occurrence/ is
+       -- a GlobalId, but there is an enclosing binding fora a LocalId.
+       -- NB: the in-scope variables are mostly LocalIds, checked by lintIdBndr,
+       --     but GHCi adds GlobalIds from the interactive context.  These
+       --     are fine; hence the test (isLocalId id == isLocalId v)
+       -- NB: when compiling Control.Exception.Base, things like absentError
+       --     are defined locally, but appear in expressions as (global)
+       --     wired-in Ids after worker/wrapper
+       --     So we simply disable the test in this case
 
 lookupJoinId :: Id -> LintM (Maybe JoinArity)
 -- Look up an Id which should be a join point, valid here
@@ -2325,14 +2341,11 @@ lookupJoinId id
             Just id' -> return (isJoinId_maybe id')
             Nothing  -> return Nothing }
 
-lintTyCoVarInScope :: Var -> LintM ()
-lintTyCoVarInScope v = lintInScope (text "is out of scope") v
-
-lintInScope :: SDoc -> Var -> LintM ()
-lintInScope loc_msg var =
- do { subst <- getTCvSubst
-    ; lintL (not (mustHaveLocalBinding var) || (var `isInScope` subst))
-             (hsep [pprBndr LetBind var, loc_msg]) }
+lintTyCoVarInScope :: TyCoVar -> LintM ()
+lintTyCoVarInScope var
+  = do { subst <- getTCvSubst
+       ; lintL (var `isInScope` subst)
+               (pprBndr LetBind var <+> text "is out of scope") }
 
 ensureEqTys :: OutType -> OutType -> MsgDoc -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage

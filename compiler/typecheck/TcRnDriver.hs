@@ -675,88 +675,79 @@ checkHiBootIface tcg_env boot_info
              , tcg_type_env = local_type_env
              , tcg_exports  = local_exports } <- tcg_env
   = do  { -- This code is tricky, see Note [DFun knot-tying]
-        ; let boot_dfuns = filter isDFunId (typeEnvIds (md_types boot_details))
-              type_env'  = extendTypeEnvWithIds local_type_env boot_dfuns
-          -- Why the seq?  Without, we will put a TypeEnv thunk in
-          -- tcg_type_env_var.  That thunk will eventually get
-          -- forced if we are typechecking interfaces, but that
-          -- is no good if we are trying to typecheck the very
-          -- DFun we were going to put in.
-          -- TODO: Maybe setGlobalTypeEnv should be strict.
-        ; tcg_env <- type_env' `seq` setGlobalTypeEnv tcg_env type_env'
-        ; dfun_prs <- checkHiBootIface' local_insts type_env'
+        ; dfun_prs <- checkHiBootIface' local_insts local_type_env
                                         local_exports boot_details
-        ; let dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
-                                     | (boot_dfun, dfun) <- dfun_prs ]
 
-        ; return tcg_env { tcg_binds = binds `unionBags` dfun_binds } }
+        -- Now add the boot-dfun bindings  $fxblah = $fblah
+        -- to (a) the type envt, and (b) the top-level bindings
+        ; let boot_dfuns = map fst dfun_prs
+              type_env'  = extendTypeEnvWithIds local_type_env boot_dfuns
+              dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
+                                     | (boot_dfun, dfun) <- dfun_prs ]
+              tcg_env_w_binds
+                = tcg_env { tcg_binds = binds `unionBags` dfun_binds }
+
+        ; type_env' `seq`
+             -- Why the seq?  Without, we will put a TypeEnv thunk in
+             -- tcg_type_env_var.  That thunk will eventually get
+             -- forced if we are typechecking interfaces, but that
+             -- is no good if we are trying to typecheck the very
+             -- DFun we were going to put in.
+             -- TODO: Maybe setGlobalTypeEnv should be strict.
+          setGlobalTypeEnv tcg_env_w_binds type_env' }
 
   | otherwise = panic "checkHiBootIface: unreachable code"
 
--- Note [DFun knot-tying]
--- ~~~~~~~~~~~~~~~~~~~~~~
--- The 'SelfBootInfo' that is fed into 'checkHiBootIface' comes
--- from typechecking the hi-boot file that we are presently
--- implementing.  Suppose we are typechecking the module A:
--- when we typecheck the hi-boot file, whenever we see an
--- identifier A.T, we knot-tie this identifier to the
--- *local* type environment (via if_rec_types.)  The contract
--- then is that we don't *look* at 'SelfBootInfo' until
--- we've finished typechecking the module and updated the
--- type environment with the new tycons and ids.
---
--- This most works well, but there is one problem: DFuns!
--- In general, it's not possible to know a priori what an
--- hs-boot file named a DFun (see Note [DFun impedance matching]),
--- so we look at the ClsInsts from the boot file to figure out
--- what DFuns to add to the type environment.  But we're not
--- allowed to poke the DFuns of the ClsInsts in the SelfBootInfo
--- until we've added the DFuns to the type environment.  A
--- Gordian knot!
---
--- We cut the knot by a little trick: we first *unconditionally*
--- add all of the boot-declared DFuns to the type environment
--- (so that knot tying works, see Trac #4003), without the
--- actual bindings for them.  Then, we compute the impedance
--- matching bindings, and add them to the environment.
---
--- There is one subtlety to doing this: we have to get the
--- DFuns from md_types, not md_insts, even though involves
--- filtering a bunch of TyThings we don't care about.  The
--- reason is only the TypeEnv in md_types has the actual
--- Id we want to add to the environment; the DFun fields
--- in md_insts are typechecking thunks that will attempt to
--- go through if_rec_types to lookup the real Id... but
--- that's what we're trying to setup right now.
+{- Note [DFun impedance matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We return a list of "impedance-matching" bindings for the dfuns
+defined in the hs-boot file, such as
+          $fxEqT = $fEqT
+We need these because the module and hi-boot file might differ in
+the name it chose for the dfun: the name of a dfun is not
+uniquely determined by its type; there might be multiple dfuns
+which, individually, would map to the same name (in which case
+we have to disambiguate them.)  There's no way for the hi file
+to know exactly what disambiguation to use... without looking
+at the hi-boot file itself.
+
+In fact, the names will always differ because we always pick names
+prefixed with "$fx" for boot dfuns, and "$f" for real dfuns
+(so that this impedance matching is always possible).
+
+Note [DFun knot-tying]
+~~~~~~~~~~~~~~~~~~~~~~
+The 'SelfBootInfo' that is fed into 'checkHiBootIface' comes from
+typechecking the hi-boot file that we are presently implementing.
+Suppose we are typechecking the module A: when we typecheck the
+hi-boot file, whenever we see an identifier A.T, we knot-tie this
+identifier to the *local* type environment (via if_rec_types.)  The
+contract then is that we don't *look* at 'SelfBootInfo' until we've
+finished typechecking the module and updated the type environment with
+the new tycons and ids.
+
+This most works well, but there is one problem: DFuns!  We do not want
+to look at the mb_insts of the ModDetails in SelfBootInfo, because a
+dfun in one of those ClsInsts is gotten (in TcIface.tcIfaceInst) by a
+(lazily evaluated) lookup in the if_rec_types.  We could extend the
+type env, do a setGloblaTypeEnv etc; but that all seems very indirect.
+It is much more directly simply to extract the DFunIds from the
+md_types of the SelfBootInfo.
+
+See Trac #4003, #16038 for why we need to take care here.
+-}
 
 checkHiBootIface' :: [ClsInst] -> TypeEnv -> [AvailInfo]
                   -> ModDetails -> TcM [(Id, Id)]
 -- Variant which doesn't require a full TcGblEnv; you could get the
 -- local components from another ModDetails.
---
--- Note [DFun impedance matching]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- We return a list of "impedance-matching" bindings for the dfuns
--- defined in the hs-boot file, such as
---           $fxEqT = $fEqT
--- We need these because the module and hi-boot file might differ in
--- the name it chose for the dfun: the name of a dfun is not
--- uniquely determined by its type; there might be multiple dfuns
--- which, individually, would map to the same name (in which case
--- we have to disambiguate them.)  There's no way for the hi file
--- to know exactly what disambiguation to use... without looking
--- at the hi-boot file itself.
---
--- In fact, the names will always differ because we always pick names
--- prefixed with "$fx" for boot dfuns, and "$f" for real dfuns
--- (so that this impedance matching is always possible).
-
 checkHiBootIface'
         local_insts local_type_env local_exports
-        (ModDetails { md_insts = boot_insts, md_fam_insts = boot_fam_insts,
-                      md_types = boot_type_env, md_exports = boot_exports })
+        (ModDetails { md_types = boot_type_env
+                    , md_fam_insts = boot_fam_insts
+                    , md_exports = boot_exports })
   = do  { traceTc "checkHiBootIface" $ vcat
-             [ ppr boot_type_env, ppr boot_insts, ppr boot_exports]
+             [ ppr boot_type_env, ppr boot_exports]
 
                 -- Check the exports of the boot module, one by one
         ; mapM_ check_export boot_exports
@@ -771,16 +762,22 @@ checkHiBootIface'
 
                 -- Check instance declarations
                 -- and generate an impedance-matching binding
-        ; mb_dfun_prs <- mapM check_inst boot_insts
+        ; mb_dfun_prs <- mapM check_cls_inst boot_dfuns
 
         ; failIfErrsM
 
         ; return (catMaybes mb_dfun_prs) }
 
   where
+    boot_dfun_names = map idName boot_dfuns
+    boot_dfuns      = filter isDFunId $ typeEnvIds boot_type_env
+       -- NB: boot_dfuns is /not/ defined thus: map instanceDFunId md_insts
+       --     We don't want to look at md_insts!
+       --     Why not?  See Note [DFun knot-tying]
+
     check_export boot_avail     -- boot_avail is exported by the boot iface
-      | name `elem` dfun_names = return ()
-      | isWiredInName name     = return ()      -- No checking for wired-in names.  In particular,
+      | name `elem` boot_dfun_names = return ()
+      | isWiredInName name          = return () -- No checking for wired-in names.  In particular,
                                                 -- 'error' is handled by a rather gross hack
                                                 -- (see comments in GHC.Err.hs-boot)
 
@@ -808,39 +805,53 @@ checkHiBootIface'
                           Nothing    -> [name]
                           Just avail -> availNames boot_avail `minusList` availNames avail
 
-    dfun_names = map getName boot_insts
-
     local_export_env :: NameEnv AvailInfo
     local_export_env = availsToNameEnv local_exports
 
-    check_inst :: ClsInst -> TcM (Maybe (Id, Id))
+    check_cls_inst :: DFunId -> TcM (Maybe (Id, Id))
         -- Returns a pair of the boot dfun in terms of the equivalent
         -- real dfun. Delicate (like checkBootDecl) because it depends
         -- on the types lining up precisely even to the ordering of
         -- the type variables in the foralls.
-    check_inst boot_inst
-        = case [dfun | inst <- local_insts,
-                       let dfun = instanceDFunId inst,
-                       idType dfun `eqType` boot_dfun_ty ] of
-            [] -> do { traceTc "check_inst" $ vcat
-                          [ text "local_insts"  <+> vcat (map (ppr . idType . instanceDFunId) local_insts)
-                          , text "boot_inst"    <+> ppr boot_inst
-                          , text "boot_dfun_ty" <+> ppr boot_dfun_ty
-                          ]
-                     ; addErrTc (instMisMatch True boot_inst)
-                     ; return Nothing }
-            (dfun:_) -> return (Just (local_boot_dfun, dfun))
-                     where
-                        local_boot_dfun = Id.mkExportedVanillaId boot_dfun_name (idType dfun)
-                           -- Name from the /boot-file/ ClsInst, but type from the dfun
-                           -- defined in /this module/.  That ensures that the TyCon etc
-                           -- inside the type are the ones defined in this module, not
-                           -- the ones gotten from the hi-boot file, which may have
-                           -- a lot less info (Trac #T8743, comment:10).
-        where
-          boot_dfun      = instanceDFunId boot_inst
+    check_cls_inst boot_dfun
+      | (real_dfun : _) <- find_real_dfun boot_dfun
+      , let local_boot_dfun = Id.mkExportedVanillaId
+                                  (idName boot_dfun) (idType real_dfun)
+      = return (Just (local_boot_dfun, real_dfun))
+          -- Two tricky points here:
+          --
+          -- * The local_boot_fun should have a Name from the /boot-file/,
+          --   but type from the dfun defined in /this module/.
+          --   That ensures that the TyCon etc inside the type are
+          --   the ones defined in this module, not the ones gotten
+          --   from the hi-boot file, which may have a lot less info
+          --   (Trac #T8743, comment:10).
+          --
+          --  * The DFunIds from boot_details are /GlobalIds/, because
+          --    they come from typechecking M.hi-boot.
+          --    But all bindings in this module should be for /LocalIds/,
+          --    otherwise dependency analysis fails (Trac #16038). This
+          --    is another reason for using mkExportedVanillaId, rather
+          --    that modifying boot_dfun, to make local_boot_fun.
+
+      | otherwise
+      = setSrcSpan (getLoc (getName boot_dfun)) $
+        do { traceTc "check_cls_inst" $ vcat
+                [ text "local_insts"  <+>
+                     vcat (map (ppr . idType . instanceDFunId) local_insts)
+                , text "boot_dfun_ty" <+> ppr (idType boot_dfun) ]
+
+           ; addErrTc (instMisMatch boot_dfun)
+           ; return Nothing }
+
+    find_real_dfun :: DFunId -> [DFunId]
+    find_real_dfun boot_dfun
+       = [dfun | inst <- local_insts
+               , let dfun = instanceDFunId inst
+               , idType dfun `eqType` boot_dfun_ty ]
+       where
           boot_dfun_ty   = idType boot_dfun
-          boot_dfun_name = idName boot_dfun
+
 
 -- In general, to perform these checks we have to
 -- compare the TyThing from the .hi-boot file to the TyThing
@@ -1306,12 +1317,10 @@ bootMisMatch is_boot extra_info real_thing boot_thing
             extra_info
           ]
 
-instMisMatch :: Bool -> ClsInst -> SDoc
-instMisMatch is_boot inst
-  = hang (ppr inst)
-       2 (text "is defined in the" <+>
-        (if is_boot then text "hs-boot" else text "hsig")
-       <+> text "file, but not in the module itself")
+instMisMatch :: DFunId -> SDoc
+instMisMatch dfun
+  = hang (text "instance" <+> ppr (idType dfun))
+       2 (text "is defined in the hs-boot file, but not in the module itself")
 
 {-
 ************************************************************************

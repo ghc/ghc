@@ -418,15 +418,7 @@ loadInterface doc_str mod from
         -- READ THE MODULE IN
         ; read_result <- case (wantHiBootFile dflags eps mod from) of
                            Failed err             -> return (Failed err)
-                           Succeeded hi_boot_file ->
-                            -- Stoutly warn against an EPS-updating import
-                            -- of one's own boot file! (one-shot only)
-                            --See Note [Do not update EPS with your own hi-boot]
-                            -- in MkIface.
-                            WARN( hi_boot_file &&
-                                  fmap fst (if_rec_types gbl_env) == Just mod,
-                                  ppr mod )
-                            computeInterface doc_str hi_boot_file mod
+                           Succeeded hi_boot_file -> computeInterface doc_str hi_boot_file mod
         ; case read_result of {
             Failed err -> do
                 { let fake_iface = emptyModIface mod
@@ -488,9 +480,20 @@ loadInterface doc_str mod from
                               }
                }
 
-        ; updateEps_  $ \ eps ->
+        ; let bad_boot = mi_boot iface && fmap fst (if_rec_types gbl_env) == Just mod
+                            -- Warn warn against an EPS-updating import
+                            -- of one's own boot file! (one-shot only)
+                            -- See Note [Loading your own hi-boot file]
+                            -- in MkIface.
+
+        ; WARN ( bad_boot, ppr mod )
+          updateEps_  $ \ eps ->
            if elemModuleEnv mod (eps_PIT eps) || is_external_sig dflags iface
-           then eps else
+                then eps
+           else if bad_boot
+                -- See Note [Loading your own hi-boot file]
+                then eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
+           else
                 eps {
                   eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
@@ -525,26 +528,56 @@ loadInterface doc_str mod from
         ; return (Succeeded res)
     }}}}
 
+{- Note [Loading your own hi-boot file]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally speaking, when compiling module M, we should not
+load M.hi boot into the EPS.  After all, we are very shortly
+going to have full information about M.  Moreover, see
+Note [Do not update EPS with your own hi-boot] in MkIface.
+
+But there is a HORRIBLE HACK here.
+
+* At the end of tcRnImports, we call checkFamInstConsistency to
+  check consistency of imported type-family instances
+  See Note [The type family instance consistency story] in FamInst
+
+* Alas, those instances may refer to data types defined in M,
+  if there is a M.hs-boot.
+
+* And that means we end up loading M.hi-boot, because those
+  data types are not yet in the type environment.
+
+But in this wierd case, /all/ we need is the types. We don't need
+instances, rules etc.  And if we put the instances in the EPS
+we get "duplicate instance" warnings when we compile the "real"
+instance in M itself.  Hence the strange business of just updateing
+the eps_PTE.
+
+This really happens in practice.  The module HsExpr.hs gets
+"duplicate instance" errors if this hack is not present.
+
+This is a mess.
 
 
--- Note [HPT space leak] (#15111)
---
--- In IfL, we defer some work until it is demanded using forkM, such
--- as building TyThings from IfaceDecls. These thunks are stored in
--- the ExternalPackageState, and they might never be poked.  If we're
--- not careful, these thunks will capture the state of the loaded
--- program when we read an interface file, and retain all that data
--- for ever.
---
--- Therefore, when loading a package interface file , we use a "clean"
--- version of the HscEnv with all the data about the currently loaded
--- program stripped out. Most of the fields can be panics because
--- we'll never read them, but hsc_HPT needs to be empty because this
--- interface will cause other interfaces to be loaded recursively, and
--- when looking up those interfaces we use the HPT in loadInterface.
--- We know that none of the interfaces below here can refer to
--- home-package modules however, so it's safe for the HPT to be empty.
---
+Note [HPT space leak] (#15111)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In IfL, we defer some work until it is demanded using forkM, such
+as building TyThings from IfaceDecls. These thunks are stored in
+the ExternalPackageState, and they might never be poked.  If we're
+not careful, these thunks will capture the state of the loaded
+program when we read an interface file, and retain all that data
+for ever.
+
+Therefore, when loading a package interface file , we use a "clean"
+version of the HscEnv with all the data about the currently loaded
+program stripped out. Most of the fields can be panics because
+we'll never read them, but hsc_HPT needs to be empty because this
+interface will cause other interfaces to be loaded recursively, and
+when looking up those interfaces we use the HPT in loadInterface.
+We know that none of the interfaces below here can refer to
+home-package modules however, so it's safe for the HPT to be empty.
+-}
+
 dontLeakTheHPT :: IfL a -> IfL a
 dontLeakTheHPT thing_inside = do
   let
