@@ -50,6 +50,7 @@ import Outputable
 import Platform
 import FastString
 import Data.Word
+import Util             ( debugIsOn )
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
@@ -107,8 +108,8 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
 
 pprDatas :: CmmStatics -> SDoc
 -- See note [emit-time elimination of static indirections]
-pprDatas (Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
-  | lbl == mkIndStaticInfoLabel
+pprDatas (Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, a, b])
+  | ASSERT( (a,b) == (0,0) ) lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
         labelInd _ = Nothing
