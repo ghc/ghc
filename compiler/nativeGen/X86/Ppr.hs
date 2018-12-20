@@ -45,6 +45,7 @@ import Unique           ( pprUniqueAlways )
 import Platform
 import FastString
 import Outputable
+import Util             ( debugIsOn )
 
 import Data.Word
 
@@ -154,8 +155,8 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
 
 pprDatas :: (Alignment, CmmStatics) -> SDoc
 -- See note [emit-time elimination of static indirections]
-pprDatas (_, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
-  | lbl == mkIndStaticInfoLabel
+pprDatas (_, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, a, b])
+  | ASSERT( (a,b) == (0,0) ) lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
         labelInd _ = Nothing
