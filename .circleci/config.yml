@@ -29,12 +29,12 @@ aliases:
       run:
         name: Set Git Identity
         command: |
-          git config user.email "ghc-circleci@haskell.org"
+          git config user.email "ben@ben-laptop"
           git config user.name "GHC CircleCI"
   - &configure_unix
     run:
       name: Configure
-      command: ./configure 
+      command: ./configure
   - &configure_unix_32
     run:
       name: Configure
