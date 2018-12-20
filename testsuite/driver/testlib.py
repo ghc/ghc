@@ -13,6 +13,11 @@ import datetime
 import copy
 import glob
 import sys
+
+
+import cProfile, pstats, io
+
+
 from math import ceil, trunc
 from pathlib import PurePath
 import collections
@@ -64,7 +69,7 @@ def isCompilerStatsTest():
 
 def isStatsTest():
     opts = getTestOpts()
-    return bool(opts.stats_range_fields)
+    return opts.is_stats_test
 
 
 # This can be called at the top of a file of tests, to set default test options
@@ -347,29 +352,18 @@ def testing_metrics():
 # measures the performance numbers of the compiler.
 # As this is a fairly rare case in the testsuite, it defaults to false to
 # indicate that it is a 'normal' performance test.
-def _collect_stats(name, opts, metric, deviation, is_compiler_stats_test=False):
+def _collect_stats(name, opts, metrics, deviation, is_compiler_stats_test=False):
     if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
         failBecause('This test has an invalid name.')
 
-    tests = Perf.get_perf_stats('HEAD^')
+    # Normalize metrics to a list of strings.
+    if isinstance(metrics, str):
+        if metrics == 'all':
+            metrics = testing_metrics()
+        else:
+            metrics = [metrics]
 
-    # Might have multiple metrics being measured for a single test.
-    test = [t for t in tests if t.test == name]
-
-    if tests == [] or test == []:
-        # There are no prior metrics for this test.
-        if isinstance(metric, str):
-            if metric == 'all':
-                for field in testing_metrics():
-                    opts.stats_range_fields[field] = None
-            else:
-                opts.stats_range_fields[metric] = None
-        if isinstance(metric, list):
-            for field in metric:
-                opts.stats_range_fields[field] = None
-
-        return
-
+    opts.is_stats_test = True
     if is_compiler_stats_test:
         opts.is_compiler_stats_test = True
 
@@ -378,24 +372,11 @@ def _collect_stats(name, opts, metric, deviation, is_compiler_stats_test=False):
     if config.compiler_debugged and is_compiler_stats_test:
         opts.skip = 1
 
-    # get the average value of the given metric from test
-    def get_avg_val(metric_2):
-        metric_2_metrics = [float(t.value) for t in test if t.metric == metric_2]
-        return sum(metric_2_metrics) / len(metric_2_metrics)
+    for metric in metrics:
+        baselineByWay = lambda way, target_commit: Perf.baseline_metric( \
+                              target_commit, name, config.test_env, metric, way)
 
-    # 'all' is a shorthand to test for bytes allocated, peak megabytes allocated, and max bytes used.
-    if isinstance(metric, str):
-        if metric == 'all':
-            for field in testing_metrics():
-                opts.stats_range_fields[field] = (get_avg_val(field), deviation)
-                return
-        else:
-            opts.stats_range_fields[metric] = (get_avg_val(metric), deviation)
-            return
-
-    if isinstance(metric, list):
-        for field in metric:
-            opts.stats_range_fields[field] = (get_avg_val(field), deviation)
+        opts.stats_range_fields[metric] = (baselineByWay, deviation)
 
 # -----
 
@@ -1154,10 +1135,11 @@ def metric_dict(name, way, metric, value):
 # name: name of the test.
 # way: the way.
 # stats_file: the path of the stats_file containing the stats for the test.
-# range_fields
+# range_fields: see TestOptions.stats_range_fields
 # Returns a pass/fail object. Passes if the stats are withing the expected value ranges.
 # This prints the results for the user.
 def check_stats(name, way, stats_file, range_fields):
+    head_commit = Perf.commit_hash('HEAD')
     result = passed()
     if range_fields:
         try:
@@ -1167,27 +1149,28 @@ def check_stats(name, way, stats_file, range_fields):
         stats_file_contents = f.read()
         f.close()
 
-        for (metric, range_val_dev) in range_fields.items():
+        for (metric, baseline_and_dev) in range_fields.items():
             field_match = re.search('\("' + metric + '", "([0-9]+)"\)', stats_file_contents)
             if field_match == None:
                 print('Failed to find metric: ', metric)
                 metric_result = failBecause('no such stats metric')
             else:
                 actual_val = int(field_match.group(1))
-                
+
                 # Store the metric so it can later be stored in a git note.
                 perf_stat = metric_dict(name, way, metric, actual_val)
                 change = None
 
                 # If this is the first time running the benchmark, then pass.
-                if range_val_dev == None:
+                baseline = baseline_and_dev[0](way, head_commit)
+                if baseline == None:
                     metric_result = passed()
                     change = MetricChange.NewMetric
                 else:
-                    (expected_val, tolerance_dev) = range_val_dev
+                    tolerance_dev = baseline_and_dev[1]
                     (change, metric_result) = Perf.check_stats_change(
                         perf_stat,
-                        expected_val,
+                        baseline,
                         tolerance_dev,
                         config.allowed_perf_changes,
                         config.verbose >= 4)
