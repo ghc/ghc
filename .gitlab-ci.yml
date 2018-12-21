@@ -298,7 +298,7 @@ validate-x86_64-windows-hadrian:
     # FIXME: --no-lint due to #15950
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --no-lint"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh binary-dist"
-    - bash -c 'make V=0 test THREADS=$THREADS JUNIT_FILE=../../junit.xml'
+    - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
     - cp -Rf $APPDATA/cabal cabal-cache
   cache:
     key: x86_64-windows
@@ -316,7 +316,7 @@ validate-x86_64-windows:
       python boot
       bash -c './configure --with-ghc=`pwd`/toolchain/bin/ghc --enable-tarballs-autodownload HappyCmd=`pwd`/toolchain/bin/happy AlexCmd=`pwd`/toolchain/bin/alex'
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
-    - bash -c 'make V=0 test THREADS=$THREADS JUNIT_FILE=../../junit.xml'
+    - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
     - cp -Rf $APPDATA/cabal cabal-cache
   cache:
     key: x86_64-windows
