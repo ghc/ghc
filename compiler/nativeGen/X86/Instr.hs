@@ -261,10 +261,7 @@ data Instr
 
         | GDTOF       Reg Reg -- src(fpreg), dst(fpreg)
 
-        | GADD        Format Reg Reg Reg -- src1, src2, dst
-        | GDIV        Format Reg Reg Reg -- src1, src2, dst
-        | GSUB        Format Reg Reg Reg -- src1, src2, dst
-        | GMUL        Format Reg Reg Reg -- src1, src2, dst
+
 
                 -- FP compare.  Cond must be `elem` [EQQ, NE, LE, LTT, GE, GTT]
                 -- Compare src1 with src2; set the Zero flag iff the numbers are
@@ -440,10 +437,6 @@ x86_regUsageOfInstr platform instr
 
     GDTOF  src dst      -> mkRU [src] [dst]
 
-    GADD   _ s1 s2 dst  -> mkRU [s1,s2] [dst]
-    GSUB   _ s1 s2 dst  -> mkRU [s1,s2] [dst]
-    GMUL   _ s1 s2 dst  -> mkRU [s1,s2] [dst]
-    GDIV   _ s1 s2 dst  -> mkRU [s1,s2] [dst]
 
     GCMP   _ src1 src2   -> mkRUR [src1,src2]
     GABS   _ src dst     -> mkRU [src] [dst]
@@ -746,8 +739,7 @@ x86_mkSpillInstr dflags reg delta slot
     case targetClassOfReg platform reg of
            RcInteger   -> MOV (archWordFormat is32Bit)
                               (OpReg reg) (OpAddr (spRel dflags off))
-           RcDouble    -> GST FF80 reg (spRel dflags off) {- RcFloat/RcDouble -}
-           RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel dflags off))
+           RcDouble    -> MOV FF64 (OpReg reg) (OpAddr (spRel dflags off))
            _         -> panic "X86.mkSpillInstr: no match"
     where platform = targetPlatform dflags
           is32Bit = target32Bit platform
@@ -766,8 +758,7 @@ x86_mkLoadInstr dflags reg delta slot
         case targetClassOfReg platform reg of
               RcInteger -> MOV (archWordFormat is32Bit)
                                (OpAddr (spRel dflags off)) (OpReg reg)
-              RcDouble  -> GLD FF80 (spRel dflags off) reg {- RcFloat/RcDouble -}
-              RcDoubleSSE -> MOV FF64 (OpAddr (spRel dflags off)) (OpReg reg)
+              RcDouble  -> MOV FF64 (OpAddr (spRel dflags off)) (OpReg reg)
               _           -> panic "X86.x86_mkLoadInstr"
     where platform = targetPlatform dflags
           is32Bit = target32Bit platform
@@ -838,8 +829,7 @@ x86_mkRegRegMoveInstr platform src dst
                      ArchX86    -> MOV II32 (OpReg src) (OpReg dst)
                      ArchX86_64 -> MOV II64 (OpReg src) (OpReg dst)
                      _          -> panic "x86_mkRegRegMoveInstr: Bad arch"
-        RcDouble    -> GMOV src dst
-        RcDoubleSSE -> MOV FF64 (OpReg src) (OpReg dst)
+        RcDouble    ->  MOV FF64 (OpReg src) (OpReg dst)
         _     -> panic "X86.RegInfo.mkRegRegMoveInstr: no match"
 
 -- | Check whether an instruction represents a reg-reg move.
