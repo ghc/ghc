@@ -993,42 +993,6 @@ newMetaTyVarTyAtLevel tc_lvl kind
 *                                                                      *
 ********************************************************************* -}
 
-data CandidatesQTvs  -- See Note [Dependent type variables]
-                     -- See Note [CandidatesQTvs determinism and order]
-  -- NB: All variables stored here are MetaTvs. No exceptions.
-  = DV { dv_kvs :: DTyVarSet    -- "kind" metavariables (dependent)
-       , dv_tvs :: DTyVarSet    -- "type" metavariables (non-dependent)
-         -- A variable may appear in both sets
-         -- E.g.   T k (x::k)    The first occurrence of k makes it
-         --                      show up in dv_tvs, the second in dv_kvs
-         -- See Note [Dependent type variables]
-       , dv_cvs :: CoVarSet
-         -- These are covars. We will *not* quantify over these, but
-         -- we must make sure also not to quantify over any cv's kinds,
-         -- so we include them here as further direction for quantifyTyVars
-    }
-
-instance Semi.Semigroup CandidatesQTvs where
-   (DV { dv_kvs = kv1, dv_tvs = tv1, dv_cvs = cv1 })
-     <> (DV { dv_kvs = kv2, dv_tvs = tv2, dv_cvs = cv2 })
-          = DV { dv_kvs = kv1 `unionDVarSet` kv2
-               , dv_tvs = tv1 `unionDVarSet` tv2
-               , dv_cvs = cv1 `unionVarSet` cv2 }
-
-instance Monoid CandidatesQTvs where
-   mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet, dv_cvs = emptyVarSet }
-   mappend = (Semi.<>)
-
-instance Outputable CandidatesQTvs where
-  ppr (DV {dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs })
-    = text "DV" <+> braces (pprWithCommas id [ text "dv_kvs =" <+> ppr kvs
-                                             , text "dv_tvs =" <+> ppr tvs
-                                             , text "dv_cvs =" <+> ppr cvs ])
-
-
-candidateKindVars :: CandidatesQTvs -> TyVarSet
-candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
-
 {- Note [Dependent type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In Haskell type inference we quantify over type variables; but we only
@@ -1136,6 +1100,48 @@ what skolems are in scope.
 
 -}
 
+data CandidatesQTvs
+  -- See Note [Dependent type variables]
+  -- See Note [CandidatesQTvs determinism and order]
+  --
+  -- Invariants:
+  --   * All variables stored here are MetaTvs. No exceptions.
+  --   * All variables are fully zonked, including their kinds
+  --
+  = DV { dv_kvs :: DTyVarSet    -- "kind" metavariables (dependent)
+       , dv_tvs :: DTyVarSet    -- "type" metavariables (non-dependent)
+         -- A variable may appear in both sets
+         -- E.g.   T k (x::k)    The first occurrence of k makes it
+         --                      show up in dv_tvs, the second in dv_kvs
+         -- See Note [Dependent type variables]
+
+       , dv_cvs :: CoVarSet
+         -- These are covars. We will *not* quantify over these, but
+         -- we must make sure also not to quantify over any cv's kinds,
+         -- so we include them here as further direction for quantifyTyVars
+    }
+
+instance Semi.Semigroup CandidatesQTvs where
+   (DV { dv_kvs = kv1, dv_tvs = tv1, dv_cvs = cv1 })
+     <> (DV { dv_kvs = kv2, dv_tvs = tv2, dv_cvs = cv2 })
+          = DV { dv_kvs = kv1 `unionDVarSet` kv2
+               , dv_tvs = tv1 `unionDVarSet` tv2
+               , dv_cvs = cv1 `unionVarSet` cv2 }
+
+instance Monoid CandidatesQTvs where
+   mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet, dv_cvs = emptyVarSet }
+   mappend = (Semi.<>)
+
+instance Outputable CandidatesQTvs where
+  ppr (DV {dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs })
+    = text "DV" <+> braces (pprWithCommas id [ text "dv_kvs =" <+> ppr kvs
+                                             , text "dv_tvs =" <+> ppr tvs
+                                             , text "dv_cvs =" <+> ppr cvs ])
+
+
+candidateKindVars :: CandidatesQTvs -> TyVarSet
+candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
+
 -- | Gathers free variables to use as quantification candidates (in
 -- 'quantifyTyVars'). This might output the same var
 -- in both sets, if it's used in both a type and a kind.
@@ -1153,11 +1159,11 @@ candidateQTyVarsOfTypes tys = foldlM (collect_cand_qtvs False emptyVarSet) mempt
 -- to be dependent. This is appropriate when generalizing a *kind*,
 -- instead of a type. (That way, -XNoPolyKinds will default the variables
 -- to Type.)
-candidateQTyVarsOfKind :: TcKind       -- not necessarily zonked
+candidateQTyVarsOfKind :: TcKind       -- Not necessarily zonked
                        -> TcM CandidatesQTvs
 candidateQTyVarsOfKind ty = collect_cand_qtvs True emptyVarSet mempty ty
 
-candidateQTyVarsOfKinds :: [TcKind]       -- not necessarily zonked
+candidateQTyVarsOfKinds :: [TcKind]    -- Not necessarily zonked
                        -> TcM CandidatesQTvs
 candidateQTyVarsOfKinds tys = foldM (collect_cand_qtvs True emptyVarSet) mempty tys
 
@@ -1167,9 +1173,24 @@ delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
        , dv_tvs = tvs `delDVarSetList` vars
        , dv_cvs = cvs `delVarSetList`  vars }
 
-collect_cand_qtvs :: Bool   -- True <=> consider every fv in Type to be dependent
-                  -> VarSet -- bound variables (both locally bound and globally bound)
-                  -> CandidatesQTvs -> Type -> TcM CandidatesQTvs
+collect_cand_qtvs
+  :: Bool            -- True <=> consider every fv in Type to be dependent
+  -> VarSet          -- Bound variables (both locally bound and globally bound)
+  -> CandidatesQTvs  -- Accumulating parameter
+  -> Type            -- Not necessarily zonked
+  -> TcM CandidatesQTvs
+
+-- Key points:
+--   * Looks through meta-tyvars as it goes;
+--     no need to zonk in advance
+--
+--   * Needs to be monadic anyway, because it does the zap-naughty
+--     stuff; see Note [Naughty quantification candidates]
+--
+--   * Returns fully-zonked CandidateQTvs, including their kinds
+--     so that subsequent dependency analysis (to build a well
+--     scoped telescope) works correctly
+
 collect_cand_qtvs is_dep bound dvs ty
   = go dvs ty
   where
@@ -1199,34 +1220,27 @@ collect_cand_qtvs is_dep bound dvs ty
 
     -----------------
     go_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
-      | is_dep
-      = case tv `elemDVarSet` kvs of
-         True  -> return dv    -- We have met this tyvar aleady
-         False | intersectsVarSet bound (tyCoVarsOfType tv_kind)
-               -> -- See Note [Naughty quantification candidates]
-                  zap_naughty
-               | otherwise
-               -> collect_cand_qtvs True emptyVarSet dv' tv_kind
-               where
-                  dv' = dv { dv_kvs = kvs `extendDVarSet` tv }
-                        -- See Note [Order of accumulation]
-
+      | tv `elemDVarSet` kvs = return dv  -- We have met this tyvar aleady
+      | not is_dep
+      , tv `elemDVarSet` tvs = return dv  -- We have met this tyvar aleady
       | otherwise
-      = case tv `elemDVarSet` kvs || tv `elemDVarSet` tvs of
-         True  -> return dv    -- We have met this tyvar aleady
-         False | intersectsVarSet bound (tyCoVarsOfType tv_kind)
-               -> -- See Note [Naughty quantification candidates]
-                  zap_naughty
-               | otherwise
-               -> collect_cand_qtvs True emptyVarSet dv' tv_kind
-               where
-                  dv' = dv { dv_tvs = tvs `extendDVarSet` tv }
-                        -- See Note [Order of accumulation]
-      where
-        tv_kind = tyVarKind tv
-        zap_naughty = do { traceTc "Zapping naughty quantifier" (pprTyVar tv)
-                         ; writeMetaTyVar tv (anyTypeOfKind tv_kind)
-                         ; collect_cand_qtvs True bound dv tv_kind }
+      = do { tv_kind <- zonkTcType (tyVarKind tv)
+                 -- This zonk is annoying, but it is necessary, both to
+                 -- ensure that the collected candidates have zonked kinds
+                 -- (Trac #15795) and to make the naughty check
+                 -- (which comes next) works correctly
+           ; if intersectsVarSet bound (tyCoVarsOfType tv_kind)
+
+             then -- See Note [Naughty quantification candidates]
+                  do { traceTc "Zapping naughty quantifier" (pprTyVar tv)
+                     ; writeMetaTyVar tv (anyTypeOfKind tv_kind)
+                     ; collect_cand_qtvs True bound dv tv_kind }
+
+             else do { let tv' = tv `setTyVarKind` tv_kind
+                           dv' | is_dep    = dv { dv_kvs = kvs `extendDVarSet` tv' }
+                               | otherwise = dv { dv_tvs = tvs `extendDVarSet` tv' }
+                               -- See Note [Order of accumulation]
+                     ; collect_cand_qtvs True emptyVarSet dv' tv_kind } }
 
 collect_cand_qtvs_co :: VarSet -- bound variables
                      -> CandidatesQTvs -> Coercion
