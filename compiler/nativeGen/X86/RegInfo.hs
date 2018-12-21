@@ -25,9 +25,8 @@ import X86.Regs
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
    = case format of
-        FF32    -> VirtualRegSSE u
-        FF64    -> VirtualRegSSE u
-        FF80    -> VirtualRegD   u
+        FF32    -> VirtualRegF u
+        FF64    -> VirtualRegD u
         _other  -> VirtualRegI   u
 
 regDotColor :: Platform -> RealReg -> SDoc
@@ -58,12 +57,4 @@ normalRegColors platform
                           , (r15, "#002080") ]
 
 fpRegColors :: [(Reg,String)]
-fpRegColors =
-        [ (fake0, "#ff00ff")
-        , (fake1, "#ff00aa")
-        , (fake2, "#aa00ff")
-        , (fake3, "#aa00aa")
-        , (fake4, "#ff0055")
-        , (fake5, "#5500ff") ]
-
-        ++ zip (map regSingle [24..39]) (repeat "red")
+fpRegColors =(map regSingle [16..31]) (repeat "red")
