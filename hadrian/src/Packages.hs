@@ -192,6 +192,8 @@ rtsBuildPath :: Stage -> Action FilePath
 rtsBuildPath stage = buildPath (rtsContext stage)
 
 -- | Build directory for libffi
+-- This probably doesn't need to be stage dependent but it is for
+-- consistency for now.
 libffiContext :: Stage -> Context
 libffiContext stage = vanillaContext stage libffi
 
