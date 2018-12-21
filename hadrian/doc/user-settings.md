@@ -142,18 +142,17 @@ userFlavour = defaultFlavour { name = "user", integerLibrary = integerSimple }
 ### Specifying the final stage to build
 
 The `finalStage` variable can be set to indicate after which stage we should
-stop the compilation pipeline.
+stop the compilation pipeline. By default it is set to `Stage2` which indicates
+that we will build everything which uses the `Stage1` `ghc` and then stop.
 
 ```
 finalStage :: Stage
 finalStage = Stage2
 ```
 
-By default it is set to `Stage2` which indicates that we will build everything
-which uses the `Stage1` `ghc` and then stop.
-
 Using this mechanism we can also build a `Stage3` compiler by setting
-`finalStage = Stage3`.
+`finalStage = Stage3` or just a `Stage1` compiler by setting
+`finalStage = Stage1`.
 
 ## Build ways
 
