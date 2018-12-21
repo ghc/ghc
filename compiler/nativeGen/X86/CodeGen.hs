@@ -107,10 +107,10 @@ sse2Enabled = do
   -- operations would change the precision and final result of what
   -- would otherwise be the same expressions with respect to single or
   -- double precision IEEE floating point computations.
-    ArchX86_64 -> True
-    ArchX86    -> True
-    _          -> panic ""
-  return True
+    ArchX86_64 -> return True
+    ArchX86    -> return True
+    _          -> panic "trying to generate x86/x86_64 on the wrong platform"
+
 
 sse4_2Enabled :: NatM Bool
 sse4_2Enabled = do
@@ -1616,21 +1616,20 @@ assignReg_IntCode pk reg (CmmLoad src _) = do
   load_code <- intLoadCode (MOV pk) src
   dflags <- getDynFlags
   let platform = targetPlatform dflags
-  return (load_code (getRegisterReg platform False{-no sse2-} reg))
+  return (load_code (getRegisterReg platform reg))
 
 -- dst is a reg, but src could be anything
 assignReg_IntCode _ reg src = do
   dflags <- getDynFlags
   let platform = targetPlatform dflags
   code <- getAnyReg src
-  return (code (getRegisterReg platform False{-no sse2-} reg))
+  return (code (getRegisterReg platform reg))
 
 
 -- Floating point assignment to memory
 assignMem_FltCode pk addr src = do
   (src_reg, src_code) <- getNonClobberedReg src
   Amode addr addr_code <- getAmode addr
-  use_sse2 <- sse2Enabled
   let
         code = src_code `appOL`
                addr_code `snocOL`
@@ -2128,7 +2127,7 @@ genCCall dflags is32Bit (PrimTarget (MO_AtomicRMW width amop))
         else getSimpleAmode dflags is32Bit addr  -- See genCCall for MO_Cmpxchg
     arg <- getNewRegNat format
     arg_code <- getAnyReg n
-    use_sse2 <- True
+    use_sse2 <- return True
     let platform = targetPlatform dflags
         dst_r    = getRegisterReg platform  (CmmLocal dst)
     code <- op_code dst_r arg amode
@@ -2263,7 +2262,7 @@ genCCall _ is32Bit target dest_regs args bid = do
                 AND fmt (OpReg tmp) (OpReg dst)
                 ]
 
-          return $ code (getRegisterReg platform True (CmmLocal r))
+          return $ code (getRegisterReg platform (CmmLocal r))
 
     (PrimTarget (MO_S_QuotRem  width), _) -> divOp1 platform True  width dest_regs args
     (PrimTarget (MO_U_QuotRem  width), _) -> divOp1 platform False width dest_regs args
@@ -2275,8 +2274,8 @@ genCCall _ is32Bit target dest_regs args bid = do
                let format = intFormat width
                lCode <- anyReg =<< trivialCode width (ADD_CC format)
                                      (Just (ADD_CC format)) arg_x arg_y
-               let reg_l = getRegisterReg platform True (CmmLocal res_l)
-                   reg_h = getRegisterReg platform True (CmmLocal res_h)
+               let reg_l = getRegisterReg platform (CmmLocal res_l)
+                   reg_h = getRegisterReg platform (CmmLocal res_h)
                    code = hCode reg_h `appOL`
                           lCode reg_l `snocOL`
                           ADC format (OpImm (ImmInteger 0)) (OpReg reg_h)
@@ -2296,8 +2295,8 @@ genCCall _ is32Bit target dest_regs args bid = do
             do (y_reg, y_code) <- getRegOrMem arg_y
                x_code <- getAnyReg arg_x
                let format = intFormat width
-                   reg_h = getRegisterReg platform True (CmmLocal res_h)
-                   reg_l = getRegisterReg platform True (CmmLocal res_l)
+                   reg_h = getRegisterReg platform (CmmLocal res_h)
+                   reg_l = getRegisterReg platform (CmmLocal res_l)
                    code = y_code `appOL`
                           x_code rax `appOL`
                           toOL [MUL2 format y_reg,
@@ -2406,7 +2405,7 @@ genCCall32' dflags target dest_regs args = do
         delta0 <- getDeltaNat
         setDeltaNat (delta0 - arg_pad_size)
 
-        use_sse2 <- True
+        use_sse2 <- return True
         push_codes <- mapM (push_arg use_sse2) (reverse prom_args)
         delta <- getDeltaNat
         MASSERT(delta == delta0 - tot_arg_size)
@@ -2467,7 +2466,11 @@ genCCall32' dflags target dest_regs args = do
                       fmt = floatFormat w
                          in toOL [ SUB II32 (OpImm (ImmInt b)) (OpReg esp),
                                    DELTA (delta0 - b),
-                                   GST fmt fake0 tmp_amode,
+                                   X87Store fmt  tmp_amode,
+                                   -- X87Store only supported for the CDECL ABI
+                                   -- NB: This code will need to be
+                                   -- revisted once GHC does more work around
+                                   -- SIGFPE f
                                    MOV fmt (OpAddr tmp_amode) (OpReg r_dest),
                                    ADD II32 (OpImm (ImmInt b)) (OpReg esp),
                                    DELTA delta0]
@@ -2481,7 +2484,7 @@ genCCall32' dflags target dest_regs args = do
                     w  = typeWidth ty
                     b  = widthInBytes w
                     r_dest_hi = getHiVRegFromLo r_dest
-                    r_dest    = getRegisterReg platform use_sse2 (CmmLocal dest)
+                    r_dest    = getRegisterReg platform  (CmmLocal dest)
             assign_code many = pprPanic "genCCall.assign_code - too many return values:" (ppr many)
 
         return (push_code `appOL`
@@ -2654,7 +2657,7 @@ genCCall64' dflags target dest_regs args = do
                 _ -> unitOL (MOV (cmmTypeFormat rep) (OpReg rax) (OpReg r_dest))
           where
                 rep = localRegType dest
-                r_dest = getRegisterReg platform True (CmmLocal dest)
+                r_dest = getRegisterReg platform  (CmmLocal dest)
         assign_code _many = panic "genCCall.assign_code many"
 
     return (adjust_rsp          `appOL`

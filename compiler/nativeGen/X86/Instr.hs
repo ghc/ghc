@@ -241,6 +241,12 @@ data Instr
         | NOP
 
 
+        -- We need to support the FSTP (x87 store and pop) instruction
+        -- so that we can correctly read off the return value of an
+        -- x86 CDECL C function call when its floating point.
+        -- so we dont include a register argument, and just use st(0)
+        -- this is
+        | X87Store         Format  AddrMode -- src(fpreg), dst
 
 
         -- SSE2 floating point: we use a restricted set of the available SSE2
@@ -385,6 +391,8 @@ x86_regUsageOfInstr platform instr
     CALL (Right reg) params -> mkRU (reg:params) (callClobberedRegs platform)
     CLTD   _            -> mkRU [eax] [edx]
     NOP                 -> mkRU [] []
+
+    X87Store    _  dst    -> mkRUR ( use_EA dst [])
 
     CVTSS2SD   src dst  -> mkRU [src] [dst]
     CVTSD2SS   src dst  -> mkRU [src] [dst]
@@ -532,7 +540,8 @@ x86_patchRegsOfInstr instr env
     JMP op regs          -> JMP (patchOp op) regs
     JMP_TBL op ids s lbl -> JMP_TBL (patchOp op) ids s lbl
 
-
+    -- literally only support storing the top x87 stack value st(0)
+    X87Store  fmt  dst     -> X87Store fmt  (lookupAddr dst)
 
     CVTSS2SD src dst    -> CVTSS2SD (env src) (env dst)
     CVTSD2SS src dst    -> CVTSD2SS (env src) (env dst)
@@ -726,6 +735,7 @@ x86_isMetaInstr instr
 
 
 
+---  TODO: why is there
 -- | Make a reg-reg move instruction.
 --      On SPARC v8 there are no instructions to move directly between
 --      floating point and integer regs. If we need to do that then we
@@ -744,6 +754,8 @@ x86_mkRegRegMoveInstr platform src dst
                      ArchX86_64 -> MOV II64 (OpReg src) (OpReg dst)
                      _          -> panic "x86_mkRegRegMoveInstr: Bad arch"
         RcDouble    ->  MOV FF64 (OpReg src) (OpReg dst)
+        -- this code is the lie we tell ourselves because flaot and double
+        -- use the same register class...
         _     -> panic "X86.RegInfo.mkRegRegMoveInstr: no match"
 
 -- | Check whether an instruction represents a reg-reg move.
