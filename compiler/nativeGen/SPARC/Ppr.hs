@@ -156,7 +156,7 @@ pprReg reg
                 VirtualRegHi  u -> text "%vHi_"  <> pprUniqueAlways u
                 VirtualRegF   u -> text "%vF_"   <> pprUniqueAlways u
                 VirtualRegD   u -> text "%vD_"   <> pprUniqueAlways u
-                VirtualRegSSE u -> text "%vSSE_" <> pprUniqueAlways u
+
 
         RegReal rr
          -> case rr of

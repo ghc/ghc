@@ -317,7 +317,7 @@ pprReg f r
       RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
       RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u
       RegVirtual (VirtualRegD  u)  -> text "%vD_"   <> pprUniqueAlways u
-      RegVirtual (VirtualRegSSE u) -> text "%vSSE_" <> pprUniqueAlways u
+
   where
     ppr32_reg_no :: Format -> Int -> SDoc
     ppr32_reg_no II8   = ppr32_reg_byte
@@ -910,7 +910,9 @@ gpop reg offset
    = hcat [text "fstp ", greg reg offset]
 
 greg :: Reg -> RegNo -> SDoc
-greg reg offset = text "%st(" <> int (gregno reg - firstfake+offset) <> char ')'
+greg reg offset = text "%st(" <> int (gregno reg - firstxmm +offset) <> char ')'
+-- this code seems REALLY DANGEROUS
+-- AUDIT FIXME
 
 gsemi :: SDoc
 gsemi = text " ; "
@@ -926,38 +928,8 @@ gregno (RegReal (RealRegSingle i)) = i
 gregno _           = --pprPanic "gregno" (ppr other)
                      999   -- bogus; only needed for debug printing
 
-pprG :: Instr -> SDoc -> SDoc
-pprG fake actual
-   = (char '#' <> pprGInstr fake) $$ actual
 
 
-pprGInstr :: Instr -> SDoc
-pprGInstr (GMOV src dst)   = pprFormatRegReg (sLit "gmov") FF64 src dst
-pprGInstr (GLD fmt src dst) = pprFormatAddrReg (sLit "gld") fmt src dst
-pprGInstr (GST fmt src dst) = pprFormatRegAddr (sLit "gst") fmt src dst
-
-pprGInstr (GLDZ dst) = pprFormatReg (sLit "gldz") FF64 dst
-pprGInstr (GLD1 dst) = pprFormatReg (sLit "gld1") FF64 dst
-
-pprGInstr (GFTOI src dst) = pprFormatFormatRegReg (sLit "gftoi") FF32 II32 src dst
-pprGInstr (GDTOI src dst) = pprFormatFormatRegReg (sLit "gdtoi") FF64 II32 src dst
-
-pprGInstr (GITOF src dst) = pprFormatFormatRegReg (sLit "gitof") II32 FF32 src dst
-pprGInstr (GITOD src dst) = pprFormatFormatRegReg (sLit "gitod") II32 FF64 src dst
-pprGInstr (GDTOF src dst) = pprFormatFormatRegReg (sLit "gdtof") FF64 FF32 src dst
-
-pprGInstr (GCMP co src dst) = pprCondRegReg (sLit "gcmp_") FF64 co src dst
-pprGInstr (GABS fmt src dst) = pprFormatRegReg (sLit "gabs") fmt src dst
-pprGInstr (GNEG fmt src dst) = pprFormatRegReg (sLit "gneg") fmt src dst
-pprGInstr (GSQRT fmt src dst) = pprFormatRegReg (sLit "gsqrt") fmt src dst
-pprGInstr (GSIN fmt _ _ src dst) = pprFormatRegReg (sLit "gsin") fmt src dst
-pprGInstr (GCOS fmt _ _ src dst) = pprFormatRegReg (sLit "gcos") fmt src dst
-pprGInstr (GTAN fmt _ _ src dst) = pprFormatRegReg (sLit "gtan") fmt src dst
-
-pprGInstr (GADD fmt src1 src2 dst) = pprFormatRegRegReg (sLit "gadd") fmt src1 src2 dst
-pprGInstr (GSUB fmt src1 src2 dst) = pprFormatRegRegReg (sLit "gsub") fmt src1 src2 dst
-pprGInstr (GMUL fmt src1 src2 dst) = pprFormatRegRegReg (sLit "gmul") fmt src1 src2 dst
-pprGInstr (GDIV fmt src1 src2 dst) = pprFormatRegRegReg (sLit "gdiv") fmt src1 src2 dst
 
 pprGInstr _ = panic "X86.Ppr.pprGInstr: no match"
 
