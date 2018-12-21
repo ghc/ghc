@@ -1733,8 +1733,6 @@ kcTyFamInstEqn tc_fam_tc
            , text "hsib_vars ="  <+> ppr imp_vars
            , text "feqn_bndrs =" <+> ppr mb_expl_bndrs
            , text "feqn_pats ="  <+> ppr hs_pats ])
-       ; checkTc (fam_name == eqn_tc_name)
-                 (wrongTyFamName fam_name eqn_tc_name)
           -- this check reports an arity error instead of a kind error; easier for user
        ; checkTc (hs_pats `lengthIs` vis_arity) $
                   wrongNumberOfParmsErr vis_arity
@@ -1750,7 +1748,6 @@ kcTyFamInstEqn tc_fam_tc
              -- During kind-checkig, a,b,c,d should be TyVarTvs and unify appropriately
     }
   where
-    fam_name  = tyConName tc_fam_tc
     vis_arity = length (tyConVisibleTyVars tc_fam_tc)
 
 kcTyFamInstEqn _ (dL->L _ (XHsImplicitBndrs _)) = panic "kcTyFamInstEqn"
@@ -3812,12 +3809,6 @@ defaultAssocKindErr :: TyCon -> SDoc
 defaultAssocKindErr fam_tc
   = text "Kind mis-match on LHS of default declaration for"
     <+> quotes (ppr fam_tc)
-
-wrongTyFamName :: Name -> Name -> SDoc
-wrongTyFamName fam_tc_name eqn_tc_name
-  = hang (text "Mismatched type name in type family instance.")
-       2 (vcat [ text "Expected:" <+> ppr fam_tc_name
-               , text "  Actual:" <+> ppr eqn_tc_name ])
 
 badRoleAnnot :: Name -> Role -> Role -> SDoc
 badRoleAnnot var annot inferred

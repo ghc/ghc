@@ -1,6 +1,6 @@
 
 T11623.hs:5:23: error:
-    • Mismatched type name in type family instance.
-        Expected: T
-          Actual: Maybe
-    • In the type family declaration for ‘T’
+    Mismatched type name in type family instance.
+      Expected: T
+        Actual: Maybe
+    In the declaration for type family ‘T’

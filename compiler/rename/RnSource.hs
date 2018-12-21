@@ -30,7 +30,8 @@ import RnEnv
 import RnUtils          ( HsDocContext(..), mapFvRn, bindLocalNames
                         , checkDupRdrNames, inHsDocContext, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
-                        , extendTyVarEnvFVRn, newLocalBndrsRn )
+                        , extendTyVarEnvFVRn, newLocalBndrsRn
+                        , withHsDocContext )
 import RnUnbound        ( mkUnboundName, notInScopeErr )
 import RnNames
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
@@ -804,18 +805,36 @@ rnTyFamInstDecl :: Maybe (Name, [Name])
                 -> TyFamInstDecl GhcPs
                 -> RnM (TyFamInstDecl GhcRn, FreeVars)
 rnTyFamInstDecl mb_cls (TyFamInstDecl { tfid_eqn = eqn })
-  = do { (eqn', fvs) <- rnTyFamInstEqn mb_cls eqn
+  = do { (eqn', fvs) <- rnTyFamInstEqn mb_cls NotClosedTyFam eqn
        ; return (TyFamInstDecl { tfid_eqn = eqn' }, fvs) }
 
+-- | Tracks whether we are renaming an equation in a closed type family
+-- equation ('ClosedTyFam') or not ('NotClosedTyFam').
+data ClosedTyFamInfo
+  = NotClosedTyFam
+  | ClosedTyFam (Located RdrName) Name
+                -- The names (RdrName and Name) of the closed type family
+
 rnTyFamInstEqn :: Maybe (Name, [Name])
+               -> ClosedTyFamInfo
                -> TyFamInstEqn GhcPs
                -> RnM (TyFamInstEqn GhcRn, FreeVars)
-rnTyFamInstEqn mb_cls eqn@(HsIB { hsib_body = FamEqn { feqn_tycon = tycon
-                                                     , feqn_rhs   = rhs }})
+rnTyFamInstEqn mb_cls ctf_info
+    eqn@(HsIB { hsib_body = FamEqn { feqn_tycon = tycon
+                                   , feqn_rhs   = rhs }})
   = do { let rhs_kvs = extractHsTyRdrTyVarsKindVars rhs
-       ; rnFamInstEqn (TySynCtx tycon) mb_cls rhs_kvs eqn rnTySyn }
-rnTyFamInstEqn _ (HsIB _ (XFamEqn _)) = panic "rnTyFamInstEqn"
-rnTyFamInstEqn _ (XHsImplicitBndrs _) = panic "rnTyFamInstEqn"
+       ; (eqn'@(HsIB { hsib_body =
+                       FamEqn { feqn_tycon = dL -> L _ tycon' }}), fvs)
+           <- rnFamInstEqn (TySynCtx tycon) mb_cls rhs_kvs eqn rnTySyn
+       ; case ctf_info of
+           NotClosedTyFam -> pure ()
+           ClosedTyFam fam_rdr_name fam_name ->
+             checkTc (fam_name == tycon') $
+             withHsDocContext (TyFamilyCtx fam_rdr_name) $
+             wrongTyFamName fam_name tycon'
+       ; pure (eqn', fvs) }
+rnTyFamInstEqn _ _ (HsIB _ (XFamEqn _)) = panic "rnTyFamInstEqn"
+rnTyFamInstEqn _ _ (XHsImplicitBndrs _) = panic "rnTyFamInstEqn"
 
 rnTyFamDefltEqn :: Name
                 -> TyFamDefltEqn GhcPs
@@ -1853,7 +1872,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                ; injectivity' <- traverse (rnInjectivityAnn tyvars' res_sig')
                                           injectivity
                ; return ( (tyvars', res_sig', injectivity') , fv_kind ) }
-       ; (info', fv2) <- rn_info info
+       ; (info', fv2) <- rn_info tycon' info
        ; return (FamilyDecl { fdExt = noExt
                             , fdLName = tycon', fdTyVars = tyvars'
                             , fdFixity = fixity
@@ -1865,14 +1884,18 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
      kvs = extractRdrKindSigVars res_sig
 
      ----------------------
-     rn_info (ClosedTypeFamily (Just eqns))
-       = do { (eqns', fvs) <- rnList (rnTyFamInstEqn Nothing) eqns
-                                                    -- no class context,
+     rn_info :: Located Name
+             -> FamilyInfo GhcPs -> RnM (FamilyInfo GhcRn, FreeVars)
+     rn_info (dL->L _ fam_name) (ClosedTypeFamily (Just eqns))
+       = do { (eqns', fvs)
+                <- rnList (rnTyFamInstEqn Nothing (ClosedTyFam tycon fam_name))
+                                          -- no class context
+                          eqns
             ; return (ClosedTypeFamily (Just eqns'), fvs) }
-     rn_info (ClosedTypeFamily Nothing)
+     rn_info _ (ClosedTypeFamily Nothing)
        = return (ClosedTypeFamily Nothing, emptyFVs)
-     rn_info OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
-     rn_info DataFamily     = return (DataFamily, emptyFVs)
+     rn_info _ OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
+     rn_info _ DataFamily     = return (DataFamily, emptyFVs)
 rnFamDecl _ (XFamilyDecl _) = panic "rnFamDecl"
 
 rnFamResultSig :: HsDocContext
@@ -2025,6 +2048,12 @@ badAssocRhs ns
                   <+> text "out-of-scope variable" <> plural ns
                   <+> pprWithCommas (quotes . ppr) ns)
                2 (text "All such variables must be bound on the LHS"))
+
+wrongTyFamName :: Name -> Name -> SDoc
+wrongTyFamName fam_tc_name eqn_tc_name
+  = hang (text "Mismatched type name in type family instance.")
+       2 (vcat [ text "Expected:" <+> ppr fam_tc_name
+               , text "  Actual:" <+> ppr eqn_tc_name ])
 
 -----------------
 rnConDecls :: [LConDecl GhcPs] -> RnM ([LConDecl GhcRn], FreeVars)

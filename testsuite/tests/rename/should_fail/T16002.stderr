@@ -1,0 +1,6 @@
+
+T16002.hs:6:3: error:
+    Mismatched type name in type family instance.
+      Expected: B
+        Actual: A
+    In the declaration for type family ‘B’

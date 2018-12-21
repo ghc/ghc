@@ -1,6 +1,6 @@
 
-Overlap5.hs:8:3:
+Overlap5.hs:8:3: error:
     Mismatched type name in type family instance.
       Expected: F
         Actual: G
-    In the type family declaration for ‘F’
+    In the declaration for type family ‘F’
