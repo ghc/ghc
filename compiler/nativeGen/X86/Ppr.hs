@@ -45,6 +45,7 @@ import Unique           ( pprUniqueAlways )
 import Platform
 import FastString
 import Outputable
+import Util             ( debugIsOn )
 
 import Data.Word
 

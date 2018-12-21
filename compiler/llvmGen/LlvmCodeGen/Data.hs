@@ -22,6 +22,7 @@ import Platform
 
 import FastString
 import Outputable
+import Util     ( debugIsOn )
 
 -- ----------------------------------------------------------------------------
 -- * Constants

@@ -50,6 +50,7 @@ import Outputable
 import Platform
 import FastString
 import Data.Word
+import Util             ( debugIsOn )
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out

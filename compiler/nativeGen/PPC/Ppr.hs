@@ -34,6 +34,7 @@ import Platform
 import FastString
 import Outputable
 import DynFlags
+import Util                  ( debugIsOn )
 
 import Data.Word
 import Data.Int
