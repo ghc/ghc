@@ -55,4 +55,4 @@ successColour = mkSuccessColour (Dull Green)
 -- `Stage1` compiler. Setting it to `Stage3` will build the `Stage3`
 -- compiler. Setting it to `Stage0` will mean nothing gets built at all.
 finalStage :: Stage
-finalStage = Stage3
+finalStage = Stage2
