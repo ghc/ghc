@@ -409,17 +409,13 @@ pprReg f r
 
 ppr_reg_float :: Int -> PtrString
 ppr_reg_float i = case i of
-        16 -> sLit "%fake0";  17 -> sLit "%fake1"
-        18 -> sLit "%fake2";  19 -> sLit "%fake3"
-        20 -> sLit "%fake4";  21 -> sLit "%fake5"
-        24 -> sLit "%xmm0";   25 -> sLit "%xmm1"
-        26 -> sLit "%xmm2";   27 -> sLit "%xmm3"
-        28 -> sLit "%xmm4";   29 -> sLit "%xmm5"
-        30 -> sLit "%xmm6";   31 -> sLit "%xmm7"
-        32 -> sLit "%xmm8";   33 -> sLit "%xmm9"
-        34 -> sLit "%xmm10";  35 -> sLit "%xmm11"
-        36 -> sLit "%xmm12";  37 -> sLit "%xmm13"
-        38 -> sLit "%xmm14";  39 -> sLit "%xmm15"
+        16 -> sLit "%xmm0" ;   17 -> sLit "%xmm1"
+        18 -> sLit "%xmm2" ;   19 -> sLit "%xmm3"
+        20 -> sLit "%xmm4" ;   21 -> sLit "%fake5"
+        24 -> sLit "%xmm8" ;   25 -> sLit "%xmm9"
+        26 -> sLit "%xmm10";   27 -> sLit "%xmm11"
+        28 -> sLit "%xmm12";   29 -> sLit "%xmm13"
+        30 -> sLit "%xmm14";   31 -> sLit "%xmm15"
         _  -> sLit "very naughty x86 register"
 
 pprFormat :: Format -> SDoc
@@ -431,16 +427,9 @@ pprFormat x
                 II64  -> sLit "q"
                 FF32  -> sLit "ss"      -- "scalar single-precision float" (SSE2)
                 FF64  -> sLit "sd"      -- "scalar double-precision float" (SSE2)
-                FF80  -> sLit "t"
                 )
 
-pprFormat_x87 :: Format -> SDoc
-pprFormat_x87 x
-  = ptext $ case x of
-                FF32  -> sLit "s"
-                FF64  -> sLit "l"
-                FF80  -> sLit "t"
-                _     -> panic "X86.Ppr.pprFormat_x87"
+
 
 pprCond :: Cond -> SDoc
 pprCond c
@@ -847,226 +836,6 @@ pprInstr (FETCHGOT reg)
 pprInstr (FETCHPC reg)
    = vcat [ text "\tcall 1f",
             hcat [ text "1:\tpopl\t", pprReg II32 reg ]
-          ]
-
-
--- -----------------------------------------------------------------------------
--- i386 floating-point
-
--- Simulating a flat register set on the x86 FP stack is tricky.
--- you have to free %st(7) before pushing anything on the FP reg stack
--- so as to preclude the possibility of a FP stack overflow exception.
-pprInstr g@(GMOV src dst)
-   | src == dst
-   = empty
-   | otherwise
-   = pprG g (hcat [gtab, gpush src 0, gsemi, gpop dst 1])
-
--- GLD fmt addr dst ==> FLDsz addr ; FSTP (dst+1)
-pprInstr g@(GLD fmt addr dst)
- = pprG g (hcat [gtab, text "fld", pprFormat_x87 fmt, gsp,
-                 pprAddr addr, gsemi, gpop dst 1])
-
--- GST fmt src addr ==> FLD dst ; FSTPsz addr
-pprInstr g@(GST fmt src addr)
- | src == fake0 && fmt /= FF80 -- fstt instruction doesn't exist
- = pprG g (hcat [gtab,
-                 text "fst", pprFormat_x87 fmt, gsp, pprAddr addr])
- | otherwise
- = pprG g (hcat [gtab, gpush src 0, gsemi,
-                 text "fstp", pprFormat_x87 fmt, gsp, pprAddr addr])
-
-pprInstr g@(GLDZ dst)
- = pprG g (hcat [gtab, text "fldz ; ", gpop dst 1])
-pprInstr g@(GLD1 dst)
- = pprG g (hcat [gtab, text "fld1 ; ", gpop dst 1])
-
-pprInstr (GFTOI src dst)
-   = pprInstr (GDTOI src dst)
-
-pprInstr g@(GDTOI src dst)
-   = pprG g (vcat [
-         hcat [gtab, text "subl $8, %esp ; fnstcw 4(%esp)"],
-         hcat [gtab, gpush src 0],
-         hcat [gtab, text "movzwl 4(%esp), ", reg,
-                     text " ; orl $0xC00, ", reg],
-         hcat [gtab, text "movl ", reg, text ", 0(%esp) ; fldcw 0(%esp)"],
-         hcat [gtab, text "fistpl 0(%esp)"],
-         hcat [gtab, text "fldcw 4(%esp) ; movl 0(%esp), ", reg],
-         hcat [gtab, text "addl $8, %esp"]
-     ])
-   where
-     reg = pprReg II32 dst
-
-pprInstr (GITOF src dst)
-   = pprInstr (GITOD src dst)
-
-pprInstr g@(GITOD src dst)
-   = pprG g (hcat [gtab, text "pushl ", pprReg II32 src,
-                   text " ; fildl (%esp) ; ",
-                   gpop dst 1, text " ; addl $4,%esp"])
-
-pprInstr g@(GDTOF src dst)
-  = pprG g (vcat [gtab <> gpush src 0,
-                  gtab <> text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ;",
-                  gtab <> gpop dst 1])
-
-{- Gruesome swamp follows.  If you're unfortunate enough to have ventured
-   this far into the jungle AND you give a Rat's Ass (tm) what's going
-   on, here's the deal.  Generate code to do a floating point comparison
-   of src1 and src2, of kind cond, and set the Zero flag if true.
-
-   The complications are to do with handling NaNs correctly.  We want the
-   property that if either argument is NaN, then the result of the
-   comparison is False ... except if we're comparing for inequality,
-   in which case the answer is True.
-
-   Here's how the general (non-inequality) case works.  As an
-   example, consider generating the an equality test:
-
-     pushl %eax         -- we need to mess with this
-     <get src1 to top of FPU stack>
-     fcomp <src2 location in FPU stack> and pop pushed src1
-                -- Result of comparison is in FPU Status Register bits
-                -- C3 C2 and C0
-     fstsw %ax  -- Move FPU Status Reg to %ax
-     sahf       -- move C3 C2 C0 from %ax to integer flag reg
-     -- now the serious magic begins
-     setpo %ah     -- %ah = if comparable(neither arg was NaN) then 1 else 0
-     sete  %al     -- %al = if arg1 == arg2 then 1 else 0
-     andb %ah,%al  -- %al &= %ah
-                   -- so %al == 1 iff (comparable && same); else it holds 0
-     decb %al      -- %al == 0, ZeroFlag=1  iff (comparable && same);
-                      else %al == 0xFF, ZeroFlag=0
-     -- the zero flag is now set as we desire.
-     popl %eax
-
-   The special case of inequality differs thusly:
-
-     setpe %ah     -- %ah = if incomparable(either arg was NaN) then 1 else 0
-     setne %al     -- %al = if arg1 /= arg2 then 1 else 0
-     orb %ah,%al   -- %al = if (incomparable || different) then 1 else 0
-     decb %al      -- if (incomparable || different) then (%al == 0, ZF=1)
-                                                     else (%al == 0xFF, ZF=0)
--}
-pprInstr g@(GCMP cond src1 src2)
-   | case cond of { NE -> True; _ -> False }
-   = pprG g (vcat [
-        hcat [gtab, text "pushl %eax ; ",gpush src1 0],
-        hcat [gtab, text "fcomp ", greg src2 1,
-                    text "; fstsw %ax ; sahf ;  setpe %ah"],
-        hcat [gtab, text "setne %al ;  ",
-              text "orb %ah,%al ;  decb %al ;  popl %eax"]
-    ])
-   | otherwise
-   = pprG g (vcat [
-        hcat [gtab, text "pushl %eax ; ",gpush src1 0],
-        hcat [gtab, text "fcomp ", greg src2 1,
-                    text "; fstsw %ax ; sahf ;  setpo %ah"],
-        hcat [gtab, text "set", pprCond (fix_FP_cond cond), text " %al ;  ",
-              text "andb %ah,%al ;  decb %al ;  popl %eax"]
-    ])
-    where
-        {- On the 486, the flags set by FP compare are the unsigned ones!
-           (This looks like a HACK to me.  WDP 96/03)
-        -}
-        fix_FP_cond :: Cond -> Cond
-        fix_FP_cond GE   = GEU
-        fix_FP_cond GTT  = GU
-        fix_FP_cond LTT  = LU
-        fix_FP_cond LE   = LEU
-        fix_FP_cond EQQ  = EQQ
-        fix_FP_cond NE   = NE
-        fix_FP_cond _    = panic "X86.Ppr.fix_FP_cond: no match"
-        -- there should be no others
-
-
-pprInstr g@(GABS _ src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fabs ; ", gpop dst 1])
-
-pprInstr g@(GNEG _ src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fchs ; ", gpop dst 1])
-
-pprInstr g@(GSQRT fmt src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fsqrt"] $$
-             hcat [gtab, gcoerceto fmt, gpop dst 1])
-
-pprInstr g@(GSIN fmt l1 l2 src dst)
-   = pprG g (pprTrigOp "fsin" False l1 l2 src dst fmt)
-
-pprInstr g@(GCOS fmt l1 l2 src dst)
-   = pprG g (pprTrigOp "fcos" False l1 l2 src dst fmt)
-
-pprInstr g@(GTAN fmt l1 l2 src dst)
-   = pprG g (pprTrigOp "fptan" True l1 l2 src dst fmt)
-
--- In the translations for GADD, GMUL, GSUB and GDIV,
--- the first two cases are mere optimisations.  The otherwise clause
--- generates correct code under all circumstances.
-
-pprInstr g@(GADD _ src1 src2 dst)
-   | src1 == dst
-   = pprG g (text "\t#GADD-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; faddp %st(0),", greg src1 1])
-   | src2 == dst
-   = pprG g (text "\t#GADD-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; faddp %st(0),", greg src2 1])
-   | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-                   text " ; fadd ", greg src2 1, text ",%st(0)",
-                   gsemi, gpop dst 1])
-
-
-pprInstr g@(GMUL _ src1 src2 dst)
-   | src1 == dst
-   = pprG g (text "\t#GMUL-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; fmulp %st(0),", greg src1 1])
-   | src2 == dst
-   = pprG g (text "\t#GMUL-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; fmulp %st(0),", greg src2 1])
-   | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-             text " ; fmul ", greg src2 1, text ",%st(0)",
-             gsemi, gpop dst 1])
-
-
-pprInstr g@(GSUB _ src1 src2 dst)
-   | src1 == dst
-   = pprG g (text "\t#GSUB-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; fsubrp %st(0),", greg src1 1])
-   | src2 == dst
-   = pprG g (text "\t#GSUB-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; fsubp %st(0),", greg src2 1])
-   | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-                   text " ; fsub ", greg src2 1, text ",%st(0)",
-                   gsemi, gpop dst 1])
-
-
-pprInstr g@(GDIV _ src1 src2 dst)
-   | src1 == dst
-   = pprG g (text "\t#GDIV-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; fdivrp %st(0),", greg src1 1])
-   | src2 == dst
-   = pprG g (text "\t#GDIV-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; fdivp %st(0),", greg src2 1])
-   | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-                   text " ; fdiv ", greg src2 1, text ",%st(0)",
-                   gsemi, gpop dst 1])
-
-
-pprInstr GFREE
-   = vcat [ text "\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)",
-            text "\tffree %st(4) ;ffree %st(5)"
           ]
 
 -- Atomics
