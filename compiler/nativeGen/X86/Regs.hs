@@ -84,10 +84,6 @@ virtualRegSqueeze cls vr
                 VirtualRegF{}           -> 0
                 _other                  -> 0
 
-        RcDoubleSSE
-         -> case vr of
-                VirtualRegSSE{}         -> 1
-                _other                  -> 0
 
         _other -> 0
 
@@ -98,7 +94,7 @@ realRegSqueeze cls rr
         RcInteger
          -> case rr of
                 RealRegSingle regNo
-                        | regNo < firstfake -> 1
+                        | regNo < firstxmm -> 1
                         | otherwise     -> 0
 
                 RealRegPair{}           -> 0
@@ -106,15 +102,11 @@ realRegSqueeze cls rr
         RcDouble
          -> case rr of
                 RealRegSingle regNo
-                        | regNo >= firstfake && regNo <= lastfake -> 1
+                        | regNo >= firstxmm  -> 1
                         | otherwise     -> 0
 
                 RealRegPair{}           -> 0
 
-        RcDoubleSSE
-         -> case rr of
-                RealRegSingle regNo | regNo >= firstxmm -> 1
-                _otherwise                        -> 0
 
         _other -> 0
 
@@ -217,8 +209,8 @@ firstxmm  = 24
 
 lastxmm :: Platform -> RegNo
 lastxmm platform
- | target32Bit platform = 31
- | otherwise            = 39
+ | target32Bit platform = firstxmm + 7  -- xmm0 - xmmm7
+ | otherwise            = firstxmm + 15 -- xmm0 -xmm15
 
 lastint :: Platform -> RegNo
 lastint platform
@@ -235,7 +227,7 @@ xmmregnos :: Platform -> [RegNo]
 xmmregnos platform = [firstxmm  .. lastxmm platform]
 
 floatregnos :: Platform -> [RegNo]
-floatregnos platform = fakeregnos ++ xmmregnos platform
+floatregnos platform = xmmregnos platform
 
 -- argRegs is the set of regs which are read for an n-argument call to C.
 -- For archs which pass all args on the stack (x86), is empty.
@@ -258,16 +250,14 @@ classOfRealReg platform reg
  = case reg of
         RealRegSingle i
           | i <= lastint platform -> RcInteger
-          | i <= lastfake         -> RcDouble
-          | otherwise             -> RcDoubleSSE
-
+          | i <= lastxmm         -> RcDouble
         RealRegPair{}   -> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
 
 -- | Get the name of the register with this number.
 showReg :: Platform -> RegNo -> String
 showReg platform n
         | n >= firstxmm  = "%xmm" ++ show (n-firstxmm)
-        | n >= firstfake = "%fake" ++ show (n-firstfake)
+
         | n >= 8         = "%r" ++ show n
         | otherwise      = regNames platform A.! n
 
@@ -295,6 +285,8 @@ Intel x86 architecture:
 The fp registers are all Double registers; we don't have any RcFloat class
 regs.  @regClass@ barfs if you give it a VirtualRegF, and mkVReg above should
 never generate them.
+
+TODO: cleanup modelling float vs double registers and how they are the same class.
 -}
 
 fake0, fake1, fake2, fake3, fake4, fake5,
@@ -308,12 +300,7 @@ esi   = regSingle 4
 edi   = regSingle 5
 ebp   = regSingle 6
 esp   = regSingle 7
-fake0 = regSingle 16
-fake1 = regSingle 17
-fake2 = regSingle 18
-fake3 = regSingle 19
-fake4 = regSingle 20
-fake5 = regSingle 21
+
 
 
 
@@ -360,22 +347,22 @@ r12   = regSingle 12
 r13   = regSingle 13
 r14   = regSingle 14
 r15   = regSingle 15
-xmm0  = regSingle 24
-xmm1  = regSingle 25
-xmm2  = regSingle 26
-xmm3  = regSingle 27
-xmm4  = regSingle 28
-xmm5  = regSingle 29
-xmm6  = regSingle 30
-xmm7  = regSingle 31
-xmm8  = regSingle 32
-xmm9  = regSingle 33
-xmm10 = regSingle 34
-xmm11 = regSingle 35
-xmm12 = regSingle 36
-xmm13 = regSingle 37
-xmm14 = regSingle 38
-xmm15 = regSingle 39
+xmm0  = regSingle 16
+xmm1  = regSingle 17
+xmm2  = regSingle 18
+xmm3  = regSingle 19
+xmm4  = regSingle 20
+xmm5  = regSingle 21
+xmm6  = regSingle 22
+xmm7  = regSingle 23
+xmm8  = regSingle 24
+xmm9  = regSingle 25
+xmm10 = regSingle 26
+xmm11 = regSingle 27
+xmm12 = regSingle 28
+xmm13 = regSingle 29
+xmm14 = regSingle 30
+xmm15 = regSingle 21
 
 ripRel :: Displacement -> AddrMode
 ripRel imm      = AddrBaseIndex EABaseRip EAIndexNone imm
@@ -409,7 +396,7 @@ callClobberedRegs platform
    -- Only xmm0-5 are caller-saves registers on 64bit windows.
    -- ( https://docs.microsoft.com/en-us/cpp/build/register-usage )
    -- For details check the Win64 ABI.
-   ++ map regSingle fakeregnos ++ map xmm [0  .. 5]
+   ++ map xmm [0  .. 5]
  | otherwise
     -- all xmm regs are caller-saves
     -- caller-saves registers
@@ -432,7 +419,7 @@ allFPArgRegs :: Platform -> [Reg]
 allFPArgRegs platform
  | platformOS platform == OSMinGW32
     = panic "X86.Regs.allFPArgRegs: not defined for this platform"
- | otherwise = map regSingle [firstxmm .. firstxmm+7]
+ | otherwise = map regSingle [firstxmm .. lastxmm]
 
 -- Machine registers which might be clobbered by instructions that
 -- generate results into fixed registers, or need arguments in a fixed

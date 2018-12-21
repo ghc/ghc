@@ -1721,8 +1721,12 @@ vecElemProjectCast dflags WordVec  W32 =  Just (mo_u_32ToWord dflags)
 vecElemProjectCast _      WordVec  W64 =  Nothing
 vecElemProjectCast _      _        _   =  Nothing
 
+
+
 -- Check to make sure that we can generate code for the specified vector type
 -- given the current set of dynamic flags.
+-- Currently there checks are specific to x86 and x86_64 architecture.
+-- This should be fixed!
 checkVecCompatibility :: DynFlags -> PrimOpVecCat -> Length -> Width -> FCode ()
 checkVecCompatibility dflags vcat l w = do
     when (hscTarget dflags /= HscLlvm) $ do
