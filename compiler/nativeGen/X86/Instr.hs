@@ -240,43 +240,7 @@ data Instr
         | BT          Format Imm Operand
         | NOP
 
-        -- x86 Float Arithmetic.
-        -- Note that we cheat by treating G{ABS,MOV,NEG} of doubles
-        -- as single instructions right up until we spit them out.
-        -- all the 3-operand fake fp insns are src1 src2 dst
-        -- and furthermore are constrained to be fp regs only.
-        -- IMPORTANT: keep is_G_insn up to date with any changes here
-        | GMOV        Reg Reg -- src(fpreg), dst(fpreg)
-        | GLD         Format AddrMode Reg -- src, dst(fpreg)
-        | GST         Format Reg AddrMode -- src(fpreg), dst
 
-        | GLDZ        Reg -- dst(fpreg)
-        | GLD1        Reg -- dst(fpreg)
-
-        | GFTOI       Reg Reg -- src(fpreg), dst(intreg)
-        | GDTOI       Reg Reg -- src(fpreg), dst(intreg)
-
-        | GITOF       Reg Reg -- src(intreg), dst(fpreg)
-        | GITOD       Reg Reg -- src(intreg), dst(fpreg)
-
-        | GDTOF       Reg Reg -- src(fpreg), dst(fpreg)
-
-
-
-                -- FP compare.  Cond must be `elem` [EQQ, NE, LE, LTT, GE, GTT]
-                -- Compare src1 with src2; set the Zero flag iff the numbers are
-                -- comparable and the comparison is True.  Subsequent code must
-                -- test the %eflags zero flag regardless of the supplied Cond.
-        | GCMP        Cond Reg Reg -- src1, src2
-
-        | GABS        Format Reg Reg -- src, dst
-        | GNEG        Format Reg Reg -- src, dst
-        | GSQRT       Format Reg Reg -- src, dst
-        | GSIN        Format CLabel CLabel Reg Reg -- src, dst
-        | GCOS        Format CLabel CLabel Reg Reg -- src, dst
-        | GTAN        Format CLabel CLabel Reg Reg -- src, dst
-
-        | GFREE         -- do ffree on all x86 regs; an ugly hack
 
 
         -- SSE2 floating point: we use a restricted set of the available SSE2
@@ -421,30 +385,6 @@ x86_regUsageOfInstr platform instr
     CALL (Right reg) params -> mkRU (reg:params) (callClobberedRegs platform)
     CLTD   _            -> mkRU [eax] [edx]
     NOP                 -> mkRU [] []
-
-    GMOV   src dst      -> mkRU [src] [dst]
-    GLD    _ src dst    -> mkRU (use_EA src []) [dst]
-    GST    _ src dst    -> mkRUR (src : use_EA dst [])
-
-    GLDZ   dst          -> mkRU [] [dst]
-    GLD1   dst          -> mkRU [] [dst]
-
-    GFTOI  src dst      -> mkRU [src] [dst]
-    GDTOI  src dst      -> mkRU [src] [dst]
-
-    GITOF  src dst      -> mkRU [src] [dst]
-    GITOD  src dst      -> mkRU [src] [dst]
-
-    GDTOF  src dst      -> mkRU [src] [dst]
-
-
-    GCMP   _ src1 src2   -> mkRUR [src1,src2]
-    GABS   _ src dst     -> mkRU [src] [dst]
-    GNEG   _ src dst     -> mkRU [src] [dst]
-    GSQRT  _ src dst     -> mkRU [src] [dst]
-    GSIN   _ _ _ src dst -> mkRU [src] [dst]
-    GCOS   _ _ _ src dst -> mkRU [src] [dst]
-    GTAN   _ _ _ src dst -> mkRU [src] [dst]
 
     CVTSS2SD   src dst  -> mkRU [src] [dst]
     CVTSD2SS   src dst  -> mkRU [src] [dst]
@@ -592,33 +532,7 @@ x86_patchRegsOfInstr instr env
     JMP op regs          -> JMP (patchOp op) regs
     JMP_TBL op ids s lbl -> JMP_TBL (patchOp op) ids s lbl
 
-    GMOV src dst         -> GMOV (env src) (env dst)
-    GLD  fmt src dst     -> GLD fmt (lookupAddr src) (env dst)
-    GST  fmt src dst     -> GST fmt (env src) (lookupAddr dst)
 
-    GLDZ dst            -> GLDZ (env dst)
-    GLD1 dst            -> GLD1 (env dst)
-
-    GFTOI src dst       -> GFTOI (env src) (env dst)
-    GDTOI src dst       -> GDTOI (env src) (env dst)
-
-    GITOF src dst       -> GITOF (env src) (env dst)
-    GITOD src dst       -> GITOD (env src) (env dst)
-
-    GDTOF src dst       -> GDTOF (env src) (env dst)
-
-    GADD fmt s1 s2 dst   -> GADD fmt (env s1) (env s2) (env dst)
-    GSUB fmt s1 s2 dst   -> GSUB fmt (env s1) (env s2) (env dst)
-    GMUL fmt s1 s2 dst   -> GMUL fmt (env s1) (env s2) (env dst)
-    GDIV fmt s1 s2 dst   -> GDIV fmt (env s1) (env s2) (env dst)
-
-    GCMP fmt src1 src2   -> GCMP fmt (env src1) (env src2)
-    GABS fmt src dst     -> GABS fmt (env src) (env dst)
-    GNEG fmt src dst     -> GNEG fmt (env src) (env dst)
-    GSQRT fmt src dst    -> GSQRT fmt (env src) (env dst)
-    GSIN fmt l1 l2 src dst       -> GSIN fmt l1 l2 (env src) (env dst)
-    GCOS fmt l1 l2 src dst       -> GCOS fmt l1 l2 (env src) (env dst)
-    GTAN fmt l1 l2 src dst       -> GTAN fmt l1 l2 (env src) (env dst)
 
     CVTSS2SD src dst    -> CVTSS2SD (env src) (env dst)
     CVTSD2SS src dst    -> CVTSD2SS (env src) (env dst)
@@ -959,13 +873,8 @@ i386_insert_ffrees
         -> [GenBasicBlock Instr]
 
 i386_insert_ffrees blocks
-   | any (any is_G_instr) [ instrs | BasicBlock _ instrs <- blocks ]
-   = map insertGFREEs blocks
-   | otherwise
    = blocks
- where
-   insertGFREEs (BasicBlock id insns)
-     = BasicBlock id (insertBeforeNonlocalTransfers GFREE insns)
+
 
 insertBeforeNonlocalTransfers :: Instr -> [Instr] -> [Instr]
 insertBeforeNonlocalTransfers insert insns
@@ -977,34 +886,6 @@ insertBeforeNonlocalTransfers insert insns
                         _           -> insn : r
 
 
--- if you ever add a new FP insn to the fake x86 FP insn set,
--- you must update this too
-is_G_instr :: Instr -> Bool
-is_G_instr instr
-   = case instr of
-        GMOV{}          -> True
-        GLD{}           -> True
-        GST{}           -> True
-        GLDZ{}          -> True
-        GLD1{}          -> True
-        GFTOI{}         -> True
-        GDTOI{}         -> True
-        GITOF{}         -> True
-        GITOD{}         -> True
-        GDTOF{}         -> True
-        GADD{}          -> True
-        GDIV{}          -> True
-        GSUB{}          -> True
-        GMUL{}          -> True
-        GCMP{}          -> True
-        GABS{}          -> True
-        GNEG{}          -> True
-        GSQRT{}         -> True
-        GSIN{}          -> True
-        GCOS{}          -> True
-        GTAN{}          -> True
-        GFREE           -> panic "is_G_instr: GFREE (!)"
-        _               -> False
 
 
 --

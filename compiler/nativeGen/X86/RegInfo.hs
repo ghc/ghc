@@ -57,4 +57,4 @@ normalRegColors platform
                           , (r15, "#002080") ]
 
 fpRegColors :: [(Reg,String)]
-fpRegColors =(map regSingle [16..31]) (repeat "red")
+fpRegColors =zip (map regSingle [16..31])  (repeat "red")

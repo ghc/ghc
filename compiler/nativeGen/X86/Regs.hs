@@ -36,6 +36,7 @@ module X86.Regs (
         xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7,
         xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15,
         xmm,
+        firstxmm,lastxmm,
 
         ripRel,
         allFPArgRegs,
@@ -243,11 +244,12 @@ classOfRealReg :: Platform -> RealReg -> RegClass
 -- However, we can get away without this at the moment because the
 -- only allocatable integer regs are also 8-bit compatible (1, 3, 4).
 classOfRealReg platform reg
- = case reg of
+    = case reg of
         RealRegSingle i
-          | i <= lastint platform -> RcInteger
-          | i <= lastxmm platform -> RcDouble
-        RealRegPair{}   -> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
+            | i <= lastint platform -> RcInteger
+            | i <= lastxmm platform -> RcDouble
+            | otherwise             -> panic "X86.Reg.classOfRealReg registerSingle too high"
+        _   -> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
 
 -- | Get the name of the register with this number.
 showReg :: Platform -> RegNo -> String

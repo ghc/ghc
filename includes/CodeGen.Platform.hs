@@ -41,65 +41,59 @@ import Reg
 #  define r15   15
 # endif
 
-# define fake0 16
-# define fake1 17
-# define fake2 18
-# define fake3 19
-# define fake4 20
-# define fake5 21
 
 -- N.B. XMM, YMM, and ZMM are all aliased to the same hardware registers hence
 -- being assigned the same RegNos.
-# define xmm0  24
-# define xmm1  25
-# define xmm2  26
-# define xmm3  27
-# define xmm4  28
-# define xmm5  29
-# define xmm6  30
-# define xmm7  31
-# define xmm8  32
-# define xmm9  33
-# define xmm10 34
-# define xmm11 35
-# define xmm12 36
-# define xmm13 37
-# define xmm14 38
-# define xmm15 39
+# define xmm0  16
+# define xmm1  17
+# define xmm2  18
+# define xmm3  19
+# define xmm4  20
+# define xmm5  21
+# define xmm6  22
+# define xmm7  23
+# define xmm8  24
+# define xmm9  25
+# define xmm10 26
+# define xmm11 27
+# define xmm12 28
+# define xmm13 29
+# define xmm14 30
+# define xmm15 31
 
-# define ymm0  24
-# define ymm1  25
-# define ymm2  26
-# define ymm3  27
-# define ymm4  28
-# define ymm5  29
-# define ymm6  30
-# define ymm7  31
-# define ymm8  32
-# define ymm9  33
-# define ymm10 34
-# define ymm11 35
-# define ymm12 36
-# define ymm13 37
-# define ymm14 38
-# define ymm15 39
+# define ymm0  16
+# define ymm1  17
+# define ymm2  18
+# define ymm3  19
+# define ymm4  20
+# define ymm5  21
+# define ymm6  22
+# define ymm7  23
+# define ymm8  24
+# define ymm9  25
+# define ymm10 26
+# define ymm11 27
+# define ymm12 28
+# define ymm13 29
+# define ymm14 30
+# define ymm15 31
 
-# define zmm0  24
-# define zmm1  25
-# define zmm2  26
-# define zmm3  27
-# define zmm4  28
-# define zmm5  29
-# define zmm6  30
-# define zmm7  31
-# define zmm8  32
-# define zmm9  33
-# define zmm10 34
-# define zmm11 35
-# define zmm12 36
-# define zmm13 37
-# define zmm14 38
-# define zmm15 39
+# define zmm0  16
+# define zmm1  17
+# define zmm2  18
+# define zmm3  19
+# define zmm4  20
+# define zmm5  21
+# define zmm6  22
+# define zmm7  23
+# define zmm8  24
+# define zmm9  25
+# define zmm10 26
+# define zmm11 27
+# define zmm12 28
+# define zmm13 29
+# define zmm14 30
+# define zmm15 31
 
 -- Note: these are only needed for ARM/ARM64 because globalRegMaybe is now used in CmmSink.hs.
 -- Since it's only used to check 'isJust', the actual values don't matter, thus

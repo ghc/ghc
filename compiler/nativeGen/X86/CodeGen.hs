@@ -97,7 +97,7 @@ is32BitPlatform = do
 
 sse2Enabled :: NatM Bool
 sse2Enabled = do
-  dflats <- getDynFlags
+  dflags <- getDynFlags
   case platformArch (targetPlatform dflags) of
   -- We Assume  SSE1 and SSE2 operations are available on both
   -- x86 and x86_64. Historically we didn't default to SSE2 and
@@ -294,8 +294,9 @@ swizzleRegisterRep (Any _ codefn)     format = Any   format codefn
 -- | Grab the Reg for a CmmReg
 getRegisterReg :: Platform  -> CmmReg -> Reg
 
-getRegisterReg _  _ignoreSSEFlag (CmmLocal (LocalReg u pk))
+getRegisterReg _   (CmmLocal (LocalReg u pk))
   = -- by Assuming SSE2, Int,Word,Float,Double all can be register allocated
+   let fmt = cmmTypeFormat pk in
         RegVirtual (mkVirtualReg u fmt)
 
 getRegisterReg platform  (CmmGlobal mid)
@@ -1119,9 +1120,7 @@ getNonClobberedReg expr = do
                 return (reg, code)
 
 reg2reg :: Format -> Reg -> Reg -> Instr
-reg2reg format src dst
-  | format == FF80 = GMOV src dst
-  | otherwise    = MOV format (OpReg src) (OpReg dst)
+reg2reg format src dst = MOV format (OpReg src) (OpReg dst)
 
 
 --------------------------------------------------------------------------------
@@ -1635,8 +1634,8 @@ assignMem_FltCode pk addr src = do
   let
         code = src_code `appOL`
                addr_code `snocOL`
-                if use_sse2 then MOV pk (OpReg src_reg) (OpAddr addr)
-                            else GST pk src_reg addr
+               MOV pk (OpReg src_reg) (OpAddr addr)
+
   return code
 
 -- Floating point assignment to a register/temporary
@@ -1900,7 +1899,7 @@ genCCall _ is32bit (PrimTarget (MO_Prefetch_Data n )) _  [src] _ =
 
 genCCall dflags is32Bit (PrimTarget (MO_BSwap width)) [dst] [src] _ = do
     let platform = targetPlatform dflags
-    let dst_r = getRegisterRegInt platform  (CmmLocal dst)
+    let dst_r = getRegisterReg platform (CmmLocal dst)
     case width of
         W64 | is32Bit -> do
                ChildCode64 vcode rlo <- iselExpr64 src
@@ -2245,7 +2244,7 @@ genCCall _ is32Bit target dest_regs args bid = do
                    any <- anyReg res
                    return (any (getRegisterReg platform  (CmmLocal r)))
 
-        actuallyInlineFloatOp' _ _ _ args
+        actuallyInlineFloatOp' _ _ args
               = panic $ "genCCall.actuallyInlineFloatOp': bad number of arguments! ("
                       ++ show (length args) ++ ")"
 
@@ -2334,8 +2333,8 @@ genCCall _ is32Bit target dest_regs args bid = do
         divOp platform signed width [res_q, res_r]
               m_arg_x_high arg_x_low arg_y
             = do let format = intFormat width
-                     reg_q = getRegisterReg platform True (CmmLocal res_q)
-                     reg_r = getRegisterReg platform True (CmmLocal res_r)
+                     reg_q = getRegisterReg platform (CmmLocal res_q)
+                     reg_r = getRegisterReg platform (CmmLocal res_r)
                      widen | signed    = CLTD format
                            | otherwise = XOR format (OpReg rdx) (OpReg rdx)
                      instr | signed    = IDIV
@@ -2362,8 +2361,8 @@ genCCall _ is32Bit target dest_regs args bid = do
                  rCode <- anyReg =<< trivialCode width (instr format)
                                        (mrevinstr format) arg_x arg_y
                  reg_tmp <- getNewRegNat II8
-                 let reg_c = getRegisterReg platform True (CmmLocal res_c)
-                     reg_r = getRegisterReg platform True (CmmLocal res_r)
+                 let reg_c = getRegisterReg platform  (CmmLocal res_c)
+                     reg_r = getRegisterReg platform  (CmmLocal res_r)
                      code = rCode reg_r `snocOL`
                             SETCC cond (OpReg reg_tmp) `snocOL`
                             MOVZxL II8 (OpReg reg_tmp) (OpReg reg_c)
@@ -2465,7 +2464,7 @@ genCCall32' dflags target dest_regs args = do
                   let tmp_amode = AddrBaseIndex (EABaseReg esp)
                                                        EAIndexNone
                                                        (ImmInt 0)
-                             fmt = floatFormat w
+                      fmt = floatFormat w
                          in toOL [ SUB II32 (OpImm (ImmInt b)) (OpReg esp),
                                    DELTA (delta0 - b),
                                    GST fmt fake0 tmp_amode,
