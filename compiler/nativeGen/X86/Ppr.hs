@@ -411,7 +411,7 @@ ppr_reg_float :: Int -> PtrString
 ppr_reg_float i = case i of
         16 -> sLit "%xmm0" ;   17 -> sLit "%xmm1"
         18 -> sLit "%xmm2" ;   19 -> sLit "%xmm3"
-        20 -> sLit "%xmm4" ;   21 -> sLit "%fake5"
+        20 -> sLit "%xmm4" ;   21 -> sLit "%xmm5"
         24 -> sLit "%xmm8" ;   25 -> sLit "%xmm9"
         26 -> sLit "%xmm10";   27 -> sLit "%xmm11"
         28 -> sLit "%xmm12";   29 -> sLit "%xmm13"
@@ -429,6 +429,12 @@ pprFormat x
                 FF64  -> sLit "sd"      -- "scalar double-precision float" (SSE2)
                 )
 
+pprFormat_x87 :: Format -> SDoc
+pprFormat_x87 x
+  = ptext $ case x of
+                FF32  -> sLit "s"
+                FF64  -> sLit "l"
+                _     -> panic "X86.Ppr.pprFormat_x87"
 
 
 pprCond :: Cond -> SDoc
@@ -838,6 +844,14 @@ pprInstr (FETCHPC reg)
             hcat [ text "1:\tpopl\t", pprReg II32 reg ]
           ]
 
+
+-- the
+-- GST fmt src addr ==> FLD dst ; FSTPsz addr
+pprInstr g@(X87Store fmt  addr)
+ = pprX87 g (hcat [gtab,
+                 text "fstp", pprFormat_x87 fmt, gsp, pprAddr addr])
+
+
 -- Atomics
 
 pprInstr (LOCK i) = text "\tlock" $$ pprInstr i
@@ -928,10 +942,12 @@ gregno (RegReal (RealRegSingle i)) = i
 gregno _           = --pprPanic "gregno" (ppr other)
                      999   -- bogus; only needed for debug printing
 
+pprX87 :: Instr -> SDoc -> SDoc
+pprX87 fake actual
+   = (char '#' <> pprX87Instr fake) $$ actual
 
-
-
-pprGInstr _ = panic "X86.Ppr.pprGInstr: no match"
+pprX87Instr (X87Store fmt  dst) = pprFormatAddr (sLit "gst") fmt  dst
+pprX87Instr _ = panic "X86.Ppr.pprGInstr: no match"
 
 pprDollImm :: Imm -> SDoc
 pprDollImm i = text "$" <> pprImm i
@@ -1125,6 +1141,14 @@ pprFormatRegAddr name format src op
         pprAddr op
     ]
 
+
+pprFormatAddr :: PtrString -> Format -> AddrMode -> SDoc
+pprFormatAddr name format  op
+  = hcat [
+        pprMnemonic name format,
+        comma,
+        pprAddr op
+    ]
 
 pprShift :: PtrString -> Format -> Operand -> Operand -> SDoc
 pprShift name format src dest

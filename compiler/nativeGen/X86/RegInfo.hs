@@ -25,7 +25,9 @@ import X86.Regs
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
    = case format of
-        FF32    -> VirtualRegF u
+        FF32    -> VirtualRegD u
+        -- for scalar F32, we use the same xmm as F64!
+        -- this is a hack that needs some improvement.
         FF64    -> VirtualRegD u
         _other  -> VirtualRegI   u
 
