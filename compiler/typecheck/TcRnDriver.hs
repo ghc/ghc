@@ -820,12 +820,12 @@ checkHiBootIface'
       = return (Just (local_boot_dfun, real_dfun))
           -- Two tricky points here:
           --
-          -- * The local_boot_fun should have a Name from the /boot-file/,
-          --   but type from the dfun defined in /this module/.
-          --   That ensures that the TyCon etc inside the type are
-          --   the ones defined in this module, not the ones gotten
-          --   from the hi-boot file, which may have a lot less info
-          --   (Trac #T8743, comment:10).
+          --  * The local_boot_fun should have a Name from the /boot-file/,
+          --    but type from the dfun defined in /this module/.
+          --    That ensures that the TyCon etc inside the type are
+          --    the ones defined in this module, not the ones gotten
+          --    from the hi-boot file, which may have a lot less info
+          --    (Trac #8743, comment:10).
           --
           --  * The DFunIds from boot_details are /GlobalIds/, because
           --    they come from typechecking M.hi-boot.
