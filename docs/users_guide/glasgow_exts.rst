@@ -8788,8 +8788,9 @@ Kind polymorphism
     :implies: :extension:`PolyKinds`, :extension:`DataKinds`, :extension:`KindSignatures`
     :since: 8.0.1
 
-    In the past this extension used to enable advanced type-level programming
-    techniques. Now it's a shorthand for a couple of other extensions.
+    The extension :extension:`TypeInType` is now deprecated: its sole effect is
+    to switch on :extension:`PolyKinds`
+    (and hence :extension:`KindSignatures`) and :extension:`DataKinds`.
 
 .. extension:: PolyKinds
     :shortdesc: Enable kind polymorphism.
