@@ -1,0 +1,5 @@
+
+<no location info>: error:
+    System.IO.Unsafe: Can't be safely imported!
+    The module itself isn't safe.
+
