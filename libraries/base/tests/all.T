@@ -201,6 +201,7 @@ test('T8089',
      [exit_code(99), run_timeout_multiplier(0.01)],
      compile_and_run, [''])
 test('T8684', expect_broken(8684), compile_and_run, [''])
+test('hWaitForInput-accurate-pipe', normal, compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
         [ collect_stats('bytes allocated')
