@@ -286,6 +286,7 @@ validate-x86_64-windows-hadrian:
   stage: full-build
   variables:
     GHC_VERSION: "8.6.2"
+    LANG: "en_US.UTF-8"
   # due to #16073
   allow_failure: true
   script:
@@ -310,6 +311,7 @@ validate-x86_64-windows:
   stage: full-build
   variables:
     GHC_VERSION: "8.6.2"
+    LANG: "en_US.UTF-8"
   script:
     - |
       set MSYSTEM=MINGW64
