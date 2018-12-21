@@ -46,9 +46,10 @@ libffiRules :: Rules ()
 libffiRules =
     forM_ [Stage1 ..] $ \stage -> do
       root <- buildRootRules
-      fmap ((root -/- stageString stage -/- "rts/build") -/-) libffiDependencies &%> \_ -> do
-          libffiPath <- libffiBuildPath stage
-          need [libffiPath -/- libffiLibrary]
+      fmap ((root -/- stageString stage -/- "rts/build") -/-) libffiDependencies
+          &%> \_ -> do
+            libffiPath <- libffiBuildPath stage
+            need [libffiPath -/- libffiLibrary]
 
     -- we set a higher priority because this overlaps
     -- with the static lib rule from Rules.Library.libraryRules.
@@ -70,7 +71,8 @@ libffiRules =
             forM_ hs $ \header ->
                 copyFile header (rtsPath -/- takeFileName header)
 
-            ways <- interpretInContext (libffiContext stage) (getLibraryWays <> getRtsWays)
+            ways <- interpretInContext (libffiContext stage)
+                                       (getLibraryWays <> getRtsWays)
             forM_ (nubOrd ways) $ \way -> do
                 rtsLib <- rtsLibffiLibrary stage way
                 copyFileUntracked (libffiPath -/- libffiLibrary) rtsLib
@@ -91,11 +93,11 @@ libffiRules =
         removeDirectory (root -/- libname)
         -- TODO: Simplify.
         actionFinally (do
-            build $ target (libffiContext stage) (Tar Extract)
+          build $ target (libffiContext stage) (Tar Extract)
                                                   [tarball]
                                                   [root -/- stageString stage]
-            moveDirectory (root -/- stageString stage -/- libname) libffiPath)  $
-                removeFiles (root -/- stageString stage) [libname <//> "*"]
+          moveDirectory (root -/- stageString stage -/- libname) libffiPath)  $
+            removeFiles (root -/- stageString stage) [libname <//> "*"]
 
         top <- topDirectory
         fixFile mkIn (fixLibffiMakefile top)
@@ -108,4 +110,4 @@ libffiRules =
             copyFile file (libffiPath -/- file)
         env <- configureEnvironment stage
         buildWithCmdOptions env $
-            target (libffiContext stage) (Configure libffiPath) [mk <.> "in"] [mk]
+          target (libffiContext stage) (Configure libffiPath) [mk <.> "in"] [mk]
