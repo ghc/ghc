@@ -4,7 +4,7 @@
 -- accidentally commit them.
 module UserSettings (
     userFlavours, userPackages, userDefaultFlavour,
-    verboseCommand, buildProgressColour, successColour, stage1Only, buildStage3
+    verboseCommand, buildProgressColour, successColour, stage1Only
     ) where
 
 import Flavour
@@ -57,15 +57,3 @@ successColour = mkSuccessColour (Dull Green)
 -- top-level @ghc.mk@.
 stage1Only :: Bool
 stage1Only = False
-
--- | Build a stage3 compiler with the resulting stage2 compiler
-buildStage3 :: (Stage -> Action [Package]) -> (Stage -> Action [Package])
-buildStage3 packages stage = do
-    packages0 <- packages Stage0
-    packages1 <- packages Stage1
-    packages2 <- packages Stage2
-    return $ case stage of
-        Stage0 -> packages0
-        Stage1 -> packages1
-        Stage2 -> packages1
-        Stage3 -> packages2

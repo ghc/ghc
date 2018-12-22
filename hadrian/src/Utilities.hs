@@ -38,9 +38,6 @@ contextDependencies Context {..} = do
     depPkgs <- go [package]
     return [ Context depStage pkg way | pkg <- depPkgs, pkg /= package ]
   where
-    -- Not sure this is exactly right but bounding it to Stage1 as it was
-    -- before is definitely wrong. Perhaps it should resolve to the
-    -- previous stage?
     depStage = stage
     go pkgs  = do
         deps <- concatMapM step pkgs
