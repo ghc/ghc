@@ -83,8 +83,9 @@ validate-x86_64-linux-deb8-hadrian:
 .validate:
   variables:
     TEST_TYPE: test
-  script:
+  before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
+  script:
     - ./boot
     - ./configure $CONFIGURE_ARGS
     - |
@@ -117,6 +118,7 @@ validate-x86_64-darwin:
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
   before_script:
+    - git clean -xdf && git submodule foreach git clean -xdf
     - python .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
@@ -143,6 +145,7 @@ validate-x86_64-darwin:
   tags:
     - x86_64-linux
   before_script:
+    - git clean -xdf && git submodule foreach git clean -xdf
     - python3 .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
