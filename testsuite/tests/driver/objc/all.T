@@ -15,5 +15,6 @@ test('objc-hi',
 test('objcpp-hi',
      [ skip_if_not_osx,
        objcpp_src,
+       when(opsys('darwin'), expect_broken(16083)),
        expect_fail_for(['ghci']) ],
      compile_and_run, ['-framework Foundation -lstdc++'])
