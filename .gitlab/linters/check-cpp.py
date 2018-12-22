@@ -6,6 +6,8 @@
 from linter import run_linters, RegexpLinter
 
 linters = [
+    RegexpLinter(r'WARN\s+\(',
+                 message='CPP macros should not have a space between the macro name and their argument list'),
     RegexpLinter(r'ASSERT\s+\(',
                  message='CPP macros should not have a space between the macro name and their argument list'),
     RegexpLinter(r'ASSERT2\s+\(',
