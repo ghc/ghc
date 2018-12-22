@@ -35,8 +35,10 @@ test('readFail028', normal, compile_fail, [''])
 test('readFail029', normal, compile_fail, [''])
 test('readFail030', normal, compile_fail, [''])
 test('readFail031', normal, compile_fail, [''])
-test('readFail032', when(opsys('darwin'), expect_broken(15662)),
-     compile_fail, ['-cpp'])
+# N.B. readFail032 and readFail048 used to fail on Darwin
+# due to a toolchain bug (#15662). This appears to be fixed in
+# Mojave but will likely still fail on earlier releases.
+test('readFail032', normal, compile_fail, ['-cpp'])
 test('readFail033', normal, compile_fail, [''])
 test('readFail034', normal, compile_fail, [''])
 test('readFail035', normal, compile_fail, [''])
@@ -51,8 +53,8 @@ test('readFail043', normal, compile_fail, [''])
 test('readFail044', normal, compile_fail, [''])
 test('readFail046', normal, compile_fail, [''])
 test('readFail047', normal, compile_fail, [''])
-test('readFail048', when(opsys('darwin'), expect_broken(15662)),
-     compile_fail, ['-cpp -haddock'])
+# See comment attached to readFail032 above.
+test('readFail048', normal, compile_fail, ['-cpp -haddock'])
 test('T3095', normal, compile_fail, [''])
 test('T3153', normal, compile_fail, [''])
 test('T3751', normal, compile_fail, [''])
