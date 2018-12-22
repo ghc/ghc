@@ -412,6 +412,7 @@ ppr_reg_float i = case i of
         16 -> sLit "%xmm0" ;   17 -> sLit "%xmm1"
         18 -> sLit "%xmm2" ;   19 -> sLit "%xmm3"
         20 -> sLit "%xmm4" ;   21 -> sLit "%xmm5"
+        22 -> sLit "%xmm6" ;   23 -> sLit "%xmm7"
         24 -> sLit "%xmm8" ;   25 -> sLit "%xmm9"
         26 -> sLit "%xmm10";   27 -> sLit "%xmm11"
         28 -> sLit "%xmm12";   29 -> sLit "%xmm13"
