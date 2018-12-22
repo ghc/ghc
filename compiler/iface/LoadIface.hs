@@ -486,7 +486,7 @@ loadInterface doc_str mod from
                             -- See Note [Loading your own hi-boot file]
                             -- in MkIface.
 
-        ; WARN ( bad_boot, ppr mod )
+        ; WARN( bad_boot, ppr mod )
           updateEps_  $ \ eps ->
            if elemModuleEnv mod (eps_PIT eps) || is_external_sig dflags iface
                 then eps
