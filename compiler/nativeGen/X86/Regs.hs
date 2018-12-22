@@ -254,6 +254,7 @@ classOfRealReg platform reg
         _   -> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
 
 -- | Get the name of the register with this number.
+-- NOTE: fixme, we dont track which "way" the XMM registers are used
 showReg :: Platform -> RegNo -> String
 showReg platform n
         | n >= firstxmm && n <= lastxmm  platform = "%xmm" ++ show (n-firstxmm)
