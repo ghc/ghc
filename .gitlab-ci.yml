@@ -213,6 +213,16 @@ nightly-i386-linux-deb9:
   cache:
     key: linux-i386-deb9
 
+# N.B. Has DEBUG assertions enabled in stage2
+validate-x86_64-linux-deb9-debug:
+  extends: .validate-linux
+  stage: build
+  image: ghcci/x86_64-linux-deb9:0.2
+  variables:
+    BUILD_FLAVOUR: devel2
+  cache:
+    key: linux-x86_64-deb9
+
 validate-x86_64-linux-deb9:
   extends: .validate-linux
   stage: build
