@@ -139,36 +139,21 @@ userFlavour :: Flavour
 userFlavour = defaultFlavour { name = "user", integerLibrary = integerSimple }
 ```
 
-### stage3
+### Specifying the final stage to build
 
-The `stage3` compiler is a compiler built using `stage2`. In order to build
-the `stage3` compiler you need to create a flavour
-which contains packages to be built in `Stage2`. For example, we can define
-the `buildStage3` function which asks for the same packages at `stage1` to
-be built again at `stage2`. This includes `ghc` and all its dependencies.
+The `finalStage` variable can be set to indicate after which stage we should
+stop the compilation pipeline.
 
 ```
--- | Build a stage3 compiler with the resulting stage2 compiler
-buildStage3 :: (Stage -> Action [Package]) -> (Stage -> Action [Package])
-buildStage3 packages stage = do
-    packages0 <- packages Stage0
-    packages1 <- packages Stage1
-    return $ case stage of
-        Stage0 -> packages0
-        Stage1 -> packages1
-        Stage2 -> packages1
-        Stage3 -> []
+finalStage :: Stage
+finalStage = Stage2
 ```
 
-After modifying the flavour, `stage3` targets will be built as normal.
+By default it is set to `Stage2` which indicates that we will build everything
+which uses the `Stage1` `ghc` and then stop.
 
-```
-userFlavour :: Flavour
-userFlavour = defaultFlavour { name = "user"
-                             , packages = buildStage3 (packages defaultFlavour)
-                             }
-```
-
+Using this mechanism we can also build a `Stage3` compiler by setting
+`finalStage = Stage3`.
 
 ## Build ways
 
@@ -233,10 +218,6 @@ verboseCommand = return True
 ```
 
 ## Miscellaneous
-
-By setting `stage1Only = True` you can disable building Stage2 GHC and Stage2
-utilities such as `haddock`. Note that all Stage0 and Stage1 libraries will
-still be built.
 
 To change the default behaviour of Hadrian with respect to building split
 objects, override the `splitObjects` setting of the `Flavour` record:

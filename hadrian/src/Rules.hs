@@ -30,7 +30,7 @@ allStages :: [Stage]
 allStages = [minBound .. maxBound]
 
 -- | This rule calls 'need' on all top-level build targets that Hadrian builds
--- by default, respecting the 'stage1Only' flag.
+-- by default, respecting the 'finalStage' flag.
 topLevelTargets :: Rules ()
 topLevelTargets = action $ do
     verbosity <- getVerbosity
@@ -45,8 +45,7 @@ topLevelTargets = action $ do
         putNormal . unlines $
             [ stageHeader "libraries" libNames
             , stageHeader "programs" pgmNames ]
-    let buildStages = [Stage0, Stage1] ++ if stage1Only then []
-                                                        else [Stage2 ..]
+    let buildStages = [ s | s <- [Stage0 ..], s < finalStage ]
     targets <- concatForM buildStages $ \stage -> do
         packages <- stagePackages stage
         mapM (path stage) packages
