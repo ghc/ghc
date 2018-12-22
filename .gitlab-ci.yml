@@ -385,4 +385,5 @@ validate-x86_64-windows:
 circleci-validate-x86_64-darwin:
   extends: .circleci
   stage: full-build
+  allow_failure: true
   script: ".gitlab/circle-ci-job.sh validate-x86_64-darwin"
