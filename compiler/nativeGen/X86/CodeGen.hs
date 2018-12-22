@@ -632,7 +632,6 @@ getRegister' _ is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
         LEA II64 (OpAddr (ripRel (litToImm displacement))) (OpReg dst))
 
 getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
-    sse2 <- return True
     case mop of
       MO_F_Neg w  -> sse2NegCode w x
 
@@ -765,7 +764,6 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
 
 
 getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
-  sse2 <- return True
   case mop of
       MO_F_Eq _ -> condFltReg is32Bit EQQ x y
       MO_F_Ne _ -> condFltReg is32Bit NE  x y
@@ -1244,7 +1242,6 @@ getNonClobberedOperand (CmmLit lit) = do
 
 getNonClobberedOperand (CmmLoad mem pk) = do
   is32Bit <- is32BitPlatform
-  use_sse2 <- return True
   -- this logic could be simplified
   -- TODO FIXME
   if  (not (isFloatType pk) || use_sse2)
@@ -1639,7 +1636,6 @@ assignMem_FltCode pk addr src = do
 
 -- Floating point assignment to a register/temporary
 assignReg_FltCode _ reg src = do
-  use_sse2 <- sse2Enabled
   src_code <- getAnyReg src
   dflags <- getDynFlags
   let platform = targetPlatform dflags
@@ -2127,7 +2123,6 @@ genCCall dflags is32Bit (PrimTarget (MO_AtomicRMW width amop))
         else getSimpleAmode dflags is32Bit addr  -- See genCCall for MO_Cmpxchg
     arg <- getNewRegNat format
     arg_code <- getAnyReg n
-    use_sse2 <- return True
     let platform = targetPlatform dflags
         dst_r    = getRegisterReg platform  (CmmLocal dst)
     code <- op_code dst_r arg amode
@@ -2217,7 +2212,6 @@ genCCall dflags is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _
 genCCall _ is32Bit target dest_regs args bid = do
   dflags <- getDynFlags
   let platform = targetPlatform dflags
-      sse2     = True
   case (target, dest_regs) of
     -- void return type prim op
     (PrimTarget op, []) ->
@@ -2405,8 +2399,7 @@ genCCall32' dflags target dest_regs args = do
         delta0 <- getDeltaNat
         setDeltaNat (delta0 - arg_pad_size)
 
-        use_sse2 <- return True
-        push_codes <- mapM (push_arg use_sse2) (reverse prom_args)
+        push_codes <- mapM push_arg (reverse prom_args)
         delta <- getDeltaNat
         MASSERT(delta == delta0 - tot_arg_size)
 
@@ -2499,10 +2492,10 @@ genCCall32' dflags target dest_regs args = do
         roundTo a x | x `mod` a == 0 = x
                     | otherwise = x + a - (x `mod` a)
 
-        push_arg :: Bool -> CmmActual {-current argument-}
+        push_arg ::  CmmActual {-current argument-}
                         -> NatM InstrBlock  -- code
 
-        push_arg use_sse2 arg -- we don't need the hints on x86
+        push_arg  arg -- we don't need the hints on x86
           | isWord64 arg_ty = do
             ChildCode64 code r_lo <- iselExpr64 arg
             delta <- getDeltaNat
