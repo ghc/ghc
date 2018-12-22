@@ -33,18 +33,28 @@ GHCCI_URL="localhost:8888"
 [ ${CI_PIPELINE_ID:-} ] || (echo "CI_PIPELINE_ID is not set"; exit 1)
 # the first argument to this script is the Circle CI job type:
 # validate-x86_64-linux, validate-i386-linux, ...
-CIRCLE_JOB="circleci-$1"
+CIRCLE_JOB="$1"
+echo "Job type: $CIRCLE_JOB"
 
 gitlab_user=$(echo $CI_REPOSITORY_URL | cut -d/ -f4)
 gitlab_repo=$(echo $CI_REPOSITORY_URL | cut -d/ -f5 | cut -d. -f1)
 
+echo "Gitlab user: $gitlab_user"
+echo "Gitlab repo: $gitlab_repo"
+
 BODY="{ \"jobType\": \"$CIRCLE_JOB\", \"source\": { \"user\": \"$gitlab_user\", \"project\":\"$gitlab_repo\", \"commit\":\"$CI_COMMIT_SHA\" }, \"pipelineID\": $CI_PIPELINE_ID, \"runnerID\": $CI_RUNNER_ID, \"jobID\": $CI_JOB_ID }"
 
+echo "About to send:"
+echo $BODY
 
 RESP=$(curl -s -XPOST -H "Content-Type: application/json" -d "$BODY" \
 	    http://${GHCCI_URL}/job)
 
+echo "Submitted job, response:"
+echo $RESP
+
 if [ $? -eq 0 ]; then
+    echo "Submission went fine"
     build_num=$(echo $RESP | jq '.build_num')
     circle_url=$(echo $RESP | jq '.url')
 else
