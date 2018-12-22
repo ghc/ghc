@@ -44,8 +44,6 @@ getFreeRegs platform cls (FreeRegs f) = go f 0
         -- ToDo: there's no point looking through all the integer registers
         -- in order to find a floating-point one.
 
-
-
 allocateReg :: RealReg -> FreeRegs -> FreeRegs
 allocateReg (RealRegSingle r) (FreeRegs f)
         = FreeRegs (f .&. complement (1 `shiftL` r))
