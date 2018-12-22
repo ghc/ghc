@@ -1,4 +1,4 @@
-module Stage (Stage (..), stageString, stageLibraries) where
+module Stage (Stage (..), stageString) where
 
 import Development.Shake.Classes
 import GHC.Generics
@@ -29,10 +29,3 @@ instance NFData   Stage
 -- | Prettyprint a 'Stage'.
 stageString :: Stage -> String
 stageString stage = "stage" ++ show (fromEnum stage)
-
--- | Which libraries we need to use when building a certain stage.
-stageLibraries :: Stage -> Stage
-stageLibraries Stage0 = Stage0
-stageLibraries Stage1 = Stage1
-stageLibraries Stage2 = Stage1
-stageLibraries Stage3 = Stage2
