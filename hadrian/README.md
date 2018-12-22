@@ -183,17 +183,31 @@ $ ./configure [--prefix=PATH] && make install
 
 workflow, for now.
 
+#### Building stage3
+
+It is possible to define a flavour which builds a `stage3` compiler, which is a
+compiler built using `stage2`. This is useful for cross-compilation. Detailed
+instructions can be found in the user settings part of the manual.
+
+#### Testing
+
+To run GHC's testsuite, use `build test`. See
+[doc/testsuite.md](doc/testsuite.md) to learn about all the options
+you can use to mimic what the Make build system offers.
+
+`build selftest` runs tests of the build system. Current test coverage
+is close to zero (see [#197][test-issue]).
+
 Troubleshooting
 ---------------
 
 Here are a few simple suggestions that might help you fix the build:
-  
 * Hadrian is occasionally broken by changes in GHC. If this happens, you might want to switch
   to an earlier GHC commit.
-  
+
 * If Hadrian fails with the message `Configuration file hadrian/cfg/system.config is missing`,
   you have probably forgotten to pass the `--configure` flag during the first build.
-  
+
 * If you need help in debugging Hadrian, read the [wiki](https://github.com/snowleopard/hadrian/wiki)
   and Shake's [debugging tutorial](https://shakebuild.com/debugging).
 

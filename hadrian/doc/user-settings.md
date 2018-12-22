@@ -138,6 +138,38 @@ You can choose which integer library to use when builing GHC using the
 userFlavour :: Flavour
 userFlavour = defaultFlavour { name = "user", integerLibrary = integerSimple }
 ```
+
+### stage3
+
+The `stage3` compiler is a compiler built using `stage2`. In order to build
+the `stage3` compiler you need to create a flavour
+which contains packages to be built in `Stage2`. For example, we can define
+the `buildStage3` function which asks for the same packages at `stage1` to
+be built again at `stage2`. This includes `ghc` and all its dependencies.
+
+```
+-- | Build a stage3 compiler with the resulting stage2 compiler
+buildStage3 :: (Stage -> Action [Package]) -> (Stage -> Action [Package])
+buildStage3 packages stage = do
+    packages0 <- packages Stage0
+    packages1 <- packages Stage1
+    return $ case stage of
+        Stage0 -> packages0
+        Stage1 -> packages1
+        Stage2 -> packages1
+        Stage3 -> []
+```
+
+After modifying the flavour, `stage3` targets will be built as normal.
+
+```
+userFlavour :: Flavour
+userFlavour = defaultFlavour { name = "user"
+														 , packages = buildStage3 (packages defaultFlavour)
+														 }
+```
+
+
 ## Build ways
 
 Packages can be built in a number of ways, such as `vanilla`, `profiling` (with
