@@ -865,50 +865,9 @@ pprInstr (CMPXCHG format src dst)
    = pprFormatOpOp (sLit "cmpxchg") format src dst
 
 
-pprTrigOp :: String -> Bool -> CLabel -> CLabel
-          -> Reg -> Reg -> Format -> SDoc
-pprTrigOp op -- fsin, fcos or fptan
-          isTan -- we need a couple of extra steps if we're doing tan
-          l1 l2 -- internal labels for us to use
-          src dst fmt
-    = -- We'll be needing %eax later on
-      hcat [gtab, text "pushl %eax;"] $$
-      -- tan is going to use an extra space on the FP stack
-      (if isTan then hcat [gtab, text "ffree %st(6)"] else empty) $$
-      -- First put the value in %st(0) and try to apply the op to it
-      hcat [gpush src 0, text ("; " ++ op)] $$
-      -- Now look to see if C2 was set (overflow, |value| >= 2^63)
-      hcat [gtab, text "fnstsw %ax"] $$
-      hcat [gtab, text "test   $0x400,%eax"] $$
-      -- If we were in bounds then jump to the end
-      hcat [gtab, text "je     " <> ppr l1] $$
-      -- Otherwise we need to shrink the value. Start by
-      -- loading pi, doubleing it (by adding it to itself),
-      -- and then swapping pi with the value, so the value we
-      -- want to apply op to is in %st(0) again
-      hcat [gtab, text "ffree %st(7); fldpi"] $$
-      hcat [gtab, text "fadd   %st(0),%st"] $$
-      hcat [gtab, text "fxch   %st(1)"] $$
-      -- Now we have a loop in which we make the value smaller,
-      -- see if it's small enough, and loop if not
-      (ppr l2 <> char ':') $$
-      hcat [gtab, text "fprem1"] $$
-      -- My Debian libc uses fstsw here for the tan code, but I can't
-      -- see any reason why it should need to be different for tan.
-      hcat [gtab, text "fnstsw %ax"] $$
-      hcat [gtab, text "test   $0x400,%eax"] $$
-      hcat [gtab, text "jne    " <> ppr l2] $$
-      hcat [gtab, text "fstp   %st(1)"] $$
-      hcat [gtab, text op] $$
-      (ppr l1 <> char ':') $$
-      -- Pop the 1.0 tan gave us
-      (if isTan then hcat [gtab, text "fstp %st(0)"] else empty) $$
-      -- Restore %eax
-      hcat [gtab, text "popl %eax;"] $$
-      -- And finally make the result the right size
-      hcat [gtab, gcoerceto fmt, gpop dst 1]
 
 --------------------------
+-- some left over
 
 -- coerce %st(0) to the specified size
 gcoerceto :: Format -> SDoc
