@@ -47,7 +47,7 @@ BODY="{ \"jobType\": \"$CIRCLE_JOB\", \"source\": { \"user\": \"$gitlab_user\", 
 echo "About to send:"
 echo $BODY
 
-RESP=$(curl -s -XPOST -H "Content-Type: application/json" -d "$BODY" \
+RESP=$(curl -XPOST -H "Content-Type: application/json" -d "$BODY" \
 	    http://${GHCCI_URL}/job)
 
 echo "Submitted job, response:"
