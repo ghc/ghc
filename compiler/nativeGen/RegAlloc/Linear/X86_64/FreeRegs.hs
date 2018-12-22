@@ -39,10 +39,15 @@ getFreeRegs platform cls (FreeRegs f) = go f 0
           | n .&. 1 /= 0 && classOfRealReg platform (RealRegSingle m) == cls
           = RealRegSingle m : (go (n `shiftR` 1) $! (m+1))
 
+          | m > finalRegister = []
+
           | otherwise
           = go (n `shiftR` 1) $! (m+1)
         -- ToDo: there's no point looking through all the integer registers
         -- in order to find a floating-point one.
+        -- Because they're seperate subintervals. A problem for another day.
+
+        finalRegister = lastxmm platform
 
 allocateReg :: RealReg -> FreeRegs -> FreeRegs
 allocateReg (RealRegSingle r) (FreeRegs f)
