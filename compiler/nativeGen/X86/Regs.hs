@@ -205,6 +205,8 @@ spRel dflags n
 
 firstxmm :: RegNo
 firstxmm  = 16
+
+--  on 32bit platformOSs, only the first 8 XMM/YMM/ZMM registers are available
 lastxmm :: Platform -> RegNo
 lastxmm platform
  | target32Bit platform = firstxmm + 7  -- xmm0 - xmmm7
@@ -254,9 +256,8 @@ classOfRealReg platform reg
 -- | Get the name of the register with this number.
 showReg :: Platform -> RegNo -> String
 showReg platform n
-        | n >= firstxmm  = "%xmm" ++ show (n-firstxmm)
-
-        | n >= 8         = "%r" ++ show n
+        | n >= firstxmm && n <= lastxmm  platform = "%xmm" ++ show (n-firstxmm)
+        | n >= 8   && n < firstxmm      = "%r" ++ show n
         | otherwise      = regNames platform A.! n
 
 regNames :: Platform -> A.Array Int String
