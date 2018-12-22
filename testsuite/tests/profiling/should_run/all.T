@@ -23,7 +23,9 @@ expect_broken_for_10037 = expect_broken_for(
      # e.g. prof and profllvm
 
 test('heapprof001',
-     [when(have_profiling(), extra_ways(extra_prof_ways)), extra_run_opts('7')],
+     [when(have_profiling(), extra_ways(extra_prof_ways)),
+      when(arch('i386'), expect_broken_for(15382, ['prof_hc_hb'])),
+      extra_run_opts('7')],
      compile_and_run, [''])
 
 test('T2592',
