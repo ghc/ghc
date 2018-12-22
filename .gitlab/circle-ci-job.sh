@@ -33,7 +33,7 @@ GHCCI_URL="localhost:8888"
 [ ${CI_PIPELINE_ID:-} ] || (echo "CI_PIPELINE_ID is not set"; exit 1)
 # the first argument to this script is the Circle CI job type:
 # validate-x86_64-linux, validate-i386-linux, ...
-CIRCLE_JOB="$1"
+CIRCLE_JOB="circleci-$1"
 echo "Job type: $CIRCLE_JOB"
 
 gitlab_user=$(echo $CI_REPOSITORY_URL | cut -d/ -f4)
