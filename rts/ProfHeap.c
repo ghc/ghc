@@ -201,7 +201,9 @@ LDV_recordDead( const StgClosure *c, uint32_t size )
                 } else {
                     id = closureIdentity(c);
                     ctr = lookupHashTable(censuses[t].hash, (StgWord)id);
-                    ASSERT( ctr != NULL );
+                    if (ctr == NULL)
+                        barf("LDV_recordDead: Failed to find counter for closure %p", c);
+
                     ctr->c.ldv.void_total += size;
                     ctr = lookupHashTable(censuses[era].hash, (StgWord)id);
                     if (ctr == NULL) {
