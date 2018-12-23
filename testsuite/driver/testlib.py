@@ -460,8 +460,13 @@ def have_gdb( ):
 def have_readelf( ):
     return config.have_readelf
 
+def using_integer_backend(backend):
+    """ A predicate to test which integer backend we are using. """
+    assert backend in ["integer-gmp", "integer-simple"]
+    return config.integer_backend == backend
+
 # Many tests sadly break with integer-simple due to GHCi's ignorance of it.
-broken_without_gmp = when(config.integer_backend != "integer-gmp",
+broken_without_gmp = when(not(using_integer_backend("integer-gmp")),
                           expect_broken(16043))
 
 # ---
