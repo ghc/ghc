@@ -81,7 +81,6 @@ runTestBuilderArgs = builder RunTest ? do
     top         <- expr $ topDirectory
     ghcFlags    <- expr runTestGhcFlags
     timeoutProg <- expr buildRoot <&> (-/- timeoutPath)
-    integerLib  <- expr (integerLibrary flav)
 
     let asZeroOne s b = s ++ zeroOne b
 
@@ -111,7 +110,6 @@ runTestBuilderArgs = builder RunTest ? do
 
             , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
-            , arg "-e", arg $ "config.integer_backend=" ++ show (pkgName integerLib)
 
             -- Use default value, see:
             -- https://github.com/ghc/ghc/blob/master/testsuite/mk/boilerplate.mk
