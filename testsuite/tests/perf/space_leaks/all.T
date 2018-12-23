@@ -1,11 +1,12 @@
 
 test('space_leak_001',
      # This could potentially be replaced with
-     # collect_stats('all',5) to test all 3 with 
+     # collect_stats('all',5) to test all 3 with
      # 5% possible deviation.
      [collect_stats(['peak_megabytes_allocated','bytes allocated'],5),
       collect_stats('max_bytes_used',15),
-      omit_ways(['profasm','profthreaded','threaded1','threaded2'])
+      omit_ways(['profasm','profthreaded','threaded1','threaded2']),
+      reqlib('integer-gmp')
       ],
      compile_and_run,
      [''])

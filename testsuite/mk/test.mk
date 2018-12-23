@@ -247,8 +247,6 @@ else
 RUNTEST_OPTS += -e config.ghc_built_by_llvm=True
 endif
 
-RUNTEST_OPTS += -e 'config.integer_backend="$(INTEGER_LIBRARY)"'
-
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config-file=$(CONFIG) \

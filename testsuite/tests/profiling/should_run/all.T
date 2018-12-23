@@ -115,7 +115,10 @@ test('T5363', [], compile_and_run, [''])
 
 test('profinline001', [], compile_and_run, [''])
 
-test('T11627a', [ extra_ways(extra_prof_ways)
+test('T11627a', [ extra_ways(extra_prof_ways),
+                  # integer-simple has an extremely large representation and
+                  # consequently needs significantly more time
+                  when(have_library('integer-simple'), skip)
                 ],
      compile_and_run, [''])
 

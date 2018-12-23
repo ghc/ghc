@@ -133,11 +133,12 @@ def stage1(name, opts):
 
 # Cache the results of looking to see if we have a library or not.
 # This makes quite a difference, especially on Windows.
-have_lib = {}
+have_lib_cache = {}
 
-def _reqlib( name, opts, lib ):
-    if lib in have_lib:
-        got_it = have_lib[lib]
+def have_library(lib):
+    """ Test whether the given library is available """
+    if lib in have_lib_cache:
+        got_it = have_lib_cache[lib]
     else:
         cmd = strip_quotes(config.ghc_pkg)
         p = subprocess.Popen([cmd, '--no-user-package-db', 'describe', lib],
@@ -149,9 +150,12 @@ def _reqlib( name, opts, lib ):
         p.communicate()
         r = p.wait()
         got_it = r == 0
-        have_lib[lib] = got_it
+        have_lib_cache[lib] = got_it
 
-    if not got_it:
+    return got_it
+
+def _reqlib( name, opts, lib ):
+    if not have_library(lib):
         opts.expect = 'missing-lib'
 
 def req_haddock( name, opts ):
@@ -212,11 +216,6 @@ def record_broken(name, opts, bug):
     me = (bug, opts.testdir, name)
     if not me in brokens:
         brokens.append(me)
-
-def broken_without_gmp(name, opts):
-    # Many tests sadly break with integer-simple due to GHCi's ignorance of it.
-    when(config.integer_backend != "integer-gmp",
-         expect_broken(16043))
 
 def _expect_pass(way):
     # Helper function. Not intended for use in .T files.
@@ -464,6 +463,9 @@ def have_gdb( ):
 
 def have_readelf( ):
     return config.have_readelf
+
+# Many tests sadly break with integer-simple due to GHCi's ignorance of it.
+broken_without_gmp = unless(have_library('integer-gmp'), expect_broken(16043))
 
 # ---
 
@@ -1745,7 +1747,7 @@ def normalise_errmsg( str ):
     # Error messages sometimes contain this blurb which can vary
     # spuriously depending upon build configuration (e.g. based on integer
     # backend)
-    str = re.sub('...plus [a-z]+ instances involving out-of-scope types',
+    str = re.sub('...plus ([a-z]+|[0-9]+) instances involving out-of-scope types',
                  '...plus N instances involving out-of-scope types', str)
 
     # Also filter out bullet characters.  This is because bullets are used to
