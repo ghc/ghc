@@ -21,7 +21,7 @@ test('arith008', normal, compile_and_run, [opts])
 test('arith009', normal, compile_and_run, [''])
 test('arith010', normal, compile_and_run, [''])
 test('arith011',
-     when(using_integer_backend("integer-simple"), expect_broken(16091)),
+     when(have_library("integer-simple"), expect_broken(16091)),
      compile_and_run, [''])
 
 test('arith012', normal, compile_and_run, [opts])
