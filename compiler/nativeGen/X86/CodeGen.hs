@@ -2120,19 +2120,32 @@ genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
   | otherwise = do
     code_src <- getAnyReg src
     src_r <- getNewRegNat format
-    tmp_r <- getNewRegNat format
     let dst_r = getRegisterReg platform False (CmmLocal dst)
 
     -- The following insn sequence makes sure 'ctz 0' has a defined value.
     -- starting with Haswell, one could use the TZCNT insn instead.
-    return $ code_src src_r `appOL` toOL
-             ([ MOVZxL  II8    (OpReg src_r) (OpReg src_r) | width == W8 ] ++
-              [ BSF     format (OpReg src_r) tmp_r
-              , MOV     II32   (OpImm (ImmInt bw)) (OpReg dst_r)
-              , CMOV NE format (OpReg tmp_r) dst_r
-              ]) -- NB: We don't need to zero-extend the result for the
-                 -- W8/W16 cases because the 'MOV' insn already
-                 -- took care of implicitly clearing the upper bits
+    if isBmi2Enabled dflags && width /= W8
+    then
+        return $ code_src src_r `appOL`
+            unitOL (XOR (intFormat width) (OpReg dst_r) (OpReg dst_r))
+            `appOL`
+            unitOL (TZCNT (intFormat width) (OpReg src_r) dst_r)
+            `appOL`
+            (if width == W16 then
+                 -- We used a 16-bit destination register above,
+                 -- so zero-extend
+                 unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
+             else nilOL)
+    else do
+        tmp_r <- getNewRegNat format
+        return $ code_src src_r `appOL` toOL
+                 ([ MOVZxL  II8    (OpReg src_r) (OpReg src_r) | width == W8 ] ++
+                  [ BSF     format (OpReg src_r) tmp_r
+                  , MOV     II32   (OpImm (ImmInt bw)) (OpReg dst_r)
+                  , CMOV NE format (OpReg tmp_r) dst_r
+                  ]) -- NB: We don't need to zero-extend the result for the
+                     -- W8/W16 cases because the 'MOV' insn already
+                     -- took care of implicitly clearing the upper bits
   where
     bw = widthInBits width
     platform = targetPlatform dflags
