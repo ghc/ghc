@@ -46,7 +46,8 @@ test('T3972', [], compile_and_run, [''])
 test('T5315', normal, compile_and_run, [''])
 test('T5453', normal, compile_and_run, [''])
 test('T5441', [], multimod_compile_and_run, ['T5441', ''])
-test('T5603', normal, compile_and_run, [''])
+# This compares Core from integer-gmp
+test('T5603', reqlib('integer-gmp'), compile_and_run, [''])
 test('T2110', normal, compile_and_run, [''])
 test('AmapCoerce', normal, compile_and_run, [''])
 
