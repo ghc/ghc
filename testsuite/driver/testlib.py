@@ -133,11 +133,12 @@ def stage1(name, opts):
 
 # Cache the results of looking to see if we have a library or not.
 # This makes quite a difference, especially on Windows.
-have_lib = {}
+have_lib_cache = {}
 
-def _reqlib( name, opts, lib ):
-    if lib in have_lib:
-        got_it = have_lib[lib]
+def have_library(lib):
+    """ Test whether the given library is available """
+    if lib in have_lib_cache:
+        got_it = have_lib_cache[lib]
     else:
         cmd = strip_quotes(config.ghc_pkg)
         p = subprocess.Popen([cmd, '--no-user-package-db', 'describe', lib],
@@ -149,9 +150,12 @@ def _reqlib( name, opts, lib ):
         p.communicate()
         r = p.wait()
         got_it = r == 0
-        have_lib[lib] = got_it
+        have_lib_cache[lib] = got_it
 
-    if not got_it:
+    return got_it
+
+def _reqlib( name, opts, lib ):
+    if not have_library(lib):
         opts.expect = 'missing-lib'
 
 def req_haddock( name, opts ):
@@ -460,14 +464,8 @@ def have_gdb( ):
 def have_readelf( ):
     return config.have_readelf
 
-def using_integer_backend(backend):
-    """ A predicate to test which integer backend we are using. """
-    assert backend in ["integer-gmp", "integer-simple"]
-    return config.integer_backend == backend
-
 # Many tests sadly break with integer-simple due to GHCi's ignorance of it.
-broken_without_gmp = when(not(using_integer_backend("integer-gmp")),
-                          expect_broken(16043))
+broken_without_gmp = unless(have_library('integer-gmp'), expect_broken(16043))
 
 # ---
 
