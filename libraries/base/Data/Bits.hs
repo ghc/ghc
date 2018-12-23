@@ -440,6 +440,9 @@ instance Bits Int where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
+    -- We want popCnt# to be inlined in user code so that `ghc -msse4.2`
+    -- can compile it down to a popcnt instruction without an extra function call
+    {-# INLINE popCount #-}
 
     zeroBits = 0
 
@@ -469,7 +472,6 @@ instance Bits Int where
     bitSize i              = finiteBitSize i
 
     popCount (I# x#) = I# (word2Int# (popCnt# (int2Word# x#)))
-    {-# INLINE popCount #-} -- we want popCnt# to be inlined in user code so that `ghc -msse4.2` can compile it down to a popcnt instruction
 
     isSigned _             = True
 
@@ -486,6 +488,7 @@ instance Bits Word where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
+    {-# INLINE popCount #-}
 
     (W# x#) .&.   (W# y#)    = W# (x# `and#` y#)
     (W# x#) .|.   (W# y#)    = W# (x# `or#`  y#)
@@ -509,7 +512,6 @@ instance Bits Word where
     bitSize i                = finiteBitSize i
     isSigned _               = False
     popCount (W# x#)         = I# (word2Int# (popCnt# x#))
-    {-# INLINE popCount #-}
     bit                      = bitDefault
     testBit                  = testBitDefault
 
