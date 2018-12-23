@@ -12,6 +12,8 @@ setTestOpts(req_interp)
 if config.have_ext_interp :
        setTestOpts(extra_ways(['ext-interp']))
        setTestOpts(only_ways(['normal','ghci','ext-interp']))
+       if config.ghc_built_by_llvm:
+           setTestOpts(expect_broken_for(16087, ['ext-interp']))
 
 test('TH_mkName', normal, compile, ['-v0'])
 test('TH_overloadedlabels', normal, compile, ['-v0'])
