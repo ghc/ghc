@@ -213,6 +213,11 @@ def record_broken(name, opts, bug):
     if not me in brokens:
         brokens.append(me)
 
+def broken_without_gmp(name, opts):
+    # Many tests sadly break with integer-simple due to GHCi's ignorance of it.
+    when(config.integer_backend != "integer-gmp",
+         expect_broken(16043))
+
 def _expect_pass(way):
     # Helper function. Not intended for use in .T files.
     opts = getTestOpts()
@@ -459,10 +464,6 @@ def have_gdb( ):
 
 def have_readelf( ):
     return config.have_readelf
-
-# Many tests sadly break with integer-simple due to GHCi's ignorance of it.
-broken_without_gmp = when(config.integer_backend != "integer-gmp",
-                          expect_broken(16043))
 
 # ---
 
