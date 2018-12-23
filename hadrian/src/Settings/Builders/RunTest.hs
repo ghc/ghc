@@ -83,6 +83,9 @@ runTestBuilderArgs = builder RunTest ? do
     timeoutProg <- expr buildRoot <&> (-/- timeoutPath)
     integerLib  <- expr (integerLibrary flav)
 
+    -- See #16087
+    let ghcBuiltByLlvm = False -- TODO: Implement this check
+
     let asZeroOne s b = s ++ zeroOne b
 
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
@@ -112,6 +115,7 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
             , arg "-e", arg $ "config.integer_backend=" ++ show (pkgName integerLib)
+            , arg "-e", arg $ "config.ghc_built_by_llvm=" ++ show ghcBuiltByLlvm
 
             -- Use default value, see:
             -- https://github.com/ghc/ghc/blob/master/testsuite/mk/boilerplate.mk
