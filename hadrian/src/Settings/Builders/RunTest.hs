@@ -81,7 +81,6 @@ runTestBuilderArgs = builder RunTest ? do
     top         <- expr $ topDirectory
     ghcFlags    <- expr runTestGhcFlags
     timeoutProg <- expr buildRoot <&> (-/- timeoutPath)
-    integerLib  <- expr (integerLibrary flav)
 
     -- See #16087
     let ghcBuiltByLlvm = False -- TODO: Implement this check
@@ -114,7 +113,6 @@ runTestBuilderArgs = builder RunTest ? do
 
             , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
-            , arg "-e", arg $ "config.integer_backend=" ++ show (pkgName integerLib)
             , arg "-e", arg $ "config.ghc_built_by_llvm=" ++ show ghcBuiltByLlvm
 
             -- Use default value, see:
