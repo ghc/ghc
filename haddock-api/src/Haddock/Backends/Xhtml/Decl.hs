@@ -34,7 +34,7 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Text.XHtml hiding     ( name, title, p, quote )
 
-import BasicTypes (PromotionFlag(..))
+import BasicTypes (PromotionFlag(..), isPromoted)
 import GHC hiding (LexicalFixity(..))
 import GHC.Exts
 import Name
@@ -1163,8 +1163,9 @@ ppr_mono_ty (HsTyVar _ _ (L _ name)) True _ _
 
 ppr_mono_ty (HsBangTy _ b ty) u q _ =
   ppBang b +++ ppLParendType u q HideEmptyContexts ty
-ppr_mono_ty (HsTyVar _ _ (L _ name)) _ q _ =
-  ppDocName q Prefix True name
+ppr_mono_ty (HsTyVar _ prom (L _ name)) _ q _
+  | isPromoted prom = promoQuote (ppDocName q Prefix True name)
+  | otherwise = ppDocName q Prefix True name
 ppr_mono_ty (HsStarTy _ isUni) u _ _ =
   toHtml (if u || isUni then "★" else "*")
 ppr_mono_ty (HsFunTy _ ty1 ty2) u q e =
