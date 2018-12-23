@@ -327,7 +327,7 @@ validate-x86_64-linux-deb9-unreg:
 
 validate-x86_64-windows-hadrian:
   extends: .validate-windows
-  stage: full-build
+  stage: build
   variables:
     GHC_VERSION: "8.6.2"
     LANG: "en_US.UTF-8"
@@ -351,7 +351,7 @@ validate-x86_64-windows-hadrian:
 
 validate-x86_64-windows:
   extends: .validate-windows
-  stage: full-build
+  stage: build
   variables:
     GHC_VERSION: "8.6.2"
     LANG: "en_US.UTF-8"
