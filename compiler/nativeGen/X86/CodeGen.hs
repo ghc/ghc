@@ -2047,16 +2047,12 @@ genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] b
     code_src <- getAnyReg src
     src_r <- getNewRegNat format
     let dst_r = getRegisterReg platform False (CmmLocal dst)
-    if isBmi2Enabled dflags
+    if isBmi2Enabled dflags && width /= W8
         then do
             return $ code_src src_r `appOL`
-                (if width == W8 then
-                     -- The LZCNT instruction doesn't take a r/m8
-                     unitOL (MOVZxL II8 (OpReg src_r) (OpReg src_r)) `appOL`
-                     unitOL (LZCNT II16 (OpReg src_r) dst_r)
-                 else
-                     unitOL (LZCNT format (OpReg src_r) dst_r)) `appOL`
-                (if width == W8 || width == W16 then
+                unitOL (LZCNT (intFormat width) (OpReg src_r) dst_r)
+                `appOL`
+                (if width == W16 then
                      -- We used a 16-bit destination register above,
                      -- so zero-extend
                      unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
