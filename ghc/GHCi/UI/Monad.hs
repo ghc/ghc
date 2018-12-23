@@ -458,25 +458,19 @@ mkEvalWrapper progname args =
     "(System.Environment.withArgs " ++ show args ++ " m)"
 
 compileGHCiExpr :: GhcMonad m => String -> m ForeignHValue
-compileGHCiExpr expr = do
-  dflags <- getSessionDynFlags >>= condSetNoSafe
-  withTempSession (mkTempSession dflags) $ GHC.compileExprRemote expr
+compileGHCiExpr expr =
+  withTempSession mkTempSession $ GHC.compileExprRemote expr
   where
-    condSetNoSafe dflags
-      | safeLanguageOn dflags = do
-          -- We can't compile GHCi internal functions if -XSafe is set. We
-          -- temporarily deactivate it with -fno-safe-haskell (see #12509).
-        (dflags', _, _) <- GHC.parseDynamicFlags dflags
-                                  [L noSrcSpan "-fno-safe-haskell"]
-          -- It's not necessary to handle eventually produced warnings by
-          -- 'parseDynamicFlags' here. They are shown anyway.
-        return dflags'
-      | otherwise = return dflags
-    mkTempSession dflags hsc_env = hsc_env
-      { hsc_dflags = dflags
+   mkTempSession hsc_env = hsc_env
+      { hsc_dflags = (hsc_dflags hsc_env) {
+          -- GHCi's internal expression are incompatible with -XSafe,
+          -- so we take care to disable Safe Haskell for the duration
+          -- of running expressions that are internal to GHCi. (see #12509)
+          safeHaskell = Sf_None
+        }
           -- RebindableSyntax can wreak havoc with GHCi in several ways
-          -- (see #13385 and #14342 for examples), so we take care to disable it
-          -- for the duration of running expressions that are internal to GHCi.
+          -- (see #13385 and #14342 for examples), so we temporarily
+          -- disable it too.
           `xopt_unset` LangExt.RebindableSyntax
           -- We heavily depend on -fimplicit-import-qualified to compile expr
           -- with fully qualified names without imports.
