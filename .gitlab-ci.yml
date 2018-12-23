@@ -318,7 +318,7 @@ validate-x86_64-linux-deb9-unreg:
     - bash .gitlab/win32-init.sh
   after_script:
     - rd /s /q tmp
-    - bash -c 'cp -Rf $APPDATA/cabal cabal-cache'
+    - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
   cache:
     paths:
       - cabal-cache
