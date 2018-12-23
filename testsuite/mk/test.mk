@@ -240,8 +240,6 @@ else
 RUNTEST_OPTS += -e config.local=True
 endif
 
-RUNTEST_OPTS += -e 'config.integer_backend="$(INTEGER_LIBRARY)"'
-
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config-file=$(CONFIG) \

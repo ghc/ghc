@@ -118,7 +118,7 @@ test('profinline001', [], compile_and_run, [''])
 test('T11627a', [ extra_ways(extra_prof_ways),
                   # integer-simple has an extremely large representation and
                   # consequently needs more time
-                  when(using_integer_backend('integer-simple'),
+                  when(have_library('integer-simple'),
                        run_timeout_multiplier(3))
                 ],
      compile_and_run, [''])
