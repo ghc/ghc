@@ -302,12 +302,23 @@ validate-x86_64-linux-deb9-unreg:
   before_script:
     - git clean -xdf
     - git submodule foreach git clean -xdf
-    - PATH=C:\msys64\usr\bin;%PATH%
+
+    # Use a local temporary directory to ensure that concurrent builds don't
+    # interfere with one another
+    - |
+      mkdir tmp
+      set TMP=%cd%\tmp
+      set TEMP=%cd%\tmp
+
+    - set PATH=C:\msys64\usr\bin;%PATH%
     - python .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
     - bash .gitlab/win32-init.sh
+  after_script:
+    - rd /s /q tmp
+    - bash -c 'cp -Rf $APPDATA/cabal cabal-cache'
   cache:
     paths:
       - cabal-cache
@@ -333,7 +344,6 @@ validate-x86_64-windows-hadrian:
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --no-lint"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh binary-dist"
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
-    - cp -Rf $APPDATA/cabal cabal-cache
   cache:
     key: x86_64-windows
   tags:
@@ -352,7 +362,6 @@ validate-x86_64-windows:
       bash -c './configure --with-ghc=`pwd`/toolchain/bin/ghc --enable-tarballs-autodownload HappyCmd=`pwd`/toolchain/bin/happy AlexCmd=`pwd`/toolchain/bin/alex'
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
-    - cp -Rf $APPDATA/cabal cabal-cache
   cache:
     key: x86_64-windows
   tags:
