@@ -735,6 +735,7 @@ pprInstr (XOR format src dst) = pprFormatOpOp (sLit "xor")  format src dst
 
 pprInstr (POPCNT format src dst) = pprOpOp (sLit "popcnt") format src (OpReg dst)
 pprInstr (LZCNT format src dst)  = pprOpOp (sLit "lzcnt")  format src (OpReg dst)
+pprInstr (TZCNT format src dst)  = pprOpOp (sLit "tzcnt")  format src (OpReg dst)
 pprInstr (BSF format src dst)    = pprOpOp (sLit "bsf")    format src (OpReg dst)
 pprInstr (BSR format src dst)    = pprOpOp (sLit "bsr")    format src (OpReg dst)
 
