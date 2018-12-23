@@ -47,8 +47,8 @@ T15723:
 ## check that there are two assembly equates
 # mentioning T15155.a_closure (def and use)
 T15155:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-asm T15155l.hs | grep -F ".equiv " \
-	| grep -F "T15155.a_closure" | wc -l | sed -e 's/ *//g' | grep "2" ; echo $$?
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-asm T15155l.hs | tee T15155.asm | grep -F ".equiv " \
+	| grep -F "T15155.a_closure" | wc -l | sed -e 's/ *//g' | (grep "2" || cat T15155.asm) ; echo $$?
 
 ## check that there are two "$def" aliases:
 #  - one that bitcasts to %T15155_a_closure_struct*
