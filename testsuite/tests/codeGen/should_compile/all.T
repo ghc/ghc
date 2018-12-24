@@ -54,7 +54,7 @@ test('T15723',
   ], run_command, ['$MAKE -s --no-print-directory T15723'])
 
 test('T15155',
-  [ [ when(unregisterised(), skip) ],
+  [ only_ways(['optasm']),
   ], run_command, ['$MAKE -s --no-print-directory T15155'])
 
 test('T15155l',
