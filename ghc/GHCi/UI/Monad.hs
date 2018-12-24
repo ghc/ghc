@@ -461,7 +461,7 @@ compileGHCiExpr :: GhcMonad m => String -> m ForeignHValue
 compileGHCiExpr expr =
   withTempSession mkTempSession $ GHC.compileExprRemote expr
   where
-   mkTempSession hsc_env = hsc_env
+    mkTempSession hsc_env = hsc_env
       { hsc_dflags = (hsc_dflags hsc_env) {
           -- GHCi's internal expression are incompatible with -XSafe,
           -- so we take care to disable Safe Haskell for the duration
