@@ -6,7 +6,7 @@
 Monadic type operations
 
 This module contains monadic operations over types that contain
-mutable type variables
+mutable type variables.
 -}
 
 {-# LANGUAGE CPP, TupleSections, MultiWayIf #-}
