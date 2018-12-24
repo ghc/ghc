@@ -109,7 +109,12 @@ download_tarballs() {
     download_mingw "${format_url}-isl-0.18-1-any.pkg.tar.xz"
     download_mingw "${format_url}-mpfr-3.1.6-1-any.pkg.tar.xz"
     download_mingw "${format_url}-gmp-6.1.2-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-binutils-2.29.1-1-any.pkg.tar.xz"
+    if test "$mingw_arch" = "x86_64"; then
+        # Try using Tamar's branch
+        download_mingw "${format_url}-binutils-git-2.25.r93824.012da41a23-1-any.pkg.tar.xz"
+    else
+        download_mingw "${format_url}-binutils-2.29.1-1-any.pkg.tar.xz"
+    fi
     download_mingw "${format_url}-libidn2-2.0.4-1-any.pkg.tar.xz"
     download_mingw "${format_url}-gcc-7.2.0-1-any.pkg.tar.xz"
 
