@@ -319,6 +319,7 @@ validate-x86_64-linux-deb9-unreg:
   after_script:
     - rd /s /q tmp
     - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
+    - bash -c 'make clean || true'
   cache:
     paths:
       - cabal-cache
