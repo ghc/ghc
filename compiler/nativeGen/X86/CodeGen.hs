@@ -2050,8 +2050,6 @@ genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] b
     if isBmi2Enabled dflags && width /= W8
         then do
             return $ code_src src_r `appOL`
-                unitOL (XOR (intFormat width) (OpReg dst_r) (OpReg dst_r))
-                `appOL`
                 unitOL (LZCNT (intFormat width) (OpReg src_r) dst_r)
                 `appOL`
                 (if width == W16 then
@@ -2127,8 +2125,6 @@ genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
     if isBmi2Enabled dflags && width /= W8
     then
         return $ code_src src_r `appOL`
-            unitOL (XOR (intFormat width) (OpReg dst_r) (OpReg dst_r))
-            `appOL`
             unitOL (TZCNT (intFormat width) (OpReg src_r) dst_r)
             `appOL`
             (if width == W16 then
