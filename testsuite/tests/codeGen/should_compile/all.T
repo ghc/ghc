@@ -44,7 +44,7 @@ test('T14999',
 
 # Verify that we optimize away redundant jumps for unordered comparisons.
 test('T15196',
-  [ unless(arch('x86_64'),skip),
+  [ unless(arch('x86_64'), skip),
     only_ways('normal'),
   ], run_command, ['$MAKE -s --no-print-directory T15196'])
 
@@ -54,9 +54,8 @@ test('T15723',
   ], run_command, ['$MAKE -s --no-print-directory T15723'])
 
 test('T15155',
-  [ [ when(unregisterised(), skip) ],
+  [ unless(have_ncg(), skip)
   ], run_command, ['$MAKE -s --no-print-directory T15155'])
 
-test('T15155l',
-  [ only_ways(llvm_ways),
-  ], run_command, ['$MAKE -s --no-print-directory T15155l'])
+test('T15155l', only_ways(llvm_ways),
+     run_command, ['$MAKE -s --no-print-directory T15155l'])
