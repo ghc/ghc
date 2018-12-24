@@ -115,7 +115,13 @@ ppr_bind ann (Rec binds)           = vcat (map pp binds)
 
 ppr_binding :: OutputableBndr b => Annotation b -> (b, Expr b) -> SDoc
 ppr_binding ann (val_bdr, expr)
-  = ann expr $$ pprBndr LetBind val_bdr $$ pp_bind
+  = sdocWithDynFlags $ \dflags ->
+      vcat [ ann expr
+           , if gopt Opt_SuppressTypeSignatures dflags
+               then empty
+               else pprBndr LetBind val_bdr
+           , pp_bind
+           ]
   where
     pp_bind = case bndrIsJoin_maybe val_bdr of
                 Nothing -> pp_normal_bind
