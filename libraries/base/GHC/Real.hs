@@ -481,22 +481,26 @@ instance Integral Natural where
 #else
 -- | @since 4.8.0.0
 instance Integral Natural where
-  quot (Natural a) (Natural b) = Natural (quot a b)
-  {-# INLINE quot #-}
-  rem (Natural a) (Natural b) = Natural (rem a b)
-  {-# INLINE rem #-}
-  div (Natural a) (Natural b) = Natural (div a b)
-  {-# INLINE div #-}
-  mod (Natural a) (Natural b) = Natural (mod a b)
-  {-# INLINE mod #-}
-  divMod (Natural a) (Natural b) = (Natural q, Natural r)
-    where (q,r) = divMod a b
-  {-# INLINE divMod #-}
-  quotRem (Natural a) (Natural b) = (Natural q, Natural r)
-    where (q,r) = quotRem a b
-  {-# INLINE quotRem #-}
-  toInteger (Natural a) = a
-  {-# INLINE toInteger #-}
+    {-# INLINE toInteger #-}
+    toInteger (Natural a) = a
+
+    {-# INLINE quot #-}
+    Natural a `quot` Natural b = Natural (a `quot` b)
+
+    {-# INLINE rem #-}
+    Natural a `rem` Natural b = Natural (a `rem` b)
+
+    {-# INLINE div #-}
+    Natural a `div` Natural b = Natural (a `div` b)
+
+    {-# INLINE mod #-}
+    Natural a `mod` Natural b = Natural (a `mod` b)
+
+    {-# INLINE divMod #-}
+    Natural a `divMod` Natural b = coerce (a `divMod` b)
+
+    {-# INLINE quotRem #-}
+    Natural a `quotRem` Natural b = coerce (a `quotRem` b)
 #endif
 
 --------------------------------------------------------------
