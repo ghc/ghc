@@ -431,9 +431,17 @@ interactiveUI config srcs maybe_exprs = do
    -- The initial set of DynFlags used for interactive evaluation is the same
    -- as the global DynFlags, plus -XExtendedDefaultRules and
    -- -XNoMonomorphismRestriction.
+   -- However we set/unset these two extensions only, if they were not already
+   -- explicitely specified before. The function 'xopt_set_unlessExplSpec'
+   -- inspects the data field DynFlags.extensions.
+   -- At this point of the GHCi initialization this data field contains only
+   -- the extensions specified at the command line.
+   -- The ghci config file has not yet been processed. (#10857)
    dflags <- getDynFlags
-   let dflags' = (`xopt_set` LangExt.ExtendedDefaultRules)
-               . (`xopt_unset` LangExt.MonomorphismRestriction)
+   let dflags' = (xopt_set_unlessExplSpec
+                      LangExt.ExtendedDefaultRules xopt_set)
+               . (xopt_set_unlessExplSpec
+                      LangExt.MonomorphismRestriction xopt_unset)
                $ dflags
    GHC.setInteractiveDynFlags dflags'
 
