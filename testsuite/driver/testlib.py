@@ -1747,7 +1747,7 @@ def normalise_errmsg( str ):
     # Error messages sometimes contain this blurb which can vary
     # spuriously depending upon build configuration (e.g. based on integer
     # backend)
-    str = re.sub('...plus [a-z]+ instances involving out-of-scope types',
+    str = re.sub('...plus ([a-z]+|[0-9]+) instances involving out-of-scope types',
                  '...plus N instances involving out-of-scope types', str)
 
     # Also filter out bullet characters.  This is because bullets are used to
