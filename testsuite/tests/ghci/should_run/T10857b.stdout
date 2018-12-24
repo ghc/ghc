@@ -1,0 +1,4 @@
+base language is: Haskell2010
+with the following modifiers:
+  -XNoDatatypeContexts
+  -XNondecreasingIndentation

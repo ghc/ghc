@@ -34,6 +34,7 @@ module DynFlags (
         wopt, wopt_set, wopt_unset,
         wopt_fatal, wopt_set_fatal, wopt_unset_fatal,
         xopt, xopt_set, xopt_unset,
+        xopt_set_unlessExplSpec,
         lang_set,
         useUnicodeSyntax,
         useStarIsType,
@@ -1076,6 +1077,9 @@ data DynFlags = DynFlags {
   warnUnsafeOnLoc       :: SrcSpan,
   trustworthyOnLoc      :: SrcSpan,
   -- Don't change this without updating extensionFlags:
+  -- Here we collect the settings of the language extensions
+  -- from the command line, the ghci config file and
+  -- from interactive :set / :seti commands.
   extensions            :: [OnOff LangExt.Extension],
   -- extensionFlags should always be equal to
   --     flattenExtensionFlags language extensions
@@ -2376,6 +2380,19 @@ xopt_unset dfs f
     = let onoffs = Off f : extensions dfs
       in dfs { extensions = onoffs,
                extensionFlags = flattenExtensionFlags (language dfs) onoffs }
+
+-- | Set or unset a 'LangExt.Extension', unless it has been explicitely
+--   set or unset before.
+xopt_set_unlessExplSpec
+        :: LangExt.Extension
+        -> (DynFlags -> LangExt.Extension -> DynFlags)
+        -> DynFlags -> DynFlags
+xopt_set_unlessExplSpec ext setUnset dflags =
+    let referedExts = stripOnOff <$> extensions dflags
+        stripOnOff (On x)  = x
+        stripOnOff (Off x) = x
+    in
+        if ext `elem` referedExts then dflags else setUnset dflags ext
 
 lang_set :: DynFlags -> Maybe Language -> DynFlags
 lang_set dflags lang =
