@@ -1742,7 +1742,8 @@ kcTyFamInstEqn tc_fam_tc
        ; discardResult $
          bindImplicitTKBndrs_Q_Tv imp_vars $
          bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
-         do { (_, res_kind) <- tcFamTyPats tc_fam_tc NotAssociated hs_pats
+         do { fam_app <- tcFamTyPats tc_fam_tc NotAssociated hs_pats
+            ; res_kind <- tcTypeKindM fam_app
             ; tcCheckLHsType hs_rhs_ty res_kind }
              -- Why "_Tv" here?  Consider (Trac #14066
              --  type family Bar x y where
@@ -1893,7 +1894,9 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
                                                            (tyConKind  fam_tc)
                 ; return (mkTyConApp fam_tc args, rhs_kind) }
            | otherwise
-           = tcFamTyPats fam_tc mb_clsinfo hs_pats
+           = do { fam_app <- tcFamTyPats fam_tc mb_clsinfo hs_pats
+                ; res_kind <- tcTypeKindM fam_app
+                ; return (fam_app, res_kind) }
 
 {- Note [Apparently-nullary families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1941,7 +1944,7 @@ tcFamTyPats fam_tc mb_clsinfo hs_pats
        -- Ensure that the instance is consistent its parent class
        ; addConsistencyConstraints mb_clsinfo fam_app
 
-       ; return (fam_app, tcTypeKind fam_app) }
+       ; return fam_app }
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
@@ -2438,8 +2441,8 @@ rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
         -- So we return ( [a,b,z], [x,y]
         --              , [], [x,y,z]
         --              , [a~(x,y),b~z], <arg-subst> )
-  | Just subst <- ASSERT( isLiftedTypeKind (tcTypeKind res_ty) )
-                  ASSERT( isLiftedTypeKind (tcTypeKind res_tmpl) )
+  | Just subst <- ASSERT( isLiftedTypeKind (typeKind res_ty) )
+                  ASSERT( isLiftedTypeKind (typeKind res_tmpl) )
                   tcMatchTy res_tmpl res_ty
   = let (univ_tvs, raw_eqs, kind_subst) = mkGADTVars tmpl_tvs dc_tvs subst
         raw_ex_tvs = dc_tvs `minusList` univ_tvs
@@ -2959,8 +2962,8 @@ checkValidDataCon dflags existential_ok tc con
               orig_res_ty = dataConOrigResTy con
         ; traceTc "checkValidDataCon" (vcat
               [ ppr con, ppr tc, ppr tc_tvs
-              , ppr res_ty_tmpl <+> dcolon <+> ppr (tcTypeKind res_ty_tmpl)
-              , ppr orig_res_ty <+> dcolon <+> ppr (tcTypeKind orig_res_ty)])
+              , ppr res_ty_tmpl <+> dcolon <+> ppr (typeKind res_ty_tmpl)
+              , ppr orig_res_ty <+> dcolon <+> ppr (typeKind orig_res_ty)])
 
 
         ; checkTc (isJust (tcMatchTy res_ty_tmpl

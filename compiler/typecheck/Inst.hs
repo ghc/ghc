@@ -298,14 +298,13 @@ instTyVarsWith orig tvs tys
     go subst [] []
       = return subst
     go subst (tv:tvs) (ty:tys)
-      | tv_kind `tcEqType` ty_kind
-      = go (extendTCvSubst subst tv ty) tvs tys
-      | otherwise
-      = do { co <- emitWantedEq orig KindLevel Nominal ty_kind tv_kind
-           ; go (extendTCvSubst subst tv (ty `mkCastTy` co)) tvs tys }
-      where
-        tv_kind = substTy subst (tyVarKind tv)
-        ty_kind = tcTypeKind ty
+      = do { let tv_kind = substTy subst (tyVarKind tv)
+           ; ty_kind <- tcTypeKindM ty
+           ; eq_kind <- tv_kind `tcEqTypeM` ty_kind
+           ; ty' <- if eq_kind then return ty
+                    else do { co <- emitWantedEq orig KindLevel Nominal ty_kind tv_kind
+                            ; return (ty `mkCastTy` co) }
+           ; go (extendTCvSubst subst tv ty') tvs tys }
 
     go _ _ _ = pprPanic "instTysWith" (ppr tvs $$ ppr tys)
 
@@ -580,17 +579,17 @@ tcInstTyBinder _ subst (Anon ty)
 mkHEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
 -- monadic just for convenience with mkEqBoxTy
 mkHEqBoxTy co ty1 ty2
-  = return $
-    mkTyConApp (promoteDataCon heqDataCon) [k1, k2, ty1, ty2, mkCoercionTy co]
-  where k1 = tcTypeKind ty1
-        k2 = tcTypeKind ty2
+  = do { k1 <- tcTypeKindM ty1
+       ; k2 <- tcTypeKindM ty2
+       ; return $ mkTyConApp (promoteDataCon heqDataCon)
+                     [k1, k2, ty1, ty2, mkCoercionTy co] }
 
 -- | This takes @a ~# b@ and returns @a ~ b@.
 mkEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
 mkEqBoxTy co ty1 ty2
-  = return $
-    mkTyConApp (promoteDataCon eqDataCon) [k, ty1, ty2, mkCoercionTy co]
-  where k = tcTypeKind ty1
+  = do { k <- tcTypeKindM ty1
+       ; return $ mkTyConApp (promoteDataCon eqDataCon)
+                         [k, ty1, ty2, mkCoercionTy co] }
 
 {-
 ************************************************************************

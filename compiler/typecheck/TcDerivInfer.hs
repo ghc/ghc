@@ -111,6 +111,8 @@ inferConstraintsDataConArgs inst_ty inst_tys
                 , denv_cls_tys     = cls_tys } <- ask
        wildcard <- isStandaloneWildcardDeriv
 
+       inst_ty_kind <- lift $ tcTypeKindM inst_ty
+
        let tc_binders = tyConBinders rep_tc
            choose_level bndr
              | isNamedTyConBinder bndr = KindLevel
@@ -157,7 +159,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
            is_generic  = main_cls `hasKey` genClassKey
            is_generic1 = main_cls `hasKey` gen1ClassKey
            -- is_functor_like: see Note [Inferring the instance context]
-           is_functor_like = tcTypeKind inst_ty `tcEqKind` typeToTypeKind
+           is_functor_like = inst_ty_kind `tcEqKind` typeToTypeKind
                           || is_generic1
 
            get_gen1_constraints :: Class -> CtOrigin -> TypeOrKind -> Type
@@ -192,6 +194,8 @@ inferConstraintsDataConArgs inst_ty inst_tys
            -- See Note [Inferring the instance context]
            mk_functor_like_constraints orig t_or_k cls
               = map $ \ty -> let ki = tcTypeKind ty in
+                                 -- OK to use typeKind because 'ty' is a fully
+                                 -- zonked constructor argument type
                              ( [ mk_cls_pred orig t_or_k cls ty
                                , mkPredOrigin orig KindLevel
                                    (mkPrimEqPred ki typeToTypeKind) ]
@@ -228,15 +232,17 @@ inferConstraintsDataConArgs inst_ty inst_tys
            -- Reason: when the IF holds, we generate a method
            --             dataCast2 f = gcast2 f
            --         and we need the Data constraints to typecheck the method
-           extra_constraints = [mkThetaOriginFromPreds constrs]
+           mk_extra_constraints
+             | main_cls `hasKey` dataClassKey
+             = do { rep_tc_arg_kinds <- lift $ mapM tcTypeKindM rep_tc_args
+                  ; if all isLiftedTypeKind rep_tc_arg_kinds
+                    then return [mkThetaOriginFromPreds constrs]
+                    else return [] }
+             | otherwise
+             = return []
              where
-               constrs
-                 | main_cls `hasKey` dataClassKey
-                 , all (isLiftedTypeKind . tcTypeKind) rep_tc_args
-                 = [ mk_cls_pred deriv_origin t_or_k main_cls ty
-                   | (t_or_k, ty) <- zip t_or_ks rep_tc_args]
-                 | otherwise
-                 = []
+               constrs = [ mk_cls_pred deriv_origin t_or_k main_cls ty
+                         | (t_or_k, ty) <- zip t_or_ks rep_tc_args ]
 
            mk_cls_pred orig t_or_k cls ty
                 -- Don't forget to apply to cls_tys' too
@@ -276,6 +282,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
                           [ ppr main_cls <+> ppr inst_tys'
                           , ppr arg_constraints
                           ]
+                   ; extra_constraints <- mk_extra_constraints
                    ; return ( stupid_constraints ++ extra_constraints
                                                  ++ arg_constraints
                             , tvs', inst_tys') }

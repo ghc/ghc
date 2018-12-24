@@ -2400,7 +2400,8 @@ tcRnType hsc_env normalise rdr_type
        ; _ <- checkNoErrs (simplifyInteractive lie)
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
-       ; kvs <- kindGeneralize (tcTypeKind ty)
+       ; kind <- tcTypeKindM ty
+       ; kvs <- kindGeneralize kind
        ; ty  <- zonkTcTypeToType ty
 
        -- Do validity checking on type
@@ -2408,12 +2409,12 @@ tcRnType hsc_env normalise rdr_type
 
        ; ty' <- if normalise
                 then do { fam_envs <- tcGetFamInstEnvs
-                        ; let (_, ty')
-                                = normaliseType fam_envs Nominal ty
+                        ; let (_, ty') = normaliseType fam_envs Nominal ty
                         ; return ty' }
                 else return ty ;
 
-       ; return (ty', mkInvForAllTys kvs (tcTypeKind ty')) }
+       ; kind' <- tcTypeKindM ty'
+       ; return (ty', mkInvForAllTys kvs kind') }
 
 {- Note [TcRnExprMode]
 ~~~~~~~~~~~~~~~~~~~~~~

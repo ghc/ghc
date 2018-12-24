@@ -37,6 +37,10 @@ module TcMType (
   tauifyExpType, inferResultToType,
 
   --------------------------------
+  -- Getting the kind of a type
+  tcEqTypeM, tcTypeKindM, piResultTysM,
+
+  --------------------------------
   -- Creating new evidence variables
   newEvVar, newEvVars, newDict,
   newWanted, newWanteds, newHoleCt, cloneWanted, cloneWC,
@@ -60,18 +64,21 @@ module TcMType (
   freshenTyVarBndrs, freshenCoVarBndrsX,
 
   --------------------------------
-  -- Zonking and tidying
-  zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin,
-  tidyEvVar, tidyCt, tidySkolemInfo,
-    zonkTcTyVar, zonkTcTyVars,
-  zonkTcTyVarToTyVar, zonkTyVarTyVarPairs,
-  zonkTyCoVarsAndFV, zonkTcTypeAndFV,
-  zonkTyCoVarsAndFVList,
+  -- Quantification
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
   candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
   CandidatesQTvs(..), delCandidates, candidateKindVars,
   skolemiseQuantifiedTyVar, defaultTyVar,
   quantifyTyVars,
+
+  --------------------------------
+  -- Zonking and tidying
+  zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin,
+  tidyEvVar, tidyCt, tidySkolemInfo,
+  zonkTcTyVar, zonkTcTyVars,
+  zonkTcTyVarToTyVar, zonkTyVarTyVarPairs,
+  zonkTyCoVarsAndFV, zonkTcTypeAndFV,
+  zonkTyCoVarsAndFVList,
   zonkTcTyCoVarBndr, zonkTyConBinders,
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind,
@@ -124,6 +131,221 @@ import Maybes
 import Data.List        ( mapAccumL )
 import Control.Arrow    ( second )
 import qualified Data.Semigroup as Semi
+
+{-
+************************************************************************
+*                                                                      *
+            tcTypeKind
+*                                                                      *
+************************************************************************
+-}
+
+tcTypeKindM :: HasDebugCallStack => TcType -> TcM TcKind
+tcTypeKindM (TyConApp tc tys) = return (piResultTys (tyConKind tc) tys)
+tcTypeKindM (LitTy l)         = return (typeLiteralKind l)
+tcTypeKindM (CastTy _ty co)   = return (pSnd $ coercionKind co)
+tcTypeKindM (CoercionTy co)   = return (coercionType co)
+
+tcTypeKindM (FunTy arg res)
+  = do { arg_k <- tcTypeKindM arg
+       ; if tcIsConstraintKind arg_k
+          then do { res_k <- tcTypeKindM res
+                  ; if tcIsConstraintKind res_k
+                    then return constraintKind
+                    else return liftedTypeKind }
+          else return liftedTypeKind }
+
+tcTypeKindM (AppTy fun arg)
+  = go fun [arg]
+  where
+    -- Accumulate the type arugments, so we can call piResultTys,
+    -- rather than a succession of calls to piResultTy (which is
+    -- asymptotically costly as the number of arguments increases)
+    go (AppTy fun arg) args = go fun (arg:args)
+    go fun             args = do { fun_k <- tcTypeKindM fun
+                                 ; piResultTysM fun_k args }
+
+tcTypeKindM ty@(ForAllTy {})
+  = do { body_k <- tcTypeKindM body
+       ; if tcIsConstraintKind body_k
+         then return constraintKind
+         else case occCheckExpand tvs body_k of   -- We must make sure tv does
+                 Just k' -> return k'             -- not occur in kind
+                 Nothing -> pprPanic "tcTypeKindM"
+                            (ppr ty $$ ppr tvs $$ ppr body <+> dcolon <+> ppr body_k) }
+  where
+    (tvs, body) = splitTyVarForAllTys ty
+
+tcTypeKindM (TyVarTy tv)
+  | isMetaTyVar tv
+  = do { maybe_ty <- readMetaTyVar tv
+       ; case maybe_ty of
+            Indirect ty -> tcTypeKindM ty
+            Flexi       -> return (tyVarKind tv) }
+  | otherwise
+  = return (tyVarKind tv)
+
+piResultTysM :: HasDebugCallStack => TcType -> [TcType] -> TcM TcType
+piResultTysM ty orig_args = go init_subst ty orig_args
+  where
+    init_subst = mkEmptyTCvSubst $ mkInScopeSet (tyCoVarsOfTypes (ty:orig_args))
+
+    go :: TCvSubst -> TcType -> [TcType] -> TcM TcType
+    go subst ty []
+      = return (substTy subst ty) -- substTy has a fast-path for empty substitutions
+
+    go subst ty all_args@(arg:args)
+      | Just ty' <- tcView ty
+      = go subst ty' all_args
+
+      | FunTy _ res <- ty
+      = go subst res args
+
+      | ForAllTy (Bndr tv _) res <- ty
+      = go (extendTCvSubst subst tv arg) res args
+
+      | TyVarTy tv <- ty
+      , isMetaTyVar tv
+       = do { maybe_ty <- readMetaTyVar tv
+            ; case maybe_ty of
+                 Indirect ty -> go subst ty all_args
+                 Flexi       -> try_subst subst ty all_args }
+
+      | otherwise
+      = try_subst subst ty all_args
+
+    try_subst subst ty args
+      | not (isEmptyTCvSubst subst)  -- See Note [Care with kind instantiation]
+      = go init_subst (substTy subst ty) args
+
+      | otherwise
+      = -- We have not run out of arguments, but the function doesn't
+        -- have the right kind to apply to them; so panic.
+        -- Without the explicit isEmptyVarEnv test, an ill-kinded type
+        -- would give an infniite loop, which is very unhelpful
+        -- c.f. Trac #15473
+        pprPanic "piResultTysM" (ppr ty $$ ppr orig_args $$ ppr args)
+
+
+-- | A monadic version of tcEqType
+-- If it returns True, the two types are definitely equal
+-- If not, they might still be equal, after zonking
+-- Reason for this one-sided conservative-ness: tcEqTypeM is used only
+-- for fast-path checks, and we don't want the full glory of RnEnv2,
+-- which requires us to find the free vars to find the in-scope set,
+-- which requires zonking... and is almost never necessary
+tcEqTypeM :: TcType -> TcType -> TcM Bool
+tcEqTypeM t1 t2
+  = do { k1 <- tcTypeKindM t1
+       ; k2 <- tcTypeKindM t2
+       ; tc_eq_type_m k1 k2 `scAndM` tc_eq_type_m t1 t2 }
+
+tc_eq_type_m :: TcType -> TcType -> TcM Bool
+tc_eq_type_m orig_ty1 orig_ty2
+  = go orig_ty1 orig_ty2
+  where
+    go :: TcType -> TcType -> TcM Bool
+    go t1 t2 | Just t1' <- tcView t1 = go t1' t2
+    go t1 t2 | Just t2' <- tcView t2 = go t1 t2'
+
+    go (TyVarTy tv1) t2 = go_tv tv1 t2
+    go t1 (TyVarTy tv2) = go_tv tv2 t1
+
+    go (LitTy lit1) (LitTy lit2)
+      = return (lit1 == lit2)
+
+    go t1@(ForAllTy {}) t2 = return (tcEqTypeNoKindCheck t1 t2)
+    go t1 t2@(ForAllTy {}) = return (tcEqTypeNoKindCheck t1 t2)
+
+    -- Make sure we handle all FunTy cases since falling through to the
+    -- AppTy case means that tcRepSplitAppTy_maybe may see an unzonked
+    -- kind variable, which causes things to blow up.
+    go (FunTy arg1 res1) (FunTy arg2 res2)
+      = go arg1 arg2 `scAndM` go res1 res2
+    go ty (FunTy arg res) = eqFunTy arg res ty
+    go (FunTy arg res) ty = eqFunTy arg res ty
+
+      -- See Note [Equality on AppTys] in Type
+    go (AppTy s1 t1)        ty2
+      | Just (s2, t2) <- repSplitAppTy_maybe ty2
+      = go s1 s2 `scAndM` go t1 t2
+    go ty1                  (AppTy s2 t2)
+      | Just (s1, t1) <- repSplitAppTy_maybe ty1
+      = go s1 s2 `scAndM` go t1 t2
+
+    go (TyConApp tc1 ts1) (TyConApp tc2 ts2)
+      | tc1 == tc2 = gos ts1 ts2
+      | otherwise  = return False
+
+    go (CastTy t1 _)   t2              = go t1 t2
+    go t1              (CastTy t2 _)   = go t1 t2
+    go (CoercionTy {}) (CoercionTy {}) = return True
+
+    go _ _ = return False
+
+    --------
+    gos []       []       = return True
+    gos (t1:ts1) (t2:ts2) = go t1 t2 `scAndM` gos ts1 ts2
+    gos _ _ = return False
+
+    --------
+    go_tv :: TcTyVar -> TcType -> TcM Bool
+    go_tv tv1 t2
+      | isMetaTyVar tv1
+      = do { mb_t1 <- readMetaTyVar tv1
+           ; case mb_t1 of
+               Indirect t1 -> go t1 t2
+               Flexi       -> go_tv1 tv1 t2 }
+      | otherwise
+      = go_tv1 tv1 t2
+
+    --------
+    go_tv1 :: TcTyVar -> TcType -> TcM Bool
+    -- tv1 is not a filled-in meta-tyvar
+    go_tv1 tv1 (TyVarTy tv2)
+      | isMetaTyVar tv2
+      = do { mb_t2 <- readMetaTyVar tv2
+           ; case mb_t2 of
+               Indirect t2 -> go_tv1 tv1 t2
+               Flexi       -> go_tv2 tv1 tv2 }
+      | otherwise
+      = go_tv2 tv1 tv2
+
+    go_tv1 _ _ = return False  -- TyVar vs non-TyVar
+
+    --------
+    go_tv2 :: TcTyVar -> TcTyVar -> TcM Bool
+    -- Neither is a filled-in meta-tyvar
+    go_tv2 tv1 tv2 = return (tv1 == tv2)
+
+    --------
+    -- @eqFunTy arg res ty@ is True when @ty@ equals @FunTy arg res@. This is
+    -- sometimes hard to know directly because @ty@ might have some casts
+    -- obscuring the FunTy. And 'splitAppTy' is difficult because we can't
+    -- always extract a RuntimeRep (see Note [xyz]) if the kind of the arg or
+    -- res is unzonked/unflattened. Thus this function, which handles this
+    -- corner case.
+    eqFunTy :: Type -> Type -> Type -> TcM Bool
+               -- Last arg is /not/ FunTy
+    eqFunTy arg res ty@(AppTy{}) = get_args ty []
+      where
+        get_args :: Type -> [Type] -> TcM Bool
+        get_args (AppTy f x)       args = get_args f (x:args)
+        get_args (CastTy t _)      args = get_args t args
+        get_args (TyConApp tc tys) args
+          | tc == funTyCon
+          , [_, _, arg', res'] <- tys ++ args
+          = go arg arg' <&&> go res res'
+        get_args _ _    = return False
+    eqFunTy _ _ _     = return False
+
+scAndM :: TcM Bool -> TcM Bool -> TcM Bool
+-- A short-circuiting 'and' for monadic computations
+-- If the first returns False, it does not do the second at all
+-- (Whereas <&&> does the seecond regardless.)
+scAndM mb1 mb2 = do { b1 <- mb1
+                    ; if b1 then mb2
+                            else return False }
 
 {-
 ************************************************************************
@@ -684,7 +906,8 @@ newFskTyVar fam_ty
                               , mtv_ref   = ref
                               , mtv_tclvl = tclvl }
              name = mkMetaTyVarName uniq (fsLit "fsk")
-       ; return (mkTcTyVar name (tcTypeKind fam_ty) details) }
+       ; fam_ty_kind <- tcTypeKindM fam_ty
+       ; return (mkTcTyVar name fam_ty_kind details) }
 
 newFmvTyVar :: TcType -> TcM TcTyVar
 -- Very like newMetaTyVar, except sets mtv_tclvl to one less
@@ -697,7 +920,8 @@ newFmvTyVar fam_ty
                               , mtv_ref   = ref
                               , mtv_tclvl = tclvl }
              name = mkMetaTyVarName uniq (fsLit "s")
-       ; return (mkTcTyVar name (tcTypeKind fam_ty) details) }
+       ; fam_ty_kind <- tcTypeKindM fam_ty
+       ; return (mkTcTyVar name fam_ty_kind details) }
 
 newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
 newMetaDetails info
@@ -784,10 +1008,9 @@ writeMetaTyVarRef tyvar ref ty
   = do { meta_details <- readMutVar ref;
        -- Zonk kinds to allow the error check to work
        ; zonked_tv_kind <- zonkTcType tv_kind
-       ; zonked_ty      <- zonkTcType ty
-       ; let zonked_ty_kind = tcTypeKind zonked_ty  -- Need to zonk even before typeKind;
-                                                    -- otherwise, we can panic in piResultTy
-             kind_check_ok = tcIsConstraintKind zonked_tv_kind
+       ; ty_kind        <- tcTypeKindM ty
+       ; zonked_ty_kind <- zonkTcType ty_kind
+       ; let kind_check_ok = tcIsConstraintKind zonked_tv_kind
                           || tcEqKind zonked_ty_kind zonked_tv_kind
              -- Hack alert! tcIsConstraintKind: see TcHsType
              -- Note [Extra-constraint holes in partial type signatures]
@@ -2199,4 +2422,4 @@ formatLevPolyErr ty
                , text "Kind:" <+> pprWithTYPE tidy_ki ])
   where
     (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
-    tidy_ki             = tidyType tidy_env (tcTypeKind ty)
+    tidy_ki             = tidyType tidy_env (typeKind ty)

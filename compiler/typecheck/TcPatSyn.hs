@@ -53,7 +53,6 @@ import FieldLabel
 import Bag
 import Util
 import ErrUtils
-import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition )
 
@@ -166,8 +165,8 @@ tcInferPatSynDecl (PSB { psb_id = lname@(dL->L _ name), psb_args = details
     do { prov_dicts <- mapM zonkId prov_dicts
        ; let filtered_prov_dicts = mkMinimalBySCs evVarPred prov_dicts
              -- Filtering: see Note [Remove redundant provided dicts]
-             (prov_theta, prov_evs)
-                 = unzip (mapMaybe mkProvEvidence filtered_prov_dicts)
+       ; pairs <- mapMaybeM mkProvEvidence filtered_prov_dicts
+       ; let (prov_theta, prov_evs) = unzip pairs
              req_theta = map evVarPred req_dicts
 
        -- Report coercions that esacpe
@@ -189,29 +188,30 @@ tcInferPatSynDecl (PSB { psb_id = lname@(dL->L _ name), psb_args = details
                           pat_ty rec_fields } }
 tcInferPatSynDecl (XPatSynBind _) = panic "tcInferPatSynDecl"
 
-mkProvEvidence :: EvId -> Maybe (PredType, EvTerm)
+mkProvEvidence :: EvId -> TcM (Maybe (PredType, EvTerm))
 -- See Note [Equality evidence in pattern synonyms]
 mkProvEvidence ev_id
   | EqPred r ty1 ty2 <- classifyPredType pred
-  , let k1 = tcTypeKind ty1
-        k2 = tcTypeKind ty2
-        is_homo = k1 `tcEqType` k2
-        homo_tys   = [k1, ty1, ty2]
-        hetero_tys = [k1, k2, ty1, ty2]
-  = case r of
-      ReprEq | is_homo
-             -> Just ( mkClassPred coercibleClass    homo_tys
-                     , evDataConApp coercibleDataCon homo_tys eq_con_args )
-             | otherwise -> Nothing
-      NomEq  | is_homo
-             -> Just ( mkClassPred eqClass    homo_tys
-                     , evDataConApp eqDataCon homo_tys eq_con_args )
-             | otherwise
-             -> Just ( mkClassPred heqClass    hetero_tys
-                     , evDataConApp heqDataCon hetero_tys eq_con_args )
+  = do { k1 <- tcTypeKindM ty1
+       ; k2 <- tcTypeKindM ty2
+       ; is_homo <- k1 `tcEqTypeM` k2
+       ; let homo_tys   = [k1, ty1, ty2]
+             hetero_tys = [k1, k2, ty1, ty2]
+       ; return $
+         case r of
+           ReprEq | is_homo
+                  -> Just ( mkClassPred coercibleClass    homo_tys
+                          , evDataConApp coercibleDataCon homo_tys eq_con_args )
+                  | otherwise -> Nothing
+           NomEq  | is_homo
+                  -> Just ( mkClassPred eqClass    homo_tys
+                          , evDataConApp eqDataCon homo_tys eq_con_args )
+                  | otherwise
+                  -> Just ( mkClassPred heqClass    hetero_tys
+                          , evDataConApp heqDataCon hetero_tys eq_con_args ) }
 
   | otherwise
-  = Just (pred, EvExpr (evId ev_id))
+  = return (Just (pred, EvExpr (evId ev_id)))
   where
     pred = evVarPred ev_id
     eq_con_args = [evId ev_id]

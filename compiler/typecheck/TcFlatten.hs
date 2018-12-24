@@ -1470,12 +1470,13 @@ flatten_app_ty_args fun_xi fun_co []
   -- this will be a common case when called from flatten_fam_app, so shortcut
   = return (fun_xi, fun_co)
 flatten_app_ty_args fun_xi fun_co arg_tys
-  = do { (xi, co, kind_co) <- case tcSplitTyConApp_maybe fun_xi of
+  = do { let fun_kind  = tcTypeKind fun_xi  -- fun_xi is flat, to tcTypeKind is fine
+       ; (xi, co, kind_co) <- case tcSplitTyConApp_maybe fun_xi of
            Just (tc, xis) ->
              do { let tc_roles  = tyConRolesRepresentational tc
                       arg_roles = dropList xis tc_roles
                 ; (arg_xis, arg_cos, kind_co)
-                    <- flatten_vector (tcTypeKind fun_xi) arg_roles arg_tys
+                    <- flatten_vector fun_kind arg_roles arg_tys
 
                   -- Here, we have fun_co :: T xi1 xi2 ~ ty
                   -- and we need to apply fun_co to the arg_cos. The problem is
@@ -1494,7 +1495,7 @@ flatten_app_ty_args fun_xi fun_co arg_tys
                 ; return (app_xi, app_co, kind_co) }
            Nothing ->
              do { (arg_xis, arg_cos, kind_co)
-                    <- flatten_vector (tcTypeKind fun_xi) (repeat Nominal) arg_tys
+                    <- flatten_vector fun_kind (repeat Nominal) arg_tys
                 ; let arg_xi = mkAppTys fun_xi arg_xis
                       arg_co = mkAppCos fun_co arg_cos
                 ; return (arg_xi, arg_co, kind_co) }
@@ -1626,8 +1627,7 @@ flatten_exact_fam_app_fully tc tys
   -- See Note [Reduce type family applications eagerly]
      -- the following tcTypeKind should never be evaluated, as it's just used in
      -- casting, and casts by refl are dropped
-  = do { let reduce_co = mkNomReflCo (tcTypeKind (mkTyConApp tc tys))
-       ; mOut <- try_to_reduce_nocache tc tys reduce_co id
+  = do { mOut <- try_to_reduce_nocache tc tys
        ; case mOut of
            Just out -> pure out
            Nothing -> do
@@ -1749,16 +1749,8 @@ flatten_exact_fam_app_fully tc tys
 
     try_to_reduce_nocache :: TyCon   -- F, family tycon
                           -> [Type]  -- args, not necessarily flattened
-                          -> CoercionN -- kind_co :: tcTypeKind(F args)
-                                       --            ~N tcTypeKind(F orig_args)
-                                       -- where
-                                       -- orig_args is what was passed to the
-                                       -- outer function
-                          -> (   Coercion     -- :: (xi |> kind_co) ~ F args
-                              -> Coercion )   -- what to return from outer
-                                              -- function
                           -> FlatM (Maybe (Xi, Coercion))
-    try_to_reduce_nocache tc tys kind_co update_co
+    try_to_reduce_nocache tc tys
       = do { checkStackDepth (mkTyConApp tc tys)
            ; mb_match <- liftTcS $ matchFam tc tys
            ; case mb_match of
@@ -1769,11 +1761,8 @@ flatten_exact_fam_app_fully tc tys
                        ; eq_rel <- getEqRel
                        ; let co  = maybeSubCo eq_rel norm_co
                                     `mkTransCo` mkSymCo final_co
-                             role = eqRelRole eq_rel
-                             xi' = xi `mkCastTy` kind_co
-                             co' = update_co $
-                                   mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
-                       ; return $ Just (xi', co') }
+                             co'  = mkSymCo co
+                       ; return $ Just (xi, co') }
                Nothing -> pure Nothing }
 
 {- Note [Reduce type family applications eagerly]
@@ -2062,6 +2051,7 @@ unflattenWanteds tv_eqs funeqs
                         -- Note [Unflattening can force the solver to iterate]
       = ASSERT2( tyVarKind tv `eqType` tcTypeKind rhs, ppr ct )
            -- CTyEqCan invariant should ensure this is true
+           -- We can do tcTypeKind because the constraint is inert
         do { is_filled <- isFilledMetaTyVar tv
            ; elim <- case is_filled of
                False -> do { traceTcS "unflatten_eq 2" (ppr ct)
@@ -2102,10 +2092,9 @@ unflattenWanteds tv_eqs funeqs
     finalise_eq (CTyEqCan { cc_ev = ev, cc_tyvar = tv
                           , cc_rhs = rhs, cc_eq_rel = eq_rel }) rest
       | isFmvTyVar tv
-      = do { ty1 <- zonkTcTyVar tv
-           ; rhs' <- zonkTcType rhs
-           ; if ty1 `tcEqType` rhs'
-             then do { setReflEvidence ev eq_rel rhs'
+      = do { already_eq <- mkTyVarTy tv `tcEqTypeM` rhs
+           ; if already_eq
+             then do { setReflEvidence ev eq_rel rhs
                      ; return rest }
              else return (mkNonCanonical ev `consCts` rest) }
 

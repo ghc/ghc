@@ -39,7 +39,7 @@ module Type (
         mkForAllTy, mkForAllTys, mkTyCoInvForAllTys, mkSpecForAllTys,
         mkVisForAllTys, mkTyCoInvForAllTy,
         mkInvForAllTy, mkInvForAllTys,
-        splitForAllTys, splitForAllVarBndrs,
+        splitForAllTys, splitTyVarForAllTys, splitForAllVarBndrs,
         splitForAllTy_maybe, splitForAllTy,
         splitForAllTy_ty_maybe, splitForAllTy_co_maybe,
         splitPiTy_maybe, splitPiTy, splitPiTys,
@@ -132,7 +132,7 @@ module Type (
         Kind,
 
         -- ** Finding the kind of a type
-        typeKind, tcTypeKind, isTypeLevPoly, resultIsLevPoly,
+        typeKind, tcTypeKind, typeLiteralKind, isTypeLevPoly, resultIsLevPoly,
         tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
 
         -- ** Common Kind
@@ -1820,6 +1820,10 @@ isEvVarType :: Type -> Bool
 -- See Note [Evidence for quantified constraints]
 isEvVarType ty = isCoVarType ty || isPredTy ty
 
+isPredTy :: Type -> Bool
+-- See Note [Types for coercions, predicates, and evidence]
+isPredTy ty = tcIsConstraintKind (typeKind ty)
+
 -- | Does this type classify a core (unlifted) Coercion?
 -- At either role nominal or representational
 --    (t1 ~# t2) or (t1 ~R# t2)
@@ -2701,6 +2705,7 @@ Note that:
 
 -----------------------------
 typeKind :: HasDebugCallStack => Type -> Kind
+-- No need to expand synonyms
 typeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)         = typeLiteralKind l
 typeKind (FunTy {})        = liftedTypeKind
@@ -2726,17 +2731,17 @@ typeKind ty@(ForAllTy {})
     (tvs, body) = splitTyVarForAllTys ty
     body_kind   = typeKind body
 
------------------------------
+----------------------------
 tcTypeKind :: HasDebugCallStack => Type -> Kind
+-- No need to expand synonyms
 tcTypeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
 tcTypeKind (LitTy l)         = typeLiteralKind l
-tcTypeKind (TyVarTy tyvar)   = tyVarKind tyvar
-tcTypeKind (CastTy _ty co)   = pSnd $ coercionKind co
-tcTypeKind (CoercionTy co)   = coercionType co
-
 tcTypeKind (FunTy arg res)
-  | isPredTy arg && isPredTy res = constraintKind
-  | otherwise                    = liftedTypeKind
+  | isPredTy arg, isPredTy res = constraintKind
+  | otherwise                  = liftedTypeKind
+tcTypeKind (TyVarTy tyvar)     = tyVarKind tyvar
+tcTypeKind (CastTy _ty co)     = pSnd $ coercionKind co
+tcTypeKind (CoercionTy co)     = coercionType co
 
 tcTypeKind (AppTy fun arg)
   = go fun [arg]
@@ -2750,7 +2755,6 @@ tcTypeKind (AppTy fun arg)
 tcTypeKind ty@(ForAllTy {})
   | tcIsConstraintKind body_kind
   = constraintKind
-
   | otherwise
   = case occCheckExpand tvs body_kind of   -- We must make sure tv does not occur in kind
       Just k' -> k'                        -- As it is already out of scope!
@@ -2758,19 +2762,12 @@ tcTypeKind ty@(ForAllTy {})
                   (ppr ty $$ ppr tvs $$ ppr body <+> dcolon <+> ppr body_kind)
   where
     (tvs, body) = splitTyVarForAllTys ty
-    body_kind = tcTypeKind body
-
-
-isPredTy :: Type -> Bool
--- See Note [Types for coercions, predicates, and evidence]
-isPredTy ty = tcIsConstraintKind (tcTypeKind ty)
+    body_kind   = tcTypeKind body
 
 --------------------------
 typeLiteralKind :: TyLit -> Kind
-typeLiteralKind l =
-  case l of
-    NumTyLit _ -> typeNatKind
-    StrTyLit _ -> typeSymbolKind
+typeLiteralKind (NumTyLit {}) = typeNatKind
+typeLiteralKind (StrTyLit {}) = typeSymbolKind
 
 -- | Returns True if a type is levity polymorphic. Should be the same
 -- as (isKindLevPoly . typeKind) but much faster.

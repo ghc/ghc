@@ -155,8 +155,14 @@ newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcM FamInst
 newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
   = ASSERT2( tyCoVarsOfTypes lhs `subVarSet` tcv_set, text "lhs" <+> pp_ax )
     ASSERT2( tyCoVarsOfType  rhs `subVarSet` tcv_set, text "rhs" <+> pp_ax )
-    ASSERT2( lhs_kind `eqType` rhs_kind, text "kind" <+> pp_ax $$ ppr lhs_kind $$ ppr rhs_kind )
-    do { (subst, tvs') <- freshenTyVarBndrs tvs
+    do { when debugIsOn $
+         do { lhs_kind <- tcTypeKindM (mkTyConApp fam_tc lhs)
+            ; rhs_kind <- tcTypeKindM rhs
+            ; ASSERT2( lhs_kind `eqType` rhs_kind,
+                       text "kind" <+> pp_ax $$ ppr lhs_kind $$ ppr rhs_kind )
+              return () }
+
+       ;  (subst, tvs') <- freshenTyVarBndrs tvs
        ; (subst, cvs') <- freshenCoVarBndrsX subst cvs
        ; dflags <- getDynFlags
        ; let lhs'     = substTys subst lhs
@@ -187,8 +193,6 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
                          , fi_rhs      = rhs'
                          , fi_axiom    = axiom }) }
   where
-    lhs_kind = tcTypeKind (mkTyConApp fam_tc lhs)
-    rhs_kind = tcTypeKind rhs
     tcv_set  = mkVarSet (tvs ++ cvs)
     pp_ax    = pprCoAxiom axiom
     CoAxBranch { cab_tvs = tvs

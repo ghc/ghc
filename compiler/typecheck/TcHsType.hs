@@ -249,7 +249,7 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
 
        ; return (mkInvForAllTys kvs ty1) }
 
-tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type_and_gen"
+tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type"
 
 tcTopLHsType :: LHsSigType GhcRn -> ContextKind -> TcM Type
 -- tcTopLHsType is used for kind-checking top-level HsType where
@@ -812,14 +812,10 @@ tc_hs_tuple_type mode rn_ty HsBoxedOrConstraintTuple hs_tys exp_kind
            -- (Either Int, Int), we do not want to get an error saying
            -- "the second argument of a tuple should have kind *->*"
 
-       ; tys <- zonkTcTypes tys  -- Expose as much kind information as poss
-
-       ; traceTc "tc_hs_tuple 3" $
-         vcat [ ppr ty <+> dcolon <+> ppr (tcTypeKind ty) | ty <- tys ]
+       ; kinds <- mapM tcTypeKindM tys -- Expose as much kind information as poss
 
        ; let (arg_kind, tup_sort)
-               = case [ (k,s) | ty <- tys
-                              , let k = typeKind ty
+               = case [ (k,s) | k <- kinds
                               , Just s <- [tupKindSort_maybe k] ] of
                     ((k,s) : _) -> (k,s)
                     [] -> (liftedTypeKind, BoxedTuple)
@@ -898,22 +894,15 @@ tcInferApps :: TcTyMode
             -> TcType               -- ^ Function
             -> [LHsType GhcRn]      -- ^ Args
             -> TcM TcType           -- ^ (f args, args, result kind)
--- Precondition: tcTypeKind fun_ty = fun_ki
---    Reason: we will return a type application like (fun_ty arg1 ... argn),
---            and that type must be well-kinded
---            See Note [The tcType invariant]
--- Postcondition: Result kind is zonked.
-tcInferApps mode orig_hs_ty orig_fun_ty orig_hs_args
-  = do { fun_ty <- zonkTcType orig_fun_ty
-       ; let fun_ki = tcTypeKind fun_ty
-             empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
+tcInferApps mode orig_hs_ty fun_ty orig_hs_args
+  = do { fun_ki <- tcTypeKindM fun_ty
+       ; let empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
                            tyCoVarsOfType fun_ki
              (orig_ki_binders, orig_inner_ki) = tcSplitPiTys fun_ki
 
        ; traceTc "tcInferApps {" $
          vcat [ text "orig_hs_ty:" <+> ppr orig_hs_ty
               , text "orig_hs_args:" <+> ppr orig_hs_args
-              , text "caller_fun_ty:" <+> ppr orig_fun_ty
               , text "fun_ty:" <+> ppr fun_ty
               , text "fun_ki:" <+> ppr fun_ki ]
        ; (f_args, _res_k) <- go 1 empty_subst fun_ty orig_ki_binders orig_inner_ki orig_hs_args
@@ -1021,8 +1010,8 @@ checkExpectedKindX pp_hs_ty ty exp_kind
         -- foralls out front. If the actual kind has more, instantiate accordingly.
         -- Otherwise, just pass the type & kind through: the errors are caught
         -- in unifyType.
-        let act_kind          = tcTypeKind ty
-            n_exp_invis_bndrs = invisibleTyBndrCount exp_kind
+        act_kind <- tcTypeKindM ty
+      ; let n_exp_invis_bndrs = invisibleTyBndrCount exp_kind
             n_act_invis_bndrs = invisibleTyBndrCount act_kind
             n_to_inst         = n_act_invis_bndrs - n_exp_invis_bndrs
       ; (new_args, act_kind') <- tcInstTyBinders (splitPiTysInvisibleN n_to_inst act_kind)
@@ -1037,8 +1026,8 @@ checkExpectedKindX pp_hs_ty ty exp_kind
              , text "act_kind':" <+> ppr act_kind'
              , text "exp_kind:" <+> ppr exp_kind ]
 
-      ; if act_kind' `tcEqType` exp_kind
-        then return ty'   -- This is very common
+      ; eq_kinds <- act_kind' `tcEqTypeM` exp_kind
+      ; if eq_kinds then return ty'   -- This is very common
         else
    do { let origin = TypeEqOrigin { uo_actual   = act_kind'
                                   , uo_expected = exp_kind

@@ -1039,10 +1039,12 @@ zonk_cmd_top env (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
        new_ty <- zonkTcTypeToTypeX env ty
        new_ids <- mapSndM (zonkExpr env) ids
 
-       MASSERT( isLiftedTypeKind (tcTypeKind new_stack_tys) )
-         -- desugarer assumes that this is not levity polymorphic...
-         -- but indeed it should always be lifted due to the typing
-         -- rules for arrows
+       when debugIsOn $
+         do { new_stack_kind <- tcTypeKindM new_stack_tys
+            ; MASSERT( isLiftedTypeKind new_stack_kind) }
+            -- desugarer assumes that this is not levity polymorphic...
+            -- but indeed it should always be lifted due to the typing
+            -- rules for arrows
 
        return (HsCmdTop (CmdTopTc new_stack_tys new_ty new_ids) new_cmd)
 zonk_cmd_top _ (XCmdTop {}) = panic "zonk_cmd_top"

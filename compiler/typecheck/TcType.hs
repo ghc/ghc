@@ -1711,8 +1711,8 @@ tcEqType :: HasDebugCallStack => TcType -> TcType -> Bool
 -- equality] (in TyCoRep) as `eqType`, but Type.eqType believes (* ==
 -- Constraint), and that is NOT what we want in the type checker!
 tcEqType ty1 ty2
-  = isNothing (tc_eq_type tcView ki1 ki2) &&
-    isNothing (tc_eq_type tcView ty1 ty2)
+  =  tc_eq_type False False ki1 ki2
+  && tc_eq_type False False ty1 ty2
   where
     ki1 = tcTypeKind ty1
     ki2 = tcTypeKind ty2
@@ -1721,93 +1721,83 @@ tcEqType ty1 ty2
 -- as long as their non-coercion structure is identical.
 tcEqTypeNoKindCheck :: TcType -> TcType -> Bool
 tcEqTypeNoKindCheck ty1 ty2
-  = isNothing $ tc_eq_type tcView ty1 ty2
+  = tc_eq_type True True ty1 ty2
 
--- | Like 'tcEqType', but returns information about whether the difference
--- is visible in the case of a mismatch.
--- @Nothing@    : the types are equal
--- @Just True@  : the types differ, and the point of difference is visible
--- @Just False@ : the types differ, and the point of difference is invisible
-tcEqTypeVis :: TcType -> TcType -> Maybe Bool
-tcEqTypeVis ty1 ty2
-  = tc_eq_type tcView ty1 ty2 <!> invis (tc_eq_type tcView ki1 ki2)
-  where
-    ki1 = tcTypeKind ty1
-    ki2 = tcTypeKind ty2
+-- | Like 'tcEqType', but returns True if the /visible/ part of the types
+-- are equal, even if they are really unequal (in the invisible bits)
+tcEqTypeVis :: TcType -> TcType -> Bool
+tcEqTypeVis ty1 ty2 = tc_eq_type True False ty1 ty2
 
-      -- convert Just True to Just False
-    invis :: Maybe Bool -> Maybe Bool
-    invis = fmap (const False)
-
-(<!>) :: Maybe Bool -> Maybe Bool -> Maybe Bool
-Nothing        <!> x         = x
-Just True      <!> _         = Just True
-Just _vis      <!> Just True = Just True
-Just vis       <!> _         = Just vis
-infixr 3 <!>
+-- | Like 'pickyEqTypeVis', but returns a Bool for convenience
+pickyEqType :: TcType -> TcType -> Bool
+-- Check when two types _look_ the same, _including_ synonyms.
+-- So (pickyEqType String [Char]) returns False
+-- This ignores kinds and coercions, because this is used only for printing.
+pickyEqType ty1 ty2 = tc_eq_type True True ty1 ty2
 
 -- | Real worker for 'tcEqType'. No kind check!
-tc_eq_type :: (TcType -> Maybe TcType)  -- ^ @tcView@, if you want unwrapping
-           -> Type -> Type -> Maybe Bool
-tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
+tc_eq_type :: Bool          -- ^ True <=> do not expand type synonyms
+           -> Bool          -- ^ True <=> compare visible args only
+           -> Type -> Type
+           -> Bool
+-- Flags False, False is the usual setting for tc_eq_type
+tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
+  = go orig_env orig_ty1 orig_ty2
   where
-    go :: Bool -> RnEnv2 -> Type -> Type -> Maybe Bool
-    go vis env t1 t2 | Just t1' <- view_fun t1 = go vis env t1' t2
-    go vis env t1 t2 | Just t2' <- view_fun t2 = go vis env t1 t2'
+    go :: RnEnv2 -> Type -> Type -> Bool
+    go env t1 t2 | not keep_syns, Just t1' <- tcView t1 = go env t1' t2
+    go env t1 t2 | not keep_syns, Just t2' <- tcView t2 = go env t1 t2'
 
-    go vis env (TyVarTy tv1)       (TyVarTy tv2)
-      = check vis $ rnOccL env tv1 == rnOccR env tv2
+    go env (TyVarTy tv1) (TyVarTy tv2)
+      = rnOccL env tv1 == rnOccR env tv2
 
-    go vis _   (LitTy lit1)        (LitTy lit2)
-      = check vis $ lit1 == lit2
+    go _   (LitTy lit1) (LitTy lit2)
+      = lit1 == lit2
 
-    go vis env (ForAllTy (Bndr tv1 vis1) ty1)
-               (ForAllTy (Bndr tv2 vis2) ty2)
-      = go (isVisibleArgFlag vis1) env (varType tv1) (varType tv2)
-          <!> go vis (rnBndr2 env tv1 tv2) ty1 ty2
-          <!> check vis (vis1 == vis2)
+    go env (ForAllTy (Bndr tv1 vis1) ty1)
+           (ForAllTy (Bndr tv2 vis2) ty2)
+      =  vis1 == vis2
+      && (vis_only || go env (varType tv1) (varType tv2))
+      && go (rnBndr2 env tv1 tv2) ty1 ty2
+
     -- Make sure we handle all FunTy cases since falling through to the
     -- AppTy case means that tcRepSplitAppTy_maybe may see an unzonked
     -- kind variable, which causes things to blow up.
-    go vis env (FunTy arg1 res1) (FunTy arg2 res2)
-      = go vis env arg1 arg2 <!> go vis env res1 res2
-    go vis env ty (FunTy arg res)
-      = eqFunTy vis env arg res ty
-    go vis env (FunTy arg res) ty
-      = eqFunTy vis env arg res ty
+    go env (FunTy arg1 res1) (FunTy arg2 res2)
+      = go env arg1 arg2 && go env res1 res2
+    go env ty (FunTy arg res) = eqFunTy env arg res ty
+    go env (FunTy arg res) ty = eqFunTy env arg res ty
 
       -- See Note [Equality on AppTys] in Type
-    go vis env (AppTy s1 t1)        ty2
+    go env (AppTy s1 t1)        ty2
       | Just (s2, t2) <- tcRepSplitAppTy_maybe ty2
-      = go vis env s1 s2 <!> go vis env t1 t2
-    go vis env ty1                  (AppTy s2 t2)
+      = go env s1 s2 && go env t1 t2
+    go env ty1                  (AppTy s2 t2)
       | Just (s1, t1) <- tcRepSplitAppTy_maybe ty1
-      = go vis env s1 s2 <!> go vis env t1 t2
-    go vis env (TyConApp tc1 ts1)   (TyConApp tc2 ts2)
-      = check vis (tc1 == tc2) <!> gos (tc_vis vis tc1) env ts1 ts2
-    go vis env (CastTy t1 _)        t2              = go vis env t1 t2
-    go vis env t1                   (CastTy t2 _)   = go vis env t1 t2
-    go _   _   (CoercionTy {})      (CoercionTy {}) = Nothing
-    go vis _   _                    _               = Just vis
+      = go env s1 s2 && go env t1 t2
 
-    gos _      _   []       []       = Nothing
-    gos (v:vs) env (t1:ts1) (t2:ts2) = go v env t1 t2 <!> gos vs env ts1 ts2
-    gos (v:_)  _   _        _        = Just v
-    gos _      _   _        _        = panic "tc_eq_type"
+    go env (TyConApp tc1 ts1)   (TyConApp tc2 ts2)
+      = tc1 == tc2 && gos env (tc_vis tc1) ts1 ts2
 
-    tc_vis :: Bool -> TyCon -> [Bool]
-    tc_vis True tc = viss ++ repeat True
-       -- the repeat True is necessary because tycons can legitimately
-       -- be oversaturated
+    go env (CastTy t1 _)   t2              = go env t1 t2
+    go env t1              (CastTy t2 _)   = go env t1 t2
+    go _   (CoercionTy {}) (CoercionTy {}) = True
+
+    go _ _ _ = False
+
+    gos _   _         []       []      = True
+    gos env (ig:igs) (t1:ts1) (t2:ts2) = (ig || go env t1 t2)
+                                      && gos env igs ts1 ts2
+    gos _ _ _ _ = False
+
+    tc_vis :: TyCon -> [Bool]  -- True for the fields we should ignore
+    tc_vis tc | vis_only  = inviss ++ repeat False    -- Ignore invisibles
+              | otherwise = repeat False              -- Ignore nothing
+       -- The repeat False is necessary because tycons
+       -- can legitimately be oversaturated
       where
         bndrs = tyConBinders tc
-        viss  = map isVisibleTyConBinder bndrs
-    tc_vis False _ = repeat False  -- if we're not in a visible context, our args
-                                   -- aren't either
-
-    check :: Bool -> Bool -> Maybe Bool
-    check _   True  = Nothing
-    check vis False = Just vis
+        inviss  = map isInvisibleTyConBinder bndrs
 
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
 
@@ -1817,30 +1807,20 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
     -- always extract a RuntimeRep (see Note [xyz]) if the kind of the arg or
     -- res is unzonked/unflattened. Thus this function, which handles this
     -- corner case.
-    eqFunTy :: Bool -> RnEnv2 -> Type -> Type -> Type -> Maybe Bool
-    eqFunTy vis env arg res (FunTy arg' res')
-      = go vis env arg arg' <!> go vis env res res'
-    eqFunTy vis env arg res ty@(AppTy{})
-      | Just (tc, [_, _, arg', res']) <- get_args ty []
-      , tc == funTyCon
-      = go vis env arg arg' <!> go vis env res res'
+    eqFunTy :: RnEnv2 -> Type -> Type -> Type -> Bool
+               -- Last arg is /not/ FunTy
+    eqFunTy env arg res ty@(AppTy{}) = get_args ty []
       where
-        get_args :: Type -> [Type] -> Maybe (TyCon, [Type])
+        get_args :: Type -> [Type] -> Bool
         get_args (AppTy f x)       args = get_args f (x:args)
         get_args (CastTy t _)      args = get_args t args
-        get_args (TyConApp tc tys) args = Just (tc, tys ++ args)
-        get_args _                 _    = Nothing
-    eqFunTy vis _ _ _ _
-      = Just vis
+        get_args (TyConApp tc tys) args
+          | tc == funTyCon
+          , [_, _, arg', res'] <- tys ++ args
+          = go env arg arg' && go env res res'
+        get_args _ _    = False
+    eqFunTy _ _ _ _     = False
 
--- | Like 'pickyEqTypeVis', but returns a Bool for convenience
-pickyEqType :: TcType -> TcType -> Bool
--- Check when two types _look_ the same, _including_ synonyms.
--- So (pickyEqType String [Char]) returns False
--- This ignores kinds and coercions, because this is used only for printing.
-pickyEqType ty1 ty2
-  = isNothing $
-    tc_eq_type (const Nothing) ty1 ty2
 
 {- *********************************************************************
 *                                                                      *
@@ -1972,7 +1952,7 @@ boxEqPred eq_rel ty1 ty2
  where
    k1 = tcTypeKind ty1
    k2 = tcTypeKind ty2
-   homo_kind = k1 `tcEqType` k2
+   homo_kind = k1 `tcEqType` k2  -- Constraints here are inert, so tcEqType is fine
 
 pickCapturedPreds
   :: TyVarSet           -- Quantifying over these

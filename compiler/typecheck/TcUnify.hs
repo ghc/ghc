@@ -435,15 +435,14 @@ matchExpectedAppTy orig_ty
 
     -- Defer splitting by generating an equality constraint
     defer
-      = do { ty1 <- newFlexiTyVarTy kind1
+      = do { orig_kind <- tcTypeKindM orig_ty
+           ; let kind1 = mkFunTy liftedTypeKind orig_kind
+                 kind2 = liftedTypeKind    -- m :: * -> k
+                                           -- arg type :: *
+           ; ty1 <- newFlexiTyVarTy kind1
            ; ty2 <- newFlexiTyVarTy kind2
            ; co <- unifyType Nothing (mkAppTy ty1 ty2) orig_ty
            ; return (co, (ty1, ty2)) }
-
-    orig_kind = tcTypeKind orig_ty
-    kind1 = mkFunTy liftedTypeKind orig_kind
-    kind2 = liftedTypeKind    -- m :: * -> k
-                              -- arg type :: *
 
 {-
 ************************************************************************
@@ -790,7 +789,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
     inst_and_unify = do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
 
-                           -- if we haven't recurred through an arrow, then
+                           -- If we haven't recurred through an arrow, then
                            -- the eq_orig will list ty_actual. In this case,
                            -- we want to update the origin to reflect the
                            -- instantiation. If we *have* recurred through
@@ -909,9 +908,11 @@ fill_infer_result orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl
   where
     check_hole ty   -- Debug check only
       = do { let ty_lvl = tcTypeLevel ty
-           ; MASSERT2( not (ty_lvl `strictlyDeeperThan` res_lvl),
-                       ppr u $$ ppr res_lvl $$ ppr ty_lvl $$
-                       ppr ty <+> dcolon <+> ppr (tcTypeKind ty) $$ ppr orig_ty )
+           ; when debugIsOn $
+             do { kind <- tcTypeKindM ty
+                ; MASSERT2( not (ty_lvl `strictlyDeeperThan` res_lvl)
+                          , ppr u $$ ppr res_lvl $$ ppr ty_lvl $$
+                            ppr ty <+> dcolon <+> ppr kind $$ ppr orig_ty ) }
            ; cts <- readTcRef ref
            ; case cts of
                Just already_there -> pprPanic "writeExpType"
@@ -993,12 +994,12 @@ promoteTcType dest_lvl ty
     dont_promote_it :: TcM (TcCoercion, TcType)
     dont_promote_it  -- Check that ty :: TYPE rr, for some (fresh) rr
       = do { res_kind <- newOpenTypeKind
-           ; let ty_kind = tcTypeKind ty
-                 kind_orig = TypeEqOrigin { uo_actual   = ty_kind
+           ; ty_kind  <- tcTypeKindM ty
+           ; let kind_orig = TypeEqOrigin { uo_actual   = ty_kind
                                           , uo_expected = res_kind
                                           , uo_thing    = Nothing
                                           , uo_visible  = False }
-           ; ki_co <- uType KindLevel kind_orig (tcTypeKind ty) res_kind
+           ; ki_co <- uType KindLevel kind_orig ty_kind res_kind
            ; let co = mkTcGReflRightCo Nominal ty ki_co
            ; return (co, ty `mkCastTy` ki_co) }
 
@@ -1639,10 +1640,11 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
     go dflags cur_lvl
       | canSolveByUnification cur_lvl tv1 ty2
       , Just ty2' <- metaTyVarUpdateOK dflags tv1 ty2
-      = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2') (tyVarKind tv1)
+      = do { k2'  <- tcTypeKindM ty2'
+           ; co_k <- uType KindLevel kind_origin k2' (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
-                  , ppr ty2 <+> dcolon <+> ppr (tcTypeKind  ty2)
+                  , ppr ty2 <+> dcolon <+> ppr k2'
                   , ppr (isTcReflCo co_k), ppr co_k ]
 
            ; if isTcReflCo co_k  -- only proceed if the kinds matched.

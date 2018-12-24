@@ -27,6 +27,7 @@ import TcClassDcl( instDeclCtxt3, tcATDefault, tcMkDeclCtxt )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
 import TcValidity( checkValidInstHead )
+import TcMType( tcTypeKindM )
 import InstEnv
 import Inst
 import FamInstEnv
@@ -629,9 +630,9 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mbl_deriv_strat overlap_mode))
              -- Perform an additional unification with the kind of the `via`
              -- type and the result of the previous kind unification.
              Just (ViaStrategy via_ty) -> do
-               let via_kind     = tcTypeKind via_ty
-                   inst_ty_kind = tcTypeKind inst_ty'
-                   mb_match     = tcUnifyTy inst_ty_kind via_kind
+               via_kind     <- tcTypeKindM via_ty
+               inst_ty_kind <- tcTypeKindM inst_ty'
+               let mb_match = tcUnifyTy inst_ty_kind via_kind
 
                checkTc (isJust mb_match)
                        (derivingViaKindErr cls inst_ty_kind
@@ -788,13 +789,14 @@ deriveTyData tvs tc tc_args mb_deriv_strat deriv_pred
                                 -- See Note [tc_args and tycon arity]
               (tc_args_to_keep, args_to_drop)
                               = splitAt n_args_to_keep tc_args
-              inst_ty_kind    = tcTypeKind (mkTyConApp tc tc_args_to_keep)
+              enough_args     = n_args_to_keep >= 0
 
-              -- Match up the kinds, and apply the resulting kind substitution
+        ; inst_ty_kind <- tcTypeKindM (mkTyConApp tc tc_args_to_keep)
+
+        ; let -- Match up the kinds, and apply the resulting kind substitution
               -- to the types.  See Note [Unify kinds in deriving]
               -- We are assuming the tycon tyvars and the class tyvars are distinct
-              mb_match        = tcUnifyTy inst_ty_kind cls_arg_kind
-              enough_args     = n_args_to_keep >= 0
+              mb_match = tcUnifyTy inst_ty_kind cls_arg_kind
 
         -- Check that the result really is well-kinded
         ; checkTc (enough_args && isJust mb_match)
@@ -826,24 +828,21 @@ deriveTyData tvs tc tc_args mb_deriv_strat deriv_pred
             case mb_deriv_strat' of
               -- Perform an additional unification with the kind of the `via`
               -- type and the result of the previous kind unification.
-              Just (ViaStrategy via_ty) -> do
-                let final_via_ty   = via_ty
-                    final_via_kind = tcTypeKind final_via_ty
-                    final_inst_ty_kind
-                              = tcTypeKind (mkTyConApp tc final_tc_args')
-                    via_match = tcUnifyTy final_inst_ty_kind final_via_kind
+              Just (ViaStrategy via_ty) ->
+                do { final_via_kind <- tcTypeKindM via_ty
+                   ; final_inst_ty_kind <- tcTypeKindM (mkTyConApp tc final_tc_args')
+                   ; let via_match = tcUnifyTy final_inst_ty_kind final_via_kind
 
-                checkTc (isJust via_match)
-                        (derivingViaKindErr cls final_inst_ty_kind
-                                            final_via_ty final_via_kind)
+                   ; checkTc (isJust via_match) $
+                     derivingViaKindErr cls final_inst_ty_kind
+                                        via_ty final_via_kind
 
-                let Just via_subst = via_match
-                    (final_tkvs, final_cls_tys, final_tc_args)
-                      = propagate_subst via_subst tkvs'
-                                        final_cls_tys' final_tc_args'
-                pure ( final_tkvs, final_cls_tys, final_tc_args
-                     , Just $ ViaStrategy $ substTy via_subst via_ty
-                     )
+                   ; let Just via_subst = via_match
+                         (final_tkvs, final_cls_tys, final_tc_args)
+                            = propagate_subst via_subst tkvs'
+                                              final_cls_tys' final_tc_args'
+                   ; pure ( final_tkvs, final_cls_tys, final_tc_args
+                          , Just $ ViaStrategy $ substTy via_subst via_ty ) }
 
               _ -> pure ( tkvs', final_cls_tys', final_tc_args'
                         , mb_deriv_strat' )

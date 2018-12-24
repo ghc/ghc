@@ -873,16 +873,17 @@ can_eq_nc'
    -> TcS (StopOrContinue Ct)
 
 -- Expand synonyms first; see Note [Type synonyms and canonicalization]
-can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
-  | Just ty1' <- tcView ty1 = can_eq_nc flat ev eq_rel ty1' ps_ty1 ty2  ps_ty2
-  | Just ty2' <- tcView ty2 = can_eq_nc flat ev eq_rel ty1  ps_ty1 ty2' ps_ty2
+can_eq_nc' flat rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
+  | Just ty1' <- tcView ty1 = can_eq_nc' flat rdr_env envs ev eq_rel ty1' ps_ty1 ty2  ps_ty2
+  | Just ty2' <- tcView ty2 = can_eq_nc' flat rdr_env envs ev eq_rel ty1  ps_ty1 ty2' ps_ty2
 
 -- need to check for reflexivity in the ReprEq case.
 -- See Note [Eager reflexivity check]
 -- Check only when flat because the zonk_eq_types check in canEqNC takes
 -- care of the non-flat case.
 can_eq_nc' True _rdr_env _envs ev ReprEq ty1 _ ty2 _
-  | ty1 `tcEqType` ty2
+  | ty1 `tcEqType` ty2    -- In the flat case ty1 and ty2 are zonked,
+                          -- so it's ok to use the non-monadic tcEqType
   = canEqReflexive ev ReprEq ty1
 
 -- When working with ReprEq, unwrap newtypes.
@@ -1038,17 +1039,16 @@ can_eq_nc_forall ev eq_rel s1 s2
     -- This version returns the wanted constraint rather
     -- than putting it in the work list
     unify loc role ty1 ty2
-      | ty1 `tcEqType` ty2
-      = return (mkTcReflCo role ty1, emptyBag)
-      | otherwise
-      = do { (wanted, co) <- newWantedEq loc role ty1 ty2
-           ; return (co, unitBag (mkNonCanonical wanted)) }
+      = do { already_eq <- ty1 `tcEqTypeM` ty2
+           ; if already_eq then return (mkTcReflCo role ty1, emptyBag)
+             else do { (wanted, co) <- newWantedEq loc role ty1 ty2
+                     ; return (co, unitBag (mkNonCanonical wanted)) } }
 
 ---------------------------------
 -- | Compare types for equality, while zonking as necessary. Gives up
 -- as soon as it finds that two types are not equal.
 -- This is quite handy when some unification has made two
--- types in an inert wanted to be equal. We can discover the equality without
+-- types in an inert Wanted to be equal. We can discover the equality without
 -- flattening, which is sometimes very expensive (in the case of type functions).
 -- In particular, this function makes a ~20% improvement in test case
 -- perf/compiler/T5030.
@@ -1304,11 +1304,13 @@ can_eq_app ev s1 t1 s2 t2
     -- Test case: typecheck/should_run/Typeable1
     -- We could also include this mismatch check above (for W and D), but it's slow
     -- and we'll get a better error message not doing it
-  | s1k `mismatches` s2k
-  = canEqHardFailure ev (s1 `mkAppTy` t1) (s2 `mkAppTy` t2)
-
   | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
-  = do { let co   = mkTcCoVarCo evar
+  = do { s1k <- tcTypeKindM s1
+       ; s2k <- tcTypeKindM s2
+       ; if isForAllTy s1k /= isForAllTy s2k
+         then canEqHardFailure ev (s1 `mkAppTy` t1) (s2 `mkAppTy` t2)
+         else
+    do { let co   = mkTcCoVarCo evar
              co_s = mkTcLRCo CLeft  co
              co_t = mkTcLRCo CRight co
        ; evar_s <- newGivenEvVar loc ( mkTcEqPredLikeEv ev s1 s2
@@ -1316,15 +1318,7 @@ can_eq_app ev s1 t1 s2 t2
        ; evar_t <- newGivenEvVar loc ( mkTcEqPredLikeEv ev t1 t2
                                      , evCoercion co_t )
        ; emitWorkNC [evar_t]
-       ; canEqNC evar_s NomEq s1 s2 }
-
-  where
-    s1k = tcTypeKind s1
-    s2k = tcTypeKind s2
-
-    k1 `mismatches` k2
-      =  isForAllTy k1 && not (isForAllTy k2)
-      || not (isForAllTy k1) && isForAllTy k2
+       ; canEqNC evar_s NomEq s1 s2 }}
 
 -----------------------
 -- | Break apart an equality over a casted type
@@ -1789,10 +1783,8 @@ canCFunEqCan ev fn tys fsk
               else do { traceTcS "canCFunEqCan: non-refl" $
                         vcat [ text "Kind co:" <+> ppr kind_co
                              , text "RHS:" <+> ppr fsk <+> dcolon <+> ppr (tyVarKind fsk)
-                             , text "LHS:" <+> hang (ppr (mkTyConApp fn tys))
-                                                  2 (dcolon <+> ppr (tcTypeKind (mkTyConApp fn tys)))
-                             , text "New LHS" <+> hang (ppr new_lhs)
-                                                     2 (dcolon <+> ppr (tcTypeKind new_lhs)) ]
+                             , text "LHS:" <+> ppr (mkTyConApp fn tys)
+                             , text "New LHS" <+> ppr new_lhs ]
                       ; (ev', new_co, new_fsk)
                           <- newFlattenSkolem flav (ctEvLoc ev) fn tys'
                       ; let xi = mkTyVarTy new_fsk `mkCastTy` kind_co
@@ -1821,15 +1813,25 @@ canEqTyVar :: CtEvidence          -- ev :: lhs ~ rhs
            -> TcType -> TcType      -- rhs: already flat
            -> TcS (StopOrContinue Ct)
 canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
-  | k1 `tcEqType` k2
-  = canEqTyVarHomo ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
+ = do { let k1 = tyVarKind tv1
+      ; k2 <- tcTypeKindM xi2
+      ; homo_kind <- tcEqTypeM k1 k2
+      ; if homo_kind
+        then canEqTyVarHomo  ev eq_rel swapped tv1 ps_ty1    xi2 ps_xi2
+        else canEqTyVarTake2 ev eq_rel swapped tv1 ps_ty1 k1 xi2 ps_xi2 k2 }
 
-         -- Note [Flattening] in TcFlatten gives us (F2), which says that
+canEqTyVarTake2 :: CtEvidence          -- ev :: lhs ~ rhs
+                -> EqRel -> SwapFlag
+                -> TcTyVar -> TcType -> TcKind   -- tv1, its pretty form, and its kind
+                -> TcType  -> TcType -> TcKind   -- rhs, its pretty form, and its kind
+                                                 -- Both tv1 and rhs are already flat
+                -> TcS (StopOrContinue Ct)
+canEqTyVarTake2 ev eq_rel swapped tv1 ps_ty1 k1 xi2 ps_xi2 k2
+  = do { -- Note [Flattening] in TcFlatten gives us (F2), which says that
          -- flattening is always homogeneous (doesn't change kinds). But
          -- perhaps by flattening the kinds of the two sides of the equality
          -- at hand makes them equal. So let's try that.
-  | otherwise
-  = do { (flat_k1, k1_co) <- flattenKind loc flav k1  -- k1_co :: flat_k1 ~N kind(xi1)
+         (flat_k1, k1_co) <- flattenKind loc flav k1  -- k1_co :: flat_k1 ~N kind(xi1)
        ; (flat_k2, k2_co) <- flattenKind loc flav k2  -- k2_co :: flat_k2 ~N kind(xi2)
        ; traceTcS "canEqTyVar tried flattening kinds"
                   (vcat [ sep [ parens (ppr tv1 <+> dcolon <+> ppr k1)
@@ -1848,7 +1850,7 @@ canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
          -- See Note [Equalities with incompatible kinds]
 
        ; let role = eqRelRole eq_rel
-       ; if flat_k1 `tcEqType` flat_k2
+       ; if flat_k1 `tcEqType` flat_k2   -- Fully zonked, so tcEqType is ok
          then do { let rhs_kind_co = mkTcSymCo k2_co `mkTcTransCo` k1_co
                          -- :: kind(xi2) ~N kind(xi1)
 
@@ -1880,10 +1882,6 @@ canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
                                         new_rhs flat_k2 ps_rhs } }
   where
     xi1 = mkTyVarTy tv1
-
-    k1 = tyVarKind tv1
-    k2 = tcTypeKind xi2
-
     loc  = ctEvLoc ev
     flav = ctEvFlavour ev
 
@@ -1922,7 +1920,7 @@ canEqTyVarHetero ev eq_rel tv1 co1 ki1 ps_tv1 xi2 ki2 ps_xi2
 
   -- See Note [Equalities with incompatible kinds]
   | otherwise   -- Wanted and Derived
-                  -- NB: all kind equalities are Nominal
+                -- NB: all kind equalities are Nominal
   = do { emitNewDerivedEq kind_loc Nominal ki1 ki2
              -- kind_ev :: (ki1 :: *) ~ (ki2 :: *)
        ; traceTcS "Hetero equality gives rise to derived kind equality" $
@@ -2364,7 +2362,9 @@ unifyWanted :: CtLoc -> Role
 -- See Note [unifyWanted and unifyDerived]
 -- The returned coercion's role matches the input parameter
 unifyWanted loc Phantom ty1 ty2
-  = do { kind_co <- unifyWanted loc Nominal (tcTypeKind ty1) (tcTypeKind ty2)
+  = do { k1 <- tcTypeKindM ty1
+       ; k2 <- tcTypeKindM ty2
+       ; kind_co <- unifyWanted loc Nominal k1 k2
        ; return (mkPhantomCo kind_co ty1 ty2) }
 
 unifyWanted loc role orig_ty1 orig_ty2
@@ -2401,9 +2401,10 @@ unifyWanted loc role orig_ty1 orig_ty2
     go ty1 ty2 = bale_out ty1 ty2
 
     bale_out ty1 ty2
-       | ty1 `tcEqType` ty2 = return (mkTcReflCo role ty1)
-        -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
-       | otherwise = emitNewWantedEq loc role orig_ty1 orig_ty2
+      = do { -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
+             already_eq <- ty1 `tcEqTypeM` ty2
+           ; if already_eq then return (mkTcReflCo role ty1)
+             else emitNewWantedEq loc role orig_ty1 orig_ty2 }
 
 unifyDeriveds :: CtLoc -> [Role] -> [TcType] -> [TcType] -> TcS ()
 -- See Note [unifyWanted and unifyDerived]
@@ -2444,9 +2445,10 @@ unify_derived loc role    orig_ty1 orig_ty2
     go ty1 ty2 = bale_out ty1 ty2
 
     bale_out ty1 ty2
-       | ty1 `tcEqType` ty2 = return ()
-        -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
-       | otherwise = emitNewDerivedEq loc role orig_ty1 orig_ty2
+      = do { -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
+             already_eq <- ty1 `tcEqTypeM` ty2
+           ; if already_eq then return ()
+             else emitNewDerivedEq loc role orig_ty1 orig_ty2 }
 
 maybeSym :: SwapFlag -> TcCoercion -> TcCoercion
 maybeSym IsSwapped  co = mkTcSymCo co

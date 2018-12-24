@@ -1205,6 +1205,7 @@ interactGivenIP inerts workItem@(CDictCan { cc_ev = ev, cc_class = cls
     filtered_dicts  = addDictsByClass dicts cls other_ip_dicts
 
     -- Pick out any Given constraints for the same implicit parameter
+    -- Everything is inert (zonked) to ok to use tcEqType
     is_this_ip (CDictCan { cc_ev = ev, cc_tyargs = ip_str':_ })
        = isGiven ev && ip_str `tcEqType` ip_str'
     is_this_ip _ = False
@@ -1631,11 +1632,12 @@ solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS ()
 --       we often write tv := xi
 solveByUnification wd tv xi
   = do { let tv_ty = mkTyVarTy tv
+       ; xi_kind <- tcTypeKindM xi
        ; traceTcS "Sneaky unification:" $
                        vcat [text "Unifies:" <+> ppr tv <+> text ":=" <+> ppr xi,
                              text "Coercion:" <+> pprEq tv_ty xi,
-                             text "Left Kind is:" <+> ppr (tcTypeKind tv_ty),
-                             text "Right Kind is:" <+> ppr (tcTypeKind xi) ]
+                             text "Left Kind is:" <+> ppr (tyVarKind tv),
+                             text "Right Kind is:" <+> ppr xi_kind ]
 
        ; unifyTyVar tv xi
        ; setEvBindIfWanted wd (evCoercion (mkTcNomReflCo xi)) }

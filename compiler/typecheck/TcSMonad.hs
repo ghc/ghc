@@ -105,7 +105,7 @@ module TcSMonad (
     zonkTyCoVarsAndFV, zonkTcType, zonkTcTypes, zonkTcTyVar, zonkCo,
     zonkTyCoVarsAndFVList,
     zonkSimples, zonkWC,
-    zonkTyCoVarKind,
+    zonkTyCoVarKind, tcEqTypeM, tcTypeKindM,
 
     -- References
     newTcRef, readTcRef, writeTcRef, updTcRef,
@@ -3126,6 +3126,13 @@ zonkWC wc = wrapTcS (TcM.zonkWC wc)
 zonkTyCoVarKind :: TcTyCoVar -> TcS TcTyCoVar
 zonkTyCoVarKind tv = wrapTcS (TcM.zonkTyCoVarKind tv)
 
+tcEqTypeM :: TcType -> TcType -> TcS Bool
+tcEqTypeM ty1 ty2 = wrapTcS (TcM.tcEqTypeM ty1 ty2)
+
+tcTypeKindM :: TcType -> TcS TcKind
+tcTypeKindM ty = wrapTcS (TcM.tcTypeKindM ty)
+
+
 {- *********************************************************************
 *                                                                      *
 *                Flatten skolems                                       *
@@ -3399,10 +3406,8 @@ newGivenEvVars loc pts = mapM (newGivenEvVar loc) pts
 emitNewWantedEq :: CtLoc -> Role -> TcType -> TcType -> TcS Coercion
 -- | Emit a new Wanted equality into the work-list
 emitNewWantedEq loc role ty1 ty2
-  | otherwise
   = do { (ev, co) <- newWantedEq loc role ty1 ty2
-       ; updWorkListTcS $
-         extendWorkListEq (mkNonCanonical ev)
+       ; updWorkListTcS $ extendWorkListEq (mkNonCanonical ev)
        ; return co }
 
 -- | Make a new equality CtEvidence

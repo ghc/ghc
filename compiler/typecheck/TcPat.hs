@@ -351,7 +351,8 @@ tc_pat penv (LazyPat x pat) pat_ty thing_inside
 
         -- Check that the expected pattern type is itself lifted
         ; pat_ty <- readExpType pat_ty
-        ; _ <- unifyType Nothing (tcTypeKind pat_ty) liftedTypeKind
+        ; pat_kind <- tcTypeKindM pat_ty
+        ; _ <- unifyType Nothing pat_kind liftedTypeKind
 
         ; return (LazyPat x pat', res) }
 
