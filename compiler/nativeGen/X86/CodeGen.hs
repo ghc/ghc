@@ -2045,19 +2045,24 @@ genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] b
 
   | otherwise = do
     code_src <- getAnyReg src
-    src_r <- getNewRegNat format
     let dst_r = getRegisterReg platform False (CmmLocal dst)
-    if isBmi2Enabled dflags && width /= W8
+    if isBmi2Enabled dflags
         then do
-            return $ code_src src_r `appOL`
-                unitOL (LZCNT (intFormat width) (OpReg src_r) dst_r)
-                `appOL`
-                (if width == W16 then
-                     -- We used a 16-bit destination register above,
-                     -- so zero-extend
-                     unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
-                 else nilOL)
+            src_r <- getNewRegNat (intFormat width)
+            return $ appOL (code_src src_r) $ case width of
+                W8 -> toOL
+                    [ MOVZxL II8  (OpReg src_r)       (OpReg src_r) -- zero-extend to 32 bit
+                    , LZCNT  II32 (OpReg src_r)       dst_r         -- lzcnt with extra 24 zeros
+                    , SUB    II32 (OpImm (ImmInt 24)) (OpReg dst_r) -- compensate for extra zeros
+                    ]
+                W16 -> toOL
+                    [ LZCNT  II16 (OpReg src_r) dst_r
+                    , MOVZxL II16 (OpReg dst_r) (OpReg dst_r) -- zero-extend from 16 bit
+                    ]
+                _ -> unitOL (LZCNT (intFormat width) (OpReg src_r) dst_r)
         else do
+            let format = if width == W8 then II16 else intFormat width
+            src_r <- getNewRegNat format
             tmp_r <- getNewRegNat format
             return $ code_src src_r `appOL` toOL
                      ([ MOVZxL  II8    (OpReg src_r) (OpReg src_r) | width == W8 ] ++
@@ -2071,7 +2076,6 @@ genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] b
   where
     bw = widthInBits width
     platform = targetPlatform dflags
-    format = if width == W8 then II16 else intFormat width
     lbl = mkCmmCodeLabel primUnitId (fsLit (clzLabel width))
 
 genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
