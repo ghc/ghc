@@ -13,7 +13,7 @@ stages:
   - full-build
 
 ############################################################
-# Tags
+# Runner Tags
 ############################################################
 #
 # * x86_64-linux: Any Docker-capable x86_64 Linux machine
@@ -267,7 +267,6 @@ validate-x86_64-linux-fedora27:
 validate-x86_64-linux-deb9-integer-simple:
   extends: .validate-linux
   stage: full-build
-  allow_failure: true
   variables:
     INTEGER_LIBRARY: integer-simple
   image: ghcci/x86_64-linux-deb9:0.2
