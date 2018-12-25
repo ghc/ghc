@@ -87,6 +87,8 @@ test('ffi018', [omit_ways(['ghci'])], compile_and_run, ['ffi018_c.c'])
 test('ffi018_ghci',
      [extra_files(['ffi018.h']),
       only_ways(['ghci']),
+      # This test is fragile when unregisterised; see #16085
+      when(unregisterised(), skip),
       pre_cmd('$MAKE -s --no-print-directory ffi018_ghci_setup')],
      compile_and_run, ['ffi018_ghci_c.o'])
 
