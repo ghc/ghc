@@ -2085,6 +2085,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
           dst_r   = getRegisterReg platform False (CmmLocal dst)
       lbl1 <- getBlockIdNat
       lbl2 <- getBlockIdNat
+      let format = if width == W8 then II16 else intFormat width
       tmp_r <- getNewRegNat format
 
       -- New CFG Edges:
@@ -2121,22 +2122,26 @@ genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
 
   | otherwise = do
     code_src <- getAnyReg src
-    src_r <- getNewRegNat format
     let dst_r = getRegisterReg platform False (CmmLocal dst)
 
-    -- The following insn sequence makes sure 'ctz 0' has a defined value.
-    -- starting with Haswell, one could use the TZCNT insn instead.
-    if isBmi2Enabled dflags && width /= W8
-    then
-        return $ code_src src_r `appOL`
-            unitOL (TZCNT (intFormat width) (OpReg src_r) dst_r)
-            `appOL`
-            (if width == W16 then
-                 -- We used a 16-bit destination register above,
-                 -- so zero-extend
-                 unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
-             else nilOL)
+    if isBmi2Enabled dflags
+    then do
+        src_r <- getNewRegNat (intFormat width)
+        return $ appOL (code_src src_r) $ case width of
+            W8 -> toOL
+                [ OR    II32 (OpImm (ImmInt 0xFFFFFF00)) (OpReg src_r)
+                , TZCNT II32 (OpReg src_r)        dst_r
+                ]
+            W16 -> toOL
+                [ TZCNT  II16 (OpReg src_r) dst_r
+                , MOVZxL II16 (OpReg dst_r) (OpReg dst_r)
+                ]
+            _ -> unitOL $ TZCNT (intFormat width) (OpReg src_r) dst_r
     else do
+        -- The following insn sequence makes sure 'ctz 0' has a defined value.
+        -- starting with Haswell, one could use the TZCNT insn instead.
+        let format = if width == W8 then II16 else intFormat width
+        src_r <- getNewRegNat format
         tmp_r <- getNewRegNat format
         return $ code_src src_r `appOL` toOL
                  ([ MOVZxL  II8    (OpReg src_r) (OpReg src_r) | width == W8 ] ++
@@ -2149,7 +2154,6 @@ genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
   where
     bw = widthInBits width
     platform = targetPlatform dflags
-    format = if width == W8 then II16 else intFormat width
 
 genCCall dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
     targetExpr <- cmmMakeDynamicReference dflags
