@@ -246,6 +246,7 @@ getScopeFromContext (ClassTyDecl _) = Just [ModuleScope]
 getScopeFromContext (Decl _ _) = Just [ModuleScope]
 getScopeFromContext (TyVarBind a (ResolvedScopes xs)) = Just $ a:xs
 getScopeFromContext (TyVarBind a _) = Just [a]
+getScopeFromContext (EvidenceVarBind _ a _) = Just [a]
 getScopeFromContext _ = Nothing
 
 getBindSiteFromContext :: ContextInfo -> Maybe Span
@@ -293,8 +294,23 @@ definedInAsts asts n = case nameSrcSpan n of
   RealSrcSpan sp -> srcSpanFile sp `elem` M.keys asts
   _ -> False
 
+getEvidenceBindDeps :: ContextInfo -> [Name]
+getEvidenceBindDeps (EvidenceVarBind (EvLetBind xs) _ _) =
+  getEvBindDeps xs
+getEvidenceBindDeps _ = []
+
+isEvidenceBind :: ContextInfo -> Bool
+isEvidenceBind EvidenceVarBind{} = True
+isEvidenceBind _ = False
+
+isEvidenceContext :: ContextInfo -> Bool
+isEvidenceContext EvidenceVarUse = True
+isEvidenceContext EvidenceVarBind{} = True
+isEvidenceContext _ = False
+
 isOccurrence :: ContextInfo -> Bool
 isOccurrence Use = True
+isOccurrence EvidenceVarUse = True
 isOccurrence _ = False
 
 scopeContainsSpan :: Scope -> Span -> Bool

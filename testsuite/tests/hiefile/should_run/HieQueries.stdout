@@ -1,0 +1,11 @@
+At (31,9), found evidence of type: C [a]
+
+Evidence from SrcSpanOneLine "HieQueries.hs" 31 1 14 of type: C [a]
+Is bound by a let, depending on:
+
+Evidence of type: forall a. C a => C [a]
+bound by an instance at RealSrcSpan SrcSpanOneLine "HieQueries.hs" 27 10 22
+
+Evidence from SrcSpanOneLine "HieQueries.hs" 31 1 14 of type: C a
+Is bound by a signature
+
