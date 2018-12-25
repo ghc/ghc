@@ -12,12 +12,13 @@ Main functions for .hie file generation
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TupleSections #-}
 module HieAst ( mkHieFile ) where
 
 import GhcPrelude
 
 import Avail                      ( Avails )
-import Bag                        ( Bag, bagToList )
+import Bag
 import BasicTypes
 import BooleanFormula
 import Class                      ( FunDep )
@@ -29,8 +30,6 @@ import HsSyn
 import HscTypes
 import Module                     ( ModuleName, ml_hs_file )
 import MonadUtils                 ( concatMapM, liftIO )
-import Name                       ( Name, nameSrcSpan, setNameLoc )
-import NameEnv                    ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import SrcLoc
 import TcHsSyn                    ( hsLitType, hsPatType )
 import Type                       ( mkVisFunTys, Type )
@@ -38,6 +37,19 @@ import TysWiredIn                 ( mkListTy, mkSumTy )
 import Var                        ( Id, Var, setVarName, varName, varType )
 import TcRnTypes
 import MkIface                    ( mkIfaceExports )
+import TysWiredIn                 ( mkListTy, mkSumTy )
+import Name                       ( Name, nameSrcSpan, setNameLoc, pprDefinedAt)
+import NameEnv                    ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
+import SrcLoc
+import TcEvidence
+import Type                       ( Type, isEvVarType, mkFunTys)
+import Var                        ( Id, Var, EvVar, setVarName, varName, varType )
+
+import VarSet
+import UniqSet
+import VarEnv
+import Data.Foldable
+import Outputable (ppr, showSDocUnsafe, (<+>))
 
 import HieTypes
 import HieUtils
@@ -48,7 +60,8 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
 import Data.List                  ( foldl1' )
-import Data.Maybe                 ( listToMaybe )
+import Data.Maybe                 ( listToMaybe, catMaybes)
+import Data.Semigroup
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
 
@@ -64,12 +77,14 @@ The Typechecker introduces new names for mono names in AbsBinds.
 We don't care about the distinction between mono and poly bindings,
 so we replace all occurrences of the mono name with the poly name.
 -}
-newtype HieState = HieState
+data HieState = HieState
   { name_remapping :: NameEnv Id
+  , hie_ev_binds   :: Bag EvBind
+  , hie_ev_vars    :: VarEnv SrcSpan
   }
 
 initState :: HieState
-initState = HieState emptyNameEnv
+initState = HieState emptyNameEnv emptyBag mempty
 
 class ModifyState a where -- See Note [Name Remapping]
   addSubstitution :: a -> a -> HieState -> HieState
@@ -84,8 +99,84 @@ instance ModifyState Id where
 modifyState :: ModifyState (IdP p) => [ABExport p] -> HieState -> HieState
 modifyState = foldr go id
   where
-    go ABE{abe_poly=poly,abe_mono=mono} f = addSubstitution mono poly . f
+    go ABE{abe_poly=poly,abe_mono=mono,abe_wrap=wrap} f
+      = addWrapper wrap . addSubstitution mono poly . f
     go _ f = f
+
+addEvBinds :: TcEvBinds -> HieState -> HieState
+addEvBinds (EvBinds bs) s  = s { hie_ev_binds = bs `unionBags` hie_ev_binds s }
+addEvBinds (TcEvBinds _) s = error "got tcevbinds"-- s -- panic?
+
+addEvVars :: SrcSpan -> [EvVar] -> HieState -> HieState
+addEvVars sp xs s = s { hie_ev_vars = mkVarEnv (map (,sp) xs) <> hie_ev_vars s }
+
+addWrapper :: HsWrapper -> HieState -> HieState
+addWrapper (WpLet bs)      = addEvBinds bs
+addWrapper (WpCompose a b) = addWrapper a . addWrapper b
+addWrapper (WpFun _ b _ _) = addWrapper b
+addWrapper _               = id
+
+addPatterns :: HasSrcSpan (Pat p) => [Pat p] -> HieState -> HieState
+addPatterns ps = foldr (\p f -> addPattern p . f) id ps
+
+addPattern :: HasSrcSpan (Pat p) => Pat p -> HieState -> HieState
+addPattern (LazyPat _ p)     = addPattern p
+addPattern (AsPat _ _ p)     = addPattern p
+addPattern (ParPat _ p)      = addPattern p
+addPattern (BangPat _ p)     = addPattern p
+addPattern (ListPat _ ps)    = addPatterns ps
+addPattern (TuplePat _ ps _) = addPatterns ps
+addPattern (SumPat _ p _ _)  = addPattern p
+addPattern (ConPatIn _ dets) = addConDets dets
+addPattern (ViewPat _ _ p)   = addPattern p
+addPattern (SigPat _ p _)    = addPattern p
+addPattern (CoPat _ wrp p _) = addWrapper wrp . addPattern p
+addPattern p@(ConPatOut{ pat_dicts = ev_vars, pat_binds = ev_binds
+                       , pat_args  = dets   , pat_wrap  = wrap
+                       }) =
+  addWrapper wrap . addEvVars (getLoc p) ev_vars . addEvBinds ev_binds . addConDets dets
+addPattern _ = id
+
+addConDets :: HasSrcSpan (Pat p) => HsConPatDetails p -> HieState -> HieState
+addConDets (PrefixCon ps) = addPatterns ps
+addConDets (InfixCon a b) = addPattern a . addPattern b
+addConDets (RecCon r)     = addPatterns $ map (hsRecFieldArg . unLoc) (rec_flds r)
+
+explainWrapper :: HsWrapper -> Maybe (HieM ())
+explainWrapper (WpEvApp e@(EvExpr a)) = Just $ do
+      liftIO $ putStrLn $ "Evidence of " ++ showSDocUnsafe (ppr (exprType a))
+      bs <- asks hie_ev_binds
+      vs <- asks hie_ev_vars
+      let bmap = foldrBag (flip extendEvBinds) emptyEvBindMap bs
+      liftIO $ putStrLn $ showSDocUnsafe $ ppr bs
+      liftIO $ putStrLn $ "Constructed using: "
+      for_ (nonDetEltsUniqSet $ findRootEvVars bmap $ evVarsOfTerm e) $ \v -> do
+        liftIO $ putStrLn $ "Evidence of " ++ showSDocUnsafe (ppr (varType v))
+        liftIO $ putStrLn $ "Evidence variable: " ++ showSDocUnsafe (ppr v)
+        liftIO $ putStrLn $ "Introduced at: " ++ show (lookupVarEnv vs v)
+        liftIO $ putStrLn $ "Defined as: " ++ showSDocUnsafe (ppr $ lookupEvBind bmap v)
+        liftIO $ putStrLn $ showSDocUnsafe (pprDefinedAt (varName v))
+explainWrapper (WpCompose a b) = case catMaybes [explainWrapper a,explainWrapper b] of
+  [] -> Nothing
+  xs -> Just $ sequence_ xs
+explainWrapper _ = Nothing
+
+findRootEvVars :: EvBindMap -> VarSet -> VarSet
+findRootEvVars ev_binds seeds
+  = transCloVarSet also_needs seeds
+  where
+   also_needs :: VarSet -> VarSet
+   also_needs needs = nonDetFoldUniqSet add emptyVarSet needs
+     -- It's OK to use nonDetFoldUFM here because we immediately
+     -- forget about the ordering by creating a set
+
+   add :: Var -> VarSet -> VarSet
+   add v needs
+     | Just ev_bind <- lookupEvBind ev_binds v
+     , EvBind { eb_rhs = rhs } <- ev_bind
+     = evVarsOfTerm rhs `unionVarSet` needs
+     | otherwise
+     = needs
 
 type HieM = ReaderT HieState Hsc
 
@@ -515,24 +606,29 @@ instance ( ToHie (Context (Located (IdP a)))
          , ToHie (Located (PatSynBind a a))
          , HasType (LHsBind a)
          , ModifyState (IdP a)
+         , HasSrcSpan (Pat a)
          , Data (HsBind a)
          ) => ToHie (BindContext (LHsBind a)) where
   toHie (BC context scope b@(L span bind)) =
     concatM $ getTypeNode b : case bind of
-      FunBind{fun_id = name, fun_matches = matches} ->
+      FunBind{fun_id = name, fun_matches = matches, fun_co_fn = wrap} ->
         [ toHie $ C (ValBind context scope $ getRealSpan span) name
-        , toHie matches
+        , local (addWrapper wrap) $ toHie matches
         ]
       PatBind{pat_lhs = lhs, pat_rhs = rhs} ->
         [ toHie $ PS (getRealSpan span) scope NoScope lhs
-        , toHie rhs
+        , local (addPattern lhs) $ toHie rhs
         ]
       VarBind{var_rhs = expr} ->
         [ toHie expr
         ]
-      AbsBinds{abs_exports = xs, abs_binds = binds} ->
-        [ local (modifyState xs) $ -- Note [Name Remapping]
-            toHie $ fmap (BC context scope) binds
+      AbsBinds{ abs_exports = xs, abs_binds = binds
+              , abs_ev_binds = ev_binds
+              , abs_ev_vars = ev_vars } ->
+        [  local (modifyState xs) $ -- Note [Name Remapping]
+            local (\s -> foldr addEvBinds s ev_binds) $
+              local (addEvVars span ev_vars) $
+                toHie $ fmap (BC context scope) binds
         ]
       PatSynBind _ psb ->
         [ toHie $ L span psb -- PatSynBinds only occur at the top level
@@ -595,7 +691,7 @@ instance ( a ~ GhcPass p
       [ toHie mctx
       , let rhsScope = mkScope $ grhss_span grhss
           in toHie $ patScopes Nothing rhsScope NoScope pats
-      , toHie grhss
+      , local (addPatterns pats) $ toHie grhss
       ]
     XMatch _ -> []
 
@@ -658,9 +754,11 @@ instance ( a ~ GhcPass p
         [ toHie $ C Use c
         , toHie $ contextify dets
         ]
-      ConPatOut {pat_con = con, pat_args = dets}->
+      ConPatOut {pat_con = con, pat_args = dets, pat_wrap = wrap
+                , pat_binds = ev_binds, pat_dicts = ev_vars}->
         [ toHie $ C Use $ fmap conLikeName con
-        , toHie $ contextify dets
+        , local (addEvBinds ev_binds . addWrapper wrap . addEvVars ospan ev_vars) $
+            toHie $ contextify dets
         ]
       ViewPat _ expr pat ->
         [ toHie expr
@@ -683,8 +781,10 @@ instance ( a ~ GhcPass p
                        (protectSig @a cscope sig)
               -- See Note [Scoping Rules for SigPat]
         ]
-      CoPat _ _ _ _ ->
-        []
+      CoPat _ wrap pat __ ->
+        [ local (addWrapper wrap)
+            $ toHie $ PS rsp scope pscope pat
+        ]
       XPat _ -> []
     where
       contextify (PrefixCon args) = PrefixCon $ patScopes rsp scope pscope args
@@ -840,7 +940,7 @@ instance ( a ~ GhcPass p
         ]
       HsProc _ pat cmdtop ->
         [ toHie $ PS Nothing (mkLScope cmdtop) NoScope pat
-        , toHie cmdtop
+        , local (addPattern pat) $ toHie cmdtop
         ]
       HsStatic _ expr ->
         [ toHie expr
@@ -854,8 +954,8 @@ instance ( a ~ GhcPass p
       HsTickPragma _ _ _ _ expr ->
         [ toHie expr
         ]
-      HsWrap _ _ a ->
-        [ toHie $ L mspan a
+      HsWrap _ w a ->
+        [ sequence_ (explainWrapper w) >> toHie (L mspan a)
         ]
       HsBracket _ b ->
         [ toHie b
@@ -900,7 +1000,7 @@ instance ( a ~ GhcPass p
         ]
       BindStmt _ pat body _ _ ->
         [ toHie $ PS (getRealSpan $ getLoc body) scope NoScope pat
-        , toHie body
+        , local (addPattern pat) $ toHie body
         ]
       ApplicativeStmt _ stmts _ ->
         [ concatMapM (toHie . RS scope . snd) stmts
@@ -1030,7 +1130,7 @@ instance ( a ~ GhcPass p
          ) => ToHie (RScoped (ApplicativeArg (GhcPass p))) where
   toHie (RS sc (ApplicativeArgOne _ pat expr _)) = concatM
     [ toHie $ PS Nothing sc NoScope pat
-    , toHie expr
+    , local (addPattern pat) $ toHie expr
     ]
   toHie (RS sc (ApplicativeArgMany _ stmts _ pat)) = concatM
     [ toHie $ listScopes NoScope stmts
