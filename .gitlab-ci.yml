@@ -328,11 +328,11 @@ validate-x86_64-linux-deb9-unreg:
 validate-x86_64-windows-hadrian:
   extends: .validate-windows
   stage: full-build
+  # due to #16073
+  allow_failure: true
   variables:
     GHC_VERSION: "8.6.2"
     LANG: "en_US.UTF-8"
-  # due to #16073
-  allow_failure: true
   script:
     - |
       set MSYSTEM=MINGW64
@@ -352,6 +352,8 @@ validate-x86_64-windows-hadrian:
 validate-x86_64-windows:
   extends: .validate-windows
   stage: full-build
+  # due to #16084
+  allow_failure: true
   variables:
     GHC_VERSION: "8.6.2"
     LANG: "en_US.UTF-8"
