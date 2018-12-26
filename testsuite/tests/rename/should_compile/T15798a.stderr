@@ -1,0 +1,3 @@
+
+T15798a.hs:11:3: warning: [-Wmissing-deriving-strategies]
+    No deriving strategy specified. Did you want stock, newtype, or anyclass?

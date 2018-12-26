@@ -84,6 +84,10 @@ Compiler
 
 - The deprecated ghc-flag ``-Wamp`` has been removed.
 
+- Add new :ghc-flag:`-Wmissing-deriving-strategies` flag that warns users when they are not
+  taking advantage of :extension:`DerivingStrategies`. The warning is supplied at each
+  ``deriving`` site.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
