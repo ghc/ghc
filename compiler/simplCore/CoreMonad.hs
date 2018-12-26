@@ -36,7 +36,6 @@ module CoreMonad (
 
     -- ** Lifting into the monad
     liftIO, liftIOWithCount,
-    liftIO1, liftIO2, liftIO3, liftIO4,
 
     -- ** Dealing with annotations
     getAnnotations, getFirstAnnotations,
