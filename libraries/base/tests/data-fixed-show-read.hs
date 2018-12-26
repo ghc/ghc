@@ -21,6 +21,10 @@ main = do doit 38.001
           print (read "-38" :: Centi)
           print (read "0.008" :: Fixed B7)
           print (read "-0.008" :: Fixed B7)
+          print $ show (Just (-1 :: Milli))
+          print $ show (Just (1 :: Milli))
+          print ((read $ show (Just (-1 :: Deci))) :: Maybe Deci)
+          print ((read $ show (Just (1 :: Deci))) :: Maybe Deci)
 
 doit :: Centi -> IO ()
 doit c = do let s = show c

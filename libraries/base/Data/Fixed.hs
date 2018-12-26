@@ -158,7 +158,7 @@ showFixed chopTrailingZeros fa@(MkFixed a) = (show i) ++ (withDot (showIntegerZe
 
 -- | @since 2.01
 instance (HasResolution a) => Show (Fixed a) where
-    show = showFixed False
+    showsPrec p n = showParen (p > 6 && n < 0) $ showString $ showFixed False n
 
 -- | @since 4.3.0.0
 instance (HasResolution a) => Read (Fixed a) where
