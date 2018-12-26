@@ -415,7 +415,7 @@ validate-x86_64-windows-hadrian:
 
 validate-x86_64-windows:
   extends: .validate-windows
-  stage: full-build
+  stage: build
   # due to #16084
   allow_failure: true
   variables:
