@@ -1004,6 +1004,7 @@ rnSrcDerivDecl (DerivDecl _ ty mds overlap)
            <- rnLDerivStrategy DerivDeclCtx mds $ \strat_tvs ppr_via_ty ->
               rnAndReportFloatingViaTvs strat_tvs loc ppr_via_ty "instance" $
               rnHsSigWcType BindUnlessForall DerivDeclCtx ty
+       ; warnNoDerivStrat mds' loc
        ; return (DerivDecl noExt ty' mds' overlap, fvs) }
   where
     loc = getLoc $ hsib_body $ hswc_body ty
@@ -1705,6 +1706,29 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
            ; return (cL loc ds', fvs) }
 rnDataDefn _ (XHsDataDefn _) = panic "rnDataDefn"
 
+warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)
+                 -> SrcSpan
+                 -> RnM ()
+warnNoDerivStrat mds loc
+  = do { dyn_flags <- getDynFlags
+       ; when (wopt Opt_WarnMissingDerivingStrategies dyn_flags) $
+           case mds of
+             Nothing -> addWarnAt
+               (Reason Opt_WarnMissingDerivingStrategies)
+               loc
+               (if xopt LangExt.DerivingStrategies dyn_flags
+                 then no_strat_warning
+                 else no_strat_warning $+$ deriv_strat_nenabled
+               )
+             _ -> pure ()
+       }
+  where
+    no_strat_warning :: SDoc
+    no_strat_warning = text "No deriving strategy specified. Did you want stock"
+                       <> text ", newtype, or anyclass?"
+    deriv_strat_nenabled :: SDoc
+    deriv_strat_nenabled = text "Use DerivingStrategies to specify a strategy."
+
 rnLHsDerivingClause :: HsDocContext -> LHsDerivingClause GhcPs
                     -> RnM (LHsDerivingClause GhcRn, FreeVars)
 rnLHsDerivingClause doc
@@ -1715,6 +1739,7 @@ rnLHsDerivingClause doc
   = do { (dcs', dct', fvs)
            <- rnLDerivStrategy doc dcs $ \strat_tvs ppr_via_ty ->
               mapFvRn (rn_deriv_ty strat_tvs ppr_via_ty) dct
+       ; warnNoDerivStrat dcs' loc
        ; pure ( cL loc (HsDerivingClause { deriv_clause_ext = noExt
                                          , deriv_clause_strategy = dcs'
                                          , deriv_clause_tys = cL loc' dct' })
