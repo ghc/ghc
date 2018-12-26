@@ -911,23 +911,45 @@ condIntCode cond width x y = do
 condIntCode' :: Bool -> Cond -> Width -> CmmExpr -> CmmExpr -> NatM CondCode
 
 -- simple code for 64-bit on 32-bit platforms
-condIntCode' True cond W64 x y = do
-  ChildCode64 code_x x_lo <- iselExpr64 x
-  ChildCode64 code_y y_lo <- iselExpr64 y
-  let x_hi = getHiVRegFromLo x_lo
-      y_hi = getHiVRegFromLo y_lo
-      cmp  = if condUnsigned cond then CMPL else CMP
-  end_lbl <- getBlockIdNat
-  let code = code_x `appOL` code_y `appOL` toOL
-             [ cmp II32 x_hi (RIReg y_hi)
-             , BCC NE end_lbl Nothing
-             , cmp II32 x_lo (RIReg y_lo)
-             , BCC ALWAYS end_lbl Nothing
+condIntCode' True cond W64 x y
+  | condUnsigned cond
+  = do
+      ChildCode64 code_x x_lo <- iselExpr64 x
+      ChildCode64 code_y y_lo <- iselExpr64 y
+      let x_hi = getHiVRegFromLo x_lo
+          y_hi = getHiVRegFromLo y_lo
+      end_lbl <- getBlockIdNat
+      let code = code_x `appOL` code_y `appOL` toOL
+                 [ CMPL II32 x_hi (RIReg y_hi)
+                 , BCC NE end_lbl Nothing
+                 , CMPL II32 x_lo (RIReg y_lo)
+                 , BCC ALWAYS end_lbl Nothing
 
-             , NEWBLOCK end_lbl
-             ]
-  return (CondCode False cond code)
-               
+                 , NEWBLOCK end_lbl
+                 ]
+      return (CondCode False cond code)
+  | otherwise
+  = do
+      ChildCode64 code_x x_lo <- iselExpr64 x
+      ChildCode64 code_y y_lo <- iselExpr64 y
+      let x_hi = getHiVRegFromLo x_lo
+          y_hi = getHiVRegFromLo y_lo
+      end_lbl <- getBlockIdNat
+      cmp_lo  <- getBlockIdNat
+      let code = code_x `appOL` code_y `appOL` toOL
+                 [ CMP II32 x_hi (RIReg y_hi)
+                 , BCC NE end_lbl Nothing
+                 , CMP II32 x_hi (RIImm (ImmInt 0))
+                 , BCC LE cmp_lo Nothing
+                 , CMPL II32 x_lo (RIReg y_lo)
+                 , BCC ALWAYS end_lbl Nothing
+                 , CMPL II32 y_lo (RIReg x_lo)
+                 , BCC ALWAYS end_lbl Nothing
+
+                 , NEWBLOCK end_lbl
+                 ]
+      return (CondCode False cond code)
+
 -- optimize pointer tag checks. Operation andi. sets condition register
 -- so cmpi ..., 0 is redundant.
 condIntCode' _ cond _ (CmmMachOp (MO_And _) [x, CmmLit (CmmInt imm rep)])
