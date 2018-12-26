@@ -851,6 +851,7 @@ In general, the ``pluginRecompile`` field has the following type::
 
 The ``PluginRecompile`` data type is an enumeration determining how the plugin
 should affect recompilation. ::
+
     data PluginRecompile = ForceRecompile | NoForceRecompile | MaybeRecompile Fingerprint
 
 A plugin which declares itself impure using ``ForceRecompile`` will always

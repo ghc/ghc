@@ -834,6 +834,7 @@ data WarningFlag =
    | Opt_WarnStarBinder                   -- Since 8.6
    | Opt_WarnImplicitKindVars             -- Since 8.6
    | Opt_WarnSpaceAfterBang
+   | Opt_WarnMissingDerivingStrategies    -- Since 8.8
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -4022,6 +4023,7 @@ wWarningFlagsDeps = [
   flagSpec "wrong-do-bind"               Opt_WarnWrongDoBind,
   flagSpec "missing-pattern-synonym-signatures"
                                     Opt_WarnMissingPatternSynonymSignatures,
+  flagSpec "missing-deriving-strategies" Opt_WarnMissingDerivingStrategies,
   flagSpec "simplifiable-class-constraints" Opt_WarnSimplifiableClassConstraints,
   flagSpec "missing-home-modules"        Opt_WarnMissingHomeModules,
   flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags,
