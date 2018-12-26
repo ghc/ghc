@@ -535,7 +535,7 @@ takeWhile               :: (a -> Bool) -> [a] -> [a]
 takeWhile _ []          =  []
 takeWhile p (x:xs)
             | p x       =  x : takeWhile p xs
-            | otherwise =  []
+            | otherwise =  takeWhile p xs
 
 {-# INLINE [0] takeWhileFB #-} -- See Note [Inline FB functions]
 takeWhileFB :: (a -> Bool) -> (a -> b -> b) -> b -> a -> b -> b
@@ -567,7 +567,7 @@ dropWhile               :: (a -> Bool) -> [a] -> [a]
 dropWhile _ []          =  []
 dropWhile p xs@(x:xs')
             | p x       =  dropWhile p xs'
-            | otherwise =  xs
+            | otherwise =  x : dropWhile p xs'
 
 -- | 'take' @n@, applied to a list @xs@, returns the prefix of @xs@
 -- of length @n@, or @xs@ itself if @n > 'length' xs@:
