@@ -17,17 +17,18 @@ fi
 name=$1
 version=$2
 
-versions="$(curl -s https://registry.hub.docker.com/v1/repositories/$repo/$name/tags | jq -r .[].name)"
-if echo "$versions" | grep $version > /dev/null; then
-    echo "Version $version of $name already exists"
-    echo "Previous versions are:"
-    echo "$versions"
-    exit 1
-fi
+#versions="$(curl -s https://registry.hub.docker.com/v1/repositories/$repo/$name/tags | jq -r .[].name)"
+#if echo "$versions" | grep $version > /dev/null; then
+#    echo "Version $version of $name already exists"
+#    echo "Previous versions are:"
+#    echo "$versions"
+#    exit 1
+#fi
 
 docker build $name -t $repo/$name:$version
 docker push $repo/$name:$version
 
 repo_name="$repo/$name"
 sed -i -E -e "s%$repo_name"':[0-9]+(\.[0-9]+)*%'"$repo_name:$version%" ../config.yml
+sed -i -E -e "s%$repo_name"':[0-9]+(\.[0-9]+)*%'"$repo_name:$version%" ../../.gitlab-ci.yml
 echo "Built, pushed, and bumped $name:$version"

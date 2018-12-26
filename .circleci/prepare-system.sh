@@ -11,6 +11,8 @@ hackage_index_state="@1522046735"
 
 if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
 if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
+if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
+if [[ -z ${BUILD_FLAVOUR:-} ]]; then BUILD_FLAVOUR=perf; fi
 
 cat > mk/build.mk <<EOF
 V=1
@@ -20,6 +22,14 @@ HSCOLOUR_SRCS=YES
 BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
 BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
 BeConservative=YES
+INTEGER_LIBRARY=$INTEGER_LIBRARY
+EOF
+
+cat <<EOF >> mk/build.mk
+BuildFlavour=$BUILD_FLAVOUR
+ifneq "\$(BuildFlavour)" ""
+include mk/flavours/\$(BuildFlavour).mk
+endif
 EOF
 
 case "$(uname)" in
@@ -27,15 +37,6 @@ case "$(uname)" in
     if [[ -n ${TARGET:-} ]]; then
       if [[ $TARGET = FreeBSD ]]; then
         # cross-compiling to FreeBSD
-        add-apt-repository -y ppa:hvr/ghc
-        apt-get update -qq
-        apt-get install -qy ghc-8.0.2 cabal-install-1.24 alex happy \
-                            ncurses-dev git make automake autoconf gcc perl \
-                            python3 texinfo xz-utils lbzip2 patch
-        cabal update
-        cabal install --reinstall hscolour --index-state=$hackage_index_state
-        ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour
-
         echo 'HADDOCK_DOCS = NO' >> mk/build.mk
         echo 'WERROR=' >> mk/build.mk
         # https://circleci.com/docs/2.0/env-vars/#interpolating-environment-variables-to-set-other-environment-variables
@@ -43,10 +44,6 @@ case "$(uname)" in
       else
         fail "TARGET=$target not supported"
       fi
-    else
-      cabal update -v
-      cabal install --reinstall hscolour
-      sudo ln -s /home/ghc/.cabal/bin/HsColour /usr/local/bin/HsColour || true
     fi
     ;;
 
