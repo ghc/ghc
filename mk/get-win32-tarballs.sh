@@ -37,7 +37,7 @@ download_file() {
             return
         else
             echo "Downloading ${description} to ${dest_dir}..."
-            $curl_cmd || echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk || {
+            $curl_cmd || (echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk) || {
                 rm -f "${dest_file}"
                 fail "ERROR: Download failed."
                 exit 1
