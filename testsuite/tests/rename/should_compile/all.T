@@ -163,3 +163,7 @@ test('T14747', [], multimod_compile, ['T14747', '-v0'])
 test('T15149', [], multimod_compile, ['T15149', '-v0'])
 test('T13064', normal, compile, [''])
 test('T15994', [], run_command, ['$MAKE -s --no-print-directory T15994'])
+test('T15798a', normal, compile, [''])
+test('T15798b', normal, compile, [''])
+test('T15798c', normal, compile, [''])
+
