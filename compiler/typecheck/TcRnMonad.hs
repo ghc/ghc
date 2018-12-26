@@ -75,7 +75,6 @@ module TcRnMonad(
   askNoErrs, discardErrs, tryTcDiscardingErrs,
   checkNoErrs, whenNoErrs,
   ifErrsM, failIfErrsM,
-  checkTH, failTH,
 
   -- * Context management for the type checker
   getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
@@ -1020,17 +1019,6 @@ ifErrsM bale_out normal
 failIfErrsM :: TcRn ()
 -- Useful to avoid error cascades
 failIfErrsM = ifErrsM failM (return ())
-
-checkTH :: a -> String -> TcRn ()
-checkTH _ _ = return () -- OK
-
-failTH :: Outputable a => a -> String -> TcRn x
-failTH e what  -- Raise an error in a stage-1 compiler
-  = failWithTc (vcat [ hang (char 'A' <+> text what
-                             <+> text "requires GHC with interpreter support:")
-                          2 (ppr e)
-                     , text "Perhaps you are using a stage-1 compiler?" ])
-
 
 {- *********************************************************************
 *                                                                      *

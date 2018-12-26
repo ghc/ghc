@@ -8,7 +8,7 @@ module TcEvidence (
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
-  mkWpFun, mkWpFuns, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
+  mkWpFun, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
   pprHsWrapper,
 
   -- Evidence bindings
@@ -299,21 +299,6 @@ mkWpFun WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational (
 mkWpFun (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
 mkWpFun (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
 mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
-
--- | @mkWpFuns [(ty1, wrap1), (ty2, wrap2)] ty_res wrap_res@,
--- where @wrap1 :: ty1 "->" ty1'@ and @wrap2 :: ty2 "->" ty2'@,
--- @wrap3 :: ty3 "->" ty3'@ and @ty_res@ is /either/ @ty3@ or @ty3'@,
--- gives a wrapper @(ty1' -> ty2' -> ty3) "->" (ty1 -> ty2 -> ty3')@.
--- Notice that the result wrapper goes the other way round to all
--- the others. This is a result of sub-typing contravariance.
--- The SDoc is a description of what you were doing when you called mkWpFuns.
-mkWpFuns :: [(TcType, HsWrapper)] -> TcType -> HsWrapper -> SDoc -> HsWrapper
-mkWpFuns args res_ty res_wrap doc = snd $ go args res_ty res_wrap
-  where
-    go [] res_ty res_wrap = (res_ty, res_wrap)
-    go ((arg_ty, arg_wrap) : args) res_ty res_wrap
-      = let (tail_ty, tail_wrap) = go args res_ty res_wrap in
-        (arg_ty `mkVisFunTy` tail_ty, mkWpFun arg_wrap tail_wrap arg_ty tail_ty doc)
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
