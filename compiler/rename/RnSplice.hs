@@ -378,22 +378,19 @@ mkQuasiQuoteExpr flavour quoter q_span quote
 rnSplice :: HsSplice GhcPs -> RnM (HsSplice GhcRn, FreeVars)
 -- Not exported...used for all
 rnSplice (HsTypedSplice x hasParen splice_name expr)
-  = do  { checkTH expr "Template Haskell typed splice"
-        ; loc  <- getSrcSpanM
+  = do  { loc  <- getSrcSpanM
         ; n' <- newLocalBndrRn (cL loc splice_name)
         ; (expr', fvs) <- rnLExpr expr
         ; return (HsTypedSplice x hasParen n' expr', fvs) }
 
 rnSplice (HsUntypedSplice x hasParen splice_name expr)
-  = do  { checkTH expr "Template Haskell untyped splice"
-        ; loc  <- getSrcSpanM
+  = do  { loc  <- getSrcSpanM
         ; n' <- newLocalBndrRn (cL loc splice_name)
         ; (expr', fvs) <- rnLExpr expr
         ; return (HsUntypedSplice x hasParen n' expr', fvs) }
 
 rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
-  = do  { checkTH quoter "Template Haskell quasi-quote"
-        ; loc  <- getSrcSpanM
+  = do  { loc  <- getSrcSpanM
         ; splice_name' <- newLocalBndrRn (cL loc splice_name)
 
           -- Rename the quoter; akin to the HsVar case of rnExpr
