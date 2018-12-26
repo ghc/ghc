@@ -62,7 +62,7 @@ import ListSetOps (assocMaybe)
 -- is a simple reader around 'TcRn'.
 type DerivM = ReaderT DerivEnv TcRn
 
--- | Is GHC processing a stanalone deriving declaration?
+-- | Is GHC processing a standalone deriving declaration?
 isStandaloneDeriv :: DerivM Bool
 isStandaloneDeriv = asks (go . denv_ctxt)
   where

@@ -1,0 +1,4 @@
+
+T15798b.hs:9:19: warning: [-Wmissing-deriving-strategies]
+    No deriving strategy specified. Did you want stock, newtype, or anyclass?
+    Use DerivingStrategies to specify a strategy.

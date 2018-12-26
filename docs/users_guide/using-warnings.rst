@@ -904,6 +904,27 @@ of ``-W(no-)*``.
     This option isn't enabled by default because it can be very noisy,
     and it often doesn't indicate a bug in the program.
 
+.. ghc-flag:: -Wmissing-deriving-strategies
+    :shortdesc: warn when a deriving clause is missing a deriving strategy
+    :type: dynamic
+    :reverse: -Wno-missing-deriving-strategies
+    :category:
+
+    :since: 8.8.1
+
+    The datatype below derives the ``Eq`` typeclass, but doesn't specify a
+    strategy. When :ghc-flag:`-Wmissing-deriving-strategies` is enabled,
+    the compiler will emit a warning about this. ::
+
+        data Foo a = Foo a
+          deriving (Eq)
+
+    The compiler will warn here that the deriving clause doesn't specify a
+    strategy. If the warning is enabled, but :extension:`DerivingStrategies` is
+    not enabled, the compiler will suggest turning on the
+    :extension:`DerivingStrategies` extension. This option is not on by default,
+    having to be turned on manually or with :ghc-flag:`-Weverything`.
+
 .. ghc-flag:: -Wmissing-fields
     :shortdesc: warn when fields of a record are uninitialised
     :type: dynamic
