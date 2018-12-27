@@ -28,7 +28,7 @@ def check_for_url_rewrites():
        subprocess.check_output('git config remote.origin.url'.split()).find(b'github.com') != -1 and \
        subprocess.call(['git', 'config', '--get-regexp', '^url.*github.com/.*/packages-.insteadOf'], stdout=subprocess.DEVNULL) != 0:
         # If we cloned from github, make sure the url rewrites are set.
-        # Otherwise 'git submodule update --init' prints confusing errors.
+        # Otherwise 'git submodule update --init --recursive' prints confusing errors.
         die("""\
             It seems you cloned this repository from GitHub. But your git config files
             don't contain the url rewrites that are needed to make this work (GitHub
@@ -46,7 +46,7 @@ def check_for_url_rewrites():
 
             And then:
 
-              git submodule update --init
+              git submodule update --init --recursive
               ./boot
 
             Or start over, and clone the GHC repository from the haskell server:
@@ -83,7 +83,7 @@ def check_boot_packages():
             if not os.path.isfile(license_path):
                 die("""\
                     Error: %s doesn't exist
-                    Maybe you haven't run 'git submodule update --init'?
+                    Maybe you haven't run 'git submodule update --init --recursive'?
                     """ % license_path)
 
 # Create libraries/*/{ghc.mk,GNUmakefile}
