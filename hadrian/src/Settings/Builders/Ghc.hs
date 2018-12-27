@@ -83,7 +83,9 @@ findHsDependencies = builder (Ghc FindHsDependencies) ? do
             , getInputs ]
 
 haddockGhcArgs :: Args
-haddockGhcArgs = mconcat [ commonGhcArgs, getContextData hcOpts ]
+haddockGhcArgs = mconcat [ commonGhcArgs
+                         , getContextData hcOpts
+                         , ghcWarningsArgs ]
 
 -- | Common GHC command line arguments used in 'ghcBuilderArgs',
 -- 'ghcCBuilderArgs', 'ghcMBuilderArgs' and 'haddockGhcArgs'.
