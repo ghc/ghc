@@ -944,7 +944,7 @@ tcMonadFailOp orig pat fail_op res_ty
          rebindableSyntax <- xoptM LangExt.RebindableSyntax
        ; desugarFlag      <- xoptM LangExt.MonadFailDesugaring
        ; missingWarning   <- woptM Opt_WarnMissingMonadFailInstances
-       ; if | rebindableSyntax && (desugarFlag || missingWarning)
+       ; if | rebindableSyntax && desugarFlag && missingWarning
               -> warnRebindableClash pat
             | not desugarFlag && missingWarning
               -> emitMonadFailConstraint pat res_ty
