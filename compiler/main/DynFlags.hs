@@ -2382,7 +2382,7 @@ xopt_unset dfs f
       in dfs { extensions = onoffs,
                extensionFlags = flattenExtensionFlags (language dfs) onoffs }
 
--- | Set or unset a 'LangExt.Extension', unless it has been explicitely
+-- | Set or unset a 'LangExt.Extension', unless it has been explicitly
 --   set or unset before.
 xopt_set_unlessExplSpec
         :: LangExt.Extension

@@ -433,12 +433,7 @@ interactiveUI config srcs maybe_exprs = do
    -- The initial set of DynFlags used for interactive evaluation is the same
    -- as the global DynFlags, plus -XExtendedDefaultRules and
    -- -XNoMonomorphismRestriction.
-   -- However we set/unset these two extensions only, if they were not already
-   -- explicitely specified before. The function 'xopt_set_unlessExplSpec'
-   -- inspects the data field DynFlags.extensions.
-   -- At this point of the GHCi initialization this data field contains only
-   -- the extensions specified at the command line.
-   -- The ghci config file has not yet been processed. (#10857)
+   -- See note [Changing language extensions for interactive evaluation] #10857
    dflags <- getDynFlags
    let dflags' = (xopt_set_unlessExplSpec
                       LangExt.ExtendedDefaultRules xopt_set)
@@ -508,6 +503,32 @@ interactiveUI config srcs maybe_exprs = do
                  }
 
    return ()
+
+{-
+Note [Changing language extensions for interactive evaluation]
+--------------------------------------------------------------
+GHCi maintains two sets of options:
+
+- The "loading options" apply when loading modules
+- The "interactive options" apply when evaluating expressions and commands
+    typed at the GHCi prompt.
+
+The loading options are mostly created in ghc/Main.hs:main' from the command
+line flags. In the function ghc/GHCi/UI.hs:interactiveUI the loading options
+are copied to the interactive options.
+
+These interactive options (but not the loading options!) are supplemented
+unconditionally by setting ExtendedDefaultRules ON and
+MonomorphismRestriction OFF. The unconditional setting of these options
+eventually overwrite settings already specified at the command line.
+
+Therefore instead of unconditionally setting ExtendedDefaultRules and
+NoMonomorphismRestriction for the interactive options, we use the function
+'xopt_set_unlessExplSpec' to first check whether the extension has already
+specified at the command line.
+
+The ghci config file has not yet been processed.
+-}
 
 resetLastErrorLocations :: GHCi ()
 resetLastErrorLocations = do
