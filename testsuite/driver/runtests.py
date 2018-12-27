@@ -27,6 +27,7 @@ from testutil import getStdout, Watcher, str_warn, str_info
 from testglobals import getConfig, ghc_env, getTestRun, TestOptions, brokens
 from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty
 from junit import junit
+import cpu_features
 
 # Readline sometimes spews out ANSI escapes for some values of TERM,
 # which result in test failures. Thus set TERM to a nice, simple, safe
@@ -273,6 +274,12 @@ t = getTestRun()
 t.start_time = time.localtime()
 
 print('Beginning test run at', time.strftime("%c %Z",t.start_time))
+
+# For reference
+try:
+    print('Detected CPU features: ', cpu_features.get_cpu_features())
+except Exception as e:
+    print('Failed to detect CPU features: ', e)
 
 sys.stdout.flush()
 # we output text, which cannot be unbuffered
