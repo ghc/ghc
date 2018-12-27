@@ -26,7 +26,7 @@ def die(mesg):
 def check_for_url_rewrites():
     if os.path.isdir('.git') and \
        subprocess.check_output('git config remote.origin.url'.split()).find(b'github.com') != -1 and \
-       subprocess.call(['git', 'config', '--get-regexp', '^url.*github.com/.*/packages-.insteadOf']) != 0:
+       subprocess.call(['git', 'config', '--get-regexp', '^url.*github.com/.*/packages-.insteadOf'], stdout=subprocess.DEVNULL) != 0:
         # If we cloned from github, make sure the url rewrites are set.
         # Otherwise 'git submodule update --init' prints confusing errors.
         die("""\
