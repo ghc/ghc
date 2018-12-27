@@ -1,4 +1,4 @@
-module Settings.Warnings (defaultGhcWarningsArgs, warningArgs) where
+module Settings.Warnings (defaultGhcWarningsArgs, ghcWarningsArgs) where
 
 import Expression
 import Oracles.Flag
@@ -18,8 +18,8 @@ defaultGhcWarningsArgs = mconcat
     , flag GccIsClang ? arg "-optc-Wno-unknown-pragmas" ]
 
 -- | Package-specific warnings-related arguments, mostly suppressing various warnings.
-warningArgs :: Args
-warningArgs = builder Ghc ? do
+ghcWarningsArgs :: Args
+ghcWarningsArgs = do
     isIntegerSimple <- (== integerSimple) <$> getIntegerPackage
     mconcat
         [ stage0 ? mconcat

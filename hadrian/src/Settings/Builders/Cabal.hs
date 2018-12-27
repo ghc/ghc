@@ -13,6 +13,7 @@ cabalBuilderArgs :: Args
 cabalBuilderArgs = builder (Cabal Setup) ? do
     verbosity <- expr getVerbosity
     top       <- expr topDirectory
+    pkg       <- getPackage
     path      <- getContextPath
     stage     <- getStage
     mconcat [ arg "configure"
@@ -25,13 +26,15 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
             , flag CrossCompiling ? pure [ "--disable-executable-stripping"
                                          , "--disable-library-stripping" ]
             , arg "--cabal-file"
-            , arg =<< pkgCabalFile <$> getPackage
+            , arg $ pkgCabalFile pkg
             , arg "--distdir"
             , arg $ top -/- path
             , arg "--ipid"
             , arg "$pkg-$version"
             , arg "--prefix"
             , arg "${pkgroot}/.."
+            , arg "--htmldir"
+            , arg $ "${pkgroot}/../../docs/html/libraries/" ++ pkgName pkg
             , withStaged $ Ghc CompileHs
             , withStaged (GhcPkg Update)
             , withBuilderArgs (GhcPkg Update stage)
