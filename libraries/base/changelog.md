@@ -3,6 +3,11 @@
 ## 4.12.0.0 *TBA*
   * Bundled with GHC *TBA*
 
+  * Fix `Show` instance of `Data.Fixed`: Negative numbers are now parenthesized
+    according to their surrounding context. I.e. `Data.Fixed.show` produces
+    syntactically correct Haskell for expressions like `Just (-1 :: Fixed E2)`.
+    (#16031)
+
   * Support the characters from recent versions of Unicode (up to v. 12) in
     literals (#5518).
 
