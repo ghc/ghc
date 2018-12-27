@@ -327,3 +327,5 @@ test('T15631',
      run_command,
      ['$MAKE -s --no-print-directory T15631'])
 test('T15673', normal, compile, ['-O'])
+
+test('T16039', normal, compile, ['-O'])
