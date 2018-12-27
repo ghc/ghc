@@ -133,6 +133,7 @@ def boot_pkgs():
                                 dir = dir_)))
 
                 makefile = os.path.join(package, 'GNUmakefile')
+                print('Creating %s' % makefile)
                 with open(makefile, 'w') as f:
                     f.write(dedent(
                         """\
