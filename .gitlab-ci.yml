@@ -96,7 +96,7 @@ validate-x86_64-linux-deb8-hadrian:
       mv ghc-*.tar.xz ghc.tar.xz
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml
+      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml SKIP_PERF_TESTS=YES
   artifacts:
     reports:
       junit: junit.xml
