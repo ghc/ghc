@@ -264,7 +264,7 @@ validate-x86_64-linux-fedora27:
     when: always
     expire_in: 2 week
 
-validate-x86_64-linux-deb9-integer-simple:
+.validate-x86_64-linux-deb9-integer-simple:
   extends: .validate-linux
   stage: full-build
   variables:
@@ -273,7 +273,7 @@ validate-x86_64-linux-deb9-integer-simple:
   cache:
     key: linux-x86_64-deb9
 
-nightly-x86_64-linux-deb9-integer-simple:
+.nightly-x86_64-linux-deb9-integer-simple:
   extends: validate-x86_64-linux-deb9-integer-simple
   stage: full-build
   artifacts:
