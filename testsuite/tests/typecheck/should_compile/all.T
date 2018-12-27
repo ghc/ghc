@@ -388,6 +388,9 @@ test('holes2', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -
 test('holes3', normal, compile_fail, ['-fno-max-valid-hole-fits -funclutter-valid-hole-fits'])
 test('hole_constraints', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -funclutter-valid-hole-fits'])
 test('hole_constraints_nested', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -funclutter-valid-hole-fits'])
+test('compact_holes', normal, compile, ['-fdefer-type-errors'])
+test('compact_holes_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits'])
+test('compact_holes_constraints', normal, compile, ['-fdefer-type-errors'])
 test('valid_hole_fits', [extra_files(['ValidHoleFits.hs'])],
     multimod_compile, ['valid_hole_fits','-fdefer-type-errors -fno-max-valid-hole-fits'])
 test('local_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits'])

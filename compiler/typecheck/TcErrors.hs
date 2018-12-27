@@ -711,7 +711,7 @@ mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
 mkGivenErrorReporter :: Reporter
 -- See Note [Given errors]
 mkGivenErrorReporter ctxt cts
-  = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
+  = do { (ctxt, binds_msg, ct) <- relevantBindings True False ctxt ct
        ; dflags <- getDynFlags
        ; let (implic:_) = cec_encl ctxt
                  -- Always non-empty when mkGivenErrorReporter is called
@@ -977,6 +977,14 @@ mkErrorMsgFromCt :: ReportErrCtxt -> Ct -> Report -> TcM ErrMsg
 mkErrorMsgFromCt ctxt ct report
   = mkErrorReport ctxt (ctLocEnv (ctLoc ct)) report
 
+mkCompactErrorMsgFromCt :: Ct -> Report -> TcM ErrMsg
+-- Omits the context block of the error message
+mkCompactErrorMsgFromCt ct (Report important relevant_bindings valid_subs)
+  = do { let tcl_env = ctLocEnv (ctLoc ct)
+       ; mkErrDocAt (RealSrcSpan (tcl_loc tcl_env))
+            (errDoc important [] (relevant_bindings ++ valid_subs))
+       }
+
 mkErrorReport :: ReportErrCtxt -> TcLclEnv -> Report -> TcM ErrMsg
 mkErrorReport ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
@@ -1080,7 +1088,7 @@ solve it.
 
 mkIrredErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkIrredErr ctxt cts
-  = do { (ctxt, binds_msg, ct1) <- relevantBindings True ctxt ct1
+  = do { (ctxt, binds_msg, ct1) <- relevantBindings True False ctxt ct1
        ; let orig = ctOrigin ct1
              msg  = couldNotDeduce (getUserGivens ctxt) (map ctPred cts, orig)
        ; mkErrorMsgFromCt ctxt ct1 $
@@ -1156,23 +1164,29 @@ mkHoleError _ _ ct@(CHoleCan { cc_hole = ExprHole (OutOfScope occ rdr_env0) })
 
 mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
   -- Explicit holes, like "_" or "_f"
-  = do { (ctxt, binds_msg, ct) <- relevantBindings False ctxt ct
+  = do { compact_holes         <- goptM Opt_CompactHoles
+       ; (ctxt, binds_msg, ct) <- relevantBindings False compact_holes ctxt ct
                -- The 'False' means "don't filter the bindings"; see Trac #8191
 
        ; show_hole_constraints <- goptM Opt_ShowHoleConstraints
        ; let constraints_msg
                | isExprHoleCt ct, show_hole_constraints
-                  = givenConstraintsMsg ctxt
+                  = givenConstraintsMsg compact_holes ctxt
                | otherwise = empty
 
        ; show_valid_hole_fits <- goptM Opt_ShowValidHoleFits
        ; (ctxt, sub_msg) <- if show_valid_hole_fits
                             then validHoleFits ctxt tidy_simples ct
                             else return (ctxt, empty)
-       ; mkErrorMsgFromCt ctxt ct $
-            important hole_msg `mappend`
-            relevant_bindings (binds_msg $$ constraints_msg) `mappend`
-            valid_hole_fits sub_msg}
+       ; if compact_holes
+         then mkCompactErrorMsgFromCt ct $
+                  important compact_hole_msg `mappend`
+                  relevant_bindings (binds_msg $$ constraints_msg) `mappend`
+                  valid_hole_fits sub_msg
+         else mkErrorMsgFromCt ctxt ct $
+                  important hole_msg `mappend`
+                  relevant_bindings (binds_msg $$ constraints_msg) `mappend`
+                  valid_hole_fits sub_msg}
 
   where
     occ       = holeOcc hole
@@ -1189,6 +1203,12 @@ mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
                                2 (text "standing for" <+>
                                   quotes pp_hole_type_with_kind)
                           , tyvars_msg, type_hole_hint ]
+    compact_hole_msg = case hole of
+      ExprHole {} -> vcat [ text "Hole:"
+                          , nest 2 (pp_with_type occ hole_ty) ]
+      TypeHole {} -> vcat [ text "Type wildcard:"
+                          , nest 2 (pp_with_equality occ pp_hole_type_with_kind)
+                          ]
 
     pp_hole_type_with_kind
       | isLiftedTypeKind hole_kind
@@ -1249,28 +1269,35 @@ validHoleFits ctxt@(CEC {cec_encl = implics
        ; return (ctxt {cec_tidy = tidy_env}, msg) }
 
 -- See Note [Constraints include ...]
-givenConstraintsMsg :: ReportErrCtxt -> SDoc
-givenConstraintsMsg ctxt =
-    let constraints :: [(Type, RealSrcSpan)]
-        constraints =
-          do { implic@Implic{ ic_given = given } <- cec_encl ctxt
-             ; constraint <- given
-             ; return (varType constraint, tcl_loc (implicLclEnv implic)) }
+givenConstraintsMsg :: Bool -> ReportErrCtxt -> SDoc
+givenConstraintsMsg want_compact ctxt
+  | want_compact = ppUnless (null constraints) $
+                     vcat [ text "Constraints:"
+                          , nest 2 (vcat $ map (ppr . fst) constraints) ]
+  | otherwise    = ppUnless (null constraints) $
+                     hang (text "Constraints include")
+                        2 (vcat $ map pprConstraint constraints)
 
-        pprConstraint (constraint, loc) =
-          ppr constraint <+> nest 2 (parens (text "from" <+> ppr loc))
+  where
+    constraints :: [(Type, RealSrcSpan)]
+    constraints =
+      do { implic@Implic{ ic_given = given } <- cec_encl ctxt
+         ; constraint <- given
+         ; return (varType constraint, tcl_loc (implicLclEnv implic)) }
 
-    in ppUnless (null constraints) $
-         hang (text "Constraints include")
-            2 (vcat $ map pprConstraint constraints)
+    pprConstraint (constraint, loc) =
+      ppr constraint <+> nest 2 (parens (text "from" <+> ppr loc))
 
 pp_with_type :: OccName -> Type -> SDoc
 pp_with_type occ ty = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType ty)
 
+pp_with_equality :: OccName -> SDoc -> SDoc
+pp_with_equality occ doc = hang (pprPrefixOcc occ) 2 (text "~" <+> doc)
+
 ----------------
 mkIPErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkIPErr ctxt cts
-  = do { (ctxt, binds_msg, ct1) <- relevantBindings True ctxt ct1
+  = do { (ctxt, binds_msg, ct1) <- relevantBindings True False ctxt ct1
        ; let orig    = ctOrigin ct1
              preds   = map ctPred cts
              givens  = getUserGivens ctxt
@@ -1459,7 +1486,7 @@ mkEqErr _ [] = panic "mkEqErr"
 mkEqErr1 :: ReportErrCtxt -> Ct -> TcM ErrMsg
 mkEqErr1 ctxt ct   -- Wanted or derived;
                    -- givens handled in mkGivenErrorReporter
-  = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
+  = do { (ctxt, binds_msg, ct) <- relevantBindings True False ctxt ct
        ; rdr_env <- getGlobalRdrEnv
        ; fam_envs <- tcGetFamInstEnvs
        ; exp_syns <- goptM Opt_PrintExpandedSynonyms
@@ -2402,7 +2429,7 @@ mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
 -- from an overlap (returning Left clas), otherwise return (Right pred)
 mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_overlapped))
   | null matches  -- No matches but perhaps several unifiers
-  = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
+  = do { (ctxt, binds_msg, ct) <- relevantBindings True False ctxt ct
        ; candidate_insts <- get_candidate_instances
        ; return (ctxt, cannot_resolve_msg ct candidate_insts binds_msg) }
 
@@ -2943,10 +2970,11 @@ getSkolemInfo (implic:implics) tvs
 
 relevantBindings :: Bool  -- True <=> filter by tyvar; False <=> no filtering
                           -- See Trac #8191
+                 -> Bool  -- True <=> compact printing; False <=> normal printing
                  -> ReportErrCtxt -> Ct
                  -> TcM (ReportErrCtxt, SDoc, Ct)
 -- Also returns the zonked and tidied CtOrigin of the constraint
-relevantBindings want_filtering ctxt ct
+relevantBindings want_filtering want_compact ctxt ct
   = do { dflags <- getDynFlags
        ; (env1, tidy_orig) <- zonkTidyOrigin (cec_tidy ctxt) (ctLocOrigin loc)
        ; let ct_tvs = tyCoVarsOfCt ct `unionVarSet` extra_tvs
@@ -2973,14 +3001,19 @@ relevantBindings want_filtering ctxt ct
          -- tcl_bndrs has the innermost bindings first,
          -- which are probably the most relevant ones
 
-       ; let doc = ppUnless (null docs) $
-                   hang (text "Relevant bindings include")
-                      2 (vcat docs $$ ppWhen discards discardMsg)
+       ; let doc | want_compact = ppUnless (null docs) $
+                                  vcat [ text "Context:"
+                                       , nest 2 (vcat docs $$ ppWhen discards discardMsg)
+                                       ]
+                 | otherwise = ppUnless (null docs) $
+                               hang (text "Relevant bindings include")
+                                  2 (vcat docs $$ ppWhen discards discardMsg)
 
              -- Put a zonked, tidied CtOrigin into the Ct
              loc'  = setCtLocOrigin loc tidy_orig
              ct'   = setCtLoc ct loc'
              ctxt' = ctxt { cec_tidy = tidy_env' }
+
 
        ; return (ctxt', doc, ct') }
   where
@@ -3025,9 +3058,11 @@ relevantBindings want_filtering ctxt ct
           = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env id_type
                ; traceTc "relevantBindings 1" (ppr id_name <+> dcolon <+> ppr tidy_ty)
                ; let id_tvs = tyCoVarsOfType tidy_ty
-                     doc = sep [ pprPrefixOcc id_name <+> dcolon <+> ppr tidy_ty
-                               , nest 2 (parens (text "bound at"
-                                    <+> ppr (getSrcLoc id_name)))]
+                     id_info = pprPrefixOcc id_name <+> dcolon <+> ppr tidy_ty
+                     bind_info = nest 2 (parens (text "bound at"
+                                    <+> ppr (getSrcLoc id_name)))
+                     doc | want_compact = id_info
+                         | otherwise = sep [ id_info, bind_info ]
                      new_seen = tvs_seen `unionVarSet` id_tvs
 
                ; if (want_filtering && not (hasPprDebug dflags)

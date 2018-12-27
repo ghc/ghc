@@ -1,0 +1,26 @@
+
+compact_holes.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Hole:
+        _ :: t
+    • Context:
+        f :: t
+
+compact_holes.hs:7:7: warning: [-Wtyped-holes (in -Wdefault)]
+    • Hole:
+        _ :: Char
+    • Context:
+        x :: Int
+        g :: Int -> Char
+
+compact_holes.hs:9:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Hole:
+        _ :: [Char]
+    • Context:
+        h :: [Char]
+
+compact_holes.hs:12:15: warning: [-Wtyped-holes (in -Wdefault)]
+    • Hole:
+        _ :: b0
+    • Context:
+        y :: [a]
+        z :: [a] -> [a]

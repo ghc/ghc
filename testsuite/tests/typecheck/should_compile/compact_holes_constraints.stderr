@@ -1,0 +1,44 @@
+
+compact_holes_constraints.hs:8:6: warning: [-Wtyped-holes (in -Wdefault)]
+    • Hole:
+        _ :: a
+    • Context:
+        f1 :: a
+      Constraints:
+        Eq a
+
+compact_holes_constraints.hs:12:6: warning: [-Wtyped-holes (in -Wdefault)]
+    • Hole:
+        _ :: a
+    • Context:
+        f2 :: a
+      Constraints:
+        Show a
+        Eq a
+
+compact_holes_constraints.hs:16:35: warning: [-Wtyped-holes (in -Wdefault)]
+    • Hole:
+        _ :: [a]
+    • Context:
+        f3 :: [a]
+      Constraints:
+        Eq a
+
+compact_holes_constraints.hs:20:19: warning: [-Wtyped-holes (in -Wdefault)]
+    • Hole:
+        _ :: a
+    • Context:
+        x :: a
+        castWith :: (a :~: b) -> a -> b
+      Constraints:
+        b ~ a
+
+compact_holes_constraints.hs:27:32: warning: [-Wtyped-holes (in -Wdefault)]
+    • Hole:
+        _ :: String
+    • Context:
+        x :: a
+        a :: AnyShow
+        foo :: AnyShow -> String
+      Constraints:
+        Show a

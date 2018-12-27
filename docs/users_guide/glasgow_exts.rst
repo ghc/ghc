@@ -11665,6 +11665,52 @@ for typed holes:
               minBound :: forall a. Bounded a => a
                 with minBound @Bool
 
+.. ghc-flag:: -fcompact-holes
+    :shortdesc: Show typed hole errors in a more compact format.
+    :type: dynamic
+    :reverse: -fno-compact-holes
+    :category: verbosity
+
+    When reporting typed holes, show them in a different, more compact
+    format. In particular, we omit:
+
+    - the information on where type variables occuring
+      in the types are bound,
+    - the "In the expression" contextual part of
+      the error message,
+    - where the relevant bindings in scope are
+      bound (but does show the bindings).
+
+    By default, this flag implies the following other flags:
+
+    - :ghc-flag:`-fshow-hole-constraints`
+      (because constraints are usually necessary for understanding hole
+      errors),
+    - :ghc-flag:`-fno-show-valid-hole-fits` (because hole fits
+      would make error messages significantly longer again), and
+    - :ghc-flag:`-funclutter-valid-hole-fits` (because if you decide to
+      show hole fits anyway, they should be displayed in a compact form
+      as well).
+
+    Example: With this flag, the program ::
+
+        f :: Eq a => a -> Bool
+        f x = _
+
+    results in the following error message:
+
+    .. code-block:: none
+
+      show_constraints.hs:4:7: error:
+         • Hole:
+             _ :: Bool
+         • Context:
+             x :: a
+             f :: a -> Bool
+           Constraints:
+             Eq a
+
+
 .. _typed-hole-valid-hole-fits:
 
 Valid Hole Fits
