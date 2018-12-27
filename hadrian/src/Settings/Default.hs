@@ -278,4 +278,5 @@ defaultBuilderArgs = mconcat
 
 -- | All 'Package'-dependent command line arguments.
 defaultPackageArgs :: Args
-defaultPackageArgs = mconcat [ packageArgs, warningArgs ]
+defaultPackageArgs = mconcat [ packageArgs
+                             , builder Ghc ? ghcWarningsArgs ]
