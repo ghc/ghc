@@ -1,5 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Test.Haddock.Xhtml
@@ -8,10 +11,7 @@ module Test.Haddock.Xhtml
     , stripLinks, stripLinksWhen, stripAnchorsWhen, stripFooter
     ) where
 
-
-import Data.Generics.Aliases
-import Data.Generics.Schemes
-
+import Data.Data ( Data(..), Typeable, eqT, (:~:)(..) )
 import Text.XML.Light
 import Text.XHtml (Html, HtmlAttr, (!))
 import qualified Text.XHtml as Xhtml
@@ -25,6 +25,12 @@ newtype Xml = Xml
 deriving instance Eq Element
 deriving instance Eq Content
 deriving instance Eq CData
+
+-- | Similar to @everywhere (mkT f) x@ from SYB.
+gmapEverywhere :: forall a b. (Data a, Typeable b) => (b -> b) -> a -> a
+gmapEverywhere f x = gmapT (gmapEverywhere f) $ case eqT @a @b of
+                                                  Nothing -> x
+                                                  Just Refl -> f x
 
 
 parseXml :: String -> Maybe Xml
@@ -58,12 +64,12 @@ stripAnchorsWhen p =
 
 
 processAnchors :: (Attr -> Attr) -> Xml -> Xml
-processAnchors f = Xml . everywhere (mkT f) . xmlElement
+processAnchors f = Xml . gmapEverywhere f . xmlElement
 
 
 stripFooter :: Xml -> Xml
 stripFooter =
-    Xml . everywhere (mkT defoot) . xmlElement
+    Xml . gmapEverywhere defoot . xmlElement
   where
     defoot el
         | isFooter el = el { elContent = [] }
