@@ -40,8 +40,9 @@ def check_for_url_rewrites():
               git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
               git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
               git config --global url."https://github.com/ghc/packages-".insteadOf   https://github.com/ghc/packages/
-              git config --global url."ssh://git\@github.com/ghc/packages-".insteadOf ssh://git\@github.com/ghc/packages/
-              git config --global url."git\@github.com:/ghc/packages-".insteadOf      git\@github.com:/ghc/packages/
+              git config --global url."ssh://git@github.com/ghc/packages-".insteadOf ssh://git@github.com/ghc/packages/
+              git config --global url."git@github.com:/ghc/packages-".insteadOf      git@github.com:/ghc/packages/
+              git config --global url."git@github.com:ghc/packages-".insteadOf       git@github.com:ghc/packages/
 
             And then:
 
