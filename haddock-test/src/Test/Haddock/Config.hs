@@ -301,7 +301,7 @@ defaultDiffTool :: IO (Maybe FilePath)
 defaultDiffTool =
     liftM listToMaybe . filterM isAvailable $ ["colordiff", "diff"]
   where
-    isAvailable = liftM isJust . findProgramLocation silent
+    isAvailable = liftM isJust . findExecutable
 
 
 defaultStdOut :: FilePath
