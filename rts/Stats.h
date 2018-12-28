@@ -59,6 +59,7 @@ void      stat_workerStop(void);
 
 void      initStats0(void);
 void      initStats1(void);
+void      resetChildProcessStats(void);
 
 double    mut_user_time_until(Time t);
 double    mut_user_time(void);
