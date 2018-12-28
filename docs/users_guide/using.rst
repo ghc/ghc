@@ -931,6 +931,18 @@ messages and in GHCi:
                   in a’
         or by using the flag -fno-warn-unused-do-bind
 
+.. ghc-flag:: -fdefer-diagnostics
+    :shortdesc: Defer and group diagnostic messages by severity
+    :type: dynamic
+    :category: verbosity
+
+    Causes GHC to group diagnostic messages by severity and output them after
+    other messages when building a multi-module Haskell program. This flag can
+    make diagnostic messages more visible when used in conjunction with
+    :ghc-flag:`--make` and :ghc-flag:`-j[⟨n⟩]`. Otherwise, it can be hard to
+    find the relevant errors or likely to ignore the warnings when they are
+    mixed with many other messages.
+
 .. ghc-flag:: -fdiagnostics-color=⟨always|auto|never⟩
     :shortdesc: Use colors in error messages
     :type: dynamic
