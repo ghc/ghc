@@ -1,0 +1,23 @@
+[1 of 3] Compiling A                ( A.hs, interpreted )
+[2 of 3] Compiling B                ( B.hs, interpreted )
+[3 of 3] Compiling C                ( C.hs, interpreted )
+
+A.hs:5:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘incompletePattern’:
+        Patterns not matched: p where p is not one of {0}
+
+A.hs:8:15: warning: [-Wunused-matches (in -Wextra)]
+    Defined but not used: ‘x’
+
+B.hs:7:1: warning: [-Wunused-imports (in -Wextra)]
+    The import of ‘Data.List’ is redundant
+      except perhaps to import instances from ‘Data.List’
+    To import instances alone, use: import Data.List()
+
+C.hs:6:7: error: Variable not in scope: variableNotInScope :: ()
+Failed, two modules loaded.
+[3 of 3] Compiling C                ( C.hs, interpreted )
+
+C.hs:6:7: error: Variable not in scope: variableNotInScope :: ()
+Failed, two modules loaded.
