@@ -1570,13 +1570,12 @@ data GenCCallPlatform = GCPLinux | GCPLinux64ELF !Int | GCPAIX
 
 platformToGCP :: Platform -> GenCCallPlatform
 platformToGCP platform = case platformOS platform of
-    OSLinux  -> case platformArch platform of
-        ArchPPC           -> GCPLinux
-        ArchPPC_64 ELF_V1 -> GCPLinux64ELF 1
-        ArchPPC_64 ELF_V2 -> GCPLinux64ELF 2
-        _ -> panic "PPC.CodeGen.platformToGCP: Unknown Linux"
     OSAIX    -> GCPAIX
-    _ -> panic "PPC.CodeGen.platformToGCP: not defined for this OS"
+    _ -> case platformArch platform of
+            ArchPPC           -> GCPLinux
+            ArchPPC_64 ELF_V1 -> GCPLinux64ELF 1
+            ArchPPC_64 ELF_V2 -> GCPLinux64ELF 2
+	    _ -> panic "platformToGCP: Not PowerPC"
 
 
 genCCall'
