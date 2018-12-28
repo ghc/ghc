@@ -22,3 +22,11 @@ T14257:
 	./T14257 +RTS -hc
 	# Make sure that samples are monotonically increasing
 	awk 'BEGIN{t=0} /BEGIN_SAMPLE/{if ($$2 < t) print "uh oh", $$t, $$0; t=$$2;}' T14257.hp
+
+.PHONY: T15897
+T15897:
+	# The bug is caught by an assertion so we run the tests with debug runtime
+	# and ignore the outputs
+	"$(TEST_HC)" -prof -fprof-auto -debug -v0 T15897.hs
+	./T15897 10000000 +RTS -s -hc 2>/dev/null
+	./T15897 10000000 +RTS -s -hr 2>/dev/null
