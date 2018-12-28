@@ -582,14 +582,13 @@ ppc_mkLoadInstr dflags reg delta slot
 stackFrameHeaderSize :: DynFlags -> Int
 stackFrameHeaderSize dflags
   = case platformOS platform of
-      OSLinux  -> case platformArch platform of
-                             -- header + parameter save area
-        ArchPPC           -> 64 -- TODO: check ABI spec
-        ArchPPC_64 ELF_V1 -> 48 + 8 * 8
-        ArchPPC_64 ELF_V2 -> 32 + 8 * 8
-        _ -> panic "PPC.stackFrameHeaderSize: Unknown Linux"
       OSAIX    -> 24 + 8 * 4
-      _ -> panic "PPC.stackFrameHeaderSize: not defined for this OS"
+      _ -> case platformArch platform of
+                             -- header + parameter save area
+             ArchPPC           -> 64 -- TODO: check ABI spec
+             ArchPPC_64 ELF_V1 -> 48 + 8 * 8
+             ArchPPC_64 ELF_V2 -> 32 + 8 * 8
+             _ -> panic "PPC.stackFrameHeaderSize: not defined for this OS"
      where platform = targetPlatform dflags
 
 -- | The maximum number of bytes required to spill a register. PPC32
