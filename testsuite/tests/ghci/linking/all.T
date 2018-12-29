@@ -40,3 +40,8 @@ test('T14708',
       unless(ghc_dynamic(), skip),
       extra_clean(['T14708scratch/*', 'T14708'])],
      makefile_test, ['T14708'])
+
+test('T15729',
+     [extra_files(['T15729.hs', 'T15729.c']),
+      unless(doing_ghci, skip)],
+     makefile_test, ['T15729'])
