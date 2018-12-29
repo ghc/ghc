@@ -38,7 +38,8 @@ module TcMType (
 
   --------------------------------
   -- Getting the kind of a type
-  tcEqTypeM, tcTypeKindM, piResultTysM,
+  tcEqTypeM, tcTypeKindM, piResultTysM, tcTupKindSortM,
+  splitPiTyInvisibleM, invisibleTyBndrCountM,
 
   --------------------------------
   -- Creating new evidence variables
@@ -117,6 +118,7 @@ import TysWiredIn
 import TysPrim
 import VarEnv
 import NameEnv
+import Kind( isConstraintKindCon )
 import PrelNames
 import Util
 import Outputable
@@ -124,6 +126,7 @@ import FastString
 import Bag
 import Pair
 import UniqSet
+import BasicTypes( TupleSort(..) )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -141,16 +144,19 @@ import qualified Data.Semigroup as Semi
 -}
 
 tcTypeKindM :: HasDebugCallStack => TcType -> TcM TcKind
-tcTypeKindM (TyConApp tc tys) = return (piResultTys (tyConKind tc) tys)
+-- Looks through unification variables in order to
+--   find the right TcKind to return.
+-- But does /not/ guarantee that the returned kind is zonked
+tcTypeKindM (TyConApp tc tys) = piResultTysM (tyConKind tc) tys
 tcTypeKindM (LitTy l)         = return (typeLiteralKind l)
 tcTypeKindM (CastTy _ty co)   = return (pSnd $ coercionKind co)
 tcTypeKindM (CoercionTy co)   = return (coercionType co)
 
 tcTypeKindM (FunTy arg res)
-  = do { arg_k <- tcTypeKindM arg
-       ; if tcIsConstraintKind arg_k
-          then do { res_k <- tcTypeKindM res
-                  ; if tcIsConstraintKind res_k
+  = do { arg_is_constraint <- isPredTyM arg
+       ; if arg_is_constraint
+          then do { res_is_constraint <- isPredTyM res
+                  ; if res_is_constraint
                     then return constraintKind
                     else return liftedTypeKind }
           else return liftedTypeKind }
@@ -167,7 +173,8 @@ tcTypeKindM (AppTy fun arg)
 
 tcTypeKindM ty@(ForAllTy {})
   = do { body_k <- tcTypeKindM body
-       ; if tcIsConstraintKind body_k
+       ; body_is_constraint <- tcIsConstraintKindM body_k
+       ; if body_is_constraint
          then return constraintKind
          else case occCheckExpand tvs body_k of   -- We must make sure tv does
                  Just k' -> return k'             -- not occur in kind
@@ -177,22 +184,54 @@ tcTypeKindM ty@(ForAllTy {})
     (tvs, body) = splitTyVarForAllTys ty
 
 tcTypeKindM (TyVarTy tv)
+  = return (tyVarKind tv)
+
+----------------------
+isPredTyM :: TcType -> TcM Bool
+isPredTyM ty = do { ki <- tcTypeKindM ty
+                  ; tcIsConstraintKindM ki }
+                  
+tcIsConstraintKindM :: TcKind -> TcM Bool
+-- Like tcIsConstraintKind, but looks through unification variables
+tcIsConstraintKindM ty | Just ty' <- tcView ty
+                       = tcIsConstraintKindM ty'
+tcIsConstraintKindM (TyVarTy tv)
   | isMetaTyVar tv
   = do { maybe_ty <- readMetaTyVar tv
        ; case maybe_ty of
-            Indirect ty -> tcTypeKindM ty
-            Flexi       -> return (tyVarKind tv) }
-  | otherwise
-  = return (tyVarKind tv)
+            Indirect ty -> tcIsConstraintKindM ty
+            Flexi       -> return False }
+tcIsConstraintKindM ty@(TyConApp tc tys)
+  | isConstraintKindCon tc
+  = ASSERT2( null tys, ppr ty )
+    return True
+tcIsConstraintKindM _ = return False
 
+tcTupKindSortM :: TcKind -> TcM (Maybe TupleSort)
+tcTupKindSortM k
+  | tcIsConstraintKind k = return (Just ConstraintTuple)
+  | tcIsLiftedTypeKind k = return (Just BoxedTuple)
+  | Just k' <- tcView k  = tcTupKindSortM k'
+  | TyVarTy tv <- k
+  , isMetaTyVar tv
+  = do { maybe_k <- readMetaTyVar tv
+       ; case maybe_k of
+            Indirect k' -> tcTupKindSortM k'
+            Flexi       -> return Nothing }
+  | otherwise = return Nothing
+
+----------------------
 piResultTysM :: HasDebugCallStack => TcType -> [TcType] -> TcM TcType
+-- Like piResultTys, but looks through unification varaibles
 piResultTysM ty orig_args = go init_subst ty orig_args
   where
     init_subst = mkEmptyTCvSubst $ mkInScopeSet (tyCoVarsOfTypes (ty:orig_args))
 
     go :: TCvSubst -> TcType -> [TcType] -> TcM TcType
     go subst ty []
-      = return (substTy subst ty) -- substTy has a fast-path for empty substitutions
+      = do { traceTc "about to subst" (ppr subst $$ ppr ty)
+           ; traceTc "result of subst" (ppr (substTy subst ty))
+           ; return (substTy subst ty) }  -- substTy has a fast-path for empty substitutions
 
     go subst ty all_args@(arg:args)
       | Just ty' <- tcView ty
@@ -216,7 +255,9 @@ piResultTysM ty orig_args = go init_subst ty orig_args
 
     try_subst subst ty args
       | not (isEmptyTCvSubst subst)  -- See Note [Care with kind instantiation]
-      = go init_subst (substTy subst ty) args
+      = do { traceTc "about to subst" (ppr subst $$ ppr ty $$ ppr args)
+           ; traceTc "result of subst" (ppr (substTy subst ty))
+           ; go init_subst (substTy subst ty) args }
 
       | otherwise
       = -- We have not run out of arguments, but the function doesn't
@@ -226,6 +267,53 @@ piResultTysM ty orig_args = go init_subst ty orig_args
         -- c.f. Trac #15473
         pprPanic "piResultTysM" (ppr ty $$ ppr orig_args $$ ppr args)
 
+
+invisibleTyBndrCountM :: TcType -> TcM Int
+-- Returns the number of leading invisible forall'd binders in the type
+-- Includes invisible /predicate/ arguments; e.g. for
+--    e.g.  forall {k}. (k ~ *) => k -> k
+-- returns 2 not 1
+invisibleTyBndrCountM ty = go 0 ty
+  where
+    go n ty
+      | Just ty' <- tcView ty  = go n ty'
+    go n (ForAllTy bndr res)
+      | Bndr _ vis <- bndr
+      , isInvisibleArgFlag vis = go (n+1) res
+    go n (FunTy arg res)       = do { is_pred <- isPredTyM arg
+                                    ; if is_pred then go (n+1) res
+                                                 else return n }
+    go n (TyVarTy tv)   
+      | isMetaTyVar tv
+      = do { maybe_ty <- readMetaTyVar tv
+           ; case maybe_ty of
+               Indirect ty -> go n ty
+               Flexi       -> return n }
+
+    go n _ = return n
+
+splitPiTyInvisibleM :: Type -> TcM (Maybe (TyCoBinder, Type))
+-- Like split off one invisible binder
+-- Includes invisible /predicate/ binders
+-- Look through unification variables
+splitPiTyInvisibleM ty
+  | Just ty' <- tcView ty  = splitPiTyInvisibleM ty'
+splitPiTyInvisibleM (ForAllTy bndr res)
+  | Bndr _ vis <- bndr
+  , isInvisibleArgFlag vis
+  = return (Just (Named bndr, res))
+splitPiTyInvisibleM (FunTy arg res)
+  = do { is_pred <- isPredTyM arg
+       ; if is_pred
+         then return (Just (Anon arg, res))
+         else return Nothing }
+splitPiTyInvisibleM (TyVarTy tv)
+  | isMetaTyVar tv
+  = do { maybe_ty <- readMetaTyVar tv
+       ; case maybe_ty of       
+           Indirect ty -> splitPiTyInvisibleM ty
+           Flexi       -> return Nothing }
+splitPiTyInvisibleM _ = return Nothing
 
 -- | A monadic version of tcEqType
 -- If it returns True, the two types are definitely equal
@@ -346,6 +434,17 @@ scAndM :: TcM Bool -> TcM Bool -> TcM Bool
 scAndM mb1 mb2 = do { b1 <- mb1
                     ; if b1 then mb2
                             else return False }
+
+mkPrimEqPredRoleM :: Role -> Type -> Type -> TcM PredType
+mkPrimEqPredRoleM role ty1 ty2
+  = do { k1 <- tcTypeKindM ty1
+       ; k2 <- tcTypeKindM ty2
+       ; return (TyConApp tc [k1, k2, ty1, ty2]) }
+  where
+    tc = case role of
+           Nominal          -> eqPrimTyCon
+           Representational -> eqReprPrimTyCon
+           Phantom          -> pprPanic "mkPrimEqPredRole" (ppr ty1 $$ ppr ty2)
 
 {-
 ************************************************************************
@@ -471,14 +570,15 @@ emitDerivedEqs origin pairs
 -- | Emits a new equality constraint
 emitWantedEq :: CtOrigin -> TypeOrKind -> Role -> TcType -> TcType -> TcM Coercion
 emitWantedEq origin t_or_k role ty1 ty2
-  = do { hole <- newCoercionHole pty
+  = do { pty <- mkPrimEqPredRoleM role ty1 ty2
+                -- NB: the types might not be fully zonked;
+                --     hence using mkPrimEqPredRoleM
+       ; hole <- newCoercionHole pty
        ; loc <- getCtLocM origin (Just t_or_k)
        ; emitSimple $ mkNonCanonical $
          CtWanted { ctev_pred = pty, ctev_dest = HoleDest hole
                   , ctev_nosh = WDeriv, ctev_loc = loc }
        ; return (HoleCo hole) }
-  where
-    pty = mkPrimEqPredRole role ty1 ty2
 
 -- | Creates a new EvVar and immediately emits it as a Wanted.
 -- No equality predicates here.

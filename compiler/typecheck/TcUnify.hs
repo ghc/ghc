@@ -1474,8 +1474,9 @@ uType t_or_k origin orig_ty1 orig_ty2
 
     ------------------
     defer ty1 ty2   -- See Note [Check for equality before deferring]
-      | ty1 `tcEqType` ty2 = return (mkNomReflCo ty1)
-      | otherwise          = uType_defer t_or_k origin ty1 ty2
+      = do { already_eq <- ty1 `tcEqTypeM` ty2
+           ; if already_eq then return (mkNomReflCo ty1)
+                           else uType_defer t_or_k origin ty1 ty2 }
 
     ------------------
     go_app vis s1 t1 s2 t2

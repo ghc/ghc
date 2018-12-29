@@ -78,7 +78,7 @@ import TcSimplify
 import TcHsSyn
 import TcErrors ( reportAllUnsolved )
 import TcType
-import Inst   ( tcInstTyBinders, tcInstTyBinder )
+import Inst   ( tcInstInvisibleTyBinders, tcInstTyBinder )
 import TyCoRep( TyCoBinder(..), TyBinder )  -- Used in etaExpandAlgTyCon
 import Type
 import Coercion
@@ -440,8 +440,8 @@ data TcTyMode
   = TcTyMode { mode_level :: TypeOrKind
              , mode_unsat :: Bool        -- True <=> allow unsaturated type families
              }
- -- The mode_unsat field is solely so that type families/synonyms can be unsaturated
- -- in GHCi :kind calls
+ -- The mode_unsat field is solely so that type families/synonyms
+ -- can appear unsaturated in GHCi :kind calls
 
 typeLevelMode :: TcTyMode
 typeLevelMode = TcTyMode { mode_level = TypeLevel, mode_unsat = False }
@@ -676,17 +676,16 @@ tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = ty }) exp_kind
   | null (unLoc ctxt)
   = tc_lhs_type mode ty exp_kind
 
+  -- See Note [Body kind of a HsQualTy]
+  | tcIsConstraintKind exp_kind
+  = do { ctxt' <- tc_hs_context mode ctxt
+       ; ty' <- tc_lhs_type mode ty constraintKind
+       ; return (mkPhiTy ctxt' ty') }
+  
   | otherwise
   = do { ctxt' <- tc_hs_context mode ctxt
-
-         -- See Note [Body kind of a HsQualTy]
-       ; ty' <- if tcIsConstraintKind exp_kind
-                then tc_lhs_type mode ty constraintKind
-                else do { ek <- newOpenTypeKind
-                                -- The body kind (result of the function)
-                                -- can be TYPE r, for any r, hence newOpenTypeKind
-                        ; tc_lhs_type mode ty ek }
-
+       ; ek <- newOpenTypeKind          -- The body kind (result of the function) can
+       ; ty' <- tc_lhs_type mode ty ek  -- be TYPE r, for any r, hence newOpenTypeKind
        ; checkExpectedKind (unLoc ty) (mkPhiTy ctxt' ty') exp_kind }
 
 --------- Lists, arrays, and tuples
@@ -782,14 +781,6 @@ tc_infer_hs_type_ek mode hs_ty ek
 --- Typechecking tuple types
 ----------------------------
 
-tupKindSort_maybe :: TcKind -> Maybe TupleSort
-tupKindSort_maybe k
-  | Just (k', _) <- splitCastTy_maybe k = tupKindSort_maybe k'
-  | Just k'      <- tcView k            = tupKindSort_maybe k'
-  | tcIsConstraintKind k = Just ConstraintTuple
-  | tcIsLiftedTypeKind k   = Just BoxedTuple
-  | otherwise            = Nothing
-
 
 tc_hs_tuple_type :: TcTyMode -> HsType GhcRn
                  -> HsTupleSort -> [LHsType GhcRn]   -- Payload of the HsTupleTy
@@ -798,34 +789,37 @@ tc_hs_tuple_type :: TcTyMode -> HsType GhcRn
 -- See Note [Inferring tuple kinds]
 
 tc_hs_tuple_type mode rn_ty HsBoxedOrConstraintTuple hs_tys exp_kind
-  | Just tup_sort <- tupKindSort_maybe exp_kind
-  = -- We can get the tup_sort from expected kind, so go with that
-    -- (NB: not zonking before looking at exp_kind, to avoid left-right bias)
-    traceTc "tc_hs_type tuple" (ppr hs_tys) >>
-    tc_tuple rn_ty mode tup_sort hs_tys exp_kind
+  = do { mb_tup_sort <- tcTupKindSortM exp_kind
+       ; case mb_tup_sort of {
+           Just tup_sort -> do { traceTc "tc_hs_type tuple" (ppr hs_tys)
+                               ; tc_tuple rn_ty mode tup_sort hs_tys exp_kind } ;
+           Nothing ->
 
-  | otherwise -- Can't get tup_sort from expected kind
-  = do { traceTc "tc_hs_type tuple 2" (ppr hs_tys)
+    do { traceTc "tc_hs_type tuple 2" (ppr hs_tys $$ ppr exp_kind)
        ; tys <- mapM (tc_infer_lhs_type mode) hs_tys
            -- Infer each arg type separately, because errors can be
            -- confusing if we give them a shared kind.  Eg Trac #7410
            -- (Either Int, Int), we do not want to get an error saying
            -- "the second argument of a tuple should have kind *->*"
 
-       ; kinds <- mapM tcTypeKindM tys -- Expose as much kind information as poss
+       ; mb_tss <- mapMaybeM (\ty -> tcTypeKindM ty >>= tcTupKindSortM) tys
+                  -- Expose as much kind information as poss
 
-       ; let (arg_kind, tup_sort)
-               = case [ (k,s) | k <- kinds
-                              , Just s <- [tupKindSort_maybe k] ] of
-                    ((k,s) : _) -> (k,s)
-                    [] -> (liftedTypeKind, BoxedTuple)
-         -- In the [] case, it's not clear what the kind is, so guess *
+       ; let tup_sort = case mb_tss of
+                           (s : _) -> s          -- In the [] case, it's not clear what
+                           []      -> BoxedTuple -- sort of tuple this is, so guess BoxedTuple
+             arg_kind = case tup_sort of
+                         BoxedTuple      -> liftedTypeKind
+                         ConstraintTuple -> constraintKind
+                         _ -> pprPanic "tc_hs_tuple_type" (ppr tys)
+                              -- tcTypeKindSortM returns only Boxed/ConstraintTuple
 
        ; tys' <- sequence [ setSrcSpan loc $
                             checkExpectedKind hs_ty ty arg_kind
                           | ((L loc hs_ty),ty) <- zip hs_tys tys ]
 
-       ; finish_tuple rn_ty tup_sort tys' (map (const arg_kind) tys') exp_kind }
+       ; finish_tuple rn_ty tup_sort tys' (map (const arg_kind) tys') exp_kind
+       } } }
 
 tc_hs_tuple_type mode rn_ty hs_tup_sort tys exp_kind
   = tc_tuple rn_ty mode tup_sort tys exp_kind
@@ -930,7 +924,7 @@ tcInferApps mode orig_hs_ty fun_ty orig_hs_args
       | isInvisibleBinder ki_binder
         -- It's invisible. Instantiate.
       = do { traceTc "tcInferApps (invis)" (ppr ki_binder $$ ppr subst)
-           ; (subst', arg') <- tcInstTyBinder Nothing subst ki_binder
+           ; (subst', arg') <- tcInstTyBinder subst ki_binder
            ; go n subst' (mkNakedAppTy fun arg')
                 ki_binders inner_ki all_args }
 
@@ -1006,21 +1000,12 @@ checkExpectedKindX :: HasDebugCallStack
 --   typeKind ty' = exp_kind
 -- so that the caller can satisfy Note [The well-kinded type invariant]
 checkExpectedKindX pp_hs_ty ty exp_kind
- = do { -- We need to make sure that both kinds have the same number of implicit
-        -- foralls out front. If the actual kind has more, instantiate accordingly.
-        -- Otherwise, just pass the type & kind through: the errors are caught
-        -- in unifyType.
-        act_kind <- tcTypeKindM ty
-      ; let n_exp_invis_bndrs = invisibleTyBndrCount exp_kind
-            n_act_invis_bndrs = invisibleTyBndrCount act_kind
-            n_to_inst         = n_act_invis_bndrs - n_exp_invis_bndrs
-      ; (new_args, act_kind') <- tcInstTyBinders (splitPiTysInvisibleN n_to_inst act_kind)
-      ; let ty' = mkNakedAppTys ty new_args
+ = do { act_kind <- tcTypeKindM ty
+
+      ; (ty', act_kind') <- match_invisibles ty act_kind
 
       ; traceTc "checkExpectedKind" $
         vcat [ pp_hs_ty
-             , text "n_to_inst:" <+> ppr n_to_inst
-             , text "new_args:" <+> ppr new_args
              , text "ty':" <+> ppr ty'
              , text "act_kind:" <+> ppr act_kind
              , text "act_kind':" <+> ppr act_kind'
@@ -1041,6 +1026,21 @@ checkExpectedKindX pp_hs_ty ty exp_kind
       ; return (ty' `mkNakedCastTy` co_k)
         -- mkNakedCastTy to ensure that (typeKind result_ty = exp_kind)
    }}
+  where
+    -- We need to make sure that both kinds have the same number of implicit
+    -- foralls out front. If the actual kind has more, instantiate accordingly.
+    -- Otherwise, just pass the type & kind through: the errors are caught
+    -- in unifyType.  
+    match_invisibles ty act_kind
+      = do { n_act_invis_bndrs <- invisibleTyBndrCountM act_kind
+           ; if n_act_invis_bndrs == 0 then return (ty, act_kind)
+             else
+        do { n_exp_invis_bndrs <- invisibleTyBndrCountM exp_kind
+           ; let n_to_inst = n_act_invis_bndrs - n_exp_invis_bndrs
+           ; if n_to_inst <= 0 then return (ty, act_kind)
+             else
+        do { (new_args, act_kind') <- tcInstInvisibleTyBinders n_to_inst act_kind
+           ; return (mkNakedAppTys ty new_args, act_kind') } } }
 
 ---------------------------
 tcHsMbContext :: Maybe (LHsContext GhcRn) -> TcM [PredType]
@@ -1135,7 +1135,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
       = do { let tc_arity = tyConArity tc
                  tc_kind  = tyConKind tc
 --           ; tc_kind <- zonkTcType tc_kind
-           ; (tc_args, kind) <- tcInstTyBinders (splitPiTysInvisibleN tc_arity tc_kind)
+           ; (tc_args, kind) <- tcInstInvisibleTyBinders tc_arity tc_kind
                  -- Instantiate enough invisible arguments
                  -- to saturate the family TyCon
 

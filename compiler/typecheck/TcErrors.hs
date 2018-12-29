@@ -1975,8 +1975,8 @@ misMatchMsg ct oriented ty1 ty2
 -- themselves.
 pprWithExplicitKindsWhenMismatch :: Type -> Type -> CtOrigin
                                  -> SDoc -> SDoc
-pprWithExplicitKindsWhenMismatch ty1 ty2 ct =
-  pprWithExplicitKindsWhen show_kinds
+pprWithExplicitKindsWhenMismatch ty1 ty2 ct
+  = pprWithExplicitKindsWhen show_kinds
   where
     (act_ty, exp_ty) = case ct of
       TypeEqOrigin { uo_actual = act

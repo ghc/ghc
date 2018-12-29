@@ -32,3 +32,15 @@ instance SingKind ('KProxy :: KProxy Nat) where
 instance SingKind ('KProxy :: KProxy Foo) where
   fromSing (SBar n) = BarTerm (fromSing n)
   toSing n = case toSing n of SomeSing n' -> SomeSing (SBar n')
+
+{- toSing :: DemoteRep ('KProxy :: KProxy Foo)
+          -> SomeSing ('KPoxy :: KProxy Foo)
+
+
+      n :: DemoteRep @Foo ('KProxy :: KProxy Foo) = FooTerm
+      toSing n :: SomeSing ('KProxy :: KProxy Foo)
+
+      n' :: Sing (a :: Foo)
+      SomeSing (SBar n') :: SomeSing ('KProxy :: KProxy Foo)
+      SBar n' :: Sing (a :: Foo)
+-}      

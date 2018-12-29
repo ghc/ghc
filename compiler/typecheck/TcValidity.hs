@@ -480,7 +480,7 @@ check_type env ctxt rank (CastTy ty _) = check_type env ctxt rank ty
 -- See Note [Liberal type synonyms].
 check_type env ctxt rank ty
   | not (null tvbs && null theta)
-  = do  { traceTc "check_type" (ppr ty $$ ppr (forAllAllowed rank))
+  = do  { traceTc "check_type" (ppr ty $$ ppr (forAllAllowed rank) $$ ppr tvbs $$ ppr theta $$ ppr tau)
         ; checkTcM (forAllAllowed rank) (forAllTyErr env rank ty)
                 -- Reject e.g. (Maybe (?x::Int => Int)),
                 -- with a decent error message

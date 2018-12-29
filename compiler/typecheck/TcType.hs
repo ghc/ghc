@@ -1721,19 +1721,20 @@ tcEqType ty1 ty2
 -- as long as their non-coercion structure is identical.
 tcEqTypeNoKindCheck :: TcType -> TcType -> Bool
 tcEqTypeNoKindCheck ty1 ty2
-  = tc_eq_type True True ty1 ty2
+  = tc_eq_type False False ty1 ty2
 
 -- | Like 'tcEqType', but returns True if the /visible/ part of the types
 -- are equal, even if they are really unequal (in the invisible bits)
 tcEqTypeVis :: TcType -> TcType -> Bool
-tcEqTypeVis ty1 ty2 = tc_eq_type True False ty1 ty2
+tcEqTypeVis ty1 ty2 = tc_eq_type False True ty1 ty2
 
 -- | Like 'pickyEqTypeVis', but returns a Bool for convenience
 pickyEqType :: TcType -> TcType -> Bool
--- Check when two types _look_ the same, _including_ synonyms.
+-- Check when two types _look_ the same, _including_ synonyms
 -- So (pickyEqType String [Char]) returns False
+-- But it /does/ account for invisible arguments
 -- This ignores kinds and coercions, because this is used only for printing.
-pickyEqType ty1 ty2 = tc_eq_type True True ty1 ty2
+pickyEqType ty1 ty2 = tc_eq_type True False ty1 ty2
 
 -- | Real worker for 'tcEqType'. No kind check!
 tc_eq_type :: Bool          -- ^ True <=> do not expand type synonyms

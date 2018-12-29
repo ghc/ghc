@@ -62,8 +62,6 @@ module Type (
         coAxNthLHS,
         stripCoercionTy, splitCoercionType_maybe,
 
-        splitPiTysInvisible, splitPiTysInvisibleN,
-        invisibleTyBndrCount,
         filterOutInvisibleTypes, filterOutInferredTypes,
         partitionInvisibleTypes, partitionInvisibles,
         tyConArgFlags, appTyArgFlags,
@@ -767,8 +765,9 @@ repSplitAppTy_maybe _other = Nothing
 -- See Note [Decomposing fat arrow c=>t]
 -- Defined here to avoid module loops between Unify and TcType.
 tcRepSplitAppTy_maybe :: Type -> Maybe (Type,Type)
--- ^ Does the AppTy split as in 'tcSplitAppTy_maybe', but assumes that
--- any coreView stuff is already done. Refuses to look through (c => t)
+-- ^ Does the AppTy split as in 'tcSplitAppTy_maybe'.
+-- The "Rep" means that we assumes that any tcView stuff is already done.
+-- Refuses to look through (c => t)
 tcRepSplitAppTy_maybe (FunTy ty1 ty2)
   | isPredTy ty1
   = Nothing  -- See Note [Decomposing fat arrow c=>t]
@@ -789,6 +788,7 @@ tcRepSplitAppTy_maybe _other = Nothing
 -- | Like 'tcSplitTyConApp_maybe' but doesn't look through type synonyms.
 tcRepSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 -- Defined here to avoid module loops between Unify and TcType.
+-- The "Rep" means that we assumes that any tcView stuff is already done.
 tcRepSplitTyConApp_maybe (TyConApp tc tys)
   = Just (tc, tys)
 
@@ -804,6 +804,7 @@ tcRepSplitTyConApp_maybe _
 -- | Like 'tcSplitTyConApp' but doesn't look through type synonyms.
 tcRepSplitTyConApp :: HasCallStack => Type -> (TyCon, [Type])
 -- Defined here to avoid module loops between Unify and TcType.
+-- The "Rep" means that we assumes that any tcView stuff is already done.
 tcRepSplitTyConApp ty =
   case tcRepSplitTyConApp_maybe ty of
     Just stuff -> stuff
@@ -1532,43 +1533,6 @@ splitForAllVarBndrs ty = split ty ty []
     split orig_ty _                bs = (reverse bs, orig_ty)
 {-# INLINE splitForAllVarBndrs #-}
 
-invisibleTyBndrCount :: Type -> Int
--- Returns the number of leading invisible forall'd binders in the type
--- Includes invisible predicate arguments; e.g. for
---    e.g.  forall {k}. (k ~ *) => k -> k
--- returns 2 not 1
-invisibleTyBndrCount ty = length (fst (splitPiTysInvisible ty))
-
--- Like splitPiTys, but returns only *invisible* binders, including constraints
--- Stops at the first visible binder
-splitPiTysInvisible :: Type -> ([TyCoBinder], Type)
-splitPiTysInvisible ty = split ty ty []
-   where
-    split orig_ty ty bs
-      | Just ty' <- coreView ty  = split orig_ty ty' bs
-    split _ (ForAllTy b res) bs
-      | Bndr _ vis <- b
-      , isInvisibleArgFlag vis   = split res res (Named b  : bs)
-    split _ (FunTy arg res)  bs
-      | isPredTy arg             = split res res (Anon arg : bs)
-    split orig_ty _          bs  = (reverse bs, orig_ty)
-
-splitPiTysInvisibleN :: Int -> Type -> ([TyCoBinder], Type)
--- Same as splitPiTysInvisible, but stop when
---   - you have found 'n' TyCoBinders,
---   - or you run out of invisible binders
-splitPiTysInvisibleN n ty = split n ty ty []
-   where
-    split n orig_ty ty bs
-      | n == 0                  = (reverse bs, orig_ty)
-      | Just ty' <- coreView ty = split n orig_ty ty' bs
-      | ForAllTy b res <- ty
-      , Bndr _ vis <- b
-      , isInvisibleArgFlag vis  = split (n-1) res res (Named b  : bs)
-      | FunTy arg res <- ty
-      , isPredTy arg            = split (n-1) res res (Anon arg : bs)
-      | otherwise               = (reverse bs, orig_ty)
-
 -- | Given a 'TyCon' and a list of argument types, filter out any invisible
 -- (i.e., 'Inferred' or 'Specified') arguments.
 filterOutInvisibleTypes :: TyCon -> [Type] -> [Type]
@@ -1820,9 +1784,9 @@ isEvVarType :: Type -> Bool
 -- See Note [Evidence for quantified constraints]
 isEvVarType ty = isCoVarType ty || isPredTy ty
 
-isPredTy :: Type -> Bool
+isPredTy :: HasDebugCallStack => Type -> Bool
 -- See Note [Types for coercions, predicates, and evidence]
-isPredTy ty = tcIsConstraintKind (typeKind ty)
+isPredTy ty = tcIsConstraintKind (tcTypeKind ty)
 
 -- | Does this type classify a core (unlifted) Coercion?
 -- At either role nominal or representational

@@ -3163,9 +3163,11 @@ pprPrecType = pprPrecTypeX emptyTidyEnv
 pprPrecTypeX :: TidyEnv -> PprPrec -> Type -> SDoc
 pprPrecTypeX env prec ty
   = getPprStyle $ \sty ->
-    if debugStyle sty           -- Use debugPprType when in
-    then debug_ppr_ty prec ty   -- when in debug-style
+    if debugStyle sty          -- Use debugPprType when in
+    then debug_ppr_ty prec ty  -- when in debug-style
     else pprPrecIfaceType prec (tidyToIfaceTypeStyX env ty sty)
+    -- NB: debug-style is used for -dppr-debug
+    --     dump-style  is used for -ddump-tc-trace etc
 
 pprTyLit :: TyLit -> SDoc
 pprTyLit = pprIfaceTyLit . toIfaceTyLit

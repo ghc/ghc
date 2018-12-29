@@ -8,7 +8,7 @@ import Var ( TyCoVar )
 import {-# SOURCE #-} TyCoRep( Type, Coercion )
 import Util
 
-isPredTy     :: Type -> Bool
+isPredTy     :: HasDebugCallStack => Type -> Bool
 isCoercionTy :: Type -> Bool
 
 mkAppTy    :: Type -> Type -> Type

@@ -39,7 +39,7 @@ import {-# SOURCE #-} TcInstDcls( tcInstDecls1 )
 import TcDeriv (DerivInfo)
 import TcHsType
 import ClsInst( AssocInstInfo(..) )
-import Inst( tcInstTyBinders )
+import Inst( tcInstInvisibleTyBinders )
 import TcMType
 import TysWiredIn ( unitTy )
 import TcType
@@ -1889,9 +1889,8 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        ; return (qtvs, pats, rhs_ty) }
   where
     tc_lhs | null hs_pats  -- See Note [Apparently-nullary families]
-           = do { (args, rhs_kind) <- tcInstTyBinders $
-                                      splitPiTysInvisibleN (tyConArity fam_tc)
-                                                           (tyConKind  fam_tc)
+           = do { (args, rhs_kind) <- tcInstInvisibleTyBinders (tyConArity fam_tc)
+                                                               (tyConKind  fam_tc)
                 ; return (mkTyConApp fam_tc args, rhs_kind) }
            | otherwise
            = do { fam_app <- tcFamTyPats fam_tc mb_clsinfo hs_pats
@@ -1930,7 +1929,7 @@ Inferred quantifiers always come first.
 -----------------
 tcFamTyPats :: TyCon -> AssocInstInfo
             -> HsTyPats GhcRn                -- Patterns
-            -> TcM (TcType, TcKind)          -- (lhs_type, lhs_kind)
+            -> TcM TcType
 -- Used for both type and data families
 tcFamTyPats fam_tc mb_clsinfo hs_pats
   = do { traceTc "tcFamTyPats {" $
