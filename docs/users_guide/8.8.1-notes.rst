@@ -111,6 +111,10 @@ Runtime system
   Generation of these files, which sport a ``.hie`` suffix, is enabled via the
   ``-fwrite-ide-info`` flag. See :ref:`hie-options` for more information.
 
+- A new flag ``-xp`` is added on x86_64. When it is passed, the runtime linker
+  can load object files compiled with ``-fPIC -fexternal-dynamic-refs``
+  anywhere in the address space. This used to be restricted to the low 2Gb.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
