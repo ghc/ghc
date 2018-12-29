@@ -267,6 +267,7 @@ validate-x86_64-linux-fedora27:
 validate-x86_64-linux-deb9-integer-simple:
   extends: .validate-linux
   stage: full-build
+  allow_failure: true
   variables:
     INTEGER_LIBRARY: integer-simple
   image: ghcci/x86_64-linux-deb9:0.2
@@ -276,6 +277,7 @@ validate-x86_64-linux-deb9-integer-simple:
 nightly-x86_64-linux-deb9-integer-simple:
   extends: validate-x86_64-linux-deb9-integer-simple
   stage: full-build
+  allow_failure: true
   artifacts:
     expire_in: 2 year
   variables:
@@ -287,6 +289,7 @@ nightly-x86_64-linux-deb9-integer-simple:
 validate-x86_64-linux-deb9-unreg:
   extends: .validate-linux
   stage: full-build
+  allow_failure: true
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
   image: ghcci/x86_64-linux-deb9:0.2
