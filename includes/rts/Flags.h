@@ -188,6 +188,17 @@ typedef struct _CONCURRENT_FLAGS {
  */
 #define DEFAULT_TICK_INTERVAL USToTime(10000)
 
+/*
+ * When linkerAlwaysPic is true, the runtime linker assume that all object
+ * files were compiled with -fPIC -fexternal-dynamic-refs and load them
+ * anywhere in the address space.
+ */
+#if defined(x86_64_HOST_ARCH) && defined(darwin_HOST_OS)
+#define DEFAULT_LINKER_ALWAYS_PIC true
+#else
+#define DEFAULT_LINKER_ALWAYS_PIC false
+#endif
+
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _MISC_FLAGS {
     Time    tickInterval;        /* units: TIME_RESOLUTION */
@@ -197,6 +208,7 @@ typedef struct _MISC_FLAGS {
     bool generate_stack_trace;
     bool machineReadable;
     bool internalCounters;       /* See Note [Internal Counter Stats] */
+    bool linkerAlwaysPic;        /* Assume the object code is always PIC */
     StgWord linkerMemBase;       /* address to ask the OS for memory
                                   * for the linker, NULL ==> off */
 } MISC_FLAGS;
