@@ -527,19 +527,17 @@ pprGotDeclaration _ _ OSAIX
                  ]
 
 
--- PPC 64 ELF v1 needs a Table Of Contents (TOC) on Linux
-pprGotDeclaration _ (ArchPPC_64 ELF_V1) OSLinux
+-- PPC 64 ELF v1 needs a Table Of Contents (TOC)
+pprGotDeclaration _ (ArchPPC_64 ELF_V1) _
         = text ".section \".toc\",\"aw\""
 -- In ELF v2 we also need to tell the assembler that we want ABI
 -- version 2. This would normally be done at the top of the file
 -- right after a file directive, but I could not figure out how
 -- to do that.
-pprGotDeclaration _ (ArchPPC_64 ELF_V2) OSLinux
+pprGotDeclaration _ (ArchPPC_64 ELF_V2) _
         = vcat [ text ".abiversion 2",
                  text ".section \".toc\",\"aw\""
                ]
-pprGotDeclaration _ (ArchPPC_64 _) _
-        = panic "pprGotDeclaration: ArchPPC_64 only Linux supported"
 
 -- Emit GOT declaration
 -- Output whatever needs to be output once per .s file.
