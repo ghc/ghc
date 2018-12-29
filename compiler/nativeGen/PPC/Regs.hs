@@ -229,11 +229,8 @@ allArgRegs = map regSingle [3..10]
 
 -- these are the regs which we cannot assume stay alive over a C call.
 callClobberedRegs :: Platform -> [Reg]
-callClobberedRegs platform
-  = case platformOS platform of
-    OSAIX    -> map regSingle (0:[2..12] ++ map fReg [0..13])
-    OSLinux  -> map regSingle (0:[2..13] ++ map fReg [0..13])
-    _        -> panic "PPC.Regs.callClobberedRegs: not defined for this architecture"
+callClobberedRegs _platform
+  = map regSingle (0:[2..12] ++ map fReg [0..13])
 
 
 allMachRegNos   :: [RegNo]
@@ -263,11 +260,10 @@ allFPArgRegs :: Platform -> [Reg]
 allFPArgRegs platform
     = case platformOS platform of
       OSAIX    -> map (regSingle . fReg) [1..13]
-      OSLinux  -> case platformArch platform of
+      _        -> case platformArch platform of
         ArchPPC      -> map (regSingle . fReg) [1..8]
         ArchPPC_64 _ -> map (regSingle . fReg) [1..13]
         _            -> panic "PPC.Regs.allFPArgRegs: unknown PPC Linux"
-      _        -> panic "PPC.Regs.allFPArgRegs: not defined for this architecture"
 
 fits16Bits :: Integral a => a -> Bool
 fits16Bits x = x >= -32768 && x < 32768
