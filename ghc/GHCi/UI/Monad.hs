@@ -14,13 +14,14 @@ module GHCi.UI.Monad (
         GHCi(..), startGHCi,
         GHCiState(..), setGHCiState, getGHCiState, modifyGHCiState,
         GHCiOption(..), isOptionSet, setOption, unsetOption,
-        Command(..),
+        Command(..), CommandResult(..), cmdSuccess,
         PromptFunction,
         BreakLocation(..),
         TickArray,
         getDynFlags,
 
-        runStmt, runDecls, runDecls', resume, timeIt, recordBreak, revertCAFs,
+        runStmt, runDecls, runDecls', resume, recordBreak, revertCAFs,
+        ActionStats(..), runAndPrintStats, runWithStats, printStats,
 
         printForUserNeverQualify, printForUserModInfo,
         printForUser, printForUserPartWay, prettyLocations,
@@ -93,6 +94,10 @@ data GHCiState = GHCiState
         last_command   :: Maybe Command,
             -- ^ @:@ at the GHCi prompt repeats the last command, so we
             -- remember it here
+        cmd_wrapper    :: InputT GHCi CommandResult -> InputT GHCi (Maybe Bool),
+            -- ^ The command wrapper is run for each command or statement.
+            -- The 'Bool' value denotes whether the command is successful and
+            -- 'Nothing' means to exit GHCi.
         cmdqueue       :: [String],
 
         remembered_ctx :: [InteractiveImport],
@@ -163,6 +168,21 @@ data Command
    , cmdCompletionFunc :: CompletionFunc GHCi
      -- ^ 'CompletionFunc' for arguments
    }
+
+data CommandResult
+   = CommandComplete
+   { cmdInput :: String
+   , cmdResult :: Either SomeException (Maybe Bool)
+   , cmdStats :: ActionStats
+   }
+   | CommandIncomplete
+     -- ^ Unterminated multiline command
+   deriving Show
+
+cmdSuccess :: Haskeline.MonadException m => CommandResult -> m (Maybe Bool)
+cmdSuccess CommandComplete{ cmdResult = Left e } = liftIO $ throwIO e
+cmdSuccess CommandComplete{ cmdResult = Right r } = return r
+cmdSuccess CommandIncomplete = return $ Just True
 
 type PromptFunction = [String]
                    -> Int
@@ -386,22 +406,39 @@ resume canLogSpan step = do
 -- --------------------------------------------------------------------------
 -- timing & statistics
 
-timeIt :: (a -> Maybe Integer) -> InputT GHCi a -> InputT GHCi a
-timeIt getAllocs action
-  = do b <- lift $ isOptionSet ShowTiming
-       if not b
-          then action
-          else do time1   <- liftIO $ getCurrentTime
-                  a <- action
-                  let allocs = getAllocs a
-                  time2   <- liftIO $ getCurrentTime
-                  dflags  <- getDynFlags
-                  let period = time2 `diffUTCTime` time1
-                  liftIO $ printTimes dflags allocs (realToFrac period)
-                  return a
+data ActionStats = ActionStats
+  { actionAllocs :: Maybe Integer
+  , actionElapsedTime :: Double
+  } deriving Show
 
-printTimes :: DynFlags -> Maybe Integer -> Double -> IO ()
-printTimes dflags mallocs secs
+runAndPrintStats
+  :: (a -> Maybe Integer)
+  -> InputT GHCi a
+  -> InputT GHCi (ActionStats, Either SomeException a)
+runAndPrintStats getAllocs action = do
+  result <- runWithStats getAllocs action
+  case result of
+    (stats, Right{}) -> do
+      showTiming <- lift $ isOptionSet ShowTiming
+      when showTiming $ do
+        dflags  <- getDynFlags
+        liftIO $ printStats dflags stats
+    _ -> return ()
+  return result
+
+runWithStats
+  :: ExceptionMonad m
+  => (a -> Maybe Integer) -> m a -> m (ActionStats, Either SomeException a)
+runWithStats getAllocs action = do
+  t0 <- liftIO getCurrentTime
+  result <- gtry action
+  let allocs = either (const Nothing) getAllocs result
+  t1 <- liftIO getCurrentTime
+  let elapsedTime = realToFrac $ t1 `diffUTCTime` t0
+  return (ActionStats allocs elapsedTime, result)
+
+printStats :: DynFlags -> ActionStats -> IO ()
+printStats dflags ActionStats{actionAllocs = mallocs, actionElapsedTime = secs}
    = do let secs_str = showFFloat (Just 2) secs
         putStrLn (showSDoc dflags (
                  parens (text (secs_str "") <+> text "secs" <> comma <+>
