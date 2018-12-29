@@ -53,11 +53,13 @@
  * SILENTLY generate crashing code for data references.  This hack is
  * enabled by X86_64_ELF_NONPIC_HACK.
  *
- * One workaround is to use shared Haskell libraries.  This is
- * coming.  Another workaround is to keep the static libraries but
- * compile them with -fPIC, because that will generate PIC references
- * to data which can be relocated.  The PIC code is still too green to
- * do this systematically, though.
+ * One workaround is to use shared Haskell libraries. This is the case
+ * when dynamically-linked GHCi is used.
+ *
+ * Another workaround is to keep the static libraries but compile them
+ * with -fPIC -fexternal-dynamic-refs, because that will generate PIC
+ * references to data which can be relocated. This is the case when
+ * +RTS -xp is passed.
  *
  * See bug #781
  * See thread http://www.haskell.org/pipermail/cvs-ghc/2007-September/038458.html
@@ -74,7 +76,7 @@
  * Sym*_NeedsProto: the symbol is undefined and we add a dummy
  *                  default proto extern void sym(void);
  */
-#define X86_64_ELF_NONPIC_HACK 1
+#define X86_64_ELF_NONPIC_HACK (!RtsFlags.MiscFlags.linkerAlwaysPic)
 
 #if defined(sparc_HOST_ARCH)
 #  define ELF_TARGET_SPARC  /* Used inside <elf.h> */
