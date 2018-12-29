@@ -32,10 +32,16 @@ roundDownToPage (size_t x)
 }
 
 INLINE_HEADER size_t
+roundUpToAlign (size_t size, size_t align)
+{
+    /* alignment must always be a power of 2 */
+    return (size + align - 1) & ~(align - 1);
+}
+
+INLINE_HEADER size_t
 roundUpToPage (size_t x)
 {
-    size_t size = getPageSize();
-    return ((x + size - 1) & ~(size - 1));
+    return roundUpToAlign(x, getPageSize());
 }
 
 

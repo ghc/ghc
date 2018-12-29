@@ -579,7 +579,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 /* Figure out what kind of section it is.  Logic derived from
    Figure 1.14 ("Special Sections") of the ELF document
    ("Portable Formats Specification, Version 1.1"). */
-static int getSectionKind_ELF( Elf_Shdr *hdr, int *is_bss )
+static SectionKind getSectionKind_ELF( Elf_Shdr *hdr, int *is_bss )
 {
     *is_bss = false;
 
@@ -681,23 +681,31 @@ ocGetNames_ELF ( ObjectCode* oc )
       StgWord mapped_size = 0, mapped_offset = 0;
       StgWord size = shdr[i].sh_size;
       StgWord offset = shdr[i].sh_offset;
+      StgWord align = shdr[i].sh_addralign;
 
       if (is_bss && size > 0) {
          /* This is a non-empty .bss section.  Allocate zeroed space for
             it, and set its .sh_offset field such that
             ehdrC + .sh_offset == addr_of_zeroed_space.  */
-#if defined(NEED_GOT)
-          /* always use mmap if we use GOT slots.  Otherwise the malloced
-           * address might be out of range for sections that are mmaped.
-           */
-          alloc = SECTION_MMAP;
-          start = mmap(NULL, size,
-                       PROT_READ | PROT_WRITE | PROT_EXEC,
-                       MAP_ANON | MAP_PRIVATE,
-                       -1, 0);
-          mapped_start = start;
-          mapped_offset = 0;
-          mapped_size = roundUpToPage(size);
+#if defined(NEED_GOT) || RTS_LINKER_USE_MMAP
+          if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
+              /* The space for bss sections is already preallocated */
+              ASSERT(oc->bssBegin != NULL);
+              alloc = SECTION_NOMEM;
+              start =
+                oc->image + roundUpToAlign(oc->bssBegin - oc->image, align);
+              oc->bssBegin = (char*)start + size;
+              ASSERT(oc->bssBegin <= oc->bssEnd);
+          } else {
+              /* Use mmapForLinker to allocate .bss, otherwise the malloced
+               * address might be out of range for sections that are mmaped.
+               */
+              alloc = SECTION_MMAP;
+              start = mmapForLinker(size, MAP_ANONYMOUS, -1, 0);
+              mapped_start = start;
+              mapped_offset = 0;
+              mapped_size = roundUpToPage(size);
+          }
 #else
           alloc = SECTION_MALLOC;
           start = stgCallocBytes(1, size, "ocGetNames_ELF(BSS)");
@@ -1874,22 +1882,27 @@ int ocRunInit_ELF( ObjectCode *oc )
 
 #if defined(NEED_SYMBOL_EXTRAS)
 
-int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
+int ocAllocateExtras_ELF( ObjectCode *oc )
 {
-  Elf_Ehdr *ehdr;
-  Elf_Shdr* shdr;
-  Elf_Word i, shnum;
+  Elf_Ehdr *ehdr = (Elf_Ehdr *) oc->image;
+  Elf_Shdr* shdr = (Elf_Shdr *) ( ((char *)oc->image) + ehdr->e_shoff );
+  Elf_Shdr* symtab = NULL;
+  Elf_Word shnum = elf_shnum(ehdr);
+  int bssSize = 0;
 
-  ehdr = (Elf_Ehdr *) oc->image;
-  shdr = (Elf_Shdr *) ( ((char *)oc->image) + ehdr->e_shoff );
+  for (Elf_Word i = 0; i < shnum; ++i) {
+    if(shdr[i].sh_type == SHT_SYMTAB) {
+      symtab = &shdr[i];
+    } else {
+      int isBss = 0;
+      getSectionKind_ELF(&shdr[i], &isBss);
+      if (isBss && shdr[i].sh_size > 0) {
+        bssSize += roundUpToAlign(shdr[i].sh_size, shdr[i].sh_addralign);
+      }
+    }
+  }
 
-  shnum = elf_shnum(ehdr);
-
-  for( i = 0; i < shnum; i++ )
-    if( shdr[i].sh_type == SHT_SYMTAB )
-      break;
-
-  if( i == shnum )
+  if (symtab == NULL)
   {
     // Not having a symbol table is not in principle a problem.
     // When an object file has no symbols then the 'strip' program
@@ -1899,15 +1912,15 @@ int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
     return 1;
   }
 
-  if( shdr[i].sh_entsize != sizeof( Elf_Sym ) )
+  if( symtab->sh_entsize != sizeof( Elf_Sym ) )
   {
     errorBelch( "The entry size (%d) of the symtab isn't %d\n",
-      (int) shdr[i].sh_entsize, (int) sizeof( Elf_Sym ) );
+      (int) symtab->sh_entsize, (int) sizeof( Elf_Sym ) );
 
     return 0;
   }
 
-  return ocAllocateSymbolExtras( oc, shdr[i].sh_size / sizeof( Elf_Sym ), 0 );
+  return ocAllocateExtras(oc, symtab->sh_size / sizeof( Elf_Sym ), 0, bssSize);
 }
 
 #endif /* NEED_SYMBOL_EXTRAS */
