@@ -19,8 +19,12 @@ test('ghcilink004',
       when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259))],
      run_command, ['$MAKE -s --no-print-directory ghcilink004'])
 
-test('ghcilink005', [extra_files(['TestLink.hs', 'f.c']),
-                     unless(doing_ghci, skip)], run_command,
+test('ghcilink005',
+     [extra_files(['TestLink.hs', 'f.c']),
+      # Fragile when unregisterised; see #16085
+      when(unregisterised(), skip),
+      unless(doing_ghci, skip)],
+     run_command,
      ['$MAKE -s --no-print-directory ghcilink005'])
 
 test('ghcilink006', [unless(doing_ghci, skip)], run_command,

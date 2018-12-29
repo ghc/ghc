@@ -247,6 +247,8 @@ test('T7040', [omit_ways(['ghci'])], compile_and_run, ['T7040_c.c'])
 test('T7040_ghci',
      [extra_files(['T7040_c.h']),
       only_ways(['ghci']),
+      # Fragile when unregisterised; see #16085
+      when(unregisterised(), skip),
       pre_cmd('$MAKE -s --no-print-directory T7040_ghci_setup')],
      compile_and_run, ['T7040_ghci_c.o'])
 
