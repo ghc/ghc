@@ -160,6 +160,9 @@ Template Haskell
 Build system
 ~~~~~~~~~~~~
 
+- Configure: Add ALEX and HAPPY variables to explicitly set the alex and happy
+  programs to use.
+- Configure: Deprecate --with-ghc=ARG in favour of the GHC variable.
 
 Included libraries
 ------------------
