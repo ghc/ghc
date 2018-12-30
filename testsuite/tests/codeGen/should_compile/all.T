@@ -53,7 +53,7 @@ test('T15723',
     unless(have_dynamic(), skip),
   ], run_command, ['$MAKE -s --no-print-directory T15723'])
 
-test('T15155', only_ways('optasm'),
+test('T15155', [ unless(config.have_ncg, skip) ],
      run_command, ['$MAKE -s --no-print-directory T15155'])
 
 test('T15155l', only_ways(llvm_ways),
