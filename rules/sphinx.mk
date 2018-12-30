@@ -56,13 +56,18 @@ pdf_$1 : $1/$2.pdf
 pdf : pdf_$1
 
 ifneq "$$(BINDIST)" "YES"
+# N.B. If we don't redirect latex output to /dev/null then we end up with literally
+# 30% of the build output being warnings, even in a successful build. However,
+# to make sure that we don't silence errors we allow each xelatex invocation
+# besides the last to fail.
+
 $1/$2.pdf: $1/conf.py $$($1_RST_SOURCES)
 	$(SPHINXBUILD) -b latex -d $1/.doctrees-pdf $(SPHINXOPTS) $1 $1/build-pdf/$2
-	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex
-	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex
-	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex
+	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex 2>/dev/null >/dev/null || true
+	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex 2>/dev/null >/dev/null || true
+	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex 2>/dev/null >/dev/null || true
 	cd $1/build-pdf/$2 ; makeindex $2.idx
-	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex
+	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex 2>/dev/null >/dev/null || true
 	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex
 	cp $1/build-pdf/$2/$2.pdf $1/$2.pdf
 endif
