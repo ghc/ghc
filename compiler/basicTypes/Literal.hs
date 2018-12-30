@@ -217,7 +217,10 @@ instance Binary Literal where
         = do putByte bh 7
              put_ bh i
              put_ bh e
+<<<<<<< HEAD
 
+=======
+>>>>>>> c226d83f6e06a4f1a5422d723847186f56cdf7d3
     put_ bh (LitRubbish)      = do putByte bh 8
     get bh = do
             h <- getByte bh
@@ -650,15 +653,15 @@ litIsLifted _                  = False
 
 -- | Find the Haskell 'Type' the literal occupies
 literalType :: Literal -> Type
-literalType LitNullAddr       = addrPrimTy
-literalType (LitChar _)       = charPrimTy
-literalType (LitString  _)    = addrPrimTy
-literalType (LitFloat _)      = floatPrimTy
-literalType (LitDouble _)     = doublePrimTy
-literalType (LitLabel _ _ _)  = addrPrimTy
-literalType (LitNumber _ _ t) = t
+literalType LitNullAddr         = addrPrimTy
+literalType (LitChar _)         = charPrimTy
+literalType (LitString  _)      = addrPrimTy
+literalType (LitFloat _)        = floatPrimTy
+literalType (LitDouble _)       = doublePrimTy
+literalType (LitLabel _ _ _)    = addrPrimTy
+literalType (LitNumber _ _ t)   = t
 literalType (LitRational _ _ t) = t
-literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
+literalType (LitRubbish)        = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep
 
@@ -697,9 +700,9 @@ cmpLit (LitNumber nt1 a _)  (LitNumber nt2  b _)
   | nt1 == nt2 = a   `compare` b
   | otherwise  = nt1 `compare` nt2
 cmpLit (LitRational i1 e1 _) (LitRational i2 e2 _)
-  | e1 == e2 = i1 `compare` i2
+  | e1 == e2  = i1 `compare` i2
   | otherwise = e1 `compare` e2
-cmpLit (RubbishLit)          (RubbishLit)           = EQ
+cmpLit (LitRubbish)         (LitRubbish)          = EQ
 cmpLit lit1 lit2
   | litTag lit1 < litTag lit2 = LT
   | otherwise                 = GT
@@ -735,6 +738,8 @@ pprLiteral add_par (LitNumber nt i _)
        LitNumInt64   -> pprPrimInt64 i
        LitNumWord    -> pprPrimWord i
        LitNumWord64  -> pprPrimWord64 i
+pprLiteral add_par (LitRational i e _) = 
+    (pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)
 pprLiteral add_par (LitLabel l mb fod) =
     add_par (text "__label" <+> b <+> ppr fod)
 pprLiteral add_par (LitRational i e _) = 
