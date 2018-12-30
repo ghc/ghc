@@ -160,6 +160,8 @@ Template Haskell
 Build system
 ~~~~~~~~~~~~
 
+- Configure: Add ALEX and HAPPY variables to explicitly set the alex and happy
+  programs to use.
 
 Included libraries
 ------------------

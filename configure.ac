@@ -867,9 +867,13 @@ dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
 
 dnl ** check for installed happy binary + version
+
+AC_ARG_VAR(HAPPY,[Use as the path to happy [default=autodetect]])
 FPTOOLS_HAPPY
 
 dnl ** check for installed alex binary + version
+
+AC_ARG_VAR(ALEX,[Use as the path to alex [default=autodetect]])
 FPTOOLS_ALEX
 
 dnl --------------------------------------------------
