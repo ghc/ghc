@@ -885,12 +885,10 @@ freeRegBase _ = True
 #elif defined(MACHREGS_powerpc)
 
 freeReg 0 = False -- Used by code setting the back chain pointer
-                  -- in stack reallocations on Linux
-                  -- r0 is not usable in all insns so also reserved
-                  -- on Darwin.
+                  -- in stack reallocations on Linux.
+                  -- Moreover r0 is not usable in all insns.
 freeReg 1 = False -- The Stack Pointer
-# if !defined(MACHREGS_darwin)
--- most non-darwin powerpc OSes use r2 as a TOC pointer or something like that
+-- most ELF PowerPC OSes use r2 as a TOC pointer
 freeReg 2 = False
 freeReg 13 = False -- reserved for system thread ID on 64 bit
 -- at least linux in -fPIC relies on r30 in PLT stubs
