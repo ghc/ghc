@@ -1212,19 +1212,19 @@ rationalTyConName, mkRationalName, ratioTyConName, ratioDataConName, realClassNa
     integralClassName, realFracClassName, fractionalClassName,
     fromRationalName, toIntegerName, toRationalName, fromIntegralName,
     realToFracName :: Name
-rationalTyConName   = tcQual  gHC_REAL (fsLit "Rational")     rationalTyConKey
-mkRationalName      = tcQual  gHC_REAL (fsLit "mkRational")   mkRationalIdKey
-ratioTyConName      = tcQual  gHC_REAL (fsLit "Ratio")        ratioTyConKey
-ratioDataConName    = dcQual  gHC_REAL (fsLit ":%")           ratioDataConKey
-realClassName       = clsQual gHC_REAL (fsLit "Real")         realClassKey
-integralClassName   = clsQual gHC_REAL (fsLit "Integral")     integralClassKey
-realFracClassName   = clsQual gHC_REAL (fsLit "RealFrac")     realFracClassKey
-fractionalClassName = clsQual gHC_REAL (fsLit "Fractional")   fractionalClassKey
-fromRationalName    = varQual gHC_REAL (fsLit "fromRational") fromRationalClassOpKey
-toIntegerName       = varQual gHC_REAL (fsLit "toInteger")    toIntegerClassOpKey
-toRationalName      = varQual gHC_REAL (fsLit "toRational")   toRationalClassOpKey
-fromIntegralName    = varQual  gHC_REAL (fsLit "fromIntegral")fromIntegralIdKey
-realToFracName      = varQual  gHC_REAL (fsLit "realToFrac")  realToFracIdKey
+rationalTyConName   = tcQual   gHC_REAL  (fsLit "Rational")     rationalTyConKey
+ratioTyConName      = tcQual   gHC_REAL  (fsLit "Ratio")        ratioTyConKey
+ratioDataConName    = dcQual   gHC_REAL  (fsLit ":%")           ratioDataConKey
+realClassName       = clsQual  gHC_REAL  (fsLit "Real")         realClassKey
+integralClassName   = clsQual  gHC_REAL  (fsLit "Integral")     integralClassKey
+realFracClassName   = clsQual  gHC_REAL  (fsLit "RealFrac")     realFracClassKey
+fractionalClassName = clsQual  gHC_REAL  (fsLit "Fractional")   fractionalClassKey
+mkRationalName      = varQual  gHC_REAL  (fsLit "mkRational")   mkRationalIdKey
+fromRationalName    = varQual  gHC_REAL  (fsLit "fromRational") fromRationalClassOpKey
+toIntegerName       = varQual  gHC_REAL  (fsLit "toInteger")    toIntegerClassOpKey
+toRationalName      = varQual  gHC_REAL  (fsLit "toRational")   toRationalClassOpKey
+fromIntegralName    = varQual  gHC_REAL  (fsLit "fromIntegral") fromIntegralIdKey
+realToFracName      = varQual  gHC_REAL  (fsLit "realToFrac")   realToFracIdKey
 
 -- PrelFloat classes
 floatingClassName, realFloatClassName :: Name
