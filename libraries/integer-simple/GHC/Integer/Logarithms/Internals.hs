@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, MagicHash, UnboxedTuples, NoImplicitPrelude #-}
-{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 #include "MachDeps.h"
 

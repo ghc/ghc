@@ -5,7 +5,7 @@
            , RecordWildCards
            , PatternSynonyms
   #-}
-{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
 -- |

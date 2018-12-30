@@ -14,7 +14,7 @@
 -- -Wno-unused-top-binds is there (I hope) to stop Haddock complaining
 -- about the constraint tuples being defined but not used
 
-{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_HADDOCK not-home #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Classes

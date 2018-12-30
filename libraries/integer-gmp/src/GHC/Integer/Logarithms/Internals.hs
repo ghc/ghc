@@ -3,7 +3,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE CPP #-}
 
-{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 #include "MachDeps.h"
 
