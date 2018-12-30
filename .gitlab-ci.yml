@@ -126,8 +126,6 @@ validate-x86_64-darwin:
 
     - bash .gitlab/darwin-init.sh
     - PATH="`pwd`/toolchain/bin:$PATH"
-      # Disable sphinx PDF output as MacTeX apparently doesn't provide xelatex
-    - echo "BUILD_SPHINX_PDF=NO" >> mk/build.mk
     - echo "libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp" >> mk/build.mk
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
