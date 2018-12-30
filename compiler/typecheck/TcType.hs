@@ -225,7 +225,7 @@ import ErrUtils( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )
-import Data.Functor.Identity( Identity(..) )
+-- import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
 
@@ -1292,8 +1292,6 @@ getDFunTyLitKey (StrTyLit n) = mkOccName Name.varName (show n)  -- hm
 
 {- Note [The well-kinded type invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [The tcType invariant] in TcHsType.
-
 During type inference, we maintain this invariant
 
    (INV-TK): it is legal to call 'tcTypeKind' on any Type ty,
@@ -1347,6 +1345,19 @@ Notes:
 
 ---------------
 mkNakedAppTys :: Type -> [Type] -> Type
+mkNakedAppTys = mkAppTys
+
+mkNakedAppTy :: Type -> Type -> Type
+mkNakedAppTy = mkAppTy
+
+mkNakedCastTy :: Type -> Coercion -> Type
+mkNakedCastTy = mkCastTy
+
+nakedSubstTy :: HasCallStack => TCvSubst -> TcType  -> TcType
+nakedSubstTy = substTy
+
+{-
+mkNakedAppTys :: Type -> [Type] -> Type
 -- See Note [The well-kinded type invariant]
 mkNakedAppTys ty1                []   = ty1
 mkNakedAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
@@ -1368,7 +1379,7 @@ mkNakedCastTy :: Type -> Coercion -> Type
 mkNakedCastTy ty co = CastTy ty co
 
 nakedSubstTy :: HasCallStack => TCvSubst -> TcType  -> TcType
-nakedSubstTy subst ty
+nakedSubstTy subst ty = substTy subst ty
   | isEmptyTCvSubst subst = ty
   | otherwise             = runIdentity                   $
                             checkValidSubst subst [ty] [] $
@@ -1383,6 +1394,7 @@ nakedSubstMapper
                , tcm_hole       = \_ hole   -> return (HoleCo hole)
                , tcm_tycobinder = \subst tv _ -> return (substVarBndr subst tv)
                , tcm_tycon    = return }
+-}
 
 {-
 ************************************************************************

@@ -1742,8 +1742,7 @@ kcTyFamInstEqn tc_fam_tc
        ; discardResult $
          bindImplicitTKBndrs_Q_Tv imp_vars $
          bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
-         do { fam_app <- tcFamTyPats tc_fam_tc NotAssociated hs_pats
-            ; res_kind <- tcTypeKindM fam_app
+         do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc NotAssociated hs_pats
             ; tcCheckLHsType hs_rhs_ty res_kind }
              -- Why "_Tv" here?  Consider (Trac #14066
              --  type family Bar x y where
@@ -1893,9 +1892,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
                                                                (tyConKind  fam_tc)
                 ; return (mkTyConApp fam_tc args, rhs_kind) }
            | otherwise
-           = do { fam_app <- tcFamTyPats fam_tc mb_clsinfo hs_pats
-                ; res_kind <- tcTypeKindM fam_app
-                ; return (fam_app, res_kind) }
+           = tcFamTyPats fam_tc mb_clsinfo hs_pats
 
 {- Note [Apparently-nullary families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1929,26 +1926,28 @@ Inferred quantifiers always come first.
 -----------------
 tcFamTyPats :: TyCon -> AssocInstInfo
             -> HsTyPats GhcRn                -- Patterns
-            -> TcM TcType
+            -> TcM (TcType, TcKind)
 -- Used for both type and data families
 tcFamTyPats fam_tc mb_clsinfo hs_pats
   = do { traceTc "tcFamTyPats {" $
          vcat [ ppr fam_tc <+> dcolon <+> ppr (tyConKind fam_tc)
               , text "arity:" <+> ppr fam_arity ]
 
-       ; fam_app <- tcInferApps typeLevelMode lhs_fun fun_ty hs_pats
+       ; let fun_ty   = mkTyConApp fam_tc []
+             fam_kind = tyConKind fam_tc
+       ; (fam_app, fam_app_kind) <- tcInferApps typeLevelMode lhs_fun
+                                                fun_ty fam_kind hs_pats
 
        ; traceTc "End tcFamTyPats }" (ppr fam_app)
 
        -- Ensure that the instance is consistent its parent class
        ; addConsistencyConstraints mb_clsinfo fam_app
 
-       ; return fam_app }
+       ; return (fam_app, fam_app_kind) }
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
     lhs_fun   = noLoc (HsTyVar noExt NotPromoted (noLoc fam_name))
-    fun_ty    = mkTyConApp fam_tc []
 
 
 unravelFamInstPats :: TcType -> [TcType]
