@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving, ScopedTypeVariables #-}
-{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
 -- |

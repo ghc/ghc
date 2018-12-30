@@ -1,7 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, ImplicitParams #-}
 {-# LANGUAGE RankNTypes, PolyKinds, DataKinds #-}
-{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
 -- |

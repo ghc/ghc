@@ -1,7 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples, BangPatterns #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
-{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
 -- |

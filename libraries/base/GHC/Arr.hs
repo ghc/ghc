@@ -1,7 +1,7 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, RoleAnnotations #-}
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
 -- |

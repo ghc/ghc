@@ -4,7 +4,7 @@
            , MagicHash
            , UnboxedTuples
   #-}
-{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
