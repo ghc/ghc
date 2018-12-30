@@ -696,7 +696,7 @@ cmpLit (LitNumber nt1 a _)  (LitNumber nt2  b _)
   | nt1 == nt2 = a   `compare` b
   | otherwise  = nt1 `compare` nt2
 cmpLit (LitRational i1 e1 _) (LitRational i2 e2 _)
-  | e1 == e2 = i1 `compare` i2
+  | e1 == e2  = i1 `compare` i2
   | otherwise = e1 `compare` e2
 cmpLit (LitRubbish)         (LitRubbish)          = EQ
 cmpLit lit1 lit2
@@ -734,7 +734,7 @@ pprLiteral add_par (LitNumber nt i _)
        LitNumInt64   -> pprPrimInt64 i
        LitNumWord    -> pprPrimWord i
        LitNumWord64  -> pprPrimWord64 i
-pprLiteral add_par (LitRational i e _) =
+pprLiteral add_par (LitRational i e _) = 
     (pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)
 pprLiteral add_par (LitLabel l mb fod) =
     add_par (text "__label" <+> b <+> ppr fod)
