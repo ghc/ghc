@@ -87,6 +87,7 @@ dnl use either is considered a Feature.
 dnl ** What command to use to compile compiler sources ?
 dnl --------------------------------------------------------------
 
+AC_ARG_VAR(GHC,[Use as the path to GHC. --with-ghc=ARG takes precedence])
 AC_ARG_WITH([ghc],
 [AC_HELP_STRING([--with-ghc=ARG],
   [Use ARG as the path to GHC  [default=autodetect]])],
@@ -867,9 +868,13 @@ dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
 
 dnl ** check for installed happy binary + version
+
+AC_ARG_VAR(HAPPY,[Use as the path to happy [default=autodetect]])
 FPTOOLS_HAPPY
 
 dnl ** check for installed alex binary + version
+
+AC_ARG_VAR(ALEX,[Use as the path to alex [default=autodetect]])
 FPTOOLS_ALEX
 
 dnl --------------------------------------------------
