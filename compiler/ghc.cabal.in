@@ -272,7 +272,6 @@ Library
         CodeGen.Platform.ARM64
         CodeGen.Platform.NoRegs
         CodeGen.Platform.PPC
-        CodeGen.Platform.PPC_Darwin
         CodeGen.Platform.SPARC
         CodeGen.Platform.X86
         CodeGen.Platform.X86_64

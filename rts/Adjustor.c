@@ -287,32 +287,12 @@ extern void obscure_ccall_ret_code(void);
  */
 
 typedef struct AdjustorStub {
-#if defined(powerpc_HOST_ARCH) && defined(darwin_HOST_OS)
-    unsigned        lis;
-    unsigned        ori;
-    unsigned        lwz;
-    unsigned        mtctr;
-    unsigned        bctr;
-    StgFunPtr       code;
-#elif defined(powerpc64_HOST_ARCH) && defined(darwin_HOST_OS)
-        /* powerpc64-darwin: just guessing that it won't use fundescs. */
-    unsigned        lis;
-    unsigned        ori;
-    unsigned        rldimi;
-    unsigned        oris;
-    unsigned        ori2;
-    unsigned        lwz;
-    unsigned        mtctr;
-    unsigned        bctr;
-    StgFunPtr       code;
-#else
         /* fundesc-based ABIs */
 #define         FUNDESCS
     StgFunPtr       code;
     struct AdjustorStub
                     *toc;
     void            *env;
-#endif
     StgStablePtr    hptr;
     StgFunPtr       wptr;
     StgInt          negative_framesize;
@@ -1036,20 +1016,16 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
            whose stack layout is based on the AIX ABI.
 
            Besides (obviously) AIX, this includes
-            Mac OS 9 and BeOS/PPC (may they rest in peace),
+            Mac OS 9 and BeOS/PPC and Mac OS X PPC (may they rest in peace),
                 which use the 32-bit AIX ABI
             powerpc64-linux,
-                which uses the 64-bit AIX ABI
-            and Darwin (Mac OS X),
-                which uses the same stack layout as AIX,
-                but no function descriptors.
+                which uses the 64-bit AIX ABI.
 
            The actual stack-frame shuffling is implemented out-of-line
            in the function adjustorCode, in AdjustorAsm.S.
            Here, we set up an AdjustorStub structure, which
-           is a function descriptor (on platforms that have function
-           descriptors) or a short piece of stub code (on Darwin) to call
-           adjustorCode with a pointer to the AdjustorStub struct loaded
+           is a function descriptor with a pointer to the AdjustorStub
+           struct in the position of the TOC that is loaded
            into register r2.
 
            One nice thing about this is that there is _no_ code generated at

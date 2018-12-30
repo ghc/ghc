@@ -1566,7 +1566,7 @@ genCCall target dest_regs argsAndHints
                 = panic "genCall: Wrong number of arguments/results for fabs"
 
 -- TODO: replace 'Int' by an enum such as 'PPC_64ABI'
-data GenCCallPlatform = GCPLinux | GCPDarwin | GCPLinux64ELF !Int | GCPAIX
+data GenCCallPlatform = GCPLinux | GCPLinux64ELF !Int | GCPAIX
 
 platformToGCP :: Platform -> GenCCallPlatform
 platformToGCP platform = case platformOS platform of
@@ -1576,7 +1576,6 @@ platformToGCP platform = case platformOS platform of
         ArchPPC_64 ELF_V2 -> GCPLinux64ELF 2
         _ -> panic "PPC.CodeGen.platformToGCP: Unknown Linux"
     OSAIX    -> GCPAIX
-    OSDarwin -> GCPDarwin
     _ -> panic "PPC.CodeGen.platformToGCP: not defined for this OS"
 
 
@@ -1588,51 +1587,49 @@ genCCall'
     -> [CmmActual]        -- arguments (of mixed type)
     -> NatM InstrBlock
 
-{-
-    The PowerPC calling convention for Darwin/Mac OS X
-    is described in Apple's document
-    "Inside Mac OS X - Mach-O Runtime Architecture".
-
+{- 
     PowerPC Linux uses the System V Release 4 Calling Convention
     for PowerPC. It is described in the
     "System V Application Binary Interface PowerPC Processor Supplement".
 
-    Both conventions are similar:
+    PowerPC 64 Linux uses the System V Release 4 Calling Convention for
+    64-bit PowerPC. It is specified in
+    "64-bit PowerPC ELF Application Binary Interface Supplement 1.9"
+    (PPC64 ELF v1.9).
+
+    PowerPC 64 Linux in little endian mode uses the "Power Architecture 64-Bit
+    ELF V2 ABI Specification -- OpenPOWER ABI for Linux Supplement"
+    (PPC64 ELF v2).
+
+    AIX follows the "PowerOpen ABI: Application Binary Interface Big-Endian
+    32-Bit Hardware Implementation"
+
+    All four conventions are similar:
     Parameters may be passed in general-purpose registers starting at r3, in
     floating point registers starting at f1, or on the stack.
 
     But there are substantial differences:
     * The number of registers used for parameter passing and the exact set of
       nonvolatile registers differs (see MachRegs.hs).
-    * On Darwin, stack space is always reserved for parameters, even if they are
-      passed in registers. The called routine may choose to save parameters from
-      registers to the corresponding space on the stack.
-    * On Darwin, a corresponding amount of GPRs is skipped when a floating point
-      parameter is passed in an FPR.
+    * On AIX and 64-bit ELF, stack space is always reserved for parameters,
+      even if they are passed in registers. The called routine may choose to
+      save parameters from registers to the corresponding space on the stack.
+    * On AIX and 64-bit ELF, a corresponding amount of GPRs is skipped when
+      a floating point parameter is passed in an FPR.
     * SysV insists on either passing I64 arguments on the stack, or in two GPRs,
       starting with an odd-numbered GPR. It may skip a GPR to achieve this.
-      Darwin just treats an I64 like two separate II32s (high word first).
+      AIX just treats an I64 likt two separate I32s (high word first).
     * I64 and FF64 arguments are 8-byte aligned on the stack for SysV, but only
-      4-byte aligned like everything else on Darwin.
+      4-byte aligned like everything else on AIX.
     * The SysV spec claims that FF32 is represented as FF64 on the stack. GCC on
       PowerPC Linux does not agree, so neither do we.
-
-    PowerPC 64 Linux uses the System V Release 4 Calling Convention for
-    64-bit PowerPC. It is specified in
-    "64-bit PowerPC ELF Application Binary Interface Supplement 1.9"
-    (PPC64 ELF v1.9).
-    PowerPC 64 Linux in little endian mode uses the "Power Architecture 64-Bit
-    ELF V2 ABI Specification -- OpenPOWER ABI for Linux Supplement"
-    (PPC64 ELF v2).
-    AIX follows the "PowerOpen ABI: Application Binary Interface Big-Endian
-    32-Bit Hardware Implementation"
 
     According to all conventions, the parameter area should be part of the
     caller's stack frame, allocated in the caller's prologue code (large enough
     to hold the parameter lists for all called routines). The NCG already
     uses the stack for register spilling, leaving 64 bytes free at the top.
-    If we need a larger parameter area than that, we just allocate a new stack
-    frame just before ccalling.
+    If we need a larger parameter area than that, we increase the size
+    of the stack frame just before ccalling.
 -}
 
 
@@ -1715,7 +1712,6 @@ genCCall' dflags gcp target dest_regs args
 
         initialStackOffset = case gcp of
                              GCPAIX          -> 24
-                             GCPDarwin       -> 24
                              GCPLinux        -> 8
                              GCPLinux64ELF 1 -> 48
                              GCPLinux64ELF 2 -> 32
@@ -1723,9 +1719,6 @@ genCCall' dflags gcp target dest_regs args
             -- size of linkage area + size of arguments, in bytes
         stackDelta finalStack = case gcp of
                                 GCPAIX ->
-                                    roundTo 16 $ (24 +) $ max 32 $ sum $
-                                    map (widthInBytes . typeWidth) argReps
-                                GCPDarwin ->
                                     roundTo 16 $ (24 +) $ max 32 $ sum $
                                     map (widthInBytes . typeWidth) argReps
                                 GCPLinux -> roundTo 16 finalStack
@@ -1783,19 +1776,7 @@ genCCall' dflags gcp target dest_regs args
                 let vr_hi = getHiVRegFromLo vr_lo
 
                 case gcp of
-                    GCPAIX -> -- same as for Darwin
-                        do let storeWord vr (gpr:_) _ = MR gpr vr
-                               storeWord vr [] offset
-                                   = ST II32 vr (AddrRegImm sp (ImmInt offset))
-                           passArguments args
-                                         (drop 2 gprs)
-                                         fprs
-                                         (stackOffset+8)
-                                         (accumCode `appOL` code
-                                               `snocOL` storeWord vr_hi gprs stackOffset
-                                               `snocOL` storeWord vr_lo (drop 1 gprs) (stackOffset+4))
-                                         ((take 2 gprs) ++ accumUsed)
-                    GCPDarwin ->
+                    GCPAIX ->
                         do let storeWord vr (gpr:_) _ = MR gpr vr
                                storeWord vr [] offset
                                    = ST II32 vr (AddrRegImm sp (ImmInt offset))
@@ -1836,10 +1817,9 @@ genCCall' dflags gcp target dest_regs args
                             Fixed _ freg fcode -> fcode `snocOL` MR reg freg
                             Any _ acode -> acode reg
                     stackOffsetRes = case gcp of
-                                     -- The Darwin ABI requires that we reserve
-                                     -- stack slots for register parameters
-                                     GCPDarwin -> stackOffset + stackBytes
-                                     -- ... so does the PowerOpen ABI.
+                                     -- The PowerOpen ABI requires that we
+                                     -- reserve stack slots for register
+                                     -- parameters
                                      GCPAIX    -> stackOffset + stackBytes
                                      -- ... the SysV ABI 32-bit doesn't.
                                      GCPLinux -> stackOffset
@@ -1861,13 +1841,9 @@ genCCall' dflags gcp target dest_regs args
                               accumUsed
             where
                 stackOffset' = case gcp of
-                               GCPDarwin ->
-                                   -- stackOffset is at least 4-byte aligned
-                                   -- The Darwin ABI is happy with that.
-                                   stackOffset
                                GCPAIX ->
                                    -- The 32bit PowerOPEN ABI is happy with
-                                   -- 32bit-alignment as well...
+                                   -- 32bit-alignment ...
                                    stackOffset
                                GCPLinux
                                    -- ... the SysV ABI requires 8-byte
@@ -1910,18 +1886,6 @@ genCCall' dflags gcp target dest_regs args
                           --
                           -- The PowerOpen ABI specification can be found at
                           -- ftp://www.sourceware.org/pub/binutils/ppc-docs/ppc-poweropen/
-                          FF32 -> (1, 1, 4, fprs)
-                          FF64 -> (2, 1, 8, fprs)
-                          II64 -> panic "genCCall' passArguments II64"
-                          FF80 -> panic "genCCall' passArguments FF80"
-                      GCPDarwin ->
-                          case cmmTypeFormat rep of
-                          II8  -> (1, 0, 4, gprs)
-                          II16 -> (1, 0, 4, gprs)
-                          II32 -> (1, 0, 4, gprs)
-                          -- The Darwin ABI requires that we skip a
-                          -- corresponding number of GPRs when we use
-                          -- the FPRs.
                           FF32 -> (1, 1, 4, fprs)
                           FF64 -> (2, 1, 8, fprs)
                           II64 -> panic "genCCall' passArguments II64"

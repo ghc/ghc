@@ -30,38 +30,12 @@
     /* The following defines mirror struct AdjustorStub
        from Adjustor.c. Make sure to keep these in sync.
     */
-#if defined(powerpc_HOST_ARCH) && defined(darwin_HOST_OS)
-#define HEADER_WORDS   6
-#elif defined(powerpc64_HOST_ARCH) && defined(darwin_HOST_OS)
-#else
 #define HEADER_WORDS   3
-#endif
 
 #define HPTR_OFF        ((HEADER_WORDS    )*WS)
 #define WPTR_OFF        ((HEADER_WORDS + 1)*WS)
 #define FRAMESIZE_OFF   ((HEADER_WORDS + 2)*WS)
 #define EXTRA_WORDS_OFF ((HEADER_WORDS + 3)*WS)
-
-    /* Darwin insists on register names, everyone else prefers
-       to use numbers. */
-#if !defined(darwin_HOST_OS)
-#define r0 0
-#define r1 1
-#define r2 2
-#define r3 3
-#define r4 4
-#define r5 5
-#define r6 6
-#define r7 7
-#define r8 8
-#define r9 9
-#define r10 10
-#define r11 11
-#define r12 12
-
-#define r30 30
-#define r31 31
-#endif
 
 #if defined(aix_HOST_OS)
 /* IBM's assembler needs a different pseudo-op to declare a .text section */
@@ -83,69 +57,65 @@ adjustorCode:
     /* On entry, r2 will point to the AdjustorStub data structure. */
 
         /* save the link */
-    mflr    r0
-    STORE   r0, LINK_SLOT(r1)
+    mflr    0
+    STORE   0, LINK_SLOT(1)
     
         /* set up stack frame */
-    LOAD    r12, FRAMESIZE_OFF(r2)
+    LOAD    12, FRAMESIZE_OFF(2)
 #if defined(powerpc64_HOST_ARCH)
-    stdux   r1, r1, r12
+    stdux   1, 1, 12
 #else   
-    stwux   r1, r1, r12
+    stwux   1, 1, 12
 #endif
 
         /* Save some regs so that we can use them.
            Note that we use the "Red Zone" below the stack pointer.
         */
-    STORE   r31, -WS(r1)
-    STORE   r30, -2*WS(r1)
+    STORE   31, -WS(1)
+    STORE   30, -2*WS(1)
 
-    mr      r31, r1
-    subf    r30, r12, r31
+    mr      31, 1
+    subf    30, 12, 31
 
-    LOAD    r12, EXTRA_WORDS_OFF(r2)
-    mtctr   r12
+    LOAD    12, EXTRA_WORDS_OFF(2)
+    mtctr   12
     b       L2
 L1:
-    LOAD    r0, LINKAGE_AREA_SIZE +  8*WS(r30)
-    STORE   r0, LINKAGE_AREA_SIZE + 10*WS(r31)
-    addi    r30, r30, WS
-    addi    r31, r31, WS
+    LOAD    0, LINKAGE_AREA_SIZE +  8*WS(30)
+    STORE   0, LINKAGE_AREA_SIZE + 10*WS(31)
+    addi    30, 30, WS
+    addi    31, 31, WS
 L2:
     bdnz    L1
 
         /* Restore r30 and r31 now.
         */
-    LOAD    r31, -WS(r1)
-    LOAD    r30, -2*WS(r1)
+    LOAD    31, -WS(1)
+    LOAD    30, -2*WS(1)
 
-    STORE   r10, LINKAGE_AREA_SIZE + 9*WS(r1)
-    STORE   r9,  LINKAGE_AREA_SIZE + 8*WS(r1)
-    mr      r10, r8
-    mr      r9, r7
-    mr      r8, r6
-    mr      r7, r5
-    mr      r6, r4
-    mr      r5, r3
+    STORE   10, LINKAGE_AREA_SIZE + 9*WS(1)
+    STORE   9,  LINKAGE_AREA_SIZE + 8*WS(1)
+    mr      10, 8
+    mr      9, 7
+    mr      8, 6
+    mr      7, 5
+    mr      6, 4
+    mr      5, 3
 
-    LOAD    r3, HPTR_OFF(r2)
+    LOAD    3, HPTR_OFF(2)
 
-    LOAD    r12, WPTR_OFF(r2)
-#if defined(darwin_HOST_OS)
-    mtctr   r12
-#else
-    LOAD    r0, 0(r12)
+    LOAD    12, WPTR_OFF(2)
+    LOAD    0, 0(12)
         /* The function we're calling will never be a nested function,
            so we don't load r11. 
         */
-    mtctr   r0
-    LOAD    r2, WS(r12)
-#endif
+    mtctr   0
+    LOAD    2, WS(12)
     bctrl
 
-    LOAD    r1, 0(r1)
-    LOAD    r0, LINK_SLOT(r1)
-    mtlr    r0
+    LOAD    1, 0(1)
+    LOAD    0, LINK_SLOT(1)
+    mtlr    0
     blr
 #endif
 
