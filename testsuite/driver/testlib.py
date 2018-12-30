@@ -440,6 +440,9 @@ def cygwin( ):
 def have_vanilla( ):
     return config.have_vanilla
 
+def have_ncg( ):
+    return config.have_ncg
+
 def have_dynamic( ):
     return config.have_dynamic
 
@@ -1174,7 +1177,7 @@ def check_stats(name, way, stats_file, range_fields):
                 metric_result = failBecause('no such stats metric')
             else:
                 actual_val = int(field_match.group(1))
-                
+
                 # Store the metric so it can later be stored in a git note.
                 perf_stat = metric_dict(name, way, metric, actual_val)
                 change = None
