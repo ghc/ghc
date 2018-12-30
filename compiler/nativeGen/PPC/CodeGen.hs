@@ -904,10 +904,55 @@ getCondCode _ = panic "getCondCode(2)(powerpc)"
 -- passed back up the tree.
 
 condIntCode :: Cond -> Width -> CmmExpr -> CmmExpr -> NatM CondCode
+condIntCode cond width x y = do
+  dflags <- getDynFlags
+  condIntCode' (target32Bit (targetPlatform dflags)) cond width x y
+
+condIntCode' :: Bool -> Cond -> Width -> CmmExpr -> CmmExpr -> NatM CondCode
+
+-- simple code for 64-bit on 32-bit platforms
+condIntCode' True cond W64 x y
+  | condUnsigned cond
+  = do
+      ChildCode64 code_x x_lo <- iselExpr64 x
+      ChildCode64 code_y y_lo <- iselExpr64 y
+      let x_hi = getHiVRegFromLo x_lo
+          y_hi = getHiVRegFromLo y_lo
+      end_lbl <- getBlockIdNat
+      let code = code_x `appOL` code_y `appOL` toOL
+                 [ CMPL II32 x_hi (RIReg y_hi)
+                 , BCC NE end_lbl Nothing
+                 , CMPL II32 x_lo (RIReg y_lo)
+                 , BCC ALWAYS end_lbl Nothing
+
+                 , NEWBLOCK end_lbl
+                 ]
+      return (CondCode False cond code)
+  | otherwise
+  = do
+      ChildCode64 code_x x_lo <- iselExpr64 x
+      ChildCode64 code_y y_lo <- iselExpr64 y
+      let x_hi = getHiVRegFromLo x_lo
+          y_hi = getHiVRegFromLo y_lo
+      end_lbl <- getBlockIdNat
+      cmp_lo  <- getBlockIdNat
+      let code = code_x `appOL` code_y `appOL` toOL
+                 [ CMP II32 x_hi (RIReg y_hi)
+                 , BCC NE end_lbl Nothing
+                 , CMP II32 x_hi (RIImm (ImmInt 0))
+                 , BCC LE cmp_lo Nothing
+                 , CMPL II32 x_lo (RIReg y_lo)
+                 , BCC ALWAYS end_lbl Nothing
+                 , CMPL II32 y_lo (RIReg x_lo)
+                 , BCC ALWAYS end_lbl Nothing
+
+                 , NEWBLOCK end_lbl
+                 ]
+      return (CondCode False cond code)
 
 -- optimize pointer tag checks. Operation andi. sets condition register
 -- so cmpi ..., 0 is redundant.
-condIntCode cond _ (CmmMachOp (MO_And _) [x, CmmLit (CmmInt imm rep)])
+condIntCode' _ cond _ (CmmMachOp (MO_And _) [x, CmmLit (CmmInt imm rep)])
                  (CmmLit (CmmInt 0 _))
   | not $ condUnsigned cond,
     Just src2 <- makeImmediate rep False imm
@@ -916,7 +961,7 @@ condIntCode cond _ (CmmMachOp (MO_And _) [x, CmmLit (CmmInt imm rep)])
       let code' = code `snocOL` AND r0 src1 (RIImm src2)
       return (CondCode False cond code')
 
-condIntCode cond width x (CmmLit (CmmInt y rep))
+condIntCode' _ cond width x (CmmLit (CmmInt y rep))
   | Just src2 <- makeImmediate rep (not $ condUnsigned cond) y
   = do
       let op_len = max W32 width
@@ -927,7 +972,7 @@ condIntCode cond width x (CmmLit (CmmInt y rep))
             (if condUnsigned cond then CMPL else CMP) format src1 (RIImm src2)
       return (CondCode False cond code')
 
-condIntCode cond width x y = do
+condIntCode' _ cond width x y = do
   let op_len = max W32 width
   let extend = if condUnsigned cond then extendUExpr width op_len
                else extendSExpr width op_len
