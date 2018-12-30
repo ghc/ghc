@@ -4,7 +4,7 @@
            , ExistentialQuantification
   #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
-{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
 -- |

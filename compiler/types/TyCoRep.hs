@@ -16,7 +16,7 @@ Note [The Type-related module hierarchy]
 -}
 
 -- We expose the relevant stuff from this module via the Type module
-{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf #-}
 
 module TyCoRep (
