@@ -198,11 +198,11 @@ initStats0(void)
    initStats1() can be called after setupRtsFlags()
    ------------------------------------------------------------------------ */
 
+void initGenerationStats(void);
+
 void
 initStats1 (void)
 {
-    uint32_t i;
-
     if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
         statsPrintf("    Alloc    Copied     Live     GC     GC      TOT      TOT  Page Flts\n");
         statsPrintf("    bytes     bytes     bytes   user   elap     user     elap\n");
@@ -219,11 +219,27 @@ initStats1 (void)
         (Time *)stgMallocBytes(
             sizeof(Time)*RtsFlags.GcFlags.generations,
             "initStats");
-    for (i = 0; i < RtsFlags.GcFlags.generations; i++) {
+    initGenerationStats();
+}
+
+void
+initGenerationStats()
+{
+    for (uint32_t i = 0; i < RtsFlags.GcFlags.generations; i++) {
         GC_coll_cpu[i] = 0;
         GC_coll_elapsed[i] = 0;
         GC_coll_max_pause[i] = 0;
     }
+}
+
+/* ---------------------------------------------------------------------------
+   Reset stats of child process after fork()
+   ------------------------------------------------------------------------ */
+
+void resetChildProcessStats()
+{
+    initStats0();
+    initGenerationStats();
 }
 
 /* -----------------------------------------------------------------------------
