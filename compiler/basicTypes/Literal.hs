@@ -738,8 +738,6 @@ pprLiteral add_par (LitRational i e _) =
     (pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)
 pprLiteral add_par (LitLabel l mb fod) =
     add_par (text "__label" <+> b <+> ppr fod)
-pprLiteral add_par (LitRational i e _) = 
-    (pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
