@@ -582,7 +582,6 @@ stackFrameHeaderSize dflags
         ArchPPC_64 ELF_V2 -> 32 + 8 * 8
         _ -> panic "PPC.stackFrameHeaderSize: Unknown Linux"
       OSAIX    -> 24 + 8 * 4
-      OSDarwin -> 64 -- TODO: check ABI spec
       _ -> panic "PPC.stackFrameHeaderSize: not defined for this OS"
      where platform = targetPlatform dflags
 
@@ -602,8 +601,8 @@ maxSpillSlots dflags
 --     = 0 -- useful for testing allocMoreStack
 
 -- | The number of bytes that the stack pointer should be aligned
--- to. This is 16 both on PPC32 and PPC64 at least for Darwin, and
--- Linux (see ELF processor specific supplements).
+-- to. This is 16 both on PPC32 and PPC64 ELF (see ELF processor
+-- specific supplements).
 stackAlign :: Int
 stackAlign = 16
 

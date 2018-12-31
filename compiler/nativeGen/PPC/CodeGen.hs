@@ -1566,7 +1566,7 @@ genCCall target dest_regs argsAndHints
                 = panic "genCall: Wrong number of arguments/results for fabs"
 
 -- TODO: replace 'Int' by an enum such as 'PPC_64ABI'
-data GenCCallPlatform = GCPLinux | GCPDarwin | GCPLinux64ELF !Int | GCPAIX
+data GenCCallPlatform = GCPLinux | GCPLinux64ELF !Int | GCPAIX
 
 platformToGCP :: Platform -> GenCCallPlatform
 platformToGCP platform = case platformOS platform of
@@ -1576,7 +1576,6 @@ platformToGCP platform = case platformOS platform of
         ArchPPC_64 ELF_V2 -> GCPLinux64ELF 2
         _ -> panic "PPC.CodeGen.platformToGCP: Unknown Linux"
     OSAIX    -> GCPAIX
-    OSDarwin -> GCPDarwin
     _ -> panic "PPC.CodeGen.platformToGCP: not defined for this OS"
 
 
@@ -1588,11 +1587,8 @@ genCCall'
     -> [CmmActual]        -- arguments (of mixed type)
     -> NatM InstrBlock
 
-{-
-    The PowerPC calling convention for Darwin/Mac OS X
-    is described in Apple's document
-    "Inside Mac OS X - Mach-O Runtime Architecture".
-
+{- TODO: Remove references to Darwin and rewrite to integrate 64-bit ABIs
+         and AIX.
     PowerPC Linux uses the System V Release 4 Calling Convention
     for PowerPC. It is described in the
     "System V Application Binary Interface PowerPC Processor Supplement".
@@ -1715,7 +1711,6 @@ genCCall' dflags gcp target dest_regs args
 
         initialStackOffset = case gcp of
                              GCPAIX          -> 24
-                             GCPDarwin       -> 24
                              GCPLinux        -> 8
                              GCPLinux64ELF 1 -> 48
                              GCPLinux64ELF 2 -> 32
@@ -1723,9 +1718,6 @@ genCCall' dflags gcp target dest_regs args
             -- size of linkage area + size of arguments, in bytes
         stackDelta finalStack = case gcp of
                                 GCPAIX ->
-                                    roundTo 16 $ (24 +) $ max 32 $ sum $
-                                    map (widthInBytes . typeWidth) argReps
-                                GCPDarwin ->
                                     roundTo 16 $ (24 +) $ max 32 $ sum $
                                     map (widthInBytes . typeWidth) argReps
                                 GCPLinux -> roundTo 16 finalStack
@@ -1783,19 +1775,7 @@ genCCall' dflags gcp target dest_regs args
                 let vr_hi = getHiVRegFromLo vr_lo
 
                 case gcp of
-                    GCPAIX -> -- same as for Darwin
-                        do let storeWord vr (gpr:_) _ = MR gpr vr
-                               storeWord vr [] offset
-                                   = ST II32 vr (AddrRegImm sp (ImmInt offset))
-                           passArguments args
-                                         (drop 2 gprs)
-                                         fprs
-                                         (stackOffset+8)
-                                         (accumCode `appOL` code
-                                               `snocOL` storeWord vr_hi gprs stackOffset
-                                               `snocOL` storeWord vr_lo (drop 1 gprs) (stackOffset+4))
-                                         ((take 2 gprs) ++ accumUsed)
-                    GCPDarwin ->
+                    GCPAIX ->
                         do let storeWord vr (gpr:_) _ = MR gpr vr
                                storeWord vr [] offset
                                    = ST II32 vr (AddrRegImm sp (ImmInt offset))
@@ -1836,10 +1816,9 @@ genCCall' dflags gcp target dest_regs args
                             Fixed _ freg fcode -> fcode `snocOL` MR reg freg
                             Any _ acode -> acode reg
                     stackOffsetRes = case gcp of
-                                     -- The Darwin ABI requires that we reserve
-                                     -- stack slots for register parameters
-                                     GCPDarwin -> stackOffset + stackBytes
-                                     -- ... so does the PowerOpen ABI.
+                                     -- The PowerOpen ABI requires that we
+                                     -- reserve stack slots for register
+                                     -- parameters
                                      GCPAIX    -> stackOffset + stackBytes
                                      -- ... the SysV ABI 32-bit doesn't.
                                      GCPLinux -> stackOffset
@@ -1861,13 +1840,9 @@ genCCall' dflags gcp target dest_regs args
                               accumUsed
             where
                 stackOffset' = case gcp of
-                               GCPDarwin ->
-                                   -- stackOffset is at least 4-byte aligned
-                                   -- The Darwin ABI is happy with that.
-                                   stackOffset
                                GCPAIX ->
                                    -- The 32bit PowerOPEN ABI is happy with
-                                   -- 32bit-alignment as well...
+                                   -- 32bit-alignment ...
                                    stackOffset
                                GCPLinux
                                    -- ... the SysV ABI requires 8-byte
@@ -1910,18 +1885,6 @@ genCCall' dflags gcp target dest_regs args
                           --
                           -- The PowerOpen ABI specification can be found at
                           -- ftp://www.sourceware.org/pub/binutils/ppc-docs/ppc-poweropen/
-                          FF32 -> (1, 1, 4, fprs)
-                          FF64 -> (2, 1, 8, fprs)
-                          II64 -> panic "genCCall' passArguments II64"
-                          FF80 -> panic "genCCall' passArguments FF80"
-                      GCPDarwin ->
-                          case cmmTypeFormat rep of
-                          II8  -> (1, 0, 4, gprs)
-                          II16 -> (1, 0, 4, gprs)
-                          II32 -> (1, 0, 4, gprs)
-                          -- The Darwin ABI requires that we skip a
-                          -- corresponding number of GPRs when we use
-                          -- the FPRs.
                           FF32 -> (1, 1, 4, fprs)
                           FF64 -> (2, 1, 8, fprs)
                           II64 -> panic "genCCall' passArguments II64"
