@@ -1221,16 +1221,7 @@ case ${TargetOS} in
         RtsLinkerUseMmap=1
         ;;
     darwin|ios|watchos|tvos)
-        # Don't use mmap on powerpc/darwin as the mmap there doesn't support
-        # reallocating. Reallocating is needed to allocate jump islands just
-        # after each object image. Jumps to these jump islands use relative
-        # branches which are limited to offsets that can be represented in
-        # 24-bits.
-        if test "$TargetArch" != "powerpc" ; then
-            RtsLinkerUseMmap=1
-        else
-            RtsLinkerUseMmap=0
-        fi
+        RtsLinkerUseMmap=1
         ;;
     *)
         # Windows (which doesn't have mmap) and everything else.
