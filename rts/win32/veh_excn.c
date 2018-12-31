@@ -92,14 +92,9 @@
 // Registered exception handler
 PVOID __hs_handle = NULL;
 LPTOP_LEVEL_EXCEPTION_FILTER oldTopFilter = NULL;
-bool crash_dump = false;
-bool filter_called = false;
 
 long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
 {
-    if (!crash_dump && filter_called)
-      return EXCEPTION_CONTINUE_EXECUTION;
-
     long action   = EXCEPTION_CONTINUE_SEARCH;
     int exit_code = EXIT_FAILURE;
     ULONG_PTR what;
@@ -107,7 +102,9 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
 
     // When the system unwinds the VEH stack after having handled an excn,
     // return immediately.
-    if ((exception_data->ExceptionRecord->ExceptionFlags & EH_UNWINDING) == 0)
+    if (exception_data
+        && exception_data->ExceptionRecord
+        && (exception_data->ExceptionRecord->ExceptionFlags & EH_UNWINDING) ==0)
     {
         // Error handling cases covered by this implementation.
         switch (exception_data->ExceptionRecord->ExceptionCode) {
@@ -122,20 +119,31 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
                 action = EXCEPTION_CONTINUE_EXECUTION;
                 break;
             case EXCEPTION_ACCESS_VIOLATION:
-                what = exception_data->ExceptionRecord->ExceptionInformation[0];
-                fprintf(stderr, "Access violation in generated code"
-                                " when %s 0x%" PRIxPTR "\n"
-                                , what == 0 ? "reading"
-                                : what == 1 ? "writing"
-                                : what == 8 ? "executing data at"
-                                :             "?"
-                                , (uintptr_t) exception_data
-                                                ->ExceptionRecord
-                                                ->ExceptionInformation[1]
+              {
+                if (exception_data->ExceptionRecord->NumberParameters < 2)
+                  {
+                    fprintf(stderr, "Access violation in generated code. "
+                                    "Empty exception record.");
+                  }
+                else
+                  {
+                    what = exception_data->ExceptionRecord
+                                         ->ExceptionInformation[0];
+                    fprintf(stderr, "Access violation in generated code"
+                                    " when %s 0x%" PRIxPTR "\n"
+                                    , what == 0 ? "reading"
+                                    : what == 1 ? "writing"
+                                    : what == 8 ? "executing data at"
+                                    :             "?"
+                                    , (uintptr_t) exception_data
+                                                    ->ExceptionRecord
+                                                    ->ExceptionInformation[1]
                                 );
+                  }
                 action = EXCEPTION_CONTINUE_EXECUTION;
                 exit_code = SIGSEGV;
                 break;
+              }
             default:;
         }
 
@@ -154,19 +162,22 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
     return action;
 }
 
+/* Registered top level exception filter.  We're not very interested in handling
+   the error here, that's why we have __hs_exception_handler, but we do want
+   to register the fact that the filter was called.  This allows us to prevent
+   continuing to run when the exception was completely unhandled.
+   EXCEPTION_CONTINUE_EXECUTION is returned so that the OS gives the VEH
+   handlers a chance to run.  */
 long WINAPI __hs_exception_filter(struct _EXCEPTION_POINTERS *exception_data)
 {
-    filter_called = true;
     long result = EXCEPTION_CONTINUE_EXECUTION;
     if (oldTopFilter)
     {
         result = (*oldTopFilter)(exception_data);
         if (EXCEPTION_CONTINUE_SEARCH == result)
             result = EXCEPTION_CONTINUE_EXECUTION;
-        return result;
     }
 
-    crash_dump = true;
     return result;
 }
 
