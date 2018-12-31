@@ -1436,25 +1436,36 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl =
           GotSymbolOffset -> ppr lbl <> text "@gotoff"
 
 -- Figure out whether a label is a permissible alias
--- into the module.
+-- into the module (as embodied by 'lab'). There are two
+-- possibilities that we check for the indirectee:
+-- * either it is a static closure name to an external haskell
+--   name (i.e. export) into the same module as the alias label
+-- * or it is a static closure name for a module-internal
+--   haskell name.
+-- These are sufficient conditions for establishing e.g. a
+-- GNU assembly alias ('.equiv' directive). Sadly, there is
+-- no such thing as an alias to an imported symbol (conf.
+-- http://blog.omega-prime.co.uk/2011/07/06/the-sad-state-of-symbol-aliases/)
+-- See note [emit-time elimination of static indirections]
 --
 isAliasToLocalOrIntoThisModule :: CLabel -> CLabel -> Bool
 isAliasToLocalOrIntoThisModule alias lab
- | Just nam <- hasHaskellName lab
+ | Just nam <- haskellName
  , staticClosureLabel
  , isExternalName nam
  , Just mod <- nameModule_maybe nam
  , Just anam <- hasHaskellName alias
- , Just thismod <- nameModule_maybe anam
- = thismod == mod
+ , Just amod <- nameModule_maybe anam
+ = amod == mod
 
- | Just nam <- hasHaskellName lab
+ | Just nam <- haskellName
  , staticClosureLabel
  , isInternalName nam
  = True
 
  | otherwise = False
    where staticClosureLabel = isStaticClosureLabel lab
+         haskellName = hasHaskellName lab
 
 
 {-
@@ -1478,5 +1489,37 @@ symbols can be referenced by a tagged pointer.
 
 Currently the 'isAliasToLocalOrIntoThisModule' predicate will
 give a clue whether a label can be equated with another, already
-emitted label (which can in turn be an alias).
+emitted, label (which can in turn be an alias). The general mechanics
+is that we identify data (IND_STATIC closures) that are amenable
+to aliasing while pretty-printing of assembly output, and emit the
+'.equiv' directive instead of static data in such a case.
+
+Here is a sketch how the output is massaged:
+
+                     Consider
+newtype A = A Int
+{-# NOINLINE a #-}
+a = A 42                                -- I# 42# is the indirectee
+                                        -- 'a' is exported
+
+#### INDIRECTEE
+a1_rXq_closure:                         -- module local haskell value
+        .quad   GHC.Types.I#_con_info   -- an Int
+        .quad   42
+
+#### BEFORE
+.globl T15155.a_closure                 -- exported newtype wrapped value
+T15155.a_closure:
+        .quad   stg_IND_STATIC_info     -- the closure info
+        .quad   a1_rXq_closure+1        -- indirectee
+        .quad   0
+        .quad   0
+
+#### AFTER
+.globl T15155.a_closure                 -- exported newtype wrapped value
+.equiv a1_rXq_closure,T15155.a_closure  -- both are shared
+
+The transformation is performed because
+     T15155.a_closure `isAliasToLocalOrIntoThisModule` a1_rXq_closure+1
+returns True.
 -}
