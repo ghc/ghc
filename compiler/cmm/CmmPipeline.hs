@@ -167,7 +167,6 @@ cpsTop hsc_env proc =
         usingInconsistentPicReg
            = case (platformArch platform, platformOS platform, positionIndependent dflags)
              of   (ArchX86, OSDarwin, pic) -> pic
-                  (ArchPPC, OSDarwin, pic) -> pic
                   _                        -> False
 
 -- Note [Sinking after stack layout]
@@ -313,12 +312,6 @@ points, then at the join point we don't have a consistent value for
 
 Hence, on x86/Darwin, we have to split proc points, and then each proc
 point will get its own PIC initialisation sequence.
-
-The situation is the same for ppc/Darwin. We use essentially the same
-sequence to load the program counter onto reg:
-
-    bcl  20,31,1f
- 1: mflr reg
 
 This isn't an issue on x86/ELF, where the sequence is
 
