@@ -901,7 +901,6 @@ freeReg 30 = False
    Then use r12 as temporary register, which is also what the C ABI does.
 -}
 
-# endif
 # if defined(REG_Base)
 freeReg REG_Base  = False
 # endif

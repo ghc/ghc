@@ -279,8 +279,6 @@ the stack. See Note [Overlapping global registers] for implications.
    1            SP              (callee-save, non-volatile)
    2            AIX, powerpc64-linux:
                     RTOC        (a strange special case)
-                darwin:
-                                (caller-save, volatile)
                 powerpc32-linux:
                                 reserved for use by system
 
@@ -315,18 +313,6 @@ the stack. See Note [Overlapping global registers] for implications.
 #define REG_R7          r20
 #define REG_R8          r21
 
-#if defined(MACHREGS_darwin)
-
-#define REG_F1          f14
-#define REG_F2          f15
-#define REG_F3          f16
-#define REG_F4          f17
-
-#define REG_D1          f18
-#define REG_D2          f19
-
-#else
-
 #define REG_F1          fr14
 #define REG_F2          fr15
 #define REG_F3          fr16
@@ -340,8 +326,6 @@ the stack. See Note [Overlapping global registers] for implications.
 #define REG_D4          fr23
 #define REG_D5          fr24
 #define REG_D6          fr25
-
-#endif
 
 #define REG_Sp          r22
 #define REG_SpLim       r24
