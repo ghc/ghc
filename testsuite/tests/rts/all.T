@@ -34,7 +34,6 @@ test('derefnull',
       # The output under OS X is too unstable to readily compare
       when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(139)]),
-      when(platform('powerpc-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(opsys('mingw32'), [ignore_stderr, exit_code(11)]),
       # since these test are supposed to crash the
       # profile report will be empty always.
@@ -58,7 +57,6 @@ test('divbyzero',
       # The output under OS X is too unstable to readily compare
       when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(136)]),
       when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(136)]),
-      when(platform('powerpc-apple-darwin'), [ignore_stderr, exit_code(136)]),
       # since these test are supposed to crash the
       # profile report will be empty always.
       # so disable the check for profiling

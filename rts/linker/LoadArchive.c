@@ -47,15 +47,11 @@ static StgBool loadFatArchive(char tmp[static 20], FILE* f, pathchar* path)
 #elif defined(x86_64_HOST_ARCH)
     const uint32_t mycputype = CPU_TYPE_X86_64;
     const uint32_t mycpusubtype = CPU_SUBTYPE_X86_64_ALL;
-#elif defined(powerpc_HOST_ARCH)
-    const uint32_t mycputype = CPU_TYPE_POWERPC;
-    const uint32_t mycpusubtype = CPU_SUBTYPE_POWERPC_ALL;
-#elif defined(powerpc64_HOST_ARCH)
-    const uint32_t mycputype = CPU_TYPE_POWERPC64;
-    const uint32_t mycpusubtype = CPU_SUBTYPE_POWERPC_ALL;
 #elif defined(aarch64_HOST_ARCH)
     const uint32_t mycputype = CPU_TYPE_ARM64;
     const uint32_t mycpusubtype = CPU_SUBTYPE_ARM64_ALL;
+#elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
+#error No Darwin support on PowerPC
 #else
 #error Unknown Darwin architecture
 #endif

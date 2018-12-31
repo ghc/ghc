@@ -961,15 +961,6 @@
 #define RTS_LIBGCC_SYMBOLS
 #endif
 
-#if defined(darwin_HOST_OS) && defined(powerpc_HOST_ARCH)
-      // Symbols that don't have a leading underscore
-      // on Mac OS X. They have to receive special treatment,
-      // see machoInitSymbolsWithoutUnderscore()
-#define RTS_MACHO_NOUNDERLINE_SYMBOLS                   \
-      SymI_NeedsProto(saveFP)                           \
-      SymI_NeedsProto(restFP)
-#endif
-
 /* entirely bogus claims about types of these symbols */
 #define SymI_NeedsProto(vvv)  extern void vvv(void);
 #define SymI_NeedsDataProto(vvv)  extern StgWord vvv[];
