@@ -250,4 +250,10 @@ T14140:
 T15631:
 	$(RM) -f T15631.o T15631.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques T15631.hs | grep 'case'
-# Expecting one fewwer case expressions after fixing Trac #15631
+# Expecting one fewer case expressions after fixing Trac #15631
+
+# Expecting 2 IND_STATIC closures originally; one less with #16039 fixed
+T16039:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-llvm T16039.hs 2>/dev/null \
+	| grep -F 'closure$$def' | grep -E "stg_IND_STATIC_info" \
+	| wc -l | sed -e 's/ *//g' | grep "1"; echo $$?
