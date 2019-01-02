@@ -784,8 +784,11 @@ ifneq "$(BINDIST)" "YES"
 # Make sure we have all the GHCi libs by the time we've built
 # ghc-stage2.
 #
-GHCI_LIBS = $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-install_GHCI_LIB)) \
-	    $(compiler_stage2_GHCI_LIB)
+GHCI_LIBS = \
+    $(foreach way,$(GhcLibWays),\
+        $(foreach lib,$(PACKAGES_STAGE1),\
+            $(libraries/$(lib)_dist-install_$(way)_GHCI_LIB)) \
+        $(compiler_stage2_$(way)_GHCI_LIB))
 
 ifeq "$(UseArchivesForGhci)" "NO"
 ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(GHCI_LIBS)
