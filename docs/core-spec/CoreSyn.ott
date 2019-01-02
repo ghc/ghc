@@ -34,19 +34,19 @@ indexvar i, j, kk {{ tex k }}, aa {{ tex a }}, bb {{ tex b }}, cc {{ tex c }} ::
 grammar
 
 lit {{ tex \textsf{lit} }} :: 'Literal_' ::=
-  {{ com Literals, \coderef{basicTypes/Literal.lhs}{Literal} }}
+  {{ com Literals, \coderef{basicTypes/Literal.hs}{Literal} }}
 
 z :: 'Name_' ::= {{ com Term or type name }}
   | alpha           ::   :: Type    {{ com Type-level name }}
   | x               ::   :: Term    {{ com Term-level name }}
 
-n, m, aname {{ tex \alpha }}, xname {{ tex x }} :: 'Var_' ::= {{ com Variable names, \coderef{basicTypes/Var.lhs}{Var} }}
+n, m, aname {{ tex \alpha }}, xname {{ tex x }} :: 'Var_' ::= {{ com Variable names, \coderef{basicTypes/Var.hs}{Var} }}
   | z _ t           ::   :: IdOrTyVar   {{ com Name, labeled with type/kind }}
     {{ tex {[[z]]}^{[[t]]} }}
   | z $             :: M :: NoSupScript {{ com Name without an explicit type/kind }}
   | K               :: M :: DataCon     {{ com Data constructor }}
 
-l :: 'Label_' ::= {{ com Labels for join points, also \coderef{basicTypes/Var.lhs}{Var} }}
+l :: 'Label_' ::= {{ com Labels for join points, also \coderef{basicTypes/Var.hs}{Var} }}
   | p / I _ t     ::   :: Label   {{ com Label with join arity and type }}
     {{ tex  {[[p]]}_{[[I]]}^{[[t]]} }}
 
@@ -64,7 +64,7 @@ labels :: 'Labels_' ::= {{ com List of labels }}
   | </ li // , // i />       ::   :: List
   | empty                    :: M :: empty
 
-e, u :: 'Expr_' ::= {{ com Expressions, \coderef{coreSyn/CoreSyn.lhs}{Expr} }}
+e, u :: 'Expr_' ::= {{ com Expressions, \coderef{coreSyn/CoreSyn.hs}{Expr} }}
   | n                                            ::   :: Var  {{ com \ctor{Var}: Variable }}
   | lit                                          ::   :: Lit  {{ com \ctor{Lit}: Literal }}
   | e1 e2                                        ::   :: App  {{ com \ctor{App}: Application }}
@@ -85,31 +85,31 @@ e, u :: 'Expr_' ::= {{ com Expressions, \coderef{coreSyn/CoreSyn.lhs}{Expr} }}
   | \\ e                                         :: M :: Newline
     {{ tex \qquad \\ \multicolumn{1}{r}{[[e]]} }}
 
-binding :: 'Bind_' ::= {{ com Let-bindings, \coderef{coreSyn/CoreSyn.lhs}{Bind} }}
+binding :: 'Bind_' ::= {{ com Let-bindings, \coderef{coreSyn/CoreSyn.hs}{Bind} }}
   | n = e                         ::   :: NonRec  {{ com \ctor{NonRec}: Non-recursive binding }}
   | rec </ ni = ei // ;; // i /> ::   :: Rec     {{ com \ctor{Rec}: Recursive binding }}
 
-jbinding :: 'JoinBind_' ::= {{ com Join bindings, also \coderef{coreSyn/CoreSyn.lhs}{Bind} }}
+jbinding :: 'JoinBind_' ::= {{ com Join bindings, also \coderef{coreSyn/CoreSyn.hs}{Bind} }}
   | l </ ni // i /> = e     ::   :: NonRec {{ com \ctor{NonRec}: Non-recursive binding }}
   | rec </ li </ nij // j /> = ei // i /> :: :: Rec {{ com \ctor{Rec}: Recursive binding }}
 
-alt :: 'Alt_' ::= {{ com Case alternative, \coderef{coreSyn/CoreSyn.lhs}{Alt} }}
+alt :: 'Alt_' ::= {{ com Case alternative, \coderef{coreSyn/CoreSyn.hs}{Alt} }}
   | Kp </ ni // i /> -> e    ::   :: Alt  {{ com Constructor applied to fresh names }}
 
-tick :: 'Tickish_' ::= {{ com Internal notes, \coderef{coreSyn/CoreSyn.lhs}{Tickish} }}
+tick :: 'Tickish_' ::= {{ com Internal notes, \coderef{coreSyn/CoreSyn.hs}{Tickish} }}
 
-Kp {{ tex \mathbb{K} }} :: 'AltCon_' ::= {{ com Constructors used in patterns, \coderef{coreSyn/CoreSyn.lhs}{AltCon} }}
+Kp {{ tex \mathbb{K} }} :: 'AltCon_' ::= {{ com Constructors used in patterns, \coderef{coreSyn/CoreSyn.hs}{AltCon} }}
   | K        ::   :: DataAlt         {{ com \ctor{DataAlt}: Data constructor }}
   | lit      ::   :: LitAlt          {{ com \ctor{LitAlt}: Literal (such as an integer or character) }}
   | _        ::   :: DEFAULT         {{ com \ctor{DEFAULT}: Wildcard }}
 
-program :: 'CoreProgram_' ::= {{ com A System FC program, \coderef{coreSyn/CoreSyn.lhs}{CoreProgram} }}
+program :: 'CoreProgram_' ::= {{ com A System FC program, \coderef{coreSyn/CoreSyn.hs}{CoreProgram} }}
   | </ bindingi // i />  ::   :: CoreProgram  {{ com List of bindings }}
 
 %% TYPES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 t {{ tex \tau }}, k {{ tex \kappa }}, s {{ tex \sigma }}, phi {{ tex \phi }}
-  :: 'Type_' ::= {{ com Types/kinds, \coderef{types/TyCoRep.lhs}{Type} }}
+  :: 'Type_' ::= {{ com Types/kinds, \coderef{types/TyCoRep.hs}{Type} }}
   | n                       ::   :: TyVarTy       {{ com \ctor{TyVarTy}: Variable }}
   | t1 t2                   ::   :: AppTy         {{ com \ctor{AppTy}: Application }}
   | T </ ti // i />         ::   :: TyConApp      {{ com \ctor{TyConApp}: Application of type constructor }}
@@ -118,12 +118,12 @@ t {{ tex \tau }}, k {{ tex \kappa }}, s {{ tex \sigma }}, phi {{ tex \phi }}
   | lit                     ::   :: LitTy         {{ com \ctor{LitTy}: Type-level literal }}
   | t |> g                  ::   :: CastTy        {{ com \ctor{CastTy}: Kind cast }}
   | g                       ::   :: CoercionTy    {{ com \ctor{CoercionTy}: Coercion used in type }}
-  | tyConKind T             :: M :: tyConKind     {{ com \coderef{types/TyCon.lhs}{tyConKind} }}
+  | tyConKind T             :: M :: tyConKind     {{ com \coderef{types/TyCon.hs}{tyConKind} }}
   | t1 k1 ~# k2 t2          :: M :: unliftedEq    {{ com Metanotation for coercion types }}
     {{ tex [[t1]] \mathop{ {}^{[[k1]]}\!\! \sim_{\#}^{[[k2]]} } [[t2]] }}
   | t1 k1 ~Rep# k2 t2         :: M :: unliftedREq   {{ com Metanotation for coercion types }}
     {{ tex [[t1]] \mathop{ {}^{[[k1]]}\!\! \sim_{\mathsf{R}\#}^{[[k2]]} } [[t2]] }}
-  | literalType lit         :: M :: literalType   {{ com \coderef{basicTypes/Literal.lhs}{literalType} }}
+  | literalType lit         :: M :: literalType   {{ com \coderef{basicTypes/Literal.hs}{literalType} }}
   | ( t )                   :: M :: parens        {{ com Parentheses }}
   | { t }                   :: M :: IParens       {{ com Invisible parentheses }}
     {{ tex [[t]] }}
@@ -137,7 +137,7 @@ t {{ tex \tau }}, k {{ tex \kappa }}, s {{ tex \sigma }}, phi {{ tex \phi }}
 
 %% COERCIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-g {{ tex \gamma }}, h {{ tex \eta }} :: 'Coercion_' ::= {{ com Coercions, \coderef{types/TyCoRep.lhs}{Coercion} }}
+g {{ tex \gamma }}, h {{ tex \eta }} :: 'Coercion_' ::= {{ com Coercions, \coderef{types/TyCoRep.hs}{Coercion} }}
   | < t >                   ::   :: Refl          {{ com \ctor{Refl}: Nominal Reflexivity }}
     {{ tex {\langle [[t]] \rangle} }}
   | < t > R mg              ::   :: GRefl         {{ com \ctor{GRefl}: Generalized Reflexivity }}
@@ -163,7 +163,7 @@ g {{ tex \gamma }}, h {{ tex \eta }} :: 'Coercion_' ::= {{ com Coercions, \coder
   | ( g )                   :: M :: Parens        {{ com Parentheses }}
   | t $ liftingsubst        :: M :: Lifted        {{ com Type lifted to coercion }}
 
-prov :: 'UnivCoProvenance_' ::= {{ com \ctor{UnivCo} provenance, \coderef{types/TyCoRep.lhs}{UnivCoProvenance} }}
+prov :: 'UnivCoProvenance_' ::= {{ com \ctor{UnivCo} provenance, \coderef{types/TyCoRep.hs}{UnivCoProvenance} }}
   | UnsafeCoerceProv   ::   :: UnsafeCoerceProv  {{ com From \texttt{unsafeCoerce\#} }}
     {{ tex \mathsf{unsafe} }}
   | PhantomProv        ::   :: PhantomProv       {{ com From the need for a phantom coercion }}
@@ -171,20 +171,20 @@ prov :: 'UnivCoProvenance_' ::= {{ com \ctor{UnivCo} provenance, \coderef{types/
   | ProofIrrelProv     ::   :: ProofIrrelProv    {{ com From proof irrelevance }}
     {{ tex \mathsf{irrel} }}
 
-mg {{ tex m }} :: 'MCoercion_' ::= {{ com A possibly reflexive coercion , \coderef{types/TyCoRep.lhs}{MCoercion} }}
+mg {{ tex m }} :: 'MCoercion_' ::= {{ com A possibly reflexive coercion , \coderef{types/TyCoRep.hs}{MCoercion} }}
   | MRefl            ::   :: MRefl                {{ com \ctor{MRefl}: A trivial reflexive coercion }}
   | MCo g            ::   :: MCo                  {{ com \ctor{MCo}: Other coercions }}
     {{ tex [[g]] }}
 
-LorR :: 'LeftOrRight_' ::= {{ com left or right deconstructor, \coderef{types/TyCoRep.lhs}{LeftOrRight} }}
+LorR :: 'LeftOrRight_' ::= {{ com left or right deconstructor, \coderef{types/TyCoRep.hs}{LeftOrRight} }}
   | Left             ::   :: CLeft                {{ com \ctor{CLeft}: Left projection }}
   | Right            ::   :: CRight               {{ com \ctor{CRight}: Right projection }}
 
-C :: 'CoAxiom_' ::= {{ com Axioms, \coderef{types/TyCon.lhs}{CoAxiom} }}
+C :: 'CoAxiom_' ::= {{ com Axioms, \coderef{types/TyCon.hs}{CoAxiom} }}
   | T RA </ axBranchi // ; // i />     ::   :: CoAxiom  {{ com \ctor{CoAxiom}: Axiom }}
   | ( C )                              :: M :: Parens   {{ com Parentheses }}
 
-R {{ tex \rho }} :: 'Role_' ::= {{ com Roles, \coderef{types/CoAxiom.lhs}{Role} }}
+R {{ tex \rho }} :: 'Role_' ::= {{ com Roles, \coderef{types/CoAxiom.hs}{Role} }}
   | Nom              ::   :: Nominal              {{ com Nominal }}
     {{ tex \mathsf{N} }}
   | Rep              ::   :: Representational     {{ com Representational }}
@@ -193,17 +193,17 @@ R {{ tex \rho }} :: 'Role_' ::= {{ com Roles, \coderef{types/CoAxiom.lhs}{Role} 
     {{ tex \mathsf{P} }}
   | role_list [ i ]  :: M :: RoleListIndex        {{ com Look up in list }}
 
-axBranch, b :: 'CoAxBranch_' ::= {{ com Axiom branches, \coderef{types/TyCon.lhs}{CoAxBranch} }}
+axBranch, b :: 'CoAxBranch_' ::= {{ com Axiom branches, \coderef{types/TyCon.hs}{CoAxBranch} }}
   | forall </ ni RAi // i /> . ( </ tj // j /> ~> s )  ::   :: CoAxBranch  {{ com \ctor{CoAxBranch}: Axiom branch }}
   | ( </ axBranchi // i /> ) [ ind ]               :: M :: lookup      {{ com List lookup }}
 
-mu {{ tex \mu }} :: 'CoAxiomRule_' ::= {{ com CoAxiomRules, \coderef{types/CoAxiom.lhs}{CoAxiomRule} }}
+mu {{ tex \mu }} :: 'CoAxiomRule_' ::= {{ com CoAxiomRules, \coderef{types/CoAxiom.hs}{CoAxiomRule} }}
   | M ( I , role_list , R' )   ::  :: CoAxiomRule  {{ com Named rule, with parameter info }}
     {{ tex {[[M]]}_{([[I]], [[ role_list ]], [[R']])} }}
 
 %% TYCONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-T :: 'TyCon_' ::= {{ com Type constructors, \coderef{types/TyCon.lhs}{TyCon} }}
+T :: 'TyCon_' ::= {{ com Type constructors, \coderef{types/TyCon.hs}{TyCon} }}
   | ( -> )       ::   :: FunTyCon          {{ com \ctor{FunTyCon}: Arrow }}
 
   % the following also includes TupleTyCon, SynTyCon
@@ -213,7 +213,7 @@ T :: 'TyCon_' ::= {{ com Type constructors, \coderef{types/TyCon.lhs}{TyCon} }}
   | ' K          ::   :: PromotedDataCon   {{ com \ctor{PromotedDataCon}: Promoted data constructor }}
   | dataConTyCon K :: M :: dataConTyCon    {{ com TyCon extracted from DataCon }}
 
-H :: 'PrimTyCon_' ::= {{ com Primitive type constructors, \coderef{prelude/TysPrim.lhs}{} }}
+H :: 'PrimTyCon_' ::= {{ com Primitive type constructors, \coderef{prelude/TysPrim.hs}{} }}
   | Int#         ::   :: intPrimTyCon           {{ com Unboxed Int (\texttt{intPrimTyCon}) }}
   | ( ~# )       ::   :: eqPrimTyCon            {{ com Unboxed equality (\texttt{eqPrimTyCon}) }}
   | ( ~Rep# )      ::   :: eqReprPrimTyCon        {{ com Unboxed representational equality (\texttt{eqReprPrimTyCon}) }}
@@ -224,22 +224,22 @@ H :: 'PrimTyCon_' ::= {{ com Primitive type constructors, \coderef{prelude/TysPr
   | TYPE         ::   :: TYPE                   {{ com TYPE (\texttt{tYPETyCon}) }}
   | Levity       ::   :: Levity                 {{ com Levity (\texttt{LevityTyCon}) }}
 
-K :: 'DataCon_' ::= {{ com Data constructors, \coderef{basicTypes/DataCon.lhs}{DataCon} }}
+K :: 'DataCon_' ::= {{ com Data constructors, \coderef{basicTypes/DataCon.hs}{DataCon} }}
   | Lifted       ::   :: Lifted       {{ com \ctor{Lifted}, a lifted type }}
   | Unlifted     ::   :: Unlifted     {{ com \ctor{Unlifted}, an unlifted type }}
 
 %% CONTEXTS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-G {{ tex \Gamma }} :: 'LintM_Bindings_' ::= {{ com List of bindings, \coderef{coreSyn/CoreLint.lhs}{LintM} }}
+G {{ tex \Gamma }} :: 'LintM_Bindings_' ::= {{ com List of bindings, \coderef{coreSyn/CoreLint.hs}{LintM} }}
   | n                        ::   :: Binding   {{ com Single binding }}
   | </ Gi // , // i />       ::   :: Concat    {{ com Context concatenation }}
-  | vars_of binding          :: M :: VarsOf    {{ com \coderef{coreSyn/CoreSyn.lhs}{bindersOf} }}
+  | vars_of binding          :: M :: VarsOf    {{ com \coderef{coreSyn/CoreSyn.hs}{bindersOf} }}
 
-D {{ tex \Delta }} :: 'LintM_JoinBindings_' ::= {{ com List of join bindings, \coderef{coreSyn/CoreLint.lhs}{LintM} }}
+D {{ tex \Delta }} :: 'LintM_JoinBindings_' ::= {{ com List of join bindings, \coderef{coreSyn/CoreLint.hs}{LintM} }}
   | l                        ::   :: Binding   {{ com Single binding }}
   | </ Di // , // i />       ::   :: Concat    {{ com Context concatenation }}
   | empty                    :: M :: Empty     {{ com Empty context }}
-  | labels_of binding        :: M :: LabelsOf  {{ com \coderef{coreSyn/CoreSyn.lhs}{bindersOf} }}
+  | labels_of binding        :: M :: LabelsOf  {{ com \coderef{coreSyn/CoreSyn.hs}{bindersOf} }}
 
 O {{ tex \Omega }} :: 'VarEnv_Role_' ::= {{ com Mapping from type variables to roles }}
   | </ ni : Ri // i />       ::   :: List      {{ com List of bindings }}
