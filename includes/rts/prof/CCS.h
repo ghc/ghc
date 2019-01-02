@@ -36,7 +36,7 @@ typedef struct CostCentre_ {
     StgWord64 mem_alloc;      // align 8 (Note [struct alignment])
     StgWord   time_ticks;
 
-    StgInt is_caf;            // non-zero for a CAF cost centre
+    StgBool is_caf;           // true <=> CAF cost centre
 
     struct CostCentre_ *link;
 } CostCentre;
@@ -96,9 +96,8 @@ void startProfTimer     ( void );
 #define EMPTY_TABLE NULL
 
 /* Constants used to set is_caf flag on CostCentres */
-#define CC_IS_CAF      'c'            /* 'c'  => *is* a CAF cc           */
-#define CC_NOT_CAF     0
-
+#define CC_IS_CAF      true
+#define CC_NOT_CAF     false
 /* -----------------------------------------------------------------------------
  * Data Structures
  * ---------------------------------------------------------------------------*/
@@ -109,10 +108,15 @@ void startProfTimer     ( void );
 // result).
 
 typedef struct IndexTable_ {
+    // Just a linked list of (cc, ccs) pairs, where the `ccs` is the result of
+    // pushing `cc` to the owner of the index table (another CostCentreStack).
     CostCentre *cc;
     CostCentreStack *ccs;
     struct IndexTable_ *next;
-    uint32_t back_edge;
+    // back_edge is true when `cc` is already in the stack, so pushing it
+    // truncates or drops (see RECURSION_DROPS and RECURSION_TRUNCATES in
+    // Profiling.c).
+    bool back_edge;
 } IndexTable;
 
 

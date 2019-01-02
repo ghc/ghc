@@ -118,7 +118,7 @@ static  CostCentreStack * pruneCCSTree    ( CostCentreStack *ccs );
 static  CostCentreStack * actualPush      ( CostCentreStack *, CostCentre * );
 static  CostCentreStack * isInIndexTable  ( IndexTable *, CostCentre * );
 static  IndexTable *      addToIndexTable ( IndexTable *, CostCentreStack *,
-                                            CostCentre *, unsigned int );
+                                            CostCentre *, bool );
 static  void              ccsSetSelected  ( CostCentreStack *ccs );
 static  void              aggregateCCCosts( CostCentreStack *ccs );
 
@@ -476,48 +476,23 @@ ccsSetSelected (CostCentreStack *ccs)
    Cost-centre stack manipulation
    -------------------------------------------------------------------------- */
 
-#if defined(DEBUG)
-CostCentreStack * _pushCostCentre ( CostCentreStack *ccs, CostCentre *cc );
+/* Append ccs1 to ccs2 (ignoring any CAF cost centre at the root of ccs1 */
 CostCentreStack *
-pushCostCentre ( CostCentreStack *ccs, CostCentre *cc )
-#define pushCostCentre _pushCostCentre
+appendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
 {
     IF_DEBUG(prof,
-             traceBegin("pushing %s on ", cc->label);
-             debugCCS(ccs);
-             traceEnd(););
+            if (ccs1 != ccs2) {
+              debugBelch("Appending ");
+              debugCCS(ccs1);
+              debugBelch(" to ");
+              debugCCS(ccs2);
+              debugBelch("\n");});
 
-    return pushCostCentre(ccs,cc);
-}
-#endif
-
-/* Append ccs1 to ccs2 (ignoring any CAF cost centre at the root of ccs1 */
-
-#if defined(DEBUG)
-CostCentreStack *_appendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 );
-CostCentreStack *
-appendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
-#define appendCCS _appendCCS
-{
-  IF_DEBUG(prof,
-          if (ccs1 != ccs2) {
-            debugBelch("Appending ");
-            debugCCS(ccs1);
-            debugBelch(" to ");
-            debugCCS(ccs2);
-            debugBelch("\n");});
-  return appendCCS(ccs1,ccs2);
-}
-#endif
-
-CostCentreStack *
-appendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
-{
     if (ccs1 == ccs2) {
         return ccs1;
     }
 
-    if (ccs2 == CCS_MAIN || ccs2->cc->is_caf == CC_IS_CAF) {
+    if (ccs2 == CCS_MAIN || ccs2->cc->is_caf) {
         // stop at a CAF element
         return ccs1;
     }
@@ -532,8 +507,12 @@ appendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
 CostCentreStack *
 pushCostCentre (CostCentreStack *ccs, CostCentre *cc)
 {
-    CostCentreStack *temp_ccs, *ret;
-    IndexTable *ixtable;
+    IF_DEBUG(prof,
+             traceBegin("pushing %s on ", cc->label);
+             debugCCS(ccs);
+             traceEnd(););
+
+    CostCentreStack *ret;
 
     if (ccs == EMPTY_STACK) {
         ACQUIRE_LOCK(&ccs_mutex);
@@ -545,8 +524,8 @@ pushCostCentre (CostCentreStack *ccs, CostCentre *cc)
             return ccs;
         } else {
             // check if we've already memoized this stack
-            ixtable = ccs->indexTable;
-            temp_ccs = isInIndexTable(ixtable,cc);
+            IndexTable *ixtable = ccs->indexTable;
+            CostCentreStack *temp_ccs = isInIndexTable(ixtable,cc);
 
             if (temp_ccs != EMPTY_STACK) {
                 return temp_ccs;
@@ -585,7 +564,7 @@ pushCostCentre (CostCentreStack *ccs, CostCentre *cc)
                     new_ccs = ccs;
 #endif
                     ccs->indexTable = addToIndexTable (ccs->indexTable,
-                                                       new_ccs, cc, 1);
+                                                       new_ccs, cc, true);
                     ret = new_ccs;
                 } else {
                     ret = actualPush (ccs,cc);
@@ -649,7 +628,7 @@ actualPush_ (CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs)
 
     /* update the memoization table for the parent stack */
     ccs->indexTable = addToIndexTable(ccs->indexTable, new_ccs, cc,
-                                      0/*not a back edge*/);
+                                      false/*not a back edge*/);
 
     /* return a pointer to the new stack */
     return new_ccs;
@@ -674,7 +653,7 @@ isInIndexTable(IndexTable *it, CostCentre *cc)
 
 static IndexTable *
 addToIndexTable (IndexTable *it, CostCentreStack *new_ccs,
-                 CostCentre *cc, unsigned int back_edge)
+                 CostCentre *cc, bool back_edge)
 {
     IndexTable *new_it;
 
