@@ -31,7 +31,8 @@ if %CABMAJOR% equ 2 (
 )
 if %_cabal_ok% equ 1 (
     "%CABAL%" --project-file=%PROJ% new-build %CABFLAGS% -j exe:hadrian
-    "%CABAL%" --project-file=%PROJ% new-run   %CABFLAGS%    exe:hadrian -- ^
+    rem use new-exec instead of new-run to make sure that the build-tools (alex & happy) are in PATH
+    "%CABAL%" --project-file=%PROJ% new-exec  %CABFLAGS%    hadrian -- ^
         --directory "%CD%" ^
         %*
 ) else (
