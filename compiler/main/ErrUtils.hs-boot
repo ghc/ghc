@@ -1,10 +1,29 @@
 module ErrUtils where
 
 import GhcPrelude
-import Outputable (SDoc, PrintUnqualified )
+import Outputable (SDoc, PprStyle )
 import SrcLoc (SrcSpan)
 import Json
-import {-# SOURCE #-} DynFlags ( DynFlags, DumpFlag )
+import {-# SOURCE #-} DynFlags ( DynFlags )
+
+type DumpAction = DynFlags -> PprStyle -> DumpOptions -> String
+                  -> DumpFormat -> SDoc -> IO ()
+
+data DumpOptions = DumpOptions
+   { dumpMandatoryFile :: Bool
+   , dumpSuffix        :: String
+   }
+
+data DumpFormat
+  = FormatHaskell
+  | FormatCore
+  | FormatSTG
+  | FormatByteCode
+  | FormatCMM
+  | FormatASM
+  | FormatC
+  | FormatLLVM
+  | FormatText
 
 data Severity
   = SevOutput
@@ -21,6 +40,6 @@ type MsgDoc = SDoc
 mkLocMessage :: Severity -> SrcSpan -> MsgDoc -> MsgDoc
 mkLocMessageAnn :: Maybe String -> Severity -> SrcSpan -> MsgDoc -> MsgDoc
 getCaretDiagnostic :: Severity -> SrcSpan -> IO MsgDoc
-dumpSDoc :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
+defaultDumpAction :: DumpAction
 
 instance ToJson Severity

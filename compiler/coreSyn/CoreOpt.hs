@@ -134,7 +134,7 @@ simpleOptPgm :: DynFlags -> Module
              -> IO (CoreProgram, [CoreRule])
 -- See Note [The simple optimiser]
 simpleOptPgm dflags this_mod binds rules
-  = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
+  = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis" FormatText
                        (pprCoreBindings occ_anald_binds $$ pprRules rules );
 
        ; return (reverse binds', rules') }
