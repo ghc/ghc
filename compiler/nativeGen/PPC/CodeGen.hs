@@ -1054,7 +1054,7 @@ genJump tree
 
 genJump' :: CmmExpr -> GenCCallPlatform -> NatM InstrBlock
 
-genJump' tree (GCPLinux64ELF 1)
+genJump' tree (GCP64ELF 1)
   = do
         (target,code) <- getSomeReg tree
         return (code
@@ -1064,7 +1064,7 @@ genJump' tree (GCPLinux64ELF 1)
                `snocOL` LD II64 r11 (AddrRegImm target (ImmInt 16))
                `snocOL` BCTR [] Nothing)
 
-genJump' tree (GCPLinux64ELF 2)
+genJump' tree (GCP64ELF 2)
   = do
         (target,code) <- getSomeReg tree
         return (code
@@ -1566,16 +1566,16 @@ genCCall target dest_regs argsAndHints
                 = panic "genCall: Wrong number of arguments/results for fabs"
 
 -- TODO: replace 'Int' by an enum such as 'PPC_64ABI'
-data GenCCallPlatform = GCPLinux | GCPLinux64ELF !Int | GCPAIX
+data GenCCallPlatform = GCP32ELF | GCP64ELF !Int | GCPAIX
 
 platformToGCP :: Platform -> GenCCallPlatform
 platformToGCP platform
   = case platformOS platform of
       OSAIX    -> GCPAIX
       _ -> case platformArch platform of
-             ArchPPC           -> GCPLinux
-             ArchPPC_64 ELF_V1 -> GCPLinux64ELF 1
-             ArchPPC_64 ELF_V2 -> GCPLinux64ELF 2
+             ArchPPC           -> GCP32ELF
+             ArchPPC_64 ELF_V1 -> GCP64ELF 1
+             ArchPPC_64 ELF_V2 -> GCP64ELF 2
              _ -> panic "platformToGCP: Not PowerPC"
 
 
@@ -1665,7 +1665,7 @@ genCCall' dflags gcp target dest_regs args
             Right dyn -> do -- implement call through function pointer
                 (dynReg, dynCode) <- getSomeReg dyn
                 case gcp of
-                     GCPLinux64ELF 1 -> return ( dynCode
+                     GCP64ELF 1      -> return ( dynCode
                        `appOL`  codeBefore
                        `snocOL` ST spFormat toc (AddrRegImm sp (ImmInt 40))
                        `snocOL` LD II64 r11 (AddrRegImm dynReg (ImmInt 0))
@@ -1675,7 +1675,7 @@ genCCall' dflags gcp target dest_regs args
                        `snocOL` BCTRL usedRegs
                        `snocOL` LD spFormat toc (AddrRegImm sp (ImmInt 40))
                        `appOL`  codeAfter)
-                     GCPLinux64ELF 2 -> return ( dynCode
+                     GCP64ELF 2      -> return ( dynCode
                        `appOL`  codeBefore
                        `snocOL` ST spFormat toc (AddrRegImm sp (ImmInt 24))
                        `snocOL` MR r12 dynReg
@@ -1695,7 +1695,7 @@ genCCall' dflags gcp target dest_regs args
                        `snocOL` BCTRL usedRegs
                        `snocOL` LD spFormat toc (AddrRegImm sp (ImmInt 20))
                        `appOL`  codeAfter)
-                     _              -> return ( dynCode
+                     _               -> return ( dynCode
                        `snocOL` MTCTR dynReg
                        `appOL`  codeBefore
                        `snocOL` BCTRL usedRegs
@@ -1711,22 +1711,22 @@ genCCall' dflags gcp target dest_regs args
                 return ()
 
         initialStackOffset = case gcp of
-                             GCPAIX          -> 24
-                             GCPLinux        -> 8
-                             GCPLinux64ELF 1 -> 48
-                             GCPLinux64ELF 2 -> 32
+                             GCPAIX     -> 24
+                             GCP32ELF   -> 8
+                             GCP64ELF 1 -> 48
+                             GCP64ELF 2 -> 32
                              _ -> panic "genCall': unknown calling convention"
             -- size of linkage area + size of arguments, in bytes
         stackDelta finalStack = case gcp of
                                 GCPAIX ->
                                     roundTo 16 $ (24 +) $ max 32 $ sum $
                                     map (widthInBytes . typeWidth) argReps
-                                GCPLinux -> roundTo 16 finalStack
-                                GCPLinux64ELF 1 ->
+                                GCP32ELF -> roundTo 16 finalStack
+                                GCP64ELF 1 ->
                                     roundTo 16 $ (48 +) $ max 64 $ sum $
                                     map (roundTo 8 . widthInBytes . typeWidth)
                                         argReps
-                                GCPLinux64ELF 2 ->
+                                GCP64ELF 2 ->
                                     roundTo 16 $ (32 +) $ max 64 $ sum $
                                     map (roundTo 8 . widthInBytes . typeWidth)
                                         argReps
@@ -1759,13 +1759,14 @@ genCCall' dflags gcp target dest_regs args
         -- link editor replaces the NOP instruction with a load of the TOC
         -- from the stack to restore the TOC.
         maybeNOP = case gcp of
+           GCP32ELF        -> nilOL
            -- See Section 3.9.4 of OpenPower ABI
            GCPAIX          -> unitOL NOP
            -- See Section 3.5.11 of PPC64 ELF v1.9
-           GCPLinux64ELF 1 -> unitOL NOP
+           GCP64ELF 1      -> unitOL NOP
            -- See Section 2.3.6 of PPC64 ELF v2
-           GCPLinux64ELF 2 -> unitOL NOP
-           _               -> nilOL
+           GCP64ELF 2      -> unitOL NOP
+           _               -> panic "maybeNOP: Unknown PowerPC 64-bit ABI"
 
         passArguments [] _ _ stackOffset accumCode accumUsed = return (stackOffset, accumCode, accumUsed)
         passArguments ((arg,arg_ty):args) gprs fprs stackOffset
@@ -1788,7 +1789,7 @@ genCCall' dflags gcp target dest_regs args
                                                `snocOL` storeWord vr_hi gprs stackOffset
                                                `snocOL` storeWord vr_lo (drop 1 gprs) (stackOffset+4))
                                          ((take 2 gprs) ++ accumUsed)
-                    GCPLinux ->
+                    GCP32ELF ->
                         do let stackOffset' = roundTo 8 stackOffset
                                stackCode = accumCode `appOL` code
                                    `snocOL` ST II32 vr_hi (AddrRegImm sp (ImmInt stackOffset'))
@@ -1808,7 +1809,7 @@ genCCall' dflags gcp target dest_regs args
                                _ -> -- only one or no regs left
                                    passArguments args [] fprs (stackOffset'+8)
                                                  stackCode accumUsed
-                    GCPLinux64ELF _ -> panic "passArguments: 32 bit code"
+                    GCP64ELF _ -> panic "passArguments: 32 bit code"
 
         passArguments ((arg,rep):args) gprs fprs stackOffset accumCode accumUsed
             | reg : _ <- regs = do
@@ -1822,9 +1823,9 @@ genCCall' dflags gcp target dest_regs args
                                      -- parameters
                                      GCPAIX    -> stackOffset + stackBytes
                                      -- ... the SysV ABI 32-bit doesn't.
-                                     GCPLinux -> stackOffset
+                                     GCP32ELF -> stackOffset
                                      -- ... but SysV ABI 64-bit does.
-                                     GCPLinux64ELF _ -> stackOffset + stackBytes
+                                     GCP64ELF _ -> stackOffset + stackBytes
                 passArguments args
                               (drop nGprs gprs)
                               (drop nFprs fprs)
@@ -1845,14 +1846,14 @@ genCCall' dflags gcp target dest_regs args
                                    -- The 32bit PowerOPEN ABI is happy with
                                    -- 32bit-alignment ...
                                    stackOffset
-                               GCPLinux
+                               GCP32ELF
                                    -- ... the SysV ABI requires 8-byte
                                    -- alignment for doubles.
                                 | isFloatType rep && typeWidth rep == W64 ->
                                    roundTo 8 stackOffset
                                 | otherwise ->
                                    stackOffset
-                               GCPLinux64ELF _ ->
+                               GCP64ELF _ ->
                                    -- Everything on the stack is mapped to
                                    -- 8-byte aligned doublewords
                                    stackOffset
@@ -1863,7 +1864,7 @@ genCCall' dflags gcp target dest_regs args
                          -- "Single precision floating point values
                          -- are mapped to the second word in a single
                          -- doubleword"
-                         GCPLinux64ELF 1 -> stackOffset' + 4
+                         GCP64ELF 1      -> stackOffset' + 4
                          _               -> stackOffset'
                      | otherwise = stackOffset'
 
@@ -1890,7 +1891,7 @@ genCCall' dflags gcp target dest_regs args
                           FF64 -> (2, 1, 8, fprs)
                           II64 -> panic "genCCall' passArguments II64"
                           FF80 -> panic "genCCall' passArguments FF80"
-                      GCPLinux ->
+                      GCP32ELF ->
                           case cmmTypeFormat rep of
                           II8  -> (1, 0, 4, gprs)
                           II16 -> (1, 0, 4, gprs)
@@ -1900,7 +1901,7 @@ genCCall' dflags gcp target dest_regs args
                           FF64 -> (0, 1, 8, fprs)
                           II64 -> panic "genCCall' passArguments II64"
                           FF80 -> panic "genCCall' passArguments FF80"
-                      GCPLinux64ELF _ ->
+                      GCP64ELF _ ->
                           case cmmTypeFormat rep of
                           II8  -> (1, 0, 8, gprs)
                           II16 -> (1, 0, 8, gprs)
