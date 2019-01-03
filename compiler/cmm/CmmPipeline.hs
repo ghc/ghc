@@ -45,7 +45,7 @@ cmmPipeline hsc_env srtInfo prog =
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
 
      (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo tops
-     dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" (ppr cmms)
+     dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (ppr cmms)
 
      return (srtInfo, cmms)
 
@@ -87,7 +87,7 @@ cpsTop hsc_env proc =
                pp <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
                   minimalProcPointSet (targetPlatform dflags) call_pps g
                dumpWith dflags Opt_D_dump_cmm_proc "Proc points"
-                     (ppr l $$ ppr pp $$ ppr g)
+                     FormatCMM (ppr l $$ ppr pp $$ ppr g)
                return pp
              else
                return call_pps
@@ -107,15 +107,15 @@ cpsTop hsc_env proc =
 
        ------------- CAF analysis ----------------------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l g
-       dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" (ppr cafEnv)
+       dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" FormatText (ppr cafEnv)
 
        g <- if splitting_proc_points
             then do
                ------------- Split into separate procedures -----------------------
                let pp_map = {-# SCC "procPointAnalysis" #-}
                             procPointAnalysis proc_points g
-               dumpWith dflags Opt_D_dump_cmm_procmap "procpoint map" $
-                    ppr pp_map
+               dumpWith dflags Opt_D_dump_cmm_procmap "procpoint map"
+                  FormatCMM (ppr pp_map)
                g <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
                     splitAtProcPoints dflags l call_pps proc_points pp_map
                                       (CmmProc h l v g)
@@ -146,7 +146,7 @@ cpsTop hsc_env proc =
         dump = dumpGraph dflags
 
         dumps flag name
-           = mapM_ (dumpWith dflags flag name . ppr)
+           = mapM_ (dumpWith dflags flag name FormatCMM . ppr)
 
         condPass flag pass g dumpflag dumpname =
             if gopt flag dflags
@@ -342,7 +342,7 @@ runUniqSM m = do
 dumpGraph :: DynFlags -> DumpFlag -> String -> CmmGraph -> IO ()
 dumpGraph dflags flag name g = do
   when (gopt Opt_DoCmmLinting dflags) $ do_lint g
-  dumpWith dflags flag name (ppr g)
+  dumpWith dflags flag name FormatCMM (ppr g)
  where
   do_lint g = case cmmLintGraph dflags g of
                  Just err -> do { fatalErrorMsg dflags err
@@ -350,11 +350,11 @@ dumpGraph dflags flag name g = do
                                 }
                  Nothing  -> return ()
 
-dumpWith :: DynFlags -> DumpFlag -> String -> SDoc -> IO ()
-dumpWith dflags flag txt sdoc = do
+dumpWith :: DynFlags -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
+dumpWith dflags flag txt fmt sdoc = do
          -- ToDo: No easy way of say "dump all the cmm, *and* split
          -- them into files."  Also, -ddump-cmm-verbose doesn't play
          -- nicely with -ddump-to-file, since the headers get omitted.
-   dumpIfSet_dyn dflags flag txt sdoc
+   dumpIfSet_dyn dflags flag txt fmt sdoc
    when (not (dopt flag dflags)) $
-      dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose txt sdoc
+      dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose txt fmt sdoc
