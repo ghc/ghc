@@ -211,7 +211,8 @@ import Outputable
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
-                               , getCaretDiagnostic )
+                               , getCaretDiagnostic, DumpAction
+                               , defaultDumpAction )
 import Json
 import SysTools.Terminal ( stderrSupportsAnsiColors )
 import SysTools.BaseDir ( expandToolDir, expandTopDir )
@@ -1111,6 +1112,7 @@ data DynFlags = DynFlags {
 
   -- | MsgDoc output action: use "ErrUtils" instead of this if you can
   log_action            :: LogAction,
+  dump_action           :: DumpAction,
   flushOut              :: FlushOut,
   flushErr              :: FlushErr,
 
@@ -2033,7 +2035,8 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
 
         -- Logging
 
-        log_action = defaultLogAction,
+        log_action  = defaultLogAction,
+        dump_action = defaultDumpAction,
 
         flushOut = defaultFlushOut,
         flushErr = defaultFlushErr,

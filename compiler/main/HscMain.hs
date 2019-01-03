@@ -352,12 +352,12 @@ hscParse' mod_summary
         POk pst rdr_module -> do
             let (warns, errs) = getMessages pst dflags
             logWarnings warns
-            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" $
-                                   ppr rdr_module
-            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST" $
-                                   showAstData NoBlankSrcSpan rdr_module
-            liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics" $
-                                   ppSourceStats False rdr_module
+            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
+                        FormatHaskell (ppr rdr_module)
+            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST"
+                        FormatHaskell (showAstData NoBlankSrcSpan rdr_module)
+            liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics"
+                        FormatText (ppSourceStats False rdr_module)
             when (not $ isEmptyBag errs) $ throwErrors errs
 
             -- To get the list of extra source files, we take the list
@@ -408,8 +408,8 @@ extract_renamed_stuff mod_summary tc_result = do
     let rn_info = getRenamedStuff tc_result
 
     dflags <- getDynFlags
-    liftIO $ dumpIfSet_dyn dflags Opt_D_dump_rn_ast "Renamer" $
-                           showAstData NoBlankSrcSpan rn_info
+    liftIO $ dumpIfSet_dyn dflags Opt_D_dump_rn_ast "Renamer"
+                FormatHaskell (showAstData NoBlankSrcSpan rn_info)
 
     -- Create HIE files
     when (gopt Opt_WriteHie dflags) $ do
@@ -1388,7 +1388,7 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                       cmmToRawCmm dflags cmms
 
             let dump a = do dumpIfSet_dyn dflags Opt_D_dump_cmm_raw "Raw Cmm"
-                              (ppr a)
+                              FormatCMM (ppr a)
                             return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
@@ -1438,13 +1438,15 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags = hsc_dflags hsc_env
     cmm <- ioMsgMaybe $ parseCmmFile dflags filename
     liftIO $ do
-        dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose "Parsed Cmm" (ppr cmm)
+        dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose "Parsed Cmm"
+           FormatCMM (ppr cmm)
         let -- Make up a module name to give the NCG. We can't pass bottom here
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
             cmm_mod = mkModule (thisPackage dflags) mod_name
         (_, cmmgroup) <- cmmPipeline hsc_env (emptySRT cmm_mod) cmm
-        dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm" (ppr cmmgroup)
+        dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm"
+          FormatCMM (ppr cmmgroup)
         rawCmms <- cmmToRawCmm dflags (Stream.yield cmmgroup)
         _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
              rawCmms
@@ -1481,7 +1483,7 @@ doCodeGen hsc_env this_mod data_tycons
         -- to proc-point splitting).
 
     let dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm_from_stg
-                       "Cmm produced by codegen" (ppr a)
+                       "Cmm produced by codegen" FormatCMM (ppr a)
                      return a
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
@@ -1512,7 +1514,7 @@ doCodeGen hsc_env this_mod data_tycons
 
     let
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
-                        "Output Cmm" (ppr a)
+                        "Output Cmm" FormatCMM (ppr a)
                      return a
 
         ppr_stream2 = Stream.mapM dump2 pipeline_stream
@@ -1804,9 +1806,10 @@ hscParseThingWithLocation source linenumber parser str
 
         POk pst thing -> do
             logWarningsReportErrors (getMessages pst dflags)
-            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr thing)
-            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST" $
-                                   showAstData NoBlankSrcSpan thing
+            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
+                        FormatHaskell (ppr thing)
+            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST"
+                        FormatHaskell (showAstData NoBlankSrcSpan thing)
             return thing
 
 
