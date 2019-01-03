@@ -90,7 +90,7 @@ tracePm herald doc = do
   dflags <- getDynFlags
   printer <- mkPrintUnqualifiedDs
   liftIO $ dumpIfSet_dyn_printer printer dflags
-            Opt_D_dump_ec_trace (text herald $$ (nest 2 doc))
+            Opt_D_dump_ec_trace "" FormatText (text herald $$ (nest 2 doc))
 
 -- | Generate a fresh `Id` of a given type
 mkPmId :: Type -> DsM Id

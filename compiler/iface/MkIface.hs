@@ -167,7 +167,7 @@ mkFullIface hsc_env partial_iface = do
       addFingerprints hsc_env partial_iface
 
     -- Debug printing
-    dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" (pprModIface full_iface)
+    dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" FormatText (pprModIface full_iface)
 
     return full_iface
 
@@ -311,7 +311,7 @@ mkIface_ hsc_env
           mi_doc_hdr     = doc_hdr,
           mi_decl_docs   = decl_docs,
           mi_arg_docs    = arg_docs,
-          mi_final_exts        = () }
+          mi_final_exts  = () }
   where
      cmp_rule     = comparing ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,

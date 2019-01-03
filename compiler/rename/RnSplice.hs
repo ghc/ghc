@@ -40,7 +40,7 @@ import THNames          ( liftName )
 
 import DynFlags
 import FastString
-import ErrUtils         ( dumpIfSet_dyn_printer )
+import ErrUtils         ( dumpIfSet_dyn_printer, DumpFormat (..) )
 import TcEnv            ( tcMetaTy )
 import Hooks
 import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
@@ -746,7 +746,7 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
        ; when is_decl $  -- Raw material for -dth-dec-file
          do { dflags <- getDynFlags
             ; liftIO $ dumpIfSet_dyn_printer alwaysQualify dflags Opt_D_th_dec_file
-                                             (spliceCodeDoc loc) } }
+                                             "" FormatHaskell (spliceCodeDoc loc) } }
   where
     -- `-ddump-splices`
     spliceDebugDoc :: SrcSpan -> SDoc
