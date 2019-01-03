@@ -19,7 +19,7 @@ import CoreArity        ( etaExpand )
 import CoreMonad        ( FloatOutSwitches(..) )
 
 import DynFlags
-import ErrUtils         ( dumpIfSet_dyn )
+import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import Id               ( Id, idArity, idType, isBottomingId,
                           isJoinId, isJoinId_maybe )
 import SetLevels
@@ -174,11 +174,13 @@ floatOutwards float_sws dflags us pgm
             } ;
 
         dumpIfSet_dyn dflags Opt_D_verbose_core2core "Levels added:"
+                  FormatCore
                   (vcat (map ppr annotated_w_levels));
 
         let { (tlets, ntlets, lams) = get_stats (sum_stats fss) };
 
         dumpIfSet_dyn dflags Opt_D_dump_simpl_stats "FloatOut stats:"
+                FormatText
                 (hcat [ int tlets,  text " Lets floated to top level; ",
                         int ntlets, text " Lets floated elsewhere; from ",
                         int lams,   text " Lambda groups"]);
