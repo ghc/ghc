@@ -354,6 +354,7 @@ finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
           let platform = targetPlatform dflags
           dumpIfSet_dyn dflags
                   Opt_D_dump_asm_conflicts "Register conflict graph"
+                  FormatText
                   $ Color.dotGraph
                           (targetRegDotColor platform)
                           (Color.trivColorable platform
@@ -372,7 +373,9 @@ finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
                 $ makeImportsDoc dflags (concat (ngs_imports ngs))
         return us'
   where
-    dump_stats = dumpSDoc dflags alwaysQualify Opt_D_dump_asm_stats "NCG stats"
+    dump_stats = dumpAction dflags (mkDumpStyle dflags alwaysQualify)
+                   (dumpOptionsFromFlag Opt_D_dump_asm_stats) "NCG stats"
+                   FormatText
 
 cmmNativeGenStream :: (Outputable statics, Outputable instr
                       ,Outputable jumpDest, Instruction instr)
@@ -410,7 +413,7 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
           -- Link native code information into debug blocks
           -- See Note [What is this unwinding business?] in Debug.
           let !ldbgs = cmmDebugLink (ngs_labels ngs') (ngs_unwinds ngs') ndbgs
-          dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos"
+          dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos" FormatText
             (vcat $ map ppr ldbgs)
 
           -- Accumulate debug information for emission in finishNativeGen.
@@ -495,7 +498,7 @@ emitNativeCode dflags h sdoc = do
 
         -- dump native code
         dumpIfSet_dyn dflags
-                Opt_D_dump_asm "Asm code"
+                Opt_D_dump_asm "Asm code" FormatASM
                 sdoc
 
 -- | Complete native code generation phase for a single top-level chunk of Cmm.
@@ -536,7 +539,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 cmmToCmm dflags this_mod fixed_cmm
 
         dumpIfSet_dyn dflags
-                Opt_D_dump_opt_cmm "Optimised Cmm"
+                Opt_D_dump_opt_cmm "Optimised Cmm" FormatCMM
                 (pprCmmGroup [opt_cmm])
 
         let cmmCfg = {-# SCC "getCFG" #-}
@@ -551,11 +554,11 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
 
         dumpIfSet_dyn dflags
-                Opt_D_dump_asm_native "Native code"
+                Opt_D_dump_asm_native "Native code" FormatASM
                 (vcat $ map (pprNatCmmDecl ncgImpl) native)
 
         dumpIfSet_dyn dflags
-                Opt_D_dump_cfg_weights "CFG Weights"
+                Opt_D_dump_cfg_weights "CFG Weights" FormatText
                 (pprEdgeWeights nativeCfgWeights)
 
         -- tag instructions with register liveness information
@@ -570,6 +573,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_liveness "Liveness annotations added"
+                FormatCMM
                 (vcat $ map ppr withLiveness)
 
         -- allocate registers
@@ -609,10 +613,12 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 -- dump out what happened during register allocation
                 dumpIfSet_dyn dflags
                         Opt_D_dump_asm_regalloc "Registers allocated"
+                        FormatCMM
                         (vcat $ map (pprNatCmmDecl ncgImpl) alloced)
 
                 dumpIfSet_dyn dflags
                         Opt_D_dump_asm_regalloc_stages "Build/spill stages"
+                        FormatText
                         (vcat   $ map (\(stage, stats)
                                         -> text "# --------------------------"
                                         $$ text "#  cmm " <> int count <> text " Stage " <> int stage
@@ -651,6 +657,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
                 dumpIfSet_dyn dflags
                         Opt_D_dump_asm_regalloc "Registers allocated"
+                        FormatCMM
                         (vcat $ map (pprNatCmmDecl ncgImpl) alloced)
 
                 let mPprStats =
@@ -684,6 +691,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_cfg_weights "CFG Update information"
+                FormatText
                 ( text "stack:" <+> ppr stack_updt_blks $$
                   text "linearAlloc:" <+> ppr cfgRegAllocUpdates )
 
@@ -697,6 +705,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_cfg_weights "CFG Final Weights"
+                FormatText
                 ( pprEdgeWeights optimizedCFG )
 
         --TODO: Partially check validity of the cfg.
@@ -738,6 +747,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_expanded "Synthetic instructions expanded"
+                FormatCMM
                 (vcat $ map (pprNatCmmDecl ncgImpl) expanded)
 
         -- generate unwinding information from cmm

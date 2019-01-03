@@ -141,6 +141,7 @@ traceSmpl :: String -> SDoc -> SimplM ()
 traceSmpl herald doc
   = do { dflags <- getDynFlags
        ; liftIO $ Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_trace "Simpl Trace"
+           FormatText
            (hang (text herald) 2 doc) }
 
 {-

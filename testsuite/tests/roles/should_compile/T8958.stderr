@@ -19,7 +19,7 @@ Dependent modules: []
 Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
                      integer-gmp-1.0.2.0]
 
-==================== Typechecker ====================
+==================== Typechecked bindings ====================
 T8958.$tcMap
   = GHC.Types.TyCon
       16542473435673943392##
@@ -118,4 +118,5 @@ AbsBinds [a] []
                    [LclIdX[DFunId], Unf=DFun: \ (@ a) -> T8958.C:Nominal TYPE: a]
    Binds: $dNominal = T8958.C:Nominal @ a
    Evidence: [EvBinds{}]}
+
 

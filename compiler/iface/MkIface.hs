@@ -333,6 +333,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 
     -- Debug printing
     dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE"
+                  FormatText
                   (pprModIface new_iface)
 
     -- bug #1617: on reload we weren't updating the PrintUnqualified

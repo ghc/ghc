@@ -2023,17 +2023,25 @@ tryRules env rules fn args call_cont
 
     nodump
       | dopt Opt_D_dump_rule_rewrites dflags
-      = liftIO $ dumpSDoc dflags alwaysQualify Opt_D_dump_rule_rewrites "" empty
+      = liftIO $ do
+         let sty = mkDumpStyle dflags alwaysQualify
+         dumpAction dflags dflags sty
+           (dumpOptionsFromFlag Opt_D_dump_rule_rewrites) "" FormatCore empty
 
       | dopt Opt_D_dump_rule_firings dflags
-      = liftIO $ dumpSDoc dflags alwaysQualify Opt_D_dump_rule_firings "" empty
+      = liftIO $ do
+         let sty = mkDumpStyle dflags alwaysQualify
+         dumpAction dflags dflags sty
+           (dumpOptionsFromFlag Opt_D_dump_rule_firings) "" FormatCore empty
 
       | otherwise
       = return ()
 
     log_rule dflags flag hdr details
-      = liftIO . dumpSDoc dflags alwaysQualify flag "" $
-                   sep [text hdr, nest 4 details]
+      = liftIO $ do
+         let sty = mkDumpStyle dflags alwaysQualify
+         dumpAction dflags sty (dumpOptionsFromFlag flag) "" FormatCore $
+           sep [text hdr, nest 4 details]
 
 trySeqRules :: SimplEnv
             -> OutExpr -> InExpr   -- Scrutinee and RHS

@@ -9,7 +9,7 @@ Dependent modules: []
 Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
                      integer-gmp-1.0.2.0]
 
-==================== Typechecker ====================
+==================== Typechecked bindings ====================
 Roles2.$tcT2
   = GHC.Types.TyCon
       9065817229114433861##
@@ -56,4 +56,5 @@ $krep [InlPrag=NOUSERINLINE[~]]
 Roles2.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles2"#)
+
 
