@@ -284,7 +284,7 @@ basicKnownKeyNames
         toDynName,
 
         -- Numeric stuff
-        negateName, minusName, geName, eqName,
+        negateName, minusName, timesName, geName, eqName,
 
         -- Conversion functions
         rationalTyConName,
@@ -295,6 +295,9 @@ basicKnownKeyNames
 
         -- Int# stuff
         divIntName, modIntName,
+
+        -- Real stuff
+        raiseToPowerName,
 
         -- String stuff
         fromStringName,
@@ -1126,6 +1129,7 @@ numClassName, fromIntegerName, minusName, negateName :: Name
 numClassName      = clsQual gHC_NUM (fsLit "Num")         numClassKey
 fromIntegerName   = varQual gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
 minusName         = varQual gHC_NUM (fsLit "-")           minusClassOpKey
+timesName         = varQual gHC_NUM (fsLit "*")           timesClassOpKey
 negateName        = varQual gHC_NUM (fsLit "negate")      negateClassOpKey
 
 integerTyConName, mkIntegerName, integerSDataConName,
@@ -1208,7 +1212,7 @@ mkNaturalName         = varQual gHC_NATURAL (fsLit "mkNatural")         mkNatura
 wordToNaturalName     = varQual gHC_NATURAL (fsLit "wordToNatural#")    wordToNaturalIdKey
 
 -- GHC.Real types and classes
-rationalTyConName, mkRationalName, ratioTyConName, ratioDataConName, realClassName,
+rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
     integralClassName, realFracClassName, fractionalClassName,
     fromRationalName, toIntegerName, toRationalName, fromIntegralName,
     realToFracName :: Name
@@ -1219,12 +1223,12 @@ realClassName       = clsQual  gHC_REAL  (fsLit "Real")         realClassKey
 integralClassName   = clsQual  gHC_REAL  (fsLit "Integral")     integralClassKey
 realFracClassName   = clsQual  gHC_REAL  (fsLit "RealFrac")     realFracClassKey
 fractionalClassName = clsQual  gHC_REAL  (fsLit "Fractional")   fractionalClassKey
-mkRationalName      = varQual  gHC_REAL  (fsLit "mkRational")   mkRationalIdKey
 fromRationalName    = varQual  gHC_REAL  (fsLit "fromRational") fromRationalClassOpKey
 toIntegerName       = varQual  gHC_REAL  (fsLit "toInteger")    toIntegerClassOpKey
 toRationalName      = varQual  gHC_REAL  (fsLit "toRational")   toRationalClassOpKey
 fromIntegralName    = varQual  gHC_REAL  (fsLit "fromIntegral") fromIntegralIdKey
 realToFracName      = varQual  gHC_REAL  (fsLit "realToFrac")   realToFracIdKey
+raiseToPowerName    = varQual  gHC_REAL  (fsLit "^^")           raiseToPowerOpKey
 
 -- PrelFloat classes
 floatingClassName, realFloatClassName :: Name
@@ -2281,14 +2285,15 @@ during type checking.
 unboundKey :: Unique
 unboundKey                    = mkPreludeMiscIdUnique 158
 
-fromIntegerClassOpKey, minusClassOpKey, fromRationalClassOpKey,
+fromIntegerClassOpKey, minusClassOpKey, timesClassOpKey, fromRationalClassOpKey,
     enumFromClassOpKey, enumFromThenClassOpKey, enumFromToClassOpKey,
     enumFromThenToClassOpKey, eqClassOpKey, geClassOpKey, negateClassOpKey,
     failMClassOpKey_preMFP, bindMClassOpKey, thenMClassOpKey, returnMClassOpKey,
-    fmapClassOpKey
+    fmapClassOpKey, raiseToPowerOpKey
     :: Unique
 fromIntegerClassOpKey         = mkPreludeMiscIdUnique 160
 minusClassOpKey               = mkPreludeMiscIdUnique 161
+timesClassOpKey               = mkPreludeMiscIdUnique 571
 fromRationalClassOpKey        = mkPreludeMiscIdUnique 162
 enumFromClassOpKey            = mkPreludeMiscIdUnique 163
 enumFromThenClassOpKey        = mkPreludeMiscIdUnique 164
@@ -2302,6 +2307,7 @@ bindMClassOpKey               = mkPreludeMiscIdUnique 171 -- (>>=)
 thenMClassOpKey               = mkPreludeMiscIdUnique 172 -- (>>)
 fmapClassOpKey                = mkPreludeMiscIdUnique 173
 returnMClassOpKey             = mkPreludeMiscIdUnique 174
+raiseToPowerOpKey             = mkPreludeMiscIdUnique 572 -- (^^)
 
 -- Recursive do notation
 mfixIdKey :: Unique
@@ -2429,7 +2435,7 @@ makeStaticKey = mkPreludeMiscIdUnique 561
 -- Natural
 naturalFromIntegerIdKey, naturalToIntegerIdKey, plusNaturalIdKey,
    minusNaturalIdKey, timesNaturalIdKey, mkNaturalIdKey,
-   naturalSDataConKey, wordToNaturalIdKey, mkRationalIdKey :: Unique
+   naturalSDataConKey, wordToNaturalIdKey :: Unique
 naturalFromIntegerIdKey = mkPreludeMiscIdUnique 562
 naturalToIntegerIdKey   = mkPreludeMiscIdUnique 563
 plusNaturalIdKey        = mkPreludeMiscIdUnique 564
@@ -2438,7 +2444,6 @@ timesNaturalIdKey       = mkPreludeMiscIdUnique 566
 mkNaturalIdKey          = mkPreludeMiscIdUnique 567
 naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
-mkRationalIdKey         = mkPreludeMiscIdUnique 570
 
 {-
 ************************************************************************
