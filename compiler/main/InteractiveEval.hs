@@ -639,6 +639,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                Just subst -> do
                  let dflags = hsc_dflags hsc_env
                  dumpIfSet_dyn dflags Opt_D_dump_rtti "RTTI"
+                   FormatText
                    (fsep [text "RTTI Improvement for", ppr id, equals,
                           ppr subst])
 

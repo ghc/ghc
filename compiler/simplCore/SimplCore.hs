@@ -36,7 +36,7 @@ import FloatIn          ( floatInwards )
 import FloatOut         ( floatOutwards )
 import FamInstEnv
 import Id
-import ErrUtils         ( withTiming, withTimingD )
+import ErrUtils         ( withTiming, withTimingD, DumpFormat (..) )
 import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )
 import VarSet
 import VarEnv
@@ -90,6 +90,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
 
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
              "Grand total simplifier statistics"
+             FormatText
              (pprSimplCount stats)
 
        ; return guts2 }
@@ -576,6 +577,7 @@ simplifyExpr dflags expr
                   "Simplifier statistics" (pprSimplCount counts)
 
         ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
+                        FormatCore
                         (pprCoreExpr expr')
 
         ; return expr'
@@ -688,6 +690,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                                      binds
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
+                     FormatCore
                      (pprCoreBindings tagged_binds);
 
                 -- Get any new rules, and extend the rule base

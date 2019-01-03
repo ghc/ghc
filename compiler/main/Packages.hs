@@ -85,7 +85,7 @@ import CmdLineParser
 import System.Environment ( getEnv )
 import FastString
 import ErrUtils         ( debugTraceMsg, MsgDoc, dumpIfSet_dyn, compilationProgressMsg,
-                          withTiming )
+                          withTiming, DumpFormat (..) )
 import Exception
 
 import System.Directory
@@ -1616,6 +1616,7 @@ mkPackageState dflags dbs preload0 = do
       mod_map = Map.union mod_map1 mod_map2
 
   dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Mod Map"
+    FormatText
     (pprModuleMap mod_map)
 
   -- Force pstate to avoid leaking the dflags0 passed to mkPackageState

@@ -259,8 +259,10 @@ dumpPassResult :: DynFlags
                -> CoreProgram -> [CoreRule]
                -> IO ()
 dumpPassResult dflags unqual mb_flag hdr extra_info binds rules
-  = do { forM_ mb_flag $ \flag ->
-           Err.dumpSDoc dflags unqual flag (showSDoc dflags hdr) dump_doc
+  = do { forM_ mb_flag $ \flag -> do
+           let sty = mkDumpStyle dflags unqual
+           dumpAction dflags sty (dumpOptionsFromFlag flag)
+              (showSDoc dflags hdr) FormatCore dump_doc
 
          -- Report result size
          -- This has the side effect of forcing the intermediate to be evaluated

@@ -111,7 +111,8 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
      hashNo <- writeMixEntries dflags mod tickCount entries orig_file2
      modBreaks <- mkModBreaks hsc_env mod tickCount entries
 
-     dumpIfSet_dyn dflags Opt_D_dump_ticked "HPC" (pprLHsBinds binds1)
+     dumpIfSet_dyn dflags Opt_D_dump_ticked "HPC" FormatHaskell
+       (pprLHsBinds binds1)
 
      return (binds1, HpcInfo tickCount hashNo, Just modBreaks)
 

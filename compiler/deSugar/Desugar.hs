@@ -270,7 +270,7 @@ deSugarExpr hsc_env tc_expr = do {
        ; case mb_core_expr of
             Nothing   -> return ()
             Just expr -> dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared"
-                         (pprCoreExpr expr)
+                         FormatCore (pprCoreExpr expr)
 
        ; return (msgs, mb_core_expr) }
 

@@ -189,7 +189,8 @@ cmmLlvmGen cmm@CmmProc{} = do
                     {-# SCC "llvm_fix_regs" #-}
                     fixStgRegisters dflags cmm
 
-    dumpIfSetLlvm Opt_D_dump_opt_cmm "Optimised Cmm" (pprCmmGroup [fixed_cmm])
+    dumpIfSetLlvm Opt_D_dump_opt_cmm "Optimised Cmm"
+      FormatCMM (pprCmmGroup [fixed_cmm])
 
     -- generate llvm code from cmm
     llvmBC <- withClearVars $ genLlvmProc fixed_cmm

@@ -209,7 +209,7 @@ corePrepExpr dflags hsc_env expr =
     us <- mkSplitUniqSupply 's'
     initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
     let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
-    dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" (ppr new_expr)
+    dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
     return new_expr
 
 corePrepTopBinds :: CorePrepEnv -> [CoreBind] -> UniqSM Floats

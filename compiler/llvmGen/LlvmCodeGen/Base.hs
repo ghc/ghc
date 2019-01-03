@@ -337,10 +337,10 @@ getLlvmPlatform :: LlvmM Platform
 getLlvmPlatform = getDynFlag targetPlatform
 
 -- | Dumps the document if the corresponding flag has been set by the user
-dumpIfSetLlvm :: DumpFlag -> String -> Outp.SDoc -> LlvmM ()
-dumpIfSetLlvm flag hdr doc = do
+dumpIfSetLlvm :: DumpFlag -> String -> DumpFormat -> Outp.SDoc -> LlvmM ()
+dumpIfSetLlvm flag hdr fmt doc = do
   dflags <- getDynFlags
-  liftIO $ dumpIfSet_dyn dflags flag hdr doc
+  liftIO $ dumpIfSet_dyn dflags flag hdr fmt doc
 
 -- | Prints the given contents to the output handle
 renderLlvm :: Outp.SDoc -> LlvmM ()
@@ -353,7 +353,7 @@ renderLlvm sdoc = do
                (Outp.mkCodeStyle Outp.CStyle) sdoc
 
     -- Dump, if requested
-    dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" sdoc
+    dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" FormatLLVM sdoc
     return ()
 
 -- | Marks a variable as "used"

@@ -2711,9 +2711,9 @@ loadUnqualIfaces hsc_env ictxt
 ************************************************************************
 -}
 
+-- | Dump, with a banner, if -ddump-rn
 rnDump :: (Outputable a, Data a) => a -> TcRn ()
--- Dump, with a banner, if -ddump-rn
-rnDump rn = do { traceOptTcRn Opt_D_dump_rn (mkDumpDoc "Renamer" (ppr rn)) }
+rnDump rn = dumpOptTcRn Opt_D_dump_rn "Renamer" FormatHaskell (ppr rn)
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
@@ -2721,13 +2721,14 @@ tcDump env
 
         -- Dump short output if -ddump-types or -ddump-tc
         when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
-          (traceTcRnForUser Opt_D_dump_types short_dump) ;
+          (dumpTcRn True (dumpOptionsFromFlag Opt_D_dump_types)
+            "" FormatText short_dump) ;
 
         -- Dump bindings if -ddump-tc
-        traceOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump);
+        dumpOptTcRn Opt_D_dump_tc "Typechecker" FormatHaskell full_dump;
 
         -- Dump bindings as an hsSyn AST if -ddump-tc-ast
-        traceOptTcRn Opt_D_dump_tc_ast (mkDumpDoc "Typechecker" ast_dump)
+        dumpOptTcRn Opt_D_dump_tc_ast "Typechecker AST" FormatHaskell ast_dump
    }
   where
     short_dump = pprTcGblEnv env

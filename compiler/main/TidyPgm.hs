@@ -417,11 +417,13 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; unless (dopt Opt_D_dump_simpl dflags) $
             Err.dumpIfSet_dyn dflags Opt_D_dump_rules
               (showSDoc dflags (ppr CoreTidy <+> text "rules"))
+              Err.FormatText
               (pprRulesForUser dflags tidy_rules)
 
           -- Print one-line size info
         ; let cs = coreBindsStats tidy_binds
         ; Err.dumpIfSet_dyn dflags Opt_D_dump_core_stats "Core Stats"
+            Err.FormatText
             (text "Tidy size (terms,types,coercions)"
              <+> ppr (moduleName mod) <> colon
              <+> int (cs_tm cs)

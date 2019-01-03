@@ -1918,6 +1918,7 @@ mkDefMethBind clas inst_tys sel_id dm_name
                              [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
 
         ; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body"
+                   FormatHaskell
                    (vcat [ppr clas <+> ppr inst_tys,
                           nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
 
