@@ -64,8 +64,7 @@ import qualified IOEnv  ( liftIO )
 import Var
 import Outputable
 import FastString
-import qualified ErrUtils as Err
-import ErrUtils( Severity(..) )
+import ErrUtils( Severity(..), DumpFormat (..), dumpOptionsFromFlag )
 import UniqSupply
 import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
@@ -836,9 +835,10 @@ debugTraceMsg :: SDoc -> CoreM ()
 debugTraceMsg = msg SevDump
 
 -- | Show some labelled 'SDoc' if a particular flag is set or at a verbosity level of @-v -ddump-most@ or higher
-dumpIfSet_dyn :: DumpFlag -> String -> SDoc -> CoreM ()
-dumpIfSet_dyn flag str doc
+dumpIfSet_dyn :: DumpFlag -> String -> DumpFormat -> SDoc -> CoreM ()
+dumpIfSet_dyn flag str fmt doc
   = do { dflags <- getDynFlags
        ; unqual <- getPrintUnqualified
-       ; when (dopt flag dflags) $ liftIO $
-         Err.dumpSDoc dflags unqual flag str doc }
+       ; when (dopt flag dflags) $ liftIO $ do
+         let sty = mkDumpStyle dflags unqual
+         dumpAction dflags dflags sty (dumpOptionsFromFlag flag) str fmt doc }
