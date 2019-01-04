@@ -67,6 +67,7 @@ stage0Packages = do
              , ghcHeap
              , ghci
              , ghcPkg
+             , haskeline
              , hsc2hs
              , hpc
              , mtl
@@ -97,7 +98,6 @@ stage1Packages = do
              , ghcCompact
              , ghcPkg
              , ghcPrim
-             , haskeline
              , hp2ps
              , hsc2hs
              , intLib

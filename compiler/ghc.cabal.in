@@ -67,6 +67,7 @@ Library
                    deepseq    >= 1.4 && < 1.5,
                    directory  >= 1   && < 1.4,
                    filepath   >= 1   && < 1.5,
+                   haskeline  == 0.8.*,
                    hpc        == 0.6.*,
                    process    >= 1   && < 1.7,
                    template-haskell == 2.16.*,
@@ -93,14 +94,9 @@ Library
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         Include-Dirs: ../rts/dist/build @FFIIncludeDir@
         Build-Depends:
-            haskeline  == 0.8.*,
             ghc-prim   >= 0.5.0 && < 0.7
         Exposed-Modules:
             GHCi.Leak
-            GHCi.UI
-            GHCi.UI.Info
-            GHCi.UI.Monad
-            GHCi.UI.Tags
             GHCi.Util
 
     -- sanity-check to ensure not more than one integer flag is set
@@ -595,6 +591,10 @@ Library
         Hoopl.Dataflow
         Hoopl.Graph
         Hoopl.Label
+        GHCi.UI
+        GHCi.UI.Info
+        GHCi.UI.Monad
+        GHCi.UI.Tags
 
     Exposed-Modules:
             AsmCodeGen
