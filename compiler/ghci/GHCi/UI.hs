@@ -74,7 +74,9 @@ import qualified Lexer
 import StringBuffer
 import Outputable hiding ( printForUser, printForUserPartWay )
 
+#if defined(HAVE_INTERNAL_INTERPRETER)
 import DynamicLoading ( initializePlugins )
+#endif
 
 -- Other random utilities
 import BasicTypes hiding ( isTopLevel )
@@ -146,7 +148,9 @@ import GHC.IO.Exception ( IOErrorType(InvalidArgument) )
 import GHC.IO.Handle ( hFlushAll )
 import GHC.TopHandler ( topHandler )
 
+#if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Leak
+#endif
 
 -----------------------------------------------------------------------------
 
@@ -1849,12 +1853,15 @@ loadModule' files = do
 
   hsc_env <- GHC.getSession
 
+  let !dflags = hsc_dflags hsc_env
+
+#if defined(HAVE_INTERNAL_INTERPRETER)
   -- Grab references to the currently loaded modules so that we can
   -- see if they leak.
-  let !dflags = hsc_dflags hsc_env
   leak_indicators <- if gopt Opt_GhciLeakCheck dflags
     then liftIO $ getLeakIndicators hsc_env
     else return (panic "no leak indicators")
+#endif
 
   -- unload first
   _ <- GHC.abandonAll
@@ -1863,7 +1870,12 @@ loadModule' files = do
   GHC.setTargets targets
   success <- doLoadAndCollectInfo False LoadAllTargets
   when (gopt Opt_GhciLeakCheck dflags) $
-    liftIO $ checkLeakIndicators dflags leak_indicators
+#if defined(HAVE_INTERNAL_INTERPRETER)
+    if not $ gopt Opt_ExternalInterpreter dflags
+    then liftIO $ checkLeakIndicators dflags leak_indicators
+    else
+#endif
+      return (panic "leak checking is disabled with external interpreter")
   return success
 
 -- | @:add@ command
@@ -2898,9 +2910,13 @@ newDynFlags interactive_only minus_opts = do
 
       when (interactive_only && packageFlagsChanged idflags1 idflags0) $ do
           liftIO $ hPutStrLn stderr "cannot set package flags with :seti; use :set"
+#if defined(HAVE_INTERNAL_INTERPRETER)
       -- Load any new plugins
       hsc_env0 <- GHC.getSession
       idflags2 <- liftIO (initializePlugins hsc_env0 idflags1)
+#else
+      let idflags2 = idflags1
+#endif
       GHC.setInteractiveDynFlags idflags2
       installInteractivePrint (interactivePrint idflags1) False
 
