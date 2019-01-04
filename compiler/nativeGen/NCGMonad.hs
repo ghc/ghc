@@ -76,7 +76,6 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     pprNatCmmDecl             :: NatCmmDecl statics instr -> SDoc,
     maxSpillSlots             :: Int,
     allocatableRegs           :: [RealReg],
-    ncg_x86fp_kludge          :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgAllocMoreStack         :: Int -> NatCmmDecl statics instr
                               -> UniqSM (NatCmmDecl statics instr, [(BlockId,BlockId)]),

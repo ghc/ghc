@@ -166,9 +166,6 @@ isFloat64 _other                 = False
 -----------------------------------------------------------------------------
 
 data Width   = W8 | W16 | W32 | W64
-             | W80      -- Extended double-precision float,
-                        -- used in x86 native codegen only.
-                        -- (we use Ord, so it'd better be in this order)
              | W128
              | W256
              | W512
@@ -185,7 +182,7 @@ mrStr W64  = sLit("W64")
 mrStr W128 = sLit("W128")
 mrStr W256 = sLit("W256")
 mrStr W512 = sLit("W512")
-mrStr W80  = sLit("W80")
+
 
 
 -------- Common Widths  ------------
@@ -222,7 +219,7 @@ widthInBits W64  = 64
 widthInBits W128 = 128
 widthInBits W256 = 256
 widthInBits W512 = 512
-widthInBits W80  = 80
+
 
 widthInBytes :: Width -> Int
 widthInBytes W8   = 1
@@ -232,7 +229,7 @@ widthInBytes W64  = 8
 widthInBytes W128 = 16
 widthInBytes W256 = 32
 widthInBytes W512 = 64
-widthInBytes W80  = 10
+
 
 widthFromBytes :: Int -> Width
 widthFromBytes 1  = W8
@@ -242,7 +239,7 @@ widthFromBytes 8  = W64
 widthFromBytes 16 = W128
 widthFromBytes 32 = W256
 widthFromBytes 64 = W512
-widthFromBytes 10 = W80
+
 widthFromBytes n  = pprPanic "no width for given number of bytes" (ppr n)
 
 -- log_2 of the width in bytes, useful for generating shifts.
@@ -254,7 +251,7 @@ widthInLog W64  = 3
 widthInLog W128 = 4
 widthInLog W256 = 5
 widthInLog W512 = 6
-widthInLog W80  = panic "widthInLog: F80"
+
 
 -- widening / narrowing
 

@@ -1328,12 +1328,12 @@ Roughly in order of "includes more information":
    number of bits.  It may represent a signed or unsigned integer, a
    floating-point value, or an address.
 
-    data Width = W8 | W16 | W32 | W64 | W80 | W128
+    data Width = W8 | W16 | W32 | W64  | W128
 
  - Size, which is used in the native code generator, is Width +
    floating point information.
 
-   data Size = II8 | II16 | II32 | II64 | FF32 | FF64 | FF80
+   data Size = II8 | II16 | II32 | II64 | FF32 | FF64
 
    it is necessary because e.g. the instruction to move a 64-bit float
    on x86 (movsd) is different from the instruction to move a 64-bit

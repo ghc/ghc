@@ -97,7 +97,6 @@ cmmToLlvmType ty | isVecType ty   = LMVector (vecLength ty) (cmmToLlvmType (vecE
 widthToLlvmFloat :: Width -> LlvmType
 widthToLlvmFloat W32  = LMFloat
 widthToLlvmFloat W64  = LMDouble
-widthToLlvmFloat W80  = LMFloat80
 widthToLlvmFloat W128 = LMFloat128
 widthToLlvmFloat w    = panic $ "widthToLlvmFloat: Bad float size: " ++ show w
 
