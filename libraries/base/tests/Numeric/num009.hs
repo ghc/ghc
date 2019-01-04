@@ -1,8 +1,6 @@
 -- trac #2059
 --
--- Note that this test fails miserably when compiled to use X87 floating point.
--- For instance, in the case of (sin 1e20) the X86 FSIN instruction doesn't even
--- get the sign right on my machine.
+
 
 module Main(main) where
 
