@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -- | Maybe type
 module GHC.Maybe
