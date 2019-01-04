@@ -223,7 +223,7 @@ data CoAxBranch
     , cab_tvs      :: [TyVar]       -- Bound type variables; not necessarily fresh
     , cab_eta_tvs  :: [TyVar]       -- Eta-reduced tyvars
                                     -- See Note [CoAxBranch type variables]
-                                    -- cab_tvs and cab_lhsmay be eta-reduded; see FamInstEnv
+                                    -- cab_tvs and cab_lhs may be eta-reduded; see
                                     -- Note [Eta reduction for data families]
     , cab_cvs      :: [CoVar]       -- Bound coercion variables
                                     -- Always empty, for now.

@@ -615,10 +615,11 @@ If we're not careful during tidying, then when this program is compiled with
     axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
       Sing _ = DataFamilyInstanceLHS.R:SingMyKind_ _
 
-Its misleading to have a wildcard type appearing on the RHS like
-that. To avoid this issue, during tidying, we always opt to add a
-numeric suffix to types that are simply `_`. That way, you instead end
-up with:
+It's misleading to have a wildcard type appearing on the RHS like
+that. To avoid this issue, when building a CoAxiom (which is what eventually
+gets printed above), we tidy all the variables in an env that already contains
+'_'. Thus, any variable named '_' will be renamed, giving us the nicer output
+here:
 
   COERCION AXIOMS
     axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
@@ -626,7 +627,9 @@ up with:
 
 Which is at least legal syntax.
 
-See also Note [CoAxBranch type variables] in CoAxiom
+See also Note [CoAxBranch type variables] in CoAxiom; note that we
+are tidying (changing OccNames only), not freshening, in accordance with
+that Note.
 -}
 
 -- all axiom roles are Nominal, as this is only used with type families
