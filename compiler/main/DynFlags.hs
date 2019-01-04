@@ -5833,19 +5833,23 @@ data SseVersion = SSE1
 isSseEnabled :: DynFlags -> Bool
 isSseEnabled dflags = case platformArch (targetPlatform dflags) of
     ArchX86_64 -> True
-    ArchX86    -> sseVersion dflags >= Just SSE1
+    ArchX86    -> True
     _          -> False
 
 isSse2Enabled :: DynFlags -> Bool
 isSse2Enabled dflags = case platformArch (targetPlatform dflags) of
-    ArchX86_64 -> -- SSE2 is fixed on for x86_64.  It would be
-                  -- possible to make it optional, but we'd need to
-                  -- fix at least the foreign call code where the
-                  -- calling convention specifies the use of xmm regs,
-                  -- and possibly other places.
-                  True
-    ArchX86    -> sseVersion dflags >= Just SSE2
+  -- We Assume  SSE1 and SSE2 operations are available on both
+  -- x86 and x86_64. Historically we didn't default to SSE2 and
+  -- SSE1 on x86, which results in defacto nondeterminism for how
+  -- rounding behaves in the associated x87 floating point instructions
+  -- because variations in the spill/fpu stack placement of arguments for
+  -- operations would change the precision and final result of what
+  -- would otherwise be the same expressions with respect to single or
+  -- double precision IEEE floating point computations.
+    ArchX86_64 -> True
+    ArchX86    -> True
     _          -> False
+
 
 isSse4_2Enabled :: DynFlags -> Bool
 isSse4_2Enabled dflags = sseVersion dflags >= Just SSE42

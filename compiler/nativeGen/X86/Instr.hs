@@ -10,7 +10,7 @@
 
 module X86.Instr (Instr(..), Operand(..), PrefetchVariant(..), JumpDest(..),
                   getJumpDestBlockId, canShortcut, shortcutStatics,
-                  shortcutJump, i386_insert_ffrees, allocMoreStack,
+                  shortcutJump, allocMoreStack,
                   maxSpillSlots, archWordFormat )
 where
 
@@ -240,46 +240,14 @@ data Instr
         | BT          Format Imm Operand
         | NOP
 
-        -- x86 Float Arithmetic.
-        -- Note that we cheat by treating G{ABS,MOV,NEG} of doubles
-        -- as single instructions right up until we spit them out.
-        -- all the 3-operand fake fp insns are src1 src2 dst
-        -- and furthermore are constrained to be fp regs only.
-        -- IMPORTANT: keep is_G_insn up to date with any changes here
-        | GMOV        Reg Reg -- src(fpreg), dst(fpreg)
-        | GLD         Format AddrMode Reg -- src, dst(fpreg)
-        | GST         Format Reg AddrMode -- src(fpreg), dst
 
-        | GLDZ        Reg -- dst(fpreg)
-        | GLD1        Reg -- dst(fpreg)
-
-        | GFTOI       Reg Reg -- src(fpreg), dst(intreg)
-        | GDTOI       Reg Reg -- src(fpreg), dst(intreg)
-
-        | GITOF       Reg Reg -- src(intreg), dst(fpreg)
-        | GITOD       Reg Reg -- src(intreg), dst(fpreg)
-
-        | GDTOF       Reg Reg -- src(fpreg), dst(fpreg)
-
-        | GADD        Format Reg Reg Reg -- src1, src2, dst
-        | GDIV        Format Reg Reg Reg -- src1, src2, dst
-        | GSUB        Format Reg Reg Reg -- src1, src2, dst
-        | GMUL        Format Reg Reg Reg -- src1, src2, dst
-
-                -- FP compare.  Cond must be `elem` [EQQ, NE, LE, LTT, GE, GTT]
-                -- Compare src1 with src2; set the Zero flag iff the numbers are
-                -- comparable and the comparison is True.  Subsequent code must
-                -- test the %eflags zero flag regardless of the supplied Cond.
-        | GCMP        Cond Reg Reg -- src1, src2
-
-        | GABS        Format Reg Reg -- src, dst
-        | GNEG        Format Reg Reg -- src, dst
-        | GSQRT       Format Reg Reg -- src, dst
-        | GSIN        Format CLabel CLabel Reg Reg -- src, dst
-        | GCOS        Format CLabel CLabel Reg Reg -- src, dst
-        | GTAN        Format CLabel CLabel Reg Reg -- src, dst
-
-        | GFREE         -- do ffree on all x86 regs; an ugly hack
+        -- We need to support the FSTP (x87 store and pop) instruction
+        -- so that we can correctly read off the return value of an
+        -- x86 CDECL C function call when its floating point.
+        -- so we dont include a register argument, and just use st(0)
+        -- this instruction is used ONLY for return values of C ffi calls
+        -- in x86_32 abi
+        | X87Store         Format  AddrMode -- st(0), dst
 
 
         -- SSE2 floating point: we use a restricted set of the available SSE2
@@ -427,33 +395,7 @@ x86_regUsageOfInstr platform instr
     CLTD   _            -> mkRU [eax] [edx]
     NOP                 -> mkRU [] []
 
-    GMOV   src dst      -> mkRU [src] [dst]
-    GLD    _ src dst    -> mkRU (use_EA src []) [dst]
-    GST    _ src dst    -> mkRUR (src : use_EA dst [])
-
-    GLDZ   dst          -> mkRU [] [dst]
-    GLD1   dst          -> mkRU [] [dst]
-
-    GFTOI  src dst      -> mkRU [src] [dst]
-    GDTOI  src dst      -> mkRU [src] [dst]
-
-    GITOF  src dst      -> mkRU [src] [dst]
-    GITOD  src dst      -> mkRU [src] [dst]
-
-    GDTOF  src dst      -> mkRU [src] [dst]
-
-    GADD   _ s1 s2 dst  -> mkRU [s1,s2] [dst]
-    GSUB   _ s1 s2 dst  -> mkRU [s1,s2] [dst]
-    GMUL   _ s1 s2 dst  -> mkRU [s1,s2] [dst]
-    GDIV   _ s1 s2 dst  -> mkRU [s1,s2] [dst]
-
-    GCMP   _ src1 src2   -> mkRUR [src1,src2]
-    GABS   _ src dst     -> mkRU [src] [dst]
-    GNEG   _ src dst     -> mkRU [src] [dst]
-    GSQRT  _ src dst     -> mkRU [src] [dst]
-    GSIN   _ _ _ src dst -> mkRU [src] [dst]
-    GCOS   _ _ _ src dst -> mkRU [src] [dst]
-    GTAN   _ _ _ src dst -> mkRU [src] [dst]
+    X87Store    _  dst    -> mkRUR ( use_EA dst [])
 
     CVTSS2SD   src dst  -> mkRU [src] [dst]
     CVTSD2SS   src dst  -> mkRU [src] [dst]
@@ -603,33 +545,8 @@ x86_patchRegsOfInstr instr env
     JMP op regs          -> JMP (patchOp op) regs
     JMP_TBL op ids s lbl -> JMP_TBL (patchOp op) ids s lbl
 
-    GMOV src dst         -> GMOV (env src) (env dst)
-    GLD  fmt src dst     -> GLD fmt (lookupAddr src) (env dst)
-    GST  fmt src dst     -> GST fmt (env src) (lookupAddr dst)
-
-    GLDZ dst            -> GLDZ (env dst)
-    GLD1 dst            -> GLD1 (env dst)
-
-    GFTOI src dst       -> GFTOI (env src) (env dst)
-    GDTOI src dst       -> GDTOI (env src) (env dst)
-
-    GITOF src dst       -> GITOF (env src) (env dst)
-    GITOD src dst       -> GITOD (env src) (env dst)
-
-    GDTOF src dst       -> GDTOF (env src) (env dst)
-
-    GADD fmt s1 s2 dst   -> GADD fmt (env s1) (env s2) (env dst)
-    GSUB fmt s1 s2 dst   -> GSUB fmt (env s1) (env s2) (env dst)
-    GMUL fmt s1 s2 dst   -> GMUL fmt (env s1) (env s2) (env dst)
-    GDIV fmt s1 s2 dst   -> GDIV fmt (env s1) (env s2) (env dst)
-
-    GCMP fmt src1 src2   -> GCMP fmt (env src1) (env src2)
-    GABS fmt src dst     -> GABS fmt (env src) (env dst)
-    GNEG fmt src dst     -> GNEG fmt (env src) (env dst)
-    GSQRT fmt src dst    -> GSQRT fmt (env src) (env dst)
-    GSIN fmt l1 l2 src dst       -> GSIN fmt l1 l2 (env src) (env dst)
-    GCOS fmt l1 l2 src dst       -> GCOS fmt l1 l2 (env src) (env dst)
-    GTAN fmt l1 l2 src dst       -> GTAN fmt l1 l2 (env src) (env dst)
+    -- literally only support storing the top x87 stack value st(0)
+    X87Store  fmt  dst     -> X87Store fmt  (lookupAddr dst)
 
     CVTSS2SD src dst    -> CVTSS2SD (env src) (env dst)
     CVTSD2SS src dst    -> CVTSD2SS (env src) (env dst)
@@ -752,8 +669,7 @@ x86_mkSpillInstr dflags reg delta slot
     case targetClassOfReg platform reg of
            RcInteger   -> MOV (archWordFormat is32Bit)
                               (OpReg reg) (OpAddr (spRel dflags off))
-           RcDouble    -> GST FF80 reg (spRel dflags off) {- RcFloat/RcDouble -}
-           RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel dflags off))
+           RcDouble    -> MOV FF64 (OpReg reg) (OpAddr (spRel dflags off))
            _         -> panic "X86.mkSpillInstr: no match"
     where platform = targetPlatform dflags
           is32Bit = target32Bit platform
@@ -772,8 +688,7 @@ x86_mkLoadInstr dflags reg delta slot
         case targetClassOfReg platform reg of
               RcInteger -> MOV (archWordFormat is32Bit)
                                (OpAddr (spRel dflags off)) (OpReg reg)
-              RcDouble  -> GLD FF80 (spRel dflags off) reg {- RcFloat/RcDouble -}
-              RcDoubleSSE -> MOV FF64 (OpAddr (spRel dflags off)) (OpReg reg)
+              RcDouble  -> MOV FF64 (OpAddr (spRel dflags off)) (OpReg reg)
               _           -> panic "X86.x86_mkLoadInstr"
     where platform = targetPlatform dflags
           is32Bit = target32Bit platform
@@ -827,6 +742,7 @@ x86_isMetaInstr instr
 
 
 
+---  TODO: why is there
 -- | Make a reg-reg move instruction.
 --      On SPARC v8 there are no instructions to move directly between
 --      floating point and integer regs. If we need to do that then we
@@ -844,8 +760,10 @@ x86_mkRegRegMoveInstr platform src dst
                      ArchX86    -> MOV II32 (OpReg src) (OpReg dst)
                      ArchX86_64 -> MOV II64 (OpReg src) (OpReg dst)
                      _          -> panic "x86_mkRegRegMoveInstr: Bad arch"
-        RcDouble    -> GMOV src dst
-        RcDoubleSSE -> MOV FF64 (OpReg src) (OpReg dst)
+        RcDouble    ->  MOV FF64 (OpReg src) (OpReg dst)
+        -- this code is the lie we tell ourselves because both float and double
+        -- use the same register class.on x86_64 and x86 32bit with SSE2,
+        -- more plainly, both use the XMM registers
         _     -> panic "X86.RegInfo.mkRegRegMoveInstr: no match"
 
 -- | Check whether an instruction represents a reg-reg move.
@@ -969,58 +887,6 @@ x86_mkStackDeallocInstr platform amount
       ArchX86    -> [ADD II32 (OpImm (ImmInt amount)) (OpReg esp)]
       ArchX86_64 -> [ADD II64 (OpImm (ImmInt amount)) (OpReg rsp)]
       _ -> panic "x86_mkStackDeallocInstr"
-
-i386_insert_ffrees
-        :: [GenBasicBlock Instr]
-        -> [GenBasicBlock Instr]
-
-i386_insert_ffrees blocks
-   | any (any is_G_instr) [ instrs | BasicBlock _ instrs <- blocks ]
-   = map insertGFREEs blocks
-   | otherwise
-   = blocks
- where
-   insertGFREEs (BasicBlock id insns)
-     = BasicBlock id (insertBeforeNonlocalTransfers GFREE insns)
-
-insertBeforeNonlocalTransfers :: Instr -> [Instr] -> [Instr]
-insertBeforeNonlocalTransfers insert insns
-     = foldr p [] insns
-     where p insn r = case insn of
-                        CALL _ _    -> insert : insn : r
-                        JMP _ _     -> insert : insn : r
-                        JXX_GBL _ _ -> panic "insertBeforeNonlocalTransfers: cannot handle JXX_GBL"
-                        _           -> insn : r
-
-
--- if you ever add a new FP insn to the fake x86 FP insn set,
--- you must update this too
-is_G_instr :: Instr -> Bool
-is_G_instr instr
-   = case instr of
-        GMOV{}          -> True
-        GLD{}           -> True
-        GST{}           -> True
-        GLDZ{}          -> True
-        GLD1{}          -> True
-        GFTOI{}         -> True
-        GDTOI{}         -> True
-        GITOF{}         -> True
-        GITOD{}         -> True
-        GDTOF{}         -> True
-        GADD{}          -> True
-        GDIV{}          -> True
-        GSUB{}          -> True
-        GMUL{}          -> True
-        GCMP{}          -> True
-        GABS{}          -> True
-        GNEG{}          -> True
-        GSQRT{}         -> True
-        GSIN{}          -> True
-        GCOS{}          -> True
-        GTAN{}          -> True
-        GFREE           -> panic "is_G_instr: GFREE (!)"
-        _               -> False
 
 
 --
