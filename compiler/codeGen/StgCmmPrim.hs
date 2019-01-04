@@ -1723,6 +1723,9 @@ vecElemProjectCast _      _        _   =  Nothing
 
 -- Check to make sure that we can generate code for the specified vector type
 -- given the current set of dynamic flags.
+-- Currently these checks are specific to x86 and x86_64 architecture.
+-- This should be fixed!
+-- In particular,
 checkVecCompatibility :: DynFlags -> PrimOpVecCat -> Length -> Width -> FCode ()
 checkVecCompatibility dflags vcat l w = do
     when (hscTarget dflags /= HscLlvm) $ do

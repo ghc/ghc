@@ -81,7 +81,6 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
                             | passFloatInXmm          -> k (RegisterParam (DoubleReg s), (vs, fs, ds, ls, ss))
                         (W64, (vs, fs, d:ds, ls, ss))
                             | not passFloatInXmm      -> k (RegisterParam d, (vs, fs, ds, ls, ss))
-                        (W80, _) -> panic "F80 unsupported register type"
                         _ -> (assts, (r:rs))
               int = case (w, regs) of
                       (W128, _) -> panic "W128 unsupported register type"
@@ -95,12 +94,16 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
               w  = typeWidth ty
               gcp | isGcPtrType ty = VGcPtr
                   | otherwise      = VNonGcPtr
+              -- basically this now means handle args one way on x86_64 and x86
+              -- and do the registers differently on the other platforms
+              -- THIS should be cleanuped.
               passFloatInXmm = passFloatArgsInXmm dflags
 
 passFloatArgsInXmm :: DynFlags -> Bool
 passFloatArgsInXmm dflags = case platformArch (targetPlatform dflags) of
                               ArchX86_64 -> True
-                              _          -> False
+                              ArchX86    -> False --
+                              _ -> False
 
 -- We used to spill vector registers to the stack since the LLVM backend didn't
 -- support vector registers in its calling convention. However, this has now
