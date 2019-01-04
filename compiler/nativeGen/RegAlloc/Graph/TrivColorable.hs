@@ -160,8 +160,8 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
 trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclusions
         | let cALLOCATABLE_REGS_DOUBLE
                   =        (case platformArch platform of
-                            ArchX86       -> 6
-                            ArchX86_64    -> 0
+                            ArchX86       -> 8
+                            ArchX86_64    -> 10
                             ArchPPC       -> 26
                             ArchSPARC     -> 11
                             ArchSPARC64   -> panic "trivColorable ArchSPARC64"
@@ -183,31 +183,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
 
         = count3 < cALLOCATABLE_REGS_DOUBLE
 
-trivColorable platform virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts exclusions
-        | let cALLOCATABLE_REGS_SSE
-                  =        (case platformArch platform of
-                            ArchX86       -> 8
-                            ArchX86_64    -> 10
-                            ArchPPC       -> 0
-                            ArchSPARC     -> 0
-                            ArchSPARC64   -> panic "trivColorable ArchSPARC64"
-                            ArchPPC_64 _  -> 0
-                            ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            ArchARM64     -> panic "trivColorable ArchARM64"
-                            ArchAlpha     -> panic "trivColorable ArchAlpha"
-                            ArchMipseb    -> panic "trivColorable ArchMipseb"
-                            ArchMipsel    -> panic "trivColorable ArchMipsel"
-                            ArchJavaScript-> panic "trivColorable ArchJavaScript"
-                            ArchUnknown   -> panic "trivColorable ArchUnknown")
-        , count2        <- accSqueeze 0 cALLOCATABLE_REGS_SSE
-                                (virtualRegSqueeze RcDoubleSSE)
-                                conflicts
 
-        , count3        <- accSqueeze  count2    cALLOCATABLE_REGS_SSE
-                                (realRegSqueeze   RcDoubleSSE)
-                                exclusions
-
-        = count3 < cALLOCATABLE_REGS_SSE
 
 
 -- Specification Code ----------------------------------------------------------
