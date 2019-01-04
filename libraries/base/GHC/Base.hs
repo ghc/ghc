@@ -543,6 +543,9 @@ class Functor f => Applicative f where
     -- efficient than the default one. In particular, if 'fmap' is an
     -- expensive operation, it is likely better to use 'liftA2' than to
     -- 'fmap' over the structure and then use '<*>'.
+    --
+    -- This became a typeclass method in 4.10.0.0. Prior to that, it was
+    -- a function defined in terms of '<*>' and 'fmap'.
     liftA2 :: (a -> b -> c) -> f a -> f b -> f c
     liftA2 f x = (<*>) (fmap f x)
 
