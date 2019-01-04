@@ -138,10 +138,10 @@ findNameUses infos span0 string =
     locToSpans <$> findLoc infos span0 string
   where
     locToSpans (modinfo,name',span') =
-        stripSurrounding (span' : map toSrcSpan spans)
+        stripSurrounding (span' : map toSrcSpan srcSpans)
       where
         toSrcSpan = RealSrcSpan . spaninfoSrcSpan
-        spans = filter ((== Just name') . fmap getName . spaninfoVar)
+        srcSpans = filter ((== Just name') . fmap getName . spaninfoVar)
                        (modinfoSpans modinfo)
 
 -- | Filter out redundant spans which surround/contain other spans.
