@@ -424,6 +424,7 @@ PACKAGES_STAGE0 = binary text transformers mtl parsec Cabal/Cabal hpc ghc-boot-t
 ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
 endif
+PACKAGES_STAGE0 += haskeline
 
 PACKAGES_STAGE1 += ghc-prim
 PACKAGES_STAGE1 += $(INTEGER_LIBRARY)

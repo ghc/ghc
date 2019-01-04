@@ -322,8 +322,8 @@ $(eval $(call distdir-opts,rts,dist,1))
 # We like plenty of warnings.
 WARNING_OPTS += -Wall
 WARNING_OPTS += -Wextra
-WARNING_OPTS += -Wstrict-prototypes 
-WARNING_OPTS += -Wmissing-prototypes 
+WARNING_OPTS += -Wstrict-prototypes
+WARNING_OPTS += -Wmissing-prototypes
 WARNING_OPTS += -Wmissing-declarations
 WARNING_OPTS += -Winline
 WARNING_OPTS += -Waggregate-return
@@ -341,7 +341,7 @@ endif
 #WARNING_OPTS += -Wshadow
 #WARNING_OPTS += -Wcast-qual
 
-# This one seems buggy on GCC 4.1.2, which is the only GCC version we 
+# This one seems buggy on GCC 4.1.2, which is the only GCC version we
 # have that can bootstrap the SPARC build. We end up with lots of supurious
 # warnings of the form "cast increases required alignment of target type".
 # Some legitimate warnings can be fixed by adding an intermediate cast to
@@ -373,7 +373,7 @@ rts_CC_OPTS += -DUSE_LIBFFI_FOR_ADJUSTORS
 endif
 
 # We *want* type-checking of hand-written cmm.
-rts_HC_OPTS += -dcmm-lint 
+rts_HC_OPTS += -dcmm-lint
 
 # -fno-strict-aliasing is required for the runtime, because we often
 # use a variety of types to represent closure pointers (StgPtr,
@@ -637,4 +637,3 @@ install_libffi_headers :
 $(eval $(call clean-target,rts,dist,rts/dist))
 
 BINDIST_EXTRAS += rts/package.conf.in
-
