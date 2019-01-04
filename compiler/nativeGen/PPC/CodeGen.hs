@@ -1889,7 +1889,18 @@ genCCall' dflags gcp target dest_regs args
                           FF32 -> (1, 1, 4, fprs)
                           FF64 -> (2, 1, 8, fprs)
                           II64 -> panic "genCCall' passArguments II64"
-                          FF80 -> panic "genCCall' passArguments FF80"
+
+                      GCPDarwin ->
+                          case cmmTypeFormat rep of
+                          II8  -> (1, 0, 4, gprs)
+                          II16 -> (1, 0, 4, gprs)
+                          II32 -> (1, 0, 4, gprs)
+                          -- The Darwin ABI requires that we skip a
+                          -- corresponding number of GPRs when we use
+                          -- the FPRs.
+                          FF32 -> (1, 1, 4, fprs)
+                          FF64 -> (2, 1, 8, fprs)
+                          II64 -> panic "genCCall' passArguments II64"
                       GCPLinux ->
                           case cmmTypeFormat rep of
                           II8  -> (1, 0, 4, gprs)
@@ -1899,7 +1910,6 @@ genCCall' dflags gcp target dest_regs args
                           FF32 -> (0, 1, 4, fprs)
                           FF64 -> (0, 1, 8, fprs)
                           II64 -> panic "genCCall' passArguments II64"
-                          FF80 -> panic "genCCall' passArguments FF80"
                       GCPLinux64ELF _ ->
                           case cmmTypeFormat rep of
                           II8  -> (1, 0, 8, gprs)
@@ -1911,7 +1921,6 @@ genCCall' dflags gcp target dest_regs args
                           -- the FPRs.
                           FF32 -> (1, 1, 8, fprs)
                           FF64 -> (1, 1, 8, fprs)
-                          FF80 -> panic "genCCall' passArguments FF80"
 
         moveResult reduceToFF32 =
             case dest_regs of
