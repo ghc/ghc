@@ -20,7 +20,9 @@ Build-Type: Simple
 Cabal-Version: >=1.10
 
 Flag ghci
-    Description: Build GHCi support.
+    Description:
+        Build internal interpreter support. This can be used for for GHCi,
+        Template Haskell, etc, instead of 'iserv'.
     Default: False
     Manual: True
 
@@ -36,12 +38,17 @@ Executable ghc
     Build-Depends: base       >= 4   && < 5,
                    array      >= 0.1 && < 0.6,
                    bytestring >= 0.9 && < 0.11,
+                   containers >= 0.5 && < 0.7,
+                   deepseq    == 1.4.*,
                    directory  >= 1   && < 1.4,
-                   process    >= 1   && < 1.7,
                    filepath   >= 1   && < 1.5,
+                   haskeline  == 0.7.*,
+                   process    >= 1   && < 1.7,
+                   time       >= 1.8 && < 1.10,
                    transformers == 0.5.*,
                    ghc-boot   == @ProjectVersionMunged@,
-                   ghc        == @ProjectVersionMunged@
+                   ghc        == @ProjectVersionMunged@,
+                   ghci       == @ProjectVersionMunged@
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.7
@@ -54,36 +61,33 @@ Executable ghc
                  -Wnoncanonical-monad-instances
                  -Wnoncanonical-monoid-instances
 
+    Other-Modules:
+        GHCi.UI
+        GHCi.UI.Info
+        GHCi.UI.Monad
+        GHCi.UI.Tags
+
+    Other-Extensions:
+        BangPatterns
+        FlexibleInstances
+        LambdaCase
+        MagicHash
+        MultiWayIf
+        OverloadedStrings
+        RankNTypes
+        RecordWildCards
+        ScopedTypeVariables
+        UnboxedTuples
+        ViewPatterns
+
     if flag(ghci)
         -- NB: this is never built by the bootstrapping GHC+libraries
         Build-depends:
-            containers     >= 0.5 && < 0.7,
-            deepseq        == 1.4.*,
-            ghc-prim       >= 0.5.0 && < 0.7,
-            ghci           == @ProjectVersionMunged@,
-            haskeline      == 0.7.*,
-            time           >= 1.8 && < 1.10
+            ghc-prim       >= 0.5.0 && < 0.7
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
-        GHC-Options: -fno-warn-name-shadowing
         Other-Modules:
             GHCi.Leak
-            GHCi.UI
-            GHCi.UI.Info
-            GHCi.UI.Monad
-            GHCi.UI.Tags
             GHCi.Util
-        Other-Extensions:
-            BangPatterns
-            FlexibleInstances
-            LambdaCase
-            MagicHash
-            MultiWayIf
-            OverloadedStrings
-            RankNTypes
-            RecordWildCards
-            ScopedTypeVariables
-            UnboxedTuples
-            ViewPatterns
 
     -- The flag being True by default, this reflects the
     -- mk/config.mk.in logic for GhcThreaded (which ends up
