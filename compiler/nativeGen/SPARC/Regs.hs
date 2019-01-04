@@ -104,7 +104,6 @@ virtualRegSqueeze cls vr
                 VirtualRegD{}           -> 1
                 _other                  -> 0
 
-        _other -> 0
 
 {-# INLINE realRegSqueeze #-}
 realRegSqueeze :: RegClass -> RealReg -> Int
@@ -135,7 +134,6 @@ realRegSqueeze cls rr
 
                 RealRegPair{}           -> 1
 
-        _other -> 0
 
 -- | All the allocatable registers in the machine,
 --      including register pairs.
