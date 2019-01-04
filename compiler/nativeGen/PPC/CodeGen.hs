@@ -1593,7 +1593,7 @@ genCCall'
     -> [CmmActual]        -- arguments (of mixed type)
     -> NatM InstrBlock
 
-{- 
+{-
     PowerPC Linux uses the System V Release 4 Calling Convention
     for PowerPC. It is described in the
     "System V Application Binary Interface PowerPC Processor Supplement".
@@ -1906,8 +1906,8 @@ genCCall' dflags gcp target dest_regs args
                           FF32 -> (1, 1, 4, fprs)
                           FF64 -> (2, 1, 8, fprs)
                           II64 -> panic "genCCall' passArguments II64"
-                          FF80 -> panic "genCCall' passArguments FF80"
-                      GCP32ELF ->
+
+                      GCPLinux ->
                           case cmmTypeFormat rep of
                           II8  -> (1, 0, 4, gprs)
                           II16 -> (1, 0, 4, gprs)
@@ -1916,8 +1916,7 @@ genCCall' dflags gcp target dest_regs args
                           FF32 -> (0, 1, 4, fprs)
                           FF64 -> (0, 1, 8, fprs)
                           II64 -> panic "genCCall' passArguments II64"
-                          FF80 -> panic "genCCall' passArguments FF80"
-                      GCP64ELF _ ->
+                      GCPLinux64ELF _ ->
                           case cmmTypeFormat rep of
                           II8  -> (1, 0, 8, gprs)
                           II16 -> (1, 0, 8, gprs)
@@ -1928,7 +1927,6 @@ genCCall' dflags gcp target dest_regs args
                           -- the FPRs.
                           FF32 -> (1, 1, 8, fprs)
                           FF64 -> (1, 1, 8, fprs)
-                          FF80 -> panic "genCCall' passArguments FF80"
 
         moveResult reduceToFF32 =
             case dest_regs of
