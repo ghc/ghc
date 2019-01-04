@@ -1729,6 +1729,22 @@ vecElemProjectCast _      _        _   =  Nothing
 
 -- Check to make sure that we can generate code for the specified vector type
 -- given the current set of dynamic flags.
+-- Currently these checks are specific to x86 and x86_64 architecture.
+-- This should be fixed!
+-- In particular,
+-- 1) Add better support for other architectures! (this may require a redesign)
+-- 2) Decouple design choices from LLVM's pseudo SIMD model!
+--   The high level LLVM naive rep makes per CPU family SIMD generation is own
+--   optimization problem, and hides important differences in eg ARM vs x86_64 simd
+-- 3) Depending on the architecture, the SIMD registers may also support general
+--    computations on Float/Double/Word/Int scalars, but currently on
+--    for example x86_64, we always put Word/Int (or sized) in GPR
+--    (general purpose) registers. Would relaxing that allow for
+--    useful optimization opportunities.
+--      Phrased differently, its worth experimenting/exploring supporting
+--    other register mapping strategies than we currently have, especially if
+--    someday we want SIMD to be a first class denizen in GHC.
+
 checkVecCompatibility :: DynFlags -> PrimOpVecCat -> Length -> Width -> FCode ()
 checkVecCompatibility dflags vcat l w = do
     when (hscTarget dflags /= HscLlvm) $ do
