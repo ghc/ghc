@@ -25,10 +25,13 @@ import X86.Regs
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
    = case format of
-        FF32    -> VirtualRegSSE u
-        FF64    -> VirtualRegSSE u
-        FF80    -> VirtualRegD   u
-        _other  -> VirtualRegI   u
+        FF32    -> VirtualRegD u
+        -- for scalar F32, we use the same xmm as F64!
+        -- this is a hack that needs some improvement.
+        -- For now we map both to being allocated as "Double" Registers
+        -- on X86/X86_64
+        FF64    -> VirtualRegD u
+        _other  -> VirtualRegI u
 
 regDotColor :: Platform -> RealReg -> SDoc
 regDotColor platform reg
@@ -37,11 +40,12 @@ regDotColor platform reg
         _        -> panic "Register not assigned a color"
 
 regColors :: Platform -> UniqFM [Char]
-regColors platform = listToUFM (normalRegColors platform ++ fpRegColors platform)
+regColors platform = listToUFM (normalRegColors platform)
 
 normalRegColors :: Platform -> [(Reg,String)]
 normalRegColors platform =
     zip (map regSingle [0..lastint platform]) colors
+        ++ zip (map regSingle [firstxmm..lastxmm platform]) greys
   where
     -- 16 colors - enough for amd64 gp regs
     colors = ["#800000","#ff0000","#808000","#ffff00","#008000"
@@ -49,17 +53,6 @@ normalRegColors platform =
              ,"#800080","#ff00ff","#87005f","#875f00","#87af00"
              ,"#ff00af"]
 
-fpRegColors :: Platform -> [(Reg,String)]
-fpRegColors platform =
-        [ (fake0, "red")
-        , (fake1, "red")
-        , (fake2, "red")
-        , (fake3, "red")
-        , (fake4, "red")
-        , (fake5, "red") ]
-
-        ++ zip (map regSingle [firstxmm..lastxmm platform]) greys
-  where
     -- 16 shades of grey, enough for the currently supported
     -- SSE extensions.
     greys = ["#0e0e0e","#1c1c1c","#2a2a2a","#383838","#464646"
