@@ -157,6 +157,7 @@ linux_retry_mmap(int operation, W_ size, void *ret, void *addr, int prot, int fl
 }
 #endif /* defined(linux_HOST_OS) */
 
+#if !defined(darwin_HOST_OS)
 static void
 post_mmap_madvise(int operation, W_ size, void *ret)
 {
@@ -174,6 +175,7 @@ post_mmap_madvise(int operation, W_ size, void *ret)
     }
 #endif
 }
+#endif /* !defined(darwin_HOST_OS) */
 
 /* Returns NULL on failure; errno set */
 static void *
