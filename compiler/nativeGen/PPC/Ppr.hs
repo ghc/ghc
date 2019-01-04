@@ -161,7 +161,7 @@ pprReg r
       RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
       RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u
       RegVirtual (VirtualRegD  u)  -> text "%vD_"   <> pprUniqueAlways u
-      RegVirtual (VirtualRegSSE u) -> text "%vSSE_" <> pprUniqueAlways u
+
   where
     ppr_reg_no :: Int -> SDoc
     ppr_reg_no i
@@ -180,7 +180,7 @@ pprFormat x
                 II64 -> sLit "d"
                 FF32 -> sLit "fs"
                 FF64 -> sLit "fd"
-                _    -> panic "PPC.Ppr.pprFormat: no match")
+              _    -> panic "PPC.Ppr.pprFormat: no match")
 
 
 pprCond :: Cond -> SDoc
