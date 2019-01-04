@@ -143,7 +143,7 @@ pprReg reg
                 VirtualRegHi  u -> text "%vHi_"  <> pprUniqueAlways u
                 VirtualRegF   u -> text "%vF_"   <> pprUniqueAlways u
                 VirtualRegD   u -> text "%vD_"   <> pprUniqueAlways u
-                VirtualRegSSE u -> text "%vSSE_" <> pprUniqueAlways u
+
 
         RegReal rr
          -> case rr of
@@ -211,8 +211,7 @@ pprFormat x
         II32    -> sLit ""
         II64    -> sLit "d"
         FF32    -> sLit ""
-        FF64    -> sLit "d"
-        _       -> panic "SPARC.Ppr.pprFormat: no match")
+        FF64    -> sLit "d")
 
 
 -- | Pretty print a format for an instruction suffix.
@@ -226,8 +225,8 @@ pprStFormat x
         II32  -> sLit ""
         II64  -> sLit "x"
         FF32  -> sLit ""
-        FF64  -> sLit "d"
-        _       -> panic "SPARC.Ppr.pprFormat: no match")
+        FF64  -> sLit "d")
+
 
 
 -- | Pretty print a condition code.
