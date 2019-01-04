@@ -999,10 +999,10 @@ by saying ``-fno-wombat``.
 
     :default: off
 
-    Turn on the static argument transformation, which turns a recursive
-    function into a non-recursive one with a local recursive loop. See
-    Chapter 7 of `Andre Santos's PhD
-    thesis <http://research.microsoft.com/en-us/um/people/simonpj/papers/santos-thesis.ps.gz>`__
+    Turn on the static argument transformation, which turns a recursive function
+    into a non-recursive one with a local recursive loop. See Chapter 7 of
+    `Andre Santos's PhD thesis
+    <https://www.microsoft.com/en-us/research/publication/compilation-transformation-non-strict-functional-languages/>`__.
 
 .. ghc-flag:: -fstg-lift-lams
     :shortdesc: Enable late lambda lifting on the STG intermediate
@@ -1065,8 +1065,9 @@ by saying ``-fno-wombat``.
 
     :default: on
 
-    Switch on the strictness analyser. The
-    implementation is described in the paper `Theory and Practice of Demand Analysis in Haskell`<https://www.microsoft.com/en-us/research/wp-content/uploads/2017/03/demand-jfp-draft.pdf>`__.
+    Switch on the strictness analyser. The implementation is described in the
+    paper `Theory and Practice of Demand Analysis in Haskell
+    <https://www.microsoft.com/en-us/research/wp-content/uploads/2017/03/demand-jfp-draft.pdf>`__.
 
     The strictness analyser figures out when arguments and variables in
     a function can be treated 'strictly' (that is they are always
