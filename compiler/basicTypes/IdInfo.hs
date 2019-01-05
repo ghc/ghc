@@ -464,8 +464,7 @@ vanillaCafInfo :: CafInfo
 vanillaCafInfo = MayHaveCafRefs
 
 mayHaveCafRefs :: CafInfo -> Bool
-mayHaveCafRefs  MayHaveCafRefs = True
-mayHaveCafRefs _               = False
+mayHaveCafRefs = (==MayHaveCafRefs)
 
 instance Outputable CafInfo where
    ppr = ppCafInfo

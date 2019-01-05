@@ -409,10 +409,10 @@ inlineBoringOk e
     go :: Int -> CoreExpr -> Bool
     go credit (Lam x e) | isId x           = go (credit+1) e
                         | otherwise        = go credit e
-    go credit (App f (Type {}))            = go credit f
+    go credit (App f Type {})              = go credit f
     go credit (App f a) | credit > 0
                         , exprIsTrivial a  = go (credit-1) f
-    go credit (Tick _ e)                 = go credit e -- dubious
+    go credit (Tick _ e)                   = go credit e -- dubious
     go credit (Cast e _)                   = go credit e
     go _      (Var {})                     = boringCxtOk
     go _      _                            = boringCxtNotOk

@@ -99,7 +99,7 @@ exprArity e = go e
     go (Tick t e) | not (tickishIsCode t) = go e
     go (Cast e co)                 = trim_arity (go e) (pSnd (coercionKind co))
                                         -- Note [exprArity invariant]
-    go (App e (Type _))            = go e
+    go (App e Type {})             = go e
     go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
         -- See Note [exprArity for applications]
         -- NB: coercions count as a value argument

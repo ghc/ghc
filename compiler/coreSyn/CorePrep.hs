@@ -273,9 +273,9 @@ point all the CafInfo is supposed to be correct, and we must make certain
 that is true of the new top-level bindings.  There are two cases
 to consider
 
-a) The top-level binding is marked asCafRefs.  In that case we are
+a) The top-level binding is marked MayHaveCafRefs.  In that case we are
    basically fine.  The floated bindings had better all be lazy lets,
-   so they can float to top level, but they'll all have HasCafRefs
+   so they can float to top level, but they'll all have MayHaveCafRefs
    (the default) which is safe.
 
 b) The top-level binding is marked NoCafRefs.  This really happens
