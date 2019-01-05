@@ -1,6 +1,12 @@
 #include "Rts.h"
 #include "MachDeps.h"
 
+/*
+ * The algorithm for PDEP or generalized insert or expand is from
+ * Henry S. Warren, Hacker's Delight, 2nd ed, p 157, Figure 7-12
+ * "Parallel suffix method for the /expand/ operation".
+ */
+
 StgWord64
 hs_pdep64(StgWord64 src, StgWord64 mask)
 {

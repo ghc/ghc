@@ -1,6 +1,12 @@
 #include "Rts.h"
 #include "MachDeps.h"
 
+/*
+ * The algorithm for PEXT or generalized extract or compress is from
+ * Henry S. Warren, Hacker's Delight, 2nd ed, p 153, Figure 7-10
+ * "Parallel suffix method for the /compress/ operation".
+ */
+
 StgWord64
 hs_pext64(StgWord64 src, StgWord64 mask)
 {
