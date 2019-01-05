@@ -397,12 +397,12 @@ floatExpr (Var v)   = (zeroStats, emptyFloats, Var v)
 floatExpr (Type ty) = (zeroStats, emptyFloats, Type ty)
 floatExpr (Coercion co) = (zeroStats, emptyFloats, Coercion co)
 floatExpr (Lit lit) = (zeroStats, emptyFloats, Lit lit)
-
+{-
 floatExpr (App (App (Var v) _) e)
                     | v `hasKey` noinlineIdKey
                     , pprTrace "floatExpr" (ppr e) False
                     = undefined
-
+-}
 floatExpr (App e a)
   = case (atJoinCeiling $ floatExpr  e) of { (fse, floats_e, e') ->
     case (atJoinCeiling $ floatExpr  a) of { (fsa, floats_a, a') ->
