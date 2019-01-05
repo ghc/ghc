@@ -1446,7 +1446,7 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl =
 -- GNU assembly alias ('.equiv' directive). Sadly, there is
 -- no such thing as an alias to an imported symbol (conf.
 -- http://blog.omega-prime.co.uk/2011/07/06/the-sad-state-of-symbol-aliases/)
--- See note [emit-time elimination of static indirections]
+-- See note [emit-time elimination of static indirections].
 --
 isAliasToLocalOrIntoThisModule :: CLabel -> CLabel -> Bool
 isAliasToLocalOrIntoThisModule alias lab
@@ -1473,11 +1473,26 @@ Note [emit-time elimination of static indirections]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As described in #15155, certain static values are repesentationally
 equivalent, e.g. 'cast'ed values (when created by 'newtype' wrappers).
+
+             newtype A = A Int
+             {-# NOINLINE a #-}
+             a = A 42
+
+a1_rYB :: Int
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+a1_rYB = GHC.Types.I# 42#
+
+a [InlPrag=NOINLINE] :: A
+[GblId, Unf=OtherCon []]
+a = a1_rYB `cast` (Sym (T15155.N:A[0]) :: Int ~R# A)
+
 Formerly we created static indirections for these (IND_STATIC), which
 consist of a statically allocated forwarding closure that contains
-the (possibly tagged) indirectee. This approach is suboptimal for two
-reasons: a) they occupy extra space, b) they need to be entered in
-order to obtain the indirectee, thus they cannot be tagged.
+the (possibly tagged) indirectee. (See CMM/assembly below.)
+This approach is suboptimal for two reasons:
+  (a) they occupy extra space,
+  (b) they need to be entered in order to obtain the indirectee,
+      thus they cannot be tagged.
 
 Fortunately there is a common case where static indirections can be
 eliminated while emitting assembly (native or LLVM), viz. when the
@@ -1502,6 +1517,34 @@ newtype A = A Int
 a = A 42                                -- I# 42# is the indirectee
                                         -- 'a' is exported
 
+                 results in STG
+
+a1_rXq :: GHC.Types.Int
+[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+    CCS_DONT_CARE GHC.Types.I#! [42#];
+
+T15155.a [InlPrag=NOINLINE] :: T15155.A
+[GblId, Unf=OtherCon []] =
+    CAF_ccs  \ u  []  a1_rXq;
+
+                 and CMM
+
+[section ""data" . a1_rXq_closure" {
+     a1_rXq_closure:
+         const GHC.Types.I#_con_info;
+         const 42;
+ }]
+
+[section ""data" . T15155.a_closure" {
+     T15155.a_closure:
+         const stg_IND_STATIC_info;
+         const a1_rXq_closure+1;
+         const 0;
+         const 0;
+ }]
+
+The emitted assembly is
+
 #### INDIRECTEE
 a1_rXq_closure:                         -- module local haskell value
         .quad   GHC.Types.I#_con_info   -- an Int
@@ -1511,7 +1554,7 @@ a1_rXq_closure:                         -- module local haskell value
 .globl T15155.a_closure                 -- exported newtype wrapped value
 T15155.a_closure:
         .quad   stg_IND_STATIC_info     -- the closure info
-        .quad   a1_rXq_closure+1        -- indirectee
+        .quad   a1_rXq_closure+1        -- indirectee ('+1' being the tag)
         .quad   0
         .quad   0
 
