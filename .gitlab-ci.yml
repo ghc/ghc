@@ -11,6 +11,7 @@ stages:
   - lint
   - build
   - full-build
+  - packaging
   - cleanup # See Note [Cleanup on Windows]
 
 ############################################################
@@ -94,8 +95,7 @@ validate-x86_64-linux-deb8-hadrian:
       THREADS=`mk/detect-cpu-count.sh`
       make V=0 -j$THREADS
     - |
-      make binary-dist TAR_COMP_OPTS="-1"
-      mv ghc-*.tar.xz ghc.tar.xz
+      make binary-dist TAR_COMP_OPTS="-1" BIN_DIST_NAME=ghc-bindist
     - |
       THREADS=`mk/detect-cpu-count.sh`
       make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml
@@ -105,12 +105,13 @@ validate-x86_64-linux-deb8-hadrian:
       junit: junit.xml
     expire_in: 2 week
     paths:
-      - ghc.tar.xz
+      - ghc-bindist-*.tar.xz
       - junit.xml
 
 validate-x86_64-darwin:
   extends: .validate
   stage: full-build
+  allow_failure: true
   tags:
     - x86_64-darwin
   variables:
@@ -320,6 +321,9 @@ validate-x86_64-linux-deb9-unreg:
     - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
     - bash -c 'make clean || true'
   dependencies: []
+  artifacts:
+    paths:
+      - ghc-bindist-*.tar.xz
   cache:
     paths:
       - cabal-cache
@@ -345,7 +349,7 @@ validate-x86_64-windows-hadrian:
     # FIXME: Testsuite disabled due to #16156.
     #- bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   cache:
-    key: x86_64-windows
+    key: x86_64-windows-hadrian
   tags:
     - x86_64-windows
 
@@ -364,9 +368,7 @@ validate-x86_64-windows:
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
     - bash -c "echo include mk/flavours/quick.mk > mk/build.mk"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
-    - |
-      bash -c "make binary-dist TAR_COMP_OPTS=-1"
-      mv ghc-*.tar.xz ghc.tar.xz
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist TAR_COMP_OPTS=-1 BIN_DIST_NAME=ghc-bindist"
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   cache:
     key: x86_64-windows
@@ -379,6 +381,30 @@ validate-x86_64-windows:
     paths:
       - ghc.tar.xz
       - junit.xml
+
+############################################################
+# Packaging
+############################################################
+
+doc-tarball:
+  stage: packaging
+  tags:
+    - x86_64-linux
+  image: ghcci/x86_64-linux-deb9:0.2
+  dependencies:
+    - validate-x86_64-linux-deb9
+    - validate-x86_64-windows
+  artifacts:
+    paths:
+      - haddock.html.tar.xz
+      - libraries.html.tar.xz
+      - users_guide.html.tar.xz
+      - index.html
+      - "*.pdf"
+  script:
+    - ls -lh
+    - rm -Rf docs
+    - distrib/mkDocs/mkDocs ghc-bindist-x86_64-unknown-linux.tar.xz ghc-bindist-x86_64-unknown-mingw32.tar.xz
 
 # Note [Cleanup on Windows]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~
