@@ -119,7 +119,7 @@ validate-x86_64-darwin:
     LANG: "en_US.UTF-8"
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
-    - python .gitlab/fix-submodules.py
+    - python3 .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
