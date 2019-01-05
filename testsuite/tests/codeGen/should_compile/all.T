@@ -57,5 +57,5 @@ test('T15155',
   [ unless(have_ncg(), skip)
   ], run_command, ['$MAKE -s --no-print-directory T15155'])
 
-test('T15155l', only_ways(llvm_ways),
+test('T15155l', when(unregisterised(), skip),
      run_command, ['$MAKE -s --no-print-directory T15155l'])
