@@ -330,6 +330,9 @@ renameDeriv is_boot inst_infos bagBinds
     setXOptM LangExt.KindSignatures $
     -- Derived decls (for newtype-deriving) can use ScopedTypeVariables &
     -- KindSignatures
+    setXOptM LangExt.TypeApplications $
+    -- GND/DerivingVia uses TypeApplications in generated code
+    -- (See Note [Newtype-deriving instances] in TcGenDeriv)
     unsetXOptM LangExt.RebindableSyntax $
     -- See Note [Avoid RebindableSyntax when deriving]
     do  {

@@ -35,7 +35,7 @@ import RnFixity
 import RnUtils          ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , bindLocalNames
                         , mapMaybeFvRn, mapFvRn
-                        , warnUnusedLocalBinds )
+                        , warnUnusedLocalBinds, typeAppErr )
 import RnUnbound        ( reportUnboundName )
 import RnSplice         ( rnBracket, rnSpliceExpr, checkThLocalName )
 import RnTypes
@@ -171,7 +171,9 @@ rnExpr (HsApp x fun arg)
        ; return (HsApp x fun' arg', fvFun `plusFV` fvArg) }
 
 rnExpr (HsAppType x fun arg)
-  = do { (fun',fvFun) <- rnLExpr fun
+  = do { type_app <- xoptM LangExt.TypeApplications
+       ; unless type_app $ addErr $ typeAppErr "type" $ hswc_body arg
+       ; (fun',fvFun) <- rnLExpr fun
        ; (arg',fvArg) <- rnHsWcType HsTypeCtx arg
        ; return (HsAppType x fun' arg', fvFun `plusFV` fvArg) }
 

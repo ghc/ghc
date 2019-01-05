@@ -3,6 +3,7 @@
 This module contains miscellaneous functions related to renaming.
 
 -}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -14,7 +15,7 @@ module RnUtils (
         warnUnusedMatches, warnUnusedTypePatterns,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         mkFieldEnv,
-        unknownSubordinateErr, badQualBndrErr,
+        unknownSubordinateErr, badQualBndrErr, typeAppErr,
         HsDocContext(..), pprHsDocContext,
         inHsDocContext, withHsDocContext,
 
@@ -363,6 +364,11 @@ badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name
   = text "Qualified name in binding position:" <+> ppr rdr_name
 
+typeAppErr :: String -> LHsType GhcPs -> SDoc
+typeAppErr what (L _ k)
+  = hang (text "Illegal visible" <+> text what <+> text "application"
+            <+> quotes (char '@' <> ppr k))
+       2 (text "Perhaps you intended to use TypeApplications")
 
 checkTupSize :: Int -> RnM ()
 checkTupSize tup_size

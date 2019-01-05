@@ -47,7 +47,7 @@ import RnHsDoc          ( rnLHsDoc, rnMbLHsDoc )
 import RnEnv
 import RnUnbound        ( perhapsForallMsg )
 import RnUtils          ( HsDocContext(..), withHsDocContext, mapFvRn
-                        , pprHsDocContext, bindLocalNamesFV
+                        , pprHsDocContext, bindLocalNamesFV, typeAppErr
                         , newLocalBndrRn, checkDupRdrNames, checkShadowedRdrNames )
 import RnFixity         ( lookupFieldFixityRn, lookupFixityRn
                         , lookupTyFixityRn )
@@ -645,7 +645,7 @@ rnHsTyKi env (HsAppTy _ ty1 ty2)
 
 rnHsTyKi env (HsAppKindTy _ ty k)
   = do { kind_app <- xoptM LangExt.TypeApplications
-       ; unless kind_app (addErr (typeAppErr k))
+       ; unless kind_app (addErr (typeAppErr "kind" k))
        ; (ty', fvs1) <- rnLHsTyKi env ty
        ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
        ; return (HsAppKindTy noExt ty' k', fvs1 `plusFV` fvs2) }
@@ -1477,10 +1477,6 @@ opTyErr op overall_ty
           | otherwise
           = text "Use TypeOperators to allow operators in types"
 
-typeAppErr :: LHsKind GhcPs -> SDoc
-typeAppErr (L _ k)
-  = hang (text "Illegal visible kind application" <+> quotes (ppr k))
-       2 (text "Perhaps you intended to use TypeApplications")
 {-
 ************************************************************************
 *                                                                      *
