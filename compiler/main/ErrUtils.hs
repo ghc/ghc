@@ -7,6 +7,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RankNTypes #-}
 
 module ErrUtils (
         -- * Basic types
@@ -41,7 +42,8 @@ module ErrUtils (
         -- * Dump files
         dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_printer,
         dumpOptionsFromFlag, DumpOptions (..),
-        DumpFormat (..), DumpAction, defaultDumpAction,
+        DumpFormat (..), DumpAction, TraceAction,
+        defaultDumpAction, defaultTraceAction,
         touchDumpFile,
 
         -- * Issuing messages during compilation
@@ -753,7 +755,13 @@ data DumpFormat
 type DumpAction = DynFlags -> PprStyle -> DumpOptions -> String
                   -> DumpFormat -> SDoc -> IO ()
 
+type TraceAction = forall a. DynFlags -> String -> SDoc -> a -> a
+
 -- | Default action for 'dumpAction' hook
 defaultDumpAction :: DumpAction
 defaultDumpAction dflags sty dumpOpt title _fmt doc = do
    dumpSDocWithStyle sty dflags dumpOpt title doc
+
+-- | Default action for 'traceAction' hook
+defaultTraceAction :: TraceAction
+defaultTraceAction dflags title doc = pprTraceWithFlags dflags title doc
