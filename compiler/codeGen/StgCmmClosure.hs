@@ -332,6 +332,7 @@ mkLFImported id
   | isValueUnfolding unf
   , Just expr <- maybeUnfoldingTemplate unf
   , Just con <- exprIsSatConApp_maybe expr
+  , if mayHaveCafRefs (idCafInfo id) then pprTrace "caffy #+##" (ppr id <+> ppr expr) True else True
   = LFCon con
 
   | arity > 0
