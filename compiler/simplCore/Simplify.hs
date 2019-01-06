@@ -2023,15 +2023,11 @@ tryRules env rules fn args call_cont
     nodump
       | dopt Opt_D_dump_rule_rewrites dflags
       = liftIO $ do
-         let sty = mkDumpStyle dflags alwaysQualify
-         dumpAction dflags dflags sty
-           (dumpOptionsFromFlag Opt_D_dump_rule_rewrites) "" FormatCore empty
+         touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_rewrites)
 
       | dopt Opt_D_dump_rule_firings dflags
       = liftIO $ do
-         let sty = mkDumpStyle dflags alwaysQualify
-         dumpAction dflags dflags sty
-           (dumpOptionsFromFlag Opt_D_dump_rule_firings) "" FormatCore empty
+         touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_firings)
 
       | otherwise
       = return ()
@@ -2039,7 +2035,7 @@ tryRules env rules fn args call_cont
     log_rule dflags flag hdr details
       = liftIO $ do
          let sty = mkDumpStyle dflags alwaysQualify
-         dumpAction dflags dflags sty (dumpOptionsFromFlag flag) "" FormatCore $
+         dumpAction dflags dflags sty (dumpOptionsFromFlag flag) "" FormatText $
            sep [text hdr, nest 4 details]
 
 trySeqRules :: SimplEnv
