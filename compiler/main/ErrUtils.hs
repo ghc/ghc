@@ -43,6 +43,7 @@ module ErrUtils (
         dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_printer,
         dumpOptionsFromFlag, DumpOptions (..),
         DumpFormat (..), DumpAction, dumpAction, defaultDumpAction,
+        touchDumpFile,
 
         -- * Issuing messages during compilation
         putMsg, printInfoForUser, printOutputForUser,
@@ -466,6 +467,11 @@ mkDumpDoc hdr doc
            blankLine]
      where
         line = text (replicate 20 '=')
+
+
+-- | Ensure that a dump file is created even if it stays empty
+touchDumpFile :: DynFlags -> DumpOptions -> IO ()
+touchDumpFile dflags dumpOpt = withDumpFileHandle dflags dumpOpt (const (return ()))
 
 -- | Run an action with the handle of a 'DumpFlag' if we are outputting to a
 -- file, otherwise 'Nothing'.
