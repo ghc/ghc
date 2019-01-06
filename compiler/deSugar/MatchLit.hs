@@ -97,17 +97,11 @@ dsLit l = do
     HsInt _ i        -> return (mkIntExpr dflags (il_value i))
     XLit x           -> pprPanic "dsLit" (ppr x)
     HsRat _ fl _     -> case fl of
-                          FL { fl_signi = signi, fl_exp = exp, fl_exp_base = base } -> do
-                            ratio <- dsLookupDataCon ratioDataConName -- (:%)
-                            times <- dsLookupGlobalId timesName -- (*)
-                            power <- dsLookupGlobalId raiseToPowerName -- (^^)
-                            signi' <- mkIntegerExpr signi
-                            let intBase = case base of Base2 -> 2 ; Base10 -> 10
-                            intBase' <- mkIntegerExpr intBase
-                            exp' <- mkIntegerExpr exp
-                            let e1 = mkConApp ratio [signi', mkIntExpr dflags 1] -- (signi :% 1)
-                            let e2 = mkApps (Var power) [intBase', exp'] -- (intBase ^^ exp)
-                            return (mkApps (Var times) [e1, e2])
+                          FL { fl_signi = fl_signi, fl_exp = fl_exp } -> do
+                            mkRational <- dsLookupGlobalId mkRationalName
+                            litI <- mkIntegerExpr fl_signi
+                            litE <- mkIntegerExpr fl_exp
+                            return ((Var mkRational) `App` litI `App` litE)
 
 dsOverLit :: HsOverLit GhcTc -> DsM CoreExpr
 -- ^ Post-typechecker, the 'HsExpr' field of an 'OverLit' contains
