@@ -37,15 +37,15 @@ $(ghc-cabal_INPLACE) : $(ghc-cabal_DIST_BINARY) | $$(dir $$@)/.
 	"$(CP)" $< $@
 
 # Minor hack, since we can't reuse the `hs-suffix-rules-srcdir` macro
-ifneq ($(wildcard libraries/Cabal/Cabal/Distribution/Parsec/Lexer.x),)
+ifneq ($(wildcard libraries/Cabal/Cabal/Distribution/Fields/Lexer.x),)
 # Lexer.x exists so we have to call Alex ourselves
-CABAL_LEXER_DEP := bootstrapping/Cabal/Distribution/Parsec/Lexer.hs
+CABAL_LEXER_DEP := bootstrapping/Cabal/Distribution/Fields/Lexer.hs
 
-bootstrapping/Cabal/Distribution/Parsec/Lexer.hs: libraries/Cabal/Cabal/Distribution/Parsec/Lexer.x
-	mkdir -p bootstrapping/Cabal/Distribution/Parsec
+bootstrapping/Cabal/Distribution/Fields/Lexer.hs: libraries/Cabal/Cabal/Distribution/Fields/Lexer.x
+	mkdir -p bootstrapping/Cabal/Distribution/Fields
 	$(call cmd,ALEX) $< -o $@
 else
-CABAL_LEXER_DEP := libraries/Cabal/Cabal/Distribution/Parsec/Lexer.hs
+CABAL_LEXER_DEP := libraries/Cabal/Cabal/Distribution/Fields/Lexer.hs
 endif
 
 $(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*/*/*.hs)

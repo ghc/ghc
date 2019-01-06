@@ -451,9 +451,6 @@ PACKAGES_STAGE1 += text
 PACKAGES_STAGE1 += transformers
 PACKAGES_STAGE1 += mtl
 PACKAGES_STAGE1 += parsec
-# temporary until Cabal switches to parsec mode by default
-libraries/Cabal/Cabal_dist-boot_CONFIGURE_OPTS += --flag parsec
-libraries/Cabal/Cabal_dist-install_CONFIGURE_OPTS += --flag parsec
 PACKAGES_STAGE1 += Cabal/Cabal
 PACKAGES_STAGE1 += ghc-boot-th
 PACKAGES_STAGE1 += ghc-boot
