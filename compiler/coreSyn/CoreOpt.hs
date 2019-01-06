@@ -33,6 +33,7 @@ import PprCore  ( pprCoreBindings, pprRules )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import Literal  ( Literal(LitString) )
 import Id
+import IdInfo   ( mayHaveCafRefs )
 import Var      ( isNonCoVarId )
 import VarSet
 import VarEnv
