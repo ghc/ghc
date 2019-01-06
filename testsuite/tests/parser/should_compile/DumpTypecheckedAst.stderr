@@ -1,5 +1,5 @@
 
-==================== Typechecked AST ====================
+==================== Typechecker AST ====================
 
 {Bag(Located (HsBind Var)):
  [({ <no location info> }
@@ -768,5 +768,4 @@
         (WpHole)
         []))]}
     (False)))]}
-
 

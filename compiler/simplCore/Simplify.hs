@@ -227,7 +227,8 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
       | not (dopt Opt_D_verbose_core2core dflags)
       = thing_inside
       | otherwise
-      = pprTrace ("SimplBind " ++ what) (ppr old_bndr) thing_inside
+      = traceAction dflags ("SimplBind " ++ what)
+         (ppr old_bndr) thing_inside
 
 --------------------------
 simplLazyBind :: SimplEnv
@@ -1751,14 +1752,20 @@ completeCall env var cont
     interesting_cont = interestingCallContext env call_cont
     active_unf       = activeUnfolding (getMode env) var
 
+    log_inlining doc
+      = liftIO $ dumpAction dflags
+           (mkUserStyle dflags alwaysQualify AllTheWay)
+           (dumpOptionsFromFlag Opt_D_dump_inlinings)
+           "" FormatText doc
+
     dump_inline unfolding cont
       | not (dopt Opt_D_dump_inlinings dflags) = return ()
       | not (dopt Opt_D_verbose_core2core dflags)
       = when (isExternalName (idName var)) $
-            liftIO $ printOutputForUser dflags alwaysQualify $
+            log_inlining $
                 sep [text "Inlining done:", nest 4 (ppr var)]
       | otherwise
-      = liftIO $ printOutputForUser dflags alwaysQualify $
+      = liftIO $ log_inlining $
            sep [text "Inlining done: " <> ppr var,
                 nest 4 (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
                               text "Cont:  " <+> ppr cont])]

@@ -2710,10 +2710,10 @@ tcDump env
             "" FormatText short_dump) ;
 
         -- Dump bindings if -ddump-tc
-        dumpOptTcRn Opt_D_dump_tc "Typechecked bindings" FormatHaskell full_dump;
+        dumpOptTcRn Opt_D_dump_tc "Typechecker" FormatHaskell full_dump;
 
         -- Dump bindings as an hsSyn AST if -ddump-tc-ast
-        dumpOptTcRn Opt_D_dump_tc_ast "Typechecked AST" FormatHaskell ast_dump
+        dumpOptTcRn Opt_D_dump_tc_ast "Typechecker AST" FormatHaskell ast_dump
    }
   where
     short_dump = pprTcGblEnv env
