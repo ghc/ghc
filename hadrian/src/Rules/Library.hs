@@ -25,7 +25,9 @@ libraryRules = do
     root -/- "//libHS*-*.dylib"       %> buildDynamicLibUnix root "dylib"
     root -/- "//libHS*-*.so"          %> buildDynamicLibUnix root "so"
     root -/- "//*.a"                  %> buildStaticLib      root
-    priority 2 $ root -/- "//HS*-*.o" %> buildGhciLibO       root
+    priority 2 $ do
+        root -/- "//HS*-*.o" %> buildGhciLibO root
+        root -/- "//HS*-*.p_o" %> buildGhciLibO root
 
 -- * 'Action's for building libraries
 
@@ -193,8 +195,9 @@ parseLibGhciFilename :: Parsec.Parsec String () LibGhci
 parseLibGhciFilename = do
     _ <- Parsec.string "HS"
     (pkgname, pkgver) <- parsePkgId
-    way <- parseWaySuffix vanilla
-    _ <- Parsec.string ".o"
+    _ <- Parsec.string "."
+    way <- parseWayPrefix vanilla
+    _ <- Parsec.string "o"
     return (LibGhci pkgname pkgver way)
 
 -- | Parse the filename of a dynamic library to be built into a 'LibDyn' value.

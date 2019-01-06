@@ -61,10 +61,10 @@ stage1Dependencies =
 -- | Given a library 'Package' this action computes all of its targets. See
 -- 'packageTargets' for the explanation of the @includeGhciLib@ parameter.
 libraryTargets :: Bool -> Context -> Action [FilePath]
-libraryTargets includeGhciLib context = do
+libraryTargets includeGhciLib context@Context {..} = do
     libFile  <- pkgLibraryFile     context
     ghciLib  <- pkgGhciLibraryFile context
-    ghci     <- if includeGhciLib
+    ghci     <- if includeGhciLib && not (wayUnit Dynamic way)
                 then interpretInContext context $ getContextData buildGhciLib
                 else return False
     return $ [ libFile ] ++ [ ghciLib | ghci ]
