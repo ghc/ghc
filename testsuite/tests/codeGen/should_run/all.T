@@ -192,3 +192,5 @@ test('T15892',
         # happen, so -G1 -A32k:
         extra_run_opts('+RTS -G1 -A32k -RTS') ],
      compile_and_run, ['-O'])
+
+test('T14677', normal, compile_and_run, ['-O'])
