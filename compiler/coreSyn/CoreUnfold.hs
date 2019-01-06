@@ -1238,10 +1238,10 @@ traceInline :: DynFlags -> Id -> String -> SDoc -> a -> a
 traceInline dflags inline_id str doc result
  | Just prefix <- inlineCheck dflags
  =  if prefix `isPrefixOf` occNameString (getOccName inline_id)
-      then pprTrace str doc result
+      then traceAction dflags dflags str doc result
       else result
  | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
- = pprTrace str doc result
+ = traceAction dflags dflags str doc result
  | otherwise
  = result
 
