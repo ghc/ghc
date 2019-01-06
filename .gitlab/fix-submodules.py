@@ -6,7 +6,6 @@ clone their submodules from its usual location. Otherwise users would need to
 fork all submodules before their CI builds would succeed.
 """
 
-from typing import List, Dict
 from pathlib import Path
 import re
 
@@ -16,7 +15,7 @@ open('.gitmodules', 'w').write(x)
 
 import subprocess
 
-def get_configs(config_file: Path) -> Dict[str, str]:
+def get_configs(config_file):
     args = ['git', 'config', '-f', config_file.as_posix(), '--list']
     out = subprocess.check_output(args)
     configs = {}
@@ -27,7 +26,7 @@ def get_configs(config_file: Path) -> Dict[str, str]:
 
     return configs
 
-def set_config(config_file: Path, key: str, value: str) -> None:
+def set_config(config_file, key, value):
     args = ['git', 'config', '-f', config_file.as_posix(), '--replace', key, value]
     subprocess.check_call(args)
 
