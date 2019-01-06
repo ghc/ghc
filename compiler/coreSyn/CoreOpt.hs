@@ -847,6 +847,7 @@ exprIsSatConApp_maybe e = go 0 e
     go n_val_args (Var v)
        | Just dc <- isDataConWorkId_maybe v
        , dataConRepArity dc == n_val_args
+       , if mayHaveCafRefs (idCafInfo v) then pprTrace "caffy #+#" (ppr v <+> ppr e) True else True
        = Just dc
     go n_val_args (App f a)
        | isTypeArg a = go n_val_args       f
