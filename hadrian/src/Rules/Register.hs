@@ -10,10 +10,11 @@ import Settings.Default
 import Target
 import Utilities
 
-import Distribution.ParseUtils
 import Distribution.Version (Version)
+import qualified Distribution.Parsec as Cabal
+import qualified Distribution.Types.PackageName as Cabal
+import qualified Distribution.Types.PackageId as Cabal
 
-import qualified Distribution.Compat.ReadP   as Parse
 import qualified Hadrian.Haskell.Cabal.Parse as Cabal
 import qualified System.Directory            as IO
 import qualified Text.Parsec                 as Parsec
@@ -127,13 +128,14 @@ getPackageNameFromConfFile :: FilePath -> Action String
 getPackageNameFromConfFile conf
   | takeBaseName conf == "rts" = return "rts"
   | otherwise = case parseCabalName (takeBaseName conf) of
-      Nothing -> error $ "getPackageNameFromConfFile: couldn't parse " ++ conf
-      Just (name, _) -> return name
+      Left err -> error $ "getPackageNameFromConfFile: couldn't parse " ++ takeBaseName conf ++ ": " ++ err
+      Right (name, _) -> return name
 
-parseCabalName :: String -> Maybe (String, Version)
-parseCabalName = readPToMaybe parse
+parseCabalName :: String -> Either String (String, Version)
+parseCabalName = fmap f . Cabal.eitherParsec
   where
-    parse = (,) <$> (parsePackageName <* Parse.char '-') <*> parseOptVersion
+    f :: Cabal.PackageId -> (String, Version)
+    f pkg_id = (Cabal.unPackageName $ Cabal.pkgName pkg_id, Cabal.pkgVersion pkg_id)
 
 getPackageByName :: String -> Action Package
 getPackageByName n = case findPackageByName n of
