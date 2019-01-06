@@ -193,4 +193,4 @@ test('T15892',
         extra_run_opts('+RTS -G1 -A32k -RTS') ],
      compile_and_run, ['-O'])
 
-test('T14677', normal, compile_and_run, ['-O'])
+test('T14677', normal, compile_and_run, ['-O2 -ddump-stg -ddump-cmm'])
