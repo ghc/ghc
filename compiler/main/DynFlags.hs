@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
 
 -------------------------------------------------------------------------------
 --
@@ -210,8 +211,8 @@ import Outputable
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
-                               , getCaretDiagnostic, DumpAction
-                               , defaultDumpAction )
+                               , getCaretDiagnostic, DumpAction, TraceAction
+                               , defaultDumpAction, defaultTraceAction )
 import Json
 import SysTools.Terminal ( stderrSupportsAnsiColors )
 import SysTools.BaseDir ( expandToolDir, expandTopDir )
@@ -1102,6 +1103,7 @@ data DynFlags = DynFlags {
   -- | MsgDoc output action: use "ErrUtils" instead of this if you can
   log_action            :: LogAction,
   dumpAction            :: DumpAction,
+  traceAction           :: TraceAction,
   flushOut              :: FlushOut,
   flushErr              :: FlushErr,
 
@@ -2023,8 +2025,9 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
 
         -- Logging
 
-        log_action = defaultLogAction,
-        dumpAction = defaultDumpAction,
+        log_action  = defaultLogAction,
+        dumpAction  = defaultDumpAction,
+        traceAction = defaultTraceAction,
 
         flushOut = defaultFlushOut,
         flushErr = defaultFlushErr,
