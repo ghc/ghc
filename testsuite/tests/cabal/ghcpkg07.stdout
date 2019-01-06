@@ -1,11 +1,10 @@
 Reading package info from "test.pkg" ... done.
-exposed-modules:
-    E, A from testpkg-1.2.3.4-XXX:A, A1 from testpkg-1.2.3.4-XXX:A,
-    E2 from testpkg7a-1.0-XXX:E
+exposed-modules: E, A from testpkg-1.2.3.4-XXX:A,
+                 A1 from testpkg-1.2.3.4-XXX:A, E2 from testpkg7a-1.0-XXX:E
 testpkg7b-1.0: module reexport refers to a module A that is reexported but not defined in the defining package testpkg7a-1.0-XXX (ignoring)
 testpkg7b-1.0: module reexport refers to a module A1 that is reexported but not defined in the defining package testpkg7a-1.0-XXX (ignoring)
 testpkg7b-1.0: module reexport refers to a module E2 that is reexported but not defined in the defining package testpkg7a-1.0-XXX (ignoring)
-exposed-modules:
-    F1 from testpkg-1.2.3.4-XXX:A, F2 from testpkg7a-1.0-XXX:A,
-    F3 from testpkg7a-1.0-XXX:A1, F4 from testpkg7a-1.0-XXX:E,
-    E from testpkg7a-1.0-XXX:E, E3 from testpkg7a-1.0-XXX:E2
+exposed-modules: F1 from testpkg-1.2.3.4-XXX:A,
+                 F2 from testpkg7a-1.0-XXX:A, F3 from testpkg7a-1.0-XXX:A1,
+                 F4 from testpkg7a-1.0-XXX:E, E from testpkg7a-1.0-XXX:E,
+                 E3 from testpkg7a-1.0-XXX:E2

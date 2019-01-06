@@ -36,13 +36,13 @@ import qualified Data.Graph as Graph
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.ModuleName (ModuleName)
 import Distribution.InstalledPackageInfo as Cabal
-import Distribution.Compat.ReadP hiding (get)
-import Distribution.ParseUtils
+import qualified Distribution.Parsec as Cabal
 import Distribution.Package hiding (installedUnitId)
 import Distribution.Text
 import Distribution.Version
 import Distribution.Backpack
 import Distribution.Types.UnqualComponentName
+import Distribution.Types.LibraryName
 import Distribution.Types.MungedPackageName
 import Distribution.Types.MungedPackageId
 import Distribution.Simple.Utils (fromUTF8BS, toUTF8BS, writeUTF8File, readUTF8File)
@@ -59,7 +59,7 @@ import System.Console.GetOpt
 import qualified Control.Exception as Exception
 import Data.Maybe
 
-import Data.Char ( isSpace, toLower )
+import Data.Char ( toLower )
 import Control.Monad
 import System.Directory ( doesDirectoryExist, getDirectoryContents,
                           doesFileExist, removeFile,
@@ -501,11 +501,11 @@ runit verbosity cli nonopts = do
     (_cmd:_) -> do
         die ("command-line syntax error\n" ++ shortUsage prog)
 
-parseCheck :: ReadP a a -> String -> String -> IO a
-parseCheck parser str what =
-  case [ x | (x,ys) <- readP_to_S parser str, all isSpace ys ] of
-    [x] -> return x
-    _ -> die ("cannot parse \'" ++ str ++ "\' as a " ++ what)
+parseCheck :: Cabal.Parsec a => String -> String -> IO a
+parseCheck str what =
+  case Cabal.eitherParsec str of
+    Left e  -> die ("cannot parse \'" ++ str ++ "\' as a " ++ what ++ ": " ++ e)
+    Right x -> pure x
 
 -- | Either an exact 'PackageIdentifier', or a glob for all packages
 -- matching 'PackageName'.
@@ -518,20 +518,14 @@ displayGlobPkgId (ExactPackageIdentifier pid) = display pid
 displayGlobPkgId (GlobPackageIdentifier pn) = display pn ++ "-*"
 
 readGlobPkgId :: String -> IO GlobPackageIdentifier
-readGlobPkgId str = parseCheck parseGlobPackageId str "package identifier"
-
-parseGlobPackageId :: ReadP r GlobPackageIdentifier
-parseGlobPackageId =
-  fmap ExactPackageIdentifier parse
-     +++
-  (do n <- parse
-      _ <- string "-*"
-      return (GlobPackageIdentifier n))
+readGlobPkgId str
+  | "-*" `isSuffixOf` str =
+    GlobPackageIdentifier <$> parseCheck (init (init str)) "package identifier (glob)"
+  | otherwise = ExactPackageIdentifier <$> parseCheck str "package identifier (exact)"
 
 readPackageArg :: AsPackageArg -> String -> IO PackageArg
-readPackageArg AsUnitId str =
-    parseCheck (IUId `fmap` parse) str "installed package id"
-readPackageArg AsDefault str = Id `fmap` readGlobPkgId str
+readPackageArg AsUnitId str = IUId <$> parseCheck str "installed package id"
+readPackageArg AsDefault str = Id <$> readGlobPkgId str
 
 -- -----------------------------------------------------------------------------
 -- Package databases
@@ -1160,13 +1154,11 @@ parsePackageInfo
         -> IO (InstalledPackageInfo, [ValidateWarning])
 parsePackageInfo str =
   case parseInstalledPackageInfo str of
-    ParseOk warnings ok -> return (mungePackageInfo ok, ws)
+    Right (warnings, ok) -> pure (mungePackageInfo ok, ws)
       where
-        ws = [ msg | PWarning msg <- warnings
+        ws = [ msg | msg <- warnings
                    , not ("Unrecognized field pkgroot" `isPrefixOf` msg) ]
-    ParseFailed err -> case locatedErrorMsg err of
-                           (Nothing, s) -> die s
-                           (Just l, s) -> die (show l ++ ": " ++ s)
+    Left err -> die (unlines err)
 
 mungePackageInfo :: InstalledPackageInfo -> InstalledPackageInfo
 mungePackageInfo ipi = ipi
@@ -1352,7 +1344,7 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.packageName        = packageName pkg,
        GhcPkg.packageVersion     = Version.Version (versionNumbers (packageVersion pkg)) [],
        GhcPkg.sourceLibName      =
-         fmap (mkPackageName . unUnqualComponentName) (sourceLibName pkg),
+         fmap (mkPackageName . unUnqualComponentName) (libraryNameString $ sourceLibName pkg),
        GhcPkg.depends            = depends pkg,
        GhcPkg.abiDepends         = map (\(AbiDependency k v) -> (k,unAbiHash v)) (abiDepends pkg),
        GhcPkg.abiHash            = unAbiHash (abiHash pkg),
@@ -1902,10 +1894,9 @@ checkPackageConfig pkg verbosity db_stack
 checkPackageId :: InstalledPackageInfo -> Validate ()
 checkPackageId ipi =
   let str = display (mungedId ipi) in
-  case [ x :: MungedPackageId | (x,ys) <- readP_to_S parse str, all isSpace ys ] of
-    [_] -> return ()
-    []  -> verror CannotForce ("invalid package identifier: " ++ str)
-    _   -> verror CannotForce ("ambiguous package identifier: " ++ str)
+  case Cabal.eitherParsec str :: Either String MungedPackageId of
+    Left e -> verror CannotForce ("invalid package identifier: '" ++ str ++ "': " ++ e)
+    Right _ -> pure ()
 
 checkUnitId :: InstalledPackageInfo -> PackageDBStack -> Bool
                 -> Validate ()
