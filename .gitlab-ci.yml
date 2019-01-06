@@ -11,6 +11,7 @@ stages:
   - lint
   - build
   - full-build
+  - cleanup # See Note [Cleanup on Windows]
 
 ############################################################
 # Runner Tags
@@ -367,6 +368,35 @@ validate-x86_64-windows:
     key: x86_64-windows
   tags:
     - x86_64-windows
+
+# Note [Cleanup on Windows]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# As noted in [1], gitlab-runner's shell executor doesn't clean up its working
+# directory after builds. Unfortunately, we are forced to use the shell executor
+# on Windows. To avoid running out of disk space we add a stage at the end of
+# the build to remove the \GitLabRunner\builds directory. Since we only run a
+# single build at a time on Windows this should be safe.
+#
+# [1] https://gitlab.com/gitlab-org/gitlab-runner/issues/3856
+
+# See Note [Cleanup on Windows]
+cleanup-windows:
+  stage: cleanup
+  tags:
+    - x86_64-windows
+  when: always
+  before_script:
+    - echo "Time to clean up"
+  script:
+    - echo "Let's go"
+  after_script:
+    - set "BUILD_DIR=%CI_PROJECT_DIR%"
+    - set "BUILD_DIR=%BUILD_DIR:/=\%"
+    - echo "Cleaning %BUILD_DIR%"
+    - cd \GitLabRunner
+    - rmdir /S /Q %BUILD_DIR%/*
+    - exit /b 0
 
 ############################################################
 # Validation via CircleCI
