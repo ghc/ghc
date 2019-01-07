@@ -266,8 +266,14 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         -- docs for con_names on why it is a list to begin with.
         name = commaSeparate dflags . map unL $ getConNames con
 
-        resType = apps $ map (reL . HsTyVar NoExt NotPromoted . reL) $
-                        (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _ _) <- hsQTvExplicit $ tyClDeclTyVars dat]
+        resType = let c  = HsTyVar NoExt NotPromoted (noLoc (tcdName dat))
+                      as = map (tyVarBndr2Type . unLoc) (hsQTvExplicit $ tyClDeclTyVars dat)
+                  in apps (map noLoc (c : as))
+
+        tyVarBndr2Type :: HsTyVarBndr GhcRn -> HsType GhcRn
+        tyVarBndr2Type (UserTyVar _ n) = HsTyVar NoExt NotPromoted n
+        tyVarBndr2Type (KindedTyVar _ n k) = HsKindSig NoExt (noLoc (HsTyVar NoExt NotPromoted n)) k
+        tyVarBndr2Type (XTyVarBndr _) = panic "haddock:ppCtor"
 
 ppCtor dflags _dat subdocs con@(ConDeclGADT { })
    = concatMap (lookupCon dflags subdocs) (getConNames con) ++ f
