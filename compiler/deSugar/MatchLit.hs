@@ -89,8 +89,8 @@ dsLit l = do
     HsWordPrim   _ w  -> return (Lit (mkLitWordWrap dflags w))
     HsInt64Prim  _ i  -> return (Lit (mkLitInt64Wrap dflags i))
     HsWord64Prim _ w  -> return (Lit (mkLitWord64Wrap dflags w))
-    HsFloatPrim  _ fl -> dsFractionalLitToRational fl
-    HsDoublePrim _ fl -> dsFractionalLitToRational fl
+    HsFloatPrim  _ fl -> return (Lit (LitFloat (rationalFromFractionalLit fl)))
+    HsDoublePrim _ fl -> return (Lit (LitFloat (rationalFromFractionalLit fl)))
     HsChar _ c        -> return (mkCharExpr c)
     HsString _ str    -> mkStringExprFS str
     HsInteger _ i _   -> mkIntegerExpr i
