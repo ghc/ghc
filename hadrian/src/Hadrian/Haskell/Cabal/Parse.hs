@@ -208,7 +208,7 @@ resolveContextData context@Context {..} = do
     -- Create the @cabal_macros.h@, ...
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
-    pdi <- liftIO $ getHookedBuildInfo (pkgPath package)
+    pdi <- liftIO $ getHookedBuildInfo [pkgPath package, cPath -/- "build"]
     let pd'  = C.updatePackageDescription pdi pd
         lbi' = lbi { C.localPkgDescr = pd' }
     liftIO $ C.initialBuildSteps cPath pd' lbi' C.silent
@@ -282,12 +282,12 @@ resolveContextData context@Context {..} = do
           , depLdOpts       = forDeps Installed.ldOptions
           , buildGhciLib    = C.withGHCiLib lbi' }
 
-getHookedBuildInfo :: FilePath -> IO C.HookedBuildInfo
-getHookedBuildInfo baseDir = do
-    -- TODO: We should probably better generate this in the build directory,
-    -- rather than in the base directory? However, @configure@ is run in the
-    -- base directory.
+-- | Look for a @.buildinfo@ in all of the specified directories, stopping on
+-- the first one we find.
+getHookedBuildInfo :: [FilePath] -> IO C.HookedBuildInfo
+getHookedBuildInfo [] = return C.emptyHookedBuildInfo
+getHookedBuildInfo (baseDir:baseDirs) = do
     maybeInfoFile <- C.findHookedPackageDesc baseDir
     case maybeInfoFile of
-        Nothing       -> return C.emptyHookedBuildInfo
+        Nothing       -> getHookedBuildInfo baseDirs
         Just infoFile -> C.readHookedBuildInfo C.silent infoFile
