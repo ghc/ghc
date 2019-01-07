@@ -637,11 +637,18 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- Because we are going to apply the eq_spec args manually in the
              -- wrapper
 
-    arg_ibangs =
-      case mb_bangs of
-        Nothing    -> zipWith (dataConSrcToImplBang dflags fam_envs)
-                              orig_arg_tys orig_bangs
-        Just bangs -> bangs
+    new_tycon = isNewTyCon tycon
+    arg_ibangs
+      | new_tycon
+      = nOfThem (length orig_arg_tys) HsLazy
+        -- Don't invoke dataConSrcToImplBang for newtypes! They shouldn't have
+        -- strictness/UNPACK annotations, but dataConSrcToImplBang can sneak
+        -- them by way of the StrictData extension. (See #16141.)
+      | otherwise
+      = case mb_bangs of
+          Nothing    -> zipWith (dataConSrcToImplBang dflags fam_envs)
+                                orig_arg_tys orig_bangs
+          Just bangs -> bangs
 
     (rep_tys_w_strs, wrappers)
       = unzip (zipWith dataConArgRep all_arg_tys (ev_ibangs ++ arg_ibangs))
@@ -650,7 +657,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     (rep_tys, rep_strs) = unzip (concat rep_tys_w_strs)
 
     wrapper_reqd =
-        (not (isNewTyCon tycon)
+        (not new_tycon
                      -- (Most) newtypes have only a worker, with the exception
                      -- of some newtypes written with GADT syntax. See below.
          && (any isBanged (ev_ibangs ++ arg_ibangs)
