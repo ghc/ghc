@@ -2021,7 +2021,6 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
       TypeLevel -> text "type"
       KindLevel -> text "kind"
 
-    occurs_stuck_error = undefined -- ??? figure out this
     msg1 = case level of
       KindLevel
         | Just th <- maybe_thing

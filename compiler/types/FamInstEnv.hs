@@ -1130,7 +1130,7 @@ reduceTyFamApp envs role tc tys
     in TyFamAppOk (co, ty)
 
   | Nominal <- role
-  = TyFamAppStuck 0
+  =  TyFamAppStuck $ length (filterOutInvisibleTypes tc tys)
   | otherwise
   = TyFamAppStuck 0
 
