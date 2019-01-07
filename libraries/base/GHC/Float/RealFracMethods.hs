@@ -58,6 +58,7 @@ import GHC.Integer
 
 import GHC.Base
 import GHC.Num ()
+import GHC.Real ()
 
 #if WORD_SIZE_IN_BITS < 64
 
