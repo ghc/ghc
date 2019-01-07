@@ -83,25 +83,29 @@ dsLit :: HsLit GhcRn -> DsM CoreExpr
 dsLit l = do
   dflags <- getDynFlags
   case l of
-    HsStringPrim _ s -> return (Lit (LitString s))
-    HsCharPrim   _ c -> return (Lit (LitChar c))
-    HsIntPrim    _ i -> return (Lit (mkLitIntWrap dflags i))
-    HsWordPrim   _ w -> return (Lit (mkLitWordWrap dflags w))
-    HsInt64Prim  _ i -> return (Lit (mkLitInt64Wrap dflags i))
-    HsWord64Prim _ w -> return (Lit (mkLitWord64Wrap dflags w))
-    HsFloatPrim  _ f -> return (Lit (LitFloat (rationalFromFractionalLit f)))
-    HsDoublePrim _ d -> return (Lit (LitDouble (rationalFromFractionalLit d)))
-    HsChar _ c       -> return (mkCharExpr c)
-    HsString _ str   -> mkStringExprFS str
-    HsInteger _ i _  -> mkIntegerExpr i
-    HsInt _ i        -> return (mkIntExpr dflags (il_value i))
-    XLit x           -> pprPanic "dsLit" (ppr x)
-    HsRat _ fl _     -> case fl of
-                          FL { fl_signi = fl_signi, fl_exp = fl_exp } -> do
-                            mkRational <- dsLookupGlobalId mkRationalName
-                            litI <- mkIntegerExpr fl_signi
-                            litE <- mkIntegerExpr fl_exp
-                            return ((Var mkRational) `App` litI `App` litE)
+    HsStringPrim _ s  -> return (Lit (LitString s))
+    HsCharPrim   _ c  -> return (Lit (LitChar c))
+    HsIntPrim    _ i  -> return (Lit (mkLitIntWrap dflags i))
+    HsWordPrim   _ w  -> return (Lit (mkLitWordWrap dflags w))
+    HsInt64Prim  _ i  -> return (Lit (mkLitInt64Wrap dflags i))
+    HsWord64Prim _ w  -> return (Lit (mkLitWord64Wrap dflags w))
+    HsFloatPrim  _ fl -> dsFractionalLitToRational fl
+    HsDoublePrim _ fl -> dsFractionalLitToRational fl
+    HsChar _ c        -> return (mkCharExpr c)
+    HsString _ str    -> mkStringExprFS str
+    HsInteger _ i _   -> mkIntegerExpr i
+    HsInt _ i         -> return (mkIntExpr dflags (il_value i))
+    XLit x            -> pprPanic "dsLit" (ppr x)
+    HsRat _ fl _      -> dsFractionalLitToRational fl
+
+dsFractionalLitToRational :: FractionalLit -> DsM CoreExpr
+dsFractionalLitToRational fl =
+  case fl of
+    FL { fl_signi = fl_signi, fl_exp = fl_exp } -> do
+      mkRational <- dsLookupGlobalId mkRationalName
+      litI <- mkIntegerExpr fl_signi
+      litE <- mkIntegerExpr fl_exp
+      return ((Var mkRational) `App` litI `App` litE)
 
 dsOverLit :: HsOverLit GhcTc -> DsM CoreExpr
 -- ^ Post-typechecker, the 'HsExpr' field of an 'OverLit' contains
@@ -445,15 +449,15 @@ hsLitKey :: DynFlags -> HsLit GhcTc -> Literal
 -- In the case of the fixed-width numeric types, we need to wrap here
 -- because Literal has an invariant that the literal is in range, while
 -- HsLit does not.
-hsLitKey dflags (HsIntPrim    _ i) = mkLitIntWrap  dflags i
-hsLitKey dflags (HsWordPrim   _ w) = mkLitWordWrap dflags w
-hsLitKey dflags (HsInt64Prim  _ i) = mkLitInt64Wrap  dflags i
-hsLitKey dflags (HsWord64Prim _ w) = mkLitWord64Wrap dflags w
-hsLitKey _      (HsCharPrim   _ c) = mkLitChar            c
-hsLitKey _      (HsFloatPrim  _ f) = mkLitFloat           (rationalFromFractionalLit f)
-hsLitKey _      (HsDoublePrim _ d) = mkLitDouble          (rationalFromFractionalLit d)
-hsLitKey _      (HsString _ s)     = LitString (fastStringToByteString s)
-hsLitKey _      l                  = pprPanic "hsLitKey" (ppr l)
+hsLitKey dflags (HsIntPrim    _ i)  = mkLitIntWrap  dflags i
+hsLitKey dflags (HsWordPrim   _ w)  = mkLitWordWrap dflags w
+hsLitKey dflags (HsInt64Prim  _ i)  = mkLitInt64Wrap  dflags i
+hsLitKey dflags (HsWord64Prim _ w)  = mkLitWord64Wrap dflags w
+hsLitKey _      (HsCharPrim   _ c)  = mkLitChar            c
+hsLitKey _      (HsFloatPrim  _ fl) = mkLitFloat (rationalFromFractionalLit fl)
+hsLitKey _      (HsDoublePrim _ fl) = mkLitDouble (rationalFromFractionalLit fl)
+hsLitKey _      (HsString _ s)      = LitString (fastStringToByteString s)
+hsLitKey _      l                   = pprPanic "hsLitKey" (ppr l)
 
 {-
 ************************************************************************
