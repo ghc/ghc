@@ -10,11 +10,15 @@ import GhcPrelude
 
 import BasicTypes
 import CoreSyn
+import CoreSubst
+import Literal
 import Id
+import Panic
 import TyCoRep
 import UniqSupply
 import Unique
 import Var
+import Outputable
 
 {-
 ************************************************************************
@@ -29,54 +33,60 @@ import Var
 -- depending on its arity.
 arityWorkerWrapper :: CoreBind -> UniqSM [CoreBind]
 arityWorkerWrapper (NonRec name expr)
-  = fmap (uncurry NonRec) <$> (arityWorkerWrapper' name expr)
+  = fmap (uncurry NonRec) <$> arityWorkerWrapper' name expr
 arityWorkerWrapper (Rec binds)
-  = do { bindss' <- mapM (uncurry arityWorkerWrapper') binds
-       ; return [Rec (concat bindss')] }
+  = do { binds' <- mapM (uncurry arityWorkerWrapper') binds
+       ; return [Rec (concat binds')] }
 
 -- ^ Change a function binding into a call to its wrapper and the production of
--- a wrapper.
-arityWorkerWrapper' :: CoreBndr -> CoreExpr -> UniqSM [(CoreBndr,CoreExpr)]
+-- a wrapper. The worker/wrapper transformation *only* makes sense for Id's or
+-- binders to code.
+arityWorkerWrapper'
+  :: CoreBndr
+  -> CoreExpr
+  -> UniqSM [(CoreBndr,CoreExpr)]
 arityWorkerWrapper' name expr
   = let arity = idCallArity name in
-      case arity >= 1 of
+      case arity >= 1 && isId name of
         True ->
-          do { uniq <- getUniqueM
-             ; worker  <- mkArityWrapper name expr uniq arity
-             ; wrapper <- mkArityWorker  name expr uniq arity
-             ; return [worker,wrapper] }
+          getUniqueM >>= \uniq ->
+            let wname   = mkWorkerId uniq name (idType name)
+                worker  = mkArityWrapper name wname expr arity
+                wrapper = mkArityWorker  name wname expr arity in
+              return [worker,wrapper]
         False -> return [(name,expr)]
 
--- ^ Create the new type for an extensional function
+-- ^ Create the new type for an extensional function given the arity.
 mkArityType :: Type -> Arity -> Type
-mkArityType (ForAllTy x ty) n = ForAllTy x (mkArityType ty n)
-mkArityType (FunTy _ a b) n = FunTildeTy a (mkArityType b (n-1))
-mkArityType ty _ = ty
+mkArityType (ForAllTy x ty) _ = ForAllTy x (mkArityType ty 0)
+mkArityType (FunTy _ a b)   _ = FunTildeTy a (mkArityType b 0)
+mkArityType ty              _ = ty
 
 -- ^ Given an expression and it's name, generate a new expression with a
--- tilde-lambda type. For expressions that are not functions, we do not generate
--- a worker
+-- tilde-lambda type. This is the exact same code, but we have encoded the arity
+-- in the type.
 mkArityWorker
-  :: CoreBndr -> CoreExpr -> Unique -> Arity -> UniqSM (CoreBndr,CoreExpr)
-mkArityWorker name expr uniq arity = return
-  ( mkWorkerId uniq name (mkArityType (idType name) arity) , expr )
+  :: CoreBndr -> CoreBndr -> CoreExpr -> Arity -> (CoreBndr,CoreExpr)
+mkArityWorker name wname expr arity
+  = ( wname
+    -- ( mkWorkerId uniq name (panic (showSDocUnsafe (debugPprType (mkArityType (idType name) arity))))
+    , substExpr (text "eta-worker-subst") substitution expr
+    )
+  where substitution = extendIdSubst emptySubst name (Var wname)
 
--- ^ The wrapper does not change the type. It leaves anything that is not a
--- lambda unchanged
+-- ^ The wrapper does not change the type and will call the newly created worker
+-- function.
 mkArityWrapper
-  :: CoreBndr -> CoreExpr -> Unique -> Arity -> UniqSM (CoreBndr,CoreExpr)
-mkArityWrapper name expr uniq arity
-  = do { expr' <- mkArityWrapper'
-                    expr
-                    arity
-                    (mkWorkerId uniq name (varType name)) []
-       ; return (name,expr') }
+  :: CoreBndr -> CoreBndr -> CoreExpr -> Arity -> (CoreBndr,CoreExpr)
+mkArityWrapper name wname expr arity
+  = ( name
+    , mkArityWrapper' expr arity wname []
+    )
 
 mkArityWrapper'
-  :: CoreExpr -> Arity -> CoreBndr -> [CoreBndr] -> UniqSM CoreExpr
-mkArityWrapper' (Lam bndr expr) arity w ls
-  | isTyVar bndr   = Lam bndr <$> mkArityWrapper' expr arity w (bndr : ls)
-  | isTcTyVar bndr = Lam bndr <$> mkArityWrapper' expr arity w (bndr : ls)
-  | arity == 1     = return $ Lam bndr (mkApps (Var w) (fmap Var ls))
-  | otherwise      = Lam bndr <$> (mkArityWrapper' expr (arity-1) w (bndr : ls))
-mkArityWrapper' expr _ _ _ = return expr
+  :: CoreExpr -> Arity -> CoreBndr -> [CoreExpr] -> CoreExpr
+mkArityWrapper' (Lam b e) a w l =
+  case isId b of
+    True  -> Lam b $ mkArityWrapper' e (a-1) w (Var b : l)
+    False -> Lam b $ mkArityWrapper' e a w (Type (TyVarTy b) : l)
+mkArityWrapper' _ _ w l = mkApps (Var w) (reverse l)
