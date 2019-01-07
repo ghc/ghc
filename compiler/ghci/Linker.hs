@@ -1556,7 +1556,8 @@ searchForLibUsingGcc dflags so dirs = do
                 l:_ -> l
    if (file == so)
       then return Nothing
-      else return (Just file)
+      else do b <- doesFileExist file -- file could be a folder (see #16063)
+              return (if b then Just file else Nothing)
 
 -- | Retrieve the list of search directory GCC and the System use to find
 --   libraries and components. See Note [Fork/Exec Windows].
