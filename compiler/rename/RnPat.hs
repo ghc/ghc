@@ -820,6 +820,9 @@ isNegativeZeroOverLit :: HsOverLit t -> Bool
 isNegativeZeroOverLit lit
  = case ol_val lit of
         HsIntegral i    -> 0 == il_value i && il_neg i
+        -- For HsFractional, the value of fl is n * (b ^^ e) so it is sufficient
+        -- to check if n = 0. b is equal to either 2 or 10. We don't call
+        -- rationalFromFractionalLit here as it is expensive when e is big.
         HsFractional fl -> 0 == fl_signi fl && fl_neg fl
         _               -> False
 
