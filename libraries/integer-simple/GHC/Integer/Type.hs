@@ -316,12 +316,71 @@ shiftRInteger j@(Negative _) i
     = complementInteger (shiftRInteger (complementInteger j) i)
 shiftRInteger Naught         _ = Naught
 
--- XXX this could be a lot more efficient, but this is a quick
--- reimplementation of the default Data.Bits instance, so that we can
--- implement the Integer interface
+{-# NOINLINE popCountInteger #-}
+popCountInteger :: Integer -> Int#
+popCountInteger (Positive p) = popCountPositive p
+popCountInteger Naught       = 0#
+popCountInteger (Negative n) = negateInt# (popCountPositive n)
+
+popCountPositive :: Positive -> Int#
+popCountPositive p = word2Int# (go 0## p)
+  where
+  go :: Word# -> Positive -> Word#
+  go acc# None = acc#
+  go acc# (Some d ds) = go (popCnt# d `plusWord#` acc#) ds
+
+-- | 'Integer' for which only /n/-th bit is set. Undefined behaviour
+-- for negative /n/ values.
+bitInteger :: Int# -> Integer
+bitInteger i# = if isTrue# (i# <# 0#)
+                then Naught
+                else Positive (bitPositive i#)
+
+-- Assumes 0 <= i
+bitPositive :: Int# -> Positive
+bitPositive i#
+    = if isTrue# (i# >=# WORD_SIZE_IN_BITS#)
+      then Some 0## (bitPositive (i# -# WORD_SIZE_IN_BITS#))
+      else Some (uncheckedShiftL# 1## i#) None
+
 testBitInteger :: Integer -> Int# -> Bool
-testBitInteger x i = (x `andInteger` (oneInteger `shiftLInteger` i))
-        `neqInteger` Naught
+testBitInteger (!_) i# | isTrue# (i# <# 0#) = False
+testBitInteger Naught       _  = False
+testBitInteger (Positive p) i# = isTrue# (testBitPositive p i#)
+  where
+  -- Straightforward decrement of 'j#' by the word size stopping when
+  -- 'j#' is less than the word size or the number runs out.
+  testBitPositive :: Positive -> Int# -> Int#
+  testBitPositive None          _ = 0#
+  testBitPositive (Some w# ws)  j#
+    = if isTrue# (j# >=# WORD_SIZE_IN_BITS#)
+      then testBitPositive ws (j# -# WORD_SIZE_IN_BITS#)
+      else neWord# (uncheckedShiftL# 1## j# `and#` w#) 0##
+testBitInteger (Negative n) i# = isTrue# (testBitNegative n i#)
+  where
+  -- For negative numbers, we want to inspect the correct bit of the two's
+  -- complement. Like for positive numbers, we walk down the words until
+  -- 'j#' is less than the word size (or the number runs out).
+  testBitNegative :: Positive -> Int# -> Int#
+  testBitNegative (Some 0## ws) j#
+    -- If the number starts (on the low end) with a bunch of '0##' and 'j#'
+    -- falls in those, we know that @n - 1@ would have flipped all those
+    -- bits, so @!(n - 1) & i@ is false.
+    = if isTrue# (j# >=# WORD_SIZE_IN_BITS#)
+      then testBitNegative ws (j# -# WORD_SIZE_IN_BITS#)
+      else 1#
+  testBitNegative (Some w# ws) j#
+    -- Yet, as soon as we find something that isn't a '0##', we can subtract
+    -- and forget about the 1 altogether!
+    = testBitNegativeMinus1 (Some (w# `minusWord#` 1##) ws) j#
+  testBitNegative None _ = 0# -- XXX Can't happen due to Positive's invariant
+
+  testBitNegativeMinus1 :: Positive -> Int# -> Int#
+  testBitNegativeMinus1 None         _ = 1#
+  testBitNegativeMinus1 (Some w# ws) j#
+    = if isTrue# (j# >=# WORD_SIZE_IN_BITS#)
+      then testBitNegativeMinus1 ws (j# -# WORD_SIZE_IN_BITS#)
+      else neWord# (uncheckedShiftL# 1## j# `and#` not# w#) 0##
 
 twosComplementPositive :: Positive -> DigitsOnes
 twosComplementPositive p = flipBits (p `minusPositive` onePositive)
@@ -416,6 +475,37 @@ x `quotInteger` y = case x `quotRemInteger` y of
 remInteger :: Integer -> Integer -> Integer
 x `remInteger` y = case x `quotRemInteger` y of
                    (# _, r #) -> r
+
+{-# NOINLINE gcdInteger #-}
+gcdInteger :: Integer -> Integer -> Integer
+gcdInteger (Positive a) (Positive b) = Positive (gcdPositive a b)
+gcdInteger (Positive a) (Negative b) = Positive (gcdPositive a b)
+gcdInteger (Negative a) (Positive b) = Positive (gcdPositive a b)
+gcdInteger (Negative a) (Negative b) = Positive (gcdPositive a b)
+gcdInteger Naught                  b = absInteger b
+gcdInteger a                  Naught = absInteger a
+
+gcdPositive :: Positive -> Positive -> Positive
+gcdPositive p1 p2 = case p1 `quotRemPositive` p2 of
+                        (# _, Positive r #) -> gcdPositive p2 r
+                        (# _, Naught     #) -> p2
+                        (# _, Negative _ #) -> errorPositive -- XXX Can't happen
+
+
+{-# NOINLINE lcmInteger #-}
+lcmInteger :: Integer -> Integer -> Integer
+lcmInteger (Positive a) (Positive b) = Positive (lcmPositive a b)
+lcmInteger (Positive a) (Negative b) = Positive (lcmPositive a b)
+lcmInteger (Negative a) (Positive b) = Positive (lcmPositive a b)
+lcmInteger (Negative a) (Negative b) = Positive (lcmPositive a b)
+lcmInteger Naught                  _ = Naught
+lcmInteger _                  Naught = Naught
+
+lcmPositive :: Positive -> Positive -> Positive
+lcmPositive p1 p2 = case p1 `quotRemPositive` (p1 `gcdPositive` p2) of
+                        (# Positive q, _ #) -> q `timesPositive` p2
+                        (# _,          _ #) -> errorPositive -- XXX Can't happen
+
 
 {-# NOINLINE compareInteger #-}
 compareInteger :: Integer -> Integer -> Ordering
