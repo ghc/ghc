@@ -42,19 +42,15 @@ module GHC.Natural
     , quotRemNatural
     , quotNatural
     , remNatural
-#if defined(MIN_VERSION_integer_gmp)
     , gcdNatural
     , lcmNatural
-#endif
       -- * Bits
     , andNatural
     , orNatural
     , xorNatural
     , bitNatural
     , testBitNatural
-#if defined(MIN_VERSION_integer_gmp)
     , popCountNatural
-#endif
     , shiftLNatural
     , shiftRNatural
       -- * Conversions
@@ -439,6 +435,15 @@ naturalFromInteger n
   | True                   = underflowError
 {-# INLINE naturalFromInteger #-}
 
+
+-- | Compute greatest common divisor.
+gcdNatural :: Natural -> Natural -> Natural
+gcdNatural (Natural n) (Natural m) = Natural (n `gcdInteger` m)
+
+-- | Compute lowest common multiple.
+lcmNatural :: Natural -> Natural -> Natural
+lcmNatural (Natural n) (Natural m) = Natural (n `lcmInteger` m)
+
 -- | 'Natural' subtraction. Returns 'Nothing's for non-positive results.
 --
 -- @since 4.8.0.0
@@ -460,7 +465,9 @@ plusNatural (Natural x) (Natural y) = Natural (x `plusInteger` y)
 {-# CONSTANT_FOLDED plusNatural #-}
 
 minusNatural :: Natural -> Natural -> Natural
-minusNatural (Natural x) (Natural y) = Natural (x `minusInteger` y)
+minusNatural (Natural x) (Natural y)
+  = if z `ltInteger` wordToInteger 0## then underflowError else Natural z
+  where z = x `minusInteger` y
 {-# CONSTANT_FOLDED minusNatural #-}
 
 timesNatural :: Natural -> Natural -> Natural
@@ -492,6 +499,9 @@ naturalToInteger (Natural i) = i
 testBitNatural :: Natural -> Int -> Bool
 testBitNatural (Natural n) (I# i) = testBitInteger n i
 -- {-# CONSTANT_FOLDED testBitNatural #-}
+
+popCountNatural :: Natural -> Int
+popCountNatural (Natural n) = I# (popCountInteger n)
 
 bitNatural :: Int# -> Natural
 bitNatural i#
