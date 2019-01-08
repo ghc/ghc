@@ -2415,7 +2415,7 @@ tcRnType hsc_env normalise rdr_type
        ; ty  <- zonkTcTypeToType ty
 
        -- Do validity checking on type
-       ; checkValidType GhciCtxt ty
+       ; checkValidType (GhciCtxt True) ty
 
        ; ty' <- if normalise
                 then do { fam_envs <- tcGetFamInstEnvs

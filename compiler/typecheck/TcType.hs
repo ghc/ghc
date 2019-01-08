@@ -606,7 +606,11 @@ data UserTypeCtxt
   | GenSigCtxt          -- Higher-rank or impredicative situations
                         -- e.g. (f e) where f has a higher-rank type
                         -- We might want to elaborate this
-  | GhciCtxt            -- GHCi command :kind <type>
+  | GhciCtxt Bool       -- GHCi command :kind <type>
+                        -- The Bool indicates if we are checking the outermost
+                        -- type application.
+                        -- See Note [Unsaturated type synonyms in GHCi] in
+                        -- TcValidity.
 
   | ClassSCCtxt Name    -- Superclasses of a class
   | SigmaCtxt           -- Theta part of a normal for-all type
@@ -650,7 +654,7 @@ pprUserTypeCtxt (InstDeclCtxt False) = text "an instance declaration"
 pprUserTypeCtxt (InstDeclCtxt True)  = text "a stand-alone deriving instance declaration"
 pprUserTypeCtxt SpecInstCtxt      = text "a SPECIALISE instance pragma"
 pprUserTypeCtxt GenSigCtxt        = text "a type expected by the context"
-pprUserTypeCtxt GhciCtxt          = text "a type in a GHCi command"
+pprUserTypeCtxt (GhciCtxt {})     = text "a type in a GHCi command"
 pprUserTypeCtxt (ClassSCCtxt c)   = text "the super-classes of class" <+> quotes (ppr c)
 pprUserTypeCtxt SigmaCtxt         = text "the context of a polymorphic type"
 pprUserTypeCtxt (DataTyCtxt tc)   = text "the context of the data type declaration for" <+> quotes (ppr tc)

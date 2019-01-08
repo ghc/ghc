@@ -228,7 +228,7 @@ checkAmbiguity ctxt ty
 wantAmbiguityCheck :: UserTypeCtxt -> Bool
 wantAmbiguityCheck ctxt
   = case ctxt of  -- See Note [When we don't check for ambiguity]
-      GhciCtxt     -> False
+      GhciCtxt {}  -> False
       TySynCtxt {} -> False
       TypeAppCtxt  -> False
       _            -> True
@@ -357,7 +357,7 @@ checkValidType ctxt ty
                  ForSigCtxt _   -> rank1
                  SpecInstCtxt   -> rank1
                  ThBrackCtxt    -> rank1
-                 GhciCtxt       -> ArbitraryRank
+                 GhciCtxt {}    -> ArbitraryRank
 
                  TyVarBndrKindCtxt _ -> rank0
                  DataKindCtxt _      -> rank1
@@ -547,16 +547,63 @@ check_syn_tc_app env ctxt rank ty tc tys
                          in addErrCtxt err_ctxt $ check_type env ctxt rank ty'
              Nothing  -> pprPanic "check_tau_type" (ppr ty)  }
 
-  | GhciCtxt <- ctxt  -- Accept under-saturated type synonyms in
-                      -- GHCi :kind commands; see Trac #7586
+  | GhciCtxt True <- ctxt  -- Accept outermost under-saturated type synonym or
+                           -- type family constructors in GHCi :kind commands.
+                           -- See Note [Unsaturated type synonyms in GHCi]
   = mapM_ check_arg tys
 
   | otherwise
   = failWithTc (tyConArityErr tc tys)
   where
     tc_arity  = tyConArity tc
-    check_arg | isTypeFamilyTyCon tc = check_arg_type  env ctxt rank
-              | otherwise            = check_type      env ctxt synArgMonoType
+    check_arg
+      | isTypeFamilyTyCon tc = check_arg_type  env arg_ctxt rank
+      | otherwise            = check_type      env arg_ctxt synArgMonoType
+    arg_ctxt
+      | GhciCtxt _ <- ctxt = GhciCtxt False
+          -- When checking an argument, set the field of GhciCtxt to False to
+          -- indicate that we are no longer in an outermost position (and thus
+          -- unsaturated synonyms are no longer allowed).
+          -- See Note [Unsaturated type synonyms in GHCi]
+      | otherwise          = ctxt
+
+{-
+Note [Unsaturated type synonyms in GHCi]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally speaking, GHC disallows unsaturated uses of type synonyms or type
+families. For instance, if one defines `type Const a b = a`, then GHC will not
+permit using `Const` unless it is applied to (at least) two arguments. There is
+an exception to this rule, however: GHCi's :kind command. For instance, it
+is quite common to look up the kind of a type constructor like so:
+
+  λ> :kind Const
+  Const :: j -> k -> j
+  λ> :kind Const Int
+  Const Int :: k -> Type
+
+Strictly speaking, the two uses of `Const` above are unsaturated, but this
+is an extremely benign (and useful) example of unsaturation, so we allow it
+here as a special case.
+
+That being said, we do not allow unsaturation carte blanche in GHCi. Otherwise,
+this GHCi interaction would be possible:
+
+  λ> newtype Fix f = MkFix (f (Fix f))
+  λ> type Id a = a
+  λ> :kind Fix Id
+  Fix Id :: Type
+
+This is rather dodgy, so we move to disallow this. We only permit unsaturated
+synonyms in GHCi if they are *top-level*—that is, if the synonym is the
+outermost type being applied. This allows `Const` and `Const Int` in the
+first example, but not `Fix Id` in the second example, as `Id` is not the
+outermost type being applied (`Fix` is).
+
+We track this outermost property in the GhciCtxt constructor of UserTypeCtxt.
+A field of True in GhciCtxt indicates that we're in an outermost position. Any
+time we invoke `check_arg` to check the validity of an argument, we switch the
+field to False.
+-}
 
 ----------------------------------------
 check_ubx_tuple :: TidyEnv -> UserTypeCtxt -> KindOrType
@@ -1007,7 +1054,7 @@ okIPCtxt GenSigCtxt             = True
 okIPCtxt (ConArgCtxt {})        = True
 okIPCtxt (ForSigCtxt {})        = True  -- ??
 okIPCtxt ThBrackCtxt            = True
-okIPCtxt GhciCtxt               = True
+okIPCtxt (GhciCtxt {})          = True
 okIPCtxt SigmaCtxt              = True
 okIPCtxt (DataTyCtxt {})        = True
 okIPCtxt (PatSynCtxt {})        = True

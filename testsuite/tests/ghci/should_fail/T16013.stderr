@@ -1,0 +1,3 @@
+
+<interactive>:1:1: error:
+    The type synonym ‘Foo’ should have 1 argument, but has been given none

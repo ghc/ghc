@@ -1852,7 +1852,7 @@ expectedKindInCtxt :: UserTypeCtxt -> ContextKind
 -- splice), or only certain kinds (like in type signatures).
 expectedKindInCtxt (TySynCtxt _)   = AnyKind
 expectedKindInCtxt ThBrackCtxt     = AnyKind
-expectedKindInCtxt GhciCtxt        = AnyKind
+expectedKindInCtxt (GhciCtxt {})   = AnyKind
 -- The types in a 'default' decl can have varying kinds
 -- See Note [Extended defaults]" in TcEnv
 expectedKindInCtxt DefaultDeclCtxt     = AnyKind
