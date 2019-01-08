@@ -2,7 +2,7 @@
 
 :l QSort
 :break 5
-qsort [8::Integer, 4]
+qsort [8::Int, 4]
 
 :p right
 seq right ()

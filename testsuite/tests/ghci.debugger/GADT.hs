@@ -9,7 +9,7 @@ data SafeList x y where
 safeHead :: SafeList x NonEmpty -> x
 safeHead (Cons x _) = x
 
-foo = Cons 3 (Cons 6 (Cons 9 Nil))
+foo = Cons (3 :: Int) (Cons 6 (Cons 9 Nil))
 
 
 data Dict x where

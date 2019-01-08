@@ -1,19 +1,19 @@
 Breakpoint 0 activated at QSort.hs:5:16-51
 Stopped in QSort.qsort, QSort.hs:5:16-51
-_result :: [Integer] = _
-a :: Integer = 8
-left :: [Integer] = _
-right :: [Integer] = _
-right = (_t1::[Integer])
+_result :: [Int] = _
+a :: Int = 8
+left :: [Int] = _
+right :: [Int] = _
+right = (_t1::[Int])
 ()
 right = []
-left = (_t2::[Integer])
+left = (_t2::[Int])
 ()
-left = 4 : (_t3::[Integer])
+left = 4 : (_t3::[Int])
 1
 left = [4]
 Stopped in QSort.qsort, QSort.hs:5:16-51
-_result :: [Integer] = _
-a :: Integer = 4
-left :: [Integer] = _
-right :: [Integer] = _
+_result :: [Int] = _
+a :: Int = 4
+left :: [Int] = _
+right :: [Int] = _

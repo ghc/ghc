@@ -1,6 +1,6 @@
 :seti -XMonomorphismRestriction
 :l T2740.hs
-:step f 1 2 3
+:step f (1 :: Int) 2 3
 :print x
 :print y
 :force x

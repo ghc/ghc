@@ -3,7 +3,7 @@
 :set -XGADTs -XRankNTypes
 :l GADT
 
-let d = DictN (1 :: Integer)
+let d = DictN (1 :: Int)
 :p d
 seq _t1 ()
 :p d

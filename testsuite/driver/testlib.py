@@ -467,9 +467,6 @@ def have_gdb( ):
 def have_readelf( ):
     return config.have_readelf
 
-# Many tests sadly break with integer-simple due to GHCi's ignorance of it.
-broken_without_gmp = unless(have_library('integer-gmp'), expect_broken(16043))
-
 # ---
 
 def high_memory_usage(name, opts):

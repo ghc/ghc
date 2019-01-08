@@ -1,8 +1,8 @@
 Breakpoint 0 activated at QSort.hs:4:12-13
 Breakpoint 1 activated at QSort.hs:5:16-51
 Stopped in QSort.qsort, QSort.hs:5:16-51
-_result :: [Integer] = _
-a :: Integer = 3
-left :: [Integer] = _
-right :: [Integer] = _
-a :: Integer 	-- Defined in ‘interactive:Ghci1’
+_result :: [Int] = _
+a :: Int = 3
+left :: [Int] = _
+right :: [Int] = _
+a :: Int 	-- Defined in ‘interactive:Ghci1’

@@ -1,6 +1,6 @@
 Breakpoint 0 activated at QSort.hs:5:16-51
 Stopped in QSort.qsort, QSort.hs:5:16-51
-_result :: [Integer] = _
-a :: Integer = 8
-left :: [Integer] = _
-right :: [Integer] = _
+_result :: [Int] = _
+a :: Int = 8
+left :: [Int] = _
+right :: [Int] = _
