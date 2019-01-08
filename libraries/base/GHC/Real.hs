@@ -31,12 +31,8 @@ import {-# SOURCE #-} GHC.Exception( divZeroException, overflowException
                                    , underflowException
                                    , ratioZeroDenomException )
 
-#if defined(OPTIMISE_INTEGER_GCD_LCM)
-# if defined(MIN_VERSION_integer_gmp)
+#if defined(MIN_VERSION_integer_gmp)
 import GHC.Integer.GMP.Internals
-# else
-#  error unsupported OPTIMISE_INTEGER_GCD_LCM configuration
-# endif
 #endif
 
 infixr 8  ^, ^^
@@ -412,17 +408,9 @@ instance Integral Word where
 instance  Real Integer  where
     toRational x        =  x :% 1
 
-#if defined(MIN_VERSION_integer_gmp)
 -- | @since 4.8.0.0
 instance Real Natural where
-    toRational (NatS# w)  = toRational (W# w)
-    toRational (NatJ# bn) = toRational (Jp# bn)
-#else
--- | @since 4.8.0.0
-instance Real Natural where
-  toRational (Natural a) = toRational a
-  {-# INLINE toRational #-}
-#endif
+    toRational n = naturalToInteger n :% 1
 
 -- Note [Integer division constant folding]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -466,7 +454,6 @@ instance  Integral Integer where
     n `quotRem` d = case n `quotRemInteger` d of
                       (# q, r #) -> (q, r)
 
-#if defined(MIN_VERSION_integer_gmp)
 -- | @since 4.8.0.0
 instance Integral Natural where
     toInteger = naturalToInteger
@@ -478,30 +465,6 @@ instance Integral Natural where
     quotRem = quotRemNatural
     quot    = quotNatural
     rem     = remNatural
-#else
--- | @since 4.8.0.0
-instance Integral Natural where
-    {-# INLINE toInteger #-}
-    toInteger (Natural a) = a
-
-    {-# INLINE quot #-}
-    Natural a `quot` Natural b = Natural (a `quot` b)
-
-    {-# INLINE rem #-}
-    Natural a `rem` Natural b = Natural (a `rem` b)
-
-    {-# INLINE div #-}
-    Natural a `div` Natural b = Natural (a `div` b)
-
-    {-# INLINE mod #-}
-    Natural a `mod` Natural b = Natural (a `mod` b)
-
-    {-# INLINE divMod #-}
-    Natural a `divMod` Natural b = coerce (a `divMod` b)
-
-    {-# INLINE quotRem #-}
-    Natural a `quotRem` Natural b = coerce (a `quotRem` b)
-#endif
 
 --------------------------------------------------------------
 -- Instances for @Ratio@
@@ -789,24 +752,27 @@ lcm _ 0         =  0
 lcm 0 _         =  0
 lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 
-#if defined(OPTIMISE_INTEGER_GCD_LCM)
 {-# RULES
-"gcd/Int->Int->Int"             gcd = gcdInt'
 "gcd/Integer->Integer->Integer" gcd = gcdInteger
 "lcm/Integer->Integer->Integer" lcm = lcmInteger
 "gcd/Natural->Natural->Natural" gcd = gcdNatural
 "lcm/Natural->Natural->Natural" lcm = lcmNatural
  #-}
 
+#if defined(MIN_VERSION_integer_gmp)
+-- GMP defines a more efficient Int# and Word# GCD
+
 gcdInt' :: Int -> Int -> Int
 gcdInt' (I# x) (I# y) = I# (gcdInt x y)
 
+gcdWord' :: Word -> Word -> Word
+gcdWord' (W# x) (W# y) = W# (gcdWord x y)
+
 {-# RULES
+"gcd/Int->Int->Int"             gcd = gcdInt'
 "gcd/Word->Word->Word"          gcd = gcdWord'
  #-}
 
-gcdWord' :: Word -> Word -> Word
-gcdWord' (W# x) (W# y) = W# (gcdWord x y)
 #endif
 
 integralEnumFrom :: (Integral a, Bounded a) => a -> [a]

@@ -63,10 +63,6 @@ import GHC.Num
 import GHC.Base
 import GHC.Real
 
-#if defined(MIN_VERSION_integer_gmp)
-import GHC.Integer.GMP.Internals (bitInteger, popCountInteger)
-#endif
-
 infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`
 infixl 7 .&.
 infixl 6 `xor`
@@ -526,13 +522,8 @@ instance Bits Integer where
    testBit x (I# i) = testBitInteger x i
    zeroBits   = 0
 
-#if defined(MIN_VERSION_integer_gmp)
    bit (I# i#) = bitInteger i#
    popCount x  = I# (popCountInteger x)
-#else
-   bit        = bitDefault
-   popCount   = popCountDefault
-#endif
 
    rotate x i = shift x i   -- since an Integer never wraps around
 
@@ -540,7 +531,6 @@ instance Bits Integer where
    bitSize _  = errorWithoutStackTrace "Data.Bits.bitSize(Integer)"
    isSigned _ = True
 
-#if defined(MIN_VERSION_integer_gmp)
 -- | @since 4.8.0
 instance Bits Natural where
    (.&.) = andNatural
@@ -563,50 +553,6 @@ instance Bits Natural where
    bitSizeMaybe _ = Nothing
    bitSize _  = errorWithoutStackTrace "Data.Bits.bitSize(Natural)"
    isSigned _ = False
-#else
--- | @since 4.8.0.0
-instance Bits Natural where
-  Natural n .&. Natural m = Natural (n .&. m)
-  {-# INLINE (.&.) #-}
-  Natural n .|. Natural m = Natural (n .|. m)
-  {-# INLINE (.|.) #-}
-  xor (Natural n) (Natural m) = Natural (xor n m)
-  {-# INLINE xor #-}
-  complement _ = errorWithoutStackTrace "Bits.complement: Natural complement undefined"
-  {-# INLINE complement #-}
-  shift (Natural n) = Natural . shift n
-  {-# INLINE shift #-}
-  rotate (Natural n) = Natural . rotate n
-  {-# INLINE rotate #-}
-  bit = Natural . bit
-  {-# INLINE bit #-}
-  setBit (Natural n) = Natural . setBit n
-  {-# INLINE setBit #-}
-  clearBit (Natural n) = Natural . clearBit n
-  {-# INLINE clearBit #-}
-  complementBit (Natural n) = Natural . complementBit n
-  {-# INLINE complementBit #-}
-  testBit (Natural n) = testBit n
-  {-# INLINE testBit #-}
-  bitSizeMaybe _ = Nothing
-  {-# INLINE bitSizeMaybe #-}
-  bitSize = errorWithoutStackTrace "Natural: bitSize"
-  {-# INLINE bitSize #-}
-  isSigned _ = False
-  {-# INLINE isSigned #-}
-  shiftL (Natural n) = Natural . shiftL n
-  {-# INLINE shiftL #-}
-  shiftR (Natural n) = Natural . shiftR n
-  {-# INLINE shiftR #-}
-  rotateL (Natural n) = Natural . rotateL n
-  {-# INLINE rotateL #-}
-  rotateR (Natural n) = Natural . rotateR n
-  {-# INLINE rotateR #-}
-  popCount (Natural n) = popCount n
-  {-# INLINE popCount #-}
-  zeroBits = Natural 0
-
-#endif
 
 -----------------------------------------------------------------------------
 

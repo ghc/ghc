@@ -24,9 +24,6 @@ module GHC.Num (module GHC.Num, module GHC.Integer, module GHC.Natural) where
 import GHC.Base
 import GHC.Integer
 import GHC.Natural
-#if !defined(MIN_VERSION_integer_gmp)
-import {-# SOURCE #-} GHC.Exception.Type (underflowException)
-#endif
 
 infixl 7  *
 infixl 6  +, -
@@ -125,7 +122,6 @@ instance  Num Integer  where
     abs = absInteger
     signum = signumInteger
 
-#if defined(MIN_VERSION_integer_gmp)
 -- | Note that `Natural`'s 'Num' instance isn't a ring: no element but 0 has an
 -- additive inverse. It is a semiring though.
 --
@@ -140,25 +136,3 @@ instance  Num Natural  where
     abs = id
     signum = signumNatural
 
-#else
--- | Note that `Natural`'s 'Num' instance isn't a ring: no element but 0 has an
--- additive inverse. It is a semiring though.
---
--- @since 4.8.0.0
-instance Num Natural where
-  Natural n + Natural m = Natural (n + m)
-  {-# INLINE (+) #-}
-  Natural n * Natural m = Natural (n * m)
-  {-# INLINE (*) #-}
-  Natural n - Natural m
-      | m > n     = raise# underflowException
-      | otherwise = Natural (n - m)
-  {-# INLINE (-) #-}
-  abs (Natural n) = Natural n
-  {-# INLINE abs #-}
-  signum (Natural n) = Natural (signum n)
-  {-# INLINE signum #-}
-  fromInteger = naturalFromInteger
-  {-# INLINE fromInteger #-}
-
-#endif
