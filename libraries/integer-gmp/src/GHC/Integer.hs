@@ -64,6 +64,8 @@ module GHC.Integer (
     complementInteger,
     shiftLInteger, shiftRInteger, testBitInteger,
 
+    popCountInteger, bitInteger,
+
     -- * Hashing
     hashInteger,
     ) where
