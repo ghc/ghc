@@ -616,6 +616,8 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                      , dcr_boxer   = mk_boxer boxers
                      , dcr_arg_tys = rep_tys
                      , dcr_stricts = rep_strs
+                       -- For newtypes, dcr_bangs is always [HsLazy].
+                       -- See Note [HsImplBangs for newtypes].
                      , dcr_bangs   = arg_ibangs }) }
 
   where
@@ -640,10 +642,8 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     new_tycon = isNewTyCon tycon
     arg_ibangs
       | new_tycon
-      = nOfThem (length orig_arg_tys) HsLazy
-        -- Don't invoke dataConSrcToImplBang for newtypes! They shouldn't have
-        -- strictness/UNPACK annotations, but dataConSrcToImplBang can sneak
-        -- them by way of the StrictData extension. (See #16141.)
+      = ASSERT( isSingleton orig_arg_tys )
+        [HsLazy] -- See Note [HsImplBangs for newtypes]
       | otherwise
       = case mb_bangs of
           Nothing    -> zipWith (dataConSrcToImplBang dflags fam_envs)
@@ -781,6 +781,29 @@ wrappers! After all, a newtype can also be written with GADT syntax:
 Again, this needs a wrapper data con to reorder the type variables. It does
 mean that this newtype constructor requires another level of indirection when
 being called, but the inliner should make swift work of that.
+
+Note [HsImplBangs for newtypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Most of the time, we use the dataConSrctoImplBang function to decide what
+strictness/unpackedness to use for the fields of a data type constructor. But
+there is an exception to this rule: newtype constructors. You might not think
+that newtypes would pose a challenge, since newtypes are seemingly forbidden
+from having strictness annotations in the first place. But consider this
+(from Trac #16141):
+
+  {-# LANGUAGE StrictData #-}
+  {-# OPTIONS_GHC -O #-}
+  newtype T a b where
+    MkT :: forall b a. Int -> T a b
+
+Because StrictData (plus optimization) is enabled, invoking
+dataConSrcToImplBang would sneak in and unpack the field of type Int to Int#!
+This would be disastrous, since the wrapper for `MkT` uses a coercion involving
+Int, not Int#.
+
+Bottom line: dataConSrcToImplBang should never be invoked for newtypes. In the
+case of a newtype constructor, we simply hardcode its dcr_bangs field to
+[HsLazy].
 -}
 
 -------------------------
@@ -788,7 +811,11 @@ newLocal :: Type -> UniqSM Var
 newLocal ty = do { uniq <- getUniqueM
                  ; return (mkSysLocalOrCoVar (fsLit "dt") uniq ty) }
 
--- | Unpack/Strictness decisions from source module
+-- | Unpack/Strictness decisions from source module.
+--
+-- This function should only ever be invoked for data constructor fields, and
+-- never on the field of a newtype constructor.
+-- See @Note [HsImplBangs for newtypes]@.
 dataConSrcToImplBang
    :: DynFlags
    -> FamInstEnvs
