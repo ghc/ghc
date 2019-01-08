@@ -819,10 +819,9 @@ generalizeOverLitVal lit = lit
 isNegativeZeroOverLit :: HsOverLit t -> Bool
 isNegativeZeroOverLit lit
  = case ol_val lit of
-        HsIntegral i   -> 0 == il_value i && il_neg i
-        HsFractional f -> let val = rationalFromFractionalLit f
-                          in  0 == val && fl_neg f
-        _              -> False
+        HsIntegral i    -> 0 == il_value i && il_neg i
+        HsFractional fl -> 0 == fl_signi fl && fl_neg fl
+        _               -> False
 
 {-
 Note [Negative zero]
