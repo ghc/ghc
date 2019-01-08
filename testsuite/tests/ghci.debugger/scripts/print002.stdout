@@ -1,5 +1,6 @@
 Just 1.2
 f = Just 1.2
+ten = 10
 i = Just 10
 10
 i = Just 10

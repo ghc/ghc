@@ -1,8 +1,8 @@
 Stopped in QSort.qsort, QSort.hs:5:16-51
-_result :: [Integer] = _
-a :: Integer = 1
-left :: [Integer] = _
-right :: [Integer] = _
+_result :: [Int] = _
+a :: Int = 1
+left :: [Int] = _
+right :: [Int] = _
 Stopped in QSort.qsort, QSort.hs:5:17-26
 _result :: [a] = _
 left :: [a] = _

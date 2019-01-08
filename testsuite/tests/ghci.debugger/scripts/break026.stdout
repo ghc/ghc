@@ -1,42 +1,42 @@
 Stopped in Test.foldl, break026.hs:5:16-22
-_result :: Integer = _
-c :: Integer = 0
-go :: Integer -> [t1] -> Integer = _
+_result :: Int = _
+c :: Int = 0
+go :: Int -> [t1] -> Int = _
 xs :: [t1] = _
 Stopped in Test.foldl.go, break026.hs:7:23-35
-_result :: Integer = _
-c :: Integer = 0
-f :: Integer -> Integer -> Integer = _
-x :: Integer = 1
-xs :: [Integer] = _
+_result :: Int = _
+c :: Int = 0
+f :: Int -> Int -> Int = _
+x :: Int = 1
+xs :: [Int] = _
 Stopped in Test.foldl.go, break026.hs:7:23-35
 _result :: t = _
 c :: t = _
-f :: t -> Integer -> t = _
-x :: Integer = 2
-xs :: [Integer] = _
+f :: t -> Int -> t = _
+x :: Int = 2
+xs :: [Int] = _
 c = 1
 Stopped in Test.foldl, break026.hs:5:16-22
-_result :: Integer = _
-c :: Integer = 0
-go :: Integer -> [t1] -> Integer = _
+_result :: Int = _
+c :: Int = 0
+go :: Int -> [t1] -> Int = _
 xs :: [t1] = _
 Stopped in Test.foldl.go, break026.hs:7:23-35
-_result :: Integer = _
-c :: Integer = 0
-f :: Integer -> Integer -> Integer = _
-x :: Integer = 1
-xs :: [Integer] = _
+_result :: Int = _
+c :: Int = 0
+f :: Int -> Int -> Int = _
+x :: Int = 1
+xs :: [Int] = _
 Stopped in Test.foldl.go, break026.hs:7:23-35
 _result :: t = _
 c :: t = _
-f :: t -> Integer -> t = _
-x :: Integer = 2
-xs :: [Integer] = _
+f :: t -> Int -> t = _
+x :: Int = 2
+xs :: [Int] = _
 Stopped in Test.foldl.go, break026.hs:7:27-31
-_result :: Integer = _
-c :: Integer = 0
-f :: Integer -> Integer -> Integer = _
-x :: Integer = 1
+_result :: Int = _
+c :: Int = 0
+f :: Int -> Int -> Int = _
+x :: Int = 1
 ()
 1

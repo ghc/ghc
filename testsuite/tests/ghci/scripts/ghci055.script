@@ -1,5 +1,5 @@
 let x=undefined
-let y=3 :: Integer
+let y=3 :: Int
 :force x
 :show bindings
 -- in 7.3 and earlier this used to print just "*** Exception:

@@ -9,7 +9,6 @@ it :: () = ()
 _t3 :: [a0] = _
 _t2 :: a0 = _
 ()
-t = O (Just [1,1] : (_t4::[Maybe [Integer]]))
+t = O (Just [1,1] : (_t4::[Maybe [Int]]))
 ()
-t = O (Just [1,1] : (_t5::Maybe [Integer]) :
-       (_t6::[Maybe [Integer]]))
+t = O (Just [1,1] : (_t5::Maybe [Int]) : (_t6::[Maybe [Int]]))
