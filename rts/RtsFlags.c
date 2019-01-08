@@ -1906,6 +1906,7 @@ static bool read_heap_profiling_flag(const char *arg)
     case 'r':
     case 'B':
     case 'b':
+    case 'T':
         if (arg[2] != '\0' && arg[3] != '\0') {
             {
                 const char *left  = strchr(arg, '{');
