@@ -44,22 +44,18 @@ newtype Event = Event Int
 
 evtNothing :: Event
 evtNothing = Event 0
-{-# INLINE evtNothing #-}
 
 -- | Data is available to be read.
 evtRead :: Event
 evtRead = Event 1
-{-# INLINE evtRead #-}
 
 -- | The file descriptor is ready to accept a write.
 evtWrite :: Event
 evtWrite = Event 2
-{-# INLINE evtWrite #-}
 
 -- | Another thread closed the file descriptor.
 evtClose :: Event
 evtClose = Event 4
-{-# INLINE evtClose #-}
 
 eventIs :: Event -> Event -> Bool
 eventIs (Event a) (Event b) = a .&. b /= 0
