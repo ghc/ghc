@@ -41,8 +41,6 @@ module GHC.Integer.GMP.Internals
     , module GHC.Integer
 
       -- ** Additional 'Integer' operations
-    , bitInteger
-    , popCountInteger
     , gcdInteger
     , gcdExtInteger
     , lcmInteger
