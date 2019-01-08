@@ -1312,12 +1312,6 @@ which is what loadSrcInterface does.
 
 It is enabled by default and disabled by the flag
 `-fno-implicit-import-qualified`.
-
-Note [Safe Haskell and GHCi]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We DON'T do this Safe Haskell as we need to check imports. We can
-and should instead check the qualified import but at the moment
-this requires some refactoring so leave as a TODO
 -}
 
 
@@ -1335,14 +1329,17 @@ lookupQualifiedNameGHCi rdr_name
       | Just (mod,occ) <- isQual_maybe rdr_name
       , is_ghci
       , gopt Opt_ImplicitImportQualified dflags   -- Enables this GHCi behaviour
-      , not (safeDirectImpsReq dflags)            -- See Note [Safe Haskell and GHCi]
       = do { res <- loadSrcInterface_maybe doc mod False Nothing
            ; case res of
                 Succeeded iface
-                  -> return [ name
+                     -- check, whether the interface is safe enough (#12509)
+                  -> if chkSafe (safeHaskell dflags) (mi_trust iface)
+                     then return
+                            [ name
                             | avail <- mi_exports iface
                             , name  <- availNames avail
                             , nameOccName name == occ ]
+                     else return []
 
                 _ -> -- Either we couldn't load the interface, or
                      -- we could but we didn't find the name in it
@@ -1352,6 +1349,11 @@ lookupQualifiedNameGHCi rdr_name
       | otherwise
       = do { traceRn "lookupQualifiedNameGHCi: off" (ppr rdr_name)
            ; return [] }
+
+    chkSafe :: SafeHaskellMode -> IfaceTrustInfo -> Bool
+    chkSafe gMode miMode = chk gMode (getSafeMode miMode)
+    chk Sf_Safe Sf_Unsafe = False
+    chk _       _         = True
 
     doc = text "Need to find" <+> ppr rdr_name
 
