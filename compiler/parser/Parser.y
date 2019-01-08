@@ -87,8 +87,6 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilD
 -- compiler/utils
 import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
-
-import qualified GHC.LanguageExtensions as LangExt
 }
 
 %expect 237 -- shift/reduce conflicts
@@ -3755,14 +3753,14 @@ fileSrcSpan = do
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()
 hintMultiWayIf span = do
-  mwiEnabled <- liftM ((LangExt.MultiWayIf `extopt`) . options) getPState
+  mwiEnabled <- getBit MultiWayIfBit
   unless mwiEnabled $ parseErrorSDoc span $
     text "Multi-way if-expressions need MultiWayIf turned on"
 
 -- Hint about if usage for beginners
 hintIf :: SrcSpan -> String -> P (LHsExpr GhcPs)
 hintIf span msg = do
-  mwiEnabled <- liftM ((LangExt.MultiWayIf `extopt`) . options) getPState
+  mwiEnabled <- getBit MultiWayIfBit
   if mwiEnabled
     then parseErrorSDoc span $ text $ "parse error in if statement"
     else parseErrorSDoc span $ text $ "parse error in if statement: "++msg
@@ -3770,8 +3768,8 @@ hintIf span msg = do
 -- Hint about explicit-forall, assuming UnicodeSyntax is on
 hintExplicitForall :: SrcSpan -> P ()
 hintExplicitForall span = do
-    forall      <- extension explicitForallEnabled
-    rulePrag    <- extension inRulePrag
+    forall   <- getBit ExplicitForallBit
+    rulePrag <- getBit InRulePragBit
     unless (forall || rulePrag) $ parseErrorSDoc span $ vcat
       [ text "Illegal symbol '\x2200' in type" -- U+2200 FOR ALL
       , text "Perhaps you intended to use RankNTypes or a similar language"
@@ -3781,7 +3779,7 @@ hintExplicitForall span = do
 -- Hint about explicit-forall, assuming UnicodeSyntax is off
 hintExplicitForall' :: SrcSpan -> P (Located RdrName)
 hintExplicitForall' span = do
-    forall    <- extension explicitForallEnabled
+    forall <- getBit ExplicitForallBit
     let illegalDot = "Illegal symbol '.' in type"
     if forall
       then parseErrorSDoc span $ vcat
@@ -3801,7 +3799,7 @@ checkIfBang _ = False
 -- | Warn about missing space after bang
 warnSpaceAfterBang :: SrcSpan -> P ()
 warnSpaceAfterBang span = do
-    bang_on <- extension bangPatEnabled
+    bang_on <- getBit BangPatBit
     unless bang_on $
       addWarning Opt_WarnSpaceAfterBang span msg
     where
@@ -3814,8 +3812,8 @@ warnSpaceAfterBang span = do
 -- variable or constructor. See Trac #13450.
 reportEmptyDoubleQuotes :: SrcSpan -> P (Located (HsExpr GhcPs))
 reportEmptyDoubleQuotes span = do
-    thEnabled <- liftM ((LangExt.TemplateHaskellQuotes `extopt`) . options) getPState
-    if thEnabled
+    thQuotes <- getBit ThQuotesBit
+    if thQuotes
       then parseErrorSDoc span $ vcat
         [ text "Parser error on `''`"
         , text "Character literals may not be empty"
