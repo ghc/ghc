@@ -377,8 +377,27 @@ rnImplicitBndrs bind_free_tvs
 rnLHsInstType :: SDoc -> LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
 -- Rename the type in an instance.
 -- The 'doc_str' is "an instance declaration".
--- Do not try to decompose the inst_ty in case it is malformed
-rnLHsInstType doc inst_ty = rnHsSigType (GenericCtx doc) inst_ty
+rnLHsInstType doc_str inst_ty
+  | Just cls <- getLHsInstDeclClass_maybe inst_ty
+  , isTcOcc (rdrNameOcc (unLoc cls))
+         -- The guards check that the instance type looks like
+         --   blah => C ty1 .. tyn
+  = do { let full_doc = doc_str <+> text "for" <+> quotes (ppr cls)
+       ; rnHsSigType (GenericCtx full_doc) inst_ty }
+
+  | otherwise  -- The instance is malformed. We'd still like
+               -- to make *some* progress (rather than failing outright), so
+               -- we rename it anyway and then report an error.
+               -- Importantly, this error should be thrown before we reach the
+               -- typechecker, lest we encounter different errors that are
+               -- hopelessly confusing (such as the one in Trac #16114).
+  = do { addErrAt (getLoc (hsSigType inst_ty)) $
+         hang (text "Illegal class instance:" <+> quotes (ppr inst_ty))
+            2 (vcat [ text "Class instances must be of the form"
+                    , nest 2 $ text "context => C ty_1 ... ty_n"
+                    , text "where" <+> quotes (char 'C') <+> text "is a class"
+                    ])
+       ; rnHsSigType (GenericCtx doc_str) inst_ty }
 
 {- ******************************************************
 *                                                       *
