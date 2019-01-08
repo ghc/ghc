@@ -1,7 +1,7 @@
 :l Test2
 :b 3
 :b 5
-f (1 :: Integer)
+f (1 :: Int)
 :st
 -- Test that the binding for x is now gone
 :show bindings

@@ -3,5 +3,5 @@
 :set -XGADTs -XRankNTypes
 :l GADT
 
-let e = Exist 1
+let e = Exist (1 :: Int)
 :p e

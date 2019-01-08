@@ -3,7 +3,7 @@
 
 :set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l Test 
-let t = O (map Just [[1,1],[2,2]])
+let t = O (map Just [[1 :: Int,1],[2,2]])
 :p t
 seq _t1 ()  -- The contents of the opaque
 :p t

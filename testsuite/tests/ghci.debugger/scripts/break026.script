@@ -1,12 +1,12 @@
 :load break026
-:step foldl (+) 0 [1::Integer .. 5]
+:step foldl (+) 0 [1::Int .. 5]
 :step
 :step
 :force c
         -- answer should be 1
 
 :load break026
-:step foldl (+) 0 [1::Integer .. 5]
+:step foldl (+) 0 [1::Int .. 5]
 :step
 :step
 -- a diversion to single-step the evaluation of c:

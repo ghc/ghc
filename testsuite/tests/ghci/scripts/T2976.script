@@ -1,4 +1,4 @@
-let test = 0 :: Integer
+let test = 0 :: Int
 :show bindings
 :force test
 :show bindings
