@@ -1602,13 +1602,13 @@ trimJoinCont _ Nothing cont
 trimJoinCont var (Just arity) cont
   = trim arity cont
   where
-    trim 0 cont@(Stop {})
+    trim 0 cont@Stop {}
       = cont
     trim 0 cont
       = mkBoringStop (contResultType cont)
-    trim n cont@(ApplyToVal { sc_cont = k })
+    trim n cont@ApplyToVal { sc_cont = k }
       = cont { sc_cont = trim (n-1) k }
-    trim n cont@(ApplyToTy { sc_cont = k })
+    trim n cont@ApplyToTy { sc_cont = k }
       = cont { sc_cont = trim (n-1) k } -- join arity counts types!
     trim _ cont
       = pprPanic "completeCall" $ ppr var $$ ppr cont
@@ -1733,7 +1733,7 @@ completeCall env var cont
                                 lone_variable arg_infos interesting_cont
   -- Inline the variable's RHS
   = do { checkedTick (UnfoldingDone var)
-       ; dump_inline expr cont
+       ; dump_inline expr
        ; simplExprF (zapSubstEnv env) expr cont }
 
   | otherwise
@@ -1750,7 +1750,7 @@ completeCall env var cont
     interesting_cont = interestingCallContext env call_cont
     active_unf       = activeUnfolding (getMode env) var
 
-    dump_inline unfolding cont
+    dump_inline unfolding
       | not (dopt Opt_D_dump_inlinings dflags) = return ()
       | not (dopt Opt_D_verbose_core2core dflags)
       = when (isExternalName (idName var)) $
@@ -3560,4 +3560,3 @@ simplRules env mb_new_id rules mb_cont
                           , ru_fn    = fn_name'
                           , ru_args  = args'
                           , ru_rhs   = rhs' }) }
-
