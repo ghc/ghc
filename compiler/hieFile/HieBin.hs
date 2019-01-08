@@ -22,7 +22,8 @@ import Data.IORef
 import Data.List                  ( mapAccumR )
 import Data.Word                  ( Word32 )
 import Control.Monad              ( replicateM )
-
+import System.Directory           ( createDirectoryIfMissing )
+import System.FilePath            ( takeDirectory )
 
 -- | `Name`'s get converted into `HieName`'s before being written into @.hie@
 -- files. See 'toHieName' and 'fromHieName' for logic on how to convert between
@@ -63,7 +64,7 @@ initBinMemSize :: Int
 initBinMemSize = 1024*1024
 
 writeHieFile :: Binary a => FilePath -> a -> IO ()
-writeHieFile filename hiefile = do
+writeHieFile hie_file_path hiefile = do
   bh0 <- openBinMem initBinMemSize
 
   -- remember where the dictionary pointer will go
@@ -115,7 +116,8 @@ writeHieFile filename hiefile = do
   putDictionary bh dict_next dict_map
 
   -- and send the result to the file
-  writeBinMem bh filename
+  createDirectoryIfMissing True (takeDirectory hie_file_path)
+  writeBinMem bh hie_file_path
   return ()
 
 readHieFile :: Binary a => NameCache -> FilePath -> IO (a, NameCache)
