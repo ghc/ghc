@@ -130,7 +130,7 @@ tcRnExports explicit_mod exports
                               tcg_rdr_env = rdr_env,
                               tcg_imports = imports,
                               tcg_src     = hsc_src }
- = unsetWOptM Opt_WarnWarningsDeprecations $
+ = unsetWOptM Opt_WarnWarningsDeprecations $ unsetWOptM Opt_WarnDeprecations $
        -- Do not report deprecations arising from the export
        -- list, to avoid bleating about re-exporting a deprecated
        -- thing (especially via 'module Foo' export item)

@@ -367,9 +367,10 @@ rnImportDecl this_mod
         imports = calculateAvails dflags iface mod_safe' want_boot (ImportedByUser imv)
 
     -- Complain if we import a deprecated module
-    whenWOptM Opt_WarnWarningsDeprecations (
+    when (wopt Opt_WarnWarningsDeprecations dflags ||
+          wopt Opt_WarnDeprecations dflags) (
        case (mi_warns iface) of
-          WarnAll txt -> addWarn (Reason Opt_WarnWarningsDeprecations)
+          WarnAll txt -> addWarn (Reason (warningTextToWarningFlag txt))
                                 (moduleWarn imp_mod_name txt)
           _           -> return ()
      )

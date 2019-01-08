@@ -22,6 +22,7 @@ module DynFlags (
         DumpFlag(..),
         GeneralFlag(..),
         WarningFlag(..), WarnReason(..),
+        warningTextToWarningFlag,
         Language(..),
         PlatformConstants(..),
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
@@ -203,7 +204,7 @@ import Maybes
 import MonadUtils
 import qualified Pretty
 import SrcLoc
-import BasicTypes       ( IntWithInf, treatZeroAsInf )
+import BasicTypes       ( IntWithInf, WarningTxt(..), treatZeroAsInf )
 import FastString
 import Fingerprint
 import Outputable
@@ -787,6 +788,7 @@ data WarningFlag =
    | Opt_WarnUnusedMatches
    | Opt_WarnUnusedTypePatterns
    | Opt_WarnUnusedForalls
+   | Opt_WarnDeprecations
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnMissingMonadFailInstances -- since 8.0
@@ -836,6 +838,13 @@ data WarningFlag =
    | Opt_WarnSpaceAfterBang
    | Opt_WarnMissingDerivingStrategies    -- Since 8.8
    deriving (Eq, Show, Enum)
+
+-- | Convert a 'WarningText' to either 'Opt_WarnDeprecations' or
+--   'Opt_WarnWarningsDeprecations' depending on if the 'WarningTxt'
+--   came from a WARNING pragrma or a DEPRECATED pragma.
+warningTextToWarningFlag :: WarningTxt -> WarningFlag
+warningTextToWarningFlag (WarningTxt _ _) = Opt_WarnWarningsDeprecations
+warningTextToWarningFlag (DeprecatedTxt _ _) = Opt_WarnDeprecations
 
 data Language = Haskell98 | Haskell2010
    deriving (Eq, Enum, Show)
@@ -3452,7 +3461,8 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "W"       (NoArg (mapM_ setWarningFlag minusWOpts))
   , make_ord_flag defFlag "Werror"
                (NoArg (do { setGeneralFlag Opt_WarnIsError
-                          ; mapM_ setFatalWarningFlag minusWeverythingOpts   }))
+                          ; let everyOptsExceptDeprecation = filter (/= Opt_WarnDeprecations) minusWeverythingOpts
+                          ; mapM_ setFatalWarningFlag everyOptsExceptDeprecation }))
   , make_ord_flag defFlag "Wwarn"
                (NoArg (do { unSetGeneralFlag Opt_WarnIsError
                           ; mapM_ unSetFatalWarningFlag minusWeverythingOpts }))
@@ -3949,7 +3959,7 @@ wWarningFlagsDeps = [
   flagSpec "deferred-type-errors"        Opt_WarnDeferredTypeErrors,
   flagSpec "deferred-out-of-scope-variables"
                                          Opt_WarnDeferredOutOfScopeVariables,
-  flagSpec "deprecations"                Opt_WarnWarningsDeprecations,
+  flagSpec "deprecations"                Opt_WarnDeprecations,
   flagSpec "deprecated-flags"            Opt_WarnDeprecatedFlags,
   flagSpec "deriving-typeable"           Opt_WarnDerivingTypeable,
   flagSpec "dodgy-exports"               Opt_WarnDodgyExports,

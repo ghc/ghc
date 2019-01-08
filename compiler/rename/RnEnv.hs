@@ -1236,12 +1236,13 @@ warnIfDeprecated gre@(GRE { gre_name = name, gre_imp = iss })
   | (imp_spec : _) <- iss
   = do { dflags <- getDynFlags
        ; this_mod <- getModule
-       ; when (wopt Opt_WarnWarningsDeprecations dflags &&
+       ; when ((wopt Opt_WarnWarningsDeprecations dflags ||
+                wopt Opt_WarnDeprecations dflags) &&
                not (nameIsLocalOrFrom this_mod name)) $
                    -- See Note [Handling of deprecations]
          do { iface <- loadInterfaceForName doc name
             ; case lookupImpDeprec iface gre of
-                Just txt -> addWarn (Reason Opt_WarnWarningsDeprecations)
+                Just txt -> addWarn (Reason (warningTextToWarningFlag txt))
                                    (mk_msg imp_spec txt)
                 Nothing  -> return () } }
   | otherwise
