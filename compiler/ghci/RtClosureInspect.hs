@@ -67,6 +67,9 @@ import Data.List
 import GHC.Exts
 import Data.Array.Base
 import GHC.Integer.GMP.Internals
+#elif defined(INTEGER_SIMPLE)
+import GHC.Exts
+import GHC.Integer.Simple.Internals
 #endif
 import qualified Data.Sequence as Seq
 import Data.Sequence (viewl, ViewL(..))
@@ -410,9 +413,36 @@ cPprTermBase y =
       let
         !(UArray _ _ _ arr#) = listArray (0,length ws-1) ws
         constr
-          | "Jp#" <- occNameString (nameOccName (dataConName con)) = Jp#
+          | "Jp#" <- getOccString (dataConName con) = Jp#
           | otherwise = Jn#
       return (Just (Ppr.integer (constr (BN# arr#))))
+#elif defined(INTEGER_SIMPLE)
+   -- As with the GMP case, this depends deeply on the integer-simple
+   -- representation.
+   --
+   -- @
+   -- data Integer = Positive !Digits | Negative !Digits | Naught
+   --
+   -- data Digits = Some !Word# !Digits
+   --             | None
+   -- @
+   --
+   -- NB: the above has some type synonyms expanded out for the sake of brevity
+   ppr_integer _ Term{subTerms=[]} =
+      return (Just (Ppr.integer Naught))
+   ppr_integer _ Term{dc=Right con, subTerms=[digitTerm]}
+        | Just digits <- get_digits digitTerm
+        = return (Just (Ppr.integer (constr digits)))
+      where
+        get_digits :: Term -> Maybe Digits
+        get_digits Term{subTerms=[]} = Just None
+        get_digits Term{subTerms=[Prim{valRaw=[W# w]},t]}
+          = Some w <$> get_digits t
+        get_digits _ = Nothing
+
+        constr
+          | "Positive" <- getOccString (dataConName con) = Positive
+          | otherwise = Negative
 #endif
    ppr_integer _ _ = return Nothing
 
