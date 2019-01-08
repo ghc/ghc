@@ -45,6 +45,11 @@ Flag terminfo
     Default: True
     Manual: True
 
+Flag integer-simple
+    Description: Use integer-simple
+    Manual: True
+    Default: False
+
 Flag integer-gmp
     Description: Use integer-gmp
     Manual: True
@@ -89,10 +94,19 @@ Library
         CPP-Options: -DGHCI
         Include-Dirs: ../rts/dist/build @FFIIncludeDir@
 
+    -- sanity-check to ensure not more than one integer flag is set
+    if flag(integer-gmp) && flag(integer-simple)
+        build-depends: invalid-cabal-flag-settings<0
+
     -- gmp internals are used by the GHCi debugger if available
     if flag(integer-gmp)
         CPP-Options: -DINTEGER_GMP
         build-depends: integer-gmp >= 1.0.2
+
+    -- simple internals are used by the GHCi debugger if available
+    if flag(integer-simple)
+        CPP-Options: -DINTEGER_SIMPLE
+        build-depends: integer-simple >= 0.1.1.1
 
     Other-Extensions:
         BangPatterns
