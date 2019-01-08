@@ -106,7 +106,6 @@ Library
 
     if flag(integer-gmp)
         build-depends: integer-gmp ^>= 1.0.1
-        cpp-options: -DOPTIMISE_INTEGER_GCD_LCM
 
     exposed-modules:
         Control.Applicative
