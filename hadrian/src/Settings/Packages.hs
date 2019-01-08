@@ -72,7 +72,9 @@ packageArgs = do
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
             , flag CrossCompiling ? arg "-terminfo"
             , notStage0 ? intLib == integerGmp ?
-              arg "integer-gmp" ]
+              arg "integer-gmp"
+            , notStage0 ? intLib == integerSimple ?
+              arg "integer-simple" ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
 
