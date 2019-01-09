@@ -1,4 +1,4 @@
 
 WildcardInInstanceHead.hs:7:14: error:
     Wildcard ‘_’ not allowed
-      in an instance declaration for ‘Foo’
+      in an instance declaration
