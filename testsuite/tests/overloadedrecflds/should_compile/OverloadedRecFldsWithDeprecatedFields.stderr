@@ -1,0 +1,15 @@
+
+OverloadedRecFldsWithDeprecatedFields.hs:16:11: warning: [-Wdeprecations (in -Wdefault)]
+    In the use of ‘foo’
+    (imported from OverloadedRecFldsWithDeprecatedFields_A):
+    Deprecated: "Deprecated foo"
+
+OverloadedRecFldsWithDeprecatedFields.hs:16:20: warning: [-Wdeprecations (in -Wdefault)]
+    In the use of ‘bar’
+    (imported from OverloadedRecFldsWithDeprecatedFields_A):
+    Deprecated: "Deprecated bar"
+
+OverloadedRecFldsWithDeprecatedFields.hs:19:5: warning: [-Wdeprecations (in -Wdefault)]
+    In the use of ‘foo’
+    (imported from OverloadedRecFldsWithDeprecatedFields_A):
+    Deprecated: "Deprecated foo"

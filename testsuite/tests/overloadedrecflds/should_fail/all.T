@@ -32,3 +32,4 @@ test('hasfieldfail03', normal, compile_fail, [''])
 test('T14953', [extra_files(['T14953_A.hs', 'T14953_B.hs'])],
      multimod_compile_fail, ['T14953', ''])
 test('DuplicateExports', normal, compile_fail, [''])
+test('OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation', [extra_files(['OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation_A.hs'])], multimod_compile_fail, ['OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation', ''])

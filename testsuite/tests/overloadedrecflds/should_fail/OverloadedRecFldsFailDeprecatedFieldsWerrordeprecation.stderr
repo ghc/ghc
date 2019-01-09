@@ -1,0 +1,17 @@
+[1 of 2] Compiling OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation_A ( OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation_A.hs, OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation_A.o )
+[2 of 2] Compiling Main             ( OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation.hs, OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation.o )
+
+OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation.hs:18:11: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
+    In the use of ‘foo’
+    (imported from OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation_A):
+    Deprecated: "Deprecated foo"
+
+OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation.hs:18:20: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
+    In the use of ‘bar’
+    (imported from OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation_A):
+    Deprecated: "Deprecated bar"
+
+OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation.hs:21:5: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
+    In the use of ‘foo’
+    (imported from OverloadedRecFldsFailDeprecatedFieldsWerrordeprecation_A):
+    Deprecated: "Deprecated foo"
