@@ -1,5 +1,5 @@
 module Rules.Gmp (
-    gmpRules, gmpBuildPath, gmpObjectsDir, gmpLibraryH
+    gmpRules, gmpBuildPath, gmpObjects, gmpLibraryH
     ) where
 
 import Base
@@ -8,6 +8,18 @@ import Oracles.Setting
 import Packages
 import Target
 import Utilities
+
+-- | Build GMP library objects and return their paths.
+gmpObjects :: Action [FilePath]
+gmpObjects = do
+    gmpPath <- gmpBuildPath
+    need [gmpPath -/- gmpLibraryH]
+    -- We need to use the untracked version of 'getDirectoryFiles', because the
+    -- contents of 'gmpObjectsDir' is built by Hadrian (in 'gmpRules'). Using
+    -- the tracked version can lead to Shake Lint failure.
+    -- See: https://ghc.haskell.org/trac/ghc/ticket/15971.
+    map unifyPath <$>
+        liftIO (getDirectoryFilesIO "" [gmpPath -/- gmpObjectsDir -/- "*.o"])
 
 gmpBase :: FilePath
 gmpBase = pkgPath integerGmp -/- "gmp"
