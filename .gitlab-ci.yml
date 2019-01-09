@@ -360,6 +360,7 @@ validate-x86_64-linux-deb9-unreg:
     - bash -c 'make clean || true'
   dependencies: []
   artifacts:
+    when: always # remove when #16156 is sorted
     paths:
       - ghc-bindist-*.tar.xz
   cache:
