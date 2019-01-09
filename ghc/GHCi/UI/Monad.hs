@@ -20,7 +20,7 @@ module GHCi.UI.Monad (
         TickArray,
         getDynFlags,
 
-        runStmt, runDecls, resume, timeIt, recordBreak, revertCAFs,
+        runStmt, runDecls, runDecls', resume, timeIt, recordBreak, revertCAFs,
 
         printForUserNeverQualify, printForUserModInfo,
         printForUser, printForUserPartWay, prettyLocations,
@@ -46,7 +46,7 @@ import SrcLoc
 import Module
 import GHCi
 import GHCi.RemoteTypes
-import HsSyn (ImportDecl, GhcPs)
+import HsSyn (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import Util
 
 import Exception
@@ -338,8 +338,8 @@ printForUserPartWay doc = do
   liftIO $ Outputable.printForUserPartWay dflags stdout (pprUserLength dflags) unqual doc
 
 -- | Run a single Haskell expression
-runStmt :: String -> GHC.SingleStep -> GHCi (Maybe GHC.ExecResult)
-runStmt expr step = do
+runStmt :: GhciLStmt GhcPs -> String -> GHC.SingleStep -> GHCi (Maybe GHC.ExecResult)
+runStmt stmt stmt_text step = do
   st <- getGHCiState
   GHC.handleSourceError (\e -> do GHC.printException e; return Nothing) $ do
     let opts = GHC.execOptions
@@ -348,7 +348,7 @@ runStmt expr step = do
                   , GHC.execSingleStep = step
                   , GHC.execWrap = \fhv -> EvalApp (EvalThis (evalWrapper st))
                                                    (EvalThis fhv) }
-    Just <$> GHC.execStmt expr opts
+    Just <$> GHC.execStmt' stmt stmt_text opts
 
 runDecls :: String -> GHCi (Maybe [GHC.Name])
 runDecls decls = do
@@ -361,6 +361,18 @@ runDecls decls = do
                                         return Nothing) $ do
           r <- GHC.runDeclsWithLocation (progname st) (line_number st) decls
           return (Just r)
+
+runDecls' :: [LHsDecl GhcPs] -> GHCi (Maybe [GHC.Name])
+runDecls' decls = do
+  st <- getGHCiState
+  reifyGHCi $ \x ->
+    withProgName (progname st) $
+    withArgs (args st) $
+    reflectGHCi x $
+      GHC.handleSourceError
+        (\e -> do GHC.printException e;
+                  return Nothing)
+        (Just <$> GHC.runParsedDecls decls)
 
 resume :: (SrcSpan -> Bool) -> GHC.SingleStep -> GHCi GHC.ExecResult
 resume canLogSpan step = do

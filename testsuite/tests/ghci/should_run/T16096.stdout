@@ -1,0 +1,56 @@
+
+==================== Desugared ====================
+letrec {
+  x :: [GHC.Types.Int]
+  [LclId]
+  x = let {
+        $dEnum :: GHC.Enum.Enum GHC.Types.Int
+        [LclId]
+        $dEnum = GHC.Enum.$fEnumInt } in
+      letrec {
+        x :: [GHC.Types.Int]
+        [LclId]
+        x = GHC.Enum.enumFrom
+              @ GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
+      x; } in
+GHC.Base.returnIO
+  @ [()]
+  (GHC.Types.:
+     @ ()
+     (GHC.Prim.unsafeCoerce#
+        @ 'GHC.Types.LiftedRep
+        @ 'GHC.Types.LiftedRep
+        @ [GHC.Types.Int]
+        @ ()
+        x)
+     (GHC.Types.[] @ ()))
+
+
+
+==================== Desugared ====================
+letrec {
+  x :: [GHC.Types.Int]
+  [LclId]
+  x = let {
+        $dEnum :: GHC.Enum.Enum GHC.Types.Int
+        [LclId]
+        $dEnum = GHC.Enum.$fEnumInt } in
+      letrec {
+        x :: [GHC.Types.Int]
+        [LclId]
+        x = GHC.Enum.enumFrom
+              @ GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
+      x; } in
+GHC.Base.returnIO
+  @ [()]
+  (GHC.Types.:
+     @ ()
+     (GHC.Prim.unsafeCoerce#
+        @ 'GHC.Types.LiftedRep
+        @ 'GHC.Types.LiftedRep
+        @ [GHC.Types.Int]
+        @ ()
+        x)
+     (GHC.Types.[] @ ()))
+
+
