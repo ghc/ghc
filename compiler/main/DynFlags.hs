@@ -22,7 +22,7 @@ module DynFlags (
         DumpFlag(..),
         GeneralFlag(..),
         WarningFlag(..), WarnReason(..),
-        warningTextToWarningFlag,
+        deprecationTypeMatchesFlags, warningTextToWarningFlag,
         Language(..),
         PlatformConstants(..),
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
@@ -838,6 +838,11 @@ data WarningFlag =
    | Opt_WarnSpaceAfterBang
    | Opt_WarnMissingDerivingStrategies    -- Since 8.8
    deriving (Eq, Show, Enum)
+
+-- | Returns true if the type of deprecation (WARNING or DEPRECATED)
+--   matches the specified warning flags.
+deprecationTypeMatchesFlags :: WarningTxt -> DynFlags -> Bool
+deprecationTypeMatchesFlags txt = wopt (warningTextToWarningFlag txt)
 
 -- | Convert a 'WarningText' to either 'Opt_WarnDeprecations' or
 --   'Opt_WarnWarningsDeprecations' depending on if the 'WarningTxt'
@@ -4726,6 +4731,7 @@ smallestGroups flag = mapMaybe go warningHierarchies where
 standardWarnings :: [WarningFlag]
 standardWarnings -- see Note [Documenting warning flags]
     = [ Opt_WarnOverlappingPatterns,
+        Opt_WarnDeprecations,
         Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
         Opt_WarnDeferredTypeErrors,

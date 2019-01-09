@@ -1242,8 +1242,9 @@ warnIfDeprecated gre@(GRE { gre_name = name, gre_imp = iss })
                    -- See Note [Handling of deprecations]
          do { iface <- loadInterfaceForName doc name
             ; case lookupImpDeprec iface gre of
-                Just txt -> addWarn (Reason (warningTextToWarningFlag txt))
-                                   (mk_msg imp_spec txt)
+                Just txt -> when (deprecationTypeMatchesFlags txt dflags) $
+                  addWarn (Reason (warningTextToWarningFlag txt))
+                          (mk_msg imp_spec txt)
                 Nothing  -> return () } }
   | otherwise
   = return ()

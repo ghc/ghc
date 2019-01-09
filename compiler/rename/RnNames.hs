@@ -370,8 +370,9 @@ rnImportDecl this_mod
     when (wopt Opt_WarnWarningsDeprecations dflags ||
           wopt Opt_WarnDeprecations dflags) (
        case (mi_warns iface) of
-          WarnAll txt -> addWarn (Reason (warningTextToWarningFlag txt))
-                                (moduleWarn imp_mod_name txt)
+          WarnAll txt -> when (deprecationTypeMatchesFlags txt dflags) $
+            addWarn (Reason (warningTextToWarningFlag txt))
+                    (moduleWarn imp_mod_name txt)
           _           -> return ()
      )
 
