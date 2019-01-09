@@ -1921,7 +1921,7 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, pr
         stopNow()
     if r.returncode == 99 and getTestOpts().exit_code != 99:
         # Only print a message when timeout killed the process unexpectedly.
-        if_verbose(1, 'Timeout happened...killed process "{0}"...\n'.format(cmd))
+        if_verbose(1, 'Timeout happened ({0} seconds)...killed process "{1}"...\n'.format(timeout, cmd))
     return r.returncode
 
 # -----------------------------------------------------------------------------
