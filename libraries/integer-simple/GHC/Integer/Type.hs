@@ -329,6 +329,7 @@ popCountPositive p = word2Int# (go 0## p)
   go acc# None = acc#
   go acc# (Some d ds) = go (popCnt# d `plusWord#` acc#) ds
 
+{-# NOINLINE bitInteger #-}
 -- | 'Integer' for which only /n/-th bit is set. Undefined behaviour
 -- for negative /n/ values.
 bitInteger :: Int# -> Integer
@@ -343,6 +344,7 @@ bitPositive i#
       then Some 0## (bitPositive (i# -# WORD_SIZE_IN_BITS#))
       else Some (uncheckedShiftL# 1## i#) None
 
+{-# NOINLINE testBitInteger #-}
 testBitInteger :: Integer -> Int# -> Bool
 testBitInteger (!_) i# | isTrue# (i# <# 0#) = False
 testBitInteger Naught       _  = False
