@@ -134,12 +134,12 @@ static void *itimer_thread_func(void *_handle_tick)
 
         // first try a cheap test
         if (stopped) {
-            ACQUIRE_LOCK(&mutex);
+            OS_ACQUIRE_LOCK(&mutex);
             // should we really stop?
             if (stopped) {
                 waitCondition(&start_cond, &mutex);
             }
-            RELEASE_LOCK(&mutex);
+            OS_RELEASE_LOCK(&mutex);
         } else {
             handle_tick(0);
         }
@@ -176,19 +176,19 @@ initTicker (Time interval, TickProc handle_tick)
 void
 startTicker(void)
 {
-    ACQUIRE_LOCK(&mutex);
+    OS_ACQUIRE_LOCK(&mutex);
     stopped = 0;
     signalCondition(&start_cond);
-    RELEASE_LOCK(&mutex);
+    OS_RELEASE_LOCK(&mutex);
 }
 
 /* There may be at most one additional tick fired after a call to this */
 void
 stopTicker(void)
 {
-    ACQUIRE_LOCK(&mutex);
+    OS_ACQUIRE_LOCK(&mutex);
     stopped = 1;
-    RELEASE_LOCK(&mutex);
+    OS_RELEASE_LOCK(&mutex);
 }
 
 /* There may be at most one additional tick fired after a call to this */
