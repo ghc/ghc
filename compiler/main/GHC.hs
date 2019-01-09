@@ -96,11 +96,11 @@ module GHC (
         -- * Interactive evaluation
 
         -- ** Executing statements
-        execStmt, ExecOptions(..), execOptions, ExecResult(..),
+        execStmt, execStmt', ExecOptions(..), execOptions, ExecResult(..),
         resumeExec,
 
         -- ** Adding new declarations
-        runDecls, runDeclsWithLocation,
+        runDecls, runDeclsWithLocation, runParsedDecls,
 
         -- ** Get/set the current context
         parseImportDecl,

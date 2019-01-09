@@ -1,0 +1,5 @@
+:set -Wall
+x = 1 :: Int
+x = 1 :: Int
+x <- return (1 :: Int)
+let x = 1 :: Int

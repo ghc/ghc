@@ -31,8 +31,8 @@ module GHCi.UI (
 #include "HsVersions.h"
 
 -- GHCi
-import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls )
-import GHCi.UI.Monad hiding ( args, runStmt, runDecls )
+import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls' )
+import GHCi.UI.Monad hiding ( args, runStmt )
 import GHCi.UI.Tags
 import GHCi.UI.Info
 import Debugger
@@ -50,10 +50,11 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
              GetDocsFailure(..),
              getModuleGraph, handleSourceError )
+import HscMain (hscParseDeclsWithLocation, hscParseStmtWithLocation)
 import HsImpExp
 import HsSyn
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
-                  setInteractivePrintName, hsc_dflags, msObjFilePath )
+                  setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
@@ -82,6 +83,7 @@ import NameSet
 import Panic hiding ( showException )
 import Util
 import qualified GHC.LanguageExtensions as LangExt
+import Bag (unitBag)
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -1088,50 +1090,93 @@ enqueueCommands cmds = do
 -- | Entry point to execute some haskell code from user.
 -- The return value True indicates success, as in `runOneCommand`.
 runStmt :: String -> SingleStep -> GHCi (Maybe GHC.ExecResult)
-runStmt stmt step = do
+runStmt input step = do
   dflags <- GHC.getInteractiveDynFlags
   -- In GHCi, we disable `-fdefer-type-errors`, as well as `-fdefer-type-holes`
   -- and `-fdefer-out-of-scope-variables` for **naked expressions**. The
   -- declarations and statements are not affected.
   -- See Note [Deferred type errors in GHCi] in typecheck/TcRnDriver.hs
-  if | GHC.isStmt dflags stmt    -> run_stmt
-     | GHC.isImport dflags stmt  -> run_import
+  st <- getGHCiState
+  let source = progname st
+  let line = line_number st
+
+  if | GHC.isStmt dflags input -> do
+         hsc_env <- GHC.getSession
+         mb_stmt <- liftIO (runInteractiveHsc hsc_env (hscParseStmtWithLocation source line input))
+         case mb_stmt of
+           Nothing ->
+             -- empty statement / comment
+             return (Just exec_complete)
+           Just stmt ->
+             run_stmt stmt
+
+     | GHC.isImport dflags input -> run_import
+
      -- Every import declaration should be handled by `run_import`. As GHCi
      -- in general only accepts one command at a time, we simply throw an
      -- exception when the input contains multiple commands of which at least
      -- one is an import command (see #10663).
-     | GHC.hasImport dflags stmt -> throwGhcException
+     | GHC.hasImport dflags input -> throwGhcException
        (CmdLineError "error: expecting a single import declaration")
+
+     -- Otherwise assume a declaration (or a list of declarations)
      -- Note: `GHC.isDecl` returns False on input like
      -- `data Infix a b = a :@: b; infixl 4 :@:`
      -- and should therefore not be used here.
-     | otherwise                 -> run_decl
-
+     | otherwise -> do
+         hsc_env <- GHC.getSession
+         decls <- liftIO (hscParseDeclsWithLocation hsc_env source line input)
+         run_decls decls
   where
+    exec_complete = GHC.ExecComplete (Right []) 0
+
     run_import = do
-      addImportToContext stmt
-      return (Just (GHC.ExecComplete (Right []) 0))
+      addImportToContext input
+      return (Just exec_complete)
 
-    run_decl =
-        do _ <- liftIO $ tryIO $ hFlushAll stdin
-           m_result <- GhciMonad.runDecls stmt
-           case m_result of
-               Nothing     -> return Nothing
-               Just result ->
-                 Just <$> afterRunStmt (const True)
-                            (GHC.ExecComplete (Right result) 0)
-
-    run_stmt =
-        do -- In the new IO library, read handles buffer data even if the Handle
-           -- is set to NoBuffering.  This causes problems for GHCi where there
-           -- are really two stdin Handles.  So we flush any bufferred data in
-           -- GHCi's stdin Handle here (only relevant if stdin is attached to
-           -- a file, otherwise the read buffer can't be flushed).
-           _ <- liftIO $ tryIO $ hFlushAll stdin
-           m_result <- GhciMonad.runStmt stmt step
+    run_stmt :: GhciLStmt GhcPs -> GHCi (Maybe GHC.ExecResult)
+    run_stmt stmt = do
+           m_result <- GhciMonad.runStmt stmt input step
            case m_result of
                Nothing     -> return Nothing
                Just result -> Just <$> afterRunStmt (const True) result
+
+    -- `x = y` (a declaration) should be treated as `let x = y` (a statement).
+    -- The reason is because GHCi wasn't designed to support `x = y`, but then
+    -- b98ff3 (#7253) added support for it, except it did not do a good job and
+    -- caused problems like:
+    --
+    --  - not adding the binders defined this way in the necessary places caused
+    --    `x = y` to not work in some cases (#12091).
+    --  - some GHCi command crashed after `x = y` (#15721)
+    --  - warning generation did not work for `x = y` (#11606)
+    --  - because `x = y` is a declaration (instead of a statement) differences
+    --    in generated code caused confusion (#16089)
+    --
+    -- Instead of dealing with all these problems individually here we fix this
+    -- mess by just treating `x = y` as `let x = y`.
+    run_decls :: [LHsDecl GhcPs] -> GHCi (Maybe GHC.ExecResult)
+    -- Only turn `FunBind` and `VarBind` into statements, other bindings
+    -- (e.g. `PatBind`) need to stay as decls.
+    run_decls [L l (ValD _ bind@FunBind{})] = run_stmt (mk_stmt l bind)
+    run_decls [L l (ValD _ bind@VarBind{})] = run_stmt (mk_stmt l bind)
+    -- Note that any `x = y` declarations below will be run as declarations
+    -- instead of statements (e.g. `...; x = y; ...`)
+    run_decls decls = do
+      -- In the new IO library, read handles buffer data even if the Handle
+      -- is set to NoBuffering.  This causes problems for GHCi where there
+      -- are really two stdin Handles.  So we flush any bufferred data in
+      -- GHCi's stdin Handle here (only relevant if stdin is attached to
+      -- a file, otherwise the read buffer can't be flushed).
+      _ <- liftIO $ tryIO $ hFlushAll stdin
+      m_result <- GhciMonad.runDecls' decls
+      forM m_result $ \result ->
+        afterRunStmt (const True) (GHC.ExecComplete (Right result) 0)
+
+    mk_stmt :: SrcSpan -> HsBind GhcPs -> GhciLStmt GhcPs
+    mk_stmt loc bind =
+      let l = L loc
+      in l (LetStmt noExt (l (HsValBinds noExt (ValBinds noExt (unitBag (l bind)) []))))
 
 -- | Clean up the GHCi environment after a statement has run
 afterRunStmt :: (SrcSpan -> Bool) -> GHC.ExecResult -> GHCi GHC.ExecResult

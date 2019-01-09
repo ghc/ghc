@@ -1,0 +1,4 @@
+:set -ddump-ds -dsuppress-uniques
+-- These two should desugar to same Core
+let x = [1..] :: [Int]
+x = [1..] :: [Int]

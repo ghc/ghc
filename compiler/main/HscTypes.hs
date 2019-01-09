@@ -23,7 +23,7 @@ module HscTypes (
         needsTemplateHaskellOrQQ, mgBootModules,
 
         -- * Hsc monad
-        Hsc(..), runHsc, runInteractiveHsc,
+        Hsc(..), runHsc, mkInteractiveHscEnv, runInteractiveHsc,
 
         -- * Information about modules
         ModDetails(..), emptyModDetails,
@@ -253,13 +253,15 @@ runHsc hsc_env (Hsc hsc) = do
     printOrThrowWarnings (hsc_dflags hsc_env) w
     return a
 
+mkInteractiveHscEnv :: HscEnv -> HscEnv
+mkInteractiveHscEnv hsc_env = hsc_env{ hsc_dflags = interactive_dflags }
+  where
+    interactive_dflags = ic_dflags (hsc_IC hsc_env)
+
 runInteractiveHsc :: HscEnv -> Hsc a -> IO a
 -- A variant of runHsc that switches in the DynFlags from the
 -- InteractiveContext before running the Hsc computation.
-runInteractiveHsc hsc_env
-  = runHsc (hsc_env { hsc_dflags = interactive_dflags })
-  where
-    interactive_dflags = ic_dflags (hsc_IC hsc_env)
+runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
 
 -- -----------------------------------------------------------------------------
 -- Source Errors

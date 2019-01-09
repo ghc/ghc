@@ -63,8 +63,8 @@ module HscMain
     , hscGetModuleInterface
     , hscRnImportDecls
     , hscTcRnLookupRdrName
-    , hscStmt, hscStmtWithLocation, hscParsedStmt
-    , hscDecls, hscDeclsWithLocation
+    , hscStmt, hscParseStmtWithLocation, hscStmtWithLocation, hscParsedStmt
+    , hscDecls, hscParseDeclsWithLocation, hscDeclsWithLocation, hscParsedDecls
     , hscTcExpr, TcRnExprMode(..), hscImport, hscKcType
     , hscParseExpr
     , hscCompileCoreExpr
@@ -1602,17 +1602,27 @@ hscDecls :: HscEnv
          -> IO ([TyThing], InteractiveContext)
 hscDecls hsc_env str = hscDeclsWithLocation hsc_env str "<interactive>" 1
 
+hscParseDeclsWithLocation :: HscEnv -> String -> Int -> String -> IO [LHsDecl GhcPs]
+hscParseDeclsWithLocation hsc_env source line_num str = do
+    L _ (HsModule{ hsmodDecls = decls }) <-
+      runInteractiveHsc hsc_env $
+        hscParseThingWithLocation source line_num parseModule str
+    return decls
+
 -- | Compile a decls
 hscDeclsWithLocation :: HscEnv
                      -> String -- ^ The statement
                      -> String -- ^ The source
                      -> Int    -- ^ Starting line
                      -> IO ([TyThing], InteractiveContext)
-hscDeclsWithLocation hsc_env0 str source linenumber =
- runInteractiveHsc hsc_env0 $ do
+hscDeclsWithLocation hsc_env str source linenumber = do
     L _ (HsModule{ hsmodDecls = decls }) <-
+      runInteractiveHsc hsc_env $
         hscParseThingWithLocation source linenumber parseModule str
+    hscParsedDecls hsc_env decls
 
+hscParsedDecls :: HscEnv -> [LHsDecl GhcPs] -> IO ([TyThing], InteractiveContext)
+hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     {- Rename and typecheck it -}
     hsc_env <- getHscEnv
     tc_gblenv <- ioMsgMaybe $ tcRnDeclsi hsc_env decls

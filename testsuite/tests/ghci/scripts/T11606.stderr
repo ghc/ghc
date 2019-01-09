@@ -1,0 +1,12 @@
+
+<interactive>:3:1: warning: [-Wname-shadowing (in -Wall)]
+    This binding for ‘x’ shadows the existing binding
+      defined at <interactive>:2:1
+
+<interactive>:4:1: warning: [-Wname-shadowing (in -Wall)]
+    This binding for ‘x’ shadows the existing binding
+      defined at <interactive>:3:1
+
+<interactive>:5:5: warning: [-Wname-shadowing (in -Wall)]
+    This binding for ‘x’ shadows the existing binding
+      defined at <interactive>:4:1
