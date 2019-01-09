@@ -103,11 +103,8 @@ cObjects context = do
 -- 'Context' is @integer-gmp@.
 extraObjects :: Context -> Action [FilePath]
 extraObjects context
-    | package context == integerGmp = do
-        gmpPath <- gmpBuildPath
-        need [gmpPath -/- gmpLibraryH]
-        map unifyPath <$> getDirectoryFiles "" [gmpPath -/- gmpObjectsDir -/- "*.o"]
-    | otherwise         = return []
+    | package context == integerGmp = gmpObjects
+    | otherwise                     = return []
 
 -- | Return all the object files to be put into the library we're building for
 -- the given 'Context'.
