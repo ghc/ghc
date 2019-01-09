@@ -11,8 +11,6 @@ this [Haskell Symposium 2016 paper](https://dl.acm.org/authorize?N41275) and thi
 
 The new build system can work side-by-side with the existing build system, since it
 places all build artefacts in a dedicated directory (called `_build` by default).
-See [this guide](https://ghc.haskell.org/trac/ghc/wiki/Building/Hadrian/QuickStart)
-if you'd like to start using Hadrian for building GHC.
 
 Your first build
 ----------------
@@ -54,6 +52,13 @@ or already have it, you can use the Cabal-based build script.
 
 * If you have never built GHC before, start with the
 [preparation guide][ghc-preparation].
+
+Cheatsheet for Make users
+-------------------------
+
+You can find a cheatsheet-style document that shows the Hadrian equivalents of
+commands that GHC users are used to run with the Make build system
+[here](doc/make.md).
 
 Using the build system
 ----------------------
