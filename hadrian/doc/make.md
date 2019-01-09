@@ -1,6 +1,6 @@
 # Hadrian for Make users
 
-This is a cheatsheet-style document meant to succintly show how to use
+This is a cheatsheet-style document meant to succinctly show how to use
 Hadrian for any GHC developer familiar with the Make build system, by showing
 the Make command(s) to achieve some goal and then the Hadrian equivalent. If you
 are looking for a more verbose and comprehensive document, you should head to
