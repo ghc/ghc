@@ -223,6 +223,10 @@ ifneq "$(TEST_ENV)" ""
 RUNTEST_OPTS += --test-env="$(TEST_ENV)"
 endif
 
+ifneq "$(TIMEOUT_MULT)" ""
+RUNTEST_OPTS += --timeout-mult="$(TIMEOUT_MULT)"
+endif
+
 ifeq "$(CLEANUP)" "0"
 RUNTEST_OPTS += -e config.cleanup=False
 else ifeq "$(CLEANUP)" "NO"

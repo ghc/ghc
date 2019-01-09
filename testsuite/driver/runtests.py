@@ -58,6 +58,7 @@ parser.add_argument("--way", action="append", help="just this way")
 parser.add_argument("--skipway", action="append", help="skip this way")
 parser.add_argument("--threads", type=int, help="threads to run simultaneously")
 parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
+parser.add_argument("--timeout-mult", type=float, default=1, help="apply a global multiplier to timeout values")
 parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")
 parser.add_argument("--test-env", default='local', help="Override default chosen test-env.")
 perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
@@ -243,6 +244,8 @@ testopts_local.x = TestOptions()
 # if timeout == -1 then we try to calculate a sensible value
 if config.timeout == -1:
     config.timeout = int(read_no_crs(config.top + '/timeout/calibrate.out'))
+
+config.timeout *= args.timeout_mult
 
 print('Timeout is ' + str(config.timeout))
 print('Known ways: ' + ', '.join(config.other_ways))
