@@ -56,3 +56,5 @@ test('T15633b',
       extra_hc_opts("-package-db tc-plugin-ghci/pkg.plugins01/local.package.conf")
       ],
      ghci_script, ['T15633b.script'])
+
+test('T16096', just_ghci, ghci_script, ['T16096.script'])
