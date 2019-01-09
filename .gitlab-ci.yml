@@ -319,6 +319,7 @@ validate-x86_64-linux-deb9-unreg:
     - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
     - bash -c 'make clean || true'
   artifacts:
+    when: always # remove when #16156 is sorted
     paths:
       - ghc-bindist-*.tar.xz
   cache:
