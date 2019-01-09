@@ -466,3 +466,4 @@ test('T15437', expect_broken(15437), multimod_compile,
      ['T15437', '-v0 ' + config.ghc_th_way_flags])
 test('T15985', normal, compile, [''])
 test('T16133', normal, compile_fail, [''])
+test('T15471', normal, multimod_compile, ['T15471.hs', '-v0'])

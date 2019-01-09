@@ -43,6 +43,8 @@ import Util
 import Outputable
 import FastString
 import Type
+import TcType (TcType)
+import {-# SOURCE #-} TcRnTypes (TcLclEnv)
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -2403,6 +2405,8 @@ data HsSplice id
         (XSpliced id)
         ThModFinalizers     -- TH finalizers produced by the splice.
         (HsSplicedThing id) -- The result of splicing
+   | HsSplicedT
+      DelayedSplice
    | XSplice (XXSplice id)  -- Note [Trees that Grow] extension point
 
 type instance XTypedSplice   (GhcPass _) = NoExt
@@ -2441,6 +2445,21 @@ instance Data ThModFinalizers where
   gunfold _ z _ = z $ ThModFinalizers []
   toConstr  a   = mkConstr (dataTypeOf a) "ThModFinalizers" [] Data.Prefix
   dataTypeOf a  = mkDataType "HsExpr.ThModFinalizers" [toConstr a]
+
+-- See Note [Running typed splices in the zonker]
+-- These are the arguments that are passed to `TcSplice.runTopSplice`
+data DelayedSplice =
+  DelayedSplice
+    TcLclEnv          -- The local environment to run the splice in
+    (LHsExpr GhcRn)   -- The original renamed expression
+    TcType            -- The result type of running the splice, unzonked
+    (LHsExpr GhcTcId) -- The typechecked expression to run and splice in the result
+
+-- A Data instance which ignores the argument of 'DelayedSplice'.
+instance Data DelayedSplice where
+  gunfold _ _ _ = panic "DelayedSplice"
+  toConstr  a   = mkConstr (dataTypeOf a) "DelayedSplice" [] Data.Prefix
+  dataTypeOf a  = mkDataType "HsExpr.DelayedSplice" [toConstr a]
 
 -- | Haskell Spliced Thing
 --
@@ -2573,6 +2592,7 @@ pprSplice (HsUntypedSplice _ NoParens n e)
   = ppr_splice empty  n e empty
 pprSplice (HsQuasiQuote _ n q _ s)      = ppr_quasi n q s
 pprSplice (HsSpliced _ _ thing)         = ppr thing
+pprSplice (HsSplicedT {})               = text "Unevaluated typed splice"
 pprSplice (XSplice x)                   = ppr x
 
 ppr_quasi :: OutputableBndr p => p -> p -> FastString -> SDoc
