@@ -147,8 +147,6 @@ static void *itimer_thread_func(void *_handle_tick)
 
     if (USE_TIMERFD_FOR_ITIMER)
         close(timerfd);
-    closeMutex(&mutex);
-    closeCondition(&start_cond);
     return NULL;
 }
 
@@ -207,6 +205,8 @@ exitTicker (bool wait)
         if (pthread_join(thread, NULL)) {
             sysErrorBelch("Itimer: Failed to join");
         }
+        closeMutex(&mutex);
+        closeCondition(&start_cond);
     } else {
         pthread_detach(thread);
     }
