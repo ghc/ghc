@@ -15,8 +15,9 @@ if [ ! -e $toolchain/bin/ghc ]; then
 fi
 
 if [ ! -e $toolchain/bin/cabal ]; then
-    curl https://www.haskell.org/cabal/release/cabal-install-2.2.0.0/cabal-install-2.2.0.0-i386-unknown-mingw32.zip > /tmp/cabal.zip
-    unzip /tmp/cabal.zip
+    curl https://www.haskell.org/cabal/release/cabal-install-2.2.0.0/cabal-install-2.2.0.0-i386-unknown-mingw32.zip > cabal.zip
+    unzip cabal.zip
+    rm cabal.zip
     mv cabal.exe $toolchain/bin
 fi
 
