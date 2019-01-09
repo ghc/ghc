@@ -26,7 +26,7 @@ module TcSplice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQuasi,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH
+     finishTH, runTopSplice
       ) where
 
 #include "HsVersions.h"
@@ -58,7 +58,7 @@ import HscMain
         -- These imports are the reason that TcSplice
         -- is very high up the module hierarchy
 import FV
-import RnSplice( traceSplice, SpliceInfo(..) )
+import RnSplice( traceSplice, SpliceInfo(..))
 import RdrName
 import HscTypes
 import Convert
@@ -491,28 +491,44 @@ tcTopSplice expr res_ty
          -- making sure it has type Q (T res_ty)
          res_ty <- expTypeToType res_ty
        ; meta_exp_ty <- tcTExpTy res_ty
-       ; zonked_q_expr <- tcTopSpliceExpr Typed $
+       ; q_expr <- tcTopSpliceExpr Typed $
                           tcMonoExpr expr (mkCheckExpType meta_exp_ty)
+       ; lcl_env <- getLclEnv
+       ; let delayed_splice
+              = DelayedSplice lcl_env expr res_ty q_expr
+       ; return (HsSpliceE noExt (HsSplicedT delayed_splice))
 
-         -- See Note [Collecting modFinalizers in typed splices].
+       }
+
+
+-- This is called in the zonker
+-- See Note [Running typed splices in the zonker]
+runTopSplice :: DelayedSplice -> TcM (HsExpr GhcTc)
+runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
+  = setLclEnv lcl_env $ do {
+         zonked_ty <- zonkTcType res_ty
+       ; zonked_q_expr <- zonkTopLExpr q_expr
+        -- See Note [Collecting modFinalizers in typed splices].
        ; modfinalizers_ref <- newTcRef []
          -- Run the expression
        ; expr2 <- setStage (RunSplice modfinalizers_ref) $
                     runMetaE zonked_q_expr
        ; mod_finalizers <- readTcRef modfinalizers_ref
        ; addModFinalizersWithLclEnv $ ThModFinalizers mod_finalizers
+       -- We use orig_expr here and not q_expr when tracing as a call to
+       -- unsafeTExpCoerce is added to the original expression by the
+       -- typechecker when typed quotes are type checked.
        ; traceSplice (SpliceInfo { spliceDescription = "expression"
                                  , spliceIsDecl      = False
-                                 , spliceSource      = Just expr
+                                 , spliceSource      = Just orig_expr
                                  , spliceGenerated   = ppr expr2 })
+        -- Rename and typecheck the spliced-in expression,
+        -- making sure it has type res_ty
+        -- These steps should never fail; this is a *typed* splice
+       ; addErrCtxt (spliceResultDoc zonked_q_expr) $ do
+         { (exp3, _fvs) <- rnLExpr expr2
+         ; unLoc <$> tcMonoExpr exp3 (mkCheckExpType zonked_ty)} }
 
-         -- Rename and typecheck the spliced-in expression,
-         -- making sure it has type res_ty
-         -- These steps should never fail; this is a *typed* splice
-       ; addErrCtxt (spliceResultDoc expr) $ do
-       { (exp3, _fvs) <- rnLExpr expr2
-       ; exp4 <- tcMonoExpr exp3 (mkCheckExpType res_ty)
-       ; return (unLoc exp4) } }
 
 {-
 ************************************************************************
@@ -527,7 +543,7 @@ spliceCtxtDoc splice
   = hang (text "In the Template Haskell splice")
          2 (pprSplice splice)
 
-spliceResultDoc :: LHsExpr GhcRn -> SDoc
+spliceResultDoc :: LHsExpr GhcTc -> SDoc
 spliceResultDoc expr
   = sep [ text "In the result of the splice:"
         , nest 2 (char '$' <> ppr expr)
@@ -559,7 +575,7 @@ tcTopSpliceExpr isTypedSplice tc_action
        ; const_binds     <- simplifyTop wanted
 
           -- Zonk it and tie the knot of dictionary bindings
-       ; zonkTopLExpr (mkHsDictLet (EvBinds const_binds) expr') }
+       ; return $ mkHsDictLet (EvBinds const_binds) expr' }
 
 {-
 ************************************************************************
@@ -578,7 +594,7 @@ runAnnotation target expr = do
     -- Check the instances we require live in another module (we want to execute it..)
     -- and check identifiers live in other modules using TH stage checks. tcSimplifyStagedExpr
     -- also resolves the LIE constraints to detect e.g. instance ambiguity
-    zonked_wrapped_expr' <- tcTopSpliceExpr Untyped $
+    zonked_wrapped_expr' <- zonkTopLExpr =<< tcTopSpliceExpr Untyped (
            do { (expr', expr_ty) <- tcInferRhoNC expr
                 -- We manually wrap the typechecked expression in a call to toAnnotationWrapper
                 -- By instantiating the call >here< it gets registered in the
@@ -589,7 +605,8 @@ runAnnotation target expr = do
                       = L loc (mkHsWrap wrapper
                                  (HsVar noExt (L loc to_annotation_wrapper_id)))
               ; return (L loc (HsApp noExt
-                                specialised_to_annotation_wrapper_expr expr')) }
+                                specialised_to_annotation_wrapper_expr expr'))
+                                })
 
     -- Run the appropriately wrapped expression to get the value of
     -- the annotation and its dictionaries. The return value is of
@@ -790,6 +807,58 @@ runMeta' show_code ppr_hs run_and_convert expr
         failWithTc msg
 
 {-
+Note [Running typed splices in the zonker]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+See #15471 for the full discussion.
+
+For many years typed splices were run immediately after they were type checked
+however, this is too early as it means to zonk some type variables before
+they can be unified with type variables in the surrounding context.
+
+For example,
+
+```
+module A where
+
+test_foo :: forall a . Q (TExp (a -> a))
+test_foo = [|| id ||]
+
+module B where
+
+import A
+
+qux = $$(test_foo)
+```
+
+We would expect `qux` to have inferred type `forall a . a -> a` but if
+we run the splices too early the unified variables are zonked to `Any`. The
+inferred type is the unusable `Any -> Any`.
+
+To run the splice, we must compile `test_foo` all the way to byte code.
+But at the moment when the type checker is looking at the splice, test_foo
+has type `Q (TExp (alpha -> alpha))` and we
+certainly can't compile code involving unification variables!
+
+We could default `alpha` to `Any` but then we infer `qux :: Any -> Any`
+which definitely is not what we want.  Moreover, if we had
+  qux = [$$(test_foo), (\x -> x +1::Int)]
+then `alpha` would have to be `Int`.
+
+Conclusion: we must defer taking decisions about `alpha` until the
+typechecker is done; and *then* we can run the splice.  It's fine to do it
+later, because we know it'll produce type-correct code.
+
+Deferring running the splice until later, in the zonker, means that the
+unification variables propagate upwards from the splice into the surrounding
+context and are unified correctly.
+
+This is implemented by storing the arguments we need for running the splice
+in a `DelayedSplice`. In the zonker, the arguments are passed to
+`TcSplice.runTopSplice` and the expression inserted into the AST as normal.
+
+
+
 Note [Exceptions in TH]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have something like this

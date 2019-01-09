@@ -5,11 +5,11 @@ module TcSplice where
 
 import GhcPrelude
 import Name
-import HsExpr   ( PendingRnSplice )
+import HsExpr   ( PendingRnSplice, DelayedSplice )
 import TcRnTypes( TcM , SpliceType )
 import TcType   ( ExpRhoType )
 import Annotations ( Annotation, CoreAnnTarget )
-import HsExtension ( GhcTcId, GhcRn, GhcPs )
+import HsExtension ( GhcTcId, GhcRn, GhcPs, GhcTc )
 
 import HsSyn      ( HsSplice, HsBracket, HsExpr, LHsExpr, LHsType, LPat,
                     LHsDecl, ThModFinalizers )
@@ -28,6 +28,8 @@ tcTypedBracket :: HsExpr GhcRn
                -> HsBracket GhcRn
                -> ExpRhoType
                -> TcM (HsExpr GhcTcId)
+
+runTopSplice :: DelayedSplice -> TcM (HsExpr GhcTc)
 
 runAnnotation     :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
 
