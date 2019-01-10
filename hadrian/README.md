@@ -116,6 +116,11 @@ this flag.
 * `--verbose`: run Hadrian in verbose mode. In particular this prints diagnostic
 messages by Shake oracles.
 
+* `--lint`: run [Shake Lint](https://shakebuild.com/manual#lint) during the
+build to check that the build system is well formed. Note that the Lint check
+currently fails under certain circumstances, as discussed in
+[this ticket](https://ghc.haskell.org/trac/ghc/ticket/15971).
+
 #### User settings
 
 The Make-based build system uses `mk/build.mk` to specify user build settings.
