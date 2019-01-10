@@ -166,4 +166,4 @@ test('T15994', [], run_command, ['$MAKE -s --no-print-directory T15994'])
 test('T15798a', normal, compile, [''])
 test('T15798b', normal, compile, [''])
 test('T15798c', normal, compile, [''])
-
+test('T16116a', normal, compile, [''])
