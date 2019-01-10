@@ -14,10 +14,9 @@ gmpObjects :: Action [FilePath]
 gmpObjects = do
     gmpPath <- gmpBuildPath
     need [gmpPath -/- gmpLibraryH]
-    -- We need to use the untracked version of 'getDirectoryFiles', because the
-    -- contents of 'gmpObjectsDir' is built by Hadrian (in 'gmpRules'). Using
-    -- the tracked version can lead to Shake Lint failure.
-    -- See: https://ghc.haskell.org/trac/ghc/ticket/15971.
+    -- The line below causes a Shake Lint failure on Windows, which forced us to
+    -- disable Lint by default. See more details here:
+    -- https://ghc.haskell.org/trac/ghc/ticket/15971.
     map unifyPath <$>
         liftIO (getDirectoryFilesIO "" [gmpPath -/- gmpObjectsDir -/- "*.o"])
 
