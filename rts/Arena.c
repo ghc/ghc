@@ -117,3 +117,16 @@ arenaBlocks( void )
 {
     return arena_blocks;
 }
+
+#if defined(DEBUG)
+void checkPtrInArena( StgPtr p, Arena *arena )
+{
+    for (bdescr *bd = arena->current; bd; bd = bd->link) {
+        if (p >= bd->start && p < bd->free) {
+            return;
+        }
+    }
+
+    barf("Location %p is not in arena %p", (void*)p, (void*)arena);
+}
+#endif
