@@ -172,9 +172,38 @@ The "wrapper Id", \$WC, goes as follows
   nothing for the wrapper to do.  That is, if its defn would be
         \$wC = C
 
+Note [Data constructor workers and wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Algebraic data types
+  - Always have a worker, with no unfolding
+  - May or may not have a wrapper; see Note [The need for a wrapper]
+
+* Newtypes
+  - Always have a worker, which has a compulsory unfolding (just a cast)
+  - May or may not have a wrapper; see Note [The need for a wrapper]
+
+* INVARIANT: the dictionary constructor for a class
+             never has a wrapper.
+
+* Neither_ the worker _nor_ the wrapper take the dcStupidTheta dicts as arguments
+
+* The wrapper (if it exists) takes dcOrigArgTys as its arguments
+  The worker takes dataConRepArgTys as its arguments
+  If the worker is absent, dataConRepArgTys is the same as dcOrigArgTys
+
+* The 'NoDataConRep' case of DataConRep is important. Not only is it
+  efficient, but it also ensures that the wrapper is replaced by the
+  worker (because it *is* the worker) even when there are no
+  args. E.g. in
+               f (:) x
+  the (:) *is* the worker.  This is really important in rule matching,
+  (We could match on the wrappers, but that makes it less likely that
+  rules will match when we bring bits of unfoldings together.)
+
 Note [The need for a wrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Why might the wrapper have anything to do?  Two reasons:
+Why might the wrapper have anything to do?  The full story is
+in wrapper_reqd in MkId.mkDataConRep.
 
 * Unboxing strict fields (with -funbox-strict-fields)
         data T = MkT !(Int,Int)
@@ -197,12 +226,14 @@ Why might the wrapper have anything to do?  Two reasons:
   The third argument is a coercion
         [a] :: [a]~[a]
 
-INVARIANT: the dictionary constructor for a class
-           never has a wrapper.
+* Data family instances may do a cast on the result
+
+* Type variables may be permuted; see MkId
+  Note [Data con wrappers and GADT syntax]
 
 
-A note about the stupid context
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [The stupid context]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 Data types can have a context:
 
         data (Eq a, Ord b) => T a b = T1 a b | T2 a
@@ -566,9 +597,12 @@ perspective.
 -}
 
 -- | Data Constructor Representation
+-- See Note [Data constructor workers and wrappers]
 data DataConRep
-  = NoDataConRep              -- No wrapper
+  = -- NoDataConRep means that the data con has no wrapper
+    NoDataConRep
 
+    -- DCR means that the data con has a wrapper
   | DCR { dcr_wrap_id :: Id   -- Takes src args, unboxes/flattens,
                               -- and constructs the representation
 
@@ -586,30 +620,6 @@ data DataConRep
                                      -- See Note [Bangs on data constructor arguments]
 
     }
--- Algebraic data types always have a worker, and
--- may or may not have a wrapper, depending on whether
--- the wrapper does anything.
---
--- Data types have a worker with no unfolding
--- Newtypes just have a worker, which has a compulsory unfolding (just a cast)
-
--- _Neither_ the worker _nor_ the wrapper take the dcStupidTheta dicts as arguments
-
--- The wrapper (if it exists) takes dcOrigArgTys as its arguments
--- The worker takes dataConRepArgTys as its arguments
--- If the worker is absent, dataConRepArgTys is the same as dcOrigArgTys
-
--- The 'NoDataConRep' case is important
--- Not only is this efficient,
--- but it also ensures that the wrapper is replaced
--- by the worker (because it *is* the worker)
--- even when there are no args. E.g. in
---              f (:) x
--- the (:) *is* the worker.
--- This is really important in rule matching,
--- (We could match on the wrappers,
--- but that makes it less likely that rules will match
--- when we bring bits of unfoldings together.)
 
 -------------------------
 
