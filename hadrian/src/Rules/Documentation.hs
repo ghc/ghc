@@ -36,9 +36,6 @@ pdfRoot = docRoot -/- "pdfs"
 archiveRoot :: FilePath
 archiveRoot = docRoot -/- "archives"
 
-haddockHtmlLib :: FilePath
-haddockHtmlLib = htmlRoot -/- "haddock-bundle.min.js"
-
 manPageBuildPath :: FilePath
 manPageBuildPath = "docs/users_guide/build-man/ghc.1"
 
@@ -67,6 +64,8 @@ pathPath _ = ""
 -- | Build all documentation
 documentationRules :: Rules ()
 documentationRules = do
+    haddockResources
+
     buildDocumentationArchives
     buildHtmlDocumentation
     buildManPage
@@ -97,7 +96,6 @@ buildHtmlDocumentation = do
     root <- buildRootRules
 
     root -/- htmlRoot -/- "index.html" %> \file -> do
-        need [root -/- haddockHtmlLib]
         need $ map ((root -/-) . pathIndex) docPaths
         copyFileUntracked "docs/index.html" file
 
@@ -106,25 +104,30 @@ buildSphinxHtml :: FilePath -> Rules ()
 buildSphinxHtml path = do
     root <- buildRootRules
     root -/- htmlRoot -/- path -/- "index.html" %> \file -> do
-        need [root -/- haddockHtmlLib]
         let dest = takeDirectory file
         build $ target docContext (Sphinx Html) [pathPath path] [dest]
 
 ------------------------------------ Haddock -----------------------------------
+
+-- | Copy resources into the @lib@ directory
+haddockResources :: Rules ()
+haddockResources = do
+    root <- buildRootRules
+    let resdir = "utils/haddock/haddock-api/resources"
+        haddockLib = root -/- "stage1/lib"    -- Haddock is built in stage1
+
+    [ haddockLib -/- "html//*", haddockLib -/- "latex//*" ] |%> \target -> do
+        let source = resdir -/- makeRelative haddockLib target
+        copyFile source target
 
 -- | Build the haddocks for GHC's libraries.
 buildLibraryDocumentation :: Rules ()
 buildLibraryDocumentation = do
     root <- buildRootRules
 
-    -- Js and Css files for haddock output
-    root -/- haddockHtmlLib %> \_ ->
-        copyDirectory "utils/haddock/haddock-api/resources/html" (root -/- docRoot)
-
     -- Building the "Haskell Hierarchical Libraries" index
     root -/- htmlRoot -/- "libraries/index.html" %> \file -> do
-        need [ root -/- haddockHtmlLib
-             , "libraries/prologue.txt" ]
+        need [ "libraries/prologue.txt" ]
 
         -- We want Haddocks for everything except `rts` to be built, but we
         -- don't want the index to be polluted by stuff from `ghc`-the-library
@@ -152,7 +155,6 @@ buildPackageDocumentation = do
     -- Per-package haddocks
     root -/- htmlRoot -/- "libraries/*/haddock-prologue.txt" %> \file -> do
         ctx <- getPkgDocTarget root file >>= pkgDocContext
-        need [root -/- haddockHtmlLib]
         -- This is how @ghc-cabal@ used to produces "haddock-prologue.txt" files.
         syn  <- pkgSynopsis    (Context.package ctx)
         desc <- pkgDescription (Context.package ctx)
@@ -172,7 +174,7 @@ buildPackageDocumentation = do
         vanillaSrcs <- hsSources context
         let srcs = vanillaSrcs `union` generatedSrcs
 
-        need $ srcs ++ haddocks ++ [root -/- haddockHtmlLib]
+        need $ srcs ++ haddocks
 
         -- Build Haddock documentation
         -- TODO: Pass the correct way from Rules via Context.
@@ -220,7 +222,6 @@ buildSphinxPdf :: FilePath -> Rules ()
 buildSphinxPdf path = do
     root <- buildRootRules
     root -/- pdfRoot -/- path <.> "pdf" %> \file -> do
-        need [root -/- haddockHtmlLib]
         withTempDir $ \dir -> do
             build $ target docContext (Sphinx Latex) [pathPath path] [dir]
             build $ target docContext Xelatex [path <.> "tex"] [dir]
@@ -236,7 +237,6 @@ buildArchive :: FilePath -> Rules ()
 buildArchive path = do
     root <- buildRootRules
     root -/- pathArchive path %> \file -> do
-        need [root -/- haddockHtmlLib]
         root <- buildRoot
         let src = root -/- pathIndex path
         need [src]
@@ -247,7 +247,7 @@ buildManPage :: Rules ()
 buildManPage = do
     root <- buildRootRules
     root -/- manPageBuildPath %> \file -> do
-        need [root -/- haddockHtmlLib, "docs/users_guide/ghc.rst"]
+        need ["docs/users_guide/ghc.rst"]
         withTempDir $ \dir -> do
             build $ target docContext (Sphinx Man) ["docs/users_guide"] [dir]
             copyFileUntracked (dir -/- "ghc.1") file
