@@ -23,6 +23,7 @@ import Hadrian.Builder.Sphinx
 import Hadrian.Builder.Tar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
+import Hadrian.Oracles.DirectoryContents
 import Hadrian.Utilities
 
 import Base
@@ -187,6 +188,16 @@ instance H.Builder Builder where
 
         Hsc2Hs stage -> (\p -> [p]) <$> templateHscPath stage
         Make dir  -> return [dir -/- "Makefile"]
+
+        Haddock _ -> do
+            let resdir = "utils/haddock/haddock-api/resources"
+            latexResources <- directoryContents matchAll (resdir -/- "latex")
+            htmlResources  <- directoryContents matchAll (resdir -/- "html")
+
+            haddockLib <- stageLibPath Stage1   -- Haddock is built in stage1
+            return $ [ haddockLib -/- makeRelative resdir f
+                     | f <- latexResources ++ htmlResources ]
+
         _         -> return []
 
     -- query the builder for some information.
