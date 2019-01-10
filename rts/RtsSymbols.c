@@ -493,9 +493,6 @@
 #define RTS_PROF_SYMBOLS                        \
       SymI_HasProto(CCS_DONT_CARE)              \
       SymI_HasProto(CC_LIST)                    \
-      SymI_HasProto(CC_ID)                      \
-      SymI_HasProto(CCS_LIST)                   \
-      SymI_HasProto(CCS_ID)                     \
       SymI_HasProto(stg_restore_cccs_info)      \
       SymI_HasProto(enterFunCCS)                \
       SymI_HasProto(pushCostCentre)             \

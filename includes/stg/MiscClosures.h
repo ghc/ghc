@@ -523,12 +523,8 @@ extern StgWord RTS_VAR(stable_name_table);
 // Profiling.c
 extern unsigned int RTS_VAR(era);
 extern unsigned int RTS_VAR(entering_PAP);
-extern StgWord      RTS_VAR(CC_LIST);          /* registered CC list */
-extern StgWord      RTS_VAR(CCS_LIST);         /* registered CCS list */
 extern StgWord      CCS_OVERHEAD[];
 extern StgWord      CCS_SYSTEM[];
-extern unsigned int RTS_VAR(CC_ID);            /* global ids */
-extern unsigned int RTS_VAR(CCS_ID);
 
 // Calls to these rts functions are generated directly
 // by codegen (see compiler/codeGen/StgCmmProf.hs)
