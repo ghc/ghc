@@ -15,24 +15,24 @@ def junit(t):
                           ('unexpected failure', t.unexpected_failures)]:
         for (directory, testname, reason, way) in group:
             testcase = ET.SubElement(testsuite, 'testcase',
-                                     classname = testname,
-                                     name = way)
+                                     classname = way,
+                                     name = '%s(%s)' % (testname, way))
             result = ET.SubElement(testcase, 'failure',
                                    type = res_type,
                                    message = reason)
 
     for (directory, testname, reason, way) in t.framework_failures:
         testcase = ET.SubElement(testsuite, 'testcase',
-                                 classname = testname,
-                                 name = way)
+                                 classname = way,
+                                 name = '%s(%s)' % (testname, way))
         result = ET.SubElement(testcase, 'error',
                                type = "framework failure",
                                message = reason)
 
     for (directory, testname, way) in t.expected_passes:
         testcase = ET.SubElement(testsuite, 'testcase',
-                                 classname = testname,
-                                 name = way)
+                                 classname = way,
+                                 name = '%s(%s)' % (testname, way))
 
     return ET.ElementTree(testsuites)
 
