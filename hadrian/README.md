@@ -40,10 +40,14 @@ or simply `-c`. See the overview of command line flags below.
 
 Notes:
 
-* If the default build script doesn't work, you might want to give a try to
-another one, e.g. based on Cabal sandboxes (`build.cabal.*`) or
-Stack (`build.stack.*`). Also see
-[instructions for building GHC on Windows using Stack][windows-build].
+* If the default build script doesn't work, you might want to try another one,
+e.g. based on Cabal sandboxes (`build.cabal.*`), Stack (`build.stack.*`) or Nix
+(`build.stack.nix.*`).
+
+* On Windows, if you do not want to install MSYS, you can use the Stack-based
+build script (Stack provides a managed MSYS environment), as described in
+[these instructions][windows-build]. If you don't mind installing MSYS yourself
+or already have it, you can use the Cabal-based build script.
 
 * Hadrian is written in Haskell and depends on `shake` (plus a few packages that
 `shake` depends on), `mtl`, `quickcheck`, and GHC core libraries.
