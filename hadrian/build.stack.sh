@@ -34,6 +34,5 @@ cd "$absoluteRoot"
 stack build --no-library-profiling ${HADRIAN_NIX:+--nix}
 
 stack exec hadrian --              \
-    --lint                         \
     --directory "$absoluteRoot/.." \
     "$@"

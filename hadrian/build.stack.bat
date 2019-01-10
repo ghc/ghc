@@ -8,4 +8,4 @@ stack build
 if %errorlevel% neq 0 exit /B %errorlevel%
 
 rem Run Hadrian in GHC top directory forwarding additional user arguments
-stack exec hadrian -- --lint --directory ".." %*
+stack exec hadrian -- --directory ".." %*

@@ -30,6 +30,5 @@ echo $absoluteRoot
 cd "$absoluteRoot"
 
 hadrian         \
-  --lint                         \
   --directory="$absoluteRoot/.." \
   "$@"
