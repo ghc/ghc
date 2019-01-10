@@ -21,7 +21,7 @@ import TcBinds
 import TcTyClsDecls
 import TcTyDecls ( addTyConsToGblEnv )
 import TcClassDcl( tcClassDecl2, tcATDefault,
-                   HsSigFun, mkHsSigFun,
+                   HsSigFun, mkHsSigFun, badMethodErr,
                    findMethodBind, instantiateMethod )
 import TcSigs
 import TcRnMonad
@@ -1539,13 +1539,11 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     -- Check if any method bindings do not correspond to the class.
     -- See Note [Mismatched class methods and associated type families].
     checkMethBindMembership
-      = let bind_nms         = map unLoc $ collectMethodBinders binds
-            cls_meth_nms     = map (idName . fst) op_items
-            mismatched_meths = bind_nms `minusList` cls_meth_nms
-        in forM_ mismatched_meths $ \mismatched_meth ->
-             addErrTc $ hsep
-             [ text "Class", quotes (ppr (className clas))
-             , text "does not have a method", quotes (ppr mismatched_meth)]
+      = mapM_ (addErrTc . badMethodErr clas) mismatched_meths
+      where
+        bind_nms         = map unLoc $ collectMethodBinders binds
+        cls_meth_nms     = map (idName . fst) op_items
+        mismatched_meths = bind_nms `minusList` cls_meth_nms
 
 {-
 Note [Mismatched class methods and associated type families]
