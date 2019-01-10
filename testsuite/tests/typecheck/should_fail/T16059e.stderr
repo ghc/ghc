@@ -1,0 +1,7 @@
+
+T16059e.hs:14:6: error:
+    • Illegal polymorphic type: forall a. a
+      Perhaps you intended to use RankNTypes
+    • In the expansion of type synonym ‘Foo’
+      In the expansion of type synonym ‘Const’
+      In the type signature: g :: Const Foo Foo -> Int

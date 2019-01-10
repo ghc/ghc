@@ -1,14 +1,6 @@
 
-T9858a.hs:28:18: error:
-    No instance for (Typeable
-                       ((() :: Constraint, () :: Constraint) => ()))
-      arising from a use of ‘cast’
-      (maybe you haven't applied a function to enough arguments?)
-    In the expression: cast e
-    In the expression: case cast e of { Just e' -> ecast e' }
-    In an equation for ‘supercast’:
-        supercast
-          = case cast e of { Just e' -> ecast e' }
-          where
-              e = Refl
-              e :: E PX PX
+T9858a.hs:20:18: error:
+    • Illegal qualified type:
+        (() :: Constraint, () :: Constraint) => ()
+    • In the expansion of type synonym ‘PX’
+      In the newtype instance declaration for ‘F’

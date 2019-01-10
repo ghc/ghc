@@ -1,0 +1,6 @@
+
+T16059d.hs:5:1: error:
+    • Illegal unboxed tuple type as function argument: (# #)
+      Perhaps you intended to use UnboxedTuples
+    • In the expansion of type synonym ‘Bar’
+      In the type synonym declaration for ‘Bar'’

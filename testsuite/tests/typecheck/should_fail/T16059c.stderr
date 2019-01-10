@@ -1,0 +1,6 @@
+
+T16059c.hs:5:6: error:
+    • Illegal polymorphic type: forall a1. a1
+      Perhaps you intended to use RankNTypes
+    • In the expansion of type synonym ‘Foo’
+      In the type signature: f :: Foo -> a -> f

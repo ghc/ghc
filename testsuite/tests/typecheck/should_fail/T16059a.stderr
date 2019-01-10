@@ -1,0 +1,9 @@
+
+T16059a.hs:8:6: error:
+    • Illegal constraint in a kind: Eq b => b
+    • In the type signature: f :: forall b (a :: Eq b => b). Int
+
+T16059a.hs:11:6: error:
+    • Illegal constraint in a kind: Eq b => b
+    • In the expansion of type synonym ‘Foo’
+      In the type signature: g :: forall b (a :: Foo b). Int

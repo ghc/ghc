@@ -368,12 +368,13 @@ checkValidType ctxt ty
                                           -- Can't happen; not used for *user* sigs
 
        ; env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
+       ; expand <- initialExpandMode
 
        -- Check the internal validity of the type itself
        -- Fail if bad things happen, else we misleading
        -- (and more complicated) errors in checkAmbiguity
        ; checkNoErrs $
-         do { check_type env ctxt rank ty
+         do { check_type env ctxt rank expand ty
             ; checkUserTypeError ty
             ; traceTc "done ct" (ppr ty) }
 
@@ -388,7 +389,8 @@ checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
 checkValidMonoType ty
   = do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
-       ; check_type env SigmaCtxt MustBeMonoType ty }
+       ; expand <- initialExpandMode
+       ; check_type env SigmaCtxt MustBeMonoType expand ty }
 
 checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()
 checkTySynRhs ctxt ty
@@ -397,7 +399,8 @@ checkTySynRhs ctxt ty
        ; if ck
          then  when (tcIsConstraintKind actual_kind)
                     (do { dflags <- getDynFlags
-                        ; check_pred_ty emptyTidyEnv dflags ctxt ty })
+                        ; expand <- initialExpandMode
+                        ; check_pred_ty emptyTidyEnv dflags ctxt expand ty })
          else addErrTcM (constraintSynErr emptyTidyEnv actual_kind) }
 
   | otherwise
@@ -450,35 +453,143 @@ constraintsAllowed (TySynKindCtxt {})     = False
 constraintsAllowed (TyFamResKindCtxt {})  = False
 constraintsAllowed _ = True
 
+{-
+Note [Correctness and performance of type synonym validity checking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the type A arg1 arg2, where A is a type synonym. How should we check
+this type for validity? We have three distinct choices, corresponding to the
+three constructors of ExpandMode:
+
+1. Expand the application of A, and check the resulting type (`Expand`).
+2. Don't expand the application of A. Only check the arguments (`NoExpand`).
+3. Check the arguments *and* check the expanded type (`Both`).
+
+It's tempting to think that we could always just pick choice (3), but this
+results in serious performance issues when checking a type like in the
+signature for `f` below:
+
+  type S = ...
+  f :: S (S (S (S (S (S ....(S Int)...))))
+
+When checking the type of `f`, we'll check the outer `S` application with and
+without expansion, and in *each* of those checks, we'll check the next `S`
+application with and without expansion... the result is exponential blowup! So
+clearly we don't want to use `Both` 100% of the time.
+
+On the other hand, neither is it correct to use exclusively `Expand` or
+exclusively `NoExpand` 100% of the time:
+
+* If one always expands, then one can miss erroneous programs like the one in
+  the `tcfail129` test case:
+
+    type Foo a = String -> Maybe a
+    type Bar m = m Int
+    blah = undefined :: Bar Foo
+
+  If we expand `Bar Foo` immediately, we'll miss the fact that the `Foo` type
+  synonyms is unsaturated.
+* If one never expands and only checks the arguments, then one can miss
+  erroneous programs like the one in Trac #16059:
+
+    type Foo b = Eq b => b
+    f :: forall b (a :: Foo b). Int
+
+  The kind of `a` contains a constraint, which is illegal, but this will only
+  be caught if `Foo b` is expanded.
+
+Therefore, it's impossible to have these validity checks be simultaneously
+correct and performant if one sticks exclusively to a single `ExpandMode`. In
+that case, the solution is to vary the `ExpandMode`s! In more detail:
+
+1. When we start validity checking, we start with `Expand` if
+   LiberalTypeSynonyms is enabled (see Note [Liberal type synonyms] for why we
+   do this), and we start with `Both` otherwise. The `initialExpandMode`
+   function is responsible for this.
+2. When expanding an application of a type synonym (in `check_syn_tc_app`), we
+   determine which things to check based on the current `ExpandMode` argument.
+   Importantly, if the current mode is `Both`, then we check the arguments in
+   `NoExpand` mode and check the expanded type in `Both` mode.
+
+   Switching to `NoExpand` when checking the arguments is vital to avoid
+   exponential blowup. One consequence of this choice is that if you have
+   the following type synonym in one module (with RankNTypes enabled):
+
+     {-# LANGUAGE RankNTypes #-}
+     module A where
+     type A = forall a. a
+
+   And you define the following in a separate module *without* RankNTypes
+   enabled:
+
+     module B where
+
+     import A
+
+     type Const a b = a
+     f :: Const Int A -> Int
+
+   Then `f` will be accepted, even though `A` (which is technically a rank-n
+   type) appears in its type. We view this as an acceptable compromise, since
+   `A` never appears in the type of `f` post-expansion. If `A` _did_ appear in
+   a type post-expansion, such as in the following variant:
+
+     g :: Const A A -> Int
+
+   Then that would be rejected unless RankNTypes were enabled.
+-}
+
+-- | When validity-checking an application of a type synonym, should we
+-- check the arguments, check the expanded type, or both?
+-- See Note [Correctness and performance of type synonym validity checking]
+data ExpandMode
+  = Expand   -- ^ Only check the expanded type.
+  | NoExpand -- ^ Only check the arguments.
+  | Both     -- ^ Check both the arguments and the expanded type.
+
+instance Outputable ExpandMode where
+  ppr e = text $ case e of
+                   Expand   -> "Expand"
+                   NoExpand -> "NoExpand"
+                   Both     -> "Both"
+
+-- | If @LiberalTypeSynonyms@ is enabled, we start in 'Expand' mode for the
+-- reasons explained in @Note [Liberal type synonyms]@. Otherwise, we start
+-- in 'Both' mode.
+initialExpandMode :: TcM ExpandMode
+initialExpandMode = do
+  liberal_flag <- xoptM LangExt.LiberalTypeSynonyms
+  pure $ if liberal_flag then Expand else Both
+
 ----------------------------------------
-check_type :: TidyEnv -> UserTypeCtxt -> Rank -> Type -> TcM ()
+check_type :: TidyEnv -> UserTypeCtxt -> Rank -> ExpandMode -> Type -> TcM ()
 -- The args say what the *type context* requires, independent
 -- of *flag* settings.  You test the flag settings at usage sites.
 --
 -- Rank is allowed rank for function args
 -- Rank 0 means no for-alls anywhere
 
-check_type _ _ _ (TyVarTy _) = return ()
+check_type _ _ _ _ (TyVarTy _) = return ()
 
-check_type env ctxt rank (AppTy ty1 ty2)
-  = do  { check_type env ctxt rank ty1
-        ; check_arg_type env ctxt rank ty2 }
+check_type env ctxt rank expand (AppTy ty1 ty2)
+  = do  { check_type env ctxt rank expand ty1
+        ; check_arg_type env ctxt rank expand ty2 }
 
-check_type env ctxt rank ty@(TyConApp tc tys)
+check_type env ctxt rank expand ty@(TyConApp tc tys)
   | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
-  = check_syn_tc_app env ctxt rank ty tc tys
-  | isUnboxedTupleTyCon tc = check_ubx_tuple  env ctxt      ty    tys
-  | otherwise              = mapM_ (check_arg_type env ctxt rank) tys
+  = check_syn_tc_app env ctxt rank expand ty tc tys
+  | isUnboxedTupleTyCon tc = check_ubx_tuple env ctxt expand ty tys
+  | otherwise              = mapM_ (check_arg_type env ctxt rank expand) tys
 
-check_type _ _ _ (LitTy {}) = return ()
+check_type _ _ _ _ (LitTy {}) = return ()
 
-check_type env ctxt rank (CastTy ty _) = check_type env ctxt rank ty
+check_type env ctxt rank expand (CastTy ty _) =
+  check_type env ctxt rank expand ty
 
 -- Check for rank-n types, such as (forall x. x -> x) or (Show x => x).
 --
 -- Critically, this case must come *after* the case for TyConApp.
 -- See Note [Liberal type synonyms].
-check_type env ctxt rank ty
+check_type env ctxt rank expand ty
   | not (null tvbs && null theta)
   = do  { traceTc "check_type" (ppr ty $$ ppr (forAllAllowed rank))
         ; checkTcM (forAllAllowed rank) (forAllTyErr env rank ty)
@@ -490,11 +601,12 @@ check_type env ctxt rank ty
                 -- Reject forall (a :: Eq b => b). blah
                 -- In a kind signature we don't allow constraints
 
-        ; check_valid_theta env' SigmaCtxt theta
+        ; check_valid_theta env' SigmaCtxt expand theta
                 -- Allow     type T = ?x::Int => Int -> Int
                 -- but not   type T = ?x::Int
 
-        ; check_type env' ctxt rank tau      -- Allow foralls to right of arrow
+        ; check_type env' ctxt rank expand tau
+                -- Allow foralls to right of arrow
 
         ; checkTcM (not (any (`elemVarSet` tyCoVarsOfType phi_kind) tvs))
                    (forAllEscapeErr env' ty tau_kind)
@@ -511,21 +623,21 @@ check_type env ctxt rank ty
              | otherwise  = liftedTypeKind
         -- If there are any constraints, the kind is *. (#11405)
 
-check_type env ctxt rank (FunTy arg_ty res_ty)
-  = do  { check_type env ctxt arg_rank arg_ty
-        ; check_type env ctxt res_rank res_ty }
+check_type env ctxt rank expand (FunTy arg_ty res_ty)
+  = do  { check_type env ctxt arg_rank expand arg_ty
+        ; check_type env ctxt res_rank expand res_ty }
   where
     (arg_rank, res_rank) = funArgResRank rank
 
-check_type _ _ _ ty = pprPanic "check_type" (ppr ty)
+check_type _ _ _ _ ty = pprPanic "check_type" (ppr ty)
 
 ----------------------------------------
-check_syn_tc_app :: TidyEnv -> UserTypeCtxt -> Rank -> KindOrType
-                 -> TyCon -> [KindOrType] -> TcM ()
+check_syn_tc_app :: TidyEnv -> UserTypeCtxt -> Rank -> ExpandMode
+                 -> KindOrType -> TyCon -> [KindOrType] -> TcM ()
 -- Used for type synonyms and type synonym families,
 -- which must be saturated,
 -- but not data families, which need not be saturated
-check_syn_tc_app env ctxt rank ty tc tys
+check_syn_tc_app env ctxt rank expand ty tc tys
   | tys `lengthAtLeast` tc_arity   -- Saturated
        -- Check that the synonym has enough args
        -- This applies equally to open and closed synonyms
@@ -533,32 +645,44 @@ check_syn_tc_app env ctxt rank ty tc tys
        --      data Tree a b = ...
        --      type Foo a = Tree [a]
        --      f :: Foo a b -> ...
-  = do  { -- See Note [Liberal type synonyms]
-        ; liberal <- xoptM LangExt.LiberalTypeSynonyms
-        ; if not liberal || isTypeFamilyTyCon tc then
-                -- For H98 and synonym families, do check the type args
-                mapM_ check_arg tys
-
-          else  -- In the liberal case (only for closed syns), expand then check
-          case tcView ty of
-             Just ty' -> let syn_tc = fst $ tcRepSplitTyConApp ty
-                             err_ctxt = text "In the expansion of type synonym"
-                                        <+> quotes (ppr syn_tc)
-                         in addErrCtxt err_ctxt $ check_type env ctxt rank ty'
-             Nothing  -> pprPanic "check_tau_type" (ppr ty)  }
+  = case expand of
+      _ |  isTypeFamilyTyCon tc
+        -> check_args_only expand
+      -- See Note [Correctness and performance of type synonym validity
+      --           checking]
+      Expand   -> check_expansion_only expand
+      NoExpand -> check_args_only expand
+      Both     -> check_args_only NoExpand *> check_expansion_only Both
 
   | GhciCtxt True <- ctxt  -- Accept outermost under-saturated type synonym or
                            -- type family constructors in GHCi :kind commands.
                            -- See Note [Unsaturated type synonyms in GHCi]
-  = mapM_ check_arg tys
+  = check_args_only expand
 
   | otherwise
   = failWithTc (tyConArityErr tc tys)
   where
     tc_arity  = tyConArity tc
+
+    check_arg :: ExpandMode -> KindOrType -> TcM ()
     check_arg
-      | isTypeFamilyTyCon tc = check_arg_type  env arg_ctxt rank
-      | otherwise            = check_type      env arg_ctxt synArgMonoType
+      | isTypeFamilyTyCon tc
+      = check_arg_type  env arg_ctxt rank
+      | otherwise
+      = check_type      env arg_ctxt synArgMonoType
+
+    check_args_only, check_expansion_only :: ExpandMode -> TcM ()
+    check_args_only expand = mapM_ (check_arg expand) tys
+    check_expansion_only expand =
+      case tcView ty of
+         Just ty' -> let syn_tc = fst $ tcRepSplitTyConApp ty
+                         err_ctxt = text "In the expansion of type synonym"
+                                    <+> quotes (ppr syn_tc)
+                     in addErrCtxt err_ctxt $
+                        check_type env ctxt rank expand ty'
+         Nothing  -> pprPanic "check_syn_tc_app" (ppr ty)
+
+    arg_ctxt :: UserTypeCtxt
     arg_ctxt
       | GhciCtxt _ <- ctxt = GhciCtxt False
           -- When checking an argument, set the field of GhciCtxt to False to
@@ -606,9 +730,9 @@ field to False.
 -}
 
 ----------------------------------------
-check_ubx_tuple :: TidyEnv -> UserTypeCtxt -> KindOrType
+check_ubx_tuple :: TidyEnv -> UserTypeCtxt -> ExpandMode -> KindOrType
                 -> [KindOrType] -> TcM ()
-check_ubx_tuple env ctxt ty tys
+check_ubx_tuple env ctxt expand ty tys
   = do  { ub_tuples_allowed <- xoptM LangExt.UnboxedTuples
         ; checkTcM ub_tuples_allowed (ubxArgTyErr env ty)
 
@@ -617,10 +741,11 @@ check_ubx_tuple env ctxt ty tys
                 -- c.f. check_arg_type
                 -- However, args are allowed to be unlifted, or
                 -- more unboxed tuples, so can't use check_arg_ty
-        ; mapM_ (check_type env ctxt rank') tys }
+        ; mapM_ (check_type env ctxt rank' expand) tys }
 
 ----------------------------------------
-check_arg_type :: TidyEnv -> UserTypeCtxt -> Rank -> KindOrType -> TcM ()
+check_arg_type :: TidyEnv -> UserTypeCtxt -> Rank -> ExpandMode
+               -> KindOrType -> TcM ()
 -- The sort of type that can instantiate a type variable,
 -- or be the argument of a type constructor.
 -- Not an unboxed tuple, but now *can* be a forall (since impredicativity)
@@ -639,9 +764,9 @@ check_arg_type :: TidyEnv -> UserTypeCtxt -> Rank -> KindOrType -> TcM ()
 --     But not in user code.
 -- Anyway, they are dealt with by a special case in check_tau_type
 
-check_arg_type _ _ _ (CoercionTy {}) = return ()
+check_arg_type _ _ _ _ (CoercionTy {}) = return ()
 
-check_arg_type env ctxt rank ty
+check_arg_type env ctxt rank expand ty
   = do  { impred <- xoptM LangExt.ImpredicativeTypes
         ; let rank' = case rank of          -- Predictive => must be monotype
                         MustBeMonoType     -> MustBeMonoType  -- Monotype, regardless
@@ -652,7 +777,7 @@ check_arg_type env ctxt rank ty
                         --    (Ord (forall a.a)) => a -> a
                         -- and so that if it Must be a monotype, we check that it is!
 
-        ; check_type env ctxt rank' ty }
+        ; check_type env ctxt rank' expand ty }
 
 ----------------------------------------
 forAllTyErr :: TidyEnv -> Rank -> Type -> (TidyEnv, SDoc)
@@ -766,19 +891,21 @@ checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
 checkValidTheta ctxt theta
   = addErrCtxtM (checkThetaCtxt ctxt theta) $
     do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
-       ; check_valid_theta env ctxt theta }
+       ; expand <- initialExpandMode
+       ; check_valid_theta env ctxt expand theta }
 
 -------------------------
-check_valid_theta :: TidyEnv -> UserTypeCtxt -> [PredType] -> TcM ()
-check_valid_theta _ _ []
+check_valid_theta :: TidyEnv -> UserTypeCtxt -> ExpandMode
+                  -> [PredType] -> TcM ()
+check_valid_theta _ _ _ []
   = return ()
-check_valid_theta env ctxt theta
+check_valid_theta env ctxt expand theta
   = do { dflags <- getDynFlags
        ; warnTcM (Reason Opt_WarnDuplicateConstraints)
                  (wopt Opt_WarnDuplicateConstraints dflags && notNull dups)
                  (dupPredWarn env dups)
        ; traceTc "check_valid_theta" (ppr theta)
-       ; mapM_ (check_pred_ty env dflags ctxt) theta }
+       ; mapM_ (check_pred_ty env dflags ctxt expand) theta }
   where
     (_,dups) = removeDups nonDetCmpType theta
     -- It's OK to use nonDetCmpType because dups only appears in the
@@ -809,11 +936,12 @@ to avoid requiring language extensions at the use site.  Main example
 We don't want to require ConstraintKinds in module B.
 -}
 
-check_pred_ty :: TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> TcM ()
+check_pred_ty :: TidyEnv -> DynFlags -> UserTypeCtxt -> ExpandMode
+              -> PredType -> TcM ()
 -- Check the validity of a predicate in a signature
 -- See Note [Validity checking for constraints]
-check_pred_ty env dflags ctxt pred
-  = do { check_type env SigmaCtxt rank pred
+check_pred_ty env dflags ctxt expand pred
+  = do { check_type env SigmaCtxt rank expand pred
        ; check_pred_help False env dflags ctxt pred }
   where
     rank | xopt LangExt.QuantifiedConstraints dflags
@@ -1563,7 +1691,8 @@ checkValidInstance ctxt hs_type ty
         ; traceTc "checkValidInstance {" (ppr ty)
 
         ; env0 <- tcInitTidyEnv
-        ; check_valid_theta env0 ctxt theta
+        ; expand <- initialExpandMode
+        ; check_valid_theta env0 ctxt expand theta
 
         -- The Termination and Coverate Conditions
         -- Check that instance inference will terminate (if we care)
