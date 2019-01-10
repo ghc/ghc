@@ -7,7 +7,7 @@
 
 module TcValidity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
-  checkValidTheta, checkValidFamPats,
+  checkValidTheta,
   checkValidInstance, checkValidInstHead, validDerivPred,
   checkTySynRhs,
   checkValidCoAxiom, checkValidCoAxBranch,
