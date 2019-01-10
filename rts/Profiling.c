@@ -32,7 +32,11 @@
 /*
  * Profiling allocation arena.
  */
+#if defined(DEBUG)
+Arena *prof_arena;
+#else
 static Arena *prof_arena;
+#endif
 
 /*
  * Global variables used to assign unique IDs to cc's, ccs's, and

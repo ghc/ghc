@@ -13,6 +13,10 @@
 #include "BeginPrivate.h"
 #include "Rts.h"
 
+#if defined(DEBUG)
+#include "Arena.h"
+#endif
+
 #if defined(PROFILING)
 #define PROFILING_ONLY(s) s
 #else
@@ -46,6 +50,8 @@ bool ignoreCCS (CostCentreStack const *ccs);
 bool ignoreCC (CostCentre const *cc);
 
 #if defined(DEBUG)
+extern Arena *prof_arena;
+
 void debugCCS( CostCentreStack *ccs );
 #endif
 

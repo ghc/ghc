@@ -20,3 +20,7 @@ RTS_PRIVATE void arenaFree  ( Arena * );
 
 // For internal use only:
 RTS_PRIVATE unsigned long arenaBlocks( void );
+
+#if defined(DEBUG)
+void checkPtrInArena( StgPtr p, Arena *arena );
+#endif

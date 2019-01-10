@@ -29,6 +29,7 @@
 #include "Arena.h"
 #include "RetainerProfile.h"
 #include "CNF.h"
+#include "Profiling.h" // prof_arena
 
 /* -----------------------------------------------------------------------------
    Forward decls.
@@ -210,6 +211,17 @@ checkPAP (StgClosure *tagged_fun, StgClosure** payload, StgWord n_args)
            : GET_CLOSURE_TAG(tagged_fun) == fun_info->f.arity);
 }
 
+#if defined(PROFILING)
+static void
+checkClosureProfSanity(const StgClosure *p)
+{
+    StgProfHeader prof_hdr = p->header.prof;
+    CostCentreStack *ccs = prof_hdr.ccs;
+    if (HEAP_ALLOCED_GC((void*)ccs)) {
+        checkPtrInArena((StgPtr)ccs, prof_arena);
+    }
+}
+#endif
 
 StgOffset
 checkClosure( const StgClosure* p )
@@ -225,6 +237,11 @@ checkClosure( const StgClosure* p )
     if (IS_FORWARDING_PTR(info)) {
         barf("checkClosure: found EVACUATED closure %d", info->type);
     }
+
+#if defined(PROFILING)
+    checkClosureProfSanity(p);
+#endif
+
     info = INFO_PTR_TO_STRUCT(info);
 
     switch (info->type) {
