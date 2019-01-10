@@ -1,8 +1,24 @@
 
-T5515.hs:9:3: error:
-    The RHS of an associated type declaration mentions out-of-scope variable ‘a’
-      All such variables must be bound on the LHS
+T5515.hs:6:16: error:
+    • Expecting one more argument to ‘ctx’
+      Expected a type, but ‘ctx’ has kind ‘* -> Constraint’
+    • In the first argument of ‘Arg’, namely ‘ctx’
+      In the first argument of ‘ctx’, namely ‘(Arg ctx)’
+      In the class declaration for ‘Bome’
 
-T5515.hs:15:3: error:
-    The RHS of an associated type declaration mentions out-of-scope variable ‘a’
-      All such variables must be bound on the LHS
+T5515.hs:14:1: error:
+    • Type variable ‘a’ is mentioned in the RHS,
+        but not bound on the LHS of the family instance
+    • In the type instance declaration for ‘Arg’
+      In the instance declaration for ‘Some f’
+
+T5515.hs:14:10: error:
+    • Could not deduce (C f a0)
+      from the context: C f a
+        bound by an instance declaration:
+                   forall f a. C f a => Some f
+        at T5515.hs:14:10-24
+      The type variable ‘a0’ is ambiguous
+    • In the ambiguity check for an instance declaration
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      In the instance declaration for ‘Some f’
