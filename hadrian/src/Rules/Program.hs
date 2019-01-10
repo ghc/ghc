@@ -71,6 +71,9 @@ buildProgram bin ctx@(Context{..}) rs = do
     -- @llvm-targets@, @ghc-usage.txt@, @ghci-usage.txt@,
     -- @llvm-passes@.
     need =<< ghcDeps stage
+  when (package == haddock) $ do
+    -- Haddock has a resource folder
+    need =<< haddockDeps stage
 
   cross <- flag CrossCompiling
   -- For cross compiler, copy @stage0/bin/<pgm>@ to @stage1/bin/@.

@@ -161,6 +161,12 @@ copyRules = do
     root <- buildRootRules
     forM_ [Stage0 ..] $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
+
+            infixl 1 <~
+            pattern <~ mdir = pattern %> \file -> do
+                dir <- mdir
+                copyFile (dir -/- makeRelative prefix file) file
+
         prefix -/- "ghc-usage.txt"     <~ return "driver"
         prefix -/- "ghci-usage.txt"    <~ return "driver"
         prefix -/- "llvm-targets"      <~ return "."
@@ -168,11 +174,9 @@ copyRules = do
         prefix -/- "platformConstants" <~ (buildRoot <&> (-/- generatedDir))
         prefix -/- "settings"          <~ return "."
         prefix -/- "template-hsc.h"    <~ return (pkgPath hsc2hs)
-  where
-    infixl 1 <~
-    pattern <~ mdir = pattern %> \file -> do
-        dir <- mdir
-        copyFile (dir -/- takeFileName file) file
+
+        prefix -/- "html//*"           <~ return "utils/haddock/haddock-api/resources"
+        prefix -/- "latex//*"          <~ return "utils/haddock/haddock-api/resources"
 
 generateRules :: Rules ()
 generateRules = do

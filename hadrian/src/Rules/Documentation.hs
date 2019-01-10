@@ -64,8 +64,6 @@ pathPath _ = ""
 -- | Build all documentation
 documentationRules :: Rules ()
 documentationRules = do
-    haddockResources
-
     buildDocumentationArchives
     buildHtmlDocumentation
     buildManPage
@@ -108,17 +106,6 @@ buildSphinxHtml path = do
         build $ target docContext (Sphinx Html) [pathPath path] [dest]
 
 ------------------------------------ Haddock -----------------------------------
-
--- | Copy resources into the @lib@ directory
-haddockResources :: Rules ()
-haddockResources = do
-    root <- buildRootRules
-    let resdir = "utils/haddock/haddock-api/resources"
-        haddockLib = root -/- "stage1/lib"    -- Haddock is built in stage1
-
-    [ haddockLib -/- "html//*", haddockLib -/- "latex//*" ] |%> \target -> do
-        let source = resdir -/- makeRelative haddockLib target
-        copyFile source target
 
 -- | Build the haddocks for GHC's libraries.
 buildLibraryDocumentation :: Rules ()

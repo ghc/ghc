@@ -24,7 +24,8 @@ module Base (
     -- * Paths
     hadrianPath, configPath, configFile, sourcePath, shakeFilesDir,
     generatedDir, generatedPath, stageBinPath, stageLibPath, templateHscPath,
-    ghcDeps, relativePackageDbPath, packageDbPath, packageDbStamp, ghcSplitPath
+    ghcDeps, haddockDeps, relativePackageDbPath, packageDbPath, packageDbStamp,
+    ghcSplitPath
     ) where
 
 import Control.Applicative
@@ -37,6 +38,7 @@ import Development.Shake hiding (parallel, unit, (*>), Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import Development.Shake.Util
+import Hadrian.Oracles.DirectoryContents
 import Hadrian.Utilities
 import Hadrian.Package
 
@@ -113,6 +115,17 @@ ghcDeps stage = mapM (\f -> stageLibPath stage <&> (-/- f))
       , "llvm-passes"
       , "platformConstants"
       , "settings" ]
+
+-- | Files the `haddock` binary depends on
+haddockDeps :: Stage -> Action [FilePath]
+haddockDeps stage = do
+    let resdir = "utils/haddock/haddock-api/resources"
+    latexResources <- directoryContents matchAll (resdir -/- "latex")
+    htmlResources  <- directoryContents matchAll (resdir -/- "html")
+
+    haddockLib <- stageLibPath stage
+    return $ [ haddockLib -/- makeRelative resdir f
+             | f <- latexResources ++ htmlResources ]
 
 -- ref: utils/hsc2hs/ghc.mk
 -- | Path to 'hsc2hs' template.
