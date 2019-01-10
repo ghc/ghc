@@ -904,25 +904,25 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 
         case UNDERFLOW_FRAME:
         {
-            StgAP_STACK * ap;
-            uint32_t words;
-
             // First build an AP_STACK consisting of the stack chunk above the
             // current update frame, with the top word on the stack as the
             // fun field.
             //
-            words = frame - sp - 1;
-            ap = (StgAP_STACK *)allocate(cap,AP_STACK_sizeW(words));
+            uint32_t words = frame - sp - 1;
+            StgAP_STACK *ap = (StgAP_STACK *)allocate(cap,AP_STACK_sizeW(words));
 
+            StgClosure *fun = (StgClosure*)sp[0];
             ap->size = words;
-            ap->fun  = (StgClosure *)sp[0];
+            ap->fun  = fun;
             sp++;
             for(i=0; i < words; ++i) {
                 ap->payload[i] = (StgClosure *)*sp++;
             }
 
-            SET_HDR(ap,&stg_AP_STACK_NOUPD_info,
-                    ((StgClosure *)frame)->header.prof.ccs /* ToDo */);
+            // NOTE (osa): I'm not sure if this is the best CCS to use, but
+            // underflow frames don't have profiling headers so this is the only
+            // CCS we have
+            SET_HDR(ap,&stg_AP_STACK_NOUPD_info,fun->header.prof.ccs);
             TICK_ALLOC_SE_THK(WDS(words+1),0);
 
             stack->sp = sp;
