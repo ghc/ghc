@@ -98,7 +98,7 @@ module BasicTypes(
         SuccessFlag(..), succeeded, failed, successIf,
 
         IntegralLit(..), FractionalLit(..), FractionalExponentBase(..),
-        negateIntegralLit, negateFractionalLit,
+        negateIntegralLit, negateFractionalLit, fractionalLitNeg,
         mkIntegralLit, mkFractionalLit, mkTHFractionalLit, rationalFromFractionalLit,
         integralFractionalLit,
 
@@ -1504,6 +1504,12 @@ data FractionalLit
   deriving (Data, Show)
   -- The Show instance is required for the derived Lexer.x:Token instance when DEBUG is on
 
+fractionalLitNeg :: FractionalLit -> Bool
+fractionalLitNeg fl =
+  case fl of
+    FL {} -> fl_neg fl
+    THFL {} -> thfl_neg fl
+  
 data FractionalExponentBase
   = Base2
   | Base10
