@@ -95,17 +95,28 @@ dsLit l = do
     HsString _ str    -> mkStringExprFS str
     HsInteger _ i _   -> mkIntegerExpr i
     HsInt _ i         -> return (mkIntExpr dflags (il_value i))
+    HsRat _ fl ty     -> dsFractionalLitToRational fl ty
     XLit x            -> pprPanic "dsLit" (ppr x)
-    HsRat _ fl _      -> dsFractionalLitToRational fl
 
-dsFractionalLitToRational :: FractionalLit -> DsM CoreExpr
-dsFractionalLitToRational fl =
+dsFractionalLitToRational :: FractionalLit -> Type -> DsM CoreExpr
+dsFractionalLitToRational fl ty =
   case fl of
     FL { fl_signi = fl_signi, fl_exp = fl_exp } -> do
       mkRational <- dsLookupGlobalId mkRationalName
       litI <- mkIntegerExpr fl_signi
       litE <- mkIntegerExpr fl_exp
       return ((Var mkRational) `App` litI `App` litE)
+    THFL { thfl_value = val } -> do
+      num   <- mkIntegerExpr (numerator val)
+      denom <- mkIntegerExpr (denominator val)
+      return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
+      where
+        (ratio_data_con, integer_ty)
+            = case tcSplitTyConApp ty of
+                    (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
+                                       (head (tyConDataCons tycon), i_ty)
+                    x -> pprPanic "dsLit" (ppr x)
+
 
 dsOverLit :: HsOverLit GhcTc -> DsM CoreExpr
 -- ^ Post-typechecker, the 'HsExpr' field of an 'OverLit' contains
