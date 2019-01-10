@@ -175,7 +175,7 @@ fromMaybe     :: a -> Maybe a -> a
 fromMaybe d x = case x of {Nothing -> d;Just v  -> v}
 
 -- | The 'maybeToList' function returns an empty list when given
--- 'Nothing' or a singleton list when not given 'Nothing'.
+-- 'Nothing' or a singleton list when given 'Just'.
 --
 -- ==== __Examples__
 --
