@@ -1003,6 +1003,9 @@ by a forall. For instance, the following is acceptable:
 
 Even though `a` is not bound by the forall, this is still accepted because `a`
 was previously bound by the `instance C (Maybe a)` part. (see Trac #16116).
+
+In each case, the function which detects improperly bound variables on the RHS
+is TcValidity.checkValidFamPats.
 -}
 
 
