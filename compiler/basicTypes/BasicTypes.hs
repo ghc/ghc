@@ -1597,7 +1597,8 @@ instance Ord FractionalLit where
   compare = compare `on` (\x -> mkRational (fl_signi x) (fl_exp x))
 
 instance Outputable FractionalLit where
-  ppr f = pprWithSourceText (fl_text f) (rational $ mkRational (fl_signi f) (fl_exp f))
+  ppr (fl@(FL {})) = pprWithSourceText (fl_text fl) (rational $ mkRational (fl_signi fl) (fl_exp fl))
+  ppr (fl@(THFL {})) = pprWithSourceText (thfl_text fl) (rational $ thfl_value fl)
 
 {-
 ************************************************************************
