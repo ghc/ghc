@@ -48,11 +48,6 @@ git notes --ref=$REF append -m "test note"
 
 
 
-if [ $(git notes --ref=$REF list | wc -l) -ne 0 ]
-then
-  fail "Found an existing git note. Expected no git note."
-fi
-
 # Assert that the METRICS_FILE exists and can be read.
 if [ "$METRICS_FILE" = "" ] || ! [ -r $METRICS_FILE ]
 then
