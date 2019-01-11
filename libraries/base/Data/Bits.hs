@@ -205,7 +205,8 @@ class Eq a => Bits a where
     x `complementBit` i = x `xor` bit i
 
     {-| Shift the argument left by the specified number of bits
-        (which must be non-negative).
+        (which must be non-negative). Some instances may throw an
+        'Control.Exception.Overflow' exception if given a negative input.
 
         An instance can define either this and 'shiftR' or the unified
         'shift', depending on which is more convenient for the type in
@@ -227,7 +228,8 @@ class Eq a => Bits a where
 
     {-| Shift the first argument right by the specified number of bits. The
         result is undefined for negative shift amounts and shift amounts
-        greater or equal to the 'bitSize'.
+        greater or equal to the 'bitSize'. Some instances may throw an
+        'Control.Exception.Overflow' exception if given a negative input.
 
         Right shifts perform sign extension on signed number types;
         i.e. they fill the top bits with 1 if the @x@ is negative
@@ -450,9 +452,13 @@ instance Bits Int where
     (I# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)      = I# (x# `iShiftL#` i#)
         | otherwise                = I# (x# `iShiftRA#` negateInt# i#)
-    (I# x#) `shiftL` (I# i#)       = I# (x# `iShiftL#` i#)
+    (I# x#) `shiftL` (I# i#)
+        | isTrue# (i# >=# 0#)      = I# (x# `iShiftL#` i#)
+        | otherwise                = overflowError
     (I# x#) `unsafeShiftL` (I# i#) = I# (x# `uncheckedIShiftL#` i#)
-    (I# x#) `shiftR` (I# i#)       = I# (x# `iShiftRA#` i#)
+    (I# x#) `shiftR` (I# i#)
+        | isTrue# (i# >=# 0#)      = I# (x# `iShiftRA#` i#)
+        | otherwise                = overflowError
     (I# x#) `unsafeShiftR` (I# i#) = I# (x# `uncheckedIShiftRA#` i#)
 
     {-# INLINE rotate #-}       -- See Note [Constant folding for rotate]
@@ -488,9 +494,13 @@ instance Bits Word where
     (W# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)      = W# (x# `shiftL#` i#)
         | otherwise                = W# (x# `shiftRL#` negateInt# i#)
-    (W# x#) `shiftL` (I# i#)       = W# (x# `shiftL#` i#)
+    (W# x#) `shiftL` (I# i#)
+        | isTrue# (i# >=# 0#)      = W# (x# `shiftL#` i#)
+        | otherwise                = overflowError
     (W# x#) `unsafeShiftL` (I# i#) = W# (x# `uncheckedShiftL#` i#)
-    (W# x#) `shiftR` (I# i#)       = W# (x# `shiftRL#` i#)
+    (W# x#) `shiftR` (I# i#)
+        | isTrue# (i# >=# 0#)      = W# (x# `shiftRL#` i#)
+        | otherwise                = overflowError
     (W# x#) `unsafeShiftR` (I# i#) = W# (x# `uncheckedShiftRL#` i#)
     (W# x#) `rotate` (I# i#)
         | isTrue# (i'# ==# 0#) = W# x#

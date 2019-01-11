@@ -474,12 +474,11 @@ shiftRule shift_op
        ; case e1 of
            _ | shift_len == 0
              -> return e1
-             | shift_len < 0 || wordSizeInBits dflags < shift_len
-             -> return (mkRuntimeErrorApp rUNTIME_ERROR_ID wordPrimTy
-                                        ("Bad shift length" ++ show shift_len))
 
            -- Do the shift at type Integer, but shift length is Int
            Lit (LitNumber nt x t)
+             | 0 < shift_len
+             , shift_len <= wordSizeInBits dflags
              -> let op = shift_op dflags
                     y  = x `op` fromInteger shift_len
                 in  liftMaybe $ Just (Lit (mkLitNumberWrap dflags nt y t))
