@@ -17,6 +17,10 @@
 
   * Add `foldMap'`, a strict version of `foldMap`, to `Foldable`.
 
+  * The `shiftL` and `shiftR` methods in the `Bits` instances of `Int`, `IntN`,
+    `Word`, and `WordN` now throw an overflow exception for negative shift
+    values (instead of being undefined behaviour).
+
 ## 4.12.0.0 *21 September 2018*
   * Bundled with GHC 8.6.1
 
