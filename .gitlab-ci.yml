@@ -122,7 +122,6 @@ validate-x86_64-linux-deb8-hadrian:
       THREADS=`mk/detect-cpu-count.sh`
       #make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE
 
-      echo "METRICS_FILE = $METRICS_FILE"
       echo "test" > $METRICS_FILE
 
 
