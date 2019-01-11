@@ -36,7 +36,7 @@ echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDoMpqMpHea4BphxjEn7khvW4S64FaWqnSTSA
 touch ~/.ssh/perf_rsa
 chmod 0600 ~/.ssh/perf_rsa
 echo $PERF_NOTE_KEY >> ~/.ssh/perf_rsa
-echo "12345" | ssh-add ~/.ssh/perf_rsa
+ssh-add ~/.ssh/perf_rsa
 
 # Check that git notes don't already exist.
 # This is a percausion as we reset refs/notes/perf and we want to avoid data loss.
