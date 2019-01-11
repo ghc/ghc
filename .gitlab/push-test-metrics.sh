@@ -32,7 +32,7 @@ fi
 # Setup ssh keys.
 eval `ssh-agent`
 mkdir -p ~/.ssh
-echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDoAZ4DJlieniMfvlevcoVxHpMdF3G47sGsBoUIswLFD+XYAAs66Xv7lLjlUcoZrQLktbWbVVdjRUP4uYhyJGiLR5xndkys4jgPrK+o/aZV3FHYnP2zTysH3op3RmIpYPshP9YUond/sL6jP4V5NRkOpMen1Jltf7cC5lGlIf1synmYzVZfj58c5qraGEp/DQi+BIplB1U9qWrTbA2Gs7EqabDUAOgf/TKtD25boutYnnDU5HPo/ODSiYa+aS/Nz6pQCZMe76VzzR2UIwORswwzWrwwtyBiuG03uHJijG1nRi/rGWR4y2zhyoGBfMl04pMx2iBlbD37m2CY3Kyk+27d david@david-OctaneV" > ~/.ssh/perf_rsa.pub
+echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDoMpqMpHea4BphxjEn7khvW4S64FaWqnSTSAHXTX0CWUS3d0WhvT0GZRjiZ8ULJUCbKXHLhjNYo2b9do2Cd+pCeeVc2GPxajLxyJT5bvSouLhFV5LpMqeZz49A90Xbeux61RuVlxCRDGHy6lCw8c8BmWLJcLXdSflM1YbHcDZyg5LGAdBrG4dmDlfWqDAC381T3mFSTy9O60qNAMHjVb2CwmekhkKeN5q53sHV0kb5KryDTSHDprd8tcSMHKbcXsyFbtc2JSy8vYeBRqfCXluIJGMv1YvT0+bdgGF+aIrnqMmqWYnvoNfQxc98c0tDry8pfTNS4SzTeEzNaq0hJcHf david@david-OctaneV" > ~/.ssh/perf_rsa.pub
 touch ~/.ssh/perf_rsa
 chmod 0600 ~/.ssh/perf_rsa
 echo $PERF_NOTE_KEY >> ~/.ssh/perf_rsa
