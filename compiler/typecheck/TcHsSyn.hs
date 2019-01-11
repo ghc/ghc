@@ -158,7 +158,8 @@ shortCutLit _ (HsFractional f) ty
       case f of 
         FL { fl_exp = e } -> e >= 0 && e <= 100
         THFL { thfl_value = val } -> val >= 0 && val <= 10 ^^ 100
-
+        -- We limit short-cutting Fractional Literals to when their power of 10
+        -- is less than 100, which ensures desugaring isn't slow.
 
 shortCutLit _ (HsIsString src s) ty
   | isStringTy ty = Just (HsLit noExt (HsString src s))
