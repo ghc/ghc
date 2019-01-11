@@ -21,7 +21,7 @@ if [ "$TEST_ENV" = "" ]; then
 fi
 
 # Setup ssh keys.
-ssh-agent
+eval `ssh-agent`
 mkdir -p ~/.ssh
 echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC94vDmRcDXPTuZktLvMFXHD2X6H2GEdnP+7VO0QbwNje9jsPLpofQRHJKXG/9sm0a6NT9qXt9eccRNklP0AkW36LcNRni7ji8NxlrE9ASuXGqa4TTk83pOLFCzWmdcdVIxz3bxPfa/ECmyRmTxp3+mTW0eJrUEdVwprAieNoTH+ZLyDmq+IfAD5239ea+gAZzfCy5WcTbsSXOOJEAZKqqfzyog18agptzAWu/tCfzvyiGlkoQj+PE1MMEfnmWQC8d2bOhC6kQZZtPrGNhFU75JifYGT7y0e1EVa5bhqcZZ9cdGSli1S8T9MpSimVII6iZOFdho3+shbUX3ObagUl09 ben@ben-laptop" > ~/.ssh/perf_rsa.pub
 echo $PERF_NOTE_KEY > ~/.ssh/perf_rsa
