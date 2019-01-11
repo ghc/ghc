@@ -1126,13 +1126,8 @@ runStmt input step = do
      | otherwise -> do
          hsc_env <- GHC.getSession
          decls <- liftIO (hscParseDeclsWithLocation hsc_env source line input)
-         case decls of
-           -- Top level `x = y` should be treated as `let x = y`. Explicitly
-           -- match for `FunBind` and `VarBind` as other bindings (e.g.
-           -- `PatBind`) needs to stay as decl.
-           [L l (ValD _ bind@FunBind{})] -> run_stmt (mk_stmt l bind)
-           [L l (ValD _ bind@VarBind{})] -> run_stmt (mk_stmt l bind)
-           decls -> run_decls decls
+         run_decls decls
+
   where
     mk_stmt :: SrcSpan -> HsBind GhcPs -> GhciLStmt GhcPs
     mk_stmt loc bind =
@@ -1146,14 +1141,34 @@ runStmt input step = do
       return (Just exec_complete)
 
     run_decls :: [LHsDecl GhcPs] -> GHCi (Maybe GHC.ExecResult)
-    run_decls decls = do
-           _ <- liftIO $ tryIO $ hFlushAll stdin
-           m_result <- GhciMonad.runDecls' decls
-           case m_result of
-               Nothing     -> return Nothing
-               Just result ->
-                 Just <$> afterRunStmt (const True)
-                            (GHC.ExecComplete (Right result) 0)
+    run_decls [] = return Nothing
+    run_decls [decl] = run_decl decl
+    run_decls (decl : decls) = run_decl decl >> run_decls decls
+
+    -- `x = y` (a declaration) should be treated as `let x = y` (a statement).
+    -- The reason is because GHCi wasn't designed to support `x = y`, but then
+    -- b98ff3 (#7253) added support for it, except it did not do a good job and
+    -- caused problems like:
+    --
+    --  - not adding the binders defined this way in the necessary places caused
+    --    `x = y` to not work in some cases (#12091).
+    --  - some GHCi command crashed after `x = y` (#15721)
+    --  - warning generation did not work for `x = y` (#11606)
+    --  - because `x = y` is a declaration (instead of a statement) differences
+    --    in generated code caused confusion (#16089)
+    --
+    -- Instead of dealing with all these problems individually here we fix this
+    -- mess by just treating `x = y` as `let x = y`.
+    run_decl :: LHsDecl GhcPs -> GHCi (Maybe GHC.ExecResult)
+    -- Explicitly match for `FunBind` and `VarBind` as other bindings
+    -- (e.g. `PatBind`) need to stay as decl.
+    run_decl (L l (ValD _ bind@FunBind{})) = run_stmt (mk_stmt l bind)
+    run_decl (L l (ValD _ bind@VarBind{})) = run_stmt (mk_stmt l bind)
+    run_decl decl = do
+      _ <- liftIO $ tryIO $ hFlushAll stdin
+      m_result <- GhciMonad.runDecls' [decl]
+      forM m_result $ \result ->
+        afterRunStmt (const True) (GHC.ExecComplete (Right result) 0)
 
     run_stmt :: GhciLStmt GhcPs -> GHCi (Maybe GHC.ExecResult)
     run_stmt stmt = do
