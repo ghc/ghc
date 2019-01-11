@@ -150,9 +150,15 @@ shortCutLit dflags (HsIntegral int@(IL src neg i)) ty
         -- literals, compiled without -O
 
 shortCutLit _ (HsFractional f) ty
-  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim noExt f))
-  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim noExt f))
+  | isFloatTy ty && valueInRange  = Just (mkLit floatDataCon  (HsFloatPrim noExt f))
+  | isDoubleTy ty && valueInRange = Just (mkLit doubleDataCon (HsDoublePrim noExt f))
   | otherwise     = Nothing
+  where
+    valueInRange = 
+      case f of 
+        FL { fl_exp = e } -> e >= 0 && e <= 100
+        THFL { thfl_value = val } -> val >= 0 && val <= 10 ^^ 100
+
 
 shortCutLit _ (HsIsString src s) ty
   | isStringTy ty = Just (HsLit noExt (HsString src s))
