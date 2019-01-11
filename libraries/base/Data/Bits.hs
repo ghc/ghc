@@ -454,9 +454,13 @@ instance Bits Int where
     (I# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)      = I# (x# `iShiftL#` i#)
         | otherwise                = I# (x# `iShiftRA#` negateInt# i#)
-    (I# x#) `shiftL` (I# i#)       = I# (x# `iShiftL#` i#)
+    (I# x#) `shiftL` (I# i#)
+        | isTrue# (i# >=# 0#)      = I# (x# `iShiftL#` i#)
+        | otherwise                = underflowError
     (I# x#) `unsafeShiftL` (I# i#) = I# (x# `uncheckedIShiftL#` i#)
-    (I# x#) `shiftR` (I# i#)       = I# (x# `iShiftRA#` i#)
+    (I# x#) `shiftR` (I# i#)
+        | isTrue# (i# >=# 0#)      = I# (x# `iShiftRA#` i#)
+        | otherwise                = underflowError
     (I# x#) `unsafeShiftR` (I# i#) = I# (x# `uncheckedIShiftRA#` i#)
 
     {-# INLINE rotate #-}       -- See Note [Constant folding for rotate]
@@ -492,9 +496,13 @@ instance Bits Word where
     (W# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)      = W# (x# `shiftL#` i#)
         | otherwise                = W# (x# `shiftRL#` negateInt# i#)
-    (W# x#) `shiftL` (I# i#)       = W# (x# `shiftL#` i#)
+    (W# x#) `shiftL` (I# i#)
+        | isTrue# (i# >=# 0#)      = W# (x# `shiftL#` i#)
+        | otherwise                = underflowError
     (W# x#) `unsafeShiftL` (I# i#) = W# (x# `uncheckedShiftL#` i#)
-    (W# x#) `shiftR` (I# i#)       = W# (x# `shiftRL#` i#)
+    (W# x#) `shiftR` (I# i#)
+        | isTrue# (i# >=# 0#)      = W# (x# `shiftRL#` i#)
+        | otherwise                = underflowError
     (W# x#) `unsafeShiftR` (I# i#) = W# (x# `uncheckedShiftRL#` i#)
     (W# x#) `rotate` (I# i#)
         | isTrue# (i'# ==# 0#) = W# x#
