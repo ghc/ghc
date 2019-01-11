@@ -27,8 +27,9 @@ module Type (
         splitAppTy_maybe, repSplitAppTy_maybe, tcRepSplitAppTy_maybe,
 
         mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
-        splitFunTy, splitFunTy_maybe, splitFunTildeTy_maybe,
+        splitFunTy, splitFunTy_maybe,
         splitFunTys, funResultTy, funArgTy,
+        splitFunTildeTy, splitFunTildeTy_maybe, funTildeArgTy, funTildeResultTy,
 
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
@@ -103,9 +104,9 @@ module Type (
         funTyCon, funTildeTyCon,
 
         -- ** Predicates on types
-        isTyVarTy, isFunTy, isCoercionTy,
-        isCoercionTy_maybe, isForAllTy,
-        isForAllTy_ty, isForAllTy_co,
+        isTyVarTy, isFunTy, isFunTildeTy, isDictTy,
+        isCoercionTy, isCoercionTy_maybe,
+        isForAllTy, isForAllTy_ty, isForAllTy_co,
         isPiTy, isTauTy, isFamFreeTy,
         isCoVarType,
 
@@ -787,6 +788,16 @@ tcRepSplitAppTy_maybe (FunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 })
     rep1 = getRuntimeRep ty1
     rep2 = getRuntimeRep ty2
 
+tcRepSplitAppTy_maybe (FunTildeTy ty1 ty2)
+  | isConstraintKind (typeKind ty1)
+  = Nothing  -- See Note [Decomposing fat arrow c=>t]
+
+  | otherwise
+  = Just (TyConApp funTildeTyCon [rep1, rep2, ty1], ty2)
+  where
+    rep1 = getRuntimeRep ty1
+    rep2 = getRuntimeRep ty2
+
 tcRepSplitAppTy_maybe (AppTy ty1 ty2)    = Just (ty1, ty2)
 tcRepSplitAppTy_maybe (TyConApp tc tys)
   | not (mustBeSaturated tc) || tys `lengthExceeds` tyConArity tc
@@ -958,6 +969,13 @@ splitFunTy ty | Just ty' <- coreView ty = splitFunTy ty'
 splitFunTy (FunTy _ arg res) = (arg, res)
 splitFunTy other             = pprPanic "splitFunTy" (ppr other)
 
+splitFunTildeTy :: Type -> (Type, Type)
+-- ^ Attempts to extract the argument and result types from a type, and
+-- panics if that is not possible. See also 'splitFunTy_maybe'
+splitFunTildeTy ty | Just ty' <- coreView ty = splitFunTildeTy ty'
+splitFunTildeTy (FunTildeTy arg res) = (arg, res)
+splitFunTildeTy other                = pprPanic "splitFunTildeTy" (ppr other)
+
 splitFunTy_maybe :: Type -> Maybe (Type, Type)
 -- ^ Attempts to extract the argument and result types from a type
 splitFunTy_maybe ty | Just ty' <- coreView ty = splitFunTy_maybe ty'
@@ -966,9 +984,8 @@ splitFunTy_maybe _                 = Nothing
 
 splitFunTildeTy_maybe :: Type -> Maybe (Type, Type)
 splitFunTildeTy_maybe ty | Just ty' <- coreView ty = splitFunTildeTy_maybe ty'
-splitFunTildeTy_maybe (FunTildeTy arg res) = Just (arg, res)
-splitFunTildeTy_maybe _               = Nothing
-
+splitFunTildeTy_maybe (FunTildeTy arg res)         = Just (arg, res)
+splitFunTildeTy_maybe _                            = Nothing
 
 splitFunTys :: Type -> ([Type], Type)
 splitFunTys ty = split [] ty ty
@@ -983,15 +1000,25 @@ funResultTy ty | Just ty' <- coreView ty = funResultTy ty'
 funResultTy (FunTy { ft_res = res }) = res
 funResultTy ty                       = pprPanic "funResultTy" (ppr ty)
 
+funTildeResultTy :: Type -> Type
+-- ^ Just like 'piResultTys' but for a single argument
+-- Try not to iterate 'piResultTy', because it's inefficient to substitute
+-- one variable at a time; instead use 'piResultTys"
+funTildeResultTy ty | Just ty' <- coreView ty = funTildeResultTy ty'
+funTildeResultTy (FunTildeTy _ res) = res
+funTildeResultTy ty            = pprPanic "funTildeResultTy" (ppr ty)
+
 funArgTy :: Type -> Type
 -- ^ Extract the function argument type and panic if that is not possible
 funArgTy ty | Just ty' <- coreView ty = funArgTy ty'
 funArgTy (FunTy { ft_arg = arg })    = arg
 funArgTy ty                           = pprPanic "funArgTy" (ppr ty)
 
--- ^ Just like 'piResultTys' but for a single argument
--- Try not to iterate 'piResultTy', because it's inefficient to substitute
--- one variable at a time; instead use 'piResultTys"
+funTildeArgTy :: Type -> Type
+funTildeArgTy ty | Just ty' <- coreView ty = funTildeArgTy ty'
+funTildeArgTy (FunTildeTy arg _res) = arg
+funTildeArgTy ty                    = pprPanic "funTildeArgTy" (ppr ty)
+
 piResultTy :: HasDebugCallStack => Type -> Type ->  Type
 piResultTy ty arg = case piResultTy_maybe ty arg of
                       Just res -> res
@@ -1004,6 +1031,9 @@ piResultTy_maybe ty arg
   | Just ty' <- coreView ty = piResultTy_maybe ty' arg
 
   | FunTy { ft_res = res } <- ty
+  = Just res
+
+  | FunTildeTy { ft_res = res } <- ty
   = Just res
 
   | ForAllTy (Bndr tv _) res <- ty
@@ -1044,6 +1074,9 @@ piResultTys ty orig_args@(arg:args)
   | FunTy { ft_res = res } <- ty
   = piResultTys res args
 
+  | FunTildeTy { ft_res = res } <- ty
+  = piResultTys res args
+
   | ForAllTy (Bndr tv _) res <- ty
   = go (extendTCvSubst init_subst tv arg) res args
 
@@ -1060,6 +1093,9 @@ piResultTys ty orig_args@(arg:args)
       = go subst ty' all_args
 
       | FunTy { ft_res = res } <- ty
+      = go subst res args
+
+      | FunTildeTy { ft_res = res } <- ty
       = go subst res args
 
       | ForAllTy (Bndr tv _) res <- ty
@@ -1543,6 +1579,12 @@ isFunTy :: Type -> Bool
 isFunTy ty | Just ty' <- coreView ty = isFunTy ty'
 isFunTy (FunTy {}) = True
 isFunTy _          = False
+
+-- | Is this a function?
+isFunTildeTy :: Type -> Bool
+isFunTildeTy ty | Just ty' <- coreView ty = isFunTildeTy ty'
+isFunTildeTy (FunTildeTy {}) = True
+isFunTildeTy _               = False
 
 -- | Take a forall type apart, or panics if that is not possible.
 splitForAllTy :: Type -> (TyCoVar, Type)
@@ -2249,6 +2291,8 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
       = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (FunTy _ s1 t1) (FunTy _ s2 t2)
       = go env s1 s2 `thenCmpTy` go env t1 t2
+    go env (FunTildeTy s1 t1) (FunTildeTy s2 t2)
+      = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
     go _   (LitTy l1)          (LitTy l2)          = liftOrdering (compare l1 l2)
@@ -2739,7 +2783,7 @@ tyConsOfType ty
      go (TyConApp tc tys)           = go_tc tc `unionUniqSets` go_s tys
      go (AppTy a b)                 = go a `unionUniqSets` go b
      go (FunTy _ a b)               = go a `unionUniqSets` go b `unionUniqSets` go_tc funTyCon
-     go (FunTildeTy a b)            = go a `unionUniqSets` go b `unionUniqSets` go_tc funTyCon
+     go (FunTildeTy a b)            = go a `unionUniqSets` go b `unionUniqSets` go_tc funTildeTyCon
      go (ForAllTy (Bndr tv _) ty)   = go ty `unionUniqSets` go (varType tv)
      go (CastTy ty co)              = go ty `unionUniqSets` go_co co
      go (CoercionTy co)             = go_co co

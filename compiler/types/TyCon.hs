@@ -1324,6 +1324,8 @@ type TyConRepName = Name -- The Name of the top-level declaration
 tyConRepName_maybe :: TyCon -> Maybe TyConRepName
 tyConRepName_maybe (FunTyCon   { tcRepName = rep_nm })
   = Just rep_nm
+tyConRepName_maybe (FunTildeTyCon   { tcRepName = rep_nm })
+  = Just rep_nm
 tyConRepName_maybe (PrimTyCon  { primRepName = mb_rep_nm })
   = mb_rep_nm
 tyConRepName_maybe (AlgTyCon { algTcParent = parent })

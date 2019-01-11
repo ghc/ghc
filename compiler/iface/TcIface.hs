@@ -1145,6 +1145,7 @@ tcIfaceType = go
     go (IfaceFreeTyVar n)      = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceLitTy l)          = LitTy <$> tcIfaceTyLit l
     go (IfaceFunTy flag t1 t2) = FunTy flag <$> go t1 <*> go t2
+    go (IfaceFunTildeTy t1 t2) = FunTildeTy <$> go t1 <*> go t2
     go (IfaceTupleTy s i tks)  = tcIfaceTupleTy s i tks
     go (IfaceAppTy t ts)
       = do { t'  <- go t
@@ -1218,6 +1219,7 @@ tcIfaceCo = go
     go (IfaceReflCo t)           = Refl <$> tcIfaceType t
     go (IfaceGReflCo r t mco)    = GRefl r <$> tcIfaceType t <*> go_mco mco
     go (IfaceFunCo r c1 c2)      = mkFunCo r <$> go c1 <*> go c2
+    go (IfaceFunTildeCo r c1 c2) = mkFunTildeCo r <$> go c1 <*> go c2
     go (IfaceTyConAppCo r tc cs)
       = TyConAppCo r <$> tcIfaceTyCon tc <*> mapM go cs
     go (IfaceAppCo c1 c2)        = AppCo <$> go c1 <*> go c2

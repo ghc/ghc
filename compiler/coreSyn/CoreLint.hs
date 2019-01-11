@@ -1818,6 +1818,15 @@ lintCoercion co@(FunTildeCo r co1 co2)
        ; lintRole co2 r r2
        ; return (k, k', mkFunTildeTy s1 s2, mkFunTildeTy t1 t2, r) }
 
+lintCoercion co@(FunTildeCo r co1 co2)
+  = do { (k1,k'1,s1,t1,r1) <- lintCoercion co1
+       ; (k2,k'2,s2,t2,r2) <- lintCoercion co2
+       ; k <- lintArrow (text "coercion" <+> quotes (ppr co)) k1 k2
+       ; k' <- lintArrow (text "coercion" <+> quotes (ppr co)) k'1 k'2
+       ; lintRole co1 r r1
+       ; lintRole co2 r r2
+       ; return (k, k', mkFunTildeTy s1 s2, mkFunTildeTy t1 t2, r) }
+
 lintCoercion (CoVarCo cv)
   | not (isCoVar cv)
   = failWithL (hang (text "Bad CoVarCo:" <+> ppr cv)

@@ -11,13 +11,11 @@ import GhcPrelude
 import BasicTypes
 import CoreSyn
 import CoreSubst
-import Literal
 import Id
-import Panic
 import TyCoRep
+-- import Type
+-- import Var
 import UniqSupply
-import Unique
-import Var
 import Outputable
 
 {-
@@ -50,26 +48,32 @@ arityWorkerWrapper' name expr
       case arity >= 1 && isId name of
         True ->
           getUniqueM >>= \uniq ->
-            let wname   = mkWorkerId uniq name (idType name)
-                worker  = mkArityWrapper name wname expr arity
-                wrapper = mkArityWorker  name wname expr arity in
+            -- let ty      = idType name
+            let ty      = mkArityType (idType name) arity
+            -- let ty      = FunTildeTy (LitTy (NumTyLit 0)) (LitTy (NumTyLit 0))
+            -- let ty      = panic (showSDocUnsafe (ppr (FunTildeTy (LitTy (NumTyLit 0)) (LitTy (NumTyLit 0)))))
+            -- let ty      = panic (showSDocUnsafe (ppr (mkArityType (idType name) arity)))
+                wname   = mkWorkerId uniq name ty
+                worker  = mkArityWorker  name wname expr
+                wrapper = mkArityWrapper name wname expr arity
+            in
               return [worker,wrapper]
         False -> return [(name,expr)]
 
 -- ^ Create the new type for an extensional function given the arity.
 mkArityType :: Type -> Arity -> Type
-mkArityType (ForAllTy x ty) _ = ForAllTy x (mkArityType ty 0)
-mkArityType (FunTy _ a b)   _ = FunTildeTy a (mkArityType b 0)
+mkArityType (ForAllTy x ty) n = ForAllTy x (mkArityType ty n)
+mkArityType (FunTy _ a b)   0 = FunTy a (mkArityType b 0)
+mkArityType (FunTy _ a b)   n = FunTildeTy a (mkArityType b (n-1))
 mkArityType ty              _ = ty
 
 -- ^ Given an expression and it's name, generate a new expression with a
 -- tilde-lambda type. This is the exact same code, but we have encoded the arity
 -- in the type.
 mkArityWorker
-  :: CoreBndr -> CoreBndr -> CoreExpr -> Arity -> (CoreBndr,CoreExpr)
-mkArityWorker name wname expr arity
+  :: CoreBndr -> CoreBndr -> CoreExpr -> (CoreBndr,CoreExpr)
+mkArityWorker name wname expr
   = ( wname
-    -- ( mkWorkerId uniq name (panic (showSDocUnsafe (debugPprType (mkArityType (idType name) arity))))
     , substExpr (text "eta-worker-subst") substitution expr
     )
   where substitution = extendIdSubst emptySubst name (Var wname)

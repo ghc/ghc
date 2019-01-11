@@ -677,6 +677,8 @@ rnIfaceCo (IfaceGReflCo role ty mco)
   = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
 rnIfaceCo (IfaceFunCo role co1 co2)
     = IfaceFunCo role <$> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceFunTildeCo role co1 co2)
+    = IfaceFunTildeCo role <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceTyConAppCo role tc cos)
     = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
 rnIfaceCo (IfaceAppCo co1 co2)
@@ -723,6 +725,8 @@ rnIfaceType (IfaceAppTy t1 t2)
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)
 rnIfaceType (IfaceFunTy af t1 t2)
     = IfaceFunTy af <$> rnIfaceType t1 <*> rnIfaceType t2
+rnIfaceType (IfaceFunTildeTy t1 t2)
+    = IfaceFunTildeTy <$> rnIfaceType t1 <*> rnIfaceType t2
 rnIfaceType (IfaceTupleTy s i tks)
     = IfaceTupleTy s i <$> rnIfaceAppArgs tks
 rnIfaceType (IfaceTyConApp tc tks)

@@ -1167,6 +1167,12 @@ flatten_one ty@(FunTy _ ty1 ty2)
        ; return (ty { ft_arg = xi1, ft_res = xi2 }
                 , mkFunCo role co1 co2) }
 
+flatten_one (FunTildeTy ty1 ty2)
+  = do { (xi1,co1) <- flatten_one ty1
+       ; (xi2,co2) <- flatten_one ty2
+       ; role <- getRole
+       ; return (mkFunTildeTy xi1 xi2, mkFunTildeCo role co1 co2) }
+
 flatten_one ty@(ForAllTy {})
 -- TODO (RAE): This is inadequate, as it doesn't flatten the kind of
 -- the bound tyvar. Doing so will require carrying around a substitution
