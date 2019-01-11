@@ -319,19 +319,13 @@ Note [CoAxBranch type variables]
 In the case of a CoAxBranch of an associated type-family instance,
 we use the *same* type variables (where possible) as the
 enclosing class or instance.  Consider
-   class C a b where
-     type F x b
-     type F [y] b = ...     -- Second param must be b
 
-   instance C Int [z] where
+  instance C Int [z] where
      type F Int [z] = ...   -- Second param must be [z]
 
 In the CoAxBranch in the instance decl (F Int [z]) we use the
 same 'z', so that it's easy to check that that type is the same
 as that in the instance header.
-
-Similarly in the CoAxBranch for the default decl for F in the
-class decl, we use the same 'b' to make the same check easy.
 
 So, unlike FamInsts, there is no expectation that the cab_tvs
 are fresh wrt each other, or any other CoAxBranch.
@@ -412,13 +406,13 @@ Now
 For a CoAxBranch for a data family instance with representation
 TyCon rep_tc:
 
-  - cab_tvs of its CoAxiom) may be shorter
+  - cab_tvs (of its CoAxiom) may be shorter
     than tyConTyVars of rep_tc.
 
   - cab_lhs may be shorter than tyConArity of the family tycon
        i.e. LHS is unsaturated
 
-  - cab_rhs will be (rep_tc cab__tvs)
+  - cab_rhs will be (rep_tc cab_tvs)
        i.e. RHS is un-saturated
 
   - This eta reduction happens for data instances as well
@@ -431,7 +425,7 @@ But for a /type/ family
 
 There are certain situations (e.g., pretty-printing) where it is necessary to
 deal with eta-expanded data family instances. For these situations, the
-cab_eta_tvs field records the stuff that has been eta-expanded away.
+cab_eta_tvs field records the stuff that has been eta-reduced away.
 So if we have
     axiom forall a b. F [a->b] = D b a
 and cab_eta_tvs is [p,q], then the original user-written definition
