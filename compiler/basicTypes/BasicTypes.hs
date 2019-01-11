@@ -1515,13 +1515,16 @@ data FractionalExponentBase
   | Base10
   deriving (Data, Show)
 
-mkRational :: Integer -> Integer -> Rational
-mkRational i e = mkRationalWithExponentBase i e Base10
+mkRationalBase2 :: Integer -> Integer -> Rational
+mkRationalBase2 i e = mkRationalWithExponentBase i e Base2
+
+mkRationalBase10 :: Integer -> Integer -> Rational
+mkRationalBase10 i e = mkRationalWithExponentBase i e Base10
 
 mkRationalWithExponentBase :: Integer -> Integer -> FractionalExponentBase -> Rational
 mkRationalWithExponentBase i e feb = (i :% 1) * (eb ^^ e)
   where eb = case feb of Base2 -> 2 ; Base10 -> 10
-
+  
 rationalFromFractionalLit :: FractionalLit -> Rational
 rationalFromFractionalLit (FL _ _ i e expBase) =
   mkRationalWithExponentBase i e expBase
@@ -1529,7 +1532,7 @@ rationalFromFractionalLit (THFL _ _ r) = r
 
 
 mkFractionalLit :: Integer -> Integer -> FractionalLit
-mkFractionalLit i e = FL { fl_text = SourceText (show (realToFrac (mkRational i e)::Double))
+mkFractionalLit i e = FL { fl_text = SourceText (show (realToFrac (mkRationalBase10 i e)::Double))
                            -- Converting to a Double here may technically lose
                            -- precision (see #15502). We could alternatively
                            -- convert to a Rational for the most accuracy, but
@@ -1591,13 +1594,13 @@ instance Outputable IntegralLit where
   ppr (IL NoSourceText _ value) = text (show value)
 
 instance Eq FractionalLit where
-  (==) = (==) `on` (\x -> mkRational (fl_signi x) (fl_exp x))
+  (==) = (==) `on` (\x -> mkRationalWithExponentBase (fl_signi x) (fl_exp x) (fl_exp_base x))
 
 instance Ord FractionalLit where
-  compare = compare `on` (\x -> mkRational (fl_signi x) (fl_exp x))
+  compare = compare `on` (\x -> mkRationalWithExponentBase (fl_signi x) (fl_exp x) (fl_exp_base x))
 
 instance Outputable FractionalLit where
-  ppr (fl@(FL {})) = pprWithSourceText (fl_text fl) (rational $ mkRational (fl_signi fl) (fl_exp fl))
+  ppr (fl@(FL {})) = pprWithSourceText (fl_text fl) (rational $ mkRationalWithExponentBase (fl_signi fl) (fl_exp fl) (fl_exp_base fl))
   ppr (fl@(THFL {})) = pprWithSourceText (thfl_text fl) (rational $ thfl_value fl)
 
 {-
