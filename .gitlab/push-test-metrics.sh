@@ -2,11 +2,11 @@
 # vim: sw=2 et
 set -euo pipefail
 
-GHC_ORIGIN="git@gitlab.haskell.org:DavidEichmann/ghc-perf-notes-test.git"
 
 
 
 # TODO CHANGE ME BEFORE MERGE
+GHC_ORIGIN="git@gitlab.haskell.org:DavidEichmann/ghc-perf-notes-test.git"
 REF="perf_tmp"
 
 
@@ -33,8 +33,9 @@ fi
 eval `ssh-agent`
 mkdir -p ~/.ssh
 echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDoAZ4DJlieniMfvlevcoVxHpMdF3G47sGsBoUIswLFD+XYAAs66Xv7lLjlUcoZrQLktbWbVVdjRUP4uYhyJGiLR5xndkys4jgPrK+o/aZV3FHYnP2zTysH3op3RmIpYPshP9YUond/sL6jP4V5NRkOpMen1Jltf7cC5lGlIf1synmYzVZfj58c5qraGEp/DQi+BIplB1U9qWrTbA2Gs7EqabDUAOgf/TKtD25boutYnnDU5HPo/ODSiYa+aS/Nz6pQCZMe76VzzR2UIwORswwzWrwwtyBiuG03uHJijG1nRi/rGWR4y2zhyoGBfMl04pMx2iBlbD37m2CY3Kyk+27d david@david-OctaneV" > ~/.ssh/perf_rsa.pub
-echo $PERF_NOTE_KEY > ~/.ssh/perf_rsa
-chmod 0400 ~/.ssh/perf_rsa
+touch ~/.ssh/perf_rsa
+chmod 0600 ~/.ssh/perf_rsa
+echo $PERF_NOTE_KEY >> ~/.ssh/perf_rsa
 echo "12345" | ssh-add ~/.ssh/perf_rsa
 
 # Check that git notes don't already exist.
