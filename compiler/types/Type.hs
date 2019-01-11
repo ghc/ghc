@@ -1389,14 +1389,16 @@ mkLamType v ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 
--- | Given a list of type-level vars and a result kind,
+-- | Given a list of type-level vars and the free vars of a result kind,
 -- makes TyCoBinders, preferring anonymous binders
 -- if the variable is, in fact, not dependent.
 -- e.g.    mkTyConBindersPreferAnon [(k:*),(b:k),(c:k)] (k->k)
 -- We want (k:*) Named, (b:k) Anon, (c:k) Anon
 --
 -- All non-coercion binders are /visible/.
-mkTyConBindersPreferAnon :: [TyVar] -> TyCoVarSet -> [TyConBinder]
+mkTyConBindersPreferAnon :: [TyVar]      -- ^ binders
+                         -> TyCoVarSet   -- ^ free variables of result
+                         -> [TyConBinder]
 mkTyConBindersPreferAnon vars inner_tkvs = ASSERT( all isTyVar vars)
                                            fst (go vars)
   where
