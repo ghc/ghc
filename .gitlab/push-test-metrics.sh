@@ -35,7 +35,7 @@ mkdir -p ~/.ssh
 echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDoMpqMpHea4BphxjEn7khvW4S64FaWqnSTSAHXTX0CWUS3d0WhvT0GZRjiZ8ULJUCbKXHLhjNYo2b9do2Cd+pCeeVc2GPxajLxyJT5bvSouLhFV5LpMqeZz49A90Xbeux61RuVlxCRDGHy6lCw8c8BmWLJcLXdSflM1YbHcDZyg5LGAdBrG4dmDlfWqDAC381T3mFSTy9O60qNAMHjVb2CwmekhkKeN5q53sHV0kb5KryDTSHDprd8tcSMHKbcXsyFbtc2JSy8vYeBRqfCXluIJGMv1YvT0+bdgGF+aIrnqMmqWYnvoNfQxc98c0tDry8pfTNS4SzTeEzNaq0hJcHf david@david-OctaneV" > ~/.ssh/perf_rsa.pub
 touch ~/.ssh/perf_rsa
 chmod 0600 ~/.ssh/perf_rsa
-echo $PERF_NOTE_KEY >> ~/.ssh/perf_rsa
+echo "$PERF_NOTE_KEY" >> ~/.ssh/perf_rsa
 ssh-add ~/.ssh/perf_rsa
 
 # Check that git notes don't already exist.
