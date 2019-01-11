@@ -79,7 +79,7 @@ import TcHsSyn
 import TcErrors ( reportAllUnsolved )
 import TcType
 import Inst   ( tcInstTyBinders, tcInstTyBinder )
-import TyCoRep( TyCoBinder(..), TyBinder, tyCoBinderArgFlag )  -- Used in etaExpandAlgTyCon
+import TyCoRep( TyCoBinder(..), tyCoBinderArgFlag )  -- Used in etaExpandAlgTyCon
 import Type
 import TysPrim
 import Coercion
@@ -966,118 +966,122 @@ tcInferApps :: TcTyMode
 --            and that type must be well-kinded
 --            See Note [The tcType invariant]
 -- Postcondition: Result kind is zonked.
-tcInferApps mode orig_hs_ty fun_ty fun_ki orig_hs_args
-  = do { traceTc "tcInferApps {" (ppr orig_hs_ty $$ ppr orig_hs_args $$ ppr fun_ki)
-       ; (f_args, res_k) <- go 1 empty_subst fun_ty orig_ki_binders orig_inner_ki orig_hs_args
+tcInferApps mode orig_hs_ty fun_ty orig_fun_ki orig_hs_args
+  = do { traceTc "tcInferApps {" (ppr orig_hs_ty $$ ppr orig_hs_args $$ ppr orig_fun_ki)
+       ; (f_args, res_k) <- go 1 empty_subst fun_ty orig_fun_ki orig_hs_args
        ; traceTc "tcInferApps }" empty
        ; res_k <- zonkTcType res_k  -- Uphold (IT4) of Note [The tcType invariant]
        ; return (f_args, res_k) }
   where
     empty_subst                      = mkEmptyTCvSubst $ mkInScopeSet $
-                                       tyCoVarsOfType fun_ki
-    (orig_ki_binders, orig_inner_ki) = tcSplitPiTys fun_ki
+                                       tyCoVarsOfType orig_fun_ki
 
     go :: Int             -- the # of the next argument
        -> TCvSubst        -- instantiating substitution
        -> TcType          -- function applied to some args
-       -> [TyBinder]      -- binders in function kind (both vis. and invis.)
-       -> TcKind          -- function kind body (not a Pi-type)
+       -> TcKind          -- function kind
        -> [LHsTypeArg GhcRn] -- un-type-checked args
        -> TcM (TcType, TcKind)  -- same as overall return type
 
+                                     -- case on all_args first, for performance reasons
+    go n subst fun fun_ki all_args = case (all_args, tcSplitPiTy_maybe fun_ki) of
       -- no user-written args left. We're done!
-    go _ subst fun ki_binders inner_ki []
-      = return ( fun
-               , nakedSubstTy subst $ mkPiTys ki_binders inner_ki)
+      ([], _) -> return (fun, nakedSubstTy subst fun_ki)
                  -- nakedSubstTy: see Note [The well-kinded type invariant]
-    go n subst fun all_kindbinder inner_ki (HsArgPar _:args)
-      = go n subst fun all_kindbinder inner_ki args
-      -- The function's kind has a binder. Is it visible or invisible?
-    go n subst fun all_kindbinder@(ki_binder:ki_binders) inner_ki
-       all_args@(arg:args)
-      | Specified <- tyCoBinderArgFlag ki_binder
-      , HsTypeArg ki <- arg
+
+      -- We don't care about parens here
+      (HsArgPar _ : args, _) -> go n subst fun fun_ki args
+
+      -- Next argument is a kind application (fun @ki)
+      (HsTypeArg ki_arg : args, Just (ki_binder, inner_ki)) ->
+        case tyCoBinderArgFlag ki_binder of
+        Inferred -> instantiate ki_binder inner_ki
+        Specified ->
          -- Invisible and specified binder with visible kind argument
-         = do { traceTc "tcInferApps (vis kind app)" (vcat [ ppr ki_binder, ppr ki
-                                                     , ppr (tyBinderType ki_binder)
-                                                     , ppr subst, ppr (tyCoBinderArgFlag ki_binder) ])
-                  ; let exp_kind = nakedSubstTy subst $ tyBinderType ki_binder
-                    -- nakedSubstTy: see Note [The well-kinded type invariant]
-                  ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty ki n) $
-                            unsetWOptM Opt_WarnPartialTypeSignatures $
-                            setXOptM LangExt.PartialTypeSignatures $
-                            -- see Note [Wildcards in visible kind application]
-                            tc_lhs_type (kindLevel mode) ki exp_kind
-                  ; traceTc "tcInferApps (vis kind app)" (ppr exp_kind)
-                  ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
-                  ; go (n+1) subst'
-                       (mkNakedAppTy fun arg')
-                       ki_binders inner_ki args }
+          do { traceTc "tcInferApps (vis kind app)"
+                       (vcat [ ppr ki_binder, ppr ki_arg
+                             , ppr (tyBinderType ki_binder)
+                             , ppr subst, ppr (tyCoBinderArgFlag ki_binder) ])
+             ; let exp_kind = nakedSubstTy subst $ tyBinderType ki_binder
+                   -- nakedSubstTy: see Note [The well-kinded type invariant]
+             ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty ki_arg n) $
+                       unsetWOptM Opt_WarnPartialTypeSignatures $
+                       setXOptM LangExt.PartialTypeSignatures $
+                           -- see Note [Wildcards in visible kind application]
+                       tc_lhs_type (kindLevel mode) ki_arg exp_kind
+             ; traceTc "tcInferApps (vis kind app)" (ppr exp_kind)
+             ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
+             ; go (n+1) subst'
+                  (mkNakedAppTy fun arg')
+                  inner_ki args }
 
-      | isInvisibleBinder ki_binder
-          -- Instantiate if not specified or if there is no kind application
-      = do { traceTc "tcInferApps (invis normal app)" (ppr ki_binder $$ ppr subst $$ ppr (tyCoBinderArgFlag ki_binder))
-           ; (subst', arg') <- tcInstTyBinder Nothing subst ki_binder
-           ; go n subst' (mkNakedAppTy fun arg')
-                        ki_binders inner_ki all_args }
+         -- visible kind application, but we need a normal type application; error.
+         -- this is when we have (fun @ki) but (fun :: k1 -> k2), that is, without a forall
+        Required -> do { traceTc "tcInferApps (error)"
+                                 (vcat [ ppr ki_binder
+                                       , ppr ki_arg
+                                       , ppr (tyBinderType ki_binder)
+                                       , ppr subst
+                                       , ppr (isInvisibleBinder ki_binder) ])
+                       ; ty_app_err ki_arg $ nakedSubstTy subst fun_ki }
 
-      | otherwise -- if binder is visible
-         = case arg of
-             HsValArg ty -- check the next argument
-               -> do { traceTc "tcInferApps (vis normal app)"
-                         (vcat [ ppr ki_binder
-                               , ppr ty
-                               , ppr (tyBinderType ki_binder)
-                               , ppr subst ])
-                     ; let exp_kind = nakedSubstTy subst $ tyBinderType ki_binder
+        -- no binder; try applying the substitution, or fail if that's not possible
+      (HsTypeArg ki_arg : _, Nothing) -> try_again_after_substing_or $
+                                         ty_app_err ki_arg substed_fun_ki
+
+      -- normal argument (fun ty)
+      (HsValArg arg : args, Just (ki_binder, inner_ki))
+        -- next binder is invisible; need to instantiate it
+        | isInvisibleBinder ki_binder
+         -> instantiate ki_binder inner_ki
+
+        -- "normal" case
+        | otherwise
+         -> do { traceTc "tcInferApps (vis normal app)"
+                          (vcat [ ppr ki_binder
+                                , ppr arg
+                                , ppr (tyBinderType ki_binder)
+                                , ppr subst ])
+                ; let exp_kind = nakedSubstTy subst $ tyBinderType ki_binder
                      -- nakedSubstTy: see Note [The well-kinded type invariant]
-                     ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty ty n) $
-                               tc_lhs_type mode ty exp_kind
-                     ; traceTc "tcInferApps (vis normal app)" (ppr exp_kind)
-                     ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
-                     ; go (n+1) subst'
-                          (mkNakedAppTy fun arg')
-                          ki_binders inner_ki args }
-            -- error if the argument is a kind application
-             HsTypeArg ki -> do { traceTc "tcInferApps (error)"
-                                    (vcat [ ppr ki_binder
-                                          , ppr ki
-                                          , ppr (tyBinderType ki_binder)
-                                          , ppr subst
-                                          , ppr (isInvisibleBinder ki_binder) ])
-                                ; ty_app_err ki $ nakedSubstTy subst $
-                                                  mkPiTys all_kindbinder inner_ki }
+                ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty arg n) $
+                          tc_lhs_type mode arg exp_kind
+                ; traceTc "tcInferApps (vis normal app) 2" (ppr exp_kind)
+                ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
+                ; go (n+1) subst' (mkNakedAppTy fun arg') inner_ki args }
 
-             HsArgPar _ -> panic "tcInferApps"  -- handled in separate clause of "go"
+          -- no binder; try applying the substitution, or infer another arrow in fun kind
+      (HsValArg _ : _, Nothing)
+        -> try_again_after_substing_or $
+           do { traceTc "tcInferApps (no binder)" empty
+              ; (co, arg_k, res_k) <- matchExpectedFunKind hs_ty substed_fun_ki
+              ; let new_in_scope = tyCoVarsOfTypes [arg_k, res_k]
+                    subst'       = zapped_subst `extendTCvInScopeSet` new_in_scope
+              ; go n subst'
+                   (fun `mkNakedCastTy` co)  -- See Note [The well-kinded type invariant]
+                   (mkFunTy arg_k res_k) all_args }
 
-       -- We've run out of known binders in the functions's kind.
-    go n subst fun [] inner_ki all_args@(arg:args)
-      | not (null new_ki_binders)
-         -- But, after substituting, we have more binders.
-      = go n zapped_subst fun new_ki_binders new_inner_ki all_args
-
-      | otherwise
-      = case arg of
-        (HsValArg _)
-         -- Even after substituting, still no binders. Use matchExpectedFunKind
-         -> do { traceTc "tcInferApps (no binder)" (ppr new_inner_ki $$ ppr zapped_subst)
-               ; (co, arg_k, res_k) <- matchExpectedFunKind hs_ty substed_inner_ki
-               ; let new_in_scope = tyCoVarsOfTypes [arg_k, res_k]
-                     subst'       = zapped_subst `extendTCvInScopeSet` new_in_scope
-               ; go n subst'
-                    (fun `mkNakedCastTy` co)  -- See Note [The well-kinded type invariant]
-                    [mkAnonBinder arg_k]
-                    res_k all_args }
-        (HsTypeArg ki) -> ty_app_err ki substed_inner_ki
-        (HsArgPar _) -> go n subst fun [] inner_ki args
       where
-        substed_inner_ki               = substTy subst inner_ki
-        (new_ki_binders, new_inner_ki) = tcSplitPiTys substed_inner_ki
+        instantiate ki_binder inner_ki
+          = do { traceTc "tcInferApps (need to instantiate)"
+                         (vcat [ ppr ki_binder
+                               , ppr subst
+                               , ppr (tyCoBinderArgFlag ki_binder)])
+               ; (subst', arg') <- tcInstTyBinder Nothing subst ki_binder
+               ; go n subst' (mkNakedAppTy fun arg') inner_ki all_args }
+
+        try_again_after_substing_or fallthrough
+          | not (isEmptyTCvSubst subst)
+          = go n zapped_subst fun substed_fun_ki all_args
+          | otherwise
+          = fallthrough
+
+        substed_fun_ki                 = substTy subst fun_ki
         zapped_subst                   = zapTCvSubst subst
-        hs_ty = appTypeToArg orig_hs_ty (take (n-1) orig_hs_args)
+        hs_ty                          = appTypeToArg orig_hs_ty (take (n-1) orig_hs_args)
 
     ty_app_err arg ty = failWith $ text "Cannot apply function of kind" <+> quotes (ppr ty)
-                           $$ text "to visible kind argument" <+> quotes (ppr arg)
+                                   $$ text "to visible kind argument" <+> quotes (ppr arg)
 
 appTypeToArg :: LHsType GhcRn -> [LHsTypeArg GhcRn] -> LHsType GhcRn
 appTypeToArg f [] = f

@@ -551,6 +551,9 @@ isNamedBinder (Anon {})  = False
 
 -- | If its a named binder, is the binder a tyvar?
 -- Returns True for nondependent binder.
+-- This check that we're really returning a *Ty*Binder (as opposed to a
+-- coercion binder). That way, if/when we allow coercion quantification
+-- in more places, we'll know we missed updating some function.
 isTyBinder :: TyCoBinder -> Bool
 isTyBinder (Named bnd) = isTyVarBinder bnd
 isTyBinder _ = True
