@@ -64,6 +64,7 @@ function reset_append_note_push {
   git fetch -f $GHC_ORIGIN refs/notes/$REF:refs/notes/$REF || true
   echo "git notes --ref=$REF append -F $METRICS_FILE HEAD"
   git notes --ref=$REF append -F $METRICS_FILE HEAD
+  echo "git push $GHC_ORIGIN refs/notes/$REF"
   git push $GHC_ORIGIN refs/notes/$REF
 }
 
