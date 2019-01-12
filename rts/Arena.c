@@ -121,8 +121,17 @@ arenaBlocks( void )
 #if defined(DEBUG)
 void checkPtrInArena( StgPtr p, Arena *arena )
 {
-    for (bdescr *bd = arena->current; bd; bd = bd->link) {
-        if (p >= bd->start && p < bd->free) {
+    // We don't update free pointers of arena blocks, so we have to check cached
+    // free pointer for the first block.
+    if (p >= arena->current->start && p < arena->free) {
+        return;
+    }
+
+    // Rest of the blocks should be full (except there may be a little bit of
+    // slop at the end). Again, free pointers are not updated so we can't use
+    // those.
+    for (bdescr *bd = arena->current->link; bd; bd = bd->link) {
+        if (p >= bd->start && p < bd->start + (bd->blocks*BLOCK_SIZE_W)) {
             return;
         }
     }
