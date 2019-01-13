@@ -158,6 +158,8 @@ def get_compiler_info():
     s = re.sub('[\r\n]', '', s)
     rtsInfoDict = dict(eval(s))
 
+    config.have_ncg = compilerInfoDict.get("Have native code generator", "NO") == "YES"
+
     # external interpreter needs RTS linker support
     # If the field is not present (GHC 8.0 and earlier), assume we don't
     # have -fexternal-interpreter (though GHC 8.0 actually does)

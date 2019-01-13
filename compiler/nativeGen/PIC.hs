@@ -569,60 +569,6 @@ pprGotDeclaration _ _ _
 -- the splitter in driver/split/ghc-split.pl recognizes the new output
 
 pprImportedSymbol :: DynFlags -> Platform -> CLabel -> SDoc
-pprImportedSymbol dflags platform@(Platform { platformArch = ArchPPC, platformOS = OSDarwin }) importedLbl
-        | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
-        = case positionIndependent dflags of
-           False ->
-            vcat [
-                text ".symbol_stub",
-                text "L" <> pprCLabel platform lbl <> ptext (sLit "$stub:"),
-                    text "\t.indirect_symbol" <+> pprCLabel platform lbl,
-                    text "\tlis r11,ha16(L" <> pprCLabel platform lbl
-                        <> text "$lazy_ptr)",
-                    text "\tlwz r12,lo16(L" <> pprCLabel platform lbl
-                        <> text "$lazy_ptr)(r11)",
-                    text "\tmtctr r12",
-                    text "\taddi r11,r11,lo16(L" <> pprCLabel platform lbl
-                        <> text "$lazy_ptr)",
-                    text "\tbctr"
-            ]
-           True ->
-            vcat [
-                text ".section __TEXT,__picsymbolstub1,"
-                  <> text "symbol_stubs,pure_instructions,32",
-                text "\t.align 2",
-                text "L" <> pprCLabel platform lbl <> ptext (sLit "$stub:"),
-                    text "\t.indirect_symbol" <+> pprCLabel platform lbl,
-                    text "\tmflr r0",
-                    text "\tbcl 20,31,L0$" <> pprCLabel platform lbl,
-                text "L0$" <> pprCLabel platform lbl <> char ':',
-                    text "\tmflr r11",
-                    text "\taddis r11,r11,ha16(L" <> pprCLabel platform lbl
-                        <> text "$lazy_ptr-L0$" <> pprCLabel platform lbl <> char ')',
-                    text "\tmtlr r0",
-                    text "\tlwzu r12,lo16(L" <> pprCLabel platform lbl
-                        <> text "$lazy_ptr-L0$" <> pprCLabel platform lbl
-                        <> text ")(r11)",
-                    text "\tmtctr r12",
-                    text "\tbctr"
-            ]
-          $+$ vcat [
-                text ".lazy_symbol_pointer",
-                text "L" <> pprCLabel platform lbl <> ptext (sLit "$lazy_ptr:"),
-                text "\t.indirect_symbol" <+> pprCLabel platform lbl,
-                text "\t.long dyld_stub_binding_helper"]
-
-        | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
-        = vcat [
-                text ".non_lazy_symbol_pointer",
-                char 'L' <> pprCLabel platform lbl <> text "$non_lazy_ptr:",
-                text "\t.indirect_symbol" <+> pprCLabel platform lbl,
-                text "\t.long\t0"]
-
-        | otherwise
-        = empty
-
-
 pprImportedSymbol dflags platform@(Platform { platformArch = ArchX86, platformOS = OSDarwin }) importedLbl
         | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
         = case positionIndependent dflags of
@@ -826,14 +772,6 @@ initializePicBase_ppc ArchPPC os picReg
                               : insns)
 
         return (CmmProc info lab live (ListGraph blocks') : statics)
-
-
-initializePicBase_ppc ArchPPC OSDarwin picReg
-        (CmmProc info lab live (ListGraph (entry:blocks)) : statics) -- just one entry because of splitting
-        = return (CmmProc info lab live (ListGraph (b':blocks)) : statics)
-
-        where   BasicBlock bID insns = entry
-                b' = BasicBlock bID (PPC.FETCHPC picReg : insns)
 
 -------------------------------------------------------------------------
 -- Load TOC into register 2

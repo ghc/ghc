@@ -12,7 +12,6 @@ import Reg
 import qualified CodeGen.Platform.ARM        as ARM
 import qualified CodeGen.Platform.ARM64      as ARM64
 import qualified CodeGen.Platform.PPC        as PPC
-import qualified CodeGen.Platform.PPC_Darwin as PPC_Darwin
 import qualified CodeGen.Platform.SPARC      as SPARC
 import qualified CodeGen.Platform.X86        as X86
 import qualified CodeGen.Platform.X86_64     as X86_64
@@ -33,9 +32,7 @@ callerSaves platform
    ArchARM64  -> ARM64.callerSaves
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
-       case platformOS platform of
-       OSDarwin -> PPC_Darwin.callerSaves
-       _        -> PPC.callerSaves
+        PPC.callerSaves
 
     | otherwise -> NoRegs.callerSaves
 
@@ -56,9 +53,7 @@ activeStgRegs platform
    ArchARM64  -> ARM64.activeStgRegs
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
-       case platformOS platform of
-       OSDarwin -> PPC_Darwin.activeStgRegs
-       _        -> PPC.activeStgRegs
+        PPC.activeStgRegs
 
     | otherwise -> NoRegs.activeStgRegs
 
@@ -74,9 +69,7 @@ haveRegBase platform
    ArchARM64  -> ARM64.haveRegBase
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
-       case platformOS platform of
-       OSDarwin -> PPC_Darwin.haveRegBase
-       _        -> PPC.haveRegBase
+        PPC.haveRegBase
 
     | otherwise -> NoRegs.haveRegBase
 
@@ -92,9 +85,7 @@ globalRegMaybe platform
    ArchARM64  -> ARM64.globalRegMaybe
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
-       case platformOS platform of
-       OSDarwin -> PPC_Darwin.globalRegMaybe
-       _        -> PPC.globalRegMaybe
+        PPC.globalRegMaybe
 
     | otherwise -> NoRegs.globalRegMaybe
 
@@ -110,9 +101,7 @@ freeReg platform
    ArchARM64  -> ARM64.freeReg
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
-       case platformOS platform of
-       OSDarwin -> PPC_Darwin.freeReg
-       _        -> PPC.freeReg
+        PPC.freeReg
 
     | otherwise -> NoRegs.freeReg
 
