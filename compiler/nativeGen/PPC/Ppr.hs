@@ -126,13 +126,7 @@ pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
 pprData (CmmString str)
-  = sdocWithPlatform $ \platform ->
-    if platformOS platform == OSDarwin
-    then vcat (map do1 str) $$ do1 0
-    else text "\t.string" <+> doubleQuotes (pprASCII str)
-  where
-    do1 :: Word8 -> SDoc
-    do1 w = text "\t.byte\t" <> int (fromIntegral w)
+  = text "\t.string" <+> doubleQuotes (pprASCII str)
 pprData (CmmUninitialised bytes) = keyword <> int bytes
     where keyword = sdocWithPlatform $ \platform ->
                     case platformOS platform of
