@@ -323,9 +323,11 @@ usage_text[] = {
 "  -Pa        Give information about *all* cost centres in tree format",
 "  -pj        Output cost-center profile in JSON format",
 "",
+"  -h         Heap residency profile, by cost centre stack",
 "  -h<break-down> Heap residency profile (hp2ps) (output file <program>.hp)",
 "     break-down: c = cost centre stack (default)",
 "                 m = module",
+"                 T = closure type",
 "                 d = closure description",
 "                 y = type description",
 "                 r = retainer",
@@ -347,9 +349,10 @@ usage_text[] = {
 "  -xt            Include threads (TSOs) in a heap profile",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
+#else /* PROFILING */
+"  -h       Heap residency profile (output file <program>.hp)",
+"  -hT      Produce a heap profile grouped by closure type",
 #endif /* PROFILING */
-"",
-"  -hT            Produce a heap profile grouped by closure type"
 
 #if defined(TRACING)
 "",
@@ -372,10 +375,6 @@ usage_text[] = {
 "             the initial enabled event classes are 'sgpu'",
 #endif
 
-#if !defined(PROFILING)
-"",
-"  -h       Heap residency profile (output file <program>.hp)",
-#endif
 "  -i<sec>  Time between heap profile samples (seconds, default: 0.1)",
 "",
 #if defined(TICKY_TICKY)
