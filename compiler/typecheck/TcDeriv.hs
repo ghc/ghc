@@ -1640,7 +1640,10 @@ mkNewTypeEqn
                      [ text "Both DeriveAnyClass and"
                        <+> text "GeneralizedNewtypeDeriving are enabled"
                      , text "Defaulting to the DeriveAnyClass strategy"
-                       <+> text "for instantiating" <+> ppr cls ]
+                       <+> text "for instantiating" <+> ppr cls
+                     , text "Use DerivingStrategies to pick"
+                       <+> text "a different strategy"
+                      ]
                  mk_originative_eqn DerivSpecAnyClass
                -- CanDeriveStock
                CanDeriveStock gen_fn -> mk_originative_eqn $
