@@ -46,9 +46,7 @@ getProgramContexts stage = do
     -- iserv gets its names from Packages.hs:programName
     let allCtxs = [ vanillaContext stage pkg
                   , Context stage pkg profiling
-                  -- TODO Dynamic way has been reverted as the dynamic build is
-                  --      broken. See #15837.
-                  -- , Context stage pkg dynamic
+                  , Context stage pkg dynamic
                   ]
     forM allCtxs $ \ctx -> do
       name <- programName ctx

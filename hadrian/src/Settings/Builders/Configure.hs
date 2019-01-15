@@ -19,8 +19,13 @@ configureBuilderArgs = do
             , builder (Configure libffiPath) ? do
                 top            <- expr topDirectory
                 targetPlatform <- getSetting TargetPlatform
+                way <- getWay
+                rtsWays <- getRtsWays
                 pure [ "--prefix=" ++ top -/- libffiPath -/- "inst"
                      , "--libdir=" ++ top -/- libffiPath -/- "inst/lib"
                      , "--enable-static=yes"
-                     , "--enable-shared=no" -- TODO: add support for yes
+                     , "--enable-shared="
+                            ++ (if any (wayUnit Dynamic)  (way:rtsWays)
+                                then "yes"
+                                else "no")
                      , "--host=" ++ targetPlatform ] ]
