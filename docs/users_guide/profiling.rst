@@ -697,6 +697,11 @@ following RTS options select which break-down to use:
     *Requires :ghc-flag:`-prof`.* Breaks down the graph by the cost-centre stack
     which produced the data.
 
+    .. note:: The meaning of the shortened :rts-flag:`-h` is dependent on whether
+              your program was compiled for profiling. When compiled for profiling,
+              :rts-flag:`-h` is equivalent to :rts-flag:`-hc`, but otherwise is
+              equivalent to :rts-flag:`-hT` (see :ref:`rts-profiling`).
+
 .. rts-flag:: -hm
 
     *Requires :ghc-flag:`-prof`.* Break down the live heap by the module
