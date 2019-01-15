@@ -121,3 +121,7 @@ plugin-recomp-change-prof:
 	"$(MAKE)" -s --no-print-directory -C plugin-recomp package.plugins01 TOP=$(TOP) RUN=-DRUN2
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin PurePlugin
 	"$(TEST_HC)" $(TEST_HC_OPTS) -prof -osuf p_o -hisuf p_hi -v0 plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin PurePlugin
+
+.PHONY: T16104
+T16104:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T16104.hs -package-db T16104-plugin/pkg.T16104-plugin/local.package.conf
