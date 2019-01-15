@@ -46,8 +46,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     libs    <- getContextData extraLibs
     libDirs <- getContextData extraLibDirs
     fmwks   <- getContextData frameworks
-    dynamic <- requiresDynamic
     darwin  <- expr osxHost
+    way     <- getWay
 
     -- Relative path from the output (rpath $ORIGIN).
     originPath <- dropFileName <$> getOutput
@@ -55,6 +55,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     libPath' <- expr (libPath context)
     distDir <- expr Context.distDir
     let
+        dynamic = Dynamic `wayUnit` way
         distPath = libPath' -/- distDir
         originToLibsDir = makeRelativeNoSysLink originPath distPath
         rpath | darwin = "@loader_path" -/- originToLibsDir
@@ -117,8 +118,7 @@ commonGhcArgs = do
 wayGhcArgs :: Args
 wayGhcArgs = do
     way <- getWay
-    dynamic <- requiresDynamic
-    mconcat [ if dynamic
+    mconcat [ if Dynamic `wayUnit` way
                 then pure ["-fPIC", "-dynamic"]
                 else arg "-static"
             , (Threaded  `wayUnit` way) ? arg "-optc-DTHREADED_RTS"
@@ -154,20 +154,3 @@ includeGhcArgs = do
             , arg $      "-I" ++ root -/- generatedDir
             , arg $ "-optc-I" ++ root -/- generatedDir
             , pure ["-optP-include", "-optP" ++ autogen -/- "cabal_macros.h"] ]
-
--- Check if building dynamically is required. GHC is a special case that needs
--- to be built dynamically if any of the RTS ways is dynamic.
-requiresDynamic :: Expr Bool
-requiresDynamic = wayUnit Dynamic <$> getWay
-    -- TODO This logic has been reverted as the dynamic build is broken.
-    --      See #15837.
-    --
-    -- pkg <- getPackage
-    -- way <- getWay
-    -- rtsWays <- getRtsWays
-    -- let
-    --     dynRts = any (Dynamic `wayUnit`) rtsWays
-    --     dynWay = Dynamic `wayUnit` way
-    -- return $ if pkg == ghc
-    --             then dynRts || dynWay
-    --             else dynWay
