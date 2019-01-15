@@ -418,7 +418,7 @@ cvtTySynEqn (TySynEqn mb_bndrs lhs rhs)
        ; case head_ty of
            ConT nm -> do { nm' <- tconNameL nm
                          ; rhs' <- cvtType rhs
-                         ; args' <- mapM wrap_tyargs args
+                         ; let args' = map wrap_tyarg args
                          ; returnL $ mkHsImplicitBndrs
                             $ FamEqn { feqn_ext    = noExt
                                      , feqn_tycon  = nm'
@@ -485,7 +485,7 @@ cvt_datainst_hdr cxt bndrs tys
        ; (head_ty, args) <- split_ty_app tys
        ; case head_ty of
           ConT nm -> do { nm' <- tconNameL nm
-                        ; args' <- mapM wrap_tyargs args
+                        ; let args' = map wrap_tyarg args
                         ; return (cxt', nm', bndrs', args') }
           InfixT t1 nm t2 -> do { nm' <- tconNameL nm
                                 ; args' <- mapM cvtType [t1,t2]
@@ -622,9 +622,9 @@ cvtSrcStrictness SourceStrict       = SrcStrict
 cvt_arg :: (TH.Bang, TH.Type) -> CvtM (LHsType GhcPs)
 cvt_arg (Bang su ss, ty)
   = do { ty'' <- cvtType ty
-       ; ty' <- wrap_apps ty''
-       ; let su' = cvtSrcUnpackedness su
-       ; let ss' = cvtSrcStrictness ss
+       ; let ty' = parenthesizeHsType appPrec ty''
+             su' = cvtSrcUnpackedness su
+             ss' = cvtSrcStrictness ss
        ; returnL $ HsBangTy noExt (HsSrcBang NoSourceText su' ss') ty' }
 
 cvt_id_arg :: (TH.Name, TH.Bang, TH.Type) -> CvtM (LConDeclField GhcPs)
@@ -880,9 +880,9 @@ cvtl e = wrapL (cvt e)
                                                           (mkLHsPar y')}
     cvt (AppTypeE e t) = do { e' <- cvtl e
                             ; t' <- cvtType t
-                            ; tp <- wrap_apps t'
-                            ; let tp' = parenthesizeHsType appPrec tp
-                            ; return $ HsAppType noExt e' (mkHsWildCardBndrs tp') }
+                            ; let tp = parenthesizeHsType appPrec t'
+                            ; return $ HsAppType noExt e'
+                                     $ mkHsWildCardBndrs tp }
     cvt (LamE [] e)    = cvt e -- Degenerate case. We convert the body as its
                                -- own expression to avoid pretty-printing
                                -- oddities that can result from zero-argument
@@ -1509,6 +1509,9 @@ mk_apps :: HsType GhcPs -> [LHsTypeArg GhcPs] -> CvtM (LHsType GhcPs)
 mk_apps head_ty []       = returnL head_ty
 mk_apps head_ty (arg:args) =
   do { head_ty' <- returnL head_ty
+       -- We must parenthesize the function type in case of an explicit
+       -- signature. For instance, in `(Maybe :: Type -> Type) Int`, there
+       -- *must* be parentheses around `Maybe :: Type -> Type`.
      ; let phead_ty = parenthesizeHsType sigPrec head_ty'
      ; case arg of
        HsValArg ty  -> do { p_ty      <- add_parens ty
@@ -1523,18 +1526,10 @@ mk_apps head_ty (arg:args) =
       | hsTypeNeedsParens appPrec t = returnL (HsParTy noExt lt)
       | otherwise                   = return lt
 
--- See Note [Adding parens for splices]
-wrap_apps  :: LHsType GhcPs -> CvtM (LHsType GhcPs)
-wrap_apps t@(dL->L _ HsAppTy {})     = returnL (HsParTy noExt t)
-wrap_apps t@(dL->L _ HsAppKindTy {}) = returnL (HsParTy noExt t)
-wrap_apps t                          = return $ parenthesizeHsType sigPrec t
-
-wrap_tyargs :: LHsTypeArg GhcPs -> CvtM (LHsTypeArg GhcPs)
-wrap_tyargs (HsValArg ty) = do { ty' <- wrap_apps ty
-                                  ; return $ HsValArg ty'}
-wrap_tyargs (HsTypeArg ki) = do { ki' <- wrap_apps ki
-                               ; return $ HsTypeArg ki'}
-wrap_tyargs argPar = return argPar
+wrap_tyarg :: LHsTypeArg GhcPs -> LHsTypeArg GhcPs
+wrap_tyarg (HsValArg ty)    = HsValArg  $ parenthesizeHsType appPrec ty
+wrap_tyarg (HsTypeArg ki)   = HsTypeArg $ parenthesizeHsType appPrec ki
+wrap_tyarg ta@(HsArgPar {}) = ta -- Already parenthesized
 
 -- ---------------------------------------------------------------------
 -- Note [Adding parens for splices]
