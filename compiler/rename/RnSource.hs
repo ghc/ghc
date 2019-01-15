@@ -648,13 +648,27 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
                            , cid_overlap_mode = oflag
                            , cid_datafam_insts = adts })
-  = do { (inst_ty', inst_fvs) <- rnLHsInstType (text "an instance declaration") inst_ty
+  = do { (inst_ty', inst_fvs)
+           <- rnHsSigType (GenericCtx $ text "an instance declaration") inst_ty
        ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
-       ; let cls = case hsTyGetAppHead_maybe head_ty' of
-                     Nothing -> mkUnboundName (mkTcOccFS (fsLit "<class>"))
-                     Just (dL->L _ cls) -> cls
-                     -- rnLHsInstType has added an error message
-                     -- if hsTyGetAppHead_maybe fails
+       ; cls <-
+           case hsTyGetAppHead_maybe head_ty' of
+             Just (dL->L _ cls) -> pure cls
+             Nothing -> do
+               -- The instance is malformed. We'd still like
+               -- to make *some* progress (rather than failing outright), so
+               -- we report an error and continue for as long as we can.
+               -- Importantly, this error should be thrown before we reach the
+               -- typechecker, lest we encounter different errors that are
+               -- hopelessly confusing (such as the one in Trac #16114).
+               addErrAt (getLoc (hsSigType inst_ty)) $
+                 hang (text "Illegal class instance:" <+> quotes (ppr inst_ty))
+                    2 (vcat [ text "Class instances must be of the form"
+                            , nest 2 $ text "context => C ty_1 ... ty_n"
+                            , text "where" <+> quotes (char 'C')
+                              <+> text "is a class"
+                            ])
+               pure $ mkUnboundName (mkTcOccFS (fsLit "<class>"))
 
           -- Rename the bindings
           -- The typechecker (not the renamer) checks that all

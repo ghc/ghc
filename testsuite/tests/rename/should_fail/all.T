@@ -143,5 +143,5 @@ test('T15611a', normal, compile_fail, [''])
 test('T15611b', normal, ghci_script, ['T15611b.script'])
 test('T15828', normal, compile_fail, [''])
 test('T16002', normal, compile_fail, [''])
-
+test('T16114', normal, compile_fail, [''])
 test('ExplicitForAllRules2', normal, compile_fail, [''])

@@ -1,6 +1,6 @@
 
-T5951.hs:8:8: error:
-    Illegal class instance: ‘A => B => C’
+T16114.hs:4:10: error:
+    Illegal class instance: ‘Eq a => Eq a => Eq (T a)’
       Class instances must be of the form
         context => C ty_1 ... ty_n
       where ‘C’ is a class
