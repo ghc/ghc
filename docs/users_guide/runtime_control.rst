@@ -984,6 +984,10 @@ executables:
     ``THUNK``). To get a more detailed profile, use the full profiling support
     (:ref:`profiling`). Can be shortened to :rts-flag:`-h`.
 
+    .. note:: The meaning of the shortened :rts-flag:`-h` is dependent on whether
+              your program was compiled for profiling.
+              (See :ref:`rts-options-heap-prof` for details.)
+
 .. rts-flag:: -L ⟨n⟩
 
     :default: 25 characters
