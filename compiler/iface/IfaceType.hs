@@ -135,8 +135,7 @@ data IfaceType
                              -- See Note [Suppressing invisible arguments] for
                              -- an explanation of why the second field isn't
                              -- IfaceType, analogous to AppTy.
-  | IfaceFunTy     IfaceType IfaceType
-  | IfaceDFunTy    IfaceType IfaceType
+  | IfaceFunTy     AnonArgFlag IfaceType IfaceType
   | IfaceForAllTy  IfaceForAllBndr IfaceType
   | IfaceTyConApp  IfaceTyCon IfaceAppArgs  -- Not necessarily saturated
                                             -- Includes newtypes, synonyms, tuples
@@ -394,7 +393,7 @@ splitIfaceSigmaTy ty
         = case split_foralls ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
     split_foralls rho = ([], rho)
 
-    split_rho (IfaceDFunTy ty1 ty2)
+    split_rho (IfaceFunTy InvisArg ty1 ty2)
         = case split_rho ty2 of { (ps, tau) -> (ty1:ps, tau) }
     split_rho tau = ([], tau)
 
@@ -438,8 +437,7 @@ ifTypeIsVarFree ty = go ty
     go (IfaceTyVar {})         = False
     go (IfaceFreeTyVar {})     = False
     go (IfaceAppTy fun args)   = go fun && go_args args
-    go (IfaceFunTy arg res)    = go arg && go res
-    go (IfaceDFunTy arg res)   = go arg && go res
+    go (IfaceFunTy _ arg res)  = go arg && go res
     go (IfaceForAllTy {})      = False
     go (IfaceTyConApp _ args)  = go_args args
     go (IfaceTupleTy _ _ args) = go_args args
@@ -474,8 +472,7 @@ substIfaceType env ty
     go (IfaceFreeTyVar tv)    = IfaceFreeTyVar tv
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
-    go (IfaceFunTy  t1 t2)    = IfaceFunTy  (go t1) (go t2)
-    go (IfaceDFunTy t1 t2)    = IfaceDFunTy (go t1) (go t2)
+    go (IfaceFunTy af t1 t2)  = IfaceFunTy af (go t1) (go t2)
     go ty@(IfaceLitTy {})     = ty
     go (IfaceTyConApp tc tys) = IfaceTyConApp tc (substIfaceAppArgs env tys)
     go (IfaceTupleTy s i tys) = IfaceTupleTy s i (substIfaceAppArgs env tys)
@@ -775,12 +772,12 @@ ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
         -- Function types
-ppr_ty ctxt_prec (IfaceFunTy ty1 ty2)
+ppr_ty ctxt_prec (IfaceFunTy _ ty1 ty2)  -- Should be VisArg
   = -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
     maybeParen ctxt_prec funPrec $
     sep [ppr_ty funPrec ty1, sep (ppr_fun_tail ty2)]
   where
-    ppr_fun_tail (IfaceFunTy ty1 ty2)
+    ppr_fun_tail (IfaceFunTy _ ty1 ty2)
       = (arrow <+> ppr_ty funPrec ty1) : ppr_fun_tail ty2
     ppr_fun_tail other_ty
       = [arrow <+> pprIfaceType other_ty]
@@ -916,14 +913,11 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
     go ink subs (IfaceTupleTy sort is_prom tc_args)
       = IfaceTupleTy sort is_prom (go_args ink subs tc_args)
 
-    go ink subs (IfaceFunTy arg res)
-      = IfaceFunTy (go ink subs arg) (go ink subs res)
+    go ink subs (IfaceFunTy af arg res)
+      = IfaceFunTy af (go ink subs arg) (go ink subs res)
 
     go ink subs (IfaceAppTy t ts)
       = IfaceAppTy (go ink subs t) (go_args ink subs ts)
-
-    go ink subs (IfaceDFunTy x y)
-      = IfaceDFunTy (go ink subs x) (go ink subs y)
 
     go ink subs (IfaceCastTy x co)
       = IfaceCastTy (go ink subs x) co
@@ -1673,12 +1667,9 @@ instance Binary IfaceType where
             putByte bh 2
             put_ bh ae
             put_ bh af
-    put_ bh (IfaceFunTy ag ah) = do
+    put_ bh (IfaceFunTy af ag ah) = do
             putByte bh 3
-            put_ bh ag
-            put_ bh ah
-    put_ bh (IfaceDFunTy ag ah) = do
-            putByte bh 4
+            put_ bh af
             put_ bh ag
             put_ bh ah
     put_ bh (IfaceTyConApp tc tys)
@@ -1703,12 +1694,10 @@ instance Binary IfaceType where
               2 -> do ae <- get bh
                       af <- get bh
                       return (IfaceAppTy ae af)
-              3 -> do ag <- get bh
+              3 -> do af <- get bh
+                      ag <- get bh
                       ah <- get bh
-                      return (IfaceFunTy ag ah)
-              4 -> do ag <- get bh
-                      ah <- get bh
-                      return (IfaceDFunTy ag ah)
+                      return (IfaceFunTy af ag ah)
               5 -> do { tc <- get bh; tys <- get bh
                       ; return (IfaceTyConApp tc tys) }
               6 -> do { a <- get bh; b <- get bh

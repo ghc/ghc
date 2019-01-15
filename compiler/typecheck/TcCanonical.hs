@@ -1,5 +1,10 @@
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-overlapping-patterns -Wno-incomplete-patterns #-}
+    -- Yuk!  Suppresses bogus warnings
+    -- The -Wno-incomplete-patterns suppresses
+    --     a pattern-checker iteration limit error
+
 module TcCanonical(
      canonicalize,
      unifyDerived,
@@ -1080,7 +1085,7 @@ zonk_eq_types = go
       , Just (arg2, res2) <- split2
       = do { res_a <- go arg1 arg2
            ; res_b <- go res1 res2
-           ; return $ combine_rev mkFunTy res_b res_a
+           ; return $ combine_rev mkVisFunTy res_b res_a
            }
       | isJust split1 || isJust split2
       = bale_out ty1 ty2

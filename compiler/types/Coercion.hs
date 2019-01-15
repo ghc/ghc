@@ -699,7 +699,7 @@ mkFunCo r co1 co2
     -- See Note [Refl invariant]
   | Just (ty1, _) <- isReflCo_maybe co1
   , Just (ty2, _) <- isReflCo_maybe co2
-  = mkReflCo r (mkFunTy ty1 ty2)
+  = mkReflCo r (mkVisFunTy ty1 ty2)
   | otherwise = FunCo r co1 co2
 
 -- | Apply a 'Coercion' to another 'Coercion'.
@@ -2184,7 +2184,7 @@ coercionKind co =
        | otherwise                = go_forall empty_subst co
        where
          empty_subst = mkEmptyTCvSubst (mkInScopeSet $ tyCoVarsOfCo co)
-    go (FunCo _ co1 co2)    = mkFunTy <$> go co1 <*> go co2
+    go (FunCo _ co1 co2)    = mkVisFunTy <$> go co1 <*> go co2
     go (CoVarCo cv)         = coVarTypes cv
     go (HoleCo h)           = coVarTypes (coHoleCoVar h)
     go (AxiomInstCo ax ind cos)
@@ -2362,7 +2362,8 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
                   ; _           -> False      } )
         mkNomReflCo ty1
 
-    go (FunTy arg1 res1) (FunTy arg2 res2)
+    go (FFunTy { ft_arg = arg1, ft_res = res1 })
+       (FFunTy { ft_arg = arg2, ft_res = res2 })
       = mkFunCo Nominal (go arg1 arg2) (go res1 res2)
 
     go (TyConApp tc1 args1) (TyConApp tc2 args2)

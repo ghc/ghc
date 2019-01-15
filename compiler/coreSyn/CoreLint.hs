@@ -1765,7 +1765,7 @@ lintCoercion co@(FunCo r co1 co2)
        ; k' <- lintArrow (text "coercion" <+> quotes (ppr co)) k'1 k'2
        ; lintRole co1 r r1
        ; lintRole co2 r r2
-       ; return (k, k', mkFunTy s1 s2, mkFunTy t1 t2, r) }
+       ; return (k, k', mkVisFunTy s1 s2, mkVisFunTy t1 t2, r) }
 
 lintCoercion (CoVarCo cv)
   | not (isCoVar cv)

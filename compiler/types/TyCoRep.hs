@@ -17,13 +17,18 @@ Note [The Type-related module hierarchy]
 
 -- We expose the relevant stuff from this module via the Type module
 {-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, PatternSynonyms #-}
 
 module TyCoRep (
         TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
 
         -- * Types
-        Type(..),
+        Type( TyVarTy, AppTy, TyConApp, ForAllTy
+            , LitTy, CastTy, CoercionTy
+            , FFunTy, ft_arg, ft_res, ft_af
+            , FunTy ),  -- Export the type synonym FunTy too
+
+        AnonArgFlag,
         TyLit(..),
         KindOrType, Kind,
         KnotTied,
@@ -40,7 +45,8 @@ module TyCoRep (
         -- * Functions over types
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
-        mkFunTy, mkFunTys, mkTyCoForAllTy, mkForAllTys,
+        mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
+        mkTyCoForAllTy, mkForAllTys,
         mkForAllTy,
         mkTyCoPiTy, mkTyCoPiTys,
         mkPiTys,
@@ -156,7 +162,7 @@ import GhcPrelude
 import {-# SOURCE #-} DataCon( dataConFullSig
                              , dataConUserTyVarBinders
                              , DataCon )
-import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy, mkCastTy
+import {-# SOURCE #-} Type( isCoercionTy, mkAppTy, mkCastTy
                           , tyCoVarsOfTypeWellScoped
                           , tyCoVarsOfTypesWellScoped
                           , scopedSort
@@ -308,7 +314,11 @@ data Type
         {-# UNPACK #-} !TyCoVarBinder
         Type            -- ^ A Π type.
 
-  | FunTy Type Type     -- ^ t1 -> t2   Very common, so an important special case
+  | FFunTy      -- ^ t1 -> t2   Very common, so an important special case
+                -- FFunTy for "full function type"; see pattern synonym for FunTy
+     { ft_af  :: AnonArgFlag  -- Is this (->) or (=>)?
+     , ft_arg :: Type           -- Argument type
+     , ft_res :: Type }         -- Resuult type
 
   | LitTy TyLit     -- ^ Type literals are similar to type constructors.
 
@@ -327,6 +337,13 @@ data Type
 
   deriving Data.Data
 
+{-# COMPLETE FunTy, TyVarTy, AppTy, TyConApp, ForAllTy, LitTy, CastTy, CoercionTy #-}
+
+-- | 'FunTy' is a (uni-directional) pattern synonym for the common
+-- case where we want to match on the argument/result type, but
+-- ignoring the AnonArgFlag
+pattern FunTy :: Type -> Type -> Type
+pattern FunTy arg res <- FFunTy { ft_arg = arg, ft_res = res }
 
 -- NOTE:  Other parts of the code assume that type literals do not contain
 -- types or type variables.
@@ -522,9 +539,9 @@ type KnotTied ty = ty
 -- dependent ('Named') or nondependent ('Anon'). They may also be visible or
 -- not. See Note [TyCoBinders]
 data TyCoBinder
-  = Named TyCoVarBinder -- A type-lambda binder
-  | Anon Type           -- A term-lambda binder. Type here can be CoercionTy.
-                        -- Visibility is determined by the type (Constraint vs. *)
+  = Named TyCoVarBinder    -- A type-lambda binder
+  | Anon AnonArgFlag Type  -- A term-lambda binder. Type here can be CoercionTy.
+                           -- Visibility is determined by the AnonArgFlag
   deriving Data.Data
 
 -- | 'TyBinder' is like 'TyCoBinder', but there can only be 'TyVarBinder'
@@ -539,7 +556,8 @@ delBinderVar vars (Bndr tv _) = vars `delVarSet` tv
 -- | Does this binder bind an invisible argument?
 isInvisibleBinder :: TyCoBinder -> Bool
 isInvisibleBinder (Named (Bndr _ vis)) = isInvisibleArgFlag vis
-isInvisibleBinder (Anon ty)            = isPredTy ty
+isInvisibleBinder (Anon InvisArg _)    = True
+isInvisibleBinder (Anon VisArg   _)    = False
 
 -- | Does this binder bind a visible argument?
 isVisibleBinder :: TyCoBinder -> Bool
@@ -560,9 +578,8 @@ isTyBinder _ = True
 
 tyCoBinderArgFlag :: TyCoBinder -> ArgFlag
 tyCoBinderArgFlag (Named (Bndr _ flag)) = flag
-tyCoBinderArgFlag (Anon ty)
- | isPredTy ty = Inferred
- | otherwise = Required
+tyCoBinderArgFlag (Anon InvisArg _)     = Inferred
+tyCoBinderArgFlag (Anon VisArg _)       = Required
 
 {- Note [TyCoBinders]
 ~~~~~~~~~~~~~~~~~~~
@@ -815,14 +832,15 @@ mkTyCoVarTy v
 mkTyCoVarTys :: [TyCoVar] -> [Type]
 mkTyCoVarTys = map mkTyCoVarTy
 
-infixr 3 `mkFunTy`      -- Associates to the right
--- | Make an arrow type
-mkFunTy :: Type -> Type -> Type
-mkFunTy arg res = FunTy arg res
+infixr 3 `mkVisFunTy`, `mkInvisFunTy`      -- Associates to the right
+mkVisFunTy, mkInvisFunTy :: Type -> Type -> Type
+mkVisFunTy   arg res = FFunTy { ft_af = VisArg,   ft_arg = arg, ft_res = res }
+mkInvisFunTy arg res = FFunTy { ft_af = InvisArg, ft_arg = arg, ft_res = res }
 
 -- | Make nested arrow types
-mkFunTys :: [Type] -> Type -> Type
-mkFunTys tys ty = foldr mkFunTy ty tys
+mkVisFunTys, mkInvisFunTys :: [Type] -> Type -> Type
+mkVisFunTys   tys ty = foldr mkVisFunTy   ty tys
+mkInvisFunTys tys ty = foldr mkInvisFunTy ty tys
 
 -- | If tv is a coercion variable and it is not used in the body, returns
 -- a FunTy, otherwise makes a forall type.
@@ -832,7 +850,7 @@ mkTyCoForAllTy tv vis ty
   | isCoVar tv
   , not (tv `elemVarSet` tyCoVarsOfType ty)
   = ASSERT( vis == Inferred )
-    mkFunTy (varType tv) ty
+    mkInvisFunTy (varType tv) ty
   | otherwise
   = ForAllTy (Bndr tv vis) ty
 
@@ -846,12 +864,12 @@ mkForAllTys :: [TyCoVarBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 mkTyCoPiTy :: TyCoBinder -> Type -> Type
-mkTyCoPiTy (Anon ty1) ty2           = FunTy ty1 ty2
+mkTyCoPiTy (Anon af ty1) ty2        = FFunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 }
 mkTyCoPiTy (Named (Bndr tv vis)) ty = mkTyCoForAllTy tv vis ty
 
 -- | Like 'mkTyCoPiTy', but does not check the occurrence of the binder
 mkPiTy:: TyCoBinder -> Type -> Type
-mkPiTy (Anon ty1) ty2           = FunTy ty1 ty2
+mkPiTy (Anon af ty1) ty2        = FFunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 }
 mkPiTy (Named (Bndr tv vis)) ty = mkForAllTy tv vis ty
 
 mkTyCoPiTys :: [TyCoBinder] -> Type -> Type
@@ -2722,7 +2740,7 @@ extendTvSubstBinderAndInScope :: TCvSubst -> TyCoBinder -> Type -> TCvSubst
 extendTvSubstBinderAndInScope subst (Named (Bndr v _)) ty
   = ASSERT( isTyVar v )
     extendTvSubstAndInScope subst v ty
-extendTvSubstBinderAndInScope subst (Anon _)     _
+extendTvSubstBinderAndInScope subst (Anon {}) _
   = subst
 
 extendTvSubstWithClone :: TCvSubst -> TyVar -> TyVar -> TCvSubst
@@ -3102,7 +3120,10 @@ subst_ty subst ty
                 -- by [Int], represented with TyConApp
     go (TyConApp tc tys) = let args = map go tys
                            in  args `seqList` TyConApp tc args
-    go (FunTy arg res)   = (FunTy $! go arg) $! go res
+    go ty@(FFunTy { ft_arg = arg, ft_res = res })
+      = let !arg' = go arg
+            !res' = go res
+        in ty { ft_arg = arg', ft_res = res' }
     go (ForAllTy (Bndr tv vis) ty)
                          = case substVarBndrUnchecked subst tv of
                              (subst', tv') ->
@@ -3555,7 +3576,7 @@ pprTyVar tv
     kind = tyVarKind tv
 
 instance Outputable TyCoBinder where
-  ppr (Anon ty) = text "[anon]" <+> ppr ty
+  ppr (Anon af ty) = ppr af <+> ppr ty
   ppr (Named (Bndr v Required))  = ppr v
   ppr (Named (Bndr v Specified)) = char '@' <> ppr v
   ppr (Named (Bndr v Inferred))  = braces (ppr v)
@@ -3580,9 +3601,13 @@ debug_ppr_ty _ (LitTy l)
 debug_ppr_ty _ (TyVarTy tv)
   = ppr tv  -- With -dppr-debug we get (tv :: kind)
 
-debug_ppr_ty prec (FunTy arg res)
+debug_ppr_ty prec (FFunTy { ft_af = af, ft_arg = arg, ft_res = res })
   = maybeParen prec funPrec $
     sep [debug_ppr_ty funPrec arg, arrow <+> debug_ppr_ty prec res]
+  where
+    arrow = case af of
+              VisArg   -> text "->"
+              InvisArg -> text "=>"
 
 debug_ppr_ty prec (TyConApp tc tys)
   | null tys  = ppr tc
@@ -3788,7 +3813,9 @@ tidyType env (TyVarTy tv)         = TyVarTy (tidyTyCoVarOcc env tv)
 tidyType env (TyConApp tycon tys) = let args = tidyTypes env tys
                                     in args `seqList` TyConApp tycon args
 tidyType env (AppTy fun arg)      = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env (FunTy fun arg)      = (FunTy $! (tidyType env fun)) $! (tidyType env arg)
+tidyType env ty@(FunTy arg res)   = let !arg' = tidyType env arg
+                                        !res' = tidyType env res
+                                    in ty { ft_arg = arg', ft_res = res' }
 tidyType env (ty@(ForAllTy{}))    = mkForAllTys' (zip tvs' vis) $! tidyType env' body_ty
   where
     (tvs, vis, body_ty) = splitForAllTys' ty

@@ -2147,8 +2147,8 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
 
        ; kvs <- kindGeneralize (mkSpecForAllTys (binderVars tmpl_bndrs) $
                                 mkSpecForAllTys exp_tvs $
-                                mkFunTys ctxt $
-                                mkFunTys arg_tys $
+                                mkInvisFunTys ctxt $
+                                mkVisFunTys arg_tys $
                                 unitTy)
                  -- That type is a lie, of course. (It shouldn't end in ()!)
                  -- And we could construct a proper result type from the info
@@ -2222,8 +2222,8 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
        ; let user_tvs = imp_tvs ++ exp_tvs
 
        ; tkvs <- kindGeneralize (mkSpecForAllTys user_tvs $
-                                 mkFunTys ctxt $
-                                 mkFunTys arg_tys $
+                                 mkInvisFunTys ctxt $
+                                 mkVisFunTys arg_tys $
                                  res_ty)
 
              -- Zonk to Types
@@ -3709,7 +3709,7 @@ badDataConTyCon data_con res_ty_tmpl actual_res_ty
     (actual_res_tvs, actual_res_theta, actual_res_rho)
       = tcSplitNestedSigmaTys actual_res_ty
     suggested_ty = mkSpecForAllTys (actual_ex_tvs ++ actual_res_tvs) $
-                   mkFunTys (actual_theta ++ actual_res_theta)
+                   mkInvisFunTys (actual_theta ++ actual_res_theta)
                    actual_res_rho
 
 badGadtDecl :: Name -> SDoc

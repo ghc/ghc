@@ -5,6 +5,9 @@
 
 {-# LANGUAGE CPP, TupleSections, ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+    -- Yuk!  Suppresses bogus warnings
+
 module TcValidity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   checkValidTheta,
@@ -1546,7 +1549,7 @@ dropCasts :: Type -> Type
 -- To consider: drop only HoleCo casts
 dropCasts (CastTy ty _)     = dropCasts ty
 dropCasts (AppTy t1 t2)     = mkAppTy (dropCasts t1) (dropCasts t2)
-dropCasts (FunTy t1 t2)     = mkFunTy (dropCasts t1) (dropCasts t2)
+dropCasts ty@(FunTy t1 t2)  = ty { ft_arg = dropCasts t1, ft_res = dropCasts t2 }
 dropCasts (TyConApp tc tys) = mkTyConApp tc (map dropCasts tys)
 dropCasts (ForAllTy b ty)   = ForAllTy (dropCastsB b) (dropCasts ty)
 dropCasts ty                = ty  -- LitTy, TyVarTy, CoercionTy

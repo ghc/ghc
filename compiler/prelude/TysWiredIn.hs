@@ -598,7 +598,7 @@ constraintKind   = mkTyConApp constraintKindTyCon []
 -- mkFunKind and mkForAllKind are defined here
 -- solely so that TyCon can use them via a SOURCE import
 mkFunKind :: Kind -> Kind -> Kind
-mkFunKind = mkFunTy
+mkFunKind = mkVisFunTy
 
 mkForAllKind :: TyCoVar -> ArgFlag -> Kind -> Kind
 mkForAllKind = mkForAllTy

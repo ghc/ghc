@@ -33,7 +33,8 @@ import GhcPrelude
 import TcRnMonad
 import TcEnv
 import TcBinds( tcValBinds, addTypecheckedBinds )
-import TyCoRep( Type(..), Coercion(..), MCoercion(..), UnivCoProvenance(..) )
+import TyCoRep( Type(..), Type( FunTy )
+              , Coercion(..), MCoercion(..), UnivCoProvenance(..) )
 import TcType
 import TysWiredIn( unitTy )
 import MkCore( rEC_SEL_ERROR_ID )
@@ -878,7 +879,7 @@ mkOneRecordSelector all_cons idDetails fl
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
            | otherwise  = mkSpecForAllTys data_tvs          $
                           mkPhiTy (conLikeStupidTheta con1) $   -- Urgh!
-                          mkFunTy data_ty                   $
+                          mkVisFunTy data_ty                $
                           mkSpecForAllTys field_tvs         $
                           mkPhiTy field_theta               $
                           -- req_theta is empty for normal DataCon

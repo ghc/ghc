@@ -58,7 +58,8 @@ import MkId( mkDictFunId )
 import CoreSyn( Expr(..) )  -- For the Coercion constructor
 import Id
 import Name
-import Var      ( EvVar, mkTyVar, tyVarName, VarBndr(..) )
+import Var      ( EvVar, mkTyVar, tyVarName
+                , VarBndr(..), AnonArgFlag(..) )
 import DataCon
 import VarEnv
 import PrelNames
@@ -158,7 +159,7 @@ deeplySkolemise ty
                       <.> mkWpEvVarApps ids1
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2
-                    , mkFunTys arg_tys' rho ) }
+                    , mkVisFunTys arg_tys' rho ) }
 
       | otherwise
       = return (idHsWrapper, [], [], substTy subst ty)
@@ -197,7 +198,7 @@ top_instantiate inst_all orig ty
        ; (subst, inst_tvs') <- mapAccumLM newMetaTyVarX empty_subst inst_tvs
        ; let inst_theta' = substTheta subst inst_theta
              sigma'      = substTy subst (mkForAllTys leave_bndrs $
-                                          mkFunTys leave_theta rho)
+                                          mkInvisFunTys leave_theta rho)
              inst_tv_tys' = mkTyVarTys inst_tvs'
 
        ; wrap1 <- instCall orig inst_tv_tys' inst_theta'
@@ -272,7 +273,7 @@ deeply_instantiate orig subst ty
                     <.> wrap2
                     <.> wrap1
                     <.> mkWpEvVarApps ids1,
-                 mkFunTys arg_tys' rho2) }
+                 mkVisFunTys arg_tys' rho2) }
 
   | otherwise
   = do { let ty' = substTy subst ty
@@ -511,14 +512,15 @@ tcInstInvisibleTyBinder subst (Named (Bndr tv _))
   = do { (subst', tv') <- newMetaTyVarX subst tv
        ; return (subst', mkTyVarTy tv') }
 
-tcInstInvisibleTyBinder subst (Anon ty)
-     -- This is the *only* constraint currently handled in types.
+tcInstInvisibleTyBinder subst (Anon af ty)
   | Just (mk, k1, k2) <- get_eq_tys_maybe substed_ty
-  = do { co <- unifyKind Nothing k1 k2
+    -- Equality is the *only* constraint currently handled in types.
+  = ASSERT( af == InvisArg )
+    do { co <- unifyKind Nothing k1 k2
        ; arg' <- mk co
        ; return (subst, arg') }
 
-  | isPredTy substed_ty
+  | otherwise  -- This should never happen
   = do { let (env, tidy_ty) = tidyOpenType emptyTidyEnv substed_ty
        ; addErrTcM (env, text "Illegal constraint in a kind:" <+> ppr tidy_ty)
 
@@ -526,44 +528,38 @@ tcInstInvisibleTyBinder subst (Anon ty)
        ; u <- newUnique
        ; let name = mkSysTvName u (fsLit "dict")
        ; return (subst, mkTyVarTy $ mkTyVar name substed_ty) }
-
-
-  | otherwise
-  = do { tv_ty <- newFlexiTyVarTy substed_ty
-       ; return (subst, tv_ty) }
-
   where
     substed_ty = substTy subst ty
 
-      -- See Note [Constraints handled in types]
-    get_eq_tys_maybe :: Type
-                     -> Maybe ( Coercion -> TcM Type
-                                 -- given a coercion proving t1 ~# t2, produce the
-                                 -- right instantiation for the TyBinder at hand
-                              , Type  -- t1
-                              , Type  -- t2
-                              )
-    get_eq_tys_maybe ty
-        -- unlifted equality (~#)
-      | Just (Nominal, k1, k2) <- getEqPredTys_maybe ty
-      = Just (\co -> return $ mkCoercionTy co, k1, k2)
+  -- See Note [Constraints handled in types]
+get_eq_tys_maybe :: Type
+                 -> Maybe ( Coercion -> TcM Type
+                             -- given a coercion proving t1 ~# t2, produce the
+                             -- right instantiation for the TyBinder at hand
+                          , Type  -- t1
+                          , Type  -- t2
+                          )
+get_eq_tys_maybe ty
+    -- unlifted equality (~#)
+  | Just (Nominal, k1, k2) <- getEqPredTys_maybe ty
+  = Just (\co -> return $ mkCoercionTy co, k1, k2)
 
-        -- lifted heterogeneous equality (~~)
-      | Just (tc, [_, _, k1, k2]) <- splitTyConApp_maybe ty
-      = if | tc `hasKey` heqTyConKey
-             -> Just (\co -> mkHEqBoxTy co k1 k2, k1, k2)
-           | otherwise
-             -> Nothing
+    -- lifted heterogeneous equality (~~)
+  | Just (tc, [_, _, k1, k2]) <- splitTyConApp_maybe ty
+  = if | tc `hasKey` heqTyConKey
+         -> Just (\co -> mkHEqBoxTy co k1 k2, k1, k2)
+       | otherwise
+         -> Nothing
 
-        -- lifted homogeneous equality (~)
-      | Just (tc, [_, k1, k2]) <- splitTyConApp_maybe ty
-      = if | tc `hasKey` eqTyConKey
-             -> Just (\co -> mkEqBoxTy co k1 k2, k1, k2)
-           | otherwise
-             -> Nothing
+    -- lifted homogeneous equality (~)
+  | Just (tc, [_, k1, k2]) <- splitTyConApp_maybe ty
+  = if | tc `hasKey` eqTyConKey
+         -> Just (\co -> mkEqBoxTy co k1 k2, k1, k2)
+       | otherwise
+         -> Nothing
 
-      | otherwise
-      = Nothing
+  | otherwise
+  = Nothing
 
 -------------------------------
 -- | This takes @a ~# b@ and returns @a ~~ b@.

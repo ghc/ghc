@@ -460,8 +460,8 @@ liftTc = KindRepM . lift
 builtInKindReps :: [(Kind, Name)]
 builtInKindReps =
     [ (star, starKindRepName)
-    , (mkFunTy star star, starArrStarKindRepName)
-    , (mkFunTys [star, star] star, starArrStarArrStarKindRepName)
+    , (mkVisFunTy star star, starArrStarKindRepName)
+    , (mkVisFunTys [star, star] star, starArrStarArrStarKindRepName)
     ]
   where
     star = liftedTypeKind

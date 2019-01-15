@@ -449,9 +449,9 @@ tcPatSynSig name sig_ty
     build_patsyn_type kvs imp univ req ex prov body
       = mkInvForAllTys kvs $
         mkSpecForAllTys (imp ++ univ) $
-        mkFunTys req $
+        mkInvisFunTys req $
         mkSpecForAllTys ex $
-        mkFunTys prov $
+        mkInvisFunTys prov $
         body
 tcPatSynSig _ (XHsImplicitBndrs _) = panic "tcPatSynSig"
 

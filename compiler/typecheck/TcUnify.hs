@@ -8,6 +8,9 @@ Type subsumption and unification
 
 {-# LANGUAGE CPP, MultiWayIf, TupleSections, ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+    -- Yuk!  Suppresses bogus warnings
+
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
@@ -153,8 +156,8 @@ matchExpectedFunTys herald arity orig_ty thing_inside
     go acc_arg_tys n ty
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
-    go acc_arg_tys n (FunTy arg_ty res_ty)
-      = ASSERT( not (isPredTy arg_ty) )
+    go acc_arg_tys n (FFunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+      = ASSERT( af == VisArg )
         do { (result, wrap_res) <- go (mkCheckExpType arg_ty : acc_arg_tys)
                                       (n-1) res_ty
            ; return ( result
@@ -196,7 +199,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
            ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkFunTys more_arg_tys res_ty
+           ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
            ; wrap <- tcSubTypeDS AppOrigin GenSigCtxt unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (result, wrap) }
@@ -282,8 +285,8 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     go n acc_args ty
       | Just ty' <- tcView ty = go n acc_args ty'
 
-    go n acc_args (FunTy arg_ty res_ty)
-      = ASSERT( not (isPredTy arg_ty) )
+    go n acc_args (FFunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+      = ASSERT( af == VisArg )
         do { (wrap_res, tys, ty_r) <- go (n-1) (arg_ty : acc_args) res_ty
            ; return ( mkWpFun idHsWrapper wrap_res arg_ty ty_r doc
                     , arg_ty : tys, ty_r ) }
@@ -320,14 +323,14 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     defer n fun_ty
       = do { arg_tys <- replicateM n newOpenFlexiTyVarTy
            ; res_ty  <- newOpenFlexiTyVarTy
-           ; let unif_fun_ty = mkFunTys arg_tys res_ty
+           ; let unif_fun_ty = mkVisFunTys arg_tys res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
            ; return (mkWpCastN co, arg_tys, res_ty) }
 
     ------------
     mk_ctxt :: [TcSigmaType] -> TcSigmaType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
     mk_ctxt arg_tys res_ty env
-      = do { let ty = mkFunTys arg_tys res_ty
+      = do { let ty = mkVisFunTys arg_tys res_ty
            ; (env1, zonked) <- zonkTidyTcType env ty
                    -- zonking might change # of args
            ; let (zonked_args, _) = tcSplitFunTys zonked
@@ -441,7 +444,7 @@ matchExpectedAppTy orig_ty
            ; return (co, (ty1, ty2)) }
 
     orig_kind = tcTypeKind orig_ty
-    kind1 = mkFunTy liftedTypeKind orig_kind
+    kind1 = mkFunKind liftedTypeKind orig_kind
     kind2 = liftedTypeKind    -- m :: * -> k
                               -- arg type :: *
 
@@ -754,9 +757,8 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     -- caused Trac #12616 because (also bizarrely) 'deriving' code had
     -- -XImpredicativeTypes on.  I deleted the entire case.
 
-    go (FunTy act_arg act_res) (FunTy exp_arg exp_res)
-      | not (isPredTy act_arg)
-      , not (isPredTy exp_arg)
+    go (FFunTy { ft_af = VisArg, ft_arg = act_arg, ft_res = act_res })
+       (FFunTy { ft_af = VisArg, ft_arg = exp_arg, ft_res = exp_res })
       = -- See Note [Co/contra-variance of subsumption checking]
         do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt       act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
@@ -2049,7 +2051,7 @@ matchExpectedFunKind hs_ty n k = go n k
     defer n k
       = do { arg_kinds <- newMetaKindVars n
            ; res_kind  <- newMetaKindVar
-           ; let new_fun = mkFunTys arg_kinds res_kind
+           ; let new_fun = mkVisFunTys arg_kinds res_kind
                  origin  = TypeEqOrigin { uo_actual   = k
                                         , uo_expected = new_fun
                                         , uo_thing    = Just (ppr hs_ty)

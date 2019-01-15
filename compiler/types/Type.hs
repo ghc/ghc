@@ -25,7 +25,8 @@ module Type (
         mkAppTy, mkAppTys, splitAppTy, splitAppTys, repSplitAppTys,
         splitAppTy_maybe, repSplitAppTy_maybe, tcRepSplitAppTy_maybe,
 
-        mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe,
+        mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
+        splitFunTy, splitFunTy_maybe,
         splitFunTys, funResultTy, funArgTy,
 
         mkTyConApp, mkTyConTy,
@@ -103,7 +104,7 @@ module Type (
         binderVar, binderVars, binderType, binderArgFlag,
         tyCoBinderType, tyCoBinderVar_maybe,
         tyBinderType,
-        binderRelevantType_maybe, caseBinder,
+        binderRelevantType_maybe,
         isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder,
         isInvisibleBinder, isNamedBinder,
         tyConBindersTyCoBinders,
@@ -422,8 +423,8 @@ expandTypeSynonyms ty
     go _     (LitTy l)     = LitTy l
     go subst (TyVarTy tv)  = substTyVar subst tv
     go subst (AppTy t1 t2) = mkAppTy (go subst t1) (go subst t2)
-    go subst (FunTy arg res)
-      = mkFunTy (go subst arg) (go subst res)
+    go subst ty@(FunTy arg res)
+      = ty { ft_arg = go subst arg, ft_res = go subst res }
     go subst (ForAllTy (Bndr tv vis) t)
       = let (subst', tv') = substVarBndrUsing go subst tv in
         ForAllTy (Bndr tv' vis) (go subst' t)
@@ -564,9 +565,11 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
       = return ty   -- common case (E.g. Int, LiftedRep etc)
 
       | otherwise
-      = mktyconapp tc <$> mapM go tys 
+      = mktyconapp tc <$> mapM go tys
 
-    go (FunTy arg res)   = FunTy <$> go arg <*> go res
+    go ty@(FunTy arg res) = do { arg' <- go arg; res' <- go res
+                               ; return (ty { ft_arg = arg', ft_res = res' }) }
+
     go (ForAllTy (Bndr tv vis) inner)
       = do { (env', tv') <- tycobinder env tv vis
            ; inner' <- mapType mapper env' inner
@@ -783,10 +786,8 @@ repSplitAppTy_maybe _other = Nothing
 tcRepSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'tcSplitAppTy_maybe', but assumes that
 -- any coreView stuff is already done. Refuses to look through (c => t)
--- The "Rep" means that we assumes that any tcView stuff is already done.
--- Refuses to look through (c => t)
-tcRepSplitAppTy_maybe (FunTy ty1 ty2)
-  | isPredTy ty1
+tcRepSplitAppTy_maybe (FFunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 })
+  | InvisArg <- af
   = Nothing  -- See Note [Decomposing fat arrow c=>t]
 
   | otherwise
@@ -1007,14 +1008,14 @@ splitFunTys ty = split [] ty ty
 funResultTy :: Type -> Type
 -- ^ Extract the function result type and panic if that is not possible
 funResultTy ty | Just ty' <- coreView ty = funResultTy ty'
-funResultTy (FunTy _ res) = res
-funResultTy ty            = pprPanic "funResultTy" (ppr ty)
+funResultTy (FFunTy { ft_res = res })    = res
+funResultTy ty                           = pprPanic "funResultTy" (ppr ty)
 
 funArgTy :: Type -> Type
 -- ^ Extract the function argument type and panic if that is not possible
 funArgTy ty | Just ty' <- coreView ty = funArgTy ty'
-funArgTy (FunTy arg _res) = arg
-funArgTy ty               = pprPanic "funArgTy" (ppr ty)
+funArgTy (FFunTy { ft_arg = arg })    = arg
+funArgTy ty                           = pprPanic "funArgTy" (ppr ty)
 
 -- ^ Just like 'piResultTys' but for a single argument
 -- Try not to iterate 'piResultTy', because it's inefficient to substitute
@@ -1030,7 +1031,7 @@ piResultTy_maybe :: Type -> Type -> Maybe Type
 piResultTy_maybe ty arg
   | Just ty' <- coreView ty = piResultTy_maybe ty' arg
 
-  | FunTy _ res <- ty
+  | FFunTy { ft_res = res } <- ty
   = Just res
 
   | ForAllTy (Bndr tv _) res <- ty
@@ -1068,7 +1069,7 @@ piResultTys ty orig_args@(arg:args)
   | Just ty' <- coreView ty
   = piResultTys ty' orig_args
 
-  | FunTy _ res <- ty
+  | FFunTy { ft_res = res } <- ty
   = piResultTys res args
 
   | ForAllTy (Bndr tv _) res <- ty
@@ -1086,7 +1087,7 @@ piResultTys ty orig_args@(arg:args)
       | Just ty' <- coreView ty
       = go subst ty' all_args
 
-      | FunTy _ res <- ty
+      | FFunTy { ft_res = res } <- ty
       = go subst res args
 
       | ForAllTy (Bndr tv _) res <- ty
@@ -1157,7 +1158,8 @@ mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
   | isFunTyCon tycon
   , [_rep1,_rep2,ty1,ty2] <- tys
-  = FunTy ty1 ty2
+  = FFunTy { ft_af = VisArg, ft_arg = ty1, ft_res = ty2 }
+    -- The FunTyCon (->) is always a visible one
 
   | otherwise
   = TyConApp tycon tys
@@ -1170,7 +1172,7 @@ mkTyConApp tycon tys
 -- look through synonyms.
 tyConAppTyConPicky_maybe :: Type -> Maybe TyCon
 tyConAppTyConPicky_maybe (TyConApp tc _) = Just tc
-tyConAppTyConPicky_maybe (FunTy {})      = Just funTyCon
+tyConAppTyConPicky_maybe (FFunTy {})     = Just funTyCon
 tyConAppTyConPicky_maybe _               = Nothing
 
 
@@ -1178,7 +1180,7 @@ tyConAppTyConPicky_maybe _               = Nothing
 tyConAppTyCon_maybe :: Type -> Maybe TyCon
 tyConAppTyCon_maybe ty | Just ty' <- coreView ty = tyConAppTyCon_maybe ty'
 tyConAppTyCon_maybe (TyConApp tc _) = Just tc
-tyConAppTyCon_maybe (FunTy {})      = Just funTyCon
+tyConAppTyCon_maybe (FFunTy {})     = Just funTyCon
 tyConAppTyCon_maybe _               = Nothing
 
 tyConAppTyCon :: Type -> TyCon
@@ -1301,7 +1303,7 @@ tyConBindersTyCoBinders :: [TyConBinder] -> [TyCoBinder]
 tyConBindersTyCoBinders = map to_tyb
   where
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
-    to_tyb (Bndr tv AnonTCB)        = Anon (varType tv)
+    to_tyb (Bndr tv AnonTCB)        = Anon VisArg (varType tv)
 
 {-
 --------------------------------------------------------------------
@@ -1351,12 +1353,12 @@ interfaces.  Notably this plays a role in tcTySigs in TcBinds.hs.
                                 ~~~~~~~~
 -}
 
--- | Make a dependent forall over an Inferred variablem
+-- | Make a dependent forall over an Inferred variable
 mkTyCoInvForAllTy :: TyCoVar -> Type -> Type
 mkTyCoInvForAllTy tv ty
   | isCoVar tv
   , not (tv `elemVarSet` tyCoVarsOfType ty)
-  = mkFunTy (varType tv) ty
+  = mkInvisFunTy (varType tv) ty
   | otherwise
   = ForAllTy (Bndr tv Inferred) ty
 
@@ -1402,7 +1404,7 @@ mkLamType v ty
    | isTyVar v
    = ForAllTy (Bndr v Inferred) ty
    | otherwise
-   = FunTy (varType v) ty
+   = mkVisFunTy (varType v) ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 
@@ -1473,7 +1475,7 @@ isForAllTy_co _             = False
 isPiTy :: Type -> Bool
 isPiTy ty | Just ty' <- coreView ty = isPiTy ty'
 isPiTy (ForAllTy {}) = True
-isPiTy (FunTy {})    = True
+isPiTy (FFunTy {})   = True
 isPiTy _             = False
 
 -- | Is this a function?
@@ -1528,7 +1530,8 @@ splitPiTy_maybe ty = go ty
   where
     go ty | Just ty' <- coreView ty = go ty'
     go (ForAllTy bndr ty) = Just (Named bndr, ty)
-    go (FunTy arg res)    = Just (Anon arg, res)
+    go (FFunTy { ft_af = af, ft_arg = arg, ft_res = res})
+                          = Just (Anon af arg, res)
     go _                  = Nothing
 
 -- | Takes a forall type apart, or panics
@@ -1544,7 +1547,8 @@ splitPiTys ty = split ty ty []
   where
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
     split _       (ForAllTy b res) bs = split res res (Named b  : bs)
-    split _       (FunTy arg res)  bs = split res res (Anon arg : bs)
+    split _       (FFunTy { ft_af = af, ft_arg = arg, ft_res = res }) bs
+                                      = split res res (Anon af arg : bs)
     split orig_ty _                bs = (reverse bs, orig_ty)
 
 -- | Like 'splitPiTys' but split off only /named/ binders
@@ -1574,8 +1578,8 @@ splitPiTysInvisible ty = split ty ty []
     split _ (ForAllTy b res) bs
       | Bndr _ vis <- b
       , isInvisibleArgFlag vis   = split res res (Named b  : bs)
-    split _ (FunTy arg res)  bs
-      | isPredTy arg             = split res res (Anon arg : bs)
+    split _ (FFunTy { ft_af = InvisArg, ft_arg = arg, ft_res = res })  bs
+                                 = split res res (Anon InvisArg arg : bs)
     split orig_ty _          bs  = (reverse bs, orig_ty)
 
 splitPiTysInvisibleN :: Int -> Type -> ([TyCoBinder], Type)
@@ -1590,8 +1594,8 @@ splitPiTysInvisibleN n ty = split n ty ty []
       | ForAllTy b res <- ty
       , Bndr _ vis <- b
       , isInvisibleArgFlag vis  = split (n-1) res res (Named b  : bs)
-      | FunTy arg res <- ty
-      , isPredTy arg            = split (n-1) res res (Anon arg : bs)
+      | FFunTy { ft_af = InvisArg, ft_arg = arg, ft_res = res } <- ty
+                                = split (n-1) res res (Anon InvisArg arg : bs)
       | otherwise               = (reverse bs, orig_ty)
 
 -- | Given a 'TyCon' and a list of argument types, filter out any invisible
@@ -1695,7 +1699,7 @@ isTauTy (CoercionTy _)        = False  -- Not sure about this
 -}
 
 -- | Make an anonymous binder
-mkAnonBinder :: Type -> TyCoBinder
+mkAnonBinder :: AnonArgFlag -> Type -> TyCoBinder
 mkAnonBinder = Anon
 
 -- | Does this binder bind a variable that is /not/ erased? Returns
@@ -1715,27 +1719,18 @@ tyCoBinderVar_maybe _          = Nothing
 tyCoBinderType :: TyCoBinder -> Type
 -- Barely used
 tyCoBinderType (Named tvb) = binderType tvb
-tyCoBinderType (Anon ty)   = ty
+tyCoBinderType (Anon _ ty) = ty
 
 tyBinderType :: TyBinder -> Type
 tyBinderType (Named (Bndr tv _))
   = ASSERT( isTyVar tv )
     tyVarKind tv
-tyBinderType (Anon ty)   = ty
+tyBinderType (Anon _ ty)   = ty
 
 -- | Extract a relevant type, if there is one.
 binderRelevantType_maybe :: TyCoBinder -> Maybe Type
-binderRelevantType_maybe (Named {}) = Nothing
-binderRelevantType_maybe (Anon ty)  = Just ty
-
--- | Like 'maybe', but for binders.
-caseBinder :: TyCoBinder           -- ^ binder to scrutinize
-           -> (TyCoVarBinder -> a) -- ^ named case
-           -> (Type -> a)          -- ^ anonymous case
-           -> a
-caseBinder (Named v) f _ = f v
-caseBinder (Anon t)  _ d = d t
-
+binderRelevantType_maybe (Named {})  = Nothing
+binderRelevantType_maybe (Anon _ ty) = Just ty
 
 {-
 %************************************************************************
@@ -1833,10 +1828,10 @@ tcReturnsConstraintKind :: Kind -> Bool
 --         forall k. k -> Constraint
 tcReturnsConstraintKind kind
   | Just kind' <- tcView kind = tcReturnsConstraintKind kind'
-tcReturnsConstraintKind (ForAllTy _ ty) = tcReturnsConstraintKind ty
-tcReturnsConstraintKind (FunTy    _ ty) = tcReturnsConstraintKind ty
-tcReturnsConstraintKind (TyConApp tc _) = isConstraintKindCon tc
-tcReturnsConstraintKind _               = False
+tcReturnsConstraintKind (ForAllTy _ ty)          = tcReturnsConstraintKind ty
+tcReturnsConstraintKind (FFunTy { ft_res = ty }) = tcReturnsConstraintKind ty
+tcReturnsConstraintKind (TyConApp tc _)          = isConstraintKindCon tc
+tcReturnsConstraintKind _                        = False
 
 isEvVarType :: Type -> Bool
 -- True of (a) predicates, of kind Constraint, such as (Eq a), and (a ~ b)
@@ -2761,9 +2756,12 @@ tcTypeKind (TyVarTy tyvar)   = tyVarKind tyvar
 tcTypeKind (CastTy _ty co)   = pSnd $ coercionKind co
 tcTypeKind (CoercionTy co)   = coercionType co
 
-tcTypeKind (FunTy arg res)
-  | isPredTy arg, isPredTy res = constraintKind
-  | otherwise                  = liftedTypeKind
+tcTypeKind (FFunTy { ft_af = af, ft_res = res })
+  | InvisArg <- af
+  , tcIsConstraintKind (tcTypeKind res)
+  = constraintKind     -- Eq a => Ord a         :: Constraint
+  | otherwise          -- Eq a => a -> a        :: TYPE LiftedRep
+  = liftedTypeKind     -- Eq a => Array# Int    :: Type LiftedRep (not TYPE PtrRep)
 
 tcTypeKind (AppTy fun arg)
   = go fun [arg]
@@ -2808,7 +2806,7 @@ isTypeLevPoly = go
     go ty@(TyConApp tc _) | not (isTcLevPoly tc) = False
                           | otherwise            = check_kind ty
     go (ForAllTy _ ty)                           = go ty
-    go (FunTy {})                                = False
+    go (FFunTy {})                               = False
     go (LitTy {})                                = False
     go ty@(CastTy {})                            = check_kind ty
     go ty@(CoercionTy {})                        = pprPanic "isTypeLevPoly co" (ppr ty)
@@ -2875,9 +2873,10 @@ occCheckExpand vs_to_avoid ty
     go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1
                                 ; ty2' <- go cxt ty2
                                 ; return (mkAppTy ty1' ty2') }
-    go cxt (FunTy ty1 ty2) = do { ty1' <- go cxt ty1
-                                ; ty2' <- go cxt ty2
-                                ; return (mkFunTy ty1' ty2') }
+    go cxt ty@(FunTy ty1 ty2)
+       = do { ty1' <- go cxt ty1
+            ; ty2' <- go cxt ty2
+            ; return (ty { ft_arg = ty1', ft_res = ty2' }) }
     go cxt@(as, env) (ForAllTy (Bndr tv vis) body_ty)
        = do { ki' <- go cxt (varType tv)
             ; let tv' = setVarType tv ki'

@@ -133,7 +133,7 @@ module TcType (
 
   mkForAllTy, mkForAllTys, mkTyCoInvForAllTys, mkSpecForAllTys, mkTyCoInvForAllTy,
   mkInvForAllTy, mkInvForAllTys,
-  mkFunTy, mkFunTys,
+  mkVisFunTy, mkVisFunTys, mkInvisFunTy, mkInvisFunTys,
   mkTyConApp, mkAppTy, mkAppTys,
   mkTyConTy, mkTyVarTy, mkTyVarTys,
   mkTyCoVarTy, mkTyCoVarTys,
@@ -1269,7 +1269,7 @@ mkSpecSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
 mkSpecSigmaTy tyvars preds ty = mkSigmaTy (mkTyCoVarBinders Specified tyvars) preds ty
 
 mkPhiTy :: [PredType] -> Type -> Type
-mkPhiTy = mkFunTys
+mkPhiTy = mkInvisFunTys
 
 ---------------
 getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to
@@ -1279,7 +1279,7 @@ getDFunTyKey (TyVarTy tv)            = getOccName tv
 getDFunTyKey (TyConApp tc _)         = getOccName tc
 getDFunTyKey (LitTy x)               = getDFunTyLitKey x
 getDFunTyKey (AppTy fun _)           = getDFunTyKey fun
-getDFunTyKey (FunTy _ _)             = getOccName funTyCon
+getDFunTyKey (FFunTy {})             = getOccName funTyCon
 getDFunTyKey (ForAllTy _ t)          = getDFunTyKey t
 getDFunTyKey (CastTy ty _)           = getDFunTyKey ty
 getDFunTyKey t@(CoercionTy _)        = pprPanic "getDFunTyKey" (ppr t)
@@ -1365,8 +1365,9 @@ tcSplitPredFunTy_maybe :: Type -> Maybe (PredType, Type)
 -- Split off the first predicate argument from a type
 tcSplitPredFunTy_maybe ty
   | Just ty' <- tcView ty = tcSplitPredFunTy_maybe ty'
-tcSplitPredFunTy_maybe (FunTy arg res)
-  | isPredTy arg = Just (arg, res)
+tcSplitPredFunTy_maybe (FFunTy { ft_af = InvisArg
+                               , ft_arg = arg, ft_res = res })
+  = Just (arg, res)
 tcSplitPredFunTy_maybe _
   = Nothing
 
@@ -1409,7 +1410,7 @@ tcSplitNestedSigmaTys ty
     -- underneath it.
   | Just (arg_tys, tvs1, theta1, rho1) <- tcDeepSplitSigmaTy_maybe ty
   = let (tvs2, theta2, rho2) = tcSplitNestedSigmaTys rho1
-    in (tvs1 ++ tvs2, theta1 ++ theta2, mkFunTys arg_tys rho2)
+    in (tvs1 ++ tvs2, theta1 ++ theta2, mkVisFunTys arg_tys rho2)
     -- If there's no forall, we're done.
   | otherwise = ([], [], ty)
 
@@ -1443,7 +1444,7 @@ tcTyConAppTyCon_maybe ty
   | Just ty' <- tcView ty = tcTyConAppTyCon_maybe ty'
 tcTyConAppTyCon_maybe (TyConApp tc _)
   = Just tc
-tcTyConAppTyCon_maybe (FunTy _ _)
+tcTyConAppTyCon_maybe (FFunTy {})
   = Just funTyCon
 tcTyConAppTyCon_maybe _
   = Nothing
@@ -1488,10 +1489,12 @@ tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
                                           (args,res') = tcSplitFunTys res
 
 tcSplitFunTy_maybe :: Type -> Maybe (Type, Type)
-tcSplitFunTy_maybe ty | Just ty' <- tcView ty         = tcSplitFunTy_maybe ty'
-tcSplitFunTy_maybe (FunTy arg res) | not (isPredTy arg) = Just (arg, res)
-tcSplitFunTy_maybe _                                    = Nothing
-        -- Note the tcTypeKind guard
+tcSplitFunTy_maybe ty
+  | Just ty' <- tcView ty = tcSplitFunTy_maybe ty'
+tcSplitFunTy_maybe (FFunTy { ft_af = af, ft_arg = arg, ft_res = res })
+  | VisArg <- af = Just (arg, res)
+tcSplitFunTy_maybe _ = Nothing
+        -- Note the VisArg guard
         -- Consider     (?x::Int) => Bool
         -- We don't want to treat this as a function type!
         -- A concrete example is test tc230:
@@ -2116,15 +2119,15 @@ isSigmaTy :: TcType -> Bool
 -- *necessarily* have any foralls.  E.g
 --        f :: (?x::Int) => Int -> Int
 isSigmaTy ty | Just ty' <- tcView ty = isSigmaTy ty'
-isSigmaTy (ForAllTy {}) = True
-isSigmaTy (FunTy a _)   = isPredTy a
-isSigmaTy _             = False
+isSigmaTy (ForAllTy {})                 = True
+isSigmaTy (FFunTy { ft_af = InvisArg }) = True
+isSigmaTy _                             = False
 
 isRhoTy :: TcType -> Bool   -- True of TcRhoTypes; see Note [TcRhoType]
 isRhoTy ty | Just ty' <- tcView ty = isRhoTy ty'
-isRhoTy (ForAllTy {}) = False
-isRhoTy (FunTy a r)   = not (isPredTy a) && isRhoTy r
-isRhoTy _             = True
+isRhoTy (ForAllTy {})                           = False
+isRhoTy (FFunTy { ft_af = VisArg, ft_res = r }) = isRhoTy r
+isRhoTy _                                       = True
 
 -- | Like 'isRhoTy', but also says 'True' for 'Infer' types
 isRhoExpTy :: ExpType -> Bool
@@ -2135,9 +2138,9 @@ isOverloadedTy :: Type -> Bool
 -- Yes for a type of a function that might require evidence-passing
 -- Used only by bindLocalMethods
 isOverloadedTy ty | Just ty' <- tcView ty = isOverloadedTy ty'
-isOverloadedTy (ForAllTy _  ty) = isOverloadedTy ty
-isOverloadedTy (FunTy a _)      = isPredTy a
-isOverloadedTy _                = False
+isOverloadedTy (ForAllTy _  ty)              = isOverloadedTy ty
+isOverloadedTy (FFunTy { ft_af = InvisArg }) = True
+isOverloadedTy _                             = False
 
 isFloatTy, isDoubleTy, isIntegerTy, isIntTy, isWordTy, isBoolTy,
     isUnitTy, isCharTy, isAnyTy :: Type -> Bool
@@ -2205,7 +2208,7 @@ isTyVarHead tv (CastTy ty _)   = isTyVarHead tv ty
 isTyVarHead _ (TyConApp {})    = False
 isTyVarHead _  (LitTy {})      = False
 isTyVarHead _  (ForAllTy {})   = False
-isTyVarHead _  (FunTy {})      = False
+isTyVarHead _  (FFunTy {})     = False
 isTyVarHead _  (CoercionTy {}) = False
 
 
