@@ -93,9 +93,9 @@
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
-	url = https://gitlab.haskell.org/ghc/haddock.git
+	url = https://github.com/facebook/fbhaddock.git
 	ignore = untracked
-	branch = ghc-head
+	branch = ghc-8.8.2-facebook
 [submodule "nofib"]
 	path = nofib
 	url = https://gitlab.haskell.org/ghc/nofib.git
