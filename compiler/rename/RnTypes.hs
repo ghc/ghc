@@ -15,7 +15,6 @@ module RnTypes (
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType,
         HsSigWcTypeScoping(..), rnHsSigWcType, rnHsSigWcTypeScoped,
-        rnLHsInstType,
         newTyVarNameRn,
         rnConDeclFields,
         rnLTyVar,
@@ -373,12 +372,6 @@ rnImplicitBndrs bind_free_tvs
              text "but it will stop doing so in the future."
            , text "Suggested fix: add" <+>
              quotes (text "forall" <+> hsep (map ppr kvs) <> char '.') ]
-
-rnLHsInstType :: SDoc -> LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
--- Rename the type in an instance.
--- The 'doc_str' is "an instance declaration".
--- Do not try to decompose the inst_ty in case it is malformed
-rnLHsInstType doc inst_ty = rnHsSigType (GenericCtx doc) inst_ty
 
 {- ******************************************************
 *                                                       *
