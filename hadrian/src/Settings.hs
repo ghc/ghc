@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiWayIf #-}
+
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, isLibrary, stagePackages, programContext,
@@ -51,9 +53,11 @@ getIntegerPackage = expr (integerLibrary =<< flavour)
 programContext :: Stage -> Package -> Action Context
 programContext stage pkg = do
     profiled <- ghcProfiled <$> flavour
-    return $ if pkg == ghc && profiled && stage > Stage0
-             then Context stage pkg profiling
-             else vanillaContext stage pkg
+    dynGhcProgs <- dynamicGhcPrograms =<< flavour
+    return $ if | pkg == ghc && profiled && stage > Stage0
+                    -> Context stage pkg profiling
+                | dynGhcProgs -> Context stage pkg dynamic
+                | otherwise   -> vanillaContext stage pkg
 
 -- TODO: switch to Set Package as the order of packages should not matter?
 -- Otherwise we have to keep remembering to sort packages from time to time.
