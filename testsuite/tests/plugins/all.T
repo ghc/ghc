@@ -208,3 +208,7 @@ test('T15858',
       extra_hc_opts("-package-db plugin-recomp/pkg.plugins01/local.package.conf ")
       ],
      ghci_script, ['T15858.script'])
+
+test('T16104',
+     [pre_cmd('"$(TEST_HC)" $(TEST_HC_OPTS) T16104_Plugin.hs')],
+     compile, [''])
