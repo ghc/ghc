@@ -306,11 +306,12 @@ compileForeign :: HscEnv -> ForeignSrcLang -> FilePath -> IO FilePath
 compileForeign _ RawObject object_file = return object_file
 compileForeign hsc_env lang stub_c = do
         let phase = case lang of
-              LangC -> Cc
-              LangCxx -> Ccxx
-              LangObjc -> Cobjc
+              LangC      -> Cc
+              LangCxx    -> Ccxx
+              LangObjc   -> Cobjc
               LangObjcxx -> Cobjcxx
-              RawObject -> panic "compileForeign: should be unreachable"
+              LangAsm    -> As True -- allow CPP
+              RawObject  -> panic "compileForeign: should be unreachable"
         (_, stub_o) <- runPipeline StopLn hsc_env
                        (stub_c, Just (RealPhase phase))
                        Nothing (Temporary TFL_GhcSession)

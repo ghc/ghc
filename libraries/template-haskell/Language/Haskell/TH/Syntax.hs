@@ -503,11 +503,12 @@ addForeignFile = addForeignSource
 addForeignSource :: ForeignSrcLang -> String -> Q ()
 addForeignSource lang src = do
   let suffix = case lang of
-                 LangC -> "c"
-                 LangCxx -> "cpp"
-                 LangObjc -> "m"
+                 LangC      -> "c"
+                 LangCxx    -> "cpp"
+                 LangObjc   -> "m"
                  LangObjcxx -> "mm"
-                 RawObject -> "a"
+                 LangAsm    -> "s"
+                 RawObject  -> "a"
   path <- addTempFile suffix
   runIO $ writeFile path src
   addForeignFilePath lang path
