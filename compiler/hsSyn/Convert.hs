@@ -1506,20 +1506,25 @@ cvtTypeKind ty_str ty
 
 -- | Constructs an application of a type to arguments passed in a list.
 mk_apps :: HsType GhcPs -> [LHsTypeArg GhcPs] -> CvtM (LHsType GhcPs)
-mk_apps head_ty []       = returnL head_ty
-mk_apps head_ty (arg:args) =
-  do { head_ty' <- returnL head_ty
-       -- We must parenthesize the function type in case of an explicit
-       -- signature. For instance, in `(Maybe :: Type -> Type) Int`, there
-       -- *must* be parentheses around `Maybe :: Type -> Type`.
-     ; let phead_ty = parenthesizeHsType sigPrec head_ty'
-     ; case arg of
-       HsValArg ty  -> do { p_ty      <- add_parens ty
-                          ; mk_apps (HsAppTy noExt phead_ty p_ty) args }
-       HsTypeArg ki -> do { p_ki      <- add_parens ki
-                          ; mk_apps (HsAppKindTy noExt phead_ty p_ki) args }
-       HsArgPar _   -> mk_apps (HsParTy noExt phead_ty) args
-     }
+mk_apps head_ty type_args = do
+  head_ty' <- returnL head_ty
+  -- We must parenthesize the function type in case of an explicit
+  -- signature. For instance, in `(Maybe :: Type -> Type) Int`, there
+  -- _must_ be parentheses around `Maybe :: Type -> Type`.
+  let phead_ty :: LHsType GhcPs
+      phead_ty = parenthesizeHsType sigPrec head_ty'
+
+      go :: [LHsTypeArg GhcPs] -> CvtM (LHsType GhcPs)
+      go [] = pure head_ty'
+      go (arg:args) =
+        case arg of
+          HsValArg ty  -> do p_ty <- add_parens ty
+                             mk_apps (HsAppTy noExt phead_ty p_ty) args
+          HsTypeArg ki -> do p_ki <- add_parens ki
+                             mk_apps (HsAppKindTy noExt phead_ty p_ki) args
+          HsArgPar _   -> mk_apps (HsParTy noExt phead_ty) args
+
+  go type_args
    where
     -- See Note [Adding parens for splices]
     add_parens lt@(dL->L _ t)
