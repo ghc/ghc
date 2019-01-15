@@ -1,18 +1,71 @@
-module Rules.Libffi (libffiRules, libffiDependencies) where
+module Rules.Libffi (libffiRules, libffiDependencies, libffiName) where
 
 import Hadrian.Utilities
 
+import Context
+import Way.Type
 import Packages
 import Settings.Builders.Common
 import Target
 import Utilities
 
+import Data.List (partition)
+
+{-
+Note [Hadrian: install libffi hack]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are 2 important steps in handling libffi's .a and .so files:
+
+  1. libffi's .a and .so|.dynlib|.dll files are copied from the libffi build dir
+  to the rts build dir. This is because libffi is ultimately bundled with the
+  rts package. Relevant code is in the libffiRules function.
+  2. The rts is "installed" via the hadrian/src/Hadrian/Haskell/Cabal/Parse.hs
+  copyPackage action. This uses the "cabal copy" command which (among other
+  things) attempts to copy the bundled .a and .so|.dynlib|.dll files from the
+  rts build dir to the install dir.
+
+There is an issue in step 1. that the name of the shared library files is not
+know untill after libffi is built. As a workaround, the rts package needs just
+the libffiDependencies, and the corresponding rule (defined below in
+libffiRules) does the extra work of installing the shared library files into the
+rts build directory after building libffi.
+-}
+
+-- | Build directory for @libffi@. This probably doesn't need to be stage
+-- dependent but it is for consistency for now.
+libffiContext :: Stage -> Action Context
+libffiContext stage = do
+    ways <- interpretInContext
+            (Context stage libffi (error "libffiContext: way not set"))
+            getLibraryWays
+    return . Context stage libffi $ if any (wayUnit Dynamic) ways
+        then dynamic
+        else vanilla
+
+-- | The name of the (locally built) library
+libffiName :: Expr String
+libffiName = do
+    windows <- expr windowsHost
+    way <- getWay
+    return $ libffiName' windows (Dynamic `wayUnit` way)
+
+-- | The name of the (locally built) library
+libffiName' :: Bool -> Bool -> String
+libffiName' windows dynamic
+    = (if dynamic then "" else "C")
+    ++ (if windows then "ffi-6" else "ffi")
+
 libffiDependencies :: [FilePath]
 libffiDependencies = ["ffi.h", "ffitarget.h"]
 
-libffiLibrary :: FilePath
-libffiLibrary = "inst/lib/libffi.a"
+libffiStaticLibrary :: FilePath
+libffiStaticLibrary = "inst/lib/libffi.a"
 
+-- | Given a way, this returns the path to the .a or .so libffi library file.
+-- after building libffi, the .a and .so files will be copied to these paths.
+-- These paths will be under the rts build directory as libffi is bundled with
+-- the rts package.
 rtsLibffiLibrary :: Stage -> Way -> Action FilePath
 rtsLibffiLibrary stage way = do
     name    <- libffiLibraryName
@@ -29,10 +82,11 @@ fixLibffiMakefile top =
 -- TODO: check code duplication w.r.t. ConfCcArgs
 configureEnvironment :: Stage -> Action [CmdOption]
 configureEnvironment stage = do
-    cFlags  <- interpretInContext (libffiContext stage) $ mconcat
+    context <- libffiContext stage
+    cFlags  <- interpretInContext context $ mconcat
                [ cArgs
                , getStagedSettingList ConfCcArgs ]
-    ldFlags <- interpretInContext (libffiContext stage) ldArgs
+    ldFlags <- interpretInContext context ldArgs
     sequence [ builderEnvironment "CC" $ Cc CompileC stage
              , builderEnvironment "CXX" $ Cc CompileC stage
              , builderEnvironment "LD" (Ld stage)
@@ -45,74 +99,118 @@ configureEnvironment stage = do
 libffiRules :: Rules ()
 libffiRules = forM_ [Stage1 ..] $ \stage -> do
     root <- buildRootRules
-    let path       = root -/- stageString stage
-        libffiPath = path -/- pkgName libffi -/- "build"
-        libffiOuts = [libffiPath -/- libffiLibrary] ++
-                     fmap ((path -/- "rts/build") -/-) libffiDependencies
-
-    -- We set a higher priority because this rule overlaps with the build rule
-    -- for static libraries 'Rules.Library.libraryRules'.
-    priority 2.0 $ libffiOuts &%> \(out : _) -> do
+    let libffiPathParent = root -/- stageString stage -/- "libffi"
+        libffiPath       = libffiPathParent -/- "build"
+    let
+      -- Installs libffi into the rts build path.
+      installLibffiRts = do
         useSystemFfi <- flag UseSystemFfi
         rtsPath      <- rtsBuildPath stage
         if useSystemFfi
         then do
+            -- If using the system libffi, then copy the system header files.
             ffiIncludeDir <- setting FfiIncludeDir
             putBuild "| System supplied FFI library will be used"
-            forM_ ["ffi.h", "ffitarget.h"] $ \file ->
+            forM_ libffiDependencies $ \file ->
                 copyFile (ffiIncludeDir -/- file) (rtsPath -/- file)
             putSuccess "| Successfully copied system FFI library header files"
         else do
-            build $ target (libffiContext stage) (Make libffiPath) [] []
+            -- Build libffi.
+            buildLibffi
 
-            -- Here we produce 'libffiDependencies'
-            hs <- liftIO $ getDirectoryFilesIO "" [libffiPath -/- "inst/include/*"]
-            forM_ hs $ \header -> do
+            -- Copy header files.
+            headers <- liftIO
+                    $ getDirectoryFilesIO "" [libffiPath -/- "inst/include/*"]
+            forM_ headers $ \header -> do
                 let target = rtsPath -/- takeFileName header
                 copyFileUntracked header target
                 produces [target]
 
-            ways <- interpretInContext (libffiContext stage)
-                                       (getLibraryWays <> getRtsWays)
-            forM_ (nubOrd ways) $ \way -> do
+            -- Find ways.
+            ways <- nubOrd <$> interpretInContext
+                                    (stageContext stage)
+                                    (getLibraryWays <> getRtsWays)
+            let (dynamicWays, staticWays) = partition (wayUnit Dynamic) ways
+
+            -- Install static libraries.
+            forM_ staticWays $ \way -> do
                 rtsLib <- rtsLibffiLibrary stage way
-                copyFileUntracked out rtsLib
+                copyFileUntracked (libffiPath -/- libffiStaticLibrary) rtsLib
                 produces [rtsLib]
 
-            putSuccess "| Successfully built custom library 'libffi'"
+            -- Install dynamic libraries.
+            when (not $ null dynamicWays) $ do
+                -- Find dynamic libraries.
+                windows <- windowsHost
+                osx     <- osxHost
+                let libffiName'' = libffiName' windows True
+                (dynLibsSrcDir, dynLibFiles) <- if windows
+                    then do
+                        let libffiDll = "lib" ++ libffiName'' ++ ".dll"
+                        return (libffiPath -/- "inst/bin", [libffiDll])
+                    else do
+                        let libffiLibPath = libffiPath -/- "inst/lib"
+                        dynLibsRelative <- getDirectoryFiles
+                            libffiLibPath
+                            (if osx
+                                then ["lib" ++ libffiName'' ++ ".dylib*"]
+                                else ["lib" ++ libffiName'' ++ ".so*"])
+                        return (libffiLibPath, dynLibsRelative)
 
-    fmap (libffiPath -/-) ["Makefile.in", "configure" ] &%> \[mkIn, _] -> do
+                -- Install dynamic libraries.
+                rtsPath <- rtsBuildPath stage
+                forM_ dynLibFiles $ \dynLibFile -> do
+                    let target = rtsPath -/- dynLibFile
+                    copyFileUntracked (dynLibsSrcDir -/- dynLibFile) target
+                    produces [target]
+
+            putSuccess "| Successfully bundled custom library 'libffi' with rts"
+
+      -- Extract the libffi tar file and build.
+      buildLibffi = do
+        -- Clear build directory.
         removeDirectory libffiPath
+        createDirectory libffiPathParent
+
+        -- Extract the libffi tar arcive
         tarball <- unifyPath . fromSingleton "Exactly one LibFFI tarball is expected"
                <$> getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
-
         need [tarball]
         -- Go from 'libffi-3.99999+git20171002+77e130c.tar.gz' to 'libffi-3.99999'
         let libname = takeWhile (/= '+') $ takeFileName tarball
-
-        root <- buildRoot
-        removeDirectory (root -/- libname)
-        -- TODO: Simplify.
+            extractParentDir = root -/- stageString stage
+            extractDir = extractParentDir -/- libname
+        removeDirectory extractDir
+        context <- libffiContext stage
         actionFinally (do
-            build $ target (libffiContext stage) (Tar Extract) [tarball] [path]
-            moveDirectory (path -/- libname) libffiPath) $
+            build $ target context (Tar Extract) [tarball] [extractParentDir]
+            moveDirectory extractDir libffiPath) $
             -- And finally:
-            removeFiles (path) [libname <//> "*"]
+            removeFiles extractDir [".//*"]
 
+        -- Fix Makefile.in.
+        let mk   = libffiPath -/- "Makefile"
+            mkIn = mk <.> "in"
         top <- topDirectory
         fixFile mkIn (fixLibffiMakefile top)
 
-        files <- liftIO $ getDirectoryFilesIO "." [libffiPath <//> "*"]
-        produces files
-
-    fmap (libffiPath -/-) ["Makefile", "config.guess", "config.sub"] &%> \[mk, _, _] -> do
-        need [mk <.> "in"]
+        -- Configure.
         forM_ ["config.guess", "config.sub"] $ \file -> do
             copyFile file (libffiPath -/- file)
         env <- configureEnvironment stage
         buildWithCmdOptions env $
-            target (libffiContext stage) (Configure libffiPath) [mk <.> "in"] [mk]
+          target context (Configure libffiPath) [mkIn] [mk]
 
-        dir   <- setting BuildPlatform
-        files <- liftIO $ getDirectoryFilesIO "." [libffiPath -/- dir <//> "*"]
+        -- Build.
+        build $ target context (Make libffiPath) [] []
+        files <- liftIO $ getDirectoryFilesIO "." [libffiPath <//> "*"]
         produces files
+        putSuccess "| Successfully built custom library 'libffi'"
+
+    -- See [Hadrian: install libffi hack]. Needing any of the libffi header
+    -- files also results in installing relevant libffi library files to rtsPath
+    -- if necessary. Instead, the rts should need and copy the relevant libffi
+    -- library files. The problem is that the names of the library files are
+    -- only known after building libffi.
+    fmap ((root -/- stageString stage -/- "rts/build") -/-) libffiDependencies
+      &%> \_ -> installLibffiRts
