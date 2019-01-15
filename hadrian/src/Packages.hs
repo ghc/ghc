@@ -12,7 +12,7 @@ module Packages (
 
     -- * Package information
     programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
-    rtsContext, rtsBuildPath, libffiContext, libffiBuildPath, libffiLibraryName,
+    rtsContext, rtsBuildPath, libffiBuildPath, libffiLibraryName,
     generatedGhcDependencies, ensureConfigured
     ) where
 
@@ -200,14 +200,12 @@ rtsContext stage = vanillaContext stage rts
 rtsBuildPath :: Stage -> Action FilePath
 rtsBuildPath stage = buildPath (rtsContext stage)
 
--- | Build directory for @libffi@. This probably doesn't need to be stage
--- dependent but it is for consistency for now.
-libffiContext :: Stage -> Context
-libffiContext stage = vanillaContext stage libffi
-
 -- | Build directory for in-tree 'libffi' library.
 libffiBuildPath :: Stage -> Action FilePath
-libffiBuildPath stage = buildPath (libffiContext stage)
+libffiBuildPath stage = buildPath $ Context
+    stage
+    libffi
+    (error "libffiBuildPath: way not set.")
 
 -- | Name of the 'libffi' library.
 libffiLibraryName :: Action FilePath

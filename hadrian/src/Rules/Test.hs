@@ -113,11 +113,7 @@ needIservBins = do
     rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
     need =<< traverse programPath
                [ Context Stage1 iserv w
-               | w <- [vanilla, profiling
-                    -- TODO dynamic way has been reverted as the dynamic build
-                    --      is broken. See #15837.
-                    -- , dynamic
-                    ]
+               | w <- [vanilla, profiling, dynamic]
                , w `elem` rtsways
                ]
 

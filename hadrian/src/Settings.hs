@@ -50,12 +50,17 @@ flavour = do
 getIntegerPackage :: Expr Package
 getIntegerPackage = expr (integerLibrary =<< flavour)
 
+-- TODO: there is duplication and inconsistency between this and
+-- Rules.Program.getProgramContexts. There should only be one way to get a
+-- context / contexts for a given stage and package.
 programContext :: Stage -> Package -> Action Context
 programContext stage pkg = do
     profiled <- ghcProfiled <$> flavour
-    return $ if pkg == ghc && profiled && stage > Stage0
-             then Context stage pkg profiling
-             else vanillaContext stage pkg
+    dynGhcProgs <- dynamicGhcPrograms =<< flavour
+    return . Context stage pkg . wayFromUnits . concat $
+        [ [ Profiling  | pkg == ghc && profiled && stage > Stage0 ]
+        , [ Dynamic    | dynGhcProgs && stage > Stage0 ]
+        ]
 
 -- TODO: switch to Set Package as the order of packages should not matter?
 -- Otherwise we have to keep remembering to sort packages from time to time.

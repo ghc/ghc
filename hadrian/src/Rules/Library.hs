@@ -13,6 +13,7 @@ import Flavour
 import Oracles.ModuleFiles
 import Packages
 import Rules.Gmp
+import Rules.Libffi (libffiDependencies)
 import Settings
 import Target
 import Utilities
@@ -57,6 +58,14 @@ buildDynamicLibUnix root suffix dynlibpath = do
     let context = libDynContext dynlib
     deps <- contextDependencies context
     need =<< mapM pkgLibraryFile deps
+
+    -- TODO should this be somewhere else?
+    -- Custom build step to generate libffi.so* in the rts build directory.
+    when (package context == rts) . interpretInContext context $ do
+        stage   <- getStage
+        rtsPath <- expr (rtsBuildPath stage)
+        expr $ need ((rtsPath -/-) <$> libffiDependencies)
+
     objs <- libraryObjects context
     build $ target context (Ghc LinkHs $ Context.stage context) objs [dynlibpath]
 
