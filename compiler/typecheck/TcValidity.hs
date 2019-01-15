@@ -369,12 +369,14 @@ checkValidType ctxt ty
 
        ; env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
+       ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
+                             , ve_rank = rank, ve_expand = expand }
 
        -- Check the internal validity of the type itself
        -- Fail if bad things happen, else we misleading
        -- (and more complicated) errors in checkAmbiguity
        ; checkNoErrs $
-         do { check_type env ctxt rank expand ty
+         do { check_type ve ty
             ; checkUserTypeError ty
             ; traceTc "done ct" (ppr ty) }
 
@@ -390,7 +392,9 @@ checkValidMonoType :: Type -> TcM ()
 checkValidMonoType ty
   = do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
-       ; check_type env SigmaCtxt MustBeMonoType expand ty }
+       ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = SigmaCtxt
+                             , ve_rank = MustBeMonoType, ve_expand = expand }
+       ; check_type ve ty }
 
 checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()
 checkTySynRhs ctxt ty
@@ -428,6 +432,13 @@ data Rank = ArbitraryRank         -- Any rank ok
 
           | MustBeMonoType  -- Monotype regardless of flags
 
+instance Outputable Rank where
+  ppr ArbitraryRank  = text "ArbitraryRank"
+  ppr (LimitedRank top_forall_ok r)
+                     = text "LimitedRank" <+> ppr top_forall_ok
+                                          <+> parens (ppr r)
+  ppr (MonoType msg) = text "MonoType" <+> parens msg
+  ppr MustBeMonoType = text "MustBeMonoType"
 
 rankZeroMonoType, tyConArgMonoType, synArgMonoType, constraintMonoType :: Rank
 rankZeroMonoType   = MonoType (text "Perhaps you intended to use RankNTypes")
@@ -560,36 +571,52 @@ initialExpandMode = do
   liberal_flag <- xoptM LangExt.LiberalTypeSynonyms
   pure $ if liberal_flag then Expand else Both
 
+-- | Information about a type being validity-checked.
+data ValidityEnv = ValidityEnv
+  { ve_tidy_env :: TidyEnv
+  , ve_ctxt     :: UserTypeCtxt
+  , ve_rank     :: Rank
+  , ve_expand   :: ExpandMode }
+
+instance Outputable ValidityEnv where
+  ppr (ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
+                  , ve_rank = rank, ve_expand = expand }) =
+    hang (text "ValidityEnv")
+       2 (vcat [ text "ve_tidy_env" <+> ppr env
+               , text "ve_ctxt"     <+> pprUserTypeCtxt ctxt
+               , text "ve_rank"     <+> ppr rank
+               , text "ve_expand"   <+> ppr expand ])
+
 ----------------------------------------
-check_type :: TidyEnv -> UserTypeCtxt -> Rank -> ExpandMode -> Type -> TcM ()
+check_type :: ValidityEnv -> Type -> TcM ()
 -- The args say what the *type context* requires, independent
 -- of *flag* settings.  You test the flag settings at usage sites.
 --
 -- Rank is allowed rank for function args
 -- Rank 0 means no for-alls anywhere
 
-check_type _ _ _ _ (TyVarTy _) = return ()
+check_type _ (TyVarTy _) = return ()
 
-check_type env ctxt rank expand (AppTy ty1 ty2)
-  = do  { check_type env ctxt rank expand ty1
-        ; check_arg_type env ctxt rank expand ty2 }
+check_type ve (AppTy ty1 ty2)
+  = do  { check_type ve ty1
+        ; check_arg_type ve ty2 }
 
-check_type env ctxt rank expand ty@(TyConApp tc tys)
+check_type ve ty@(TyConApp tc tys)
   | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
-  = check_syn_tc_app env ctxt rank expand ty tc tys
-  | isUnboxedTupleTyCon tc = check_ubx_tuple env ctxt expand ty tys
-  | otherwise              = mapM_ (check_arg_type env ctxt rank expand) tys
+  = check_syn_tc_app ve ty tc tys
+  | isUnboxedTupleTyCon tc = check_ubx_tuple ve ty tys
+  | otherwise              = mapM_ (check_arg_type ve) tys
 
-check_type _ _ _ _ (LitTy {}) = return ()
+check_type _ (LitTy {}) = return ()
 
-check_type env ctxt rank expand (CastTy ty _) =
-  check_type env ctxt rank expand ty
+check_type ve (CastTy ty _) = check_type ve ty
 
 -- Check for rank-n types, such as (forall x. x -> x) or (Show x => x).
 --
 -- Critically, this case must come *after* the case for TyConApp.
 -- See Note [Liberal type synonyms].
-check_type env ctxt rank expand ty
+check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
+                          , ve_rank = rank, ve_expand = expand }) ty
   | not (null tvbs && null theta)
   = do  { traceTc "check_type" (ppr ty $$ ppr (forAllAllowed rank))
         ; checkTcM (forAllAllowed rank) (forAllTyErr env rank ty)
@@ -605,7 +632,7 @@ check_type env ctxt rank expand ty
                 -- Allow     type T = ?x::Int => Int -> Int
                 -- but not   type T = ?x::Int
 
-        ; check_type env' ctxt rank expand tau
+        ; check_type (ve{ve_tidy_env = env'}) tau
                 -- Allow foralls to right of arrow
 
         ; checkTcM (not (any (`elemVarSet` tyCoVarsOfType phi_kind) tvs))
@@ -623,21 +650,22 @@ check_type env ctxt rank expand ty
              | otherwise  = liftedTypeKind
         -- If there are any constraints, the kind is *. (#11405)
 
-check_type env ctxt rank expand (FunTy arg_ty res_ty)
-  = do  { check_type env ctxt arg_rank expand arg_ty
-        ; check_type env ctxt res_rank expand res_ty }
+check_type (ve@ValidityEnv{ve_rank = rank}) (FunTy arg_ty res_ty)
+  = do  { check_type (ve{ve_rank = arg_rank}) arg_ty
+        ; check_type (ve{ve_rank = res_rank}) res_ty }
   where
     (arg_rank, res_rank) = funArgResRank rank
 
-check_type _ _ _ _ ty = pprPanic "check_type" (ppr ty)
+check_type _ ty = pprPanic "check_type" (ppr ty)
 
 ----------------------------------------
-check_syn_tc_app :: TidyEnv -> UserTypeCtxt -> Rank -> ExpandMode
+check_syn_tc_app :: ValidityEnv
                  -> KindOrType -> TyCon -> [KindOrType] -> TcM ()
 -- Used for type synonyms and type synonym families,
 -- which must be saturated,
 -- but not data families, which need not be saturated
-check_syn_tc_app env ctxt rank expand ty tc tys
+check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
+                 ty tc tys
   | tys `lengthAtLeast` tc_arity   -- Saturated
        -- Check that the synonym has enough args
        -- This applies equally to open and closed synonyms
@@ -665,11 +693,14 @@ check_syn_tc_app env ctxt rank expand ty tc tys
     tc_arity  = tyConArity tc
 
     check_arg :: ExpandMode -> KindOrType -> TcM ()
-    check_arg
+    check_arg expand
       | isTypeFamilyTyCon tc
-      = check_arg_type  env arg_ctxt rank
+      = check_arg_type ve'
       | otherwise
-      = check_type      env arg_ctxt synArgMonoType
+      = check_type (ve'{ve_rank = synArgMonoType})
+      where
+        ve' :: ValidityEnv
+        ve' = ve{ve_ctxt = arg_ctxt, ve_expand = expand}
 
     check_args_only, check_expansion_only :: ExpandMode -> TcM ()
     check_args_only expand = mapM_ (check_arg expand) tys
@@ -679,7 +710,7 @@ check_syn_tc_app env ctxt rank expand ty tc tys
                          err_ctxt = text "In the expansion of type synonym"
                                     <+> quotes (ppr syn_tc)
                      in addErrCtxt err_ctxt $
-                        check_type env ctxt rank expand ty'
+                        check_type (ve{ve_expand = expand}) ty'
          Nothing  -> pprPanic "check_syn_tc_app" (ppr ty)
 
     arg_ctxt :: UserTypeCtxt
@@ -730,9 +761,8 @@ field to False.
 -}
 
 ----------------------------------------
-check_ubx_tuple :: TidyEnv -> UserTypeCtxt -> ExpandMode -> KindOrType
-                -> [KindOrType] -> TcM ()
-check_ubx_tuple env ctxt expand ty tys
+check_ubx_tuple :: ValidityEnv -> KindOrType -> [KindOrType] -> TcM ()
+check_ubx_tuple (ve@ValidityEnv{ve_tidy_env = env}) ty tys
   = do  { ub_tuples_allowed <- xoptM LangExt.UnboxedTuples
         ; checkTcM ub_tuples_allowed (ubxArgTyErr env ty)
 
@@ -741,11 +771,10 @@ check_ubx_tuple env ctxt expand ty tys
                 -- c.f. check_arg_type
                 -- However, args are allowed to be unlifted, or
                 -- more unboxed tuples, so can't use check_arg_ty
-        ; mapM_ (check_type env ctxt rank' expand) tys }
+        ; mapM_ (check_type (ve{ve_rank = rank'})) tys }
 
 ----------------------------------------
-check_arg_type :: TidyEnv -> UserTypeCtxt -> Rank -> ExpandMode
-               -> KindOrType -> TcM ()
+check_arg_type :: ValidityEnv -> KindOrType -> TcM ()
 -- The sort of type that can instantiate a type variable,
 -- or be the argument of a type constructor.
 -- Not an unboxed tuple, but now *can* be a forall (since impredicativity)
@@ -764,9 +793,9 @@ check_arg_type :: TidyEnv -> UserTypeCtxt -> Rank -> ExpandMode
 --     But not in user code.
 -- Anyway, they are dealt with by a special case in check_tau_type
 
-check_arg_type _ _ _ _ (CoercionTy {}) = return ()
+check_arg_type _ (CoercionTy {}) = return ()
 
-check_arg_type env ctxt rank expand ty
+check_arg_type (ve@ValidityEnv{ve_rank = rank}) ty
   = do  { impred <- xoptM LangExt.ImpredicativeTypes
         ; let rank' = case rank of          -- Predictive => must be monotype
                         MustBeMonoType     -> MustBeMonoType  -- Monotype, regardless
@@ -777,7 +806,7 @@ check_arg_type env ctxt rank expand ty
                         --    (Ord (forall a.a)) => a -> a
                         -- and so that if it Must be a monotype, we check that it is!
 
-        ; check_type env ctxt rank' expand ty }
+        ; check_type (ve{ve_rank = rank'}) ty }
 
 ----------------------------------------
 forAllTyErr :: TidyEnv -> Rank -> Type -> (TidyEnv, SDoc)
@@ -941,13 +970,19 @@ check_pred_ty :: TidyEnv -> DynFlags -> UserTypeCtxt -> ExpandMode
 -- Check the validity of a predicate in a signature
 -- See Note [Validity checking for constraints]
 check_pred_ty env dflags ctxt expand pred
-  = do { check_type env SigmaCtxt rank expand pred
+  = do { check_type ve pred
        ; check_pred_help False env dflags ctxt pred }
   where
     rank | xopt LangExt.QuantifiedConstraints dflags
          = ArbitraryRank
          | otherwise
          = constraintMonoType
+
+    ve :: ValidityEnv
+    ve = ValidityEnv{ ve_tidy_env = env
+                    , ve_ctxt     = SigmaCtxt
+                    , ve_rank     = rank
+                    , ve_expand   = expand }
 
 check_pred_help :: Bool    -- True <=> under a type synonym
                 -> TidyEnv
