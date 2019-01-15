@@ -141,3 +141,7 @@ test('plugin-recomp-change-prof',
       when(not config.have_profiling,skip)
       ],
      run_command, ['$MAKE -s --no-print-directory plugin-recomp-change-prof'])
+
+test('T16104',
+     pre_cmd('$MAKE -s --no-print-directory -C T16104-plugin package.T16104-plugin TOP={top}'),
+     run_command, ['$MAKE -s --no-print-directory T16104'])
