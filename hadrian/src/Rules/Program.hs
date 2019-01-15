@@ -47,16 +47,13 @@ getProgramContexts stage = do
     -- iserv gets its names from Packages.hs:programName
     --
     profiled <- ghcProfiled <$> flavour
-    let allCtxs =
-          if pkg == ghc && profiled && stage > Stage0
-            then [ Context stage pkg profiling ]
-            else [ vanillaContext stage pkg
-                  , Context stage pkg profiling
-                  -- TODO Dynamic way has been reverted as the dynamic build is
-                  --      broken. See #15837.
-                  -- , Context stage pkg dynamic
-                 ]
-
+    ctx <- programContext stage pkg -- TODO: see todo on programContext.
+    let allCtxs = if pkg == iserv
+        then [ vanillaContext stage pkg
+             , Context stage pkg profiling
+             , Context stage pkg dynamic
+             ]
+        else [ ctx ]
     forM allCtxs $ \ctx -> do
       name <- programName ctx
       return (name <.> exe, ctx)
