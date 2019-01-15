@@ -1,0 +1,11 @@
+Name:           T16104-plugin
+Version:        0.1
+Synopsis:       For testing
+Cabal-Version:  >= 1.2
+Build-Type:     Simple
+License:        BSD3
+License-File:   LICENSE
+
+Library
+    Build-Depends: base, ghc
+    Exposed-Modules: T16104_Plugin
