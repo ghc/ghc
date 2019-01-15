@@ -208,3 +208,9 @@ test('T15858',
       extra_hc_opts("-package-db plugin-recomp/pkg.plugins01/local.package.conf ")
       ],
      ghci_script, ['T15858.script'])
+
+test('T16104',
+     [extra_files(['T16104-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C T16104-plugin package.T16104-plugin TOP={top}')
+     ],
+     run_command, ['$MAKE -s --no-print-directory T16104'])
