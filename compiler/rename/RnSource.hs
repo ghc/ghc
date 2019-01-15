@@ -784,14 +784,6 @@ rnFamInstEqn doc mb_cls rhs_kvars
                                       ++ map hsLTyVarName bndrs'
                     ; warnUnusedTypePatterns all_nms nms_used
 
-                         -- See Note [Renaming associated types]
-                    ; let bad_tvs = maybe [] (filter is_bad . snd) mb_cls
-                          var_name_set = mkNameSet (map hsLTyVarName bndrs'
-                                                    ++ all_imp_var_names)
-                          is_bad cls_tkv = cls_tkv `elemNameSet` rhs_fvs
-                                           && not (cls_tkv `elemNameSet` var_name_set)
-                    ; unless (null bad_tvs) (badAssocRhs bad_tvs)
-
                     ; return ((bndrs', pats', payload'), rhs_fvs `plusFV` pat_fvs) }
 
        ; let all_fvs  = fvs `addOneFV` unLoc tycon'
@@ -999,6 +991,21 @@ can all be in scope (Trac #5862):
       id :: Ob x a => x a a
       (.) :: (Ob x a, Ob x b, Ob x c) => x b c -> x a b -> x a c
 Here 'k' is in scope in the kind signature, just like 'x'.
+
+Although type family equations can bind type variables with explicit foralls,
+it need not be the case that all variables that appear on the RHS must be bound
+by a forall. For instance, the following is acceptable:
+
+   class C a where
+     type T a b
+   instance C (Maybe a) where
+     type forall b. T (Maybe a) b = Either a b
+
+Even though `a` is not bound by the forall, this is still accepted because `a`
+was previously bound by the `instance C (Maybe a)` part. (see Trac #16116).
+
+In each case, the function which detects improperly bound variables on the RHS
+is TcValidity.checkValidFamPats.
 -}
 
 
@@ -2078,13 +2085,6 @@ are no data constructors we allow h98_style = True
 ***************************************************** -}
 
 ---------------
-badAssocRhs :: [Name] -> RnM ()
-badAssocRhs ns
-  = addErr (hang (text "The RHS of an associated type declaration mentions"
-                  <+> text "out-of-scope variable" <> plural ns
-                  <+> pprWithCommas (quotes . ppr) ns)
-               2 (text "All such variables must be bound on the LHS"))
-
 wrongTyFamName :: Name -> Name -> SDoc
 wrongTyFamName fam_tc_name eqn_tc_name
   = hang (text "Mismatched type name in type family instance.")
