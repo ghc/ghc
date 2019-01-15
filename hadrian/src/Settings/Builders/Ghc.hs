@@ -8,6 +8,7 @@ import Packages
 import Settings.Builders.Common
 import Settings.Warnings
 import qualified Context as Context
+import Rules.Libffi (libffiName)
 
 ghcBuilderArgs :: Args
 ghcBuilderArgs = mconcat [compileAndLinkHs, compileC, findHsDependencies]
@@ -46,19 +47,36 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     libs    <- getContextData extraLibs
     libDirs <- getContextData extraLibDirs
     fmwks   <- getContextData frameworks
-    dynamic <- requiresDynamic
     darwin  <- expr osxHost
+    way     <- getWay
 
     -- Relative path from the output (rpath $ORIGIN).
     originPath <- dropFileName <$> getOutput
     context <- getContext
     libPath' <- expr (libPath context)
     distDir <- expr Context.distDir
+
+    useSystemFfi <- expr (flag UseSystemFfi)
+    buildPath <- getBuildPath
+    libffiName' <- libffiName
+
     let
+        dynamic = Dynamic `wayUnit` way
         distPath = libPath' -/- distDir
         originToLibsDir = makeRelativeNoSysLink originPath distPath
         rpath | darwin = "@loader_path" -/- originToLibsDir
               | otherwise = "$ORIGIN" -/- originToLibsDir
+
+        -- TODO: an alternative would be to generalize by linking with extra
+        -- bundled libraries, but currently the rts is the only use case. It is
+        -- a special case when `useSystemFfi == True`: the ffi library files
+        -- are not actually bundled with the rts. Perhaps ffi should be part of
+        -- rts's extra libraries instead of extra bundled libraries in that
+        -- case. Care should be take as to not break the make build.
+        rtsFfiArg = package rts ? not useSystemFfi ? mconcat
+            [ arg ("-L" ++ buildPath)
+            , arg ("-l" ++ libffiName')
+            ]
 
     mconcat [ dynamic ? mconcat
                 [ arg "-dynamic"
@@ -70,8 +88,9 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
             , not (nonHsMainPackage pkg) ? arg "-rtsopts"
-            , pure [ "-l" ++ lib    | lib <-    libs    ]
+            , pure [ "-l" ++ lib    | lib    <- libs    ]
             , pure [ "-L" ++ libDir | libDir <- libDirs ]
+            , rtsFfiArg
             , darwin ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             ]
 
@@ -117,8 +136,7 @@ commonGhcArgs = do
 wayGhcArgs :: Args
 wayGhcArgs = do
     way <- getWay
-    dynamic <- requiresDynamic
-    mconcat [ if dynamic
+    mconcat [ if Dynamic `wayUnit` way
                 then pure ["-fPIC", "-dynamic"]
                 else arg "-static"
             , (Threaded  `wayUnit` way) ? arg "-optc-DTHREADED_RTS"
@@ -156,20 +174,3 @@ includeGhcArgs = do
             , arg $      "-I" ++ root -/- generatedDir
             , arg $ "-optc-I" ++ root -/- generatedDir
             , pure ["-optP-include", "-optP" ++ cabalMacros] ]
-
--- Check if building dynamically is required. GHC is a special case that needs
--- to be built dynamically if any of the RTS ways is dynamic.
-requiresDynamic :: Expr Bool
-requiresDynamic = wayUnit Dynamic <$> getWay
-    -- TODO This logic has been reverted as the dynamic build is broken.
-    --      See #15837.
-    --
-    -- pkg <- getPackage
-    -- way <- getWay
-    -- rtsWays <- getRtsWays
-    -- let
-    --     dynRts = any (Dynamic `wayUnit`) rtsWays
-    --     dynWay = Dynamic `wayUnit` way
-    -- return $ if pkg == ghc
-    --             then dynRts || dynWay
-    --             else dynWay
