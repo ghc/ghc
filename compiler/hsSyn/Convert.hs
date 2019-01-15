@@ -1369,8 +1369,10 @@ cvtTypeKind ty_str ty
                           HsFunTy{}    -> returnL (HsParTy noExt x')
                           HsForAllTy{} -> returnL (HsParTy noExt x') -- #14646
                           HsQualTy{}   -> returnL (HsParTy noExt x') -- #15324
-                          _            -> return x'
-                 returnL (HsFunTy noExt x'' y')
+                          _            -> return $
+                                          parenthesizeHsType sigPrec x'
+                 let y'' = parenthesizeHsType sigPrec y'
+                 returnL (HsFunTy noExt x'' y'')
              | otherwise
              -> mk_apps
                 (HsTyVar noExt NotPromoted (noLoc (getRdrName funTyCon)))
@@ -1507,12 +1509,13 @@ mk_apps :: HsType GhcPs -> [LHsTypeArg GhcPs] -> CvtM (LHsType GhcPs)
 mk_apps head_ty []       = returnL head_ty
 mk_apps head_ty (arg:args) =
   do { head_ty' <- returnL head_ty
+     ; let phead_ty = parenthesizeHsType sigPrec head_ty'
      ; case arg of
        HsValArg ty  -> do { p_ty      <- add_parens ty
-                          ; mk_apps (HsAppTy noExt head_ty' p_ty) args }
+                          ; mk_apps (HsAppTy noExt phead_ty p_ty) args }
        HsTypeArg ki -> do { p_ki      <- add_parens ki
-                          ; mk_apps (HsAppKindTy noExt head_ty' p_ki) args }
-       HsArgPar _   -> mk_apps (HsParTy noExt head_ty') args
+                          ; mk_apps (HsAppKindTy noExt phead_ty p_ki) args }
+       HsArgPar _   -> mk_apps (HsParTy noExt phead_ty) args
      }
    where
     -- See Note [Adding parens for splices]
@@ -1524,7 +1527,7 @@ mk_apps head_ty (arg:args) =
 wrap_apps  :: LHsType GhcPs -> CvtM (LHsType GhcPs)
 wrap_apps t@(dL->L _ HsAppTy {})     = returnL (HsParTy noExt t)
 wrap_apps t@(dL->L _ HsAppKindTy {}) = returnL (HsParTy noExt t)
-wrap_apps t                          = return t
+wrap_apps t                          = return $ parenthesizeHsType sigPrec t
 
 wrap_tyargs :: LHsTypeArg GhcPs -> CvtM (LHsTypeArg GhcPs)
 wrap_tyargs (HsValArg ty) = do { ty' <- wrap_apps ty

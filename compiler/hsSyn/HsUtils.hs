@@ -510,7 +510,7 @@ nlHsFunTy a b = noLoc (HsFunTy noExt (parenthesizeHsType funPrec a)
     parenthesize_fun_tail (dL->L loc (HsFunTy ext ty1 ty2))
       = cL loc (HsFunTy ext (parenthesizeHsType funPrec ty1)
                            (parenthesize_fun_tail ty2))
-    parenthesize_fun_tail lty = lty
+    parenthesize_fun_tail lty = parenthesizeHsType sigPrec lty
 nlHsParTy t   = noLoc (HsParTy noExt t)
 
 nlHsTyConApp :: IdP (GhcPass p) -> [LHsType (GhcPass p)] -> LHsType (GhcPass p)
