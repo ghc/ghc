@@ -568,7 +568,6 @@ tcInstTyBinder subst (Anon ty)
 -------------------------------
 -- | This takes @a ~# b@ and returns @a ~~ b@.
 mkHEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
--- monadic just for convenience with mkEqBoxTy
 mkHEqBoxTy co ty1 ty2
   = do { k1 <- tcTypeKindM ty1
        ; k2 <- tcTypeKindM ty2

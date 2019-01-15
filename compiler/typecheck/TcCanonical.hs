@@ -1040,7 +1040,8 @@ can_eq_nc_forall ev eq_rel s1 s2
     -- than putting it in the work list
     unify loc role ty1 ty2
       = do { already_eq <- ty1 `tcEqTypeM` ty2
-           ; if already_eq then return (mkTcReflCo role ty1, emptyBag)
+           ; if already_eq
+             then return (mkTcReflCo role ty1, emptyBag)
              else do { (wanted, co) <- newWantedEq loc role ty1 ty2
                      ; return (co, unitBag (mkNonCanonical wanted)) } }
 
@@ -1813,21 +1814,15 @@ canEqTyVar :: CtEvidence          -- ev :: lhs ~ rhs
            -> TcType -> TcType      -- rhs: already flat
            -> TcS (StopOrContinue Ct)
 canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
- = do { let k1 = tyVarKind tv1
-      ; k2 <- tcTypeKindM xi2
-      ; homo_kind <- tcEqTypeM k1 k2
-      ; if homo_kind
-        then canEqTyVarHomo  ev eq_rel swapped tv1 ps_ty1    xi2 ps_xi2
-        else canEqTyVarTake2 ev eq_rel swapped tv1 ps_ty1 k1 xi2 ps_xi2 k2 }
+  = do { let k1 = tyVarKind tv1
+       ; k2 <- tcTypeKindM xi2
+       ; homo_kind <- tcEqTypeM k1 k2
+       ; if homo_kind
+         then canEqTyVarHomo  ev eq_rel swapped tv1 ps_ty1    xi2 ps_xi2
+         else
 
-canEqTyVarTake2 :: CtEvidence          -- ev :: lhs ~ rhs
-                -> EqRel -> SwapFlag
-                -> TcTyVar -> TcType -> TcKind   -- tv1, its pretty form, and its kind
-                -> TcType  -> TcType -> TcKind   -- rhs, its pretty form, and its kind
-                                                 -- Both tv1 and rhs are already flat
-                -> TcS (StopOrContinue Ct)
-canEqTyVarTake2 ev eq_rel swapped tv1 ps_ty1 k1 xi2 ps_xi2 k2
-  = do { -- Note [Flattening] in TcFlatten gives us (F2), which says that
+    -- So the LHS and RHS don't have equal kinds, even modulo zonking
+    do { -- Note [Flattening] in TcFlatten gives us (F2), which says that
          -- flattening is always homogeneous (doesn't change kinds). But
          -- perhaps by flattening the kinds of the two sides of the equality
          -- at hand makes them equal. So let's try that.
@@ -1842,7 +1837,7 @@ canEqTyVarTake2 ev eq_rel swapped tv1 ps_ty1 k1 xi2 ps_xi2 k2
                         , ppr flat_k2
                         , ppr k2_co ])
 
-         -- we know the LHS is a tyvar. So let's dump all the coercions on the RHS
+         -- We know the LHS is a tyvar. So let's dump all the coercions on the RHS
          -- If flat_k1 == flat_k2, let's dump all the coercions on the RHS and
          -- then call canEqTyVarHomo. If they don't equal, just rewriteEqEvidence
          -- (as an optimization, so that we don't have to flatten the kinds again)
@@ -1879,7 +1874,7 @@ canEqTyVarTake2 ev eq_rel swapped tv1 ps_ty1 k1 xi2 ps_xi2 k2
        ; new_ev <- rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
          -- no longer swapped, due to rewriteEqEvidence
        ; canEqTyVarHetero new_ev eq_rel tv1 sym_k1_co flat_k1 ps_ty1
-                                        new_rhs flat_k2 ps_rhs } }
+                                        new_rhs flat_k2 ps_rhs } } }
   where
     xi1 = mkTyVarTy tv1
     loc  = ctEvLoc ev

@@ -833,16 +833,18 @@ deriveTyData tvs tc tc_args mb_deriv_strat deriv_pred
                    ; final_inst_ty_kind <- tcTypeKindM (mkTyConApp tc final_tc_args')
                    ; let via_match = tcUnifyTy final_inst_ty_kind final_via_kind
 
-                   ; checkTc (isJust via_match) $
-                     derivingViaKindErr cls final_inst_ty_kind
-                                        via_ty final_via_kind
+                   ; case via_match of
+                       Nothing -> derivingViaKindErr cls final_inst_ty_kind
+                                                     via_ty final_via_kind
 
-                   ; let Just via_subst = via_match
-                         (final_tkvs, final_cls_tys, final_tc_args)
-                            = propagate_subst via_subst tkvs'
+                       Just via_subst
+                         -> pure ( final_tkvs, final_cls_tys, final_tc_args
+                                 , Just $ ViaStrategy $ substTy via_subst via_ty ) }
+                         where
+                            let (final_tkvs, final_cls_tys, final_tc_args)
+                                    = propagate_subst via_subst tkvs'
                                               final_cls_tys' final_tc_args'
-                   ; pure ( final_tkvs, final_cls_tys, final_tc_args
-                          , Just $ ViaStrategy $ substTy via_subst via_ty ) }
+
 
               _ -> pure ( tkvs', final_cls_tys', final_tc_args'
                         , mb_deriv_strat' )

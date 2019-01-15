@@ -1199,7 +1199,7 @@ reifyInstances th_nm th_tys
                 -- In particular, the type might have kind
                 -- variables inside it (Trac #7477)
 
-        ; traceTc "reifyInstances" (ppr ty $$ ppr (typeKind ty))
+        ; traceTc "reifyInstances" (ppr ty $$ ppr (tcTypeKind ty))
         ; case splitTyConApp_maybe ty of   -- This expands any type synonyms
             Just (tc, tys)                 -- See Trac #7910
                | Just cls <- tyConClass_maybe tc

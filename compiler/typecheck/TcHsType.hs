@@ -1008,7 +1008,7 @@ checkExpectedKindX pp_hs_ty ty act_kind exp_kind
     -- We need to make sure that both kinds have the same number of implicit
     -- foralls out front. If the actual kind has more, instantiate accordingly.
     -- Otherwise, just pass the type & kind through: the errors are caught
-    -- in unifyType.  
+    -- in unifyType.
     match_invisibles ty act_kind
       = do { n_act_invis_bndrs <- invisibleTyBndrCountM act_kind
            ; if n_act_invis_bndrs == 0 then return (ty, act_kind)

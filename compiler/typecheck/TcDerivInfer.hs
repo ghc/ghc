@@ -194,7 +194,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
            -- See Note [Inferring the instance context]
            mk_functor_like_constraints orig t_or_k cls
               = map $ \ty -> let ki = tcTypeKind ty in
-                                 -- OK to use typeKind because 'ty' is a fully
+                                 -- OK to use tcTypeKind because 'ty' is a fully
                                  -- zonked constructor argument type
                              ( [ mk_cls_pred orig t_or_k cls ty
                                , mkPredOrigin orig KindLevel
@@ -236,13 +236,13 @@ inferConstraintsDataConArgs inst_ty inst_tys
              | main_cls `hasKey` dataClassKey
              = do { rep_tc_arg_kinds <- lift $ mapM tcTypeKindM rep_tc_args
                   ; if all isLiftedTypeKind rep_tc_arg_kinds
-                    then return [mkThetaOriginFromPreds constrs]
+                    then return [mkThetaOriginFromPreds preds]
                     else return [] }
              | otherwise
              = return []
              where
-               constrs = [ mk_cls_pred deriv_origin t_or_k main_cls ty
-                         | (t_or_k, ty) <- zip t_or_ks rep_tc_args ]
+               preds = [ mk_cls_pred deriv_origin t_or_k main_cls ty
+                       | (t_or_k, ty) <- zip t_or_ks rep_tc_args ]
 
            mk_cls_pred orig t_or_k cls ty
                 -- Don't forget to apply to cls_tys' too

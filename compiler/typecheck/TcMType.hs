@@ -2522,4 +2522,4 @@ formatLevPolyErr ty
                , text "Kind:" <+> pprWithTYPE tidy_ki ])
   where
     (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
-    tidy_ki             = tidyType tidy_env (typeKind ty)
+    tidy_ki             = tidyType tidy_env (tcTypeKind ty)
