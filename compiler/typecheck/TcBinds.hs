@@ -944,7 +944,8 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                                       , sig_inst_theta = annotated_theta
                                       , sig_inst_skols = annotated_tvs }))
   = -- Choose quantifiers for a partial type signature
-    do { psig_qtv_prs <- zonkTyVarTyVarPairs annotated_tvs
+    do { psig_qtv_prs    <- zonkTyVarTyVarPairs annotated_tvs
+       ; annotated_theta <- zonkTcTypes annotated_theta
 
             -- Check whether the quantified variables of the
             -- partial signature have been unified together
@@ -959,14 +960,18 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                                           , not (tv `elem` qtvs) ]
 
        ; let psig_qtvs = mkVarSet (map snd psig_qtv_prs)
+             used_tvs  = closeOverKinds $
+                         tyCoVarsOfTypes annotated_theta  -- These are put there
+                         `unionVarSet` tau_tvs            -- by the user
+                         `unionVarSet` psig_qtvs
+                         -- Include psig_qtvs, whose kinds may mention variables
+                         -- that should be quantified (Trac #16152)
 
-       ; annotated_theta      <- zonkTcTypes annotated_theta
-       ; (free_tvs, my_theta) <- choose_psig_context psig_qtvs annotated_theta wcx
+       ; (grown_used_tvs, my_theta) <- choose_psig_context used_tvs annotated_theta wcx
 
-       ; let keep_me    = free_tvs `unionVarSet` psig_qtvs
-             final_qtvs = [ mkTyVarBinder vis tv
+       ; let final_qtvs = [ mkTyVarBinder vis tv
                           | tv <- qtvs -- Pulling from qtvs maintains original order
-                          , tv `elemVarSet` keep_me
+                          , tv `elemVarSet` grown_used_tvs
                           , let vis | tv `elemVarSet` psig_qtvs = Specified
                                     | otherwise                 = Inferred ]
 
@@ -992,20 +997,14 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
 
     choose_psig_context :: VarSet -> TcThetaType -> Maybe TcType
                         -> TcM (VarSet, TcThetaType)
-    choose_psig_context _ annotated_theta Nothing
-      = do { let free_tvs = closeOverKinds (tyCoVarsOfTypes annotated_theta
-                                            `unionVarSet` tau_tvs)
-           ; return (free_tvs, annotated_theta) }
+    choose_psig_context free_tvs annotated_theta Nothing
+      = return (free_tvs, annotated_theta)
 
-    choose_psig_context psig_qtvs annotated_theta (Just wc_var_ty)
-      = do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta seed_tvs)
+    choose_psig_context free_tvs annotated_theta (Just wc_var_ty)
+      = do { let grown_free_tvs = growThetaTyVars inferred_theta free_tvs
                             -- growThetaVars just like the no-type-sig case
                             -- Omitting this caused #12844
-                 seed_tvs = tyCoVarsOfTypes annotated_theta  -- These are put there
-                            `unionVarSet` tau_tvs            --       by the user
-
-           ; let keep_me  = psig_qtvs `unionVarSet` free_tvs
-                 my_theta = pickCapturedPreds keep_me inferred_theta
+                 my_theta = pickCapturedPreds grown_free_tvs inferred_theta
 
            -- Fill in the extra-constraints wildcard hole with inferred_theta,
            -- so that the Hole constraint we have already emitted
@@ -1027,7 +1026,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                 vcat [ ppr sig
                      , ppr annotated_theta, ppr inferred_theta
                      , ppr inferred_diff ]
-           ; return (free_tvs, my_theta) }
+           ; return (grown_free_tvs, my_theta) }
 
     mk_ctuple preds = return (mkBoxedTupleTy preds)
        -- Hack alert!  See TcHsType:

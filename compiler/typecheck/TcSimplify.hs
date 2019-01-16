@@ -1183,6 +1183,7 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
 ------------------
 growThetaTyVars :: ThetaType -> TyCoVarSet -> TyCoVarSet
 -- See Note [Growing the tau-tvs using constraints]
+-- If the input set is closed over kinds, so is the output set
 growThetaTyVars theta tcvs
   | null theta = tcvs
   | otherwise  = transCloVarSet mk_next seed_tcvs
