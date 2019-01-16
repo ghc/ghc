@@ -125,8 +125,8 @@ pprDatas :: CmmStatics -> SDoc
 pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
-pprData (CmmString str)
-  = text "\t.string" <+> doubleQuotes (pprASCII str)
+pprData (CmmString str) = pprBytes str
+
 pprData (CmmUninitialised bytes) = text ".space " <> int bytes
 pprData (CmmStaticLit lit)       = pprDataItem lit
 
