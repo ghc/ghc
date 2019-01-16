@@ -260,6 +260,9 @@ typedef struct {
  * info table describes the pointerhood of the arguments).
  *
  * The stack frame size is also cached in the frame for convenience.
+ *
+ * The only RET_FUN is stg_gc_fun, which is created by __stg_gc_fun,
+ * both in HeapStackCheck.cmm.
  */
 typedef struct {
     const StgInfoTable* info;
