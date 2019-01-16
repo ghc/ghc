@@ -424,26 +424,26 @@ dictSelRule val_index n_ty_args _ id_unf _ args
 mkDataConWorkId :: Name -> DataCon -> Id
 mkDataConWorkId wkr_name data_con
   | isNewTyCon tycon
-  = mkGlobalId (DataConWrapId data_con) wkr_name nt_wrap_ty nt_work_info
+  = mkGlobalId (DataConWrapId data_con) wkr_name wkr_ty nt_work_info
   | otherwise
-  = mkGlobalId (DataConWorkId data_con) wkr_name alg_wkr_ty wkr_info
+  = mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty alg_wkr_info
 
   where
-    tycon = dataConTyCon data_con
+    tycon  = dataConTyCon data_con  -- The representation TyCon
+    wkr_ty = dataConRepType data_con
 
         ----------- Workers for data types --------------
-    alg_wkr_ty = dataConRepType data_con
-    wkr_arity = dataConRepArity data_con
-    wkr_info  = noCafIdInfo
-                `setArityInfo`          wkr_arity
-                `setStrictnessInfo`     wkr_sig
-                `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
-                                                        -- even if arity = 0
-                `setLevityInfoWithType` alg_wkr_ty
-                  -- NB: unboxed tuples have workers, so we can't use
-                  -- setNeverLevPoly
+    alg_wkr_info = noCafIdInfo
+                   `setArityInfo`          wkr_arity
+                   `setStrictnessInfo`     wkr_sig
+                   `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
+                                                           -- even if arity = 0
+                   `setLevityInfoWithType` wkr_ty
+                     -- NB: unboxed tuples have workers, so we can't use
+                     -- setNeverLevPoly
 
-    wkr_sig = mkClosedStrictSig (replicate wkr_arity topDmd) (dataConCPR data_con)
+    wkr_arity = dataConRepArity data_con
+    wkr_sig   = mkClosedStrictSig (replicate wkr_arity topDmd) (dataConCPR data_con)
         --      Note [Data-con worker strictness]
         -- Notice that we do *not* say the worker Id is strict
         -- even if the data constructor is declared strict
@@ -464,20 +464,21 @@ mkDataConWorkId wkr_name data_con
         -- not from the worker Id.
 
         ----------- Workers for newtypes --------------
-    (nt_tvs, _, nt_arg_tys, _) = dataConSig data_con
-    res_ty_args  = mkTyVarTys nt_tvs
-    nt_wrap_ty   = dataConUserType data_con
+    univ_tvs = dataConUnivTyVars data_con
+    arg_tys  = dataConRepArgTys  data_con  -- Should be same as dataConOrigArgTys
     nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
                   `setArityInfo` 1      -- Arity 1
                   `setInlinePragInfo`     alwaysInlinePragma
                   `setUnfoldingInfo`      newtype_unf
-                  `setLevityInfoWithType` nt_wrap_ty
-    id_arg1      = mkTemplateLocal 1 (head nt_arg_tys)
+                  `setLevityInfoWithType` wkr_ty
+    id_arg1      = mkTemplateLocal 1 (head arg_tys)
+    res_ty_args  = mkTyVarTys univ_tvs
     newtype_unf  = ASSERT2( isVanillaDataCon data_con &&
-                            isSingleton nt_arg_tys, ppr data_con  )
+                            isSingleton arg_tys
+                          , ppr data_con  )
                               -- Note [Newtype datacons]
                    mkCompulsoryUnfolding $
-                   mkLams nt_tvs $ Lam id_arg1 $
+                   mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
 
 dataConCPR :: DataCon -> DmdResult
