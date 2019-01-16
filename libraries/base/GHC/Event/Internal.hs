@@ -58,7 +58,7 @@ evtClose :: Event
 evtClose = Event 4
 
 eventIs :: Event -> Event -> Bool
-eventIs (Event a) (Event b) = a .&. b /= 0
+Event a `eventIs` Event b = a .&. b /= 0
 
 -- | @since 4.4.0.0
 instance Show Event where
