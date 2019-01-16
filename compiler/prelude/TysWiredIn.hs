@@ -16,8 +16,6 @@ module TysWiredIn (
 
         mkWiredInIdName,    -- used in MkId
 
-        mkFunKind, mkForAllKind,
-
         -- * All wired in things
         wiredInTyCons, isBuiltInOcc_maybe,
 
@@ -594,14 +592,6 @@ constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 liftedTypeKind, constraintKind :: Kind
 liftedTypeKind   = tYPE liftedRepTy
 constraintKind   = mkTyConApp constraintKindTyCon []
-
--- mkFunKind and mkForAllKind are defined here
--- solely so that TyCon can use them via a SOURCE import
-mkFunKind :: Kind -> Kind -> Kind
-mkFunKind = mkVisFunTy
-
-mkForAllKind :: TyCoVar -> ArgFlag -> Kind -> Kind
-mkForAllKind = mkForAllTy
 
 {-
 ************************************************************************

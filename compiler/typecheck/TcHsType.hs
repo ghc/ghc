@@ -2388,7 +2388,7 @@ etaExpandAlgTyCon tc_bndrs kind
               arg'   = substTy subst arg
               tv     = mkTyVar (mkInternalName uniq occ loc) arg'
               subst' = extendTCvInScope subst tv
-              tcb    = Bndr tv AnonTCB
+              tcb    = Bndr tv (AnonTCB VisArg)
               (uniq:uniqs') = uniqs
               (occ:occs')   = occs
 
@@ -2417,7 +2417,7 @@ tcbVisibilities tc orig_args
     go fun_kind subst all_args@(arg : args)
       | Just (tcb, inner_kind) <- splitPiTy_maybe fun_kind
       = case tcb of
-          Anon {}             -> AnonTCB      : go inner_kind subst  args
+          Anon af _           -> AnonTCB af   : go inner_kind subst  args
           Named (Bndr tv vis) -> NamedTCB vis : go inner_kind subst' args
                  where
                     subst' = extendTCvSubst subst tv arg

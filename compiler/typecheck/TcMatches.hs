@@ -619,7 +619,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
                          , trS_by = by, trS_using = using, trS_form = form
                          , trS_ret = return_op, trS_bind = bind_op
                          , trS_fmap = fmap_op }) res_ty thing_inside
-  = do { let star_star_kind = liftedTypeKind `mkFunKind` liftedTypeKind
+  = do { let star_star_kind = liftedTypeKind `mkVisFunTy` liftedTypeKind
        ; m1_ty   <- newFlexiTyVarTy star_star_kind
        ; m2_ty   <- newFlexiTyVarTy star_star_kind
        ; tup_ty  <- newFlexiTyVarTy liftedTypeKind
@@ -744,7 +744,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 --        -> m (st1, (st2, st3))
 --
 tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
-  = do { let star_star_kind = liftedTypeKind `mkFunKind` liftedTypeKind
+  = do { let star_star_kind = liftedTypeKind `mkVisFunTy` liftedTypeKind
        ; m_ty   <- newFlexiTyVarTy star_star_kind
 
        ; let mzip_ty  = mkInvForAllTys [alphaTyVar, betaTyVar] $

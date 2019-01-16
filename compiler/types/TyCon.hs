@@ -133,10 +133,9 @@ module TyCon(
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType )
+import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType, mkForAllTy, mkFFunTy )
 import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
-                                 , vecCountTyCon, vecElemTyCon, liftedTypeKind
-                                 , mkFunKind, mkForAllKind )
+                                 , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyCoVars, dataConFieldLabels
                                  , dataConTyCon, dataConFullSig
                                  , isUnboxedSumCon )
@@ -403,15 +402,15 @@ type TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
 
 data TyConBndrVis
   = NamedTCB ArgFlag
-  | AnonTCB
+  | AnonTCB  AnonArgFlag
 
 instance Outputable TyConBndrVis where
-  ppr (NamedTCB flag) = text "NamedTCB" <+> ppr flag
-  ppr AnonTCB         = text "AnonTCB"
+  ppr (NamedTCB flag) = text "NamedTCB" <> ppr flag
+  ppr (AnonTCB af)    = text "AnonTCB"  <> ppr af
 
 mkAnonTyConBinder :: TyVar -> TyConBinder
 mkAnonTyConBinder tv = ASSERT( isTyVar tv)
-                       Bndr tv AnonTCB
+                       Bndr tv (AnonTCB VisArg)
 
 mkAnonTyConBinders :: [TyVar] -> [TyConBinder]
 mkAnonTyConBinders tvs = map mkAnonTyConBinder tvs
@@ -438,8 +437,9 @@ tyConBinderArgFlag :: TyConBinder -> ArgFlag
 tyConBinderArgFlag (Bndr _ vis) = tyConBndrVisArgFlag vis
 
 tyConBndrVisArgFlag :: TyConBndrVis -> ArgFlag
-tyConBndrVisArgFlag (NamedTCB vis) = vis
-tyConBndrVisArgFlag AnonTCB        = Required
+tyConBndrVisArgFlag (NamedTCB vis)     = vis
+tyConBndrVisArgFlag (AnonTCB VisArg)   = Required
+tyConBndrVisArgFlag (AnonTCB InvisArg) = Inferred
 
 isNamedTyConBinder :: TyConBinder -> Bool
 -- Identifies kind variables
@@ -453,8 +453,9 @@ isVisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 isVisibleTyConBinder (Bndr _ tcb_vis) = isVisibleTcbVis tcb_vis
 
 isVisibleTcbVis :: TyConBndrVis -> Bool
-isVisibleTcbVis (NamedTCB vis) = isVisibleArgFlag vis
-isVisibleTcbVis AnonTCB        = True
+isVisibleTcbVis (NamedTCB vis)     = isVisibleArgFlag vis
+isVisibleTcbVis (AnonTCB VisArg)   = True
+isVisibleTcbVis (AnonTCB InvisArg) = False
 
 isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
@@ -464,8 +465,8 @@ mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: TyConBinder -> Kind -> Kind
-    mk (Bndr tv AnonTCB)        k = mkFunKind (varType tv) k
-    mk (Bndr tv (NamedTCB vis)) k = mkForAllKind tv vis k
+    mk (Bndr tv (AnonTCB af))   k = mkFFunTy af (varType tv) k
+    mk (Bndr tv (NamedTCB vis)) k = mkForAllTy tv vis k
 
 tyConTyVarBinders :: [TyConBinder]   -- From the TyCon
                   -> [TyVarBinder]   -- Suitable for the foralls of a term function
@@ -476,7 +477,8 @@ tyConTyVarBinders tc_bndrs
    mk_binder (Bndr tv tc_vis) = mkTyVarBinder vis tv
       where
         vis = case tc_vis of
-                AnonTCB           -> Specified
+                AnonTCB VisArg    -> Specified
+                AnonTCB InvisArg  -> Inferred
                 NamedTCB Required -> Specified
                 NamedTCB vis      -> vis
 
@@ -597,18 +599,21 @@ They fit together like so:
 -}
 
 instance Outputable tv => Outputable (VarBndr tv TyConBndrVis) where
-  ppr (Bndr v AnonTCB)              = text "anon" <+> parens (ppr v)
-  ppr (Bndr v (NamedTCB Required))  = text "req"  <+> parens (ppr v)
-  ppr (Bndr v (NamedTCB Specified)) = text "spec" <+> parens (ppr v)
-  ppr (Bndr v (NamedTCB Inferred))  = text "inf"  <+> parens (ppr v)
+  ppr (Bndr v bi) = ppr_bi bi <+> parens (ppr v)
+    where
+      ppr_bi (AnonTCB VisArg)     = text "anon-vis"
+      ppr_bi (AnonTCB InvisArg)   = text "anon-invis"
+      ppr_bi (NamedTCB Required)  = text "req"
+      ppr_bi (NamedTCB Specified) = text "spec"
+      ppr_bi (NamedTCB Inferred)  = text "inf"
 
 instance Binary TyConBndrVis where
-  put_ bh AnonTCB        = putByte bh 0
+  put_ bh (AnonTCB af)   = do { putByte bh 0; put_ bh af }
   put_ bh (NamedTCB vis) = do { putByte bh 1; put_ bh vis }
 
   get bh = do { h <- getByte bh
               ; case h of
-                  0 -> return AnonTCB
+                  0 -> do { af  <- get bh; return (AnonTCB af) }
                   _ -> do { vis <- get bh; return (NamedTCB vis) } }
 
 

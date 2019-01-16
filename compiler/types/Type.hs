@@ -1303,7 +1303,7 @@ tyConBindersTyCoBinders :: [TyConBinder] -> [TyCoBinder]
 tyConBindersTyCoBinders = map to_tyb
   where
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
-    to_tyb (Bndr tv AnonTCB)        = Anon VisArg (varType tv)
+    to_tyb (Bndr tv (AnonTCB af))   = Anon af (varType tv)
 
 {-
 --------------------------------------------------------------------
@@ -1427,7 +1427,7 @@ mkTyConBindersPreferAnon vars inner_tkvs = ASSERT( all isTyVar vars)
               = ( Bndr v (NamedTCB Required) : binders
                 , fvs `delVarSet` v `unionVarSet` kind_vars )
               | otherwise
-              = ( Bndr v AnonTCB : binders
+              = ( Bndr v (AnonTCB VisArg) : binders
                 , fvs `unionVarSet` kind_vars )
       where
         (binders, fvs) = go vs

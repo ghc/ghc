@@ -10,4 +10,4 @@ tcfail057.hs:6:7: error:
       In an equation for ‘f’: f x = x
     • Relevant bindings include
         x :: RealFrac a (bound at tcfail057.hs:6:3)
-        f :: RealFrac a => a -> a (bound at tcfail057.hs:6:1)
+        f :: RealFrac a -> a -> a (bound at tcfail057.hs:6:1)

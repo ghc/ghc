@@ -717,7 +717,9 @@ pprIfaceTyConBinders = sep . map go
     go (Bndr (IfaceTvBndr bndr) vis) =
       -- See Note [Pretty-printing invisible arguments]
       case vis of
-        AnonTCB            -> ppr_bndr True
+        AnonTCB  VisArg    -> ppr_bndr True
+        AnonTCB  InvisArg  -> ppr_bndr True  -- Rare; just promoted GADT data constructors
+                                             -- Should we print them differently?
         NamedTCB Required  -> ppr_bndr True
         NamedTCB Specified -> char '@' <> ppr_bndr True
         NamedTCB Inferred  -> char '@' <> braces (ppr_bndr False)
@@ -765,7 +767,14 @@ pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
 -- called from other places, besides `:type` and `:info`.
 pprPrecIfaceType prec ty = eliminateRuntimeRep (ppr_ty prec) ty
 
+ppr_sigma :: PprPrec -> IfaceType -> SDoc
+ppr_sigma ctxt_prec ty
+  = maybeParen ctxt_prec funPrec (pprIfaceSigmaType ShowForAllMust ty)
+
 ppr_ty :: PprPrec -> IfaceType -> SDoc
+ppr_ty ctxt_prec ty@(IfaceForAllTy {})        = ppr_sigma ctxt_prec ty
+ppr_ty ctxt_prec ty@(IfaceFunTy InvisArg _ _) = ppr_sigma ctxt_prec ty
+
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [TcTyVars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
@@ -777,7 +786,7 @@ ppr_ty ctxt_prec (IfaceFunTy _ ty1 ty2)  -- Should be VisArg
     maybeParen ctxt_prec funPrec $
     sep [ppr_ty funPrec ty1, sep (ppr_fun_tail ty2)]
   where
-    ppr_fun_tail (IfaceFunTy _ ty1 ty2)
+    ppr_fun_tail (IfaceFunTy VisArg ty1 ty2)
       = (arrow <+> ppr_ty funPrec ty1) : ppr_fun_tail ty2
     ppr_fun_tail other_ty
       = [arrow <+> pprIfaceType other_ty]
@@ -815,9 +824,6 @@ ppr_ty ctxt_prec (IfaceCoercionTy co)
   = if_print_coercions
       (ppr_co ctxt_prec co)
       (text "<>")
-
-ppr_ty ctxt_prec ty -- IfaceForAllTy
-  = maybeParen ctxt_prec funPrec (pprIfaceSigmaType ShowForAllMust ty)
 
 {- Note [Defaulting RuntimeRep variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
