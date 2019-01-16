@@ -14,6 +14,7 @@ module PprBase (
         floatToBytes,
         doubleToBytes,
         pprASCII,
+        pprBytes,
         pprSectionHeader
 )
 
@@ -28,6 +29,7 @@ import DynFlags
 import FastString
 import Outputable
 import Platform
+import FileCleanup
 
 import qualified Data.Array.Unsafe as U ( castSTUArray )
 import Data.Array.ST
@@ -40,6 +42,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import GHC.Exts
 import GHC.Word
+import System.IO.Unsafe
 
 
 
@@ -124,6 +127,51 @@ pprASCII str
                  , chr' (ord0 + w .&. 0x07)
                  ]
        ord0 = 0x30 -- = ord '0'
+
+-- | Pretty print binary data.
+--
+-- Use either the ".string" directive or a ".incbin" directive.
+-- See Note [Embedding large binary blobs]
+--
+-- A NULL byte is added after the binary data.
+--
+pprBytes :: ByteString -> SDoc
+pprBytes bs = sdocWithDynFlags $ \dflags ->
+  if binBlobThreshold dflags == 0
+     || fromIntegral (BS.length bs) <= binBlobThreshold dflags
+    then text "\t.string " <> doubleQuotes (pprASCII bs)
+    else unsafePerformIO $ do
+      bFile <- newTempName dflags TFL_CurrentModule ".dat"
+      BS.writeFile bFile bs
+      return $ text "\t.incbin \"" <> text bFile <> text "\"\n\t.byte 0"
+
+{-
+Note [Embedding large binary blobs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To embed a blob of binary data (e.g. an UTF-8 encoded string) into the generated
+code object, we have several options:
+
+   1. Generate a ".byte" directive for each byte. This is what was done in the past
+      (see Note [Pretty print ASCII when AsmCodeGen]).
+
+   2. Generate a single ".string"/".asciz" directive for the whole sequence of
+      bytes. Bytes in the ASCII printable range are rendered as characters and
+      other values are escaped (e.g., "\t", "\077", etc.).
+
+   3. Create a temporary file into which we dump the binary data and generate a
+      single ".incbin" directive. The assembler will include the binary file for
+      us in the generated output object.
+
+Now the code generator uses either (2) or (3), depending on the binary blob
+size.  Using (3) for small blobs adds too much overhead (see benchmark results
+in #16190), so we only do it when the size is above a threshold (500K at the
+time of writing).
+
+The threshold is configurable via the `-fbinary-blob-threshold` flag.
+
+-}
+
 
 {-
 Note [Pretty print ASCII when AsmCodeGen]
