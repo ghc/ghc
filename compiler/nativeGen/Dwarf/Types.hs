@@ -27,24 +27,21 @@ import GhcPrelude
 import Debug
 import CLabel
 import CmmExpr         ( GlobalReg(..) )
-import Encoding
 import FastString
 import Outputable
 import Platform
 import Unique
 import Reg
 import SrcLoc
-import Util
+import PprBase
 
 import Dwarf.Constants
 
-import qualified Data.ByteString as BS
 import qualified Control.Monad.Trans.State.Strict as S
 import Control.Monad (zipWithM, join)
 import Data.Bits
 import qualified Data.Map as Map
 import Data.Word
-import Data.Char
 
 import CodeGen.Platform
 
@@ -580,25 +577,7 @@ pprString' str = text "\t.asciz \"" <> str <> char '"'
 
 -- | Generate a string constant. We take care to escape the string.
 pprString :: String -> SDoc
-pprString str
-  = pprString' $ hcat $ map escapeChar $
-    if str `lengthIs` utf8EncodedLength str
-    then str
-    else map (chr . fromIntegral) $ BS.unpack $ bytesFS $ mkFastString str
-
--- | Escape a single non-unicode character
-escapeChar :: Char -> SDoc
-escapeChar '\\' = text "\\\\"
-escapeChar '\"' = text "\\\""
-escapeChar '\n' = text "\\n"
-escapeChar c
-  | isAscii c && isPrint c && c /= '?' -- prevents trigraph warnings
-  = char c
-  | otherwise
-  = char '\\' <> char (intToDigit (ch `div` 64)) <>
-                 char (intToDigit ((ch `div` 8) `mod` 8)) <>
-                 char (intToDigit (ch `mod` 8))
-  where ch = ord c
+pprString str = pprBytes $ bytesFS $ mkFastString str
 
 -- | Generate an offset into another section. This is tricky because
 -- this is handled differently depending on platform: Mac Os expects
