@@ -363,11 +363,21 @@ validate-x86_64-windows:
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
     - bash -c "echo include mk/flavours/quick.mk > mk/build.mk"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
+    - |
+      bash -c "make binary-dist TAR_COMP_OPTS=-1"
+      mv ghc-*.tar.xz ghc.tar.xz
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   cache:
     key: x86_64-windows
   tags:
     - x86_64-windows
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+    paths:
+      - ghc.tar.xz
+      - junit.xml
 
 # Note [Cleanup on Windows]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~
