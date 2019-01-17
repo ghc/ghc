@@ -49,6 +49,7 @@ import System.Directory
 import Trace.Hpc.Mix
 import Trace.Hpc.Util
 
+import qualified Data.ByteString as BS
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -1352,9 +1353,9 @@ hpcInitCode this_mod (HpcInfo tickCount hashNo)
   where
     tickboxes = ppr (mkHpcTicksLabel $ this_mod)
 
-    module_name  = hcat (map (text.charToC) $
+    module_name  = hcat (map (text.charToC) $ BS.unpack $
                          bytesFS (moduleNameFS (Module.moduleName this_mod)))
-    package_name = hcat (map (text.charToC) $
+    package_name = hcat (map (text.charToC) $ BS.unpack $
                          bytesFS (unitIdFS  (moduleUnitId this_mod)))
     full_name_str
        | moduleUnitId this_mod == mainUnitId

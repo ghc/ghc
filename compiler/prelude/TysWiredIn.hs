@@ -738,7 +738,7 @@ isBuiltInOcc_maybe occ =
                 in Just $ dataConName $ sumDataCon alt arity
       _ -> Nothing
   where
-    name = fastStringToByteString $ occNameFS occ
+    name = bytesFS $ occNameFS occ
 
     choose_ns :: Name -> Name -> Name
     choose_ns tc dc

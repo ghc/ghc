@@ -344,7 +344,7 @@ instance Binary ModuleName where
 
 instance BinaryStringRep ModuleName where
   fromStringRep = mkModuleNameFS . mkFastStringByteString
-  toStringRep   = fastStringToByteString . moduleNameFS
+  toStringRep   = bytesFS . moduleNameFS
 
 instance Data ModuleName where
   -- don't traverse?
@@ -519,7 +519,7 @@ newtype ComponentId        = ComponentId        FastString deriving (Eq, Ord)
 
 instance BinaryStringRep ComponentId where
   fromStringRep = ComponentId . mkFastStringByteString
-  toStringRep (ComponentId s) = fastStringToByteString s
+  toStringRep (ComponentId s) = bytesFS s
 
 instance Uniquable ComponentId where
   getUnique (ComponentId n) = getUnique n
@@ -849,7 +849,7 @@ rawHashUnitId sorted_holes =
   . BS.concat $ do
         (m, b) <- sorted_holes
         [ toStringRep m,                BS.Char8.singleton ' ',
-          fastStringToByteString (unitIdFS (moduleUnitId b)), BS.Char8.singleton ':',
+          bytesFS (unitIdFS (moduleUnitId b)), BS.Char8.singleton ':',
           toStringRep (moduleName b),   BS.Char8.singleton '\n']
 
 fingerprintUnitId :: BS.ByteString -> Fingerprint -> BS.ByteString

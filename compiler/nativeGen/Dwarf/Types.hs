@@ -38,6 +38,7 @@ import Util
 
 import Dwarf.Constants
 
+import qualified Data.ByteString as BS
 import qualified Control.Monad.Trans.State.Strict as S
 import Control.Monad (zipWithM, join)
 import Data.Bits
@@ -583,7 +584,7 @@ pprString str
   = pprString' $ hcat $ map escapeChar $
     if str `lengthIs` utf8EncodedLength str
     then str
-    else map (chr . fromIntegral) $ bytesFS $ mkFastString str
+    else map (chr . fromIntegral) $ BS.unpack $ bytesFS $ mkFastString str
 
 -- | Escape a single non-unicode character
 escapeChar :: Char -> SDoc

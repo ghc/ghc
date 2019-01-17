@@ -41,10 +41,7 @@ module SMRep (
         aRG_GEN, aRG_GEN_BIG,
 
         -- ** Arrays
-        card, cardRoundUp, cardTableSizeB, cardTableSizeW,
-
-        -- * Operations over [Word8] strings that don't belong here
-        pprWord8String, stringToWord8s
+        card, cardRoundUp, cardTableSizeB, cardTableSizeW
     ) where
 
 import GhcPrelude
@@ -55,9 +52,9 @@ import Outputable
 import Platform
 import FastString
 
-import Data.Char( ord )
 import Data.Word
 import Data.Bits
+import Data.ByteString (ByteString)
 
 {-
 ************************************************************************
@@ -195,7 +192,7 @@ data ClosureTypeInfo
   | BlackHole
   | IndStatic
 
-type ConstrDescription = [Word8] -- result of dataConIdentity
+type ConstrDescription = ByteString -- result of dataConIdentity
 type FunArity          = Int
 type SelectorOffset    = Int
 
@@ -564,11 +561,3 @@ pprTypeInfo (ThunkSelector offset)
 pprTypeInfo Thunk     = text "Thunk"
 pprTypeInfo BlackHole = text "BlackHole"
 pprTypeInfo IndStatic = text "IndStatic"
-
--- XXX Does not belong here!!
-stringToWord8s :: String -> [Word8]
-stringToWord8s s = map (fromIntegral . ord) s
-
-pprWord8String :: [Word8] -> SDoc
--- Debug printing.  Not very clever right now.
-pprWord8String ws = text (show ws)

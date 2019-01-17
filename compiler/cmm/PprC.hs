@@ -51,6 +51,8 @@ import Unique
 import Util
 
 -- The rest
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import Control.Monad.ST
 import Data.Bits
 import Data.Char
@@ -1224,8 +1226,8 @@ machRep_S_CType w
 -- ---------------------------------------------------------------------
 -- print strings as valid C strings
 
-pprStringInCStyle :: [Word8] -> SDoc
-pprStringInCStyle s = doubleQuotes (text (concatMap charToC s))
+pprStringInCStyle :: ByteString -> SDoc
+pprStringInCStyle s = doubleQuotes (text (concatMap charToC (BS.unpack s)))
 
 -- ---------------------------------------------------------------------------
 -- Initialising static objects with floating-point numbers.  We can't

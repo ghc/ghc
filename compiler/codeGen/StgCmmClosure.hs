@@ -91,6 +91,7 @@ import DynFlags
 import Util
 
 import Data.Coerce (coerce)
+import qualified Data.ByteString.Char8 as BS8
 
 -----------------------------------------------------------------------------
 --                Data types and synonyms
@@ -916,10 +917,9 @@ enterIdLabel dflags id c
 mkProfilingInfo :: DynFlags -> Id -> String -> ProfilingInfo
 mkProfilingInfo dflags id val_descr
   | not (gopt Opt_SccProfilingOn dflags) = NoProfilingInfo
-  | otherwise = ProfilingInfo ty_descr_w8 val_descr_w8
+  | otherwise = ProfilingInfo ty_descr_w8 (BS8.pack val_descr)
   where
-    ty_descr_w8  = stringToWord8s (getTyDescription (idType id))
-    val_descr_w8 = stringToWord8s val_descr
+    ty_descr_w8  = BS8.pack (getTyDescription (idType id))
 
 getTyDescription :: Type -> String
 getTyDescription ty
@@ -966,8 +966,8 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
    prof | not (gopt Opt_SccProfilingOn dflags) = NoProfilingInfo
         | otherwise                            = ProfilingInfo ty_descr val_descr
 
-   ty_descr  = stringToWord8s $ occNameString $ getOccName $ dataConTyCon data_con
-   val_descr = stringToWord8s $ occNameString $ getOccName data_con
+   ty_descr  = BS8.pack $ occNameString $ getOccName $ dataConTyCon data_con
+   val_descr = BS8.pack $ occNameString $ getOccName data_con
 
 -- We need a black-hole closure info to pass to @allocDynClosure@ when we
 -- want to allocate the black hole on entry to a CAF.

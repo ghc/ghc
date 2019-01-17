@@ -54,8 +54,8 @@ import MonadUtils
 import Util
 import Outputable
 
+import Data.ByteString (ByteString)
 import Data.Bits
-import Data.Word
 
 -- When we split at proc points, we need an empty info table.
 mkEmptyContInfoTable :: CLabel -> CmmInfoTable
@@ -416,7 +416,7 @@ mkProfLits _ (ProfilingInfo td cd)
        ; (cd_lit, cd_decl) <- newStringLit cd
        ; return ((td_lit,cd_lit), [td_decl,cd_decl]) }
 
-newStringLit :: [Word8] -> UniqSM (CmmLit, GenCmmDecl CmmStatics info stmt)
+newStringLit :: ByteString -> UniqSM (CmmLit, GenCmmDecl CmmStatics info stmt)
 newStringLit bytes
   = do { uniq <- getUniqueM
        ; return (mkByteStringCLit (mkStringLitLabel uniq) bytes) }

@@ -370,8 +370,7 @@ mkHsString :: String -> HsLit (GhcPass p)
 mkHsString s = HsString NoSourceText (mkFastString s)
 
 mkHsStringPrimLit :: FastString -> HsLit (GhcPass p)
-mkHsStringPrimLit fs
-  = HsStringPrim NoSourceText (fastStringToByteString fs)
+mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)
 
 -------------
 userHsLTyVarBndrs :: SrcSpan -> [Located (IdP (GhcPass p))]

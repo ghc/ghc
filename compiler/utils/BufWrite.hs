@@ -77,7 +77,7 @@ bPutStr (BufHandle buf r hdl) !str = do
                 loop cs (i+1)
 
 bPutFS :: BufHandle -> FastString -> IO ()
-bPutFS b fs = bPutBS b $ fastStringToByteString fs
+bPutFS b fs = bPutBS b $ bytesFS fs
 
 bPutFZS :: BufHandle -> FastZString -> IO ()
 bPutFZS b fs = bPutBS b $ fastZStringToByteString fs

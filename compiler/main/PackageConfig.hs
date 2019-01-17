@@ -62,11 +62,11 @@ newtype PackageName        = PackageName        FastString deriving (Eq, Ord)
 
 instance BinaryStringRep SourcePackageId where
   fromStringRep = SourcePackageId . mkFastStringByteString
-  toStringRep (SourcePackageId s) = fastStringToByteString s
+  toStringRep (SourcePackageId s) = bytesFS s
 
 instance BinaryStringRep PackageName where
   fromStringRep = PackageName . mkFastStringByteString
-  toStringRep (PackageName s) = fastStringToByteString s
+  toStringRep (PackageName s) = bytesFS s
 
 instance Uniquable SourcePackageId where
   getUnique (SourcePackageId n) = getUnique n

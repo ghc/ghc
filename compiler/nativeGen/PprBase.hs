@@ -34,6 +34,8 @@ import Control.Monad.ST
 
 import Data.Word
 import Data.Char
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 
 
 
@@ -90,13 +92,13 @@ doubleToBytes d
 -- Print as a string and escape non-printable characters.
 -- This is similar to charToC in Utils.
 
-pprASCII :: [Word8] -> SDoc
+pprASCII :: ByteString -> SDoc
 pprASCII str
   -- Transform this given literal bytestring to escaped string and construct
   -- the literal SDoc directly.
   -- See Trac #14741
   -- and Note [Pretty print ASCII when AsmCodeGen]
-  = text $ foldr (\w s -> (do1 . fromIntegral) w ++ s) "" str
+  = text $ foldr (\w s -> (do1 . fromIntegral) w ++ s) "" (BS.unpack str)
     where
        do1 :: Int -> String
        do1 w | '\t' <- chr w = "\\t"

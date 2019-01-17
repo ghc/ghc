@@ -107,7 +107,7 @@ data Message a where
    -> Int     -- non-ptr words
    -> Int     -- constr tag
    -> Int     -- pointer tag
-   -> [Word8] -- constructor desccription
+   -> ByteString -- constructor desccription
    -> Message (RemotePtr StgInfoTable)
 
   -- | Evaluate a statement

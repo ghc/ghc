@@ -257,6 +257,7 @@ import Data.Char        ( ord )
 import System.Exit
 import Data.Maybe
 import qualified Data.Map as M
+import qualified Data.ByteString.Char8 as BS8
 
 #include "HsVersions.h"
 }
@@ -497,7 +498,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $13 $15
                           ty  = Constr (fromIntegral $9)  -- Tag
-                                       (stringToWord8s $13)
+                                       (BS8.pack $13)
                           rep = mkRTSRep (fromIntegral $11) $
                                   mkHeapRep dflags False (fromIntegral $5)
                                                   (fromIntegral $7) ty
@@ -868,7 +869,7 @@ section "bss"       = UninitialisedData
 section s           = OtherSection s
 
 mkString :: String -> CmmStatic
-mkString s = CmmString (map (fromIntegral.ord) s)
+mkString s = CmmString (BS8.pack s)
 
 -- |
 -- Given an info table, decide what the entry convention for the proc
@@ -1165,8 +1166,7 @@ reserveStackFrame psize preg body = do
 profilingInfo dflags desc_str ty_str
   = if not (gopt Opt_SccProfilingOn dflags)
     then NoProfilingInfo
-    else ProfilingInfo (stringToWord8s desc_str)
-                       (stringToWord8s ty_str)
+    else ProfilingInfo (BS8.pack desc_str) (BS8.pack ty_str)
 
 staticClosure :: UnitId -> FastString -> FastString -> [CmmLit] -> CmmParse ()
 staticClosure pkg cl_label info payload
