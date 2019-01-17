@@ -50,6 +50,7 @@ import Outputable
 import Platform
 import FastString
 import Data.Word
+import qualified Data.ByteString as BS
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
@@ -110,7 +111,7 @@ pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
 pprData (CmmString str)
-  = vcat (map do1 str) $$ do1 0
+  = vcat (map do1 (BS.unpack str)) $$ do1 0
     where
        do1 :: Word8 -> SDoc
        do1 w = text "\t.byte\t" <> int (fromIntegral w)
