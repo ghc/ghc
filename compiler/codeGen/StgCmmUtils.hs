@@ -71,12 +71,12 @@ import FastString
 import Outputable
 import RepType
 
-import qualified Data.ByteString as BS
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Map as M
 import Data.Char
 import Data.List
 import Data.Ord
-import Data.Word
 
 
 -------------------------------------------------------------------------
@@ -86,7 +86,7 @@ import Data.Word
 -------------------------------------------------------------------------
 
 cgLit :: Literal -> FCode CmmLit
-cgLit (LitString s) = newByteStringCLit (BS.unpack s)
+cgLit (LitString s) = newByteStringCLit s
  -- not unpackFS; we want the UTF-8 byte stream.
 cgLit other_lit     = do dflags <- getDynFlags
                          return (mkSimpleLit dflags other_lit)
@@ -320,9 +320,9 @@ emitRODataLits lbl lits = emitDecl (mkRODataLits lbl lits)
 newStringCLit :: String -> FCode CmmLit
 -- Make a global definition for the string,
 -- and return its label
-newStringCLit str = newByteStringCLit (map (fromIntegral . ord) str)
+newStringCLit str = newByteStringCLit (BS8.pack str)
 
-newByteStringCLit :: [Word8] -> FCode CmmLit
+newByteStringCLit :: ByteString -> FCode CmmLit
 newByteStringCLit bytes
   = do  { uniq <- newUnique
         ; let (lit, decl) = mkByteStringCLit (mkStringLitLabel uniq) bytes

@@ -32,7 +32,8 @@
 module FastString
        (
         -- * ByteString
-        fastStringToByteString,
+        bytesFS,            -- :: FastString -> ByteString
+        fastStringToByteString, -- = bytesFS (kept for haddock)
         mkFastStringByteString,
         fastZStringToByteString,
         unsafeMkByteString,
@@ -56,7 +57,6 @@ module FastString
 
         -- ** Deconstruction
         unpackFS,           -- :: FastString -> String
-        bytesFS,            -- :: FastString -> [Word8]
 
         -- ** Encoding
         zEncodeFS,
@@ -132,8 +132,13 @@ import GHC.Conc.Sync    (sharedCAF)
 import GHC.Base         ( unpackCString#, unpackNBytes# )
 
 
+-- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
+bytesFS :: FastString -> ByteString
+bytesFS f = fs_bs f
+
+{-# DEPRECATED fastStringToByteString "Use `bytesFS` instead" #-}
 fastStringToByteString :: FastString -> ByteString
-fastStringToByteString f = fs_bs f
+fastStringToByteString = bytesFS
 
 fastZStringToByteString :: FastZString -> ByteString
 fastZStringToByteString (FastZString bs) = bs
@@ -221,7 +226,7 @@ instance Data FastString where
 cmpFS :: FastString -> FastString -> Ordering
 cmpFS f1@(FastString u1 _ _ _) f2@(FastString u2 _ _ _) =
   if u1 == u2 then EQ else
-  compare (fastStringToByteString f1) (fastStringToByteString f2)
+  compare (bytesFS f1) (bytesFS f2)
 
 foreign import ccall unsafe "memcmp"
   memcmp :: Ptr a -> Ptr b -> Int -> IO Int
@@ -475,13 +480,7 @@ mkFastString str =
 
 -- | Creates a 'FastString' from a UTF-8 encoded @[Word8]@
 mkFastStringByteList :: [Word8] -> FastString
-mkFastStringByteList str =
-  inlinePerformIO $ do
-    let l = Prelude.length str
-    buf <- mallocForeignPtrBytes l
-    withForeignPtr buf $ \ptr -> do
-      pokeArray (castPtr ptr) str
-      mkFastStringForeignPtr ptr buf l
+mkFastStringByteList str = mkFastStringByteString (BS.pack str)
 
 -- | Creates a Z-encoded 'FastString' from a 'String'
 mkZFastString :: String -> FastZString
@@ -553,10 +552,6 @@ nullFS f = BS.null (fs_bs f)
 unpackFS :: FastString -> String
 unpackFS (FastString _ _ bs _) = utf8DecodeByteString bs
 
--- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
-bytesFS :: FastString -> [Word8]
-bytesFS fs = BS.unpack $ fastStringToByteString fs
-
 -- | Returns a Z-encoded version of a 'FastString'.  This might be the
 -- original, if it was already Z-encoded.  The first time this
 -- function is applied to a particular 'FastString', the results are
@@ -576,8 +571,7 @@ zEncodeFS fs@(FastString _ _ _ ref) =
 
 appendFS :: FastString -> FastString -> FastString
 appendFS fs1 fs2 = mkFastStringByteString
-                 $ BS.append (fastStringToByteString fs1)
-                             (fastStringToByteString fs2)
+                 $ BS.append (bytesFS fs1) (bytesFS fs2)
 
 concatFS :: [FastString] -> FastString
 concatFS = mkFastStringByteString . BS.concat . map fs_bs
@@ -627,7 +621,7 @@ getFastStringTable =
 -- |Outputs a 'FastString' with /no decoding at all/, that is, you
 -- get the actual bytes in the 'FastString' written to the 'Handle'.
 hPutFS :: Handle -> FastString -> IO ()
-hPutFS handle fs = BS.hPut handle $ fastStringToByteString fs
+hPutFS handle fs = BS.hPut handle $ bytesFS fs
 
 -- ToDo: we'll probably want an hPutFSLocal, or something, to output
 -- in the current locale's encoding (for error messages and suchlike).

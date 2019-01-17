@@ -50,8 +50,7 @@ import FastString
 import Data.List
 import System.IO
 
--- Temp Jan08
-import SMRep
+import qualified Data.ByteString as BS
 
 
 pprCmms :: (Outputable info, Outputable g)
@@ -121,8 +120,8 @@ pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
          , case prof_info of
              NoProfilingInfo -> empty
              ProfilingInfo ct cd ->
-               vcat [ text "type: " <> pprWord8String ct
-                    , text "desc: " <> pprWord8String cd ]
+               vcat [ text "type: " <> text (show (BS.unpack ct))
+                    , text "desc: " <> text (show (BS.unpack cd)) ]
          , text "srt: " <> ppr srt ]
 
 instance Outputable ForeignHint where
