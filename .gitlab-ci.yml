@@ -45,6 +45,17 @@ ghc-linters:
   tags:
     - lint
 
+check-submodules:
+  stage: lint
+  image: ghcci/linters:0.1
+  script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" -a -n "$RELEASE" ]; then
+        .gitlab/linters/check-submodules
+      fi
+  tags:
+    - lint
+
 ############################################################
 # Validation via Pipelines (hadrian)
 ############################################################
