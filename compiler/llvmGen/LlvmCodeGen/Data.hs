@@ -22,6 +22,7 @@ import Platform
 
 import FastString
 import Outputable
+import qualified Data.ByteString as BS
 
 -- ----------------------------------------------------------------------------
 -- * Constants
@@ -102,7 +103,8 @@ llvmSection (Section t suffix) = do
 genData :: CmmStatic -> LlvmM LlvmStatic
 
 genData (CmmString str) = do
-    let v  = map (\x -> LMStaticLit $ LMIntLit (fromIntegral x) i8) str
+    let v  = map (\x -> LMStaticLit $ LMIntLit (fromIntegral x) i8)
+                 (BS.unpack str)
         ve = v ++ [LMStaticLit $ LMIntLit 0 i8]
     return $ LMStaticArray ve (LMArray (length ve) i8)
 
