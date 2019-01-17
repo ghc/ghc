@@ -432,8 +432,12 @@ tcRnSrcDecls explicit_mod_hdr decls
         -- Zonk the final code.  This must be done last.
         -- Even simplifyTop may do some unification.
         -- This pass also warns about missing type signatures
-      ; (bind_env, ev_binds', binds', fords', imp_specs', rules')
-            <- zonkTcGblEnv new_ev_binds tcg_env
+        -- Zonking may give rise to some more constraints when running
+        -- typed template haskell splices.
+      ; ((bind_env, ev_binds', binds', fords', imp_specs', rules'), splice_lie)
+            <- captureTopConstraints $ zonkTcGblEnv new_ev_binds tcg_env
+
+      ; splice_ev_binds <- simplifyTop splice_lie
 
         -- Finalizers must run after constraints are simplified, or some types
         -- might not be complete when using reify (see #12777).
@@ -448,7 +452,7 @@ tcRnSrcDecls explicit_mod_hdr decls
         -- This won't give rise to any more finalisers as you can't nest
         -- finalisers inside finalisers.
       ; (bind_env_mf, ev_binds_mf, binds_mf, fords_mf, imp_specs_mf, rules_mf)
-            <- zonkTcGblEnv emptyBag tcg_env_mf
+            <- zonkTcGblEnv splice_ev_binds tcg_env_mf
 
 
       ; let { final_type_env = plusTypeEnv (tcg_type_env tcg_env)
