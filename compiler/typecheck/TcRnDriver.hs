@@ -434,43 +434,36 @@ tcRnSrcDecls explicit_mod_hdr decls
         -- This pass also warns about missing type signatures
         -- Zonking may give rise to some more constraints when running
         -- typed template haskell splices.
-      ; ((bind_env, ev_binds', binds', fords', imp_specs', rules'), splice_lie)
+      ; ((_, tcg_env), splice_lie)
             <- captureTopConstraints $ zonkTcGblEnv new_ev_binds tcg_env
 
+      -- simplifyTop does unification so we need to zonk again afterwards.
       ; splice_ev_binds <- simplifyTop splice_lie
 
         -- Finalizers must run after constraints are simplified, or some types
         -- might not be complete when using reify (see #12777).
         -- and also after we zonk the first time because we run typed splices
         -- in the zonker which gives rise to the finalisers.
-      ; (tcg_env_mf, _) <- setGblEnv (clearTcGblEnv tcg_env)
-                                     run_th_modfinalizers
+      ; (tcg_env_mf, _) <- setGblEnv tcg_env run_th_modfinalizers
       ; finishTH
       ; traceTc "Tc11" empty
 
       ; -- zonk the new bindings arising from running the finalisers.
         -- This won't give rise to any more finalisers as you can't nest
         -- finalisers inside finalisers.
-      ; (bind_env_mf, ev_binds_mf, binds_mf, fords_mf, imp_specs_mf, rules_mf)
+      ; (bind_env_mf, tcg_env_mf)
             <- zonkTcGblEnv splice_ev_binds tcg_env_mf
 
 
       ; let { final_type_env = plusTypeEnv (tcg_type_env tcg_env)
-                                (plusTypeEnv bind_env_mf bind_env)
-            ; tcg_env' = tcg_env_mf
-                          { tcg_binds    = binds' `unionBags` binds_mf,
-                            tcg_ev_binds = ev_binds' `unionBags` ev_binds_mf ,
-                            tcg_imp_specs = imp_specs' ++ imp_specs_mf ,
-                            tcg_rules    = rules' ++ rules_mf ,
-                            tcg_fords    = fords' ++ fords_mf } } ;
-
+                                           bind_env_mf
+            ; tcg_env' = tcg_env_mf }
       ; setGlobalTypeEnv tcg_env' final_type_env
 
    } }
 
 zonkTcGblEnv :: Bag EvBind -> TcGblEnv
-             -> TcM (TypeEnv, Bag EvBind, LHsBinds GhcTc,
-                       [LForeignDecl GhcTc], [LTcSpecPrag], [LRuleDecl GhcTc])
+             -> TcM (TypeEnv, TcGblEnv)
 zonkTcGblEnv new_ev_binds tcg_env =
   let TcGblEnv {   tcg_binds     = binds,
                    tcg_ev_binds  = cur_ev_binds,
@@ -480,8 +473,16 @@ zonkTcGblEnv new_ev_binds tcg_env =
 
       all_ev_binds = cur_ev_binds `unionBags` new_ev_binds
 
-  in {-# SCC "zonkTopDecls" #-}
-      zonkTopDecls all_ev_binds binds rules imp_specs fords
+  in do
+      (bind_env, ev_binds', binds', fords', imp_specs', rules') <-
+        {-# SCC "zonkTopDecls" #-}
+          zonkTopDecls all_ev_binds binds rules imp_specs fords
+      return (bind_env, tcg_env { tcg_ev_binds = ev_binds'
+                                , tcg_binds = binds'
+                                , tcg_fords = fords'
+                                , tcg_imp_specs = imp_specs'
+                                , tcg_rules = rules' })
+
 
 
 -- | Remove accumulated bindings, rules and so on from TcGblEnv
