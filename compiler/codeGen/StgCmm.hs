@@ -50,7 +50,6 @@ import VarSet ( isEmptyDVarSet )
 import OrdList
 import MkGraph
 
-import qualified Data.ByteString as BS
 import Data.IORef
 import Control.Monad (when,void)
 import Util
@@ -141,7 +140,7 @@ cgTopBinding dflags (StgTopLifted (StgRec pairs))
 cgTopBinding dflags (StgTopStringLit id str)
   = do  { id' <- maybeExternaliseId dflags id
         ; let label = mkBytesLabel (idName id')
-        ; let (lit, decl) = mkByteStringCLit label (BS.unpack str)
+        ; let (lit, decl) = mkByteStringCLit label str
         ; emitDecl decl
         ; addBindC (litIdInfo dflags id' mkLFStringLit lit)
         }

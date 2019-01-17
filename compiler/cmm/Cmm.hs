@@ -39,8 +39,7 @@ import Hoopl.Collections
 import Hoopl.Graph
 import Hoopl.Label
 import Outputable
-
-import Data.Word        ( Word8 )
+import Data.ByteString (ByteString)
 
 -----------------------------------------------------------------------------
 --  Cmm, GenCmm
@@ -159,7 +158,7 @@ data CmmInfoTable
 
 data ProfilingInfo
   = NoProfilingInfo
-  | ProfilingInfo [Word8] [Word8] -- closure_type, closure_desc
+  | ProfilingInfo ByteString ByteString -- closure_type, closure_desc
 
 -----------------------------------------------------------------------------
 --              Static Data
@@ -195,7 +194,7 @@ data CmmStatic
         -- a literal value, size given by cmmLitRep of the literal.
   | CmmUninitialised Int
         -- uninitialised data, N bytes long
-  | CmmString [Word8]
+  | CmmString ByteString
         -- string of 8-bit values only, not zero terminated.
 
 data CmmStatics
