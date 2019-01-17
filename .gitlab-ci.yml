@@ -109,7 +109,6 @@ validate-x86_64-linux-deb8-hadrian:
 validate-x86_64-darwin:
   extends: .validate
   stage: full-build
-  allow_failure: true
   tags:
     - x86_64-darwin
   variables:
