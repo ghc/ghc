@@ -1,4 +1,7 @@
-# Optimised only, we're testing the strictness analyser here
+# Run this always
+test('T16197', normal, run_command, ['$MAKE -s --no-print-directory T16197'])
+
+# Run the rest only in optasm way, we're testing the strictness analyser here
 setTestOpts( only_ways(['optasm']) )
 
 test('strun001', normal, compile_and_run, [''])
