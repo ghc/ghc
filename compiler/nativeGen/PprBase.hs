@@ -1,3 +1,5 @@
+{-# LANGUAGE MagicHash #-}
+
 -----------------------------------------------------------------------------
 --
 -- Pretty-printing assembly language
@@ -33,9 +35,11 @@ import Data.Array.ST
 import Control.Monad.ST
 
 import Data.Word
-import Data.Char
+import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import GHC.Exts
+import GHC.Word
 
 
 
@@ -98,21 +102,28 @@ pprASCII str
   -- the literal SDoc directly.
   -- See Trac #14741
   -- and Note [Pretty print ASCII when AsmCodeGen]
-  = text $ foldr (\w s -> (do1 . fromIntegral) w ++ s) "" (BS.unpack str)
+  = text $ BS.foldr (\w s -> do1 w ++ s) "" str
     where
-       do1 :: Int -> String
-       do1 w | '\t' <- chr w = "\\t"
-             | '\n' <- chr w = "\\n"
-             | '"'  <- chr w = "\\\""
-             | '\\' <- chr w = "\\\\"
-             | isPrint (chr w) = [chr w]
+       do1 :: Word8 -> String
+       do1 w | 0x09 == w = "\\t"
+             | 0x0A == w = "\\n"
+             | 0x22 == w = "\\\""
+             | 0x5C == w = "\\\\"
+               -- ASCII printable characters range
+             | w >= 0x20 && w <= 0x7E = [chr' w]
              | otherwise = '\\' : octal w
 
-       octal :: Int -> String
-       octal w = [ chr (ord '0' + (w `div` 64) `mod` 8)
-                 , chr (ord '0' + (w `div` 8) `mod` 8)
-                 , chr (ord '0' + w `mod` 8)
+       -- we know that the Chars we create are in the ASCII range
+       -- so we bypass the check in "chr"
+       chr' :: Word8 -> Char
+       chr' (W8# w#) = C# (chr# (word2Int# w#))
+
+       octal :: Word8 -> String
+       octal w = [ chr' (ord0 + (w `unsafeShiftR` 6) .&. 0x07)
+                 , chr' (ord0 + (w `unsafeShiftR` 3) .&. 0x07)
+                 , chr' (ord0 + w .&. 0x07)
                  ]
+       ord0 = 0x30 -- = ord '0'
 
 {-
 Note [Pretty print ASCII when AsmCodeGen]
