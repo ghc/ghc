@@ -84,9 +84,11 @@ import Binary
 import UniqSet
 import Unique( mkAlphaTyVarUnique )
 
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Builder as BSB
+import qualified Data.ByteString.Lazy    as LBS
 import qualified Data.Data as Data
 import Data.Char
-import Data.Word
 import Data.List( find )
 
 {-
@@ -1356,11 +1358,15 @@ dataConRepArgTys (MkData { dcRep = rep
 
 -- | The string @package:module.name@ identifying a constructor, which is attached
 -- to its info table and used by the GHCi debugger and the heap profiler
-dataConIdentity :: DataCon -> [Word8]
+dataConIdentity :: DataCon -> ByteString
 -- We want this string to be UTF-8, so we get the bytes directly from the FastStrings.
-dataConIdentity dc = bytesFS (unitIdFS (moduleUnitId mod)) ++
-                  fromIntegral (ord ':') : bytesFS (moduleNameFS (moduleName mod)) ++
-                  fromIntegral (ord '.') : bytesFS (occNameFS (nameOccName name))
+dataConIdentity dc = LBS.toStrict $ BSB.toLazyByteString $ mconcat
+   [ BSB.byteString $ bytesFS (unitIdFS (moduleUnitId mod))
+   , BSB.int8 $ fromIntegral (ord ':')
+   , BSB.byteString $ bytesFS (moduleNameFS (moduleName mod))
+   , BSB.int8 $ fromIntegral (ord '.')
+   , BSB.byteString $ bytesFS (occNameFS (nameOccName name))
+   ]
   where name = dataConName dc
         mod  = ASSERT( isExternalName name ) nameModule name
 
