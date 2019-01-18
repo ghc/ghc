@@ -1576,11 +1576,15 @@ canDecomposableTyConAppOK :: CtEvidence -> EqRel
                           -> TcS ()
 -- Precondition: tys1 and tys2 are the same length, hence "OK"
 canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
-  = case ev of
+  = ASSERT( tys1 `equalLength` tys2 )
+    case ev of
      CtDerived {}
         -> unifyDeriveds loc tc_roles tys1 tys2
 
      CtWanted { ctev_dest = dest }
+                   -- new_locs and tc_roles are both infinite, so
+                   -- we are guaranteed that cos has the same length
+                   -- as tys1 and tys2
         -> do { cos <- zipWith4M unifyWanted new_locs tc_roles tys1 tys2
               ; setWantedEq dest (mkTyConAppCo role tc cos) }
 
@@ -1596,21 +1600,29 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
   where
     loc        = ctEvLoc ev
     role       = eqRelRole eq_rel
+
+      -- infinite, as tyConRolesX returns an infinite tail of Nominal
     tc_roles   = tyConRolesX role tc
 
-      -- the following makes a better distinction between "kind" and "type"
-      -- in error messages
-    bndrs      = tyConBinders tc
-    is_kinds   = map isNamedTyConBinder bndrs
-    is_viss    = map isVisibleTyConBinder bndrs
-
-    kind_xforms = map (\is_kind -> if is_kind then toKindLoc else id) is_kinds
-    vis_xforms  = map (\is_vis  -> if is_vis  then id
-                                   else flip updateCtLocOrigin toInvisibleOrigin)
-                      is_viss
-
-    -- zipWith3 (.) composes its first two arguments and applies it to the third
-    new_locs = zipWith3 (.) kind_xforms vis_xforms (repeat loc)
+      -- Add nuances to the location during decomposition:
+      --  * if the argument is a kind argument, remember this, so that error
+      --    messages say "kind", not "type". This is determined based on whether
+      --    the corresponding tyConBinder is named (that is, dependent)
+      --  * if the argument is invisible, note this as well, again by
+      --    looking at the corresponding binder
+      -- For oversaturated tycons, we need the (repeat loc) tail, which doesn't
+      -- do either of these changes. (Forgetting to do so led to #16188)
+      --
+      -- NB: infinite in length
+    new_locs = [ new_loc
+               | bndr <- tyConBinders tc
+               , let new_loc0 | isNamedTyConBinder bndr = toKindLoc loc
+                              | otherwise               = loc
+                     new_loc  | isVisibleTyConBinder bndr
+                              = updateCtLocOrigin new_loc0 toInvisibleOrigin
+                              | otherwise
+                              = new_loc0 ]
+               ++ repeat loc
 
 -- | Call when canonicalizing an equality fails, but if the equality is
 -- representational, there is some hope for the future.
