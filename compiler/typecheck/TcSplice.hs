@@ -506,6 +506,9 @@ tcTopSplice expr res_ty
 runTopSplice :: DelayedSplice -> TcM (HsExpr GhcTc)
 runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
   = do
+      -- Setting this flag means that we zonk the resulting bindings after
+      -- simplifying any constraints that arise from running this splice.
+      recordTypedThSpliceRun
       lie_var <- getConstraintVar
       -- We don't want to store the old constraint var from where the
       -- splice is defined as by the time we run the splice we have lost

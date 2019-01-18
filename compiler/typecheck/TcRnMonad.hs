@@ -107,9 +107,9 @@ module TcRnMonad(
   traceTcConstraints, emitWildCardHoleConstraints,
 
   -- * Template Haskell context
-  recordThUse, recordThSpliceUse, recordTopLevelSpliceLoc,
-  getTopLevelSpliceLocs, keepAlive, getStage, getStageAndBindLevel, setStage,
-  addModFinalizersWithLclEnv,
+  recordThUse, recordThSpliceUse, recordTypedThSpliceRun, typedThSpliceRun,
+  recordTopLevelSpliceLoc, getTopLevelSpliceLocs, keepAlive, getStage,
+  getStageAndBindLevel, setStage, addModFinalizersWithLclEnv,
 
   -- * Safe Haskell context
   recordUnsafeInfer, finalSafeMode, fixSafeInstances,
@@ -214,6 +214,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         used_gre_var <- newIORef [] ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
+        typed_th_splice_var <- newIORef False ;
         th_locs_var  <- newIORef Set.empty ;
         infer_var    <- newIORef (True, emptyBag) ;
         dfun_n_var   <- newIORef emptyOccSet ;
@@ -274,6 +275,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_ann_env        = emptyAnnEnv,
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
+                tcg_typed_th_splice_run = typed_th_splice_var,
                 tcg_th_top_level_locs
                                    = th_locs_var,
                 tcg_exports        = [],
@@ -1708,6 +1710,14 @@ recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
 
 recordThSpliceUse :: TcM ()
 recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
+
+typedThSpliceRun :: TcM Bool
+typedThSpliceRun =
+  do { env <- getGblEnv; readTcRef (tcg_typed_th_splice_run env) }
+
+recordTypedThSpliceRun :: TcM ()
+recordTypedThSpliceRun =
+  do { env <- getGblEnv; writeTcRef (tcg_typed_th_splice_run env) True }
 
 -- | When generating an out-of-scope error message for a variable matching a
 -- binding in a later inter-splice group, the typechecker uses the splice

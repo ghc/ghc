@@ -434,31 +434,40 @@ tcRnSrcDecls explicit_mod_hdr decls
         -- This pass also warns about missing type signatures
         -- Zonking may give rise to some more constraints when running
         -- typed template haskell splices.
-      ; ((_, tcg_env), splice_lie)
+      ; ((bind_env, tcg_env), splice_lie)
             <- captureTopConstraints $ zonkTcGblEnv new_ev_binds tcg_env
 
-      -- simplifyTop does unification so we need to zonk again afterwards.
-      ; splice_ev_binds <- simplifyTop splice_lie
+      ; tth_run <- typedThSpliceRun
 
-        -- Finalizers must run after constraints are simplified, or some types
-        -- might not be complete when using reify (see #12777).
-        -- and also after we zonk the first time because we run typed splices
-        -- in the zonker which gives rise to the finalisers.
-      ; (tcg_env_mf, _) <- setGblEnv tcg_env run_th_modfinalizers
+      -- Only do this additional zonking and solving if we actually ran any
+      -- splices to save the souls of those not using Typed Template
+      -- Haskell.
+      ; (bind_env_final, tcg_env_final) <-
+          if not tth_run
+            then ASSERT(isEmptyWC splice_lie) return (bind_env, tcg_env)
+            else do {
+              -- simplifyTop does unification so we need to zonk again afterwards.
+              splice_ev_binds <- simplifyTop splice_lie
+
+
+              -- Finalizers must run after constraints are simplified, or some types
+              -- might not be complete when using reify (see #12777).
+              -- and also after we zonk the first time because we run typed splices
+              -- in the zonker which gives rise to the finalisers.
+            ; (tcg_env_mf, _) <- setGblEnv tcg_env run_th_modfinalizers
+              -- zonk the new bindings arising from running the finalisers.
+              -- This won't give rise to any more finalisers as you can't nest
+              -- finalisers inside finalisers.
+            ; zonkTcGblEnv splice_ev_binds tcg_env_mf }
+
       ; finishTH
       ; traceTc "Tc11" empty
 
-      ; -- zonk the new bindings arising from running the finalisers.
-        -- This won't give rise to any more finalisers as you can't nest
-        -- finalisers inside finalisers.
-      ; (bind_env_mf, tcg_env_mf)
-            <- zonkTcGblEnv splice_ev_binds tcg_env_mf
 
 
       ; let { final_type_env = plusTypeEnv (tcg_type_env tcg_env)
-                                           bind_env_mf
-            ; tcg_env' = tcg_env_mf }
-      ; setGlobalTypeEnv tcg_env' final_type_env
+                                           bind_env_final }
+      ; setGlobalTypeEnv tcg_env_final final_type_env
 
    } }
 

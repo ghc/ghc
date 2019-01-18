@@ -592,6 +592,12 @@ data TcGblEnv
           -- ^ @True@ <=> A Template Haskell splice was used.
           --
           -- Splices disable recompilation avoidance (see #481)
+          --
+        tcg_typed_th_splice_run :: TcRef Bool,
+          -- ^ @True@ <=> A Typed Template Haskell splice was run.
+          --
+          -- This is used to control whether we zonk all bindings twice in
+          -- TcRnDriver.
 
         tcg_th_top_level_locs :: TcRef (Set RealSrcSpan),
           -- ^ Locations of the top-level splices; used for providing details on
