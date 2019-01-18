@@ -60,7 +60,7 @@ stg_ap_0_fast ( P_ fun )
 
 again:
     W_  info;
-    W_ untaggedfun;
+    P_ untaggedfun;
     W_ arity;
     untaggedfun = UNTAG(fun);
     info = %INFO_PTR(untaggedfun);
@@ -106,6 +106,11 @@ again:
                 pap = Hp - SIZEOF_StgPAP + WDS(1);
                 SET_HDR(pap, stg_PAP_info, CCCS);
                 StgPAP_arity(pap) = arity;
+                if (arity <= TAG_MASK) {
+                  // TODO: Shouldn't this already be tagged? If not why did we
+                  // untag it at the beginning of this function?
+                  fun = untaggedfun + arity;
+                }
                 StgPAP_fun(pap)   = fun;
                 StgPAP_n_args(pap) = 0;
                 return (pap);
@@ -117,9 +122,8 @@ again:
                 return (fun);
             } else {
                 // We're going to copy this PAP, and put the new CCS in it
-                fun = untaggedfun;
                 W_ size;
-                size = SIZEOF_StgPAP + WDS(TO_W_(StgPAP_n_args(fun)));
+                size = SIZEOF_StgPAP + WDS(TO_W_(StgPAP_n_args(untaggedfun)));
                 HP_CHK_GEN(size);
                 TICK_ALLOC_PAP(size, 0);
                 // attribute this allocation to the "overhead of profiling"
@@ -127,13 +131,13 @@ again:
                 P_ pap;
                 pap = Hp - size + WDS(1);
                 // We'll lose the original PAP, so we should enter its CCS
-                ccall enterFunCCS(BaseReg "ptr", StgHeader_ccs(fun) "ptr");
+                ccall enterFunCCS(BaseReg "ptr", StgHeader_ccs(untaggedfun) "ptr");
                 SET_HDR(pap, stg_PAP_info, CCCS);
-                StgPAP_arity(pap) = StgPAP_arity(fun);
-                StgPAP_n_args(pap) = StgPAP_n_args(fun);
+                StgPAP_arity(pap) = StgPAP_arity(untaggedfun);
+                StgPAP_n_args(pap) = StgPAP_n_args(untaggedfun);
                 StgPAP_fun(pap)   = StgPAP_fun(fun);
                 W_ i;
-                i = TO_W_(StgPAP_n_args(fun));
+                i = TO_W_(StgPAP_n_args(untaggedfun));
             loop:
                 if (i == 0) {
                     return (pap);
