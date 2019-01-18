@@ -508,3 +508,4 @@ test('T16059d', [extra_files(['T16059b.hs'])], multimod_compile_fail,
     ['T16059d', '-v0'])
 test('T16059e', [extra_files(['T16059b.hs'])], multimod_compile_fail,
     ['T16059e', '-v0'])
+test('T16204c', normal, compile_fail, [''])
