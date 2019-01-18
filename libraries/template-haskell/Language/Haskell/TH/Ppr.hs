@@ -268,6 +268,7 @@ pprLit _ (CharL c)       = text (show c)
 pprLit _ (CharPrimL c)   = text (show c) <> char '#'
 pprLit _ (StringL s)     = pprString s
 pprLit _ (StringPrimL s) = pprString (bytesToString s) <> char '#'
+pprLit _ (BytesPrimL {}) = pprString "<binary data>"
 pprLit i (RationalL rat) = parensIf (i > noPrec) $
                            integer (numerator rat) <+> char '/'
                               <+> integer (denominator rat)

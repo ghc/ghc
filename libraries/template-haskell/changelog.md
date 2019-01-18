@@ -5,6 +5,9 @@
   * Introduce a `liftTyped` method to the `Lift` class and set the default
     implementations of `lift`/`liftTyped` to be in terms of each other.
 
+  * Introduce support for `Bytes` literals (raw bytes embedded into the output
+    binary)
+
 ## 2.15.0.0 *TBA*
 
   * In `Language.Haskell.TH.Syntax`, `DataInstD`, `NewTypeInstD`, `TySynEqn`,
