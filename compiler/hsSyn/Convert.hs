@@ -45,6 +45,9 @@ import Control.Monad( unless, liftM, ap )
 import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
+import Foreign.ForeignPtr
+import Foreign.Ptr
+import System.IO.Unsafe
 
 -------------------------------------------------------------------
 --              The external interface
@@ -1189,6 +1192,11 @@ cvtLit (StringL s)     = do { let { s' = mkFastString s }
 cvtLit (StringPrimL s) = do { let { s' = BS.pack s }
                             ; force s'
                             ; return $ HsStringPrim NoSourceText s' }
+cvtLit (BytesPrimL (Bytes fptr off sz)) = do
+  let bs = unsafePerformIO $ withForeignPtr fptr $ \ptr ->
+             BS.packCStringLen (ptr `plusPtr` fromIntegral off, fromIntegral sz)
+  force bs
+  return $ HsStringPrim NoSourceText bs
 cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
         -- cvtLit should not be called on IntegerL, RationalL
         -- That precondition is established right here in
