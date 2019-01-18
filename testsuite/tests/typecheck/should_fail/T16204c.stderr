@@ -1,0 +1,12 @@
+
+T16204c.hs:16:8: error:
+    • Couldn't match kind ‘Rep’ with ‘*’
+      When matching types
+        a0 :: Rep
+        a :: *
+      Expected type: Sing a
+        Actual type: Sing a0
+    • In the first argument of ‘id’, namely ‘sTo’
+      In the expression: id sTo
+      In an equation for ‘x’: x = id sTo
+    • Relevant bindings include x :: Sing a (bound at T16204c.hs:16:1)
