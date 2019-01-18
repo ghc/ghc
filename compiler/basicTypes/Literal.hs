@@ -188,6 +188,20 @@ Note [Natural literals]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Similar to Integer literals.
 
+Note [String literals]
+~~~~~~~~~~~~~~~~~~~~~~
+
+String literals are UTF-8 encoded and stored into ByteStrings in the following
+ASTs: Haskell, Core, Stg, Cmm. TH can also emit ByteString based string literals
+with the BytesPrimL constructor (see #14741).
+
+It wasn't true before as [Word8] was used in Cmm AST and in TH which was quite
+bad for performance with large strings (see #16198 and #14741).
+
+To include string literals into output objects, the assembler code generator has
+to embed the UTF-8 encoded binary blob. See Note [Embedding large binary blobs]
+for more details.
+
 -}
 
 instance Binary LitNumType where

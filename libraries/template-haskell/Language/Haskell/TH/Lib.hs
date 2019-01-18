@@ -26,7 +26,7 @@ module Language.Haskell.TH.Lib (
     -- ** Constructors lifted to 'Q'
     -- *** Literals
         intPrimL, wordPrimL, floatPrimL, doublePrimL, integerL, rationalL,
-        charL, stringL, stringPrimL, charPrimL,
+        charL, stringL, stringPrimL, charPrimL, bytesPrimL, mkBytes,
     -- *** Patterns
         litP, varP, tupP, unboxedTupP, unboxedSumP, conP, uInfixP, parensP,
         infixP, tildeP, bangP, asP, wildP, recP,
@@ -157,6 +157,8 @@ import Language.Haskell.TH.Lib.Internal hiding
 import Language.Haskell.TH.Syntax
 
 import Control.Monad (liftM2)
+import Foreign.ForeignPtr
+import Data.Word
 import Prelude
 
 -- All definitions below represent the "old" API, since their definitions are
@@ -303,3 +305,17 @@ standaloneDerivWithStrategyD mds ctxt ty = do
   ctxt' <- ctxt
   ty'   <- ty
   return $ StandaloneDerivD mds ctxt' ty'
+
+-------------------------------------------------------------------------------
+-- * Bytes literals
+
+-- | Create a Bytes datatype representing raw bytes to be embedded into the
+-- program/library binary.
+--
+-- @since 2.16.0.0
+mkBytes
+   :: ForeignPtr Word8 -- ^ Pointer to the data
+   -> Word             -- ^ Offset from the pointer
+   -> Word             -- ^ Number of bytes
+   -> Bytes
+mkBytes = Bytes
