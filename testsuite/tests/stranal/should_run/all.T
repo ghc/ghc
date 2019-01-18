@@ -1,7 +1,9 @@
-# Run this always
+# Run this always as we compile the test with -O0 and -O1 and check that the
+# output is correct and the same in both cases.
 test('T16197', normal, run_command, ['$MAKE -s --no-print-directory T16197'])
 
-# Run the rest only in optasm way, we're testing the strictness analyser here
+# Run the rest only in optasm way (which implies -O), we're testing the
+# strictness analyser here
 setTestOpts( only_ways(['optasm']) )
 
 test('strun001', normal, compile_and_run, [''])
