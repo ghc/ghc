@@ -26,7 +26,7 @@ module TyCoRep (
         Type( TyVarTy, AppTy, TyConApp, ForAllTy
             , LitTy, CastTy, CoercionTy
             , FFunTy, ft_arg, ft_res, ft_af
-            , FunTy ),  -- Export the type synonym FunTy too
+            ),  -- Export the type synonym FunTy too
 
         AnonArgFlag,
         TyLit(..),
@@ -315,10 +315,10 @@ data Type
         Type            -- ^ A Π type.
 
   | FFunTy      -- ^ t1 -> t2   Very common, so an important special case
-                -- FFunTy for "full function type"; see pattern synonym for FunTy
+                -- See Note [Function types]
      { ft_af  :: AnonArgFlag  -- Is this (->) or (=>)?
      , ft_arg :: Type           -- Argument type
-     , ft_res :: Type }         -- Resuult type
+     , ft_res :: Type }         -- Result type
 
   | LitTy TyLit     -- ^ Type literals are similar to type constructors.
 
@@ -337,6 +337,24 @@ data Type
 
   deriving Data.Data
 
+{- Note [Function types]
+~~~~~~~~~~~~~~~~~~~~~~~~
+(to be completed...)
+
+* FFunTy is the data constructor, meaning "full function type".
+
+* FunTy is a (unidirectional) pattern synonym that allows
+  positional pattern matching (FunTy arg res), ignoring the
+  ArgFlag.
+
+* We use #define FunTy FFunTy _, to allow pattern matching on
+  a (positional) FunTy constructor.
+-}
+
+{- -----------------------
+      Commented out until the pattern match
+      checker can handle it; see Trac #16185
+
 {-# COMPLETE FunTy, TyVarTy, AppTy, TyConApp
            , ForAllTy, LitTy, CastTy, CoercionTy :: Type #-}
 
@@ -345,6 +363,10 @@ data Type
 -- ignoring the AnonArgFlag
 pattern FunTy :: Type -> Type -> Type
 pattern FunTy arg res <- FFunTy { ft_arg = arg, ft_res = res }
+
+       End of commented out block
+---------------------------------- -}
+
 
 -- NOTE:  Other parts of the code assume that type literals do not contain
 -- types or type variables.
@@ -3818,8 +3840,8 @@ tidyType env (TyVarTy tv)         = TyVarTy (tidyTyCoVarOcc env tv)
 tidyType env (TyConApp tycon tys) = let args = tidyTypes env tys
                                     in args `seqList` TyConApp tycon args
 tidyType env (AppTy fun arg)      = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env ty@(FunTy arg res)   = let !arg' = tidyType env arg
-                                        !res' = tidyType env res
+tidyType env ty@(FunTy arg res)   = let { !arg' = tidyType env arg
+                                        ; !res' = tidyType env res }
                                     in ty { ft_arg = arg', ft_res = res' }
 tidyType env (ty@(ForAllTy{}))    = mkForAllTys' (zip tvs' vis) $! tidyType env' body_ty
   where

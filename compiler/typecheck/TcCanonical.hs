@@ -1,10 +1,5 @@
 {-# LANGUAGE CPP #-}
 
-{-# OPTIONS_GHC -Wno-overlapping-patterns -Wno-incomplete-patterns #-}
-    -- Yuk!  Suppresses bogus warnings
-    -- The -Wno-incomplete-patterns suppresses
-    --     a pattern-checker iteration limit error
-
 module TcCanonical(
      canonicalize,
      unifyDerived,
@@ -829,7 +824,6 @@ is flattened, but this is left as future work. (Mar '15)
 
 Note [FunTy and decomposing tycon applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When can_eq_nc' attempts to decompose a tycon application we haven't yet zonked.
 This means that we may very well have a FunTy containing a type of some unknown
 kind. For instance, we may have,
@@ -928,8 +922,8 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- Including FunTy (s -> t)
 can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
     --- See Note [FunTy and decomposing type constructor applications].
-  | Just (tc1, tys1) <- tcRepSplitTyConApp_maybe' ty1
-  , Just (tc2, tys2) <- tcRepSplitTyConApp_maybe' ty2
+  | Just (tc1, tys1) <- repSplitTyConApp_maybe ty1
+  , Just (tc2, tys2) <- repSplitTyConApp_maybe ty2
   , not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
@@ -1094,8 +1088,8 @@ zonk_eq_types = go
         split2 = tcSplitFunTy_maybe ty2
 
     go ty1 ty2
-      | Just (tc1, tys1) <- tcRepSplitTyConApp_maybe ty1
-      , Just (tc2, tys2) <- tcRepSplitTyConApp_maybe ty2
+      | Just (tc1, tys1) <- repSplitTyConApp_maybe ty1
+      , Just (tc2, tys2) <- repSplitTyConApp_maybe ty2
       = if tc1 == tc2 && tys1 `equalLength` tys2
           -- Crucial to check for equal-length args, because
           -- we cannot assume that the two args to 'go' have

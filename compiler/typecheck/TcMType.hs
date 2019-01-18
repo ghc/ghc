@@ -1200,11 +1200,11 @@ collect_cand_qtvs is_dep bound dvs ty
     -- Uses accumulating-parameter style
     go dv (AppTy t1 t2)    = foldlM go dv [t1, t2]
     go dv (TyConApp _ tys) = foldlM go dv tys
+    go dv (FunTy arg res)  = foldlM go dv [arg, res]
     go dv (LitTy {})       = return dv
     go dv (CastTy ty co)   = do dv1 <- go dv ty
                                 collect_cand_qtvs_co bound dv1 co
     go dv (CoercionTy co)  = collect_cand_qtvs_co bound dv co
-    go dv (FunTy arg res)  = foldlM go dv [arg, res]
 
     go dv (TyVarTy tv)
       | is_bound tv = return dv

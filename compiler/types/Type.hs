@@ -33,7 +33,7 @@ module Type (
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
         splitTyConApp_maybe, splitTyConApp, tyConAppArgN, nextRole,
-        tcRepSplitTyConApp_maybe, tcRepSplitTyConApp, tcSplitTyConApp_maybe,
+        tcSplitTyConApp_maybe,
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
 
@@ -803,31 +803,6 @@ tcRepSplitAppTy_maybe (TyConApp tc tys)
   = Just (TyConApp tc tys', ty')    -- Never create unsaturated type family apps!
 tcRepSplitAppTy_maybe _other = Nothing
 
--- | Like 'tcSplitTyConApp_maybe' but doesn't look through type synonyms.
-tcRepSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
--- The "Rep" means that we assumes that any tcView stuff is already done.
--- Defined here to avoid module loops between Unify and TcType.
-tcRepSplitTyConApp_maybe (TyConApp tc tys)
-  = Just (tc, tys)
-
-tcRepSplitTyConApp_maybe (FunTy arg res)
-  = Just (funTyCon, [arg_rep, res_rep, arg, res])
-  where
-    arg_rep = getRuntimeRep arg
-    res_rep = getRuntimeRep res
-
-tcRepSplitTyConApp_maybe _
-  = Nothing
-
--- | Like 'tcSplitTyConApp' but doesn't look through type synonyms.
-tcRepSplitTyConApp :: HasCallStack => Type -> (TyCon, [Type])
--- The "Rep" means that we assumes that any tcView stuff is already done.
--- Defined here to avoid module loops between Unify and TcType.
-tcRepSplitTyConApp ty =
-  case tcRepSplitTyConApp_maybe ty of
-    Just stuff -> stuff
-    Nothing    -> pprPanic "tcRepSplitTyConApp" (ppr ty)
-
 -------------
 splitAppTy :: Type -> (Type, Type)
 -- ^ Attempts to take a type application apart, as in 'splitAppTy_maybe',
@@ -1220,9 +1195,17 @@ splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 splitTyConApp_maybe ty | Just ty' <- coreView ty = splitTyConApp_maybe ty'
 splitTyConApp_maybe ty                           = repSplitTyConApp_maybe ty
 
--- | Like 'splitTyConApp_maybe', but doesn't look through synonyms. This
--- assumes the synonyms have already been dealt with.
+-------------------
 repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
+-- ^ Like 'splitTyConApp_maybe', but doesn't look through synonyms. This
+-- assumes the synonyms have already been dealt with.
+--
+-- Moreover, for a FunTy, it only succeeds if the argument types
+-- have enough info to extract the runtime-rep arguments that
+-- the funTyCon requires.  This will usually be true;
+-- but may be temporarily false during canonicalization:
+--     see Note [FunTy and decomposing tycon applications] in TcCanonical
+--
 repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy arg res)
   | Just arg_rep <- getRuntimeRep_maybe arg
@@ -1230,6 +1213,7 @@ repSplitTyConApp_maybe (FunTy arg res)
   = Just (funTyCon, [arg_rep, res_rep, arg, res])
 repSplitTyConApp_maybe _ = Nothing
 
+-------------------
 -- | Attempts to tease a list type apart and gives the type of the elements if
 -- successful (looks through type synonyms)
 splitListTyConApp_maybe :: Type -> Maybe Type
@@ -1795,7 +1779,7 @@ in TcCanonical.
 tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 -- Defined here to avoid module loops between Unify and TcType.
 tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
-tcSplitTyConApp_maybe ty                         = tcRepSplitTyConApp_maybe ty
+tcSplitTyConApp_maybe ty                         = repSplitTyConApp_maybe ty
 
 -- tcIsConstraintKind stuf only makes sense in the typechecker
 -- After that Constraint = Type
@@ -2622,7 +2606,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
             get_rank (AppTy {})      = 3
             get_rank (LitTy {})      = 4
             get_rank (TyConApp {})   = 5
-            get_rank (FunTy {})      = 6
+            get_rank (FFunTy {})     = 6
             get_rank (ForAllTy {})   = 7
 
     gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
@@ -2724,7 +2708,7 @@ typeKind :: HasDebugCallStack => Type -> Kind
 -- No need to expand synonyms
 typeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)         = typeLiteralKind l
-typeKind (FunTy {})        = liftedTypeKind
+typeKind (FFunTy {})       = liftedTypeKind
 typeKind (TyVarTy tyvar)   = tyVarKind tyvar
 typeKind (CastTy _ty co)   = pSnd $ coercionKind co
 typeKind (CoercionTy co)   = coercionType co

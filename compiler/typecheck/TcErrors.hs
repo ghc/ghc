@@ -2,9 +2,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 
-{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
-    -- Yuk!  Suppresses bogus warnings
-
 module TcErrors(
        reportUnsolved, reportAllUnsolved, warnAllUnsolved,
        warnDefaulting,
@@ -2269,7 +2266,7 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
     sameShapes :: Type -> Type -> Bool
     sameShapes AppTy{}          AppTy{}          = True
     sameShapes (TyConApp tc1 _) (TyConApp tc2 _) = tc1 == tc2
-    sameShapes (FunTy {})       (FunTy {})       = True
+    sameShapes (FFunTy {})      (FFunTy {})      = True
     sameShapes (ForAllTy {})    (ForAllTy {})    = True
     sameShapes (CastTy ty1 _)   ty2              = sameShapes ty1 ty2
     sameShapes ty1              (CastTy ty2 _)   = sameShapes ty1 ty2

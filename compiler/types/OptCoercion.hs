@@ -2,14 +2,6 @@
 
 {-# LANGUAGE CPP #-}
 
-{-# OPTIONS_GHC -Wno-overlapping-patterns -Wno-incomplete-patterns #-}
-    -- Yuk!  Suppresses bogus warnings
-    -- The -Wno-incomplete-patterns suppresses
-    --     a pattern-checker iteration limit error
-    -- I have not idea why the iteration limit had suddenly blown up
-    -- This happened when I added FFunTy, and a COMPLETE pragma for
-    -- Type; but there is no pattern matching on Type here!
-
 module OptCoercion ( optCoercion, checkAxInstCo ) where
 
 #include "HsVersions.h"

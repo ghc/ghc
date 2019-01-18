@@ -8,9 +8,6 @@ Type subsumption and unification
 
 {-# LANGUAGE CPP, MultiWayIf, TupleSections, ScopedTypeVariables #-}
 
-{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
-    -- Yuk!  Suppresses bogus warnings
-
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,

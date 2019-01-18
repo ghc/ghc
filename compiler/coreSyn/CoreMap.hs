@@ -3,15 +3,13 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-
-{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
-    -- Yuk!  Suppresses bogus warnings
 
 module CoreMap(
    -- * Maps over Core expressions
@@ -36,6 +34,8 @@ module CoreMap(
    lkDNamed, xtDNamed,
    (>.>), (|>), (|>>),
  ) where
+
+#include "HsVersions.h"
 
 import GhcPrelude
 
@@ -569,7 +569,7 @@ lkT (D env ty) m = go ty m
     go (LitTy l)                   = tm_tylit  >.> lkTyLit l
     go (ForAllTy (Bndr tv _) ty)   = tm_forall >.> lkG (D (extendCME env tv) ty)
                                                >=> lkBndr env tv
-    go ty@(FunTy {})               = pprPanic "lkT FunTy" (ppr ty)
+    go ty@(FFunTy {})              = pprPanic "lkT FunTy" (ppr ty)
     go (CastTy t _)                = go t
     go (CoercionTy {})             = tm_coerce
 
@@ -588,7 +588,7 @@ xtT (D env (ForAllTy (Bndr tv _) ty))  f m
   = m { tm_forall = tm_forall m |> xtG (D (extendCME env tv) ty)
                                 |>> xtBndr env tv f }
 xtT (D _   ty@(TyConApp _ (_:_))) _ _ = pprPanic "xtT TyConApp" (ppr ty)
-xtT (D _   ty@(FunTy {}))         _ _ = pprPanic "xtT FunTy" (ppr ty)
+xtT (D _   ty@(FFunTy {}))        _ _ = pprPanic "xtT FunTy" (ppr ty)
 
 fdT :: (a -> b -> b) -> TypeMapX a -> b -> b
 fdT k m = foldTM k (tm_var m)

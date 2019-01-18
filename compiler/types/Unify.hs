@@ -4,11 +4,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 
-{-# OPTIONS_GHC -Wno-overlapping-patterns -Wno-incomplete-patterns #-}
-    -- Yuk!  Suppresses bogus warnings
-    -- The -Wno-incomplete-patterns suppresses
-    --     a pattern-checker iteration limit error
-
 module Unify (
         tcMatchTy, tcMatchTyKi,
         tcMatchTys, tcMatchTyKis,

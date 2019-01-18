@@ -33,8 +33,7 @@ import GhcPrelude
 import TcRnMonad
 import TcEnv
 import TcBinds( tcValBinds, addTypecheckedBinds )
-import TyCoRep( Type(..), Type( FunTy )
-              , Coercion(..), MCoercion(..), UnivCoProvenance(..) )
+import TyCoRep( Type(..), Coercion(..), MCoercion(..), UnivCoProvenance(..) )
 import TcType
 import TysWiredIn( unitTy )
 import MkCore( rEC_SEL_ERROR_ID )
