@@ -1274,7 +1274,7 @@ tcInferFun (L loc (HsRecFld _ f))
 tcInferFun fun
   = tcInferSigma fun
       -- NB: tcInferSigma; see TcUnify
-      -- Note [Deep instantiation of InferResult]
+      -- Note [Deep instantiation of InferResult] in TcUnify
 
 
 ----------------

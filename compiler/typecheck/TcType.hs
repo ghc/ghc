@@ -364,11 +364,16 @@ data ExpType = Check TcType
 
 data InferResult
   = IR { ir_uniq :: Unique  -- For debugging only
+
        , ir_lvl  :: TcLevel -- See Note [TcLevel of ExpType] in TcMType
-       , ir_inst :: Bool    -- True <=> deeply instantiate before returning
-                            --           i.e. return a RhoType
-                            -- False <=> do not instantiate before returning
-                            --           i.e. return a SigmaType
+
+       , ir_inst :: Bool
+         -- True <=> deeply instantiate before returning
+         --           i.e. return a RhoType
+         -- False <=> do not instantiate before returning
+         --           i.e. return a SigmaType
+         -- See Note [Deep instantiation of InferResult] in TcUnify
+
        , ir_ref  :: IORef (Maybe TcType) }
          -- The type that fills in this hole should be a Type,
          -- that is, its kind should be (TYPE rr) for some rr

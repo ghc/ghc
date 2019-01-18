@@ -1267,7 +1267,7 @@ tcMonoBinds is_rec sig_fn no_gen
     do  { ((co_fn, matches'), rhs_ty)
             <- tcInferInst $ \ exp_ty ->
                   -- tcInferInst: see TcUnify,
-                  -- Note [Deep instantiation of InferResult]
+                  -- Note [Deep instantiation of InferResult] in TcUnify
                tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
                   -- We extend the error context even for a non-recursive
                   -- function so that in type error messages we show the
