@@ -1576,7 +1576,8 @@ canDecomposableTyConAppOK :: CtEvidence -> EqRel
                           -> TcS ()
 -- Precondition: tys1 and tys2 are the same length, hence "OK"
 canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
-  = case ev of
+  = ASSERT( tys1 `equalLength` tys2 )
+    case ev of
      CtDerived {}
         -> unifyDeriveds loc tc_roles tys1 tys2
 
@@ -1598,19 +1599,23 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
     role       = eqRelRole eq_rel
     tc_roles   = tyConRolesX role tc
 
-      -- the following makes a better distinction between "kind" and "type"
-      -- in error messages
-    bndrs      = tyConBinders tc
-    is_kinds   = map isNamedTyConBinder bndrs
-    is_viss    = map isVisibleTyConBinder bndrs
-
-    kind_xforms = map (\is_kind -> if is_kind then toKindLoc else id) is_kinds
-    vis_xforms  = map (\is_vis  -> if is_vis  then id
-                                   else flip updateCtLocOrigin toInvisibleOrigin)
-                      is_viss
-
-    -- zipWith3 (.) composes its first two arguments and applies it to the third
-    new_locs = zipWith3 (.) kind_xforms vis_xforms (repeat loc)
+      -- Add nuances to the location during decomposition:
+      --  * if the argument is a kind argument, rmeember this, so that error
+      --    messages say "kind", not "type". This is determined based on whether
+      --    the corresponding tyConBinder is named (that is, dependent)
+      --  * if the argument is invisible, note this as well, again by
+      --    looking at the corresponding binder
+      -- For oversaturated tycons, we need the (repeat loc) tail, which doesn't
+      -- do either of these changes. (Forgetting to do so led to #16188)
+    new_locs = [ new_loc
+               | bndr <- tyConBinders tc
+               , let new_loc0 | isNamedTyConBinder bndr = toKindLoc loc
+                              | otherwise               = loc
+                     new_loc  | isVisibleTyConBinder bndr
+                              = updateCtLocOrigin new_loc0 toInvisibleOrigin
+                              | otherwise
+                              = new_loc0 ]
+               ++ repeat loc
 
 -- | Call when canonicalizing an equality fails, but if the equality is
 -- representational, there is some hope for the future.
