@@ -232,6 +232,8 @@ applyTypeToArgs e op_ty args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
     go op_ty (_ : args)           | Just (_, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
+    go op_ty (_ : args)           | Just (_, res_ty) <- splitFunTildeTy_maybe op_ty
+                                  = go res_ty args
     go _ _ = pprPanic "applyTypeToArgs" panic_msg
 
     -- go_ty_args: accumulate type arguments so we can

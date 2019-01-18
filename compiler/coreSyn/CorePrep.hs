@@ -927,8 +927,11 @@ cpeApp top_env expr
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
-            (arg_ty, res_ty) = expectJust "cpeBody:collect_args" $
-                               splitFunTy_maybe fun_ty
+            (arg_ty, res_ty)
+               = expectJust "cpeBody:collect_args" $
+                   case splitFunTy_maybe fun_ty of
+                     Nothing -> splitFunTildeTy_maybe fun_ty
+                     Just t  -> Just t
         (fs, arg') <- cpeArg top_env ss1 arg arg_ty
         rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
       CpeCast co ->

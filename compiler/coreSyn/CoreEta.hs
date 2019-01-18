@@ -11,10 +11,9 @@ import GhcPrelude
 import BasicTypes
 import CoreSyn
 import CoreSubst
+import CoreArity
 import Id
 import TyCoRep
--- import Type
--- import Var
 import UniqSupply
 import Outputable
 
@@ -44,15 +43,11 @@ arityWorkerWrapper'
   -> CoreExpr
   -> UniqSM [(CoreBndr,CoreExpr)]
 arityWorkerWrapper' name expr
-  = let arity = idCallArity name in
+  = let arity = manifestArity expr in
       case arity >= 1 && isId name of
         True ->
           getUniqueM >>= \uniq ->
-            -- let ty      = idType name
-            let ty      = mkArityType (idType name) arity
-            -- let ty      = FunTildeTy (LitTy (NumTyLit 0)) (LitTy (NumTyLit 0))
-            -- let ty      = panic (showSDocUnsafe (ppr (FunTildeTy (LitTy (NumTyLit 0)) (LitTy (NumTyLit 0)))))
-            -- let ty      = panic (showSDocUnsafe (ppr (mkArityType (idType name) arity)))
+            let ty      = exprArityType arity (idType name)
                 wname   = mkWorkerId uniq name ty
                 worker  = mkArityWorker  name wname expr
                 wrapper = mkArityWrapper name wname expr arity
@@ -60,12 +55,99 @@ arityWorkerWrapper' name expr
               return [worker,wrapper]
         False -> return [(name,expr)]
 
--- ^ Create the new type for an extensional function given the arity.
-mkArityType :: Type -> Arity -> Type
-mkArityType (ForAllTy x ty) n = ForAllTy x (mkArityType ty n)
-mkArityType (FunTy _ a b)   0 = FunTy a (mkArityType b 0)
-mkArityType (FunTy _ a b)   n = FunTildeTy a (mkArityType b (n-1))
-mkArityType ty              _ = ty
+{- | exprArityType creates the new type for an extensional function given the
+arity. We also need to consider higher-order functions. The type of a
+function argument can change based on the usage of the type in the body of
+the function. For example, consider the zipWith function.
+
+zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
+zipWith =
+  /\a -> /\b -> /\c -> \f -> \xs -> \ys ->
+    case as of
+      [] -> []
+      (x:xs') ->
+        case bs of
+          [] -> []
+          (y:ys') ->
+            (f x y) : zipWith f xs' ys'
+
+We know that zipWith has the type
+
+forall a b c. (a ~> b ~> c) ~> [a] ~> [b] ~> [c]
+
+because the function is only applied to two arguments in the body of the
+function.
+-}
+exprArityType :: Arity -> Type -> Type
+exprArityType n (ForAllTy tv body_ty)
+  = ForAllTy tv (exprArityType n body_ty)
+exprArityType 0 (FunTy arg res)
+  = FunTy (extensionalize arg) (exprArityType 0 res)
+exprArityType n (FunTy arg res)
+  = FunTildeTy (extensionalize arg) (exprArityType (n-1) res)
+exprArityType _ ty = ty
+
+{-
+Note [Extensionality and Higher-Order Functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider the following program.
+
+foo f =
+  let a = f 1 2
+      b = f 2
+  in a + b 3
+
+Should we give this program the type,
+
+(Int ~> Int ~> Int) ~> Int
+             -or-
+(Int ~> Int -> Int) ~> Int
+
+The problem is that we cannot decide what the arity of f from this function it
+depends on the definition of the funciton passed in. For instance, (+) has the
+type Int ~> Int ~> Int, but the following program has the type Int ~> Int ->
+Int.
+
+bar x =
+  let x' = factorial x
+  in \y -> y + x'
+
+We can remedy this problem of choosing the correct type for higher-order
+functions by always assuming the best (i.e. most extensional) type in the
+worker, then handling the problems in the wrapper.
+
+fooWorker :: (Int ~> Int ~> Int) ~> Int
+fooWorker f =
+  let a = f 1 2
+      b = f 2
+  in a + b 3
+
+
+fooWrapper :: (Int -> Int -> Int) -> Int
+fooWrapper f =
+  let f' = \x1 x2 -> f x1 x2
+  in fooWorker f'
+
+The wrapper eta-expands all functions.
+-}
+
+-- ^ As described in Note [Extensionality and Higher-Order Functions],
+-- extentionalize returns the most extensional version of a type. This only
+-- effects function types
+
+-- TODO Coercions need an extensionalize function
+extensionalize :: Type -> Type
+extensionalize (TyVarTy v) = TyVarTy v
+extensionalize (AppTy a b) = AppTy (extensionalize a) (extensionalize b)
+extensionalize (TyConApp tc args) = TyConApp tc (map extensionalize args)
+extensionalize (ForAllTy tv a) = ForAllTy tv (extensionalize a)
+extensionalize (FunTy a b) = FunTildeTy (extensionalize a) (extensionalize b)
+extensionalize (FunTildeTy a b)
+  = FunTildeTy (extensionalize a) (extensionalize b)
+extensionalize (LitTy l) = LitTy l
+extensionalize (CastTy a kc) = CastTy (extensionalize a) kc
+extensionalize (CoercionTy c) = CoercionTy c
 
 -- ^ Given an expression and it's name, generate a new expression with a
 -- tilde-lambda type. This is the exact same code, but we have encoded the arity
