@@ -8,6 +8,9 @@
   * Add a `ForallVisT` constructor to `Type` to represent visible, dependent
     quantification.
 
+  * Introduce support for `Bytes` literals (raw bytes embedded into the output
+    binary)
+
 ## 2.15.0.0 *TBA*
 
   * In `Language.Haskell.TH.Syntax`, `DataInstD`, `NewTypeInstD`, `TySynEqn`,

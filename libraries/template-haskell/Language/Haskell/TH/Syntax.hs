@@ -44,6 +44,7 @@ import GHC.ForeignSrcLang.Type
 import Language.Haskell.TH.LanguageExtensions
 import Numeric.Natural
 import Prelude
+import Foreign.ForeignPtr
 
 import qualified Control.Monad.Fail as Fail
 
@@ -1619,12 +1620,31 @@ data Lit = CharL Char
          | FloatPrimL Rational
          | DoublePrimL Rational
          | StringPrimL [Word8]  -- ^ A primitive C-style string, type Addr#
+         | BytesPrimL Bytes     -- ^ Some raw bytes, type Addr#:
          | CharPrimL Char
     deriving( Show, Eq, Ord, Data, Generic )
 
     -- We could add Int, Float, Double etc, as we do in HsLit,
     -- but that could complicate the
     -- supposedly-simple TH.Syntax literal type
+
+-- | Raw bytes embedded into the binary.
+--
+-- Avoid using Bytes constructor directly as it is likely to change in the
+-- future. Use helpers such as `mkBytes` in Language.Haskell.TH.Lib instead.
+data Bytes = Bytes
+   { bytesPtr    :: ForeignPtr Word8 -- ^ Pointer to the data
+   , bytesOffset :: Word             -- ^ Offset from the pointer
+   , bytesSize   :: Word             -- ^ Number of bytes
+   -- Maybe someday:
+   -- , bytesAlignement  :: Word -- ^ Alignement constraint
+   -- , bytesReadOnly    :: Bool -- ^ Shall we embed into a read-only
+   --                            --   section or not
+   -- , bytesInitialized :: Bool -- ^ False: only use `bytesSize` to allocate
+   --                            --   an uninitialized region
+   }
+   deriving (Eq,Ord,Data,Generic,Show)
+
 
 -- | Pattern in Haskell given in @{}@
 data Pat

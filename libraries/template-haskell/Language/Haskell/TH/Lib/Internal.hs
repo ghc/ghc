@@ -86,6 +86,8 @@ stringL     :: String -> Lit
 stringL     = StringL
 stringPrimL :: [Word8] -> Lit
 stringPrimL = StringPrimL
+bytesPrimL :: Bytes -> Lit
+bytesPrimL = BytesPrimL
 rationalL   :: Rational -> Lit
 rationalL   = RationalL
 
