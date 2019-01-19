@@ -48,7 +48,6 @@ import           Data.ByteString ( ByteString )
 import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Internal as BS
 
-
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName
 
@@ -177,7 +176,8 @@ getGADTConType (ConDeclGADT { con_forall = L _ has_forall
                             , con_qvars = qtvs
                             , con_mb_cxt = mcxt, con_args = args
                             , con_res_ty = res_ty })
- | has_forall = noLoc (HsForAllTy { hst_xforall = NoExt
+ | has_forall = noLoc (HsForAllTy { hst_fvf = ForallInvis
+                                  , hst_xforall = NoExt
                                   , hst_bndrs = hsQTvExplicit qtvs
                                   , hst_body  = theta_ty })
  | otherwise  = theta_ty
@@ -209,7 +209,8 @@ getGADTConTypeG (ConDeclGADT { con_forall = L _ has_forall
                             , con_qvars = qtvs
                             , con_mb_cxt = mcxt, con_args = args
                             , con_res_ty = res_ty })
- | has_forall = noLoc (HsForAllTy { hst_xforall = NoExt
+ | has_forall = noLoc (HsForAllTy { hst_fvf = ForallInvis
+                                  , hst_xforall = NoExt
                                   , hst_bndrs = hsQTvExplicit qtvs
                                   , hst_body  = theta_ty })
  | otherwise  = theta_ty
@@ -273,8 +274,8 @@ reparenTypePrec = go
   go _ (HsExplicitTupleTy x tys) = HsExplicitTupleTy x (map reparenLType tys)
   go p (HsIParamTy x n ty)
     = paren p PREC_CTX $ HsIParamTy x n (reparenLType ty)
-  go p (HsForAllTy x tvs ty)
-    = paren p PREC_CTX $ HsForAllTy x (map (fmap reparenTyVar) tvs) (reparenLType ty)
+  go p (HsForAllTy x fvf tvs ty)
+    = paren p PREC_CTX $ HsForAllTy x fvf (map (fmap reparenTyVar) tvs) (reparenLType ty)
   go p (HsQualTy x ctxt ty)
     = paren p PREC_FUN $ HsQualTy x (fmap (map reparenLType) ctxt) (reparenLType ty)
   go p (HsFunTy x ty1 ty2)

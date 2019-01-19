@@ -206,7 +206,7 @@ freeVariables =
     everythingWithState Set.empty Set.union query
   where
     query term ctx = case cast term :: Maybe (HsType GhcRn) of
-        Just (HsForAllTy _ bndrs _) ->
+        Just (HsForAllTy _ _ bndrs _) ->
             (Set.empty, Set.union ctx (bndrsNames bndrs))
         Just (HsTyVar _ _ (L _ name))
             | getName name `Set.member` ctx -> (Set.empty, ctx)
@@ -244,8 +244,8 @@ data RenameEnv name = RenameEnv
 
 
 renameType :: HsType GhcRn -> Rename (IdP GhcRn) (HsType GhcRn)
-renameType (HsForAllTy x bndrs lt) =
-    HsForAllTy x
+renameType (HsForAllTy x fvf bndrs lt) =
+    HsForAllTy x fvf
         <$> mapM (located renameBinder) bndrs
         <*> renameLType lt
 renameType (HsQualTy x lctxt lt) =

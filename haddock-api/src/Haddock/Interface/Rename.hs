@@ -225,10 +225,11 @@ renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of
-  HsForAllTy { hst_bndrs = tyvars, hst_body = ltype } -> do
+  HsForAllTy { hst_fvf = fvf, hst_bndrs = tyvars, hst_body = ltype } -> do
     tyvars'   <- mapM renameLTyVarBndr tyvars
     ltype'    <- renameLType ltype
-    return (HsForAllTy { hst_xforall = NoExt, hst_bndrs = tyvars', hst_body = ltype' })
+    return (HsForAllTy { hst_fvf = fvf, hst_xforall = NoExt
+                       , hst_bndrs = tyvars', hst_body = ltype' })
 
   HsQualTy { hst_ctxt = lcontext , hst_body = ltype } -> do
     lcontext' <- renameLContext lcontext

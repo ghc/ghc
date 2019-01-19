@@ -72,7 +72,7 @@ dropHsDocTy :: HsType a -> HsType a
 dropHsDocTy = f
     where
         g (L src x) = L src (f x)
-        f (HsForAllTy x a e) = HsForAllTy x a (g e)
+        f (HsForAllTy x fvf a e) = HsForAllTy x fvf a (g e)
         f (HsQualTy x a e) = HsQualTy x a (g e)
         f (HsBangTy x a b) = HsBangTy x a (g b)
         f (HsAppTy x a b) = HsAppTy x (g a) (g b)

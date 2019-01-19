@@ -104,16 +104,21 @@ ppHsContext context = parenList (map (\ (a,b) -> ppHsQName a <+>
 					 hsep (map ppHsAType b)) context)
 
 ppHsType :: HsType -> Doc
-ppHsType (HsForAllType Nothing context htype) =
+ppHsType (HsForAllType _ Nothing context htype) =
      hsep [ ppHsContext context, text "=>", ppHsType htype]
-ppHsType (HsForAllType (Just tvs) [] htype) =
-     hsep (text "forall" : map ppHsName tvs ++ text "." : [ppHsType htype])
-ppHsType (HsForAllType (Just tvs) context htype) =
-     hsep (text "forall" : map ppHsName tvs ++ text "." :
+ppHsType (HsForAllType fvf (Just tvs) [] htype) =
+     hsep (text "forall" : map ppHsName tvs ++ pprHsForAllSeparator fvf :
+       [ppHsType htype])
+ppHsType (HsForAllType fvf (Just tvs) context htype) =
+     hsep (text "forall" : map ppHsName tvs ++ pprHsForAllSeparator fvf :
 	   ppHsContext context : text "=>" : [ppHsType htype])
 ppHsType (HsTyFun a b) = fsep [ppHsBType a, text "-&gt;", ppHsType b]
 ppHsType (HsTyIP n t)  = fsep [(char '?' <> ppHsName n), text "::", ppHsType t]
 ppHsType t = ppHsBType t
+
+ppHsForAllSeparator :: ForallVisFlag -> Doc
+ppHsForAllSeparator ForallVis   = text "-&gt;"
+ppHsForAllSeparator ForallInvis = text "."
 
 ppHsBType (HsTyApp (HsTyCon (Qual (Module "Prelude") (HsTyClsName (HsSpecial "[]")))) b )
   = brackets $ ppHsType b
