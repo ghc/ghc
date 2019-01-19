@@ -209,4 +209,4 @@ test('T15858',
       ],
      ghci_script, ['T15858.script'])
 
-test('T16104', default, compile, [''])
+test('T16104', normal, compile, [''])
