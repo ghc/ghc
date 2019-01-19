@@ -87,7 +87,7 @@ import Unique           ( Unique, Uniquable(..) )
 import FastString
 import Data.Maybe
 
-import NameCache (lookupOrigNameCache)
+import IfaceEnv         ( lookupOrigIO )
 import GhcPrelude
 import MonadUtils       ( mapMaybeM )
 import Convert          ( thRdrNameGuesses )
@@ -127,6 +127,6 @@ thNameToGhcName th_name
       | Just n <- isExact_maybe rdr_name   -- This happens in derived code
       = return $ if isExternalName n then Just n else Nothing
       | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-      = do { cache <- getOrigNameCache
-           ; return $ lookupOrigNameCache cache rdr_mod rdr_occ }
+      = do { hsc_env <- getHscEnv
+           ; Just <$> liftIO (lookupOrigIO hsc_env rdr_mod rdr_occ) }
       | otherwise = return Nothing
