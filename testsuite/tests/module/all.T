@@ -198,11 +198,11 @@ test('mod142', [extra_files(['Mod142_A.hs'])], multimod_compile_fail, ['mod142',
 
 test('mod143', [extra_files(['Mod143_A.hs'])], multimod_compile_fail, ['mod143', '-v0'])
 
-test('mod144', [extra_files(['Mod144_A.hs'])], run_command, ['$MAKE -s --no-print-directory mod144'])
+test('mod144', [extra_files(['Mod144_A.hs'])], makefile_test, [])
 
 test('mod145', [extra_files(['Mod145_A.hs'])], multimod_compile_fail, ['mod145', '-v0'])
 
-test('mod146', [extra_files(['Mod145_A.hs'])], run_command, ['$MAKE -s --no-print-directory mod146'])
+test('mod146', [extra_files(['Mod145_A.hs'])], makefile_test, [])
 
 test('mod147', [extra_files(['Mod147_A.hs'])], multimod_compile_fail, ['mod147', '-v0'])
 
@@ -217,11 +217,11 @@ test('mod155', normal, compile_fail, [''])
 test('mod156', normal, compile, [''])
 test('mod157', [extra_files(['Mod157_A.hs', 'Mod157_B.hs', 'Mod157_C.hs', 'Mod157_D.hs'])], multimod_compile, ['mod157', '-v0'])
 
-test('mod158', [extra_files(['Mod157_A.hs', 'Mod157_B.hs', 'Mod157_C.hs', 'Mod157_D.hs'])], run_command, ['$MAKE -s --no-print-directory mod158'])
+test('mod158', [extra_files(['Mod157_A.hs', 'Mod157_B.hs', 'Mod157_C.hs', 'Mod157_D.hs'])], makefile_test, [])
 
 test('mod159', [extra_files(['Mod159_A.hs', 'Mod159_B.hs', 'Mod159_C.hs', 'Mod159_D.hs'])], multimod_compile, ['mod159', '-v0'])
 
-test('mod160', [extra_files(['Mod159_A.hs', 'Mod159_B.hs', 'Mod159_C.hs', 'Mod159_D.hs'])], run_command, ['$MAKE -s --no-print-directory mod160'])
+test('mod160', [extra_files(['Mod159_A.hs', 'Mod159_B.hs', 'Mod159_C.hs', 'Mod159_D.hs'])], makefile_test, [])
 
 test('mod161', normal, compile_fail, [''])
 test('mod162', [extra_files(['Mod162_A.hs'])], multimod_compile, ['mod162', '-v0'])
@@ -230,13 +230,13 @@ test('mod163', [extra_files(['Mod163_A.hs'])], multimod_compile, ['mod163', '-v0
 
 test('mod164', [extra_files(['Mod164_A.hs', 'Mod164_B.hs'])], multimod_compile_fail, ['mod164', '-v0'])
 
-test('mod165', [extra_files(['Mod164_A.hs', 'Mod164_B.hs'])], run_command, ['$MAKE -s --no-print-directory mod165'])
+test('mod165', [extra_files(['Mod164_A.hs', 'Mod164_B.hs'])], makefile_test, [])
 
-test('mod166', [extra_files(['Mod164_A.hs', 'Mod164_B.hs'])], run_command,
-     ['$MAKE -s --no-print-directory mod166 MAKELEVEL='])
+test('mod166', [extra_files(['Mod164_A.hs', 'Mod164_B.hs'])],
+     run_command, ['$MAKE -s --no-print-directory mod166 MAKELEVEL='])
 
-test('mod167', [extra_files(['Mod164_A.hs', 'Mod164_B.hs'])], run_command,
-     ['$MAKE -s --no-print-directory mod167 MAKELEVEL='])
+test('mod167', [extra_files(['Mod164_A.hs', 'Mod164_B.hs'])],
+     run_command, ['$MAKE -s --no-print-directory mod167 MAKELEVEL='])
 
 test('mod168', normal, compile, [''])
 test('mod169', normal, compile, [''])

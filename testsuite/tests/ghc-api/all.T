@@ -1,15 +1,11 @@
 test('ghcApi', normal, compile_and_run, ['-package ghc'])
-test('T6145', normal,
-              run_command,
-              ['$MAKE -s --no-print-directory T6145'])
+test('T6145', normal, makefile_test, ['T6145'])
 test('T8639_api', when(arch('powerpc64') or arch('powerpc64le'),
                        expect_broken(11259)),
-              run_command,
-              ['$MAKE -s --no-print-directory T8639_api'])
+              makefile_test, ['T8639_api'])
 test('T8628', when(arch('powerpc64') or arch('powerpc64le'),
                    expect_broken(11259)),
-              run_command,
-              ['$MAKE -s --no-print-directory T8628'])
+              makefile_test, ['T8628'])
 test('T9595', extra_run_opts('"' + config.libdir + '"'),
               compile_and_run,
               ['-package ghc'])
