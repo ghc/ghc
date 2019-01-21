@@ -380,8 +380,8 @@ validate-x86_64-windows:
       - ghc.tar.xz
       - junit.xml
 
-# Note [Cleanup on Windows]
-# ~~~~~~~~~~~~~~~~~~~~~~~~~
+# Note [Cleaning up after shell executor]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 # As noted in [1], gitlab-runner's shell executor doesn't clean up its working
 # directory after builds. Unfortunately, we are forced to use the shell executor
@@ -391,7 +391,7 @@ validate-x86_64-windows:
 #
 # [1] https://gitlab.com/gitlab-org/gitlab-runner/issues/3856
 
-# See Note [Cleanup on Windows]
+# See Note [Cleanup after shell executor]
 cleanup-windows:
   stage: cleanup
   tags:
@@ -412,3 +412,21 @@ cleanup-windows:
     - del %BUILD_DIR%\* /F /Q
     - for /d %%p in (%BUILD_DIR%\*) do rd /Q /S "%%p"
     - exit /b 0
+
+# See Note [Cleanup after shell executor]
+cleanup-darwin:
+  stage: cleanup
+  tags:
+    - x86_64-darwin
+  when: always
+  before_script:
+    - echo "Time to clean up"
+  script:
+    - echo "Let's go"
+  after_script:
+    - BUILD_DIR=$CI_PROJECT_DIR
+    - echo "Cleaning $BUILD_DIR"
+    - cd $HOME
+    - rm -Rf $BUILD_DIR/*
+    - exit 0
+
