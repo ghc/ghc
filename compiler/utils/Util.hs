@@ -28,7 +28,7 @@ module Util (
         mapAndUnzip, mapAndUnzip3, mapAccumL2,
         nOfThem, filterOut, partitionWith,
 
-        dropWhileEndLE, spanEnd, last2,
+        dropWhileEndLE, spanEnd, last2, lastMaybe,
 
         foldl1', foldl2, count, countWhile, all2,
 
@@ -779,6 +779,15 @@ last2 = foldl' (\(_,x2) x -> (x2,x)) (partialError,partialError)
   where
     partialError = panic "last2 - list length less than two"
 
+lastMaybe :: [a] -> Maybe a
+lastMaybe [] = Nothing
+lastMaybe xs = Just $ last xs
+
+-- | If there is a good chance that you will only look at the last
+-- element prefer seperate calls to @last@ + @init@.
+-- @last@ does not allocate while traversing the list, while this
+-- will. But if you are guaranteed to use both this will
+-- usually be more efficient.
 snocView :: [a] -> Maybe ([a],a)
         -- Split off the last element
 snocView [] = Nothing
