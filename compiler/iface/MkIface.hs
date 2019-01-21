@@ -1722,32 +1722,29 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
  where
    branch_list = fromBranches branches
 
--- 2nd parameter is the list of branch LHSs, for conversion from incompatible branches
--- to incompatible indices
+-- 2nd parameter is the list of branch LHSs, in case of a closed type family,
+-- for conversion from incompatible branches to incompatible indices.
+-- For an open type family the list should be empty.
 -- See Note [Storing compatibility] in CoAxiom
 coAxBranchToIfaceBranch :: TyCon -> [[Type]] -> CoAxBranch -> IfaceAxBranch
 coAxBranchToIfaceBranch tc lhs_s
-                        branch@(CoAxBranch { cab_incomps = incomps })
-  = (coAxBranchToIfaceBranch' tc branch) { ifaxbIncomps = iface_incomps }
+                        (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
+                                    , cab_eta_tvs = eta_tvs
+                                    , cab_lhs = lhs, cab_roles = roles
+                                    , cab_rhs = rhs, cab_incomps = incomps })
+
+  = IfaceAxBranch { ifaxbTyVars  = toIfaceTvBndrs tidy_tvs
+                  , ifaxbCoVars  = map toIfaceIdBndr cvs
+                  , ifaxbEtaTyVars = toIfaceTvBndrs eta_tvs
+                  , ifaxbLHS     = toIfaceTcArgs tc lhs
+                  , ifaxbRoles   = roles
+                  , ifaxbRHS     = toIfaceType rhs
+                  , ifaxbIncomps = iface_incomps }
   where
     iface_incomps = map (expectJust "iface_incomps"
-                        . (flip findIndex lhs_s
-                          . eqTypes)
+                        . flip findIndex lhs_s
+                        . eqTypes
                         . coAxBranchLHS) incomps
-
--- use this one for standalone branches without incompatibles
-coAxBranchToIfaceBranch' :: TyCon -> CoAxBranch -> IfaceAxBranch
-coAxBranchToIfaceBranch' tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
-                                        , cab_eta_tvs = eta_tvs
-                                        , cab_lhs = lhs
-                                        , cab_roles = roles, cab_rhs = rhs })
-  = IfaceAxBranch { ifaxbTyVars    = toIfaceTvBndrs tvs
-                  , ifaxbCoVars    = map toIfaceIdBndr cvs
-                  , ifaxbEtaTyVars = toIfaceTvBndrs eta_tvs
-                  , ifaxbLHS       = toIfaceTcArgs tc lhs
-                  , ifaxbRoles     = roles
-                  , ifaxbRHS       = toIfaceType rhs
-                  , ifaxbIncomps   = [] }
 
 -----------------
 tyConToIfaceDecl :: TidyEnv -> TyCon -> (TidyEnv, IfaceDecl)
@@ -1829,7 +1826,8 @@ tyConToIfaceDecl env tycon
     to_if_fam_flav (ClosedSynFamilyTyCon (Just ax))
       = IfaceClosedSynFamilyTyCon (Just (axn, ibr))
       where defs = fromBranches $ coAxiomBranches ax
-            ibr  = map (coAxBranchToIfaceBranch' tycon) defs
+            lhss = map coAxBranchLHS defs
+            ibr  = map (coAxBranchToIfaceBranch tycon lhss) defs
             axn  = coAxiomName ax
 
     ifaceConDecls (NewTyCon { data_con = con })    = IfNewTyCon  (ifaceConDecl con)

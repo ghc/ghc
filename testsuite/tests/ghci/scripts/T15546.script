@@ -1,0 +1,5 @@
+:set -XTypeFamilies
+type family E a b where E a a = (); E a b = Bool
+:info E
+:set -fprint-axiom-incomps
+:info E

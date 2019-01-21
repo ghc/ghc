@@ -446,6 +446,7 @@ data GeneralFlag
    | Opt_PrintExplicitCoercions
    | Opt_PrintExplicitRuntimeReps
    | Opt_PrintEqualityRelations
+   | Opt_PrintAxiomIncomps
    | Opt_PrintUnicodeSyntax
    | Opt_PrintExpandedSynonyms
    | Opt_PrintPotentialInstances
@@ -4168,6 +4169,7 @@ fFlagsDeps = [
   flagSpec "print-explicit-coercions"         Opt_PrintExplicitCoercions,
   flagSpec "print-explicit-runtime-reps"      Opt_PrintExplicitRuntimeReps,
   flagSpec "print-equality-relations"         Opt_PrintEqualityRelations,
+  flagSpec "print-axiom-incomps"              Opt_PrintAxiomIncomps,
   flagSpec "print-unicode-syntax"             Opt_PrintUnicodeSyntax,
   flagSpec "print-expanded-synonyms"          Opt_PrintExpandedSynonyms,
   flagSpec "print-potential-instances"        Opt_PrintPotentialInstances,
