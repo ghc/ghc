@@ -59,7 +59,6 @@ module DynFlags (
         fFlags, fLangFlags, xFlags,
         wWarningFlags,
         dynFlagDependencies,
-        tablesNextToCode,
         makeDynFlagsConsistent,
         shouldUseColor,
         shouldUseHexWordLiterals,
@@ -880,6 +879,10 @@ data DynFlags = DynFlags {
   integerLibrary        :: IntegerLibrary,
     -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
     --   by GHC-API users. See Note [The integer library] in PrelNames
+  tablesNextToCode      :: Bool,
+    -- ^ Determines whether we will be compiling info tables that reside just
+    --   before the entry code, or with an indirection to the entry code. See
+    --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
   llvmTargets           :: LlvmTargets,
   llvmPasses            :: LlvmPasses,
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
@@ -1624,15 +1627,6 @@ defaultObjectTarget platform
   | cGhcWithNativeCodeGen == "YES"      =  HscAsm
   | otherwise                           =  HscLlvm
 
--- Determines whether we will be compiling
--- info tables that reside just before the entry code, or with an
--- indirection to the entry code.  See TABLES_NEXT_TO_CODE in
--- includes/rts/storage/InfoTables.h.
-tablesNextToCode :: DynFlags -> Bool
-tablesNextToCode dflags =
-    not (platformUnregisterised $ targetPlatform dflags) &&
-    sTablesNextToCode (settings dflags)
-
 data DynLibLoader
   = Deployable
   | SystemDependent
@@ -1887,6 +1881,9 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         ghcLink                 = LinkBinary,
         hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
         integerLibrary          = cIntegerLibraryType,
+        tablesNextToCode        =
+            not (platformUnregisterised $ sTargetPlatform mySettings) &&
+            sTablesNextToCode mySettings,
         verbosity               = 0,
         optLevel                = 0,
         debugLevel              = 0,
