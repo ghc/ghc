@@ -304,8 +304,13 @@ void printRtsInfo(const RtsConfig rts_config) {
     mkRtsInfoPair("Target OS",               TargetOS);
     mkRtsInfoPair("Target vendor",           TargetVendor);
     mkRtsInfoPair("Word size",               TOSTRING(WORD_SIZE_IN_BITS));
+    // TODO(@Ericson2314) This is a joint property of the RTS and generated
+    // code. The compiler will soon be multi-target so it doesn't make sense to
+    // say the target is <ABI adj>, unless we are talking about the host
+    // platform of the compiler / ABI used by a compiler plugin. This is *not*
+    // that, so I think a rename is in order to avoid confusion.
     mkRtsInfoPair("Compiler unregisterised", GhcUnregisterised);
-    mkRtsInfoPair("Tables next to code",     GhcEnableTablesNextToCode);
+    mkRtsInfoPair("Tables next to code",     TablesNextToCode);
     mkRtsInfoPair("Flag -with-rtsopts",      /* See #15261 */
         rts_config.rts_opts != NULL ? rts_config.rts_opts : "");
     printf(" ]\n");

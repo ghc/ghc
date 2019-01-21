@@ -102,7 +102,7 @@ $(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$(dir $$@)/.
 #
 #	Tack on some extra config information from the build system
 #
-ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
+ifeq "$(TablesNextToCode)" "YES"
 	@echo >> $@
 	@echo "#define TABLES_NEXT_TO_CODE 1" >> $@
 endif
@@ -218,7 +218,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("Use native code generator", "$(GhcWithNativeCodeGen)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
-	@echo ',("Tables next to code", "$(GhcEnableTablesNextToCode)")' >> $@
+	@echo ',("Tables next to code", "$(TablesNextToCode)")' >> $@
 	@echo ',("Leading underscore", "$(LeadingUnderscore)")' >> $@
 	@echo ',("Use LibFFI", "$(UseLibFFIForAdjustors)")' >> $@
 # Note that GhcThreaded just reflects the Makefile variable setting. In
