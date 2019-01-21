@@ -418,7 +418,7 @@ rts/RtsUtils_CC_OPTS += -DTargetOS=\"$(TargetOS_CPP)\"
 rts/RtsUtils_CC_OPTS += -DTargetVendor=\"$(TargetVendor_CPP)\"
 #
 rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
-rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
+rts/RtsUtils_CC_OPTS += -DTablesNextToCode=\"$(TablesNextToCode)\"
 #
 rts/xxhash_CC_OPTS += -O3 -ffast-math -ftree-vectorize
 
