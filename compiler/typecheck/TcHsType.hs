@@ -1235,7 +1235,6 @@ checkCrossStageLiftingTy top_lvl id_name id (Brack _ (TcPending ps_var lie_var))
               -- Put the 'lift' constraint into the right LIE
               lift_id <- tcLookupId THNames.liftTyName
               let c = (mkTyConApp (classTyCon typeableClass) [k, id_ty])
-              pprTrace "c" (ppr c) (return ())
               dict <- instCall (OccurrenceOf id_name) [k, id_ty] [c]
               return (mkLHsWrap dict (nlHsVar lift_id)))
 
