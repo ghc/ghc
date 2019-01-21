@@ -911,6 +911,7 @@ data WarningFlag =
    | Opt_WarnSpaceAfterBang
    | Opt_WarnMissingDerivingStrategies    -- Since 8.8
    | Opt_WarnPrepositiveQualifiedModule   -- Since TBD
+   | Opt_WarnUnusedPackages               -- Since 8.10
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -4110,7 +4111,8 @@ wWarningFlagsDeps = [
   flagSpec "missing-space-after-bang"    Opt_WarnSpaceAfterBang,
   flagSpec "partial-fields"              Opt_WarnPartialFields,
   flagSpec "prepositive-qualified-module"
-                                         Opt_WarnPrepositiveQualifiedModule
+                                         Opt_WarnPrepositiveQualifiedModule,
+  flagSpec "unused-packages"             Opt_WarnUnusedPackages
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
