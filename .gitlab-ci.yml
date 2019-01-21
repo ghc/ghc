@@ -327,8 +327,6 @@ validate-x86_64-linux-deb9-unreg:
 validate-x86_64-windows-hadrian:
   extends: .validate-windows
   stage: full-build
-  # due to #16073
-  allow_failure: true
   variables:
     GHC_VERSION: "8.6.2"
     LANG: "en_US.UTF-8"
@@ -339,10 +337,11 @@ validate-x86_64-windows-hadrian:
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
       mkdir -p _build
       cp -R inplace/mingw _build/mingw
-    # FIXME: --no-lint due to #15950
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --no-lint"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh binary-dist"
-    - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick"
+    # FIXME: Bindist disabled due to #16073
+    #- bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh binary-dist"
+    # FIXME: Testsuite disabled due to #16156.
+    #- bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   cache:
     key: x86_64-windows
   tags:
