@@ -53,6 +53,8 @@ import Fingerprint
 import Data.List
 import Outputable (Outputable(..), text, (<+>))
 
+import {-# SOURCE #-} qualified TcHoleErrors (HoleFitPlugin)
+
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
 import qualified Data.Semigroup
@@ -79,6 +81,9 @@ data Plugin = Plugin {
   , tcPlugin :: TcPlugin
     -- ^ An optional typechecker plugin, which may modify the
     -- behaviour of the constraint solver.
+  , holeFitPlugin :: HoleFitPlugin
+    -- ^ An optional plugin to handle hole fits, which may re-order
+    --   or change the list of valid hole fits and refinement hole fits
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
   , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
@@ -169,6 +174,7 @@ instance Monoid PluginRecompile where
 
 type CorePlugin = [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 type TcPlugin = [CommandLineOption] -> Maybe TcRnTypes.TcPlugin
+type HoleFitPlugin = [CommandLineOption] -> Maybe TcHoleErrors.HoleFitPlugin
 
 purePlugin, impurePlugin, flagRecompile :: [CommandLineOption] -> IO PluginRecompile
 purePlugin _args = return NoForceRecompile
@@ -186,7 +192,8 @@ defaultPlugin :: Plugin
 defaultPlugin = Plugin {
         installCoreToDos      = const return
       , tcPlugin              = const Nothing
-      , pluginRecompile  = impurePlugin
+      , holeFitPlugin         = const Nothing
+      , pluginRecompile       = impurePlugin
       , renamedResultAction   = \_ env grp -> return (env, grp)
       , parsedResultAction    = \_ _ -> return
       , typeCheckResultAction = \_ _ -> return
