@@ -323,7 +323,7 @@ EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p);
 EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p)
 {
     StgInfoTable *info = INFO_PTR_TO_STRUCT((StgInfoTable *)p);
-    return info->type != INVALID_OBJECT && info->type < N_CLOSURE_TYPES;
+    return info->type != INVALID_OBJECT && info->type < N_CLOSURE_TYPES && !HEAP_ALLOCED(p);
 }
 
 EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR (StgWord p);
