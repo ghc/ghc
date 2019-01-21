@@ -47,6 +47,7 @@ import IfaceType
 import BinFingerprint
 import CoreSyn( IsOrphan, isOrphan )
 import PprCore()            -- Printing DFunArgs
+import DynFlags( gopt, GeneralFlag (Opt_PrintAxiomIncomps) )
 import Demand
 import Class
 import FieldLabel
@@ -66,7 +67,7 @@ import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( VarBndr(..), binderVar )
 import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
-import Util( dropList, filterByList )
+import Util( dropList, filterByList, notNull )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
 
@@ -545,6 +546,28 @@ to cross the separate compilation boundary.
 In general we retain all info that is left by CoreTidy.tidyLetBndr, since
 that is what is seen by importing module with --make
 
+Note [Displaying axiom incompatibilities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With -fprint-axiom-incomps we display which closed type family equations
+are incompatible with which. This information is sometimes necessary
+because GHC doesn't try equations in order: any equation can be used when
+all preceding equations that are incompatible with it do not apply.
+
+For example, the last "a && a = a" equation in Data.Type.Bool.&& is
+actually compatible with all previous equations, and can reduce at any
+time.
+
+This is displayed as:
+Prelude> :i Data.Type.Equality.==
+type family (==) (a :: k) (b :: k) :: Bool
+  where
+      (==) (f a) (g b) = (f == g) && (a == b)
+      (==) a a = 'True
+          -- incompatible indices: 0
+      (==) _1 _2 = 'False
+          -- incompatible indices: 1, 0
+The comment after an equation refers to all previous equations (0-indexed)
+that are incompatible with it.
 
 ************************************************************************
 *                                                                      *
@@ -571,13 +594,17 @@ pprAxBranch pp_tc (IfaceAxBranch { ifaxbTyVars = tvs
   = WARN( not (null _cvs), pp_tc $$ ppr _cvs )
     hang ppr_binders 2 (hang pp_lhs 2 (equals <+> ppr rhs))
     $+$
-    nest 2 maybe_incomps
+    nest 6 maybe_incomps
   where
     -- See Note [Printing foralls in type family instances] in IfaceType
     ppr_binders = pprUserIfaceForAll $ map (mkIfaceForAllTvBndr Specified) tvs
     pp_lhs = hang pp_tc 2 (pprParendIfaceAppArgs pat_tys)
-    maybe_incomps = ppUnless (null incomps) $ parens $
-                    text "incompatible indices:" <+> ppr incomps
+
+    -- See Note [Displaying axiom incompatibilities]
+    maybe_incomps
+      = sdocWithDynFlags $ \dflags ->
+        ppWhen (gopt Opt_PrintAxiomIncomps dflags && notNull incomps) $
+        text "--" <+> text "incompatible indices:" <+> interpp'SP incomps
 
 instance Outputable IfaceAnnotation where
   ppr (IfaceAnnotation target value) = ppr target <+> colon <+> ppr value
