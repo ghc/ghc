@@ -11,6 +11,7 @@
 #include "BeginPrivate.h"
 
 typedef struct hashtable HashTable; /* abstract */
+typedef struct strhashtable StrHashTable;
 
 /* Hash table access where the keys are StgWords.
  * Values are passed into the hash table and stored as `const void *` values,
@@ -40,27 +41,44 @@ void mapHashTable(HashTable *table, void *data, MapHashFn fn);
  * assumed to be allocated by the caller, and mustn't be deallocated
  * until the corresponding hash table entry has been removed).
  */
-HashTable * allocStrHashTable ( void );
+INLINE_HEADER StrHashTable * allocStrHashTable ( void )
+{
+    return (StrHashTable*) allocHashTable();
+}
 
-#define lookupStrHashTable(table, key)  \
-   (lookupHashTable(table, (StgWord)key))
+void        insertStrHashTable ( StrHashTable *table, const char * key,
+                                 const void *data );
+void *      lookupStrHashTable ( const StrHashTable *table, const char * key);
+void *      removeStrHashTable ( StrHashTable *table, const char * key,
+                                 const void *data );
 
-#define insertStrHashTable(table, key, data)  \
-   (insertHashTable(table, (StgWord)key, data))
-
-#define removeStrHashTable(table, key, data) \
-   (removeHashTable(table, (StgWord)key, data))
-
-/* Hash tables for arbitrary keys */
+/*
+ * Hash tables for arbitrary key types.
+ * Generally, these functions allow for the specification of the
+ * HashFunction and CompareFunction. It's recommended that those
+ * are inlinable so there's a chance the compiler can discard
+ * some parameter-passing, as well as function calls, though note
+ * it's not guaranteed. Either way, the functions are parameters
+ * as the types should be statically known and thus
+ * storing them is unnecessary.
+ */
 typedef int HashFunction(const HashTable *table, StgWord key);
 typedef int CompareFunction(StgWord key1, StgWord key2);
-HashTable * allocHashTable_(HashFunction *hash, CompareFunction *compare);
 int hashWord(const HashTable *table, StgWord key);
-int hashStr(const HashTable *table, StgWord key);
+int hashStr(const HashTable *table, StgWord w);
+void        insertHashTable_ ( HashTable *table, StgWord key,
+                               const void *data, HashFunction f );
+void *      lookupHashTable_ ( const HashTable *table, StgWord key,
+                               HashFunction f, CompareFunction cmp );
+void *      removeHashTable_ ( HashTable *table, StgWord key,
+                               const void *data, HashFunction f,
+                               CompareFunction cmp );
 
 /* Freeing hash tables
  */
 void freeHashTable ( HashTable *table, void (*freeDataFun)(void *) );
+#define freeStrHashTable(table, f) \
+    (freeHashTable((HashTable*) table, f))
 
 void exitHashTable ( void );
 

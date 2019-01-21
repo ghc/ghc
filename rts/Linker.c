@@ -158,7 +158,7 @@
    2) The number of duplicate symbols, since now only symbols that are
       true duplicates will display the error.
  */
-/*Str*/HashTable *symhash;
+StrHashTable *symhash;
 
 /* List of currently loaded objects */
 ObjectCode *objects = NULL;     /* initially empty */
@@ -227,7 +227,7 @@ int ocTryLoad( ObjectCode* oc );
 
 static void *mmap_32bit_base = (void *)MMAP_32BIT_BASE_DEFAULT;
 
-static void ghciRemoveSymbolTable(HashTable *table, const SymbolName* key,
+static void ghciRemoveSymbolTable(StrHashTable *table, const SymbolName* key,
     ObjectCode *owner)
 {
     RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
@@ -262,7 +262,7 @@ static void ghciRemoveSymbolTable(HashTable *table, const SymbolName* key,
  */
 int ghciInsertSymbolTable(
    pathchar* obj_name,
-   HashTable *table,
+   StrHashTable *table,
    const SymbolName* key,
    SymbolAddr* data,
    HsBool weak,
@@ -373,7 +373,7 @@ int ghciInsertSymbolTable(
 * Returns: 0 on failure and result is not set,
 *          nonzero on success and result set to nonzero pointer
 */
-HsBool ghciLookupSymbolInfo(HashTable *table,
+HsBool ghciLookupSymbolInfo(StrHashTable *table,
     const SymbolName* key, RtsSymbolInfo **result)
 {
     RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
@@ -524,7 +524,7 @@ exitLinker( void ) {
    }
 #endif
    if (linker_init_done == 1) {
-       freeHashTable(symhash, free);
+       freeStrHashTable(symhash, free);
    }
 #if defined(THREADED_RTS)
    closeMutex(&linker_mutex);
@@ -1200,7 +1200,7 @@ void freeObjectCode (ObjectCode *oc)
     }
 
     if (oc->extraInfos != NULL) {
-        freeHashTable(oc->extraInfos, NULL);
+        freeStrHashTable(oc->extraInfos, NULL);
         oc->extraInfos = NULL;
     }
 

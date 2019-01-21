@@ -34,14 +34,14 @@ static HashTable *fd_hash;
 static Mutex file_lock_mutex;
 #endif
 
-static int cmpLocks(StgWord w1, StgWord w2)
+STATIC_INLINE int cmpLocks(StgWord w1, StgWord w2)
 {
     Lock *l1 = (Lock *)w1;
     Lock *l2 = (Lock *)w2;
     return (l1->device == l2->device && l1->inode == l2->inode);
 }
 
-static int hashLock(const HashTable *table, StgWord w)
+STATIC_INLINE int hashLock(const HashTable *table, StgWord w)
 {
     Lock *l = (Lock *)w;
     StgWord key = l->inode ^ (l->inode >> 32) ^ l->device ^ (l->device >> 32);
@@ -52,7 +52,7 @@ static int hashLock(const HashTable *table, StgWord w)
 void
 initFileLocking(void)
 {
-    obj_hash = allocHashTable_(hashLock, cmpLocks);
+    obj_hash = allocHashTable();
     fd_hash  = allocHashTable(); /* ordinary word-based table */
 #if defined(THREADED_RTS)
     initMutex(&file_lock_mutex);
@@ -85,7 +85,7 @@ lockFile(int fd, StgWord64 dev, StgWord64 ino, int for_writing)
     key.device = dev;
     key.inode  = ino;
 
-    lock = lookupHashTable(obj_hash, (StgWord)&key);
+    lock = lookupHashTable_(obj_hash, (StgWord)&key, hashLock, cmpLocks);
 
     if (lock == NULL)
     {
@@ -93,7 +93,7 @@ lockFile(int fd, StgWord64 dev, StgWord64 ino, int for_writing)
         lock->device = dev;
         lock->inode  = ino;
         lock->readers = for_writing ? -1 : 1;
-        insertHashTable(obj_hash, (StgWord)lock, (void *)lock);
+        insertHashTable_(obj_hash, (StgWord)lock, (void *)lock, hashLock);
         insertHashTable(fd_hash, fd, lock);
         RELEASE_LOCK(&file_lock_mutex);
         return 0;
@@ -135,7 +135,7 @@ unlockFile(int fd)
     }
 
     if (lock->readers == 0) {
-        removeHashTable(obj_hash, (StgWord)lock, NULL);
+        removeHashTable_(obj_hash, (StgWord)lock, NULL, hashLock, cmpLocks);
         stgFree(lock);
     }
     removeHashTable(fd_hash, fd, NULL);

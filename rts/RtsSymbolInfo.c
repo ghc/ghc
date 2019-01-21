@@ -93,7 +93,7 @@ static void unmarkImport(SymbolInfo* info)
 /* -----------------------------------------------------------------------------
 * Marks the symbol at the given address as weak or not.
 * If the extra symbol infos table has not been initialized
-* yet this will create and allocate a new Hashtable
+* yet this will create and allocate a new StrHashtable
 */
 void setWeakSymbol(ObjectCode *owner, const void *label)
 {
@@ -103,7 +103,7 @@ void setWeakSymbol(ObjectCode *owner, const void *label)
 /* -----------------------------------------------------------------------------
 * Marks the symbol at the given address as import or not.
 * If the extra symbol infos table has not been initialized
-* yet this will create and allocate a new Hashtable
+* yet this will create and allocate a new StrHashtable
 */
 void setImportSymbol(ObjectCode *owner, const void *label)
 {
@@ -113,7 +113,7 @@ void setImportSymbol(ObjectCode *owner, const void *label)
 /* -----------------------------------------------------------------------------
 * Clear the import symbol flag.
 * If the extra symbol infos table has not been initialized
-* yet this will create and allocate a new Hashtable
+* yet this will create and allocate a new StrHashtable
 */
 void clearImportSymbol(ObjectCode *owner, const void *label)
 {
