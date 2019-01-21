@@ -124,5 +124,5 @@ plugin-recomp-change-prof:
 
 .PHONY: T16104
 T16104:
-	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T16104_Plugin.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T16104_Plugin.hs -package ghc
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T16104.hs
