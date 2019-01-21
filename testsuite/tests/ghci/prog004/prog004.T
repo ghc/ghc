@@ -3,5 +3,4 @@ def f(name, opts):
         opts.skip = 1
 setTestOpts(f)
 
-test('ghciprog004', [], run_command,
-     ['$MAKE -s --no-print-directory ghciprog004'])
+test('ghciprog004', [], makefile_test, ['ghciprog004'])

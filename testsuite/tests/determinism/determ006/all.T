@@ -1,1 +1,1 @@
-test('determ006', [extra_files(['spec-inline-determ.hs'])], run_command, ['$MAKE -s --no-print-directory determ006'])
+test('determ006', [extra_files(['spec-inline-determ.hs'])], makefile_test, ['determ006'])

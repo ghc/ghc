@@ -896,7 +896,7 @@ def do_test(name, way, func, args, files):
                 framework_fail(name, way,
                     'extra_file does not exist: ' + extra_file)
 
-    if func.__name__ == 'run_command' or opts.pre_cmd:
+    if func.__name__ == 'run_command' or func.__name__ == 'makefile_test' or opts.pre_cmd:
         # When running 'MAKE' make sure 'TOP' still points to the
         # root of the testsuite.
         src_makefile = in_srcdir('Makefile')
