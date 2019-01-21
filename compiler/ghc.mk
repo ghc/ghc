@@ -272,7 +272,7 @@ endif
 ifeq "$(GhcWithInterpreter)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --flags=ghci
 
-ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
+ifeq "$(TablesNextToCode)" "YES"
 # Should GHCI be building info tables in the TABLES_NEXT_TO_CODE style
 # or not?
 # XXX This should logically be a CPP option, but there doesn't seem to

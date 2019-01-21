@@ -316,7 +316,7 @@ generateSettings = do
         , ("Use native code generator", expr $ yesNo <$> ghcWithNativeCodeGen)
         , ("Support SMP", expr $ yesNo <$> ghcWithSMP)
         , ("RTS ways", unwords . map show <$> getRtsWays)
-        , ("Tables next to code", expr $ yesNo <$> ghcEnableTablesNextToCode)
+        , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)
         , ("Leading underscore", expr $ yesNo <$> flag LeadingUnderscore)
         , ("Use LibFFI", expr $ yesNo <$> useLibFFIForAdjustors)
         , ("Use Threads", yesNo . any (wayUnit Threaded) <$> getRtsWays)
@@ -376,7 +376,7 @@ generateGhcAutoconfH :: Expr String
 generateGhcAutoconfH = do
     trackGenerateHs
     configHContents  <- expr $ map undefinePackage <$> readFileLines configH
-    tablesNextToCode <- expr ghcEnableTablesNextToCode
+    tablesNextToCode <- getFlag    TablesNextToCode
     ghcUnreg         <- getFlag    GhcUnregisterised
     ccLlvmBackend    <- getSetting CcLlvmBackend
     ccClangBackend   <- getSetting CcClangBackend
