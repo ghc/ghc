@@ -24,18 +24,12 @@ import Data.ByteString (ByteString)
 import Control.Monad.Fail
 import qualified Data.ByteString as BS
 
-tables_next_to_code :: Bool
-#if defined(TABLES_NEXT_TO_CODE)
-tables_next_to_code = True
-#else
-tables_next_to_code = False
-#endif
-
 -- NOTE: Must return a pointer acceptable for use in the header of a closure.
 -- If tables_next_to_code is enabled, then it must point the the 'code' field.
 -- Otherwise, it should point to the start of the StgInfoTable.
 mkConInfoTable
-   :: Int     -- ptr words
+   :: Bool    -- TABLES_NEXT_TO_CODE
+   -> Int     -- ptr words
    -> Int     -- non-ptr words
    -> Int     -- constr tag
    -> Int     -- pointer tag
@@ -44,7 +38,7 @@ mkConInfoTable
       -- resulting info table is allocated with allocateExec(), and
       -- should be freed with freeExec().
 
-mkConInfoTable ptr_words nonptr_words tag ptrtag con_desc = do
+mkConInfoTable tables_next_to_code ptr_words nonptr_words tag ptrtag con_desc = do
   let entry_addr = interpConstrEntry !! ptrtag
   code' <- if tables_next_to_code
     then Just <$> mkJumpToAddr entry_addr
@@ -60,7 +54,7 @@ mkConInfoTable ptr_words nonptr_words tag ptrtag con_desc = do
                  srtlen = fromIntegral tag,
                  code  = code'
               }
-  castFunPtrToPtr <$> newExecConItbl itbl con_desc
+  castFunPtrToPtr <$> newExecConItbl tables_next_to_code itbl con_desc
 
 
 -- -----------------------------------------------------------------------------
@@ -337,9 +331,9 @@ data StgConInfoTable = StgConInfoTable {
 
 
 pokeConItbl
-  :: Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
+  :: Bool -> Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
   -> IO ()
-pokeConItbl wr_ptr _ex_ptr itbl = do
+pokeConItbl tables_next_to_code wr_ptr _ex_ptr itbl = do
   if tables_next_to_code
     then do
       -- Write the offset to the con_desc from the end of the standard InfoTable
@@ -353,8 +347,8 @@ pokeConItbl wr_ptr _ex_ptr itbl = do
       pokeByteOff wr_ptr itblSize (conDesc itbl)
   pokeItbl (wr_ptr `plusPtr` (#offset StgConInfoTable, i)) (infoTable itbl)
 
-sizeOfEntryCode :: MonadFail m => m Int
-sizeOfEntryCode
+sizeOfEntryCode :: MonadFail m => Bool -> m Int
+sizeOfEntryCode tables_next_to_code
   | not tables_next_to_code = pure 0
   | otherwise = do
      code' <- mkJumpToAddr undefined
@@ -363,10 +357,10 @@ sizeOfEntryCode
        Right xs -> sizeOf (head xs) * length xs
 
 -- Note: Must return proper pointer for use in a closure
-newExecConItbl :: StgInfoTable -> ByteString -> IO (FunPtr ())
-newExecConItbl obj con_desc
+newExecConItbl :: Bool -> StgInfoTable -> ByteString -> IO (FunPtr ())
+newExecConItbl tables_next_to_code obj con_desc
    = alloca $ \pcode -> do
-        sz0 <- sizeOfEntryCode
+        sz0 <- sizeOfEntryCode tables_next_to_code
         let lcon_desc = BS.length con_desc + 1{- null terminator -}
             -- SCARY
             -- This size represents the number of bytes in an StgConInfoTable.
@@ -379,7 +373,7 @@ newExecConItbl obj con_desc
         ex_ptr <- peek pcode
         let cinfo = StgConInfoTable { conDesc = ex_ptr `plusPtr` fromIntegral sz
                                     , infoTable = obj }
-        pokeConItbl wr_ptr ex_ptr cinfo
+        pokeConItbl tables_next_to_code wr_ptr ex_ptr cinfo
         BS.useAsCStringLen con_desc $ \(src, len) ->
             copyBytes (castPtr wr_ptr `plusPtr` fromIntegral sz) src len
         let null_off = fromIntegral sz + fromIntegral (BS.length con_desc)
