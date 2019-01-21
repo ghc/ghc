@@ -267,7 +267,75 @@ data LoadHowMuch
 load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much = do
     mod_graph <- depanal [] False
-    load' how_much (Just batchMsg) mod_graph
+    success <- load' how_much (Just batchMsg) mod_graph
+    warnUnusedPackages
+    pure success
+
+-- Note [Unused packages]
+--
+-- Cabal passes `--package-id` flag for each direct dependency. But GHC
+-- loads them lazily, so when compilation is done, we have a list of all
+-- actually loaded packages. All the packages, specified on command line,
+-- but never loaded, are probably unused dependencies.
+
+warnUnusedPackages :: GhcMonad m => m ()
+warnUnusedPackages = do
+    hsc_env <- getSession
+    eps <- liftIO $ hscEPS hsc_env
+
+    let dflags = hsc_dflags hsc_env
+        pit = eps_PIT eps
+
+    let loadedPackages
+          = map (getPackageDetails dflags)
+          . nub . sort
+          . map moduleUnitId
+          . moduleEnvKeys
+          $ pit
+
+        requestedArgs = mapMaybe packageArg (packageFlags dflags)
+
+        unusedArgs
+          = filter (\arg -> not $ any (matching dflags arg) loadedPackages)
+                   requestedArgs
+
+    let warn = makeIntoWarning
+          (Reason Opt_WarnUnusedPackages)
+          (mkPlainErrMsg dflags noSrcSpan msg)
+        msg = hang
+          ( text "The following packages were specified "
+            <> text "via -package or -package-id flags, "
+            <> text "but were not needed for compilation: ")
+          4
+          (sep (map pprUnusedArg unusedArgs))
+
+    when (wopt Opt_WarnUnusedPackages dflags && not (null unusedArgs)) $
+      logWarnings (listToBag [warn])
+
+    where
+        packageArg (ExposePackage _ arg _) = Just arg
+        packageArg _ = Nothing
+
+        pprUnusedArg (PackageArg str) = text str
+        pprUnusedArg (UnitIdArg uid) = ppr uid
+
+        matchingStr :: String -> PackageConfig -> Bool
+        matchingStr str p
+                =  str == sourcePackageIdString p
+                || str == packageNameString p
+
+        matching :: DynFlags -> PackageArg -> PackageConfig -> Bool
+        matching _ (PackageArg str) p = matchingStr str p
+        matching dflags (UnitIdArg uid) p = uid == realUnitId dflags p
+
+        -- For wired-in packages, we have to unwire their id,
+        -- otherwise they won't match package flags
+        realUnitId :: DynFlags -> PackageConfig -> UnitId
+        realUnitId dflags
+          = unwireUnitId dflags
+          . DefiniteUnitId
+          . DefUnitId
+          . installedPackageConfigId
 
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally
