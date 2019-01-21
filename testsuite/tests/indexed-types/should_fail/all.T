@@ -86,7 +86,7 @@ test('Overlap11', normal, compile_fail, [''])
 test('Overlap15', normal, compile_fail, [''])
 test('T7194', normal, compile_fail, [''])
 test('T7354', normal, compile_fail, [''])
-test('T7354a', [extra_files(['T7354b.hs'])], run_command, ['$MAKE -s --no-print-directory T7354a'])
+test('T7354a', [extra_files(['T7354b.hs'])], makefile_test, ['T7354a'])
 test('T7536', normal, compile_fail, [''])
 
 test('T7729', normal, compile_fail, [''])
@@ -100,11 +100,8 @@ test('T7938', normal, compile_fail, [''])
 test('ClosedFam3', [], multimod_compile_fail, ['ClosedFam3', '-v0'])
 test('ClosedFam4', normal, compile_fail, [''])
 test('T8155', normal, compile_fail, [''])
-test('T8227', [], run_command, ['$MAKE -s --no-print-directory T8227'])
-test('T8129',
-     normal,
-     run_command,
-     ['$MAKE -s --no-print-directory T8129'])
+test('T8227', [], makefile_test, ['T8227'])
+test('T8129', normal, makefile_test, ['T8129'])
 
 test('T8368', normal, compile_fail, [''])
 test('T8368a', normal, compile_fail, [''])
