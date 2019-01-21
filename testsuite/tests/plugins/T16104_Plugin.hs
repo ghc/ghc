@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module T16105_Plugin (plugin) where
+module T16104_Plugin (plugin) where
 
 import GhcPlugins
 import Data.Bits
