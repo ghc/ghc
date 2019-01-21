@@ -62,7 +62,7 @@ packageArgs = do
             , (any (wayUnit Threaded) rtsWays) ?
               notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
             , ghcWithInterpreter ?
-              ghcEnableTablesNextToCode ?
+              flag TablesNextToCode ?
               notM (flag GhcUnregisterised) ?
               notStage0 ? arg "--ghc-option=-DGHCI_TABLES_NEXT_TO_CODE"
             , ghcWithInterpreter ?
@@ -191,7 +191,7 @@ rtsPackageArgs = package rts ? do
     targetOs       <- getSetting TargetOs
     targetVendor   <- getSetting TargetVendor
     ghcUnreg       <- expr $ yesNo <$> flag GhcUnregisterised
-    ghcEnableTNC   <- expr $ yesNo <$> ghcEnableTablesNextToCode
+    ghcEnableTNC   <- expr $ yesNo <$> flag TablesNextToCode
     rtsWays        <- getRtsWays
     way            <- getWay
     path           <- getBuildPath
@@ -243,7 +243,8 @@ rtsPackageArgs = package rts ? do
             , "-DTargetOS="                  ++ show targetOs
             , "-DTargetVendor="              ++ show targetVendor
             , "-DGhcUnregisterised="         ++ show ghcUnreg
-            , "-DGhcEnableTablesNextToCode=" ++ show ghcEnableTNC ]
+            , "-DTablesNextToCode="          ++ show ghcEnableTNC
+            ]
 
           -- We're after pur performance here. So make sure fast math and
           -- vectorization is enabled.
