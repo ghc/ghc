@@ -10,3 +10,5 @@ import VarEnv     ( TidyEnv )
 
 findValidHoleFits :: TidyEnv -> [Implication] -> [Ct] -> Ct
                   -> TcM (TidyEnv, SDoc)
+
+data HoleFitPlugin
