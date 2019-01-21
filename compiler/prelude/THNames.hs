@@ -160,7 +160,9 @@ templateHaskellNames = [
     overlapTyConName, derivClauseQTyConName, derivStrategyQTyConName,
 
     -- Quasiquoting
-    quoteDecName, quoteTypeName, quoteExpName, quotePatName]
+    quoteDecName, quoteTypeName, quoteExpName, quotePatName,
+
+    liftTyName ]
 
 thSyn, thLib, qqLib :: Module
 thSyn = mkTHModule (fsLit "Language.Haskell.TH.Syntax")
@@ -213,6 +215,7 @@ sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
 newNameName    = thFun (fsLit "newName")   newNameIdKey
 liftName       = thFun (fsLit "lift")      liftIdKey
 liftStringName = thFun (fsLit "liftString")  liftStringIdKey
+liftTyName     = libFun (fsLit "liftTy")   liftTyKey
 mkNameName     = thFun (fsLit "mkName")     mkNameIdKey
 mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
 mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
@@ -740,6 +743,7 @@ mkNameSIdKey         = mkPreludeMiscIdUnique 210
 unTypeIdKey          = mkPreludeMiscIdUnique 211
 unTypeQIdKey         = mkPreludeMiscIdUnique 212
 unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 213
+liftTyKey             = mkPreludeMiscIdUnique 214
 
 
 -- data Lit = ...

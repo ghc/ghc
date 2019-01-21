@@ -66,6 +66,7 @@ module TcHsType (
 
 import GhcPrelude
 
+import Id
 import HsSyn
 import TcRnMonad
 import TcEvidence
@@ -94,6 +95,7 @@ import Name
 import NameSet
 import VarEnv
 import TysWiredIn
+import THNames
 import BasicTypes
 import SrcLoc
 import Constants ( mAX_CTUPLE_SIZE )
@@ -107,6 +109,8 @@ import FastString
 import PrelNames hiding ( wildCardName )
 import DynFlags ( WarningFlag (Opt_WarnPartialTypeSignatures) )
 import qualified GHC.LanguageExtensions as LangExt
+
+import Inst
 
 import Maybes
 import Data.List ( find )
@@ -1207,6 +1211,46 @@ tc_hs_context mode ctxt = mapM (tc_lhs_pred mode) (unLoc ctxt)
 tc_lhs_pred :: TcTyMode -> LHsType GhcRn -> TcM PredType
 tc_lhs_pred mode pred = tc_lhs_type mode pred constraintKind
 
+checkCrossStageLiftingTy :: TopLevelFlag -> Name -> Id -> ThStage -> TcM ()
+checkCrossStageLiftingTy top_lvl id_name id (Brack _ (TcPending ps_var lie_var))
+  | isTopLevel top_lvl
+  = when (isExternalName id_name) (keepAlive id_name)
+    -- See Note [Keeping things alive for Template Haskell] in RnSplice
+
+  | otherwise
+  =     -- Nested identifiers, such as 'x' in
+        -- E.g. \x -> [|| h x ||]
+        -- We must behave as if the reference to x was
+        --      h $(lift x)
+        -- We use 'x' itself as the splice proxy, used by
+        -- the desugarer to stitch it all back together.
+        -- If 'x' occurs many times we may get many identical
+        -- bindings of the same splice proxy, but that doesn't
+        -- matter, although it's a mite untidy.
+    do  { let id_ty = mkTyVarTy id
+              k = idType id
+        ; typeableClass <- tcLookupClass typeableClassName
+        ; liftTy <-
+            setConstraintVar lie_var (do
+              -- Put the 'lift' constraint into the right LIE
+              lift_id <- tcLookupId THNames.liftTyName
+              let c = (mkTyConApp (classTyCon typeableClass) [k, id_ty])
+              pprTrace "c" (ppr c) (return ())
+              dict <- instCall (OccurrenceOf id_name) [k, id_ty] [c]
+              return (mkLHsWrap dict (nlHsVar lift_id)))
+
+        -- Update the pending splices
+        ; ps <- readMutVar ps_var
+        ; let pending_splice =
+                Right $ PendingTcTySplice id_name liftTy
+        ; writeMutVar ps_var (pending_splice : ps)
+
+        ; return () }
+checkCrossStageLiftingTy _ _ _ _ = return ()
+
+checkThLocalTyId :: Name -> Id -> TcM ()
+checkThLocalTyId = checkThLocalIdX checkCrossStageLiftingTy
+
 ---------------------------
 tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
 -- See Note [Type checking recursive type and class declarations]
@@ -1215,7 +1259,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
        ; case thing of
-           ATyVar _ tv -> -- Important: zonk before returning
+           ATyVar n tv -> -- Important: zonk before returning
                           -- We may have the application ((a::kappa) b)
                           -- where kappa is already unified to (k1 -> k2)
                           -- Then we want to see that arrow.  Best done
@@ -1224,6 +1268,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                           -- want to zonk the kind, leaving the TyVar
                           -- un-zonked  (Trac #14873)
                           do { ty <- zonkTcTyVar tv
+                             ; checkThLocalTyId n tv
                              ; return (ty, tcTypeKind ty) }
 
            ATcTyCon tc_tc

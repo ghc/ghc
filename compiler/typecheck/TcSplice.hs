@@ -132,6 +132,7 @@ import qualified Data.Map as Map
 import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
 import Data.Data (Data)
 import Data.Proxy    ( Proxy (..) )
+import Data.Either
 import GHC.Exts         ( unsafeCoerce# )
 
 {-
@@ -180,12 +181,12 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
                                 -- NC for no context; tcBracket does that
 
        ; meta_ty <- tcTExpTy expr_ty
-       ; ps' <- readMutVar ps_ref
+       ; (ps', ts') <- partitionEithers <$> readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
                        (unLoc (mkHsApp (nlHsTyApp texpco [expr_ty])
-                                      (noLoc (HsTcBracketOut noExt brack ps'))))
+                                      (noLoc (HsTcBracketOut noExt brack ps' ts'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
@@ -197,7 +198,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        ; meta_ty <- tcBrackTy brack
        ; traceTc "tc_bracket done untyped" (ppr meta_ty)
        ; tcWrapResultO (Shouldn'tHappenOrigin "untyped bracket")
-                       rn_expr (HsTcBracketOut noExt brack ps') meta_ty res_ty }
+                       rn_expr (HsTcBracketOut noExt brack ps' []) meta_ty res_ty }
 
 ---------------
 tcBrackTy :: HsBracket GhcRn -> TcM TcType
@@ -477,7 +478,7 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var) splice_name expr res_ty
        ; untypeq <- tcLookupId unTypeQName
        ; let expr'' = mkHsApp (nlHsTyApp untypeq [res_ty]) expr'
        ; ps <- readMutVar ps_var
-       ; writeMutVar ps_var (PendingTcSplice splice_name expr'' : ps)
+       ; writeMutVar ps_var (Left (PendingTcSplice splice_name expr'') : ps)
 
        -- The returned expression is ignored; it's in the pending splices
        ; return (panic "tcSpliceExpr") }

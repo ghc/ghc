@@ -118,8 +118,11 @@ module Language.Haskell.TH.Lib (
     implicitParamBindD,
 
     -- ** Reify
-    thisModule
+    thisModule,
 
+
+    -- ** Lifting types
+    liftTy, liftTyRep
    ) where
 
 import Language.Haskell.TH.Lib.Internal hiding
@@ -303,3 +306,5 @@ standaloneDerivWithStrategyD mds ctxt ty = do
   ctxt' <- ctxt
   ty'   <- ty
   return $ StandaloneDerivD mds ctxt' ty'
+
+

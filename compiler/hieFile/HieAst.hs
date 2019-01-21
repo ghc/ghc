@@ -805,7 +805,8 @@ instance ( a ~ GhcPass p
         [ toHie b
         , toHie p
         ]
-      HsTcBracketOut _ b p ->
+      -- TODO: MP
+      HsTcBracketOut _ b p _ ->
         [ toHie b
         , toHie p
         ]

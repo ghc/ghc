@@ -1987,18 +1987,17 @@ too_many_args fun args
 -}
 
 checkThLocalId :: Id -> TcM ()
-checkThLocalId id
-  = do  { mb_local_use <- getStageAndBindLevel (idName id)
-        ; case mb_local_use of
-             Just (top_lvl, bind_lvl, use_stage)
-                | thLevel use_stage > bind_lvl
-                -> checkCrossStageLifting top_lvl id use_stage
-             _  -> return ()   -- Not a locally-bound thing, or
-                               -- no cross-stage link
-    }
+checkThLocalId id = checkThLocalIdX checkCrossStageLifting (idName id) id
 
 --------------------------------------
-checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
+
+
+polySpliceErr :: Id -> SDoc
+polySpliceErr id
+  = text "Can't splice the polymorphic local variable" <+> quotes (ppr id)
+
+--------------------------------------
+checkCrossStageLifting :: TopLevelFlag -> Name -> Id -> ThStage -> TcM ()
 -- If we are inside typed brackets, and (use_lvl > bind_lvl)
 -- we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [|| x ||]
@@ -2008,7 +2007,7 @@ checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
 -- This is similar to checkCrossStageLifting in RnSplice, but
 -- this code is applied to *typed* brackets.
 
-checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var))
+checkCrossStageLifting top_lvl id_name id (Brack _ (TcPending ps_var lie_var))
   | isTopLevel top_lvl
   = when (isExternalName id_name) (keepAlive id_name)
     -- See Note [Keeping things alive for Template Haskell] in RnSplice
@@ -2043,19 +2042,14 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var))
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
-        ; let pending_splice = PendingTcSplice id_name
+        ; let pending_splice = Left $ PendingTcSplice id_name
                                  (nlHsApp (noLoc lift) (nlHsVar id))
         ; writeMutVar ps_var (pending_splice : ps)
 
         ; return () }
-  where
-    id_name = idName id
 
-checkCrossStageLifting _ _ _ = return ()
+checkCrossStageLifting _ _ _ _ = return ()
 
-polySpliceErr :: Id -> SDoc
-polySpliceErr id
-  = text "Can't splice the polymorphic local variable" <+> quotes (ppr id)
 
 {-
 Note [Lifting strings]

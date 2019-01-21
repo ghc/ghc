@@ -26,7 +26,7 @@ module Language.Haskell.TH.Syntax
     , ForeignSrcLang(..)
     ) where
 
-import Data.Data hiding (Fixity(..))
+import Data.Data hiding (Fixity(..), TypeRep)
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad (liftM)
@@ -44,6 +44,7 @@ import GHC.ForeignSrcLang.Type
 import Language.Haskell.TH.LanguageExtensions
 import Numeric.Natural
 import Prelude
+
 
 import qualified Control.Monad.Fail as Fail
 

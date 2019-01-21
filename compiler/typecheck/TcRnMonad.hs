@@ -109,7 +109,7 @@ module TcRnMonad(
   -- * Template Haskell context
   recordThUse, recordThSpliceUse, recordTopLevelSpliceLoc,
   getTopLevelSpliceLocs, keepAlive, getStage, getStageAndBindLevel, setStage,
-  addModFinalizersWithLclEnv,
+  addModFinalizersWithLclEnv, checkThLocalIdX,
 
   -- * Safe Haskell context
   recordUnsafeInfer, finalSafeMode, fixSafeInstances,
@@ -1737,7 +1737,8 @@ getStage = do { env <- getLclEnv; return (tcl_th_ctxt env) }
 getStageAndBindLevel :: Name -> TcRn (Maybe (TopLevelFlag, ThLevel, ThStage))
 getStageAndBindLevel name
   = do { env <- getLclEnv;
-       ; case lookupNameEnv (tcl_th_bndrs env) name of
+       ; pprTrace "stage" (ppr name) (return ())
+       ; case pprTraceIt "level" (lookupNameEnv (tcl_th_bndrs env) name) of
            Nothing                  -> return Nothing
            Just (top_lvl, bind_lvl) -> return (Just (top_lvl, bind_lvl, tcl_th_ctxt env)) }
 
@@ -1752,6 +1753,19 @@ addModFinalizersWithLclEnv mod_finalizers
        th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
        updTcRef th_modfinalizers_var $ \fins ->
          (lcl_env, mod_finalizers) : fins
+
+-- Used in TcExpr and TcHsType
+checkThLocalIdX :: (TopLevelFlag -> Name -> Id -> ThStage -> TcM ())
+                -> Name -> Id -> TcM ()
+checkThLocalIdX k n id
+  = do  { mb_local_use <- getStageAndBindLevel n
+        ; case mb_local_use of
+             Just (top_lvl, bind_lvl, use_stage)
+                | thLevel use_stage > bind_lvl
+                -> k top_lvl n id use_stage
+             _  -> return ()   -- Not a locally-bound thing, or
+                               -- no cross-stage link
+    }
 
 {-
 ************************************************************************
