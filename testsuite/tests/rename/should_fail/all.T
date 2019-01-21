@@ -110,8 +110,7 @@ test('T9815', normal, compile_fail, [''])
 
 test('T9032',
      normal,
-     run_command,
-     ['$MAKE -s --no-print-directory T9032'])
+     makefile_test, [])
 test('T10618', normal, compile_fail, [''])
 test('T10668', normal, compile_fail, [''])
 test('T5001b', normal, compile_fail, [''])
