@@ -30,6 +30,10 @@ module Plugins (
       -- - access to loaded interface files with 'interfaceLoadAction'
       --
     , keepRenamedSource
+      -- ** Hole fit plugins
+      -- | hole fit plugins allow plugins to change the behavior of valid hole
+      -- fit suggestions
+    , HoleFitPluginR
 
       -- * Internal
     , PluginWithArgs(..), plugins, pluginRecompile'
@@ -42,7 +46,8 @@ import GhcPrelude
 
 import {-# SOURCE #-} CoreMonad ( CoreToDo, CoreM )
 import qualified TcRnTypes
-import TcRnTypes ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports )
+import TcRnTypes ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
+import TcHoleFitTypes ( HoleFitPluginR )
 import HsSyn
 import DynFlags
 import HscTypes
@@ -79,6 +84,9 @@ data Plugin = Plugin {
   , tcPlugin :: TcPlugin
     -- ^ An optional typechecker plugin, which may modify the
     -- behaviour of the constraint solver.
+  , holeFitPlugin :: HoleFitPlugin
+    -- ^ An optional plugin to handle hole fits, which may re-order
+    --   or change the list of valid hole fits and refinement hole fits.
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
   , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
@@ -169,6 +177,7 @@ instance Monoid PluginRecompile where
 
 type CorePlugin = [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 type TcPlugin = [CommandLineOption] -> Maybe TcRnTypes.TcPlugin
+type HoleFitPlugin = [CommandLineOption] -> Maybe HoleFitPluginR
 
 purePlugin, impurePlugin, flagRecompile :: [CommandLineOption] -> IO PluginRecompile
 purePlugin _args = return NoForceRecompile
@@ -186,7 +195,8 @@ defaultPlugin :: Plugin
 defaultPlugin = Plugin {
         installCoreToDos      = const return
       , tcPlugin              = const Nothing
-      , pluginRecompile  = impurePlugin
+      , holeFitPlugin         = const Nothing
+      , pluginRecompile       = impurePlugin
       , renamedResultAction   = \_ env grp -> return (env, grp)
       , parsedResultAction    = \_ _ -> return
       , typeCheckResultAction = \_ _ -> return

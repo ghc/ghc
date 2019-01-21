@@ -208,6 +208,8 @@ import Data.Maybe    ( mapMaybe )
 import GHCi.Message
 import GHCi.RemoteTypes
 
+import {-# SOURCE #-} TcHoleFitTypes ( HoleFitPlugin )
+
 import qualified Language.Haskell.TH as TH
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used
@@ -685,6 +687,8 @@ data TcGblEnv
 
         tcg_tc_plugins :: [TcPluginSolver],
         -- ^ A list of user-defined plugins for the constraint solver.
+        tcg_hf_plugins :: [HoleFitPlugin],
+        -- ^ A list of user-defined plugins for hole fit suggestions.
 
         tcg_top_loc :: RealSrcSpan,
         -- ^ The RealSrcSpan this module came from

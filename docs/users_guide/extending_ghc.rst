@@ -834,6 +834,329 @@ output:
     typeCheckPlugin (tc):
     {$trModule = Module (TrNameS "main"#) (TrNameS "A"#), a = ()}
 
+.. _hole-fit-plugins
+
+Hole fit plugins
+~~~~~~~~~~~~~~~~
+
+Hole-fit plugins are plugins that are called when a typed-hole error message is
+being generated, and allows you to access information about the typed-hole at
+compile time, and allows you to customize valid hole fit suggestions.
+
+Using hole-fit plugins, you can extend the behavior of valid hole fit
+suggestions to use e.g. Hoogle or other external tools to find and/or synthesize
+valid hole fits, with the same information about the typed-hole that GHC uses.
+
+There are two access points are bundled together for defining hole fit plugins,
+namely a candidate plugin and a fit plugin, for modifying the candidates to be
+checked and fits respectively.
+
+
+::
+
+    type CandPlugin = TypedHole -> [HoleFitCandidate] -> TcM [HoleFitCandidate]
+
+    type FitPlugin =  TypedHole -> [HoleFit] -> TcM [HoleFit]
+
+    data HoleFitPlugin = HoleFitPlugin
+      { candPlugin :: CandPlugin
+         -- ^ A plugin for modifying hole fit candidates before they're checked
+      , fitPlugin :: FitPlugin
+         -- ^ A plugin for modifying valid hole fits after they've been found.
+      }
+
+Where ``TypedHole`` contains all the information about the hole available to GHC
+at error generation.
+
+::
+
+    data TypedHole = TyH { tyHRelevantCts :: Cts
+                          -- ^ Any relevant Cts to the hole
+                        , tyHImplics :: [Implication]
+                          -- ^ The nested implications of the hole with the
+                          --   innermost implication first.
+                        , tyHCt :: Maybe Ct
+                          -- ^ The hole constraint itself, if available.
+                        }
+
+``HoleFitPlugins`` are then defined as follows
+
+::
+
+    plugin :: Plugin
+    plugin = defaultPlugin {
+        holeFitPlugin = (fmap . fmap) fromPureHFPlugin hfPlugin
+      }
+
+
+    hfPlugin :: [CommandLineOption] -> Maybe HoleFitPlugin
+
+
+Where ``fromPureHFPlugin :: HoleFitPlugin -> HoleFitPluginR`` is a convencience
+function provided in the ``TcHoleErrors`` module, for defining plugins that do
+not require internal state.
+
+
+Stateful hole fit plugins
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+``HoleFitPlugins`` are wrapped in a ``HoleFitPluginR``, which provides a
+``TcRef`` for the plugin to use to track internal state, and to facilitate
+communication between the candidate and fit plugin.
+
+::
+
+    -- | HoleFitPluginR adds a TcRef to hole fit plugins so that plugins can
+    -- track internal state. Note the existential quantification, ensuring that
+    -- the state cannot be modified from outside the plugin.
+    data HoleFitPluginR = forall s. HoleFitPluginR
+      { hfPluginInit :: TcM (TcRef s)
+        -- ^ Initializes the TcRef to be passed to the plugin
+      , hfPluginRun :: TcRef s -> HoleFitPlugin
+        -- ^ The function defining the plugin itself
+      , hfPluginStop :: TcRef s -> TcM ()
+        -- ^ Cleanup of state, guaranteed to be called even on error
+      }
+
+The plugin is then defined as by providing a value for the ``holeFitPlugin``
+field, a function that takes the ``CommandLineOption`` strings that are passed
+to the compiler using the :ghc-flag:`-fplugin-opt` flags and returns a
+``HoleFitPluginR``. This function can be used to pass the ``CommandLineOption``
+strings along to the candidate and fit plugins respectively.
+
+
+
+Hole fit plugin example
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The following plugins allows users to limit the search for valid hole fits to
+certain modules, to sort the hole fits by where they originated (in ascending or
+descending order), as well as allowing users to put a limit on how much time is
+spent on searching for valid hole fits, after which new searches are aborted.
+
+::
+
+    {-# LANGUAGE TypeApplications, RecordWildCards #-}
+    module HolePlugin where
+
+    import GhcPlugins hiding ((<>))
+
+    import TcHoleErrors
+
+    import Data.List (stripPrefix, sortOn)
+
+    import TcRnTypes
+
+    import TcRnMonad
+
+    import Data.Time (UTCTime, NominalDiffTime)
+    import qualified Data.Time as Time
+
+    import Text.Read
+
+
+    data HolePluginState = HPS { timeAlloted :: Maybe NominalDiffTime
+                              , elapsedTime :: NominalDiffTime
+                              , timeCurStarted :: UTCTime }
+
+    bumpElapsed :: NominalDiffTime -> HolePluginState -> HolePluginState
+    bumpElapsed ad (HPS a e t) = HPS a (e + ad) t
+
+    setAlloted :: Maybe NominalDiffTime -> HolePluginState -> HolePluginState
+    setAlloted a (HPS _ e t) = HPS a e t
+
+    setCurStarted :: UTCTime -> HolePluginState -> HolePluginState
+    setCurStarted nt (HPS a e _) = HPS a e nt
+
+    hpStartState :: HolePluginState
+    hpStartState = HPS Nothing zero undefined
+      where zero = fromInteger @NominalDiffTime 0
+
+    initPlugin :: [CommandLineOption] -> TcM (TcRef HolePluginState)
+    initPlugin [msecs] = newTcRef $ hpStartState { timeAlloted = alloted }
+      where
+        errMsg = "Invalid amount of milliseconds given to plugin: " <> show msecs
+        alloted = case readMaybe @Integer msecs of
+          Just millisecs -> Just $ fromInteger @NominalDiffTime millisecs / 1000
+          _ -> error errMsg
+    initPlugin _ = newTcRef hpStartState
+
+    fromModule :: HoleFitCandidate -> [String]
+    fromModule (GreHFCand gre) =
+      map (moduleNameString . importSpecModule) $ gre_imp gre
+    fromModule _ = []
+
+    toHoleFitCommand :: TypedHole -> String -> Maybe String
+    toHoleFitCommand TyH{tyHCt = Just (CHoleCan _ h)} str
+        = stripPrefix ("_" <> str) $ occNameString $ holeOcc h
+    toHoleFitCommand _ _ = Nothing
+
+    -- | This candidate plugin filters the candidates by module,
+    -- using the name of the hole as module to search in
+    modFilterTimeoutP :: [CommandLineOption] -> TcRef HolePluginState -> CandPlugin
+    modFilterTimeoutP _ ref hole cands = do
+      curTime <- liftIO Time.getCurrentTime
+      HPS {..} <- readTcRef ref
+      updTcRef ref (setCurStarted curTime)
+      return $ case timeAlloted of
+        -- If we're out of time we remove all the candidates. Then nothing is checked.
+        Just sofar | elapsedTime > sofar -> []
+        _ -> case toHoleFitCommand hole "only_" of
+
+              Just modName -> filter (inScopeVia modName) cands
+              _ -> cands
+      where inScopeVia modNameStr cand@(GreHFCand _) =
+              elem (toModName modNameStr) $ fromModule cand
+            inScopeVia _ _ = False
+            toModName = replace '_' '.'
+            replace :: Eq a => a -> a -> [a] -> [a]
+            replace _ _ [] = []
+            replace a b (x:xs) = (if x == a then b else x):replace a b xs
+
+    modSortP :: [CommandLineOption] -> TcRef HolePluginState -> FitPlugin
+    modSortP _ ref hole hfs = do
+      curTime <- liftIO Time.getCurrentTime
+      HPS {..} <- readTcRef ref
+      updTcRef ref $ bumpElapsed (Time.diffUTCTime curTime timeCurStarted)
+      return $ case timeAlloted of
+        -- If we're out of time, remove any candidates, so nothing is checked.
+        Just sofar | elapsedTime > sofar -> [RawHoleFit $ text msg]
+        _ -> case toHoleFitCommand hole "sort_by_mod" of
+                -- If only_ is on, the fits will all be from the same module.
+                Just ('_':'d':'e':'s':'c':_) -> reverse hfs
+                Just _ -> orderByModule hfs
+                _ ->  hfs
+      where orderByModule :: [HoleFit] -> [HoleFit]
+            orderByModule = sortOn (fmap fromModule . mbHFCand)
+            mbHFCand :: HoleFit -> Maybe HoleFitCandidate
+            mbHFCand HoleFit {hfCand = c} = Just c
+            mbHFCand _ = Nothing
+            msg = hang (text "Error: The time ran out, and the search was aborted for this hole.")
+                   7 $ text "Try again with a longer timeout."
+
+    plugin :: Plugin
+    plugin = defaultPlugin { holeFitPlugin = holeFitP, pluginRecompile = purePlugin}
+
+    holeFitP :: [CommandLineOption] -> Maybe HoleFitPluginR
+    holeFitP opts = Just (HoleFitPluginR initP pluginDef stopP)
+      where initP = initPlugin opts
+            stopP = const $ return ()
+            pluginDef ref = HoleFitPlugin { candPlugin = modFilterTimeoutP opts ref
+                                          , fitPlugin  = modSortP opts ref }
+
+When you then compile a module containing the following
+
+::
+
+    {-# OPTIONS -fplugin=HolePlugin
+                -fplugin-opt=HolePlugin:600
+                -funclutter-valid-hole-fits #-}
+    module Main where
+
+    import Prelude hiding (head, last)
+
+    import Data.List (head, last)
+
+
+    f, g, h, i, j :: [Int] -> Int
+    f = _too_long
+    j = _
+    i = _sort_by_mod_desc
+    g = _only_Data_List
+    h = _only_Prelude
+
+    main :: IO ()
+    main = return ()
+
+
+The output is as follows:
+
+.. code-block:: none
+
+    Main.hs:12:5: error:
+        • Found hole: _too_long :: [Int] -> Int
+          Or perhaps ‘_too_long’ is mis-spelled, or not in scope
+        • In the expression: _too_long
+          In an equation for ‘f’: f = _too_long
+        • Relevant bindings include
+            f :: [Int] -> Int (bound at Main.hs:12:1)
+          Valid hole fits include
+            Error: The time ran out, and the search was aborted for this hole.
+                   Try again with a longer timeout.
+      |
+    12 | f = _too_long
+      |     ^^^^^^^^^
+
+    Main.hs:13:5: error:
+        • Found hole: _ :: [Int] -> Int
+        • In the expression: _
+          In an equation for ‘j’: j = _
+        • Relevant bindings include
+            j :: [Int] -> Int (bound at Main.hs:13:1)
+          Valid hole fits include
+            j :: [Int] -> Int
+            f :: [Int] -> Int
+            g :: [Int] -> Int
+            h :: [Int] -> Int
+            i :: [Int] -> Int
+            head :: forall a. [a] -> a
+            (Some hole fits suppressed; use -fmax-valid-hole-fits=N or -fno-max-valid-hole-fits)
+      |
+    13 | j = _
+      |     ^
+
+    Main.hs:14:5: error:
+        • Found hole: _sort_by_mod_desc :: [Int] -> Int
+          Or perhaps ‘_sort_by_mod_desc’ is mis-spelled, or not in scope
+        • In the expression: _sort_by_mod_desc
+          In an equation for ‘i’: i = _sort_by_mod_desc
+        • Relevant bindings include
+            i :: [Int] -> Int (bound at Main.hs:14:1)
+          Valid hole fits include
+            sum :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
+            product :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
+            minimum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+            maximum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+            length :: forall (t :: * -> *) a. Foldable t => t a -> Int
+            last :: forall a. [a] -> a
+            (Some hole fits suppressed; use -fmax-valid-hole-fits=N or -fno-max-valid-hole-fits)
+      |
+    14 | i = _sort_by_mod_desc
+      |     ^^^^^^^^^^^^^^^^^
+
+    Main.hs:15:5: error:
+        • Found hole: _only_Data_List :: [Int] -> Int
+          Or perhaps ‘_only_Data_List’ is mis-spelled, or not in scope
+        • In the expression: _only_Data_List
+          In an equation for ‘g’: g = _only_Data_List
+        • Relevant bindings include
+            g :: [Int] -> Int (bound at Main.hs:15:1)
+          Valid hole fits include
+            head :: forall a. [a] -> a
+            last :: forall a. [a] -> a
+      |
+    15 | g = _only_Data_List
+      |     ^^^^^^^^^^^^^^^
+
+    Main.hs:16:5: error:
+        • Found hole: _only_Prelude :: [Int] -> Int
+          Or perhaps ‘_only_Prelude’ is mis-spelled, or not in scope
+        • In the expression: _only_Prelude
+          In an equation for ‘h’: h = _only_Prelude
+        • Relevant bindings include
+            h :: [Int] -> Int (bound at Main.hs:16:1)
+          Valid hole fits include
+            length :: forall (t :: * -> *) a. Foldable t => t a -> Int
+            maximum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+            minimum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+            product :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
+            sum :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
+      |
+    16 | h = _only_Prelude
+      |     ^^^^^^^^^^^^^
+
+
 
 .. _plugin_recompilation:
 
