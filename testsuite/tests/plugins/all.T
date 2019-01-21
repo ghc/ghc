@@ -209,4 +209,8 @@ test('T15858',
       ],
      ghci_script, ['T15858.script'])
 
-test('T16104', normal, run_command, ['$MAKE -s --no-print-directory T16104'])
+test('T16104',
+     [extra_files(['T16104-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C T16104-plugin package.T16104-plugin TOP={top}')
+     ],
+     run_command, ['$MAKE -s --no-print-directory T16104'])
