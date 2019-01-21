@@ -14,6 +14,8 @@ test('T4340', [], run_command, ['$MAKE -s --no-print-directory T4340'])
 
 test('T10272', [], run_command, ['$MAKE -s --no-print-directory T10272'])
 
+test('T11004', [], run_command, ['$MAKE -s --no-print-directory T11004'])
+
 test('T12504', [extra_files(['T12504']), ignore_stdout], run_command,
      ['$MAKE -s --no-print-directory T12504'])
 
