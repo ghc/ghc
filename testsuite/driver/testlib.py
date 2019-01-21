@@ -1002,6 +1002,13 @@ def badResult(result):
 def run_command( name, way, cmd ):
     return simple_run( name, '', override_options(cmd), '' )
 
+def makefile_test( name, way, target=None ):
+    if target is None:
+        target = name
+
+    cmd = '$MAKE -s --no-print-directory {target}'.format(target=target)
+    return run_command(name, way, cmd)
+
 # -----------------------------------------------------------------------------
 # GHCi tests
 
