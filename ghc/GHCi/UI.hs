@@ -445,7 +445,10 @@ interactiveUI config srcs maybe_exprs = do
    lastErrLocationsRef <- liftIO $ newIORef []
    progDynFlags <- GHC.getProgramDynFlags
    _ <- GHC.setProgramDynFlags $
-      progDynFlags { log_action = ghciLogAction lastErrLocationsRef }
+      -- Ensure we don't override the user's log action lest we break
+      -- -ddump-json (#14078)
+      progDynFlags { log_action = ghciLogAction (log_action progDynFlags)
+                                                lastErrLocationsRef }
 
    when (isNothing maybe_exprs) $ do
         -- Only for GHCi (not runghc and ghc -e):
@@ -536,9 +539,10 @@ resetLastErrorLocations = do
     st <- getGHCiState
     liftIO $ writeIORef (lastErrorLocations st) []
 
-ghciLogAction :: IORef [(FastString, Int)] ->  LogAction
-ghciLogAction lastErrLocations dflags flag severity srcSpan style msg = do
-    defaultLogAction dflags flag severity srcSpan style msg
+ghciLogAction :: LogAction -> IORef [(FastString, Int)] ->  LogAction
+ghciLogAction old_log_action lastErrLocations
+              dflags flag severity srcSpan style msg = do
+    old_log_action dflags flag severity srcSpan style msg
     case severity of
         SevError -> case srcSpan of
             RealSrcSpan rsp -> modifyIORef lastErrLocations
