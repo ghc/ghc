@@ -592,7 +592,8 @@ tc_extend_local_env top_lvl extra_env thing_inside
                                 -- The LocalRdrEnv contains only non-top-level names
                                 -- (GlobalRdrEnv handles the top level)
             , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
-                                 [(n, thlvl) | (n, ATcId {}) <- pairs] }
+                                 ([(n, thlvl) | (n, ATcId {}) <- pairs] ++
+                                 [(n, thlvl) | (n, ATyVar {}) <- pairs]) }
 
 tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcM TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things

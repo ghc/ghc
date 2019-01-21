@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP, TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -----------------------------------------------------------------------------
 --
@@ -67,16 +68,23 @@ import Control.Monad
 import Data.List
 
 -----------------------------------------------------------------------------
-dsBracket :: HsBracket GhcRn -> [PendingTcSplice] -> DsM CoreExpr
+dsBracket :: HsBracket GhcRn -> [PendingTcSplice]
+                             -> [PendingTcTySplice]
+                             -> DsM CoreExpr
 -- Returns a CoreExpr of type TH.ExpQ
 -- The quoted thing is parameterised over Name, even though it has
 -- been type checked.  We don't want all those type decorations!
 
-dsBracket brack splices
+dsBracket brack splices ty_splices
   = dsExtendMetaEnv new_bit (do_brack brack)
   where
-    new_bit = mkNameEnv [(n, DsSplice (unLoc e))
+    new_bit_e = mkNameEnv [(n, DsSplice (unLoc e))
                         | PendingTcSplice n e <- splices]
+
+    new_bit_ty = mkNameEnv [(n, DsSpliceTy (unLoc e))
+                           | PendingTcTySplice n e <- ty_splices ]
+
+    new_bit = new_bit_e `plusNameEnv` new_bit_ty
 
     do_brack (VarBr _ _ n) = do { MkC e1  <- lookupOcc n ; return e1 }
     do_brack (ExpBr _ e)   = do { MkC e1  <- repLE e     ; return e1 }
@@ -1161,13 +1169,18 @@ repTy (HsTyVar _ _ (dL->L _ n))
   | isLiftedTypeKindTyConName n       = repTStar
   | n `hasKey` constraintKindTyConKey = repTConstraint
   | n `hasKey` funTyConKey            = repArrowTyCon
-  | isTvOcc occ   = do tv1 <- lookupOcc n
-                       repTvar tv1
-  | isDataOcc occ = do tc1 <- lookupOcc n
-                       repPromotedDataCon tc1
-  | n == eqTyConName = repTequality
-  | otherwise     = do tc1 <- lookupOcc n
-                       repNamedTyCon tc1
+  | n == eqTyConName                  = repTequality
+  | otherwise = do
+    mb_val <- dsLookupMetaEnv n
+    if
+      | Just (DsSpliceTy t) <- mb_val -> MkC <$> dsExpr t
+      | isTvOcc occ   -> do tv1 <- lookupOcc n
+                            repTvar tv1
+      | isDataOcc occ -> do tc1 <- lookupOcc n
+                            repPromotedDataCon tc1
+      | otherwise  ->   do tc1 <- lookupOcc n
+                           repNamedTyCon tc1
+
   where
     occ = nameOccName n
 

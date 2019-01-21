@@ -1,3 +1,6 @@
+{-# LANGUAGE TypeApplications, ExplicitNamespaces,
+             PatternSynonyms, AllowAmbiguousTypes,
+             ScopedTypeVariables, PolyKinds #-}
 -- |
 -- Language.Haskell.TH.Lib.Internal exposes some additional functionality that
 -- is used internally in GHC's integration with Template Haskell. This is not a
@@ -18,6 +21,7 @@ import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
 import qualified Language.Haskell.TH.Syntax as TH
 import Control.Monad( liftM, liftM2 )
 import Data.Word( Word8 )
+import Type.Reflection hiding (Module)
 import Prelude
 
 ----------------------------------------------------------
@@ -936,3 +940,20 @@ thisModule :: Q Module
 thisModule = do
   loc <- location
   return $ Module (mkPkgName $ loc_package loc) (mkModName $ loc_module loc)
+
+-----------------------------------------------------
+--
+--              Lifting types
+--
+-----------------------------------------------------
+
+liftTy :: forall t . Typeable t => Q Type
+liftTy = liftTyRep (typeRep @t)
+
+liftTyRep :: TypeRep a -> Q Type
+liftTyRep tr = case tr of
+                 App t1 t2 -> appT (liftTyRep t1) (liftTyRep t2)
+                 Con tc    -> conT (mkNameG_tc (tyConPackage tc)
+                                              (tyConModule tc)
+                                              (tyConName tc))
+                 Fun t1 t2 -> arrowT `appT` liftTyRep t1 `appT` liftTyRep t2

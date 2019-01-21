@@ -561,6 +561,8 @@ data HsExpr p
                            -- renamed expression, plus
       [PendingTcSplice]    -- _typechecked_ splices to be
                            -- pasted back in by the desugarer
+      [PendingTcTySplice]  -- Pending implicit type splices to be pasted in
+                           -- by desugarer
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
   --         'ApiAnnotation.AnnClose'
@@ -1114,8 +1116,9 @@ ppr_expr (HsSpliceE _ s)         = pprSplice s
 ppr_expr (HsBracket _ b)         = pprHsBracket b
 ppr_expr (HsRnBracketOut _ e []) = ppr e
 ppr_expr (HsRnBracketOut _ e ps) = ppr e $$ text "pending(rn)" <+> ppr ps
-ppr_expr (HsTcBracketOut _ e []) = ppr e
-ppr_expr (HsTcBracketOut _ e ps) = ppr e $$ text "pending(tc)" <+> ppr ps
+ppr_expr (HsTcBracketOut _ e [] []) = ppr e
+ppr_expr (HsTcBracketOut _ e ps ts) = ppr e $$ text "pending(tc)" <+> ppr ps
+                                            $$ text "pending(tys)" <+> ppr ts
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
   = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]
@@ -2486,8 +2489,14 @@ data UntypedSpliceFlavour
 
 -- | Pending Type-checker Splice
 data PendingTcSplice
-  -- AZ:TODO: The hard-coded GhcTc feels wrong.
   = PendingTcSplice SplicePointName (LHsExpr GhcTc)
+
+-- These only arise implicitly from type applications
+-- We can always persist types but we still have to properly do it.
+-- The only thing we are going to lift are variables implicitly so directly
+-- store Id here rather than a Type or LHsType.
+data PendingTcTySplice
+  = PendingTcTySplice SplicePointName (LHsExpr GhcTc)
 
 {-
 Note [Pending Splices]
@@ -2545,6 +2554,13 @@ checker:
   * Pending *typed* expression splices, (PendingTcSplice), e.g.,
         [||1 + $$(f 2)||]
 
+and a sixth, which arising implicitly from type applications:
+
+  * Pending *type* splice e.g
+        [|| id @a ||]
+    We need to implicitly lift the |a| like we do for expressions. All types
+    can be lifted so we don't bother with any constraints or the like.
+
 It would be possible to eliminate HsRnBracketOut and use HsBracketOut for the
 output of the renamer. However, when pretty printing the output of the renamer,
 e.g., in a type error message, we *do not* want to print out the pending
@@ -2562,8 +2578,8 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsSplice p) where
   ppr s = pprSplice s
 
-pprPendingSplice :: (OutputableBndrId (GhcPass p))
-                 => SplicePointName -> LHsExpr (GhcPass p) -> SDoc
+pprPendingSplice :: Outputable p
+                 => SplicePointName -> p -> SDoc
 pprPendingSplice n e = angleBrackets (ppr n <> comma <+> ppr e)
 
 pprSpliceDecl ::  (OutputableBndrId (GhcPass p))
@@ -2660,6 +2676,9 @@ instance Outputable PendingRnSplice where
 
 instance Outputable PendingTcSplice where
   ppr (PendingTcSplice n e) = pprPendingSplice n e
+
+instance Outputable PendingTcTySplice where
+  ppr (PendingTcTySplice n e) = pprPendingSplice n e
 
 {-
 ************************************************************************

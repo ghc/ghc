@@ -408,6 +408,8 @@ data DsMetaVal
 
    | DsSplice (HsExpr GhcTc) -- These bindings are introduced by
                              -- the PendingSplices on a HsBracketOut
+   | DsSpliceTy (HsExpr GhcTc)
+
 
 
 {-
@@ -979,7 +981,7 @@ data PendingStuff
   | RnPendingTyped                -- Renaming the inside of a *typed* bracket
 
   | TcPending                     -- Typechecking the inside of a typed bracket
-      (TcRef [PendingTcSplice])   --   Accumulate pending splices here
+      (TcRef [Either PendingTcSplice PendingTcTySplice])   --   Accumulate pending splices here
       (TcRef WantedConstraints)   --     and type constraints here
 
 topStage, topAnnStage, topSpliceStage :: ThStage
