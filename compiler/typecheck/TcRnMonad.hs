@@ -1737,8 +1737,7 @@ getStage = do { env <- getLclEnv; return (tcl_th_ctxt env) }
 getStageAndBindLevel :: Name -> TcRn (Maybe (TopLevelFlag, ThLevel, ThStage))
 getStageAndBindLevel name
   = do { env <- getLclEnv;
-       ; pprTrace "stage" (ppr name) (return ())
-       ; case pprTraceIt "level" (lookupNameEnv (tcl_th_bndrs env) name) of
+       ; case lookupNameEnv (tcl_th_bndrs env) name of
            Nothing                  -> return Nothing
            Just (top_lvl, bind_lvl) -> return (Just (top_lvl, bind_lvl, tcl_th_ctxt env)) }
 
