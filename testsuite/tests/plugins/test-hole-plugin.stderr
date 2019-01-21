@@ -1,0 +1,66 @@
+
+test-hole-plugin.hs:12:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _too_long :: [Int] -> Int
+      Or perhaps ‘_too_long’ is mis-spelled, or not in scope
+    • In the expression: _too_long
+      In an equation for ‘f’: f = _too_long
+    • Relevant bindings include
+        f :: [Int] -> Int (bound at test-hole-plugin.hs:12:1)
+      Valid hole fits include
+        Error: Too many holes were checked, and the search aborted forthis hole. Try again with a higher limit.
+
+test-hole-plugin.hs:13:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: [Int] -> Int
+    • In the expression: _
+      In an equation for ‘j’: j = _
+    • Relevant bindings include
+        j :: [Int] -> Int (bound at test-hole-plugin.hs:13:1)
+      Valid hole fits include
+        j :: [Int] -> Int
+        f :: [Int] -> Int
+        i :: [Int] -> Int
+        g :: [Int] -> Int
+        h :: [Int] -> Int
+        head :: forall a. [a] -> a
+        (Some hole fits suppressed; use -fmax-valid-hole-fits=N or -fno-max-valid-hole-fits)
+
+test-hole-plugin.hs:14:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _sort_by_mod_desc :: [Int] -> Int
+      Or perhaps ‘_sort_by_mod_desc’ is mis-spelled, or not in scope
+    • In the expression: _sort_by_mod_desc
+      In an equation for ‘i’: i = _sort_by_mod_desc
+    • Relevant bindings include
+        i :: [Int] -> Int (bound at test-hole-plugin.hs:14:1)
+      Valid hole fits include
+        sum :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
+        product :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
+        minimum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+        maximum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+        length :: forall (t :: * -> *) a. Foldable t => t a -> Int
+        last :: forall a. [a] -> a
+        (Some hole fits suppressed; use -fmax-valid-hole-fits=N or -fno-max-valid-hole-fits)
+
+test-hole-plugin.hs:15:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _only_Data_List :: [Int] -> Int
+      Or perhaps ‘_only_Data_List’ is mis-spelled, or not in scope
+    • In the expression: _only_Data_List
+      In an equation for ‘g’: g = _only_Data_List
+    • Relevant bindings include
+        g :: [Int] -> Int (bound at test-hole-plugin.hs:15:1)
+      Valid hole fits include
+        head :: forall a. [a] -> a
+        last :: forall a. [a] -> a
+
+test-hole-plugin.hs:16:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _only_Prelude :: [Int] -> Int
+      Or perhaps ‘_only_Prelude’ is mis-spelled, or not in scope
+    • In the expression: _only_Prelude
+      In an equation for ‘h’: h = _only_Prelude
+    • Relevant bindings include
+        h :: [Int] -> Int (bound at test-hole-plugin.hs:16:1)
+      Valid hole fits include
+        length :: forall (t :: * -> *) a. Foldable t => t a -> Int
+        maximum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+        minimum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+        product :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
+        sum :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
