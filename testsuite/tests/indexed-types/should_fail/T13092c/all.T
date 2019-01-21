@@ -5,4 +5,4 @@
 # defined in T13092c_4, and would not be read otherwise.)
 
 test('T13092c', ignore_stdout,
-     run_command, ['$MAKE -s --no-print-directory T13092c'])
+     makefile_test, ['T13092c'])

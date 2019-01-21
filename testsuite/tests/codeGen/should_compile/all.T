@@ -12,7 +12,7 @@ test('T2388', normal, compile, [''])
 test('T3132', normal, compile, ['-dcmm-lint'])
 test('T3286', [], multimod_compile, ['T3286', '-v0'])
 test('T3579', normal, compile, [''])
-test('T2578', normal, run_command, ['$MAKE -s --no-print-directory T2578'])
+test('T2578', normal, makefile_test, [])
 # skip llvm on i386 as we don't support fPIC
 test('jmp_tbl', when(arch('i386'), omit_ways(llvm_ways)), compile, ['-fPIC -O'])
 test('massive_array',
@@ -27,7 +27,7 @@ test('T9329', [when(unregisterised(), expect_broken(15467)), cmm_src], compile, 
 
 test('debug',
      [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
-     run_command, ['$MAKE -s --no-print-directory debug'])
+     makefile_test, [])
 test('T9964', normal, compile, ['-O'])
 test('T10518', [cmm_src], compile, [''])
 test('T10667', [ when((arch('powerpc64') or arch('powerpc64le')),
@@ -40,15 +40,15 @@ test('T14999',
       when(unregisterised(), skip),
       unless(opsys('linux') and arch('x86_64') and have_gdb() and
         have_readelf(), skip)],
-     run_command, ['$MAKE -s --no-print-directory T14999'])
+     makefile_test, [])
 
 # Verify that we optimize away redundant jumps for unordered comparisons.
 test('T15196',
   [ unless(arch('x86_64'),skip),
     only_ways('normal'),
-  ], run_command, ['$MAKE -s --no-print-directory T15196'])
+  ], makefile_test, [])
 
 test('T15723',
   [ unless(have_profiling(), skip),
     unless(have_dynamic(), skip),
-  ], run_command, ['$MAKE -s --no-print-directory T15723'])
+  ], makefile_test, [])

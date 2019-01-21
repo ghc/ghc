@@ -1,1 +1,1 @@
-test('determ022', [extra_files(['A.hs'])], run_command, ['$MAKE -s --no-print-directory determ022'])
+test('determ022', [extra_files(['A.hs'])], makefile_test, ['determ022'])

@@ -1,1 +1,1 @@
-test('T15904', [], run_command, ['$MAKE -s --no-print-directory T15904'])
+test('T15904', [], makefile_test, [])

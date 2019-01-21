@@ -1,1 +1,1 @@
-test('showsrcspan', normal, run_command, ['$MAKE -s --no-print-directory showsrcspan'])
+test('showsrcspan', normal, makefile_test, ['showsrcspan'])

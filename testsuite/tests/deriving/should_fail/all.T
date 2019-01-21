@@ -12,8 +12,7 @@ test('drvfail011', normal, compile_fail, [''])
 test('drvfail012', normal, compile_fail, [''])
 test('drvfail013', normal, compile_fail, [''])
 test('drvfail015', normal, compile_fail, [''])
-test('drvfail016', [], run_command,
-     ['$MAKE --no-print-directory -s drvfail016'])
+test('drvfail016', [], makefile_test, [])
 test('T1830_1', normal, compile_fail, [''])
 test('T2394', normal, compile_fail, [''])
 # T2604 was removed as it was out of date re: fixing #9858
@@ -33,7 +32,7 @@ test('T5287', normal, compile_fail, [''])
 test('T5478', normal, compile_fail, [''])
 test('T5686', normal, compile_fail, [''])
 test('T5922', normal, compile_fail, [''])
-test('T1133A', [], run_command, ['$MAKE --no-print-directory -s T1133A'])
+test('T1133A', [], makefile_test, [])
 # 5863a was removed as it was out of date re: fixing #9858
 test('T7959', normal, compile_fail, [''])
 
