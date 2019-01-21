@@ -206,7 +206,7 @@ typedef struct _ObjectCode {
 
     /* Holds the list of symbols in the .o file which
        require extra information.*/
-    HashTable *extraInfos;
+    StrHashTable *extraInfos;
 
 } ObjectCode;
 
@@ -260,12 +260,12 @@ void addSection (Section *s, SectionKind kind, SectionAlloc alloc,
                  void* start, StgWord size, StgWord mapped_offset,
                  void* mapped_start, StgWord mapped_size);
 
-HsBool ghciLookupSymbolInfo(HashTable *table,
+HsBool ghciLookupSymbolInfo(StrHashTable *table,
                             const SymbolName* key, RtsSymbolInfo **result);
 
 int ghciInsertSymbolTable(
     pathchar* obj_name,
-    HashTable *table,
+    StrHashTable *table,
     const SymbolName* key,
     SymbolAddr* data,
     HsBool weak,
@@ -274,7 +274,7 @@ int ghciInsertSymbolTable(
 /* lock-free version of lookupSymbol */
 SymbolAddr* lookupSymbol_ (SymbolName* lbl);
 
-extern /*Str*/HashTable *symhash;
+extern StrHashTable *symhash;
 
 pathchar*
 resolveSymbolAddr (pathchar* buffer, int size,

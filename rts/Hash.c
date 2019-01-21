@@ -49,22 +49,25 @@ struct hashtable {
     HashList **dir[HDIRSIZE];   /* Directory of segments */
     HashList *freeList;         /* free list of HashLists */
     HashListChunk *chunks;
-    HashFunction *hash;         /* hash function */
-    CompareFunction *compare;   /* key comparison function */
 };
+
+/* Create an identical structure, but is distinct on a type level,
+ * for string hash table. Since it's a direct embedding of
+ * a hashtable and not a reference, there shouldn't be
+ * any overhead post-compilation.  */
+struct strhashtable { struct hashtable table; };
 
 /* -----------------------------------------------------------------------------
  * Hash first using the smaller table.  If the bucket is less than the
  * next bucket to be split, re-hash using the larger table.
  * -------------------------------------------------------------------------- */
-
 int
 hashWord(const HashTable *table, StgWord key)
 {
     int bucket;
 
     /* Strip the boring zero bits */
-    key /= sizeof(StgWord);
+    key >>= sizeof(StgWord);
 
     /* Mod the size of the hash table (a power of 2) */
     bucket = key & table->mask1;
@@ -97,13 +100,13 @@ hashStr(const HashTable *table, StgWord w)
     return bucket;
 }
 
-static int
+STATIC_INLINE int
 compareWord(StgWord key1, StgWord key2)
 {
     return (key1 == key2);
 }
 
-static int
+STATIC_INLINE int
 compareStr(StgWord key1, StgWord key2)
 {
     return (strcmp((char *)key1, (char *)key2) == 0);
@@ -114,7 +117,7 @@ compareStr(StgWord key1, StgWord key2)
  * Allocate a new segment of the dynamically growing hash table.
  * -------------------------------------------------------------------------- */
 
-static void
+STATIC_INLINE void
 allocSegment(HashTable *table, int segment)
 {
     table->dir[segment] = stgMallocBytes(HSEGSIZE * sizeof(HashList *),
@@ -128,8 +131,8 @@ allocSegment(HashTable *table, int segment)
  * by @table->split@ is affected by the expansion.
  * -------------------------------------------------------------------------- */
 
-static void
-expand(HashTable *table)
+STATIC_INLINE void
+expand(HashTable *table, HashFunction f)
 {
     int oldsegment;
     int oldindex;
@@ -170,7 +173,7 @@ expand(HashTable *table)
     old = new = NULL;
     for (hl = table->dir[oldsegment][oldindex]; hl != NULL; hl = next) {
         next = hl->next;
-        if (table->hash(table, hl->key) == newbucket) {
+        if (f(table, hl->key) == newbucket) {
             hl->next = new;
             new = hl;
         } else {
@@ -184,19 +187,20 @@ expand(HashTable *table)
     return;
 }
 
-void *
-lookupHashTable(const HashTable *table, StgWord key)
+STATIC_INLINE void*
+lookupHashTable_inlined(const HashTable *table, StgWord key,
+                        HashFunction f, CompareFunction cmp)
 {
     int bucket;
     int segment;
     int index;
+
     HashList *hl;
 
-    bucket = table->hash(table, key);
+    bucket = f(table, key);
     segment = bucket / HSEGSIZE;
     index = bucket % HSEGSIZE;
 
-    CompareFunction *cmp = table->compare;
     for (hl = table->dir[segment][index]; hl != NULL; hl = hl->next) {
         if (cmp(hl->key, key))
             return (void *) hl->data;
@@ -204,6 +208,26 @@ lookupHashTable(const HashTable *table, StgWord key)
 
     /* It's not there */
     return NULL;
+}
+
+void *
+lookupHashTable_(const HashTable *table, StgWord key,
+                 HashFunction f, CompareFunction cmp)
+{
+    return lookupHashTable_inlined(table, key, f, cmp);
+}
+
+void *
+lookupHashTable(const HashTable *table, StgWord key)
+{
+    return lookupHashTable_inlined(table, key, hashWord, compareWord);
+}
+
+void *
+lookupStrHashTable(const StrHashTable* table, const char* key)
+{
+    return lookupHashTable_inlined(&table->table, (StgWord) key,
+                                   hashStr, compareStr);
 }
 
 // Puts up to szKeys keys of the hash table into the given array. Returns the
@@ -273,8 +297,9 @@ freeHashList (HashTable *table, HashList *hl)
     table->freeList = hl;
 }
 
-void
-insertHashTable(HashTable *table, StgWord key, const void *data)
+STATIC_INLINE void
+insertHashTable_inlined(HashTable *table, StgWord key,
+                        const void *data, HashFunction f)
 {
     int bucket;
     int segment;
@@ -287,9 +312,9 @@ insertHashTable(HashTable *table, StgWord key, const void *data)
 
     /* When the average load gets too high, we expand the table */
     if (++table->kcount >= HLOAD * table->bcount)
-        expand(table);
+        expand(table, f);
 
-    bucket = table->hash(table, key);
+    bucket = f(table, key);
     segment = bucket / HSEGSIZE;
     index = bucket % HSEGSIZE;
 
@@ -299,11 +324,30 @@ insertHashTable(HashTable *table, StgWord key, const void *data)
     hl->data = data;
     hl->next = table->dir[segment][index];
     table->dir[segment][index] = hl;
-
 }
 
-void *
-removeHashTable(HashTable *table, StgWord key, const void *data)
+void
+insertHashTable_(HashTable *table, StgWord key,
+                 const void *data, HashFunction f)
+{
+    return insertHashTable_inlined(table, key, data, f);
+}
+
+void
+insertHashTable(HashTable *table, StgWord key, const void *data)
+{
+    insertHashTable_inlined(table, key, data, hashWord);
+}
+
+void
+insertStrHashTable(StrHashTable *table, const char * key, const void *data)
+{
+    insertHashTable_inlined(&table->table, (StgWord) key, data, hashStr);
+}
+
+STATIC_INLINE void*
+removeHashTable_inlined(HashTable *table, StgWord key, const void *data,
+                        HashFunction f, CompareFunction cmp)
 {
     int bucket;
     int segment;
@@ -311,12 +355,12 @@ removeHashTable(HashTable *table, StgWord key, const void *data)
     HashList *hl;
     HashList *prev = NULL;
 
-    bucket = table->hash(table, key);
+    bucket = f(table, key);
     segment = bucket / HSEGSIZE;
     index = bucket % HSEGSIZE;
 
     for (hl = table->dir[segment][index]; hl != NULL; hl = hl->next) {
-        if (table->compare(hl->key,key) && (data == NULL || hl->data == data)) {
+        if (cmp(hl->key, key) && (data == NULL || hl->data == data)) {
             if (prev == NULL)
                 table->dir[segment][index] = hl->next;
             else
@@ -331,6 +375,26 @@ removeHashTable(HashTable *table, StgWord key, const void *data)
     /* It's not there */
     ASSERT(data == NULL);
     return NULL;
+}
+
+void*
+removeHashTable_(HashTable *table, StgWord key, const void *data,
+                 HashFunction f, CompareFunction cmp)
+{
+    return removeHashTable_inlined(table, key, data, f, cmp);
+}
+
+void *
+removeHashTable(HashTable *table, StgWord key, const void *data)
+{
+    return removeHashTable_inlined(table, key, data, hashWord, compareWord);
+}
+
+void *
+removeStrHashTable(StrHashTable *table, const char * key, const void *data)
+{
+    return removeHashTable_inlined(&table->table, (StgWord) key,
+                                   data, hashStr, compareStr);
 }
 
 /* -----------------------------------------------------------------------------
@@ -406,7 +470,7 @@ mapHashTable(HashTable *table, void *data, MapHashFn fn)
  * -------------------------------------------------------------------------- */
 
 HashTable *
-allocHashTable_(HashFunction *hash, CompareFunction *compare)
+allocHashTable(void)
 {
     HashTable *table;
     HashList **hb;
@@ -426,22 +490,8 @@ allocHashTable_(HashFunction *hash, CompareFunction *compare)
     table->bcount = HSEGSIZE;
     table->freeList = NULL;
     table->chunks = NULL;
-    table->hash = hash;
-    table->compare = compare;
 
     return table;
-}
-
-HashTable *
-allocHashTable(void)
-{
-    return allocHashTable_(hashWord, compareWord);
-}
-
-HashTable *
-allocStrHashTable(void)
-{
-    return allocHashTable_(hashStr, compareStr);
 }
 
 void
