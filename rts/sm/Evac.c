@@ -541,6 +541,10 @@ loop:
           evacuate_static_object(IND_STATIC_LINK((StgClosure *)q), q);
           return;
 
+      case SRT:
+          evacuate_static_object(STATIC_LINK(info,(StgClosure *)q), q);
+          return;
+
       case CONSTR:
       case CONSTR_1_0:
       case CONSTR_2_0:

@@ -1751,6 +1751,7 @@ scavenge_static(void)
     case CONSTR_2_0:
     case CONSTR_1_1:
     case CONSTR_0_2:
+    case SRT:
       {
         StgPtr q, next;
 
