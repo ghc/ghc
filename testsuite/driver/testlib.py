@@ -882,6 +882,8 @@ def do_test(name, way, func, args, files):
         if os.path.isfile(src):
             link_or_copy_file(src, dst)
         elif os.path.isdir(src):
+            if os.path.exists(dst):
+                shutil.rmtree(dst)
             os.mkdir(dst)
             lndir(src, dst)
         else:
