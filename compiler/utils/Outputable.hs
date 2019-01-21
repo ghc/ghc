@@ -609,8 +609,8 @@ quotes d =
       else SDoc $ \sty ->
            let pp_d = runSDoc d sty
                str  = show pp_d
-           in case (str, snocView str) of
-             (_, Just (_, '\'')) -> pp_d
+           in case (str, lastMaybe str) of
+             (_, Just '\'') -> pp_d
              ('\'' : _, _)       -> pp_d
              _other              -> Pretty.quotes pp_d
 
