@@ -71,6 +71,8 @@ make_constr_itbls hsc_env cons =
 
          descr = dataConIdentity dcon
 
-     r <- iservCmd hsc_env (MkConInfoTable ptrs' nptrs_really
+         tables_next_to_code = tablesNextToCode dflags
+
+     r <- iservCmd hsc_env (MkConInfoTable tables_next_to_code ptrs' nptrs_really
                               conNo (tagForCon dflags dcon) descr)
      return (getName dcon, ItblPtr r)
