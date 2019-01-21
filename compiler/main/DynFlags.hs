@@ -58,7 +58,7 @@ module DynFlags (
         fFlags, fLangFlags, xFlags,
         wWarningFlags,
         dynFlagDependencies,
-        tablesNextToCode, mkTablesNextToCode,
+        tablesNextToCode,
         makeDynFlagsConsistent,
         shouldUseColor,
         shouldUseHexWordLiterals,
