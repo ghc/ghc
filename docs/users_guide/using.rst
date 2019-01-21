@@ -842,6 +842,37 @@ messages and in GHCi:
     kinds, GHC uses type-level coercions. Users will rarely need to
     see these, as they are meant to be internal.
 
+.. ghc-flag:: -fprint-axiom-incomps
+    :shortdesc: Display equation incompatibilities in closed type families
+    :type: dynamic
+    :reverse: -fno-print-axiom-incomps
+    :category: verbosity
+
+    Using :ghc-flag:`-fprint-axiom-incomps` tells GHC to display
+    incompatibilities between closed type families' equations, whenever they
+    are printed by :ghci-cmd:`:info` or :ghc-flag:`--show-iface ⟨file⟩`.
+
+    .. code-block:: none
+
+        ghci> :i Data.Type.Equality.==
+        type family (==) (a :: k) (b :: k) :: Bool
+          where
+              (==) (f a) (g b) = (f == g) && (a == b)
+              (==) a a = 'True
+              (==) _1 _2 = 'False
+        ghci> :set -fprint-axiom-incomps
+        ghci> :i Data.Type.Equality.==
+        type family (==) (a :: k) (b :: k) :: Bool
+          where
+              (==) (f a) (g b) = (f == g) && (a == b)
+              (==) a a = 'True
+                  -- incompatible indices: 0
+              (==) _1 _2 = 'False
+                  -- incompatible indices: 1, 0
+
+    The comment after each equation refers to the indices (0-indexed) of
+    preceding equations it is incompatible with.
+
 .. ghc-flag:: -fprint-equality-relations
     :shortdesc: Distinguish between equality relations when printing
     :type: dynamic
