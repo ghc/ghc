@@ -98,10 +98,7 @@ test('T3064',
      compile,
      [''])
 
-test('T4007',
-     normal,
-     run_command,
-     ['$MAKE -s --no-print-directory T4007'])
+test('T4007', normal, makefile_test, ['T4007'])
 
 test('T5030',
      [collect_compiler_stats('bytes allocated', 10),

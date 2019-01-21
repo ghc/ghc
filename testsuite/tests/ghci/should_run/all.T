@@ -14,8 +14,7 @@ test('T3171',
       skip, # This test is quite flaky (#15383)
       req_interp,
       combined_output],
-     run_command,
-     ['$MAKE -s --no-print-directory T3171'])
+     makefile_test, [])
 
 test('ghcirun004', just_ghci, compile_and_run, [''])
 test('T8377',      just_ghci, compile_and_run, [''])
