@@ -1,0 +1,11 @@
+type family E a b :: *
+  where
+      E a a = ()
+      E a b = Bool
+  	-- Defined at <interactive>:2:1
+type family E a b :: *
+  where
+      E a a = ()
+      E a b = Bool
+          -- incompatible indices: 0
+  	-- Defined at <interactive>:2:1
