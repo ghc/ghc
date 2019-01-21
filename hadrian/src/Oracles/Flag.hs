@@ -13,6 +13,7 @@ data Flag = ArSupportsAtFile
           | CrossCompiling
           | GccIsClang
           | GhcUnregisterised
+          | TablesNextToCode
           | GmpInTree
           | GmpFrameworkPref
           | LeadingUnderscore
@@ -30,6 +31,7 @@ flag f = do
             CrossCompiling     -> "cross-compiling"
             GccIsClang         -> "gcc-is-clang"
             GhcUnregisterised  -> "ghc-unregisterised"
+            TablesNextToCode   -> "tables-next-to-code"
             GmpInTree          -> "intree-gmp"
             GmpFrameworkPref   -> "gmp-framework-preferred"
             LeadingUnderscore  -> "leading-underscore"

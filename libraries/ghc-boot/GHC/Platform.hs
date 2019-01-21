@@ -237,6 +237,9 @@ data PlatformMisc = PlatformMisc
   , platformMisc_ghcWithNativeCodeGen :: Bool
   , platformMisc_ghcWithSMP           :: Bool
   , platformMisc_ghcRTSWays           :: String
+  -- | Determines whether we will be compiling info tables that reside just
+  --   before the entry code, or with an indirection to the entry code. See
+  --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
   , platformMisc_tablesNextToCode     :: Bool
   , platformMisc_leadingUnderscore    :: Bool
   , platformMisc_libFFI               :: Bool
