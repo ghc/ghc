@@ -1,0 +1,22 @@
+# Confused about what this is? See
+# https://gitlab.haskell.org/help/user/project/code_owners
+
+# Catch-all
+* @bgamari
+
+# Build system
+/hadrian                         @snowleopard @alp @DavidEichmann
+
+# RTS-like things
+/rts                             @bgamari @simonmar @osa1 @Phyx
+/includes                        @bgamari @simonmar @osa1
+
+# The compiler
+/compiler/typecheck              @simonpj @goldfire
+/compiler/rename                 @simonpj @goldfire
+/compiler/typecheck/TcDeriv*     @RyanGlScott
+/compiler/nativeGen              @simonmar @bgamari @AndreasK
+
+# Core libraries
+/libraries/base                  @hvr
+/libraries/template-haskell      @goldfire
