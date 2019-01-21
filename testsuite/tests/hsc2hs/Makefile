@@ -41,6 +41,11 @@ T10272:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make $@
 	./$@
 
+.PHONY: T11004
+T11004:
+	LANG=C '$(HSC2HS)' $@.hsc
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c $@.hs
+
 .PHONY: T12504
 T12504:
 	'$(HSC2HS)' T12504/path/to/$@.hsc
