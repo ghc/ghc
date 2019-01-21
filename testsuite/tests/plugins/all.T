@@ -7,27 +7,28 @@ setTestOpts(req_interp)
 
 test('plugins01',
      [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
-     when(opsys('mingw32'), multi_cpu_race),
+      when(opsys('mingw32'), multi_cpu_race),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins01 TOP={top}')],
      run_command, ['$MAKE -s --no-print-directory plugins01'])
 
 test('plugins02',
      [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
-     when(opsys('mingw32'), multi_cpu_race),
+      when(opsys('mingw32'), multi_cpu_race),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins02 TOP={top}')],
      compile_fail,
      ['-package-db simple-plugin/pkg.plugins02/local.package.conf -fplugin Simple.BadlyTypedPlugin -package simple-plugin ' + config.plugin_way_flags])
 
 test('plugins03',
      [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
-     when(opsys('mingw32'), multi_cpu_race),
+      when(opsys('mingw32'), multi_cpu_race),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins03 TOP={top}')],
      compile_fail,
      ['-package-db simple-plugin/pkg.plugins03/local.package.conf -fplugin Simple.NonExistentPlugin -package simple-plugin'])
 
-test('plugins04', [extra_files(['HomePackagePlugin.hs']),
-                   only_ways([config.ghc_plugin_way]),
-                   when(opsys('mingw32'), multi_cpu_race)],
+test('plugins04',
+     [extra_files(['HomePackagePlugin.hs']),
+      only_ways([config.ghc_plugin_way]),
+      when(opsys('mingw32'), multi_cpu_race)],
      multimod_compile_fail,
      ['plugins04', '-package ghc -fplugin HomePackagePlugin'])
 
