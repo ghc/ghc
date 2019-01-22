@@ -14638,7 +14638,7 @@ See also the ``NOINLINE`` (:ref:`noinline-pragma`) and ``INLINABLE``
 ``INLINABLE`` pragma
 ~~~~~~~~~~~~~~~~~~~~
 
-.. pragma:: INLINEABLE ⟨name⟩
+.. pragma:: INLINABLE ⟨name⟩
 
     :where: top-level
 
