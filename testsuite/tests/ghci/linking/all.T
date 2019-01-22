@@ -7,6 +7,8 @@ test('ghcilink001',
      ['$MAKE -s --no-print-directory ghcilink001'])
 
 test('ghcilink002', [extra_files(['TestLink.hs', 'f.c']),
+                     # Fragile when unregisterised; see #16085
+                     when(unregisterised(), skip),
                      unless(doing_ghci, skip)], run_command,
      ['$MAKE -s --no-print-directory ghcilink002'])
 
