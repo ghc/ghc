@@ -53,14 +53,24 @@ testOneFile libdir fileName = do
 
            problems'' = filter (\((a,_),_) -> a /= AnnEofPos) problems'
 
-       putStrLn "---Problems (should be empty list)---"
+           -- Check that every annotation location in 'vs' appears after
+           -- the start of the enclosing span 's'
+           comesBefore ((s,k),vs) = not $ all ok vs
+             where
+               ok v = (k == AnnEofPos) || (srcSpanStart s <= srcSpanStart v)
+
+           precedingProblems = filter comesBefore $ Map.toList anns
+
+       putStrLn "---Unattached Annotation Problems (should be empty list)---"
        putStrLn (intercalate "\n" [pp $ Map.fromList $ map fst problems''])
+       putStrLn "---Ann before enclosing span problem (should be empty list)---"
+       putStrLn (showAnnsList precedingProblems)
        putStrLn "---Annotations-----------------------"
        putStrLn "-- SrcSpan the annotation is attached to, AnnKeywordId,"
        putStrLn "--    list of locations the keyword item appears in"
        -- putStrLn (intercalate "\n" [showAnns anns])
        putStrLn (showAnns anns)
-       if null problems''
+       if null problems'' && null precedingProblems
           then exitSuccess
           else exitFailure
 
@@ -73,11 +83,13 @@ testOneFile libdir fileName = do
 
 
 showAnns :: Map.Map ApiAnnKey [SrcSpan] -> String
-showAnns anns = "[\n" ++ (intercalate ",\n"
+showAnns anns = showAnnsList $ Map.toList anns
+
+showAnnsList :: [(ApiAnnKey, [SrcSpan])] -> String
+showAnnsList annsList = "[\n" ++ (intercalate ",\n"
    $ map (\((s,k),v)
-              -- -> ("(AK " ++ pp s ++ " " ++ show k ++" = " ++ pp v ++ ")\n"))
               -> ("((" ++ pp s ++ "," ++ show k ++"), " ++ pp v ++ ")"))
-   $ Map.toList anns)
+   annsList)
     ++ "\n]\n"
 
 pp :: (Outputable a) => a -> String
