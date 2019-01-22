@@ -17,6 +17,8 @@ import TyCoRep
 import UniqSupply
 import Outputable
 
+import qualified Data.Map as F
+
 {-
 ************************************************************************
 *                                                                      *
@@ -30,10 +32,21 @@ import Outputable
 -- depending on its arity.
 arityWorkerWrapper :: CoreBind -> UniqSM [CoreBind]
 arityWorkerWrapper (NonRec name expr)
-  = fmap (uncurry NonRec) <$> arityWorkerWrapper' name expr
-arityWorkerWrapper (Rec binds)
-  = do { binds' <- mapM (uncurry arityWorkerWrapper') binds
-       ; return [Rec (concat binds')] }
+  = arityWorkerWrapper' name expr >>= \e_ww ->
+      case e_ww of
+        Left  (worker,wrapper) -> return (map (uncurry NonRec) [worker,wrapper])
+        Right (n,e) -> return [NonRec n e]
+arityWorkerWrapper (Rec binds) =
+  do { out <- mapM (uncurry arityWorkerWrapper') binds
+     ; let (recs,nonrecs) = collectRecs out
+     ; return ([Rec recs] ++ map (uncurry NonRec) nonrecs) }
+  where collectRecs = foldr (\x (recs,nonrecs) ->
+                               case x of
+                                 Left (worker,wrapper) ->
+                                   (worker:recs,wrapper:nonrecs)
+                                 Right cb -> (cb:recs,nonrecs)
+                            )
+                            ([],[])
 
 -- ^ Change a function binding into a call to its wrapper and the production of
 -- a wrapper. The worker/wrapper transformation *only* makes sense for Id's or
@@ -41,19 +54,24 @@ arityWorkerWrapper (Rec binds)
 arityWorkerWrapper'
   :: CoreBndr
   -> CoreExpr
-  -> UniqSM [(CoreBndr,CoreExpr)]
+  -> UniqSM (Either ((CoreBndr,CoreExpr),(CoreBndr,CoreExpr))
+                    (CoreBndr,CoreExpr))
+  -- the first component are recursive binds and the second are non-recursive
+  -- binds (the wrappers are non-recursive)
 arityWorkerWrapper' name expr
   = let arity = manifestArity expr in
       case arity >= 1 && isId name of
         True ->
-          getUniqueM >>= \uniq ->
-            let ty      = exprArityType arity (idType name)
-                wname   = mkWorkerId uniq name ty
-                worker  = mkArityWorker  name wname expr
-                wrapper = mkArityWrapper name wname expr arity
-            in
-              return [worker,wrapper]
-        False -> return [(name,expr)]
+          let ty = exprArityType arity (idType name) in
+            do { uniq <- getUniqueM
+               ; let wname  = mkWorkerId uniq name ty
+               ; let worker = mkArityWorker name wname expr
+               ; let fm     = calledArityMap expr
+               -- ; panic $ showSDocUnsafe (ppr (F.toList fm))
+               -- ; panic $ showSDocUnsafe (ppr expr)
+               ; wrapper <- mkArityWrapper fm name wname expr arity
+               ; return (Left (worker,wrapper)) }
+        False -> return (Right (name,expr))
 
 {- | exprArityType creates the new type for an extensional function given the
 arity. We also need to consider higher-order functions. The type of a
@@ -128,7 +146,7 @@ fooWrapper :: (Int -> Int -> Int) -> Int
 fooWrapper f =
   let f' = \x1 x2 -> f x1 x2
   in fooWorker f'
-
+w
 The wrapper eta-expands all functions.
 -}
 
@@ -149,30 +167,82 @@ extensionalize (LitTy l) = LitTy l
 extensionalize (CastTy a kc) = CastTy (extensionalize a) kc
 extensionalize (CoercionTy c) = CoercionTy c
 
+calledArityMap :: CoreExpr -> F.Map CoreBndr Arity
+calledArityMap e =
+  case e of
+    Var x -> F.singleton x 0
+
+    Lit _ -> F.empty
+
+    expr@(App _ _) ->
+      case collectArgs expr of
+        (Var x,args) ->
+          let fm = F.unionsWith retGreater (map calledArityMap args)
+              a  = length args in
+            F.unionWith retGreater (F.singleton x a) fm
+        (_,args) -> F.unionsWith retGreater (map calledArityMap args)
+
+    Lam _ expr -> calledArityMap expr
+
+    Let bnds expr ->
+      let fm = F.unionsWith retGreater (map calledArityMap (rhssOfBind bnds)) in
+        F.unionWith retGreater fm (calledArityMap expr)
+
+    Case expr _ _ alts ->
+      let fm = F.unionsWith retGreater (map calledArityMap (rhssOfAlts alts)) in
+        F.unionWith retGreater fm (calledArityMap expr)
+
+    Cast expr _ -> calledArityMap expr
+
+    Tick _ expr -> calledArityMap expr
+
+    Type _ -> F.empty
+
+    Coercion _ -> F.empty
+  where retGreater x y =
+          case x > y of
+            True  -> x
+            False -> y
+
 -- ^ Given an expression and it's name, generate a new expression with a
 -- tilde-lambda type. This is the exact same code, but we have encoded the arity
 -- in the type.
 mkArityWorker
-  :: CoreBndr -> CoreBndr -> CoreExpr -> (CoreBndr,CoreExpr)
+  :: CoreBndr
+  -> CoreBndr
+  -> CoreExpr
+  -> (CoreBndr,CoreExpr)
 mkArityWorker name wname expr
-  = ( wname
-    , substExpr (text "eta-worker-subst") substitution expr
-    )
+  = ( wname , substExpr (text "eta-worker-subst") substitution expr )
   where substitution = extendIdSubst emptySubst name (Var wname)
 
 -- ^ The wrapper does not change the type and will call the newly created worker
 -- function.
 mkArityWrapper
-  :: CoreBndr -> CoreBndr -> CoreExpr -> Arity -> (CoreBndr,CoreExpr)
-mkArityWrapper name wname expr arity
-  = ( name
-    , mkArityWrapper' expr arity wname []
-    )
+  :: F.Map CoreBndr Arity
+  -> CoreBndr
+  -> CoreBndr
+  -> CoreExpr
+  -> Arity
+  -> UniqSM (CoreBndr,CoreExpr)
+mkArityWrapper fm name wname expr arity
+  = mkArityWrapper' fm expr arity wname [] >>= \expr' ->
+     return ( name , expr' )
 
 mkArityWrapper'
-  :: CoreExpr -> Arity -> CoreBndr -> [CoreExpr] -> CoreExpr
-mkArityWrapper' (Lam b e) a w l =
+  :: F.Map CoreBndr Arity
+  -> CoreExpr
+  -> Arity
+  -> CoreBndr
+  -> [CoreExpr]
+  -> UniqSM CoreExpr
+mkArityWrapper' fm (Lam b e) a w l =
   case isId b of
-    True  -> Lam b $ mkArityWrapper' e (a-1) w (Var b : l)
-    False -> Lam b $ mkArityWrapper' e a w (Type (TyVarTy b) : l)
-mkArityWrapper' _ _ w l = mkApps (Var w) (reverse l)
+    True  ->
+      -- let expr = panic (showSDocUnsafe (ppr (idCallArity b))) in
+      let expr = etaExpand (F.findWithDefault 0 b fm) (Var b) in
+      -- let expr = etaExpand undefined (Var b) in
+        Lam b <$> mkArityWrapper' fm e (a-1) w (expr : l)
+    False ->
+      Lam b <$> mkArityWrapper' fm e a w (Type (TyVarTy b) : l)
+mkArityWrapper' _ _ _ w l = return $ mkApps (Var w) (reverse l)
