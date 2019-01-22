@@ -1,0 +1,18 @@
+:t foldl
+:print foldl
+
+:t fmap
+:print fmap
+
+:t return
+:print return
+
+:t pure
+:print pure
+
+:m + Data.Monoid
+:p mempty
+:p mappend
+
+:m + Data.List
+:p foldl'
