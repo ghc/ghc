@@ -1008,9 +1008,9 @@ outerLevel = 1  -- Things defined outside brackets
 
 thLevel :: ThStage -> ThLevel
 thLevel (Splice _)    = 0
-thLevel (RunSplice _) =
+thLevel (RunSplice _) = 0
     -- See Note [RunSplice ThLevel].
-    panic "thLevel: called when running a splice"
+--    panic "thLevel: called when running a splice"
 thLevel Comp          = 1
 thLevel (Brack s _)   = thLevel s + 1
 
