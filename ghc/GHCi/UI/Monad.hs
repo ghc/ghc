@@ -12,7 +12,7 @@
 
 module GHCi.UI.Monad (
         GHCi(..), startGHCi,
-        GHCiState(..), setGHCiState, getGHCiState, modifyGHCiState,
+        GHCiState(..), GhciMonad(..),
         GHCiOption(..), isOptionSet, setOption, unsetOption,
         Command(..), CommandResult(..), cmdSuccess,
         PromptFunction,
@@ -219,7 +219,8 @@ instance Outputable BreakLocation where
                    then Outputable.empty
                    else doubleQuotes (text (onBreakCmd loc))
 
-recordBreak :: BreakLocation -> GHCi (Bool{- was already present -}, Int)
+recordBreak
+  :: GhciMonad m => BreakLocation -> m (Bool{- was already present -}, Int)
 recordBreak brkLoc = do
    st <- getGHCiState
    let oldActiveBreaks = breaks st
@@ -239,13 +240,18 @@ newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> Ghc a }
 reflectGHCi :: (Session, IORef GHCiState) -> GHCi a -> IO a
 reflectGHCi (s, gs) m = unGhc (unGHCi m gs) s
 
-reifyGHCi :: ((Session, IORef GHCiState) -> IO a) -> GHCi a
-reifyGHCi f = GHCi f'
-  where
-    -- f' :: IORef GHCiState -> Ghc a
-    f' gs = reifyGhc (f'' gs)
-    -- f'' :: IORef GHCiState -> Session -> IO a
-    f'' gs s = f (s, gs)
+reifyGHCi :: GhciMonad m => ((Session, IORef GHCiState) -> IO a) -> m a
+reifyGHCi f = do
+  s <- GHC.getSession
+  sRef <- liftIO $ newIORef s
+  gs <- getGHCiState
+  gsRef <- liftIO $ newIORef gs
+  ret <- liftIO (f (Session sRef, gsRef)) `gfinally` do
+    s' <- liftIO $ readIORef sRef
+    GHC.setSession s'
+    gs' <- liftIO $ readIORef gsRef
+    setGHCiState gs'
+  return ret
 
 startGHCi :: GHCi a -> GHCiState -> Ghc a
 startGHCi g state = do ref <- liftIO $ newIORef state; unGHCi g ref
@@ -260,20 +266,20 @@ instance Applicative GHCi where
 instance Monad GHCi where
   (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
 
-class HasGhciState m where
-    getGHCiState    :: m GHCiState
-    setGHCiState    :: GHCiState -> m ()
-    modifyGHCiState :: (GHCiState -> GHCiState) -> m ()
+class GhcMonad m => GhciMonad m where
+  getGHCiState    :: m GHCiState
+  setGHCiState    :: GHCiState -> m ()
+  modifyGHCiState :: (GHCiState -> GHCiState) -> m ()
 
-instance HasGhciState GHCi where
-    getGHCiState      = GHCi $ \r -> liftIO $ readIORef r
-    setGHCiState s    = GHCi $ \r -> liftIO $ writeIORef r s
-    modifyGHCiState f = GHCi $ \r -> liftIO $ modifyIORef r f
+instance GhciMonad GHCi where
+  getGHCiState      = GHCi $ \r -> liftIO $ readIORef r
+  setGHCiState s    = GHCi $ \r -> liftIO $ writeIORef r s
+  modifyGHCiState f = GHCi $ \r -> liftIO $ modifyIORef r f
 
-instance (MonadTrans t, Monad m, HasGhciState m) => HasGhciState (t m) where
-    getGHCiState    = lift getGHCiState
-    setGHCiState    = lift . setGHCiState
-    modifyGHCiState = lift . modifyGHCiState
+instance GhciMonad (InputT GHCi) where
+  getGHCiState    = lift getGHCiState
+  setGHCiState    = lift . setGHCiState
+  modifyGHCiState = lift . modifyGHCiState
 
 liftGhc :: Ghc a -> GHCi a
 liftGhc m = GHCi $ \_ -> m
@@ -318,17 +324,17 @@ instance ExceptionMonad (InputT GHCi) where
   gcatch = Haskeline.catch
   gmask f = Haskeline.liftIOOp gmask (f . Haskeline.liftIOOp_)
 
-isOptionSet :: GHCiOption -> GHCi Bool
+isOptionSet :: GhciMonad m => GHCiOption -> m Bool
 isOptionSet opt
  = do st <- getGHCiState
       return (opt `elem` options st)
 
-setOption :: GHCiOption -> GHCi ()
+setOption :: GhciMonad m => GHCiOption -> m ()
 setOption opt
  = do st <- getGHCiState
       setGHCiState (st{ options = opt : filter (/= opt) (options st) })
 
-unsetOption :: GHCiOption -> GHCi ()
+unsetOption :: GhciMonad m => GHCiOption -> m ()
 unsetOption opt
  = do st <- getGHCiState
       setGHCiState (st{ options = filter (/= opt) (options st) })
@@ -351,14 +357,16 @@ printForUser doc = do
   dflags <- getDynFlags
   liftIO $ Outputable.printForUser dflags stdout unqual doc
 
-printForUserPartWay :: SDoc -> GHCi ()
+printForUserPartWay :: GhcMonad m => SDoc -> m ()
 printForUserPartWay doc = do
   unqual <- GHC.getPrintUnqual
   dflags <- getDynFlags
   liftIO $ Outputable.printForUserPartWay dflags stdout (pprUserLength dflags) unqual doc
 
 -- | Run a single Haskell expression
-runStmt :: GhciLStmt GhcPs -> String -> GHC.SingleStep -> GHCi (Maybe GHC.ExecResult)
+runStmt
+  :: GhciMonad m
+  => GhciLStmt GhcPs -> String -> GHC.SingleStep -> m (Maybe GHC.ExecResult)
 runStmt stmt stmt_text step = do
   st <- getGHCiState
   GHC.handleSourceError (\e -> do GHC.printException e; return Nothing) $ do
@@ -370,7 +378,7 @@ runStmt stmt stmt_text step = do
                                                    (EvalThis fhv) }
     Just <$> GHC.execStmt' stmt stmt_text opts
 
-runDecls :: String -> GHCi (Maybe [GHC.Name])
+runDecls :: GhciMonad m => String -> m (Maybe [GHC.Name])
 runDecls decls = do
   st <- getGHCiState
   reifyGHCi $ \x ->
@@ -382,7 +390,7 @@ runDecls decls = do
           r <- GHC.runDeclsWithLocation (progname st) (line_number st) decls
           return (Just r)
 
-runDecls' :: [LHsDecl GhcPs] -> GHCi (Maybe [GHC.Name])
+runDecls' :: GhciMonad m => [LHsDecl GhcPs] -> m (Maybe [GHC.Name])
 runDecls' decls = do
   st <- getGHCiState
   reifyGHCi $ \x ->
@@ -394,7 +402,7 @@ runDecls' decls = do
                   return Nothing)
         (Just <$> GHC.runParsedDecls decls)
 
-resume :: (SrcSpan -> Bool) -> GHC.SingleStep -> GHCi GHC.ExecResult
+resume :: GhciMonad m => (SrcSpan -> Bool) -> GHC.SingleStep -> m GHC.ExecResult
 resume canLogSpan step = do
   st <- getGHCiState
   reifyGHCi $ \x ->
@@ -412,14 +420,15 @@ data ActionStats = ActionStats
   } deriving Show
 
 runAndPrintStats
-  :: (a -> Maybe Integer)
-  -> InputT GHCi a
-  -> InputT GHCi (ActionStats, Either SomeException a)
+  :: GhciMonad m
+  => (a -> Maybe Integer)
+  -> m a
+  -> m (ActionStats, Either SomeException a)
 runAndPrintStats getAllocs action = do
   result <- runWithStats getAllocs action
   case result of
     (stats, Right{}) -> do
-      showTiming <- lift $ isOptionSet ShowTiming
+      showTiming <- isOptionSet ShowTiming
       when showTiming $ do
         dflags  <- getDynFlags
         liftIO $ printStats dflags stats
@@ -455,7 +464,7 @@ printStats dflags ActionStats{actionAllocs = mallocs, actionElapsedTime = secs}
 -----------------------------------------------------------------------------
 -- reverting CAFs
 
-revertCAFs :: GHCi ()
+revertCAFs :: GhciMonad m => m ()
 revertCAFs = do
   liftIO rts_revertCAFs
   s <- getGHCiState
@@ -483,14 +492,14 @@ initInterpBuffering = do
   return (nobuf, flush)
 
 -- | Invoke "hFlush stdout; hFlush stderr" in the interpreter
-flushInterpBuffers :: GHCi ()
+flushInterpBuffers :: GhciMonad m => m ()
 flushInterpBuffers = do
   st <- getGHCiState
   hsc_env <- GHC.getSession
   liftIO $ evalIO hsc_env (flushStdHandles st)
 
 -- | Turn off buffering for stdin, stdout, and stderr in the interpreter
-turnOffBuffering :: GHCi ()
+turnOffBuffering :: GhciMonad m => m ()
 turnOffBuffering = do
   st <- getGHCiState
   turnOffBuffering_ (noBuffering st)
