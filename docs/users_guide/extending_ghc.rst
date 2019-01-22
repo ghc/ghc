@@ -671,7 +671,7 @@ you need to access the renamed or type checked version of the syntax tree with
     renamed :: [CommandLineOption] -> TcGblEnv -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
 
 By overriding the ``renamedResultAction`` field we can modify each ``HsGroup``
-after it has been renamed. A source file is seperated into groups depending on
+after it has been renamed. A source file is separated into groups depending on
 the location of template haskell splices so the contents of these groups may
 not be intuitive. In order to save the entire renamed AST for inspection
 at the end of typechecking you can set ``renamedResultAction`` to ``keepRenamedSource``

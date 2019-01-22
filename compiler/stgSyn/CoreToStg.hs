@@ -180,7 +180,7 @@ import Control.Monad (liftM, ap)
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- Previously `coreToStg` was initializing cost-centre stack fields as `noCCS`,
--- and the fields were then fixed by a seperate pass `stgMassageForProfiling`.
+-- and the fields were then fixed by a separate pass `stgMassageForProfiling`.
 -- We now initialize these correctly. The initialization works like this:
 --
 --   - For non-top level bindings always use `currentCCS`.

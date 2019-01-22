@@ -1277,7 +1277,7 @@ The main effects of CONLIKE are:
     - The occurrence analyser (OccAnal) and simplifier (Simplify) treat
       CONLIKE thing like constructors, by ANF-ing them
 
-    - New function coreUtils.exprIsExpandable is like exprIsCheap, but
+    - New function CoreUtils.exprIsExpandable is like exprIsCheap, but
       additionally spots applications of CONLIKE functions
 
     - A CoreUnfolding has a field that caches exprIsExpandable

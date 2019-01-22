@@ -210,7 +210,7 @@ data PScoped a = PS (Maybe Span)
 {- Note [TyVar Scopes]
 Due to -XScopedTypeVariables, type variables can be in scope quite far from
 their original binding. We resolve the scope of these type variables
-in a seperate pass
+in a separate pass
 -}
 data TScoped a = TS TyVarScope a -- TyVarScope
 
