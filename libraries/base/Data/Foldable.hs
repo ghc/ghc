@@ -706,7 +706,7 @@ GHC used to proceed like this:
 
   mapM_ <big> (build g)
 
-  = { Defintion of mapM_ }
+  = { Definition of mapM_ }
     foldr ((>>) . <big>) (return ()) (build g)
 
   = { foldr/build rule }

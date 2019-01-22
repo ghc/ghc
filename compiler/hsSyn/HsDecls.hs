@@ -796,7 +796,7 @@ Examples:
 
  * data T2 a b = ...
    -- No CUSK; we do not want to guess T2 :: * -> * -> *
-   -- becuase the full decl might be   data T a b = MkT (a b)
+   -- because the full decl might be   data T a b = MkT (a b)
 
   * data T3 (a :: k -> *) (b :: *) = ...
     -- CUSK; equivalent to   T3 :: (k -> *) -> * -> *

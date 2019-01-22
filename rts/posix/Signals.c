@@ -164,7 +164,7 @@ ioManagerWakeup (void)
         r = write(io_manager_wakeup_fd, &byte, 1);
 #endif
         /* N.B. If the TimerManager is shutting down as we run this
-         * then there is a possiblity that our first read of
+         * then there is a possibility that our first read of
          * io_manager_wakeup_fd is non-negative, but before we get to the
          * write the file is closed. If this occurs, io_manager_wakeup_fd
          * will be written into with -1 (GHC.Event.Control does this prior

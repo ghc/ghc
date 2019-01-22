@@ -509,7 +509,7 @@ this exhaustive list can be empty!
   scrutinee is bound to raise an exception or diverge. When do we know
   this?  See Note [Bottoming expressions] in CoreUtils.
 
-* The possiblity of empty alternatives is one reason we need a type on
+* The possibility of empty alternatives is one reason we need a type on
   the case expression: if the alternatives are empty we can't get the
   type from the alternatives!
 

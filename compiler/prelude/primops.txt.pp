@@ -21,7 +21,7 @@
 --  http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps
 --
 -- Note in particular that Haskell block-style comments are not recognized
--- here, so stick to '--' (even for Notes spanning mutliple lines).
+-- here, so stick to '--' (even for Notes spanning multiple lines).
 
 -- This file is divided into named sections, each containing or more
 -- primop entries. Section headers have the format:
