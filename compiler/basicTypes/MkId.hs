@@ -1265,7 +1265,7 @@ proxyHashId
                     `setNeverLevPoly`  ty )
   where
     -- proxy# :: forall k (a:k). Proxy# k a
-    bndrs   = mkTemplateKiTyVars [liftedTypeKind] (\ks -> ks)
+    bndrs   = mkTemplateKiTyVars [liftedTypeKind] id
     [k,t]   = mkTyVarTys bndrs
     ty      = mkSpecForAllTys bndrs (mkProxyPrimTy k t)
 
