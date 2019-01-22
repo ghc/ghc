@@ -1,5 +1,11 @@
----Problems (should be empty list)---
+---Unattached Annotation Problems (should be empty list)---
 []
+---Ann before enclosing span problem (should be empty list)---
+[
+((Test11018.hs:12:22-31,AnnOpenP), [Test11018.hs:12:21]),
+((Test11018.hs:37:23-31,AnnOpenP), [Test11018.hs:37:22])
+]
+
 ---Annotations-----------------------
 -- SrcSpan the annotation is attached to, AnnKeywordId,
 --    list of locations the keyword item appears in
