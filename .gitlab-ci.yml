@@ -42,6 +42,7 @@ ghc-linters:
         .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
         .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
       fi
+  dependencies: []
   tags:
     - lint
 
@@ -98,6 +99,7 @@ validate-x86_64-linux-deb8-hadrian:
     - |
       THREADS=`mk/detect-cpu-count.sh`
       make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml
+  dependencies: []
   artifacts:
     reports:
       junit: junit.xml
@@ -318,6 +320,7 @@ validate-x86_64-linux-deb9-unreg:
     - rd /s /q tmp
     - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
     - bash -c 'make clean || true'
+  dependencies: []
   cache:
     paths:
       - cabal-cache
@@ -386,6 +389,7 @@ cleanup-windows:
   tags:
     - x86_64-windows
   when: always
+  dependencies: []
   before_script:
     - echo "Time to clean up"
   script:
