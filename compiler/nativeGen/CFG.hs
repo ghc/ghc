@@ -361,7 +361,7 @@ pprEdgeWeights m =
               ppr weight <> text "\"];\n"
         --for the case that there are no edges from/to this node.
         --This should rarely happen but it can save a lot of time
-        --to immediatly see it when it does.
+        --to immediately see it when it does.
         printNode node
             = text "\t" <> ppr node <> text ";\n"
         getEdgeNodes (from, to, _weight) = [from,to]

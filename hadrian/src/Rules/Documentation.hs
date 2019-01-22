@@ -118,7 +118,7 @@ buildLibraryDocumentation = do
 
         -- We want Haddocks for everything except `rts` to be built, but we
         -- don't want the index to be polluted by stuff from `ghc`-the-library
-        -- (there will be a seperate top-level link to those Haddocks).
+        -- (there will be a separate top-level link to those Haddocks).
         haddocks <- allHaddocks
         let neededDocs = filter (\x -> takeFileName x /= "rts.haddock") haddocks
             libDocs = filter (\x -> takeFileName x /= "ghc.haddock") neededDocs
