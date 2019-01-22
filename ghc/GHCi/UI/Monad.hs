@@ -240,19 +240,6 @@ newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> Ghc a }
 reflectGHCi :: (Session, IORef GHCiState) -> GHCi a -> IO a
 reflectGHCi (s, gs) m = unGhc (unGHCi m gs) s
 
-reifyGHCi :: GhciMonad m => ((Session, IORef GHCiState) -> IO a) -> m a
-reifyGHCi f = do
-  s <- GHC.getSession
-  sRef <- liftIO $ newIORef s
-  gs <- getGHCiState
-  gsRef <- liftIO $ newIORef gs
-  ret <- liftIO (f (Session sRef, gsRef)) `gfinally` do
-    s' <- liftIO $ readIORef sRef
-    GHC.setSession s'
-    gs' <- liftIO $ readIORef gsRef
-    setGHCiState gs'
-  return ret
-
 startGHCi :: GHCi a -> GHCiState -> Ghc a
 startGHCi g state = do ref <- liftIO $ newIORef state; unGHCi g ref
 
@@ -270,16 +257,19 @@ class GhcMonad m => GhciMonad m where
   getGHCiState    :: m GHCiState
   setGHCiState    :: GHCiState -> m ()
   modifyGHCiState :: (GHCiState -> GHCiState) -> m ()
+  reifyGHCi       :: ((Session, IORef GHCiState) -> IO a) -> m a
 
 instance GhciMonad GHCi where
   getGHCiState      = GHCi $ \r -> liftIO $ readIORef r
   setGHCiState s    = GHCi $ \r -> liftIO $ writeIORef r s
   modifyGHCiState f = GHCi $ \r -> liftIO $ modifyIORef r f
+  reifyGHCi f       = GHCi $ \r -> reifyGhc $ \s -> f (s, r)
 
 instance GhciMonad (InputT GHCi) where
   getGHCiState    = lift getGHCiState
   setGHCiState    = lift . setGHCiState
   modifyGHCiState = lift . modifyGHCiState
+  reifyGHCi       = lift . reifyGHCi
 
 liftGhc :: Ghc a -> GHCi a
 liftGhc m = GHCi $ \_ -> m
