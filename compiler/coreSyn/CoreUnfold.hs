@@ -294,7 +294,7 @@ Note [INLINE pragmas and boring contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An INLINE pragma uses mkInlineUnfoldingWithArity to build the
 unfolding.  That sets the ug_boring_ok flag to False if the function
-is not tiny (inlineBorkingOK), so that even INLINE functions are not
+is not tiny (inlineBoringOK), so that even INLINE functions are not
 inlined in an utterly boring context.  E.g.
      \x y. Just (f y x)
 Nothing is gained by inlining f here, even if it has an INLINE

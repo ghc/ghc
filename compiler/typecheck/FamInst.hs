@@ -776,7 +776,7 @@ unusedInjTvsInRHS tycon injList lhs rhs =
   (`minusVarSet` injRhsVars) <$> injLHSVars
     where
       inj_pairs :: [(Type, ArgFlag)]
-      -- All the injective arguments, paired with their visiblity
+      -- All the injective arguments, paired with their visibility
       inj_pairs = ASSERT2( injList `equalLength` lhs
                          , ppr tycon $$ ppr injList $$ ppr lhs )
                   filterByList injList (lhs `zip` tyConArgFlags tycon lhs)
