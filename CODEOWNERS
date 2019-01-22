@@ -5,10 +5,14 @@
 * @bgamari
 
 # Build system
-/hadrian                         @snowleopard @alp @DavidEichmann
+/hadrian                         @snowleopard @alp @DavidEichmann @angerman
+/configure.ac                    @angerman @hvr
+/aclocal.m4                      @angerman @hvr
+/config.sub                      @angerman @hvr
 
 # RTS-like things
-/rts                             @bgamari @simonmar @osa1 @Phyx
+/rts                             @bgamari @simonmar @osa1 @Phyx @angerman
+/rts/linker                      @angerman @Phyx
 /includes                        @bgamari @simonmar @osa1
 
 # The compiler
@@ -16,6 +20,7 @@
 /compiler/rename                 @simonpj @goldfire
 /compiler/typecheck/TcDeriv*     @RyanGlScott
 /compiler/nativeGen              @simonmar @bgamari @AndreasK
+/compiler/llvmGen                @angerman
 /compiler/codeGen                @osa1
 /compiler/cmm                    @osa1
 /compiler/simplCore/CallArity.hs @nomeata @sgraf
@@ -32,3 +37,9 @@
 # Core libraries
 /libraries/base                  @hvr
 /libraries/template-haskell      @goldfire
+
+# Internal utilities and libraries
+/libraries/libiserv              @angerman @simonmar
+/utils/iserv-proxy               @angerman @simonmar
+/utils/iserv                     @angerman @simonmar
+
