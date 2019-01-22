@@ -100,6 +100,8 @@ test('T1679', normal, compile_and_run, [''])
 test('T1288', [omit_ways(['ghci'])], compile_and_run, ['T1288_c.c'])
 test('T1288_ghci',
      [only_ways(['ghci']),
+      # This test is fragile when unregisterised; see #16085
+      when(unregisterised(), skip),
       pre_cmd('$MAKE -s --no-print-directory T1288_ghci_setup')],
      compile_and_run, ['T1288_ghci_c.o'])
 
