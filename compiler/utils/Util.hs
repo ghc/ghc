@@ -783,20 +783,25 @@ lastMaybe :: [a] -> Maybe a
 lastMaybe [] = Nothing
 lastMaybe xs = Just $ last xs
 
--- | If there is a good chance that you will only look at the last
--- element prefer seperate calls to @last@ + @init@.
--- @last@ does not allocate while traversing the list, while this
--- will. But if you are guaranteed to use both this will
--- usually be more efficient.
+-- | Split a list into its last element and the initial part of the list.
+-- @snocView xs = Just (init xs, last xs)@ for non-empty lists.
+-- @snocView xs = Nothing@ otherwise.
+-- Unless both parts of the result are guaranteed to be used
+-- prefer seperate calls to @last@ + @init@.
+-- If you are guaranteed to use both, this will
+-- be more efficient.
 snocView :: [a] -> Maybe ([a],a)
-        -- Split off the last element
 snocView [] = Nothing
-snocView xs = go [] xs
-            where
-                -- Invariant: second arg is non-empty
-              go acc [x]    = Just (reverse acc, x)
-              go acc (x:xs) = go (x:acc) xs
-              go _   []     = panic "Util: snocView"
+snocView xs
+    | (xs,x) <- go xs
+    = Just (xs,x)
+  where
+    go :: [a] -> ([a],a)
+    go [x] = ([],x)
+    go (x:xs)
+        | !(xs',x') <- go xs
+        = (x:xs', x')
+    go [] = error "impossible"
 
 split :: Char -> String -> [String]
 split c s = case rest of
@@ -809,6 +814,18 @@ capitalise :: String -> String
 capitalise [] = []
 capitalise (c:cs) = toUpper c : cs
 
+
+foo
+  | unlikelyPred (last xs)
+  = bar (init xs)
+  | otherwise
+  = bar xs
+
+foo
+  | Just (front,end) <- snocView xs
+  , unlikelyPred end
+  = bar front
+  | otherwise = xs
 
 {-
 ************************************************************************
