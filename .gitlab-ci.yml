@@ -93,8 +93,15 @@ validate-x86_64-linux-deb8-hadrian:
       THREADS=`mk/detect-cpu-count.sh`
       make V=0 -j$THREADS
     - |
-      make binary-dist TAR_COMP_OPTS="-1"
-      mv ghc-*.tar.xz ghc.tar.xz
+      # Use gzip compression in bindist test for speed
+      make binary-dist-prep TAR_COMP=gzip
+      make test_bindist TAR_COMP=gzip
+    - |
+      # Only keep bindist artifacts for master commits
+      if [ $CI_COMMIT_REF_NAME == "master" ]; then
+          make binary-dist TAR_COMP_OPTS="-1"
+          mv ghc-*.tar.xz ghc.tar.xz
+      fi
     - |
       THREADS=`mk/detect-cpu-count.sh`
       make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml
