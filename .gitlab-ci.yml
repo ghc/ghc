@@ -117,6 +117,7 @@ validate-x86_64-darwin:
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
+    CONFIGURE_ARGS: --with-intree-gmp
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
     - python3 .gitlab/fix-submodules.py
@@ -126,7 +127,6 @@ validate-x86_64-darwin:
 
     - bash .gitlab/darwin-init.sh
     - PATH="`pwd`/toolchain/bin:$PATH"
-    - echo "libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp" >> mk/build.mk
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
   artifacts:
