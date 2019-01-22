@@ -57,7 +57,7 @@ data Proxy t = Proxy deriving ( Bounded -- ^ @since 4.7.0.0
                               , Read    -- ^ @since 4.7.0.0
                               )
 
--- | A concrete, promotable proxy type, for use at the kind level
+-- | A concrete, promotable proxy type, for use at the kind level.
 -- There are no instances for this because it is intended at the kind level only
 data KProxy (t :: Type) = KProxy
 
