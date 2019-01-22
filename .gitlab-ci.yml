@@ -388,11 +388,11 @@ doc-tarball:
     - validate-x86_64-windows
   artifacts:
     paths:
-      - haddock.html.tar.xz
-      - libraries.html.tar.xz
-      - users_guide.html.tar.xz
-      - index.html
-      - "*.pdf"
+      - docs/haddock.html.tar.xz
+      - docs/libraries.html.tar.xz
+      - docs/users_guide.html.tar.xz
+      - docs/index.html
+      - "docs/*.pdf"
   script:
     - ls -lh
     - rm -Rf docs
