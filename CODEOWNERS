@@ -16,6 +16,8 @@
 /compiler/rename                 @simonpj @goldfire
 /compiler/typecheck/TcDeriv*     @RyanGlScott
 /compiler/nativeGen              @simonmar @bgamari @AndreasK
+/compiler/codeGen                @osa1
+/compiler/cmm                    @osa1
 /compiler/simplCore/CallArity.hs @nomeata @sgraf
 /compiler/utils/UnVarGraph.hs    @nomeata
 /compiler/simplCore/Exitify.hs   @nomeata
