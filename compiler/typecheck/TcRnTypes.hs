@@ -1010,6 +1010,9 @@ thLevel :: ThStage -> ThLevel
 thLevel (Splice _)    = 0
 thLevel (RunSplice _) = 0
     -- See Note [RunSplice ThLevel].
+    -- This code path gets hit by reifyInstances which extends the local
+    -- environment with some type variables which we would ordinarily need
+    -- to know the stage of.
 --    panic "thLevel: called when running a splice"
 thLevel Comp          = 1
 thLevel (Brack s _)   = thLevel s + 1
