@@ -1822,7 +1822,7 @@ liftIO k = V (k >>= \a -> return (a,[],[]))
 reportValidateErrors :: Verbosity -> [ValidateError] -> [ValidateWarning]
                      -> String -> Maybe Force -> IO Bool
 reportValidateErrors verbosity es ws prefix mb_force = do
-  mapM_ (warn . (prefix++)) ws
+  when (verbosity >= Normal) $ mapM_ (warn . (prefix++)) ws
   oks <- mapM report es
   return (and oks)
   where
