@@ -147,6 +147,6 @@ test('T12962', [], compile_and_run, [''])
 test('T14257', [], run_command, ['$MAKE -s --no-print-directory T14257'])
 
 test('T15897',
-     [extra_ways(['profasm']), only_ways(['profasm']), run_timeout_multiplier(2)],
+     [extra_ways(['profasm']), only_ways(['profasm']), run_timeout_multiplier(4)],
      run_command,
      ['$MAKE -s --no-print-directory T15897'])
