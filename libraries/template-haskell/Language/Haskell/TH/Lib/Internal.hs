@@ -947,8 +947,8 @@ thisModule = do
 --
 -----------------------------------------------------
 
-liftTy :: forall t . Typeable t => Q Type
-liftTy = liftTyRep (typeRep @t)
+liftTy :: forall t . Q Type
+liftTy = undefined
 
 liftTyRep :: TypeRep a -> Q Type
 liftTyRep tr = case tr of

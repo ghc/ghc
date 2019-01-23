@@ -8,6 +8,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 
