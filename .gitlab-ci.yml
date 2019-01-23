@@ -407,5 +407,8 @@ cleanup-windows:
     - set "BUILD_DIR=%BUILD_DIR:/=\%"
     - echo "Cleaning %BUILD_DIR%"
     - cd \GitLabRunner
-    - rmdir /S /Q %BUILD_DIR%/*
+    # This is way more complicated than it should be:
+    # See https://stackoverflow.com/questions/1965787
+    - del %BUILD_DIR%\* /F /Q
+    - for /d %%p in (%BUILD_DIR%\*) do rd /Q /S "%%p"
     - exit /b 0
