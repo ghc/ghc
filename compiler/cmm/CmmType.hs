@@ -4,7 +4,8 @@ module CmmType
     , cInt
     , cmmBits, cmmFloat
     , typeWidth, cmmEqType, cmmEqType_ignoring_ptrhood
-    , isFloatType, isGcPtrType, isWord32, isWord64, isFloat64, isFloat32
+    , isFloatType, isGcPtrType, isBitsType
+    , isWord32, isWord64, isFloat64, isFloat32
 
     , Width(..)
     , widthInBits, widthInBytes, widthInLog, widthFromBytes
@@ -132,12 +133,15 @@ cInt :: DynFlags -> CmmType
 cInt dflags = cmmBits (cIntWidth  dflags)
 
 ------------ Predicates ----------------
-isFloatType, isGcPtrType :: CmmType -> Bool
+isFloatType, isGcPtrType, isBitsType :: CmmType -> Bool
 isFloatType (CmmType FloatCat    _) = True
 isFloatType _other                  = False
 
 isGcPtrType (CmmType GcPtrCat _) = True
 isGcPtrType _other               = False
+
+isBitsType (CmmType BitsCat _) = True
+isBitsType _                   = False
 
 isWord32, isWord64, isFloat32, isFloat64 :: CmmType -> Bool
 -- isWord64 is true of 64-bit non-floats (both gc-ptrs and otherwise)
