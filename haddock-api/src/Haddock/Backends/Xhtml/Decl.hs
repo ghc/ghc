@@ -800,9 +800,9 @@ ppShortConstrParts summary dataInst con unicode qual
   = case con of
       ConDeclH98{ con_args = det
                 , con_ex_tvs = tyVars
+                , con_forall = L _ forall_
                 , con_mb_cxt = cxt
                 } -> let context = unLoc (fromMaybe (noLoc []) cxt)
-                         forall_ = False
                          header_ = ppConstrHdr forall_ tyVars context unicode qual
                      in case det of
 
@@ -873,9 +873,9 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
     decl = case con of
       ConDeclH98{ con_args = det
                 , con_ex_tvs = tyVars
+                , con_forall = L _ forall_
                 , con_mb_cxt = cxt
                 } -> let context = unLoc (fromMaybe (noLoc []) cxt)
-                         forall_ = False
                          header_ = ppConstrHdr forall_ tyVars context unicode qual
                      in case det of
         -- Prefix constructor, e.g. 'Just a'
