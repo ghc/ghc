@@ -467,4 +467,4 @@ test('T15437', expect_broken(15437), multimod_compile,
 test('T15985', normal, compile, [''])
 test('T16133', normal, compile_fail, [''])
 test('T15471', normal, multimod_compile, ['T15471.hs', '-v0'])
-test('T16180', when(opsys('darwin'), expect_broken(16218)), compile_and_run, [''])
+test('T16180', normal, compile_and_run, [''])
