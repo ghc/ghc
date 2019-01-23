@@ -153,7 +153,8 @@ ppLlvmFunctionHeader (LlvmFunctionDecl n l c r varg p a) args
                                     <> ftext n)
                     (zip p args)
     in ppr l <+> ppr c <+> ppr r <+> char '@' <> ftext n <> lparen <>
-        (hsep $ punctuate comma args') <> ptext varg' <> rparen <> align
+        (hsep $ punctuate comma args') <> ptext varg' <> rparen <>
+        text "unnamed_addr" <+> align
 
 -- | Print out a list of function declaration.
 ppLlvmFunctionDecls :: LlvmFunctionDecls -> SDoc
