@@ -17,7 +17,11 @@ main = do
     args <- getArgs
     case args of
         [] -> do
-            system "./hWaitForInput-accurate-stdin --read-from-stdin" >>= exitWith
+            let cp =
+                    (shell "./hWaitForInput-accurate-stdin --read-from-stdin")
+                        {std_in = CreatePipe}
+            (_, _, _, ph) <- createProcess cp
+            waitForProcess ph >>= exitWith
         ("--read-from-stdin":_) -> do
             let nanoSecondsPerSecond = 1000 * 1000 * 1000
             let milliSecondsPerSecond = 1000
