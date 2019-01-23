@@ -27,7 +27,7 @@ where
 
 import GhcPrelude
 
-import {-# SOURCE #-} MkId ( mkPrimOpId, magicDictId )
+import {-# SOURCE #-} MkId
 
 import CoreSyn
 import MkCore
@@ -39,15 +39,15 @@ import TysWiredIn
 import TysPrim
 import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
                    , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons
-                   , tyConFamilySize )
+                   , tyConFamilySize, TyCon, isPromotedDataCon)
 import DataCon     ( dataConTagZ, dataConTyCon, dataConWorkId )
 import CoreUtils   ( cheapEqExpr, exprIsHNF, exprType )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
-import OccName     ( occNameFS )
+import OccName     ( occNameFS, isTcOcc, occNameString, isDataOcc )
 import PrelNames
 import Maybes      ( orElse )
-import Name        ( Name, nameOccName )
+import Name        ( Name, nameOccName, NamedThing(..), nameModule, isExternalName )
 import Outputable
 import FastString
 import BasicTypes
@@ -55,6 +55,13 @@ import DynFlags
 import Platform
 import Util
 import Coercion     (mkUnbranchedAxInstCo,mkSymCo,Role(..))
+import TyCoRep
+import THNames ( liftTyName )
+import TcType
+import Module
+import Unique
+import VarSet
+import FV
 
 import Control.Applicative ( Alternative(..) )
 
@@ -1191,6 +1198,8 @@ builtinRules
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
      BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = idName magicDictId,
                    ru_nargs = 4, ru_try = \_ _ _ -> match_magicDict },
+     BuiltinRule { ru_name = fsLit "LiftType", ru_fn = liftTyName,
+                   ru_nargs = 2, ru_try = match_liftTy },
      mkBasicRule divIntName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 div)
         , leftZero zeroi
@@ -1433,6 +1442,122 @@ match_magicDict [Type _, Var wrap `App` Type a `App` Type _ `App` f, x, y ]
       `App` y
 
 match_magicDict _ = Nothing
+
+-- This rule implements the magic type lifting for template haskell quotes.
+match_liftTy :: RuleFun
+match_liftTy dflags _ _ [Type _, Type t1]
+  = typeToLHsTypeTc dflags t1
+match_liftTy _ _ _ as = pprTrace "match_liftty" (ppr as) Nothing
+
+mkString :: String -> CoreExpr
+mkString = mkStringFS . mkFastString
+
+mkStringFS :: FastString -> CoreExpr
+mkStringFS str =
+    let unpack_id = unpackCStringId
+    in (App (Var unpack_id) lit)
+  where
+    lit = Lit (LitString (fastStringToByteString str))
+
+globalVar :: NamedThing a => a -> CoreExpr
+-- Not bound by the meta-env
+-- Could be top-level; or could be local
+--      f x = $(g [| x |])
+-- Here the x will be local
+globalVar vid
+  | isExternalName name
+  = mkApps (Var mk_varg) [mkString name_pkg, mkString name_mod, mkString name_occ_str]
+  {-
+  | otherwise
+  = do  { MkC occ <- nameLit name
+        ; MkC uni <- coreIntLit (getKey (getUnique name))
+        ; rep2 mkNameLName [occ,uni] }
+        -}
+  where
+      name = getName vid
+      mod = ASSERT( isExternalName name) nameModule name
+      name_mod = moduleNameString (moduleName mod)
+      name_pkg = unitIdString (moduleUnitId mod)
+      name_occ = nameOccName name
+      name_occ_str = occNameString name_occ
+      mk_varg | OccName.isDataOcc name_occ = mkNameG_dId
+              -- | OccName.isVarOcc  name_occ = mkNameG_vName
+              | OccName.isTcOcc   name_occ = mkNameG_tcId
+              | otherwise                  = unitDataConId -- pprPanic "DsMeta.globalVar" (ppr name)
+
+app e1 e2 = mkApps (Var appTId) [e1, e2]
+
+apps v [] = v
+apps v (x:xs) = apps (v `app` x) xs
+
+typeToLHsTypeTc :: DynFlags -> Type -> Maybe CoreExpr
+-- This is the fused together version of typeToLHsType and repTy but
+-- crucially doesn't do any lookups so can be a pure function.
+typeToLHsTypeTc dflags ty
+  =
+  -- Whilst there are free variables we can still extrude the scope.
+  if isEmptyVarSet (fvVarSet (tyCoFVsOfType ty))
+    then Just (pprTrace "type" (ppr ty) $ go ty)
+    else Nothing
+  where
+    go :: Type -> CoreExpr
+    {-
+    go ty@(FunTy arg _)
+      | isPredTy arg
+      , (theta, tau) <- tcSplitPhiTy ty
+      = _
+      -}
+    go (FunTy arg res) = (Var arrowTId) `app` go arg `app` go res
+    go (TyVarTy tv)    = (Var varTId) `App` local_name tv
+    go (AppTy t1 t2)   = mkApps (Var appTId) [go t1, go t2]
+    go ty@(TyConApp tc args)
+    {-
+      | any isInvisibleTyConBinder (tyConBinders tc)
+        -- We must produce an explicit kind signature here to make certain
+        -- programs kind-check. See Note [Kind signatures in typeToLHsType].
+      = nlHsParTy $ noLoc $ HsKindSig NoExt lhs_ty (go (typeKind ty))
+      -}
+      | otherwise = lhs_ty
+       where
+        tc_e = (Var mk_c) `App` (globalVar tc)
+        mk_c | isPromotedDataCon tc = promotedTId
+             | otherwise = conTId
+        lhs_ty = apps tc_e (map go args')
+        args'  = filterOutInvisibleTypes tc args
+    go (CastTy ty _)        = go ty
+    go (CoercionTy co)      = pprPanic "PrelRule" (ppr co)
+    go ty@(ForAllTy {})
+      =  pprTrace "forall" (ppr (tvs, sigma, tau)) $ mkApps (Var forallTId) [c_tvs, c_sigma, c_tau]
+      where
+        (tvs, sigma, tau) = tcSplitSigmaTy ty
+        c_tvs = mkListExpr tyVarBndrQ $ map go_tv tvs
+        c_sigma = (Var cxtId) `App` (mkListExpr typeQ $ map go sigma)
+        c_tau = go tau
+
+    go (LitTy lt)
+      = (Var litTId) `App` (case lt of
+                             (NumTyLit n) -> (Var numTyLitId) `App` (Lit (mkLitInteger n integerTy))
+                             (StrTyLit s) -> (Var strTyLitId) `App` (mkStringFS s))
+
+    go_tv :: TyVar -> CoreExpr
+    go_tv tv = mkApps (Var kindedTVId) [(local_name tv), go (tyVarKind tv)]
+
+    local_name :: Id -> CoreExpr
+    local_name vid =
+      let name = getName vid
+          mod = ASSERT( isExternalName name) nameModule name
+          name_mod = moduleNameString (moduleName mod)
+          name_pkg = unitIdString (moduleUnitId mod)
+          name_occ = nameOccName name
+          name_occ_str = occNameString name_occ
+          u = getKey (getUnique vid)
+      in mkApps (Var mkNameLId) [ mkString name_occ_str
+                                , mkIntExpr dflags (fromIntegral u) ]
+    {-
+
+-}
+--- IDs
+
 
 -------------------------------------------------
 -- Integer rules
