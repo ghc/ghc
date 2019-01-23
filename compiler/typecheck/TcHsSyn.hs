@@ -156,7 +156,7 @@ shortCutLit _ (HsFractional f) ty
   where
     valueInRange = 
       case f of 
-        FL { fl_exp = e } -> e >= 0 && e <= 100
+        FL { fl_exp = e } -> e <= 100
         THFL { thfl_value = val } -> val >= 0 && val <= 10 ^^ 100
         -- We limit short-cutting Fractional Literals to when their power of 10
         -- is less than 100, which ensures desugaring isn't slow.
