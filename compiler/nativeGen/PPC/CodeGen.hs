@@ -1634,15 +1634,13 @@ genCCall'
 
 
 genCCall' dflags gcp target dest_regs args
-  = ASSERT(not $ any (`elem` [II16]) $ map cmmTypeFormat argReps)
-        -- we rely on argument promotion in the codeGen
-    do
+  = do
         (finalStack,passArgumentsCode,usedRegs) <- passArguments
-                                                        (zip args argReps)
-                                                        allArgRegs
-                                                        (allFPArgRegs platform)
-                                                        initialStackOffset
-                                                        (toOL []) []
+                                                   (zip3 args argReps argHints)
+                                                   allArgRegs
+                                                   (allFPArgRegs platform)
+                                                   initialStackOffset
+                                                   nilOL []
 
         (labelOrExpr, reduceToFF32) <- case target of
             ForeignTarget (CmmLit (CmmLabel lbl)) _ -> do
@@ -1733,6 +1731,7 @@ genCCall' dflags gcp target dest_regs args
                                 _ -> panic "genCall': unknown calling conv."
 
         argReps = map (cmmExprType dflags) args
+        (argHints, _) = foreignTargetHints target
 
         roundTo a x | x `mod` a == 0 = x
                     | otherwise = x + a - (x `mod` a)
@@ -1769,7 +1768,7 @@ genCCall' dflags gcp target dest_regs args
            _               -> panic "maybeNOP: Unknown PowerPC 64-bit ABI"
 
         passArguments [] _ _ stackOffset accumCode accumUsed = return (stackOffset, accumCode, accumUsed)
-        passArguments ((arg,arg_ty):args) gprs fprs stackOffset
+        passArguments ((arg,arg_ty,_):args) gprs fprs stackOffset
                accumCode accumUsed | isWord64 arg_ty
                                      && target32Bit (targetPlatform dflags) =
             do
@@ -1811,9 +1810,9 @@ genCCall' dflags gcp target dest_regs args
                                                  stackCode accumUsed
                     GCP64ELF _ -> panic "passArguments: 32 bit code"
 
-        passArguments ((arg,rep):args) gprs fprs stackOffset accumCode accumUsed
+        passArguments ((arg,rep,hint):args) gprs fprs stackOffset accumCode accumUsed
             | reg : _ <- regs = do
-                register <- getRegister arg
+                register <- getRegister arg_pro
                 let code = case register of
                             Fixed _ freg fcode -> fcode `snocOL` MR reg freg
                             Any _ acode -> acode reg
@@ -1833,14 +1832,25 @@ genCCall' dflags gcp target dest_regs args
                               (accumCode `appOL` code)
                               (reg : accumUsed)
             | otherwise = do
-                (vr, code) <- getSomeReg arg
+                (vr, code) <- getSomeReg arg_pro
                 passArguments args
                               (drop nGprs gprs)
                               (drop nFprs fprs)
                               (stackOffset' + stackBytes)
-                              (accumCode `appOL` code `snocOL` ST (cmmTypeFormat rep) vr stackSlot)
+                              (accumCode `appOL` code
+                                         `snocOL` ST format_pro vr stackSlot)
                               accumUsed
             where
+                arg_pro
+                   | isBitsType rep = CmmMachOp (conv_op (typeWidth rep) (wordWidth dflags)) [arg]
+                   | otherwise      = arg
+                format_pro
+                   | isBitsType rep = intFormat (wordWidth dflags)
+                   | otherwise      = cmmTypeFormat rep
+                conv_op = case hint of
+                            SignedHint -> MO_SS_Conv
+                            _          -> MO_UU_Conv
+
                 stackOffset' = case gcp of
                                GCPAIX ->
                                    -- The 32bit PowerOPEN ABI is happy with
