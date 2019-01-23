@@ -395,7 +395,7 @@ cleanup-windows:
     - set "BUILD_DIR=%BUILD_DIR:/=\%"
     - echo "Cleaning %BUILD_DIR%"
     - cd \GitLabRunner
-    - rmdir /S /Q %BUILD_DIR%/*
+    - rmdir /S /Q %BUILD_DIR%\*
     - exit /b 0
 
 ############################################################
