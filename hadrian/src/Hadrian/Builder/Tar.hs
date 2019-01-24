@@ -14,6 +14,7 @@ import Development.Shake
 import Development.Shake.Classes
 import GHC.Generics
 import Hadrian.Expression
+import Oracles.Setting
 
 -- | Tar can be used to 'Create' an archive or 'Extract' from it.
 data TarMode = Create | Extract deriving (Eq, Generic, Show)
@@ -34,6 +35,7 @@ args Create = mconcat
     , getInputs ]
 args Extract = mconcat
     [ arg "-x"
+    , windowsHost ? arg "--force-local"
     , input "*.gz"  ? arg "--gzip"
     , input "*.bz2" ? arg "--bzip2"
     , input "*.xz"  ? arg "--xz"

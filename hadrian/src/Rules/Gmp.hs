@@ -15,8 +15,8 @@ gmpObjects = do
     -- The line below causes a Shake Lint failure on Windows, which forced us to
     -- disable Lint by default. See more details here:
     -- https://ghc.haskell.org/trac/ghc/ticket/15971.
-    map unifyPath <$>
-        liftIO (getDirectoryFilesIO "" [gmpPath -/- gmpObjectsDir -/- "*.o"])
+    map (unifyPath . (gmpPath -/-)) <$>
+        liftIO (getDirectoryFilesIO gmpPath [gmpObjectsDir -/- "*.o"])
 
 gmpBase :: FilePath
 gmpBase = pkgPath integerGmp -/- "gmp"
@@ -103,18 +103,19 @@ gmpRules = do
 
     -- Extract in-tree GMP sources and apply patches
     fmap (gmpPath -/-) ["Makefile.in", "configure"] &%> \_ -> do
+        top <- topDirectory
         removeDirectory gmpPath
         -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
         -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
         -- That's because the doc/ directory contents are under the GFDL,
         -- which causes problems for Debian.
         tarball <- unifyPath . fromSingleton "Exactly one GMP tarball is expected"
-               <$> getDirectoryFiles "" [gmpBase -/- "gmp-tarballs/gmp*.tar.bz2"]
+               <$> getDirectoryFiles top [gmpBase -/- "gmp-tarballs/gmp*.tar.bz2"]
 
         withTempDir $ \dir -> do
             let tmp = unifyPath dir
-            need [tarball]
-            build $ target gmpContext (Tar Extract) [tarball] [tmp]
+            need [top -/- tarball]
+            build $ target gmpContext (Tar Extract) [top -/- tarball] [tmp]
 
             let patch     = gmpBase -/- "gmpsrc.patch"
                 patchName = takeFileName patch
