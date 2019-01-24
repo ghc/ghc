@@ -451,6 +451,7 @@ data GeneralFlag
    | Opt_KillOneShot
    | Opt_FullLaziness
    | Opt_FloatIn
+   | Opt_FloatBetweenLambdas
    | Opt_LateSpecialise
    | Opt_Specialise
    | Opt_SpecialiseAggressively
@@ -3930,6 +3931,7 @@ fFlagsDeps = [
   flagSpec "external-interpreter"             Opt_ExternalInterpreter,
   flagSpec "flat-cache"                       Opt_FlatCache,
   flagSpec "float-in"                         Opt_FloatIn,
+  flagSpec "float-between-lambdas"            Opt_FloatBetweenLambdas,
   flagSpec "force-recomp"                     Opt_ForceRecomp,
   flagSpec "ignore-optim-changes"             Opt_IgnoreOptimChanges,
   flagSpec "ignore-hpc-changes"               Opt_IgnoreHpcChanges,

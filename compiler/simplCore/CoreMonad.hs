@@ -195,7 +195,12 @@ data FloatOutSwitches = FloatOutSwitches {
                              --            based on arity information.
                              -- See Note [Floating over-saturated applications]
                              -- in SetLevels
-  floatToTopLevelOnly :: Bool      -- ^ Allow floating to the top level only.
+  floatToTopLevelOnly :: Bool,     -- ^ Allow floating to the top level only.
+
+  floatBetweenLambdas :: Bool -- True <=> \x. let ... in \y... (x+1)...
+                              --          Float out the (x+1)
+                              -- False <=> do not do so
+                              -- See Trac #15606
   }
 instance Outputable FloatOutSwitches where
     ppr = pprFloatOutSwitches
@@ -206,6 +211,7 @@ pprFloatOutSwitches sw
      sep $ punctuate comma $
      [ text "Lam ="    <+> ppr (floatOutLambdas sw)
      , text "Consts =" <+> ppr (floatOutConstants sw)
+     , text "Between =" <+> ppr (floatBetweenLambdas sw)
      , text "OverSatApps ="   <+> ppr (floatOutOverSatApps sw) ])
 
 -- The core-to-core pass ordering is derived from the DynFlags:

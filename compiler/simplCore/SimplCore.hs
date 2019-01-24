@@ -136,6 +136,7 @@ getCoreToDo dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
     static_ptrs   = xopt LangExt.StaticPointers           dflags
+    float_between = gopt Opt_FloatBetweenLambdas          dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
@@ -196,6 +197,7 @@ getCoreToDo dflags
           , floatOutConstants = True
           , floatOutOverSatApps = False
           , floatToTopLevelOnly = True
+          , floatBetweenLambdas = False
           }
         ]
 
@@ -224,8 +226,9 @@ getCoreToDo dflags
 
         if full_laziness then
            CoreDoFloatOutwards FloatOutSwitches {
-                                 floatOutLambdas   = Just 0,
-                                 floatOutConstants = True,
+                                 floatOutLambdas     = Just 0,
+                                 floatBetweenLambdas = float_between,
+                                 floatOutConstants   = True,
                                  floatOutOverSatApps = False,
                                  floatToTopLevelOnly = False }
                 -- Was: gentleFloatOutSwitches
@@ -285,6 +288,7 @@ getCoreToDo dflags
         runWhen full_laziness $
            CoreDoFloatOutwards FloatOutSwitches {
                                  floatOutLambdas     = floatLamArgs dflags,
+                                 floatBetweenLambdas = float_between,
                                  floatOutConstants   = True,
                                  floatOutOverSatApps = True,
                                  floatToTopLevelOnly = False },

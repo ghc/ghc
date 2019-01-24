@@ -401,7 +401,7 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
   , arity > 0
   , arity < n_val_args
   , Nothing <- isClassOpId_maybe fn
-  =  do { rargs' <- mapM (lvlNonTailMFE env False) rargs
+  =  do { rargs' <- mapM (lvlNonTailMFE env_arg False) rargs
         ; lapp'  <- lvlNonTailMFE env False lapp
         ; return (foldl' App lapp' rargs') }
 
@@ -411,6 +411,8 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
             -- Note [Floating to the top]
        ; return (foldl' App (lookupVar env fn) args') }
   where
+    env_arg    = switchBumpingOn env
+
     n_val_args = count (isValArg . deAnnotate) args
     arity      = idArity fn
 
@@ -439,10 +441,10 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
     lvl_arg :: [Demand] -> CoreExprWithFVs -> LvlM ([Demand], LevelledExpr)
     lvl_arg strs arg | (str1 : strs') <- strs
                      , is_val_arg arg
-                     = do { arg' <- lvlMFE env (isStrictDmd str1) arg
+                     = do { arg' <- lvlMFE env_arg (isStrictDmd str1) arg
                           ; return (strs', arg') }
                      | otherwise
-                     = do { arg' <- lvlMFE env False arg
+                     = do { arg' <- lvlMFE env_arg False arg
                           ; return (strs, arg') }
 
 lvlApp env _ (fun, args)
@@ -1196,13 +1198,14 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
                       = collectNAnnBndrs join_arity rhs
                       | otherwise
                       = collectAnnBndrs rhs
-    (env1, bndrs1)    = substBndrsSL NonRecursive env bndrs
+    env1              = switchBumpingOn env
+    (env2, bndrs1)    = substBndrsSL NonRecursive env1 bndrs
     all_bndrs         = abs_vars ++ bndrs1
     (body_env, bndrs') | Just _ <- mb_join_arity
-                      = lvlJoinBndrs env1 dest_lvl rec all_bndrs
-                      | otherwise
-                      = case lvlLamBndrs env1 dest_lvl all_bndrs of
-                          (env2, bndrs') -> (placeJoinCeiling env2, bndrs')
+                       = lvlJoinBndrs env2 dest_lvl rec all_bndrs
+                       | otherwise
+                       = case lvlLamBndrs env2 dest_lvl all_bndrs of
+                           (env3, bndrs') -> (placeJoinCeiling env3, bndrs')
         -- The important thing here is that we call lvlLamBndrs on
         -- all these binders at once (abs_vars and bndrs), so they
         -- all get the same major level.  Otherwise we create stupid
@@ -1279,12 +1282,20 @@ substBndrsSL is_rec env@(LE { le_subst = subst, le_env = id_env }) bndrs
 
 lvlLamBndrs :: LevelEnv -> Level -> [OutVar] -> (LevelEnv, [LevelledBndr])
 -- Compute the levels for the binders of a lambda group
+-- Bump a major level if
+--      Any "major binder"
+-- and  le_bump is True
+--
+-- If we bump a major level,
+--   then set le_bump to False if floatBetweenLambdas is False
 lvlLamBndrs env lvl bndrs
-  = lvlBndrs env new_lvl bndrs
-  where
-    new_lvl | any is_major bndrs = incMajorLvl lvl
-            | otherwise          = incMinorLvl lvl
+  | le_bump env
+  , any is_major bndrs
+  = lvlBndrs (switchBumpingOff env) (incMajorLvl lvl) bndrs
 
+  | otherwise
+  = lvlBndrs env (incMinorLvl lvl) bndrs
+  where
     is_major bndr = isId bndr && not (isProbablyOneShotLambda bndr)
        -- The "probably" part says "don't float things out of a
        -- probable one-shot lambda"
@@ -1423,6 +1434,9 @@ countFreeIds = nonDetFoldUDFM add 0
 data LevelEnv
   = LE { le_switches :: FloatOutSwitches
        , le_ctxt_lvl :: Level           -- The current level
+       , le_bump     :: Bool            -- True <=> bump major level when you meet
+                                        --          a value lambda
+                                        -- False <=> do not bump
        , le_lvl_env  :: VarEnv Level    -- Domain is *post-cloned* TyVars and Ids
        , le_join_ceil:: Level           -- Highest level to which joins float
                                         -- Invariant: always >= le_ctxt_lvl
@@ -1434,6 +1448,13 @@ data LevelEnv
                                         -- an Id via le_env) but we do use the Co/TyVar substs
        , le_env      :: IdEnv ([OutVar], LevelledExpr)  -- Domain is pre-cloned Ids
     }
+
+switchBumpingOff :: LevelEnv -> LevelEnv
+switchBumpingOff env@(LE { le_switches = sw })
+  = env { le_bump = floatBetweenLambdas sw }
+
+switchBumpingOn :: LevelEnv -> LevelEnv
+switchBumpingOn env = env { le_bump = True }
 
 {- Note [le_subst and le_env]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1470,6 +1491,7 @@ initialEnv :: FloatOutSwitches -> LevelEnv
 initialEnv float_lams
   = LE { le_switches = float_lams
        , le_ctxt_lvl = tOP_LEVEL
+       , le_bump     = True
        , le_join_ceil = panic "initialEnv"
        , le_lvl_env = emptyVarEnv
        , le_subst = emptySubst
