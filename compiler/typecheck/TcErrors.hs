@@ -1975,17 +1975,16 @@ misMatchMsg ct oriented ty1 ty2
 -- themselves.
 pprWithExplicitKindsWhenMismatch :: Type -> Type -> CtOrigin
                                  -> SDoc -> SDoc
-pprWithExplicitKindsWhenMismatch ty1 ty2 ct =
-  pprWithExplicitKindsWhen mismatch
+pprWithExplicitKindsWhenMismatch ty1 ty2 ct
+  = pprWithExplicitKindsWhen show_kinds
   where
     (act_ty, exp_ty) = case ct of
       TypeEqOrigin { uo_actual = act
                    , uo_expected = exp } -> (act, exp)
       _                                  -> (ty1, ty2)
-    mismatch | Just vis <- tcEqTypeVis act_ty exp_ty
-             = not vis
-             | otherwise
-             = False
+    show_kinds = tcEqTypeVis act_ty exp_ty
+                 -- True when the visible bit of the types look the same,
+                 -- so we want to show the kinds in the displayed type
 
 mkExpectedActualMsg :: Type -> Type -> CtOrigin -> Maybe TypeOrKind -> Bool
                     -> (Bool, Maybe SwapFlag, SDoc)
