@@ -18,7 +18,8 @@
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
-module DsMeta( dsBracket, repTyCoreExpr ) where
+module DsMeta( dsBracket, repTyCoreExpr, repLamCoreExpr, globalVarCoreExpr,
+               repPvarCoreExpr ) where
 
 #include "HsVersions.h"
 
@@ -71,6 +72,14 @@ import Data.List
 repTyCoreExpr :: HsType GhcRn -> DsM CoreExpr
 repTyCoreExpr = fmap unC . repTy
 
+repLamCoreExpr :: CoreExpr -> CoreExpr -> DsM CoreExpr
+repLamCoreExpr ce e = unC <$> repLam (MkC ce) (MkC e)
+
+globalVarCoreExpr :: Name -> DsM CoreExpr
+globalVarCoreExpr n = unC <$> globalVar n
+
+repPvarCoreExpr :: CoreExpr -> DsM CoreExpr
+repPvarCoreExpr e = unC <$> repPvar (MkC e)
 -----------------------------------------------------------------------------
 dsBracket :: HsBracket GhcRn -> [PendingTcSplice]
                              -> [PendingTcTySplice]

@@ -38,14 +38,14 @@ import TyCon
 import Class
 import DynFlags
 import Outputable
-import Util( splitAtList, fstOf3 )
+import Util( splitAtList, fstOf3, singleton )
 import Data.Maybe
 
 import HsUtils
 import DsMeta
 import DsMonad
 
-import VarSet
+import CoreSyn
 import FV
 
 {- *******************************************************************
@@ -591,18 +591,40 @@ matchCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
 
 matchLiftTy :: [Type] -> TcM ClsInstResult
 matchLiftTy args@[_k, t2]
-  | isEmptyVarSet (fvVarSet (tyCoFVsOfType t2)) = do
-    ev <- initDsTc (repTyCoreExpr (typeToLHsTypeRn t2))
+    | isTyVarTy t2 = return NoInstance
+    | otherwise =  do
     liftTyClass <- tcLookupClass THNames.liftTyClassName
     let liftTyTyCon = classTyCon liftTyClass
         dc = classDataCon liftTyClass
-    return (OneInst { cir_new_theta = [ mkTyConApp liftTyTyCon args ]
-                    , cir_mk_ev = \_ -> evDataConApp dc args [ev]
+        fvs = fvVarList (tyCoFVsOfType t2)
+        new_preds = map (mkTyConApp liftTyTyCon . singleton . mkTyVarTy) fvs
+
+    ev_w_lams <- initDsTc $ do
+            vars <- mapM (globalVarCoreExpr . idName) fvs
+            vars_p <- mapM repPvarCoreExpr vars
+            main_ev <- repTyCoreExpr (typeToLHsTypeRn t2)
+            foldlM repLamCoreExpr main_ev vars_p
+
+    appE <- tcLookupId THNames.appEName
+    let mk_app e1 e2 = mkApps (Var appE) [e1, e2]
+        mk_apps es = foldl mk_app ev_w_lams es
+
+
+
+
+    pprTrace "matchLiftTy" (ppr args $$ ppr new_preds) (return ())
+    return (OneInst { cir_new_theta = new_preds
+                    , cir_mk_ev = \evs -> evDataConApp dc args [mk_apps evs]
                     , cir_what = BuiltinInstance })
-  | otherwise = do
-      traceTc "matchLiftTy" (ppr t2 $$ ppr (fvVarSet (tyCoFVsOfType t2)))
-      return NoInstance
 matchLiftTy args = pprPanic "matchLiftTy" (ppr args)
+
+{-
+Note [Constructing LiftT evidence]
+When we call `repTyCoreExpr`, the unbound variables will be inserted
+as local names. When we get the evidence for solving these variables we
+generate code which binds the same variables.
+
+-}
 
 
 
