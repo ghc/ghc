@@ -99,7 +99,7 @@ module Type (
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinders,
         mkAnonBinder,
-        isAnonTyCoBinder, isNamedTyCoBinder,
+        isAnonTyCoBinder,
         binderVar, binderVars, binderType, binderArgFlag,
         tyCoBinderType, tyCoBinderVar_maybe,
         tyBinderType,
@@ -1680,10 +1680,6 @@ mkAnonBinder = Anon
 isAnonTyCoBinder :: TyCoBinder -> Bool
 isAnonTyCoBinder (Named {}) = False
 isAnonTyCoBinder (Anon {})  = True
-
-isNamedTyCoBinder :: TyCoBinder -> Bool
-isNamedTyCoBinder (Named {}) = True
-isNamedTyCoBinder (Anon {})  = False
 
 tyCoBinderVar_maybe :: TyCoBinder -> Maybe TyCoVar
 tyCoBinderVar_maybe (Named tv) = Just $ binderVar tv
