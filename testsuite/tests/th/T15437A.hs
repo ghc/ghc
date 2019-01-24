@@ -6,7 +6,6 @@ module T15437A where
 
 import Language.Haskell.TH.Syntax (Q, TExp)
 import Language.Haskell.TH.Lib.Internal
-import Type.Reflection
 
 get :: forall a. Int
 get = 1

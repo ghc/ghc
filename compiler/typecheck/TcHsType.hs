@@ -79,7 +79,6 @@ import TcSimplify
 import TcHsSyn
 import TcErrors ( reportAllUnsolved )
 import TcType
-import Inst   ( tcInstTyBinders, tcInstTyBinder )
 import TyCoRep( TyCoBinder(..), TyBinder, tyCoBinderArgFlag )  -- Used in etaExpandAlgTyCon
 import Type
 import TysPrim
@@ -1234,7 +1233,6 @@ checkCrossStageLiftingTy top_lvl id_name id (Brack _ (TcPending ps_var lie_var))
             setConstraintVar lie_var (do
               -- Put the 'lift' constraint into the right LIE
               let [lift_id] = classMethods liftTyClass
-              let wrap = mkWpTyApps [k, id_ty]
               let c = (mkTyConApp (classTyCon liftTyClass) [k, id_ty])
               dict <- instCall (OccurrenceOf id_name) [k, id_ty] [c]
               return (mkLHsWrap dict (nlHsVar lift_id)))

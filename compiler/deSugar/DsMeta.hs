@@ -18,7 +18,7 @@
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
-module DsMeta( dsBracket, repTy' ) where
+module DsMeta( dsBracket, repTyCoreExpr ) where
 
 #include "HsVersions.h"
 
@@ -67,7 +67,9 @@ import Data.ByteString ( unpack )
 import Control.Monad
 import Data.List
 
-repTy' = fmap unC . repTy
+-- repTy is used to generate evidence in ClsInst for LiftT constraints.
+repTyCoreExpr :: HsType GhcRn -> DsM CoreExpr
+repTyCoreExpr = fmap unC . repTy
 
 -----------------------------------------------------------------------------
 dsBracket :: HsBracket GhcRn -> [PendingTcSplice]
@@ -1303,7 +1305,9 @@ repE (HsVar _ (dL->L _ x)) =
                                  ; repVarOrCon x str }
         Just (DsBound y)   -> repVarOrCon x (coreVar y)
         Just (DsSplice e)  -> do { e' <- dsExpr e
-                                 ; return (MkC e') } }
+                                 ; return (MkC e') }
+        Just (DsSpliceTy e)  -> do { e' <- dsExpr e
+                                   ; return (MkC e') } }
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ _ s) = repOverLabel s
 
@@ -1951,6 +1955,8 @@ lookupOcc n
                 Nothing           -> globalVar n
                 Just (DsBound x)  -> return (coreVar x)
                 Just (DsSplice _) -> pprPanic "repE:lookupOcc" (ppr n)
+                Just (DsSpliceTy _) ->
+                  pprPanic "repE:lookupOcc:DsSpliceTy" (ppr n)
     }
 
 globalVar :: Name -> DsM (Core TH.Name)

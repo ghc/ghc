@@ -1,6 +1,5 @@
-{-# LANGUAGE TypeApplications, ExplicitNamespaces,
-             PatternSynonyms, AllowAmbiguousTypes,
-             ScopedTypeVariables, PolyKinds #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 -- |
 -- Language.Haskell.TH.Lib.Internal exposes some additional functionality that
 -- is used internally in GHC's integration with Template Haskell. This is not a
@@ -21,7 +20,6 @@ import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
 import qualified Language.Haskell.TH.Syntax as TH
 import Control.Monad( liftM, liftM2 )
 import Data.Word( Word8 )
-import Type.Reflection hiding (Module)
 import Prelude
 
 ----------------------------------------------------------
