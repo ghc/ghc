@@ -139,6 +139,11 @@ T5327:
 	$(RM) -f T5327.hi T5327.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5327.hs -O -ddump-simpl | grep -c '># 34# '
 
+.PHONY: T16254
+T16254:
+	$(RM) -f T16254.hi T16254.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T16254.hs -O -ddump-simpl | grep -c '># 34# '
+
 .PHONY: T5623
 T5623:
 	$(RM) -f T5623.hi T5623.o
