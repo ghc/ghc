@@ -1,0 +1,15 @@
+TYPE SIGNATURES
+  x :: forall (x :: Bool). P (F Int) (x |> Sym (T14729.D:R:FInt[0]))
+  y :: forall (x :: Bool). P Bool x
+TYPE CONSTRUCTORS
+  type family F{1} :: * -> *
+    roles nominal
+  data type P{2} :: forall k -> k -> *
+    roles nominal phantom
+COERCION AXIOMS
+  axiom T14729.D:R:FInt :: F Int = Bool
+FAMILY INSTANCES
+  type instance F Int = Bool -- Defined at T14729.hs:10:15
+Dependent modules: []
+Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
+                     integer-gmp-1.0.2.0]
