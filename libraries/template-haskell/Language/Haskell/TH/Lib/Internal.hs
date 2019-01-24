@@ -947,6 +947,9 @@ thisModule = do
 --
 -----------------------------------------------------
 
+class LiftT (t :: k) where
+  liftTyCl :: Q Type
+
 liftTy :: forall t . Q Type
 liftTy = undefined
 

@@ -25,6 +25,7 @@ import FamInst( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
 import TysWiredIn
 import TysPrim( eqPrimTyCon, eqReprPrimTyCon )
 import PrelNames
+import qualified THNames
 
 import Id
 import Type
@@ -39,6 +40,14 @@ import DynFlags
 import Outputable
 import Util( splitAtList, fstOf3 )
 import Data.Maybe
+
+import HsUtils
+import DsMeta
+import DsMonad
+
+import Unique
+import VarSet
+import FV
 
 {- *******************************************************************
 *                                                                    *
@@ -126,6 +135,9 @@ matchGlobalInst dflags short_cut clas tys
   | clas `hasKey` eqTyConKey          = matchHomoEquality         tys
   | clas `hasKey` coercibleTyConKey   = matchCoercible            tys
   | cls_name == hasFieldClassName     = matchHasField dflags short_cut clas tys
+  | clas `hasKey` THNames.liftTyClassKey
+                                      = matchLiftTy tys
+  | pprTrace "matchGlobalInst" (ppr clas $$ ppr tys) False = undefined
   | otherwise                         = matchInstEnv dflags short_cut clas tys
   where
     cls_name = className clas
@@ -579,6 +591,22 @@ matchCoercible args@[k, t1, t2]
   where
     args' = [k, k, t1, t2]
 matchCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
+
+matchLiftTy :: [Type] -> TcM ClsInstResult
+matchLiftTy args@[_k, t2]
+  | isEmptyVarSet (fvVarSet (tyCoFVsOfType t2)) = do
+    ev <- initDsTc (repTy' (typeToLHsTypeRn t2))
+    liftTyClass <- tcLookupClass THNames.liftTyClassName
+    let liftTyTyCon = classTyCon liftTyClass
+        dc = classDataCon liftTyClass
+    return (OneInst { cir_new_theta = [ mkTyConApp liftTyTyCon args ]
+                    , cir_mk_ev = \_ -> evDataConApp dc args [ev]
+                    , cir_what = BuiltinInstance })
+  | otherwise =
+      pprTrace "matchLiftTy" (ppr t2 $$ ppr (fvVarSet (tyCoFVsOfType t2))) $
+      return NoInstance
+matchLiftTy args = pprPanic "matchLiftTy" (ppr args)
+
 
 
 {- ********************************************************************

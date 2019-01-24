@@ -1229,18 +1229,15 @@ checkCrossStageLiftingTy top_lvl id_name id (Brack _ (TcPending ps_var lie_var))
         -- matter, although it's a mite untidy.
     do  { let id_ty = mkTyVarTy id
               k = idType id
-        ; typeableClass <- tcLookupClass typeableClassName
+        ; liftTyClass <- tcLookupClass liftTyClassName
         ; liftTy <-
             setConstraintVar lie_var (do
               -- Put the 'lift' constraint into the right LIE
-              lift_id <- tcLookupId THNames.liftTyName
+              let [lift_id] = classMethods liftTyClass
               let wrap = mkWpTyApps [k, id_ty]
-              return (mkLHsWrap wrap (nlHsVar lift_id)))
-              {-
-              let c = (mkTyConApp (classTyCon typeableClass) [k, id_ty])
+              let c = (mkTyConApp (classTyCon liftTyClass) [k, id_ty])
               dict <- instCall (OccurrenceOf id_name) [k, id_ty] [c]
               return (mkLHsWrap dict (nlHsVar lift_id)))
-              -}
 
         -- Update the pending splices
         ; ps <- readMutVar ps_var
