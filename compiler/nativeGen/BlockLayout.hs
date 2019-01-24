@@ -222,27 +222,25 @@ type FrontierMap = LabelMap ([BlockId],BlockChain)
 --
 --   We use OrdList instead of [] to allow fast append on both sides
 --   when combining chains.
-data BlockChain
-    = BlockChain
-    { chainMembers :: !LabelSet
-    , chainBlocks :: !(OrdList BlockId)
-    }
+newtype BlockChain
+    = BlockChain { chainBlocks :: (OrdList BlockId) }
 
 instance Eq (BlockChain) where
-    (BlockChain s1 _) == (BlockChain s2 _)
-        = s1 == s2
-
-instance Outputable (BlockChain) where
-    ppr (BlockChain _ blks) =
-        parens (text "Chain:" <+> ppr (fromOL $ blks) )
-
-data WeightedEdge = WeightedEdge !BlockId !BlockId EdgeWeight deriving (Eq)
+    (BlockChain blks1) == (BlockChain blks2)
+        = fromOL blks1 == fromOL blks2
 
 -- Useful for things like sets and debugging purposes, sorts by blocks
 -- in the chain.
 instance Ord (BlockChain) where
-   (BlockChain lbls1 _) `compare` (BlockChain lbls2 _)
-       = lbls1 `compare` lbls2
+   (BlockChain lbls1) `compare` (BlockChain lbls2)
+       = (fromOL lbls1) `compare` (fromOL lbls2)
+
+instance Outputable (BlockChain) where
+    ppr (BlockChain blks) =
+        parens (text "Chain:" <+> ppr (fromOL $ blks) )
+
+data WeightedEdge = WeightedEdge !BlockId !BlockId EdgeWeight deriving (Eq)
+
 
 -- | Non deterministic! (Uniques) Sorts edges by weight and nodes.
 instance Ord WeightedEdge where
@@ -270,54 +268,48 @@ noDups chains =
         else pprTrace "Duplicates:" (ppr (map toList dups) $$ text "chains" <+> ppr chains ) False
 
 inFront :: BlockId -> BlockChain -> Bool
-inFront bid (BlockChain _ seq)
+inFront bid (BlockChain seq)
   = headOL seq == bid
 
 chainMember :: BlockId -> BlockChain -> Bool
 chainMember bid chain
-  = setMember bid . chainMembers $ chain
+  = elem bid $ fromOL . chainBlocks $ chain
+--   = setMember bid . chainMembers $ chain
 
 chainSingleton :: BlockId -> BlockChain
 chainSingleton lbl
-    = BlockChain (setSingleton lbl) (unitOL lbl)
+    = BlockChain (unitOL lbl)
 
 chainSnoc :: BlockChain -> BlockId -> BlockChain
-chainSnoc (BlockChain lbls blks) lbl
-  = BlockChain (setInsert lbl lbls) (blks `snocOL` lbl)
+chainSnoc (BlockChain blks) lbl
+  = BlockChain (blks `snocOL` lbl)
 
 chainConcat :: BlockChain -> BlockChain -> BlockChain
-chainConcat (BlockChain lbls1 blks1) (BlockChain lbls2 blks2)
-  = BlockChain (setUnion lbls1 lbls2) (blks1 `appOL` blks2)
+chainConcat (BlockChain blks1) (BlockChain blks2)
+  = BlockChain (blks1 `appOL` blks2)
 
 chainToBlocks :: BlockChain -> [BlockId]
-chainToBlocks (BlockChain _ blks) = fromOL blks
+chainToBlocks (BlockChain blks) = fromOL blks
 
 -- | Given the Chain A -> B -> C -> D and we break at C
 --   we get the two Chains (A -> B, C -> D) as result.
 breakChainAt :: BlockId -> BlockChain
              -> (BlockChain,BlockChain)
-breakChainAt bid (BlockChain lbls blks)
-    | not (setMember bid lbls)
+breakChainAt bid (BlockChain blks)
+    | not (bid == head rblks)
     = panic "Block not in chain"
     | otherwise
-    = let (lblks, rblks) = break (\lbl -> lbl == bid)
-                                 (fromOL blks)
-          --TODO: Remove old
-          --lblSet :: [GenBasicBlock i] -> BlockChain
-          --lblSet blks =
-          --  setFromList
-                --(map (\(BasicBlock lbl _) -> lbl) $ toList blks)
-      in
-      (BlockChain (setFromList lblks) (toOL lblks),
-       BlockChain (setFromList rblks) (toOL rblks))
+    = (BlockChain (toOL lblks),
+       BlockChain (toOL rblks))
+  where
+    (lblks, rblks) = break (\lbl -> lbl == bid) (fromOL blks)
 
 takeR :: Int -> BlockChain -> [BlockId]
-takeR n (BlockChain _ blks) =
+takeR n (BlockChain blks) =
     take n . fromOLReverse $ blks
 
-
 takeL :: Int -> BlockChain -> [BlockId]
-takeL n (BlockChain _ blks) = --error "TODO: takeLn"
+takeL n (BlockChain blks) =
     take n . fromOL $ blks
 
 -- | For a given list of chains try to fuse chains with strong
@@ -329,7 +321,7 @@ fuseChains :: WeightedEdgeList -> LabelMap BlockChain
            -> (LabelMap BlockChain, Set.Set WeightedEdge)
 fuseChains weights chains
     = let fronts = mapFromList $
-                    map (\chain -> (head $ takeL 1 chain,chain)) $
+                    map (\chain -> (headOL . chainBlocks $ chain,chain)) $
                     mapElems chains :: LabelMap BlockChain
           (chains', used, _) = applyEdges weights chains fronts Set.empty
       in (chains', used)
@@ -348,8 +340,8 @@ fuseChains weights chains
             , Just c2 <- mapLookup to chainsFront
             , c1 /= c2
             = let newChain = chainConcat c1 c2
-                  front = head $ takeL 1 newChain
-                  end = head $ takeR 1 newChain
+                  front = headOL . chainBlocks $ newChain
+                  end = lastOL . chainBlocks $ newChain
                   chainsFront' = mapInsert front newChain $
                                  mapDelete to chainsFront
                   chainsEnd'   = mapInsert end newChain $
