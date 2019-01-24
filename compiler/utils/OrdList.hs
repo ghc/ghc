@@ -12,7 +12,8 @@ can be appended in linear time.
 module OrdList (
         OrdList,
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL, lastOL,
-        mapOL, fromOL, toOL, foldrOL, foldlOL, reverseOL
+        headOL,
+        mapOL, fromOL, toOL, foldrOL, foldlOL, reverseOL, fromOLReverse
 ) where
 
 import GhcPrelude
@@ -62,13 +63,22 @@ snocOL   :: OrdList a   -> a         -> OrdList a
 consOL   :: a           -> OrdList a -> OrdList a
 appOL    :: OrdList a   -> OrdList a -> OrdList a
 concatOL :: [OrdList a] -> OrdList a
+headOL   :: OrdList a   -> a
 lastOL   :: OrdList a   -> a
+
 
 nilOL        = None
 unitOL as    = One as
 snocOL as   b    = Snoc as b
 consOL a    bs   = Cons a bs
 concatOL aas = foldr appOL None aas
+
+headOL None        = panic "headOL"
+headOL (One a)     = a
+headOL (Many as)   = head as
+headOL (Cons a _)  = a
+headOL (Snoc as _) = headOL as
+headOL (Two as _)  = headOL as
 
 lastOL None        = panic "lastOL"
 lastOL (One a)     = a
@@ -94,6 +104,17 @@ fromOL a = go a []
         go (Snoc a b) acc = go a (b:acc)
         go (Two a b)  acc = go a (go b acc)
         go (Many xs)  acc = xs ++ acc
+
+fromOLReverse :: OrdList a -> [a]
+fromOLReverse a = go a []
+        -- acc is already in reverse order
+  where go :: OrdList a -> [a] -> [a]
+        go None       acc = acc
+        go (One a)    acc = a : acc
+        go (Cons a b) acc = go b (a : acc)
+        go (Snoc a b) acc = b : go a acc
+        go (Two a b)  acc = go b (go a acc)
+        go (Many xs)  acc = reverse xs ++ acc
 
 mapOL :: (a -> b) -> OrdList a -> OrdList b
 mapOL _ None = None
