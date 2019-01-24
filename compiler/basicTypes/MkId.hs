@@ -30,13 +30,8 @@ module MkId (
         coercionTokenId, magicDictId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
 
-        -- TH things
-        nameTyCon, typeQTyCon,
-
-        varTId, conTId, appTId, arrowTId, unpackCStringId, mkNameG_tcId, mkNameLId,
-        forallTId, kindedTVId, tyVarBndrQ, typeQ, starKId, cxtId, promotedTId, mkNameG_dId
-        , litTId, strTyLitId, numTyLitId, integerTy
-
+        -- Re-export error Ids
+        module PrelRules
     ) where
 
 #include "HsVersions.h"
@@ -45,8 +40,8 @@ import GhcPrelude
 
 import Rules
 import TysPrim
-import PrelRules
 import TysWiredIn
+import PrelRules
 import Type
 import FamInstEnv
 import Coercion
@@ -77,7 +72,6 @@ import Outputable
 import FastString
 import ListSetOps
 import qualified GHC.LanguageExtensions as LangExt
-import qualified THNames
 
 import Data.Maybe       ( maybeToList )
 
@@ -1633,67 +1627,3 @@ pcMiscPrelId name ty info
     -- random calls to GHCbase.unpackPS__.  If GHCbase is the module
     -- being compiled, then it's just a matter of luck if the definition
     -- will be in "the right place" to be in scope.
-
-
-varTId, conTId, appTId, arrowTId, mkNameG_tcId, unpackCStringId, mkNameLId, forallTId
-  , kindedTVId :: Id
-varTId = pcMiscPrelId THNames.varTName (nameTy `mkFunTy` typeQ) noCafIdInfo
-conTId = pcMiscPrelId THNames.conTName (nameTy `mkFunTy` typeQ) noCafIdInfo
-appTId = pcMiscPrelId THNames.appTName (typeQ `mkFunTy` typeQ `mkFunTy` typeQ) noCafIdInfo
-arrowTId = pcMiscPrelId THNames.arrowTName typeQ noCafIdInfo
-mkNameG_tcId = pcMiscPrelId THNames.mkNameG_tcName (stringTy `mkFunTy` stringTy `mkFunTy` stringTy `mkFunTy` nameTy) noCafIdInfo
-mkNameG_dId = pcMiscPrelId THNames.mkNameG_dName (stringTy `mkFunTy` stringTy `mkFunTy` stringTy `mkFunTy` nameTy) noCafIdInfo
-mkNameLId = pcMiscPrelId THNames.mkNameLName (stringTy `mkFunTy` intTy `mkFunTy` nameTy) noCafIdInfo
-forallTId = pcMiscPrelId THNames.forallTName (mkListTy tyVarBndrQ `mkFunTy` ctxQ `mkFunTy` typeQ `mkFunTy` typeQ) noCafIdInfo
-kindedTVId = pcMiscPrelId THNames.kindedTVName (nameTy `mkFunTy` typeQ `mkFunTy` tyVarBndrQ) noCafIdInfo
-starKId = pcMiscPrelId THNames.starKName typeQ noCafIdInfo
-cxtId = pcMiscPrelId THNames.cxtName (mkListTy typeQ `mkFunTy` ctxQ) noCafIdInfo
-promotedTId = pcMiscPrelId THNames.promotedTName (nameTy `mkFunTy` typeQ) noCafIdInfo
-litTId = pcMiscPrelId THNames.litTName (tyLitQ `mkFunTy` typeQ) noCafIdInfo
-numTyLitId = pcMiscPrelId THNames.numTyLitName (integerTy `mkFunTy` tyLitQ) noCafIdInfo
-strTyLitId = pcMiscPrelId THNames.strTyLitName (stringTy `mkFunTy` tyLitQ) noCafIdInfo
-
-unpackCStringId = pcMiscPrelId unpackCStringName (addrPrimTy `mkFunTy` stringTy) noCafIdInfo
-
-
-nameTy, typeQ :: Type
-nameTy = mkTyConTy nameTyCon
-typeQ = mkTyConApp qTyCon [typeTy]
-tyLitQ = mkTyConApp qTyCon [tyLitTy]
-kindQ  = mkTyConTy kindQTyCon
-tyVarBndrQ = mkTyConTy tyVarBndrQTyCon
-typeTy = mkTyConTy typeTyCon
-tyLitTy = mkTyConTy tyLitTyCon
-ctxQ = mkTyConApp qTyCon [mkListTy typeTy]
-integerTy = mkTyConTy integerTyCon
-
-
-qTyCon :: TyCon
-qTyCon = mkPrimTyCon THNames.qTyConName binders liftedTypeKind roles
-  where
-    binders = mkTemplateAnonTyConBinders (map (const liftedTypeKind) roles)
-    roles = [Nominal]
-
-nameTyCon :: TyCon
-nameTyCon = mkPrimTyCon THNames.nameTyConName [] liftedTypeKind []
-
-typeQTyCon, kindQTyCon :: TyCon
-typeQTyCon = mkPrimTyCon THNames.typeQTyConName [] liftedTypeKind []
-
-kindQTyCon = mkPrimTyCon THNames.kindQTyConName [] liftedTypeKind []
-
-typeTyCon :: TyCon
-typeTyCon = mkPrimTyCon THNames.typeTyConName [] liftedTypeKind []
-
-tyLitTyCon :: TyCon
-tyLitTyCon = mkPrimTyCon THNames.tyLitTyConName [] liftedTypeKind []
-
-tyVarBndrQTyCon :: TyCon
-tyVarBndrQTyCon = mkPrimTyCon THNames.tyVarBndrQTyConName [] liftedTypeKind []
-
-integerTyCon :: TyCon
-integerTyCon = mkPrimTyCon integerTyConName [] liftedTypeKind []
-
-
-
-

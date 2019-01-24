@@ -158,7 +158,6 @@ templateHaskellNames = [
     predQTyConName, decsQTyConName, ruleBndrQTyConName, tySynEqnQTyConName,
     roleTyConName, tExpTyConName, injAnnTyConName, kindQTyConName,
     overlapTyConName, derivClauseQTyConName, derivStrategyQTyConName,
-    tyLitTyConName,
 
     -- Quasiquoting
     quoteDecName, quoteTypeName, quoteExpName, quotePatName,
@@ -193,7 +192,7 @@ liftTyClassName = libCls (fsLit "LiftT") liftTyClassKey
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     matchTyConName, clauseTyConName, funDepTyConName, predTyConName,
-    tExpTyConName, injAnnTyConName, overlapTyConName, tyLitTyConName :: Name
+    tExpTyConName, injAnnTyConName, overlapTyConName :: Name
 qTyConName             = thTc (fsLit "Q")              qTyConKey
 nameTyConName          = thTc (fsLit "Name")           nameTyConKey
 fieldExpTyConName      = thTc (fsLit "FieldExp")       fieldExpTyConKey
@@ -209,7 +208,6 @@ predTyConName          = thTc (fsLit "Pred")           predTyConKey
 tExpTyConName          = thTc (fsLit "TExp")           tExpTyConKey
 injAnnTyConName        = thTc (fsLit "InjectivityAnn") injAnnTyConKey
 overlapTyConName       = thTc (fsLit "Overlap")        overlapTyConKey
-tyLitTyConName         = thTc (fsLit "TyLit")          tyLitTyConKey
 
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
@@ -647,7 +645,7 @@ expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     fieldPatQTyConKey, fieldExpQTyConKey, funDepTyConKey, predTyConKey,
     predQTyConKey, decsQTyConKey, ruleBndrQTyConKey, tySynEqnQTyConKey,
     roleTyConKey, tExpTyConKey, injAnnTyConKey, kindQTyConKey,
-    overlapTyConKey, derivClauseQTyConKey, derivStrategyQTyConKey, tyLitTyConKey :: Unique
+    overlapTyConKey, derivClauseQTyConKey, derivStrategyQTyConKey :: Unique
 expTyConKey             = mkPreludeTyConUnique 200
 matchTyConKey           = mkPreludeTyConUnique 201
 clauseTyConKey          = mkPreludeTyConUnique 202
@@ -684,7 +682,6 @@ kindQTyConKey           = mkPreludeTyConUnique 232
 overlapTyConKey         = mkPreludeTyConUnique 233
 derivClauseQTyConKey    = mkPreludeTyConUnique 234
 derivStrategyQTyConKey  = mkPreludeTyConUnique 235
-tyLitTyConKey           = mkPreludeTyConUnique 236
 
 {- *********************************************************************
 *                                                                      *
@@ -1112,5 +1109,3 @@ floatPrimL_RDR  = nameRdrName floatPrimLName
 doublePrimL_RDR = nameRdrName doublePrimLName
 stringPrimL_RDR = nameRdrName stringPrimLName
 charPrimL_RDR   = nameRdrName charPrimLName
-
-

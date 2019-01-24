@@ -182,7 +182,6 @@ exposedPrimTyCons
 
     , tYPETyCon
 
-
 #include "primop-vector-tycons.hs-incl"
     ]
 
