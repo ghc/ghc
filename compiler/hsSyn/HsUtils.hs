@@ -18,6 +18,7 @@ which deal with the instantiated versions are located elsewhere:
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE RankNTypes #-}
 
 module HsUtils(
   -- Terms
@@ -34,7 +35,7 @@ module HsUtils(
   nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
-  typeToLHsType,
+  typeToLHsType, typeToLHsTypeRn,
 
   -- * Constructing general big tuples
   -- $big_tuples
@@ -647,15 +648,21 @@ mkClassOpSigs sigs
     fiddle sig = sig
 
 typeToLHsType :: Type -> LHsType GhcPs
+typeToLHsType = typeToLHsTypeX getRdrName
+
+typeToLHsTypeRn :: Type -> HsType GhcRn
+typeToLHsTypeRn = unLoc . typeToLHsTypeX getName
+
+typeToLHsTypeX :: forall p . (forall a . NamedThing a => a -> IdP (GhcPass p)) -> Type -> LHsType (GhcPass p)
 -- ^ Converting a Type to an HsType RdrName
 -- This is needed to implement GeneralizedNewtypeDeriving.
 --
 -- Note that we use 'getRdrName' extensively, which
 -- generates Exact RdrNames rather than strings.
-typeToLHsType ty
+typeToLHsTypeX get_name ty
   = go ty
   where
-    go :: Type -> LHsType GhcPs
+    go :: Type -> LHsType (GhcPass p)
     go ty@(FunTy arg _)
       | isPredTy arg
       , (theta, tau) <- tcSplitPhiTy ty
@@ -668,7 +675,7 @@ typeToLHsType ty
       = noLoc (HsForAllTy { hst_bndrs = map go_tv tvs
                           , hst_xforall = noExt
                           , hst_body = go tau })
-    go (TyVarTy tv)         = nlHsTyVar (getRdrName tv)
+    go (TyVarTy tv)         = nlHsTyVar (get_name tv)
     go (AppTy t1 t2)        = nlHsAppTy (go t1) (go t2)
     go (LitTy (NumTyLit n))
       = noLoc $ HsTyLit NoExt (HsNumTy NoSourceText n)
@@ -681,7 +688,7 @@ typeToLHsType ty
       = nlHsParTy $ noLoc $ HsKindSig NoExt lhs_ty (go (typeKind ty))
       | otherwise = lhs_ty
        where
-        lhs_ty = nlHsTyConApp (getRdrName tc) (map go args')
+        lhs_ty = nlHsTyConApp (get_name tc) (map go args')
         args'  = filterOutInvisibleTypes tc args
     go (CastTy ty _)        = go ty
     go (CoercionTy co)      = pprPanic "toLHsSigWcType" (ppr co)
@@ -689,8 +696,8 @@ typeToLHsType ty
          -- Source-language types have _invisible_ kind arguments,
          -- so we must remove them here (Trac #8563)
 
-    go_tv :: TyVar -> LHsTyVarBndr GhcPs
-    go_tv tv = noLoc $ KindedTyVar noExt (noLoc (getRdrName tv))
+    go_tv :: TyVar -> LHsTyVarBndr (GhcPass p)
+    go_tv tv = noLoc $ KindedTyVar noExt (noLoc (get_name tv))
                                    (go (tyVarKind tv))
 
 {-

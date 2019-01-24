@@ -146,7 +146,7 @@ templateHaskellNames = [
     derivClauseName,
 
     -- The type classes
-    liftClassName,
+    liftClassName, liftTyClassName,
 
     -- And the tycons
     qTyConName, nameTyConName, patTyConName, fieldPatTyConName, matchQTyConName,
@@ -176,6 +176,7 @@ mkTHModule m = mkModule thUnitId (mkModuleNameFS m)
 libFun, libTc, thFun, thTc, thCls, thCon, qqFun :: FastString -> Unique -> Name
 libFun = mk_known_key_name OccName.varName  thLib
 libTc  = mk_known_key_name OccName.tcName   thLib
+libCls = mk_known_key_name OccName.clsName  thLib
 thFun  = mk_known_key_name OccName.varName  thSyn
 thTc   = mk_known_key_name OccName.tcName   thSyn
 thCls  = mk_known_key_name OccName.clsName  thSyn
@@ -185,6 +186,9 @@ qqFun  = mk_known_key_name OccName.varName  qqLib
 -------------------- TH.Syntax -----------------------
 liftClassName :: Name
 liftClassName = thCls (fsLit "Lift") liftClassKey
+
+liftTyClassName :: Name
+liftTyClassName = libCls (fsLit "LiftT") liftTyClassKey
 
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
@@ -622,6 +626,9 @@ incoherentDataConName   = thCon (fsLit "Incoherent")   incoherentDataConKey
 
 liftClassKey :: Unique
 liftClassKey = mkPreludeClassUnique 200
+
+liftTyClassKey :: Unique
+liftTyClassKey = mkPreludeClassUnique 201
 
 {- *********************************************************************
 *                                                                      *

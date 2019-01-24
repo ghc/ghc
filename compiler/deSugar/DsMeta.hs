@@ -18,7 +18,7 @@
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
-module DsMeta( dsBracket ) where
+module DsMeta( dsBracket, repTy' ) where
 
 #include "HsVersions.h"
 
@@ -66,6 +66,8 @@ import MonadUtils
 import Data.ByteString ( unpack )
 import Control.Monad
 import Data.List
+
+repTy' = fmap unC . repTy
 
 -----------------------------------------------------------------------------
 dsBracket :: HsBracket GhcRn -> [PendingTcSplice]
