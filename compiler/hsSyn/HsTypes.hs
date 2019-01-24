@@ -57,8 +57,7 @@ module HsTypes (
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
         splitLHsForAllTy, splitLHsQualTy, splitLHsSigmaTy,
-        splitHsFunType,
-        splitHsAppTys, hsTyGetAppHead_maybe,
+        splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType,
         hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
@@ -1136,15 +1135,6 @@ The SrcSpan is the span of the original HsPar
 
 -}
 
-splitHsAppTys :: HsType GhcRn -> (LHsType GhcRn, [LHsTypeArg GhcRn])
-splitHsAppTys e = go (noLoc e) []
-  where
-    go :: LHsType GhcRn -> [LHsTypeArg GhcRn]
-       -> (LHsType GhcRn, [LHsTypeArg GhcRn])
-    go (L _ (HsAppTy _ f a))      as = go f (HsValArg a : as)
-    go (L _ (HsAppKindTy _ ty k)) as = go ty (HsTypeArg k : as)
-    go (L sp (HsParTy _ f))       as = go f (HsArgPar sp : as)
-    go f                          as = (f,as)
 --------------------------------
 splitLHsPatSynTy :: LHsType pass
                  -> ( [LHsTyVarBndr pass]    -- universals
