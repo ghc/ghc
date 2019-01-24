@@ -2,7 +2,8 @@
 (c) The University of Glasgow 2006
 -}
 
-{-# LANGUAGE RankNTypes, CPP, MultiWayIf, FlexibleContexts #-}
+{-# LANGUAGE RankNTypes, CPP, MultiWayIf, FlexibleContexts, BangPatterns,
+             ScopedTypeVariables #-}
 
 -- | Module for (a) type kinds and (b) type coercions,
 -- as used in System FC. See 'CoreSyn.Expr' for
@@ -29,7 +30,7 @@ module Coercion (
         mkAxInstRHS, mkUnbranchedAxInstRHS,
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
-        mkSymCo, mkTransCo,
+        mkSymCo, mkTransCo, mkTransMCo,
         mkNthCo, nthCoRole, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos,
@@ -106,7 +107,9 @@ module Coercion (
         tidyCo, tidyCos,
 
         -- * Other
-        promoteCoercion, buildCoercion
+        promoteCoercion, buildCoercion,
+
+        simplifyArgsWorker
        ) where
 
 #include "HsVersions.h"
@@ -978,6 +981,12 @@ mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
 mkTransCo co1 co2                 = TransCo co1 co2
 
+-- | Compose two MCoercions via transitivity
+mkTransMCo :: MCoercion -> MCoercion -> MCoercion
+mkTransMCo MRefl     co2       = co2
+mkTransMCo co1       MRefl     = co1
+mkTransMCo (MCo co1) (MCo co2) = MCo (mkTransCo co1 co2)
+
 mkNthCo :: HasDebugCallStack
         => Role  -- The role of the coercion you're creating
         -> Int   -- Zero-indexed
@@ -1137,7 +1146,7 @@ mkGReflLeftCo r ty co
     -- instead of @isReflCo@
   | otherwise    = mkSymCo $ GRefl r ty (MCo co)
 
--- | Given @ty :: k1@, @co :: k1 ~ k2@, @co2:: ty ~ ty'@,
+-- | Given @ty :: k1@, @co :: k1 ~ k2@, @co2:: ty ~r ty'@,
 -- produces @co' :: (ty |> co) ~r ty'
 -- It is not only a utility function, but it saves allocation when co
 -- is a GRefl coercion.
@@ -1146,7 +1155,7 @@ mkCoherenceLeftCo r ty co co2
   | isGReflCo co = co2
   | otherwise = (mkSymCo $ GRefl r ty (MCo co)) `mkTransCo` co2
 
--- | Given @ty :: k1@, @co :: k1 ~ k2@, @co2:: ty' ~ ty@,
+-- | Given @ty :: k1@, @co :: k1 ~ k2@, @co2:: ty' ~r ty@,
 -- produces @co' :: ty' ~r (ty |> co)
 -- It is not only a utility function, but it saves allocation when co
 -- is a GRefl coercion.
@@ -2426,3 +2435,382 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
     go ty1 ty2
       = pprPanic "buildKindCoercion" (vcat [ ppr orig_ty1, ppr orig_ty2
                                            , ppr ty1, ppr ty2 ])
+
+{-
+%************************************************************************
+%*                                                                      *
+       Simplifying types
+%*                                                                      *
+%************************************************************************
+
+The function below morally belongs in TcFlatten, but it is used also in
+FamInstEnv, and so lives here.
+
+Note [simplifyArgsWorker]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Invariant (F2) of Note [Flattening] says that flattening is homogeneous.
+This causes some trouble when flattening a function applied to a telescope
+of arguments, perhaps with dependency. For example, suppose
+
+  type family F :: forall (j :: Type) (k :: Type). Maybe j -> Either j k -> Bool -> [k]
+
+and we wish to flatten the args of (with kind applications explicit)
+
+  F a b (Just a c) (Right a b d) False
+
+where all variables are skolems and
+
+  a :: Type
+  b :: Type
+  c :: a
+  d :: k
+
+  [G] aco :: a ~ fa
+  [G] bco :: b ~ fb
+  [G] cco :: c ~ fc
+  [G] dco :: d ~ fd
+
+The first step is to flatten all the arguments. This is done before calling
+simplifyArgsWorker. We start from
+
+  a
+  b
+  Just a c
+  Right a b d
+  False
+
+and get
+
+  (fa,                             co1 :: fa ~ a)
+  (fb,                             co2 :: fb ~ b)
+  (Just fa (fc |> aco) |> co6,     co3 :: (Just fa (fc |> aco) |> co6) ~ (Just a c))
+  (Right fa fb (fd |> bco) |> co7, co4 :: (Right fa fb (fd |> bco) |> co7) ~ (Right a b d))
+  (False,                          co5 :: False ~ False)
+
+where
+  co6 :: Maybe fa ~ Maybe a
+  co7 :: Either fa fb ~ Either a b
+
+We now process the flattened args in left-to-right order. The first two args
+need no further processing. But now consider the third argument. Let f3 = the flattened
+result, Just fa (fc |> aco) |> co6.
+This f3 flattened argument has kind (Maybe a), due to
+(F2). And yet, when we build the application (F fa fb ...), we need this
+argument to have kind (Maybe fa), not (Maybe a). We must cast this argument.
+The coercion to use is
+determined by the kind of F: we see in F's kind that the third argument has
+kind Maybe j. Critically, we also know that the argument corresponding to j
+(in our example, a) flattened with a coercion co1. We can thus know the
+coercion needed for the 3rd argument is (Maybe (sym co1)), thus building
+(f3 |> Maybe (sym co1))
+
+More generally, we must use the Lifting Lemma, as implemented in
+Coercion.liftCoSubst. As we work left-to-right, any variable that is a
+dependent parameter (j and k, in our example) gets mapped in a lifting context
+to the coercion that is output from flattening the corresponding argument (co1
+and co2, in our example). Then, after flattening later arguments, we lift the
+kind of these arguments in the lifting context that we've be building up.
+This coercion is then used to keep the result of flattening well-kinded.
+
+Working through our example, this is what happens:
+
+  1. Extend the (empty) LC with [j |-> co1]. No new casting must be done,
+     because the binder associated with the first argument has a closed type (no
+     variables).
+
+  2. Extend the LC with [k |-> co2]. No casting to do.
+
+  3. Lifting the kind (Maybe j) with our LC
+     yields co8 :: Maybe fa ~ Maybe a. Use (f3 |> sym co8) as the argument to
+     F.
+
+  4. Lifting the kind (Either j k) with our LC
+     yields co9 :: Either fa fb ~ Either a b. Use (f4 |> sym co9) as the 4th
+     argument to F, where f4 is the flattened form of argument 4, written above.
+
+  5. We lift Bool with our LC, getting <Bool>;
+     casting has no effect.
+
+We're now almost done, but the new application (F fa fb (f3 |> sym co8) (f4 > sym co9) False)
+has the wrong kind. Its kind is [fb], instead of the original [b].
+So we must use our LC one last time to lift the result kind [k],
+getting res_co :: [fb] ~ [b], and we cast our result.
+
+Accordingly, the final result is
+
+  F fa fb (Just fa (fc |> aco) |> Maybe (sym aco) |> sym (Maybe (sym aco)))
+          (Right fa fb (fd |> bco) |> Either (sym aco) (sym bco) |> sym (Either (sym aco) (sym bco)))
+          False
+            |> [sym bco]
+
+The res_co (in this case, [sym bco])
+is returned as the third return value from simplifyArgsWorker.
+
+Note [Last case in simplifyArgsWorker]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In writing simplifyArgsWorker's `go`, we know here that args cannot be empty,
+because that case is first. We've run out of
+binders. But perhaps inner_ki is a tyvar that has been instantiated with a
+Π-type.
+
+Here is an example.
+
+  a :: forall (k :: Type). k -> k
+  type family Star
+  Proxy :: forall j. j -> Type
+  axStar :: Star ~ Type
+  type family NoWay :: Bool
+  axNoWay :: NoWay ~ False
+  bo :: Type
+  [G] bc :: bo ~ Bool   (in inert set)
+
+  co :: (forall j. j -> Type) ~ (forall (j :: Star). (j |> axStar) -> Star)
+  co = forall (j :: sym axStar). (<j> -> sym axStar)
+
+  We are flattening:
+  a (forall (j :: Star). (j |> axStar) -> Star)   -- 1
+    (Proxy |> co)                                 -- 2
+    (bo |> sym axStar)                            -- 3
+    (NoWay |> sym bc)                             -- 4
+      :: Star
+
+First, we flatten all the arguments (before simplifyArgsWorker), like so:
+
+    (forall j. j -> Type, co1 :: (forall j. j -> Type) ~
+                                 (forall (j :: Star). (j |> axStar) -> Star))  -- 1
+    (Proxy |> co,         co2 :: (Proxy |> co) ~ (Proxy |> co))                -- 2
+    (Bool |> sym axStar,  co3 :: (Bool |> sym axStar) ~ (bo |> sym axStar))    -- 3
+    (False |> sym bc,     co4 :: (False |> sym bc) ~ (NoWay |> sym bc))        -- 4
+
+Then we do the process described in Note [simplifyArgsWorker].
+
+1. Lifting Type (the kind of the first arg) gives us a reflexive coercion, so we
+   don't use it. But we do build a lifting context [k -> co1] (where co1 is a
+   result of flattening an argument, written above).
+
+2. Lifting k gives us co1, so the second argument becomes (Proxy |> co |> sym co1).
+   This is not a dependent argument, so we don't extend the lifting context.
+
+Now we need to deal with argument (3). After flattening, should we tack on a homogenizing
+coercion? The way we normally tell is to lift the kind of the binder.
+But here, the remainder of the kind of `a` that we're left with
+after processing two arguments is just `k`.
+
+The way forward is look up k in the lifting context, getting co1. If we're at
+all well-typed, co1 will be a coercion between Π-types, with at least one binder.
+So, let's
+decompose co1 with decomposePiCos. This decomposition needs arguments to use
+to instantiate any kind parameters. Look at the type of co1. If we just
+decomposed it, we would end up with coercions whose types include j, which is
+out of scope here. Accordingly, decomposePiCos takes a list of types whose
+kinds are the *right-hand* types in the decomposed coercion. (See comments on
+decomposePiCos.) Because the flattened types have unflattened kinds (because
+flattening is homogeneous), passing the list of flattened types to decomposePiCos
+just won't do: later arguments' kinds won't be as expected. So we need to get
+the *unflattened* types to pass to decomposePiCos. We can do this easily enough
+by taking the kind of the argument coercions, passed in originally.
+
+(Alternative 1: We could re-engineer decomposePiCos to deal with this situation.
+But that function is already gnarly, and taking the right-hand types is correct
+at its other call sites, which are much more common than this one.)
+
+(Alternative 2: We could avoid calling decomposePiCos entirely, integrating its
+behavior into simplifyArgsWorker. This would work, I think, but then all of the
+complication of decomposePiCos would end up layered on top of all the complication
+here. Please, no.)
+
+(Alternative 3: We could pass the unflattened arguments into simplifyArgsWorker
+so that we don't have to recreate them. But that would complicate the interface
+of this function to handle a very dark, dark corner case. Better to keep our
+demons to ourselves here instead of exposing them to callers. This decision is
+easily reversed if there is ever any performance trouble due to the call of
+coercionKind.)
+
+So we now call
+
+  decomposePiCos co1
+                 (Pair (forall j. j -> Type) (forall (j :: Star). (j |> axStar) -> Star))
+                 [bo |> sym axStar, NoWay |> sym bc]
+
+to get
+
+  co5 :: Star ~ Type
+  co6 :: (j |> axStar) ~ (j |> co5), substituted to
+                              (bo |> sym axStar |> axStar) ~ (bo |> sym axStar |> co5)
+                           == bo ~ bo
+  res_co :: Type ~ Star
+
+We then use these casts on (the flattened) (3) and (4) to get
+
+  (Bool |> sym axStar |> co5 :: Type)   -- (C3)
+  (False |> sym bc |> co6    :: bo)     -- (C4)
+
+We can simplify to
+
+  Bool                        -- (C3)
+  (False |> sym bc :: bo)     -- (C4)
+
+Of course, we still must do the processing in Note [simplifyArgsWorker] to finish
+the job. We thus want to recur. Our new function kind is the left-hand type of
+co1 (gotten, recall, by lifting the variable k that was the return kind of the
+original function). Why the left-hand type (as opposed to the right-hand type)?
+Because we have casted all the arguments according to decomposePiCos, which gets
+us from the right-hand type to the left-hand one. We thus recur with that new
+function kind, zapping our lifting context, because we have essentially applied
+it.
+
+This recursive call returns ([Bool, False], [...], Refl). The Bool and False
+are the correct arguments we wish to return. But we must be careful about the
+result coercion: our new, flattened application will have kind Type, but we
+want to make sure that the result coercion casts this back to Star. (Why?
+Because we started with an application of kind Star, and flattening is homogeneous.)
+
+So, we have to twiddle the result coercion appropriately.
+
+Let's check whether this is well-typed. We know
+
+  a :: forall (k :: Type). k -> k
+
+  a (forall j. j -> Type) :: (forall j. j -> Type) -> forall j. j -> Type
+
+  a (forall j. j -> Type)
+    Proxy
+      :: forall j. j -> Type
+
+  a (forall j. j -> Type)
+    Proxy
+    Bool
+      :: Bool -> Type
+
+  a (forall j. j -> Type)
+    Proxy
+    Bool
+    False
+      :: Type
+
+  a (forall j. j -> Type)
+    Proxy
+    Bool
+    False
+     |> res_co
+     :: Star
+
+as desired.
+
+Whew.
+
+-}
+
+
+-- This is shared between the flattener and the normaliser in FamInstEnv.
+-- See Note [simplifyArgsWorker]
+{-# INLINE simplifyArgsWorker #-}
+simplifyArgsWorker :: [TyCoBinder] -> Kind
+                       -- the binders & result kind (not a Π-type) of the function applied to the args
+                       -- list of binders can be shorter or longer than the list of args
+                   -> TyCoVarSet   -- free vars of the args
+                   -> [Role]   -- list of roles, r
+                   -> [(Type, Coercion)] -- flattened type arguments, arg
+                                         -- each comes with the coercion used to flatten it,
+                                         -- with co :: flattened_type ~ original_type
+                   -> ([Type], [Coercion], CoercionN)
+-- Returns (xis, cos, res_co), where each co :: xi ~ arg,
+-- and res_co :: kind (f xis) ~ kind (f tys), where f is the function applied to the args
+-- Precondition: if f :: forall bndrs. inner_ki (where bndrs and inner_ki are passed in),
+-- then (f orig_tys) is well kinded. Note that (f flattened_tys) might *not* be well-kinded.
+-- Massaging the flattened_tys in order to make (f flattened_tys) well-kinded is what this
+-- function is all about. That is, (f xis), where xis are the returned arguments, *is*
+-- well kinded.
+simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
+                   orig_roles orig_simplified_args
+  = go [] [] orig_lc orig_ki_binders orig_inner_ki orig_roles orig_simplified_args
+  where
+    orig_lc = emptyLiftingContext $ mkInScopeSet $ orig_fvs
+
+    go :: [Type]      -- Xis accumulator, in reverse order
+       -> [Coercion]  -- Coercions accumulator, in reverse order
+                      -- These are in 1-to-1 correspondence
+       -> LiftingContext  -- mapping from tyvars to flattening coercions
+       -> [TyCoBinder]    -- Unsubsted binders of function's kind
+       -> Kind        -- Unsubsted result kind of function (not a Pi-type)
+       -> [Role]      -- Roles at which to flatten these ...
+       -> [(Type, Coercion)]  -- flattened arguments, with their flattening coercions
+       -> ([Type], [Coercion], CoercionN)
+    go acc_xis acc_cos lc binders inner_ki _ []
+      = (reverse acc_xis, reverse acc_cos, kind_co)
+      where
+        final_kind = mkTyCoPiTys binders inner_ki
+        kind_co = liftCoSubst Nominal lc final_kind
+
+    go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) ((xi,co):args)
+      = -- By Note [Flattening] in TcFlatten invariant (F2),
+         -- tcTypeKind(xi) = tcTypeKind(ty). But, it's possible that xi will be
+         -- used as an argument to a function whose kind is different, if
+         -- earlier arguments have been flattened to new types. We thus
+         -- need a coercion (kind_co :: old_kind ~ new_kind).
+         --
+         -- The bangs here have been observed to improve performance
+         -- significantly in optimized builds.
+         let kind_co = mkSymCo $
+               liftCoSubst Nominal lc (tyCoBinderType binder)
+             !casted_xi = xi `mkCastTy` kind_co
+             casted_co =  mkCoherenceLeftCo role xi kind_co co
+
+         -- now, extend the lifting context with the new binding
+             !new_lc | Just tv <- tyCoBinderVar_maybe binder
+                     = extendLiftingContextAndInScope lc tv casted_co
+                     | otherwise
+                     = lc
+         in
+         go (casted_xi : acc_xis)
+            (casted_co : acc_cos)
+            new_lc
+            binders
+            inner_ki
+            roles
+            args
+
+
+      -- See Note [Last case in simplifyArgsWorker]
+    go acc_xis acc_cos lc [] inner_ki roles args
+      | Just k   <- getTyVar_maybe inner_ki
+      , Just co1 <- liftCoSubstTyVar lc Nominal k
+      = let co1_kind              = coercionKind co1
+            unflattened_tys       = map (pSnd . coercionKind . snd) args
+            (arg_cos, res_co)     = decomposePiCos co1 co1_kind unflattened_tys
+            casted_args           = ASSERT2( equalLength args arg_cos
+                                           , ppr args $$ ppr arg_cos )
+                                    [ (casted_xi, casted_co)
+                                    | ((xi, co), arg_co, role) <- zip3 args arg_cos roles
+                                    , let casted_xi = xi `mkCastTy` arg_co
+                                          casted_co = mkCoherenceLeftCo role xi arg_co co ]
+               -- In general decomposePiCos can return fewer cos than tys,
+               -- but not here; because we're well typed, there will be enough
+               -- binders. Note that decomposePiCos does substitutions, so even
+               -- if the original substitution results in something ending with
+               -- ... -> k, that k will be substituted to perhaps reveal more
+               -- binders.
+            zapped_lc             = zapLiftingContext lc
+            Pair flattened_kind _ = co1_kind
+            (bndrs, new_inner)    = splitPiTys flattened_kind
+
+            (xis_out, cos_out, res_co_out)
+              = go acc_xis acc_cos zapped_lc bndrs new_inner roles casted_args
+        in
+        (xis_out, cos_out, res_co_out `mkTransCo` res_co)
+
+    go _ _ _ _ _ _ _ = panic
+        "simplifyArgsWorker wandered into deeper water than usual"
+           -- This debug information is commented out because leaving it in
+           -- causes a ~2% increase in allocations in T9872d.
+           -- That's independent of the analagous case in flatten_args_fast
+           -- in TcFlatten:
+           -- each of these causes a 2% increase on its own, so commenting them
+           -- both out gives a 4% decrease in T9872d.
+           {-
+
+             (vcat [ppr orig_binders,
+                    ppr orig_inner_ki,
+                    ppr (take 10 orig_roles), -- often infinite!
+                    ppr orig_tys])
+           -}
