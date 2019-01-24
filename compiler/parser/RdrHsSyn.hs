@@ -263,13 +263,13 @@ mkTyFamInstEqn bndrs lhs rhs
 mkDataFamInst :: SrcSpan
               -> NewOrData
               -> Maybe (Located CType)
-              -> Located ( Maybe (LHsContext GhcPs), Maybe [LHsTyVarBndr GhcPs]
-                         , LHsType GhcPs)
+              -> (Maybe ( LHsContext GhcPs), Maybe [LHsTyVarBndr GhcPs]
+                        , LHsType GhcPs)
               -> Maybe (LHsKind GhcPs)
               -> [LConDecl GhcPs]
               -> HsDeriving GhcPs
               -> P (LInstDecl GhcPs)
-mkDataFamInst loc new_or_data cType (dL->L _ (mcxt, bndrs, tycl_hdr))
+mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
               ksig data_cons maybe_deriv
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
