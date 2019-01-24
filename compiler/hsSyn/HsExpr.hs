@@ -2493,8 +2493,8 @@ data PendingTcSplice
 
 -- These only arise implicitly from type applications
 -- We can always persist types but we still have to properly do it.
--- The only thing we are going to lift are variables implicitly so directly
--- store Id here rather than a Type or LHsType.
+-- The structure is the same as `PendingTcSplice` but for types
+-- rather than terms.
 data PendingTcTySplice
   = PendingTcTySplice SplicePointName (LHsExpr GhcTc)
 
@@ -2559,7 +2559,12 @@ and a sixth, which arising implicitly from type applications:
   * Pending *type* splice e.g
         [|| id @a ||]
     We need to implicitly lift the |a| like we do for expressions. All types
-    can be lifted so we don't bother with any constraints or the like.
+    The type must be constrained by a `LiftT` constraint which is
+    solved automatically by the compiler. This is so that we definitely
+    know what a type is before splicing in an expression. We can
+    solve the constraint for all types which is why we do it
+    automatically. The only time when we fail is when there is a
+    variable which wouldn't be bound in the resulting program.
 
 It would be possible to eliminate HsRnBracketOut and use HsBracketOut for the
 output of the renamer. However, when pretty printing the output of the renamer,

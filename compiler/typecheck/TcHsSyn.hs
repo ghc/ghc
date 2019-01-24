@@ -776,7 +776,7 @@ zonkExpr env (HsTcBracketOut x body bs ts)
     zonk_b (PendingTcSplice n e) = do e' <- zonkLExpr env e
                                       return (PendingTcSplice n e')
 
-    zonk_t (PendingTcTySplice n e) = do e' <- return e
+    zonk_t (PendingTcTySplice n e) = do e' <- zonkLExpr env e
                                         return (PendingTcTySplice n e')
 
 zonkExpr env (HsSpliceE _ (HsSplicedT s)) =
