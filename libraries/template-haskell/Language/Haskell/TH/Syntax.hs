@@ -1666,6 +1666,7 @@ data Exp
                                        -- or constructor name.
   | LabelE String                      -- ^ @{ #x }@ ( Overloaded label )
   | ImplicitParamVarE String           -- ^ @{ ?x }@ ( Implicit parameter )
+  | BracketE Exp                        -- TH Bracket
   deriving( Show, Eq, Ord, Data, Generic )
 
 type FieldExp = (Name,Exp)

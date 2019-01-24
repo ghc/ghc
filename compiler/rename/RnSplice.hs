@@ -93,7 +93,7 @@ rnBracket e br_body
                pprPanic "rnBracket: Renaming bracket when running a splice"
                         (ppr e)
            ; Comp           -> return ()
-           ; Brack {}       -> failWithTc illegalBracket
+           ; Brack {}       -> return () --failWithTc illegalBracket
            }
 
          -- Brackets are desugared to code that mentions the TH package

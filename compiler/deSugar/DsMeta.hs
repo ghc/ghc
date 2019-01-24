@@ -1411,11 +1411,13 @@ repE (HsUnboundVar _ uv)   = do
                                occ   <- occNameLit (unboundVarOcc uv)
                                sname <- repNameS occ
                                repUnboundVar sname
-
+--repE (HsBracket _ (ExpBr _ e)) = repLE e >>= repBracket
+--repE (HsBracket _ e) = notHandled "brack" (ppr e)
+repE (HsRnBracketOut _ (ExpBr _ e) []) = repLE e >>= repBracket
 repE e@(HsCoreAnn {})      = notHandled "Core annotations" (ppr e)
 repE e@(HsSCC {})          = notHandled "Cost centres" (ppr e)
 repE e@(HsTickPragma {})   = notHandled "Tick Pragma" (ppr e)
-repE e                     = notHandled "Expression form" (ppr e)
+--repE e                     = notHandled "Expression form" (ppr e)
 
 -----------------------------------------------------------------------------
 -- Building representations of auxillary structures like Match, Clause, Stmt,
@@ -2169,6 +2171,9 @@ repSectionR (MkC x) (MkC y) = rep2 sectionRName [x,y]
 
 repImplicitParamVar :: Core String -> DsM (Core TH.ExpQ)
 repImplicitParamVar (MkC x) = rep2 implicitParamVarEName [x]
+
+repBracket :: Core TH.ExpQ -> DsM (Core TH.ExpQ)
+repBracket (MkC e) = rep2 brackEName [e]
 
 ------------ Right hand sides (guarded expressions) ----
 repGuarded :: Core [TH.Q (TH.Guard, TH.Exp)] -> DsM (Core TH.BodyQ)
