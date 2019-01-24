@@ -38,9 +38,7 @@ test('T10399',      [extra_files(['Test10399.hs']),
                      ignore_stderr], makefile_test, ['T10399'])
 test('T10313',      [extra_files(['Test10313.hs', 'stringSource.hs']),
                      ignore_stderr], makefile_test, ['T10313'])
-# Stricter tests from trac #16217 now causes this to fail. Will be fixed for trac #16212
-test('T11018',      [expect_broken(11018),
-                     extra_files(['Test11018.hs']),
+test('T11018',      [extra_files(['Test11018.hs']),
                      ignore_stderr], makefile_test, ['T11018'])
 test('bundle-export', [extra_files(['BundleExport.hs']),
                        ignore_stderr], makefile_test, ['bundle-export'])
