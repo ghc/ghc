@@ -66,10 +66,10 @@ libffiRules = forM_ [Stage1 ..] $ \stage -> do
             build $ target (libffiContext stage) (Make libffiPath) [] []
 
             -- Here we produce 'libffiDependencies'
-            hs <- liftIO $ getDirectoryFilesIO "" [libffiPath -/- "inst/include/*"]
+            hs <- liftIO $ getDirectoryFilesIO libffiPath ["inst/include/*"]
             forM_ hs $ \header -> do
                 let target = rtsPath -/- takeFileName header
-                copyFileUntracked header target
+                copyFileUntracked (libffiPath -/- header) target
                 produces [target]
 
             ways <- interpretInContext (libffiContext stage)
@@ -83,10 +83,11 @@ libffiRules = forM_ [Stage1 ..] $ \stage -> do
 
     fmap (libffiPath -/-) ["Makefile.in", "configure" ] &%> \[mkIn, _] -> do
         removeDirectory libffiPath
+        top <- topDirectory
         tarball <- unifyPath . fromSingleton "Exactly one LibFFI tarball is expected"
-               <$> getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
+               <$> getDirectoryFiles top ["libffi-tarballs/libffi*.tar.gz"]
 
-        need [tarball]
+        need [top -/- tarball]
         -- Go from 'libffi-3.99999+git20171002+77e130c.tar.gz' to 'libffi-3.99999'
         let libname = takeWhile (/= '+') $ takeFileName tarball
 
@@ -99,7 +100,6 @@ libffiRules = forM_ [Stage1 ..] $ \stage -> do
             -- And finally:
             removeFiles (path) [libname <//> "*"]
 
-        top <- topDirectory
         fixFile mkIn (fixLibffiMakefile top)
 
         files <- liftIO $ getDirectoryFilesIO "." [libffiPath <//> "*"]
