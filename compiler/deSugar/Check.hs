@@ -491,6 +491,10 @@ pmTopNormaliseType_maybe :: FamInstEnvs -> Bag EvVar -> Type
 -- Behaves exactly like `topNormaliseType_maybe`, but instead of returning a
 -- coercion, it returns useful information for issuing pattern matching
 -- warnings. See Note [Type normalisation for EmptyCase] for details.
+--
+-- NB: Normalisation can potentially change kinds, if the head of the type
+-- is a type family with a variable result kind. I (Richard E) can't think
+-- of a way to cause trouble here, though.
 pmTopNormaliseType_maybe env ty_cs typ
   = do (_, mb_typ') <- liftD $ initTcDsForSolver $ tcNormalise ty_cs typ
          -- Before proceeding, we chuck typ into the constraint solver, in case
@@ -536,7 +540,7 @@ pmTopNormaliseType_maybe env ty_cs typ
 
     tyFamStepper :: NormaliseStepper ([Type] -> [Type], [DataCon] -> [DataCon])
     tyFamStepper rec_nts tc tys  -- Try to step a type/data family
-      = let (_args_co, ntys) = normaliseTcArgs env Representational tc tys in
+      = let (_args_co, ntys, _res_co) = normaliseTcArgs env Representational tc tys in
           -- NB: It's OK to use normaliseTcArgs here instead of
           -- normalise_tc_args (which takes the LiftingContext described
           -- in Note [Normalising types]) because the reduceTyFamApp below
@@ -747,7 +751,7 @@ then
       type we get if we rewrite type families but not data families or
       newtypes.
   (b) dcs is the list of data constructors "skipped", every time we normalise a
-      newtype to it's core representation, we keep track of the source data
+      newtype to its core representation, we keep track of the source data
       constructor.
   (c) core_ty is the rewritten type. That is,
         pmTopNormaliseType_maybe env ty_cs ty = Just (src_ty, dcs, core_ty)
