@@ -209,6 +209,7 @@ pprExp i (StaticE e) = parensIf (i >= appPrec) $
 pprExp _ (UnboundVarE v) = pprName' Applied v
 pprExp _ (LabelE s) = text "#" <> text s
 pprExp _ (ImplicitParamVarE n) = text ('?' : n)
+pprExp i (BracketE e) = text "[|" <> pprExp i e <> text "|]"
 
 pprFields :: [(Name,Exp)] -> Doc
 pprFields = sep . punctuate comma . map (\(s,e) -> ppr s <+> equals <+> ppr e)

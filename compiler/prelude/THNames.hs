@@ -56,7 +56,7 @@ templateHaskellNames = [
     condEName, multiIfEName, letEName, caseEName, doEName, mdoEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
     listEName, sigEName, recConEName, recUpdEName, staticEName, unboundVarEName,
-    labelEName, implicitParamVarEName,
+    labelEName, implicitParamVarEName, brackEName,
     -- FieldExp
     fieldExpName,
     -- Body
@@ -277,7 +277,7 @@ varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
     sectionLName, sectionRName, lamEName, lamCaseEName, tupEName,
     unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
     caseEName, doEName, mdoEName, compEName, staticEName, unboundVarEName,
-    labelEName, implicitParamVarEName :: Name
+    labelEName, implicitParamVarEName, brackEName :: Name
 varEName              = libFun (fsLit "varE")              varEIdKey
 conEName              = libFun (fsLit "conE")              conEIdKey
 litEName              = libFun (fsLit "litE")              litEIdKey
@@ -315,6 +315,7 @@ staticEName           = libFun (fsLit "staticE")           staticEIdKey
 unboundVarEName       = libFun (fsLit "unboundVarE")       unboundVarEIdKey
 labelEName            = libFun (fsLit "labelE")            labelEIdKey
 implicitParamVarEName = libFun (fsLit "implicitParamVarE") implicitParamVarEIdKey
+brackEName            = libFun (fsLit "brackE")            brackEKey
 
 -- type FieldExp = ...
 fieldExpName :: Name
@@ -800,7 +801,7 @@ varEIdKey, conEIdKey, litEIdKey, appEIdKey, appTypeEIdKey, infixEIdKey,
     letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey,
-    unboundVarEIdKey, labelEIdKey, implicitParamVarEIdKey, mdoEIdKey :: Unique
+    unboundVarEIdKey, labelEIdKey, implicitParamVarEIdKey, mdoEIdKey, brackEKey :: Unique
 varEIdKey              = mkPreludeMiscIdUnique 270
 conEIdKey              = mkPreludeMiscIdUnique 271
 litEIdKey              = mkPreludeMiscIdUnique 272
@@ -834,6 +835,7 @@ unboundVarEIdKey       = mkPreludeMiscIdUnique 299
 labelEIdKey            = mkPreludeMiscIdUnique 300
 implicitParamVarEIdKey = mkPreludeMiscIdUnique 301
 mdoEIdKey              = mkPreludeMiscIdUnique 302
+brackEKey              = mkPreludeMiscIdUnique 303
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique
