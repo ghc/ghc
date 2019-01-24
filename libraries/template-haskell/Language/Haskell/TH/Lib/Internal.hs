@@ -950,9 +950,6 @@ thisModule = do
 class LiftT (t :: k) where
   liftTyCl :: Q Type
 
-liftTy :: forall t . Q Type
-liftTy = undefined
-
 liftTyRep :: TypeRep a -> Q Type
 liftTyRep tr = case tr of
                  App t1 t2 -> appT (liftTyRep t1) (liftTyRep t2)
