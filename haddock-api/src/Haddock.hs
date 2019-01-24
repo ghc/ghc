@@ -467,8 +467,7 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
   -- We disable pattern match warnings because than can be very
   -- expensive to check
   let dynflags'' = unsetPatternMatchWarnings $
-        updOptLevel 0 $
-        gopt_unset dynflags' Opt_SplitObjs
+        updOptLevel 0 dynflags'
   -- ignore the following return-value, which is a list of packages
   -- that may need to be re-linked: Haddock doesn't do any
   -- dynamic or static linking at all!
