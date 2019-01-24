@@ -949,11 +949,3 @@ thisModule = do
 
 class LiftT (t :: k) where
   liftTyCl :: Q Type
-
-liftTyRep :: TypeRep a -> Q Type
-liftTyRep tr = case tr of
-                 App t1 t2 -> appT (liftTyRep t1) (liftTyRep t2)
-                 Con tc    -> conT (mkNameG_tc (tyConPackage tc)
-                                              (tyConModule tc)
-                                              (tyConName tc))
-                 Fun t1 t2 -> arrowT `appT` liftTyRep t1 `appT` liftTyRep t2

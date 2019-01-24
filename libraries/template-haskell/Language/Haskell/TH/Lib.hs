@@ -122,7 +122,7 @@ module Language.Haskell.TH.Lib (
 
 
     -- ** Lifting types
-    liftTy, liftTyRep
+    LiftT(..)
    ) where
 
 import Language.Haskell.TH.Lib.Internal hiding
