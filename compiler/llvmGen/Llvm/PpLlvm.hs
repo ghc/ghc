@@ -175,7 +175,8 @@ ppLlvmFunctionDecl (LlvmFunctionDecl n l c r varg p a)
         args = hcat $ intersperse (comma <> space) $
                   map (\(t,a) -> ppr t <+> ppSpaceJoin a) p
     in text "declare" <+> ppr l <+> ppr c <+> ppr r <+> char '@' <>
-        ftext n <> lparen <> args <> ptext varg' <> rparen <> align $+$ newLine
+        ftext n <> lparen <> args <> ptext varg' <> rparen <>
+        text "unnamed_addr" <+> align $+$ newLine
 
 
 -- | Print out a list of LLVM blocks.
