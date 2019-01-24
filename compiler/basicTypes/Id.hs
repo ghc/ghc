@@ -66,7 +66,9 @@ module Id (
         isClassOpId_maybe, isDFunId,
         isPrimOpId, isPrimOpId_maybe,
         isFCallId, isFCallId_maybe,
-        isDataConWorkId, isDataConWorkId_maybe, isDataConWrapId, isDataConId_maybe,
+        isDataConWorkId, isDataConWorkId_maybe,
+        isDataConWrapId, isDataConWrapId_maybe,
+        isDataConId_maybe,
         idDataCon,
         isConLikeId, isBottomingId, idIsFrom,
         hasNoBinding,
@@ -427,6 +429,7 @@ isClassOpId_maybe       :: Id -> Maybe Class
 isPrimOpId_maybe        :: Id -> Maybe PrimOp
 isFCallId_maybe         :: Id -> Maybe ForeignCall
 isDataConWorkId_maybe   :: Id -> Maybe DataCon
+isDataConWrapId_maybe   :: Id -> Maybe DataCon
 
 isRecordSelector id = case Var.idDetails id of
                         RecSelId {}     -> True
@@ -479,6 +482,10 @@ isDataConWorkId_maybe id = case Var.idDetails id of
 isDataConWrapId id = case Var.idDetails id of
                        DataConWrapId _ -> True
                        _               -> False
+
+isDataConWrapId_maybe id = case Var.idDetails id of
+                        DataConWrapId con -> Just con
+                        _                 -> Nothing
 
 isDataConId_maybe :: Id -> Maybe DataCon
 isDataConId_maybe id = case Var.idDetails id of
