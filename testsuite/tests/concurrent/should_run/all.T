@@ -196,6 +196,8 @@ test('conc036', skip, compile_and_run, [''])
 # Interrupting foreign calls only makes sense if we are threaded
 test('foreignInterruptible', [when(fast(), skip),
                               when(opsys('mingw32'),expect_fail),
+                              # Fragile in unregisterised way; see #15467.
+                              when(unregisterised(), skip),
                               # I don't think we support interrupting Sleep()
                               # on Windows.  --SDM
                               only_threaded_ways,
