@@ -60,7 +60,7 @@ import CoreFVs    ( orphNamesOfFamInst )
 import TyCon
 import Type             hiding( typeKind )
 import RepType
-import TcType           hiding( typeKind )
+import TcType
 import Var
 import Id
 import Name             hiding ( varName )

@@ -50,7 +50,7 @@ module TyCon(
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
         isUnboxedSumTyCon, isPromotedTupleTyCon,
         isTypeSynonymTyCon,
-        mightBeUnsaturatedTyCon,
+        mustBeSaturated,
         isPromotedDataCon, isPromotedDataCon_maybe,
         isKindTyCon, isLiftedTypeKindTyConName,
         isTauTyCon, isFamFreeTyCon,
@@ -69,7 +69,8 @@ module TyCon(
         isTyConAssoc, tyConAssoc_maybe, tyConFlavourAssoc_maybe,
         isImplicitTyCon,
         isTyConWithSrcDataCons,
-        isTcTyCon, isTcLevPoly,
+        isTcTyCon, setTcTyConKind,
+        isTcLevPoly,
 
         -- ** Extracting information out of TyCons
         tyConName,
@@ -108,7 +109,7 @@ module TyCon(
         pprPromotionQuote, mkTyConKind,
 
         -- ** Predicated on TyConFlavours
-        tcFlavourCanBeUnsaturated, tcFlavourIsOpen,
+        tcFlavourIsOpen,
 
         -- * Runtime type representation
         TyConRepName, tyConRepName_maybe,
@@ -1930,11 +1931,11 @@ isFamFreeTyCon _                                          = True
 --            (T ~N d), (a ~N e) and (b ~N f)?
 -- Specifically NOT true of synonyms (open and otherwise)
 --
--- It'd be unusual to call mightBeUnsaturatedTyCon on a regular H98
+-- It'd be unusual to call mustBeSaturated on a regular H98
 -- type synonym, because you should probably have expanded it first
 -- But regardless, it's not decomposable
-mightBeUnsaturatedTyCon :: TyCon -> Bool
-mightBeUnsaturatedTyCon = tcFlavourCanBeUnsaturated . tyConFlavour
+mustBeSaturated :: TyCon -> Bool
+mustBeSaturated = tcFlavourMustBeSaturated . tyConFlavour
 
 -- | Is this an algebraic 'TyCon' declared with the GADT syntax?
 isGadtSyntaxTyCon :: TyCon -> Bool
@@ -2130,6 +2131,14 @@ tyConCType_maybe _ = Nothing
 isTcTyCon :: TyCon -> Bool
 isTcTyCon (TcTyCon {}) = True
 isTcTyCon _            = False
+
+setTcTyConKind :: TyCon -> Kind -> TyCon
+-- Update the Kind of a TcTyCon
+-- The new kind is always a zonked version of its previous
+-- kind, so we don't need to update any other fields.
+-- See Note [The Purely Kinded Invariant] in TcHsType
+setTcTyConKind tc@(TcTyCon {}) kind = tc { tyConKind = kind }
+setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)
 
 -- | Could this TyCon ever be levity-polymorphic when fully applied?
 -- True is safe. False means we're sure. Does only a quick check
@@ -2504,19 +2513,19 @@ tyConFlavour (PromotedDataCon {}) = PromotedDataConFlavour
 tyConFlavour (TcTyCon { tcTyConFlavour = flav }) = flav
 
 -- | Can this flavour of 'TyCon' appear unsaturated?
-tcFlavourCanBeUnsaturated :: TyConFlavour -> Bool
-tcFlavourCanBeUnsaturated ClassFlavour            = True
-tcFlavourCanBeUnsaturated DataTypeFlavour         = True
-tcFlavourCanBeUnsaturated NewtypeFlavour          = True
-tcFlavourCanBeUnsaturated DataFamilyFlavour{}     = True
-tcFlavourCanBeUnsaturated TupleFlavour{}          = True
-tcFlavourCanBeUnsaturated SumFlavour              = True
-tcFlavourCanBeUnsaturated AbstractTypeFlavour     = True
-tcFlavourCanBeUnsaturated BuiltInTypeFlavour      = True
-tcFlavourCanBeUnsaturated PromotedDataConFlavour  = True
-tcFlavourCanBeUnsaturated TypeSynonymFlavour      = False
-tcFlavourCanBeUnsaturated OpenTypeFamilyFlavour{} = False
-tcFlavourCanBeUnsaturated ClosedTypeFamilyFlavour = False
+tcFlavourMustBeSaturated :: TyConFlavour -> Bool
+tcFlavourMustBeSaturated ClassFlavour            = False
+tcFlavourMustBeSaturated DataTypeFlavour         = False
+tcFlavourMustBeSaturated NewtypeFlavour          = False
+tcFlavourMustBeSaturated DataFamilyFlavour{}     = False
+tcFlavourMustBeSaturated TupleFlavour{}          = False
+tcFlavourMustBeSaturated SumFlavour              = False
+tcFlavourMustBeSaturated AbstractTypeFlavour     = False
+tcFlavourMustBeSaturated BuiltInTypeFlavour      = False
+tcFlavourMustBeSaturated PromotedDataConFlavour  = False
+tcFlavourMustBeSaturated TypeSynonymFlavour      = True
+tcFlavourMustBeSaturated OpenTypeFamilyFlavour{} = True
+tcFlavourMustBeSaturated ClosedTypeFamilyFlavour = True
 
 -- | Is this flavour of 'TyCon' an open type family or a data family?
 tcFlavourIsOpen :: TyConFlavour -> Bool

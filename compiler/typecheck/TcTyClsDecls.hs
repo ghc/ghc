@@ -39,7 +39,6 @@ import {-# SOURCE #-} TcInstDcls( tcInstDecls1 )
 import TcDeriv (DerivInfo)
 import TcHsType
 import ClsInst( AssocInstInfo(..) )
-import Inst( tcInstTyBinders )
 import TcMType
 import TysWiredIn ( unitTy )
 import TcType
@@ -1742,7 +1741,7 @@ kcTyFamInstEqn tc_fam_tc
        ; discardResult $
          bindImplicitTKBndrs_Q_Tv imp_vars $
          bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
-         do { (_, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
+         do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsType hs_rhs_ty res_kind }
              -- Why "_Tv" here?  Consider (Trac #14066
              --  type family Bar x y where
@@ -1870,7 +1869,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
                   solveEqualities                              $
                   bindImplicitTKBndrs_Q_Skol imp_vars          $
                   bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
-                  do { (lhs_ty, rhs_kind) <- tc_lhs
+                  do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)
                      ; addConsistencyConstraints mb_clsinfo lhs_ty
@@ -1897,43 +1896,6 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
              -- have been solved before we attempt to unravel it
        ; traceTc "tcTyFamInstEqnGuts }" (ppr fam_tc <+> pprTyVars qtvs)
        ; return (qtvs, pats, rhs_ty) }
-  where
-    tc_lhs | null hs_pats  -- See Note [Apparently-nullary families]
-           = do { (args, rhs_kind) <- tcInstTyBinders $
-                                      splitPiTysInvisibleN (tyConArity fam_tc)
-                                                           (tyConKind  fam_tc)
-                ; return (mkTyConApp fam_tc args, rhs_kind) }
-           | otherwise
-           = tcFamTyPats fam_tc hs_pats
-
-{- Note [Apparently-nullary families]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  type family F :: k -> *
-
-This really means
-  type family F @k :: k -> *
-
-That is, the family has arity 1, and can match on the kind. So it's
-not really a nullary family.   NB that
-  type famly F2 :: forall k. k -> *
-is quite different and really does have arity 0.
-
-Returning to F we might have
-  type instannce F = Maybe
-which instantaite 'k' to '*' and really means
-  type instannce F @* = Maybe
-
-Conclusion: in this odd case where there are no LHS patterns, we
-should instantiate any invisible foralls in F's kind, to saturate
-its arity (but no more).  This is what happens in tc_lhs in
-tcTyFamInstEqnGuts.
-
-If there are any visible patterns, then the first will force
-instantiation of any Inferred quantifiers for F -- remember,
-Inferred quantifiers always come first.
--}
-
 
 -----------------
 tcFamTyPats :: TyCon
@@ -1942,9 +1904,7 @@ tcFamTyPats :: TyCon
 -- Used for both type and data families
 tcFamTyPats fam_tc hs_pats
   = do { traceTc "tcFamTyPats {" $
-         vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
-              , text "arity:" <+> ppr fam_arity
-              , text "kind:" <+> ppr fam_kind ]
+         vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity ]
 
        ; let fun_ty = mkTyConApp fam_tc []
 
@@ -1952,18 +1912,15 @@ tcFamTyPats fam_tc hs_pats
                                 setXOptM LangExt.PartialTypeSignatures $
                                 -- See Note [Wildcards in family instances] in
                                 -- RnSource.hs
-                                tcInferApps typeLevelMode lhs_fun fun_ty
-                                            fam_kind hs_pats
+                                tcInferApps typeLevelMode lhs_fun fun_ty hs_pats
 
        ; traceTc "End tcFamTyPats }" $
-         vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
-              , text "res_kind:" <+> ppr res_kind ]
+         vcat [ ppr fam_tc, text "res_kind:" <+> ppr res_kind ]
 
        ; return (fam_app, res_kind) }
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    fam_kind  = tyConKind fam_tc
     lhs_fun   = noLoc (HsTyVar noExt NotPromoted (noLoc fam_name))
 
 unravelFamInstPats :: TcType -> [TcType]

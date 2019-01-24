@@ -790,7 +790,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
     inst_and_unify = do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
 
-                           -- if we haven't recurred through an arrow, then
+                           -- If we haven't recurred through an arrow, then
                            -- the eq_orig will list ty_actual. In this case,
                            -- we want to update the origin to reflect the
                            -- instantiation. If we *have* recurred through
@@ -1450,12 +1450,12 @@ uType t_or_k origin orig_ty1 orig_ty2
 
     go (AppTy s1 t1) (TyConApp tc2 ts2)
       | Just (ts2', t2') <- snocView ts2
-      = ASSERT( mightBeUnsaturatedTyCon tc2 )
+      = ASSERT( not (mustBeSaturated tc2) )
         go_app (isNextTyConArgVisible tc2 ts2') s1 t1 (TyConApp tc2 ts2') t2'
 
     go (TyConApp tc1 ts1) (AppTy s2 t2)
       | Just (ts1', t1') <- snocView ts1
-      = ASSERT( mightBeUnsaturatedTyCon tc1 )
+      = ASSERT( not (mustBeSaturated tc1) )
         go_app (isNextTyConArgVisible tc1 ts1') (TyConApp tc1 ts1') t1' s2 t2
 
     go (CoercionTy co1) (CoercionTy co2)
@@ -2019,37 +2019,43 @@ we return a made-up TcTyVarDetails, but I think it works smoothly.
 -}
 
 -- | Breaks apart a function kind into its pieces.
-matchExpectedFunKind :: Outputable fun
-                     => fun             -- ^ type, only for errors
-                     -> TcKind          -- ^ function kind
-                     -> TcM (Coercion, TcKind, TcKind)
-                                  -- ^ co :: old_kind ~ arg -> res
-matchExpectedFunKind hs_ty = go
-  where
-    go k | Just k' <- tcView k = go k'
+matchExpectedFunKind
+  :: Outputable fun
+  => fun             -- ^ type, only for errors
+  -> Arity           -- ^ n: number of desired arrows
+  -> TcKind          -- ^ fun_ kind
+  -> TcM Coercion    -- ^ co :: fun_kind ~ (arg1 -> ... -> argn -> res)
 
-    go k@(TyVarTy kvar)
+matchExpectedFunKind hs_ty n k = go n k
+  where
+    go 0 k = return (mkNomReflCo k)
+
+    go n k | Just k' <- tcView k = go n k'
+
+    go n k@(TyVarTy kvar)
       | isMetaTyVar kvar
       = do { maybe_kind <- readMetaTyVar kvar
            ; case maybe_kind of
-                Indirect fun_kind -> go fun_kind
-                Flexi ->             defer k }
+                Indirect fun_kind -> go n fun_kind
+                Flexi ->             defer n k }
 
-    go k@(FunTy arg res) = return (mkNomReflCo k, arg, res)
-    go other             = defer other
+    go n (FunTy arg res)
+      = do { co <- go (n-1) res
+           ; return (mkTcFunCo Nominal (mkTcNomReflCo arg) co) }
 
-    defer k
-      = do { arg_kind <- newMetaKindVar
-           ; res_kind <- newMetaKindVar
-           ; let new_fun = mkFunTy arg_kind res_kind
+    go n other
+     = defer n other
+
+    defer n k
+      = do { arg_kinds <- newMetaKindVars n
+           ; res_kind  <- newMetaKindVar
+           ; let new_fun = mkFunTys arg_kinds res_kind
                  origin  = TypeEqOrigin { uo_actual   = k
                                         , uo_expected = new_fun
                                         , uo_thing    = Just (ppr hs_ty)
                                         , uo_visible  = True
                                         }
-           ; co <- uType KindLevel origin k new_fun
-           ; return (co, arg_kind, res_kind) }
-
+           ; uType KindLevel origin k new_fun }
 
 {- *********************************************************************
 *                                                                      *

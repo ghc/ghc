@@ -313,7 +313,7 @@ import NameSet
 import RdrName
 import HsSyn
 import Type     hiding( typeKind )
-import TcType           hiding( typeKind )
+import TcType
 import Id
 import TysPrim          ( alphaTyVars )
 import TyCon

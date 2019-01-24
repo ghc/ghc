@@ -204,6 +204,7 @@ data ZonkEnv  -- See Note [The ZonkEnv]
             , ze_tv_env :: TyCoVarEnv TyCoVar
             , ze_id_env :: IdEnv      Id
             , ze_meta_tv_env :: TcRef (TyVarEnv Type) }
+
 {- Note [The ZonkEnv]
 ~~~~~~~~~~~~~~~~~~~~~
 * ze_flexi :: ZonkFlexi says what to do with a
