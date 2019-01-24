@@ -62,11 +62,11 @@ arityWorkerWrapper' name expr
   = let arity = manifestArity expr in
       case arity >= 1 && isId name of
         True ->
-          let ty = exprArityType arity (idType name) in
+          let fm = calledArityMap expr
+              ty = exprArityType arity (idType name) expr fm in
             do { uniq <- getUniqueM
                ; let wname  = mkWorkerId uniq name ty
                ; let worker = mkArityWorker name wname expr
-               ; let fm     = calledArityMap expr
                -- ; panic $ showSDocUnsafe (ppr (F.toList fm))
                -- ; panic $ showSDocUnsafe (ppr expr)
                ; wrapper <- mkArityWrapper fm name wname expr arity
@@ -146,27 +146,22 @@ fooWrapper :: (Int -> Int -> Int) -> Int
 fooWrapper f =
   let f' = \x1 x2 -> f x1 x2
   in fooWorker f'
-w
+
 The wrapper eta-expands all functions.
 -}
 
--- ^ As described in Note [Extensionality and Higher-Order Functions],
--- extentionalize returns the most extensional version of a type. This only
--- effects function types
+{-
+calledArityMap takes a core expression (meant to be the RHS of a top level
+binding) and returns a Map of binders to an arity. This map will be used for
+determining how much to etaExpand the higher-order functions used in
+mkArityWrapper.
 
--- TODO Coercions need an extensionalize function
-extensionalize :: Type -> Type
-extensionalize (TyVarTy v) = TyVarTy v
-extensionalize (AppTy a b) = AppTy (extensionalize a) (extensionalize b)
-extensionalize (TyConApp tc args) = TyConApp tc (map extensionalize args)
-extensionalize (ForAllTy tv a) = ForAllTy tv (extensionalize a)
-extensionalize (FunTy a b) = FunTildeTy (extensionalize a) (extensionalize b)
-extensionalize (FunTildeTy a b)
-  = FunTildeTy (extensionalize a) (extensionalize b)
-extensionalize (LitTy l) = LitTy l
-extensionalize (CastTy a kc) = CastTy (extensionalize a) kc
-extensionalize (CoercionTy c) = CoercionTy c
-
+foo :: (Int -> Int -> Int) -> Int
+foo f =
+  let x = f 1 2
+      y = f 2 in
+    x + y 3
+-}
 calledArityMap :: CoreExpr -> F.Map CoreBndr Arity
 calledArityMap e =
   case e of
@@ -204,6 +199,54 @@ calledArityMap e =
             True  -> x
             False -> y
 
+{-
+exprArityType creates the new type for an extensional function given the
+arity. We also need to consider higher-order functions. The type of a function
+argument can change based on the usage of the type in the body of the
+function. For example, consider the zipWith function.
+
+zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
+zipWith =
+  /\a -> /\b -> /\c -> \f -> \xs -> \ys ->
+    case as of
+      [] -> []
+      (x:xs') ->
+        case bs of
+          [] -> []
+          (y:ys') ->
+            (f x y) : zipWith f xs' ys'
+
+We know that zipWith has the type
+
+forall a b c. (a ~> b ~> c) ~> [a] ~> [b] ~> [c]
+
+because the function is only applied to two arguments in the body of the
+function.
+-}
+exprArityType :: Arity -> Type -> CoreExpr -> F.Map CoreBndr Arity -> Type
+exprArityType n (ForAllTy tv body_ty) (Lam _ expr) fm
+  = ForAllTy tv (exprArityType n body_ty expr fm)
+exprArityType 0 (FunTy arg res) (Lam bndr expr) fm
+  = FunTy (flatEtaType (F.findWithDefault 0 bndr fm) arg)
+          (exprArityType 0 res expr fm)
+exprArityType n (FunTy arg res) (Lam bndr expr) fm
+  = FunTildeTy (flatEtaType (F.findWithDefault 0 bndr fm) arg)
+               (exprArityType (n-1) res expr fm)
+exprArityType _ ty _ _ = ty
+
+-- ^ As described in Note [Extensionality and Higher-Order Functions],
+-- extentionalize returns the most extensional version of a type. This only
+-- effects function types
+
+-- TODO Coercions need an extensionalize function
+flatEtaType :: Arity -> Type -> Type
+flatEtaType n (ForAllTy tv body_ty) = ForAllTy tv (flatEtaType n body_ty)
+flatEtaType 0 (FunTy arg res) = FunTy arg (flatEtaType 0 res)
+flatEtaType n (FunTy arg res) = FunTildeTy arg (flatEtaType (n-1) res)
+flatEtaType _ ty = ty
+
+
+
 -- ^ Given an expression and it's name, generate a new expression with a
 -- tilde-lambda type. This is the exact same code, but we have encoded the arity
 -- in the type.
@@ -227,7 +270,10 @@ mkArityWrapper
   -> UniqSM (CoreBndr,CoreExpr)
 mkArityWrapper fm name wname expr arity
   = mkArityWrapper' fm expr arity wname [] >>= \expr' ->
-     return ( name , expr' )
+     let name' = setInlinePragma name alwaysInlinePragma in
+     -- let name' = name in
+       -- We will always inline the wrapper for call fusion
+       return ( name' , expr' )
 
 mkArityWrapper'
   :: F.Map CoreBndr Arity
@@ -239,9 +285,7 @@ mkArityWrapper'
 mkArityWrapper' fm (Lam b e) a w l =
   case isId b of
     True  ->
-      -- let expr = panic (showSDocUnsafe (ppr (idCallArity b))) in
       let expr = etaExpand (F.findWithDefault 0 b fm) (Var b) in
-      -- let expr = etaExpand undefined (Var b) in
         Lam b <$> mkArityWrapper' fm e (a-1) w (expr : l)
     False ->
       Lam b <$> mkArityWrapper' fm e a w (Type (TyVarTy b) : l)

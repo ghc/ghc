@@ -1038,6 +1038,10 @@ lintTyApp fun_ty arg_ty
   = failWithL (mkTyAppMsg fun_ty arg_ty)
 
 -----------------
+-- Tilde Types must appear fully applied
+lintValApps :: [CoreExpr] -> OutType -> [OutType] -> LintM OutType
+lintValApps = undefined
+
 lintValApp :: CoreExpr -> OutType -> OutType -> LintM OutType
 lintValApp arg fun_ty arg_ty
   | Just (arg,res) <- splitFunTy_maybe fun_ty
