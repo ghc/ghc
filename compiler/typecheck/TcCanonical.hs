@@ -873,9 +873,9 @@ can_eq_nc'
    -> TcS (StopOrContinue Ct)
 
 -- Expand synonyms first; see Note [Type synonyms and canonicalization]
-can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
-  | Just ty1' <- tcView ty1 = can_eq_nc flat ev eq_rel ty1' ps_ty1 ty2  ps_ty2
-  | Just ty2' <- tcView ty2 = can_eq_nc flat ev eq_rel ty1  ps_ty1 ty2' ps_ty2
+can_eq_nc' flat rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
+  | Just ty1' <- tcView ty1 = can_eq_nc' flat rdr_env envs ev eq_rel ty1' ps_ty1 ty2  ps_ty2
+  | Just ty2' <- tcView ty2 = can_eq_nc' flat rdr_env envs ev eq_rel ty1  ps_ty1 ty2' ps_ty2
 
 -- need to check for reflexivity in the ReprEq case.
 -- See Note [Eager reflexivity check]
@@ -1048,7 +1048,7 @@ can_eq_nc_forall ev eq_rel s1 s2
 -- | Compare types for equality, while zonking as necessary. Gives up
 -- as soon as it finds that two types are not equal.
 -- This is quite handy when some unification has made two
--- types in an inert wanted to be equal. We can discover the equality without
+-- types in an inert Wanted to be equal. We can discover the equality without
 -- flattening, which is sometimes very expensive (in the case of type functions).
 -- In particular, this function makes a ~20% improvement in test case
 -- perf/compiler/T5030.
@@ -1836,10 +1836,11 @@ canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
   | k1 `tcEqType` k2
   = canEqTyVarHomo ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
 
-         -- Note [Flattening] in TcFlatten gives us (F2), which says that
-         -- flattening is always homogeneous (doesn't change kinds). But
-         -- perhaps by flattening the kinds of the two sides of the equality
-         -- at hand makes them equal. So let's try that.
+  -- So the LHS and RHS don't have equal kinds
+  -- Note [Flattening] in TcFlatten gives us (F2), which says that
+  -- flattening is always homogeneous (doesn't change kinds). But
+  -- perhaps by flattening the kinds of the two sides of the equality
+  -- at hand makes them equal. So let's try that.
   | otherwise
   = do { (flat_k1, k1_co) <- flattenKind loc flav k1  -- k1_co :: flat_k1 ~N kind(xi1)
        ; (flat_k2, k2_co) <- flattenKind loc flav k2  -- k2_co :: flat_k2 ~N kind(xi2)
@@ -1852,7 +1853,7 @@ canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
                         , ppr flat_k2
                         , ppr k2_co ])
 
-         -- we know the LHS is a tyvar. So let's dump all the coercions on the RHS
+         -- We know the LHS is a tyvar. So let's dump all the coercions on the RHS
          -- If flat_k1 == flat_k2, let's dump all the coercions on the RHS and
          -- then call canEqTyVarHomo. If they don't equal, just rewriteEqEvidence
          -- (as an optimization, so that we don't have to flatten the kinds again)
@@ -1934,7 +1935,7 @@ canEqTyVarHetero ev eq_rel tv1 co1 ki1 ps_tv1 xi2 ki2 ps_xi2
 
   -- See Note [Equalities with incompatible kinds]
   | otherwise   -- Wanted and Derived
-                  -- NB: all kind equalities are Nominal
+                -- NB: all kind equalities are Nominal
   = do { emitNewDerivedEq kind_loc Nominal ki1 ki2
              -- kind_ev :: (ki1 :: *) ~ (ki2 :: *)
        ; traceTcS "Hetero equality gives rise to derived kind equality" $

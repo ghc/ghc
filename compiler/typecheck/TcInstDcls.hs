@@ -794,12 +794,17 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
                bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
-                    -- Ensure that the instance is consistent with its
-                    -- parent class
+
+                  -- Ensure that the instance is consistent
+                  -- with its parent class
                   ; addConsistencyConstraints mb_clsinfo lhs_ty
+
+                  -- Add constraints from the data constructors
                   ; mapM_ (wrapLocM_ kcConDecl) hs_cons
+
+                  -- Add constraints from the result signature
                   ; res_kind <- tc_kind_sig m_ksig
-                  ; lhs_ty <- checkExpectedKind YesSaturation pp_lhs lhs_ty lhs_kind res_kind
+                  ; lhs_ty <- checkExpectedKind_pp pp_lhs lhs_ty lhs_kind res_kind
                   ; return (stupid_theta, lhs_ty, res_kind) }
 
        -- See TcTyClsDecls Note [Generalising in tcFamTyPatsGuts]
@@ -894,7 +899,7 @@ There are several fiddly subtleties lurking here
   'k1' and 'k2', as well as 'b'.
 
   The skolemise bit is done in tc_kind_sig, while the instantiate bit
-  is done by the checkExpectedKind that immediately follows.
+  is done by tcFamTyPats.
 
 * Very fiddly point.  When we eta-reduce to
      axiom AxDrep forall a b. D [(a,b]] = Drep a b

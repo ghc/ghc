@@ -430,7 +430,7 @@ splitAppCo_maybe (TyConAppCo r tc args)
   , Just (args', arg') <- snocView args
   = Just ( mkTyConAppCo r tc args', arg' )
 
-  | mightBeUnsaturatedTyCon tc
+  | not (mustBeSaturated tc)
     -- Never create unsaturated type family apps!
   , Just (args', arg') <- snocView args
   , Just arg'' <- setNominalRole_maybe (nthRole r tc (length args')) arg'

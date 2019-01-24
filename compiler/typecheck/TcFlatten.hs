@@ -1329,8 +1329,7 @@ flatten_exact_fam_app_fully tc tys
   -- See Note [Reduce type family applications eagerly]
      -- the following tcTypeKind should never be evaluated, as it's just used in
      -- casting, and casts by refl are dropped
-  = do { let reduce_co = mkNomReflCo (tcTypeKind (mkTyConApp tc tys))
-       ; mOut <- try_to_reduce_nocache tc tys reduce_co id
+  = do { mOut <- try_to_reduce_nocache tc tys
        ; case mOut of
            Just out -> pure out
            Nothing -> do
@@ -1452,16 +1451,8 @@ flatten_exact_fam_app_fully tc tys
 
     try_to_reduce_nocache :: TyCon   -- F, family tycon
                           -> [Type]  -- args, not necessarily flattened
-                          -> CoercionN -- kind_co :: tcTypeKind(F args)
-                                       --            ~N tcTypeKind(F orig_args)
-                                       -- where
-                                       -- orig_args is what was passed to the
-                                       -- outer function
-                          -> (   Coercion     -- :: (xi |> kind_co) ~ F args
-                              -> Coercion )   -- what to return from outer
-                                              -- function
                           -> FlatM (Maybe (Xi, Coercion))
-    try_to_reduce_nocache tc tys kind_co update_co
+    try_to_reduce_nocache tc tys
       = do { checkStackDepth (mkTyConApp tc tys)
            ; mb_match <- liftTcS $ matchFam tc tys
            ; case mb_match of
@@ -1470,13 +1461,9 @@ flatten_exact_fam_app_fully tc tys
                Just (norm_co, norm_ty)
                  -> do { (xi, final_co) <- bumpDepth $ flatten_one norm_ty
                        ; eq_rel <- getEqRel
-                       ; let co  = maybeSubCo eq_rel norm_co
-                                    `mkTransCo` mkSymCo final_co
-                             role = eqRelRole eq_rel
-                             xi' = xi `mkCastTy` kind_co
-                             co' = update_co $
-                                   mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
-                       ; return $ Just (xi', co') }
+                       ; let co  = mkSymCo (maybeSubCo eq_rel norm_co
+                                            `mkTransCo` mkSymCo final_co)
+                       ; return $ Just (xi, co) }
                Nothing -> pure Nothing }
 
 {- Note [Reduce type family applications eagerly]

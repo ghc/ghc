@@ -46,7 +46,7 @@ module TcHsType (
 
         typeLevelMode, kindLevelMode,
 
-        kindGeneralize, checkExpectedKind, RequireSaturation(..),
+        kindGeneralize, checkExpectedKind_pp,
         reportFloatingKvs,
 
         -- Sort-checking kinds
@@ -76,9 +76,10 @@ import TcUnify
 import TcIface
 import TcSimplify
 import TcHsSyn
+import TyCoRep  ( Type(..) )
 import TcErrors ( reportAllUnsolved )
 import TcType
-import Inst   ( tcInstTyBinders, tcInstTyBinder )
+import Inst   ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
 import TyCoRep( TyCoBinder(..), tyCoBinderArgFlag )  -- Used in etaExpandAlgTyCon
 import Type
 import TysPrim
@@ -251,7 +252,7 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
 
        ; return (mkInvForAllTys kvs ty1) }
 
-tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type_and_gen"
+tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type"
 
 tcTopLHsType :: LHsSigType GhcRn -> ContextKind -> TcM Type
 -- tcTopLHsType is used for kind-checking top-level HsType where
@@ -291,7 +292,7 @@ tcHsDeriv hs_ty
                               -- with "illegal deriving", below
                tcTopLHsType hs_ty AnyKind
        ; let (tvs, pred)    = splitForAllTys ty
-             (kind_args, _) = splitFunTys (typeKind pred)
+             (kind_args, _) = splitFunTys (tcTypeKind pred)
        ; case getClassPredTys_maybe pred of
            Just (cls, tys) -> return (tvs, (cls, tys, kind_args))
            Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
@@ -402,8 +403,6 @@ and Note [The wildcard story for types] in HsTypes.hs
             The main kind checker: no validity checks here
 *                                                                      *
 ************************************************************************
-
-        First a couple of simple wrappers for kcHsType
 -}
 
 ---------------------------
@@ -431,11 +430,43 @@ tcLHsType ty = addTypeCtxt ty (tc_infer_lhs_type typeLevelMode ty)
 -- Like tcLHsType, but use it in a context where type synonyms and type families
 -- do not need to be saturated, like in a GHCi :kind call
 tcLHsTypeUnsaturated :: LHsType GhcRn -> TcM (TcType, TcKind)
-tcLHsTypeUnsaturated ty = addTypeCtxt ty (tc_infer_lhs_type mode ty)
-  where
-    mode = allowUnsaturated typeLevelMode
+tcLHsTypeUnsaturated hs_ty
+  | Just (hs_fun_ty, hs_args) <- splitHsAppTys (unLoc hs_ty)
+  = addTypeCtxt hs_ty $
+    do { (fun_ty, _ki) <- tcInferAppHead mode hs_fun_ty
+       ; tcInferApps_nosat mode hs_fun_ty fun_ty hs_args }
+         -- Notice the 'nosat'; do not instantiate trailing
+         -- invisible arguments of a type family.
+         -- See Note [Dealing with :kind]
 
-{-
+  | otherwise
+  = addTypeCtxt hs_ty $
+    tc_infer_lhs_type mode hs_ty
+
+  where
+    mode = typeLevelMode
+
+{- Note [Dealing with :kind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this GHCi command
+  ghci> type family F :: Either j k
+  ghci> :kind F
+  F :: forall {j,k}. Either j k
+
+We will only get the 'forall' if we /refrain/ from saturating those
+invisible binders. But generally we /do/ saturate those invisible
+binders (see tcInferApps), and we want to do so for nested application
+even in GHCi.  Consider for example (Trac #16287)
+  ghci> type family F :: k
+  ghci> data T :: (forall k. k) -> Type
+  ghci> :kind T F
+We want to reject this. It's just at the very top level that we want
+to switch off saturation.
+
+So tcLHsTypeUnsaturated does a little special case for top level
+applications.  Actually the common case is a bare variable, as above.
+
+
 ************************************************************************
 *                                                                      *
       Type-checking modes
@@ -450,38 +481,23 @@ concern things that the renamer can't handle.
 
 -}
 
--- | Do we require type families to be saturated?
-data RequireSaturation
-  = YesSaturation
-  | NoSaturation   -- e.g. during a call to GHCi's :kind
-
 -- | Info about the context in which we're checking a type. Currently,
 -- differentiates only between types and kinds, but this will likely
 -- grow, at least to include the distinction between patterns and
 -- not-patterns.
-data TcTyMode
-  = TcTyMode { mode_level :: TypeOrKind
-             , mode_sat   :: RequireSaturation
-             }
- -- The mode_unsat field is solely so that type families/synonyms can be unsaturated
- -- in GHCi :kind calls
+--
+-- To find out where the mode is used, search for 'mode_level'
+data TcTyMode = TcTyMode { mode_level :: TypeOrKind }
 
 typeLevelMode :: TcTyMode
-typeLevelMode = TcTyMode { mode_level = TypeLevel, mode_sat = YesSaturation }
+typeLevelMode = TcTyMode { mode_level = TypeLevel }
 
 kindLevelMode :: TcTyMode
-kindLevelMode = TcTyMode { mode_level = KindLevel, mode_sat = YesSaturation }
-
-allowUnsaturated :: TcTyMode -> TcTyMode
-allowUnsaturated mode = mode { mode_sat = NoSaturation }
+kindLevelMode = TcTyMode { mode_level = KindLevel }
 
 -- switch to kind level
 kindLevel :: TcTyMode -> TcTyMode
 kindLevel mode = mode { mode_level = KindLevel }
-
-instance Outputable RequireSaturation where
-  ppr YesSaturation = text "YesSaturation"
-  ppr NoSaturation  = text "NoSaturation"
 
 instance Outputable TcTyMode where
   ppr = ppr . mode_level
@@ -504,7 +520,7 @@ metavariable.
 In types, however, we're not so lucky, because *we cannot re-generalize*!
 There is no lambda. So, we must be careful only to instantiate at the last
 possible moment, when we're sure we're never going to want the lost polymorphism
-again. This is done in calls to tcInstTyBinders.
+again. This is done in calls to tcInstInvisibleTyBinders.
 
 To implement this behavior, we use bidirectional type checking, where we
 explicitly think about whether we know the kind of the type we're checking
@@ -531,37 +547,6 @@ But, we want to make sure that our pattern-matches are complete. So,
 we have a bunch of repetitive code just so that we get warnings if we're
 missing any patterns.
 
-Note [The tcType invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(IT1) If    tc_ty = tc_hs_type hs_ty exp_kind
-      then  tcTypeKind tc_ty = exp_kind
-without any zonking needed.  The reason for this is that in
-tcInferApps we see (F ty), and we kind-check 'ty' with an
-expected-kind coming from F.  Then, to make the resulting application
-well kinded --- see Note [The well-kinded type invariant] in TcType ---
-we need the kind-checked 'ty' to have exactly the kind that F expects,
-with no funny zonking nonsense in between.
-
-The tcType invariant also applies to checkExpectedKind:
-
-(IT2) if
-        (tc_ty, _, _) = checkExpectedKind ty act_ki exp_ki
-      then
-        tcTypeKind tc_ty = exp_ki
-
-These other invariants are all necessary, too, as these functions
-are used within tc_hs_type:
-
-(IT3) If (ty, ki) <- tc_infer_hs_type ..., then tcTypeKind ty == ki.
-
-(IT4) If (ty, ki) <- tc_infer_hs_type ..., then zonk ki == ki.
-      (In other words, the result kind of tc_infer_hs_type is zonked.)
-
-(IT5) If (ty, ki) <- tcTyVar ..., then tcTypeKind ty == ki.
-
-(IT6) If (ty, ki) <- tcTyVar ..., then zonk ki == ki.
-      (In other words, the result kind of tcTyVar is zonked.)
-
 -}
 
 ------------------------------------------
@@ -571,23 +556,27 @@ are used within tc_hs_type:
 tc_infer_lhs_type :: TcTyMode -> LHsType GhcRn -> TcM (TcType, TcKind)
 tc_infer_lhs_type mode (L span ty)
   = setSrcSpan span $
-    do { (ty', kind) <- tc_infer_hs_type mode ty
-       ; return (ty', kind) }
+    tc_infer_hs_type mode ty
 
+---------------------------
+-- | Call 'tc_infer_hs_type' and check its result against an expected kind.
+tc_infer_hs_type_ek :: HasDebugCallStack => TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
+tc_infer_hs_type_ek mode hs_ty ek
+  = do { (ty, k) <- tc_infer_hs_type mode hs_ty
+       ; checkExpectedKind hs_ty ty k ek }
+
+---------------------------
 -- | Infer the kind of a type and desugar. This is the "up" type-checker,
 -- as described in Note [Bidirectional type checking]
 tc_infer_hs_type :: TcTyMode -> HsType GhcRn -> TcM (TcType, TcKind)
-tc_infer_hs_type mode (HsParTy _ t)          = tc_infer_lhs_type mode t
-tc_infer_hs_type mode (HsTyVar _ _ (L _ tv)) = tcTyVar mode tv
 
-tc_infer_hs_type mode e@(HsAppTy {}) = tcTyApp mode e
-tc_infer_hs_type mode e@(HsAppKindTy {}) = tcTyApp mode e
+tc_infer_hs_type mode (HsParTy _ t)
+  = tc_infer_lhs_type mode t
 
-tc_infer_hs_type mode (HsOpTy _ lhs lhs_op@(L _ hs_op) rhs)
-  | not (hs_op `hasKey` funTyConKey)
-  = do { (op, op_kind) <- tcTyVar mode hs_op
-       ; tcTyApps mode (noLoc $ HsTyVar noExt NotPromoted lhs_op) op op_kind
-                       [HsValArg lhs, HsValArg rhs] }
+tc_infer_hs_type mode ty
+  | Just (hs_fun_ty, hs_args) <- splitHsAppTys ty
+  = do { (fun_ty, _ki) <- tcInferAppHead mode hs_fun_ty
+       ; tcInferApps mode hs_fun_ty fun_ty hs_args }
 
 tc_infer_hs_type mode (HsKindSig _ ty sig)
   = do { sig' <- tcLHsKindSig KindSigCtxt sig
@@ -610,8 +599,7 @@ tc_infer_hs_type mode (HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)))
 
 tc_infer_hs_type mode (HsDocTy _ ty _) = tc_infer_lhs_type mode ty
 tc_infer_hs_type _    (XHsType (NHsCoreTy ty))
-  = do { ty <- zonkTcType ty  -- (IT3) and (IT4) of Note [The tcType invariant]
-       ; return (ty, tcTypeKind ty) }
+  = return (ty, tcTypeKind ty)
 
 tc_infer_hs_type _ (HsExplicitListTy _ _ tys)
   | null tys  -- this is so that we can use visible kind application with '[]
@@ -631,25 +619,7 @@ tc_lhs_type mode (L span ty) exp_kind
     tc_hs_type mode ty exp_kind
 
 ------------------------------------------
-tc_fun_type :: TcTyMode -> LHsType GhcRn -> LHsType GhcRn -> TcKind
-            -> TcM TcType
-tc_fun_type mode ty1 ty2 exp_kind = case mode_level mode of
-  TypeLevel ->
-    do { arg_k <- newOpenTypeKind
-       ; res_k <- newOpenTypeKind
-       ; ty1' <- tc_lhs_type mode ty1 arg_k
-       ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; checkExpectedKindMode mode (ppr $ HsFunTy noExt ty1 ty2) (mkFunTy ty1' ty2')
-                           liftedTypeKind exp_kind }
-  KindLevel ->  -- no representation polymorphism in kinds. yet.
-    do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
-       ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
-       ; checkExpectedKindMode mode (ppr $ HsFunTy noExt ty1 ty2) (mkFunTy ty1' ty2')
-                           liftedTypeKind exp_kind }
-
-------------------------------------------
 tc_hs_type :: TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
--- See Note [The tcType invariant]
 -- See Note [Bidirectional type checking]
 
 tc_hs_type mode (HsParTy _ ty)   exp_kind = tc_lhs_type mode ty exp_kind
@@ -709,29 +679,30 @@ tc_hs_type mode forall@(HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_ki
 
        ; return (mkForAllTys bndrs ty') }
 
-tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = ty }) exp_kind
+tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
   | null (unLoc ctxt)
-  = tc_lhs_type mode ty exp_kind
+  = tc_lhs_type mode rn_ty exp_kind
+
+  -- See Note [Body kind of a HsQualTy]
+  | tcIsConstraintKind exp_kind
+  = do { ctxt' <- tc_hs_context mode ctxt
+       ; ty'   <- tc_lhs_type mode rn_ty constraintKind
+       ; return (mkPhiTy ctxt' ty') }
 
   | otherwise
   = do { ctxt' <- tc_hs_context mode ctxt
 
-         -- See Note [Body kind of a HsQualTy]
-       ; ty' <- if tcIsConstraintKind exp_kind
-                then tc_lhs_type mode ty constraintKind
-                else do { ek <- newOpenTypeKind
-                                -- The body kind (result of the function)
-                                -- can be TYPE r, for any r, hence newOpenTypeKind
-                        ; ty' <- tc_lhs_type mode ty ek
-                        ; checkExpectedKindMode mode (ppr ty) ty' liftedTypeKind exp_kind }
-
-       ; return (mkPhiTy ctxt' ty') }
+       ; ek <- newOpenTypeKind  -- The body kind (result of the function) can
+                                -- be TYPE r, for any r, hence newOpenTypeKind
+       ; ty' <- tc_lhs_type mode rn_ty ek
+       ; checkExpectedKind (unLoc rn_ty) (mkPhiTy ctxt' ty')
+                           liftedTypeKind exp_kind }
 
 --------- Lists, arrays, and tuples
 tc_hs_type mode rn_ty@(HsListTy _ elt_ty) exp_kind
   = do { tau_ty <- tc_lhs_type mode elt_ty liftedTypeKind
        ; checkWiredInTyCon listTyCon
-       ; checkExpectedKindMode mode (ppr rn_ty) (mkListTy tau_ty) liftedTypeKind exp_kind }
+       ; checkExpectedKind rn_ty (mkListTy tau_ty) liftedTypeKind exp_kind }
 
 -- See Note [Distinguishing tuple kinds] in HsTypes
 -- See Note [Inferring tuple kinds]
@@ -757,10 +728,10 @@ tc_hs_type mode rn_ty@(HsTupleTy _ HsBoxedOrConstraintTuple hs_tys) exp_kind
          -- In the [] case, it's not clear what the kind is, so guess *
 
        ; tys' <- sequence [ setSrcSpan loc $
-                            checkExpectedKindMode mode (ppr hs_ty) ty kind arg_kind
+                            checkExpectedKind hs_ty ty kind arg_kind
                           | ((L loc hs_ty),ty,kind) <- zip3 hs_tys tys kinds ]
 
-       ; finish_tuple rn_ty mode tup_sort tys' (map (const arg_kind) tys') exp_kind }
+       ; finish_tuple rn_ty tup_sort tys' (map (const arg_kind) tys') exp_kind }
 
 
 tc_hs_type mode rn_ty@(HsTupleTy _ hs_tup_sort tys) exp_kind
@@ -778,10 +749,9 @@ tc_hs_type mode rn_ty@(HsSumTy _ hs_tys) exp_kind
        ; tau_tys   <- zipWithM (tc_lhs_type mode) hs_tys arg_kinds
        ; let arg_reps = map kindRep arg_kinds
              arg_tys  = arg_reps ++ tau_tys
-       ; checkExpectedKindMode mode (ppr rn_ty)
-                           (mkTyConApp (sumTyCon arity) arg_tys)
-                           (unboxedSumKind arg_reps)
-                           exp_kind
+             sum_ty   = mkTyConApp (sumTyCon arity) arg_tys
+             sum_kind = unboxedSumKind arg_reps
+       ; checkExpectedKind rn_ty sum_ty sum_kind exp_kind
        }
 
 --------- Promoted lists and tuples
@@ -789,7 +759,7 @@ tc_hs_type mode rn_ty@(HsExplicitListTy _ _ tys) exp_kind
   = do { tks <- mapM (tc_infer_lhs_type mode) tys
        ; (taus', kind) <- unifyKinds tys tks
        ; let ty = (foldr (mk_cons kind) (mk_nil kind) taus')
-       ; checkExpectedKindMode mode (ppr rn_ty) ty (mkListTy kind) exp_kind }
+       ; checkExpectedKind rn_ty ty (mkListTy kind) exp_kind }
   where
     mk_cons k a b = mkTyConApp (promoteDataCon consDataCon) [k, a, b]
     mk_nil  k     = mkTyConApp (promoteDataCon nilDataCon) [k]
@@ -802,7 +772,7 @@ tc_hs_type mode rn_ty@(HsExplicitTupleTy _ tys) exp_kind
        ; let kind_con   = tupleTyCon           Boxed arity
              ty_con     = promotedTupleDataCon Boxed arity
              tup_k      = mkTyConApp kind_con ks
-       ; checkExpectedKindMode mode (ppr rn_ty) (mkTyConApp ty_con (ks ++ taus)) tup_k exp_kind }
+       ; checkExpectedKind rn_ty (mkTyConApp ty_con (ks ++ taus)) tup_k exp_kind }
   where
     arity = length tys
 
@@ -812,41 +782,53 @@ tc_hs_type mode rn_ty@(HsIParamTy _ (L _ n) ty) exp_kind
        ; ty' <- tc_lhs_type mode ty liftedTypeKind
        ; let n' = mkStrLitTy $ hsIPNameFS n
        ; ipClass <- tcLookupClass ipClassName
-       ; checkExpectedKindMode mode (ppr rn_ty) (mkClassPred ipClass [n',ty'])
-           constraintKind exp_kind }
+       ; checkExpectedKind rn_ty (mkClassPred ipClass [n',ty'])
+                           constraintKind exp_kind }
 
-tc_hs_type mode rn_ty@(HsStarTy _ _) exp_kind
+tc_hs_type _ rn_ty@(HsStarTy _ _) exp_kind
   -- Desugaring 'HsStarTy' to 'Data.Kind.Type' here means that we don't have to
   -- handle it in 'coreView' and 'tcView'.
-  = checkExpectedKindMode mode (ppr rn_ty) liftedTypeKind liftedTypeKind exp_kind
+  = checkExpectedKind rn_ty liftedTypeKind liftedTypeKind exp_kind
 
 --------- Literals
-tc_hs_type mode rn_ty@(HsTyLit _ (HsNumTy _ n)) exp_kind
+tc_hs_type _ rn_ty@(HsTyLit _ (HsNumTy _ n)) exp_kind
   = do { checkWiredInTyCon typeNatKindCon
-       ; checkExpectedKindMode mode (ppr rn_ty) (mkNumLitTy n) typeNatKind exp_kind }
+       ; checkExpectedKind rn_ty (mkNumLitTy n) typeNatKind exp_kind }
 
-tc_hs_type mode rn_ty@(HsTyLit _ (HsStrTy _ s)) exp_kind
+tc_hs_type _ rn_ty@(HsTyLit _ (HsStrTy _ s)) exp_kind
   = do { checkWiredInTyCon typeSymbolKindCon
-       ; checkExpectedKindMode mode (ppr rn_ty) (mkStrLitTy s) typeSymbolKind exp_kind }
+       ; checkExpectedKind rn_ty (mkStrLitTy s) typeSymbolKind exp_kind }
 
 --------- Potentially kind-polymorphic types: call the "up" checker
 -- See Note [Future-proofing the type checker]
-tc_hs_type mode ty@(HsTyVar {})   ek = tc_infer_hs_type_ek mode ty ek
-tc_hs_type mode ty@(HsAppTy {})   ek = tc_infer_hs_type_ek mode ty ek
-tc_hs_type mode ty@(HsAppKindTy{}) ek = tc_infer_hs_type_ek mode ty ek
-tc_hs_type mode ty@(HsOpTy {})    ek = tc_infer_hs_type_ek mode ty ek
-tc_hs_type mode ty@(HsKindSig {}) ek = tc_infer_hs_type_ek mode ty ek
+tc_hs_type mode ty@(HsTyVar {})            ek = tc_infer_hs_type_ek mode ty ek
+tc_hs_type mode ty@(HsAppTy {})            ek = tc_infer_hs_type_ek mode ty ek
+tc_hs_type mode ty@(HsAppKindTy{})         ek = tc_infer_hs_type_ek mode ty ek
+tc_hs_type mode ty@(HsOpTy {})             ek = tc_infer_hs_type_ek mode ty ek
+tc_hs_type mode ty@(HsKindSig {})          ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(XHsType (NHsCoreTy{})) ek = tc_infer_hs_type_ek mode ty ek
+tc_hs_type _    wc@(HsWildCardTy _)        ek = tcWildCardOcc wc ek
 
-tc_hs_type mode wc@(HsWildCardTy _) exp_kind
-  = do { wc_ty <- tcWildCardOcc mode wc exp_kind
-       ; return (mkNakedCastTy wc_ty (mkTcNomReflCo exp_kind))
-         -- Take care here! Even though the coercion is Refl,
-         -- we still need it to establish Note [The tcType invariant]
-       }
+------------------------------------------
+tc_fun_type :: TcTyMode -> LHsType GhcRn -> LHsType GhcRn -> TcKind
+            -> TcM TcType
+tc_fun_type mode ty1 ty2 exp_kind = case mode_level mode of
+  TypeLevel ->
+    do { arg_k <- newOpenTypeKind
+       ; res_k <- newOpenTypeKind
+       ; ty1' <- tc_lhs_type mode ty1 arg_k
+       ; ty2' <- tc_lhs_type mode ty2 res_k
+       ; checkExpectedKind (HsFunTy noExt ty1 ty2) (mkFunTy ty1' ty2')
+                           liftedTypeKind exp_kind }
+  KindLevel ->  -- no representation polymorphism in kinds. yet.
+    do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
+       ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
+       ; checkExpectedKind (HsFunTy noExt ty1 ty2) (mkFunTy ty1' ty2')
+                           liftedTypeKind exp_kind }
 
-tcWildCardOcc :: TcTyMode -> HsType GhcRn -> Kind -> TcM TcType
-tcWildCardOcc mode wc exp_kind
+---------------------------
+tcWildCardOcc :: HsType GhcRn -> Kind -> TcM TcType
+tcWildCardOcc wc exp_kind
   = do { wc_tv <- newWildTyVar
           -- The wildcard's kind should be an un-filled-in meta tyvar
        ; loc <- getSrcSpanM
@@ -857,7 +839,7 @@ tcWildCardOcc mode wc exp_kind
        -- See Note [Wildcards in visible kind application]
        ; unless (part_tysig && not warning)
              (emitWildCardHoleConstraints [(name,wc_tv)])
-       ; checkExpectedKindMode mode (ppr wc) (mkTyVarTy wc_tv)
+       ; checkExpectedKind wc (mkTyVarTy wc_tv)
                            (tyVarKind wc_tv) exp_kind }
 
 {- Note [Wildcards in visible kind application]
@@ -883,12 +865,12 @@ See related Note [Wildcards in visible type application] here and
 Note [The wildcard story for types] in HsTypes.hs
 
 -}
----------------------------
--- | Call 'tc_infer_hs_type' and check its result against an expected kind.
-tc_infer_hs_type_ek :: HasDebugCallStack => TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
-tc_infer_hs_type_ek mode hs_ty ek
-  = do { (ty, k) <- tc_infer_hs_type mode hs_ty
-       ; checkExpectedKindMode mode (ppr hs_ty) ty k ek }
+
+{- *********************************************************************
+*                                                                      *
+                Tuples
+*                                                                      *
+********************************************************************* -}
 
 ---------------------------
 tupKindSort_maybe :: TcKind -> Maybe TupleSort
@@ -906,18 +888,17 @@ tc_tuple rn_ty mode tup_sort tys exp_kind
            UnboxedTuple    -> mapM (\_ -> newOpenTypeKind) tys
            ConstraintTuple -> return (nOfThem arity constraintKind)
        ; tau_tys <- zipWithM (tc_lhs_type mode) tys arg_kinds
-       ; finish_tuple rn_ty mode tup_sort tau_tys arg_kinds exp_kind }
+       ; finish_tuple rn_ty tup_sort tau_tys arg_kinds exp_kind }
   where
     arity   = length tys
 
 finish_tuple :: HsType GhcRn
-             -> TcTyMode
              -> TupleSort
              -> [TcType]    -- ^ argument types
              -> [TcKind]    -- ^ of these kinds
              -> TcKind      -- ^ expected kind of the whole tuple
              -> TcM TcType
-finish_tuple rn_ty mode tup_sort tau_tys tau_kinds exp_kind
+finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind
   = do { traceTc "finish_tuple" (ppr res_kind $$ ppr tau_kinds $$ ppr exp_kind)
        ; let arg_tys  = case tup_sort of
                    -- See also Note [Unboxed tuple RuntimeRep vars] in TyCon
@@ -933,7 +914,7 @@ finish_tuple rn_ty mode tup_sort tau_tys tau_kinds exp_kind
                                ; checkWiredInTyCon tc
                                ; return tc }
            UnboxedTuple  -> return (tupleTyCon Unboxed arity)
-       ; checkExpectedKindMode mode (ppr rn_ty) (mkTyConApp tycon arg_tys) res_kind exp_kind }
+       ; checkExpectedKind rn_ty (mkTyConApp tycon arg_tys) res_kind exp_kind }
   where
     arity = length tau_tys
     tau_reps = map kindRep tau_kinds
@@ -948,6 +929,49 @@ bigConstraintTuple arity
           <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
        2 (text "Instead, use a nested tuple")
 
+
+{- *********************************************************************
+*                                                                      *
+                Type applications
+*                                                                      *
+********************************************************************* -}
+
+splitHsAppTys :: HsType GhcRn -> Maybe (LHsType GhcRn, [LHsTypeArg GhcRn])
+splitHsAppTys hs_ty
+  | is_app hs_ty = Just (go (noLoc hs_ty) [])
+  | otherwise    = Nothing
+  where
+    is_app :: HsType GhcRn -> Bool
+    is_app (HsAppKindTy {})        = True
+    is_app (HsAppTy {})            = True
+    is_app (HsOpTy _ _ (L _ op) _) = not (op `hasKey` funTyConKey)
+      -- I'm not sure why this funTyConKey test is necessary
+      -- Can it even happen?  Perhaps for   t1 `(->)` t2
+      -- but then maybe it's ok to treat that like a normal
+      -- application rather than using the special rule for HsFunTy
+    is_app (HsTyVar {})            = True
+    is_app (HsParTy _ (L _ ty))    = is_app ty
+    is_app _                       = False
+
+    go (L _  (HsAppTy _ f a))      as = go f (HsValArg a : as)
+    go (L _  (HsAppKindTy l ty k)) as = go ty (HsTypeArg l k : as)
+    go (L sp (HsParTy _ f))        as = go f (HsArgPar sp : as)
+    go (L _  (HsOpTy _ l op@(L sp _) r)) as
+      = ( L sp (HsTyVar noExt NotPromoted op)
+        , HsValArg l : HsValArg r : as )
+    go f as = (f, as)
+
+---------------------------
+tcInferAppHead :: TcTyMode -> LHsType GhcRn -> TcM (TcType, TcKind)
+-- Version of tc_infer_lhs_type specialised for the head of an
+-- application. In particular, for a HsTyVar (which includes type
+-- constructors, it does not zoom off into tcInferApps and family
+-- saturation
+tcInferAppHead mode (L _ (HsTyVar _ _ (L _ tv)))
+  = tcTyVar mode tv
+tcInferAppHead mode ty
+  = tc_infer_lhs_type mode ty
+
 ---------------------------
 -- | Apply a type of a given kind to a list of arguments. This instantiates
 -- invisible parameters as necessary. Always consumes all the arguments,
@@ -955,84 +979,116 @@ bigConstraintTuple arity
 -- This takes an optional @VarEnv Kind@ which maps kind variables to kinds.-
 -- These kinds should be used to instantiate invisible kind variables;
 -- they come from an enclosing class for an associated type/data family.
-tcInferApps :: TcTyMode
-            -> LHsType GhcRn        -- ^ Function (for printing only)
-            -> TcType               -- ^ Function
-            -> TcKind               -- ^ Function kind (zonked)
-            -> [LHsTypeArg GhcRn]   -- ^ Args
-            -> TcM (TcType, TcKind) -- ^ (f args, args, result kind)
--- Precondition: tcTypeKind fun_ty = fun_ki
---    Reason: we will return a type application like (fun_ty arg1 ... argn),
---            and that type must be well-kinded
---            See Note [The tcType invariant]
--- Postcondition: Result kind is zonked.
-tcInferApps mode orig_hs_ty fun_ty orig_fun_ki orig_hs_args
-  = do { traceTc "tcInferApps {" (ppr orig_hs_ty $$ ppr orig_hs_args $$ ppr orig_fun_ki)
-       ; (f_args, res_k) <- go 1 empty_subst fun_ty orig_fun_ki orig_hs_args
-       ; traceTc "tcInferApps }" empty
-       ; res_k <- zonkTcType res_k  -- Uphold (IT4) of Note [The tcType invariant]
+--
+-- tcInferApps also arranges to saturate any trailing invisible arguments
+--   of a type-family application, which is usually the right thing to do
+-- tcInferApps_nosat does not do this saturation; it is used only
+--   by ":kind" in GHCi
+tcInferApps, tcInferApps_nosat
+    :: TcTyMode
+    -> LHsType GhcRn        -- ^ Function (for printing only)
+    -> TcType               -- ^ Function
+    -> [LHsTypeArg GhcRn]   -- ^ Args
+    -> TcM (TcType, TcKind) -- ^ (f args, args, result kind)
+tcInferApps mode hs_ty fun hs_args
+  = do { (f_args, res_k) <- tcInferApps_nosat mode hs_ty fun hs_args
+       ; saturateFamApp f_args res_k }
+
+tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
+  = do { traceTc "tcInferApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
+       ; (f_args, res_k) <- go_init 1 fun orig_hs_args
+       ; traceTc "tcInferApps }" (ppr f_args <+> dcolon <+> ppr res_k)
        ; return (f_args, res_k) }
   where
-    empty_subst                      = mkEmptyTCvSubst $ mkInScopeSet $
-                                       tyCoVarsOfType orig_fun_ki
 
-    go :: Int             -- the # of the next argument
-       -> TCvSubst        -- instantiating substitution
-       -> TcType          -- function applied to some args
-       -> TcKind          -- function kind
-       -> [LHsTypeArg GhcRn] -- un-type-checked args
-       -> TcM (TcType, TcKind)  -- same as overall return type
+    -- go_init just initialises the auxiliary
+    -- arguments of the 'go' loop
+    go_init n fun all_args
+      = go n fun empty_subst fun_ki all_args
+      where
+        fun_ki = tcTypeKind fun
+           -- We do (tcTypeKind fun) here, even though the caller
+           -- knows the function kind, to absolutely guarantee
+           -- INVARIANT for 'go'
+           -- Note that in a typical application (F t1 t2 t3),
+           -- the 'fun' is just a TyCon, so tcTypeKind is fast
 
-                                     -- case on all_args first, for performance reasons
-    go n subst fun fun_ki all_args = case (all_args, tcSplitPiTy_maybe fun_ki) of
-      -- no user-written args left. We're done!
-      ([], _) -> return (fun, nakedSubstTy subst fun_ki)
-                 -- nakedSubstTy: see Note [The well-kinded type invariant]
+        empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
+                      tyCoVarsOfType fun_ki
 
-      -- We don't care about parens here
-      (HsArgPar _ : args, _) -> go n subst fun fun_ki args
+    go :: Int             -- The # of the next argument
+       -> TcType          -- Function applied to some args
+       -> TCvSubst        -- Applies to function kind
+       -> TcKind          -- Function kind
+       -> [LHsTypeArg GhcRn]    -- Un-type-checked args
+       -> TcM (TcType, TcKind)  -- Result type and its kind
+    -- INVARIANT: in any call (go n fun subst fun_ki args)
+    --               tcTypeKind fun  =  subst(fun_ki)
+    -- So the 'subst' and 'fun_ki' arguments are simply
+    -- there to avoid repeatedly calling tcTypeKind.
+    --
+    -- Reason for INVARIANT: to support the Purely Kinded Type Invariant
+    -- it's important that if fun_ki has a forall, then so does
+    -- (tcTypeKind fun), because the next thing we are going to do
+    -- is apply 'fun' to an argument type.
 
-      -- Next argument is a kind application (fun @ki)
-      (HsTypeArg _ ki_arg : args, Just (ki_binder, inner_ki)) ->
+    -- Dispatch on all_args first, for performance reasons
+    go n fun subst fun_ki all_args = case (all_args, tcSplitPiTy_maybe fun_ki) of
+
+      ---------------- No user-written args left. We're done!
+      ([], _) -> return (fun, substTy subst fun_ki)
+
+      ---------------- HsArgPar: We don't care about parens here
+      (HsArgPar _ : args, _) -> go n fun subst fun_ki args
+
+      ---------------- HsTypeArg: a kind application (fun @ki)
+      (HsTypeArg _ hs_ki_arg : hs_args, Just (ki_binder, inner_ki)) ->
         case tyCoBinderArgFlag ki_binder of
-        Inferred -> instantiate ki_binder inner_ki
+
+        -- FunTy with PredTy on LHS, or ForAllTy with Inferred
+        Inferred  -> instantiate ki_binder inner_ki
+
+        -- Specified (invisible) binder with visible kind argument
         Specified ->
-         -- Invisible and specified binder with visible kind argument
           do { traceTc "tcInferApps (vis kind app)"
-                       (vcat [ ppr ki_binder, ppr ki_arg
+                       (vcat [ ppr ki_binder, ppr hs_ki_arg
                              , ppr (tyBinderType ki_binder)
                              , ppr subst, ppr (tyCoBinderArgFlag ki_binder) ])
-             ; let exp_kind = nakedSubstTy subst $ tyBinderType ki_binder
-                   -- nakedSubstTy: see Note [The well-kinded type invariant]
-             ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty ki_arg n) $
-                       unsetWOptM Opt_WarnPartialTypeSignatures $
-                       setXOptM LangExt.PartialTypeSignatures $
-                           -- see Note [Wildcards in visible kind application]
-                       tc_lhs_type (kindLevel mode) ki_arg exp_kind
+
+             ; let exp_kind = substTy subst $ tyBinderType ki_binder
+
+             ; ki_arg <- addErrCtxt (funAppCtxt orig_hs_ty hs_ki_arg n) $
+                         unsetWOptM Opt_WarnPartialTypeSignatures $
+                         setXOptM LangExt.PartialTypeSignatures $
+                             -- Urgh!  see Note [Wildcards in visible kind application]
+                             -- ToDo: must kill this ridiculous messing with DynFlags
+                         tc_lhs_type (kindLevel mode) hs_ki_arg exp_kind
+
              ; traceTc "tcInferApps (vis kind app)" (ppr exp_kind)
-             ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
-             ; go (n+1) subst'
-                  (mkNakedAppTy fun arg')
-                  inner_ki args }
+             ; (subst', fun') <- mkAppTyM subst fun ki_binder ki_arg
+             ; go (n+1) fun' subst' inner_ki hs_args }
 
-         -- visible kind application, but we need a normal type application; error.
-         -- this is when we have (fun @ki) but (fun :: k1 -> k2), that is, without a forall
-        Required -> do { traceTc "tcInferApps (error)"
-                                 (vcat [ ppr ki_binder
-                                       , ppr ki_arg
-                                       , ppr (tyBinderType ki_binder)
-                                       , ppr subst
-                                       , ppr (isInvisibleBinder ki_binder) ])
-                       ; ty_app_err ki_arg $ nakedSubstTy subst fun_ki }
+        -- Visible kind application, but we need a normal type application; error.
+        -- This happens when we have (fun @ki) but (fun :: k1 -> k2),
+        -- that is, without a forall
+        Required ->
+          do { traceTc "tcInferApps (error)"
+                       (vcat [ ppr ki_binder
+                             , ppr hs_ki_arg
+                             , ppr (tyBinderType ki_binder)
+                             , ppr subst
+                             , ppr (isInvisibleBinder ki_binder) ])
+             ; ty_app_err hs_ki_arg $ substTy subst fun_ki }
 
-        -- no binder; try applying the substitution, or fail if that's not possible
+      -- No binder; try applying the substitution, or fail if that's not possible
       (HsTypeArg _ ki_arg : _, Nothing) -> try_again_after_substing_or $
                                            ty_app_err ki_arg substed_fun_ki
 
-      -- normal argument (fun ty)
+      ---------------- HsValArg: a nomal argument (fun ty)
       (HsValArg arg : args, Just (ki_binder, inner_ki))
         -- next binder is invisible; need to instantiate it
-        | isInvisibleBinder ki_binder
+        | isInvisibleBinder ki_binder   -- FunTy with PredTy on LHS;
+                                        -- or ForAllTy with Inferred or Specified
          -> instantiate ki_binder inner_ki
 
         -- "normal" case
@@ -1042,138 +1098,266 @@ tcInferApps mode orig_hs_ty fun_ty orig_fun_ki orig_hs_args
                                 , ppr arg
                                 , ppr (tyBinderType ki_binder)
                                 , ppr subst ])
-                ; let exp_kind = nakedSubstTy subst $ tyBinderType ki_binder
-                     -- nakedSubstTy: see Note [The well-kinded type invariant]
+                ; let exp_kind = substTy subst $ tyBinderType ki_binder
                 ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty arg n) $
                           tc_lhs_type mode arg exp_kind
                 ; traceTc "tcInferApps (vis normal app) 2" (ppr exp_kind)
-                ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
-                ; go (n+1) subst' (mkNakedAppTy fun arg') inner_ki args }
+                ; (subst', fun') <- mkAppTyM subst fun ki_binder arg'
+                ; go (n+1) fun' subst' inner_ki args }
 
           -- no binder; try applying the substitution, or infer another arrow in fun kind
       (HsValArg _ : _, Nothing)
         -> try_again_after_substing_or $
-           do { traceTc "tcInferApps (no binder)" empty
-              ; (co, arg_k, res_k) <- matchExpectedFunKind hs_ty substed_fun_ki
-              ; let new_in_scope = tyCoVarsOfTypes [arg_k, res_k]
-                    subst'       = zapped_subst `extendTCvInScopeSet` new_in_scope
-              ; go n subst'
-                   (fun `mkNakedCastTy` co)  -- See Note [The well-kinded type invariant]
-                   (mkFunTy arg_k res_k) all_args }
+           do { let arrows_needed = n_initial_val_args all_args
+              ; co <- matchExpectedFunKind hs_ty arrows_needed substed_fun_ki
 
+              ; fun' <- zonkTcType (fun `mkTcCastTy` co)
+                     -- This zonk is essential, to expose the fruits
+                     -- of matchExpectedFunKind to the 'go' loop
+
+              ; traceTc "tcInferApps (no binder)" $
+                   vcat [ ppr fun <+> dcolon <+> ppr fun_ki
+                        , ppr arrows_needed
+                        , ppr co
+                        , ppr fun' <+> dcolon <+> ppr (tcTypeKind fun')]
+              ; go_init n fun' all_args }
+                -- Use go_init to establish go's INVARIANT
       where
         instantiate ki_binder inner_ki
           = do { traceTc "tcInferApps (need to instantiate)"
                          (vcat [ ppr ki_binder
                                , ppr subst
                                , ppr (tyCoBinderArgFlag ki_binder)])
-               ; (subst', arg') <- tcInstTyBinder Nothing subst ki_binder
-               ; go n subst' (mkNakedAppTy fun arg') inner_ki all_args }
+               ; (subst', arg') <- tcInstInvisibleTyBinder subst ki_binder
+               ; go n (mkAppTy fun arg') subst' inner_ki all_args }
+                 -- Because tcInvisibleTyBinder instantiate ki_binder,
+                 -- the kind of arg' will have the same shape as the kind
+                 -- of ki_binder.  So we don't need mkAppTyM here.
 
         try_again_after_substing_or fallthrough
           | not (isEmptyTCvSubst subst)
-          = go n zapped_subst fun substed_fun_ki all_args
+          = go n fun zapped_subst substed_fun_ki all_args
           | otherwise
           = fallthrough
 
-        substed_fun_ki                 = substTy subst fun_ki
-        zapped_subst                   = zapTCvSubst subst
-        hs_ty                          = appTypeToArg orig_hs_ty (take (n-1) orig_hs_args)
+        zapped_subst   = zapTCvSubst subst
+        substed_fun_ki = substTy subst fun_ki
+        hs_ty          = appTypeToArg orig_hs_ty (take (n-1) orig_hs_args)
 
-    ty_app_err arg ty = failWith $ text "Cannot apply function of kind" <+> quotes (ppr ty)
-                                   $$ text "to visible kind argument" <+> quotes (ppr arg)
+    n_initial_val_args :: [HsArg tm ty] -> Arity
+    -- Count how many leading HsValArgs we have
+    n_initial_val_args (HsValArg {} : args) = 1 + n_initial_val_args args
+    n_initial_val_args (HsArgPar {} : args) = n_initial_val_args args
+    n_initial_val_args _                    = 0
+
+    ty_app_err arg ty
+      = failWith $ text "Cannot apply function of kind" <+> quotes (ppr ty)
+                $$ text "to visible kind argument" <+> quotes (ppr arg)
+
+
+mkAppTyM :: TCvSubst
+         -> TcType -> TyCoBinder    -- fun, plus its top-level binder
+         -> TcType                  -- arg
+         -> TcM (TCvSubst, TcType)  -- Extended subst, plus (fun arg)
+-- Precondition: the application (fun arg) is well-kinded after zonking
+--               That is, the application makes sense
+--
+-- Precondition: for (mkAppTyM subst fun bndr arg)
+--       tcTypeKind fun  =  Pi bndr. body
+--  That is, fun always has a ForAllTy or FunTy at the top
+--           and 'bndr' is fun's pi-binder
+--
+-- Postcondition: if fun and arg satisfy (PKTI), the purely-kinded type
+--                invariant, then so does the result type (fun arg)
+--
+-- We do not require that
+--    tcTypeKind arg = tyVarKind (binderVar bndr)
+-- This must be true after zonking (precondition 1), but it's not
+-- required for the (PKTI).
+mkAppTyM subst fun ki_binder arg
+  | -- See Note [mkAppTyM]: Nasty case 2
+    TyConApp tc args <- fun
+  , isTypeSynonymTyCon tc
+  , args `lengthIs` (tyConArity tc - 1)
+  , any isTrickyTvBinder (tyConTyVars tc) -- We could cache this in the synonym
+  = do { arg'  <- zonkTcType  arg
+       ; args' <- zonkTcTypes args
+       ; let subst' = case ki_binder of
+                        Anon {}           -> subst
+                        Named (Bndr tv _) -> extendTvSubstAndInScope subst tv arg'
+       ; return (subst', mkTyConApp tc (args' ++ [arg'])) }
+
+
+mkAppTyM subst fun (Anon {}) arg
+   = return (subst, mk_app_ty fun arg)
+
+mkAppTyM subst fun (Named (Bndr tv _)) arg
+  = do { arg' <- if isTrickyTvBinder tv
+                 then -- See Note [mkAppTyM]: Nasty case 1
+                      zonkTcType arg
+                 else return     arg
+       ; return ( extendTvSubstAndInScope subst tv arg'
+                , mk_app_ty fun arg' ) }
+
+mk_app_ty :: TcType -> TcType -> TcType
+-- This function just adds an ASSERT for mkAppTyM's precondition
+mk_app_ty fun arg
+  = ASSERT2( isPiTy fun_kind
+           ,  ppr fun <+> dcolon <+> ppr fun_kind $$ ppr arg )
+    mkAppTy fun arg
+  where
+    fun_kind = tcTypeKind fun
+
+isTrickyTvBinder :: TcTyVar -> Bool
+-- NB: isTrickyTvBinder is just an optimisation
+-- It would be absolutely sound to return True always
+isTrickyTvBinder tv = isPiTy (tyVarKind tv)
+
+{- Note [The Purely Kinded Type Invariant (PKTI)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+During type inference, we maintain this invariant
+
+ (PKTI) It is legal to call 'tcTypeKind' on any Type ty,
+        on any sub-term of ty, /without/ zonking ty
+
+        Moreover, any such returned kind
+        will itself satisfy (PKTI)
+
+By "legal to call tcTypeKind" we mean "tcTypeKind will not crash".
+The way in which tcTypeKind can crash is in applications
+    (a t1 t2 .. tn)
+if 'a' is a type variable whose kind doesn't have enough arrows
+or foralls.  (The crash is in piResultTys.)
+
+The loop in tcInferApps has to be very careful to maintain the (PKTI).
+For example, suppose
+    kappa is a unification variable
+    We have already unified kappa := Type
+      yielding    co :: Refl (Type -> Type)
+    a :: kappa
+then consider the type
+    (a Int)
+If we call tcTypeKind on that, we'll crash, because the (un-zonked)
+kind of 'a' is just kappa, not an arrow kind.  So we must zonk first.
+
+So the type inference engine is very careful when building applications.
+This happens in tcInferApps. Suppose we are kind-checking the type (a Int),
+where (a :: kappa).  Then in tcInferApps we'll run out of binders on
+a's kind, so we'll call matchExpectedFunKind, and unify
+   kappa := kappa1 -> kappa2,  with evidence co :: kappa ~ (kappa1 ~ kappa2)
+At this point we must zonk the function type to expose the arrrow, so
+that (a Int) will satisfy (PKTI).
+
+The absence of this caused Trac #14174 and #14520.
+
+The calls to mkAppTyM is the other place we are very careful.
+
+Note [mkAppTyM]
+~~~~~~~~~~~~~~~
+mkAppTyM is trying to guaranteed the Purely Kinded Type Invariant
+(PKTI) for its result type (fun arg).  There are two ways it can go wrong:
+
+* Nasty case 1: forall types (polykinds/T14174a)
+    T :: forall (p :: *->*). p Int -> p Bool
+  Now kind-check (T x), where x::kappa.
+  Well, T and x both satisfy the PKTI, but
+     T x :: x Int -> x Bool
+  and (x Int) does /not/ satisfy the PKTI.
+
+* Nasty case 2: type synonyms
+    type S f a = f a
+  Even though (S ff aa) would satisfy the (PKTI) if S was a data type
+  (i.e. nasty case 1 is dealt with), it might still not satisfy (PKTI)
+  if S is a type synonym, because the /expansion/ of (S ff aa) is
+  (ff aa), and /that/ does not satisfy (PKTI).  E.g. perhaps
+  (ff :: kappa), where 'kappa' has already been unified with (*->*).
+
+  We check for nasty case 2 on the final argument of a type synonym.
+
+Notice that in both cases the trickiness only happens if the
+bound variable has a pi-type.  Hence isTrickyTvBinder.
+-}
+
+
+saturateFamApp :: TcType -> TcKind -> TcM (TcType, TcKind)
+-- Precondition for (saturateFamApp ty kind):
+--     tcTypeKind ty = kind
+--
+-- If 'ty' is an unsaturated family application wtih trailing
+-- invisible arguments, instanttiate them.
+-- See Note [saturateFamApp]
+
+saturateFamApp ty kind
+  | Just (tc, args) <- tcSplitTyConApp_maybe ty
+  , mustBeSaturated tc
+  , let n_to_inst = tyConArity tc - length args
+  = do { (extra_args, ki') <- tcInstInvisibleTyBinders n_to_inst kind
+       ; return (ty `mkTcAppTys` extra_args, ki') }
+  | otherwise
+  = return (ty, kind)
+
+{- Note [saturateFamApp]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   type family F :: Either j k
+   type instance F @Type = Right Maybe
+   type instance F @Type = Right Either```
+
+Then F :: forall {j,k}. Either j k
+
+The two type instances do a visible kind application that instantiates
+'j' but not 'k'.  But we want to end up with instances that look like
+  type instance F @Type @(*->*) = Right @Type @(*->*) Maybe
+
+so that F has arity 2.  We must instantiate that trailing invisible
+binder. In general, Invisible binders precede Specified and Required,
+so this is only going to bite for apparently-nullary families.
+
+Note that
+  type family F2 :: forall k. k -> *
+is quite different and really does have arity 0.
+
+It's not just type instances where we need to saturate those
+unsaturated arguments: see #11246.  Hence doing this in tcInferApps.
+-}
 
 appTypeToArg :: LHsType GhcRn -> [LHsTypeArg GhcRn] -> LHsType GhcRn
-appTypeToArg f [] = f
-appTypeToArg f (HsValArg arg : args) = appTypeToArg (mkHsAppTy f arg) args
+appTypeToArg f []                       = f
+appTypeToArg f (HsValArg arg    : args) = appTypeToArg (mkHsAppTy f arg) args
+appTypeToArg f (HsArgPar _      : args) = appTypeToArg f                 args
 appTypeToArg f (HsTypeArg l arg : args)
   = appTypeToArg (mkHsAppKindTy l f arg) args
-appTypeToArg f (HsArgPar _ : arg) = appTypeToArg f arg
 
--- | Applies a type to a list of arguments.
--- Always consumes all the arguments, using 'matchExpectedFunKind' as
--- necessary. If you wish to apply a type to a list of HsTypes, this is
--- your function.
--- Used for type-checking types only.
-tcTyApps :: TcTyMode
-         -> LHsType GhcRn        -- ^ Function (for printing only)
-         -> TcType               -- ^ Function
-         -> TcKind               -- ^ Function kind (zonked)
-         -> [LHsTypeArg GhcRn]   -- ^ Args
-         -> TcM (TcType, TcKind) -- ^ (f args, result kind)   result kind is zonked
--- Precondition: see precondition for tcInferApps
-tcTyApps mode orig_hs_ty fun_ty fun_ki args
-  = do { (ty', ki') <- tcInferApps mode orig_hs_ty fun_ty fun_ki args
-       ; return (ty' `mkNakedCastTy` mkNomReflCo ki', ki') }
-          -- The mkNakedCastTy is for (IT3) of Note [The tcType invariant]
 
-tcTyApp :: TcTyMode -> HsType GhcRn -> TcM (TcType, TcKind) -- only HsAppTy or HsAppKindTy
-tcTyApp mode e
-  = do { let (hs_fun_ty, hs_args) = splitHsAppTys e
-       ; (fun_ty, fun_kind) <- tc_infer_lhs_type mode hs_fun_ty
-          -- NB: (IT4) of Note [The tcType invariant] ensures that fun_kind is zonked
-       ; tcTyApps mode hs_fun_ty fun_ty fun_kind hs_args }
---------------------------
--- Internally-callable version of checkExpectedKind
-checkExpectedKindMode :: HasDebugCallStack
-                      => TcTyMode
-                      -> SDoc        -- type we're checking
-                      -> TcType      -- type we're checking
-                      -> TcKind      -- kind of that type
-                      -> TcKind      -- expected kind
-                      -> TcM TcType
-checkExpectedKindMode mode = checkExpectedKind (mode_sat mode)
+{- *********************************************************************
+*                                                                      *
+                checkExpectedKind
+*                                                                      *
+********************************************************************* -}
 
 -- | This instantiates invisible arguments for the type being checked if it must
 -- be saturated and is not yet saturated. It then calls and uses the result
 -- from checkExpectedKindX to build the final type
--- Obeys Note [The tcType invariant]
 checkExpectedKind :: HasDebugCallStack
-                  => RequireSaturation  -- ^ Do we require all type families to be saturated?
-                  -> SDoc           -- ^ type we're checking (for printing)
-                  -> TcType         -- ^ type we're checking
-                  -> TcKind         -- ^ the known kind of that type
-                  -> TcKind         -- ^ the expected kind
+                  => HsType GhcRn       -- ^ type we're checking (for printing)
+                  -> TcType             -- ^ type we're checking
+                  -> TcKind             -- ^ the known kind of that type
+                  -> TcKind             -- ^ the expected kind
                   -> TcM TcType
-checkExpectedKind sat hs_ty ty act exp
-  = do { (new_ty, new_act) <- case splitTyConApp_maybe ty of
-           Just (tc, args)
-             -- if the family tycon must be saturated and is not yet satured
-             -- If we don't do this, we get #11246
-             | YesSaturation <- sat
-             , not (mightBeUnsaturatedTyCon tc) && length args < tyConArity tc
-             -> do {
-                   -- we need to instantiate all invisible arguments up until saturation
-                   (tc_args, kind) <- tcInstTyBinders (splitPiTysInvisibleN
-                                                        (tyConArity tc - length args)
-                                                        act)
-                   ; let tc_ty = mkTyConApp tc $ args ++ tc_args
-                   ; traceTc "checkExpectedKind:satTyFam" (vcat [ ppr tc <+> dcolon <+> ppr act
-                                                   , ppr kind ])
-                   ; return (tc_ty, kind) }
-           _ -> return (ty, act)
-       ; (new_args, co_k) <- checkExpectedKindX hs_ty new_act exp
-       ; return (new_ty `mkNakedAppTys` new_args `mkNakedCastTy` co_k) }
+-- Just a convenience wrapper to save calls to 'ppr'
+checkExpectedKind hs_ty ty act exp
+  = checkExpectedKind_pp (ppr hs_ty) ty act exp
 
-checkExpectedKindX :: HasDebugCallStack
-                   => SDoc                 -- HsType whose kind we're checking
-                   -> TcKind               -- the known kind of that type, k
-                   -> TcKind               -- the expected kind, exp_kind
-                   -> TcM ([TcType], TcCoercionN)
-    -- (the new args, the coercion)
--- Instantiate a kind (if necessary) and then call unifyType
---      (checkExpectedKind ty act_kind exp_kind)
--- checks that the actual kind act_kind is compatible
---      with the expected kind exp_kind
-checkExpectedKindX pp_hs_ty act_kind exp_kind
-  = do { -- We need to make sure that both kinds have the same number of implicit
-         -- foralls out front. If the actual kind has more, instantiate accordingly.
-         -- Otherwise, just pass the type & kind through: the errors are caught
-         -- in unifyType.
-         let n_exp_invis_bndrs = invisibleTyBndrCount exp_kind
-             n_act_invis_bndrs = invisibleTyBndrCount act_kind
-             n_to_inst         = n_act_invis_bndrs - n_exp_invis_bndrs
-       ; (new_args, act_kind') <- tcInstTyBinders (splitPiTysInvisibleN n_to_inst act_kind)
+checkExpectedKind_pp :: HasDebugCallStack
+                     => SDoc               -- ^ The thing we are checking
+                     -> TcType             -- ^ type we're checking
+                     -> TcKind             -- ^ the known kind of that type
+                     -> TcKind             -- ^ the expected kind
+                     -> TcM TcType
+checkExpectedKind_pp pp_hs_ty ty act_kind exp_kind
+  = do { traceTc "checkExpectedKind" (ppr ty $$ ppr act_kind)
+
+       ; (new_args, act_kind') <- tcInstInvisibleTyBinders n_to_inst act_kind
 
        ; let origin = TypeEqOrigin { uo_actual   = act_kind'
                                    , uo_expected = exp_kind
@@ -1182,18 +1366,27 @@ checkExpectedKindX pp_hs_ty act_kind exp_kind
 
        ; traceTc "checkExpectedKindX" $
          vcat [ pp_hs_ty
-              , text "act_kind:" <+> ppr act_kind
               , text "act_kind':" <+> ppr act_kind'
               , text "exp_kind:" <+> ppr exp_kind ]
 
+       ; let res_ty = ty `mkTcAppTys` new_args
+
        ; if act_kind' `tcEqType` exp_kind
-         then return (new_args, mkTcNomReflCo exp_kind)  -- This is very common
+         then return res_ty  -- This is very common
          else do { co_k <- uType KindLevel origin act_kind' exp_kind
                  ; traceTc "checkExpectedKind" (vcat [ ppr act_kind
                                                      , ppr exp_kind
                                                      , ppr co_k ])
-                      -- See Note [The tcType invariant]
-                ; return (new_args, co_k) } }
+                ; return (res_ty `mkTcCastTy` co_k) } }
+    where
+      -- We need to make sure that both kinds have the same number of implicit
+      -- foralls out front. If the actual kind has more, instantiate accordingly.
+      -- Otherwise, just pass the type & kind through: the errors are caught
+      -- in unifyType.
+      n_exp_invis_bndrs = invisibleTyBndrCount exp_kind
+      n_act_invis_bndrs = invisibleTyBndrCount act_kind
+      n_to_inst         = n_act_invis_bndrs - n_exp_invis_bndrs
+
 
 ---------------------------
 tcHsMbContext :: Maybe (LHsContext GhcRn) -> TcM [PredType]
@@ -1220,26 +1413,14 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
        ; case thing of
-           ATyVar _ tv -> -- Important: zonk before returning
-                          -- We may have the application ((a::kappa) b)
-                          -- where kappa is already unified to (k1 -> k2)
-                          -- Then we want to see that arrow.  Best done
-                          -- here because we are also maintaining
-                          -- Note [The tcType invariant], so we don't just
-                          -- want to zonk the kind, leaving the TyVar
-                          -- un-zonked  (Trac #14873)
-                          do { ty <- zonkTcTyVar tv
-                             ; return (ty, tcTypeKind ty) }
+           ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
 
            ATcTyCon tc_tc
              -> do { -- See Note [GADT kind self-reference]
                      unless (isTypeLevel (mode_level mode))
                             (promotionErr name TyConPE)
                    ; check_tc tc_tc
-                   ; tc_kind <- zonkTcType (tyConKind tc_tc)
-                        -- (IT6) of Note [The tcType invariant]
-                   ; return (mkTyConTy tc_tc `mkNakedCastTy` mkNomReflCo tc_kind, tc_kind) }
-                        -- the mkNakedCastTy ensures (IT5) of Note [The tcType invariant]
+                   ; return (mkTyConTy tc_tc, tyConKind tc_tc) }
 
            AGlobal (ATyCon tc)
              -> do { check_tc tc
@@ -1362,8 +1543,8 @@ we try to figure out whether it's a tuple of kind * or Constraint.
 
 If after Step 2 it's not clear from the arguments that it's
 Constraint, then it must be *.  Once having decided that we re-check
-the Check the arguments again to give good error messages
-in eg. `(Maybe, Maybe)`
+the arguments to give good error messages in
+  e.g.  (Maybe, Maybe)
 
 Note that we will still fail to infer the correct kind in this case:
 
@@ -2320,7 +2501,8 @@ tcHsPartialSigType ctxt sig_ty
   , (explicit_hs_tvs, L _ hs_ctxt, hs_tau) <- splitLHsSigmaTy hs_ty
   = addSigCtxt ctxt hs_ty $
     do { (implicit_tvs, (explicit_tvs, (wcs, wcx, theta, tau)))
-            <- tcWildCardBinders sig_wcs $ \ wcs ->
+            <- solveLocalEqualities "tcHsPatSigTypes"      $
+               tcWildCardBinders sig_wcs $ \ wcs ->
                bindImplicitTKBndrs_Tv implicit_hs_tvs       $
                bindExplicitTKBndrs_Tv explicit_hs_tvs       $
                do {   -- Instantiate the type-class context; but if there
@@ -2371,7 +2553,7 @@ tcPartialContext :: HsContext GhcRn -> TcM (TcThetaType, Maybe TcType)
 tcPartialContext hs_theta
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
   , L _ wc@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
-  = do { wc_tv_ty <- tcWildCardOcc typeLevelMode wc constraintKind
+  = do { wc_tv_ty <- tcWildCardOcc wc constraintKind
        ; theta <- mapM tcLHsPredType hs_theta1
        ; return (theta, Just wc_tv_ty) }
   | otherwise
@@ -2600,7 +2782,8 @@ together.  Hence the new_tv function in tcHsPatSigType.
 unifyKinds :: [LHsType GhcRn] -> [(TcType, TcKind)] -> TcM ([TcType], TcKind)
 unifyKinds rn_tys act_kinds
   = do { kind <- newMetaKindVar
-       ; let check rn_ty (ty, act_kind) = checkExpectedKind YesSaturation (ppr $ unLoc rn_ty) ty act_kind kind
+       ; let check rn_ty (ty, act_kind)
+               = checkExpectedKind (unLoc rn_ty) ty act_kind kind
        ; tys' <- zipWithM check rn_tys act_kinds
        ; return (tys', kind) }
 

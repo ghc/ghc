@@ -667,7 +667,7 @@ typeToLHsType ty
       | tyConAppNeedsKindSig True tc (length args)
         -- We must produce an explicit kind signature here to make certain
         -- programs kind-check. See Note [Kind signatures in typeToLHsType].
-      = nlHsParTy $ noLoc $ HsKindSig NoExt lhs_ty (go (typeKind ty))
+      = nlHsParTy $ noLoc $ HsKindSig NoExt lhs_ty (go (tcTypeKind ty))
       | otherwise = lhs_ty
        where
         arg_flags :: [ArgFlag]

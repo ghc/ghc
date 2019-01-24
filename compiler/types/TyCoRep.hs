@@ -917,8 +917,9 @@ isLiftedRuntimeRep rep
 
 isUnliftedRuntimeRep rep
   | Just rep' <- coreView rep          = isUnliftedRuntimeRep rep'
-  | TyConApp rr_tc args <- rep
-  , isUnliftedRuntimeRepTyCon rr_tc    = ASSERT( null args ) True
+  | TyConApp rr_tc _ <- rep   -- NB: args might be non-empty
+                              --     e.g. TupleRep
+  , isUnliftedRuntimeRepTyCon rr_tc    = True
   | otherwise                          = False
 
 isUnliftedRuntimeRepTyCon :: TyCon -> Bool
@@ -3448,6 +3449,8 @@ pprPrecTypeX env prec ty
     if debugStyle sty           -- Use debugPprType when in
     then debug_ppr_ty prec ty   -- when in debug-style
     else pprPrecIfaceType prec (tidyToIfaceTypeStyX env ty sty)
+    -- NB: debug-style is used for -dppr-debug
+    --     dump-style  is used for -ddump-tc-trace etc
 
 pprTyLit :: TyLit -> SDoc
 pprTyLit = pprIfaceTyLit . toIfaceTyLit
