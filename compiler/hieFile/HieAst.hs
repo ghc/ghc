@@ -28,6 +28,7 @@ import HscTypes
 import Module                     ( ModuleName, ml_hs_file )
 import MonadUtils                 ( concatMapM, liftIO )
 import Name                       ( Name, nameSrcSpan, setNameLoc )
+import NameEnv                    ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import SrcLoc
 import TcHsSyn                    ( hsPatType )
 import Type                       ( Type )
@@ -60,11 +61,11 @@ We don't care about the distinction between mono and poly bindings,
 so we replace all occurrences of the mono name with the poly name.
 -}
 newtype HieState = HieState
-  { name_remapping :: M.Map Name Id
+  { name_remapping :: NameEnv Id
   }
 
 initState :: HieState
-initState = HieState M.empty
+initState = HieState emptyNameEnv
 
 class ModifyState a where -- See Note [Name Remapping]
   addSubstitution :: a -> a -> HieState -> HieState
@@ -74,7 +75,7 @@ instance ModifyState Name where
 
 instance ModifyState Id where
   addSubstitution mono poly hs =
-    hs{name_remapping = M.insert (varName mono) poly (name_remapping hs)}
+    hs{name_remapping = extendNameEnv (name_remapping hs) (varName mono) poly}
 
 modifyState :: ModifyState (IdP p) => [ABExport p] -> HieState -> HieState
 modifyState = foldr go id
@@ -377,7 +378,9 @@ instance ToHie (Context (Located Var)) where
       C context (L (RealSrcSpan span) name')
         -> do
         m <- asks name_remapping
-        let name = M.findWithDefault name' (varName name') m
+        let name = case lookupNameEnv m (varName name') of
+              Just var -> var
+              Nothing-> name'
         pure
           [Node
             (NodeInfo S.empty [] $
@@ -392,7 +395,7 @@ instance ToHie (Context (Located Name)) where
   toHie c = case c of
       C context (L (RealSrcSpan span) name') -> do
         m <- asks name_remapping
-        let name = case M.lookup name' m of
+        let name = case lookupNameEnv m name' of
               Just var -> varName var
               Nothing -> name'
         pure
