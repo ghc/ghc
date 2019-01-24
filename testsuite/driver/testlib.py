@@ -18,7 +18,7 @@ from pathlib import PurePath
 import collections
 import subprocess
 
-from testglobals import config, ghc_env, default_testopts, brokens, t
+from testglobals import config, ghc_env, default_testopts, brokens, t, TestResult
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, str_fail, str_pass
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
@@ -940,24 +940,24 @@ def do_test(name, way, func, args, files):
 
     if passFail == 'pass':
         if _expect_pass(way):
-            t.expected_passes.append((directory, name, way))
+            t.expected_passes.append(TestResult(directory, name, way))
             t.n_expected_passes += 1
         else:
             if_verbose(1, '*** unexpected pass for %s' % full_name)
-            t.unexpected_passes.append((directory, name, 'unexpected', way))
+            t.unexpected_passes.append(TestResult(directory, name, 'unexpected', way))
     elif passFail == 'fail':
         if _expect_pass(way):
             reason = result['reason']
             tag = result.get('tag')
             if tag == 'stat':
                 if_verbose(1, '*** unexpected stat test failure for %s' % full_name)
-                t.unexpected_stat_failures.append((directory, name, reason, way))
+                t.unexpected_stat_failures.append(TestResult(directory, name, reason, way))
             else:
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
-                t.unexpected_failures.append((directory, name, reason, way))
+                t.unexpected_failures.append(TestResult(directory, name, reason, way))
         else:
             if opts.expect == 'missing-lib':
-                t.missing_libs.append((directory, name, 'missing-lib', way))
+                t.missing_libs.append(TestResult(directory, name, 'missing-lib', way))
             else:
                 t.n_expected_failures += 1
     else:
@@ -980,14 +980,14 @@ def framework_fail(name, way, reason):
     directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
-    t.framework_failures.append((directory, name, way, reason))
+    t.framework_failures.append(TestResult(directory, name, way, reason))
 
 def framework_warn(name, way, reason):
     opts = getTestOpts()
     directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework warning for %s %s ' % (full_name, reason))
-    t.framework_warnings.append((directory, name, way, reason))
+    t.framework_warnings.append(TestResult(directory, name, way, reason))
 
 def badResult(result):
     try:
@@ -2154,9 +2154,10 @@ def summary(t, file, short=False, color=False):
         file.write('WARNING: Testsuite run was terminated early\n')
 
 def printUnexpectedTests(file, testInfoss):
-    unexpected = set(name for testInfos in testInfoss
-                       for (_, name, _, _) in testInfos
-                       if not name.endswith('.T'))
+    unexpected = set(result.name
+                     for testInfos in testInfoss
+                     for result in testInfos
+                     if not result.name.endswith('.T'))
     if unexpected:
         file.write('Unexpected results from:\n')
         file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
@@ -2164,9 +2165,11 @@ def printUnexpectedTests(file, testInfoss):
 
 def printTestInfosSummary(file, testInfos):
     maxDirLen = max(len(directory) for (directory, _, _, _) in testInfos)
-    for (directory, name, reason, way) in testInfos:
-        directory = directory.ljust(maxDirLen)
-        file.write('   {directory}  {name} [{reason}] ({way})\n'.format(**locals()))
+    for result in testInfos:
+        directory = result.directory.ljust(maxDirLen)
+        file.write('   {directory}  {r.name} [{r.reason}] ({r.way})\n'.format(
+            r = result,
+            directory = directory))
     file.write('\n')
 
 def modify_lines(s, f):
