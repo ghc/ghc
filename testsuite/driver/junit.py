@@ -13,26 +13,27 @@ def junit(t):
 
     for res_type, group in [('stat failure', t.unexpected_stat_failures),
                           ('unexpected failure', t.unexpected_failures)]:
-        for (directory, testname, reason, way) in group:
+        for tr in group:
             testcase = ET.SubElement(testsuite, 'testcase',
-                                     classname = way,
-                                     name = '%s(%s)' % (testname, way))
+                                     classname = tr.way,
+                                     name = '%s(%sb)' % (tr.testname, tr.way))
+            new_reason = "\n".join([tr.reason, "STDERR:", tr.stderr.decode("utf-8")]) if tr.stderr else tr.reason
             result = ET.SubElement(testcase, 'failure',
                                    type = res_type,
-                                   message = reason)
+                                   message = new_reason)
 
-    for (directory, testname, reason, way) in t.framework_failures:
+    for tr in t.framework_failures:
         testcase = ET.SubElement(testsuite, 'testcase',
-                                 classname = way,
-                                 name = '%s(%s)' % (testname, way))
+                                 classname = tr.way,
+                                 name = '%s(%s)' % (tr.testname, tr.way))
         result = ET.SubElement(testcase, 'error',
                                type = "framework failure",
-                               message = reason)
+                               message = tr.reason)
 
-    for (directory, testname, way) in t.expected_passes:
+    for tr in t.expected_passes:
         testcase = ET.SubElement(testsuite, 'testcase',
-                                 classname = way,
-                                 name = '%s(%s)' % (testname, way))
+                                 classname = tr.way,
+                                 name = '%s(%s)' % (tr.testname, tr.way))
 
     return ET.ElementTree(testsuites)
 

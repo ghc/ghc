@@ -151,6 +151,20 @@ ghc_env = os.environ.copy()
 # -----------------------------------------------------------------------------
 # Information about the current test run
 
+class TestResult:
+    """
+    A result from the execution of a test. These live in the expected_passes,
+    framework_failures, framework_warnings, unexpected_passes,
+    unexpected_failures, unexpected_stat_failures lists of TestRun.
+    """
+    __slots__ = 'directory', 'testname', 'reason', 'way', 'stderr'
+    def __init__(self, directory, testname, reason, way, stderr=None):
+        self.directory = directory
+        self.testname = testname
+        self.reason = reason
+        self.way = way
+        self.stderr = stderr
+
 class TestRun:
    def __init__(self):
        self.start_time = None
@@ -161,6 +175,7 @@ class TestRun:
        self.n_expected_passes = 0
        self.n_expected_failures = 0
 
+       # type: List[TestResult]
        self.missing_libs = []
        self.framework_failures = []
        self.framework_warnings = []

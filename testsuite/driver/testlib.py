@@ -18,8 +18,8 @@ from pathlib import PurePath
 import collections
 import subprocess
 
-from testglobals import config, ghc_env, default_testopts, brokens, t
-from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, str_fail, str_pass
+from testglobals import config, ghc_env, default_testopts, brokens, t, TestResult
+from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, failBecauseStderr, str_fail, str_pass
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
 from perf_notes import MetricChange
@@ -940,24 +940,25 @@ def do_test(name, way, func, args, files):
 
     if passFail == 'pass':
         if _expect_pass(way):
-            t.expected_passes.append((directory, name, way))
+            t.expected_passes.append(TestResult(directory, name, "", way))
             t.n_expected_passes += 1
         else:
             if_verbose(1, '*** unexpected pass for %s' % full_name)
-            t.unexpected_passes.append((directory, name, 'unexpected', way))
+            t.unexpected_passes.append(TestResult(directory, name, 'unexpected', way))
     elif passFail == 'fail':
         if _expect_pass(way):
             reason = result['reason']
             tag = result.get('tag')
             if tag == 'stat':
                 if_verbose(1, '*** unexpected stat test failure for %s' % full_name)
-                t.unexpected_stat_failures.append((directory, name, reason, way))
+                t.unexpected_stat_failures.append(TestResult(directory, name, reason, way))
             else:
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
-                t.unexpected_failures.append((directory, name, reason, way))
+                result = TestResult(directory, name, reason, way, stderr=result.get('stderr'))
+                t.unexpected_failures.append(result)
         else:
             if opts.expect == 'missing-lib':
-                t.missing_libs.append((directory, name, 'missing-lib', way))
+                t.missing_libs.append(TestResult(directory, name, 'missing-lib', way))
             else:
                 t.n_expected_failures += 1
     else:
@@ -980,14 +981,14 @@ def framework_fail(name, way, reason):
     directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
-    t.framework_failures.append((directory, name, way, reason))
+    t.framework_failures.append(TestResult(directory, name, reason, way))
 
 def framework_warn(name, way, reason):
     opts = getTestOpts()
     directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework warning for %s %s ' % (full_name, reason))
-    t.framework_warnings.append((directory, name, way, reason))
+    t.framework_warnings.append(TestResult(directory, name, reason, way))
 
 def badResult(result):
     try:
@@ -1089,15 +1090,20 @@ def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts, **kwa
 
     expected_stderr_file = find_expected_file(name, 'stderr')
     actual_stderr_file = add_suffix(name, 'comp.stderr')
+    diff_file_name = in_testdir(add_suffix(name, 'comp.diff'))
 
     if not compare_outputs(way, 'stderr',
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
                                             normalise_errmsg),
                            expected_stderr_file, actual_stderr_file,
+                           diff_file=diff_file_name,
                            whitespace_normaliser=getattr(getTestOpts(),
                                                          "whitespace_normaliser",
                                                          normalise_whitespace)):
-        return failBecause('stderr mismatch')
+        stderr = open(diff_file_name, 'rb').read()
+        os.remove(diff_file_name)
+        return failBecauseStderr('stderr mismatch', stderr=stderr )
+
 
     # no problems found, this test passed
     return passed()
@@ -1291,10 +1297,11 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 
     exit_code = runCmd(cmd, None, stdout, stderr, opts.compile_timeout_multiplier)
 
+    actual_stderr_path = in_testdir(name, 'comp.stderr')
+
     if exit_code != 0 and not should_fail:
         if config.verbose >= 1 and _expect_pass(way):
             print('Compile failed (exit code {0}) errors were:'.format(exit_code))
-            actual_stderr_path = in_testdir(name, 'comp.stderr')
             dump_file(actual_stderr_path)
 
     # ToDo: if the sub-shell was killed by ^C, then exit
@@ -1306,10 +1313,12 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 
     if should_fail:
         if exit_code == 0:
-            return failBecause('exit code 0')
+            stderr_contents = open(actual_stderr_path, 'rb').read()
+            return failBecauseStderr('exit code 0', stderr_contents)
     else:
         if exit_code != 0:
-            return failBecause('exit code non-0')
+            stderr_contents = open(actual_stderr_path, 'rb').read()
+            return failBecauseStderr('exit code non-0', stderr_contents)
 
     return passed()
 
@@ -1622,7 +1631,7 @@ def check_prof_ok(name, way):
 # new output. Returns true if output matched or was accepted, false
 # otherwise. See Note [Output comparison] for the meaning of the
 # normaliser and whitespace_normaliser parameters.
-def compare_outputs(way, kind, normaliser, expected_file, actual_file,
+def compare_outputs(way, kind, normaliser, expected_file, actual_file, diff_file=None,
                     whitespace_normaliser=lambda x:x):
 
     expected_path = in_srcdir(expected_file)
@@ -1657,6 +1666,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
             # See Note [Output comparison].
             r = runCmd('diff -uw "{0}" "{1}"'.format(expected_normalised_path,
                                                         actual_normalised_path),
+                        stdout=diff_file,
                         print_output=True)
 
             # If for some reason there were no non-whitespace differences,
@@ -1664,7 +1674,10 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
             if r == 0:
                 r = runCmd('diff -u "{0}" "{1}"'.format(expected_normalised_path,
                                                            actual_normalised_path),
+                           stdout=diff_file,
                            print_output=True)
+        elif diff_file: open(diff_file, 'ab').close() # Make sure the file exists still as
+                                            # we will try to read it later
 
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
@@ -2154,19 +2167,22 @@ def summary(t, file, short=False, color=False):
         file.write('WARNING: Testsuite run was terminated early\n')
 
 def printUnexpectedTests(file, testInfoss):
-    unexpected = set(name for testInfos in testInfoss
-                       for (_, name, _, _) in testInfos
-                       if not name.endswith('.T'))
+    unexpected = set(result.testname
+                     for testInfos in testInfoss
+                     for result in testInfos
+                     if not result.testname.endswith('.T'))
     if unexpected:
         file.write('Unexpected results from:\n')
         file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
         file.write('\n')
 
 def printTestInfosSummary(file, testInfos):
-    maxDirLen = max(len(directory) for (directory, _, _, _) in testInfos)
-    for (directory, name, reason, way) in testInfos:
-        directory = directory.ljust(maxDirLen)
-        file.write('   {directory}  {name} [{reason}] ({way})\n'.format(**locals()))
+    maxDirLen = max(len(tr.directory) for tr in testInfos)
+    for result in testInfos:
+        directory = result.directory.ljust(maxDirLen)
+        file.write('   {directory}  {r.testname} [{r.reason}] ({r.way})\n'.format(
+            r = result,
+            directory = directory))
     file.write('\n')
 
 def modify_lines(s, f):
