@@ -52,7 +52,7 @@ module TcType (
   --------------------------------
   -- Builders
   mkPhiTy, mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy,
-  mkNakedAppTy, mkNakedAppTys, mkNakedCastTy, nakedSubstTy,
+  mkTcAppTy, mkTcAppTys, mkTcCastTy,
 
   --------------------------------
   -- Splitters
@@ -225,7 +225,7 @@ import ErrUtils( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )
-import Data.Functor.Identity( Identity(..) )
+-- import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
 
@@ -1296,8 +1296,6 @@ getDFunTyLitKey (StrTyLit n) = mkOccName Name.varName (show n)  -- hm
 
 {- Note [The well-kinded type invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [The tcType invariant] in TcHsType.
-
 During type inference, we maintain this invariant
 
    (INV-TK): it is legal to call 'tcTypeKind' on any Type ty,
@@ -1350,43 +1348,19 @@ Notes:
 -}
 
 ---------------
-mkNakedAppTys :: Type -> [Type] -> Type
--- See Note [The well-kinded type invariant]
-mkNakedAppTys ty1                []   = ty1
-mkNakedAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
-mkNakedAppTys ty1                tys2 = foldl' AppTy ty1 tys2
+-- ToDo: I think we need Tc versions of these
+-- Reason: mkCastTy checks isReflexiveCastTy, which checks
+--         for equality; and that has a different answer
+--         depending on whether or not Type = Constraint
 
-mkNakedAppTy :: Type -> Type -> Type
--- See Note [The well-kinded type invariant]
-mkNakedAppTy ty1 ty2 = mkNakedAppTys ty1 [ty2]
+mkTcAppTys :: Type -> [Type] -> Type
+mkTcAppTys = mkAppTys
 
-mkNakedCastTy :: Type -> Coercion -> Type
--- Do /not/ attempt to get rid of the cast altogether,
--- even if it is Refl: see Note [The well-kinded type invariant]
--- Even doing (t |> co1) |> co2  --->  t |> (co1;co2)
--- does not seem worth the bother
---
--- NB: zonking will get rid of these casts, because it uses mkCastTy
---
--- In fact the calls to mkNakedCastTy ar pretty few and far between.
-mkNakedCastTy ty co = CastTy ty co
+mkTcAppTy :: Type -> Type -> Type
+mkTcAppTy = mkAppTy
 
-nakedSubstTy :: HasCallStack => TCvSubst -> TcType  -> TcType
-nakedSubstTy subst ty
-  | isEmptyTCvSubst subst = ty
-  | otherwise             = runIdentity                   $
-                            checkValidSubst subst [ty] [] $
-                            mapType nakedSubstMapper subst ty
-  -- Interesting idea: use StrictIdentity to avoid space leaks
-
-nakedSubstMapper :: TyCoMapper TCvSubst Identity
-nakedSubstMapper
-  = TyCoMapper { tcm_smart      = False
-               , tcm_tyvar      = \subst tv -> return (substTyVar subst tv)
-               , tcm_covar      = \subst cv -> return (substCoVar subst cv)
-               , tcm_hole       = \_ hole   -> return (HoleCo hole)
-               , tcm_tycobinder = \subst tv _ -> return (substVarBndr subst tv)
-               , tcm_tycon    = return }
+mkTcCastTy :: Type -> Coercion -> Type
+mkTcCastTy = mkCastTy   -- Do we need a tc version of mkCastTy?
 
 {-
 ************************************************************************

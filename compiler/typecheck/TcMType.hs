@@ -1937,7 +1937,7 @@ zonkTcTypeMapper = TyCoMapper
   , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
   , tcm_hole  = hole
   , tcm_tycobinder = \_env tv _vis -> ((), ) <$> zonkTyCoVarKind tv
-  , tcm_tycon = return }
+  , tcm_tycon = zonk_tc_tycon }
   where
     hole :: () -> CoercionHole -> TcM Coercion
     hole _ hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
@@ -1948,6 +1948,9 @@ zonkTcTypeMapper = TyCoMapper
                Nothing -> do { cv' <- zonkCoVar cv
                              ; return $ HoleCo (hole { ch_co_var = cv' }) } }
 
+    zonk_tc_tycon tc = do { tck' <- zonkTcType (tyConKind tc)
+                          ; return (setTcTyConKind tc tck') }
+    
 -- For unbound, mutable tyvars, zonkType uses the function given to it
 -- For tyvars bound at a for-all, zonkType zonks them to an immutable
 --      type variable and zonks the kind too

@@ -69,7 +69,8 @@ module TyCon(
         isTyConAssoc, tyConAssoc_maybe, tyConFlavourAssoc_maybe,
         isImplicitTyCon,
         isTyConWithSrcDataCons,
-        isTcTyCon, isTcLevPoly,
+        isTcTyCon, setTcTyConKind,
+        isTcLevPoly,
 
         -- ** Extracting information out of TyCons
         tyConName,
@@ -2130,6 +2131,14 @@ tyConCType_maybe _ = Nothing
 isTcTyCon :: TyCon -> Bool
 isTcTyCon (TcTyCon {}) = True
 isTcTyCon _            = False
+
+setTcTyConKind :: TyCon -> Kind -> TyCon
+-- Update the Kind of a TcTyCon
+-- The new kind is always a zonked version of its previous
+-- kind, so we don't need to update any other fields.
+-- See Note [The Purely Kinded Invariant] in TcHsType
+setTcTyConKind tc@(TcTyCon {}) kind = tc { tyConKind = kind }
+setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)
 
 -- | Could this TyCon ever be levity-polymorphic when fully applied?
 -- True is safe. False means we're sure. Does only a quick check

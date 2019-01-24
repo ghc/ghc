@@ -2019,37 +2019,43 @@ we return a made-up TcTyVarDetails, but I think it works smoothly.
 -}
 
 -- | Breaks apart a function kind into its pieces.
-matchExpectedFunKind :: Outputable fun
-                     => fun             -- ^ type, only for errors
-                     -> TcKind          -- ^ function kind
-                     -> TcM (Coercion, TcKind, TcKind)
-                                  -- ^ co :: old_kind ~ arg -> res
-matchExpectedFunKind hs_ty = go
-  where
-    go k | Just k' <- tcView k = go k'
+matchExpectedFunKind
+  :: Outputable fun
+  => fun             -- ^ type, only for errors
+  -> Arity           -- ^ n: number of desired arrows
+  -> TcKind          -- ^ fun_ kind
+  -> TcM Coercion    -- ^ co :: fun_kind ~ (arg1 -> ... -> argn -> res)
 
-    go k@(TyVarTy kvar)
+matchExpectedFunKind hs_ty n k = go n k
+  where
+    go 0 k = return (mkNomReflCo k)
+
+    go n k | Just k' <- tcView k = go n k'
+
+    go n k@(TyVarTy kvar)
       | isMetaTyVar kvar
       = do { maybe_kind <- readMetaTyVar kvar
            ; case maybe_kind of
-                Indirect fun_kind -> go fun_kind
-                Flexi ->             defer k }
+                Indirect fun_kind -> go n fun_kind
+                Flexi ->             defer n k }
 
-    go k@(FunTy arg res) = return (mkNomReflCo k, arg, res)
-    go other             = defer other
+    go n (FunTy arg res)
+      = do { co <- go (n-1) res
+           ; return (mkTcFunCo Nominal (mkTcNomReflCo arg) co) }
 
-    defer k
-      = do { arg_kind <- newMetaKindVar
-           ; res_kind <- newMetaKindVar
-           ; let new_fun = mkFunTy arg_kind res_kind
+    go n other
+     = defer n other
+
+    defer n k
+      = do { arg_kinds <- newMetaKindVars n
+           ; res_kind  <- newMetaKindVar
+           ; let new_fun = mkFunTys arg_kinds res_kind
                  origin  = TypeEqOrigin { uo_actual   = k
                                         , uo_expected = new_fun
                                         , uo_thing    = Just (ppr hs_ty)
                                         , uo_visible  = True
                                         }
-           ; co <- uType KindLevel origin k new_fun
-           ; return (co, arg_kind, res_kind) }
-
+           ; uType KindLevel origin k new_fun }
 
 {- *********************************************************************
 *                                                                      *
