@@ -1,0 +1,5 @@
+:set -XTypeFamilies -XTypeInType -XRankNTypes
+import Data.Kind( Type )
+type family F :: k
+data T :: (forall k. k) -> Type
+:kind T F

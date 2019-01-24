@@ -15,7 +15,7 @@ module Inst (
        instCall, instDFunType, instStupidTheta, instTyVarsWith,
        newWanted, newWanteds,
 
-       tcInstTyBinders, tcInstTyBinder,
+       tcInstInvisibleTyBinders, tcInstInvisibleTyBinder,
 
        newOverloadedLit, mkOverLit,
 
@@ -484,43 +484,34 @@ no longer cut it, but it seems fine for now.
 -}
 
 ---------------------------
--- | Instantantiate the TyConBinders of a forall type,
---   given its decomposed form (tvs, ty)
-tcInstTyBinders :: HasDebugCallStack
-              => ([TyCoBinder], TcKind)   -- ^ The type (forall bs. ty)
-              -> TcM ([TcType], TcKind)   -- ^ Instantiated bs, substituted ty
--- Takes a pair because that is what splitPiTysInvisible returns
--- See also Note [Bidirectional type checking]
-tcInstTyBinders (bndrs, ty)
-  | null bndrs        -- It's fine for bndrs to be empty e.g.
-  = return ([], ty)   -- Check that (Maybe :: forall {k}. k->*),
-                      --       and see the call to instTyBinders in checkExpectedKind
-                      -- A user bug to be reported as such; it is not a compiler crash!
+-- | Instantiates up to n invisible binders
+-- Returns the instantiating types, and body kind
+tcInstInvisibleTyBinders :: Int -> TcKind -> TcM ([TcType], TcKind)
 
-  | otherwise
-  = do { (subst, args) <- mapAccumLM (tcInstTyBinder Nothing) empty_subst bndrs
-       ; ty' <- zonkTcType (substTy subst ty)
-                   -- Why zonk the result? So that tcTyVar can
-                   -- obey (IT6) of Note [The tcType invariant] in TcHsType
-                   -- ToDo: SLPJ: I don't think this is needed
-       ; return (args, ty') }
+tcInstInvisibleTyBinders 0 kind
+  = return ([], kind)
+tcInstInvisibleTyBinders n ty
+  = go n empty_subst ty
   where
-     empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
+    empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
+
+    go n subst kind
+      | n > 0
+      , Just (bndr, body) <- tcSplitPiTy_maybe kind
+      , isInvisibleBinder bndr
+      = do { (subst', arg) <- tcInstInvisibleTyBinder subst bndr
+           ; (args, inner_ty) <- go (n-1) subst' body
+           ; return (arg:args, inner_ty) }
+      | otherwise
+      = return ([], substTy subst kind)
 
 -- | Used only in *types*
-tcInstTyBinder :: Maybe (VarEnv Kind)
-               -> TCvSubst -> TyBinder -> TcM (TCvSubst, TcType)
-tcInstTyBinder mb_kind_info subst (Named (Bndr tv _))
-  = case lookup_tv tv of
-      Just ki -> return (extendTvSubstAndInScope subst tv ki, ki)
-      Nothing -> do { (subst', tv') <- newMetaTyVarX subst tv
-                    ; return (subst', mkTyVarTy tv') }
-  where
-    lookup_tv tv = do { env <- mb_kind_info   -- `Maybe` monad
-                      ; lookupVarEnv env tv }
+tcInstInvisibleTyBinder :: TCvSubst -> TyBinder -> TcM (TCvSubst, TcType)
+tcInstInvisibleTyBinder subst (Named (Bndr tv _))
+  = do { (subst', tv') <- newMetaTyVarX subst tv
+       ; return (subst', mkTyVarTy tv') }
 
-
-tcInstTyBinder _ subst (Anon ty)
+tcInstInvisibleTyBinder subst (Anon ty)
      -- This is the *only* constraint currently handled in types.
   | Just (mk, k1, k2) <- get_eq_tys_maybe substed_ty
   = do { co <- unifyKind Nothing k1 k2
