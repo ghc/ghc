@@ -34,6 +34,7 @@ args Create = mconcat
     , getInputs ]
 args Extract = mconcat
     [ arg "-x"
+    , arg "--force-local"
     , input "*.gz"  ? arg "--gzip"
     , input "*.bz2" ? arg "--bzip2"
     , input "*.xz"  ? arg "--xz"
