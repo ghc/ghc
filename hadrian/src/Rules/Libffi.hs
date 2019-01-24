@@ -50,7 +50,6 @@ libffiRules =
           &%> \_ -> do
             libffiPath <- libffiBuildPath stage
             need [libffiPath -/- libffiLibrary]
-
     -- we set a higher priority because this overlaps
     -- with the static lib rule from Rules.Library.libraryRules.
       priority 2.0 $ root -/- stageString stage <//> libffiLibrary %> \_ -> do
@@ -67,9 +66,9 @@ libffiRules =
             libffiPath <- libffiBuildPath stage
             build $ target (libffiContext stage) (Make libffiPath) [] []
 
-            hs <- getDirectoryFiles "" [libffiPath -/- "inst/include/*"]
+            hs <- getDirectoryFiles libffiPath ["inst/include/*"]
             forM_ hs $ \header ->
-                copyFile header (rtsPath -/- takeFileName header)
+                copyFile (libffiPath -/- header) (rtsPath -/- takeFileName header)
 
             ways <- interpretInContext (libffiContext stage)
                                        (getLibraryWays <> getRtsWays)
