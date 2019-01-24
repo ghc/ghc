@@ -9,3 +9,5 @@ class LiftingMonad2  ((trans :: MTrans)) where
 data Nat (t :: NatKind) where
     ZeroNat :: Nat Zero
     SuccNat :: Nat t -> Nat (Succ t)
+
+data Foo (a) b = Foo { av :: a, bv :: b }
