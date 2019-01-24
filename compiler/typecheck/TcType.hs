@@ -52,7 +52,7 @@ module TcType (
   --------------------------------
   -- Builders
   mkPhiTy, mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy,
-  mkNakedAppTy, mkNakedAppTys, mkNakedCastTy, nakedSubstTy,
+  mkTcAppTy, mkTcAppTys, mkTcCastTy,
 
   --------------------------------
   -- Splitters
@@ -225,7 +225,7 @@ import ErrUtils( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )
-import Data.Functor.Identity( Identity(..) )
+-- import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
 
@@ -1290,103 +1290,23 @@ getDFunTyLitKey (StrTyLit n) = mkOccName Name.varName (show n)  -- hm
 
 {- *********************************************************************
 *                                                                      *
-           Maintaining the well-kinded type invariant
+           Building types
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [The well-kinded type invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [The tcType invariant] in TcHsType.
+-- ToDo: I think we need Tc versions of these
+-- Reason: mkCastTy checks isReflexiveCastTy, which checks
+--         for equality; and that has a different answer
+--         depending on whether or not Type = Constraint
 
-During type inference, we maintain this invariant
+mkTcAppTys :: Type -> [Type] -> Type
+mkTcAppTys = mkAppTys
 
-   (INV-TK): it is legal to call 'tcTypeKind' on any Type ty,
-             /without/ zonking ty
+mkTcAppTy :: Type -> Type -> Type
+mkTcAppTy = mkAppTy
 
-For example, suppose
-    kappa is a unification variable
-    We have already unified kappa := Type
-      yielding    co :: Refl (Type -> Type)
-    a :: kappa
-then consider the type
-    (a Int)
-If we call tcTypeKind on that, we'll crash, because the (un-zonked)
-kind of 'a' is just kappa, not an arrow kind.  If we zonk first
-we'd be fine, but that is too tiresome, so instead we maintain
-(INV-TK).  So we do not form (a Int); instead we form
-    (a |> co) Int
-and tcTypeKind has no problem with that.
-
-Bottom line: we want to keep that 'co' /even though it is Refl/.
-
-Immediate consequence: during type inference we cannot use the "smart
-contructors" for types, particularly
-   mkAppTy, mkCastTy
-because they all eliminate Refl casts.  Solution: during type
-inference use the mkNakedX type formers, which do no Refl-elimination.
-E.g. mkNakedCastTy uses an actual CastTy, without optimising for
-Refl.  (NB: mkNakedCastTy is only called in two places: in tcInferApps
-and in checkExpectedResultKind.)
-
-Where does this show up in practice: apparently mainly in
-TcHsType.tcInferApps.  Suppose we are kind-checking the type (a Int),
-where (a :: kappa).  Then in tcInferApps we'll run out of binders on
-a's kind, so we'll call matchExpectedFunKind, and unify
-   kappa := kappa1 -> kappa2,  with evidence co :: kappa ~ (kappa1 ~ kappa2)
-That evidence is actually Refl, but we must not discard the cast to
-form the result type
-   ((a::kappa) (Int::*))
-because that does not satisfy the invariant, and crashes TypeKind.  This
-caused Trac #14174 and #14520.
-
-Notes:
-
-* The Refls will be removed later, when we zonk the type.
-
-* This /also/ applies to substitution.  We must use nakedSubstTy,
-  not substTy, because the latter uses smart constructors that do
-  Refl-elimination.
-
--}
-
----------------
-mkNakedAppTys :: Type -> [Type] -> Type
--- See Note [The well-kinded type invariant]
-mkNakedAppTys ty1                []   = ty1
-mkNakedAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
-mkNakedAppTys ty1                tys2 = foldl' AppTy ty1 tys2
-
-mkNakedAppTy :: Type -> Type -> Type
--- See Note [The well-kinded type invariant]
-mkNakedAppTy ty1 ty2 = mkNakedAppTys ty1 [ty2]
-
-mkNakedCastTy :: Type -> Coercion -> Type
--- Do /not/ attempt to get rid of the cast altogether,
--- even if it is Refl: see Note [The well-kinded type invariant]
--- Even doing (t |> co1) |> co2  --->  t |> (co1;co2)
--- does not seem worth the bother
---
--- NB: zonking will get rid of these casts, because it uses mkCastTy
---
--- In fact the calls to mkNakedCastTy ar pretty few and far between.
-mkNakedCastTy ty co = CastTy ty co
-
-nakedSubstTy :: HasCallStack => TCvSubst -> TcType  -> TcType
-nakedSubstTy subst ty
-  | isEmptyTCvSubst subst = ty
-  | otherwise             = runIdentity                   $
-                            checkValidSubst subst [ty] [] $
-                            mapType nakedSubstMapper subst ty
-  -- Interesting idea: use StrictIdentity to avoid space leaks
-
-nakedSubstMapper :: TyCoMapper TCvSubst Identity
-nakedSubstMapper
-  = TyCoMapper { tcm_smart      = False
-               , tcm_tyvar      = \subst tv -> return (substTyVar subst tv)
-               , tcm_covar      = \subst cv -> return (substCoVar subst cv)
-               , tcm_hole       = \_ hole   -> return (HoleCo hole)
-               , tcm_tycobinder = \subst tv _ -> return (substVarBndr subst tv)
-               , tcm_tycon    = return }
+mkTcCastTy :: Type -> Coercion -> Type
+mkTcCastTy = mkCastTy   -- Do we need a tc version of mkCastTy?
 
 {-
 ************************************************************************

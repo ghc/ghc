@@ -1940,9 +1940,7 @@ tcFamTyPats :: TyCon
 -- Used for both type and data families
 tcFamTyPats fam_tc hs_pats
   = do { traceTc "tcFamTyPats {" $
-         vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
-              , text "arity:" <+> ppr fam_arity
-              , text "kind:" <+> ppr fam_kind ]
+         vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity ]
 
        ; let fun_ty = mkTyConApp fam_tc []
 
@@ -1950,18 +1948,15 @@ tcFamTyPats fam_tc hs_pats
                                 setXOptM LangExt.PartialTypeSignatures $
                                 -- See Note [Wildcards in family instances] in
                                 -- RnSource.hs
-                                tcInferApps typeLevelMode lhs_fun fun_ty
-                                            fam_kind hs_pats
+                                tcInferApps typeLevelMode lhs_fun fun_ty hs_pats
 
        ; traceTc "End tcFamTyPats }" $
-         vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
-              , text "res_kind:" <+> ppr res_kind ]
+         vcat [ ppr fam_tc, text "res_kind:" <+> ppr res_kind ]
 
        ; return (fam_app, res_kind) }
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    fam_kind  = tyConKind fam_tc
     lhs_fun   = noLoc (HsTyVar noExt NotPromoted (noLoc fam_name))
 
 unravelFamInstPats :: TcType -> [TcType]

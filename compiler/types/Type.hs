@@ -538,9 +538,11 @@ data TyCoMapper env m
           -- ^ The returned env is used in the extended scope
 
       , tcm_tycon :: TyCon -> m TyCon
-          -- ^ This is used only to turn 'TcTyCon's into 'TyCon's.
-          -- See Note [Type checking recursive type and class declarations]
-          -- in TcTyClsDecls
+          -- ^ This is used only for TcTyCons
+          -- a) To zonk TcTyCons
+          -- b) To turn TcTyCons into TyCons.
+          --    See Note [Type checking recursive type and class declarations]
+          --    in TcTyClsDecls
       }
 
 {-# INLINABLE mapType #-}  -- See Note [Specialising mappers]
@@ -552,12 +554,18 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
   where
     go (TyVarTy tv) = tyvar env tv
     go (AppTy t1 t2) = mkappty <$> go t1 <*> go t2
-    go t@(TyConApp tc []) | not (isTcTyCon tc)
-                          = return t  -- avoid allocation in this exceedingly
-                                      -- common case (mostly, for *)
-    go (TyConApp tc tys)
+    go ty@(TyConApp tc tys)
+      | isTcTyCon tc
       = do { tc' <- tycon tc
            ; mktyconapp tc' <$> mapM go tys }
+
+      -- Not a TcTyCon
+      | null tys    -- Avoid allocation in this very
+      = return ty   -- common case (E.g. Int, LiftedRep etc)
+
+      | otherwise
+      = mktyconapp tc <$> mapM go tys 
+
     go (FunTy arg res)   = FunTy <$> go arg <*> go res
     go (ForAllTy (Bndr tv vis) inner)
       = do { (env', tv') <- tycobinder env tv vis
@@ -586,7 +594,9 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
     go (Refl ty) = Refl <$> mapType mapper env ty
     go (GRefl r ty mco) = mkgreflco r <$> mapType mapper env ty <*> (go_mco mco)
     go (TyConAppCo r tc args)
-      = do { tc' <- tycon tc
+      = do { tc' <- if isTcTyCon tc
+                    then tycon tc
+                    else return tc
            ; mktyconappco r tc' <$> mapM go args }
     go (AppCo c1 c2) = mkappco <$> go c1 <*> go c2
     go (ForAllCo tv kind_co co)
@@ -719,6 +729,10 @@ mkAppTy ty1               ty2 = AppTy ty1 ty2
         --
         -- Here Id is partially applied in the type sig for Foo,
         -- but once the type synonyms are expanded all is well
+        --
+        -- Moreover in TcHsTypes.tcInferApps we build up a type
+        --   (T t1 t2 t3) one argument at a type, thus forming
+        --   (T t1), (T t1 t2), etc
 
 mkAppTys :: Type -> [Type] -> Type
 mkAppTys ty1                []   = ty1
@@ -966,9 +980,6 @@ In the compiler we maintain the invariant that all saturated applications of
 See #11714.
 -}
 
-isFunTy :: Type -> Bool
-isFunTy ty = isJust (splitFunTy_maybe ty)
-
 splitFunTy :: Type -> (Type, Type)
 -- ^ Attempts to extract the argument and result types from a type, and
 -- panics if that is not possible. See also 'splitFunTy_maybe'
@@ -1010,6 +1021,8 @@ piResultTy ty arg = case piResultTy_maybe ty arg of
                       Nothing  -> pprPanic "piResultTy" (ppr ty $$ ppr arg)
 
 piResultTy_maybe :: Type -> Type -> Maybe Type
+-- We don't need a 'tc' version, because
+-- this function behaves the same for Type and Constraint
 piResultTy_maybe ty arg
   | Just ty' <- coreView ty = piResultTy_maybe ty' arg
 
@@ -1454,10 +1467,16 @@ isForAllTy_co _             = False
 
 -- | Is this a function or forall?
 isPiTy :: Type -> Bool
-isPiTy ty | Just ty' <- coreView ty = isForAllTy ty'
+isPiTy ty | Just ty' <- coreView ty = isPiTy ty'
 isPiTy (ForAllTy {}) = True
 isPiTy (FunTy {})    = True
 isPiTy _             = False
+
+-- | Is this a function?
+isFunTy :: Type -> Bool
+isFunTy ty | Just ty' <- coreView ty = isFunTy ty'
+isFunTy (FunTy {}) = True
+isFunTy _          = False
 
 -- | Take a forall type apart, or panics if that is not possible.
 splitForAllTy :: Type -> (TyCoVar, Type)
@@ -2763,7 +2782,7 @@ tcTypeKind ty@(ForAllTy {})
     body_kind = tcTypeKind body
 
 
-isPredTy :: Type -> Bool
+isPredTy :: HasDebugCallStack => Type -> Bool
 -- See Note [Types for coercions, predicates, and evidence]
 isPredTy ty = tcIsConstraintKind (tcTypeKind ty)
 

@@ -498,29 +498,18 @@ tcInstTyBinders (bndrs, ty)
                       -- A user bug to be reported as such; it is not a compiler crash!
 
   | otherwise
-  = do { (subst, args) <- mapAccumLM (tcInstTyBinder Nothing) empty_subst bndrs
-       ; ty' <- zonkTcType (substTy subst ty)
-                   -- Why zonk the result? So that tcTyVar can
-                   -- obey (IT6) of Note [The tcType invariant] in TcHsType
-                   -- ToDo: SLPJ: I don't think this is needed
-       ; return (args, ty') }
+  = do { (subst, args) <- mapAccumLM tcInstTyBinder empty_subst bndrs
+       ; return (args, substTy subst ty) }
   where
      empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
 
 -- | Used only in *types*
-tcInstTyBinder :: Maybe (VarEnv Kind)
-               -> TCvSubst -> TyBinder -> TcM (TCvSubst, TcType)
-tcInstTyBinder mb_kind_info subst (Named (Bndr tv _))
-  = case lookup_tv tv of
-      Just ki -> return (extendTvSubstAndInScope subst tv ki, ki)
-      Nothing -> do { (subst', tv') <- newMetaTyVarX subst tv
-                    ; return (subst', mkTyVarTy tv') }
-  where
-    lookup_tv tv = do { env <- mb_kind_info   -- `Maybe` monad
-                      ; lookupVarEnv env tv }
+tcInstTyBinder :: TCvSubst -> TyBinder -> TcM (TCvSubst, TcType)
+tcInstTyBinder subst (Named (Bndr tv _))
+  = do { (subst', tv') <- newMetaTyVarX subst tv
+       ; return (subst', mkTyVarTy tv') }
 
-
-tcInstTyBinder _ subst (Anon ty)
+tcInstTyBinder subst (Anon ty)
      -- This is the *only* constraint currently handled in types.
   | Just (mk, k1, k2) <- get_eq_tys_maybe substed_ty
   = do { co <- unifyKind Nothing k1 k2
