@@ -954,7 +954,12 @@ def do_test(name, way, func, args, files):
                 t.unexpected_stat_failures.append(TestResult(directory, name, reason, way))
             else:
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
-                t.unexpected_failures.append(TestResult(directory, name, reason, way))
+                other = {
+                    'stdout': result.get('stdout'),
+                    'stderr': result.get('stderr')
+                }
+                result = TestResult(directory, name, reason, way, **other)
+                t.unexpected_failures.append(result)
         else:
             if opts.expect == 'missing-lib':
                 t.missing_libs.append(TestResult(directory, name, 'missing-lib', way))
@@ -1097,7 +1102,7 @@ def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts, **kwa
                            whitespace_normaliser=getattr(getTestOpts(),
                                                          "whitespace_normaliser",
                                                          normalise_whitespace)):
-        return failBecause('stderr mismatch')
+        return failBecause('stderr mismatch', stderr=open(actual_stderr_file, 'rb').read())
 
     # no problems found, this test passed
     return passed()
