@@ -1797,7 +1797,9 @@ checkCrossStageLifting mk_expr top_lvl id_name id
         -- If 'x' occurs many times we may get many identical
         -- bindings of the same splice proxy, but that doesn't
         -- matter, although it's a mite untidy.
-    do  { liftExpr <- setConstraintVar lie_var (mk_expr id_name id)
+
+    do  { -- Put the constraint (either Lift or LiftT) into the right LIE
+          liftExpr <- setConstraintVar lie_var (mk_expr id_name id)
         -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; let pending_splice = PendingTcSplice id_name liftExpr

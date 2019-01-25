@@ -561,6 +561,7 @@ data HsExpr p
                            -- renamed expression, plus
       [PendingTcSplice]    -- _typechecked_ splices to be
                            -- pasted back in by the desugarer
+
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
   --         'ApiAnnotation.AnnClose'
 

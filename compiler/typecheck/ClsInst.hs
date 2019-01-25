@@ -628,18 +628,20 @@ The definition of the `LiftT` class is:
 class LiftT (t :: k) where
   liftTyCl :: Q Type
 
+For further information about LiftT and why it exists see Note [The LiftT Story]
+
 We solve these constraints magically in the function `matchLiftTy` by
 converting the type `t` into a core expression which builds a term of type
 `Q Type`.
 
-Example 1: LiftT @Bool
+Example 1: LiftT Bool
 
 For simple ground types with no free variables we need to convert a `Type` into
 a `CoreExpr`. This is achieved by cominbing `HsUtils.typeToHsTypeRn` and
 `DsMeta.repTy`. This generates a core expression of the right type which we then
 convert to the evidence by applying the constructor for `LiftT`.
 
-Example 2: LiftT @(a, Int)
+Example 2: LiftT (a, Int)
 
 When a type has a free variable, we need to recursively solve LiftT constraints.
 We do this by creating `new_preds` which contains `LiftT a`.
@@ -648,24 +650,41 @@ When generating the evidence for a term with free variables, we do it in two sta
 
 Stage 1: Generate a representation of a lambda
 
-For `LiftT @(a, Int)` we generate the TH representation of
+For `LiftT (a, Int)` we generate core which produces the TH representation of
 
 ```
 \a -> (,) a Int
 ```
 
+Which involves calls to functions like `lamE`, `appE` and so on.
+
 Stage 2: Apply the arguments
 
 Then we apply this lambda to the dictionaries produced by recursively creating
-evidence. Note that this is an application in the representation type, not at the
-core level. So overall the term we generate is equivalent to:
+evidence.
 
-[t| (\a -> (,) a Int) $dictA |]
+In our example, we solve the constraint `LiftT a` somehow, so the evidence for
+this is a `CoreExpr` whose code constructs an expression of type `Q Type`.
+So in order to use this we need to apply the previously constructed lambda
+to the evidence so that when we run the core expression and then interpret the
+resulting program, the type is taken as an argument.
+
+So overall the core we generate is something like:
+
+[t|(\a -> (,) a Int)|] `app` $dictA
+
+Note that this is an application in the representation type, not at the
+core level.
 
 So when we splice it in, this gets converted to a normal lambda with type
 arguments.
 
-Example 3: LiftT @(forall a. a -> a)
+Say that the user decides that `a = Int` then the splice results in the core
+
+(\a -> (,) a Int) @Int
+
+
+Example 3: LiftT (forall a. a -> a)
 
 LiftT also works for polymorphic types. No further special cases are needed as
 they are handled by `typeToHsTypeRn` and `repTy` without modifications.

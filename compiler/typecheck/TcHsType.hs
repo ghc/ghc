@@ -1245,7 +1245,7 @@ foo = [| get @a |]
 this now means approximately:
 
 foo :: forall a . LiftT a => Q (TExp a)
-foo = [| get @$$(liftTyCl @a) |]
+foo = [| get @$(liftTyCl @Type @a) |]
 
 So when we splice in foo, we can instantiate |a| and have it turned into its
 representation appropiately.
@@ -1276,13 +1276,12 @@ but far less expressive.
 checkThLocalTyId :: Name -> Id -> TcM ()
 checkThLocalTyId = checkThLocalIdX mkSpliceTyExpr
 
--- Construct the term for `liftTyCl @ty`
+-- Construct the term for `liftTyCl @k @ty`
 mkSpliceTyExpr :: Name -> Id -> TcM (LHsExpr GhcTc)
 mkSpliceTyExpr id_name id = do
   let id_ty = mkTyVarTy id
       k = idType id
   liftTClass <- tcLookupClass liftTClassName
-  -- Put the 'lift' constraint into the right LIE
   let [lift_id] = classMethods liftTClass
       c = (mkTyConApp (classTyCon liftTClass) [k, id_ty])
   dict <- instCall (OccurrenceOf id_name) [k, id_ty] [c]

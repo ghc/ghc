@@ -952,6 +952,8 @@ thisModule = do
 -- It is the type analogue to `Lift`.
 --
 -- It is solved automatically by the compiler so it is forbidden
--- to write instances for it.
+-- to write instances for it. As such, unlike `Lift`, there is not
+-- one instance per kind but one instance per type as we just create the
+-- representation directly from the type.
 class LiftT (t :: k) where
   liftTyCl :: Q Type
