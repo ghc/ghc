@@ -21,6 +21,9 @@ import Unique
 import UniqFM
 import X86.Regs
 
+import Debug.Trace
+import Numeric (showHex)
+
 
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
@@ -32,38 +35,50 @@ mkVirtualReg u format
 
 regDotColor :: Platform -> RealReg -> SDoc
 regDotColor platform reg
- = let Just str = lookupUFM (regColors platform) reg
-   in text str
+ = case (lookupUFM (regColors platform) reg) of
+        Just str -> text str
+        _        -> panic "Register not assigned a color"
 
 regColors :: Platform -> UniqFM [Char]
-regColors platform = listToUFM (normalRegColors platform ++ fpRegColors)
+regColors platform = listToUFM (normalRegColors platform ++ fpRegColors platform)
 
 normalRegColors :: Platform -> [(Reg,String)]
-normalRegColors platform
- | target32Bit platform = [ (eax, "#00ff00")
-                          , (ebx, "#0000ff")
-                          , (ecx, "#00ffff")
-                          , (edx, "#0080ff") ]
- | otherwise            = [ (rax, "#00ff00"), (eax, "#00ff00")
-                          , (rbx, "#0000ff"), (ebx, "#0000ff")
-                          , (rcx, "#00ffff"), (ecx, "#00ffff")
-                          , (rdx, "#0080ff"), (edx, "#00ffff")
-                          , (r8,  "#00ff80")
-                          , (r9,  "#008080")
-                          , (r10, "#0040ff")
-                          , (r11, "#00ff40")
-                          , (r12, "#008040")
-                          , (r13, "#004080")
-                          , (r14, "#004040")
-                          , (r15, "#002080") ]
+normalRegColors platform =
+    zip (map regSingle [0..lastint platform]) colors
+  where
+    -- 16 colors - enough for amd64 gp regs
+    colors = ["#800000","#ff0000","#808000","#ffff00","#008000"
+             ,"#00ff00","#008080","#00ffff","#000080","#0000ff"
+             ,"#800080","#ff00ff","#87005f","#875f00","#87af00"
+             ,"#ff00af"]
 
-fpRegColors :: [(Reg,String)]
-fpRegColors =
-        [ (fake0, "#ff00ff")
-        , (fake1, "#ff00aa")
-        , (fake2, "#aa00ff")
-        , (fake3, "#aa00aa")
-        , (fake4, "#ff0055")
-        , (fake5, "#5500ff") ]
+fpRegColors :: Platform -> [(Reg,String)]
+fpRegColors platform =
+        [ (fake0, "red")
+        , (fake1, "red")
+        , (fake2, "red")
+        , (fake3, "red")
+        , (fake4, "red")
+        , (fake5, "red") ]
 
-        ++ zip (map regSingle [24..39]) (repeat "red")
+        ++ zip (map regSingle [firstxmm..lastxmm platform]) greys
+  where
+    -- 16 shades of grey, enough for the currently supported
+    -- SSE extensions.
+    greys = ["#0e0e0e","#1c1c1c","#2a2a2a","#383838","#464646"
+            ,"#545454","#626262","#707070","#7e7e7e","#8c8c8c"
+            ,"#9a9a9a","#a8a8a8","#b6b6b6","#c4c4c4","#d2d2d2"
+            ,"#e0e0e0"]
+
+
+
+--     32 shades of grey - use for avx 512 if we ever need it
+--     greys = ["#070707","#0e0e0e","#151515","#1c1c1c"
+--             ,"#232323","#2a2a2a","#313131","#383838","#3f3f3f"
+--             ,"#464646","#4d4d4d","#545454","#5b5b5b","#626262"
+--             ,"#696969","#707070","#777777","#7e7e7e","#858585"
+--             ,"#8c8c8c","#939393","#9a9a9a","#a1a1a1","#a8a8a8"
+--             ,"#afafaf","#b6b6b6","#bdbdbd","#c4c4c4","#cbcbcb"
+--             ,"#d2d2d2","#d9d9d9","#e0e0e0"]
+
+
