@@ -31,7 +31,7 @@ quickCrossArgs = sourceArgs SourceArgs
         , naturalInBaseFixArgs
         ]
     , hsLibrary  = notStage0 ? mconcat [ arg "-O", arg "-fllvm" ]
-    , hsCompiler = stage0 ? arg "-O"
+    , hsCompiler = stage0 ? arg "-O2"
     , hsGhc      = mconcat
                    [ stage0 ? arg "-O"
                    , stage1 ? mconcat [ arg "-O0", arg "-fllvm" ] ] }
