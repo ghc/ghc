@@ -357,7 +357,7 @@ coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
        | otherwise                    = True
     id_arity  = idArity bndr
     mk_arity_msg stg_arity
-        = vcat [ppr bndr,
+        = vcat [ppr bndr, ppr rhs,
                 text "Id arity:" <+> ppr id_arity,
                 text "STG arity:" <+> ppr stg_arity]
 
