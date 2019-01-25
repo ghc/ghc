@@ -135,24 +135,14 @@ tcRnExports explicit_mod exports
        -- list, to avoid bleating about re-exporting a deprecated
        -- thing (especially via 'module Foo' export item)
    do   {
-        -- In interactive mode, we behave as if he had
-        -- written "module Main where ..."
+        -- See note: [Check unused bindings in modules without header]
         ; dflags <- getDynFlags
-        ; let is_main_mod = mainModIs dflags == this_mod
-        ; let default_main = case mainFunIs dflags of
-                 Just main_fun
-                     | is_main_mod -> mkUnqual varName (fsLit main_fun)
-                 _                 -> main_RDR_Unqual
+        ; (dflt_main_hdr, dflt_main_rdrName) <- defaultMain this_mod
         ; let real_exports
                  | explicit_mod = exports
                  | ghcLink dflags == LinkInMemory = Nothing
-                 | otherwise
-                          = Just (noLoc [noLoc (IEVar noExt
-                                     (noLoc (IEName $ noLoc default_main)))])
-                        -- ToDo: the 'noLoc' here is unhelpful if 'main'
-                        --       turns out to be out of scope
-
-        ; let do_it = exports_from_avail real_exports rdr_env imports this_mod
+                 | otherwise = dflt_main_hdr
+              do_it = exports_from_avail real_exports rdr_env imports this_mod
         ; (rn_exports, final_avails)
             <- if hsc_src == HsigFile
                 then do (msgs, mb_r) <- tryTc do_it
@@ -164,15 +154,41 @@ tcRnExports explicit_mod exports
 
         ; traceRn "rnExports: Exports:" (ppr final_avails)
 
-        ; let new_tcg_env =
-                  tcg_env { tcg_exports    = final_avails,
-                             tcg_rn_exports = case tcg_rn_exports tcg_env of
-                                                Nothing -> Nothing
-                                                Just _  -> rn_exports,
-                            tcg_dus = tcg_dus tcg_env `plusDU`
-                                      usesOnly final_ns }
+        ; let final_ns_chk = availsToNameSetWithSelectors $
+                                  gresToAvailInfo $
+                                    lookupGRE_RdrName dflt_main_rdrName rdr_env
+              new_tcg_dus = tcg_dus tcg_env `plusDU` usesOnly final_ns
+              main_missing = case tcg_main tcg_env of
+                               Nothing -> True
+                               Just _  -> False
+              new_tcg_env =
+                tcg_env { tcg_exports    = final_avails,
+                          tcg_rn_exports = case tcg_rn_exports tcg_env of
+                                              Nothing -> Nothing
+                                              Just _  -> rn_exports,
+                          tcg_dus = new_tcg_dus,
+                          tcg_dus_chk = if explicit_mod || main_missing
+                                        then new_tcg_dus
+                                        else tcg_dus tcg_env `plusDU`
+                                                 usesOnly final_ns_chk }
         ; failIfErrsM
         ; return new_tcg_env }
+
+defaultMain :: Module -> RnM (Maybe (Located [LIE GhcPs]), RdrName)
+defaultMain this_mod = do {
+      ; dflags <- getDynFlags
+      ; let is_main_mod = mainModIs dflags == this_mod
+      ; let {default_main = case mainFunIs dflags of
+           Just main_fun
+               | is_main_mod -> mkUnqual varName (fsLit main_fun)
+           _                 -> main_RDR_Unqual
+           }
+      ; return $ ( Just (noLoc [noLoc (IEVar noExt
+                                (noLoc (IEName $ noLoc default_main)))])
+                   , default_main )
+                  -- ToDo: the 'noLoc' here is unhelpful if 'main'
+                  --       turns out to be out of scope
+      }
 
 exports_from_avail :: Maybe (Located [LIE GhcPs])
                          -- Nothing => no explicit export list
@@ -391,10 +407,22 @@ isDoc (IEDocNamed {}) = True
 isDoc (IEGroup {})    = True
 isDoc _ = False
 
+-- Note [Check unused bindings in modules without header]
+--   While checking for unused top bindings, exported names count as 'used'.
+--   If we have a module without a module header, then GHC adds a default
+--   module header and exports only the main function.
+--   In GHCi, if no module header is available, we have to export all
+--   top bindings. However, to report the same unused bindings as with GHC
+--   we just export the main function, but only if it's defined in the module.
+--   Hence, we need to two different sets of used names:
+--   One (tcg_dus) containing all the really exported names, and a second one
+--   (tcg-dus_chk) with names to be used while checking for unused bindings.
+--   (See Trac ticket #13839)
+
+
+
 -- Renaming and typechecking of exports happens after everything else has
 -- been typechecked.
-
-
 
 -- Renaming exports lists is a minefield. Five different things can appear in
 -- children export lists ( T(A, B, C) ).

@@ -280,6 +280,9 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_imports        = emptyImportAvails,
                 tcg_used_gres     = used_gre_var,
                 tcg_dus            = emptyDUs,
+                tcg_dus_chk        = emptyDUs,
+                -- See Note [Check unused bindings in modules without header]
+                --          in TcRnExports.hs
 
                 tcg_rn_imports     = [],
                 tcg_rn_exports     =

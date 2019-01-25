@@ -556,6 +556,8 @@ data TcGblEnv
           --    - To create the Dependencies field in interface (mkDependencies)
 
         tcg_dus       :: DefUses,   -- ^ What is defined in this module and what is used.
+        tcg_dus_chk   :: DefUses,
+          -- ^ As tcg_dus, but used for warning msg generation #13839
         tcg_used_gres :: TcRef [GlobalRdrElt],  -- ^ Records occurrences of imported entities
           -- One entry for each occurrence; but may have different GREs for
           -- the same Name See Note [Tracking unused binding and imports]
@@ -756,12 +758,19 @@ We gather two sorts of usage information
       Records *defined* Names (local, top-level)
           and *used*    Names (local or imported)
 
-      Used (a) to report "defined but not used"
-               (see RnNames.reportUnusedNames)
-           (b) to generate version-tracking usage info in interface
-               files (see MkIface.mkUsedNames)
+      Used to generate version-tracking usage info in interface
+          files (see MkIface.mkUsedNames)
    This usage info is mainly gathered by the renamer's
    gathering of free-variables
+
+ * tcg_dus_chk (defs/uses)
+      Records *defined* Names (local, top-level)
+          and *used*    Names (local or imported)
+
+      Used to report "defined but not used"
+           (see RnNames.reportUnusedNames)
+      See note [Check unused bindings in modules without header]
+          in TcRnExports.hs
 
  * tcg_used_gres
       Used only to report unused import declarations
@@ -1020,7 +1029,7 @@ splice. In particular it is not set when the splice is renamed or typechecked.
 'RunSplice' is needed to provide a reference where 'addModFinalizer' can insert
 the finalizer (see Note [Delaying modFinalizers in untyped splices]), and
 'addModFinalizer' runs when doing Q things. Therefore, It doesn't make sense to
-set 'RunSplice' when renaming or typechecking the splice, where 'Splice', 
+set 'RunSplice' when renaming or typechecking the splice, where 'Splice',
 'Brack' or 'Comp' are used instead.
 
 -}

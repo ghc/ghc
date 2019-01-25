@@ -1181,7 +1181,7 @@ reportUnusedNames _export_decls gbl_env
         ; warnMissingSignatures gbl_env }
   where
     used_names :: NameSet
-    used_names = findUses (tcg_dus gbl_env) emptyNameSet
+    used_names = findUses (tcg_dus_chk gbl_env) emptyNameSet
     -- NB: currently, if f x = g, we only treat 'g' as used if 'f' is used
     -- Hence findUses
 
