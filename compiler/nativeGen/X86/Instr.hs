@@ -1063,6 +1063,8 @@ is_G_instr instr
 -- Otherwise, we would repeat the $rsp adjustment for each branch to
 -- L.
 --
+-- Returns a list of (L,Lnew) pairs.
+--
 allocMoreStack
   :: Platform
   -> Int
