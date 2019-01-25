@@ -35,7 +35,7 @@ module HsUtils(
   nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
-  typeToLHsType, typeToLHsTypeRn,
+  typeToLHsType, typeToHsTypeRn,
 
   -- * Constructing general big tuples
   -- $big_tuples
@@ -647,18 +647,17 @@ mkClassOpSigs sigs
       = cL loc (ClassOpSig noExt False nms (dropWildCards ty))
     fiddle sig = sig
 
+-- This is used in deriving machinery
 typeToLHsType :: Type -> LHsType GhcPs
 typeToLHsType = typeToLHsTypeX getRdrName
 
-typeToLHsTypeRn :: Type -> HsType GhcRn
-typeToLHsTypeRn = unLoc . typeToLHsTypeX getName
+-- This is used when generating LiftT evidence
+typeToHsTypeRn :: Type -> HsType GhcRn
+typeToHsTypeRn = unLoc . typeToLHsTypeX getName
 
-typeToLHsTypeX :: forall p . (forall a . NamedThing a => a -> IdP (GhcPass p)) -> Type -> LHsType (GhcPass p)
--- ^ Converting a Type to an HsType RdrName
--- This is needed to implement GeneralizedNewtypeDeriving.
---
--- Note that we use 'getRdrName' extensively, which
--- generates Exact RdrNames rather than strings.
+typeToLHsTypeX :: forall p .
+                  (forall a . NamedThing a => a -> IdP (GhcPass p))
+               -> Type -> LHsType (GhcPass p)
 typeToLHsTypeX get_name ty
   = go ty
   where

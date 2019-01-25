@@ -408,7 +408,6 @@ data DsMetaVal
 
    | DsSplice (HsExpr GhcTc) -- These bindings are introduced by
                              -- the PendingSplices on a HsBracketOut
-   | DsSpliceTy (HsExpr GhcTc)
 
 
 
@@ -981,7 +980,7 @@ data PendingStuff
   | RnPendingTyped                -- Renaming the inside of a *typed* bracket
 
   | TcPending                     -- Typechecking the inside of a typed bracket
-      (TcRef [Either PendingTcSplice PendingTcTySplice])   --   Accumulate pending splices here
+      (TcRef [PendingTcSplice])   --   Accumulate pending splices here
       (TcRef WantedConstraints)   --     and type constraints here
 
 topStage, topAnnStage, topSpliceStage :: ThStage
@@ -1012,8 +1011,8 @@ thLevel (RunSplice _) = 0
     -- See Note [RunSplice ThLevel].
     -- This code path gets hit by reifyInstances which extends the local
     -- environment with some type variables which we would ordinarily need
-    -- to know the stage of.
---    panic "thLevel: called when running a splice"
+    -- to know the stage of. It used to panic but I don't see a particular
+    -- reason for that (MP).
 thLevel Comp          = 1
 thLevel (Brack s _)   = thLevel s + 1
 
@@ -1025,7 +1024,7 @@ splice. In particular it is not set when the splice is renamed or typechecked.
 'RunSplice' is needed to provide a reference where 'addModFinalizer' can insert
 the finalizer (see Note [Delaying modFinalizers in untyped splices]), and
 'addModFinalizer' runs when doing Q things. Therefore, It doesn't make sense to
-set 'RunSplice' when renaming or typechecking the splice, where 'Splice', 
+set 'RunSplice' when renaming or typechecking the splice, where 'Splice',
 'Brack' or 'Comp' are used instead.
 
 -}

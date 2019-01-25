@@ -805,10 +805,9 @@ instance ( a ~ GhcPass p
         [ toHie b
         , toHie p
         ]
-      HsTcBracketOut _ b p tc ->
+      HsTcBracketOut _ b p ->
         [ toHie b
         , toHie p
-        , toHie tc
         ]
       HsSpliceE _ x ->
         [ toHie $ L mspan x
@@ -1470,9 +1469,6 @@ instance ToHie PendingRnSplice where
   toHie _ = pure []
 
 instance ToHie PendingTcSplice where
-  toHie _ = pure []
-
-instance ToHie PendingTcTySplice where
   toHie _ = pure []
 
 instance ToHie (LBooleanFormula (Located Name)) where

@@ -18,7 +18,12 @@
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
-module DsMeta( dsBracket, repTyCoreExpr, repLamCoreExpr, globalVarCoreExpr,
+module DsMeta( dsBracket,
+
+               -- Functions used in ClsInst to generate evidence for LiftT
+               repTyCoreExpr,
+               repLamCoreExpr,
+               globalVarCoreExpr,
                repPvarCoreExpr ) where
 
 #include "HsVersions.h"
@@ -68,7 +73,15 @@ import Data.ByteString ( unpack )
 import Control.Monad
 import Data.List
 
--- repTy is used to generate evidence in ClsInst for LiftT constraints.
+-------------------------------------------------------------------------------
+{-
+These functions are repackaged slightly so that we can reuse them in ClsInst
+without having to know about the `Core` data type outside of this module.
+
+They are used to generate evidence for `LiftT` constraints which is a
+core expression which produces something of type `Q Type`.
+-}
+
 repTyCoreExpr :: HsType GhcRn -> DsM CoreExpr
 repTyCoreExpr = fmap unC . repTy
 
@@ -80,24 +93,19 @@ globalVarCoreExpr n = unC <$> globalVar n
 
 repPvarCoreExpr :: CoreExpr -> DsM CoreExpr
 repPvarCoreExpr e = unC <$> repPvar (MkC e)
+
+
 -----------------------------------------------------------------------------
-dsBracket :: HsBracket GhcRn -> [PendingTcSplice]
-                             -> [PendingTcTySplice]
-                             -> DsM CoreExpr
+dsBracket :: HsBracket GhcRn -> [PendingTcSplice] -> DsM CoreExpr
 -- Returns a CoreExpr of type TH.ExpQ
 -- The quoted thing is parameterised over Name, even though it has
 -- been type checked.  We don't want all those type decorations!
 
-dsBracket brack splices ty_splices
+dsBracket brack splices
   = dsExtendMetaEnv new_bit (do_brack brack)
   where
-    new_bit_e = mkNameEnv [(n, DsSplice (unLoc e))
+    new_bit = mkNameEnv [(n, DsSplice (unLoc e))
                         | PendingTcSplice n e <- splices]
-
-    new_bit_ty = mkNameEnv [(n, DsSpliceTy (unLoc e))
-                           | PendingTcTySplice n e <- ty_splices ]
-
-    new_bit = new_bit_e `plusNameEnv` new_bit_ty
 
     do_brack (VarBr _ _ n) = do { MkC e1  <- lookupOcc n ; return e1 }
     do_brack (ExpBr _ e)   = do { MkC e1  <- repLE e     ; return e1 }
@@ -1184,9 +1192,12 @@ repTy (HsTyVar _ _ (dL->L _ n))
   | n `hasKey` funTyConKey            = repArrowTyCon
   | n == eqTyConName                  = repTequality
   | otherwise = do
+    -- Have to lookup the variable in the environment before the calls to
+    -- `isTvOcc` as the variables for splice points return true for
+    -- `isTvOcc` as well.
     mb_val <- dsLookupMetaEnv n
     if
-      | Just (DsSpliceTy t) <- mb_val -> MkC <$> dsExpr t
+      | Just (DsSplice t) <- mb_val -> MkC <$> dsExpr t
       | isTvOcc occ   -> do tv1 <- lookupOcc n
                             repTvar tv1
       | isDataOcc occ -> do tc1 <- lookupOcc n
@@ -1314,9 +1325,7 @@ repE (HsVar _ (dL->L _ x)) =
                                  ; repVarOrCon x str }
         Just (DsBound y)   -> repVarOrCon x (coreVar y)
         Just (DsSplice e)  -> do { e' <- dsExpr e
-                                 ; return (MkC e') }
-        Just (DsSpliceTy e)  -> do { e' <- dsExpr e
-                                   ; return (MkC e') } }
+                                 ; return (MkC e') } }
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ _ s) = repOverLabel s
 
@@ -1964,8 +1973,6 @@ lookupOcc n
                 Nothing           -> globalVar n
                 Just (DsBound x)  -> return (coreVar x)
                 Just (DsSplice _) -> pprPanic "repE:lookupOcc" (ppr n)
-                Just (DsSpliceTy _) ->
-                  pprPanic "repE:lookupOcc:DsSpliceTy" (ppr n)
     }
 
 globalVar :: Name -> DsM (Core TH.Name)

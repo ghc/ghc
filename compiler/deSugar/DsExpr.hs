@@ -719,7 +719,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 -- Template Haskell stuff
 
 ds_expr _ (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
-ds_expr _ (HsTcBracketOut _ x ps ts) = dsBracket x ps ts
+ds_expr _ (HsTcBracketOut _ x ps) = dsBracket x ps
 ds_expr _ (HsSpliceE _ s)         = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension

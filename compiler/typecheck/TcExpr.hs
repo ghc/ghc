@@ -1987,68 +1987,34 @@ too_many_args fun args
 -}
 
 checkThLocalId :: Id -> TcM ()
-checkThLocalId id = checkThLocalIdX checkCrossStageLifting (idName id) id
+checkThLocalId id = checkThLocalIdX mkSpliceExpr (idName id) id
 
 --------------------------------------
-
 
 polySpliceErr :: Id -> SDoc
 polySpliceErr id
   = text "Can't splice the polymorphic local variable" <+> quotes (ppr id)
 
 --------------------------------------
-checkCrossStageLifting :: TopLevelFlag -> Name -> Id -> ThStage -> TcM ()
--- If we are inside typed brackets, and (use_lvl > bind_lvl)
--- we must check whether there's a cross-stage lift to do
--- Examples   \x -> [|| x ||]
---            [|| map ||]
--- There is no error-checking to do, because the renamer did that
---
--- This is similar to checkCrossStageLifting in RnSplice, but
--- this code is applied to *typed* brackets.
 
-checkCrossStageLifting top_lvl id_name id (Brack _ (TcPending ps_var lie_var))
-  | isTopLevel top_lvl
-  = when (isExternalName id_name) (keepAlive id_name)
-    -- See Note [Keeping things alive for Template Haskell] in RnSplice
-
-  | otherwise
-  =     -- Nested identifiers, such as 'x' in
-        -- E.g. \x -> [|| h x ||]
-        -- We must behave as if the reference to x was
-        --      h $(lift x)
-        -- We use 'x' itself as the splice proxy, used by
-        -- the desugarer to stitch it all back together.
-        -- If 'x' occurs many times we may get many identical
-        -- bindings of the same splice proxy, but that doesn't
-        -- matter, although it's a mite untidy.
-    do  { let id_ty = idType id
-        ; checkTc (isTauTy id_ty) (polySpliceErr id)
-               -- If x is polymorphic, its occurrence sites might
-               -- have different instantiations, so we can't use plain
-               -- 'x' as the splice proxy name.  I don't know how to
-               -- solve this, and it's probably unimportant, so I'm
-               -- just going to flag an error for now
-
-        ; lift <- if isStringTy id_ty then
-                     do { sid <- tcLookupId THNames.liftStringName
-                                     -- See Note [Lifting strings]
-                        ; return (HsVar noExt (noLoc sid)) }
-                  else
-                     setConstraintVar lie_var   $
-                          -- Put the 'lift' constraint into the right LIE
-                     newMethodFromName (OccurrenceOf id_name)
-                                       THNames.liftName id_ty
-
-                   -- Update the pending splices
-        ; ps <- readMutVar ps_var
-        ; let pending_splice = Left $ PendingTcSplice id_name
-                                 (nlHsApp (noLoc lift) (nlHsVar id))
-        ; writeMutVar ps_var (pending_splice : ps)
-
-        ; return () }
-
-checkCrossStageLifting _ _ _ _ = return ()
+-- Construct the expression for `lift x`
+mkSpliceExpr :: Name -> Id -> TcM (LHsExpr GhcTc)
+mkSpliceExpr id_name id = do
+  let id_ty = idType id
+  checkTc (isTauTy id_ty) (polySpliceErr id)
+  -- If x is polymorphic, its occurrence sites might
+  -- have different instantiations, so we can't use plain
+  -- 'x' as the splice proxy name.  I don't know how to
+  -- solve this, and it's probably unimportant, so I'm
+  -- just going to flag an error for now
+  lift <- if isStringTy id_ty
+    then do
+      sid <- tcLookupId THNames.liftStringName
+      -- See Note [Lifting strings]
+      return (HsVar noExt (noLoc sid))
+    else do
+      newMethodFromName (OccurrenceOf id_name) THNames.liftName id_ty
+  return (nlHsApp (noLoc lift) (nlHsVar id))
 
 
 {-

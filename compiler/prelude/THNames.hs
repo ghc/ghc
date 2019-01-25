@@ -146,7 +146,7 @@ templateHaskellNames = [
     derivClauseName,
 
     -- The type classes
-    liftClassName, liftTyClassName,
+    liftClassName, liftTClassName,
 
     -- And the tycons
     qTyConName, nameTyConName, patTyConName, fieldPatTyConName, matchQTyConName,
@@ -186,8 +186,8 @@ qqFun  = mk_known_key_name OccName.varName  qqLib
 liftClassName :: Name
 liftClassName = thCls (fsLit "Lift") liftClassKey
 
-liftTyClassName :: Name
-liftTyClassName = libCls (fsLit "LiftT") liftTyClassKey
+liftTClassName :: Name
+liftTClassName = libCls (fsLit "LiftT") liftTClassKey
 
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
@@ -624,8 +624,8 @@ incoherentDataConName   = thCon (fsLit "Incoherent")   incoherentDataConKey
 liftClassKey :: Unique
 liftClassKey = mkPreludeClassUnique 200
 
-liftTyClassKey :: Unique
-liftTyClassKey = mkPreludeClassUnique 201
+liftTClassKey :: Unique
+liftTClassKey = mkPreludeClassUnique 201
 
 {- *********************************************************************
 *                                                                      *

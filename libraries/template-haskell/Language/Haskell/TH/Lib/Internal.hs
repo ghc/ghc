@@ -945,5 +945,13 @@ thisModule = do
 --
 -----------------------------------------------------
 
+
+-- | This class provides a way to turn a type into its
+-- representation.
+--
+-- It is the type analogue to `Lift`.
+--
+-- It is solved automatically by the compiler so it is forbidden
+-- to write instances for it.
 class LiftT (t :: k) where
   liftTyCl :: Q Type

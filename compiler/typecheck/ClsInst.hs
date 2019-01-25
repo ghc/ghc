@@ -134,7 +134,7 @@ matchGlobalInst dflags short_cut clas tys
   | clas `hasKey` eqTyConKey          = matchHomoEquality         tys
   | clas `hasKey` coercibleTyConKey   = matchCoercible            tys
   | cls_name == hasFieldClassName     = matchHasField dflags short_cut clas tys
-  | clas `hasKey` THNames.liftTyClassKey = matchLiftTy tys
+  | clas `hasKey` THNames.liftTClassKey = matchLiftTy tys
   | otherwise                         = matchInstEnv dflags short_cut clas tys
   where
     cls_name = className clas
@@ -589,30 +589,32 @@ matchCoercible args@[k, t1, t2]
     args' = [k, k, t1, t2]
 matchCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
 
+-- See Note [Constructing LiftT evidence]
 matchLiftTy :: [Type] -> TcM ClsInstResult
 matchLiftTy args@[_k, t2]
     | isTyVarTy t2 = return NoInstance
     | otherwise =  do
-    liftTyClass <- tcLookupClass THNames.liftTyClassName
-    let liftTyTyCon = classTyCon liftTyClass
-        dc = classDataCon liftTyClass
+    liftTClass <- tcLookupClass THNames.liftTClassName
+    let liftTTyCon = classTyCon liftTClass
+        dc = classDataCon liftTClass
         fvs = fvVarList (tyCoFVsOfType t2)
-        new_preds = map (mkTyConApp liftTyTyCon . singleton . mkTyVarTy) fvs
+        new_preds = map (mkTyConApp liftTTyCon . singleton . mkTyVarTy) fvs
 
+    -- Constructs a TH representation of term \a1 .. an -> rep_ty
+    -- Where the variables of the lambda are the free variables in rep_ty.
     ev_w_lams <- initDsTc $ do
             vars <- mapM (globalVarCoreExpr . idName) fvs
             vars_p <- mapM repPvarCoreExpr vars
-            main_ev <- repTyCoreExpr (typeToLHsTypeRn t2)
+            main_ev <- repTyCoreExpr (typeToHsTypeRn t2)
             foldlM repLamCoreExpr main_ev vars_p
 
     appE <- tcLookupId THNames.appEName
     let mk_app e1 e2 = mkApps (Var appE) [e1, e2]
+        -- Apply the evidence to the lambda so that we get
+        -- (\a1 ... an -> rep_ty) t_1 t_2 t_3
         mk_apps es = foldl mk_app ev_w_lams es
 
-
-
-
-    pprTrace "matchLiftTy" (ppr args $$ ppr new_preds) (return ())
+    traceTc "matchLiftTy" (ppr args $$ ppr new_preds)
     return (OneInst { cir_new_theta = new_preds
                     , cir_mk_ev = \evs -> evDataConApp dc args [mk_apps evs]
                     , cir_what = BuiltinInstance })
@@ -620,9 +622,53 @@ matchLiftTy args = pprPanic "matchLiftTy" (ppr args)
 
 {-
 Note [Constructing LiftT evidence]
-When we call `repTyCoreExpr`, the unbound variables will be inserted
-as local names. When we get the evidence for solving these variables we
-generate code which binds the same variables.
+
+The definition of the `LiftT` class is:
+
+class LiftT (t :: k) where
+  liftTyCl :: Q Type
+
+We solve these constraints magically in the function `matchLiftTy` by
+converting the type `t` into a core expression which builds a term of type
+`Q Type`.
+
+Example 1: LiftT @Bool
+
+For simple ground types with no free variables we need to convert a `Type` into
+a `CoreExpr`. This is achieved by cominbing `HsUtils.typeToHsTypeRn` and
+`DsMeta.repTy`. This generates a core expression of the right type which we then
+convert to the evidence by applying the constructor for `LiftT`.
+
+Example 2: LiftT @(a, Int)
+
+When a type has a free variable, we need to recursively solve LiftT constraints.
+We do this by creating `new_preds` which contains `LiftT a`.
+
+When generating the evidence for a term with free variables, we do it in two stages.
+
+Stage 1: Generate a representation of a lambda
+
+For `LiftT @(a, Int)` we generate the TH representation of
+
+```
+\a -> (,) a Int
+```
+
+Stage 2: Apply the arguments
+
+Then we apply this lambda to the dictionaries produced by recursively creating
+evidence. Note that this is an application in the representation type, not at the
+core level. So overall the term we generate is equivalent to:
+
+[t| (\a -> (,) a Int) $dictA |]
+
+So when we splice it in, this gets converted to a normal lambda with type
+arguments.
+
+Example 3: LiftT @(forall a. a -> a)
+
+LiftT also works for polymorphic types. No further special cases are needed as
+they are handled by `typeToHsTypeRn` and `repTy` without modifications.
 
 -}
 

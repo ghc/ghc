@@ -325,7 +325,6 @@ deriving instance                   Data RecordConTc
 deriving instance                   Data CmdTopTc
 deriving instance                   Data PendingRnSplice
 deriving instance                   Data PendingTcSplice
-deriving instance                   Data PendingTcTySplice
 
 -- ---------------------------------------------------------------------
 -- Data derivations from HsLit ----------------------------------------

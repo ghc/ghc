@@ -175,7 +175,7 @@ import FastString
 import Panic
 import Util
 import Annotations
-import BasicTypes( TopLevelFlag )
+import BasicTypes( TopLevelFlag, isTopLevel )
 import Maybes
 import CostCentreState
 
@@ -1754,17 +1754,56 @@ addModFinalizersWithLclEnv mod_finalizers
          (lcl_env, mod_finalizers) : fins
 
 -- Used in TcExpr and TcHsType
-checkThLocalIdX :: (TopLevelFlag -> Name -> Id -> ThStage -> TcM ())
+checkThLocalIdX :: (Name -> Id -> TcM (LHsExpr GhcTc))
                 -> Name -> Id -> TcM ()
-checkThLocalIdX k n id
+checkThLocalIdX mk_expr n id
   = do  { mb_local_use <- getStageAndBindLevel n
         ; case mb_local_use of
              Just (top_lvl, bind_lvl, use_stage)
                 | thLevel use_stage > bind_lvl
-                -> k top_lvl n id use_stage
+                -> checkCrossStageLifting mk_expr top_lvl n id use_stage
              _  -> return ()   -- Not a locally-bound thing, or
                                -- no cross-stage link
     }
+
+checkCrossStageLifting :: (Name -> Id -> TcM (LHsExpr GhcTc))
+                       -> TopLevelFlag -> Name -> Id -> ThStage -> TcM ()
+-- If we are inside typed brackets, and (use_lvl > bind_lvl)
+-- we must check whether there's a cross-stage lift to do
+-- Examples   \x -> [|| x ||]
+--            [|| map ||]
+-- There is no error-checking to do, because the renamer did that
+--
+-- This is similar to checkCrossStageLifting in RnSplice, but
+-- this code is applied to *typed* brackets.
+--
+-- This is parameterised by how to lift the expression as we use it to
+-- lift by terms and types which involve either the `Lift` or `LiftT`
+-- classes respectively.
+
+checkCrossStageLifting mk_expr top_lvl id_name id
+                        (Brack _ (TcPending ps_var lie_var))
+  | isTopLevel top_lvl
+  = when (isExternalName id_name) (keepAlive id_name)
+    -- See Note [Keeping things alive for Template Haskell] in RnSplice
+
+  | otherwise
+  =     -- Nested identifiers, such as 'x' in
+        -- E.g. \x -> [|| h x ||]
+        -- We must behave as if the reference to x was
+        --      h $(lift x)
+        -- We use 'x' itself as the splice proxy, used by
+        -- the desugarer to stitch it all back together.
+        -- If 'x' occurs many times we may get many identical
+        -- bindings of the same splice proxy, but that doesn't
+        -- matter, although it's a mite untidy.
+    do  { liftExpr <- setConstraintVar lie_var (mk_expr id_name id)
+        -- Update the pending splices
+        ; ps <- readMutVar ps_var
+        ; let pending_splice = PendingTcSplice id_name liftExpr
+        ; writeMutVar ps_var (pending_splice : ps)
+        ; return () }
+checkCrossStageLifting _ _ _ _ _ = return ()
 
 {-
 ************************************************************************

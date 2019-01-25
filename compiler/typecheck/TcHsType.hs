@@ -1210,44 +1210,81 @@ tc_hs_context mode ctxt = mapM (tc_lhs_pred mode) (unLoc ctxt)
 tc_lhs_pred :: TcTyMode -> LHsType GhcRn -> TcM PredType
 tc_lhs_pred mode pred = tc_lhs_type mode pred constraintKind
 
-checkCrossStageLiftingTy :: TopLevelFlag -> Name -> Id -> ThStage -> TcM ()
-checkCrossStageLiftingTy top_lvl id_name id (Brack _ (TcPending ps_var lie_var))
-  | isTopLevel top_lvl
-  = when (isExternalName id_name) (keepAlive id_name)
-    -- See Note [Keeping things alive for Template Haskell] in RnSplice
+-----------------------------------------------------------------------------
+{- Note [The LiftT Story]
 
-  | otherwise
-  =     -- Nested identifiers, such as 'x' in
-        -- E.g. \x -> [|| h x ||]
-        -- We must behave as if the reference to x was
-        --      h $(lift x)
-        -- We use 'x' itself as the splice proxy, used by
-        -- the desugarer to stitch it all back together.
-        -- If 'x' occurs many times we may get many identical
-        -- bindings of the same splice proxy, but that doesn't
-        -- matter, although it's a mite untidy.
-    do  { let id_ty = mkTyVarTy id
-              k = idType id
-        ; liftTyClass <- tcLookupClass liftTyClassName
-        ; liftTy <-
-            setConstraintVar lie_var (do
-              -- Put the 'lift' constraint into the right LIE
-              let [lift_id] = classMethods liftTyClass
-              let c = (mkTyConApp (classTyCon liftTyClass) [k, id_ty])
-              dict <- instCall (OccurrenceOf id_name) [k, id_ty] [c]
-              return (mkLHsWrap dict (nlHsVar lift_id)))
+In order to generate well-scoped terms we need to pay attention to the level of
+variables. For example, in foo, x is bound at level 0 and used at level 1.
 
-        -- Update the pending splices
-        ; ps <- readMutVar ps_var
-        ; let pending_splice =
-                Right $ PendingTcTySplice id_name liftTy
-        ; writeMutVar ps_var (pending_splice : ps)
+foo x = [| x |]
 
-        ; return () }
-checkCrossStageLiftingTy _ _ _ _ = return ()
+After we run `foo arg` we get a code fragment which represents the value of
+`arg` and crucially not of the unbound variable `x` as `x` is only bound at
+compile time. In order to do this, we need to know how to turn `arg` into
+`Q Exp`, this is the job of the `Lift` type class.
+
+class Lift a where
+  lift :: a -> Q Exp
+
+The point of the `LiftT` class is to perform the same kind of persistence but
+for types. How can this happen? (#15437)
+
+get :: forall a . Int
+
+foo :: forall a . Q (TExp a)
+foo = [| get @a |]
+
+The type variable `a` is bound at stage 0 but used in stage 1.
+
+Instead we now write this program using the `LiftT` constraint so that we know
+that we can serialise the type when we are given one.
+
+foo :: forall a . LiftT a => Q (TExp a)
+foo = [| get @a |]
+
+this now means approximately:
+
+foo :: forall a . LiftT a => Q (TExp a)
+foo = [| get @$$(liftTyCl @a) |]
+
+So when we splice in foo, we can instantiate |a| and have it turned into its
+representation appropiately.
+
+qux = $(foo @Int)
+
+Q: Why do we solve the class automatically?
+
+We already know how to turn any type into its representation so we magically
+solve all the instances. This also allows us to provide instances for
+polytypes, pred types and so on.
+
+Q: Is this not like Typeable?
+
+Yes it is, but there is no type index which means that we can provide an
+implementation for polytypes, pred types and so on. We also don't
+need to be able to compare these representations or do anything with them.
+
+An implementation in terms of typeable would be perhaps 10-15 lines shorter
+but far less expressive.
+
+
+-----------------------------------------------------------------------------
+-- Functions to do with cross stage persistence of types
 
 checkThLocalTyId :: Name -> Id -> TcM ()
-checkThLocalTyId = checkThLocalIdX checkCrossStageLiftingTy
+checkThLocalTyId = checkThLocalIdX mkSpliceTyExpr
+
+-- Construct the term for `liftTyCl @ty`
+mkSpliceTyExpr :: Name -> Id -> TcM (LHsExpr GhcTc)
+mkSpliceTyExpr id_name id = do
+  let id_ty = mkTyVarTy id
+      k = idType id
+  liftTClass <- tcLookupClass liftTClassName
+  -- Put the 'lift' constraint into the right LIE
+  let [lift_id] = classMethods liftTClass
+      c = (mkTyConApp (classTyCon liftTClass) [k, id_ty])
+  dict <- instCall (OccurrenceOf id_name) [k, id_ty] [c]
+  return (mkLHsWrap dict (nlHsVar lift_id))
 
 ---------------------------
 tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
@@ -1266,6 +1303,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                           -- want to zonk the kind, leaving the TyVar
                           -- un-zonked  (Trac #14873)
                           do { ty <- zonkTcTyVar tv
+                             -- See Note [The LiftT story]
                              ; checkThLocalTyId n tv
                              ; return (ty, tcTypeKind ty) }
 

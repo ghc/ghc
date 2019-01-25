@@ -63,6 +63,7 @@ import Outputable
 import Unique      ( mkAlphaTyVarUnique )
 import Bag         ( emptyBag )
 import qualified GHC.LanguageExtensions as LangExt
+import qualified THNames
 
 import Control.Monad
 import Data.Foldable
@@ -1408,9 +1409,11 @@ check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
   , hand_written_bindings
   = failWithTc rejected_class_msg
 
-  -- Handwritten instances of KnownNat/KnownSymbol class
+  -- Handwritten instances of LiftT/KnownNat/KnownSymbol class
   -- are always forbidden (#12837)
-  | clas_nm `elem` [ knownNatClassName, knownSymbolClassName ]
+  | clas_nm `elem` [ THNames.liftTClassName
+                   , knownNatClassName
+                   , knownSymbolClassName ]
   , not is_sig
     -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings
