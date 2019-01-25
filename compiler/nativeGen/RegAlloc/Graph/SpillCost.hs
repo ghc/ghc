@@ -1,4 +1,4 @@
-
+{-# LANGUAGE ScopedTypeVariables #-}
 module RegAlloc.Graph.SpillCost (
         SpillCostRecord,
         plusSpillCostRecord,
@@ -30,9 +30,11 @@ import Digraph          (flattenSCCs)
 import Outputable
 import Platform
 import State
+import CFG
 
 import Data.List        (nub, minimumBy)
 import Data.Maybe
+import Control.Monad (join)
 
 
 -- | Records the expected cost to spill some regster.
@@ -47,6 +49,10 @@ type SpillCostRecord
 type SpillCostInfo
         = UniqFM SpillCostRecord
 
+-- | Block membership in a loop
+type LoopMember = Bool
+
+type SpillCostState = State (UniqFM SpillCostRecord) ()
 
 -- | An empty map of spill costs.
 zeroSpillCostInfo :: SpillCostInfo
@@ -71,12 +77,13 @@ plusSpillCostRecord (r1, a1, b1, c1) (r2, a2, b2, c2)
 --   For each vreg, the number of times it was written to, read from,
 --   and the number of instructions it was live on entry to (lifetime)
 --
-slurpSpillCostInfo :: (Outputable instr, Instruction instr)
+slurpSpillCostInfo :: forall instr statics. (Outputable instr, Instruction instr)
                    => Platform
+                   -> Maybe CFG
                    -> LiveCmmDecl statics instr
                    -> SpillCostInfo
 
-slurpSpillCostInfo platform cmm
+slurpSpillCostInfo platform cfg cmm
         = execState (countCmm cmm) zeroSpillCostInfo
  where
         countCmm CmmData{}              = return ()
@@ -90,35 +97,36 @@ slurpSpillCostInfo platform cmm
                 | LiveInfo _ _ (Just blockLive) _ <- info
                 , Just rsLiveEntry  <- mapLookup blockId blockLive
                 , rsLiveEntry_virt  <- takeVirtuals rsLiveEntry
-                = countLIs rsLiveEntry_virt instrs
+                = countLIs (loopMember blockId) rsLiveEntry_virt instrs
 
                 | otherwise
                 = error "RegAlloc.SpillCost.slurpSpillCostInfo: bad block"
 
-        countLIs _      []
+        countLIs :: LoopMember -> UniqSet VirtualReg -> [LiveInstr instr] -> SpillCostState
+        countLIs _      _      []
                 = return ()
 
         -- Skip over comment and delta pseudo instrs.
-        countLIs rsLive (LiveInstr instr Nothing : lis)
+        countLIs inLoop rsLive (LiveInstr instr Nothing : lis)
                 | isMetaInstr instr
-                = countLIs rsLive lis
+                = countLIs inLoop rsLive lis
 
                 | otherwise
                 = pprPanic "RegSpillCost.slurpSpillCostInfo"
                 $ text "no liveness information on instruction " <> ppr instr
 
-        countLIs rsLiveEntry (LiveInstr instr (Just live) : lis)
+        countLIs inLoop rsLiveEntry (LiveInstr instr (Just live) : lis)
          = do
                 -- Increment the lifetime counts for regs live on entry to this instr.
-                mapM_ incLifetime $ nonDetEltsUniqSet rsLiveEntry
+                mapM_ (incLifetime (loopCount inLoop)) $ nonDetEltsUniqSet rsLiveEntry
                     -- This is non-deterministic but we do not
                     -- currently support deterministic code-generation.
                     -- See Note [Unique Determinism and code generation]
 
                 -- Increment counts for what regs were read/written from.
                 let (RU read written)   = regUsageOfInstr platform instr
-                mapM_ incUses   $ catMaybes $ map takeVirtualReg $ nub read
-                mapM_ incDefs   $ catMaybes $ map takeVirtualReg $ nub written
+                mapM_ (incUses (loopCount inLoop)) $ catMaybes $ map takeVirtualReg $ nub read
+                mapM_ (incDefs (loopCount inLoop)) $ catMaybes $ map takeVirtualReg $ nub written
 
                 -- Compute liveness for entry to next instruction.
                 let liveDieRead_virt    = takeVirtuals (liveDieRead  live)
@@ -132,12 +140,21 @@ slurpSpillCostInfo platform cmm
                         = (rsLiveAcross `unionUniqSets` liveBorn_virt)
                                         `minusUniqSet`  liveDieWrite_virt
 
-                countLIs rsLiveNext lis
+                countLIs inLoop rsLiveNext lis
 
-        incDefs     reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 1, 0, 0)
-        incUses     reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, 1, 0)
-        incLifetime reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, 0, 1)
+        loopCount inLoop
+          | inLoop = 10
+          | otherwise = 1
+        incDefs     count reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, count, 0, 0)
+        incUses     count reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, count, 0)
+        incLifetime count reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, 0, count)
 
+        loopBlocks = CFG.loopMembers <$> cfg
+        loopMember bid
+          | Just isMember <- join (mapLookup bid <$> loopBlocks)
+          = isMember
+          | otherwise
+          = False
 
 -- | Take all the virtual registers from this set.
 takeVirtuals :: UniqSet Reg -> UniqSet VirtualReg

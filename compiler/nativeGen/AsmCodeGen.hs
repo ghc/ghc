@@ -608,14 +608,26 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                         $ allocatableRegs ncgImpl
 
                 -- do the graph coloring register allocation
-                let ((alloced, regAllocStats), usAlloc)
+                let ((alloced, maybe_more_stack, regAllocStats), usAlloc)
                         = {-# SCC "RegAlloc-color" #-}
                           initUs usLive
                           $ Color.regAlloc
                                 dflags
                                 alloc_regs
                                 (mkUniqSet [0 .. maxSpillSlots ncgImpl])
+                                (maxSpillSlots ncgImpl)
                                 withLiveness
+                                livenessCfg
+
+                let ((alloced', stack_updt_blks), usAlloc')
+                        = initUs usAlloc $
+                                case maybe_more_stack of
+                                Nothing     -> return (alloced, [])
+                                Just amount -> do
+                                    (alloced',stack_updt_blks) <- unzip <$>
+                                                (mapM ((ncgAllocMoreStack ncgImpl) amount) alloced)
+                                    return (alloced', concat stack_updt_blks )
+
 
                 -- dump out what happened during register allocation
                 dumpIfSet_dyn dflags
@@ -637,10 +649,10 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 -- force evaluation of the Maybe to avoid space leak
                 mPprStats `seq` return ()
 
-                return  ( alloced, usAlloc
+                return  ( alloced', usAlloc'
                         , mPprStats
                         , Nothing
-                        , [], [])
+                        , [], stack_updt_blks)
 
           else do
                 -- do linear register allocation

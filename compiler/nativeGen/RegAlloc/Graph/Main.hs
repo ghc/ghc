@@ -26,6 +26,7 @@ import UniqFM
 import UniqSet
 import UniqSupply
 import Util (seqList)
+import CFG
 
 import Data.Maybe
 import Control.Monad
@@ -46,12 +47,15 @@ regAlloc
         => DynFlags
         -> UniqFM (UniqSet RealReg)     -- ^ registers we can use for allocation
         -> UniqSet Int                  -- ^ set of available spill slots.
+        -> Int                          -- ^ current number of spill slots
         -> [LiveCmmDecl statics instr]  -- ^ code annotated with liveness information.
-        -> UniqSM ( [NatCmmDecl statics instr], [RegAllocStats statics instr] )
-           -- ^ code with registers allocated and stats for each stage of
-           -- allocation
+        -> Maybe CFG                    -- ^ CFG of basic blocks if available
+        -> UniqSM ( [NatCmmDecl statics instr]
+                  , Maybe Int, [RegAllocStats statics instr] )
+           -- ^ code with registers allocated, additional stacks required
+           -- and stats for each stage of allocation
 
-regAlloc dflags regsFree slotsFree code
+regAlloc dflags regsFree slotsFree slotsCount code cfg
  = do
         -- TODO: the regClass function is currently hard coded to the default
         --       target architecture. Would prefer to determine this from dflags.
@@ -61,12 +65,19 @@ regAlloc dflags regsFree slotsFree code
                         (targetVirtualRegSqueeze platform)
                         (targetRealRegSqueeze platform)
 
-        (code_final, debug_codeGraphs, _)
+        (code_final, debug_codeGraphs, slotsCount', _)
                 <- regAlloc_spin dflags 0
                         triv
-                        regsFree slotsFree [] code
+                        regsFree slotsFree slotsCount [] code cfg
+
+        let needStack
+                | slotsCount == slotsCount'
+                = Nothing
+                | otherwise
+                = Just slotsCount'
 
         return  ( code_final
+                , needStack
                 , reverse debug_codeGraphs )
 
 
@@ -88,13 +99,16 @@ regAlloc_spin
                 --   colourable.
         -> UniqFM (UniqSet RealReg)      -- ^ Free registers that we can allocate.
         -> UniqSet Int                   -- ^ Free stack slots that we can use.
+        -> Int                           -- ^ Number of spill slots in use
         -> [RegAllocStats statics instr] -- ^ Current regalloc stats to add to.
         -> [LiveCmmDecl statics instr]   -- ^ Liveness annotated code to allocate.
+        -> Maybe CFG
         -> UniqSM ( [NatCmmDecl statics instr]
                   , [RegAllocStats statics instr]
+                  , Int                  -- Slots in use
                   , Color.Graph VirtualReg RegClass RealReg)
 
-regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
+regAlloc_spin dflags spinCount triv regsFree slotsFree slotsCount debug_codeGraphs code cfg
  = do
         let platform = targetPlatform dflags
 
@@ -134,7 +148,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
         -- This is a lazy binding, so the map will only be computed if we
         -- actually have to spill to the stack.
         let spillCosts  = foldl' plusSpillCostInfo zeroSpillCostInfo
-                        $ map (slurpSpillCostInfo platform) code
+                        $ map (slurpSpillCostInfo platform cfg) code
 
         -- The function to choose regs to leave uncolored.
         let spill       = chooseSpill spillCosts
@@ -227,6 +241,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
 
                 return  ( code_final
                         , statList
+                        , slotsCount
                         , graph_colored_lint)
 
          -- Coloring was unsuccessful. We need to spill some register to the
@@ -241,8 +256,8 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
                                 else graph_colored
 
                 -- Spill uncolored regs to the stack.
-                (code_spilled, slotsFree', spillStats)
-                        <- regSpill platform code_coalesced slotsFree rsSpill
+                (code_spilled, slotsFree', slotsCount', spillStats)
+                        <- regSpill platform code_coalesced slotsFree slotsCount rsSpill
 
                 -- Recalculate liveness information.
                 -- NOTE: we have to reverse the SCCs here to get them back into
@@ -273,8 +288,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
                 seqList statList (return ())
 
                 regAlloc_spin dflags (spinCount + 1) triv regsFree slotsFree'
-                        statList
-                        code_relive
+                              slotsCount' statList code_relive cfg
 
 
 -- | Build a graph from the liveness and coalesce information in this code.
