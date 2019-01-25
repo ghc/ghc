@@ -588,6 +588,11 @@ The GHC API exposes functions for reading and writing these files.
     that are being written out. These include testing things properties such as
     variables not occuring outside of their expected scopes.
 
+The format in which GHC currently stores its typechecked AST, makes it costly
+to collect the types for some expressions nodes. For the sake of performance,
+GHC currently chooses to skip over these, so not all expression nodes should be
+expected to have type information on them. See :ghc-ticket:`16233` for more.
+
 .. _recomp:
 
 The recompilation checker
