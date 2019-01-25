@@ -21,6 +21,9 @@
 /compiler/simplCore/Exitify.hs   @nomeata
 /compiler/simplStg/StgCse.hs     @nomeata
 /compiler/cmm/CmmSwitch.hs       @nomeata
+/compiler/types                  @simonpj @goldfire
+/compiler/deSugar                @simonpj @goldfire
+/compiler/hsSyn/Convert.hs       @goldfire
 
 # Core libraries
 /libraries/base                  @hvr
