@@ -274,7 +274,7 @@ synifyTyCon coax tc
 -- which this function obtains.
 synifyDataTyConReturnKind :: TyCon -> Maybe (LHsKind GhcRn)
 synifyDataTyConReturnKind tc
-  = case splitFunTys (tyConKind tc) of
+  = case splitFunTys (dropForAlls (tyConKind tc)) of
       (_, ret_kind)
         | isLiftedTypeKind ret_kind -> Nothing -- Don't bother displaying :: *
         | otherwise                 -> Just (synifyKindSig ret_kind)
