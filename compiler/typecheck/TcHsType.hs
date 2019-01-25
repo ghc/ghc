@@ -1267,6 +1267,8 @@ need to be able to compare these representations or do anything with them.
 An implementation in terms of typeable would be perhaps 10-15 lines shorter
 but far less expressive.
 
+-}
+
 
 -----------------------------------------------------------------------------
 -- Functions to do with cross stage persistence of types
