@@ -436,12 +436,32 @@ instance HasType (LHsExpr GhcRn) where
   getTypeNode (L spn e) = makeNode e spn
 
 instance HasType (LHsExpr GhcTc) where
-  getTypeNode e@(L spn e') = lift $ do
+  getTypeNode e@(L spn e') = lift $ if skipDesugaring e' then fallback else do
     hs_env <- Hsc $ \e w -> return (e,w)
     (_,mbe) <- liftIO $ deSugarExpr hs_env e
     case mbe of
       Just te -> makeTypeNode e' spn (exprType te)
       Nothing -> makeNode e' spn
+    where
+      fallback = makeNode e' spn
+
+-- | Skip desugaring of these expressions for performance reasons.
+--
+-- See impact on Haddock output (esp. missing type annotations or links)
+-- before marking more things here as 'False'. See impact on Haddock
+-- performance before marking more things as 'True'.
+skipDesugaring :: HsExpr a -> Bool
+skipDesugaring e = case e of
+  HsVar{}        -> False
+  HsUnboundVar{} -> False
+  HsConLikeOut{} -> False
+  HsRecFld{}     -> False
+  HsOverLabel{}  -> False
+  HsIPVar{}      -> False
+  HsOverLit{}    -> False
+  HsLit{}        -> False
+  HsWrap{}       -> False
+  _              -> True
 
 instance ( ToHie (Context (Located (IdP a)))
          , ToHie (MatchGroup a (LHsExpr a))
