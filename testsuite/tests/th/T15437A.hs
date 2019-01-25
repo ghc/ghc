@@ -25,4 +25,9 @@ foo3 = [|| get @(Eq alpha) ||]
 foo4 :: forall alpha . LiftT alpha => Q (TExp (alpha -> alpha))
 foo4 = [|| id :: alpha -> alpha ||]
 
+foo5 :: forall (alpha :: Type) (beta :: Type).
+           (LiftT alpha, LiftT beta)
+        => Q (TExp Int)
+foo5 = [|| get @(alpha, beta) ||]
+
 

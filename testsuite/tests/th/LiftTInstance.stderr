@@ -1,0 +1,4 @@
+
+LiftTInstance.hs:6:10: error:
+    • Class ‘LiftT’ does not support user-specified instances
+    • In the instance declaration for ‘LiftT ()’

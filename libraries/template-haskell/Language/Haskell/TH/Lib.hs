@@ -306,4 +306,3 @@ standaloneDerivWithStrategyD mds ctxt ty = do
   ctxt' <- ctxt
   ty'   <- ty
   return $ StandaloneDerivD mds ctxt' ty'
-

@@ -17,3 +17,7 @@ h = $$(foo3 @Int)
 
 i :: Int
 i = $$(foo @(forall (a :: *) . a -> a))
+
+a = $$(foo4 @Int)
+
+b = $$(foo5 @Int @Bool)

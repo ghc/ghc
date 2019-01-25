@@ -614,7 +614,9 @@ matchLiftTy args@[_k, t2]
         -- (\a1 ... an -> rep_ty) t_1 t_2 t_3
         mk_apps es = foldl mk_app ev_w_lams es
 
-    traceTc "matchLiftTy" (ppr args $$ ppr new_preds)
+    traceTc "matchLiftTy" (ppr args
+                            $$ ppr new_preds
+                            $$ ppr ev_w_lams)
     return (OneInst { cir_new_theta = new_preds
                     , cir_mk_ev = \evs -> evDataConApp dc args [mk_apps evs]
                     , cir_what = BuiltinInstance })
