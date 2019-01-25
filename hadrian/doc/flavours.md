@@ -50,8 +50,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O0<br>-H64m</td>
     <td></td>
     <td>-O</td>
+    <td>-O2</td>
     <td>-O</td>
-    <td></td>
     <td>-O</td>
     <td></td>
   </tr>
@@ -72,7 +72,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O<br>-H64m</td>
     <td></td>
     <td>-O2</td>
-    <td>-O</td>
+    <td>-O2</td>
     <td>-O2</td>
     <td>-O</td>
     <td>-O2</td>
@@ -83,8 +83,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O0<br>-H64m</td>
     <td></td>
     <td>-O</td>
-    <td>-O</td>
-    <td>-O</td>
+    <td>-O2</td>
     <td>-O</td>
     <td>-O</td>
   </tr>
@@ -105,7 +104,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O<br>-H64m</td>
     <td></td>
     <td>-dcore-lint</td>
-    <td></td>
+    <td>-O2</td>
     <td>-O0<br>-DDEBUG</td>
     <td></td>
     <td>-O0<br>-DDEBUG</td>

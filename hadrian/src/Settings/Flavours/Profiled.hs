@@ -19,5 +19,5 @@ profiledArgs = sourceArgs SourceArgs
         , naturalInBaseFixArgs
         ]
     , hsLibrary  = notStage0 ? arg "-O"
-    , hsCompiler = arg "-O"
+    , hsCompiler = mconcat [stage0 ? arg "-O2", notStage0 ? arg "-O"]
     , hsGhc      = arg "-O" }

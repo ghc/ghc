@@ -30,5 +30,5 @@ quickArgs = sourceArgs SourceArgs
         , naturalInBaseFixArgs
         ]
     , hsLibrary  = notStage0 ? arg "-O"
-    , hsCompiler =    stage0 ? arg "-O"
+    , hsCompiler =    stage0 ? arg "-O2"
     , hsGhc      =    stage0 ? arg "-O" }
