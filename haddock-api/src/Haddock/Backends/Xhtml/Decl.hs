@@ -1135,8 +1135,8 @@ ppFunLhType  unicode qual emptyCtxts ty = ppr_mono_ty (reparenTypePrec PREC_FUN 
 
 ppLHsTypeArg :: Unicode -> Qualification -> HideEmptyContexts -> LHsTypeArg DocNameI -> Html
 ppLHsTypeArg unicode qual emptyCtxts (HsValArg ty) = ppLParendType unicode qual emptyCtxts ty
-ppLHsTypeArg unicode qual emptyCtxts (HsTypeArg ki) = atSign unicode <>
-                                                     ppLParendType unicode qual emptyCtxts ki
+ppLHsTypeArg unicode qual emptyCtxts (HsTypeArg _ ki) = atSign unicode <>
+                                                       ppLParendType unicode qual emptyCtxts ki
 ppLHsTypeArg _ _ _ (HsArgPar _) = toHtml ""
 ppHsTyVarBndr :: Unicode -> Qualification -> HsTyVarBndr DocNameI -> Html
 ppHsTyVarBndr _       qual (UserTyVar _ (L _ name)) =

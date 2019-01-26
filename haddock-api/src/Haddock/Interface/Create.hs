@@ -1140,7 +1140,7 @@ extractPatternSyn nm t tvs cons =
     | otherwise = foldl' (\x y -> noLoc (mkAppTyArg x y)) (noLoc (HsTyVar noExt NotPromoted (noLoc t))) tvs
                     where mkAppTyArg :: LHsType GhcRn -> LHsTypeArg GhcRn -> HsType GhcRn
                           mkAppTyArg f (HsValArg ty) = HsAppTy noExt f ty
-                          mkAppTyArg f (HsTypeArg ki) = HsAppKindTy noExt f ki
+                          mkAppTyArg f (HsTypeArg l ki) = HsAppKindTy l f ki
                           mkAppTyArg f (HsArgPar _) = HsParTy noExt f
 
 extractRecSel :: Name -> Name -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn]
@@ -1162,8 +1162,8 @@ extractRecSel nm t tvs (L _ con : rest) =
     | otherwise = foldl' (\x y -> noLoc (mkAppTyArg x y)) (noLoc (HsTyVar noExt NotPromoted (noLoc t))) tvs
                    where mkAppTyArg :: LHsType GhcRn -> LHsTypeArg GhcRn -> HsType GhcRn
                          mkAppTyArg f (HsValArg ty) = HsAppTy noExt f ty
-                         mkAppTyArg f (HsTypeArg ki) = HsAppKindTy noExt f ki
-                         mkAppTyArg f (HsArgPar _) = HsParTy noExt f 
+                         mkAppTyArg f (HsTypeArg l ki) = HsAppKindTy l f ki
+                         mkAppTyArg f (HsArgPar _) = HsParTy noExt f
 
 -- | Keep export items with docs.
 pruneExportItems :: [ExportItem GhcRn] -> [ExportItem GhcRn]
