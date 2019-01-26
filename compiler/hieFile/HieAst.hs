@@ -330,7 +330,7 @@ instance (HasLoc a, HasLoc b) => HasLoc (FamEqn s a b) where
   loc _ = noSrcSpan
 instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg tm ty) where
   loc (HsValArg tm) = loc tm
-  loc (HsTypeArg ty) = loc ty
+  loc (HsTypeArg _ ty) = loc ty
   loc (HsArgPar sp)  = sp
 
 instance HasLoc (HsDataDefn GhcRn) where
@@ -1401,7 +1401,7 @@ instance ToHie (TScoped (LHsType GhcRn)) where
 
 instance (ToHie tm, ToHie ty) => ToHie (HsArg tm ty) where
   toHie (HsValArg tm) = toHie tm
-  toHie (HsTypeArg ty) = toHie ty
+  toHie (HsTypeArg _ ty) = toHie ty
   toHie (HsArgPar sp) = pure $ locOnly sp
 
 instance ToHie (TVScoped (LHsTyVarBndr GhcRn)) where

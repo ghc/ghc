@@ -1510,8 +1510,8 @@ mk_apps head_ty (arg:args) =
      ; case arg of
        HsValArg ty  -> do { p_ty      <- add_parens ty
                           ; mk_apps (HsAppTy noExt head_ty' p_ty) args }
-       HsTypeArg ki -> do { p_ki      <- add_parens ki
-                          ; mk_apps (HsAppKindTy noExt head_ty' p_ki) args }
+       HsTypeArg l ki -> do { p_ki      <- add_parens ki
+                            ; mk_apps (HsAppKindTy l head_ty' p_ki) args }
        HsArgPar _   -> mk_apps (HsParTy noExt head_ty') args
      }
    where
@@ -1529,8 +1529,8 @@ wrap_apps t                          = return t
 wrap_tyargs :: LHsTypeArg GhcPs -> CvtM (LHsTypeArg GhcPs)
 wrap_tyargs (HsValArg ty) = do { ty' <- wrap_apps ty
                                   ; return $ HsValArg ty'}
-wrap_tyargs (HsTypeArg ki) = do { ki' <- wrap_apps ki
-                               ; return $ HsTypeArg ki'}
+wrap_tyargs (HsTypeArg l ki) = do { ki' <- wrap_apps ki
+                                  ; return $ HsTypeArg l ki'}
 wrap_tyargs argPar = return argPar
 
 -- ---------------------------------------------------------------------
@@ -1567,7 +1567,8 @@ split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsTypeArg GhcPs])
 split_ty_app ty = go ty []
   where
     go (AppT f a) as' = do { a' <- cvtType a; go f (HsValArg a':as') }
-    go (AppKindT ty ki) as' = do { ki' <- cvtKind ki; go ty (HsTypeArg ki':as') }
+    go (AppKindT ty ki) as' = do { ki' <- cvtKind ki
+                                 ; go ty (HsTypeArg noSrcSpan ki':as') }
     go (ParensT t) as' = do { loc <- getL; go t (HsArgPar loc: as') }
     go f as           = return (f,as)
 

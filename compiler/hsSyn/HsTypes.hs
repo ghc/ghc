@@ -710,7 +710,7 @@ type instance XIParamTy        (GhcPass _) = NoExt
 type instance XStarTy          (GhcPass _) = NoExt
 type instance XKindSig         (GhcPass _) = NoExt
 
-type instance XAppKindTy       (GhcPass _) = NoExt
+type instance XAppKindTy       (GhcPass _) = SrcSpan -- Where the `@` lives
 
 type instance XSpliceTy        GhcPs = NoExt
 type instance XSpliceTy        GhcRn = NoExt
@@ -1045,10 +1045,10 @@ mkHsAppTys :: LHsType (GhcPass p) -> [LHsType (GhcPass p)]
            -> LHsType (GhcPass p)
 mkHsAppTys = foldl' mkHsAppTy
 
-mkHsAppKindTy :: LHsType (GhcPass p) -> LHsType (GhcPass p)
+mkHsAppKindTy :: XAppKindTy (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
               -> LHsType (GhcPass p)
-mkHsAppKindTy ty k
-  = addCLoc ty k (HsAppKindTy noExt ty k)
+mkHsAppKindTy ext ty k
+  = addCLoc ty k (HsAppKindTy ext ty k)
 
 {-
 ************************************************************************
@@ -1107,7 +1107,8 @@ hsTyGetAppHead_maybe = go
 -- Arguments in an expression/type after splitting
 data HsArg tm ty
   = HsValArg tm   -- Argument is an ordinary expression     (f arg)
-  | HsTypeArg  ty -- Argument is a visible type application (f @ty)
+  | HsTypeArg SrcSpan ty -- Argument is a visible type application (f @ty)
+                         -- SrcSpan is location of the `@`
   | HsArgPar SrcSpan -- See Note [HsArgPar]
 
 numVisibleArgs :: [HsArg tm ty] -> Arity
@@ -1119,9 +1120,9 @@ numVisibleArgs = count is_vis
 type LHsTypeArg p = HsArg (LHsType p) (LHsKind p)
 
 instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
-  ppr (HsValArg tm)  = ppr tm
-  ppr (HsTypeArg ty) = char '@' <> ppr ty
-  ppr (HsArgPar sp)  = text "HsArgPar"  <+> ppr sp
+  ppr (HsValArg tm)    = ppr tm
+  ppr (HsTypeArg _ ty) = char '@' <> ppr ty
+  ppr (HsArgPar sp)    = text "HsArgPar"  <+> ppr sp
 {-
 Note [HsArgPar]
 A HsArgPar indicates that everything to the left of this in the argument list is
@@ -1142,7 +1143,7 @@ splitHsAppTys e = go (noLoc e) []
     go :: LHsType GhcRn -> [LHsTypeArg GhcRn]
        -> (LHsType GhcRn, [LHsTypeArg GhcRn])
     go (L _ (HsAppTy _ f a))      as = go f (HsValArg a : as)
-    go (L _ (HsAppKindTy _ ty k)) as = go ty (HsTypeArg k : as)
+    go (L _ (HsAppKindTy l ty k)) as = go ty (HsTypeArg l k : as)
     go (L sp (HsParTy _ f))       as = go f (HsArgPar sp : as)
     go f                          as = (f,as)
 --------------------------------
