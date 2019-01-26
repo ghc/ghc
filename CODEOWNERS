@@ -16,11 +16,13 @@
 /compiler/rename                 @simonpj @goldfire
 /compiler/typecheck/TcDeriv*     @RyanGlScott
 /compiler/nativeGen              @simonmar @bgamari @AndreasK
-/compiler/simplCore/CallArity.hs @nomeata
+/compiler/simplCore/CallArity.hs @nomeata @sgraf
 /compiler/utils/UnVarGraph.hs    @nomeata
 /compiler/simplCore/Exitify.hs   @nomeata
 /compiler/simplStg/StgCse.hs     @nomeata
+/compiler/simplStg/StgLiftLams.hs @sgraf
 /compiler/cmm/CmmSwitch.hs       @nomeata
+/compiler/stranal/DmdAnal.hs     @simonpj @sgraf
 /compiler/types                  @simonpj @goldfire
 /compiler/deSugar                @simonpj @goldfire
 /compiler/hsSyn/Convert.hs       @goldfire
