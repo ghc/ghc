@@ -262,7 +262,7 @@ projects), as well as Well-Typed.
 [issues]: https://github.com/snowleopard/hadrian/issues
 [ghc-preparation]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
 [ghc-windows-quick-build]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows#AQuickBuild
-[windows-build]: https://github.com/snowleopard/hadrian/blob/master/doc/windows.md
+[windows-build]: https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/windows.md
 [ghc-split-objs-bug]: https://ghc.haskell.org/trac/ghc/ticket/11315
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
 [validation-issue]: https://github.com/snowleopard/hadrian/issues/187
