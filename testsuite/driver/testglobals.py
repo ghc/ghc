@@ -223,6 +223,9 @@ class TestOptions:
        # the stdin file that this test will use (empty for <name>.stdin)
        self.stdin = ''
 
+       # Set the expected stderr/stdout. '' means infer from test name.
+       self.use_specs = {}
+
        # don't compare output
        self.ignore_stdout = False
        self.ignore_stderr = False

@@ -189,6 +189,28 @@ def ignore_stderr(name, opts):
 def combined_output( name, opts ):
     opts.combined_output = True
 
+def use_specs( specs ):
+    """
+    use_specs allows one to override files based on suffixes. e.g. 'stdout',
+    'stderr', 'asm', 'prof.sample', etc.
+
+    Example use_specs({'stdout' : 'prof002.stdout'}) to make the test re-use
+    prof002.stdout.
+
+    Full Example:
+    test('T5889', [only_ways(['normal']), req_profiling,
+                   extra_files(['T5889/A.hs', 'T5889/B.hs']),
+                   use_specs({'stdout' : 'prof002.stdout'})],
+         multimod_compile,
+         ['A B', '-O -prof -fno-prof-count-entries -v0'])
+
+    """
+    return lambda name, opts, s=specs: _use_specs( name, opts, s )
+
+def _use_specs( name, opts, specs ):
+    opts.extra_files.extend(specs.values ())
+    opts.use_specs = specs
+
 # -----
 
 def expect_fail_for( ways ):
@@ -2001,6 +2023,10 @@ def in_srcdir(name, suffix=''):
 #
 def find_expected_file(name, suff):
     basename = add_suffix(name, suff)
+    # Override the basename if the user has specified one, this will then be
+    # subjected to the same name mangling scheme as normal to allow platform
+    # specific overrides to work.
+    basename = getTestOpts().use_specs.get (suff, basename)
 
     files = [basename + ws + plat
              for plat in ['-' + config.platform, '-' + config.os, '']
