@@ -2,7 +2,7 @@
 
 Here is how you can build GHC, from source, on Windows with minimal requirements.
 We only assume that `git` and `stack` are installed (see
-[prerequisites](https://github.com/snowleopard/hadrian/blob/master/doc/windows.md#prerequisites)).
+[prerequisites](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/windows.md#prerequisites)).
 
 ```
 # Get GHC sources; git core.autocrlf should be set to false (see Prerequisites section)
