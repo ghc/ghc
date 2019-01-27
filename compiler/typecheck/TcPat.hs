@@ -195,7 +195,7 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
 
   | otherwise                          -- No signature
   = do { (co, bndr_ty) <- case exp_pat_ty of
-             Check pat_ty    -> promoteTcType bind_lvl pat_ty
+             Check pat_ty _ -> promoteTcType bind_lvl pat_ty -- TODO: 9173 pass chkCtx here as well?
              Infer infer_res -> ASSERT( bind_lvl == ir_lvl infer_res )
                                 -- If we were under a constructor that bumped
                                 -- the level, we'd be in checking mode
@@ -363,7 +363,7 @@ tc_pat _ (WildPat _) pat_ty thing_inside
 tc_pat penv (AsPat x (dL->L nm_loc name) pat) pat_ty thing_inside
   = do  { (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
-                         tc_lpat pat (mkCheckExpType $ idType bndr_id)
+                         tc_lpat pat (mkCheckExpType (idType bndr_id) (text "tc_pat: AsPat"))
                                  penv thing_inside
             -- NB: if we do inference on:
             --          \ (y@(x::forall a. a->a)) = e
@@ -394,7 +394,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
             -- expr_wrap2 :: overall_pat_ty "->" inf_arg_ty
 
          -- pattern must have inf_res_ty
-        ; (pat', res) <- tc_lpat pat (mkCheckExpType inf_res_ty) penv thing_inside
+        ; (pat', res) <- tc_lpat pat (mkCheckExpType inf_res_ty $ text "tc_pat: ViewPat") penv thing_inside
 
         ; overall_pat_ty <- readExpType overall_pat_ty
         ; let expr_wrap2' = mkWpFun expr_wrap2 idHsWrapper
@@ -416,7 +416,7 @@ tc_pat penv (SigPat _ pat sig_ty) pat_ty thing_inside
                 -- from an outer scope to mention one of these tyvars in its kind.
         ; (pat', res) <- tcExtendNameTyVarEnv wcs      $
                          tcExtendNameTyVarEnv tv_binds $
-                         tc_lpat pat (mkCheckExpType inner_ty) penv thing_inside
+                         tc_lpat pat (mkCheckExpType inner_ty $ text "tc_pat: SigPat") penv thing_inside
         ; pat_ty <- readExpType pat_ty
         ; return (mkHsWrapPat wrap (SigPat inner_ty pat' sig_ty) pat_ty, res) }
 
@@ -424,7 +424,7 @@ tc_pat penv (SigPat _ pat sig_ty) pat_ty thing_inside
 -- Lists, tuples, arrays
 tc_pat penv (ListPat Nothing pats) pat_ty thing_inside
   = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv pat_ty
-        ; (pats', res) <- tcMultiple (\p -> tc_lpat p (mkCheckExpType elt_ty))
+        ; (pats', res) <- tcMultiple (\p -> tc_lpat p (mkCheckExpType elt_ty $ text "tc_pat: ListPat Nothing"))
                                      pats penv thing_inside
         ; pat_ty <- readExpType pat_ty
         ; return (mkHsWrapPat coi
@@ -434,10 +434,10 @@ tc_pat penv (ListPat Nothing pats) pat_ty thing_inside
 tc_pat penv (ListPat (Just e) pats) pat_ty thing_inside
   = do  { tau_pat_ty <- expTypeToType pat_ty
         ; ((pats', res, elt_ty), e')
-            <- tcSyntaxOpGen ListOrigin e [SynType (mkCheckExpType tau_pat_ty)]
+            <- tcSyntaxOpGen ListOrigin e [SynType (mkCheckExpType tau_pat_ty $ text "tc_pat: ListPat ListOrigin")]
                                           SynList $
                  \ [elt_ty] ->
-                 do { (pats', res) <- tcMultiple (\p -> tc_lpat p (mkCheckExpType elt_ty))
+                 do { (pats', res) <- tcMultiple (\p -> tc_lpat p (mkCheckExpType elt_ty $ text "tc_pat: ListPat SynList"))
                                                  pats penv thing_inside
                     ; return (pats', res, elt_ty) }
         ; return (ListPat (ListPatTc elt_ty (Just (tau_pat_ty,e'))) pats', res)
@@ -452,7 +452,7 @@ tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
                      -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
         ; let con_arg_tys = case boxity of Unboxed -> drop arity arg_tys
                                            Boxed   -> arg_tys
-        ; (pats', res) <- tc_lpats penv pats (map mkCheckExpType con_arg_tys)
+        ; (pats', res) <- tc_lpats penv pats (map (flip mkCheckExpType $ text "tc_pat: TuplePat") con_arg_tys)
                                    thing_inside
 
         ; dflags <- getDynFlags
@@ -480,7 +480,7 @@ tc_pat penv (SumPat _ pat alt arity ) pat_ty thing_inside
                                                penv pat_ty
         ; -- Drop levity vars, we don't care about them here
           let con_arg_tys = drop arity arg_tys
-        ; (pat', res) <- tc_lpat pat (mkCheckExpType (con_arg_tys `getNth` (alt - 1)))
+        ; (pat', res) <- tc_lpat pat (mkCheckExpType (con_arg_tys `getNth` (alt - 1)) $ text "tc_pat: SumPat")
                                  penv thing_inside
         ; pat_ty <- readExpType pat_ty
         ; return (mkHsWrapPat coi (SumPat con_arg_tys pat' alt arity) pat_ty
@@ -524,16 +524,16 @@ tc_pat _ (NPat _ (dL->L l over_lit) mb_neg eq) pat_ty thing_inside
   = do  { let orig = LiteralOrigin over_lit
         ; ((lit', mb_neg'), eq')
             <- tcSyntaxOp orig eq [SynType pat_ty, SynAny]
-                          (mkCheckExpType boolTy) $
+                          (mkCheckExpType boolTy $ text "tc_pat: NPat") $
                \ [neg_lit_ty] ->
                let new_over_lit lit_ty = newOverloadedLit over_lit
-                                           (mkCheckExpType lit_ty)
+                                           (mkCheckExpType lit_ty $ text "tc_pat: new_over_lit")
                in case mb_neg of
                  Nothing  -> (, Nothing) <$> new_over_lit neg_lit_ty
                  Just neg -> -- Negative literal
                              -- The 'negate' is re-mappable syntax
                    second Just <$>
-                   (tcSyntaxOp orig neg [SynRho] (mkCheckExpType neg_lit_ty) $
+                   (tcSyntaxOp orig neg [SynRho] (mkCheckExpType neg_lit_ty $ text "tc_pat: SynRho") $
                     \ [lit_ty] -> new_over_lit lit_ty)
 
         ; res <- thing_inside
@@ -574,17 +574,18 @@ tc_pat penv (NPlusKPat _ (dL->L nm_loc name)
               thing_inside
   = do  { pat_ty <- expTypeToType pat_ty
         ; let orig = LiteralOrigin lit
+              chkCtx = text "tc_pat: NPlusKPat"
         ; (lit1', ge')
-            <- tcSyntaxOp orig ge [synKnownType pat_ty, SynRho]
-                                  (mkCheckExpType boolTy) $
+            <- tcSyntaxOp orig ge [synKnownType pat_ty chkCtx, SynRho]
+                                  (mkCheckExpType boolTy chkCtx ) $
                \ [lit1_ty] ->
-               newOverloadedLit lit (mkCheckExpType lit1_ty)
+               newOverloadedLit lit (mkCheckExpType lit1_ty $ text "tc_pat: NPlusKPat newOverloadedLit")
         ; ((lit2', minus_wrap, bndr_id), minus')
-            <- tcSyntaxOpGen orig minus [synKnownType pat_ty, SynRho] SynAny $
+            <- tcSyntaxOpGen orig minus [synKnownType pat_ty chkCtx, SynRho] SynAny $
                \ [lit2_ty, var_ty] ->
-               do { lit2' <- newOverloadedLit lit (mkCheckExpType lit2_ty)
+               do { lit2' <- newOverloadedLit lit (mkCheckExpType lit2_ty chkCtx)
                   ; (wrap, bndr_id) <- setSrcSpan nm_loc $
-                                     tcPatBndr penv name (mkCheckExpType var_ty)
+                                     tcPatBndr penv name (mkCheckExpType var_ty chkCtx)
                            -- co :: var_ty ~ idType bndr_id
 
                            -- minus_wrap is applicable to minus'
@@ -1025,7 +1026,7 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
 
 tcConArg :: Checker (LPat GhcRn, TcSigmaType) (LPat GhcTc)
 tcConArg (arg_pat, arg_ty) penv thing_inside
-  = tc_lpat arg_pat (mkCheckExpType arg_ty) penv thing_inside
+  = tc_lpat arg_pat (mkCheckExpType arg_ty $ text "tcConArg:") penv thing_inside
 
 addDataConStupidTheta :: DataCon -> [TcType] -> TcM ()
 -- Instantiate the "stupid theta" of the data con, and throw

@@ -89,9 +89,15 @@ import qualified Data.Set as Set
 ************************************************************************
 -}
 
-tcPolyExpr, tcPolyExprNC
+tcPolyExpr
   :: LHsExpr GhcRn         -- Expression to type check
   -> TcSigmaType           -- Expected type (could be a polytype)
+  -> TcM (LHsExpr GhcTcId) -- Generalised expr with expected type
+
+tcPolyExprNC
+  :: LHsExpr GhcRn         -- Expression to type check
+  -> TcSigmaType           -- Expected type (could be a polytype)
+  -> SDoc                  -- Context (for error messages)
   -> TcM (LHsExpr GhcTcId) -- Generalised expr with expected type
 
 -- tcPolyExpr is a convenient place (frequent but not too frequent)
@@ -99,8 +105,8 @@ tcPolyExpr, tcPolyExprNC
 -- The NC version does not do so, usually because the caller wants
 -- to do so himself.
 
-tcPolyExpr   expr res_ty = tc_poly_expr expr (mkCheckExpType res_ty)
-tcPolyExprNC expr res_ty = tc_poly_expr_nc expr (mkCheckExpType res_ty)
+tcPolyExpr   expr res_ty = tc_poly_expr expr (mkCheckExpType res_ty $ text "tcPolyExpr")
+tcPolyExprNC expr res_ty ctx = tc_poly_expr_nc expr (mkCheckExpType res_ty ctx)
 
 -- these versions take an ExpType
 tc_poly_expr, tc_poly_expr_nc :: LHsExpr GhcRn -> ExpSigmaType
@@ -198,7 +204,7 @@ tcExpr (NegApp x expr neg_expr) res_ty
   = do  { (expr', neg_expr')
             <- tcSyntaxOp NegateOrigin neg_expr [SynAny] res_ty $
                \[arg_ty] ->
-               tcMonoExpr expr (mkCheckExpType arg_ty)
+               tcMonoExpr expr (mkCheckExpType arg_ty $ text "tcExpr (NegApp x expr neg_expr)")
         ; return (NegApp x expr' neg_expr') }
 
 tcExpr e@(HsIPVar _ x) res_ty
@@ -522,7 +528,7 @@ tcExpr (ExplicitList _ witness exprs) res_ty
 
       Just fln -> do { ((exprs', elt_ty), fln')
                          <- tcSyntaxOp ListOrigin fln
-                                       [synKnownType intTy, SynList] res_ty $
+                                       [synKnownType intTy $ text "tcExpr: ListOrigin", SynList] res_ty $
                             \ [elt_ty] ->
                             do { exprs' <-
                                     mapM (tc_elt elt_ty) exprs
@@ -564,7 +570,7 @@ tcExpr (HsCase x scrut matches) res_ty
                       mc_body = tcBody }
 
 tcExpr (HsIf x Nothing pred b1 b2) res_ty    -- Ordinary 'if'
-  = do { pred' <- tcMonoExpr pred (mkCheckExpType boolTy)
+  = do { pred' <- tcMonoExpr pred (mkCheckExpType boolTy $ text "required as the condition of an ‘if’")
        ; res_ty <- tauifyExpType res_ty
            -- Just like Note [Case branches must never infer a non-tau type]
            -- in TcMatches (See #10619)
@@ -618,7 +624,7 @@ tcExpr (HsStatic fvs expr) res_ty
             addErrCtxt (hang (text "In the body of a static form:")
                              2 (ppr expr)
                        ) $
-            tcPolyExprNC expr expr_ty
+            tcPolyExprNC expr expr_ty (text "in the body of a static form")
 
         -- Check that the free variables of the static form are closed.
         -- It's OK to use nonDetEltsUniqSet here as the only side effects of
@@ -1415,7 +1421,11 @@ tcArg :: LHsExpr GhcRn                   -- The function (for error messages)
       -> Int                             -- # of argument
       -> TcM (LHsExpr GhcTcId)           -- Resulting argument
 tcArg fun arg ty arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
-                          tcPolyExprNC arg ty
+                          tcPolyExprNC arg ty ctxTxt
+                          where
+                            ctxTxt =
+                              hsep [ text "in the", speakNth arg_no
+                                   , text "argument of", quotes (ppr fun)]
 
 ----------------
 tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTcId]
@@ -1502,7 +1512,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
                  , res_wrapper )                   -- :: res_ty_out "->" res_ty
                , arg_wrapper1, [], arg_wrapper2 )  -- :: arg_ty "->" arg_ty_out
              , match_wrapper )         -- :: (arg_ty -> res_ty) "->" rho_ty
-               <- matchExpectedFunTys herald 1 (mkCheckExpType rho_ty) $
+               <- matchExpectedFunTys herald 1 (mkCheckExpType rho_ty $ text "go rho_ty (SynFun arg_shape res_shape)") $
                   \ [arg_ty] res_ty ->
                   do { arg_tc_ty <- expTypeToType arg_ty
                      ; res_tc_ty <- expTypeToType res_ty
@@ -1641,7 +1651,7 @@ tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
              skol_tvs  = map snd tv_prs
        ; (ev_binds, expr') <- checkConstraints skol_info skol_tvs given $
                               tcExtendNameTyVarEnv tv_prs $
-                              tcPolyExprNC expr tau
+                              tcPolyExprNC expr tau (text "tcExprSig CompleteSig ")
 
        ; let poly_wrap = mkWpTyLams   skol_tvs
                          <.> mkWpLams given
@@ -1655,7 +1665,7 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
                 do { sig_inst <- tcInstSig sig
                    ; expr' <- tcExtendNameTyVarEnv (sig_inst_skols sig_inst) $
                               tcExtendNameTyVarEnv (sig_inst_wcs   sig_inst) $
-                              tcPolyExprNC expr (sig_inst_tau sig_inst)
+                              tcPolyExprNC expr (sig_inst_tau sig_inst) (text "tcExprSig PartialSig")
                    ; return (expr', sig_inst) }
        -- See Note [Partial expression signatures]
        ; let tau = sig_inst_tau sig_inst
@@ -1946,7 +1956,7 @@ tcTagToEnum loc fun_name args res_ty
        ; checkTc (isEnumerationTyCon rep_tc)
                  (mk_error ty' doc2)
 
-       ; arg' <- tcMonoExpr arg (mkCheckExpType intPrimTy)
+       ; arg' <- tcMonoExpr arg (mkCheckExpType intPrimTy $ text "tcTagToEnum")
        ; let fun' = L loc (mkHsWrap (WpTyApp rep_ty) (HsVar noExt (L loc fun)))
              rep_ty = mkTyConApp rep_tc rep_args
              out_args = concat
@@ -2437,7 +2447,7 @@ tcRecordField :: ConLike -> Assoc Name Type
 tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
   | Just field_ty <- assocMaybe flds_w_tys sel_name
       = addErrCtxt (fieldCtxt field_lbl) $
-        do { rhs' <- tcPolyExprNC rhs field_ty
+        do { rhs' <- tcPolyExprNC rhs field_ty (text "in the record field" <+> (quotes $ ppr field_lbl))
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
                                         field_ty loc

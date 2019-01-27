@@ -62,6 +62,7 @@ import FV ( fvVarList, unionFV )
 import Control.Monad    ( when )
 import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, nub, sortBy, unfoldr )
+import Data.Char        ( toUpper )
 import qualified Data.Set as Set
 
 import {-# SOURCE #-} TcHoleErrors ( findValidHoleFits )
@@ -1489,11 +1490,13 @@ mkEqErr1 ctxt ct   -- Wanted or derived;
               t_or_k = ctLocTypeOrKind_maybe loc
 
           KindEqOrigin cty1 mb_cty2 sub_o sub_t_or_k
-            -> (True, Nothing, msg1 $$ msg2)
+            -- -> (True, Nothing, msg1 $$ msg2)
+            -> (True, Nothing, msg2)
             where
               sub_what = case sub_t_or_k of Just KindLevel -> text "kinds"
                                             _              -> text "types"
-              msg1 = sdocWithDynFlags $ \dflags ->
+              -- TODO: Do we want to keep _msg1?
+              _msg1 = sdocWithDynFlags $ \dflags ->
                      case mb_cty2 of
                        Just cty2
                          |  gopt Opt_PrintExplicitCoercions dflags
@@ -1934,17 +1937,22 @@ misMatchMsg ct oriented ty1 ty2
           text herald2 <+> quotes (ppr ty2)
         , sameOccExtra ty2 ty1 ]
   where
-    herald1 = conc [ "Couldn't match"
+    herald1 = conc [ capitalize what, "mismatch:"
                    , if is_repr     then "representation of" else ""
-                   , if is_oriented then "expected"          else ""
-                   , what ]
-    herald2 = conc [ "with"
-                   , if is_repr     then "that of"           else ""
-                   , if is_oriented then ("actual " ++ what) else "" ]
+                   -- , if is_oriented then "expected"          else ""
+                   -- , what ]
+                   ]
+    herald2 = conc [ "/="
+                   -- , if is_repr     then "that of"           else ""
+                   -- , if is_oriented then ("actual " ++ what) else ""
+                   ]
     padding = length herald1 - length herald2
 
     is_repr = case ctEqRel ct of { ReprEq -> True; NomEq -> False }
     is_oriented = isJust oriented
+
+    capitalize []     = []
+    capitalize (c:cs) = toUpper c : cs
 
     orig = ctOrigin ct
     what = case ctLocTypeOrKind_maybe (ctLoc ct) of
@@ -1990,22 +1998,24 @@ mkExpectedActualMsg :: Type -> Type -> CtOrigin -> Maybe TypeOrKind -> Bool
                     -> (Bool, Maybe SwapFlag, SDoc)
 -- NotSwapped means (actual, expected), IsSwapped is the reverse
 -- First return val is whether or not to print a herald above this msg
-mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
-                                             , uo_expected = exp
-                                             , uo_thing = maybe_thing })
+mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
+                                          , uo_expected = exp
+                                          , uo_thing = maybe_thing
+                                          , uo_context = maybe_ctx })
                     m_level printExpanded
-  | KindLevel <- level, occurs_check_error       = (True, Nothing, empty)
+  | occurs_check_error                           = (True, Nothing, empty)
   | isUnliftedTypeKind act, isLiftedTypeKind exp = (False, Nothing, msg2)
   | isLiftedTypeKind act, isUnliftedTypeKind exp = (False, Nothing, msg3)
-  | tcIsLiftedTypeKind exp                       = (False, Nothing, msg4)
+  | tcIsLiftedTypeKind exp                       = (True, Nothing, msg1) -- was msg4
   | Just msg <- num_args_msg                     = (False, Nothing, msg $$ msg1)
-  | KindLevel <- level, Just th <- maybe_thing   = (False, Nothing, msg5 th)
-  | act `pickyEqType` ty1, exp `pickyEqType` ty2 = (True, Just NotSwapped, empty)
-  | exp `pickyEqType` ty1, act `pickyEqType` ty2 = (True, Just IsSwapped, empty)
-  | otherwise                                    = (True, Nothing, msg1)
+  | Just th <- maybe_thing                       = (True, Nothing, msg1)
+  | act `pickyEqType` ty1, exp `pickyEqType` ty2 = (True, Just NotSwapped, msg1)
+  | exp `pickyEqType` ty1, act `pickyEqType` ty2 = (True, Just IsSwapped, msg1)
+  | otherwise                                    = (True, Nothing, empty)
   where
     level = m_level `orElse` TypeLevel
 
+    -- TODO: 9173 What check is actually happening here?
     occurs_check_error
       | Just act_tv <- tcGetTyVar_maybe act
       , act_tv `elemVarSet` tyCoVarsOfType exp
@@ -2020,19 +2030,30 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
       TypeLevel -> text "type"
       KindLevel -> text "kind"
 
-    msg1 = case level of
-      KindLevel
-        | Just th <- maybe_thing
-        -> msg5 th
+    msg1
+      | Just th <- maybe_thing
+      , Just uo_ctx <- maybe_ctx
+      -- not (act `pickyEqType` exp) ??
+      = vcat [ text "Actual" <> colon
+               <+> (quotes $ ppr act)
+               <+> (text "is the")
+               <+> sort
+               <+> (text "of")
+               <+> (quotes th)
+             , text "Expected" <>  colon
+               <+> (quotes $ ppr exp)
+               <+> (text "is the")
+               <+> sort
+               <+> uo_ctx
+             -- TODO: leave it or keep it?
+             , if printExpanded then expandedTys else empty ]
 
-      _ | not (act `pickyEqType` exp)
-        -> pprWithExplicitKindsWhenMismatch ty1 ty2 ct $
-           vcat [ text "Expected" <+> sort <> colon <+> ppr exp
-                , text "  Actual" <+> sort <> colon <+> ppr act
-                , if printExpanded then expandedTys else empty ]
-
-        | otherwise
-        -> empty
+        -- maybe_thing and maybe_ctx is Nothing here
+      | not (act `pickyEqType` exp)
+      = vcat [ text "Actual"   <> colon <+> ppr act
+             , text "Expected" <> colon <+> ppr exp
+             , if printExpanded then expandedTys else empty ]
+      | otherwise = empty
 
     thing_msg = case maybe_thing of
                   Just thing -> \_ -> quotes thing <+> text "is"
@@ -2042,17 +2063,13 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
                , thing_msg True, text "unlifted" ]
     msg3 = sep [ text "Expecting an unlifted type, but"
                , thing_msg False, text "lifted" ]
-    msg4 = maybe_num_args_msg $$
+    _msg4 = maybe_num_args_msg $$
            sep [ text "Expected a type, but"
                , maybe (text "found something with kind")
                        (\thing -> quotes thing <+> text "has kind")
                        maybe_thing
                , quotes (pprWithTYPE act) ]
 
-    msg5 th = pprWithExplicitKindsWhenMismatch ty1 ty2 ct $
-              hang (text "Expected" <+> kind_desc <> comma)
-                 2 (text "but" <+> quotes th <+> text "has kind" <+>
-                    quotes (ppr act))
       where
         kind_desc | tcIsConstraintKind exp = text "a constraint"
 

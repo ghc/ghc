@@ -214,7 +214,7 @@ tcBrackTy (XBracket {}) = panic "tcUntypedBracket: Unexpected XBracket"
 tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
 tcPendingSplice (PendingRnSplice flavour splice_name expr)
   = do { res_ty <- tcMetaTy meta_ty_name
-       ; expr' <- tcMonoExpr expr (mkCheckExpType res_ty)
+       ; expr' <- tcMonoExpr expr (mkCheckExpType res_ty $ text "tcPendingSplice")
        ; return (PendingTcSplice splice_name expr') }
   where
      meta_ty_name = case flavour of
@@ -472,7 +472,7 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var) splice_name expr res_ty
        ; meta_exp_ty <- tcTExpTy res_ty
        ; expr' <- setStage pop_stage $
                   setConstraintVar lie_var $
-                  tcMonoExpr expr (mkCheckExpType meta_exp_ty)
+                  tcMonoExpr expr (mkCheckExpType meta_exp_ty $ text "tcNestedSplice")
        ; untypeq <- tcLookupId unTypeQName
        ; let expr'' = mkHsApp (nlHsTyApp untypeq [res_ty]) expr'
        ; ps <- readMutVar ps_var
@@ -491,12 +491,11 @@ tcTopSplice expr res_ty
          res_ty <- expTypeToType res_ty
        ; meta_exp_ty <- tcTExpTy res_ty
        ; q_expr <- tcTopSpliceExpr Typed $
-                          tcMonoExpr expr (mkCheckExpType meta_exp_ty)
+                          tcMonoExpr expr (mkCheckExpType meta_exp_ty $ text "tcTopSplice")
        ; lcl_env <- getLclEnv
        ; let delayed_splice
               = DelayedSplice lcl_env expr res_ty q_expr
        ; return (HsSpliceE noExt (HsSplicedT delayed_splice))
-
        }
 
 
@@ -528,7 +527,7 @@ runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
             captureConstraints $
               addErrCtxt (spliceResultDoc zonked_q_expr) $ do
                 { (exp3, _fvs) <- rnLExpr expr2
-                ; tcMonoExpr exp3 (mkCheckExpType zonked_ty)}
+                ; tcMonoExpr exp3 (mkCheckExpType zonked_ty $ text "runTopSplice")}
        ; ev <- simplifyTop wcs
        ; return $ unLoc (mkHsDictLet (EvBinds ev) res)
        }
