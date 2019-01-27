@@ -189,6 +189,12 @@ def ignore_stderr(name, opts):
 def combined_output( name, opts ):
     opts.combined_output = True
 
+def use_specs( specs ):
+    return lambda name, opts, s=specs: _use_specs( name, opts, s )
+
+def _use_specs( name, opts, specs ):
+    opts.use_specs = specs
+
 # -----
 
 def expect_fail_for( ways ):
@@ -1988,6 +1994,10 @@ def in_srcdir(name, suffix=''):
 #
 def find_expected_file(name, suff):
     basename = add_suffix(name, suff)
+    # Override the basename if the user has specified one, this will then be
+    # subjected to the same name mangling scheme as normal to allow platform
+    # specific overrides to work.
+    basename = getTestOpts().use_specs.get (suff, basename)
 
     files = [basename + ws + plat
              for plat in ['-' + config.platform, '-' + config.os, '']
