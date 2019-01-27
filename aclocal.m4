@@ -1780,22 +1780,8 @@ AC_DEFUN([FP_GMP],
       [directory containing gmp library])],
       [GMP_LIB_DIRS=$withval])
 
-  AC_ARG_ENABLE([intree-gmp],
-    [AC_HELP_STRING([--with-intree-gmp],
-      [force using the in-tree GMP])],
-      [GMP_FORCE_INTREE=YES],
-      [GMP_FORCE_INTREE=NO])
-
-  AC_ARG_ENABLE([gmp-framework-preferred],
-    [AC_HELP_STRING([--with-gmp-framework-preferred],
-      [on OSX, prefer the GMP framework to the gmp lib])],
-      [GMP_PREFER_FRAMEWORK=YES],
-      [GMP_PREFER_FRAMEWORK=NO])
-
   AC_SUBST(GMP_INCLUDE_DIRS)
   AC_SUBST(GMP_LIB_DIRS)
-  AC_SUBST(GMP_FORCE_INTREE)
-  AC_SUBST(GMP_PREFER_FRAMEWORK)
 ])# FP_GMP
 
 # FP_CURSES

@@ -64,7 +64,6 @@ data ContextData = ContextData
     , depCcOpts       :: [String]
     , depLdOpts       :: [String]
     , buildGhciLib    :: Bool
-    , frameworks      :: [String]
     } deriving (Eq, Generic, Show, Typeable)
 
 instance Binary   PackageData
