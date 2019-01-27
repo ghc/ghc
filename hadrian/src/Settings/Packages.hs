@@ -137,6 +137,9 @@ packageArgs = do
 
           , builder (Cabal Setup) ? mconcat
             [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
+            -- Windows is always built with inplace GMP until we have dynamic
+            -- linking working.
+            , windowsHost  ? arg "--configure-option=--with-intree-gmp"
             , flag GmpFrameworkPref ?
               arg "--configure-option=--with-gmp-framework-preferred"
             , arg ("--configure-option=CFLAGS=" ++ includeGmp)
