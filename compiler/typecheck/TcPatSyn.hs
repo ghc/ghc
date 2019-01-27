@@ -387,7 +387,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(dL->L _ name), psb_args = details
            tcExtendKindEnvList [(getName (binderVar ex_tv), APromotionErr PatSynExPE)
                                | ex_tv <- extra_ex] $
                -- See Note [Pattern synonym existentials do not scope]
-           tcPat PatSyn lpat (mkCheckExpType pat_ty) $
+           tcPat PatSyn lpat (mkCheckExpType pat_ty $ text "tcCheckPatSynDecl") $
            do { let in_scope    = mkInScopeSet (mkVarSet univ_tvs)
                     empty_subst = mkEmptyTCvSubst in_scope
               ; (subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst ex_tvs

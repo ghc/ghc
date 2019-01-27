@@ -3497,6 +3497,9 @@ data CtOrigin
                        -- ^ Is at least one of the three elements above visible?
                        -- (Errors from the polymorphic subsumption check are considered
                        -- visible.) Only used for prioritizing error messages.
+                 , uo_context  :: Maybe SDoc
+                       -- ^ The aspect of the context that leads us
+                       -- to expect the "expected" type
                  }
 
   | KindEqOrigin  -- See Note [Equalities with incompatible kinds] in TcCanonical.
@@ -3817,7 +3820,7 @@ pprCtO DefaultOrigin         = text "a 'default' declaration"
 pprCtO DoOrigin              = text "a do statement"
 pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = text "a proc expression"
-pprCtO (TypeEqOrigin t1 t2 _ _)= text "a type equality" <+> sep [ppr t1, char '~', ppr t2]
+pprCtO (TypeEqOrigin t1 t2 _ _ _)= text "a type equality" <+> sep [ppr t1, char '~', ppr t2]
 pprCtO AnnOrigin             = text "an annotation"
 pprCtO HoleOrigin            = text "a use of" <+> quotes (text "_")
 pprCtO ListOrigin            = text "an overloaded list"

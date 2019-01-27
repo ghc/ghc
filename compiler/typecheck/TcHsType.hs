@@ -1147,11 +1147,12 @@ checkExpectedKind sat hs_ty ty act exp
                                                    , ppr kind ])
                    ; return (tc_ty, kind) }
            _ -> return (ty, act)
-       ; (new_args, co_k) <- checkExpectedKindX hs_ty new_act exp
+       ; (new_args, co_k) <- checkExpectedKindX hs_ty ty new_act exp
        ; return (new_ty `mkNakedAppTys` new_args `mkNakedCastTy` co_k) }
 
 checkExpectedKindX :: HasDebugCallStack
                    => SDoc                 -- HsType whose kind we're checking
+                   -> TcType               -- ^ type we're checking
                    -> TcKind               -- the known kind of that type, k
                    -> TcKind               -- the expected kind, exp_kind
                    -> TcM ([TcType], TcCoercionN)
@@ -1160,7 +1161,7 @@ checkExpectedKindX :: HasDebugCallStack
 --      (checkExpectedKind ty act_kind exp_kind)
 -- checks that the actual kind act_kind is compatible
 --      with the expected kind exp_kind
-checkExpectedKindX pp_hs_ty act_kind exp_kind
+checkExpectedKindX pp_hs_ty ty act_kind exp_kind
   = do { -- We need to make sure that both kinds have the same number of implicit
          -- foralls out front. If the actual kind has more, instantiate accordingly.
          -- Otherwise, just pass the type & kind through: the errors are caught
@@ -1173,7 +1174,8 @@ checkExpectedKindX pp_hs_ty act_kind exp_kind
        ; let origin = TypeEqOrigin { uo_actual   = act_kind'
                                    , uo_expected = exp_kind
                                    , uo_thing    = Just pp_hs_ty
-                                   , uo_visible  = True } -- the hs_ty is visible
+                                   , uo_visible  = True -- the hs_ty is visible
+                                   , uo_context  = Just $ text "TcHsType.checkExpectedKindX: " <+> ppr ty}
 
        ; traceTc "checkExpectedKindX" $
          vcat [ pp_hs_ty

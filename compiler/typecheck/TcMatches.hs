@@ -125,7 +125,7 @@ tcMatchesCase :: (Outputable (body GhcRn)) =>
                 -- wrapper goes from MatchGroup's ty to expected ty
 
 tcMatchesCase ctxt scrut_ty matches res_ty
-  = tcMatches ctxt [mkCheckExpType scrut_ty] res_ty matches
+  = tcMatches ctxt [mkCheckExpType scrut_ty $ text "tcMatchesCase"] res_ty matches
 
 tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in TcUnify
               -> TcMatchCtxt HsExpr
@@ -144,7 +144,7 @@ tcMatchLambda herald match_ctxt match res_ty
 tcGRHSsPat :: GRHSs GhcRn (LHsExpr GhcRn) -> TcRhoType
            -> TcM (GRHSs GhcTcId (LHsExpr GhcTcId))
 -- Used for pattern bindings
-tcGRHSsPat grhss res_ty = tcGRHSs match_ctxt grhss (mkCheckExpType res_ty)
+tcGRHSsPat grhss res_ty = tcGRHSs match_ctxt grhss (mkCheckExpType res_ty $ text "tcGRHSsPat")
   where
     match_ctxt = MC { mc_what = PatBindRhs,
                       mc_body = tcBody }
@@ -299,7 +299,7 @@ tcDoStmts ListComp (L l stmts) res_ty
         ; (co, elt_ty) <- matchExpectedListTy res_ty
         ; let list_ty = mkListTy elt_ty
         ; stmts' <- tcStmts ListComp (tcLcStmt listTyCon) stmts
-                            (mkCheckExpType elt_ty)
+                            (mkCheckExpType elt_ty $ text "tcDoStmts: ListComp")
         ; return $ mkHsWrapCo co (HsDo list_ty ListComp (L l stmts')) }
 
 tcDoStmts DoExpr (L l stmts) res_ty
@@ -402,7 +402,7 @@ tcStmtsAndThen ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
 
 tcGuardStmt :: TcExprStmtChecker
 tcGuardStmt _ (BodyStmt _ guard _ _) res_ty thing_inside
-  = do  { guard' <- tcMonoExpr guard (mkCheckExpType boolTy)
+  = do  { guard' <- tcMonoExpr guard (mkCheckExpType boolTy $ text "tcGuardStmt: BodyStmt")
         ; thing  <- thing_inside res_ty
         ; return (BodyStmt boolTy guard' noSyntaxExpr noSyntaxExpr, thing) }
 
@@ -410,7 +410,7 @@ tcGuardStmt ctxt (BindStmt _ pat rhs _ _) res_ty thing_inside
   = do  { (rhs', rhs_ty) <- tcInferSigmaNC rhs
                                    -- Stmt has a context already
         ; (pat', thing)  <- tcPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
-                                    pat (mkCheckExpType rhs_ty) $
+                                    pat (mkCheckExpType rhs_ty $ text "tcGuardStmt: BindStmt") $
                             thing_inside res_ty
         ; return (mkTcBindStmt pat' rhs', thing) }
 
@@ -442,14 +442,14 @@ tcLcStmt _ _ (LastStmt x body noret _) elt_ty thing_inside
 -- A generator, pat <- rhs
 tcLcStmt m_tc ctxt (BindStmt _ pat rhs _ _) elt_ty thing_inside
  = do   { pat_ty <- newFlexiTyVarTy liftedTypeKind
-        ; rhs'   <- tcMonoExpr rhs (mkCheckExpType $ mkTyConApp m_tc [pat_ty])
-        ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
+        ; rhs'   <- tcMonoExpr rhs (mkCheckExpType (mkTyConApp m_tc [pat_ty]) (text "tcLcStmt: BindStmt"))
+        ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty $ text "tcLcStmt: StmtCtxt") $
                             thing_inside elt_ty
         ; return (mkTcBindStmt pat' rhs', thing) }
 
 -- A boolean guard
 tcLcStmt _ _ (BodyStmt _ rhs _ _) elt_ty thing_inside
-  = do  { rhs'  <- tcMonoExpr rhs (mkCheckExpType boolTy)
+  = do  { rhs'  <- tcMonoExpr rhs (mkCheckExpType boolTy $ text "tcLcStm: BodyStmt")
         ; thing <- thing_inside elt_ty
         ; return (BodyStmt boolTy rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
@@ -550,7 +550,7 @@ tcMcStmt _ (LastStmt x body noret return_op) res_ty thing_inside
   = do  { (body', return_op')
             <- tcSyntaxOp MCompOrigin return_op [SynRho] res_ty $
                \ [a_ty] ->
-               tcMonoExprNC body (mkCheckExpType a_ty)
+               tcMonoExprNC body (mkCheckExpType a_ty $ text "tcMcStmt: MCompOrigin")
         ; thing      <- thing_inside (panic "tcMcStmt: thing_inside")
         ; return (LastStmt x body' noret return_op', thing) }
 
@@ -566,10 +566,10 @@ tcMcStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
             <- tcSyntaxOp MCompOrigin bind_op
                           [SynRho, SynFun SynAny SynRho] res_ty $
                \ [rhs_ty, pat_ty, new_res_ty] ->
-               do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty)
+               do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty $ text "tcMcStmt: MCompOrigin")
                   ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat
-                                           (mkCheckExpType pat_ty) $
-                                     thing_inside (mkCheckExpType new_res_ty)
+                                           (mkCheckExpType pat_ty $ text "tcMcStmt: MCompOrigin") $
+                                     thing_inside (mkCheckExpType new_res_ty $ text "tcMcStmt: MCompOrigin")
                   ; return (rhs', pat', thing, new_res_ty) }
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
@@ -591,10 +591,10 @@ tcMcStmt _ (BodyStmt _ rhs then_op guard_op) res_ty thing_inside
                \ [rhs_ty, new_res_ty] ->
                do { (rhs', guard_op')
                       <- tcSyntaxOp MCompOrigin guard_op [SynAny]
-                                    (mkCheckExpType rhs_ty) $
+                                    (mkCheckExpType rhs_ty $ text "tcMcStmt: MCompOrigin") $
                          \ [test_ty] ->
-                         tcMonoExpr rhs (mkCheckExpType test_ty)
-                  ; thing <- thing_inside (mkCheckExpType new_res_ty)
+                         tcMonoExpr rhs (mkCheckExpType test_ty $ text "tcMcStmt: MCompOrigin")
+                  ; thing <- thing_inside (mkCheckExpType new_res_ty $ text "tcMcStmt: MCompOrigin")
                   ; return (thing, rhs', rhs_ty, guard_op') }
         ; return (BodyStmt rhs_ty rhs' then_op' guard_op', thing) }
 
@@ -651,11 +651,11 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
        ; let (bndr_names, n_bndr_names) = unzip bindersMap
        ; (stmts', (bndr_ids, by', return_op')) <-
             tcStmtsAndThen (TransStmtCtxt ctxt) tcMcStmt stmts
-                           (mkCheckExpType using_arg_ty) $ \res_ty' -> do
+                           (mkCheckExpType using_arg_ty $ text "tcMcStmt: TransStmtCtxt") $ \res_ty' -> do
                 { by' <- case by of
                            Nothing -> return Nothing
                            Just e  -> do { e' <- tcMonoExpr e
-                                                   (mkCheckExpType by_e_ty)
+                                                   (mkCheckExpType by_e_ty $ text "tcMcStmt: TransStmtCtxt")
                                          ; return (Just e') }
 
                 -- Find the Ids (and hence types) of all old binders
@@ -664,7 +664,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
                 -- 'return' is only used for the binders, so we know its type.
                 --   return :: (a,b,c,..) -> m (a,b,c,..)
                 ; (_, return_op') <- tcSyntaxOp MCompOrigin return_op
-                                       [synKnownType (mkBigCoreVarTupTy bndr_ids)]
+                                       [synKnownType (mkBigCoreVarTupTy bndr_ids) $ text "tcMcStmt: from synKnownType: MCompOrigin"]
                                        res_ty' $ \ _ -> return ()
 
                 ; return (bndr_ids, by', return_op') }
@@ -673,8 +673,8 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
        -- (>>=) :: m2 (n (a,b,c)) -> ( n (a,b,c) -> new_res_ty ) -> res_ty
        ; new_res_ty <- newFlexiTyVarTy liftedTypeKind
        ; (_, bind_op')  <- tcSyntaxOp MCompOrigin bind_op
-                             [ synKnownType using_res_ty
-                             , synKnownType (n_app tup_ty `mkFunTy` new_res_ty) ]
+                             [ synKnownType using_res_ty $ text "tcMcStmt: Typecheck the 'bind' function"
+                             , synKnownType (n_app tup_ty `mkFunTy` new_res_ty) $ text "tcMcStmt: Typecheck the 'bind' function" ]
                              res_ty $ \ _ -> return ()
 
        --------------- Typecheck the 'fmap' function -------------
@@ -706,7 +706,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
        -- Type check the thing in the environment with
        -- these new binders and return the result
        ; thing <- tcExtendIdEnv n_bndr_ids $
-                  thing_inside (mkCheckExpType new_res_ty)
+                  thing_inside (mkCheckExpType new_res_ty $ text "tcMcStmt: tcExtendIdEnv")
 
        ; return (TransStmt { trS_stmts = stmts', trS_bndrs = bindersMap'
                            , trS_by = by', trS_using = final_using
@@ -765,10 +765,10 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
 
        ; (((blocks', thing), inner_res_ty), bind_op')
            <- tcSyntaxOp MCompOrigin bind_op
-                         [ synKnownType (m_ty `mkAppTy` tuple_ty)
-                         , SynFun (synKnownType tuple_ty) SynRho ] res_ty $
+                         [ synKnownType (m_ty `mkAppTy` tuple_ty) (text "from synKnownType: MCompOrigin")
+                         , SynFun (synKnownType tuple_ty (text "from synKnownType: MCompOrigin, SynFun")) SynRho ] res_ty $
               \ [inner_res_ty] ->
-              do { stuff <- loop m_ty (mkCheckExpType inner_res_ty)
+              do { stuff <- loop m_ty (mkCheckExpType inner_res_ty $ text "tcMcStmt: tcExtendIdEnv")
                                  tup_tys bndr_stmts_s
                  ; return (stuff, inner_res_ty) }
 
@@ -790,13 +790,13 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
                            (ParStmtBlock x stmts names return_op : pairs)
       = do { let m_tup_ty = m_ty `mkAppTy` tup_ty_in
            ; (stmts', (ids, return_op', pairs', thing))
-                <- tcStmtsAndThen ctxt tcMcStmt stmts (mkCheckExpType m_tup_ty) $
+                <- tcStmtsAndThen ctxt tcMcStmt stmts (mkCheckExpType m_tup_ty $ text "tcMcStmt: mk_tuple_ty") $
                    \m_tup_ty' ->
                    do { ids <- tcLookupLocalIds names
                       ; let tup_ty = mkBigCoreVarTupTy ids
                       ; (_, return_op') <-
                           tcSyntaxOp MCompOrigin return_op
-                                     [synKnownType tup_ty] m_tup_ty' $
+                                     [synKnownType tup_ty (text "from synKnownType: MCompOrigin")] m_tup_ty' $
                                      \ _ -> return ()
                       ; (pairs', thing) <- loop m_ty inner_res_ty tup_tys_in pairs
                       ; return (ids, return_op', pairs', thing) }
@@ -828,10 +828,10 @@ tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
           ((rhs', pat', new_res_ty, thing), bind_op')
             <- tcSyntaxOp DoOrigin bind_op [SynRho, SynFun SynAny SynRho] res_ty $
                 \ [rhs_ty, pat_ty, new_res_ty] ->
-                do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty)
+                do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty $ text "tcDoStmt: rhs")
                    ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat
-                                            (mkCheckExpType pat_ty) $
-                                      thing_inside (mkCheckExpType new_res_ty)
+                                            (mkCheckExpType pat_ty $ text "tcDoStmt: pat") $
+                                      thing_inside (mkCheckExpType new_res_ty $ text "tcDoStmt: thing inside pat")
                    ; return (rhs', pat', new_res_ty, thing) }
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
@@ -841,13 +841,13 @@ tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
 
 tcDoStmt ctxt (ApplicativeStmt _ pairs mb_join) res_ty thing_inside
   = do  { let tc_app_stmts ty = tcApplicativeStmts ctxt pairs ty $
-                                thing_inside . mkCheckExpType
+                                thing_inside . (flip mkCheckExpType $ text "tcDoStmt: tc_app_stmts")
         ; ((pairs', body_ty, thing), mb_join') <- case mb_join of
             Nothing -> (, Nothing) <$> tc_app_stmts res_ty
             Just join_op ->
               second Just <$>
               (tcSyntaxOp DoOrigin join_op [SynRho] res_ty $
-               \ [rhs_ty] -> tc_app_stmts (mkCheckExpType rhs_ty))
+               \ [rhs_ty] -> tc_app_stmts (mkCheckExpType rhs_ty $ text "tcDoStmt: DoOrigin"))
 
         ; return (ApplicativeStmt body_ty pairs' mb_join', thing) }
 
@@ -857,8 +857,8 @@ tcDoStmt _ (BodyStmt _ rhs then_op _) res_ty thing_inside
         ; ((rhs', rhs_ty, thing), then_op')
             <- tcSyntaxOp DoOrigin then_op [SynRho, SynRho] res_ty $
                \ [rhs_ty, new_res_ty] ->
-               do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty)
-                  ; thing <- thing_inside (mkCheckExpType new_res_ty)
+               do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty $ text "BodyStmt: DoOrigin")
+                  ; thing <- thing_inside (mkCheckExpType new_res_ty $ text "BodyStmt: DoOrigin")
                   ; return (rhs', rhs_ty, thing) }
         ; return (BodyStmt rhs_ty rhs' then_op' noSyntaxExpr, thing) }
 
@@ -876,27 +876,27 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                 <- tcInferInst $ \ exp_ty ->
                    tcStmtsAndThen ctxt tcDoStmt stmts exp_ty $ \ inner_res_ty ->
                    do { tup_rets <- zipWithM tcCheckId tup_names
-                                      (map mkCheckExpType tup_elt_tys)
+                                      (map (flip mkCheckExpType $ text "tup_elt_tys") tup_elt_tys)
                              -- Unify the types of the "final" Ids (which may
                              -- be polymorphic) with those of "knot-tied" Ids
                       ; (_, ret_op')
-                          <- tcSyntaxOp DoOrigin ret_op [synKnownType tup_ty]
+                          <- tcSyntaxOp DoOrigin ret_op [synKnownType tup_ty $ text "tcDoStmt: DoOrigin"]
                                         inner_res_ty $ \_ -> return ()
                       ; return (ret_op', tup_rets) }
 
         ; ((_, mfix_op'), mfix_res_ty)
             <- tcInferInst $ \ exp_ty ->
                tcSyntaxOp DoOrigin mfix_op
-                          [synKnownType (mkFunTy tup_ty stmts_ty)] exp_ty $
+                          [synKnownType (mkFunTy tup_ty stmts_ty) (text "tcDoStmt: DoOrigin")] exp_ty $
                \ _ -> return ()
 
         ; ((thing, new_res_ty), bind_op')
             <- tcSyntaxOp DoOrigin bind_op
-                          [ synKnownType mfix_res_ty
-                          , synKnownType tup_ty `SynFun` SynRho ]
+                          [ synKnownType mfix_res_ty $ text "tcDoStmt: DoOrigin"
+                          , synKnownType tup_ty (text "tcDoStmt: DoOrigin") `SynFun` SynRho ]
                           res_ty $
                \ [new_res_ty] ->
-               do { thing <- thing_inside (mkCheckExpType new_res_ty)
+               do { thing <- thing_inside (mkCheckExpType new_res_ty $ text "tcDoStmt: DoOrigin")
                   ; return (thing, new_res_ty) }
 
         ; let rec_ids = takeList rec_names tup_ids
@@ -952,8 +952,8 @@ tcMonadFailOp orig pat fail_op res_ty
               -> return ()
 
         -- Get the fail op itself
-        ; snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
-                             (mkCheckExpType res_ty) $ \_ -> return ()) }
+        ; snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy $ text "tcMonadFailOp:"]
+                             (mkCheckExpType res_ty $ text "tcMonadFailOp") $ \_ -> return ()) }
 
 emitMonadFailConstraint :: LPat GhcTcId -> TcType -> TcRn ()
 emitMonadFailConstraint pat res_ty
@@ -1044,7 +1044,8 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
     goOps t_left ((op,t_i,exp_ty) : ops)
       = do { (_, op')
                <- tcSyntaxOp DoOrigin op
-                             [synKnownType t_left, synKnownType exp_ty] t_i $
+                             [ synKnownType t_left $ text "tcApplicativeStmts: "
+                             , synKnownType exp_ty $ text "tcApplicativeStmts: "] t_i $
                    \ _ -> return ()
            ; t_i <- readExpType t_i
            ; ops' <- goOps t_i ops
@@ -1056,17 +1057,17 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
     goArg (ApplicativeArgOne x pat rhs isBody, pat_ty, exp_ty)
       = setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
         addErrCtxt (pprStmtInCtxt ctxt (mkBindStmt pat rhs))   $
-        do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty)
-           ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
+        do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty $ text "tcApplicativeStmts: ApplicativeArgOne")
+           ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty $ text "tcApplicativeStmts: StmtCtxt") $
                           return ()
            ; return (ApplicativeArgOne x pat' rhs' isBody) }
 
     goArg (ApplicativeArgMany x stmts ret pat, pat_ty, exp_ty)
       = do { (stmts', (ret',pat')) <-
-                tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty) $
+                tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty $ text "tcApplicativeStmts: ApplicativeArgMany") $
                 \res_ty  -> do
                   { L _ ret' <- tcMonoExprNC (noLoc ret) res_ty
-                  ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
+                  ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty $ text "tcApplicativeStmts: StmtCtxt") $
                                  return ()
                   ; return (ret', pat')
                   }

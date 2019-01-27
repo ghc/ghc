@@ -357,7 +357,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
        = do { ty <- newOpenFlexiTyVarTy
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
-            ; expr' <- tcMonoExpr expr (mkCheckExpType ty)
+            ; expr' <- tcMonoExpr expr (mkCheckExpType ty $ text "tcLocalBinds")
             ; let d = toDict ipClass p ty `fmap` expr'
             ; return (ip_id, (IPBind noExt (Right ip_id) d)) }
     tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
@@ -704,7 +704,7 @@ tcPolyCheck prag_fn
                tcExtendBinderStack [TcIdBndr mono_id NotTopLevel]  $
                tcExtendNameTyVarEnv tv_prs $
                setSrcSpan loc           $
-               tcMatchesFun (cL nm_loc mono_name) matches (mkCheckExpType tau)
+               tcMatchesFun (L nm_loc mono_name) matches (mkCheckExpType tau $ text "in" <+> pprUserTypeCtxt ctxt)
 
        ; let prag_sigs = lookupPragEnv prag_fn name
        ; spec_prags <- tcSpecPrags poly_id prag_sigs
@@ -1421,9 +1421,9 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
   = tcExtendIdBinderStackForRhs [info]  $
     tcExtendTyVarEnvForRhs mb_sig       $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
-        ; (co_fn, matches') <- tcMatchesFun (cL loc (idName mono_id))
-                                 matches (mkCheckExpType $ idType mono_id)
-        ; return ( FunBind { fun_id = cL loc mono_id
+        ; (co_fn, matches') <- tcMatchesFun (L loc (idName mono_id))
+                                 matches (mkCheckExpType (idType mono_id) $ text "tcRhs")
+        ; return ( FunBind { fun_id = L loc mono_id
                            , fun_matches = matches'
                            , fun_co_fn = co_fn
                            , fun_ext = placeHolderNamesTc

@@ -427,7 +427,7 @@ newInferExpType inst
 -- | Extract a type out of an ExpType, if one exists. But one should always
 -- exist. Unless you're quite sure you know what you're doing.
 readExpType_maybe :: ExpType -> TcM (Maybe TcType)
-readExpType_maybe (Check ty)                   = return (Just ty)
+readExpType_maybe (Check ty _)                 = return (Just ty)
 readExpType_maybe (Infer (IR { ir_ref = ref})) = readMutVar ref
 
 -- | Extract a type out of an ExpType. Otherwise, panics.
@@ -440,27 +440,27 @@ readExpType exp_ty
 
 -- | Returns the expected type when in checking mode.
 checkingExpType_maybe :: ExpType -> Maybe TcType
-checkingExpType_maybe (Check ty) = Just ty
-checkingExpType_maybe _          = Nothing
+checkingExpType_maybe (Check ty _) = Just ty
+checkingExpType_maybe _            = Nothing
 
 -- | Returns the expected type when in checking mode. Panics if in inference
 -- mode.
 checkingExpType :: String -> ExpType -> TcType
-checkingExpType _   (Check ty) = ty
-checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
+checkingExpType _   (Check ty _ ) = ty
+checkingExpType err et            = pprPanic "checkingExpType" (text err $$ ppr et)
 
 tauifyExpType :: ExpType -> TcM ExpType
 -- ^ Turn a (Infer hole) type into a (Check alpha),
 -- where alpha is a fresh unification variable
-tauifyExpType (Check ty)      = return (Check ty)  -- No-op for (Check ty)
+tauifyExpType (Check ty ctx)   = return (Check ty ctx)  -- No-op for (Check ty ctx)
 tauifyExpType (Infer inf_res) = do { ty <- inferResultToType inf_res
-                                   ; return (Check ty) }
+                                   ; return (Check ty $ text "tauifyExpType Infer") }
 
 -- | Extracts the expected type if there is one, or generates a new
 -- TauTv if there isn't.
 expTypeToType :: ExpType -> TcM TcType
-expTypeToType (Check ty)      = return ty
-expTypeToType (Infer inf_res) = inferResultToType inf_res
+expTypeToType (Check ty _ctx)      = return ty
+expTypeToType (Infer inf_res)    = inferResultToType inf_res
 
 inferResultToType :: InferResult -> TcM Type
 inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
