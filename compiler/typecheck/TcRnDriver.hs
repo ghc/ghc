@@ -1738,8 +1738,8 @@ check_main dflags tcg_env explicit_mod_hdr
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcMonoExpr (cL loc (HsVar noExt (cL loc main_name)))
-                             (mkCheckExpType io_ty)
+                  tcMonoExpr (L loc (HsVar noExt (L loc main_name)))
+                             (mkCheckExpType io_ty $ text "check_main")
 
                 -- See Note [Root-main Id]
                 -- Construct the binding
@@ -2264,7 +2264,7 @@ tcGhciStmts stmts
             ret_ty      = mkListTy unitTy ;
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty] ;
             tc_io_stmts = tcStmtsAndThen GhciStmtCtxt tcDoStmt stmts
-                                         (mkCheckExpType io_ret_ty) ;
+                                         (mkCheckExpType io_ret_ty $ text "tcGhciStmts") ;
             names = collectLStmtsBinders stmts ;
          } ;
 

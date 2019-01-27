@@ -523,7 +523,7 @@ newOverloadedLit
            Just expr -> return (lit { ol_witness = expr
                                     , ol_ext = OverLitTc False res_ty })
            Nothing   -> newNonTrivialOverloadedLit orig lit
-                                                   (mkCheckExpType res_ty) }
+                                                   (mkCheckExpType res_ty $ text "Inst.newOverloadedLit") }
 
   | otherwise
   = newNonTrivialOverloadedLit orig lit res_ty
@@ -543,7 +543,7 @@ newNonTrivialOverloadedLit orig
   = do  { hs_lit <- mkOverLit val
         ; let lit_ty = hsLitType hs_lit
         ; (_, fi') <- tcSyntaxOp orig (mkRnSyntaxExpr meth_name)
-                                      [synKnownType lit_ty] res_ty $
+                                      [synKnownType lit_ty $ text "Inst.newNonTrivialOverloadedLit"] res_ty $
                       \_ -> return ()
         ; let L _ witness = nlHsSyntaxApps fi' [nlHsLit hs_lit]
         ; res_ty <- readExpType res_ty

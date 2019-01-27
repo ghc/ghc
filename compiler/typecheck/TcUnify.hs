@@ -143,32 +143,32 @@ matchExpectedFunTys :: forall a.
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
 matchExpectedFunTys herald arity orig_ty thing_inside
   = case orig_ty of
-      Check ty -> go [] arity ty
-      _        -> defer [] arity orig_ty
+      Check ty ctx -> go [] arity ty ctx
+      _            -> defer [] arity orig_ty
   where
-    go acc_arg_tys 0 ty
-      = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType ty)
+    go acc_arg_tys 0 ty ctx
+      = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType ty ctx)
            ; return (result, idHsWrapper) }
 
-    go acc_arg_tys n ty
-      | Just ty' <- tcView ty = go acc_arg_tys n ty'
+    go acc_arg_tys n ty ctx
+      | Just ty' <- tcView ty = go acc_arg_tys n ty' ctx
 
-    go acc_arg_tys n (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+    go acc_arg_tys n (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty }) ctx
       = ASSERT( af == VisArg )
-        do { (result, wrap_res) <- go (mkCheckExpType arg_ty : acc_arg_tys)
-                                      (n-1) res_ty
+        do { (result, wrap_res) <- go (mkCheckExpType arg_ty ctx : acc_arg_tys)
+                                      (n-1) res_ty ctx
            ; return ( result
                     , mkWpFun idHsWrapper wrap_res arg_ty res_ty doc ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
 
-    go acc_arg_tys n ty@(TyVarTy tv)
+    go acc_arg_tys n ty@(TyVarTy tv) ctx
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go acc_arg_tys n ty'
-               Flexi        -> defer acc_arg_tys n (mkCheckExpType ty) }
+               Indirect ty' -> go acc_arg_tys n ty' ctx
+               Flexi        -> defer acc_arg_tys n (mkCheckExpType ty ctx) }
 
        -- In all other cases we bale out into ordinary unification
        -- However unlike the meta-tyvar case, we are sure that the
@@ -184,9 +184,9 @@ matchExpectedFunTys herald arity orig_ty thing_inside
        -- > f2 = undefined
        --
        -- But in that case we add specialized type into error context
-       -- anyway, because it may be useful. See also #9605.
-    go acc_arg_tys n ty = addErrCtxtM mk_ctxt $
-                          defer acc_arg_tys n (mkCheckExpType ty)
+       -- anyway, because it may be useful. See also Trac #9605.
+    go acc_arg_tys n ty ctx = addErrCtxtM mk_ctxt $
+                            defer acc_arg_tys n (mkCheckExpType ty ctx)
 
     ------------
     defer :: [ExpSigmaType] -> Arity -> ExpRhoType -> TcM (a, HsWrapper)
@@ -546,13 +546,14 @@ tcSubTypeET :: CtOrigin -> UserTypeCtxt
             -> ExpSigmaType -> TcSigmaType -> TcM HsWrapper
 -- If wrap = tc_sub_type_et t1 t2
 --    => wrap :: t1 ~> t2
-tcSubTypeET orig ctxt (Check ty_actual) ty_expected
+tcSubTypeET orig ctxt (Check ty_actual chkCtx) ty_expected
   = tc_sub_tc_type eq_orig orig ctxt ty_actual ty_expected
   where
     eq_orig = TypeEqOrigin { uo_actual   = ty_expected
                            , uo_expected = ty_actual
                            , uo_thing    = Nothing
-                           , uo_visible  = True }
+                           , uo_visible  = True
+                           , uo_context  = Just chkCtx }
 
 tcSubTypeET _ _ (Infer inf_res) ty_expected
   = ASSERT2( not (ir_inst inf_res), ppr inf_res $$ ppr ty_expected )
@@ -592,7 +593,7 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
                    -- might not be filled if we're debugging. ugh.
            ; mb_ty_expected          <- readExpType_maybe ty_expected
            ; (tidy_env, ty_expected) <- case mb_ty_expected of
-                                          Just ty -> second mkCheckExpType <$>
+                                          Just ty -> second (flip mkCheckExpType $ text "addSubTypeCtxt") <$>
                                                      zonkTidyTcType tidy_env ty
                                           Nothing -> return (tidy_env, ty_expected)
            ; ty_expected             <- readExpType ty_expected
@@ -617,7 +618,8 @@ tcSubType_NC ctxt ty_actual ty_expected
     origin = TypeEqOrigin { uo_actual   = ty_actual
                           , uo_expected = ty_expected
                           , uo_thing    = Nothing
-                          , uo_visible  = True }
+                          , uo_visible  = True
+                          , uo_context  = Just $ text "tcSubType_NC" }
 
 tcSubTypeDS :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
 -- Just like tcSubType, but with the additional precondition that
@@ -635,12 +637,14 @@ tcSubTypeDS_NC_O :: CtOrigin   -- origin used for instantiation only
 -- ty_expected is deeply skolemised
 tcSubTypeDS_NC_O inst_orig ctxt m_thing ty_actual ty_expected
   = case ty_expected of
-      Infer inf_res -> fillInferResult inst_orig ty_actual inf_res
-      Check ty      -> tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty
+      Infer inf_res   -> fillInferResult inst_orig ty_actual inf_res
+      Check ty chkCtx -> tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty
          where
            eq_orig = TypeEqOrigin { uo_actual = ty_actual, uo_expected = ty
                                   , uo_thing  = ppr <$> m_thing
-                                  , uo_visible = True }
+                                  , uo_visible = True
+                                  , uo_context = Just chkCtx
+                                  }
 
 ---------------
 tc_sub_tc_type :: CtOrigin   -- used when calling uType
@@ -984,7 +988,8 @@ promoteTcType dest_lvl ty
            ; let eq_orig = TypeEqOrigin { uo_actual   = ty
                                         , uo_expected = prom_ty
                                         , uo_thing    = Nothing
-                                        , uo_visible  = False }
+                                        , uo_visible  = False
+                                        , uo_context  = Just $ text "promoteTcType:promote_it" } -- TODO: 9173 pass chkCtx here as well?
 
            ; co <- emitWantedEq eq_orig TypeLevel Nominal ty prom_ty
            ; return (co, prom_ty) }
@@ -996,8 +1001,9 @@ promoteTcType dest_lvl ty
                  kind_orig = TypeEqOrigin { uo_actual   = ty_kind
                                           , uo_expected = res_kind
                                           , uo_thing    = Nothing
-                                          , uo_visible  = False }
-           ; ki_co <- uType KindLevel kind_orig (tcTypeKind ty) res_kind
+                                          , uo_visible  = False
+                                          , uo_context  = Just $ text "promoteTcType:dont_promote_it" } -- TODO: 9173 pass chkCtx here as well?
+           ; ki_co <- uType KindLevel kind_orig (typeKind ty) res_kind
            ; let co = mkTcGReflRightCo Nominal ty ki_co
            ; return (co, ty `mkCastTy` ki_co) }
 
@@ -1132,8 +1138,8 @@ tcSkolemiseET :: UserTypeCtxt -> ExpSigmaType
               -> TcM (HsWrapper, result)
 tcSkolemiseET _ et@(Infer {}) thing_inside
   = (idHsWrapper, ) <$> thing_inside et
-tcSkolemiseET ctxt (Check ty) thing_inside
-  = tcSkolemise ctxt ty $ \_ -> thing_inside . mkCheckExpType
+tcSkolemiseET ctxt (Check ty cctx) thing_inside
+  = tcSkolemise ctxt ty $ \_  tcTy -> thing_inside $ mkCheckExpType tcTy cctx
 
 checkConstraints :: SkolemInfo
                  -> [TcTyVar]           -- Skolems
@@ -1311,15 +1317,16 @@ unifyType thing ty1 ty2 = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
   where
     origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
                           , uo_thing  = ppr <$> thing
-                          , uo_visible = True } -- always called from a visible context
+                          , uo_visible = True -- always called from a visible context
+                          , uo_context = Just $ text "unifyType" }
 
 unifyKind :: Maybe (HsType GhcRn) -> TcKind -> TcKind -> TcM CoercionN
 unifyKind thing ty1 ty2 = traceTc "ukind" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
                           uType KindLevel origin ty1 ty2
   where origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
                               , uo_thing  = ppr <$> thing
-                              , uo_visible = True } -- also always from a visible context
-
+                              , uo_visible = True  -- also always from a visible context
+                              , uo_context = Just $ text "unifyKind" }
 ---------------
 
 {-
@@ -2060,6 +2067,7 @@ matchExpectedFunKind hs_ty n k = go n k
                                         , uo_expected = new_fun
                                         , uo_thing    = Just (ppr hs_ty)
                                         , uo_visible  = True
+                                        , uo_context  = Just $ text "matchExpectedFunKind"
                                         }
            ; uType KindLevel origin k new_fun }
 

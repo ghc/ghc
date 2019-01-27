@@ -360,7 +360,7 @@ type TcDTyCoVarSet  = DTyCoVarSet
 
 -- | An expected type to check against during type-checking.
 -- See Note [ExpType] in TcMType, where you'll also find manipulators.
-data ExpType = Check TcType
+data ExpType = Check TcType SDoc -- SDoc is a context message for errors
              | Infer !InferResult
 
 data InferResult
@@ -383,7 +383,7 @@ type ExpSigmaType = ExpType
 type ExpRhoType   = ExpType
 
 instance Outputable ExpType where
-  ppr (Check ty) = text "Check" <> braces (ppr ty)
+  ppr (Check ty ctx) = text "Check" <> braces (ppr ty <> ctx)
   ppr (Infer ir) = ppr ir
 
 instance Outputable InferResult where
@@ -392,7 +392,7 @@ instance Outputable InferResult where
     = text "Infer" <> braces (ppr u <> comma <> ppr lvl <+> ppr inst)
 
 -- | Make an 'ExpType' suitable for checking.
-mkCheckExpType :: TcType -> ExpType
+mkCheckExpType :: TcType -> SDoc -> ExpType
 mkCheckExpType = Check
 
 
@@ -426,8 +426,8 @@ data SyntaxOpType
 infixr 0 `SynFun`
 
 -- | Like 'SynType' but accepts a regular TcType
-synKnownType :: TcType -> SyntaxOpType
-synKnownType = SynType . mkCheckExpType
+synKnownType :: TcType -> SDoc -> SyntaxOpType
+synKnownType tcTy ctx = SynType $ mkCheckExpType tcTy ctx
 
 -- | Like 'mkFunTys' but for 'SyntaxOpType'
 mkSynFunTys :: [SyntaxOpType] -> ExpType -> SyntaxOpType
@@ -2144,7 +2144,7 @@ isRhoTy _                                      = True
 
 -- | Like 'isRhoTy', but also says 'True' for 'Infer' types
 isRhoExpTy :: ExpType -> Bool
-isRhoExpTy (Check ty) = isRhoTy ty
+isRhoExpTy (Check ty _) = isRhoTy ty
 isRhoExpTy (Infer {}) = True
 
 isOverloadedTy :: Type -> Bool
