@@ -942,7 +942,7 @@ x86_mkStackAllocInstr platform amount
                            ]
             ArchX86_64 | needs_probe_call platform amount ->
                            [ MOV II64 (OpImm (ImmInt amount)) (OpReg rax)
-                           , CALL (Left $ strImmLit "__chkstk_ms") [rax]
+                           , CALL (Left $ strImmLit "___chkstk_ms") [rax]
                            , SUB II64 (OpReg rax) (OpReg rsp)
                            ]
                        | otherwise ->
