@@ -64,7 +64,7 @@ import Util
 import InstEnv     ( instanceDFunId )
 import OptCoercion ( checkAxInstCo )
 import CoreArity ( typeArity )
-import Demand ( splitStrictSig, isBotRes )
+import Demand ( splitStrictSig, isBotDiv )
 
 import HscTypes
 import DynFlags
@@ -291,7 +291,8 @@ coreDumpFlag CoreLiberateCase         = Just Opt_D_verbose_core2core
 coreDumpFlag CoreDoStaticArgs         = Just Opt_D_verbose_core2core
 coreDumpFlag CoreDoCallArity          = Just Opt_D_dump_call_arity
 coreDumpFlag CoreDoExitify            = Just Opt_D_dump_exitify
-coreDumpFlag CoreDoStrictness         = Just Opt_D_dump_stranal
+coreDumpFlag CoreDoDemand             = Just Opt_D_dump_stranal
+coreDumpFlag CoreDoCpr                = Just Opt_D_dump_cpranal
 coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
 coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
 coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
@@ -607,7 +608,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
            ppr binder)
 
        ; case splitStrictSig (idStrictness binder) of
-           (demands, result_info) | isBotRes result_info ->
+           (demands, result_info) | isBotDiv result_info ->
              checkL (demands `lengthAtLeast` idArity binder)
                (text "idArity" <+> ppr (idArity binder) <+>
                text "exceeds arity imposed by the strictness signature" <+>

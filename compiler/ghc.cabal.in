@@ -203,6 +203,7 @@ Library
         DataCon
         PatSyn
         Demand
+        Cpr
         GHC.Cmm.DebugBlock
         Exception
         FieldLabel
@@ -470,6 +471,7 @@ Library
         Specialise
         CallArity
         DmdAnal
+        CprAnal
         Exitify
         WorkWrap
         WwLib

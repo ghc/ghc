@@ -45,6 +45,7 @@ import SAT              ( doStaticArgs )
 import Specialise       ( specProgram)
 import SpecConstr       ( specConstrProgram)
 import DmdAnal          ( dmdAnalProgram )
+import CprAnal          ( cprAnalProgram )
 import CallArity        ( callArityAnalProgram )
 import Exitify          ( exitifyProgram )
 import WorkWrap         ( wwTopBinds )
@@ -141,7 +142,7 @@ getCoreToDo dflags
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
     maybe_strictness_before phase
-      = runWhen (phase `elem` strictnessBefore dflags) CoreDoStrictness
+      = runWhen (phase `elem` strictnessBefore dflags) CoreDoDemand
 
     base_mode = SimplMode { sm_phase      = panic "base_mode"
                           , sm_names      = []
@@ -175,14 +176,12 @@ getCoreToDo dflags
                           -- Don't do case-of-case transformations.
                           -- This makes full laziness work better
 
-    strictness_pass = if ww_on
-                       then [CoreDoStrictness,CoreDoWorkerWrapper]
-                       else [CoreDoStrictness]
+    dmd_cpr_ww = if ww_on then [CoreDoDemand,CoreDoCpr,CoreDoWorkerWrapper]
+                          else [CoreDoDemand,CoreDoCpr]
 
 
-    -- New demand analyser
     demand_analyser = (CoreDoPasses (
-                           strictness_pass ++
+                           dmd_cpr_ww ++
                            [simpl_phase 0 ["post-worker-wrapper"] max_iter]
                            ))
 
@@ -332,7 +331,7 @@ getCoreToDo dflags
         simpl_phase 0 ["final"] max_iter,
 
         runWhen late_dmd_anal $ CoreDoPasses (
-            strictness_pass ++
+            dmd_cpr_ww ++
             [simpl_phase 0 ["post-late-ww"] max_iter]
           ),
 
@@ -341,7 +340,7 @@ getCoreToDo dflags
         -- has run at all. See Note [Final Demand Analyser run] in DmdAnal
         -- It is EXTREMELY IMPORTANT to run this pass, otherwise execution
         -- can become /exponentially/ more expensive. See #11731, #12996.
-        runWhen (strictness || late_dmd_anal) CoreDoStrictness,
+        runWhen (strictness || late_dmd_anal) CoreDoDemand,
 
         maybe_rule_check (Phase 0)
      ]
@@ -445,8 +444,11 @@ doCorePass CoreDoCallArity           = {-# SCC "CallArity" #-}
 doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
                                        doPass exitifyProgram
 
-doCorePass CoreDoStrictness          = {-# SCC "NewStranal" #-}
+doCorePass CoreDoDemand              = {-# SCC "DmdAnal" #-}
                                        doPassDFM dmdAnalProgram
+
+doCorePass CoreDoCpr                 = {-# SCC "CprAnal" #-}
+                                       doPassDFM cprAnalProgram
 
 doCorePass CoreDoWorkerWrapper       = {-# SCC "WorkWrap" #-}
                                        doPassDFU wwTopBinds
@@ -1020,6 +1022,7 @@ transferIdInfo exported_id local_id
   where
     local_info = idInfo local_id
     transfer exp_info = exp_info `setStrictnessInfo`    strictnessInfo local_info
+                                 `setCprInfo`           cprInfo local_info
                                  `setUnfoldingInfo`     unfoldingInfo local_info
                                  `setInlinePragInfo`    inlinePragInfo local_info
                                  `setRuleInfo`          addRuleInfo (ruleInfo exp_info) new_info
