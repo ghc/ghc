@@ -73,28 +73,43 @@ data Lexeme
           )
 
 -- | @since 4.6.0.0
-data Number = MkNumber Int              -- Base
-                       Digits           -- Integral part
-            | MkDecimal Digits          -- Integral part
-                        (Maybe Digits)  -- Fractional part
-                        (Maybe Integer) -- Exponent
+data Number = MkOctal Digits                -- Integral part
+            | MkDecimal Digits              -- Integral part
+                        (Maybe Digits)      -- Fractional part
+                        (Maybe Integer)     -- Exponent
+            | MkHexadecimal Digits          -- Integral part
+                            (Maybe Digits)  -- Fractional part
+                            (Maybe Integer) -- Binary exponent
  deriving ( Eq   -- ^ @since 4.6.0.0
           , Show -- ^ @since 4.6.0.0
           )
 
 -- | @since 4.5.1.0
 numberToInteger :: Number -> Maybe Integer
-numberToInteger (MkNumber base iPart) = Just (val (fromIntegral base) iPart)
+numberToInteger (MkOctal iPart) = Just (val 8 iPart)
 numberToInteger (MkDecimal iPart Nothing Nothing) = Just (val 10 iPart)
+numberToInteger (MkHexadecimal iPart Nothing Nothing) = Just (val 16 iPart)
 numberToInteger _ = Nothing
 
 -- | @since 4.7.0.0
 numberToFixed :: Integer -> Number -> Maybe (Integer, Integer)
-numberToFixed _ (MkNumber base iPart) = Just (val (fromIntegral base) iPart, 0)
+numberToFixed _ (MkOctal iPart) = Just (val 8 iPart, 0)
 numberToFixed _ (MkDecimal iPart Nothing Nothing) = Just (val 10 iPart, 0)
 numberToFixed p (MkDecimal iPart (Just fPart) Nothing)
     = let i = val 10 iPart
           f = val 10 (integerTake p (fPart ++ repeat 0))
+          -- Sigh, we really want genericTake, but that's above us in
+          -- the hierarchy, so we define our own version here (actually
+          -- specialised to Integer)
+          integerTake             :: Integer -> [a] -> [a]
+          integerTake n _ | n <= 0 = []
+          integerTake _ []        =  []
+          integerTake n (x:xs)    =  x : integerTake (n-1) xs
+      in Just (i, f)
+numberToFixed _ (MkHexadecimal iPart Nothing Nothing) = Just (val 16 iPart, 0)
+numberToFixed p (MkHexadecimal iPart (Just fPart) Nothing)
+    = let i = val 16 iPart
+          f = val 16 (integerTake p (fPart ++ repeat 0))
           -- Sigh, we really want genericTake, but that's above us in
           -- the hierarchy, so we define our own version here (actually
           -- specialised to Integer)
@@ -144,11 +159,42 @@ numberToRangedRational (neg, pos) n@(MkDecimal iPart mFPart (Just exp))
                 else if firstDigit' < (neg - 3)
                 then Just 0
                 else Just (numberToRational n)
+numberToRangedRational (neg, pos) n@(MkHexadecimal iPart mFPart (Just exp))
+    -- if exp is out of integer bounds,
+    -- then the number is definitely out of range
+    | exp > fromIntegral (maxBound :: Int) ||
+      exp < fromIntegral (minBound :: Int)
+    = Nothing
+    | otherwise
+    = let mFirstDigit = case dropWhile (0 ==) iPart of
+                        iPart'@(_ : _) -> Just (length iPart')
+                        [] -> case mFPart of
+                              Nothing -> Nothing
+                              Just fPart ->
+                                  case span (0 ==) fPart of
+                                  (_, []) -> Nothing
+                                  (zeroes, _) ->
+                                      Just (negate (length zeroes))
+      in case mFirstDigit of
+         Nothing -> Just 0
+         Just firstDigit ->
+             let firstDigit' = firstDigit + fromInteger exp
+             in if firstDigit' > (pos + 3)
+                   -- TODO: I have no idea whether the +/- 3 padding makes
+                   --       sense for hexadecimal numbers too.
+                   --       I think firstDigit does have to be brought down
+                   --       to powers of 2 rather than 16 though.
+                   --       On the plus side we'd no longer be pretending
+                   --       that the base 2 bounds are base 10.
+                then Nothing
+                else if firstDigit' < (neg - 3)
+                then Just 0
+                else Just (numberToRational n)
 numberToRangedRational _ n = Just (numberToRational n)
 
 -- | @since 4.6.0.0
 numberToRational :: Number -> Rational
-numberToRational (MkNumber base iPart) = val (fromIntegral base) iPart % 1
+numberToRational (MkOctal iPart) = val 8 iPart % 1
 numberToRational (MkDecimal iPart mFPart mExp)
  = let i = val 10 iPart
    in case (mFPart, mExp) of
@@ -162,6 +208,19 @@ numberToRational (MkDecimal iPart mFPart mExp)
       -- Instead of calculating the fractional part alone, then
       -- adding the integral part and finally multiplying with
       -- 10 ^ exp if an exponent was given, do it all at once.
+numberToRational (MkHexadecimal iPart mFPart mExp)
+ = let i = val 16 iPart
+   in case (mFPart, mExp) of
+      (Nothing, Nothing)     -> i % 1
+      (Nothing, Just exp)
+       | exp >= 0            -> (i * (2 ^ exp)) % 1
+       | otherwise           -> i % (2 ^ (- exp))
+      (Just fPart, Nothing)  -> fracBExp 0   i fPart
+      (Just fPart, Just exp) -> fracBExp exp i fPart
+      -- fracBExp is a bit more efficient in calculating the Rational.
+      -- Instead of calculating the fractional part alone, then
+      -- adding the integral part and finally multiplying with
+      -- 2 ^ exp if an exponent was given, do it all at once.
 
 -- -----------------------------------------------------------------------------
 -- Lexing
@@ -416,16 +475,10 @@ type Digits = [Int]
 
 lexNumber :: ReadP Lexeme
 lexNumber
-  = lexHexOct  <++      -- First try for hex or octal 0x, 0o etc
-                        -- If that fails, try for a decimal number
+  = lexOctNumber <++    -- First try for octal 0o, 0O
+    lexHexNumber <++    -- Then try for hex 0x, 0X
+                        -- If that fails try for a decimal number
     lexDecNumber        -- Start with ordinary digits
-
-lexHexOct :: ReadP Lexeme
-lexHexOct
-  = do  _ <- char '0'
-        base <- lexBaseChar
-        digits <- lexDigits base
-        return (Number (MkNumber base digits))
 
 lexBaseChar :: ReadP Int
 -- Lex a single character indicating the base; fail if not there
@@ -436,6 +489,39 @@ lexBaseChar = do { c <- get;
                         'x' -> return 16
                         'X' -> return 16
                         _   -> pfail }
+
+lexOctNumber :: ReadP Lexeme
+lexOctNumber =
+  do _      <- char '0'
+     _      <- char 'o' +++ char 'O'
+     digits <- lexDigits 8
+     return (Number (MkOctal digits))
+
+lexHexNumber :: ReadP Lexeme
+lexHexNumber =
+  do _ <- char '0'
+     _ <- char 'x' +++ char 'X'
+     xs <- lexDigits 16
+     mFrac  <- lexHFrac <++ return Nothing
+     mExp   <- lexBExp  <++ return Nothing
+     return (Number (MkHexadecimal xs mFrac mExp))
+
+lexHFrac :: ReadP (Maybe Digits)
+-- Read the fractional part; fail if it doesn't
+-- start ".d" where d is a digit
+lexHFrac = do _ <- char '.'
+              fraction <- lexDigits 16
+              return (Just fraction)
+
+lexBExp :: ReadP (Maybe Integer)
+lexBExp = do _ <- char 'p' +++ char 'P'
+             exp <- signedExp +++ lexInteger 10
+             return (Just exp)
+ where
+   signedExp
+     = do c <- char '-' +++ char '+'
+          n <- lexInteger 10
+          return (if c == '-' then -n else n)
 
 lexDecNumber :: ReadP Lexeme
 lexDecNumber =
@@ -538,6 +624,15 @@ fracExp exp mant (d:ds) = exp' `seq` mant' `seq` fracExp exp' mant' ds
   where
     exp'  = exp - 1
     mant' = mant * 10 + fromIntegral d
+
+fracBExp :: Integer -> Integer -> Digits -> Rational
+fracBExp exp mant []
+  | exp < 0     = mant % (2 ^ (-exp))
+  | otherwise   = fromInteger (mant * 2 ^ exp)
+fracBExp exp mant (d:ds) = exp' `seq` mant' `seq` fracExp exp' mant' ds
+  where
+    exp'  = exp - 1
+    mant' = mant * 2 + fromIntegral d
 
 valDig :: (Eq a, Num a) => a -> Char -> Maybe Int
 valDig 8 c
