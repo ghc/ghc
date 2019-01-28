@@ -25,6 +25,7 @@ import Var
 import Id
 import IdInfo
 import Demand
+import Cpr
 import DataCon
 import TyCon
 import TyCoPpr
@@ -477,6 +478,7 @@ ppIdInfo id info
     , (has_called_arity, text "CallArity=" <> int called_arity)
     , (has_caf_info,     text "Caf=" <> ppr caf_info)
     , (has_str_info,     text "Str=" <> pprStrictness str_info)
+    , (has_cpr_info,     text "Cpr=" <> ppr cpr_info)
     , (has_unf,          text "Unf=" <> ppr unf_info)
     , (not (null rules), text "RULES:" <+> vcat (map pprRule rules))
     ]   -- Inline pragma, occ, demand, one-shot info
@@ -498,6 +500,9 @@ ppIdInfo id info
 
     str_info = strictnessInfo info
     has_str_info = not (isTopSig str_info)
+
+    cpr_info = cprInfo info
+    has_cpr_info = cpr_info /= topCpr
 
     unf_info = unfoldingInfo info
     has_unf = hasSomeUnfolding unf_info
@@ -617,4 +622,3 @@ instance Outputable id => Outputable (Tickish id) where
          _            -> hcat [text "scc<",     ppr cc, char '>']
   ppr (SourceNote span _) =
       hcat [ text "src<", pprUserRealSpan True span, char '>']
-
