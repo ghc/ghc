@@ -468,6 +468,7 @@ Library
         Specialise
         CallArity
         DmdAnal
+        CprAnal
         Exitify
         WorkWrap
         WwLib

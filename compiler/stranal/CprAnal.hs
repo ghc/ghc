@@ -9,14 +9,13 @@
 
 {-# LANGUAGE CPP #-}
 
-module DmdAnal ( dmdAnalProgram ) where
+module CprAnal ( cprAnalProgram ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
 import DynFlags
-import CprAnal          ( cprAnalProgram )
 import WwLib            ( findTypeShape, deepSplitProductType_maybe )
 import Demand   -- All of it
 import CoreSyn
@@ -27,7 +26,7 @@ import BasicTypes
 import Data.List
 import DataCon
 import Id
-import CoreUtils        ( exprIsHNF, exprType, exprIsTrivial, exprOkForSpeculation )
+import CoreUtils        ( exprIsHNF, exprType, exprIsTrivial )
 import TyCon
 import Type
 import Coercion         ( Coercion, coVarsOfCo )
@@ -36,7 +35,7 @@ import Util
 import Maybes           ( isJust )
 import TysWiredIn
 import TysPrim          ( realWorldStatePrimTy )
-import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
+import ErrUtils         ( dumpIfSet_dyn )
 import Name             ( getName, stableNameCmp )
 import Data.Function    ( on )
 import UniqSet
@@ -49,36 +48,35 @@ import UniqSet
 ************************************************************************
 -}
 
-dmdAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
-dmdAnalProgram dflags fam_envs binds
+cprAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
+cprAnalProgram dflags fam_envs binds
   = do {
         let { binds_plus_dmds = do_prog binds } ;
-        binds_plus_cpr <- cprAnalProgram dflags fam_envs binds_plus_dmds ;
         dumpIfSet_dyn dflags Opt_D_dump_str_signatures
-            "Strictness signatures" FormatText
-            (dumpStrSig binds_plus_dmds) ;
+                      "Strictness signatures" $
+            dumpStrSig binds_plus_dmds ;
         -- See Note [Stamp out space leaks in demand analysis]
-        seqBinds binds_plus_cpr `seq` return binds_plus_cpr
+        seqBinds binds_plus_dmds `seq` return binds_plus_dmds
     }
   where
     do_prog :: CoreProgram -> CoreProgram
-    do_prog binds = snd $ mapAccumL dmdAnalTopBind (emptyAnalEnv dflags fam_envs) binds
+    do_prog binds = snd $ mapAccumL cprAnalTopBind (emptyAnalEnv dflags fam_envs) binds
 
 -- Analyse a (group of) top-level binding(s)
-dmdAnalTopBind :: AnalEnv
+cprAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
-dmdAnalTopBind env (NonRec id rhs)
+cprAnalTopBind env (NonRec id rhs)
   = (extendAnalEnv TopLevel env id2 (idStrictness id2), NonRec id2 rhs2)
   where
-    ( _, _,   rhs1) = dmdAnalRhsLetDown TopLevel Nothing env             cleanEvalDmd id rhs
-    ( _, id2, rhs2) = dmdAnalRhsLetDown TopLevel Nothing (nonVirgin env) cleanEvalDmd id rhs1
+    ( _, _,   rhs1) = cprAnalRhsLetDown TopLevel Nothing env             cleanEvalDmd id rhs
+    ( _, id2, rhs2) = cprAnalRhsLetDown TopLevel Nothing (nonVirgin env) cleanEvalDmd id rhs1
         -- Do two passes to improve CPR information
         -- See Note [CPR for thunks]
         -- See Note [Optimistic CPR in the "virgin" case]
         -- See Note [Initial CPR for strict binders]
 
-dmdAnalTopBind env (Rec pairs)
+cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
   where
     (env', _, pairs')  = dmdFix TopLevel env cleanEvalDmd pairs
@@ -95,7 +93,7 @@ seqBinds over the output before returning it, to ensure that there are
 no references holding on to the input Core program.
 
 This makes a ~30% reduction in peak memory usage when compiling
-DynFlags (cf #9675 and #13426).
+DynFlags (cf Trac #9675 and #13426).
 
 This is particularly important when we are doing late demand analysis,
 since we don't do a seqBinds at any point thereafter. Hence code
@@ -140,65 +138,74 @@ dmdTransformThunkDmd e
 -- Do not process absent demands
 -- Otherwise act like in a normal demand analysis
 -- See ↦* relation in the Cardinality Analysis paper
-dmdAnalStar :: AnalEnv
+cprAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
-            -> CoreExpr -- Should obey the let/app invariant
-            -> (BothDmdArg, CoreExpr)
-dmdAnalStar env dmd e
-  | (dmd_shell, cd) <- toCleanDmd dmd
-  , (dmd_ty, e')    <- dmdAnal env cd e
-  = ASSERT2( not (isUnliftedType (exprType e)) || exprOkForSpeculation e, ppr e )
-    -- The argument 'e' should satisfy the let/app invariant
-    -- See Note [Analysing with absent demand] in Demand.hs
-    (postProcessDmdType dmd_shell dmd_ty, e')
+            -> CoreExpr -> (BothDmdArg, CoreExpr)
+cprAnalStar env dmd e
+  | (defer_and_use, cd) <- toCleanDmd dmd
+  , (dmd_ty, e')        <- cprAnal env cd e
+  = (postProcessDmdType defer_and_use dmd_ty, e')
 
 -- Main Demand Analsysis machinery
-dmdAnal, dmdAnal' :: AnalEnv
+cprAnal, cprAnal' :: AnalEnv
         -> CleanDemand         -- The main one takes a *CleanDemand*
         -> CoreExpr -> (DmdType, CoreExpr)
 
 -- The CleanDemand is always strict and not absent
 --    See Note [Ensure demand is strict]
 
-dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
-                  dmdAnal' env d e
+cprAnal env d e = -- pprTrace "cprAnal" (ppr d <+> ppr e) $
+                  cprAnal' env d e
 
-dmdAnal' _ _ (Lit lit)     = (nopDmdType, Lit lit)
-dmdAnal' _ _ (Type ty)     = (nopDmdType, Type ty)      -- Doesn't happen, in fact
-dmdAnal' _ _ (Coercion co)
+cprAnal' _ _ (Lit lit)     = (nopDmdType, Lit lit)
+cprAnal' _ _ (Type ty)     = (nopDmdType, Type ty)      -- Doesn't happen, in fact
+cprAnal' _ _ (Coercion co)
   = (unitDmdType (coercionDmdEnv co), Coercion co)
 
-dmdAnal' env dmd (Var var)
+cprAnal' env dmd (Var var)
   = (dmdTransform env var dmd, Var var)
 
-dmdAnal' env dmd (Cast e co)
+cprAnal' env dmd (Cast e co)
   = (dmd_ty `bothDmdType` mkBothDmdArg (coercionDmdEnv co), Cast e' co)
   where
-    (dmd_ty, e') = dmdAnal env dmd e
+    (dmd_ty, e') = cprAnal env dmd e
 
-dmdAnal' env dmd (Tick t e)
+{-       ----- I don't get this, so commenting out -------
+    to_co        = pSnd (coercionKind co)
+    dmd'
+      | Just tc <- tyConAppTyCon_maybe to_co
+      , isRecursiveTyCon tc = cleanEvalDmd
+      | otherwise           = dmd
+        -- This coerce usually arises from a recursive
+        -- newtype, and we don't want to look inside them
+        -- for exactly the same reason that we don't look
+        -- inside recursive products -- we might not reach
+        -- a fixpoint.  So revert to a vanilla Eval demand
+-}
+
+cprAnal' env dmd (Tick t e)
   = (dmd_ty, Tick t e')
   where
-    (dmd_ty, e') = dmdAnal env dmd e
+    (dmd_ty, e') = cprAnal env dmd e
 
-dmdAnal' env dmd (App fun (Type ty))
+cprAnal' env dmd (App fun (Type ty))
   = (fun_ty, App fun' (Type ty))
   where
-    (fun_ty, fun') = dmdAnal env dmd fun
+    (fun_ty, fun') = cprAnal env dmd fun
 
 -- Lots of the other code is there to make this
 -- beautiful, compositional, application rule :-)
-dmdAnal' env dmd (App fun arg)
+cprAnal' env dmd (App fun arg)
   = -- This case handles value arguments (type args handled above)
     -- Crucially, coercions /are/ handled here, because they are
-    -- value arguments (#10288)
+    -- value arguments (Trac #10288)
     let
         call_dmd          = mkCallDmd dmd
-        (fun_ty, fun')    = dmdAnal env call_dmd fun
+        (fun_ty, fun')    = cprAnal env call_dmd fun
         (arg_dmd, res_ty) = splitDmdTy fun_ty
-        (arg_ty, arg')    = dmdAnalStar env (dmdTransformThunkDmd arg arg_dmd) arg
+        (arg_ty, arg')    = cprAnalStar env (dmdTransformThunkDmd arg arg_dmd) arg
     in
---    pprTrace "dmdAnal:app" (vcat
+--    pprTrace "cprAnal:app" (vcat
 --         [ text "dmd =" <+> ppr dmd
 --         , text "expr =" <+> ppr (App fun arg)
 --         , text "fun dmd_ty =" <+> ppr fun_ty
@@ -208,10 +215,11 @@ dmdAnal' env dmd (App fun arg)
 --         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
     (res_ty `bothDmdType` arg_ty, App fun' arg')
 
-dmdAnal' env dmd (Lam var body)
+-- this is an anonymous lambda, since @cprAnalRhsLetDown@ uses @collectBinders@
+cprAnal' env dmd (Lam var body)
   | isTyVar var
   = let
-        (body_ty, body') = dmdAnal env dmd body
+        (body_ty, body') = cprAnal env dmd body
     in
     (body_ty, Lam var body')
 
@@ -220,12 +228,12 @@ dmdAnal' env dmd (Lam var body)
           -- body_dmd: a demand to analyze the body
 
         env'             = extendSigsWithLam env var
-        (body_ty, body') = dmdAnal env' body_dmd body
+        (body_ty, body') = cprAnal env' body_dmd body
         (lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty var
     in
     (postProcessUnsat defer_and_use lam_ty, Lam var' body')
 
-dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
+cprAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   -- Only one alternative with a product constructor
   | let tycon = dataConTyCon dc
   , isJust (isDataProductTyCon_maybe tycon)
@@ -233,7 +241,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   = let
         env_w_tc                 = env { ae_rec_tc = rec_tc' }
         env_alt                  = extendEnvForProdAlt env_w_tc scrut case_bndr dc bndrs
-        (rhs_ty, rhs')           = dmdAnal env_alt dmd rhs
+        (rhs_ty, rhs')           = cprAnal env_alt dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
@@ -242,33 +250,32 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
-        scrut_dmd          = mkProdDmd id_dmds
-        (scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
+        scrut_dmd          = mkProdDmd (addDataConStrictness dc id_dmds)
+        (scrut_ty, scrut') = cprAnal env scrut_dmd scrut
         res_ty             = alt_ty3 `bothDmdType` toBothDmdArg scrut_ty
         case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
         bndrs'             = setBndrsDemandInfo bndrs id_dmds
     in
---    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
+--    pprTrace "cprAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
 --                                   , text "case_bndr_dmd" <+> ppr (idDemandInfo case_bndr')
---                                   , text "id_dmds" <+> ppr id_dmds
 --                                   , text "scrut_dmd" <+> ppr scrut_dmd
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_ty" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty [(DataAlt dc, bndrs', rhs')])
 
-dmdAnal' env dmd (Case scrut case_bndr ty alts)
+cprAnal' env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
-        (alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd case_bndr) alts
-        (scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
+        (alt_tys, alts')     = mapAndUnzip (cprAnalAlt env dmd case_bndr) alts
+        (scrut_ty, scrut')   = cprAnal env cleanEvalDmd scrut
         (alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
                                -- NB: Base case is botDmdType, for empty case alternatives
                                --     This is a unit for lubDmdType, and the right result
                                --     when there really are no alternatives
         res_ty               = alt_ty `bothDmdType` toBothDmdArg scrut_ty
     in
---    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
+--    pprTrace "cprAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_tys" <+> ppr alt_tys
 --                                   , text "alt_ty" <+> ppr alt_ty
@@ -286,23 +293,26 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
 --
 -- This is used for a non-recursive local let without manifest lambdas.
 -- This is the LetUp rule in the paper “Higher-Order Cardinality Analysis”.
-dmdAnal' env dmd (Let (NonRec id rhs) body)
-  | useLetUp id
+cprAnal' env dmd (Let (NonRec id rhs) body)
+  | useLetUp id rhs
+  , Nothing <- unpackTrivial rhs
+      -- cprAnalRhsLetDown treats trivial right hand sides specially
+      -- so if we have a trival right hand side, fall through to that.
   = (final_ty, Let (NonRec id' rhs') body')
   where
-    (body_ty, body')   = dmdAnal env dmd body
+    (body_ty, body')   = cprAnal env dmd body
     (body_ty', id_dmd) = findBndrDmd env notArgOfDfun body_ty id
     id'                = setIdDemandInfo id id_dmd
 
-    (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
+    (rhs_ty, rhs')     = cprAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
     final_ty           = body_ty' `bothDmdType` rhs_ty
 
-dmdAnal' env dmd (Let (NonRec id rhs) body)
+cprAnal' env dmd (Let (NonRec id rhs) body)
   = (body_ty2, Let (NonRec id2 rhs') body')
   where
-    (lazy_fv, id1, rhs') = dmdAnalRhsLetDown NotTopLevel Nothing env dmd id rhs
+    (lazy_fv, id1, rhs') = cprAnalRhsLetDown NotTopLevel Nothing env dmd id rhs
     env1                 = extendAnalEnv NotTopLevel env id1 (idStrictness id1)
-    (body_ty, body')     = dmdAnal env1 dmd body
+    (body_ty, body')     = cprAnal env1 dmd body
     (body_ty1, id2)      = annotateBndr env body_ty id1
     body_ty2             = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
 
@@ -319,10 +329,10 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
         -- the vanilla call demand seem to be due to (b).  So we don't
         -- bother to re-analyse the RHS.
 
-dmdAnal' env dmd (Let (Rec pairs) body)
+cprAnal' env dmd (Let (Rec pairs) body)
   = let
         (env', lazy_fv, pairs') = dmdFix NotTopLevel env dmd pairs
-        (body_ty, body')        = dmdAnal env' dmd body
+        (body_ty, body')        = cprAnal env' dmd body
         body_ty1                = deleteFVs body_ty (map fst pairs)
         body_ty2                = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
     in
@@ -342,14 +352,14 @@ io_hack_reqd scrut con bndrs
   | otherwise
   = False
 
-dmdAnalAlt :: AnalEnv -> CleanDemand -> Id -> Alt Var -> (DmdType, Alt Var)
-dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
+cprAnalAlt :: AnalEnv -> CleanDemand -> Id -> Alt Var -> (DmdType, Alt Var)
+cprAnalAlt env dmd case_bndr (con,bndrs,rhs)
   | null bndrs    -- Literals, DEFAULT, and nullary constructors
-  , (rhs_ty, rhs') <- dmdAnal env dmd rhs
+  , (rhs_ty, rhs') <- cprAnal env dmd rhs
   = (rhs_ty, (con, [], rhs'))
 
   | otherwise     -- Non-nullary data constructors
-  , (rhs_ty, rhs') <- dmdAnal env dmd rhs
+  , (rhs_ty, rhs') <- cprAnal env dmd rhs
   , (alt_ty, dmds) <- findBndrsDmds env rhs_ty bndrs
   , let case_bndr_dmd = findIdDemand alt_ty case_bndr
         id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
@@ -374,7 +384,7 @@ as if we had
         other      -> return ()
 So the 'y' isn't necessarily going to be evaluated
 
-A more complete example (#148, #1592) where this shows up is:
+A more complete example (Trac #148, #1592) where this shows up is:
      do { let len = <expensive> ;
         ; when (...) (exitWith ExitSuccess)
         ; print len }
@@ -503,7 +513,7 @@ dmdFix :: TopLevelFlag
        -> AnalEnv                            -- Does not include bindings for this binding
        -> CleanDemand
        -> [(Id,CoreExpr)]
-       -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with strictness info
+       -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with stricness info
 
 dmdFix top_lvl env let_dmd orig_pairs
   = loop 1 initial_pairs
@@ -554,7 +564,7 @@ dmdFix top_lvl env let_dmd orig_pairs
         my_downRhs (env, lazy_fv) (id,rhs)
           = ((env', lazy_fv'), (id', rhs'))
           where
-            (lazy_fv1, id', rhs') = dmdAnalRhsLetDown top_lvl (Just bndrs) env let_dmd id rhs
+            (lazy_fv1, id', rhs') = cprAnalRhsLetDown top_lvl (Just bndrs) env let_dmd id rhs
             lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
             env'                  = extendAnalEnv top_lvl env id (idStrictness id')
 
@@ -580,9 +590,28 @@ environment, which effectively assigns them 'nopSig' (see "getStrictness")
 
 -}
 
+-- Trivial RHS
+-- See Note [Demand analysis for trivial right-hand sides]
+cprAnalTrivialRhs ::
+    AnalEnv -> Id -> CoreExpr -> Var ->
+    (DmdEnv, Id, CoreExpr)
+cprAnalTrivialRhs env id rhs fn
+  = (fn_fv, set_idStrictness env id fn_str, rhs)
+  where
+    fn_str = getStrictness env fn
+    fn_fv | isLocalId fn = unitVarEnv fn topDmd
+          | otherwise    = emptyDmdEnv
+    -- Note [Remember to demand the function itself]
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    -- fn_fv: don't forget to produce a demand for fn itself
+    -- Lacking this caused Trac #9128
+    -- The demand is very conservative (topDmd), but that doesn't
+    -- matter; trivial bindings are usually inlined, so it only
+    -- kicks in for top-level bindings and NOINLINE bindings
+
 -- Let bindings can be processed in two ways:
 -- Down (RHS before body) or Up (body before RHS).
--- dmdAnalRhsLetDown implements the Down variant:
+-- cprAnalRhsLetDown implements the Down variant:
 --  * assuming a demand of <L,U>
 --  * looking at the definition
 --  * determining a strictness signature
@@ -592,31 +621,36 @@ environment, which effectively assigns them 'nopSig' (see "getStrictness")
 -- Local non-recursive definitions without a lambda are handled with LetUp.
 --
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
-dmdAnalRhsLetDown :: TopLevelFlag
+cprAnalRhsLetDown :: TopLevelFlag
            -> Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
            -> AnalEnv -> CleanDemand
            -> Id -> CoreExpr
            -> (DmdEnv, Id, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
-dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
-  = (lazy_fv, id', rhs')
+cprAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
+  | Just fn <- unpackTrivial rhs   -- See Note [Demand analysis for trivial right-hand sides]
+  = cprAnalTrivialRhs env id rhs fn
+
+  | otherwise
+  = (lazy_fv, id', mkLams bndrs' body')
   where
-    rhs_arity      = idArity id
-    rhs_dmd
-      -- See Note [Demand analysis for join points]
-      -- See Note [Invariants on join points] invariant 2b, in CoreSyn
-      --     rhs_arity matches the join arity of the join point
-      | isJoinId id
-      = mkCallDmds rhs_arity let_dmd
-      | otherwise
-      -- NB: rhs_arity
-      -- See Note [Demand signatures are computed for a threshold demand based on idArity]
-      = mkRhsDmd env rhs_arity rhs
-    (DmdType rhs_fv rhs_dmds rhs_res, rhs')
-                   = dmdAnal env rhs_dmd rhs
-    sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_res')
-    id'            = set_idStrictness env id sig
+    (bndrs, body, body_dmd)
+       = case isJoinId_maybe id of
+           Just join_arity  -- See Note [Demand analysis for join points]
+                   | (bndrs, body) <- collectNBinders join_arity rhs
+                   -> (bndrs, body, let_dmd)
+
+           Nothing | (bndrs, body) <- collectBinders rhs
+                   -> (bndrs, body, mkBodyDmd env body)
+
+    env_body         = foldl' extendSigsWithLam env bndrs
+    (body_ty, body') = cprAnal env_body body_dmd body
+    body_ty'         = removeDmdTyArgs body_ty -- zap possible deep CPR info
+    (DmdType rhs_fv rhs_dmds rhs_res, bndrs')
+                     = annotateLamBndrs env (isDFunId id) body_ty' bndrs
+    sig_ty           = mkStrictSig (mkDmdType sig_fv rhs_dmds rhs_res')
+    id'              = set_idStrictness env id sig_ty
         -- See Note [NOINLINE and strictness]
 
 
@@ -640,63 +674,36 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
        || not (isStrictDmd (idDemandInfo id) || ae_virgin env)
           -- See Note [Optimistic CPR in the "virgin" case]
 
--- | @mkRhsDmd env rhs_arity rhs@ creates a 'CleanDemand' for
--- unleashing on the given function's @rhs@, by creating a call demand of
--- @rhs_arity@ with a body demand appropriate for possible product types.
--- See Note [Product demands for function body].
--- For example, a call of the form @mkRhsDmd _ 2 (\x y -> (x, y))@ returns a
--- clean usage demand of @C1(C1(U(U,U)))@.
-mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> CleanDemand
-mkRhsDmd env rhs_arity rhs =
-  case peelTsFuns rhs_arity (findTypeShape (ae_fam_envs env) (exprType rhs)) of
-    Just (TsProd tss) -> mkCallDmds rhs_arity (cleanEvalProdDmd (length tss))
-    _                 -> mkCallDmds rhs_arity cleanEvalDmd
+mkBodyDmd :: AnalEnv -> CoreExpr -> CleanDemand
+-- See Note [Product demands for function body]
+mkBodyDmd env body
+  = case deepSplitProductType_maybe (ae_fam_envs env) (exprType body) of
+       Nothing            -> cleanEvalDmd
+       Just (dc, _, _, _) -> cleanEvalProdDmd (dataConRepArity dc)
 
--- | If given the let-bound 'Id', 'useLetUp' determines whether we should
--- process the binding up (body before rhs) or down (rhs before body).
+unpackTrivial :: CoreExpr -> Maybe Id
+-- Returns (Just v) if the arg is really equal to v, modulo
+-- casts, type applications etc
+-- See Note [Demand analysis for trivial right-hand sides]
+unpackTrivial (Var v)                 = Just v
+unpackTrivial (Cast e _)              = unpackTrivial e
+unpackTrivial (Lam v e) | isTyVar v   = unpackTrivial e
+unpackTrivial (App e a) | isTypeArg a = unpackTrivial e
+unpackTrivial _                       = Nothing
+
+-- | If given the RHS of a let-binding, this 'useLetUp' determines
+-- whether we should process the binding up (body before rhs) or
+-- down (rhs before body).
 --
--- We use LetDown if there is a chance to get a useful strictness signature to
--- unleash at call sites. LetDown is generally more precise than LetUp if we can
--- correctly guess how it will be used in the body, that is, for which incoming
--- demand the strictness signature should be computed, which allows us to
--- unleash higher-order demands on arguments at call sites. This is mostly the
--- case when
---
---   * The binding takes any arguments before performing meaningful work (cf.
---     'idArity'), in which case we are interested to see how it uses them.
---   * The binding is a join point, hence acting like a function, not a value.
---     As a big plus, we know *precisely* how it will be used in the body; since
---     it's always tail-called, we can directly unleash the incoming demand of
---     the let binding on its RHS when computing a strictness signature. See
---     [Demand analysis for join points].
---
--- Thus, if the binding is not a join point and its arity is 0, we have a thunk
--- and use LetUp, implying that we have no usable demand signature available
--- when we analyse the let body.
---
--- Since thunk evaluation is memoised, we want to unleash its 'DmdEnv' of free
--- vars at most once, regardless of how many times it was forced in the body.
--- This makes a real difference wrt. usage demands. The other reason is being
--- able to unleash a more precise product demand on its RHS once we know how the
--- thunk was used in the let body.
---
--- Characteristic examples, always assuming a single evaluation:
---
---   * @let x = 2*y in x + x@ => LetUp. Compared to LetDown, we find out that
---     the expression uses @y@ at most once.
---   * @let x = (a,b) in fst x@ => LetUp. Compared to LetDown, we find out that
---     @b@ is absent.
---   * @let f x = x*2 in f y@ => LetDown. Compared to LetUp, we find out that
---     the expression uses @y@ strictly, because we have @f@'s demand signature
---     available at the call site.
---   * @join exit = 2*y in if a then exit else if b then exit else 3*y@ =>
---     LetDown. Compared to LetUp, we find out that the expression uses @y@
---     strictly, because we can unleash @exit@'s signature at each call site.
---   * For a more convincing example with join points, see Note [Demand analysis
---     for join points].
---
-useLetUp :: Var -> Bool
-useLetUp f = idArity f == 0 && not (isJoinId f)
+-- We use LetDown if there is a chance to get a useful strictness signature.
+-- This is the case when there are manifest value lambdas or the binding is a
+-- join point (hence always acts like a function, not a value).
+useLetUp :: Var -> CoreExpr -> Bool
+useLetUp f _         | isJoinId f = False
+useLetUp f (Lam v e) | isTyVar v  = useLetUp f e
+useLetUp _ (Lam _ _)              = False
+useLetUp _ _                      = True
+
 
 {- Note [Demand analysis for join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -727,158 +734,24 @@ The implementation is easy.  When analysing a join point, we can
 analyse its body with the demand from the entire join-binding (written
 let_dmd here).
 
-Another win for join points!  #13543.
-
-However, note that the strictness signature for a join point can
-look a little puzzling.  E.g.
-
-    (join j x = \y. error "urk")
-    (in case v of              )
-    (     A -> j 3             )  x
-    (     B -> j 4             )
-    (     C -> \y. blah        )
-
-The entire thing is in a C(S) context, so j's strictness signature
-will be    [A]b
-meaning one absent argument, returns bottom.  That seems odd because
-there's a \y inside.  But it's right because when consumed in a C(1)
-context the RHS of the join point is indeed bottom.
-
-Note [Demand signatures are computed for a threshold demand based on idArity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We compute demand signatures assuming idArity incoming arguments to approximate
-behavior for when we have a call site with at least that many arguments. idArity
-is /at least/ the number of manifest lambdas, but might be higher for PAPs and
-trivial RHS (see Note [Demand analysis for trivial right-hand sides]).
-
-Because idArity of a function varies independently of its cardinality properties
-(cf. Note [idArity varies independently of dmdTypeDepth]), we implicitly encode
-the arity for when a demand signature is sound to unleash in its 'dmdTypeDepth'
-(cf. Note [Understanding DmdType and StrictSig] in Demand). It is unsound to
-unleash a demand signature when the incoming number of arguments is less than
-that. See Note [What are demand signatures?] for more details on soundness.
-
-Why idArity arguments? Because that's a conservative estimate of how many
-arguments we must feed a function before it does anything interesting with them.
-Also it elegantly subsumes the trivial RHS and PAP case.
-
-There might be functions for which we might want to analyse for more incoming
-arguments than idArity. Example:
-
-  f x =
-    if expensive
-      then \y -> ... y ...
-      else \y -> ... y ...
-
-We'd analyse `f` under a unary call demand C(S), corresponding to idArity
-being 1. That's enough to look under the manifest lambda and find out how a
-unary call would use `x`, but not enough to look into the lambdas in the if
-branches.
-
-On the other hand, if we analysed for call demand C(C(S)), we'd get useful
-strictness info for `y` (and more precise info on `x`) and possibly CPR
-information, but
-
-  * We would no longer be able to unleash the signature at unary call sites
-  * Performing the worker/wrapper split based on this information would be
-    implicitly eta-expanding `f`, playing fast and loose with divergence and
-    even being unsound in the presence of newtypes, so we refrain from doing so.
-    Also see Note [Don't eta expand in w/w] in WorkWrap.
-
-Since we only compute one signature, we do so for arity 1. Computing multiple
-signatures for different arities (i.e., polyvariance) would be entirely
-possible, if it weren't for the additional runtime and implementation
-complexity.
-
-Note [idArity varies independently of dmdTypeDepth]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We used to check in CoreLint that dmdTypeDepth <= idArity for a let-bound
-identifier. But that means we would have to zap demand signatures every time we
-reset or decrease arity. That's an unnecessary dependency, because
-
-  * The demand signature captures a semantic property that is independent of
-    what the binding's current arity is
-  * idArity is analysis information itself, thus volatile
-  * We already *have* dmdTypeDepth, wo why not just use it to encode the
-    threshold for when to unleash the signature
-    (cf. Note [Understanding DmdType and StrictSig] in Demand)
-
-Consider the following expression, for example:
-
-    (let go x y = `x` seq ... in go) |> co
-
-`go` might have a strictness signature of `<S><L>`. The simplifier will identify
-`go` as a nullary join point through `joinPointBinding_maybe` and float the
-coercion into the binding, leading to an arity decrease:
-
-    join go = (\x y -> `x` seq ...) |> co in go
-
-With the CoreLint check, we would have to zap `go`'s perfectly viable strictness
-signature.
-
-Note [What are demand signatures?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Demand analysis interprets expressions in the abstract domain of demand
-transformers. Given an incoming demand we put an expression under, its abstract
-transformer gives us back a demand type denoting how other things (like
-arguments and free vars) were used when the expression was evaluated.
-Here's an example:
-
-  f x y =
-    if x + expensive
-      then \z -> z + y * ...
-      else \z -> z * ...
-
-The abstract transformer (let's call it F_e) of the if expression (let's call it
-e) would transform an incoming head demand <S,HU> into a demand type like
-{x-><S,1*U>,y-><L,U>}<L,U>. In pictures:
-
-     Demand ---F_e---> DmdType
-     <S,HU>            {x-><S,1*U>,y-><L,U>}<L,U>
-
-Let's assume that the demand transformers we compute for an expression are
-correct wrt. to some concrete semantics for Core. How do demand signatures fit
-in? They are strange beasts, given that they come with strict rules when to
-it's sound to unleash them.
-
-Fortunately, we can formalise the rules with Galois connections. Consider
-f's strictness signature, {}<S,1*U><L,U>. It's a single-point approximation of
-the actual abstract transformer of f's RHS for arity 2. So, what happens is that
-we abstract *once more* from the abstract domain we already are in, replacing
-the incoming Demand by a simple lattice with two elements denoting incoming
-arity: A_2 = {<2, >=2} (where '<2' is the top element and >=2 the bottom
-element). Here's the diagram:
-
-     A_2 -----f_f----> DmdType
-      ^                   |
-      | α               γ |
-      |                   v
-     Demand ---F_f---> DmdType
-
-With
-  α(C1(C1(_))) = >=2 -- example for usage demands, but similar for strictness
-  α(_)         =  <2
-  γ(ty)        =  ty
-and F_f being the abstract transformer of f's RHS and f_f being the abstracted
-abstract transformer computable from our demand signature simply by
-
-  f_f(>=2) = {}<S,1*U><L,U>
-  f_f(<2)  = postProcessUnsat {}<S,1*U><L,U>
-
-where postProcessUnsat makes a proper top element out of the given demand type.
+Another win for join points!  Trac #13543.
 
 Note [Demand analysis for trivial right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
-    foo = plusInt |> co
+        foo = plusInt |> co
 where plusInt is an arity-2 function with known strictness.  Clearly
 we want plusInt's strictness to propagate to foo!  But because it has
 no manifest lambdas, it won't do so automatically, and indeed 'co' might
-have type (Int->Int->Int) ~ T.
+have type (Int->Int->Int) ~ T, so we *can't* eta-expand.  So we have a
+special case for right-hand sides that are "trivial", namely variables,
+casts, type applications, and the like.
 
-Fortunately, CoreArity gives 'foo' arity 2, which is enough for LetDown to
-forward plusInt's demand signature, and all is well (see Note [Newtype arity] in
-CoreArity)! A small example is the test case NewtypeArity.
+Note that this can mean that 'foo' has an arity that is smaller than that
+indicated by its demand info.  e.g. if co :: (Int->Int->Int) ~ T, then
+foo's arity will be zero (see Note [exprArity invariant] in CoreArity),
+but its demand signature will be that of plusInt. A small example is the
+test case of Trac #8963.
 
 
 Note [Product demands for function body]
@@ -934,7 +807,7 @@ addLazyFVs dmd_ty lazy_fvs
         -- demand with the bottom coming up from 'error'
         --
         -- I got a loop in the fixpointer without this, due to an interaction
-        -- with the lazy_fv filtering in dmdAnalRhsLetDown.  Roughly, it was
+        -- with the lazy_fv filtering in cprAnalRhsLetDown.  Roughly, it was
         --      letrec f n x
         --          = letrec g y = x `fatbar`
         --                         letrec h z = z + ...g...
@@ -976,6 +849,13 @@ annotateBndr env dmd_ty var
   where
     (dmd_ty', dmd) = findBndrDmd env False dmd_ty var
 
+annotateLamBndrs :: AnalEnv -> DFunFlag -> DmdType -> [Var] -> (DmdType, [Var])
+annotateLamBndrs env args_of_dfun ty bndrs = mapAccumR annotate ty bndrs
+  where
+    annotate dmd_ty bndr
+      | isId bndr = annotateLamIdBndr env args_of_dfun dmd_ty bndr
+      | otherwise = (dmd_ty, bndr)
+
 annotateLamIdBndr :: AnalEnv
                   -> DFunFlag   -- is this lambda at the top of the RHS of a dfun?
                   -> DmdType    -- Demand type of body
@@ -995,7 +875,7 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
                  Nothing  -> main_ty
                  Just unf -> main_ty `bothDmdType` unf_ty
                           where
-                             (unf_ty, _) = dmdAnalStar env dmd unf
+                             (unf_ty, _) = cprAnalStar env dmd unf
 
     main_ty = addDemand dmd dmd_ty'
     (dmd_ty', dmd) = findBndrDmd env arg_of_dfun dmd_ty id
@@ -1115,7 +995,7 @@ first time.
 However, this does mean that for non-recursive bindings we must
 iterate twice to be sure of not getting over-optimistic CPR info,
 in the case where t turns out to be not-demanded.  This is handled
-by dmdAnalTopBind.
+by cprAnalTopBind.
 
 
 Note [NOINLINE and strictness]
@@ -1288,6 +1168,12 @@ extendSigEnv top_lvl sigs var sig = extendVarEnv sigs var (sig, top_lvl)
 lookupSigEnv :: AnalEnv -> Id -> Maybe (StrictSig, TopLevelFlag)
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 
+getStrictness :: AnalEnv -> Id -> StrictSig
+getStrictness env fn
+  | isGlobalId fn                        = idStrictness fn
+  | Just (sig, _) <- lookupSigEnv env fn = sig
+  | otherwise                            = nopSig
+
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
 
@@ -1327,6 +1213,17 @@ extendEnvForProdAlt env scrut case_bndr dc bndrs
     is_var (Cast e _) = is_var e
     is_var (Var v)    = isLocalId v
     is_var _          = False
+
+addDataConStrictness :: DataCon -> [Demand] -> [Demand]
+-- See Note [Add demands for strict constructors]
+addDataConStrictness con ds
+  = ASSERT2( equalLength strs ds, ppr con $$ ppr strs $$ ppr ds )
+    zipWith add ds strs
+  where
+    strs = dataConRepStrictness con
+    add dmd str | isMarkedStrict str
+                , not (isAbsDmd dmd) = strictifyDmd dmd
+                | otherwise          = dmd
 
 findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Demand])
 -- Return the demands on the Ids in the [Var]
@@ -1411,8 +1308,8 @@ binders the CPR property.  Specifically
                    | otherwise = x
 
    For $wf2 we are going to unbox the MkT *and*, since it is strict, the
-   first argument of the MkT; see Note [Add demands for strict constructors]
-   in WwLib. But then we don't want box it up again when returning it! We want
+   first argument of the MkT; see Note [Add demands for strict constructors].
+   But then we don't want box it up again when returning it!  We want
    'f2' to have the CPR property, so we give 'x' the CPR property.
 
  * It's a bit delicate because if this case is scrutinising something other
@@ -1426,7 +1323,51 @@ binders the CPR property.  Specifically
    Slightly ad-hoc, because even if the scrutinee *is* a variable it
    might not be a onre of the arguments to the original function, or a
    sub-component thereof.  But it's simple, and nothing terrible
-   happens if we get it wrong.  e.g. #10694.
+   happens if we get it wrong.  e.g. Trac #10694.
+
+Note [Add demands for strict constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this program (due to Roman):
+
+    data X a = X !a
+
+    foo :: X Int -> Int -> Int
+    foo (X a) n = go 0
+     where
+       go i | i < n     = a + go (i+1)
+            | otherwise = 0
+
+We want the worker for 'foo' too look like this:
+
+    $wfoo :: Int# -> Int# -> Int#
+
+with the first argument unboxed, so that it is not eval'd each time
+around the 'go' loop (which would otherwise happen, since 'foo' is not
+strict in 'a').  It is sound for the wrapper to pass an unboxed arg
+because X is strict, so its argument must be evaluated.  And if we
+*don't* pass an unboxed argument, we can't even repair it by adding a
+`seq` thus:
+
+    foo (X a) n = a `seq` go 0
+
+because the seq is discarded (very early) since X is strict!
+
+We achieve the effect using addDataConStrictness.  It is called at a
+case expression, such as the pattern match on (X a) in the example
+above.  After computing how 'a' is used in the alternatives, we add an
+extra 'seqDmd' to it.  The case alternative isn't itself strict in the
+sub-components, but simply evaluating the scrutinee to HNF does force
+those sub-components.
+
+If the argument is not used at all in the alternative (i.e. it is
+Absent), then *don't* add a 'seqDmd'.  If we do, it makes it look used
+and hence it'll be passed to the worker when it doesn't need to be.
+Hence the isAbsDmd test in addDataConStrictness.
+
+There is the usual danger of reboxing, which as usual we ignore. But
+if X is monomorphic, and has an UNPACK pragma, then this optimisation
+is even more important.  We don't want the wrapper to rebox an unboxed
+argument, and pass an Int to $wfoo!
 
 
 Note [Initial CPR for strict binders]

@@ -1,5 +1,29 @@
 
+==================== Strictness signatures after CPR analsis ====================
+UnsatFun.$trModule: m
+UnsatFun.f: <B,1*U(U)><B,A>b
+UnsatFun.g: <B,1*U(U)>b
+UnsatFun.g': <L,1*U(U)>
+UnsatFun.g3: <L,U(U)>m
+UnsatFun.h: <C(S),1*C1(U(U))>
+UnsatFun.h2: <S,1*U><L,1*C1(U(U))>
+UnsatFun.h3: <C(S),1*C1(U)>m
+
+
+
 ==================== Strictness signatures ====================
+UnsatFun.$trModule: m
+UnsatFun.f: <B,1*U(U)><B,A>b
+UnsatFun.g: <B,1*U(U)>b
+UnsatFun.g': <L,1*U(U)>
+UnsatFun.g3: <L,U(U)>m
+UnsatFun.h: <C(S),1*C1(U(U))>
+UnsatFun.h2: <S,1*U><L,1*C1(U(U))>
+UnsatFun.h3: <C(S),1*C1(U)>m
+
+
+
+==================== Strictness signatures after CPR analsis ====================
 UnsatFun.$trModule: m
 UnsatFun.f: <B,1*U(U)><B,A>b
 UnsatFun.g: <B,1*U(U)>b
