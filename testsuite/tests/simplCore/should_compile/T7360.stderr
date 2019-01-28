@@ -8,7 +8,8 @@ T7360.$WFoo3 [InlPrag=INLINE[0]] :: Int -> Foo
 [GblId[DataConWrapper],
  Arity=1,
  Caf=NoCafRefs,
- Str=<S,U>m3,
+ Str=<S,U>,
+ Cpr=m3,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
@@ -33,7 +34,7 @@ T7360.fun5 = fun1 T7360.Foo1
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.fun4 :: Int
 [GblId,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.fun4 = GHC.Types.I# 0#
@@ -42,7 +43,8 @@ T7360.fun4 = GHC.Types.I# 0#
 fun2 :: forall a. [a] -> ((), Int)
 [GblId,
  Arity=1,
- Str=<L,1*U>m,
+ Str=<L,1*U>,
+ Cpr=m1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
@@ -76,7 +78,7 @@ T7360.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule3 :: GHC.Types.TrName
 [GblId,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$trModule3 = GHC.Types.TrNameS T7360.$trModule4
@@ -91,7 +93,7 @@ T7360.$trModule2 = "T7360"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule1 :: GHC.Types.TrName
 [GblId,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$trModule1 = GHC.Types.TrNameS T7360.$trModule2
@@ -99,7 +101,7 @@ T7360.$trModule1 = GHC.Types.TrNameS T7360.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule :: GHC.Types.Module
 [GblId,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T7360.$trModule
@@ -107,7 +109,7 @@ T7360.$trModule
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep :: GHC.Types.KindRep
-[GblId, Str=m1, Unf=OtherCon []]
+[GblId, Cpr=m1, Unf=OtherCon []]
 $krep
   = GHC.Types.KindRepTyConApp
       GHC.Types.$tcInt (GHC.Types.[] @GHC.Types.KindRep)
@@ -122,7 +124,7 @@ T7360.$tcFoo2 = "Foo"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo1 :: GHC.Types.TrName
 [GblId,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$tcFoo1 = GHC.Types.TrNameS T7360.$tcFoo2
@@ -130,7 +132,7 @@ T7360.$tcFoo1 = GHC.Types.TrNameS T7360.$tcFoo2
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo :: GHC.Types.TyCon
 [GblId,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tcFoo
@@ -144,7 +146,7 @@ T7360.$tcFoo
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 T7360.$tc'Foo4 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
-[GblId, Str=m1, Unf=OtherCon []]
+[GblId, Cpr=m1, Unf=OtherCon []]
 T7360.$tc'Foo4
   = GHC.Types.KindRepTyConApp
       T7360.$tcFoo (GHC.Types.[] @GHC.Types.KindRep)
@@ -159,7 +161,7 @@ T7360.$tc'Foo6 = "'Foo1"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo5 :: GHC.Types.TrName
 [GblId,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$tc'Foo5 = GHC.Types.TrNameS T7360.$tc'Foo6
@@ -167,7 +169,7 @@ T7360.$tc'Foo5 = GHC.Types.TrNameS T7360.$tc'Foo6
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo1 :: GHC.Types.TyCon
 [GblId,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo1
@@ -189,7 +191,7 @@ T7360.$tc'Foo8 = "'Foo2"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo7 :: GHC.Types.TrName
 [GblId,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$tc'Foo7 = GHC.Types.TrNameS T7360.$tc'Foo8
@@ -197,7 +199,7 @@ T7360.$tc'Foo7 = GHC.Types.TrNameS T7360.$tc'Foo8
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo2 :: GHC.Types.TyCon
 [GblId,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo2
@@ -211,7 +213,7 @@ T7360.$tc'Foo2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo9 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
-[GblId, Str=m4, Unf=OtherCon []]
+[GblId, Cpr=m4, Unf=OtherCon []]
 T7360.$tc'Foo9 = GHC.Types.KindRepFun $krep T7360.$tc'Foo4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -224,7 +226,7 @@ T7360.$tc'Foo11 = "'Foo3"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo10 :: GHC.Types.TrName
 [GblId,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$tc'Foo10 = GHC.Types.TrNameS T7360.$tc'Foo11
@@ -232,7 +234,7 @@ T7360.$tc'Foo10 = GHC.Types.TrNameS T7360.$tc'Foo11
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo3 :: GHC.Types.TyCon
 [GblId,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo3
