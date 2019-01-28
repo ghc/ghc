@@ -5,6 +5,7 @@
 module T15437 where
 
 import T15437A
+import Data.Kind
 
 f :: Int
 f = $$(foo @Int)
@@ -16,7 +17,7 @@ h :: Int
 h = $$(foo3 @Int)
 
 i :: Int
-i = $$(foo @(forall (a :: *) . a -> a))
+i = $$(foo @(forall (a :: Type) . a -> a))
 
 a = $$(foo4 @Int)
 
