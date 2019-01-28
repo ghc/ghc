@@ -29,12 +29,8 @@ module Demand (
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
 
-        DmdResult, CPRResult,
-        isBotRes, isTopRes,
-        topRes, botRes, cprProdRes,
-        vanillaCprProdRes, cprSumRes,
+        Divergence(..), lubDivergence, isBotDiv, isTopDiv, topDiv, botDiv,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
-        trimCPRInfo, returnsCPR_maybe,
         StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
         nopSig, botSig, cprProdSig,
         isTopSig, hasDemandEnvSig,
@@ -146,9 +142,9 @@ Motivated to reproduce the gains of 7c0fff4 without the breakage of #10712,
 Ben opened #11222. Simon made the demand analyser "understand catch" in
 9915b656 (Jan 16) by adding a new 'catchArgDmd', which basically said to call
 its argument strictly, but also swallow any thrown exceptions in
-'postProcessDmdResult'. This was realized by extending the 'Str' constructor of
+'postProcessDivergence'. This was realized by extending the 'Str' constructor of
 'ArgStr' with a 'ExnStr' field, indicating that it catches the exception, and
-adding a 'ThrowsExn' constructor to the 'Termination' lattice as an element
+adding a 'ThrowsExn' constructor to the 'Divergence' lattice as an element
 between 'Dunno' and 'Diverges'. Then along came #11555 and finally #13330,
 so we had to revert to 'lazyApply1Dmd' again in 701256df88c (Mar 17).
 
@@ -900,85 +896,41 @@ splitProdDmd_maybe (JD { sd = s, ud = u })
 {-
 ************************************************************************
 *                                                                      *
-                   Demand results
+                   Termination
 *                                                                      *
 ************************************************************************
 
-
-DmdResult:     Dunno CPRResult
+Divergence:     Dunno
                /
           Diverges
 
-
-CPRResult:         NoCPR
-                   /    \
-            RetProd    RetSum ConTag
-
-
-Product constructors return (Dunno (RetProd rs))
 In a fixpoint iteration, start from Diverges
-We have lubs, but not glbs; but that is ok.
 -}
 
-------------------------------------------------------------------------
--- Constructed Product Result
-------------------------------------------------------------------------
-
-data Termination r
+data Divergence
   = Diverges    -- Definitely diverges
-  | Dunno r     -- Might diverge or converge
+  | Dunno       -- Might diverge or converge
   deriving( Eq, Show )
 
--- At this point, Termination is just the 'Lifted' lattice over 'r'
--- (https://hackage.haskell.org/package/lattices/docs/Algebra-Lattice-Lifted.html)
-
-type DmdResult = Termination CPRResult
-
-data CPRResult = NoCPR          -- Top of the lattice
-               | RetProd        -- Returns a constructor from a product type
-               | RetSum ConTag  -- Returns a constructor from a data type
-               deriving( Eq, Show )
-
-lubCPR :: CPRResult -> CPRResult -> CPRResult
-lubCPR (RetSum t1) (RetSum t2)
-  | t1 == t2                       = RetSum t1
-lubCPR RetProd     RetProd     = RetProd
-lubCPR _ _                     = NoCPR
-
-lubDmdResult :: DmdResult -> DmdResult -> DmdResult
-lubDmdResult Diverges       r              = r
-lubDmdResult r              Diverges       = r
-lubDmdResult (Dunno c1)     (Dunno c2)     = Dunno (c1 `lubCPR` c2)
+lubDivergence :: Divergence -> Divergence ->Divergence
+lubDivergence Diverges r        = r
+lubDivergence r        Diverges = r
+lubDivergence Dunno    Dunno    = Dunno
 -- This needs to commute with defaultDmd, i.e.
--- defaultDmd (r1 `lubDmdResult` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
+-- defaultDmd (r1 `lubDivergence` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
-bothDmdResult :: DmdResult -> Termination () -> DmdResult
--- See Note [Asymmetry of 'both' for DmdType and DmdResult]
-bothDmdResult _ Diverges   = Diverges
-bothDmdResult r (Dunno {}) = r
+bothDivergence :: Divergence -> Divergence -> Divergence
+-- See Note [Asymmetry of 'both' for DmdType and Divergence]
+bothDivergence _ Diverges = Diverges
+bothDivergence r Dunno    = r
 -- This needs to commute with defaultDmd, i.e.
--- defaultDmd (r1 `bothDmdResult` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
+-- defaultDmd (r1 `bothDivergence` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
-instance Outputable r => Outputable (Termination r) where
+instance Outputable Divergence where
   ppr Diverges      = char 'b'
-  ppr (Dunno c)     = ppr c
-
-instance Outputable CPRResult where
-  ppr NoCPR        = empty
-  ppr (RetSum n)   = char 'm' <> int n
-  ppr RetProd      = char 'm'
-
-seqDmdResult :: DmdResult -> ()
-seqDmdResult Diverges  = ()
-seqDmdResult (Dunno c) = seqCPRResult c
-
-seqCPRResult :: CPRResult -> ()
-seqCPRResult NoCPR        = ()
-seqCPRResult (RetSum n)   = n `seq` ()
-seqCPRResult RetProd      = ()
-
+  ppr Dunno         = empty
 
 ------------------------------------------------------------------------
 -- Combined demand result                                             --
@@ -986,64 +938,33 @@ seqCPRResult RetProd      = ()
 
 -- [cprRes] lets us switch off CPR analysis
 -- by making sure that everything uses TopRes
-topRes, botRes :: DmdResult
-topRes = Dunno NoCPR
-botRes = Diverges
+topDiv, botDiv :: Divergence
+topDiv = Dunno
+botDiv = Diverges
 
-cprSumRes :: ConTag -> DmdResult
-cprSumRes tag = Dunno $ RetSum tag
-
-cprProdRes :: [DmdType] -> DmdResult
-cprProdRes _arg_tys = Dunno $ RetProd
-
-vanillaCprProdRes :: Arity -> DmdResult
-vanillaCprProdRes _arity = Dunno $ RetProd
-
-isTopRes :: DmdResult -> Bool
-isTopRes (Dunno NoCPR) = True
-isTopRes _             = False
+isTopDiv :: Divergence -> Bool
+isTopDiv Dunno = True
+isTopDiv _     = False
 
 -- | True if the result diverges or throws an exception
-isBotRes :: DmdResult -> Bool
-isBotRes Diverges   = True
-isBotRes (Dunno {}) = False
-
-trimCPRInfo :: Bool -> Bool -> DmdResult -> DmdResult
-trimCPRInfo trim_all trim_sums res
-  = trimR res
-  where
-    trimR (Dunno c) = Dunno (trimC c)
-    trimR res       = res
-
-    trimC (RetSum n)   | trim_all || trim_sums = NoCPR
-                       | otherwise             = RetSum n
-    trimC RetProd      | trim_all  = NoCPR
-                       | otherwise = RetProd
-    trimC NoCPR = NoCPR
-
-returnsCPR_maybe :: DmdResult -> Maybe ConTag
-returnsCPR_maybe (Dunno c) = retCPR_maybe c
-returnsCPR_maybe _         = Nothing
-
-retCPR_maybe :: CPRResult -> Maybe ConTag
-retCPR_maybe (RetSum t)  = Just t
-retCPR_maybe RetProd     = Just fIRST_TAG
-retCPR_maybe NoCPR       = Nothing
+isBotDiv :: Divergence -> Bool
+isBotDiv Diverges = True
+isBotDiv _        = False
 
 -- See Notes [Default demand on free variables]
 -- and [defaultDmd vs. resTypeArgDmd]
-defaultDmd :: Termination r -> Demand
-defaultDmd (Dunno {}) = absDmd
-defaultDmd _          = botDmd  -- Diverges
+defaultDmd :: Divergence -> Demand
+defaultDmd Dunno = absDmd
+defaultDmd _     = botDmd  -- Diverges
 
-resTypeArgDmd :: Termination r -> Demand
+resTypeArgDmd :: Divergence -> Demand
 -- TopRes and BotRes are polymorphic, so that
 --      BotRes === (Bot -> BotRes) === ...
 --      TopRes === (Top -> TopRes) === ...
 -- This function makes that concrete
 -- Also see Note [defaultDmd vs. resTypeArgDmd]
-resTypeArgDmd (Dunno _) = topDmd
-resTypeArgDmd _         = botDmd   -- Diverges
+resTypeArgDmd Dunno = topDmd
+resTypeArgDmd _     = botDmd   -- Diverges
 
 {-
 Note [defaultDmd and resTypeArgDmd]
@@ -1070,12 +991,12 @@ data DmdType = DmdType
                   DmdEnv        -- Demand on explicitly-mentioned
                                 --      free variables
                   [Demand]      -- Demand on arguments
-                  DmdResult     -- See [Nature of result demand]
+                  Divergence     -- See [Nature of result demand]
 
 {-
 Note [Nature of result demand]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A DmdResult contains information about termination (currently distinguishing
+A Divergence contains information about termination (currently distinguishing
 definite divergence and no information; it is possible to include definite
 convergence here), and CPR information about the result.
 
@@ -1110,10 +1031,10 @@ Now consider a function h with signature "<C(S)>", and the expression
 now h puts a demand of <C(S)> onto its argument, and the demand transformer
 turns it into
   <S>b
-Now the DmdResult "b" does apply to us, even though "b1 `seq` ()" does not
+Now the Divergence "b" does apply to us, even though "b1 `seq` ()" does not
 diverge, and we do not anything being passed to b.
 
-Note [Asymmetry of 'both' for DmdType and DmdResult]
+Note [Asymmetry of 'both' for DmdType and Divergence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 'both' for DmdTypes is *asymmetrical*, because there is only one
 result!  For example, given (e1 e2), we get a DmdType dt1 for e1, use
@@ -1129,21 +1050,21 @@ We
  3. combine the termination results, but
  4. take CPR info from the first argument.
 
-3 and 4 are implemented in bothDmdResult.
+3 and 4 are implemented in bothDivergence.
 -}
 
 -- Equality needed for fixpoints in DmdAnal
 instance Eq DmdType where
-  (==) (DmdType fv1 ds1 res1)
-       (DmdType fv2 ds2 res2) = nonDetUFMToList fv1 == nonDetUFMToList fv2
+  (==) (DmdType fv1 ds1 div1)
+       (DmdType fv2 ds2 div2) = nonDetUFMToList fv1 == nonDetUFMToList fv2
          -- It's OK to use nonDetUFMToList here because we're testing for
          -- equality and even though the lists will be in some arbitrary
          -- Unique order, it is the same order for both
-                              && ds1 == ds2 && res1 == res2
+                              && ds1 == ds2 && div1 == div2
 
 lubDmdType :: DmdType -> DmdType -> DmdType
 lubDmdType d1 d2
-  = DmdType lub_fv lub_ds lub_res
+  = DmdType lub_fv lub_ds lub_div
   where
     n = max (dmdTypeDepth d1) (dmdTypeDepth d2)
     (DmdType fv1 ds1 r1) = ensureArgs n d1
@@ -1151,7 +1072,7 @@ lubDmdType d1 d2
 
     lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultDmd r1) fv2 (defaultDmd r2)
     lub_ds  = zipWithEqual "lubDmdType" lubDmd ds1 ds2
-    lub_res = lubDmdResult r1 r2
+    lub_div = lubDivergence r1 r2
 
 {-
 Note [The need for BothDmdArg]
@@ -1163,25 +1084,25 @@ the demand put on arguments, nor cpr information. So we make that explicit by
 only passing the relevant information.
 -}
 
-type BothDmdArg = (DmdEnv, Termination ())
+type BothDmdArg = (DmdEnv, Divergence)
 
 mkBothDmdArg :: DmdEnv -> BothDmdArg
-mkBothDmdArg env = (env, Dunno ())
+mkBothDmdArg env = (env, Dunno)
 
 toBothDmdArg :: DmdType -> BothDmdArg
 toBothDmdArg (DmdType fv _ r) = (fv, go r)
   where
-    go (Dunno {}) = Dunno ()
-    go Diverges   = Diverges
+    go Dunno    = Dunno
+    go Diverges = Diverges
 
 bothDmdType :: DmdType -> BothDmdArg -> DmdType
 bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
-    -- See Note [Asymmetry of 'both' for DmdType and DmdResult]
+    -- See Note [Asymmetry of 'both' for DmdType and Divergence]
     -- 'both' takes the argument/result info from its *first* arg,
     -- using its second arg just for its free-var info.
   = DmdType (plusVarEnv_CD bothDmd fv1 (defaultDmd r1) fv2 (defaultDmd t2))
             ds1
-            (r1 `bothDmdResult` t2)
+            (r1 `bothDivergence` t2)
 
 instance Outputable DmdType where
   ppr (DmdType fv ds res)
@@ -1202,19 +1123,15 @@ emptyDmdEnv = emptyVarEnv
 -- Note that it is ''not'' the top of the lattice (which would be "may use everything"),
 -- so it is (no longer) called topDmd
 nopDmdType, botDmdType :: DmdType
-nopDmdType = DmdType emptyDmdEnv [] topRes
-botDmdType = DmdType emptyDmdEnv [] botRes
-
-cprProdDmdType :: Arity -> DmdType
-cprProdDmdType arity
-  = DmdType emptyDmdEnv [] (vanillaCprProdRes arity)
+nopDmdType = DmdType emptyDmdEnv [] topDiv
+botDmdType = DmdType emptyDmdEnv [] botDiv
 
 isTopDmdType :: DmdType -> Bool
 isTopDmdType (DmdType env [] res)
-  | isTopRes res && isEmptyVarEnv env = True
+  | isTopDiv res && isEmptyVarEnv env = True
 isTopDmdType _                        = False
 
-mkDmdType :: DmdEnv -> [Demand] -> DmdResult -> DmdType
+mkDmdType :: DmdEnv -> [Demand] -> Divergence -> DmdType
 mkDmdType fv ds res = DmdType fv ds res
 
 dmdTypeDepth :: DmdType -> Arity
@@ -1222,7 +1139,7 @@ dmdTypeDepth (DmdType _ ds _) = length ds
 
 -- | This makes sure we can use the demand type with n arguments.
 -- It extends the argument list with the correct resTypeArgDmd.
--- It also adjusts the DmdResult: Divergence survives additional arguments,
+-- It also adjusts the Divergence: Divergence survives additional arguments,
 -- CPR information does not (and definite converge also would not).
 ensureArgs :: Arity -> DmdType -> DmdType
 ensureArgs n d | n == depth = d
@@ -1232,13 +1149,13 @@ ensureArgs n d | n == depth = d
 
         ds' = take n (ds ++ repeat (resTypeArgDmd r))
         r' = case r of    -- See [Nature of result demand]
-              Dunno _ -> topRes
-              _       -> r
+              Dunno -> topDiv
+              _     -> r
 
 
 seqDmdType :: DmdType -> ()
 seqDmdType (DmdType env ds res) =
-  seqDmdEnv env `seq` seqDemandList ds `seq` seqDmdResult res `seq` ()
+  seqDmdEnv env `seq` seqDemandList ds `seq` res `seq` ()
 
 seqDmdEnv :: DmdEnv -> ()
 seqDmdEnv env = seqEltsUFM seqDemandList env
@@ -1264,7 +1181,7 @@ deferAfterIO d@(DmdType _ _ res) =
         DmdType fv ds _ -> DmdType fv ds (defer_res res)
   where
   defer_res r@(Dunno {}) = r
-  defer_res _            = topRes  -- Diverges
+  defer_res _            = topDiv  -- Diverges
 
 strictenDmd :: Demand -> CleanDemand
 strictenDmd (JD { sd = s, ud = u})
@@ -1302,15 +1219,11 @@ toCleanDmd (JD { sd = s, ud = u })
 -- see Note [The need for BothDmdArg]
 postProcessDmdType :: DmdShell -> DmdType -> BothDmdArg
 postProcessDmdType du@(JD { sd = ss }) (DmdType fv _ res_ty)
-    = (postProcessDmdEnv du fv, term_info)
-    where
-       term_info = case postProcessDmdResult ss res_ty of
-                     Dunno _   -> Dunno ()
-                     Diverges  -> Diverges
+    = (postProcessDmdEnv du fv, postProcessDivergence ss res_ty)
 
-postProcessDmdResult :: Str () -> DmdResult -> DmdResult
-postProcessDmdResult Lazy _   = topRes
-postProcessDmdResult _    res = res
+postProcessDivergence :: Str () -> Divergence -> Divergence
+postProcessDivergence Lazy _   = topDiv
+postProcessDivergence _    res = res
 
 postProcessDmdEnv :: DmdShell -> DmdEnv -> DmdEnv
 postProcessDmdEnv ds@(JD { sd = ss, ud = us }) env
@@ -1333,7 +1246,7 @@ postProcessUnsat :: DmdShell -> DmdType -> DmdType
 postProcessUnsat ds@(JD { sd = ss }) (DmdType fv args res_ty)
   = DmdType (postProcessDmdEnv ds fv)
             (map (postProcessDmd ds) args)
-            (postProcessDmdResult ss res_ty)
+            (postProcessDivergence ss res_ty)
 
 postProcessDmd :: DmdShell -> Demand -> Demand
 postProcessDmd (JD { sd = ss, ud = us }) (JD { sd = s, ud = a})
@@ -1451,7 +1364,7 @@ its demand is taken to be a result demand of the type.
     For the usage component, we use Absent.
 So we use either absDmd or botDmd.
 
-Also note the equations for lubDmdResult (resp. bothDmdResult) noted there.
+Also note the equations for lubDivergence (resp. bothDivergence) noted there.
 
 Note [Always analyse in virgin pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1559,7 +1472,7 @@ transfomer, namely
 
 This DmdType gives the demands unleashed by the Id when it is applied
 to as many arguments as are given in by the arg demands in the DmdType.
-Also see Note [Nature of result demand] for the meaning of a DmdResult in a
+Also see Note [Nature of result demand] for the meaning of a Divergence in a
 strictness signature.
 
 If an Id is applied to less arguments than its arity, it means that
@@ -1593,7 +1506,7 @@ yields a more precise demand type:
     ----------------------------------------------------
     <S           ,HU              >  |  <L,U><L,U>{}
     <C(C(S     )),C1(C1(U       ))>  |  <S,U><L,U>{}
-    <C(C(S(S,L))),C1(C1(U(1*U,A)))>  |  <S,1*HU><S,1*U>{}
+    <C(C(S(S,L))),C1(C1(U(1*U,A)))>  |  <S,1*HU><L,A>{}
 
 Note that in the first example, the depth of the demand type was *higher* than
 the arity of the incoming call demand due to the anonymous lambda.
@@ -1642,10 +1555,10 @@ pprIfaceStrictSig (StrictSig (DmdType _ dmds res))
 mkStrictSigForArity :: Arity -> DmdType -> StrictSig
 mkStrictSigForArity arity dmd_ty = StrictSig (ensureArgs arity dmd_ty)
 
-mkClosedStrictSig :: [Demand] -> DmdResult -> StrictSig
+mkClosedStrictSig :: [Demand] -> Divergence -> StrictSig
 mkClosedStrictSig ds res = mkStrictSigForArity (length ds) (DmdType emptyDmdEnv ds res)
 
-splitStrictSig :: StrictSig -> ([Demand], DmdResult)
+splitStrictSig :: StrictSig -> ([Demand], Divergence)
 splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
 
 increaseStrictSigArity :: Int -> StrictSig -> StrictSig
@@ -1686,14 +1599,14 @@ strictSigDmdEnv (StrictSig (DmdType env _ _)) = env
 
 -- | True if the signature diverges or throws an exception
 isBottomingSig :: StrictSig -> Bool
-isBottomingSig (StrictSig (DmdType _ _ res)) = isBotRes res
+isBottomingSig (StrictSig (DmdType _ _ res)) = isBotDiv res
 
 nopSig, botSig :: StrictSig
 nopSig = StrictSig nopDmdType
 botSig = StrictSig botDmdType
 
 cprProdSig :: Arity -> StrictSig
-cprProdSig arity = StrictSig (cprProdDmdType arity)
+cprProdSig _arity = nopSig
 
 seqStrictSig :: StrictSig -> ()
 seqStrictSig (StrictSig ty) = seqDmdType ty
@@ -1739,7 +1652,7 @@ dmdTransformDictSelSig (StrictSig (DmdType _ [dict_dmd] _)) cd
    | (cd',defer_use) <- peelCallDmd cd
    , Just jds <- splitProdDmd_maybe dict_dmd
    = postProcessUnsat defer_use $
-     DmdType emptyDmdEnv [mkOnceUsedDmd $ mkProdDmd $ map (enhance cd') jds] topRes
+     DmdType emptyDmdEnv [mkOnceUsedDmd $ mkProdDmd $ map (enhance cd') jds] topDiv
    | otherwise
    = nopDmdType              -- See Note [Demand transformer for a dictionary selector]
   where
@@ -1829,7 +1742,7 @@ binders \pqr and \xyz; see Note [Use one-shot information] in OccurAnal.
 -- See Note [Unsaturated applications]
 appIsBottom :: StrictSig -> Int -> Bool
 appIsBottom (StrictSig (DmdType _ ds res)) n
-            | isBotRes res                   = not $ lengthExceeds ds n
+            | isBotDiv res                   = not $ lengthExceeds ds n
 appIsBottom _                              _ = False
 
 {-
@@ -2082,23 +1995,11 @@ instance Binary DmdType where
            dr <- get bh
            return (DmdType emptyDmdEnv ds dr)
 
-instance Binary DmdResult where
-  put_ bh (Dunno c)     = do { putByte bh 0; put_ bh c }
-  put_ bh Diverges      = putByte bh 1
+instance Binary Divergence where
+  put_ bh Dunno    = putByte bh 0
+  put_ bh Diverges = putByte bh 1
 
   get bh = do { h <- getByte bh
               ; case h of
-                  0 -> do { c <- get bh; return (Dunno c) }
+                  0 -> return Dunno
                   _ -> return Diverges }
-
-instance Binary CPRResult where
-    put_ bh (RetSum n)   = do { putByte bh 0; put_ bh n }
-    put_ bh RetProd      = putByte bh 1
-    put_ bh NoCPR        = putByte bh 2
-
-    get  bh = do
-            h <- getByte bh
-            case h of
-              0 -> do { n <- get bh; return (RetSum n) }
-              1 -> return RetProd
-              _ -> return NoCPR
