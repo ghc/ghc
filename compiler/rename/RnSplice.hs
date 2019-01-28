@@ -36,7 +36,7 @@ import Control.Monad    ( unless, when )
 import {-# SOURCE #-} RnExpr   ( rnLExpr )
 
 import TcEnv            ( checkWellStaged )
-import THNames          ( liftName )
+import THNames          ( liftName, liftExpName )
 
 import DynFlags
 import FastString
@@ -804,12 +804,13 @@ checkCrossStageLifting :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel
 checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name
   | Brack _ (RnPendingUntyped ps_var) <- use_stage   -- Only for untyped brackets
   , use_lvl > bind_lvl                               -- Cross-stage condition
-  = check_cross_stage_lifting top_lvl name ps_var
+  = check_cross_stage_lifting top_lvl (use_lvl - bind_lvl) name ps_var
   | otherwise
   = return ()
 
-check_cross_stage_lifting :: TopLevelFlag -> Name -> TcRef [PendingRnSplice] -> TcM ()
-check_cross_stage_lifting top_lvl name ps_var
+check_cross_stage_lifting :: TopLevelFlag -> Int
+                          -> Name -> TcRef [PendingRnSplice] -> TcM ()
+check_cross_stage_lifting top_lvl lift_by name ps_var
   | isTopLevel top_lvl
         -- Top-level identifiers in this module,
         -- (which have External Names)
@@ -834,12 +835,18 @@ check_cross_stage_lifting top_lvl name ps_var
     do  { traceRn "checkCrossStageLifting" (ppr name)
 
           -- Construct the (lift x) expression
-        ; let lift_expr   = nlHsApp (nlHsVar liftName) (nlHsVar name)
+        ; let lift_expr   = (mkLiftExpr lift_by name)
               pend_splice = PendingRnSplice UntypedExpSplice name lift_expr
 
           -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; writeMutVar ps_var (pend_splice : ps) }
+
+mkLiftExpr :: Int -> Name -> LHsExpr GhcRn
+-- The 0 case is never called externally, only by recursion.
+mkLiftExpr 0 var = nlHsVar var
+mkLiftExpr 1 var = nlHsPar $ nlHsApp (nlHsVar liftName) (mkLiftExpr 0 var)
+mkLiftExpr n var = nlHsPar $ nlHsApp (nlHsVar liftExpName ) (mkLiftExpr (n-1) var)
 
 {-
 Note [Keeping things alive for Template Haskell]

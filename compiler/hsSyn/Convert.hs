@@ -987,7 +987,11 @@ cvtl e = wrapL (cvt e)
                               ; return $ HsVar noExt (noLoc s') }
     cvt (LabelE s)       = do { return $ HsOverLabel noExt Nothing (fsLit s) }
     cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noExt n' }
-    cvt (BracketE c)          = do { HsBracket noExt . ExpBr noExt . noLoc <$> cvt c  }
+    cvt (BracketE ds c) =
+      do {
+        ds' <- cvtLocalDecs (text "a bracket expression") ds
+        ; c' <- noLoc . HsBracket noExt . ExpBr noExt . noLoc <$> cvt c
+        ; return $ HsLet noExt (noLoc ds') c' }
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

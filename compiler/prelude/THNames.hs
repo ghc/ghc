@@ -27,7 +27,7 @@ templateHaskellNames :: [Name]
 -- Should stay in sync with the import list of DsMeta
 
 templateHaskellNames = [
-    returnQName, bindQName, sequenceQName, newNameName, liftName,
+    returnQName, bindQName, sequenceQName, newNameName, liftName, liftExpName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameLName,
     mkNameSName,
     liftStringName,
@@ -206,13 +206,14 @@ overlapTyConName       = thTc (fsLit "Overlap")        overlapTyConKey
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeQName,
-    unsafeTExpCoerceName :: Name
+    unsafeTExpCoerceName, liftExpName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
 newNameName    = thFun (fsLit "newName")   newNameIdKey
 liftName       = thFun (fsLit "lift")      liftIdKey
 liftStringName = thFun (fsLit "liftString")  liftStringIdKey
+liftExpName    = thFun (fsLit "liftExp")    liftExpKey
 mkNameName     = thFun (fsLit "mkName")     mkNameIdKey
 mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
 mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
@@ -726,7 +727,7 @@ incoherentDataConKey   = mkPreludeDataConUnique 212
 returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
     mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeQIdKey,
-    unsafeTExpCoerceIdKey :: Unique
+    unsafeTExpCoerceIdKey, liftExpKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
@@ -741,6 +742,7 @@ mkNameSIdKey         = mkPreludeMiscIdUnique 210
 unTypeIdKey          = mkPreludeMiscIdUnique 211
 unTypeQIdKey         = mkPreludeMiscIdUnique 212
 unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 213
+liftExpKey           = mkPreludeMiscIdUnique 214
 
 
 -- data Lit = ...

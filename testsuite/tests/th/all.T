@@ -468,3 +468,5 @@ test('T15985', normal, compile, [''])
 test('T16133', normal, compile_fail, [''])
 test('T15471', normal, multimod_compile, ['T15471.hs', '-v0'])
 test('T16180', normal, compile_and_run, [''])
+test('TH_NestedBracket', [], multimod_compile,
+     ['TH_NestedBracket.hs', '-v0 ' + config.ghc_th_way_flags])
