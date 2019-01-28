@@ -811,7 +811,7 @@ rnLit _ = return ()
 -- Turn a Fractional-looking literal which happens to be an integer into an
 -- Integer-looking literal.
 generalizeOverLitVal :: OverLitVal -> OverLitVal
-generalizeOverLitVal (HsFractional fl@(FL {fl_text=src,fl_neg=neg,fl_signi=i,fl_exp=e}))
+generalizeOverLitVal (HsFractional fl@(FL {fl_text=src,fl_neg=neg,fl_exp=e}))
     | e >= 0 && e <= 100 = HsIntegral (IL {il_text=src,il_neg=neg,il_value=numerator val})
   where val = rationalFromFractionalLit fl
 generalizeOverLitVal lit = lit

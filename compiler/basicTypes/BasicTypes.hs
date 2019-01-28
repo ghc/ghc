@@ -1515,9 +1515,6 @@ data FractionalExponentBase
   | Base10
   deriving (Data, Show)
 
-mkRationalBase2 :: Integer -> Integer -> Rational
-mkRationalBase2 i e = mkRationalWithExponentBase i e Base2
-
 mkRationalBase10 :: Integer -> Integer -> Rational
 mkRationalBase10 i e = mkRationalWithExponentBase i e Base10
 

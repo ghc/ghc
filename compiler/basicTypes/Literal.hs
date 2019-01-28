@@ -624,7 +624,7 @@ litIsDupable dflags (LitNumber nt i _)  = case nt of
   LitNumInt64   -> True
   LitNumWord    -> True
   LitNumWord64  -> True
-litIsDupable dflags (LitRational i e _) = True
+litIsDupable _ (LitRational _ _ _)      = True
 litIsDupable _      _                   = True
 
 litFitsInChar :: Literal -> Bool
