@@ -22,6 +22,7 @@ import UniqSupply
 import BasicTypes
 import DynFlags
 import Demand
+import Cpr
 import WwLib
 import Util
 import Outputable
@@ -336,13 +337,13 @@ There is an infelicity though.  We may get something like
 The code for f duplicates that for g, without any real benefit. It
 won't really be executed, because calls to f will go via the inlining.
 
-Note [Don't CPR join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-There's no point in doing CPR on a join point. If the whole function is getting
-CPR'd, then the case expression around the worker function will get pushed into
-the join point by the simplifier, which will have the same effect that CPR would
-have - the result will be returned in an unboxed tuple.
+Note [Don't w/w join points for CPR]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There's no point in exploiting CPR info on a join point. If the whole function
+is getting CPR'd, then the case expression around the worker function will get
+pushed into the join point by the simplifier, which will have the same effect
+that w/w'ing for CPR would have - the result will be returned in an unboxed
+tuple.
 
   f z = let join j x y = (x+1, y+1)
         in case z of A -> j 1 2
@@ -362,10 +363,13 @@ have - the result will be returned in an unboxed tuple.
           in case z of A -> j 1 2
                        B -> j 2 3
 
-Doing CPR on a join point would be tricky anyway, as the worker could not be
-a join point because it would not be tail-called. However, doing the *argument*
-part of W/W still works for join points, since the wrapper body will make a tail
-call:
+Note that we still want to give @j@ the CPR property, so that @f@ has it. So
+CPR *analyse* join points as regular functions, but don't *transform* them.
+
+Doing W/W for returned products on a join point would be tricky anyway, as the
+worker could not be a join point because it would not be tail-called. However,
+doing the *argument* part of W/W still works for join points, since the wrapper
+body will make a tail call:
 
   f z = let join j x y = x + y
         in ...
@@ -459,7 +463,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
   | is_fun && is_eta_exp
-  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds res_info rhs
+  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
 
   | is_thunk                                   -- See Note [Thunk splitting]
   = splitThunk dflags fam_envs is_rec new_fn_id rhs
@@ -469,7 +473,14 @@ tryWW dflags fam_envs is_rec fn_id rhs
 
   where
     fn_info      = idInfo fn_id
-    (wrap_dmds, res_info) = splitStrictSig (strictnessInfo fn_info)
+    (wrap_dmds, div) = splitStrictSig (strictnessInfo fn_info)
+
+    cpr_ty       = getCprSig (cprInfo fn_info)
+    -- Arity of the CPR sig should match idArity when it's not a join point.
+    -- See Note [Arity trimming for CPR signatures] in CprAnal
+    cpr          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
+                          , ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
+                   ct_cpr cpr_ty
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
@@ -553,12 +564,12 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> DmdResult -> CoreExpr
+splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> CprResult -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
-splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) do
+splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
+  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) ) do
     -- The arity should match the signature
-    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_res_info
+    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr_info
     case stuff of
       Just (work_demands, join_arity, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
@@ -579,7 +590,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
             work_join_arity | isJoinId fn_id = Just join_arity
                             | otherwise      = Nothing
               -- worker is join point iff wrapper is join point
-              -- (see Note [Don't CPR join points])
+              -- (see Note [Don't w/w join points for CPR])
 
             work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
                         `setIdOccInfo` occInfo fn_info
@@ -593,9 +604,11 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
                         `setIdUnfolding` mkWorkerUnfolding dflags work_fn fn_unfolding
                                 -- See Note [Worker-wrapper for INLINABLE functions]
 
-                        `setIdStrictness` mkClosedStrictSig work_demands work_res_info
+                        `setIdStrictness` mkClosedStrictSig work_demands div
                                 -- Even though we may not be at top level,
                                 -- it's ok to give it an empty DmdEnv
+
+                        `setIdCprInfo` mkCprSig work_arity work_cpr_info
 
                         `setIdDemandInfo` worker_demand
 
@@ -649,13 +662,16 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
                     -- The arity is set by the simplifier using exprEtaExpandArity
                     -- So it may be more than the number of top-level-visible lambdas
 
-    use_res_info  | isJoinId fn_id = topRes -- Note [Don't CPR join points]
-                  | otherwise      = res_info
-    work_res_info | isJoinId fn_id = res_info -- Worker remains CPR-able
-                  | otherwise
-                  = case returnsCPR_maybe res_info of
-                       Just _  -> topRes    -- Cpr stuff done by wrapper; kill it here
-                       Nothing -> res_info  -- Preserve exception/divergence
+    -- use_cpr_info is the CPR we w/w for. Note that we kill it for join points,
+    -- see Note [Don't w/w join points for CPR].
+    use_cpr_info  | isJoinId fn_id = topCpr
+                  | otherwise      = cpr
+    -- Even if we don't w/w join points for CPR, we might still do so for
+    -- strictness. In which case a join point worker keeps its original CPR
+    -- property; see Note [Don't w/w join points for CPR]. Otherwise, the worker
+    -- doesn't have the CPR property anymore.
+    work_cpr_info | isJoinId fn_id = cpr
+                  | otherwise      = topCpr
 
 
 {-

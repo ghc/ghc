@@ -63,6 +63,7 @@ import DataCon
 import Id
 import IdInfo
 import Demand
+import Cpr
 import CoreSyn
 import Unique
 import UniqSupply
@@ -411,6 +412,7 @@ mkDictSelId name clas
     base_info = noCafIdInfo
                 `setArityInfo`          1
                 `setStrictnessInfo`     strict_sig
+                `setCprInfo`            topCprSig
                 `setLevityInfoWithType` sel_ty
 
     info | new_tycon
@@ -439,7 +441,7 @@ mkDictSelId name clas
         -- It's worth giving one, so that absence info etc is generated
         -- even if the selector isn't inlined
 
-    strict_sig = mkClosedStrictSig [arg_dmd] topRes
+    strict_sig = mkClosedStrictSig [arg_dmd] topDiv
     arg_dmd | new_tycon = evalDmd
             | otherwise = mkManyUsedDmd $
                           mkProdDmd [ if name == sel_name then evalDmd else absDmd
@@ -507,6 +509,7 @@ mkDataConWorkId wkr_name data_con
     alg_wkr_info = noCafIdInfo
                    `setArityInfo`          wkr_arity
                    `setStrictnessInfo`     wkr_sig
+                   `setCprInfo`            mkCprSig wkr_arity (dataConCPR data_con)
                    `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                            -- even if arity = 0
                    `setLevityInfoWithType` wkr_ty
@@ -514,7 +517,7 @@ mkDataConWorkId wkr_name data_con
                      -- setNeverLevPoly
 
     wkr_arity = dataConRepArity data_con
-    wkr_sig   = mkClosedStrictSig (replicate wkr_arity topDmd) (dataConCPR data_con)
+    wkr_sig   = mkClosedStrictSig (replicate wkr_arity topDmd) topDiv
         --      Note [Data-con worker strictness]
         -- Notice that we do *not* say the worker Id is strict
         -- even if the data constructor is declared strict
@@ -552,19 +555,17 @@ mkDataConWorkId wkr_name data_con
                    mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
 
-dataConCPR :: DataCon -> DmdResult
+dataConCPR :: DataCon -> CprResult
 dataConCPR con
   | isDataTyCon tycon     -- Real data types only; that is,
                           -- not unboxed tuples or newtypes
   , null (dataConExTyCoVars con)  -- No existentials
   , wkr_arity > 0
   , wkr_arity <= mAX_CPR_SIZE
-  = if is_prod then vanillaCprProdRes (dataConRepArity con)
-               else cprSumRes (dataConTag con)
+  = conCpr (dataConTag con)
   | otherwise
-  = topRes
+  = topCpr
   where
-    is_prod   = isProductTyCon tycon
     tycon     = dataConTyCon con
     wkr_arity = dataConRepArity con
 
@@ -651,12 +652,13 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                          `setInlinePragInfo`    wrap_prag
                          `setUnfoldingInfo`     wrap_unf
                          `setStrictnessInfo`    wrap_sig
+                         `setCprInfo`           mkCprSig wrap_arity (dataConCPR data_con)
                              -- We need to get the CAF info right here because GHC.Iface.Tidy
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
                          `setLevityInfoWithType` wrap_ty
 
-             wrap_sig = mkClosedStrictSig wrap_arg_dmds (dataConCPR data_con)
+             wrap_sig = mkClosedStrictSig wrap_arg_dmds topDiv
 
              wrap_arg_dmds =
                replicate (length theta) topDmd ++ map mk_dmd arg_ibangs
@@ -1218,10 +1220,16 @@ mkPrimOpId prim_op
                          (AnId id) UserSyntax
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 
+    -- PrimOps don't ever construct a product, but we want to preserve bottoms
+    cpr
+      | isBotDiv (snd (splitStrictSig strict_sig)) = botCpr
+      | otherwise                                  = topCpr
+
     info = noCafIdInfo
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
            `setArityInfo`          arity
            `setStrictnessInfo`     strict_sig
+           `setCprInfo`            mkCprSig arity cpr
            `setInlinePragInfo`     neverInlinePragma
            `setLevityInfoWithType` res_ty
                -- We give PrimOps a NOINLINE pragma so that we don't
@@ -1254,11 +1262,12 @@ mkFCallId dflags uniq fcall ty
     info = noCafIdInfo
            `setArityInfo`          arity
            `setStrictnessInfo`     strict_sig
+           `setCprInfo`            topCprSig
            `setLevityInfoWithType` ty
 
     (bndrs, _) = tcSplitPiTys ty
     arity      = count isAnonTyCoBinder bndrs
-    strict_sig = mkClosedStrictSig (replicate arity topDmd) topRes
+    strict_sig = mkClosedStrictSig (replicate arity topDmd) topDiv
     -- the call does not claim to be strict in its arguments, since they
     -- may be lifted (foreign import prim) and the called code doesn't
     -- necessarily force them. See #11076.

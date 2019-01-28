@@ -1,0 +1,18 @@
+
+==================== Strictness signatures ====================
+T5075.$trModule:
+T5075.loop: <S(LLC(C(S))LLLLL),U(A,A,C(C1(U)),A,A,A,A,A)><L,U(A,A,C(C1(U)),A,A,A,C(U))><L,U>
+
+
+
+==================== Cpr signatures ====================
+T5075.$trModule: m1
+T5075.loop:
+
+
+
+==================== Strictness signatures ====================
+T5075.$trModule:
+T5075.loop: <S(LLC(C(S))LLLLL),1*U(A,A,C(C1(U)),A,A,A,A,A)><L,U(A,A,C(C1(U)),A,A,A,C(U))><L,U>
+
+

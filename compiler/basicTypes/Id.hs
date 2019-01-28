@@ -107,9 +107,11 @@ module Id (
 
         setIdDemandInfo,
         setIdStrictness,
+        setIdCprInfo,
 
         idDemandInfo,
         idStrictness,
+        idCprInfo,
 
     ) where
 
@@ -137,6 +139,7 @@ import GHC.Types.RepType
 import TysPrim
 import DataCon
 import Demand
+import Cpr
 import Name
 import Module
 import Class
@@ -164,6 +167,7 @@ infixl  1 `setIdUnfolding`,
 
           `setIdDemandInfo`,
           `setIdStrictness`,
+          `setIdCprInfo`,
 
           `asJoinId`,
           `asJoinId_maybe`
@@ -645,6 +649,12 @@ idStrictness id = strictnessInfo (idInfo id)
 setIdStrictness :: Id -> StrictSig -> Id
 setIdStrictness id sig = modifyIdInfo (`setStrictnessInfo` sig) id
 
+idCprInfo :: Id -> CprSig
+idCprInfo id = cprInfo (idInfo id)
+
+setIdCprInfo :: Id -> CprSig -> Id
+setIdCprInfo id sig = modifyIdInfo (\info -> setCprInfo info sig) id
+
 zapIdStrictness :: Id -> Id
 zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` nopSig) id
 
@@ -948,11 +958,13 @@ transferPolyIdInfo old_id abstract_wrt new_id
 
     old_strictness  = strictnessInfo old_info
     new_strictness  = increaseStrictSigArity arity_increase old_strictness
+    old_cpr         = cprInfo old_info
 
     transfer new_info = new_info `setArityInfo` new_arity
                                  `setInlinePragInfo` old_inline_prag
                                  `setOccInfo` new_occ_info
                                  `setStrictnessInfo` new_strictness
+                                 `setCprInfo` old_cpr
 
 isNeverLevPolyId :: Id -> Bool
 isNeverLevPolyId = isNeverLevPolyIdInfo . idInfo

@@ -42,6 +42,7 @@ module IdInfo (
 
         -- ** Demand and strictness Info
         strictnessInfo, setStrictnessInfo,
+        cprInfo, setCprInfo,
         demandInfo, setDemandInfo, pprStrictness,
 
         -- ** Unfolding Info
@@ -100,6 +101,7 @@ import ForeignCall
 import Outputable
 import Module
 import Demand
+import Cpr
 import Util
 
 -- infixl so you can say (id `set` a `set` b)
@@ -111,6 +113,7 @@ infixl  1 `setRuleInfo`,
           `setOccInfo`,
           `setCafInfo`,
           `setStrictnessInfo`,
+          `setCprInfo`,
           `setDemandInfo`,
           `setNeverLevPoly`,
           `setLevityInfoWithType`
@@ -258,6 +261,9 @@ data IdInfo
         strictnessInfo  :: StrictSig,
         -- ^ A strictness signature. Digests how a function uses its arguments
         -- if applied to at least 'arityInfo' arguments.
+        cprInfo         :: CprSig,
+        -- ^ Information on whether the function will ultimately return a
+        -- freshly allocated constructor.
         demandInfo      :: Demand,
         -- ^ ID demand information
         callArityInfo   :: !ArityInfo,
@@ -302,6 +308,9 @@ setDemandInfo info dd = dd `seq` info { demandInfo = dd }
 setStrictnessInfo :: IdInfo -> StrictSig -> IdInfo
 setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
 
+setCprInfo :: IdInfo -> CprSig -> IdInfo
+setCprInfo info cpr = cpr `seq` info { cprInfo = cpr }
+
 -- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
 vanillaIdInfo
@@ -315,6 +324,7 @@ vanillaIdInfo
             occInfo             = noOccInfo,
             demandInfo          = topDmd,
             strictnessInfo      = nopSig,
+            cprInfo             = topCprSig,
             callArityInfo       = unknownArity,
             levityInfo          = NoLevityInfo
            }
