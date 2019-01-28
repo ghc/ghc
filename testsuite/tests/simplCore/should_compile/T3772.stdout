@@ -15,7 +15,7 @@ T3772.$trModule4 = "main"#
 T3772.$trModule3 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T3772.$trModule3 = GHC.Types.TrNameS T3772.$trModule4
@@ -32,7 +32,7 @@ T3772.$trModule2 = "T3772"#
 T3772.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T3772.$trModule1 = GHC.Types.TrNameS T3772.$trModule2
@@ -41,7 +41,7 @@ T3772.$trModule1 = GHC.Types.TrNameS T3772.$trModule2
 T3772.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
- Str=m,
+ Cpr=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T3772.$trModule

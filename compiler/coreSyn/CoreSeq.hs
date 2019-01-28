@@ -15,6 +15,7 @@ import GhcPrelude
 import CoreSyn
 import IdInfo
 import Demand( seqDemand, seqStrictSig )
+import Cpr( seqCprResult )
 import BasicTypes( seqOccInfo )
 import VarSet( seqDVarSet )
 import Var( varType, tyVarKind )
@@ -34,6 +35,7 @@ megaSeqIdInfo info
 
     seqDemand (demandInfo info)                 `seq`
     seqStrictSig (strictnessInfo info)          `seq`
+    seqCprResult (cprInfo info)                 `seq`
     seqCaf (cafInfo info)                       `seq`
     seqOneShot (oneShotInfo info)               `seq`
     seqOccInfo (occInfo info)

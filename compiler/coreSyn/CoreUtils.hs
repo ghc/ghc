@@ -54,7 +54,10 @@ module CoreUtils (
         collectMakeStaticArgs,
 
         -- * Join points
-        isJoinBind
+        isJoinBind,
+
+        -- * Dumping stuff
+        dumpIdInfoOfProgram
     ) where
 
 #include "HsVersions.h"
@@ -2673,3 +2676,12 @@ isJoinBind :: CoreBind -> Bool
 isJoinBind (NonRec b _)       = isJoinId b
 isJoinBind (Rec ((b, _) : _)) = isJoinId b
 isJoinBind _                  = False
+
+dumpIdInfoOfProgram :: (IdInfo -> SDoc) -> CoreProgram -> SDoc
+dumpIdInfoOfProgram ppr_id_info binds = vcat (map printId ids)
+  where
+  ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
+  getIds (NonRec i _) = [ i ]
+  getIds (Rec bs)     = map fst bs
+  printId id | isExportedId id = ppr id <> colon <+> (ppr_id_info (idInfo id))
+             | otherwise       = empty

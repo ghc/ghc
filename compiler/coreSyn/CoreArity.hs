@@ -153,7 +153,7 @@ exprBotStrictness_maybe e
         Just ar -> Just (ar, sig ar)
   where
     env    = AE { ae_ped_bot = True, ae_cheap_fn = \ _ _ -> False }
-    sig ar = mkClosedStrictSig (replicate ar topDmd) botRes
+    sig ar = mkClosedStrictSig (replicate ar topDmd) botDiv
 
 {-
 Note [exprArity invariant]
@@ -756,7 +756,7 @@ arityType _ (Var v)
   , not $ isTopSig strict_sig
   , (ds, res) <- splitStrictSig strict_sig
   , let arity = length ds
-  = if isBotRes res then ABot arity
+  = if isBotDiv res then ABot arity
                     else ATop (take arity one_shots)
   | otherwise
   = ATop (take (idArity v) one_shots)

@@ -243,7 +243,7 @@ test('T13410', normal, compile, ['-O2'])
 test('T13468',
      normal,
      makefile_test, ['T13468'])
-test('T13543', only_ways(['optasm']), compile, ['-ddump-str-signatures'])
+test('T13543', only_ways(['optasm']), compile, ['-ddump-str-signatures -ddump-cpr-signatures'])
 test('T11272',
      normal,
      makefile_test, ['T11272'])

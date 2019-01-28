@@ -46,6 +46,7 @@ import DynFlags         ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
                         , gopt, hasPprDebug )
 import Maybes           ( orElse, catMaybes, isJust, isNothing )
 import Demand
+import Cpr
 import GHC.Serialized   ( deserializeWithData )
 import Util
 import Pair
@@ -1724,6 +1725,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                                      (mkLamTypes spec_lam_args body_ty)
                              -- See Note [Transfer strictness]
                              `setIdStrictness` spec_str
+                             `setIdCprInfo` topCpr
                              `setIdArity` count isId spec_lam_args
                              `asJoinId_maybe` spec_join_arity
               spec_str   = calcSpecStrictness fn spec_lam_args pats
@@ -1757,7 +1759,7 @@ calcSpecStrictness :: Id                     -- The original function
                    -> StrictSig              -- Strictness of specialised thing
 -- See Note [Transfer strictness]
 calcSpecStrictness fn qvars pats
-  = mkClosedStrictSig spec_dmds topRes
+  = mkClosedStrictSig spec_dmds topDiv
   where
     spec_dmds = [ lookupVarEnv dmd_env qv `orElse` topDmd | qv <- qvars, isId qv ]
     StrictSig (DmdType _ dmds _) = idStrictness fn

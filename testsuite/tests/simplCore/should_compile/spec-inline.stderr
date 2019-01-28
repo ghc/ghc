@@ -15,7 +15,7 @@ Roman.$trModule4 = "main"#
 Roman.$trModule3 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.$trModule3 = GHC.Types.TrNameS Roman.$trModule4
@@ -32,7 +32,7 @@ Roman.$trModule2 = "Roman"#
 Roman.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.$trModule1 = GHC.Types.TrNameS Roman.$trModule2
@@ -41,7 +41,7 @@ Roman.$trModule1 = GHC.Types.TrNameS Roman.$trModule2
 Roman.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
- Str=m,
+ Cpr=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 Roman.$trModule
@@ -54,7 +54,7 @@ lvl = "spec-inline.hs:(19,5)-(29,25)|function go"#
 
 -- RHS size: {terms: 2, types: 2, coercions: 0, joins: 0/0}
 Roman.foo3 :: Int
-[GblId, Str=b]
+[GblId, Str=b, Cpr=b]
 Roman.foo3
   = Control.Exception.Base.patError @'GHC.Types.LiftedRep @Int lvl
 
@@ -121,7 +121,8 @@ Roman.foo_go [InlPrag=NOUSERINLINE[2]]
   :: Maybe Int -> Maybe Int -> Int
 [GblId,
  Arity=2,
- Str=<S,1*U><S,1*U>m,
+ Str=<S,1*U><S,1*U>,
+ Cpr=m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
@@ -137,7 +138,7 @@ Roman.foo_go
 Roman.foo2 :: Int
 [GblId,
  Caf=NoCafRefs,
- Str=m,
+ Cpr=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.foo2 = GHC.Types.I# 6#
@@ -146,7 +147,7 @@ Roman.foo2 = GHC.Types.I# 6#
 Roman.foo1 :: Maybe Int
 [GblId,
  Caf=NoCafRefs,
- Str=m2,
+ Cpr=m2,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.foo1 = GHC.Maybe.Just @Int Roman.foo2
@@ -156,7 +157,8 @@ foo :: Int -> Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=<S,1*U(U)>m,
+ Str=<S,1*U(U)>,
+ Cpr=m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)

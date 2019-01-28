@@ -701,7 +701,7 @@ trimArity v a = minimum [a, max_arity_by_type, max_arity_by_strsig]
   where
     max_arity_by_type = length (typeArity (idType v))
     max_arity_by_strsig
-        | isBotRes result_info = length demands
+        | isBotDiv result_info = length demands
         | otherwise = a
 
     (demands, result_info) = splitStrictSig (idStrictness v)
