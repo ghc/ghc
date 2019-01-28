@@ -53,6 +53,7 @@ module Numeric (
         readHex,
 
         readFloat,
+        readHexFloat,
 
         lexDigits,
 
@@ -122,6 +123,18 @@ readFloat = readP_to_S readFloatP
 
 readFloatP :: RealFrac a => ReadP a
 readFloatP =
+  do tok <- L.lex
+     case tok of
+       L.Number n -> return $ fromRational $ L.numberToRational n
+       _          -> pfail
+
+-- | Reads an /unsigned/ 'RealFrac' value,
+-- expressed in decimal scientific notation.
+readHexFloat :: RealFrac a => ReadS a
+readHexFloat = readP_to_S readHexFloatP
+
+readHexFloatP :: RealFrac a => ReadP a
+readHexFloatP =
   do tok <- L.lex
      case tok of
        L.Number n -> return $ fromRational $ L.numberToRational n
