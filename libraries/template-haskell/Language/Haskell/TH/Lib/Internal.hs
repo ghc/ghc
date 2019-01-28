@@ -361,9 +361,8 @@ fromToE x y = do { a <- x; b <- y; return (ArithSeqE (FromToR a b)) }
 fromThenToE :: ExpQ -> ExpQ -> ExpQ -> ExpQ
 fromThenToE x y z = do { a <- x; b <- y; c <- z;
                          return (ArithSeqE (FromThenToR a b c)) }
-
-brackE :: ExpQ -> ExpQ
-brackE x = BracketE <$> x
+brackE :: [DecQ] -> ExpQ -> ExpQ
+brackE ds e = do { ds2 <- sequence ds; e2 <- e; return (BracketE ds2 e2) }
 
 
 -------------------------------------------------------------------------------

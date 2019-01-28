@@ -463,3 +463,5 @@ test('T16133', normal, compile_fail, [''])
 test('T15471', normal, multimod_compile, ['T15471.hs', '-v0'])
 test('T16180', when(opsys('darwin'), expect_broken(16218)), compile_and_run, [''])
 test('T16183', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('TH_NestedBracket', [], multimod_compile,
+     ['TH_NestedBracket.hs', '-v0 ' + config.ghc_th_way_flags])
