@@ -511,10 +511,15 @@ compileGHCiExpr expr =
   withTempSession mkTempSession $ GHC.compileExprRemote expr
   where
     mkTempSession hsc_env = hsc_env
-      { hsc_dflags = (hsc_dflags hsc_env)
-          -- RebindableSyntax can wreak havoc with GHCi in several ways
-          -- (see #13385 and #14342 for examples), so we take care to disable it
-          -- for the duration of running expressions that are internal to GHCi.
+      { hsc_dflags = (hsc_dflags hsc_env) {
+        -- Running GHCi's internal expression is incompatible with -XSafe.
+          -- We temporarily disable any Safe Haskell settings while running
+          -- GHCi internal expressions. (see #12509)
+        safeHaskell = Sf_None
+      }
+        -- RebindableSyntax can wreak havoc with GHCi in several ways
+          -- (see #13385 and #14342 for examples), so we temporarily
+          -- disable it too.
           `xopt_unset` LangExt.RebindableSyntax
           -- We heavily depend on -fimplicit-import-qualified to compile expr
           -- with fully qualified names without imports.
