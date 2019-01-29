@@ -2900,7 +2900,7 @@ lexTokenStream :: StringBuffer -> RealSrcLoc -> DynFlags -> ParseResult [Located
 lexTokenStream buf loc dflags = unP go initState{ options = opts' }
     where dflags' = gopt_set (gopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream
           initState@PState{ options = opts } = mkPState dflags' buf loc
-          opts' = opts{ pExtsBitmap = xbit UsePosPragsBit .|. pExtsBitmap opts }
+          opts' = opts{ pExtsBitmap = complement (xbit UsePosPragsBit) .&. pExtsBitmap opts }
           go = do
             ltok <- lexer False return
             case ltok of
