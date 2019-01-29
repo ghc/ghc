@@ -28,7 +28,7 @@ module Demand (
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
 
-        DmdResult, CPRResult,
+        DmdResult, CPRResult, lubDmdResult,
         isBotRes, isTopRes,
         topRes, botRes, cprProdRes,
         vanillaCprProdRes, cprSumRes,

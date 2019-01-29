@@ -476,8 +476,8 @@ dmdTransform env var dmd
   = dmdTransformDictSelSig (idStrictness var) dmd
 
   | isGlobalId var                               -- Imported function
-  = let res = dmdTransformSig (idStrictness var) dmd in
---    pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
+  , let res = dmdTransformSig (idStrictness var) dmd
+  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
     res
 
   | Just (sig, top_lvl) <- lookupSigEnv env var  -- Local letrec bound thing
