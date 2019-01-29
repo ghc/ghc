@@ -59,6 +59,7 @@ ghc-linters:
     - ./boot
     - ./configure $CONFIGURE_ARGS
     - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh`
+    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` docs-haddock
   cache:
     key: hadrian
     paths:
