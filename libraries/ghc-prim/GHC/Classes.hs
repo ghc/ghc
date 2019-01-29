@@ -37,7 +37,7 @@ module GHC.Classes(
     Eq(..),
     Ord(..),
     -- ** Monomorphic equality operators
-    -- | See GHC.Classes#matching_overloaded_methods_in_rules
+    -- $matching_overloaded_methods_in_rules
     eqInt, neInt,
     eqWord, neWord,
     eqChar, neChar,
@@ -81,9 +81,11 @@ Matching on class methods (e.g. @(==)@) in rewrite rules tends to be a bit
 fragile. For instance, consider this motivating example from the @bytestring@
 library,
 
-> break :: (Word8 -> Bool) -> ByteString -> (ByteString, ByteString)
-> breakByte :: Word8 -> ByteString -> (ByteString, ByteString)
-> {-# RULES "break -> breakByte" forall a. break (== x) = breakByte x #-}
+@
+break :: (Word8 -> Bool) -> ByteString -> (ByteString, ByteString)
+breakByte :: Word8 -> ByteString -> (ByteString, ByteString)
+\{\-\# RULES "break -> breakByte" forall a. break (== x) = breakByte x \#\-\}
+@
 
 Here we have two functions, with @breakByte@ providing an optimized
 implementation of @break@ where the predicate is merely testing for equality
@@ -95,23 +97,27 @@ For this reason, most of the primitive types in @base@ have 'Eq' and 'Ord'
 instances defined in terms of helper functions with inlinings delayed to phase
 1. For instance, @Word8@\'s @Eq@ instance looks like,
 
-> instance Eq Word8 where
->     (==) = eqWord8
->     (/=) = neWord8
->
-> eqWord8, neWord8 :: Word8 -> Word8 -> Bool
-> eqWord8 (W8# x) (W8# y) = ...
-> neWord8 (W8# x) (W8# y) = ...
-> {-# INLINE [1] eqWord8 #-}
-> {-# INLINE [1] neWord8 #-}
+@
+instance Eq Word8 where
+    (==) = eqWord8
+    (/=) = neWord8
+
+eqWord8, neWord8 :: Word8 -> Word8 -> Bool
+eqWord8 (W8# x) (W8# y) = ...
+neWord8 (W8# x) (W8# y) = ...
+\{\-\# INLINE [1] eqWord8 \#\-\}
+\{\-\# INLINE [1] neWord8 \#\-\}
+@
 
 This allows us to save our @break@ rule above by rewriting it to instead match
 against @eqWord8@,
 
-> {-# RULES "break -> breakByte" forall a. break (`eqWord8` x) = breakByte x #-}
+@
+\{\-\# RULES "break -> breakByte" forall a. break (`eqWord8` x) = breakByte x \#\-\}
+@
 
-Currently this is only done for '(==)', '(/=)', '(<)', '(<=)', '(>)', and '(>=)'
-for the types in "GHC.Word" and "GHC.Int".
+Currently this is only done for @('==')@, @('/=')@, @('<')@, @('<=')@, @('>')@,
+and @('>=')@ for the types in "GHC.Word" and "GHC.Int".
 -}
 
 -- | The 'Eq' class defines equality ('==') and inequality ('/=').
