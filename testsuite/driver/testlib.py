@@ -468,6 +468,15 @@ def have_gdb( ):
 def have_readelf( ):
     return config.have_readelf
 
+def integer_gmp( ):
+    return have_library("integer-gmp")
+
+def integer_simple( ):
+    return have_library("integer-simple")
+
+def llvm_build ( ):
+    return config.ghc_built_by_llvm
+
 # ---
 
 def high_memory_usage(name, opts):
