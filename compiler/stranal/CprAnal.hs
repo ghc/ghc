@@ -485,12 +485,10 @@ dmdTransform env var dmd
 --    pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
     res
 
-  | Just (sig, top_lvl) <- lookupSigEnv env var  -- Local letrec bound thing
+  | Just sig <- lookupSigEnv env var  -- Local letrec bound thing
   , let fn_ty = dmdTransformSig sig dmd
   = -- pprTrace "dmdTransform" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
-    if isTopLevel top_lvl
-    then fn_ty   -- Don't record top level things
-    else addVarDmd fn_ty var (mkOnceUsedDmd dmd)
+    fn_ty
 
   | otherwise                                    -- Local non-letrec-bound thing
   = unitDmdType (unitVarEnv var (mkOnceUsedDmd dmd))
@@ -1117,7 +1115,7 @@ data AnalEnv
         -- The DmdEnv gives the demand on the free vars of the function
         -- when it is given enough args to satisfy the strictness signature
 
-type SigEnv = VarEnv (StrictSig, TopLevelFlag)
+type SigEnv = VarEnv StrictSig
 
 instance Outputable AnalEnv where
   ppr (AE { ae_sigs = env, ae_virgin = virgin })
@@ -1144,23 +1142,23 @@ extendAnalEnvs top_lvl env vars
 
 extendSigEnvs :: TopLevelFlag -> SigEnv -> [Id] -> SigEnv
 extendSigEnvs top_lvl sigs vars
-  = extendVarEnvList sigs [ (var, (idStrictness var, top_lvl)) | var <- vars]
+  = extendVarEnvList sigs [ (var, idStrictness var) | var <- vars]
 
 extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> StrictSig -> AnalEnv
 extendAnalEnv top_lvl env var sig
   = env { ae_sigs = extendSigEnv top_lvl (ae_sigs env) var sig }
 
 extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> StrictSig -> SigEnv
-extendSigEnv top_lvl sigs var sig = extendVarEnv sigs var (sig, top_lvl)
+extendSigEnv _top_lvl sigs var sig = extendVarEnv sigs var sig
 
-lookupSigEnv :: AnalEnv -> Id -> Maybe (StrictSig, TopLevelFlag)
+lookupSigEnv :: AnalEnv -> Id -> Maybe StrictSig
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 
 getStrictness :: AnalEnv -> Id -> StrictSig
 getStrictness env fn
-  | isGlobalId fn                        = idStrictness fn
-  | Just (sig, _) <- lookupSigEnv env fn = sig
-  | otherwise                            = nopSig
+  | isGlobalId fn                   = idStrictness fn
+  | Just sig <- lookupSigEnv env fn = sig
+  | otherwise                       = nopSig
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
