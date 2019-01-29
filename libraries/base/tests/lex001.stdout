@@ -1,18 +1,70 @@
 "0x3y"
 [("0x3","y")]
-[(Number (MkNumber 16 [3]),"y")]
+[(Number (MkHexadecimal [3] Nothing Nothing),"y")]
 
 "0X3abx"
 [("0X3ab","x")]
-[(Number (MkNumber 16 [3,10,11]),"x")]
+[(Number (MkHexadecimal [3,10,11] Nothing Nothing),"x")]
+
+"0x1p+1x"
+[("0x1p+1","x")]
+[(Number (MkHexadecimal [1] Nothing (Just 1)),"x")]
+
+"0x1p+8x"
+[("0x1p+8","x")]
+[(Number (MkHexadecimal [1] Nothing (Just 8)),"x")]
+
+"0x1.b7p-1x"
+[("0x1.b7p-1","x")]
+[(Number (MkHexadecimal [1] (Just [11,7]) (Just (-1))),"x")]
+
+"0x1.fffffffffffffp+1023x"
+[("0x1.fffffffffffffp+1023","x")]
+[(Number (MkHexadecimal [1] (Just [15,15,15,15,15,15,15,15,15,15,15,15,15]) (Just 1023)),"x")]
+
+"0X1.921FB4D12D84AP-1x"
+[("0X1.921FB4D12D84AP-1","x")]
+[(Number (MkHexadecimal [1] (Just [9,2,1,15,11,4,13,1,2,13,8,4,10]) (Just (-1))),"x")]
+
+"0x.Ap4x"
+[("0x.Ap4","x")]
+[(Number (MkHexadecimal [] (Just [10]) (Just 4)),"x")]
+
+"0xABx"
+[("0xAB","x")]
+[(Number (MkHexadecimal [10,11] Nothing Nothing),"x")]
+
+"0x1a.3x"
+[("0x1a.3","x")]
+[(Number (MkHexadecimal [1,10] (Just [3]) Nothing),"x")]
+
+"0x1p-4x"
+[("0x1p-4","x")]
+[(Number (MkHexadecimal [1] Nothing (Just (-4))),"x")]
+
+"0x1.2p3x"
+[("0x1.2p3","x")]
+[(Number (MkHexadecimal [1] (Just [2]) (Just 3)),"x")]
+
+"0x1p3x"
+[("0x1p3","x")]
+[(Number (MkHexadecimal [1] Nothing (Just 3)),"x")]
+
+"0x1p5000x"
+[("0x1p5000","x")]
+[(Number (MkHexadecimal [1] Nothing (Just 5000)),"x")]
+
+"0x1p-5000x"
+[("0x1p-5000","x")]
+[(Number (MkHexadecimal [1] Nothing (Just (-5000))),"x")]
 
 "0o39y"
 [("0o3","9y")]
-[(Number (MkNumber 8 [3]),"9y")]
+[(Number (MkOctal [3]),"9y")]
 
 "0O334z"
 [("0O334","z")]
-[(Number (MkNumber 8 [3,3,4]),"z")]
+[(Number (MkOctal [3,3,4]),"z")]
 
 "NaN"
 [("NaN","")]
@@ -81,4 +133,3 @@
 "083.3e-22"
 [("083.3e-22","")]
 [(Number (MkDecimal [0,8,3] (Just [3]) (Just (-22))),"")]
-
