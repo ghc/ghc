@@ -237,7 +237,6 @@ nightly-x86_64-linux-deb9:
 validate-x86_64-linux-deb9-llvm:
   extends: .validate-linux
   stage: full-build
-  allow_failure: true
   image: ghcci/x86_64-linux-deb9:0.2
   variables:
     BUILD_FLAVOUR: perf-llvm
