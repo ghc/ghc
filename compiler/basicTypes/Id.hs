@@ -107,9 +107,11 @@ module Id (
 
         setIdDemandInfo,
         setIdStrictness,
+        setIdCprInfo,
 
         idDemandInfo,
         idStrictness,
+        idCprInfo,
 
     ) where
 
@@ -644,6 +646,12 @@ idStrictness id = strictnessInfo (idInfo id)
 
 setIdStrictness :: Id -> StrictSig -> Id
 setIdStrictness id sig = modifyIdInfo (`setStrictnessInfo` sig) id
+
+idCprInfo       :: Id -> DmdResult
+idCprInfo       id = cprInfo (idInfo id)
+
+setIdCprInfo :: Id -> DmdResult -> Id
+setIdCprInfo id cpr = modifyIdInfo (\info -> setCprInfo info (idArity id) cpr) id
 
 zapIdStrictness :: Id -> Id
 zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` nopSig) id

@@ -51,12 +51,12 @@ import UniqSet
 cprAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
 cprAnalProgram dflags fam_envs binds
   = do {
-        let { binds_plus_dmds = do_prog binds } ;
+        let { binds_plus_cpr = do_prog binds } ;
         dumpIfSet_dyn dflags Opt_D_dump_str_signatures
-                      "Strictness signatures" $
-            dumpStrSig binds_plus_dmds ;
+                      "Strictness signatures after CPR analsis" $
+            dumpStrSig binds_plus_cpr ;
         -- See Note [Stamp out space leaks in demand analysis]
-        seqBinds binds_plus_dmds `seq` return binds_plus_dmds
+        seqBinds binds_plus_cpr `seq` return binds_plus_cpr
     }
   where
     do_prog :: CoreProgram -> CoreProgram
@@ -79,7 +79,7 @@ cprAnalTopBind env (NonRec id rhs)
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
   where
-    (env', _, pairs')  = dmdFix TopLevel env cleanEvalDmd pairs
+    (env', _, pairs')  = cprFix TopLevel env cleanEvalDmd pairs
                 -- We get two iterations automatically
                 -- c.f. the NonRec case above
 
@@ -253,8 +253,6 @@ cprAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         scrut_dmd          = mkProdDmd (addDataConStrictness dc id_dmds)
         (scrut_ty, scrut') = cprAnal env scrut_dmd scrut
         res_ty             = alt_ty3 `bothDmdType` toBothDmdArg scrut_ty
-        case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
-        bndrs'             = setBndrsDemandInfo bndrs id_dmds
     in
 --    pprTrace "cprAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
@@ -263,7 +261,7 @@ cprAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_ty" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
-    (res_ty, Case scrut' case_bndr' ty [(DataAlt dc, bndrs', rhs')])
+    (res_ty, Case scrut' case_bndr ty [(DataAlt dc, bndrs, rhs')])
 
 cprAnal' env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
@@ -298,11 +296,10 @@ cprAnal' env dmd (Let (NonRec id rhs) body)
   , Nothing <- unpackTrivial rhs
       -- cprAnalRhsLetDown treats trivial right hand sides specially
       -- so if we have a trival right hand side, fall through to that.
-  = (final_ty, Let (NonRec id' rhs') body')
+  = (final_ty, Let (NonRec id rhs') body')
   where
     (body_ty, body')   = cprAnal env dmd body
     (body_ty', id_dmd) = findBndrDmd env notArgOfDfun body_ty id
-    id'                = setIdDemandInfo id id_dmd
 
     (rhs_ty, rhs')     = cprAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
     final_ty           = body_ty' `bothDmdType` rhs_ty
@@ -331,7 +328,7 @@ cprAnal' env dmd (Let (NonRec id rhs) body)
 
 cprAnal' env dmd (Let (Rec pairs) body)
   = let
-        (env', lazy_fv, pairs') = dmdFix NotTopLevel env dmd pairs
+        (env', lazy_fv, pairs') = cprFix NotTopLevel env dmd pairs
         (body_ty, body')        = cprAnal env' dmd body
         body_ty1                = deleteFVs body_ty (map fst pairs)
         body_ty2                = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
@@ -361,9 +358,7 @@ cprAnalAlt env dmd case_bndr (con,bndrs,rhs)
   | otherwise     -- Non-nullary data constructors
   , (rhs_ty, rhs') <- cprAnal env dmd rhs
   , (alt_ty, dmds) <- findBndrsDmds env rhs_ty bndrs
-  , let case_bndr_dmd = findIdDemand alt_ty case_bndr
-        id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
-  = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
+  = (alt_ty, (con, bndrs, rhs'))
 
 
 {- Note [IO hack in the demand analyser]
@@ -509,30 +504,30 @@ dmdTransform env var dmd
 -}
 
 -- Recursive bindings
-dmdFix :: TopLevelFlag
+cprFix :: TopLevelFlag
        -> AnalEnv                            -- Does not include bindings for this binding
        -> CleanDemand
        -> [(Id,CoreExpr)]
        -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with stricness info
 
-dmdFix top_lvl env let_dmd orig_pairs
+cprFix top_lvl env let_dmd orig_pairs
   = loop 1 initial_pairs
   where
     bndrs = map fst orig_pairs
 
     -- See Note [Initialising strictness]
-    initial_pairs | ae_virgin env = [(setIdStrictness id botSig, rhs) | (id, rhs) <- orig_pairs ]
+    initial_pairs | ae_virgin env = [(setIdCprInfo id botRes, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
 
     -- If fixed-point iteration does not yield a result we use this instead
     -- See Note [Safe abortion in the fixed-point iteration]
     abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
     abort = (env, lazy_fv', zapped_pairs)
-      where (lazy_fv, pairs') = step True (zapIdStrictness orig_pairs)
+      where (lazy_fv, pairs') = step True (zapIdCprInfo orig_pairs)
             -- Note [Lazy and unleashable free variables]
             non_lazy_fvs = plusVarEnvList $ map (strictSigDmdEnv . idStrictness . fst) pairs'
             lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
-            zapped_pairs = zapIdStrictness pairs'
+            zapped_pairs = zapIdCprInfo pairs'
 
     -- The fixed-point varies the idStrictness field of the binders, and terminates if that
     -- annotation does not change any more.
@@ -569,8 +564,8 @@ dmdFix top_lvl env let_dmd orig_pairs
             env'                  = extendAnalEnv top_lvl env id (idStrictness id')
 
 
-    zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
-    zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
+    zapIdCprInfo :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
+    zapIdCprInfo pairs = [(setIdCprInfo id topRes, rhs) | (id, rhs) <- pairs ]
 
 {-
 Note [Safe abortion in the fixed-point iteration]
@@ -596,7 +591,7 @@ cprAnalTrivialRhs ::
     AnalEnv -> Id -> CoreExpr -> Var ->
     (DmdEnv, Id, CoreExpr)
 cprAnalTrivialRhs env id rhs fn
-  = (fn_fv, set_idStrictness env id fn_str, rhs)
+  = (fn_fv, set_idCprInfo env id fn_str, rhs)
   where
     fn_str = getStrictness env fn
     fn_fv | isLocalId fn = unitVarEnv fn topDmd
@@ -650,7 +645,7 @@ cprAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
     (DmdType rhs_fv rhs_dmds rhs_res, bndrs')
                      = annotateLamBndrs env (isDFunId id) body_ty' bndrs
     sig_ty           = mkStrictSig (mkDmdType sig_fv rhs_dmds rhs_res')
-    id'              = set_idStrictness env id sig_ty
+    id'              = set_idCprInfo env id sig_ty
         -- See Note [NOINLINE and strictness]
 
 
@@ -831,23 +826,16 @@ conservative thing and refrain from strictifying a dfun's argument
 dictionaries.
 -}
 
-setBndrsDemandInfo :: [Var] -> [Demand] -> [Var]
-setBndrsDemandInfo (b:bs) (d:ds)
-  | isTyVar b = b : setBndrsDemandInfo bs (d:ds)
-  | otherwise = setIdDemandInfo b d : setBndrsDemandInfo bs ds
-setBndrsDemandInfo [] ds = ASSERT( null ds ) []
-setBndrsDemandInfo bs _  = pprPanic "setBndrsDemandInfo" (ppr bs)
-
 annotateBndr :: AnalEnv -> DmdType -> Var -> (DmdType, Var)
 -- The returned env has the var deleted
 -- The returned var is annotated with demand info
 -- according to the result demand of the provided demand type
 -- No effect on the argument demands
 annotateBndr env dmd_ty var
-  | isId var  = (dmd_ty', setIdDemandInfo var dmd)
+  | isId var  = (dmd_ty', var)
   | otherwise = (dmd_ty, var)
   where
-    (dmd_ty', dmd) = findBndrDmd env False dmd_ty var
+    (dmd_ty', _) = findBndrDmd env False dmd_ty var
 
 annotateLamBndrs :: AnalEnv -> DFunFlag -> DmdType -> [Var] -> (DmdType, [Var])
 annotateLamBndrs env args_of_dfun ty bndrs = mapAccumR annotate ty bndrs
@@ -868,7 +856,7 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
 -- Only called for Ids
   = ASSERT( isId id )
     -- pprTrace "annLamBndr" (vcat [ppr id, ppr _dmd_ty]) $
-    (final_ty, setIdDemandInfo id dmd)
+    (final_ty, id)
   where
       -- Watch out!  See note [Lambda-bound unfoldings]
     final_ty = case maybeUnfoldingTemplate (idUnfolding id) of
@@ -1088,7 +1076,7 @@ What if we decide _not_ to store a strictness signature for a binding at all, as
 we do when aborting a fixed-point iteration? The we risk losing the information
 that the strict variables are being used. In that case, we take all free variables
 mentioned in the (unsound) strictness signature, conservatively approximate the
-demand put on them (topDmd), and add that to the "lazy_fv" returned by "dmdFix".
+demand put on them (topDmd), and add that to the "lazy_fv" returned by "cprFix".
 
 
 Note [Lambda-bound unfoldings]
@@ -1262,9 +1250,9 @@ findBndrDmd env arg_of_dfun dmd_ty id
 
     fam_envs = ae_fam_envs env
 
-set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
-set_idStrictness env id sig
-  = setIdStrictness id (killUsageSig (ae_dflags env) sig)
+set_idCprInfo :: AnalEnv -> Id -> StrictSig -> Id
+set_idCprInfo _env id sig
+  = setIdCprInfo id (snd (splitStrictSig sig))
 
 dumpStrSig :: CoreProgram -> SDoc
 dumpStrSig binds = vcat (map printId ids)

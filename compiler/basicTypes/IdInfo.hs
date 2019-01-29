@@ -40,6 +40,7 @@ module IdInfo (
 
         -- ** Demand and strictness Info
         strictnessInfo, setStrictnessInfo,
+        cprInfo, setCprInfo,
         demandInfo, setDemandInfo, pprStrictness,
 
         -- ** Unfolding Info
@@ -109,6 +110,7 @@ infixl  1 `setRuleInfo`,
           `setOccInfo`,
           `setCafInfo`,
           `setStrictnessInfo`,
+          `setCprInfo`,
           `setDemandInfo`,
           `setNeverLevPoly`,
           `setLevityInfoWithType`
@@ -299,6 +301,17 @@ setDemandInfo info dd = dd `seq` info { demandInfo = dd }
 
 setStrictnessInfo :: IdInfo -> StrictSig -> IdInfo
 setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
+
+cprInfo :: IdInfo -> DmdResult
+cprInfo = snd . splitStrictSig . strictnessInfo
+
+setCprInfo :: IdInfo -> Arity -> DmdResult -> IdInfo
+setCprInfo info arty dr = dr `seq` info { strictnessInfo = sig' }
+  where
+    sig@(StrictSig (DmdType env args _)) = strictnessInfo info
+    sig'
+      | isTopSig sig = StrictSig (DmdType env (take arty (repeat topDmd)) dr)
+      | otherwise    = StrictSig (DmdType env args dr)
 
 -- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
