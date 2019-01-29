@@ -45,7 +45,10 @@ test('print033', normal, ghci_script, ['print033.script'])
 test('print034', extra_files(['../GADT.hs', '../Test.hs']), ghci_script, ['print034.script'])
 test('print035', extra_files(['../Unboxed.hs']), ghci_script, ['print035.script'])
 test('print036', expect_broken(9046), ghci_script, ['print036.script'])
-test('print037', normal, ghci_script, ['print037.script'])
+test('print037', when(llvm_build() and integer_gmp()
+                     , expect_broken_for(16205, ['ghci-ext']))
+               , ghci_script
+               , ['print037.script'])
 
 test('break001', extra_files(['../Test2.hs']), ghci_script, ['break001.script'])
 test('break002', extra_files(['../Test2.hs']), ghci_script, ['break002.script'])
