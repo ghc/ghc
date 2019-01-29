@@ -1360,6 +1360,7 @@ isExpandableApp fn n_val_args
   | otherwise
   = case idDetails fn of
       DataConWorkId {} -> True  -- Actually handled by isWorkFreeApp
+      DataConWrapId {} -> True
       RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
       ClassOpId {}     -> n_val_args == 1
       PrimOpId {}      -> False

@@ -41,7 +41,7 @@ import OptCoercion ( optCoercion )
 import Type     hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
 import Coercion hiding ( substCo, substCoVarBndr )
-import TyCon        ( tyConArity )
+import TyCon        ( tyConArity, isNewTyCon )
 import TysWiredIn
 import PrelNames
 import BasicTypes
@@ -803,6 +803,12 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         , let subst = mkOpenSubst in_scope (bndrs `zip` args)
         = pushCoDataCon con (map (substExpr (text "exprIsConApp1") subst) dfun_args) co
 
+        -- See Note [Looking through newtype wrappers]
+        | Just a <- isDataConWrapId_maybe fun
+        , isNewTyCon (dataConTyCon a)
+        , let rhs = uf_tmpl (realIdUnfolding fun)
+        = dealWithNewtypeWrapper (Left in_scope) rhs cont
+
         -- Look through unfoldings, but only arity-zero one;
         -- if arity > 0 we are effectively inlining a function call,
         -- and that is the business of callSiteInline.
@@ -824,6 +830,24 @@ exprIsConApp_maybe (in_scope, id_unf) expr
 
     go _ _ _ = Nothing
 
+    {-
+    Note [Looking through newtype wrappers]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    exprIsConApp_maybe should look through newtypes; for example,
+    Size (I# 10) is an application of constructor I# to argument 10
+    via some coercion c.
+
+    For newtypes without a wrapper, this becomes I# 10 `cast` c,
+    and we check for casts. See Trac #5327.
+    For newtypes with a wrapper, we must simplify (\x -> x `cast` c) (I# 10),
+    which is done by dealWithNewtypeWrapper. See Trac #16254 and T16254.
+
+    dealWithNewtypeWrapper is recursive since newtypes can have
+    multiple type arguments.
+    -}
+    dealWithNewtypeWrapper scope (Lam v body) (CC (arg:args) co) =
+      dealWithNewtypeWrapper (extend scope v arg) body (CC args co)
+    dealWithNewtypeWrapper scope expr args = go scope expr args
     ----------------------------
     -- Operations on the (Either InScopeSet CoreSubst)
     -- The Left case is wildly dominant
