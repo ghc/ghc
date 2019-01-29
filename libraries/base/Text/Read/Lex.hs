@@ -501,7 +501,8 @@ lexHexNumber :: ReadP Lexeme
 lexHexNumber =
   do _ <- char '0'
      _ <- char 'x' +++ char 'X'
-     xs <- lexDigits 16
+     xs <- lexDigits 16 <++ do (point:_) <- look
+                               if point == '.' then return [] else pfail
      mFrac  <- lexHFrac <++ return Nothing
      mExp   <- lexBExp  <++ return Nothing
      return (Number (MkHexadecimal xs mFrac mExp))
