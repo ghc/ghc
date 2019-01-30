@@ -121,7 +121,7 @@ rnBracket e br_body
        }
 
 -- See Note [Propagating Splices]
-propagateSplices :: ThStage -> TcRef [PendingRnSplice] -> TcM [PendingRnSplice]
+propagateSplices :: ThStage -> TcRef [(Int, PendingRnSplice)] -> TcM [PendingRnSplice]
 propagateSplices cur_stage ps_var = do
   pendings <- readMutVar ps_var
   case cur_stage of
@@ -142,25 +142,27 @@ propagateSplices cur_stage ps_var = do
       -- Return splices to run now and trivial bindings for splices we
       -- propagated
       return (now_pendings ++ now_pendings_new)
-    _ -> return pendings
+    _ -> return (map snd pendings)
 
 -- For a splice x = e; create two new bindings (splice = e; x = splice)
-delaySplice :: PendingRnSplice -> RnM (PendingRnSplice, PendingRnSplice)
-delaySplice p@(PendingSplice l f _ e) = do
+delaySplice :: (Int, PendingRnSplice) -> RnM ((Int, PendingRnSplice), PendingRnSplice)
+delaySplice (l, p@(PendingSplice f _ e)) = do
   new_name <- newSysName (mkVarOcc "splice")
-  return (PendingSplice l f new_name e, newPending new_name p)
+  return ((l, PendingSplice f new_name e), newPending new_name p)
 
 -- Make a splice which looks like x = y
 newPending :: Name -> PendingRnSplice -> PendingRnSplice
-newPending new_sp (PendingSplice l f sp _)
-  = PendingSplice l f sp (nlHsVar new_sp)
+newPending new_sp (PendingSplice f sp _)
+  = PendingSplice f sp (nlHsVar new_sp)
 
 splitPendings :: Int
-              -> [PendingRnSplice]
-              -> ([PendingRnSplice], [PendingRnSplice])
-splitPendings lvl ps = partition do_one ps
+              -> [(Int, PendingRnSplice)]
+              -> ([PendingRnSplice], [(Int, PendingRnSplice)])
+splitPendings lvl ps =
+  let (nows, laters) = partition do_one ps
+  in (map snd nows, laters)
   where
-    do_one p@(PendingSplice l _ _ _)
+    do_one (l, p)
       | l < lvl = False
       | l == lvl = True
       -- This panic indicates that somehow we need to insert a splice at a
@@ -291,7 +293,7 @@ We don't want the type checker to see these bogus unbound variables.
 
 rnSpliceGen :: (HsSplice GhcRn -> RnM (a, FreeVars))
                                             -- Outside brackets, run splice
-            -> (HsSplice GhcRn -> (PendingRnSplice, a))
+            -> (HsSplice GhcRn -> ((Int, PendingRnSplice), a))
                                             -- Inside brackets, make it pending
             -> HsSplice GhcPs
             -> RnM (a, FreeVars)
@@ -388,11 +390,11 @@ runRnSplice flavour run_meta ppr_res splice
 ------------------
 makePending :: UntypedSpliceFlavour
             -> HsSplice GhcRn
-            -> PendingRnSplice
+            -> (Int, PendingRnSplice)
 makePending flavour (HsUntypedSplice _ _ n e)
-  = PendingSplice 0 flavour n e
+  = (0, PendingSplice flavour n e)
 makePending flavour (HsQuasiQuote _ n quoter q_span quote)
-  = PendingSplice 0 flavour n (mkQuasiQuoteExpr flavour quoter q_span quote)
+  = (0, PendingSplice flavour n (mkQuasiQuoteExpr flavour quoter q_span quote))
 makePending _ splice@(HsTypedSplice {})
   = pprPanic "makePending" (ppr splice)
 makePending _ splice@(HsSpliced {})
@@ -462,7 +464,7 @@ rnSpliceExpr :: HsSplice GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnSpliceExpr splice
   = rnSpliceGen run_expr_splice pend_expr_splice splice
   where
-    pend_expr_splice :: HsSplice GhcRn -> (PendingRnSplice, HsExpr GhcRn)
+    pend_expr_splice :: HsSplice GhcRn -> ((Int, PendingRnSplice), HsExpr GhcRn)
     pend_expr_splice rn_splice
         = (makePending UntypedExpSplice rn_splice, HsSpliceE noExt rn_splice)
 
@@ -656,7 +658,7 @@ rnSplicePat splice
   = rnSpliceGen run_pat_splice pend_pat_splice splice
   where
     pend_pat_splice :: HsSplice GhcRn ->
-                       (PendingRnSplice, Either b (Pat GhcRn))
+                       ((Int, PendingRnSplice), Either b (Pat GhcRn))
     pend_pat_splice rn_splice
       = (makePending UntypedPatSplice rn_splice
         , Right (SplicePat noExt rn_splice))
@@ -857,7 +859,7 @@ checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name
   = return name
 
 check_cross_stage_lifting :: TopLevelFlag -> Int -> Int
-                          -> Name -> TcRef [PendingRnSplice] -> TcM Name
+                          -> Name -> TcRef [(Int, PendingRnSplice)] -> TcM Name
 check_cross_stage_lifting top_lvl lift_to lift_by name ps_var
   | isTopLevel top_lvl
         -- Top-level identifiers in this module,
@@ -880,7 +882,7 @@ check_cross_stage_lifting top_lvl lift_to lift_by name ps_var
 
           -- Construct the (lift x) expression
         ; let lift_expr   = (mkLiftExpr lift_by name)
-              pend_splice = PendingSplice lift_to UntypedExpSplice n' lift_expr
+              pend_splice = (lift_to, PendingSplice UntypedExpSplice n' lift_expr)
 
         ; pprTrace "lift_expr" (ppr lift_expr $$ ppr pend_splice) (return ())
           -- Update the pending splices
