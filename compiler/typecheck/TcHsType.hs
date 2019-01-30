@@ -996,7 +996,7 @@ tcInferApps mode orig_hs_ty fun_ty fun_ki orig_hs_args
     go n subst fun all_kindbinder@(ki_binder:ki_binders) inner_ki
        all_args@(arg:args)
       | Specified <- tyCoBinderArgFlag ki_binder
-      , HsTypeArg ki <- arg
+      , HsTypeArg _ ki <- arg
          -- Invisible and specified binder with visible kind argument
          = do { traceTc "tcInferApps (vis kind app)" (vcat [ ppr ki_binder, ppr ki
                                                      , ppr (tyBinderType ki_binder)
@@ -1039,13 +1039,13 @@ tcInferApps mode orig_hs_ty fun_ty fun_ki orig_hs_args
                           (mkNakedAppTy fun arg')
                           ki_binders inner_ki args }
             -- error if the argument is a kind application
-             HsTypeArg ki -> do { traceTc "tcInferApps (error)"
+             HsTypeArg _ ki -> do { traceTc "tcInferApps (error)"
                                     (vcat [ ppr ki_binder
                                           , ppr ki
                                           , ppr (tyBinderType ki_binder)
                                           , ppr subst
                                           , ppr (isInvisibleBinder ki_binder) ])
-                                ; ty_app_err ki $ nakedSubstTy subst $
+                                  ; ty_app_err ki $ nakedSubstTy subst $
                                                   mkPiTys all_kindbinder inner_ki }
 
              HsArgPar _ -> panic "tcInferApps"  -- handled in separate clause of "go"
@@ -1068,7 +1068,7 @@ tcInferApps mode orig_hs_ty fun_ty fun_ki orig_hs_args
                     (fun `mkNakedCastTy` co)  -- See Note [The well-kinded type invariant]
                     [mkAnonBinder arg_k]
                     res_k all_args }
-        (HsTypeArg ki) -> ty_app_err ki substed_inner_ki
+        (HsTypeArg _ ki) -> ty_app_err ki substed_inner_ki
         (HsArgPar _) -> go n subst fun [] inner_ki args
       where
         substed_inner_ki               = substTy subst inner_ki
@@ -1082,7 +1082,8 @@ tcInferApps mode orig_hs_ty fun_ty fun_ki orig_hs_args
 appTypeToArg :: LHsType GhcRn -> [LHsTypeArg GhcRn] -> LHsType GhcRn
 appTypeToArg f [] = f
 appTypeToArg f (HsValArg arg : args) = appTypeToArg (mkHsAppTy f arg) args
-appTypeToArg f (HsTypeArg arg : args) = appTypeToArg (mkHsAppKindTy f arg) args
+appTypeToArg f (HsTypeArg l arg : args)
+  = appTypeToArg (mkHsAppKindTy l f arg) args
 appTypeToArg f (HsArgPar _ : arg) = appTypeToArg f arg
 
 -- | Applies a type to a list of arguments.
