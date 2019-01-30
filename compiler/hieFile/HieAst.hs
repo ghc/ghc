@@ -28,11 +28,9 @@ import HscTypes
 import Module                     ( ModuleName, ml_hs_file )
 import MonadUtils                 ( concatMapM, liftIO )
 import Name                       ( Name, nameSrcSpan, setNameLoc )
-import NameEnv                    ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import SrcLoc
-import TcHsSyn                    ( hsLitType, hsPatType )
-import Type                       ( mkFunTys, Type )
-import TysWiredIn                 ( mkListTy, mkSumTy )
+import TcHsSyn                    ( hsPatType )
+import Type                       ( Type )
 import Var                        ( Id, Var, setVarName, varName, varType )
 
 import HieTypes
@@ -62,11 +60,11 @@ We don't care about the distinction between mono and poly bindings,
 so we replace all occurrences of the mono name with the poly name.
 -}
 newtype HieState = HieState
-  { name_remapping :: NameEnv Id
+  { name_remapping :: M.Map Name Id
   }
 
 initState :: HieState
-initState = HieState emptyNameEnv
+initState = HieState M.empty
 
 class ModifyState a where -- See Note [Name Remapping]
   addSubstitution :: a -> a -> HieState -> HieState
@@ -76,7 +74,7 @@ instance ModifyState Name where
 
 instance ModifyState Id where
   addSubstitution mono poly hs =
-    hs{name_remapping = extendNameEnv (name_remapping hs) (varName mono) poly}
+    hs{name_remapping = M.insert (varName mono) poly (name_remapping hs)}
 
 modifyState :: ModifyState (IdP p) => [ABExport p] -> HieState -> HieState
 modifyState = foldr go id
@@ -379,9 +377,7 @@ instance ToHie (Context (Located Var)) where
       C context (L (RealSrcSpan span) name')
         -> do
         m <- asks name_remapping
-        let name = case lookupNameEnv m (varName name') of
-              Just var -> var
-              Nothing-> name'
+        let name = M.findWithDefault name' (varName name') m
         pure
           [Node
             (NodeInfo S.empty [] $
@@ -396,7 +392,7 @@ instance ToHie (Context (Located Name)) where
   toHie c = case c of
       C context (L (RealSrcSpan span) name') -> do
         m <- asks name_remapping
-        let name = case lookupNameEnv m name' of
+        let name = case M.lookup name' m of
               Just var -> varName var
               Nothing -> name'
         pure
@@ -436,67 +432,13 @@ instance HasType (LPat GhcTc) where
 instance HasType (LHsExpr GhcRn) where
   getTypeNode (L spn e) = makeNode e spn
 
--- | This instance tries to construct 'HieAST' nodes which include the type of
--- the expression. It is not yet possible to do this efficiently for all
--- expression forms, so we skip filling in the type for those inputs.
---
--- 'HsApp', for example, doesn't have any type information available directly on
--- the node. Our next recourse would be to desugar it into a 'CoreExpr' then
--- query the type of that. Yet both the desugaring call and the type query both
--- involve recursive calls to the function and argument! This is particularly
--- problematic when you realize that the HIE traversal will eventually visit
--- those nodes too and ask for their types again.
---
--- Since the above is quite costly, we just skip cases where computing the
--- expression's type is going to be expensive.
---
--- See #16233
 instance HasType (LHsExpr GhcTc) where
-  getTypeNode e@(L spn e') = lift $
-    -- Some expression forms have their type immediately available
-    let tyOpt = case e' of
-          HsLit _ l -> Just (hsLitType l)
-          HsOverLit _ o -> Just (overLitType o)
-
-          HsLam     _ (MG { mg_ext = groupTy }) -> Just (matchGroupType groupTy)
-          HsLamCase _ (MG { mg_ext = groupTy }) -> Just (matchGroupType groupTy)
-          HsCase _  _ (MG { mg_ext = groupTy }) -> Just (mg_res_ty groupTy)
-
-          ExplicitList  ty _ _   -> Just (mkListTy ty)
-          ExplicitSum   ty _ _ _ -> Just (mkSumTy ty)
-          HsDo          ty _ _   -> Just ty
-          HsMultiIf     ty _     -> Just ty
-
-          _ -> Nothing
-
-    in
-    case tyOpt of
-      _ | skipDesugaring e' -> fallback
-        | otherwise -> do
-            hs_env <- Hsc $ \e w -> return (e,w)
-            (_,mbe) <- liftIO $ deSugarExpr hs_env e
-            maybe fallback (makeTypeNode e' spn . exprType) mbe
-    where
-      fallback = makeNode e' spn
-
-      matchGroupType :: MatchGroupTc -> Type
-      matchGroupType (MatchGroupTc args res) = mkFunTys args res
-
-      -- | Skip desugaring of these expressions for performance reasons.
-      --
-      -- See impact on Haddock output (esp. missing type annotations or links)
-      -- before marking more things here as 'False'. See impact on Haddock
-      -- performance before marking more things as 'True'.
-      skipDesugaring :: HsExpr a -> Bool
-      skipDesugaring e = case e of
-        HsVar{}        -> False
-        HsUnboundVar{} -> False
-        HsConLikeOut{} -> False
-        HsRecFld{}     -> False
-        HsOverLabel{}  -> False
-        HsIPVar{}      -> False
-        HsWrap{}       -> False
-        _              -> True
+  getTypeNode e@(L spn e') = lift $ do
+    hs_env <- Hsc $ \e w -> return (e,w)
+    (_,mbe) <- liftIO $ deSugarExpr hs_env e
+    case mbe of
+      Just te -> makeTypeNode e' spn (exprType te)
+      Nothing -> makeNode e' spn
 
 instance ( ToHie (Context (Located (IdP a)))
          , ToHie (MatchGroup a (LHsExpr a))

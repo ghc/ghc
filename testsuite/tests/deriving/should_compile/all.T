@@ -40,7 +40,7 @@ test('deriving-via-compile', normal, compile, [''])
 test('deriving-via-standalone', normal, compile, [''])
 test('T6031', [], multimod_compile, ['T6031', '-v0 -O'])
 # Adding -O on T6031 to expose Trac #11245 regardless of way
-test('T1133', [], makefile_test, [])
+test('T1133', [], run_command, ['$MAKE --no-print-directory -s T1133'])
 test('T7704', normal, compile, [''])
 test('T7710', normal, compile, [''])
 
@@ -65,7 +65,8 @@ test('T7947', [], multimod_compile, ['T7947', '-v0'])
 test('T10561', normal, compile, [''])
 test('T10487', [], multimod_compile, ['T10487', '-v0'])
 test('T10524', normal, compile, [''])
-test('T11148', normal, makefile_test, [])
+test('T11148', normal, run_command,
+     ['$MAKE -s --no-print-directory T11148'])
 test('T9968', normal, compile, [''])
 test('T9968a', normal, compile, [''])
 test('T11174', normal, compile, [''])
