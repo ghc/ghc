@@ -1989,7 +1989,7 @@ tyapps :: { [Located TyEl] } -- NB: This list is reversed
 
 tyapp :: { Located TyEl }
         : atype                         { sL1 $1 $ TyElOpd (unLoc $1) }
-        | TYPEAPP atype                 { sLL $1 $> $ (TyElKindApp (getLoc $1) $2) }
+        | TYPEAPP atype                 { sLL $1 $> $ (TyElKindApp (comb2 $1 $2) $2) }
         | qtyconop                      { sL1 $1 $ TyElOpr (unLoc $1) }
         | tyvarop                       { sL1 $1 $ TyElOpr (unLoc $1) }
         | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ TyElOpr (unLoc $2))

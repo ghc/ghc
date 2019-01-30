@@ -831,7 +831,8 @@ checkTyVars pp_what equals_or_where tc tparms
   = do { (tvs, anns) <- fmap unzip $ mapM check tparms
        ; return (mkHsQTvs tvs, concat anns) }
   where
-    check (HsTypeArg ki@(L loc _)) = Left (loc,
+    check (HsTypeArg _ ki@(L loc _))
+                              = Left (loc,
                                       vcat [ text "Unexpected type application" <+>
                                             text "@" <> ppr ki
                                           , text "In the" <+> pp_what <+>
@@ -967,7 +968,7 @@ checkTyClHdr is_cls ty
       | isRdrTc tc               = return (ltc, HsValArg t1:HsValArg t2:acc, Infix, ann)
     go l (HsParTy _ ty)    acc ann fix = goL ty acc (ann ++mkParensApiAnn l) fix
     go _ (HsAppTy _ t1 t2) acc ann fix = goL t1 (HsValArg t2:acc) ann fix
-    go _ (HsAppKindTy _ ty ki) acc ann fix = goL ty (HsTypeArg ki:acc) ann fix
+    go _ (HsAppKindTy l ty ki) acc ann fix = goL ty (HsTypeArg l ki:acc) ann fix
     go l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ann fix
       = return (cL l (nameRdrName tup_name), map HsValArg ts, fix, ann)
       where
@@ -1374,9 +1375,25 @@ isFunLhs e = go e [] []
 -- | Either an operator or an operand.
 data TyEl = TyElOpr RdrName | TyElOpd (HsType GhcPs)
           | TyElKindApp SrcSpan (LHsType GhcPs)
+          -- See Note [TyElKindApp SrcSpan interpretation]
           | TyElTilde | TyElBang
           | TyElUnpackedness ([AddAnn], SourceText, SrcUnpackedness)
           | TyElDocPrev HsDocString
+
+
+{- Note [TyElKindApp SrcSpan interpretation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A TyElKindApp captures type application written in haskell as
+
+    @ Foo
+
+where Foo is some type.
+
+The SrcSpan reflects both elements, and there are AnnAt and AnnVal API
+Annotations attached to this SrcSpan for the specific locations of
+each within it.
+-}
 
 instance Outputable TyEl where
   ppr (TyElOpr name) = ppr name
@@ -1458,12 +1475,11 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
     -- handle (NO)UNPACK pragmas
     go k acc ops_acc ((dL->L l (TyElUnpackedness (anns, unpkSrc, unpk))):xs) =
       if not (null acc) && null xs
-      then do { (addAccAnns, acc') <- eitherToP $ mergeOpsAcc acc
+      then do { acc' <- eitherToP $ mergeOpsAcc acc
               ; let a = ops_acc acc'
                     strictMark = HsSrcBang unpkSrc unpk NoSrcStrict
                     bl = combineSrcSpans l (getLoc a)
                     bt = HsBangTy noExt strictMark a
-              ; addAccAnns
               ; addAnnsAt bl anns
               ; return (cL bl bt) }
       else parseErrorSDoc l unpkError
@@ -1499,8 +1515,7 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
                       -- due to #15884
         in guess xs
       = if not (null acc) && (k > 1 || length acc > 1)
-        then do { (_, a) <- eitherToP (mergeOpsAcc acc)
-               -- no need to add annotations since it fails anyways!
+        then do { a <- eitherToP (mergeOpsAcc acc)
                 ; failOpStrictnessCompound (cL l str) (ops_acc a) }
         else failOpStrictnessPosition (cL l str)
 
@@ -1511,8 +1526,7 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
     go k acc ops_acc ((dL->L l (TyElOpr op)):xs) =
       if null acc || null (filter isTyElOpd xs)
         then failOpFewArgs (cL l op)
-        else do { (addAccAnns, acc') <- eitherToP (mergeOpsAcc acc)
-                ; addAccAnns
+        else do { acc' <- eitherToP (mergeOpsAcc acc)
                 ; go (k + 1) [] (\c -> mkLHsOpTy c (cL l op) (ops_acc acc')) xs }
       where
         isTyElOpd (dL->L _ (TyElOpd _)) = True
@@ -1534,33 +1548,32 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
 
     -- clause [tyapp]:
     -- whenever a type application is encountered, it is added to the accumulator
-    go k acc ops_acc ((dL->L _ (TyElKindApp l a)):xs) = go k (HsTypeArg (l, a):acc) ops_acc xs
+    go k acc ops_acc ((dL->L _ (TyElKindApp l a)):xs) = go k (HsTypeArg l a:acc) ops_acc xs
 
     -- clause [end]
     -- See Note [Non-empty 'acc' in mergeOps clause [end]]
-    go _ acc ops_acc [] = do { (addAccAnns, acc') <- eitherToP (mergeOpsAcc acc)
-                             ; addAccAnns
+    go _ acc ops_acc [] = do { acc' <- eitherToP (mergeOpsAcc acc)
                              ; return (ops_acc acc') }
 
     go _ _ _ _ = panic "mergeOps.go: Impossible Match"
                         -- due to #15884
 
-mergeOpsAcc :: [HsArg (LHsType GhcPs) (SrcSpan, LHsKind GhcPs)]
-         -> Either (SrcSpan, SDoc) (P (), LHsType GhcPs)
+mergeOpsAcc :: [HsArg (LHsType GhcPs) (LHsKind GhcPs)]
+         -> Either (SrcSpan, SDoc) (LHsType GhcPs)
 mergeOpsAcc [] = panic "mergeOpsAcc: empty input"
-mergeOpsAcc (HsTypeArg (_, L loc ki):_)
+mergeOpsAcc (HsTypeArg _ (L loc ki):_)
   = Left (loc, text "Unexpected type application:" <+> ppr ki)
-mergeOpsAcc (HsValArg ty : xs) = go1 (pure ()) ty xs
+mergeOpsAcc (HsValArg ty : xs) = go1 ty xs
   where
-    go1 :: P () -> LHsType GhcPs
-        -> [HsArg (LHsType GhcPs) (SrcSpan, LHsKind GhcPs)]
-        -> Either (SrcSpan, SDoc) (P (), LHsType GhcPs)
-    go1 anns lhs []     = Right (anns, lhs)
-    go1 anns lhs (x:xs) = case x of
-        HsValArg ty -> go1 anns (mkHsAppTy lhs ty) xs
-        HsTypeArg (loc, ki) -> let ty = mkHsAppKindTy lhs ki
-                               in go1 (addAnnotation (getLoc ty) AnnAt loc >> anns) ty xs
-        HsArgPar _ -> go1 anns lhs xs
+    go1 :: LHsType GhcPs
+        -> [HsArg (LHsType GhcPs) (LHsKind GhcPs)]
+        -> Either (SrcSpan, SDoc) (LHsType GhcPs)
+    go1 lhs []     = Right lhs
+    go1 lhs (x:xs) = case x of
+        HsValArg ty -> go1 (mkHsAppTy lhs ty) xs
+        HsTypeArg loc ki -> let ty = mkHsAppKindTy loc lhs ki
+                            in go1 ty xs
+        HsArgPar _ -> go1 lhs xs
 mergeOpsAcc (HsArgPar _: xs) = mergeOpsAcc xs
 
 {- Note [Impossible case in mergeOps clause [unpk]]
@@ -1623,19 +1636,19 @@ pInfixSide (el:xs1)
   | Just t1 <- pLHsTypeArg el
   = go [t1] xs1
    where
-     go :: [HsArg (LHsType GhcPs) (SrcSpan, LHsKind GhcPs)]
+     go :: [HsArg (LHsType GhcPs) (LHsKind GhcPs)]
         -> [Located TyEl] -> Maybe (LHsType GhcPs, P (), [Located TyEl])
      go acc (el:xs)
        | Just t <- pLHsTypeArg el
        = go (t:acc) xs
      go acc xs = case mergeOpsAcc acc of
        Left _ -> Nothing
-       Right (addAnns, acc') -> Just (acc', addAnns, xs)
+       Right acc' -> Just (acc', pure (), xs)
 pInfixSide _ = Nothing
 
-pLHsTypeArg :: Located TyEl -> Maybe (HsArg (LHsType GhcPs) (SrcSpan, LHsKind GhcPs))
+pLHsTypeArg :: Located TyEl -> Maybe (HsArg (LHsType GhcPs) (LHsKind GhcPs))
 pLHsTypeArg (dL->L l (TyElOpd a)) = Just (HsValArg (L l a))
-pLHsTypeArg (dL->L _ (TyElKindApp l a)) = Just (HsTypeArg (l,a))
+pLHsTypeArg (dL->L _ (TyElKindApp l a)) = Just (HsTypeArg l a)
 pLHsTypeArg _ = Nothing
 
 pDocPrev :: [Located TyEl] -> (Maybe LHsDocString, [Located TyEl])
