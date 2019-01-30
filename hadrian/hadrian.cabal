@@ -91,6 +91,7 @@ executable hadrian
                        , Settings.Default
                        , Settings.Flavours.Common
                        , Settings.Flavours.Development
+                       , Settings.Flavours.Llvm
                        , Settings.Flavours.Performance
                        , Settings.Flavours.Profiled
                        , Settings.Flavours.Quick

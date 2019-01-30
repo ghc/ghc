@@ -12,6 +12,7 @@ import UserSettings (userFlavours, userPackages, userDefaultFlavour)
 
 import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Development
+import Settings.Flavours.Llvm
 import Settings.Flavours.Performance
 import Settings.Flavours.Profiled
 import Settings.Flavours.Quick
@@ -36,7 +37,8 @@ hadrianFlavours :: [Flavour]
 hadrianFlavours =
     [ defaultFlavour, developmentFlavour Stage1, developmentFlavour Stage2
     , performanceFlavour, profiledFlavour, quickFlavour, quickestFlavour
-    , quickCrossFlavour ]
+    , quickCrossFlavour
+    , performanceLlvmFlavour, profiledLlvmFlavour, quickLlvmFlavour ]
 
 flavour :: Action Flavour
 flavour = do
