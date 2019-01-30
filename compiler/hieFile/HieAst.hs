@@ -14,6 +14,7 @@ Main functions for .hie file generation
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TupleSections #-}
 module HieAst ( mkHieFile ) where
+import Debug.Trace
 
 import GhcPrelude
 
@@ -50,7 +51,7 @@ import VarSet
 import UniqSet
 import VarEnv
 import Data.Foldable
-import Outputable (ppr, showSDocUnsafe, (<+>))
+import Outputable (Outputable, ppr, showSDocUnsafe, (<+>))
 
 import HieTypes
 import HieUtils
@@ -65,6 +66,9 @@ import Data.Maybe                 ( listToMaybe, catMaybes)
 import Data.Semigroup
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
+
+traceGhc :: Outputable a => a -> b -> b
+traceGhc x y = trace (showSDocUnsafe $ ppr x) y
 
 -- These synonyms match those defined in main/GHC.hs
 type RenamedSource     = ( HsGroup GhcRn, [LImportDecl GhcRn]
@@ -117,28 +121,29 @@ addWrapper (WpCompose a b) = addWrapper a . addWrapper b
 addWrapper (WpFun _ b _ _) = addWrapper b
 addWrapper _               = id
 
-addPatterns :: HasSrcSpan (Pat p) => [Pat p] -> HieState -> HieState
+addPatterns :: p ~ GhcPass q => [Pat p] -> HieState -> HieState
 addPatterns ps = foldr (\p f -> addPattern p . f) id ps
 
-addPattern :: HasSrcSpan (Pat p) => Pat p -> HieState -> HieState
-addPattern (LazyPat _ p)     = addPattern p
-addPattern (AsPat _ _ p)     = addPattern p
-addPattern (ParPat _ p)      = addPattern p
-addPattern (BangPat _ p)     = addPattern p
-addPattern (ListPat _ ps)    = addPatterns ps
-addPattern (TuplePat _ ps _) = addPatterns ps
-addPattern (SumPat _ p _ _)  = addPattern p
-addPattern (ConPatIn _ dets) = addConDets dets
-addPattern (ViewPat _ _ p)   = addPattern p
-addPattern (SigPat _ p _)    = addPattern p
-addPattern (CoPat _ wrp p _) = addWrapper wrp . addPattern p
-addPattern p@(ConPatOut{ pat_dicts = ev_vars, pat_binds = ev_binds
-                       , pat_args  = dets   , pat_wrap  = wrap
-                       }) =
-  addWrapper wrap . addEvVars (getLoc p) ev_vars . addEvBinds ev_binds . addConDets dets
-addPattern _ = id
+addPattern :: p ~ GhcPass q => Pat p -> HieState -> HieState
+addPattern (dL -> (L l p)) = case p of
+    (LazyPat _ p)     -> addPattern p
+    (AsPat _ _ p)     -> addPattern p
+    (ParPat _ p)      -> addPattern p
+    (BangPat _ p)     -> addPattern p
+    (ListPat _ ps)    -> addPatterns ps
+    (TuplePat _ ps _) -> addPatterns ps
+    (SumPat _ p _ _)  -> addPattern p
+    (ConPatIn _ dets) -> addConDets dets
+    (ViewPat _ _ p)   -> addPattern p
+    (SigPat _ p _)    -> addPattern p
+    (CoPat _ wrp p _) -> addWrapper wrp . addPattern p
+    (ConPatOut{ pat_dicts = ev_vars, pat_binds = ev_binds
+                   , pat_args  = dets , pat_wrap  = wrap
+                   }) ->
+      addWrapper wrap . addEvVars l ev_vars . addEvBinds ev_binds . addConDets dets
+    _                -> id
 
-addConDets :: HasSrcSpan (Pat p) => HsConPatDetails p -> HieState -> HieState
+addConDets :: p ~ GhcPass q => HsConPatDetails p -> HieState -> HieState
 addConDets (PrefixCon ps) = addPatterns ps
 addConDets (InfixCon a b) = addPattern a . addPattern b
 addConDets (RecCon r)     = addPatterns $ map (hsRecFieldArg . unLoc) (rec_flds r)
@@ -150,6 +155,7 @@ explainWrapper (WpEvApp e@(EvExpr a)) = Just $ do
       bs <- asks hie_ev_binds
       vs <- asks hie_ev_vars
       let bmap = foldrBag (flip extendEvBinds) emptyEvBindMap bs
+      liftIO $ putStrLn $ showSDocUnsafe $ ppr bmap
       liftIO $ putStrLn $ showSDocUnsafe $ ppr bs
       liftIO $ putStrLn $ "Constructed using: "
       for_ (nonDetEltsUniqSet $ findRootEvVars bmap $ evVarsOfTerm e) $ \v -> do
@@ -606,17 +612,16 @@ instance HasType (LHsExpr GhcTc) where
         HsWrap{}       -> False
         _              -> True
 
-instance ( ToHie (Context (Located (IdP a)))
-         , ToHie (MatchGroup a (LHsExpr a))
-         , ToHie (PScoped (LPat a))
-         , ToHie (GRHSs a (LHsExpr a))
-         , ToHie (LHsExpr a)
-         , ToHie (Located (PatSynBind a a))
-         , HasType (LHsBind a)
-         , ModifyState (IdP a)
-         , HasSrcSpan (Pat a)
-         , Data (HsBind a)
-         ) => ToHie (BindContext (LHsBind a)) where
+instance ( ToHie (Context (Located (IdP (GhcPass a))))
+         , ToHie (MatchGroup (GhcPass a) (LHsExpr (GhcPass a)))
+         , ToHie (PScoped (LPat (GhcPass a)))
+         , ToHie (GRHSs (GhcPass a) (LHsExpr (GhcPass a)))
+         , ToHie (LHsExpr (GhcPass a))
+         , ToHie (Located (PatSynBind (GhcPass a) (GhcPass a)))
+         , HasType (LHsBind (GhcPass a))
+         , ModifyState (IdP (GhcPass a))
+         , Data (HsBind (GhcPass a))
+         ) => ToHie (BindContext (LHsBind (GhcPass a))) where
   toHie (BC context scope b@(L span bind)) =
     concatM $ getTypeNode b : case bind of
       FunBind{fun_id = name, fun_matches = matches, fun_co_fn = wrap} ->
