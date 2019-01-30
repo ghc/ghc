@@ -6,26 +6,21 @@
            , BangPatterns
   #-}
 
+#include "EventConfig.h"
+
 module GHC.Event.KQueue
     (
-      new
-    , available
+#if defined(HAVE_KQUEUE)
+      BackendState
+    , new
+    , poll
+    , modifyFd
+    , modifyFdOnce
+    , delete
+#endif
     ) where
 
-import qualified GHC.Event.Internal as E
-
-#include "EventConfig.h"
-#if !defined(HAVE_KQUEUE)
-import GHC.Base
-
-new :: IO E.Backend
-new = errorWithoutStackTrace "KQueue back end not implemented for this platform"
-
-available :: Bool
-available = False
-{-# INLINE available #-}
-#else
-
+#if defined(HAVE_KQUEUE)
 import Data.Bits (Bits(..), FiniteBits(..))
 import Data.Int
 import Data.Maybe ( catMaybes )
@@ -62,31 +57,23 @@ import Data.Int (Int64)
 # define NOTE_EOF 0
 #endif
 
-available :: Bool
-available = True
-{-# INLINE available #-}
-
 ------------------------------------------------------------------------
 -- Exported interface
 
-data KQueue = KQueue {
+data BackendState = BackendState {
       kqueueFd     :: {-# UNPACK #-} !KQueueFd
     , kqueueEvents :: {-# UNPACK #-} !(A.Array Event)
     }
 
-new :: IO E.Backend
-new = do
-  kqfd <- kqueue
-  events <- A.new 64
-  let !be = E.backend poll modifyFd modifyFdOnce delete (KQueue kqfd events)
-  return be
+new :: IO BackendState
+new = liftA2 BackendState kqueue (A.new 64)
 
-delete :: KQueue -> IO ()
+delete :: BackendState -> IO ()
 delete kq = do
   _ <- c_close . fromKQueueFd . kqueueFd $ kq
   return ()
 
-modifyFd :: KQueue -> Fd -> E.Event -> E.Event -> IO Bool
+modifyFd :: BackendState -> Fd -> E.Event -> E.Event -> IO Bool
 modifyFd kq fd oevt nevt = kqueueControl (kqueueFd kq) evs
   where
     evs
@@ -98,11 +85,11 @@ toFilter e = catMaybes [ check E.evtRead filterRead, check E.evtWrite filterWrit
   where
     check e' f = if e `E.eventIs` e' then Just f else Nothing
 
-modifyFdOnce :: KQueue -> Fd -> E.Event -> IO Bool
+modifyFdOnce :: BackendState -> Fd -> E.Event -> IO Bool
 modifyFdOnce kq fd evt =
     kqueueControl (kqueueFd kq) (toEvents fd (toFilter evt) (flagAdd .|. flagOneshot) noteEOF)
 
-poll :: KQueue
+poll :: BackendState
      -> Maybe Timeout
      -> (Fd -> E.Event -> IO ())
      -> IO Int

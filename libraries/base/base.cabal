@@ -379,6 +379,7 @@ Library
         other-modules:
             GHC.Event.Arr
             GHC.Event.Array
+            GHC.Event.Backend
             GHC.Event.Control
             GHC.Event.EPoll
             GHC.Event.IntTable
@@ -388,6 +389,7 @@ Library
             GHC.Event.PSQ
             GHC.Event.Poll
             GHC.Event.Thread
+            GHC.Event.TimerBackend
             GHC.Event.TimerManager
             GHC.Event.Unique
 

@@ -4,25 +4,22 @@
            , BangPatterns
   #-}
 
-module GHC.Event.Poll
-    (
-      new
-    , available
-    ) where
-
 #include "EventConfig.h"
 
-#if !defined(HAVE_POLL_H)
-import GHC.Base
-import qualified GHC.Event.Internal as E
+module GHC.Event.Poll
+    (
+#if defined(HAVE_POLL_H)
+      BackendState
+    , new
+    , poll
+    , modifyFd
+    , modifyFdOnce
+    , delete
+#endif
+    ) where
 
-new :: IO E.Backend
-new = errorWithoutStackTrace "Poll back end not implemented for this platform"
+#if defined(HAVE_POLL_H)
 
-available :: Bool
-available = False
-{-# INLINE available #-}
-#else
 #include <poll.h>
 
 import Control.Concurrent.MVar (MVar, newMVar, swapMVar)
@@ -42,29 +39,27 @@ import System.Posix.Types (Fd(..))
 import qualified GHC.Event.Array as A
 import qualified GHC.Event.Internal as E
 
-available :: Bool
-available = True
-{-# INLINE available #-}
-
-data Poll = Poll {
+data BackendState = BackendState {
       pollChanges :: {-# UNPACK #-} !(MVar (A.Array PollFd))
     , pollFd      :: {-# UNPACK #-} !(A.Array PollFd)
     }
 
-new :: IO E.Backend
-new = E.backend poll modifyFd modifyFdOnce (\_ -> return ()) `liftM`
-      liftM2 Poll (newMVar =<< A.empty) A.empty
+new :: IO BackendState
+new = liftA2 BackendState (newMVar =<< A.empty) A.empty
 
-modifyFd :: Poll -> Fd -> E.Event -> E.Event -> IO Bool
+delete :: BackendState -> IO ()
+delete _ = pure ()
+
+modifyFd :: BackendState -> Fd -> E.Event -> E.Event -> IO Bool
 modifyFd p fd oevt nevt =
   withMVar (pollChanges p) $ \ary -> do
     A.snoc ary $ PollFd fd (fromEvent nevt) (fromEvent oevt)
     return True
 
-modifyFdOnce :: Poll -> Fd -> E.Event -> IO Bool
+modifyFdOnce :: BackendState -> Fd -> E.Event -> IO Bool
 modifyFdOnce = errorWithoutStackTrace "modifyFdOnce not supported in Poll backend"
 
-reworkFd :: Poll -> PollFd -> IO ()
+reworkFd :: BackendState -> PollFd -> IO ()
 reworkFd p (PollFd fd npevt opevt) = do
   let ary = pollFd p
   if opevt == 0
@@ -77,7 +72,7 @@ reworkFd p (PollFd fd npevt opevt) = do
           | npevt /= 0 -> A.unsafeWrite ary i $ PollFd fd npevt 0
           | otherwise  -> A.removeAt ary i
 
-poll :: Poll
+poll :: BackendState
      -> Maybe E.Timeout
      -> (Fd -> E.Event -> IO ())
      -> IO Int

@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
+           , BangPatterns
            , NoImplicitPrelude
            , MagicHash
            , UnboxedTuples
@@ -89,7 +90,7 @@ ioManagerCapabilitiesChanged = return ()
 -- while this thread was blocked.  To safely close a file descriptor
 -- that has been used with 'threadWaitRead', use 'closeFdWith'.
 threadWaitRead :: Fd -> IO ()
-threadWaitRead fd
+threadWaitRead !fd
 #if !defined(mingw32_HOST_OS)
   | threaded  = Event.threadWaitRead fd
 #endif
@@ -105,7 +106,7 @@ threadWaitRead fd
 -- while this thread was blocked.  To safely close a file descriptor
 -- that has been used with 'threadWaitWrite', use 'closeFdWith'.
 threadWaitWrite :: Fd -> IO ()
-threadWaitWrite fd
+threadWaitWrite !fd
 #if !defined(mingw32_HOST_OS)
   | threaded  = Event.threadWaitWrite fd
 #endif
@@ -119,7 +120,7 @@ threadWaitWrite fd
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
 threadWaitReadSTM :: Fd -> IO (Sync.STM (), IO ())
-threadWaitReadSTM fd
+threadWaitReadSTM !fd
 #if !defined(mingw32_HOST_OS)
   | threaded  = Event.threadWaitReadSTM fd
 #endif
@@ -138,7 +139,7 @@ threadWaitReadSTM fd
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
 threadWaitWriteSTM :: Fd -> IO (Sync.STM (), IO ())
-threadWaitWriteSTM fd
+threadWaitWriteSTM !fd
 #if !defined(mingw32_HOST_OS)
   | threaded  = Event.threadWaitWriteSTM fd
 #endif
@@ -177,7 +178,7 @@ closeFdWith close fd
 -- run /earlier/ than specified.
 --
 threadDelay :: Int -> IO ()
-threadDelay time
+threadDelay !time
 #if defined(mingw32_HOST_OS)
   | threaded  = Windows.threadDelay time
 #else

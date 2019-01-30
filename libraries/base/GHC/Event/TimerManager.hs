@@ -50,18 +50,14 @@ import GHC.Num (Num(..))
 import GHC.Real (quot, fromIntegral)
 import GHC.Show (Show(..))
 import GHC.Event.Control
-import GHC.Event.Internal (Backend, Event, evtRead, Timeout(..))
+import GHC.Event.Internal (Event, evtRead, Timeout(..))
+import GHC.Event.TimerBackend (BackendState)
 import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
 import System.Posix.Types (Fd)
 
 import qualified GHC.Event.Internal as I
+import qualified GHC.Event.TimerBackend as I
 import qualified GHC.Event.PSQ as Q
-
-#if defined(HAVE_POLL)
-import qualified GHC.Event.Poll   as Poll
-#else
-# error not implemented for this operating system
-#endif
 
 ------------------------------------------------------------------------
 -- Types
@@ -89,7 +85,7 @@ type TimeoutEdit = TimeoutQueue -> TimeoutQueue
 
 -- | The event manager state.
 data TimerManager = TimerManager
-    { emBackend      :: !Backend
+    { emBackend      :: !BackendState
     , emTimeouts     :: {-# UNPACK #-} !(IORef TimeoutQueue)
     , emState        :: {-# UNPACK #-} !(IORef State)
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
@@ -107,18 +103,14 @@ handleControlEvent mgr fd _evt = do
     CMsgDie         -> writeIORef (emState mgr) Finished
     CMsgSignal fp s -> runHandlers fp s
 
-newDefaultBackend :: IO Backend
-#if defined(HAVE_POLL)
-newDefaultBackend = Poll.new
-#else
-newDefaultBackend = errorWithoutStackTrace "no back end for this platform"
-#endif
+newDefaultBackend :: IO BackendState
+newDefaultBackend = I.new
 
 -- | Create a new event manager.
 new :: IO TimerManager
 new = newWith =<< newDefaultBackend
 
-newWith :: Backend -> IO TimerManager
+newWith :: BackendState -> IO TimerManager
 newWith be = do
   timeouts <- newIORef Q.empty
   ctrl <- newControl True

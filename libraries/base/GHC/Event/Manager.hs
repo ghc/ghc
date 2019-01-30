@@ -79,23 +79,14 @@ import GHC.Real (fromIntegral)
 import GHC.Show (Show(..))
 import GHC.Event.Control
 import GHC.Event.IntTable (IntTable)
-import GHC.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
-                           Lifetime(..), EventLifetime, Timeout(..))
+import GHC.Event.Internal (Event, Lifetime(..), EventLifetime, Timeout(..))
+import GHC.Event.Internal (evtClose, evtRead, evtWrite)
 import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
 import System.Posix.Types (Fd)
 
 import qualified GHC.Event.IntTable as IT
 import qualified GHC.Event.Internal as I
-
-#if defined(HAVE_KQUEUE)
-import qualified GHC.Event.KQueue as KQueue
-#elif defined(HAVE_EPOLL)
-import qualified GHC.Event.EPoll  as EPoll
-#elif defined(HAVE_POLL)
-import qualified GHC.Event.Poll   as Poll
-#else
-# error not implemented for this operating system
-#endif
+import qualified GHC.Event.Backend as I
 
 ------------------------------------------------------------------------
 -- Types
@@ -128,7 +119,7 @@ data State = Created
 
 -- | The event manager state.
 data EventManager = EventManager
-    { emBackend      :: !Backend
+    { emBackend      :: {-# UNPACK #-} !I.BackendState
     , emFds          :: {-# UNPACK #-} !(Array Int (MVar (IntTable [FdData])))
     , emState        :: {-# UNPACK #-} !(IORef State)
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
@@ -168,23 +159,15 @@ handleControlEvent mgr fd _evt = do
     CMsgDie         -> writeIORef (emState mgr) Finished
     _               -> return ()
 
-newDefaultBackend :: IO Backend
-#if defined(HAVE_KQUEUE)
-newDefaultBackend = KQueue.new
-#elif defined(HAVE_EPOLL)
-newDefaultBackend = EPoll.new
-#elif defined(HAVE_POLL)
-newDefaultBackend = Poll.new
-#else
-newDefaultBackend = errorWithoutStackTrace "no back end for this platform"
-#endif
+newDefaultBackend :: IO I.BackendState
+newDefaultBackend = I.new
 
 -- | Create a new event manager.
 new :: IO EventManager
 new = newWith =<< newDefaultBackend
 
 -- | Create a new 'EventManager' with the given polling backend.
-newWith :: Backend -> IO EventManager
+newWith :: I.BackendState -> IO EventManager
 newWith be = do
   iofds <- fmap (listArray (0, callbackArraySize-1)) $
            replicateM callbackArraySize (newMVar =<< IT.new 8)
@@ -316,7 +299,7 @@ step mgr@EventManager{..} = do
 -- is not allowed on many platforms.
 registerFd_ :: EventManager -> IOCallback -> Fd -> Event -> Lifetime
             -> IO (FdKey, Bool)
-registerFd_ mgr@(EventManager{..}) cb fd evs lt = do
+registerFd_ mgr@(EventManager{..}) cb !fd !evs lt = do
   u <- newUnique emUniqueSource
   let fd'  = fromIntegral fd
       reg  = FdKey fd u
@@ -352,18 +335,16 @@ registerFd_ mgr@(EventManager{..}) cb fd evs lt = do
   -- i.e. just call the callback if the registration fails.
   when (not ok) (cb reg evs)
   return (reg,modify)
-{-# INLINE registerFd_ #-}
 
 -- | @registerFd mgr cb fd evs lt@ registers interest in the events @evs@
 -- on the file descriptor @fd@ for lifetime @lt@. @cb@ is called for
 -- each event that occurs.  Returns a cookie that can be handed to
 -- 'unregisterFd'.
 registerFd :: EventManager -> IOCallback -> Fd -> Event -> Lifetime -> IO FdKey
-registerFd mgr cb fd evs lt = do
+registerFd mgr cb !fd !evs lt = do
   (r, wake) <- registerFd_ mgr cb fd evs lt
   when wake $ wakeManager mgr
   return r
-{-# INLINE registerFd #-}
 
 {-
     Building GHC with parallel IO manager on Mac freezes when
@@ -392,7 +373,7 @@ eventsOf fdds  = mconcat $ map fdEvents fdds
 -- event manager thread.  The return value indicates whether the event
 -- manager ought to be woken.
 unregisterFd_ :: EventManager -> FdKey -> IO Bool
-unregisterFd_ mgr@(EventManager{..}) (FdKey fd u) =
+unregisterFd_ mgr@(EventManager{..}) (FdKey !fd u) =
   withMVar (callbackTableVar mgr fd) $ \tbl -> do
     let dropReg = nullToNothing . filter ((/= u) . keyUnique . fdKey)
         fd' = fromIntegral fd

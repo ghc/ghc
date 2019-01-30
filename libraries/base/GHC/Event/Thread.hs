@@ -35,7 +35,7 @@ import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
                     boundsIOArray)
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import GHC.Event.Control (controlWriteFd)
-import GHC.Event.Internal (eventIs, evtClose)
+import GHC.Event.Internal (eventIs, evtClose, evtNothing)
 import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
                              new, registerFd, unregisterFd_)
 import qualified GHC.Event.Manager as M
@@ -53,7 +53,7 @@ import System.Posix.Types (Fd)
 -- when the delay has expired, but the thread will never continue to
 -- run /earlier/ than specified.
 threadDelay :: Int -> IO ()
-threadDelay usecs = mask_ $ do
+threadDelay !usecs = mask_ $ do
   mgr <- getSystemTimerManager
   m <- newEmptyMVar
   reg <- TM.registerTimeout mgr usecs (putMVar m ())
@@ -77,7 +77,6 @@ registerDelay usecs = do
 -- that has been used with 'threadWaitRead', use 'closeFdWith'.
 threadWaitRead :: Fd -> IO ()
 threadWaitRead = threadWait evtRead
-{-# INLINE threadWaitRead #-}
 
 -- | Block the current thread until the given file descriptor can
 -- accept data to write.
@@ -87,7 +86,6 @@ threadWaitRead = threadWait evtRead
 -- that has been used with 'threadWaitWrite', use 'closeFdWith'.
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite = threadWait evtWrite
-{-# INLINE threadWaitWrite #-}
 
 -- | Close a file descriptor in a concurrency-safe way.
 --
@@ -112,7 +110,7 @@ closeFdWith close fd = do
     zipWithM f xs ys = sequence (zipWith f xs ys)
 
 threadWait :: Event -> Fd -> IO ()
-threadWait evt fd = mask_ $ do
+threadWait !evt !fd = mask_ $ do
   m <- newEmptyMVar
   mgr <- getSystemEventManager_
   reg <- registerFd mgr (\_ e -> putMVar m e) fd evt M.OneShot
@@ -126,16 +124,15 @@ blockedOnBadFD :: SomeException
 blockedOnBadFD = toException $ errnoToIOError "awaitEvent" eBADF Nothing Nothing
 
 threadWaitSTM :: Event -> Fd -> IO (STM (), IO ())
-threadWaitSTM evt fd = mask_ $ do
-  m <- newTVarIO Nothing
+threadWaitSTM !evt !fd = mask_ $ do
+  m <- newTVarIO evtNothing
   mgr <- getSystemEventManager_
-  reg <- registerFd mgr (\_ e -> atomically (writeTVar m (Just e))) fd evt M.OneShot
+  reg <- registerFd mgr (\_ e -> atomically (writeTVar m e)) fd evt M.OneShot
   let waitAction =
-        do mevt <- readTVar m
-           case mevt of
-             Nothing -> retry
-             Just evt' ->
-               if evt' `eventIs` evtClose
+        do evt' <- readTVar m
+           if evt' == evtNothing
+             then retry
+             else if evt' `eventIs` evtClose
                then throwSTM $ errnoToIOError "threadWaitSTM" eBADF Nothing Nothing
                else return ()
   return (waitAction, unregisterFd_ mgr reg >> return ())
@@ -150,7 +147,6 @@ threadWaitSTM evt fd = mask_ $ do
 -- that has been used with 'threadWaitReadSTM', use 'closeFdWith'.
 threadWaitReadSTM :: Fd -> IO (STM (), IO ())
 threadWaitReadSTM = threadWaitSTM evtRead
-{-# INLINE threadWaitReadSTM #-}
 
 -- | Allows a thread to use an STM action to wait until a file descriptor can accept a write.
 -- The STM action will retry while the file until the given file descriptor can accept a write.
@@ -162,7 +158,6 @@ threadWaitReadSTM = threadWaitSTM evtRead
 -- that has been used with 'threadWaitWriteSTM', use 'closeFdWith'.
 threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
 threadWaitWriteSTM = threadWaitSTM evtWrite
-{-# INLINE threadWaitWriteSTM #-}
 
 
 -- | Retrieve the system event manager for the capability on which the

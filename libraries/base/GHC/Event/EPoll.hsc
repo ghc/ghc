@@ -1,8 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving
-           , NoImplicitPrelude
-           , BangPatterns
-  #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -16,28 +15,26 @@
 --
 -----------------------------------------------------------------------------
 
+#include "EventConfig.h"
+
 module GHC.Event.EPoll
     (
-      new
-    , available
+#if defined(HAVE_EPOLL)
+      BackendState
+    , new
+    , poll
+    , modifyFd
+    , modifyFdOnce
+    , delete
+#endif
     ) where
 
-import qualified GHC.Event.Internal as E
 
-#include "EventConfig.h"
-#if !defined(HAVE_EPOLL)
-import GHC.Base
-
-new :: IO E.Backend
-new = errorWithoutStackTrace "EPoll back end not implemented for this platform"
-
-available :: Bool
-available = False
-{-# INLINE available #-}
-#else
+#if defined(HAVE_EPOLL)
 
 #include <sys/epoll.h>
 
+import qualified GHC.Event.Internal as E
 import Data.Bits (Bits, FiniteBits, (.|.), (.&.))
 import Data.Word (Word32)
 import Foreign.C.Error (eNOENT, getErrno, throwErrno,
@@ -57,32 +54,24 @@ import System.Posix.Types (Fd(..))
 import qualified GHC.Event.Array    as A
 import           GHC.Event.Internal (Timeout(..))
 
-available :: Bool
-available = True
-{-# INLINE available #-}
-
-data EPoll = EPoll {
+data BackendState = BackendState {
       epollFd     :: {-# UNPACK #-} !EPollFd
     , epollEvents :: {-# UNPACK #-} !(A.Array Event)
     }
 
 -- | Create a new epoll backend.
-new :: IO E.Backend
-new = do
-  epfd <- epollCreate
-  evts <- A.new 64
-  let !be = E.backend poll modifyFd modifyFdOnce delete (EPoll epfd evts)
-  return be
+new :: IO BackendState
+new = liftA2 BackendState epollCreate (A.new 64)
 
-delete :: EPoll -> IO ()
-delete be = do
+delete :: BackendState -> IO ()
+delete !be = do
   _ <- c_close . fromEPollFd . epollFd $ be
   return ()
 
 -- | Change the set of events we are interested in for a given file
 -- descriptor.
-modifyFd :: EPoll -> Fd -> E.Event -> E.Event -> IO Bool
-modifyFd ep fd oevt nevt =
+modifyFd :: BackendState -> Fd -> E.Event -> E.Event -> IO Bool
+modifyFd !ep !fd !oevt !nevt =
   with (Event (fromEvent nevt) fd) $ \evptr -> do
     epollControl (epollFd ep) op fd evptr
     return True
@@ -90,8 +79,8 @@ modifyFd ep fd oevt nevt =
            | nevt == mempty = controlOpDelete
            | otherwise      = controlOpModify
 
-modifyFdOnce :: EPoll -> Fd -> E.Event -> IO Bool
-modifyFdOnce ep fd evt =
+modifyFdOnce :: BackendState -> Fd -> E.Event -> IO Bool
+modifyFdOnce !ep !fd !evt =
   do let !ev = fromEvent evt .|. epollOneShot
      res <- with (Event ev fd) $
             epollControl_ (epollFd ep) controlOpModify fd
@@ -107,11 +96,11 @@ modifyFdOnce ep fd evt =
 -- | Select a set of file descriptors which are ready for I/O
 -- operations and call @f@ for all ready file descriptors, passing the
 -- events that are ready.
-poll :: EPoll                     -- ^ state
+poll :: BackendState              -- ^ state
      -> Maybe Timeout             -- ^ timeout in milliseconds
      -> (Fd -> E.Event -> IO ())  -- ^ I/O callback
      -> IO Int
-poll ep mtimeout f = do
+poll !ep mtimeout f = do
   let events = epollEvents ep
       fd = epollFd ep
 
@@ -193,7 +182,7 @@ epollCreate = do
   return epollFd'
 
 epollControl :: EPollFd -> ControlOp -> Fd -> Ptr Event -> IO ()
-epollControl epfd op fd event =
+epollControl !epfd op !fd !event =
     throwErrnoIfMinus1_ "epollControl" $ epollControl_ epfd op fd event
 
 epollControl_ :: EPollFd -> ControlOp -> Fd -> Ptr Event -> IO CInt
@@ -201,27 +190,27 @@ epollControl_ (EPollFd epfd) (ControlOp op) (Fd fd) event =
     c_epoll_ctl epfd op fd event
 
 epollWait :: EPollFd -> Ptr Event -> Int -> Int -> IO Int
-epollWait (EPollFd epfd) events numEvents timeout =
+epollWait (EPollFd !epfd) !events !numEvents !timeout =
     fmap fromIntegral .
     E.throwErrnoIfMinus1NoRetry "epollWait" $
     c_epoll_wait epfd events (fromIntegral numEvents) (fromIntegral timeout)
 
 epollWaitNonBlock :: EPollFd -> Ptr Event -> Int -> IO Int
-epollWaitNonBlock (EPollFd epfd) events numEvents =
+epollWaitNonBlock (EPollFd !epfd) !events !numEvents =
   fmap fromIntegral .
   E.throwErrnoIfMinus1NoRetry "epollWaitNonBlock" $
   c_epoll_wait_unsafe epfd events (fromIntegral numEvents) 0
 
 fromEvent :: E.Event -> EventType
-fromEvent e = remap E.evtRead  epollIn .|.
-              remap E.evtWrite epollOut
+fromEvent !e = remap E.evtRead  epollIn .|.
+               remap E.evtWrite epollOut
   where remap evt to
             | e `E.eventIs` evt = to
             | otherwise         = 0
 
 toEvent :: EventType -> E.Event
-toEvent e = remap (epollIn  .|. epollErr .|. epollHup) E.evtRead `mappend`
-            remap (epollOut .|. epollErr .|. epollHup) E.evtWrite
+toEvent !e = remap (epollIn  .|. epollErr .|. epollHup) E.evtRead `mappend`
+             remap (epollOut .|. epollErr .|. epollHup) E.evtWrite
   where remap evt to
             | e .&. evt /= 0 = to
             | otherwise      = mempty
@@ -243,5 +232,5 @@ foreign import ccall safe "sys/epoll.h epoll_wait"
 
 foreign import ccall unsafe "sys/epoll.h epoll_wait"
     c_epoll_wait_unsafe :: CInt -> Ptr Event -> CInt -> CInt -> IO CInt
-#endif /* defined(HAVE_EPOLL) */
 
+#endif
