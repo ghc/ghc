@@ -993,7 +993,7 @@ tcInferApps mode orig_hs_ty fun_ty orig_fun_ki orig_hs_args
       (HsArgPar _ : args, _) -> go n subst fun fun_ki args
 
       -- Next argument is a kind application (fun @ki)
-      (HsTypeArg ki_arg : args, Just (ki_binder, inner_ki)) ->
+      (HsTypeArg _ ki_arg : args, Just (ki_binder, inner_ki)) ->
         case tyCoBinderArgFlag ki_binder of
         Inferred -> instantiate ki_binder inner_ki
         Specified ->
@@ -1026,8 +1026,8 @@ tcInferApps mode orig_hs_ty fun_ty orig_fun_ki orig_hs_args
                        ; ty_app_err ki_arg $ nakedSubstTy subst fun_ki }
 
         -- no binder; try applying the substitution, or fail if that's not possible
-      (HsTypeArg ki_arg : _, Nothing) -> try_again_after_substing_or $
-                                         ty_app_err ki_arg substed_fun_ki
+      (HsTypeArg _ ki_arg : _, Nothing) -> try_again_after_substing_or $
+                                           ty_app_err ki_arg substed_fun_ki
 
       -- normal argument (fun ty)
       (HsValArg arg : args, Just (ki_binder, inner_ki))
@@ -1086,7 +1086,8 @@ tcInferApps mode orig_hs_ty fun_ty orig_fun_ki orig_hs_args
 appTypeToArg :: LHsType GhcRn -> [LHsTypeArg GhcRn] -> LHsType GhcRn
 appTypeToArg f [] = f
 appTypeToArg f (HsValArg arg : args) = appTypeToArg (mkHsAppTy f arg) args
-appTypeToArg f (HsTypeArg arg : args) = appTypeToArg (mkHsAppKindTy f arg) args
+appTypeToArg f (HsTypeArg l arg : args)
+  = appTypeToArg (mkHsAppKindTy l f arg) args
 appTypeToArg f (HsArgPar _ : arg) = appTypeToArg f arg
 
 -- | Applies a type to a list of arguments.
