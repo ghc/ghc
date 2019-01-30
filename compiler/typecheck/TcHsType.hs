@@ -924,9 +924,6 @@ tcInferApps :: TcTyMode
             -> TcType               -- ^ Function
             -> [LHsTypeArg GhcRn]   -- ^ Args
             -> TcM (TcType, TcKind) -- ^ (f args, args, result kind)
--- Precondition: tcTypeKind fun = fun_ki
---    Reason: we will return a type application like (fun arg1 ... argn),
---            and that type must be well-kinded
 tcInferApps mode orig_hs_ty fun orig_hs_args
   = do { traceTc "tcInferApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
        ; (f_args, res_k) <- go_init 1 fun orig_hs_args
@@ -934,25 +931,33 @@ tcInferApps mode orig_hs_ty fun orig_hs_args
        ; return (f_args, res_k) }
   where
 
+    -- go_init just initialises the auxiliary
+    -- arguments of the 'go' loop
     go_init n fun all_args
       = go n fun empty_subst fun_ki all_args
       where
-        fun_ki      = tcTypeKind fun
-        empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
-                       tyCoVarsOfType fun_ki
+        fun_ki = tcTypeKind fun
+           -- We do (tcTypeKind fun) here, even though the caller
+           -- knows the function kind, to absolutely guarantee
+           -- INVARIANT for 'go'
+           -- Note that in a typical application (F t1 t2 t3),
+           -- the 'fun' is just a TyCon, so tcTypeKind is fast
 
-    go :: Int             -- the # of the next argument
-       -> TcType          -- function applied to some args
-       -> TCvSubst        -- instantiating substitution: applies function kind
-       -> TcKind          -- function kind
-       -> [LHsTypeArg GhcRn] -- un-type-checked args
-       -> TcM (TcType, TcKind)  -- same as overall return type
+        empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
+                      tyCoVarsOfType fun_ki
+
+    go :: Int             -- The # of the next argument
+       -> TcType          -- Function applied to some args
+       -> TCvSubst        -- Applies to function kind
+       -> TcKind          -- Function kind
+       -> [LHsTypeArg GhcRn]    -- Un-type-checked args
+       -> TcM (TcType, TcKind)  -- Result type and its kind
     -- INVARIANT: in any call (go n fun subst fun_ki args)
     --               tcTypeKind fun  =  subst(fun_ki)
     -- So the 'subst' and 'fun_ki' arguments are simply
     -- there to avoid repeatedly calling tcTypeKind.
     --
-    -- Reason for the invariant: to support the Purely Kinded Invariant,
+    -- Reason for INVARIANT: to support the Purely Kinded Type Invariant
     -- it's important that if fun_ki has a forall, then so does
     -- (tcTypeKind fun), because the next thing we are going to do
     -- is apply 'fun' to an argument type.
@@ -960,16 +965,13 @@ tcInferApps mode orig_hs_ty fun orig_hs_args
     -- Dispatch on all_args first, for performance reasons
     go n fun subst fun_ki all_args = case (all_args, tcSplitPiTy_maybe fun_ki) of
 
-      ----------------
-      -- No user-written args left. We're done!
+      ---------------- No user-written args left. We're done!
       ([], _) -> return (fun, substTy subst fun_ki)
 
-      ----------------
-      -- We don't care about parens here
+      ---------------- HsArgPar: We don't care about parens here
       (HsArgPar _ : args, _) -> go n fun subst fun_ki args
 
-      ----------------
-      -- Next argument is a kind application (fun @ki)
+      ---------------- HsTypeArg: a kind application (fun @ki)
       (HsTypeArg hs_ki_arg : hs_args, Just (ki_binder, inner_ki)) ->
         case tyCoBinderArgFlag ki_binder of
         Inferred  -> -- FunTy with PredTy on LHS, or ForAllTy with Inferred
@@ -1008,8 +1010,7 @@ tcInferApps mode orig_hs_ty fun orig_hs_args
       (HsTypeArg ki_arg : _, Nothing) -> try_again_after_substing_or $
                                          ty_app_err ki_arg substed_fun_ki
 
-      ----------------
-      -- Next argument is a normal argument (fun ty)
+      ---------------- HsValArg: a nomal argument (fun ty)
       (HsValArg arg : args, Just (ki_binder, inner_ki))
         -- next binder is invisible; need to instantiate it
         | isInvisibleBinder ki_binder   -- FunTy with PredTy on LHS;
