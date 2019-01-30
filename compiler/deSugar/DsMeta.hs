@@ -596,9 +596,9 @@ repTyArgs f [] = f
 repTyArgs f (HsValArg ty : as) = do { f' <- f
                                     ; ty' <- repLTy ty
                                     ; repTyArgs (repTapp f' ty') as }
-repTyArgs f (HsTypeArg ki : as) = do { f' <- f
-                                     ; ki' <- repLTy ki
-                                     ; repTyArgs (repTappKind f' ki') as }
+repTyArgs f (HsTypeArg _ ki : as) = do { f' <- f
+                                       ; ki' <- repLTy ki
+                                       ; repTyArgs (repTappKind f' ki') as }
 repTyArgs f (HsArgPar _ : as) = repTyArgs f as
 
 repDataFamInstD :: DataFamInstDecl GhcRn -> DsM (Core TH.DecQ)

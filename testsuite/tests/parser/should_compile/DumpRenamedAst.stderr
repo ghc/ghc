@@ -536,6 +536,7 @@
                 {Name: DumpRenamedAst.F1})
                (Nothing)
                [(HsTypeArg
+                 { DumpRenamedAst.hs:24:6-11 }
                  ({ DumpRenamedAst.hs:24:7-11 }
                   (HsTyVar
                    (NoExt)
@@ -565,7 +566,7 @@
                    (NoExt)
                    ({ DumpRenamedAst.hs:24:19-26 }
                     (HsAppKindTy
-                     (NoExt)
+                     { DumpRenamedAst.hs:24:21-26 }
                      ({ DumpRenamedAst.hs:24:19 }
                       (HsTyVar
                        (NoExt)
