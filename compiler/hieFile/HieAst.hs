@@ -44,6 +44,7 @@ import SrcLoc
 import TcEvidence
 import Type                       ( Type, isEvVarType, mkFunTys)
 import Var                        ( Id, Var, EvVar, setVarName, varName, varType )
+import TcRnTypes                  ( TcGblEnv(..) )
 
 import VarSet
 import UniqSet
@@ -83,8 +84,8 @@ data HieState = HieState
   , hie_ev_vars    :: VarEnv SrcSpan
   }
 
-initState :: HieState
-initState = HieState emptyNameEnv emptyBag mempty
+initState :: Bag EvBind -> HieState
+initState top_ev_binds = HieState emptyNameEnv top_ev_binds mempty
 
 class ModifyState a where -- See Note [Name Remapping]
   addSubstitution :: a -> a -> HieState -> HieState
@@ -144,6 +145,7 @@ addConDets (RecCon r)     = addPatterns $ map (hsRecFieldArg . unLoc) (rec_flds 
 
 explainWrapper :: HsWrapper -> Maybe (HieM ())
 explainWrapper (WpEvApp e@(EvExpr a)) = Just $ do
+      liftIO $ putStrLn $ "-----------------------------"
       liftIO $ putStrLn $ "Evidence of " ++ showSDocUnsafe (ppr (exprType a))
       bs <- asks hie_ev_binds
       vs <- asks hie_ev_vars
@@ -151,6 +153,7 @@ explainWrapper (WpEvApp e@(EvExpr a)) = Just $ do
       liftIO $ putStrLn $ showSDocUnsafe $ ppr bs
       liftIO $ putStrLn $ "Constructed using: "
       for_ (nonDetEltsUniqSet $ findRootEvVars bmap $ evVarsOfTerm e) $ \v -> do
+        liftIO $ putStrLn $ "============================="
         liftIO $ putStrLn $ "Evidence of " ++ showSDocUnsafe (ppr (varType v))
         liftIO $ putStrLn $ "Evidence variable: " ++ showSDocUnsafe (ppr v)
         liftIO $ putStrLn $ "Introduced at: " ++ show (lookupVarEnv vs v)
@@ -187,6 +190,9 @@ mkHieFile :: ModSummary
 mkHieFile ms ts rs = do
   let tc_binds = tcg_binds ts
   (asts', arr) <- getCompressedAsts tc_binds rs
+  let ts = tcg_binds tce
+      top_ev_binds = tcg_ev_binds tce
+  (asts', arr) <- getCompressedAsts ts rs top_ev_binds
   let Just src_file = ml_hs_file $ ms_location ms
   src <- liftIO $ BS.readFile src_file
   return $ HieFile
@@ -199,14 +205,16 @@ mkHieFile ms ts rs = do
       , hie_hs_src = src
       }
 
-getCompressedAsts :: TypecheckedSource -> RenamedSource
+getCompressedAsts :: TypecheckedSource -> RenamedSource -> Bag EvBind
   -> Hsc (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat)
-getCompressedAsts ts rs = do
-  asts <- enrichHie ts rs
+getCompressedAsts ts rs top_ev_binds = do
+  asts <- enrichHie ts rs top_ev_binds
   return $ compressTypes asts
 
-enrichHie :: TypecheckedSource -> RenamedSource -> Hsc (HieASTs Type)
-enrichHie ts (hsGrp, imports, exports, _) = flip runReaderT initState $ do
+enrichHie :: TypecheckedSource -> RenamedSource -> Bag EvBind
+  -> Hsc (HieASTs Type)
+enrichHie ts (hsGrp, imports, exports, _) ev_bs =
+  flip runReaderT (initState ev_bs) $ do
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
     rasts <- processGrp hsGrp
     imps <- toHie $ filter (not . ideclImplicit . unLoc) imports
