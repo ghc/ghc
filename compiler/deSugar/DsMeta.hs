@@ -61,6 +61,7 @@ import ForeignCall
 import Util
 import Maybes
 import MonadUtils
+--import TcRnMonad (newSysName)
 
 import Data.ByteString ( unpack )
 import Control.Monad
@@ -1251,20 +1252,20 @@ repRole _ = panic "repRole: Impossible Match" -- due to #15884
 repSplice :: HsSplice GhcRn -> DsM (Core a)
 -- See Note [How brackets and nested splices are handled] in TcSplice
 -- We return a CoreExpr of any old type; the context should know
-repSplice (HsTypedSplice   _ _ n _) = rep_splice n
-repSplice (HsUntypedSplice _ _ n _) = rep_splice n
-repSplice (HsQuasiQuote _ n _ _ _)  = rep_splice n
+repSplice (HsTypedSplice   _ _ n _) = rep_splice n undefined
+repSplice (HsUntypedSplice _ _ n e) = rep_splice n e
+repSplice (HsQuasiQuote _ n _ _ _)  = rep_splice n undefined
 repSplice e@(HsSpliced {})          = pprPanic "repSplice" (ppr e)
 repSplice e@(HsSplicedT {})         = pprPanic "repSpliceT" (ppr e)
 repSplice e@(XSplice {})            = pprPanic "repSplice" (ppr e)
 
-rep_splice :: Name -> DsM (Core a)
-rep_splice splice_name
+rep_splice :: Name -> LHsExpr GhcRn -> DsM (Core a)
+rep_splice splice_name exp
  = do { mb_val <- dsLookupMetaEnv splice_name
        ; case mb_val of
            Just (DsSplice e) -> do { e' <- dsExpr e
                                    ; return (MkC e') }
-           _ -> pprPanic "HsSplice" (ppr splice_name) }
+           _ -> repLE exp >>= repSpliceC }
                         -- Should not happen; statically checked
 
 -----------------------------------------------------------------------------
@@ -1283,7 +1284,7 @@ repLE (dL->L loc e) = putSrcSpanDs loc (repE e)
 repE :: HsExpr GhcRn -> DsM (Core TH.ExpQ)
 repE (HsVar _ (dL->L _ x)) =
   do { mb_val <- dsLookupMetaEnv x
-     ; case mb_val of
+     ; case pprTrace "x" (ppr x) mb_val of
         Nothing            -> do { str <- globalVar x
                                  ; repVarOrCon x str }
         Just (DsBound y)   -> repVarOrCon x (coreVar y)
@@ -1415,23 +1416,41 @@ repE (HsUnboundVar _ uv)   = do
 --repE (HsBracket _ e) = notHandled "brack" (ppr e)
 --repE (HsRnBracketOut _ (ExpBr _ e) []) = repLE e >>= repBracket []
 repE (HsRnBracketOut _ (ExpBr _ e) ts) =
-  do { (ss,ds) <- repBinds (pendingSplicesToBinds ts)
-     ; e2 <- addBinds ss (repLE e)
-     ; z <- repBracket ds e2
-     ; wrapGenSyms ss z }
+  do { sp_rep <- pendingSplicesToBinds ts
+     ; e2 <- repLE e
+     ; repBracket sp_rep e2
+     }
 repE e@(HsCoreAnn {})      = notHandled "Core annotations" (ppr e)
 repE e@(HsSCC {})          = notHandled "Cost centres" (ppr e)
 repE e@(HsTickPragma {})   = notHandled "Tick Pragma" (ppr e)
 repE e                     = notHandled "Expression form" (ppr e)
 
-pendingSplicesToBinds :: [PendingRnSplice] -> HsLocalBinds GhcRn
-pendingSplicesToBinds ps =
-    HsValBinds noExt $ XValBindsLR $
-      (NValBinds
-        [(NonRecursive, (listToBag $ map do_one ps))]
-        [])
+pendingSplicesToBinds :: [PendingRnSplice GhcRn]
+                      -> DsM (Core [(TH.Name, TH.ExpQ)])
+pendingSplicesToBinds ps = do
+  name_ty <- lookupType nameTyConName
+  exp_ty <-  lookupType expTyConName
+  q_ty    <- dsLookupTyCon qTyConName
+  let ty = mkTyConApp q_ty [mkTupleTy Boxed [name_ty, exp_ty]]
+  coreList' ty <$> (mapM do_one ps)
   where
-    do_one (PendingRnSplice _ sp e) = mkVarBind sp e
+
+    do_one (PendingRnSplice _ _ sp e) = do
+     n <- globalVar sp
+     e' <- repLE e
+     repPendingSplice n e'
+
+    {-
+    mk_splice e = do
+      n <- newSysName (mkVarOcc "splice")
+      return $ HsSpliceE noExt (HsUntypedSplice noExt HasParens n e)
+      -}
+
+--mkUntypedSplice :: SpliceDecoration -> LHsExpr (GhcPass p) -> HsSplice GhcPs
+--mkUntypedSplice hasParen e = HsUntypedSplice noExt hasParen unqualSplice e
+
+--mkHsSpliceE :: SpliceDecoration -> LHsExpr (GhcPass p) -> HsExpr (GhcPass p)
+--mkHsSpliceE hasParen e = HsSpliceE noExt (mkUntypedSplice hasParen e)
 
 -----------------------------------------------------------------------------
 -- Building representations of auxillary structures like Match, Clause, Stmt,
@@ -2174,6 +2193,9 @@ repRecUpd (MkC e) (MkC fs) = rep2 recUpdEName [e,fs]
 repFieldExp :: Core TH.Name -> Core TH.ExpQ -> DsM (Core (TH.Q TH.FieldExp))
 repFieldExp (MkC n) (MkC x) = rep2 fieldExpName [n,x]
 
+repPendingSplice :: Core TH.Name -> Core TH.ExpQ -> DsM (Core ((TH.Name, TH.ExpQ)))
+repPendingSplice (MkC n) (MkC x) = rep2 fieldExpName [n,x]
+
 repInfixApp :: Core TH.ExpQ -> Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repInfixApp (MkC x) (MkC y) (MkC z) = rep2 infixAppName [x,y,z]
 
@@ -2186,8 +2208,11 @@ repSectionR (MkC x) (MkC y) = rep2 sectionRName [x,y]
 repImplicitParamVar :: Core String -> DsM (Core TH.ExpQ)
 repImplicitParamVar (MkC x) = rep2 implicitParamVarEName [x]
 
-repBracket :: Core [TH.DecQ] -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
+repBracket :: Core [(TH.Name, TH.ExpQ)] -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repBracket (MkC ds) (MkC e) = rep2 brackEName [ds, e]
+
+repSpliceC :: Core TH.ExpQ -> DsM (Core a)
+repSpliceC (MkC e) = rep2 spliceEName [e]
 
 ------------ Right hand sides (guarded expressions) ----
 repGuarded :: Core [TH.Q (TH.Guard, TH.Exp)] -> DsM (Core TH.BodyQ)

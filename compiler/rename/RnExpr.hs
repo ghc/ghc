@@ -97,9 +97,10 @@ finishHsVar :: Located Name -> RnM (HsExpr GhcRn, FreeVars)
 -- when renaming infix expressions
 finishHsVar (L l name)
  = do { this_mod <- getModule
-      ; when (nameIsLocalOrFrom this_mod name) $
-        checkThLocalName name
-      ; return (HsVar noExt (L l name), unitFV name) }
+      ; name' <- if (nameIsLocalOrFrom this_mod name)
+                  then checkThLocalName name
+                  else return name
+      ; return (HsVar noExt (L l name'), unitFV name) }
 
 rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar v
@@ -414,9 +415,35 @@ rnExpr (HsProc x pat body)
 -- Ideally, these would be done in parsing, but to keep parsing simple, we do it here.
 rnExpr e@(HsArrApp {})  = arrowFail e
 rnExpr e@(HsArrForm {}) = arrowFail e
+rnExpr (HsRnBracketOut ext b ss) = do
+  rnPendingSplices ss $ \ss' -> do
+    (b', fvs) <- rnHsBracketOut b
+    return (HsRnBracketOut ext b' ss', fvs)
+
 
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
         -- HsWrap
+
+rnHsBracketOut :: HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
+rnHsBracketOut (ExpBr ext lhs_expr) = do
+  (e', fvs) <- rnLExpr lhs_expr
+  return (ExpBr ext e', fvs)
+rnHsBracketOut _ = panic "rnHsBracketOut"
+
+rnPendingSplices :: [PendingRnSplice GhcPs] -> ([PendingRnSplice GhcRn] -> RnM (a, FreeVars)) -> RnM (a, FreeVars)
+rnPendingSplices ps act = do
+  (ps', fvs) <- mapFvRn do_one ps
+  (res, fvs') <- bindLocalNamesFV (map get_sp_names ps') $ act ps'
+  return (res, unionNameSet fvs fvs')
+  where
+    do_one :: PendingRnSplice GhcPs -> RnM (PendingRnSplice GhcRn, FreeVars)
+    do_one (PendingRnSplice l t sp e) = do
+      sp' <- lookupOccRn sp
+      (e', fvs) <- rnLExpr e
+      return (PendingRnSplice l t sp' e', fvs)
+
+    get_sp_names :: PendingRnSplice GhcRn -> Name
+    get_sp_names (PendingRnSplice _ _ sp _) = sp
 
 hsHoleExpr :: HsExpr (GhcPass id)
 hsHoleExpr = HsUnboundVar noExt (TrueExprHole (mkVarOcc "_"))

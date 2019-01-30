@@ -36,7 +36,7 @@ import Control.Monad    ( unless, when )
 import {-# SOURCE #-} RnExpr   ( rnLExpr )
 
 import TcEnv            ( checkWellStaged )
-import THNames          ( liftName, liftExpName )
+import THNames          ( liftName )
 
 import DynFlags
 import FastString
@@ -56,6 +56,7 @@ import {-# SOURCE #-} TcSplice
     )
 
 import TcHsSyn
+import Data.List
 
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
@@ -112,8 +113,38 @@ rnBracket e br_body
                           setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
                                    rn_bracket cur_stage br_body
                         ; pendings <- readMutVar ps_var
-                        ; return (HsRnBracketOut noExt body' pendings, fvs_e) }
+                        ; final_pendings <- case cur_stage of
+                            Brack l (RnPendingUntyped outer_ps_var)
+                              -> do
+                                let (now_pendings, later_pendings)
+                                      = splitPendings (thLevel l + 1) pendings
+                                pprTrace "pendings" (ppr (thLevel l) $$ ppr pendings $$ ppr now_pendings $$ ppr later_pendings) (return ())
+                                (later_pendings_final, now_pendings_new) <- mapAndUnzipM delaySplice later_pendings
+                                next_pendings <- readMutVar outer_ps_var
+                                writeMutVar outer_ps_var (later_pendings_final ++ next_pendings)
+                                return (now_pendings ++ now_pendings_new)
+                            _ -> return pendings
+
+                        ; return (HsRnBracketOut noExt body' final_pendings, fvs_e) }
        }
+
+
+delaySplice :: PendingRnSplice GhcRn -> RnM (PendingRnSplice GhcRn, PendingRnSplice GhcRn)
+delaySplice p@(PendingRnSplice l f _ e) = do
+  new_name <- newSysName (mkVarOcc "splice")
+  return (PendingRnSplice l f new_name e, newPending new_name p)
+
+-- Make a splice which looks like x = y
+newPending :: Name -> PendingRnSplice GhcRn -> PendingRnSplice GhcRn
+newPending new_sp (PendingRnSplice l f sp _) = PendingRnSplice l f sp (nlHsVar new_sp)
+
+splitPendings :: Int -> [PendingRnSplice GhcRn] -> ([PendingRnSplice GhcRn], [PendingRnSplice GhcRn])
+splitPendings lvl ps = partition do_one ps
+  where
+    do_one (PendingRnSplice l _ _ _)
+      | l < lvl = False
+      | l == lvl = True
+      | otherwise = panic "splitPendings"
 
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
 rn_bracket outer_stage br@(VarBr x flg rdr_name)
@@ -187,10 +218,12 @@ quotationCtxtDoc br_body
   = hang (text "In the Template Haskell quotation")
          2 (ppr br_body)
 
+{-
 illegalBracket :: SDoc
 illegalBracket =
     text "Template Haskell brackets cannot be nested" <+>
     text "(without intervening splices)"
+    -}
 
 illegalTypedBracket :: SDoc
 illegalTypedBracket =
@@ -244,7 +277,7 @@ We don't want the type checker to see these bogus unbound variables.
 
 rnSpliceGen :: (HsSplice GhcRn -> RnM (a, FreeVars))
                                             -- Outside brackets, run splice
-            -> (HsSplice GhcRn -> (PendingRnSplice, a))
+            -> (HsSplice GhcRn -> (PendingRnSplice GhcRn, a))
                                             -- Inside brackets, make it pending
             -> HsSplice GhcPs
             -> RnM (a, FreeVars)
@@ -341,11 +374,11 @@ runRnSplice flavour run_meta ppr_res splice
 ------------------
 makePending :: UntypedSpliceFlavour
             -> HsSplice GhcRn
-            -> PendingRnSplice
+            -> PendingRnSplice GhcRn
 makePending flavour (HsUntypedSplice _ _ n e)
-  = PendingRnSplice flavour n e
+  = PendingRnSplice 0 flavour n e
 makePending flavour (HsQuasiQuote _ n quoter q_span quote)
-  = PendingRnSplice flavour n (mkQuasiQuoteExpr flavour quoter q_span quote)
+  = PendingRnSplice 0 flavour n (mkQuasiQuoteExpr flavour quoter q_span quote)
 makePending _ splice@(HsTypedSplice {})
   = pprPanic "makePending" (ppr splice)
 makePending _ splice@(HsSpliced {})
@@ -399,10 +432,11 @@ rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
           -- Rename the quoter; akin to the HsVar case of rnExpr
         ; quoter' <- lookupOccRn quoter
         ; this_mod <- getModule
-        ; when (nameIsLocalOrFrom this_mod quoter') $
-          checkThLocalName quoter'
+        ; quoter'' <- if (nameIsLocalOrFrom this_mod quoter')
+                        then checkThLocalName quoter'
+                        else return quoter'
 
-        ; return (HsQuasiQuote x splice_name' quoter' q_loc quote
+        ; return (HsQuasiQuote x splice_name' quoter'' q_loc quote
                                                              , unitFV quoter') }
 
 rnSplice splice@(HsSpliced {}) = pprPanic "rnSplice" (ppr splice)
@@ -414,7 +448,7 @@ rnSpliceExpr :: HsSplice GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnSpliceExpr splice
   = rnSpliceGen run_expr_splice pend_expr_splice splice
   where
-    pend_expr_splice :: HsSplice GhcRn -> (PendingRnSplice, HsExpr GhcRn)
+    pend_expr_splice :: HsSplice GhcRn -> (PendingRnSplice GhcRn, HsExpr GhcRn)
     pend_expr_splice rn_splice
         = (makePending UntypedExpSplice rn_splice, HsSpliceE noExt rn_splice)
 
@@ -608,7 +642,7 @@ rnSplicePat splice
   = rnSpliceGen run_pat_splice pend_pat_splice splice
   where
     pend_pat_splice :: HsSplice GhcRn ->
-                       (PendingRnSplice, Either b (Pat GhcRn))
+                       (PendingRnSplice GhcRn, Either b (Pat GhcRn))
     pend_pat_splice rn_splice
       = (makePending UntypedPatSplice rn_splice
         , Right (SplicePat noExt rn_splice))
@@ -772,16 +806,16 @@ illegalTypedSplice = text "Typed splices may not appear in untyped brackets"
 illegalUntypedSplice :: SDoc
 illegalUntypedSplice = text "Untyped splices may not appear in typed brackets"
 
-checkThLocalName :: Name -> RnM ()
+checkThLocalName :: Name -> RnM Name
 checkThLocalName name
   | isUnboundName name   -- Do not report two errors for
-  = return ()            --   $(not_in_scope args)
+  = return name            --   $(not_in_scope args)
 
   | otherwise
   = do  { traceRn "checkThLocalName" (ppr name)
         ; mb_local_use <- getStageAndBindLevel name
         ; case mb_local_use of {
-             Nothing -> return () ;  -- Not a locally-bound thing
+             Nothing -> return name ;  -- Not a locally-bound thing
              Just (top_lvl, bind_lvl, use_stage) ->
     do  { let use_lvl = thLevel use_stage
         ; checkWellStaged (quotes (ppr name)) bind_lvl use_lvl
@@ -792,7 +826,7 @@ checkThLocalName name
 
 --------------------------------------
 checkCrossStageLifting :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel
-                       -> Name -> TcM ()
+                       -> Name -> TcM Name
 -- We are inside brackets, and (use_lvl > bind_lvl)
 -- Now we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [| x |]
@@ -804,13 +838,13 @@ checkCrossStageLifting :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel
 checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name
   | Brack _ (RnPendingUntyped ps_var) <- use_stage   -- Only for untyped brackets
   , use_lvl > bind_lvl                               -- Cross-stage condition
-  = check_cross_stage_lifting top_lvl (use_lvl - bind_lvl) name ps_var
+  = check_cross_stage_lifting top_lvl bind_lvl (use_lvl - bind_lvl) name ps_var
   | otherwise
-  = return ()
+  = return name
 
-check_cross_stage_lifting :: TopLevelFlag -> Int
-                          -> Name -> TcRef [PendingRnSplice] -> TcM ()
-check_cross_stage_lifting top_lvl lift_by name ps_var
+check_cross_stage_lifting :: TopLevelFlag -> Int -> Int
+                          -> Name -> TcRef [PendingRnSplice GhcRn] -> TcM Name
+check_cross_stage_lifting top_lvl lift_to lift_by name ps_var
   | isTopLevel top_lvl
         -- Top-level identifiers in this module,
         -- (which have External Names)
@@ -819,7 +853,7 @@ check_cross_stage_lifting top_lvl lift_by name ps_var
         -- E.g.  this is fine:
         --   f x = x
         --   g y = [| f 3 |]
-  = when (isExternalName name) (keepAlive name)
+  = when (isExternalName name) (keepAlive name) >> return name
     -- See Note [Keeping things alive for Template Haskell]
 
   | otherwise
@@ -834,19 +868,24 @@ check_cross_stage_lifting top_lvl lift_by name ps_var
         -- matter, although it's a mite untidy.
     do  { traceRn "checkCrossStageLifting" (ppr name)
 
+        ; n' <- newLocalBndrRn (noLoc (Unqual (getOccName name)))
+        ; pprTrace "check" (ppr (isExact_maybe (getRdrName n'))) (return ())
+
           -- Construct the (lift x) expression
         ; let lift_expr   = (mkLiftExpr lift_by name)
-              pend_splice = PendingRnSplice UntypedExpSplice name lift_expr
+              pend_splice = PendingRnSplice lift_to UntypedExpSplice n' lift_expr
 
+        ; pprTrace "lift_expr" (ppr lift_expr $$ ppr pend_splice) (return ())
           -- Update the pending splices
         ; ps <- readMutVar ps_var
-        ; writeMutVar ps_var (pend_splice : ps) }
+        ; writeMutVar ps_var (pend_splice : ps)
+        ; return n' }
 
 mkLiftExpr :: Int -> Name -> LHsExpr GhcRn
 -- The 0 case is never called externally, only by recursion.
 mkLiftExpr 0 var = nlHsVar var
-mkLiftExpr 1 var = nlHsPar $ nlHsApp (nlHsVar liftName) (mkLiftExpr 0 var)
-mkLiftExpr n var = nlHsPar $ nlHsApp (nlHsVar liftExpName ) (mkLiftExpr (n-1) var)
+mkLiftExpr _n var = nlHsPar $ nlHsApp (nlHsVar liftName) (mkLiftExpr 0 var)
+--mkLiftExpr n var = nlHsPar $ nlHsApp (nlHsVar liftExpName ) (mkLiftExpr (n-1) var)
 
 {-
 Note [Keeping things alive for Template Haskell]

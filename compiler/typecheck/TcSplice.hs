@@ -143,7 +143,7 @@ import GHC.Exts         ( unsafeCoerce# )
 -}
 
 tcTypedBracket   :: HsExpr GhcRn -> HsBracket GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
-tcUntypedBracket :: HsExpr GhcRn -> HsBracket GhcRn -> [PendingRnSplice] -> ExpRhoType
+tcUntypedBracket :: HsExpr GhcRn -> HsBracket GhcRn -> [PendingRnSplice GhcRn] -> ExpRhoType
                  -> TcM (HsExpr GhcTcId)
 tcSpliceExpr     :: HsSplice GhcRn  -> ExpRhoType -> TcM (HsExpr GhcTcId)
         -- None of these functions add constraints to the LIE
@@ -212,8 +212,8 @@ tcBrackTy (TExpBr {})   = panic "tcUntypedBracket: Unexpected TExpBr"
 tcBrackTy (XBracket {}) = panic "tcUntypedBracket: Unexpected XBracket"
 
 ---------------
-tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
-tcPendingSplice (PendingRnSplice flavour splice_name expr)
+tcPendingSplice :: PendingRnSplice GhcRn -> TcM PendingTcSplice
+tcPendingSplice (PendingRnSplice _l flavour splice_name expr)
   = do { res_ty <- tcMetaTy meta_ty_name
        ; expr' <- tcMonoExpr expr (mkCheckExpType res_ty)
        ; return (PendingTcSplice splice_name expr') }

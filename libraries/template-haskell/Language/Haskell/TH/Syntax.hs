@@ -710,7 +710,10 @@ liftString :: String -> Q Exp
 liftString s = return (LitE (StringL s))
 
 liftExp :: Q Exp -> Q Exp
-liftExp qe = qe >>= \e -> [| return  $(lift e) |]
+liftExp = lift
+
+instance Lift a => Lift (Q a) where
+  lift qe = qe >>= \b' -> lift b' >>= \b'' -> return ((VarE 'return) `AppE` b'')
 
 -- | @since 2.15.0.0
 instance Lift a => Lift (NonEmpty a) where
@@ -1672,7 +1675,8 @@ data Exp
                                        -- or constructor name.
   | LabelE String                      -- ^ @{ #x }@ ( Overloaded label )
   | ImplicitParamVarE String           -- ^ @{ ?x }@ ( Implicit parameter )
-  | BracketE [Dec] Exp                        -- TH Bracket
+  | BracketE [(Name, Exp)] Exp                        -- TH Bracket
+  | SpliceE Exp                        -- ^ $(abc)
   deriving( Show, Eq, Ord, Data, Generic )
 
 type FieldExp = (Name,Exp)
