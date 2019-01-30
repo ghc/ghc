@@ -1,0 +1,10 @@
+
+T16255.hs:13:3: error:
+    • Illegal oversaturated visible kind argument: ‘@Bool’
+    • In the equations for closed type family ‘F1’
+      In the type family declaration for ‘F1’
+
+T16255.hs:21:3: error:
+    • Illegal oversaturated visible kind argument: ‘@Symbol’
+    • In the equations for closed type family ‘F2’
+      In the type family declaration for ‘F2’
