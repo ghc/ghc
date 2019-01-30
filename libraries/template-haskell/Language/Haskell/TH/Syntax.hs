@@ -709,9 +709,6 @@ liftString :: String -> Q Exp
 -- Used in TcExpr to short-circuit the lifting for strings
 liftString s = return (LitE (StringL s))
 
-liftExp :: Q Exp -> Q Exp
-liftExp = lift
-
 instance Lift a => Lift (Q a) where
   lift qe = qe >>= \b' -> lift b' >>= \b'' -> return ((VarE 'return) `AppE` b'')
 
@@ -2170,49 +2167,3 @@ thenCmp :: Ordering -> Ordering -> Ordering
 thenCmp EQ o2 = o2
 thenCmp o1 _  = o1
 
--- Lift Instances
-deriving instance Lift Exp
-deriving instance Lift Name
-deriving instance Lift Lit
-deriving instance Lift OccName
-deriving instance Lift NameFlavour
-deriving instance Lift Type
-deriving instance Lift Pat
-deriving instance Lift ModName
-deriving instance Lift TyVarBndr
-deriving instance Lift TyLit
-deriving instance Lift NameSpace
-deriving instance Lift PkgName
-deriving instance Lift Match
-deriving instance Lift Body
-deriving instance Lift Guard
-deriving instance Lift Stmt
-deriving instance Lift Dec
-deriving instance Lift Clause
-deriving instance Lift Range
-deriving instance Lift Con
-deriving instance Lift Bang
-deriving instance Lift DerivClause
-deriving instance Lift DerivStrategy
-deriving instance Lift SourceUnpackedness
-deriving instance Lift SourceStrictness
-deriving instance Lift FunDep
-deriving instance Lift Overlap
-deriving instance Lift Foreign
-deriving instance Lift Callconv
-deriving instance Lift Fixity
-deriving instance Lift FixityDirection
-deriving instance Lift Safety
-deriving instance Lift Pragma
-deriving instance Lift Inline
-deriving instance Lift RuleMatch
-deriving instance Lift Phases
-deriving instance Lift RuleBndr
-deriving instance Lift AnnTarget
-deriving instance Lift TySynEqn
-deriving instance Lift TypeFamilyHead
-deriving instance Lift FamilyResultSig
-deriving instance Lift InjectivityAnn
-deriving instance Lift Role
-deriving instance Lift PatSynArgs
-deriving instance Lift PatSynDir
