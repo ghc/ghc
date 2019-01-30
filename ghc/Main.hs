@@ -31,7 +31,7 @@ import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 
 -- Frontend plugins
 #if defined(GHCI)
-import DynamicLoading   ( loadFrontendPlugin )
+import DynamicLoading   ( loadFrontendPlugin, initializePlugins  )
 import Plugins
 #else
 import DynamicLoading   ( pluginError )
@@ -56,7 +56,6 @@ import Util
 import Panic
 import UniqSupply
 import MonadUtils       ( liftIO )
-import DynamicLoading   ( initializePlugins )
 
 -- Imports for --abi-hash
 import LoadIface           ( loadUserInterface )
