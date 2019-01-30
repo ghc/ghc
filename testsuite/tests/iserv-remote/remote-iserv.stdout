@@ -1,0 +1,4 @@
+[1 of 2] Compiling Lib              ( Lib.hs, Lib.o )
+[2 of 2] Compiling Main             ( Main.hs, Main.o )
+Listening on port 2051
+Linking Main ...

@@ -107,7 +107,8 @@ main = do
     putStrLn ("Trying to connect to " ++ host_ip ++ ":" ++ (show port))
   out_pipe <- connectTo host_ip port >>= socketToPipe
 
-  putStrLn "Starting proxy"
+  when verbose $
+    putStrLn "Starting proxy"
   proxy verbose in_pipe out_pipe
 
 -- | A hook, to transform outgoing (proxy -> slave)

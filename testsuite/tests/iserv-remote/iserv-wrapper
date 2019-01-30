@@ -1,0 +1,12 @@
+#!/bin/bash
+PORT=$(($((5000+$RANDOM)) % 10000))
+
+(>&2 echo "starting remote-iserv on port $PORT")
+
+./inst/bin/remote-iserv tmp $PORT &
+REMOTE="$!"
+
+(>&2 echo "starting iserv-proxy with $@")
+./inst/bin/iserv-proxy $@ 127.0.0.1 $PORT
+
+kill $REMOTE

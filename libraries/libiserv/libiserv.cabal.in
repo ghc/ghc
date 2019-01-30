@@ -33,7 +33,7 @@ Library
     if flag(network)
        Exposed-Modules: Remote.Message
                       , Remote.Slave
-       Build-Depends: network    >= 2.6 && < 2.7,
+       Build-Depends: network    >= 2.6 && < 3,
                       directory  >= 1.3 && < 1.4,
                       filepath   >= 1.4 && < 1.5
 
