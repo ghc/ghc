@@ -1,6 +1,6 @@
 @echo off
 set CABAL=cabal
-set CABFLAGS=--disable-documentation --disable-profiling --disable-library-profiling
+set CABFLAGS=--disable-documentation --disable-profiling
 
 rem It is currently more robust to pass Cabal an absolute path to the project file.
 set PROJ="%CD%/hadrian/cabal.project"

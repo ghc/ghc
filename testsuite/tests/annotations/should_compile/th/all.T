@@ -6,9 +6,9 @@
 test('annth_make',
      [extra_files(['AnnHelper.hs', 'TestModule.hs', 'TestModuleTH.hs', 'annth.hs']),
       req_interp, omit_ways(prof_ways), unless(have_dynamic(), skip)],
-     makefile_test, ['annth_make'])
+     run_command, ['$MAKE -s --no-print-directory annth_make'])
 
 test('annth_compunits',
      [extra_files(['AnnHelper.hs', 'TestModule.hs', 'TestModuleTH.hs', 'annth.hs']),
       req_interp, omit_ways(prof_ways), unless(have_dynamic(), skip)],
-     makefile_test, ['annth_compunits'])
+     run_command, ['$MAKE -s --no-print-directory annth_compunits'])

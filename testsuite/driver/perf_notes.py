@@ -13,7 +13,6 @@ import argparse
 import re
 import subprocess
 import time
-import sys
 
 from collections import namedtuple
 from math import ceil, trunc
@@ -42,7 +41,7 @@ def is_worktree_dirty():
 # The metrics (a.k.a stats) are named tuples, PerfStat, in this form:
 #
 # ( test_env : 'val',      # Test environment.
-#   test     : 'val',      # Name of the test
+#   test     : 'val',      # Name of the test 
 #   way      : 'val',
 #   metric   : 'val',      # Metric being recorded
 #   value    : 'val',      # The statistic result e.g. runtime
@@ -74,21 +73,6 @@ def get_perf_stats(commit='HEAD', namespace='perf'):
     log = [parse_perf_stat(stat_str) for stat_str in log]
     return log
 
-# Check if a str is in a 40 character git commit hash.
-# str -> bool
-_commit_hash_re = re.compile('[0-9a-f]' * 40)
-def is_commit_hash(hash):
-    return _commit_hash_re.fullmatch(hash) != None
-
-# Convert a <ref> to a commit hash code.
-# str -> str
-def commit_hash(commit):
-    if is_commit_hash(commit):
-        return commit
-    return subprocess.check_output(['git', 'rev-parse', commit], \
-            stderr=subprocess.STDOUT) \
-            .decode() \
-            .strip()
 
 # Get allowed changes to performance. This is extracted from the commit message of
 # the given commit in this form:
@@ -99,20 +83,13 @@ def commit_hash(commit):
 #           'metrics': ['metricA', 'metricB', ...],
 #           'opts': {
 #                   'optionA': 'string value',
-#                   'optionB': 'string value',          # e.g. test_env: "x86_64-linux"
+#                   'optionB': 'string value',
 #                   ...
 #               }
 #   }
-_get_allowed_perf_changes_cache = {}
 def get_allowed_perf_changes(commit='HEAD'):
-    global _get_allowed_perf_changes_cache
-    commit =  commit_hash(commit)
-    if not commit in _get_allowed_perf_changes_cache:
-        commitByteStr = subprocess.check_output(\
-            ['git', '--no-pager', 'log', '-n1', '--format=%B', commit])
-        _get_allowed_perf_changes_cache[commit] \
-            = parse_allowed_perf_changes(commitByteStr.decode())
-    return _get_allowed_perf_changes_cache[commit]
+    commitByteStr = subprocess.check_output(['git', '--no-pager', 'log', '-n1', '--format=%B', commit])
+    return parse_allowed_perf_changes(commitByteStr.decode())
 
 def parse_allowed_perf_changes(commitMsg):
     # Helper regex. Non-capturing unless postfixed with Cap.
@@ -125,7 +102,7 @@ def parse_allowed_perf_changes(commitMsg):
     exp = (r"^Metric"
         +s+r"(Increase|Decrease)"
         +s+r"?("+qstr+r"|"+qstrList+r")?"                   # Metric or list of metrics.s..
-        +s+r"?(\(" + r"(?:[^')]|"+qstr+r")*" + r"\))?"      # Options surrounded in parenthesis. (allow parenthases in quoted strings)
+        +s+r"?(\(" + r"(?:[^')]|"+qstr+r")*" + r"\))?"      # Options surounded in parenthesis. (allow parenthases in quoted strings))
         +s+r"?:?"                                           # Optional ":"
         +s+r"?((?:(?!\n\n)(?!\n[^\s])(?:.|\n))*)"           # Test names. Stop parsing on empty or non-indented new line.
         )
@@ -236,175 +213,10 @@ def append_perf_stat(stats, commit='HEAD', namespace='perf', max_tries=5):
         tries += 1
         time.sleep(1)
 
-    print("\nAn error occurred while writing the performance metrics to git notes.\n \
-            This is usually due to a lock-file existing somewhere in the git repo.")
+    print("\nAn error occured while writing the performance metrics to git notes.\n \
+	​            This is usually due to a lock-file existing somewhere in the git repo.")
 
     return False
-
-#
-# Baseline calculation
-#
-
-# Max number of ancestor commits to search when compiling a baseline performance metric.
-BaselineSearchDepth = 75
-
-# The git notes name space for local results.
-LocalNamespace = "perf"
-
-# The git notes name space for ci results.
-CiNamespace = "ci/" + LocalNamespace
-
-# (isCalculated, best fit ci test_env or None)
-BestFitCiTestEnv = (False, None)
-
-# test_env string or None
-def best_fit_ci_test_env():
-    global BestFitCiTestEnv
-    if not BestFitCiTestEnv[0]:
-        platform = sys.platform
-        isArch64 = sys.maxsize > 2**32
-        arch = "x86_64" if isArch64 else "i386"
-
-        if platform.startswith("linux"):
-            test_env = arch + "-linux-deb9"
-        elif platform.startswith("win32"):
-            # There are no windows CI test results.
-            test_env = None
-        elif isArch64 and platform.startswith("darwin"):
-            test_env = arch + "-darwin"
-        elif isArch64 and platform.startswith("freebsd"):
-            test_env = arch + "-freebsd"
-        else:
-            test_env = None
-
-        BestFitCiTestEnv = (True, test_env)
-
-    return BestFitCiTestEnv[1]
-
-_baseline_depth_commit_log = {}
-
-# Get the commit hashes for the last BaselineSearchDepth commits from and
-# including the input commit. The output commits are all commit hashes.
-# str -> [str]
-def baseline_commit_log(commit):
-    global _baseline_depth_commit_log
-    commit = commit_hash(commit)
-    if not commit in _baseline_depth_commit_log:
-        _baseline_depth_commit_log[commit] = \
-            subprocess.check_output(['git', 'log', '--format=%H', \
-                             '-n' + str(BaselineSearchDepth)]) \
-                .decode().split('\n')
-    return _baseline_depth_commit_log[commit]
-
-# Cache of baseline values. This is a dict of dicts indexed on:
-# (useCiNamespace, commit) -> (test_env, test, metric, way) -> baseline
-# (bool          , str   ) -> (str     , str , str   , str) -> float
-_commit_metric_cache = {}
-
-# Get the baseline (expected value) of a test at a given commit. This searches
-# git notes from older commits for recorded metrics (locally and from ci). More
-# recent commits are favoured, then local results over ci results are favoured.
-#
-# commit: str - must be a commit hash (see commit_has())
-# name: str - test name
-# test_env: str - test environment (note a best fit test_env will be used
-#                      instead when looking for ci results)
-# metric: str - test metric
-# way: str - test way
-# returns: the baseline float or None if no metric was found within
-#          BaselineSearchDepth commits and since the last expected change.
-def baseline_metric(commit, name, test_env, metric, way):
-    # For performance reasons (in order to avoid calling commit_hash), we assert
-    # commit is already a commit hash.
-    assert is_commit_hash(commit)
-
-    # Get all recent commit hashes.
-    commit_hashes = baseline_commit_log(commit)
-
-    # TODO PERF use git log to get hashes of all BaselineSearchDepth commits
-    def depth_to_commit(depth):
-        return commit_hashes[depth]
-
-    def has_expected_change(commit):
-        return get_allowed_perf_changes(commit).get(name) \
-                != None
-
-    # Bool -> String
-    def namespace(useCiNamespace):
-        return CiNamespace if useCiNamespace else LocalNamespace
-
-    ci_test_env = best_fit_ci_test_env()
-
-    # gets the metric of a given commit
-    # (Bool, Int) -> (float | None)
-    def commit_metric(useCiNamespace, currentCommit):
-        global _commit_metric_cache
-
-        # Get test environment.
-        effective_test_env = ci_test_env if useCiNamespace else test_env
-        if effective_test_env == None:
-            # This can happen when no best fit ci test is found.
-            return None
-
-        # Check for cached value.
-        cacheKeyA = (useCiNamespace, currentCommit)
-        cacheKeyB = (effective_test_env, name, metric, way)
-        if cacheKeyA in _commit_metric_cache:
-            return _commit_metric_cache[cacheKeyA].get(cacheKeyB)
-
-        # Cache miss.
-        # Calculate baselines from the current commit's git note.
-        # Note that the git note may contain data for other tests. All tests'
-        # baselines will be collected and cached for future use.
-        allCommitMetrics = get_perf_stats(
-                                currentCommit,
-                                namespace(useCiNamespace))
-
-        # Collect recorded values by cacheKeyB.
-        values_by_cache_key_b = {}
-        for perfStat in allCommitMetrics:
-            currentCacheKey = (perfStat.test_env, perfStat.test, \
-                               perfStat.metric, perfStat.way)
-            currentValues = values_by_cache_key_b.setdefault(currentCacheKey, [])
-            currentValues.append(float(perfStat.value))
-
-        # Calculate and baseline (average of values) by cacheKeyB.
-        baseline_by_cache_key_b = {}
-        for currentCacheKey, currentValues in values_by_cache_key_b.items():
-            baseline_by_cache_key_b[currentCacheKey] = \
-                    sum(currentValues) / len(currentValues)
-
-        # Save baselines to the cache.
-        _commit_metric_cache[cacheKeyA] = baseline_by_cache_key_b
-        return baseline_by_cache_key_b.get(cacheKeyB)
-
-    # Searches through previous commits trying local then ci for each commit in.
-    def search(useCiNamespace, depth):
-        # Stop if reached the max search depth, or if
-        # there is an expected change at the child commit (depth-1). This is a
-        # subtlety: Metrics recorded on commit x incorporate the expected
-        # changes for commit x. Hence metrics from x are still a valid baseline,
-        # while older commits are not. This is why we check for expected changes
-        # on depth-1 rather than depth.
-        if depth >= BaselineSearchDepth or has_expected_change( \
-                        depth_to_commit(depth - 1)):
-            return None
-
-        # Check for a metric on this commit.
-        current_metric = commit_metric(useCiNamespace, depth_to_commit(depth))
-        if current_metric != None:
-            return current_metric
-
-        # Metric is not available.
-        # If tried local, now try CI. Else move to the parent commit.
-        if not useCiNamespace:
-            return search(True, depth)
-        else:
-            return search(False, depth + 1)
-
-    # Start search from parent commit using local name space.
-    return search(False, 1)
-
 
 # Check test stats. This prints the results for the user.
 # actual: the PerfStat with actual value.

@@ -4,4 +4,5 @@ test('T12010',
         only_ways(['threaded1']),
         extra_ways(['threaded1']),
         cmd_prefix('WAY_FLAGS="' + ' '.join(config.way_flags['threaded1']) + '"')],
-     makefile_test, [])
+     run_command,
+     ['$MAKE -s --no-print-directory T12010'])

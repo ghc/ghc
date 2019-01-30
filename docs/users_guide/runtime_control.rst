@@ -241,28 +241,6 @@ Miscellaneous RTS options
     crashes if exception handling are enabled. In order to get more information
     in compiled executables, C code or DLLs symbols need to be available.
 
-
-.. rts-flag:: -xp
-
-    On 64-bit machines, the runtime linker usually needs to map object code
-    into the low 2Gb of the address space, due to the x86_64 small memory model
-    where most symbol references are 32 bits. The problem is that this 2Gb of
-    address space can fill up, especially if you're loading a very large number
-    of object files into GHCi.
-
-    This flag offers a workaround, albeit a slightly convoluted one. To be able
-    to load an object file outside of the low 2Gb, the object code needs to be
-    compiled with ``-fPIC -fexternal-dynamic-refs``. When the ``+RTS -xp`` flag
-    is passed, the linker will assume that all object files were compiled with
-    ``-fPIC -fexternal-dynamic-refs`` and load them anywhere in the address
-    space. It's up to you to arrange that the object files you load (including
-    all packages) were compiled in the right way. If this is not the case for
-    an object, the linker will probably fail with an error message when the
-    problem is detected.
-
-    On some platforms where PIC is always the case, e.g. x86_64 MacOS X, this
-    flag is enabled by default.
-
 .. rts-flag:: -xm ⟨address⟩
 
     .. index::
@@ -272,10 +250,8 @@ Miscellaneous RTS options
 
         This option is for working around memory allocation
         problems only. Do not use unless GHCi fails with a message like
-        “\ ``failed to mmap() memory below 2Gb``\ ”. Consider recompiling
-        the objects with ``-fPIC -fexternal-dynamic-refs`` and using the
-        ``-xp`` flag instead. If you need to use this option to get GHCi
-        working on your machine, please file a bug.
+        “\ ``failed to mmap() memory below 2Gb``\ ”. If you need to use this
+        option to get GHCi working on your machine, please file a bug.
 
     On 64-bit machines, the RTS needs to allocate memory in the low 2Gb
     of the address space. Support for this across different operating

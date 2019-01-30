@@ -93,7 +93,7 @@ test('T4321',
      omit_ways(['ghci']),
      compile_and_run, ['-O ' + sse2_opts])
 
-test('T3736', [], makefile_test, ['T3736'])
+test('T3736', [], run_command, ['$MAKE -s --no-print-directory T3736'])
 test('T3738',
      [extra_clean(['T3738a.hi', 'T3738a.o']),
       collect_stats('peak_megabytes_allocated', 0),
@@ -110,14 +110,15 @@ test('MethSharing',
       ],
      compile_and_run,
      ['-O'])
-test('T2902', [], makefile_test, ['T2902'])
+test('T2902', [], run_command, ['$MAKE -s --no-print-directory T2902'])
 test('T149',
      [ # expect_broken(149),
        # working (2 Jul 2013, x86-64/Linux)
       extra_clean(['T149_A',    'T149_B',
                    'T149_A.hi', 'T149_B.hi',
                    'T149_A.o',  'T149_B.o'])],
-     makefile_test, ['T149'])
+     run_command,
+     ['$MAKE -s --no-print-directory T149'])
 
 test('T5113',
      [collect_stats('bytes allocated',5),

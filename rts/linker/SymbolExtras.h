@@ -7,7 +7,7 @@
 
 #if defined(NEED_SYMBOL_EXTRAS)
 
-int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize);
+int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first );
 
 #if defined(arm_HOST_ARCH)
 SymbolExtra* makeArmSymbolExtra( ObjectCode const* oc,

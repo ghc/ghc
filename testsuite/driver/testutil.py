@@ -16,7 +16,7 @@ def strip_quotes(s):
     return s.strip('\'"')
 
 def str_fail(s):
-    return '\033[1m\033[31m' + s + '\033[0m'
+    return '\033[1m\033[43m\033[31m' + s + '\033[0m'
 
 def str_pass(s):
     return '\033[1m\033[32m' + s + '\033[0m'

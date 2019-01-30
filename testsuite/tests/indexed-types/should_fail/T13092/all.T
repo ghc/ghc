@@ -2,4 +2,4 @@
 # with imported ones
 
 test('T13092', extra_files(['A.hs', 'B.hs', 'C.hs', 'Main.hs']),
-     makefile_test, ['T13092'])
+     run_command, ['$MAKE -s --no-print-directory T13092'])

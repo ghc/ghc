@@ -6,7 +6,8 @@ test('heapprof002',
       extra_run_opts('7')],
      compile_and_run, [''])
 
-test('T11489', [req_profiling], makefile_test, ['T11489'])
+test('T11489', [req_profiling], run_command,
+     ['$MAKE -s --no-print-directory T11489'])
 
 # Below this line, run tests only with profiling ways.
 setTestOpts(req_profiling)
@@ -143,8 +144,9 @@ test('toplevel_scc_1',
 
 test('T12962', [], compile_and_run, [''])
 
-test('T14257', [], makefile_test, ['T14257'])
+test('T14257', [], run_command, ['$MAKE -s --no-print-directory T14257'])
 
 test('T15897',
      [extra_ways(['profasm']), only_ways(['profasm']), run_timeout_multiplier(2)],
-     makefile_test, ['T15897'])
+     run_command,
+     ['$MAKE -s --no-print-directory T15897'])
