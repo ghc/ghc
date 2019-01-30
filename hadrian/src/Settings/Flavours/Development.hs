@@ -8,7 +8,10 @@ import {-# SOURCE #-} Settings.Default
 developmentFlavour :: Stage -> Flavour
 developmentFlavour ghcStage = defaultFlavour
     { name = "devel" ++ show (fromEnum ghcStage)
-    , args = defaultBuilderArgs <> developmentArgs ghcStage <> defaultPackageArgs }
+    , args = defaultBuilderArgs <> developmentArgs ghcStage <> defaultPackageArgs
+    , libraryWays = pure [vanilla]
+    , rtsWays = pure [vanilla, threaded]
+    , dynamicGhcPrograms = return False }
 
 developmentArgs :: Stage -> Args
 developmentArgs ghcStage = do

@@ -342,6 +342,8 @@ data Instr
 
     -- bit counting instructions
         | POPCNT      Format Operand Reg -- [SSE4.2] count number of bits set to 1
+        | LZCNT       Format Operand Reg -- [BMI2] count number of leading zeros
+        | TZCNT       Format Operand Reg -- [BMI2] count number of trailing zeros
         | BSF         Format Operand Reg -- bit scan forward
         | BSR         Format Operand Reg -- bit scan reverse
 
@@ -471,6 +473,8 @@ x86_regUsageOfInstr platform instr
     DELTA   _           -> noUsage
 
     POPCNT _ src dst -> mkRU (use_R src []) [dst]
+    LZCNT  _ src dst -> mkRU (use_R src []) [dst]
+    TZCNT  _ src dst -> mkRU (use_R src []) [dst]
     BSF    _ src dst -> mkRU (use_R src []) [dst]
     BSR    _ src dst -> mkRU (use_R src []) [dst]
 
@@ -653,6 +657,8 @@ x86_patchRegsOfInstr instr env
     CLTD _              -> instr
 
     POPCNT fmt src dst -> POPCNT fmt (patchOp src) (env dst)
+    LZCNT  fmt src dst -> LZCNT  fmt (patchOp src) (env dst)
+    TZCNT  fmt src dst -> TZCNT  fmt (patchOp src) (env dst)
     PDEP   fmt src mask dst -> PDEP   fmt (patchOp src) (patchOp mask) (env dst)
     PEXT   fmt src mask dst -> PEXT   fmt (patchOp src) (patchOp mask) (env dst)
     BSF    fmt src dst -> BSF    fmt (patchOp src) (env dst)

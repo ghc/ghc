@@ -28,8 +28,7 @@ test('T12711', only_ways(['ghci']), ghci_script, ['T12711.script'])
 # test('sum_api_annots',
 #      [only_ways(['normal']),
 #       extra_files([ "unboxedsums" + str(i) + ".hs" for i in range(1, 12) ])],
-#      run_command,
-#      ['$MAKE -s --no-print-directory sum_api_annots'])
+#      makefile_test, [])
 
 test('UbxSumLevPoly', normal, compile, [''])
 test('T14051', normal, multi_compile, ['T14051.hs', [('T14051a.hs', '')], '-O2 -v0'])

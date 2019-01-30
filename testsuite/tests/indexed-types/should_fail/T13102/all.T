@@ -2,4 +2,4 @@
 
 test('T13102', [expect_broken(13102),
      extra_files(['A.hs', 'B.hs', 'orphan'])],
-     run_command, ['$MAKE -s --no-print-directory T13102'])
+     makefile_test, ['T13102'])
