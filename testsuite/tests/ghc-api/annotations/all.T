@@ -63,3 +63,5 @@ test('T16212',      [expect_broken(16212),extra_files(['Test16212.hs']),
                      ignore_stderr], makefile_test, ['T16212'])
 test('T16230',      [extra_files(['Test16230.hs']),
                      ignore_stderr], makefile_test, ['T16230'])
+test('T16236',      [extra_files(['Test16236.hs']),
+                     ignore_stderr], makefile_test, ['T16236'])

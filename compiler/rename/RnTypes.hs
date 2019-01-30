@@ -486,9 +486,9 @@ rnLHsTypeArg :: HsDocContext -> LHsTypeArg GhcPs
 rnLHsTypeArg ctxt (HsValArg ty)
    = do { (tys_rn, fvs) <- rnLHsType ctxt ty
         ; return (HsValArg tys_rn, fvs) }
-rnLHsTypeArg ctxt (HsTypeArg ki)
+rnLHsTypeArg ctxt (HsTypeArg l ki)
    = do { (kis_rn, fvs) <- rnLHsKind ctxt ki
-        ; return (HsTypeArg kis_rn, fvs) }
+        ; return (HsTypeArg l kis_rn, fvs) }
 rnLHsTypeArg _ (HsArgPar sp)
    = return (HsArgPar sp, emptyFVs)
 
@@ -636,12 +636,12 @@ rnHsTyKi env (HsAppTy _ ty1 ty2)
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
        ; return (HsAppTy noExt ty1' ty2', fvs1 `plusFV` fvs2) }
 
-rnHsTyKi env (HsAppKindTy _ ty k)
+rnHsTyKi env (HsAppKindTy l ty k)
   = do { kind_app <- xoptM LangExt.TypeApplications
        ; unless kind_app (addErr (typeAppErr "kind" k))
        ; (ty', fvs1) <- rnLHsTyKi env ty
        ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
-       ; return (HsAppKindTy noExt ty' k', fvs1 `plusFV` fvs2) }
+       ; return (HsAppKindTy l ty' k', fvs1 `plusFV` fvs2) }
 
 rnHsTyKi env t@(HsIParamTy _ n ty)
   = do { notInKinds env t
@@ -1632,7 +1632,7 @@ inScope rdr_env rdr = rdr `elemLocalRdrEnv` rdr_env
 
 extract_tyarg :: LHsTypeArg GhcPs -> FreeKiTyVarsWithDups -> FreeKiTyVarsWithDups
 extract_tyarg (HsValArg ty) acc = extract_lty TypeLevel ty acc
-extract_tyarg (HsTypeArg ki) acc = extract_lty KindLevel ki acc
+extract_tyarg (HsTypeArg _ ki) acc = extract_lty KindLevel ki acc
 extract_tyarg (HsArgPar _) acc = acc
 
 extract_tyargs :: [LHsTypeArg GhcPs] -> FreeKiTyVarsWithDups -> FreeKiTyVarsWithDups
