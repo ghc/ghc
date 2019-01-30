@@ -1,3 +1,4 @@
 test('T3007',
      extra_files(['A/', 'B/']),
-     makefile_test, [])
+     run_command,
+     ['$MAKE -s --no-print-directory T3007'])

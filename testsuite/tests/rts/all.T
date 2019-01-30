@@ -64,8 +64,8 @@ test('divbyzero',
      compile_and_run, ['-with-rtsopts="--generate-stack-traces=no"'])
 
 test('outofmem', when(opsys('darwin'), skip),
-                 makefile_test, ['outofmem'])
-test('outofmem2', normal, makefile_test, ['outofmem2'])
+                 run_command, ['$MAKE -s --no-print-directory outofmem'])
+test('outofmem2', normal, run_command, ['$MAKE -s --no-print-directory outofmem2'])
 
 test('T2047', [ignore_stdout, extra_run_opts('+RTS -c -RTS')],
               compile_and_run, ['-package containers'])
@@ -145,15 +145,15 @@ test('traceBinaryEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
 test('EventlogOutput1',
      [ extra_files(["EventlogOutput.hs"]),
        omit_ways(['dyn', 'ghci'] + prof_ways) ],
-     makefile_test, ['EventlogOutput1'])
+     run_command, ['$MAKE -s --no-print-directory EventlogOutput1'])
 
 # Test that -ol flag defaults to <program>.eventlog
 test('EventlogOutput2',
      [ extra_files(["EventlogOutput.hs"]),
        omit_ways(['dyn', 'ghci'] + prof_ways) ],
-     makefile_test, ['EventlogOutput2'])
+     run_command, ['$MAKE -s --no-print-directory EventlogOutput2'])
 
-test('T4059', [], makefile_test, ['T4059'])
+test('T4059', [], run_command, ['$MAKE -s --no-print-directory T4059'])
 
 # Test for #4274
 test('exec_signals',
@@ -164,7 +164,7 @@ test('exec_signals',
 
 test('return_mem_to_os', normal, compile_and_run, [''])
 
-test('T4850', when(opsys('mingw32'), expect_broken(4850)), makefile_test, ['T4850'])
+test('T4850', when(opsys('mingw32'), expect_broken(4850)), run_command, ['$MAKE -s --no-print-directory T4850'])
 
 def config_T5250(name, opts):
     if not (config.arch in ['i386','x86_64']):
@@ -180,7 +180,7 @@ test('T5250', [extra_files(['spalign.c']),
                 omit_ways(['ghci']) ],
               compile_and_run, ['spalign.c'])
 
-test('T5423', [], makefile_test, ['T5423'])
+test('T5423', [], run_command, ['$MAKE -s --no-print-directory T5423'])
 
 # Workaround bug #8458: old dlopen opens sections in the wrong order,
 # so we just accept both orders.
@@ -208,22 +208,22 @@ def checkDynAsm(actual_file, normaliser):
 test('T5435_v_asm_a', [extra_files(['T5435.hs', 'T5435_asm.c']),
                      when(arch('powerpc64') or arch('powerpc64le'),
                           expect_broken(11259))],
-     makefile_test, ['T5435_v_asm_a'])
+     run_command, ['$MAKE -s --no-print-directory T5435_v_asm_a'])
 # this one just needs to run on linux, as darwin/mingw32 are covered
 # by the _a test already.
 test('T5435_v_asm_b', [extra_files(['T5435.hs', 'T5435_asm.c']),
                       when(arch('powerpc64') or arch('powerpc64le'),
                           expect_broken(11259)),
 		      when(opsys('darwin') or opsys('mingw32'), skip)],
-     makefile_test, ['T5435_v_asm_b'])
+     run_command, ['$MAKE -s --no-print-directory T5435_v_asm_b'])
 test('T5435_v_gcc', [extra_files(['T5435.hs', 'T5435_gcc.c']),
                      when(arch('powerpc64') or arch('powerpc64le'),
                           expect_broken(11259))],
-     makefile_test, ['T5435_v_gcc'])
+     run_command, ['$MAKE -s --no-print-directory T5435_v_gcc'])
 test('T5435_dyn_asm', [extra_files(['T5435.hs', 'T5435_asm.c']),
                        check_stdout(checkDynAsm)],
-     makefile_test, ['T5435_dyn_asm'])
-test('T5435_dyn_gcc', extra_files(['T5435.hs', 'T5435_gcc.c']) , makefile_test, ['T5435_dyn_gcc'])
+     run_command, ['$MAKE -s --no-print-directory T5435_dyn_asm'])
+test('T5435_dyn_gcc', extra_files(['T5435.hs', 'T5435_gcc.c']) , run_command, ['$MAKE -s --no-print-directory T5435_dyn_gcc'])
 
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
@@ -235,7 +235,7 @@ test('T6006', [ omit_ways(prof_ways + ['ghci']),
                  # needs it.
                compile_and_run, ['T6006_c.c -no-hs-main'])
 
-test('T7037', [], makefile_test, ['T7037'])
+test('T7037', [], run_command, ['$MAKE -s --no-print-directory T7037'])
 
 test('T7087', exit_code(1), compile_and_run, [''])
 test('T7160', normal, compile_and_run, [''])
@@ -277,7 +277,7 @@ test('T8035', normal, compile_and_run, [''])
 test('linker_unload',
      [extra_files(['LinkerUnload.hs', 'Test.hs']),
       when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259))],
-     makefile_test, ['linker_unload'])
+     run_command, ['$MAKE -s --no-print-directory linker_unload'])
 
 test('T8209', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
@@ -328,13 +328,16 @@ test('overflow2', [ exit_code(251) ], compile_and_run, [''])
 test('overflow3', [ exit_code(251) ], compile_and_run, [''])
 
 test('linker_error1', [extra_files(['linker_error.c']),
-                       ignore_stderr], makefile_test, ['linker_error1'])
+                       ignore_stderr], run_command,
+     ['$MAKE -s --no-print-directory linker_error1'])
 
 test('linker_error2', [extra_files(['linker_error.c']),
-                       ignore_stderr], makefile_test, ['linker_error2'])
+                       ignore_stderr], run_command,
+     ['$MAKE -s --no-print-directory linker_error2'])
 
 test('linker_error3', [extra_files(['linker_error.c']),
-                       ignore_stderr], makefile_test, ['linker_error3'])
+                       ignore_stderr], run_command,
+     ['$MAKE -s --no-print-directory linker_error3'])
 
 def grep_stderr(pattern):
     def wrapper(cmd, pattern=pattern):
@@ -384,12 +387,14 @@ test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
                compile_and_run, [''])
 
-test('T9405', [when(msys(), expect_broken(12714))], makefile_test, ['T9405'])
+test('T9405', [when(msys(), expect_broken(12714))], run_command,
+     ['$MAKE -s --no-print-directory T9405'])
 
 test('T11788', when(ghc_dynamic(), skip),
-              makefile_test, ['T11788'])
+              run_command, ['$MAKE -s --no-print-directory T11788'])
 
-test('T10296a', [req_smp], makefile_test, ['T10296a'])
+test('T10296a', [req_smp], run_command,
+     ['$MAKE -s --no-print-directory T10296a'])
 
 test('T10296b', [only_ways('threaded2')], compile_and_run, [''])
 
@@ -398,10 +403,10 @@ test('numa001', [ extra_run_opts('8'), unless(unregisterised(), extra_ways(['deb
 
 test('T12497', [ unless(opsys('mingw32'), skip)
                ],
-               makefile_test, ['T12497'])
+               run_command, ['$MAKE -s --no-print-directory T12497'])
 
 test('T13617', [ unless(opsys('mingw32'), skip)],
-               makefile_test, ['T13617'])
+               run_command, ['$MAKE -s --no-print-directory T13617'])
 
 # This test sometimes produces out of sequence samples in the profasm way, but
 # not reliably, so we just skip it. See ticket #15065.
@@ -416,7 +421,8 @@ test('T13894', normal, compile_and_run, [''])
 # this test fails with the profasm way on some machines but not others,
 # so we just skip it.
 test('T14497', [omit_ways(['profasm']), multi_cpu_race], compile_and_run, ['-O'])
-test('T14695', [normal, ignore_stderr], makefile_test, ['T14695'])
+test('T14695', [normal, ignore_stderr]
+             , run_command, ['$MAKE -s --no-print-directory T14695'])
 test('T14702', [ ignore_stdout
                , when(unregisterised(), skip)
                , only_ways(['threaded1', 'threaded2'])
@@ -425,7 +431,8 @@ test('T14702', [ ignore_stdout
                , compile_and_run, [''])
 
 test('T14900', normal, compile_and_run, ['-package ghc-compact'])
-test('InternalCounters', normal, makefile_test, ['InternalCounters'])
+test('InternalCounters', normal, run_command,
+  ['$MAKE -s --no-print-directory InternalCounters'])
 test('alloccounter1', normal, compile_and_run,
   [
     # avoid allocating stack chunks, which counts as
@@ -454,7 +461,8 @@ test('keep-cafs-fail',
     filter_stdout_lines('Evaluated a CAF|exit.*'),
     ignore_stderr, # on OS X the shell emits an "Abort trap" message to stderr
   ],
-  makefile_test, ['KeepCafsFail'])
+  run_command,
+  ['$MAKE -s --no-print-directory KeepCafsFail'])
 
 # Test the -fkeep-cafs flag
 test('keep-cafs',
@@ -464,5 +472,6 @@ test('keep-cafs',
     when(platform('powerpc64le-unknown-linux'), expect_broken(11261)),
     when(opsys('freebsd'), expect_broken(16035)),
   ],
-  makefile_test, ['KeepCafs'])
+  run_command,
+  ['$MAKE -s --no-print-directory KeepCafs'])
 

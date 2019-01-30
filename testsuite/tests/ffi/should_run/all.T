@@ -160,11 +160,11 @@ test('T5594', [ omit_ways(['ghci']),
                 # needs it.
                 compile_and_run, ['T5594_c.c -no-hs-main'])
 
-test('Capi_Ctype_001', [extra_files(['Capi_Ctype_A_001.hsc', 'capi_ctype_001.h', 'capi_ctype_001_c.c'])],
-     makefile_test, ['Capi_Ctype_001'])
+test('Capi_Ctype_001', [extra_files(['Capi_Ctype_A_001.hsc', 'capi_ctype_001.h', 'capi_ctype_001_c.c'])], run_command,
+     ['$MAKE -s --no-print-directory Capi_Ctype_001'])
 
-test('Capi_Ctype_002', [extra_files(['Capi_Ctype_A_002.hsc', 'capi_ctype_002_A.h', 'capi_ctype_002_B.h'])],
-     makefile_test, ['Capi_Ctype_002'])
+test('Capi_Ctype_002', [extra_files(['Capi_Ctype_A_002.hsc', 'capi_ctype_002_A.h', 'capi_ctype_002_B.h'])], run_command,
+     ['$MAKE -s --no-print-directory Capi_Ctype_002'])
 
 test('ffi_parsing_001', [omit_ways(['ghci'])], compile_and_run,
      ['ffi_parsing_001_c.c'])

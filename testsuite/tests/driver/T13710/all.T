@@ -1,3 +1,4 @@
 test('T13710',
      [extra_files(['A.hs', 'A.hs-boot', 'B.hs'])],
-     makefile_test, [])
+     run_command,
+     ['$MAKE -s --no-print-directory T13710'])

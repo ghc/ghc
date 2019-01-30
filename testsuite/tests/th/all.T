@@ -51,10 +51,10 @@ test('TH_NestedSplices', [], multimod_compile,
 test('TH_spliceE5_prof',
      [req_profiling, only_ways(['normal']),
       when(ghc_dynamic(), expect_broken(11495))],
-     makefile_test, ['TH_spliceE5_prof'])
+     run_command, ['$MAKE -s --no-print-directory TH_spliceE5_prof'])
 
 test('TH_spliceE5_prof_ext', [req_profiling, only_ways(['normal'])],
-     makefile_test, ['TH_spliceE5_prof_ext'])
+     run_command, ['$MAKE -s --no-print-directory TH_spliceE5_prof_ext'])
 
 test('TH_spliceD1', [], multimod_compile_fail,
      ['TH_spliceD1', '-v0 ' + config.ghc_th_way_flags])
@@ -134,7 +134,8 @@ test('T2713', normal, compile_fail, ['-v0'])
 test('T2674', normal, compile_fail, ['-v0'])
 test('TH_emptycase', normal, compile, ['-v0'])
 
-test('T2386', [only_ways(['normal'])], makefile_test, ['T2386'])
+test('T2386', [only_ways(['normal'])], run_command,
+     ['$MAKE -s --no-print-directory T2386'])
 
 test('T2685', [], multimod_compile, ['T2685', '-v0 ' + config.ghc_th_way_flags])
 
@@ -197,7 +198,8 @@ test('T5452', normal, compile, ['-v0'])
 test('T5434', [], multimod_compile,
      ['T5434', '-v0 -Wall ' + config.ghc_th_way_flags])
 test('T5508', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
-test('TH_Depends', [only_ways(['normal'])], makefile_test, ['TH_Depends'])
+test('TH_Depends', [only_ways(['normal'])], run_command,
+     ['$MAKE -s --no-print-directory TH_Depends'])
 test('T5597', [], multimod_compile, ['T5597', '-v0 ' + config.ghc_th_way_flags])
 test('T5665', [], multimod_compile, ['T5665', '-v0 ' + config.ghc_th_way_flags])
 test('T5700', [], multimod_compile,
@@ -237,7 +239,8 @@ test('T7276a', [ only_ways(['ghci']), combined_output ],
 test('TH_TyInstWhere1', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('TH_TyInstWhere2', normal, compile, ['-v0'])
 
-test('T7445', [only_ways(['normal'])], makefile_test, ['T7445'])
+test('T7445', [only_ways(['normal'])], run_command,
+     ['$MAKE -s --no-print-directory T7445'])
 test('T7532', [], multimod_compile, ['T7532', '-v0 ' + config.ghc_th_way_flags])
 test('T2222', normal, compile, ['-v0'])
 test('T1849', only_ways(['ghci']), ghci_script, ['T1849.script'])
@@ -262,7 +265,8 @@ test('T8186', normal, compile_and_run, ['-v0'])
 
 test('T8333',
      only_ways(['normal']),
-     makefile_test, ['T8333'])
+     run_command,
+     ['$MAKE -s --no-print-directory T8333'])
 
 test('T4124', normal, compile, ['-v0'])
 test('T4128', normal, compile, ['-v0'])
@@ -303,7 +307,9 @@ test('T7484', normal, compile_fail, ['-v0'])
 test('T1476', normal, compile, ['-v0'])
 test('T1476b', normal, compile, ['-v0'])
 test('T8031', normal, compile, ['-v0'])
-test('T8624', only_ways(['normal']), makefile_test, ['T8624'])
+test('T8624', only_ways(['normal']),
+              run_command,
+              ['$MAKE -s --no-print-directory T8624'])
 test('TH_Lift', normal, compile, ['-v0'])
 test('T10047', only_ways(['ghci']), ghci_script, ['T10047.script'])
 test('T10019', only_ways(['ghci']), ghci_script, ['T10019.script'])

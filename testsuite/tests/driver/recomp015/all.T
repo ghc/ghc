@@ -6,5 +6,6 @@ test('recomp015',
        unless(opsys('linux') or opsys('solaris2') or opsys('openbsd'), skip),
        when(arch('arm'), skip),
        when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11323))],
-     makefile_test, [])
+     run_command,
+     ['$MAKE -s --no-print-directory recomp015'])
 

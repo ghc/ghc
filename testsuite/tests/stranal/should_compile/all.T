@@ -36,7 +36,8 @@ test('T9208', when(compiler_debugged(), expect_broken(9208)), compile, [''])
 test('T10694', [ grep_errmsg(r'Str=') ],   compile, ['-dppr-cols=200 -ddump-simpl'])
 test('T11770', [ check_errmsg('OneShot') ], compile, ['-ddump-simpl'])
 
-test('T13031', normal, makefile_test, [])
+test('T13031', normal, run_command,
+         ['$MAKE -s --no-print-directory T13031'])
 
 test('T13077', normal, compile, [''])
 test('T13077a', normal, compile, [''])
@@ -47,4 +48,4 @@ test('T13077a', normal, compile, [''])
 #   don't mention MutVar# and Array# anymore.
 test('T15627',  [ grep_errmsg(r'(wmutVar|warray).*Int#') ], compile, ['-dppr-cols=200 -ddump-simpl'])
 
-test('T16029', normal, makefile_test, [])
+test('T16029', normal, run_command, ['$MAKE -s --no-print-directory T16029'])

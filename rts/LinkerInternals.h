@@ -201,10 +201,6 @@ typedef struct _ObjectCode {
     unsigned long   first_symbol_extra;
     unsigned long   n_symbol_extras;
 #endif
-    /* Additional memory that is preallocated and contiguous with image
-       which can be used used to relocate bss sections. */
-    char* bssBegin;
-    char* bssEnd;
 
     ForeignExportStablePtr *stable_ptrs;
 

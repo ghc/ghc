@@ -2,7 +2,8 @@
 []
 ---Ann before enclosing span problem (should be empty list)---
 [
-
+((Test11018.hs:12:22-31,AnnOpenP), [Test11018.hs:12:21]),
+((Test11018.hs:37:23-31,AnnOpenP), [Test11018.hs:37:22])
 ]
 
 ---Annotations-----------------------
@@ -23,14 +24,14 @@
 ((Test11018.hs:(7,16)-(9,10),AnnDo), [Test11018.hs:7:16-17]),
 ((Test11018.hs:8:3-15,AnnLarrow), [Test11018.hs:8:5-6]),
 ((Test11018.hs:8:3-15,AnnSemi), [Test11018.hs:9:3]),
-((Test11018.hs:(12,1)-(15,7),AnnCloseP), [Test11018.hs:12:32]),
 ((Test11018.hs:(12,1)-(15,7),AnnData), [Test11018.hs:12:1-4]),
 ((Test11018.hs:(12,1)-(15,7),AnnEqual), [Test11018.hs:13:5]),
-((Test11018.hs:(12,1)-(15,7),AnnOpenP), [Test11018.hs:12:21]),
 ((Test11018.hs:(12,1)-(15,7),AnnSemi), [Test11018.hs:17:1]),
 ((Test11018.hs:12:21-32,AnnCloseP), [Test11018.hs:12:32]),
 ((Test11018.hs:12:21-32,AnnOpenP), [Test11018.hs:12:21]),
+((Test11018.hs:12:22-31,AnnCloseP), [Test11018.hs:12:32]),
 ((Test11018.hs:12:22-31,AnnDcolonU), [Test11018.hs:12:24]),
+((Test11018.hs:12:22-31,AnnOpenP), [Test11018.hs:12:21]),
 ((Test11018.hs:12:26,AnnRarrow), [Test11018.hs:12:28-29]),
 ((Test11018.hs:12:26-31,AnnRarrow), [Test11018.hs:12:28-29]),
 ((Test11018.hs:(13,16)-(15,7),AnnCloseC), [Test11018.hs:15:7]),
@@ -123,14 +124,14 @@
 ((Test11018.hs:(32,13)-(34,10),AnnDo), [Test11018.hs:32:13-14]),
 ((Test11018.hs:33:3-14,AnnLarrowU), [Test11018.hs:33:5]),
 ((Test11018.hs:33:3-14,AnnSemi), [Test11018.hs:34:3]),
-((Test11018.hs:(37,1)-(40,7),AnnCloseP), [Test11018.hs:37:32]),
 ((Test11018.hs:(37,1)-(40,7),AnnData), [Test11018.hs:37:1-4]),
 ((Test11018.hs:(37,1)-(40,7),AnnEqual), [Test11018.hs:38:5]),
-((Test11018.hs:(37,1)-(40,7),AnnOpenP), [Test11018.hs:37:22]),
 ((Test11018.hs:(37,1)-(40,7),AnnSemi), [Test11018.hs:42:1]),
 ((Test11018.hs:37:22-32,AnnCloseP), [Test11018.hs:37:32]),
 ((Test11018.hs:37:22-32,AnnOpenP), [Test11018.hs:37:22]),
+((Test11018.hs:37:23-31,AnnCloseP), [Test11018.hs:37:32]),
 ((Test11018.hs:37:23-31,AnnDcolonU), [Test11018.hs:37:25]),
+((Test11018.hs:37:23-31,AnnOpenP), [Test11018.hs:37:22]),
 ((Test11018.hs:37:27,AnnRarrowU), [Test11018.hs:37:29]),
 ((Test11018.hs:37:27-31,AnnRarrowU), [Test11018.hs:37:29]),
 ((Test11018.hs:(38,17)-(40,7),AnnCloseC), [Test11018.hs:40:7]),

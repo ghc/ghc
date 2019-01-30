@@ -54,7 +54,7 @@ test('mul2', normal, compile_and_run, ['-fobject-code'])
 test('quotRem2', normal, compile_and_run, ['-fobject-code'])
 test('T5863', normal, compile_and_run, [''])
 
-test('T7014', [], makefile_test, [])
+test('T7014', [], run_command, ['$MAKE -s --no-print-directory T7014'])
 
 test('T7233', normal, compile_and_run, [''])
 test('NumDecimals', normal, compile_and_run, [''])

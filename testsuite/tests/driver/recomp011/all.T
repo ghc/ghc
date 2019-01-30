@@ -3,4 +3,4 @@
 test('recomp011',
      [extra_files(['Main.hs']),
       when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11260))],
-     makefile_test, [])
+     run_command, ['$MAKE -s --no-print-directory recomp011'])

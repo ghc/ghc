@@ -6,7 +6,6 @@ before_script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
   - git checkout .gitmodules
-  - "git fetch origin refs/notes/perf:refs/notes/ci/perf || true"
 
 stages:
   - lint
@@ -76,7 +75,6 @@ validate-x86_64-linux-deb8-hadrian:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
-    - "git fetch origin refs/notes/perf:refs/notes/ci/perf || true"
   tags:
     - x86_64-linux
 
@@ -99,16 +97,8 @@ validate-x86_64-linux-deb8-hadrian:
       make binary-dist TAR_COMP_OPTS="-1"
       mv ghc-*.tar.xz ghc.tar.xz
     - |
-      # Prepare to push git notes.
-      METRICS_FILE=$(mktemp)
-      git config user.email "ben+ghc-ci@smart-cactus.org"
-      git config user.name "GHC GitLab CI"
-    - |
       THREADS=`mk/detect-cpu-count.sh`
-      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE
-    - |
-      # Push git notes.
-      METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh
+      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml
   dependencies: []
   artifacts:
     reports:
@@ -130,14 +120,12 @@ validate-x86_64-darwin:
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: --with-intree-gmp
-    TEST_ENV: "x86_64-darwin"
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
     - python3 .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
-    - "git fetch origin refs/notes/perf:refs/notes/ci/perf || true"
 
     - bash .gitlab/darwin-init.sh
     - PATH="`pwd`/toolchain/bin:$PATH"
@@ -162,7 +150,6 @@ validate-x86_64-darwin:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
-    - "git fetch origin refs/notes/perf:refs/notes/ci/perf || true"
 
     - bash .circleci/prepare-system.sh
     # workaround for docker permissions
@@ -180,8 +167,6 @@ validate-aarch64-linux-deb9:
   stage: full-build
   image: ghcci/aarch64-linux-deb9:0.1
   allow_failure: true
-  variables:
-    TEST_ENV: "aarch64-linux-deb9"
   artifacts:
     when: always
     expire_in: 2 week
@@ -206,8 +191,6 @@ validate-i386-linux-deb9:
   stage: full-build
   image: ghcci/i386-linux-deb9:0.1
   allow_failure: true
-  variables:
-    TEST_ENV: "i386-linux-deb9"
   artifacts:
     when: always
     expire_in: 2 week
@@ -221,7 +204,6 @@ nightly-i386-linux-deb9:
   allow_failure: true
   variables:
     TEST_TYPE: slowtest
-    TEST_ENV: "i386-linux-deb9"
   artifacts:
     when: always
     expire_in: 2 week
@@ -235,8 +217,6 @@ validate-x86_64-linux-deb9:
   extends: .validate-linux
   stage: build
   image: ghcci/x86_64-linux-deb9:0.2
-  variables:
-    TEST_ENV: "x86_64-linux-deb9"
   artifacts:
     when: always
     expire_in: 2 week
@@ -261,7 +241,6 @@ validate-x86_64-linux-deb9-llvm:
   image: ghcci/x86_64-linux-deb9:0.2
   variables:
     BUILD_FLAVOUR: perf-llvm
-    TEST_ENV: "x86_64-linux-deb9-llvm"
   cache:
     key: linux-x86_64-deb9
 
@@ -269,8 +248,6 @@ validate-x86_64-linux-deb8:
   extends: .validate-linux
   stage: full-build
   image: ghcci/x86_64-linux-deb8:0.1
-  variables:
-    TEST_ENV: "x86_64-linux-deb8"
   cache:
     key: linux-x86_64-deb8
   artifacts:
@@ -281,8 +258,6 @@ validate-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
   image: ghcci/x86_64-linux-fedora27:0.1
-  variables:
-    TEST_ENV: "x86_64-linux-fedora27"
   cache:
     key: linux-x86_64-fedora27
   artifacts:
@@ -294,7 +269,6 @@ validate-x86_64-linux-deb9-integer-simple:
   stage: full-build
   variables:
     INTEGER_LIBRARY: integer-simple
-    TEST_ENV: "x86_64-linux-deb9-integer-simple"
   image: ghcci/x86_64-linux-deb9:0.2
   cache:
     key: linux-x86_64-deb9
@@ -315,7 +289,6 @@ validate-x86_64-linux-deb9-unreg:
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
-    TEST_ENV: "x86_64-linux-deb9-unreg"
   image: ghcci/x86_64-linux-deb9:0.2
   cache:
     key: linux-x86_64-deb9
@@ -341,7 +314,6 @@ validate-x86_64-linux-deb9-unreg:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
-    - "git fetch origin refs/notes/perf:refs/notes/ci/perf || true"
     - bash .gitlab/win32-init.sh
   after_script:
     - rd /s /q tmp
@@ -408,8 +380,8 @@ validate-x86_64-windows:
       - ghc.tar.xz
       - junit.xml
 
-# Note [Cleaning up after shell executor]
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Note [Cleanup on Windows]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 # As noted in [1], gitlab-runner's shell executor doesn't clean up its working
 # directory after builds. Unfortunately, we are forced to use the shell executor
@@ -419,7 +391,7 @@ validate-x86_64-windows:
 #
 # [1] https://gitlab.com/gitlab-org/gitlab-runner/issues/3856
 
-# See Note [Cleanup after shell executor]
+# See Note [Cleanup on Windows]
 cleanup-windows:
   stage: cleanup
   tags:
@@ -440,21 +412,3 @@ cleanup-windows:
     - del %BUILD_DIR%\* /F /Q
     - for /d %%p in (%BUILD_DIR%\*) do rd /Q /S "%%p"
     - exit /b 0
-
-# See Note [Cleanup after shell executor]
-cleanup-darwin:
-  stage: cleanup
-  tags:
-    - x86_64-darwin
-  when: always
-  before_script:
-    - echo "Time to clean up"
-  script:
-    - echo "Let's go"
-  after_script:
-    - BUILD_DIR=$CI_PROJECT_DIR
-    - echo "Cleaning $BUILD_DIR"
-    - cd $HOME
-    - rm -Rf $BUILD_DIR/*
-    - exit 0
-

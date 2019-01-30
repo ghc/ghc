@@ -1,7 +1,9 @@
-test('Orphans', normal, makefile_test, ['Orphans'])
+test('Orphans', normal, run_command, ['$MAKE -s --no-print-directory Orphans'])
 test('DocsInHiFile0',
      extra_files(['DocsInHiFile.hs']),
-     makefile_test, ['DocsInHiFile0'])
+     run_command,
+     ['$MAKE -s --no-print-directory DocsInHiFile0'])
 test('DocsInHiFile1',
      extra_files(['DocsInHiFile.hs']),
-     makefile_test, ['DocsInHiFile1'])
+     run_command,
+     ['$MAKE -s --no-print-directory DocsInHiFile1'])

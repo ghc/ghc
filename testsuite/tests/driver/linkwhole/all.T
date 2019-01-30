@@ -3,4 +3,4 @@ test('linkwhole',
       when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259)),
       when(opsys('freebsd'), expect_broken(16035)),
       when(opsys('mingw32'), skip)],
-     makefile_test, [])
+     run_command, ['$MAKE -s --no-print-directory linkwhole'])

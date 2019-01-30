@@ -19,7 +19,7 @@ test('gadt14', normal, compile, [''])
 test('gadt15', normal, compile, [''])
 test('gadt16', normal, compile, [''])
 
-test('gadt17', [extra_files(['Gadt17_help.hs'])], makefile_test, ['gadt17'])
+test('gadt17', [extra_files(['Gadt17_help.hs'])], run_command, ['$MAKE -s --no-print-directory gadt17'])
 
 test('gadt18', normal, compile, [''])
 test('gadt19', normal, compile, [''])
@@ -27,7 +27,7 @@ test('gadt20', normal, compile, [''])
 test('gadt21', normal, compile_fail, [''])
 test('gadt22', normal, compile, [''])
 
-test('gadt23', [extra_files(['Gadt23_AST.hs'])], makefile_test, ['gadt23'])
+test('gadt23', [extra_files(['Gadt23_AST.hs'])], run_command, ['$MAKE -s --no-print-directory gadt23'])
 
 test('gadt24', normal, compile, [''])
 
@@ -107,7 +107,7 @@ test('FloatEq', normal, compile, [''])
 test('T7205', normal, compile, [''])
 test('T7293', normal, compile_fail, ['-Werror'])
 test('T7294', normal, compile, [''])
-test('T7321', [], makefile_test, [])
+test('T7321', [], run_command, ['$MAKE -s --no-print-directory T7321'])
 test('T7974', normal, compile, [''])
 test('T7558', normal, compile_fail, [''])
 test('T9096', normal, compile, [''])

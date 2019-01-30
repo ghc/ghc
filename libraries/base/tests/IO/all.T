@@ -89,14 +89,14 @@ test('hDuplicateTo001', [], compile_and_run, [''])
 test('countReaders001', [], compile_and_run, [''])
 
 test('concio001', [normal, multi_cpu_race],
-     makefile_test, ['test.concio001'])
+     run_command, ['$MAKE -s --no-print-directory test.concio001'])
 test('concio001.thr', [extra_files(['concio001.hs']), multi_cpu_race],
-     makefile_test, ['test.concio001.thr'])
+     run_command, ['$MAKE -s --no-print-directory test.concio001.thr'])
 
 test('concio002', reqlib('process'), compile_and_run, [''])
 
 test('T2122', [], compile_and_run, [''])
-test('T3307', [], makefile_test, ['T3307-test'])
+test('T3307', [], run_command, ['$MAKE -s --no-print-directory T3307-test'])
 test('T4855', normal, compile_and_run, [''])
 
 test('hSetEncoding001',extra_run_opts('hSetEncoding001.in'), compile_and_run, [''])
@@ -118,7 +118,8 @@ test('encoding003', normal, compile_and_run, [''])
 test('encoding004', extra_files(['encoded-data/']), compile_and_run, [''])
 test('encoding005', normal, compile_and_run, [''])
 
-test('environment001', [], makefile_test, ['environment001-test'])
+test('environment001', [], run_command,
+     ['$MAKE -s --no-print-directory environment001-test'])
 
 test('newline001', [], compile_and_run, [''])
 

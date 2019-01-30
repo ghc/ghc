@@ -1778,7 +1778,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
  * so simply set correct pointer here.
  */
 bool
-ocAllocateExtras_PEi386 ( ObjectCode* oc )
+ocAllocateSymbolExtras_PEi386 ( ObjectCode* oc )
 {
    /* If the ObjectCode was unloaded we don't need a trampoline, it's likely
       an import library so we're discarding it earlier.  */

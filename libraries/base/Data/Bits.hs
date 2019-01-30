@@ -438,9 +438,6 @@ instance Bits Int where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
-    -- We want popCnt# to be inlined in user code so that `ghc -msse4.2`
-    -- can compile it down to a popcnt instruction without an extra function call
-    {-# INLINE popCount #-}
 
     zeroBits = 0
 
@@ -481,16 +478,13 @@ instance Bits Int where
 instance FiniteBits Int where
     finiteBitSize _ = WORD_SIZE_IN_BITS
     countLeadingZeros  (I# x#) = I# (word2Int# (clz# (int2Word# x#)))
-    {-# INLINE countLeadingZeros #-}
     countTrailingZeros (I# x#) = I# (word2Int# (ctz# (int2Word# x#)))
-    {-# INLINE countTrailingZeros #-}
 
 -- | @since 2.01
 instance Bits Word where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
-    {-# INLINE popCount #-}
 
     (W# x#) .&.   (W# y#)    = W# (x# `and#` y#)
     (W# x#) .|.   (W# y#)    = W# (x# `or#`  y#)
@@ -525,9 +519,7 @@ instance Bits Word where
 instance FiniteBits Word where
     finiteBitSize _ = WORD_SIZE_IN_BITS
     countLeadingZeros  (W# x#) = I# (word2Int# (clz# x#))
-    {-# INLINE countLeadingZeros #-}
     countTrailingZeros (W# x#) = I# (word2Int# (ctz# x#))
-    {-# INLINE countTrailingZeros #-}
 
 -- | @since 2.01
 instance Bits Integer where
