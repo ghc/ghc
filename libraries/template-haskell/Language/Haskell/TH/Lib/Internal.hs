@@ -365,10 +365,6 @@ fromThenToE x y z = do { a <- x; b <- y; c <- z;
 brackE :: [Q (Name, Exp)] -> ExpQ -> ExpQ
 brackE ds e = do { ds2 <- sequence ds; e2 <- e; return (BracketE ds2 e2) }
 
-spliceE :: ExpQ -> ExpQ
-spliceE e = do { e2 <- e; return (SpliceE e2) }
-
-
 -------------------------------------------------------------------------------
 -- *   Dec
 

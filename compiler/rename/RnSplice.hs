@@ -94,7 +94,7 @@ rnBracket e br_body
                pprPanic "rnBracket: Renaming bracket when running a splice"
                         (ppr e)
            ; Comp           -> return ()
-           ; Brack {}       -> return () --failWithTc illegalBracket
+           ; Brack {}       -> return ()
            }
 
          -- Brackets are desugared to code that mentions the TH package
@@ -112,39 +112,60 @@ rnBracket e br_body
                         ; (body', fvs_e) <-
                           setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
                                    rn_bracket cur_stage br_body
-                        ; pendings <- readMutVar ps_var
-                        ; final_pendings <- case cur_stage of
-                            Brack l (RnPendingUntyped outer_ps_var)
-                              -> do
-                                let (now_pendings, later_pendings)
-                                      = splitPendings (thLevel l + 1) pendings
-                                pprTrace "pendings" (ppr (thLevel l) $$ ppr pendings $$ ppr now_pendings $$ ppr later_pendings) (return ())
-                                (later_pendings_final, now_pendings_new) <- mapAndUnzipM delaySplice later_pendings
-                                next_pendings <- readMutVar outer_ps_var
-                                writeMutVar outer_ps_var (later_pendings_final ++ next_pendings)
-                                return (now_pendings ++ now_pendings_new)
-                            _ -> return pendings
+
+                        -- Read the ps_var and work out where the splices
+                        -- go
+                        ; final_pendings <- propagateSplices cur_stage ps_var
 
                         ; return (HsRnBracketOut noExt body' final_pendings, fvs_e) }
        }
 
+-- See Note [Propagating Splices]
+propagateSplices :: ThStage -> TcRef [PendingRnSplice] -> TcM [PendingRnSplice]
+propagateSplices cur_stage ps_var = do
+  pendings <- readMutVar ps_var
+  case cur_stage of
+    Brack l (RnPendingUntyped outer_ps_var) -> do
+      -- Choose splices we need to propagate further
+      let (now_pendings, later_pendings)
+            = splitPendings (thLevel l + 1) pendings
+      traceTc "pendings" (ppr (thLevel l) $$ ppr pendings
+                                          $$ ppr now_pendings
+                                          $$ ppr later_pendings)
+      -- Create new bindings for delayer and propagated splices
+      (later_pendings_final, now_pendings_new) <- mapAndUnzipM delaySplice later_pendings
 
-delaySplice :: PendingRnSplice GhcRn -> RnM (PendingRnSplice GhcRn, PendingRnSplice GhcRn)
-delaySplice p@(PendingRnSplice l f _ e) = do
+      -- Add propagated splices to the outer environment
+      next_pendings <- readMutVar outer_ps_var
+      writeMutVar outer_ps_var (later_pendings_final ++ next_pendings)
+
+      -- Return splices to run now and trivial bindings for splices we
+      -- propagated
+      return (now_pendings ++ now_pendings_new)
+    _ -> return pendings
+
+-- For a splice x = e; create two new bindings (splice = e; x = splice)
+delaySplice :: PendingRnSplice -> RnM (PendingRnSplice, PendingRnSplice)
+delaySplice p@(PendingSplice l f _ e) = do
   new_name <- newSysName (mkVarOcc "splice")
-  return (PendingRnSplice l f new_name e, newPending new_name p)
+  return (PendingSplice l f new_name e, newPending new_name p)
 
 -- Make a splice which looks like x = y
-newPending :: Name -> PendingRnSplice GhcRn -> PendingRnSplice GhcRn
-newPending new_sp (PendingRnSplice l f sp _) = PendingRnSplice l f sp (nlHsVar new_sp)
+newPending :: Name -> PendingRnSplice -> PendingRnSplice
+newPending new_sp (PendingSplice l f sp _)
+  = PendingSplice l f sp (nlHsVar new_sp)
 
-splitPendings :: Int -> [PendingRnSplice GhcRn] -> ([PendingRnSplice GhcRn], [PendingRnSplice GhcRn])
+splitPendings :: Int
+              -> [PendingRnSplice]
+              -> ([PendingRnSplice], [PendingRnSplice])
 splitPendings lvl ps = partition do_one ps
   where
-    do_one (PendingRnSplice l _ _ _)
+    do_one p@(PendingSplice l _ _ _)
       | l < lvl = False
       | l == lvl = True
-      | otherwise = panic "splitPendings"
+      -- This panic indicates that somehow we need to insert a splice at a
+      -- higher level than where it was created.
+      | otherwise = pprPanic "splitPendings" (ppr p)
 
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
 rn_bracket outer_stage br@(VarBr x flg rdr_name)
@@ -218,13 +239,6 @@ quotationCtxtDoc br_body
   = hang (text "In the Template Haskell quotation")
          2 (ppr br_body)
 
-{-
-illegalBracket :: SDoc
-illegalBracket =
-    text "Template Haskell brackets cannot be nested" <+>
-    text "(without intervening splices)"
-    -}
-
 illegalTypedBracket :: SDoc
 illegalTypedBracket =
     text "Typed brackets may only appear in typed splices."
@@ -277,7 +291,7 @@ We don't want the type checker to see these bogus unbound variables.
 
 rnSpliceGen :: (HsSplice GhcRn -> RnM (a, FreeVars))
                                             -- Outside brackets, run splice
-            -> (HsSplice GhcRn -> (PendingRnSplice GhcRn, a))
+            -> (HsSplice GhcRn -> (PendingRnSplice, a))
                                             -- Inside brackets, make it pending
             -> HsSplice GhcPs
             -> RnM (a, FreeVars)
@@ -374,11 +388,11 @@ runRnSplice flavour run_meta ppr_res splice
 ------------------
 makePending :: UntypedSpliceFlavour
             -> HsSplice GhcRn
-            -> PendingRnSplice GhcRn
+            -> PendingRnSplice
 makePending flavour (HsUntypedSplice _ _ n e)
-  = PendingRnSplice 0 flavour n e
+  = PendingSplice 0 flavour n e
 makePending flavour (HsQuasiQuote _ n quoter q_span quote)
-  = PendingRnSplice 0 flavour n (mkQuasiQuoteExpr flavour quoter q_span quote)
+  = PendingSplice 0 flavour n (mkQuasiQuoteExpr flavour quoter q_span quote)
 makePending _ splice@(HsTypedSplice {})
   = pprPanic "makePending" (ppr splice)
 makePending _ splice@(HsSpliced {})
@@ -448,7 +462,7 @@ rnSpliceExpr :: HsSplice GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnSpliceExpr splice
   = rnSpliceGen run_expr_splice pend_expr_splice splice
   where
-    pend_expr_splice :: HsSplice GhcRn -> (PendingRnSplice GhcRn, HsExpr GhcRn)
+    pend_expr_splice :: HsSplice GhcRn -> (PendingRnSplice, HsExpr GhcRn)
     pend_expr_splice rn_splice
         = (makePending UntypedExpSplice rn_splice, HsSpliceE noExt rn_splice)
 
@@ -642,7 +656,7 @@ rnSplicePat splice
   = rnSpliceGen run_pat_splice pend_pat_splice splice
   where
     pend_pat_splice :: HsSplice GhcRn ->
-                       (PendingRnSplice GhcRn, Either b (Pat GhcRn))
+                       (PendingRnSplice, Either b (Pat GhcRn))
     pend_pat_splice rn_splice
       = (makePending UntypedPatSplice rn_splice
         , Right (SplicePat noExt rn_splice))
@@ -843,7 +857,7 @@ checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name
   = return name
 
 check_cross_stage_lifting :: TopLevelFlag -> Int -> Int
-                          -> Name -> TcRef [PendingRnSplice GhcRn] -> TcM Name
+                          -> Name -> TcRef [PendingRnSplice] -> TcM Name
 check_cross_stage_lifting top_lvl lift_to lift_by name ps_var
   | isTopLevel top_lvl
         -- Top-level identifiers in this module,
@@ -857,15 +871,8 @@ check_cross_stage_lifting top_lvl lift_to lift_by name ps_var
     -- See Note [Keeping things alive for Template Haskell]
 
   | otherwise
-  =     -- Nested identifiers, such as 'x' in
-        -- E.g. \x -> [| h x |]
-        -- We must behave as if the reference to x was
-        --      h $(lift x)
-        -- We use 'x' itself as the SplicePointName, used by
-        -- the desugarer to stitch it all back together.
-        -- If 'x' occurs many times we may get many identical
-        -- bindings of the same SplicePointName, but that doesn't
-        -- matter, although it's a mite untidy.
+  =
+    -- See Note [Cross stage persistence]
     do  { traceRn "checkCrossStageLifting" (ppr name)
 
         ; n' <- newLocalBndrRn (noLoc (Unqual (getOccName name)))
@@ -873,7 +880,7 @@ check_cross_stage_lifting top_lvl lift_to lift_by name ps_var
 
           -- Construct the (lift x) expression
         ; let lift_expr   = (mkLiftExpr lift_by name)
-              pend_splice = PendingRnSplice lift_to UntypedExpSplice n' lift_expr
+              pend_splice = PendingSplice lift_to UntypedExpSplice n' lift_expr
 
         ; pprTrace "lift_expr" (ppr lift_expr $$ ppr pend_splice) (return ())
           -- Update the pending splices
@@ -946,4 +953,126 @@ Examples:
   \y. [| \x. $(f 'y) |] -- Not ok (bind =1, use = 1)
 
   [| \x. $(f 'x) |]     -- OK (bind = 2, use = 1)
+
+Note [Cross stage persistence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If a a variable is used in quote but bound at an earlier level then we have
+to "lift" the value at runtime to the right level.
+
+The simplest example of this is
+
+```
+foo :: Lift a => a -> Q Exp
+foo x = [| x |]
+```
+
+`x` is bound at level 0 but used at level 1. This is disallowed but if `a` is
+an instance of `Lift` then we can serialise `x` and splice it in which corrects
+the difference in stages.
+
+```
+foo :: Lift a => a -> Q Exp
+foo x = [| $(lift x) |]
+```
+
+Now x is both bound and used at stage 0.
+
+This is implemented by the checkCrossStageLifting function. If we see a variable
+is used out-of-phase then we attempt to lift it by implicitly creating a splice.
+We create a new name for the splice point and add a new pending splice to the
+splice environment.
+
+```
+foo :: Lift a => a -> Q Exp
+foo x = [| x' |]_{ x' = lift x }
+```
+
+So that when we lookup `x'` in DsMeta when desugaring we find it in the DsMetaEnv
+and instead insert the call to `lift x` rather than the serialisation of `x`.
+
+The n-level case
+~~~~~~~~~~~~~~~~
+
+The n-level case is a generalisation of this idea.
+
+```
+foo2 :: Lift a => a -> Q Exp
+foo2 x = [| [| x |] |]
+```
+
+Now x is bound at stage 0 but used in stage 2. We therefore need to lift it twice.
+
+```
+foo2 :: Lift a => a -> Q Exp
+foo2 x = [| [| $($(lift (lift x))) |] |]
+```
+
+There are a few details to work out here.
+
+1. We augment the `PendingRnSplice` data type with the target stage of the splice as
+now we must now how far to propagate the expression. Previously we always propagated
+to the top-level but now we have nested brackets we sometimes stop earlier.
+
+See Note [Propagating Splices] for more information about this.
+
+2. We have to work out how much to lift by. We do this once in `checkCrossStageLifting`
+rather than increase the lifting level by one each time we have to propagate a splice
+outwards so it happens in one place.
+
+3. We now need a representation of brackets in the template-haskell AST.
+This means we add the `BrackE` constructor.
+
+```
+data Exp = ... | BrackE [(Name, Exp)] Exp | ...
+```
+
+This is the representation of a renamed bracket, which is an environment created
+by the splices and the expression inside the bracket.
+
+Note [Propagating Splices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+With nested brackets, we sometimes need to lift expressions twice.
+
+```
+foo2 :: Lift a => a -> Q Exp
+foo2 x = [| [| x |] |]
+```
+
+When we encounter `x` in the inner bracket we call `checkCrossStageLifting`
+which decides by how much and how to lift. We then need to float this splice
+to where it needs to be run, in this case level 0.
+
+Pending splices are stored in the `ps_var` variable which is associated with
+each bracket so it is initially added to the `ps_var` of the inner bracket.
+When we leave the scope, we need to continue floating the splice for `x`
+further outwards. We do this by adding it to the `ps_var` for the outer splice.
+As bindings float outwards, we invent new trivial bindings which record
+the correct environment for each bracket.
+
+```
+foo2 :: Lift a => a -> Q Exp
+foo2 x = [| [| x'' |]_{x'' = x'} |]_{x' = (lift (lift x))}
+```
+
+This is the purpose of record the target level for each splice.
+In `foo3`, the target of `x` is stage 1 as `x` is bound in stage 1 so
+we don't propage the splice at all (as then `x` would not be in scope).
+
+```
+foo3 :: Q Exp
+foo3 = [| \x -> [| x |] |]
+```
+
+==>
+
+```
+foo3 :: Q Exp
+foo3 = [| \x -> [| x' |]_{ x' = lift x } |]
+```
+
+
+
+
 -}

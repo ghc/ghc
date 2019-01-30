@@ -1676,7 +1676,6 @@ data Exp
   | LabelE String                      -- ^ @{ #x }@ ( Overloaded label )
   | ImplicitParamVarE String           -- ^ @{ ?x }@ ( Implicit parameter )
   | BracketE [(Name, Exp)] Exp                        -- TH Bracket
-  | SpliceE Exp                        -- ^ $(abc)
   deriving( Show, Eq, Ord, Data, Generic )
 
 type FieldExp = (Name,Exp)

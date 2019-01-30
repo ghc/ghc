@@ -27,7 +27,7 @@ templateHaskellNames :: [Name]
 -- Should stay in sync with the import list of DsMeta
 
 templateHaskellNames = [
-    returnQName, bindQName, sequenceQName, newNameName, liftName, liftExpName,
+    returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameLName,
     mkNameSName,
     liftStringName,
@@ -56,7 +56,7 @@ templateHaskellNames = [
     condEName, multiIfEName, letEName, caseEName, doEName, mdoEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
     listEName, sigEName, recConEName, recUpdEName, staticEName, unboundVarEName,
-    labelEName, implicitParamVarEName, brackEName, spliceEName,
+    labelEName, implicitParamVarEName, brackEName,
     -- FieldExp
     fieldExpName,
     -- Body
@@ -206,14 +206,13 @@ overlapTyConName       = thTc (fsLit "Overlap")        overlapTyConKey
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeQName,
-    unsafeTExpCoerceName, liftExpName :: Name
+    unsafeTExpCoerceName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
 newNameName    = thFun (fsLit "newName")   newNameIdKey
 liftName       = thFun (fsLit "lift")      liftIdKey
 liftStringName = thFun (fsLit "liftString")  liftStringIdKey
-liftExpName    = thFun (fsLit "liftExp")    liftExpKey
 mkNameName     = thFun (fsLit "mkName")     mkNameIdKey
 mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
 mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
@@ -278,7 +277,7 @@ varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
     sectionLName, sectionRName, lamEName, lamCaseEName, tupEName,
     unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
     caseEName, doEName, mdoEName, compEName, staticEName, unboundVarEName,
-    labelEName, implicitParamVarEName, brackEName, spliceEName :: Name
+    labelEName, implicitParamVarEName, brackEName :: Name
 varEName              = libFun (fsLit "varE")              varEIdKey
 conEName              = libFun (fsLit "conE")              conEIdKey
 litEName              = libFun (fsLit "litE")              litEIdKey
@@ -317,7 +316,6 @@ unboundVarEName       = libFun (fsLit "unboundVarE")       unboundVarEIdKey
 labelEName            = libFun (fsLit "labelE")            labelEIdKey
 implicitParamVarEName = libFun (fsLit "implicitParamVarE") implicitParamVarEIdKey
 brackEName            = libFun (fsLit "brackE")            brackEKey
-spliceEName           = libFun (fsLit "spliceE")           spliceEKey
 
 -- type FieldExp = ...
 fieldExpName :: Name
@@ -728,7 +726,7 @@ incoherentDataConKey   = mkPreludeDataConUnique 212
 returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
     mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeQIdKey,
-    unsafeTExpCoerceIdKey, liftExpKey :: Unique
+    unsafeTExpCoerceIdKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
@@ -743,7 +741,6 @@ mkNameSIdKey         = mkPreludeMiscIdUnique 210
 unTypeIdKey          = mkPreludeMiscIdUnique 211
 unTypeQIdKey         = mkPreludeMiscIdUnique 212
 unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 213
-liftExpKey           = mkPreludeMiscIdUnique 214
 
 
 -- data Lit = ...
@@ -805,7 +802,7 @@ varEIdKey, conEIdKey, litEIdKey, appEIdKey, appTypeEIdKey, infixEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey,
     unboundVarEIdKey, labelEIdKey, implicitParamVarEIdKey, mdoEIdKey,
-    brackEKey, spliceEKey :: Unique
+    brackEKey :: Unique
 varEIdKey              = mkPreludeMiscIdUnique 270
 conEIdKey              = mkPreludeMiscIdUnique 271
 litEIdKey              = mkPreludeMiscIdUnique 272
@@ -840,7 +837,6 @@ labelEIdKey            = mkPreludeMiscIdUnique 300
 implicitParamVarEIdKey = mkPreludeMiscIdUnique 301
 mdoEIdKey              = mkPreludeMiscIdUnique 302
 brackEKey              = mkPreludeMiscIdUnique 303
-spliceEKey              = mkPreludeMiscIdUnique 304
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique

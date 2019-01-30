@@ -430,20 +430,22 @@ rnHsBracketOut (ExpBr ext lhs_expr) = do
   return (ExpBr ext e', fvs)
 rnHsBracketOut _ = panic "rnHsBracketOut"
 
-rnPendingSplices :: [PendingRnSplice GhcPs] -> ([PendingRnSplice GhcRn] -> RnM (a, FreeVars)) -> RnM (a, FreeVars)
+rnPendingSplices :: [PendingPsSplice]
+                 -> ([PendingRnSplice] -> RnM (a, FreeVars))
+                 -> RnM (a, FreeVars)
 rnPendingSplices ps act = do
   (ps', fvs) <- mapFvRn do_one ps
   (res, fvs') <- bindLocalNamesFV (map get_sp_names ps') $ act ps'
   return (res, unionNameSet fvs fvs')
   where
-    do_one :: PendingRnSplice GhcPs -> RnM (PendingRnSplice GhcRn, FreeVars)
-    do_one (PendingRnSplice l t sp e) = do
+    do_one :: PendingPsSplice -> RnM (PendingRnSplice, FreeVars)
+    do_one (PendingSplice l t sp e) = do
       sp' <- newLocalBndrRn (noLoc sp)
       (e', fvs) <- rnLExpr e
-      return (PendingRnSplice l t sp' e', fvs)
+      return (PendingSplice l t sp' e', fvs)
 
-    get_sp_names :: PendingRnSplice GhcRn -> Name
-    get_sp_names (PendingRnSplice _ _ sp _) = sp
+    get_sp_names :: PendingRnSplice -> Name
+    get_sp_names (PendingSplice _ _ sp _) = sp
 
 hsHoleExpr :: HsExpr (GhcPass id)
 hsHoleExpr = HsUnboundVar noExt (TrueExprHole (mkVarOcc "_"))

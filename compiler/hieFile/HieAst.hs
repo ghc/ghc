@@ -1523,7 +1523,7 @@ instance ToHie (LSpliceDecl GhcRn) where
 instance ToHie (HsBracket a) where
   toHie _ = pure []
 
-instance ToHie (PendingRnSplice p) where
+instance ToHie (PendingSplice p) where
   toHie _ = pure []
 
 instance ToHie PendingTcSplice where
