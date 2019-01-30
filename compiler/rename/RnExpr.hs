@@ -35,7 +35,7 @@ import RnFixity
 import RnUtils          ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , bindLocalNames
                         , mapMaybeFvRn, mapFvRn
-                        , warnUnusedLocalBinds, typeAppErr )
+                        , warnUnusedLocalBinds, typeAppErr, newLocalBndrRn )
 import RnUnbound        ( reportUnboundName )
 import RnSplice         ( rnBracket, rnSpliceExpr, checkThLocalName )
 import RnTypes
@@ -438,7 +438,7 @@ rnPendingSplices ps act = do
   where
     do_one :: PendingRnSplice GhcPs -> RnM (PendingRnSplice GhcRn, FreeVars)
     do_one (PendingRnSplice l t sp e) = do
-      sp' <- lookupOccRn sp
+      sp' <- newLocalBndrRn (noLoc sp)
       (e', fvs) <- rnLExpr e
       return (PendingRnSplice l t sp' e', fvs)
 

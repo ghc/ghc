@@ -884,8 +884,7 @@ check_cross_stage_lifting top_lvl lift_to lift_by name ps_var
 mkLiftExpr :: Int -> Name -> LHsExpr GhcRn
 -- The 0 case is never called externally, only by recursion.
 mkLiftExpr 0 var = nlHsVar var
-mkLiftExpr _n var = nlHsPar $ nlHsApp (nlHsVar liftName) (mkLiftExpr 0 var)
---mkLiftExpr n var = nlHsPar $ nlHsApp (nlHsVar liftExpName ) (mkLiftExpr (n-1) var)
+mkLiftExpr n var = nlHsPar $ nlHsApp (nlHsVar liftName) (mkLiftExpr (n - 1) var)
 
 {-
 Note [Keeping things alive for Template Haskell]
