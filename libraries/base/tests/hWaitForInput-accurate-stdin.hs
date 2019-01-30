@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 import Control.Concurrent
 import Control.Monad
 import GHC.Clock
@@ -18,7 +20,11 @@ main = do
     case args of
         [] -> do
             let cp =
-                    (shell "./hWaitForInput-accurate-stdin --read-from-stdin")
+                    (shell
+                         ((if isLinuxHost
+                               then ("./" ++)
+                               else id)
+                              "hWaitForInput-accurate-stdin --read-from-stdin"))
                         {std_in = CreatePipe}
             (_, _, _, ph) <- createProcess cp
             waitForProcess ph >>= exitWith
@@ -36,3 +42,10 @@ main = do
             -- We can never wait for a shorter amount of time than specified
             putStrLn $ "delta >= 0: " ++ show (delta >= 0)
         _ -> error "should not happen."
+
+isLinuxHost :: Bool
+#if defined(mingw32_HOST_OS)
+isLinuxHost = False
+#else
+isLinuxHost = True
+#endif
