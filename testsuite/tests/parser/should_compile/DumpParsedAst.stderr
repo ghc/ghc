@@ -292,6 +292,7 @@
                {OccName: F1}))
              (Nothing)
              [(HsTypeArg
+               { DumpParsedAst.hs:17:6-11 }
                ({ DumpParsedAst.hs:17:7-11 }
                 (HsTyVar
                  (NoExt)
@@ -324,7 +325,7 @@
                  (NoExt)
                  ({ DumpParsedAst.hs:17:19-26 }
                   (HsAppKindTy
-                   (NoExt)
+                   { DumpParsedAst.hs:17:21-26 }
                    ({ DumpParsedAst.hs:17:19 }
                     (HsTyVar
                      (NoExt)
