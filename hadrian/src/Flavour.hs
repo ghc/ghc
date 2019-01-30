@@ -1,4 +1,4 @@
-module Flavour (Flavour (..), werror) where
+module Flavour (Flavour (..), werror, llvm) where
 
 import Expression
 
@@ -34,7 +34,11 @@ data Flavour = Flavour {
     ghcDebugged :: Bool }
 
 
--- | Turn on -Werror for packages built with the stage1 compiler.
+-- | Turn on @-Werror@ for packages built with the stage1 compiler.
 -- It mimics the CI settings so is useful to turn on when developing.
 werror :: Flavour -> Flavour
 werror fl = fl { args = args fl <> (builder Ghc ? notStage0 ? arg "-Werror") }
+
+-- | Turn on the LLVM backend (see the @-fllvm@ GHC flag).
+llvm :: Flavour -> Flavour
+llvm fl = fl { args = args fl <> (builder Ghc ? arg "-fllvm") }
