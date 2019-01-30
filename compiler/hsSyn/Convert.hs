@@ -992,9 +992,8 @@ cvtl e = wrapL (cvt e)
         ds' <- mapM cvtPendingSplice ds
         ; c' <- ExpBr noExt . noLoc <$> cvt c
         ; return $ HsRnBracketOut noExt c' ds'  }
-    cvt (SpliceE e) =do { e' <- cvt e; return $ mkHsSpliceE HasParens (noLoc e') }
 
-    cvtPendingSplice (n, e) = PendingRnSplice 0 UntypedExpSplice <$> vName n <*> cvtl e
+    cvtPendingSplice (n, e) = PendingSplice 0 UntypedExpSplice <$> vName n <*> cvtl e
 
 
 

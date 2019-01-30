@@ -1252,20 +1252,20 @@ repRole _ = panic "repRole: Impossible Match" -- due to #15884
 repSplice :: HsSplice GhcRn -> DsM (Core a)
 -- See Note [How brackets and nested splices are handled] in TcSplice
 -- We return a CoreExpr of any old type; the context should know
-repSplice (HsTypedSplice   _ _ n _) = rep_splice n undefined
-repSplice (HsUntypedSplice _ _ n e) = rep_splice n e
-repSplice (HsQuasiQuote _ n _ _ _)  = rep_splice n undefined
+repSplice (HsTypedSplice   _ _ n _) = rep_splice n
+repSplice (HsUntypedSplice _ _ n _) = rep_splice n
+repSplice (HsQuasiQuote _ n _ _ _)  = rep_splice n
 repSplice e@(HsSpliced {})          = pprPanic "repSplice" (ppr e)
 repSplice e@(HsSplicedT {})         = pprPanic "repSpliceT" (ppr e)
 repSplice e@(XSplice {})            = pprPanic "repSplice" (ppr e)
 
-rep_splice :: Name -> LHsExpr GhcRn -> DsM (Core a)
-rep_splice splice_name exp
+rep_splice :: Name -> DsM (Core a)
+rep_splice splice_name
  = do { mb_val <- dsLookupMetaEnv splice_name
        ; case mb_val of
            Just (DsSplice e) -> do { e' <- dsExpr e
                                    ; return (MkC e') }
-           _ -> repLE exp >>= repSpliceC }
+           _ -> pprPanic "HsSplice" (ppr splice_name) }
                         -- Should not happen; statically checked
 
 -----------------------------------------------------------------------------
@@ -1284,7 +1284,7 @@ repLE (dL->L loc e) = putSrcSpanDs loc (repE e)
 repE :: HsExpr GhcRn -> DsM (Core TH.ExpQ)
 repE (HsVar _ (dL->L _ x)) =
   do { mb_val <- dsLookupMetaEnv x
-     ; case pprTrace "x" (ppr x) mb_val of
+     ; case mb_val of
         Nothing            -> do { str <- globalVar x
                                  ; repVarOrCon x str }
         Just (DsBound y)   -> repVarOrCon x (coreVar y)
@@ -1412,9 +1412,6 @@ repE (HsUnboundVar _ uv)   = do
                                occ   <- occNameLit (unboundVarOcc uv)
                                sname <- repNameS occ
                                repUnboundVar sname
---repE (HsBracket _ (ExpBr _ e)) = repLE e >>= repBracket
---repE (HsBracket _ e) = notHandled "brack" (ppr e)
---repE (HsRnBracketOut _ (ExpBr _ e) []) = repLE e >>= repBracket []
 repE (HsRnBracketOut _ (ExpBr _ e) ts) =
   do { sp_rep <- pendingSplicesToBinds ts
      ; e2 <- repLE e
@@ -1425,7 +1422,7 @@ repE e@(HsSCC {})          = notHandled "Cost centres" (ppr e)
 repE e@(HsTickPragma {})   = notHandled "Tick Pragma" (ppr e)
 repE e                     = notHandled "Expression form" (ppr e)
 
-pendingSplicesToBinds :: [PendingRnSplice GhcRn]
+pendingSplicesToBinds :: [PendingRnSplice]
                       -> DsM (Core [(TH.Name, TH.ExpQ)])
 pendingSplicesToBinds ps = do
   name_ty <- lookupType nameTyConName
@@ -1434,23 +1431,10 @@ pendingSplicesToBinds ps = do
   let ty = mkTyConApp q_ty [mkTupleTy Boxed [name_ty, exp_ty]]
   coreList' ty <$> (mapM do_one ps)
   where
-
-    do_one (PendingRnSplice _ _ sp e) = do
+    do_one (PendingSplice _ _ sp e) = do
      n <- globalVar sp
      e' <- repLE e
      repPendingSplice n e'
-
-    {-
-    mk_splice e = do
-      n <- newSysName (mkVarOcc "splice")
-      return $ HsSpliceE noExt (HsUntypedSplice noExt HasParens n e)
-      -}
-
---mkUntypedSplice :: SpliceDecoration -> LHsExpr (GhcPass p) -> HsSplice GhcPs
---mkUntypedSplice hasParen e = HsUntypedSplice noExt hasParen unqualSplice e
-
---mkHsSpliceE :: SpliceDecoration -> LHsExpr (GhcPass p) -> HsExpr (GhcPass p)
---mkHsSpliceE hasParen e = HsSpliceE noExt (mkUntypedSplice hasParen e)
 
 -----------------------------------------------------------------------------
 -- Building representations of auxillary structures like Match, Clause, Stmt,
@@ -2210,9 +2194,6 @@ repImplicitParamVar (MkC x) = rep2 implicitParamVarEName [x]
 
 repBracket :: Core [(TH.Name, TH.ExpQ)] -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repBracket (MkC ds) (MkC e) = rep2 brackEName [ds, e]
-
-repSpliceC :: Core TH.ExpQ -> DsM (Core a)
-repSpliceC (MkC e) = rep2 spliceEName [e]
 
 ------------ Right hand sides (guarded expressions) ----
 repGuarded :: Core [TH.Q (TH.Guard, TH.Exp)] -> DsM (Core TH.BodyQ)

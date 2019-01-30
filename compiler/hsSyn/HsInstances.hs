@@ -323,9 +323,9 @@ deriving instance Data (ArithSeqInfo GhcTc)
 
 deriving instance                   Data RecordConTc
 deriving instance                   Data CmdTopTc
-deriving instance                   Data (PendingRnSplice GhcPs)
-deriving instance                   Data (PendingRnSplice GhcRn)
-deriving instance                   Data (PendingRnSplice GhcTc)
+deriving instance                   Data (PendingSplice GhcPs)
+deriving instance                   Data (PendingSplice GhcRn)
+deriving instance                   Data (PendingSplice GhcTc)
 deriving instance                   Data PendingTcSplice
 
 -- ---------------------------------------------------------------------

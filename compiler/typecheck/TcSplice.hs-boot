@@ -21,7 +21,7 @@ tcSpliceExpr :: HsSplice GhcRn
 
 tcUntypedBracket :: HsExpr GhcRn
                  -> HsBracket GhcRn
-                 -> [PendingRnSplice GhcRn]
+                 -> [PendingRnSplice]
                  -> ExpRhoType
                  -> TcM (HsExpr GhcTcId)
 tcTypedBracket :: HsExpr GhcRn

@@ -554,7 +554,7 @@ data HsExpr p
       (XRnBracketOut p)
       (HsBracket (NoGhcTc p))    -- Output of the renamer is the *original* renamed
                            -- expression, plus
-      [PendingRnSplice p]    -- _renamed_ splices to be type checked
+      [PendingSplice p]    -- _renamed_ splices to be type checked
 
   | HsTcBracketOut
       (XTcBracketOut p)
@@ -2474,10 +2474,13 @@ data HsSplicedThing id
 -- See Note [Pending Splices]
 type SplicePointName = Name
 
--- | Pending Renamer Splice
+-- | Pending Splice
 -- Parametrised so that we can properly insert renamed syntax from TH
-data PendingRnSplice p
-  = PendingRnSplice Int UntypedSpliceFlavour (IdP (NoGhcTc p)) (LHsExpr (NoGhcTc p))
+data PendingSplice p
+  = PendingSplice Int UntypedSpliceFlavour (IdP (NoGhcTc p)) (LHsExpr (NoGhcTc p))
+
+type PendingRnSplice = PendingSplice GhcRn
+type PendingPsSplice = PendingSplice GhcPs
 
 data UntypedSpliceFlavour
   = UntypedExpSplice
@@ -2656,8 +2659,8 @@ thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>
 thTyBrackets :: SDoc -> SDoc
 thTyBrackets pp_body = text "[||" <+> pp_body <+> ptext (sLit "||]")
 
-instance (OutputableBndrId (GhcPass p)) => Outputable (PendingRnSplice (GhcPass p)) where
-  ppr (PendingRnSplice target _ n e) = pprPendingSplice target n e
+instance (OutputableBndrId (GhcPass p)) => Outputable (PendingSplice (GhcPass p)) where
+  ppr (PendingSplice target _ n e) = pprPendingSplice target n e
 
 instance Outputable PendingTcSplice where
   ppr (PendingTcSplice n e) = pprPendingSplice 0 n e

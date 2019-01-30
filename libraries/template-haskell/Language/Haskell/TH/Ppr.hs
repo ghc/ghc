@@ -210,7 +210,6 @@ pprExp _ (UnboundVarE v) = pprName' Applied v
 pprExp _ (LabelE s) = text "#" <> text s
 pprExp _ (ImplicitParamVarE n) = text ('?' : n)
 pprExp i (BracketE ss e) = pprFields ss $$ text "[|" <> pprExp i e <> text "|]"
-pprExp i (SpliceE e) = text "$(" <> pprExp i e <> text ")"
 
 pprFields :: [(Name,Exp)] -> Doc
 pprFields = sep . punctuate comma . map (\(s,e) -> ppr s <+> equals <+> ppr e)

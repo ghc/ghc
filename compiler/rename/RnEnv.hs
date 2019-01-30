@@ -318,7 +318,6 @@ lookupExactOcc_either name
 
            []    -> -- See Note [Splicing Exact names]
                     do { lcl_env <- getLocalRdrEnv
-                       ; traceRn "Exact Occ" (ppr lcl_env)
                        ; if name `inLocalRdrEnvScope` lcl_env
                          then return (Right name)
                          else
