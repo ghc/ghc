@@ -2456,12 +2456,13 @@ To solve this problem in a robust way, we do the following:
    equation, drop the first n of them (where n is the arity of the type family
    tycon), and check if there are any types leftover. If so, reject.
 
-   Why does this work? We know that none of the leftover types after the first
-   n types, since step (1) would have already caught that. Moreover, the only
-   places where visible kind applications are allowed are in the first n types,
-   since those are the only arguments that can correspond to binding forms.
-   Therefore, the remaining arguments must correspond to oversaturated uses of
-   visible kind application, which is precisely what we want to reject.
+   Why does this work? We know that after dropping the first n type patterns,
+   none of the leftover types can be required arguments, since step (1) would
+   have already caught that. Moreover, the only places where visible kind
+   applications should be allowed are in the first n types, since those are the
+   only arguments that can correspond to binding forms. Therefore, the
+   remaining arguments must correspond to oversaturated uses of visible kind
+   applications, which are precisely what we want to reject.
 
 Note that we only perform this check for type families, and not for data
 families. This is because it is perfectly acceptable to oversaturate data
