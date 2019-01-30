@@ -39,7 +39,7 @@ test('Records', normal, compile, [''])
 # The point about this test is that it compiles NewTyCo1 and NewTyCo2
 # *separately*
 #
-test('NewTyCo', [], run_command, ['$MAKE -s --no-print-directory NewTyCo'])
+test('NewTyCo', [], makefile_test, ['NewTyCo'])
 
 test('Infix', normal, compile, [''])
 test('Kind', normal, compile, [''])
@@ -130,8 +130,7 @@ test('IndTypesPerf',
        extra_clean(['IndTypesPerf.o', 'IndTypesPerf.hi',
                     'IndTypesPerfMerge.o', 'IndTypesPerfMerge.hi'])
      ] ,
-     run_command,
-     ['$MAKE -s --no-print-directory IndTypesPerf'])
+     makefile_test, ['IndTypesPerf'])
 
 test('T4120', normal, compile, [''])
 test('T3787', normal, compile, [''])
@@ -171,13 +170,9 @@ test('HO', normal, compile, [''])
 
 # The point about this test is that it compiles the two T5955
 # modules *separately*
-test('T5955', [], run_command, ['$MAKE -s --no-print-directory T5955'])
+test('T5955', [], makefile_test, ['T5955'])
 
-test('T6152',
-     normal,
-     run_command,
-     ['$MAKE -s --no-print-directory T6152'])
-
+test('T6152', normal, makefile_test, ['T6152'])
 test('T7082', normal, compile, [''])
 
 test('Overlap1', normal, compile, [''])
@@ -206,22 +201,13 @@ test('T7837', normal, compile,
 test('T4185', normal, compile, [''])
 
 # Caused infinite loop in the compiler
-test('T8002',
-     normal,
-     run_command,
-     ['$MAKE -s --no-print-directory T8002'])
+test('T8002', normal, makefile_test, ['T8002'])
 
 # Import and export of associated types
-test('T8011',
-     normal,
-     run_command,
-     ['$MAKE -s --no-print-directory T8011'])
+test('T8011', normal, makefile_test, ['T8011'])
 
 # Marshalling of associated types
-test('T8500',
-     normal,
-     run_command,
-     ['$MAKE -s --no-print-directory T8500'])
+test('T8500', normal, makefile_test, ['T8500'])
 
 test('T8018', normal, compile, [''])
 test('T8020', normal, compile, [''])

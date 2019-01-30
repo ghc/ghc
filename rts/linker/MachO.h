@@ -13,7 +13,7 @@ int ocGetNames_MachO       ( ObjectCode* oc );
 int ocResolve_MachO        ( ObjectCode* oc );
 int ocRunInit_MachO        ( ObjectCode* oc );
 int machoGetMisalignment( FILE * );
-int ocAllocateSymbolExtras_MachO ( ObjectCode* oc );
+int ocAllocateExtras_MachO ( ObjectCode* oc );
 
 #if defined(powerpc_HOST_ARCH)
 void machoInitSymbolsWithoutUnderscore( void );
