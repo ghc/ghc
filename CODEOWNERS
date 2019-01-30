@@ -5,44 +5,44 @@
 * @bgamari
 
 # Build system
-/hadrian                         @snowleopard @alp @DavidEichmann @angerman
+/hadrian/                         @snowleopard @alp @DavidEichmann @angerman
 /configure.ac                    @angerman @hvr
 /aclocal.m4                      @angerman @hvr
 /config.sub                      @angerman @hvr
 
 # RTS-like things
-/rts                             @bgamari @simonmar @osa1 @Phyx @angerman
-/rts/linker                      @angerman @Phyx
-/includes                        @bgamari @simonmar @osa1
+/rts/                             @bgamari @simonmar @osa1 @Phyx @angerman
+/rts/linker/                      @angerman @Phyx
+/includes/                        @bgamari @simonmar @osa1
 
 # The compiler
-/compiler/typecheck              @simonpj @goldfire
-/compiler/rename                 @simonpj @goldfire
-/compiler/typecheck/TcDeriv*     @RyanGlScott
-/compiler/nativeGen              @simonmar @bgamari @AndreasK
-/compiler/llvmGen                @angerman
-/compiler/codeGen                @simonmar @osa1
-/compiler/cmm                    @simonmar @osa1
-/compiler/ghci                   @simonmar
-/compiler/simplCore/CallArity.hs @nomeata
-/compiler/utils/UnVarGraph.hs    @nomeata
-/compiler/simplCore/Exitify.hs   @nomeata
-/compiler/simplStg/StgCse.hs     @nomeata
+/compiler/typecheck/              @simonpj @goldfire
+/compiler/rename/                 @simonpj @goldfire
+/compiler/types/                  @simonpj @goldfire
+/compiler/deSugar/                @simonpj @goldfire
+/compiler/typecheck/TcDeriv*      @RyanGlScott
+/compiler/nativeGen/              @simonmar @bgamari @AndreasK
+/compiler/llvmGen/                @angerman
+/compiler/codeGen/                @simonmar @osa1
+/compiler/cmm/                    @simonmar @osa1
+/compiler/ghci/                   @simonmar
+/compiler/simplCore/CallArity.hs  @nomeata
+/compiler/utils/UnVarGraph.hs     @nomeata
+/compiler/simplCore/Exitify.hs    @nomeata
+/compiler/simplStg/StgCse.hs      @nomeata
 /compiler/simplStg/StgLiftLams.hs @sgraf
-/compiler/cmm/CmmSwitch.hs       @nomeata
-/compiler/stranal/DmdAnal.hs     @simonpj @sgraf
-/compiler/types                  @simonpj @goldfire
-/compiler/deSugar                @simonpj @goldfire
-/compiler/hsSyn/Convert.hs       @goldfire
+/compiler/cmm/CmmSwitch.hs        @nomeata
+/compiler/stranal/DmdAnal.hs      @simonpj @sgraf
+/compiler/hsSyn/Convert.hs        @goldfire
 
 # Core libraries
-/libraries/base                  @hvr
-/libraries/template-haskell      @goldfire
+/libraries/base/                  @hvr
+/libraries/template-haskell/      @goldfire
 
 # Internal utilities and libraries
-/libraries/libiserv              @angerman @simonmar
-/utils/iserv-proxy               @angerman @simonmar
-/utils/iserv                     @angerman @simonmar
-/utils/gen-dll                   @Phyx
-/utils/fs                        @Phyx
+/libraries/libiserv/              @angerman @simonmar
+/utils/iserv-proxy/               @angerman @simonmar
+/utils/iserv/                     @angerman @simonmar
+/utils/gen-dll/                   @Phyx
+/utils/fs/                        @Phyx
 
