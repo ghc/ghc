@@ -12,6 +12,7 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- | Abstract Haskell syntax for expressions.
 module HsExpr where
@@ -551,9 +552,9 @@ data HsExpr p
     -- See Note [Pending Splices]
   | HsRnBracketOut
       (XRnBracketOut p)
-      (HsBracket GhcRn)    -- Output of the renamer is the *original* renamed
+      (HsBracket (NoGhcTc p))    -- Output of the renamer is the *original* renamed
                            -- expression, plus
-      [PendingRnSplice]    -- _renamed_ splices to be type checked
+      [PendingRnSplice p]    -- _renamed_ splices to be type checked
 
   | HsTcBracketOut
       (XTcBracketOut p)
@@ -2474,8 +2475,9 @@ data HsSplicedThing id
 type SplicePointName = Name
 
 -- | Pending Renamer Splice
-data PendingRnSplice
-  = PendingRnSplice UntypedSpliceFlavour SplicePointName (LHsExpr GhcRn)
+-- Parametrised so that we can properly insert renamed syntax from TH
+data PendingRnSplice p
+  = PendingRnSplice Int UntypedSpliceFlavour (IdP (NoGhcTc p)) (LHsExpr (NoGhcTc p))
 
 data UntypedSpliceFlavour
   = UntypedExpSplice
@@ -2561,9 +2563,9 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsSplice p) where
   ppr s = pprSplice s
 
-pprPendingSplice :: (OutputableBndrId (GhcPass p))
-                 => SplicePointName -> LHsExpr (GhcPass p) -> SDoc
-pprPendingSplice n e = angleBrackets (ppr n <> comma <+> ppr e)
+pprPendingSplice :: (OutputableBndrId (GhcPass p), Outputable n)
+                 => Int -> n -> LHsExpr (GhcPass p) -> SDoc
+pprPendingSplice target n e = angleBrackets (ppr target <> ppr n <> comma <+> ppr e)
 
 pprSpliceDecl ::  (OutputableBndrId (GhcPass p))
           => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
@@ -2654,11 +2656,11 @@ thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>
 thTyBrackets :: SDoc -> SDoc
 thTyBrackets pp_body = text "[||" <+> pp_body <+> ptext (sLit "||]")
 
-instance Outputable PendingRnSplice where
-  ppr (PendingRnSplice _ n e) = pprPendingSplice n e
+instance (OutputableBndrId (GhcPass p)) => Outputable (PendingRnSplice (GhcPass p)) where
+  ppr (PendingRnSplice target _ n e) = pprPendingSplice target n e
 
 instance Outputable PendingTcSplice where
-  ppr (PendingTcSplice n e) = pprPendingSplice n e
+  ppr (PendingTcSplice n e) = pprPendingSplice 0 n e
 
 {-
 ************************************************************************

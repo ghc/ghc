@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 -- |
 -- Language.Haskell.TH.Lib.Internal exposes some additional functionality that
 -- is used internally in GHC's integration with Template Haskell. This is not a
@@ -361,8 +362,11 @@ fromToE x y = do { a <- x; b <- y; return (ArithSeqE (FromToR a b)) }
 fromThenToE :: ExpQ -> ExpQ -> ExpQ -> ExpQ
 fromThenToE x y z = do { a <- x; b <- y; c <- z;
                          return (ArithSeqE (FromThenToR a b c)) }
-brackE :: [DecQ] -> ExpQ -> ExpQ
+brackE :: [Q (Name, Exp)] -> ExpQ -> ExpQ
 brackE ds e = do { ds2 <- sequence ds; e2 <- e; return (BracketE ds2 e2) }
+
+spliceE :: ExpQ -> ExpQ
+spliceE e = do { e2 <- e; return (SpliceE e2) }
 
 
 -------------------------------------------------------------------------------

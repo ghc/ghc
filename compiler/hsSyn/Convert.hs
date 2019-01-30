@@ -989,9 +989,14 @@ cvtl e = wrapL (cvt e)
     cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noExt n' }
     cvt (BracketE ds c) =
       do {
-        ds' <- cvtLocalDecs (text "a bracket expression") ds
-        ; c' <- noLoc . HsBracket noExt . ExpBr noExt . noLoc <$> cvt c
-        ; return $ HsLet noExt (noLoc ds') c' }
+        ds' <- mapM cvtPendingSplice ds
+        ; c' <- ExpBr noExt . noLoc <$> cvt c
+        ; return $ HsRnBracketOut noExt c' ds'  }
+    cvt (SpliceE e) =do { e' <- cvt e; return $ mkHsSpliceE HasParens (noLoc e') }
+
+    cvtPendingSplice (n, e) = PendingRnSplice 0 UntypedExpSplice <$> vName n <*> cvtl e
+
+
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

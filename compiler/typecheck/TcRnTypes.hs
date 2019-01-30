@@ -974,7 +974,7 @@ data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
 
 data PendingStuff
   = RnPendingUntyped              -- Renaming the inside of an *untyped* bracket
-      (TcRef [PendingRnSplice])   -- Pending splices in here
+      (TcRef [PendingRnSplice GhcRn])   -- Pending splices in here
 
   | RnPendingTyped                -- Renaming the inside of a *typed* bracket
 
@@ -1020,7 +1020,7 @@ splice. In particular it is not set when the splice is renamed or typechecked.
 'RunSplice' is needed to provide a reference where 'addModFinalizer' can insert
 the finalizer (see Note [Delaying modFinalizers in untyped splices]), and
 'addModFinalizer' runs when doing Q things. Therefore, It doesn't make sense to
-set 'RunSplice' when renaming or typechecking the splice, where 'Splice', 
+set 'RunSplice' when renaming or typechecking the splice, where 'Splice',
 'Brack' or 'Comp' are used instead.
 
 -}
