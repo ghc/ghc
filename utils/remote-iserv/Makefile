@@ -10,6 +10,6 @@
 #
 # -----------------------------------------------------------------------------
 
-dir = iserv-proxy
+dir = remote-iserv
 TOP = ../..
 include $(TOP)/mk/sub-makefile.mk

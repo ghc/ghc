@@ -25,6 +25,11 @@ import GHC.Fingerprint (getFileHash)
 
 import qualified Data.ByteString as BS
 
+import Text.Printf
+import System.Environment (getProgName)
+
+trace :: String -> IO ()
+trace s = getProgName >>= \name -> printf "[%20s] %s\n" name s
 
 dropLeadingPathSeparator :: FilePath -> FilePath
 dropLeadingPathSeparator p | isAbsolute p = joinPath (drop 1 (splitPath p))
@@ -43,9 +48,8 @@ foreign export ccall startSlave :: Bool -> Int -> CString -> IO ()
 -- start the slave process, and runs iserv.
 startSlave :: Bool -> Int -> CString -> IO ()
 startSlave verbose port s = do
-  putStr "DocRoot: "
   base_path <- peekCString s
-  putStrLn base_path
+  trace $ "DocRoot: " ++ base_path
   _ <- forkIO $ startSlave' verbose base_path (toEnum port)
   return ()
 
@@ -54,16 +58,18 @@ startSlave verbose port s = do
 -- slave process.
 startSlave' :: Bool -> String -> PortNumber -> IO ()
 startSlave' verbose base_path port = do
+  hSetBuffering stdin LineBuffering
+  hSetBuffering stdout LineBuffering
 
   sock <- openSocket port
 
   forever $ do
-    when verbose $ putStrLn "Opening socket"
+    when verbose $ trace "Opening socket"
     pipe <- acceptSocket sock >>= socketToPipe
     putStrLn $ "Listening on port " ++ show port
-    when verbose $ putStrLn "Starting serv"
+    when verbose $ trace "Starting serv"
     uninterruptibleMask $ serv verbose (hook verbose base_path pipe) pipe
-    when verbose $ putStrLn "serv ended"
+    when verbose $ trace "serv ended"
     return ()
 
 -- | The iserv library may need access to files, specifically
@@ -117,9 +123,13 @@ hook verbose base_path pipe m = case m of
   -- when loading DLLs (.so, .dylib, .dll, ...) and these are provided
   -- as relative paths, the intention is to load a pre-existing system library,
   -- therefore we hook the LoadDLL call only for absolute paths to ship the
-  -- dll from the host to the target.
+  -- dll from the host to the target.  On windows we assume that we don't
+  -- want to copy libraries that are referenced in C:\ these are usually
+  -- system libraries.
+  Msg (LoadDLL path@('C':':':_)) -> do
+    return m
   Msg (LoadDLL path) | isAbsolute path -> do
-    when verbose $ putStrLn ("Need DLL: " ++ (base_path <//> path))
+    when verbose $ trace ("Need DLL: " ++ (base_path <//> path))
     handleLoad pipe path (base_path <//> path)
     return $ Msg (LoadDLL (base_path <//> path))
   _other -> return m

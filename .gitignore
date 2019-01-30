@@ -182,6 +182,7 @@ _darcs/
 /testlog*
 /utils/iserv/iserv.cabal
 /utils/iserv-proxy/iserv-proxy.cabal
+/utils/remote-iserv/remote-iserv.cabal
 /utils/mkUserGuidePart/mkUserGuidePart.cabal
 /utils/runghc/runghc.cabal
 /utils/gen-dll/gen-dll.cabal
