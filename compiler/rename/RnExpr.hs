@@ -439,13 +439,13 @@ rnPendingSplices ps act = do
   return (res, unionNameSet fvs fvs')
   where
     do_one :: PendingPsSplice -> RnM (PendingRnSplice, FreeVars)
-    do_one (PendingSplice l t sp e) = do
+    do_one (PendingSplice t sp e) = do
       sp' <- newLocalBndrRn (noLoc sp)
       (e', fvs) <- rnLExpr e
-      return (PendingSplice l t sp' e', fvs)
+      return (PendingSplice t sp' e', fvs)
 
     get_sp_names :: PendingRnSplice -> Name
-    get_sp_names (PendingSplice _ _ sp _) = sp
+    get_sp_names (PendingSplice _ sp _) = sp
 
 hsHoleExpr :: HsExpr (GhcPass id)
 hsHoleExpr = HsUnboundVar noExt (TrueExprHole (mkVarOcc "_"))

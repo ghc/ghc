@@ -974,7 +974,9 @@ data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
 
 data PendingStuff
   = RnPendingUntyped              -- Renaming the inside of an *untyped* bracket
-      (TcRef [PendingRnSplice])   -- Pending splices in here
+      (TcRef [(Int, PendingRnSplice)])   -- Pending splices in here
+                                         -- Int is the stage which we want
+                                         -- to run the splice
 
   | RnPendingTyped                -- Renaming the inside of a *typed* bracket
 

@@ -993,7 +993,7 @@ cvtl e = wrapL (cvt e)
         ; c' <- ExpBr noExt . noLoc <$> cvt c
         ; return $ HsRnBracketOut noExt c' ds'  }
 
-    cvtPendingSplice (n, e) = PendingSplice 0 UntypedExpSplice <$> vName n <*> cvtl e
+    cvtPendingSplice (n, e) = PendingSplice UntypedExpSplice <$> vName n <*> cvtl e
 
 
 

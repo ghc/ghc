@@ -61,7 +61,6 @@ import ForeignCall
 import Util
 import Maybes
 import MonadUtils
---import TcRnMonad (newSysName)
 
 import Data.ByteString ( unpack )
 import Control.Monad
@@ -1431,7 +1430,7 @@ pendingSplicesToBinds ps = do
   let ty = mkTyConApp q_ty [mkTupleTy Boxed [name_ty, exp_ty]]
   coreList' ty <$> (mapM do_one ps)
   where
-    do_one (PendingSplice _ _ sp e) = do
+    do_one (PendingSplice _ sp e) = do
      n <- globalVar sp
      e' <- repLE e
      repPendingSplice n e'

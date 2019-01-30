@@ -2477,7 +2477,7 @@ type SplicePointName = Name
 -- | Pending Splice
 -- Parametrised so that we can properly insert renamed syntax from TH
 data PendingSplice p
-  = PendingSplice Int UntypedSpliceFlavour (IdP (NoGhcTc p)) (LHsExpr (NoGhcTc p))
+  = PendingSplice UntypedSpliceFlavour (IdP (NoGhcTc p)) (LHsExpr (NoGhcTc p))
 
 type PendingRnSplice = PendingSplice GhcRn
 type PendingPsSplice = PendingSplice GhcPs
@@ -2567,8 +2567,8 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsSplice p) where
   ppr s = pprSplice s
 
 pprPendingSplice :: (OutputableBndrId (GhcPass p), Outputable n)
-                 => Int -> n -> LHsExpr (GhcPass p) -> SDoc
-pprPendingSplice target n e = angleBrackets (ppr target <> ppr n <> comma <+> ppr e)
+                 => n -> LHsExpr (GhcPass p) -> SDoc
+pprPendingSplice n e = angleBrackets (ppr n <> comma <+> ppr e)
 
 pprSpliceDecl ::  (OutputableBndrId (GhcPass p))
           => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
@@ -2660,10 +2660,10 @@ thTyBrackets :: SDoc -> SDoc
 thTyBrackets pp_body = text "[||" <+> pp_body <+> ptext (sLit "||]")
 
 instance (OutputableBndrId (GhcPass p)) => Outputable (PendingSplice (GhcPass p)) where
-  ppr (PendingSplice target _ n e) = pprPendingSplice target n e
+  ppr (PendingSplice _ n e) = pprPendingSplice n e
 
 instance Outputable PendingTcSplice where
-  ppr (PendingTcSplice n e) = pprPendingSplice 0 n e
+  ppr (PendingTcSplice n e) = pprPendingSplice n e
 
 {-
 ************************************************************************
