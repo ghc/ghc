@@ -36,7 +36,8 @@ hadrianFlavours :: [Flavour]
 hadrianFlavours =
     [ defaultFlavour, developmentFlavour Stage1, developmentFlavour Stage2
     , performanceFlavour, profiledFlavour, quickFlavour, quickestFlavour
-    , quickCrossFlavour ]
+    , quickCrossFlavour
+    , llvm performanceFlavour, llvm profiledFlavour, llvm quickFlavour ]
 
 flavour :: Action Flavour
 flavour = do
