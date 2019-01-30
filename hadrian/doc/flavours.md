@@ -109,6 +109,39 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td></td>
     <td>-O0<br>-DDEBUG</td>
   </tr>
+  <tr>
+    <th>quick-llvm</td>
+    <td>-O0<br>-H64m<br>-fllvm</td>
+    <td>-O0<br>-H64m<br>-fllvm</td>
+    <td></td>
+    <td>-O</td>
+    <td>-O</td>
+    <td></td>
+    <td>-O</td>
+    <td></td>
+  </tr>
+  <tr>
+    <th>perf-llvm</td>
+    <td>-O<br>-H64m<br>-fllvm</td>
+    <td>-O<br>-H64m<br>-fllvm</td>
+    <td></td>
+    <td>-O2</td>
+    <td>-O</td>
+    <td>-O2</td>
+    <td>-O</td>
+    <td>-O2</td>
+  </tr>
+  <tr>
+    <th>prof-llvm</td>
+    <td>-O0<br>-H64m<br>-fllvm</td>
+    <td>-O0<br>-H64m<br>-fllvm</td>
+    <td></td>
+    <td>-O</td>
+    <td>-O</td>
+    <td>-O</td>
+    <td>-O</td>
+    <td>-O</td>
+  </tr>
 </table>
 
 ## Ways
@@ -132,7 +165,7 @@ information. The following table lists ways that are built in different flavours
         <th>stage1+</th>
     </tr>
     <tr>
-    <th>default<br>perf<br>prof<br>devel1<br>devel2</td>
+    <th>default<br>perf<br>prof<br>devel1<br>devel2<br>perf-llvm<br>prof-llvm</td>
     <td>vanilla</td>
     <td>vanilla<br>profiling<br>dynamic</td>
     <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
@@ -149,7 +182,7 @@ information. The following table lists ways that are built in different flavours
     <td>Only in<br>prof<br>flavour</td>
 </tr>
 <tr>
-    <th>quick</th>
+    <th>quick<br>quick-llvm</th>
     <td>vanilla</td>
     <td>vanilla<br>dynamic</td>
     <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
