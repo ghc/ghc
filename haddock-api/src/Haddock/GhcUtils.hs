@@ -19,10 +19,12 @@ module Haddock.GhcUtils where
 
 
 import Control.Arrow
+import Data.Char ( isSpace )
+
 import Haddock.Types( DocNameI )
 
 import Exception
-import Outputable
+import Outputable ( Outputable, panic, showPpr )
 import Name
 import NameSet
 import Module
@@ -30,6 +32,14 @@ import HscTypes
 import GHC
 import Class
 import DynFlags
+import SrcLoc    ( advanceSrcLoc )
+
+import           StringBuffer ( StringBuffer )
+import qualified StringBuffer             as S
+
+import           Data.ByteString ( ByteString )
+import qualified Data.ByteString          as BS
+import qualified Data.ByteString.Internal as BS
 
 
 moduleString :: Module -> String
@@ -413,11 +423,129 @@ minimalDef n = do
 -------------------------------------------------------------------------------
 
 
-setObjectDir, setHiDir, setStubDir, setOutputDir :: String -> DynFlags -> DynFlags
+setObjectDir, setHiDir, setHieDir, setStubDir, setOutputDir :: String -> DynFlags -> DynFlags
 setObjectDir  f d = d{ objectDir  = Just f}
 setHiDir      f d = d{ hiDir      = Just f}
+setHieDir     f d = d{ hieDir     = Just f}
 setStubDir    f d = d{ stubDir    = Just f
                      , includePaths = addGlobalInclude (includePaths d) [f] }
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
   -- \#included from the .hc file when compiling with -fvia-C.
-setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f
+setOutputDir  f = setObjectDir f . setHiDir f . setHieDir f . setStubDir f
+
+
+-------------------------------------------------------------------------------
+-- * 'StringBuffer' and 'ByteString'
+-------------------------------------------------------------------------------
+-- We get away with a bunch of these functions because 'StringBuffer' and
+-- 'ByteString' have almost exactly the same structure.
+
+-- | Convert a UTF-8 encoded 'ByteString' into a 'StringBuffer. This really
+-- relies on the internals of both 'ByteString' and 'StringBuffer'.
+--
+-- /O(n)/ (but optimized into a @memcpy@ by @bytestring@ under the hood)
+stringBufferFromByteString :: ByteString -> StringBuffer
+stringBufferFromByteString bs =
+  let BS.PS fp off len = bs <> BS.pack [0,0,0]
+  in S.StringBuffer { S.buf = fp, S.len = len - 3, S.cur = off }
+
+-- | Take the first @n@ /bytes/ of the 'StringBuffer' and put them in a
+-- 'ByteString'.
+--
+-- /O(1)/
+takeStringBuffer :: Int -> StringBuffer -> ByteString
+takeStringBuffer !n !(S.StringBuffer fp _ cur) = BS.PS fp cur n
+
+-- | Return the prefix of the first 'StringBuffer' that /isn't/ in the second
+-- 'StringBuffer'. **The behavior is undefined if the 'StringBuffers' use
+-- separate buffers.**
+--
+-- /O(1)/
+splitStringBuffer :: StringBuffer -> StringBuffer -> ByteString
+splitStringBuffer buf1 buf2 = takeStringBuffer n buf1
+  where n = S.byteDiff buf1 buf2
+
+-- | Split the 'StringBuffer' at the next newline (or the end of the buffer).
+-- Also: initial position is passed in and the updated position is returned.
+--
+-- /O(n)/ (but /O(1)/ space)
+spanLine :: RealSrcLoc -> StringBuffer -> (ByteString, RealSrcLoc, StringBuffer)
+spanLine !loc !buf = go loc buf
+  where
+
+  go !l !b
+    | not (S.atEnd b)
+    = case S.nextChar b of
+        ('\n', b') -> (splitStringBuffer buf b', advanceSrcLoc l '\n', b')
+        (c,    b') -> go (advanceSrcLoc l c) b'
+    | otherwise
+    = (splitStringBuffer buf b, advanceSrcLoc l '\n', b)
+
+-- | Given a start position and a buffer with that start position, split the
+-- buffer at an end position.
+--
+-- /O(n)/ (but /O(1)/ space)
+spanPosition :: RealSrcLoc   -- ^ start of buffeer
+             -> RealSrcLoc   -- ^ position until which to take
+             -> StringBuffer -- ^ buffer from which to take
+             -> (ByteString, StringBuffer)
+spanPosition !start !end !buf = go start buf
+  where
+
+  go !l !b
+    | l < end
+    , not (S.atEnd b)
+    , (c, b') <- S.nextChar b
+    = go (advanceSrcLoc l c) b'
+    | otherwise
+    = (splitStringBuffer buf b, b)
+
+-- | Try to parse a line of CPP from the from of the buffer. A \"line\" of CPP
+-- consists of
+--
+--   * at most 10 whitespace characters, including at least one newline
+--   * a @#@ character
+--   * keep parsing lines until you find a line not ending in @\\@.
+--
+-- This is chock full of heuristics about what a line of CPP is.
+--
+-- /O(n)/ (but /O(1)/ space)
+tryCppLine :: RealSrcLoc -> StringBuffer -> Maybe (ByteString, RealSrcLoc, StringBuffer)
+tryCppLine !loc !buf = spanSpace (S.prevChar buf '\n' == '\n') loc buf
+  where
+
+  -- Keep consuming space characters until we hit either a @#@ or something
+  -- else. If we hit a @#@, start parsing CPP
+  spanSpace !seenNl !l !b
+    | S.atEnd b
+    = Nothing
+    | otherwise
+    = case S.nextChar b of
+        ('#' , b') | not (S.atEnd b')
+                   , ('-', b'') <- S.nextChar b'
+                   , ('}', _) <- S.nextChar b''
+                   -> Nothing -- Edge case exception for @#-}@
+                   | seenNl
+                   -> Just (spanCppLine (advanceSrcLoc l '#') b') -- parse CPP
+                   | otherwise
+                   -> Nothing -- We didn't see a newline, so this can't be CPP!
+
+        (c   , b') | isSpace c -> spanSpace (seenNl || c == '\n')
+                                            (advanceSrcLoc l c) b'
+                   | otherwise -> Nothing
+
+  -- Consume a CPP line to its "end" (basically the first line that ends not
+  -- with a @\@ character)
+  spanCppLine !l !b
+    | S.atEnd b
+    = (splitStringBuffer buf b, l, b)
+    | otherwise
+    = case S.nextChar b of
+        ('\\', b') | not (S.atEnd b')
+                   , ('\n', b'') <- S.nextChar b'
+                   -> spanCppLine (advanceSrcLoc (advanceSrcLoc l '\\') '\n') b''
+
+        ('\n', b') -> (splitStringBuffer buf b', advanceSrcLoc l '\n', b')
+
+        (c   , b') -> spanCppLine (advanceSrcLoc l c) b'
+

@@ -39,6 +39,7 @@ import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Options
 import Haddock.Utils
+import Haddock.GhcUtils (modifySessionDynFlags, setOutputDir)
 
 import Control.Monad hiding (forM_)
 import Data.Foldable (forM_, foldl')
@@ -66,6 +67,8 @@ import qualified GHC.Paths as GhcPaths
 import Paths_haddock_api (getDataDir)
 import System.Directory (doesDirectoryExist)
 #endif
+import System.Directory (getTemporaryDirectory)
+import System.FilePath ((</>))
 
 import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
@@ -164,6 +167,15 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   -- bypass the interface version check
   let noChecks = Flag_BypassInterfaceVersonCheck `elem` flags
 
+  -- Create a temporary directory and redirect GHC output there (unless user
+  -- requested otherwise).
+  --
+  -- Output dir needs to be set before calling 'depanal' since 'depanal' uses it
+  -- to compute output file names that are stored in the 'DynFlags' of the
+  -- resulting 'ModSummary's.
+  let withDir | Flag_NoTmpCompDir `elem` flags = id
+              | otherwise = withTempOutputDir
+
   unless (Flag_NoWarnings `elem` flags) $ do
     hypSrcWarnings flags
     forM_ (warnings args) $ \warning -> do
@@ -171,7 +183,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
     when noChecks $
       hPutStrLn stderr noCheckWarning
 
-  ghc flags' $ do
+  ghc flags' $ withDir $ do
     dflags <- getDynFlags
 
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
@@ -202,6 +214,15 @@ haddockWithGhc ghc args = handleTopExceptions $ do
       -- Render even though there are no input files (usually contents/index).
       liftIO $ renderStep dflags flags sinceQual qual packages []
 
+-- | Run the GHC action using a temporary output directory
+withTempOutputDir :: Ghc a -> Ghc a
+withTempOutputDir action = do
+  tmp <- liftIO getTemporaryDirectory
+  x   <- liftIO getProcessID
+  let dir = tmp </> ".haddock-" ++ show x
+  modifySessionDynFlags (setOutputDir dir)
+  withTempDir dir action
+
 -- | Create warnings about potential misuse of -optghc
 warnings :: [String] -> [String]
 warnings = map format . filter (isPrefixOf "-optghc")
@@ -221,8 +242,9 @@ withGhc flags action = do
   let handleSrcErrors action' = flip handleSourceError action' $ \err -> do
         printException err
         liftIO exitFailure
+      needHieFiles = Flag_HyperlinkedSource `elem` flags
 
-  withGhc' libDir (ghcFlags flags) (\_ -> handleSrcErrors action)
+  withGhc' libDir needHieFiles (ghcFlags flags) (\_ -> handleSrcErrors action)
 
 
 readPackagesAndProcessModules :: [Flag] -> [String]
@@ -444,14 +466,10 @@ readInterfaceFiles name_cache_accessor pairs bypass_version_check = do
 
 -- | Start a GHC session with the -haddock flag set. Also turn off
 -- compilation and linking. Then run the given 'Ghc' action.
-withGhc' :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
-withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
-  dynflags  <- getSessionDynFlags
-  dynflags' <- parseGhcFlags (gopt_set dynflags Opt_Haddock) {
-    hscTarget = HscNothing,
-    ghcMode   = CompManager,
-    ghcLink   = NoLink
-    }
+withGhc' :: String -> Bool -> [String] -> (DynFlags -> Ghc a) -> IO a
+withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
+  dynflags' <- parseGhcFlags =<< getSessionDynFlags
+
   -- We disable pattern match warnings because than can be very
   -- expensive to check
   let dynflags'' = unsetPatternMatchWarnings $
@@ -482,11 +500,19 @@ withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
     parseGhcFlags dynflags = do
       -- TODO: handle warnings?
 
-      let flags' = filterRtsFlags flags
-      (dynflags', rest, _) <- parseDynamicFlags dynflags (map noLoc flags')
+      let extra_opts | needHieFiles = [Opt_WriteHie, Opt_Haddock]
+                     | otherwise = [Opt_Haddock]
+          dynflags' = (foldl' gopt_set dynflags extra_opts)
+                        { hscTarget = HscNothing
+                        , ghcMode   = CompManager
+                        , ghcLink   = NoLink
+                        }
+          flags' = filterRtsFlags flags
+
+      (dynflags'', rest, _) <- parseDynamicFlags dynflags' (map noLoc flags')
       if not (null rest)
         then throwE ("Couldn't parse GHC options: " ++ unwords flags')
-        else return dynflags'
+        else return dynflags''
 
 unsetPatternMatchWarnings :: DynFlags -> DynFlags
 unsetPatternMatchWarnings dflags =

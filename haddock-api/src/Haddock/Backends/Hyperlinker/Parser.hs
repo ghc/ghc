@@ -1,213 +1,212 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Haddock.Backends.Hyperlinker.Parser (parse) where
 
-import Data.Either         ( isRight, isLeft )
-import Data.List           ( foldl', isPrefixOf, isSuffixOf )
-import Data.Maybe          ( maybeToList )
-import Data.Char           ( isSpace )
-import qualified Text.Read as R
+import Control.Applicative ( Alternative(..) )
+import Data.List           ( isPrefixOf, isSuffixOf )
 
-import GHC                 ( DynFlags, addSourceToTokens )
-import SrcLoc
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC
+
+import GHC.LanguageExtensions.Type
+
+import BasicTypes          ( IntegralLit(..) )
+import DynFlags
+import qualified EnumSet as E
+import ErrUtils            ( emptyMessages )
 import FastString          ( mkFastString )
-import StringBuffer        ( stringToStringBuffer )
-import Lexer               ( Token(..) )
-import qualified Lexer as L
+import Lexer               ( P(..), ParseResult(..), PState(..), Token(..)
+                           , mkPStatePure, lexer, mkParserFlags' )
+import Outputable          ( showSDoc, panic )
+import SrcLoc
+import StringBuffer        ( StringBuffer, atEnd )
 
 import Haddock.Backends.Hyperlinker.Types as T
-
+import Haddock.GhcUtils
 
 -- | Turn source code string into a stream of more descriptive tokens.
 --
--- Result should retain original file layout (including comments, whitespace,
--- etc.), i.e. the following "law" should hold:
---
--- prop> concat . map tkValue . parse = id
---
--- (In reality, this only holds for input not containing '\r', '\t', '\f', '\v',
--- characters, since GHC transforms those into ' ' and '\n')
-parse :: DynFlags -> FilePath -> String -> [T.Token]
-parse dflags fp = ghcToks . processCPP dflags fp . filterCRLF
+-- Result should retain original file layout (including comments,
+-- whitespace, and CPP).
+parse
+  :: CompilerInfo  -- ^ Underlying CC compiler (whatever expanded CPP)
+  -> DynFlags      -- ^ Flags for this module
+  -> FilePath      -- ^ Path to the source of this module
+  -> BS.ByteString -- ^ Raw UTF-8 encoded source of this module
+  -> [T.Token]
+parse comp dflags fpath bs = case unP (go False []) initState of
+    POk _ toks -> reverse toks
+    PFailed _ ss errMsg -> panic $ "Hyperlinker parse error at " ++ show ss ++
+                                   ": " ++ showSDoc dflags errMsg
   where
-    -- Remove CRLFs from source
-    filterCRLF :: String -> String
-    filterCRLF ('\r':'\n':cs) = '\n' : filterCRLF cs
-    filterCRLF (c:cs) = c : filterCRLF cs
-    filterCRLF [] = []
 
--- | Parse the source into tokens using the GHC lexer.
---
---   * CPP lines are removed and reinserted as line-comments
---   * top-level file pragmas are parsed as block comments (see the
---     'ITblockComment' case of 'classify' for more details)
---
-processCPP :: DynFlags    -- ^ GHC's flags
-           -> FilePath    -- ^ source file name (for position information)
-           -> String      -- ^ source file contents
-           -> [(Located L.Token, String)]
-processCPP dflags fpath s = addSrc . go start . splitCPP $ s
-  where
+    initState = mkPStatePure pflags buf start
+    buf = stringBufferFromByteString bs
     start = mkRealSrcLoc (mkFastString fpath) 1 1
-    addSrc = addSourceToTokens start (stringToStringBuffer s)
+    needPragHack' = needPragHack comp dflags
+    pflags = mkParserFlags' (warningFlags dflags)
+                            (extensionFlags dflags)
+                            (thisPackage dflags)
+                            (safeImportsOn dflags)
+                            False -- lex Haddocks as comment tokens
+                            True  -- produce comment tokens
+                            False -- produce position pragmas tokens
 
-    -- Transform a list of Haskell/CPP lines into a list of tokens
-    go :: RealSrcLoc -> [Either String String] -> [Located L.Token]
-    go _   [] = []
-    go pos ls =
-      let (hLinesRight,  ls')  = span isRight ls
-          (cppLinesLeft, rest) = span isLeft ls'
+    go :: Bool        -- ^ are we currently in a pragma?
+       -> [T.Token]   -- ^ tokens accumulated so far (in reverse)
+       -> P [T.Token]
+    go inPrag toks = do
+      (b, _) <- getInput
+      if not (atEnd b)
+        then do
+          (newToks, inPrag') <- parseCppLine <|> parsePlainTok inPrag <|> unknownLine
+          go inPrag' (newToks ++ toks)
+        else
+          pure toks
 
-          hSrc   = concat [ hLine   | Right hLine  <- hLinesRight  ]
-          cppSrc = concat [ cppLine | Left cppLine <- cppLinesLeft ]
+    -- | Like 'Lexer.lexer', but slower, with a better API, and filtering out empty tokens
+    wrappedLexer :: P (RealLocated Lexer.Token)
+    wrappedLexer = Lexer.lexer False andThen
+      where andThen (L (RealSrcSpan s) t)
+              | srcSpanStartLine s /= srcSpanEndLine s ||
+                srcSpanStartCol s /= srcSpanEndCol s
+              = pure (L s t)
+            andThen (L (RealSrcSpan s) ITeof) = pure (L s ITeof)
+            andThen _ = wrappedLexer
 
-      in case L.lexTokenStream (stringToStringBuffer hSrc) pos dflags of
+    -- | Try to parse a CPP line (can fail)
+    parseCppLine :: P ([T.Token], Bool)
+    parseCppLine = do
+      (b, l) <- getInput
+      case tryCppLine l b of
+        Just (cppBStr, l', b')
+             -> let cppTok = T.Token { tkType = TkCpp
+                                     , tkValue = cppBStr
+                                     , tkSpan = mkRealSrcSpan l l' }
+                in setInput (b', l') *> pure ([cppTok], False)
+        _    -> empty
 
-           -- Stuff that fails to lex gets turned into comments
-           L.PFailed _ _ss _msg ->
-             let (src_pos, failed) = mkToken ITunknown pos hSrc
-                 (new_pos, cpp)    = mkToken ITlineComment src_pos cppSrc
-             in failed : cpp : go new_pos rest
+    -- | Try to parse a regular old token (can fail)
+    parsePlainTok :: Bool -> P ([T.Token], Bool)  -- return list is only ever 0-2 elements
+    parsePlainTok inPrag = do
+      (bInit, lInit) <- getInput
+      L sp tok <- Lexer.lexer False return
+      (bEnd, _) <- getInput
+      case sp of
+        UnhelpfulSpan _ -> pure ([], False) -- pretend the token never existed
+        RealSrcSpan rsp -> do
+          let typ = if inPrag then TkPragma else classify tok
+              RealSrcLoc lStart = srcSpanStart sp -- safe since @sp@ is real
+              (spaceBStr, bStart) = spanPosition lInit lStart bInit
+              inPragDef = inPragma inPrag tok
 
-           -- Successfully lexed
-           L.POk ss toks ->
-             let (new_pos, cpp) = mkToken ITlineComment (L.loc ss) cppSrc
-             in toks ++ [cpp] ++ go new_pos rest
+          (bEnd', inPrag') <- case tok of
 
-    -- Manually make a token from a 'String', advancing the cursor position
-    mkToken tok start' str =
-      let end = foldl' advanceSrcLoc start' str
-      in (end, L (RealSrcSpan $ mkRealSrcSpan start' end) (tok str))
+            -- Update internal line + file position if this is a LINE pragma
+            ITline_prag _ -> tryOrElse (bEnd, inPragDef) $ do
+              L _ (ITinteger (IL { il_value = line })) <- wrappedLexer
+              L _ (ITstring _ file)                    <- wrappedLexer
+              L spF ITclose_prag                       <- wrappedLexer
+
+              let newLoc = mkRealSrcLoc file (fromIntegral line - 1) (srcSpanEndCol spF)
+              (bEnd'', _) <- getInput
+              setInput (bEnd'', newLoc)
+
+              pure (bEnd'', False)
+
+            -- Update internal column position if this is a COLUMN pragma
+            ITcolumn_prag _ -> tryOrElse (bEnd, inPragDef) $ do
+              L _ (ITinteger (IL { il_value = col }))  <- wrappedLexer
+              L spF ITclose_prag                       <- wrappedLexer
+
+              let newLoc = mkRealSrcLoc (srcSpanFile spF) (srcSpanEndLine spF) (fromIntegral col)
+              (bEnd'', _) <- getInput
+              setInput (bEnd'', newLoc)
+
+              pure (bEnd'', False)
+
+            -- See 'needPragHack'
+            ITclose_prag{}
+              | needPragHack'
+              , '\n' `BSC.elem` spaceBStr
+              -> getInput >>= \(b,p) -> setInput (b,advanceSrcLoc p '\n') >> pure (bEnd, False)
+
+            _ -> pure (bEnd, inPragDef)
+
+          let tokBStr = splitStringBuffer bStart bEnd'
+              plainTok = T.Token { tkType = typ
+                                 , tkValue = tokBStr
+                                 , tkSpan = rsp }
+              spaceTok = T.Token { tkType = TkSpace
+                                 , tkValue = spaceBStr
+                                 , tkSpan = mkRealSrcSpan lInit lStart }
+
+          pure (plainTok : [ spaceTok | not (BS.null spaceBStr) ], inPrag')
+
+    -- | Parse whatever remains of the line as an unknown token (can't fail)
+    unknownLine :: P ([T.Token], Bool)
+    unknownLine = do
+      (b, l) <- getInput
+      let (unkBStr, l', b') = spanLine l b
+          unkTok = T.Token { tkType = TkUnknown
+                           , tkValue = unkBStr
+                           , tkSpan = mkRealSrcSpan l l' }
+      setInput (b', l')
+      pure ([unkTok], False)
 
 
--- | Split apart the initial file into Haskell source lines ('Left' entries) and
--- CPP lines ('Right' entries).
+-- | This is really, really, /really/ gross. Problem: consider a Haskell
+-- file that looks like:
 --
--- All characters in the input are present in the output:
+-- @
+-- {-# LANGUAGE CPP #-}
+-- module SomeMod where
 --
--- prop> concat . map (either id id) . splitCPP = id
-splitCPP :: String -> [Either String String]
-splitCPP "" = []
-splitCPP s | isCPPline s = Left l : splitCPP rest
-           | otherwise =  Right l : splitCPP rest
+-- #define SIX 6
+--
+-- {-# INLINE foo
+--   #-}
+-- foo = 1
+-- @
+--
+-- Clang's CPP replaces the @#define SIX 6@ line with an empty line (as it
+-- should), but get confused about @#-}@. I'm guessing it /starts/ by
+-- parsing that as a pre-processor directive and, when it fails to, it just
+-- leaves the line alone. HOWEVER, it still adds an extra newline. =.=
+--
+-- This function makes sure that the Hyperlinker backend also adds that
+-- extra newline (or else our spans won't line up with GHC's anymore).
+needPragHack :: CompilerInfo -> DynFlags -> Bool
+needPragHack comp dflags = isCcClang && E.member Cpp (extensionFlags dflags)
   where
-    ~(l, rest) = spanToNewline 0 s
+    isCcClang = case comp of
+      GCC -> False
+      Clang -> True
+      AppleClang -> True
+      AppleClang51 -> True
+      UnknownCC -> False
+
+-- | Get the input
+getInput :: P (StringBuffer, RealSrcLoc)
+getInput = P $ \p @ PState { buffer = buf, loc = srcLoc } -> POk p (buf, srcLoc)
+
+-- | Set the input
+setInput :: (StringBuffer, RealSrcLoc) -> P ()
+setInput (buf, srcLoc) = P $ \p -> POk (p { buffer = buf, loc = srcLoc }) ()
 
 
--- | Heuristic to decide if a line is going to be a CPP line. This should be a
--- cheap operation since it is going to be run on every line being processed.
---
--- Right now it just checks if the first non-whitespace character in the first
--- five characters of the line is a '#':
---
--- >>> isCPPline "#define FOO 1"
--- True
---
--- >>> isCPPline "\t\t  #ifdef GHC"
--- True
---
--- >>> isCPPline "       #endif"
--- False
---
-isCPPline :: String -> Bool
-isCPPline = isPrefixOf "#" . dropWhile (`elem` " \t") . take 5
+-- | Orphan instance that adds backtracking to 'P'
+instance Alternative P where
+  empty = P $ \_ -> PFailed (const emptyMessages) noSrcSpan "Alterative.empty"
+  P x <|> P y = P $ \s -> case x s of { p@POk{} -> p
+                                      ; _ -> y s }
 
-
--- | Split a "line" off the front of a string, hopefully without cutting tokens
--- in half. I say "hopefully" because knowing what a token is requires lexing,
--- yet lexing depends on this function.
---
--- All characters in the input are present in the output:
---
--- prop> curry (++) . spanToNewLine 0 = id
-spanToNewline :: Int                 -- ^ open '{-'
-              -> String              -- ^ input
-              -> (String, String)
-
--- Base case and space characters
-spanToNewline _ "" = ("", "")
-spanToNewline n ('\n':str) | n <= 0 = ("\n", str)
-spanToNewline n ('\n':str) | n <= 0 = ("\n", str)
-spanToNewline n ('\\':'\n':str) =
-    let (str', rest) = spanToNewline n str
-    in ('\\':'\n':str', rest)
-
--- Block comments
-spanToNewline n ('{':'-':str) =
-    let (str', rest) = spanToNewline (n+1) str
-    in ('{':'-':str', rest)
-spanToNewline n ('-':'}':str) =
-    let (str', rest) = spanToNewline (n-1) str
-    in ('-':'}':str', rest)
-
--- When not in a block comment, try to lex a Haskell token
-spanToNewline 0 str@(c:_) | ((lexed, str') : _) <- R.lex str, not (isSpace c) =
-    if all (== '-') lexed && length lexed >= 2
-      -- A Haskell line comment
-      then case span (/= '\n') str' of
-             (str'', '\n':rest) -> (lexed ++ str'' ++ "\n", rest)
-             (_, _) -> (str, "")
-
-      -- An actual Haskell token
-      else let (str'', rest) = spanToNewline 0 str'
-           in (lexed ++ str'', rest)
-
--- In all other cases, advance one character at a time
-spanToNewline n (c:str) =
-    let (str', rest) = spanToNewline n str
-    in (c:str', rest)
-
-
--- | Turn a list of GHC's 'L.Token' (and their source 'String') into a list of
--- Haddock's 'T.Token'.
-ghcToks :: [(Located L.Token, String)] -> [T.Token]
-ghcToks = reverse . (\(_,ts,_) -> ts) . foldl' go (start, [], False)
-  where
-    start = mkRealSrcLoc (mkFastString "lexing") 1 1
-
-    go :: (RealSrcLoc, [T.Token], Bool)
-       -- ^ current position, tokens accumulated, currently in pragma (or not)
-
-       -> (Located L.Token, String)
-       -- ^ next token, its content
-
-       -> (RealSrcLoc, [T.Token], Bool)
-       -- ^ new position, new tokens accumulated, currently in pragma (or not)
-
-    go (pos, toks, in_prag) (L l tok, raw) =
-        ( next_pos
-        , classifiedTok ++ maybeToList white ++ toks
-        , inPragma in_prag tok
-        )
-       where
-         (next_pos, white) = mkWhitespace pos l
-
-         classifiedTok = [ Token (classify' tok) raw rss
-                         | RealSrcSpan rss <- [l]
-                         , not (null raw)
-                         ]
-
-         classify' | in_prag = const TkPragma
-                   | otherwise = classify
-
-
--- | Find the correct amount of whitespace between tokens.
-mkWhitespace :: RealSrcLoc -> SrcSpan -> (RealSrcLoc, Maybe T.Token)
-mkWhitespace prev spn =
-  case spn of
-    UnhelpfulSpan _ -> (prev,Nothing)
-    RealSrcSpan s | null wsstring -> (end, Nothing)
-                  | otherwise -> (end, Just (Token TkSpace wsstring wsspan))
-      where
-        start = realSrcSpanStart s
-        end = realSrcSpanEnd s
-        wsspan = mkRealSrcSpan prev start
-        nls = srcLocLine start - srcLocLine prev
-        spaces = if nls == 0 then srcLocCol start - srcLocCol prev
-                             else srcLocCol start - 1
-        wsstring = replicate nls '\n' ++ replicate spaces ' '
-
+-- | Try a parser. If it fails, backtrack and return the pure value.
+tryOrElse :: a -> P a -> P a
+tryOrElse x p = p <|> pure x
 
 -- | Classify given tokens as appropriate Haskell token type.
-classify :: L.Token -> TokenType
+classify :: Lexer.Token -> TokenType
 classify tok =
   case tok of
     ITas                   -> TkKeyword
@@ -382,12 +381,7 @@ classify tok =
     ITunknown           {} -> TkUnknown
     ITeof                  -> TkUnknown
 
-    -- Line comments are only supposed to start with '--'. Starting with '#'
-    -- means that this was probably a CPP.
-    ITlineComment s
-      | isCPPline s        -> TkCpp
-      | otherwise          -> TkComment
-
+    ITlineComment       {} -> TkComment
     ITdocCommentNext    {} -> TkComment
     ITdocCommentPrev    {} -> TkComment
     ITdocCommentNamed   {} -> TkComment
@@ -404,9 +398,9 @@ classify tok =
       | otherwise          -> TkComment
 
 -- | Classify given tokens as beginning pragmas (or not).
-inPragma :: Bool     -- ^ currently in pragma
-         -> L.Token  -- ^ current token
-         -> Bool     -- ^ new information about whether we are in a pragma
+inPragma :: Bool           -- ^ currently in pragma
+         -> Lexer.Token    -- ^ current token
+         -> Bool           -- ^ new information about whether we are in a pragma
 inPragma _ ITclose_prag = False
 inPragma True _ = True
 inPragma False tok =

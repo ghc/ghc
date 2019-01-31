@@ -33,7 +33,7 @@ module Haddock.Utils (
 
   -- * Miscellaneous utilities
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
-  writeUtf8File,
+  writeUtf8File, withTempDir,
 
   -- * HTML cross reference mapping
   html_xrefs_ref, html_xrefs_ref',
@@ -62,6 +62,7 @@ import Haddock.Types
 import Haddock.GhcUtils
 
 import BasicTypes ( PromotionFlag(..) )
+import Exception (ExceptionMonad)
 import GHC
 import Name
 import Outputable ( panic )
@@ -76,6 +77,7 @@ import Data.List ( isSuffixOf )
 import Data.Maybe ( mapMaybe )
 import System.Environment ( getProgName )
 import System.Exit
+import System.Directory ( createDirectory, removeDirectoryRecursive )
 import System.IO ( hPutStr, hSetEncoding, IOMode(..), stderr, utf8, withFile )
 import System.IO.Unsafe ( unsafePerformIO )
 import qualified System.FilePath.Posix as HtmlPath
@@ -405,6 +407,10 @@ writeUtf8File :: FilePath -> String -> IO ()
 writeUtf8File filepath contents = withFile filepath WriteMode $ \h -> do
     hSetEncoding h utf8
     hPutStr h contents
+
+withTempDir :: (ExceptionMonad m) => FilePath -> m a -> m a
+withTempDir dir = gbracket_ (liftIO $ createDirectory dir)
+                            (liftIO $ removeDirectoryRecursive dir)
 
 -----------------------------------------------------------------------------
 -- * HTML cross references

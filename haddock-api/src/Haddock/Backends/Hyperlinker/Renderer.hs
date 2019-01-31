@@ -1,4 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Haddock.Backends.Hyperlinker.Renderer (render) where
 
@@ -6,15 +10,19 @@ module Haddock.Backends.Hyperlinker.Renderer (render) where
 import Haddock.Backends.Hyperlinker.Types
 import Haddock.Backends.Hyperlinker.Utils
 
-import qualified GHC
-import qualified Name as GHC
-import qualified Unique as GHC
+import qualified Data.ByteString as BS
+
+import HieTypes
+import Module   ( ModuleName, moduleNameString )
+import Name     ( getOccString, isInternalName, Name, nameModule, nameUnique )
+import SrcLoc
+import Unique   ( getKey )
+import Encoding ( utf8DecodeByteString )
 
 import System.FilePath.Posix ((</>))
 
-import Data.List
-import Data.Maybe
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Text.XHtml (Html, HtmlAttr, (!))
 import qualified Text.XHtml as Html
@@ -22,22 +30,24 @@ import qualified Text.XHtml as Html
 
 type StyleClass = String
 
+-- | Produce the HTML corresponding to a hyperlinked Haskell source
+render
+  :: Maybe FilePath    -- ^ path to the CSS file
+  -> Maybe FilePath    -- ^ path to the JS file
+  -> SrcMaps            -- ^ Paths to sources
+  -> HieAST PrintedType  -- ^ ASTs from @.hie@ files
+  -> [Token]       -- ^ tokens to render
+  -> Html
+render mcss mjs srcs ast tokens = header mcss mjs <> body srcs ast tokens
 
-render :: Maybe FilePath -> Maybe FilePath -> SrcMap -> [RichToken]
-       -> Html
-render mcss mjs srcs tokens = header mcss mjs <> body srcs tokens
-
-body :: SrcMap -> [RichToken] -> Html
-body srcs tokens = Html.body . Html.pre $ hypsrc
+body :: SrcMaps -> HieAST PrintedType -> [Token] -> Html
+body srcs ast tokens = Html.body . Html.pre $ hypsrc
   where
-    hypsrc = mconcat . map (richToken srcs) $ tokens
-
+    hypsrc = renderWithAst srcs ast tokens
 
 header :: Maybe FilePath -> Maybe FilePath -> Html
-header mcss mjs
-    | isNothing mcss && isNothing mjs = Html.noHtml
-header mcss mjs =
-    Html.header $ css mcss <> js mjs
+header Nothing Nothing = Html.noHtml
+header mcss mjs = Html.header $ css mcss <> js mjs
   where
     css Nothing = Html.noHtml
     css (Just cssFile) = Html.thelink Html.noHtml !
@@ -51,25 +61,132 @@ header mcss mjs =
         , Html.src scriptFile
         ]
 
--- | Given information about the source position of definitions, render a token
-richToken :: SrcMap -> RichToken -> Html
-richToken srcs (RichToken Token{..} details)
-    | tkType == TkSpace = renderSpace (GHC.srcSpanStartLine tkSpan) tkValue
-    | otherwise = linked content
+
+splitTokens :: HieAST PrintedType -> [Token] -> ([Token],[Token],[Token])
+splitTokens ast toks = (before,during,after)
   where
+    (before,rest) = span leftOf toks
+    (during,after) = span inAst rest
+    leftOf t = realSrcSpanEnd (tkSpan t) <= realSrcSpanStart nodeSp
+    inAst t = nodeSp `containsSpan` tkSpan t
+    nodeSp = nodeSpan ast
+
+-- | Turn a list of tokens into hyperlinked sources, threading in relevant link
+-- information from the 'HieAST'.
+renderWithAst :: SrcMaps -> HieAST PrintedType -> [Token] -> Html
+renderWithAst srcs Node{..} toks = anchored $ case toks of
+
+    [tok] | nodeSpan == tkSpan tok -> richToken srcs nodeInfo tok
+
+    -- NB: the GHC lexer lexes backquoted identifiers and parenthesized operators
+    -- as multiple tokens.
+    --
+    --  * @a `elem` b@ turns into @[a, `, elem, `, b]@ (excluding space tokens)
+    --  * @(+) 1 2@    turns into @[(, +, ), 1, 2]@    (excluding space tokens)
+    --
+    -- However, the HIE ast considers @`elem`@ and @(+)@ to be single nodes. In
+    -- order to make sure these get hyperlinked properly, we intercept these
+    -- special sequences of tokens and merge them into just one identifier or
+    -- operator token.
+    [BacktickTok s1, tok @ Token{ tkType = TkIdentifier }, BacktickTok s2]
+          | realSrcSpanStart s1 == realSrcSpanStart nodeSpan
+          , realSrcSpanEnd s2   == realSrcSpanEnd nodeSpan
+          -> richToken srcs nodeInfo
+                       (Token{ tkValue = "`" <> tkValue tok <> "`"
+                             , tkType = TkOperator
+                             , tkSpan = nodeSpan })
+    [OpenParenTok s1, tok @ Token{ tkType = TkOperator }, CloseParenTok s2]
+          | realSrcSpanStart s1 == realSrcSpanStart nodeSpan
+          , realSrcSpanEnd s2   == realSrcSpanEnd nodeSpan
+          -> richToken srcs nodeInfo
+                       (Token{ tkValue = "(" <> tkValue tok <> ")"
+                             , tkType = TkOperator
+                             , tkSpan = nodeSpan })
+
+    _ -> go nodeChildren toks
+  where
+    go _ [] = mempty
+    go [] xs = foldMap renderToken xs
+    go (cur:rest) xs =
+        foldMap renderToken before <> renderWithAst srcs cur during <> go rest after
+      where
+        (before,during,after) = splitTokens cur xs
+    anchored c = Map.foldrWithKey anchorOne c (nodeIdentifiers nodeInfo)
+    anchorOne n dets c = externalAnchor n d $ internalAnchor n d c
+      where d = identInfo dets
+
+renderToken :: Token -> Html
+renderToken Token{..}
+    | BS.null tkValue = mempty
+    | tkType == TkSpace = renderSpace (srcSpanStartLine tkSpan) tkValue'
+    | otherwise = tokenSpan ! [ multiclass style ]
+  where
+    tkValue' = filterCRLF $ utf8DecodeByteString tkValue
+    style = tokenStyle tkType
+    tokenSpan = Html.thespan (Html.toHtml tkValue')
+
+
+-- | Given information about the source position of definitions, render a token
+richToken :: SrcMaps -> NodeInfo PrintedType -> Token -> Html
+richToken srcs details Token{..}
+    | tkType == TkSpace = renderSpace (srcSpanStartLine tkSpan) tkValue'
+    | otherwise = annotate details $ linked content
+  where
+    tkValue' = filterCRLF $ utf8DecodeByteString tkValue
     content = tokenSpan ! [ multiclass style ]
-    tokenSpan = Html.thespan (Html.toHtml tkValue)
-    style = tokenStyle tkType ++ maybe [] richTokenStyle details
+    tokenSpan = Html.thespan (Html.toHtml tkValue')
+    style = tokenStyle tkType ++ concatMap (richTokenStyle (null (nodeType details))) contexts
+
+    contexts = concatMap (Set.elems . identInfo) . Map.elems . nodeIdentifiers $ details
+
+    -- pick an arbitary identifier to hyperlink with
+    identDet = Map.lookupMin . nodeIdentifiers $ details
 
     -- If we have name information, we can make links
-    linked = case details of
-      Just d -> externalAnchor d . internalAnchor d . hyperlink srcs d
+    linked = case identDet of
+      Just (n,_) -> hyperlink srcs n
       Nothing -> id
 
-richTokenStyle :: TokenDetails -> [StyleClass]
-richTokenStyle (RtkVar _) = ["hs-var"]
-richTokenStyle (RtkType _) = ["hs-type"]
-richTokenStyle _ = []
+-- | Remove CRLFs from source
+filterCRLF :: String -> String
+filterCRLF ('\r':'\n':cs) = '\n' : filterCRLF cs
+filterCRLF (c:cs) = c : filterCRLF cs
+filterCRLF [] = []
+
+annotate :: NodeInfo PrintedType -> Html -> Html
+annotate  ni content =
+    Html.thespan (annot <> content) ! [ Html.theclass "annot" ]
+  where
+    annot
+      | not (null annotation) =
+          Html.thespan (Html.toHtml annotation) ! [ Html.theclass "annottext" ]
+      | otherwise = mempty
+    annotation = typ ++ identTyps
+    typ = unlines (nodeType ni)
+    typedIdents = [ (n,t) | (n, identType -> Just t) <- Map.toList $ nodeIdentifiers ni ]
+    identTyps
+      | length typedIdents > 1 || null (nodeType ni)
+          = concatMap (\(n,t) -> printName n ++ " :: " ++ t ++ "\n") typedIdents
+      | otherwise = ""
+
+    printName :: Either ModuleName Name -> String
+    printName = either moduleNameString getOccString
+
+richTokenStyle
+  :: Bool         -- ^ are we lacking a type annotation?
+  -> ContextInfo  -- ^ in what context did this token show up?
+  -> [StyleClass]
+richTokenStyle True  Use           = ["hs-type"]
+richTokenStyle False Use           = ["hs-var"]
+richTokenStyle  _    RecField{}    = ["hs-var"]
+richTokenStyle  _    PatternBind{} = ["hs-var"]
+richTokenStyle  _    MatchBind{}   = ["hs-var"]
+richTokenStyle  _    TyVarBind{}   = ["hs-type"]
+richTokenStyle  _    ValBind{}     = ["hs-var"]
+richTokenStyle  _    TyDecl        = ["hs-type"]
+richTokenStyle  _    ClassTyDecl{} = ["hs-type"]
+richTokenStyle  _    Decl{}        = ["hs-var"]
+richTokenStyle  _    IEThing{}     = []  -- could be either a value or type
 
 tokenStyle :: TokenType -> [StyleClass]
 tokenStyle TkIdentifier = ["hs-identifier"]
@@ -87,61 +204,70 @@ tokenStyle TkPragma = ["hs-pragma"]
 tokenStyle TkUnknown = []
 
 multiclass :: [StyleClass] -> HtmlAttr
-multiclass = Html.theclass . intercalate " "
+multiclass = Html.theclass . unwords
 
-externalAnchor :: TokenDetails -> Html -> Html
-externalAnchor (RtkDecl name) content =
-    Html.anchor content ! [ Html.name $ externalAnchorIdent name ]
-externalAnchor _ content = content
+externalAnchor :: Identifier -> Set.Set ContextInfo -> Html -> Html
+externalAnchor (Right name) contexts content
+  | not (isInternalName name)
+  , any isBinding contexts
+  = Html.thespan content ! [ Html.identifier $ externalAnchorIdent name ]
+externalAnchor _ _ content = content
 
-internalAnchor :: TokenDetails -> Html -> Html
-internalAnchor (RtkBind name) content =
-    Html.anchor content ! [ Html.name $ internalAnchorIdent name ]
-internalAnchor _ content = content
+isBinding :: ContextInfo -> Bool
+isBinding (ValBind RegularBind _ _) = True
+isBinding PatternBind{} = True
+isBinding Decl{} = True
+isBinding (RecField RecFieldDecl _) = True
+isBinding TyVarBind{} = True
+isBinding ClassTyDecl{} = True
+isBinding _ = False
 
-externalAnchorIdent :: GHC.Name -> String
+internalAnchor :: Identifier -> Set.Set ContextInfo -> Html -> Html
+internalAnchor (Right name) contexts content
+  | isInternalName name
+  , any isBinding contexts
+  = Html.thespan content ! [ Html.identifier $ internalAnchorIdent name ]
+internalAnchor _ _ content = content
+
+externalAnchorIdent :: Name -> String
 externalAnchorIdent = hypSrcNameUrl
 
-internalAnchorIdent :: GHC.Name -> String
-internalAnchorIdent = ("local-" ++) . show . GHC.getKey . GHC.nameUnique
+internalAnchorIdent :: Name -> String
+internalAnchorIdent = ("local-" ++) . show . getKey . nameUnique
 
-hyperlink :: SrcMap -> TokenDetails -> Html -> Html
-hyperlink srcs details = case rtkName details of
-    Left name ->
-        if GHC.isInternalName name
-        then internalHyperlink name
-        else externalNameHyperlink srcs name
-    Right name -> externalModHyperlink srcs name
+-- | Generate the HTML hyperlink for an identifier
+hyperlink :: SrcMaps -> Identifier -> Html -> Html
+hyperlink (srcs, srcs') ident = case ident of
+    Right name | isInternalName name -> internalHyperlink name
+               | otherwise -> externalNameHyperlink name
+    Left name -> externalModHyperlink name
 
-internalHyperlink :: GHC.Name -> Html -> Html
-internalHyperlink name content =
-    Html.anchor content ! [ Html.href $ "#" ++ internalAnchorIdent name ]
-
-externalNameHyperlink :: SrcMap -> GHC.Name -> Html -> Html
-externalNameHyperlink srcs name content = case Map.lookup mdl srcs of
-    Just SrcLocal -> Html.anchor content !
-        [ Html.href $ hypSrcModuleNameUrl mdl name ]
-    Just (SrcExternal path) -> Html.anchor content !
-        [ Html.href $ path </> hypSrcModuleNameUrl mdl name ]
-    Nothing -> content
   where
-    mdl = GHC.nameModule name
+    internalHyperlink name content =
+        Html.anchor content ! [ Html.href $ "#" ++ internalAnchorIdent name ]
 
-externalModHyperlink :: SrcMap -> GHC.ModuleName -> Html -> Html
-externalModHyperlink srcs name content =
-    let srcs' = Map.mapKeys GHC.moduleName srcs in
-    case Map.lookup name srcs' of
-      Just SrcLocal -> Html.anchor content !
-        [ Html.href $ hypSrcModuleUrl' name ]
-      Just (SrcExternal path) -> Html.anchor content !
-        [ Html.href $ path </> hypSrcModuleUrl' name ]
-      Nothing -> content
+    externalNameHyperlink name content = case Map.lookup mdl srcs of
+        Just SrcLocal -> Html.anchor content !
+            [ Html.href $ hypSrcModuleNameUrl mdl name ]
+        Just (SrcExternal path) -> Html.anchor content !
+            [ Html.href $ spliceURL Nothing (Just mdl) (Just name) Nothing (".." </> path) ]
+        Nothing -> content
+      where
+        mdl = nameModule name
+
+    externalModHyperlink moduleName content =
+        case Map.lookup moduleName srcs' of
+          Just SrcLocal -> Html.anchor content !
+            [ Html.href $ hypSrcModuleUrl' moduleName ]
+          Just (SrcExternal path) -> Html.anchor content !
+            [ Html.href $ spliceURL' Nothing (Just moduleName) Nothing Nothing (".." </> path) ]
+          Nothing -> content
 
 
 renderSpace :: Int -> String -> Html
-renderSpace _ [] = Html.noHtml
-renderSpace line ('\n':rest) = mconcat
-    [ Html.thespan . Html.toHtml $ "\n"
+renderSpace !_ "" = Html.noHtml
+renderSpace !line ('\n':rest) = mconcat
+    [ Html.thespan (Html.toHtml '\n')
     , lineAnchor (line + 1)
     , renderSpace (line + 1) rest
     ]
@@ -151,4 +277,4 @@ renderSpace line space =
 
 
 lineAnchor :: Int -> Html
-lineAnchor line = Html.anchor Html.noHtml ! [ Html.name $ hypSrcLineUrl line ]
+lineAnchor line = Html.thespan Html.noHtml ! [ Html.identifier $ hypSrcLineUrl line ]

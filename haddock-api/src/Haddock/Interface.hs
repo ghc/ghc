@@ -43,18 +43,16 @@ import Haddock.Types
 import Haddock.Utils
 
 import Control.Monad
+import Control.Exception (evaluate)
 import Data.List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Distribution.Verbosity
-import System.Directory
-import System.FilePath
 import Text.Printf
 
 import Module (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
 import Digraph
 import DynFlags hiding (verbosity)
-import Exception
 import GHC hiding (verbosity)
 import HscTypes
 import FastString (unpackFS)
@@ -90,7 +88,7 @@ processModules verbosity modules flags extIfaces = do
   out verbosity verbose "Creating interfaces..."
   let instIfaceMap =  Map.fromList [ (instMod iface, iface) | ext <- extIfaces
                                    , iface <- ifInstalledIfaces ext ]
-  (interfaces, ms) <- createIfaces0 verbosity modules flags instIfaceMap
+  (interfaces, ms) <- createIfaces verbosity modules flags instIfaceMap
 
   let exportedNames =
         Set.unions $ map (Set.fromList . ifaceExports) $
@@ -123,39 +121,15 @@ processModules verbosity modules flags extIfaces = do
 --------------------------------------------------------------------------------
 
 
-createIfaces0 :: Verbosity -> [String] -> [Flag] -> InstIfaceMap -> Ghc ([Interface], ModuleSet)
-createIfaces0 verbosity modules flags instIfaceMap =
-  -- Output dir needs to be set before calling depanal since depanal uses it to
-  -- compute output file names that are stored in the DynFlags of the
-  -- resulting ModSummaries.
-  (if useTempDir then withTempOutputDir else id) $ do
-    modGraph <- depAnalysis
-    createIfaces verbosity flags instIfaceMap modGraph
+createIfaces :: Verbosity -> [String] -> [Flag] -> InstIfaceMap -> Ghc ([Interface], ModuleSet)
+createIfaces verbosity modules flags instIfaceMap = do
+  -- Ask GHC to tell us what the module graph is
+  targets <- mapM (\filePath -> guessTarget filePath Nothing) modules
+  setTargets targets
+  modGraph <- depanal [] False
 
-  where
-    useTempDir :: Bool
-    useTempDir = Flag_NoTmpCompDir `notElem` flags
-
-
-    withTempOutputDir :: Ghc a -> Ghc a
-    withTempOutputDir action = do
-      tmp <- liftIO getTemporaryDirectory
-      x   <- liftIO getProcessID
-      let dir = tmp </> ".haddock-" ++ show x
-      modifySessionDynFlags (setOutputDir dir)
-      withTempDir dir action
-
-
-    depAnalysis :: Ghc ModuleGraph
-    depAnalysis = do
-      targets <- mapM (\f -> guessTarget f Nothing) modules
-      setTargets targets
-      depanal [] False
-
-
-createIfaces :: Verbosity -> [Flag] -> InstIfaceMap -> ModuleGraph -> Ghc ([Interface], ModuleSet)
-createIfaces verbosity flags instIfaceMap mods = do
-  let sortedMods = flattenSCCs $ topSortModuleGraph False mods Nothing
+  -- Visit modules in that order
+  let sortedMods = flattenSCCs $ topSortModuleGraph False modGraph Nothing
   out verbosity normal "Haddock coverage:"
   (ifaces, _, !ms) <- foldM f ([], Map.empty, emptyModuleSet) sortedMods
   return (reverse ifaces, ms)
@@ -263,12 +237,3 @@ buildHomeLinks ifaces = foldl upd Map.empty (reverse ifaces)
         keep_old env n = Map.insertWith (\_ old -> old) n mdl env
         keep_new env n = Map.insert n mdl env
 
-
---------------------------------------------------------------------------------
--- * Utils
---------------------------------------------------------------------------------
-
-
-withTempDir :: (ExceptionMonad m) => FilePath -> m a -> m a
-withTempDir dir = gbracket_ (liftIO $ createDirectory dir)
-                            (liftIO $ removeDirectoryRecursive dir)

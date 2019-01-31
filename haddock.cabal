@@ -78,6 +78,7 @@ executable haddock
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
       ghc-boot,
+      ghc-boot-th,
       ghc == 8.7.*,
       bytestring,
       parsec,
@@ -119,7 +120,6 @@ executable haddock
       Haddock.Backends.HaddockDB
       Haddock.Backends.Hoogle
       Haddock.Backends.Hyperlinker
-      Haddock.Backends.Hyperlinker.Ast
       Haddock.Backends.Hyperlinker.Parser
       Haddock.Backends.Hyperlinker.Renderer
       Haddock.Backends.Hyperlinker.Types

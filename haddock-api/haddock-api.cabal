@@ -59,6 +59,7 @@ library
                , directory
                , filepath
                , ghc-boot
+               , ghc-boot-th
                , transformers
 
   hs-source-dirs: src
@@ -97,7 +98,6 @@ library
     Haddock.Backends.HaddockDB
     Haddock.Backends.Hoogle
     Haddock.Backends.Hyperlinker
-    Haddock.Backends.Hyperlinker.Ast
     Haddock.Backends.Hyperlinker.Parser
     Haddock.Backends.Hyperlinker.Renderer
     Haddock.Backends.Hyperlinker.Types
@@ -130,7 +130,6 @@ test-suite spec
     Haddock
     Haddock.Backends.Hoogle
     Haddock.Backends.Hyperlinker
-    Haddock.Backends.Hyperlinker.Ast
     Haddock.Backends.Hyperlinker.Renderer
     Haddock.Backends.Hyperlinker.Utils
     Haddock.Backends.LaTeX
@@ -187,6 +186,7 @@ test-suite spec
                , directory
                , filepath
                , ghc-boot
+               , ghc-boot-th
                , transformers
 
   build-tool-depends:

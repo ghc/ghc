@@ -6,6 +6,12 @@
 
  * Support inline markup in markdown-style links (#875)
 
+ * The hyperlinker backend has been re-engineered to use HIE files
+   and display type annotations on expressions (#977)
+
+ * The hyperlinker backend lexer is now more incremental, faster, and
+   more memory efficient (#977)
+
 ## Changes in version 2.22.0
 
  * Make `--package-version` optional for `--hoogle` (#899)
