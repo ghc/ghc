@@ -56,7 +56,7 @@ import           GHC.Event.Internal (Timeout(..))
 
 data BackendState = BackendState {
       epollFd     :: {-# UNPACK #-} !EPollFd
-    , epollEvents :: {-# UNPACK #-} !(A.Array Event)
+    , epollEvents :: {-# UNPACK #-} !(A.Array EPollEvent)
     }
 
 -- | Create a new epoll backend.
@@ -72,7 +72,7 @@ delete !be = do
 -- descriptor.
 modifyFd :: BackendState -> Fd -> E.Event -> E.Event -> IO Bool
 modifyFd !ep !fd !oevt !nevt =
-  with (Event (fromEvent nevt) fd) $ \evptr -> do
+  with (EPollEvent (fromEvent nevt) fd) $ \evptr -> do
     epollControl (epollFd ep) op fd evptr
     return True
   where op | oevt == mempty = controlOpAdd
@@ -82,13 +82,13 @@ modifyFd !ep !fd !oevt !nevt =
 modifyFdOnce :: BackendState -> Fd -> E.Event -> IO Bool
 modifyFdOnce !ep !fd !evt =
   do let !ev = fromEvent evt .|. epollOneShot
-     res <- with (Event ev fd) $
+     res <- with (EPollEvent ev fd) $
             epollControl_ (epollFd ep) controlOpModify fd
      if res == 0
        then return True
        else do err <- getErrno
                if err == eNOENT
-                 then with (Event ev fd) $ \evptr -> do
+                 then with (EPollEvent ev fd) $ \evptr -> do
                         epollControl (epollFd ep) controlOpAdd fd evptr
                         return True
                  else throwErrno "modifyFdOnce"
@@ -120,20 +120,20 @@ newtype EPollFd = EPollFd {
       fromEPollFd :: CInt
     } deriving (Eq, Show)
 
-data Event = Event {
-      eventTypes :: EventType
-    , eventFd    :: Fd
+data EPollEvent = EPollEvent {
+      eventTypes :: {-# UNPACK #-} !EventType
+    , eventFd    :: {-# UNPACK #-} !Fd
     } deriving (Show)
 
 -- | @since 4.3.1.0
-instance Storable Event where
+instance Storable EPollEvent where
     sizeOf    _ = #size struct epoll_event
     alignment _ = alignment (undefined :: CInt)
 
     peek ptr = do
         ets <- #{peek struct epoll_event, events} ptr
         ed  <- #{peek struct epoll_event, data.fd}   ptr
-        let !ev = Event (EventType ets) ed
+        let !ev = EPollEvent (EventType ets) ed
         return ev
 
     poke ptr e = do
@@ -181,21 +181,21 @@ epollCreate = do
   let !epollFd' = EPollFd fd
   return epollFd'
 
-epollControl :: EPollFd -> ControlOp -> Fd -> Ptr Event -> IO ()
+epollControl :: EPollFd -> ControlOp -> Fd -> Ptr EPollEvent -> IO ()
 epollControl !epfd op !fd !event =
     throwErrnoIfMinus1_ "epollControl" $ epollControl_ epfd op fd event
 
-epollControl_ :: EPollFd -> ControlOp -> Fd -> Ptr Event -> IO CInt
+epollControl_ :: EPollFd -> ControlOp -> Fd -> Ptr EPollEvent -> IO CInt
 epollControl_ (EPollFd epfd) (ControlOp op) (Fd fd) event =
     c_epoll_ctl epfd op fd event
 
-epollWait :: EPollFd -> Ptr Event -> Int -> Int -> IO Int
+epollWait :: EPollFd -> Ptr EPollEvent -> Int -> Int -> IO Int
 epollWait (EPollFd !epfd) !events !numEvents !timeout =
     fmap fromIntegral .
     E.throwErrnoIfMinus1NoRetry "epollWait" $
     c_epoll_wait epfd events (fromIntegral numEvents) (fromIntegral timeout)
 
-epollWaitNonBlock :: EPollFd -> Ptr Event -> Int -> IO Int
+epollWaitNonBlock :: EPollFd -> Ptr EPollEvent -> Int -> IO Int
 epollWaitNonBlock (EPollFd !epfd) !events !numEvents =
   fmap fromIntegral .
   E.throwErrnoIfMinus1NoRetry "epollWaitNonBlock" $
@@ -225,12 +225,12 @@ foreign import ccall unsafe "sys/epoll.h epoll_create"
     c_epoll_create :: CInt -> IO CInt
 
 foreign import ccall unsafe "sys/epoll.h epoll_ctl"
-    c_epoll_ctl :: CInt -> CInt -> CInt -> Ptr Event -> IO CInt
+    c_epoll_ctl :: CInt -> CInt -> CInt -> Ptr EPollEvent -> IO CInt
 
 foreign import ccall safe "sys/epoll.h epoll_wait"
-    c_epoll_wait :: CInt -> Ptr Event -> CInt -> CInt -> IO CInt
+    c_epoll_wait :: CInt -> Ptr EPollEvent -> CInt -> CInt -> IO CInt
 
 foreign import ccall unsafe "sys/epoll.h epoll_wait"
-    c_epoll_wait_unsafe :: CInt -> Ptr Event -> CInt -> CInt -> IO CInt
+    c_epoll_wait_unsafe :: CInt -> Ptr EPollEvent -> CInt -> CInt -> IO CInt
 
 #endif

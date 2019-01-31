@@ -19,7 +19,6 @@ module GHC.Event.Thread
 import Control.Exception (finally, SomeException, toException)
 import Data.Foldable (forM_, mapM_, sequence_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Data.Tuple (snd)
 import Foreign.C.Error (eBADF, errnoToIOError)
 import Foreign.C.Types (CInt(..), CUInt(..))
 import Foreign.Ptr (Ptr)
@@ -99,8 +98,8 @@ closeFdWith close fd = do
   eventManagerArray <- readIORef eventManager
   let (low, high) = boundsIOArray eventManagerArray
   mgrs <- flip mapM [low..high] $ \i -> do
-    Just (_,!mgr) <- readIOArray eventManagerArray i
-    return mgr
+    (_,mgr) <- readIOArray eventManagerArray i
+    pure mgr
   mask_ $ do
     tables <- flip mapM mgrs $ \mgr -> takeMVar $ M.callbackTableVar mgr fd
     cbApps <- zipWithM (\mgr table -> M.closeFd_ mgr table fd) mgrs tables
@@ -108,6 +107,7 @@ closeFdWith close fd = do
   where
     finish mgr table cbApp = putMVar (M.callbackTableVar mgr fd) table >> cbApp
     zipWithM f xs ys = sequence (zipWith f xs ys)
+
 
 threadWait :: Event -> Fd -> IO ()
 threadWait !evt !fd = mask_ $ do
@@ -170,22 +170,26 @@ getSystemEventManager = do
   t <- myThreadId
   (cap, _) <- threadCapability t
   eventManagerArray <- readIORef eventManager
-  mmgr <- readIOArray eventManagerArray cap
-  return $ fmap snd mmgr
+  (_,mgr) <- readIOArray eventManagerArray cap
+  return (Just mgr)
 
 getSystemEventManager_ :: IO EventManager
 getSystemEventManager_ = do
-  Just mgr <- getSystemEventManager
-  return mgr
-{-# INLINE getSystemEventManager_ #-}
+  t <- myThreadId
+  (cap, _) <- threadCapability t
+  eventManagerArray <- readIORef eventManager
+  (_,mgr) <- readIOArray eventManagerArray cap
+  pure mgr
 
 foreign import ccall unsafe "getOrSetSystemEventThreadEventManagerStore"
     getOrSetSystemEventThreadEventManagerStore :: Ptr a -> IO (Ptr a)
 
-eventManager :: IORef (IOArray Int (Maybe (ThreadId, EventManager)))
+eventManager :: IORef (IOArray Int (ThreadId, EventManager))
 eventManager = unsafePerformIO $ do
     numCaps <- getNumCapabilities
-    eventManagerArray <- newIOArray (0, numCaps - 1) Nothing
+    eventManagerArray <- newIOArray (0, numCaps - 1) uninitializedEventManagerTuple
+    forM_ [0..numCaps-1] $ \i -> do
+      createIOManagerThread i >>= writeIOArray eventManagerArray i
     em <- newIORef eventManagerArray
     sharedCAF em getOrSetSystemEventThreadEventManagerStore
 {-# NOINLINE eventManager #-}
@@ -207,26 +211,35 @@ ioManagerLock = unsafePerformIO $ do
    sharedCAF m getOrSetSystemEventThreadIOManagerThreadStore
 
 getSystemTimerManager :: IO TM.TimerManager
-getSystemTimerManager = do
-  Just mgr <- readIORef timerManager
-  return mgr
+getSystemTimerManager = readIORef timerManager
 
 foreign import ccall unsafe "getOrSetSystemTimerThreadEventManagerStore"
     getOrSetSystemTimerThreadEventManagerStore :: Ptr a -> IO (Ptr a)
 
-timerManager :: IORef (Maybe TM.TimerManager)
+timerManager :: IORef TM.TimerManager
 timerManager = unsafePerformIO $ do
-    em <- newIORef Nothing
+    -- It is safe to do that because accesses to timerManager are
+    -- are preceeded by timerManagerThreadVar. On timerManagerThreadVar's
+    -- first access, it will replace the error thunk inside the
+    -- timerManager IORef.
+    -- What about getSystemTimerManager? That function is only called
+    -- if the threaded RTS is used, which means that ensureIOManagerIsRunning
+    -- will have been called when the runtime started. 
+    em <- newIORef uninitializedTimerManager
     sharedCAF em getOrSetSystemTimerThreadEventManagerStore
 {-# NOINLINE timerManager #-}
+
+uninitializedTimerManager :: a
+uninitializedTimerManager = error "GHC.Event.Thread: timer manager not initialized"
+{-# NOINLINE uninitializedTimerManager #-}
 
 foreign import ccall unsafe "getOrSetSystemTimerThreadIOManagerThreadStore"
     getOrSetSystemTimerThreadIOManagerThreadStore :: Ptr a -> IO (Ptr a)
 
 {-# NOINLINE timerManagerThreadVar #-}
-timerManagerThreadVar :: MVar (Maybe ThreadId)
+timerManagerThreadVar :: MVar ThreadId
 timerManagerThreadVar = unsafePerformIO $ do
-   m <- newMVar Nothing
+   m <- newMVar =<< createTimerManagerThread
    sharedCAF m getOrSetSystemTimerThreadIOManagerThreadStore
 
 ensureIOManagerIsRunning :: IO ()
@@ -254,66 +267,63 @@ restartPollLoop mgr i = do
   labelThread t ("IOManager on cap " ++ show_int i)
   return t
 
-startIOManagerThread :: IOArray Int (Maybe (ThreadId, EventManager))
-                        -> Int
-                        -> IO ()
+createIOManagerThread :: Int -> IO (ThreadId,EventManager)
+createIOManagerThread i = do
+  !mgr <- new
+  !t <- forkOn i $ do
+          c_setIOManagerControlFd
+            (fromIntegral i)
+            (fromIntegral $ controlWriteFd $ M.emControl mgr)
+          loop mgr
+  labelThread t ("IOManager on cap " ++ show_int i)
+  pure (t,mgr)
+
+startIOManagerThread ::
+     IOArray Int (ThreadId, EventManager)
+  -> Int
+  -> IO ()
 startIOManagerThread eventManagerArray i = do
-  let create = do
-        !mgr <- new
-        !t <- forkOn i $ do
-                c_setIOManagerControlFd
-                  (fromIntegral i)
-                  (fromIntegral $ controlWriteFd $ M.emControl mgr)
-                loop mgr
-        labelThread t ("IOManager on cap " ++ show_int i)
-        writeIOArray eventManagerArray i (Just (t,mgr))
-  old <- readIOArray eventManagerArray i
-  case old of
-    Nothing     -> create
-    Just (t,em) -> do
-      s <- threadStatus t
-      case s of
-        ThreadFinished -> create
-        ThreadDied     -> do
-          -- Sanity check: if the thread has died, there is a chance
-          -- that event manager is still alive. This could happend during
-          -- the fork, for example. In this case we should clean up
-          -- open pipes and everything else related to the event manager.
-          -- See #4449
-          c_setIOManagerControlFd (fromIntegral i) (-1)
-          M.cleanup em
-          create
-        _other         -> return ()
+  (t,em) <- readIOArray eventManagerArray i
+  s <- threadStatus t
+  case s of
+    ThreadFinished -> createIOManagerThread i >>= writeIOArray eventManagerArray i
+    ThreadDied     -> do
+      -- Sanity check: if the thread has died, there is a chance
+      -- that event manager is still alive. This could happend during
+      -- the fork, for example. In this case we should clean up
+      -- open pipes and everything else related to the event manager.
+      -- See #4449
+      c_setIOManagerControlFd (fromIntegral i) (-1)
+      M.cleanup em
+      createIOManagerThread i >>= writeIOArray eventManagerArray i
+    _other         -> return ()
+
+createTimerManagerThread :: IO ThreadId
+createTimerManagerThread = do
+  !mgr <- TM.new
+  c_setTimerManagerControlFd
+    (fromIntegral $ controlWriteFd $ TM.emControl mgr)
+  writeIORef timerManager mgr
+  !t <- forkIO $ TM.loop mgr
+  labelThread t "TimerManager"
+  return t
 
 startTimerManagerThread :: IO ()
 startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
-  let create = do
-        !mgr <- TM.new
-        c_setTimerManagerControlFd
-          (fromIntegral $ controlWriteFd $ TM.emControl mgr)
-        writeIORef timerManager $ Just mgr
-        !t <- forkIO $ TM.loop mgr
-        labelThread t "TimerManager"
-        return $ Just t
-  case old of
-    Nothing            -> create
-    st@(Just t) -> do
-      s <- threadStatus t
-      case s of
-        ThreadFinished -> create
-        ThreadDied     -> do
-          -- Sanity check: if the thread has died, there is a chance
-          -- that event manager is still alive. This could happend during
-          -- the fork, for example. In this case we should clean up
-          -- open pipes and everything else related to the event manager.
-          -- See #4449
-          mem <- readIORef timerManager
-          _ <- case mem of
-                 Nothing -> return ()
-                 Just em -> do c_setTimerManagerControlFd (-1)
-                               TM.cleanup em
-          create
-        _other         -> return st
+  s <- threadStatus old
+  case s of
+    ThreadFinished -> createTimerManagerThread
+    ThreadDied -> do
+      -- Sanity check: if the thread has died, there is a chance
+      -- that event manager is still alive. This could happend during
+      -- the fork, for example. In this case we should clean up
+      -- open pipes and everything else related to the event manager.
+      -- See #4449
+      em <- readIORef timerManager
+      c_setTimerManagerControlFd (-1)
+      TM.cleanup em
+      createTimerManagerThread
+    _ -> return old
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 
@@ -327,27 +337,32 @@ ioManagerCapabilitiesChanged = do
     let (_, high) = boundsIOArray eventManagerArray
     let old_n_caps = high + 1
     if new_n_caps > old_n_caps
-      then do new_eventManagerArray <- newIOArray (0, new_n_caps - 1) Nothing
+      then do new_eventManagerArray <- newIOArray
+                (0, new_n_caps - 1) uninitializedEventManagerTuple
 
               -- copy the existing values into the new array:
               forM_ [0..high] $ \i -> do
-                Just (tid,mgr) <- readIOArray eventManagerArray i
+                (tid,mgr) <- readIOArray eventManagerArray i
                 if i < numEnabled
-                  then writeIOArray new_eventManagerArray i (Just (tid,mgr))
+                  then writeIOArray new_eventManagerArray i (tid,mgr)
                   else do tid' <- restartPollLoop mgr i
-                          writeIOArray new_eventManagerArray i (Just (tid',mgr))
+                          writeIOArray new_eventManagerArray i (tid',mgr)
 
               -- create new IO managers for the new caps:
-              forM_ [old_n_caps..new_n_caps-1] $
-                startIOManagerThread new_eventManagerArray
+              forM_ [old_n_caps..new_n_caps-1] $ \i -> do
+                createIOManagerThread i >>= writeIOArray new_eventManagerArray i
 
               -- update the event manager array reference:
               writeIORef eventManager new_eventManagerArray
       else when (new_n_caps > numEnabled) $
             forM_ [numEnabled..new_n_caps-1] $ \i -> do
-              Just (_,mgr) <- readIOArray eventManagerArray i
+              (_,mgr) <- readIOArray eventManagerArray i
               tid <- restartPollLoop mgr i
-              writeIOArray eventManagerArray i (Just (tid,mgr))
+              writeIOArray eventManagerArray i (tid,mgr)
+
+{-# NOINLINE uninitializedEventManagerTuple #-}
+uninitializedEventManagerTuple :: a
+uninitializedEventManagerTuple = error "GHC.Event.Thread: uninitialized event manager tuple"
 
 -- Used to tell the RTS how it can send messages to the I/O manager.
 foreign import ccall unsafe "setIOManagerControlFd"

@@ -70,10 +70,10 @@ import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (maybe)
 import Data.OldList (partition)
-import GHC.Arr (Array, (!), listArray)
+import GHC.Primitive.Array (Array,indexArray,replicateArrayP)
 import GHC.Base
 import GHC.Conc.Sync (yield)
-import GHC.List (filter, replicate)
+import GHC.List (filter)
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral)
 import GHC.Show (Show(..))
@@ -120,7 +120,7 @@ data State = Created
 -- | The event manager state.
 data EventManager = EventManager
     { emBackend      :: {-# UNPACK #-} !I.BackendState
-    , emFds          :: {-# UNPACK #-} !(Array Int (MVar (IntTable [FdData])))
+    , emFds          :: {-# UNPACK #-} !(Array (MVar (IntTable [FdData])))
     , emState        :: {-# UNPACK #-} !(IORef State)
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
     , emControl      :: {-# UNPACK #-} !Control
@@ -136,7 +136,7 @@ hashFd fd = fromIntegral fd .&. (callbackArraySize - 1)
 {-# INLINE hashFd #-}
 
 callbackTableVar :: EventManager -> Fd -> MVar (IntTable [FdData])
-callbackTableVar mgr fd = emFds mgr ! hashFd fd
+callbackTableVar mgr fd = indexArray (emFds mgr) (hashFd fd)
 {-# INLINE callbackTableVar #-}
 
 haveOneShot :: Bool
@@ -169,8 +169,8 @@ new = newWith =<< newDefaultBackend
 -- | Create a new 'EventManager' with the given polling backend.
 newWith :: I.BackendState -> IO EventManager
 newWith be = do
-  iofds <- fmap (listArray (0, callbackArraySize-1)) $
-           replicateM callbackArraySize (newMVar =<< IT.new 8)
+  iofds <- replicateArrayP callbackArraySize
+    (newMVar =<< IT.new 8)
   ctrl <- newControl False
   state <- newIORef Created
   us <- newSource
@@ -190,8 +190,6 @@ newWith be = do
   registerControlFd mgr (controlReadFd ctrl) evtRead
   registerControlFd mgr (wakeupReadFd ctrl) evtRead
   return mgr
-  where
-    replicateM n x = sequence (replicate n x)
 
 failOnInvalidFile :: String -> Fd -> IO Bool -> IO ()
 failOnInvalidFile loc fd m = do

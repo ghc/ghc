@@ -265,6 +265,8 @@ Library
         GHC.OldList
         GHC.OverloadedLabels
         GHC.Pack
+        GHC.Primitive.Array
+        GHC.Primitive.Monad
         GHC.Profiling
         GHC.Ptr
         GHC.Read
