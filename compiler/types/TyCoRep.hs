@@ -90,7 +90,7 @@ module TyCoRep (
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList, tyCoVarsOfProv,
         almostDevoidCoVarOfCo,
-        injectiveVarsOfBinder, injectiveVarsOfType,
+        injectiveVarsOfBinder, injectiveVarsOfType, tyConAppNeedsKindSig,
 
         noFreeVarsOfType, noFreeVarsOfCo,
 
@@ -2104,19 +2104,27 @@ almost_devoid_co_var_of_types (ty:tys) cv
 ------------- Injective free vars -----------------
 
 -- | Returns the free variables of a 'TyConBinder' that are in injective
--- positions. (See @Note [Kind annotations on TyConApps]@ in "TcSplice" for an
--- explanation of what an injective position is.)
-injectiveVarsOfBinder :: TyConBinder -> FV
-injectiveVarsOfBinder (Bndr tv vis) =
+-- positions. (See
+-- @Note [When does a tycon application need an explicit kind signature?]@ for
+-- an explanation of what an injective position is.)
+injectiveVarsOfBinder
+  :: Bool -- ^ Should specified binders count towards injective positions?
+          --   (If you're using visible kind applications, then you want 'True'
+          --   here.)
+  -> TyConBinder -> FV
+injectiveVarsOfBinder spec_inj_pos (Bndr tv vis) =
   case vis of
-    AnonTCB           -> injectiveVarsOfType (varType tv)
-    NamedTCB Required -> unitFV tv `unionFV`
-                         injectiveVarsOfType (varType tv)
-    NamedTCB _        -> emptyFV
+    AnonTCB -> injectiveVarsOfType (varType tv)
+    NamedTCB argf
+      |     (argf == Required)
+         || (spec_inj_pos && (argf == Specified))
+      -> unitFV tv `unionFV` injectiveVarsOfType (varType tv)
+      |  otherwise
+      -> emptyFV
 
 -- | Returns the free variables of a 'Type' that are in injective positions.
--- (See @Note [Kind annotations on TyConApps]@ in "TcSplice" for an explanation
--- of what an injective position is.)
+-- (See @Note [When does a tycon application need an explicit kind signature?]@
+-- for an explanation of what an injective position is.)
 injectiveVarsOfType :: Type -> FV
 injectiveVarsOfType = go
   where
@@ -2132,11 +2140,175 @@ injectiveVarsOfType = go
                          filterByList (inj ++ repeat True) tys
                          -- Oversaturated arguments to a tycon are
                          -- always injective, hence the repeat True
-    go (ForAllTy tvb ty) = tyCoFVsBndr tvb $ go (binderType tvb)
-                                             `unionFV` go ty
+    go (ForAllTy tvb ty) = tyCoFVsBndr tvb $ go ty
     go LitTy{}           = emptyFV
     go (CastTy ty _)     = go ty
     go CoercionTy{}      = emptyFV
+
+-- | Does a 'TyCon' (that is applied to some arguments) need to be ascribed
+-- with an explicit kind signature to resolve ambiguity if rendered as a
+-- source-syntax type?
+-- (See @Note [When does a tycon application need an explicit kind signature?]@
+-- for a full explanation of what this function checks for.)
+tyConAppNeedsKindSig
+  :: Bool -- ^ Should specified binders count towards injective positions in
+          --   the kind of the TyCon?
+  -> TyCon -> [Type] -> Bool
+tyConAppNeedsKindSig spec_inj_pos tc args
+  | GT <- compareLength args tc_binders
+  = False
+  | otherwise
+  = let (dropped_binders, remaining_binders)
+          = splitAtList args tc_binders
+        result_kind  = mkTyConKind remaining_binders tc_res_kind
+        result_vars  = tyCoVarsOfType result_kind
+        dropped_vars = fvVarSet $
+                       mapUnionFV (injectiveVarsOfBinder spec_inj_pos)
+                                  dropped_binders
+
+    in not (subVarSet result_vars dropped_vars)
+  where
+    tc_binders  = tyConBinders tc
+    tc_res_kind = tyConResKind tc
+
+{-
+Note [When does a tycon application need an explicit kind signature?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are a couple of places in GHC where we convert Core Types into forms that
+more closely resemble user-written syntax. These include:
+
+1. Template Haskell Type reification
+2. Converting Types to LHsTypes (in HsUtils.typeToLHsType)
+
+This conversion presents a challenge: how do we ensure that the resulting type
+has enough kind information so as not to be ambiguous? To better motivate this
+question, consider the following Core type:
+
+  -- Foo :: Type -> Type
+  type Foo = Proxy Type
+
+There is nothing ambiguous about the RHS of Foo in Core. But if we were to,
+say, reify it into a TH Type, then it's tempting to just drop the invisible
+Type argument and simply return `Proxy`. But now we've lost crucial kind
+information: we don't know if we're dealing with `Proxy Type` or `Proxy Bool`
+or `Proxy Int` or something else! We've inadvertently introduced ambiguity.
+
+Unlike in other situations in GHC, we can't just turn on
+-fprint-explicit-kinds, as we need to produce something which has the same
+structure as a source-syntax type. Our solution is to annotate certain tycons
+with their kinds whenever they appear in applied form in order to resolve the
+ambiguity. For instance, we would reify the RHS of Foo like so:
+
+  type Foo = (Proxy :: Type -> Type)
+
+We need to devise an algorithm that determines precisely which tycons need
+these explicit kind signatures. We certainly don't want to annotate _every_
+tycon with a kind signature, or else we might end up with horribly bloated
+types like the following:
+
+  (Either :: Type -> Type -> Type) (Int :: Type) (Char :: Type)
+
+We only want to annotate tycons that absolutely require kind signatures in
+order to resolve some sort of ambiguity, and nothing more.
+
+Suppose we have a tycon application (T ty1 ... tyn). Assuming that T is not
+oversatured (more on this later), we can assume T's declaration is of the form
+T (tvb1 :: s1) ... (tvbn :: sn) :: p. If any kind variable that
+is free in p is not free in an /injective position/ in tvb1 ... tvbn (more on
+this in a bit), then we add a kind annotation, since we would not otherwise be
+able to infer the kind of the whole tycon application.
+
+The injective positions of tyvar binder are defined to be the injective
+positions in the kind of its tyvar, provided the tyvar binder meets one of
+three criteria (see injectiveVarsOfBinder):
+
+* Anonymous. For example, in the promoted data constructor '(:):
+
+    '(:) :: forall a. a -> [a] -> [a]
+
+  The second and third tyvar binders (of kinds `a` and `[a]`) are both
+  anonymous, so if we had '(:) 'True '[], then the inferred kinds of 'True and
+  '[] would contribute to the inferred kind of '(:) 'True '[].
+* Has required visibility. For example, in the type family:
+
+    type family Wurble k (a :: k) :: k
+    Wurble :: forall k -> k -> k
+
+  The first tyvar binder (of kind `forall k`) has required visibility, so if
+  we had Wurble (Maybe a) Nothing, then the inferred kind of Maybe a would
+  contribute to the inferred kind of Wurble (Maybe a) Nothing.
+* (Optional) Has specified visibility. Continuing the '(:) example:
+
+    '(:) :: forall a. a -> [a] -> [a]
+
+  Normally, the tyvar binder wouldn't contribute to the inferred kind of
+  '(:) 'True '[], since it's not explicitly instantiated by the user. But if
+  visible kind application is enabled, then this is possible, since the user
+  can write '(:) @Bool 'True '[].
+
+  There are some situations where using visible kind application is appropriate
+  (e.g., HsUtils.typeToLHsType) and others where it is not (e.g., TH
+  reification), so the `injectiveVarsOfBinder` function is parametrized by a
+  Bool which decides if specified binders should be counted towards injective
+  positions or not.
+
+An injective position in a type is one that does not occur as an argument to
+a non-injective type constructor (e.g., non-injective type families). See
+injectiveVarsOfType.
+
+How can be sure that this is correct? That is, how can we be sure that in the
+event that we leave off a kind annotation, that one could infer the kind of the
+tycon application from its arguments? It's essentially a proof by induction: if
+we can infer the kinds of every subtree of a type, then the whole tycon
+application will have an inferrable kind--unless, of course, the remainder of
+the tycon application's kind has uninstantiated kind variables.
+
+An earlier implementation of this algorithm only checked if p contained any
+free variables. But this was unsatisfactory, since a datatype like this:
+
+  data Foo = Foo (Proxy '[False, True])
+
+Would be reified like this:
+
+  data Foo = Foo (Proxy ('(:) False ('(:) True ('[] :: [Bool])
+                                     :: [Bool]) :: [Bool]))
+
+Which has a rather excessive amount of kind annotations. With the current
+algorithm, we instead reify Foo to this:
+
+  data Foo = Foo (Proxy ('(:) False ('(:) True ('[] :: [Bool]))))
+
+Since in the case of '[], the kind p is [a], and there are no arguments in the
+kind of '[]. On the other hand, in the case of '(:) True '[], the kind p is
+(forall a. [a]), but a occurs free in the first and second arguments of the
+full kind of '(:), which is (forall a. a -> [a] -> [a]). (See Trac #14060.)
+
+What happens if T is oversaturated? That is, if T's kind has fewer than n
+arguments, in the case that the concrete application instantiates a result
+kind variable with an arrow kind? If we run out of arguments, we do not attach
+a kind annotation. This should be a rare case, indeed. Here is an example:
+
+   data T1 :: k1 -> k2 -> *
+   data T2 :: k1 -> k2 -> *
+
+   type family G (a :: k) :: k
+   type instance G T1 = T2
+
+   type instance F Char = (G T1 Bool :: (* -> *) -> *)   -- F from above
+
+Here G's kind is (forall k. k -> k), and the desugared RHS of that last
+instance of F is (G (* -> (* -> *) -> *) (T1 * (* -> *)) Bool). According to
+the algorithm above, there are 3 arguments to G so we should peel off 3
+arguments in G's kind. But G's kind has only two arguments. This is the
+rare special case, and we choose not to annotate the application of G with
+a kind signature. After all, we needn't do this, since that instance would
+be reified as:
+
+   type instance F Char = G (T1 :: * -> (* -> *) -> *) Bool
+
+So the kind of G isn't ambiguous anymore due to the explicit kind annotation
+on its argument. See #8953 and test th/T8953.
+-}
 
 ------------- No free vars -----------------
 
