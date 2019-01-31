@@ -958,7 +958,7 @@ def do_test(name, way, func, args, files):
                     'stdout': result.get('stdout'),
                     'stderr': result.get('stderr')
                 }
-                result = TestResult(directory, name, reason, way, **other)
+                result = TestResult(directory, name, reason, way)
                 t.unexpected_failures.append(result)
         else:
             if opts.expect == 'missing-lib':
@@ -1102,7 +1102,7 @@ def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts, **kwa
                            whitespace_normaliser=getattr(getTestOpts(),
                                                          "whitespace_normaliser",
                                                          normalise_whitespace)):
-        return failBecause('stderr mismatch', stderr=open(actual_stderr_file, 'rb').read())
+        return failBecause('stderr mismatch') #stderr=open(actual_stderr_file, 'rb').read())
 
     # no problems found, this test passed
     return passed()
@@ -2159,20 +2159,20 @@ def summary(t, file, short=False, color=False):
         file.write('WARNING: Testsuite run was terminated early\n')
 
 def printUnexpectedTests(file, testInfoss):
-    unexpected = set(result.name
+    unexpected = set(result.testname
                      for testInfos in testInfoss
                      for result in testInfos
-                     if not result.name.endswith('.T'))
+                     if not result.testname.endswith('.T'))
     if unexpected:
         file.write('Unexpected results from:\n')
         file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
         file.write('\n')
 
 def printTestInfosSummary(file, testInfos):
-    maxDirLen = max(len(directory) for (directory, _, _, _) in testInfos)
+    maxDirLen = max(len(tr.directory) for tr in testInfos)
     for result in testInfos:
         directory = result.directory.ljust(maxDirLen)
-        file.write('   {directory}  {r.name} [{r.reason}] ({r.way})\n'.format(
+        file.write('   {directory}  {r.testname} [{r.reason}] ({r.way})\n'.format(
             r = result,
             directory = directory))
     file.write('\n')
