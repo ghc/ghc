@@ -931,7 +931,7 @@ def do_test(name, way, func, args, files):
 
     if passFail == 'pass':
         if _expect_pass(way):
-            t.expected_passes.append(TestResult(directory, name, way))
+            t.expected_passes.append(TestResult(directory, name, "", way))
             t.n_expected_passes += 1
         else:
             if_verbose(1, '*** unexpected pass for %s' % full_name)
@@ -976,14 +976,14 @@ def framework_fail(name, way, reason):
     directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
-    t.framework_failures.append(TestResult(directory, name, way, reason))
+    t.framework_failures.append(TestResult(directory, name, reason, way))
 
 def framework_warn(name, way, reason):
     opts = getTestOpts()
     directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework warning for %s %s ' % (full_name, reason))
-    t.framework_warnings.append(TestResult(directory, name, way, reason))
+    t.framework_warnings.append(TestResult(directory, name, reason, way))
 
 def badResult(result):
     try:
