@@ -954,7 +954,6 @@ def do_test(name, way, func, args, files):
                 t.unexpected_stat_failures.append(TestResult(directory, name, reason, way))
             else:
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
-                print(result)
                 result = TestResult(directory, name, reason, way, stderr=result.get('stderr'))
                 t.unexpected_failures.append(result)
         else:
