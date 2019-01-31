@@ -91,7 +91,6 @@ executable haddock
       Documentation.Haddock.Parser.Monad
       Documentation.Haddock.Types
       Documentation.Haddock.Doc
-      Documentation.Haddock.Utf8
       Documentation.Haddock.Parser.Util
       Documentation.Haddock.Markup
 

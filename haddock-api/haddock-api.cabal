@@ -46,7 +46,7 @@ library
                , Cabal           ^>= 2.4.0
                , ghc             ^>= 8.7
                , ghc-paths       ^>= 0.1.0.9
-               , haddock-library ^>= 1.7.0
+               , haddock-library ^>= 1.8.0
                , xhtml           ^>= 3000.2.2
 
   -- Versions for the dependencies below are transitively pinned by
@@ -170,7 +170,7 @@ test-suite spec
   build-depends: Cabal           ^>= 2.4
                , ghc             ^>= 8.7
                , ghc-paths       ^>= 0.1.0.9
-               , haddock-library ^>= 1.7.0
+               , haddock-library ^>= 1.8.0
                , xhtml           ^>= 3000.2.2
                , hspec           >= 2.4.4 && < 2.6
                , QuickCheck      ^>= 2.11
