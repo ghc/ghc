@@ -1181,20 +1181,20 @@ IO ()``, and it works by converting the value to ``String`` using ``show``.
 This is not ideal in certain cases, like when the output is long, or
 contains strings with non-ascii characters.
 
-The :ghc-flag:`-interactive-print ⟨expr⟩` flag allows to specify any function
+The :ghc-flag:`-interactive-print ⟨name⟩` flag allows to specify any function
 of type ``C a => a -> IO ()``, for some constraint ``C``, as the function for
 printing evaluated expressions. The function can reside in any loaded module or
 any registered package, but only when it resides in a registered package will
 it survive a :ghci-cmd:`:cd`, :ghci-cmd:`:add`, :ghci-cmd:`:load`,
 :ghci-cmd:`:reload` or, :ghci-cmd:`:set`.
 
-.. ghc-flag:: -interactive-print ⟨expr⟩
+.. ghc-flag:: -interactive-print ⟨name⟩
     :shortdesc: :ref:`Select the function to use for printing evaluated
         expressions in GHCi <ghci-interactive-print>`
     :type: dynamic
     :category:
 
-    Set the function used by GHCi to print evaluation results. Expression
+    Set the function used by GHCi to print evaluation results. Given name
     must be of type ``C a => a -> IO ()``.
 
 As an example, suppose we have following special printing module: ::
@@ -1224,7 +1224,7 @@ will start an interactive session where values with be printed using
 A custom pretty printing function can be used, for example, to format
 tree-like and nested structures in a more readable way.
 
-The :ghc-flag:`-interactive-print ⟨expr⟩` flag can also be used when running
+The :ghc-flag:`-interactive-print ⟨name⟩` flag can also be used when running
 GHC in ``-e mode``:
 
 .. code-block:: none
