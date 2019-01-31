@@ -4,6 +4,7 @@ module Plugins (
       -- * Plugins
       Plugin(..)
     , defaultPlugin
+    , trustPlugin, distrustPlugin
     , CommandLineOption
       -- ** Recompilation checking
     , purePlugin, impurePlugin, flagRecompile
@@ -81,6 +82,9 @@ data Plugin = Plugin {
     -- behaviour of the constraint solver.
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
+  , pluginTrustworthy :: [CommandLineOption] -> IO Bool
+    -- ^ Specify whether the plugin is trustworthy or safe inference should
+    -- be marked as failed.
   , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
                             -> Hsc HsParsedModule
     -- ^ Modify the module when it is parsed. This is called by
@@ -91,7 +95,7 @@ data Plugin = Plugin {
     -- `HsGroup` has been renamed.
   , typeCheckResultAction :: [CommandLineOption] -> ModSummary -> TcGblEnv
                                -> TcM TcGblEnv
-    -- ^ Modify the module when it is type checked. This is called add the
+    -- ^ Modify the module when it is type checked. This is called at the
     -- very end of typechecking.
   , spliceRunAction :: [CommandLineOption] -> LHsExpr GhcTc
                          -> TcM (LHsExpr GhcTc)
@@ -178,19 +182,31 @@ impurePlugin _args = return ForceRecompile
 flagRecompile =
   return . MaybeRecompile . fingerprintFingerprints . map fingerprintString . sort
 
--- | Default plugin: does nothing at all! For compatibility reasons
--- you should base all your plugin definitions on this default value.
+-- | Default plugin: does nothing at all except for marking that safe inference
+-- has failed. For compatibility reason you should base all your plugin
+-- definitions on this default value.
 defaultPlugin :: Plugin
 defaultPlugin = Plugin {
         installCoreToDos      = const return
       , tcPlugin              = const Nothing
       , pluginRecompile  = impurePlugin
+      , pluginTrustworthy = \_ -> return False
       , renamedResultAction   = \_ env grp -> return (env, grp)
       , parsedResultAction    = \_ _ -> return
       , typeCheckResultAction = \_ _ -> return
       , spliceRunAction       = \_ -> return
       , interfaceLoadAction   = \_ -> return
     }
+
+-- | Mark a plugin as trustworthy so safe inference will not be affected when
+-- the plugin is used.
+trustPlugin :: Plugin -> Plugin
+trustPlugin plugin = plugin { pluginTrustworthy = \_ -> return True }
+
+-- | Mark a plugin as not unsafe so safe inference will always fail when the
+-- plugin is used.
+distrustPlugin :: Plugin -> Plugin
+distrustPlugin plugin = plugin { pluginTrustworthy = \_ -> return False }
 
 
 -- | A renamer plugin which mades the renamed source available in

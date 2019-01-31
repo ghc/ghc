@@ -2874,7 +2874,9 @@ runRenamerPlugin :: TcGblEnv
 runRenamerPlugin gbl_env hs_group = do
     dflags <- getDynFlags
     withPlugins dflags
-      (\p opts (e, g) -> ( mark_plugin_unsafe dflags >> renamedResultAction p opts e g))
+      (\p opts (e, g) -> do
+        mark_plugin_unsafe p opts dflags
+        renamedResultAction p opts e g)
       (gbl_env, hs_group)
 
 
@@ -2896,12 +2898,15 @@ runTypecheckerPlugin :: ModSummary -> HscEnv -> TcGblEnv -> TcM TcGblEnv
 runTypecheckerPlugin sum hsc_env gbl_env = do
     let dflags = hsc_dflags hsc_env
     withPlugins dflags
-      (\p opts env -> mark_plugin_unsafe dflags
-                        >> typeCheckResultAction p opts sum env)
+      (\p opts env -> do
+        mark_plugin_unsafe p opts dflags
+        typeCheckResultAction p opts sum env)
       gbl_env
 
-mark_plugin_unsafe :: DynFlags -> TcM ()
-mark_plugin_unsafe dflags = recordUnsafeInfer pluginUnsafe
+mark_plugin_unsafe :: Plugin -> [CommandLineOption] -> DynFlags -> TcM ()
+mark_plugin_unsafe plugin opts dflags = do
+  trustworthy <- liftIO $ pluginTrustworthy plugin opts
+  unless trustworthy $ recordUnsafeInfer pluginUnsafe
   where
     unsafeText = "Use of plugins makes the module unsafe"
     pluginUnsafe = unitBag ( mkPlainWarnMsg dflags noSrcSpan

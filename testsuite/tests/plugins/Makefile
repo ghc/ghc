@@ -125,3 +125,8 @@ plugin-recomp-change-prof:
 .PHONY: T16104
 T16104:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T16104.hs -package-db T16104-plugin/pkg.T16104-plugin/local.package.conf
+
+.PHONY: T16260
+T16260:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T16260.hs -package-db T16260-plugin/pkg.T16260-plugin/local.package.conf -fplugin T16260_Plugin
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T16260.hs -package-db T16260-plugin/pkg.T16260-plugin/local.package.conf -fplugin T16260_Plugin -fplugin-opt T16260_Plugin:unsafe
