@@ -39,7 +39,7 @@ import {-# SOURCE #-} TcInstDcls( tcInstDecls1 )
 import TcDeriv (DerivInfo)
 import TcHsType
 import ClsInst( AssocInstInfo(..) )
-import Inst( tcInstTyBinders )
+import Inst( tcInstInvisibleTyBinders )
 import TcMType
 import TysWiredIn ( unitTy )
 import TcType
@@ -1740,7 +1740,7 @@ kcTyFamInstEqn tc_fam_tc
        ; discardResult $
          bindImplicitTKBndrs_Q_Tv imp_vars $
          bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
-         do { (_, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
+         do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsType hs_rhs_ty res_kind }
              -- Why "_Tv" here?  Consider (Trac #14066
              --  type family Bar x y where
@@ -1897,9 +1897,8 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        ; return (qtvs, pats, rhs_ty) }
   where
     tc_lhs | null hs_pats  -- See Note [Apparently-nullary families]
-           = do { (args, rhs_kind) <- tcInstTyBinders $
-                                      splitPiTysInvisibleN (tyConArity fam_tc)
-                                                           (tyConKind  fam_tc)
+           = do { (args, rhs_kind) <- tcInstInvisibleTyBinders (tyConArity fam_tc)
+                                                               (tyConKind  fam_tc)
                 ; return (mkTyConApp fam_tc args, rhs_kind) }
            | otherwise
            = tcFamTyPats fam_tc hs_pats

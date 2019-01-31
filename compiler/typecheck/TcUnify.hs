@@ -790,7 +790,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
     inst_and_unify = do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
 
-                           -- if we haven't recurred through an arrow, then
+                           -- If we haven't recurred through an arrow, then
                            -- the eq_orig will list ty_actual. In this case,
                            -- we want to update the origin to reflect the
                            -- instantiation. If we *have* recurred through

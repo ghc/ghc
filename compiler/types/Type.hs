@@ -783,6 +783,8 @@ repSplitAppTy_maybe _other = Nothing
 tcRepSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'tcSplitAppTy_maybe', but assumes that
 -- any coreView stuff is already done. Refuses to look through (c => t)
+-- The "Rep" means that we assumes that any tcView stuff is already done.
+-- Refuses to look through (c => t)
 tcRepSplitAppTy_maybe (FunTy ty1 ty2)
   | isPredTy ty1
   = Nothing  -- See Note [Decomposing fat arrow c=>t]
@@ -802,6 +804,7 @@ tcRepSplitAppTy_maybe _other = Nothing
 
 -- | Like 'tcSplitTyConApp_maybe' but doesn't look through type synonyms.
 tcRepSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
+-- The "Rep" means that we assumes that any tcView stuff is already done.
 -- Defined here to avoid module loops between Unify and TcType.
 tcRepSplitTyConApp_maybe (TyConApp tc tys)
   = Just (tc, tys)
@@ -817,6 +820,7 @@ tcRepSplitTyConApp_maybe _
 
 -- | Like 'tcSplitTyConApp' but doesn't look through type synonyms.
 tcRepSplitTyConApp :: HasCallStack => Type -> (TyCon, [Type])
+-- The "Rep" means that we assumes that any tcView stuff is already done.
 -- Defined here to avoid module loops between Unify and TcType.
 tcRepSplitTyConApp ty =
   case tcRepSplitTyConApp_maybe ty of
@@ -2722,6 +2726,7 @@ Note that:
 
 -----------------------------
 typeKind :: HasDebugCallStack => Type -> Kind
+-- No need to expand synonyms
 typeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)         = typeLiteralKind l
 typeKind (FunTy {})        = liftedTypeKind
@@ -2749,6 +2754,7 @@ typeKind ty@(ForAllTy {})
 
 -----------------------------
 tcTypeKind :: HasDebugCallStack => Type -> Kind
+-- No need to expand synonyms
 tcTypeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
 tcTypeKind (LitTy l)         = typeLiteralKind l
 tcTypeKind (TyVarTy tyvar)   = tyVarKind tyvar
@@ -2756,8 +2762,8 @@ tcTypeKind (CastTy _ty co)   = pSnd $ coercionKind co
 tcTypeKind (CoercionTy co)   = coercionType co
 
 tcTypeKind (FunTy arg res)
-  | isPredTy arg && isPredTy res = constraintKind
-  | otherwise                    = liftedTypeKind
+  | isPredTy arg, isPredTy res = constraintKind
+  | otherwise                  = liftedTypeKind
 
 tcTypeKind (AppTy fun arg)
   = go fun [arg]
@@ -2788,10 +2794,8 @@ isPredTy ty = tcIsConstraintKind (tcTypeKind ty)
 
 --------------------------
 typeLiteralKind :: TyLit -> Kind
-typeLiteralKind l =
-  case l of
-    NumTyLit _ -> typeNatKind
-    StrTyLit _ -> typeSymbolKind
+typeLiteralKind (NumTyLit {}) = typeNatKind
+typeLiteralKind (StrTyLit {}) = typeSymbolKind
 
 -- | Returns True if a type is levity polymorphic. Should be the same
 -- as (isKindLevPoly . typeKind) but much faster.
