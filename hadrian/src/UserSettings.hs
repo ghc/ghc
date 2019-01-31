@@ -28,6 +28,11 @@ userFlavours = [userFlavour] -- Add more build flavours if need be.
 userFlavour :: Flavour
 userFlavour = defaultFlavour { name = "user" } -- Modify other settings here.
 
+-- | Turn on -Werror for packages built with the stage1 compiler.
+-- This mimics the CI settings so is useful to turn on when developing.
+werror :: Flavour -> Flavour
+werror fl = fl { args = args fl <> (builder Ghc ? notStage0 ? arg "-Werror") }
+
 -- | Add user-defined packages. Note, this only lets Hadrian know about the
 -- existence of a new package; to actually build it you need to create a new
 -- build flavour, modifying the list of packages that are built by default.
