@@ -663,7 +663,7 @@ typeToLHsType ty
     go (LitTy (StrTyLit s))
       = noLoc $ HsTyLit NoExt (HsStrTy NoSourceText s)
     go ty@(TyConApp tc args)
-      | tyConAppNeedsKindSig True tc args
+      | tyConAppNeedsKindSig True tc (length args)
         -- We must produce an explicit kind signature here to make certain
         -- programs kind-check. See Note [Kind signatures in typeToLHsType].
       = nlHsParTy $ noLoc $ HsKindSig NoExt lhs_ty (go (typeKind ty))
