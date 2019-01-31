@@ -216,6 +216,16 @@ be reset with the :ghc-flag:`-fclear-plugins` option.
     Give arguments to a plugin module; module must be specified with
     :ghc-flag:`-fplugin=⟨module⟩`.
 
+.. ghc-flag:: -fplugin-trustworthy
+    :shortdesc: Trust the used plugins and no longer mark the compiled module
+        as unsafe
+    :type: dynamic
+    :category: plugins
+
+    By default, when a module is compiled with plugins, it will be marked as
+    unsafe. With this flag passed, all plugins are treated as trustworthy
+    and the safety inference will no longer be affected.
+
 .. ghc-flag:: -fclear-plugins
     :shortdesc: Clear the list of active plugins
     :type: dynamic

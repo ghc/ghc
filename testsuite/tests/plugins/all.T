@@ -62,6 +62,7 @@ test('plugins09',
      [extra_files(['simple-plugin/']),
       when(opsys('mingw32'), multi_cpu_race),
       only_ways([config.ghc_plugin_way]),
+      extra_ways([config.ghc_plugin_way]),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins09 TOP={top}')],
      makefile_test, [])
 
@@ -214,4 +215,10 @@ test('T16104',
      [extra_files(['T16104-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C T16104-plugin package.T16104-plugin TOP={top}')
      ],
+     makefile_test, [])
+
+test('T16260',
+     [extra_files(['simple-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T16260 TOP={top}')
+      ],
      makefile_test, [])
