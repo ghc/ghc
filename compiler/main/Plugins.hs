@@ -91,7 +91,7 @@ data Plugin = Plugin {
     -- `HsGroup` has been renamed.
   , typeCheckResultAction :: [CommandLineOption] -> ModSummary -> TcGblEnv
                                -> TcM TcGblEnv
-    -- ^ Modify the module when it is type checked. This is called add the
+    -- ^ Modify the module when it is type checked. This is called at the
     -- very end of typechecking.
   , spliceRunAction :: [CommandLineOption] -> LHsExpr GhcTc
                          -> TcM (LHsExpr GhcTc)
@@ -178,8 +178,10 @@ impurePlugin _args = return ForceRecompile
 flagRecompile =
   return . MaybeRecompile . fingerprintFingerprints . map fingerprintString . sort
 
--- | Default plugin: does nothing at all! For compatibility reasons
--- you should base all your plugin definitions on this default value.
+-- | Default plugin: does nothing at all, except for marking that safe
+-- inference has failed unless @-fplugin-trustworthy@ is passed. For
+-- compatibility reaso you should base all your plugin definitions on this
+-- default value.
 defaultPlugin :: Plugin
 defaultPlugin = Plugin {
         installCoreToDos      = const return

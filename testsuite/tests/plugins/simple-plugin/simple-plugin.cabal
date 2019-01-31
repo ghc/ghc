@@ -20,3 +20,4 @@ Library
         Simple.DataStructures
         Simple.SourcePlugin
         Simple.RemovePlugin
+        Simple.TrustworthyPlugin

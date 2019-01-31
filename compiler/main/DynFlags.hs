@@ -648,6 +648,7 @@ data GeneralFlag
    -- safe haskell flags
    | Opt_DistrustAllPackages
    | Opt_PackageTrust
+   | Opt_PluginTrustworthy
 
    | Opt_G_NoStateHack
    | Opt_G_NoOptCoercion
@@ -3512,6 +3513,8 @@ dynamic_flags_deps = [
 
         ------ Plugin flags ------------------------------------------------
   , make_ord_flag defGhcFlag "fplugin-opt" (hasArg addPluginModuleNameOption)
+  , make_ord_flag defGhcFlag "fplugin-trustworthy"
+      (NoArg (setGeneralFlag Opt_PluginTrustworthy))
   , make_ord_flag defGhcFlag "fplugin"     (hasArg addPluginModuleName)
   , make_ord_flag defGhcFlag "fclear-plugins" (noArg clearPluginModuleNames)
   , make_ord_flag defGhcFlag "ffrontend-opt" (hasArg addFrontendPluginOption)
