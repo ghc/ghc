@@ -1,22 +1,29 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Haddock.Backends.Hyperlinker.ParserSpec (main, spec) where
-
 
 import Test.Hspec
 import Test.QuickCheck
 
-import qualified GHC
+import GHC           ( runGhc, getSessionDynFlags )
+import DynFlags      ( CompilerInfo, DynFlags )
+import SysTools.Info ( getCompilerInfo' )
 import Control.Monad.IO.Class
+
+import Data.String     ( fromString )
+import Data.ByteString ( ByteString )
+import qualified Data.ByteString as BS 
 
 import Haddock (getGhcDirs)
 import Haddock.Backends.Hyperlinker.Parser
 import Haddock.Backends.Hyperlinker.Types
 
-withDynFlags :: (GHC.DynFlags -> IO ()) -> IO ()
+withDynFlags :: ((DynFlags, CompilerInfo) -> IO ()) -> IO ()
 withDynFlags cont = do
   libDir <- fmap snd (getGhcDirs [])
-  GHC.runGhc (Just libDir) $ do
-    dflags <- GHC.getSessionDynFlags
-    liftIO $ cont dflags
+  runGhc (Just libDir) $ do
+    dflags <- getSessionDynFlags
+    cinfo <- liftIO $ getCompilerInfo' dflags
+    liftIO $ cont (dflags, cinfo)
 
 
 main :: IO ()
@@ -53,51 +60,60 @@ instance Arbitrary NoGhcRewrite where
 parseSpec :: Spec
 parseSpec = around withDynFlags $ do
 
-    it "is total" $ \dflags ->
-        property $ \src -> length (parse dflags "" src) `shouldSatisfy` (>= 0)
+    it "is total" $ \(dflags, cinfo) ->
+        property $ \src -> length (parse cinfo dflags "" (fromString src)) `shouldSatisfy` (>= 0)
 
-    it "retains file layout" $ \dflags ->
-        property $ \(NoGhcRewrite src) -> concatMap tkValue (parse dflags "" src) == src
+    it "retains file layout" $ \(dflags, cinfo) ->
+        property $ \(NoGhcRewrite src) ->
+          let orig = fromString src
+              lexed = BS.concat (map tkValue (parse cinfo dflags "" orig))
+          in lexed == orig 
 
     context "when parsing single-line comments" $ do
 
-        it "should ignore content until the end of line" $ \dflags ->
+        it "should ignore content until the end of line" $ \(dflags, cinfo) ->
             shouldParseTo
                 "-- some very simple comment\nidentifier"
                 [TkComment, TkSpace, TkIdentifier]
+                cinfo
                 dflags
 
-        it "should allow endline escaping" $ \dflags ->
+        it "should allow endline escaping" $ \(dflags, cinfo) ->
             shouldParseTo
                 "#define first line\\\nsecond line\\\nand another one"
                 [TkCpp]
+                cinfo
                 dflags
 
     context "when parsing multi-line comments" $ do
 
-        it "should support nested comments" $ \dflags ->
+        it "should support nested comments" $ \(dflags, cinfo) ->
             shouldParseTo
                 "{- comment {- nested -} still comment -} {- next comment -}"
                 [TkComment, TkSpace, TkComment]
+                cinfo
                 dflags
 
-        it "should distinguish compiler pragma" $ \dflags ->
+        it "should distinguish compiler pragma" $ \(dflags, cinfo) ->
             shouldParseTo
                 "{- comment -}{-# LANGUAGE GADTs #-}{- comment -}"
                 [TkComment, TkPragma, TkComment]
+                cinfo
                 dflags
 
-    it "should recognize preprocessor directives" $ \dflags -> do
+    it "should recognize preprocessor directives" $ \(dflags, cinfo) -> do
             shouldParseTo
                 "\n#define foo bar"
-                [TkSpace, TkCpp]
+                [TkCpp]
+                cinfo
                 dflags
             shouldParseTo
                 "x # y"
                 [TkIdentifier, TkSpace, TkOperator, TkSpace,TkIdentifier]
+                cinfo
                 dflags
 
-    it "should distinguish basic language constructs" $ \dflags -> do
+    it "should distinguish basic language constructs" $ \(dflags, cinfo) -> do
         
         shouldParseTo
             "(* 2) <$> (\"abc\", foo)"
@@ -105,6 +121,7 @@ parseSpec = around withDynFlags $ do
             , TkSpace, TkOperator, TkSpace
             , TkSpecial, TkString, TkSpecial, TkSpace, TkIdentifier, TkSpecial
             ]
+            cinfo
             dflags
             
         shouldParseTo
@@ -114,6 +131,7 @@ parseSpec = around withDynFlags $ do
             , TkIdentifier, TkSpace, TkKeyword, TkSpace
             , TkIdentifier, TkSpace, TkOperator, TkSpace, TkIdentifier
             ]
+            cinfo
             dflags
         
         shouldParseTo
@@ -124,9 +142,10 @@ parseSpec = around withDynFlags $ do
             , TkSpace, TkKeyword, TkSpace
             , TkIdentifier, TkSpace, TkGlyph, TkSpace, TkIdentifier
             ]
+            cinfo
             dflags
 
-    it "should parse do-notation syntax" $ \dflags -> do
+    it "should parse do-notation syntax" $ \(dflags, cinfo) -> do
         shouldParseTo
             "do { foo <- getLine; putStrLn foo }"
             [ TkKeyword, TkSpace, TkSpecial, TkSpace
@@ -134,10 +153,11 @@ parseSpec = around withDynFlags $ do
             , TkIdentifier, TkSpecial, TkSpace
             , TkIdentifier, TkSpace, TkIdentifier, TkSpace, TkSpecial
             ]
+            cinfo
             dflags
 
         shouldParseTo
-            (unlines
+            (fromString $ unlines
                 [ "do"
                 , "    foo <- getLine"
                 , "    putStrLn foo"
@@ -146,7 +166,10 @@ parseSpec = around withDynFlags $ do
             , TkSpace, TkGlyph, TkSpace, TkIdentifier, TkSpace
             , TkIdentifier, TkSpace, TkIdentifier, TkSpace
             ]
+            cinfo
             dflags
   where
-    shouldParseTo :: String -> [TokenType] -> GHC.DynFlags -> Expectation
-    shouldParseTo str tokens dflags = map tkType (parse dflags "" str) `shouldBe` tokens
+    shouldParseTo :: ByteString -> [TokenType] -> CompilerInfo -> DynFlags -> Expectation
+    shouldParseTo str tokens cinfo dflags = [ tkType tok
+                                            | tok <- parse cinfo dflags "" str
+                                            , not (BS.null (tkValue tok)) ] `shouldBe` tokens

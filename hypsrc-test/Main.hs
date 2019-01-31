@@ -15,14 +15,23 @@ import Test.Haddock.Xhtml
 checkConfig :: CheckConfig Xml
 checkConfig = CheckConfig
     { ccfgRead = parseXml
-    , ccfgClean = \_ -> strip
+    , ccfgClean = strip
     , ccfgDump = dumpXml
     , ccfgEqual = (==) `on` dumpXml
     }
   where
-    strip = stripAnchors' . stripLinks' . stripFooter
+    -- The whole point of the ClangCppBug is to demonstrate a situation where
+    -- line numbers may vary (and test that links still work). Consequently, we
+    -- strip out line numbers for this test case.
+    strip f | takeBaseName f == "ClangCppBug"
+            = stripAnchors' . stripLinks' . stripIds' . stripIds'' . stripFooter
+            | otherwise
+            = stripAnchors' . stripLinks' . stripIds' . stripFooter
+    
     stripLinks' = stripLinksWhen $ \href -> "#local-" `isPrefixOf` href
     stripAnchors' = stripAnchorsWhen $ \name -> "local-" `isPrefixOf` name
+    stripIds' = stripIdsWhen $ \name -> "local-" `isPrefixOf` name
+    stripIds'' = stripIdsWhen $ \name -> "line-" `isPrefixOf` name
 
 
 dirConfig :: DirConfig

@@ -8,7 +8,7 @@
 module Test.Haddock.Xhtml
     ( Xml(..)
     , parseXml, dumpXml
-    , stripLinks, stripLinksWhen, stripAnchorsWhen, stripFooter
+    , stripLinks, stripLinksWhen, stripAnchorsWhen, stripIdsWhen, stripFooter
     ) where
 
 import Data.Data ( Data(..), Typeable, eqT, (:~:)(..) )
@@ -60,6 +60,14 @@ stripAnchorsWhen p =
   where
     unname attr@(Attr { attrKey = key, attrVal = val })
         | qName key == "name" && p val = attr { attrVal = "" }
+        | otherwise = attr
+
+stripIdsWhen :: (String -> Bool) -> Xml -> Xml
+stripIdsWhen p =
+    processAnchors unname
+  where
+    unname attr@(Attr { attrKey = key, attrVal = val })
+        | qName key == "id" && p val = attr { attrVal = "" }
         | otherwise = attr
 
 
