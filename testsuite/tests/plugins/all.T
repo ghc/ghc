@@ -215,3 +215,9 @@ test('T16104',
       pre_cmd('$MAKE -s --no-print-directory -C T16104-plugin package.T16104-plugin TOP={top}')
      ],
      makefile_test, [])
+
+test('T16260',
+     [extra_files(['simple-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T16260 TOP={top}')
+      ],
+     makefile_test, [])
