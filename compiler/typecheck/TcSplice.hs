@@ -1922,7 +1922,7 @@ reify_tc_app tc tys
           False -- We don't reify types using visible kind applications, so
                 -- don't count specified binders as contributing towards
                 -- injective positions in the kind of the tycon.
-          tc tys
+          tc (length tys)
       = do { let full_kind = tcTypeKind (mkTyConApp tc tys)
            ; th_full_kind <- reifyKind full_kind
            ; return (TH.SigT th_type th_full_kind) }
