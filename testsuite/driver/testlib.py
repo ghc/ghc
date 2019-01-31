@@ -19,7 +19,7 @@ import collections
 import subprocess
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, TestResult
-from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, str_fail, str_pass
+from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, failBecauseStderr, str_fail, str_pass
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
 from perf_notes import MetricChange
@@ -921,11 +921,8 @@ def do_test(name, way, func, args, files):
                 t.unexpected_stat_failures.append(TestResult(directory, name, reason, way))
             else:
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
-                other = {
-                    'stdout': result.get('stdout'),
-                    'stderr': result.get('stderr')
-                }
-                result = TestResult(directory, name, reason, way)
+                print(result)
+                result = TestResult(directory, name, reason, way, stderr=result.get('stderr'))
                 t.unexpected_failures.append(result)
         else:
             if opts.expect == 'missing-lib':
@@ -1061,15 +1058,20 @@ def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts, **kwa
 
     expected_stderr_file = find_expected_file(name, 'stderr')
     actual_stderr_file = add_suffix(name, 'comp.stderr')
+    diff_file_name = in_testdir(add_suffix(name, 'comp.diff'))
 
     if not compare_outputs(way, 'stderr',
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
                                             normalise_errmsg),
                            expected_stderr_file, actual_stderr_file,
+                           diff_file=diff_file_name,
                            whitespace_normaliser=getattr(getTestOpts(),
                                                          "whitespace_normaliser",
                                                          normalise_whitespace)):
-        return failBecause('stderr mismatch') #stderr=open(actual_stderr_file, 'rb').read())
+        stderr = open(diff_file_name, 'rb').read()
+        os.remove(diff_file_name)
+        return failBecauseStderr('stderr mismatch', stderr=stderr )
+
 
     # no problems found, this test passed
     return passed()
@@ -1265,10 +1267,11 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 
     exit_code = runCmd(cmd, None, stdout, stderr, opts.compile_timeout_multiplier)
 
+    actual_stderr_path = in_testdir(name, 'comp.stderr')
+
     if exit_code != 0 and not should_fail:
         if config.verbose >= 1 and _expect_pass(way):
             print('Compile failed (exit code {0}) errors were:'.format(exit_code))
-            actual_stderr_path = in_testdir(name, 'comp.stderr')
             dump_file(actual_stderr_path)
 
     # ToDo: if the sub-shell was killed by ^C, then exit
@@ -1280,10 +1283,12 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 
     if should_fail:
         if exit_code == 0:
-            return failBecause('exit code 0')
+            stderr_contents = open(actual_stderr_path, 'rb').read()
+            return failBecauseStderr('exit code 0', stderr_contents)
     else:
         if exit_code != 0:
-            return failBecause('exit code non-0')
+            stderr_contents = open(actual_stderr_path, 'rb').read()
+            return failBecauseStderr('exit code non-0', stderr_contents)
 
     return passed()
 
@@ -1601,7 +1606,7 @@ def check_prof_ok(name, way):
 # new output. Returns true if output matched or was accepted, false
 # otherwise. See Note [Output comparison] for the meaning of the
 # normaliser and whitespace_normaliser parameters.
-def compare_outputs(way, kind, normaliser, expected_file, actual_file,
+def compare_outputs(way, kind, normaliser, expected_file, actual_file, diff_file=None,
                     whitespace_normaliser=lambda x:x):
 
     expected_path = in_srcdir(expected_file)
@@ -1636,6 +1641,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
             # See Note [Output comparison].
             r = runCmd('diff -uw "{0}" "{1}"'.format(expected_normalised_path,
                                                         actual_normalised_path),
+                        stdout=diff_file,
                         print_output=True)
 
             # If for some reason there were no non-whitespace differences,
@@ -1643,6 +1649,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
             if r == 0:
                 r = runCmd('diff -u "{0}" "{1}"'.format(expected_normalised_path,
                                                            actual_normalised_path),
+                           stdout=diff_file,
                            print_output=True)
 
         if config.accept and (getTestOpts().expect == 'fail' or
