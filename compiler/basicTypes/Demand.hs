@@ -124,7 +124,53 @@ mkJointDmds ss as = zipWithEqual "mkJointDmds" mkJointDmd ss as
 Note [Exceptions and strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to smart about catching exceptions, but we aren't anymore.
-See Trac #14998 for more background.
+See Trac #14998 for the way it's resolved at the moment.
+
+Here's a historic break-down:
+
+Appearently, exception handling prim-ops didn't used to have any special
+strictness signatures, thus defaulting to topSig, which assumes they use their
+arguments lazily. Joachim was the first to realise that we could provide richer
+information. Thus, in 0558911f91c (Dec 13), he added signatures to
+primops.txt.pp indicating that functions like `catch#` and `catchRetry#` call
+their argument, which is useful information for usage analysis. Still with a
+'Lazy' strictness demand (i.e. 'lazyApply1Dmd'), though, and the world was fine.
+
+In 7c0fff4 (July 15), Simon argued that giving `catch#` et al. a
+'strictApply1Dmd' leads to substantial performance gains. That was at the cost
+of correctness, as Trac #10712 proved. So, back to 'lazyApply1Dmd' in
+28638dfe79e (Dec 15).
+
+Motivated to reproduce the gains of 7c0fff4 without the breakage of Trac #10712,
+Ben added a new 'catchArgDmd', which basically said to call its argument
+strictly, but also swallow any thrown exceptions in 'postProcessDmdResult'.
+This was realized by extending the 'Str' constructor of 'ArgStr' with a 'ExnStr'
+field, indicating that it catches the exception, and adding a 'ThrowsExn'
+constructor to the 'Termination' lattice as an element between 'Dunno' and
+'Diverges'. Then along came Trac #11555 and finally #13330, so we had to revert
+to 'lazyApply1Dmd' again in 701256df88c (Mar 17).
+
+This left the other variants like 'catchRetry#' having 'catchArgDmd', which is
+where #14998 picked up. Item 1 was concerned with measuring the impact of also
+making `catchRetry#` and `catchSTM#` have 'lazyApply1Dmd'. The result was that
+there was none; the performance gains stemmed the (change in) definition of
+'catchException', the semantics of which would probably make the saner default
+for 'catch'. We removed the last usages of 'catchArgDmd' in 00b8ecb7 (Apr 18).
+
+There was a lot of dead code resulting from that change, that we removed in this
+commit (as of this writing): We got rid of 'ThrowsExn' and 'ExnStr' again and
+removed any code that was dealing with the peculiarities.
+
+So history keeps telling us that the only possibly correct strictness annotation
+for the first argument of 'catch#' is 'lazyApply1Dmd', because 'catch#' really
+is not strict in its argument: Just try this in GHCi
+
+  :set -XScopedTypeVariables
+  import Control.Exception
+  catch undefined (\(_ :: SomeException) -> putStrLn "you'll see this")
+
+Any analysis that assumes otherwise will be broken in some way or another
+(beyond `-fno-pendantic-bottoms`).
 -}
 
 -- | Vanilla strictness domain
@@ -1242,8 +1288,8 @@ postProcessDmdType du@(JD { sd = ss }) (DmdType fv _ res_ty)
                      Diverges  -> Diverges
 
 postProcessDmdResult :: Str () -> DmdResult -> DmdResult
-postProcessDmdResult Lazy           _         = topRes
-postProcessDmdResult _              res       = res
+postProcessDmdResult Lazy _   = topRes
+postProcessDmdResult _    res = res
 
 postProcessDmdEnv :: DmdShell -> DmdEnv -> DmdEnv
 postProcessDmdEnv ds@(JD { sd = ss, ud = us }) env
@@ -1273,7 +1319,7 @@ postProcessDmd (JD { sd = ss, ud = us }) (JD { sd = s, ud = a})
   = JD { sd = s', ud = a' }
   where
     s' = case ss of
-           Lazy         -> Lazy
+           Lazy  -> Lazy
            Str _ -> s
     a' = case us of
            Abs        -> Abs
