@@ -2,6 +2,10 @@
 -- hadrian/src/UserSettings.hs to hadrian/UserSettings.hs and edit your copy.
 -- If you don't copy the file your changes will be tracked by git and you can
 -- accidentally commit them.
+--
+-- See doc/user-settings.md for instructions, and src/Flavour.hs for auxiliary
+-- functions for manipulating flavours.
+-- Please update doc/user-settings.md when committing changes to this file.
 module UserSettings (
     userFlavours, userPackages, userDefaultFlavour,
     verboseCommand, buildProgressColour, successColour, finalStage

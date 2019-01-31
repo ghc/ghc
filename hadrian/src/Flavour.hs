@@ -1,4 +1,4 @@
-module Flavour (Flavour (..)) where
+module Flavour (Flavour (..), werror) where
 
 import Expression
 
@@ -32,3 +32,9 @@ data Flavour = Flavour {
     ghcProfiled :: Bool,
     -- | Build GHC with debug information.
     ghcDebugged :: Bool }
+
+
+-- | Turn on -Werror for packages built with the stage1 compiler.
+-- It mimics the CI settings so is useful to turn on when developing.
+werror :: Flavour -> Flavour
+werror fl = fl { args = args fl <> (builder Ghc ? notStage0 ? arg "-Werror") }
