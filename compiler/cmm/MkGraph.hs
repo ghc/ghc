@@ -327,7 +327,17 @@ copyIn dflags conv area formals extra_stk
     ci (reg, RegisterParam r) =
         CmmAssign (CmmLocal reg) (CmmReg (CmmGlobal r))
 
-    ci (reg, StackParam off) =
+    ci (reg, StackParam off)
+      | isBitsType $ localRegType reg
+      , typeWidth (localRegType reg) < wordWidth dflags =
+        let
+          stack_slot = (CmmLoad (CmmStackSlot area off) (cmmBits $ wordWidth dflags))
+          local = CmmLocal reg
+          width = cmmRegWidth dflags local
+          expr  = CmmMachOp (MO_XX_Conv (wordWidth dflags) width) [stack_slot]
+        in CmmAssign local expr 
+         
+      | otherwise =
          CmmAssign (CmmLocal reg) (CmmLoad (CmmStackSlot area off) ty)
          where ty = localRegType reg
 
@@ -377,8 +387,16 @@ copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
     co (v, RegisterParam r) (rs, ms) =
         (r:rs, mkAssign (CmmGlobal r) v <*> ms)
 
+    -- See Note [Width of parameters]
     co (v, StackParam off)  (rs, ms)
-       = (rs, mkStore (CmmStackSlot area off) v <*> ms)
+      = (rs, mkStore (CmmStackSlot area off) (value v) <*> ms)
+
+    width v = cmmExprWidth dflags v
+    value v
+      | isBitsType $ cmmExprType dflags v
+      , width v < wordWidth dflags =
+        CmmMachOp (MO_XX_Conv (width v) (wordWidth dflags)) [v]
+      | otherwise = v
 
     (setRA, init_offset) =
       case area of
@@ -405,22 +423,26 @@ copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
 
 -- Note [Width of parameters]
 --
--- Consider passing a small (< word width) primitive like Int8# to a function
--- through a register. It's actually non-trivial to do this without
--- extending/narrowing:
+-- Consider passing a small (< word width) primitive like Int8# to a function.
+-- It's actually non-trivial to do this without extending/narrowing:
 -- * Global registers are considered to have native word width (i.e., 64-bits on
---   x86-64), so CmmLint would complain if we assigne an 8-bit parameter to a
+--   x86-64), so CmmLint would complain if we assigned an 8-bit parameter to a
 --   global register.
 -- * Same problem exists with LLVM IR.
 -- * Lowering gets harder since on x86-32 not every register exposes its lower
 --   8 bits (e.g., for %eax we can use %al, but there isn't a corresponding
 --   8-bit register for %edi). So we would either need to extend/narrow anyway,
 --   or complicate the calling convention.
+-- * Passing a small integer in a stack slot, which has native word width,
+--   requires extending to word width when writing to the stack and narrowing
+--   when reading off the stack (see #16258).
 -- So instead, we always extend every parameter smaller than native word width
 -- in copyOutOflow and then truncate it back to the expected width in copyIn.
 -- Note that we do this in cmm using MO_XX_Conv to avoid requiring
 -- zero-/sign-extending - it's up to a backend to handle this in a most
--- efficient way (e.g., a simple register move)
+-- efficient way (e.g., a simple register move or a smaller size store).
+-- This convention (of ignoring the upper bits) is different from some C ABIs,
+-- e.g. all PowerPC ELF ABIs, that require sign or zero extending parameters.
 --
 -- There was some discussion about this on this PR:
 -- https://github.com/ghc-proposals/ghc-proposals/pull/74
