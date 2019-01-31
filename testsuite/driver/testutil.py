@@ -9,7 +9,7 @@ def passed():
     return {'passFail': 'pass'}
 
 def failBecause(reason, tag=None, **kwargs):
-    return kwargs.update({'passFail': 'fail', 'reason': reason, 'tag': tag})
+    return dict({'passFail': 'fail', 'reason': reason, 'tag': tag}, **kwargs)
 
 def strip_quotes(s):
     # Don't wrap commands to subprocess.call/Popen in quotes.
