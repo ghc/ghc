@@ -107,6 +107,10 @@ path component, excluding any separators.
 Users can add and remove packages from particular build stages. As an example,
 below we add package `base` to Stage0 and remove package `haskeline` from Stage1:
 ```haskell
+...
+import Packages
+...
+
 userFlavour :: Flavour
 userFlavour = defaultFlavour { name = "user", packages = modifiedPackages }
 
@@ -136,7 +140,7 @@ You can choose which integer library to use when builing GHC using the
 (default) and `integerSimple`.
 ```haskell
 userFlavour :: Flavour
-userFlavour = defaultFlavour { name = "user", integerLibrary = integerSimple }
+userFlavour = defaultFlavour { name = "user", integerLibrary = pure integerSimple }
 ```
 
 ### Specifying the final stage to build
