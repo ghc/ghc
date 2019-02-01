@@ -60,4 +60,4 @@ test('T13163',      [extra_files(['Test13163.hs']),
 test('T15303',      [extra_files(['Test15303.hs']),
                      ignore_stderr], makefile_test, ['T15303'])
 test('T16212',      [extra_files(['Test16212.hs']),
-                     ignore_stderr], makefile_test)
+                     ignore_stderr], makefile_test, ['T16212'])
