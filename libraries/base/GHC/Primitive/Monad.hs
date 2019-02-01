@@ -1,7 +1,15 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
+
+#include "MachDeps.h"
 
 module GHC.Primitive.Monad
   ( PrimMonad(..)
@@ -12,6 +20,8 @@ module GHC.Primitive.Monad
   ) where
 
 import GHC.Base
+import GHC.Int (Int32(I32#))
+import Foreign.C.Types (CInt(..))
 import GHC.ST (ST(..))
 
 -- All the code in this module is copied directly from
@@ -78,6 +88,35 @@ class Prim a where
   -- The offset and length are in elements of type @a@ rather than in bytes.
   setOffAddr# :: Addr# -> Int# -> Int# -> a -> State# s -> State# s
 
+deriving newtype instance Prim CInt
+
+instance Prim Int where
+  sizeOf# _ = SIZEOF_HSINT#
+  alignment# _ = ALIGNMENT_HSINT#
+  indexByteArray# arr i = I# (indexIntArray# arr i)
+  readByteArray# arr i s0 = case readIntArray# arr i s0 of
+    (# s1, r #) -> (# s1, I# r #)
+  writeByteArray# arr i (I# r) s0 = writeIntArray# arr i r s0
+  setByteArray# = defaultSetByteArray#
+  indexOffAddr# arr i = I# (indexIntOffAddr# arr i)
+  readOffAddr# arr i s0 = case readIntOffAddr# arr i s0 of
+    (# s1, r #) -> (# s1, I# r #)
+  writeOffAddr# arr i (I# r) s0 = writeIntOffAddr# arr i r s0
+  setOffAddr# = defaultSetOffAddr#
+
+instance Prim Int32 where
+  sizeOf# _ = 4#
+  alignment# _ = 4#
+  indexByteArray# arr i = I32# (indexInt32Array# arr i)
+  readByteArray# arr i s0 = case readInt32Array# arr i s0 of
+    (# s1, r #) -> (# s1, I32# r #)
+  writeByteArray# arr i (I32# r) s0 = writeInt32Array# arr i r s0
+  setByteArray# = defaultSetByteArray#
+  indexOffAddr# arr i = I32# (indexInt32OffAddr# arr i)
+  readOffAddr# arr i s0 = case readInt32OffAddr# arr i s0 of
+    (# s1, r #) -> (# s1, I32# r #)
+  writeOffAddr# arr i (I32# r) s0 = writeInt32OffAddr# arr i r s0
+  setOffAddr# = defaultSetOffAddr#
 
 -- | Execute a primitive operation with no result
 primitive_ :: PrimMonad m

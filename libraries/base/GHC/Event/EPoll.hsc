@@ -2,6 +2,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -16,6 +18,7 @@
 -----------------------------------------------------------------------------
 
 #include "EventConfig.h"
+#include "PrimitiveHsc.h"
 
 module GHC.Event.EPoll
     (
@@ -110,15 +113,18 @@ poll !ep mtimeout f = do
     Just timeout -> epollWait fd es cap $ fromTimeout timeout
     Nothing      -> epollWaitNonBlock fd es cap
 
+  -- If we received the greatest number of events that our buffer allows,
+  -- double the size of the buffer so that future calls to epoll_wait
+  -- are more likely to have enough space to put every epoll_event.
   when (n > 0) $ do
     A.forM_ events $ \e -> f (eventFd e) (toEvent (eventTypes e))
     cap <- A.capacity events
     when (cap == n) $ A.ensureCapacity events (2 * cap)
   return n
 
-newtype EPollFd = EPollFd {
-      fromEPollFd :: CInt
-    } deriving (Eq, Show)
+newtype EPollFd = EPollFd { fromEPollFd :: CInt }
+  deriving stock (Eq, Show)
+  deriving newtype (Prim)
 
 data EPollEvent = EPollEvent {
       eventTypes :: {-# UNPACK #-} !EventType

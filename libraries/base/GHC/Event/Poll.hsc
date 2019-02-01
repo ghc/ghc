@@ -1,9 +1,11 @@
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving
            , NoImplicitPrelude
            , BangPatterns
   #-}
 
+#include "PrimitiveHsc.h"
 #include "EventConfig.h"
 
 module GHC.Event.Poll
@@ -35,6 +37,7 @@ import GHC.Num (Num(..))
 import GHC.Real (fromIntegral, div)
 import GHC.Show (Show)
 import System.Posix.Types (Fd(..))
+import GHC.Primitive.Monad (Prim(..))
 
 import qualified GHC.Event.Array as A
 import qualified GHC.Event.Internal as E
@@ -189,6 +192,17 @@ toEvent e = remap (pollIn .|. pollErr .|. pollHup)  E.evtRead `mappend`
   where remap evt to
             | e .&. evt /= 0 = to
             | otherwise      = mempty
+
+unI :: Int -> Int##
+unI (I## i) = i
+
+instance Prim PollFd where
+  sizeOf## _ = unI #{size struct pollfd}
+  alignment## _ = alignment## (undefined :: CInt)
+  indexByteArray## arr i = PollFd
+    (#{index struct pollfd, fd})
+    (#{index struct events, fd})
+    (#{index struct revents, fd})
 
 -- | @since 4.3.1.0
 instance Storable PollFd where

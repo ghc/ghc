@@ -1,282 +1,234 @@
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE BangPatterns, CPP, NoImplicitPrelude #-}
 
 module GHC.Event.Array
     (
       Array
     , capacity
-    , clear
-    , concat
-    , copy
-    , duplicate
     , empty
     , ensureCapacity
     , findIndex
     , forM_
-    , length
     , loop
     , new
     , removeAt
     , snoc
     , unsafeLoad
-    , unsafeRead
     , unsafeWrite
     , useAsPtr
     ) where
 
 import Data.Bits ((.|.), shiftR)
-import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef, writeIORef)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe
-import Foreign.C.Types (CSize(..))
-import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
-import Foreign.Ptr (Ptr, nullPtr, plusPtr)
-import Foreign.Storable (Storable(..))
 import GHC.Base hiding (empty)
-import GHC.ForeignPtr (mallocPlainForeignPtrBytes, newForeignPtr_)
 import GHC.Num (Num(..))
-import GHC.Real (fromIntegral)
-import GHC.Show (show)
+import GHC.Ptr (Ptr(..))
+
+import GHC.Primitive.PrimArray
+import GHC.Primitive.Monad (Prim,sizeOf#)
 
 #include "MachDeps.h"
 
-#define BOUNDS_CHECKING 1
-
-#if defined(BOUNDS_CHECKING)
--- This fugly hack is brought by GHC's apparent reluctance to deal
--- with MagicHash and UnboxedTuples when inferring types. Eek!
-#define CHECK_BOUNDS(_func_,_len_,_k_) \
-if (_k_) < 0 || (_k_) >= (_len_) then errorWithoutStackTrace ("GHC.Event.Array." ++ (_func_) ++ ": bounds error, index " ++ show (_k_) ++ ", capacity " ++ show (_len_)) else
-#else
-#define CHECK_BOUNDS(_func_,_len_,_k_)
-#endif
-
--- Invariant: size <= capacity
+-- Invariant: length <= capacity
+--
+-- All the documentation in this module refers to two size-like
+-- properties of the array: length and capacity. The length is
+-- the current number of active elements in the array. The capacity
+-- is the maximum number of elements the array can currently hold.
+--
+-- The capacity is always a power of two. Is this actually
+-- required by any of the backends?
 newtype Array a = Array (IORef (AC a))
 
--- The actual array content.
-data AC a = AC
-    !(ForeignPtr a)  -- Elements
-    !Int      -- Number of elements (length)
-    !Int      -- Maximum number of elements (capacity)
+-- The actual array content. The type `a` is required
+-- to have a size that is a multiple of the size of a machine word. We
+-- use the first slot in the array to store the current
+-- number of live elements. This is a hack, but it means
+-- that we can cut down on allocations and indirections.
+-- The reward gets even sweeter once
+-- https://github.com/ghc-proposals/ghc-proposals/pull/203
+-- happens, since that will allow us to put a
+-- MutableByteArray# directly in a MutVar#.
+--
+-- The mutable prim array must be pinned. The Poll
+-- backend (GHC/Event/Poll.hsc) calls the useAsPtr function
+-- provided by this module. The other backends (epoll and
+-- kqueue) use unsafeLoad, which also needs a pointer.
+newtype AC a = AC (MutablePrimArray RealWorld a)
 
-empty :: IO (Array a)
+empty :: Prim a => IO (Array a)
 empty = do
-  p <- newForeignPtr_ nullPtr
-  Array `fmap` newIORef (AC p 0 0)
+  p <- newPinnedPrimArray 1
+  writeElementCount p 0
+  fmap Array (newIORef (AC p))
 
-allocArray :: Storable a => Int -> IO (ForeignPtr a)
-allocArray n = allocHack undefined
- where
-  allocHack :: Storable a => a -> IO (ForeignPtr a)
-  allocHack dummy = mallocPlainForeignPtrBytes (n * sizeOf dummy)
-
-reallocArray :: Storable a => ForeignPtr a -> Int -> Int -> IO (ForeignPtr a)
-reallocArray p newSize oldSize = reallocHack undefined p
- where
-  reallocHack :: Storable a => a -> ForeignPtr a -> IO (ForeignPtr a)
-  reallocHack dummy src = do
-      let size = sizeOf dummy
-      dst <- mallocPlainForeignPtrBytes (newSize * size)
-      withForeignPtr src $ \s ->
-        when (s /= nullPtr && oldSize > 0) .
-          withForeignPtr dst $ \d -> do
-            _ <- memcpy d s (fromIntegral (oldSize * size))
-            return ()
-      return dst
-
-new :: Storable a => Int -> IO (Array a)
+new :: Prim a => Int -> IO (Array a)
 new c = do
-    es <- allocArray cap
-    fmap Array (newIORef (AC es 0 cap))
+    p <- newPinnedPrimArray (cap + 1)
+    writeElementCount p 0
+    fmap Array (newIORef (AC p))
   where
     cap = firstPowerOf2 c
 
-duplicate :: Storable a => Array a -> IO (Array a)
-duplicate a = dupHack undefined a
- where
-  dupHack :: Storable b => b -> Array b -> IO (Array b)
-  dupHack dummy (Array ref) = do
-    AC es len cap <- readIORef ref
-    ary <- allocArray cap
-    withForeignPtr ary $ \dest ->
-      withForeignPtr es $ \src -> do
-        _ <- memcpy dest src (fromIntegral (len * sizeOf dummy))
-        return ()
-    Array `fmap` newIORef (AC ary len cap)
-
-length :: Array a -> IO Int
-length (Array ref) = do
-    AC _ len _ <- readIORef ref
-    return len
-
-capacity :: Array a -> IO Int
+capacity :: Prim a => Array a -> IO Int
 capacity (Array ref) = do
-    AC _ _ cap <- readIORef ref
-    return cap
+    AC p <- readIORef ref
+    sz <- getSizeofMutablePrimArray p
+    return (sz - 1)
 
-unsafeRead :: Storable a => Array a -> Int -> IO a
-unsafeRead (Array ref) ix = do
-    AC es _ cap <- readIORef ref
-    CHECK_BOUNDS("unsafeRead",cap,ix)
-      withForeignPtr es $ \p ->
-        peekElemOff p ix
-
-unsafeWrite :: Storable a => Array a -> Int -> a -> IO ()
+-- | Write an element to the given index. This does not
+--   check to see if the index is lower than the capacity.
+unsafeWrite :: Prim a => Array a -> Int -> a -> IO ()
 unsafeWrite (Array ref) ix a = do
-    ac <- readIORef ref
-    unsafeWrite' ac ix a
+    AC p <- readIORef ref
+    unsafeWrite' p ix a
 
-unsafeWrite' :: Storable a => AC a -> Int -> a -> IO ()
-unsafeWrite' (AC es _ cap) ix a = do
-    CHECK_BOUNDS("unsafeWrite'",cap,ix)
-      withForeignPtr es $ \p ->
-        pokeElemOff p ix a
+unsafeWrite' :: Prim a => MutablePrimArray RealWorld a -> Int -> a -> IO ()
+unsafeWrite' p ix a = writePrimArray p (ix + 1) a
 
-unsafeLoad :: Array a -> (Ptr a -> Int -> IO Int) -> IO Int
+-- Run a callback that takes a Ptr to the contents and the
+-- capacity. Replaces the length with the value returned
+-- by the callback.
+unsafeLoad :: Prim a
+  => Array a
+  -> (Ptr a -> Int -> IO Int) -- callback args are pointer and capacity
+  -> IO Int
 unsafeLoad (Array ref) load = do
-    AC es _ cap <- readIORef ref
-    len' <- withForeignPtr es $ \p -> load p cap
-    writeIORef ref (AC es len' cap)
+    AC p <- readIORef ref
+    sz <- getSizeofMutablePrimArray p
+    let cap = sz - 1
+    -- This pointer conversion is safe since the next
+    -- instruction (writeElementCount) guarantees that
+    -- the array will be live on the heap.
+    len' <- load (advancePtr (mutablePrimArrayContents p) 1) cap
+    writeElementCount p len'
     return len'
 
-ensureCapacity :: Storable a => Array a -> Int -> IO ()
+ensureCapacity :: Prim a => Array a -> Int -> IO ()
 ensureCapacity (Array ref) c = do
-    ac@(AC _ _ cap) <- readIORef ref
-    ac'@(AC _ _ cap') <- ensureCapacity' ac c
-    when (cap' /= cap) $
-      writeIORef ref ac'
-
-ensureCapacity' :: Storable a => AC a -> Int -> IO (AC a)
-ensureCapacity' ac@(AC es len cap) c = do
+    AC p <- readIORef ref
+    sz <- getSizeofMutablePrimArray p
+    let cap = sz - 1
+    let cap' = firstPowerOf2 c
     if c > cap
       then do
-        es' <- reallocArray es cap' cap
-        return (AC es' len cap')
-      else
-        return ac
-  where
-    cap' = firstPowerOf2 c
+        p' <- newPrimArray (cap' + 1)
+        copyMutablePrimArray p' 0 p 0 sz
+        writeIORef ref (AC p')
+      else pure ()
 
-useAsPtr :: Array a -> (Ptr a -> Int -> IO b) -> IO b
+-- Run a callback that takes a Ptr to the contents and the
+-- length. Returns whatever the callback returned.
+useAsPtr :: Prim a
+  => Array a
+  -> (Ptr a -> Int -> IO b) -- callback args are pointer and length
+  -> IO b
 useAsPtr (Array ref) f = do
-    AC es len _ <- readIORef ref
-    withForeignPtr es $ \p -> f p len
+    AC p <- readIORef ref
+    len <- readElementCount p
+    r <- f (advancePtr (mutablePrimArrayContents p) 1) len
+    touchMutablePrimArray p
+    return r
 
-snoc :: Storable a => Array a -> a -> IO ()
+-- Push an element onto the end of the array. This function
+-- ensures that enough space is available, growing the array
+-- if neccessary.
+snoc :: Prim a => Array a -> a -> IO ()
 snoc (Array ref) e = do
-    ac@(AC _ len _) <- readIORef ref
+    AC p <- readIORef ref
+    sz <- getSizeofMutablePrimArray p
+    len <- readElementCount p
+    let cap = sz - 1
     let len' = len + 1
-    ac'@(AC es _ cap) <- ensureCapacity' ac len'
-    unsafeWrite' ac' len e
-    writeIORef ref (AC es len' cap)
+    let cap' = firstPowerOf2 len'
+    if len' > cap
+      then do
+        p' <- newPrimArray (cap' + 1)
+        copyMutablePrimArray p' 0 p 0 sz
+        unsafeWrite' p' len e
+        writeIORef ref (AC p')
+      else unsafeWrite' p len e
 
-clear :: Array a -> IO ()
-clear (Array ref) = do
-  atomicModifyIORef' ref $ \(AC es _ cap) ->
-        (AC es 0 cap, ())
+-- Execute the provided action on each element in the array.
+forM_ :: Prim a => Array a -> (a -> IO ()) -> IO ()
+forM_ (Array ref) g = do
+  AC p <- readIORef ref
+  len <- readElementCount p
+  -- This loop is a little unusual. Remember that the first element in
+  -- the array is not an element at all. It is the length (the count of
+  -- active elements). Consequently, we skip this element, and we go one
+  -- element further than we normally would. Note the use of LTE rather
+  -- than LT in the if expression.
+  let go !ix = if ix <= len
+        then do
+          g =<< readPrimArray p ix
+          go (ix + 1)
+        else pure ()
+  go 1
 
-forM_ :: Storable a => Array a -> (a -> IO ()) -> IO ()
-forM_ ary g = forHack ary g undefined
-  where
-    forHack :: Storable b => Array b -> (b -> IO ()) -> b -> IO ()
-    forHack (Array ref) f dummy = do
-      AC es len _ <- readIORef ref
-      let size = sizeOf dummy
-          offset = len * size
-      withForeignPtr es $ \p -> do
-        let go n | n >= offset = return ()
-                 | otherwise = do
-              f =<< peek (p `plusPtr` n)
-              go (n + size)
-        go 0
+-- Traverse the array with some effectful callback until the
+-- callback returns False. The callback also uses an accumulator.
+-- This function is strict in the accumulator.
+loop :: Prim a => Array a -> b -> (b -> a -> IO (b,Bool)) -> IO ()
+loop (Array ref) z g = do
+  AC p <- readIORef ref
+  len <- readElementCount p
+  -- This loop is a little unusual. See the comment in forM_.
+  let go !ix !k = if ix <= len
+        then do
+          (k', cont) <- g k =<< readPrimArray p ix
+          when cont (go (ix + 1) k')
+        else pure ()
+  go 1 z
 
-loop :: Storable a => Array a -> b -> (b -> a -> IO (b,Bool)) -> IO ()
-loop ary z g = loopHack ary z g undefined
-  where
-    loopHack :: Storable b => Array b -> c -> (c -> b -> IO (c,Bool)) -> b
-             -> IO ()
-    loopHack (Array ref) y f dummy = do
-      AC es len _ <- readIORef ref
-      let size = sizeOf dummy
-          offset = len * size
-      withForeignPtr es $ \p -> do
-        let go n k
-                | n >= offset = return ()
-                | otherwise = do
-                      (k',cont) <- f k =<< peek (p `plusPtr` n)
-                      when cont $ go (n + size) k'
-        go 0 y
+-- Find the first occurence of the element. Returns the
+-- element and its index.
+findIndex :: Prim a => (a -> Bool) -> Array a -> IO (Maybe (Int,a))
+findIndex predicate (Array ref) = do
+  AC p <- readIORef ref
+  len <- readElementCount p
+  -- This loop is a little unusual. See the comment in forM_.
+  let go !ix = if ix <= len
+        then do
+          val <- readPrimArray p ix
+          if predicate val
+            then pure (Just (ix,val))
+            else go ix
+        else pure Nothing
+  go 1
 
-findIndex :: Storable a => (a -> Bool) -> Array a -> IO (Maybe (Int,a))
-findIndex = findHack undefined
- where
-  findHack :: Storable b => b -> (b -> Bool) -> Array b -> IO (Maybe (Int,b))
-  findHack dummy p (Array ref) = do
-    AC es len _ <- readIORef ref
-    let size   = sizeOf dummy
-        offset = len * size
-    withForeignPtr es $ \ptr ->
-      let go !n !i
-            | n >= offset = return Nothing
-            | otherwise = do
-                val <- peek (ptr `plusPtr` n)
-                if p val
-                  then return $ Just (i, val)
-                  else go (n + size) (i + 1)
-      in  go 0 0
+-- Remove the element at the given index.
+removeAt :: Prim a => Array a -> Int -> IO ()
+removeAt (Array ref) i = do
+  AC p <- readIORef ref
+  oldLen <- readElementCount p
+  when (i < 0 || i >= oldLen) $ errorWithoutStackTrace "removeAt: invalid index"
+  let newLen = oldLen - 1
+  writeElementCount p newLen
+  copyMutablePrimArray p (i + 2) p (i + 1) (newLen - i)
 
-concat :: Storable a => Array a -> Array a -> IO ()
-concat (Array d) (Array s) = do
-  da@(AC _ dlen _) <- readIORef d
-  sa@(AC _ slen _) <- readIORef s
-  writeIORef d =<< copy' da dlen sa 0 slen
+-- Write a machine int (indicating the number of active elements)
+-- to the first slot in the array. This ignores the element
+-- type, which is expected to have a size that is a multiple of the
+-- size of a machine int.
+writeElementCount :: MutablePrimArray RealWorld a -> Int -> IO ()
+writeElementCount (MutablePrimArray arr) i = writePrimArray
+  (MutablePrimArray arr :: MutablePrimArray RealWorld Int) 0 i
 
--- | Copy part of the source array into the destination array. The
--- destination array is resized if not large enough.
-copy :: Storable a => Array a -> Int -> Array a -> Int -> Int -> IO ()
-copy (Array d) dstart (Array s) sstart maxCount = do
-  da <- readIORef d
-  sa <- readIORef s
-  writeIORef d =<< copy' da dstart sa sstart maxCount
+readElementCount :: MutablePrimArray RealWorld a -> IO Int
+readElementCount (MutablePrimArray arr) = readPrimArray
+  (MutablePrimArray arr :: MutablePrimArray RealWorld Int) 0
 
--- | Copy part of the source array into the destination array. The
--- destination array is resized if not large enough.
-copy' :: Storable a => AC a -> Int -> AC a -> Int -> Int -> IO (AC a)
-copy' d dstart s sstart maxCount = copyHack d s undefined
- where
-  copyHack :: Storable b => AC b -> AC b -> b -> IO (AC b)
-  copyHack dac@(AC _ oldLen _) (AC src slen _) dummy = do
-    when (maxCount < 0 || dstart < 0 || dstart > oldLen || sstart < 0 ||
-          sstart > slen) $ errorWithoutStackTrace "copy: bad offsets or lengths"
-    let size = sizeOf dummy
-        count = min maxCount (slen - sstart)
-    if count == 0
-      then return dac
-      else do
-        AC dst dlen dcap <- ensureCapacity' dac (dstart + count)
-        withForeignPtr dst $ \dptr ->
-          withForeignPtr src $ \sptr -> do
-            _ <- memcpy (dptr `plusPtr` (dstart * size))
-                        (sptr `plusPtr` (sstart * size))
-                        (fromIntegral (count * size))
-            return $ AC dst (max dlen (dstart + count)) dcap
+-- Offset a pointer by the given number of elements. This uses
+-- the Prim instances instead of the Storable instance.
+advancePtr :: forall a. Prim a => Ptr a -> Int -> Ptr a
+{-# INLINE advancePtr #-}
+advancePtr (Ptr a#) (I# i#) = Ptr (plusAddr# a# (i# *# sizeOf# (undefined :: a)))
 
-removeAt :: Storable a => Array a -> Int -> IO ()
-removeAt a i = removeHack a undefined
- where
-  removeHack :: Storable b => Array b -> b -> IO ()
-  removeHack (Array ary) dummy = do
-    AC fp oldLen cap <- readIORef ary
-    when (i < 0 || i >= oldLen) $ errorWithoutStackTrace "removeAt: invalid index"
-    let size   = sizeOf dummy
-        newLen = oldLen - 1
-    when (newLen > 0 && i < newLen) .
-      withForeignPtr fp $ \ptr -> do
-        _ <- memmove (ptr `plusPtr` (size * i))
-                     (ptr `plusPtr` (size * (i+1)))
-                     (fromIntegral (size * (newLen-i)))
-        return ()
-    writeIORef ary (AC fp newLen cap)
 
 {-The firstPowerOf2 function works by setting all bits on the right-hand
 side of the most significant flagged bit to 1, and then incrementing
@@ -303,10 +255,3 @@ firstPowerOf2 !n =
 #else
 # error firstPowerOf2 not defined on this architecture
 #endif
-
-foreign import ccall unsafe "string.h memcpy"
-    memcpy :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
-
-foreign import ccall unsafe "string.h memmove"
-    memmove :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
-

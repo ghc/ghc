@@ -16,6 +16,7 @@ module GHC.Primitive.Array
   ) where
 
 import GHC.Base
+import GHC.Int (Int(I#))
 import GHC.Primitive.Monad (PrimMonad(..),primitive_)
 
 -- Most the code in this module is copied directly from

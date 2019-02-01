@@ -34,6 +34,7 @@ extra-source-files:
     include/CTypes.h
     include/EventConfig.h.in
     include/HsBaseConfig.h.in
+    include/PrimitiveHsc.h
     include/ieee-flpt.h
     include/md5.h
     include/fs.h
@@ -267,6 +268,7 @@ Library
         GHC.Pack
         GHC.Primitive.Array
         GHC.Primitive.Monad
+        GHC.Primitive.PrimArray
         GHC.Profiling
         GHC.Ptr
         GHC.Read
