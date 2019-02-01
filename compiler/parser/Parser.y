@@ -2025,12 +2025,8 @@ atype :: { LHsType GhcPs }
                                              [mo $1,mc $3] }
         | '[' ktype ']'               {% ams (sLL $1 $> $ HsListTy  noExt $2) [mos $1,mcs $3] }
         | '(' ktype ')'               {% ams (sLL $1 $> $ HsParTy   noExt $2) [mop $1,mcp $3] }
-        | quasiquote                  { sL1 $1 (HsSpliceTy noExt (unLoc $1) ) }
-        | '$(' exp ')'                {% ams (sLL $1 $> $ mkHsSpliceTy HasParens $2)
-                                             [mj AnnOpenPE $1,mj AnnCloseP $3] }
-        | TH_ID_SPLICE                {%ams (sLL $1 $> $ mkHsSpliceTy HasDollar $ sL1 $1 $ HsVar noExt $
-                                             (sL1 $1 (mkUnqual varName (getTH_ID_SPLICE $1))))
-                                             [mj AnnThIdSplice $1] }
+        | quasiquote                  { mapLoc (HsSpliceTy noExt) $1 }
+        | splice_untyped              { mapLoc (HsSpliceTy noExt) $1 }
                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar noExt IsPromoted $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | SIMPLEQUOTE  '(' ktype ',' comma_types1 ')'
@@ -2749,17 +2745,23 @@ aexp2   :: { LHsExpr GhcPs }
                                           [mu AnnOpenB $1,mu AnnCloseB $4] }
 
 splice_exp :: { LHsExpr GhcPs }
-        : TH_ID_SPLICE          {% ams (sL1 $1 $ mkHsSpliceE HasDollar
+        : splice_untyped { mapLoc (HsSpliceE noExt) $1 }
+        | splice_typed   { mapLoc (HsSpliceE noExt) $1 }
+
+splice_untyped :: { Located (HsSplice GhcPs) }
+        : TH_ID_SPLICE          {% ams (sL1 $1 $ mkUntypedSplice HasDollar
                                         (sL1 $1 $ HsVar noExt (sL1 $1 (mkUnqual varName
                                                            (getTH_ID_SPLICE $1)))))
                                        [mj AnnThIdSplice $1] }
-        | '$(' exp ')'          {% ams (sLL $1 $> $ mkHsSpliceE HasParens $2)
+        | '$(' exp ')'          {% ams (sLL $1 $> $ mkUntypedSplice HasParens $2)
                                        [mj AnnOpenPE $1,mj AnnCloseP $3] }
-        | TH_ID_TY_SPLICE       {% ams (sL1 $1 $ mkHsSpliceTE HasDollar
+
+splice_typed :: { Located (HsSplice GhcPs) }
+        : TH_ID_TY_SPLICE       {% ams (sL1 $1 $ mkTypedSplice HasDollar
                                         (sL1 $1 $ HsVar noExt (sL1 $1 (mkUnqual varName
                                                         (getTH_ID_TY_SPLICE $1)))))
                                        [mj AnnThIdTySplice $1] }
-        | '$$(' exp ')'         {% ams (sLL $1 $> $ mkHsSpliceTE HasParens $2)
+        | '$$(' exp ')'         {% ams (sLL $1 $> $ mkTypedSplice HasParens $2)
                                        [mj AnnOpenPTE $1,mj AnnCloseP $3] }
 
 cmdargs :: { [LHsCmdTop GhcPs] }
@@ -3810,7 +3812,7 @@ warnSpaceAfterBang span = do
 -- When two single quotes don't followed by tyvar or gtycon, we report the
 -- error as empty character literal, or TH quote that missing proper type
 -- variable or constructor. See Trac #13450.
-reportEmptyDoubleQuotes :: SrcSpan -> P (Located (HsExpr GhcPs))
+reportEmptyDoubleQuotes :: SrcSpan -> P a
 reportEmptyDoubleQuotes span = do
     thQuotes <- getBit ThQuotesBit
     if thQuotes
