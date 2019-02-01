@@ -2049,6 +2049,9 @@ enableCodeGenForTH target nodemap =
         , ms_hspp_opts = dflags@DynFlags
           {hscTarget = HscNothing}
         } <- ms
+      -- Don't enable codegen for TH on indefinite packages; we
+      -- can't compile anything anyway! See #16219.
+      , not (isIndefinite dflags)
       , ms_mod `Set.member` needs_codegen_set
       = do
         let new_temp_file suf dynsuf = do
