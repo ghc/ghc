@@ -884,7 +884,7 @@ checkDatatypeContext Nothing = return ()
 checkDatatypeContext (Just c)
     = do allowed <- getBit DatatypeContextsBit
          unless allowed $
-             parseErrorSDoc (getLoc c)
+             addError (getLoc c)
                  (text "Illegal datatype context (use DatatypeContexts):"
                   <+> pprLHsContext c)
 
@@ -921,11 +921,9 @@ checkRuleTyVarBndrNames = mapM_ (check . fmap hsTyVarName)
 checkRecordSyntax :: Outputable a => Located a -> P (Located a)
 checkRecordSyntax lr@(dL->L loc r)
     = do allowed <- getBit TraditionalRecordSyntaxBit
-         if allowed
-             then return lr
-             else parseErrorSDoc loc
-                   (text "Illegal record syntax (use TraditionalRecordSyntax):"
-                    <+> ppr r)
+         unless allowed $ addError loc $
+           text "Illegal record syntax (use TraditionalRecordSyntax):" <+> ppr r
+         return lr
 
 -- | Check if the gadt_constrlist is empty. Only raise parse error for
 -- `data T where` to avoid affecting existing error message, see #8258.
@@ -933,13 +931,12 @@ checkEmptyGADTs :: Located ([AddAnn], [LConDecl GhcPs])
                 -> P (Located ([AddAnn], [LConDecl GhcPs]))
 checkEmptyGADTs gadts@(dL->L span (_, []))           -- Empty GADT declaration.
     = do gadtSyntax <- getBit GadtSyntaxBit   -- GADTs implies GADTSyntax
-         if gadtSyntax
-            then return gadts
-            else parseErrorSDoc span $ vcat
-              [ text "Illegal keyword 'where' in data declaration"
-              , text "Perhaps you intended to use GADTs or a similar language"
-              , text "extension to enable syntax: data T where"
-              ]
+         unless gadtSyntax $ addError span $ vcat
+           [ text "Illegal keyword 'where' in data declaration"
+           , text "Perhaps you intended to use GADTs or a similar language"
+           , text "extension to enable syntax: data T where"
+           ]
+         return gadts
 checkEmptyGADTs gadts = return gadts              -- Ordinary GADT declaration.
 
 checkTyClHdr :: Bool               -- True  <=> class header
@@ -999,7 +996,7 @@ checkBlockArguments expr = case unLoc expr of
     check element = do
       blockArguments <- getBit BlockArgumentsBit
       unless blockArguments $
-        parseErrorSDoc (getLoc expr) $
+        addError (getLoc expr) $
           text "Unexpected " <> text element <> text " in function application:"
            $$ nest 4 (ppr expr)
            $$ text "You could write it with parentheses"
@@ -1041,7 +1038,7 @@ checkNoDocs msg ty = go ty
   where
     go (dL->L _ (HsAppKindTy _ ty ki)) = go ty *> go ki
     go (dL->L _ (HsAppTy _ t1 t2)) = go t1 *> go t2
-    go (dL->L l (HsDocTy _ t ds)) = parseErrorSDoc l $ hsep
+    go (dL->L l (HsDocTy _ t ds)) = addError l $ hsep
                                   [ text "Unexpected haddock", quotes (ppr ds)
                                   , text "on", msg, quotes (ppr t) ]
     go _ = pure ()
@@ -1288,7 +1285,7 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
  | semiThen || semiElse
     = do doAndIfThenElse <- getBit DoAndIfThenElseBit
          unless doAndIfThenElse $ do
-             parseErrorSDoc (combineLocs guardExpr elseExpr)
+             addError (combineLocs guardExpr elseExpr)
                             (text "Unexpected semi-colons in conditional:"
                           $$ nest 4 expr
                           $$ text "Perhaps you meant to use DoAndIfThenElse?")
@@ -2209,10 +2206,9 @@ mkTypeImpExp :: Located RdrName   -- TcCls or Var name space
              -> P (Located RdrName)
 mkTypeImpExp name =
   do allowed <- getBit ExplicitNamespacesBit
-     if allowed
-       then return (fmap (`setRdrNameSpace` tcClsName) name)
-       else parseErrorSDoc (getLoc name)
-              (text "Illegal keyword 'type' (use ExplicitNamespaces to enable)")
+     unless allowed $ addError (getLoc name) $
+       text "Illegal keyword 'type' (use ExplicitNamespaces to enable)"
+     return (fmap (`setRdrNameSpace` tcClsName) name)
 
 checkImportSpec :: Located [LIE GhcPs] -> P (Located [LIE GhcPs])
 checkImportSpec ie@(dL->L _ specs) =

@@ -1,0 +1,38 @@
+
+T16270.hs:14:6: error:
+    Unexpected semi-colons in conditional:
+        if c then False; else True
+    Perhaps you meant to use DoAndIfThenElse?
+
+T16270.hs:19:8: error:
+    Unexpected do block in function application:
+        do 1
+    You could write it with parentheses
+    Or perhaps you meant to enable BlockArguments?
+
+T16270.hs:20:8: error:
+    Unexpected lambda expression in function application:
+        \ x -> x
+    You could write it with parentheses
+    Or perhaps you meant to enable BlockArguments?
+
+T16270.hs:22:6: error:
+    Illegal datatype context (use DatatypeContexts): Num a =>
+
+T16270.hs:24:22: error:
+    Illegal record syntax (use TraditionalRecordSyntax): {fst :: a,
+                                                          snd :: b}
+
+T16270.hs:25:5: error:
+    Illegal record syntax (use TraditionalRecordSyntax): p {fst = 1,
+                                                            snd = True}
+
+T16270.hs:27:8: error:
+    Unexpected semi-colons in conditional:
+        if True; then (); else ()
+    Perhaps you meant to use DoAndIfThenElse?
+
+T16270.hs:29:10: error:
+    Illegal keyword 'where' in data declaration
+    Perhaps you intended to use GADTs or a similar language
+    extension to enable syntax: data T where
