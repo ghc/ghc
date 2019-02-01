@@ -126,9 +126,9 @@ Note [Exceptions and strictness]
 We used to smart about catching exceptions, but we aren't anymore.
 See Trac #14998 for the way it's resolved at the moment.
 
-Here's a historic break-down:
+Here's a historic breakdown:
 
-Appearently, exception handling prim-ops didn't used to have any special
+Apparently, exception handling prim-ops didn't use to have any special
 strictness signatures, thus defaulting to topSig, which assumes they use their
 arguments lazily. Joachim was the first to realise that we could provide richer
 information. Thus, in 0558911f91c (Dec 13), he added signatures to
@@ -142,24 +142,36 @@ of correctness, as Trac #10712 proved. So, back to 'lazyApply1Dmd' in
 28638dfe79e (Dec 15).
 
 Motivated to reproduce the gains of 7c0fff4 without the breakage of Trac #10712,
-Ben added a new 'catchArgDmd', which basically said to call its argument
-strictly, but also swallow any thrown exceptions in 'postProcessDmdResult'.
-This was realized by extending the 'Str' constructor of 'ArgStr' with a 'ExnStr'
-field, indicating that it catches the exception, and adding a 'ThrowsExn'
-constructor to the 'Termination' lattice as an element between 'Dunno' and
-'Diverges'. Then along came Trac #11555 and finally #13330, so we had to revert
-to 'lazyApply1Dmd' again in 701256df88c (Mar 17).
+Ben opened Trac #11222. Simon made the demand analyser "understand catch" in
+9915b656 (Jan 16) by adding a new 'catchArgDmd', which basically said to call
+its argument strictly, but also swallow any thrown exceptions in
+'postProcessDmdResult'. This was realized by extending the 'Str' constructor of
+'ArgStr' with a 'ExnStr' field, indicating that it catches the exception, and
+adding a 'ThrowsExn' constructor to the 'Termination' lattice as an element
+between 'Dunno' and 'Diverges'. Then along came Trac #11555 and finally #13330,
+so we had to revert to 'lazyApply1Dmd' again in 701256df88c (Mar 17).
 
 This left the other variants like 'catchRetry#' having 'catchArgDmd', which is
 where #14998 picked up. Item 1 was concerned with measuring the impact of also
 making `catchRetry#` and `catchSTM#` have 'lazyApply1Dmd'. The result was that
-there was none; the performance gains stemmed the (change in) definition of
-'catchException', the semantics of which would probably make the saner default
-for 'catch'. We removed the last usages of 'catchArgDmd' in 00b8ecb7 (Apr 18).
-
-There was a lot of dead code resulting from that change, that we removed in this
-commit (as of this writing): We got rid of 'ThrowsExn' and 'ExnStr' again and
+there was none. We removed the last usages of 'catchArgDmd' in 00b8ecb7
+(Apr 18). There was a lot of dead code resulting from that change, that we
+removed in ef6b283 (Jan 19): We got rid of 'ThrowsExn' and 'ExnStr' again and
 removed any code that was dealing with the peculiarities.
+
+Where did the speed-ups vanish to? In Trac #14998, item 3 established that
+turning 'catch#' strict in its first argument didn't bring back any of the
+alleged performance benefits. Item 2 of that ticket finally found out that it
+was entirely due to 'catchException's new (since Trac #11555) definition, which
+was simply
+
+    catchException !io handler = catch io handler
+
+While 'catchException' is arguably the saner semantics for 'catch', it is an
+internal helper function in "GHC.IO". Its use in
+"GHC.IO.Handle.Internals.do_operation" made for the huge allocation differences:
+Remove the bang and you find the regressions we originally wanted to avoid with
+'catchArgDmd'. See also #exceptions_and_strictness# in "GHC.IO".
 
 So history keeps telling us that the only possibly correct strictness annotation
 for the first argument of 'catch#' is 'lazyApply1Dmd', because 'catch#' really
