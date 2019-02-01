@@ -28,6 +28,7 @@ module HsUtils(
   mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
   mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap,
+  mkHsCmdIf,
 
   nlHsTyApp, nlHsTyApps, nlHsVar, nlHsDataCon,
   nlHsLit, nlHsApp, nlHsApps, nlHsSyntaxApps,
@@ -274,6 +275,10 @@ mkHsComp ctxt stmts expr = mkHsDo ctxt (stmts ++ [last_stmt])
 mkHsIf :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
        -> HsExpr (GhcPass p)
 mkHsIf c a b = HsIf noExt (Just noSyntaxExpr) c a b
+
+mkHsCmdIf :: LHsExpr (GhcPass p) -> LHsCmd (GhcPass p) -> LHsCmd (GhcPass p)
+       -> HsCmd (GhcPass p)
+mkHsCmdIf c a b = HsCmdIf noExt (Just noSyntaxExpr) c a b
 
 mkNPat lit neg     = NPat noExt lit neg noSyntaxExpr
 mkNPlusKPat id lit
