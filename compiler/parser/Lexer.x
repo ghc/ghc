@@ -57,7 +57,7 @@ module Lexer (
    activeContext, nextIsEOF,
    getLexState, popLexState, pushLexState,
    ExtBits(..), getBit,
-   addWarning,
+   addWarning, addError,
    lexTokenStream,
    addAnnotation,AddAnn,addAnnsAt,mkParensApiAnn,
    commentToAnnotation
@@ -2478,6 +2478,17 @@ mkPStatePure options buf loc =
       comment_q = [],
       annotations_comments = []
     }
+
+addError :: SrcSpan -> SDoc -> P ()
+addError srcspan msg
+ = P $ \s@PState{messages=m} ->
+       let
+           m' d =
+               let (ws, es) = m d
+                   errormsg = mkErrMsg d srcspan alwaysQualify msg
+                   es' = es `snocBag` errormsg
+               in (ws, es')
+       in POk s{messages=m'} ()
 
 addWarning :: WarningFlag -> SrcSpan -> SDoc -> P ()
 addWarning option srcspan warning
