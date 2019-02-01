@@ -2875,7 +2875,9 @@ outOfLineCmmOp bid mop res args
               MO_F32_Cos   -> fsLit "cosf"
               MO_F32_Tan   -> fsLit "tanf"
               MO_F32_Exp   -> fsLit "expf"
+              MO_F32_ExpM1 -> fsLit "expm1f"
               MO_F32_Log   -> fsLit "logf"
+              MO_F32_Log1P -> fsLit "log1pf"
 
               MO_F32_Asin  -> fsLit "asinf"
               MO_F32_Acos  -> fsLit "acosf"
@@ -2896,7 +2898,9 @@ outOfLineCmmOp bid mop res args
               MO_F64_Cos   -> fsLit "cos"
               MO_F64_Tan   -> fsLit "tan"
               MO_F64_Exp   -> fsLit "exp"
+              MO_F64_ExpM1 -> fsLit "expm1"
               MO_F64_Log   -> fsLit "log"
+              MO_F64_Log1P -> fsLit "log1p"
 
               MO_F64_Asin  -> fsLit "asin"
               MO_F64_Acos  -> fsLit "acos"
