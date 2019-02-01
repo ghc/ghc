@@ -3,7 +3,7 @@ module Settings.Builders.Make (makeBuilderArgs, validateBuilderArgs) where
 import Oracles.Setting
 import Packages
 import Rules.Gmp
-import Settings.Builders.Common
+import Settings.Builders.Common hiding (Normal)
 import CommandLine
 
 makeBuilderArgs :: Args
@@ -37,6 +37,6 @@ validateBuilderArgs = builder (Make "testsuite/tests") ? do
 
 -- | Support for speed of validation
 setTestSpeed :: TestSpeed -> String
-setTestSpeed Fast    = "fasttest"
-setTestSpeed Average = "test"
-setTestSpeed Slow    = "slowtest"
+setTestSpeed Fast   = "fasttest"
+setTestSpeed Normal = "test"
+setTestSpeed Slow   = "slowtest"

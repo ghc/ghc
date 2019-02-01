@@ -25,6 +25,7 @@ Flags:
                     2008-07-01: 14% slower than the default.
   --quiet           More pretty build log.
                     See Note [Default build system verbosity].
+  --hadrian         Build the compiler and run the tests through hadrian.
   --help            shows this usage help.
 
   validate runs 'make -j\$THREADS', where by default THREADS is the number of
@@ -54,6 +55,7 @@ be_quiet=0
 # heavy cost of xz, which is the typical default. The options are defined in
 # mk/config.mk.in
 tar_comp=gzip
+use_hadrian=NO
 
 while [ $# -gt 0 ]
 do
@@ -82,6 +84,10 @@ do
     --quiet)
         be_quiet=1
         ;;
+    --hadrian)
+	use_hadrian=YES
+	hadrian_build_root=_validatebuild
+	;;
     --help)
         show_help
         exit 0;;
@@ -96,7 +102,12 @@ done
 check_packages () {
     if [ "$bindistdir" = "" ]
     then
-        ghc_pkg=inplace/bin/ghc-pkg
+	if [ "$use_hadrian" = "YES" ]
+	then
+	    ghc_pkg=$hadrian_build_root/stage1/bin/ghc-pkg
+	else
+            ghc_pkg=inplace/bin/ghc-pkg
+	fi
     else
         ghc_pkg="$bindistdir"/bin/ghc-pkg
     fi
@@ -127,26 +138,37 @@ fi
 
 echo "using THREADS=${threads}" >&2
 
-if type gmake > /dev/null 2> /dev/null
+if [ "$use_hadrian" = "NO" ]
 then
-    make="gmake"
+   if type gmake > /dev/null 2> /dev/null
+   then
+       make="gmake"
+   else
+       make="make"
+   fi
+   if [ $be_quiet -eq 1 ]; then
+       # See Note [Default build system verbosity].
+       make="$make -s"
+   fi
+   $make -C utils/checkUniques
 else
-    make="make"
+    hadrian="hadrian/build.sh -j$threads --build-root=$hadrian_build_root"
+    if [ $be_quiet -eq 0 ]; then
+	hadrian="$hadrian -V"
+    fi
 fi
-
-if [ $be_quiet -eq 1 ]; then
-    # See Note [Default build system verbosity].
-    make="$make -s"
-fi
-
-$make -C utils/checkUniques
 
 if [ $testsuite_only -eq 0 ]; then
 
 thisdir=`pwd`
 
 if [ $no_clean -eq 0 ]; then
-    $make maintainer-clean
+    if [ "$use_hadrian" = "NO" ]
+    then
+	$make maintainer-clean
+    else
+	$hadrian clean && rm -rf $hadrian_build_root
+    fi
 
     INSTDIR="$thisdir/inst"
 
@@ -154,27 +176,32 @@ if [ $no_clean -eq 0 ]; then
     ./configure --prefix="$INSTDIR" $config_args
 fi
 
-echo "Validating=YES"       >  mk/are-validating.mk
-echo "ValidateSpeed=$speed" >> mk/are-validating.mk
-echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
+if [ "$use_hadrian" = "NO" ]
+then
+    echo "Validating=YES"       >  mk/are-validating.mk
+    echo "ValidateSpeed=$speed" >> mk/are-validating.mk
+    echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
 
-# Note [Default build system verbosity].
-#
-# From https://ghc.haskell.org/trac/ghc/wiki/Design/BuildSystem:
-#
-#   "The build system should clearly report what it's doing (and sometimes
-#   why), without being too verbose. It should emit actual command lines as
-#   much as possible, so that they can be inspected and cut & pasted."
-#
-# That should be the default. Only suppress commands, by setting V=0 and using
-# `make -s`, when user explicitly asks for it with `./validate --quiet`.
-if [ $be_quiet -eq 1 ]; then
-    # See Note [Default build system verbosity].
-    echo "V=0"                  >> mk/are-validating.mk # Less gunk
+    # Note [Default build system verbosity].
+    #
+    # From https://ghc.haskell.org/trac/ghc/wiki/Design/BuildSystem:
+    #
+    #   "The build system should clearly report what it's doing (and sometimes
+    #   why), without being too verbose. It should emit actual command lines as
+    #   much as possible, so that they can be inspected and cut & pasted."
+    #
+    # That should be the default. Only suppress commands, by setting V=0 and using
+    # `make -s`, when user explicitly asks for it with `./validate --quiet`.
+    if [ $be_quiet -eq 1 ]; then
+	# See Note [Default build system verbosity].
+	echo "V=0"                  >> mk/are-validating.mk # Less gunk
+    fi
+
+    $make -j$threads
+    # For a "debug make", add "--debug=b --debug=m"
+else
+    $hadrian
 fi
-
-$make -j$threads
-# For a "debug make", add "--debug=b --debug=m"
 
 check_packages post-build
 
@@ -183,19 +210,47 @@ check_packages post-build
 
 if [ $speed != "FAST" ]; then
 
-    $make binary-dist-prep TAR_COMP=$tar_comp
-    $make test_bindist TEST_PREP=YES TAR_COMP=$tar_comp
+    bindistdir="bindisttest/install   dir"
+
+    if [ "$use_hadrian" = "NO" ]
+    then
+	$make binary-dist-prep TAR_COMP=$tar_comp
+	$make test_bindist TEST_PREP=YES TAR_COMP=$tar_comp
+    else
+	# $hadrian binary-dist
+	# cd $hadrian_build_root/bindist/
+	# dir=$(ls | grep -v tar)
+	# cd $dir
+	# ./configure --prefix="$thisdir/$bindistdir" && make install
+	# cd $thisdir
+	ghc="$bindistdir/bin/ghc"
+	"$ghc" -e '1+1'
+    fi
+
+    check_packages post-install
 
     #
     # Install the xhtml package into the bindist.
     # This verifies that we can install a package into the
     # bindist with Cabal.
     #
-    bindistdir="bindisttest/install   dir"
-
-    check_packages post-install
-
-    $make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir"
+    if [ "$use_hadrian" = "NO" ]
+    then
+	$make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir"
+    else
+	cd libraries/xhtml
+	"$thisdir/$bindistdir/bin/ghc" --make Setup
+	# TODO: Add --with-haddock=...
+	./Setup configure --with-ghc="$thisdir/$bindistdir/bin/ghc" \
+		--global --builddir=dist-bindist \
+		--prefix="$thisdir/$bindistdir"
+	./Setup build --builddir=dist-bindist
+	# TODO: ./Setup haddock
+	./Setup install --builddir=dist-bindist
+	./Setup clean --builddir=dist-bindist
+	rm -f Setup Setup.exe Setup.hi Setup.o
+	cd ../../
+    fi
 
     check_packages post-xhtml
 fi
@@ -226,15 +281,18 @@ then
 fi
 
 case "$speed" in
-SLOW)
+    SLOW)
+	HADRIAN_TEST_SPEED=slow
         MAKE_TEST_TARGET=slowtest
         BINDIST="BINDIST=YES"
         ;;
-NORMAL)
+    NORMAL)
+	HADRIAN_TEST_SPEED=normal
         MAKE_TEST_TARGET=test
         BINDIST="BINDIST=YES"
         ;;
-FAST)
+    FAST)
+	HADRIAN_TEST_SPEED=fast
         MAKE_TEST_TARGET=fasttest
         BINDIST="BINDIST=NO"
         ;;
@@ -252,21 +310,31 @@ fi
 
 rm -f testsuite_summary.txt testsuite_summary_stage1.txt
 
-# Use LOCAL=0, see Note [Running tests in /tmp].
-$make -C testsuite/tests $BINDIST $PYTHON_ARG \
-      $MAKE_TEST_TARGET stage=2 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
-      NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../testsuite_summary.txt \
-      JUNIT_FILE=../../testsuite.xml \
-      2>&1 | tee testlog
+if [ "$use_hadrian" = "NO" ]
+then
+    # Use LOCAL=0, see Note [Running tests in /tmp].
+    $make -C testsuite/tests $BINDIST $PYTHON_ARG \
+	  $MAKE_TEST_TARGET stage=2 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
+	  NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../testsuite_summary.txt \
+	  JUNIT_FILE=../../testsuite.xml \
+	  2>&1 | tee testlog
 
-# Run a few tests using the stage1 compiler.
-# See Note [Why is there no stage1 setup function?].
-# Don't use BINDIST=YES, as stage1 is not available in a bindist.
-$make -C testsuite/tests/stage1 $PYTHON_ARG \
-      $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
-      NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../../testsuite_summary_stage1.txt \
-      JUNIT_FILE=../../../testsuite_stage1.xml \
-      2>&1 | tee testlog-stage1
+    # Run a few tests using the stage1 compiler.
+    # See Note [Why is there no stage1 setup function?].
+    # Don't use BINDIST=YES, as stage1 is not available in a bindist.
+    $make -C testsuite/tests/stage1 $PYTHON_ARG \
+	  $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
+	  NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../../testsuite_summary_stage1.txt \
+	  JUNIT_FILE=../../../testsuite_stage1.xml \
+	  2>&1 | tee testlog-stage1
+else
+    # TODO: run stage 1 tests too
+    echo "Stage 1 tests not supported by hadrian" > testsuite_summary_stage1.txt
+    $hadrian test --test-speed=$HADRIAN_TEST_SPEED \
+                  --test-compiler="$thisdir/$bindistdir/bin/ghc" \
+                  --summary=$thisdir/testsuite_summary.txt \
+                  --summary-junit=$thisdir/testsuite.xml
+fi
 
 echo
 echo '==== STAGE 1 TESTS ==== '

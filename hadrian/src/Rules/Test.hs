@@ -3,8 +3,10 @@ module Rules.Test (testRules) where
 import System.Environment
 
 import Base
+import CommandLine
 import Expression
 import Oracles.Setting
+import Oracles.TestSettings
 import Packages
 import Settings
 import Settings.Default
@@ -28,66 +30,65 @@ testRules = do
 
     -- Using program shipped with testsuite to generate ghcconfig file.
     root -/- ghcConfigProgPath ~> do
-        ghc <- builderPath $ Ghc CompileHs Stage0
+        ghc0Path <- getCompilerPath "stage0"
         createDirectory $ takeDirectory (root -/- ghcConfigProgPath)
-        cmd ghc [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
+        cmd ghc0Path [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
 
     -- TODO : Use input test compiler and not just stage2 compiler.
     root -/- ghcConfigPath ~> do
-        ghcPath <- needFile Stage1 ghc
+        args <- userSetting defaultTestArgs
+        let testGhc = testCompiler args
+        ghcPath <- getCompilerPath testGhc
+        when (testGhc `elem` ["stage1", "stage2"]) $ need [ ghcPath ]
         need [root -/- ghcConfigProgPath]
         cmd [FileStdout $ root -/- ghcConfigPath] (root -/- ghcConfigProgPath)
             [ghcPath]
 
     root -/- timeoutPath ~> timeoutProgBuilder
 
-    "validate" ~> do
-        needTestBuilders
-        build $ target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
-
     "test" ~> do
-        needTestBuilders
+        -- needTestBuilders
 
         -- TODO : Should we remove the previosly generated config file?
         -- Prepare Ghc configuration file for input compiler.
         need [root -/- ghcConfigPath, root -/- timeoutPath]
 
+        args            <- userSetting defaultTestArgs
+        ghcPath         <- getCompilerPath (testCompiler args)
+
         -- TODO This approach doesn't work.
         -- Set environment variables for test's Makefile.
         env <- sequence
             [ builderEnvironment "MAKE" $ Make ""
-            , builderEnvironment "TEST_HC" $ Ghc CompileHs Stage2
+            , pure (AddEnv "TEST_HC" ghcPath)
             , AddEnv "TEST_HC_OPTS" <$> runTestGhcFlags ]
 
         makePath        <- builderPath $ Make ""
         top             <- topDirectory
-        ghcPath         <- (top -/-) <$> builderPath (Ghc CompileHs Stage2)
         ghcFlags        <- runTestGhcFlags
-        checkPprPath    <- (top -/-) <$> needFile Stage1 checkPpr
-        annotationsPath <- (top -/-) <$> needFile Stage1 checkApiAnnotations
+
+        -- where to get those from?
+        checkPprPath    <- needFile Stage0 checkPpr
+        annotationsPath <- needFile Stage0 checkApiAnnotations
+        pythonPath      <- builderPath Python
+        need [ checkPprPath, annotationsPath ]
 
         -- Set environment variables for test's Makefile.
         liftIO $ do
             setEnv "MAKE" makePath
+            setEnv "PYTHON" pythonPath
             setEnv "TEST_HC" ghcPath
             setEnv "TEST_HC_OPTS" ghcFlags
-            setEnv "CHECK_PPR" checkPprPath
-            setEnv "CHECK_API_ANNOTATIONS" annotationsPath
+            setEnv "CHECK_PPR" (top </> checkPprPath)
+            setEnv "CHECK_API_ANNOTATIONS" (top </> annotationsPath)
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
         -- the test output: https://ghc.haskell.org/trac/ghc/ticket/15951.
         withVerbosity Loud $ buildWithCmdOptions env $
+            -- is it really the right target, especially with an
+            -- external ghc?
             target (vanillaContext Stage2 compiler) RunTest [] []
-
--- | Build extra programs and libraries required by testsuite
-needTestsuitePackages :: Action ()
-needTestsuitePackages = do
-    targets   <- mapM (needFile Stage1) =<< testsuitePackages
-    -- iserv is not supported under Windows
-    windows <- windowsHost
-    when (not windows) needIservBins
-    need targets
 
 -- | Build the timeout program.
 -- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
@@ -108,11 +109,36 @@ timeoutProgBuilder = do
             writeFile' (root -/- timeoutPath) script
             makeExecutable (root -/- timeoutPath)
 
+needTestBuilders :: Action ()
+needTestBuilders = do
+    testGhc <- testCompiler <$> userSetting defaultTestArgs
+    ghcPath <- getCompilerPath testGhc
+    bindir <- getBinaryDirectory testGhc
+    when (testGhc `elem` ["stage1", "stage2"]) needTestsuitePackages
+
+-- | Build extra programs and libraries required by testsuite
+needTestsuitePackages :: Action ()
+needTestsuitePackages = do
+    testGhc <- testCompiler <$> userSetting defaultTestArgs
+    when (testGhc `elem` ["stage1", "stage2"]) $ do
+        let stg = stageOf testGhc
+        targets   <- mapM (needFile stg) =<< testsuitePackages
+        -- iserv is not supported under Windows
+        windows <- windowsHost
+        when (not windows) needIservBins
+        need targets
+
+    where stageOf "stage1" = Stage1
+          stageOf "stage2" = Stage2
+          stageOf _ = error "unexpected argument"
+
 needIservBins :: Action ()
 needIservBins = do
-    rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
+    testGhc <- testCompiler <$> userSetting defaultTestArgs
+    let stg = if testGhc == "stage1" then Stage0 else Stage1
+    rtsways <- interpretInContext (vanillaContext stg ghc) getRtsWays
     need =<< traverse programPath
-               [ Context Stage1 iserv w
+               [ Context stg iserv w
                | w <- [vanilla, profiling
                     -- TODO dynamic way has been reverted as the dynamic build
                     --      is broken. See #15837.
@@ -120,14 +146,6 @@ needIservBins = do
                     ]
                , w `elem` rtsways
                ]
-
-needTestBuilders :: Action ()
-needTestBuilders = do
-    needBuilder $ Ghc CompileHs Stage2
-    needBuilder $ GhcPkg Update Stage1
-    needBuilder Hpc
-    needBuilder $ Hsc2Hs Stage1
-    needTestsuitePackages
 
 needFile :: Stage -> Package -> Action FilePath
 needFile stage pkg

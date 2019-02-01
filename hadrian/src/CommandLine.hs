@@ -8,11 +8,11 @@ import Data.Either
 import qualified Data.HashMap.Strict as Map
 import Data.List.Extra
 import Development.Shake hiding (Normal)
-import Hadrian.Utilities hiding (buildRoot)
+import qualified Hadrian.Utilities as HU
 import System.Console.GetOpt
 import System.Environment
 
-data TestSpeed = Slow | Average | Fast deriving (Show, Eq)
+data TestSpeed = Slow | Normal | Fast deriving (Show, Eq)
 
 -- | All arguments that can be passed to Hadrian via the command line.
 data CommandLineArgs = CommandLineArgs
@@ -20,10 +20,10 @@ data CommandLineArgs = CommandLineArgs
     , flavour        :: Maybe String
     , freeze1        :: Bool
     , integerSimple  :: Bool
-    , progressColour :: UseColour
-    , progressInfo   :: ProgressInfo
+    , progressColour :: HU.UseColour
+    , progressInfo   :: HU.ProgressInfo
     , splitObjects   :: Bool
-    , buildRoot      :: BuildRoot
+    , buildRoot      :: HU.BuildRoot
     , testArgs       :: TestArgs }
     deriving (Eq, Show)
 
@@ -34,10 +34,10 @@ defaultCommandLineArgs = CommandLineArgs
     , flavour        = Nothing
     , freeze1        = False
     , integerSimple  = False
-    , progressColour = Auto
-    , progressInfo   = Brief
+    , progressColour = HU.Auto
+    , progressInfo   = HU.Brief
     , splitObjects   = False
-    , buildRoot      = BuildRoot "_build"
+    , buildRoot      = HU.BuildRoot "_build"
     , testArgs       = defaultTestArgs }
 
 -- | These arguments are used by the `test` target.
@@ -80,9 +80,9 @@ readBuildRoot :: Maybe FilePath -> Either String (CommandLineArgs -> CommandLine
 readBuildRoot ms =
     maybe (Left "Cannot parse build-root") (Right . set) (go =<< ms)
   where
-    go :: String -> Maybe BuildRoot
-    go = Just . BuildRoot
-    set :: BuildRoot -> CommandLineArgs -> CommandLineArgs
+    go :: String -> Maybe HU.BuildRoot
+    go = Just . HU.BuildRoot
+    set :: HU.BuildRoot -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { buildRoot = flag }
 
 readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
@@ -95,25 +95,25 @@ readProgressColour :: Maybe String -> Either String (CommandLineArgs -> CommandL
 readProgressColour ms =
     maybe (Left "Cannot parse progress-colour") (Right . set) (go =<< lower <$> ms)
   where
-    go :: String -> Maybe UseColour
-    go "never"   = Just Never
-    go "auto"    = Just Auto
-    go "always"  = Just Always
+    go :: String -> Maybe HU.UseColour
+    go "never"   = Just HU.Never
+    go "auto"    = Just HU.Auto
+    go "always"  = Just HU.Always
     go _         = Nothing
-    set :: UseColour -> CommandLineArgs -> CommandLineArgs
+    set :: HU.UseColour -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { progressColour = flag }
 
 readProgressInfo :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readProgressInfo ms =
     maybe (Left "Cannot parse progress-info") (Right . set) (go =<< lower <$> ms)
   where
-    go :: String -> Maybe ProgressInfo
-    go "none"    = Just None
-    go "brief"   = Just Brief
-    go "normal"  = Just Normal
-    go "unicorn" = Just Unicorn
+    go :: String -> Maybe HU.ProgressInfo
+    go "none"    = Just HU.None
+    go "brief"   = Just HU.Brief
+    go "normal"  = Just HU.Normal
+    go "unicorn" = Just HU.Unicorn
     go _         = Nothing
-    set :: ProgressInfo -> CommandLineArgs -> CommandLineArgs
+    set :: HU.ProgressInfo -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { progressInfo = flag }
 
 readSplitObjects :: Either String (CommandLineArgs -> CommandLineArgs)
@@ -160,7 +160,7 @@ readTestSpeed ms =
     go :: String -> Maybe TestSpeed
     go "fast"    = Just Fast
     go "slow"    = Just Slow
-    go "average" = Just Average
+    go "normal"  = Just Normal
     go _         = Nothing
     set :: TestSpeed -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { testArgs = (testArgs flags) {testSpeed = flag} }
@@ -223,18 +223,18 @@ optDescrs =
 
 -- | A type-indexed map containing Hadrian command line arguments to be passed
 -- to Shake via 'shakeExtra'.
-cmdLineArgsMap :: IO (Map.HashMap TypeRep Dynamic)
+cmdLineArgsMap :: IO (Map.HashMap HU.TypeRep HU.Dynamic)
 cmdLineArgsMap = do
     (opts, _, _) <- getOpt Permute optDescrs <$> getArgs
     let args = foldl (flip id) defaultCommandLineArgs (rights opts)
-    return $ insertExtra (progressColour args) -- Accessed by Hadrian.Utilities
-           $ insertExtra (progressInfo   args) -- Accessed by Hadrian.Utilities
-           $ insertExtra (buildRoot      args) -- Accessed by Hadrian.Utilities
-           $ insertExtra (testArgs       args) -- Accessed by Settings.Builders.RunTest
-           $ insertExtra args Map.empty
+    return $ HU.insertExtra (progressColour args) -- Accessed by Hadrian.Utilities
+           $ HU.insertExtra (progressInfo   args) -- Accessed by Hadrian.Utilities
+           $ HU.insertExtra (buildRoot      args) -- Accessed by Hadrian.Utilities
+           $ HU.insertExtra (testArgs       args) -- Accessed by Settings.Builders.RunTest
+           $ HU.insertExtra args Map.empty
 
 cmdLineArgs :: Action CommandLineArgs
-cmdLineArgs = userSetting defaultCommandLineArgs
+cmdLineArgs = HU.userSetting defaultCommandLineArgs
 
 cmdConfigure :: Action Bool
 cmdConfigure = configure <$> cmdLineArgs
@@ -242,19 +242,19 @@ cmdConfigure = configure <$> cmdLineArgs
 cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs
 
-lookupBuildRoot :: Map.HashMap TypeRep Dynamic -> BuildRoot
-lookupBuildRoot = buildRoot . lookupExtra defaultCommandLineArgs
+lookupBuildRoot :: Map.HashMap HU.TypeRep HU.Dynamic -> HU.BuildRoot
+lookupBuildRoot = buildRoot . HU.lookupExtra defaultCommandLineArgs
 
-lookupFreeze1 :: Map.HashMap TypeRep Dynamic -> Bool
-lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs
+lookupFreeze1 :: Map.HashMap HU.TypeRep HU.Dynamic -> Bool
+lookupFreeze1 = freeze1 . HU.lookupExtra defaultCommandLineArgs
 
 cmdIntegerSimple :: Action Bool
 cmdIntegerSimple = integerSimple <$> cmdLineArgs
 
-cmdProgressColour :: Action UseColour
+cmdProgressColour :: Action HU.UseColour
 cmdProgressColour = progressColour <$> cmdLineArgs
 
-cmdProgressInfo :: Action ProgressInfo
+cmdProgressInfo :: Action HU.ProgressInfo
 cmdProgressInfo = progressInfo <$> cmdLineArgs
 
 cmdSplitObjects :: Action Bool

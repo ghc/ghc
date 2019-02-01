@@ -1,14 +1,13 @@
 module Settings.Builders.RunTest (runTestBuilderArgs, runTestGhcFlags) where
 
-import Hadrian.Utilities
+import Hadrian.Utilities hiding (Normal)
 import System.Environment
 
 import CommandLine
 import Flavour
-import Oracles.Setting (setting)
 import Oracles.TestSettings
 import Packages
-import Settings.Builders.Common
+import Settings.Builders.Common hiding (Normal)
 
 getTestSetting :: TestSetting -> Expr String
 getTestSetting key = expr $ testSetting key
@@ -58,18 +57,19 @@ runTestBuilderArgs = builder RunTest ? do
             [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
             | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
 
+    testGhc <- expr (testCompiler <$> userSetting defaultTestArgs)
     flav    <- expr flavour
     rtsWays <- expr testRTSSettings
-    libWays <- libraryWays flav
+    libWays <- expr (inferLibraryWays testGhc)
     let hasRtsWay w = elem w rtsWays
         hasLibWay w = elem w libWays
-        debugged    = ghcDebugged flav
     hasDynamic          <- getBooleanSetting TestGhcDynamic
     hasDynamicByDefault <- getBooleanSetting TestGhcDynamicByDefault
     withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
     withSMP             <- getBooleanSetting TestGhcWithSMP
+    debugged            <- read <$> getTestSetting TestGhcDebugged
 
     windows     <- expr windowsHost
     darwin      <- expr osxHost
@@ -93,8 +93,9 @@ runTestBuilderArgs = builder RunTest ? do
             , pure ["--rootdir=" ++ test | test <- libTests]
             , arg "-e", arg $ "windows=" ++ show windows
             , arg "-e", arg $ "darwin=" ++ show darwin
-            , arg "-e", arg $ "config.local=True"
-            , arg "-e", arg $ "config.cleanup=False" -- Don't clean up.
+            , arg "-e", arg $ "config.local=" ++
+                show (elem testGhc ["stage1", "stage2"])
+            , arg "-e", arg $ "config.cleanup=False" -- Don't clean up for now.
             , arg "-e", arg $ "config.compiler_debugged=" ++ quote (yesNo debugged)
             , arg "-e", arg $ "ghc_debugged=" ++ quote (yesNo debugged)
             , arg "-e", arg $ asZeroOne "ghc_with_native_codegen=" withNativeCodeGen
@@ -115,9 +116,6 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
             , arg "-e", arg $ "config.ghc_built_by_llvm=" ++ show ghcBuiltByLlvm
 
-            -- Use default value, see:
-            -- https://github.com/ghc/ghc/blob/master/testsuite/mk/boilerplate.mk
-            , arg "-e", arg $ "config.in_tree_compiler=True"
             , arg "-e", arg $ "config.top=" ++ show (top -/- "testsuite")
             , arg "-e", arg $ "config.wordsize=" ++ show wordsize
             , arg "-e", arg $ "config.os="       ++ show os
@@ -136,8 +134,8 @@ getTestArgs = do
     -- targets specified in the TEST env var
     testEnvTargets <- maybe [] words <$> expr (liftIO $ lookupEnv "TEST")
     args            <- expr $ userSetting defaultTestArgs
-    bindir          <- expr $ setBinaryDirectory (testCompiler args)
-    compiler        <- expr $ setCompiler (testCompiler args)
+    bindir          <- expr $ getBinaryDirectory (testCompiler args)
+    compiler        <- expr $ getCompilerPath (testCompiler args)
     globalVerbosity <- shakeVerbosity <$> expr getShakeOptions
     let configFileArg= ["--config-file=" ++ (testConfigFile args)]
         testOnlyArg  =  map ("--only=" ++) (testOnly args ++ testEnvTargets)
@@ -149,10 +147,10 @@ getTestArgs = do
                            else Nothing
         speedArg     = ["-e", "config.speed=" ++ setTestSpeed (testSpeed args)]
         summaryArg   = case testSummary args of
-                           Just filepath -> Just $ "--summary-file" ++ quote filepath
+                           Just filepath -> Just $ "--summary-file \"" ++ filepath ++ "\""
                            Nothing -> Just $ "--summary-file=testsuite_summary.txt"
         junitArg     = case testJUnit args of
-                           Just filepath -> Just $ "--junit " ++ quote filepath
+                           Just filepath -> Just $ "--junit=" ++ filepath
                            Nothing -> Nothing
         configArgs   = concat [["-e", configArg] | configArg <- testConfigs args]
         verbosityArg = case testVerbosity args of
@@ -164,46 +162,35 @@ getTestArgs = do
         haddockArg   = ["--config", "haddock=" ++ show (bindir -/- "haddock")]
         hp2psArg     = ["--config", "hp2ps=" ++ show (bindir -/- "hp2ps")]
         hpcArg       = ["--config", "hpc=" ++ show (bindir -/- "hpc")]
+        inTreeArg    = [ "-e", "config.in_tree_compiler="
+                    ++ show (testCompiler args `elem` ["stage1", "stage2"]) ]
+
     pure $  configFileArg ++ testOnlyArg ++ speedArg
          ++ catMaybes [ onlyPerfArg, skipPerfArg, summaryArg
                       , junitArg, verbosityArg  ]
          ++ configArgs ++ wayArgs ++  compilerArg ++ ghcPkgArg
-         ++ haddockArg ++ hp2psArg ++ hpcArg
-
--- TODO: Switch to 'Stage' as the first argument instead of 'String'.
--- | Directory to look for Binaries
--- | We assume that required programs are present in the same binary directory
--- | in which ghc is stored and that they have their conventional name.
--- | QUESTION : packages can be named different from their conventional names.
--- | For example, ghc-pkg can be named as ghc-pkg-version. In such cases, it will
--- | be impossible to search the binary. Only possible way will be to take user
--- | inputs for these directory also. boilerplate soes not account for this
--- | problem, but simply returns an error. How should we handle such cases?
-setBinaryDirectory :: String -> Action FilePath
-setBinaryDirectory "stage0" = takeDirectory <$> setting SystemGhc
-setBinaryDirectory "stage1" = liftM2 (-/-) topDirectory (stageBinPath Stage0)
-setBinaryDirectory "stage2" = liftM2 (-/-) topDirectory (stageBinPath Stage1)
-setBinaryDirectory compiler = pure $ parentPath compiler
-
--- TODO: Switch to 'Stage' as the first argument instead of 'String'.
--- | Set Test Compiler.
-setCompiler :: String -> Action FilePath
-setCompiler "stage0" = setting SystemGhc
-setCompiler "stage1" = liftM2 (-/-) topDirectory (fullPath Stage0 ghc)
-setCompiler "stage2" = liftM2 (-/-) topDirectory (fullPath Stage1 ghc)
-setCompiler compiler = pure compiler
+         ++ haddockArg ++ hp2psArg ++ hpcArg ++ inTreeArg
 
 -- | Set speed for test
 setTestSpeed :: TestSpeed -> String
-setTestSpeed Slow    = "0"
-setTestSpeed Average = "1"
-setTestSpeed Fast    = "2"
+setTestSpeed Slow   = "0"
+setTestSpeed Normal = "1"
+setTestSpeed Fast   = "2"
 
--- | Returns parent path of test compiler
--- | TODO: Is there a simpler way to find parent directory?
-parentPath :: String -> String
-parentPath path = intercalate "/" $ init $ splitOn "/" path
+inferLibraryWays :: String -> Action [Way]
+inferLibraryWays compiler = do
+  bindir <- getBinaryDirectory compiler
+  Stdout ghcPrimLibdir <- cmd [Cwd bindir]
+    ("ghc-pkg")
+    ["field", "ghc-prim", "library-dirs", "--simple-output"]
+  catMaybes <$> traverse (lookForWay ghcPrimLibdir) candidateWays
 
--- | TODO: Move to Hadrian utilities.
-fullPath :: Stage -> Package -> Action FilePath
-fullPath stage pkg = programPath =<< programContext stage pkg
+  where lookForWay dir (hifile, w) = do
+          exists <- doesFileExist (dir -/- hifile)
+          if exists then return (Just w) else return Nothing
+
+        candidateWays =
+          [ ("GHC/PrimopWrappers.hi", vanilla)
+          , ("GHC/PrimopWrappers.dyn_hi", dynamic)
+          , ("GHC/PrimopWrappers.p_hi", profiling)
+          ]

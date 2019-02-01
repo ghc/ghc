@@ -91,11 +91,16 @@ you can simply do:
 bindistRules :: Rules ()
 bindistRules = do
     root <- buildRootRules
-    phony "binary-dist" $ do
-        -- We 'need' all binaries and libraries
-        targets <- mapM pkgTarget =<< stagePackages Stage1
-        need targets
 
+    phony "binary-dist" $ do
+        version        <- setting ProjectVersion
+        targetPlatform <- setting TargetPlatformFull
+        let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
+
+        need [ root -/- "bindist" -/- ghcVersionPretty <.> "tar.xz" ]
+
+
+    root -/- "bindist" -/- "ghc-*.tar.xz" %> \archivePath -> do
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
         distDir        <- Context.distDir
@@ -106,6 +111,10 @@ bindistRules = do
             ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
             rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir
                                -/- "include"
+
+        -- We 'need' all binaries and libraries built by stage 1
+        targets <- mapM pkgTarget =<< stagePackages Stage1
+        need targets
 
         -- We create the bindist directory at <root>/bindist/ghc-X.Y.Z-platform/
         -- and populate it with Stage2 build results
@@ -131,11 +140,10 @@ bindistRules = do
                    , "ghci-script", "ghci", "haddock", "hpc", "hp2ps", "hsc2hs"
                    , "runghc"]
 
-        -- Finally, we create the archive <root>/bindist/ghc-X.Y.Z-platform.tar.xz
         command [Cwd $ root -/- "bindist"] "tar"
-            [ "-c", "--xz", "-f"
-            , ghcVersionPretty <.> "tar.xz"
-            , ghcVersionPretty ]
+                [ "-c", "--xz", "-f"
+                , takeFileName archivePath
+                , ghcVersionPretty ]
 
     -- Prepare binary distribution configure script
     -- (generated under <ghc root>/distrib/configure by 'autoreconf')
@@ -224,19 +232,19 @@ bindistMakefile = unlines
     , "# to it. This implementation is a bit hacky and depends on consistency"
     , "# of program names. For hadrian build this will work as programs have a"
     , "# consistent naming procedure."
-    , "\trm -f $2"
-    , "\t$(CREATE_SCRIPT) $2"
-    , "\t@echo \"#!$(SHELL)\" >>  $2"
-    , "\t@echo \"exedir=\\\"$4\\\"\" >> $2"
-    , "\t@echo \"exeprog=\\\"$1\\\"\" >> $2"
-    , "\t@echo \"executablename=\\\"$5\\\"\" >> $2"
-    , "\t@echo \"bindir=\\\"$3\\\"\" >> $2"
-    , "\t@echo \"libdir=\\\"$6\\\"\" >> $2"
-    , "\t@echo \"docdir=\\\"$7\\\"\" >> $2"
-    , "\t@echo \"includedir=\\\"$8\\\"\" >> $2"
-    , "\t@echo \"\" >> $2 "
-    , "\tcat wrappers/$1 >> $2"
-    , "\t$(EXECUTABLE_FILE) $2 ;"
+    , "\trm -f '$2'"
+    , "\t$(CREATE_SCRIPT) '$2'"
+    , "\t@echo \"#!$(SHELL)\" >>  '$2'"
+    , "\t@echo \"exedir=\\\"$4\\\"\" >> '$2'"
+    , "\t@echo \"exeprog=\\\"$1\\\"\" >> '$2'"
+    , "\t@echo \"executablename=\\\"$5\\\"\" >> '$2'"
+    , "\t@echo \"bindir=\\\"$3\\\"\" >> '$2'"
+    , "\t@echo \"libdir=\\\"$6\\\"\" >> '$2'"
+    , "\t@echo \"docdir=\\\"$7\\\"\" >> '$2'"
+    , "\t@echo \"includedir=\\\"$8\\\"\" >> '$2'"
+    , "\t@echo \"\" >> '$2'"
+    , "\tcat wrappers/$1 >> '$2'"
+    , "\t$(EXECUTABLE_FILE) '$2' ;"
     , "endef"
     , ""
     , "# Hacky function to patch up the 'haddock-interfaces' and 'haddock-html'"
@@ -245,10 +253,10 @@ bindistMakefile = unlines
     , "# $1 = package name (ex: 'bytestring')"
     , "# $2 = path to .conf file"
     , "# $3 = Docs Directory"
-    , "\tcat $2 | sed 's|haddock-interfaces.*|haddock-interfaces: $3/html/libraries/$1/$1.haddock|' \\"
-    , "\t       | sed 's|haddock-html.*|haddock-html: $3/html/libraries/$1|' \\"
-    , "\t       > $2.copy"
-    , "\tmv $2.copy $2"
+    , "\tcat '$2' | sed 's|haddock-interfaces.*|haddock-interfaces: $3/html/libraries/$1/$1.haddock|' \\"
+    , "\t         | sed 's|haddock-html.*|haddock-html: $3/html/libraries/$1|' \\"
+    , "\t         > '$2.copy'"
+    , "\tmv '$2.copy' '$2'"
     , "endef"
     , ""
     , "# QUESTION : should we use shell commands?"
@@ -273,10 +281,10 @@ bindistMakefile = unlines
     , ""
     , "install_ghci:"
     , "\t@echo \"Copying and installing ghci\""
-    , "\t$(CREATE_SCRIPT) $(WrapperBinsDir)/ghci"
-    , "\t@echo \"#!$(SHELL)\" >>  $(WrapperBinsDir)/ghci"
-    , "\tcat wrappers/ghci-script >> $(WrapperBinsDir)/ghci"
-    , "\t$(EXECUTABLE_FILE) $(WrapperBinsDir)/ghci"
+    , "\t$(CREATE_SCRIPT) '$(WrapperBinsDir)/ghci'"
+    , "\t@echo \"#!$(SHELL)\" >>  '$(WrapperBinsDir)/ghci'"
+    , "\tcat wrappers/ghci-script >> '$(WrapperBinsDir)/ghci'"
+    , "\t$(EXECUTABLE_FILE) '$(WrapperBinsDir)/ghci'"
     , ""
     , "LIBRARIES = $(wildcard ./lib/*)"
     , "install_lib:"
@@ -302,7 +310,7 @@ bindistMakefile = unlines
     , "\t\tcp -R $$i \"$(docdir)/\"; \\"
     , "\tdone"
     , ""
-    , "BINARY_NAMES=$(shell ls ./bin/)"
+    , "BINARY_NAMES=$(shell ls ./wrappers/)"
     , "install_wrappers:"
     , "\t@echo \"Installing Wrapper scripts\""
     , "\t$(INSTALL_DIR) \"$(WrapperBinsDir)\""
@@ -318,7 +326,7 @@ bindistMakefile = unlines
     , "\t\t$(call patchpackageconf," ++
       "$(shell echo $(notdir $p) | sed 's/-\\([0-9]*[0-9]\\.\\)*conf//g')," ++
       "$p,$(docdir)))"
-    , "\t$(WrapperBinsDir)/ghc-pkg recache"
+    , "\t'$(WrapperBinsDir)/ghc-pkg' recache"
     , ""
     , "# END INSTALL"
     , "# ----------------------------------------------------------------------"
