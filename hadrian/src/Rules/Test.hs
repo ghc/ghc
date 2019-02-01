@@ -47,9 +47,9 @@ testRules = do
     root -/- timeoutPath ~> timeoutProgBuilder
 
     "test" ~> do
-        -- needTestBuilders
 
         -- TODO : Should we remove the previosly generated config file?
+        needTestBuilders
         -- Prepare Ghc configuration file for input compiler.
         need [root -/- ghcConfigPath, root -/- timeoutPath]
 
@@ -66,6 +66,10 @@ testRules = do
         makePath        <- builderPath $ Make ""
         top             <- topDirectory
         ghcFlags        <- runTestGhcFlags
+        let ghciFlags = ghcFlags ++ unwords
+              [ "--interactive", "-v0", "-ignore-dot-ghci"
+              , "-fno-ghci-history"
+              ]
 
         -- where to get those from?
         checkPprPath    <- needFile Stage0 checkPpr
@@ -79,6 +83,7 @@ testRules = do
             setEnv "PYTHON" pythonPath
             setEnv "TEST_HC" ghcPath
             setEnv "TEST_HC_OPTS" ghcFlags
+            setEnv "TEST_HC_OPTS_INTERACTIVE" ghciFlags
             setEnv "CHECK_PPR" (top </> checkPprPath)
             setEnv "CHECK_API_ANNOTATIONS" (top </> annotationsPath)
 

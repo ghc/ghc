@@ -38,13 +38,15 @@ runTestGhcFlags = do
     -- Take flags to send to the Haskell compiler from test.mk.
     -- See: https://github.com/ghc/ghc/blob/master/testsuite/mk/test.mk#L37
     unwords <$> sequence
-        [ pure " -dcore-lint -dcmm-lint -no-user-package-db -rtsopts"
+        [ pure "-dcore-lint -dstg-lint -dcmm-lint"
+        , pure "-no-user-package-db -rtsopts"
         , pure ghcOpts
         , pure ghcExtraFlags
         , ifMinGhcVer "711" "-fno-warn-missed-specialisations"
         , ifMinGhcVer "711" "-fshow-warning-groups"
         , ifMinGhcVer "801" "-fdiagnostics-color=never"
         , ifMinGhcVer "801" "-fno-diagnostics-show-caret"
+        , pure "-Werror=compat"
         , pure "-dno-debug-output"
         ]
 
@@ -93,8 +95,9 @@ runTestBuilderArgs = builder RunTest ? do
             , pure ["--rootdir=" ++ test | test <- libTests]
             , arg "-e", arg $ "windows=" ++ show windows
             , arg "-e", arg $ "darwin=" ++ show darwin
-            , arg "-e", arg $ "config.local=" ++
-                show (elem testGhc ["stage1", "stage2"])
+            , arg "-e", arg $ "config.local=False"
+            , arg "-e", arg $ "config.exeext=" ++
+                show (if windows then "exe" else "")
             , arg "-e", arg $ "config.cleanup=False" -- Don't clean up for now.
             , arg "-e", arg $ "config.compiler_debugged=" ++ quote (yesNo debugged)
             , arg "-e", arg $ "ghc_debugged=" ++ quote (yesNo debugged)
