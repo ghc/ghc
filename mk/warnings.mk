@@ -122,6 +122,9 @@ libraries/parsec_dist-install_EXTRA_HC_OPTS += -Wno-name-shadowing -Wno-unused-m
 libraries/parsec_dist-install_EXTRA_HC_OPTS += -Wno-unused-do-bind -Wno-missing-signatures
 libraries/parsec_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports -Wno-type-defaults
 
+# text warns with integer-simple
+libraries/text_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
+
 # Turn of trustworthy-safe warning
 libraries/base_dist-install_EXTRA_HC_OPTS += -Wno-trustworthy-safe
 libraries/ghc-prim_dist-install_EXTRA_HC_OPTS += -Wno-trustworthy-safe
