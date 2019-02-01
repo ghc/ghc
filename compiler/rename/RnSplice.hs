@@ -112,9 +112,7 @@ rnBracket e br_body
                         ; (body', fvs_e) <-
                           setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
                                    rn_bracket cur_stage br_body
-
                         ; pendings <- readMutVar ps_var
-
                         ; return (HsRnBracketOut noExt body' pendings, fvs_e) }
        }
 
@@ -431,7 +429,7 @@ rnSpliceExpr splice
     pend_expr_splice :: HsSplice GhcRn -> (PendingRnSplice, HsExpr GhcRn)
     pend_expr_splice rn_splice
         = (makePending UntypedExpSplice rn_splice
-          , HsVar noExt (noLoc (getSplicePoint rn_splice)))
+          , HsSpliceE noExt rn_splice)
 
     run_expr_splice :: HsSplice GhcRn -> RnM (HsExpr GhcRn, FreeVars)
     run_expr_splice rn_splice
@@ -844,12 +842,13 @@ check_cross_stage_lifting top_lvl lift_by name ps_var
           -- Construct the `$^n (lift^n x)` expression
         ; let lift_expr   = mkLiftExpr lift_by name
         -- Call the normal `rnExpr` function here so that splices get dealt
-        -- with uniformly. We know the result is going to be a variable
-        -- though because of the way we constructed `lift_expr`.
+        -- with uniformly. We know the result is going to be a `HsSpliceE`
+        -- though because of the way we constructed `lift_expr` with an
+        -- outermost `HsSpliceE` constructor.
         ; (e, _) <- rnLExpr lift_expr
         ; traceRn "checkCrossStageLifting:end" (ppr lift_expr $$ ppr e)
         ; case unLoc e of
-            (HsVar _ (unLoc -> n)) -> return n
+            (HsSpliceE _ (HsUntypedSplice _ _ n _)) -> return n
             _ -> pprPanic "checkCrossStageLifting"
                   (ppr lift_expr
                   $$ ppr e
@@ -942,10 +941,17 @@ foo x = [| x |]
 ```
 
 `x` is bound at level 0 but used at level 1. This is disallowed but if `a` is
-an instance of `Lift` then we can serialise `x` and splice it in which corrects
+an instance of `Lift` then we can represent `x` and splice it in which corrects
 the difference in stages.
 
 ```
+class Lift a where
+  lift :: a -> Q Exp
+
+instance Lift Bool where
+  lift False = [| False |]
+  lift True  = [| True  |]
+
 foo :: Lift a => a -> Q Exp
 foo x = [| $(lift x) |]
 ```
@@ -953,17 +959,8 @@ foo x = [| $(lift x) |]
 Now x is both bound and used at stage 0.
 
 This is implemented by the checkCrossStageLifting function. If we see a variable
-is used out-of-phase then we attempt to lift it by implicitly creating a splice.
-We create a new name for the splice point and add a new pending splice to the
-splice environment.
+is used out-of-phase then treat it exactly as if the user had written `$(lift x)`.
 
-```
-foo :: Lift a => a -> Q Exp
-foo x = [| x' |]_{ x' = lift x }
-```
-
-So that when we lookup `x'` in DsMeta when desugaring we find it in the DsMetaEnv
-and instead insert the call to `lift x` rather than the serialisation of `x`.
 
 The n-level case
 ~~~~~~~~~~~~~~~~
@@ -982,71 +979,10 @@ foo2 :: Lift a => a -> Q Exp
 foo2 x = [| [| $($(lift (lift x))) |] |]
 ```
 
-There are a few details to work out here.
+In general for a variable bound at level i and used at level j, we need to lift it
+`j-i` times. That means we insert `j-i` calls to `lift` followed by `j-i` splices.
 
-1. We augment the `PendingRnSplice` data type with the target stage of the splice as
-now we must now how far to propagate the expression. Previously we always propagated
-to the top-level but now we have nested brackets we sometimes stop earlier.
-
-See Note [Propagating Splices] for more information about this.
-
-2. We have to work out how much to lift by. We do this once in `checkCrossStageLifting`
-rather than increase the lifting level by one each time we have to propagate a splice
-outwards so it happens in one place.
-
-3. We now need a representation of brackets in the template-haskell AST.
-This means we add the `BrackE` constructor.
-
-```
-data Exp = ... | BrackE [(Name, Exp)] Exp | ...
-```
-
-This is the representation of a renamed bracket, which is an environment created
-by the splices and the expression inside the bracket.
-
-Note [Propagating Splices]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-With nested brackets, we sometimes need to lift expressions twice.
-
-```
-foo2 :: Lift a => a -> Q Exp
-foo2 x = [| [| x |] |]
-```
-
-When we encounter `x` in the inner bracket we call `checkCrossStageLifting`
-which decides by how much and how to lift. We then need to float this splice
-to where it needs to be run, in this case level 0.
-
-Pending splices are stored in the `ps_var` variable which is associated with
-each bracket so it is initially added to the `ps_var` of the inner bracket.
-When we leave the scope, we need to continue floating the splice for `x`
-further outwards. We do this by adding it to the `ps_var` for the outer splice.
-As bindings float outwards, we invent new trivial bindings which record
-the correct environment for each bracket.
-
-```
-foo2 :: Lift a => a -> Q Exp
-foo2 x = [| [| x'' |]_{x'' = x'} |]_{x' = (lift (lift x))}
-```
-
-This is the purpose of record the target level for each splice.
-In `foo3`, the target of `x` is stage 1 as `x` is bound in stage 1 so
-we don't propage the splice at all (as then `x` would not be in scope).
-
-```
-foo3 :: Q Exp
-foo3 = [| \x -> [| x |] |]
-```
-
-==>
-
-```
-foo3 :: Q Exp
-foo3 = [| \x -> [| x' |]_{ x' = lift x } |]
-```
-
-
-
+If `j-i = 2` for a variable `x` then we treat it as `$($(lift (lift x)))` this
+expression is generated by `mkLiftExpr`.
 
 -}

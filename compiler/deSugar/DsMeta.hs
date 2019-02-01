@@ -1412,18 +1412,22 @@ repE (HsUnboundVar _ uv)   = do
                                sname <- repNameS occ
                                repUnboundVar sname
 repE (HsRnBracketOut _ (ExpBr _ e) ts) =
-  do { sp_rep <- pendingSplicesToBinds ts
-     ; e2 <- repLE e
-     ; repBracket sp_rep e2
+  do { let sps = map (\(PendingSplice _ n _) -> n) ts
+     ; ss <- mkGenSyms sps
+     ; addBinds ss $ do {
+       sp_rep <- repPendingSplices ts
+      ; e2 <- repLE e
+      ; e <- repBracket sp_rep e2
+      ; wrapGenSyms ss e }
      }
 repE e@(HsCoreAnn {})      = notHandled "Core annotations" (ppr e)
 repE e@(HsSCC {})          = notHandled "Cost centres" (ppr e)
 repE e@(HsTickPragma {})   = notHandled "Tick Pragma" (ppr e)
 repE e                     = notHandled "Expression form" (ppr e)
 
-pendingSplicesToBinds :: [PendingRnSplice]
+repPendingSplices :: [PendingRnSplice]
                       -> DsM (Core [(TH.Name, TH.ExpQ)])
-pendingSplicesToBinds ps = do
+repPendingSplices ps = do
   name_ty <- lookupType nameTyConName
   exp_ty <-  lookupType expTyConName
   q_ty    <- dsLookupTyCon qTyConName
@@ -1431,7 +1435,7 @@ pendingSplicesToBinds ps = do
   coreList' ty <$> (mapM do_one ps)
   where
     do_one (PendingSplice _ sp e) = do
-     n <- globalVar sp
+     n <- lookupBinder sp
      e' <- repLE e
      repPendingSplice n e'
 

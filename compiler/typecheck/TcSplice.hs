@@ -215,6 +215,7 @@ tcBrackTy (XBracket {}) = panic "tcUntypedBracket: Unexpected XBracket"
 tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
 tcPendingSplice (PendingSplice flavour splice_name expr)
   = do { res_ty <- tcMetaTy meta_ty_name
+       ; traceRn "tcPendingSplice" (ppr splice_name $$ ppr expr)
        ; expr' <- tcMonoExpr expr (mkCheckExpType res_ty)
        ; return (PendingTcSplice splice_name expr') }
   where
