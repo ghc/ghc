@@ -200,6 +200,28 @@ $ ./configure [--prefix=PATH] && make install
 
 workflow, for now.
 
+### Validation
+
+You can use the `./validate` script to:
+1) build a complete binary distribution;
+2) install it;
+3) run the testsuite against it;
+
+all using Hadrian. You just have to use the `--hadrian`
+flag in combination with whatever your typical
+`./validate` arguments are when using the Make build
+system. For example:
+
+``` sh
+$ THREAD=4 ./validate --hadrian --quiet
+```
+
+to build, package up, install and test a complete
+GHC compiler with some parallelism and a rather
+"succint" output. It currently still has issues,
+like [#16353](https://ghc.haskell.org/trac/ghc/ticket/16353)
+or [#16352](https://ghc.haskell.org/trac/ghc/ticket/16352).
+
 #### Building Stage3
 
 It is possible to define a build flavour that builds a Stage3 compiler, which is

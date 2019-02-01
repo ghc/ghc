@@ -22,6 +22,7 @@ import Target
 import Utilities
 
 import Data.List (union)
+import qualified Data.Set as Set
 import qualified Text.Parsec as Parsec
 
 docRoot :: FilePath
@@ -79,10 +80,36 @@ documentationRules = do
     -- Haddock's manual, and builds man pages
     "docs" ~> do
         root <- buildRoot
-        let html     = htmlRoot -/- "index.html" -- also implies "docs-haddock"
+        doctargets <- ghcDocs =<< flavour
+
+        let html     = htmlRoot -/- "index.html"
             archives = map pathArchive docPaths
             pdfs     = map pathPdf $ docPaths \\ ["libraries"]
-        need $ map (root -/-) $ [html] ++ archives ++ pdfs ++ [manPageBuildPath]
+
+            targets = -- include PDFs unless --docs=no-sphinx[-pdf] is
+                      -- passed.
+                      concat
+                      [ pdfs | SphinxPDFs `Set.member` doctargets ]
+
+                      -- include man page unless --docs=no-man is passed.
+                   ++ [ manPageBuildPath | ManPage `Set.member` doctargets ]
+
+                      -- include html targets uness we neither want
+                      -- haddocks nor html pages produced by sphinx.
+                   ++ [ html | Set.size (doctargets `Set.intersection`
+                                         Set.fromList [Haddocks, SphinxHTML]
+                                        ) > 0 ]
+
+                      -- include archives for whatever targets remain from
+                      -- the --docs arguments we got.
+                   ++ [ ar
+                      | (ar, doc) <- zip archives docPaths
+                      , archiveTarget doc `Set.member` doctargets ]
+
+        need $ map (root -/-) targets
+
+    where archiveTarget "libraries"   = Haddocks
+          archiveTarget _             = SphinxHTML
 
 ------------------------------------- HTML -------------------------------------
 
@@ -94,7 +121,15 @@ buildHtmlDocumentation = do
     root <- buildRootRules
 
     root -/- htmlRoot -/- "index.html" %> \file -> do
-        need $ map ((root -/-) . pathIndex) docPaths
+        doctargets <- ghcDocs =<< flavour
+
+        -- We include the HTML output of haddock for libraries unless
+        -- told not to (e.g with --docs=no-haddocks). Likewise for
+        -- the HTML version of the users guide or the Haddock manual.
+        let targets = [ "libraries" | Haddocks `Set.member` doctargets ]
+                   ++ concat [ ["users_guide", "Haddock"]
+                             | SphinxHTML `Set.member` doctargets ]
+        need $ map ((root -/-) . pathIndex) targets
         copyFileUntracked "docs/index.html" file
 
 -- | Compile a Sphinx ReStructured Text package to HTML.
