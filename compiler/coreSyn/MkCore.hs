@@ -758,7 +758,7 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 aBSENT_SUM_FIELD_ERROR_ID
   = mkVanillaGlobalWithInfo absentSumFieldErrorName
       (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
-      (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] exnRes
+      (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] botRes
                      `setArityInfo` 0
                      `setCafInfo` NoCafRefs) -- #15038
 
@@ -785,8 +785,7 @@ mkRuntimeErrorId name
         -- any pc_bottoming_Id will itself have CafRefs, which bloats
         -- SRTs.
 
-    strict_sig = mkClosedStrictSig [evalDmd] exnRes
-              -- exnRes: these throw an exception, not just diverge
+    strict_sig = mkClosedStrictSig [evalDmd] botRes
 
 runtimeErrorTy :: Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a

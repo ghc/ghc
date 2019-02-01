@@ -2478,9 +2478,6 @@ section "Exceptions"
 --          0#      -> maskAsynchExceptions# (\st -> case ma of MVar a -> ...)
 -- The outer case just decides whether to mask exceptions, but we don't want
 -- thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd.
---
--- For catch, catchSTM, and catchRetry, we must be extra careful; see
--- Note [Exceptions and strictness] in Demand
 
 primop  CatchOp "catch#" GenPrimOp
           (State# RealWorld -> (# State# RealWorld, a #) )
@@ -2499,8 +2496,7 @@ primop  RaiseOp "raise#" GenPrimOp
    b -> o
       -- NB: the type variable "o" is "a", but with OpenKind
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] exnRes }
-      -- NB: result is ThrowsExn
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
    out_of_line = True
    has_side_effects = True
      -- raise# certainly throws a Haskell exception and hence has_side_effects
@@ -2528,7 +2524,7 @@ primop  RaiseOp "raise#" GenPrimOp
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] exnRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] botRes }
    out_of_line = True
    has_side_effects = True
 
@@ -2579,7 +2575,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
--- NB: retry#'s strictness information specifies it to throw an exception
+-- NB: retry#'s strictness information specifies it to diverge.
 -- This lets the compiler perform some extra simplifications, since retry#
 -- will technically never return.
 --
@@ -2589,13 +2585,10 @@ primop  AtomicallyOp "atomically#" GenPrimOp
 -- with:
 --   retry# s1
 -- where 'e' would be unreachable anyway.  See Trac #8091.
---
--- Note that it *does not* return botRes as the "exception" that is thrown may be
--- "caught" by catchRetry#. This mistake caused #14171.
 primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] exnRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
    out_of_line = True
    has_side_effects = True
 
