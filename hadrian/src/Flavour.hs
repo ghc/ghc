@@ -1,6 +1,10 @@
-module Flavour (Flavour (..), werror) where
+module Flavour
+  ( Flavour (..), werror
+  , DocTargets, DocTarget(..)
+  ) where
 
 import Expression
+import Data.Set (Set)
 
 -- Please update doc/{flavours.md, user-settings.md} when changing this file.
 -- | 'Flavour' is a collection of build settings that fully define a GHC build.
@@ -31,8 +35,13 @@ data Flavour = Flavour {
     -- | Build profiled GHC.
     ghcProfiled :: Bool,
     -- | Build GHC with debug information.
-    ghcDebugged :: Bool }
+    ghcDebugged :: Bool,
+    -- | Whether to build docs, and which ones.
+    ghcDocs :: Action DocTargets }
 
+type DocTargets = Set DocTarget
+data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | ManPage
+  deriving (Eq, Ord, Show, Bounded, Enum)
 
 -- | Turn on -Werror for packages built with the stage1 compiler.
 -- It mimics the CI settings so is useful to turn on when developing.

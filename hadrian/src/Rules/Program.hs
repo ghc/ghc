@@ -8,6 +8,7 @@ import Context
 import Expression hiding (stage, way)
 import Oracles.Flag
 import Oracles.ModuleFiles
+import Oracles.Setting (topDirectory)
 import Packages
 import Settings
 import Settings.Default
@@ -18,6 +19,18 @@ import Utilities
 buildProgramRules :: [(Resource, Int)] -> Rules ()
 buildProgramRules rs = do
     root <- buildRootRules
+
+    -- Proxy rule for the whole mingw toolchain on Windows.
+    -- We 'need' configure  because that's when the inplace/mingw
+    -- folder gets filled with the toolchain. This "proxy" gcc rule
+    -- is listed as a runtime dependency for stage >= 1 GHCs.
+    root -/- "mingw" -/- ".stamp" %> \stampPath -> do
+        top <- topDirectory
+        need [ top -/- "configure" ]
+        copyDirectory (top -/- "inplace" -/- "mingw") root
+        writeFile' stampPath "OK"
+
+    -- Rules for programs that are actually built by hadrian.
     forM_ [Stage0 ..] $ \stage ->
         [ root -/- stageString stage -/- "bin"     -/- "*"
         , root -/- stageString stage -/- "lib/bin" -/- "*" ] |%> \bin -> do
@@ -33,8 +46,7 @@ getProgramContexts stage = do
   sPackages <- filter isProgram <$> stagePackages stage
   tPackages <- testsuitePackages
   -- TODO: Shall we use Stage2 for testsuite packages instead?
-  let allPackages = sPackages
-                ++ if stage == Stage1 then tPackages else []
+  let allPackages = sPackages ++ tPackages
   fmap concat . forM allPackages $ \pkg -> do
     -- the iserv pkg results in three different programs at
     -- the moment, ghc-iserv (built the vanilla way),
