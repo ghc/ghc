@@ -1513,7 +1513,9 @@ callishOp DoubleAsinhOp  = Just MO_F64_Asinh
 callishOp DoubleAcoshOp  = Just MO_F64_Acosh
 callishOp DoubleAtanhOp  = Just MO_F64_Atanh
 callishOp DoubleLogOp    = Just MO_F64_Log
+callishOp DoubleLog1POp  = Just MO_F64_Log1P
 callishOp DoubleExpOp    = Just MO_F64_Exp
+callishOp DoubleExpM1Op  = Just MO_F64_ExpM1
 callishOp DoubleSqrtOp   = Just MO_F64_Sqrt
 
 callishOp FloatPowerOp  = Just MO_F32_Pwr
@@ -1530,7 +1532,9 @@ callishOp FloatAsinhOp  = Just MO_F32_Asinh
 callishOp FloatAcoshOp  = Just MO_F32_Acosh
 callishOp FloatAtanhOp  = Just MO_F32_Atanh
 callishOp FloatLogOp    = Just MO_F32_Log
+callishOp FloatLog1POp  = Just MO_F32_Log1P
 callishOp FloatExpOp    = Just MO_F32_Exp
+callishOp FloatExpM1Op  = Just MO_F32_ExpM1
 callishOp FloatSqrtOp   = Just MO_F32_Sqrt
 
 callishOp _ = Nothing

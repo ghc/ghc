@@ -616,7 +616,9 @@ outOfLineMachOp_table
 outOfLineMachOp_table mop
  = case mop of
         MO_F32_Exp    -> fsLit "expf"
+        MO_F32_ExpM1  -> fsLit "expm1f"
         MO_F32_Log    -> fsLit "logf"
+        MO_F32_Log1P  -> fsLit "log1pf"
         MO_F32_Sqrt   -> fsLit "sqrtf"
         MO_F32_Fabs   -> unsupported
         MO_F32_Pwr    -> fsLit "powf"
@@ -638,7 +640,9 @@ outOfLineMachOp_table mop
         MO_F32_Atanh  -> fsLit "atanhf"
 
         MO_F64_Exp    -> fsLit "exp"
+        MO_F64_ExpM1  -> fsLit "expm1"
         MO_F64_Log    -> fsLit "log"
+        MO_F64_Log1P  -> fsLit "log1p"
         MO_F64_Sqrt   -> fsLit "sqrt"
         MO_F64_Fabs   -> unsupported
         MO_F64_Pwr    -> fsLit "pow"

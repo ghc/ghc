@@ -556,7 +556,9 @@ data CallishMachOp
   | MO_F64_Acosh
   | MO_F64_Atanh
   | MO_F64_Log
+  | MO_F64_Log1P
   | MO_F64_Exp
+  | MO_F64_ExpM1
   | MO_F64_Fabs
   | MO_F64_Sqrt
   | MO_F32_Pwr
@@ -573,7 +575,9 @@ data CallishMachOp
   | MO_F32_Acosh
   | MO_F32_Atanh
   | MO_F32_Log
+  | MO_F32_Log1P
   | MO_F32_Exp
+  | MO_F32_ExpM1
   | MO_F32_Fabs
   | MO_F32_Sqrt
 

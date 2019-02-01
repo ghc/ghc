@@ -1955,7 +1955,9 @@ genCCall' dflags gcp target dest_regs args
             where
                 (functionName, reduce) = case mop of
                     MO_F32_Exp   -> (fsLit "exp", True)
+                    MO_F32_ExpM1 -> (fsLit "expm1", True)
                     MO_F32_Log   -> (fsLit "log", True)
+                    MO_F32_Log1P -> (fsLit "log1p", True)
                     MO_F32_Sqrt  -> (fsLit "sqrt", True)
                     MO_F32_Fabs  -> unsupported
 
@@ -1977,7 +1979,9 @@ genCCall' dflags gcp target dest_regs args
                     MO_F32_Atanh -> (fsLit "atanh", True)
 
                     MO_F64_Exp   -> (fsLit "exp", False)
+                    MO_F64_ExpM1 -> (fsLit "expm1", False)
                     MO_F64_Log   -> (fsLit "log", False)
+                    MO_F64_Log1P -> (fsLit "log1p", False)
                     MO_F64_Sqrt  -> (fsLit "sqrt", False)
                     MO_F64_Fabs  -> unsupported
 

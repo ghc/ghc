@@ -763,7 +763,18 @@ primop   DoubleExpOp   "expDouble#"      Monadic
    with
    code_size = { primOpCodeSizeForeignCall }
 
+primop   DoubleExpM1Op "expm1Double#"    Monadic
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
 primop   DoubleLogOp   "logDouble#"      Monadic
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+   can_fail = True
+
+primop   DoubleLog1POp   "log1pDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
@@ -904,7 +915,18 @@ primop   FloatExpOp   "expFloat#"      Monadic
    with
    code_size = { primOpCodeSizeForeignCall }
 
+primop   FloatExpM1Op   "expm1Float#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
 primop   FloatLogOp   "logFloat#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+   can_fail = True
+
+primop   FloatLog1POp  "log1pFloat#"     Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
