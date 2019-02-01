@@ -27,6 +27,7 @@ import Data.Functor.Classes
 import Control.Applicative
 import Data.Coerce (coerce)
 import Data.Data (Data)
+import Data.Type.Equality (TestEquality(..))
 import GHC.Generics (Generic, Generic1)
 import Text.Read (Read(..), readListDefault, readListPrecDefault)
 
@@ -118,3 +119,12 @@ instance (Alternative f, Applicative g) => Alternative (Compose f g) where
     empty = Compose empty
     (<|>) = coerce ((<|>) :: f (g a) -> f (g a) -> f (g a))
       :: forall a . Compose f g a -> Compose f g a -> Compose f g a
+
+-- | The deduction (via generativity) that if @g x :~: g y@ then @x :~: y@.
+--
+-- @since 4.13.0.0
+instance (TestEquality f) => TestEquality (Compose f g) where
+  testEquality (Compose x) (Compose y) =
+    case (testEquality x y :: Maybe (g x :~: g y)) of
+      Just Refl -> Just (Refl :: x :~: y)
+      Nothing   -> Nothing
