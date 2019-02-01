@@ -591,38 +591,6 @@ data HsExpr p
              (LHsExpr p)        -- Body
 
   ---------------------------------------
-  -- The following are commands, not expressions proper
-  -- They are only used in the parsing stage and are removed
-  --    immediately in parser.RdrHsSyn.checkCommand
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.Annlarrowtail',
-  --          'ApiAnnotation.Annrarrowtail','ApiAnnotation.AnnLarrowtail',
-  --          'ApiAnnotation.AnnRarrowtail'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsArrApp             -- Arrow tail, or arrow application (f -< arg)
-        (XArrApp p)     -- type of the arrow expressions f,
-                        -- of the form a t t', where arg :: t
-        (LHsExpr p)     -- arrow expression, f
-        (LHsExpr p)     -- input expression, arg
-        HsArrAppType    -- higher-order (-<<) or first-order (-<)
-        Bool            -- True => right-to-left (f -< arg)
-                        -- False => left-to-right (arg >- f)
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpenB' @'(|'@,
-  --         'ApiAnnotation.AnnCloseB' @'|)'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsArrForm            -- Command formation,  (| e cmd1 .. cmdn |)
-        (XArrForm p)
-        (LHsExpr p)      -- the operator
-                         -- after type-checking, a type abstraction to be
-                         -- applied to the type of the local environment tuple
-        (Maybe Fixity)   -- fixity (filled in by the renamer), for forms that
-                         -- were converted from OpApp's by the renamer
-        [LHsCmdTop p]    -- argument commands
-
-  ---------------------------------------
   -- Haskell program coverage (Hpc) Support
 
   | HsTick
@@ -1144,22 +1112,6 @@ ppr_expr (HsTickPragma _ _ externalSrcLoc _ exp)
           ppr exp,
           text ")"]
 
-ppr_expr (HsArrApp _ arrow arg HsFirstOrderApp True)
-  = hsep [ppr_lexpr arrow, larrowt, ppr_lexpr arg]
-ppr_expr (HsArrApp _ arrow arg HsFirstOrderApp False)
-  = hsep [ppr_lexpr arg, arrowt, ppr_lexpr arrow]
-ppr_expr (HsArrApp _ arrow arg HsHigherOrderApp True)
-  = hsep [ppr_lexpr arrow, larrowtt, ppr_lexpr arg]
-ppr_expr (HsArrApp _ arrow arg HsHigherOrderApp False)
-  = hsep [ppr_lexpr arg, arrowtt, ppr_lexpr arrow]
-
-ppr_expr (HsArrForm _ (L _ (HsVar _ (L _ v))) (Just _) [arg1, arg2])
-  = sep [pprCmdArg (unLoc arg1), hsep [pprInfixOcc v, pprCmdArg (unLoc arg2)]]
-ppr_expr (HsArrForm _ (L _ (HsConLikeOut _ c)) (Just _) [arg1, arg2])
-  = sep [pprCmdArg (unLoc arg1), hsep [pprInfixOcc (conLikeName c), pprCmdArg (unLoc arg2)]]
-ppr_expr (HsArrForm _ op _ args)
-  = hang (text "(|" <+> ppr_lexpr op)
-         4 (sep (map (pprCmdArg.unLoc) args) <+> text "|)")
 ppr_expr (HsRecFld _ f) = ppr f
 ppr_expr (XExpr x) = ppr x
 
@@ -1264,8 +1216,6 @@ hsExprNeedsParens p = go
     go (HsTick _ _ (L _ e))           = go e
     go (HsBinTick _ _ _ (L _ e))      = go e
     go (HsTickPragma _ _ _ _ (L _ e)) = go e
-    go (HsArrApp{})                   = True
-    go (HsArrForm{})                  = True
     go (RecordCon{})                  = False
     go (HsRecFld{})                   = False
     go (XExpr{})                      = True
