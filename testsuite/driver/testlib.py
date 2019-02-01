@@ -1676,7 +1676,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file, diff_file
                                                            actual_normalised_path),
                            stdout=diff_file,
                            print_output=True)
-        else: open(diff_file, 'ab').close() # Make sure the file exists still as
+        elif diff_file: open(diff_file, 'ab').close() # Make sure the file exists still as
                                             # we will try to read it later
 
         if config.accept and (getTestOpts().expect == 'fail' or
