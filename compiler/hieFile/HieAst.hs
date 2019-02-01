@@ -844,14 +844,6 @@ instance ( a ~ GhcPass p
       HsStatic _ expr ->
         [ toHie expr
         ]
-      HsArrApp _ a b _ _ ->
-        [ toHie a
-        , toHie b
-        ]
-      HsArrForm _ expr _ cmds ->
-        [ toHie expr
-        , toHie cmds
-        ]
       HsTick _ _ expr ->
         [ toHie expr
         ]

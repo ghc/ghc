@@ -9,6 +9,12 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module   RdrHsSyn (
         mkHsOpApp,
@@ -53,7 +59,6 @@ module   RdrHsSyn (
         isTildeRdr,
         checkPatterns,        -- SrcLoc -> [HsExp] -> P [HsPat]
         checkMonadComp,       -- P (HsStmtContext RdrName)
-        checkCommand,         -- LHsExpr RdrName -> P (LHsCmd RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
         checkDoAndIfThenElse,
@@ -81,7 +86,22 @@ module   RdrHsSyn (
         warnStarIsType,
         failOpFewArgs,
 
-        SumOrTuple (..), mkSumOrTuple
+        SumOrTuple (..), mkSumOrTuple,
+
+        -- Expression/command ambiguity resolution
+        PV,
+        ExpCmdP(ExpCmdP, runExpCmdP),
+        ExpCmdI(..),
+        ecFromExp,
+        ecFromCmd,
+        ecHsLam,
+        ecHsLet,
+        ecOpApp,
+        ecHsCase,
+        ecHsApp,
+        ecHsIf,
+        ecHsDo,
+        ecHsPar,
 
     ) where
 
@@ -984,24 +1004,37 @@ checkTyClHdr is_cls ty
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
-checkBlockArguments :: LHsExpr GhcPs -> P ()
-checkBlockArguments expr = case unLoc expr of
-    HsDo _ DoExpr _ -> check "do block"
-    HsDo _ MDoExpr _ -> check "mdo block"
-    HsLam {} -> check "lambda expression"
-    HsCase {} -> check "case expression"
-    HsLamCase {} -> check "lambda-case expression"
-    HsLet {} -> check "let expression"
-    HsIf {} -> check "if expression"
-    HsProc {} -> check "proc expression"
-    _ -> return ()
+checkBlockArguments :: forall b. ExpCmdI b => Located (b GhcPs) -> PV ()
+checkBlockArguments = case expCmdG @b of { ExpG -> checkExpr; CmdG -> checkCmd }
   where
-    check element = do
+    checkExpr :: LHsExpr GhcPs -> P ()
+    checkExpr expr = case unLoc expr of
+      HsDo _ DoExpr _ -> check "do block" expr
+      HsDo _ MDoExpr _ -> check "mdo block" expr
+      HsLam {} -> check "lambda expression" expr
+      HsCase {} -> check "case expression" expr
+      HsLamCase {} -> check "lambda-case expression" expr
+      HsLet {} -> check "let expression" expr
+      HsIf {} -> check "if expression" expr
+      HsProc {} -> check "proc expression" expr
+      _ -> return ()
+
+    checkCmd :: LHsCmd GhcPs -> P ()
+    checkCmd cmd = case unLoc cmd of
+      HsCmdLam {} -> check "lambda command" cmd
+      HsCmdCase {} -> check "case command" cmd
+      HsCmdIf {} -> check "if command" cmd
+      HsCmdLet {} -> check "let command" cmd
+      HsCmdDo {} -> check "do command" cmd
+      _ -> return ()
+
+    check :: (HasSrcSpan a, Outputable a) => String -> a -> P ()
+    check element a = do
       blockArguments <- getBit BlockArgumentsBit
       unless blockArguments $
-        addError (getLoc expr) $
+        addError (getLoc a) $
           text "Unexpected " <> text element <> text " in function application:"
-           $$ nest 4 (ppr expr)
+           $$ nest 4 (ppr a)
            $$ text "You could write it with parentheses"
            $$ text "Or perhaps you meant to enable BlockArguments?"
 
@@ -1282,14 +1315,23 @@ checkValSigLhs lhs@(dL->L l _)
     default_RDR = mkUnqual varName (fsLit "default")
     pattern_RDR = mkUnqual varName (fsLit "pattern")
 
+checkDoAndIfThenElse
+  :: forall b. ExpCmdI b =>
+     LHsExpr GhcPs
+  -> Bool
+  -> Located (b GhcPs)
+  -> Bool
+  -> Located (b GhcPs)
+  -> P ()
+checkDoAndIfThenElse =
+  case expCmdG @b of
+    ExpG -> checkDoAndIfThenElse'
+    CmdG -> checkDoAndIfThenElse'
 
-checkDoAndIfThenElse :: LHsExpr GhcPs
-                     -> Bool
-                     -> LHsExpr GhcPs
-                     -> Bool
-                     -> LHsExpr GhcPs
-                     -> P ()
-checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
+checkDoAndIfThenElse'
+  :: (HasSrcSpan a, Outputable a, Outputable b, HasSrcSpan c, Outputable c)
+  => a -> Bool -> b -> Bool -> c -> P ()
+checkDoAndIfThenElse' guardExpr semiThen thenExpr semiElse elseExpr
  | semiThen || semiElse
     = do doAndIfThenElse <- getBit DoAndIfThenElseBit
          unless doAndIfThenElse $ do
@@ -1868,100 +1910,428 @@ checkMonadComp = do
                 else ListComp
 
 -- -------------------------------------------------------------------------
--- Checking arrow syntax.
+-- Expression/command ambiguity (arrow syntax).
+-- See Note [Ambiguous syntactic categories]
+--
 
--- We parse arrow syntax as expressions and check for valid syntax below,
--- converting the expression into a pattern at the same time.
+-- ExpCmdP as defined is isomorphic to a pair of parsers:
+--
+--   data ExpCmdP = ExpCmdP { expP :: PV (LHsExpr GhcPs)
+--                          , cmdP :: PV (LHsCmd  GhcPs) }
+--
+-- See Note [Parser-Validator]
+-- See Note [Ambiguous syntactic categories]
+newtype ExpCmdP =
+  ExpCmdP { runExpCmdP :: forall b. ExpCmdI b => PV (Located (b GhcPs)) }
 
-checkCommand :: LHsExpr GhcPs -> P (LHsCmd GhcPs)
-checkCommand lc = locMap checkCmd lc
+-- See Note [Ambiguous syntactic categories]
+data ExpCmdG b where
+  ExpG :: ExpCmdG HsExpr
+  CmdG :: ExpCmdG HsCmd
 
-locMap :: (SrcSpan -> a -> P b) -> Located a -> P (Located b)
-locMap f (dL->L l a) = f l a >>= (\b -> return $ cL l b)
+-- See Note [Ambiguous syntactic categories]
+class    ExpCmdI b      where expCmdG :: ExpCmdG b
+instance ExpCmdI HsExpr where expCmdG = ExpG
+instance ExpCmdI HsCmd  where expCmdG = CmdG
 
-checkCmd :: SrcSpan -> HsExpr GhcPs -> P (HsCmd GhcPs)
-checkCmd _ (HsArrApp _ e1 e2 haat b) =
-    return $ HsCmdArrApp noExt e1 e2 haat b
-checkCmd _ (HsArrForm _ e mf args) =
-    return $ HsCmdArrForm noExt e Prefix mf args
-checkCmd _ (HsApp _ e1 e2) =
-    checkCommand e1 >>= (\c -> return $ HsCmdApp noExt c e2)
-checkCmd _ (HsLam _ mg) =
-    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdLam noExt mg')
-checkCmd _ (HsPar _ e) =
-    checkCommand e >>= (\c -> return $ HsCmdPar noExt c)
-checkCmd _ (HsCase _ e mg) =
-    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdCase noExt e mg')
-checkCmd _ (HsIf _ cf ep et ee) = do
-    pt <- checkCommand et
-    pe <- checkCommand ee
-    return $ HsCmdIf noExt cf ep pt pe
-checkCmd _ (HsLet _ lb e) =
-    checkCommand e >>= (\c -> return $ HsCmdLet noExt lb c)
-checkCmd _ (HsDo _ DoExpr (dL->L l stmts)) =
-    mapM checkCmdLStmt stmts >>=
-    (\ss -> return $ HsCmdDo noExt (cL l ss) )
-
-checkCmd _ (OpApp _ eLeft op eRight) = do
-    -- OpApp becomes a HsCmdArrForm with a (Just fixity) in it
-    c1 <- checkCommand eLeft
-    c2 <- checkCommand eRight
-    let arg1 = cL (getLoc c1) $ HsCmdTop noExt c1
-        arg2 = cL (getLoc c2) $ HsCmdTop noExt c2
-    return $ HsCmdArrForm noExt op Infix Nothing [arg1, arg2]
-
-checkCmd l e = cmdFail l e
-
-checkCmdLStmt :: ExprLStmt GhcPs -> P (CmdLStmt GhcPs)
-checkCmdLStmt = locMap checkCmdStmt
-
-checkCmdStmt :: SrcSpan -> ExprStmt GhcPs -> P (CmdStmt GhcPs)
-checkCmdStmt _ (LastStmt x e s r) =
-    checkCommand e >>= (\c -> return $ LastStmt x c s r)
-checkCmdStmt _ (BindStmt x pat e b f) =
-    checkCommand e >>= (\c -> return $ BindStmt x pat c b f)
-checkCmdStmt _ (BodyStmt x e t g) =
-    checkCommand e >>= (\c -> return $ BodyStmt x c t g)
-checkCmdStmt _ (LetStmt x bnds) = return $ LetStmt x bnds
-checkCmdStmt _ stmt@(RecStmt { recS_stmts = stmts }) = do
-    ss <- mapM checkCmdLStmt stmts
-    return $ stmt { recS_ext = noExt, recS_stmts = ss }
-checkCmdStmt _ (XStmtLR _) = panic "checkCmdStmt"
-checkCmdStmt l stmt = cmdStmtFail l stmt
-
-checkCmdMatchGroup :: MatchGroup GhcPs (LHsExpr GhcPs)
-                   -> P (MatchGroup GhcPs (LHsCmd GhcPs))
-checkCmdMatchGroup mg@(MG { mg_alts = (dL->L l ms) }) = do
-    ms' <- mapM (locMap $ const convert) ms
-    return $ mg { mg_ext = noExt
-                , mg_alts = cL l ms' }
-    where convert match@(Match { m_grhss = grhss }) = do
-            grhss' <- checkCmdGRHSs grhss
-            return $ match { m_ext = noExt, m_grhss = grhss'}
-          convert (XMatch _) = panic "checkCmdMatchGroup.XMatch"
-checkCmdMatchGroup (XMatchGroup {}) = panic "checkCmdMatchGroup"
-
-checkCmdGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> P (GRHSs GhcPs (LHsCmd GhcPs))
-checkCmdGRHSs (GRHSs x grhss binds) = do
-    grhss' <- mapM checkCmdGRHS grhss
-    return $ GRHSs x grhss' binds
-checkCmdGRHSs (XGRHSs _) = panic "checkCmdGRHSs"
-
-checkCmdGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> P (LGRHS GhcPs (LHsCmd GhcPs))
-checkCmdGRHS = locMap $ const convert
+ecFromCmd :: LHsCmd GhcPs -> ExpCmdP
+ecFromCmd c@(getLoc -> l) = ExpCmdP onB
   where
-    convert (GRHS x stmts e) = do
-        c <- checkCommand e
---        cmdStmts <- mapM checkCmdLStmt stmts
-        return $ GRHS x {- cmdStmts -} stmts c
-    convert (XGRHS _) = panic "checkCmdGRHS"
+    onB :: forall b. ExpCmdI b => PV (Located (b GhcPs))
+    onB = case expCmdG @b of { ExpG -> onExp; CmdG -> return c }
+    onExp :: P (LHsExpr GhcPs)
+    onExp = do
+      addError l $ vcat
+        [ text "Arrow command found where an expression was expected:",
+          nest 2 (ppr c) ]
+      return (cL l hsHoleExpr)
+
+ecFromExp :: LHsExpr GhcPs -> ExpCmdP
+ecFromExp e@(getLoc -> l) = ExpCmdP onB
+  where
+    onB :: forall b. ExpCmdI b => PV (Located (b GhcPs))
+    onB = case expCmdG @b of { ExpG -> return e; CmdG -> onCmd }
+    onCmd :: P (LHsCmd GhcPs)
+    onCmd =
+      addFatalError l $
+        text "Parse error in command:" <+> ppr e
+
+hsHoleExpr :: HsExpr (GhcPass id)
+hsHoleExpr = HsUnboundVar noExt (TrueExprHole (mkVarOcc "_"))
+
+ecHsLam :: forall b. ExpCmdI b => MatchGroup GhcPs (Located (b GhcPs)) -> b GhcPs
+ecHsLam = case expCmdG @b of { ExpG -> HsLam noExt; CmdG -> HsCmdLam noExt }
+
+ecHsLet :: forall b. ExpCmdI b => LHsLocalBinds GhcPs -> Located (b GhcPs) -> b GhcPs
+ecHsLet = case expCmdG @b of { ExpG -> HsLet noExt; CmdG -> HsCmdLet noExt }
+
+ecOpApp :: forall b. ExpCmdI b => Located (b GhcPs) -> LHsExpr GhcPs
+        -> Located (b GhcPs) -> b GhcPs
+ecOpApp = case expCmdG @b of { ExpG -> OpApp noExt; CmdG -> cmdOpApp }
+  where
+    cmdOpApp c1 op c2 =
+      let cmdArg c = cL (getLoc c) $ HsCmdTop noExt c in
+      HsCmdArrForm noExt op Infix Nothing [cmdArg c1, cmdArg c2]
+
+ecHsCase :: forall b. ExpCmdI b =>
+  LHsExpr GhcPs -> MatchGroup GhcPs (Located (b GhcPs)) -> b GhcPs
+ecHsCase = case expCmdG @b of { ExpG -> HsCase noExt; CmdG -> HsCmdCase noExt }
+
+ecHsApp :: forall b. ExpCmdI b =>
+  Located (b GhcPs) -> LHsExpr GhcPs -> b GhcPs
+ecHsApp = case expCmdG @b of { ExpG -> HsApp noExt; CmdG -> HsCmdApp noExt }
+
+ecHsIf :: forall b. ExpCmdI b =>
+   LHsExpr GhcPs -> Located (b GhcPs) -> Located (b GhcPs) -> b GhcPs
+ecHsIf = case expCmdG @b of { ExpG -> mkHsIf; CmdG -> mkHsCmdIf }
+
+ecHsDo :: forall b. ExpCmdI b =>
+  Located [LStmt GhcPs (Located (b GhcPs))] -> b GhcPs
+ecHsDo = case expCmdG @b of { ExpG -> HsDo noExt DoExpr; CmdG -> HsCmdDo noExt }
+
+ecHsPar :: forall b. ExpCmdI b => Located (b GhcPs) -> b GhcPs
+ecHsPar = case expCmdG @b of { ExpG -> HsPar noExt; CmdG -> HsCmdPar noExt }
+
+{- Note [Ambiguous syntactic categories]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are places in the grammar where we do not know whether we are parsing an
+expression or a pattern without unlimited lookahead (which we do not have in
+'happy'):
+
+View patterns:
+
+    f (Con a b     ) = ...  -- 'Con a b' is a pattern
+    f (Con a b -> x) = ...  -- 'Con a b' is an expression
+
+do-notation:
+
+    do { Con a b <- x } -- 'Con a b' is a pattern
+    do { Con a b }      -- 'Con a b' is an expression
+
+Guards:
+
+    x | True <- p && q = ...  -- 'True' is a pattern
+    x | True           = ...  -- 'True' is an expression
+
+Top-level value/function declarations (FunBind/PatBind):
+
+    f !a         -- TH splice
+    f !a = ...   -- function declaration
+
+    Until we encounter the = sign, we don't know if it's a top-level
+    TemplateHaskell splice where ! is an infix operator, or if it's a function
+    declaration where ! is a strictness annotation.
+
+There are also places in the grammar where we do not know whether we are
+parsing an expression or a command:
+
+    proc x -> do { (stuff) -< x }   -- 'stuff' is an expression
+    proc x -> do { (stuff) }        -- 'stuff' is a command
+
+    Until we encounter arrow syntax (-<) we don't know whether to parse 'stuff'
+    as an expression or a command.
+
+In fact, do-notation is subject to both ambiguities:
+
+    proc x -> do { (stuff) -< x }        -- 'stuff' is an expression
+    proc x -> do { (stuff) <- f -< x }   -- 'stuff' is a pattern
+    proc x -> do { (stuff) }             -- 'stuff' is a command
+
+There are many possible solutions to this problem. For an overview of the ones
+we decided against, see Note [Resolving parsing ambiguities: non-taken alternatives]
+
+The solution that keeps basic definitions (such as HsExpr) clean, keeps the
+concerns local to the parser, and does not require duplication of hsSyn types,
+or an extra pass over the entire AST, is to parse into a function from a GADT
+to a parser-validator:
+
+    data ExpCmdG b where
+      ExpG :: ExpCmdG HsExpr
+      CmdG :: ExpCmdG HsCmd
+
+    type ExpCmd = forall b. ExpCmdG b -> PV (Located (b GhcPs))
+
+    checkExp :: ExpCmd -> PV (LHsExpr GhcPs)
+    checkCmd :: ExpCmd -> PV (LHsCmd GhcPs)
+    checkExp f = f ExpG  -- interpret as an expression
+    checkCmd f = f CmdG  -- interpret as a command
+
+Consider the 'alts' production used to parse case-of alternatives:
+
+  alts :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
+    : alts1     { sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
+    | ';' alts  { sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2)),snd $ unLoc $2) }
+
+We abstract over LHsExpr, and it becomes:
+
+  alts :: { forall b. ExpCmdG b -> PV (Located ([AddAnn],[LMatch GhcPs (Located (b GhcPs))])) }
+    : alts1
+        { \tag -> $1 tag >>= \ $1 ->
+                  return $ sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
+    | ';' alts
+        { \tag -> $2 tag >>= \ $2 ->
+                  return $ sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2)),snd $ unLoc $2) }
+
+Note that 'ExpCmdG' is a singleton type, the value is completely
+determined by the type:
+
+  when (b~HsExpr),  tag = ExpG
+  when (b~HsCmd),   tag = CmdG
+
+This is a clear indication that we can use a class to pass this value behind
+the scenes:
+
+  class    ExpCmdI b      where expCmdG :: ExpCmdG b
+  instance ExpCmdI HsExpr where expCmdG = ExpG
+  instance ExpCmdI HsCmd  where expCmdG = CmdG
+
+And now the 'alts' production is simplified, as we no longer need to
+thread 'tag' explicitly:
+
+  alts :: { forall b. ExpCmdI b => PV (Located ([AddAnn],[LMatch GhcPs (Located (b GhcPs))])) }
+    : alts1     { $1 >>= \ $1 ->
+                  return $ sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
+    | ';' alts  { $2 >>= \ $2 ->
+                  return $ sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2)),snd $ unLoc $2) }
+
+Compared to the initial definition, the added bits are:
+
+    forall b. ExpCmdI b => PV ( ... ) -- in the type signature
+    $1 >>= \ $1 -> return $           -- in one reduction rule
+    $2 >>= \ $2 -> return $           -- in another reduction rule
+
+The overhead is constant relative to the size of the rest of the reduction
+rule, so this approach scales well to large parser productions.
+
+-}
 
 
-cmdFail :: SrcSpan -> HsExpr GhcPs -> P a
-cmdFail loc e = addFatalError loc (text "Parse error in command:" <+> ppr e)
-cmdStmtFail :: SrcSpan -> Stmt GhcPs (LHsExpr GhcPs) -> P a
-cmdStmtFail loc e = addFatalError loc
-                    (text "Parse error in command statement:" <+> ppr e)
+{- Note [Resolving parsing ambiguities: non-taken alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Alternative I, extra constructors in HsExpr
+-------------------------------------------
+We could add extra constructors to HsExpr to represent command-specific and
+pattern-specific syntactic constructs. Under this scheme, we parse patterns
+and commands as expressions and rejig later.  This is what GHC used to do, and
+it polluted 'HsExpr' with irrelevant constructors:
+
+  * for commands: 'HsArrForm', 'HsArrApp'
+  * for patterns: 'EWildPat', 'EAsPat', 'EViewPat', 'ELazyPat'
+
+(As of now, we still do that for patterns, but we plan to fix it).
+
+There are several issues with this:
+
+  * The implementation details of parsing are leaking into hsSyn definitions.
+
+  * Code that uses HsExpr has to panic on these impossible-after-parsing cases.
+
+  * HsExpr is arbitrarily selected as the extension basis. Why not extend
+    HsCmd or HsPat with extra constructors instead?
+
+  * We cannot handle corner cases. For instance, the following function
+    declaration LHS is not a valid expression (see Trac #1087):
+
+      !a + !b = ...
+
+  * There are points in the pipeline where the representation was awfully
+    incorrect. For instance,
+
+      f !a b !c = ...
+
+    is first parsed as
+
+      (f ! a b) ! c = ...
+
+
+Alternative II, extra constructors in HsExpr for GhcPs
+------------------------------------------------------
+We could address some of the problems with Alternative I by using Trees That
+Grow and extending HsExpr only in the GhcPs pass. However, GhcPs corresponds to
+the output of parsing, not to its intermediate results, so we wouldn't want
+them there either.
+
+Alternative III, extra constructors in HsExpr for GhcPrePs
+----------------------------------------------------------
+We could introduce a new pass, GhcPrePs, to keep GhcPs pristine.
+Unfortunately, creating a new pass would significantly bloat conversion code
+and slow down the compiler by adding another linear-time pass over the entire
+AST. For example, in order to build HsExpr GhcPrePs, we would need to build
+HsLocalBinds GhcPrePs (as part of HsLet), and we never want HsLocalBinds
+GhcPrePs.
+
+
+Alternative IV, sum type and bottom-up data flow
+------------------------------------------------
+Expressions and commands are disjoint. There are no user inputs that could be
+interpreted as either an expression or a command depending on outer context:
+
+  5        -- definitely an expression
+  x -< y   -- definitely a command
+
+Even though we have both 'HsLam' and 'HsCmdLam', we can look at
+the body to disambiguate:
+
+  \p -> 5        -- definitely an expression
+  \p -> x -< y   -- definitely a command
+
+This means we could use a bottom-up flow of information to determine
+whether we are parsing an expression or a command, using a sum type
+for intermediate results:
+
+  Either (LHsExpr GhcPs) (LHsCmd GhcPs)
+
+There are two problems with this:
+
+  * We cannot handle the ambiguity between expressions and
+    patterns, which are not disjoint.
+
+  * Bottom-up flow of information leads to poor error messages. Consider
+
+        if ... then 5 else (x -< y)
+
+    Do we report that '5' is not a valid command or that (x -< y) is not a
+    valid expression?  It depends on whether we want the entire node to be
+    'HsIf' or 'HsCmdIf', and this information flows top-down, from the
+    surrounding parsing context (are we in 'proc'?)
+
+Alternative V, backtracking with parser combinators
+---------------------------------------------------
+One might think we could sidestep the issue entirely by using a backtracking
+parser and doing something along the lines of (try pExpr <|> pPat).
+
+Turns out, this wouldn't work very well, as there can be patterns inside
+expressions (e.g. via 'case', 'let', 'do') and expressions inside patterns
+(e.g. view patterns). To handle this, we would need to backtrack while
+backtracking, and unbound levels of backtracking lead to very fragile
+performance.
+
+Alternative VI, an intermediate data type
+-----------------------------------------
+There are common syntactic elements of expressions, commands, and patterns
+(e.g. all of them must have balanced parentheses), and we can capture this
+common structure in an intermediate data type, Frame:
+
+data Frame
+  = FrameVar RdrName
+    -- ^ Identifier: Just, map, BS.length
+  | FrameTuple [LTupArgFrame] Boxity
+    -- ^ Tuple (section): (a,b) (a,b,c) (a,,) (,a,)
+  | FrameTySig LFrame (LHsSigWcType GhcPs)
+    -- ^ Type signature: x :: ty
+  | FramePar (SrcSpan, SrcSpan) LFrame
+    -- ^ Parentheses
+  | FrameIf LFrame LFrame LFrame
+    -- ^ If-expression: if p then x else y
+  | FrameCase LFrame [LFrameMatch]
+    -- ^ Case-expression: case x of { p1 -> e1; p2 -> e2 }
+  | FrameDo (HsStmtContext Name) [LFrameStmt]
+    -- ^ Do-expression: do { s1; a <- s2; s3 }
+  ...
+  | FrameExpr (HsExpr GhcPs)   -- unambiguously an expression
+  | FramePat (HsPat GhcPs)     -- unambiguously a pattern
+  | FrameCommand (HsCmd GhcPs) -- unambiguously a command
+
+To determine which constructors 'Frame' needs to have, we take the union of
+intersections between HsExpr, HsCmd, and HsPat.
+
+The intersection between HsPat and HsExpr:
+
+  HsPat  =  VarPat   | TuplePat      | SigPat        | ParPat   | ...
+  HsExpr =  HsVar    | ExplicitTuple | ExprWithTySig | HsPar    | ...
+  -------------------------------------------------------------------
+  Frame  =  FrameVar | FrameTuple    | FrameTySig    | FramePar | ...
+
+The intersection between HsCmd and HsExpr:
+
+  HsCmd  = HsCmdIf | HsCmdCase | HsCmdDo | HsCmdPar
+  HsExpr = HsIf    | HsCase    | HsDo    | HsPar
+  ------------------------------------------------
+  Frame = FrameIf  | FrameCase | FrameDo | FramePar
+
+The intersection between HsCmd and HsPat:
+
+  HsPat  = ParPat   | ...
+  HsCmd  = HsCmdPar | ...
+  -----------------------
+  Frame  = FramePar | ...
+
+Take the union of each intersection and this yields the final 'Frame' data
+type. The problem with this approach is that we end up duplicating a good
+portion of hsSyn:
+
+    Frame         for  HsExpr, HsPat, HsCmd
+    TupArgFrame   for  HsTupArg
+    FrameMatch    for  Match
+    FrameStmt     for  StmtLR
+    FrameGRHS     for  GRHS
+    FrameGRHSs    for  GRHSs
+    ...
+
+Alternative VII, a product type
+-------------------------------
+We could avoid the intermediate representation of Alternative VI by parsing
+into a product of interpretations directly:
+
+    -- See Note [Parser-Validator]
+    type ExpCmdPat = ( PV (LHsExpr GhcPs)
+                     , PV (LHsCmd GhcPs)
+                     , PV (LHsPat GhcPs) )
+
+This means that in positions where we do not know whether to produce
+expression, a pattern, or a command, we instead produce a parser-validator for
+each possible option.
+
+Then, as soon as we have parsed far enough to resolve the ambiguity, we pick
+the appropriate component of the product, discarding the rest:
+
+    checkExpOf3 (e, _, _) = e  -- interpret as an expression
+    checkCmdOf3 (_, c, _) = c  -- interpret as a command
+    checkPatOf3 (_, _, p) = p  -- interpret as a pattern
+
+We can easily define ambiguities between arbitrary subsets of interpretations.
+For example, when we know ahead of type that only an expression or a command is
+possible, but not a pattern, we can use a smaller type:
+
+    -- See Note [Parser-Validator]
+    type ExpCmd = (PV (LHsExpr GhcPs), PV (LHsCmd GhcPs))
+
+    checkExpOf2 (e, _) = e  -- interpret as an expression
+    checkCmdOf2 (_, c) = c  -- interpret as a command
+
+However, there is a slight problem with this approach, namely code duplication
+in parser productions. Consider the 'alts' production used to parse case-of
+alternatives:
+
+  alts :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
+    : alts1     { sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
+    | ';' alts  { sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2)),snd $ unLoc $2) }
+
+Under the new scheme, we have to completely duplicate its type signature and
+each reduction rule:
+
+  alts :: { ( PV (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)])) -- as an expression
+            , PV (Located ([AddAnn],[LMatch GhcPs (LHsCmd GhcPs)]))  -- as a command
+            ) }
+    : alts1
+        { ( checkExpOf2 $1 >>= \ $1 ->
+            return $ sL1 $1 (fst $ unLoc $1,snd $ unLoc $1)
+          , checkCmdOf2 $1 >>= \ $1 ->
+            return $ sL1 $1 (fst $ unLoc $1,snd $ unLoc $1)
+          ) }
+    | ';' alts
+        { ( checkExpOf2 $2 >>= \ $2 ->
+            return $ sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2)),snd $ unLoc $2)
+          , checkCmdOf2 $2 >>= \ $2 ->
+            return $ sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2)),snd $ unLoc $2)
+          ) }
+
+And the same goes for other productions: 'altslist', 'alts1', 'alt', 'alt_rhs',
+'ralt', 'gdpats', 'gdpat', 'exp', ... and so on. That is a lot of code!
+
+-}
 
 ---------------------------------------------------------------------------
 -- Miscellaneous utilities
@@ -2305,6 +2675,38 @@ failOpStrictnessPosition (dL->L loc _) = addFatalError loc msg
 
 -----------------------------------------------------------------------------
 -- Misc utils
+
+type PV = P -- See Note [Parser-Validator]
+
+{- Note [Parser-Validator]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When resolving ambiguities, we need to postpone failure to make a choice later.
+For example, if we have ambiguity between some A and B, our parser could be
+
+  abParser :: P (Maybe A, Maybe B)
+
+This way we can represent four possible outcomes of parsing:
+
+    (Just a, Nothing)       -- definitely A
+    (Nothing, Just b)       -- definitely B
+    (Just a, Just b)        -- either A or B
+    (Nothing, Nothing)      -- neither A nor B
+
+However, if we want to report informative parse errors, accumulate warnings,
+and add API annotations, we are better off using 'P' instead of 'Maybe':
+
+  abParser :: P (P A, P B)
+
+So we have an outer layer of P that consumes the input and builds the inner
+layer, which validates the input.
+
+For clarity, we introduce the notion of a parser-validator: a parser that does
+not consume any input, but may fail or use other effects. Thus we have:
+
+  abParser :: P (PV A, PV B)
+
+-}
 
 -- | Hint about bang patterns, assuming @BangPatterns@ is off.
 hintBangPat :: SrcSpan -> HsExpr GhcPs -> P ()
