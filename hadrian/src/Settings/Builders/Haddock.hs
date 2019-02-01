@@ -51,7 +51,8 @@ haddockBuilderArgs = mconcat
             , arg "--no-tmp-comp-dir"
             , arg $ "--dump-interface=" ++ output
             , arg "--html"
-            , arg "--hyperlinked-source"
+            -- FIXME: this causes a crash
+            -- , arg "--hyperlinked-source"
             , arg "--hoogle"
             , arg "--quickjump"
             , arg $ "--title=" ++ pkgName pkg ++ "-" ++ version

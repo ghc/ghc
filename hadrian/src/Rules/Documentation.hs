@@ -82,7 +82,7 @@ documentationRules = do
         let html     = htmlRoot -/- "index.html" -- also implies "docs-haddock"
             archives = map pathArchive docPaths
             pdfs     = map pathPdf $ docPaths \\ ["libraries"]
-        need $ map (root -/-) $ [html] ++ archives ++ pdfs ++ [manPageBuildPath]
+        need $ map (root -/-) $ [html] ++ archives ++ {- pdfs ++ -} [manPageBuildPath]
 
 ------------------------------------- HTML -------------------------------------
 
