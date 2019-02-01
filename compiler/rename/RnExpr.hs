@@ -412,23 +412,11 @@ rnExpr (HsProc x pat body)
       { (body',fvBody) <- rnCmdTop body
       ; return (HsProc x pat' body', fvBody) }
 
--- Ideally, these would be done in parsing, but to keep parsing simple, we do it here.
-rnExpr e@(HsArrApp {})  = arrowFail e
-rnExpr e@(HsArrForm {}) = arrowFail e
-
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
         -- HsWrap
 
 hsHoleExpr :: HsExpr (GhcPass id)
 hsHoleExpr = HsUnboundVar noExt (TrueExprHole (mkVarOcc "_"))
-
-arrowFail :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
-arrowFail e
-  = do { addErr (vcat [ text "Arrow command found where an expression was expected:"
-                      , nest 2 (ppr e) ])
-         -- Return a place-holder hole, so that we can carry on
-         -- to report other errors
-       ; return (hsHoleExpr, emptyFVs) }
 
 ----------------------
 -- See Note [Parsing sections] in Parser.y
