@@ -58,6 +58,7 @@ module Packages (
         pprPackages,
         pprPackagesSimple,
         pprModuleMap,
+        isIndefinite,
         isDllName
     )
 where
