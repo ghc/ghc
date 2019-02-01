@@ -56,7 +56,6 @@ import {-# SOURCE #-} TcSplice
     )
 
 import TcHsSyn
-import Data.List
 import HsDumpAst
 
 import GHCi.RemoteTypes ( ForeignRef )
@@ -114,18 +113,10 @@ rnBracket e br_body
                           setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
                                    rn_bracket cur_stage br_body
 
-                        -- Read the ps_var and work out where the splices
-                        -- go
-                        ; final_pendings <- propagateSplices cur_stage ps_var
+                        ; pendings <- readMutVar ps_var
 
-                        ; return (HsRnBracketOut noExt body' final_pendings, fvs_e) }
+                        ; return (HsRnBracketOut noExt body' pendings, fvs_e) }
        }
-
--- See Note [Propagating Splices]
-propagateSplices :: ThStage -> TcRef [PendingRnSplice] -> TcM [PendingRnSplice]
-propagateSplices cur_stage ps_var = do
-  pendings <- readMutVar ps_var
-  return (pendings)
 
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
 rn_bracket outer_stage br@(VarBr x flg rdr_name)
@@ -828,13 +819,13 @@ checkCrossStageLifting :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel
 checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name
   | Brack _ (RnPendingUntyped ps_var) <- use_stage   -- Only for untyped brackets
   , use_lvl > bind_lvl                               -- Cross-stage condition
-  = check_cross_stage_lifting top_lvl bind_lvl (use_lvl - bind_lvl) name ps_var
+  = check_cross_stage_lifting top_lvl (use_lvl - bind_lvl) name ps_var
   | otherwise
   = return name
 
-check_cross_stage_lifting :: TopLevelFlag -> Int -> Int
+check_cross_stage_lifting :: TopLevelFlag -> Int
                           -> Name -> TcRef [PendingRnSplice] -> TcM Name
-check_cross_stage_lifting top_lvl lift_to lift_by name ps_var
+check_cross_stage_lifting top_lvl lift_by name ps_var
   | isTopLevel top_lvl
         -- Top-level identifiers in this module,
         -- (which have External Names)
@@ -868,6 +859,7 @@ check_cross_stage_lifting top_lvl lift_to lift_by name ps_var
 
 -- Calling `getRdrName` on a `Name` uses `Exact` so when renamed they will
 -- resolves to the same `Name`.
+-- mkLiftExpr 2 v => $($(lift (lift v)))
 mkLiftExpr :: Int -> Name -> LHsExpr GhcPs
 mkLiftExpr n var = foldr ($) (nlHsVar (getRdrName var)) es
   where
