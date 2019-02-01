@@ -186,6 +186,10 @@ instance H.Builder Builder where
                   ++ ghcdeps
                   ++ ghcgens
                   ++ [ touchyPath | win ]
+                  ++ [ root -/- "mingw" -/- ".stamp" | win ]
+                     -- proxy for the entire mingw toolchain that
+                     -- we have in inplace/mingw initially, and then at
+                     -- root -/- mingw.
 
         Hsc2Hs stage -> (\p -> [p]) <$> templateHscPath stage
         Make dir  -> return [dir -/- "Makefile"]
@@ -232,7 +236,11 @@ instance H.Builder Builder where
 
                 Ar Unpack _ -> cmd echo [Cwd output] [path] buildArgs
 
-                Autoreconf dir -> cmd echo [Cwd dir] [path] buildArgs
+                Autoreconf dir -> do
+                    -- same trick as for Configure
+                    bash <- bashPath
+                    let env = AddEnv "CONFIG_SHELL" bash
+                    cmd echo env [Cwd dir] ["sh", path] buildArgs
                 Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
                     -- otherwise Windows breaks. TODO: Figure out why.
@@ -288,7 +296,7 @@ systemBuilderPath builder = case builder of
     Alex            -> fromKey "alex"
     Ar _ Stage0     -> fromKey "system-ar"
     Ar _ _          -> fromKey "ar"
-    Autoreconf _    -> fromKey "autoreconf"
+    Autoreconf _    -> stripExe =<< fromKey "autoreconf"
     Cc  _  Stage0   -> fromKey "system-cc"
     Cc  _  _        -> fromKey "cc"
     -- We can't ask configure for the path to configure!
@@ -329,7 +337,18 @@ systemBuilderPath builder = case builder of
                 (True , True ) -> fixAbsolutePathOnWindows fullPath
                 (True , False) -> fixAbsolutePathOnWindows fullPath <&> (<.> exe)
 
--- | Was the path to a given system 'Builder' specified in configuration files?
+    -- Without this function, on Windows I've observed a builder path
+    -- for the 'autoreconf' system.config field, set to
+    -- /usr/bin/autoreconf in the file, but where the path that we read
+    -- is C:/msys64/usr/bin/autoreconf.exe. My standard msys2 set up happens
+    -- to have an executable named 'autoreconf' there, without the 'exe'
+    -- extension. Hence this function.
+    stripExe s = do
+        let sWithoutExe = take (length s - 4) s
+        exists <- doesFileExist s
+        if exists then return s else return sWithoutExe
+
+    -- | Was the path to a given system 'Builder' specified in configuration files?
 isSpecified :: Builder -> Action Bool
 isSpecified = fmap (not . null) . systemBuilderPath
 
