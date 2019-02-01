@@ -351,20 +351,6 @@ makePending _ splice@(HsSplicedT {})
 makePending _ splice@(XSplice {})
   = pprPanic "makePending" (ppr splice)
 
-getSplicePoint :: HsSplice GhcRn -> Name
-getSplicePoint (HsUntypedSplice _ _ n _)
-  = n
-getSplicePoint (HsQuasiQuote _ n _ _ _)
-  = n
-getSplicePoint splice@(HsTypedSplice {})
-  = pprPanic "getSplicePoint" (ppr splice)
-getSplicePoint splice@(HsSpliced {})
-  = pprPanic "getSplicePoint" (ppr splice)
-getSplicePoint splice@(HsSplicedT {})
-  = pprPanic "getSplicePoint" (ppr splice)
-getSplicePoint splice@(XSplice {})
-  = pprPanic "getSplicePoint" (ppr splice)
-
 ------------------
 mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name -> SrcSpan -> FastString
                  -> LHsExpr GhcRn
@@ -815,15 +801,15 @@ checkCrossStageLifting :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel
 -- this is only run on *untyped* brackets.
 
 checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name
-  | Brack _ (RnPendingUntyped ps_var) <- use_stage   -- Only for untyped brackets
+  | Brack _ (RnPendingUntyped {}) <- use_stage   -- Only for untyped brackets
   , use_lvl > bind_lvl                               -- Cross-stage condition
-  = check_cross_stage_lifting top_lvl (use_lvl - bind_lvl) name ps_var
+  = check_cross_stage_lifting top_lvl (use_lvl - bind_lvl) name
   | otherwise
   = return name
 
 check_cross_stage_lifting :: TopLevelFlag -> Int
-                          -> Name -> TcRef [PendingRnSplice] -> TcM Name
-check_cross_stage_lifting top_lvl lift_by name ps_var
+                          -> Name -> TcM Name
+check_cross_stage_lifting top_lvl lift_by name
   | isTopLevel top_lvl
         -- Top-level identifiers in this module,
         -- (which have External Names)

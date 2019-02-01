@@ -1264,6 +1264,7 @@ rep_splice splice_name
        ; case mb_val of
            Just (DsSplice e) -> do { e' <- dsExpr e
                                    ; return (MkC e') }
+           Just (DsBound e)  -> do { repVar (coreVar e) }
            _ -> pprPanic "HsSplice" (ppr splice_name) }
                         -- Should not happen; statically checked
 
@@ -2109,7 +2110,7 @@ repVarOrCon :: Name -> Core TH.Name -> DsM (Core TH.ExpQ)
 repVarOrCon vc str | isDataOcc (nameOccName vc) = repCon str
                    | otherwise                  = repVar str
 
-repVar :: Core TH.Name -> DsM (Core TH.ExpQ)
+repVar :: Core TH.Name -> DsM (Core a)
 repVar (MkC s) = rep2 varEName [s]
 
 repCon :: Core TH.Name -> DsM (Core TH.ExpQ)
