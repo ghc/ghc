@@ -58,6 +58,8 @@ stage0Packages = do
     cross <- flag CrossCompiling
     return $ [ binary
              , cabal
+             , checkApiAnnotations
+             , checkPpr
              , compareSizes
              , compiler
              , deriveConstants
@@ -100,8 +102,10 @@ stage1Packages = do
              , ghcPkg
              , ghcPrim
              , haskeline
+             , hp2ps
              , hsc2hs
              , intLib
+             , parallel
              , pretty
              , process
              , rts
@@ -133,6 +137,7 @@ testsuitePackages = do
              , ghcCompact
              , ghcPkg
              , hp2ps
+             , hpcBin
              , hsc2hs
              , iserv
              , runGhc
