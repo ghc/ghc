@@ -40,7 +40,7 @@ import CoreUtils
 import CoreOpt          ( pushCoTyArg, pushCoValArg
                         , joinPointBinding_maybe, joinPointBindings_maybe )
 import Rules            ( mkRuleInfo, lookupRule, getRules )
-import Demand           ( mkClosedStrictSig, topDmd, exnRes )
+import Demand           ( mkClosedStrictSig, topDmd, botRes )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
 import MonadUtils       ( mapAccumLM, liftIO )
@@ -695,7 +695,7 @@ addLetBndrInfo new_bndr new_arity is_bot new_unf
 
     -- Bottoming bindings: see Note [Bottoming bindings]
     info4 | is_bot    = info3 `setStrictnessInfo`
-                        mkClosedStrictSig (replicate new_arity topDmd) exnRes
+                        mkClosedStrictSig (replicate new_arity topDmd) botRes
           | otherwise = info3
 
      -- Zap call arity info. We have used it by now (via
