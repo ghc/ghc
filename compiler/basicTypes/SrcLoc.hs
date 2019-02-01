@@ -77,6 +77,9 @@ module SrcLoc (
         getLoc, unLoc,
         unRealSrcSpan, getRealSrcSpan,
 
+        -- ** Modifying Located
+        mapLoc,
+
         -- ** Combining and comparing Located values
         eqLocated, cmpLocated, combineLocs, addCLoc,
         leftmost_smallest, leftmost_largest, rightmost,
@@ -526,6 +529,9 @@ data GenLocated l e = L l e
 
 type Located = GenLocated SrcSpan
 type RealLocated = GenLocated RealSrcSpan
+
+mapLoc :: (a -> b) -> GenLocated l a -> GenLocated l b
+mapLoc = fmap
 
 unLoc :: HasSrcSpan a => a -> SrcSpanLess a
 unLoc (dL->L _ e) = e

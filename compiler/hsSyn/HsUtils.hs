@@ -67,7 +67,7 @@ module HsUtils(
   unitRecStmtTc,
 
   -- Template Haskell
-  mkHsSpliceTy, mkHsSpliceE, mkHsSpliceTE, mkUntypedSplice,
+  mkUntypedSplice, mkTypedSplice,
   mkHsQuasiQuote, unqualQuasiQuote,
 
   -- Collecting binders
@@ -346,16 +346,8 @@ unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
 mkUntypedSplice :: SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
 mkUntypedSplice hasParen e = HsUntypedSplice noExt hasParen unqualSplice e
 
-mkHsSpliceE :: SpliceDecoration -> LHsExpr GhcPs -> HsExpr GhcPs
-mkHsSpliceE hasParen e = HsSpliceE noExt (mkUntypedSplice hasParen e)
-
-mkHsSpliceTE :: SpliceDecoration -> LHsExpr GhcPs -> HsExpr GhcPs
-mkHsSpliceTE hasParen e
-  = HsSpliceE noExt (HsTypedSplice noExt hasParen unqualSplice e)
-
-mkHsSpliceTy :: SpliceDecoration -> LHsExpr GhcPs -> HsType GhcPs
-mkHsSpliceTy hasParen e = HsSpliceTy noExt
-                      (HsUntypedSplice noExt hasParen unqualSplice e)
+mkTypedSplice :: SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
+mkTypedSplice hasParen e = HsTypedSplice noExt hasParen unqualSplice e
 
 mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsSplice GhcPs
 mkHsQuasiQuote quoter span quote
