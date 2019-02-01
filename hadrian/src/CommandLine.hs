@@ -12,7 +12,7 @@ import Hadrian.Utilities hiding (buildRoot)
 import System.Console.GetOpt
 import System.Environment
 
-data TestSpeed = Slow | Average | Fast deriving (Show, Eq)
+data TestSpeed = TestSlow | TestNormal | TestFast deriving (Show, Eq)
 
 -- | All arguments that can be passed to Hadrian via the command line.
 data CommandLineArgs = CommandLineArgs
@@ -65,7 +65,7 @@ defaultTestArgs = TestArgs
     , testOnly       = []
     , testOnlyPerf   = False
     , testSkipPerf   = False
-    , testSpeed      = Fast
+    , testSpeed      = TestNormal
     , testSummary    = Nothing
     , testVerbosity  = Nothing
     , testWays       = [] }
@@ -158,9 +158,9 @@ readTestSpeed ms =
     maybe (Left "Cannot parse test-speed") (Right . set) (go =<< lower <$> ms)
   where
     go :: String -> Maybe TestSpeed
-    go "fast"    = Just Fast
-    go "slow"    = Just Slow
-    go "average" = Just Average
+    go "fast"    = Just TestFast
+    go "slow"    = Just TestSlow
+    go "normal"  = Just TestNormal
     go _         = Nothing
     set :: TestSpeed -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { testArgs = (testArgs flags) {testSpeed = flag} }

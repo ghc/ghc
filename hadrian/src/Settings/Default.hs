@@ -100,6 +100,7 @@ stage1Packages = do
              , ghcPkg
              , ghcPrim
              , haskeline
+             , hp2ps
              , hsc2hs
              , intLib
              , pretty
@@ -108,7 +109,7 @@ stage1Packages = do
              , stm
              , time
              , unlit
-             , xhtml                     
+             , xhtml
              ]
           ++ [ haddock | not cross           ]
           ++ [ hpcBin   | not cross          ]
@@ -133,10 +134,11 @@ testsuitePackages = do
              , ghcCompact
              , ghcPkg
              , hp2ps
+             , hpcBin
              , hsc2hs
-             , iserv
              , runGhc
              , unlit         ] ++
+             concat [ [iserv, libiserv] | not win ] ++
              [ timeout | win ]
 
 -- | Default build ways for library packages:

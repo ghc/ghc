@@ -82,7 +82,10 @@ documentationRules = do
         let html     = htmlRoot -/- "index.html" -- also implies "docs-haddock"
             archives = map pathArchive docPaths
             pdfs     = map pathPdf $ docPaths \\ ["libraries"]
-        need $ map (root -/-) $ [html] ++ archives ++ pdfs ++ [manPageBuildPath]
+
+        -- TODO: We don't 'need' the PDFs because of LaTeX problems on CI,
+        -- see https://ghc.haskell.org/trac/ghc/ticket/16352
+        need $ map (root -/-) $ [html] ++ archives {- ++ pdfs -} ++ [manPageBuildPath]
 
 ------------------------------------- HTML -------------------------------------
 

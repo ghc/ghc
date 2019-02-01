@@ -16,6 +16,8 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
     pkg       <- getPackage
     path      <- getContextPath
     stage     <- getStage
+    windows   <- expr windowsHost
+    let prefix = "${pkgroot}" ++ (if windows then "" else "/..")
     mconcat [ arg "configure"
             -- Don't strip libraries when cross compiling.
             -- TODO: We need to set @--with-strip=(stripCmdPath :: Action FilePath)@,
@@ -32,7 +34,7 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
             , arg "--ipid"
             , arg "$pkg-$version"
             , arg "--prefix"
-            , arg "${pkgroot}/.."
+            , arg prefix
 
             -- NB: this is valid only because Hadrian puts the @docs@ and
             -- @libraries@ folders in the same relative position:
@@ -42,7 +44,7 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
             --
             -- This doesn't hold if we move the @docs@ folder anywhere else.
             , arg "--htmldir"
-            , arg $ "${pkgroot}/../../docs/html/libraries/" ++ pkgName pkg
+            , arg $ "${pkgroot}/../docs/html/libraries/" ++ pkgName pkg
 
             , withStaged $ Ghc CompileHs
             , withStaged (GhcPkg Update)

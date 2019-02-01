@@ -174,6 +174,19 @@ time you fire up a build. This is not possible with the Make build system.
   build docs
   ```
 
+- Validate (generate+install a bindist and test it)
+
+  ``` sh
+  # Make
+  ./validate # --fast, --slow, etc
+
+  # Hadrian
+  ./validate --hadrian # --fast, --slow, etc
+  ```
+
+  The hadrian variant doesn't make full use of all
+  the `validate` flags yet.
+
 - Running nofib
 
   ``` sh
