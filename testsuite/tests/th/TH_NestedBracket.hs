@@ -30,5 +30,33 @@ e = $($(foo4) True)
 f :: Bool
 f = $($($(foo5 True)))
 
+g :: (Bool, ExpQ)
+g = $(mixed_levels True)
+
+-- Desugared Variants
+
+aD :: Bool
+aD = $(fooD True)
+
+bD :: ExpQ
+bD = $(foo2D True)
+
+cD :: Bool
+cD = $($(foo2D True))
+
+dD :: Bool
+dD = $($(foo3D True))
+
+eD :: Bool
+eD = $($(foo4D) True)
+
+fD :: Bool
+fD = $($($(foo5D True)))
+
+gD :: (Bool, ExpQ)
+gD = $(mixed_levelsD True)
+
+
+
 --c :: _
 --c = $(foo3)

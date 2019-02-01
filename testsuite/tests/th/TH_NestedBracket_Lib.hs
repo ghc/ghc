@@ -25,6 +25,36 @@ foo4 = [| \x -> [| x |] |]
 foo5 :: Lift a => a -> Q Exp
 foo5 x = [| [| [| x |] |] |]
 
+mixed_levels :: Lift a => a -> Q Exp
+mixed_levels x = [| (x, [| x |]) |]
+
+-- Desugared variants
+
+-- Test the normal lifting
+fooD :: Lift a => a -> Q Exp
+fooD x = [| $(lift x) |]
+
+-- Test living two levels
+foo2D :: Lift a => a -> Q Exp
+foo2D x = [| [| $($(lift( lift x))) |] |]
+
+
+-- Test lifting with additional syntax
+foo3D :: Bool -> Q Exp
+foo3D x = [| [| not $($(lift (lift x))) |] |]
+
+-- Test lifting from level 1 to level 2
+foo4D :: Q Exp
+foo4D = [| \x -> [| $(lift x) |] |]
+
+-- Test lifting three levels
+foo5D :: Lift a => a -> Q Exp
+foo5D x = [| [| [| $($($(lift (lift (lift x))))) |] |] |]
+
+mixed_levelsD :: Lift a => a -> Q Exp
+mixed_levelsD x = [| ($(lift x), [| $($(lift (lift x))) |]) |]
+
+
 normalLift :: Bool -> Q Exp
 normalLift = lift
 

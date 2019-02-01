@@ -409,6 +409,10 @@ data DsMetaVal
    | DsSplice (HsExpr GhcTc) -- These bindings are introduced by
                              -- the PendingSplices on a HsBracketOut
 
+instance Outputable DsMetaVal where
+  ppr (DsBound v)  = text "DsBound" <+> ppr v
+  ppr (DsSplice e) = text "DsSplice" <+> ppr e
+
 
 {-
 ************************************************************************
@@ -974,7 +978,7 @@ data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
 
 data PendingStuff
   = RnPendingUntyped              -- Renaming the inside of an *untyped* bracket
-      (TcRef [(Int, PendingRnSplice)])   -- Pending splices in here
+      (TcRef [PendingRnSplice])   -- Pending splices in here
                                          -- Int is the stage which we want
                                          -- to run the splice
 
