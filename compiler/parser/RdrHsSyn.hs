@@ -51,7 +51,6 @@ module   RdrHsSyn (
         bang_RDR,
         checkPatterns,        -- SrcLoc -> [HsExp] -> P [HsPat]
         checkMonadComp,       -- P (HsStmtContext RdrName)
-        checkCommand,         -- LHsExpr RdrName -> P (LHsCmd RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
         checkDoAndIfThenElse,
@@ -75,7 +74,13 @@ module   RdrHsSyn (
         warnStarIsType,
         failOpFewArgs,
 
-        SumOrTuple (..), mkSumOrTuple
+        SumOrTuple (..), mkSumOrTuple,
+
+        -- Expression/command ambiguity resolution
+        EC(..),
+        ecFromExp,
+        ecFromCmd,
+        mkLBodyStmt,
 
     ) where
 
@@ -1853,6 +1858,37 @@ checkMonadComp = do
 -- We parse arrow syntax as expressions and check for valid syntax below,
 -- converting the expression into a pattern at the same time.
 
+-- | Expression/command ambiguity.
+data EC e c =
+  EC
+    { ecExp :: P e
+    , ecCmd :: P c
+    }
+
+ecFromCmd :: LHsCmd GhcPs -> EC (LHsExpr GhcPs) (LHsCmd GhcPs)
+ecFromCmd c@(getLoc -> l) = EC
+  { ecCmd = return c
+  , ecExp = do
+      addError l $ vcat
+        [ text "Arrow command found where an expression was expected:",
+          nest 2 (ppr c) ]
+      return (cL l hsHoleExpr)
+  }
+
+-- TEST="T3822 T3964 T5022 T5283 arrowcase1 arrowdo1 arrowdo2 arrowfail001 arrowfail004 arrowform1 arrowpat arrowrec1 arrowrun001 arrowrun002 arrowrun003 arrowrun004"
+
+ecFromExp :: LHsExpr GhcPs -> EC (LHsExpr GhcPs) (LHsCmd GhcPs)
+ecFromExp e@(getLoc -> l) = EC
+  { ecExp = return e
+  , ecCmd =
+      parseErrorSDoc l $
+        text "Parse error in command:" <+> ppr e
+  }
+
+hsHoleExpr :: HsExpr (GhcPass id)
+hsHoleExpr = HsUnboundVar noExt (TrueExprHole (mkVarOcc "_"))
+
+{-
 checkCommand :: LHsExpr GhcPs -> P (LHsCmd GhcPs)
 checkCommand lc = locMap checkCmd lc
 
@@ -1942,6 +1978,7 @@ cmdFail loc e = parseErrorSDoc loc (text "Parse error in command:" <+> ppr e)
 cmdStmtFail :: SrcSpan -> Stmt GhcPs (LHsExpr GhcPs) -> P a
 cmdStmtFail loc e = parseErrorSDoc loc
                     (text "Parse error in command statement:" <+> ppr e)
+-}
 
 ---------------------------------------------------------------------------
 -- Miscellaneous utilities
@@ -2332,3 +2369,6 @@ mkLHsDocTy t doc =
 
 mkLHsDocTyMaybe :: LHsType GhcPs -> Maybe LHsDocString -> LHsType GhcPs
 mkLHsDocTyMaybe t = maybe t (mkLHsDocTy t)
+
+mkLBodyStmt :: Located (body GhcPs) -> LStmt GhcPs (Located (body GhcPs))
+mkLBodyStmt a = cL (getLoc a) (mkBodyStmt a)
