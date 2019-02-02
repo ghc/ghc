@@ -55,7 +55,8 @@ import HscMain (hscParseDeclsWithLocation, hscParseStmtWithLocation)
 import HsImpExp
 import HsSyn
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
-                  setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc )
+                  setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
+                  hsc_dynLinker )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
@@ -2998,6 +2999,7 @@ showCmd "-a" = showOptions True
 showCmd str = do
     st <- getGHCiState
     dflags <- getDynFlags
+    hsc_env <- GHC.getSession
 
     let lookupCmd :: String -> Maybe (m ())
         lookupCmd name = lookup name $ map (\(_,b,c) -> (b,c)) cmds
@@ -3017,7 +3019,7 @@ showCmd str = do
             , action "imports"    $ showImports
             , action "modules"    $ showModules
             , action "bindings"   $ showBindings
-            , action "linker"     $ getDynFlags >>= liftIO . showLinkerState
+            , action "linker"     $ getDynFlags >>= liftIO . (showLinkerState (hsc_dynLinker hsc_env))
             , action "breaks"     $ showBkptTable
             , action "context"    $ showContext
             , action "packages"   $ showPackages
