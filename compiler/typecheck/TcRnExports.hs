@@ -175,12 +175,12 @@ tcRnExports explicit_mod exports
         ; return new_tcg_env }
 
 exports_from_avail :: Maybe (Located [LIE GhcPs])
-                         -- Nothing => no explicit export list
+                         -- ^ 'Nothing' means no explicit export list
                    -> GlobalRdrEnv
                    -> ImportAvails
-                         -- Imported modules; this is used to test if a
-                         -- 'module Foo' export is valid (it's not valid
-                         -- if we didn't import Foo!)
+                         -- ^ Imported modules; this is used to test if a
+                         -- @module Foo@ export is valid (it's not valid
+                         -- if we didn't import @Foo@!)
                    -> Module
                    -> RnM (Maybe [(LIE GhcRn, Avails)], Avails)
                          -- (Nothing, _) <=> no explicit export list
@@ -230,6 +230,17 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
     kids_env :: NameEnv [GlobalRdrElt]
     kids_env = mkChildEnv (globalRdrEnvElts rdr_env)
 
+    -- When 'availFromGRE' sees something with a parent, it assumes that the
+    -- parent, if exported, is going to show up in some other GRE. This is
+    -- mostly OK because parents are generally top-level. One frustrating
+    -- exception is type constructors whose parents are also type constructors
+    -- (ex: associated data instance type constructors).
+    --
+    -- For these cases, we duplicate the GRE and erase the parent from the copy
+    expand_tyty_gre :: GlobalRdrElt -> [GlobalRdrElt]
+    expand_tyty_gre (gre @ GRE { gre_name = me, gre_par = ParentIs p })
+      | isTyConName p, isTyConName me = [gre, gre{ gre_par = NoParent }]
+    expand_tyty_gre gre = [gre]
 
     imported_modules = [ imv_name imv
                        | xs <- moduleEnvElts $ imp_mods imports
@@ -248,7 +259,9 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
         = do { let { exportValid = (mod `elem` imported_modules)
                                 || (moduleName this_mod == mod)
                    ; gre_prs     = pickGREsModExp mod (globalRdrEnvElts rdr_env)
-                   ; new_exports = map (availFromGRE . fst) gre_prs
+                   ; new_exports = [ availFromGRE gre'
+                                   | (gre, _) <- gre_prs
+                                   , gre' <- expand_tyty_gre gre ]
                    ; all_gres    = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
                    ; mods        = addOneToUniqSet earlier_mods mod
                    }
