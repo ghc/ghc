@@ -1146,7 +1146,7 @@ cvtOverLit :: Lit -> CvtM (HsOverLit GhcPs)
 cvtOverLit (IntegerL i)
   = do { force i; return $ mkHsIntegral   (mkIntegralLit i) }
 cvtOverLit (RationalL r)
-  = do { force r; return $ mkHsFractional (mkFractionalLit r) }
+  = do { force r; return $ mkHsFractional (mkTHFractionalLit r) }
 cvtOverLit (StringL s)
   = do { let { s' = mkFastString s }
        ; force s'
@@ -1181,9 +1181,9 @@ cvtLit :: Lit -> CvtM (HsLit GhcPs)
 cvtLit (IntPrimL i)    = do { force i; return $ HsIntPrim NoSourceText i }
 cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim NoSourceText w }
 cvtLit (FloatPrimL f)
-  = do { force f; return $ HsFloatPrim noExt (mkFractionalLit f) }
+  = do { force f; return $ HsFloatPrim noExt (mkTHFractionalLit f) }
 cvtLit (DoublePrimL f)
-  = do { force f; return $ HsDoublePrim noExt (mkFractionalLit f) }
+  = do { force f; return $ HsDoublePrim noExt (mkTHFractionalLit f) }
 cvtLit (CharL c)       = do { force c; return $ HsChar NoSourceText c }
 cvtLit (CharPrimL c)   = do { force c; return $ HsCharPrim NoSourceText c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }

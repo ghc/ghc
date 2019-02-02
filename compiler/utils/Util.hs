@@ -90,7 +90,10 @@ module Util (
 
         -- * Floating point
         readRational,
+        readSignificandExponentPair,
         readHexRational,
+        readHexSignificandExponentPair,
+
 
         -- * read helpers
         maybeRead, maybeReadFuzzy,
@@ -1157,9 +1160,28 @@ exactLog2 x
 
 readRational__ :: ReadS Rational -- NB: doesn't handle leading "-"
 readRational__ r = do
+      ((i, e), t) <- readSignificandExponentPair__ r
+      return ((i%1)*10^^e, t)
+
+readRational :: String -> Rational -- NB: *does* handle a leading "-"
+readRational top_s
+  = case top_s of
+      '-' : xs -> - (read_me xs)
+      xs       -> read_me xs
+  where
+    read_me s
+      = case (do { (x,"") <- readRational__ s ; return x }) of
+          [x] -> x
+          []  -> error ("readRational: no parse:"        ++ top_s)
+          _   -> error ("readRational: ambiguous parse:" ++ top_s)
+
+
+readSignificandExponentPair__ :: ReadS (Integer, Integer) -- NB: doesn't handle leading "-"
+readSignificandExponentPair__ r = do
      (n,d,s) <- readFix r
      (k,t)   <- readExp s
-     return ((n%1)*10^^(k-d), t)
+     let pair = (n, toInteger (k - d))
+     return (pair, t)
  where
      readFix r = do
         (ds,s)  <- lexDecDigits r
@@ -1193,17 +1215,17 @@ readRational__ r = do
                | p x       =  let (ys,zs) = span' p xs' in (x:ys,zs)
                | otherwise =  ([],xs)
 
-readRational :: String -> Rational -- NB: *does* handle a leading "-"
-readRational top_s
+readSignificandExponentPair :: String -> (Integer, Integer) -- NB: *does* handle a leading "-"
+readSignificandExponentPair top_s
   = case top_s of
-      '-' : xs -> - (read_me xs)
+      '-' : xs -> let (i, e) = read_me xs in (-i, e)
       xs       -> read_me xs
   where
     read_me s
-      = case (do { (x,"") <- readRational__ s ; return x }) of
+      = case (do { (x,"") <- readSignificandExponentPair__ s ; return x }) of
           [x] -> x
-          []  -> error ("readRational: no parse:"        ++ top_s)
-          _   -> error ("readRational: ambiguous parse:" ++ top_s)
+          []  -> error ("readSignificandExponentPair: no parse:"        ++ top_s)
+          _   -> error ("readSignificandExponentPair: ambiguous parse:" ++ top_s)
 
 
 readHexRational :: String -> Rational
@@ -1262,6 +1284,60 @@ readHexRational__ ('0' : x : rest)
 readHexRational__ _ = Nothing
 
 
+readHexSignificandExponentPair :: String -> (Integer, Integer)
+readHexSignificandExponentPair str =
+  case str of
+    '-' : xs -> let (i, e) = readMe xs in (-i, e)
+    xs       -> readMe xs
+  where
+  readMe as =
+    case readHexSignificandExponentPair__ as of
+      Just n -> n
+      _      -> error ("readHexSignificandExponentPair: no parse:" ++ str)
+
+
+readHexSignificandExponentPair__ :: String -> Maybe (Integer, Integer)
+readHexSignificandExponentPair__ ('0' : x : rest)
+  | x == 'X' || x == 'x' =
+  do let (front,rest2) = span' isHexDigit rest
+     guard (not (null front))
+     let frontNum = steps 16 0 front
+     case rest2 of
+       '.' : rest3 ->
+          do let (back,rest4) = span' isHexDigit rest3
+             guard (not (null back))
+             let backNum = steps 16 frontNum back
+                 exp1    = -4 * length back
+             case rest4 of
+               p : ps | isExp p -> fmap (mk backNum . (+ exp1)) (getExp ps)
+               _ -> return (mk backNum exp1)
+       p : ps | isExp p -> fmap (mk frontNum) (getExp ps)
+       _ -> Nothing
+
+  where
+  isExp p = p == 'p' || p == 'P'
+
+  getExp ('+' : ds) = dec ds
+  getExp ('-' : ds) = fmap negate (dec ds)
+  getExp ds         = dec ds
+
+  mk :: Integer -> Int -> (Integer, Integer)
+  mk n e = (n, fromIntegral e)
+
+  dec cs = case span' isDigit cs of
+             (ds,"") | not (null ds) -> Just (steps 10 0 ds)
+             _ -> Nothing
+
+  steps base n ds = foldl' (step base) n ds
+  step  base n d  = base * n + fromIntegral (digitToInt d)
+
+  span' _ xs@[]         =  (xs, xs)
+  span' p xs@(x:xs')
+            | x == '_'  = span' p xs'   -- skip "_"  (#14473)
+            | p x       =  let (ys,zs) = span' p xs' in (x:ys,zs)
+            | otherwise =  ([],xs)
+
+readHexSignificandExponentPair__ _ = Nothing
 
 
 -----------------------------------------------------------------------------
