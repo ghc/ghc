@@ -4,7 +4,7 @@ version:              2.22.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
-license:              BSD3
+license:              BSD2
 license-file:         LICENSE
 author:               Simon Marlow, David Waern
 maintainer:           Alec Theriault <alec.theriault@gmail.com>, Alex Biehl <alexbiehl@gmail.com>, Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
