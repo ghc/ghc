@@ -193,6 +193,7 @@ newHscEnv dflags = do
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
     iserv_mvar <- newMVar Nothing
+    emptyDynLinker <- uninitializedLinker
     return HscEnv {  hsc_dflags       = dflags
                   ,  hsc_targets      = []
                   ,  hsc_mod_graph    = emptyMG
@@ -202,7 +203,8 @@ newHscEnv dflags = do
                   ,  hsc_NC           = nc_var
                   ,  hsc_FC           = fc_var
                   ,  hsc_type_env_var = Nothing
-                  , hsc_iserv        = iserv_mvar
+                  ,  hsc_iserv        = iserv_mvar
+                  ,  hsc_dynLinker    = emptyDynLinker
                   }
 
 -- -----------------------------------------------------------------------------
