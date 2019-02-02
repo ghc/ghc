@@ -67,3 +67,5 @@ test('T16230',      [extra_files(['Test16230.hs']),
                      ignore_stderr], run_command, ['$MAKE -s --no-print-directory T16230'])
 test('T16236',      [extra_files(['Test16236.hs']),
                      ignore_stderr], run_command, ['$MAKE -s --no-print-directory T16236'])
+test('StarBinderAnns',      [extra_files(['StarBinderAnns.hs']),
+                     ignore_stderr], run_command, ['$MAKE -s --no-print-directory StarBinderAnns'])
