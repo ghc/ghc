@@ -957,10 +957,10 @@ checkTyClHdr is_cls ty
     goL (dL->L l ty) acc ann fix = go l ty acc ann fix
 
     -- workaround to define '*' despite StarIsType
-    go _ (HsParTy _ (dL->L l (HsStarTy _ isUni))) acc ann fix
+    go lp (HsParTy _ (dL->L l (HsStarTy _ isUni))) acc ann fix
       = do { warnStarBndr l
            ; let name = mkOccName tcClsName (if isUni then "★" else "*")
-           ; return (cL l (Unqual name), acc, fix, ann) }
+           ; return (cL l (Unqual name), acc, fix, (ann ++ mkParensApiAnn lp)) }
 
     go l (HsTyVar _ _ (dL->L _ tc)) acc ann fix
       | isRdrTc tc               = return (cL l tc, acc, fix, ann)
