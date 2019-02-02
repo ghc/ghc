@@ -59,6 +59,7 @@ test('T13163',      [extra_files(['Test13163.hs']),
                      ignore_stderr], makefile_test, ['T13163'])
 test('T15303',      [extra_files(['Test15303.hs']),
                      ignore_stderr], makefile_test, ['T15303'])
-# Stricter tests from trac #16217 now causes this to fail. Will be fixed for trac #16212
-test('T16212',      [expect_broken(16212),extra_files(['Test16212.hs']),
-                     ignore_stderr], run_command, ['$MAKE -s --no-print-directory T16212'])
+test('T16212',      [extra_files(['Test16212.hs']),
+                     ignore_stderr], makefile_test, ['T16212'])
+test('StarBinderAnns',      [extra_files(['StarBinderAnns.hs']),
+                     ignore_stderr], makefile_test, ['StarBinderAnns'])
