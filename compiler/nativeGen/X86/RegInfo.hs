@@ -21,10 +21,6 @@ import Unique
 import UniqFM
 import X86.Regs
 
-import Debug.Trace
-import Numeric (showHex)
-
-
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
    = case format of
