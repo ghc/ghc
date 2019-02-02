@@ -1532,8 +1532,8 @@ ppr_cmd (HsCmdArrForm _ (L _ (HsConLikeOut _ c)) Infix _    [arg1, arg2])
   = hang (pprCmdArg (unLoc arg1)) 4 (sep [ pprInfixOcc (conLikeName c)
                                          , pprCmdArg (unLoc arg2)])
 ppr_cmd (HsCmdArrForm _ op _ _ args)
-  = hang (text "(|" <> ppr_lexpr op)
-         4 (sep (map (pprCmdArg.unLoc) args) <> text "|)")
+  = hang (text "(|" <+> ppr_lexpr op)
+         4 (sep (map (pprCmdArg.unLoc) args) <+> text "|)")
 ppr_cmd (XCmd x) = ppr x
 
 pprCmdArg :: (OutputableBndrId (GhcPass p)) => HsCmdTop (GhcPass p) -> SDoc
