@@ -97,9 +97,9 @@ module BasicTypes(
 
         SuccessFlag(..), succeeded, failed, successIf,
 
-        IntegralLit(..), FractionalLit(..),
-        negateIntegralLit, negateFractionalLit,
-        mkIntegralLit, mkFractionalLit,
+        IntegralLit(..), FractionalLit(..), FractionalExponentBase(..),
+        negateIntegralLit, negateFractionalLit, fractionalLitNeg,
+        mkIntegralLit, mkFractionalLit, mkTHFractionalLit, rationalFromFractionalLit,
         integralFractionalLit,
 
         SourceText(..), pprWithSourceText,
@@ -116,6 +116,7 @@ import Outputable
 import SrcLoc ( Located,unLoc )
 import Data.Data hiding (Fixity, Prefix, Infix)
 import Data.Function (on)
+import GHC.Real (Ratio((:%)))
 
 {-
 ************************************************************************
@@ -1481,20 +1482,54 @@ negateIntegralLit (IL text neg value)
 
 -- | Fractional Literal
 --
--- Used (instead of Rational) to represent exactly the floating point literal that we
+-- Used (instead of Rational) to represent the exact floating point literal that we
 -- encountered in the user's source program. This allows us to pretty-print exactly what
 -- the user wrote, which is important e.g. for floating point numbers that can't represented
 -- as Doubles (we used to via Double for pretty-printing). See also #2245.
 data FractionalLit
-  = FL { fl_text :: SourceText     -- How the value was written in the source
-       , fl_neg :: Bool            -- See Note [Negative zero]
-       , fl_value :: Rational      -- Numeric value of the literal
+  = FL { fl_text :: SourceText                 -- How the value was written in the source
+       , fl_neg :: Bool                        -- See Note [Negative zero]
+       , fl_signi :: Integer                   -- The significand component of the literal
+       , fl_exp :: Integer                     -- The exponent component of the literal
+       , fl_exp_base :: FractionalExponentBase -- See Note [Fractional exponent bases]
        }
+  -- | TemplateHaskell fractional lit: we lose information during conversion
+  -- from Haskell syntax to TH syntax (happens when desugaring quasiquotes, in
+  -- DsMeta) where we convert a `FL` to a `Rational` because that's what TH
+  -- syntax wants.
+  | THFL { thfl_text :: SourceText -- How the value was written in the source
+         , thfl_neg :: Bool        -- See Note [Negative zero]
+         , thfl_value :: Rational  -- Numeric value of the literal
+         }
   deriving (Data, Show)
   -- The Show instance is required for the derived Lexer.x:Token instance when DEBUG is on
 
-mkFractionalLit :: Real a => a -> FractionalLit
-mkFractionalLit r = FL { fl_text = SourceText (show (realToFrac r::Double))
+fractionalLitNeg :: FractionalLit -> Bool
+fractionalLitNeg fl =
+  case fl of
+    FL {} -> fl_neg fl
+    THFL {} -> thfl_neg fl
+  
+data FractionalExponentBase
+  = Base2
+  | Base10
+  deriving (Data, Show)
+
+mkRationalBase10 :: Integer -> Integer -> Rational
+mkRationalBase10 i e = mkRationalWithExponentBase i e Base10
+
+mkRationalWithExponentBase :: Integer -> Integer -> FractionalExponentBase -> Rational
+mkRationalWithExponentBase i e feb = (i :% 1) * (eb ^^ e)
+  where eb = case feb of Base2 -> 2 ; Base10 -> 10
+  
+rationalFromFractionalLit :: FractionalLit -> Rational
+rationalFromFractionalLit (FL _ _ i e expBase) =
+  mkRationalWithExponentBase i e expBase
+rationalFromFractionalLit (THFL _ _ r) = r
+
+
+mkFractionalLit :: Integer -> Integer -> FractionalLit
+mkFractionalLit i e = FL { fl_text = SourceText (show (realToFrac (mkRationalBase10 i e)::Double))
                            -- Converting to a Double here may technically lose
                            -- precision (see #15502). We could alternatively
                            -- convert to a Rational for the most accuracy, but
@@ -1502,20 +1537,45 @@ mkFractionalLit r = FL { fl_text = SourceText (show (realToFrac r::Double))
                            -- strangely, so we opt not to do this. (In contrast
                            -- to mkIntegralLit, where we always convert to an
                            -- Integer for the highest accuracy.)
-                       , fl_neg = r < 0
-                       , fl_value = toRational r }
+                         , fl_neg = i < 0
+                         , fl_signi = i
+                         , fl_exp = e
+                         , fl_exp_base = Base10 }
+
+mkTHFractionalLit :: Rational -> FractionalLit
+mkTHFractionalLit r = THFL { thfl_text = SourceText (show (realToFrac r::Double))
+                             -- Converting to a Double here may technically lose
+                             -- precision (see #15502). We could alternatively
+                             -- convert to a Rational for the most accuracy, but
+                             -- it would cause Floats and Doubles to be displayed
+                             -- strangely, so we opt not to do this. (In contrast
+                             -- to mkIntegralLit, where we always convert to an
+                             -- Integer for the highest accuracy.)
+                           , thfl_neg = r < 0
+                           , thfl_value = r }
 
 negateFractionalLit :: FractionalLit -> FractionalLit
-negateFractionalLit (FL text neg value)
+negateFractionalLit (FL text neg i e eb)
   = case text of
-      SourceText ('-':src) -> FL (SourceText src)     False value
-      SourceText      src  -> FL (SourceText ('-':src)) True  value
-      NoSourceText         -> FL NoSourceText (not neg) (negate value)
+      SourceText ('-':src) -> FL (SourceText src)       False i e eb
+      SourceText      src  -> FL (SourceText ('-':src)) True  i e eb
+      NoSourceText         -> FL NoSourceText (not neg) (negate i) e eb
+negateFractionalLit (THFL text neg r)
+  = case text of
+      SourceText ('-':src) -> THFL (SourceText src)       False r
+      SourceText      src  -> THFL (SourceText ('-':src)) True  r
+      NoSourceText         -> THFL NoSourceText (not neg) (negate r)
 
 integralFractionalLit :: Bool -> Integer -> FractionalLit
-integralFractionalLit neg i = FL { fl_text = SourceText (show i),
-                                   fl_neg = neg,
-                                   fl_value = fromInteger i }
+integralFractionalLit neg i = FL { fl_text = SourceText (show i)
+                                 , fl_neg = neg
+                                 , fl_signi = i
+                                 , fl_exp = 0
+                                 , fl_exp_base = Base10 }
+
+-- Note [fractional exponent bases] For hexadecimal rationals of
+-- the form 0x0.3p10 the exponent is given on base 2 rather than
+-- base 10. These are the only options, hence the sum type. See also #15646.
 
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module MatchLit)
@@ -1531,13 +1591,14 @@ instance Outputable IntegralLit where
   ppr (IL NoSourceText _ value) = text (show value)
 
 instance Eq FractionalLit where
-  (==) = (==) `on` fl_value
+  (==) = (==) `on` (\x -> mkRationalWithExponentBase (fl_signi x) (fl_exp x) (fl_exp_base x))
 
 instance Ord FractionalLit where
-  compare = compare `on` fl_value
+  compare = compare `on` (\x -> mkRationalWithExponentBase (fl_signi x) (fl_exp x) (fl_exp_base x))
 
 instance Outputable FractionalLit where
-  ppr f = pprWithSourceText (fl_text f) (rational (fl_value f))
+  ppr (fl@(FL {})) = pprWithSourceText (fl_text fl) (rational $ mkRationalWithExponentBase (fl_signi fl) (fl_exp fl) (fl_exp_base fl))
+  ppr (fl@(THFL {})) = pprWithSourceText (thfl_text fl) (rational $ thfl_value fl)
 
 {-
 ************************************************************************

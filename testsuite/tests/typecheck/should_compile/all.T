@@ -663,3 +663,8 @@ test('T14761c', normal, compile, [''])
 test('T16008', normal, compile, [''])
 test('T16033', normal, compile, [''])
 test('T16141', normal, compile, ['-O'])
+test('T15646', 
+     compile_timeout_multiplier(0.01),
+     # 0.01 may seem tiny (1 is timeout after 300s, so this is 3 seconds),
+     # but if this test regresses, it will take about 10 seconds to finish.
+     compile, [''])
