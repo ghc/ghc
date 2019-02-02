@@ -64,7 +64,8 @@ executable haddock
 
   -- haddock typically only supports a single GHC major version 
   build-depends:
-    base ^>= 4.12.0
+    -- FIXME: drop 4.12.0.0 once GHC HEAD updates to 4.13.0.0
+    base ^>= 4.12.0.0 || ^>= 4.13.0.0
 
   if flag(in-ghc-tree)
     hs-source-dirs: haddock-api/src,  haddock-library/src
