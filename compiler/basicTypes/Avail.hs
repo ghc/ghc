@@ -47,27 +47,27 @@ import Data.Function
 -- -----------------------------------------------------------------------------
 -- The AvailInfo type
 
--- | Records what things are "available", i.e. in scope
-data AvailInfo = Avail Name      -- ^ An ordinary identifier in scope
-               | AvailTC Name
-                         [Name]
-                         [FieldLabel]
-                                 -- ^ A type or class in scope. Parameters:
-                                 --
-                                 --  1) The name of the type or class
-                                 --  2) The available pieces of type or class,
-                                 --     excluding field selectors.
-                                 --  3) The record fields of the type
-                                 --     (see Note [Representing fields in AvailInfo]).
-                                 --
-                                 -- The AvailTC Invariant:
-                                 --   * If the type or class is itself
-                                 --     to be in scope, it must be
-                                 --     *first* in this list.  Thus,
-                                 --     typically: @AvailTC Eq [Eq, ==, \/=]@
-                deriving( Eq, Data )
-                        -- Equality used when deciding if the
-                        -- interface has changed
+-- | Records what things are \"available\", i.e. in scope
+data AvailInfo
+
+  -- | An ordinary identifier in scope
+  = Avail Name
+
+  -- | A type or class in scope
+  --
+  -- The __AvailTC Invariant__: If the type or class is itself to be in scope,
+  -- it must be /first/ in this list.  Thus, typically:
+  --
+  -- > AvailTC Eq [Eq, ==, \/=] []
+  | AvailTC
+       Name         -- ^ The name of the type or class
+       [Name]       -- ^ The available pieces of type or class,
+                    -- excluding field selectors.
+       [FieldLabel] -- ^ The record fields of the type
+                    -- (see Note [Representing fields in AvailInfo]).
+
+   deriving ( Eq    -- ^ Used when deciding if the interface has changed
+            , Data )
 
 -- | A collection of 'AvailInfo' - several things that are \"available\"
 type Avails = [AvailInfo]

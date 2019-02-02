@@ -89,6 +89,41 @@ At one point I implemented a compromise:
 But the compromise seemed too much of a hack, so we backed it out.
 You just have to use an explicit export list:
     module M( F(..) ) where ...
+
+Note [Avails of associated data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose you have (Trac #16077)
+
+    {-# LANGUAGE TypeFamilies #-}
+    module A (module A) where
+
+    class    C a  where { data T a }
+    instance C () where { data T () = D }
+
+Because @A@ is exported explicitly, GHC tries to produce an export list
+from the @GlobalRdrEnv@. In this case, it pulls out the following:
+
+    [ C defined at A.hs:4:1
+    , T parent:C defined at A.hs:4:23
+    , D parent:T defined at A.hs:5:35 ]
+
+If map these directly into avails, (via 'availFromGRE'), we get
+@[C{C;}, C{T;}, T{D;}]@, which eventually gets merged into @[C{C, T;}, T{D;}]@.
+That's not right, because @T{D;}@ violates the AvailTC invariant: @T@ is
+exported, but it isn't the first entry in the avail!
+
+We work around this issue by expanding GREs where the parent and child
+are both type constructors into two GRES.
+
+    T parent:C defined at A.hs:4:23
+
+      =>
+
+    [ T parent:C defined at A.hs:4:23
+    , T defined at A.hs:4:23 ]
+
+Then, we get  @[C{C;}, C{T;}, T{T;}, T{D;}]@, which eventually gets merged
+into @[C{C, T;}, T{T, D;}]@ (which satsifies the AvailTC invariant).
 -}
 
 data ExportAccum        -- The type of the accumulating parameter of
@@ -175,12 +210,12 @@ tcRnExports explicit_mod exports
         ; return new_tcg_env }
 
 exports_from_avail :: Maybe (Located [LIE GhcPs])
-                         -- Nothing => no explicit export list
+                         -- ^ 'Nothing' means no explicit export list
                    -> GlobalRdrEnv
                    -> ImportAvails
-                         -- Imported modules; this is used to test if a
-                         -- 'module Foo' export is valid (it's not valid
-                         -- if we didn't import Foo!)
+                         -- ^ Imported modules; this is used to test if a
+                         -- @module Foo@ export is valid (it's not valid
+                         -- if we didn't import @Foo@!)
                    -> Module
                    -> RnM (Maybe [(LIE GhcRn, Avails)], Avails)
                          -- (Nothing, _) <=> no explicit export list
@@ -230,6 +265,11 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
     kids_env :: NameEnv [GlobalRdrElt]
     kids_env = mkChildEnv (globalRdrEnvElts rdr_env)
 
+    -- See Note [Avails of associated data families]
+    expand_tyty_gre :: GlobalRdrElt -> [GlobalRdrElt]
+    expand_tyty_gre (gre @ GRE { gre_name = me, gre_par = ParentIs p })
+      | isTyConName p, isTyConName me = [gre, gre{ gre_par = NoParent }]
+    expand_tyty_gre gre = [gre]
 
     imported_modules = [ imv_name imv
                        | xs <- moduleEnvElts $ imp_mods imports
@@ -248,7 +288,9 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
         = do { let { exportValid = (mod `elem` imported_modules)
                                 || (moduleName this_mod == mod)
                    ; gre_prs     = pickGREsModExp mod (globalRdrEnvElts rdr_env)
-                   ; new_exports = map (availFromGRE . fst) gre_prs
+                   ; new_exports = [ availFromGRE gre'
+                                   | (gre, _) <- gre_prs
+                                   , gre' <- expand_tyty_gre gre ]
                    ; all_gres    = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
                    ; mods        = addOneToUniqSet earlier_mods mod
                    }
