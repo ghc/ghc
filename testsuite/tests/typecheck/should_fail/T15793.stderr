@@ -1,0 +1,5 @@
+
+T15793.hs:18:3: error:
+    • Illegal oversaturated visible kind argument: ‘@a’
+    • In the equations for closed type family ‘F2’
+      In the type family declaration for ‘F2’
