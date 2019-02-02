@@ -22,7 +22,8 @@ import GhcPrelude
 
 import {-# SOURCE #-} HsExpr( HsExpr, pprExpr )
 import BasicTypes ( IntegralLit(..),FractionalLit(..),negateIntegralLit,
-                    negateFractionalLit,SourceText(..),pprWithSourceText )
+                    negateFractionalLit,SourceText(..),pprWithSourceText,
+                    fractionalLitNeg )
 import Type
 import Outputable
 import FastString
@@ -297,9 +298,9 @@ hsLitNeedsParens p = go
     go (HsInt64Prim _ x)  = p > topPrec && x < 0
     go (HsWord64Prim {})  = False
     go (HsInteger _ x _)  = p > topPrec && x < 0
-    go (HsRat _ x _)      = p > topPrec && fl_neg x
-    go (HsFloatPrim _ x)  = p > topPrec && fl_neg x
-    go (HsDoublePrim _ x) = p > topPrec && fl_neg x
+    go (HsRat _ x _)      = p > topPrec && fractionalLitNeg x
+    go (HsFloatPrim _ x)  = p > topPrec && fractionalLitNeg x
+    go (HsDoublePrim _ x) = p > topPrec && fractionalLitNeg x
     go (XLit _)           = False
 
 -- | @'hsOverLitNeedsParens' p ol@ returns 'True' if an overloaded literal
@@ -309,6 +310,6 @@ hsOverLitNeedsParens p (OverLit { ol_val = olv }) = go olv
   where
     go :: OverLitVal -> Bool
     go (HsIntegral x)   = p > topPrec && il_neg x
-    go (HsFractional x) = p > topPrec && fl_neg x
+    go (HsFractional x) = p > topPrec && fractionalLitNeg x
     go (HsIsString {})  = False
 hsOverLitNeedsParens _ (XOverLit { }) = False

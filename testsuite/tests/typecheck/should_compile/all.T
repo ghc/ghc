@@ -688,3 +688,8 @@ test('T16832', normal, ghci_script, ['T16832.script'])
 test('T16946', normal, compile, [''])
 test('T17007', normal, compile, [''])
 test('T17067', normal, compile, [''])
+test('T15646',
+     compile_timeout_multiplier(0.01),
+     # 0.01 may seem tiny (1 is timeout after 300s, so this is 3 seconds),
+     # but if this test regresses, it will take about 10 seconds to finish.
+     compile, [''])
