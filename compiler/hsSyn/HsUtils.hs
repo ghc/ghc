@@ -502,7 +502,8 @@ nlHsTyConApp tycon tys  = foldl' nlHsAppTy (nlHsTyVar tycon) tys
 
 nlHsAppKindTy ::
   LHsType (GhcPass p) -> LHsKind (GhcPass p) -> LHsType (GhcPass p)
-nlHsAppKindTy f k = noLoc (HsAppKindTy noExt f (parenthesizeHsType appPrec k))
+nlHsAppKindTy f k
+  = noLoc (HsAppKindTy noSrcSpan f (parenthesizeHsType appPrec k))
 
 {-
 Tuples.  All these functions are *pre-typechecker* because they lack
