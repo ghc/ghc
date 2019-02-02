@@ -3806,6 +3806,9 @@ wrongKindOfFamily family
                  | isDataFamilyTyCon family = text "data family"
                  | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
 
+-- | Produce an error for oversaturated type family equations with too many
+-- required arguments.
+-- See Note [Oversaturated type family equations] in TcValidity.
 wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr max_args
   = text "Number of parameters must match family declaration; expected"
