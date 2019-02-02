@@ -146,5 +146,8 @@ test('T12962', [], compile_and_run, [''])
 test('T14257', [], makefile_test, ['T14257'])
 
 test('T15897',
-     [extra_ways(['profasm']), only_ways(['profasm']), run_timeout_multiplier(2)],
+     [extra_ways(['profasm']), only_ways(['profasm']),
+      run_timeout_multiplier(2),
+      # Fragile in unregisterised way (#15467, #16227)
+      when(unregisterised(), skip)],
      makefile_test, ['T15897'])
