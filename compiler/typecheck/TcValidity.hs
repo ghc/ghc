@@ -2055,7 +2055,17 @@ checkFamPatBinders fam_tc qtvs pats rhs
          --    data instance forall a.  T Int = MkT Int
          -- See Note [Unused explicitly bound variables in a family pattern]
        ; check_tvs bad_qtvs (text "bound by a forall")
-                            (text "used in") }
+                            (text "used in")
+
+         -- Check for oversaturated visible kind arguments in a type family
+         -- equation.
+         -- See Note [Oversaturated type family equations]
+       ; when (isTypeFamilyTyCon fam_tc) $
+           case drop (tyConArity fam_tc) pats of
+             [] -> pure ()
+             spec_arg:_ ->
+               addErr $ text "Illegal oversaturated visible kind argument:"
+                    <+> quotes (char '@' <> pprParendType spec_arg) }
   where
     pat_tvs       = tyCoVarsOfTypes pats
     exact_pat_tvs = exactTyCoVarsOfTypes pats
@@ -2400,6 +2410,62 @@ type application, like @x \@Bool 1@. (Of course it does nothing, but it is
 permissible.) In the type family case, the only sensible explanation is that
 the user has made a mistake -- thus we throw an error.
 
+Note [Oversaturated type family equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Type family tycons have very rigid arities. We want to reject something like
+this:
+
+  type family Foo :: Type -> Type where
+    Foo x = ...
+
+Because Foo has arity zero (i.e., it doesn't bind anything to the left of the
+double colon), we want to disallow any equation for Foo that has more than zero
+arguments, such as `Foo x = ...`. The algorithm here is pretty simple: if an
+equation has more arguments than the arity of the type family, reject.
+
+Things get trickier when visible kind application enters the picture. Consider
+the following example:
+
+  type family Bar (x :: j) :: forall k. Either j k where
+    Bar 5 @Symbol = ...
+
+The arity of Bar is two, since it binds two variables, `j` and `x`. But even
+though Bar's equation has two arguments, it's still invalid. Imagine the same
+equation in Core:
+
+    Bar Nat 5 Symbol = ...
+
+Here, it becomes apparent that Bar is actually taking /three/ arguments! So
+we can't just rely on a simple counting argument to reject
+`Bar 5 @Symbol = ...`, since it only has two user-written arguments.
+Moreover, there's one explicit argument (5) and one visible kind argument
+(@Symbol), which matches up perfectly with the fact that Bar has one required
+binder (x) and one specified binder (j), so that's not a valid way to detect
+oversaturation either.
+
+To solve this problem in a robust way, we do the following:
+
+1. When kind-checking, we count the number of user-written *required*
+   arguments and check if there is an equal number of required tycon binders.
+   If not, reject. (See `wrongNumberOfParmsErr` in TcTyClsDecls.)
+
+   We perform this step during kind-checking, not during validity checking,
+   since we can give better error messages if we catch it early.
+2. When validity checking, take all of the (Core) type patterns from on
+   equation, drop the first n of them (where n is the arity of the type family
+   tycon), and check if there are any types leftover. If so, reject.
+
+   Why does this work? We know that after dropping the first n type patterns,
+   none of the leftover types can be required arguments, since step (1) would
+   have already caught that. Moreover, the only places where visible kind
+   applications should be allowed are in the first n types, since those are the
+   only arguments that can correspond to binding forms. Therefore, the
+   remaining arguments must correspond to oversaturated uses of visible kind
+   applications, which are precisely what we want to reject.
+
+Note that we only perform this check for type families, and not for data
+families. This is because it is perfectly acceptable to oversaturate data
+family instance equations: see Note [Arity of data families] in FamInstEnv.
 
 ************************************************************************
 *                                                                      *

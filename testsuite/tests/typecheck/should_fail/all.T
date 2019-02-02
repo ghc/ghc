@@ -492,6 +492,7 @@ test('T15592a', normal, compile_fail, [''])
 test('T15629', normal, compile_fail, [''])
 test('T15767', normal, compile_fail, [''])
 test('T15648', [extra_files(['T15648a.hs'])], multimod_compile_fail, ['T15648', '-v0 -fprint-equality-relations'])
+test('T15793', normal, compile_fail, [''])
 test('T15796', normal, compile_fail, [''])
 test('T15807', normal, compile_fail, [''])
 test('T15954', normal, compile_fail, [''])
@@ -508,3 +509,4 @@ test('T16059d', [extra_files(['T16059b.hs'])], multimod_compile_fail,
     ['T16059d', '-v0'])
 test('T16059e', [extra_files(['T16059b.hs'])], multimod_compile_fail,
     ['T16059e', '-v0'])
+test('T16255', normal, compile_fail, [''])
