@@ -285,6 +285,7 @@ basicKnownKeyNames
 
         -- Numeric stuff
         negateName, minusName, geName, eqName,
+        mkRationalBase2Name, mkRationalBase10Name,
 
         -- Conversion functions
         rationalTyConName,
@@ -1182,22 +1183,24 @@ mkNaturalName         = varQual gHC_NATURAL (fsLit "mkNatural")         mkNatura
 wordToNaturalName     = varQual gHC_NATURAL (fsLit "wordToNatural#")    wordToNaturalIdKey
 
 -- GHC.Real types and classes
-rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
-    integralClassName, realFracClassName, fractionalClassName,
-    fromRationalName, toIntegerName, toRationalName, fromIntegralName,
-    realToFracName :: Name
-rationalTyConName   = tcQual  gHC_REAL (fsLit "Rational")     rationalTyConKey
-ratioTyConName      = tcQual  gHC_REAL (fsLit "Ratio")        ratioTyConKey
-ratioDataConName    = dcQual  gHC_REAL (fsLit ":%")           ratioDataConKey
-realClassName       = clsQual gHC_REAL (fsLit "Real")         realClassKey
-integralClassName   = clsQual gHC_REAL (fsLit "Integral")     integralClassKey
-realFracClassName   = clsQual gHC_REAL (fsLit "RealFrac")     realFracClassKey
-fractionalClassName = clsQual gHC_REAL (fsLit "Fractional")   fractionalClassKey
-fromRationalName    = varQual gHC_REAL (fsLit "fromRational") fromRationalClassOpKey
-toIntegerName       = varQual gHC_REAL (fsLit "toInteger")    toIntegerClassOpKey
-toRationalName      = varQual gHC_REAL (fsLit "toRational")   toRationalClassOpKey
-fromIntegralName    = varQual  gHC_REAL (fsLit "fromIntegral")fromIntegralIdKey
-realToFracName      = varQual  gHC_REAL (fsLit "realToFrac")  realToFracIdKey
+rationalTyConName, mkRationalBase2Name, mkRationalBase10Name, ratioTyConName,
+    ratioDataConName, realClassName, integralClassName, realFracClassName,
+    fractionalClassName, fromRationalName, toIntegerName, toRationalName,
+    fromIntegralName, realToFracName :: Name
+rationalTyConName    = tcQual   gHC_REAL  (fsLit "Rational")         rationalTyConKey
+ratioTyConName       = tcQual   gHC_REAL  (fsLit "Ratio")            ratioTyConKey
+ratioDataConName     = dcQual   gHC_REAL  (fsLit ":%")               ratioDataConKey
+realClassName        = clsQual  gHC_REAL  (fsLit "Real")             realClassKey
+integralClassName    = clsQual  gHC_REAL  (fsLit "Integral")         integralClassKey
+realFracClassName    = clsQual  gHC_REAL  (fsLit "RealFrac")         realFracClassKey
+fractionalClassName  = clsQual  gHC_REAL  (fsLit "Fractional")       fractionalClassKey
+mkRationalBase2Name  = varQual  gHC_REAL  (fsLit "mkRationalBase2")  mkRationalBase2IdKey
+mkRationalBase10Name = varQual  gHC_REAL  (fsLit "mkRationalBase10") mkRationalBase10IdKey
+fromRationalName     = varQual  gHC_REAL  (fsLit "fromRational")     fromRationalClassOpKey
+toIntegerName        = varQual  gHC_REAL  (fsLit "toInteger")        toIntegerClassOpKey
+toRationalName       = varQual  gHC_REAL  (fsLit "toRational")       toRationalClassOpKey
+fromIntegralName     = varQual  gHC_REAL  (fsLit "fromIntegral")     fromIntegralIdKey
+realToFracName       = varQual  gHC_REAL  (fsLit "realToFrac")       realToFracIdKey
 
 -- PrelFloat classes
 floatingClassName, realFloatClassName :: Name
@@ -2394,7 +2397,8 @@ makeStaticKey = mkPreludeMiscIdUnique 561
 -- Natural
 naturalFromIntegerIdKey, naturalToIntegerIdKey, plusNaturalIdKey,
    minusNaturalIdKey, timesNaturalIdKey, mkNaturalIdKey,
-   naturalSDataConKey, wordToNaturalIdKey :: Unique
+   naturalSDataConKey, wordToNaturalIdKey, mkRationalBase2IdKey,
+   mkRationalBase10IdKey :: Unique
 naturalFromIntegerIdKey = mkPreludeMiscIdUnique 562
 naturalToIntegerIdKey   = mkPreludeMiscIdUnique 563
 plusNaturalIdKey        = mkPreludeMiscIdUnique 564
@@ -2403,6 +2407,8 @@ timesNaturalIdKey       = mkPreludeMiscIdUnique 566
 mkNaturalIdKey          = mkPreludeMiscIdUnique 567
 naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
+mkRationalBase2IdKey    = mkPreludeMiscIdUnique 570
+mkRationalBase10IdKey   = mkPreludeMiscIdUnique 571
 
 {-
 ************************************************************************

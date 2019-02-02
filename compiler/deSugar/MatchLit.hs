@@ -83,20 +83,33 @@ dsLit :: HsLit GhcRn -> DsM CoreExpr
 dsLit l = do
   dflags <- getDynFlags
   case l of
-    HsStringPrim _ s -> return (Lit (LitString s))
-    HsCharPrim   _ c -> return (Lit (LitChar c))
-    HsIntPrim    _ i -> return (Lit (mkLitIntWrap dflags i))
-    HsWordPrim   _ w -> return (Lit (mkLitWordWrap dflags w))
-    HsInt64Prim  _ i -> return (Lit (mkLitInt64Wrap dflags i))
-    HsWord64Prim _ w -> return (Lit (mkLitWord64Wrap dflags w))
-    HsFloatPrim  _ f -> return (Lit (LitFloat (fl_value f)))
-    HsDoublePrim _ d -> return (Lit (LitDouble (fl_value d)))
-    HsChar _ c       -> return (mkCharExpr c)
-    HsString _ str   -> mkStringExprFS str
-    HsInteger _ i _  -> mkIntegerExpr i
-    HsInt _ i        -> return (mkIntExpr dflags (il_value i))
-    XLit x           -> pprPanic "dsLit" (ppr x)
-    HsRat _ (FL _ _ val) ty -> do
+    HsStringPrim _ s  -> return (Lit (LitString s))
+    HsCharPrim   _ c  -> return (Lit (LitChar c))
+    HsIntPrim    _ i  -> return (Lit (mkLitIntWrap dflags i))
+    HsWordPrim   _ w  -> return (Lit (mkLitWordWrap dflags w))
+    HsInt64Prim  _ i  -> return (Lit (mkLitInt64Wrap dflags i))
+    HsWord64Prim _ w  -> return (Lit (mkLitWord64Wrap dflags w))
+    HsFloatPrim  _ fl -> return (Lit (LitFloat (rationalFromFractionalLit fl)))
+    HsDoublePrim _ fl -> return (Lit (LitDouble (rationalFromFractionalLit fl)))
+    HsChar _ c        -> return (mkCharExpr c)
+    HsString _ str    -> mkStringExprFS str
+    HsInteger _ i _   -> mkIntegerExpr i
+    HsInt _ i         -> return (mkIntExpr dflags (il_value i))
+    HsRat _ fl ty     -> dsFractionalLitToRational fl ty
+    XLit x            -> pprPanic "dsLit" (ppr x)
+
+dsFractionalLitToRational :: FractionalLit -> Type -> DsM CoreExpr
+dsFractionalLitToRational fl ty =
+  case fl of
+    FL { fl_signi = fl_signi, fl_exp = fl_exp, fl_exp_base = feb } -> do
+      let mkRationalName = case feb of 
+                             Base2 -> mkRationalBase2Name
+                             Base10 -> mkRationalBase10Name
+      mkRational <- dsLookupGlobalId mkRationalName
+      litI <- mkIntegerExpr fl_signi
+      litE <- mkIntegerExpr fl_exp
+      return ((Var mkRational) `App` litI `App` litE)
+    THFL { thfl_value = val } -> do
       num   <- mkIntegerExpr (numerator val)
       denom <- mkIntegerExpr (denominator val)
       return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
@@ -106,6 +119,7 @@ dsLit l = do
                     (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
                                        (head (tyConDataCons tycon), i_ty)
                     x -> pprPanic "dsLit" (ppr x)
+
 
 dsOverLit :: HsOverLit GhcTc -> DsM CoreExpr
 -- ^ Post-typechecker, the 'HsExpr' field of an 'OverLit' contains
@@ -449,15 +463,15 @@ hsLitKey :: DynFlags -> HsLit GhcTc -> Literal
 -- In the case of the fixed-width numeric types, we need to wrap here
 -- because Literal has an invariant that the literal is in range, while
 -- HsLit does not.
-hsLitKey dflags (HsIntPrim    _ i) = mkLitIntWrap  dflags i
-hsLitKey dflags (HsWordPrim   _ w) = mkLitWordWrap dflags w
-hsLitKey dflags (HsInt64Prim  _ i) = mkLitInt64Wrap  dflags i
-hsLitKey dflags (HsWord64Prim _ w) = mkLitWord64Wrap dflags w
-hsLitKey _      (HsCharPrim   _ c) = mkLitChar            c
-hsLitKey _      (HsFloatPrim  _ f) = mkLitFloat           (fl_value f)
-hsLitKey _      (HsDoublePrim _ d) = mkLitDouble          (fl_value d)
-hsLitKey _      (HsString _ s)     = LitString (bytesFS s)
-hsLitKey _      l                  = pprPanic "hsLitKey" (ppr l)
+hsLitKey dflags (HsIntPrim    _ i)  = mkLitIntWrap  dflags i
+hsLitKey dflags (HsWordPrim   _ w)  = mkLitWordWrap dflags w
+hsLitKey dflags (HsInt64Prim  _ i)  = mkLitInt64Wrap  dflags i
+hsLitKey dflags (HsWord64Prim _ w)  = mkLitWord64Wrap dflags w
+hsLitKey _      (HsCharPrim   _ c)  = mkLitChar            c
+hsLitKey _      (HsFloatPrim  _ fl) = mkLitFloat (rationalFromFractionalLit fl)
+hsLitKey _      (HsDoublePrim _ fl) = mkLitDouble (rationalFromFractionalLit fl)
+hsLitKey _      (HsString _ s)      = LitString (bytesFS s)
+hsLitKey _      l                   = pprPanic "hsLitKey" (ppr l)
 
 {-
 ************************************************************************
