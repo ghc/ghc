@@ -103,7 +103,7 @@ validate-x86_64-linux-deb8-hadrian:
   artifacts:
     reports:
       junit: junit.xml
-    expire_in: 3 day
+    expire_in: 2 week
     paths:
       - ghc.tar.xz
       - junit.xml
@@ -133,7 +133,7 @@ validate-x86_64-darwin:
     - cp -Rf $HOME/.cabal cabal-cache
   artifacts:
     when: always
-    expire_in: 3 day
+    expire_in: 2 week
   cache:
     key: darwin
     paths:
@@ -169,6 +169,7 @@ validate-aarch64-linux-deb9:
   allow_failure: true
   artifacts:
     when: always
+    expire_in: 2 week
   cache:
     key: linux-aarch64-deb9
   tags:
@@ -178,7 +179,7 @@ nightly-aarch64-linux-deb9:
   extends: validate-aarch64-linux-deb9
   stage: full-build
   artifacts:
-    expire_in: 6 month
+    expire_in: 2 year
   variables:
     TEST_TYPE: slowtest
   only:
@@ -190,6 +191,9 @@ validate-i386-linux-deb9:
   stage: full-build
   image: ghcci/i386-linux-deb9:0.1
   allow_failure: true
+  artifacts:
+    when: always
+    expire_in: 2 week
   cache:
     key: linux-i386-deb9
 
@@ -202,6 +206,7 @@ nightly-i386-linux-deb9:
     TEST_TYPE: slowtest
   artifacts:
     when: always
+    expire_in: 2 week
   only:
     variables:
       - $NIGHTLY
@@ -222,6 +227,9 @@ validate-x86_64-linux-deb9:
   extends: .validate-linux
   stage: build
   image: ghcci/x86_64-linux-deb9:0.2
+  artifacts:
+    when: always
+    expire_in: 2 week
   cache:
     key: linux-x86_64-deb9
 
@@ -229,8 +237,7 @@ nightly-x86_64-linux-deb9:
   extends: validate-x86_64-linux-deb9
   stage: build
   artifacts:
-    when: always
-    expire_in: 1 year
+    expire_in: 2 year
   variables:
     TEST_TYPE: slowtest
   only:
@@ -241,9 +248,6 @@ validate-x86_64-linux-deb9-llvm:
   extends: .validate-linux
   stage: full-build
   image: ghcci/x86_64-linux-deb9:0.2
-  artifacts:
-    # Don't keep artifacts for LLVM builds
-    paths:
   variables:
     BUILD_FLAVOUR: perf-llvm
   cache:
@@ -255,6 +259,9 @@ validate-x86_64-linux-deb8:
   image: ghcci/x86_64-linux-deb8:0.1
   cache:
     key: linux-x86_64-deb8
+  artifacts:
+    when: always
+    expire_in: 2 week
 
 validate-x86_64-linux-fedora27:
   extends: .validate-linux
@@ -264,7 +271,7 @@ validate-x86_64-linux-fedora27:
     key: linux-x86_64-fedora27
   artifacts:
     when: always
-    expire_in: 3 day
+    expire_in: 2 week
 
 validate-x86_64-linux-deb9-integer-simple:
   extends: .validate-linux
@@ -279,7 +286,7 @@ nightly-x86_64-linux-deb9-integer-simple:
   extends: validate-x86_64-linux-deb9-integer-simple
   stage: full-build
   artifacts:
-    expire_in: 1 year
+    expire_in: 2 year
   variables:
     TEST_TYPE: slowtest
   only:
