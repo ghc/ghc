@@ -251,7 +251,7 @@ linkDependencies hsc_env pls span needed_mods = do
 withExtendedLinkEnv :: (ExceptionMonad m) =>
                        DynLinker -> [(Name,ForeignHValue)] -> m a -> m a
 withExtendedLinkEnv dl new_env action
-    = gbracket (liftIO $ extendLinkEnv new_env)
+    = gbracket (liftIO $ extendLinkEnv dl new_env)
                (\_ -> reset_old_env)
                (\_ -> action)
     where
@@ -323,7 +323,7 @@ reallyInitDynLinker hsc_env dl = do
   pls <- linkPackages' hsc_env (preloadPackages (pkgState dflags)) pls0
 
   -- steps (c), (d) and (e)
-  linkCmdLineLibs' hsc_env dl pls
+  linkCmdLineLibs' hsc_env pls
 
 
 linkCmdLineLibs :: HscEnv -> DynLinker -> IO ()
