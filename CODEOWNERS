@@ -16,6 +16,7 @@
 /includes/                        @bgamari @simonmar @osa1
 
 # The compiler
+/compiler/parser/                 @int-index
 /compiler/typecheck/              @simonpj @goldfire
 /compiler/rename/                 @simonpj @goldfire
 /compiler/types/                  @simonpj @goldfire
