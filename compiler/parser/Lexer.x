@@ -2686,23 +2686,23 @@ alternativeLayoutRuleToken t
                  do setAlrExpectingOCurly Nothing
                     setALRContext (ALRLayout expectingOCurly thisCol : context)
                     setNextToken t
-                    return (L thisLoc ITocurly)
+                    return (L thisLoc ITvocurly)
               | otherwise ->
                  do setAlrExpectingOCurly Nothing
-                    setPendingImplicitTokens [L lastLoc ITccurly]
+                    setPendingImplicitTokens [L lastLoc ITvccurly]
                     setNextToken t
-                    return (L lastLoc ITocurly)
+                    return (L lastLoc ITvocurly)
              (_, _, Just expectingOCurly) ->
                  do setAlrExpectingOCurly Nothing
                     setALRContext (ALRLayout expectingOCurly thisCol : context)
                     setNextToken t
-                    return (L thisLoc ITocurly)
+                    return (L thisLoc ITvocurly)
              -- We do the [] cases earlier than in the spec, as we
              -- have an actual EOF token
              (ITeof, ALRLayout _ _ : ls, _) ->
                  do setALRContext ls
                     setNextToken t
-                    return (L thisLoc ITccurly)
+                    return (L thisLoc ITvccurly)
              (ITeof, _, _) ->
                  return t
              -- the other ITeof case omitted; general case below covers it
@@ -2713,7 +2713,7 @@ alternativeLayoutRuleToken t
               | newLine ->
                  do setPendingImplicitTokens [t]
                     setALRContext ls
-                    return (L thisLoc ITccurly)
+                    return (L thisLoc ITvccurly)
              -- This next case is to handle a transitional issue:
              (ITwhere, ALRLayout _ col : ls, _)
               | newLine && thisCol == col && transitional ->
@@ -2725,7 +2725,7 @@ alternativeLayoutRuleToken t
                     setNextToken t
                     -- Note that we use lastLoc, as we may need to close
                     -- more layouts, or give a semicolon
-                    return (L lastLoc ITccurly)
+                    return (L lastLoc ITvccurly)
              -- This next case is to handle a transitional issue:
              (ITvbar, ALRLayout _ col : ls, _)
               | newLine && thisCol == col && transitional ->
@@ -2737,17 +2737,19 @@ alternativeLayoutRuleToken t
                     setNextToken t
                     -- Note that we use lastLoc, as we may need to close
                     -- more layouts, or give a semicolon
-                    return (L lastLoc ITccurly)
+                    return (L lastLoc ITvccurly)
              (_, ALRLayout _ col : ls, _)
               | newLine && thisCol == col ->
                  do setNextToken t
-                    return (L thisLoc ITsemi)
+                    let loc = realSrcSpanStart thisLoc
+                        zeroWidthLoc = mkRealSrcSpan loc loc
+                    return (L zeroWidthLoc ITsemi)
               | newLine && thisCol < col ->
                  do setALRContext ls
                     setNextToken t
                     -- Note that we use lastLoc, as we may need to close
                     -- more layouts, or give a semicolon
-                    return (L lastLoc ITccurly)
+                    return (L lastLoc ITvccurly)
              -- We need to handle close before open, as 'then' is both
              -- an open and a close
              (u, _, _)
@@ -2756,7 +2758,7 @@ alternativeLayoutRuleToken t
                  ALRLayout _ _ : ls ->
                      do setALRContext ls
                         setNextToken t
-                        return (L thisLoc ITccurly)
+                        return (L thisLoc ITvccurly)
                  ALRNoLayout _ isLet : ls ->
                      do let ls' = if isALRopen u
                                      then ALRNoLayout (containsCommas u) False : ls
@@ -2779,21 +2781,21 @@ alternativeLayoutRuleToken t
              (ITin, ALRLayout ALRLayoutLet _ : ls, _) ->
                  do setALRContext ls
                     setPendingImplicitTokens [t]
-                    return (L thisLoc ITccurly)
+                    return (L thisLoc ITvccurly)
              (ITin, ALRLayout _ _ : ls, _) ->
                  do setALRContext ls
                     setNextToken t
-                    return (L thisLoc ITccurly)
+                    return (L thisLoc ITvccurly)
              -- the other ITin case omitted; general case below covers it
              (ITcomma, ALRLayout _ _ : ls, _)
               | topNoLayoutContainsCommas ls ->
                  do setALRContext ls
                     setNextToken t
-                    return (L thisLoc ITccurly)
+                    return (L thisLoc ITvccurly)
              (ITwhere, ALRLayout ALRLayoutDo _ : ls, _) ->
                  do setALRContext ls
                     setPendingImplicitTokens [t]
-                    return (L thisLoc ITccurly)
+                    return (L thisLoc ITvccurly)
              -- the other ITwhere case omitted; general case below covers it
              (_, _, _) -> return t
 
