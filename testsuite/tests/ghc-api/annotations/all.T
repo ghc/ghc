@@ -67,3 +67,5 @@ test('T16236',      [extra_files(['Test16236.hs']),
                      ignore_stderr], makefile_test, ['T16236'])
 test('StarBinderAnns',      [extra_files(['StarBinderAnns.hs']),
                      ignore_stderr], makefile_test, ['StarBinderAnns'])
+test('T16279',      [extra_files(['Test16279.hs']),
+                     ignore_stderr], makefile_test, ['T16279'])
