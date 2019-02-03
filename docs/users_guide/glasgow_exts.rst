@@ -5879,8 +5879,7 @@ The superclasses of a class declaration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: FlexibleContexts
-    :shortdesc: Enable flexible contexts. Implied by
-        :extension:`ImplicitParams`.
+    :shortdesc: Enable flexible contexts.
 
     :since: 6.8.1
 
@@ -6464,7 +6463,6 @@ Relaxed rules for the instance head
 .. extension:: FlexibleInstances
     :shortdesc: Enable flexible instances.
         Implies :extension:`TypeSynonymInstances`.
-        Implied by :extension:`ImplicitParams`.
 
     :implies: :extension:`TypeSynonymInstances`
     :since: 6.8.1
@@ -10882,7 +10880,6 @@ Implicit parameters
 
 .. extension:: ImplicitParams
     :shortdesc: Enable Implicit Parameters.
-        Implies :extension:`FlexibleContexts` and :extension:`FlexibleInstances`.
 
     :since: 6.8.1
 
