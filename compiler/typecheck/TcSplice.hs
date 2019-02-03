@@ -524,9 +524,14 @@ runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
         -- Rename and typecheck the spliced-in expression,
         -- making sure it has type res_ty
         -- These steps should never fail; this is a *typed* splice
-       ; addErrCtxt (spliceResultDoc zonked_q_expr) $ do
-         { (exp3, _fvs) <- rnLExpr expr2
-         ; unLoc <$> tcMonoExpr exp3 (mkCheckExpType zonked_ty)} }
+       ; (res, wcs) <-
+            captureConstraints $
+              addErrCtxt (spliceResultDoc zonked_q_expr) $ do
+                { (exp3, _fvs) <- rnLExpr expr2
+                ; tcMonoExpr exp3 (mkCheckExpType zonked_ty)}
+       ; ev <- simplifyTop wcs
+       ; return $ unLoc (mkHsDictLet (EvBinds ev) res)
+       }
 
 
 {-
