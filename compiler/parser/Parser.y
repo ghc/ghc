@@ -2733,10 +2733,11 @@ aexp    :: { EC (LHsExpr GhcPs) (LHsCmd GhcPs) }
               }
           }
         | '\\' 'lcase' altslist
-            {% fmap ecFromExp $
-               ams (sLL $1 $> $ HsLamCase noExt
-                                   (mkMatchGroup FromSource (snd $ unLoc $3)))
-                   (mj AnnLam $1:mj AnnCase $2:(fst $ unLoc $3)) }
+            {% ecExp $3 >>= \alts ->
+               fmap ecFromExp $
+               ams (sLL $1 alts $ HsLamCase noExt
+                                   (mkMatchGroup FromSource (snd $ unLoc alts)))
+                   (mj AnnLam $1:mj AnnCase $2:(fst $ unLoc alts)) }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp {% do
             e2 <- ecExp $2
             let anns =   mj AnnIf $1
@@ -2762,13 +2763,21 @@ aexp    :: { EC (LHsExpr GhcPs) (LHsCmd GhcPs) }
                                            ams (sLL $1 $> $ HsMultiIf noExt
                                                      (reverse $ snd $ unLoc $2))
                                                (mj AnnIf $1:(fst $ unLoc $2)) }
-        | 'case' exp 'of' altslist      {% ecExp $2 >>= \e2 ->
-                                           fmap ecFromExp $
-                                           ams (cL (comb3 $1 $3 $4) $
-                                                   HsCase noExt e2 (mkMatchGroup
-                                                   FromSource (snd $ unLoc $4)))
-                                               (mj AnnCase $1:mj AnnOf $3
-                                                  :(fst $ unLoc $4)) }
+        | 'case' exp 'of' altslist      {% do
+            e2 <- ecExp $2
+            return EC
+              { ecExp = do
+                   alts <- ecExp $4
+                   ams (cL (comb3 $1 $3 alts) $ HsCase noExt e2 (mkMatchGroup
+                           FromSource (snd $ unLoc alts)))
+                       (mj AnnCase $1:mj AnnOf $3 :(fst $ unLoc alts))
+              , ecCmd = do
+                   alts <- ecCmd $4
+                   ams (cL (comb3 $1 $3 alts) $ HsCmdCase noExt e2 (mkMatchGroup
+                           FromSource (snd $ unLoc alts)))
+                       (mj AnnCase $1:mj AnnOf $3 :(fst $ unLoc alts))
+              }
+          }
         | 'do' stmtlist              {
           EC { ecExp =
                   ecExp $2 >>= \stmts ->
@@ -3118,67 +3127,191 @@ guardquals1 :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
 -----------------------------------------------------------------------------
 -- Case alternatives
 
-altslist :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
-        : '{'            alts '}'  { sLL $1 $> ((moc $1:mcc $3:(fst $ unLoc $2))
-                                               ,(reverse (snd $ unLoc $2))) }
-        |     vocurly    alts  close { cL (getLoc $2) (fst $ unLoc $2
-                                        ,(reverse (snd $ unLoc $2))) }
-        | '{'                 '}'    { sLL $1 $> ([moc $1,mcc $2],[]) }
-        |     vocurly          close { noLoc ([],[]) }
+altslist :: { EC (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]))
+                 (Located ([AddAnn],[LMatch GhcPs (LHsCmd  GhcPs)])) }
+        : '{'            alts '}'  {
+          EC { ecExp =
+                ecExp $2 >>= \alts ->
+                return $ sLL $1 $> ((moc $1:mcc $3:(fst $ unLoc alts)) ,(reverse (snd $ unLoc alts)))
+             , ecCmd =
+                ecCmd $2 >>= \alts ->
+                return $ sLL $1 $> ((moc $1:mcc $3:(fst $ unLoc alts)) ,(reverse (snd $ unLoc alts)))
+             }
+          }
+        |     vocurly    alts  close {
+          EC { ecExp =
+                  ecExp $2 >>= \alts ->
+                  return $ cL (getLoc alts) (fst $ unLoc alts,(reverse (snd $ unLoc alts)))
+             , ecCmd =
+                  ecCmd $2 >>= \alts ->
+                  return $ cL (getLoc alts) (fst $ unLoc alts,(reverse (snd $ unLoc alts)))
+             }
+          }
+        | '{'                 '}' {
+          let { r :: Located ([AddAnn],[a])
+              ; r = sLL $1 $> ([moc $1,mcc $2],[]) }
+          in EC { ecExp = return r, ecCmd = return r }
+          }
+        |     vocurly          close {
+          let { r :: Located ([AddAnn],[a])
+              ; r = noLoc ([],[]) }
+          in EC { ecExp = return r, ecCmd = return r }
+        }
 
-alts    :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
-        : alts1                    { sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
-        | ';' alts                 { sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2))
-                                               ,snd $ unLoc $2) }
+alts    :: { EC (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]))
+                (Located ([AddAnn],[LMatch GhcPs (LHsCmd  GhcPs)])) }
+        : alts1                    {
+            EC { ecExp = ecExp $1 >>= \alts ->
+                         return $ sL1 alts (fst $ unLoc alts,snd $ unLoc alts)
+               , ecCmd = ecCmd $1 >>= \alts ->
+                         return $ sL1 alts (fst $ unLoc alts,snd $ unLoc alts)
+               }
+          }
+        | ';' alts                 {
+            EC { ecExp =
+                    ecExp $2 >>= \alts ->
+                    return $ sLL $1 alts ((mj AnnSemi $1:(fst $ unLoc alts)) ,snd $ unLoc alts)
+               , ecCmd =
+                    ecCmd $2 >>= \alts ->
+                    return $ sLL $1 alts ((mj AnnSemi $1:(fst $ unLoc alts)) ,snd $ unLoc alts)
+               }
+          }
 
-alts1   :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
-        : alts1 ';' alt         {% if null (snd $ unLoc $1)
-                                     then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
-                                                  ,[$3]))
-                                     else (ams (head $ snd $ unLoc $1)
-                                               (mj AnnSemi $2:(fst $ unLoc $1))
-                                           >> return (sLL $1 $> ([],$3 : (snd $ unLoc $1))) ) }
-        | alts1 ';'             {% if null (snd $ unLoc $1)
-                                     then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
-                                                  ,snd $ unLoc $1))
-                                     else (ams (head $ snd $ unLoc $1)
-                                               (mj AnnSemi $2:(fst $ unLoc $1))
-                                           >> return (sLL $1 $> ([],snd $ unLoc $1))) }
-        | alt                   { sL1 $1 ([],[$1]) }
+alts1   :: { EC (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]))
+                (Located ([AddAnn],[LMatch GhcPs (LHsCmd  GhcPs)])) }
+        : alts1 ';' alt         {
+          EC { ecExp =
+                ecExp $1 >>= \alts ->
+                ecExp $3 >>= \alt ->
+                   if null (snd $ unLoc alts)
+                   then return (sLL alts alt (mj AnnSemi $2:(fst $ unLoc alts)
+                                ,[alt]))
+                   else (ams (head $ snd $ unLoc alts)
+                             (mj AnnSemi $2:(fst $ unLoc alts))
+                         >> return (sLL alts alt ([],alt : (snd $ unLoc alts))) )
+             , ecCmd =
+                ecCmd $1 >>= \alts ->
+                ecCmd $3 >>= \alt ->
+                   if null (snd $ unLoc alts)
+                   then return (sLL alts alt (mj AnnSemi $2:(fst $ unLoc alts)
+                                ,[alt]))
+                   else (ams (head $ snd $ unLoc alts)
+                             (mj AnnSemi $2:(fst $ unLoc alts))
+                         >> return (sLL alts alt ([],alt : (snd $ unLoc alts))) )
+             }
+          }
+        | alts1 ';'             {
+          EC { ecExp =
+                ecExp $1 >>= \alts ->
+                   if null (snd $ unLoc alts)
+                   then return (sLL alts $> (mj AnnSemi $2:(fst $ unLoc alts)
+                                ,snd $ unLoc alts))
+                   else (ams (head $ snd $ unLoc alts)
+                             (mj AnnSemi $2:(fst $ unLoc alts))
+                         >> return (sLL alts $> ([],snd $ unLoc alts)))
+             , ecCmd =
+                ecCmd $1 >>= \alts ->
+                   if null (snd $ unLoc alts)
+                   then return (sLL alts $> (mj AnnSemi $2:(fst $ unLoc alts)
+                                ,snd $ unLoc alts))
+                   else (ams (head $ snd $ unLoc alts)
+                             (mj AnnSemi $2:(fst $ unLoc alts))
+                         >> return (sLL alts $> ([],snd $ unLoc alts)))
+             }
+          }
+        | alt                   {
+          EC { ecExp = ecExp $1 >>= \alt -> return $ sL1 alt ([],[alt])
+             , ecCmd = ecCmd $1 >>= \alt -> return $ sL1 alt ([],[alt])
+             }
+          }
 
-alt     :: { LMatch GhcPs (LHsExpr GhcPs) }
-           : pat alt_rhs  {%ams (sLL $1 $> (Match { m_ext = noExt
-                                                  , m_ctxt = CaseAlt
-                                                  , m_pats = [$1]
-                                                  , m_grhss = snd $ unLoc $2 }))
-                                      (fst $ unLoc $2)}
+alt     :: { EC (LMatch GhcPs (LHsExpr GhcPs))
+                (LMatch GhcPs (LHsCmd  GhcPs)) }
+           : pat alt_rhs  {
+              let { mkR :: Located ([AddAnn],GRHSs GhcPs (Located (body GhcPs)))
+                        -> P (LMatch GhcPs (Located (body GhcPs)))
+                  ; mkR rhs =
+                      ams (sLL $1 rhs (Match { m_ext = noExt
+                                             , m_ctxt = CaseAlt
+                                             , m_pats = [$1]
+                                             , m_grhss = snd $ unLoc rhs }))
+                          (fst $ unLoc rhs)
+                  }
+              in EC { ecExp = ecExp $2 >>= mkR
+                    , ecCmd = ecCmd $2 >>= mkR }
+           }
 
-alt_rhs :: { Located ([AddAnn],GRHSs GhcPs (LHsExpr GhcPs)) }
-        : ralt wherebinds           { sLL $1 $> (fst $ unLoc $2,
-                                            GRHSs noExt (unLoc $1) (snd $ unLoc $2)) }
+alt_rhs :: { EC (Located ([AddAnn],GRHSs GhcPs (LHsExpr GhcPs)))
+                (Located ([AddAnn],GRHSs GhcPs (LHsCmd GhcPs))) }
+        : ralt wherebinds           {
+          let { mkR :: Located [LGRHS GhcPs (Located (body GhcPs))]
+                    -> Located ([AddAnn],GRHSs GhcPs (Located (body GhcPs)))
+              ; mkR alt = sLL alt $> (fst $ unLoc $2, GRHSs noExt (unLoc alt) (snd $ unLoc $2))
+              } in
+          EC { ecExp = fmap mkR (ecExp $1)
+             , ecCmd = fmap mkR (ecCmd $1)
+             }
+          }
 
-ralt :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
-        : '->' exp            {% ecExp $2 >>= \e2 ->
-                                 ams (sLL $1 e2 (unguardedRHS (comb2 $1 e2) e2))
-                                     [mu AnnRarrow $1] }
-        | gdpats              { sL1 $1 (reverse (unLoc $1)) }
+ralt :: { EC (Located [LGRHS GhcPs (LHsExpr GhcPs)])
+             (Located [LGRHS GhcPs (LHsCmd  GhcPs)]) }
+        : '->' exp            {
+          let anns = [mu AnnRarrow $1] in
+          EC { ecExp =  do
+                 e2 <- ecExp $2
+                 ams (sLL $1 e2 (unguardedRHS (comb2 $1 e2) e2)) anns
+             , ecCmd =  do
+                 c2 <- ecCmd $2
+                 ams (sLL $1 c2 (unguardedRHS (comb2 $1 c2) c2)) anns
+             }
+          }
+        | gdpats              {
+          EC { ecExp = ecExp $1 >>= \gdpats ->
+                       return $ sL1 gdpats (reverse (unLoc gdpats))
+             , ecCmd = ecCmd $1 >>= \gdpats ->
+                       return $ sL1 gdpats (reverse (unLoc gdpats))
+             }
+          }
 
-gdpats :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
-        : gdpats gdpat                  { sLL $1 $> ($2 : unLoc $1) }
-        | gdpat                         { sL1 $1 [$1] }
+gdpats :: { EC (Located [LGRHS GhcPs (LHsExpr GhcPs)])
+               (Located [LGRHS GhcPs (LHsCmd  GhcPs)]) }
+        : gdpats gdpat {
+            EC { ecExp = do
+                   gdpats <- ecExp $1
+                   gdpat <- ecExp $2
+                   return $ sLL gdpats gdpat (gdpat : unLoc gdpats)
+               , ecCmd = do
+                   gdpats <- ecCmd $1
+                   gdpat <- ecCmd $2
+                   return $ sLL gdpats gdpat (gdpat : unLoc gdpats)
+               }
+          }
+        | gdpat        {
+            EC { ecExp = ecExp $1 >>= \gdpat -> return $ sL1 gdpat [gdpat]
+               , ecCmd = ecCmd $1 >>= \gdpat -> return $ sL1 gdpat [gdpat]
+               }
+          }
 
 -- layout for MultiWayIf doesn't begin with an open brace, because it's hard to
 -- generate the open brace in addition to the vertical bar in the lexer, and
 -- we don't need it.
 ifgdpats :: { Located ([AddAnn],[LGRHS GhcPs (LHsExpr GhcPs)]) }
-         : '{' gdpats '}'                 { sLL $1 $> ([moc $1,mcc $3],unLoc $2)  }
-         |     gdpats close               { sL1 $1 ([],unLoc $1) }
+         : '{' gdpats '}'                 {% ecExp $2 >>= \gdpats ->
+                                             return $ sLL $1 $> ([moc $1,mcc $3],unLoc gdpats)  }
+         |     gdpats close               {% ecExp $1 >>= \gdpats ->
+                                             return $ sL1 gdpats ([],unLoc gdpats) }
 
-gdpat   :: { LGRHS GhcPs (LHsExpr GhcPs) }
-        : '|' guardquals '->' exp
-                                  {% ecExp $4 >>= \e4 ->
-                                     ams (sL (comb2 $1 e4) $ GRHS noExt (unLoc $2) e4)
-                                         [mj AnnVbar $1,mu AnnRarrow $3] }
+gdpat   :: { EC (LGRHS GhcPs (LHsExpr GhcPs)) (LGRHS GhcPs (LHsCmd GhcPs)) }
+        : '|' guardquals '->' exp {
+            let anns = [mj AnnVbar $1,mu AnnRarrow $3] in
+            EC { ecExp = do
+                   e4 <- ecExp $4
+                   ams (sL (comb2 $1 e4) $ GRHS noExt (unLoc $2) e4) anns
+               , ecCmd = do
+                   c4 <- ecCmd $4
+                   ams (sL (comb2 $1 c4) $ GRHS noExt (unLoc $2) c4) anns
+               }
+          }
 
 -- 'pat' recognises a pattern, including one with a bang at the top
 --      e.g.  "!x" or "!(x,y)" or "C a b" etc

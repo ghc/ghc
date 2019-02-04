@@ -1875,8 +1875,6 @@ ecFromCmd c@(getLoc -> l) = EC
       return (cL l hsHoleExpr)
   }
 
--- TEST="T3822 T3964 arrowcase1 arrowfail001"
-
 ecFromExp :: LHsExpr GhcPs -> EC (LHsExpr GhcPs) (LHsCmd GhcPs)
 ecFromExp e@(getLoc -> l) = EC
   { ecExp = return e
