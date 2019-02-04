@@ -28,7 +28,7 @@ module Type (
 
         mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
         splitFunTy, splitFunTy_maybe,
-        splitFunTys, funResultTy, funArgTy,
+        splitFunTys, funResultTy, funArgTy, argTy,
         splitFunTildeTy, splitFunTildeTy_maybe, funTildeArgTy, funTildeResultTy,
 
         mkTyConApp, mkTyConTy,
@@ -1019,6 +1019,13 @@ funTildeArgTy ty | Just ty' <- coreView ty = funTildeArgTy ty'
 funTildeArgTy (FunTildeTy arg _res) = arg
 funTildeArgTy ty                    = pprPanic "funTildeArgTy" (ppr ty)
 
+argTy :: Type -> Type
+argTy ty | Just ty' <- coreView ty = argTy ty'
+argTy (FunTy arg _res)      = arg
+argTy (FunTildeTy arg _res) = arg
+argTy ty                    = pprPanic "argTy" (ppr ty)
+
+
 piResultTy :: HasDebugCallStack => Type -> Type ->  Type
 piResultTy ty arg = case piResultTy_maybe ty arg of
                       Just res -> res
@@ -1181,6 +1188,7 @@ mkTyConApp tycon tys
 tyConAppTyConPicky_maybe :: Type -> Maybe TyCon
 tyConAppTyConPicky_maybe (TyConApp tc _) = Just tc
 tyConAppTyConPicky_maybe (FunTy {})      = Just funTyCon
+tyConAppTyConPicky_maybe (FunTildeTy {}) = Just funTildeTyCon
 tyConAppTyConPicky_maybe _               = Nothing
 
 
@@ -1189,6 +1197,7 @@ tyConAppTyCon_maybe :: Type -> Maybe TyCon
 tyConAppTyCon_maybe ty | Just ty' <- coreView ty = tyConAppTyCon_maybe ty'
 tyConAppTyCon_maybe (TyConApp tc _) = Just tc
 tyConAppTyCon_maybe (FunTy {})      = Just funTyCon
+tyConAppTyCon_maybe (FunTildeTy {}) = Just funTildeTyCon
 tyConAppTyCon_maybe _               = Nothing
 
 tyConAppTyCon :: Type -> TyCon
@@ -1199,6 +1208,10 @@ tyConAppArgs_maybe :: Type -> Maybe [Type]
 tyConAppArgs_maybe ty | Just ty' <- coreView ty = tyConAppArgs_maybe ty'
 tyConAppArgs_maybe (TyConApp _ tys) = Just tys
 tyConAppArgs_maybe (FunTy _ arg res)
+  | Just rep1 <- getRuntimeRep_maybe arg
+  , Just rep2 <- getRuntimeRep_maybe res
+  = Just [rep1, rep2, arg, res]
+tyConAppArgs_maybe (FunTildeTy arg res)
   | Just rep1 <- getRuntimeRep_maybe arg
   , Just rep2 <- getRuntimeRep_maybe res
   = Just [rep1, rep2, arg, res]
@@ -1256,6 +1269,10 @@ repSplitTyConApp_maybe (FunTy _ arg res)
   | Just arg_rep <- getRuntimeRep_maybe arg
   , Just res_rep <- getRuntimeRep_maybe res
   = Just (funTyCon, [arg_rep, res_rep, arg, res])
+repSplitTyConApp_maybe (FunTildeTy arg res)
+  | Just arg_rep <- getRuntimeRep_maybe arg
+  , Just res_rep <- getRuntimeRep_maybe res
+  = Just (funTildeTyCon, [arg_rep, res_rep, arg, res])
 repSplitTyConApp_maybe _ = Nothing
 
 -------------------
@@ -2313,8 +2330,10 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
             get_rank (LitTy {})      = 4
             get_rank (TyConApp {})   = 5
             get_rank (FunTy {})      = 6
+            get_rank (FunTildeTy {}) = 6
+            -- If we want to distinguish extensional functions from normal
+            -- functions, then we need to use @isFunTildeTy@.
             get_rank (ForAllTy {})   = 7
-            get_rank (FunTildeTy {}) = 8
 
     gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
     gos _   []         []         = TEQ

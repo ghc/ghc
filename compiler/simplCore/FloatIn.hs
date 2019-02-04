@@ -201,7 +201,14 @@ fiExpr dflags to_drop ann_expr@(_,AnnApp {})
       | otherwise
       = (res_ty, extra_fvs)
       where
-       (arg_ty, res_ty) = splitFunTy fun_ty
+       (arg_ty, res_ty) =
+         case splitFunTy_maybe fun_ty of
+           Just x -> x
+           Nothing ->
+             case splitFunTildeTy_maybe fun_ty of
+               Just x -> x
+               Nothing -> pprPanic "fiExpr.splitFunTy" (ppr fun_ty)
+
 
 {- Note [Dead bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~

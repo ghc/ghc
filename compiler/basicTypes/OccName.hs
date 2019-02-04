@@ -55,7 +55,7 @@ module OccName (
 
         -- ** Derived 'OccName's
         isDerivedOccName,
-        mkDataConWrapperOcc, mkWorkerOcc,
+        mkDataConWrapperOcc, mkWorkerOcc, mkEtaWorkerOcc,
         mkMatcherOcc, mkBuilderOcc,
         mkDefaultMethodOcc, isDefaultMethodOcc, isTypeableBindOcc,
         mkNewTyCoOcc, mkClassOpAuxOcc,
@@ -606,7 +606,7 @@ isTypeableBindOcc occ =
      '$':'t':'r':_ -> True  -- Module binding
      _ -> False
 
-mkDataConWrapperOcc, mkWorkerOcc,
+mkDataConWrapperOcc, mkWorkerOcc, mkEtaWorkerOcc,
         mkMatcherOcc, mkBuilderOcc,
         mkDefaultMethodOcc,
         mkClassDataConOcc, mkDictOcc,
@@ -621,6 +621,7 @@ mkDataConWrapperOcc, mkWorkerOcc,
 -- These derived variables have a prefix that no Haskell value could have
 mkDataConWrapperOcc = mk_simple_deriv varName  "$W"
 mkWorkerOcc         = mk_simple_deriv varName  "$w"
+mkEtaWorkerOcc      = mk_simple_deriv varName  "$etaW_"
 mkMatcherOcc        = mk_simple_deriv varName  "$m"
 mkBuilderOcc        = mk_simple_deriv varName  "$b"
 mkDefaultMethodOcc  = mk_simple_deriv varName  "$dm"

@@ -309,7 +309,6 @@ Library
         GHC.StgToCmm.ExtCode
         SMRep
         CoreArity
-        CoreEta
         CoreFVs
         CoreLint
         CorePrep
@@ -473,7 +472,7 @@ Library
         StgSyn
         StgFVs
         CallArity
-        EtaWorkerWrapper
+        EtaArityWW
         DmdAnal
         Exitify
         WorkWrap

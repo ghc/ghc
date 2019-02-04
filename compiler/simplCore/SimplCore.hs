@@ -46,7 +46,7 @@ import Specialise       ( specProgram)
 import SpecConstr       ( specConstrProgram)
 import DmdAnal          ( dmdAnalProgram )
 import CallArity        ( callArityAnalProgram )
-import EtaWorkerWrapper ( etaArityWorkerWrapperProgram )
+import EtaArityWW       ( etaArityWW )
 import Exitify          ( exitifyProgram )
 import WorkWrap         ( wwTopBinds )
 import SrcLoc
@@ -202,7 +202,6 @@ getCoreToDo dflags
         ]
 
     core_todo =
-     [runWhen eta_arity $ CoreDoPasses [ CoreDoCallArity, CoreDoEtaArity ]] ++
      if opt_level == 0 then
        [ static_ptrs_float_outwards,
          CoreDoSimplify max_iter
@@ -302,6 +301,11 @@ getCoreToDo dflags
                 -- We want CSE to follow the final full-laziness pass, because it may
                 -- succeed in commoning up things floated out by full laziness.
                 -- CSE used to rely on the no-shadowing invariant, but it doesn't any more
+
+        runWhen eta_arity $ CoreDoPasses
+            [ CoreDoEtaArity
+            , simpl_phase 0 ["post-eta-arity"] max_iter
+            ],
 
         runWhen do_float_in CoreDoFloatInwards,
 
@@ -445,7 +449,7 @@ doCorePass CoreDoCallArity           = {-# SCC "CallArity" #-}
                                        doPassD callArityAnalProgram
 
 doCorePass CoreDoEtaArity            = {-# SCC "EtaArity" #-}
-                                       doPassDU etaArityWorkerWrapperProgram
+                                       doPassDU etaArityWW
 
 doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
                                        doPass exitifyProgram

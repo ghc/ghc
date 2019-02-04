@@ -1888,7 +1888,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
         ; rebuildCall env (addValArgTo info' arg') cont }
   where
     info'  = info { ai_strs = strs, ai_discs = discs }
-    arg_ty = funArgTy fun_ty
+    arg_ty = argTy fun_ty
 
     -- Use this for lazy arguments
     cci_lazy | encl_rules = RuleArgCtxt

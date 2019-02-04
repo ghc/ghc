@@ -110,6 +110,8 @@ countFunRepArgs 0 _
 countFunRepArgs n ty
   | FunTy _ arg res <- unwrapType ty
   = length (typePrimRepArgs arg) + countFunRepArgs (n - 1) res
+  | FunTildeTy arg res <- unwrapType ty
+  = length (typePrimRepArgs arg) + countFunRepArgs (n - 1) res
   | otherwise
   = pprPanic "countFunRepArgs: arity greater than type can handle" (ppr (n, ty, typePrimRep ty))
 

@@ -1092,6 +1092,11 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
            -- Avoid free vars of the original expression
        = go (n-1) subst' res_ty (EtaVar eta_id' : eis)
 
+       | Just (arg_ty, res_ty) <- splitFunTildeTy_maybe ty
+       , not (isTypeLevPoly arg_ty)
+       , let (subst', eta_id') = freshEtaId n subst arg_ty
+       = go (n-1) subst' res_ty (EtaVar eta_id' : eis)
+
        ----------- Newtypes
        -- Given this:
        --      newtype T = MkT ([T] -> Int)
