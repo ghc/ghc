@@ -2702,15 +2702,24 @@ aexp    :: { EC (LHsExpr GhcPs) (LHsCmd GhcPs) }
                                    fmap ecFromExp $
                                    ams (sLL $1 e2 $ ELazyPat noExt e2) [mj AnnTilde $1] }
 
-        | '\\' apat apats '->' exp
-                   {% ecExp $5 >>= \e5 ->
-                      fmap ecFromExp $
-                      ams (sLL $1 e5 $ HsLam noExt (mkMatchGroup FromSource
-                            [sLL $1 e5 $ Match { m_ext = noExt
-                                               , m_ctxt = LambdaExpr
-                                               , m_pats = $2:$3
-                                               , m_grhss = unguardedGRHSs e5 }]))
-                          [mj AnnLam $1, mu AnnRarrow $4] }
+        | '\\' apat apats '->' exp {
+          let
+            anns = [mj AnnLam $1, mu AnnRarrow $4]
+            mkMG :: Located (body GhcPs) -> MatchGroup GhcPs (Located (body GhcPs))
+            mkMG a = mkMatchGroup FromSource
+              [sLL $1 a $ Match { m_ext = noExt
+                                 , m_ctxt = LambdaExpr
+                                 , m_pats = $2:$3
+                                 , m_grhss = unguardedGRHSs a }]
+          in
+            EC { ecExp =
+                    ecExp $5 >>= \e5 ->
+                    ams (sLL $1 e5 $ HsLam noExt (mkMG e5)) anns
+               , ecCmd =
+                    ecCmd $5 >>= \c5 ->
+                    ams (sLL $1 c5 $ HsCmdLam noExt (mkMG c5)) anns
+               }
+          }
         | 'let' binds 'in' exp {
             let anns = mj AnnLet $1 : mj AnnIn $3 : (fst $ unLoc $2) in
             let lb = snd (unLoc $2) in
