@@ -28,9 +28,11 @@ module Demand (
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
 
-        DmdResult, CPRResult, lubDmdResult,
+        DmdResult, CPRResult, lubDmdResult, lubCPR,
         isBotRes, isTopRes,
-        topRes, botRes, cprProdRes,
+        isBotCpr, isTopCpr,
+        topCpr, botCpr, sumCpr, prodCpr, trimCpr, dmdResToCpr,
+        topRes, botRes, cprRes, cprProdRes,
         vanillaCprProdRes, cprSumRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         trimCPRInfo, returnsCPR_maybe,
@@ -912,11 +914,11 @@ DmdResult:     Dunno CPRResult
 CPRResult:         NoCPR
                    /    \
             RetProd    RetSum ConTag
+                   \    /
+                   BotCPR
 
-
-Product constructors return (Dunno (RetProd rs))
+Product constructors return (Dunno RetProd)
 In a fixpoint iteration, start from Diverges
-We have lubs, but not glbs; but that is ok.
 -}
 
 ------------------------------------------------------------------------
@@ -936,13 +938,16 @@ type DmdResult = Termination CPRResult
 data CPRResult = NoCPR          -- Top of the lattice
                | RetProd        -- Returns a constructor from a product type
                | RetSum ConTag  -- Returns a constructor from a data type
+               | BotCPR
                deriving( Eq, Show )
 
 lubCPR :: CPRResult -> CPRResult -> CPRResult
 lubCPR (RetSum t1) (RetSum t2)
-  | t1 == t2                       = RetSum t1
-lubCPR RetProd     RetProd     = RetProd
-lubCPR _ _                     = NoCPR
+  | t1 == t2               = RetSum t1
+lubCPR RetProd     RetProd = RetProd
+lubCPR BotCPR      cpr     = cpr
+lubCPR cpr         BotCPR  = cpr
+lubCPR _           _       = NoCPR
 
 lubDmdResult :: DmdResult -> DmdResult -> DmdResult
 lubDmdResult Diverges       r              = r
@@ -968,6 +973,7 @@ instance Outputable CPRResult where
   ppr NoCPR        = empty
   ppr (RetSum n)   = char 'm' <> int n
   ppr RetProd      = char 'm'
+  ppr BotCPR       = char 'b'
 
 seqDmdResult :: DmdResult -> ()
 seqDmdResult Diverges  = ()
@@ -977,30 +983,66 @@ seqCPRResult :: CPRResult -> ()
 seqCPRResult NoCPR        = ()
 seqCPRResult (RetSum n)   = n `seq` ()
 seqCPRResult RetProd      = ()
+seqCPRResult BotCPR       = ()
 
 
 ------------------------------------------------------------------------
 -- Combined demand result                                             --
 ------------------------------------------------------------------------
 
+topCpr :: CPRResult
+topCpr = NoCPR
+
+botCpr :: CPRResult
+botCpr = BotCPR
+
+sumCpr :: ConTag -> CPRResult
+sumCpr = RetSum
+
+prodCpr :: CPRResult
+prodCpr = RetProd
+
+isTopCpr :: CPRResult -> Bool
+isTopCpr cpr = topCpr == cpr
+
+isBotCpr :: CPRResult -> Bool
+isBotCpr cpr = botCpr == cpr
+
+trimCpr :: Bool -> Bool -> CPRResult -> CPRResult
+trimCpr trim_all trim_sums cpr
+  | trim_all  = NoCPR
+  | otherwise = case cpr of
+      RetSum{} | trim_sums -> NoCPR
+      _ -> cpr
+
 -- [cprRes] lets us switch off CPR analysis
 -- by making sure that everything uses TopRes
 topRes, botRes :: DmdResult
-topRes = Dunno NoCPR
+topRes = Dunno topCpr
 botRes = Diverges
+
+-- | Assumes termination is possible and wraps the given 'CPRResult' in 'Dunno'.
+cprRes :: CPRResult -> DmdResult
+cprRes cpr = Dunno cpr
+
+-- | Extracts CPR information from the 'DmdResult', turning 'botRes' into
+-- 'botCpr'.
+dmdResToCpr :: DmdResult -> CPRResult
+dmdResToCpr Diverges    = botCpr
+dmdResToCpr (Dunno cpr) = cpr
 
 cprSumRes :: ConTag -> DmdResult
 cprSumRes tag = Dunno $ RetSum tag
 
 cprProdRes :: [DmdType] -> DmdResult
-cprProdRes _arg_tys = Dunno $ RetProd
+cprProdRes _arg_tys = Dunno prodCpr
 
 vanillaCprProdRes :: Arity -> DmdResult
-vanillaCprProdRes _arity = Dunno $ RetProd
+vanillaCprProdRes _arity = Dunno prodCpr
 
 isTopRes :: DmdResult -> Bool
-isTopRes (Dunno NoCPR) = True
-isTopRes _             = False
+isTopRes (Dunno cpr) = isTopCpr cpr
+isTopRes _           = False
 
 -- | True if the result diverges or throws an exception
 isBotRes :: DmdResult -> Bool
@@ -1011,14 +1053,8 @@ trimCPRInfo :: Bool -> Bool -> DmdResult -> DmdResult
 trimCPRInfo trim_all trim_sums res
   = trimR res
   where
-    trimR (Dunno c) = Dunno (trimC c)
+    trimR (Dunno c) = Dunno (trimCpr trim_all trim_sums c)
     trimR res       = res
-
-    trimC (RetSum n)   | trim_all || trim_sums = NoCPR
-                       | otherwise             = RetSum n
-    trimC RetProd      | trim_all  = NoCPR
-                       | otherwise = RetProd
-    trimC NoCPR = NoCPR
 
 returnsCPR_maybe :: DmdResult -> Maybe ConTag
 returnsCPR_maybe (Dunno c) = retCPR_maybe c
@@ -1028,6 +1064,7 @@ retCPR_maybe :: CPRResult -> Maybe ConTag
 retCPR_maybe (RetSum t)  = Just t
 retCPR_maybe RetProd     = Just fIRST_TAG
 retCPR_maybe NoCPR       = Nothing
+retCPR_maybe BotCPR      = Nothing
 
 -- See Notes [Default demand on free variables]
 -- and [defaultDmd vs. resTypeArgDmd]
@@ -2094,10 +2131,12 @@ instance Binary CPRResult where
     put_ bh (RetSum n)   = do { putByte bh 0; put_ bh n }
     put_ bh RetProd      = putByte bh 1
     put_ bh NoCPR        = putByte bh 2
+    put_ bh BotCPR       = putByte bh 3
 
     get  bh = do
             h <- getByte bh
             case h of
               0 -> do { n <- get bh; return (RetSum n) }
               1 -> return RetProd
-              _ -> return NoCPR
+              2 -> return NoCPR
+              _ -> return BotCPR

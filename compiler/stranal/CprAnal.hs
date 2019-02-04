@@ -16,7 +16,7 @@ module CprAnal ( cprAnalProgram ) where
 import GhcPrelude
 
 import DynFlags
-import WwLib            ( findTypeShape, deepSplitProductType_maybe )
+import WwLib            ( deepSplitProductType_maybe )
 import Demand   -- All of it
 import CoreSyn
 import CoreSeq          ( seqBinds )
@@ -29,16 +29,12 @@ import Id
 import CoreUtils        ( exprIsHNF )
 import TyCon
 import Type
-import Coercion         ( Coercion, coVarsOfCo )
 import FamInstEnv
 import Util
 import Maybes           ( isJust )
-import TysWiredIn
-import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn )
 import Name             ( getName, stableNameCmp )
 import Data.Function    ( on )
-import UniqSet
 
 {-
 ************************************************************************
@@ -67,10 +63,10 @@ cprAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
 cprAnalTopBind env (NonRec id rhs)
-  = (extendAnalEnv TopLevel env id2 (idStrictness id2), NonRec id2 rhs2)
+  = (extendAnalEnv TopLevel env id2 (get_idCprInfo id2), NonRec id2 rhs2)
   where
-    ( _, _,   rhs1) = cprAnalRhsLetDown TopLevel Nothing env             0 id rhs
-    ( _, id2, rhs2) = cprAnalRhsLetDown TopLevel Nothing (nonVirgin env) 0 id rhs1
+    (_,   rhs1) = cprAnalRhsLetDown TopLevel env             0 id rhs
+    (id2, rhs2) = cprAnalRhsLetDown TopLevel (nonVirgin env) 0 id rhs1
         -- Do two passes to improve CPR information
         -- See Note [CPR for thunks]
         -- See Note [Optimistic CPR in the "virgin" case]
@@ -79,7 +75,7 @@ cprAnalTopBind env (NonRec id rhs)
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
   where
-    (env', _, pairs')  = cprFix TopLevel env 0 pairs
+    (env', pairs')  = cprFix TopLevel env 0 pairs
                 -- We get two iterations automatically
                 -- c.f. the NonRec case above
 
@@ -128,21 +124,10 @@ c) The application rule wouldn't be right either
    evaluation of f in a C(L) demand!
 -}
 
--- Do not process absent demands
--- Otherwise act like in a normal demand analysis
--- See ↦* relation in the Cardinality Analysis paper
-cprAnalStar :: AnalEnv
-            -> Demand   -- This one takes a *Demand*
-            -> CoreExpr -> (BothDmdArg, CoreExpr)
-cprAnalStar env dmd e
-  | (defer_and_use, cd) <- toCleanDmd dmd
-  , (dmd_ty, e')        <- cprAnal env (cleanDemandToArity cd) e
-  = (postProcessDmdType defer_and_use dmd_ty, e')
-
 -- Main Demand Analsysis machinery
 cprAnal, cprAnal' :: AnalEnv
         -> Arity
-        -> CoreExpr -> (DmdType, CoreExpr)
+        -> CoreExpr -> (CprType, CoreExpr)
 
 -- The CleanDemand is always strict and not absent
 --    See Note [Ensure demand is strict]
@@ -150,23 +135,23 @@ cprAnal, cprAnal' :: AnalEnv
 cprAnal env n e = -- pprTrace "cprAnal" (ppr n <+> ppr e) $
                   cprAnal' env n e
 
-cprAnal' _ _ (Lit lit)     = (nopDmdType, Lit lit)
-cprAnal' _ _ (Type ty)     = (nopDmdType, Type ty)      -- Doesn't happen, in fact
+cprAnal' _ _ (Lit lit)     = (topCprType, Lit lit)
+cprAnal' _ _ (Type ty)     = (topCprType, Type ty)      -- Doesn't happen, in fact
 cprAnal' _ _ (Coercion co)
-  = (unitDmdType (coercionDmdEnv co), Coercion co)
+  = (topCprType, Coercion co)
 
 cprAnal' env n (Var var)
   = (cprTransform env var n, Var var)
 
 cprAnal' env n (Cast e co)
-  = (dmd_ty `bothDmdType` mkBothDmdArg (coercionDmdEnv co), Cast e' co)
+  = (cpr_ty, Cast e' co)
   where
-    (dmd_ty, e') = cprAnal env n e
+    (cpr_ty, e') = cprAnal env n e
 
 cprAnal' env n (Tick t e)
-  = (dmd_ty, Tick t e')
+  = (cpr_ty, Tick t e')
   where
-    (dmd_ty, e') = cprAnal env n e
+    (cpr_ty, e') = cprAnal env n e
 
 cprAnal' env n (App fun (Type ty))
   = (fun_ty, App fun' (Type ty))
@@ -180,9 +165,9 @@ cprAnal' env n (App fun arg)
     -- Crucially, coercions /are/ handled here, because they are
     -- value arguments (Trac #10288)
     let
-        (fun_ty, fun')    = cprAnal env (n+1) fun
-        (arg_dmd, res_ty) = splitDmdTy fun_ty
-        (arg_ty, arg')    = cprAnalStar env arg_dmd arg
+        (fun_ty, fun') = cprAnal env (n+1) fun
+        res_ty         = applyCprTy fun_ty
+        (_, arg')      = cprAnal env 0 arg
     in
 --    pprTrace "cprAnal:app" (vcat
 --         [ text "dmd =" <+> ppr dmd
@@ -192,7 +177,7 @@ cprAnal' env n (App fun arg)
 --         , text "arg dmd_ty =" <+> ppr arg_ty
 --         , text "res dmd_ty =" <+> ppr res_ty
 --         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
-    (res_ty `bothDmdType` arg_ty, App fun' arg')
+    (res_ty, App fun' arg')
 
 -- this is an anonymous lambda, since @cprAnalRhsLetDown@ uses @collectBinders@
 cprAnal' env n (Lam var body)
@@ -203,15 +188,16 @@ cprAnal' env n (Lam var body)
     (body_ty, Lam var body')
 
   | otherwise
-  = let (_, defer_and_use) = peelCallDmd (arityToCallDemand n)
-        body_n = max 0 (n-1)
-          -- body_n: a demand to analyze the body
-
+  = let body_n = max 0 (n-1)
         env'             = extendSigsWithLam env var
         (body_ty, body') = cprAnal env' body_n body
-        (lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty var
+        lam_ty = abstractCprTy body_ty
+        is_unsat = body_n == n
+        lam_ty'
+          | is_unsat = topCprType
+          | otherwise = lam_ty
     in
-    (postProcessUnsat defer_and_use lam_ty, Lam var' body')
+    (lam_ty', Lam var body')
 
 cprAnal' env n (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   -- Only one alternative with a product constructor
@@ -222,15 +208,10 @@ cprAnal' env n (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         env_w_tc                 = env { ae_rec_tc = rec_tc' }
         env_alt                  = extendEnvForProdAlt env_w_tc scrut case_bndr dc bndrs
         (rhs_ty, rhs')           = cprAnal env_alt n rhs
-        (alt_ty1, _)          = findBndrsDmds env rhs_ty bndrs
-        (alt_ty2, _) = findBndrDmd env False alt_ty1 case_bndr
-        alt_ty3 | io_hack_reqd scrut dc bndrs = deferAfterIO alt_ty2
-                | otherwise                   = alt_ty2
-
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
-        (scrut_ty, scrut') = cprAnal env 0 scrut
-        res_ty             = alt_ty3 `bothDmdType` toBothDmdArg scrut_ty
+        (_, scrut') = cprAnal env 0 scrut
+        res_ty             = rhs_ty
     in
 --    pprTrace "cprAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
@@ -243,53 +224,26 @@ cprAnal' env n (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
 
 cprAnal' env n (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
-        (alt_tys, alts')     = mapAndUnzip (cprAnalAlt env n case_bndr) alts
-        (scrut_ty, scrut')   = cprAnal env 0 scrut
-        (alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
-                               -- NB: Base case is botDmdType, for empty case alternatives
-                               --     This is a unit for lubDmdType, and the right result
+        (alt_tys, alts') = mapAndUnzip (cprAnalAlt env n case_bndr) alts
+        (_, scrut')      = cprAnal env 0 scrut
+        res_ty           = foldr lubCprType botCprType alt_tys
+                               -- NB: Base case is botCprType, for empty case alternatives
+                               --     This is a unit for lubCprType, and the right result
                                --     when there really are no alternatives
-        res_ty               = alt_ty `bothDmdType` toBothDmdArg scrut_ty
     in
 --    pprTrace "cprAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_tys" <+> ppr alt_tys
 --                                   , text "alt_ty" <+> ppr alt_ty
 --                                   , text "res_ty" <+> ppr res_ty ]) $
-    (res_ty, Case scrut' case_bndr' ty alts')
-
--- Let bindings can be processed in two ways:
--- Down (RHS before body) or Up (body before RHS).
--- The following case handle the up variant.
---
--- It is very simple. For  let x = rhs in body
---   * Demand-analyse 'body' in the current environment
---   * Find the demand, 'rhs_dmd' placed on 'x' by 'body'
---   * Demand-analyse 'rhs' in 'rhs_dmd'
---
--- This is used for a non-recursive local let without manifest lambdas.
--- This is the LetUp rule in the paper “Higher-Order Cardinality Analysis”.
-cprAnal' env n (Let (NonRec id rhs) body)
-  | useLetUp id rhs
-  , Nothing <- unpackTrivial rhs
-      -- cprAnalRhsLetDown treats trivial right hand sides specially
-      -- so if we have a trival right hand side, fall through to that.
-  = (final_ty, Let (NonRec id rhs') body')
-  where
-    (body_ty, body')   = cprAnal env n body
-    (body_ty', id_dmd) = findBndrDmd env notArgOfDfun body_ty id
-
-    (rhs_ty, rhs')     = cprAnalStar env id_dmd rhs
-    final_ty           = body_ty' `bothDmdType` rhs_ty
+    (res_ty, Case scrut' case_bndr ty alts')
 
 cprAnal' env n (Let (NonRec id rhs) body)
-  = (body_ty2, Let (NonRec id2 rhs') body')
+  = (body_ty, Let (NonRec id1 rhs') body')
   where
-    (lazy_fv, id1, rhs') = cprAnalRhsLetDown NotTopLevel Nothing env n id rhs
-    env1                 = extendAnalEnv NotTopLevel env id1 (idStrictness id1)
-    (body_ty, body')     = cprAnal env1 n body
-    (body_ty1, id2)      = annotateBndr env body_ty id1
-    body_ty2             = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
+    (id1, rhs')      = cprAnalRhsLetDown NotTopLevel env n id rhs
+    env1             = extendAnalEnv NotTopLevel env id1 (get_idCprInfo id1)
+    (body_ty, body') = cprAnal env1 n body
 
         -- If the actual demand is better than the vanilla call
         -- demand, you might think that we might do better to re-analyse
@@ -306,37 +260,19 @@ cprAnal' env n (Let (NonRec id rhs) body)
 
 cprAnal' env n (Let (Rec pairs) body)
   = let
-        (env', lazy_fv, pairs') = cprFix NotTopLevel env n pairs
-        (body_ty, body')        = cprAnal env' n body
-        body_ty1                = deleteFVs body_ty (map fst pairs)
-        body_ty2                = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
+        (env', pairs')   = cprFix NotTopLevel env n pairs
+        (body_ty, body') = cprAnal env' n body
     in
-    body_ty2 `seq`
-    (body_ty2,  Let (Rec pairs') body')
+    body_ty `seq`
+    (body_ty,  Let (Rec pairs') body')
 
-io_hack_reqd :: CoreExpr -> DataCon -> [Var] -> Bool
--- See Note [IO hack in the demand analyser]
-io_hack_reqd scrut con bndrs
-  | (bndr:_) <- bndrs
-  , con == tupleDataCon Unboxed 2
-  , idType bndr `eqType` realWorldStatePrimTy
-  , (fun, _) <- collectArgs scrut
-  = case fun of
-      Var f -> not (isPrimOpId f)
-      _     -> True
-  | otherwise
-  = False
-
-cprAnalAlt :: AnalEnv -> Arity -> Id -> Alt Var -> (DmdType, Alt Var)
+cprAnalAlt :: AnalEnv -> Arity -> Id -> Alt Var -> (CprType, Alt Var)
 cprAnalAlt env n _case_bndr (con,bndrs,rhs)
-  | null bndrs    -- Literals, DEFAULT, and nullary constructors
-  , (rhs_ty, rhs') <- cprAnal env n rhs
-  = (rhs_ty, (con, [], rhs'))
-
-  | otherwise     -- Non-nullary data constructors
-  , (rhs_ty, rhs') <- cprAnal env n rhs
-  , (alt_ty, _) <- findBndrsDmds env rhs_ty bndrs
-  = (alt_ty, (con, bndrs, rhs'))
+  = (rhs_ty, (con, bndrs, rhs'))
+  where
+    -- Assymetry with the product case, see
+    -- Note [CPR in a product case alternative]
+    (rhs_ty, rhs') = cprAnal env n rhs
 
 
 {- Note [IO hack in the demand analyser]
@@ -443,43 +379,32 @@ strict in |y|.
 ************************************************************************
 -}
 
-cprTransformSig :: StrictSig -> Arity -> DmdType
-cprTransformSig (StrictSig ty@(DmdType _ args _)) arty
+cprTransformSig :: CprType -> Arity -> CprType
+cprTransformSig ty arty
   -- We are only interested in CPR here, so this is OK. TODO: Clean up
-  | arty >= length args = ty
-  | otherwise = nopDmdType
+  | arty >= ct_arty ty = ty
+  | otherwise = topCprType
 
 arityToCallDemand :: Arity -> CleanDemand
 arityToCallDemand n = iterate mkCallDmd (strictenDmd topDmd) !! n
 
-cleanDemandToArity :: CleanDemand -> Arity
-cleanDemandToArity cd
-  | -- pprTrace "cleanDemandToArity" (ppr cd) $
-    getStrDmd cd == getStrDmd (strictenDmd botDmd)
-  = 0 -- TODO: This is too conservative, but may work for CPR
-  | let (cd', ds) = peelCallDmd cd
-  , isStrictDmd ds
-  = 1 + cleanDemandToArity cd'
-  | otherwise
-  = 0
-
 cprTransform :: AnalEnv         -- The strictness environment
              -> Id              -- The function
              -> Arity           -- The demand on the function
-             -> DmdType         -- The demand type of the function in this context
+             -> CprType         -- The demand type of the function in this context
         -- Returned DmdEnv includes the demand on
         -- this function plus demand on its free variables
 
 cprTransform env var arty
   | isDataConWorkId var                          -- Data constructor
-  = dmdTransformDataConSig (idArity var) (idStrictness var) (arityToCallDemand arty)
+  = dmdTypeToCprType (dmdTransformDataConSig (idArity var) (idStrictness var) (arityToCallDemand arty))
   | gopt Opt_DmdTxDictSel (ae_dflags env),
     Just _ <- isClassOpId_maybe var -- Dictionary component selector
   = -- dmdTransformDictSelSig (idStrictness var) dmd
-    nopDmdType -- dmdTransformDictSelSig always returns a topRes
+    topCprType -- dmdTransformDictSelSig always returns a topRes
 
   | isGlobalId var                               -- Imported function
-  , let res = cprTransformSig (idStrictness var) arty
+  , let res = cprTransformSig (get_idCprInfo var) arty
   = -- pprTrace "cprTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
     res
 
@@ -489,7 +414,7 @@ cprTransform env var arty
     fn_ty
 
   | otherwise                                    -- Local non-letrec-bound thing
-  = unitDmdType (unitVarEnv var (mkOnceUsedDmd (arityToCallDemand arty)))
+  = topCprType
 
 {-
 ************************************************************************
@@ -504,64 +429,58 @@ cprFix :: TopLevelFlag
        -> AnalEnv                            -- Does not include bindings for this binding
        -> Arity
        -> [(Id,CoreExpr)]
-       -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with stricness info
+       -> (AnalEnv, [(Id,CoreExpr)]) -- Binders annotated with stricness info
 
 cprFix top_lvl env let_arty orig_pairs
   = loop 1 initial_pairs
   where
-    bndrs = map fst orig_pairs
-
     -- See Note [Initialising strictness]
-    initial_pairs | ae_virgin env = [(setIdCprInfo id botRes, rhs) | (id, rhs) <- orig_pairs ]
+    initial_pairs | ae_virgin env = [(setIdCprInfo id botCpr, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
 
     -- If fixed-point iteration does not yield a result we use this instead
     -- See Note [Safe abortion in the fixed-point iteration]
-    abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
-    abort = (env, lazy_fv', zapped_pairs)
-      where (lazy_fv, pairs') = step True (zapIdCprInfo orig_pairs)
-            -- Note [Lazy and unleashable free variables]
-            non_lazy_fvs = plusVarEnvList $ map (strictSigDmdEnv . idStrictness . fst) pairs'
-            lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
+    abort :: (AnalEnv, [(Id,CoreExpr)])
+    abort = (env, zapped_pairs)
+      where pairs' = step True (zapIdCprInfo orig_pairs)
             zapped_pairs = zapIdCprInfo pairs'
 
-    -- The fixed-point varies the idStrictness field of the binders, and terminates if that
+    -- The fixed-point varies the idCprInfo field of the binders, and terminates if that
     -- annotation does not change any more.
-    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
+    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, [(Id,CoreExpr)])
     loop n pairs
-      | found_fixpoint = (final_anal_env, lazy_fv, pairs')
+      | found_fixpoint = (final_anal_env, pairs')
       | n == 10        = abort
       | otherwise      = loop (n+1) pairs'
       where
-        found_fixpoint    = map (idStrictness . fst) pairs' == map (idStrictness . fst) pairs
+        found_fixpoint    = map (idCprInfo . fst) pairs' == map (idCprInfo . fst) pairs
         first_round       = n == 1
-        (lazy_fv, pairs') = step first_round pairs
+        pairs'            = step first_round pairs
         final_anal_env    = extendAnalEnvs top_lvl env (map fst pairs')
 
-    step :: Bool -> [(Id, CoreExpr)] -> (DmdEnv, [(Id, CoreExpr)])
-    step first_round pairs = (lazy_fv, pairs')
+    step :: Bool -> [(Id, CoreExpr)] -> [(Id, CoreExpr)]
+    step first_round pairs = pairs'
       where
         -- In all but the first iteration, delete the virgin flag
         start_env | first_round = env
                   | otherwise   = nonVirgin env
 
-        start = (extendAnalEnvs top_lvl start_env (map fst pairs), emptyDmdEnv)
+        start = extendAnalEnvs top_lvl start_env (map fst pairs)
 
-        ((_,lazy_fv), pairs') = mapAccumL my_downRhs start pairs
+        (_, pairs') = mapAccumL my_downRhs start pairs
                 -- mapAccumL: Use the new signature to do the next pair
                 -- The occurrence analyser has arranged them in a good order
                 -- so this can significantly reduce the number of iterations needed
 
-        my_downRhs (env, lazy_fv) (id,rhs)
-          = ((env', lazy_fv'), (id', rhs'))
+        my_downRhs env (id,rhs)
+          = (env', (id', rhs'))
           where
-            (lazy_fv1, id', rhs') = cprAnalRhsLetDown top_lvl (Just bndrs) env let_arty id rhs
-            lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
-            env'                  = extendAnalEnv top_lvl env id (idStrictness id')
+            (id', rhs') = cprAnalRhsLetDown top_lvl env let_arty id rhs
+            env'        = extendAnalEnv top_lvl env id (get_idCprInfo id')
 
 
     zapIdCprInfo :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
-    zapIdCprInfo pairs = [(setIdCprInfo id topRes, rhs) | (id, rhs) <- pairs ]
+    zapIdCprInfo pairs = [(setIdCprInfo id topCpr, rhs) | (id, rhs) <- pairs ]
 
 {-
 Note [Safe abortion in the fixed-point iteration]
@@ -585,20 +504,11 @@ environment, which effectively assigns them 'nopSig' (see "getStrictness")
 -- See Note [Demand analysis for trivial right-hand sides]
 cprAnalTrivialRhs ::
     AnalEnv -> Id -> CoreExpr -> Var ->
-    (DmdEnv, Id, CoreExpr)
+    (Id, CoreExpr)
 cprAnalTrivialRhs env id rhs fn
-  = (fn_fv, set_idCprInfo env id fn_str, rhs)
+  = (set_idCprInfo id fn_str, rhs)
   where
     fn_str = getStrictness env fn
-    fn_fv | isLocalId fn = unitVarEnv fn topDmd
-          | otherwise    = emptyDmdEnv
-    -- Note [Remember to demand the function itself]
-    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    -- fn_fv: don't forget to produce a demand for fn itself
-    -- Lacking this caused Trac #9128
-    -- The demand is very conservative (topDmd), but that doesn't
-    -- matter; trivial bindings are usually inlined, so it only
-    -- kicks in for top-level bindings and NOINLINE bindings
 
 -- Let bindings can be processed in two ways:
 -- Down (RHS before body) or Up (body before RHS).
@@ -613,18 +523,17 @@ cprAnalTrivialRhs env id rhs fn
 --
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
 cprAnalRhsLetDown :: TopLevelFlag
-           -> Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
            -> AnalEnv -> Arity
            -> Id -> CoreExpr
-           -> (DmdEnv, Id, CoreExpr)
+           -> (Id, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
-cprAnalRhsLetDown top_lvl rec_flag env let_arty id rhs
+cprAnalRhsLetDown top_lvl env let_arty id rhs
   | Just fn <- unpackTrivial rhs   -- See Note [Demand analysis for trivial right-hand sides]
   = cprAnalTrivialRhs env id rhs fn
 
   | otherwise
-  = (lazy_fv, id', mkLams bndrs' body')
+  = (id', mkLams bndrs' body')
   where
     (bndrs, body, body_arty)
        = case isJoinId_maybe id of
@@ -637,33 +546,19 @@ cprAnalRhsLetDown top_lvl rec_flag env let_arty id rhs
 
     env_body         = foldl' extendSigsWithLam env bndrs
     (body_ty, body') = cprAnal env_body body_arty body
-    body_ty'         = removeDmdTyArgs body_ty -- zap possible deep CPR info
-    (DmdType rhs_fv rhs_dmds rhs_res, bndrs')
-                     = annotateLamBndrs env (isDFunId id) body_ty' bndrs
-    sig_ty           = mkStrictSig (mkDmdType sig_fv rhs_dmds rhs_res')
-    id'              = set_idCprInfo env id sig_ty
+    body_ty'         = removeCprTyArgs body_ty -- zap possible deep CPR info
+    (rhs_ty, bndrs')
+                     = annotateLamBndrs body_ty' bndrs
+    sig_ty           = trimCprTy trim_all trim_sums rhs_ty
+    id'              = set_idCprInfo id sig_ty
         -- See Note [NOINLINE and strictness]
 
-
-    -- See Note [Aggregated demand for cardinality]
-    rhs_fv1 = case rec_flag of
-                Just bs -> reuseEnv (delVarEnvList rhs_fv bs)
-                Nothing -> rhs_fv
-
-    -- See Note [Lazy and unleashable free variables]
-    (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv1
-
-    rhs_res'  = trimCPRInfo trim_all trim_sums rhs_res
     trim_all  = is_thunk && not_strict
     trim_sums = not (isTopLevel top_lvl) -- See Note [CPR for sum types]
 
     -- See Note [CPR for thunks]
     is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
-    not_strict
-       =  isTopLevel top_lvl  -- Top level and recursive things don't
-       || isJust rec_flag     -- get their demandInfo set at all
-       || not (isStrictDmd (idDemandInfo id) || ae_virgin env)
-          -- See Note [Optimistic CPR in the "virgin" case]
+    not_strict = not (isStrictDmd (idDemandInfo id))
 
 unpackTrivial :: CoreExpr -> Maybe Id
 -- Returns (Just v) if the arg is really equal to v, modulo
@@ -674,20 +569,6 @@ unpackTrivial (Cast e _)              = unpackTrivial e
 unpackTrivial (Lam v e) | isTyVar v   = unpackTrivial e
 unpackTrivial (App e a) | isTypeArg a = unpackTrivial e
 unpackTrivial _                       = Nothing
-
--- | If given the RHS of a let-binding, this 'useLetUp' determines
--- whether we should process the binding up (body before rhs) or
--- down (rhs before body).
---
--- We use LetDown if there is a chance to get a useful strictness signature.
--- This is the case when there are manifest value lambdas or the binding is a
--- join point (hence always acts like a function, not a value).
-useLetUp :: Var -> CoreExpr -> Bool
-useLetUp f _         | isJoinId f = False
-useLetUp f (Lam v e) | isTyVar v  = useLetUp f e
-useLetUp _ (Lam _ _)              = False
-useLetUp _ _                      = True
-
 
 {- Note [Demand analysis for join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -769,40 +650,6 @@ a product type.
 ************************************************************************
 -}
 
-unitDmdType :: DmdEnv -> DmdType
-unitDmdType dmd_env = DmdType dmd_env [] topRes
-
-coercionDmdEnv :: Coercion -> DmdEnv
-coercionDmdEnv co = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCo co)
-                    -- The VarSet from coVarsOfCo is really a VarEnv Var
-
-addLazyFVs :: DmdType -> DmdEnv -> DmdType
-addLazyFVs dmd_ty lazy_fvs
-  = dmd_ty `bothDmdType` mkBothDmdArg lazy_fvs
-        -- Using bothDmdType (rather than just both'ing the envs)
-        -- is vital.  Consider
-        --      let f = \x -> (x,y)
-        --      in  error (f 3)
-        -- Here, y is treated as a lazy-fv of f, but we must `bothDmd` that L
-        -- demand with the bottom coming up from 'error'
-        --
-        -- I got a loop in the fixpointer without this, due to an interaction
-        -- with the lazy_fv filtering in cprAnalRhsLetDown.  Roughly, it was
-        --      letrec f n x
-        --          = letrec g y = x `fatbar`
-        --                         letrec h z = z + ...g...
-        --                         in h (f (n-1) x)
-        --      in ...
-        -- In the initial iteration for f, f=Bot
-        -- Suppose h is found to be strict in z, but the occurrence of g in its RHS
-        -- is lazy.  Now consider the fixpoint iteration for g, esp the demands it
-        -- places on its free variables.  Suppose it places none.  Then the
-        --      x `fatbar` ...call to h...
-        -- will give a x->V demand for x.  That turns into a L demand for x,
-        -- which floats out of the defn for h.  Without the modifyEnv, that
-        -- L demand doesn't get both'd with the Bot coming up from the inner
-        -- call to f.  So we just get an L demand for x for g.
-
 {-
 Note [Do not strictify the argument dictionaries of a dfun]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -811,46 +658,24 @@ conservative thing and refrain from strictifying a dfun's argument
 dictionaries.
 -}
 
-annotateBndr :: AnalEnv -> DmdType -> Var -> (DmdType, Var)
--- The returned env has the var deleted
--- The returned var is annotated with demand info
--- according to the result demand of the provided demand type
--- No effect on the argument demands
-annotateBndr env dmd_ty var
-  | isId var  = (dmd_ty', var)
-  | otherwise = (dmd_ty, var)
+annotateLamBndrs :: CprType -> [Var] -> (CprType, [Var])
+annotateLamBndrs ty bndrs = mapAccumR annotate ty bndrs
   where
-    (dmd_ty', _) = findBndrDmd env False dmd_ty var
+    annotate cpr_ty bndr
+      | isId bndr = annotateLamIdBndr cpr_ty bndr
+      | otherwise = (cpr_ty, bndr)
 
-annotateLamBndrs :: AnalEnv -> DFunFlag -> DmdType -> [Var] -> (DmdType, [Var])
-annotateLamBndrs env args_of_dfun ty bndrs = mapAccumR annotate ty bndrs
-  where
-    annotate dmd_ty bndr
-      | isId bndr = annotateLamIdBndr env args_of_dfun dmd_ty bndr
-      | otherwise = (dmd_ty, bndr)
-
-annotateLamIdBndr :: AnalEnv
-                  -> DFunFlag   -- is this lambda at the top of the RHS of a dfun?
-                  -> DmdType    -- Demand type of body
+annotateLamIdBndr :: CprType    -- Demand type of body
                   -> Id         -- Lambda binder
-                  -> (DmdType,  -- Demand type of lambda
+                  -> (CprType,  -- Demand type of lambda
                       Id)       -- and binder annotated with demand
 
-annotateLamIdBndr env arg_of_dfun dmd_ty id
+annotateLamIdBndr cpr_ty id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
     -- pprTrace "annLamBndr" (vcat [ppr id, ppr _dmd_ty]) $
-    (main_ty, id)
-  where
-      -- Watch out!  See note [Lambda-bound unfoldings]
-      -- Irrelevant for CPR
-    main_ty = addDemand dmd dmd_ty' -- TODO: This should just bump incoming arguments of the type
-    (dmd_ty', dmd) = findBndrDmd env arg_of_dfun dmd_ty id
-
-deleteFVs :: DmdType -> [Var] -> DmdType
-deleteFVs (DmdType fvs dmds res) bndrs
-  = DmdType (delVarEnvList fvs bndrs) dmds res
+    (abstractCprTy cpr_ty, id)
 
 {-
 Note [CPR for sum types]
@@ -1076,10 +901,57 @@ forget that fact, otherwise we might make 'x' absent when it isn't.
 ************************************************************************
 -}
 
-type DFunFlag = Bool  -- indicates if the lambda being considered is in the
-                      -- sequence of lambdas at the top of the RHS of a dfun
-notArgOfDfun :: DFunFlag
-notArgOfDfun = False
+-- | The abstract domain $A_t$ from the original 'CPR for Haskell' paper.
+data CprType
+  = CprType
+  { ct_arty :: !Arity     -- ^ Number of arguments the denoted expression eats
+                          --   before returning the 'ct_cpr'
+  , ct_cpr  :: !CPRResult -- ^ 'CPRResult' eventually unleashed when applied to
+                          --   'ct_arty' arguments
+  }
+
+topCprType :: CprType
+topCprType = CprType 0 topCpr
+
+botCprType :: CprType
+botCprType = CprType 0 botCpr -- TODO: Figure out if arity 0 does what we want
+
+prodCprType :: Arity -> CprType
+prodCprType _con_arty = CprType 0 prodCpr
+
+lubCprType :: CprType -> CprType -> CprType
+lubCprType ty1@(CprType n1 cpr1) ty2@(CprType n2 cpr2)
+  -- The arity of bottom CPR types can be extended arbitrarily.
+  | isBotCpr cpr1 && n1 <= n2 = ty2
+  | isBotCpr cpr2 && n2 <= n1 = ty1
+  -- There might be non-bottom CPR types with mismatching arities.
+  -- Consider test DmdAnalGADTs. We want to return top in these cases.
+  | n1 == n2                  = CprType n1 (lubCPR cpr1 cpr2)
+  | otherwise                 = topCprType
+
+applyCprTy :: CprType -> CprType
+applyCprTy (CprType n res)
+  | n > 0        = CprType (n-1) res
+  | isBotCpr res = botCprType
+  | otherwise    = topCprType
+
+abstractCprTy :: CprType -> CprType
+abstractCprTy (CprType n res)
+  | isTopCpr res = topCprType
+  | otherwise    = CprType (n+1) res
+
+removeCprTyArgs :: CprType -> CprType
+removeCprTyArgs ty@(CprType 0 _) = ty
+removeCprTyArgs _                = topCprType
+
+trimCprTy :: Bool -> Bool -> CprType -> CprType
+trimCprTy trim_all trim_sums (CprType arty res) = CprType arty (trimCpr trim_all trim_sums res)
+
+dmdTypeToCprType :: DmdType -> CprType
+dmdTypeToCprType (DmdType _ args dr) = CprType (length args) (dmdResToCpr dr)
+
+instance Outputable CprType where
+  ppr (CprType arty res) = ppr arty <> ppr res
 
 data AnalEnv
   = AE { ae_dflags :: DynFlags
@@ -1097,7 +969,7 @@ data AnalEnv
         -- The DmdEnv gives the demand on the free vars of the function
         -- when it is given enough args to satisfy the strictness signature
 
-type SigEnv = VarEnv StrictSig
+type SigEnv = VarEnv CprType
 
 instance Outputable AnalEnv where
   ppr (AE { ae_sigs = env, ae_virgin = virgin })
@@ -1124,23 +996,23 @@ extendAnalEnvs top_lvl env vars
 
 extendSigEnvs :: TopLevelFlag -> SigEnv -> [Id] -> SigEnv
 extendSigEnvs _top_lvl sigs vars
-  = extendVarEnvList sigs [ (var, idStrictness var) | var <- vars]
+  = extendVarEnvList sigs [ (var, get_idCprInfo var) | var <- vars]
 
-extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> StrictSig -> AnalEnv
+extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> CprType -> AnalEnv
 extendAnalEnv _top_lvl env var sig
   = env { ae_sigs = extendSigEnv _top_lvl (ae_sigs env) var sig }
 
-extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> StrictSig -> SigEnv
+extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> CprType -> SigEnv
 extendSigEnv _top_lvl sigs var sig = extendVarEnv sigs var sig
 
-lookupSigEnv :: AnalEnv -> Id -> Maybe StrictSig
+lookupSigEnv :: AnalEnv -> Id -> Maybe CprType
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 
-getStrictness :: AnalEnv -> Id -> StrictSig
+getStrictness :: AnalEnv -> Id -> CprType
 getStrictness env fn
-  | isGlobalId fn                   = idStrictness fn
+  | isGlobalId fn                   = get_idCprInfo fn
   | Just sig <- lookupSigEnv env fn = sig
-  | otherwise                       = nopSig
+  | otherwise                       = topCprType
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
@@ -1153,7 +1025,7 @@ extendSigsWithLam env id
        -- See Note [Optimistic CPR in the "virgin" case]
        -- See Note [Initial CPR for strict binders]
   , Just (dc,_,_,_) <- deepSplitProductType_maybe (ae_fam_envs env) $ idType id
-  = extendAnalEnv NotTopLevel env id (cprProdSig (dataConRepArity dc))
+  = extendAnalEnv NotTopLevel env id (prodCprType (dataConRepArity dc))
 
   | otherwise
   = env
@@ -1166,14 +1038,15 @@ extendEnvForProdAlt env scrut case_bndr dc bndrs
     env1 = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
 
     ids_w_strs    = filter isId bndrs `zip` dataConRepStrictness dc
-    case_bndr_sig = cprProdSig (dataConRepArity dc)
+    case_bndr_sig = prodCprType (dataConRepArity dc)
     fam_envs      = ae_fam_envs env
 
+    -- This could go away with nested CPR.
     do_con_arg env (id, str)
        | let is_strict = isStrictDmd (idDemandInfo id) || isMarkedStrict str
        , ae_virgin env || (is_var_scrut && is_strict)  -- See Note [CPR in a product case alternative]
        , Just (dc,_,_,_) <- deepSplitProductType_maybe fam_envs $ idType id
-       = extendAnalEnv NotTopLevel env id (cprProdSig (dataConRepArity dc))
+       = extendAnalEnv NotTopLevel env id (prodCprType (dataConRepArity dc))
        | otherwise
        = env
 
@@ -1182,47 +1055,12 @@ extendEnvForProdAlt env scrut case_bndr dc bndrs
     is_var (Var v)    = isLocalId v
     is_var _          = False
 
-findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Demand])
--- Return the demands on the Ids in the [Var]
-findBndrsDmds env dmd_ty bndrs
-  = go dmd_ty bndrs
-  where
-    go dmd_ty []  = (dmd_ty, [])
-    go dmd_ty (b:bs)
-      | isId b    = let (dmd_ty1, dmds) = go dmd_ty bs
-                        (dmd_ty2, dmd)  = findBndrDmd env False dmd_ty1 b
-                    in (dmd_ty2, dmd : dmds)
-      | otherwise = go dmd_ty bs
+set_idCprInfo :: Id -> CprType -> Id
+set_idCprInfo id ty = setIdCprInfo id (ct_cpr ty)
+-- TODO: Check that `ct_arty res == dmdTypeDepth == idArity`
 
-findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
--- See Note [Trimming a demand to a type] in Demand.hs
-findBndrDmd env arg_of_dfun dmd_ty id
-  = (dmd_ty', dmd')
-  where
-    dmd' = killUsageDemand (ae_dflags env) $
-           strictify $
-           trimToType starting_dmd (findTypeShape fam_envs id_ty)
-
-    (dmd_ty', starting_dmd) = peelFV dmd_ty id
-
-    id_ty = idType id
-
-    strictify dmd
-      | gopt Opt_DictsStrict (ae_dflags env)
-             -- We never want to strictify a recursive let. At the moment
-             -- annotateBndr is only call for non-recursive lets; if that
-             -- changes, we need a RecFlag parameter and another guard here.
-      , not arg_of_dfun -- See Note [Do not strictify the argument dictionaries of a dfun]
-      = strictifyDictDmd id_ty dmd
-      | otherwise
-      = dmd
-
-    fam_envs = ae_fam_envs env
-
-set_idCprInfo :: AnalEnv -> Id -> StrictSig -> Id
-set_idCprInfo _env id sig
-  | let res = snd (splitStrictSig sig)
-  = setIdCprInfo id res
+get_idCprInfo :: Id -> CprType
+get_idCprInfo id = CprType (idArity id) (idCprInfo id)
 
 dumpStrSig :: CoreProgram -> SDoc
 dumpStrSig binds = vcat (map printId ids)

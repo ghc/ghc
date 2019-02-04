@@ -302,13 +302,16 @@ setDemandInfo info dd = dd `seq` info { demandInfo = dd }
 setStrictnessInfo :: IdInfo -> StrictSig -> IdInfo
 setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
 
-cprInfo :: IdInfo -> DmdResult
-cprInfo = snd . splitStrictSig . strictnessInfo
+cprInfo :: IdInfo -> CPRResult
+cprInfo = dmdResToCpr . snd . splitStrictSig . strictnessInfo
 
-setCprInfo :: IdInfo -> Arity -> DmdResult -> IdInfo
-setCprInfo info arty dr = dr `seq` info { strictnessInfo = sig' }
+setCprInfo :: IdInfo -> Arity -> CPRResult -> IdInfo
+setCprInfo info arty cpr = dr `seq` info { strictnessInfo = sig' }
   where
-    sig@(StrictSig (DmdType env args _)) = strictnessInfo info
+    sig@(StrictSig (DmdType env args res)) = strictnessInfo info
+    dr
+      | isBotRes res = botRes -- CPR doesn't provide accurate termination info
+      | otherwise    = cprRes cpr
     sig'
       | isTopSig sig = StrictSig (DmdType env (take arty (repeat topDmd)) dr)
       | otherwise    = StrictSig (DmdType env args dr)
