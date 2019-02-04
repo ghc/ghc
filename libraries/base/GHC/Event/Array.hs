@@ -103,7 +103,8 @@ unsafeLoad (Array ref) load = do
     let cap = sz - 1
     -- This pointer conversion is safe since the next
     -- instruction (writeElementCount) guarantees that
-    -- the array will be live on the heap.
+    -- the array will be live on the heap. We do not
+    -- need to use touch.
     len' <- load (advancePtr (mutablePrimArrayContents p) 1) cap
     writeElementCount p len'
     return len'
@@ -197,7 +198,7 @@ findIndex predicate (Array ref) = do
           val <- readPrimArray p ix
           if predicate val
             then pure (Just (ix,val))
-            else go ix
+            else go (ix + 1)
         else pure Nothing
   go 1
 
@@ -213,7 +214,7 @@ removeAt (Array ref) i = do
 
 -- Write a machine int (indicating the number of active elements)
 -- to the first slot in the array. This ignores the element
--- type, which is expected to have a size that is a multiple of the
+-- type, which is expected to have a size that is greater than the
 -- size of a machine int.
 writeElementCount :: MutablePrimArray RealWorld a -> Int -> IO ()
 writeElementCount (MutablePrimArray arr) i = writePrimArray

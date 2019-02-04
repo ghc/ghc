@@ -1,11 +1,13 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving
-           , NoImplicitPrelude
-           , BangPatterns
-  #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE UnboxedTuples #-}
 
-#include "PrimitiveHsc.h"
 #include "EventConfig.h"
 
 module GHC.Event.Poll
@@ -39,6 +41,7 @@ import GHC.Show (Show)
 import System.Posix.Types (Fd(..))
 import GHC.Primitive.Monad (Prim(..))
 
+import qualified GHC.Primitive.Monad as P
 import qualified GHC.Event.Array as A
 import qualified GHC.Event.Internal as E
 
@@ -152,13 +155,17 @@ data PollFd = PollFd {
     } deriving Show -- ^ @since 4.4.0.0
 
 newtype Event = Event CShort
-    deriving ( Eq         -- ^ @since 4.4.0.0
-             , Show       -- ^ @since 4.4.0.0
-             , Num        -- ^ @since 4.4.0.0
-             , Storable   -- ^ @since 4.4.0.0
-             , Bits       -- ^ @since 4.4.0.0
-             , FiniteBits -- ^ @since 4.7.0.0
-             )
+    deriving stock
+      ( Eq         -- ^ @since 4.4.0.0
+      , Show       -- ^ @since 4.4.0.0
+      )
+    deriving newtype
+      ( Num        -- ^ @since 4.4.0.0
+      , Storable   -- ^ @since 4.4.0.0
+      , Bits       -- ^ @since 4.4.0.0
+      , FiniteBits -- ^ @since 4.7.0.0
+      , Prim       -- ^ @since 4.14.0.0
+      )
 
 -- We have to duplicate the whole enum like this in order for the
 -- hsc2hs cross-compilation mode to work
@@ -196,13 +203,35 @@ toEvent e = remap (pollIn .|. pollErr .|. pollHup)  E.evtRead `mappend`
 unI :: Int -> Int##
 unI (I## i) = i
 
+-- | @since 4.14.0.0
 instance Prim PollFd where
   sizeOf## _ = unI #{size struct pollfd}
   alignment## _ = alignment## (undefined :: CInt)
   indexByteArray## arr i = PollFd
-    (#{index struct pollfd, fd})
-    (#{index struct events, fd})
-    (#{index struct revents, fd})
+    (#{indexByteArrayHash struct pollfd, fd} arr i)
+    (#{indexByteArrayHash struct pollfd, events} arr i)
+    (#{indexByteArrayHash struct pollfd, revents} arr i)
+  writeByteArray## arr i p s0 = case #{writeByteArrayHash struct pollfd, fd} arr i (pfdFd p) s0 of
+    s1 -> case #{writeByteArrayHash struct pollfd, events} arr i (pfdEvents p) s1 of
+      s2 -> #{writeByteArrayHash struct pollfd, revents} arr i (pfdRevents p) s2
+  readByteArray## arr i s0 = case #{readByteArrayHash struct pollfd, fd} arr i s0 of
+    (## s1, fdVal ##) -> case #{readByteArrayHash struct pollfd, events} arr i s1 of
+      (## s2, eventsVal ##) -> case #{readByteArrayHash struct pollfd, revents} arr i s2 of
+        (## s3, reventsVal ##) -> (## s3, PollFd fdVal eventsVal reventsVal ##)
+  setByteArray## = P.defaultSetByteArray##
+  indexOffAddr## arr i = PollFd
+    (#{indexOffAddrHash struct pollfd, fd} arr i)
+    (#{indexOffAddrHash struct pollfd, events} arr i)
+    (#{indexOffAddrHash struct pollfd, revents} arr i)
+  writeOffAddr## arr i p s0 = case #{writeOffAddrHash struct pollfd, fd} arr i (pfdFd p) s0 of
+    s1 -> case #{writeOffAddrHash struct pollfd, events} arr i (pfdEvents p) s1 of
+      s2 -> #{writeOffAddrHash struct pollfd, revents} arr i (pfdRevents p) s2
+  readOffAddr## arr i s0 = case #{readOffAddrHash struct pollfd, fd} arr i s0 of
+    (## s1, fdVal ##) -> case #{readOffAddrHash struct pollfd, events} arr i s1 of
+      (## s2, eventsVal ##) -> case #{readOffAddrHash struct pollfd, revents} arr i s2 of
+        (## s3, reventsVal ##) -> (## s3, PollFd fdVal eventsVal reventsVal ##)
+  setOffAddr## = P.defaultSetOffAddr##
+  
 
 -- | @since 4.3.1.0
 instance Storable PollFd where

@@ -1,9 +1,12 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -18,7 +21,6 @@
 -----------------------------------------------------------------------------
 
 #include "EventConfig.h"
-#include "PrimitiveHsc.h"
 
 module GHC.Event.EPoll
     (
@@ -53,8 +55,10 @@ import GHC.Show (Show)
 import System.Posix.Internals (c_close)
 import System.Posix.Internals (setCloseOnExec)
 import System.Posix.Types (Fd(..))
+import GHC.Primitive.Monad (Prim(..))
 
-import qualified GHC.Event.Array    as A
+import qualified GHC.Event.Array     as A
+import qualified GHC.Primitive.Monad as P
 import           GHC.Event.Internal (Timeout(..))
 
 data BackendState = BackendState {
@@ -131,6 +135,32 @@ data EPollEvent = EPollEvent {
     , eventFd    :: {-# UNPACK #-} !Fd
     } deriving (Show)
 
+unI :: Int -> Int##
+unI (I## i) = i
+
+-- | @since 4.14.0.0
+instance Prim EPollEvent where
+  sizeOf## _ = unI #{size struct epoll_event}
+  alignment## _ = alignment## (undefined :: CInt)
+  indexByteArray## arr i = EPollEvent
+    (#{indexByteArrayHash struct epoll_event, events} arr i)
+    (#{indexByteArrayHash struct epoll_event, data.fd} arr i)
+  writeByteArray## arr i p s0 = case #{writeByteArrayHash struct epoll_event, events} arr i (eventTypes p) s0 of
+    s1 -> #{writeByteArrayHash struct epoll_event, data.fd} arr i (eventFd p) s1
+  readByteArray## arr i s0 = case #{readByteArrayHash struct epoll_event, events} arr i s0 of
+    (## s1, eventsVal ##) -> case #{readByteArrayHash struct epoll_event, data.fd} arr i s1 of
+      (## s2, dataFdVal ##) -> (## s2, EPollEvent eventsVal dataFdVal ##)
+  setByteArray## = P.defaultSetByteArray##
+  indexOffAddr## arr i = EPollEvent
+    (#{indexOffAddrHash struct epoll_event, events} arr i)
+    (#{indexOffAddrHash struct epoll_event, data.fd} arr i)
+  writeOffAddr## arr i p s0 = case #{writeOffAddrHash struct epoll_event, events} arr i (eventTypes p) s0 of
+    s1 -> #{writeOffAddrHash struct epoll_event, data.fd} arr i (eventFd p) s1
+  readOffAddr## arr i s0 = case #{readOffAddrHash struct epoll_event, data.fd} arr i s0 of
+    (## s1, eventsVal ##) -> case #{readOffAddrHash struct epoll_event, events} arr i s1 of
+      (## s2, dataFdVal ##) -> (## s2, EPollEvent eventsVal dataFdVal ##)
+  setOffAddr## = P.defaultSetOffAddr##
+  
 -- | @since 4.3.1.0
 instance Storable EPollEvent where
     sizeOf    _ = #size struct epoll_event
@@ -154,14 +184,17 @@ newtype ControlOp = ControlOp CInt
  , controlOpDelete = EPOLL_CTL_DEL
  }
 
-newtype EventType = EventType {
-      unEventType :: Word32
-    } deriving ( Show       -- ^ @since 4.4.0.0
-               , Eq         -- ^ @since 4.4.0.0
-               , Num        -- ^ @since 4.4.0.0
-               , Bits       -- ^ @since 4.4.0.0
-               , FiniteBits -- ^ @since 4.7.0.0
-               )
+newtype EventType = EventType { unEventType :: Word32 }
+  deriving stock
+    ( Show       -- ^ @since 4.4.0.0
+    , Eq         -- ^ @since 4.4.0.0
+    )
+  deriving newtype
+    ( Num        -- ^ @since 4.4.0.0
+    , Bits       -- ^ @since 4.4.0.0
+    , FiniteBits -- ^ @since 4.7.0.0
+    , Prim       -- ^ @since 4.14.0.0
+    )
 
 #{enum EventType, EventType
  , epollIn  = EPOLLIN

@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 module GHC.Event.TimerBackend
-    ( BackendState(..)
+    ( BackendState
     , new
     , poll
     , modifyFd

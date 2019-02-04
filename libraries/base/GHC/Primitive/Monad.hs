@@ -20,8 +20,10 @@ module GHC.Primitive.Monad
   ) where
 
 import GHC.Base
-import GHC.Int (Int32(I32#))
-import Foreign.C.Types (CInt(..))
+import GHC.Int (Int32(I32#),Int16(I16#))
+import GHC.Word (Word32(W32#))
+import Foreign.C.Types (CInt(..),CShort(..))
+import System.Posix.Types (Fd(..))
 import GHC.ST (ST(..))
 
 -- All the code in this module is copied directly from
@@ -89,6 +91,8 @@ class Prim a where
   setOffAddr# :: Addr# -> Int# -> Int# -> a -> State# s -> State# s
 
 deriving newtype instance Prim CInt
+deriving newtype instance Prim CShort
+deriving newtype instance Prim Fd
 
 instance Prim Int where
   sizeOf# _ = SIZEOF_HSINT#
@@ -104,6 +108,20 @@ instance Prim Int where
   writeOffAddr# arr i (I# r) s0 = writeIntOffAddr# arr i r s0
   setOffAddr# = defaultSetOffAddr#
 
+instance Prim Int16 where
+  sizeOf# _ = 2#
+  alignment# _ = 2#
+  indexByteArray# arr i = I16# (indexInt16Array# arr i)
+  readByteArray# arr i s0 = case readInt16Array# arr i s0 of
+    (# s1, r #) -> (# s1, I16# r #)
+  writeByteArray# arr i (I16# r) s0 = writeInt16Array# arr i r s0
+  setByteArray# = defaultSetByteArray#
+  indexOffAddr# arr i = I16# (indexInt16OffAddr# arr i)
+  readOffAddr# arr i s0 = case readInt16OffAddr# arr i s0 of
+    (# s1, r #) -> (# s1, I16# r #)
+  writeOffAddr# arr i (I16# r) s0 = writeInt16OffAddr# arr i r s0
+  setOffAddr# = defaultSetOffAddr#
+
 instance Prim Int32 where
   sizeOf# _ = 4#
   alignment# _ = 4#
@@ -117,6 +135,21 @@ instance Prim Int32 where
     (# s1, r #) -> (# s1, I32# r #)
   writeOffAddr# arr i (I32# r) s0 = writeInt32OffAddr# arr i r s0
   setOffAddr# = defaultSetOffAddr#
+
+instance Prim Word32 where
+  sizeOf# _ = 4#
+  alignment# _ = 4#
+  indexByteArray# arr i = W32# (indexWord32Array# arr i)
+  readByteArray# arr i s0 = case readWord32Array# arr i s0 of
+    (# s1, r #) -> (# s1, W32# r #)
+  writeByteArray# arr i (W32# r) s0 = writeWord32Array# arr i r s0
+  setByteArray# = defaultSetByteArray#
+  indexOffAddr# arr i = W32# (indexWord32OffAddr# arr i)
+  readOffAddr# arr i s0 = case readWord32OffAddr# arr i s0 of
+    (# s1, r #) -> (# s1, W32# r #)
+  writeOffAddr# arr i (W32# r) s0 = writeWord32OffAddr# arr i r s0
+  setOffAddr# = defaultSetOffAddr#
+
 
 -- | Execute a primitive operation with no result
 primitive_ :: PrimMonad m

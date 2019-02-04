@@ -29,6 +29,7 @@ import System.Posix.Types (Fd)
 import GHC.Base
 import GHC.Word (Word64)
 import GHC.Num (Num(..))
+import GHC.Primitive.Monad (Prim)
 import GHC.Show (Show(..))
 import Data.Semigroup.Internal (stimesMonoid)
 
