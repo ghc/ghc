@@ -89,6 +89,41 @@ At one point I implemented a compromise:
 But the compromise seemed too much of a hack, so we backed it out.
 You just have to use an explicit export list:
     module M( F(..) ) where ...
+
+Note [Avails of associated data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose you have (Trac #16077)
+
+    {-# LANGUAGE TypeFamilies #-}
+    module A (module A) where
+
+    class    C a  where { data T a }
+    instance C () where { data T () = D }
+
+Because @A@ is exported explicitly, GHC tries to produce an export list
+from the @GlobalRdrEnv@. In this case, it pulls out the following:
+
+    [ C defined at A.hs:4:1
+    , T parent:C defined at A.hs:4:23
+    , D parent:T defined at A.hs:5:35 ]
+
+If map these directly into avails, (via 'availFromGRE'), we get
+@[C{C;}, C{T;}, T{D;}]@, which eventually gets merged into @[C{C, T;}, T{D;}]@.
+That's not right, because @T{D;}@ violates the AvailTC invariant: @T@ is
+exported, but it isn't the first entry in the avail!
+
+We work around this issue by expanding GREs where the parent and child
+are both type constructors into two GRES.
+
+    T parent:C defined at A.hs:4:23
+
+      =>
+
+    [ T parent:C defined at A.hs:4:23
+    , T defined at A.hs:4:23 ]
+
+Then, we get  @[C{C;}, C{T;}, T{T;}, T{D;}]@, which eventually gets merged
+into @[C{C, T;}, T{T, D;}]@ (which satsifies the AvailTC invariant).
 -}
 
 data ExportAccum        -- The type of the accumulating parameter of
@@ -230,13 +265,7 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
     kids_env :: NameEnv [GlobalRdrElt]
     kids_env = mkChildEnv (globalRdrEnvElts rdr_env)
 
-    -- When 'availFromGRE' sees something with a parent, it assumes that the
-    -- parent, if exported, is going to show up in some other GRE. This is
-    -- mostly OK because parents are generally top-level. One frustrating
-    -- exception is type constructors whose parents are also type constructors
-    -- (ex: associated data instance type constructors).
-    --
-    -- For these cases, we duplicate the GRE and erase the parent from the copy
+    -- See Note [Avails of associated data families]
     expand_tyty_gre :: GlobalRdrElt -> [GlobalRdrElt]
     expand_tyty_gre (gre @ GRE { gre_name = me, gre_par = ParentIs p })
       | isTyConName p, isTyConName me = [gre, gre{ gre_par = NoParent }]
