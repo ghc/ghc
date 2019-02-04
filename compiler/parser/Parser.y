@@ -2760,14 +2760,24 @@ aexp    :: { EC (LHsExpr GhcPs) (LHsCmd GhcPs) }
                                                    FromSource (snd $ unLoc $4)))
                                                (mj AnnCase $1:mj AnnOf $3
                                                   :(fst $ unLoc $4)) }
-        | 'do' stmtlist              {% fmap ecFromExp $
-                                        ams (cL (comb2 $1 $2)
-                                               (mkHsDo DoExpr (snd $ unLoc $2)))
-                                               (mj AnnDo $1:(fst $ unLoc $2)) }
-        | 'mdo' stmtlist            {% fmap ecFromExp $
-                                       ams (cL (comb2 $1 $2)
-                                              (mkHsDo MDoExpr (snd $ unLoc $2)))
-                                           (mj AnnMdo $1:(fst $ unLoc $2)) }
+        | 'do' stmtlist              {
+          EC { ecExp =
+                  ecExp $2 >>= \stmts ->
+                  ams (cL (comb2 $1 stmts)
+                         (mkHsDo DoExpr (snd $ unLoc stmts)))
+                         (mj AnnDo $1:(fst $ unLoc stmts))
+             , ecCmd =
+                  ecCmd $2 >>= \stmts ->
+                  ams (cL (comb2 $1 stmts)
+                         (HsCmdDo noExt (mapLoc snd stmts)))
+                         (mj AnnDo $1:(fst $ unLoc stmts))
+             }
+          }
+        | 'mdo' stmtlist            {% ecExp $2 >>= \stmts ->
+                                       fmap ecFromExp $
+                                       ams (cL (comb2 $1 stmts)
+                                              (mkHsDo MDoExpr (snd $ unLoc stmts)))
+                                           (mj AnnMdo $1:(fst $ unLoc stmts)) }
         | 'proc' aexp '->' exp
                        {% (checkPattern empty <=< ecExp) $2 >>= \ p ->
                            ecCmd $4 >>= \ cmd ->
@@ -3197,11 +3207,30 @@ apats  :: { [LPat GhcPs] }
 -----------------------------------------------------------------------------
 -- Statement sequences
 
-stmtlist :: { Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]) }
-        : '{'           stmts '}'       { sLL $1 $> ((moc $1:mcc $3:(fst $ unLoc $2))
-                                             ,(reverse $ snd $ unLoc $2)) } -- AZ:performance of reverse?
-        |     vocurly   stmts close     { cL (gl $2) (fst $ unLoc $2
-                                                    ,reverse $ snd $ unLoc $2) }
+stmtlist :: { EC (Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]))
+                 (Located ([AddAnn],[LStmt GhcPs (LHsCmd  GhcPs)])) }
+        : '{' stmts '}' {
+          EC { ecExp =
+                  ecExp $2 >>= \stmts ->
+                  return $ sLL $1 $> ((moc $1:mcc $3:(fst $ unLoc stmts)),
+                                      (reverse $ snd $ unLoc stmts)) -- AZ:performance of reverse?
+             , ecCmd =
+                  ecCmd $2 >>= \stmts ->
+                  return $ sLL $1 $> ((moc $1:mcc $3:(fst $ unLoc stmts)),
+                                      (reverse $ snd $ unLoc stmts)) -- AZ:performance of reverse?
+             }
+          }
+        | vocurly stmts close {
+          EC { ecExp =
+                ecExp $2 >>= \stmts ->
+                return $ cL (gl stmts) (fst $ unLoc stmts,
+                                     reverse $ snd $ unLoc stmts)
+             , ecCmd =
+                ecCmd $2 >>= \stmts ->
+                return $ cL (gl stmts) (fst $ unLoc stmts,
+                                     reverse $ snd $ unLoc stmts)
+             }
+         }
 
 --      do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be an expression, but that's hard to enforce
@@ -3209,34 +3238,80 @@ stmtlist :: { Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]) }
 -- So we use BodyStmts throughout, and switch the last one over
 -- in ParseUtils.checkDo instead
 
-stmts :: { Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]) }
-        : stmts ';' stmt  {% if null (snd $ unLoc $1)
-                              then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
-                                                     ,$3 : (snd $ unLoc $1)))
+stmts :: { EC (Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]))
+              (Located ([AddAnn],[LStmt GhcPs (LHsCmd  GhcPs)])) }
+        : stmts ';' stmt  {
+          EC { ecExp =
+                              ecExp $1 >>= \stmts ->
+                              ecExp $3 >>= \stmt ->
+                              if null (snd $ unLoc stmts)
+                              then return (sLL stmts stmt (mj AnnSemi $2:(fst $ unLoc stmts)
+                                                     ,stmt : (snd $ unLoc stmts)))
                               else do
-                               { ams (head $ snd $ unLoc $1) [mj AnnSemi $2]
-                               ; return $ sLL $1 $> (fst $ unLoc $1,$3 :(snd $ unLoc $1)) }}
+                               { ams (head $ snd $ unLoc stmts) [mj AnnSemi $2]
+                               ; return $ sLL stmts stmt (fst $ unLoc stmts,stmt :(snd $ unLoc stmts)) }
+             , ecCmd =
+                              ecCmd $1 >>= \stmts ->
+                              ecCmd $3 >>= \stmt ->
+                              if null (snd $ unLoc stmts)
+                              then return (sLL stmts stmt (mj AnnSemi $2:(fst $ unLoc stmts)
+                                                     ,stmt : (snd $ unLoc stmts)))
+                              else do
+                               { ams (head $ snd $ unLoc stmts) [mj AnnSemi $2]
+                               ; return $ sLL stmts stmt (fst $ unLoc stmts,stmt :(snd $ unLoc stmts)) }
+              }
+        }
 
-        | stmts ';'     {% if null (snd $ unLoc $1)
-                             then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1),snd $ unLoc $1))
+        | stmts ';'     {
+          EC { ecExp =
+                             ecExp $1 >>= \stmts ->
+                             if null (snd $ unLoc stmts)
+                             then return (sLL stmts $> (mj AnnSemi $2:(fst $ unLoc stmts),snd $ unLoc stmts))
                              else do
-                               { ams (head $ snd $ unLoc $1)
+                               { ams (head $ snd $ unLoc stmts)
                                                [mj AnnSemi $2]
-                               ; return $1 } }
-        | stmt                   { sL1 $1 ([],[$1]) }
-        | {- empty -}            { noLoc ([],[]) }
+                               ; return stmts }
+             , ecCmd =
+                             ecCmd $1 >>= \stmts ->
+                             if null (snd $ unLoc stmts)
+                             then return (sLL stmts $> (mj AnnSemi $2:(fst $ unLoc stmts),snd $ unLoc stmts))
+                             else do
+                               { ams (head $ snd $ unLoc stmts)
+                                               [mj AnnSemi $2]
+                               ; return stmts }
+             }
+          }
+        | stmt                   {
+          EC { ecExp = ecExp $1 >>= \stmt -> return $ sL1 stmt ([],[stmt])
+             , ecCmd = ecCmd $1 >>= \stmt -> return $ sL1 stmt ([],[stmt])
+             }
+          }
+        | {- empty -}            {
+          EC { ecExp = return (noLoc ([],[]))
+             , ecCmd = return (noLoc ([],[]))
+             }
+          }
 
 
 -- For typing stmts at the GHCi prompt, where
 -- the input may consist of just comments.
 maybe_stmt :: { Maybe (LStmt GhcPs (LHsExpr GhcPs)) }
-        : stmt                          { Just $1 }
+        : stmt                          {% fmap Just (ecExp $1) }
         | {- nothing -}                 { Nothing }
 
-stmt  :: { LStmt GhcPs (LHsExpr GhcPs) }
-        : qual                          { $1 }
-        | 'rec' stmtlist                {% ams (sLL $1 $> $ mkRecStmt (snd $ unLoc $2))
-                                               (mj AnnRec $1:(fst $ unLoc $2)) }
+stmt  :: { EC (LStmt GhcPs (LHsExpr GhcPs)) (LStmt GhcPs (LHsCmd GhcPs)) }
+        : ec_qual                       { $1 }
+        | 'rec' stmtlist                {
+          EC { ecExp =
+                  ecExp $2 >>= \stmts ->
+                  ams (sLL $1 stmts $ mkRecStmt (snd $ unLoc stmts))
+                      (mj AnnRec $1:(fst $ unLoc stmts))
+             , ecCmd =
+                  ecCmd $2 >>= \stmts ->
+                  ams (sLL $1 stmts $ mkRecStmt (snd $ unLoc stmts))
+                      (mj AnnRec $1:(fst $ unLoc stmts))
+             }
+        }
 -- FIXME (int-index): unify with ec_qual
 qual  :: { LStmt GhcPs (LHsExpr GhcPs) }
       : ec_qual {% ecExp $1 }
