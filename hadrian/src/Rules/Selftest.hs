@@ -13,6 +13,8 @@ import Settings
 import Target
 import Utilities
 
+import System.FilePath.Posix ((</>))
+
 instance Arbitrary Way where
     arbitrary = wayFromUnits <$> arbitrary
 
