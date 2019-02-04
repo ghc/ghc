@@ -1,0 +1,10 @@
+DocAppend
+  (DocAppend
+     (DocHeader
+        Header {headerLevel = 3, headerTitle = DocString "Title"})
+     (DocUnorderedList
+        [DocParagraph (DocString "List directly"),
+         DocAppend
+           (DocParagraph (DocString "after the title"))
+           (DocCodeBlock (DocString "with some inline things\n"))]))
+  (DocUnorderedList [DocParagraph (DocString "is parsed weirdly")])
