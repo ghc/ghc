@@ -353,7 +353,8 @@ synifyDataCon use_gadt_syntax dc =
   use_named_field_syntax = not (null field_tys)
   name = synifyName dc
   -- con_qvars means a different thing depending on gadt-syntax
-  (univ_tvs, ex_tvs, _eq_spec, theta, arg_tys, res_ty) = dataConFullSig dc
+  (_univ_tvs, ex_tvs, _eq_spec, theta, arg_tys, res_ty) = dataConFullSig dc
+  user_tvs = dataConUserTyVars dc -- Used for GADT data constructors
 
   -- skip any EqTheta, use 'orig'inal syntax
   ctx | null theta = Nothing
@@ -385,8 +386,8 @@ synifyDataCon use_gadt_syntax dc =
            then return $ noLoc $
               ConDeclGADT { con_g_ext  = noExt
                           , con_names  = [name]
-                          , con_forall = noLoc False
-                          , con_qvars  = synifyTyVars (univ_tvs ++ ex_tvs)
+                          , con_forall = noLoc $ not $ null user_tvs
+                          , con_qvars  = synifyTyVars user_tvs
                           , con_mb_cxt = ctx
                           , con_args   = hat
                           , con_res_ty = synifyType WithinType [] res_ty
