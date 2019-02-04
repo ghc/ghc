@@ -21,7 +21,7 @@ module Bug873
 --   Note that <tt>(<a>$</a>)</tt> is levity-polymorphic in its result
 --   type, so that <tt>foo <a>$</a> True</tt> where <tt>foo :: Bool -&gt;
 --   Int#</tt> is well-typed.
-($) :: () => (a -> b) -> a -> b
+($) :: forall (r :: RuntimeRep) a (b :: TYPE r). (a -> b) -> a -> b
 infixr 0 $
 ($$) :: (a -> b) -> a -> b
 infixr 0 $$

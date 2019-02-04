@@ -891,7 +891,7 @@ hiDecl dflags t = do
     Nothing -> do
       liftErrMsg $ tell ["Warning: Not found in environment: " ++ pretty dflags t]
       return Nothing
-    Just x -> case tyThingToLHsDecl x of
+    Just x -> case tyThingToLHsDecl ShowRuntimeRep x of
       Left m -> liftErrMsg (tell [bugWarn m]) >> return Nothing
       Right (m, t') -> liftErrMsg (tell $ map bugWarn m)
                       >> return (Just $ noLoc t')
