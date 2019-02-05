@@ -1,0 +1,70 @@
+TOP=../../..
+include $(TOP)/mk/boilerplate.mk
+include $(TOP)/mk/test.mk
+
+# Remark: these should be synced up with the testsuites listed in `utils/haddock/haddock.cabal`
+# See #16206
+
+
+# Corresponds to files in the `haddock-test` package
+haddockTest=$(TOP)/../utils/haddock/haddock-test/src/Test/Haddock.hs \
+						$(TOP)/../utils/haddock/haddock-test/src/Test/Haddock/Config.hs \
+						$(TOP)/../utils/haddock/haddock-test/src/Test/Haddock/Utils.hs \
+						$(TOP)/../utils/haddock/haddock-test/src/Test/Haddock/Xhtml.hs \
+						$(TOP)/../utils/haddock/haddock-test/src/Test/Haddock/Process.hs
+
+# Corresponds to the `html-test` testsuite
+.PHONY: htmlTest
+htmlTest:
+	'$(TEST_HC)' \
+		-odir . \
+		-package Cabal \
+		-o html-test \
+		$(haddockTest) \
+		$(TOP)/../utils/haddock/html-test/Main.hs
+	./html-test \
+		--ghc-path=$(TEST_HC) \
+		--haddock-path=$(HADDOCK) \
+		--haddock-stdout=haddock-out.log
+
+# Corresponds to the `latex-test` testsuite
+.PHONY: latexTest
+latexTest:
+	'$(TEST_HC)' \
+		-odir . \
+		-package Cabal \
+		-o latex-test \
+		$(haddockTest) \
+		$(TOP)/../utils/haddock/latex-test/Main.hs
+	./latex-test \
+		--ghc-path=$(TEST_HC) \
+		--haddock-path=$(HADDOCK) \
+		--haddock-stdout=haddock-out.log
+
+# Corresponds to the `hoogle-test` testsuite
+.PHONY: hoogleTest
+hoogleTest:
+	'$(TEST_HC)' \
+		-odir . \
+		-package Cabal \
+		-o hoogle-test \
+		$(haddockTest) \
+		$(TOP)/../utils/haddock/hoogle-test/Main.hs
+	./hoogle-test \
+		--ghc-path=$(TEST_HC) \
+		--haddock-path=$(HADDOCK) \
+		--haddock-stdout=haddock-out.log
+
+# Corresponds to the `hypsrc-test` testsuite
+.PHONY: hypsrcTest
+hypsrcTest:
+	'$(TEST_HC)' \
+		-odir . \
+		-package Cabal \
+		-o hypsrc-test \
+		$(haddockTest) \
+		$(TOP)/../utils/haddock/hypsrc-test/Main.hs
+	./hypsrc-test \
+		--ghc-path=$(TEST_HC) \
+		--haddock-path=$(HADDOCK) \
+		--haddock-stdout=haddock-out.log
