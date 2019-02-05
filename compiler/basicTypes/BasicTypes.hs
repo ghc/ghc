@@ -99,7 +99,7 @@ module BasicTypes(
 
         IntegralLit(..), FractionalLit(..), FractionalExponentBase(..),
         negateIntegralLit, negateFractionalLit, fractionalLitNeg,
-        mkIntegralLit, mkFractionalLit, mkTHFractionalLit, rationalFromFractionalLit,
+        mkIntegralLit, mkTHFractionalLit, rationalFromFractionalLit,
         integralFractionalLit,
 
         SourceText(..), pprWithSourceText,
@@ -1515,9 +1515,6 @@ data FractionalExponentBase
   | Base10
   deriving (Data, Show)
 
-mkRationalBase10 :: Integer -> Integer -> Rational
-mkRationalBase10 i e = mkRationalWithExponentBase i e Base10
-
 mkRationalWithExponentBase :: Integer -> Integer -> FractionalExponentBase -> Rational
 mkRationalWithExponentBase i e feb = (i :% 1) * (eb ^^ e)
   where eb = case feb of Base2 -> 2 ; Base10 -> 10
@@ -1526,21 +1523,6 @@ rationalFromFractionalLit :: FractionalLit -> Rational
 rationalFromFractionalLit (FL _ _ i e expBase) =
   mkRationalWithExponentBase i e expBase
 rationalFromFractionalLit (THFL _ _ r) = r
-
-
-mkFractionalLit :: Integer -> Integer -> FractionalLit
-mkFractionalLit i e = FL { fl_text = SourceText (show (realToFrac (mkRationalBase10 i e)::Double))
-                           -- Converting to a Double here may technically lose
-                           -- precision (see #15502). We could alternatively
-                           -- convert to a Rational for the most accuracy, but
-                           -- it would cause Floats and Doubles to be displayed
-                           -- strangely, so we opt not to do this. (In contrast
-                           -- to mkIntegralLit, where we always convert to an
-                           -- Integer for the highest accuracy.)
-                         , fl_neg = i < 0
-                         , fl_signi = i
-                         , fl_exp = e
-                         , fl_exp_base = Base10 }
 
 mkTHFractionalLit :: Rational -> FractionalLit
 mkTHFractionalLit r = THFL { thfl_text = SourceText (show (realToFrac r::Double))
