@@ -281,26 +281,27 @@ TICK_VAR(2)
 #define IF_RTSFLAGS(c,s)  if (RtsFlags.c) { s; } doNothing()
 
 #if defined(DEBUG)
+/* See Note [RtsFlags is a pointer in STG code] */
 #if IN_STG_CODE
 #define IF_DEBUG(c,s)  if (RtsFlags[0].DebugFlags.c) { s; } doNothing()
 #else
 #define IF_DEBUG(c,s)  if (RtsFlags.DebugFlags.c) { s; } doNothing()
-#endif
+#endif /* IN_STG_CODE */
 #else
 #define IF_DEBUG(c,s)  doNothing()
-#endif
+#endif /* DEBUG */
 
 #if defined(DEBUG)
 #define DEBUG_ONLY(s) s
 #else
 #define DEBUG_ONLY(s) doNothing()
-#endif
+#endif /* DEBUG */
 
 #if defined(DEBUG)
 #define DEBUG_IS_ON   1
 #else
 #define DEBUG_IS_ON   0
-#endif
+#endif /* DEBUG */
 
 /* -----------------------------------------------------------------------------
    Useful macros and inline functions

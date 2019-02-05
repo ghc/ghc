@@ -267,7 +267,11 @@ typedef struct _RTS_FLAGS {
 #if defined(COMPILING_RTS_MAIN)
 extern DLLIMPORT RTS_FLAGS RtsFlags;
 #elif IN_STG_CODE
-/* Hack because the C code generator can't generate '&label'. */
+/* Note [RtsFlags is a pointer in STG code]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * When compiling with IN_STG_CODE the RtsFlags symbol is defined as a pointer.
+ * This is necessary because the C code generator can't generate '&label'.
+ */
 extern RTS_FLAGS RtsFlags[];
 #else
 extern RTS_FLAGS RtsFlags;
