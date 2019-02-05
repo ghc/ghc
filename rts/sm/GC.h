@@ -55,6 +55,8 @@ void gcWorkerThread (Capability *cap);
 void initGcThreads (uint32_t from, uint32_t to);
 void freeGcThreads (void);
 
+void resizeGenerations (void);
+
 #if defined(THREADED_RTS)
 void waitForGcThreads (Capability *cap, bool idle_cap[]);
 void releaseGCThreads (Capability *cap, bool idle_cap[]);
