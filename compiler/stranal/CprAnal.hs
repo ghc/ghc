@@ -166,7 +166,6 @@ cprAnal' env n (Lam var body)
   | isTyVar var
   , (body_ty, body') <- cprAnal env n body
   = (body_ty, Lam var body')
-
   | otherwise
   = (lam_ty', Lam var body')
   where
@@ -179,64 +178,28 @@ cprAnal' env n (Lam var body)
       | is_unsat = topCprType
       | otherwise = lam_ty
 
-cprAnal' env n (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
-  -- Only one alternative with a product constructor
-  | let tycon = dataConTyCon dc
-  , isJust (isDataProductTyCon_maybe tycon)
-  , Just rec_tc' <- checkRecTc (ae_rec_tc env) tycon
-  = let
-        env_w_tc                 = env { ae_rec_tc = rec_tc' }
-        env_alt                  = extendEnvForProdAlt env_w_tc scrut case_bndr dc bndrs
-        (rhs_ty, rhs')           = cprAnal env_alt n rhs
-        -- Compute demand on the scrutinee
-        -- See Note [Demand on scrutinee of a product case]
-        (_, scrut') = cprAnal env 0 scrut
-        res_ty             = rhs_ty
-    in
---    pprTrace "cprAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
---                                   , text "dmd" <+> ppr dmd
---                                   , text "case_bndr_dmd" <+> ppr (idDemandInfo case_bndr')
---                                   , text "scrut_dmd" <+> ppr scrut_dmd
---                                   , text "scrut_ty" <+> ppr scrut_ty
---                                   , text "alt_ty" <+> ppr alt_ty2
---                                   , text "res_ty" <+> ppr res_ty ]) $
-    (res_ty, Case scrut' case_bndr ty [(DataAlt dc, bndrs, rhs')])
-
 cprAnal' env n (Case scrut case_bndr ty alts)
-  = let      -- Case expression with multiple alternatives
-        (alt_tys, alts') = mapAndUnzip (cprAnalAlt env n case_bndr) alts
-        (_, scrut')      = cprAnal env 0 scrut
-        res_ty           = foldr lubCprType botCprType alt_tys
-                               -- NB: Base case is botCprType, for empty case alternatives
-                               --     This is a unit for lubCprType, and the right result
-                               --     when there really are no alternatives
-    in
---    pprTrace "cprAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
---                                   , text "scrut_ty" <+> ppr scrut_ty
---                                   , text "alt_tys" <+> ppr alt_tys
---                                   , text "alt_ty" <+> ppr alt_ty
---                                   , text "res_ty" <+> ppr res_ty ]) $
-    (res_ty, Case scrut' case_bndr ty alts')
+  = (res_ty, Case scrut' case_bndr ty alts')
+  where
+    -- Compute demand on the scrutinee
+    -- See Note [Demand on scrutinee of a product case]
+    (_, scrut')      = cprAnal env 0 scrut
+    (alt_tys, alts') = mapAndUnzip (cprAnalAlt env scrut case_bndr n) alts
+    res_ty           = foldl' lubCprType botCprType alt_tys
+--    pprTrace "cprAnal:Case" (vcat [ text "scrut" <+> ppr scrut
+--                                  , text "dmd" <+> ppr dmd
+--                                  , text "case_bndr_dmd" <+> ppr (idDemandInfo case_bndr')
+--                                  , text "scrut_dmd" <+> ppr scrut_dmd
+--                                  , text "scrut_ty" <+> ppr scrut_ty
+--                                  , text "alt_ty" <+> ppr alt_ty2
+--                                  , text "res_ty" <+> ppr res_ty ]) $
 
 cprAnal' env n (Let (NonRec id rhs) body)
-  = (body_ty, Let (NonRec id1 rhs') body')
+  = (body_ty, Let (NonRec id' rhs') body')
   where
-    (id1, rhs')      = cprAnalRhsLetDown NotTopLevel env n id rhs
-    env1             = extendAnalEnv NotTopLevel env id1 (get_idCprInfo id1)
-    (body_ty, body') = cprAnal env1 n body
-
-        -- If the actual demand is better than the vanilla call
-        -- demand, you might think that we might do better to re-analyse
-        -- the RHS with the stronger demand.
-        -- But (a) That seldom happens, because it means that *every* path in
-        --         the body of the let has to use that stronger demand
-        -- (b) It often happens temporarily in when fixpointing, because
-        --     the recursive function at first seems to place a massive demand.
-        --     But we don't want to go to extra work when the function will
-        --     probably iterate to something less demanding.
-        -- In practice, all the times the actual demand on id2 is more than
-        -- the vanilla call demand seem to be due to (b).  So we don't
-        -- bother to re-analyse the RHS.
+    (id', rhs')      = cprAnalRhsLetDown NotTopLevel env n id rhs
+    env'             = extendAnalEnv NotTopLevel env id' (get_idCprInfo id')
+    (body_ty, body') = cprAnal env' n body
 
 cprAnal' env n (Let (Rec pairs) body)
   = let
@@ -246,14 +209,23 @@ cprAnal' env n (Let (Rec pairs) body)
     body_ty `seq`
     (body_ty,  Let (Rec pairs') body')
 
-cprAnalAlt :: AnalEnv -> Arity -> Id -> Alt Var -> (CprType, Alt Var)
-cprAnalAlt env n _case_bndr (con,bndrs,rhs)
+cprAnalAlt
+  :: AnalEnv
+  -> CoreExpr -- ^ scrutinee
+  -> Id       -- ^ case binder
+  -> Arity    -- ^ incoming arity
+  -> Alt Var  -- ^ current alternative
+  -> (CprType, Alt Var)
+cprAnalAlt env scrut case_bndr n (con@(DataAlt dc),bndrs,rhs)
+  -- See 'extendEnvForDataAlt' and Note [CPR in a DataAlt case alternative]
   = (rhs_ty, (con, bndrs, rhs'))
   where
-    -- Assymetry with the product case, see
-    -- Note [CPR in a product case alternative]
+    env_alt        = extendEnvForDataAlt env scrut case_bndr dc bndrs
+    (rhs_ty, rhs') = cprAnal env_alt n rhs
+cprAnalAlt env _ _ n (con,bndrs,rhs)
+  = (rhs_ty, (con, bndrs, rhs'))
+  where
     (rhs_ty, rhs') = cprAnal env n rhs
-
 
 {- Note [IO hack in the demand analyser]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -871,6 +843,9 @@ botCprType = CprType 0 botCpr -- TODO: Figure out if arity 0 does what we want
 prodCprType :: Arity -> CprType
 prodCprType _con_arty = CprType 0 prodCpr
 
+sumCprType :: ConTag -> CprType
+sumCprType con_tag = CprType 0 (sumCpr con_tag)
+
 lubCprType :: CprType -> CprType -> CprType
 lubCprType ty1@(CprType n1 cpr1) ty2@(CprType n2 cpr2)
   -- The arity of bottom CPR types can be extended arbitrarily.
@@ -980,22 +955,36 @@ extendSigsWithLam env id
   | otherwise
   = env
 
-extendEnvForProdAlt :: AnalEnv -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
--- See Note [CPR in a product case alternative]
-extendEnvForProdAlt env scrut case_bndr dc bndrs
-  = foldl' do_con_arg env1 ids_w_strs
+extendEnvForDataAlt :: AnalEnv -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
+-- See Note [CPR in a DataAlt case alternative]
+extendEnvForDataAlt env scrut case_bndr dc bndrs
+  = foldl' do_con_arg env' ids_w_strs
   where
-    env1 = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
+    env' = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
 
     ids_w_strs    = filter isId bndrs `zip` dataConRepStrictness dc
-    case_bndr_sig = prodCprType (dataConRepArity dc)
-    fam_envs      = ae_fam_envs env
 
-    -- This could go away with nested CPR, where we have proper termination
-    -- information.
+    tycon          = dataConTyCon dc
+    is_product     = isJust (isDataProductTyCon_maybe tycon)
+    is_sum         = isJust (isDataSumTyCon_maybe tycon)
+    case_bndr_sig
+      | is_product = prodCprType (dataConRepArity dc)
+      | is_sum     = sumCprType  (dataConTag dc)
+      -- Any of the constructors had existentials. This is a little too
+      -- conservative (after all, we only care about the particular data con),
+      -- but there is no easy way to write is_sum and this won't happen much.
+      | otherwise  = topCprType
+
+    -- We could have much deeper CPR info here with Nested CPR, which could
+    -- propagate available unboxed things from the scrutinee, getting rid of
+    -- the is_var_scrut heuristic. See Note [CPR in a DataAlt case alternative].
+    -- Giving strict binders the CPR property only makes sense for products, as
+    -- the arguments in Note [Initial CPR for strict binders] don't apply to
+    -- sums (yet); we lack WW for strict binders of sum type.
     do_con_arg env (id, str)
        | let is_strict = isStrictDmd (idDemandInfo id) || isMarkedStrict str
-       , ae_virgin env || (is_var_scrut && is_strict)  -- See Note [CPR in a product case alternative]
+       , is_var_scrut && is_strict
+       , let fam_envs = ae_fam_envs env
        , Just (dc,_,_,_) <- deepSplitProductType_maybe fam_envs $ idType id
        = extendAnalEnv NotTopLevel env id (prodCprType (dataConRepArity dc))
        | otherwise
@@ -1022,10 +1011,10 @@ dumpStrSig binds = vcat (map printId ids)
   printId id | isExportedId id = ppr id <> colon <+> pprIfaceStrictSig (idStrictness id)
              | otherwise       = empty
 
-{- Note [CPR in a product case alternative]
+{- Note [CPR in a DataAlt case alternative]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In a case alternative for a product type, we want to give some of the
-binders the CPR property.  Specifically
+In a case alternative, we want to give some of the binders the CPR property.
+Specifically
 
  * The case binder; inside the alternative, the case binder always has
    the CPR property, meaning that a case on it will successfully cancel.
@@ -1155,7 +1144,7 @@ Note that
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~~
 Here are some examples (stranal/should_compile/T10482a) of the
-usefulness of Note [CPR in a product case alternative].  The main
+usefulness of Note [CPR in a DataAlt case alternative].  The main
 point: all of these functions can have the CPR property.
 
     ------- f1 -----------

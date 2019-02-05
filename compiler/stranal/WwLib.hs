@@ -947,7 +947,10 @@ deepSplitCprType_maybe fam_envs con_tag ty
   , cons `lengthAtLeast` con_tag -- This might not be true if we import the
                                  -- type constructor via a .hs-bool file (#8743)
   , let con = cons `getNth` (con_tag - fIRST_TAG)
-        arg_tys = dataConInstArgTys con tc_args
+  , null (dataConExTyCoVars con) -- We have no simple way to express
+                                 -- existentials. Omitting this triggers an
+                                 -- assertion in 'dataConInstArgTys'
+  , let arg_tys = dataConInstArgTys con tc_args
         strict_marks = dataConRepStrictness con
   = Just (con, tc_args, zipEqual "dsct" arg_tys strict_marks, co)
 deepSplitCprType_maybe _ _ _ = Nothing
@@ -1084,6 +1087,9 @@ after all, the analysis is not really wrong), so we simply do nothing here in
 mkWWcpr. But we still want to emit warning with -DDEBUG, to hopefully catch
 other cases where something went avoidably wrong.
 
+This warning also triggers for the stream fusion library within `text`.
+We can'easily W/W constructed results like `Stream` because we have no simple
+way to express existential types in the worker's type signature.
 
 Note [Profiling and unpacking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
