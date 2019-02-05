@@ -465,6 +465,10 @@ library
                sm/GCUtils.c
                sm/MBlock.c
                sm/MarkWeak.c
+               sm/NonMoving.c
+               sm/NonMovingMark.c
+               sm/NonMovingScav.c
+               sm/NonMovingSweep.c
                sm/Sanity.c
                sm/Scav.c
                sm/Scav_thr.c
