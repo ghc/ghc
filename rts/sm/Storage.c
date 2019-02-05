@@ -1133,8 +1133,8 @@ dirty_TSO (Capability *cap, StgTSO *tso)
 void
 dirty_STACK (Capability *cap, StgStack *stack)
 {
-    if (stack->dirty == 0) {
-        stack->dirty = 1;
+    if (! (stack->dirty & STACK_DIRTY)) {
+        stack->dirty = STACK_DIRTY;
         recordClosureMutated(cap,(StgClosure*)stack);
     }
 }
