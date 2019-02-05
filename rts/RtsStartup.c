@@ -432,6 +432,9 @@ hs_exit_(bool wait_foreign)
     /* shutdown the hpc support (if needed) */
     exitHpc();
 
+    /* wait for any on-going concurrent GC to finish */
+    nonmovingExit();
+
     // clean up things from the storage manager's point of view.
     // also outputs the stats (+RTS -s) info.
     exitStorage();
