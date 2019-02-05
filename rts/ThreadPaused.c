@@ -330,6 +330,17 @@ threadPaused(Capability *cap, StgTSO *tso)
             }
 #endif
 
+            if (RTS_UNLIKELY(nonmoving_write_barrier_enabled
+                             && ip_THUNK(INFO_PTR_TO_STRUCT(bh_info)))) {
+                // We are about to replace a thunk with a blackhole.
+                // Add the free variables of the closure we are about to
+                // overwrite to the update remembered set.
+                // N.B. We caught the WHITEHOLE case above.
+                updateRemembSetPushThunkEager(cap,
+                                             THUNK_INFO_PTR_TO_STRUCT(bh_info),
+                                             (StgThunk *) bh);
+            }
+
             // The payload of the BLACKHOLE points to the TSO
             ((StgInd *)bh)->indirectee = (StgClosure *)tso;
             write_barrier();

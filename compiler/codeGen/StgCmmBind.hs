@@ -631,6 +631,7 @@ emitBlackHoleCode node = do
              -- work with profiling.
 
   when eager_blackholing $ do
+    whenUpdRemSetEnabled dflags $ emitUpdRemSetPushThunk node
     emitStore (cmmOffsetW dflags node (fixedHdrSizeW dflags)) currentTSOExpr
     emitPrimCall [] MO_WriteBarrier []
     emitStore node (CmmReg (CmmGlobal EagerBlackholeInfo))
