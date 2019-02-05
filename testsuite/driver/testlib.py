@@ -369,7 +369,8 @@ def _collect_stats(name, opts, metrics, deviation, is_compiler_stats_test=False)
         opts.skip = 1
 
     for metric in metrics:
-        baselineByWay = lambda way, target_commit: Perf.baseline_metric( \
+        def baselineByWay(way, target_commit, metric=metric):
+            return Perf.baseline_metric( \
                               target_commit, name, config.test_env, metric, way)
 
         opts.stats_range_fields[metric] = (baselineByWay, deviation)
