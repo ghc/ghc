@@ -282,6 +282,13 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
         }
     }
 
+    // Initialize UpdRemSets
+    if (RtsFlags.GcFlags.useNonmoving) {
+        for (i = 0; i < to; ++i) {
+            init_upd_rem_set(&capabilities[i]->upd_rem_set);
+        }
+    }
+
 #if defined(THREADED_RTS) && defined(llvm_CC_FLAVOR) && (CC_SUPPORTS_TLS == 0)
     newThreadLocalKey(&gctKey);
 #endif
@@ -1082,6 +1089,27 @@ allocatePinned (Capability *cap, W_ n)
    Write Barriers
    -------------------------------------------------------------------------- */
 
+/* These write barriers on heavily mutated objects serve two purposes:
+ *
+ * - Efficient maintenance of the generational invariant: Record whether or not
+ *   we have added a particular mutable object to mut_list as they may contain
+ *   references to younger generations.
+ *
+ * - Maintenance of the nonmoving collector's snapshot invariant: Record objects
+ *   which are about to no longer be reachable due to mutation.
+ *
+ * In each case we record whether the object has been added to the mutable list
+ * by way of either the info pointer or a dedicated "dirty" flag. The GC will
+ * clear this flag and remove the object from mut_list (or rather, not re-add it)
+ * to if it finds the object contains no references into any younger generation.
+ *
+ * Note that all dirty objects will be marked as clean during preparation for a
+ * concurrent collection. Consequently, we can use the dirtiness flag to determine
+ * whether or not we need to add overwritten pointers to the update remembered
+ * set (since we need only write the value prior to the first update to maintain
+ * the snapshot invariant).
+ */
+
 /*
    This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
    MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
@@ -1089,21 +1117,36 @@ allocatePinned (Capability *cap, W_ n)
    and is put on the mutable list.
 */
 void
-dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
+dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
 {
     Capability *cap = regTableToCapability(reg);
-    if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
-        p->header.info = &stg_MUT_VAR_DIRTY_info;
-        recordClosureMutated(cap,p);
+    if (mvar->header.info == &stg_MUT_VAR_CLEAN_info) {
+        mvar->header.info = &stg_MUT_VAR_DIRTY_info;
+        recordClosureMutated(cap, (StgClosure *) mvar);
+        if (nonmoving_write_barrier_enabled != 0) {
+            updateRemembSetPushClosure_(reg,
+                                      old,
+                                      &mvar->var);
+        }
     }
 }
 
+/*
+ * old is the pointer that we overwrote, which is required by the concurrent
+ * garbage collector. Note that we, while StgTVars contain multiple pointers,
+ * only overwrite one per dirty_TVAR call so we only need to take one old
+ * pointer argument.
+ */
 void
-dirty_TVAR(Capability *cap, StgTVar *p)
+dirty_TVAR(Capability *cap, StgTVar *p,
+           StgClosure *old)
 {
     if (p->header.info == &stg_TVAR_CLEAN_info) {
         p->header.info = &stg_TVAR_DIRTY_info;
         recordClosureMutated(cap,(StgClosure*)p);
+        if (nonmoving_write_barrier_enabled != 0) {
+            updateRemembSetPushClosure(cap, old, NULL);
+        }
     }
 }
 
@@ -1118,6 +1161,8 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
     if (tso->dirty == 0) {
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
+        if (nonmoving_write_barrier_enabled)
+            updateRemembSetPushClosure(cap, (StgClosure *) tso->_link, NULL);
     }
     tso->_link = target;
 }
@@ -1128,6 +1173,8 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
     if (tso->dirty == 0) {
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
+        if (nonmoving_write_barrier_enabled)
+            updateRemembSetPushClosure(cap, (StgClosure *) tso->block_info.prev, NULL);
     }
     tso->block_info.prev = target;
 }
@@ -1139,15 +1186,24 @@ dirty_TSO (Capability *cap, StgTSO *tso)
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
     }
+
+    if (nonmoving_write_barrier_enabled)
+        updateRemembSetPushTSO(cap, tso);
 }
 
 void
 dirty_STACK (Capability *cap, StgStack *stack)
 {
+    // First push to upd_rem_set before we set stack->dirty since we
+    // the nonmoving collector may already be marking the stack.
+    if (nonmoving_write_barrier_enabled)
+        updateRemembSetPushStack(cap, stack);
+
     if (! (stack->dirty & STACK_DIRTY)) {
         stack->dirty = STACK_DIRTY;
         recordClosureMutated(cap,(StgClosure*)stack);
     }
+
 }
 
 /*
@@ -1159,9 +1215,16 @@ dirty_STACK (Capability *cap, StgStack *stack)
    such as Chaneneos and cheap-concurrency.
 */
 void
-dirty_MVAR(StgRegTable *reg, StgClosure *p)
+dirty_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 {
-    recordClosureMutated(regTableToCapability(reg),p);
+    Capability *cap = regTableToCapability(reg);
+    if (nonmoving_write_barrier_enabled) {
+        StgMVar *mvar = (StgMVar *) p;
+        updateRemembSetPushClosure(cap, old_val, NULL);
+        updateRemembSetPushClosure(cap, (StgClosure *) mvar->head, NULL);
+        updateRemembSetPushClosure(cap, (StgClosure *) mvar->tail, NULL);
+    }
+    recordClosureMutated(cap, p);
 }
 
 /* -----------------------------------------------------------------------------
