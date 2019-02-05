@@ -226,6 +226,7 @@ void nonmovingFlushCapUpdRemSetBlocks(Capability *cap)
         debugTrace(DEBUG_nonmoving_gc,
                    "Capability %d flushing update remembered set: %d",
                    cap->no, markQueueLength(&cap->upd_rem_set.queue));
+        traceConcUpdRemSetFlush(cap);
         nonmovingAddUpdRemSetBlocks(&cap->upd_rem_set.queue);
         atomic_inc(&upd_rem_set_flush_count, 1);
         cap->upd_rem_set_syncd = true;
@@ -241,6 +242,7 @@ void nonmovingFlushCapUpdRemSetBlocks(Capability *cap)
 void nonmovingBeginFlush(Task *task)
 {
     debugTrace(DEBUG_nonmoving_gc, "Starting update remembered set flush...");
+    traceConcSyncBegin();
     for (unsigned int i = 0; i < n_capabilities; i++) {
         capabilities[i]->upd_rem_set_syncd = false;
     }
@@ -336,6 +338,7 @@ void nonmovingFinishFlush(Task *task)
     upd_rem_set_block_list = NULL;
 
     debugTrace(DEBUG_nonmoving_gc, "Finished update remembered set flush...");
+    traceConcSyncEnd();
     releaseAllCapabilities(n_capabilities, NULL, task);
 }
 #endif
@@ -1457,6 +1460,7 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
 GNUC_ATTR_HOT void
 nonmovingMark (MarkQueue *queue)
 {
+    traceConcMarkBegin();
     debugTrace(DEBUG_nonmoving_gc, "Starting mark pass");
     unsigned int count = 0;
     while (true) {
@@ -1497,6 +1501,7 @@ nonmovingMark (MarkQueue *queue)
             } else {
                 // Nothing more to do
                 debugTrace(DEBUG_nonmoving_gc, "Finished mark pass: %d", count);
+                traceConcMarkEnd(count);
                 return;
             }
         }
