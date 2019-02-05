@@ -631,6 +631,7 @@ emitBlackHoleCode node = do
              -- work with profiling.
 
   when eager_blackholing $ do
+    whenUpdRemSetEnabled dflags $ emitUpdRemSetPushThunk node
     emitStore (cmmOffsetW dflags node (fixedHdrSizeW dflags)) currentTSOExpr
     -- See Note [Heap memory barriers] in SMP.h.
     emitPrimCall [] MO_WriteBarrier []

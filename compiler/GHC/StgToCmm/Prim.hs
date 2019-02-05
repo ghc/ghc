@@ -42,6 +42,7 @@ import BlockId
 import MkGraph
 import StgSyn
 import Cmm
+import Module   ( rtsUnitId )
 import Type     ( Type, tyConAppTyCon )
 import TyCon
 import CLabel
@@ -339,14 +340,20 @@ dispatchPrimop dflags = \case
     emitAssign (CmmLocal res) (cmmLoadIndexW dflags mutv (fixedHdrSizeW dflags) (gcWord dflags))
 
   WriteMutVarOp -> \[mutv, var] -> OpDest_AllDone $ \res@[] -> do
+    old_val <- CmmLocal <$> newTemp (cmmExprType dflags var)
+    emitAssign old_val (cmmLoadIndexW dflags mutv (fixedHdrSizeW dflags) (gcWord dflags))
+
     -- Without this write barrier, other CPUs may see this pointer before
     -- the writes for the closure it points to have occurred.
+    -- Note that this also must come after we read the old value to ensure
+    -- that the read of old_val comes before another core's write to the
+    -- MutVar's value.
     emitPrimCall res MO_WriteBarrier []
     emitStore (cmmOffsetW dflags mutv (fixedHdrSizeW dflags)) var
     emitCCall
             [{-no results-}]
             (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
-            [(baseExpr, AddrHint), (mutv,AddrHint)]
+            [(baseExpr, AddrHint), (mutv, AddrHint), (CmmReg old_val, AddrHint)]
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes
@@ -1983,17 +1990,21 @@ doWritePtrArrayOp :: CmmExpr
 doWritePtrArrayOp addr idx val
   = do dflags <- getDynFlags
        let ty = cmmExprType dflags val
+           hdr_size = arrPtrsHdrSize dflags
+       -- Update remembered set for non-moving collector
+       whenUpdRemSetEnabled dflags
+           $ emitUpdRemSetPush (cmmLoadIndexOffExpr dflags hdr_size ty addr ty idx)
        -- This write barrier is to ensure that the heap writes to the object
        -- referred to by val have happened before we write val into the array.
        -- See #12469 for details.
        emitPrimCall [] MO_WriteBarrier []
-       mkBasicIndexedWrite (arrPtrsHdrSize dflags) Nothing addr ty idx val
+       mkBasicIndexedWrite hdr_size Nothing addr ty idx val
        emit (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
-  -- the write barrier.  We must write a byte into the mark table:
-  -- bits8[a + header_size + StgMutArrPtrs_size(a) + x >> N]
+       -- the write barrier.  We must write a byte into the mark table:
+       -- bits8[a + header_size + StgMutArrPtrs_size(a) + x >> N]
        emit $ mkStore (
          cmmOffsetExpr dflags
-          (cmmOffsetExprW dflags (cmmOffsetB dflags addr (arrPtrsHdrSize dflags))
+          (cmmOffsetExprW dflags (cmmOffsetB dflags addr hdr_size)
                          (loadArrPtrsSize dflags addr))
           (CmmMachOp (mo_wordUShr dflags) [idx,
                                            mkIntExpr dflags (mUT_ARR_PTRS_CARD_BITS dflags)])
@@ -2584,6 +2595,9 @@ emitCopyArray copy src0 src_off dst0 dst_off0 n =
         dst     <- assignTempE dst0
         dst_off <- assignTempE dst_off0
 
+        -- Nonmoving collector write barrier
+        emitCopyUpdRemSetPush dflags (arrPtrsHdrSizeW dflags) dst dst_off n
+
         -- Set the dirty bit in the header.
         emit (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
 
@@ -2645,6 +2659,9 @@ emitCopySmallArray copy src0 src_off dst0 dst_off n =
         -- Passed as arguments (be careful)
         src     <- assignTempE src0
         dst     <- assignTempE dst0
+
+        -- Nonmoving collector write barrier
+        emitCopyUpdRemSetPush dflags (smallArrPtrsHdrSizeW dflags) dst dst_off n
 
         -- Set the dirty bit in the header.
         emit (setInfo dst (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
@@ -2774,6 +2791,12 @@ doWriteSmallPtrArrayOp :: CmmExpr
 doWriteSmallPtrArrayOp addr idx val = do
     dflags <- getDynFlags
     let ty = cmmExprType dflags val
+
+    -- Update remembered set for non-moving collector
+    tmp <- newTemp ty
+    mkBasicIndexedRead (smallArrPtrsHdrSize dflags) Nothing ty tmp addr ty idx
+    whenUpdRemSetEnabled dflags $ emitUpdRemSetPush (CmmReg (CmmLocal tmp))
+
     emitPrimCall [] MO_WriteBarrier [] -- #12469
     mkBasicIndexedWrite (smallArrPtrsHdrSize dflags) Nothing addr ty idx val
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
@@ -2953,3 +2976,31 @@ emitCtzCall res x width = do
         [ res ]
         (MO_Ctz width)
         [ x ]
+
+---------------------------------------------------------------------------
+-- Pushing to the update remembered set
+---------------------------------------------------------------------------
+
+-- | Push a range of pointer-array elements that are about to be copied over to
+-- the update remembered set.
+emitCopyUpdRemSetPush :: DynFlags
+                      -> WordOff    -- ^ array header size
+                      -> CmmExpr    -- ^ destination array
+                      -> CmmExpr    -- ^ offset in destination array (in words)
+                      -> Int        -- ^ number of elements to copy
+                      -> FCode ()
+emitCopyUpdRemSetPush _dflags _hdr_size _dst _dst_off 0 = return ()
+emitCopyUpdRemSetPush dflags hdr_size dst dst_off n =
+    whenUpdRemSetEnabled dflags $ do
+        updfr_off <- getUpdFrameOff
+        graph <- mkCall lbl (NativeNodeCall,NativeReturn) [] args updfr_off []
+        emit graph
+  where
+    lbl = mkLblExpr $ mkPrimCallLabel
+          $ PrimCall (fsLit "stg_copyArray_barrier") rtsUnitId
+    args =
+      [ mkIntExpr dflags hdr_size
+      , dst
+      , dst_off
+      , mkIntExpr dflags n
+      ]
