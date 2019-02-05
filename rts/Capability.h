@@ -23,6 +23,7 @@
 #include "sm/GC.h" // for evac_fn
 #include "Task.h"
 #include "Sparks.h"
+#include "sm/NonMovingMark.h" // for MarkQueue
 
 #include "BeginPrivate.h"
 
@@ -297,6 +298,8 @@ EXTERN_INLINE void recordClosureMutated (Capability *cap, StgClosure *p);
 Capability * waitForWorkerCapability (Task *task);
 
 #if defined(THREADED_RTS)
+
+Capability * waitForWorkerCapability (Task *task);
 
 // Gives up the current capability IFF there is a higher-priority
 // thread waiting for it.  This happens in one of two ways:
