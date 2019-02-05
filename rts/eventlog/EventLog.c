@@ -106,7 +106,14 @@ char *EventDesc[] = {
   [EVENT_HEAP_PROF_SAMPLE_END]    = "End of heap profile sample",
   [EVENT_HEAP_PROF_SAMPLE_STRING] = "Heap profile string sample",
   [EVENT_HEAP_PROF_SAMPLE_COST_CENTRE] = "Heap profile cost-centre sample",
-  [EVENT_USER_BINARY_MSG]     = "User binary message"
+  [EVENT_USER_BINARY_MSG]     = "User binary message",
+  [EVENT_CONC_MARK_BEGIN]        = "Begin concurrent mark phase",
+  [EVENT_CONC_MARK_END]          = "End concurrent mark phase",
+  [EVENT_CONC_SYNC_BEGIN]        = "Begin concurrent GC synchronisation",
+  [EVENT_CONC_SYNC_END]          = "End concurrent GC synchronisation",
+  [EVENT_CONC_SWEEP_BEGIN]       = "Begin concurrent sweep",
+  [EVENT_CONC_SWEEP_END]         = "End concurrent sweep",
+  [EVENT_CONC_UPD_REM_SET_FLUSH] = "Update remembered set flushed"
 };
 
 // Event type.
@@ -439,6 +446,23 @@ init_event_types(void)
 
         case EVENT_USER_BINARY_MSG:
             eventTypes[t].size = EVENT_SIZE_DYNAMIC;
+            break;
+
+        case EVENT_CONC_MARK_BEGIN:
+        case EVENT_CONC_SYNC_BEGIN:
+        case EVENT_CONC_SYNC_END:
+        case EVENT_CONC_SWEEP_BEGIN:
+        case EVENT_CONC_SWEEP_END:
+            eventTypes[t].size = 0;
+            break;
+
+        case EVENT_CONC_MARK_END:
+            eventTypes[t].size = 4;
+            break;
+
+        case EVENT_CONC_UPD_REM_SET_FLUSH: // (cap)
+            eventTypes[t].size =
+                sizeof(EventCapNo);
             break;
 
         default:
@@ -1000,6 +1024,15 @@ void postTaskDeleteEvent (EventTaskId taskId)
 }
 
 void
+postEventNoCap (EventTypeNum tag)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    ensureRoomForEvent(&eventBuf, tag);
+    postEventHeader(&eventBuf, tag);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void
 postEvent (Capability *cap, EventTypeNum tag)
 {
     EventsBuf *eb = &capEventBuf[cap->no];
@@ -1123,6 +1156,23 @@ void postThreadLabel(Capability    *cap,
     postPayloadSize(eb, size);
     postThreadID(eb, id);
     postBuf(eb, (StgWord8*) label, strsize);
+}
+
+void postConcUpdRemSetFlush(Capability *cap)
+{
+    EventsBuf *eb = &capEventBuf[cap->no];
+    ensureRoomForEvent(eb, EVENT_CONC_UPD_REM_SET_FLUSH);
+    postEventHeader(eb, EVENT_CONC_UPD_REM_SET_FLUSH);
+    postCapNo(eb, cap->no);
+}
+
+void postConcMarkEnd(StgWord32 marked_obj_count)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    ensureRoomForEvent(&eventBuf, EVENT_CONC_MARK_END);
+    postEventHeader(&eventBuf, EVENT_CONC_MARK_END);
+    postWord32(&eventBuf, marked_obj_count);
+    RELEASE_LOCK(&eventBufMutex);
 }
 
 void closeBlockMarker (EventsBuf *ebuf)
