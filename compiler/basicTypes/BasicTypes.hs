@@ -1545,7 +1545,7 @@ fractionalLitNeg fl =
 data FractionalExponentBase
   = Base2
   | Base10
-  deriving (Data, Show)
+  deriving (Eq, Ord, Data, Show)
 
 mkRationalWithExponentBase :: Integer -> Integer -> FractionalExponentBase -> Rational
 mkRationalWithExponentBase i e feb = (i :% 1) * (eb ^^ e)
@@ -1605,10 +1605,10 @@ instance Outputable IntegralLit where
   ppr (IL NoSourceText _ value) = text (show value)
 
 instance Eq FractionalLit where
-  (==) = (==) `on` (\x -> mkRationalWithExponentBase (fl_signi x) (fl_exp x) (fl_exp_base x))
+  (==) = (==) `on` (\x -> (fl_signi x, fl_exp x, fl_exp_base x))
 
 instance Ord FractionalLit where
-  compare = compare `on` (\x -> mkRationalWithExponentBase (fl_signi x) (fl_exp x) (fl_exp_base x))
+  compare = compare `on` (\x -> (fl_signi x, fl_exp x, fl_exp_base x))
 
 instance Outputable FractionalLit where
   ppr (fl@(FL {})) = pprWithSourceText (fl_text fl) (rational $ mkRationalWithExponentBase (fl_signi fl) (fl_exp fl) (fl_exp_base fl))
