@@ -66,7 +66,7 @@ logCostCentreStack(FILE *prof_file, CostCentreStack const *ccs)
     fprintf(prof_file,
             "{\"id\": %" FMT_Int ", "
             "\"entries\": %" FMT_Word64 ", "
-            "\"alloc\": %" FMT_Word ", "
+            "\"alloc\": %" FMT_Word64 ", "
             "\"ticks\": %" FMT_Word ", ",
             ccs->cc->ccID,
             ccs->scc_count,
