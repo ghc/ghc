@@ -261,7 +261,7 @@ mkIntegerExpr i = do t <- lookupTyCon integerTyConName
 -- | Create a 'CoreExpr' which will evaluate to a @Rational@ with given significand and exponent
 mkRationalExpr  :: MonadThings m => Integer -> Integer -> m CoreExpr  -- Result :: Rational
 mkRationalExpr i e = do t <- lookupTyCon rationalTyConName
-                        return (Lit (mkLitRational i e (mkTyConTy t)))
+                        return (Lit (LitRational i e (mkTyConTy t)))
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Natural@
 mkNaturalExpr  :: MonadThings m => Integer -> m CoreExpr
