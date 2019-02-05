@@ -15,6 +15,7 @@
 
 #include "BeginPrivate.h"
 
+#include "GCThread.h"
 #include "HeapAlloc.h"
 
 void GarbageCollect (uint32_t force_major_gc,
@@ -53,6 +54,7 @@ extern volatile StgWord64 waitForGcThreads_yield;
 
 void gcWorkerThread (Capability *cap);
 void initGcThreads (uint32_t from, uint32_t to);
+void initGcThread (gc_thread *t);
 void freeGcThreads (void);
 
 #if defined(THREADED_RTS)

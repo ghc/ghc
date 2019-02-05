@@ -162,7 +162,6 @@ DECLARE_GCT
 static void mark_root               (void *user, StgClosure **root);
 static void prepare_collected_gen   (generation *gen);
 static void prepare_uncollected_gen (generation *gen);
-static void init_gc_thread          (gc_thread *t);
 static void resize_generations      (void);
 static void resize_nursery          (void);
 static void start_gc_threads        (void);
@@ -333,7 +332,7 @@ GarbageCollect (uint32_t collect_gen,
   }
 
   // Prepare this gc_thread
-  init_gc_thread(gct);
+  initGcThread(gct);
 
   /* Allocate a mark stack if we're doing a major collection.
    */
@@ -910,7 +909,7 @@ new_gc_thread (uint32_t n, gc_thread *t)
     t->free_blocks = NULL;
     t->gc_count = 0;
 
-    init_gc_thread(t);
+    initGcThread(t);
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++)
     {
@@ -1147,7 +1146,7 @@ gcWorkerThread (Capability *cap)
     debugTrace(DEBUG_gc, "GC thread %d standing by...", gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->gc_spin);
 
-    init_gc_thread(gct);
+    initGcThread(gct);
 
     traceEventGcWork(gct->cap);
 
@@ -1559,8 +1558,8 @@ collect_pinned_object_blocks (void)
    Initialise a gc_thread before GC
    -------------------------------------------------------------------------- */
 
-static void
-init_gc_thread (gc_thread *t)
+void
+initGcThread (gc_thread *t)
 {
     t->static_objects = END_OF_STATIC_OBJECT_LIST;
     t->scavenged_static_objects = END_OF_STATIC_OBJECT_LIST;
