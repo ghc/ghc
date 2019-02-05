@@ -85,6 +85,10 @@ struct Capability_ {
     bdescr **mut_lists;
     bdescr **saved_mut_lists; // tmp use during GC
 
+    // The update remembered set for the non-moving collector
+    UpdRemSet upd_rem_set;
+    bool upd_rem_set_syncd;
+
     // block for allocating pinned objects into
     bdescr *pinned_object_block;
     // full pinned object blocks allocated since the last GC
@@ -257,7 +261,8 @@ extern Capability **capabilities;
 typedef enum {
     SYNC_OTHER,
     SYNC_GC_SEQ,
-    SYNC_GC_PAR
+    SYNC_GC_PAR,
+    SYNC_FLUSH_UPD_REM_SET
 } SyncType;
 
 //

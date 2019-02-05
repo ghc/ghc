@@ -80,10 +80,22 @@ typedef struct MarkQueue_ {
     // Cached value of blocks->start.
     MarkQueueBlock *top;
 
+    // Is this a mark queue or a capability-local update remembered set?
+    bool is_upd_rem_set;
+
     // Marked objects outside of nonmoving heap, namely large and static
     // objects.
     HashTable *marked_objects;
 } MarkQueue;
+
+/* While it shares its representation with MarkQueue, UpdRemSet differs in
+ * behavior when pushing; namely full chunks are immediately pushed to the
+ * global update remembered set, not accumulated into a chain. We make this
+ * distinction apparent in the types.
+ */
+typedef struct {
+    MarkQueue queue;
+} UpdRemSet;
 
 // The length of MarkQueueBlock.entries
 #define MARK_QUEUE_BLOCK_ENTRIES ((BLOCK_SIZE - sizeof(MarkQueueBlock)) / sizeof(MarkQueueEnt))
@@ -101,6 +113,24 @@ extern StgIndStatic *debug_caf_list_snapshot;
 #endif
 
 extern MarkQueue *current_mark_queue;
+extern bdescr *upd_rem_set_block_list;
+extern bool nonmoving_write_barrier_enabled;
+void nonmovingMarkInitUpdRemSet(void);
+
+void init_upd_rem_set(UpdRemSet *rset);
+void updateRemembSetPushThunk(Capability *cap, StgThunk *origin);
+void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *origin);
+void updateRemembSetPushTSO(Capability *cap, StgTSO *tso);
+void updateRemembSetPushStack(Capability *cap, StgStack *stack);
+// Debug only -- count number of blocks in global UpdRemSet
+int countGlobalUpdateRemembSetBlocks(void);
+
+#if defined(THREADED_RTS)
+void nonmovingFlushCapUpdRemSetBlocks(Capability *cap);
+void nonmovingBeginFlush(Task *task);
+bool nonmovingWaitForFlush(void);
+void nonmovingFinishFlush(Task *task);
+#endif
 
 void markQueueAddRoot(MarkQueue* q, StgClosure** root);
 
@@ -124,6 +154,9 @@ void markQueuePushClosure_(MarkQueue *q, StgClosure *p);
 void markQueuePushThunkSrt(MarkQueue *q, const StgInfoTable *info);
 void markQueuePushFunSrt(MarkQueue *q, const StgInfoTable *info);
 void markQueuePushArray(MarkQueue *q, const StgMutArrPtrs *array, StgWord start_index);
+void updateRemembSetPushThunkEager(Capability *cap,
+                                  const StgThunkInfoTable *orig_info,
+                                  StgThunk *thunk);
 
 INLINE_HEADER bool markQueueIsEmpty(MarkQueue *q)
 {

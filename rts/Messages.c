@@ -238,8 +238,8 @@ loop:
         // a collision to update a BLACKHOLE and a BLOCKING_QUEUE
         // becomes orphaned (see updateThunk()).
         bq->link = owner->bq;
+        dirty_TSO(cap, owner); // we will modify owner->bq
         owner->bq = bq;
-        dirty_TSO(cap, owner); // we modified owner->bq
 
         // If the owner of the blackhole is currently runnable, then
         // bump it to the front of the run queue.  This gives the

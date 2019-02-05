@@ -70,6 +70,14 @@ bdescr *nonmoving_large_objects = NULL;
 bdescr *nonmoving_marked_large_objects = NULL;
 memcount n_nonmoving_large_blocks = 0;
 memcount n_nonmoving_marked_large_blocks = 0;
+#if defined(THREADED_RTS)
+/* Protects everything above. Furthermore, we only set the BF_MARKED bit of
+ * large object blocks when this is held. This ensures that the write barrier
+ * (e.g. finish_upd_rem_set_mark) and the collector (mark_closure) don't try to
+ * move the same large object to nonmoving_marked_large_objects more than once.
+ */
+static Mutex nonmoving_large_objects_mutex;
+#endif
 
 /*
  * Where we keep our threads during collection since we must have a snapshot of
@@ -90,10 +98,186 @@ StgWeak *nonmoving_weak_ptr_list = NULL;
 StgIndStatic *debug_caf_list_snapshot = (StgIndStatic*)END_OF_CAF_LIST;
 #endif
 
+/* Note [Update remembered set]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The concurrent non-moving collector uses a remembered set to ensure
+ * that its marking is consistent with the snapshot invariant defined in
+ * the design. This remembered set, known as the update remembered set,
+ * records all pointers that have been overwritten since the beginning
+ * of the concurrent mark. It is maintained via a write barrier that
+ * is enabled whenever a concurrent mark is active.
+ *
+ * The representation of the update remembered set is the same as that of
+ * the mark queue. For efficiency, each capability maintains its own local
+ * accumulator of remembered set entries. When a capability fills its
+ * accumulator it is linked in to the global remembered set
+ * (upd_rem_set_block_list), where it is consumed by the mark phase.
+ *
+ * The mark phase is responsible for freeing update remembered set block
+ * allocations.
+ *
+ *
+ * Note [Concurrent read barrier on deRefWeak#]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * In general the non-moving GC assumes that all pointers reachable from a
+ * marked object are themselves marked (or in the mark queue). However,
+ * weak pointers are an obvious exception to this rule. In particular,
+ * deRefWeakPtr# allows the mutator to turn a weak reference into a strong
+ * reference. This interacts badly with concurrent collection. For
+ * instance, consider this program:
+ *
+ *     f :: a -> b -> IO b
+ *     f k v = do
+ *         -- assume that k and v are the only references to the
+ *         -- closures to which they refer.
+ *         weak <- mkWeakPtr k v Nothing
+ *
+ *         -- N.B. k is now technically dead since the only reference to it is
+ *         -- weak, but we've not yet had a chance to tombstone the WeakPtr
+ *         -- (which will happen in the course of major GC).
+ *         performMajorGC
+ *         -- Now we are running concurrently with the mark...
+
+ *         Just x <- deRefWeak weak
+ *         -- We have now introduced a reference to `v`, which will
+ *         -- not be marked as the only reference to `v` when the snapshot was
+ *         -- taken is via a WeakPtr.
+ *         return x
+ *
+ */
+static Mutex upd_rem_set_lock;
+bdescr *upd_rem_set_block_list = NULL;
+
+#if defined(THREADED_RTS)
+/* Used during the mark/sweep phase transition to track how many capabilities
+ * have pushed their update remembered sets. Protected by upd_rem_set_lock.
+ */
+static volatile StgWord upd_rem_set_flush_count = 0;
+#endif
+
+
+/* Signaled by each capability when it has flushed its update remembered set */
+static Condition upd_rem_set_flushed_cond;
+
+/* Indicates to mutators that the write barrier must be respected. Set while
+ * concurrent mark is running.
+ */
+bool nonmoving_write_barrier_enabled = false;
+
 /* Used to provide the current mark queue to the young generation
  * collector for scavenging.
  */
 MarkQueue *current_mark_queue = NULL;
+
+/* Initialise update remembered set data structures */
+void nonmovingMarkInitUpdRemSet() {
+    initMutex(&upd_rem_set_lock);
+    initCondition(&upd_rem_set_flushed_cond);
+#if defined(THREADED_RTS)
+    initMutex(&nonmoving_large_objects_mutex);
+#endif
+}
+
+#if defined(THREADED_RTS) && defined(DEBUG)
+static uint32_t markQueueLength(MarkQueue *q);
+#endif
+static void init_mark_queue_(MarkQueue *queue);
+
+/* Transfers the given capability's update-remembered set to the global
+ * remembered set.
+ *
+ * Really the argument type should be UpdRemSet* but this would be rather
+ * inconvenient without polymorphism.
+ */
+static void nonmovingAddUpdRemSetBlocks(MarkQueue *rset)
+{
+    if (markQueueIsEmpty(rset)) return;
+
+    // find the tail of the queue
+    bdescr *start = rset->blocks;
+    bdescr *end = start;
+    while (end->link != NULL)
+        end = end->link;
+
+    // add the blocks to the global remembered set
+    ACQUIRE_LOCK(&upd_rem_set_lock);
+    end->link = upd_rem_set_block_list;
+    upd_rem_set_block_list = start;
+    RELEASE_LOCK(&upd_rem_set_lock);
+
+    // Reset remembered set
+    ACQUIRE_SM_LOCK;
+    init_mark_queue_(rset);
+    rset->is_upd_rem_set = true;
+    RELEASE_SM_LOCK;
+}
+
+#if defined(THREADED_RTS)
+/* Called by capabilities to flush their update remembered sets when
+ * synchronising with the non-moving collector as it transitions from mark to
+ * sweep phase.
+ */
+void nonmovingFlushCapUpdRemSetBlocks(Capability *cap)
+{
+    if (! cap->upd_rem_set_syncd) {
+        debugTrace(DEBUG_nonmoving_gc,
+                   "Capability %d flushing update remembered set: %d",
+                   cap->no, markQueueLength(&cap->upd_rem_set.queue));
+        nonmovingAddUpdRemSetBlocks(&cap->upd_rem_set.queue);
+        atomic_inc(&upd_rem_set_flush_count, 1);
+        cap->upd_rem_set_syncd = true;
+        signalCondition(&upd_rem_set_flushed_cond);
+        // After this mutation will remain suspended until nonmovingFinishFlush
+        // releases its capabilities.
+    }
+}
+
+/* Request that all capabilities flush their update remembered sets and suspend
+ * execution until the further notice.
+ */
+void nonmovingBeginFlush(Task *task)
+{
+    debugTrace(DEBUG_nonmoving_gc, "Starting update remembered set flush...");
+    for (unsigned int i = 0; i < n_capabilities; i++) {
+        capabilities[i]->upd_rem_set_syncd = false;
+    }
+    upd_rem_set_flush_count = 0;
+    stopAllCapabilitiesWith(NULL, task, SYNC_FLUSH_UPD_REM_SET);
+
+    // XXX: We may have been given a capability via releaseCapability (i.e. a
+    // task suspended due to a foreign call) in which case our requestSync
+    // logic won't have been hit. Make sure that everyone so far has flushed.
+    // Ideally we want to mark asynchronously with syncing.
+    for (unsigned int i = 0; i < n_capabilities; i++) {
+        nonmovingFlushCapUpdRemSetBlocks(capabilities[i]);
+    }
+}
+
+/* Wait until a capability has flushed its update remembered set. Returns true
+ * if all capabilities have flushed.
+ */
+bool nonmovingWaitForFlush()
+{
+    ACQUIRE_LOCK(&upd_rem_set_lock);
+    debugTrace(DEBUG_nonmoving_gc, "Flush count %d", upd_rem_set_flush_count);
+    bool finished = upd_rem_set_flush_count == n_capabilities;
+    if (!finished) {
+        waitCondition(&upd_rem_set_flushed_cond, &upd_rem_set_lock);
+    }
+    RELEASE_LOCK(&upd_rem_set_lock);
+    return finished;
+}
+
+/* Notify capabilities that the synchronisation is finished; they may resume
+ * execution.
+ */
+void nonmovingFinishFlush(Task *task)
+{
+    debugTrace(DEBUG_nonmoving_gc, "Finished update remembered set flush...");
+    releaseAllCapabilities(n_capabilities, NULL, task);
+}
+#endif
 
 /*********************************************************
  * Pushing to either the mark queue or remembered set
@@ -105,14 +289,18 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
     // Are we at the end of the block?
     if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {
         // Yes, this block is full.
-        // allocate a fresh block.
-        ACQUIRE_SM_LOCK;
-        bdescr *bd = allocGroup(1);
-        bd->link = q->blocks;
-        q->blocks = bd;
-        q->top = (MarkQueueBlock *) bd->start;
-        q->top->head = 0;
-        RELEASE_SM_LOCK;
+        if (q->is_upd_rem_set) {
+            nonmovingAddUpdRemSetBlocks(q);
+        } else {
+            // allocate a fresh block.
+            ACQUIRE_SM_LOCK;
+            bdescr *bd = allocGroup(1);
+            bd->link = q->blocks;
+            q->blocks = bd;
+            q->top = (MarkQueueBlock *) bd->start;
+            q->top->head = 0;
+            RELEASE_SM_LOCK;
+        }
     }
 
     q->top->entries[q->top->head] = *ent;
@@ -183,6 +371,199 @@ void push_fun_srt (MarkQueue *q, const StgInfoTable *info)
     if (fun_info->i.srt) {
         push_closure(q, (StgClosure*)GET_FUN_SRT(fun_info), NULL);
     }
+}
+
+/*********************************************************
+ * Pushing to the update remembered set
+ *
+ * upd_rem_set_push_* functions are directly called by
+ * mutators and need to check whether the value is in
+ * non-moving heap.
+ *********************************************************/
+
+// Check if the object is traced by the non-moving collector. This holds in two
+// conditions:
+//
+// - Object is in non-moving heap
+// - Object is a large (BF_LARGE) and marked as BF_NONMOVING
+// - Object is static (HEAP_ALLOCED_GC(obj) == false)
+//
+static
+bool check_in_nonmoving_heap(StgClosure *p) {
+    if (HEAP_ALLOCED_GC(p)) {
+        // This works for both large and small objects:
+        return Bdescr((P_)p)->flags & BF_NONMOVING;
+    } else {
+        return true; // a static object
+    }
+}
+
+/* Push the free variables of a (now-evaluated) thunk to the
+ * update remembered set.
+ */
+void updateRemembSetPushThunk(Capability *cap, StgThunk *origin)
+{
+    // TODO: Eliminate this conditional once it's folded into codegen
+    if (!nonmoving_write_barrier_enabled) return;
+    const StgThunkInfoTable *info = get_thunk_itbl((StgClosure*)origin);
+    updateRemembSetPushThunkEager(cap, info, origin);
+}
+
+void updateRemembSetPushThunkEager(Capability *cap,
+                                  const StgThunkInfoTable *info,
+                                  StgThunk *thunk)
+{
+    switch (info->i.type) {
+    case THUNK:
+    case THUNK_1_0:
+    case THUNK_0_1:
+    case THUNK_2_0:
+    case THUNK_1_1:
+    case THUNK_0_2:
+    {
+        MarkQueue *queue = &cap->upd_rem_set.queue;
+        push_thunk_srt(queue, &info->i);
+
+        // Don't record the origin of objects living outside of the nonmoving
+        // heap; we can't perform the selector optimisation on them anyways.
+        bool record_origin = check_in_nonmoving_heap((StgClosure*)thunk);
+
+        for (StgWord i = 0; i < info->i.layout.payload.ptrs; i++) {
+            if (check_in_nonmoving_heap(thunk->payload[i])) {
+                push_closure(queue,
+                             thunk->payload[i],
+                             record_origin ? &thunk->payload[i] : NULL);
+            }
+        }
+        break;
+    }
+    case AP:
+    {
+        MarkQueue *queue = &cap->upd_rem_set.queue;
+        StgAP *ap = (StgAP *) thunk;
+        push_closure(queue, ap->fun, &ap->fun);
+        mark_PAP_payload(queue, ap->fun, ap->payload, ap->n_args);
+        break;
+    }
+    case THUNK_SELECTOR:
+    case BLACKHOLE:
+        // TODO: This is right, right?
+        break;
+    default:
+        barf("updateRemembSetPushThunk: invalid thunk pushed: p=%p, type=%d",
+             thunk, info->i.type);
+    }
+}
+
+void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *origin)
+{
+    // TODO: Eliminate this conditional once it's folded into codegen
+    if (!nonmoving_write_barrier_enabled) return;
+    updateRemembSetPushThunk(regTableToCapability(reg), origin);
+}
+
+void updateRemembSetPushClosure(Capability *cap,
+                              StgClosure *p,
+                              StgClosure **origin)
+{
+    if (!nonmoving_write_barrier_enabled) return;
+    if (!check_in_nonmoving_heap(p)) return;
+    MarkQueue *queue = &cap->upd_rem_set.queue;
+    // We only shortcut things living in the nonmoving heap.
+    if (! check_in_nonmoving_heap((StgClosure *) origin))
+        origin = NULL;
+
+    push_closure(queue, p, origin);
+}
+
+void updateRemembSetPushClosure_(StgRegTable *reg,
+                               StgClosure *p,
+                               StgClosure **origin)
+{
+    updateRemembSetPushClosure(regTableToCapability(reg), p, origin);
+}
+
+STATIC_INLINE bool needs_upd_rem_set_mark(StgClosure *p)
+{
+    // TODO: Deduplicate with mark_closure
+    bdescr *bd = Bdescr((StgPtr) p);
+    if (bd->gen != oldest_gen) {
+        return false;
+    } else if (bd->flags & BF_LARGE) {
+        if (! (bd->flags & BF_NONMOVING_SWEEPING)) {
+            return false;
+        } else {
+            return ! (bd->flags & BF_MARKED);
+        }
+    } else {
+        struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
+        nonmoving_block_idx block_idx = nonmovingGetBlockIdx((StgPtr) p);
+        return nonmovingGetMark(seg, block_idx) != nonmovingMarkEpoch;
+    }
+}
+
+/* Set the mark bit; only to be called *after* we have fully marked the closure */
+STATIC_INLINE void finish_upd_rem_set_mark(StgClosure *p)
+{
+    bdescr *bd = Bdescr((StgPtr) p);
+    if (bd->flags & BF_LARGE) {
+        // Someone else may have already marked it.
+        ACQUIRE_LOCK(&nonmoving_large_objects_mutex);
+        if (! (bd->flags & BF_MARKED)) {
+            bd->flags |= BF_MARKED;
+            dbl_link_remove(bd, &nonmoving_large_objects);
+            dbl_link_onto(bd, &nonmoving_marked_large_objects);
+            n_nonmoving_large_blocks -= bd->blocks;
+            n_nonmoving_marked_large_blocks += bd->blocks;
+        }
+        RELEASE_LOCK(&nonmoving_large_objects_mutex);
+    } else {
+        struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
+        nonmoving_block_idx block_idx = nonmovingGetBlockIdx((StgPtr) p);
+        nonmovingSetMark(seg, block_idx);
+    }
+}
+
+void updateRemembSetPushTSO(Capability *cap, StgTSO *tso)
+{
+    // TODO: Eliminate this conditional once it's folded into codegen
+    if (!nonmoving_write_barrier_enabled) return;
+    if (needs_upd_rem_set_mark((StgClosure *) tso)) {
+        debugTrace(DEBUG_nonmoving_gc, "upd_rem_set: TSO %p", tso);
+        mark_tso(&cap->upd_rem_set.queue, tso);
+        finish_upd_rem_set_mark((StgClosure *) tso);
+    }
+}
+
+void updateRemembSetPushStack(Capability *cap, StgStack *stack)
+{
+    // N.B. caller responsible for checking nonmoving_write_barrier_enabled
+    if (needs_upd_rem_set_mark((StgClosure *) stack)) {
+        StgWord marking = stack->marking;
+        // See Note [StgStack dirtiness flags and concurrent marking]
+        if (cas(&stack->marking, marking, nonmovingMarkEpoch)
+              != nonmovingMarkEpoch) {
+            // We have claimed the right to mark the stack.
+            debugTrace(DEBUG_nonmoving_gc, "upd_rem_set: STACK %p", stack->sp);
+            mark_stack(&cap->upd_rem_set.queue, stack);
+            finish_upd_rem_set_mark((StgClosure *) stack);
+            return;
+        } else {
+            // The concurrent GC has claimed the right to mark the stack.
+            // Wait until it finishes marking before proceeding with
+            // mutation.
+            while (needs_upd_rem_set_mark((StgClosure *) stack));
+#if defined(PARALLEL_GC)
+                busy_wait_nop(); // TODO: Spinning here is unfortunate
+#endif
+            return;
+        }
+    }
+}
+
+int countGlobalUpdateRemembSetBlocks()
+{
+    return countBlocks(upd_rem_set_block_list);
 }
 
 /*********************************************************
@@ -278,7 +659,7 @@ again:
 }
 
 /*********************************************************
- * Creating and destroying MarkQueues
+ * Creating and destroying MarkQueues and UpdRemSets
  *********************************************************/
 
 /* Must hold sm_mutex. */
@@ -295,6 +676,16 @@ void initMarkQueue(MarkQueue *queue)
 {
     init_mark_queue_(queue);
     queue->marked_objects = allocHashTable();
+    queue->is_upd_rem_set = false;
+}
+
+/* Must hold sm_mutex. */
+void init_upd_rem_set(UpdRemSet *rset)
+{
+    init_mark_queue_(&rset->queue);
+    // Update remembered sets don't have to worry about static objects
+    rset->queue.marked_objects = NULL;
+    rset->queue.is_upd_rem_set = true;
 }
 
 void freeMarkQueue(MarkQueue *queue)
@@ -310,6 +701,18 @@ void freeMarkQueue(MarkQueue *queue)
     RELEASE_SM_LOCK;
     freeHashTable(queue->marked_objects, NULL);
 }
+
+#if defined(THREADED_RTS) && defined(DEBUG)
+static uint32_t markQueueLength(MarkQueue *q)
+{
+    uint32_t n = 0;
+    for (bdescr *block = q->blocks; block; block = block->link) {
+        MarkQueueBlock *queue = (MarkQueueBlock*)block->start;
+        n += queue->head;
+    }
+    return n;
+}
+#endif
 
 
 /*********************************************************
@@ -622,9 +1025,12 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
         // we moved everything to the non-moving heap before starting the major
         // collection, we know that we don't need to trace it: it was allocated
         // after we took our snapshot.
-
+#if !defined(THREADED_RTS)
         // This should never happen in the non-concurrent case
         barf("Closure outside of non-moving heap: %p", p);
+#else
+        return;
+#endif
     }
 
     ASSERTM(LOOKS_LIKE_CLOSURE_PTR(p), "invalid closure, info=%p", p->header.info);
@@ -892,7 +1298,22 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
     case STACK: {
         // See Note [StgStack dirtiness flags and concurrent marking]
         StgStack *stack = (StgStack *) p;
-        mark_stack(queue, stack);
+        StgWord marking = stack->marking;
+
+        // N.B. stack->marking must be != nonmovingMarkEpoch unless
+        // someone has already marked it.
+        if (cas(&stack->marking, marking, nonmovingMarkEpoch)
+              != nonmovingMarkEpoch) {
+            // We have claimed the right to mark the stack.
+            mark_stack(queue, stack);
+        } else {
+            // A mutator has already started marking the stack; we just let it
+            // do its thing and move on. There's no reason to wait; we know that
+            // the stack will be fully marked before we sweep due to the final
+            // post-mark synchronization. Most importantly, we do not set its
+            // mark bit, the mutator is responsible for this.
+            return;
+        }
         break;
     }
 
@@ -935,6 +1356,12 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
      * mutator waiting for us to finish so it can start execution.
      */
     if (bd->flags & BF_LARGE) {
+        /* Marking a large object isn't idempotent since we move it to
+         * nonmoving_marked_large_objects; to ensure that we don't repeatedly
+         * mark a large object, we only set BF_MARKED on large objects in the
+         * nonmoving heap while holding nonmoving_large_objects_mutex
+         */
+        ACQUIRE_LOCK(&nonmoving_large_objects_mutex);
         if (! (bd->flags & BF_MARKED)) {
             // Remove the object from nonmoving_large_objects and link it to
             // nonmoving_marked_large_objects
@@ -944,6 +1371,7 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
             n_nonmoving_marked_large_blocks += bd->blocks;
             bd->flags |= BF_MARKED;
         }
+        RELEASE_LOCK(&nonmoving_large_objects_mutex);
     } else {
         // TODO: Kill repetition
         struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
@@ -987,9 +1415,23 @@ GNUC_ATTR_HOT void nonmovingMark(MarkQueue *queue)
             break;
         }
         case NULL_ENTRY:
-            // Nothing more to do
-            debugTrace(DEBUG_nonmoving_gc, "Finished mark pass: %d", count);
-            return;
+            // Perhaps the update remembered set has more to mark...
+            if (upd_rem_set_block_list) {
+                ACQUIRE_LOCK(&upd_rem_set_lock);
+                bdescr *old = queue->blocks;
+                queue->blocks = upd_rem_set_block_list;
+                queue->top = (MarkQueueBlock *) queue->blocks->start;
+                upd_rem_set_block_list = NULL;
+                RELEASE_LOCK(&upd_rem_set_lock);
+
+                ACQUIRE_SM_LOCK;
+                freeGroup(old);
+                RELEASE_SM_LOCK;
+            } else {
+                // Nothing more to do
+                debugTrace(DEBUG_nonmoving_gc, "Finished mark pass: %d", count);
+                return;
+            }
         }
     }
 }
