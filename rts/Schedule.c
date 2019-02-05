@@ -44,6 +44,8 @@
 #include "StablePtr.h"
 #include "StableName.h"
 #include "TopHandler.h"
+#include "sm/NonMoving.h"
+#include "sm/NonMovingMark.h"
 
 #if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
@@ -2497,7 +2499,9 @@ resumeThread (void *task_)
     tso = incall->suspended_tso;
     incall->suspended_tso = NULL;
     incall->suspended_cap = NULL;
-    tso->_link = END_TSO_QUEUE; // no write barrier reqd
+    // we will modify tso->_link
+    updateRemembSetPushClosure(cap, (StgClosure *)tso->_link, NULL);
+    tso->_link = END_TSO_QUEUE;
 
     traceEventRunThread(cap, tso);
 
@@ -2671,6 +2675,8 @@ initScheduler(void)
   /* Initialise the mutex and condition variables used by
    * the scheduler. */
   initMutex(&sched_mutex);
+  initMutex(&sync_finished_mutex);
+  initCondition(&sync_finished_cond);
 #endif
 
   ACQUIRE_LOCK(&sched_mutex);
@@ -2706,6 +2712,7 @@ exitScheduler (bool wait_foreign USED_IF_THREADS)
     // If we haven't killed all the threads yet, do it now.
     if (sched_state < SCHED_SHUTTING_DOWN) {
         sched_state = SCHED_INTERRUPTING;
+        nonmovingWaitUntilFinished();
         Capability *cap = task->cap;
         waitForCapability(&cap,task);
         scheduleDoGC(&cap,task,true);
