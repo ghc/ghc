@@ -153,6 +153,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.heapSizeSuggestionAuto = false;
     RtsFlags.GcFlags.pcFreeHeap         = 3;    /* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
+    RtsFlags.GcFlags.useNonmoving       = false;
     RtsFlags.GcFlags.generations        = 2;
     RtsFlags.GcFlags.squeezeUpdFrames   = true;
     RtsFlags.GcFlags.compact            = false;
@@ -176,6 +177,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.weak            = false;
     RtsFlags.DebugFlags.gccafs          = false;
     RtsFlags.DebugFlags.gc              = false;
+    RtsFlags.DebugFlags.nonmoving_gc    = false;
     RtsFlags.DebugFlags.block_alloc     = false;
     RtsFlags.DebugFlags.sanity          = false;
     RtsFlags.DebugFlags.stable          = false;
@@ -295,6 +297,7 @@ usage_text[] = {
 "  -xb<addr> Sets the address from which a suitable start for the heap memory",
 "            will be searched from. This is useful if the default address",
 "            clashes with some third-party library.",
+"  -xn       Use the non-moving collector for the old generation.",
 "  -m<n>     Minimum % of heap which must be available (default 3%)",
 "  -G<n>     Number of generations (default: 2)",
 "  -c<n>     Use in-place compaction instead of copying in the oldest generation",
@@ -400,6 +403,7 @@ usage_text[] = {
 "  -Dw  DEBUG: weak",
 "  -DG  DEBUG: gccafs",
 "  -Dg  DEBUG: gc",
+"  -Dn  DEBUG: non-moving gc",
 "  -Db  DEBUG: block",
 "  -DS  DEBUG: sanity",
 "  -Dt  DEBUG: stable",
@@ -1528,6 +1532,12 @@ error = true;
                     break;
 #endif
 
+                case 'n':
+                    OPTION_SAFE;
+                    RtsFlags.GcFlags.useNonmoving = true;
+                    unchecked_arg_start++;
+                    break;
+
                 case 'c': /* Debugging tool: show current cost centre on
                            an exception */
                     OPTION_SAFE;
@@ -1701,6 +1711,16 @@ static void normaliseRtsOpts (void)
     if (RtsFlags.MiscFlags.generate_dump_file) {
         RtsFlags.MiscFlags.install_seh_handlers = true;
     }
+
+    if (RtsFlags.GcFlags.useNonmoving && RtsFlags.GcFlags.generations == 1) {
+        barf("The non-moving collector doesn't support -G1");
+    }
+
+    if (RtsFlags.GcFlags.compact && RtsFlags.GcFlags.useNonmoving) {
+        errorBelch("The non-moving collector cannot be used in conjunction with\n"
+                   "the compacting collector.");
+        errorUsage();
+    }
 }
 
 static void errorUsage (void)
@@ -1851,6 +1871,9 @@ static void read_debug_flags(const char* arg)
             break;
         case 'g':
             RtsFlags.DebugFlags.gc = true;
+            break;
+        case 'n':
+            RtsFlags.DebugFlags.nonmoving_gc = true;
             break;
         case 'b':
             RtsFlags.DebugFlags.block_alloc = true;
