@@ -940,7 +940,7 @@ update_bkwd_compact( generation *gen )
 }
 
 void
-compact(StgClosure *static_objects)
+compact(StgClosure *static_objects, StgWeak *dead_weak_ptr_list, StgTSO *resurrected_threads)
 {
     W_ n, g, blocks;
     generation *gen;
