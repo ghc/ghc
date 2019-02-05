@@ -672,6 +672,8 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
      * Sweep
      ****************************************************/
 
+    traceConcSweepBegin();
+
     // Because we can't mark large object blocks (no room for mark bit) we
     // collect them in a map in mark_queue and we pass it here to sweep large
     // objects
@@ -681,6 +683,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     nonmovingSweep();
     ASSERT(nonmovingHeap.sweep_list == NULL);
     debugTrace(DEBUG_nonmoving_gc, "Finished sweeping.");
+    traceConcSweepEnd();
 
     // TODO: Remainder of things done by GarbageCollect (update stats)
 
