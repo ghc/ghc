@@ -709,9 +709,19 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
             barf("threadStackUnderflow: not enough space for return values");
         }
 
-        new_stack->sp -= retvals;
+        if (nonmoving_write_barrier_enabled) {
+            // ensure that values that we copy into the new stack are marked
+            // for the nonmoving collector. Note that these values won't
+            // necessarily form a full closure so we need to handle them
+            // specially.
+            for (unsigned int i = 0; i < retvals; i++) {
+                updateRemembSetPushClosure(cap,
+                                         (StgClosure *) old_stack->sp[i],
+                                         NULL);
+            }
+        }
 
-        memcpy(/* dest */ new_stack->sp,
+        memcpy(/* dest */ new_stack->sp - retvals,
                /* src  */ old_stack->sp,
                /* size */ retvals * sizeof(W_));
     }
@@ -723,8 +733,12 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
     // restore the stack parameters, and update tot_stack_size
     tso->tot_stack_size -= old_stack->stack_size;
 
-    // we're about to run it, better mark it dirty
+    // we're about to run it, better mark it dirty.
+    //
+    // N.B. the nonmoving collector may mark the stack, meaning that sp must
+    // point at a valid stack frame.
     dirty_STACK(cap, new_stack);
+    new_stack->sp -= retvals;
 
     return retvals;
 }
@@ -755,7 +769,7 @@ loop:
     if (q == (StgMVarTSOQueue*)&stg_END_TSO_QUEUE_closure) {
         /* No further takes, the MVar is now full. */
         if (info == &stg_MVAR_CLEAN_info) {
-            dirty_MVAR(&cap->r, (StgClosure*)mvar);
+            dirty_MVAR(&cap->r, (StgClosure*)mvar, mvar->value);
         }
 
         mvar->value = value;

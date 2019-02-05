@@ -35,6 +35,18 @@ static void nonmovingBumpEpoch(void) {
 
 struct NonmovingSegment * const END_NONMOVING_TODO_LIST = (struct NonmovingSegment*)1;
 
+#if defined(THREADED_RTS)
+/*
+ * This mutex ensures that only one non-moving collection is active at a time.
+ */
+Mutex nonmoving_collection_mutex;
+
+OSThreadId mark_thread;
+bool concurrent_coll_running = false;
+Condition concurrent_coll_finished;
+Mutex concurrent_coll_finished_lock;
+#endif
+
 #if defined(DEBUG)
 void gcCAFs(void);
 #endif
@@ -58,6 +70,9 @@ void gcCAFs(void);
  *
  */
 
+#if defined(THREADED_RTS)
+static void* nonmovingConcurrentMark(void *mark_queue);
+#endif
 static void nonmovingClearBitmap(struct NonmovingSegment *seg);
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads);
 
@@ -252,13 +267,30 @@ static struct NonmovingAllocator *alloc_nonmoving_allocator(uint32_t n_caps)
 
 void nonmovingInit(void)
 {
+#if defined(THREADED_RTS)
+    initMutex(&nonmoving_collection_mutex);
+    initCondition(&concurrent_coll_finished);
+    initMutex(&concurrent_coll_finished_lock);
+#endif
     for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
         nonmovingHeap.allocators[i] = alloc_nonmoving_allocator(n_capabilities);
     }
+    nonmovingMarkInitUpdRemSet();
 }
 
 void nonmovingExit(void)
 {
+#if defined(THREADED_RTS)
+    if (mark_thread) {
+        debugTrace(DEBUG_nonmoving_gc,
+                   "waiting for nonmoving collector thread to terminate");
+        ACQUIRE_LOCK(&concurrent_coll_finished_lock);
+        waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
+    }
+    closeMutex(&concurrent_coll_finished_lock);
+    closeCondition(&concurrent_coll_finished);
+    closeMutex(&nonmoving_collection_mutex);
+#endif
 }
 
 /*
@@ -268,6 +300,12 @@ void nonmovingExit(void)
  */
 void nonmovingWaitUntilFinished(void)
 {
+#if defined(THREADED_RTS)
+    ACQUIRE_LOCK(&concurrent_coll_finished_lock);
+    if (mark_thread)
+        waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
+    RELEASE_LOCK(&concurrent_coll_finished_lock);
+#endif
 }
 
 /*
@@ -407,6 +445,18 @@ static void nonmovingMarkWeakPtrList(MarkQueue *mark_queue, StgWeak *dead_weak_p
 
 void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 {
+#if defined(THREADED_RTS)
+    // We can't start a new collection until the old one has finished
+    // We also don't run in final GC
+    if (concurrent_coll_running || sched_state > SCHED_RUNNING) {
+        return;
+    }
+
+    for (unsigned int i = 0; i < n_capabilities; i++) {
+        capabilities[i]->upd_rem_set_syncd = false;
+    }
+#endif
+
     nonmovingPrepareMark();
     nonmovingPrepareSweep();
 
@@ -463,9 +513,26 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     // those lists to mark function in sequential case. In concurrent case we
     // allocate fresh lists.
 
+#if defined(THREADED_RTS)
+    // If we're interrupting or shutting down, do not let this capability go and
+    // run a STW collection. Reason: we won't be able to acquire this capability
+    // again for the sync if we let it go, because it'll immediately start doing
+    // a major GC, becuase that's what we do when exiting scheduler (see
+    // exitScheduler()).
+    if (sched_state == SCHED_RUNNING) {
+        concurrent_coll_running = true;
+        nonmoving_write_barrier_enabled = true;
+        debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
+        createOSThread(&mark_thread, "non-moving mark thread",
+                       nonmovingConcurrentMark, mark_queue);
+    } else {
+        nonmovingConcurrentMark(mark_queue);
+    }
+#else
     // Use the weak and thread lists from the preparation for any new weaks and
     // threads found to be dead in mark.
     nonmovingMark_(mark_queue, dead_weaks, resurrected_threads);
+#endif
 }
 
 /* Mark mark queue, threads, and weak pointers until no more weaks have been
@@ -485,12 +552,46 @@ static void nonmovingMarkThreadsWeaks(MarkQueue *mark_queue)
     }
 }
 
+#if defined(THREADED_RTS)
+static void* nonmovingConcurrentMark(void *data)
+{
+    MarkQueue *mark_queue = (MarkQueue*)data;
+    StgWeak *dead_weaks = NULL;
+    StgTSO *resurrected_threads = (StgTSO*)&stg_END_TSO_QUEUE_closure;
+    nonmovingMark_(mark_queue, &dead_weaks, &resurrected_threads);
+    return NULL;
+}
+#endif
+
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads)
 {
+    ACQUIRE_LOCK(&nonmoving_collection_mutex);
     debugTrace(DEBUG_nonmoving_gc, "Starting mark...");
 
     // Do concurrent marking; most of the heap will get marked here.
     nonmovingMarkThreadsWeaks(mark_queue);
+
+#if defined(THREADED_RTS)
+    Task *task = newBoundTask();
+
+    // If at this point if we've decided to exit then just return
+    if (sched_state > SCHED_RUNNING) {
+        // Note that we break our invariants here and leave segments in
+        // nonmovingHeap.sweep_list, don't free nonmoving_large_objects etc.
+        // However because we won't be running mark-sweep in the final GC this
+        // is OK.
+        goto finish;
+    }
+
+    // We're still running, request a sync
+    nonmovingBeginFlush(task);
+
+    bool all_caps_syncd;
+    do {
+        all_caps_syncd = nonmovingWaitForFlush();
+        nonmovingMarkThreadsWeaks(mark_queue);
+    } while (!all_caps_syncd);
+#endif
 
     nonmovingResurrectThreads(mark_queue, resurrected_threads);
 
@@ -516,6 +617,15 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 
     debugTrace(DEBUG_nonmoving_gc,
                "Done marking, resurrecting threads before releasing capabilities");
+
+
+    // Schedule fianlizers and resurrect 
+#if defined(THREADED_RTS)
+    // Just pick a random capability. Not sure if this is a good idea -- we use
+    // only one capability for all finalizers.
+    scheduleFinalizers(capabilities[0], *dead_weaks);
+    resurrectThreads(*resurrected_threads);
+#endif
 
 #if defined(DEBUG)
     // Zap CAFs that we will sweep
@@ -548,6 +658,12 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
         nonmoving_old_weak_ptr_list = NULL;
     }
 
+    // Everything has been marked; allow the mutators to proceed
+#if defined(THREADED_RTS)
+    nonmoving_write_barrier_enabled = false;
+    nonmovingFinishFlush(task);
+#endif
+
     current_mark_queue = NULL;
     freeMarkQueue(mark_queue);
     stgFree(mark_queue);
@@ -567,6 +683,18 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     debugTrace(DEBUG_nonmoving_gc, "Finished sweeping.");
 
     // TODO: Remainder of things done by GarbageCollect (update stats)
+
+#if defined(THREADED_RTS)
+finish:
+    // We are done...
+    mark_thread = 0;
+
+    // Signal that the concurrent collection is finished, allowing the next
+    // non-moving collection to proceed
+    concurrent_coll_running = false;
+    signalCondition(&concurrent_coll_finished);
+    RELEASE_LOCK(&nonmoving_collection_mutex);
+#endif
 }
 
 #if defined(DEBUG)
@@ -775,6 +903,32 @@ void locate_object(P_ obj)
             return;
         }
     }
+
+
+    // Search workspaces FIXME only works in non-threaded runtime
+#if !defined(THREADED_RTS)
+    for (uint32_t g = 0; g < RtsFlags.GcFlags.generations - 1; ++ g) {
+        gen_workspace *ws = &gct->gens[g];
+        for (bdescr *blk = ws->todo_bd; blk; blk = blk->link) {
+            if (obj >= blk->start && obj < blk->free) {
+                debugBelch("%p is in generation %" FMT_Word32 " todo bds\n", obj, g);
+                return;
+            }
+        }
+        for (bdescr *blk = ws->scavd_list; blk; blk = blk->link) {
+            if (obj >= blk->start && obj < blk->free) {
+                debugBelch("%p is in generation %" FMT_Word32 " scavd bds\n", obj, g);
+                return;
+            }
+        }
+        for (bdescr *blk = ws->todo_large_objects; blk; blk = blk->link) {
+            if (obj >= blk->start && obj < blk->free) {
+                debugBelch("%p is in generation %" FMT_Word32 " todo large bds\n", obj, g);
+                return;
+            }
+        }
+    }
+#endif
 }
 
 void nonmovingPrintSweepList()

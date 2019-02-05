@@ -515,9 +515,9 @@ blockedThrowTo (Capability *cap, StgTSO *target, MessageThrowTo *msg)
 
     ASSERT(target->cap == cap);
 
+    dirty_TSO(cap,target); // we will modify the blocked_exceptions queue
     msg->link = target->blocked_exceptions;
     target->blocked_exceptions = msg;
-    dirty_TSO(cap,target); // we modified the blocked_exceptions queue
 }
 
 /* -----------------------------------------------------------------------------
