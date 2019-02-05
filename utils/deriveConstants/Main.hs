@@ -307,6 +307,9 @@ wanteds os = concat
                              "sizeofW(StgHeader) - sizeofW(StgProfHeader)"
           ,constantWord Both "PROF_HDR_SIZE" "sizeofW(StgProfHeader)"
 
+           -- Stack flags for C--
+          ,constantWord C "STACK_DIRTY" "STACK_DIRTY"
+
            -- Size of a storage manager block (in bytes).
           ,constantWord Both "BLOCK_SIZE"  "BLOCK_SIZE"
           ,constantWord C    "MBLOCK_SIZE" "MBLOCK_SIZE"

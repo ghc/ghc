@@ -185,6 +185,11 @@ typedef struct StgTSO_ {
 
 } *StgTSOPtr; // StgTSO defined in rts/Types.h
 
+
+#define STACK_DIRTY 1
+// used by sanity checker to verify that all dirty stacks are on the mutable list
+#define STACK_SANE 64
+
 typedef struct StgStack_ {
     StgHeader  header;
     StgWord32  stack_size;     // stack size in *words*
