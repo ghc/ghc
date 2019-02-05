@@ -189,6 +189,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/storage/ClosureMacros.h"
 #include "rts/storage/MBlock.h"
 #include "rts/storage/GC.h"
+#include "rts/NonMoving.h"
 
 /* Other RTS external APIs */
 #include "rts/Parallel.h"
