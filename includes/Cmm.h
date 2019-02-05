@@ -797,6 +797,11 @@
    Misc junk
    -------------------------------------------------------------------------- */
 
+#if !defined(THREADED_RTS)
+// This is also done in rts/NonMoving.h, but that isn't visible from C--
+#define nonmoving_write_barrier_enabled 0
+#endif
+
 #define NO_TREC                   stg_NO_TREC_closure
 #define END_TSO_QUEUE             stg_END_TSO_QUEUE_closure
 #define STM_AWOKEN                stg_STM_AWOKEN_closure
