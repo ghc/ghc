@@ -182,12 +182,20 @@
 
 #define EVENT_USER_BINARY_MSG              181
 
+#define EVENT_CONC_MARK_BEGIN              200
+#define EVENT_CONC_MARK_END                201
+#define EVENT_CONC_SYNC_BEGIN              202
+#define EVENT_CONC_SYNC_END                203
+#define EVENT_CONC_SWEEP_BEGIN             204
+#define EVENT_CONC_SWEEP_END               205
+#define EVENT_CONC_UPD_REM_SET_FLUSH       206
+
 /*
  * The highest event code +1 that ghc itself emits. Note that some event
  * ranges higher than this are reserved but not currently emitted by ghc.
  * This must match the size of the EventDesc[] array in EventLog.c
  */
-#define NUM_GHC_EVENT_TAGS        182
+#define NUM_GHC_EVENT_TAGS        207
 
 #if 0  /* DEPRECATED EVENTS: */
 /* we don't actually need to record the thread, it's implicit */

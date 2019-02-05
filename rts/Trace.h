@@ -302,6 +302,14 @@ void traceHeapProfSampleCostCentre(StgWord8 profile_id,
                                    CostCentreStack *stack, StgWord residency);
 #endif /* PROFILING */
 
+void traceConcMarkBegin(void);
+void traceConcMarkEnd(StgWord32 marked_obj_count);
+void traceConcSyncBegin(void);
+void traceConcSyncEnd(void);
+void traceConcSweepBegin(void);
+void traceConcSweepEnd(void);
+void traceConcUpdRemSetFlush(Capability *cap);
+
 void flushTrace(void);
 
 #else /* !TRACING */
@@ -340,6 +348,14 @@ void flushTrace(void);
 #define traceHeapProfSampleEnd(era) /* nothing */
 #define traceHeapProfSampleCostCentre(profile_id, stack, residency) /* nothing */
 #define traceHeapProfSampleString(profile_id, label, residency) /* nothing */
+
+#define traceConcMarkBegin() /* nothing */
+#define traceConcMarkEnd(marked_obj_count) /* nothing */
+#define traceConcSyncBegin() /* nothing */
+#define traceConcSyncEnd() /* nothing */
+#define traceConcSweepBegin() /* nothing */
+#define traceConcSweepEnd() /* nothing */
+#define traceConcUpdRemSetFlush(cap) /* nothing */
 
 #define flushTrace() /* nothing */
 
