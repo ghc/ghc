@@ -44,6 +44,9 @@
     W_ bd;                                                      \
                                                                 \
     OVERWRITING_CLOSURE(p1);                                    \
+    IF_WRITE_BARRIER_ENABLED {                                  \
+      ccall updateRemembSetPushThunk_(BaseReg, p1 "ptr");       \
+    }                                                           \
     StgInd_indirectee(p1) = p2;                                 \
     prim_write_barrier;                                         \
     SET_INFO(p1, stg_BLACKHOLE_info);                           \
@@ -56,7 +59,7 @@
     } else {                                                    \
       TICK_UPD_NEW_IND();                                       \
       and_then;                                                 \
-  }
+    }
 
 #else /* !CMINUSMINUS */
 
@@ -70,6 +73,9 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     /* not necessarily true: ASSERT( !closure_IND(p1) ); */
     /* occurs in RaiseAsync.c:raiseAsync() */
     OVERWRITING_CLOSURE(p1);
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled)) {
+        updateRemembSetPushThunk(cap, (StgThunk*)p1);
+    }
     ((StgInd *)p1)->indirectee = p2;
     write_barrier();
     SET_INFO(p1, &stg_BLACKHOLE_info);

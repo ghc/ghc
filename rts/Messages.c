@@ -238,6 +238,12 @@ loop:
         // a collision to update a BLACKHOLE and a BLOCKING_QUEUE
         // becomes orphaned (see updateThunk()).
         bq->link = owner->bq;
+        SET_HDR(bq, &stg_BLOCKING_QUEUE_DIRTY_info, CCS_SYSTEM);
+        // We are about to make the newly-constructed message visible to other cores;
+        // a barrier is necessary to ensure that all writes are visible.
+        // See Note [Heap memory barriers] in SMP.h.
+        write_barrier();
+        dirty_TSO(cap, owner); // we will modify owner->bq
         owner->bq = bq;
         dirty_TSO(cap, owner); // we modified owner->bq
 
@@ -284,6 +290,11 @@ loop:
         }
 #endif
 
+        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled)) {
+            // We are about to overwrite bq->queue; make sure its current value
+            // makes it into the update remembered set
+            updateRemembSetPushClosure(cap, (StgClosure*)bq->queue);
+        }
         msg->link = bq->queue;
         bq->queue = msg;
         recordClosureMutated(cap,(StgClosure*)msg);
