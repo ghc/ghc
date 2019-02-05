@@ -467,6 +467,7 @@ library
                sm/MBlock.c
                sm/MarkWeak.c
                sm/NonMoving.c
+               sm/NonMovingCensus.c
                sm/NonMovingMark.c
                sm/NonMovingScav.c
                sm/NonMovingSweep.c
