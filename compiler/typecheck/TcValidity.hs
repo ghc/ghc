@@ -694,7 +694,7 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
 
     check_arg :: ExpandMode -> KindOrType -> TcM ()
     check_arg expand =
-      check_arg_type (not (isTypeFamilyTyCon tc)) (ve{ve_expand = expand})
+      check_arg_type (isTypeSynonymTyCon tc) (ve{ve_expand = expand})
 
     check_args_only, check_expansion_only :: ExpandMode -> TcM ()
     check_args_only expand = mapM_ (check_arg expand) tys
