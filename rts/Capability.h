@@ -294,6 +294,8 @@ EXTERN_INLINE void recordMutableCap (const StgClosure *p, Capability *cap,
 
 EXTERN_INLINE void recordClosureMutated (Capability *cap, StgClosure *p);
 
+Capability * waitForWorkerCapability (Task *task);
+
 #if defined(THREADED_RTS)
 
 // Gives up the current capability IFF there is a higher-priority

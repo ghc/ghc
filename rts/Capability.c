@@ -641,7 +641,7 @@ enqueueWorker (Capability* cap USED_IF_THREADS)
 
 #if defined(THREADED_RTS)
 
-static Capability * waitForWorkerCapability (Task *task)
+Capability * waitForWorkerCapability (Task *task)
 {
     Capability *cap;
 
