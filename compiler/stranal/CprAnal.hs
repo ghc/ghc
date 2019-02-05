@@ -63,19 +63,15 @@ cprAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
 cprAnalTopBind env (NonRec id rhs)
-  = (extendAnalEnv TopLevel env id2 (get_idCprInfo id2), NonRec id2 rhs2)
+  = (extendAnalEnv TopLevel env id' (get_idCprInfo id'), NonRec id' rhs')
   where
-    (_,   rhs1) = cprAnalRhsLetDown TopLevel env             0 id rhs
-    (id2, rhs2) = cprAnalRhsLetDown TopLevel (nonVirgin env) 0 id rhs1
-        -- Do two passes to improve CPR information
-        -- See Note [CPR for thunks]
-        -- See Note [Optimistic CPR in the "virgin" case]
+    (id', rhs') = cprAnalRhsLetDown TopLevel env 0 id rhs
         -- See Note [Initial CPR for strict binders]
 
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
   where
-    (env', pairs')  = cprFix TopLevel env 0 pairs
+    (env', pairs') = cprFix TopLevel env 0 pairs
                 -- We get two iterations automatically
                 -- c.f. the NonRec case above
 
@@ -137,11 +133,9 @@ cprAnal env n e = -- pprTrace "cprAnal" (ppr n <+> ppr e) $
 
 cprAnal' _ _ (Lit lit)     = (topCprType, Lit lit)
 cprAnal' _ _ (Type ty)     = (topCprType, Type ty)      -- Doesn't happen, in fact
-cprAnal' _ _ (Coercion co)
-  = (topCprType, Coercion co)
+cprAnal' _ _ (Coercion co) = (topCprType, Coercion co)
 
-cprAnal' env n (Var var)
-  = (cprTransform env var n, Var var)
+cprAnal' env n (Var var)   = (cprTransform env var n, Var var)
 
 cprAnal' env n (Cast e co)
   = (cpr_ty, Cast e' co)
@@ -158,46 +152,32 @@ cprAnal' env n (App fun (Type ty))
   where
     (fun_ty, fun') = cprAnal env n fun
 
--- Lots of the other code is there to make this
--- beautiful, compositional, application rule :-)
 cprAnal' env n (App fun arg)
-  = -- This case handles value arguments (type args handled above)
-    -- Crucially, coercions /are/ handled here, because they are
-    -- value arguments (Trac #10288)
-    let
-        (fun_ty, fun') = cprAnal env (n+1) fun
-        res_ty         = applyCprTy fun_ty
-        (_, arg')      = cprAnal env 0 arg
-    in
---    pprTrace "cprAnal:app" (vcat
---         [ text "dmd =" <+> ppr dmd
---         , text "expr =" <+> ppr (App fun arg)
---         , text "fun dmd_ty =" <+> ppr fun_ty
---         , text "arg dmd =" <+> ppr arg_dmd
---         , text "arg dmd_ty =" <+> ppr arg_ty
---         , text "res dmd_ty =" <+> ppr res_ty
---         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
-    (res_ty, App fun' arg')
+  = (res_ty, App fun' arg')
+  where
+    (fun_ty, fun') = cprAnal env (n+1) fun
+    -- In contrast to DmdAnal, there is no useful (non-nested) CPR info to be
+    -- had by looking into the CprType of arg.
+    (_, arg')      = cprAnal env 0     arg
+    res_ty         = applyCprTy fun_ty
 
 -- this is an anonymous lambda, since @cprAnalRhsLetDown@ uses @collectBinders@
 cprAnal' env n (Lam var body)
   | isTyVar var
-  = let
-        (body_ty, body') = cprAnal env n body
-    in
-    (body_ty, Lam var body')
+  , (body_ty, body') <- cprAnal env n body
+  = (body_ty, Lam var body')
 
   | otherwise
-  = let body_n = max 0 (n-1)
-        env'             = extendSigsWithLam env var
-        (body_ty, body') = cprAnal env' body_n body
-        lam_ty = abstractCprTy body_ty
-        is_unsat = body_n == n
-        lam_ty'
-          | is_unsat = topCprType
-          | otherwise = lam_ty
-    in
-    (lam_ty', Lam var body')
+  = (lam_ty', Lam var body')
+  where
+    body_n           = max 0 (n-1)
+    env'             = extendSigsWithLam env var
+    (body_ty, body') = cprAnal env' body_n body
+    lam_ty           = abstractCprTy body_ty
+    is_unsat         = n == 0
+    lam_ty'
+      | is_unsat = topCprType
+      | otherwise = lam_ty
 
 cprAnal' env n (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   -- Only one alternative with a product constructor
@@ -496,7 +476,7 @@ round, for two reasons:
    strictness annotations have been updated.
 
 This final iteration does not add the variables to the strictness signature
-environment, which effectively assigns them 'nopSig' (see "getStrictness")
+environment, which effectively assigns them 'nopSig' (see "getCprType")
 
 -}
 
@@ -508,18 +488,14 @@ cprAnalTrivialRhs ::
 cprAnalTrivialRhs env id rhs fn
   = (set_idCprInfo id fn_str, rhs)
   where
-    fn_str = getStrictness env fn
+    fn_str = getCprType env fn
 
--- Let bindings can be processed in two ways:
--- Down (RHS before body) or Up (body before RHS).
--- cprAnalRhsLetDown implements the Down variant:
+-- Let bindings can be processed in the following way (cf. LetDown from the
+-- paper “Higher-Order Cardinality Analysis”):
+--
 --  * assuming a demand of <L,U>
 --  * looking at the definition
 --  * determining a strictness signature
---
--- It is used for toplevel definition, recursive definitions and local
--- non-recursive definitions that have manifest lambdas.
--- Local non-recursive definitions without a lambda are handled with LetUp.
 --
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
 cprAnalRhsLetDown :: TopLevelFlag
@@ -533,7 +509,7 @@ cprAnalRhsLetDown top_lvl env let_arty id rhs
   = cprAnalTrivialRhs env id rhs fn
 
   | otherwise
-  = (id', mkLams bndrs' body')
+  = (id', mkLams bndrs body')
   where
     (bndrs, body, body_arty)
        = case isJoinId_maybe id of
@@ -546,9 +522,12 @@ cprAnalRhsLetDown top_lvl env let_arty id rhs
 
     env_body         = foldl' extendSigsWithLam env bndrs
     (body_ty, body') = cprAnal env_body body_arty body
-    body_ty'         = removeCprTyArgs body_ty -- zap possible deep CPR info
-    (rhs_ty, bndrs')
-                     = annotateLamBndrs body_ty' bndrs
+    -- zap possible deep CPR info
+    body_ty'         = removeCprTyArgs body_ty
+    -- account for lambdas
+    n_val_lams       = length (filter isId bndrs)
+    rhs_ty           = iterate abstractCprTy body_ty' !! n_val_lams
+    -- possibly trim thunk CPR info
     sig_ty           = trimCprTy trim_all trim_sums rhs_ty
     id'              = set_idCprInfo id sig_ty
         -- See Note [NOINLINE and strictness]
@@ -649,33 +628,6 @@ a product type.
 *                                                                      *
 ************************************************************************
 -}
-
-{-
-Note [Do not strictify the argument dictionaries of a dfun]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The typechecker can tie recursive knots involving dfuns, so we do the
-conservative thing and refrain from strictifying a dfun's argument
-dictionaries.
--}
-
-annotateLamBndrs :: CprType -> [Var] -> (CprType, [Var])
-annotateLamBndrs ty bndrs = mapAccumR annotate ty bndrs
-  where
-    annotate cpr_ty bndr
-      | isId bndr = annotateLamIdBndr cpr_ty bndr
-      | otherwise = (cpr_ty, bndr)
-
-annotateLamIdBndr :: CprType    -- Demand type of body
-                  -> Id         -- Lambda binder
-                  -> (CprType,  -- Demand type of lambda
-                      Id)       -- and binder annotated with demand
-
-annotateLamIdBndr cpr_ty id
--- For lambdas we add the demand to the argument demands
--- Only called for Ids
-  = ASSERT( isId id )
-    -- pprTrace "annLamBndr" (vcat [ppr id, ppr _dmd_ty]) $
-    (abstractCprTy cpr_ty, id)
 
 {-
 Note [CPR for sum types]
@@ -1008,8 +960,8 @@ extendSigEnv _top_lvl sigs var sig = extendVarEnv sigs var sig
 lookupSigEnv :: AnalEnv -> Id -> Maybe CprType
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 
-getStrictness :: AnalEnv -> Id -> CprType
-getStrictness env fn
+getCprType :: AnalEnv -> Id -> CprType
+getCprType env fn
   | isGlobalId fn                   = get_idCprInfo fn
   | Just sig <- lookupSigEnv env fn = sig
   | otherwise                       = topCprType
@@ -1021,12 +973,10 @@ extendSigsWithLam :: AnalEnv -> Id -> AnalEnv
 -- Extend the AnalEnv when we meet a lambda binder
 extendSigsWithLam env id
   | isId id
-  , isStrictDmd (idDemandInfo id) || ae_virgin env
-       -- See Note [Optimistic CPR in the "virgin" case]
+  , isStrictDmd (idDemandInfo id)
        -- See Note [Initial CPR for strict binders]
   , Just (dc,_,_,_) <- deepSplitProductType_maybe (ae_fam_envs env) $ idType id
   = extendAnalEnv NotTopLevel env id (prodCprType (dataConRepArity dc))
-
   | otherwise
   = env
 
@@ -1041,7 +991,8 @@ extendEnvForProdAlt env scrut case_bndr dc bndrs
     case_bndr_sig = prodCprType (dataConRepArity dc)
     fam_envs      = ae_fam_envs env
 
-    -- This could go away with nested CPR.
+    -- This could go away with nested CPR, where we have proper termination
+    -- information.
     do_con_arg env (id, str)
        | let is_strict = isStrictDmd (idDemandInfo id) || isMarkedStrict str
        , ae_virgin env || (is_var_scrut && is_strict)  -- See Note [CPR in a product case alternative]
