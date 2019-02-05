@@ -62,6 +62,8 @@
 #include "Hash.h"
 
 #include "sm/MarkWeak.h"
+#include "sm/NonMoving.h" // for nonmoving_set_closure_mark_bit
+#include "sm/NonMovingScav.h"
 
 static void scavenge_large_bitmap (StgPtr p,
                                    StgLargeBitmap *large_bitmap,
@@ -1652,7 +1654,10 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                 ;
             }
 
-            if (scavenge_one(p)) {
+            if (RtsFlags.GcFlags.useNonmoving && major_gc && gen == oldest_gen) {
+                // We can't use scavenge_one here as we need to scavenge SRTs
+                nonmovingScavengeOne((StgClosure *)p);
+            } else if (scavenge_one(p)) {
                 // didn't manage to promote everything, so put the
                 // object back on the list.
                 recordMutableGen_GC((StgClosure *)p,gen_no);
@@ -1664,7 +1669,14 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 void
 scavenge_capability_mut_lists (Capability *cap)
 {
-    uint32_t g;
+    // In a major GC only nonmoving heap's mut list is root
+    if (RtsFlags.GcFlags.useNonmoving && major_gc) {
+        uint32_t g = oldest_gen->no;
+        scavenge_mutable_list(cap->saved_mut_lists[g], oldest_gen);
+        freeChain_sync(cap->saved_mut_lists[g]);
+        cap->saved_mut_lists[g] = NULL;
+        return;
+    }
 
     /* Mutable lists from each generation > N
      * we want to *scavenge* these roots, not evacuate them: they're not
@@ -1672,7 +1684,7 @@ scavenge_capability_mut_lists (Capability *cap)
      * Also do them in reverse generation order, for the usual reason:
      * namely to reduce the likelihood of spurious old->new pointers.
      */
-    for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
+    for (uint32_t g = RtsFlags.GcFlags.generations-1; g > N; g--) {
         scavenge_mutable_list(cap->saved_mut_lists[g], &generations[g]);
         freeChain_sync(cap->saved_mut_lists[g]);
         cap->saved_mut_lists[g] = NULL;
@@ -2041,6 +2053,16 @@ loop:
     did_something = false;
     for (g = RtsFlags.GcFlags.generations-1; g >= 0; g--) {
         ws = &gct->gens[g];
+
+        if (ws->todo_seg != END_NONMOVING_TODO_LIST) {
+            struct NonmovingSegment *seg = ws->todo_seg;
+            ASSERT(seg->todo_link);
+            ws->todo_seg = seg->todo_link;
+            seg->todo_link = NULL;
+            scavengeNonmovingSegment(seg);
+            did_something = true;
+            break;
+        }
 
         gct->scan_bd = NULL;
 
