@@ -748,6 +748,8 @@ static Capability * waitForReturnCapability (Task *task)
  * result of the external call back to the Haskell thread that
  * made it.
  *
+ * pCap is strictly an output.
+ *
  * ------------------------------------------------------------------------- */
 
 void waitForCapability (Capability **pCap, Task *task)
@@ -839,6 +841,9 @@ void waitForCapability (Capability **pCap, Task *task)
  *    - Another Task is trying to acquire all the Capabilities (pending_sync !=
  *      SYNC_GC_PAR), either to do a sequential GC, forkProcess, or
  *      setNumCapabilities.  We should give up the Capability temporarily.
+ *
+ * When yieldCapability returns *pCap will have been updated to the new
+ * capability held by the caller.
  *
  * ------------------------------------------------------------------------- */
 
