@@ -34,6 +34,9 @@
 REGPARM1 void evacuate  (StgClosure **p);
 REGPARM1 void evacuate1 (StgClosure **p);
 
+void evacuate_static_object(StgClosure **link_field, StgClosure *q);
+void evacuate_static_object1(StgClosure **link_field, StgClosure *q);
+
 void evacuate_BLACKHOLE(StgClosure **p);
 void evacuate_BLACKHOLE1(StgClosure **p);
 
