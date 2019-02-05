@@ -797,6 +797,11 @@
    Misc junk
    -------------------------------------------------------------------------- */
 
+#if !defined(THREADED_RTS)
+// This is also done in rts/NonMoving.h, but that isn't visible from C--
+#define nonmoving_write_barrier_enabled 0
+#endif
+
 #define NO_TREC                   stg_NO_TREC_closure
 #define END_TSO_QUEUE             stg_END_TSO_QUEUE_closure
 #define STM_AWOKEN                stg_STM_AWOKEN_closure
@@ -826,6 +831,19 @@
       __bd = Bdescr(__p);                                       \
       __gen = TO_W_(bdescr_gen_no(__bd));                       \
       if (__gen > 0) { recordMutableCap(__p, __gen); }
+
+/* -----------------------------------------------------------------------------
+   Update remembered set write barrier
+   -------------------------------------------------------------------------- */
+
+/* Record that a reference to object `p`, residing at word `origin_field` of
+ * object `origin` has been overwritten. This implements the nonmoving collector's
+ * update remembered set write barrier.
+ */
+#define recordMutatedPtr(p, origin)                             \
+    if (nonmoving_write_barrier_enabled != 0) (likely: False) { \
+        ccall updateRemembSetPushClosure_(BaseReg "ptr", (p) "ptr", (origin) "ptr"); \
+    }
 
 /* -----------------------------------------------------------------------------
    Arrays
