@@ -263,6 +263,9 @@ threadStableNameTable( evac_fn evac, void *user )
 void
 gcStableNameTable( void )
 {
+    // We must take the stable name lock lest we race with the nonmoving
+    // collector (namely nonmovingSweepStableNameTable).
+    stableNameLock();
     FOR_EACH_STABLE_NAME(
         p, {
             // FOR_EACH_STABLE_NAME traverses free entries too, so
@@ -286,6 +289,7 @@ gcStableNameTable( void )
                 }
             }
         });
+    stableNameUnlock();
 }
 
 /* -----------------------------------------------------------------------------
