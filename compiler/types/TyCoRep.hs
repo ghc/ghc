@@ -90,7 +90,7 @@ module TyCoRep (
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList, tyCoVarsOfProv,
         almostDevoidCoVarOfCo,
-        injectiveVarsOfBinder, injectiveVarsOfType, tyConAppNeedsKindSig,
+        injectiveVarsOfType, tyConAppNeedsKindSig,
 
         noFreeVarsOfType, noFreeVarsOfCo,
 
@@ -2103,25 +2103,6 @@ almost_devoid_co_var_of_types (ty:tys) cv
 
 ------------- Injective free vars -----------------
 
--- | Returns the free variables of a 'TyConBinder' that are in injective
--- positions. (See
--- @Note [When does a tycon application need an explicit kind signature?]@ for
--- an explanation of what an injective position is.)
-injectiveVarsOfBinder
-  :: Bool -- ^ Should specified binders count towards injective positions?
-          --   (If you're using visible kind applications, then you want 'True'
-          --   here.)
-  -> TyConBinder -> FV
-injectiveVarsOfBinder spec_inj_pos (Bndr tv vis) =
-  case vis of
-    AnonTCB -> injectiveVarsOfType (varType tv)
-    NamedTCB argf
-      |     (argf == Required)
-         || (spec_inj_pos && (argf == Specified))
-      -> unitFV tv `unionFV` injectiveVarsOfType (varType tv)
-      |  otherwise
-      -> emptyFV
-
 -- | Returns the free variables of a 'Type' that are in injective positions.
 -- For example, if @F@ is a non-injective type family, then:
 --
@@ -2129,8 +2110,14 @@ injectiveVarsOfBinder spec_inj_pos (Bndr tv vis) =
 -- injectiveTyVarsOf( Either c (Maybe (a, F b c)) ) = {a,c}
 -- @
 --
--- (See @Note [When does a tycon application need an explicit kind signature?]@
--- for an explanation of what an injective position is.)
+-- If @'injectiveVarsOfType' ty = itvs@, then knowing @ty@ fixes @itvs@.
+-- More formally, if
+-- @a@ is in @'injectiveVarsOfType' ty@
+-- and  @S1(ty) ~ S2(ty)@,
+-- then @S1(a)  ~ S2(a)@,
+-- where @S1@ and @S2@ are arbitrary substitutions.
+--
+-- See @Note [When does a tycon application need an explicit kind signature?]@.
 injectiveVarsOfType :: Type -> FV
 injectiveVarsOfType = go
   where
@@ -2156,6 +2143,10 @@ injectiveVarsOfType = go
 -- a source-syntax type?
 -- (See @Note [When does a tycon application need an explicit kind signature?]@
 -- for a full explanation of what this function checks for.)
+
+-- Morally, this function ought to belong in TyCon.hs, not TyCoRep.hs, but
+-- accomplishing this requires a fair deal of futzing aruond with .hs-boot
+-- files.
 tyConAppNeedsKindSig
   :: Bool  -- ^ Should specified binders count towards injective positions in
            --   the kind of the TyCon?
@@ -2172,13 +2163,31 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
         result_kind  = mkTyConKind remaining_binders tc_res_kind
         result_vars  = tyCoVarsOfType result_kind
         dropped_vars = fvVarSet $
-                       mapUnionFV (injectiveVarsOfBinder spec_inj_pos)
+                       mapUnionFV (injective_vars_of_binder spec_inj_pos)
                                   dropped_binders
 
     in not (subVarSet result_vars dropped_vars)
   where
     tc_binders  = tyConBinders tc
     tc_res_kind = tyConResKind tc
+
+    -- Returns the variables that would be fixed by knowing a TyConBinder. See
+    -- Note [When does a tycon application need an explicit kind signature?]
+    -- for a more detailed explanation of what this function does.
+    injective_vars_of_binder
+      :: Bool -- Should specified binders count towards injective positions?
+              -- (If you're using visible kind applications, then you want True
+              -- here.)
+      -> TyConBinder -> FV
+    injective_vars_of_binder spec_inj_pos (Bndr tv vis) =
+      case vis of
+        AnonTCB -> injectiveVarsOfType (varType tv)
+        NamedTCB argf
+          |     (argf == Required)
+             || (spec_inj_pos && (argf == Specified))
+          -> unitFV tv `unionFV` injectiveVarsOfType (varType tv)
+          |  otherwise
+          -> emptyFV
 
 {-
 Note [When does a tycon application need an explicit kind signature?]
@@ -2257,9 +2266,9 @@ Must Answer is:
 as we explain more of the machinery underlying this process.)
 
 Answering this question is precisely the role that the `injectiveVarsOfType`
-and `injectiveVarsOfBinder` functions exist to serve. If an omitted argument
+and `injective_vars_of_binder` functions exist to serve. If an omitted argument
 `a` appears in the set returned by `injectiveVarsOfType ty`, then knowing
-`ty` determines (i.e., fills in) `a`. (More on `injectiveVarsOfBinder` in a
+`ty` determines (i.e., fills in) `a`. (More on `injective_vars_of_binder` in a
 bit.)
 
 More formally, if
@@ -2280,8 +2289,9 @@ Question We Must Answer:
   variables of these binders fill in the remainder of T's kind?
 
 Alright, we're getting closer. Next, we need to clarify what the injective
-variables of a tycon binder are. This the role that the `injectiveVarsOfBinder`
-function serves. Here is what this function does for each form of tycon binder:
+variables of a tycon binder are. This the role that the
+`injective_vars_of_binder` function serves. Here is what this function does for
+each form of tycon binder:
 
 * Anonymous binders are injective positions. For example, in the promoted data
   constructor '(:):
@@ -2291,8 +2301,8 @@ function serves. Here is what this function does for each form of tycon binder:
   The second and third tyvar binders (of kinds `a` and `[a]`) are both
   anonymous, so if we had '(:) 'True '[], then the kinds of 'True and
   '[] would contribute to the kind of '(:) 'True '[]. Therefore,
-  injectiveVarsOfBinder(_ :: a) = injectiveVarsOfType(a) = {a}.
-  (Similarly, injectiveVarsOfBinder(_ :: [a]) = {a}.)
+  injective_vars_of_binder(_ :: a) = injectiveVarsOfType(a) = {a}.
+  (Similarly, injective_vars_of_binder(_ :: [a]) = {a}.)
 * Named binders:
   - Inferred binders are never injective positions. For example, in this data
     type:
@@ -2302,7 +2312,7 @@ function serves. Here is what this function does for each form of tycon binder:
 
     If we had Proxy 'True, then the kind of 'True would not contribute to the
     kind of Proxy 'True. Therefore,
-    injectiveVarsOfBinder(forall {k}. ...) = {}.
+    injective_vars_of_binder(forall {k}. ...) = {}.
   - Required binders are injective positions. For example, in this data type:
 
       data Wurble k (a :: k) :: k
@@ -2311,7 +2321,7 @@ function serves. Here is what this function does for each form of tycon binder:
   The first tyvar binder (of kind `forall k`) has required visibility, so if
   we had Wurble (Maybe a) Nothing, then the kind of Maybe a would
   contribute to the kind of Wurble (Maybe a) Nothing. Hence,
-  injectiveVarsOfBinder(forall a -> ...) = {a}.
+  injective_vars_of_binder(forall a -> ...) = {a}.
   - Specified binders /might/ be injective positions, depending on how you
     approach things. Continuing the '(:) example:
 
@@ -2321,21 +2331,21 @@ function serves. Here is what this function does for each form of tycon binder:
     of '(:) 'True '[], since it's not explicitly instantiated by the user. But
     if visible kind application is enabled, then this is possible, since the
     user can write '(:) @Bool 'True '[]. (In that case,
-    injectiveVarsOfBinder(forall a. ...) = {a}.)
+    injective_vars_of_binder(forall a. ...) = {a}.)
 
     There are some situations where using visible kind application is appropriate
     (e.g., HsUtils.typeToLHsType) and others where it is not (e.g., TH
-    reification), so the `injectiveVarsOfBinder` function is parametrized by a
-    Bool which decides if specified binders should be counted towards injective
-    positions or not.
+    reification), so the `injective_vars_of_binder` function is parametrized by
+    a Bool which decides if specified binders should be counted towards
+    injective positions or not.
 
-Now that we've defined injectiveVarsOfBinder, we can refine the Question We
+Now that we've defined injective_vars_of_binder, we can refine the Question We
 Must Answer once more:
 
 * Given the first n arguments of T (ty_1 ... ty_n), consider the binders
   of T that are instantiated by non-omitted arguments. For each such binder
-  b_i, take the union of all injectiveVarsOfBinder(b_i). Is this set a superset
-  of the free variables of the remainder of T's kind?
+  b_i, take the union of all injective_vars_of_binder(b_i). Is this set a
+  superset of the free variables of the remainder of T's kind?
 
 If the answer to this question is "no", then (T ty_1 ... ty_n) needs an
 explicit kind signature, since T's kind has kind variables leftover that
@@ -2352,18 +2362,18 @@ And suppose we have this application of S:
 
   S Int Bool
 
-The Int argument would be omitted, and injectiveVarsOfBinder(_ :: Type) = {}.
-This is not a superset of {k}, which might suggest that (S Bool) needs an
-explicit kind signature. But (S Bool :: Type) doesn't actually fix `k`! This is
-because the kind signature only affects the /result/ of the application, not
-all of the individual arguments. So adding a kind signature here won't make a
-difference. Therefore, the fourth (and final) iteration of the Question We Must
-Answer is:
+The Int argument would be omitted, and
+injective_vars_of_binder(_ :: Type) = {}. This is not a superset of {k}, which
+might suggest that (S Bool) needs an explicit kind signature. But
+(S Bool :: Type) doesn't actually fix `k`! This is because the kind signature
+only affects the /result/ of the application, not all of the individual
+arguments. So adding a kind signature here won't make a difference. Therefore,
+the fourth (and final) iteration of the Question We Must Answer is:
 
 * Given the first n arguments of T (ty_1 ... ty_n), consider the binders
   of T that are instantiated by non-omitted arguments. For each such binder
-  b_i, take the union of all injectiveVarsOfBinder(b_i). Is this set a superset
-  of the free variables of the kind of (T ty_1 ... ty_n)?
+  b_i, take the union of all injective_vars_of_binder(b_i). Is this set a
+  superset of the free variables of the kind of (T ty_1 ... ty_n)?
 
 Phew, that was a lot of work!
 
