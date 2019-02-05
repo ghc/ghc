@@ -416,15 +416,20 @@ GarbageCollect (uint32_t collect_gen,
    * Repeatedly scavenge all the areas we know about until there's no
    * more scavenging to be done.
    */
+
+  StgWeak *dead_weak_ptr_list = NULL;
+  StgTSO *resurrected_threads = END_TSO_QUEUE;
+
   for (;;)
   {
       scavenge_until_all_done();
+
       // The other threads are now stopped.  We might recurse back to
       // here, but from now on this is the only thread.
 
       // must be last...  invariant is that everything is fully
       // scavenged at this point.
-      if (traverseWeakPtrList()) { // returns true if evaced something
+      if (traverseWeakPtrList(&dead_weak_ptr_list, &resurrected_threads)) { // returns true if evaced something
           inc_running();
           continue;
       }
@@ -468,7 +473,7 @@ GarbageCollect (uint32_t collect_gen,
   // Finally: compact or sweep the oldest generation.
   if (major_gc && oldest_gen->mark) {
       if (oldest_gen->compact)
-          compact(gct->scavenged_static_objects);
+          compact(gct->scavenged_static_objects, dead_weak_ptr_list, resurrected_threads);
       else
           sweep(oldest_gen);
   }
