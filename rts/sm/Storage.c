@@ -29,6 +29,7 @@
 #include "Trace.h"
 #include "GC.h"
 #include "Evac.h"
+#include "NonMoving.h"
 #if defined(ios_HOST_OS)
 #include "Hash.h"
 #endif
@@ -82,7 +83,7 @@ Mutex sm_mutex;
 static void allocNurseries (uint32_t from, uint32_t to);
 static void assignNurseriesToCapabilities (uint32_t from, uint32_t to);
 
-static void
+void
 initGeneration (generation *gen, int g)
 {
     gen->no = g;
@@ -170,6 +171,19 @@ initStorage (void)
   }
   oldest_gen->to = oldest_gen;
 
+  // Nonmoving heap uses oldest_gen so initialize it after initializing oldest_gen
+  if (RtsFlags.GcFlags.useNonmoving)
+      nonmovingInit();
+
+#if defined(THREADED_RTS)
+  // nonmovingAddCapabilities allocates segments, which requires taking the gc
+  // sync lock, so initialize it before nonmovingAddCapabilities
+  initSpinLock(&gc_alloc_block_sync);
+#endif
+
+  if (RtsFlags.GcFlags.useNonmoving)
+      nonmovingAddCapabilities(n_capabilities);
+
   /* The oldest generation has one step. */
   if (RtsFlags.GcFlags.compact || RtsFlags.GcFlags.sweep) {
       if (RtsFlags.GcFlags.generations == 1) {
@@ -195,9 +209,6 @@ initStorage (void)
 
   exec_block = NULL;
 
-#if defined(THREADED_RTS)
-  initSpinLock(&gc_alloc_block_sync);
-#endif
   N = 0;
 
   for (n = 0; n < n_numa_nodes; n++) {
