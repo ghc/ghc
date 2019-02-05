@@ -289,6 +289,22 @@ collection. Hopefully, you won't need any of these in normal operation,
 but there are several things that can be tweaked for maximum
 performance.
 
+.. rts-flag:: -xn
+
+    :default: off
+    :since: 8.8.1
+
+    .. index::
+       single: concurrent mark and sweep
+
+    Enable the concurrent mark-and-sweep garbage collector for old generation
+    collectors. Typically GHC uses a stop-the-world copying garbage collector
+    for all generations. This can cause long pauses in execution during major
+    garbage collections. :rts-flag:`-xn` enables the use of a concurrent
+    mark-and-sweep garbage collector for oldest generation collections.
+
+    TODO
+
 .. rts-flag:: -A ⟨size⟩
 
     :default: 1MB
