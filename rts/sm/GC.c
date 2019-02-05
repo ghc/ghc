@@ -330,16 +330,6 @@ GarbageCollect (uint32_t collect_gen,
   // Prepare this gc_thread
   initGcThread(gct);
 
-  // Hand out the UpdRemSets
-  /*
-  for (uint32_t n = 0; n < n_capabilities; n++) {
-      MarkQueue *set = &cap->upd_rem_set;
-      debugTrace(true, "%d UpdRemSet blocks freed.", countBlocks(set->blocks));
-      freeChain(set->blocks);
-      initMarkQueue(&cap->upd_rem_set);
-  }
-  */
-
   /* Allocate a mark stack if we're doing a major collection.
    */
   if (major_gc && oldest_gen->mark) {
