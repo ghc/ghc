@@ -31,6 +31,7 @@
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 #define evacuate(p) evacuate1(p)
 #define evacuate_BLACKHOLE(p) evacuate_BLACKHOLE1(p)
+#define evacuate_static_object(p, q) evacuate_static_object1(p, q)
 #define HEAP_ALLOCED_GC(p) HEAP_ALLOCED(p)
 #endif
 
@@ -339,7 +340,7 @@ evacuate_large(StgPtr p)
      - link_field must be STATIC_LINK(q)
    ------------------------------------------------------------------------- */
 
-STATIC_INLINE void
+void
 evacuate_static_object (StgClosure **link_field, StgClosure *q)
 {
     StgWord link = (StgWord)*link_field;
