@@ -27,6 +27,7 @@
 #include "LdvProfile.h"
 #include "CNF.h"
 #include "Scav.h"
+#include "NonMoving.h"
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 #define evacuate(p) evacuate1(p)
@@ -62,9 +63,18 @@ STATIC_INLINE void evacuate_large(StgPtr p);
    Allocate some space in which to copy an object.
    -------------------------------------------------------------------------- */
 
+/* size is in words */
 STATIC_INLINE StgPtr
 alloc_for_copy (uint32_t size, uint32_t gen_no)
 {
+    ASSERT(gen_no < RtsFlags.GcFlags.generations);
+
+    if (RtsFlags.GcFlags.useNonmoving && major_gc) {
+        // unconditionally promote to non-moving heap in major gc
+        gct->copied += size;
+        return nonmovingAllocate(gct->cap, size);
+    }
+
     StgPtr to;
     gen_workspace *ws;
 
@@ -79,6 +89,11 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
         } else {
             gct->failed_to_evac = true;
         }
+    }
+
+    if (RtsFlags.GcFlags.useNonmoving && gen_no == oldest_gen->no) {
+        gct->copied += size;
+        return nonmovingAllocate(gct->cap, size);
     }
 
     ws = &gct->gens[gen_no];  // zero memory references here
@@ -100,6 +115,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
    The evacuate() code
    -------------------------------------------------------------------------- */
 
+/* size is in words */
 STATIC_INLINE GNUC_ATTR_HOT void
 copy_tag(StgClosure **p, const StgInfoTable *info,
          StgClosure *src, uint32_t size, uint32_t gen_no, StgWord tag)
@@ -296,7 +312,9 @@ evacuate_large(StgPtr p)
    */
   new_gen_no = bd->dest_no;
 
-  if (new_gen_no < gct->evac_gen_no) {
+  if (RtsFlags.GcFlags.useNonmoving && major_gc) {
+      new_gen_no = oldest_gen->no;
+  } else if (new_gen_no < gct->evac_gen_no) {
       if (gct->eager_promotion) {
           new_gen_no = gct->evac_gen_no;
       } else {
@@ -308,6 +326,9 @@ evacuate_large(StgPtr p)
   new_gen = &generations[new_gen_no];
 
   bd->flags |= BF_EVACUATED;
+  if (RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen) {
+      bd->flags |= BF_NONMOVING;
+  }
   initBdescr(bd, new_gen, new_gen->to);
 
   // If this is a block of pinned or compact objects, we don't have to scan
@@ -575,7 +596,16 @@ loop:
 
   bd = Bdescr((P_)q);
 
-  if ((bd->flags & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT)) != 0) {
+  if ((bd->flags & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT | BF_NONMOVING)) != 0) {
+      // Pointer to non-moving heap. Non-moving heap is collected using
+      // mark-sweep so this object should be marked and then retained in sweep.
+      if (bd->flags & BF_NONMOVING) {
+          // NOTE: large objects in nonmoving heap are also marked with
+          // BF_NONMOVING. Those are moved to scavenged_large_objects list in
+          // mark phase.
+          return;
+      }
+
       // pointer into to-space: just return it.  It might be a pointer
       // into a generation that we aren't collecting (> N), or it
       // might just be a pointer into to-space.  The latter doesn't
@@ -906,6 +936,10 @@ evacuate_BLACKHOLE(StgClosure **p)
     // blackholes can't be in a compact
     ASSERT((bd->flags & BF_COMPACT) == 0);
 
+    if (bd->flags & BF_NONMOVING) {
+        return;
+    }
+
     // blackholes *can* be in a large object: when raiseAsync() creates an
     // AP_STACK the payload might be large enough to create a large object.
     // See #14497.
@@ -1056,7 +1090,7 @@ selector_chain:
         // save any space in any case, and updating with an indirection is
         // trickier in a non-collected gen: we would have to update the
         // mutable list.
-        if (bd->flags & BF_EVACUATED) {
+        if ((bd->flags & BF_EVACUATED) || (bd->flags & BF_NONMOVING)) {
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
             *q = (StgClosure *)p;
             // shortcut, behave as for:  if (evac) evacuate(q);
