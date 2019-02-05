@@ -282,6 +282,14 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
         }
     }
 
+    // Initialize NonmovingAllocators and UpdRemSets
+    if (RtsFlags.GcFlags.useNonmoving) {
+        nonmovingAddCapabilities(to);
+        for (i = 0; i < to; ++i) {
+            init_upd_rem_set(&capabilities[i]->upd_rem_set);
+        }
+    }
+
 #if defined(THREADED_RTS) && defined(llvm_CC_FLAVOR) && (CC_SUPPORTS_TLS == 0)
     newThreadLocalKey(&gctKey);
 #endif
@@ -412,6 +420,22 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
 
     // successfully claimed by us; overwrite with IND_STATIC
 #endif
+
+    // Push stuff that will become unreachable after updating to UpdRemSet to
+    // maintain snapshot invariant
+    const StgInfoTable *orig_info_tbl = INFO_PTR_TO_STRUCT(orig_info);
+    // OSA: Assertions to make sure my understanding of static thunks is correct
+    ASSERT(orig_info_tbl->type == THUNK_STATIC);
+    // Secondly I think static thunks can't have payload: anything that they
+    // reference should be in SRTs
+    ASSERT(orig_info_tbl->layout.payload.ptrs == 0);
+    // Becuase the payload is empty we just push the SRT
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled)) {
+        StgThunkInfoTable *thunk_info = itbl_to_thunk_itbl(orig_info_tbl);
+        if (thunk_info->i.srt) {
+            updateRemembSetPushClosure(cap, GET_SRT(thunk_info));
+        }
+    }
 
     // For the benefit of revertCAFs(), save the original info pointer
     caf->saved_info = orig_info;
@@ -1082,6 +1106,27 @@ allocatePinned (Capability *cap, W_ n)
    Write Barriers
    -------------------------------------------------------------------------- */
 
+/* These write barriers on heavily mutated objects serve two purposes:
+ *
+ * - Efficient maintenance of the generational invariant: Record whether or not
+ *   we have added a particular mutable object to mut_list as they may contain
+ *   references to younger generations.
+ *
+ * - Maintenance of the nonmoving collector's snapshot invariant: Record objects
+ *   which are about to no longer be reachable due to mutation.
+ *
+ * In each case we record whether the object has been added to the mutable list
+ * by way of either the info pointer or a dedicated "dirty" flag. The GC will
+ * clear this flag and remove the object from mut_list (or rather, not re-add it)
+ * to if it finds the object contains no references into any younger generation.
+ *
+ * Note that all dirty objects will be marked as clean during preparation for a
+ * concurrent collection. Consequently, we can use the dirtiness flag to determine
+ * whether or not we need to add overwritten pointers to the update remembered
+ * set (since we need only write the value prior to the first update to maintain
+ * the snapshot invariant).
+ */
+
 /*
    This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
    MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
@@ -1089,21 +1134,34 @@ allocatePinned (Capability *cap, W_ n)
    and is put on the mutable list.
 */
 void
-dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
+dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
 {
     Capability *cap = regTableToCapability(reg);
-    if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
-        p->header.info = &stg_MUT_VAR_DIRTY_info;
-        recordClosureMutated(cap,p);
+    if (mvar->header.info == &stg_MUT_VAR_CLEAN_info) {
+        mvar->header.info = &stg_MUT_VAR_DIRTY_info;
+        recordClosureMutated(cap, (StgClosure *) mvar);
+        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled != 0)) {
+            updateRemembSetPushClosure_(reg, old);
+        }
     }
 }
 
+/*
+ * old is the pointer that we overwrote, which is required by the concurrent
+ * garbage collector. Note that we, while StgTVars contain multiple pointers,
+ * only overwrite one per dirty_TVAR call so we only need to take one old
+ * pointer argument.
+ */
 void
-dirty_TVAR(Capability *cap, StgTVar *p)
+dirty_TVAR(Capability *cap, StgTVar *p,
+           StgClosure *old)
 {
     if (p->header.info == &stg_TVAR_CLEAN_info) {
         p->header.info = &stg_TVAR_DIRTY_info;
         recordClosureMutated(cap,(StgClosure*)p);
+        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled != 0)) {
+            updateRemembSetPushClosure(cap, old);
+        }
     }
 }
 
@@ -1118,6 +1176,8 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
     if (tso->dirty == 0) {
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
+        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
+            updateRemembSetPushClosure(cap, (StgClosure *) tso->_link);
     }
     tso->_link = target;
 }
@@ -1128,6 +1188,8 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
     if (tso->dirty == 0) {
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
+        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
+            updateRemembSetPushClosure(cap, (StgClosure *) tso->block_info.prev);
     }
     tso->block_info.prev = target;
 }
@@ -1139,14 +1201,46 @@ dirty_TSO (Capability *cap, StgTSO *tso)
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
     }
+
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
+        updateRemembSetPushTSO(cap, tso);
 }
 
 void
 dirty_STACK (Capability *cap, StgStack *stack)
 {
+    // First push to upd_rem_set before we set stack->dirty since we
+    // the nonmoving collector may already be marking the stack.
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
+        updateRemembSetPushStack(cap, stack);
+
     if (! (stack->dirty & STACK_DIRTY)) {
         stack->dirty = STACK_DIRTY;
         recordClosureMutated(cap,(StgClosure*)stack);
+    }
+
+}
+
+/*
+ * This is the concurrent collector's write barrier for MVARs. In the other
+ * write barriers above this is folded into the dirty_* functions.  However, in
+ * the case of MVars we need to separate the acts of adding the MVar to the
+ * mutable list and adding its fields to the update remembered set.
+ *
+ * Specifically, the wakeup loop in stg_putMVarzh wants to freely mutate the
+ * pointers of the MVar but needs to keep its lock, meaning we can't yet add it
+ * to the mutable list lest the assertion checking for clean MVars on the
+ * mutable list would fail.
+ */
+void
+update_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
+{
+    Capability *cap = regTableToCapability(reg);
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled)) {
+        StgMVar *mvar = (StgMVar *) p;
+        updateRemembSetPushClosure(cap, old_val);
+        updateRemembSetPushClosure(cap, (StgClosure *) mvar->head);
+        updateRemembSetPushClosure(cap, (StgClosure *) mvar->tail);
     }
 }
 
@@ -1159,9 +1253,11 @@ dirty_STACK (Capability *cap, StgStack *stack)
    such as Chaneneos and cheap-concurrency.
 */
 void
-dirty_MVAR(StgRegTable *reg, StgClosure *p)
+dirty_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 {
-    recordClosureMutated(regTableToCapability(reg),p);
+    Capability *cap = regTableToCapability(reg);
+    update_MVAR(reg, p, old_val);
+    recordClosureMutated(cap, p);
 }
 
 /* -----------------------------------------------------------------------------

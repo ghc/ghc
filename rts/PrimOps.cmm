@@ -346,8 +346,13 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
         // Compare and Swap Succeeded:
         SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
         len = StgMutArrPtrs_ptrs(arr);
+
         // The write barrier.  We must write a byte into the mark table:
         I8[arr + SIZEOF_StgMutArrPtrs + WDS(len) + (ind >> MUT_ARR_PTRS_CARD_BITS )] = 1;
+
+        // Concurrent GC write barrier
+        updateRemembSetPushPtr(old);
+
         return (0,new);
     }
 }
@@ -458,16 +463,45 @@ stg_thawSmallArrayzh ( gcptr src, W_ offset, W_ n )
     cloneSmallArray(stg_SMALL_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
 }
 
+// Concurrent GC write barrier for pointer array copies
+//
+// hdr_size in bytes. dst_off in words, n in words.
+stg_copyArray_barrier ( W_ hdr_size, gcptr dst, W_ dst_off, W_ n)
+{
+    W_ end, p;
+    ASSERT(n > 0);  // Assumes n==0 is handled by caller
+    p = dst + hdr_size + WDS(dst_off);
+    end = p + WDS(n);
+
+again:
+    IF_WRITE_BARRIER_ENABLED {
+        ccall updateRemembSetPushClosure_(BaseReg "ptr", W_[p] "ptr");
+    }
+    p = p + WDS(1);
+    if (p < end) {
+        goto again;
+    }
+
+    return ();
+}
+
 stg_copySmallArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n)
 {
     W_ dst_p, src_p, bytes;
 
-    SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
+    if (n > 0) {
+        IF_WRITE_BARRIER_ENABLED {
+            call stg_copyArray_barrier(SIZEOF_StgSmallMutArrPtrs,
+                                      dst, dst_off, n);
+        }
 
-    dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
-    src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
-    bytes = WDS(n);
-    prim %memcpy(dst_p, src_p, bytes, SIZEOF_W);
+        SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
+
+        dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
+        src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
+        bytes = WDS(n);
+        prim %memcpy(dst_p, src_p, bytes, SIZEOF_W);
+    }
 
     return ();
 }
@@ -476,15 +510,22 @@ stg_copySmallMutableArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n
 {
     W_ dst_p, src_p, bytes;
 
-    SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
+    if (n > 0) {
+        IF_WRITE_BARRIER_ENABLED {
+            call stg_copyArray_barrier(SIZEOF_StgSmallMutArrPtrs,
+                                      dst, dst_off, n);
+        }
 
-    dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
-    src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
-    bytes = WDS(n);
-    if (src == dst) {
-        prim %memmove(dst_p, src_p, bytes, SIZEOF_W);
-    } else {
-        prim %memcpy(dst_p, src_p, bytes, SIZEOF_W);
+        SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
+
+        dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
+        src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
+        bytes = WDS(n);
+        if (src == dst) {
+            prim %memmove(dst_p, src_p, bytes, SIZEOF_W);
+        } else {
+            prim %memcpy(dst_p, src_p, bytes, SIZEOF_W);
+        }
     }
 
     return ();
@@ -506,6 +547,10 @@ stg_casSmallArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
     } else {
         // Compare and Swap Succeeded:
         SET_HDR(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info, CCCS);
+
+        // Concurrent GC write barrier
+        updateRemembSetPushPtr(old);
+
         return (0,new);
     }
 }
@@ -544,7 +589,7 @@ stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
         return (1,h);
     } else {
         if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
-            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
+            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", old);
         }
         return (0,new);
     }
@@ -557,7 +602,7 @@ stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
     } else {
         StgMutVar_var(mv) = new;
         if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
-            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
+            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", old);
         }
         return (0,new);
     }
@@ -624,11 +669,12 @@ stg_atomicModifyMutVar2zh ( gcptr mv, gcptr f )
     (h) = prim %cmpxchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y);
     if (h != x) { goto retry; }
 #else
+    h = StgMutVar_var(mv);
     StgMutVar_var(mv) = y;
 #endif
 
     if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
-        ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
+        ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", h);
     }
 
     return (x,z);
@@ -749,6 +795,9 @@ stg_addCFinalizzerToWeakzh ( W_ fptr,   // finalizer
         return (0);
     }
 
+    // Write barrier for concurrent non-moving collector
+    updateRemembSetPushPtr(StgWeak_cfinalizers(w))
+
     StgCFinalizerList_link(c) = StgWeak_cfinalizers(w);
     StgWeak_cfinalizers(w) = c;
 
@@ -828,6 +877,8 @@ stg_deRefWeakzh ( gcptr w )
     if (info == stg_WEAK_info) {
         code = 1;
         val = StgWeak_value(w);
+        // See Note [Concurrent read barrier on deRefWeak#] in NonMovingMark.c
+        updateRemembSetPushPtr(val);
     } else {
         code = 0;
         val = w;
@@ -1491,7 +1542,7 @@ stg_takeMVarzh ( P_ mvar /* :: MVar a */ )
      */
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
         if (info == stg_MVAR_CLEAN_info) {
-            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr", StgMVar_value(mvar) "ptr");
         }
 
         // We want to put the heap check down here in the slow path,
@@ -1534,6 +1585,9 @@ loop:
         // If the MVar is not already dirty, then we don't need to make
         // it dirty, as it is empty with nothing blocking on it.
         unlockClosure(mvar, info);
+        // However, we do need to ensure that the nonmoving collector
+        // knows about the reference to the value that we just removed...
+        updateRemembSetPushPtr(val);
         return (val);
     }
     if (StgHeader_info(q) == stg_IND_info ||
@@ -1545,7 +1599,7 @@ loop:
     // There are putMVar(s) waiting... wake up the first thread on the queue
 
     if (info == stg_MVAR_CLEAN_info) {
-        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr", val "ptr");
     }
 
     tso = StgMVarTSOQueue_tso(q);
@@ -1611,7 +1665,7 @@ loop:
     // There are putMVar(s) waiting... wake up the first thread on the queue
 
     if (info == stg_MVAR_CLEAN_info) {
-        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr", val "ptr");
     }
 
     tso = StgMVarTSOQueue_tso(q);
@@ -1649,7 +1703,7 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
     if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
 
         if (info == stg_MVAR_CLEAN_info) {
-            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr", StgMVar_value(mvar) "ptr");
         }
 
         // We want to put the heap check down here in the slow path,
@@ -1681,14 +1735,20 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
         jump stg_block_putmvar(mvar,val);
     }
 
+    // We are going to mutate the closure, make sure its current pointers
+    // are marked.
+    if (info == stg_MVAR_CLEAN_info) {
+        ccall update_MVAR(BaseReg "ptr", mvar "ptr", StgMVar_value(mvar) "ptr");
+    }
+
     q = StgMVar_head(mvar);
 loop:
     if (q == stg_END_TSO_QUEUE_closure) {
         /* No further takes, the MVar is now full. */
-        if (info == stg_MVAR_CLEAN_info) {
-            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
-        }
         StgMVar_value(mvar) = val;
+        if (info == stg_MVAR_CLEAN_info) {
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr", StgMVar_value(mvar) "ptr");
+        }
         unlockClosure(mvar, stg_MVAR_DIRTY_info);
         return ();
     }
@@ -1766,7 +1826,7 @@ loop:
     if (q == stg_END_TSO_QUEUE_closure) {
         /* No further takes, the MVar is now full. */
         if (info == stg_MVAR_CLEAN_info) {
-            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr", StgMVar_value(mvar) "ptr");
         }
 
         StgMVar_value(mvar) = val;
@@ -1833,7 +1893,7 @@ stg_readMVarzh ( P_ mvar, /* :: MVar a */ )
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
 
         if (info == stg_MVAR_CLEAN_info) {
-            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr", StgMVar_value(mvar));
         }
 
         ALLOC_PRIM_WITH_CUSTOM_FAILURE
