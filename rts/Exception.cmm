@@ -318,6 +318,7 @@ stg_killThreadzh (P_ target, P_ exception)
             return ();
         } else {
             StgTSO_why_blocked(CurrentTSO) = BlockedOnMsgThrowTo;
+            updateRemembSetPushPtr(StgTSO_block_info(CurrentTSO));
             StgTSO_block_info(CurrentTSO) = msg;
             // we must block, and unlock the message before returning
             jump stg_block_throwto (target, exception);
@@ -489,6 +490,8 @@ retry_pop_stack:
       ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
       ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
 
+      // No need to push `trec` to update remembered set; it will be no longer
+      // reachable after we overwrite StgTSO.trec.
       StgTSO_trec(CurrentTSO) = NO_TREC;
       if (r != 0) {
         // Transaction was valid: continue searching for a catch frame
@@ -607,6 +610,8 @@ retry_pop_stack:
       outer  = StgTRecHeader_enclosing_trec(trec);
       ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
       ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
+      // No need to push `trec` to update remembered set since we just freed
+      // it; it is no longer reachable.
       StgTSO_trec(CurrentTSO) = outer;
       Sp = Sp + SIZEOF_StgCatchSTMFrame;
     }
