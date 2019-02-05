@@ -139,6 +139,7 @@ library
                       rts/Linker.h
                       rts/Main.h
                       rts/Messages.h
+                      rts/NonMoving.h
                       rts/OSThreads.h
                       rts/Parallel.h
                       rts/PrimFloat.h
