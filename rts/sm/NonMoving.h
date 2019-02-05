@@ -95,7 +95,6 @@ extern uint64_t nonmoving_live_words;
 
 void nonmovingInit(void);
 void nonmovingExit(void);
-void nonmovingWaitUntilFinished(void);
 
 
 // dead_weaks and resurrected_threads lists are used for two things:

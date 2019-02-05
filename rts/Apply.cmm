@@ -652,6 +652,8 @@ INFO_TABLE(stg_AP_STACK,/*special layout*/0,0,AP_STACK,"AP_STACK","AP_STACK")
     /* someone else beat us to it */
     jump ENTRY_LBL(stg_WHITEHOLE) (ap);
   }
+  // Can't add StgInd_indirectee(ap) to UpdRemSet here because the old value is
+  // not reachable.
   StgInd_indirectee(ap) = CurrentTSO;
   prim_write_barrier;
   SET_INFO(ap, __stg_EAGER_BLACKHOLE_info);
