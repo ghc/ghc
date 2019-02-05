@@ -796,6 +796,49 @@ void traceThreadLabel_(Capability *cap,
     }
 }
 
+void traceConcMarkBegin()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_MARK_BEGIN);
+}
+
+void traceConcMarkEnd(StgWord32 marked_obj_count)
+{
+    if (eventlog_enabled)
+        postConcMarkEnd(marked_obj_count);
+}
+
+void traceConcSyncBegin()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SYNC_BEGIN);
+}
+
+void traceConcSyncEnd()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SYNC_END);
+}
+
+void traceConcSweepBegin()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SWEEP_BEGIN);
+}
+
+void traceConcSweepEnd()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SWEEP_END);
+}
+
+void traceConcUpdRemSetFlush(Capability *cap)
+{
+    if (eventlog_enabled)
+        postConcUpdRemSetFlush(cap);
+}
+
+
 void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)
 {
 #if defined(DEBUG)
