@@ -114,7 +114,15 @@ extern StgIndStatic *debug_caf_list_snapshot;
 
 extern MarkQueue *current_mark_queue;
 extern bdescr *upd_rem_set_block_list;
+
+#if defined(THREADED_RTS)
 extern bool nonmoving_write_barrier_enabled;
+#else
+// The write barrier is never needed if !THREADED since we don't perform
+// concurrent collection in this case.
+#define nonmoving_write_barrier_enabled 0
+#endif
+
 void nonmovingMarkInitUpdRemSet(void);
 
 void init_upd_rem_set(UpdRemSet *rset);
