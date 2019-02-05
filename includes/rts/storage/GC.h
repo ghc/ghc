@@ -234,7 +234,7 @@ void setKeepCAFs (void);
    and is put on the mutable list.
    -------------------------------------------------------------------------- */
 
-void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
+void dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mv, StgClosure *old);
 
 /* set to disable CAF garbage collection in GHCi. */
 /* (needed when dynamic libraries are used). */
