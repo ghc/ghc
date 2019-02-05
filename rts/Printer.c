@@ -111,10 +111,15 @@ printThunkObject( StgThunk *obj, char* tag )
 void
 printClosure( const StgClosure *obj )
 {
-    const StgInfoTable *info;
-
+    debugBelch("%p: ", obj);
     obj = UNTAG_CONST_CLOSURE(obj);
-    info = get_itbl(obj);
+    const StgInfoTable* info = get_itbl(obj);
+
+    while (IS_FORWARDING_PTR(info)) {
+        obj = (StgClosure*)UN_FORWARDING_PTR(obj);
+        debugBelch("(forwarding to %p) ", (void*)obj);
+        info = get_itbl(obj);
+    }
 
     switch ( info->type ) {
     case INVALID_OBJECT:
