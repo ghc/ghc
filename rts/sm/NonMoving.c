@@ -21,6 +21,7 @@
 #include "NonMoving.h"
 #include "NonMovingMark.h"
 #include "NonMovingSweep.h"
+#include "NonMovingCensus.h"
 #include "StablePtr.h" // markStablePtrTable
 #include "Schedule.h" // markScheduler
 #include "Weak.h" // dead_weak_ptr_list
@@ -724,6 +725,10 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     ASSERT(nonmovingHeap.sweep_list == NULL);
     debugTrace(DEBUG_nonmoving_gc, "Finished sweeping.");
     traceConcSweepEnd();
+#if defined(DEBUG)
+    if (RtsFlags.DebugFlags.nonmoving_gc)
+        nonmovingPrintAllocatorCensus();
+#endif
 
     // TODO: Remainder of things done by GarbageCollect (update stats)
 
