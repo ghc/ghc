@@ -599,13 +599,13 @@ check_type _ (TyVarTy _) = return ()
 
 check_type ve (AppTy ty1 ty2)
   = do  { check_type ve ty1
-        ; check_arg_type ve ty2 }
+        ; check_arg_type False ve ty2 }
 
 check_type ve ty@(TyConApp tc tys)
   | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
   = check_syn_tc_app ve ty tc tys
   | isUnboxedTupleTyCon tc = check_ubx_tuple ve ty tys
-  | otherwise              = mapM_ (check_arg_type ve) tys
+  | otherwise              = mapM_ (check_arg_type False ve) tys
 
 check_type _ (LitTy {}) = return ()
 
@@ -693,14 +693,8 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
     tc_arity  = tyConArity tc
 
     check_arg :: ExpandMode -> KindOrType -> TcM ()
-    check_arg expand
-      | isTypeFamilyTyCon tc
-      = check_arg_type ve'
-      | otherwise
-      = check_type (ve'{ve_rank = synArgMonoType})
-      where
-        ve' :: ValidityEnv
-        ve' = ve{ve_ctxt = arg_ctxt, ve_expand = expand}
+    check_arg expand =
+      check_arg_type (isTypeSynonymTyCon tc) (ve{ve_expand = expand})
 
     check_args_only, check_expansion_only :: ExpandMode -> TcM ()
     check_args_only expand = mapM_ (check_arg expand) tys
@@ -712,15 +706,6 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
                      in addErrCtxt err_ctxt $
                         check_type (ve{ve_expand = expand}) ty'
          Nothing  -> pprPanic "check_syn_tc_app" (ppr ty)
-
-    arg_ctxt :: UserTypeCtxt
-    arg_ctxt
-      | GhciCtxt _ <- ctxt = GhciCtxt False
-          -- When checking an argument, set the field of GhciCtxt to False to
-          -- indicate that we are no longer in an outermost position (and thus
-          -- unsaturated synonyms are no longer allowed).
-          -- See Note [Unsaturated type synonyms in GHCi]
-      | otherwise          = ctxt
 
 {-
 Note [Unsaturated type synonyms in GHCi]
@@ -774,7 +759,9 @@ check_ubx_tuple (ve@ValidityEnv{ve_tidy_env = env}) ty tys
         ; mapM_ (check_type (ve{ve_rank = rank'})) tys }
 
 ----------------------------------------
-check_arg_type :: ValidityEnv -> KindOrType -> TcM ()
+check_arg_type
+  :: Bool -- ^ Is this the argument to a type synonym?
+  -> ValidityEnv -> KindOrType -> TcM ()
 -- The sort of type that can instantiate a type variable,
 -- or be the argument of a type constructor.
 -- Not an unboxed tuple, but now *can* be a forall (since impredicativity)
@@ -793,11 +780,14 @@ check_arg_type :: ValidityEnv -> KindOrType -> TcM ()
 --     But not in user code.
 -- Anyway, they are dealt with by a special case in check_tau_type
 
-check_arg_type _ (CoercionTy {}) = return ()
+check_arg_type _ _ (CoercionTy {}) = return ()
 
-check_arg_type (ve@ValidityEnv{ve_rank = rank}) ty
+check_arg_type type_syn (ve@ValidityEnv{ve_ctxt = ctxt, ve_rank = rank}) ty
   = do  { impred <- xoptM LangExt.ImpredicativeTypes
         ; let rank' = case rank of          -- Predictive => must be monotype
+                        -- Rank-n arguments to type synonyms are OK, provided
+                        -- that LiberalTypeSynonyms is enabled.
+                        _ | type_syn       -> synArgMonoType
                         MustBeMonoType     -> MustBeMonoType  -- Monotype, regardless
                         _other | impred    -> ArbitraryRank
                                | otherwise -> tyConArgMonoType
@@ -805,8 +795,17 @@ check_arg_type (ve@ValidityEnv{ve_rank = rank}) ty
                         -- so that we don't suggest -XImpredicativeTypes in
                         --    (Ord (forall a.a)) => a -> a
                         -- and so that if it Must be a monotype, we check that it is!
+              ctxt' :: UserTypeCtxt
+              ctxt'
+                | GhciCtxt _ <- ctxt = GhciCtxt False
+                    -- When checking an argument, set the field of GhciCtxt to
+                    -- False to indicate that we are no longer in an outermost
+                    -- position (and thus unsaturated synonyms are no longer
+                    -- allowed).
+                    -- See Note [Unsaturated type synonyms in GHCi]
+                | otherwise          = ctxt
 
-        ; check_type (ve{ve_rank = rank'}) ty }
+        ; check_type (ve{ve_ctxt = ctxt', ve_rank = rank'}) ty }
 
 ----------------------------------------
 forAllTyErr :: TidyEnv -> Rank -> Type -> (TidyEnv, SDoc)
