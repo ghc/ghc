@@ -1,5 +1,6 @@
 # Test +RTS -G1 here (it isn't tested anywhere else)
-setTestOpts(unless(fast(), extra_ways(['g1'])))
+# N.B. Nonmoving collector doesn't support -G1
+setTestOpts(unless(fast(), [ extra_ways(['g1']), omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc'])]))
 
 test('cgrun001', normal, compile_and_run, [''])
 test('cgrun002', normal, compile_and_run, [''])
