@@ -29,6 +29,8 @@
 #include "Arena.h"
 #include "RetainerProfile.h"
 #include "CNF.h"
+#include "sm/NonMoving.h"
+#include "sm/NonMovingMark.h"
 #include "Profiling.h" // prof_arena
 
 /* -----------------------------------------------------------------------------
@@ -39,6 +41,9 @@ static void  checkSmallBitmap    ( StgPtr payload, StgWord bitmap, uint32_t );
 static void  checkLargeBitmap    ( StgPtr payload, StgLargeBitmap*, uint32_t );
 static void  checkClosureShallow ( const StgClosure * );
 static void  checkSTACK          (StgStack *stack);
+
+static W_    countNonMovingSegments ( struct NonmovingSegment *segs );
+static W_    countNonMovingHeap     ( struct NonmovingHeap *heap );
 
 /* -----------------------------------------------------------------------------
    Check stack sanity
@@ -481,6 +486,41 @@ void checkHeapChain (bdescr *bd)
     }
 }
 
+/* -----------------------------------------------------------------------------
+ * Check nonmoving heap sanity
+ *
+ * After a concurrent sweep the nonmoving heap can be checked for validity.
+ * -------------------------------------------------------------------------- */
+
+static void checkNonmovingSegments (struct NonmovingSegment *seg)
+{
+    while (seg != NULL) {
+        const nonmoving_block_idx count = nonmovingSegmentBlockCount(seg);
+        for (nonmoving_block_idx i=0; i < count; i++) {
+            if (seg->bitmap[i] == nonmovingMarkEpoch) {
+                StgPtr p = nonmovingSegmentGetBlock(seg, i);
+                checkClosure((StgClosure *) p);
+            } else if (i < seg->next_free_snap){
+                seg->bitmap[i] = 0;
+            }
+        }
+        seg = seg->link;
+    }
+}
+
+void checkNonmovingHeap (const struct NonmovingHeap *heap)
+{
+    for (unsigned int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
+        const struct NonmovingAllocator *alloc = heap->allocators[i];
+        checkNonmovingSegments(alloc->filled);
+        checkNonmovingSegments(alloc->active);
+        for (unsigned int cap=0; cap < n_capabilities; cap++) {
+            checkNonmovingSegments(alloc->current[cap]);
+        }
+    }
+}
+
+
 void
 checkHeapChunk(StgPtr start, StgPtr end)
 {
@@ -753,15 +793,24 @@ static void checkGeneration (generation *gen,
     uint32_t n;
     gen_workspace *ws;
 
-    ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
+    //ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
 
 #if defined(THREADED_RTS)
-    // heap sanity checking doesn't work with SMP, because we can't
-    // zero the slop (see Updates.h).  However, we can sanity-check
-    // the heap after a major gc, because there is no slop.
+    // heap sanity checking doesn't work with SMP for two reasons:
+    //   * we can't zero the slop (see Updates.h).  However, we can sanity-check
+    //     the heap after a major gc, because there is no slop.
+    //
+    //   * the nonmoving collector may be mutating its large object lists, unless we
+    //     were in fact called by the nonmoving collector.
     if (!after_major_gc) return;
 #endif
+
+    if (RtsFlags.GcFlags.useNonmoving && gen == oldest_gen) {
+        ASSERT(countBlocks(nonmoving_large_objects) == n_nonmoving_large_blocks);
+        ASSERT(countBlocks(nonmoving_marked_large_objects) == n_nonmoving_marked_large_blocks);
+        ASSERT(countNonMovingSegments(nonmovingHeap.free) == (W_) nonmovingHeap.n_free * NONMOVING_SEGMENT_BLOCKS);
+    }
 
     checkHeapChain(gen->blocks);
 
@@ -811,6 +860,15 @@ markCompactBlocks(bdescr *bd)
     }
 }
 
+static void
+markNonMovingSegments(struct NonmovingSegment *seg)
+{
+    while (seg) {
+        markBlocks(Bdescr((P_)seg));
+        seg = seg->link;
+    }
+}
+
 // If memInventory() calculates that we have a memory leak, this
 // function will try to find the block(s) that are leaking by marking
 // all the ones that we know about, and search through memory to find
@@ -821,7 +879,7 @@ markCompactBlocks(bdescr *bd)
 static void
 findMemoryLeak (void)
 {
-    uint32_t g, i;
+    uint32_t g, i, j;
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         for (i = 0; i < n_capabilities; i++) {
             markBlocks(capabilities[i]->mut_lists[g]);
@@ -841,6 +899,23 @@ findMemoryLeak (void)
     for (i = 0; i < n_capabilities; i++) {
         markBlocks(gc_threads[i]->free_blocks);
         markBlocks(capabilities[i]->pinned_object_block);
+    }
+
+    if (RtsFlags.GcFlags.useNonmoving) {
+        markBlocks(nonmoving_large_objects);
+        markBlocks(nonmoving_marked_large_objects);
+        for (i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
+            struct NonmovingAllocator *alloc = nonmovingHeap.allocators[i];
+            markNonMovingSegments(alloc->filled);
+            markNonMovingSegments(alloc->active);
+            for (j = 0; j < n_capabilities; j++) {
+                markNonMovingSegments(alloc->current[j]);
+            }
+        }
+        markNonMovingSegments(nonmovingHeap.sweep_list);
+        markNonMovingSegments(nonmovingHeap.free);
+        if (current_mark_queue)
+            markBlocks(current_mark_queue->blocks);
     }
 
 #if defined(PROFILING)
@@ -901,14 +976,63 @@ void findSlop(bdescr *bd)
 static W_
 genBlocks (generation *gen)
 {
-    ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
+    W_ ret = 0;
+    if (RtsFlags.GcFlags.useNonmoving && gen == oldest_gen) {
+        // See Note [Live data accounting in nonmoving collector].
+        ASSERT(countNonMovingHeap(&nonmovingHeap) == gen->n_blocks);
+        ret += countAllocdBlocks(nonmoving_large_objects);
+        ret += countAllocdBlocks(nonmoving_marked_large_objects);
+        ret += countNonMovingHeap(&nonmovingHeap);
+        if (current_mark_queue)
+            ret += countBlocks(current_mark_queue->blocks);
+    } else {
+        ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
+        ret += gen->n_blocks;
+    }
+
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
     ASSERT(countCompactBlocks(gen->compact_objects) == gen->n_compact_blocks);
     ASSERT(countCompactBlocks(gen->compact_blocks_in_import) == gen->n_compact_blocks_in_import);
-    return gen->n_blocks + gen->n_old_blocks +
+
+    ret += gen->n_old_blocks +
         countAllocdBlocks(gen->large_objects) +
         countAllocdCompactBlocks(gen->compact_objects) +
         countAllocdCompactBlocks(gen->compact_blocks_in_import);
+    return ret;
+}
+
+static W_
+countNonMovingSegments(struct NonmovingSegment *segs)
+{
+    W_ ret = 0;
+    while (segs) {
+        ret += countBlocks(Bdescr((P_)segs));
+        segs = segs->link;
+    }
+    return ret;
+}
+
+static W_
+countNonMovingAllocator(struct NonmovingAllocator *alloc)
+{
+    W_ ret = countNonMovingSegments(alloc->filled)
+           + countNonMovingSegments(alloc->active);
+    for (uint32_t i = 0; i < n_capabilities; ++i) {
+        ret += countNonMovingSegments(alloc->current[i]);
+    }
+    return ret;
+}
+
+static W_
+countNonMovingHeap(struct NonmovingHeap *heap)
+{
+    W_ ret = 0;
+    for (int alloc_idx = 0; alloc_idx < NONMOVING_ALLOCA_CNT; alloc_idx++) {
+        ret += countNonMovingAllocator(heap->allocators[alloc_idx]);
+    }
+    ret += countNonMovingSegments(heap->sweep_list);
+    ret += countNonMovingSegments(heap->free);
+    return ret;
 }
 
 void
@@ -916,8 +1040,8 @@ memInventory (bool show)
 {
   uint32_t g, i;
   W_ gen_blocks[RtsFlags.GcFlags.generations];
-  W_ nursery_blocks, retainer_blocks,
-      arena_blocks, exec_blocks, gc_free_blocks = 0;
+  W_ nursery_blocks = 0, retainer_blocks = 0,
+      arena_blocks = 0, exec_blocks = 0, gc_free_blocks = 0;
   W_ live_blocks = 0, free_blocks = 0;
   bool leak;
 
@@ -934,20 +1058,19 @@ memInventory (bool show)
       gen_blocks[g] += genBlocks(&generations[g]);
   }
 
-  nursery_blocks = 0;
   for (i = 0; i < n_nurseries; i++) {
       ASSERT(countBlocks(nurseries[i].blocks) == nurseries[i].n_blocks);
       nursery_blocks += nurseries[i].n_blocks;
   }
   for (i = 0; i < n_capabilities; i++) {
-      gc_free_blocks += countBlocks(gc_threads[i]->free_blocks);
+      W_ n = countBlocks(gc_threads[i]->free_blocks);
+      gc_free_blocks += n;
       if (capabilities[i]->pinned_object_block != NULL) {
           nursery_blocks += capabilities[i]->pinned_object_block->blocks;
       }
       nursery_blocks += countBlocks(capabilities[i]->pinned_object_blocks);
   }
 
-  retainer_blocks = 0;
 #if defined(PROFILING)
   if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
       retainer_blocks = retainerStackBlocks();
