@@ -592,9 +592,6 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
         all_caps_syncd = nonmovingWaitForFlush();
         nonmovingMarkThreadsWeaks(mark_queue);
     } while (!all_caps_syncd);
-
-#else
-    nonmovingMarkThreadsWeaks(mark_queue);
 #endif
 
     nonmovingResurrectThreads(mark_queue, resurrected_threads);
