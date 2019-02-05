@@ -60,6 +60,14 @@ isAlive(StgClosure *p)
     // ignore closures in generations that we're not collecting.
     bd = Bdescr((P_)q);
 
+    // isAlive is used when scavenging moving generations, before the mark
+    // phase. Because we don't know alive-ness of objects before the mark phase
+    // we have to conservatively treat objects in the non-moving generation as
+    // alive here.
+    if (bd->flags & BF_NONMOVING) {
+        return p;
+    }
+
     // if it's a pointer into to-space, then we're done
     if (bd->flags & BF_EVACUATED) {
         return p;
