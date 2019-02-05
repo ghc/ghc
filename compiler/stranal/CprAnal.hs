@@ -51,7 +51,7 @@ cprAnalProgram dflags fam_envs binds
         dumpIfSet_dyn dflags Opt_D_dump_str_signatures
                       "Strictness signatures after CPR analsis" $
             dumpStrSig binds_plus_cpr ;
-        -- See Note [Stamp out space leaks in demand analysis]
+        -- See Note [Stamp out space leaks in demand analysis] in DmdAnal.hs
         seqBinds binds_plus_cpr `seq` return binds_plus_cpr
     }
   where
@@ -66,35 +66,11 @@ cprAnalTopBind env (NonRec id rhs)
   = (extendAnalEnv TopLevel env id' (get_idCprInfo id'), NonRec id' rhs')
   where
     (id', rhs') = cprAnalRhsLetDown TopLevel env 0 id rhs
-        -- See Note [Initial CPR for strict binders]
 
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
   where
     (env', pairs') = cprFix TopLevel env 0 pairs
-                -- We get two iterations automatically
-                -- c.f. the NonRec case above
-
-{- Note [Stamp out space leaks in demand analysis]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The demand analysis pass outputs a new copy of the Core program in
-which binders have been annotated with demand and strictness
-information. It's tiresome to ensure that this information is fully
-evaluated everywhere that we produce it, so we just run a single
-seqBinds over the output before returning it, to ensure that there are
-no references holding on to the input Core program.
-
-This makes a ~30% reduction in peak memory usage when compiling
-DynFlags (cf Trac #9675 and #13426).
-
-This is particularly important when we are doing late demand analysis,
-since we don't do a seqBinds at any point thereafter. Hence code
-generation would hold on to an extra copy of the Core program, via
-unforced thunks in demand or strictness information; and it is the
-most memory-intensive part of the compilation process, so this added
-seqBinds makes a big difference in peak memory usage.
--}
-
 
 {-
 ************************************************************************
@@ -102,31 +78,14 @@ seqBinds makes a big difference in peak memory usage.
 \subsection{The analyser itself}
 *                                                                      *
 ************************************************************************
-
-Note [Ensure demand is strict]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's important not to analyse e with a lazy demand because
-a) When we encounter   case s of (a,b) ->
-        we demand s with U(d1d2)... but if the overall demand is lazy
-        that is wrong, and we'd need to reduce the demand on s,
-        which is inconvenient
-b) More important, consider
-        f (let x = R in x+x), where f is lazy
-   We still want to mark x as demanded, because it will be when we
-   enter the let.  If we analyse f's arg with a Lazy demand, we'll
-   just mark x as Lazy
-c) The application rule wouldn't be right either
-   Evaluating (f x) in a L demand does *not* cause
-   evaluation of f in a C(L) demand!
 -}
 
--- Main Demand Analsysis machinery
-cprAnal, cprAnal' :: AnalEnv
-        -> Arity
-        -> CoreExpr -> (CprType, CoreExpr)
-
--- The CleanDemand is always strict and not absent
---    See Note [Ensure demand is strict]
+-- Main CPR Analysis machinery
+cprAnal, cprAnal'
+  :: AnalEnv
+  -> Arity               -- ^ number of arguments the expression is applied to
+  -> CoreExpr            -- ^ expression to be denoted by a 'CprType'
+  -> (CprType, CoreExpr) -- ^ the updated expression and its 'CprType'
 
 cprAnal env n e = -- pprTrace "cprAnal" (ppr n <+> ppr e) $
                   cprAnal' env n e
@@ -181,8 +140,6 @@ cprAnal' env n (Lam var body)
 cprAnal' env n (Case scrut case_bndr ty alts)
   = (res_ty, Case scrut' case_bndr ty alts')
   where
-    -- Compute demand on the scrutinee
-    -- See Note [Demand on scrutinee of a product case]
     (_, scrut')      = cprAnal env 0 scrut
     (alt_tys, alts') = mapAndUnzip (cprAnalAlt env scrut case_bndr n) alts
     res_ty           = foldl' lubCprType botCprType alt_tys
@@ -227,103 +184,7 @@ cprAnalAlt env _ _ n (con,bndrs,rhs)
   where
     (rhs_ty, rhs') = cprAnal env n rhs
 
-{- Note [IO hack in the demand analyser]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There's a hack here for I/O operations.  Consider
-
-     case foo x s of { (# s', r #) -> y }
-
-Is this strict in 'y'? Often not! If foo x s performs some observable action
-(including raising an exception with raiseIO#, modifying a mutable variable, or
-even ending the program normally), then we must not force 'y' (which may fail
-to terminate) until we have performed foo x s.
-
-Hackish solution: spot the IO-like situation and add a virtual branch,
-as if we had
-     case foo x s of
-        (# s, r #) -> y
-        other      -> return ()
-So the 'y' isn't necessarily going to be evaluated
-
-A more complete example (Trac #148, #1592) where this shows up is:
-     do { let len = <expensive> ;
-        ; when (...) (exitWith ExitSuccess)
-        ; print len }
-
-However, consider
-  f x s = case getMaskingState# s of
-            (# s, r #) ->
-          case x of I# x2 -> ...
-
-Here it is terribly sad to make 'f' lazy in 's'.  After all,
-getMaskingState# is not going to diverge or throw an exception!  This
-situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
-(on an MVar not an Int), and made a material difference.
-
-So if the scrutinee is a primop call, we *don't* apply the
-state hack:
-  - If it is a simple, terminating one like getMaskingState,
-    applying the hack is over-conservative.
-  - If the primop is raise# then it returns bottom, so
-    the case alternatives are already discarded.
-  - If the primop can raise a non-IO exception, like
-    divide by zero or seg-fault (eg writing an array
-    out of bounds) then we don't mind evaluating 'x' first.
-
-Note [Demand on the scrutinee of a product case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When figuring out the demand on the scrutinee of a product case,
-we use the demands of the case alternative, i.e. id_dmds.
-But note that these include the demand on the case binder;
-see Note [Demand on case-alternative binders] in Demand.hs.
-This is crucial. Example:
-   f x = case x of y { (a,b) -> k y a }
-If we just take scrut_demand = U(L,A), then we won't pass x to the
-worker, so the worker will rebuild
-     x = (a, absent-error)
-and that'll crash.
-
-Note [Aggregated demand for cardinality]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We use different strategies for strictness and usage/cardinality to
-"unleash" demands captured on free variables by bindings. Let us
-consider the example:
-
-f1 y = let {-# NOINLINE h #-}
-           h = y
-       in  (h, h)
-
-We are interested in obtaining cardinality demand U1 on |y|, as it is
-used only in a thunk, and, therefore, is not going to be updated any
-more. Therefore, the demand on |y|, captured and unleashed by usage of
-|h| is U1. However, if we unleash this demand every time |h| is used,
-and then sum up the effects, the ultimate demand on |y| will be U1 +
-U1 = U. In order to avoid it, we *first* collect the aggregate demand
-on |h| in the body of let-expression, and only then apply the demand
-transformer:
-
-transf[x](U) = {y |-> U1}
-
-so the resulting demand on |y| is U1.
-
-The situation is, however, different for strictness, where this
-aggregating approach exhibits worse results because of the nature of
-|both| operation for strictness. Consider the example:
-
-f y c =
-  let h x = y |seq| x
-   in case of
-        True  -> h True
-        False -> y
-
-It is clear that |f| is strict in |y|, however, the suggested analysis
-will infer from the body of |let| that |h| is used lazily (as it is
-used in one branch only), therefore lazy demand will be put on its
-free variable |y|. Conversely, if the demand on |h| is unleashed right
-on the spot, we will get the desired result, namely, that |f| is
-strict in |y|.
-
-
+{-
 ************************************************************************
 *                                                                      *
                     Demand transformer
@@ -349,6 +210,7 @@ cprTransform :: AnalEnv         -- The strictness environment
 
 cprTransform env var arty
   | isDataConWorkId var                          -- Data constructor
+  -- TODO
   = dmdTypeToCprType (dmdTransformDataConSig (idArity var) (idStrictness var) (arityToCallDemand arty))
   | gopt Opt_DmdTxDictSel (ae_dflags env),
     Just _ <- isClassOpId_maybe var -- Dictionary component selector
@@ -386,7 +248,7 @@ cprFix :: TopLevelFlag
 cprFix top_lvl env let_arty orig_pairs
   = loop 1 initial_pairs
   where
-    -- See Note [Initialising strictness]
+    -- See Note [Initialising strictness] in DmdAnal.hs
     initial_pairs | ae_virgin env = [(setIdCprInfo id botCpr, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
 
@@ -462,14 +324,12 @@ cprAnalTrivialRhs env id rhs fn
   where
     fn_str = getCprType env fn
 
--- Let bindings can be processed in the following way (cf. LetDown from the
--- paper “Higher-Order Cardinality Analysis”):
+-- Let bindings are processed in the following way (cf. LetDown from the paper
+-- “Higher-Order Cardinality Analysis”):
 --
 --  * assuming a demand of <L,U>
 --  * looking at the definition
 --  * determining a strictness signature
---
--- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
 cprAnalRhsLetDown :: TopLevelFlag
            -> AnalEnv -> Arity
            -> Id -> CoreExpr
@@ -502,12 +362,11 @@ cprAnalRhsLetDown top_lvl env let_arty id rhs
     -- possibly trim thunk CPR info
     sig_ty           = trimCprTy trim_all trim_sums rhs_ty
     id'              = set_idCprInfo id sig_ty
-        -- See Note [NOINLINE and strictness]
-
-    trim_all  = is_thunk && not_strict
-    trim_sums = not (isTopLevel top_lvl) -- See Note [CPR for sum types]
 
     -- See Note [CPR for thunks]
+    -- See Note [CPR for sum types]
+    trim_all  = is_thunk && not_strict
+    trim_sums = not (isTopLevel top_lvl)
     is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
     not_strict = not (isStrictDmd (idDemandInfo id))
 
@@ -568,31 +427,6 @@ indicated by its demand info.  e.g. if co :: (Int->Int->Int) ~ T, then
 foo's arity will be zero (see Note [exprArity invariant] in CoreArity),
 but its demand signature will be that of plusInt. A small example is the
 test case of Trac #8963.
-
-
-Note [Product demands for function body]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This example comes from shootout/binary_trees:
-
-    Main.check' = \ b z ds. case z of z' { I# ip ->
-                                case ds_d13s of
-                                  Main.Nil -> z'
-                                  Main.Node s14k s14l s14m ->
-                                    Main.check' (not b)
-                                      (Main.check' b
-                                         (case b {
-                                            False -> I# (-# s14h s14k);
-                                            True  -> I# (+# s14h s14k)
-                                          })
-                                         s14l)
-                                     s14m   }   }   }
-
-Here we *really* want to unbox z, even though it appears to be used boxed in
-the Nil case.  Partly the Nil case is not a hot path.  But more specifically,
-the whole function gets the CPR property if we do.
-
-So for the demand on the body of a RHS we use a product demand if it's
-a product type.
 
 ************************************************************************
 *                                                                      *
@@ -688,135 +522,6 @@ have a CPR in it or not.  Simple solution:
            which aren't very interesting anyway.
 
 NB: strictly_demanded is never true of a top-level Id, or of a recursive Id.
-
-Note [Optimistic CPR in the "virgin" case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Demand and strictness info are initialized by top elements. However,
-this prevents from inferring a CPR property in the first pass of the
-analyser, so we keep an explicit flag ae_virgin in the AnalEnv
-datatype.
-
-We can't start with 'not-demanded' (i.e., top) because then consider
-        f x = let
-                  t = ... I# x
-              in
-              if ... then t else I# y else f x'
-
-In the first iteration we'd have no demand info for x, so assume
-not-demanded; then we'd get TopRes for f's CPR info.  Next iteration
-we'd see that t was demanded, and so give it the CPR property, but by
-now f has TopRes, so it will stay TopRes.  Instead, by checking the
-ae_virgin flag at the first time round, we say 'yes t is demanded' the
-first time.
-
-However, this does mean that for non-recursive bindings we must
-iterate twice to be sure of not getting over-optimistic CPR info,
-in the case where t turns out to be not-demanded.  This is handled
-by cprAnalTopBind.
-
-
-Note [NOINLINE and strictness]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The strictness analyser used to have a HACK which ensured that NOINLNE
-things were not strictness-analysed.  The reason was unsafePerformIO.
-Left to itself, the strictness analyser would discover this strictness
-for unsafePerformIO:
-        unsafePerformIO:  C(U(AV))
-But then consider this sub-expression
-        unsafePerformIO (\s -> let r = f x in
-                               case writeIORef v r s of (# s1, _ #) ->
-                               (# s1, r #)
-The strictness analyser will now find that r is sure to be eval'd,
-and may then hoist it out.  This makes tests/lib/should_run/memo002
-deadlock.
-
-Solving this by making all NOINLINE things have no strictness info is overkill.
-In particular, it's overkill for runST, which is perfectly respectable.
-Consider
-        f x = runST (return x)
-This should be strict in x.
-
-So the new plan is to define unsafePerformIO using the 'lazy' combinator:
-
-        unsafePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
-
-Remember, 'lazy' is a wired-in identity-function Id, of type a->a, which is
-magically NON-STRICT, and is inlined after strictness analysis.  So
-unsafePerformIO will look non-strict, and that's what we want.
-
-Now we don't need the hack in the strictness analyser.  HOWEVER, this
-decision does mean that even a NOINLINE function is not entirely
-opaque: some aspect of its implementation leaks out, notably its
-strictness.  For example, if you have a function implemented by an
-error stub, but which has RULES, you may want it not to be eliminated
-in favour of error!
-
-Note [Lazy and unleashable free variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We put the strict and once-used FVs in the DmdType of the Id, so
-that at its call sites we unleash demands on its strict fvs.
-An example is 'roll' in imaginary/wheel-sieve2
-Something like this:
-        roll x = letrec
-                     go y = if ... then roll (x-1) else x+1
-                 in
-                 go ms
-We want to see that roll is strict in x, which is because
-go is called.   So we put the DmdEnv for x in go's DmdType.
-
-Another example:
-
-        f :: Int -> Int -> Int
-        f x y = let t = x+1
-            h z = if z==0 then t else
-                  if z==1 then x+1 else
-                  x + h (z-1)
-        in h y
-
-Calling h does indeed evaluate x, but we can only see
-that if we unleash a demand on x at the call site for t.
-
-Incidentally, here's a place where lambda-lifting h would
-lose the cigar --- we couldn't see the joint strictness in t/x
-
-        ON THE OTHER HAND
-
-We don't want to put *all* the fv's from the RHS into the
-DmdType. Because
-
- * it makes the strictness signatures larger, and hence slows down fixpointing
-
-and
-
- * it is useless information at the call site anyways:
-   For lazy, used-many times fv's we will never get any better result than
-   that, no matter how good the actual demand on the function at the call site
-   is (unless it is always absent, but then the whole binder is useless).
-
-Therefore we exclude lazy multiple-used fv's from the environment in the
-DmdType.
-
-But now the signature lies! (Missing variables are assumed to be absent.) To
-make up for this, the code that analyses the binding keeps the demand on those
-variable separate (usually called "lazy_fv") and adds it to the demand of the
-whole binding later.
-
-What if we decide _not_ to store a strictness signature for a binding at all, as
-we do when aborting a fixed-point iteration? The we risk losing the information
-that the strict variables are being used. In that case, we take all free variables
-mentioned in the (unsound) strictness signature, conservatively approximate the
-demand put on them (topDmd), and add that to the "lazy_fv" returned by "cprFix".
-
-
-Note [Lambda-bound unfoldings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We allow a lambda-bound variable to carry an unfolding, a facility that is used
-exclusively for join points; see Note [Case binders and join points].  If so,
-we must be careful to demand-analyse the RHS of the unfolding!  Example
-   \x. \y{=Just x}. <body>
-Then if <body> uses 'y', then transitively it uses 'x', and we must not
-forget that fact, otherwise we might make 'x' absent when it isn't.
-
 
 ************************************************************************
 *                                                                      *
@@ -1194,72 +899,4 @@ point: all of these functions can have the CPR property.
     f4 :: T4 Int -> Int
     f4 (MkT4 x@(Foo v) y) | y>0       = f4 (MkT4 x (y-1))
                           | otherwise = v
-
-
-Note [Initialising strictness]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See section 9.2 (Finding fixpoints) of the paper.
-
-Our basic plan is to initialise the strictness of each Id in a
-recursive group to "bottom", and find a fixpoint from there.  However,
-this group B might be inside an *enclosing* recursive group A, in
-which case we'll do the entire fixpoint shebang on for each iteration
-of A. This can be illustrated by the following example:
-
-Example:
-
-  f [] = []
-  f (x:xs) = let g []     = f xs
-                 g (y:ys) = y+1 : g ys
-              in g (h x)
-
-At each iteration of the fixpoint for f, the analyser has to find a
-fixpoint for the enclosed function g. In the meantime, the demand
-values for g at each iteration for f are *greater* than those we
-encountered in the previous iteration for f. Therefore, we can begin
-the fixpoint for g not with the bottom value but rather with the
-result of the previous analysis. I.e., when beginning the fixpoint
-process for g, we can start from the demand signature computed for g
-previously and attached to the binding occurrence of g.
-
-To speed things up, we initialise each iteration of A (the enclosing
-one) from the result of the last one, which is neatly recorded in each
-binder.  That way we make use of earlier iterations of the fixpoint
-algorithm. (Cunning plan.)
-
-But on the *first* iteration we want to *ignore* the current strictness
-of the Id, and start from "bottom".  Nowadays the Id can have a current
-strictness, because interface files record strictness for nested bindings.
-To know when we are in the first iteration, we look at the ae_virgin
-field of the AnalEnv.
-
-
-Note [Final Demand Analyser run]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Some of the information that the demand analyser determines is not always
-preserved by the simplifier.  For example, the simplifier will happily rewrite
-  \y [Demand=1*U] let x = y in x + x
-to
-  \y [Demand=1*U] y + y
-which is quite a lie.
-
-The once-used information is (currently) only used by the code
-generator, though.  So:
-
- * We zap the used-once info in the worker-wrapper;
-   see Note [Zapping Used Once info in WorkWrap] in WorkWrap. If it's
-   not reliable, it's better not to have it at all.
-
- * Just before TidyCore, we add a pass of the demand analyser,
-      but WITHOUT subsequent worker/wrapper and simplifier,
-   right before TidyCore.  See SimplCore.getCoreToDo.
-
-   This way, correct information finds its way into the module interface
-   (strictness signatures!) and the code generator (single-entry thunks!)
-
-Note that, in contrast, the single-call information (C1(..)) /can/ be
-relied upon, as the simplifier tends to be very careful about not
-duplicating actual function calls.
-
-Also see #11731.
 -}
