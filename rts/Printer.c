@@ -646,6 +646,77 @@ void printTSO( StgTSO *tso )
     printStack( tso->stackobj );
 }
 
+void printStaticObjects( StgClosure *p )
+{
+    while (p != END_OF_STATIC_OBJECT_LIST) {
+        p = UNTAG_STATIC_LIST_PTR(p);
+        printClosure(p);
+
+        const StgInfoTable *info = get_itbl(p);
+        p = *STATIC_LINK(info, p);
+    }
+}
+
+void printWeakLists()
+{
+    debugBelch("======= WEAK LISTS =======\n");
+
+    for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
+        debugBelch("Capability %d:\n", cap_idx);
+        Capability *cap = capabilities[cap_idx];
+        for (StgWeak *weak = cap->weak_ptr_list_hd; weak; weak = weak->link) {
+            printClosure((StgClosure*)weak);
+        }
+    }
+
+    for (uint32_t gen_idx = 0; gen_idx <= oldest_gen->no; ++gen_idx) {
+        generation *gen = &generations[gen_idx];
+        debugBelch("Generation %d current weaks:\n", gen_idx);
+        for (StgWeak *weak = gen->weak_ptr_list; weak; weak = weak->link) {
+            printClosure((StgClosure*)weak);
+        }
+        debugBelch("Generation %d old weaks:\n", gen_idx);
+        for (StgWeak *weak = gen->old_weak_ptr_list; weak; weak = weak->link) {
+            printClosure((StgClosure*)weak);
+        }
+    }
+
+    debugBelch("=========================\n");
+}
+
+void printLargeAndPinnedObjects()
+{
+    debugBelch("====== PINNED OBJECTS ======\n");
+
+    for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
+        Capability *cap = capabilities[cap_idx];
+
+        debugBelch("Capability %d: Current pinned object block: %p\n", 
+                   cap_idx, (void*)cap->pinned_object_block);
+        for (bdescr *bd = cap->pinned_object_blocks; bd; bd = bd->link) {
+            debugBelch("%p\n", (void*)bd);
+        }
+    }
+
+    debugBelch("====== LARGE OBJECTS =======\n");
+    for (uint32_t gen_idx = 0; gen_idx <= oldest_gen->no; ++gen_idx) {
+        generation *gen = &generations[gen_idx];
+        debugBelch("Generation %d current large objects:\n", gen_idx);
+        for (bdescr *bd = gen->large_objects; bd; bd = bd->link) {
+            debugBelch("%p: ", (void*)bd);
+            printClosure((StgClosure*)bd->start);
+        }
+
+        debugBelch("Generation %d scavenged large objects:\n", gen_idx);
+        for (bdescr *bd = gen->scavenged_large_objects; bd; bd = bd->link) {
+            debugBelch("%p: ", (void*)bd);
+            printClosure((StgClosure*)bd->start);
+        }
+    }
+
+    debugBelch("============================\n");
+}
+
 /* --------------------------------------------------------------------------
  * Address printing code
  *
