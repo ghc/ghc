@@ -52,7 +52,7 @@ void scheduleWorker (Capability *cap, Task *task);
 #if defined(THREADED_RTS)
 void stopAllCapabilitiesWith (Capability **pCap, Task *task, SyncType sync_type);
 void stopAllCapabilities (Capability **pCap, Task *task);
-void releaseAllCapabilities(uint32_t n, Capability *cap, Task *task);
+void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task);
 #endif
 
 /* The state of the scheduler.  This is used to control the sequence
