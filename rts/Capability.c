@@ -27,6 +27,7 @@
 #include "STM.h"
 #include "RtsUtils.h"
 #include "sm/OSMem.h"
+#include "sm/BlockAlloc.h" // for countBlocks()
 
 #if !defined(mingw32_HOST_OS)
 #include "rts/IOManager.h" // for setIOManagerControlFd()

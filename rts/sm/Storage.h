@@ -17,6 +17,7 @@
    -------------------------------------------------------------------------- */
 
 void initStorage(void);
+void initGeneration(generation *gen, int g);
 void exitStorage(void);
 void freeStorage(bool free_heap);
 

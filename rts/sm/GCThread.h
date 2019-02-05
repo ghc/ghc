@@ -83,6 +83,7 @@ typedef struct gen_workspace_ {
     bdescr *     todo_bd;
     StgPtr       todo_free;            // free ptr for todo_bd
     StgPtr       todo_lim;             // lim for todo_bd
+    struct NonmovingSegment *todo_seg; // only available for oldest gen workspace
 
     WSDeque *    todo_q;
     bdescr *     todo_overflow;
@@ -100,9 +101,6 @@ typedef struct gen_workspace_ {
     bdescr *     part_list;
     StgWord      n_part_blocks;      // count of above
     StgWord      n_part_words;
-
-    StgWord pad[1];
-
 } gen_workspace ATTRIBUTE_ALIGNED(64);
 // align so that computing gct->gens[n] is a shift, not a multiply
 // fails if the size is <64, which is why we need the pad above

@@ -51,6 +51,7 @@
 #include "CheckUnload.h"
 #include "CNF.h"
 #include "RtsFlags.h"
+#include "NonMoving.h"
 
 #if defined(PROFILING)
 #include "RetainerProfile.h"
@@ -304,11 +305,6 @@ GarbageCollect (uint32_t collect_gen,
   debugTrace(DEBUG_gc, "GC (gen %d, using %d thread(s))",
              N, n_gc_threads);
 
-#if defined(DEBUG)
-  // check for memory leaks if DEBUG is on
-  memInventory(DEBUG_gc);
-#endif
-
   // do this *before* we start scavenging
   collectFreshWeakPtrs();
 
@@ -465,14 +461,6 @@ GarbageCollect (uint32_t collect_gen,
 #endif
 
   // NO MORE EVACUATION AFTER THIS POINT!
-
-  // Finally: compact or sweep the oldest generation.
-  if (major_gc && oldest_gen->mark) {
-      if (oldest_gen->compact)
-          compact(gct->scavenged_static_objects, dead_weak_ptr_list, resurrected_threads);
-      else
-          sweep(oldest_gen);
-  }
 
   copied = 0;
   par_max_copied = 0;
@@ -632,16 +620,32 @@ GarbageCollect (uint32_t collect_gen,
         gen->old_blocks = NULL;
         gen->n_old_blocks = 0;
 
-        /* LARGE OBJECTS.  The current live large objects are chained on
-         * scavenged_large, having been moved during garbage
-         * collection from large_objects.  Any objects left on the
-         * large_objects list are therefore dead, so we free them here.
-         */
-        freeChain(gen->large_objects);
-        gen->large_objects  = gen->scavenged_large_objects;
-        gen->n_large_blocks = gen->n_scavenged_large_blocks;
-        gen->n_large_words  = countOccupied(gen->large_objects);
-        gen->n_new_large_words = 0;
+        /* LARGE OBJECTS */
+        if (RtsFlags.GcFlags.useNonmoving && g == oldest_gen->no) {
+            /* When using the non-moving collector we need to preserve old
+             * large objects here as we'll only know about their liveness after
+             * the mark phase.
+             */
+            for (bd = gen->scavenged_large_objects; bd; bd = next) {
+                next = bd->link;
+                dbl_link_onto(bd, &gen->large_objects);
+                gen->n_large_words += bd->free - bd->start;
+            }
+            gen->n_large_blocks += gen->n_scavenged_large_blocks;
+            gen->scavenged_large_objects = NULL;
+            gen->n_scavenged_large_blocks = 0;
+        } else {
+            /* The current live large objects are chained on scavenged_large,
+             * having been moved during garbage collection from large_objects.
+             * Any objects left on the large_objects list are therefore dead,
+             * so we free them here.
+             */
+            freeChain(gen->large_objects);
+            gen->large_objects  = gen->scavenged_large_objects;
+            gen->n_large_blocks = gen->n_scavenged_large_blocks;
+            gen->n_large_words  = countOccupied(gen->large_objects);
+            gen->n_new_large_words = 0;
+        }
 
         /* COMPACT_NFDATA. The currently live compacts are chained
          * to live_compact_objects, quite like large objects. And
@@ -653,6 +657,8 @@ GarbageCollect (uint32_t collect_gen,
          *
          * See Note [Compact Normal Forms] for details.
          */
+
+        // TODO(osa): we need the same large object treatment here
         for (bd = gen->compact_objects; bd; bd = next) {
             next = bd->link;
             compactFree(((StgCompactNFDataBlock*)bd->start)->owner);
@@ -708,6 +714,36 @@ GarbageCollect (uint32_t collect_gen,
     }
   } // for all generations
 
+  // Mark and sweep the oldest generation.
+  // N.B. This can only happen after we've moved
+  // oldest_gen->scavenged_large_objects back to oldest_gen->large_objects.
+  ASSERT(oldest_gen->scavenged_large_objects == NULL);
+  if (RtsFlags.GcFlags.useNonmoving && major_gc) {
+      // All threads in non-moving heap should be found to be alive, becuase
+      // threads in the non-moving generation's list should live in the
+      // non-moving heap, and we consider non-moving objects alive during
+      // preparation.
+      ASSERT(oldest_gen->old_threads == END_TSO_QUEUE);
+      // For weaks, remember that we evacuated all weaks to the non-moving heap
+      // in markWeakPtrList(), and then moved the weak_ptr_list list to
+      // old_weak_ptr_list. We then moved weaks with live keys to the
+      // weak_ptr_list again. Then, in collectDeadWeakPtrs() we moved weaks in
+      // old_weak_ptr_list to dead_weak_ptr_list. So at this point
+      // old_weak_ptr_list should be empty.
+      ASSERT(oldest_gen->old_weak_ptr_list == NULL);
+
+      // we may need to take the lock to allocate mark queue blocks
+      RELEASE_SM_LOCK;
+      // dead_weak_ptr_list contains weak pointers with dead keys. Those need to
+      // be kept alive because we'll use them in finalizeSchedulers(). Similarly
+      // resurrected_threads are also going to be used in resurrectedThreads()
+      // so we need to mark those too.
+      // Note that in sequential case these lists will be appended with more
+      // weaks and threads found to be dead in mark.
+      nonmovingCollect(&dead_weak_ptr_list, &resurrected_threads);
+      ACQUIRE_SM_LOCK;
+  }
+
   // update the max size of older generations after a major GC
   resize_generations();
 
@@ -733,7 +769,7 @@ GarbageCollect (uint32_t collect_gen,
 
  // mark the garbage collected CAFs as dead
 #if defined(DEBUG)
-  if (major_gc) { gcCAFs(); }
+  if (major_gc && !RtsFlags.GcFlags.useNonmoving) { gcCAFs(); }
 #endif
 
   // Update the stable name hash table
@@ -766,8 +802,9 @@ GarbageCollect (uint32_t collect_gen,
   // check sanity after GC
   // before resurrectThreads(), because that might overwrite some
   // closures, which will cause problems with THREADED where we don't
-  // fill slop.
-  IF_DEBUG(sanity, checkSanity(true /* after GC */, major_gc));
+  // fill slop. If we are using the nonmoving collector then we can't claim to
+  // be *after* the major GC; it's now running concurrently.
+  IF_DEBUG(sanity, checkSanity(true /* after GC */, major_gc && !RtsFlags.GcFlags.useNonmoving));
 
   // If a heap census is due, we need to do it before
   // resurrectThreads(), for the same reason as checkSanity above:
@@ -940,6 +977,7 @@ new_gc_thread (uint32_t n, gc_thread *t)
         ws->todo_overflow = NULL;
         ws->n_todo_overflow = 0;
         ws->todo_large_objects = NULL;
+        ws->todo_seg = END_NONMOVING_TODO_LIST;
 
         ws->part_list = NULL;
         ws->n_part_blocks = 0;
@@ -1317,6 +1355,18 @@ releaseGCThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
 #endif
 
 /* ----------------------------------------------------------------------------
+   Save the mutable lists in saved_mut_lists where it will be scavenged
+   during GC
+   ------------------------------------------------------------------------- */
+
+static void
+stash_mut_list (Capability *cap, uint32_t gen_no)
+{
+    cap->saved_mut_lists[gen_no] = cap->mut_lists[gen_no];
+    cap->mut_lists[gen_no] = allocBlockOnNode_sync(cap->node);
+}
+
+/* ----------------------------------------------------------------------------
    Initialise a generation that is to be collected
    ------------------------------------------------------------------------- */
 
@@ -1327,11 +1377,17 @@ prepare_collected_gen (generation *gen)
     gen_workspace *ws;
     bdescr *bd, *next;
 
-    // Throw away the current mutable list.  Invariant: the mutable
-    // list always has at least one block; this means we can avoid a
-    // check for NULL in recordMutable().
     g = gen->no;
-    if (g != 0) {
+
+    if (RtsFlags.GcFlags.useNonmoving && g == oldest_gen->no) {
+        // Nonmoving heap's mutable list is always a root.
+        for (i = 0; i < n_capabilities; i++) {
+            stash_mut_list(capabilities[i], g);
+        }
+    } else if (g != 0) {
+        // Otherwise throw away the current mutable list. Invariant: the
+        // mutable list always has at least one block; this means we can avoid
+        // a check for NULL in recordMutable().
         for (i = 0; i < n_capabilities; i++) {
             freeChain(capabilities[i]->mut_lists[g]);
             capabilities[i]->mut_lists[g] =
@@ -1351,9 +1407,12 @@ prepare_collected_gen (generation *gen)
     gen->old_blocks   = gen->blocks;
     gen->n_old_blocks = gen->n_blocks;
     gen->blocks       = NULL;
-    gen->n_blocks     = 0;
-    gen->n_words      = 0;
-    gen->live_estimate = 0;
+
+    if (!(RtsFlags.GcFlags.useNonmoving && g == oldest_gen->no)) {
+        gen->n_blocks     = 0;
+        gen->n_words      = 0;
+        gen->live_estimate = 0;
+    }
 
     // initialise the large object queues.
     ASSERT(gen->scavenged_large_objects == NULL);
@@ -1447,18 +1506,6 @@ prepare_collected_gen (generation *gen)
     }
 }
 
-
-/* ----------------------------------------------------------------------------
-   Save the mutable lists in saved_mut_lists
-   ------------------------------------------------------------------------- */
-
-static void
-stash_mut_list (Capability *cap, uint32_t gen_no)
-{
-    cap->saved_mut_lists[gen_no] = cap->mut_lists[gen_no];
-    cap->mut_lists[gen_no] = allocBlockOnNode_sync(cap->node);
-}
-
 /* ----------------------------------------------------------------------------
    Initialise a generation that is *not* to be collected
    ------------------------------------------------------------------------- */
@@ -1527,31 +1574,50 @@ collect_gct_blocks (void)
 }
 
 /* -----------------------------------------------------------------------------
-   During mutation, any blocks that are filled by allocatePinned() are
-   stashed on the local pinned_object_blocks list, to avoid needing to
-   take a global lock.  Here we collect those blocks from the
-   cap->pinned_object_blocks lists and put them on the
-   main g0->large_object list.
+   During mutation, any blocks that are filled by allocatePinned() are stashed
+   on the local pinned_object_blocks list, to avoid needing to take a global
+   lock.  Here we collect those blocks from the cap->pinned_object_blocks lists
+   and put them on the g0->large_object or oldest_gen->large_objects.
+
+   How to decide which list to put them on?
+
+   - When non-moving heap is enabled and this is a major GC, we put them on
+     oldest_gen. This is because after preparation we really want no
+     old-to-young references, and we want to be able to reset mut_lists. For
+     this we need to promote every potentially live object to the oldest gen.
+
+   - Otherwise we put them on g0.
    -------------------------------------------------------------------------- */
 
 static void
 collect_pinned_object_blocks (void)
 {
-    uint32_t n;
-    bdescr *bd, *prev;
+    generation *gen;
+    if (RtsFlags.GcFlags.useNonmoving && major_gc) {
+        gen = oldest_gen;
+    } else {
+        gen = g0;
+    }
 
-    for (n = 0; n < n_capabilities; n++) {
-        prev = NULL;
-        for (bd = capabilities[n]->pinned_object_blocks; bd != NULL; bd = bd->link) {
-            prev = bd;
-        }
-        if (prev != NULL) {
-            prev->link = g0->large_objects;
-            if (g0->large_objects != NULL) {
-                g0->large_objects->u.back = prev;
+    for (uint32_t n = 0; n < n_capabilities; n++) {
+        bdescr *last = NULL;
+        for (bdescr *bd = capabilities[n]->pinned_object_blocks; bd != NULL; bd = bd->link) {
+            if (gen == oldest_gen) {
+                bd->flags |= BF_NONMOVING;
+                bd->gen = oldest_gen;
+                bd->gen_no = oldest_gen->no;
+                oldest_gen->n_large_words += bd->free - bd->start;
+                oldest_gen->n_large_blocks += bd->blocks;
             }
-            g0->large_objects = capabilities[n]->pinned_object_blocks;
-            capabilities[n]->pinned_object_blocks = 0;
+            last = bd;
+        }
+        if (last != NULL) {
+            last->link = gen->large_objects;
+            if (gen->large_objects != NULL) {
+                gen->large_objects->u.back = last;
+            }
+            gen->large_objects = capabilities[n]->pinned_object_blocks;
+            capabilities[n]->pinned_object_blocks = NULL;
         }
     }
 }
