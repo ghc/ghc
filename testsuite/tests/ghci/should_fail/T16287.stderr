@@ -1,0 +1,12 @@
+
+<interactive>:1:1: error:
+    The type synonym ‘F1’ should have 1 argument, but has been given none
+
+<interactive>:1:1: error:
+    The type family ‘F2’ should have no arguments, but has been given none
+
+<interactive>:1:1: error:
+    The type synonym ‘F1’ should have 1 argument, but has been given none
+
+<interactive>:1:1: error:
+    The type family ‘F2’ should have no arguments, but has been given none

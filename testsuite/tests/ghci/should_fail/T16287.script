@@ -1,0 +1,10 @@
+:set -XPolyKinds -XRankNTypes -XTypeFamilies
+import Data.Kind
+type F1 a = a
+type family F2 :: k
+data T1 :: (Type -> Type) -> Type
+data T2 :: (forall k. k) -> Type
+:kind T1 F1
+:kind T2 F2
+:kind Maybe (T1 F1)
+:kind Maybe (T2 F2)
