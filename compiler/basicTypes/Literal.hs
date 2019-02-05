@@ -20,7 +20,7 @@ module Literal
         , mkLitWord64, mkLitWord64Wrap
         , mkLitFloat, mkLitDouble
         , mkLitChar, mkLitString
-        , mkLitInteger, mkLitNatural, mkLitRational
+        , mkLitInteger, mkLitNatural
         , mkLitNumber, mkLitNumberWrap
 
         -- ** Operations on Literals
@@ -447,9 +447,6 @@ mkLitString s = LitString (bytesFS $ mkFastString s)
 
 mkLitInteger :: Integer -> Type -> Literal
 mkLitInteger x ty = LitNumber LitNumInteger x ty
-
-mkLitRational :: Integer -> Integer -> Type -> Literal
-mkLitRational i e ty = LitRational i e ty
 
 mkLitNatural :: Integer -> Type -> Literal
 mkLitNatural x ty = ASSERT2( inNaturalRange x,  integer x )
