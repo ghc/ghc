@@ -33,27 +33,29 @@ level (though let-bound terms should be included too) terms in the types.
 
 etaArityWW
   :: DynFlags -> UniqSupply -> CoreProgram -> CoreProgram
-etaArityWW dflags us binds = initUs_ us $ concatMapM arityWorkerWrapper binds
+etaArityWW dflags us binds = initUs_ us $ concatMapM etaArityWWBind binds
 
--- ^ Given a top level entity, produce the WorkerWrapper transformed
+-- ^ Given a CoreBind, produce the WorkerWrapper transformed
 -- version. This transformation may or may not produce new top level entities
 -- depending on its arity.
-arityWorkerWrapper :: CoreBind -> UniqSM [CoreBind]
-arityWorkerWrapper (NonRec name expr)
-  = map (uncurry NonRec) <$> arityWorkerWrapper' name expr
-arityWorkerWrapper (Rec binds)
-  = (return . Rec) <$> concatMapM (uncurry arityWorkerWrapper') binds
+etaArityWWBind :: CoreBind -> UniqSM [CoreBind]
+etaArityWWBind (NonRec name expr)
+  = map (uncurry NonRec) <$> (etaArityWWBind' name =<< etaArityWWExpr expr)
+etaArityWWBind (Rec binds)
+  = (return . Rec)
+  <$> concatMapM (\(id,expr) -> etaArityWWBind' id =<< etaArityWWExpr expr)
+                 binds
 
 -- ^ Change a function binding into a call to its wrapper and the production of
 -- a wrapper. The worker/wrapper transformation *only* makes sense for Id's or
 -- binders to code.
-arityWorkerWrapper'
+etaArityWWBind'
   :: Id
   -> CoreExpr
   -> UniqSM [(Id,CoreExpr)]
   -- the first component are recursive binds and the second are non-recursive
   -- binds (the wrappers are non-recursive)
-arityWorkerWrapper' fn_id rhs
+etaArityWWBind' fn_id rhs
   | arity >= 1 && isId fn_id
   = let fm = calledArityMap rhs
         work_ty = exprArityType arity (idType fn_id) rhs fm
@@ -93,37 +95,24 @@ arityWorkerWrapper' fn_id rhs
 
   where arity = manifestArity rhs
 
-{- | exprArityType creates the new type for an extensional function given the
-arity. We also need to consider higher-order functions. The type of a
-function argument can change based on the usage of the type in the body of
-the function. For example, consider the zipWith function.
-
-zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
-zipWith =
-  /\a -> /\b -> /\c -> \f -> \xs -> \ys ->
-    case as of
-      [] -> []
-      (x:xs') ->
-        case bs of
-          [] -> []
-          (y:ys') ->
-            (f x y) : zipWith f xs' ys'
-
-We know that zipWith has the type
-
-forall a b c. (a ~> b ~> c) ~> [a] ~> [b] ~> [c]
-
-because the function is only applied to two arguments in the body of the
-function.
--}
-exprArityType :: Arity -> Type -> Type
-exprArityType n (ForAllTy tv body_ty)
-  = ForAllTy tv (exprArityType n body_ty)
-exprArityType 0 (FunTy arg res)
-  = FunTy (extensionalize arg) (exprArityType 0 res)
-exprArityType n (FunTy arg res)
-  = FunTildeTy (extensionalize arg) (exprArityType (n-1) res)
-exprArityType _ ty = ty
+-- ^ Traverses the expression to do etaArityWWBind in let-expressions
+etaArityWWExpr :: CoreExpr -> UniqSM CoreExpr
+etaArityWWExpr e@(Var _) = return e
+etaArityWWExpr e@(Lit _) = return e
+etaArityWWExpr (App res arg) = App <$> etaArityWWExpr res <*> etaArityWWExpr arg
+etaArityWWExpr (Lam bndr expr) = Lam bndr <$> etaArityWWExpr expr
+etaArityWWExpr (Let bind expr)
+  = mkLets <$> etaArityWWBind bind <*> etaArityWWExpr expr
+etaArityWWExpr (Case expr bndr ty alts)
+  = do { expr' <- etaArityWWExpr expr
+       ; alts' <- mapM goAlt alts
+       ; return (Case expr' bndr ty alts') }
+  where goAlt (con,bndrs,expr) =
+          etaArityWWExpr expr >>= \expr' -> return (con,bndrs,expr')
+etaArityWWExpr (Cast expr co) = Cast <$> etaArityWWExpr expr <*> return co
+etaArityWWExpr (Tick tk expr) = Tick tk <$> etaArityWWExpr expr
+etaArityWWExpr e@(Type _) = return e
+etaArityWWExpr e@(Coercion _) = return e
 
 {-
 Note [Extensionality and Higher-Order Functions]
