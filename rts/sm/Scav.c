@@ -63,8 +63,6 @@
 
 #include "sm/MarkWeak.h"
 
-static void scavenge_stack (StgPtr p, StgPtr stack_end);
-
 static void scavenge_large_bitmap (StgPtr p,
                                    StgLargeBitmap *large_bitmap,
                                    StgWord size );
@@ -72,10 +70,19 @@ static void scavenge_large_bitmap (StgPtr p,
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 # define evacuate(a) evacuate1(a)
 # define evacuate_BLACKHOLE(a) evacuate_BLACKHOLE1(a)
+# define evacuate_static_object(a, b) evacuate_static_object1(a, b)
 # define scavenge_loop(a) scavenge_loop1(a)
 # define scavenge_block(a) scavenge_block1(a)
 # define scavenge_mutable_list(bd,g) scavenge_mutable_list1(bd,g)
 # define scavenge_capability_mut_lists(cap) scavenge_capability_mut_Lists1(cap)
+# define scavengeTSO(tso) scavengeTSO1(tso)
+# define scavenge_stack(p, stack_end) scavenge_stack1(p, stack_end)
+# define scavenge_fun_srt(info) scavenge_fun_srt1(info)
+# define scavenge_fun_srt(info) scavenge_fun_srt1(info)
+# define scavenge_thunk_srt(info) scavenge_thunk_srt1(info)
+# define scavenge_mut_arr_ptrs(info) scavenge_mut_arr_ptrs1(info)
+# define scavenge_PAP(pap) scavenge_PAP1(pap)
+# define scavenge_AP(ap) scavenge_AP1(ap)
 #endif
 
 static void do_evacuate(StgClosure **p, void *user STG_UNUSED)
@@ -87,7 +94,7 @@ static void do_evacuate(StgClosure **p, void *user STG_UNUSED)
    Scavenge a TSO.
    -------------------------------------------------------------------------- */
 
-static void
+void
 scavengeTSO (StgTSO *tso)
 {
     bool saved_eager;
@@ -198,7 +205,7 @@ scavenge_compact(StgCompactNFData *str)
    Mutable arrays of pointers
    -------------------------------------------------------------------------- */
 
-static StgPtr scavenge_mut_arr_ptrs (StgMutArrPtrs *a)
+StgPtr scavenge_mut_arr_ptrs (StgMutArrPtrs *a)
 {
     W_ m;
     bool any_failed;
@@ -348,14 +355,14 @@ scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
     return p;
 }
 
-STATIC_INLINE GNUC_ATTR_HOT StgPtr
+GNUC_ATTR_HOT StgPtr
 scavenge_PAP (StgPAP *pap)
 {
     evacuate(&pap->fun);
     return scavenge_PAP_payload (pap->fun, pap->payload, pap->n_args);
 }
 
-STATIC_INLINE StgPtr
+StgPtr
 scavenge_AP (StgAP *ap)
 {
     evacuate(&ap->fun);
@@ -366,7 +373,7 @@ scavenge_AP (StgAP *ap)
    Scavenge SRTs
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE GNUC_ATTR_HOT void
+GNUC_ATTR_HOT void
 scavenge_thunk_srt(const StgInfoTable *info)
 {
     StgThunkInfoTable *thunk_info;
@@ -380,7 +387,7 @@ scavenge_thunk_srt(const StgInfoTable *info)
     }
 }
 
-STATIC_INLINE GNUC_ATTR_HOT void
+GNUC_ATTR_HOT void
 scavenge_fun_srt(const StgInfoTable *info)
 {
     StgFunInfoTable *fun_info;
@@ -1570,10 +1577,10 @@ static void
 scavenge_mutable_list(bdescr *bd, generation *gen)
 {
     StgPtr p, q;
-    uint32_t gen_no;
 
-    gen_no = gen->no;
+    uint32_t gen_no = gen->no;
     gct->evac_gen_no = gen_no;
+
     for (; bd != NULL; bd = bd->link) {
         for (q = bd->start; q < bd->free; q++) {
             p = (StgPtr)*q;
@@ -1793,7 +1800,7 @@ scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, StgWord size )
    AP_STACK_UPDs, since these are just sections of copied stack.
    -------------------------------------------------------------------------- */
 
-static void
+void
 scavenge_stack(StgPtr p, StgPtr stack_end)
 {
   const StgRetInfoTable* info;
