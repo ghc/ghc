@@ -1466,8 +1466,8 @@ isPiTy _             = False
 -- | Is this a function?
 isFunTy :: Type -> Bool
 isFunTy ty | Just ty' <- coreView ty = isFunTy ty'
-isFunTy (FunTy {}) = True
-isFunTy _          = False
+isFunTy (FFunTy {}) = True
+isFunTy _           = False
 
 -- | Take a forall type apart, or panics if that is not possible.
 splitForAllTy :: Type -> (TyCoVar, Type)
