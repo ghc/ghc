@@ -8,6 +8,7 @@ import CoreSyn
 import CoreSubst
 import CoreArity
 import CoreFVs
+import CoreUnfold
 import Id
 import IdInfo
 import TyCoRep
@@ -33,30 +34,36 @@ level (though let-bound terms should be included too) terms in the types.
 
 etaArityWW
   :: DynFlags -> UniqSupply -> CoreProgram -> CoreProgram
-etaArityWW dflags us binds = initUs_ us $ concatMapM etaArityWWBind binds
+etaArityWW dflags us binds
+  = initUs_ us $ concatMapM (etaArityWWBind dflags) binds
 
 -- ^ Given a CoreBind, produce the WorkerWrapper transformed
 -- version. This transformation may or may not produce new top level entities
 -- depending on its arity.
-etaArityWWBind :: CoreBind -> UniqSM [CoreBind]
-etaArityWWBind (NonRec name expr)
-  = map (uncurry NonRec) <$> (etaArityWWBind' name =<< etaArityWWExpr expr)
-etaArityWWBind (Rec binds)
+etaArityWWBind :: DynFlags -> CoreBind -> UniqSM [CoreBind]
+etaArityWWBind dflags (NonRec name expr)
+  = map (uncurry NonRec)
+  <$> (etaArityWWBind' dflags name =<< etaArityWWExpr dflags expr)
+etaArityWWBind dflags (Rec binds)
   = (return . Rec)
-  <$> concatMapM (\(id,expr) -> etaArityWWBind' id =<< etaArityWWExpr expr)
+  <$> concatMapM (\(id,expr) ->
+                    etaArityWWBind' dflags id =<< etaArityWWExpr dflags expr)
                  binds
 
 -- ^ Change a function binding into a call to its wrapper and the production of
 -- a wrapper. The worker/wrapper transformation *only* makes sense for Id's or
 -- binders to code.
 etaArityWWBind'
-  :: Id
+  :: DynFlags
+  -> Id
   -> CoreExpr
   -> UniqSM [(Id,CoreExpr)]
   -- the first component are recursive binds and the second are non-recursive
   -- binds (the wrappers are non-recursive)
-etaArityWWBind' fn_id rhs
-  | arity >= 1 && isId fn_id
+etaArityWWBind' dflags fn_id rhs
+  | arity >= 1              -- we only do etaArityWW on functions
+    && isId fn_id           -- only work on terms
+    && not (isJoinId fn_id) -- do not interfere with join points
   = let fm = calledArityMap rhs
         work_ty = exprArityType arity (idType fn_id) rhs fm
         fn_info = idInfo fn_id
@@ -88,7 +95,10 @@ etaArityWWBind' fn_id rhs
                              `setInlinePragma` wrap_prag
              work_rhs = mkArityWorkerRhs fn_id work_id rhs
        ; wrap_rhs <- mkArityWrapperRhs fm work_id rhs arity
-       ; return [(work_id,work_rhs),(wrap_id,wrap_rhs)] }
+       ; return [(work_id `setIdUnfolding` mkSimpleUnfolding dflags work_rhs
+                 ,work_rhs)
+                ,(wrap_id `setIdUnfolding` mkSimpleUnfolding dflags wrap_rhs
+                 ,wrap_rhs)] }
 
   | otherwise
   = return [(fn_id,rhs)]
@@ -96,23 +106,25 @@ etaArityWWBind' fn_id rhs
   where arity = manifestArity rhs
 
 -- ^ Traverses the expression to do etaArityWWBind in let-expressions
-etaArityWWExpr :: CoreExpr -> UniqSM CoreExpr
-etaArityWWExpr e@(Var _) = return e
-etaArityWWExpr e@(Lit _) = return e
-etaArityWWExpr (App res arg) = App <$> etaArityWWExpr res <*> etaArityWWExpr arg
-etaArityWWExpr (Lam bndr expr) = Lam bndr <$> etaArityWWExpr expr
-etaArityWWExpr (Let bind expr)
-  = mkLets <$> etaArityWWBind bind <*> etaArityWWExpr expr
-etaArityWWExpr (Case expr bndr ty alts)
-  = do { expr' <- etaArityWWExpr expr
+etaArityWWExpr :: DynFlags -> CoreExpr -> UniqSM CoreExpr
+etaArityWWExpr _ e@(Var _) = return e
+etaArityWWExpr _ e@(Lit _) = return e
+etaArityWWExpr dflags (App res arg)
+  = App <$> etaArityWWExpr dflags res <*> etaArityWWExpr dflags arg
+etaArityWWExpr dflags (Lam bndr expr) = Lam bndr <$> etaArityWWExpr dflags expr
+etaArityWWExpr dflags (Let bind expr)
+  = mkLets <$> etaArityWWBind dflags bind <*> etaArityWWExpr dflags expr
+etaArityWWExpr dflags (Case expr bndr ty alts)
+  = do { expr' <- etaArityWWExpr dflags expr
        ; alts' <- mapM goAlt alts
        ; return (Case expr' bndr ty alts') }
   where goAlt (con,bndrs,expr) =
-          etaArityWWExpr expr >>= \expr' -> return (con,bndrs,expr')
-etaArityWWExpr (Cast expr co) = Cast <$> etaArityWWExpr expr <*> return co
-etaArityWWExpr (Tick tk expr) = Tick tk <$> etaArityWWExpr expr
-etaArityWWExpr e@(Type _) = return e
-etaArityWWExpr e@(Coercion _) = return e
+          etaArityWWExpr dflags expr >>= \expr' -> return (con,bndrs,expr')
+etaArityWWExpr dflags (Cast expr co)
+  = Cast <$> etaArityWWExpr dflags expr <*> return co
+etaArityWWExpr dflags (Tick tk expr) = Tick tk <$> etaArityWWExpr dflags expr
+etaArityWWExpr _ e@(Type _) = return e
+etaArityWWExpr _ e@(Coercion _) = return e
 
 {-
 Note [Extensionality and Higher-Order Functions]
@@ -279,7 +291,7 @@ mkArityWrapperRhs
   -> Arity
   -> UniqSM CoreExpr
 -- mkArityWrapperRhs _ work_id _ _ = return (Var work_id)
-mkArityWrapperRhs fm wname expr arity = go fm expr arity wname []
+mkArityWrapperRhs fm work_id expr arity = go fm expr arity work_id []
   where go fm (Lam b e) a w l
           | isId b = let expr = etaExpand (F.findWithDefault 0 b fm) (Var b) in
                        Lam b <$> go fm e (a-1) w (expr : l)
