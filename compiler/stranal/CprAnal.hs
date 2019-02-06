@@ -653,8 +653,7 @@ extendSigsWithLam :: AnalEnv -> Id -> AnalEnv
 -- Extend the AnalEnv when we meet a lambda binder
 extendSigsWithLam env id
   | isId id
-  , isStrictDmd (idDemandInfo id)
-       -- See Note [Initial CPR for strict binders]
+  , isStrictDmd (idDemandInfo id) -- See Note [CPR for strict binders]
   , Just (dc,_,_,_) <- deepSplitProductType_maybe (ae_fam_envs env) $ idType id
   = extendAnalEnv NotTopLevel env id (prodCprType (dataConRepArity dc))
   | otherwise
@@ -684,8 +683,8 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
     -- propagate available unboxed things from the scrutinee, getting rid of
     -- the is_var_scrut heuristic. See Note [CPR in a DataAlt case alternative].
     -- Giving strict binders the CPR property only makes sense for products, as
-    -- the arguments in Note [Initial CPR for strict binders] don't apply to
-    -- sums (yet); we lack WW for strict binders of sum type.
+    -- the arguments in Note [CPR for strict binders] don't apply to sums (yet);
+    -- we lack WW for strict binders of sum type.
     do_con_arg env (id, str)
        | let is_strict = isStrictDmd (idDemandInfo id) || isMarkedStrict str
        , is_var_scrut && is_strict
@@ -739,9 +738,8 @@ Specifically
    box.  If the wrapper doesn't cancel with its caller, we'll end up
    re-boxing something that we did have available in boxed form.
 
- * Any strict binders with product type, can use
-   Note [Initial CPR for strict binders].  But we can go a little
-   further. Consider
+ * Any strict binders with product type, can use Note [CPR for strict binders].
+   But we can go a little further. Consider
 
       data T = MkT !Int Int
 
@@ -811,13 +809,8 @@ is even more important.  We don't want the wrapper to rebox an unboxed
 argument, and pass an Int to $wfoo!
 
 
-Note [Initial CPR for strict binders]
+Note [CPR for strict binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-CPR is initialized for a lambda binder in an optimistic manner, i.e,
-if the binder is used strictly and at least some of its components as
-a product are used, which is checked by the value of the absence
-demand.
-
 If the binder is marked demanded with a strict demand, then give it a
 CPR signature. Here's a concrete example ('f1' in test T10482a),
 assuming h is strict:
