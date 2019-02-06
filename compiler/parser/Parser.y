@@ -1,4 +1,3 @@
-
 --                                                              -*-haskell-*-
 -- ---------------------------------------------------------------------------
 -- (c) The University of Glasgow 1997-2003
@@ -2586,7 +2585,7 @@ exp10 :: { LHsExpr GhcPs }
         | scc_annot exp        {% ams (sLL $1 $> $ HsSCC noExt (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
                                       (fst $ fst $ unLoc $1) }
 
-optSemi :: { ([Located a],Bool) }
+optSemi :: { ([Located Token],Bool) }
         : ';'         { ([$1],True) }
         | {- empty -} { ([],False) }
 
