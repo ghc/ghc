@@ -45,8 +45,8 @@ module Type (
         splitForAllTy_maybe, splitForAllTy,
         splitForAllTy_ty_maybe, splitForAllTy_co_maybe,
         splitPiTy_maybe, splitPiTy, splitPiTys,
-        mkTyCoPiTy, mkTyCoPiTys, mkTyConBindersPreferAnon,
-        mkPiTys,
+        mkTyConBindersPreferAnon,
+        mkPiTy, mkPiTys,
         mkLamType, mkLamTypes,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
@@ -1383,11 +1383,11 @@ mkLamTypes :: [Var] -> Type -> Type
 -- ^ 'mkLamType' for multiple type or value arguments
 
 mkLamType v ty
-   | isCoVar v
-   , v `elemVarSet` tyCoVarsOfType ty
-   = ForAllTy (Bndr v Inferred) ty
    | isTyVar v
    = ForAllTy (Bndr v Inferred) ty
+   | isCoVar v
+   , v `elemVarSet` tyCoVarsOfType ty
+   = ForAllTy (Bndr v Required) ty
    | otherwise
    = mkVisFunTy (varType v) ty
 
@@ -1725,36 +1725,6 @@ binderRelevantType_maybe (Anon _ ty) = Just ty
 ************************************************************************
 
 Predicates on PredType
-
-Note [Types for coercions, predicates, and evidence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We treat differently:
-
-  (a) Predicate types
-        Test: isPredTy
-        Binders: DictIds
-        Kind: Constraint
-        Examples: (Eq a), and (a ~ b)
-
-  (b) Coercion types are primitive, unboxed equalities
-        Test: isCoVarTy
-        Binders: CoVars (can appear in coercions)
-        Kind: TYPE (TupleRep [])
-        Examples: (t1 ~# t2) or (t1 ~R# t2)
-
-  (c) Evidence types is the type of evidence manipulated by
-      the type constraint solver.
-        Test: isEvVarType
-        Binders: EvVars
-        Kind: Constraint or TYPE (TupleRep [])
-        Examples: all coercion types and predicate types
-
-Coercion types and predicate types are mutually exclusive,
-but evidence types are a superset of both.
-
-When treated as a user type, predicates are invisible and are
-implicitly instantiated; but coercion types, and non-pred evidence
-types, are just regular old types.
 
 Note [Evidence for quantified constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3066,7 +3036,7 @@ modifyJoinResTy orig_ar f orig_ty
   where
     go 0 ty = f ty
     go n ty | Just (arg_bndr, res_ty) <- splitPiTy_maybe ty
-            = mkTyCoPiTy arg_bndr (go (n-1) res_ty)
+            = mkPiTy arg_bndr (go (n-1) res_ty)
             | otherwise
             = pprPanic "modifyJoinResTy" (ppr orig_ar <+> ppr orig_ty)
 

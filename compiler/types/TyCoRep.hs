@@ -45,10 +45,8 @@ module TyCoRep (
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
         mkFFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
-        mkTyCoForAllTy, mkForAllTys,
-        mkForAllTy,
-        mkTyCoPiTy, mkTyCoPiTys,
-        mkPiTys,
+        mkForAllTy, mkForAllTys,
+        mkPiTy, mkPiTys,
 
         kindRep_maybe, kindRep,
         isLiftedTypeKind, isUnliftedTypeKind,
@@ -336,23 +334,49 @@ data Type
 
   deriving Data.Data
 
+-- NOTE:  Other parts of the code assume that type literals do not contain
+-- types or type variables.
+data TyLit
+  = NumTyLit Integer
+  | StrTyLit FastString
+  deriving (Eq, Ord, Data.Data)
+
+
 {- Note [Function types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-(to be completed...)
+FFunTy is the constructor for a function type.  Lots of things to say
+about it!
 
 * FFunTy is the data constructor, meaning "full function type".
+
+* The function type constructor (->) has kind
+     (->) :: forall r1 r2. TYPE r1 -> TYPE r2 -> Type LiftedRep
+  mkTyConApp ensure that we convert a saturated application
+    TyConApp (->) [r1,r2,t1,t2] into FunTy t1 t2
+  dropping the 'r1' and 'r2' arguments; they are easily recovered
+  from 't1' and 't2'.
+
+* The ft_af field says whether or not this is an invisible argument
+     VisArg:   t1 -> t2    Ordinary function type
+     InvisArg: t1 => t2    t1 is guaranteed to be a predicate type,
+                           i.e. t1 :: Constraint
+  See Note [Types for coercions, predicates, and evidence]
+
+  This visibility info makes no difference in Core; it matters
+  only when we regard the type as a Haskell source type.
 
 * FunTy is a (unidirectional) pattern synonym that allows
   positional pattern matching (FunTy arg res), ignoring the
   ArgFlag.
-
-* We use #define FunTy FFunTy _, to allow pattern matching on
-  a (positional) FunTy constructor.
 -}
 
 {- -----------------------
       Commented out until the pattern match
       checker can handle it; see Trac #16185
+
+      For now we use the CPP macro #define FunTy FFunTy _
+      (see HsVersions.h) to allow pattern matching on a
+      (positional) FunTy constructor.
 
 {-# COMPLETE FunTy, TyVarTy, AppTy, TyConApp
            , ForAllTy, LitTy, CastTy, CoercionTy :: Type #-}
@@ -366,15 +390,99 @@ pattern FunTy arg res <- FFunTy { ft_arg = arg, ft_res = res }
        End of commented out block
 ---------------------------------- -}
 
+{- Note [Types for coercions, predicates, and evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We treat differently:
 
--- NOTE:  Other parts of the code assume that type literals do not contain
--- types or type variables.
-data TyLit
-  = NumTyLit Integer
-  | StrTyLit FastString
-  deriving (Eq, Ord, Data.Data)
+  (a) Predicate types
+        Test: isPredTy
+        Binders: DictIds
+        Kind: Constraint
+        Examples: (Eq a), and (a ~ b)
 
-{- Note [Arguments to type constructors]
+  (b) Coercion types are primitive, unboxed equalities
+        Test: isCoVarTy
+        Binders: CoVars (can appear in coercions)
+        Kind: TYPE (TupleRep [])
+        Examples: (t1 ~# t2) or (t1 ~R# t2)
+
+  (c) Evidence types is the type of evidence manipulated by
+      the type constraint solver.
+        Test: isEvVarType
+        Binders: EvVars
+        Kind: Constraint or TYPE (TupleRep [])
+        Examples: all coercion types and predicate types
+
+Coercion types and predicate types are mutually exclusive,
+but evidence types are a superset of both.
+
+When treated as a user type,
+
+  - Predicates (of kind Constraint) are invisible and are
+    implicitly instantiated
+
+  - Coercion types, and non-pred evidence types (i.e. not
+    of kind Constrain), are just regular old types, are
+    visible, and are not implicitly instantiated.
+
+In a FunTy { ft_af = InvisArg }, the argument type is always
+a Predicate type.
+
+Note [Constraints in kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Do we allow a type constructor to have a kind like
+   S :: Eq a => a -> Type
+
+No, we do not.  Doing so would mean would need a TyConApp like
+   S @k @(d :: Eq k) (ty :: k)
+ and we have no way to build, or decompose, evidence like
+ (d :: Eq k) at the type level.
+
+But we admit one exception: equality.  We /do/ allow, say,
+   MkT :: (a ~ b) => a -> b -> Type
+
+How does this work?
+
+* In Inst.tcInstInvisibleTyBinder we instantiate a call
+  of MkT by emitting
+     [W] co :: alpha ~# beta
+  and producing the elaborated term
+     MkT @alpha @beta (Eq# alpha beta co)
+  We don't generate a boxed "Wanted"; we generate only a
+  regular old unboxed primitive-equality Wanted, and build
+  the box on the spot.
+
+* How can we get such a MkT?  By promoting a GADT-style data
+  constructor
+     data T a b where
+       MkT :: (a~b) => a -> b -> T a b
+  See DataCon.mkPromotedDataCon
+  and Note [Promoted data constructors] in TyCon
+
+* How do we prevent a MkT having an illegal constraint like
+  Eq a?  We check for this at use-sites; see TcHsType.tcTyVar,
+  specifically dc_theta_illegal_constraint.
+
+* Notice that nothing special happens if
+    K :: (a ~# b) => blah
+  because (a ~# b) is not a predicate type, and is never
+  implicitly instantiated. (Mind you, it's not clear how you
+  could creates a type constructor with such a kind.) See
+  Note [Types for coercions, predicates, and evidence]
+
+* The existence of promoted MkT with an equality-constraint
+  argument is the (only) reason that the AnonTCB constructor
+  of TyConBndrVis carries an AnonArgFlag (VisArg/InvisArg).
+  For example, when we promote the data constructor
+     MkT :: forall a b. (a~b) => a -> b -> T a b
+  we get a PromotedDataCon with tyConBinders
+      Bndr (a :: Type)  (NamedTCB Inferred)
+      Bndr (b :: Type)  (NamedTCB Inferred)
+      Bndr (_ :: a ~ b) (AnonTCB InvisArg)
+      Bndr (_ :: a)     (AnonTCB VisArg))
+      Bndr (_ :: b)     (AnonTCB VisArg))
+
+Note [Arguments to type constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Because of kind polymorphism, in addition to type application we now
 have kind instantiation. We reuse the same notations to do so.
@@ -537,13 +645,14 @@ True in any case.
 
 We decide to always construct (2) if co is not used in t.
 
-Thus in mkTyCoForAllTy, we check whether the variable is a coercion
-variable and whether it is used in the body. If so, it returns a FunTy
-instead of a ForAllTy.
+Thus in mkLamType, we check whether the variable is a coercion
+variable (of type (t1 ~# t2), and whether it is un-used in the
+body. If so, it returns a FunTy instead of a ForAllTy.
 
-There are cases we want to skip the check. For example, the check is unnecessary
-when it is known from the context that the input variable is a type variable.
-In those cases, we use mkForAllTy.
+There are cases we want to skip the check. For example, the check is
+unnecessary when it is known from the context that the input variable
+is a type variable.  In those cases, we use mkForAllTy.
+
 -}
 
 -- | A type labeled 'KnotTied' might have knot-tied tycons in it. See
@@ -868,18 +977,6 @@ mkVisFunTys, mkInvisFunTys :: [Type] -> Type -> Type
 mkVisFunTys   tys ty = foldr mkVisFunTy   ty tys
 mkInvisFunTys tys ty = foldr mkInvisFunTy ty tys
 
--- | If tv is a coercion variable and it is not used in the body, returns
--- a FunTy, otherwise makes a forall type.
--- See Note [Unused coercion variable in ForAllTy]
-mkTyCoForAllTy :: TyCoVar -> ArgFlag -> Type -> Type
-mkTyCoForAllTy tv vis ty
-  | isCoVar tv
-  , not (tv `elemVarSet` tyCoVarsOfType ty)
-  = ASSERT( vis == Inferred )
-    mkInvisFunTy (varType tv) ty
-  | otherwise
-  = ForAllTy (Bndr tv vis) ty
-
 -- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
 -- See Note [Unused coercion variable in ForAllTy]
 mkForAllTy :: TyCoVar -> ArgFlag -> Type -> Type
@@ -889,19 +986,10 @@ mkForAllTy tv vis ty = ForAllTy (Bndr tv vis) ty
 mkForAllTys :: [TyCoVarBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
-mkTyCoPiTy :: TyCoBinder -> Type -> Type
-mkTyCoPiTy (Anon af ty1) ty2        = FFunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 }
-mkTyCoPiTy (Named (Bndr tv vis)) ty = mkTyCoForAllTy tv vis ty
-
--- | Like 'mkTyCoPiTy', but does not check the occurrence of the binder
 mkPiTy:: TyCoBinder -> Type -> Type
 mkPiTy (Anon af ty1) ty2        = FFunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 }
 mkPiTy (Named (Bndr tv vis)) ty = mkForAllTy tv vis ty
 
-mkTyCoPiTys :: [TyCoBinder] -> Type -> Type
-mkTyCoPiTys tbs ty = foldr mkTyCoPiTy ty tbs
-
--- | Like 'mkTyCoPiTys', but does not check the occurrence of the binder
 mkPiTys :: [TyCoBinder] -> Type -> Type
 mkPiTys tbs ty = foldr mkPiTy ty tbs
 
@@ -1042,6 +1130,11 @@ data Coercion
 
   | FunCo Role Coercion Coercion         -- lift FunTy
          -- FunCo :: "e" -> e -> e -> e
+         -- Note: why doesn't FunCo have a AnonArgFlag, like FFunTy?
+         -- Because the AnonArgFlag has no impact on Core; it is only
+         -- there to guide implicit instantiation of Haskell source
+         -- types, and that is irrelevant for coercions, which are
+         -- Core-only.
 
   -- These are special
   | CoVarCo CoVar      -- :: _ -> (N or R)
@@ -2194,7 +2287,8 @@ injectiveVarsOfType = go
 -- files.
 tyConAppNeedsKindSig
   :: Bool  -- ^ Should specified binders count towards injective positions in
-           --   the kind of the TyCon?
+           --   the kind of the TyCon? (If you're using visible kind
+           --   applications, then you want True here.
   -> TyCon
   -> Int   -- ^ The number of args the 'TyCon' is applied to.
   -> Bool  -- ^ Does @T t_1 ... t_n@ need a kind signature? (Where @n@ is the
@@ -2208,8 +2302,7 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
         result_kind  = mkTyConKind remaining_binders tc_res_kind
         result_vars  = tyCoVarsOfType result_kind
         dropped_vars = fvVarSet $
-                       mapUnionFV (injective_vars_of_binder spec_inj_pos)
-                                  dropped_binders
+                       mapUnionFV injective_vars_of_binder dropped_binders
 
     in not (subVarSet result_vars dropped_vars)
   where
@@ -2219,20 +2312,17 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
     -- Returns the variables that would be fixed by knowing a TyConBinder. See
     -- Note [When does a tycon application need an explicit kind signature?]
     -- for a more detailed explanation of what this function does.
-    injective_vars_of_binder
-      :: Bool -- Should specified binders count towards injective positions?
-              -- (If you're using visible kind applications, then you want True
-              -- here.)
-      -> TyConBinder -> FV
-    injective_vars_of_binder spec_inj_pos (Bndr tv vis) =
+    injective_vars_of_binder :: TyConBinder -> FV
+    injective_vars_of_binder (Bndr tv vis) =
       case vis of
-        AnonTCB -> injectiveVarsOfType (varType tv)
-        NamedTCB argf
-          |     (argf == Required)
-             || (spec_inj_pos && (argf == Specified))
-          -> unitFV tv `unionFV` injectiveVarsOfType (varType tv)
-          |  otherwise
-          -> emptyFV
+        AnonTCB VisArg -> injectiveVarsOfType (varType tv)
+        NamedTCB argf  | source_of_injectivity argf
+                       -> unitFV tv `unionFV` injectiveVarsOfType (varType tv)
+        _              -> emptyFV
+
+    source_of_injectivity Required  = True
+    source_of_injectivity Specified = spec_inj_pos
+    source_of_injectivity Inferred  = False
 
 {-
 Note [When does a tycon application need an explicit kind signature?]

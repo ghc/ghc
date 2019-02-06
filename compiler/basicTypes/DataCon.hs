@@ -983,13 +983,6 @@ mkDataCon name declared_infix prom_info
                 (univ_tvs ++ ex_tvs)
             ++ map (const Representational) (theta ++ orig_arg_tys)
 
-mkCleanAnonTyConBinders :: [TyConBinder] -> [Type] -> [TyConBinder]
-mkCleanAnonTyConBinders tc_bndrs tys
-  = [ mkAnonTyConBinder (mkTyVar name ty)
-    | (name, ty) <- fresh_names `zip` tys ]
-  where
-    fresh_names = freshNames (map getName (binderVars tc_bndrs))
-
 freshNames :: [Name] -> [Name]
 -- Make an infinite list of Names whose Uniques and OccNames
 -- differ from those in the 'avoid' list

@@ -1275,7 +1275,7 @@ flatten_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
     go acc_xis acc_cos lc binders inner_ki _ []
       = return (reverse acc_xis, reverse acc_cos, kind_co)
       where
-        final_kind = mkTyCoPiTys binders inner_ki
+        final_kind = mkPiTys binders inner_ki
         kind_co = liftCoSubst Nominal lc final_kind
 
     go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) (ty:tys)

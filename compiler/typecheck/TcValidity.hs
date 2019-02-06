@@ -673,7 +673,6 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
        --      data Tree a b = ...
        --      type Foo a = Tree [a]
        --      f :: Foo a b -> ...
-<<<<<<< 1c3e61cb1fc5d61775a36463811d2a6bf9ebe93a
   = case expand of
       _ |  isTypeFamilyTyCon tc
         -> check_args_only expand
@@ -682,21 +681,6 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
       Expand   -> check_expansion_only expand
       NoExpand -> check_args_only expand
       Both     -> check_args_only NoExpand *> check_expansion_only Both
-=======
-  = do  { -- See Note [Liberal type synonyms]
-        ; liberal <- xoptM LangExt.LiberalTypeSynonyms
-        ; if not liberal || isTypeFamilyTyCon tc then
-                -- For H98 and synonym families, do check the type args
-                mapM_ check_arg tys
-
-          else  -- In the liberal case (only for closed syns), expand then check
-          case tcView ty of
-             Just ty' -> let syn_tc = tcTyConAppTyCon ty
-                             err_ctxt = text "In the expansion of type synonym"
-                                        <+> quotes (ppr syn_tc)
-                         in addErrCtxt err_ctxt $ check_type env ctxt rank ty'
-             Nothing  -> pprPanic "check_tau_type" (ppr ty)  }
->>>>>>> Improvements to the AnonArgFlag stuff
 
   | GhciCtxt True <- ctxt  -- Accept outermost under-saturated type synonym or
                            -- type family constructors in GHCi :kind commands.

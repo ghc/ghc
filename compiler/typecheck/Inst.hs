@@ -540,23 +540,15 @@ get_eq_tys_maybe :: Type
                           , Type  -- t2
                           )
 get_eq_tys_maybe ty
-    -- unlifted equality (~#)
-  | Just (Nominal, k1, k2) <- getEqPredTys_maybe ty
-  = Just (\co -> return $ mkCoercionTy co, k1, k2)
-
-    -- lifted heterogeneous equality (~~)
+  -- Lifted heterogeneous equality (~~)
   | Just (tc, [_, _, k1, k2]) <- splitTyConApp_maybe ty
-  = if | tc `hasKey` heqTyConKey
-         -> Just (\co -> mkHEqBoxTy co k1 k2, k1, k2)
-       | otherwise
-         -> Nothing
+  , tc `hasKey` heqTyConKey
+  = Just (\co -> mkHEqBoxTy co k1 k2, k1, k2)
 
-    -- lifted homogeneous equality (~)
+  -- Lifted homogeneous equality (~)
   | Just (tc, [_, k1, k2]) <- splitTyConApp_maybe ty
-  = if | tc `hasKey` eqTyConKey
-         -> Just (\co -> mkEqBoxTy co k1 k2, k1, k2)
-       | otherwise
-         -> Nothing
+  , tc `hasKey` eqTyConKey
+  = Just (\co -> mkEqBoxTy co k1 k2, k1, k2)
 
   | otherwise
   = Nothing

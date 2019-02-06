@@ -151,6 +151,7 @@ import NameSet          ( NameSet, mkNameSet, elemNameSet )
 import BasicTypes       ( Arity, Boxity(..), TupleSort(..), ConTagZ,
                           SourceText(..) )
 import ForeignCall
+import Var              ( AnonArgFlag(..) )
 import SrcLoc           ( noSrcSpan )
 import Unique
 import Data.Array

@@ -439,7 +439,7 @@ tyConBinderArgFlag (Bndr _ vis) = tyConBndrVisArgFlag vis
 tyConBndrVisArgFlag :: TyConBndrVis -> ArgFlag
 tyConBndrVisArgFlag (NamedTCB vis)     = vis
 tyConBndrVisArgFlag (AnonTCB VisArg)   = Required
-tyConBndrVisArgFlag (AnonTCB InvisArg) = Inferred
+tyConBndrVisArgFlag (AnonTCB InvisArg) = Inferred    -- See Note [AnonTCB InvisArg]
 
 isNamedTyConBinder :: TyConBinder -> Bool
 -- Identifies kind variables
@@ -478,7 +478,7 @@ tyConTyVarBinders tc_bndrs
       where
         vis = case tc_vis of
                 AnonTCB VisArg    -> Specified
-                AnonTCB InvisArg  -> Inferred
+                AnonTCB InvisArg  -> Inferred   -- See Note [AnonTCB InvisArg]
                 NamedTCB Required -> Specified
                 NamedTCB vis      -> vis
 
@@ -488,7 +488,26 @@ tyConVisibleTyVars tc
   = [ tv | Bndr tv vis <- tyConBinders tc
          , isVisibleTcbVis vis ]
 
-{- Note [Building TyVarBinders from TyConBinders]
+{- Note [AnonTCB InivsArg]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's pretty rare to have an (AnonTCB InvisArg) binder.  The
+only way it can occur is in a PromotedDataCon whose
+kind has an equality constraint:
+  'MkT :: forall a b. (a~b) => blah
+See Note [Constraints in kinds] in TyCoRep, and
+Note [Promoted data constructors] in this module.
+
+When mapping an (AnonTCB InvisArg) to an ArgFlag, in
+tyConBndrVisArgFlag, we use "Inferred" to mean "the user cannot
+specify this arguments, even with visible type/kind application;
+instead the type checker must fill it in.
+
+We map (AnonTCB VisArg) to Required, of course: the user must
+provide it. It would be utterly wrong to do this for constraint
+arguments, which is why AnonTCB must have the AnonArgFlag in
+the first place.
+
+Note [Building TyVarBinders from TyConBinders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We sometimes need to build the quantified type of a value from
 the TyConBinders of a type or class.  For that we need not
@@ -1125,12 +1144,20 @@ via the PromotedDataCon alternative in TyCon.
   the DataCon.  Eg. If the data constructor Data.Maybe.Just(unique 78,
   say) is promoted to a TyCon whose name is Data.Maybe.Just(unique 78)
 
-* Small note: We promote the *user* type of the DataCon.  Eg
+* We promote the *user* type of the DataCon.  Eg
      data T = MkT {-# UNPACK #-} !(Bool, Bool)
   The promoted kind is
-     MkT :: (Bool,Bool) -> T
+     'MkT :: (Bool,Bool) -> T
   *not*
-     MkT :: Bool -> Bool -> T
+     'MkT :: Bool -> Bool -> T
+
+  Similarly for GADTs:
+     data G a where
+       MkG :: forall b. b -> G [b]
+  The promoted data constructor has kind
+       'MkG :: forall b. b -> G [b]
+  *not*
+       'MkG :: forall a b. (a ~# [b]) => b -> G a
 
 Note [Enumeration types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
