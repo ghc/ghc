@@ -175,10 +175,6 @@ static void collect_gct_blocks      (void);
 static void collect_pinned_object_blocks (void);
 static void heapOverflow            (void);
 
-#if defined(DEBUG)
-static void gcCAFs                  (void);
-#endif
-
 /* -----------------------------------------------------------------------------
    The mark stack.
    -------------------------------------------------------------------------- */
