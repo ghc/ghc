@@ -141,15 +141,10 @@ cprAnal' env n (Case scrut case_bndr ty alts)
   = (res_ty, Case scrut' case_bndr ty alts')
   where
     (_, scrut')      = cprAnal env 0 scrut
+    -- Regardless whether scrut had the CPR property or not, the case binder
+    -- certainly has it. See 'extendEnvForDataAlt'.
     (alt_tys, alts') = mapAndUnzip (cprAnalAlt env scrut case_bndr n) alts
     res_ty           = foldl' lubCprType botCprType alt_tys
---    pprTrace "cprAnal:Case" (vcat [ text "scrut" <+> ppr scrut
---                                  , text "dmd" <+> ppr dmd
---                                  , text "case_bndr_dmd" <+> ppr (idDemandInfo case_bndr')
---                                  , text "scrut_dmd" <+> ppr scrut_dmd
---                                  , text "scrut_ty" <+> ppr scrut_ty
---                                  , text "alt_ty" <+> ppr alt_ty2
---                                  , text "res_ty" <+> ppr res_ty ]) $
 
 cprAnal' env n (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
@@ -159,12 +154,10 @@ cprAnal' env n (Let (NonRec id rhs) body)
     (body_ty, body') = cprAnal env' n body
 
 cprAnal' env n (Let (Rec pairs) body)
-  = let
-        (env', pairs')   = cprFix NotTopLevel env n pairs
-        (body_ty, body') = cprAnal env' n body
-    in
-    body_ty `seq`
-    (body_ty,  Let (Rec pairs') body')
+  = body_ty `seq` (body_ty,  Let (Rec pairs') body')
+  where
+    (env', pairs')   = cprFix NotTopLevel env n pairs
+    (body_ty, body') = cprAnal env' n body
 
 cprAnalAlt
   :: AnalEnv
@@ -196,7 +189,7 @@ cprTransformSig :: CprType -> Arity -> CprType
 cprTransformSig ty arty
   -- We are only interested in CPR here, so this is OK. TODO: Clean up
   | arty >= ct_arty ty = ty
-  | otherwise = topCprType
+  | otherwise          = topCprType
 
 arityToCallDemand :: Arity -> CleanDemand
 arityToCallDemand n = iterate mkCallDmd (strictenDmd topDmd) !! n
