@@ -1151,7 +1151,7 @@ via the PromotedDataCon alternative in TyCon.
   *not*
      'MkT :: Bool -> Bool -> T
 
-  Similarly for GADTs:
+* Similarly for GADTs:
      data G a where
        MkG :: forall b. b -> G [b]
   The promoted data constructor has kind

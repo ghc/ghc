@@ -80,7 +80,7 @@ import TyCoRep  ( Type(..) )
 import TcErrors ( reportAllUnsolved )
 import TcType
 import Inst   ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
-import TyCoRep( TyCoBinder(..), tyCoBinderArgFlag )  -- Used in etaExpandAlgTyCon
+import TyCoRep( TyCoBinder(..) )  -- Used in etaExpandAlgTyCon
 import Type
 import TysPrim
 import Coercion
@@ -1042,17 +1042,16 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
 
       ---------------- HsTypeArg: a kind application (fun @ki)
       (HsTypeArg hs_ki_arg : hs_args, Just (ki_binder, inner_ki)) ->
-        case tyCoBinderArgFlag ki_binder of
+        case ki_binder of
 
-        -- FunTy with PredTy on LHS, or ForAllTy with Inferred
-        Inferred  -> instantiate ki_binder inner_ki
+        Named (Bndr _ Inferred) -> instantiate ki_binder inner_ki
+        Anon InvisArg _         -> instantiate ki_binder inner_ki
 
-        -- Specified (invisible) binder with visible kind argument
-        Specified ->
+        Named (Bndr _ Specified) ->  -- Visible kind application
           do { traceTc "tcInferApps (vis kind app)"
                        (vcat [ ppr ki_binder, ppr hs_ki_arg
                              , ppr (tyBinderType ki_binder)
-                             , ppr subst, ppr (tyCoBinderArgFlag ki_binder) ])
+                             , ppr subst ])
 
              ; let exp_kind = substTy subst $ tyBinderType ki_binder
 
@@ -1067,17 +1066,10 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
              ; (subst', fun') <- mkAppTyM subst fun ki_binder ki_arg
              ; go (n+1) fun' subst' inner_ki hs_args }
 
-        -- Visible kind application, but we need a normal type application; error.
-        -- This happens when we have (fun @ki) but (fun :: k1 -> k2),
-        -- that is, without a forall
-        Required ->
-          do { traceTc "tcInferApps (error)"
-                       (vcat [ ppr ki_binder
-                             , ppr hs_ki_arg
-                             , ppr (tyBinderType ki_binder)
-                             , ppr subst
-                             , ppr (isInvisibleBinder ki_binder) ])
-             ; ty_app_err hs_ki_arg $ substTy subst fun_ki }
+        -- Attempted visible kind application (fun @ki), but fun_ki is
+        --   forall k -> blah   or   k1 -> k2
+        -- So we need a normal application.  Error.
+        _ -> ty_app_err hs_ki_arg $ substTy subst fun_ki
 
       -- No binder; try applying the substitution, or fail if that's not possible
       (HsTypeArg ki_arg : _, Nothing) -> try_again_after_substing_or $
@@ -1086,7 +1078,7 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
       ---------------- HsValArg: a nomal argument (fun ty)
       (HsValArg arg : args, Just (ki_binder, inner_ki))
         -- next binder is invisible; need to instantiate it
-        | isInvisibleBinder ki_binder   -- FunTy with PredTy on LHS;
+        | isInvisibleBinder ki_binder   -- FunTy with InvisArg on LHS;
                                         -- or ForAllTy with Inferred or Specified
          -> instantiate ki_binder inner_ki
 
@@ -1124,9 +1116,7 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
       where
         instantiate ki_binder inner_ki
           = do { traceTc "tcInferApps (need to instantiate)"
-                         (vcat [ ppr ki_binder
-                               , ppr subst
-                               , ppr (tyCoBinderArgFlag ki_binder)])
+                         (vcat [ ppr ki_binder, ppr subst])
                ; (subst', arg') <- tcInstInvisibleTyBinder subst ki_binder
                ; go n (mkAppTy fun arg') subst' inner_ki all_args }
                  -- Because tcInvisibleTyBinder instantiate ki_binder,
@@ -1452,7 +1442,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
     -- We cannot promote a data constructor with a context that contains
     -- constraints other than equalities, so error if we find one.
-    -- See Note [Constraints handled in types] in Inst.
+    -- See Note [Constraints in kinds] in TyCoRep
     dc_theta_illegal_constraint :: ThetaType -> Maybe PredType
     dc_theta_illegal_constraint = find go
       where

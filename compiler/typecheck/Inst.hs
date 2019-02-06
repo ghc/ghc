@@ -410,81 +410,6 @@ instStupidTheta orig theta
 *                                                                      *
 ************************************************************************
 
-Note [Constraints handled in types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Generally, we cannot handle constraints written in types. For example,
-if we declare
-
-  data C a where
-    MkC :: Show a => a -> C a
-
-we will not be able to use MkC in types, as we have no way of creating
-a type-level Show dictionary.
-
-However, we make an exception for equality types. Consider
-
-  data T1 a where
-    MkT1 :: T1 Bool
-
-  data T2 a where
-    MkT2 :: a ~ Bool => T2 a
-
-MkT1 has a constrained return type, while MkT2 uses an explicit equality
-constraint. These two types are often written interchangeably, with a
-reasonable expectation that they mean the same thing. For this to work --
-and for us to be able to promote GADTs -- we need to be able to instantiate
-equality constraints in types.
-
-One wrinkle is that the equality in MkT2 is *lifted*. But, for proper
-GADT equalities, GHC produces *unlifted* constraints. (This unlifting comes
-from DataCon.eqSpecPreds, which uses mkPrimEqPred.) And, perhaps a wily
-user will use (~~) for a heterogeneous equality. We thus must support
-all of (~), (~~), and (~#) in types. (See Note [The equality types story]
-in TysPrim for a primer on these equality types.)
-
-The get_eq_tys_maybe function recognizes these three forms of equality,
-returning a suitable type formation function and the two types related
-by the equality constraint. In the lifted case, it uses mkHEqBoxTy or
-mkEqBoxTy, which promote the datacons of the (~~) or (~) datatype,
-respectively.
-
-One might reasonably wonder who *unpacks* these boxes once they are
-made. After all, there is no type-level `case` construct. The surprising
-answer is that no one ever does. Instead, if a GADT constructor is used
-on the left-hand side of a type family equation, that occurrence forces
-GHC to unify the types in question. For example:
-
-  data G a where
-    MkG :: G Bool
-
-  type family F (x :: G a) :: a where
-    F MkG = False
-
-When checking the LHS `F MkG`, GHC sees the MkG constructor and then must
-unify F's implicit parameter `a` with Bool. This succeeds, making the equation
-
-    F Bool (MkG @Bool <Bool>) = False
-
-Note that we never need unpack the coercion. This is because type family
-equations are *not* parametric in their kind variables. That is, we could have
-just said
-
-  type family H (x :: G a) :: a where
-    H _ = False
-
-The presence of False on the RHS also forces `a` to become Bool, giving us
-
-    H Bool _ = False
-
-The fact that any of this works stems from the lack of phase separation between
-types and kinds (unlike the very present phase separation between terms and types).
-
-Once we have the ability to pattern-match on types below top-level, this will
-no longer cut it, but it seems fine for now.
-
--}
-
----------------------------
 -- | Instantiates up to n invisible binders
 -- Returns the instantiating types, and body kind
 tcInstInvisibleTyBinders :: Int -> TcKind -> TcM ([TcType], TcKind)
@@ -515,23 +440,17 @@ tcInstInvisibleTyBinder subst (Named (Bndr tv _))
 tcInstInvisibleTyBinder subst (Anon af ty)
   | Just (mk, k1, k2) <- get_eq_tys_maybe substed_ty
     -- Equality is the *only* constraint currently handled in types.
+    -- See Note [Constraints in kinds] in TyCoRep
   = ASSERT( af == InvisArg )
     do { co <- unifyKind Nothing k1 k2
        ; arg' <- mk co
        ; return (subst, arg') }
 
   | otherwise  -- This should never happen
-  = do { let (env, tidy_ty) = tidyOpenType emptyTidyEnv substed_ty
-       ; addErrTcM (env, text "Illegal constraint in a kind:" <+> ppr tidy_ty)
+               -- See TyCoRep Note [Constraints in kinds]
+  = pprPanic "tcInvisibleTyBinder" (ppr ty)
 
-         -- just invent a new variable so that we can continue
-       ; u <- newUnique
-       ; let name = mkSysTvName u (fsLit "dict")
-       ; return (subst, mkTyVarTy $ mkTyVar name substed_ty) }
-  where
-    substed_ty = substTy subst ty
-
-  -- See Note [Constraints handled in types]
+-------------------------------
 get_eq_tys_maybe :: Type
                  -> Maybe ( Coercion -> TcM Type
                              -- given a coercion proving t1 ~# t2, produce the
@@ -539,6 +458,7 @@ get_eq_tys_maybe :: Type
                           , Type  -- t1
                           , Type  -- t2
                           )
+-- See Note [Constraints in kinds] in TyCoRep
 get_eq_tys_maybe ty
   -- Lifted heterogeneous equality (~~)
   | Just (tc, [_, _, k1, k2]) <- splitTyConApp_maybe ty
@@ -553,7 +473,6 @@ get_eq_tys_maybe ty
   | otherwise
   = Nothing
 
--------------------------------
 -- | This takes @a ~# b@ and returns @a ~~ b@.
 mkHEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
 -- monadic just for convenience with mkEqBoxTy

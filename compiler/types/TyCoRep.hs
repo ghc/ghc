@@ -61,7 +61,6 @@ module TyCoRep (
         isInvisibleArgFlag, isVisibleArgFlag,
         isInvisibleBinder, isVisibleBinder,
         isTyBinder, isNamedBinder,
-        tyCoBinderArgFlag,
 
         -- * Functions over coercions
         pickLR,
@@ -439,7 +438,15 @@ No, we do not.  Doing so would mean would need a TyConApp like
  (d :: Eq k) at the type level.
 
 But we admit one exception: equality.  We /do/ allow, say,
-   MkT :: (a ~ b) => a -> b -> Type
+   MkT :: (a ~ b) => a -> b -> Type a b
+
+Why?  Because we can, without much difficulty.  Moreover
+we can promote a GADT data constructor (see TyCon
+Note [Promoted data constructors]), like
+  data GT a b where
+    MkGT : a -> a -> GT a a
+so programmers might reasonably expect to be able to
+promote MkT as well.
 
 How does this work?
 
@@ -449,7 +456,7 @@ How does this work?
   and producing the elaborated term
      MkT @alpha @beta (Eq# alpha beta co)
   We don't generate a boxed "Wanted"; we generate only a
-  regular old unboxed primitive-equality Wanted, and build
+  regular old /unboxed/ primitive-equality Wanted, and build
   the box on the spot.
 
 * How can we get such a MkT?  By promoting a GADT-style data
@@ -458,6 +465,10 @@ How does this work?
        MkT :: (a~b) => a -> b -> T a b
   See DataCon.mkPromotedDataCon
   and Note [Promoted data constructors] in TyCon
+
+* We support both homogeneous (~) and heterogeneous (~~)
+  equality.  (See Note [The equality types story]
+  in TysPrim for a primer on these equality types.)
 
 * How do we prevent a MkT having an illegal constraint like
   Eq a?  We check for this at use-sites; see TcHsType.tcTyVar,
@@ -481,6 +492,44 @@ How does this work?
       Bndr (_ :: a ~ b) (AnonTCB InvisArg)
       Bndr (_ :: a)     (AnonTCB VisArg))
       Bndr (_ :: b)     (AnonTCB VisArg))
+
+* One might reasonably wonder who *unpacks* these boxes once they are
+  made. After all, there is no type-level `case` construct. The
+  surprising answer is that no one ever does. Instead, if a GADT
+  constructor is used on the left-hand side of a type family equation,
+  that occurrence forces GHC to unify the types in question. For
+  example:
+
+  data G a where
+    MkG :: G Bool
+
+  type family F (x :: G a) :: a where
+    F MkG = False
+
+  When checking the LHS `F MkG`, GHC sees the MkG constructor and then must
+  unify F's implicit parameter `a` with Bool. This succeeds, making the equation
+
+    F Bool (MkG @Bool <Bool>) = False
+
+  Note that we never need unpack the coercion. This is because type
+  family equations are *not* parametric in their kind variables. That
+  is, we could have just said
+
+  type family H (x :: G a) :: a where
+    H _ = False
+
+  The presence of False on the RHS also forces `a` to become Bool,
+  giving us
+
+    H Bool _ = False
+
+  The fact that any of this works stems from the lack of phase
+  separation between types and kinds (unlike the very present phase
+  separation between terms and types).
+
+  Once we have the ability to pattern-match on types below top-level,
+  this will no longer cut it, but it seems fine for now.
+
 
 Note [Arguments to type constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -706,11 +755,6 @@ isNamedBinder (Anon {})  = False
 isTyBinder :: TyCoBinder -> Bool
 isTyBinder (Named bnd) = isTyVarBinder bnd
 isTyBinder _ = True
-
-tyCoBinderArgFlag :: TyCoBinder -> ArgFlag
-tyCoBinderArgFlag (Named (Bndr _ flag)) = flag
-tyCoBinderArgFlag (Anon InvisArg _)     = Inferred
-tyCoBinderArgFlag (Anon VisArg _)       = Required
 
 {- Note [TyCoBinders]
 ~~~~~~~~~~~~~~~~~~~
