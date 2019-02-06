@@ -90,7 +90,7 @@ module TyCoRep (
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList, tyCoVarsOfProv,
         almostDevoidCoVarOfCo,
-        injectiveVarsOfBinder, injectiveVarsOfType,
+        injectiveVarsOfType, tyConAppNeedsKindSig,
 
         noFreeVarsOfType, noFreeVarsOfCo,
 
@@ -2103,20 +2103,21 @@ almost_devoid_co_var_of_types (ty:tys) cv
 
 ------------- Injective free vars -----------------
 
--- | Returns the free variables of a 'TyConBinder' that are in injective
--- positions. (See @Note [Kind annotations on TyConApps]@ in "TcSplice" for an
--- explanation of what an injective position is.)
-injectiveVarsOfBinder :: TyConBinder -> FV
-injectiveVarsOfBinder (Bndr tv vis) =
-  case vis of
-    AnonTCB           -> injectiveVarsOfType (varType tv)
-    NamedTCB Required -> unitFV tv `unionFV`
-                         injectiveVarsOfType (varType tv)
-    NamedTCB _        -> emptyFV
-
 -- | Returns the free variables of a 'Type' that are in injective positions.
--- (See @Note [Kind annotations on TyConApps]@ in "TcSplice" for an explanation
--- of what an injective position is.)
+-- For example, if @F@ is a non-injective type family, then:
+--
+-- @
+-- injectiveTyVarsOf( Either c (Maybe (a, F b c)) ) = {a,c}
+-- @
+--
+-- If @'injectiveVarsOfType' ty = itvs@, then knowing @ty@ fixes @itvs@.
+-- More formally, if
+-- @a@ is in @'injectiveVarsOfType' ty@
+-- and  @S1(ty) ~ S2(ty)@,
+-- then @S1(a)  ~ S2(a)@,
+-- where @S1@ and @S2@ are arbitrary substitutions.
+--
+-- See @Note [When does a tycon application need an explicit kind signature?]@.
 injectiveVarsOfType :: Type -> FV
 injectiveVarsOfType = go
   where
@@ -2132,11 +2133,283 @@ injectiveVarsOfType = go
                          filterByList (inj ++ repeat True) tys
                          -- Oversaturated arguments to a tycon are
                          -- always injective, hence the repeat True
-    go (ForAllTy tvb ty) = tyCoFVsBndr tvb $ go (binderType tvb)
-                                             `unionFV` go ty
+    go (ForAllTy tvb ty) = tyCoFVsBndr tvb $ go ty
     go LitTy{}           = emptyFV
     go (CastTy ty _)     = go ty
     go CoercionTy{}      = emptyFV
+
+-- | Does a 'TyCon' (that is applied to some number of arguments) need to be
+-- ascribed with an explicit kind signature to resolve ambiguity if rendered as
+-- a source-syntax type?
+-- (See @Note [When does a tycon application need an explicit kind signature?]@
+-- for a full explanation of what this function checks for.)
+
+-- Morally, this function ought to belong in TyCon.hs, not TyCoRep.hs, but
+-- accomplishing this requires a fair deal of futzing aruond with .hs-boot
+-- files.
+tyConAppNeedsKindSig
+  :: Bool  -- ^ Should specified binders count towards injective positions in
+           --   the kind of the TyCon?
+  -> TyCon
+  -> Int   -- ^ The number of args the 'TyCon' is applied to.
+  -> Bool  -- ^ Does @T t_1 ... t_n@ need a kind signature? (Where @n@ is the
+           --   number of arguments)
+tyConAppNeedsKindSig spec_inj_pos tc n_args
+  | LT <- listLengthCmp tc_binders n_args
+  = False
+  | otherwise
+  = let (dropped_binders, remaining_binders)
+          = splitAt n_args tc_binders
+        result_kind  = mkTyConKind remaining_binders tc_res_kind
+        result_vars  = tyCoVarsOfType result_kind
+        dropped_vars = fvVarSet $
+                       mapUnionFV (injective_vars_of_binder spec_inj_pos)
+                                  dropped_binders
+
+    in not (subVarSet result_vars dropped_vars)
+  where
+    tc_binders  = tyConBinders tc
+    tc_res_kind = tyConResKind tc
+
+    -- Returns the variables that would be fixed by knowing a TyConBinder. See
+    -- Note [When does a tycon application need an explicit kind signature?]
+    -- for a more detailed explanation of what this function does.
+    injective_vars_of_binder
+      :: Bool -- Should specified binders count towards injective positions?
+              -- (If you're using visible kind applications, then you want True
+              -- here.)
+      -> TyConBinder -> FV
+    injective_vars_of_binder spec_inj_pos (Bndr tv vis) =
+      case vis of
+        AnonTCB -> injectiveVarsOfType (varType tv)
+        NamedTCB argf
+          |     (argf == Required)
+             || (spec_inj_pos && (argf == Specified))
+          -> unitFV tv `unionFV` injectiveVarsOfType (varType tv)
+          |  otherwise
+          -> emptyFV
+
+{-
+Note [When does a tycon application need an explicit kind signature?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are a couple of places in GHC where we convert Core Types into forms that
+more closely resemble user-written syntax. These include:
+
+1. Template Haskell Type reification (see, for instance, TcSplice.reify_tc_app)
+2. Converting Types to LHsTypes (in HsUtils.typeToLHsType, or in Haddock)
+
+This conversion presents a challenge: how do we ensure that the resulting type
+has enough kind information so as not to be ambiguous? To better motivate this
+question, consider the following Core type:
+
+  -- Foo :: Type -> Type
+  type Foo = Proxy Type
+
+There is nothing ambiguous about the RHS of Foo in Core. But if we were to,
+say, reify it into a TH Type, then it's tempting to just drop the invisible
+Type argument and simply return `Proxy`. But now we've lost crucial kind
+information: we don't know if we're dealing with `Proxy Type` or `Proxy Bool`
+or `Proxy Int` or something else! We've inadvertently introduced ambiguity.
+
+Unlike in other situations in GHC, we can't just turn on
+-fprint-explicit-kinds, as we need to produce something which has the same
+structure as a source-syntax type. Moreover, we can't rely on visible kind
+application, since the first kind argument to Proxy is inferred, not specified.
+Our solution is to annotate certain tycons with their kinds whenever they
+appear in applied form in order to resolve the ambiguity. For instance, we
+would reify the RHS of Foo like so:
+
+  type Foo = (Proxy :: Type -> Type)
+
+We need to devise an algorithm that determines precisely which tycons need
+these explicit kind signatures. We certainly don't want to annotate _every_
+tycon with a kind signature, or else we might end up with horribly bloated
+types like the following:
+
+  (Either :: Type -> Type -> Type) (Int :: Type) (Char :: Type)
+
+We only want to annotate tycons that absolutely require kind signatures in
+order to resolve some sort of ambiguity, and nothing more.
+
+Suppose we have a tycon application (T ty_1 ... ty_n). Why might this type
+require a kind signature? It might require it when we need to fill in any of
+T's omitted arguments. By "omitted argument", we mean one that is dropped when
+reifying ty_1 ... ty_n. Sometimes, the omitted arguments are inferred and
+specified arguments (e.g., TH reification in TcSplice), and sometimes the
+omitted arguments are only the inferred ones (e.g., in HsUtils.typeToLHsType,
+which reifies specified arguments through visible kind application).
+Regardless, the key idea is that _some_ arguments are going to be omitted after
+reification, and the only mechanism we have at our disposal for filling them in
+is through explicit kind signatures.
+
+What do we mean by "fill in"? Let's consider this small example:
+
+  T :: forall {k}. Type -> (k -> Type) -> k
+
+Moreover, we have this application of T:
+
+  T @{j} Int aty
+
+When we reify this type, we omit the inferred argument @{j}. Is it fixed by the
+other (non-inferred) arguments? Yes! If we know the kind of (aty :: blah), then
+we'll generate an equality constraint (kappa -> Type) and, assuming we can
+solve it, that will fix `kappa`. (Here, `kappa` is the unification variable
+that we instantiate `k` with.)
+
+Therefore, for any application of a tycon T to some arguments, the Question We
+Must Answer is:
+
+* Given the first n arguments of T, do the kinds of the non-omitted arguments
+  fill in the omitted arguments?
+
+(This is still a bit hand-wavey, but we'll refine this question incrementally
+as we explain more of the machinery underlying this process.)
+
+Answering this question is precisely the role that the `injectiveVarsOfType`
+and `injective_vars_of_binder` functions exist to serve. If an omitted argument
+`a` appears in the set returned by `injectiveVarsOfType ty`, then knowing
+`ty` determines (i.e., fills in) `a`. (More on `injective_vars_of_binder` in a
+bit.)
+
+More formally, if
+`a` is in `injectiveVarsOfType ty`
+and  S1(ty) ~ S2(ty),
+then S1(a)  ~ S2(a),
+where S1 and S2 are arbitrary substitutions.
+
+For example, is `F` is a non-injective type family, then
+
+  injectiveVarsOfType(Either c (Maybe (a, F b c))) = {a, c}
+
+Now that we know what this function does, here is a second attempt at the
+Question We Must Answer:
+
+* Given the first n arguments of T (ty_1 ... ty_n), consider the binders
+  of T that are instantiated by non-omitted arguments. Do the injective
+  variables of these binders fill in the remainder of T's kind?
+
+Alright, we're getting closer. Next, we need to clarify what the injective
+variables of a tycon binder are. This the role that the
+`injective_vars_of_binder` function serves. Here is what this function does for
+each form of tycon binder:
+
+* Anonymous binders are injective positions. For example, in the promoted data
+  constructor '(:):
+
+    '(:) :: forall a. a -> [a] -> [a]
+
+  The second and third tyvar binders (of kinds `a` and `[a]`) are both
+  anonymous, so if we had '(:) 'True '[], then the kinds of 'True and
+  '[] would contribute to the kind of '(:) 'True '[]. Therefore,
+  injective_vars_of_binder(_ :: a) = injectiveVarsOfType(a) = {a}.
+  (Similarly, injective_vars_of_binder(_ :: [a]) = {a}.)
+* Named binders:
+  - Inferred binders are never injective positions. For example, in this data
+    type:
+
+      data Proxy a
+      Proxy :: forall {k}. k -> Type
+
+    If we had Proxy 'True, then the kind of 'True would not contribute to the
+    kind of Proxy 'True. Therefore,
+    injective_vars_of_binder(forall {k}. ...) = {}.
+  - Required binders are injective positions. For example, in this data type:
+
+      data Wurble k (a :: k) :: k
+      Wurble :: forall k -> k -> k
+
+  The first tyvar binder (of kind `forall k`) has required visibility, so if
+  we had Wurble (Maybe a) Nothing, then the kind of Maybe a would
+  contribute to the kind of Wurble (Maybe a) Nothing. Hence,
+  injective_vars_of_binder(forall a -> ...) = {a}.
+  - Specified binders /might/ be injective positions, depending on how you
+    approach things. Continuing the '(:) example:
+
+      '(:) :: forall a. a -> [a] -> [a]
+
+    Normally, the (forall a. ...) tyvar binder wouldn't contribute to the kind
+    of '(:) 'True '[], since it's not explicitly instantiated by the user. But
+    if visible kind application is enabled, then this is possible, since the
+    user can write '(:) @Bool 'True '[]. (In that case,
+    injective_vars_of_binder(forall a. ...) = {a}.)
+
+    There are some situations where using visible kind application is appropriate
+    (e.g., HsUtils.typeToLHsType) and others where it is not (e.g., TH
+    reification), so the `injective_vars_of_binder` function is parametrized by
+    a Bool which decides if specified binders should be counted towards
+    injective positions or not.
+
+Now that we've defined injective_vars_of_binder, we can refine the Question We
+Must Answer once more:
+
+* Given the first n arguments of T (ty_1 ... ty_n), consider the binders
+  of T that are instantiated by non-omitted arguments. For each such binder
+  b_i, take the union of all injective_vars_of_binder(b_i). Is this set a
+  superset of the free variables of the remainder of T's kind?
+
+If the answer to this question is "no", then (T ty_1 ... ty_n) needs an
+explicit kind signature, since T's kind has kind variables leftover that
+aren't fixed by the non-omitted arguments.
+
+One last sticking point: what does "the remainder of T's kind" mean? You might
+be tempted to think that it corresponds to all of the arguments in the kind of
+T that would normally be instantiated by omitted arguments. But this isn't
+quite right, strictly speaking. Consider the following (silly) example:
+
+  S :: forall {k}. Type -> Type
+
+And suppose we have this application of S:
+
+  S Int Bool
+
+The Int argument would be omitted, and
+injective_vars_of_binder(_ :: Type) = {}. This is not a superset of {k}, which
+might suggest that (S Bool) needs an explicit kind signature. But
+(S Bool :: Type) doesn't actually fix `k`! This is because the kind signature
+only affects the /result/ of the application, not all of the individual
+arguments. So adding a kind signature here won't make a difference. Therefore,
+the fourth (and final) iteration of the Question We Must Answer is:
+
+* Given the first n arguments of T (ty_1 ... ty_n), consider the binders
+  of T that are instantiated by non-omitted arguments. For each such binder
+  b_i, take the union of all injective_vars_of_binder(b_i). Is this set a
+  superset of the free variables of the kind of (T ty_1 ... ty_n)?
+
+Phew, that was a lot of work!
+
+How can be sure that this is correct? That is, how can we be sure that in the
+event that we leave off a kind annotation, that one could infer the kind of the
+tycon application from its arguments? It's essentially a proof by induction: if
+we can infer the kinds of every subtree of a type, then the whole tycon
+application will have an inferrable kind--unless, of course, the remainder of
+the tycon application's kind has uninstantiated kind variables.
+
+What happens if T is oversaturated? That is, if T's kind has fewer than n
+arguments, in the case that the concrete application instantiates a result
+kind variable with an arrow kind? If we run out of arguments, we do not attach
+a kind annotation. This should be a rare case, indeed. Here is an example:
+
+   data T1 :: k1 -> k2 -> *
+   data T2 :: k1 -> k2 -> *
+
+   type family G (a :: k) :: k
+   type instance G T1 = T2
+
+   type instance F Char = (G T1 Bool :: (* -> *) -> *)   -- F from above
+
+Here G's kind is (forall k. k -> k), and the desugared RHS of that last
+instance of F is (G (* -> (* -> *) -> *) (T1 * (* -> *)) Bool). According to
+the algorithm above, there are 3 arguments to G so we should peel off 3
+arguments in G's kind. But G's kind has only two arguments. This is the
+rare special case, and we choose not to annotate the application of G with
+a kind signature. After all, we needn't do this, since that instance would
+be reified as:
+
+   type instance F Char = G (T1 :: * -> (* -> *) -> *) Bool
+
+So the kind of G isn't ambiguous anymore due to the explicit kind annotation
+on its argument. See #8953 and test th/T8953.
+-}
 
 ------------- No free vars -----------------
 
