@@ -94,7 +94,7 @@ cprAnal' _ _ (Lit lit)     = (topCprType, Lit lit)
 cprAnal' _ _ (Type ty)     = (topCprType, Type ty)      -- Doesn't happen, in fact
 cprAnal' _ _ (Coercion co) = (topCprType, Coercion co)
 
-cprAnal' env n (Var var)   = (cprTransform env var n, Var var)
+cprAnal' env _ (Var var)   = (cprTransform env var, Var var)
 
 cprAnal' env n (Cast e co)
   = (cpr_ty, Cast e' co)
@@ -180,45 +180,31 @@ cprAnalAlt env _ _ n (con,bndrs,rhs)
 {-
 ************************************************************************
 *                                                                      *
-                    Demand transformer
+                    CPR transformer
 *                                                                      *
 ************************************************************************
 -}
 
-cprTransformSig :: CprType -> Arity -> CprType
-cprTransformSig ty arty
-  -- We are only interested in CPR here, so this is OK. TODO: Clean up
-  | arty >= ct_arty ty = ty
-  | otherwise          = topCprType
-
-arityToCallDemand :: Arity -> CleanDemand
-arityToCallDemand n = iterate mkCallDmd (strictenDmd topDmd) !! n
-
-cprTransform :: AnalEnv         -- The strictness environment
-             -> Id              -- The function
-             -> Arity           -- The demand on the function
-             -> CprType         -- The demand type of the function in this context
-        -- Returned DmdEnv includes the demand on
-        -- this function plus demand on its free variables
-
-cprTransform env var arty
+cprTransform :: AnalEnv         -- ^ The analysis environment
+             -> Id              -- ^ The function
+             -> CprType         -- ^ The demand type of the function
+cprTransform env var
   | isDataConWorkId var                          -- Data constructor
-  -- TODO
-  = dmdTypeToCprType (dmdTransformDataConSig (idArity var) (idStrictness var) (arityToCallDemand arty))
-  | gopt Opt_DmdTxDictSel (ae_dflags env),
-    Just _ <- isClassOpId_maybe var -- Dictionary component selector
-  = -- dmdTransformDictSelSig (idStrictness var) dmd
-    topCprType -- dmdTransformDictSelSig always returns a topRes
+  , let cpr    = dmdResToCpr (snd (splitStrictSig (idStrictness var)))
+  , let cpr_ty = CprType (idArity var) cpr
+  = cpr_ty
+
+  -- No handling of Opt_DmdTxDictSel: dmdTransformDictSelSig always returns a
+  -- topRes, so it can't get any worse than that.
 
   | isGlobalId var                               -- Imported function
-  , let res = cprTransformSig (get_idCprInfo var) arty
-  = -- pprTrace "cprTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
-    res
+  , let sig = get_idCprInfo var
+  = -- pprTrace "cprTransform" (vcat [ppr var, ppr arty, ppr sig])
+    sig
 
   | Just sig <- lookupSigEnv env var  -- Local letrec bound thing
-  , let fn_ty = cprTransformSig sig arty
   = -- pprTrace "cprTransform" (vcat [ppr var, ppr sig, ppr arty, ppr fn_ty]) $
-    fn_ty
+    sig
 
   | otherwise                                    -- Local non-letrec-bound thing
   = topCprType
@@ -526,7 +512,7 @@ NB: strictly_demanded is never true of a top-level Id, or of a recursive Id.
 -- | The abstract domain $A_t$ from the original 'CPR for Haskell' paper.
 data CprType
   = CprType
-  { ct_arty :: !Arity     -- ^ Number of arguments the denoted expression eats
+  { _ct_arty :: !Arity    -- ^ Number of arguments the denoted expression eats
                           --   before returning the 'ct_cpr'
   , ct_cpr  :: !CPRResult -- ^ 'CPRResult' eventually unleashed when applied to
                           --   'ct_arty' arguments
@@ -571,9 +557,6 @@ removeCprTyArgs _                = topCprType
 
 trimCprTy :: Bool -> Bool -> CprType -> CprType
 trimCprTy trim_all trim_sums (CprType arty res) = CprType arty (trimCpr trim_all trim_sums res)
-
-dmdTypeToCprType :: DmdType -> CprType
-dmdTypeToCprType (DmdType _ args dr) = CprType (length args) (dmdResToCpr dr)
 
 instance Outputable CprType where
   ppr (CprType arty res) = ppr arty <> ppr res
@@ -697,7 +680,8 @@ set_idCprInfo id ty = setIdCprInfo id (ct_cpr ty)
 -- TODO: Check that `ct_arty res == dmdTypeDepth == idArity`
 
 get_idCprInfo :: Id -> CprType
-get_idCprInfo id = CprType (idArity id) (idCprInfo id)
+-- TODO: Encode arity in CprInfo
+get_idCprInfo id = CprType (length (fst (splitStrictSig (idStrictness id)))) (idCprInfo id)
 
 dumpStrSig :: CoreProgram -> SDoc
 dumpStrSig binds = vcat (map printId ids)
