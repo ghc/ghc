@@ -1,7 +1,7 @@
 name:                 haddock-test
 version:              0.0.1
 synopsis:             Test utilities for Haddock
-license:              BSD3
+license:              BSD2
 author:               Simon Marlow, David Waern
 maintainer:           Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
 homepage:             http://www.haskell.org/haddock/
