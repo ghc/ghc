@@ -962,7 +962,12 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
                                 (StgClosure **) &(obj)->field)
 
     if (!HEAP_ALLOCED_GC(p)) {
+        if (p->header.info == &stg_GCD_CAF_info) {
+            barf("Trying to mark a GCD CAF: %p\n", (void*)p);
+        }
+
         const StgInfoTable *info = get_itbl(p);
+
         StgHalfWord type = info->type;
 
         if (type == CONSTR_0_1 || type == CONSTR_0_2 || type == CONSTR_NOCAF) {

@@ -550,6 +550,10 @@ loop:
   if (!HEAP_ALLOCED_GC(q)) {
       if (!major_gc) return;
 
+      if (q->header.info == &stg_GCD_CAF_info) {
+          barf("Trying to evacuate a GCD CAF: %p\n", (void*)p);
+      }
+
       info = get_itbl(q);
       switch (info->type) {
 
