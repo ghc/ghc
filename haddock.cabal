@@ -89,6 +89,7 @@ executable haddock
     other-modules:
       Documentation.Haddock.Parser
       Documentation.Haddock.Parser.Monad
+      Documentation.Haddock.Parser.Identifier
       Documentation.Haddock.Types
       Documentation.Haddock.Doc
       Documentation.Haddock.Parser.Util

@@ -13,7 +13,8 @@
 module Haddock.Backends.Xhtml.Names (
   ppName, ppDocName, ppLDocName, ppRdrName, ppUncheckedLink,
   ppBinder, ppBinderInfix, ppBinder',
-  ppModule, ppModuleRef, ppIPName, linkId, Notation(..)
+  ppModule, ppModuleRef, ppIPName, linkId, Notation(..),
+  ppWrappedDocName, ppWrappedName,
 ) where
 
 
@@ -24,7 +25,7 @@ import Haddock.Utils
 
 import Text.XHtml hiding ( name, p, quote )
 import qualified Data.Map as M
-import qualified Data.List as List
+import Data.List ( stripPrefix )
 
 import GHC hiding (LexicalFixity(..))
 import Name
@@ -49,9 +50,11 @@ ppIPName :: HsIPName -> Html
 ppIPName = toHtml . ('?':) . unpackFS . hsIPNameFS
 
 
-ppUncheckedLink :: Qualification -> (ModuleName, OccName) -> Html
-ppUncheckedLink _ (mdl, occ) = linkIdOcc' mdl (Just occ) << ppOccName occ -- TODO: apply ppQualifyName
-
+ppUncheckedLink :: Qualification -> Wrap (ModuleName, OccName) -> Html
+ppUncheckedLink _ x = linkIdOcc' mdl (Just occ) << occHtml
+  where
+    (mdl, occ) = unwrap x
+    occHtml = toHtml (showWrapped (occNameString . snd) x) -- TODO: apply ppQualifyName
 
 -- The Bool indicates if it is to be rendered in infix notation
 ppLDocName :: Qualification -> Notation -> Located DocName -> Html
@@ -68,6 +71,19 @@ ppDocName qual notation insertAnchors docName =
           ppQualifyName qual notation name (nameModule name)
       | otherwise -> ppName notation name
 
+
+ppWrappedDocName :: Qualification -> Notation -> Bool -> Wrap DocName -> Html
+ppWrappedDocName qual notation insertAnchors docName = case docName of
+  Unadorned n -> ppDocName qual notation insertAnchors n
+  Parenthesized n -> ppDocName qual Prefix insertAnchors n
+  Backticked n -> ppDocName qual Infix insertAnchors n
+
+ppWrappedName :: Notation -> Wrap Name -> Html
+ppWrappedName notation docName = case docName of
+  Unadorned n -> ppName notation n
+  Parenthesized n -> ppName Prefix n
+  Backticked n -> ppName Infix n
+
 -- | Render a name depending on the selected qualification mode
 ppQualifyName :: Qualification -> Notation -> Name -> Module -> Html
 ppQualifyName qual notation name mdl =
@@ -79,7 +95,7 @@ ppQualifyName qual notation name mdl =
         then ppName notation name
         else ppFullQualName notation mdl name
     RelativeQual localmdl ->
-      case List.stripPrefix (moduleString localmdl) (moduleString mdl) of
+      case stripPrefix (moduleString localmdl) (moduleString mdl) of
         -- local, A.x -> x
         Just []      -> ppName notation name
         -- sub-module, A.B.x -> B.x

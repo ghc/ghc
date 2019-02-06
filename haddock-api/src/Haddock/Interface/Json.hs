@@ -62,7 +62,10 @@ jsonMDoc MetaDoc{..} =
              ]
 
 jsonDoc :: Doc Name -> JsonDoc
-jsonDoc doc = jsonString (show (bimap (moduleNameString . fst) nameStableString doc))
+jsonDoc doc = jsonString (show (bimap showModName showName doc))
+  where
+    showModName = showWrapped (moduleNameString . fst)
+    showName = showWrapped nameStableString
 
 jsonModule :: Module -> JsonDoc
 jsonModule = JSString . moduleStableString

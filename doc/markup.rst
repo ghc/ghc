@@ -932,14 +932,9 @@ necessary to escape the single quote when used as an apostrophe: ::
 
 Nothing special is needed to hyperlink identifiers which contain
 apostrophes themselves: to hyperlink ``foo'`` one would simply type
-``'foo''``. Hyperlinking operators works in exactly the same way.
+``'foo''``. Hyperlinking operators works in exactly the same way. ::
 
-Note that it is not possible to directly hyperlink an identifier in infix
-form or an operator in prefix form. The next best thing to do is to wrap
-the whole identifier in monospaced text and put the parentheses/backticks
-outside of the identifier, but inside the link: ::
-
-    -- | A prefix operator @('++')@ and an infix identifier @\``elem`\`@.
+    -- | A prefix operator @'(++)'@ and an infix identifier @'`elem`'@.
 
 Emphasis, Bold and Monospaced Text
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

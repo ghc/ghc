@@ -112,7 +112,7 @@ spec = do
         "``" `shouldParseTo` "``"
 
       it "can parse an identifier in infix notation enclosed within backticks" $ do
-        "``infix``" `shouldParseTo` "`" <> DocIdentifier "infix" <> "`"
+        "``infix``" `shouldParseTo` DocIdentifier "`infix`"
 
       it "can parse identifiers containing a single quote" $ do
         "'don't'" `shouldParseTo` DocIdentifier "don't"
@@ -137,6 +137,13 @@ spec = do
 
       it "can parse type-namespaced identifiers" $ do
         "t'foo'" `shouldParseTo` DocIdentifier "foo"
+
+      it "can parse parenthesized operators and backticked identifiers" $ do
+        "'(<|>)'" `shouldParseTo` DocIdentifier "(<|>)"
+        "'`elem`'" `shouldParseTo` DocIdentifier "`elem`"
+
+      it "can properly figure out the end of identifiers" $ do
+        "'DbModule'/'DbUnitId'" `shouldParseTo` DocIdentifier "DbModule" <> "/" <> DocIdentifier "DbUnitId"
 
     context "when parsing operators" $ do
       it "can parse an operator enclosed within single quotes" $ do

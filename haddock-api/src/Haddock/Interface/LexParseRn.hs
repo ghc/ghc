@@ -22,6 +22,7 @@ module Haddock.Interface.LexParseRn
 import Avail
 import Control.Arrow
 import Control.Monad
+import Data.Functor (($>))
 import Data.List
 import Data.Ord
 import Documentation.Haddock.Doc (metaDocConcat)
@@ -95,8 +96,9 @@ rename dflags gre = rn
     rn d = case d of
       DocAppend a b -> DocAppend <$> rn a <*> rn b
       DocParagraph doc -> DocParagraph <$> rn doc
-      DocIdentifier (NsRdrName ns x) -> do
-        let occ = rdrNameOcc x
+      DocIdentifier i -> do
+        let NsRdrName ns x = unwrap i
+            occ = rdrNameOcc x
             isValueName = isDataOcc occ || isVarOcc occ
 
         let valueNsChoices | isValueName = [x]
@@ -119,7 +121,7 @@ rename dflags gre = rn
             case choices of
               -- The only way this can happen is if a value namespace was
               -- specified on something that cannot be a value.
-              [] -> invalidValue dflags x
+              [] -> invalidValue dflags i
 
               -- There was nothing in the environment so we need to
               -- pick some default from what's available to us. We
@@ -129,14 +131,14 @@ rename dflags gre = rn
               -- type constructor names (such as in #253). So now we
               -- only get type constructor links if they are actually
               -- in scope.
-              a:_ -> outOfScope dflags ns a
+              a:_ -> outOfScope dflags ns (i $> a)
 
           -- There is only one name in the environment that matches so
           -- use it.
-          [a] -> pure (DocIdentifier (gre_name a))
+          [a] -> pure (DocIdentifier (i $> gre_name a))
 
           -- There are multiple names available.
-          gres -> ambiguous dflags x gres
+          gres -> ambiguous dflags i gres
 
       DocWarning doc -> DocWarning <$> rn doc
       DocEmphasis doc -> DocEmphasis <$> rn doc
@@ -168,13 +170,13 @@ rename dflags gre = rn
 -- users shouldn't rely on this doing the right thing. See tickets
 -- #253 and #375 on the confusion this causes depending on which
 -- default we pick in 'rename'.
-outOfScope :: DynFlags -> Namespace -> RdrName -> ErrMsgM (Doc a)
+outOfScope :: DynFlags -> Namespace -> Wrap RdrName -> ErrMsgM (Doc a)
 outOfScope dflags ns x =
-  case x of
-    Unqual occ -> warnAndMonospace occ
-    Qual mdl occ -> pure (DocIdentifierUnchecked (mdl, occ))
-    Orig _ occ -> warnAndMonospace occ
-    Exact name -> warnAndMonospace name  -- Shouldn't happen since x is out of scope
+  case unwrap x of
+    Unqual occ -> warnAndMonospace (x $> occ)
+    Qual mdl occ -> pure (DocIdentifierUnchecked (x $> (mdl, occ)))
+    Orig _ occ -> warnAndMonospace (x $> occ)
+    Exact name -> warnAndMonospace (x $> name)  -- Shouldn't happen since x is out of scope
   where
     prefix = case ns of
                Value -> "the value "
@@ -182,11 +184,11 @@ outOfScope dflags ns x =
                None -> ""
 
     warnAndMonospace a = do
-      tell ["Warning: " ++ prefix ++ "'" ++ showPpr dflags a ++ "' is out of scope.\n" ++
-            "    If you qualify the identifier, haddock can try to link it\n" ++
-            "    it anyway."]
-      pure (monospaced a)
-    monospaced a = DocMonospaced (DocString (showPpr dflags a))
+      let a' = showWrapped (showPpr dflags) a
+      tell ["Warning: " ++ prefix ++ "'" ++ a' ++ "' is out of scope.\n" ++
+            "    If you qualify the identifier, haddock can try to link it anyway."]
+      pure (monospaced a')
+    monospaced = DocMonospaced . DocString
 
 -- | Handle ambiguous identifiers.
 --
@@ -194,36 +196,42 @@ outOfScope dflags ns x =
 --
 -- Emits a warning if the 'GlobalRdrElts's don't belong to the same type or class.
 ambiguous :: DynFlags
-          -> RdrName
+          -> Wrap NsRdrName
           -> [GlobalRdrElt] -- ^ More than one @gre@s sharing the same `RdrName` above.
           -> ErrMsgM (Doc Name)
 ambiguous dflags x gres = do
   let noChildren = map availName (gresToAvailInfo gres)
       dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
-      msg = "Warning: " ++ x_str ++ " is ambiguous. It is defined\n" ++
+      msg = "Warning: " ++ showNsRdrName dflags x ++ " is ambiguous. It is defined\n" ++
             concatMap (\n -> "    * " ++ defnLoc n ++ "\n") (map gre_name gres) ++
             "    You may be able to disambiguate the identifier by qualifying it or\n" ++
             "    by specifying the type/value namespace explicitly.\n" ++
-            "    Defaulting to " ++ x_str ++ " defined " ++ defnLoc dflt
+            "    Defaulting to the one defined " ++ defnLoc dflt
   -- TODO: Once we have a syntax for namespace qualification (#667) we may also
   -- want to emit a warning when an identifier is a data constructor for a type
   -- of the same name, but not the only constructor.
   -- For example, for @data D = C | D@, someone may want to reference the @D@
   -- constructor.
   when (length noChildren > 1) $ tell [msg]
-  pure (DocIdentifier dflt)
+  pure (DocIdentifier (x $> dflt))
   where
     isLocalName (nameSrcLoc -> RealSrcLoc {}) = True
     isLocalName _ = False
-    x_str = '\'' : showPpr dflags x ++ "'"
     defnLoc = showSDoc dflags . pprNameDefnLoc
 
 -- | Handle value-namespaced names that cannot be for values.
 --
 -- Emits a warning that the value-namespace is invalid on a non-value identifier.
-invalidValue :: DynFlags -> RdrName -> ErrMsgM (Doc a)
+invalidValue :: DynFlags -> Wrap NsRdrName -> ErrMsgM (Doc a)
 invalidValue dflags x = do
-  tell ["Warning: '" ++ showPpr dflags x ++ "' cannot be value, yet it is\n" ++
+  tell ["Warning: " ++ showNsRdrName dflags x ++ " cannot be value, yet it is\n" ++
             "    namespaced as such. Did you mean to specify a type namespace\n" ++
             "    instead?"]
-  pure (DocMonospaced (DocString (showPpr dflags x)))
+  pure (DocMonospaced (DocString (showNsRdrName dflags x)))
+
+-- | Printable representation of a wrapped and namespaced name
+showNsRdrName :: DynFlags -> Wrap NsRdrName -> String
+showNsRdrName dflags = (\p i -> p ++ "'" ++ i ++ "'") <$> prefix <*> ident
+  where
+    ident = showWrapped (showPpr dflags . rdrName)
+    prefix = renderNs . namespace . unwrap

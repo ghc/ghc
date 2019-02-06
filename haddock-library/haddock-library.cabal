@@ -49,6 +49,7 @@ library
   other-modules:
     Documentation.Haddock.Parser.Util
     Documentation.Haddock.Parser.Monad
+    Documentation.Haddock.Parser.Identifier
 
 test-suite spec
   import: lib-defaults
@@ -70,6 +71,7 @@ test-suite spec
       Documentation.Haddock.Parser.UtilSpec
       Documentation.Haddock.ParserSpec
       Documentation.Haddock.Types
+      Documentation.Haddock.Parser.Identifier
 
   build-depends:
     , base-compat  ^>= 0.9.3 || ^>= 0.10.0

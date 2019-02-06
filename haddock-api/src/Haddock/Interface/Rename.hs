@@ -173,8 +173,8 @@ renameLDocHsSyn :: LHsDocString -> RnM LHsDocString
 renameLDocHsSyn = return
 
 
-renameDoc :: Traversable t => t Name -> RnM (t DocName)
-renameDoc = traverse rename
+renameDoc :: Traversable t => t (Wrap Name) -> RnM (t (Wrap DocName))
+renameDoc = traverse (traverse rename)
 
 renameFnArgsDoc :: FnArgsDoc Name -> RnM (FnArgsDoc DocName)
 renameFnArgsDoc = mapM renameDoc

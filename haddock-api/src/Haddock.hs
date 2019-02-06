@@ -663,7 +663,7 @@ getPrologue dflags flags =
       h <- openFile filename ReadMode
       hSetEncoding h utf8
       str <- hGetContents h -- semi-closes the handle
-      return . Just $! second rdrName $ parseParas dflags Nothing str
+      return . Just $! second (fmap rdrName) $ parseParas dflags Nothing str
     _ -> throwE "multiple -p/--prologue options"
 
 

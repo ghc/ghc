@@ -1106,8 +1106,8 @@ ppSymName name
   | otherwise = ppName name
 
 
-ppVerbOccName :: OccName -> LaTeX
-ppVerbOccName = text . latexFilter . occNameString
+ppVerbOccName :: Wrap OccName -> LaTeX
+ppVerbOccName = text . latexFilter . showWrapped occNameString
 
 ppIPName :: HsIPName -> LaTeX
 ppIPName = text . ('?':) . unpackFS . hsIPNameFS
@@ -1115,13 +1115,12 @@ ppIPName = text . ('?':) . unpackFS . hsIPNameFS
 ppOccName :: OccName -> LaTeX
 ppOccName = text . occNameString
 
+ppVerbDocName :: Wrap DocName -> LaTeX
+ppVerbDocName = text . latexFilter . showWrapped (occNameString . nameOccName . getName)
 
-ppVerbDocName :: DocName -> LaTeX
-ppVerbDocName = ppVerbOccName . nameOccName . getName
 
-
-ppVerbRdrName :: RdrName -> LaTeX
-ppVerbRdrName = ppVerbOccName . rdrNameOcc
+ppVerbRdrName :: Wrap RdrName -> LaTeX
+ppVerbRdrName = text . latexFilter . showWrapped (occNameString . rdrNameOcc)
 
 
 ppDocName :: DocName -> LaTeX
@@ -1182,7 +1181,7 @@ parLatexMarkup ppId = Markup {
   markupString               = \s v -> text (fixString v s),
   markupAppend               = \l r v -> l v <> r v,
   markupIdentifier           = markupId ppId,
-  markupIdentifierUnchecked  = markupId (ppVerbOccName . snd),
+  markupIdentifierUnchecked  = markupId (ppVerbOccName . fmap snd),
   markupModule               = \m _ -> let (mdl,_ref) = break (=='#') m in tt (text mdl),
   markupWarning              = \p v -> emph (p v),
   markupEmphasis             = \p v -> emph (p v),
@@ -1239,11 +1238,11 @@ parLatexMarkup ppId = Markup {
       where theid = ppId_ id
 
 
-latexMarkup :: DocMarkup DocName (StringContext -> LaTeX)
+latexMarkup :: DocMarkup (Wrap DocName) (StringContext -> LaTeX)
 latexMarkup = parLatexMarkup ppVerbDocName
 
 
-rdrLatexMarkup :: DocMarkup RdrName (StringContext -> LaTeX)
+rdrLatexMarkup :: DocMarkup (Wrap RdrName) (StringContext -> LaTeX)
 rdrLatexMarkup = parLatexMarkup ppVerbRdrName
 
 

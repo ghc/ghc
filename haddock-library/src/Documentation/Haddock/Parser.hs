@@ -27,8 +27,7 @@ module Documentation.Haddock.Parser (
 import           Control.Applicative
 import           Control.Arrow (first)
 import           Control.Monad
-import           Data.Char (chr, isUpper, isAlpha, isAlphaNum, isSpace)
-import           Data.Foldable (asum)
+import           Data.Char (chr, isUpper, isAlpha, isSpace)
 import           Data.List (intercalate, unfoldr, elemIndex)
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid
@@ -37,6 +36,7 @@ import           Documentation.Haddock.Doc
 import           Documentation.Haddock.Markup ( markup, plainMarkup )
 import           Documentation.Haddock.Parser.Monad
 import           Documentation.Haddock.Parser.Util
+import           Documentation.Haddock.Parser.Identifier
 import           Documentation.Haddock.Types
 import           Prelude hiding (takeWhile)
 import qualified Prelude as P
@@ -47,36 +47,9 @@ import           Text.Parsec (try)
 import qualified Data.Text as T
 import           Data.Text (Text)
 
-#if MIN_VERSION_base(4,9,0)
-import           Text.Read.Lex                      (isSymbolChar)
-#else
-import           Data.Char                          (GeneralCategory (..),
-                                                     generalCategory)
-#endif
 
 -- $setup
 -- >>> :set -XOverloadedStrings
-
-#if !MIN_VERSION_base(4,9,0)
--- inlined from base-4.10.0.0
-isSymbolChar :: Char -> Bool
-isSymbolChar c = not (isPuncChar c) && case generalCategory c of
-    MathSymbol           -> True
-    CurrencySymbol       -> True
-    ModifierSymbol       -> True
-    OtherSymbol          -> True
-    DashPunctuation      -> True
-    OtherPunctuation     -> c `notElem` ("'\"" :: String)
-    ConnectorPunctuation -> c /= '_'
-    _                    -> False
-  where
-    -- | The @special@ character class as defined in the Haskell Report.
-    isPuncChar :: Char -> Bool
-    isPuncChar = (`elem` (",;()[]{}`" :: String))
-#endif
-
--- | Identifier string surrounded with opening and closing quotes/backticks.
-data Identifier = Identifier !Namespace !Char String !Char
 
 -- | Drops the quotes/backticks around all identifiers, as if they
 -- were valid but still 'String's.
@@ -838,34 +811,6 @@ autoUrl = mkLink <$> url
     mkHyperlink lnk = Hyperlink (T.unpack lnk) Nothing
 
 
-
--- | Parses strings between identifier delimiters. Consumes all input that it
--- deems to be valid in an identifier. Note that it simply blindly consumes
--- characters and does no actual validation itself.
-parseValid :: Parser String
-parseValid = p some
-  where
-    idChar = Parsec.satisfy (\c -> isAlphaNum c || isSymbolChar c || c == '_')
-
-    p p' = do
-      vs <- p' idChar
-      c <- peekChar'
-      case c of
-        '`' -> return vs
-        '\'' -> choice' [ (\x -> vs ++ "'" ++ x) <$> ("'" *> p many), return vs ]
-        _ -> fail "outofvalid"
-
--- | Parses identifiers with help of 'parseValid'. Asks GHC for
--- 'String' from the string it deems valid.
+-- | Parses identifiers with help of 'parseValid'.
 identifier :: Parser (DocH mod Identifier)
-identifier = do
-  ns <- asum [ Value <$ Parsec.char 'v'
-             , Type <$ Parsec.char 't'
-             , pure None
-             ]
-  o <- idDelim
-  vid <- parseValid
-  e <- idDelim
-  return $ DocIdentifier (Identifier ns o vid e)
-  where
-    idDelim = Parsec.oneOf "'`"
+identifier = DocIdentifier <$> parseValid
