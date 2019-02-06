@@ -45,7 +45,7 @@ import GHC.Read
 import Text.ParserCombinators.ReadPrec
 import Text.Read.Lex
 
-import GHC.TypeLits (Nat, KnownNat, natVal)
+import GHC.TypeNats (Nat, KnownNat, natVal)
 
 default () -- avoid any defaulting shenanigans
 
