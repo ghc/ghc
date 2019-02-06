@@ -57,7 +57,7 @@ module HsUtils(
   -- Types
   mkHsAppTy, mkHsAppKindTy, userHsTyVarBndrs, userHsLTyVarBndrs,
   mkLHsSigType, mkLHsSigWcType, mkClassOpSigs, mkHsSigEnv,
-  nlHsAppTy, nlHsTyVar, nlHsFunTy, nlHsParTy, nlHsTyConApp,
+  nlHsAppTy, nlHsAppKindTy, nlHsTyVar, nlHsFunTy, nlHsParTy, nlHsTyConApp,
 
   -- Stmts
   mkTransformStmt, mkTransformByStmt, mkBodyStmt, mkBindStmt, mkTcBindStmt,
@@ -105,14 +105,14 @@ import TcEvidence
 import RdrName
 import Var
 import TyCoRep
-import Type   ( filterOutInvisibleTypes )
+import Type   ( tyConArgFlags )
 import TysWiredIn ( unitTy )
 import TcType
 import DataCon
 import ConLike
 import Id
 import Name
-import NameSet
+import NameSet hiding ( unitFV )
 import NameEnv
 import BasicTypes
 import SrcLoc
@@ -121,7 +121,6 @@ import Util
 import Bag
 import Outputable
 import Constants
-import TyCon
 
 import Data.Either
 import Data.Function
@@ -501,6 +500,10 @@ nlHsParTy t   = noLoc (HsParTy noExt t)
 nlHsTyConApp :: IdP (GhcPass p) -> [LHsType (GhcPass p)] -> LHsType (GhcPass p)
 nlHsTyConApp tycon tys  = foldl' nlHsAppTy (nlHsTyVar tycon) tys
 
+nlHsAppKindTy ::
+  LHsType (GhcPass p) -> LHsKind (GhcPass p) -> LHsType (GhcPass p)
+nlHsAppKindTy f k = noLoc (HsAppKindTy noExt f (parenthesizeHsType appPrec k))
+
 {-
 Tuples.  All these functions are *pre-typechecker* because they lack
 types on the tuple.
@@ -660,14 +663,24 @@ typeToLHsType ty
     go (LitTy (StrTyLit s))
       = noLoc $ HsTyLit NoExt (HsStrTy NoSourceText s)
     go ty@(TyConApp tc args)
-      | any isInvisibleTyConBinder (tyConBinders tc)
+      | tyConAppNeedsKindSig True tc (length args)
         -- We must produce an explicit kind signature here to make certain
         -- programs kind-check. See Note [Kind signatures in typeToLHsType].
       = nlHsParTy $ noLoc $ HsKindSig NoExt lhs_ty (go (typeKind ty))
       | otherwise = lhs_ty
        where
-        lhs_ty = nlHsTyConApp (getRdrName tc) (map go args')
-        args'  = filterOutInvisibleTypes tc args
+        arg_flags :: [ArgFlag]
+        arg_flags = tyConArgFlags tc args
+
+        lhs_ty :: LHsType GhcPs
+        lhs_ty = foldl' (\f (arg, flag) ->
+                          let arg' = go arg in
+                          case flag of
+                            Inferred  -> f
+                            Specified -> f `nlHsAppKindTy` arg'
+                            Required  -> f `nlHsAppTy`     arg')
+                        (nlHsTyVar (getRdrName tc))
+                        (zip args arg_flags)
     go (CastTy ty _)        = go ty
     go (CoercionTy co)      = pprPanic "toLHsSigWcType" (ppr co)
 
@@ -684,48 +697,40 @@ Note [Kind signatures in typeToLHsType]
 There are types that typeToLHsType can produce which require explicit kind
 signatures in order to kind-check. Here is an example from Trac #14579:
 
-  newtype Wat (x :: Proxy (a :: Type)) = MkWat (Maybe a) deriving Eq
-  newtype Glurp a = MkGlurp (Wat ('Proxy :: Proxy a)) deriving Eq
+  -- type P :: forall {k} {t :: k}. Proxy t
+  type P = 'Proxy
+
+  -- type Wat :: forall a. Proxy a -> *
+  newtype Wat (x :: Proxy (a :: Type)) = MkWat (Maybe a)
+    deriving Eq
+
+  -- type Wat2 :: forall {a}. Proxy a -> *
+  type Wat2 = Wat
+
+  -- type Glurp :: * -> *
+  newtype Glurp a = MkGlurp (Wat2 (P :: Proxy a))
+    deriving Eq
 
 The derived Eq instance for Glurp (without any kind signatures) would be:
 
   instance Eq a => Eq (Glurp a) where
-    (==) = coerce @(Wat 'Proxy -> Wat 'Proxy -> Bool)
-                  @(Glurp a    -> Glurp a    -> Bool)
+    (==) = coerce @(Wat2 P  -> Wat2 P  -> Bool)
+                  @(Glurp a -> Glurp a -> Bool)
                   (==) :: Glurp a -> Glurp a -> Bool
 
 (Where the visible type applications use types produced by typeToLHsType.)
 
-The type 'Proxy has an underspecified kind, so we must ensure that
-typeToLHsType ascribes it with its kind: ('Proxy :: Proxy a).
+The type P (in Wat2 P) has an underspecified kind, so we must ensure that
+typeToLHsType ascribes it with its kind: Wat2 (P :: Proxy a). To accomplish
+this, whenever we see an application of a tycon to some arguments, we use
+the tyConAppNeedsKindSig function to determine if it requires an explicit kind
+signature to resolve some ambiguity. (See Note
+Note [When does a tycon application need an explicit kind signature?] for a
+more detailed explanation of how this works.)
 
-We must be careful not to produce too many kind signatures, or else
-typeToLHsType can produce noisy types like
-('Proxy :: Proxy (a :: (Type :: Type))). In pursuit of this goal, we adopt the
-following criterion for choosing when to annotate types with kinds:
-
-* If there is a tycon application with any invisible arguments, annotate
-  the tycon application with its kind.
-
-Why is this the right criterion? The problem we encountered earlier was the
-result of an invisible argument (the `a` in ('Proxy :: Proxy a)) being
-underspecified, so producing a kind signature for 'Proxy will catch this.
-If there are no invisible arguments, then there is nothing to do, so we can
-avoid polluting the result type with redundant noise.
-
-What about a more complicated tycon, such as this?
-
-  T :: forall {j} (a :: j). a -> Type
-
-Unlike in the previous 'Proxy example, annotating an application of `T` to an
-argument (e.g., annotating T ty to obtain (T ty :: Type)) will not fix
-its invisible argument `j`. But because we apply this strategy recursively,
-`j` will be fixed because the kind of `ty` will be fixed! That is to say,
-something to the effect of (T (ty :: j) :: Type) will be produced.
-
-This strategy certainly isn't foolproof, as tycons that contain type families
-in their kind might break down. But we'd likely need visible kind application
-to make those work.
+Note that we pass True to tyConAppNeedsKindSig since we are generated code with
+visible kind applications, so even specified arguments count towards injective
+positions in the kind of the tycon.
 -}
 
 {- *********************************************************************
