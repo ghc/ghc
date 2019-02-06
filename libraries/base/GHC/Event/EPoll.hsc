@@ -7,6 +7,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnliftedFFITypes #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -45,7 +46,6 @@ import Data.Word (Word32)
 import Foreign.C.Error (eNOENT, getErrno, throwErrno,
                         throwErrnoIfMinus1, throwErrnoIfMinus1_)
 import Foreign.C.Types (CInt(..))
-import Foreign.Marshal.Utils (with)
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable(..))
 import GHC.Base
@@ -55,6 +55,8 @@ import GHC.Show (Show)
 import System.Posix.Internals (c_close)
 import System.Posix.Internals (setCloseOnExec)
 import System.Posix.Types (Fd(..))
+import GHC.Primitive.PrimArray (MutablePrimArray(..))
+import GHC.Primitive.PrimArray (newPrimArray,writePrimArray)
 import GHC.Primitive.Monad (Prim(..))
 
 import qualified GHC.Event.Array     as A
@@ -78,10 +80,12 @@ delete !be = do
 -- | Change the set of events we are interested in for a given file
 -- descriptor.
 modifyFd :: BackendState -> Fd -> E.Event -> E.Event -> IO Bool
-modifyFd !ep !fd !oevt !nevt =
-  with (EPollEvent (fromEvent nevt) fd) $ \evptr -> do
-    epollControl (epollFd ep) op fd evptr
-    return True
+modifyFd !ep !fd !oevt !nevt = do
+  -- No need to pin the array since c_epoll_ctl uses unsafe FFI. 
+  evArr <- newPrimArray 1 
+  writePrimArray evArr 0 (EPollEvent (fromEvent nevt) fd)
+  epollControl (epollFd ep) op fd evArr
+  return True
   where op | oevt == mempty = controlOpAdd
            | nevt == mempty = controlOpDelete
            | otherwise      = controlOpModify
@@ -89,16 +93,20 @@ modifyFd !ep !fd !oevt !nevt =
 modifyFdOnce :: BackendState -> Fd -> E.Event -> IO Bool
 modifyFdOnce !ep !fd !evt =
   do let !ev = fromEvent evt .|. epollOneShot
-     res <- with (EPollEvent ev fd) $
-            epollControl_ (epollFd ep) controlOpModify fd
+     -- No need to pin the array since c_epoll_ctl uses unsafe FFI. 
+     evArr <- newPrimArray 1 
+     writePrimArray evArr 0 (EPollEvent ev fd)
+     res <- epollControl_ (epollFd ep) controlOpModify fd evArr
      if res == 0
        then return True
-       else do err <- getErrno
-               if err == eNOENT
-                 then with (EPollEvent ev fd) $ \evptr -> do
-                        epollControl (epollFd ep) controlOpAdd fd evptr
-                        return True
-                 else throwErrno "modifyFdOnce"
+       else do
+         err <- getErrno
+         if err == eNOENT
+           then do
+             writePrimArray evArr 0 (EPollEvent ev fd)
+             epollControl (epollFd ep) controlOpAdd fd evArr
+             return True
+           else throwErrno "modifyFdOnce"
 
 -- | Select a set of file descriptors which are ready for I/O
 -- operations and call @f@ for all ready file descriptors, passing the
@@ -220,13 +228,23 @@ epollCreate = do
   let !epollFd' = EPollFd fd
   return epollFd'
 
-epollControl :: EPollFd -> ControlOp -> Fd -> Ptr EPollEvent -> IO ()
+epollControl ::
+     EPollFd
+  -> ControlOp
+  -> Fd
+  -> MutablePrimArray RealWorld EPollEvent
+  -> IO ()
 epollControl !epfd op !fd !event =
     throwErrnoIfMinus1_ "epollControl" $ epollControl_ epfd op fd event
 
-epollControl_ :: EPollFd -> ControlOp -> Fd -> Ptr EPollEvent -> IO CInt
-epollControl_ (EPollFd epfd) (ControlOp op) (Fd fd) event =
-    c_epoll_ctl epfd op fd event
+epollControl_ ::
+     EPollFd
+  -> ControlOp
+  -> Fd
+  -> MutablePrimArray RealWorld EPollEvent
+  -> IO CInt
+epollControl_ (EPollFd epfd) (ControlOp op) (Fd fd) (MutablePrimArray eventBytes) =
+    c_epoll_ctl epfd op fd eventBytes
 
 epollWait :: EPollFd -> Ptr EPollEvent -> Int -> Int -> IO Int
 epollWait (EPollFd !epfd) !events !numEvents !timeout =
@@ -264,7 +282,10 @@ foreign import ccall unsafe "sys/epoll.h epoll_create"
     c_epoll_create :: CInt -> IO CInt
 
 foreign import ccall unsafe "sys/epoll.h epoll_ctl"
-    c_epoll_ctl :: CInt -> CInt -> CInt -> Ptr EPollEvent -> IO CInt
+    c_epoll_ctl :: CInt -> CInt -> CInt 
+                -> MutableByteArray## RealWorld
+                   -- this is an array of epoll_event
+                -> IO CInt
 
 foreign import ccall safe "sys/epoll.h epoll_wait"
     c_epoll_wait :: CInt -> Ptr EPollEvent -> CInt -> CInt -> IO CInt
