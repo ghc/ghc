@@ -28,12 +28,11 @@ module TyCoRep (
             , FFunTy, ft_arg, ft_res, ft_af
             ),  -- Export the type synonym FunTy too
 
-        AnonArgFlag,
         TyLit(..),
         KindOrType, Kind,
         KnotTied,
         PredType, ThetaType,      -- Synonyms
-        ArgFlag(..),
+        ArgFlag(..), AnonArgFlag(..),
 
         -- * Coercions
         Coercion(..),

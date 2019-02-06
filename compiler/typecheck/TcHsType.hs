@@ -1954,7 +1954,7 @@ kcLHsQTyVars_NonCusk name flav
        | hsLTyVarName hs_tv `elemNameSet` dep_names
        = mkNamedTyConBinder Required tv
        | otherwise
-       = mkAnonTyConBinder tv
+       = mkAnonTyConBinder VisArg tv
 
 kcLHsQTyVars_NonCusk _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
 

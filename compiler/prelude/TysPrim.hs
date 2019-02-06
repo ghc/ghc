@@ -320,10 +320,10 @@ mkTemplateKindTyConBinders :: [Kind] -> [TyConBinder]
 mkTemplateKindTyConBinders kinds = [mkNamedTyConBinder Specified tv | tv <- mkTemplateKindVars kinds]
 
 mkTemplateAnonTyConBinders :: [Kind] -> [TyConBinder]
-mkTemplateAnonTyConBinders kinds = map mkAnonTyConBinder (mkTemplateTyVars kinds)
+mkTemplateAnonTyConBinders kinds = mkAnonTyConBinders VisArg (mkTemplateTyVars kinds)
 
 mkTemplateAnonTyConBindersFrom :: Int -> [Kind] -> [TyConBinder]
-mkTemplateAnonTyConBindersFrom n kinds = map mkAnonTyConBinder (mkTemplateTyVarsFrom n kinds)
+mkTemplateAnonTyConBindersFrom n kinds = mkAnonTyConBinders VisArg (mkTemplateTyVarsFrom n kinds)
 
 alphaTyVars :: [TyVar]
 alphaTyVars = mkTemplateTyVars $ repeat liftedTypeKind

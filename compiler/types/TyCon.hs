@@ -408,12 +408,12 @@ instance Outputable TyConBndrVis where
   ppr (NamedTCB flag) = text "NamedTCB" <> ppr flag
   ppr (AnonTCB af)    = text "AnonTCB"  <> ppr af
 
-mkAnonTyConBinder :: TyVar -> TyConBinder
-mkAnonTyConBinder tv = ASSERT( isTyVar tv)
-                       Bndr tv (AnonTCB VisArg)
+mkAnonTyConBinder :: AnonArgFlag -> TyVar -> TyConBinder
+mkAnonTyConBinder af tv = ASSERT( isTyVar tv)
+                          Bndr tv (AnonTCB af)
 
-mkAnonTyConBinders :: [TyVar] -> [TyConBinder]
-mkAnonTyConBinders tvs = map mkAnonTyConBinder tvs
+mkAnonTyConBinders :: AnonArgFlag -> [TyVar] -> [TyConBinder]
+mkAnonTyConBinders af tvs = map (mkAnonTyConBinder af) tvs
 
 mkNamedTyConBinder :: ArgFlag -> TyVar -> TyConBinder
 -- The odd argument order supports currying
@@ -431,7 +431,7 @@ mkRequiredTyConBinder :: TyCoVarSet  -- these are used dependently
                       -> TyConBinder
 mkRequiredTyConBinder dep_set tv
   | tv `elemVarSet` dep_set = mkNamedTyConBinder Required tv
-  | otherwise               = mkAnonTyConBinder tv
+  | otherwise               = mkAnonTyConBinder  VisArg   tv
 
 tyConBinderArgFlag :: TyConBinder -> ArgFlag
 tyConBinderArgFlag (Bndr _ vis) = tyConBndrVisArgFlag vis

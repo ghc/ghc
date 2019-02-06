@@ -128,7 +128,7 @@ module TcType (
 
   --------------------------------
   -- Rexported from Type
-  Type, PredType, ThetaType, TyCoBinder, ArgFlag(..),
+  Type, PredType, ThetaType, TyCoBinder, ArgFlag(..), AnonArgFlag(..),
 
   mkForAllTy, mkForAllTys, mkTyCoInvForAllTys, mkSpecForAllTys, mkTyCoInvForAllTy,
   mkInvForAllTy, mkInvForAllTys,

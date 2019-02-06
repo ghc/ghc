@@ -14,7 +14,8 @@ module Type (
         -- $type_classification
 
         -- $representation_types
-        TyThing(..), Type, ArgFlag(..), KindOrType, PredType, ThetaType,
+        TyThing(..), Type, ArgFlag(..), AnonArgFlag,
+        KindOrType, PredType, ThetaType,
         Var, TyVar, isTyVar, TyCoVar, TyCoBinder, TyCoVarBinder, TyVarBinder,
         KnotTied,
 
