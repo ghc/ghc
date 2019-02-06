@@ -2129,7 +2129,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
         src_r <- getNewRegNat (intFormat width)
         return $ appOL (code_src src_r) $ case width of
             W8 -> toOL
-                [ OR    II32 (OpImm (ImmInt 0xFFFFFF00)) (OpReg src_r)
+                [ OR    II32 (OpImm (ImmInteger 0xFFFFFF00)) (OpReg src_r)
                 , TZCNT II32 (OpReg src_r)        dst_r
                 ]
             W16 -> toOL
