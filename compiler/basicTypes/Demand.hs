@@ -22,7 +22,7 @@ module Demand (
 
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
         nopDmdType, botDmdType, mkDmdType,
-        addDemand, removeDmdTyArgs,
+        addDemand, ensureArgs,
         BothDmdArg, mkBothDmdArg, toBothDmdArg,
 
         DmdEnv, emptyDmdEnv,
@@ -47,7 +47,7 @@ module Demand (
         deferAfterIO,
         postProcessUnsat, postProcessDmdType,
 
-        splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd,
+        splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
         mkWorkerDemand, dmdTransformSig, dmdTransformDataConSig,
         dmdTransformDictSelSig, argOneShots, argsOneShots, saturatedByOneShots,
         trimToType, TypeShape(..),
@@ -679,6 +679,9 @@ mkCallDmd :: CleanDemand -> CleanDemand
 mkCallDmd (JD {sd = d, ud = u})
   = JD { sd = mkSCall d, ud = mkUCall One u }
 
+mkCallDmds :: Arity -> CleanDemand -> CleanDemand
+mkCallDmds arity cd = iterate mkCallDmd cd !! arity
+
 -- See Note [Demand on the worker] in WorkWrap
 mkWorkerDemand :: Int -> Demand
 mkWorkerDemand n = JD { sd = Lazy, ud = Use One (go n) }
@@ -1206,10 +1209,6 @@ mkDmdType fv ds res = DmdType fv ds res
 
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
-
--- Remove any demand on arguments. This is used in dmdAnalRhs on the body
-removeDmdTyArgs :: DmdType -> DmdType
-removeDmdTyArgs = ensureArgs 0
 
 -- This makes sure we can use the demand type with n arguments,
 -- It extends the argument list with the correct resTypeArgDmd
