@@ -74,17 +74,13 @@ etaArityWWBind' dflags fn_id rhs
         work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
                                  , inl_inline = NoInline
                                  , inl_sat    = Nothing
-                                 , inl_act    = ActiveAfter NoSourceText 0
+                                 , inl_act    = work_act
                                  , inl_rule   = FunLike }
-        wrap_act  = case fn_act of
+        work_act  = case fn_act of
                       ActiveAfter {} -> fn_act
                       NeverActive    -> ActiveAfter NoSourceText 0
                       _              -> ActiveAfter NoSourceText 2
-        wrap_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
-                                 , inl_inline = NoUserInline
-                                 , inl_sat = Nothing
-                                 , inl_act = wrap_act
-                                 , inl_rule = rule_match_info }
+        wrap_prag = alwaysInlinePragma
     in
     do { uniq <- getUniqueM
        ; let work_id = mkEtaWorkerId uniq fn_id work_ty

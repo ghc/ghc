@@ -1316,10 +1316,18 @@ pushCoValArg co
   = ASSERT2( isFunTy tyR, ppr co $$ ppr arg )
     Just (mkSymCo co1, MCo co2)
 
+  | isFunTildeTy tyL
+  , (co1, co2) <- decomposeFunCo Representational co
+              -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
+              -- then co1 :: tyL1 ~ tyR1
+              --      co2 :: tyL2 ~ tyR2
+  = ASSERT2( isFunTildeTy tyR, ppr co $$ ppr arg )
+    Just (mkSymCo co1, MCo co2)
+
   | otherwise
   = Nothing
   where
-    arg = funArgTy tyR
+    arg = argTy tyR
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
@@ -1342,6 +1350,21 @@ pushCoercionIntoLambda in_scope x e co
                                 x
                                 (mkCast (Var x') co1)
       in Just (x', substExpr (text "pushCoercionIntoLambda") subst e `mkCast` co2)
+
+    | ASSERT(not (isTyVar x) && not (isCoVar x)) True
+    , Pair s1s2 t1t2 <- coercionKind co
+    , Just (_s1,_s2) <- splitFunTildeTy_maybe s1s2
+    , Just (t1,_t2) <- splitFunTildeTy_maybe t1t2
+    = let (co1, co2) = decomposeFunCo Representational co
+          -- Should we optimize the coercions here?
+          -- Otherwise they might not match too well
+          x' = x `setIdType` t1
+          in_scope' = in_scope `extendInScopeSet` x'
+          subst = extendIdSubst (mkEmptySubst in_scope')
+                                x
+                                (mkCast (Var x') co1)
+      in Just (x', substExpr (text "pushCoercionIntoLambda") subst e `mkCast` co2)
+
     | otherwise
     = pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
       Nothing
@@ -1454,7 +1477,7 @@ collectBindersPushingCo e
 
       | isId b
       , let Pair tyL tyR = coercionKind co
-      , ASSERT( isFunTy tyL) isFunTy tyR
+      , ASSERT( isFunTy tyL || isFunTildeTy tyL) (isFunTy tyR || isFunTildeTy tyR)
       , (co_arg, co_res) <- decomposeFunCo Representational co
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e co_res
