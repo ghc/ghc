@@ -1955,9 +1955,12 @@ zonkTcTypeMapper = TyCoMapper
                Nothing -> do { cv' <- zonkCoVar cv
                              ; return $ HoleCo (hole { ch_co_var = cv' }) } }
 
-    zonk_tc_tycon tc = do { tck' <- zonkTcType (tyConKind tc)
-                          ; return (setTcTyConKind tc tck') }
-    
+    zonk_tc_tycon tc  -- A non-poly TcTyCon may have unification
+                      -- variables that need zonking
+      | tcTyConIsPoly tc = return tc
+      | otherwise        = do { tck' <- zonkTcType (tyConKind tc)
+                              ; return (setTcTyConKind tc tck') }
+
 -- For unbound, mutable tyvars, zonkType uses the function given to it
 -- For tyvars bound at a for-all, zonkType zonks them to an immutable
 --      type variable and zonks the kind too
