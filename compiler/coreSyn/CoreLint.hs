@@ -61,7 +61,7 @@ import InstEnv     ( instanceDFunId )
 import OptCoercion ( checkAxInstCo )
 import UniqSupply
 import CoreArity ( typeArity )
-import Demand ( splitStrictSig, isBotRes )
+import Demand
 
 import HscTypes
 import DynFlags
@@ -570,15 +570,11 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
               (addWarnL (text "INLINE binder is (non-rule) loop breaker:" <+> ppr binder))
               -- Only non-rule loop breakers inhibit inlining
 
-      -- Check whether arity and demand type are consistent (only if demand analysis
-      -- already happened)
-      --
-      -- Note (Apr 2014): this is actually ok.  See Note [Demand analysis for trivial right-hand sides]
-      --                  in DmdAnal.  After eta-expansion in CorePrep the rhs is no longer trivial.
-      --       ; let dmdTy = idStrictness binder
-      --       ; checkL (case dmdTy of
-      --                  StrictSig dmd_ty -> idArity binder >= dmdTypeDepth dmd_ty || exprIsTrivial rhs)
-      --           (mkArityMsg binder)
+       -- Check whether arity and demand type are consistent (only if demand analysis
+       -- already happened)
+       -- See Note [Demand signatures are computed for idArity] in DmdAnal
+       ; let StrictSig dmd_ty = idStrictness binder
+       ; checkL (idArity binder >= dmdTypeDepth dmd_ty) (mkArityMsg binder)
 
        -- Check that the binder's arity is within the bounds imposed by
        -- the type and the strictness signature. See Note [exprArity invariant]
@@ -2562,7 +2558,6 @@ mkKindErrMsg tyvar arg_ty
           hang (text "Arg type:")
                  4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
-{- Not needed now
 mkArityMsg :: Id -> MsgDoc
 mkArityMsg binder
   = vcat [hsep [text "Demand type has",
@@ -2575,7 +2570,7 @@ mkArityMsg binder
 
          ]
            where (StrictSig dmd_ty) = idStrictness binder
--}
+
 mkCastErr :: CoreExpr -> Coercion -> Type -> Type -> MsgDoc
 mkCastErr expr = mk_cast_err "expression" "type" (ppr expr)
 
