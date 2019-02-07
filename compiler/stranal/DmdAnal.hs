@@ -50,19 +50,14 @@ import UniqSet
 -}
 
 dmdAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
-dmdAnalProgram dflags fam_envs binds
-  = do {
-        let { binds_plus_dmds = do_prog binds } ;
-        binds_plus_cpr <- cprAnalProgram dflags fam_envs binds_plus_dmds ;
-        dumpIfSet_dyn dflags Opt_D_dump_str_signatures
-            "Strictness signatures" FormatText
-            (dumpStrSig binds_plus_dmds) ;
-        -- See Note [Stamp out space leaks in demand analysis]
-        seqBinds binds_plus_cpr `seq` return binds_plus_cpr
-    }
-  where
-    do_prog :: CoreProgram -> CoreProgram
-    do_prog binds = snd $ mapAccumL dmdAnalTopBind (emptyAnalEnv dflags fam_envs) binds
+dmdAnalProgram dflags fam_envs binds = do
+  let env             = emptyAnalEnv dflags fam_envs
+  let binds_plus_dmds = snd $ mapAccumL dmdAnalTopBind env binds
+  let binds_plus_cpr  = cprAnalProgram fam_envs binds_plus_dmds
+  dumpIfSet_dyn dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
+    dumpStrSig binds_plus_cpr
+  -- See Note [Stamp out space leaks in demand analysis]
+  seqBinds binds_plus_cpr `seq` return binds_plus_cpr
 
 -- Analyse a (group of) top-level binding(s)
 dmdAnalTopBind :: AnalEnv

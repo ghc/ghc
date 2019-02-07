@@ -15,11 +15,9 @@ module CprAnal ( cprAnalProgram ) where
 
 import GhcPrelude
 
-import DynFlags
 import WwLib            ( deepSplitProductType_maybe )
 import Demand   -- All of it
 import CoreSyn
-import CoreSeq          ( seqBinds )
 import Outputable
 import VarEnv
 import BasicTypes
@@ -32,27 +30,14 @@ import Type
 import FamInstEnv
 import Util
 import Maybes           ( isJust )
-import ErrUtils         ( dumpIfSet_dyn )
-import Name             ( getName, stableNameCmp )
-import Data.Function    ( on )
 
 --
 -- * Analysing programs
 --
 
-cprAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
-cprAnalProgram dflags fam_envs binds
-  = do {
-        let { binds_plus_cpr = do_prog binds } ;
-        dumpIfSet_dyn dflags Opt_D_dump_str_signatures
-                      "Strictness signatures after CPR analsis" $
-            dumpStrSig binds_plus_cpr ;
-        -- See Note [Stamp out space leaks in demand analysis] in DmdAnal.hs
-        seqBinds binds_plus_cpr `seq` return binds_plus_cpr
-    }
-  where
-    do_prog :: CoreProgram -> CoreProgram
-    do_prog binds = snd $ mapAccumL cprAnalTopBind (emptyAnalEnv fam_envs) binds
+cprAnalProgram :: FamInstEnvs -> CoreProgram -> CoreProgram
+cprAnalProgram fam_envs binds
+  = snd $ mapAccumL cprAnalTopBind (emptyAnalEnv fam_envs) binds
 
 -- Analyse a (group of) top-level binding(s)
 cprAnalTopBind :: AnalEnv
@@ -474,15 +459,6 @@ set_idCprInfo id ty = setIdCprInfo id (ct_cpr ty)
 get_idCprInfo :: Id -> CprType
 -- TODO: Encode arity in CprInfo
 get_idCprInfo id = CprType (length (fst (splitStrictSig (idStrictness id)))) (idCprInfo id)
-
-dumpStrSig :: CoreProgram -> SDoc
-dumpStrSig binds = vcat (map printId ids)
-  where
-  ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
-  getIds (NonRec i _) = [ i ]
-  getIds (Rec bs)     = map fst bs
-  printId id | isExportedId id = ppr id <> colon <+> pprIfaceStrictSig (idStrictness id)
-             | otherwise       = empty
 
 {- Note [Safe abortion in the fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
