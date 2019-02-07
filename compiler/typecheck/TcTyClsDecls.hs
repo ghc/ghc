@@ -917,7 +917,7 @@ getInitialKind cusk
        ; let parent_tv_prs = tcTyConScopedTyVars tycon
             -- See Note [Don't process associated types in kcLHsQTyVars]
        ; inner_tcs <- tcExtendNameTyVarEnv parent_tv_prs $
-                      getFamDeclInitialKinds (Just tycon) ats
+                      getFamDeclInitialKinds cusk (Just tycon) ats
        ; return (tycon : inner_tcs) }
 
 getInitialKind cusk
@@ -932,8 +932,8 @@ getInitialKind cusk
                    Nothing   -> return liftedTypeKind
         ; return [tc] }
 
-getInitialKind _ (FamDecl { tcdFam = decl })
-  = do { tc <- getFamDeclInitialKind Nothing decl
+getInitialKind cusk (FamDecl { tcdFam = decl })
+  = do { tc <- getFamDeclInitialKind cusk Nothing decl
        ; return [tc] }
 
 getInitialKind cusk (SynDecl { tcdLName = dL->L _ name
@@ -956,22 +956,24 @@ getInitialKind _ (XTyClDecl _) = panic "getInitialKind"
 
 ---------------------------------
 getFamDeclInitialKinds
-  :: Maybe TcTyCon -- ^ Enclosing class TcTyCon, if any
+  :: Bool        -- ^ True <=> cusk
+  -> Maybe TyCon -- ^ Just cls <=> this is an associated family of class cls
   -> [LFamilyDecl GhcRn]
   -> TcM [TcTyCon]
-getFamDeclInitialKinds mb_parent_tycon decls
-  = mapM (addLocM (getFamDeclInitialKind mb_parent_tycon)) decls
+getFamDeclInitialKinds cusk mb_parent_tycon decls
+  = mapM (addLocM (getFamDeclInitialKind cusk mb_parent_tycon)) decls
 
 getFamDeclInitialKind
-  :: Maybe TcTyCon -- ^ Enclosing class TcTyCon, if any
+  :: Bool        -- ^ True <=> cusk
+  -> Maybe TyCon -- ^ Just cls <=> this is an associated family of class cls
   -> FamilyDecl GhcRn
   -> TcM TcTyCon
-getFamDeclInitialKind mb_parent_tycon
+getFamDeclInitialKind parent_cusk mb_parent_tycon
     decl@(FamilyDecl { fdLName     = (dL->L _ name)
                      , fdTyVars    = ktvs
                      , fdResultSig = (dL->L _ resultSig)
                      , fdInfo      = info })
-  = kcLHsQTyVars name flav cusk ktvs $
+  = kcLHsQTyVars name flav fam_cusk ktvs $
     case resultSig of
       KindSig _ ki                              -> tcLHsKindSig ctxt ki
       TyVarSig _ (dL->L _ (KindedTyVar _ _ ki)) -> tcLHsKindSig ctxt ki
@@ -981,15 +983,15 @@ getFamDeclInitialKind mb_parent_tycon
                -- by default
         | otherwise                         -> newMetaKindVar
   where
-    mb_cusk = tcTyConIsPoly <$> mb_parent_tycon
-    cusk    = famDeclHasCusk mb_cusk decl
-    flav  = case info of
+    assoc_with_no_cusk = isJust mb_parent_tycon && not parent_cusk
+    fam_cusk = famDeclHasCusk assoc_with_no_cusk decl
+    flav = case info of
       DataFamily         -> DataFamilyFlavour mb_parent_tycon
       OpenTypeFamily     -> OpenTypeFamilyFlavour mb_parent_tycon
       ClosedTypeFamily _ -> ASSERT( isNothing mb_parent_tycon )
                             ClosedTypeFamilyFlavour
     ctxt  = TyFamResKindCtxt name
-getFamDeclInitialKind _ (XFamilyDecl _) = panic "getFamDeclInitialKind"
+getFamDeclInitialKind _ _ (XFamilyDecl _) = panic "getFamDeclInitialKind"
 
 ------------------------------------------------------------------------
 kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
