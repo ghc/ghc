@@ -628,6 +628,7 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
   | otherwise
   = (lazy_fv, id', mkLams bndrs' body')
   where
+    rhs_arity        = exprArity rhs
     (bndrs, body, body_dmd)
        = case isJoinId_maybe id of
            Just join_arity  -- See Note [Demand analysis for join points]
@@ -635,15 +636,15 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
                    -> (bndrs, body, let_dmd)
 
            Nothing | (bndrs, body) <- collectBinders rhs
-                   -> (bndrs, body, mkBodyDmd env body)
+                   -> (bndrs, body, mkBodyDmd env (exprArity body) body)
 
     env_body         = foldl' extendSigsWithLam env bndrs
     (body_ty, body') = dmdAnal env_body body_dmd body
-    body_ty'         = removeDmdTyArgs body_ty -- zap possible deep CPR info
-    (DmdType rhs_fv rhs_dmds rhs_res, bndrs')
-                     = annotateLamBndrs env (isDFunId id) body_ty' bndrs
+    (rhs_ty, bndrs') = annotateLamBndrs env (isDFunId id) body_ty bndrs
+    DmdType rhs_fv rhs_dmds rhs_res
+                     = ensureArgs rhs_arity rhs_ty -- zap possible deep CPR info
     sig_ty           = mkStrictSig (mkDmdType sig_fv rhs_dmds rhs_res')
-    id'              = set_idStrictness env id sig_ty
+    id'              = set_idStrictness env id rhs_arity sig_ty
         -- See Note [NOINLINE and strictness]
 
 
@@ -667,10 +668,14 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
        || not (isStrictDmd (idDemandInfo id) || ae_virgin env)
           -- See Note [Optimistic CPR in the "virgin" case]
 
-mkBodyDmd :: AnalEnv -> CoreExpr -> CleanDemand
+-- | Creates a 'CleanDemand' appropriate for unleashing on the given function
+-- body, by wrapping a head demand into @arity@ many calls.
 -- See Note [Product demands for function body]
-mkBodyDmd env body
-  = case deepSplitProductType_maybe (ae_fam_envs env) (exprType body) of
+mkBodyDmd :: AnalEnv -> Arity -> CoreExpr -> CleanDemand
+mkBodyDmd env arity body
+  = iterate mkCallDmd base !! arity
+  where
+    base = case deepSplitProductType_maybe (ae_fam_envs env) (exprType body) of
        Nothing            -> cleanEvalDmd
        Just (dc, _, _, _) -> cleanEvalProdDmd (dataConRepArity dc)
 
@@ -1247,9 +1252,10 @@ findBndrDmd env arg_of_dfun dmd_ty id
 
     fam_envs = ae_fam_envs env
 
-set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
-set_idStrictness env id sig
-  = setIdStrictness id (killUsageSig (ae_dflags env) sig)
+set_idStrictness :: AnalEnv -> Id -> Arity -> StrictSig -> Id
+set_idStrictness env id arity sig
+  = id `setIdStrictness` (killUsageSig (ae_dflags env) sig)
+       `setIdArity` arity -- computed by exprArity and must match sig
 
 dumpStrSig :: CoreProgram -> SDoc
 dumpStrSig binds = vcat (map printId ids)

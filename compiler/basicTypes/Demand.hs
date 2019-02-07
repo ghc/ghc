@@ -22,7 +22,7 @@ module Demand (
 
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
         nopDmdType, botDmdType, mkDmdType,
-        addDemand, removeDmdTyArgs,
+        addDemand, ensureArgs,
         BothDmdArg, mkBothDmdArg, toBothDmdArg,
 
         DmdEnv, emptyDmdEnv,
@@ -1206,10 +1206,6 @@ mkDmdType fv ds res = DmdType fv ds res
 
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
-
--- Remove any demand on arguments. This is used in dmdAnalRhs on the body
-removeDmdTyArgs :: DmdType -> DmdType
-removeDmdTyArgs = ensureArgs 0
 
 -- This makes sure we can use the demand type with n arguments,
 -- It extends the argument list with the correct resTypeArgDmd
