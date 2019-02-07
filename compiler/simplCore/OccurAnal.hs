@@ -2210,17 +2210,45 @@ extendFvs env s
 
 Note [Binder swap]
 ~~~~~~~~~~~~~~~~~~
-We do these two transformations right here:
+The "binder swap" tranformation swaps occurence of the
+scrutinee of a case for occurrences of the case-binder:
 
- (1)   case x of b { pi -> ri }
-    ==>
+ (1)  case x of b { pi -> ri }
+         ==>
       case x of b { pi -> let x=b in ri }
 
  (2)  case (x |> co) of b { pi -> ri }
-    ==>
+        ==>
       case (x |> co) of b { pi -> let x = b |> sym co in ri }
 
-    Why (2)?  See Note [Case of cast]
+In both cases, the trivial 'let' can be eliminated by the
+immediately following simplifier pass.
+
+There are two reasons for making this swap:
+
+(A) It reduces the number of occurrences of the scrutinee, x.
+    That in turn might reduce its occurrences to one, so we
+    can inline it and save an allocation.  E.g.
+      let x = factorial y in case x of b { I# v -> ...x... }
+    If we replace 'x' by 'b' in the alternative we get
+      let x = factorial y in case x of b { I# v -> ...b... }
+    and now we can inline 'x', thus
+      case (factorial y) of b { I# v -> ...b... }
+
+(B) The case-binder b has unfolding information; in the
+    example above we know that b = I# v. That in turn allows
+    nested cases to simplify.  Consider
+       case x of b { I# v ->
+       ...(case x of b2 { I# v2 -> rhs })...
+    If we replace 'x' by 'b' in the alternative we get
+       case x of b { I# v ->
+       ...(case b of b2 { I# v2 -> rhs })...
+    and now it is trivial to simplify the inner case:
+       case x of b { I# v ->
+       ...(let b2 = b in rhs)...
+
+    The same can happen even if the scrutinee is a variable
+    with a cast: see Note [Case of cast]
 
 In both cases, in a particular alternative (pi -> ri), we only
 add the binding if
@@ -2236,18 +2264,19 @@ Notice that
   * The deliberate shadowing of 'x'.
   * That (a) rapidly becomes false, so no bindings are injected.
 
-The reason for doing these transformations here is because it allows
-us to adjust the OccInfo for 'x' and 'b' as we go.
+The reason for doing these transformations /here in the occurrence
+analyser/ is because it allows us to adjust the OccInfo for 'x' and
+'b' as we go.
 
   * Suppose the only occurrences of 'x' are the scrutinee and in the
     ri; then this transformation makes it occur just once, and hence
     get inlined right away.
 
-  * If we do this in the Simplifier, we don't know whether 'x' is used
-    in ri, so we are forced to pessimistically zap b's OccInfo even
-    though it is typically dead (ie neither it nor x appear in the
-    ri).  There's nothing actually wrong with zapping it, except that
-    it's kind of nice to know which variables are dead.  My nose
+  * If instead we do this in the Simplifier, we don't know whether 'x'
+    is used in ri, so we are forced to pessimistically zap b's OccInfo
+    even though it is typically dead (ie neither it nor x appear in
+    the ri).  There's nothing actually wrong with zapping it, except
+    that it's kind of nice to know which variables are dead.  My nose
     tells me to keep this information as robustly as possible.
 
 The Maybe (Id,CoreExpr) passed to occAnalAlt is the extra let-binding
