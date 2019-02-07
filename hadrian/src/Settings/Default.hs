@@ -108,8 +108,8 @@ stage1Packages = do
              , stm
              , time
              , unlit
-             , xhtml
-             , ghcTags                       ]
+             , xhtml                     
+             ]
           ++ [ haddock | not cross           ]
           ++ [ hpcBin   | not cross          ]
           ++ [ iserv    | not win, not cross ]

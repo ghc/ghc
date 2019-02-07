@@ -340,7 +340,6 @@ include rules/build-perl.mk
 include rules/build-package.mk
 include rules/build-package-way.mk
 include rules/haddock.mk
-include rules/tags-package.mk
 include rules/foreachLibrary.mk
 
 # -----------------------------------------------------------------------------
@@ -553,7 +552,6 @@ ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 # the ghc library's package-data.mk is sufficient, as that in turn depends on
 # all the other libraries' package-data.mk files.
 utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
-utils/ghctags/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/check-api-annotations/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/check-ppr/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
@@ -666,7 +664,6 @@ BUILD_DIRS += compiler
 BUILD_DIRS += utils/hsc2hs
 BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/testremove
-BUILD_DIRS += utils/ghctags
 BUILD_DIRS += utils/check-api-annotations
 BUILD_DIRS += utils/check-ppr
 BUILD_DIRS += utils/ghc-cabal
@@ -716,7 +713,6 @@ endif
 ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
 # See Note [No stage2 packages when CrossCompiling or Stage1Only].
 # See Note [Stage1Only vs stage=1] in mk/config.mk.in.
-BUILD_DIRS := $(filter-out utils/ghctags,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/check-api-annotations,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/check-ppr,$(BUILD_DIRS))
 endif
@@ -844,12 +840,6 @@ libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs: \
                             $(PRIMOPS_TXT_STAGE1) $$(genprimopcode_INPLACE) \
                           | $$(dir $$@)/.
 	"$(genprimopcode_INPLACE)" --make-haskell-source < $< > $@
-
-.PHONY: tags
-tags: tags_compiler
-
-.PHONY: TAGS
-TAGS: TAGS_compiler
 
 # -----------------------------------------------------------------------------
 # Installation
@@ -1512,8 +1502,8 @@ endif
 #  - neither do we register the ghc library (compiler/stage1) that we build
 #    with stage0. TODO Why not? We do build it...
 #  - as a result, we need to a) use ghc-stage2 to build packages that depend on
-#    the ghc library (e.g. ghctags [4]) and b) exclude those packages when
-#    ghc-stage2 is not available.
+#    the ghc library and b) exclude those packages when ghc-stage2 is not
+#    available.
 #  - when Stage1Only=YES, it's clear that ghc-stage2 is not available (we just
 #    said we didn't want it), so we have to exclude the stage2 packages from
 #    the build. This includes the case where Stage1Only=YES is combined with
@@ -1521,7 +1511,7 @@ endif
 #  - when CrossCompiling=YES, but Stage1Only=NO (Cross-compiling GHC itself
 #    [3]), we can not use ghc-stage2 either. The reason is that stage2 doesn't
 #    run on the host platform at all; it is built to run on $(TARGETPLATFORM)"
-#    [5]. Therefore in this case we also have to exclude the stage2 packages
+#    [4]. Therefore in this case we also have to exclude the stage2 packages
 #    from the build.
 #
 # Because we omit certain packages from the build when CrossCompiling=YES,
@@ -1536,10 +1526,7 @@ endif
 #
 #  [3] https://ghc.haskell.org/trac/ghc/wiki/Building/CrossCompiling
 #
-#  [4] 5fb72555f7b7ab67a33583f33ad9160761ca434f
-#      "ghctags needs the stage2 compiler, since it uses the GHC API."
-#
-#  [5] * bc31dbe8ee22819054df60f5ef219fed393a1c54
+#  [4] * bc31dbe8ee22819054df60f5ef219fed393a1c54
 #      "Disable any packages built with stage 2 when cross-compiling
 #       Since we can't run stage 2 on the host."
 #

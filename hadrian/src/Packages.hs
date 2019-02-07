@@ -4,7 +4,7 @@ module Packages (
     array, base, binary, bytestring, cabal, checkApiAnnotations, checkPpr,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
     filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact,
-    ghcHeap, ghci, ghcPkg, ghcPrim, ghcTags, ghcSplit, haddock, haskeline,
+    ghcHeap, ghci, ghcPkg, ghcPrim, ghcSplit, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi,
     libiserv, mtl, parsec, parallel, pretty, primitive, process, rts, runGhc,
     stm, templateHaskell, terminfo, text, time, timeout, touchy, transformers,
@@ -33,7 +33,7 @@ ghcPackages =
     [ array, base, binary, bytestring, cabal, checkPpr, checkApiAnnotations
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory
     , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact
-    , ghcHeap, ghci, ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hp2ps
+    , ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs, hp2ps
     , hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
     , parsec, parallel, pretty, process, rts, runGhc, stm, templateHaskell
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
@@ -68,7 +68,6 @@ ghcHeap             = lib  "ghc-heap"
 ghci                = lib  "ghci"
 ghcPkg              = util "ghc-pkg"
 ghcPrim             = lib  "ghc-prim"
-ghcTags             = util "ghctags"
 ghcSplit            = util "ghc-split"
 haddock             = util "haddock"
 haskeline           = lib  "haskeline"
