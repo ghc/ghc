@@ -482,9 +482,6 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 
-compiler_stage2_TAGS_HC_OPTS = -package ghc
-$(eval $(call tags-package,compiler,stage2))
-
 $(compiler_stage1_depfile_haskell) : compiler/stage1/$(PLATFORM_H)
 $(compiler_stage2_depfile_haskell) : compiler/stage2/$(PLATFORM_H)
 $(compiler_stage3_depfile_haskell) : compiler/stage3/$(PLATFORM_H)
