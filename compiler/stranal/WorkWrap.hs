@@ -9,6 +9,7 @@ module WorkWrap ( wwTopBinds ) where
 
 import GhcPrelude
 
+import CoreArity        ( manifestArity )
 import CoreSyn
 import CoreUnfold       ( certainlyWillInline, mkWwInlineRule, mkWorkerUnfolding )
 import CoreUtils        ( exprType, exprIsHNF )
@@ -457,7 +458,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Don't w/w INLINE things]
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
-  | is_fun
+  | is_fun && is_eta_exp
   = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds res_info rhs
 
   | is_thunk                                   -- See Note [Thunk splitting]
@@ -474,9 +475,11 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
         -- See Note [Zapping Used Once info in WorkWrap]
 
-    is_fun    = notNull wrap_dmds || isJoinId fn_id
-    is_thunk  = not is_fun && not (exprIsHNF rhs) && not (isJoinId fn_id)
-                           && not (isUnliftedType (idType fn_id))
+    is_fun     = notNull wrap_dmds || isJoinId fn_id
+    -- See Note [Don't eta-expand in w/w]
+    is_eta_exp = length wrap_dmds == manifestArity rhs
+    is_thunk   = not is_fun && not (exprIsHNF rhs) && not (isJoinId fn_id)
+                            && not (isUnliftedType (idType fn_id))
 
 {-
 Note [Zapping DmdEnv after Demand Analyzer]
@@ -516,6 +519,20 @@ want to _keep_ the info for the code generator).
 
 We do not do it in the demand analyser for the same reasons outlined in
 Note [Zapping DmdEnv after Demand Analyzer] above.
+
+Note [Don't eta expand in w/w]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A binding where the manifestArity of the RHS is less than idArity of the binder
+means CoreArity didn't eta expand that binding. When this happens, it does so
+for a reason (see Note [exprArity invariant] in CoreArity) and we probably have
+a PAP or trivial expression as RHS.
+
+Performing the worker/wrapper split will implicitly eta-expand the binding to
+idArity, overriding CoreArity's decision, so we don't do that.
+Failing to do this caused a compiler allocation regression in T15164, where huge
+recursive instance method groups, mostly consisting of PAPs, got w/w'd.
+This caused great churn in the simplifier, when simply waiting for the PAPs to
+inline arrived at the same output program.
 -}
 
 

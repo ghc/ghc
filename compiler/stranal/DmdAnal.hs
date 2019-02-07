@@ -286,10 +286,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
 -- This is used for a non-recursive local let without manifest lambdas.
 -- This is the LetUp rule in the paper “Higher-Order Cardinality Analysis”.
 dmdAnal' env dmd (Let (NonRec id rhs) body)
-  | useLetUp id rhs
-  , Nothing <- unpackTrivial rhs
-      -- dmdAnalRhsLetDown treats trivial right hand sides specially
-      -- so if we have a trival right hand side, fall through to that.
+  | useLetUp id
   = (final_ty, Let (NonRec id' rhs') body')
   where
     (body_ty, body')   = dmdAnal env dmd body
@@ -582,25 +579,6 @@ environment, which effectively assigns them 'nopSig' (see "getStrictness")
 
 -}
 
--- Trivial RHS
--- See Note [Demand analysis for trivial right-hand sides]
-dmdAnalTrivialRhs ::
-    AnalEnv -> Id -> CoreExpr -> Var ->
-    (DmdEnv, Id, CoreExpr)
-dmdAnalTrivialRhs env id rhs fn
-  = (fn_fv, set_idStrictness env id fn_str, rhs)
-  where
-    fn_str = getStrictness env fn
-    fn_fv | isLocalId fn = unitVarEnv fn topDmd
-          | otherwise    = emptyDmdEnv
-    -- Note [Remember to demand the function itself]
-    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    -- fn_fv: don't forget to produce a demand for fn itself
-    -- Lacking this caused Trac #9128
-    -- The demand is very conservative (topDmd), but that doesn't
-    -- matter; trivial bindings are usually inlined, so it only
-    -- kicks in for top-level bindings and NOINLINE bindings
-
 -- Let bindings can be processed in two ways:
 -- Down (RHS before body) or Up (body before RHS).
 -- dmdAnalRhsLetDown implements the Down variant:
@@ -621,12 +599,9 @@ dmdAnalRhsLetDown :: TopLevelFlag
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
-  | Just fn <- unpackTrivial rhs   -- See Note [Demand analysis for trivial right-hand sides]
-  = dmdAnalTrivialRhs env id rhs fn
-
-  | otherwise
   = (lazy_fv, id', mkLams bndrs' body')
   where
+    rhs_arity        = idArity id
     (bndrs, body, body_dmd)
        = case isJoinId_maybe id of
            Just join_arity  -- See Note [Demand analysis for join points]
@@ -634,13 +609,15 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
                    -> (bndrs, body, let_dmd)
 
            Nothing | (bndrs, body) <- collectBinders rhs
-                   -> (bndrs, body, mkBodyDmd env body)
+                   , let body_arity = rhs_arity - count isId bndrs
+                   -> (bndrs, body, mkBodyDmd env body_arity body)
 
     env_body         = foldl' extendSigsWithLam env bndrs
     (body_ty, body') = dmdAnal env_body body_dmd body
-    body_ty'         = removeDmdTyArgs body_ty -- zap possible deep CPR info
-    (DmdType rhs_fv rhs_dmds rhs_res, bndrs')
-                     = annotateLamBndrs env (isDFunId id) body_ty' bndrs
+    (rhs_ty, bndrs') = annotateLamBndrs env (isDFunId id) body_ty bndrs
+    -- Set Note [Demand signatures are computed for idArity]
+    DmdType rhs_fv rhs_dmds rhs_res
+                     = ensureArgs rhs_arity rhs_ty -- zap possible deep CPR info
     sig_ty           = mkStrictSig (mkDmdType sig_fv rhs_dmds rhs_res')
     id'              = set_idStrictness env id sig_ty
         -- See Note [NOINLINE and strictness]
@@ -666,36 +643,33 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
        || not (isStrictDmd (idDemandInfo id) || ae_virgin env)
           -- See Note [Optimistic CPR in the "virgin" case]
 
-mkBodyDmd :: AnalEnv -> CoreExpr -> CleanDemand
+-- | Creates a 'CleanDemand' appropriate for unleashing on the given function
+-- body, by wrapping a head demand into @arity@ many calls.
 -- See Note [Product demands for function body]
-mkBodyDmd env body
-  = case deepSplitProductType_maybe (ae_fam_envs env) (exprType body) of
+mkBodyDmd :: AnalEnv -> Arity -> CoreExpr -> CleanDemand
+mkBodyDmd env arity body
+  = mkCallDmds arity base
+  where
+    base = case deepSplitProductType_maybe (ae_fam_envs env) (exprType body) of
        Nothing            -> cleanEvalDmd
        Just (dc, _, _, _) -> cleanEvalProdDmd (dataConRepArity dc)
 
-unpackTrivial :: CoreExpr -> Maybe Id
--- Returns (Just v) if the arg is really equal to v, modulo
--- casts, type applications etc
--- See Note [Demand analysis for trivial right-hand sides]
-unpackTrivial (Var v)                 = Just v
-unpackTrivial (Cast e _)              = unpackTrivial e
-unpackTrivial (Lam v e) | isTyVar v   = unpackTrivial e
-unpackTrivial (App e a) | isTypeArg a = unpackTrivial e
-unpackTrivial _                       = Nothing
-
--- | If given the RHS of a let-binding, this 'useLetUp' determines
--- whether we should process the binding up (body before rhs) or
--- down (rhs before body).
+-- | If given the let-bound 'Id', 'useLetUp' determines whether we should
+-- process the binding up (body before rhs) or down (rhs before body).
 --
 -- We use LetDown if there is a chance to get a useful strictness signature.
--- This is the case when there are manifest value lambdas or the binding is a
--- join point (hence always acts like a function, not a value).
-useLetUp :: Var -> CoreExpr -> Bool
-useLetUp f _         | isJoinId f = False
-useLetUp f (Lam v e) | isTyVar v  = useLetUp f e
-useLetUp _ (Lam _ _)              = False
-useLetUp _ _                      = True
-
+-- This is the case when it takes any arguments before performing meaningful
+-- work (cf. 'idArity') or the binding is a join point (hence always acts like
+-- a function, not a value).
+--
+-- Thus, if the binding is not a join point and its arity is 0, we use LetUp.
+-- In that case, it's a thunk and we want to unleash its 'DmdEnv' of free vars
+-- at most once, regardless of how many times it was forced in the body. This
+-- makes a real difference wrt. usage demands. The other reason is being able to
+-- unleash a more precise product demand on its RHS once we know how the thunk
+-- was used in the let body.
+useLetUp :: Var -> Bool
+useLetUp f = idArity f == 0 && not (isJoinId f)
 
 {- Note [Demand analysis for join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -728,22 +702,94 @@ let_dmd here).
 
 Another win for join points!  Trac #13543.
 
+Note [Demand signatures are computed for idArity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We try hard to preserve the following invariants:
+
+  (1) Demand signatures are computed assuming 'idArity' incoming arguments
+  (2) The number of args ('dmdTypeDepth') of a strictness signature
+      must never exceed 'idArity'
+
+Why idArity arguments? Because that's a conservative estimate of how many
+arguments we must feed a function before it does anything useful with them.
+
+A direct consequence of (1) is that demand signatures may be soundly
+unleashed at call sites when there are *at least* idArity incoming arguments.
+See [What are demand signatures?] for more details in that regard.
+
+NB: It's safe to reuse an arity 1 strictness signature of a function that has
+arity 2 after eta expansion. If the resulting function was applied to two
+arguments, it's still sound to unleash the original strictness signature, which
+needed one incoming argument as a precodition. The same is not true for
+eta reduction, see Note [Demand signatures and arity decreases] in CoreOpt.
+
+(2) captures the observation that there is no sense in a strictness signature
+declaring more argument demands than there are incoming arguments.
+Consider
+
+  f x =
+    if expensive
+      then \y -> ... y ...
+      else \y -> ... y ...
+
+We'd analyse `f` under a unary call demand `C(S)`. Enough to look under the
+manifest lambda, but not enough to look into the lambdas in the if branches.
+
+But why couldn't we just look into the lambdas nonetheless? For calls to `f`
+with arity 1, it shouldn't make a difference, right? We'd get useful information
+on how `f` uses a potential second argument strictly, while the first argument
+demand should be unaffected, so it's still safe to unleash at unary call sites.
+
+But that's wrong! Consider that both lambda bodies were `x + y`. Now, suddenly
+`f` is also strict in `x`! There might be ways to work around this (i.e. a
+"graded" strictness signature, depending on how many arguments were supplied),
+but let's not overthink it for now.
+
+Another reason why we don't do it: The worker/wrapper transformation would
+look at the signature and split it for the call with two arguments, effectively
+eta expanding the worker for f where the expensive computation hides. Ergo we
+would still have to use the signature for arity 1 to guide w/w.
+
+Thus, we trim the demand signature with 'ensureArgs' when analysing bindings
+with LetDown.
+
+Note [What are demand signatures?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Demand signatures are single-point approximations of an (the best?) abstract
+transformer of a binding's right-hand side. We only compute a single
+point because it's quite costly to analyse bindings multiple times,
+also because it's simple and works well in the majority of the cases.
+
+The question is: Which is the right call demand (i.e. point of the abstract
+transformer) to compute the demand signature for? We argue that idArity is
+the right choice in Note [Demand signatures are computed for idArity].
+
+In a call with less than idArity incoming arguments, the resulting call demand
+is too weak to unleash the pre-computed demand signature. In this case, just
+unleashing nopSig (the top of the domain) is a safe bet that won't cost us
+much precision. Most importantly, it's also a sound approximation of the
+abstract transformer at those points.
+
+For a call with at least idArity incoming arguments, the resulting call demand
+is strong enough to unleash the demand signature. This will be a
+conservative choice even for stronger call demands, as abstract transformers are
+monotone functions, so any approximation for a weaker point (incoming arity 2,
+for example) is also an approximation for stronger point (incoming arity 3).
+
 Note [Demand analysis for trivial right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
-        foo = plusInt |> co
+    foo = plusInt |> co
 where plusInt is an arity-2 function with known strictness.  Clearly
 we want plusInt's strictness to propagate to foo!  But because it has
 no manifest lambdas, it won't do so automatically, and indeed 'co' might
-have type (Int->Int->Int) ~ T, so we *can't* eta-expand.  So we have a
-special case for right-hand sides that are "trivial", namely variables,
-casts, type applications, and the like.
+have type (Int->Int->Int) ~ T.
 
-Note that this can mean that 'foo' has an arity that is smaller than that
-indicated by its demand info.  e.g. if co :: (Int->Int->Int) ~ T, then
-foo's arity will be zero (see Note [exprArity invariant] in CoreArity),
-but its demand signature will be that of plusInt. A small example is the
-test case of Trac #8963.
+Fortunately, CoreArity gives 'foo' arity 2 and all is well (see the definition
+of 'manifestArity' and Note [Newtype arity] in CoreArity)! A small example is
+the test case NewtypeArity.
 
 
 Note [Product demands for function body]
@@ -1160,12 +1206,6 @@ extendSigEnv top_lvl sigs var sig = extendVarEnv sigs var (sig, top_lvl)
 lookupSigEnv :: AnalEnv -> Id -> Maybe (StrictSig, TopLevelFlag)
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 
-getStrictness :: AnalEnv -> Id -> StrictSig
-getStrictness env fn
-  | isGlobalId fn                        = idStrictness fn
-  | Just (sig, _) <- lookupSigEnv env fn = sig
-  | otherwise                            = nopSig
-
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
 
@@ -1245,7 +1285,7 @@ findBndrDmd env arg_of_dfun dmd_ty id
 
 set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
 set_idStrictness env id sig
-  = setIdStrictness id (killUsageSig (ae_dflags env) sig)
+  = id `setIdStrictness` (killUsageSig (ae_dflags env) sig)
 
 dumpStrSig :: CoreProgram -> SDoc
 dumpStrSig binds = vcat (map printId ids)
