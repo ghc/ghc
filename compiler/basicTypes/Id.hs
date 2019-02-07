@@ -668,6 +668,7 @@ isBottomingId v
   | isId v    = isBottomingSig (idStrictness v)
   | otherwise = False
 
+-- | Accesses the 'Id''s 'strictnessInfo'.
 idStrictness :: Id -> StrictSig
 idStrictness id = strictnessInfo (idInfo id)
 
