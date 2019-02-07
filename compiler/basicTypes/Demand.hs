@@ -22,7 +22,7 @@ module Demand (
 
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
         nopDmdType, botDmdType, mkDmdType,
-        addDemand, removeDmdTyArgs,
+        addDemand, ensureArgs,
         BothDmdArg, mkBothDmdArg, toBothDmdArg,
 
         DmdEnv, emptyDmdEnv,
@@ -34,7 +34,7 @@ module Demand (
         vanillaCprProdRes, cprSumRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         trimCPRInfo, returnsCPR_maybe,
-        StrictSig(..), mkStrictSig, mkClosedStrictSig,
+        StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
         nopSig, botSig, cprProdSig,
         isTopSig, hasDemandEnvSig,
         splitStrictSig, strictSigDmdEnv,
@@ -47,7 +47,7 @@ module Demand (
         deferAfterIO,
         postProcessUnsat, postProcessDmdType,
 
-        splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd,
+        splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
         mkWorkerDemand, dmdTransformSig, dmdTransformDataConSig,
         dmdTransformDictSelSig, argOneShots, argsOneShots, saturatedByOneShots,
         trimToType, TypeShape(..),
@@ -675,9 +675,14 @@ mkProdDmd dx
   = JD { sd = mkSProd $ map getStrDmd dx
        , ud = mkUProd $ map getUseDmd dx }
 
+-- | Wraps the 'CleanDemand' with a one-shot call demand: @d@ -> @C1(d)@.
 mkCallDmd :: CleanDemand -> CleanDemand
 mkCallDmd (JD {sd = d, ud = u})
   = JD { sd = mkSCall d, ud = mkUCall One u }
+
+-- | @mkCallDmds n d@ returns @C1(C1...(C1 d))@ where there are @n@ @C1@'s.
+mkCallDmds :: Arity -> CleanDemand -> CleanDemand
+mkCallDmds arity cd = iterate mkCallDmd cd !! arity
 
 -- See Note [Demand on the worker] in WorkWrap
 mkWorkerDemand :: Int -> Demand
@@ -1207,12 +1212,8 @@ mkDmdType fv ds res = DmdType fv ds res
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
 
--- Remove any demand on arguments. This is used in dmdAnalRhs on the body
-removeDmdTyArgs :: DmdType -> DmdType
-removeDmdTyArgs = ensureArgs 0
-
--- This makes sure we can use the demand type with n arguments,
--- It extends the argument list with the correct resTypeArgDmd
+-- | This makes sure we can use the demand type with n arguments.
+-- It extends the argument list with the correct resTypeArgDmd.
 -- It also adjusts the DmdResult: Divergence survives additional arguments,
 -- CPR information does not (and definite converge also would not).
 ensureArgs :: Arity -> DmdType -> DmdType
@@ -1567,8 +1568,34 @@ and <L,U(U,U)> on the second, then returning a constructor.
 
 If this same function is applied to one arg, all we can say is that it
 uses x with <L,U>, and its arg with demand <L,U>.
+
+Note [Understanding DmdType and StrictSig]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Demand types are sound approximations of an expression's semantics relative to
+the incoming demand we put the expression under. Its depth may be lower or
+higher than the arity of the call demand that elicited that DmdType. This
+happens for anonymous lambdas and in dmdTransform, for example.
+
+In contrast, a demand signature summarises a function's semantics. Despite it
+(StrSig) being a newtype wrapper around DmdType, it actually encodes two things:
+
+  * The threshold (i.e., minimum arity) to unleash the signature
+  * A demand type that is sound to unleash when the minimum arity requirement is
+    met.
+
+Here comes the subtle part: The threshold is encoded in the wrapped demand
+type's depth! So in mkStrictSigForArity we make sure to trim the list of
+argument demands to the given threshold arity. Call sites will make sure that
+this corresponds to the arity of the call demand that elicited the wrapped
+demand type. See also Note [What are demand signatures?] in DmdAnal.
+
+Besides trimming argument demands, mkStrictSigForArity will also trim CPR
+information if necessary.
 -}
 
+-- | The depth of the wrapped 'DmdType' encodes the arity at which it is safe
+-- to unleash. Better construct this through 'mkStrictSigForArity'.
+-- See Note [Understanding DmdType and StrictSig]
 newtype StrictSig = StrictSig DmdType
                   deriving( Eq )
 
@@ -1580,34 +1607,43 @@ pprIfaceStrictSig :: StrictSig -> SDoc
 pprIfaceStrictSig (StrictSig (DmdType _ dmds res))
   = hcat (map ppr dmds) <> ppr res
 
-mkStrictSig :: DmdType -> StrictSig
-mkStrictSig dmd_ty = StrictSig dmd_ty
+-- | Turns a 'DmdType' computed for the particular 'Arity' into a 'StrictSig'
+-- unleashable at that arity. See Note [Understanding DmdType and StrictSig]
+mkStrictSigForArity :: Arity -> DmdType -> StrictSig
+mkStrictSigForArity arity dmd_ty = StrictSig (ensureArgs arity dmd_ty)
 
 mkClosedStrictSig :: [Demand] -> DmdResult -> StrictSig
-mkClosedStrictSig ds res = mkStrictSig (DmdType emptyDmdEnv ds res)
+mkClosedStrictSig ds res = mkStrictSigForArity (length ds) (DmdType emptyDmdEnv ds res)
 
 splitStrictSig :: StrictSig -> ([Demand], DmdResult)
 splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
 
 increaseStrictSigArity :: Int -> StrictSig -> StrictSig
--- Add extra arguments to a strictness signature
+-- ^ Add extra arguments to a strictness signature.
+-- In contrast to 'etaExpandStrictSig', this /prepends/ additional argument
+-- demands and leaves CPR info intact.
 increaseStrictSigArity arity_increase sig@(StrictSig dmd_ty@(DmdType env dmds res))
   | isTopDmdType dmd_ty = sig
-  | arity_increase <= 0 = sig
+  | arity_increase == 0 = sig
+  | arity_increase < 0  = WARN( True, text "increaseStrictSigArity:"
+                                  <+> text "negative arity increase"
+                                  <+> ppr arity_increase )
+                          nopSig
   | otherwise           = StrictSig (DmdType env dmds' res)
   where
     dmds' = replicate arity_increase topDmd ++ dmds
 
 etaExpandStrictSig :: Arity -> StrictSig -> StrictSig
--- We are expanding (\x y. e) to (\x y z. e z)
--- Add exta demands to the /end/ of the arg demands if necessary
-etaExpandStrictSig arity sig@(StrictSig dmd_ty@(DmdType env dmds res))
-  | isTopDmdType dmd_ty = sig
-  | arity_increase <= 0 = sig
-  | otherwise           = StrictSig (DmdType env dmds' res)
-  where
-    arity_increase = arity - length dmds
-    dmds' = dmds ++ replicate arity_increase topDmd
+-- ^ We are expanding (\x y. e) to (\x y z. e z).
+-- In contrast to 'increaseStrictSigArity', this /appends/ extra arg demands if
+-- necessary, potentially destroying the signature's CPR property.
+etaExpandStrictSig arity (StrictSig dmd_ty)
+  | arity < dmdTypeDepth dmd_ty
+  -- an arity decrease must zap the whole signature, because it was possibly
+  -- computed for a higher incoming call demand.
+  = nopSig
+  | otherwise
+  = StrictSig $ ensureArgs arity dmd_ty
 
 isTopSig :: StrictSig -> Bool
 isTopSig (StrictSig ty) = isTopDmdType ty
