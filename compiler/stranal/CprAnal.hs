@@ -52,14 +52,14 @@ cprAnalProgram dflags fam_envs binds
     }
   where
     do_prog :: CoreProgram -> CoreProgram
-    do_prog binds = snd $ mapAccumL cprAnalTopBind (emptyAnalEnv dflags fam_envs) binds
+    do_prog binds = snd $ mapAccumL cprAnalTopBind (emptyAnalEnv fam_envs) binds
 
 -- Analyse a (group of) top-level binding(s)
 cprAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
 cprAnalTopBind env (NonRec id rhs)
-  = (extendAnalEnv TopLevel env id' (get_idCprInfo id'), NonRec id' rhs')
+  = (extendAnalEnv env id' (get_idCprInfo id'), NonRec id' rhs')
   where
     (id', rhs') = cprAnalRhsLetDown TopLevel env 0 id rhs
 
@@ -142,7 +142,7 @@ cprAnal' env n (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
   where
     (id', rhs')      = cprAnalRhsLetDown NotTopLevel env n id rhs
-    env'             = extendAnalEnv NotTopLevel env id' (get_idCprInfo id')
+    env'             = extendAnalEnv env id' (get_idCprInfo id')
     (body_ty, body') = cprAnal env' n body
 
 cprAnal' env n (Let (Rec pairs) body)
@@ -224,7 +224,7 @@ cprFix top_lvl env let_arty orig_pairs
         found_fixpoint    = map (idCprInfo . fst) pairs' == map (idCprInfo . fst) pairs
         first_round       = n == 1
         pairs'            = step first_round pairs
-        final_anal_env    = extendAnalEnvs top_lvl env (map fst pairs')
+        final_anal_env    = extendAnalEnvs env (map fst pairs')
 
     step :: Bool -> [(Id, CoreExpr)] -> [(Id, CoreExpr)]
     step first_round pairs = pairs'
@@ -233,7 +233,7 @@ cprFix top_lvl env let_arty orig_pairs
         start_env | first_round = env
                   | otherwise   = nonVirgin env
 
-        start = extendAnalEnvs top_lvl start_env (map fst pairs)
+        start = extendAnalEnvs start_env (map fst pairs)
 
         (_, pairs') = mapAccumL my_downRhs start pairs
                 -- mapAccumL: Use the new signature to do the next pair
@@ -244,7 +244,7 @@ cprFix top_lvl env let_arty orig_pairs
           = (env', (id', rhs'))
           where
             (id', rhs') = cprAnalRhsLetDown top_lvl env let_arty id rhs
-            env'        = extendAnalEnv top_lvl env id (get_idCprInfo id')
+            env'        = extendAnalEnv env id (get_idCprInfo id')
 
 
     zapIdCprInfo :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
@@ -264,10 +264,13 @@ cprAnalTrivialRhs env id rhs fn
 --  * assuming manifest arity
 --  * looking at the definition
 --  * determining a CPR signature
-cprAnalRhsLetDown :: TopLevelFlag
-           -> AnalEnv -> Arity
-           -> Id -> CoreExpr
-           -> (Id, CoreExpr)
+cprAnalRhsLetDown
+  :: TopLevelFlag
+  -> AnalEnv
+  -> Arity
+  -> Id
+  -> CoreExpr
+  -> (Id, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 cprAnalRhsLetDown top_lvl env let_arty id rhs
@@ -371,20 +374,15 @@ instance Outputable CprType where
   ppr (CprType arty res) = ppr arty <> ppr res
 
 data AnalEnv
-  = AE { ae_dflags :: DynFlags
-       , ae_sigs   :: SigEnv
-       , ae_virgin :: Bool    -- True on first iteration only
-                              -- See Note [Initialising strictness]
-       , ae_rec_tc :: RecTcChecker
-       , ae_fam_envs :: FamInstEnvs
- }
-
-        -- We use the se_env to tell us whether to
-        -- record info about a variable in the DmdEnv
-        -- We do so if it's a LocalId, but not top-level
-        --
-        -- The DmdEnv gives the demand on the free vars of the function
-        -- when it is given enough args to satisfy the strictness signature
+  = AE
+  { ae_sigs   :: SigEnv
+  -- ^ Current approximation of signatures for local ids
+  , ae_virgin :: Bool
+  -- ^ True only on every first iteration in a fixed-point
+  -- iteration. See Note [Initialising strictness] in "DmdAnal"
+  , ae_fam_envs :: FamInstEnvs
+  -- ^ Needed when expanding type families and synonyms of product types.
+  }
 
 type SigEnv = VarEnv CprType
 
@@ -394,33 +392,24 @@ instance Outputable AnalEnv where
          [ text "ae_virgin =" <+> ppr virgin
          , text "ae_sigs =" <+> ppr env ])
 
-emptyAnalEnv :: DynFlags -> FamInstEnvs -> AnalEnv
-emptyAnalEnv dflags fam_envs
-    = AE { ae_dflags = dflags
-         , ae_sigs = emptySigEnv
-         , ae_virgin = True
-         , ae_rec_tc = initRecTc
-         , ae_fam_envs = fam_envs
-         }
-
-emptySigEnv :: SigEnv
-emptySigEnv = emptyVarEnv
+emptyAnalEnv :: FamInstEnvs -> AnalEnv
+emptyAnalEnv fam_envs
+  = AE
+  { ae_sigs = emptyVarEnv
+  , ae_virgin = True
+  , ae_fam_envs = fam_envs
+  }
 
 -- | Extend an environment with the strictness IDs attached to the id
-extendAnalEnvs :: TopLevelFlag -> AnalEnv -> [Id] -> AnalEnv
-extendAnalEnvs top_lvl env vars
-  = env { ae_sigs = extendSigEnvs top_lvl (ae_sigs env) vars }
+extendAnalEnvs :: AnalEnv -> [Id] -> AnalEnv
+extendAnalEnvs env ids
+  = env { ae_sigs = sigs' }
+  where
+    sigs' = extendVarEnvList (ae_sigs env) [ (id, get_idCprInfo id) | id <- ids ]
 
-extendSigEnvs :: TopLevelFlag -> SigEnv -> [Id] -> SigEnv
-extendSigEnvs _top_lvl sigs vars
-  = extendVarEnvList sigs [ (var, get_idCprInfo var) | var <- vars]
-
-extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> CprType -> AnalEnv
-extendAnalEnv _top_lvl env var sig
-  = env { ae_sigs = extendSigEnv _top_lvl (ae_sigs env) var sig }
-
-extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> CprType -> SigEnv
-extendSigEnv _top_lvl sigs var sig = extendVarEnv sigs var sig
+extendAnalEnv :: AnalEnv -> Id -> CprType -> AnalEnv
+extendAnalEnv env id sig
+  = env { ae_sigs = extendVarEnv (ae_sigs env) id sig }
 
 lookupSigEnv :: AnalEnv -> Id -> Maybe CprType
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
@@ -434,7 +423,7 @@ extendSigsWithLam env id
   | isId id
   , isStrictDmd (idDemandInfo id) -- See Note [CPR for strict binders]
   , Just (dc,_,_,_) <- deepSplitProductType_maybe (ae_fam_envs env) $ idType id
-  = extendAnalEnv NotTopLevel env id (prodCprType (dataConRepArity dc))
+  = extendAnalEnv env id (prodCprType (dataConRepArity dc))
   | otherwise
   = env
 
@@ -443,7 +432,7 @@ extendEnvForDataAlt :: AnalEnv -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
 extendEnvForDataAlt env scrut case_bndr dc bndrs
   = foldl' do_con_arg env' ids_w_strs
   where
-    env' = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
+    env' = extendAnalEnv env case_bndr case_bndr_sig
 
     ids_w_strs    = filter isId bndrs `zip` dataConRepStrictness dc
 
@@ -469,7 +458,7 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
        , is_var_scrut && is_strict
        , let fam_envs = ae_fam_envs env
        , Just (dc,_,_,_) <- deepSplitProductType_maybe fam_envs $ idType id
-       = extendAnalEnv NotTopLevel env id (prodCprType (dataConRepArity dc))
+       = extendAnalEnv env id (prodCprType (dataConRepArity dc))
        | otherwise
        = env
 
