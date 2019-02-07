@@ -41,6 +41,7 @@ import Type     ( Type, tyConAppTyCon )
 import TyCon
 import CLabel
 import CmmUtils
+import CmmInfo (cmmGetClosureType)
 import PrimOp
 import SMRep
 import FastString
@@ -659,6 +660,9 @@ emitPrimOp _      [res] Word2FloatOp  [w] = emitPrimCall [res]
                                             (MO_UF_Conv W32) [w]
 emitPrimOp _      [res] Word2DoubleOp [w] = emitPrimCall [res]
                                             (MO_UF_Conv W64) [w]
+-- Get the closure type of an unlifted boxed value
+emitPrimOp dflags [res] GetClosureType [w] =
+  emitAssign (CmmLocal res) (cmmGetClosureType dflags w)
 
 -- SIMD primops
 emitPrimOp dflags [res] (VecBroadcastOp vcat n w) [e] = do

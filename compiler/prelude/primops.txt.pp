@@ -3367,6 +3367,15 @@ primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
+primop  GetClosureType "getClosureType#" GenPrimOp
+   a -> Word#
+      -- NB: the type variable "o" is "a", but with OpenKind
+   { Get the type of the given closure. The argument must be unlifted
+     and boxed. }
+   with
+   has_side_effects = False
+   out_of_line      = False
+
 ------------------------------------------------------------------------
 section "Safe coercions"
 ------------------------------------------------------------------------

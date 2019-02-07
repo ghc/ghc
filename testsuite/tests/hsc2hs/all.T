@@ -20,3 +20,5 @@ test('T12504', [extra_files(['T12504']), ignore_stdout], makefile_test, [])
 
 # Make sure response files are read and used.
 test('T15758', [], makefile_test, [])
+
+test('GetClosureType01', [], makefile_test, [])

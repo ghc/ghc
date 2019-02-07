@@ -23,7 +23,6 @@ module GHC.Event
     , Event
     , evtRead
     , evtWrite
-    , IOCallback
     , FdKey(keyFd)
     , Lifetime(..)
     , registerFd

@@ -45,7 +45,6 @@ module GHC.Event.Manager
     , Event
     , evtRead
     , evtWrite
-    , IOCallback
     , FdKey(keyFd)
     , FdData
     , registerFd
@@ -72,18 +71,21 @@ import Data.Maybe (maybe)
 import Data.OldList (partition)
 import GHC.Primitive.Array (Array,indexArray,replicateArrayP)
 import GHC.Base
-import GHC.Conc.Sync (yield)
+import GHC.Conc.Sync (yield,writeTVar,atomically)
 import GHC.List (filter)
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral)
 import GHC.Show (Show(..))
 import GHC.Event.Control
+import GHC.Event.CVar (CVar)
 import GHC.Event.IntTable (IntTable)
 import GHC.Event.Internal (Event, Lifetime(..), EventLifetime, Timeout(..))
 import GHC.Event.Internal (evtClose, evtRead, evtWrite)
+import GHC.Event.CVar (CVar)
 import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
 import System.Posix.Types (Fd)
 
+import qualified GHC.Event.CVar as CV
 import qualified GHC.Event.IntTable as IT
 import qualified GHC.Event.Internal as I
 import qualified GHC.Event.Backend as I
@@ -94,7 +96,7 @@ import qualified GHC.Event.Backend as I
 data FdData = FdData {
       fdKey       :: {-# UNPACK #-} !FdKey
     , fdEvents    :: {-# UNPACK #-} !EventLifetime
-    , _fdCallback :: !IOCallback
+    , _fdCVar     :: {-# UNPACK #-} !CVar
     }
 
 -- | A file descriptor registration cookie.
@@ -104,9 +106,6 @@ data FdKey = FdKey {
     } deriving ( Eq   -- ^ @since 4.4.0.0
                , Show -- ^ @since 4.4.0.0
                )
-
--- | Callback invoked on I/O events.
-type IOCallback = FdKey -> Event -> IO ()
 
 data State = Created
            | Running
@@ -295,15 +294,22 @@ step mgr@EventManager{..} = do
 -- platform's @select@ or @epoll@ system call, which tend to vary in
 -- what sort of fds are permitted. For instance, waiting on regular files
 -- is not allowed on many platforms.
-registerFd_ :: EventManager -> IOCallback -> Fd -> Event -> Lifetime
+--
+-- Please ensure that exceptions are masked when this function is called.
+-- Everything from GHC.Event.Thread masks exceptions before calling this.
+-- We rely on this assumption about the masking state to avoid redundant
+-- calls to mask/mask_.
+registerFd_ :: EventManager -> CVar -> Fd -> Event -> Lifetime
             -> IO (FdKey, Bool)
-registerFd_ mgr@(EventManager{..}) cb !fd !evs lt = do
+registerFd_ mgr@(EventManager{..}) !cv !fd !evs lt = do
   u <- newUnique emUniqueSource
   let fd'  = fromIntegral fd
       reg  = FdKey fd u
       el = I.eventLifetime evs lt
-      !fdd = FdData reg el cb
-  (modify,ok) <- withMVar (callbackTableVar mgr fd) $ \tbl -> do
+      !fdd = FdData reg el cv
+  -- Since the caller of registerFd_ must mask exceptions before calling
+  -- it, we do not need the full power of withMVar.
+  (modify,ok) <- withMVarMaskless (callbackTableVar mgr fd) $ \tbl -> do
     oldFdd <- IT.insertWith (++) fd' [fdd] tbl
     let prevEvs :: EventLifetime
         prevEvs = maybe mempty eventsOf oldFdd
@@ -329,20 +335,37 @@ registerFd_ mgr@(EventManager{..}) cb !fd !evs lt = do
         if ok
           then return (modify, True)
           else IT.reset fd' oldFdd tbl >> return (False, False)
-  -- this simulates behavior of old IO manager:
+  -- This simulates behavior of old IO manager:
   -- i.e. just call the callback if the registration fails.
-  when (not ok) (cb reg evs)
+  -- See https://mail.haskell.org/pipermail/ghc-devs/2013-March/000798.html
+  -- This only ever happens on the kqueue backend. The other backends
+  -- throw an exception when registration fails.
+  -- This is dangerous behavior since it can lead to the whole
+  -- runtime being blocked by an uninterruptible FFI call. We may
+  -- want to consider throwing an exception instead.
+  when (not ok) (putReady cv)
   return (reg,modify)
 
--- | @registerFd mgr cb fd evs lt@ registers interest in the events @evs@
--- on the file descriptor @fd@ for lifetime @lt@. @cb@ is called for
--- each event that occurs.  Returns a cookie that can be handed to
--- 'unregisterFd'.
-registerFd :: EventManager -> IOCallback -> Fd -> Event -> Lifetime -> IO FdKey
-registerFd mgr cb !fd !evs lt = do
-  (r, wake) <- registerFd_ mgr cb fd evs lt
+-- | @registerFd mgr cv fd evs lt@ registers interest in the events @evs@
+-- on the file descriptor @fd@ for lifetime @lt@. The @cv@ is filled when
+-- an event of the requested type occurs.  Returns a cookie that can be
+-- handed to 'unregisterFd'.
+registerFd :: EventManager -> CVar -> Fd -> Event -> Lifetime -> IO FdKey
+registerFd mgr !cv !fd !evs lt = do
+  (r, wake) <- registerFd_ mgr cv fd evs lt
   when wake $ wakeManager mgr
   return r
+
+-- This is the same as withMVar except that it doesn't do the
+-- mask/restore dance. It should only be used in a context
+-- where you know that exceptions are already masked.
+withMVarMaskless :: MVar a -> (a -> IO b) -> IO b
+{-# INLINE withMVarMaskless #-}
+withMVarMaskless m io = do
+  a <- takeMVar m
+  b <- io a `onException` putMVar m a
+  putMVar m a
+  return b
 
 {-
     Building GHC with parallel IO manager on Mac freezes when
@@ -410,7 +433,7 @@ closeFd mgr close fd = do
           wakeManager mgr
         close fd
         return fds
-  forM_ fds $ \(FdData reg el cb) -> cb reg (I.elEvent el `mappend` evtClose)
+  forM_ fds $ \(FdData _ _ cv) -> putClosed cv
 
 -- | Close a file descriptor in a race-safe way.
 -- It assumes the caller will update the callback tables and that the caller
@@ -430,8 +453,7 @@ closeFd_ mgr tbl fd = do
         _ <- I.modifyFd (emBackend mgr) fd (I.elEvent oldEls) mempty
         wakeManager mgr
       return $
-        forM_ fds $ \(FdData reg el cb) ->
-          cb reg (I.elEvent el `mappend` evtClose)
+        forM_ fds $ \(FdData _ _ cv) -> putClosed cv
 
 ------------------------------------------------------------------------
 -- Utilities
@@ -445,7 +467,7 @@ onFdEvent mgr fd evs
   | otherwise = do
     fdds <- withMVar (callbackTableVar mgr fd) $ \tbl ->
         IT.delete (fromIntegral fd) tbl >>= maybe (return []) (selectCallbacks tbl)
-    forM_ fdds $ \(FdData reg _ cb) -> cb reg evs
+    forM_ fdds $ \(FdData _ _ cv) -> putReady cv
   where
     -- | Here we look through the list of registrations for the fd of interest
     -- and sort out which match the events that were triggered. We,
@@ -494,6 +516,22 @@ onFdEvent mgr fd evs
                                   (I.elEvent allEls) (I.elEvent savedEls)
 
         return triggered
+
+-- Notify the reading end of the CVar that the file descriptor they were
+-- waiting on is ready for the operation specified earlier.
+putReady :: CVar -> IO ()
+putReady = CV.match
+  (\mv -> putMVar mv True)
+  (\tv -> atomically (writeTVar tv CV.Ready))
+
+-- Notify the reading end of the CVar that the file descriptor they were
+-- waiting on has been closed. Usually, the user handles this by throwing
+-- an exception since it is an indicator of incorrect concurrent access
+-- to a file descriptor.
+putClosed :: CVar -> IO ()
+putClosed = CV.match
+  (\mv -> putMVar mv False)
+  (\tv -> atomically (writeTVar tv CV.Closed))
 
 nullToNothing :: [a] -> Maybe [a]
 nullToNothing []       = Nothing

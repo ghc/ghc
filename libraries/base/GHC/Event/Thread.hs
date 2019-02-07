@@ -37,6 +37,7 @@ import GHC.Event.Control (controlWriteFd)
 import GHC.Event.Internal (eventIs, evtClose, evtNothing)
 import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
                              new, registerFd, unregisterFd_)
+import qualified GHC.Event.CVar as CV
 import qualified GHC.Event.Manager as M
 import qualified GHC.Event.TimerManager as TM
 import GHC.Num ((-), (+))
@@ -110,32 +111,35 @@ closeFdWith close fd = do
 
 
 threadWait :: Event -> Fd -> IO ()
-threadWait !evt !fd = mask_ $ do
+threadWait !evt !fd = do
   m <- newEmptyMVar
   mgr <- getSystemEventManager_
-  reg <- registerFd mgr (\_ e -> putMVar m e) fd evt M.OneShot
-  evt' <- takeMVar m `onException` unregisterFd_ mgr reg
-  if evt' `eventIs` evtClose
-    then ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
-    else return ()
+  ready <- mask_ $ do
+    reg <- registerFd mgr (CV.mvar m) fd evt M.OneShot
+    takeMVar m `onException` unregisterFd_ mgr reg
+  -- The event manager puts False in the MVar if the file descriptor
+  -- is closed while we are waiting on it.
+  if ready
+    then pure ()
+    else ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
 
 -- used at least by RTS in 'select()' IO manager backend
 blockedOnBadFD :: SomeException
 blockedOnBadFD = toException $ errnoToIOError "awaitEvent" eBADF Nothing Nothing
 
 threadWaitSTM :: Event -> Fd -> IO (STM (), IO ())
-threadWaitSTM !evt !fd = mask_ $ do
-  m <- newTVarIO evtNothing
+threadWaitSTM !evt !fd = do
+  m <- newTVarIO CV.NotReady
   mgr <- getSystemEventManager_
-  reg <- registerFd mgr (\_ e -> atomically (writeTVar m e)) fd evt M.OneShot
-  let waitAction =
-        do evt' <- readTVar m
-           if evt' == evtNothing
-             then retry
-             else if evt' `eventIs` evtClose
-               then throwSTM $ errnoToIOError "threadWaitSTM" eBADF Nothing Nothing
-               else return ()
-  return (waitAction, unregisterFd_ mgr reg >> return ())
+  mask_ $ do
+    reg <- registerFd mgr (CV.tvar m) fd evt M.OneShot
+    let waitAction =
+          do status <- readTVar m
+             case status of
+               CV.NotReady -> retry
+               CV.Ready -> pure ()
+               CV.Closed -> throwSTM $ errnoToIOError "threadWaitSTM" eBADF Nothing Nothing
+    return (waitAction, unregisterFd_ mgr reg >> return ())
 
 -- | Allows a thread to use an STM action to wait for a file descriptor to be readable.
 -- The STM action will retry until the file descriptor has data ready.

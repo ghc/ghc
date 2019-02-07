@@ -27,6 +27,7 @@ import Data.Maybe
 import GHC.Base hiding (empty)
 import GHC.Num (Num(..))
 import GHC.Ptr (Ptr(..))
+import Foreign.Storable (Storable,peek)
 
 import GHC.Primitive.PrimArray
 import GHC.Primitive.Monad (Prim,sizeOf#)
@@ -154,22 +155,37 @@ snoc (Array ref) e = do
         writeIORef ref (AC p')
       else unsafeWrite' p len e
 
--- Execute the provided action on each element in the array.
-forM_ :: Prim a => Array a -> (a -> IO ()) -> IO ()
+-- -- Execute the provided action on each element in the array.
+-- forM_ :: Prim a => Array a -> (a -> IO ()) -> IO ()
+-- forM_ (Array ref) g = do
+--   AC p <- readIORef ref
+--   len <- readElementCount p
+--   -- This loop is a little unusual. Remember that the first element in
+--   -- the array is not an element at all. It is the length (the count of
+--   -- active elements). Consequently, we skip this element, and we go one
+--   -- element further than we normally would. Note the use of LTE rather
+--   -- than LT in the if expression.
+--   let go !ix = if ix <= len
+--         then do
+--           g =<< readPrimArray p ix
+--           go (ix + 1)
+--         else pure ()
+--   go 1
+
+forM_ :: (Storable a, Prim a) => Array a -> (a -> IO ()) -> IO ()
+{-# INLINE forM_ #-}
 forM_ (Array ref) g = do
   AC p <- readIORef ref
   len <- readElementCount p
-  -- This loop is a little unusual. Remember that the first element in
-  -- the array is not an element at all. It is the length (the count of
-  -- active elements). Consequently, we skip this element, and we go one
-  -- element further than we normally would. Note the use of LTE rather
-  -- than LT in the if expression.
-  let go !ix = if ix <= len
+  let ptr0 = advancePtr (mutablePrimArrayContents p) 1
+      ptrN = advancePtr ptr0 len
+  let go !ptr = if ptr < ptrN
         then do
-          g =<< readPrimArray p ix
-          go (ix + 1)
+          g =<< peek ptr
+          go (advancePtr ptr 1)
         else pure ()
-  go 1
+  go ptr0
+  touchMutablePrimArray p
 
 -- Traverse the array with some effectful callback until the
 -- callback returns False. The callback also uses an accumulator.

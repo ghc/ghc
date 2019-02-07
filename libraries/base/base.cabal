@@ -385,6 +385,7 @@ Library
             GHC.Event.Array
             GHC.Event.Backend
             GHC.Event.Control
+            GHC.Event.CVar
             GHC.Event.EPoll
             GHC.Event.IntTable
             GHC.Event.Internal

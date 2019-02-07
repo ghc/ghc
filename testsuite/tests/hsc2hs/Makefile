@@ -59,3 +59,9 @@ endif
 T15758:
 	'$(HSC2HS)' $@.hsc @T15758.response
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c $@.a.hs
+
+.PHONY: GetClosureType01
+GetClosureType01:
+	'$(HSC2HS)' $@.hsc
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make $@
+	./$@
