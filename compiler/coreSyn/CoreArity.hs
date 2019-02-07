@@ -158,7 +158,13 @@ exprBotStrictness_maybe e
 {-
 Note [exprArity invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-exprArity has the following invariant:
+Assuming e is neither (see Note [Eta expanding thunks])
+
+  * trivial (e = x |> co)
+  * a PAP (e = f x)
+  * a multi-entry thunk (e = case expensive of q -> \x -> ...),
+
+exprArity has the following invariants:
 
   (1) If typeArity (exprType e) = n,
       then manifestArity (etaExpand e n) = n
@@ -168,7 +174,8 @@ exprArity has the following invariant:
 
   (2) exprArity e <= typeArity (exprType e)
 
-  (3) Hence if (exprArity e) = n, then manifestArity (etaExpand e n) = n
+  (3) Hence if (exprArity e) = n
+            then manifestArity (etaExpand e n) = n
 
       That is, if exprArity says "the arity is n" then etaExpand really
       can get "n" manifest lambdas to the top.
@@ -179,6 +186,11 @@ Why is this important?  Because
   - In CorePrep we use etaExpand on each rhs, so that the visible lambdas
     actually match that arity, which in turn means
     that the StgRhs has the right number of lambdas
+  - In demand analysis, we want to analyse trivial right-hand sides like in
+    let y = x |> co in ... as if we looked directly into the definition of x.
+    This is the case if y has the same arity as x.
+    See Note [Newtype arity] and
+    Note [Demand analysis for trivial right-hand sides] in DmdAnal.hs.
 
 An alternative would be to do the eta-expansion in TidyPgm, at least
 for top-level bindings, in which case we would not need the trim_arity
