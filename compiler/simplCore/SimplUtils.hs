@@ -1508,7 +1508,7 @@ tryEtaExpandRhs :: SimplMode -> OutId -> OutExpr
                 -> SimplM (Arity, Bool, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 -- If tryEtaExpandRhs rhs = (n, is_bot, rhs') then
---   (a) rhs' has manifest arity
+--   (a) rhs' has manifest arity n
 --   (b) if is_bot is True then rhs' applied to n args is guaranteed bottom
 tryEtaExpandRhs mode bndr rhs
   | Just join_arity <- isJoinId_maybe bndr
@@ -1517,6 +1517,7 @@ tryEtaExpandRhs mode bndr rhs
          -- Note [Do not eta-expand join points]
          -- But do return the correct arity and bottom-ness, because
          -- these are used to set the bndr's IdInfo (#15517)
+         -- Note [idArity for join points]
 
   | otherwise
   = do { (new_arity, is_bot, new_rhs) <- try_expand
@@ -1609,6 +1610,13 @@ CorePrep comes around, the code is very likely to look more like this:
              $j2 :: Int -> State# RealWorld -> (# State# RealWorld, ())
              $j2 = if n > 0 then $j1
                             else (...) eta
+
+Note [idArity for join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Because of Note [Do not eta-expand join points] we have it that the idArity
+of a join point is always (less than or) equal to the join arity.
+Essentially, for join points we set `idArity $j = count isId join_lam_bndrs`.
+It really can be less if there are type-level binders in join_lam_bndrs.
 
 Note [Do not eta-expand PAPs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

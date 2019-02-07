@@ -237,22 +237,34 @@ pprIdDetails other     = brackets (pp other)
 -- too big.
 data IdInfo
   = IdInfo {
-        arityInfo       :: !ArityInfo,          -- ^ 'Id' arity
-        ruleInfo        :: RuleInfo,            -- ^ Specialisations of the 'Id's function which exist
-                                                -- See Note [Specialisations and RULES in IdInfo]
-        unfoldingInfo   :: Unfolding,           -- ^ The 'Id's unfolding
-        cafInfo         :: CafInfo,             -- ^ 'Id' CAF info
-        oneShotInfo     :: OneShotInfo,         -- ^ Info about a lambda-bound variable, if the 'Id' is one
-        inlinePragInfo  :: InlinePragma,        -- ^ Any inline pragma atached to the 'Id'
-        occInfo         :: OccInfo,             -- ^ How the 'Id' occurs in the program
-
-        strictnessInfo  :: StrictSig,      --  ^ A strictness signature
-
-        demandInfo      :: Demand,       -- ^ ID demand information
-        callArityInfo   :: !ArityInfo,   -- ^ How this is called.
-                                         -- n <=> all calls have at least n arguments
-
-        levityInfo      :: LevityInfo    -- ^ when applied, will this Id ever have a levity-polymorphic type?
+        arityInfo       :: !ArityInfo,
+        -- ^ 'Id' arity, as computed by 'CoreArity'. Specifies how many
+        -- arguments this 'Id' has to be applied to before it doesn any
+        -- meaningful work.
+        ruleInfo        :: RuleInfo,
+        -- ^ Specialisations of the 'Id's function which exist.
+        -- See Note [Specialisations and RULES in IdInfo]
+        unfoldingInfo   :: Unfolding,
+        -- ^ The 'Id's unfolding
+        cafInfo         :: CafInfo,
+        -- ^ 'Id' CAF info
+        oneShotInfo     :: OneShotInfo,
+        -- ^ Info about a lambda-bound variable, if the 'Id' is one
+        inlinePragInfo  :: InlinePragma,
+        -- ^ Any inline pragma atached to the 'Id'
+        occInfo         :: OccInfo,
+        -- ^ How the 'Id' occurs in the program
+        strictnessInfo  :: StrictSig,
+        -- ^ A strictness signature. Digests how a function uses its arguments
+        -- if applied to at least 'arityInfo' arguments.
+        demandInfo      :: Demand,
+        -- ^ ID demand information
+        callArityInfo   :: !ArityInfo,
+        -- ^ How this is called. This is the number of arguments to which a
+        -- binding can be eta-expanded without losing any sharing.
+        -- n <=> all calls have at least n arguments
+        levityInfo      :: LevityInfo
+        -- ^ when applied, will this Id ever have a levity-polymorphic type?
     }
 
 -- Setters

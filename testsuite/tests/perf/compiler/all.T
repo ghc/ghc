@@ -393,6 +393,13 @@ test ('T15164',
       compile,
       ['-v0 -O'])
 
+# See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_186960
+test ('WWRec',
+      [ collect_compiler_stats('bytes allocated',10)
+      ],
+      compile,
+      ['-v0 -O'])
+
 test('T16190',
       collect_stats(),
       multimod_compile,

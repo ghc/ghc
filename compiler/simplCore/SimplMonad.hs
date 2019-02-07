@@ -21,7 +21,7 @@ module SimplMonad (
 
 import GhcPrelude
 
-import Var              ( Var, isTyVar, mkLocalVar )
+import Var              ( Var, isId, mkLocalVar )
 import Name             ( mkSystemVarName )
 import Id               ( Id, mkSysLocalOrCoVar )
 import IdInfo           ( IdDetails(..), vanillaIdInfo, setArityInfo )
@@ -187,7 +187,8 @@ newJoinId bndrs body_ty
   = do { uniq <- getUniqueM
        ; let name       = mkSystemVarName uniq (fsLit "$j")
              join_id_ty = mkLamTypes bndrs body_ty  -- Note [Funky mkLamTypes]
-             arity      = length (filter (not . isTyVar) bndrs)
+             -- Note [idArity for join points] in SimplUtils
+             arity      = length (filter isId bndrs)
              join_arity = length bndrs
              details    = JoinId join_arity
              id_info    = vanillaIdInfo `setArityInfo` arity

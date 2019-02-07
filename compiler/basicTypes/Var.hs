@@ -700,6 +700,8 @@ setIdNotExported id = ASSERT( isLocalId id )
 ************************************************************************
 -}
 
+-- | Is this a type-level (i.e., computationally irrelevant, thus erasable)
+-- variable? Satisfies @isTyVar = not . isId@.
 isTyVar :: Var -> Bool        -- True of both TyVar and TcTyVar
 isTyVar (TyVar {})   = True
 isTyVar (TcTyVar {}) = True
@@ -712,17 +714,21 @@ isTcTyVar _            = False
 isTyCoVar :: Var -> Bool
 isTyCoVar v = isTyVar v || isCoVar v
 
+-- | Is this a value-level (i.e., computationally relevant) 'Id'entifier?
+-- Satisfies @isId = not . isTyVar@.
 isId :: Var -> Bool
 isId (Id {}) = True
 isId _       = False
 
+-- | Is this a coercion variable?
+-- Satisfies @'isId' v ==> 'isCoVar' v == not ('isNonCoVarId' v)@.
 isCoVar :: Var -> Bool
--- A coercion variable
 isCoVar (Id { id_details = details }) = isCoVarDetails details
 isCoVar _                             = False
 
+-- | Is this a term variable ('Id') that is /not/ a coercion variable?
+-- Satisfies @'isId' v ==> 'isCoVar' v == not ('isNonCoVarId' v)@.
 isNonCoVarId :: Var -> Bool
--- A term variable (Id) that is /not/ a coercion variable
 isNonCoVarId (Id { id_details = details }) = not (isCoVarDetails details)
 isNonCoVarId _                             = False
 

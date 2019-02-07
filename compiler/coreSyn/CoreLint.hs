@@ -570,15 +570,9 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
               (addWarnL (text "INLINE binder is (non-rule) loop breaker:" <+> ppr binder))
               -- Only non-rule loop breakers inhibit inlining
 
-      -- Check whether arity and demand type are consistent (only if demand analysis
-      -- already happened)
-      --
-      -- Note (Apr 2014): this is actually ok.  See Note [Demand analysis for trivial right-hand sides]
-      --                  in DmdAnal.  After eta-expansion in CorePrep the rhs is no longer trivial.
-      --       ; let dmdTy = idStrictness binder
-      --       ; checkL (case dmdTy of
-      --                  StrictSig dmd_ty -> idArity binder >= dmdTypeDepth dmd_ty || exprIsTrivial rhs)
-      --           (mkArityMsg binder)
+       -- We used to check that the dmdTypeDepth of a demand signature never
+       -- exceeds idArity, but that is an unnecessary complication, see
+       -- Note [idArity varies independently of dmdTypeDepth] in DmdAnal
 
        -- Check that the binder's arity is within the bounds imposed by
        -- the type and the strictness signature. See Note [exprArity invariant]
@@ -2565,20 +2559,6 @@ mkKindErrMsg tyvar arg_ty
           hang (text "Arg type:")
                  4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
-{- Not needed now
-mkArityMsg :: Id -> MsgDoc
-mkArityMsg binder
-  = vcat [hsep [text "Demand type has",
-                ppr (dmdTypeDepth dmd_ty),
-                text "arguments, rhs has",
-                ppr (idArity binder),
-                text "arguments,",
-                ppr binder],
-              hsep [text "Binder's strictness signature:", ppr dmd_ty]
-
-         ]
-           where (StrictSig dmd_ty) = idStrictness binder
--}
 mkCastErr :: CoreExpr -> Coercion -> Type -> Type -> MsgDoc
 mkCastErr expr = mk_cast_err "expression" "type" (ppr expr)
 

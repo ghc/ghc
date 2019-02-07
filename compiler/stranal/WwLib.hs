@@ -134,7 +134,7 @@ mkWwBodies :: DynFlags
 -- wrap_fn_str E        = case x of { (a,b) ->
 --                        case a of { (a1,a2) ->
 --                        E a1 a2 b y }}
--- work_fn_str E        = \a2 a2 b y ->
+-- work_fn_str E        = \a1 a2 b y ->
 --                        let a = (a1,a2) in
 --                        let x = (a,b) in
 --                        E
