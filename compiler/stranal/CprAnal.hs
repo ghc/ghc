@@ -36,13 +36,9 @@ import ErrUtils         ( dumpIfSet_dyn )
 import Name             ( getName, stableNameCmp )
 import Data.Function    ( on )
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{Top level stuff}
-*                                                                      *
-************************************************************************
--}
+--
+-- * Analysing programs
+--
 
 cprAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
 cprAnalProgram dflags fam_envs binds
@@ -72,13 +68,9 @@ cprAnalTopBind env (Rec pairs)
   where
     (env', pairs') = cprFix TopLevel env 0 pairs
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{The analyser itself}
-*                                                                      *
-************************************************************************
--}
+--
+-- * Analysing expressions
+--
 
 -- Main CPR Analysis machinery
 cprAnal, cprAnal'
@@ -177,13 +169,9 @@ cprAnalAlt env _ _ n (con,bndrs,rhs)
   where
     (rhs_ty, rhs') = cprAnal env n rhs
 
-{-
-************************************************************************
-*                                                                      *
-                    CPR transformer
-*                                                                      *
-************************************************************************
--}
+--
+-- * CPR transformer
+--
 
 cprTransform :: AnalEnv         -- ^ The analysis environment
              -> Id              -- ^ The function
@@ -209,13 +197,9 @@ cprTransform env var
   | otherwise                                    -- Local non-letrec-bound thing
   = topCprType
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{Bindings}
-*                                                                      *
-************************************************************************
--}
+--
+-- * Bindings
+--
 
 -- Recursive bindings
 cprFix :: TopLevelFlag
@@ -275,26 +259,8 @@ cprFix top_lvl env let_arty orig_pairs
     zapIdCprInfo :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
     zapIdCprInfo pairs = [(setIdCprInfo id topCpr, rhs) | (id, rhs) <- pairs ]
 
-{-
-Note [Safe abortion in the fixed-point iteration]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Fixed-point iteration may fail to terminate. But we cannot simply give up and
-return the environment and code unchanged! We still need to do one additional
-round, for two reasons:
-
- * To get information on used free variables (both lazy and strict!)
-   (see Note [Lazy and unleashable free variables])
- * To ensure that all expressions have been traversed at least once, and any left-over
-   strictness annotations have been updated.
-
-This final iteration does not add the variables to the strictness signature
-environment, which effectively assigns them 'nopSig' (see "getCprType")
-
--}
-
 -- Trivial RHS
--- See Note [Demand analysis for trivial right-hand sides]
+-- See Note [Demand analysis for trivial right-hand sides] in DmdAnal.hs
 cprAnalTrivialRhs ::
     AnalEnv -> Id -> CoreExpr -> Var ->
     (Id, CoreExpr)
@@ -306,9 +272,9 @@ cprAnalTrivialRhs env id rhs fn
 -- Let bindings are processed in the following way (cf. LetDown from the paper
 -- “Higher-Order Cardinality Analysis”):
 --
---  * assuming a demand of <L,U>
+--  * assuming manifest arity
 --  * looking at the definition
---  * determining a strictness signature
+--  * determining a CPR signature
 cprAnalRhsLetDown :: TopLevelFlag
            -> AnalEnv -> Arity
            -> Id -> CoreExpr
@@ -359,155 +325,9 @@ unpackTrivial (Lam v e) | isTyVar v   = unpackTrivial e
 unpackTrivial (App e a) | isTypeArg a = unpackTrivial e
 unpackTrivial _                       = Nothing
 
-{- Note [Demand analysis for join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-   g :: (Int,Int) -> Int
-   g (p,q) = p+q
-
-   f :: T -> Int -> Int
-   f x p = g (join j y = (p,y)
-              in case x of
-                   A -> j 3
-                   B -> j 4
-                   C -> (p,7))
-
-If j was a vanilla function definition, we'd analyse its body with
-evalDmd, and think that it was lazy in p.  But for join points we can
-do better!  We know that j's body will (if called at all) be evaluated
-with the demand that consumes the entire join-binding, in this case
-the argument demand from g.  Whizzo!  g evaluates both components of
-its argument pair, so p will certainly be evaluated if j is called.
-
-For f to be strict in p, we need /all/ paths to evaluate p; in this
-case the C branch does so too, so we are fine.  So, as usual, we need
-to transport demands on free variables to the call site(s).  Compare
-Note [Lazy and unleashable free variables].
-
-The implementation is easy.  When analysing a join point, we can
-analyse its body with the demand from the entire join-binding (written
-let_dmd here).
-
-Another win for join points!  Trac #13543.
-
-Note [Demand analysis for trivial right-hand sides]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-        foo = plusInt |> co
-where plusInt is an arity-2 function with known strictness.  Clearly
-we want plusInt's strictness to propagate to foo!  But because it has
-no manifest lambdas, it won't do so automatically, and indeed 'co' might
-have type (Int->Int->Int) ~ T, so we *can't* eta-expand.  So we have a
-special case for right-hand sides that are "trivial", namely variables,
-casts, type applications, and the like.
-
-Note that this can mean that 'foo' has an arity that is smaller than that
-indicated by its demand info.  e.g. if co :: (Int->Int->Int) ~ T, then
-foo's arity will be zero (see Note [exprArity invariant] in CoreArity),
-but its demand signature will be that of plusInt. A small example is the
-test case of Trac #8963.
-
-************************************************************************
-*                                                                      *
-\subsection{Strictness signatures and types}
-*                                                                      *
-************************************************************************
--}
-
-{-
-Note [CPR for sum types]
-~~~~~~~~~~~~~~~~~~~~~~~~
-At the moment we do not do CPR for let-bindings that
-   * non-top level
-   * bind a sum type
-Reason: I found that in some benchmarks we were losing let-no-escapes,
-which messed it all up.  Example
-   let j = \x. ....
-   in case y of
-        True  -> j False
-        False -> j True
-If we w/w this we get
-   let j' = \x. ....
-   in case y of
-        True  -> case j' False of { (# a #) -> Just a }
-        False -> case j' True of { (# a #) -> Just a }
-Notice that j' is not a let-no-escape any more.
-
-However this means in turn that the *enclosing* function
-may be CPR'd (via the returned Justs).  But in the case of
-sums, there may be Nothing alternatives; and that messes
-up the sum-type CPR.
-
-Conclusion: only do this for products.  It's still not
-guaranteed OK for products, but sums definitely lose sometimes.
-
-Note [CPR for thunks]
-~~~~~~~~~~~~~~~~~~~~~
-If the rhs is a thunk, we usually forget the CPR info, because
-it is presumably shared (else it would have been inlined, and
-so we'd lose sharing if w/w'd it into a function).  E.g.
-
-        let r = case expensive of
-                  (a,b) -> (b,a)
-        in ...
-
-If we marked r as having the CPR property, then we'd w/w into
-
-        let $wr = \() -> case expensive of
-                            (a,b) -> (# b, a #)
-            r = case $wr () of
-                  (# b,a #) -> (b,a)
-        in ...
-
-But now r is a thunk, which won't be inlined, so we are no further ahead.
-But consider
-
-        f x = let r = case expensive of (a,b) -> (b,a)
-              in if foo r then r else (x,x)
-
-Does f have the CPR property?  Well, no.
-
-However, if the strictness analyser has figured out (in a previous
-iteration) that it's strict, then we DON'T need to forget the CPR info.
-Instead we can retain the CPR info and do the thunk-splitting transform
-(see WorkWrap.splitThunk).
-
-This made a big difference to PrelBase.modInt, which had something like
-        modInt = \ x -> let r = ... -> I# v in
-                        ...body strict in r...
-r's RHS isn't a value yet; but modInt returns r in various branches, so
-if r doesn't have the CPR property then neither does modInt
-Another case I found in practice (in Complex.magnitude), looks like this:
-                let k = if ... then I# a else I# b
-                in ... body strict in k ....
-(For this example, it doesn't matter whether k is returned as part of
-the overall result; but it does matter that k's RHS has the CPR property.)
-Left to itself, the simplifier will make a join point thus:
-                let $j k = ...body strict in k...
-                if ... then $j (I# a) else $j (I# b)
-With thunk-splitting, we get instead
-                let $j x = let k = I#x in ...body strict in k...
-                in if ... then $j a else $j b
-This is much better; there's a good chance the I# won't get allocated.
-
-The difficulty with this is that we need the strictness type to
-look at the body... but we now need the body to calculate the demand
-on the variable, so we can decide whether its strictness type should
-have a CPR in it or not.  Simple solution:
-        a) use strictness info from the previous iteration
-        b) make sure we do at least 2 iterations, by doing a second
-           round for top-level non-recs.  Top level recs will get at
-           least 2 iterations except for totally-bottom functions
-           which aren't very interesting anyway.
-
-NB: strictly_demanded is never true of a top-level Id, or of a recursive Id.
-
-************************************************************************
-*                                                                      *
-\subsection{Strictness signatures}
-*                                                                      *
-************************************************************************
--}
+--
+-- * CPR types
+--
 
 -- | The abstract domain $A_t$ from the original 'CPR for Haskell' paper.
 data CprType
@@ -692,8 +512,16 @@ dumpStrSig binds = vcat (map printId ids)
   printId id | isExportedId id = ppr id <> colon <+> pprIfaceStrictSig (idStrictness id)
              | otherwise       = empty
 
-{- Note [CPR in a DataAlt case alternative]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Safe abortion in the fixed-point iteration]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Fixed-point iteration may fail to terminate. But we cannot simply give up and
+return the environment and code unchanged! We still need to do one additional
+round, to ensure that all expressions have been traversed at least once, and any
+unsound CPR annotations have been updated.
+
+Note [CPR in a DataAlt case alternative]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In a case alternative, we want to give some of the binders the CPR property.
 Specifically
 
@@ -741,51 +569,6 @@ Specifically
    sub-component thereof.  But it's simple, and nothing terrible
    happens if we get it wrong.  e.g. Trac #10694.
 
-Note [Add demands for strict constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this program (due to Roman):
-
-    data X a = X !a
-
-    foo :: X Int -> Int -> Int
-    foo (X a) n = go 0
-     where
-       go i | i < n     = a + go (i+1)
-            | otherwise = 0
-
-We want the worker for 'foo' too look like this:
-
-    $wfoo :: Int# -> Int# -> Int#
-
-with the first argument unboxed, so that it is not eval'd each time
-around the 'go' loop (which would otherwise happen, since 'foo' is not
-strict in 'a').  It is sound for the wrapper to pass an unboxed arg
-because X is strict, so its argument must be evaluated.  And if we
-*don't* pass an unboxed argument, we can't even repair it by adding a
-`seq` thus:
-
-    foo (X a) n = a `seq` go 0
-
-because the seq is discarded (very early) since X is strict!
-
-We achieve the effect using addDataConStrictness.  It is called at a
-case expression, such as the pattern match on (X a) in the example
-above.  After computing how 'a' is used in the alternatives, we add an
-extra 'seqDmd' to it.  The case alternative isn't itself strict in the
-sub-components, but simply evaluating the scrutinee to HNF does force
-those sub-components.
-
-If the argument is not used at all in the alternative (i.e. it is
-Absent), then *don't* add a 'seqDmd'.  If we do, it makes it look used
-and hence it'll be passed to the worker when it doesn't need to be.
-Hence the isAbsDmd test in addDataConStrictness.
-
-There is the usual danger of reboxing, which as usual we ignore. But
-if X is monomorphic, and has an UNPACK pragma, then this optimisation
-is even more important.  We don't want the wrapper to rebox an unboxed
-argument, and pass an Int to $wfoo!
-
-
 Note [CPR for strict binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the binder is marked demanded with a strict demand, then give it a
@@ -815,6 +598,81 @@ Note that
     (e.g. from \x -> x!).
 
   * See Note [CPR examples]
+
+Note [CPR for sum types]
+~~~~~~~~~~~~~~~~~~~~~~~~
+At the moment we do not do CPR for let-bindings that
+   * non-top level
+   * bind a sum type
+Reason: I found that in some benchmarks we were losing let-no-escapes,
+which messed it all up.  Example
+   let j = \x. ....
+   in case y of
+        True  -> j False
+        False -> j True
+If we w/w this we get
+   let j' = \x. ....
+   in case y of
+        True  -> case j' False of { (# a #) -> Just a }
+        False -> case j' True of { (# a #) -> Just a }
+Notice that j' is not a let-no-escape any more.
+
+However this means in turn that the *enclosing* function
+may be CPR'd (via the returned Justs).  But in the case of
+sums, there may be Nothing alternatives; and that messes
+up the sum-type CPR.
+
+Conclusion: only do this for products.  It's still not
+guaranteed OK for products, but sums definitely lose sometimes.
+
+Note [CPR for thunks]
+~~~~~~~~~~~~~~~~~~~~~
+If the rhs is a thunk, we usually forget the CPR info, because
+it is presumably shared (else it would have been inlined, and
+so we'd lose sharing if w/w'd it into a function).  E.g.
+
+        let r = case expensive of
+                  (a,b) -> (b,a)
+        in ...
+
+If we marked r as having the CPR property, then we'd w/w into
+
+        let $wr = \() -> case expensive of
+                            (a,b) -> (# b, a #)
+            r = case $wr () of
+                  (# b,a #) -> (b,a)
+        in ...
+
+But now r is a thunk, which won't be inlined, so we are no further ahead.
+But consider
+
+        f x = let r = case expensive of (a,b) -> (b,a)
+              in if foo r then r else (x,x)
+
+Does f have the CPR property?  Well, no.
+
+However, if the strictness analyser has figured out (in a previous
+iteration) that it's strict, then we DON'T need to forget the CPR info.
+Instead we can retain the CPR info and do the thunk-splitting transform
+(see WorkWrap.splitThunk).
+
+This made a big difference to PrelBase.modInt, which had something like
+        modInt = \ x -> let r = ... -> I# v in
+                        ...body strict in r...
+r's RHS isn't a value yet; but modInt returns r in various branches, so
+if r doesn't have the CPR property then neither does modInt
+Another case I found in practice (in Complex.magnitude), looks like this:
+                let k = if ... then I# a else I# b
+                in ... body strict in k ....
+(For this example, it doesn't matter whether k is returned as part of
+the overall result; but it does matter that k's RHS has the CPR property.)
+Left to itself, the simplifier will make a join point thus:
+                let $j k = ...body strict in k...
+                if ... then $j (I# a) else $j (I# b)
+With thunk-splitting, we get instead
+                let $j x = let k = I#x in ...body strict in k...
+                in if ... then $j a else $j b
+This is much better; there's a good chance the I# won't get allocated.
 
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~~
