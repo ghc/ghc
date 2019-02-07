@@ -288,9 +288,6 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
 -- This is the LetUp rule in the paper “Higher-Order Cardinality Analysis”.
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   | useLetUp id rhs
-  , Nothing <- unpackTrivial rhs
-      -- dmdAnalRhsLetDown treats trivial right hand sides specially
-      -- so if we have a trival right hand side, fall through to that.
   = (final_ty, Let (NonRec id' rhs') body')
   where
     (body_ty, body')   = dmdAnal env dmd body
@@ -583,25 +580,6 @@ environment, which effectively assigns them 'nopSig' (see "getStrictness")
 
 -}
 
--- Trivial RHS
--- See Note [Demand analysis for trivial right-hand sides]
-dmdAnalTrivialRhs ::
-    AnalEnv -> Id -> CoreExpr -> Var ->
-    (DmdEnv, Id, CoreExpr)
-dmdAnalTrivialRhs env id rhs fn
-  = (fn_fv, set_idStrictness env id fn_str, rhs)
-  where
-    fn_str = getStrictness env fn
-    fn_fv | isLocalId fn = unitVarEnv fn topDmd
-          | otherwise    = emptyDmdEnv
-    -- Note [Remember to demand the function itself]
-    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    -- fn_fv: don't forget to produce a demand for fn itself
-    -- Lacking this caused Trac #9128
-    -- The demand is very conservative (topDmd), but that doesn't
-    -- matter; trivial bindings are usually inlined, so it only
-    -- kicks in for top-level bindings and NOINLINE bindings
-
 -- Let bindings can be processed in two ways:
 -- Down (RHS before body) or Up (body before RHS).
 -- dmdAnalRhsLetDown implements the Down variant:
@@ -622,10 +600,6 @@ dmdAnalRhsLetDown :: TopLevelFlag
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
-  | Just fn <- unpackTrivial rhs   -- See Note [Demand analysis for trivial right-hand sides]
-  = dmdAnalTrivialRhs env id rhs fn
-
-  | otherwise
   = (lazy_fv, id', mkLams bndrs' body')
   where
     rhs_arity        = exprArity rhs
@@ -678,16 +652,6 @@ mkBodyDmd env arity body
     base = case deepSplitProductType_maybe (ae_fam_envs env) (exprType body) of
        Nothing            -> cleanEvalDmd
        Just (dc, _, _, _) -> cleanEvalProdDmd (dataConRepArity dc)
-
-unpackTrivial :: CoreExpr -> Maybe Id
--- Returns (Just v) if the arg is really equal to v, modulo
--- casts, type applications etc
--- See Note [Demand analysis for trivial right-hand sides]
-unpackTrivial (Var v)                 = Just v
-unpackTrivial (Cast e _)              = unpackTrivial e
-unpackTrivial (Lam v e) | isTyVar v   = unpackTrivial e
-unpackTrivial (App e a) | isTypeArg a = unpackTrivial e
-unpackTrivial _                       = Nothing
 
 -- | If given the let-bound 'Id', 'useLetUp' determines whether we should
 -- process the binding up (body before rhs) or down (rhs before body).
@@ -1168,12 +1132,6 @@ extendSigEnv top_lvl sigs var sig = extendVarEnv sigs var (sig, top_lvl)
 
 lookupSigEnv :: AnalEnv -> Id -> Maybe (StrictSig, TopLevelFlag)
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
-
-getStrictness :: AnalEnv -> Id -> StrictSig
-getStrictness env fn
-  | isGlobalId fn                        = idStrictness fn
-  | Just (sig, _) <- lookupSigEnv env fn = sig
-  | otherwise                            = nopSig
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
