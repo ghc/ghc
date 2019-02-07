@@ -136,13 +136,17 @@ instance Eq BigNat where
 instance Ord BigNat where
     compare = compareBigNat
 
--- | Invariant: 'Jn#' and 'Jp#' are used iff value doesn't fit in 'S#'
+-- [Implementation notes]
+--
+-- Invariant: 'Jn#' and 'Jp#' are used iff value doesn't fit in 'S#'
 --
 -- Useful properties resulting from the invariants:
 --
 --  - @abs ('S#' _) <= abs ('Jp#' _)@
 --  - @abs ('S#' _) <  abs ('Jn#' _)@
---
+
+-- | Arbitrary precision integers. For more information about this datatype,
+-- see the comments in its implementation.
 data Integer  = S#                !Int#
                 -- ^ iff value in @[minBound::'Int', maxBound::'Int']@ range
               | Jp# {-# UNPACK #-} !BigNat
