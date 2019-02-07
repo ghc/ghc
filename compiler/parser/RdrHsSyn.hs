@@ -1017,7 +1017,13 @@ checkBlockArguments = withExpCmd @b checkExpr checkCmd
       _ -> return ()
 
     checkCmd :: LHsCmd GhcPs -> P ()
-    checkCmd _cmd = return () -- TODO (int-index)
+    checkCmd cmd = case unLoc cmd of
+      HsCmdLam {} -> check "lambda command" cmd
+      HsCmdCase {} -> check "case command" cmd
+      HsCmdIf {} -> check "if command" cmd
+      HsCmdLet {} -> check "let command" cmd
+      HsCmdDo {} -> check "do command" cmd
+      _ -> return ()
 
     check :: (HasSrcSpan a, Outputable a) => String -> a -> P ()
     check element a = do
