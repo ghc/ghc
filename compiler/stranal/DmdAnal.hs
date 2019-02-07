@@ -18,6 +18,7 @@ import GhcPrelude
 import DynFlags
 import WwLib            ( findTypeShape, deepSplitProductType_maybe )
 import Demand   -- All of it
+import CoreArity        ( exprArity )
 import CoreSyn
 import CoreSeq          ( seqBinds )
 import Outputable
@@ -683,19 +684,22 @@ unpackTrivial (Lam v e) | isTyVar v   = unpackTrivial e
 unpackTrivial (App e a) | isTypeArg a = unpackTrivial e
 unpackTrivial _                       = Nothing
 
--- | If given the RHS of a let-binding, this 'useLetUp' determines
--- whether we should process the binding up (body before rhs) or
--- down (rhs before body).
+-- | If given the let-bound 'Id', 'useLetUp' determines whether we should
+-- process the binding up (body before rhs) or down (rhs before body).
 --
 -- We use LetDown if there is a chance to get a useful strictness signature.
--- This is the case when there are manifest value lambdas or the binding is a
--- join point (hence always acts like a function, not a value).
+-- This is the case when it takes any arguments before performing meaningful
+-- work (cf. 'exprArity') or the binding is a join point (hence always acts like
+-- a function, not a value).
+--
+-- Thus, if the binding is not a join point and its arity is 0, we use LetUp.
+-- In that case, it's a thunk and we want to unleash its 'DmdEnv' of free vars
+-- at most once, regardless of how many times it was forced in the body. This
+-- makes a real difference wrt. usage demands. The other reason is being able to
+-- unleash a more precise product demand on its RHS once we know how the thunk
+-- was used in the let body.
 useLetUp :: Var -> CoreExpr -> Bool
-useLetUp f _         | isJoinId f = False
-useLetUp f (Lam v e) | isTyVar v  = useLetUp f e
-useLetUp _ (Lam _ _)              = False
-useLetUp _ _                      = True
-
+useLetUp f rhs = exprArity rhs == 0 && not (isJoinId f)
 
 {- Note [Demand analysis for join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
