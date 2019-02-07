@@ -136,7 +136,11 @@ instance Eq BigNat where
 instance Ord BigNat where
     compare = compareBigNat
 
--- | Invariant: 'Jn#' and 'Jp#' are used iff value doesn't fit in 'S#'
+-- | Arbitrary precision integers.
+
+-- [Implementation notes]
+
+-- Invariant: 'Jn#' and 'Jp#' are used iff value doesn't fit in 'S#'
 --
 -- Useful properties resulting from the invariants:
 --
