@@ -1149,15 +1149,15 @@ certainlyWillInline dflags fn_info
         -- INLINABLE functions come via this path
         --    See Note [certainlyWillInline: INLINABLE]
     do_cunf expr (UnfIfGoodArgs { ug_size = size, ug_args = args })
-      | not (null args)  -- See Note [certainlyWillInline: be careful of thunks]
+      | arityInfo fn_info > 0  -- See Note [certainlyWillInline: be careful of thunks]
       , not (isBottomingSig (strictnessInfo fn_info))
               -- Do not unconditionally inline a bottoming functions even if
               -- it seems smallish. We've carefully lifted it out to top level,
               -- so we don't want to re-inline it.
-      , let arity = length args
-      , size - (10 * (arity + 1)) <= ufUseThreshold dflags
+      , let unf_arity = length args
+      , size - (10 * (unf_arity + 1)) <= ufUseThreshold dflags
       = Just (fn_unf { uf_src      = InlineStable
-                     , uf_guidance = UnfWhen { ug_arity     = arity
+                     , uf_guidance = UnfWhen { ug_arity     = unf_arity
                                              , ug_unsat_ok  = unSaturatedOk
                                              , ug_boring_ok = inlineBoringOk expr } })
              -- Note the "unsaturatedOk". A function like  f = \ab. a
@@ -1174,6 +1174,17 @@ holds), it can make a big difference in an inner loop In #5623 we
 found that the WorkWrap phase thought that
        y = case x of F# v -> F# (v +# v)
 was certainlyWillInline, so the addition got duplicated.
+
+Note that we check arityInfo instead of the arity of the unfolding to detect
+this case. This is so that we don't accidentally fail to inline small partial
+applications, like `f = g 42` (where `g` recurses into `f`) where g has arity 2
+(say). Here there is no risk of work duplication, and the RHS is tiny, so
+certainlyWillInline should return True. But `unf_arity` is zero! However f's
+arity, gotten from `arityInfo fn_info`, is 1.
+
+Failing to say that `f` will inline forces W/W to generate a potentially huge
+worker for f that will immediately cancel with `g`'s wrapper anyway, causing
+unnecessary churn in the Simplifier while arriving at the same result.
 
 Note [certainlyWillInline: INLINABLE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
