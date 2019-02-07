@@ -126,6 +126,22 @@ data EventManager = EventManager
     , emLock         :: {-# UNPACK #-} !(MVar ())
     }
 
+-- This is getting too complicated to attempt. Basically, what I need is
+-- for the file descriptor tables to use a plain array instead of a
+-- hash table when the total number of file descriptors is small.
+-- If a large number of file descriptors are opened, we must migrate
+-- to a larger table. The lock-striping makes this difficult. We would
+-- need to acquire all the locks at the time same, but this isn't
+-- generally possible. It could cause deadlocks. Actually, maybe we
+-- don't need to acquire them all at the same time. If we did away
+-- with the hash table entirely (migrating from plain arrays to bigger
+-- plain arrays), maybe we could do them one-by-one. The locks
+-- themselves would be preserved. Only the arrays inside would be
+-- changed (replaced with bigger arrays). Although now we need to
+-- make sure that concurrent attempts to resize did not interfere
+-- with one another. We probably want one big lock for that. It would
+-- only be acquired during resizes. This could work.
+
 -- must be power of 2
 callbackArraySize :: Int
 callbackArraySize = 32
@@ -134,6 +150,8 @@ hashFd :: Fd -> Int
 hashFd fd = fromIntegral fd .&. (callbackArraySize - 1)
 {-# INLINE hashFd #-}
 
+-- See section 3.2 of the Mio paper for an explanation of why we
+-- are using lock-striping here.
 callbackTableVar :: EventManager -> Fd -> MVar (IntTable [FdData])
 callbackTableVar mgr fd = indexArray (emFds mgr) (hashFd fd)
 {-# INLINE callbackTableVar #-}
