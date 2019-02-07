@@ -176,26 +176,17 @@ cprAnalAlt env _ _ n (con,bndrs,rhs)
 cprTransform :: AnalEnv         -- ^ The analysis environment
              -> Id              -- ^ The function
              -> CprType         -- ^ The demand type of the function
-cprTransform env var
-  | isDataConWorkId var                          -- Data constructor
-  , let cpr    = dmdResToCpr (snd (splitStrictSig (idStrictness var)))
-  , let cpr_ty = CprType (idArity var) cpr
-  = cpr_ty
-
-  -- No handling of Opt_DmdTxDictSel: dmdTransformDictSelSig always returns a
-  -- topRes, so it can't get any worse than that.
-
-  | isGlobalId var                               -- Imported function
-  , let sig = get_idCprInfo var
-  = -- pprTrace "cprTransform" (vcat [ppr var, ppr arty, ppr sig])
+cprTransform env id
+  = -- pprTrace "cprTransform" (vcat [ppr id, ppr sig])
     sig
-
-  | Just sig <- lookupSigEnv env var  -- Local letrec bound thing
-  = -- pprTrace "cprTransform" (vcat [ppr var, ppr sig, ppr arty, ppr fn_ty]) $
+  where
     sig
-
-  | otherwise                                    -- Local non-letrec-bound thing
-  = topCprType
+      | isGlobalId id                   -- imported function or data con worker
+      = get_idCprInfo id
+      | Just sig <- lookupSigEnv env id -- local let-bound
+      = sig
+      | otherwise
+      = topCprType
 
 --
 -- * Bindings
@@ -265,9 +256,7 @@ cprAnalTrivialRhs ::
     AnalEnv -> Id -> CoreExpr -> Var ->
     (Id, CoreExpr)
 cprAnalTrivialRhs env id rhs fn
-  = (set_idCprInfo id fn_str, rhs)
-  where
-    fn_str = getCprType env fn
+  = (set_idCprInfo id (cprTransform env fn), rhs)
 
 -- Let bindings are processed in the following way (cf. LetDown from the paper
 -- “Higher-Order Cardinality Analysis”):
@@ -435,12 +424,6 @@ extendSigEnv _top_lvl sigs var sig = extendVarEnv sigs var sig
 
 lookupSigEnv :: AnalEnv -> Id -> Maybe CprType
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
-
-getCprType :: AnalEnv -> Id -> CprType
-getCprType env fn
-  | isGlobalId fn                   = get_idCprInfo fn
-  | Just sig <- lookupSigEnv env fn = sig
-  | otherwise                       = topCprType
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
