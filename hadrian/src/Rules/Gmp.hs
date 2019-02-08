@@ -39,7 +39,7 @@ gmpContext = vanillaContext Stage1 integerGmp
 gmpBuildPath :: Action FilePath
 gmpBuildPath = buildRoot <&> (-/- stageString (stage gmpContext) -/- "gmp")
 
--- | As 'gmpBuildPath' but in the 'Rules' monad.
+-- | Like 'gmpBuildPath' but in the 'Rules' monad.
 gmpBuildPathRules :: Rules FilePath
 gmpBuildPathRules = buildRootRules <&> (-/- stageString (stage gmpContext) -/- "gmp")
 
@@ -59,7 +59,6 @@ configureEnvironment = sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
 gmpRules :: Rules ()
 gmpRules = do
     -- Copy appropriate GMP header and object files
-    root    <- buildRootRules
     gmpPath <- gmpBuildPathRules
     gmpPath -/- gmpLibraryH %> \header -> do
         windows  <- windowsHost
@@ -86,8 +85,11 @@ gmpRules = do
         build $ target gmpContext (Make gmpPath) [gmpPath -/- "Makefile"] [lib]
         putSuccess "| Successfully built custom library 'gmp'"
 
-    gmpPath -/- gmpLibraryInTreeH %>                copyFile (gmpPath -/- gmpLibraryH)
-    root -/- buildDir gmpContext -/- gmpLibraryH %> copyFile (gmpPath -/- gmpLibraryH)
+    gmpPath -/- gmpLibraryInTreeH %> copyFile (gmpPath -/- gmpLibraryH)
+
+    root <- buildRootRules
+    root -/- buildDir gmpContext -/- gmpLibraryH %>
+        copyFile (gmpPath -/- gmpLibraryH)
 
     -- This file is created when 'integerGmp' is configured.
     gmpPath -/- "config.mk" %> \_ -> do
