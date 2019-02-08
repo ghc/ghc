@@ -37,7 +37,7 @@ import Var      ( isNonCoVarId )
 import VarSet
 import VarEnv
 import DataCon
-import Demand( etaExpandStrictSig )
+import Demand( ensureArgs, nopSig, StrictSig(..) )
 import OptCoercion ( optCoercion )
 import Type     hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
@@ -678,10 +678,13 @@ joinPointBinding_maybe bndr rhs
 
   | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
   , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
-  , let str_sig   = idStrictness bndr
-        str_arity = count isId bndrs  -- Strictness demands are for Ids only
-        join_bndr = bndr `asJoinId`        join_arity
-                         `setIdStrictness` etaExpandStrictSig str_arity str_sig
+  , let StrictSig dmd_ty = idStrictness bndr
+        str_arity        = count isId bndrs -- Strictness demands are for Ids only
+        new_str_sig
+          | str_arity < idArity bndr = nopSig
+          | otherwise                = StrictSig $ ensureArgs str_arity dmd_ty
+        join_bndr        = bndr `asJoinId`        join_arity
+                                `setIdStrictness` new_str_sig
   = Just (join_bndr, mkLams bndrs body)
 
   | otherwise
