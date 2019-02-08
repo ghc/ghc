@@ -429,6 +429,7 @@ cleanup-darwin:
   tags:
     - x86_64-darwin
   when: always
+  dependencies: []
   before_script:
     - echo "Time to clean up"
   script:
