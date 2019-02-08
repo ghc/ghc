@@ -704,19 +704,15 @@ Another win for join points!  Trac #13543.
 Note [Demand analysis for trivial right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
-        foo = plusInt |> co
+    foo = plusInt |> co
 where plusInt is an arity-2 function with known strictness.  Clearly
 we want plusInt's strictness to propagate to foo!  But because it has
 no manifest lambdas, it won't do so automatically, and indeed 'co' might
-have type (Int->Int->Int) ~ T, so we *can't* eta-expand.  So we have a
-special case for right-hand sides that are "trivial", namely variables,
-casts, type applications, and the like.
+have type (Int->Int->Int) ~ T.
 
-Note that this can mean that 'foo' has an arity that is smaller than that
-indicated by its demand info.  e.g. if co :: (Int->Int->Int) ~ T, then
-foo's arity will be zero (see Note [exprArity invariant] in CoreArity),
-but its demand signature will be that of plusInt. A small example is the
-test case of Trac #8963.
+Fortunately, CoreArity gives 'foo' arity 2 and all is well (see the definition
+of 'manifestArity' and Note [Newtype arity] in CoreArity)! A small example is
+the test case NewtypeArity.
 
 
 Note [Product demands for function body]
