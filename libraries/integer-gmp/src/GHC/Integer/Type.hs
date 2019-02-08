@@ -136,7 +136,11 @@ instance Eq BigNat where
 instance Ord BigNat where
     compare = compareBigNat
 
--- | Invariant: 'Jn#' and 'Jp#' are used iff value doesn't fit in 'S#'
+-- | An unbounded integer type. In contrast with fixed-size integral
+-- types such as 'Int', the 'Integer' type represents the entire
+-- infinite range of integers.
+
+-- Invariant: 'Jn#' and 'Jp#' are used iff value doesn't fit in 'S#'
 --
 -- Useful properties resulting from the invariants:
 --
