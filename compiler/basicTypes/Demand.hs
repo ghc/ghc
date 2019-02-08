@@ -38,7 +38,7 @@ module Demand (
         nopSig, botSig, cprProdSig,
         isTopSig, hasDemandEnvSig,
         splitStrictSig, strictSigDmdEnv,
-        increaseStrictSigArity, etaExpandStrictSig,
+        increaseStrictSigArity,
 
         seqDemand, seqDemandList, seqDmdType, seqStrictSig,
 
@@ -1207,7 +1207,7 @@ mkDmdType fv ds res = DmdType fv ds res
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
 
--- This makes sure we can use the demand type with n arguments,
+-- | This makes sure we can use the demand type with n arguments,
 -- It extends the argument list with the correct resTypeArgDmd
 -- It also adjusts the DmdResult: Divergence survives additional arguments,
 -- CPR information does not (and definite converge also would not).
@@ -1586,24 +1586,17 @@ splitStrictSig :: StrictSig -> ([Demand], DmdResult)
 splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
 
 increaseStrictSigArity :: Int -> StrictSig -> StrictSig
--- Add extra arguments to a strictness signature
+-- ^ Add extra arguments to a strictness signature.
+-- In contrast to 'ensureArgs', this /prepends/ additional argument demands
+-- and leaves the 'DmdResult' intact.
 increaseStrictSigArity arity_increase sig@(StrictSig dmd_ty@(DmdType env dmds res))
   | isTopDmdType dmd_ty = sig
-  | arity_increase <= 0 = sig
+  | arity_increase == 0 = sig
+  | arity_increase < 0  = WARN (True, text "increaseStrictSigArity: negative arity increase")
+                          nopSig
   | otherwise           = StrictSig (DmdType env dmds' res)
   where
     dmds' = replicate arity_increase topDmd ++ dmds
-
-etaExpandStrictSig :: Arity -> StrictSig -> StrictSig
--- We are expanding (\x y. e) to (\x y z. e z)
--- Add exta demands to the /end/ of the arg demands if necessary
-etaExpandStrictSig arity sig@(StrictSig dmd_ty@(DmdType env dmds res))
-  | isTopDmdType dmd_ty = sig
-  | arity_increase <= 0 = sig
-  | otherwise           = StrictSig (DmdType env dmds' res)
-  where
-    arity_increase = arity - length dmds
-    dmds' = dmds ++ replicate arity_increase topDmd
 
 isTopSig :: StrictSig -> Bool
 isTopSig (StrictSig ty) = isTopDmdType ty
