@@ -47,7 +47,7 @@ import GhcPrelude
 import DynFlags
 import CoreSyn
 import PprCore          ()      -- Instances
-import OccurAnal        ( occurAnalyseExpr )
+import OccurAnal        ( occurAnalyseExpr_NoBinderSwap )
 import CoreOpt
 import CoreArity       ( manifestArity )
 import CoreUtils
@@ -101,7 +101,7 @@ mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
   = DFunUnfolding { df_bndrs = bndrs
                   , df_con = con
-                  , df_args = map occurAnalyseExpr ops }
+                  , df_args = map occurAnalyseExpr_NoBinderSwap ops }
                   -- See Note [Occurrence analysis of unfoldings]
 
 mkWwInlineRule :: DynFlags -> CoreExpr -> Arity -> Unfolding
@@ -311,7 +311,7 @@ mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
                 -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
 mkCoreUnfolding src top_lvl expr guidance
-  = CoreUnfolding { uf_tmpl         = occurAnalyseExpr expr,
+  = CoreUnfolding { uf_tmpl         = occurAnalyseExpr_NoBinderSwap expr,
                       -- See Note [Occurrence analysis of unfoldings]
                     uf_src          = src,
                     uf_is_top       = top_lvl,
@@ -330,7 +330,7 @@ mkUnfolding :: DynFlags -> UnfoldingSource
 -- Calculates unfolding guidance
 -- Occurrence-analyses the expression before capturing it
 mkUnfolding dflags src is_top_lvl is_bottoming expr
-  = CoreUnfolding { uf_tmpl         = occurAnalyseExpr expr,
+  = CoreUnfolding { uf_tmpl         = occurAnalyseExpr_NoBinderSwap expr,
                       -- See Note [Occurrence analysis of unfoldings]
                     uf_src          = src,
                     uf_is_top       = is_top_lvl,
@@ -342,7 +342,7 @@ mkUnfolding dflags src is_top_lvl is_bottoming expr
   where
     is_top_bottoming = is_top_lvl && is_bottoming
     guidance         = calcUnfoldingGuidance dflags is_top_bottoming expr
-        -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
+        -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr_NoBinderSwap expr))!
         -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 
 {-
@@ -363,6 +363,39 @@ the unfolding in question was a DFun unfolding.
 But more generally, the simplifier is designed on the
 basis that it is looking at occurrence-analysed expressions, so better
 ensure that they acutally are.
+
+We use occurAnalyseExpr_NoBinderSwap instead of occurAnalyseExpr;
+see Note [No binder swap in unfoldings].
+
+Note [No binder swap in unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The binder swap can temporarily violate Core Lint, by assinging
+a LocalId binding to a GlobalId. For example, if A.foo{r872}
+is a GlobalId with unique r872, then
+
+ case A.foo{r872} of bar {
+   K x -> ...(A.foo{r872})...
+ }
+
+gets transformed to
+
+  case A.foo{r872} of bar {
+    K x -> let foo{r872} = bar
+           in ...(A.foo{r872})...
+
+This is usually not a problem, because the simplifier will transform
+this to:
+
+  case A.foo{r872} of bar {
+    K x -> ...(bar)...
+
+However, after occurrence analysis but before simplification, this extra 'let'
+violates the Core Lint invariant that we do not have local 'let' bindings for
+GlobalIds.  That seems (just) tolerable for the occurrence analysis that happens
+just before the Simplifier, but not for unfoldings, which are Linted
+independently.
+As a quick workaround, we disable binder swap in this module.
+See Trac #16288 and #16296 for further plans.
 
 Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
