@@ -173,16 +173,18 @@ instance H.Builder Builder where
         Autoreconf dir -> return [dir -/- "configure.ac"]
         Configure  dir -> return [dir -/- "configure"]
 
-        Ghc _ Stage0 -> return []
+        Ghc _ Stage0 -> generatedGhcDependencies Stage0
         Ghc _ stage -> do
             root <- buildRoot
             win <- windowsHost
             touchyPath <- programPath (vanillaContext Stage0 touchy)
             unlitPath  <- builderPath Unlit
             ghcdeps <- ghcDeps stage
+            ghcgens <- generatedGhcDependencies stage
             return $ [ root -/- ghcSplitPath stage -- TODO: Make conditional on --split-objects
                      , unlitPath ]
                   ++ ghcdeps
+                  ++ ghcgens
                   ++ [ touchyPath | win ]
 
         Hsc2Hs stage -> (\p -> [p]) <$> templateHscPath stage

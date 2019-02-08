@@ -8,7 +8,6 @@ import Context
 import Expression
 import Rules.Generate
 import Settings
-import Settings.Default
 import Target
 import Utilities
 
@@ -19,7 +18,6 @@ import qualified Text.Parsec as Parsec
 compilePackage :: [(Resource, Int)] -> Rules ()
 compilePackage rs = do
     root <- buildRootRules
-
     -- We match all file paths that look like:
     --   <root>/...stuffs.../build/...stuffs.../<something>.<suffix>
     --
@@ -32,13 +30,11 @@ compilePackage rs = do
     -- and parse the information we need (stage, package path, ...) from
     -- the path and figure out the suitable way to produce that object file.
     objectFilesUnder root |%> \path -> do
-      obj <- parsePath (parseBuildObject root) "<object file path parser>" path
-      compileObject rs path obj
-
+        obj <- parsePath (parseBuildObject root) "<object file path parser>" path
+        compileObject rs path obj
   where
     objectFilesUnder r = [ r -/- ("**/build/**/*" ++ pat)
-                         | pat <- extensionPats
-                         ]
+                         | pat <- extensionPats ]
 
     exts = [ "o", "hi", "o-boot", "hi-boot" ]
     patternsFor e = [ "." ++ e, ".*_" ++ e ]
@@ -73,8 +69,7 @@ compilePackage rs = do
 -}
 
 -- | Non Haskell source languages that we compile to get object files.
-data SourceLang = Asm | C | Cmm
-  deriving (Eq, Show)
+data SourceLang = Asm | C | Cmm deriving (Eq, Show)
 
 parseSourceLang :: Parsec.Parsec String () SourceLang
 parseSourceLang = Parsec.choice
@@ -96,16 +91,15 @@ data NonHsObject = NonHsObject SourceLang Basename Way
 
 parseNonHsObject :: Parsec.Parsec String () NonHsObject
 parseNonHsObject = do
-  lang <- parseSourceLang
-  _ <- Parsec.char '/'
-  file <- parseBasename
-  way <- parseWayPrefix vanilla
-  _ <- Parsec.char 'o'
-  return (NonHsObject lang file way)
+    lang <- parseSourceLang
+    _ <- Parsec.char '/'
+    file <- parseBasename
+    way <- parseWayPrefix vanilla
+    _ <- Parsec.char 'o'
+    return (NonHsObject lang file way)
 
 -- | > <o|hi|o-boot|hi-boot>
-data SuffixType = O | Hi | OBoot | HiBoot
-  deriving (Eq, Show)
+data SuffixType = O | Hi | OBoot | HiBoot deriving (Eq, Show)
 
 parseSuffixType :: Parsec.Parsec String () SuffixType
 parseSuffixType = Parsec.choice
@@ -120,31 +114,26 @@ parseSuffixType = Parsec.choice
   ]
 
 -- | > <way prefix>_<o|hi|o-boot|hi-boot>
-data Extension = Extension Way SuffixType
-  deriving (Eq, Show)
+data Extension = Extension Way SuffixType deriving (Eq, Show)
 
 parseExtension :: Parsec.Parsec String () Extension
-parseExtension =
-  Extension <$> parseWayPrefix vanilla <*> parseSuffixType
+parseExtension = Extension <$> parseWayPrefix vanilla <*> parseSuffixType
 
 -- | > <file>.<way prefix>_<o|hi|o-boot|hi-boot>
-data HsObject = HsObject Basename Extension
-  deriving (Eq, Show)
+data HsObject = HsObject Basename Extension deriving (Eq, Show)
 
 parseHsObject :: Parsec.Parsec String () HsObject
 parseHsObject = do
-  file <- parseBasename
-  ext <- parseExtension
-  return (HsObject file ext)
+    file <- parseBasename
+    ext <- parseExtension
+    return (HsObject file ext)
 
-data Object = Hs HsObject | NonHs NonHsObject
-  deriving (Eq, Show)
+data Object = Hs HsObject | NonHs NonHsObject deriving (Eq, Show)
 
 parseObject :: Parsec.Parsec String () Object
 parseObject = Parsec.choice
-  [ NonHs <$> parseNonHsObject
-  , Hs    <$> parseHsObject
-  ]
+    [ NonHs <$> parseNonHsObject
+    , Hs    <$> parseHsObject ]
 
 -- * Toplevel parsers
 
@@ -153,50 +142,38 @@ parseBuildObject root = parseBuildPath root parseObject
 
 -- * Getting contexts from objects
 
-objectContext :: BuildPath Object -> Action Context
-objectContext (BuildPath _ stage pkgpath obj) = do
-  pkg <- getPackageFromPath pkgpath
-  return (Context stage pkg way)
-
-  where way = case obj of
-          NonHs (NonHsObject _lang _file w)      -> w
-          Hs (HsObject _file (Extension w _suf)) -> w
-
-        getPackageFromPath path = do
-          pkgs <- getPackages
-          case filter (\p -> pkgPath p == path) pkgs of
-            (p:_) -> return p
-            _     -> error $ "couldn't find a package with path: " ++ path
-
-        getPackages = do
-          pkgs <- stagePackages stage
-          testPkgs <- testsuitePackages
-          return $ pkgs ++ if stage == Stage1 then testPkgs else []
+objectContext :: BuildPath Object -> Context
+objectContext (BuildPath _ stage pkgPath obj) =
+    Context stage (unsafeFindPackageByPath pkgPath) way
+  where
+    way = case obj of
+        NonHs (NonHsObject _lang _file w)         -> w
+        Hs    (HsObject _file (Extension w _suf)) -> w
 
 -- * Building an object
 
 compileHsObject
-  :: [(Resource, Int)] -> FilePath -> BuildPath Object -> HsObject -> Action ()
+    :: [(Resource, Int)] -> FilePath -> BuildPath Object -> HsObject -> Action ()
 compileHsObject rs objpath b@(BuildPath _root stage _path _o) hsobj =
   case hsobj of
-    HsObject _basename (Extension _way Hi)     ->
-      need [ change "hi" "o" objpath ]
-    HsObject _basename (Extension _way HiBoot) ->
-      need [ change "hi-boot" "o-boot" objpath ]
-    HsObject _basename (Extension _way _suf)   -> do
-      ctx <- objectContext b
-      ctxPath <- contextPath ctx
-      (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
-      need (src:deps)
-      needLibrary =<< contextDependencies ctx
-      buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
-
-  where change oldSuffix newSuffix str
-          | not (oldSuffix `isSuffixOf` str) = error $
-              "compileHsObject.change: " ++ oldSuffix ++
-              " not a suffix of " ++ str
-          | otherwise = take (length str - length oldSuffix) str
-                     ++ newSuffix
+    HsObject _basename (Extension way Hi    ) -> need [objpath -<.> osuf     way]
+    HsObject _basename (Extension way HiBoot) -> need [objpath -<.> obootsuf way]
+    HsObject _basename (Extension way suf) -> do
+        let ctx = objectContext b
+        ctxPath <- contextPath ctx
+        (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
+        need (src:deps)
+        needLibrary =<< contextDependencies ctx
+        buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
+        -- Andrey: It appears that the previous refactoring has broken
+        -- multiple-output build rules. Ideally, we should bring multiple-output
+        -- rules back, see: https://github.com/snowleopard/hadrian/issues/216.
+        -- As a temporary solution, I'm using Shake's new 'produces' feature to
+        -- record that this rule also produces a corresponding interface file.
+        let hi | suf == O     = objpath -<.> hisuf     way
+               | suf == OBoot = objpath -<.> hibootsuf way
+               | otherwise    = error "Internal error: unknown Haskell object extension"
+        produces [hi]
 
 compileNonHsObject
   :: [(Resource, Int)] -> FilePath -> BuildPath Object -> NonHsObject
@@ -214,11 +191,11 @@ compileNonHsObject rs objpath b@(BuildPath _root stage _path _o) nonhsobj =
         toSrcFor Cmm = obj2src "cmm" isGeneratedCmmFile
 
         go builder tosrc = do
-          ctx <- objectContext b
-          src <- tosrc ctx objpath
-          need [src]
-          needDependencies ctx src (objpath <.> "d")
-          buildWithResources rs $ target ctx (builder stage) [src] [objpath]
+            let ctx = objectContext b
+            src <- tosrc ctx objpath
+            need [src]
+            needDependencies ctx src (objpath <.> "d")
+            buildWithResources rs $ target ctx (builder stage) [src] [objpath]
 
 compileObject
   :: [(Resource, Int)] -> FilePath -> BuildPath Object -> Action ()
