@@ -331,8 +331,9 @@ threadPaused(Capability *cap, StgTSO *tso)
 #endif
 
             // The payload of the BLACKHOLE points to the TSO
-            ((StgInd *)bh)->indirectee = (StgClosure *)tso;
+            // See Note [Write barrier on thunk updates] in rts/Updates.h
             write_barrier();
+            ((StgInd *)bh)->indirectee = (StgClosure *)tso;
             SET_INFO(bh,&stg_BLACKHOLE_info);
 
             // .. and we need a write barrier, since we just mutated the closure:

@@ -23,6 +23,31 @@
  *  field. So, we call LDV_RECORD_CREATE().
  */
 
+/* Note [Write barrier on thunk updates]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Thunk updates are rather tricky, especially on architectures with weak memory
+ * ordering guarantees. updateWithIndirection plays a significant role in the
+ * update process, implementing the logic for turning a thunk or blackhole into
+ * an indirection.
+ *
+ * Before replacing a closure with an indirection we must first ensure that the
+ * writes that initialize the newly-created indirectee are available to other
+ * cores. For this reason, we must place a write barrier between the
+ * construction of the indirectee and the write to the indirectee field of the
+ * indirection.
+ *
+ * However note that we do *not* impose an ordering on the writes to the
+ * indirection's indirectee and info table pointer fields. It is in principle
+ * possible for the writes to p1->info to become visible before those to
+ * p1->indirectee. However, this is okay since we know that this field was
+ * earlier set to the owning TSO or blocking queue. When the stg_BLACKHOLE entry
+ * code sees a blackhole whose indirectee is a TSO or blocking queue it will
+ * retry or block as appropriate.
+ *
+ * See #15449.
+ */
+
 /*
  * We have two versions of this macro (sadly), one for use in C-- code,
  * and the other for C.
@@ -40,12 +65,13 @@
                  p_ updatee
 
 
+// See Note [Write barrier on thunk update]
 #define updateWithIndirection(p1, p2, and_then) \
     W_ bd;                                                      \
                                                                 \
     OVERWRITING_CLOSURE(p1);                                    \
-    StgInd_indirectee(p1) = p2;                                 \
     prim_write_barrier;                                         \
+    StgInd_indirectee(p1) = p2;                                 \
     SET_INFO(p1, stg_BLACKHOLE_info);                           \
     LDV_RECORD_CREATE(p1);                                      \
     bd = Bdescr(p1);                                            \
@@ -70,8 +96,8 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     /* not necessarily true: ASSERT( !closure_IND(p1) ); */
     /* occurs in RaiseAsync.c:raiseAsync() */
     OVERWRITING_CLOSURE(p1);
+    write_barrier();  // See Note [Write barrier on thunk update]
     ((StgInd *)p1)->indirectee = p2;
-    write_barrier();
     SET_INFO(p1, &stg_BLACKHOLE_info);
     LDV_RECORD_CREATE(p1);
     bd = Bdescr((StgPtr)p1);
