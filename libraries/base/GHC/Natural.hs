@@ -188,7 +188,7 @@ gcdNatural (NatJ# x) (NatS# y) = NatS# (gcdBigNatWord x y)
 gcdNatural (NatS# x) (NatJ# y) = NatS# (gcdBigNatWord y x)
 gcdNatural (NatS# x) (NatS# y) = NatS# (gcdWord x y)
 
--- | Compute least common multiplier.
+-- | Compute least common multiple.
 lcmNatural :: Natural -> Natural -> Natural
 lcmNatural (NatS# 0##) _ = NatS# 0##
 lcmNatural _ (NatS# 0##) = NatS# 0##
