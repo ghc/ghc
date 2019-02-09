@@ -45,7 +45,7 @@ import GHC.Read
 import Text.ParserCombinators.ReadPrec
 import Text.Read.Lex
 
-import GHC.TypeNats (Nat, KnownNat, natVal)
+import GHC.TypeLits (Nat, KnownNat, natVal)
 
 default () -- avoid any defaulting shenanigans
 
@@ -176,7 +176,7 @@ convertFixed :: forall a . HasResolution a => Lexeme -> ReadPrec (Fixed a)
 convertFixed (Number n)
  | Just (i, f) <- numberToFixed e n =
     return (fromInteger i + (fromInteger f / (10 ^ e)))
-    where r = resolution (undefined :: Fixed a)
+    where r = resolution (Proxy :: Proxy a)
           -- round 'e' up to help make the 'read . show == id' property
           -- possible also for cases where 'resolution' is not a
           -- power-of-10, such as e.g. when 'resolution = 128'
@@ -188,7 +188,7 @@ convertFixed _ = pfail
 data E (n :: Nat)
 
 instance KnownNat n => HasResolution (E n) where
-    resolution _ = 10^natVal (undefined :: E n)
+    resolution _ = 10^natVal (Proxy :: (Proxy n))
 
 type E0 = E 0
 
