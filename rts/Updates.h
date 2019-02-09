@@ -23,6 +23,12 @@
  *  field. So, we call LDV_RECORD_CREATE().
  */
 
+/* Note [Write barrier on thunk updates]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Thunk updates are rather tricky.
+ */
+
 /*
  * We have two versions of this macro (sadly), one for use in C-- code,
  * and the other for C.
@@ -40,12 +46,13 @@
                  p_ updatee
 
 
+// See Note [Write barrier on thunk update]
 #define updateWithIndirection(p1, p2, and_then) \
     W_ bd;                                                      \
                                                                 \
     OVERWRITING_CLOSURE(p1);                                    \
-    StgInd_indirectee(p1) = p2;                                 \
     prim_write_barrier;                                         \
+    StgInd_indirectee(p1) = p2;                                 \
     SET_INFO(p1, stg_BLACKHOLE_info);                           \
     LDV_RECORD_CREATE(p1);                                      \
     bd = Bdescr(p1);                                            \
@@ -70,8 +77,8 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     /* not necessarily true: ASSERT( !closure_IND(p1) ); */
     /* occurs in RaiseAsync.c:raiseAsync() */
     OVERWRITING_CLOSURE(p1);
+    write_barrier();  // See Note [Write barrier on thunk update]
     ((StgInd *)p1)->indirectee = p2;
-    write_barrier();
     SET_INFO(p1, &stg_BLACKHOLE_info);
     LDV_RECORD_CREATE(p1);
     bd = Bdescr((StgPtr)p1);
