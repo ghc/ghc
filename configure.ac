@@ -648,18 +648,21 @@ AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION], ${sUPPORTED_LLVM_VERSION}, [The sup
 
 dnl ** Which LLVM clang to use?
 dnl --------------------------------------------------------------
+AC_ARG_VAR(CLANG,[Use as the path to clang [default=autodetect]])
 AC_CHECK_TARGET_TOOL([CLANG], [clang])
 ClangCmd="$CLANG"
 AC_SUBST([ClangCmd])
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
+AC_ARG_VAR(LLC,[Use as the path to LLVM's llc [default=autodetect]])
 FIND_LLVM_PROG([LLC], [llc], [$LlvmVersion])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
+AC_ARG_VAR(OPT,[Use as the path to LLVM's opt [default=autodetect]])
 FIND_LLVM_PROG([OPT], [opt], [$LlvmVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
