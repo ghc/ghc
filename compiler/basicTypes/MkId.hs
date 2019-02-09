@@ -1264,10 +1264,14 @@ proxyHashId
        (noCafIdInfo `setUnfoldingInfo` evaldUnfolding -- Note [evaldUnfoldings]
                     `setNeverLevPoly`  ty )
   where
-    -- proxy# :: forall k (a:k). Proxy# k a
-    bndrs   = mkTemplateKiTyVars [liftedTypeKind] id
-    [k,t]   = mkTyVarTys bndrs
-    ty      = mkSpecForAllTys bndrs (mkProxyPrimTy k t)
+    -- proxy# :: forall {k} (a:k). Proxy# k a
+    --
+    -- The visibility of the `k` binder is Inferred to match the type of the
+    -- Proxy data constructor (#16293).
+    [kv,tv] = mkTemplateKiTyVars [liftedTypeKind] id
+    kv_ty   = mkTyVarTy kv
+    tv_ty   = mkTyVarTy tv
+    ty      = mkInvForAllTy kv $ mkSpecForAllTy tv $ mkProxyPrimTy kv_ty tv_ty
 
 ------------------------------------------------
 unsafeCoerceId :: Id
