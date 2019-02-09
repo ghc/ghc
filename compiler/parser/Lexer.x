@@ -2574,7 +2574,7 @@ srcParseErr options buf len
                         (if mdoInLast100
                            then text "Perhaps you intended to use RecursiveDo"
                            else text "Perhaps this statement should be within a 'do' block?")
-              $$ ppWhen (token == "=")
+              $$ ppWhen (token == "=" && doInLast100) -- #15849
                         (text "Perhaps you need a 'let' in a 'do' block?"
                          $$ text "e.g. 'let x = 5' instead of 'x = 5'")
               $$ ppWhen (not ps_enabled && pattern == "pattern ") -- #12429
@@ -2582,6 +2582,7 @@ srcParseErr options buf len
   where token = lexemeToString (offsetBytes (-len) buf) len
         pattern = decodePrevNChars 8 buf
         last100 = decodePrevNChars 100 buf
+        doInLast100 = "do" `isInfixOf` last100
         mdoInLast100 = "mdo" `isInfixOf` last100
         th_enabled = ThBit `xtest` pExtsBitmap options
         ps_enabled = PatternSynonymsBit `xtest` pExtsBitmap options
