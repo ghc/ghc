@@ -131,6 +131,7 @@ moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $ do
     void . addOracleCache $ \(ModuleFiles (stage, package)) -> do
         let context = vanillaContext stage package
+        ensureConfigured context
         srcDirs <- interpretInContext context (getContextData PD.srcDirs)
         mainIs  <- interpretInContext context (getContextData PD.mainIs)
         let removeMain = case mainIs of

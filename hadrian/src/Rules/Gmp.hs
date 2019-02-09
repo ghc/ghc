@@ -92,12 +92,7 @@ gmpRules = do
         copyFile (gmpPath -/- gmpLibraryH)
 
     -- This file is created when 'integerGmp' is configured.
-    gmpPath -/- "config.mk" %> \_ -> do
-        -- Calling 'need' on @setup-config@ triggers 'configurePackage'. Why
-        -- this indirection? Going via @setup-config@ allows us to cache the
-        -- configuration step, i.e. not to repeat it if it's already been done.
-        setupConfig <- pkgSetupConfigFile gmpContext
-        need [setupConfig]
+    gmpPath -/- "config.mk" %> \_ -> ensureConfigured gmpContext
 
     -- Run GMP's configure script
     gmpPath -/- "Makefile" %> \mk -> do

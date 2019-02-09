@@ -92,10 +92,7 @@ registerPackageRules rs stage = do
 buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildConf _ context@Context {..} conf = do
     depPkgIds <- cabalDependencies context
-
-    -- Calling 'need' on @setupConfig@, triggers the package configuration.
-    setupConfig <- pkgSetupConfigFile context
-    need [setupConfig]
+    ensureConfigured context
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
 
     ways <- interpretInContext context (getLibraryWays <> if package == rts then getRtsWays else mempty)

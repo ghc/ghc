@@ -13,7 +13,7 @@ module Packages (
     -- * Package information
     programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
     rtsContext, rtsBuildPath, libffiContext, libffiBuildPath, libffiLibraryName,
-    generatedGhcDependencies
+    generatedGhcDependencies, ensureConfigured
     ) where
 
 import Hadrian.Package
@@ -182,6 +182,16 @@ autogenPath context@Context {..}
     | otherwise         = autogen $ "build" -/- pkgName package
   where
     autogen dir = contextPath context <&> (-/- dir -/- "autogen")
+
+-- | Make sure a given context has already been fully configured. The
+-- implementation simply calls 'need' on the context's @autogen/cabal_macros.h@
+-- file, which triggers 'configurePackage' and 'buildAutogenFiles'. Why this
+-- indirection? Going via @autogen/cabal_macros.h@ allows us to cache the
+-- configuration steps, i.e. not to repeat them if they have already been done.
+ensureConfigured :: Context -> Action ()
+ensureConfigured context = do
+    autogen <- autogenPath context
+    need [autogen -/- "cabal_macros.h"]
 
 -- | RTS is considered a Stage1 package. This determines RTS build directory.
 rtsContext :: Stage -> Context

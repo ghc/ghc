@@ -107,8 +107,7 @@ biModules pd = go [ comp | comp@(bi,_,_) <-
 -- the package the 'Context' points to.
 configurePackage :: Context -> Action ()
 configurePackage context@Context {..} = do
-    putLoud $ "| Configure package " ++ quote (pkgName package)
-
+    putProgressInfo $ "| Configure package " ++ quote (pkgName package)
     gpd     <- pkgGenericDescription package
     depPkgs <- packageDependencies <$> readPackageData package
 
@@ -155,7 +154,7 @@ configurePackage context@Context {..} = do
 -- corresponding to the 'Stage' of the 'Context'.
 copyPackage :: Context -> Action ()
 copyPackage context@Context {..} = do
-    putLoud $ "| Copy package " ++ quote (pkgName package)
+    putProgressInfo $ "| Copy package " ++ quote (pkgName package)
     gpd <- pkgGenericDescription package
     ctxPath   <- Context.contextPath context
     pkgDbPath <- packageDbPath stage
@@ -167,7 +166,7 @@ copyPackage context@Context {..} = do
 -- | Register the 'Package' of a given 'Context' into the package database.
 registerPackage :: Context -> Action ()
 registerPackage context@Context {..} = do
-    putLoud $ "| Register package " ++ quote (pkgName package)
+    putProgressInfo $ "| Register package " ++ quote (pkgName package)
     ctxPath <- Context.contextPath context
     gpd <- pkgGenericDescription package
     verbosity <- getVerbosity
@@ -289,7 +288,7 @@ buildAutogenFiles :: Context -> Action ()
 buildAutogenFiles context = do
     cPath <- Context.contextPath context
     setupConfig <- pkgSetupConfigFile context
-    need [setupConfig]
+    need [setupConfig] -- This triggers 'configurePackage'
     pd <- packageDescription <$> readContextData context
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
