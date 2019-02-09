@@ -1485,7 +1485,8 @@ reifyTyCon tc
   = return (TH.PrimTyConI (reifyName tc) 2                False)
 
   | isPrimTyCon tc
-  = return (TH.PrimTyConI (reifyName tc) (tyConArity tc) (isUnliftedTyCon tc))
+  = return (TH.PrimTyConI (reifyName tc) (length (tyConVisibleTyVars tc))
+                          (isUnliftedTyCon tc))
 
   | isTypeFamilyTyCon tc
   = do { let tvs      = tyConTyVars tc
