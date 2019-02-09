@@ -36,7 +36,8 @@ module Type (
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
 
-        mkForAllTy, mkForAllTys, mkTyCoInvForAllTys, mkSpecForAllTys,
+        mkForAllTy, mkForAllTys, mkTyCoInvForAllTys,
+        mkSpecForAllTy, mkSpecForAllTys,
         mkVisForAllTys, mkTyCoInvForAllTy,
         mkInvForAllTy, mkInvForAllTys,
         splitForAllTys, splitForAllVarBndrs,
@@ -1334,7 +1335,7 @@ interfaces.  Notably this plays a role in tcTySigs in TcBinds.hs.
                                 ~~~~~~~~
 -}
 
--- | Make a dependent forall over an Inferred variablem
+-- | Make a dependent forall over an 'Inferred' variable
 mkTyCoInvForAllTy :: TyCoVar -> Type -> Type
 mkTyCoInvForAllTy tv ty
   | isCoVar tv
@@ -1343,13 +1344,13 @@ mkTyCoInvForAllTy tv ty
   | otherwise
   = ForAllTy (Bndr tv Inferred) ty
 
--- | Like mkTyCoInvForAllTy, but tv should be a tyvar
+-- | Like 'mkTyCoInvForAllTy', but tv should be a tyvar
 mkInvForAllTy :: TyVar -> Type -> Type
 mkInvForAllTy tv ty = ASSERT( isTyVar tv )
                       ForAllTy (Bndr tv Inferred) ty
 
--- | Like mkForAllTys, but assumes all variables are dependent and Inferred,
--- a common case
+-- | Like 'mkForAllTys', but assumes all variables are dependent and
+-- 'Inferred', a common case
 mkTyCoInvForAllTys :: [TyCoVar] -> Type -> Type
 mkTyCoInvForAllTys tvs ty = foldr mkTyCoInvForAllTy ty tvs
 
@@ -1357,12 +1358,17 @@ mkTyCoInvForAllTys tvs ty = foldr mkTyCoInvForAllTy ty tvs
 mkInvForAllTys :: [TyVar] -> Type -> Type
 mkInvForAllTys tvs ty = foldr mkInvForAllTy ty tvs
 
--- | Like mkForAllTys, but assumes all variables are dependent and Specified,
+-- | Like 'mkForAllTy', but assumes the variable is dependent and 'Specified',
 -- a common case
+mkSpecForAllTy :: TyVar -> Type -> Type
+mkSpecForAllTy tv ty = ASSERT( isTyVar tv )
+                       -- covar is always Inferred, so input should be tyvar
+                       ForAllTy (Bndr tv Specified) ty
+
+-- | Like 'mkForAllTys', but assumes all variables are dependent and
+-- 'Specified', a common case
 mkSpecForAllTys :: [TyVar] -> Type -> Type
-mkSpecForAllTys tvs = ASSERT( all isTyVar tvs )
-                      -- covar is always Inferred, so all inputs should be tyvar
-                      mkForAllTys [ Bndr tv Specified | tv <- tvs ]
+mkSpecForAllTys tvs ty = foldr mkSpecForAllTy ty tvs
 
 -- | Like mkForAllTys, but assumes all variables are dependent and visible
 mkVisForAllTys :: [TyVar] -> Type -> Type
