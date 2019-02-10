@@ -51,7 +51,9 @@ haddockBuilderArgs = mconcat
             , arg "--no-tmp-comp-dir"
             , arg $ "--dump-interface=" ++ output
             , arg "--html"
-            -- FIXME: this causes a crash
+            -- FIXME: this causes a crash, see #16239
+            --        a fix is on its way, but until then we comment it out:
+            --        https://gitlab.haskell.org/ghc/ghc/merge_requests/248
             -- , arg "--hyperlinked-source"
             , arg "--hoogle"
             , arg "--quickjump"
