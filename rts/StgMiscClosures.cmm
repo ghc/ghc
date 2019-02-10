@@ -242,7 +242,14 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
     (P_ node)
 {
     TICK_ENT_DYN_IND(); /* tick */
+retry:
     node = UNTAG(StgInd_indirectee(node));
+#if !ARCH_TOTAL_STORE_ORDER
+    if (node == stg_NO_INDIRECTEE_info) {
+        // See Note [Write barrier on thunk updates]
+        goto retry;
+    }
+#endif
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(node) (node);
 }
@@ -250,7 +257,14 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
     /* explicit stack */
 {
     TICK_ENT_DYN_IND(); /* tick */
+retry:
     R1 = UNTAG(StgInd_indirectee(R1));
+#if !ARCH_TOTAL_STORE_ORDER
+    if (R1 == stg_NO_INDIRECTEE_info) {
+        // See Note [Write barrier on thunk updates]
+        goto retry;
+    }
+#endif
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1) [R1];
 }
@@ -260,7 +274,14 @@ INFO_TABLE(stg_IND_direct,1,0,IND,"IND","IND")
     (P_ node)
 {
     TICK_ENT_DYN_IND(); /* tick */
+retry:
     node = StgInd_indirectee(node);
+#if !ARCH_TOTAL_STORE_ORDER
+    if (node == stg_NO_INDIRECTEE_info) {
+        // See Note [Write barrier on thunk updates]
+        goto retry;
+    }
+#endif
     TICK_ENT_VIA_NODE();
     jump %ENTRY_CODE(Sp(0)) (node);
 }
@@ -269,7 +290,14 @@ INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
     /* explicit stack */
 {
     TICK_ENT_STATIC_IND(); /* tick */
+retry:
     R1 = UNTAG(StgInd_indirectee(R1));
+#if !ARCH_TOTAL_STORE_ORDER
+    if (node == stg_NO_INDIRECTEE_info) {
+        // See Note [Write barrier on thunk updates]
+        goto retry;
+    }
+#endif
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1) [R1];
 }
@@ -297,7 +325,15 @@ retry:
         return (p);
     }
 
+#if !ARCH_TOTAL_STORE_ORDER
+    if (p == stg_NO_INDIRECTEE) {
+        // See Note [Write barrier on thunk updates]
+        goto retry;
+    }
+#endif
+
     info = StgHeader_info(p);
+
     if (info == stg_IND_info) {
         // This could happen, if e.g. we got a BLOCKING_QUEUE that has
         // just been replaced with an IND by another thread in
@@ -359,6 +395,13 @@ INFO_TABLE(stg_BLOCKING_QUEUE_CLEAN,4,0,BLOCKING_QUEUE,"BLOCKING_QUEUE","BLOCKIN
 
 INFO_TABLE(stg_BLOCKING_QUEUE_DIRTY,4,0,BLOCKING_QUEUE,"BLOCKING_QUEUE","BLOCKING_QUEUE")
 { foreign "C" barf("BLOCKING_QUEUE_DIRTY object (%p) entered!", R1) never returns; }
+
+// We initialize the SMP header indirectee field to this value to avoid needing
+// two write barriers during thunk updates.
+INFO_TABLE_CONSTR(stg_NO_INDIRECTEE,0,0,0,CONSTR_NOCAF,"NO_INDIRECTEE","NO_INDIRECTEE")
+{ foreign "C" barf("NO_INDIRECTEE object (%p) entered!", R1) never returns; }
+
+CLOSURE(stg_NO_INDIRECTEE_closure,stg_NO_INDIRECTEE);
 
 
 /* ----------------------------------------------------------------------------

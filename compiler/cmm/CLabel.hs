@@ -54,6 +54,7 @@ module CLabel (
         mkBadAlignmentLabel,
         mkArrWords_infoLabel,
         mkSRTInfoLabel,
+        mkNO_INDIRECTEELabel,
 
         mkTopTickyCtrLabel,
         mkCAFBlackHoleInfoTableLabel,
@@ -511,6 +512,7 @@ mkSMAP_FROZEN_CLEAN_infoLabel   = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_P
 mkSMAP_FROZEN_DIRTY_infoLabel   = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
 mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
 mkBadAlignmentLabel             = CmmLabel rtsUnitId (fsLit "stg_badAlignment")      CmmEntry
+mkNO_INDIRECTEELabel            = CmmLabel rtsUnitId (fsLit "stg_NO_INDIRECTEE")     CmmEntry
 
 mkSRTInfoLabel :: Int -> CLabel
 mkSRTInfoLabel n = CmmLabel rtsUnitId lbl CmmInfo

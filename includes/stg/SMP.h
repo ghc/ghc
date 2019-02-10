@@ -18,6 +18,13 @@ void arm_atomic_spin_lock(void);
 void arm_atomic_spin_unlock(void);
 #endif
 
+/* Does the platform maintain ordering of stores by a single core? */
+#if !defined(THREADED_RTS) || defined(x86_64_HOST_ARCH) || defined(i386_HOST_ARCH)
+#define ARCH_TOTAL_STORE_ORDER 1
+#else
+#define ARCH_TOTAL_STORE_ORDER 0
+#endif
+
 #if defined(THREADED_RTS)
 
 /* ----------------------------------------------------------------------------

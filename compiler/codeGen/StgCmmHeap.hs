@@ -144,9 +144,12 @@ emitSetDynHdr base info_ptr ccs
        hpStore base (zip (header dflags) [0, wORD_SIZE dflags ..])
   where
     header :: DynFlags -> [CmmExpr]
-    header dflags = [info_ptr] ++ dynProfHdr dflags ccs
-        -- ToDo: Parallel stuff
+    header dflags = [info_ptr] ++ dynProfHdr dflags ccs ++ indirectee
         -- No ticky header
+    indirectee
+      -- TODO: Make this dependent upon TSO
+      | True = [CmmLit (CmmLabel mkNO_INDIRECTEELabel)]
+      | otherwise = []
 
 -- Store the item (expr,off) in base[off]
 hpStore :: CmmExpr -> [(CmmExpr, ByteOff)] -> FCode ()
