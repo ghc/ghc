@@ -7,8 +7,7 @@ instance Show () -- Defined in ‘GHC.Show’
 instance Read () -- Defined in ‘GHC.Read’
 instance Enum () -- Defined in ‘GHC.Enum’
 instance Bounded () -- Defined in ‘GHC.Enum’
-data (##) :: TYPE ('GHC.Types.TupleRep '[]) = (##)
-  	-- Defined in ‘GHC.Prim’
+data (##) = (##) 	-- Defined in ‘GHC.Prim’
 () :: ()
 (##) :: (# #)
 (   ) :: ()
@@ -29,9 +28,7 @@ instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
 instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
 instance (Bounded a, Bounded b) => Bounded (a, b)
   -- Defined in ‘GHC.Enum’
-data (#,#) (a :: TYPE k0) (b :: TYPE k1) :: TYPE
-                                              ('GHC.Types.TupleRep '[k0, k1])
-  = (#,#) a b
+data (#,#) (a :: TYPE k0) (b :: TYPE k1) = (#,#) a b
   	-- Defined in ‘GHC.Prim’
 (,) :: a -> b -> (a, b)
 (#,#) :: a -> b -> (# a, b #)

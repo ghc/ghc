@@ -713,7 +713,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                      , nest 2 (vcat pp_cons)
                      , nest 2 $ ppShowIface ss pp_extra ]
   | otherwise = vcat [ pp_roles
-                     , hang (pp_nd <+> pp_lhs <+> pp_kind) 2 (add_bars pp_cons)
+                     , hang (pp_nd <+> pp_lhs) 2 (add_bars pp_cons)
                      , nest 2 $ ppShowIface ss pp_extra ]
   where
     is_data_instance = isIfaceDataInstance parent
