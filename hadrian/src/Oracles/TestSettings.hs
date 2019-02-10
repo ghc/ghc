@@ -74,32 +74,26 @@ testRTSSettings = do
     file <- testConfigFile
     words <$> lookupValueOrError file "GhcRTSWays"
 
--- | Directory to look for Binaries
--- | We assume that required programs are present in the same binary directory
--- | in which ghc is stored and that they have their conventional name.
--- | QUESTION : packages can be named different from their conventional names.
--- | For example, ghc-pkg can be named as ghc-pkg-version. In such cases, it will
--- | be impossible to search the binary. Only possible way will be to take user
--- | inputs for these directory also. boilerplate soes not account for this
--- | problem, but simply returns an error. How should we handle such cases?
+-- | Directory to look for binaries.
+--   We assume that required programs are present in the same binary directory
+--   in which ghc is stored and that they have their conventional name.
 getBinaryDirectory :: String -> Action FilePath
 getBinaryDirectory "stage0" = takeDirectory <$> setting SystemGhc
 getBinaryDirectory "stage1" = liftM2 (-/-) topDirectory (stageBinPath Stage0)
 getBinaryDirectory "stage2" = liftM2 (-/-) topDirectory (stageBinPath Stage1)
 getBinaryDirectory compiler = pure $ parentPath compiler
 
--- | Set Test Compiler.
+-- | Get the path to the given @--test-compiler@.
 getCompilerPath :: String -> Action FilePath
 getCompilerPath "stage0" = setting SystemGhc
 getCompilerPath "stage1" = liftM2 (-/-) topDirectory (fullPath Stage0 ghc)
 getCompilerPath "stage2" = liftM2 (-/-) topDirectory (fullPath Stage1 ghc)
 getCompilerPath compiler = pure compiler
 
--- | Returns parent path of test compiler
--- | TODO: Is there a simpler way to find parent directory?
+-- | Returns parent path of test compiler.
 parentPath :: String -> String
 parentPath path = intercalate "/" $ init $ splitOn "/" path
 
--- | TODO: Move to Hadrian utilities.
+-- | Get the full path to the given program.
 fullPath :: Stage -> Package -> Action FilePath
 fullPath stage pkg = programPath =<< programContext stage pkg

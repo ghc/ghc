@@ -34,7 +34,6 @@ testRules = do
         createDirectory $ takeDirectory (root -/- ghcConfigProgPath)
         cmd ghc0Path [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
 
-    -- TODO : Use input test compiler and not just stage2 compiler.
     root -/- ghcConfigPath ~> do
         args <- userSetting defaultTestArgs
         let testGhc = testCompiler args
@@ -55,8 +54,8 @@ testRules = do
         -- Prepare Ghc configuration file for input compiler.
         need [root -/- ghcConfigPath, root -/- timeoutPath]
 
-        args            <- userSetting defaultTestArgs
-        ghcPath         <- getCompilerPath (testCompiler args)
+        args <- userSetting defaultTestArgs
+        ghcPath <- getCompilerPath (testCompiler args)
 
         -- TODO This approach doesn't work.
         -- Set environment variables for test's Makefile.
@@ -73,21 +72,23 @@ testRules = do
               , "-fno-ghci-history"
               ]
 
-        -- where to get those from?
         checkPprPath    <- needFile Stage0 checkPpr
         annotationsPath <- needFile Stage0 checkApiAnnotations
         pythonPath      <- builderPath Python
         need [ checkPprPath, annotationsPath ]
 
         -- Set environment variables for test's Makefile.
+        -- TODO: Ideally we would define all those env vars in 'env', so that
+        --       Shake can keep track of them, but it is not as easy as it seems
+        --       to get that to work.
         liftIO $ do
             setEnv "MAKE" makePath
             setEnv "PYTHON" pythonPath
             setEnv "TEST_HC" ghcPath
             setEnv "TEST_HC_OPTS" ghcFlags
             setEnv "TEST_HC_OPTS_INTERACTIVE" ghciFlags
-            setEnv "CHECK_PPR" (top </> checkPprPath)
-            setEnv "CHECK_API_ANNOTATIONS" (top </> annotationsPath)
+            setEnv "CHECK_PPR" (top -/- checkPprPath)
+            setEnv "CHECK_API_ANNOTATIONS" (top -/- annotationsPath)
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
