@@ -95,8 +95,7 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "windows=" ++ show windows
             , arg "-e", arg $ "darwin=" ++ show darwin
             , arg "-e", arg $ "config.local=False"
-            , arg "-e", arg $ "config.exeext=" ++
-                show (if windows then "exe" else "")
+            , arg "-e", arg $ "config.exeext=" ++ exe
             , arg "-e", arg $ "config.cleanup=True"
             , arg "-e", arg $ "config.compiler_debugged=" ++ quote (yesNo debugged)
             , arg "-e", arg $ "ghc_debugged=" ++ quote (yesNo debugged)
@@ -164,8 +163,8 @@ getTestArgs = do
         haddockArg   = ["--config", "haddock=" ++ show (bindir -/- "haddock")]
         hp2psArg     = ["--config", "hp2ps=" ++ show (bindir -/- "hp2ps")]
         hpcArg       = ["--config", "hpc=" ++ show (bindir -/- "hpc")]
-        inTreeArg    = [ "-e", "config.in_tree_compiler="
-                    ++ show (testCompiler args `elem` ["stage1", "stage2"]) ]
+        inTreeArg    = [ "-e", "config.in_tree_compiler=" ++
+          show (testCompiler args `elem` ["stage1", "stage2", "stage3"]) ]
 
     pure $  configFileArg ++ testOnlyArg ++ speedArg
          ++ catMaybes [ onlyPerfArg, skipPerfArg, summaryArg
@@ -175,9 +174,9 @@ getTestArgs = do
 
 -- | Set speed for test
 setTestSpeed :: TestSpeed -> String
-setTestSpeed Slow   = "0"
-setTestSpeed Normal = "1"
-setTestSpeed Fast   = "2"
+setTestSpeed TestSlow   = "0"
+setTestSpeed TestNormal = "1"
+setTestSpeed TestFast   = "2"
 
 inferLibraryWays :: String -> Action [Way]
 inferLibraryWays compiler = do
