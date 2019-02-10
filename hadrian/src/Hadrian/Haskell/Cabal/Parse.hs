@@ -147,6 +147,7 @@ configurePackage context@Context {..} = do
     dir <- Context.buildPath context
     files <- liftIO $ getDirectoryFilesIO "." [ dir -/- "include" <//> "*"
                                               , dir -/- "*.buildinfo"
+                                              , dir -/- "lib" <//> "*"
                                               , dir -/- "config.*" ]
     produces files
 
