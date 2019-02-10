@@ -186,8 +186,8 @@ renameLType = mapM renameType
 renameLTypeArg :: LHsTypeArg GhcRn -> RnM (LHsTypeArg DocNameI)
 renameLTypeArg (HsValArg ty) = do { ty' <- renameLType ty
                                      ; return $ HsValArg ty' }
-renameLTypeArg (HsTypeArg ki) = do { ki' <- renameLKind ki
-                                 ; return $ HsTypeArg ki' }
+renameLTypeArg (HsTypeArg l ki) = do { ki' <- renameLKind ki
+                                     ; return $ HsTypeArg l ki' }
 renameLTypeArg (HsArgPar sp) = return $ HsArgPar sp
 
 renameLSigType :: LHsSigType GhcRn -> RnM (LHsSigType DocNameI)
