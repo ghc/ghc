@@ -1,107 +1,126 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module Test.Haddock.Xhtml
-    ( Xml(..)
+    ( Xml
     , parseXml, dumpXml
     , stripLinks, stripLinksWhen, stripAnchorsWhen, stripIdsWhen, stripFooter
     ) where
 
-import Data.Data ( Data(..), Typeable, eqT, (:~:)(..) )
-import Text.XML.Light
-import Text.XHtml (Html, HtmlAttr, (!))
-import qualified Text.XHtml as Xhtml
+{-
+This module used to actually parse the HTML (using the `xml` parsing library)
+which made it was possible to do more proper normalization of things like ids or
+names.
 
+However, in the interests of being able to run this from within the GHC
+testsuite (where non-bootlib dependencies are a liability), this was swapped
+out for some simple string manipulation. Since the test cases aren't very
+and since the `xhtml` library already handles the pretty-printing aspect,
+this would appear to be a reasonable compromise for now.
+-}
 
-newtype Xml = Xml
-    { xmlElement :: Element
-    } deriving Eq
+import Data.List ( stripPrefix, isPrefixOf )
+import Data.Char ( isSpace )
 
+-- | Simple wrapper around the pretty-printed HTML source
+newtype Xml = Xml { unXml :: String }
 
-deriving instance Eq Element
-deriving instance Eq Content
-deriving instance Eq CData
-
--- | Similar to @everywhere (mkT f) x@ from SYB.
-gmapEverywhere :: forall a b. (Data a, Typeable b) => (b -> b) -> a -> a
-gmapEverywhere f x = gmapT (gmapEverywhere f) $ case eqT @a @b of
-                                                  Nothing -> x
-                                                  Just Refl -> f x
-
-
+-- | Part of parsing involves dropping the @DOCTYPE@ line
 parseXml :: String -> Maybe Xml
-parseXml = fmap Xml . parseXMLDoc
-
+parseXml = Just . Xml . dropDocTypeLine
+  where
+  dropDocTypeLine bs
+    | "<!DOCTYPE" `isPrefixOf` bs
+    = drop 1 (dropWhile (/= '\n') bs)
+    | otherwise
+    = bs
 
 dumpXml :: Xml -> String
-dumpXml = Xhtml.renderHtmlFragment. xmlElementToXhtml . xmlElement
+dumpXml = unXml
+
+type Attr = String
+type Value = String
+
+-- | Almost all sanitization operations take the form of:
+--
+--    * match an attribute key
+--    * check something about the value
+--    * if the check succeeded, replace the value with a dummy value
+--
+stripAttrValueWhen
+  :: Attr             -- ^ attribute key
+  -> Value            -- ^ dummy attribute value
+  -> (Value -> Bool)  -- ^ determine whether we should modify the attribute
+  -> Xml              -- ^ input XML
+  -> Xml              -- ^ output XML
+stripAttrValueWhen key fallback p (Xml body) = Xml (filterAttrs body)
+  where
+  keyEq = key ++ "=\""
+
+  filterAttrs "" = ""
+  filterAttrs b@(c:cs)
+      | Just valRest <- stripPrefix keyEq b
+      , Just (val,rest) <- spanToEndOfString valRest
+      = if p val
+          then keyEq ++ fallback ++ "\"" ++ filterAttrs rest
+          else keyEq ++ val      ++ "\"" ++ filterAttrs rest
+
+      | otherwise
+      = c : filterAttrs cs
+
+-- | Spans to the next (unescaped) @\"@ character.
+--
+-- >>> spanToEndOfString "no closing quotation"
+-- Nothing
+-- >>> spanToEndOfString "foo\" bar \"baz\""
+-- Just ("foo", " bar \"baz\"")
+-- >>> spanToEndOfString "foo\\\" bar \"baz\""
+-- Just ("foo\\\" bar ", "baz\"")
+--
+spanToEndOfString :: String -> Maybe (String, String)
+spanToEndOfString ('"':rest) = Just ("", rest)
+spanToEndOfString ('\\':c:rest)
+  | Just (str, rest') <- spanToEndOfString rest
+  = Just ('\\':c:str, rest')
+spanToEndOfString (c:rest)
+  | Just (str, rest') <- spanToEndOfString rest
+  = Just (c:str, rest')
+spanToEndOfString _ = Nothing
 
 
+-- | Replace hyperlink targets with @\"#\"@ if they match a predicate
+stripLinksWhen :: (Value -> Bool) -> Xml -> Xml 
+stripLinksWhen = stripAttrValueWhen "href" "#"
+
+-- | Replace all hyperlink targets with @\"#\"@
 stripLinks :: Xml -> Xml
 stripLinks = stripLinksWhen (const True)
 
+-- | Replace id's with @\"\"@ if they match a predicate
+stripIdsWhen :: (Value -> Bool) -> Xml -> Xml 
+stripIdsWhen = stripAttrValueWhen "id" ""
 
-stripLinksWhen :: (String -> Bool) -> Xml -> Xml
-stripLinksWhen p =
-    processAnchors unlink
-  where
-    unlink attr@(Attr { attrKey = key, attrVal = val })
-        | qName key == "href" && p val = attr { attrVal = "#" }
-        | otherwise = attr
+-- | Replace names's with @\"\"@ if they match a predicate
+stripAnchorsWhen :: (Value -> Bool) -> Xml -> Xml
+stripAnchorsWhen = stripAttrValueWhen "name" ""
 
-
-stripAnchorsWhen :: (String -> Bool) -> Xml -> Xml
-stripAnchorsWhen p =
-    processAnchors unname
-  where
-    unname attr@(Attr { attrKey = key, attrVal = val })
-        | qName key == "name" && p val = attr { attrVal = "" }
-        | otherwise = attr
-
-stripIdsWhen :: (String -> Bool) -> Xml -> Xml
-stripIdsWhen p =
-    processAnchors unname
-  where
-    unname attr@(Attr { attrKey = key, attrVal = val })
-        | qName key == "id" && p val = attr { attrVal = "" }
-        | otherwise = attr
-
-
-processAnchors :: (Attr -> Attr) -> Xml -> Xml
-processAnchors f = Xml . gmapEverywhere f . xmlElement
-
-
+-- | Remove the @div@ which has @id=\"footer\"@
 stripFooter :: Xml -> Xml
-stripFooter =
-    Xml . gmapEverywhere defoot . xmlElement
+stripFooter (Xml body) = Xml (findDiv body)
   where
-    defoot el
-        | isFooter el = el { elContent = [] }
-        | otherwise = el
-    isFooter el = any isFooterAttr $ elAttribs el
-    isFooterAttr (Attr { .. }) = and
-        [ qName attrKey == "id"
-        , attrVal == "footer"
-        ]
+  findDiv "" = ""
+  findDiv b@(c:cs)
+      | Just divRest <- stripPrefix "<div id=\"footer\"" b
+      , Just rest <- dropToDiv divRest
+      = rest 
 
+      | otherwise
+      = c : findDiv cs
 
-xmlElementToXhtml :: Element -> Html
-xmlElementToXhtml (Element { .. }) =
-    Xhtml.tag (qName elName) contents ! attrs
-  where
-    contents = mconcat $ map xmlContentToXhtml elContent
-    attrs = map xmlAttrToXhtml elAttribs
+  dropToDiv "" = Nothing
+  dropToDiv b@(_:cs)
+      | Just valRest <- stripPrefix "</div" b
+      , valRest' <- dropWhile isSpace valRest
+      , Just valRest'' <- stripPrefix ">" valRest'
+      = Just valRest''
 
+      | otherwise
+      = dropToDiv cs
 
-xmlContentToXhtml :: Content -> Html
-xmlContentToXhtml (Elem el) = xmlElementToXhtml el
-xmlContentToXhtml (Text text) = Xhtml.toHtml $ cdData text
-xmlContentToXhtml (CRef _) = Xhtml.noHtml
-
-
-xmlAttrToXhtml :: Attr -> HtmlAttr
-xmlAttrToXhtml (Attr { .. }) = Xhtml.strAttr (qName attrKey) attrVal
