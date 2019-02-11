@@ -60,7 +60,8 @@ module GHC.Event.Manager
 -- Imports
 
 import Control.Concurrent.MVar (MVar, newMVar, putMVar,
-                                tryPutMVar, takeMVar, withMVar, modifyMVar)
+                                tryPutMVar, takeMVar, withMVar,
+                                modifyMVar, modifyMVar_)
 import Control.Exception (onException,evaluate)
 import Data.Bits ((.&.))
 import Data.Foldable (forM_,foldl',mapM_)
@@ -419,9 +420,9 @@ eventsOf = foldl' (\acc fdd -> acc <> fdEvents fdd) mempty
 unregisterFd_ :: EventManager -> FdKey -> IO Bool
 unregisterFd_ mgr@(EventManager{..}) (FdKey fd u) =
   modifyMVar (callbackTableVar mgr fd) $ \tbl0 -> do
-    let dropReg = PM.filterSmallArray ((/= u) . keyUnique . fdKey)
+    let dropReg = pure . PM.filterSmallArray ((/= u) . keyUnique . fdKey)
         fd' = fromIntegral fd
-    (tbl1, oldFdds, newFdds) <- IT.updateWith dropReg fd' tbl0
+    (tbl1, oldFdds, newFdds) <- IT.updateWithM dropReg fd' tbl0
     let oldEls = eventsOf oldFdds
     let newEls = eventsOf newFdds
     let modify = oldEls /= newEls
@@ -474,62 +475,71 @@ closeFd_ mgr tbl0 fd = do
 
 -- | Call the callbacks corresponding to the given file descriptor.
 onFdEvent :: EventManager -> Fd -> Event -> IO ()
-onFdEvent mgr fd evs
-  | fd == controlReadFd (emControl mgr) || fd == wakeupReadFd (emControl mgr) =
-    handleControlEvent mgr fd evs
+onFdEvent mgr fd0 evs
+  | fd0 == controlReadFd (emControl mgr) || fd0 == wakeupReadFd (emControl mgr) =
+    handleControlEvent mgr fd0 evs
 
   | otherwise = do
-    fdds <- modifyMVar (callbackTableVar mgr fd) $ \tbl ->
-        IT.delete (fromIntegral fd) tbl >>= selectCallbacks
-    forM_ fdds $ \(FdData _ _ cv) -> putReady cv
+    modifyMVar_ (callbackTableVar mgr fd0) $ \tbl0 -> do
+        (tbl1,_,_)<- IT.updateWithM fillAndRemoveCVars (fromIntegral fd0) tbl0
+        pure tbl1
   where
     -- | Here we look through the list of registrations for the fd of interest
     -- and sort out which match the events that were triggered. We,
     --
-    --   1. re-arm the fd as appropriate
-    --   2. reinsert registrations that weren't triggered and multishot
+    --   1. Re-arm the fd as appropriate
+    --   2. Preserve registrations that weren't triggered and multishot
     --      registrations
-    --   3. return a list containing the callbacks that should be invoked.
-    selectCallbacks :: (IntTable FdData, SmallArray FdData) -> IO (IntTable FdData, SmallArray FdData)
-    selectCallbacks (tbl0,fdds) = do
-        let -- figure out which registrations have been triggered
-            matches :: FdData -> Bool
-            matches fd' = evs `I.eventIs` I.elEvent (fdEvents fd')
-            (triggered, notTriggered) = PM.partitionSmallArray matches fdds
+    --   3. Fill CVars corresponding to registrations for which data
+    --      is now available.
+    fillAndRemoveCVars :: SmallArray FdData -> IO (SmallArray FdData)
+    fillAndRemoveCVars fdds0 = do
+      let ((!preservedEls,!allEls),fdds1) = PM.foldlFilterSmallArray'
+            ( \(!preservedEls0,!allEls0) fdd ->
+              let -- Figure out if this registration has been triggered.
+                  isTriggered :: Bool
+                  isTriggered = evs `I.eventIs` I.elEvent (fdEvents fdd)
+                  -- (triggered, notTriggered) = PM.partitionSmallArray matches fdds
 
-            -- sort out which registrations we need to retain
-            isMultishot :: FdData -> Bool
-            isMultishot fd' = I.elLifetime (fdEvents fd') == MultiShot
-            saved = PM.appendSmallArray notTriggered (PM.filterSmallArray isMultishot triggered)
+                  -- Is this a multishot registration? If so, we will need
+                  -- to retain this registration regardless of whether or
+                  -- not it was triggered.
+                  isMultishot :: Bool
+                  isMultishot = I.elLifetime (fdEvents fdd) == MultiShot
+                  
+                  -- Should we preserve this registration?
+                  isPreserved :: Bool
+                  isPreserved = not isTriggered || isMultishot
 
-            savedEls = eventsOf saved
-            allEls = eventsOf fdds
+                  preservedEls1 = if isPreserved
+                    then preservedEls0 <> fdEvents fdd
+                    else preservedEls0
 
-        -- Reinsert multishot registrations.
-        -- We deleted the table entry for this fd above so we there isn't a preexisting entry
-        tbl1 <- IT.reset (fromIntegral fd) saved tbl0
+                  allEls1 = allEls0 <> fdEvents fdd
+               in (isPreserved,(preservedEls1,allEls1))
+             ) (mempty,mempty) fdds0
 
-        case I.elLifetime allEls of
-          -- we previously armed the fd for multiple shots, no need to rearm
-          MultiShot | allEls == savedEls ->
-            return ()
+      case I.elLifetime allEls of
+        -- we previously armed the fd for multiple shots, no need to rearm
+        MultiShot | allEls == preservedEls ->
+          return ()
 
-          -- either we previously registered for one shot or the
-          -- events of interest have changed, we must re-arm
-          _ ->
-            case I.elLifetime savedEls of
-              OneShot | haveOneShot ->
-                -- if there are no saved events and we registered with one-shot
-                -- semantics then there is no need to re-arm
-                unless (OneShot == I.elLifetime allEls
-                        && mempty == I.elEvent savedEls) $ do
-                  void $ I.modifyFdOnce (emBackend mgr) fd (I.elEvent savedEls)
-              _ ->
-                -- we need to re-arm with multi-shot semantics
-                void $ I.modifyFd (emBackend mgr) fd
-                                  (I.elEvent allEls) (I.elEvent savedEls)
+        -- either we previously registered for one shot or the
+        -- events of interest have changed, we must re-arm
+        _ ->
+          case I.elLifetime preservedEls of
+            OneShot | haveOneShot ->
+              -- if there are no saved events and we registered with one-shot
+              -- semantics then there is no need to re-arm
+              unless (OneShot == I.elLifetime allEls
+                      && mempty == I.elEvent preservedEls) $ do
+                void $ I.modifyFdOnce (emBackend mgr) fd0 (I.elEvent preservedEls)
+            _ ->
+              -- we need to re-arm with multi-shot semantics
+              void $ I.modifyFd (emBackend mgr) fd0
+                                (I.elEvent allEls) (I.elEvent preservedEls)
 
-        return (tbl1,triggered)
+      return fdds1
 
 
 -- Notify the reading end of the CVar that the file descriptor they were

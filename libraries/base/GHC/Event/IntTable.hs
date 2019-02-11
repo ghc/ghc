@@ -14,7 +14,7 @@ module GHC.Event.IntTable
     , lookup
     , reset
     , delete
-    , updateWith
+    , updateWithM
     , insertCons
     ) where
 
@@ -223,17 +223,17 @@ replace !k !v (IntTable {tabSize,tabArr}) = do
 -- cause the table to grow. The old and new arrays are returned.
 --
 -- We inline this function because it is only ever called in
--- one place in the event manager.
-updateWith :: (SmallArray a -> SmallArray a) -> Int -> IntTable a -> IO (IntTable a, SmallArray a, SmallArray a)
-{-# INLINE updateWith #-}
-updateWith f !k (IntTable {tabSize,tabArr}) = do
+-- two places in the event manager.
+updateWithM :: (SmallArray a -> IO (SmallArray a)) -> Int -> IntTable a -> IO (IntTable a, SmallArray a, SmallArray a)
+{-# INLINE updateWithM #-}
+updateWithM f !k (IntTable {tabSize,tabArr}) = do
   let idx = hashIndex k (PM.sizeofMutableUnliftedArray tabArr)
   bkts <- PM.readUnliftedArray tabArr idx
   scanBuckets k bkts >>= \case
     Nothing ->
       pure (IntTable{tabSize,tabArr},PM.emptySmallArray,PM.emptySmallArray)
     Just (bktIx,Bucket{bucketValue}) -> do
-      let !newVal = f bucketValue
+      newVal <- f bucketValue
       if PM.sizeofSmallArray newVal == 0
         then do
           newBkts <- PM.deleteIndexSmallMutableArray bkts bktIx

@@ -33,6 +33,7 @@ module GHC.Primitive.SmallArray
   , filterSmallArray
   , partitionSmallArray
   , mapSmallArray'
+  , foldlFilterSmallArray'
   ) where
 
 import Data.Foldable (Foldable(..))
@@ -255,6 +256,11 @@ createArray n x f = runArray $ do
   _ <- f mary
   pure mary
 
+runArrayWriter ::
+     (forall s. ST s (a, SmallMutableArray s b))
+  -> (a, SmallArray b)
+runArrayWriter m = case runArrayWriter# m of
+  (# x, y #) -> (x, SmallArray y)
 
 runArray
   :: (forall s. ST s (SmallMutableArray s a))
@@ -270,6 +276,7 @@ runArray2 m = case runArray2# m of
 runArray#
   :: (forall s. ST s (SmallMutableArray s a))
   -> SmallArray# a
+{-# INLINE runArray# #-}
 runArray# m = case runRW# $ \s ->
   case unST m s of { (# s', SmallMutableArray mary# #) ->
   unsafeFreezeSmallArray# mary# s'} of (# _, ary# #) -> ary#
@@ -277,6 +284,7 @@ runArray# m = case runRW# $ \s ->
 runArray2# ::
      (forall s. ST s (SmallMutableArray s a,SmallMutableArray s b))
   -> (# SmallArray# a, SmallArray# b #)
+{-# INLINE runArray2# #-}
 runArray2# m = case
   ( runRW# $ \s0 ->
     case unST m s0 of
@@ -284,6 +292,18 @@ runArray2# m = case
         case unsafeFreezeSmallArray# maryA# s1 of
           (# s2, aryA# #) -> case unsafeFreezeSmallArray# maryB# s2 of
             (# s3, aryB# #) -> (# s3, (# aryA#, aryB# #) #)
+  ) of { (# _, pair #) -> pair }
+
+runArrayWriter# ::
+     (forall s. ST s (a,SmallMutableArray s b))
+  -> (# a, SmallArray# b #)
+{-# INLINE runArrayWriter# #-}
+runArrayWriter# m = case
+  ( runRW# $ \s0 ->
+    case unST m s0 of
+      (# s1, (a, SmallMutableArray maryB# ) #) ->
+        case unsafeFreezeSmallArray# maryB# s1 of
+          (# s2, aryB# #) -> (# s2, (# a, aryB# #) #)
   ) of { (# _, pair #) -> pair }
 
 unST :: ST s a -> State# s -> (# State# s, a #)
@@ -392,6 +412,34 @@ filterSmallArray p !arr = runArray $ do
         else return ixDst
   dstLen <- go 0 0
   internalResizeMutableArray marr dstLen
+
+-- | Strict left fold over an array. At each step, the callback
+-- folds an element into the accumulator and decides if the
+-- element should be preserved. 
+--
+-- Note: this function could be improved to avoid allocating
+-- when the resulting array ends up empty. 
+foldlFilterSmallArray' ::
+     (b -> a -> (Bool,b))
+  -> b
+  -> SmallArray a
+  -> (b, SmallArray a)
+foldlFilterSmallArray' p !b0 !arr = runArrayWriter $ do
+  let !sz = sizeofSmallArray arr
+  marr <- newSmallArray sz (die "foldlFilterSmallArray'" "impossible")
+  let go !ixSrc !ixDst !b = if ixSrc < sz
+        then do
+          a <- indexSmallArrayM arr ixSrc
+          let (preserve,b') = p b a
+          if preserve
+            then do
+              writeSmallArray marr ixDst a
+              go (ixSrc + 1) (ixDst + 1) b'
+            else go (ixSrc + 1) ixDst b'
+        else return (ixDst,b)
+  (dstLen,r) <- go 0 0 b0
+  finalArr <- internalResizeMutableArray marr dstLen
+  pure (r,finalArr)
 
 partitionSmallArray :: (a -> Bool) -> SmallArray a -> (SmallArray a, SmallArray a)
 {-# INLINE partitionSmallArray #-}
