@@ -1421,6 +1421,8 @@ preloadObjectFile (pathchar *path)
 
 #endif /* RTS_LINKER_USE_MMAP */
 
+   IF_DEBUG(linker, debugBelch("loadObj: preloaded image at %p\n", (void *) image));
+
    oc = mkOc(path, image, fileSize, true, NULL, misalignment);
 
 #if defined(OBJFORMAT_MACHO)
@@ -1442,7 +1444,7 @@ preloadObjectFile (pathchar *path)
 static HsInt loadObj_ (pathchar *path)
 {
    ObjectCode* oc;
-   IF_DEBUG(linker, debugBelch("loadObj %" PATH_FMT "\n", path));
+   IF_DEBUG(linker, debugBelch("loadObj: %" PATH_FMT "\n", path));
 
    /* debugBelch("loadObj %s\n", path ); */
 
@@ -1612,6 +1614,8 @@ int ocTryLoad (ObjectCode* oc) {
     if (!r) { return r; }
 
     // run init/init_array/ctors/mod_init_func
+
+    IF_DEBUG(linker, debugBelch("ocTryLoad: ocRunInit pre-start\n"));
 
     loading_obj = oc; // tells foreignExportStablePtr what to do
 #if defined(OBJFORMAT_ELF)
@@ -1816,8 +1820,8 @@ void freeProddableBlocks (ObjectCode *oc)
  */
 void
 addSection (Section *s, SectionKind kind, SectionAlloc alloc,
-            void* start, StgWord size, StgWord mapped_offset,
-            void* mapped_start, StgWord mapped_size)
+            void* start, StgWord size,
+            StgWord mapped_offset, void* mapped_start, StgWord mapped_size)
 {
    s->start        = start;     /* actual start of section in memory */
    s->size         = size;      /* actual size of section in memory */
