@@ -911,6 +911,9 @@ data DynFlags = DynFlags {
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
   specConstrRecursive   :: Int,         -- ^ Max number of specialisations for recursive types
                                         --   Not optional; otherwise ForceSpecConstr can diverge.
+  binBlobThreshold      :: Word,        -- ^ Binary literals (e.g. strings) whose size is above
+                                        --   this threshold will be dumped in a binary file
+                                        --   by the assembler code generator (0 to disable)
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
                                         --   See CoreMonad.FloatOutSwitches
@@ -1884,6 +1887,7 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         maxPmCheckIterations    = 2000000,
         ruleCheck               = Nothing,
         inlineCheck             = Nothing,
+        binBlobThreshold        = 500000, -- 500K is a good default (see #16190)
         maxRelevantBinds        = Just 6,
         maxValidHoleFits   = Just 6,
         maxRefHoleFits     = Just 6,
@@ -3526,6 +3530,8 @@ dynamic_flags_deps = [
                                                 setOptLevel (mb_n `orElse` 1)))
                 -- If the number is missing, use 1
 
+  , make_ord_flag defFlag "fbinary-blob-threshold"
+      (intSuffix (\n d -> d { binBlobThreshold = fromIntegral n }))
 
   , make_ord_flag defFlag "fmax-relevant-binds"
       (intSuffix (\n d -> d { maxRelevantBinds = Just n }))
