@@ -1,0 +1,36 @@
+
+T15957_Fail.hs:7:6: error: [-Wunused-record-wildcards (in -Wall), -Werror=unused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+
+T15957_Fail.hs:8:9: error: [-Wunused-record-wildcards (in -Wall), -Werror=unused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+
+T15957_Fail.hs:9:12: error: [-Wredundant-record-wildcards (in -Wall), -Werror=redundant-record-wildcards]
+    Record wildcard does not bind any new variables
+      Possible fix: omit the ‘..’
+
+T15957_Fail.hs:11:11: error: [-Wunused-record-wildcards (in -Wall), -Werror=unused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+
+T15957_Fail.hs:12:16: error: [-Wredundant-record-wildcards (in -Wall), -Werror=redundant-record-wildcards]
+    Record wildcard does not bind any new variables
+      Possible fix: omit the ‘..’
+
+T15957_Fail.hs:13:15: error: [-Wredundant-record-wildcards (in -Wall), -Werror=redundant-record-wildcards]
+    Record wildcard does not bind any new variables
+      Possible fix: omit the ‘..’
+
+T15957_Fail.hs:20:9: error: [-Wunused-record-wildcards (in -Wall), -Werror=unused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+
+T15957_Fail.hs:25:9: error: [-Wunused-record-wildcards (in -Wall), -Werror=unused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+
+T15957_Fail.hs:31:18: error: [-Wunused-record-wildcards (in -Wall), -Werror=unused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’

@@ -397,7 +397,7 @@ mkTrNameLit = do
 -- | Make Typeable bindings for the given 'TyCon'.
 mkTyConRepBinds :: TypeableStuff -> TypeRepTodo
                 -> TypeableTyCon -> KindRepM (LHsBinds GhcTc)
-mkTyConRepBinds stuff@(Stuff {..}) todo (TypeableTyCon {..})
+mkTyConRepBinds stuff todo (TypeableTyCon {..})
   = do -- Make a KindRep
        let (bndrs, kind) = splitForAllVarBndrs (tyConKind tycon)
        liftTc $ traceTc "mkTyConKindRepBinds"
@@ -477,7 +477,7 @@ initialKindRepEnv = foldlM add_kind_rep emptyTypeMap builtInKindReps
 mkExportedKindReps :: TypeableStuff
                    -> [(Kind, Id)]  -- ^ the kinds to generate bindings for
                    -> KindRepM ()
-mkExportedKindReps stuff@(Stuff {..}) = mapM_ kindrep_binding
+mkExportedKindReps stuff = mapM_ kindrep_binding
   where
     empty_scope = mkDeBruijnContext []
 
