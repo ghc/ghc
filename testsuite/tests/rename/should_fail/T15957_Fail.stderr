@@ -1,0 +1,11 @@
+
+T15957_Fail.hs:7:4: error: [-Wunused-record-wildcards, -Werror=unused-record-wildcards]
+    No variables bound in the record wildcard match are used:
+      data constructor ‘P’
+
+T15957_Fail.hs:8:4: error: [-Wunused-record-wildcards, -Werror=unused-record-wildcards]
+    No variables bound in the record wildcard match are used:
+      data constructor ‘P’
+
+T15957_Fail.hs:9:4: error: [-Wredundant-record-wildcards, -Werror=redundant-record-wildcards]
+    Record wildcard does not bind any new variables
