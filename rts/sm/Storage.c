@@ -420,6 +420,22 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     // successfully claimed by us; overwrite with IND_STATIC
 #endif
 
+    // Push stuff that will become unreachable after updating to UpdRemSet to
+    // maintain snapshot invariant
+    const StgInfoTable *orig_info_tbl = INFO_PTR_TO_STRUCT(orig_info);
+    // OSA: Assertions to make sure my understanding of static thunks is correct
+    ASSERT(orig_info_tbl->type == THUNK_STATIC);
+    // Secondly I think static thunks can't have payload: anything that they
+    // reference should be in SRTs
+    ASSERT(orig_info_tbl->layout.payload.ptrs == 0);
+    // Becuase the payload is empty we just push the SRT
+    if (nonmoving_write_barrier_enabled) {
+        StgThunkInfoTable *thunk_info = itbl_to_thunk_itbl(orig_info_tbl);
+        if (thunk_info->i.srt) {
+            updateRemembSetPushClosure(cap, GET_SRT(thunk_info), NULL);
+        }
+    }
+
     // For the benefit of revertCAFs(), save the original info pointer
     caf->saved_info = orig_info;
 

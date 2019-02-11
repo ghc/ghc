@@ -406,12 +406,12 @@ bool check_in_nonmoving_heap(StgClosure *p) {
 /* Push the free variables of a (now-evaluated) thunk to the
  * update remembered set.
  */
-void updateRemembSetPushThunk(Capability *cap, StgThunk *origin)
+void updateRemembSetPushThunk(Capability *cap, StgThunk *thunk)
 {
     // TODO: Eliminate this conditional once it's folded into codegen
     if (!nonmoving_write_barrier_enabled) return;
-    const StgThunkInfoTable *info = get_thunk_itbl((StgClosure*)origin);
-    updateRemembSetPushThunkEager(cap, info, origin);
+    const StgThunkInfoTable *info = get_thunk_itbl((StgClosure*)thunk);
+    updateRemembSetPushThunkEager(cap, info, thunk);
 }
 
 void updateRemembSetPushThunkEager(Capability *cap,
