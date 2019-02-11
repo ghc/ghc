@@ -12,11 +12,6 @@ typedef struct mach_header_64     MachOHeader;
 typedef struct segment_command_64 MachOSegmentCommand;
 typedef struct section_64         MachOSection;
 typedef struct nlist_64           MachONList;
-#elif defined(i386_HOST_ARCH) || defined(arm_HOST_ARCH)
-typedef struct mach_header     MachOHeader;
-typedef struct segment_command MachOSegmentCommand;
-typedef struct section         MachOSection;
-typedef struct nlist           MachONList;
 #else
 #error Unknown Darwin architecture
 #endif
