@@ -16,8 +16,4 @@ int    ocRunInit_MachO              ( ObjectCode* oc );
 int    machoGetMisalignment         ( FILE * );
 int    ocAllocateSymbolExtras_MachO ( ObjectCode* oc );
 
-#if defined(powerpc_HOST_ARCH)
-void machoInitSymbolsWithoutUnderscore( void );
-#endif
-
 #include "EndPrivate.h"

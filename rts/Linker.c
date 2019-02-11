@@ -447,9 +447,7 @@ initLinker_ (int retain_cafs)
         }
         IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
     }
-#   if defined(OBJFORMAT_MACHO) && defined(powerpc_HOST_ARCH)
-    machoInitSymbolsWithoutUnderscore();
-#   endif
+
     /* GCC defines a special symbol __dso_handle which is resolved to NULL if
        referenced from a statically linked module. We need to mimic this, but
        we cannot use NULL because we use it to mean nonexistent symbols. So we
@@ -1423,6 +1421,7 @@ preloadObjectFile (pathchar *path)
 
    IF_DEBUG(linker, debugBelch("loadObj: preloaded image at %p\n", (void *) image));
 
+   /* fixme (AP): =mapped= parameter unconditionally set to true */
    oc = mkOc(path, image, fileSize, true, NULL, misalignment);
 
 #if defined(OBJFORMAT_MACHO)
