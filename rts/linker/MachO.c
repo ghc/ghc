@@ -147,10 +147,12 @@ ocInit_MachO(ObjectCode * oc)
             oc->info->macho_symbols[i].name  = oc->info->names
                                              + oc->info->nlist[i].n_un.n_strx;
             oc->info->macho_symbols[i].nlist = &oc->info->nlist[i];
-             /* we don't have an address for this symbol yet; this will be
-              * populated during ocGetNames_MachO. hence addr = NULL
+             /* We don't have an address for this symbol yet; this
+              * will be populated during ocGetNames_MachO. Hence init
+              * with NULL
               */
             oc->info->macho_symbols[i].addr  = NULL;
+            oc->info->macho_symbols[i].got_addr = NULL;
         }
     }
 }
@@ -686,7 +688,7 @@ static int
 relocateSection(ObjectCode* oc, int curSection)
 {
     Section * sect = &oc->sections[curSection];
-    MachOSection * msect = sect->info->macho_section; // for convenience access
+    MachOSection * msect = sect->info->macho_section; // for access convenience
     MachORelocationInfo * relocs = sect->info->relocation_info;
     MachOSymbol * symbols = oc->info->macho_symbols;
 
@@ -730,33 +732,29 @@ relocateSection(ObjectCode* oc, int curSection)
         switch(reloc->r_length)
         {
             case 0:
-                checkProddableBlock(oc,thingPtr,1);
                 thing = *(uint8_t*)thingPtr;
                 relocLenBytes = 1;
                 break;
             case 1:
-                checkProddableBlock(oc,thingPtr,2);
                 thing = *(uint16_t*)thingPtr;
                 relocLenBytes = 2;
                 break;
             case 2:
-                checkProddableBlock(oc,thingPtr,4);
                 thing = *(uint32_t*)thingPtr;
                 relocLenBytes = 4;
                 break;
             case 3:
-                checkProddableBlock(oc,thingPtr,8);
                 thing = *(uint64_t*)thingPtr;
                 relocLenBytes = 8;
                 break;
             default:
                 barf("Unknown size.");
         }
+        checkProddableBlock(oc,thingPtr,relocLenBytes);
 
         /*
-         * With SIGNED_N the relocation is not at the
-         * end of instruction and baseValue needs to be
-         * adjusted accordingly.
+         * With SIGNED_N the relocation is not at the end of the
+         * instruction and baseValue needs to be adjusted accordingly.
          */
         switch (type) {
             case X86_64_RELOC_SIGNED_1:
@@ -787,7 +785,6 @@ relocateSection(ObjectCode* oc, int curSection)
             IF_DEBUG(linker, debugBelch("relocateSection: making jump island for %s, extern = %d, X86_64_RELOC_GOT\n",
                                         nm, reloc->r_extern));
 
-            ASSERT(reloc->r_extern); // fixme: redundant?
             if (reloc->r_extern == 0) {
                     errorBelch("\nrelocateSection: global offset table relocation for symbol with r_extern == 0\n");
             }
@@ -800,8 +797,8 @@ relocateSection(ObjectCode* oc, int curSection)
 
                     addr = lookupSymbol_(nm);
                     IF_DEBUG(linker, debugBelch("relocateSection: looked up %s, "
-                                                "external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n", nm));
-                    IF_DEBUG(linker, debugBelch("               : addr = %p\n", addr));
+                                                "external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n"
+                                                "               : addr = %p\n", nm, addr));
 
                     if (addr == NULL) {
                             errorBelch("\nlookupSymbol failed in relocateSection (RELOC_GOT)\n"
@@ -819,6 +816,7 @@ relocateSection(ObjectCode* oc, int curSection)
                     if ((symbol->nlist->n_type & N_TYPE) == N_SECT) {
                         ASSERT(symbol->addr != NULL);
                         addr = symbol->addr;
+
                         IF_DEBUG(linker, debugBelch("relocateSection: calculated relocation of "
                                                     "non-external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n"));
                         IF_DEBUG(linker, debugBelch("               : addr = %p\n", addr));
@@ -829,7 +827,7 @@ relocateSection(ObjectCode* oc, int curSection)
             }
 
             // creates a jump island for every relocation entry for a symbol
-            // fixme: use got_addr to store the loc. of a jump island for a symbol
+            // TODO (AP): use got_addr to store the loc. of a jump island to reuse later
             value = (uint64_t) &makeSymbolExtra(oc, reloc->r_symbolnum, (unsigned long)addr)->addr;
 
             type = X86_64_RELOC_SIGNED;
@@ -875,7 +873,7 @@ relocateSection(ObjectCode* oc, int curSection)
              * For instance, in a signed case:
              * thing = <displ. to to section r_symbolnum *in the image*> (1)
              *       + <offset within r_symbolnum section>
-             * (1) needs to be updated due to different section layout in memory.
+             * (1) needs to be updated due to different section placement in memory.
              */
 
             CHECKM(reloc->r_symbolnum > 0,
@@ -979,6 +977,13 @@ relocateSection(ObjectCode* oc, int curSection)
         }
 
         IF_DEBUG(linker, debugBelch("relocateSection: thing = %p\n", (void *) thing));
+        if (0 == reloc->r_extern) {
+            if (reloc->r_pcrel) {
+                checkProddableBlock(oc, (void *)((char *)thing + baseValue), relocLenBytes);
+            } else {
+                checkProddableBlock(oc, (void *)thing, relocLenBytes);
+            }
+        }
 
         switch(reloc->r_length)
         {

@@ -118,8 +118,6 @@ typedef struct _Segment {
     int n_sections;
 } Segment;
 
-/* todo (AP): add freeSegments */
-
 /*
  * We must keep track of the StablePtrs that are created for foreign
  * exports by constructor functions when the module is loaded, so that
@@ -194,10 +192,7 @@ typedef struct _ObjectCode {
        after allocation, so that we can use realloc */
     int        misalignment;
 
-    /* The section-kind entries for this object module.  Linked
-       list. */
-    /* fixme (AP): doesn't look like a linked list. On MachO it's an array, and
-     * generally Section struct doesn't have pointers to next. */
+    /* The section-kind entries for this object module. An array. */
     int n_sections;
     Section* sections;
 
