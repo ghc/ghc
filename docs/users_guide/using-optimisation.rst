@@ -1238,3 +1238,19 @@ by saying ``-fno-wombat``.
     if a function definition will be inlined *at a call site*. The other option
     determines if a function definition will be kept around at all for
     potential inlining.
+
+.. ghc-flag:: -fbinary-blob-threshold=⟨n⟩
+    :shortdesc: *default: 500K.* Tweak assembly generator for binary blobs.
+    :type: dynamic
+    :category: optimization
+
+    :default: 500000
+
+    The native code-generator can either dump binary blobs (e.g. string
+    literals) into the assembly file (by using ".asciz" or ".string" assembler
+    directives) or it can dump them as binary data into a temporary file which
+    is then included by the assembler (using the ".incbin" assembler directive).
+
+    This flag sets the size (in bytes) threshold above which the second approach
+    is used. You can disable the second approach entirely by setting the
+    threshold to 0.

@@ -47,7 +47,6 @@ import FastString
 import Outputable
 
 import Data.Word
-
 import Data.Bits
 
 -- -----------------------------------------------------------------------------
@@ -154,8 +153,7 @@ pprDatas (align, (Statics lbl dats))
  = vcat (pprAlign align : pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
-pprData (CmmString str)
- = ptext (sLit "\t.asciz ") <> doubleQuotes (pprASCII str)
+pprData (CmmString str) = pprBytes str
 
 pprData (CmmUninitialised bytes)
  = sdocWithPlatform $ \platform ->
