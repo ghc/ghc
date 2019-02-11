@@ -25,7 +25,6 @@ import FastString     ( mkFastString )
 import Module         ( Module, moduleName )
 import NameCache      ( initNameCache )
 import UniqSupply     ( mkSplitUniqSupply )
-import SysTools.Info  ( getCompilerInfo' )
 
 
 -- | Generate hyperlinked source for given interfaces.
@@ -62,12 +61,11 @@ ppHyperlinkedModuleSource srcdir pretty srcs iface = case ifaceHieFile iface of
                 , hie_types = types
                 , hie_hs_src = rawSrc
                 } <- fmap fst (readHieFile (initNameCache u []) hfp)
-        comp <- getCompilerInfo' df
 
         -- Get the AST and tokens corresponding to the source file we want
         let mast | M.size asts == 1 = snd <$> M.lookupMin asts
                  | otherwise        = M.lookup (mkFastString file) asts
-            tokens = parse comp df file rawSrc
+            tokens = parse df file rawSrc
 
         -- Produce and write out the hyperlinked sources
         case mast of

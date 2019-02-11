@@ -20,18 +20,11 @@ checkConfig = CheckConfig
     , ccfgEqual = (==) `on` dumpXml
     }
   where
-    -- The whole point of the ClangCppBug is to demonstrate a situation where
-    -- line numbers may vary (and test that links still work). Consequently, we
-    -- strip out line numbers for this test case.
-    strip f | takeBaseName f == "ClangCppBug"
-            = stripAnchors' . stripLinks' . stripIds' . stripIds'' . stripFooter
-            | otherwise
-            = stripAnchors' . stripLinks' . stripIds' . stripFooter
+    strip _ = stripAnchors' . stripLinks' . stripIds' . stripFooter
     
     stripLinks' = stripLinksWhen $ \href -> "#local-" `isPrefixOf` href
     stripAnchors' = stripAnchorsWhen $ \name -> "local-" `isPrefixOf` name
     stripIds' = stripIdsWhen $ \name -> "local-" `isPrefixOf` name
-    stripIds'' = stripIdsWhen $ \name -> "line-" `isPrefixOf` name
 
 
 dirConfig :: DirConfig
