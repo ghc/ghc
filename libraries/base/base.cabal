@@ -232,6 +232,7 @@ Library
         GHC.ForeignPtr
         GHC.GHCi
         GHC.Generics
+        GHC.Event.IntTable
         GHC.IO
         GHC.IO.Buffer
         GHC.IO.BufferedIO
@@ -267,6 +268,8 @@ Library
         GHC.OverloadedLabels
         GHC.Pack
         GHC.Primitive.Array
+        GHC.Primitive.SmallArray
+        GHC.Primitive.UnliftedArray
         GHC.Primitive.Monad
         GHC.Primitive.PrimArray
         GHC.Profiling
@@ -387,7 +390,6 @@ Library
             GHC.Event.Control
             GHC.Event.CVar
             GHC.Event.EPoll
-            GHC.Event.IntTable
             GHC.Event.Internal
             GHC.Event.KQueue
             GHC.Event.Manager

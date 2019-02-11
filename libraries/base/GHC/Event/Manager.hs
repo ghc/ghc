@@ -60,16 +60,17 @@ module GHC.Event.Manager
 -- Imports
 
 import Control.Concurrent.MVar (MVar, newMVar, putMVar,
-                                tryPutMVar, takeMVar, withMVar)
-import Control.Exception (onException)
+                                tryPutMVar, takeMVar, withMVar, modifyMVar)
+import Control.Exception (onException,evaluate)
 import Data.Bits ((.&.))
-import Data.Foldable (forM_)
+import Data.Foldable (forM_,foldl',mapM_)
 import Data.Functor (void)
 import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (maybe)
 import Data.OldList (partition)
 import GHC.Primitive.Array (Array,indexArray,replicateArrayP)
+import GHC.Primitive.SmallArray (SmallArray)
 import GHC.Base
 import GHC.Conc.Sync (yield,writeTVar,atomically)
 import GHC.List (filter)
@@ -81,7 +82,6 @@ import GHC.Event.CVar (CVar)
 import GHC.Event.IntTable (IntTable)
 import GHC.Event.Internal (Event, Lifetime(..), EventLifetime, Timeout(..))
 import GHC.Event.Internal (evtClose, evtRead, evtWrite)
-import GHC.Event.CVar (CVar)
 import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
 import System.Posix.Types (Fd)
 
@@ -89,6 +89,8 @@ import qualified GHC.Event.CVar as CV
 import qualified GHC.Event.IntTable as IT
 import qualified GHC.Event.Internal as I
 import qualified GHC.Event.Backend as I
+import qualified GHC.Primitive.Array as PM
+import qualified GHC.Primitive.SmallArray as PM
 
 ------------------------------------------------------------------------
 -- Types
@@ -119,7 +121,7 @@ data State = Created
 -- | The event manager state.
 data EventManager = EventManager
     { emBackend      :: {-# UNPACK #-} !I.BackendState
-    , emFds          :: {-# UNPACK #-} !(Array (MVar (IntTable [FdData])))
+    , emFds          :: {-# UNPACK #-} !(Array (MVar (IntTable FdData)))
     , emState        :: {-# UNPACK #-} !(IORef State)
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
     , emControl      :: {-# UNPACK #-} !Control
@@ -152,7 +154,7 @@ hashFd fd = fromIntegral fd .&. (callbackArraySize - 1)
 
 -- See section 3.2 of the Mio paper for an explanation of why we
 -- are using lock-striping here.
-callbackTableVar :: EventManager -> Fd -> MVar (IntTable [FdData])
+callbackTableVar :: EventManager -> Fd -> MVar (IntTable FdData)
 callbackTableVar mgr fd = indexArray (emFds mgr) (hashFd fd)
 {-# INLINE callbackTableVar #-}
 
@@ -327,10 +329,10 @@ registerFd_ mgr@(EventManager{..}) !cv !fd !evs lt = do
       !fdd = FdData reg el cv
   -- Since the caller of registerFd_ must mask exceptions before calling
   -- it, we do not need the full power of withMVar.
-  (modify,ok) <- withMVarMaskless (callbackTableVar mgr fd) $ \tbl -> do
-    oldFdd <- IT.insertWith (++) fd' [fdd] tbl
+  (modify,ok) <- modifyMVarMaskless (callbackTableVar mgr fd) $ \tbl0 -> do
+    (tbl1,oldFdd) <- IT.insertCons fd' fdd tbl0
     let prevEvs :: EventLifetime
-        prevEvs = maybe mempty eventsOf oldFdd
+        prevEvs = eventsOf oldFdd
 
         el' :: EventLifetime
         el' = prevEvs `mappend` el
@@ -339,8 +341,10 @@ registerFd_ mgr@(EventManager{..}) !cv !fd !evs lt = do
       OneShot | haveOneShot -> do
         ok <- I.modifyFdOnce emBackend fd (I.elEvent el')
         if ok
-          then return (False, True)
-          else IT.reset fd' oldFdd tbl >> return (False, False)
+          then return (tbl1,(False, True))
+          else do
+            tbl2 <- IT.reset fd' oldFdd tbl1
+            return (tbl2,(False, False))
 
       -- We don't want or don't support one-shot semantics
       _ -> do
@@ -351,8 +355,10 @@ registerFd_ mgr@(EventManager{..}) !cv !fd !evs lt = do
                    in I.modifyFd emBackend fd oldEvs newEvs
               else return True
         if ok
-          then return (modify, True)
-          else IT.reset fd' oldFdd tbl >> return (False, False)
+          then return (tbl1,(modify, True))
+          else do
+            tbl2 <- IT.reset fd' oldFdd tbl1
+            return (tbl2,(False, False))
   -- This simulates behavior of old IO manager:
   -- i.e. just call the callback if the registration fails.
   -- See https://mail.haskell.org/pipermail/ghc-devs/2013-March/000798.html
@@ -377,12 +383,12 @@ registerFd mgr !cv !fd !evs lt = do
 -- This is the same as withMVar except that it doesn't do the
 -- mask/restore dance. It should only be used in a context
 -- where you know that exceptions are already masked.
-withMVarMaskless :: MVar a -> (a -> IO b) -> IO b
-{-# INLINE withMVarMaskless #-}
-withMVarMaskless m io = do
+modifyMVarMaskless :: MVar a -> (a -> IO (a,b)) -> IO b
+{-# INLINE modifyMVarMaskless #-}
+modifyMVarMaskless m io = do
   a <- takeMVar m
-  b <- io a `onException` putMVar m a
-  putMVar m a
+  (a',b) <- (io a >>= evaluate) `onException` putMVar m a
+  putMVar m a'
   return b
 
 {-
@@ -404,24 +410,20 @@ wakeManager _ = return ()
 wakeManager mgr = sendWakeup (emControl mgr)
 #endif
 
-eventsOf :: [FdData] -> EventLifetime
-eventsOf [fdd] = fdEvents fdd
-eventsOf fdds  = mconcat $ map fdEvents fdds
+eventsOf :: SmallArray FdData -> EventLifetime
+eventsOf = foldl' (\acc fdd -> acc <> fdEvents fdd) mempty
 
 -- | Drop a previous file descriptor registration, without waking the
 -- event manager thread.  The return value indicates whether the event
 -- manager ought to be woken.
 unregisterFd_ :: EventManager -> FdKey -> IO Bool
-unregisterFd_ mgr@(EventManager{..}) (FdKey !fd u) =
-  withMVar (callbackTableVar mgr fd) $ \tbl -> do
-    let dropReg = nullToNothing . filter ((/= u) . keyUnique . fdKey)
+unregisterFd_ mgr@(EventManager{..}) (FdKey fd u) =
+  modifyMVar (callbackTableVar mgr fd) $ \tbl0 -> do
+    let dropReg = PM.filterSmallArray ((/= u) . keyUnique . fdKey)
         fd' = fromIntegral fd
-        pairEvents :: [FdData] -> IO (EventLifetime, EventLifetime)
-        pairEvents prev = do
-          r <- maybe mempty eventsOf `fmap` IT.lookup fd' tbl
-          return (eventsOf prev, r)
-    (oldEls, newEls) <- IT.updateWith dropReg fd' tbl >>=
-                        maybe (return (mempty, mempty)) pairEvents
+    (tbl1, oldFdds, newFdds) <- IT.updateWith dropReg fd' tbl0
+    let oldEls = eventsOf oldFdds
+    let newEls = eventsOf newFdds
     let modify = oldEls /= newEls
     when modify $ failOnInvalidFile "unregisterFd_" fd $
       case I.elLifetime newEls of
@@ -429,7 +431,7 @@ unregisterFd_ mgr@(EventManager{..}) (FdKey !fd u) =
           I.modifyFdOnce emBackend fd (I.elEvent newEls)
         _ ->
           I.modifyFd emBackend fd (I.elEvent oldEls) (I.elEvent newEls)
-    return modify
+    return (tbl1,modify)
 
 -- | Drop a previous file descriptor registration.
 unregisterFd :: EventManager -> FdKey -> IO ()
@@ -440,38 +442,32 @@ unregisterFd mgr reg = do
 -- | Close a file descriptor in a race-safe way.
 closeFd :: EventManager -> (Fd -> IO ()) -> Fd -> IO ()
 closeFd mgr close fd = do
-  fds <- withMVar (callbackTableVar mgr fd) $ \tbl -> do
-    prev <- IT.delete (fromIntegral fd) tbl
-    case prev of
-      Nothing  -> close fd >> return []
-      Just fds -> do
-        let oldEls = eventsOf fds
-        when (I.elEvent oldEls /= mempty) $ do
-          _ <- I.modifyFd (emBackend mgr) fd (I.elEvent oldEls) mempty
-          wakeManager mgr
-        close fd
-        return fds
-  forM_ fds $ \(FdData _ _ cv) -> putClosed cv
+  fds <- modifyMVar (callbackTableVar mgr fd) $ \tbl0 -> do
+    (tbl1,fds) <- IT.delete (fromIntegral fd) tbl0
+    let oldEls = eventsOf fds
+    when (I.elEvent oldEls /= mempty) $ do
+      _ <- I.modifyFd (emBackend mgr) fd (I.elEvent oldEls) mempty
+      wakeManager mgr
+    close fd
+    pure (tbl1,fds)
+  forM_ fds $ \(FdData _ _ cv) -> CV.close cv
 
 -- | Close a file descriptor in a race-safe way.
 -- It assumes the caller will update the callback tables and that the caller
 -- holds the callback table lock for the fd. It must hold this lock because
 -- this command executes a backend command on the fd.
 closeFd_ :: EventManager
-            -> IntTable [FdData]
-            -> Fd
-            -> IO (IO ())
-closeFd_ mgr tbl fd = do
-  prev <- IT.delete (fromIntegral fd) tbl
-  case prev of
-    Nothing  -> return (return ())
-    Just fds -> do
-      let oldEls = eventsOf fds
-      when (oldEls /= mempty) $ do
-        _ <- I.modifyFd (emBackend mgr) fd (I.elEvent oldEls) mempty
-        wakeManager mgr
-      return $
-        forM_ fds $ \(FdData _ _ cv) -> putClosed cv
+         -> IntTable FdData
+         -> Fd
+         -> IO (IntTable FdData,IO ())
+closeFd_ mgr tbl0 fd = do
+  (tbl1,fds) <- IT.delete (fromIntegral fd) tbl0
+  let oldEls = eventsOf fds
+  when (oldEls /= mempty) $ do
+    _ <- I.modifyFd (emBackend mgr) fd (I.elEvent oldEls) mempty
+    wakeManager mgr
+  return (tbl1,mapM_ (\(FdData _ _ cv) -> CV.close cv) fds)
+
 
 ------------------------------------------------------------------------
 -- Utilities
@@ -483,8 +479,8 @@ onFdEvent mgr fd evs
     handleControlEvent mgr fd evs
 
   | otherwise = do
-    fdds <- withMVar (callbackTableVar mgr fd) $ \tbl ->
-        IT.delete (fromIntegral fd) tbl >>= maybe (return []) (selectCallbacks tbl)
+    fdds <- modifyMVar (callbackTableVar mgr fd) $ \tbl ->
+        IT.delete (fromIntegral fd) tbl >>= selectCallbacks
     forM_ fdds $ \(FdData _ _ cv) -> putReady cv
   where
     -- | Here we look through the list of registrations for the fd of interest
@@ -494,24 +490,24 @@ onFdEvent mgr fd evs
     --   2. reinsert registrations that weren't triggered and multishot
     --      registrations
     --   3. return a list containing the callbacks that should be invoked.
-    selectCallbacks :: IntTable [FdData] -> [FdData] -> IO [FdData]
-    selectCallbacks tbl fdds = do
+    selectCallbacks :: (IntTable FdData, SmallArray FdData) -> IO (IntTable FdData, SmallArray FdData)
+    selectCallbacks (tbl0,fdds) = do
         let -- figure out which registrations have been triggered
             matches :: FdData -> Bool
             matches fd' = evs `I.eventIs` I.elEvent (fdEvents fd')
-            (triggered, notTriggered) = partition matches fdds
+            (triggered, notTriggered) = PM.partitionSmallArray matches fdds
 
             -- sort out which registrations we need to retain
             isMultishot :: FdData -> Bool
             isMultishot fd' = I.elLifetime (fdEvents fd') == MultiShot
-            saved = notTriggered ++ filter isMultishot triggered
+            saved = PM.appendSmallArray notTriggered (PM.filterSmallArray isMultishot triggered)
 
             savedEls = eventsOf saved
             allEls = eventsOf fdds
 
         -- Reinsert multishot registrations.
         -- We deleted the table entry for this fd above so we there isn't a preexisting entry
-        _ <- IT.insertWith (\_ _ -> saved) (fromIntegral fd) saved tbl
+        tbl1 <- IT.reset (fromIntegral fd) saved tbl0
 
         case I.elLifetime allEls of
           -- we previously armed the fd for multiple shots, no need to rearm
@@ -533,7 +529,8 @@ onFdEvent mgr fd evs
                 void $ I.modifyFd (emBackend mgr) fd
                                   (I.elEvent allEls) (I.elEvent savedEls)
 
-        return triggered
+        return (tbl1,triggered)
+
 
 -- Notify the reading end of the CVar that the file descriptor they were
 -- waiting on is ready for the operation specified earlier.
@@ -541,19 +538,6 @@ putReady :: CVar -> IO ()
 putReady = CV.match
   (\mv -> putMVar mv True)
   (\tv -> atomically (writeTVar tv CV.Ready))
-
--- Notify the reading end of the CVar that the file descriptor they were
--- waiting on has been closed. Usually, the user handles this by throwing
--- an exception since it is an indicator of incorrect concurrent access
--- to a file descriptor.
-putClosed :: CVar -> IO ()
-putClosed = CV.match
-  (\mv -> putMVar mv False)
-  (\tv -> atomically (writeTVar tv CV.Closed))
-
-nullToNothing :: [a] -> Maybe [a]
-nullToNothing []       = Nothing
-nullToNothing xs@(_:_) = Just xs
 
 unless :: Monad m => Bool -> m () -> m ()
 unless p = when (not p)

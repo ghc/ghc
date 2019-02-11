@@ -55,6 +55,8 @@ test('hTell002', normal, compile_and_run, [''])
 
 test('performGC001', normal, compile_and_run, [''])
 
+test('intTable001', normal, compile_and_run, [''])
+
 # optimisation screws up this test because some of the traces get commoned up
 test('trace001', normal, compile_and_run, [''])
 

@@ -12,12 +12,13 @@ module GHC.Event.CVar
   , mvar
   , tvar
   , match
+  , close
   ) where
 
-import GHC.Prim (unsafeCoerce#,getClosureType#,MVar#,TVar#,RealWorld)
-import GHC.Types (TYPE,RuntimeRep(UnliftedRep),Any,Bool,Type)
-import GHC.MVar (MVar(..))
-import GHC.Conc.Sync (TVar(..))
+import GHC.Prim (MVar#,TVar#,RealWorld)
+import GHC.Types (TYPE,RuntimeRep(UnliftedRep),Any,Bool(False),Type,IO)
+import GHC.MVar (MVar(..),putMVar)
+import GHC.Conc.Sync (TVar(..),atomically,writeTVar)
 
 -- Behold. One of the crowl jewels of the February 2019 event manager
 -- optimizations. This type is morally equivalent to:
@@ -69,4 +70,13 @@ match :: (MVar Bool -> a) -> (TVar Status -> a) -> CVar -> a
 {-# INLINE match #-}
 match f _ (CVar (# m | #)) = f (MVar m)
 match _ g (CVar (# | t #)) = g (TVar t)
+
+-- Notify the reading end of the CVar that the file descriptor they were
+-- waiting on has been closed. Usually, the user handles this by throwing
+-- an exception since it is an indicator of incorrect concurrent access
+-- to a file descriptor.
+close :: CVar -> IO ()
+close = match
+  (\mv -> putMVar mv False)
+  (\tv -> atomically (writeTVar tv Closed))
 

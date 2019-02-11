@@ -23,7 +23,7 @@ import Foreign.C.Error (eBADF, errnoToIOError)
 import Foreign.C.Types (CInt(..), CUInt(..))
 import Foreign.Ptr (Ptr)
 import GHC.Base
-import GHC.List (zipWith, zipWith3)
+import GHC.List (zipWith)
 import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
                       labelThread, modifyMVar_, withMVar, newTVar, sharedCAF,
                       getNumCapabilities, threadCapability, myThreadId, forkOn,
@@ -34,7 +34,6 @@ import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
                     boundsIOArray)
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import GHC.Event.Control (controlWriteFd)
-import GHC.Event.Internal (eventIs, evtClose, evtNothing)
 import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
                              new, registerFd, unregisterFd_)
 import qualified GHC.Event.CVar as CV
@@ -96,6 +95,9 @@ closeFdWith :: (Fd -> IO ())        -- ^ Action that performs the close.
             -> Fd                   -- ^ File descriptor to close.
             -> IO ()
 closeFdWith close fd = do
+  -- Future improvement idea. The implementation of this function
+  -- is pretty terrible. There must be a better way than building
+  -- all these intermediate lists.
   eventManagerArray <- readIORef eventManager
   let (low, high) = boundsIOArray eventManagerArray
   mgrs <- flip mapM [low..high] $ \i -> do
@@ -103,10 +105,12 @@ closeFdWith close fd = do
     pure mgr
   mask_ $ do
     tables <- flip mapM mgrs $ \mgr -> takeMVar $ M.callbackTableVar mgr fd
-    cbApps <- zipWithM (\mgr table -> M.closeFd_ mgr table fd) mgrs tables
-    close fd `finally` sequence_ (zipWith3 finish mgrs tables cbApps)
+    tblAppPairs <- zipWithM (\mgr table -> M.closeFd_ mgr table fd) mgrs tables
+    close fd `finally` sequence_ (zipWith finish mgrs tblAppPairs)
   where
-    finish mgr table cbApp = putMVar (M.callbackTableVar mgr fd) table >> cbApp
+    finish mgr (table,cbApp) = do
+      putMVar (M.callbackTableVar mgr fd) table
+      cbApp
     zipWithM f xs ys = sequence (zipWith f xs ys)
 
 
