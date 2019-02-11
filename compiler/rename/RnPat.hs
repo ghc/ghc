@@ -54,6 +54,7 @@ import RnEnv
 import RnFixity
 import RnUtils             ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
+                           , warnUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
 import RnTypes
@@ -74,6 +75,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad       ( when, liftM, ap, guard )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
+import DynFlags
 
 {-
 *********************************************************
@@ -529,6 +531,30 @@ rnConPatAndThen mk con (RecCon rpats)
         ; rpats' <- rnHsRecPatsAndThen mk con' rpats
         ; return (ConPatIn con' (RecCon rpats')) }
 
+-- Run the inner action to find out its free variables and then
+-- check whether the variables we bound are actually used.
+-- If none of them are used and -Wwarn-redundant-record-wildcards is
+-- enabled then we issue a warning.
+checkUnusedRecordWildcard :: SDoc
+                          -> SrcSpan
+                          -> Maybe [Name]
+                          -> CpsRn ()
+checkUnusedRecordWildcard _ _ Nothing    = return ()
+checkUnusedRecordWildcard fix_doc loc (Just [])  = do
+  -- Add a new warning if the .. pattern binds no variables
+  liftCps . setSrcSpan loc $
+              whenWOptM Opt_WarnRedundantRecordWildcards
+                (addWarn (Reason Opt_WarnRedundantRecordWildcards)
+                         (redundantWildcardErr fix_doc))
+checkUnusedRecordWildcard fix_doc loc (Just dotdot_names) =
+  CpsRn (\thing -> do
+                    (r, fvs) <- thing ()
+                    -- Check if any of the bound variables are used. We
+                    -- warn if none of them are used.
+                    setSrcSpan loc $
+                      warnUnusedRecordWildcard fix_doc dotdot_names fvs
+                    return (r, fvs) )
+
 --------------------
 rnHsRecPatsAndThen :: NameMaker
                    -> Located Name      -- Constructor
@@ -539,6 +565,7 @@ rnHsRecPatsAndThen mk (dL->L _ con)
   = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
                                             hs_rec_fields
        ; flds' <- mapM rn_field (flds `zip` [1..])
+       ; check_unused_wildcard (implicit_binders flds' <$> dd)
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where
     mkVarPat l n = VarPat noExt (cL l n)
@@ -546,10 +573,30 @@ rnHsRecPatsAndThen mk (dL->L _ con)
       do { arg' <- rnLPatAndThen (nested_mk dd mk n') (hsRecFieldArg fld)
          ; return (cL l (fld { hsRecFieldArg = arg' })) }
 
+
+    -- Reconstruct the ConPat without the ..
+    -- We print the parsed syntax rather than renamed syntax as that seemed
+    -- a bit safer to me.
+    fix_doc = ppr (ConPatIn (noLoc (getRdrName con))
+                            (RecCon (hs_rec_fields { rec_dotdot = Nothing })))
+
+    loc = maybe noSrcSpan getLoc dd
+
+    -- Get the arguments of the implicit binders
+    implicit_binders fs (unLoc -> n) = collectPatsBinders implicit_pats
+      where
+        implicit_pats = map (hsRecFieldArg . unLoc) (drop n fs)
+
+    -- Don't warn for let P{..} = ... in ...
+    check_unused_wildcard = case mk of
+                              LetMk{} -> const (return ())
+                              LamMk{} -> checkUnusedRecordWildcard fix_doc loc
+
         -- Suppress unused-match reporting for fields introduced by ".."
     nested_mk Nothing  mk                    _  = mk
     nested_mk (Just _) mk@(LetMk {})         _  = mk
-    nested_mk (Just n) (LamMk report_unused) n' = LamMk (report_unused && (n' <= n))
+    nested_mk (Just (unLoc -> n)) (LamMk report_unused) n'
+      = LamMk (report_unused && (n' <= n))
 
 {-
 ************************************************************************
@@ -622,19 +669,18 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                 -- due to #15884
 
 
-    rn_dotdot :: Maybe Int      -- See Note [DotDot fields] in HsPat
+    rn_dotdot :: Maybe (Located Int)      -- See Note [DotDot fields] in HsPat
               -> Maybe Name -- The constructor (Nothing for an
                                 --    out of scope constructor)
               -> [LHsRecField GhcRn arg] -- Explicit fields
-              -> RnM [LHsRecField GhcRn arg]   -- Filled in .. fields
-    rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
+              -> RnM ([LHsRecField GhcRn arg])   -- Field Labels we need to fill in
+    rn_dotdot (Just (dL -> L loc n)) (Just con) flds -- ".." on record construction / pat match
       | not (isUnboundName con) -- This test is because if the constructor
                                 -- isn't in scope the constructor lookup will add
                                 -- an error but still return an unbound name. We
                                 -- don't want that to screw up the dot-dot fill-in stuff.
       = ASSERT( flds `lengthIs` n )
-        do { loc <- getSrcSpanM -- Rather approximate
-           ; dd_flag <- xoptM LangExt.RecordWildCards
+        do { dd_flag <- xoptM LangExt.RecordWildCards
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs
            ; con_fields <- lookupConstructorFields con
@@ -786,6 +832,11 @@ dupFieldErr ctxt dups
   = hsep [text "duplicate field name",
           quotes (ppr (NE.head dups)),
           text "in record", pprRFC ctxt]
+
+redundantWildcardErr :: SDoc -> SDoc
+redundantWildcardErr fix_doc
+  = text "Record wildcard does not bind any new variables"
+    $$ nest 2 (text "Possible fix" <> colon <+> fix_doc)
 
 pprRFC :: HsRecFieldContext -> SDoc
 pprRFC (HsRecFieldCon {}) = text "construction"

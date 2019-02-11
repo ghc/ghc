@@ -374,7 +374,7 @@ data HsRecFields p arg         -- A bunch of record fields
                                 --      { x = 3, y = True }
         -- Used for both expressions and patterns
   = HsRecFields { rec_flds   :: [LHsRecField p arg],
-                  rec_dotdot :: Maybe Int }  -- Note [DotDot fields]
+                  rec_dotdot :: Maybe (Located Int) }  -- Note [DotDot fields]
   deriving (Functor, Foldable, Traversable)
 
 
@@ -593,7 +593,7 @@ instance (Outputable arg)
       => Outputable (HsRecFields p arg) where
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
         = braces (fsep (punctuate comma (map ppr flds)))
-  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just n })
+  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just (unLoc -> n) })
         = braces (fsep (punctuate comma (map ppr (take n flds) ++ [dotdot])))
         where
           dotdot = text ".." <+> whenPprDebug (ppr (drop n flds))

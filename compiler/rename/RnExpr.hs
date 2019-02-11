@@ -1089,7 +1089,7 @@ rnRecStmtsAndThen rnBody s cont
           --    ...bring them and their fixities into scope
         ; let bound_names = collectLStmtsBinders (map fst new_lhs_and_fv)
               -- Fake uses of variables introduced implicitly (warning suppression, see #4404)
-              implicit_uses = lStmtsImplicits (map fst new_lhs_and_fv)
+              implicit_uses = mkNameSet $ concatMap thdOf3 $ lStmtsImplicits (map fst new_lhs_and_fv)
         ; bindLocalNamesFV bound_names $
           addLocalFixities fix_env bound_names $ do
 
