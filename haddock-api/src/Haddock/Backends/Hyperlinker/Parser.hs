@@ -6,13 +6,9 @@ import Control.Applicative ( Alternative(..) )
 import Data.List           ( isPrefixOf, isSuffixOf )
 
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BSC
-
-import GHC.LanguageExtensions.Type
 
 import BasicTypes          ( IntegralLit(..) )
 import DynFlags
-import qualified EnumSet as E
 import ErrUtils            ( emptyMessages )
 import FastString          ( mkFastString )
 import Lexer               ( P(..), ParseResult(..), PState(..), Token(..)
@@ -29,12 +25,11 @@ import Haddock.GhcUtils
 -- Result should retain original file layout (including comments,
 -- whitespace, and CPP).
 parse
-  :: CompilerInfo  -- ^ Underlying CC compiler (whatever expanded CPP)
-  -> DynFlags      -- ^ Flags for this module
+  :: DynFlags      -- ^ Flags for this module
   -> FilePath      -- ^ Path to the source of this module
   -> BS.ByteString -- ^ Raw UTF-8 encoded source of this module
   -> [T.Token]
-parse comp dflags fpath bs = case unP (go False []) initState of
+parse dflags fpath bs = case unP (go False []) initState of
     POk _ toks -> reverse toks
     PFailed _ ss errMsg -> panic $ "Hyperlinker parse error at " ++ show ss ++
                                    ": " ++ showSDoc dflags errMsg
@@ -43,7 +38,6 @@ parse comp dflags fpath bs = case unP (go False []) initState of
     initState = mkPStatePure pflags buf start
     buf = stringBufferFromByteString bs
     start = mkRealSrcLoc (mkFastString fpath) 1 1
-    needPragHack' = needPragHack comp dflags
     pflags = mkParserFlags' (warningFlags dflags)
                             (extensionFlags dflags)
                             (thisPackage dflags)
@@ -125,12 +119,6 @@ parse comp dflags fpath bs = case unP (go False []) initState of
 
               pure (bEnd'', False)
 
-            -- See 'needPragHack'
-            ITclose_prag{}
-              | needPragHack'
-              , '\n' `BSC.elem` spaceBStr
-              -> getInput >>= \(b,p) -> setInput (b,advanceSrcLoc p '\n') >> pure (bEnd, False)
-
             _ -> pure (bEnd, inPragDef)
 
           let tokBStr = splitStringBuffer bStart bEnd'
@@ -154,37 +142,6 @@ parse comp dflags fpath bs = case unP (go False []) initState of
       setInput (b', l')
       pure ([unkTok], False)
 
-
--- | This is really, really, /really/ gross. Problem: consider a Haskell
--- file that looks like:
---
--- @
--- {-# LANGUAGE CPP #-}
--- module SomeMod where
---
--- #define SIX 6
---
--- {-# INLINE foo
---   #-}
--- foo = 1
--- @
---
--- Clang's CPP replaces the @#define SIX 6@ line with an empty line (as it
--- should), but get confused about @#-}@. I'm guessing it /starts/ by
--- parsing that as a pre-processor directive and, when it fails to, it just
--- leaves the line alone. HOWEVER, it still adds an extra newline. =.=
---
--- This function makes sure that the Hyperlinker backend also adds that
--- extra newline (or else our spans won't line up with GHC's anymore).
-needPragHack :: CompilerInfo -> DynFlags -> Bool
-needPragHack comp dflags = isCcClang && E.member Cpp (extensionFlags dflags)
-  where
-    isCcClang = case comp of
-      GCC -> False
-      Clang -> True
-      AppleClang -> True
-      AppleClang51 -> True
-      UnknownCC -> False
 
 -- | Get the input
 getInput :: P (StringBuffer, RealSrcLoc)
