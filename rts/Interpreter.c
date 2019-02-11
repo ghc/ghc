@@ -938,7 +938,7 @@ run_BCO_fun:
              Sp_subW(2);
              SpW(1) = (W_)obj;
              SpW(0) = (W_)&stg_apply_interp_info;
-             checkStackChunk(Sp,SpLim);
+             checkStackChunk(Sp, cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size);
              Sp_addW(2);
         );
 
