@@ -301,13 +301,6 @@ pathchar*
 resolveSymbolAddr (pathchar* buffer, int size,
                    SymbolAddr* symbol, uintptr_t* top);
 
-/* align should be a power of two */
-INLINE_HEADER size_t
-roundUpToAlign(size_t size, size_t align)
-{
-    return (size + (align - 1)) & ~(align - 1);
-}
-
 /*************************************************
  * Various bits of configuration
  *************************************************/
