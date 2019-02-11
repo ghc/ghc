@@ -149,7 +149,6 @@ becomes
 We still have recursion for non-overloaded functions which we
 specialise, but the recursive call should get specialised to the
 same recursive version.
-f
 
 Polymorphism 1
 ~~~~~~~~~~~~~~
