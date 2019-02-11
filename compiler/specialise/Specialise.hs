@@ -730,28 +730,35 @@ specImport dflags this_mod top_env done callers rb fn calls_for_fn
 
        ; return (rules2 ++ rules1, final_binds) }
 
-  |  warnMissingSpecs dflags callers
-  = do { warnMsg (vcat [ hang (text "Could not specialise imported function" <+> quotes (ppr fn))
-                            2 (vcat [ text "when specialising" <+> quotes (ppr caller)
-                                    | caller <- callers])
-                      , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
-                      , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
-       ; return ([], []) }
+  | otherwise = do { tryWarnMissingSpecs dflags callers fn calls_for_fn
+                   ; return ([], [])}
 
-  | otherwise
-  = return ([], [])
   where
     unfolding = realIdUnfolding fn   -- We want to see the unfolding even for loop breakers
 
-warnMissingSpecs :: DynFlags -> [Id] -> Bool
+-- | Returns whether or not to show a missed-spec warning.
+-- If -Wall-missed-specializations is on, show the warning.
+-- Otherwise, if -Wmissed-specializations is on, only show a warning
+-- if there is at least one imported function being specialized,
+-- and if all imported functions are marked with an inline pragma
+-- Use the most specific warning as the reason.
+tryWarnMissingSpecs :: DynFlags -> [Id] -> Id -> [CallInfo] -> CoreM ()
 -- See Note [Warning about missed specialisations]
-warnMissingSpecs dflags callers
-  | wopt Opt_WarnAllMissedSpecs dflags = True
-  | not (wopt Opt_WarnMissedSpecs dflags) = False
-  | null callers                       = False
-  | otherwise                          = all has_inline_prag callers
+tryWarnMissingSpecs dflags callers fn calls_for_fn
+  | wopt Opt_WarnMissedSpecs dflags
+    && not (null callers)
+    && allCallersInlined                  = doWarn $ Reason Opt_WarnMissedSpecs
+  | wopt Opt_WarnAllMissedSpecs dflags    = doWarn $ Reason Opt_WarnAllMissedSpecs
+  | otherwise                             = return ()
   where
-    has_inline_prag id = isAnyInlinePragma (idInlinePragma id)
+    allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
+    doWarn reason = 
+      warnMsg reason
+        (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
+                2 (vcat [ text "when specialising" <+> quotes (ppr caller)
+                        | caller <- callers])
+          , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
+          , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
 
 wantSpecImport :: DynFlags -> Unfolding -> Bool
 -- See Note [Specialise imported INLINABLE things]
