@@ -265,7 +265,7 @@ runTH pipe rstate rhv ty mb_loc = do
 runTHQ
   :: Binary a => Pipe -> RemoteRef (IORef QState) -> Maybe TH.Loc -> TH.Q a
   -> IO ByteString
-runTHQ pipe@Pipe{..} rstate mb_loc ghciq = do
+runTHQ pipe rstate mb_loc ghciq = do
   qstateref <- localRef rstate
   qstate <- readIORef qstateref
   let st = qstate { qsLocation = mb_loc, qsPipe = pipe }

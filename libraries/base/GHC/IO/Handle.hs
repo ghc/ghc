@@ -604,7 +604,7 @@ hSetBinaryMode handle bin =
 -- data is flushed first.
 hSetNewlineMode :: Handle -> NewlineMode -> IO ()
 hSetNewlineMode handle NewlineMode{ inputNL=i, outputNL=o } =
-  withAllHandles__ "hSetNewlineMode" handle $ \h_@Handle__{..} ->
+  withAllHandles__ "hSetNewlineMode" handle $ \h_@Handle__{} ->
     do
          flushBuffer h_
          return h_{ haInputNL=i, haOutputNL=o }
@@ -705,7 +705,7 @@ dupHandleTo :: FilePath
             -> Maybe HandleFinalizer
             -> IO Handle__
 dupHandleTo filepath h other_side
-            hto_@Handle__{haDevice=devTo,..}
+            hto_@Handle__{haDevice=devTo}
             h_@Handle__{haDevice=dev} mb_finalizer = do
   flushBuffer h_
   case cast devTo of

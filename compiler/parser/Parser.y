@@ -3084,16 +3084,16 @@ qual  :: { LStmt GhcPs (LHsExpr GhcPs) }
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction
 
-fbinds  :: { ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Bool)) }
+fbinds  :: { ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Maybe SrcSpan)) }
         : fbinds1                       { $1 }
-        | {- empty -}                   { ([],([], False)) }
+        | {- empty -}                   { ([],([], Nothing)) }
 
-fbinds1 :: { ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Bool)) }
+fbinds1 :: { ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Maybe SrcSpan)) }
         : fbind ',' fbinds1
                 {% addAnnotation (gl $1) AnnComma (gl $2) >>
                    return (case $3 of (ma,(flds, dd)) -> (ma,($1 : flds, dd))) }
-        | fbind                         { ([],([$1], False)) }
-        | '..'                          { ([mj AnnDotdot $1],([],   True)) }
+        | fbind                         { ([],([$1], Nothing)) }
+        | '..'                          { ([mj AnnDotdot $1],([],   Just (getLoc $1))) }
 
 fbind   :: { LHsRecField GhcPs (LHsExpr GhcPs) }
         : qvar '=' texp {% ams  (sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) $3 False)

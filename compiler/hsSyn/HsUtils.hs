@@ -1316,26 +1316,35 @@ that were defined "implicitly", without being explicitly written by the user.
 
 The main purpose is to find names introduced by record wildcards so that we can avoid
 warning the user when they don't use those names (#4404)
+
+Since the addition of -Wunused-record-wildcards, this function returns a pair
+of [(SrcSpan, [Name])]. Each element of the list is one set of implicit
+binders, the first component of the tuple is the document describes the possible
+fix to the problem (by removing the ..).
+
+This means there is some unfortunate coupling between this function and where it
+is used but it's only used for one specific purpose in one place so it seemed
+easier.
 -}
 
 lStmtsImplicits :: [LStmtLR GhcRn (GhcPass idR) (Located (body (GhcPass idR)))]
-                -> NameSet
+                -> [(SrcSpan, [Name])]
 lStmtsImplicits = hs_lstmts
   where
     hs_lstmts :: [LStmtLR GhcRn (GhcPass idR) (Located (body (GhcPass idR)))]
-              -> NameSet
-    hs_lstmts = foldr (\stmt rest -> unionNameSet (hs_stmt (unLoc stmt)) rest) emptyNameSet
+              -> [(SrcSpan, [Name])]
+    hs_lstmts = concatMap (hs_stmt . unLoc)
 
     hs_stmt :: StmtLR GhcRn (GhcPass idR) (Located (body (GhcPass idR)))
-            -> NameSet
+            -> [(SrcSpan, [Name])]
     hs_stmt (BindStmt _ pat _ _ _) = lPatImplicits pat
-    hs_stmt (ApplicativeStmt _ args _) = unionNameSets (map do_arg args)
+    hs_stmt (ApplicativeStmt _ args _) = concatMap do_arg args
       where do_arg (_, ApplicativeArgOne _ pat _ _) = lPatImplicits pat
             do_arg (_, ApplicativeArgMany _ stmts _ _) = hs_lstmts stmts
             do_arg (_, XApplicativeArg _) = panic "lStmtsImplicits"
     hs_stmt (LetStmt _ binds)     = hs_local_binds (unLoc binds)
-    hs_stmt (BodyStmt {})         = emptyNameSet
-    hs_stmt (LastStmt {})         = emptyNameSet
+    hs_stmt (BodyStmt {})         = []
+    hs_stmt (LastStmt {})         = []
     hs_stmt (ParStmt _ xs _ _)    = hs_lstmts [s | ParStmtBlock _ ss _ _ <- xs
                                                 , s <- ss]
     hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
@@ -1343,28 +1352,28 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (XStmtLR {})          = panic "lStmtsImplicits"
 
     hs_local_binds (HsValBinds _ val_binds) = hsValBindsImplicits val_binds
-    hs_local_binds (HsIPBinds {})           = emptyNameSet
-    hs_local_binds (EmptyLocalBinds _)      = emptyNameSet
-    hs_local_binds (XHsLocalBindsLR _)      = emptyNameSet
+    hs_local_binds (HsIPBinds {})           = []
+    hs_local_binds (EmptyLocalBinds _)      = []
+    hs_local_binds (XHsLocalBindsLR _)      = []
 
-hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR) -> NameSet
+hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR) -> [(SrcSpan, [Name])]
 hsValBindsImplicits (XValBindsLR (NValBinds binds _))
-  = foldr (unionNameSet . lhsBindsImplicits . snd) emptyNameSet binds
+  = concatMap (lhsBindsImplicits . snd) binds
 hsValBindsImplicits (ValBinds _ binds _)
   = lhsBindsImplicits binds
 
-lhsBindsImplicits :: LHsBindsLR GhcRn idR -> NameSet
-lhsBindsImplicits = foldBag unionNameSet (lhs_bind . unLoc) emptyNameSet
+lhsBindsImplicits :: LHsBindsLR GhcRn idR -> [(SrcSpan, [Name])]
+lhsBindsImplicits = foldBag (++) (lhs_bind . unLoc) []
   where
     lhs_bind (PatBind { pat_lhs = lpat }) = lPatImplicits lpat
-    lhs_bind _ = emptyNameSet
+    lhs_bind _ = []
 
-lPatImplicits :: LPat GhcRn -> NameSet
+lPatImplicits :: LPat GhcRn -> [(SrcSpan, [Name])]
 lPatImplicits = hs_lpat
   where
     hs_lpat lpat = hs_pat (unLoc lpat)
 
-    hs_lpats = foldr (\pat rest -> hs_lpat pat `unionNameSet` rest) emptyNameSet
+    hs_lpats = foldr (\pat rest -> hs_lpat pat ++ rest) []
 
     hs_pat (LazyPat _ pat)      = hs_lpat pat
     hs_pat (BangPat _ pat)      = hs_lpat pat
@@ -1377,16 +1386,26 @@ lPatImplicits = hs_lpat
     hs_pat (SigPat _ pat _)     = hs_lpat pat
     hs_pat (CoPat _ _ pat _)    = hs_pat pat
 
-    hs_pat (ConPatIn _ ps)           = details ps
-    hs_pat (ConPatOut {pat_args=ps}) = details ps
+    hs_pat (ConPatIn n ps)           = details n ps
+    hs_pat (ConPatOut {pat_con=con, pat_args=ps}) = details (fmap conLikeName con) ps
 
-    hs_pat _ = emptyNameSet
+    hs_pat _ = []
 
-    details (PrefixCon ps)   = hs_lpats ps
-    details (RecCon fs)      = hs_lpats explicit `unionNameSet` mkNameSet (collectPatsBinders implicit)
-      where (explicit, implicit) = partitionEithers [if pat_explicit then Left pat else Right pat
+    details :: Located Name -> HsConPatDetails GhcRn -> [(SrcSpan, [Name])]
+    details _ (PrefixCon ps)   = hs_lpats ps
+    details n (RecCon fs)      =
+      [(err_loc, collectPatsBinders implicit_pats) | Just{} <- [rec_dotdot fs] ]
+        ++ hs_lpats explicit_pats
+
+      where implicit_pats = map (hsRecFieldArg . unLoc) implicit
+            explicit_pats = map (hsRecFieldArg . unLoc) explicit
+
+
+            (explicit, implicit) = partitionEithers [if pat_explicit then Left fld else Right fld
                                                     | (i, fld) <- [0..] `zip` rec_flds fs
-                                                    , let pat = hsRecFieldArg
-                                                                     (unLoc fld)
-                                                          pat_explicit = maybe True (i<) (rec_dotdot fs)]
-    details (InfixCon p1 p2) = hs_lpat p1 `unionNameSet` hs_lpat p2
+                                                    ,  let  pat_explicit =
+                                                              maybe True ((i<) . unLoc)
+                                                                         (rec_dotdot fs)]
+            err_loc = maybe (getLoc n) getLoc (rec_dotdot fs)
+
+    details _ (InfixCon p1 p2) = hs_lpat p1 ++ hs_lpat p2

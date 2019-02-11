@@ -35,7 +35,8 @@ import RnFixity
 import RnUtils          ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , bindLocalNames
                         , mapMaybeFvRn, mapFvRn
-                        , warnUnusedLocalBinds, typeAppErr )
+                        , warnUnusedLocalBinds, typeAppErr
+                        , checkUnusedRecordWildcard )
 import RnUnbound        ( reportUnboundName )
 import RnSplice         ( rnBracket, rnSpliceExpr, checkThLocalName )
 import RnTypes
@@ -1089,13 +1090,16 @@ rnRecStmtsAndThen rnBody s cont
           --    ...bring them and their fixities into scope
         ; let bound_names = collectLStmtsBinders (map fst new_lhs_and_fv)
               -- Fake uses of variables introduced implicitly (warning suppression, see #4404)
-              implicit_uses = lStmtsImplicits (map fst new_lhs_and_fv)
+              rec_uses = lStmtsImplicits (map fst new_lhs_and_fv)
+              implicit_uses = mkNameSet $ concatMap snd $ rec_uses
         ; bindLocalNamesFV bound_names $
           addLocalFixities fix_env bound_names $ do
 
           -- (C) do the right-hand-sides and thing-inside
         { segs <- rn_rec_stmts rnBody bound_names new_lhs_and_fv
         ; (res, fvs) <- cont segs
+        ; mapM_ (\(loc, ns) -> checkUnusedRecordWildcard loc fvs (Just ns))
+                rec_uses
         ; warnUnusedLocalBinds bound_names (fvs `unionNameSet` implicit_uses)
         ; return (res, fvs) }}
 

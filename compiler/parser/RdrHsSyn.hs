@@ -1976,14 +1976,14 @@ checkPrecP (dL->L l (_,i)) (dL->L _ ol)
 mkRecConstrOrUpdate
         :: LHsExpr GhcPs
         -> SrcSpan
-        -> ([LHsRecField GhcPs (LHsExpr GhcPs)], Bool)
+        -> ([LHsRecField GhcPs (LHsExpr GhcPs)], Maybe SrcSpan)
         -> P (HsExpr GhcPs)
 
 mkRecConstrOrUpdate (dL->L l (HsVar _ (dL->L _ c))) _ (fs,dd)
   | isRdrDataCon c
   = return (mkRdrRecordCon (cL l c) (mk_rec_fields fs dd))
-mkRecConstrOrUpdate exp@(dL->L l _) _ (fs,dd)
-  | dd        = parseErrorSDoc l (text "You cannot use `..' in a record update")
+mkRecConstrOrUpdate exp _ (fs,dd)
+  | Just dd_loc <- dd = parseErrorSDoc dd_loc (text "You cannot use `..' in a record update")
   | otherwise = return (mkRdrRecordUpd exp (map (fmap mk_rec_upd_field) fs))
 
 mkRdrRecordUpd :: LHsExpr GhcPs -> [LHsRecUpdField GhcPs] -> HsExpr GhcPs
@@ -1996,10 +1996,10 @@ mkRdrRecordCon :: Located RdrName -> HsRecordBinds GhcPs -> HsExpr GhcPs
 mkRdrRecordCon con flds
   = RecordCon { rcon_ext = noExt, rcon_con_name = con, rcon_flds = flds }
 
-mk_rec_fields :: [LHsRecField id arg] -> Bool -> HsRecFields id arg
-mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
-mk_rec_fields fs True  = HsRecFields { rec_flds = fs
-                                     , rec_dotdot = Just (length fs) }
+mk_rec_fields :: [LHsRecField id arg] -> Maybe SrcSpan -> HsRecFields id arg
+mk_rec_fields fs Nothing = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
+mk_rec_fields fs (Just s)  = HsRecFields { rec_flds = fs
+                                     , rec_dotdot = Just (cL s (length fs)) }
 
 mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs
 mk_rec_upd_field (HsRecField (dL->L loc (FieldOcc _ rdr)) arg pun)

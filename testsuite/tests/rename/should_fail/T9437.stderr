@@ -1,2 +1,2 @@
 
-T9437.hs:8:12: You cannot use `..' in a record update
+T9437.hs:8:18: You cannot use `..' in a record update

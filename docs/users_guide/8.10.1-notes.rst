@@ -1,0 +1,45 @@
+.. _release-8-10-1:
+
+Release notes for version 8.10.1
+===============================
+
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+
+Highlights
+----------
+
+Full details
+------------
+
+Language
+~~~~~~~~
+
+Compiler
+~~~~~~~~
+
+- Add new flags :ghc-flag:`-Wunused-record-wildcards` and
+  :ghc-flag:`-Wredundant-record-wildcards`  which warn users when they have
+  redundant or unused uses of a record wildcard match.
+
+Runtime system
+~~~~~~~~~~~~~~
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+Build system
+~~~~~~~~~~~~
+
+Included libraries
+------------------
