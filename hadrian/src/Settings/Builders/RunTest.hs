@@ -202,6 +202,12 @@ inferLibraryWays compiler = do
         -- 'dir' is prefixed and suffixed with double quotes.
         -- In all cases, there is a \n at the end.
         -- This function cleans it all up.
-        fixup dir
-          | "\"" `isPrefixOf` dir = tail $ init (init dir)
-          | otherwise             = init dir
+        fixup = removeQuotes . removeNewline
+
+        removeNewline path
+          | "\n" `isSuffixOf` path = init path
+          | otherwise              = path
+
+        removeQuotes path
+          | "\"" `isPrefixOf` path && "\"" `isSuffixOf` path = tail (init path)
+          | otherwise                                        = path
