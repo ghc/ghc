@@ -14,6 +14,7 @@ module RnUtils (
         addFvRn, mapFvRn, mapMaybeFvRn,
         warnUnusedMatches, warnUnusedTypePatterns,
         warnUnusedTopBinds, warnUnusedLocalBinds,
+        warnUnusedRecordWildcard,
         mkFieldEnv,
         unknownSubordinateErr, badQualBndrErr, typeAppErr,
         HsDocContext(..), pprHsDocContext,
@@ -222,6 +223,16 @@ warnUnusedTopBinds gres
                                else                 gres
          warnUnusedGREs gres'
 
+
+-- | Get to see whether at least one name from each RecordWildcard is used.
+warnUnusedRecordWildcard :: Located Name -> [Name] -> FreeVars -> RnM ()
+warnUnusedRecordWildcard n ns used_names = do
+  traceRn "warnUnused" (ppr ns $$ ppr used_names)
+  let unused = filterOut (`elemNameSet` used_names) ns
+  warnIfFlag Opt_WarnUnusedRecordWildcards (not (null unused))
+    (unusedRecordWildcardWarning n)
+
+
 warnUnusedLocalBinds, warnUnusedMatches, warnUnusedTypePatterns
   :: [Name] -> FreeVars -> RnM ()
 warnUnusedLocalBinds   = check_unused Opt_WarnUnusedLocalBinds
@@ -295,6 +306,14 @@ addUnusedWarning flag occ span msg
     sep [msg <> colon,
          nest 2 $ pprNonVarNameSpace (occNameSpace occ)
                         <+> quotes (ppr occ)]
+
+unusedRecordWildcardWarning :: Located Name -> SDoc
+unusedRecordWildcardWarning (dL -> L span n)
+  = sep [text "No variables bound in the record wildcard match are used:",
+         nest 2 $ pprNonVarNameSpace (occNameSpace occ)
+                        <+> quotes (ppr occ)]
+  where
+    occ = getOccName n
 
 addNameClashErrRn :: RdrName -> [GlobalRdrElt] -> RnM ()
 addNameClashErrRn rdr_name gres

@@ -54,6 +54,7 @@ import RnEnv
 import RnFixity
 import RnUtils             ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
+                           , warnUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
 import RnTypes
@@ -74,6 +75,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad       ( when, liftM, ap, guard )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
+import DynFlags
 
 {-
 *********************************************************
@@ -529,16 +531,24 @@ rnConPatAndThen mk con (RecCon rpats)
         ; rpats' <- rnHsRecPatsAndThen mk con' rpats
         ; return (ConPatIn con' (RecCon rpats')) }
 
+checkUnusedRecordWildcards :: Located Name -> [Name] -> CpsRn ()
+checkUnusedRecordWildcards n dotdot_names =
+  CpsRn (\thing -> do
+                    (r, fvs) <- thing ()
+                    warnUnusedRecordWildcard n dotdot_names fvs
+                    return (r, fvs) )
+
 --------------------
 rnHsRecPatsAndThen :: NameMaker
                    -> Located Name      -- Constructor
                    -> HsRecFields GhcPs (LPat GhcPs)
                    -> CpsRn (HsRecFields GhcRn (LPat GhcRn))
-rnHsRecPatsAndThen mk (dL->L _ con)
+rnHsRecPatsAndThen mk lc@(dL->L _ con)
      hs_rec_fields@(HsRecFields { rec_dotdot = dd })
-  = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
+  = do { (flds, dd_fvs) <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
                                             hs_rec_fields
        ; flds' <- mapM rn_field (flds `zip` [1..])
+       ; checkUnusedRecordWildcards lc dd_fvs
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where
     mkVarPat l n = VarPat noExt (cL l n)
@@ -570,7 +580,7 @@ rnHsRecFields
     -> (SrcSpan -> RdrName -> SrcSpanLess arg)
          -- When punning, use this to build a new field
     -> HsRecFields GhcPs arg
-    -> RnM ([LHsRecField GhcRn arg], FreeVars)
+    -> RnM (([LHsRecField GhcRn arg], [Name]), FreeVars)
 
 -- This surprisingly complicated pass
 --   a) looks up the field name (possibly using disambiguation)
@@ -589,7 +599,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
        ; let all_flds | null dotdot_flds = flds1
                       | otherwise        = flds1 ++ dotdot_flds
-       ; return (all_flds, mkFVs (getFieldIds all_flds)) }
+       ; return ((all_flds, getFieldIds dotdot_flds), mkFVs (getFieldIds all_flds)) }
   where
     mb_con = case ctxt of
                 HsRecFieldCon con  -> Just con
@@ -659,7 +669,10 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                     HsRecFieldCon {} -> arg_in_scope lbl
                                     _other           -> True ]
 
-           ; addUsedGREs dot_dot_gres
+           -- Add a warning if the .. pattern binds no new variables
+           ; warnIfFlag Opt_WarnRedundantRecordWildcards (null dot_dot_gres)
+                                                        redundantWildcardErr
+
            ; return [ cL loc (HsRecField
                         { hsRecFieldLbl = cL loc (FieldOcc sel (cL loc arg_rdr))
                         , hsRecFieldArg = cL loc (mk_arg loc arg_rdr)
@@ -786,6 +799,9 @@ dupFieldErr ctxt dups
   = hsep [text "duplicate field name",
           quotes (ppr (NE.head dups)),
           text "in record", pprRFC ctxt]
+
+redundantWildcardErr :: SDoc
+redundantWildcardErr = text "Record wildcard does not bind any new variables"
 
 pprRFC :: HsRecFieldContext -> SDoc
 pprRFC (HsRecFieldCon {}) = text "construction"
