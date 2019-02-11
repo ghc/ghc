@@ -149,7 +149,7 @@ becomes
 We still have recursion for non-overloaded functions which we
 specialise, but the recursive call should get specialised to the
 same recursive version.
-
+f
 
 Polymorphism 1
 ~~~~~~~~~~~~~~
@@ -731,7 +731,11 @@ specImport dflags this_mod top_env done callers rb fn calls_for_fn
        ; return (rules2 ++ rules1, final_binds) }
 
   |  warnMissingSpecs dflags callers
-  = do { warnMsg (vcat [ hang (text "Could not specialise imported function" <+> quotes (ppr fn))
+  = do { let reason = if wopt Opt_WarnAllMissedSpecs dflags
+                      then Reason Opt_WarnAllMissedSpecs
+                      else Reason Opt_WarnMissedSpecs
+         ; warnMsg reason
+                 (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
                             2 (vcat [ text "when specialising" <+> quotes (ppr caller)
                                     | caller <- callers])
                       , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
@@ -743,6 +747,11 @@ specImport dflags this_mod top_env done callers rb fn calls_for_fn
   where
     unfolding = realIdUnfolding fn   -- We want to see the unfolding even for loop breakers
 
+-- | Returns whether or not to show a missed-spec warning.
+-- If -Wall-missed-specializations is on, show the warning.
+-- Otherwise, if -Wmissed-specializations is on, only show a warning
+-- if there is at least one imported function being specialized,
+-- and if all imported functions are marked with an inline pragma
 warnMissingSpecs :: DynFlags -> [Id] -> Bool
 -- See Note [Warning about missed specialisations]
 warnMissingSpecs dflags callers
