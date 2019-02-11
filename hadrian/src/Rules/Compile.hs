@@ -171,7 +171,7 @@ objectContext (BuildPath _ stage pkgpath obj) = do
         getPackages = do
           pkgs <- stagePackages stage
           testPkgs <- testsuitePackages
-          return $ pkgs ++ if stage == Stage1 then testPkgs else []
+          return $ pkgs ++ testPkgs
 
 -- * Building an object
 
