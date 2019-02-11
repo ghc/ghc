@@ -1021,18 +1021,163 @@ relocateSection(ObjectCode* oc, int curSection)
  *   addressability for relative or absolute access.
  */
 
-size_t ocGetRequiredSpace_MachO(ObjectCode* oc)
+SectionKind
+getSectionKind_MachO(MachOSection *section)
 {
-    size_t bytesNeeded = 0;
-    size_t sectionSize;
+    SectionKind kind;
 
-    for(int i = 0; i < oc->n_sections; i++)
-    {
-        sectionSize = oc->info->macho_sections[i].size;
-        bytesNeeded += roundUpToPage(sectionSize);
+    /* todo: Use section flags instead */
+    if (0==strcmp(section->sectname,"__text")) {
+        kind = SECTIONKIND_CODE_OR_RODATA;
+    } else if (0==strcmp(section->sectname,"__const") ||
+               0==strcmp(section->sectname,"__data") ||
+               0==strcmp(section->sectname,"__bss") ||
+               0==strcmp(section->sectname,"__common") ||
+               0==strcmp(section->sectname,"__mod_init_func")) {
+        kind = SECTIONKIND_RWDATA;
+    } else {
+        kind = SECTIONKIND_OTHER;
     }
 
-    return bytesNeeded;
+    return kind;
+}
+
+/* Calculate the # of active segments and their sizes based on section
+ * sizes and alignments. This is done in 2 passes over sections:
+ * 1. Calculate how many sections is going to be in each segment and
+ * the total segment size.
+ * 2. Fill in segment's sections_idx arrays.
+ *
+ * gbZerofillSegment is there because of this comment in mach-o/loader.h:
+ * The gigabyte zero fill sections, those with the section type
+ * S_GB_ZEROFILL, can only be in a segment with sections of this
+ * type. These segments are then placed after all other segments.
+ */
+int
+ocBuildSegments_MachO(ObjectCode *oc)
+{
+    int n_rxSections = 0;
+    size_t size_rxSegment = 0;
+    Segment *rxSegment = NULL;
+
+    int n_rwSections = 0;
+    size_t size_rwSegment = 0;
+    Segment *rwSegment = NULL;
+
+    int n_gbZerofills = 0;
+    size_t size_gbZerofillSegment = 0;
+    Segment *gbZerofillSegment = NULL;
+
+    int n_activeSegments = 0;
+    int curSegment = 0;
+    size_t size_compound;
+
+    Segment *segments = NULL;
+    void *mem = NULL, *curMem = NULL;
+
+    for (int i = 0; i < oc->n_sections; i++) {
+        MachOSection *macho = &oc->info->macho_sections[i];
+        size_t alignment = 1 << macho->align;
+
+        if (S_GB_ZEROFILL == (macho->flags & SECTION_TYPE)) {
+            size_gbZerofillSegment = roundUpToAlign(size_gbZerofillSegment, alignment);
+            size_gbZerofillSegment += macho->size;
+            n_gbZerofills++;
+        } else if (getSectionKind_MachO(macho) == SECTIONKIND_CODE_OR_RODATA) {
+            size_rxSegment = roundUpToAlign(size_rxSegment, alignment);
+            size_rxSegment += macho->size;
+            n_rxSections++;
+        } else {
+            size_rwSegment = roundUpToAlign(size_rwSegment, alignment);
+            size_rwSegment += macho->size;
+            n_rwSections++;
+        }
+    }
+
+    size_compound = roundUpToPage(size_rxSegment) +
+        roundUpToPage(size_rwSegment) +
+        roundUpToPage(size_gbZerofillSegment);
+
+    if (n_rxSections > 0) {
+        n_activeSegments++;
+    }
+    if (n_rwSections > 0) {
+        n_activeSegments++;
+    }
+    if (n_gbZerofills >0) {
+        n_activeSegments++;
+    }
+
+    mem = mmapForLinker(size_compound, MAP_ANON, -1, 0);
+    if (NULL == mem) return 0;
+
+    IF_DEBUG(linker, debugBelch("ocBuildSegments: allocating %d segments\n", n_activeSegments));
+    segments = (Segment*)stgCallocBytes(n_activeSegments, sizeof(Segment),
+                                        "ocBuildSegments_MachO(segments)");
+    curMem = mem;
+
+    /* Allocate space for RX segment */
+    if (n_rxSections > 0) {
+        rxSegment = &segments[curSegment];
+        initSegment(rxSegment,
+                    curMem,
+                    roundUpToPage(size_rxSegment),
+                    SEGMENT_PROT_RX,
+                    n_rxSections);
+        IF_DEBUG(linker, debugBelch("ocBuildSegments_MachO: init segment %d (RX) at %p size %zu\n",
+                                    curSegment, rxSegment->start, rxSegment->size));
+        curMem = (char *)curMem + rxSegment->size;
+        curSegment++;
+    }
+
+    /* Allocate space for RW segment */
+    if (n_rwSections > 0) {
+        rwSegment = &segments[curSegment];
+        initSegment(rwSegment,
+                    curMem,
+                    roundUpToPage(size_rwSegment),
+                    SEGMENT_PROT_RW,
+                    n_rwSections);
+        IF_DEBUG(linker, debugBelch("ocBuildSegments_MachO: init segment %d (RW) at %p size %zu\n",
+                                    curSegment, rwSegment->start, rwSegment->size));
+        curMem = (char *)curMem + rwSegment->size;
+        curSegment++;
+    }
+
+    /* Allocate space for GB_ZEROFILL segment */
+    if (n_gbZerofills > 0) {
+        gbZerofillSegment = &segments[curSegment];
+        initSegment(gbZerofillSegment,
+                    curMem,
+                    roundUpToPage(size_gbZerofillSegment),
+                    SEGMENT_PROT_RW,
+                    n_gbZerofills);
+        IF_DEBUG(linker, debugBelch("ocBuildSegments_MachO: init segment %d (GB_ZEROFILL) at %p size %zu\n",
+                                    curSegment, gbZerofillSegment->start, gbZerofillSegment->size));
+        curMem = (char *)curMem + gbZerofillSegment->size;
+        curSegment++;
+    }
+
+    /* Second pass over sections to fill in sections_idx arrays */
+    for (int i = 0, rx = 0, rw = 0, gb = 0;
+         i < oc->n_sections;
+         i++)
+    {
+        MachOSection *macho = &oc->info->macho_sections[i];
+
+        if (S_GB_ZEROFILL == (macho->flags & SECTION_TYPE)) {
+            gbZerofillSegment->sections_idx[gb++] = i;
+        } else if (getSectionKind_MachO(macho) == SECTIONKIND_CODE_OR_RODATA) {
+            rxSegment->sections_idx[rx++] = i;
+        } else {
+            rwSegment->sections_idx[rw++] = i;
+        }
+    }
+
+    oc->segments = segments;
+    oc->n_segments = n_activeSegments;
+
+    return 1;
 }
 
 int
@@ -1048,27 +1193,16 @@ ocGetNames_MachO(ObjectCode* oc)
 
     Section *secArray;
     secArray = (Section*)stgCallocBytes(
-         sizeof(Section),
-         oc->info->segCmd->nsects,
-         "ocGetNames_MachO(sections)");
+        oc->info->segCmd->nsects,
+        sizeof(Section),
+        "ocGetNames_MachO(sections)");
 
     oc->sections = secArray;
 
     IF_DEBUG(linker, debugBelch("ocGetNames_MachO: will load %d sections\n",
                                 oc->n_sections));
 
-#if defined(darwin_HOST_OS)
-    size_t requiredSize = ocGetRequiredSpace_MachO(oc);
-    IF_DEBUG(linker, debugBelch("ocGetNames_MachO: required mmaped space is %zu\n",
-                                requiredSize));
-
-    void* memStart = mmapForLinker(requiredSize, MAP_ANONYMOUS, -1, 0);
-    if (memStart == NULL) {
-        barf("ocGetNames_MachO: failed to mmap");
-    }
-    void* memCur = memStart;
-#endif // darwin_HOST_OS
-
+#if defined (ios_HOST_OS)
     for(int i=0; i < oc->n_sections; i++)
     {
         MachOSection * section = &oc->info->macho_sections[i];
@@ -1080,23 +1214,9 @@ ocGetNames_MachO(ObjectCode* oc)
             continue;
         }
 
-        // XXX, use SECTION_TYPE attributes, instead of relying on the name?
-
-        SectionKind kind = SECTIONKIND_OTHER;
-
-        if (0==strcmp(section->sectname,"__text")) {
-            kind = SECTIONKIND_CODE_OR_RODATA;
-        }
-        else if (0==strcmp(section->sectname,"__const") ||
-                 0==strcmp(section->sectname,"__data") ||
-                 0==strcmp(section->sectname,"__bss") ||
-                 0==strcmp(section->sectname,"__common") ||
-                 0==strcmp(section->sectname,"__mod_init_func")) {
-            kind = SECTIONKIND_RWDATA;
-        }
+        SectionKind kind = getSectionKind_MachO(section);
 
         switch(section->flags & SECTION_TYPE) {
-#if defined(ios_HOST_OS)
             case S_ZEROFILL:
             case S_GB_ZEROFILL: {
                 // See Note [mmap r+w+x]
@@ -1105,7 +1225,8 @@ ocGetNames_MachO(ObjectCode* oc)
                                   MAP_ANON | MAP_PRIVATE,
                                   -1, 0);
                 if( mem == MAP_FAILED ) {
-                    barf("failed to mmap allocate memory for zerofill section %d of size %d. errno = %d", i, section->size, errno);
+                    barf("failed to mmap allocate memory for zerofill section %d of size %d. errno = %d",
+                         i, section->size, errno);
                 }
                 addSection(&secArray[i], kind, SECTION_MMAP, mem, section->size,
                            0, mem, roundUpToPage(section->size));
@@ -1177,72 +1298,76 @@ ocGetNames_MachO(ObjectCode* oc)
                   = (MachORelocationInfo*)(oc->image + section->reloff);
                 break;
             }
+        }
+    }
+#else /* !ios_HOST_OS */
+    IF_DEBUG(linker, debugBelch("ocGetNames_MachO: building segments\n"));
 
-#else /* any other host */
+    CHECKM(ocBuildSegments_MachO(oc), "ocGetNames_MachO: failed to build segments\n");
+
+    for (int seg_n = 0; seg_n < oc->n_segments; seg_n++) {
+        Segment *segment = &oc->segments[seg_n];
+        void *curMem = segment->start;
+
+        IF_DEBUG(linker,
+                 debugBelch("ocGetNames_MachO: loading segment %d "
+                            "(address = %p, size = %zu) "
+                            "with %d sections\n",
+                            seg_n, segment->start, segment->size, segment->n_sections));
+
+        for (int sec_n = 0; sec_n < segment->n_sections; sec_n++) {
+            int sec_idx = segment->sections_idx[sec_n];
+            MachOSection *section = &oc->info->macho_sections[sec_idx];
+
+            size_t alignment = 1 << section->align;
+            SectionKind kind = getSectionKind_MachO(section);
+
+            void *secMem = (void *)roundUpToAlign((size_t)curMem, alignment);
+
+            IF_DEBUG(linker,
+                     debugBelch("ocGetNames_MachO: loading section %d in segment %d "
+                                "(#%d, %s %s)\n"
+                                "                  skipped %zu bytes due to alignment of %zu\n",
+                                sec_n, seg_n, sec_idx, section->segname, section->sectname,
+                                (char *)secMem - (char *)curMem, alignment));
+
+            switch (section->flags & SECTION_TYPE) {
             case S_ZEROFILL:
-            case S_GB_ZEROFILL: {
-                char * zeroFillArea;
-                if (RTS_LINKER_USE_MMAP) {
-                    zeroFillArea = mmapForLinker(section->size, MAP_ANONYMOUS,
-                                                 -1, 0);
-                    if (zeroFillArea == NULL) return 0;
-                    memset(zeroFillArea, 0, section->size);
-                }
-                else {
-                    zeroFillArea = stgCallocBytes(1,section->size,
-                                                  "ocGetNames_MachO(common symbols)");
-                }
-                section->offset = zeroFillArea - oc->image; // fixme: fails down the road
-                                                            // when zFA < oc->image since offset is unsigned
-
-                addSection(&secArray[i], kind, SECTION_NOMEM, // fixme: why NOMEM?
-                           (void *)(oc->image + section->offset),
-                           section->size,
-                           0, 0, 0);
-
-                addProddableBlock(oc,
-                                  (void *) (oc->image + section->offset),
-                                  section->size);
-
-                secArray[i].info->nstubs = 0;
-                secArray[i].info->stub_offset = NULL;
-                secArray[i].info->stub_size = 0;
-                secArray[i].info->stubs = NULL;
-
-                secArray[i].info->macho_section = section;
-                secArray[i].info->relocation_info
-                = (MachORelocationInfo*)(oc->image + section->reloff);
+            case S_GB_ZEROFILL:
+                IF_DEBUG(linker, debugBelch("ocGetNames_MachO: memset to 0 a ZEROFILL section\n"));
+                memset(secMem, 0, section->size);
                 break;
+            default:
+                IF_DEBUG(linker,
+                         debugBelch("ocGetNames_MachO: copying from %p to %p"
+                                    " a block of %" PRIu64 " bytes\n",
+                                    (void *) (oc->image + section->offset), secMem, section->size));
+
+                memcpy(secMem, oc->image + section->offset, section->size);
             }
-            default: {
-                size_t sectionRoundedSize = roundUpToPage(section->size);
 
-                IF_DEBUG(linker, debugBelch("ocGetNames_MachO: copying from %p to %p a block of %" PRIu64 " bytes\n",
-                                            (void *) (oc->image + section->offset), memCur, section->size));
-                memcpy(memCur, oc->image + section->offset, section->size);
-                IF_DEBUG(linker, debugBelch("ocGetNames_MachO: copied %" PRIu64 " bytes\n",
-                                            section->size));
+            /* SECTION_NOMEM since memory is already allocated in segments */
+            addSection(&secArray[sec_idx], kind, SECTION_NOMEM,
+                       secMem, section->size,
+                       0, 0, 0);
+            addProddableBlock(oc, secMem, section->size);
 
-                addSection(&secArray[i], kind, SECTION_MMAP,
-                           memCur, section->size,
-                           0, memCur, sectionRoundedSize);
-                addProddableBlock(oc, memCur, section->size);
+            curMem = (char*) secMem + section->size;
 
-                memCur = (char*) memCur + sectionRoundedSize;
+            secArray[sec_idx].info->nstubs = 0;
+            secArray[sec_idx].info->stub_offset = NULL;
+            secArray[sec_idx].info->stub_size = 0;
+            secArray[sec_idx].info->stubs = NULL;
 
-                secArray[i].info->nstubs = 0;
-                secArray[i].info->stub_offset = NULL;
-                secArray[i].info->stub_size = 0;
-                secArray[i].info->stubs = NULL;
-
-                secArray[i].info->macho_section = section;
-                secArray[i].info->relocation_info
+            secArray[sec_idx].info->macho_section = section;
+            secArray[sec_idx].info->relocation_info
                 = (MachORelocationInfo*)(oc->image + section->reloff);
-            }
-#endif
+
         }
 
     }
+#endif
+
     /* now, as all sections have been loaded, we can resolve the absolute
      * address of symbols defined in those sections.
      */
