@@ -99,7 +99,7 @@ import qualified GHC.Primitive.SmallArray as PM
 data FdData = FdData {
       fdKey       :: {-# UNPACK #-} !FdKey
     , fdEvents    :: {-# UNPACK #-} !EventLifetime
-    , _fdCVar     :: {-# UNPACK #-} !CVar
+    , fdCVar      :: {-# UNPACK #-} !CVar
     }
 
 -- | A file descriptor registration cookie.
@@ -368,7 +368,7 @@ registerFd_ mgr@(EventManager{..}) !cv !fd !evs lt = do
   -- This is dangerous behavior since it can lead to the whole
   -- runtime being blocked by an uninterruptible FFI call. We may
   -- want to consider throwing an exception instead.
-  when (not ok) (putReady cv)
+  when (not ok) (CV.ready cv)
   return (reg,modify)
 
 -- | @registerFd mgr cv fd evs lt@ registers interest in the events @evs@
@@ -494,30 +494,31 @@ onFdEvent mgr fd0 evs
     --      is now available.
     fillAndRemoveCVars :: SmallArray FdData -> IO (SmallArray FdData)
     fillAndRemoveCVars fdds0 = do
-      let ((!preservedEls,!allEls),fdds1) = PM.foldlFilterSmallArray'
-            ( \(!preservedEls0,!allEls0) fdd ->
-              let -- Figure out if this registration has been triggered.
-                  isTriggered :: Bool
-                  isTriggered = evs `I.eventIs` I.elEvent (fdEvents fdd)
-                  -- (triggered, notTriggered) = PM.partitionSmallArray matches fdds
+      ((!preservedEls,!allEls),fdds1) <- PM.foldlFilterSmallArrayP'
+        ( \(!preservedEls0,!allEls0) fdd -> do
+          let -- Figure out if this registration has been triggered.
+              isTriggered :: Bool
+              isTriggered = evs `I.eventIs` I.elEvent (fdEvents fdd)
+              -- (triggered, notTriggered) = PM.partitionSmallArray matches fdds
 
-                  -- Is this a multishot registration? If so, we will need
-                  -- to retain this registration regardless of whether or
-                  -- not it was triggered.
-                  isMultishot :: Bool
-                  isMultishot = I.elLifetime (fdEvents fdd) == MultiShot
-                  
-                  -- Should we preserve this registration?
-                  isPreserved :: Bool
-                  isPreserved = not isTriggered || isMultishot
+              -- Is this a multishot registration? If so, we will need
+              -- to retain this registration regardless of whether or
+              -- not it was triggered.
+              isMultishot :: Bool
+              isMultishot = I.elLifetime (fdEvents fdd) == MultiShot
+              
+              -- Should we preserve this registration?
+              isPreserved :: Bool
+              isPreserved = not isTriggered || isMultishot
 
-                  preservedEls1 = if isPreserved
-                    then preservedEls0 <> fdEvents fdd
-                    else preservedEls0
+              preservedEls1 = if isPreserved
+                then preservedEls0 <> fdEvents fdd
+                else preservedEls0
 
-                  allEls1 = allEls0 <> fdEvents fdd
-               in (isPreserved,(preservedEls1,allEls1))
-             ) (mempty,mempty) fdds0
+              allEls1 = allEls0 <> fdEvents fdd
+          CV.ready (fdCVar fdd)
+          pure (isPreserved,(preservedEls1,allEls1))
+         ) (mempty,mempty) fdds0
 
       case I.elLifetime allEls of
         -- we previously armed the fd for multiple shots, no need to rearm
@@ -540,14 +541,6 @@ onFdEvent mgr fd0 evs
                                 (I.elEvent allEls) (I.elEvent preservedEls)
 
       return fdds1
-
-
--- Notify the reading end of the CVar that the file descriptor they were
--- waiting on is ready for the operation specified earlier.
-putReady :: CVar -> IO ()
-putReady = CV.match
-  (\mv -> putMVar mv True)
-  (\tv -> atomically (writeTVar tv CV.Ready))
 
 unless :: Monad m => Bool -> m () -> m ()
 unless p = when (not p)

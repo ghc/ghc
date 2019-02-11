@@ -13,10 +13,11 @@ module GHC.Event.CVar
   , tvar
   , match
   , close
+  , ready
   ) where
 
 import GHC.Prim (MVar#,TVar#,RealWorld)
-import GHC.Types (TYPE,RuntimeRep(UnliftedRep),Any,Bool(False),Type,IO)
+import GHC.Types (TYPE,RuntimeRep(UnliftedRep),Any,Bool(..),Type,IO)
 import GHC.MVar (MVar(..),putMVar)
 import GHC.Conc.Sync (TVar(..),atomically,writeTVar)
 
@@ -79,4 +80,11 @@ close :: CVar -> IO ()
 close = match
   (\mv -> putMVar mv False)
   (\tv -> atomically (writeTVar tv Closed))
+
+-- | Notify the reading end of the CVar that the file descriptor they were
+-- waiting on is ready for the operation specified earlier.
+ready :: CVar -> IO ()
+ready = match
+  (\mv -> putMVar mv True)
+  (\tv -> atomically (writeTVar tv Ready))
 

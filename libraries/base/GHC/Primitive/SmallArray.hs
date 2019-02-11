@@ -33,7 +33,7 @@ module GHC.Primitive.SmallArray
   , filterSmallArray
   , partitionSmallArray
   , mapSmallArray'
-  , foldlFilterSmallArray'
+  , foldlFilterSmallArrayP'
   ) where
 
 import Data.Foldable (Foldable(..))
@@ -419,18 +419,19 @@ filterSmallArray p !arr = runArray $ do
 --
 -- Note: this function could be improved to avoid allocating
 -- when the resulting array ends up empty. 
-foldlFilterSmallArray' ::
-     (b -> a -> (Bool,b))
+foldlFilterSmallArrayP' :: PrimMonad m
+  => (b -> a -> m (Bool,b))
   -> b
   -> SmallArray a
-  -> (b, SmallArray a)
-foldlFilterSmallArray' p !b0 !arr = runArrayWriter $ do
+  -> m (b, SmallArray a)
+{-# INLINE foldlFilterSmallArrayP' #-}
+foldlFilterSmallArrayP' p !b0 !arr = do
   let !sz = sizeofSmallArray arr
   marr <- newSmallArray sz (die "foldlFilterSmallArray'" "impossible")
   let go !ixSrc !ixDst !b = if ixSrc < sz
         then do
           a <- indexSmallArrayM arr ixSrc
-          let (preserve,b') = p b a
+          (preserve,b') <- p b a
           if preserve
             then do
               writeSmallArray marr ixDst a
@@ -438,7 +439,7 @@ foldlFilterSmallArray' p !b0 !arr = runArrayWriter $ do
             else go (ixSrc + 1) ixDst b'
         else return (ixDst,b)
   (dstLen,r) <- go 0 0 b0
-  finalArr <- internalResizeMutableArray marr dstLen
+  finalArr <- unsafeFreezeSmallArray =<< internalResizeMutableArray marr dstLen
   pure (r,finalArr)
 
 partitionSmallArray :: (a -> Bool) -> SmallArray a -> (SmallArray a, SmallArray a)
@@ -468,7 +469,10 @@ partitionSmallArray p !arr = runArray2 $ do
 -- this precondition is not checked. The original mutable array must
 -- not be reused after being passed to this function, since it may
 -- be aliased. This function is not exported.
-internalResizeMutableArray :: SmallMutableArray s a -> Int -> ST s (SmallMutableArray s a)
+internalResizeMutableArray :: PrimMonad m
+  => SmallMutableArray (PrimState m) a
+  -> Int
+  -> m (SmallMutableArray (PrimState m) a)
 internalResizeMutableArray !a !len = if len == sizeofSmallMutableArray a
   then return a
   else do
