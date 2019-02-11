@@ -25,7 +25,7 @@ module RnPat (-- main entry points
                                              --   sometimes we want to make top (qualified) names.
               isTopRecNameMaker,
 
-              rnHsRecFields, HsRecFieldContext(..),
+              rnHsRecFields, rnHsRecFieldsExpr, HsRecFieldContext(..),
               rnHsRecUpdFields,
 
               -- CpsRn monad
@@ -54,6 +54,7 @@ import RnEnv
 import RnFixity
 import RnUtils             ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
+                           , warnUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
 import RnTypes
@@ -74,6 +75,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad       ( when, liftM, ap, guard )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
+import DynFlags
+import Data.Maybe
 
 {-
 *********************************************************
@@ -529,6 +532,25 @@ rnConPatAndThen mk con (RecCon rpats)
         ; rpats' <- rnHsRecPatsAndThen mk con' rpats
         ; return (ConPatIn con' (RecCon rpats')) }
 
+-- Run the inner action to find out its free variables and then
+-- check whether the variables we bound are actually used.
+-- If none of them are used and -Wwarn-redundant-record-wildcards is
+-- enabled then we issue a warning.
+checkUnusedRecordWildcards :: Maybe [Name] -> CpsRn ()
+checkUnusedRecordWildcards Nothing = return()
+checkUnusedRecordWildcards (Just [])  =
+  -- Add a new warning if the .. pattern binds no variables
+  liftCps $ whenWOptM Opt_WarnRedundantRecordWildcards
+              (addWarn (Reason Opt_WarnRedundantRecordWildcards)
+                       redundantWildcardErr)
+checkUnusedRecordWildcards (Just dotdot_names) =
+  CpsRn (\thing -> do
+                    (r, fvs) <- thing ()
+                    -- Check if any of the bound variables are used. We
+                    -- warn if none of them are used.
+                    warnUnusedRecordWildcard dotdot_names fvs
+                    return (r, fvs) )
+
 --------------------
 rnHsRecPatsAndThen :: NameMaker
                    -> Located Name      -- Constructor
@@ -536,9 +558,10 @@ rnHsRecPatsAndThen :: NameMaker
                    -> CpsRn (HsRecFields GhcRn (LPat GhcRn))
 rnHsRecPatsAndThen mk (dL->L _ con)
      hs_rec_fields@(HsRecFields { rec_dotdot = dd })
-  = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
+  = do { (flds, dd_fvs) <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
                                             hs_rec_fields
        ; flds' <- mapM rn_field (flds `zip` [1..])
+       ; checkUnusedRecordWildcards dd_fvs
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where
     mkVarPat l n = VarPat noExt (cL l n)
@@ -564,13 +587,24 @@ data HsRecFieldContext
   | HsRecFieldPat Name
   | HsRecFieldUpd
 
-rnHsRecFields
+rnHsRecFieldsExpr
     :: forall arg. HasSrcSpan arg =>
        HsRecFieldContext
     -> (SrcSpan -> RdrName -> SrcSpanLess arg)
          -- When punning, use this to build a new field
     -> HsRecFields GhcPs arg
     -> RnM ([LHsRecField GhcRn arg], FreeVars)
+rnHsRecFieldsExpr ctxt mk_arg fs = do
+  (r, fvs) <- rnHsRecFields ctxt mk_arg fs
+  return (fst r, fvs)
+
+rnHsRecFields
+    :: forall arg. HasSrcSpan arg =>
+       HsRecFieldContext
+    -> (SrcSpan -> RdrName -> SrcSpanLess arg)
+         -- When punning, use this to build a new field
+    -> HsRecFields GhcPs arg
+    -> RnM (([LHsRecField GhcRn arg], Maybe [Name]), FreeVars)
 
 -- This surprisingly complicated pass
 --   a) looks up the field name (possibly using disambiguation)
@@ -588,8 +622,8 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
        ; let all_flds | null dotdot_flds = flds1
-                      | otherwise        = flds1 ++ dotdot_flds
-       ; return (all_flds, mkFVs (getFieldIds all_flds)) }
+                      | otherwise        = flds1 ++ fromMaybe [] dotdot_flds
+       ; return ((all_flds, fmap getFieldIds dotdot_flds), mkFVs (getFieldIds all_flds)) }
   where
     mb_con = case ctxt of
                 HsRecFieldCon con  -> Just con
@@ -626,7 +660,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
               -> Maybe Name -- The constructor (Nothing for an
                                 --    out of scope constructor)
               -> [LHsRecField GhcRn arg] -- Explicit fields
-              -> RnM [LHsRecField GhcRn arg]   -- Filled in .. fields
+              -> RnM (Maybe [LHsRecField GhcRn arg])   -- Filled in .. fields
     rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
       | not (isUnboundName con) -- This test is because if the constructor
                                 -- isn't in scope the constructor lookup will add
@@ -660,7 +694,8 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                     _other           -> True ]
 
            ; addUsedGREs dot_dot_gres
-           ; return [ cL loc (HsRecField
+           ; return . Just $
+                        [ cL loc (HsRecField
                         { hsRecFieldLbl = cL loc (FieldOcc sel (cL loc arg_rdr))
                         , hsRecFieldArg = cL loc (mk_arg loc arg_rdr)
                         , hsRecPun      = False })
@@ -669,7 +704,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                     , let arg_rdr = mkVarUnqual (flLabel fl) ] }
 
     rn_dotdot _dotdot _mb_con _flds
-      = return []
+      = return Nothing
       -- _dotdot = Nothing => No ".." at all
       -- _mb_con = Nothing => Record update
       -- _mb_con = Just unbound => Out of scope data constructor
@@ -786,6 +821,9 @@ dupFieldErr ctxt dups
   = hsep [text "duplicate field name",
           quotes (ppr (NE.head dups)),
           text "in record", pprRFC ctxt]
+
+redundantWildcardErr :: SDoc
+redundantWildcardErr = text "Record wildcard does not bind any new variables"
 
 pprRFC :: HsRecFieldContext -> SDoc
 pprRFC (HsRecFieldCon {}) = text "construction"

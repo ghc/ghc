@@ -790,6 +790,8 @@ data WarningFlag =
    | Opt_WarnUnusedMatches
    | Opt_WarnUnusedTypePatterns
    | Opt_WarnUnusedForalls
+   | Opt_WarnUnusedRecordWildcards
+   | Opt_WarnRedundantRecordWildcards
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnMissingMonadFailInstances -- since 8.0
@@ -4040,6 +4042,8 @@ wWarningFlagsDeps = [
   flagSpec "unused-pattern-binds"        Opt_WarnUnusedPatternBinds,
   flagSpec "unused-top-binds"            Opt_WarnUnusedTopBinds,
   flagSpec "unused-type-patterns"        Opt_WarnUnusedTypePatterns,
+  flagSpec "unused-record-wildcards"     Opt_WarnUnusedRecordWildcards,
+  flagSpec "redundant-record-wildcards"  Opt_WarnRedundantRecordWildcards,
   flagSpec "warnings-deprecations"       Opt_WarnWarningsDeprecations,
   flagSpec "wrong-do-bind"               Opt_WarnWrongDoBind,
   flagSpec "missing-pattern-synonym-signatures"
