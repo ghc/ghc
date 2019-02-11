@@ -19,16 +19,19 @@ module GHC.Primitive.UnliftedArray
   , traverseMutableUnliftedArray
   , mutableUnliftedArrayFromList
   , sizeofUnliftedArray
+  , indexUnliftedArray
+  , unsafeFreezeUnliftedArray
+  , replicateUnliftedArrayP
   ) where
 
-import GHC.Num ((+),(*),(-))
-import GHC.ST (ST,runST)
+import GHC.Num ((+),(-))
 import GHC.Base
 import GHC.List (length)
 import GHC.Primitive.Monad (PrimMonad(..),primitive_)
 
 import qualified GHC.Primitive.Array as A
 import qualified GHC.Primitive.SmallArray as SA
+import qualified GHC.MVar as GM
 
 class PrimUnlifted a where
   toArrayArray# :: a -> ArrayArray#
@@ -60,6 +63,9 @@ instance PrimUnlifted (SA.SmallMutableArray s a) where
   toArrayArray# (SA.SmallMutableArray sma#) = unsafeCoerce# sma#
   fromArrayArray# aa# = SA.SmallMutableArray (unsafeCoerce# aa#)
 
+instance PrimUnlifted (GM.MVar a) where
+  toArrayArray# (GM.MVar mv#) = unsafeCoerce# mv#
+  fromArrayArray# mv# = GM.MVar (unsafeCoerce# mv#)
 
 -- | Creates a new 'MutableUnliftedArray'. This function is unsafe because it
 -- initializes all elements of the array as pointers to the array itself. Attempting
@@ -193,14 +199,14 @@ mutableUnliftedArrayFromListN :: (PrimMonad m, PrimUnlifted a) => Int -> [a] -> 
 {-# INLINE mutableUnliftedArrayFromListN #-}
 mutableUnliftedArrayFromListN n xs = do
   sma <- unsafeNewUnliftedArray n
-  mutableUnliftedArrayFromListWorker sma n xs
+  mutableUnliftedArrayFromListWorker sma xs
   pure sma
 
 mutableUnliftedArrayFromListWorker :: (PrimMonad m, PrimUnlifted a)
-  => MutableUnliftedArray (PrimState m) a -> Int -> [a] -> m ()
+  => MutableUnliftedArray (PrimState m) a -> [a] -> m ()
 {-# INLINE mutableUnliftedArrayFromListWorker #-}
-mutableUnliftedArrayFromListWorker sma n e = do
-  let go !ix [] = pure ()
+mutableUnliftedArrayFromListWorker sma e = do
+  let go !_ [] = pure ()
       go !ix (x : xs) = do
         writeUnliftedArray sma ix x
         go (ix + 1) xs
@@ -209,4 +215,61 @@ mutableUnliftedArrayFromListWorker sma n e = do
 die :: String -> String -> a
 {-# INLINE die #-}
 die fun problem = error $ "GHC.Primitive.UnliftedArray." ++ fun ++ ": " ++ problem
+
+
+-- Internal indexing function.
+--
+-- Note: ArrayArray# is strictly evaluated, so this should have similar
+-- consequences to indexArray#, where matching on the unboxed single causes the
+-- array access to happen.
+indexUnliftedArrayU
+  :: PrimUnlifted a
+  => UnliftedArray a
+  -> Int
+  -> (# a #)
+indexUnliftedArrayU (UnliftedArray src#) (I# i#)
+  = case indexArrayArrayArray# src# i# of
+      aa# -> (# fromArrayArray# aa# #)
+{-# inline indexUnliftedArrayU #-}
+
+-- | Gets the value at the specified position of an 'UnliftedArray'.
+indexUnliftedArray
+  :: PrimUnlifted a
+  => UnliftedArray a -- ^ source
+  -> Int -- ^ index
+  -> a
+indexUnliftedArray ua i
+  = case indexUnliftedArrayU ua i of (# v #) -> v
+{-# inline indexUnliftedArray #-}
+
+-- | Execute the monadic action the given number of times and store the
+-- results in an array.
+replicateUnliftedArrayP :: (PrimMonad m, PrimUnlifted a)
+  => Int
+  -> m a
+  -> m (UnliftedArray a)
+{-# inline replicateUnliftedArrayP #-}
+replicateUnliftedArrayP sz f = do
+  marr <- unsafeNewUnliftedArray sz
+  let go !ix = if ix < sz
+        then do
+          b <- f
+          writeUnliftedArray marr ix b
+          go (ix + 1)
+        else return ()
+  go 0
+  unsafeFreezeUnliftedArray marr
+
+
+-- | Freezes a 'MutableUnliftedArray', yielding an 'UnliftedArray'. This simply
+-- marks the array as frozen in place, so it should only be used when no further
+-- modifications to the mutable array will be performed.
+unsafeFreezeUnliftedArray
+  :: (PrimMonad m)
+  => MutableUnliftedArray (PrimState m) a
+  -> m (UnliftedArray a)
+{-# inline unsafeFreezeUnliftedArray #-}
+unsafeFreezeUnliftedArray (MutableUnliftedArray maa#)
+  = primitive $ \s -> case unsafeFreezeArrayArray# maa# s of
+      (# s', aa# #) -> (# s', UnliftedArray aa# #)
 

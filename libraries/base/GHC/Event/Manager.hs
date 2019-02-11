@@ -72,6 +72,7 @@ import Data.Maybe (maybe)
 import Data.OldList (partition)
 import GHC.Primitive.Array (Array,indexArray,replicateArrayP)
 import GHC.Primitive.SmallArray (SmallArray)
+import GHC.Primitive.UnliftedArray (UnliftedArray)
 import GHC.Base
 import GHC.Conc.Sync (yield,writeTVar,atomically)
 import GHC.List (filter)
@@ -92,6 +93,7 @@ import qualified GHC.Event.Internal as I
 import qualified GHC.Event.Backend as I
 import qualified GHC.Primitive.Array as PM
 import qualified GHC.Primitive.SmallArray as PM
+import qualified GHC.Primitive.UnliftedArray as PM
 
 ------------------------------------------------------------------------
 -- Types
@@ -122,7 +124,7 @@ data State = Created
 -- | The event manager state.
 data EventManager = EventManager
     { emBackend      :: {-# UNPACK #-} !I.BackendState
-    , emFds          :: {-# UNPACK #-} !(Array (MVar (IntTable FdData)))
+    , emFds          :: {-# UNPACK #-} !(UnliftedArray (MVar (IntTable FdData)))
     , emState        :: {-# UNPACK #-} !(IORef State)
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
     , emControl      :: {-# UNPACK #-} !Control
@@ -156,7 +158,7 @@ hashFd fd = fromIntegral fd .&. (callbackArraySize - 1)
 -- See section 3.2 of the Mio paper for an explanation of why we
 -- are using lock-striping here.
 callbackTableVar :: EventManager -> Fd -> MVar (IntTable FdData)
-callbackTableVar mgr fd = indexArray (emFds mgr) (hashFd fd)
+callbackTableVar mgr fd = PM.indexUnliftedArray (emFds mgr) (hashFd fd)
 {-# INLINE callbackTableVar #-}
 
 haveOneShot :: Bool
@@ -189,7 +191,7 @@ new = newWith =<< newDefaultBackend
 -- | Create a new 'EventManager' with the given polling backend.
 newWith :: I.BackendState -> IO EventManager
 newWith be = do
-  iofds <- replicateArrayP callbackArraySize
+  iofds <- PM.replicateUnliftedArrayP callbackArraySize
     (newMVar =<< IT.new 8)
   ctrl <- newControl False
   state <- newIORef Created
@@ -200,13 +202,14 @@ newWith be = do
                  I.delete be
                  closeControl ctrl
   lockVar <- newMVar ()
-  let mgr = EventManager { emBackend = be
-                         , emFds = iofds
-                         , emState = state
-                         , emUniqueSource = us
-                         , emControl = ctrl
-                         , emLock = lockVar
-                         }
+  let mgr = EventManager
+        { emBackend = be
+        , emFds = iofds
+        , emState = state
+        , emUniqueSource = us
+        , emControl = ctrl
+        , emLock = lockVar
+        }
   registerControlFd mgr (controlReadFd ctrl) evtRead
   registerControlFd mgr (wakeupReadFd ctrl) evtRead
   return mgr
