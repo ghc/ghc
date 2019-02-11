@@ -1424,6 +1424,7 @@ preloadObjectFile (pathchar *path)
 
    IF_DEBUG(linker, debugBelch("loadObj: preloaded image at %p\n", (void *) image));
 
+   /* FIXME (AP): =mapped= parameter unconditionally set to true */
    oc = mkOc(path, image, fileSize, true, NULL, misalignment);
 
 #if defined(OBJFORMAT_MACHO)
