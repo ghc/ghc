@@ -7,3 +7,10 @@ test('unsigned_reloc_macho_x64',
          unless(arch('x86_64'), skip)
      ],
      run_command, ['$MAKE -s --no-print-directory unsigned_reloc_macho_x64'])
+
+test('aligned_mem_access',
+     [
+         extra_files(['runner.c', 'aligned_mem_access.c']),
+         unless(opsys('darwin') and arch('x86_64'), expect_broken(13624))
+     ],
+     run_command, ['$MAKE -s --no-print-directory aligned_mem_access'])
