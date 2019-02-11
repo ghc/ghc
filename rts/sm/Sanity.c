@@ -172,7 +172,7 @@ checkStackChunk( StgPtr sp, StgPtr stack_end )
     while (p < stack_end) {
         p += checkStackFrame( p );
     }
-    // ASSERT( p == stack_end ); -- HWL
+    ASSERT( p == stack_end );
 }
 
 static void
