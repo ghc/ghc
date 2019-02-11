@@ -6,6 +6,6 @@ _getAnswer:
         movq    (%rdx), %rax
         ret
 
-        .data
+        .data                   # assembler generates an unsigned reloc for L2
 L1:     .quad 42
 L2:     .quad L1

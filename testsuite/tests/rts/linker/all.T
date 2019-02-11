@@ -1,9 +1,9 @@
 # -*-: mode: python -*-
 
-test('unsigned_reloc_macho_64',
+test('unsigned_reloc_macho_x64',
      [
-         extra_files(['runner.c', 'unsigned_reloc_macho_64.s']),
+         extra_files(['runner.c', 'unsigned_reloc_macho_x64.s']),
          unless(opsys('darwin'), skip),
          unless(arch('x86_64'), skip)
      ],
-     run_command, ['$MAKE -s --no-print-directory unsigned_reloc_macho_64'])
+     run_command, ['$MAKE -s --no-print-directory unsigned_reloc_macho_x64'])
