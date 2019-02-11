@@ -297,7 +297,7 @@ rnExpr (ExplicitSum x alt arity expr)
 rnExpr (RecordCon { rcon_con_name = con_id
                   , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
   = do { con_lname@(L _ con_name) <- lookupLocatedOccRn con_id
-       ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
+       ; (flds, fvs)   <- rnHsRecFieldsExpr (HsRecFieldCon con_name) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
        ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
        ; return (RecordCon { rcon_ext = noExt
@@ -1089,7 +1089,7 @@ rnRecStmtsAndThen rnBody s cont
           --    ...bring them and their fixities into scope
         ; let bound_names = collectLStmtsBinders (map fst new_lhs_and_fv)
               -- Fake uses of variables introduced implicitly (warning suppression, see #4404)
-              implicit_uses = lStmtsImplicits (map fst new_lhs_and_fv)
+              implicit_uses = mkNameSet $ concatMap snd $ lStmtsImplicits (map fst new_lhs_and_fv)
         ; bindLocalNamesFV bound_names $
           addLocalFixities fix_env bound_names $ do
 

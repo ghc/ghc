@@ -13,7 +13,7 @@ import Data.Binary
 type MessageHook = Msg -> IO Msg
 
 serv :: Bool -> MessageHook -> Pipe -> (forall a .IO a -> IO a) -> IO ()
-serv verbose hook pipe@Pipe{..} restore = loop
+serv verbose hook pipe restore = loop
  where
   loop = do
     Msg msg <- readPipe pipe getMessage >>= hook

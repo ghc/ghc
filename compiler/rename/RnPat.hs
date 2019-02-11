@@ -25,7 +25,7 @@ module RnPat (-- main entry points
                                              --   sometimes we want to make top (qualified) names.
               isTopRecNameMaker,
 
-              rnHsRecFields, HsRecFieldContext(..),
+              rnHsRecFields, rnHsRecFieldsExpr, HsRecFieldContext(..),
               rnHsRecUpdFields,
 
               -- CpsRn monad
@@ -54,6 +54,7 @@ import RnEnv
 import RnFixity
 import RnUtils             ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
+                           , warnUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
 import RnTypes
@@ -74,6 +75,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad       ( when, liftM, ap, guard )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
+import DynFlags
+import Data.Maybe
 
 {-
 *********************************************************
@@ -529,6 +532,32 @@ rnConPatAndThen mk con (RecCon rpats)
         ; rpats' <- rnHsRecPatsAndThen mk con' rpats
         ; return (ConPatIn con' (RecCon rpats')) }
 
+-- Run the inner action to find out its free variables and then
+-- check whether the variables we bound are actually used.
+-- If none of them are used and -Wwarn-redundant-record-wildcards is
+-- enabled then we issue a warning.
+checkUnusedRecordWildcard :: SDoc
+                          -> SrcSpan
+                          -> Maybe [(LHsRecField GhcRn arg, Name)]
+                          -> CpsRn [LHsRecField GhcRn arg]
+checkUnusedRecordWildcard _ _ Nothing = return []
+checkUnusedRecordWildcard fix_doc loc (Just [])  = do
+  -- Add a new warning if the .. pattern binds no variables
+  liftCps . setSrcSpan loc $
+              whenWOptM Opt_WarnRedundantRecordWildcards
+                (addWarn (Reason Opt_WarnRedundantRecordWildcards)
+                         (redundantWildcardErr fix_doc))
+  return []
+checkUnusedRecordWildcard fix_doc loc (Just dds) =
+  let (res, dotdot_names) = unzip dds
+  in CpsRn (\thing -> do
+                    (r, fvs) <- thing res
+                    -- Check if any of the bound variables are used. We
+                    -- warn if none of them are used.
+                    setSrcSpan loc $
+                      warnUnusedRecordWildcard fix_doc dotdot_names fvs
+                    return (r, fvs) )
+
 --------------------
 rnHsRecPatsAndThen :: NameMaker
                    -> Located Name      -- Constructor
@@ -536,20 +565,41 @@ rnHsRecPatsAndThen :: NameMaker
                    -> CpsRn (HsRecFields GhcRn (LPat GhcRn))
 rnHsRecPatsAndThen mk (dL->L _ con)
      hs_rec_fields@(HsRecFields { rec_dotdot = dd })
-  = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
+  = do { (flds, mdd_fls) <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
                                             hs_rec_fields
-       ; flds' <- mapM rn_field (flds `zip` [1..])
-       ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
+       ; flds' <- mapM rn_field flds
+       ; mdd_fls' <- traverse (mapM rn_dot_dot_fl) mdd_fls
+       ; dd_fls' <- check_unused_wildcard mdd_fls'
+       ; return (HsRecFields { rec_flds = flds' ++ dd_fls', rec_dotdot = dd }) }
   where
+    -- Reconstruct the ConPat without the ..
+    -- We print the parsed syntax rather than renamed syntax as that seemed
+    -- a bit safer to me.
+    fix_doc = ppr (ConPatIn (noLoc (getRdrName con))
+                            (RecCon (hs_rec_fields { rec_dotdot = Nothing })))
+
+    loc = maybe noSrcSpan getLoc dd
+
+    -- Don't warn for let P{..} = ... in ...
+    check_unused_wildcard = case mk of
+                              LetMk{} -> return . maybe [] (map fst)
+                              LamMk{} -> checkUnusedRecordWildcard fix_doc loc
+
     mkVarPat l n = VarPat noExt (cL l n)
-    rn_field (dL->L l fld, n') =
-      do { arg' <- rnLPatAndThen (nested_mk dd mk n') (hsRecFieldArg fld)
+    rn_field (dL->L l fld) =
+      do { arg' <- rnLPatAndThen mk (hsRecFieldArg fld)
          ; return (cL l (fld { hsRecFieldArg = arg' })) }
 
+    rn_dot_dot_fl fl = do
+      let arg_rdr = mkVarUnqual (flLabel fl)
+      name <- newPatName (nested_mk mk) (cL loc arg_rdr)
+      let e = VarPat noExt (cL loc name)
+          rec_field = mkDotDotHsRecField loc (\_ _ -> e) fl
+      return (rec_field, name)
+
         -- Suppress unused-match reporting for fields introduced by ".."
-    nested_mk Nothing  mk                    _  = mk
-    nested_mk (Just _) mk@(LetMk {})         _  = mk
-    nested_mk (Just n) (LamMk report_unused) n' = LamMk (report_unused && (n' <= n))
+    nested_mk mk@(LetMk {}) = mk
+    nested_mk (LamMk {})    = LamMk False
 
 {-
 ************************************************************************
@@ -564,13 +614,43 @@ data HsRecFieldContext
   | HsRecFieldPat Name
   | HsRecFieldUpd
 
-rnHsRecFields
+rnHsRecFieldsExpr
     :: forall arg. HasSrcSpan arg =>
        HsRecFieldContext
     -> (SrcSpan -> RdrName -> SrcSpanLess arg)
          -- When punning, use this to build a new field
     -> HsRecFields GhcPs arg
     -> RnM ([LHsRecField GhcRn arg], FreeVars)
+rnHsRecFieldsExpr ctxt mk_arg fs = do
+  ((r, mdot_fls), fvs) <- rnHsRecFields ctxt mk_arg fs
+  loc <- getSrcSpanM
+  let dot_fls = fromMaybe [] mdot_fls
+      mk_dd fl = mkDotDotHsRecField loc mk_arg fl
+  return (r ++ (map mk_dd dot_fls), fvs)
+
+mkDotDotHsRecField :: HasSrcSpan arg
+                   => SrcSpan
+                   -> (SrcSpan -> RdrName -> SrcSpanLess arg)
+                   -> FieldLabel
+                   -> LHsRecField GhcRn arg
+mkDotDotHsRecField loc mk_arg fl =
+  cL loc (HsRecField
+    { hsRecFieldLbl = cL loc (FieldOcc sel (cL loc arg_rdr))
+    , hsRecFieldArg = cL loc (mk_arg loc arg_rdr)
+    , hsRecPun      = False })
+  where
+    sel     = flSelector fl
+    arg_rdr = mkVarUnqual (flLabel fl)
+
+-- The FieldLabels we need to make names for are returned as they are treated
+-- differently to normal record fields when renaming patterns.
+rnHsRecFields
+    :: forall arg. HasSrcSpan arg =>
+       HsRecFieldContext
+    -> (SrcSpan -> RdrName -> SrcSpanLess arg)
+         -- When punning, use this to build a new field
+    -> HsRecFields GhcPs arg
+    -> RnM (([LHsRecField GhcRn arg], Maybe [FieldLabel]), FreeVars)
 
 -- This surprisingly complicated pass
 --   a) looks up the field name (possibly using disambiguation)
@@ -587,10 +667,11 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
        ; flds1  <- mapM (rn_fld pun_ok parent) flds
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
-       ; let all_flds | null dotdot_flds = flds1
-                      | otherwise        = flds1 ++ dotdot_flds
-       ; return (all_flds, mkFVs (getFieldIds all_flds)) }
+       ; let all_flds_names = getFieldIds flds1 ++ maybe [] (map flSelector)
+                                                            dotdot_flds
+       ; return ((flds1, dotdot_flds), mkFVs all_flds_names) }
   where
+
     mb_con = case ctxt of
                 HsRecFieldCon con  -> Just con
                 HsRecFieldPat con  -> Just con
@@ -622,19 +703,18 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                 -- due to #15884
 
 
-    rn_dotdot :: Maybe Int      -- See Note [DotDot fields] in HsPat
+    rn_dotdot :: Maybe (Located Int)      -- See Note [DotDot fields] in HsPat
               -> Maybe Name -- The constructor (Nothing for an
                                 --    out of scope constructor)
               -> [LHsRecField GhcRn arg] -- Explicit fields
-              -> RnM [LHsRecField GhcRn arg]   -- Filled in .. fields
-    rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
+              -> RnM (Maybe [FieldLabel])   -- Field Labels we need to fill in
+    rn_dotdot (Just (unLoc -> n)) (Just con) flds -- ".." on record construction / pat match
       | not (isUnboundName con) -- This test is because if the constructor
                                 -- isn't in scope the constructor lookup will add
                                 -- an error but still return an unbound name. We
                                 -- don't want that to screw up the dot-dot fill-in stuff.
       = ASSERT( flds `lengthIs` n )
-        do { loc <- getSrcSpanM -- Rather approximate
-           ; dd_flag <- xoptM LangExt.RecordWildCards
+        do { dd_flag <- xoptM LangExt.RecordWildCards
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs
            ; con_fields <- lookupConstructorFields con
@@ -660,16 +740,11 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                     _other           -> True ]
 
            ; addUsedGREs dot_dot_gres
-           ; return [ cL loc (HsRecField
-                        { hsRecFieldLbl = cL loc (FieldOcc sel (cL loc arg_rdr))
-                        , hsRecFieldArg = cL loc (mk_arg loc arg_rdr)
-                        , hsRecPun      = False })
-                    | fl <- dot_dot_fields
-                    , let sel     = flSelector fl
-                    , let arg_rdr = mkVarUnqual (flLabel fl) ] }
+           ; return (Just dot_dot_fields)
+          }
 
     rn_dotdot _dotdot _mb_con _flds
-      = return []
+      = return Nothing
       -- _dotdot = Nothing => No ".." at all
       -- _mb_con = Nothing => Record update
       -- _mb_con = Just unbound => Out of scope data constructor
@@ -786,6 +861,11 @@ dupFieldErr ctxt dups
   = hsep [text "duplicate field name",
           quotes (ppr (NE.head dups)),
           text "in record", pprRFC ctxt]
+
+redundantWildcardErr :: SDoc -> SDoc
+redundantWildcardErr fix_doc
+  = text "Record wildcard does not bind any new variables"
+    $$ nest 2 (text "Possible fix" <> colon <+> fix_doc)
 
 pprRFC :: HsRecFieldContext -> SDoc
 pprRFC (HsRecFieldCon {}) = text "construction"
