@@ -62,6 +62,11 @@ typedef
         }
    SectionAlloc;
 
+typedef enum {
+    SEGMENT_PROT_RX,
+    SEGMENT_PROT_RW
+} SegmentProt;
+
 /*
  * Note [No typedefs for customizable types]
  * Some pointer-to-struct types are defined opaquely
@@ -102,6 +107,18 @@ typedef
       struct _ProddableBlock* next;
    }
    ProddableBlock;
+
+typedef struct _Segment {
+    void *start;                /* page aligned start address of a segment */
+    size_t size;                /* page rounded size of a segment */
+    SegmentProt prot;           /* mem protection to set after all symbols were
+                                 * resolved */
+
+    int *sections_idx;       /* an array of section indexes assigned to this segment */
+    int n_sections;
+} Segment;
+
+/* todo (AP): add freeSegments */
 
 /*
  * We must keep track of the StablePtrs that are created for foreign
@@ -179,8 +196,13 @@ typedef struct _ObjectCode {
 
     /* The section-kind entries for this object module.  Linked
        list. */
+    /* fixme (AP): doesn't look like a linked list. On MachO it's an array, and
+     * generally Section struct doesn't have pointers to next. */
     int n_sections;
     Section* sections;
+
+    int n_segments;
+    Segment *segments;
 
     /* Allow a chain of these things */
     struct _ObjectCode * next;
@@ -311,6 +333,9 @@ ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
                   bool mapped, char *archiveMemberName,
                   int misalignment
                   );
+
+void initSegment(Segment *s, void *start, size_t size, SegmentProt prot, int n_sections);
+void freeSegments(ObjectCode *oc);
 
 /* MAP_ANONYMOUS is MAP_ANON on some systems,
    e.g. OS X (before Sierra), OpenBSD etc */
