@@ -58,8 +58,6 @@ stage0Packages = do
     cross <- flag CrossCompiling
     return $ [ binary
              , cabal
-             , checkApiAnnotations
-             , checkPpr
              , compareSizes
              , compiler
              , deriveConstants

@@ -59,7 +59,6 @@ runTestBuilderArgs = builder RunTest ? do
             | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
 
     testGhc <- expr (testCompiler <$> userSetting defaultTestArgs)
-    flav    <- expr flavour
     rtsWays <- expr testRTSSettings
     libWays <- expr (inferLibraryWays testGhc)
     let hasRtsWay w = elem w rtsWays
