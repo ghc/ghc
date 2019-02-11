@@ -7,12 +7,15 @@ def junit(t):
                               id = "0",
                               package = 'ghc',
                               tests = str(t.total_tests),
-                              failures = str(len(t.unexpected_failures) + len(t.unexpected_stat_failures)),
+                              failures = str(len(t.unexpected_failures)
+                                             + len(t.unexpected_stat_failures)
+                                             + len(t.unexpected_passes)),
                               errors = str(len(t.framework_failures)),
                               timestamp = datetime.now().isoformat())
 
     for res_type, group in [('stat failure', t.unexpected_stat_failures),
-                          ('unexpected failure', t.unexpected_failures)]:
+                            ('unexpected failure', t.unexpected_failures),
+                            ('unexpected_passes', t.unexpected_passes)]:
         for tr in group:
             testcase = ET.SubElement(testsuite, 'testcase',
                                      classname = tr.way,
