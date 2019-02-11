@@ -1,5 +1,10 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.16.0.0 *TBA*
+
+  * Introduce a `liftTyped` method to the `Lift` class and set the default
+    implementations of `lift`/`liftTyped` to be in terms of each other.
+
 ## 2.15.0.0 *TBA*
 
   * In `Language.Haskell.TH.Syntax`, `DataInstD`, `NewTypeInstD`, `TySynEqn`,
