@@ -20,6 +20,9 @@
 
   * Add `Lift` instances for `NonEmpty` and `Void`
 
+  * Introduce a `liftTyped` method to the `Lift` class and set the default
+    implementations of `lift`/`liftTyped` to be in terms of each other.
+
 ## 2.14.0.0 *TBA*
 
   * Introduce an `addForeignFilePath` function, as well as a corresponding
