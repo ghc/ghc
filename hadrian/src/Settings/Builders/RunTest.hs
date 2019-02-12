@@ -147,7 +147,7 @@ getTestArgs = do
                            else Nothing
         speedArg     = ["-e", "config.speed=" ++ setTestSpeed (testSpeed args)]
         summaryArg   = case testSummary args of
-                           Just filepath -> Just $ "--summary-file \"" ++ filepath ++ "\""
+                           Just filepath -> Just $ "--summary-file " ++ show filepath
                            Nothing -> Just $ "--summary-file=testsuite_summary.txt"
         junitArg     = case testJUnit args of
                            Just filepath -> Just $ "--junit=" ++ filepath
@@ -177,6 +177,28 @@ setTestSpeed TestSlow   = "0"
 setTestSpeed TestNormal = "1"
 setTestSpeed TestFast   = "2"
 
+
+-- | The purpose of this function is, given a compiler
+--   (stage 1, 2, 3 or an external one), to infer the ways
+--   that the libraries have been built in.
+--
+--   While we have this data readily available for in-tree compilers
+--   that we build (through the 'Flavour'), that is not the case for
+--   out-of-tree compilers that we may want to test, as is the case when
+--   we are running './validate --hadrian' (it packages up a binary
+--   distribution, installs it somewhere near and tests it).
+--
+--   We therefore proceed in a way that works regardless of whether we are
+--   dealing with an in-tree compiler or not: we ask the GHC's install
+--   ghc-pkg to give us the library directory of its @ghc-prim@ package and
+--   look at what ways are available for the interface file of the
+--   @GHC.PrimopWrappers@ module, like the Make build system does in
+--   @testsuite\/mk\/test.mk@ to compute @HAVE_DYNAMIC@, @HAVE_VANILLA@
+--   and @HAVE_PROFILING@:
+--
+--   - if we find @PrimopWrappers.hi@, we have the vanilla way;
+--   - if we find @PrimopWrappers.dyn_hi@, we have the dynamic way;
+--   - if we find @PrimopWrappers.p_hi@, we have the profiling way.
 inferLibraryWays :: String -> Action [Way]
 inferLibraryWays compiler = do
   bindir <- getBinaryDirectory compiler
