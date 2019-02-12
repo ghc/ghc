@@ -11,10 +11,22 @@ Highlights
 
 The highlights, since the 8.6.3 release, are:
 
+- Inconsistencies between the versions of ``transformers`` and ``process``
+  shipped with the compiler and those present on Hackage have been resolved
+  (:ghc-ticket:`16199`).
 - A patch fixing a set of linker failures on Windows has been reverted as it unfortunately caused 
   (:ghc-ticket:`15105`, :ghc-ticket:`15894`, :ghc-ticket:`15934`)
 - A bug wherein changes in default method definitions would fail to trigger
   recompilation has been fixed (:ghc-ticket:`15970`).
+- A bug wherein plugins would fail to lookup names not in scope in the module
+  being compiled has been fixed (:ghc-ticket:`16104`)
+- A bug resulting in hangs during RTS shutdown on Darwin has been resolved
+  (:ghc-ticket:`16150`)
+- A bug where some programs involving :extension:`StaticData` would be rejected
+  with either a typechecking error or internal compiler error has been fixed
+  (:ghc-ticket:`16141`)
+- A bug where compilation on Windows can fail with linker errors referring to
+  ``__chkstk_ms`` has been fixed (:ghc-ticket:`16166`)
 
 Known issues
 ------------
