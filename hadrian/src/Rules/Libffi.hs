@@ -81,10 +81,11 @@ libffiRules =
       root -/- stageString stage -/- "libffi/build/Makefile.in" %> \mkIn -> do
         libffiPath <- libffiBuildPath stage
         removeDirectory libffiPath
+        top <- topDirectory
         tarball <- unifyPath . fromSingleton "Exactly one LibFFI tarball is expected"
-               <$> getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
+               <$> getDirectoryFiles top ["libffi-tarballs/libffi*.tar.gz"]
 
-        need [tarball]
+        need [top -/- tarball]
         -- Go from 'libffi-3.99999+git20171002+77e130c.tar.gz' to 'libffi-3.99999'
         let libname = takeWhile (/= '+') $ takeFileName tarball
 
@@ -93,12 +94,11 @@ libffiRules =
         -- TODO: Simplify.
         actionFinally (do
           build $ target (libffiContext stage) (Tar Extract)
-                                                  [tarball]
+                                                  [top -/- tarball]
                                                   [root -/- stageString stage]
           moveDirectory (root -/- stageString stage -/- libname) libffiPath)  $
             removeFiles (root -/- stageString stage) [libname <//> "*"]
 
-        top <- topDirectory
         fixFile mkIn (fixLibffiMakefile top)
 
       -- TODO: Get rid of hard-coded @libffi@.
