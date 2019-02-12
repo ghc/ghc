@@ -452,6 +452,7 @@ void updateRemembSetPushThunkEager(Capability *cap,
     }
     case THUNK_SELECTOR:
     case BLACKHOLE:
+    case WHITEHOLE:
         // TODO: This is right, right?
         break;
     default:
