@@ -144,10 +144,7 @@ tcRnExports explicit_mod exports
         ; has_main <- lookupGlobalOccRn_maybe default_main >>= return . isJust
         -- If the module has no explicit header, and it has a main function,
         -- then we add a header like "module Main(main) where ..." (#13839)
-<<<<<<< HEAD
         -- See Note [Modules without a module header]
-=======
->>>>>>> 9ddb9ed3f1d060bfa377bc674ef1944da75dcdf4
         ; let real_exports
                  | explicit_mod = exports
                  | has_main
