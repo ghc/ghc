@@ -20,6 +20,20 @@ ghcConfigHsPath = "testsuite/mk/ghc-config.hs"
 ghcConfigProgPath :: FilePath
 ghcConfigProgPath = "test/bin/ghc-config"
 
+checkPprProgPath, checkPprSourcePath :: FilePath
+checkPprProgPath = "test/bin/check-ppr"
+checkPprSourcePath = "utils/check-ppr/Main.hs"
+
+checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath :: FilePath
+checkApiAnnotationsProgPath = "test/bin/check-api-annotations"
+checkApiAnnotationsSourcePath = "utils/check-api-annotations/Main.hs"
+
+checkPrograms :: [(FilePath, FilePath)]
+checkPrograms =
+    [ (checkPprProgPath, checkPprSourcePath)
+    , (checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath)
+    ]
+
 ghcConfigPath :: FilePath
 ghcConfigPath = "test/ghcconfig"
 
@@ -33,6 +47,19 @@ testRules = do
         ghc0Path <- getCompilerPath "stage0"
         createDirectory $ takeDirectory (root -/- ghcConfigProgPath)
         cmd ghc0Path [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
+
+    -- Rules for building check-ppr and check-ppr-annotations with the compiler
+    -- we are going to test (in-tree or out-of-tree).
+    forM_ checkPrograms $ \(progPath, sourcePath) ->
+        root -/- progPath %> \path -> do
+            testGhc <- testCompiler <$> userSetting defaultTestArgs
+            top <- topDirectory
+            when (testGhc `elem` ["stage1", "stage2", "stage3"]) $ do
+                let stg = stageOf testGhc
+                need . (:[]) =<< programPath (Context stg ghc vanilla)
+            bindir <- getBinaryDirectory testGhc
+            cmd [Cwd bindir] ("./ghc"++exe)
+                ["-package", "ghc", "-o", top -/- path, top -/- sourcePath]
 
     root -/- ghcConfigPath %> \_ -> do
         args <- userSetting defaultTestArgs
@@ -72,10 +99,8 @@ testRules = do
               , "-fno-ghci-history"
               ]
 
-        checkPprPath    <- needFile Stage0 checkPpr
-        annotationsPath <- needFile Stage0 checkApiAnnotations
         pythonPath      <- builderPath Python
-        need [ checkPprPath, annotationsPath ]
+        need [ root -/- checkPprProgPath, root -/- checkApiAnnotationsProgPath ]
 
         -- Set environment variables for test's Makefile.
         -- TODO: Ideally we would define all those env vars in 'env', so that
@@ -87,8 +112,9 @@ testRules = do
             setEnv "TEST_HC" ghcPath
             setEnv "TEST_HC_OPTS" ghcFlags
             setEnv "TEST_HC_OPTS_INTERACTIVE" ghciFlags
-            setEnv "CHECK_PPR" (top -/- checkPprPath)
-            setEnv "CHECK_API_ANNOTATIONS" (top -/- annotationsPath)
+            setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
+            setEnv "CHECK_API_ANNOTATIONS"
+                   (top -/- root -/- checkApiAnnotationsProgPath)
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
