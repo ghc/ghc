@@ -203,7 +203,7 @@ inferLibraryWays :: String -> Action [Way]
 inferLibraryWays compiler = do
   bindir <- getBinaryDirectory compiler
   Stdout ghcPrimLibdirDirty <- cmd [Cwd bindir]
-    ("./ghc-pkg")
+    ("./ghc-pkg"++exe)
     ["field", "ghc-prim", "library-dirs", "--simple-output"]
   let ghcPrimLibdir = fixup ghcPrimLibdirDirty
   ways <- catMaybes <$> traverse (lookForWay ghcPrimLibdir) candidateWays
