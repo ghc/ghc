@@ -418,6 +418,7 @@ void updateRemembSetPushThunkEager(Capability *cap,
                                   const StgThunkInfoTable *info,
                                   StgThunk *thunk)
 {
+retry:
     switch (info->i.type) {
     case THUNK:
     case THUNK_1_0:
@@ -452,9 +453,10 @@ void updateRemembSetPushThunkEager(Capability *cap,
     }
     case THUNK_SELECTOR:
     case BLACKHOLE:
-    case WHITEHOLE:
         // TODO: This is right, right?
         break;
+    case WHITEHOLE:
+        goto retry;
     default:
         barf("updateRemembSetPushThunk: invalid thunk pushed: p=%p, type=%d",
              thunk, info->i.type);
