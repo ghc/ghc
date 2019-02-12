@@ -31,7 +31,9 @@ data Flavour = Flavour {
     -- | Build profiled GHC.
     ghcProfiled :: Bool,
     -- | Build GHC with debug information.
-    ghcDebugged :: Bool }
+    ghcDebugged :: Bool,
+    -- | Build and embed doc into the bindist
+    bindistEmbedDoc :: Bool }
 
 
 -- | Turn on -Werror for packages built with the stage1 compiler.
