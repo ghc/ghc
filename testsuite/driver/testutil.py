@@ -64,7 +64,7 @@ def lndir(srcdir, dstdir):
 #
 # We define the following function to make this magic more
 # explicit/discoverable. You are enouraged to use it instead of os.symlink.
-if platform.system() == 'Windows':
+if platform.system() == 'Windows' and os.getenv('FORCE_SYMLINKS') == None:
     link_or_copy_file = shutil.copyfile
 else:
     link_or_copy_file = os.symlink
