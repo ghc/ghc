@@ -98,7 +98,7 @@ default ()
 -- TODO: Note that some functions have commented CONSTANT_FOLDED annotations,
 -- that's because the Integer counter-parts of these functions do actually have
 -- a builtinRule in PrelRules, where the Natural functions do not. The plan is
--- to eventually also add builtin rules for those function on Natural.
+-- to eventually also add builtin rules for those functions on Natural.
 #define CONSTANT_FOLDED NOINLINE
 
 -------------------------------------------------------------------------------
@@ -188,7 +188,7 @@ gcdNatural (NatJ# x) (NatS# y) = NatS# (gcdBigNatWord x y)
 gcdNatural (NatS# x) (NatJ# y) = NatS# (gcdBigNatWord y x)
 gcdNatural (NatS# x) (NatS# y) = NatS# (gcdWord x y)
 
--- | compute least common multiplier.
+-- | Compute least common multiple.
 lcmNatural :: Natural -> Natural -> Natural
 lcmNatural (NatS# 0##) _ = NatS# 0##
 lcmNatural _ (NatS# 0##) = NatS# 0##
