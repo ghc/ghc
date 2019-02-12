@@ -644,6 +644,14 @@ mkDotDotHsRecField loc mk_arg fl =
 
 -- The FieldLabels we need to make names for are returned as they are treated
 -- differently to normal record fields when renaming patterns.
+--
+-- The first list is the renamed, explicitly written patterns in a record
+-- match. For example, Foo{x = y, a = b}.
+--
+-- The elements in the second list are the `FieldLabel`s of the implicitly
+-- bound variables introduced by the .. of record wildcards. It is Nothing
+-- when there is no .., otherwise it is all the implicit names we need to
+-- bind.
 rnHsRecFields
     :: forall arg. HasSrcSpan arg =>
        HsRecFieldContext
