@@ -335,6 +335,7 @@ threadPaused(Capability *cap, StgTSO *tso)
                 // We are about to replace a thunk with a blackhole.
                 // Add the free variables of the closure we are about to
                 // overwrite to the update remembered set.
+                // N.B. We caught the WHITEHOLE case above.
                 updateRemembSetPushThunkEager(cap,
                                              THUNK_INFO_PTR_TO_STRUCT(bh_info),
                                              (StgThunk *) bh);

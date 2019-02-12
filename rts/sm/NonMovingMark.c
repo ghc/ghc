@@ -410,15 +410,18 @@ void updateRemembSetPushThunk(Capability *cap, StgThunk *thunk)
 {
     // TODO: Eliminate this conditional once it's folded into codegen
     if (!nonmoving_write_barrier_enabled) return;
-    const StgThunkInfoTable *info = get_thunk_itbl((StgClosure*)thunk);
-    updateRemembSetPushThunkEager(cap, info, thunk);
+    const StgInfoTable *info;
+    do {
+        info = get_volatile_itbl((StgClosure *) thunk);
+    } while (info->type == WHITEHOLE);
+    updateRemembSetPushThunkEager(cap, (StgThunkInfoTable *) info, thunk);
 }
 
 void updateRemembSetPushThunkEager(Capability *cap,
                                   const StgThunkInfoTable *info,
                                   StgThunk *thunk)
 {
-retry:
+    /* N.B. info->i.type mustn't be WHITEHOLE */
     switch (info->i.type) {
     case THUNK:
     case THUNK_1_0:
@@ -455,8 +458,6 @@ retry:
     case BLACKHOLE:
         // TODO: This is right, right?
         break;
-    case WHITEHOLE:
-        goto retry;
     default:
         barf("updateRemembSetPushThunk: invalid thunk pushed: p=%p, type=%d",
              thunk, info->i.type);
@@ -1348,8 +1349,7 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
     }
 
     case WHITEHOLE:
-        while (get_itbl(p)->type == WHITEHOLE);
-            // busy_wait_nop(); // FIXME
+        while (get_volatile_itbl(p)->type == WHITEHOLE);
         goto try_again;
 
     default:
