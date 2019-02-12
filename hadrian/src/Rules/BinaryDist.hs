@@ -9,6 +9,7 @@ import Packages
 import Settings
 import Target
 import Utilities
+import Flavour
 
 {-
 Note [Binary distributions]
@@ -113,8 +114,12 @@ bindistRules = do
         copyDirectory (ghcBuildDir -/- "bin") bindistFilesDir
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
-        need ["docs"]
-        copyDirectory (root -/- "docs") bindistFilesDir
+
+        -- We generate and copy docs if necessary
+        needDocs <- bindistIncludeDoc <$> flavour
+        when needDocs $ do
+            need ["docs"]
+            copyDirectory (root -/- "docs") bindistFilesDir
 
         -- We copy the binary (<build root>/stage1/bin/haddock) to
         -- the bindist's bindir (<build root>/bindist/ghc-.../bin/).
@@ -150,8 +155,9 @@ bindistRules = do
         moveFile (ghcRoot -/- "distrib" -/- "configure") configurePath
 
     -- Generate the Makefile that enables the "make install" part
-    root -/- "bindist" -/- "ghc-*" -/- "Makefile" %> \makefilePath ->
-        writeFile' makefilePath bindistMakefile
+    root -/- "bindist" -/- "ghc-*" -/- "Makefile" %> \makefilePath -> do
+        needDocs <- bindistIncludeDoc <$> flavour
+        writeFile' makefilePath (bindistMakefile needDocs)
 
     root -/- "bindist" -/- "ghc-*" -/- "wrappers/*" %> \wrapperPath ->
         writeFile' wrapperPath $ wrapper (takeFileName wrapperPath)
@@ -190,8 +196,8 @@ pkgTarget pkg
 -- bindist scripts support.
 -- | A trivial Makefile that only takes @$prefix@ into account, and not e.g
 -- @$datadir@ (for docs) and other variables, yet.
-bindistMakefile :: String
-bindistMakefile = unlines
+bindistMakefile :: Bool -> String
+bindistMakefile needDocs = unlines
     [ "MAKEFLAGS += --no-builtin-rules"
     , ".SUFFIXES:"
     , ""
@@ -245,8 +251,12 @@ bindistMakefile = unlines
     , "# $1 = package name (ex: 'bytestring')"
     , "# $2 = path to .conf file"
     , "# $3 = Docs Directory"
-    , "\tcat $2 | sed 's|haddock-interfaces.*|haddock-interfaces: $3/html/libraries/$1/$1.haddock|' \\"
-    , "\t       | sed 's|haddock-html.*|haddock-html: $3/html/libraries/$1|' \\"
+    , if needDocs
+      then "\tcat $2 | sed 's|haddock-interfaces.*|haddock-interfaces: $3/html/libraries/$1/$1.haddock|' \\"
+      else "\tcat $2 | sed 's|haddock-interfaces.*|haddock-interfaces:|' \\"
+    , if needDocs
+      then "\t       | sed 's|haddock-html.*|haddock-html: $3/html/libraries/$1|' \\"
+      else "\t       | sed 's|haddock-html.*|haddock-html:|' \\"
     , "\t       > $2.copy"
     , "\tmv $2.copy $2"
     , "endef"
