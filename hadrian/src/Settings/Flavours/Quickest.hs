@@ -12,7 +12,8 @@ quickestFlavour = defaultFlavour
     , args        = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
     , libraryWays = pure [vanilla]
     , rtsWays     = pure [vanilla, threaded]
-    , dynamicGhcPrograms = return False }
+    , dynamicGhcPrograms = return False
+    , bindistEmbedDoc = False }
 
 quickestArgs :: Args
 quickestArgs = sourceArgs SourceArgs

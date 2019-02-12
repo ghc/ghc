@@ -206,3 +206,22 @@ information. The following table lists ways that are built in different flavours
     <td>No</td>
 </tr>
 </table>
+
+## Documentation
+
+Documentation may or may not be built and embedded into binary distribution.
+
+<table>
+  <tr>
+    <th>Flavour</th>
+    <th>Build and embed documentation</th>
+  </tr>
+  <tr>
+    <td>Quickest</td>
+    <td>False</td>
+  </tr>
+  <tr>
+    <td>*</td>
+    <td>True</td>
+  </tr>
+</table>

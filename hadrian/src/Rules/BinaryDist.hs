@@ -9,6 +9,7 @@ import Packages
 import Settings
 import Target
 import Utilities
+import Flavour
 
 {-
 Note [Binary distributions]
@@ -113,8 +114,12 @@ bindistRules = do
         copyDirectory (ghcBuildDir -/- "bin") bindistFilesDir
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
-        need ["docs"]
-        copyDirectory (root -/- "docs") bindistFilesDir
+
+        -- We generate and copy docs if necessary
+        needDocs <- bindistEmbedDoc <$> flavour
+        when needDocs $ do
+            need ["docs"]
+            copyDirectory (root -/- "docs") bindistFilesDir
 
         -- We copy the binary (<build root>/stage1/bin/haddock) to
         -- the bindist's bindir (<build root>/bindist/ghc-.../bin/).

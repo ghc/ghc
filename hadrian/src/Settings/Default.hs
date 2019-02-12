@@ -222,7 +222,8 @@ defaultFlavour = Flavour
     , dynamicGhcPrograms = defaultDynamicGhcPrograms
     , ghciWithDebugger   = False
     , ghcProfiled        = False
-    , ghcDebugged        = False }
+    , ghcDebugged        = False
+    , bindistEmbedDoc    = True }
 
 -- | Default logic for determining whether to build
 --   dynamic GHC programs.
