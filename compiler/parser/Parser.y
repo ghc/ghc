@@ -1060,7 +1060,7 @@ topdecl :: { LHsDecl GhcPs }
         -- The $(..) form is one possible form of infixexp
         -- but we treat an arbitrary expression just as if
         -- it had a $(..) wrapped around it
-        | infixexp_top                          { sLL $1 $> $ mkSpliceDecl $1 }
+        | infixexp_top                          { sLL $1 $> $ mkSpliceDecl (checkExpr $1) }
 
 -- Type classes
 --
@@ -1648,7 +1648,7 @@ rule    :: { LRuleDecl GhcPs }
                                    , rd_name = cL (gl $1) (getSTRINGs $1, getSTRING $1)
                                    , rd_act = (snd $2) `orElse` AlwaysActive
                                    , rd_tyvs = sndOf3 $3, rd_tmvs = thdOf3 $3
-                                   , rd_lhs = $4, rd_rhs = $6 })
+                                   , rd_lhs = checkExpr $4, rd_rhs = checkExpr $6 })
                (mj AnnEqual $5 : (fst $2) ++ (fstOf3 $3)) }
 
 -- Rules can be specified to be NeverActive, unlike inline/specialize pragmas
@@ -1755,17 +1755,17 @@ stringlist :: { Located (OrdList (Located StringLiteral)) }
 annotation :: { LHsDecl GhcPs }
     : '{-# ANN' name_var aexp '#-}'      {% ams (sLL $1 $> (AnnD noExt $ HsAnnotation noExt
                                             (getANN_PRAGs $1)
-                                            (ValueAnnProvenance $2) $3))
+                                            (ValueAnnProvenance $2) (checkExpr $3)))
                                             [mo $1,mc $4] }
 
     | '{-# ANN' 'type' tycon aexp '#-}'  {% ams (sLL $1 $> (AnnD noExt $ HsAnnotation noExt
                                             (getANN_PRAGs $1)
-                                            (TypeAnnProvenance $3) $4))
+                                            (TypeAnnProvenance $3) (checkExpr $4)))
                                             [mo $1,mj AnnType $2,mc $5] }
 
     | '{-# ANN' 'module' aexp '#-}'      {% ams (sLL $1 $> (AnnD noExt $ HsAnnotation noExt
                                                 (getANN_PRAGs $1)
-                                                 ModuleAnnProvenance $3))
+                                                 ModuleAnnProvenance (checkExpr $3)))
                                                 [mo $1,mj AnnModule $2,mc $4] }
 
 
@@ -2373,7 +2373,7 @@ docdecld :: { LDocDecl }
 decl_no_th :: { LHsDecl GhcPs }
         : sigdecl               { $1 }
 
-        | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR noExt (sL1 $1 (HsVar noExt (sL1 $1 bang_RDR))) $2)
+        | '!' aexp rhs          {% do { let { e = sLL $1 $2 (FrameSectionR (sL1 $1 (FrameVar bang_RDR)) $2)
                                             ; l = comb2 $1 $> };
                                         (ann, r) <- checkValDef empty SrcStrict e Nothing $3 ;
                                         hintBangPat (comb2 $1 $2) (unLoc e) ;
@@ -2410,23 +2410,23 @@ decl    :: { LHsDecl GhcPs }
         -- Why do we only allow naked declaration splices in top-level
         -- declarations and not here? Short answer: because readFail009
         -- fails terribly with a panic in cvBindsAndSigs otherwise.
-        | splice_exp            { sLL $1 $> $ mkSpliceDecl $1 }
+        | splice_exp            { sLL $1 $> $ mkSpliceDecl (checkExpr $1) }
 
-rhs     :: { Located ([AddAnn],GRHSs GhcPs (LHsExpr GhcPs)) }
+rhs     :: { Located ([AddAnn],FrameGRHSs) }
         : '=' exp wherebinds    { sL (comb3 $1 $2 $3)
                                     ((mj AnnEqual $1 : (fst $ unLoc $3))
-                                    ,GRHSs noExt (unguardedRHS (comb3 $1 $2 $3) $2)
+                                    ,FrameGRHSs (unguardedFrameRHS (comb3 $1 $2 $3) $2)
                                    (snd $ unLoc $3)) }
         | gdrhs wherebinds      { sLL $1 $>  (fst $ unLoc $2
-                                    ,GRHSs noExt (reverse (unLoc $1))
+                                    ,FrameGRHSs (reverse (unLoc $1))
                                                     (snd $ unLoc $2)) }
 
-gdrhs :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
+gdrhs :: { Located [LFrameGRHS] }
         : gdrhs gdrh            { sLL $1 $> ($2 : unLoc $1) }
         | gdrh                  { sL1 $1 [$1] }
 
-gdrh :: { LGRHS GhcPs (LHsExpr GhcPs) }
-        : '|' guardquals '=' exp  {% ams (sL (comb2 $1 $>) $ GRHS noExt (unLoc $2) $4)
+gdrh :: { LFrameGRHS }
+        : '|' guardquals '=' exp  {% ams (sL (comb2 $1 $>) $ FrameGRHS (unLoc $2) $4)
                                          [mj AnnVbar $1,mj AnnEqual $3] }
 
 sigdecl :: { LHsDecl GhcPs }
@@ -2525,59 +2525,59 @@ quasiquote :: { Located (HsSplice GhcPs) }
                                 ; quoterId = mkQual varName (qual, quoter) }
                             in sL (getLoc $1) (mkHsQuasiQuote quoterId (RealSrcSpan quoteSpan) quote) }
 
-exp   :: { LHsExpr GhcPs }
-        : infixexp '::' sigtype {% ams (sLL $1 $> $ ExprWithTySig noExt $1 (mkLHsSigWcType $3))
+exp   :: { LExpPatFrame }
+        : infixexp '::' sigtype {% ams (sLL $1 $> $ FrameTySig $1 (mkLHsSigWcType $3))
                                        [mu AnnDcolon $2] }
-        | infixexp '-<' exp     {% ams (sLL $1 $> $ HsArrApp noExt $1 $3
+        | infixexp '-<' exp     {% ams (sLL $1 $> $ FrameArrApp $1 $3
                                                         HsFirstOrderApp True)
                                        [mu Annlarrowtail $2] }
-        | infixexp '>-' exp     {% ams (sLL $1 $> $ HsArrApp noExt $3 $1
+        | infixexp '>-' exp     {% ams (sLL $1 $> $ FrameArrApp $3 $1
                                                       HsFirstOrderApp False)
                                        [mu Annrarrowtail $2] }
-        | infixexp '-<<' exp    {% ams (sLL $1 $> $ HsArrApp noExt $1 $3
+        | infixexp '-<<' exp    {% ams (sLL $1 $> $ FrameArrApp $1 $3
                                                       HsHigherOrderApp True)
                                        [mu AnnLarrowtail $2] }
-        | infixexp '>>-' exp    {% ams (sLL $1 $> $ HsArrApp noExt $3 $1
+        | infixexp '>>-' exp    {% ams (sLL $1 $> $ FrameArrApp $3 $1
                                                       HsHigherOrderApp False)
                                        [mu AnnRarrowtail $2] }
         | infixexp              { $1 }
 
-infixexp :: { LHsExpr GhcPs }
+infixexp :: { LExpPatFrame }
         : exp10 { $1 }
-        | infixexp qop exp10  {% ams (sLL $1 $> (OpApp noExt $1 $2 $3))
+        | infixexp qop exp10  {% ams (sLL $1 $> (FrameOpApp $1 $2 $3))
                                      [mj AnnVal $2] }
                  -- AnnVal annotation for NPlusKPat, which discards the operator
 
-infixexp_top :: { LHsExpr GhcPs }
+infixexp_top :: { LExpPatFrame }
             : exp10_top               { $1 }
             | infixexp_top qop exp10_top
                                       {% do { when (srcSpanEnd (getLoc $2)
                                                 == srcSpanStart (getLoc $3)
                                                 && checkIfBang $2) $
                                                 warnSpaceAfterBang (comb2 $2 $3);
-                                              ams (sLL $1 $> (OpApp noExt $1 $2 $3))
+                                              ams (sLL $1 $> (FrameOpApp $1 $2 $3))
                                                    [mj AnnVal $2]
                                             }
                                       }
 
-exp10_top :: { LHsExpr GhcPs }
-        : '-' fexp                      {% ams (sLL $1 $> $ NegApp noExt $2 noSyntaxExpr)
+exp10_top :: { LExpPatFrame }
+        : '-' fexp                      {% ams (sLL $1 $> $ FrameNegApp $2)
                                                [mj AnnMinus $1] }
 
 
-        | hpc_annot exp        {% ams (sLL $1 $> $ HsTickPragma noExt (snd $ fst $ fst $ unLoc $1)
+        | hpc_annot exp        {% ams (sLL $1 $> $ FrameTickPragma (snd $ fst $ fst $ unLoc $1)
                                                                 (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
                                       (fst $ fst $ fst $ unLoc $1) }
 
-        | '{-# CORE' STRING '#-}' exp  {% ams (sLL $1 $> $ HsCoreAnn noExt (getCORE_PRAGs $1) (getStringLiteral $2) $4)
+        | '{-# CORE' STRING '#-}' exp  {% ams (sLL $1 $> $ FrameCoreAnn (getCORE_PRAGs $1) (getStringLiteral $2) $4)
                                               [mo $1,mj AnnVal $2
                                               ,mc $3] }
                                           -- hdaume: core annotation
         | fexp                         { $1 }
 
-exp10 :: { LHsExpr GhcPs }
+exp10 :: { LExpPatFrame }
         : exp10_top            { $1 }
-        | scc_annot exp        {% ams (sLL $1 $> $ HsSCC noExt (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
+        | scc_annot exp        {% ams (sLL $1 $> $ FrameSCC (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
                                       (fst $ fst $ unLoc $1) }
 
 optSemi :: { ([Located Token],Bool) }
@@ -2619,141 +2619,134 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
                                                 )))
                                          }
 
-fexp    :: { LHsExpr GhcPs }
+fexp    :: { LExpPatFrame }
         : fexp aexp                  {% checkBlockArguments $1 >> checkBlockArguments $2 >>
-                                        return (sLL $1 $> $ (HsApp noExt $1 $2)) }
+                                        return (sLL $1 $> $ (FrameApp $1 $2)) }
         | fexp TYPEAPP atype         {% checkBlockArguments $1 >>
-                                        ams (sLL $1 $> $ HsAppType noExt $1 (mkHsWildCardBndrs $3))
+                                        ams (sLL $1 $> $ FrameAppType $1 (mkHsWildCardBndrs $3))
                                             [mj AnnAt $2] }
-        | 'static' aexp              {% ams (sLL $1 $> $ HsStatic noExt $2)
+        | 'static' aexp              {% ams (sLL $1 $> $ FrameStatic $2)
                                             [mj AnnStatic $1] }
         | aexp                       { $1 }
 
-aexp    :: { LHsExpr GhcPs }
-        : qvar '@' aexp         {% ams (sLL $1 $> $ EAsPat noExt $1 $3) [mj AnnAt $2] }
+aexp    :: { LExpPatFrame }
+        : qvar '@' aexp         {% ams (sLL $1 $> $ FrameAsPat $1 $3) [mj AnnAt $2] }
             -- If you change the parsing, make sure to understand
             -- Note [Lexing type applications] in Lexer.x
 
-        | '~' aexp              {% ams (sLL $1 $> $ ELazyPat noExt $2) [mj AnnTilde $1] }
+        | '~' aexp              {% ams (sLL $1 $> $ FrameLazyPat $2) [mj AnnTilde $1] }
 
         | '\\' apat apats '->' exp
-                   {% ams (sLL $1 $> $ HsLam noExt (mkMatchGroup FromSource
-                            [sLL $1 $> $ Match { m_ext = noExt
-                                               , m_ctxt = LambdaExpr
-                                               , m_pats = $2:$3
-                                               , m_grhss = unguardedGRHSs $5 }]))
+                   {% ams (sLL $1 $> $ FrameLam ($2:$3) $5)
                           [mj AnnLam $1, mu AnnRarrow $4] }
-        | 'let' binds 'in' exp          {% ams (sLL $1 $> $ HsLet noExt (snd $ unLoc $2) $4)
+        | 'let' binds 'in' exp          {% ams (sLL $1 $> $ FrameLet (snd $ unLoc $2) $4)
                                                (mj AnnLet $1:mj AnnIn $3
                                                  :(fst $ unLoc $2)) }
         | '\\' 'lcase' altslist
-            {% ams (sLL $1 $> $ HsLamCase noExt
-                                   (mkMatchGroup FromSource (snd $ unLoc $3)))
+            {% ams (sLL $1 $> $ FrameLamCase (snd $ unLoc $3))
                    (mj AnnLam $1:mj AnnCase $2:(fst $ unLoc $3)) }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp
                            {% checkDoAndIfThenElse $2 (snd $3) $5 (snd $6) $8 >>
-                              ams (sLL $1 $> $ mkHsIf $2 $5 $8)
+                              ams (sLL $1 $> $ FrameIf $2 $5 $8)
                                   (mj AnnIf $1:mj AnnThen $4
                                      :mj AnnElse $7
                                      :(map (\l -> mj AnnSemi l) (fst $3))
                                     ++(map (\l -> mj AnnSemi l) (fst $6))) }
         | 'if' ifgdpats                 {% hintMultiWayIf (getLoc $1) >>
-                                           ams (sLL $1 $> $ HsMultiIf noExt
+                                           ams (sLL $1 $> $ FrameMultiIf
                                                      (reverse $ snd $ unLoc $2))
                                                (mj AnnIf $1:(fst $ unLoc $2)) }
         | 'case' exp 'of' altslist      {% ams (cL (comb3 $1 $3 $4) $
-                                                   HsCase noExt $2 (mkMatchGroup
-                                                   FromSource (snd $ unLoc $4)))
+                                                   FrameCase $2 (snd $ unLoc $4))
                                                (mj AnnCase $1:mj AnnOf $3
                                                   :(fst $ unLoc $4)) }
         | 'do' stmtlist              {% ams (cL (comb2 $1 $2)
-                                               (mkHsDo DoExpr (snd $ unLoc $2)))
+                                               (FrameDo DoExpr (snd $ unLoc $2)))
                                                (mj AnnDo $1:(fst $ unLoc $2)) }
         | 'mdo' stmtlist            {% ams (cL (comb2 $1 $2)
-                                              (mkHsDo MDoExpr (snd $ unLoc $2)))
+                                              (FrameDo MDoExpr (snd $ unLoc $2)))
                                            (mj AnnMdo $1:(fst $ unLoc $2)) }
         | 'proc' aexp '->' exp
                        {% checkPattern empty $2 >>= \ p ->
                            checkCommand $4 >>= \ cmd ->
-                           ams (sLL $1 $> $ HsProc noExt p (sLL $1 $> $ HsCmdTop noExt cmd))
+                           ams (sLL $1 $> $ FrameProc p (sLL $1 $> $ HsCmdTop noExt cmd))
                                             -- TODO: is LL right here?
                                [mj AnnProc $1,mu AnnRarrow $3] }
 
         | aexp1                 { $1 }
 
-aexp1   :: { LHsExpr GhcPs }
+aexp1   :: { LExpPatFrame }
         : aexp1 '{' fbinds '}' {% do { r <- mkRecConstrOrUpdate $1 (comb2 $2 $4)
                                                                    (snd $3)
                                      ; _ <- amsL (comb2 $1 $>) (moc $2:mcc $4:(fst $3))
                                      ; checkRecordSyntax (sLL $1 $> r) }}
         | aexp2                { $1 }
 
-aexp2   :: { LHsExpr GhcPs }
-        : qvar                          { sL1 $1 (HsVar noExt   $! $1) }
-        | qcon                          { sL1 $1 (HsVar noExt   $! $1) }
-        | ipvar                         { sL1 $1 (HsIPVar noExt $! unLoc $1) }
-        | overloaded_label              { sL1 $1 (HsOverLabel noExt Nothing $! unLoc $1) }
-        | literal                       { sL1 $1 (HsLit noExt  $! unLoc $1) }
+aexp2   :: { LExpPatFrame }
+        : qvar                          { sL1 $1 (FrameVar $! unLoc $1) }
+        | qcon                          { sL1 $1 (FrameVar $! unLoc $1) }
+        | ipvar                         { sL1 $1 (FrameIPVar $! unLoc $1) }
+        | overloaded_label              { sL1 $1 (FrameOverLabel $! unLoc $1) }
+        | literal                       { sL1 $1 (FrameLit $! unLoc $1) }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
 -- into HsOverLit when -foverloaded-strings is on.
---      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
+--      | STRING    { sL (getLoc $1) (FrameOverLit $! mkHsIsString (getSTRINGs $1)
 --                                       (getSTRING $1) noExt) }
-        | INTEGER   { sL (getLoc $1) (HsOverLit noExt $! mkHsIntegral   (getINTEGER $1) ) }
-        | RATIONAL  { sL (getLoc $1) (HsOverLit noExt $! mkHsFractional (getRATIONAL $1) ) }
+        | INTEGER   { sL (getLoc $1) (FrameOverLit $! mkHsIntegral   (getINTEGER $1) ) }
+        | RATIONAL  { sL (getLoc $1) (FrameOverLit $! mkHsFractional (getRATIONAL $1) ) }
 
         -- N.B.: sections get parsed by these next two productions.
         -- This allows you to write, e.g., '(+ 3, 4 -)', which isn't
         -- correct Haskell (you'd have to write '((+ 3), (4 -))')
         -- but the less cluttered version fell out of having texps.
-        | '(' texp ')'                  {% ams (sLL $1 $> (HsPar noExt $2)) [mop $1,mcp $3] }
+        | '(' texp ')'                  {% ams (sLL $1 $> (FramePar $2)) [mop $1,mcp $3] }
         | '(' tup_exprs ')'             {% do { e <- mkSumOrTuple Boxed (comb2 $1 $3) (snd $2)
                                               ; ams (sLL $1 $> e) ((mop $1:fst $2) ++ [mcp $3]) } }
 
-        | '(#' texp '#)'                {% ams (sLL $1 $> (ExplicitTuple noExt [cL (gl $2)
-                                                         (Present noExt $2)] Unboxed))
+        | '(#' texp '#)'                {% ams (sLL $1 $> (FrameTuple [cL (gl $2)
+                                                         (TupArgFramePresent $2)] Unboxed))
                                                [mo $1,mc $3] }
         | '(#' tup_exprs '#)'           {% do { e <- mkSumOrTuple Unboxed (comb2 $1 $3) (snd $2)
                                               ; ams (sLL $1 $> e) ((mo $1:fst $2) ++ [mc $3]) } }
 
         | '[' list ']'      {% ams (sLL $1 $> (snd $2)) (mos $1:mcs $3:(fst $2)) }
-        | '_'               { sL1 $1 $ EWildPat noExt }
+        | '_'               { sL1 $1 FrameWild }
 
         -- Template Haskell Extension
         | splice_exp            { $1 }
 
-        | SIMPLEQUOTE  qvar     {% ams (sLL $1 $> $ HsBracket noExt (VarBr noExt True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | SIMPLEQUOTE  qcon     {% ams (sLL $1 $> $ HsBracket noExt (VarBr noExt True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ HsBracket noExt (VarBr noExt False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket noExt (VarBr noExt False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE  qvar     {% ams (sLL $1 $> $ FrameBracket (VarBr noExt True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE  qcon     {% ams (sLL $1 $> $ FrameBracket (VarBr noExt True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ FrameBracket (VarBr noExt False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
+        | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ FrameBracket (VarBr noExt False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE {- nothing -} {% reportEmptyDoubleQuotes (getLoc $1) }
-        | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket noExt (ExpBr noExt $2))
+        | '[|' exp '|]'       {% ams (sLL $1 $> $ FrameBracket (ExpBr noExt (checkExpr $2)))
                                       (if (hasE $1) then [mj AnnOpenE $1, mu AnnCloseQ $3]
                                                     else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) }
-        | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket noExt (TExpBr noExt $2))
+        | '[||' exp '||]'     {% ams (sLL $1 $> $ FrameBracket (TExpBr noExt (checkExpr $2)))
                                       (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
-        | '[t|' ktype '|]'    {% ams (sLL $1 $> $ HsBracket noExt (TypBr noExt $2)) [mo $1,mu AnnCloseQ $3] }
+        | '[t|' ktype '|]'    {% ams (sLL $1 $> $ FrameBracket (TypBr noExt $2)) [mo $1,mu AnnCloseQ $3] }
         | '[p|' infixexp '|]' {% checkPattern empty $2 >>= \p ->
-                                      ams (sLL $1 $> $ HsBracket noExt (PatBr noExt p))
+                                      ams (sLL $1 $> $ FrameBracket (PatBr noExt p))
                                           [mo $1,mu AnnCloseQ $3] }
-        | '[d|' cvtopbody '|]' {% ams (sLL $1 $> $ HsBracket noExt (DecBrL noExt (snd $2)))
+        | '[d|' cvtopbody '|]' {% ams (sLL $1 $> $ FrameBracket (DecBrL noExt (snd $2)))
                                       (mo $1:mu AnnCloseQ $3:fst $2) }
-        | quasiquote          { sL1 $1 (HsSpliceE noExt (unLoc $1)) }
+        | quasiquote          { mapLoc FrameSplice $1 }
 
         -- arrow notation extension
-        | '(|' aexp2 cmdargs '|)'  {% ams (sLL $1 $> $ HsArrForm noExt $2
-                                                           Nothing (reverse $3))
+        | '(|' aexp2 cmdargs '|)'  {% ams (sLL $1 $> $ FrameArrForm $2 (reverse $3))
                                           [mu AnnOpenB $1,mu AnnCloseB $4] }
 
-splice_exp :: { LHsExpr GhcPs }
-        : splice_untyped { mapLoc (HsSpliceE noExt) $1 }
-        | splice_typed   { mapLoc (HsSpliceE noExt) $1 }
+splice_exp :: { LExpPatFrame }
+        : splice_untyped { mapLoc FrameSplice $1 }
+        | splice_typed   { mapLoc FrameSplice $1 }
 
 splice_untyped :: { Located (HsSplice GhcPs) }
         : TH_ID_SPLICE          {% ams (sL1 $1 $ mkUntypedSplice HasDollar
                                         (sL1 $1 $ HsVar noExt (sL1 $1 (mkUnqual varName
                                                            (getTH_ID_SPLICE $1)))))
                                        [mj AnnThIdSplice $1] }
-        | '$(' exp ')'          {% ams (sLL $1 $> $ mkUntypedSplice HasParens $2)
+        | '$(' exp ')'          {% ams (sLL $1 $> $ mkUntypedSplice HasParens (checkExpr $2))
                                        [mj AnnOpenPE $1,mj AnnCloseP $3] }
 
 splice_typed :: { Located (HsSplice GhcPs) }
@@ -2761,7 +2754,7 @@ splice_typed :: { Located (HsSplice GhcPs) }
                                         (sL1 $1 $ HsVar noExt (sL1 $1 (mkUnqual varName
                                                         (getTH_ID_TY_SPLICE $1)))))
                                        [mj AnnThIdTySplice $1] }
-        | '$$(' exp ')'         {% ams (sLL $1 $> $ mkTypedSplice HasParens $2)
+        | '$$(' exp ')'         {% ams (sLL $1 $> $ mkTypedSplice HasParens (checkExpr $2))
                                        [mj AnnOpenPTE $1,mj AnnCloseP $3] }
 
 cmdargs :: { [LHsCmdTop GhcPs] }
@@ -2787,7 +2780,7 @@ cvtopdecls0 :: { [LHsDecl GhcPs] }
 -- "texp" is short for tuple expressions:
 -- things that can appear unparenthesized as long as they're
 -- inside parens or delimitted by commas
-texp :: { LHsExpr GhcPs }
+texp :: { LExpPatFrame }
         : exp                           { $1 }
 
         -- Note [Parsing sections]
@@ -2801,68 +2794,65 @@ texp :: { LHsExpr GhcPs }
         -- Then when converting expr to pattern we unravel it again
         -- Meanwhile, the renamer checks that real sections appear
         -- inside parens.
-        | infixexp qop        { sLL $1 $> $ SectionL noExt $1 $2 }
-        | qopm infixexp       { sLL $1 $> $ SectionR noExt $1 $2 }
+        | infixexp qop        { sLL $1 $> $ FrameSectionL $1 $2 }
+        | qopm infixexp       { sLL $1 $> $ FrameSectionR $1 $2 }
 
        -- View patterns get parenthesized above
-        | exp '->' texp   {% ams (sLL $1 $> $ EViewPat noExt $1 $3) [mu AnnRarrow $2] }
+        | exp '->' texp   {% ams (sLL $1 $> $ FrameViewPat $1 $3) [mu AnnRarrow $2] }
 
 -- Always at least one comma or bar.
 tup_exprs :: { ([AddAnn],SumOrTuple) }
            : texp commas_tup_tail
                           {% do { addAnnotation (gl $1) AnnComma (fst $2)
-                                ; return ([],Tuple ((sL1 $1 (Present noExt $1)) : snd $2)) } }
+                                ; return ([],Tuple ((sL1 $1 (TupArgFramePresent $1)) : snd $2)) } }
 
            | texp bars    { (mvbars (fst $2), Sum 1  (snd $2 + 1) $1) }
 
            | commas tup_tail
                 {% do { mapM_ (\ll -> addAnnotation ll AnnComma ll) (fst $1)
                       ; return
-                           ([],Tuple (map (\l -> cL l missingTupArg) (fst $1) ++ $2)) } }
+                           ([],Tuple (map (\l -> cL l TupArgFrameMissing) (fst $1) ++ $2)) } }
 
            | bars texp bars0
                 { (mvbars (fst $1) ++ mvbars (fst $3), Sum (snd $1 + 1) (snd $1 + snd $3 + 1) $2) }
 
 -- Always starts with commas; always follows an expr
-commas_tup_tail :: { (SrcSpan,[LHsTupArg GhcPs]) }
+commas_tup_tail :: { (SrcSpan,[LTupArgFrame]) }
 commas_tup_tail : commas tup_tail
        {% do { mapM_ (\ll -> addAnnotation ll AnnComma ll) (tail $ fst $1)
              ; return (
             (head $ fst $1
-            ,(map (\l -> cL l missingTupArg) (tail $ fst $1)) ++ $2)) } }
+            ,(map (\l -> cL l TupArgFrameMissing) (tail $ fst $1)) ++ $2)) } }
 
 -- Always follows a comma
-tup_tail :: { [LHsTupArg GhcPs] }
+tup_tail :: { [LTupArgFrame] }
           : texp commas_tup_tail {% addAnnotation (gl $1) AnnComma (fst $2) >>
-                                    return ((cL (gl $1) (Present noExt $1)) : snd $2) }
-          | texp                 { [cL (gl $1) (Present noExt $1)] }
-          | {- empty -}          { [noLoc missingTupArg] }
+                                    return ((cL (gl $1) (TupArgFramePresent $1)) : snd $2) }
+          | texp                 { [cL (gl $1) (TupArgFramePresent $1)] }
+          | {- empty -}          { [noLoc TupArgFrameMissing] }
 
 -----------------------------------------------------------------------------
 -- List expressions
 
 -- The rules below are little bit contorted to keep lexps left-recursive while
 -- avoiding another shift/reduce-conflict.
-list :: { ([AddAnn],HsExpr GhcPs) }
-        : texp    { ([],ExplicitList noExt Nothing [$1]) }
-        | lexps   { ([],ExplicitList noExt Nothing (reverse (unLoc $1))) }
+list :: { ([AddAnn],ExpPatFrame) }
+        : texp    { ([],FrameList [$1]) }
+        | lexps   { ([],FrameList (reverse (unLoc $1))) }
         | texp '..'             { ([mj AnnDotdot $2],
-                                      ArithSeq noExt Nothing (From $1)) }
+                                      FrameArithSeq (From (checkExpr $1))) }
         | texp ',' exp '..'     { ([mj AnnComma $2,mj AnnDotdot $4],
-                                  ArithSeq noExt Nothing
-                                                             (FromThen $1 $3)) }
+                                  FrameArithSeq (FromThen (checkExpr $1) (checkExpr $3))) }
         | texp '..' exp         { ([mj AnnDotdot $2],
-                                   ArithSeq noExt Nothing
-                                                               (FromTo $1 $3)) }
+                                   FrameArithSeq (FromTo (checkExpr $1) (checkExpr $3))) }
         | texp ',' exp '..' exp { ([mj AnnComma $2,mj AnnDotdot $4],
-                                    ArithSeq noExt Nothing
-                                                (FromThenTo $1 $3 $5)) }
+                                    FrameArithSeq (FromThenTo (checkExpr $1) (checkExpr $3) (checkExpr $5))) }
         | texp '|' flattenedpquals
              {% checkMonadComp >>= \ ctxt ->
                 return ([mj AnnVbar $2],
-                        mkHsComp ctxt (unLoc $3) $1) }
+                        FrameComp ctxt (unLoc $3) $1) }
 
-lexps :: { Located [LHsExpr GhcPs] }
+lexps :: { Located [LExpPatFrame] }
         : lexps ',' texp          {% addAnnotation (gl $ head $ unLoc $1)
                                                             AnnComma (gl $2) >>
                                       return (sLL $1 $> (((:) $! $3) $! unLoc $1)) }
@@ -2872,26 +2862,24 @@ lexps :: { Located [LHsExpr GhcPs] }
 -----------------------------------------------------------------------------
 -- List Comprehensions
 
-flattenedpquals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
+flattenedpquals :: { Located [LFrameStmt] }
     : pquals   { case (unLoc $1) of
                     [qs] -> sL1 $1 qs
                     -- We just had one thing in our "parallel" list so
                     -- we simply return that thing directly
 
-                    qss -> sL1 $1 [sL1 $1 $ ParStmt noExt [ParStmtBlock noExt qs [] noSyntaxExpr |
-                                            qs <- qss]
-                                            noExpr noSyntaxExpr]
+                    qss -> sL1 $1 [sL1 $1 $ FrameParStmt qss]
                     -- We actually found some actual parallel lists so
                     -- we wrap them into as a ParStmt
                 }
 
-pquals :: { Located [[LStmt GhcPs (LHsExpr GhcPs)]] }
+pquals :: { Located [[LFrameStmt]] }
     : squals '|' pquals
                      {% addAnnotation (gl $ head $ unLoc $1) AnnVbar (gl $2) >>
                         return (sLL $1 $> (reverse (unLoc $1) : unLoc $3)) }
     | squals         { cL (getLoc $1) [reverse (unLoc $1)] }
 
-squals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }   -- In reverse order, because the last
+squals :: { Located [LFrameStmt] }   -- In reverse order, because the last
                                         -- one can "grab" the earlier ones
     : squals ',' transformqual
              {% addAnnotation (gl $ head $ unLoc $1) AnnComma (gl $2) >>
@@ -2911,15 +2899,15 @@ squals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }   -- In reverse order, becau
 -- consensus on the syntax, this feature is not being used until we
 -- get user demand.
 
-transformqual :: { Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)] -> Stmt GhcPs (LHsExpr GhcPs)) }
+transformqual :: { Located ([AddAnn],[LFrameStmt] -> FrameStmt) }
                         -- Function is applied to a list of stmts *in order*
-    : 'then' exp               { sLL $1 $> ([mj AnnThen $1], \ss -> (mkTransformStmt ss $2)) }
-    | 'then' exp 'by' exp      { sLL $1 $> ([mj AnnThen $1,mj AnnBy  $3],\ss -> (mkTransformByStmt ss $2 $4)) }
+    : 'then' exp               { sLL $1 $> ([mj AnnThen $1], \ss -> FrameTransformStmt ss $2) }
+    | 'then' exp 'by' exp      { sLL $1 $> ([mj AnnThen $1,mj AnnBy  $3],\ss -> FrameTransformByStmt ss $2 $4) }
     | 'then' 'group' 'using' exp
-             { sLL $1 $> ([mj AnnThen $1,mj AnnGroup $2,mj AnnUsing $3], \ss -> (mkGroupUsingStmt ss $4)) }
+             { sLL $1 $> ([mj AnnThen $1,mj AnnGroup $2,mj AnnUsing $3], \ss -> FrameGroupUsingStmt ss $4) }
 
     | 'then' 'group' 'by' exp 'using' exp
-             { sLL $1 $> ([mj AnnThen $1,mj AnnGroup $2,mj AnnBy $3,mj AnnUsing $5], \ss -> (mkGroupByUsingStmt ss $4 $6)) }
+             { sLL $1 $> ([mj AnnThen $1,mj AnnGroup $2,mj AnnBy $3,mj AnnUsing $5], \ss -> FrameGroupByUsingStmt ss $4 $6) }
 
 -- Note that 'group' is a special_id, which means that you can enable
 -- TransformListComp while still using Data.List.group. However, this
@@ -2935,13 +2923,13 @@ guardquals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
 guardquals1 :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
     : guardquals1 ',' qual  {% addAnnotation (gl $ head $ unLoc $1) AnnComma
                                              (gl $2) >>
-                               return (sLL $1 $> ($3 : unLoc $1)) }
-    | qual                  { sL1 $1 [$1] }
+                               return (sLL $1 $> (checkExprStmt $3 : unLoc $1)) }
+    | qual                  { sL1 $1 [checkExprStmt $1] }
 
 -----------------------------------------------------------------------------
 -- Case alternatives
 
-altslist :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
+altslist :: { Located ([AddAnn],[LFrameMatch]) }
         : '{'            alts '}'  { sLL $1 $> ((moc $1:mcc $3:(fst $ unLoc $2))
                                                ,(reverse (snd $ unLoc $2))) }
         |     vocurly    alts  close { cL (getLoc $2) (fst $ unLoc $2
@@ -2949,12 +2937,12 @@ altslist :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
         | '{'                 '}'    { sLL $1 $> ([moc $1,mcc $2],[]) }
         |     vocurly          close { noLoc ([],[]) }
 
-alts    :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
+alts    :: { Located ([AddAnn],[LFrameMatch]) }
         : alts1                    { sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
         | ';' alts                 { sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2))
                                                ,snd $ unLoc $2) }
 
-alts1   :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
+alts1   :: { Located ([AddAnn],[LFrameMatch]) }
         : alts1 ';' alt         {% if null (snd $ unLoc $1)
                                      then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
                                                   ,[$3]))
@@ -2969,36 +2957,33 @@ alts1   :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
                                            >> return (sLL $1 $> ([],snd $ unLoc $1))) }
         | alt                   { sL1 $1 ([],[$1]) }
 
-alt     :: { LMatch GhcPs (LHsExpr GhcPs) }
-           : pat alt_rhs  {%ams (sLL $1 $> (Match { m_ext = noExt
-                                                  , m_ctxt = CaseAlt
-                                                  , m_pats = [$1]
-                                                  , m_grhss = snd $ unLoc $2 }))
+alt     :: { LFrameMatch }
+           : pat alt_rhs  {%ams (sLL $1 $> (FrameMatch CaseAlt [$1] (snd $ unLoc $2)))
                                       (fst $ unLoc $2)}
 
-alt_rhs :: { Located ([AddAnn],GRHSs GhcPs (LHsExpr GhcPs)) }
+alt_rhs :: { Located ([AddAnn],FrameGRHSs) }
         : ralt wherebinds           { sLL $1 $> (fst $ unLoc $2,
-                                            GRHSs noExt (unLoc $1) (snd $ unLoc $2)) }
+                                            FrameGRHSs (unLoc $1) (snd $ unLoc $2)) }
 
-ralt :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
-        : '->' exp            {% ams (sLL $1 $> (unguardedRHS (comb2 $1 $2) $2))
+ralt :: { Located [LFrameGRHS] }
+        : '->' exp            {% ams (sLL $1 $> (unguardedFrameRHS (comb2 $1 $2) $2))
                                      [mu AnnRarrow $1] }
         | gdpats              { sL1 $1 (reverse (unLoc $1)) }
 
-gdpats :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
+gdpats :: { Located [LFrameGRHS] }
         : gdpats gdpat                  { sLL $1 $> ($2 : unLoc $1) }
         | gdpat                         { sL1 $1 [$1] }
 
 -- layout for MultiWayIf doesn't begin with an open brace, because it's hard to
 -- generate the open brace in addition to the vertical bar in the lexer, and
 -- we don't need it.
-ifgdpats :: { Located ([AddAnn],[LGRHS GhcPs (LHsExpr GhcPs)]) }
+ifgdpats :: { Located ([AddAnn],[LFrameGRHS]) }
          : '{' gdpats '}'                 { sLL $1 $> ([moc $1,mcc $3],unLoc $2)  }
          |     gdpats close               { sL1 $1 ([],unLoc $1) }
 
-gdpat   :: { LGRHS GhcPs (LHsExpr GhcPs) }
+gdpat   :: { LFrameGRHS }
         : '|' guardquals '->' exp
-                                  {% ams (sL (comb2 $1 $>) $ GRHS noExt (unLoc $2) $4)
+                                  {% ams (sL (comb2 $1 $>) $ FrameGRHS (unLoc $2) $4)
                                          [mj AnnVbar $1,mu AnnRarrow $3] }
 
 -- 'pat' recognises a pattern, including one with a bang at the top
@@ -3007,8 +2992,8 @@ gdpat   :: { LGRHS GhcPs (LHsExpr GhcPs) }
 -- we parse them right when bang-patterns are off
 pat     :: { LPat GhcPs }
 pat     :  exp          {% checkPattern empty $1 }
-        | '!' aexp      {% amms (checkPattern empty (sLL $1 $> (SectionR noExt
-                                                     (sL1 $1 (HsVar noExt (sL1 $1 bang_RDR))) $2)))
+        | '!' aexp      {% amms (checkPattern empty (sLL $1 $> (FrameSectionR
+                                                     (sL1 $1 (FrameVar bang_RDR)) $2)))
                                 [mj AnnBang $1] }
 
 bindpat :: { LPat GhcPs }
@@ -3016,14 +3001,14 @@ bindpat :  exp            {% checkPattern
                                 (text "Possibly caused by a missing 'do'?") $1 }
         | '!' aexp        {% amms (checkPattern
                                      (text "Possibly caused by a missing 'do'?")
-                                     (sLL $1 $> (SectionR noExt (sL1 $1 (HsVar noExt (sL1 $1 bang_RDR))) $2)))
+                                     (sLL $1 $> (FrameSectionR (sL1 $1 (FrameVar bang_RDR)) $2)))
                                   [mj AnnBang $1] }
 
 apat   :: { LPat GhcPs }
 apat    : aexp                  {% checkPattern empty $1 }
         | '!' aexp              {% amms (checkPattern empty
-                                            (sLL $1 $> (SectionR noExt
-                                                (sL1 $1 (HsVar noExt (sL1 $1 bang_RDR))) $2)))
+                                            (sLL $1 $> (FrameSectionR
+                                                (sL1 $1 (FrameVar bang_RDR)) $2)))
                                         [mj AnnBang $1] }
 
 apats  :: { [LPat GhcPs] }
@@ -3033,7 +3018,7 @@ apats  :: { [LPat GhcPs] }
 -----------------------------------------------------------------------------
 -- Statement sequences
 
-stmtlist :: { Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]) }
+stmtlist :: { Located ([AddAnn],[LFrameStmt]) }
         : '{'           stmts '}'       { sLL $1 $> ((moc $1:mcc $3:(fst $ unLoc $2))
                                              ,(reverse $ snd $ unLoc $2)) } -- AZ:performance of reverse?
         |     vocurly   stmts close     { cL (gl $2) (fst $ unLoc $2
@@ -3045,7 +3030,7 @@ stmtlist :: { Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]) }
 -- So we use BodyStmts throughout, and switch the last one over
 -- in ParseUtils.checkDo instead
 
-stmts :: { Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]) }
+stmts :: { Located ([AddAnn],[LFrameStmt]) }
         : stmts ';' stmt  {% if null (snd $ unLoc $1)
                               then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
                                                      ,$3 : (snd $ unLoc $1)))
@@ -3066,36 +3051,36 @@ stmts :: { Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]) }
 -- For typing stmts at the GHCi prompt, where
 -- the input may consist of just comments.
 maybe_stmt :: { Maybe (LStmt GhcPs (LHsExpr GhcPs)) }
-        : stmt                          { Just $1 }
+        : stmt                          { Just (checkExprStmt $1) }
         | {- nothing -}                 { Nothing }
 
-stmt  :: { LStmt GhcPs (LHsExpr GhcPs) }
+stmt  :: { LFrameStmt }
         : qual                          { $1 }
-        | 'rec' stmtlist                {% ams (sLL $1 $> $ mkRecStmt (snd $ unLoc $2))
+        | 'rec' stmtlist                {% ams (sLL $1 $> $ FrameRecStmt (snd $ unLoc $2))
                                                (mj AnnRec $1:(fst $ unLoc $2)) }
 
-qual  :: { LStmt GhcPs (LHsExpr GhcPs) }
-    : bindpat '<-' exp                  {% ams (sLL $1 $> $ mkBindStmt $1 $3)
+qual  :: { LFrameStmt }
+    : bindpat '<-' exp                  {% ams (sLL $1 $> $ FrameBindStmt $1 $3)
                                                [mu AnnLarrow $2] }
-    | exp                               { sL1 $1 $ mkBodyStmt $1 }
-    | 'let' binds                       {% ams (sLL $1 $>$ LetStmt noExt (snd $ unLoc $2))
+    | exp                               { sL1 $1 $ FrameBodyStmt $1 }
+    | 'let' binds                       {% ams (sLL $1 $>$ FrameLetStmt (snd $ unLoc $2))
                                                (mj AnnLet $1:(fst $ unLoc $2)) }
 
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction
 
-fbinds  :: { ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Bool)) }
+fbinds  :: { ([AddAnn],([LHsRecField GhcPs LExpPatFrame], Bool)) }
         : fbinds1                       { $1 }
         | {- empty -}                   { ([],([], False)) }
 
-fbinds1 :: { ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Bool)) }
+fbinds1 :: { ([AddAnn],([LHsRecField GhcPs LExpPatFrame], Bool)) }
         : fbind ',' fbinds1
                 {% addAnnotation (gl $1) AnnComma (gl $2) >>
                    return (case $3 of (ma,(flds, dd)) -> (ma,($1 : flds, dd))) }
         | fbind                         { ([],([$1], False)) }
         | '..'                          { ([mj AnnDotdot $1],([],   True)) }
 
-fbind   :: { LHsRecField GhcPs (LHsExpr GhcPs) }
+fbind   :: { LHsRecField GhcPs LExpPatFrame }
         : qvar '=' texp {% ams  (sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) $3 False)
                                 [mj AnnEqual $2] }
                         -- RHS is a 'texp', allowing view patterns (Trac #6038)
@@ -3120,7 +3105,7 @@ dbinds  :: { Located [LIPBind GhcPs] }
 --      | {- empty -}                  { [] }
 
 dbind   :: { LIPBind GhcPs }
-dbind   : ipvar '=' exp                {% ams (sLL $1 $> (IPBind noExt (Left $1) $3))
+dbind   : ipvar '=' exp                {% ams (sLL $1 $> (IPBind noExt (Left $1) (checkExpr $3)))
                                               [mj AnnEqual $2] }
 
 ipvar   :: { Located HsIPName }
@@ -3334,18 +3319,18 @@ varop   :: { Located RdrName }
                                        [mj AnnBackquote $1,mj AnnVal $2
                                        ,mj AnnBackquote $3] }
 
-qop     :: { LHsExpr GhcPs }   -- used in sections
-        : qvarop                { sL1 $1 $ HsVar noExt $1 }
-        | qconop                { sL1 $1 $ HsVar noExt $1 }
+qop     :: { LExpPatFrame }   -- used in sections
+        : qvarop                { mapLoc FrameVar $1 }
+        | qconop                { mapLoc FrameVar $1 }
         | hole_op               { $1 }
 
-qopm    :: { LHsExpr GhcPs }   -- used in sections
-        : qvaropm               { sL1 $1 $ HsVar noExt $1 }
-        | qconop                { sL1 $1 $ HsVar noExt $1 }
+qopm    :: { LExpPatFrame }   -- used in sections
+        : qvaropm               { mapLoc FrameVar $1 }
+        | qconop                { mapLoc FrameVar $1 }
         | hole_op               { $1 }
 
-hole_op :: { LHsExpr GhcPs }   -- used in sections
-hole_op : '`' '_' '`'           {% ams (sLL $1 $> $ EWildPat noExt)
+hole_op :: { LExpPatFrame }   -- used in sections
+hole_op : '`' '_' '`'           {% ams (sLL $1 $> FrameWild)
                                        [mj AnnBackquote $1,mj AnnVal $2
                                        ,mj AnnBackquote $3] }
 
@@ -3794,8 +3779,8 @@ hintExplicitForall' span = do
         , text "extension to enable explicit-forall syntax: forall <tvs>. <type>"
         ]
 
-checkIfBang :: LHsExpr GhcPs -> Bool
-checkIfBang (dL->L _ (HsVar _ (dL->L _ op))) = op == bang_RDR
+checkIfBang :: LExpPatFrame -> Bool
+checkIfBang (dL->L _ (FrameVar op)) = op == bang_RDR
 checkIfBang _ = False
 
 -- | Warn about missing space after bang

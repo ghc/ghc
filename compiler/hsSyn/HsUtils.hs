@@ -33,7 +33,7 @@ module HsUtils(
   nlHsLit, nlHsApp, nlHsApps, nlHsSyntaxApps,
   nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
-  mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
+  mkLHsTupleExpr, mkLHsVarTuple,
   typeToLHsType,
 
   -- * Constructing general big tuples
@@ -521,9 +521,6 @@ mkLHsVarTuple ids  = mkLHsTupleExpr (map nlHsVar ids)
 
 nlTuplePat :: [LPat GhcPs] -> Boxity -> LPat GhcPs
 nlTuplePat pats box = noLoc (TuplePat noExt pats box)
-
-missingTupArg :: HsTupArg GhcPs
-missingTupArg = Missing noExt
 
 mkLHsPatTup :: [LPat GhcRn] -> LPat GhcRn
 mkLHsPatTup []     = noLoc $ TuplePat noExt [] Boxed
