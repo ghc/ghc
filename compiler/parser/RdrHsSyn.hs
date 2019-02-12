@@ -1002,7 +1002,7 @@ checkTyClHdr is_cls ty
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
 checkBlockArguments :: forall b. ExpCmdI b => Located (b GhcPs) -> P ()
-checkBlockArguments = withExpCmd @b checkExpr checkCmd
+checkBlockArguments = case expCmdG @b of { ExpG -> checkExpr; CmdG -> checkCmd }
   where
     checkExpr :: LHsExpr GhcPs -> P ()
     checkExpr expr = case unLoc expr of
@@ -1315,7 +1315,10 @@ checkDoAndIfThenElse
   -> Bool
   -> Located (b GhcPs)
   -> P ()
-checkDoAndIfThenElse = withExpCmd @b checkDoAndIfThenElse' checkDoAndIfThenElse'
+checkDoAndIfThenElse =
+  case expCmdG @b of
+    ExpG -> checkDoAndIfThenElse'
+    CmdG -> checkDoAndIfThenElse'
 
 checkDoAndIfThenElse'
   :: (HasSrcSpan a, Outputable a, Outputable b, HasSrcSpan c, Outputable c)
@@ -2017,37 +2020,24 @@ checkMonadComp = do
 --
 newtype ExpCmdP = ExpCmdP { runExpCmdP :: forall b. ExpCmdI b => P (Located (b GhcPs)) }
 
---  ExpCmdI is equivalent to a CPS-encoded GADT:
---
---     data ExpCmdG b where
---       Exp :: ExpCmdG HsExpr
---       Cmd :: ExpCmdG HsCmd
---
---  Isomorphic:  forall b. ExpCmdI b => F(b)
---               forall b. ExpCmdG b -> F(b)
---
---  Equivalent: withExpCmd @b onExp onCmd
---              case (g :: ExpCmdG b) of { Exp - onExp; Cmd -> onCmd }
---
---  The choice of continuation determines whether we parse an expression or a
---  command.
+data ExpCmdG b where
+  ExpG :: ExpCmdG HsExpr
+  CmdG :: ExpCmdG HsCmd
+
 class ExpCmdI b where
-  withExpCmd ::
-    ((b ~ HsExpr) => r) ->
-    ((b ~ HsCmd) => r) ->
-    r
+  expCmdG :: ExpCmdG b
 
 instance ExpCmdI HsExpr where
-  withExpCmd e _ = e
+  expCmdG = ExpG
 
 instance ExpCmdI HsCmd where
-  withExpCmd _ c = c
+  expCmdG = CmdG
 
 ecFromCmd :: LHsCmd GhcPs -> ExpCmdP
 ecFromCmd c@(getLoc -> l) = ExpCmdP onB
   where
     onB :: forall b. ExpCmdI b => P (Located (b GhcPs))
-    onB = withExpCmd @b onExp (return c)
+    onB = case expCmdG @b of { ExpG -> onExp; CmdG -> return c }
     onExp :: P (LHsExpr GhcPs)
     onExp = do
       addError l $ vcat
@@ -2059,7 +2049,7 @@ ecFromExp :: LHsExpr GhcPs -> ExpCmdP
 ecFromExp e@(getLoc -> l) = ExpCmdP onB
   where
     onB :: forall b. ExpCmdI b => P (Located (b GhcPs))
-    onB = withExpCmd @b (return e) onCmd
+    onB = case expCmdG @b of { ExpG -> return e; CmdG -> onCmd }
     onCmd :: P (LHsCmd GhcPs)
     onCmd =
       parseErrorSDoc l $
@@ -2459,14 +2449,14 @@ mkLHsDocTyMaybe :: LHsType GhcPs -> Maybe LHsDocString -> LHsType GhcPs
 mkLHsDocTyMaybe t = maybe t (mkLHsDocTy t)
 
 ecHsLam :: forall b. ExpCmdI b => MatchGroup GhcPs (Located (b GhcPs)) -> b GhcPs
-ecHsLam = withExpCmd @b (HsLam noExt) (HsCmdLam noExt)
+ecHsLam = case expCmdG @b of { ExpG -> HsLam noExt; CmdG -> HsCmdLam noExt }
 
 ecHsLet :: forall b. ExpCmdI b => LHsLocalBinds GhcPs -> Located (b GhcPs) -> b GhcPs
-ecHsLet = withExpCmd @b (HsLet noExt) (HsCmdLet noExt)
+ecHsLet = case expCmdG @b of { ExpG -> HsLet noExt; CmdG -> HsCmdLet noExt }
 
 ecOpApp :: forall b. ExpCmdI b => Located (b GhcPs) -> LHsExpr GhcPs
         -> Located (b GhcPs) -> b GhcPs
-ecOpApp = withExpCmd @b (OpApp noExt) cmdOpApp
+ecOpApp = case expCmdG @b of { ExpG -> OpApp noExt; CmdG -> cmdOpApp }
   where
     cmdOpApp c1 op c2 =
       let cmdArg c = cL (getLoc c) $ HsCmdTop noExt c in
@@ -2474,19 +2464,19 @@ ecOpApp = withExpCmd @b (OpApp noExt) cmdOpApp
 
 ecHsCase :: forall b. ExpCmdI b =>
   LHsExpr GhcPs -> MatchGroup GhcPs (Located (b GhcPs)) -> b GhcPs
-ecHsCase = withExpCmd @b (HsCase noExt) (HsCmdCase noExt)
+ecHsCase = case expCmdG @b of { ExpG -> HsCase noExt; CmdG -> HsCmdCase noExt }
 
 ecHsApp :: forall b. ExpCmdI b =>
   Located (b GhcPs) -> LHsExpr GhcPs -> b GhcPs
-ecHsApp = withExpCmd @b (HsApp noExt) (HsCmdApp noExt)
+ecHsApp = case expCmdG @b of { ExpG -> HsApp noExt; CmdG -> HsCmdApp noExt }
 
 ecHsIf :: forall b. ExpCmdI b =>
    LHsExpr GhcPs -> Located (b GhcPs) -> Located (b GhcPs) -> b GhcPs
-ecHsIf = withExpCmd @b mkHsIf mkHsCmdIf
+ecHsIf = case expCmdG @b of { ExpG -> mkHsIf; CmdG -> mkHsCmdIf }
 
 ecHsDo :: forall b. ExpCmdI b =>
   Located [LStmt GhcPs (Located (b GhcPs))] -> b GhcPs
-ecHsDo = withExpCmd @b (HsDo noExt DoExpr) (HsCmdDo noExt)
+ecHsDo = case expCmdG @b of { ExpG -> HsDo noExt DoExpr; CmdG -> HsCmdDo noExt }
 
 ecHsPar :: forall b. ExpCmdI b => Located (b GhcPs) -> b GhcPs
-ecHsPar = withExpCmd @b (HsPar noExt) (HsCmdPar noExt)
+ecHsPar = case expCmdG @b of { ExpG -> HsPar noExt; CmdG -> HsCmdPar noExt }
