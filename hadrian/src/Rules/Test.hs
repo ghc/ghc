@@ -29,12 +29,12 @@ testRules = do
     root <- buildRootRules
 
     -- Using program shipped with testsuite to generate ghcconfig file.
-    root -/- ghcConfigProgPath ~> do
+    root -/- ghcConfigProgPath %> \_ -> do
         ghc0Path <- getCompilerPath "stage0"
         createDirectory $ takeDirectory (root -/- ghcConfigProgPath)
         cmd ghc0Path [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
 
-    root -/- ghcConfigPath ~> do
+    root -/- ghcConfigPath %> \_ -> do
         args <- userSetting defaultTestArgs
         let testGhc = testCompiler args
             stg = stageOf testGhc
@@ -45,7 +45,7 @@ testRules = do
         cmd [FileStdout $ root -/- ghcConfigPath] (root -/- ghcConfigProgPath)
             [ghcPath]
 
-    root -/- timeoutPath ~> timeoutProgBuilder
+    root -/- timeoutPath %> \_ -> timeoutProgBuilder
 
     "test" ~> do
 
@@ -130,9 +130,7 @@ needTestsuitePackages = do
     when (testGhc `elem` ["stage1", "stage2", "stage3"]) $ do
         let stg = stageOf testGhc
         targets   <- mapM (needFile stg) =<< testsuitePackages
-        -- iserv is not supported under Windows
-        windows <- windowsHost
-        when (not windows) needIservBins
+        needIservBins
         need targets
 
 -- stage 1 ghc lives under stage0/bin,
@@ -145,18 +143,21 @@ stageOf _ = error "unexpected stage argument"
 
 needIservBins :: Action ()
 needIservBins = do
-    testGhc <- testCompiler <$> userSetting defaultTestArgs
-    let stg = stageOf testGhc
-    rtsways <- interpretInContext (vanillaContext stg ghc) getRtsWays
-    need =<< traverse programPath
-               [ Context stg iserv w
-               | w <- [vanilla, profiling
-                    -- TODO dynamic way has been reverted as the dynamic build
-                    --      is broken. See #15837.
-                    -- , dynamic
-                    ]
-               , w `elem` rtsways
-               ]
+    -- iserv is not supported under Windows
+    windows <- windowsHost
+    when (not windows) $ do
+        testGhc <- testCompiler <$> userSetting defaultTestArgs
+        let stg = stageOf testGhc
+        rtsways <- interpretInContext (vanillaContext stg ghc) getRtsWays
+        need =<< traverse programPath
+            [ Context stg iserv w
+            | w <- [vanilla, profiling
+                   -- TODO dynamic way has been reverted as the dynamic build
+                   --      is broken. See #15837.
+                   -- , dynamic
+                   ]
+            , w `elem` rtsways
+            ]
 
 needFile :: Stage -> Package -> Action FilePath
 needFile stage pkg
