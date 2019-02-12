@@ -81,7 +81,7 @@ getBinaryDirectory :: String -> Action FilePath
 getBinaryDirectory "stage0" = takeDirectory <$> setting SystemGhc
 getBinaryDirectory "stage1" = liftM2 (-/-) topDirectory (stageBinPath Stage0)
 getBinaryDirectory "stage2" = liftM2 (-/-) topDirectory (stageBinPath Stage1)
-getBinaryDirectory compiler = pure $ parentPath compiler
+getBinaryDirectory compiler = pure $ takeDirectory compiler
 
 -- | Get the path to the given @--test-compiler@.
 getCompilerPath :: String -> Action FilePath
@@ -89,10 +89,6 @@ getCompilerPath "stage0" = setting SystemGhc
 getCompilerPath "stage1" = liftM2 (-/-) topDirectory (fullPath Stage0 ghc)
 getCompilerPath "stage2" = liftM2 (-/-) topDirectory (fullPath Stage1 ghc)
 getCompilerPath compiler = pure compiler
-
--- | Returns parent path of test compiler.
-parentPath :: String -> String
-parentPath path = intercalate "/" $ init $ splitOn "/" path
 
 -- | Get the full path to the given program.
 fullPath :: Stage -> Package -> Action FilePath

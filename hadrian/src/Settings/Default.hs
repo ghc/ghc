@@ -103,14 +103,13 @@ stage1Packages = do
              , hp2ps
              , hsc2hs
              , intLib
-             , parallel
              , pretty
              , process
              , rts
              , stm
              , time
              , unlit
-             , xhtml                     
+             , xhtml
              ]
           ++ [ haddock | not cross           ]
           ++ [ hpcBin   | not cross          ]
