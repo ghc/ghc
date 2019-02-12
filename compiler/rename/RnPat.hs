@@ -586,8 +586,6 @@ rnHsRecPatsAndThen mk (dL->L _ con)
          ; return (cL l (fld { hsRecFieldArg = arg' })) }
 
     rn_dot_dot_fl fl = do
-      loc <- liftCps getSrcSpanM
-      liftCps $ traceRn "dot_dot_2" (ppr loc)
       let arg_rdr = mkVarUnqual (flLabel fl)
       name <- newPatName (nested_mk mk) (cL loc arg_rdr)
       let e = VarPat noExt (cL loc name)
