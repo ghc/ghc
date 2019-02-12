@@ -18,10 +18,10 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <th colspan="8">Extra arguments</th>
   </tr>
   <tr>
-    <th colspan="2">hsDefault</td>
-    <th colspan="2">hsLibrary</td>
-    <th colspan="2">hsCompiler</td>
-    <th colspan="2">hsGhc</td>
+    <th colspan="2">hsDefault</th>
+    <th colspan="2">hsLibrary</th>
+    <th colspan="2">hsCompiler</th>
+    <th colspan="2">hsGhc</th>
   </tr>
   <tr>
     <th>stage0</td>
@@ -34,7 +34,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <th>stage1+</td>
   </tr>
   <tr>
-    <th>default<br></td>
+    <th>default<br></th>
     <td>-O<br>-H64m<br></td>
     <td>-O2<br>-H64m</td>
     <td></td>
@@ -45,7 +45,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td></td>
   </tr>
   <tr>
-    <th>quick</td>
+    <th>quick</th>
     <td>-O0<br>-H64m</td>
     <td>-O0<br>-H64m</td>
     <td></td>
@@ -56,7 +56,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td></td>
   </tr>
   <tr>
-    <th>quickest</td>
+    <th>quickest</th>
     <td>-O0<br>-H64m</td>
     <td>-O0<br>-H64m</td>
     <td></td>
@@ -67,7 +67,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td></td>
   </tr>
   <tr>
-    <th>perf</td>
+    <th>perf</th>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
     <td></td>
@@ -78,7 +78,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O2</td>
   </tr>
   <tr>
-    <th>prof</td>
+    <th>prof</th>
     <td>-O0<br>-H64m</td>
     <td>-O0<br>-H64m</td>
     <td></td>
@@ -88,29 +88,29 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O</td>
   </tr>
   <tr>
-    <th>devel1</td>
-    <td>-O<br>-H64m</td>
-    <td>-O<br>-H64m</td>
-    <td></td>
-    <td>-dcore-lint</td>
-    <td>-O0<br>-DDEBUG</td>
-    <td></td>
-    <td>-O0<br>-DDEBUG</td>
-    <td></td>
-  </tr>
-  <tr>
-    <th>devel2</td>
+    <th>devel1</th>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
     <td></td>
     <td>-dcore-lint</td>
+    <td>-O0<br>-DDEBUG</td>
+    <td></td>
+    <td>-O0<br>-DDEBUG</td>
+    <td></td>
+  </tr>
+  <tr>
+    <th>devel2</th>
+    <td>-O<br>-H64m</td>
+    <td>-O<br>-H64m</td>
+    <td></td>
+    <td>-dcore-lint</td>
     <td>-O2</td>
     <td>-O0<br>-DDEBUG</td>
     <td></td>
     <td>-O0<br>-DDEBUG</td>
   </tr>
   <tr>
-    <th>quick-llvm</td>
+    <th>quick-llvm</th>
     <td>-O0<br>-H64m<br>-fllvm</td>
     <td>-O0<br>-H64m<br>-fllvm</td>
     <td></td>
@@ -121,7 +121,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td></td>
   </tr>
   <tr>
-    <th>perf-llvm</td>
+    <th>perf-llvm</th>
     <td>-O<br>-H64m<br>-fllvm</td>
     <td>-O<br>-H64m<br>-fllvm</td>
     <td></td>
@@ -132,7 +132,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O2</td>
   </tr>
   <tr>
-    <th>prof-llvm</td>
+    <th>prof-llvm</th>
     <td>-O0<br>-H64m<br>-fllvm</td>
     <td>-O0<br>-H64m<br>-fllvm</td>
     <td></td>
