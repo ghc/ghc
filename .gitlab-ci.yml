@@ -6,7 +6,7 @@ before_script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
   - git checkout .gitmodules
-  - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/ci/perf || true"
+  - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
 stages:
   - lint
@@ -76,7 +76,7 @@ validate-x86_64-linux-deb8-hadrian:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/ci/perf || true"
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
   tags:
     - x86_64-linux
 
@@ -137,7 +137,7 @@ validate-x86_64-darwin:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/ci/perf || true"
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
     - bash .gitlab/darwin-init.sh
     - PATH="`pwd`/toolchain/bin:$PATH"
@@ -162,7 +162,7 @@ validate-x86_64-darwin:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/ci/perf || true"
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
     - bash .circleci/prepare-system.sh
     # workaround for docker permissions
@@ -340,7 +340,7 @@ validate-x86_64-linux-deb9-unreg:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/ci/perf || true"
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
     - bash .gitlab/win32-init.sh
   after_script:
     - rd /s /q tmp

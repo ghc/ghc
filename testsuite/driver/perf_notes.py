@@ -51,6 +51,9 @@ def is_worktree_dirty():
 # All the fields of a metric (excluding commit field).
 PerfStat = namedtuple('PerfStat', ['test_env','test','way','metric','value'])
 
+# A baseline recovered form stored metrics.
+Baseline = namedtuple('Baseline', ['perfStat','commit','commitDistance'])
+
 class MetricChange:
     NewMetric = 'NewMetric'
     NoChange = 'NoChange'
@@ -311,7 +314,7 @@ _commit_metric_cache = {}
 #                      instead when looking for ci results)
 # metric: str - test metric
 # way: str - test way
-# returns: the baseline float or None if no metric was found within
+# returns: the Baseline named tuple or None if no metric was found within
 #          BaselineSearchDepth commits and since the last expected change.
 def baseline_metric(commit, name, test_env, metric, way):
     # For performance reasons (in order to avoid calling commit_hash), we assert
@@ -320,8 +323,6 @@ def baseline_metric(commit, name, test_env, metric, way):
 
     # Get all recent commit hashes.
     commit_hashes = baseline_commit_log(commit)
-
-    # TODO PERF use git log to get hashes of all BaselineSearchDepth commits
     def depth_to_commit(depth):
         return commit_hashes[depth]
 
@@ -337,8 +338,9 @@ def baseline_metric(commit, name, test_env, metric, way):
 
     # gets the metric of a given commit
     # (Bool, Int) -> (float | None)
-    def commit_metric(useCiNamespace, currentCommit):
+    def commit_metric(useCiNamespace, depth):
         global _commit_metric_cache
+        currentCommit = depth_to_commit(depth)
 
         # Get test environment.
         effective_test_env = ci_test_env if useCiNamespace else test_env
@@ -371,8 +373,15 @@ def baseline_metric(commit, name, test_env, metric, way):
         # Calculate and baseline (average of values) by cacheKeyB.
         baseline_by_cache_key_b = {}
         for currentCacheKey, currentValues in values_by_cache_key_b.items():
-            baseline_by_cache_key_b[currentCacheKey] = \
-                    sum(currentValues) / len(currentValues)
+            baseline_by_cache_key_b[currentCacheKey] = Baseline( \
+                PerfStat( \
+                    currentCacheKey[0],
+                    currentCacheKey[1],
+                    currentCacheKey[3],
+                    currentCacheKey[2],
+                    sum(currentValues) / len(currentValues)),
+                currentCommit,
+                depth)
 
         # Save baselines to the cache.
         _commit_metric_cache[cacheKeyA] = baseline_by_cache_key_b
@@ -391,7 +400,7 @@ def baseline_metric(commit, name, test_env, metric, way):
             return None
 
         # Check for a metric on this commit.
-        current_metric = commit_metric(useCiNamespace, depth_to_commit(depth))
+        current_metric = commit_metric(useCiNamespace, depth)
         if current_metric != None:
             return current_metric
 
@@ -408,12 +417,13 @@ def baseline_metric(commit, name, test_env, metric, way):
 
 # Check test stats. This prints the results for the user.
 # actual: the PerfStat with actual value.
-# expected_val: the expected value (this should generally be derived from get_perf_stats())
+# baseline: the expected Baseline value (this should generally be derived from baseline_metric())
 # tolerance_dev: allowed deviation of the actual value from the expected value.
 # allowed_perf_changes: allowed changes in stats. This is a dictionary as returned by get_allowed_perf_changes().
 # force_print: Print stats even if the test stat was in the tolerance range.
 # Returns a (MetricChange, pass/fail object) tuple. Passes if the stats are withing the expected value ranges.
-def check_stats_change(actual, expected_val, tolerance_dev, allowed_perf_changes = {}, force_print = False):
+def check_stats_change(actual, baseline, tolerance_dev, allowed_perf_changes = {}, force_print = False):
+    expected_val = baseline.perfStat.value
     full_name = actual.test + ' (' + actual.way + ')'
 
     lowerBound = trunc(           int(expected_val) * ((100 - float(tolerance_dev))/100))
@@ -454,6 +464,8 @@ def check_stats_change(actual, expected_val, tolerance_dev, allowed_perf_changes
         def display(descr, val, extra):
             print(descr, str(val).rjust(length), extra)
 
+        print(  '    Baseline from ', baseline.perfStat.test_env, '@' + \
+                        baseline.commit, '(HEAD~' + baseline.commitDepth + ')')
         display('    Expected    ' + full_name + ' ' + actual.metric + ':', expected_val, '+/-' + str(tolerance_dev) + '%')
         display('    Lower bound ' + full_name + ' ' + actual.metric + ':', lowerBound, '')
         display('    Upper bound ' + full_name + ' ' + actual.metric + ':', upperBound, '')
