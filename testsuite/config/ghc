@@ -28,7 +28,8 @@ config.other_ways         = ['prof', 'normal_h',
                              'ghci-ext', 'ghci-ext-prof',
                              'ext-interp',
                              'nonmoving',
-                             'nonmoving_thr']
+                             'nonmoving_thr',
+                             'nonmoving_thr_ghc']
 
 if ghc_with_native_codegen:
     config.compile_ways.append('optasm')
@@ -101,6 +102,7 @@ config.way_flags = {
     'ext-interp'   : ['-fexternal-interpreter'],
     'nonmoving'    : [],
     'nonmoving_thr': ['-threaded'],
+    'nonmoving_thr_ghc': ['+RTS', '-xn', '-N2', '-RTS', '-threaded'],
    }
 
 config.way_rts_flags = {
@@ -141,6 +143,7 @@ config.way_rts_flags = {
     'ext-interp'       : [],
     'nonmoving'        : ['-xn'],
     'nonmoving_thr'    : ['-xn', '-N2'],
+    'nonmoving_thr_ghc': ['-xn', '-N2'],
    }
 
 # Useful classes of ways that can be used with only_ways(), omit_ways() and
