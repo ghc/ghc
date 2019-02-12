@@ -6,3 +6,5 @@ data P = P { x :: Int, y :: Int }
 
 g1 P{..} = x + 3 -- x from .. is used
 g2 P{x, ..} = x + y -- y from .. is used, even if it's in a weird style
+
+old P{..} | x < 5 = 10

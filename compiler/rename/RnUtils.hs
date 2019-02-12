@@ -225,12 +225,13 @@ warnUnusedTopBinds gres
 
 
 -- | Get to see whether at least one name from each RecordWildcard is used.
-warnUnusedRecordWildcard :: [Name] -> FreeVars -> RnM ()
-warnUnusedRecordWildcard ns used_names = do
+warnUnusedRecordWildcard :: SDoc -> [Name] -> FreeVars -> RnM ()
+warnUnusedRecordWildcard fix_doc ns used_names = do
   let used = filter (`elemNameSet` used_names) ns
   traceRn "warnUnused" (ppr ns $$ ppr used_names $$ ppr used)
   warnIfFlag Opt_WarnUnusedRecordWildcards (null used)
-    unusedRecordWildcardWarning
+    (unusedRecordWildcardWarning fix_doc)
+
 
 
 warnUnusedLocalBinds, warnUnusedMatches, warnUnusedTypePatterns
@@ -307,9 +308,10 @@ addUnusedWarning flag occ span msg
          nest 2 $ pprNonVarNameSpace (occNameSpace occ)
                         <+> quotes (ppr occ)]
 
-unusedRecordWildcardWarning :: SDoc
-unusedRecordWildcardWarning
+unusedRecordWildcardWarning :: SDoc -> SDoc
+unusedRecordWildcardWarning fix_doc
   = text "No variables bound in the record wildcard match are used"
+    $$ text "Possible fix" <> colon <+> fix_doc
 
 addNameClashErrRn :: RdrName -> [GlobalRdrElt] -> RnM ()
 addNameClashErrRn rdr_name gres

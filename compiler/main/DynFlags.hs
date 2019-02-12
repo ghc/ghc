@@ -4797,7 +4797,9 @@ minusWallOpts
         Opt_WarnUnusedDoBind,
         Opt_WarnTrustworthySafe,
         Opt_WarnUntickedPromotedConstructors,
-        Opt_WarnMissingPatternSynonymSignatures
+        Opt_WarnMissingPatternSynonymSignatures,
+        Opt_WarnUnusedRecordWildcards,
+        Opt_WarnRedundantRecordWildcards
       ]
 
 -- | Things you get with -Weverything, i.e. *all* known warnings flags

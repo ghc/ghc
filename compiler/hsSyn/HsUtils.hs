@@ -1388,5 +1388,7 @@ lPatImplicits = hs_lpat
                                                     | (i, fld) <- [0..] `zip` rec_flds fs
                                                     , let pat = hsRecFieldArg
                                                                      (unLoc fld)
-                                                          pat_explicit = maybe True (i<) (rec_dotdot fs)]
+                                                          pat_explicit =
+                                                            maybe True ((i<) . unLoc)
+                                                                       (rec_dotdot fs)]
     details (InfixCon p1 p2) = hs_lpat p1 `unionNameSet` hs_lpat p2
