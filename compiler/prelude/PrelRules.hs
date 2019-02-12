@@ -13,7 +13,7 @@ ToDo:
 -}
 
 {-# LANGUAGE CPP, RankNTypes, PatternSynonyms, ViewPatterns, RecordWildCards #-}
-{-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
+{-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE -Wno-unused-record-wildcards  #-}
 
 module PrelRules
    ( primOpRules

@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, UnboxedTuples,
     RecordWildCards, BangPatterns #-}
+{-# OPTIONS_GHC -Wno-unused-record-wildcards #-}
 
 -- -----------------------------------------------------------------------------
 --

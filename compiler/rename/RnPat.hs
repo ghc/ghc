@@ -703,7 +703,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                 --    out of scope constructor)
               -> [LHsRecField GhcRn arg] -- Explicit fields
               -> RnM (Maybe [FieldLabel])   -- Field Labels we need to fill in
-    rn_dotdot (Just (dL -> L loc n)) (Just con) flds -- ".." on record construction / pat match
+    rn_dotdot (Just (unLoc -> n)) (Just con) flds -- ".." on record construction / pat match
       | not (isUnboundName con) -- This test is because if the constructor
                                 -- isn't in scope the constructor lookup will add
                                 -- an error but still return an unbound name. We
@@ -860,7 +860,7 @@ dupFieldErr ctxt dups
 redundantWildcardErr :: SDoc -> SDoc
 redundantWildcardErr fix_doc
   = text "Record wildcard does not bind any new variables"
-    $$ text "Possible fix" <> colon <+> fix_doc
+    $$ nest 2 (text "Possible fix" <> colon <+> fix_doc)
 
 pprRFC :: HsRecFieldContext -> SDoc
 pprRFC (HsRecFieldCon {}) = text "construction"
