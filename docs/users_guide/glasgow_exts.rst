@@ -3786,7 +3786,7 @@ Haskell 98 allows the programmer to add a deriving clause to a data type
 declaration, to generate a standard instance declaration for specified class.
 GHC extends this mechanism along several axes:
 
-* The derivation mechanism can be used separtely from the data type
+* The derivation mechanism can be used separately from the data type
   declaration, using the `standalone deriving mechanism
   <#stand-alone-deriving>`__.
 

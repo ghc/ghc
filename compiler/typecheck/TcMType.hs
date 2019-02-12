@@ -1468,7 +1468,7 @@ quantifiableTv :: TcLevel   -- Level of the context, outside the quantification
                -> TcTyVar
                -> Bool
 quantifiableTv outer_tclvl tcv
-  | isTcTyVar tcv  -- Might be a CoVar; change this when gather covars separtely
+  | isTcTyVar tcv  -- Might be a CoVar; change this when gather covars separately
   = tcTyVarLevel tcv > outer_tclvl
   | otherwise
   = False
