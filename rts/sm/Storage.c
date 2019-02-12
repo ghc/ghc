@@ -1223,6 +1223,29 @@ dirty_STACK (Capability *cap, StgStack *stack)
 }
 
 /*
+ * This is the concurrent collector's write barrier for MVARs. In the other
+ * write barriers above this is folded into the dirty_* functions.  However, in
+ * the case of MVars we need to separate the acts of adding the MVar to the
+ * mutable list and adding its fields to the update remembered set.
+ *
+ * Specifically, the wakeup loop in stg_putMVarzh wants to freely mutate the
+ * pointers of the MVar but needs to keep its lock, meaning we can't yet add it
+ * to the mutable list lest the assertion checking for clean MVars on the
+ * mutable list would fail.
+ */
+void
+update_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
+{
+    Capability *cap = regTableToCapability(reg);
+    if (nonmoving_write_barrier_enabled) {
+        StgMVar *mvar = (StgMVar *) p;
+        updateRemembSetPushClosure(cap, old_val, NULL);
+        updateRemembSetPushClosure(cap, (StgClosure *) mvar->head, NULL);
+        updateRemembSetPushClosure(cap, (StgClosure *) mvar->tail, NULL);
+    }
+}
+
+/*
    This is the write barrier for MVARs.  An MVAR_CLEAN objects is not
    on the mutable list; a MVAR_DIRTY is.  When written to, a
    MVAR_CLEAN turns into a MVAR_DIRTY and is put on the mutable list.
@@ -1234,12 +1257,7 @@ void
 dirty_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 {
     Capability *cap = regTableToCapability(reg);
-    if (nonmoving_write_barrier_enabled) {
-        StgMVar *mvar = (StgMVar *) p;
-        updateRemembSetPushClosure(cap, old_val, NULL);
-        updateRemembSetPushClosure(cap, (StgClosure *) mvar->head, NULL);
-        updateRemembSetPushClosure(cap, (StgClosure *) mvar->tail, NULL);
-    }
+    update_MVAR(reg, p, old_val);
     recordClosureMutated(cap, p);
 }
 
