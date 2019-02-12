@@ -23,10 +23,10 @@ T15957_Fail.hs:13:15: error: [-Wredundant-record-wildcards (in -Wall), -Werror=r
     Record wildcard does not bind any new variables
       Possible fix: P {x = 0, y = 0}
 
-T15957_Fail.hs:20:3: error: [-Wunused-record-wildcards (in -Wall), -Werror=unused-record-wildcards]
+T15957_Fail.hs:20:9: error: [-Wunused-record-wildcards (in -Wall), -Werror=unused-record-wildcards]
     No variables bound in the record wildcard match are used
       Possible fix: P {}
 
-T15957_Fail.hs:25:3: error: [-Wunused-record-wildcards (in -Wall), -Werror=unused-record-wildcards]
+T15957_Fail.hs:25:9: error: [-Wunused-record-wildcards (in -Wall), -Werror=unused-record-wildcards]
     No variables bound in the record wildcard match are used
       Possible fix: P {}
