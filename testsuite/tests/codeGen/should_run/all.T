@@ -193,7 +193,7 @@ test('T15696_3', normal, compile_and_run, ['-O'])
 test('T15892',
      [ ignore_stdout,
        # -G1 is unsupported by the nonmoving GC
-       omit_ways(['nonmoving', 'nonmoving_thr']),
+       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']),
        # we want to do lots of major GC to make the bug more likely to
        # happen, so -G1 -A32k:
        extra_run_opts('+RTS -G1 -A32k -RTS') ],
