@@ -302,8 +302,10 @@ performance.
     for all generations. This can cause long pauses in execution during major
     garbage collections. :rts-flag:`-xn` enables the use of a concurrent
     mark-and-sweep garbage collector for oldest generation collections.
+    Under this collection strategy oldest-generation garbage collection
+    can proceed concurrently with mutation.
 
-    TODO
+    Note that :rts-flag:`-xn` cannot be used with ``-G1`` nor :rts-flag:`-c`.
 
 .. rts-flag:: -A ⟨size⟩
 

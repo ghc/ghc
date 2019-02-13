@@ -1701,8 +1701,15 @@ static void normaliseRtsOpts (void)
         RtsFlags.MiscFlags.install_seh_handlers = true;
     }
 
-    if (RtsFlags.GcFlags.useNonmoving && RtsFlags.GcFlags.generations == 1)
+    if (RtsFlags.GcFlags.useNonmoving && RtsFlags.GcFlags.generations == 1) {
         barf("The non-moving collector doesn't support -G1");
+    }
+
+    if (RtsFlags.GcFlags.compact && RtsFlags.GcFlags.useNonmoving) {
+        errorBelch("The non-moving collector cannot be used in conjunction with\n"
+                   "the compacting collector.");
+        errorUsage();
+    }
 }
 
 static void errorUsage (void)
