@@ -23,6 +23,11 @@ Compiler
   :ghc-flag:`-Wredundant-record-wildcards`  which warn users when they have
   redundant or unused uses of a record wildcard match.
 
+- Kind variables in ``forall`` are no longer implicitly quantified, see
+  `GHC proposal #24
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0024-no-kind-vars.rst>`__.
+  :ghc-flag:`-Wimplicit-kind-vars` is now obsolete.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
