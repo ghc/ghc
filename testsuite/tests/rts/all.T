@@ -67,8 +67,12 @@ test('outofmem', when(opsys('darwin'), skip),
                  makefile_test, ['outofmem'])
 test('outofmem2', normal, makefile_test, ['outofmem2'])
 
-test('T2047', [ignore_stdout, extra_run_opts('+RTS -c -RTS')],
-              compile_and_run, ['-package containers'])
+test('T2047',
+     [ignore_stdout,
+      extra_run_opts('+RTS -c -RTS'),
+      # Non-moving collector doesn't support -c
+      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc'])],
+     compile_and_run, ['-package containers'])
 
 # Blackhole-detection test.
 # Skip GHCi due to #2786
