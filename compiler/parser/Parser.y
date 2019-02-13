@@ -1238,7 +1238,7 @@ ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
 
 ty_fam_inst_eqn :: { Located ([AddAnn],TyFamInstEqn GhcPs) }
         : 'forall' tv_bndrs '.' type '=' ktype
-              {% do { hintExplicitForall (getLoc $1)
+              {% do { hintExplicitForall $1
                     ; (eqn,ann) <- mkTyFamInstEqn (Just $2) $4 $6
                     ; return (sLL $1 $>
                                (mu AnnForall $1:mj AnnDot $3:mj AnnEqual $5:ann,eqn)) } }
@@ -1382,13 +1382,13 @@ tycl_hdr :: { Located (Maybe (LHsContext GhcPs), LHsType GhcPs) }
         | type                      { sL1 $1 (Nothing, $1) }
 
 tycl_hdr_inst :: { Located ([AddAnn],(Maybe (LHsContext GhcPs), Maybe [LHsTyVarBndr GhcPs], LHsType GhcPs)) }
-        : 'forall' tv_bndrs '.' context '=>' type   {% hintExplicitForall (getLoc $1)
+        : 'forall' tv_bndrs '.' context '=>' type   {% hintExplicitForall $1
                                                        >> (addAnnotation (gl $4) (toUnicodeAnn AnnDarrow $5) (gl $5)
                                                            >> return (sLL $1 $> ([mu AnnForall $1, mj AnnDot $3]
                                                                                 , (Just $4, Just $2, $6)))
                                                           )
                                                     }
-        | 'forall' tv_bndrs '.' type   {% hintExplicitForall (getLoc $1)
+        | 'forall' tv_bndrs '.' type   {% hintExplicitForall $1
                                           >> return (sLL $1 $> ([mu AnnForall $1, mj AnnDot $3]
                                                                , (Nothing, Just $2, $4)))
                                        }
@@ -1667,7 +1667,7 @@ rule_explicit_activation :: { ([AddAnn]
 
 rule_foralls :: { ([AddAnn], Maybe [LHsTyVarBndr GhcPs], [LRuleBndr GhcPs]) }
         : 'forall' rule_vars '.' 'forall' rule_vars '.'    {% let tyvs = mkRuleTyVarBndrs $2
-                                                              in hintExplicitForall (getLoc $1)
+                                                              in hintExplicitForall $1
                                                               >> checkRuleTyVarBndrNames (mkRuleTyVarBndrs $2)
                                                               >> return ([mu AnnForall $1,mj AnnDot $3,
                                                                           mu AnnForall $4,mj AnnDot $6],
@@ -1855,7 +1855,7 @@ ktypedoc :: { LHsType GhcPs }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType GhcPs }
-        : 'forall' tv_bndrs '.' ctype   {% hintExplicitForall (getLoc $1) >>
+        : 'forall' tv_bndrs '.' ctype   {% hintExplicitForall $1 >>
                                            ams (sLL $1 $> $
                                                 HsForAllTy { hst_bndrs = $2
                                                            , hst_xforall = noExt
@@ -1882,7 +1882,7 @@ ctype   :: { LHsType GhcPs }
 -- to 'field' or to 'Int'. So we must use `ctype` to describe the type.
 
 ctypedoc :: { LHsType GhcPs }
-        : 'forall' tv_bndrs '.' ctypedoc {% hintExplicitForall (getLoc $1) >>
+        : 'forall' tv_bndrs '.' ctypedoc {% hintExplicitForall $1 >>
                                             ams (sLL $1 $> $
                                                  HsForAllTy { hst_bndrs = $2
                                                             , hst_xforall = noExt
@@ -3371,7 +3371,7 @@ tyvarop :: { Located RdrName }
 tyvarop : '`' tyvarid '`'       {% ams (sLL $1 $> (unLoc $2))
                                        [mj AnnBackquote $1,mj AnnVal $2
                                        ,mj AnnBackquote $3] }
-        | '.'                   {% hintExplicitForall' (getLoc $1) }
+        | '.'                   { sL1 $1 $ mkUnqual tcClsName (fsLit ".") }
 
 tyvarid :: { Located RdrName }
         : VARID            { sL1 $1 $! mkUnqual tvName (getVARID $1) }
@@ -3472,7 +3472,7 @@ special_id
 special_sym :: { Located FastString }
 special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }
             | '.'       { sL1 $1 (fsLit ".") }
-            | '*'       { sL1 $1 (fsLit (if isUnicode $1 then "\x2605" else "*")) }
+            | '*'       { sL1 $1 (fsLit (starSym (isUnicode $1))) }
 
 -----------------------------------------------------------------------------
 -- Data constructors
@@ -3767,32 +3767,19 @@ hintIf span msg = do
     then parseErrorSDoc span $ text $ "parse error in if statement"
     else parseErrorSDoc span $ text $ "parse error in if statement: "++msg
 
--- Hint about explicit-forall, assuming UnicodeSyntax is on
-hintExplicitForall :: SrcSpan -> P ()
-hintExplicitForall span = do
+-- Hint about explicit-forall
+hintExplicitForall :: Located Token -> P ()
+hintExplicitForall tok = do
     forall   <- getBit ExplicitForallBit
     rulePrag <- getBit InRulePragBit
-    unless (forall || rulePrag) $ parseErrorSDoc span $ vcat
-      [ text "Illegal symbol '\x2200' in type" -- U+2200 FOR ALL
+    unless (forall || rulePrag) $ parseErrorSDoc (getLoc tok) $ vcat
+      [ text "Illegal symbol" <+> quotes forallSymDoc <+> text "in type"
       , text "Perhaps you intended to use RankNTypes or a similar language"
-      , text "extension to enable explicit-forall syntax: \x2200 <tvs>. <type>"
+      , text "extension to enable explicit-forall syntax:" <+>
+        forallSymDoc <+> text "<tvs>. <type>"
       ]
-
--- Hint about explicit-forall, assuming UnicodeSyntax is off
-hintExplicitForall' :: SrcSpan -> P (Located RdrName)
-hintExplicitForall' span = do
-    forall <- getBit ExplicitForallBit
-    let illegalDot = "Illegal symbol '.' in type"
-    if forall
-      then parseErrorSDoc span $ vcat
-        [ text illegalDot
-        , text "Perhaps you meant to write 'forall <tvs>. <type>'?"
-        ]
-      else parseErrorSDoc span $ vcat
-        [ text illegalDot
-        , text "Perhaps you intended to use RankNTypes or a similar language"
-        , text "extension to enable explicit-forall syntax: forall <tvs>. <type>"
-        ]
+  where
+    forallSymDoc = text (forallSym (isUnicode tok))
 
 checkIfBang :: LHsExpr GhcPs -> Bool
 checkIfBang (dL->L _ (HsVar _ (dL->L _ op))) = op == bang_RDR
