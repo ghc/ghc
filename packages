@@ -65,6 +65,5 @@ libraries/unix               -           -                               ssh://g
 libraries/Win32              -           -                               https://github.com/haskell/win32.git
 libraries/xhtml              -           -                               https://github.com/haskell/xhtml.git
 nofib                        nofib       -                               -
-libraries/parallel           extra       -                               ssh://git@github.com/haskell/parallel.git
 libraries/stm                -           -                               ssh://git@github.com/haskell/stm.git
 .                            -           ghc.git                         -
