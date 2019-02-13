@@ -1,5 +1,7 @@
 
-Boot.hs:5:21: error:
-    Illegal symbol '.' in type
-    Perhaps you intended to use RankNTypes or a similar language
-    extension to enable explicit-forall syntax: forall <tvs>. <type>
+Boot.hs:5:13: error:
+    • Data constructor ‘D’ has existential type variables, a context, or a specialised result type
+        D :: forall n. Class n => n -> Data
+        (Enable ExistentialQuantification or GADTs to allow this)
+    • In the definition of data constructor ‘D’
+      In the data type declaration for ‘Data’
