@@ -71,6 +71,10 @@ module   RdrHsSyn (
         mkImpExpSubSpec,
         checkImportSpec,
 
+        -- Token symbols
+        forallSym,
+        starSym,
+
         -- Warnings and errors
         warnStarIsType,
         failOpFewArgs,
@@ -97,7 +101,7 @@ import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           listTyConName, listTyConKey, eqTyCon_RDR,
                           tupleTyConName, cTupleTyConNameArity_maybe )
 import ForeignCall
-import PrelNames        ( forall_tv_RDR, allNameStrings )
+import PrelNames        ( allNameStrings )
 import SrcLoc
 import Unique           ( hasKey )
 import OrdList          ( OrdList, fromOL )
@@ -575,14 +579,10 @@ tyConToDataCon loc tc
   = return (cL loc (setRdrNameSpace tc srcDataName))
 
   | otherwise
-  = Left (loc, msg $$ extra)
+  = Left (loc, msg)
   where
     occ = rdrNameOcc tc
-
     msg = text "Not a data constructor:" <+> quotes (ppr tc)
-    extra | tc == forall_tv_RDR
-          = text "Perhaps you intended to use ExistentialQuantification"
-          | otherwise = empty
 
 mkPatSynMatchGroup :: Located RdrName
                    -> Located (OrdList (LHsDecl GhcPs))
@@ -962,7 +962,7 @@ checkTyClHdr is_cls ty
     -- workaround to define '*' despite StarIsType
     go lp (HsParTy _ (dL->L l (HsStarTy _ isUni))) acc ann fix
       = do { warnStarBndr l
-           ; let name = mkOccName tcClsName (if isUni then "★" else "*")
+           ; let name = mkOccName tcClsName (starSym isUni)
            ; return (cL l (Unqual name), acc, fix, (ann ++ mkParensApiAnn lp)) }
 
     go l (HsTyVar _ _ (dL->L _ tc)) acc ann fix
@@ -2349,3 +2349,14 @@ mkLHsDocTy t doc =
 
 mkLHsDocTyMaybe :: LHsType GhcPs -> Maybe LHsDocString -> LHsType GhcPs
 mkLHsDocTyMaybe t = maybe t (mkLHsDocTy t)
+
+-----------------------------------------------------------------------------
+-- Token symbols
+
+starSym :: Bool -> String
+starSym True = "★"
+starSym False = "*"
+
+forallSym :: Bool -> String
+forallSym True = "∀"
+forallSym False = "forall"

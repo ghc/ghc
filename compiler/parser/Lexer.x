@@ -818,9 +818,7 @@ reservedWordsFM = listToUFM $
          ( "type",           ITtype,          0 ),
          ( "where",          ITwhere,         0 ),
 
-         ( "forall",         ITforall NormalSyntax,
-                                              xbit ExplicitForallBit .|.
-                                              xbit InRulePragBit),
+         ( "forall",         ITforall NormalSyntax, 0),
          ( "mdo",            ITmdo,           xbit RecursiveDoBit),
              -- See Note [Lexing type pseudo-keywords]
          ( "family",         ITfamily,        0 ),
@@ -2304,7 +2302,7 @@ data ExtBits
   | ThQuotesBit
   | IpBit
   | OverloadedLabelsBit -- #x overloaded labels
-  | ExplicitForallBit -- the 'forall' keyword and '.' symbol
+  | ExplicitForallBit -- the 'forall' keyword
   | BangPatBit -- Tells the parser to understand bang-patterns
                -- (doesn't affect the lexer)
   | PatternSynonymsBit -- pattern synonyms
