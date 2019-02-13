@@ -13,7 +13,7 @@ import Settings
 import Target
 import Utilities
 
-import System.FilePath.Posix ((</>))
+import qualified System.FilePath.Posix as Posix ((</>))
 
 instance Arbitrary Way where
     arbitrary = wayFromUnits <$> arbitrary
@@ -119,7 +119,7 @@ testPaths :: Action ()
 testPaths = do
     putBuild "==== Absolute, Relative Path Concatenation"
     test $ forAll paths $ \(path1, path2) ->
-      path1 -/- path2 == path1 </> path2
+      path1 -/- path2 == path1 Posix.</> path2
   where
     paths = (,) <$> path <*> path
     path = frequency [(1, relativePath), (1, absolutePath)]
