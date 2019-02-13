@@ -134,7 +134,7 @@ rn_hs_sig_wc_type scoping ctxt
                                AlwaysBind       -> True
                                BindUnlessForall -> not (isLHsForAllTy hs_ty)
                                NeverBind        -> False
-       ; rnImplicitBndrs bind_free_tvs tv_rdrs $ \ vars ->
+       ; rnImplicitBndrs bind_free_tvs (freeKiTyVarsAllVars tv_rdrs) $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = ib_ty' }
              ib_ty'  = HsIB { hsib_ext = vars
@@ -308,7 +308,7 @@ rnHsSigType :: HsDocContext -> LHsSigType GhcPs
 rnHsSigType ctx (HsIB { hsib_body = hs_ty })
   = do { traceRn "rnHsSigType" (ppr hs_ty)
        ; vars <- extractFilteredRdrTyVarsDups hs_ty
-       ; rnImplicitBndrs (not (isLHsForAllTy hs_ty)) vars $ \ vars ->
+       ; rnImplicitBndrs (not (isLHsForAllTy hs_ty)) (freeKiTyVarsAllVars vars) $ \ vars ->
     do { (body', fvs) <- rnLHsType ctx hs_ty
        ; return ( HsIB { hsib_ext = vars
                        , hsib_body = body' }
@@ -320,58 +320,27 @@ rnImplicitBndrs :: Bool    -- True <=> bring into scope any free type variables
                            --  we do not want to bring 'b' into scope, hence False
                            -- But   f :: a -> b
                            --  we want to bring both 'a' and 'b' into scope
-                -> FreeKiTyVarsWithDups
+                -> [Located RdrName]
                                    -- Free vars of hs_ty (excluding wildcards)
                                    -- May have duplicates, which is
                                    -- checked here
                 -> ([Name] -> RnM (a, FreeVars))
                 -> RnM (a, FreeVars)
 rnImplicitBndrs bind_free_tvs
-                fvs_with_dups@(FKTV { fktv_kis = kvs_with_dups
-                                    , fktv_tys = tvs_with_dups })
+                fvs_with_dups
                 thing_inside
-  = do { let FKTV kvs tvs = rmDupsInRdrTyVars fvs_with_dups
-             real_tvs | bind_free_tvs = tvs
+  = do { let fvs = nubL fvs_with_dups
+             real_fvs | bind_free_tvs = fvs
                       | otherwise     = []
-             -- We always bind over free /kind/ variables.
-             -- Bind free /type/ variables only if there is no
-             -- explicit forall.  E.g.
-             --    f :: Proxy (a :: k) -> b
-             --         Quantify over {k} and {a,b}
-             --    g :: forall a. Proxy (a :: k) -> b
-             --         Quantify over {k} and {}
-             -- Note that we always do the implicit kind-quantification
-             -- but, rather arbitrarily, we switch off the type-quantification
-             -- if there is an explicit forall
 
-       ; traceRn "rnImplicitBndrs" (vcat [ ppr kvs, ppr tvs, ppr real_tvs ])
-
-       ; whenWOptM Opt_WarnImplicitKindVars $
-         unless (bind_free_tvs || null kvs) $
-         addWarnAt (Reason Opt_WarnImplicitKindVars) (getLoc (head kvs)) $
-         implicit_kind_vars_msg kvs
+       ; traceRn "rnImplicitBndrs" $
+         vcat [ ppr fvs_with_dups, ppr fvs, ppr real_fvs ]
 
        ; loc <- getSrcSpanM
-          -- NB: kinds before tvs, as mandated by
-          -- Note [Ordering of implicit variables]
-       ; vars <- mapM (newLocalBndrRn . cL loc . unLoc) (kvs ++ real_tvs)
-
-       ; traceRn "checkMixedVars2" $
-           vcat [ text "kvs_with_dups" <+> ppr kvs_with_dups
-                , text "tvs_with_dups" <+> ppr tvs_with_dups ]
+       ; vars <- mapM (newLocalBndrRn . cL loc . unLoc) real_fvs
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
-  where
-    implicit_kind_vars_msg kvs =
-      vcat [ text "An explicit" <+> quotes (text "forall") <+>
-             text "was used, but the following kind variables" <+>
-             text "are not quantified:" <+>
-             hsep (punctuate comma (map (quotes . ppr) kvs))
-           , text "Despite this fact, GHC will introduce them into scope," <+>
-             text "but it will stop doing so in the future."
-           , text "Suggested fix: add" <+>
-             quotes (text "forall" <+> hsep (map ppr kvs) <> char '.') ]
 
 {- ******************************************************
 *                                                       *

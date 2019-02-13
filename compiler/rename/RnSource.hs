@@ -729,13 +729,10 @@ rnFamInstEqn doc mb_cls rhs_kvars
              -- below to report unsed binder on the LHS
        ; let pat_kity_vars = rmDupsInRdrTyVars pat_kity_vars_with_dups
 
-         -- all pat vars not explicitly bound (see extractHsTvBndrs)
-       ; let mb_imp_kity_vars = extractHsTvBndrs <$> mb_bndrs <*> pure pat_kity_vars
-             imp_vars = case mb_imp_kity_vars of
-                          -- kind vars are the only ones free if we have an explicit forall
-                          Just nbnd_kity_vars -> freeKiTyVarsKindVars nbnd_kity_vars
-                          -- all pattern vars are free otherwise
-                          Nothing             -> freeKiTyVarsAllVars pat_kity_vars
+         -- Implicitly bound variables, empty if we have an explicit 'forall' according
+         -- to the "forall-or-nothing" rule.
+       ; let imp_vars | isNothing mb_bndrs = freeKiTyVarsAllVars pat_kity_vars
+                      | otherwise = []
        ; imp_var_names <- mapM (newTyVarNameRn mb_cls) imp_vars
 
        ; let bndrs = fromMaybe [] mb_bndrs
@@ -2148,7 +2145,8 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- That order governs the order the implicitly-quantified type
           -- variable, and hence the order needed for visible type application
           -- See Trac #14808.
-              free_tkvs = extractHsTvBndrs explicit_tkvs $
+              free_tkvs = freeKiTyVarsAllVars $
+                          extractHsTvBndrs explicit_tkvs $
                           extractHsTysRdrTyVarsDups (theta ++ arg_tys ++ [res_ty])
 
               ctxt    = ConDeclCtx new_names
