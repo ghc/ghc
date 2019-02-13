@@ -224,10 +224,8 @@ warnUnusedTopBinds gres
          warnUnusedGREs gres'
 
 
--- Run the inner action to find out its free variables and then
--- check whether the variables we bound are actually used.
--- If none of them are used and -Wwarn-redundant-record-wildcards is
--- enabled then we issue a warning.
+-- | Checks to see if we need to warn for -Wunused-record-wildcards or
+-- -Wredundant-record-wildcards
 checkUnusedRecordWildcard :: SrcSpan
                           -> FreeVars
                           -> Maybe [Name]
@@ -240,6 +238,16 @@ checkUnusedRecordWildcard loc fvs (Just dotdot_names) =
   setSrcSpan loc $ warnUnusedRecordWildcard dotdot_names fvs
 
 
+-- | Produce a warning when the `..` pattern binds no new
+-- variables.
+--
+-- @
+--   data P = P { x :: Int }
+--
+--   foo (P{x, ..}) = x
+-- @
+--
+-- The `..` here doesn't bind any variables as `x` is already bound.
 warnRedundantRecordWildcard :: RnM ()
 warnRedundantRecordWildcard =
   whenWOptM Opt_WarnRedundantRecordWildcards
@@ -247,7 +255,16 @@ warnRedundantRecordWildcard =
                      redundantWildcardWarning)
 
 
--- | Get to see whether at least one name from each RecordWildcard is used.
+-- | Produce a warning when no variables bound by a `..` pattern are used.
+--
+-- @
+--   data P = P { x :: Int }
+--
+--   foo (P{..}) = ()
+-- @
+--
+-- The `..` pattern binds `x` but it is not used in the RHS so we issue
+-- a warning.
 warnUnusedRecordWildcard :: [Name] -> FreeVars -> RnM ()
 warnUnusedRecordWildcard ns used_names = do
   let used = filter (`elemNameSet` used_names) ns
