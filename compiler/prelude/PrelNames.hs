@@ -645,10 +645,6 @@ main_RDR_Unqual = mkUnqual varName (fsLit "main")
         -- We definitely don't want an Orig RdrName, because
         -- main might, in principle, be imported into module Main
 
-forall_tv_RDR, dot_tv_RDR :: RdrName
-forall_tv_RDR = mkUnqual tvName (fsLit "forall")
-dot_tv_RDR    = mkUnqual tvName (fsLit ".")
-
 eq_RDR, ge_RDR, le_RDR, lt_RDR, gt_RDR, compare_RDR,
     ltTag_RDR, eqTag_RDR, gtTag_RDR :: RdrName
 eq_RDR                  = nameRdrName eqName
