@@ -1,0 +1,9 @@
+:set -XPolyKinds -XDataKinds
+import Data.Kind (Type)
+data Proxy (a :: k)
+f :: Proxy (a :: k) -> Proxy (b :: j) -> (); f = f
+g :: Proxy (b :: j) -> Proxy (a :: (Proxy :: (k -> Type) -> Type) Proxy) -> (); g = g
+h :: Proxy (a :: (j, k)) -> Proxy (b :: Proxy a) -> (); h = h
+:t +v f
+:t +v g
+:t +v h
