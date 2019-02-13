@@ -54,7 +54,7 @@ import RnEnv
 import RnFixity
 import RnUtils             ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
-                           , warnUnusedRecordWildcard
+                           , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
 import RnTypes
@@ -75,7 +75,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad       ( when, liftM, ap, guard )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
-import DynFlags
 
 {-
 *********************************************************
@@ -531,30 +530,12 @@ rnConPatAndThen mk con (RecCon rpats)
         ; rpats' <- rnHsRecPatsAndThen mk con' rpats
         ; return (ConPatIn con' (RecCon rpats')) }
 
--- Run the inner action to find out its free variables and then
--- check whether the variables we bound are actually used.
--- If none of them are used and -Wwarn-redundant-record-wildcards is
--- enabled then we issue a warning.
-checkUnusedRecordWildcard :: SDoc
-                          -> SrcSpan
-                          -> Maybe [Name]
-                          -> CpsRn ()
-checkUnusedRecordWildcard _ _ Nothing    = return ()
-checkUnusedRecordWildcard fix_doc loc (Just [])  = do
-  -- Add a new warning if the .. pattern binds no variables
-  liftCps . setSrcSpan loc $
-              whenWOptM Opt_WarnRedundantRecordWildcards
-                (addWarn (Reason Opt_WarnRedundantRecordWildcards)
-                         (redundantWildcardErr fix_doc))
-checkUnusedRecordWildcard fix_doc loc (Just dotdot_names) =
+checkUnusedRecordWildcardCps :: SrcSpan -> Maybe [Name] -> CpsRn ()
+checkUnusedRecordWildcardCps loc dotdot_names =
   CpsRn (\thing -> do
                     (r, fvs) <- thing ()
-                    -- Check if any of the bound variables are used. We
-                    -- warn if none of them are used.
-                    setSrcSpan loc $
-                      warnUnusedRecordWildcard fix_doc dotdot_names fvs
+                    checkUnusedRecordWildcard loc fvs dotdot_names
                     return (r, fvs) )
-
 --------------------
 rnHsRecPatsAndThen :: NameMaker
                    -> Located Name      -- Constructor
@@ -573,13 +554,6 @@ rnHsRecPatsAndThen mk (dL->L _ con)
       do { arg' <- rnLPatAndThen (nested_mk dd mk n') (hsRecFieldArg fld)
          ; return (cL l (fld { hsRecFieldArg = arg' })) }
 
-
-    -- Reconstruct the ConPat without the ..
-    -- We print the parsed syntax rather than renamed syntax as that seemed
-    -- a bit safer to me.
-    fix_doc = ppr (ConPatIn (noLoc (getRdrName con))
-                            (RecCon (hs_rec_fields { rec_dotdot = Nothing })))
-
     loc = maybe noSrcSpan getLoc dd
 
     -- Get the arguments of the implicit binders
@@ -590,7 +564,7 @@ rnHsRecPatsAndThen mk (dL->L _ con)
     -- Don't warn for let P{..} = ... in ...
     check_unused_wildcard = case mk of
                               LetMk{} -> const (return ())
-                              LamMk{} -> checkUnusedRecordWildcard fix_doc loc
+                              LamMk{} -> checkUnusedRecordWildcardCps loc
 
         -- Suppress unused-match reporting for fields introduced by ".."
     nested_mk Nothing  mk                    _  = mk
@@ -832,11 +806,6 @@ dupFieldErr ctxt dups
   = hsep [text "duplicate field name",
           quotes (ppr (NE.head dups)),
           text "in record", pprRFC ctxt]
-
-redundantWildcardErr :: SDoc -> SDoc
-redundantWildcardErr fix_doc
-  = text "Record wildcard does not bind any new variables"
-    $$ nest 2 (text "Possible fix" <> colon <+> fix_doc)
 
 pprRFC :: HsRecFieldContext -> SDoc
 pprRFC (HsRecFieldCon {}) = text "construction"

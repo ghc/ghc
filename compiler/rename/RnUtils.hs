@@ -14,7 +14,7 @@ module RnUtils (
         addFvRn, mapFvRn, mapMaybeFvRn,
         warnUnusedMatches, warnUnusedTypePatterns,
         warnUnusedTopBinds, warnUnusedLocalBinds,
-        warnUnusedRecordWildcard,
+        checkUnusedRecordWildcard,
         mkFieldEnv,
         unknownSubordinateErr, badQualBndrErr, typeAppErr,
         HsDocContext(..), pprHsDocContext,
@@ -224,13 +224,36 @@ warnUnusedTopBinds gres
          warnUnusedGREs gres'
 
 
+-- Run the inner action to find out its free variables and then
+-- check whether the variables we bound are actually used.
+-- If none of them are used and -Wwarn-redundant-record-wildcards is
+-- enabled then we issue a warning.
+checkUnusedRecordWildcard :: SrcSpan
+                          -> FreeVars
+                          -> Maybe [Name]
+                          -> RnM ()
+checkUnusedRecordWildcard _ _ Nothing    = return ()
+checkUnusedRecordWildcard loc _ (Just [])  = do
+  -- Add a new warning if the .. pattern binds no variables
+  setSrcSpan loc $ warnRedundantRecordWildcard
+checkUnusedRecordWildcard loc fvs (Just dotdot_names) =
+  setSrcSpan loc $ warnUnusedRecordWildcard dotdot_names fvs
+
+
+warnRedundantRecordWildcard :: RnM ()
+warnRedundantRecordWildcard =
+  whenWOptM Opt_WarnRedundantRecordWildcards
+            (addWarn (Reason Opt_WarnRedundantRecordWildcards)
+                     redundantWildcardWarning)
+
+
 -- | Get to see whether at least one name from each RecordWildcard is used.
-warnUnusedRecordWildcard :: SDoc -> [Name] -> FreeVars -> RnM ()
-warnUnusedRecordWildcard fix_doc ns used_names = do
+warnUnusedRecordWildcard :: [Name] -> FreeVars -> RnM ()
+warnUnusedRecordWildcard ns used_names = do
   let used = filter (`elemNameSet` used_names) ns
   traceRn "warnUnused" (ppr ns $$ ppr used_names $$ ppr used)
   warnIfFlag Opt_WarnUnusedRecordWildcards (null used)
-    (unusedRecordWildcardWarning fix_doc)
+    unusedRecordWildcardWarning
 
 
 
@@ -308,10 +331,19 @@ addUnusedWarning flag occ span msg
          nest 2 $ pprNonVarNameSpace (occNameSpace occ)
                         <+> quotes (ppr occ)]
 
-unusedRecordWildcardWarning :: SDoc -> SDoc
-unusedRecordWildcardWarning fix_doc
-  = text "No variables bound in the record wildcard match are used"
-    $$ nest 2 (text "Possible fix" <> colon <+> fix_doc)
+unusedRecordWildcardWarning :: SDoc
+unusedRecordWildcardWarning =
+  wildcardDoc $ text "No variables bound in the record wildcard match are used"
+
+redundantWildcardWarning :: SDoc
+redundantWildcardWarning =
+  wildcardDoc $ text "Record wildcard does not bind any new variables"
+
+wildcardDoc :: SDoc -> SDoc
+wildcardDoc herald =
+  herald
+    $$ nest 2 (text "Possible fix" <> colon <+> text "omit the"
+                                            <+> quotes (text ".."))
 
 addNameClashErrRn :: RdrName -> [GlobalRdrElt] -> RnM ()
 addNameClashErrRn rdr_name gres

@@ -1318,7 +1318,7 @@ The main purpose is to find names introduced by record wildcards so that we can 
 warning the user when they don't use those names (#4404)
 
 Since the addition of -Wunused-record-wildcards, this function returns a pair
-of [(SrcSpan, SDoc, [Name])]. Each element of the list is one set of implicit
+of [(SrcSpan, [Name])]. Each element of the list is one set of implicit
 binders, the first component of the tuple is the document describes the possible
 fix to the problem (by removing the ..).
 
@@ -1328,15 +1328,15 @@ easier.
 -}
 
 lStmtsImplicits :: [LStmtLR GhcRn (GhcPass idR) (Located (body (GhcPass idR)))]
-                -> [(SrcSpan, SDoc, [Name])]
+                -> [(SrcSpan, [Name])]
 lStmtsImplicits = hs_lstmts
   where
     hs_lstmts :: [LStmtLR GhcRn (GhcPass idR) (Located (body (GhcPass idR)))]
-              -> [(SrcSpan, SDoc, [Name])]
+              -> [(SrcSpan, [Name])]
     hs_lstmts = concatMap (hs_stmt . unLoc)
 
     hs_stmt :: StmtLR GhcRn (GhcPass idR) (Located (body (GhcPass idR)))
-            -> [(SrcSpan, SDoc, [Name])]
+            -> [(SrcSpan, [Name])]
     hs_stmt (BindStmt _ pat _ _ _) = lPatImplicits pat
     hs_stmt (ApplicativeStmt _ args _) = concatMap do_arg args
       where do_arg (_, ApplicativeArgOne _ pat _ _) = lPatImplicits pat
@@ -1356,24 +1356,24 @@ lStmtsImplicits = hs_lstmts
     hs_local_binds (EmptyLocalBinds _)      = []
     hs_local_binds (XHsLocalBindsLR _)      = []
 
-hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR) -> [(SrcSpan, SDoc, [Name])]
+hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR) -> [(SrcSpan, [Name])]
 hsValBindsImplicits (XValBindsLR (NValBinds binds _))
-  = foldr (unionNameEnv . lhsBindsImplicits . snd) [] binds
+  = concatMap (lhsBindsImplicits . snd) binds
 hsValBindsImplicits (ValBinds _ binds _)
   = lhsBindsImplicits binds
 
-lhsBindsImplicits :: LHsBindsLR GhcRn idR -> [(SrcSpan, SDoc, [Name])]
-lhsBindsImplicits = foldBag unionNameEnv (lhs_bind . unLoc) []
+lhsBindsImplicits :: LHsBindsLR GhcRn idR -> [(SrcSpan, [Name])]
+lhsBindsImplicits = foldBag (++) (lhs_bind . unLoc) []
   where
     lhs_bind (PatBind { pat_lhs = lpat }) = lPatImplicits lpat
     lhs_bind _ = []
 
-lPatImplicits :: LPat GhcRn -> [(SrcSpan, SDoc, [Name])]
+lPatImplicits :: LPat GhcRn -> [(SrcSpan, [Name])]
 lPatImplicits = hs_lpat
   where
     hs_lpat lpat = hs_pat (unLoc lpat)
 
-    hs_lpats = foldr (\pat rest -> hs_lpat pat `unionNameEnv` rest) []
+    hs_lpats = foldr (\pat rest -> hs_lpat pat ++ rest) []
 
     hs_pat (LazyPat _ pat)      = hs_lpat pat
     hs_pat (BangPat _ pat)      = hs_lpat pat
@@ -1391,11 +1391,12 @@ lPatImplicits = hs_lpat
 
     hs_pat _ = []
 
-    details :: Located Name -> HsConPatDetails GhcRn -> [(SrcSpan, SDoc, [Name])]
+    details :: Located Name -> HsConPatDetails GhcRn -> [(SrcSpan, [Name])]
     details _ (PrefixCon ps)   = hs_lpats ps
     details n (RecCon fs)      =
-      hs_lpats explicit_pats `unionNameEnv`
-        [(err_loc, fix_doc, collectPatsBinders implicit_pats) | Just{} <- [rec_dotdot fs] ]
+      [(err_loc, collectPatsBinders implicit_pats) | Just{} <- [rec_dotdot fs] ]
+        ++ hs_lpats explicit_pats
+
       where implicit_pats = map (hsRecFieldArg . unLoc) implicit
             explicit_pats = map (hsRecFieldArg . unLoc) explicit
 
@@ -1405,15 +1406,6 @@ lPatImplicits = hs_lpat
                                                     ,  let  pat_explicit =
                                                               maybe True ((i<) . unLoc)
                                                                          (rec_dotdot fs)]
-            fix_doc = ppr (ConPatIn n (RecCon (fs { rec_flds = explicit
-                                                  , rec_dotdot = Nothing })))
-
             err_loc = maybe (getLoc n) getLoc (rec_dotdot fs)
 
-    details _ (InfixCon p1 p2) = hs_lpat p1 `unionNameEnv` hs_lpat p2
-
-
-unionNameEnv :: [(SrcSpan, SDoc, [Name])] -> [(SrcSpan, SDoc, [Name])]
-                                         -> [(SrcSpan, SDoc, [Name])]
-unionNameEnv = (++)
-
+    details _ (InfixCon p1 p2) = hs_lpat p1 ++ hs_lpat p2
