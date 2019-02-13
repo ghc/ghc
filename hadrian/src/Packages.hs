@@ -6,7 +6,7 @@ module Packages (
     filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact,
     ghcHeap, ghci, ghcPkg, ghcPrim, ghcSplit, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi,
-    libiserv, mtl, parsec, parallel, pretty, primitive, process, rts, runGhc,
+    libiserv, mtl, parsec, pretty, primitive, process, rts, runGhc,
     stm, templateHaskell, terminfo, text, time, timeout, touchy, transformers,
     unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
 
@@ -35,7 +35,7 @@ ghcPackages =
     , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact
     , ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs, hp2ps
     , hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
-    , parsec, parallel, pretty, process, rts, runGhc, stm, templateHaskell
+    , parsec, pretty, process, rts, runGhc, stm, templateHaskell
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
     , timeout ]
 
@@ -82,7 +82,6 @@ libffi              = top  "libffi"
 libiserv            = lib  "libiserv"
 mtl                 = lib  "mtl"
 parsec              = lib  "parsec"
-parallel            = lib  "parallel"
 pretty              = lib  "pretty"
 primitive           = lib  "primitive"
 process             = lib  "process"

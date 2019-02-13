@@ -34,7 +34,7 @@ import Control.Monad.Reader
 import Data.List.Extra
 import Data.Maybe
 import Data.Semigroup
-import Development.Shake hiding (parallel, unit, (*>), Normal)
+import Development.Shake hiding (unit, (*>), Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import Development.Shake.Util

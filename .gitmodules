@@ -83,10 +83,6 @@
 	url = ../packages/unix.git
 	ignore = untracked
 	branch = 2.7
-[submodule "libraries/parallel"]
-	path = libraries/parallel
-	url = ../packages/parallel.git
-	ignore = untracked
 [submodule "libraries/stm"]
 	path = libraries/stm
 	url = ../packages/stm.git

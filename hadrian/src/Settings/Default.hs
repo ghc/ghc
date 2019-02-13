@@ -135,7 +135,6 @@ testsuitePackages = do
              , hp2ps
              , hsc2hs
              , iserv
-             , parallel
              , runGhc
              , unlit         ] ++
              [ timeout | win ]
