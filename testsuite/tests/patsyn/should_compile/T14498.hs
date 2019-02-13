@@ -23,9 +23,9 @@ type SN = (TypeRep :: N -> Type)
 pattern SO = (Typeable :: TypeRep (O::N))
 
 pattern SS ::
-     forall (t :: k').
+     forall k' (t :: k').
      ()
-  => forall (a :: kk -> k') (n :: kk).
+  => forall kk (a :: kk -> k') (n :: kk).
      (t ~ a n)
   =>
   TypeRep n -> TypeRep t

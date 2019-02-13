@@ -7574,16 +7574,16 @@ instance for ``GMap`` is ::
 In this example, the declaration has only one variant. In general, it
 can be any number.
 
-When :extension:`ExplicitForAll` is enabled, type or kind variables used on
+When :extension:`ExplicitForAll` is enabled, type and kind variables used on
 the left hand side can be explicitly bound. For example: ::
 
     data instance forall a (b :: Proxy a). F (Proxy b) = FProxy Bool
 
-When an explicit ``forall`` is present, all *type* variables mentioned which
-are not already in scope must be bound by the ``forall``. Kind variables will
-be implicitly bound if necessary, for example: ::
+When an explicit ``forall`` is present, *all* type and kind variables mentioned
+which are not already in scope must be bound by the ``forall``:
 
-    data instance forall (a :: k). F a = FOtherwise
+    data instance forall   (a :: k). F a = FOtherwise  -- rejected: k not in scope
+    data instance forall k (a :: k). F a = FOtherwise  -- accepted
 
 When the flag :ghc-flag:`-Wunused-type-patterns` is enabled, type
 variables that are mentioned in the patterns on the left hand side, but not
@@ -9184,17 +9184,74 @@ a type variable ``a`` of kind ``k``. In general, there is no limit to how
 deeply nested this sort of dependency can work. However, the dependency must
 be well-scoped: ``forall (a :: k) k. ...`` is an error.
 
-For backward compatibility, kind variables *do not* need to be bound explicitly,
-even if the type starts with ``forall``.
+Implicit quantification in type synonyms and type family instances
+------------------------------------------------------------------
 
-Accordingly, the rule for kind quantification in higher-rank contexts has
-changed slightly. In GHC 7, if a kind variable was mentioned for the first
-time in the kind of a variable bound in a non-top-level ``forall``, the kind
-variable was bound there, too.
-That is, in ``f :: (forall (a :: k). ...) -> ...``, the ``k`` was bound
-by the same ``forall`` as the ``a``. In GHC 8, however, all kind variables
-mentioned in a type are bound at the outermost level. If you want one bound
-in a higher-rank ``forall``, include it explicitly.
+Consider the scoping rules for type synonyms and type family instances, such as
+these::
+
+   type          TS a (b :: k) = <rhs>
+   type instance TF a (b :: k) = <rhs>
+
+The basic principle is that all variables mentioned on the right hand side
+``<rhs>`` must be bound on the left hand side::
+
+  type TS a (b :: k) = (k, a, Proxy b)    -- accepted
+  type TS a (b :: k) = (k, a, Proxy b, z) -- rejected: z not in scope
+
+But there is one exception: free variables mentioned in the outermost kind
+signature on the right hand side are quantified implicitly. Thus, in the
+following example the variables ``a``, ``b``, and ``k`` are all in scope on the
+right hand side of ``S``::
+
+  type S a b = <rhs> :: k -> k
+
+The reason for this exception is that there may be no other way to bind ``k``.
+For example, suppose we wanted ``S`` to have the the following kind with an
+*invisible* parameter ``k``::
+
+  S :: forall k. Type -> Type -> k -> k
+
+In this case, we could not simply bind ``k`` on the left-hand side, as ``k``
+would become a *visible* parameter::
+
+  type S k a b = <rhs> :: k -> k
+  S :: forall k -> Type -> Type -> k -> k
+
+Note that we only look at the *outermost* kind signature to decide which
+variables to quantify implicitly. As a counter-example, consider ``M1``: ::
+
+  type M1 = 'Just ('Nothing :: Maybe k)    -- rejected: k not in scope
+
+Here, the kind signature is hidden inside ``'Just``, and there is no outermost
+kind signature. We can fix this example by providing an outermost kind signature: ::
+
+  type M2 = 'Just ('Nothing :: Maybe k) :: Maybe (Maybe k)
+
+Here, ``k`` is brought into scope by ``:: Maybe (Maybe k)``.
+
+A kind signature is considered to be outermost regardless of redundant
+parentheses: ::
+
+  type P =    'Nothing :: Maybe a    -- accepted
+  type P = ((('Nothing :: Maybe a))) -- accepted
+
+Closed type family instances are subject to the same rules: ::
+
+  type family F where
+    F = 'Nothing :: Maybe k            -- accepted
+
+  type family F where
+    F = 'Just ('Nothing :: Maybe k)    -- rejected: k not in scope
+
+  type family F where
+    F = 'Just ('Nothing :: Maybe k) :: Maybe (Maybe k)  -- accepted
+
+  type family F :: Maybe (Maybe k) where
+    F = 'Just ('Nothing :: Maybe k)    -- rejected: k not in scope
+
+  type family F :: Maybe (Maybe k) where
+    F @k = 'Just ('Nothing :: Maybe k) -- accepted
 
 Kind-indexed GADTs
 ------------------
@@ -10832,19 +10889,6 @@ the rules in the subtler cases:
 - If an identifier's type has a ``forall``, then the order of type variables
   as written in the ``forall`` is retained.
 
-- If the type signature includes any kind annotations (either on variable
-  binders or as annotations on types), any variables used in kind
-  annotations come before any variables never used in kind annotations.
-  This rule is not recursive: if there is an annotation within an annotation,
-  then the variables used therein are on equal footing. Examples::
-
-    f :: Proxy (a :: k) -> Proxy (b :: j) -> ()
-      -- as if f :: forall k j a b. ...
-
-    g :: Proxy (b :: j) -> Proxy (a :: (Proxy :: (k -> Type) -> Type) Proxy) -> ()
-      -- as if g :: forall j k b a. ...
-      -- NB: k is in a kind annotation within a kind annotation
-
 - If any of the variables depend on other variables (that is, if some
   of the variables are *kind* variables), the variables are reordered
   so that kind variables come before type variables, preserving the
@@ -10854,13 +10898,11 @@ the rules in the subtler cases:
     h :: Proxy (a :: (j, k)) -> Proxy (b :: Proxy a) -> ()
       -- as if h :: forall j k a b. ...
 
-  In this example, all of ``a``, ``j``, and ``k`` are considered kind
-  variables and will always be placed before ``b``, a lowly type variable.
-  (Note that ``a`` is used in ``b``\'s kind.) Yet, even though ``a`` appears
-  lexically before ``j`` and ``k``, ``j`` and ``k`` are quantified first,
-  because ``a`` depends on ``j`` and ``k``. Note further that ``j`` and ``k``
-  are not reordered with respect to each other, even though doing so would
-  not violate dependency conditions.
+  In this example, ``a`` depends on ``j`` and ``k``, and ``b`` depends on ``a``.
+  Even though ``a`` appears lexically before ``j`` and ``k``, ``j`` and ``k``
+  are quantified first, because ``a`` depends on ``j`` and ``k``. Note further
+  that ``j`` and ``k`` are not reordered with respect to each other, even
+  though doing so would not violate dependency conditions.
 
   A "stable topological sort" here, we mean that we perform this algorithm
   (which we call *ScopedSort*):

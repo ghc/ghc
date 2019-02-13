@@ -3992,7 +3992,8 @@ wWarningFlagsDeps = [
   flagSpec "hi-shadowing"                Opt_WarnHiShadows,
   flagSpec "inaccessible-code"           Opt_WarnInaccessibleCode,
   flagSpec "implicit-prelude"            Opt_WarnImplicitPrelude,
-  flagSpec "implicit-kind-vars"          Opt_WarnImplicitKindVars,
+  depFlagSpec "implicit-kind-vars"       Opt_WarnImplicitKindVars
+    "it is now an error",
   flagSpec "incomplete-patterns"         Opt_WarnIncompletePatterns,
   flagSpec "incomplete-record-updates"   Opt_WarnIncompletePatternsRecUpd,
   flagSpec "incomplete-uni-patterns"     Opt_WarnIncompleteUniPatterns,
@@ -4830,7 +4831,6 @@ minusWcompatOpts
     = [ Opt_WarnMissingMonadFailInstances
       , Opt_WarnSemigroup
       , Opt_WarnNonCanonicalMonoidInstances
-      , Opt_WarnImplicitKindVars
       , Opt_WarnStarIsType
       ]
 

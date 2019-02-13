@@ -76,3 +76,4 @@ test('T14058', [extra_files(['T14058.hs', 'T14058a.hs'])],
 test('T14326', normal, compile, [''])
 test('T14394', normal, ghci_script, ['T14394.script'])
 test('T14552', normal, compile, [''])
+test('T14498', normal, compile, [''])

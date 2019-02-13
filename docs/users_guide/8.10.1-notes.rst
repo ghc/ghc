@@ -16,6 +16,34 @@ Full details
 Language
 ~~~~~~~~
 
+- Kind variables are no longer implicitly quantified when an explicit ``forall`` is used, see
+  `GHC proposal #24
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0024-no-kind-vars.rst>`__.
+  :ghc-flag:`-Wimplicit-kind-vars` is now obsolete.
+
+- Kind variables are no longer implicitly quantified in constructor declarations: ::
+
+    data T a        = T1 (S (a :: k) | forall (b::k). T2 (S b)  -- no longer accepted
+    data T (a :: k) = T1 (S (a :: k) | forall (b::k). T2 (S b)  -- still accepted
+
+- Implicitly quantified kind variables are no longer put in front of other variables: ::
+
+    f :: Proxy (a :: k) -> Proxy (b :: j)
+
+    ghci> :t +v f   -- old order:
+    f :: forall k j (a :: k) (b :: j). Proxy a -> Proxy b
+
+    ghci> :t +v f   -- new order:
+    f :: forall k (a :: k) j (b :: j). Proxy a -> Proxy b
+
+  This is a breaking change for users of :extension:`TypeApplications`.
+
+- In type synonyms and type family equations, free variables on the RHS are no longer
+  implicitly quantified unless used in an outermost kind annotation: ::
+
+    type T = Just (Nothing :: Maybe a)         -- no longer accepted
+    type T = Just Nothing :: Maybe (Maybe a)   -- still accepted
+
 Compiler
 ~~~~~~~~
 

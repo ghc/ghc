@@ -29,7 +29,7 @@ T15039d.hs:25:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
         standing for ‘Dict ((a :: *) ~~ (b :: k))’
       Where: ‘a’, ‘k’, ‘b’ are rigid type variables bound by
                the type signature for:
-                 ex3 :: forall k a (b :: k). Dict ((a :: *) ~~ (b :: k)) -> ()
+                 ex3 :: forall a k (b :: k). Dict ((a :: *) ~~ (b :: k)) -> ()
                at T15039d.hs:24:1-43
     • In a pattern type signature: _
       In the pattern: Dict :: _

@@ -23,13 +23,13 @@ T14846.hs:38:8: error:
       In the instance declaration for ‘Category (Hom riki)’
 
 T14846.hs:39:12: error:
-    • Couldn't match kind ‘k3’ with ‘Struct cls2’
-      ‘k3’ is a rigid type variable bound by
+    • Couldn't match kind ‘k4’ with ‘Struct cls2’
+      ‘k4’ is a rigid type variable bound by
         the instance declaration
         at T14846.hs:37:10-65
       When matching kinds
         cls0 :: Struct cls -> Constraint
-        cls1 :: k3 -> Constraint
+        cls1 :: k4 -> Constraint
     • In the expression: struct :: AStruct (Structured a cls)
       In the expression: case struct :: AStruct (Structured a cls) of
       In an equation for ‘i’:
@@ -38,12 +38,12 @@ T14846.hs:39:12: error:
         i :: Hom riki a a (bound at T14846.hs:39:3)
 
 T14846.hs:39:31: error:
-    • Couldn't match kind ‘k3’ with ‘Struct cls2’
-      ‘k3’ is a rigid type variable bound by
+    • Couldn't match kind ‘k4’ with ‘Struct cls2’
+      ‘k4’ is a rigid type variable bound by
         the instance declaration
         at T14846.hs:37:10-65
       When matching kinds
-        cls1 :: k3 -> Constraint
+        cls1 :: k4 -> Constraint
         cls0 :: Struct cls -> Constraint
       Expected kind ‘Struct cls0’,
         but ‘Structured a cls’ has kind ‘Struct cls1’

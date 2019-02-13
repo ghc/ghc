@@ -1,5 +1,4 @@
 {-# LANGUAGE ExplicitForAll, PolyKinds #-}
-{-# OPTIONS -Wcompat -Wno-error=implicit-kind-vars #-}
 
 module T15264 where
 

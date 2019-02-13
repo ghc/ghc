@@ -47,7 +47,6 @@ module TcHsType (
         typeLevelMode, kindLevelMode,
 
         kindGeneralize, checkExpectedKind_pp,
-        reportFloatingKvs,
 
         -- Sort-checking kinds
         tcLHsKindSig, badKindSig,
@@ -1871,13 +1870,6 @@ kcLHsQTyVars_Cusk name flav
          -- doesn't work, we catch it here, before an error cascade
        ; checkValidTelescope tycon
 
-          -- If any of the specified tyvars aren't actually mentioned in a binder's
-          -- kind (or the return kind), then we're in the CUSK case from
-          -- Note [Free-floating kind vars]
-       ; let unmentioned_kvs   = filterOut (`elemVarSet` mentioned_kv_set) specified
-       ; reportFloatingKvs name flav (map binderVar final_tc_binders) unmentioned_kvs
-
-
        ; traceTc "kcLHsQTyVars: cusk" $
          vcat [ text "name" <+> ppr name
               , text "kv_ns" <+> ppr kv_ns
@@ -2889,8 +2881,6 @@ promotionErr name err
                NoDataKindsTC  -> text "perhaps you intended to use DataKinds"
                NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
                PatSynPE       -> text "pattern synonyms cannot be promoted"
-               PatSynExPE     -> sep [ text "the existential variables of a pattern synonym"
-                                     , text "signature do not scope over the pattern" ]
                _ -> text "it is defined and used in the same recursive group"
 
 {-
@@ -2918,112 +2908,6 @@ badPatTyVarTvs sig_ty bad_tvs
 ************************************************************************
 -}
 
-
-{- Note [Free-floating kind vars]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-
-  data S a = MkS (Proxy (a :: k))
-
-According to the rules around implicitly-bound kind variables,
-that k scopes over the whole declaration. The renamer grabs
-it and adds it to the hsq_implicits field of the HsQTyVars of the
-tycon.  So we get
-   S :: forall {k}. k -> Type
-
-That's fine.  But consider this variant:
-  data T = MkT (forall (a :: k). Proxy a)
-  -- from test ghci/scripts/T7873
-
-This is not an existential datatype, but a higher-rank one (the forall
-to the right of MkT). Again, 'k' scopes over the whole declaration,
-but we do not want to get
-   T :: forall {k}. Type
-Why not? Because the kind variable isn't fixed by anything. For
-a variable like k to be implicit, it needs to be mentioned in the kind
-of a tycon tyvar. But it isn't.
-
-Rejecting T depends on whether or not the datatype has a CUSK.
-
-Non-CUSK (handled in TcTyClsDecls.kcTyClGroup (generalise)):
-   When generalising the TyCon we check that every Specified 'k'
-   appears free in the kind of the TyCon; that is, in the kind of
-   one of its Required arguments, or the result kind.
-
-CUSK (handled in TcHsType.kcLHsQTyVars, the CUSK case):
-   When we determine the tycon's final, never-to-be-changed kind
-   in kcLHsQTyVars, we check to make sure all implicitly-bound kind
-   vars are indeed mentioned in a kind somewhere. If not, error.
-
-We also perform free-floating kind var analysis for type family instances
-(see #13985). Here is an interesting example:
-
-    type family   T :: k
-    type instance T = (Nothing :: Maybe a)
-
-Upon a cursory glance, it may appear that the kind variable `a` is
-free-floating above, since there are no (visible) LHS patterns in `T`. However,
-there is an *invisible* pattern due to the return kind, so inside of GHC, the
-instance looks closer to this:
-
-    type family T @k :: k
-    type instance T @(Maybe a) = (Nothing :: Maybe a)
-
-Here, we can see that `a` really is bound by a LHS type pattern, so `a` is in
-fact not free-floating. Contrast that with this example:
-
-    type instance T = Proxy (Nothing :: Maybe a)
-
-This would looks like this inside of GHC:
-
-    type instance T @(*) = Proxy (Nothing :: Maybe a)
-
-So this time, `a` is neither bound by a visible nor invisible type pattern on
-the LHS, so it would be reported as free-floating.
-
-Finally, here's one more brain-teaser (from #9574). In the example below:
-
-    class Funct f where
-      type Codomain f :: *
-    instance Funct ('KProxy :: KProxy o) where
-      type Codomain 'KProxy = NatTr (Proxy :: o -> *)
-
-As it turns out, `o` is not free-floating in this example. That is because `o`
-bound by the kind signature of the LHS type pattern 'KProxy. To make this more
-obvious, one can also write the instance like so:
-
-    instance Funct ('KProxy :: KProxy o) where
-      type Codomain ('KProxy :: KProxy o) = NatTr (Proxy :: o -> *)
--}
-
--- See Note [Free-floating kind vars]
-reportFloatingKvs :: Name         -- of the tycon
-                  -> TyConFlavour -- What sort of TyCon it is
-                  -> [TcTyVar]    -- all tyvars, not necessarily zonked
-                  -> [TcTyVar]    -- floating tyvars
-                  -> TcM ()
-reportFloatingKvs tycon_name flav all_tvs bad_tvs
-  = unless (null bad_tvs) $  -- don't bother zonking if there's no error
-    do { all_tvs <- mapM zonkTcTyVarToTyVar all_tvs
-       ; bad_tvs <- mapM zonkTcTyVarToTyVar bad_tvs
-       ; let (tidy_env, tidy_all_tvs) = tidyOpenTyCoVars emptyTidyEnv all_tvs
-             tidy_bad_tvs             = map (tidyTyCoVarOcc tidy_env) bad_tvs
-       ; mapM_ (report tidy_all_tvs) tidy_bad_tvs }
-  where
-    report tidy_all_tvs tidy_bad_tv
-      = addErr $
-        vcat [ text "Kind variable" <+> quotes (ppr tidy_bad_tv) <+>
-               text "is implicitly bound in" <+> ppr flav
-             , quotes (ppr tycon_name) <> comma <+>
-               text "but does not appear as the kind of any"
-             , text "of its type variables. Perhaps you meant"
-             , text "to bind it explicitly somewhere?"
-             , ppWhen (not (null tidy_all_tvs)) $
-                 hang (text "Type variables with inferred kinds:")
-                 2 (ppr_tv_bndrs tidy_all_tvs) ]
-
-    ppr_tv_bndrs tvs = sep (map pp_tv tvs)
-    pp_tv tv         = parens (ppr tv <+> dcolon <+> ppr (tyVarKind tv))
 
 -- | If the inner action emits constraints, report them as errors and fail;
 -- otherwise, propagates the return value. Useful as a wrapper around
