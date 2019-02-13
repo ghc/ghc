@@ -727,15 +727,11 @@ rnFamInstEqn doc mb_cls rhs_kvars
        ; let pat_kity_vars_with_dups = extractHsTyArgRdrKiTyVarsDup pats
              -- Use the "...Dups" form because it's needed
              -- below to report unsed binder on the LHS
-       ; let pat_kity_vars = rmDupsInRdrTyVars pat_kity_vars_with_dups
 
-         -- all pat vars not explicitly bound (see extractHsTvBndrs)
-       ; let mb_imp_kity_vars = extractHsTvBndrs <$> mb_bndrs <*> pure pat_kity_vars
-             imp_vars = case mb_imp_kity_vars of
-                          -- kind vars are the only ones free if we have an explicit forall
-                          Just nbnd_kity_vars -> freeKiTyVarsKindVars nbnd_kity_vars
-                          -- all pattern vars are free otherwise
-                          Nothing             -> freeKiTyVarsAllVars pat_kity_vars
+         -- Implicitly bound variables, empty if we have an explicit 'forall' according
+         -- to the "forall-or-nothing" rule.
+       ; let imp_vars | isNothing mb_bndrs = nubL pat_kity_vars_with_dups
+                      | otherwise = []
        ; imp_var_names <- mapM (newTyVarNameRn mb_cls) imp_vars
 
        ; let bndrs = fromMaybe [] mb_bndrs
@@ -766,7 +762,7 @@ rnFamInstEqn doc mb_cls rhs_kvars
                        -- See Note [Unused type variables in family instances]
                     ; let groups :: [NonEmpty (Located RdrName)]
                           groups = equivClasses cmpLocated $
-                                   freeKiTyVarsAllVars pat_kity_vars_with_dups
+                                   pat_kity_vars_with_dups
                     ; nms_dups <- mapM (lookupOccRn . unLoc) $
                                      [ tv | (tv :| (_:_)) <- groups ]
                           -- Add to the used variables

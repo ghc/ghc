@@ -26,6 +26,6 @@ type family H a b where
 -- More tests
 
 type family D a b where
-  forall (a :: Type -> Type) (b :: a Int) (c :: k). D (Proxy b) (Proxy c) = ()
+  forall (a :: Type -> Type) (b :: a Int) k (c :: k). D (Proxy b) (Proxy c) = ()
   forall (a :: Bool) (b :: Proxy a). D (Proxy b) () = Int
   forall (a :: Type). D a a = Maybe a
