@@ -287,8 +287,8 @@
         (NoExt)
         (DataFamInstDecl
          (HsIB
-          [{Name: k}
-          ,{Name: a}]
+          [{Name: a}
+          ,{Name: k}]
           (FamEqn
            (NoExt)
            ({ DumpRenamedAst.hs:18:18-20 }

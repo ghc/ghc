@@ -2904,8 +2904,6 @@ promotionErr name err
                NoDataKindsTC  -> text "perhaps you intended to use DataKinds"
                NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
                PatSynPE       -> text "pattern synonyms cannot be promoted"
-               PatSynExPE     -> sep [ text "the existential variables of a pattern synonym"
-                                     , text "signature do not scope over the pattern" ]
                _ -> text "it is defined and used in the same recursive group"
 
 {-
