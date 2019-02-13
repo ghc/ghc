@@ -1598,8 +1598,10 @@ loop:
         unlockClosure(mvar, info);
         // However, we do need to ensure that the nonmoving collector
         // knows about the reference to the value that we just removed...
-        ccall updateRemembSetPushClosure(MyCapability() "ptr",
-                                       val "ptr", NULL);
+        if (nonmoving_write_barrier_enabled != 0) (likely: False) {
+            ccall updateRemembSetPushClosure(MyCapability() "ptr",
+                                             val "ptr", NULL);
+        }
         return (val);
     }
     if (StgHeader_info(q) == stg_IND_info ||
@@ -1992,8 +1994,8 @@ stg_makeStableNamezh ( P_ obj )
             // We only need to push obj itself to the update remembered set
             // since we know that sn_obj will be on the nursery anyways.
             ccall updateRemembSetPushClosure_(BaseReg "ptr",
-                                            obj "ptr",
-                                            NULL "ptr");
+                                              obj "ptr",
+                                              NULL "ptr");
         }
     } else {
         sn_obj = snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry);
