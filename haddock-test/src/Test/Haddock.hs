@@ -42,6 +42,7 @@ checkFiles :: Config c -> Bool -> IO ()
 checkFiles cfg@(Config { .. }) somethingCrashed = do
     putStrLn "Testing output files..."
 
+    createDirectoryIfMissing True (cfgOutDir cfg)
     files <- ignore <$> getDirectoryTree (cfgOutDir cfg)
     failed <- liftM catMaybes . forM files $ \file -> do
         putStr $ "Checking \"" ++ file ++ "\"... "

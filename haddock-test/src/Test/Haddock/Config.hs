@@ -170,6 +170,7 @@ loadConfig :: CheckConfig c -> DirConfig -> [Flag] -> [String] -> IO (Config c)
 loadConfig ccfg dcfg flags files = do
     cfgEnv <- (:) ("haddock_datadir", dcfgResDir dcfg) <$> getEnvironment
 
+    -- Find Haddock executable
     systemHaddockPath <- List.lookup "HADDOCK_PATH" <$> getEnvironment
     haddockOnPath <- findExecutable "haddock"
 
@@ -181,14 +182,25 @@ loadConfig ccfg dcfg flags files = do
     cfgHaddockPath <- case haddock_path of
         Just path -> pure path
         Nothing   -> do
-          hPutStrLn stderr "Haddock executable not found"
+          hPutStrLn stderr "Haddock executable not found; consider using the `--haddock-path` flag."
           exitFailure
 
-    ghcPath <- case flagsGhcPath flags of
-                 Just fp -> return fp
-                 Nothing -> init <$> rawSystemStdout normal
-                                                     cfgHaddockPath
-                                                     ["--print-ghc-path"]
+    -- Perhaps Haddock knows where you can find GHC?
+    queriedGhcPath <- do
+      p <- init <$> rawSystemStdout normal cfgHaddockPath ["--print-ghc-path"]
+      exists <- doesFileExist p
+      pure $ if exists then Just p else Nothing
+
+
+    let ghc_path = msum [ flagsGhcPath flags
+                        , queriedGhcPath
+                        ]
+
+    ghcPath <- case ghc_path of
+        Just path -> pure path
+        Nothing   -> do
+          hPutStrLn stderr "GHC executable not found; consider using the `--ghc-path` flag."
+          exitFailure
 
     printVersions cfgEnv cfgHaddockPath
 
