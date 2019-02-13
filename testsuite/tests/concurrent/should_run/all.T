@@ -7,7 +7,7 @@ test('conc027', normal, compile_and_run, [''])
 test('conc051', normal, compile_and_run, [''])
 
 if ('threaded1' in config.run_ways):
-   only_threaded_ways = only_ways(['ghci','threaded1','threaded2'])
+   only_threaded_ways = only_ways(['ghci','threaded1','threaded2', 'nonmoving_thr'])
 else:
    only_threaded_ways = skip
 
@@ -202,8 +202,8 @@ test('foreignInterruptible', [when(fast(), skip),
                               ],
       compile_and_run, [''])
 
-test('conc037', only_ways(['threaded1','threaded2']), compile_and_run, [''])
-test('conc038', only_ways(['threaded1','threaded2']), compile_and_run, [''])
+test('conc037', only_ways(['threaded1', 'threaded2', 'nonmoving_thr']), compile_and_run, [''])
+test('conc038', only_ways(['threaded1', 'threaded2', 'nonmoving_thr']), compile_and_run, [''])
 
 # Omit for GHCi, uses foreign export
 # Omit for the threaded ways, because in this case the main thread is allowed to
@@ -223,7 +223,7 @@ test('conc045', normal, compile_and_run, [''])
 test('conc058', normal, compile_and_run, [''])
 
 test('conc059',
-     [only_ways(['threaded1', 'threaded2']),
+     [only_ways(['threaded1', 'threaded2', 'nonmoving_thr']),
       pre_cmd('$MAKE -s --no-print-directory conc059_setup')],
      compile_and_run, ['conc059_c.c -no-hs-main'])
 
@@ -242,7 +242,7 @@ test('conc067', ignore_stdout, compile_and_run, [''])
 test('conc068', [ omit_ways(concurrent_ways), exit_code(1) ], compile_and_run, [''])
 
 test('setnumcapabilities001',
-     [ only_ways(['threaded1','threaded2']),
+     [ only_ways(['threaded1','threaded2', 'nonmoving_thr']),
        extra_run_opts('8 12 2000'),
        req_smp ],
      compile_and_run, [''])
@@ -253,7 +253,7 @@ test('compareAndSwap', [omit_ways(['ghci','hpc']), reqlib('primitive')], compile
 test('hs_try_putmvar001',
      [
      when(opsys('mingw32'),skip), # uses pthread APIs in the C code
-     only_ways(['threaded1','threaded2']),
+     only_ways(['threaded1', 'threaded2', 'nonmoving_thr']),
       extra_clean(['hs_try_putmvar001_c.o'])],
      compile_and_run,
      ['hs_try_putmvar001_c.c'])
@@ -271,7 +271,7 @@ test('hs_try_putmvar003',
      [
      when(opsys('mingw32'),skip), # uses pthread APIs in the C code
      pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar003_setup'),
-     only_ways(['threaded1','threaded2']),
+     only_ways(['threaded1', 'threaded2', 'nonmoving_thr']),
      extra_clean(['hs_try_putmvar003_c.o']),
      extra_run_opts('1 16 32 100')
      ],
