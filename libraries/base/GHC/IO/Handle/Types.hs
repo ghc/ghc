@@ -351,8 +351,8 @@ and hence it is only possible on a seekable Handle.
 -- Newline translation
 
 -- | The representation of a newline in the external file or stream.
-data Newline = LF    -- ^ '\n'
-             | CRLF  -- ^ '\r\n'
+data Newline = LF    -- ^ @\'\\n\'@
+             | CRLF  -- ^ @\'\\r\\n\'@
              deriving ( Eq   -- ^ @since 4.2.0.0
                       , Ord  -- ^ @since 4.3.0.0
                       , Read -- ^ @since 4.3.0.0
@@ -361,9 +361,9 @@ data Newline = LF    -- ^ '\n'
 
 -- | Specifies the translation, if any, of newline characters between
 -- internal Strings and the external file or stream.  Haskell Strings
--- are assumed to represent newlines with the '\n' character; the
--- newline mode specifies how to translate '\n' on output, and what to
--- translate into '\n' on input.
+-- are assumed to represent newlines with the @\'\\n\'@ character; the
+-- newline mode specifies how to translate @\'\\n\'@ on output, and what to
+-- translate into @\'\\n\'@ on input.
 data NewlineMode
   = NewlineMode { inputNL :: Newline,
                     -- ^ the representation of newlines on input
@@ -385,7 +385,7 @@ nativeNewline = CRLF
 nativeNewline = LF
 #endif
 
--- | Map '\r\n' into '\n' on input, and '\n' to the native newline
+-- | Map @\'\\r\\n\'@ into @\'\\n\'@ on input, and @\'\\n\'@ to the native newline
 -- represetnation on output.  This mode can be used on any platform, and
 -- works with text files using any newline convention.  The downside is
 -- that @readFile >>= writeFile@ might yield a different file.

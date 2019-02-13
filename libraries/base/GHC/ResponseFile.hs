@@ -100,7 +100,7 @@ unescapeArgs = filter (not . null) . unescape
 escapeArgs :: [String] -> String
 escapeArgs = unlines . map escapeArg
 
--- | Arguments which look like '@foo' will be replaced with the
+-- | Arguments which look like @\@foo@ will be replaced with the
 -- contents of file @foo@. A gcc-like syntax for response files arguments
 -- is expected.  This must re-constitute the argument list by doing an
 -- inverse of the escaping mechanism done by the calling-program side.

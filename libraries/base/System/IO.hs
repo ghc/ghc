@@ -197,19 +197,19 @@ module System.IO (
     -- * Newline conversion
 
     -- | In Haskell, a newline is always represented by the character
-    -- '\n'.  However, in files and external character streams, a
+    -- @\'\\n\'@.  However, in files and external character streams, a
     -- newline may be represented by another character sequence, such
-    -- as '\r\n'.
+    -- as @\'\\r\\n\'@.
     --
     -- A text-mode 'Handle' has an associated 'NewlineMode' that
     -- specifies how to transate newline characters.  The
     -- 'NewlineMode' specifies the input and output translation
-    -- separately, so that for instance you can translate '\r\n'
-    -- to '\n' on input, but leave newlines as '\n' on output.
+    -- separately, so that for instance you can translate @\'\\r\\n\'@
+    -- to @\'\\n\'@ on input, but leave newlines as @\'\\n\'@ on output.
     --
     -- The default 'NewlineMode' for a 'Handle' is
     -- 'nativeNewlineMode', which does no translation on Unix systems,
-    -- but translates '\r\n' to '\n' and back on Windows.
+    -- but translates @\'\\r\\n\'@ to @\'\\n\'@ and back on Windows.
     --
     -- Binary-mode 'Handle's do no newline translation at all.
     --

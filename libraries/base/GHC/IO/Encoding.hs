@@ -57,7 +57,7 @@ import System.IO.Unsafe (unsafePerformIO)
 -- | The Latin1 (ISO8859-1) encoding.  This encoding maps bytes
 -- directly to the first 256 Unicode code points, and is thus not a
 -- complete Unicode encoding.  An attempt to write a character greater than
--- '\255' to a 'System.IO.Handle' using the 'latin1' encoding will result in an
+-- @\'\\255\'@ to a 'System.IO.Handle' using the 'latin1' encoding will result in an
 -- error.
 latin1  :: TextEncoding
 latin1 = Latin1.latin1_checked
