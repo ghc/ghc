@@ -139,7 +139,7 @@ data IODeviceType
   = Directory -- ^ The standard libraries do not have direct support
               -- for this device type, but a user implementation is
               -- expected to provide a list of file names in
-              -- the directory, in any order, separated by @'\0'@
+              -- the directory, in any order, separated by @\'\\0\'@
               -- characters, excluding the @"."@ and @".."@ names. See
               -- also 'System.Directory.getDirectoryContents'.  Seek
               -- operations are not supported on directories (other
