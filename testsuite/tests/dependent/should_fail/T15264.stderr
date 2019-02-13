@@ -1,0 +1,6 @@
+
+T15264.hs:7:22: error: Not in scope: type variable ‘k’
+
+T15264.hs:10:22: error: Not in scope: type variable ‘k1’
+
+T15264.hs:10:32: error: Not in scope: type variable ‘k2’
