@@ -250,7 +250,7 @@ mallocPlainForeignPtrAlignedBytes (I# size) (I# align) = IO $ \s ->
      }
 
 addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
--- ^This function adds a finalizer to the given foreign object.  The
+-- ^ This function adds a finalizer to the given foreign object.  The
 -- finalizer will run /before/ all other finalizers for the same
 -- object which have already been registered.
 addForeignPtrFinalizer (FunPtr fp) (ForeignPtr p c) = case c of
@@ -269,10 +269,8 @@ addForeignPtrFinalizer (FunPtr fp) (ForeignPtr p c) = case c of
 
 addForeignPtrFinalizerEnv ::
   FinalizerEnvPtr env a -> Ptr env -> ForeignPtr a -> IO ()
--- ^ Like 'addForeignPtrFinalizerEnv' but allows the finalizer to be
--- passed an additional environment parameter to be passed to the
--- finalizer.  The environment passed to the finalizer is fixed by the
--- second argument to 'addForeignPtrFinalizerEnv'
+-- ^ Like 'addForeignPtrFinalizer' but the finalizer is passed an additional
+-- environment parameter.
 addForeignPtrFinalizerEnv (FunPtr fp) (Ptr ep) (ForeignPtr p c) = case c of
   PlainForeignPtr r -> insertCFinalizer r fp 1# ep p ()
   MallocPtr     _ r -> insertCFinalizer r fp 1# ep p c
