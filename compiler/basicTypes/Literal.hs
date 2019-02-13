@@ -114,7 +114,7 @@ data Literal
 
   | LitString  ByteString       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
-                                -- at runtime.  Also emitted with a @'\0'@
+                                -- at runtime.  Also emitted with a @\'\\0\'@
                                 -- terminator. Create with 'mkLitString'
 
   | LitNullAddr                 -- ^ The @NULL@ pointer, the only pointer value
