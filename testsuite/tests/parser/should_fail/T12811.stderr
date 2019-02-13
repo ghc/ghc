@@ -1,4 +1,6 @@
 
+T12811.hs:4:15: error: Not in scope: type constructor or class ‘.’
+
 T12811.hs:4:15: error:
-    Illegal symbol '.' in type
-    Perhaps you meant to write 'forall <tvs>. <type>'?
+    Illegal operator ‘.’ in type ‘foral a . a’
+      Use TypeOperators to allow operators in types

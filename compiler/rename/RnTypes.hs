@@ -44,7 +44,6 @@ import DynFlags
 import HsSyn
 import RnHsDoc          ( rnLHsDoc, rnMbLHsDoc )
 import RnEnv
-import RnUnbound        ( perhapsForallMsg )
 import RnUtils          ( HsDocContext(..), withHsDocContext, mapFvRn
                         , pprHsDocContext, bindLocalNamesFV, typeAppErr
                         , newLocalBndrRn, checkDupRdrNames, checkShadowedRdrNames )
@@ -1463,12 +1462,7 @@ warnUnusedForAll in_doc (dL->L loc tv) used_names
 opTyErr :: Outputable a => RdrName -> a -> SDoc
 opTyErr op overall_ty
   = hang (text "Illegal operator" <+> quotes (ppr op) <+> ptext (sLit "in type") <+> quotes (ppr overall_ty))
-         2 extra
-  where
-    extra | op == dot_tv_RDR
-          = perhapsForallMsg
-          | otherwise
-          = text "Use TypeOperators to allow operators in types"
+         2 (text "Use TypeOperators to allow operators in types")
 
 {-
 ************************************************************************
