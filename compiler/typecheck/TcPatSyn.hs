@@ -384,9 +384,6 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(dL->L _ name), psb_args = details
            ASSERT2( equalLength arg_names arg_tys, ppr name $$ ppr arg_names $$ ppr arg_tys )
            pushLevelAndCaptureConstraints            $
            tcExtendTyVarEnv univ_tvs                 $
-           tcExtendKindEnvList [(getName (binderVar ex_tv), APromotionErr PatSynExPE)
-                               | ex_tv <- extra_ex] $
-               -- See Note [Pattern synonym existentials do not scope]
            tcPat PatSyn lpat (mkCheckExpType pat_ty) $
            do { let in_scope    = mkInScopeSet (mkVarSet univ_tvs)
                     empty_subst = mkEmptyTCvSubst in_scope
@@ -450,54 +447,6 @@ Consider
 This should work.  But in the matcher we must match against MkT, and then
 instantiate its argument 'x', to get a function of type (Int -> Int).
 Equality is not enough!  Trac #13752 was an example.
-
-Note [Pattern synonym existentials do not scope]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (Trac #14498):
-  pattern SS :: forall (t :: k). () =>
-                => forall (a :: kk -> k) (n :: kk).
-                => TypeRep n -> TypeRep t
-  pattern SS n <- (App (Typeable :: TypeRep (a::kk -> k)) n)
-
-Here 'k' is implicitly bound in the signature, but (with
--XScopedTypeVariables) it does still scope over the pattern-synonym
-definition.  But what about 'kk', which is oexistential?  It too is
-implicitly bound in the signature; should it too scope?  And if so,
-what type variable is it bound to?
-
-The trouble is that the type variable to which it is bound is itself
-only brought into scope in part the pattern, so it makes no sense for
-'kk' to scope over the whole pattern.  See the discussion on
-Trac #14498, esp comment:16ff. Here is a simpler example:
-  data T where { MkT :: x -> (x->Int) -> T }
-  pattern P :: () => forall x. x -> (x->Int) -> T
-  pattern P a b = (MkT a b, True)
-
-Here it would make no sense to mention 'x' in the True pattern,
-like this:
-  pattern P a b = (MkT a b, True :: x)
-
-The 'x' only makes sense "under" the MkT pattern. Conclusion: the
-existential type variables of a pattern-synonym signature should not
-scope.
-
-But it's not that easy to implement, because we don't know
-exactly what the existentials /are/ until we get to type checking.
-(See Note [The pattern-synonym signature splitting rule], and
-the partition of implicit_tvs in tcCheckPatSynDecl.)
-
-So we do this:
-
-- The reaner brings all the implicitly-bound kind variables into
-  scope, without trying to distinguish universal from existential
-
-- tcCheckPatSynDecl uses tcExtendKindEnvList to bind the
-  implicitly-bound existentials to
-      APromotionErr PatSynExPE
-  It's not really a promotion error, but it's a way to bind the Name
-  (which the renamer has not complained about) to something that, when
-  looked up, will cause a complaint (in this case
-  TcHsType.promotionErr)
 
 
 Note [The pattern-synonym signature splitting rule]
