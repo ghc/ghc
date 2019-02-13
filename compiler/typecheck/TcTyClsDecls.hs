@@ -537,7 +537,6 @@ generaliseTcTyCon tc
   = setSrcSpan (getSrcSpan tc) $
     addTyConCtxt tc $
     do { let tc_name     = tyConName tc
-             tc_flav     = tyConFlavour tc
              tc_res_kind = tyConResKind tc
              tc_tvs      = tyConTyVars  tc
 
@@ -610,21 +609,13 @@ generaliseTcTyCon tc
               , text "required_tcbs =" <+> ppr required_tcbs
               , text "final_tcbs =" <+> ppr final_tcbs ]
 
-       -- Step 8: check for floating kind vars
-       -- See Note [Free-floating kind vars]
-       -- They are easily identified by the fact that they
-       -- have not been skolemised by quantifyTyVars
-       ; let floating_specified = filter isTyVarTyVar scoped_tvs
-       ; reportFloatingKvs tc_name tc_flav
-                           scoped_tvs floating_specified
-
-       -- Step 9: Check for duplicates
+       -- Step 8: Check for duplicates
        -- E.g. data SameKind (a::k) (b::k)
        --      data T (a::k1) (b::k2) = MkT (SameKind a b)
        -- Here k1 and k2 start as TyVarTvs, and get unified with each other
        ; mapM_ report_sig_tv_err (findDupTyVarTvs scoped_tv_pairs)
 
-       -- Step 10: Check for validity.
+       -- Step 9: Check for validity.
        -- We do this here because we're about to put the tycon into
        -- the environment, and we don't want anything malformed in the
        -- environment.
