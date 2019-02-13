@@ -98,7 +98,7 @@ config.way_flags = {
     'ghci-ext-prof'    : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '-fexternal-interpreter', '-prof', '+RTS', '-I0.1', '-RTS'],
     'ext-interp'   : ['-fexternal-interpreter'],
     'nonmoving'    : ['-debug'],
-    'nonmoving_thr': ['-threaded -debug'],
+    'nonmoving_thr': ['-threaded', '-debug'],
     'nonmoving_thr_ghc': ['+RTS', '-xn', '-N2', '-RTS', '-threaded', '-debug'],
    }
 
