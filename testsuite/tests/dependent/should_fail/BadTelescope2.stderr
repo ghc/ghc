@@ -5,9 +5,9 @@ BadTelescope2.hs:10:8: error:
         k (a :: k) (b :: k)
     • In the type signature: foo :: forall a k (b :: k). SameKind a b
 
-BadTelescope2.hs:13:70: error:
-    • Expected kind ‘k0’, but ‘d’ has kind ‘Proxy a’
+BadTelescope2.hs:13:81: error:
+    • Expected kind ‘k’, but ‘d’ has kind ‘Proxy a’
     • In the second argument of ‘SameKind’, namely ‘d’
       In the type signature:
-        bar :: forall a (c :: Proxy b) (d :: Proxy a).
+        bar :: forall a k (b :: k) (c :: Proxy b) (d :: Proxy a).
                Proxy c -> SameKind b d
