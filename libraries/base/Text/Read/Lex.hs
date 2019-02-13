@@ -96,29 +96,24 @@ numberToFixed :: Integer -> Number -> Maybe (Integer, Integer)
 numberToFixed _ (MkOctal iPart) = Just (val 8 iPart, 0)
 numberToFixed _ (MkDecimal iPart Nothing Nothing) = Just (val 10 iPart, 0)
 numberToFixed p (MkDecimal iPart (Just fPart) Nothing)
-    = let i = val 10 iPart
-          f = val 10 (integerTake p (fPart ++ repeat 0))
-          -- Sigh, we really want genericTake, but that's above us in
-          -- the hierarchy, so we define our own version here (actually
-          -- specialised to Integer)
-          integerTake             :: Integer -> [a] -> [a]
-          integerTake n _ | n <= 0 = []
-          integerTake _ []        =  []
-          integerTake n (x:xs)    =  x : integerTake (n-1) xs
-      in Just (i, f)
+  = Just (fixedParts p 10 iPart fPart)
 numberToFixed _ (MkHexadecimal iPart Nothing Nothing) = Just (val 16 iPart, 0)
 numberToFixed p (MkHexadecimal iPart (Just fPart) Nothing)
-    = let i = val 16 iPart
-          f = val 16 (integerTake p (fPart ++ repeat 0))
-          -- Sigh, we really want genericTake, but that's above us in
-          -- the hierarchy, so we define our own version here (actually
-          -- specialised to Integer)
-          integerTake             :: Integer -> [a] -> [a]
-          integerTake n _ | n <= 0 = []
-          integerTake _ []        =  []
-          integerTake n (x:xs)    =  x : integerTake (n-1) xs
-      in Just (i, f)
+  = Just (fixedParts p 16 iPart fPart)
 numberToFixed _ _ = Nothing
+
+fixedParts :: Num a => Integer -> a -> Digits -> Digits -> (a, a)
+fixedParts p base iPart fPart =
+  let i = val base iPart
+      f = val base (integerTake p (fPart ++ repeat 0))
+      -- Sigh, we really want genericTake, but that's above us in
+      -- the hierarchy, so we define our own version here (actually
+      -- specialised to Integer)
+      integerTake :: Integer -> [a] -> [a]
+      integerTake n _ | n <= 0 = []
+      integerTake _ []         = []
+      integerTake n (x:xs)     = x : integerTake (n-1) xs
+  in (i, f)
 
 -- This takes a floatRange, and if the Rational would be outside of
 -- the floatRange then it may return Nothing. Note that it will not
@@ -521,7 +516,7 @@ lexFrac base = do _ <- char '.'
                   fraction <- lexDigits base
                   return (Just fraction)
 
-lexExp :: ReadP (Maybe Integer)
+lexExp :: [Char] -> ReadP (Maybe Integer)
 lexExp expChars = do _ <- choice (map char expChars)
                      exp <- signedExp +++ lexInteger 10
                      return (Just exp)
