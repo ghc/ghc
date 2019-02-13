@@ -68,7 +68,6 @@ prepareTree dest = do
         , Test "libraries//ghc.mk"
         , Test "libraries//include/Hs*Config.h"
         , Test "libraries/dph"
-        , Test "libraries/parallel"
         , Test "libraries/primitive"
         , Test "libraries/random"
         , Test "libraries/stm"
