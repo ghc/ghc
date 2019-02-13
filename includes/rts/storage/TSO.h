@@ -214,7 +214,8 @@ typedef struct StgTSO_ {
  *    no mark is necessary.
  *
  * 3. The entity seeking to mark tries to lock the stack for marking by
- *    atomically setting its `marking` flag
+ *    atomically setting its `marking` field to the current non-moving mark
+ *    epoch:
  *
  *    a. If the mutator finds the concurrent collector has already locked the
  *       stack then it waits until it is finished (indicated by the mark bit
@@ -226,7 +227,8 @@ typedef struct StgTSO_ {
  *       synchronization with mutators.
  *
  *    c. Whoever succeeds in locking the stack is responsible for marking it and
- *       setting the stack's mark bit.
+ *       setting the stack's mark bit (either the BF_MARKED bit for large objects
+ *       or otherwise its bit in its segment's mark bitmap).
  *
  */
 
