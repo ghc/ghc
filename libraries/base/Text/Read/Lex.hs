@@ -503,45 +503,28 @@ lexHexNumber =
      _ <- char 'x' +++ char 'X'
      xs <- lexDigits 16 <++ do (point:_) <- look
                                if point == '.' then return [] else pfail
-     mFrac  <- lexHFrac <++ return Nothing
-     mExp   <- lexBExp  <++ return Nothing
+     mFrac  <- lexFrac 16 <++ return Nothing
+     mExp   <- lexExp ['p', 'P']  <++ return Nothing
      return (Number (MkHexadecimal xs mFrac mExp))
-
-lexHFrac :: ReadP (Maybe Digits)
--- Read the fractional part; fail if it doesn't
--- start ".d" where d is a digit
-lexHFrac = do _ <- char '.'
-              fraction <- lexDigits 16
-              return (Just fraction)
-
-lexBExp :: ReadP (Maybe Integer)
-lexBExp = do _ <- char 'p' +++ char 'P'
-             exp <- signedExp +++ lexInteger 10
-             return (Just exp)
- where
-   signedExp
-     = do c <- char '-' +++ char '+'
-          n <- lexInteger 10
-          return (if c == '-' then -n else n)
 
 lexDecNumber :: ReadP Lexeme
 lexDecNumber =
   do xs    <- lexDigits 10
-     mFrac <- lexFrac <++ return Nothing
-     mExp  <- lexExp  <++ return Nothing
+     mFrac <- lexFrac 10 <++ return Nothing
+     mExp  <- lexExp ['e', 'E'] <++ return Nothing
      return (Number (MkDecimal xs mFrac mExp))
 
-lexFrac :: ReadP (Maybe Digits)
+lexFrac :: Int -> ReadP (Maybe Digits)
 -- Read the fractional part; fail if it doesn't
 -- start ".d" where d is a digit
-lexFrac = do _ <- char '.'
-             fraction <- lexDigits 10
-             return (Just fraction)
+lexFrac base = do _ <- char '.'
+                  fraction <- lexDigits base
+                  return (Just fraction)
 
 lexExp :: ReadP (Maybe Integer)
-lexExp = do _ <- char 'e' +++ char 'E'
-            exp <- signedExp +++ lexInteger 10
-            return (Just exp)
+lexExp expChars = do _ <- choice (map char expChars)
+                     exp <- signedExp +++ lexInteger 10
+                     return (Just exp)
  where
    signedExp
      = do c <- char '-' +++ char '+'
