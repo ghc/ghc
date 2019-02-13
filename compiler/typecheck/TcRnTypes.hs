@@ -1107,9 +1107,6 @@ data PromotionErr
   | PatSynPE         -- Pattern synonyms
                      -- See Note [Don't promote pattern synonyms] in TcEnv
 
-  | PatSynExPE       -- Pattern synonym existential type variable
-                     -- See Note [Pattern synonym existentials do not scope] in TcPatSyn
-
   | RecDataConPE     -- Data constructor in a recursive loop
                      -- See Note [Recursion and promoting data constructors] in TcTyClsDecls
   | NoDataKindsTC    -- -XDataKinds not enabled (for a tycon)
@@ -1303,7 +1300,6 @@ instance Outputable PromotionErr where
   ppr ClassPE                     = text "ClassPE"
   ppr TyConPE                     = text "TyConPE"
   ppr PatSynPE                    = text "PatSynPE"
-  ppr PatSynExPE                  = text "PatSynExPE"
   ppr FamDataConPE                = text "FamDataConPE"
   ppr (ConstrainedDataConPE pred) = text "ConstrainedDataConPE"
                                       <+> parens (ppr pred)
@@ -1322,7 +1318,6 @@ pprPECategory :: PromotionErr -> SDoc
 pprPECategory ClassPE                = text "Class"
 pprPECategory TyConPE                = text "Type constructor"
 pprPECategory PatSynPE               = text "Pattern synonym"
-pprPECategory PatSynExPE             = text "Pattern synonym existential"
 pprPECategory FamDataConPE           = text "Data constructor"
 pprPECategory ConstrainedDataConPE{} = text "Data constructor"
 pprPECategory RecDataConPE           = text "Data constructor"
