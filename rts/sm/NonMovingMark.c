@@ -418,8 +418,8 @@ void updateRemembSetPushThunk(Capability *cap, StgThunk *thunk)
 }
 
 void updateRemembSetPushThunkEager(Capability *cap,
-                                  const StgThunkInfoTable *info,
-                                  StgThunk *thunk)
+                                   const StgThunkInfoTable *info,
+                                   StgThunk *thunk)
 {
     /* N.B. info->i.type mustn't be WHITEHOLE */
     switch (info->i.type) {
@@ -472,8 +472,8 @@ void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *origin)
 }
 
 void updateRemembSetPushClosure(Capability *cap,
-                              StgClosure *p,
-                              StgClosure **origin)
+                                StgClosure *p,
+                                StgClosure **origin)
 {
     if (!nonmoving_write_barrier_enabled) return;
     if (!check_in_nonmoving_heap(p)) return;
@@ -486,8 +486,8 @@ void updateRemembSetPushClosure(Capability *cap,
 }
 
 void updateRemembSetPushClosure_(StgRegTable *reg,
-                               StgClosure *p,
-                               StgClosure **origin)
+                                 StgClosure *p,
+                                 StgClosure **origin)
 {
     updateRemembSetPushClosure(regTableToCapability(reg), p, origin);
 }
@@ -585,14 +585,14 @@ void markQueuePush (MarkQueue *q, const MarkQueueEnt *ent)
 }
 
 void markQueuePushClosure (MarkQueue *q,
-                              StgClosure *p,
-                              StgClosure **origin)
+                           StgClosure *p,
+                           StgClosure **origin)
 {
     push_closure(q, p, origin);
 }
 
 /* TODO: Do we really never want to specify the origin here? */
-void markQueueAddRoot(MarkQueue* q, StgClosure** root)
+void markQueueAddRoot (MarkQueue* q, StgClosure** root)
 {
     markQueuePushClosure(q, *root, NULL);
 }
@@ -625,7 +625,7 @@ void markQueuePushArray (MarkQueue *q,
  *********************************************************/
 
 // Returns invalid MarkQueueEnt if queue is empty.
-static MarkQueueEnt markQueuePop(MarkQueue *q)
+static MarkQueueEnt markQueuePop (MarkQueue *q)
 {
     MarkQueueBlock *top;
 
@@ -672,7 +672,7 @@ again:
  *********************************************************/
 
 /* Must hold sm_mutex. */
-static void init_mark_queue_(MarkQueue *queue)
+static void init_mark_queue_ (MarkQueue *queue)
 {
     bdescr *bd = allocGroup(1);
     queue->blocks = bd;
@@ -681,7 +681,7 @@ static void init_mark_queue_(MarkQueue *queue)
 }
 
 /* Must hold sm_mutex. */
-void initMarkQueue(MarkQueue *queue)
+void initMarkQueue (MarkQueue *queue)
 {
     init_mark_queue_(queue);
     queue->marked_objects = allocHashTable();
@@ -689,7 +689,7 @@ void initMarkQueue(MarkQueue *queue)
 }
 
 /* Must hold sm_mutex. */
-void init_upd_rem_set(UpdRemSet *rset)
+void init_upd_rem_set (UpdRemSet *rset)
 {
     init_mark_queue_(&rset->queue);
     // Update remembered sets don't have to worry about static objects
@@ -697,7 +697,7 @@ void init_upd_rem_set(UpdRemSet *rset)
     rset->queue.is_upd_rem_set = true;
 }
 
-void freeMarkQueue(MarkQueue *queue)
+void freeMarkQueue (MarkQueue *queue)
 {
     bdescr* b = queue->blocks;
     ACQUIRE_SM_LOCK;
@@ -712,7 +712,7 @@ void freeMarkQueue(MarkQueue *queue)
 }
 
 #if defined(THREADED_RTS) && defined(DEBUG)
-static uint32_t markQueueLength(MarkQueue *q)
+static uint32_t markQueueLength (MarkQueue *q)
 {
     uint32_t n = 0;
     for (bdescr *block = q->blocks; block; block = block->link) {
@@ -733,7 +733,8 @@ static uint32_t markQueueLength(MarkQueue *q)
  * barrier. Consequently it's quite important that we deeply mark
  * any outstanding transactions.
  */
-static void mark_trec_header (MarkQueue *queue, StgTRecHeader *trec)
+static void
+mark_trec_header (MarkQueue *queue, StgTRecHeader *trec)
 {
     while (trec != NO_TREC) {
         StgTRecChunk *chunk = trec->current_chunk;
@@ -752,7 +753,8 @@ static void mark_trec_header (MarkQueue *queue, StgTRecHeader *trec)
     }
 }
 
-static void mark_tso (MarkQueue *queue, StgTSO *tso)
+static void
+mark_tso (MarkQueue *queue, StgTSO *tso)
 {
     // TODO: Clear dirty if contains only old gen objects
 
@@ -776,7 +778,7 @@ static void mark_tso (MarkQueue *queue, StgTSO *tso)
 }
 
 static void
-do_push_closure(StgClosure **p, void *user)
+do_push_closure (StgClosure **p, void *user)
 {
     MarkQueue *queue = (MarkQueue *) user;
     // TODO: Origin? need reference to containing closure
@@ -961,7 +963,7 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
     p = UNTAG_CLOSURE(p);
 
 #   define PUSH_FIELD(obj, field)                                \
-        markQueuePushClosure(queue,                           \
+        markQueuePushClosure(queue,                              \
                                 (StgClosure *) (obj)->field,     \
                                 (StgClosure **) &(obj)->field)
 
@@ -1396,7 +1398,8 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
  *  c. the mark queue has been seeded with a set of roots.
  *
  */
-GNUC_ATTR_HOT void nonmovingMark(MarkQueue *queue)
+GNUC_ATTR_HOT void
+nonmovingMark (MarkQueue *queue)
 {
     traceConcMarkBegin();
     debugTrace(DEBUG_nonmoving_gc, "Starting mark pass");
@@ -1452,7 +1455,7 @@ GNUC_ATTR_HOT void nonmovingMark(MarkQueue *queue)
 // - Resurrecting threads; checking if a thread is dead.
 // - Sweeping object lists: large_objects, mut_list, stable_name_table.
 //
-bool nonmovingIsAlive(StgClosure *p)
+bool nonmovingIsAlive (StgClosure *p)
 {
     // Ignore static closures. See comments in `isAlive`.
     if (!HEAP_ALLOCED_GC(p)) {
@@ -1498,7 +1501,7 @@ bool nonmovingIsAlive(StgClosure *p)
 // - Resurrecting threads; checking if a thread is dead.
 // - Sweeping object lists: large_objects, mut_list, stable_name_table.
 //
-static bool nonmovingIsNowAlive(StgClosure *p)
+static bool nonmovingIsNowAlive (StgClosure *p)
 {
     // Ignore static closures. See comments in `isAlive`.
     if (!HEAP_ALLOCED_GC(p)) {
@@ -1522,7 +1525,7 @@ static bool nonmovingIsNowAlive(StgClosure *p)
 }
 
 // Non-moving heap variant of `tidyWeakList`
-bool nonmovingTidyWeaks(struct MarkQueue_ *queue)
+bool nonmovingTidyWeaks (struct MarkQueue_ *queue)
 {
     bool did_work = false;
 
@@ -1559,7 +1562,7 @@ bool nonmovingTidyWeaks(struct MarkQueue_ *queue)
     return did_work;
 }
 
-void nonmovingMarkDeadWeak(struct MarkQueue_ *queue, StgWeak *w)
+void nonmovingMarkDeadWeak (struct MarkQueue_ *queue, StgWeak *w)
 {
     if (w->cfinalizers != &stg_NO_FINALIZER_closure) {
         markQueuePushClosure_(queue, w->value);
@@ -1567,7 +1570,7 @@ void nonmovingMarkDeadWeak(struct MarkQueue_ *queue, StgWeak *w)
     markQueuePushClosure_(queue, w->finalizer);
 }
 
-void nonmovingMarkLiveWeak(struct MarkQueue_ *queue, StgWeak *w)
+void nonmovingMarkLiveWeak (struct MarkQueue_ *queue, StgWeak *w)
 {
     ASSERT(nonmovingClosureMarkedThisCycle((P_)w));
     markQueuePushClosure_(queue, w->value);
@@ -1579,7 +1582,7 @@ void nonmovingMarkLiveWeak(struct MarkQueue_ *queue, StgWeak *w)
 // considered "dead". We mark values and finalizers of such weaks, and then
 // schedule them for finalization in `scheduleFinalizers` (which we run during
 // synchronization).
-void nonmovingMarkDeadWeaks(struct MarkQueue_ *queue, StgWeak **dead_weaks)
+void nonmovingMarkDeadWeaks (struct MarkQueue_ *queue, StgWeak **dead_weaks)
 {
     StgWeak *next_w;
     for (StgWeak *w = nonmoving_old_weak_ptr_list; w; w = next_w) {
@@ -1592,7 +1595,7 @@ void nonmovingMarkDeadWeaks(struct MarkQueue_ *queue, StgWeak **dead_weaks)
 }
 
 // Non-moving heap variant of of `tidyThreadList`
-void nonmovingTidyThreads()
+void nonmovingTidyThreads ()
 {
     StgTSO *next;
     StgTSO **prev = &nonmoving_old_threads;
@@ -1617,7 +1620,7 @@ void nonmovingTidyThreads()
     }
 }
 
-void nonmovingResurrectThreads(struct MarkQueue_ *queue, StgTSO **resurrected_threads)
+void nonmovingResurrectThreads (struct MarkQueue_ *queue, StgTSO **resurrected_threads)
 {
     StgTSO *next;
     for (StgTSO *t = nonmoving_old_threads; t != END_TSO_QUEUE; t = next) {
@@ -1637,7 +1640,7 @@ void nonmovingResurrectThreads(struct MarkQueue_ *queue, StgTSO **resurrected_th
 
 #ifdef DEBUG
 
-void printMarkQueueEntry(MarkQueueEnt *ent)
+void printMarkQueueEntry (MarkQueueEnt *ent)
 {
     if (ent->type == MARK_CLOSURE) {
         debugBelch("Closure: ");
@@ -1649,7 +1652,7 @@ void printMarkQueueEntry(MarkQueueEnt *ent)
     }
 }
 
-void printMarkQueue(MarkQueue *q)
+void printMarkQueue (MarkQueue *q)
 {
     debugBelch("======== MARK QUEUE ========\n");
     for (bdescr *block = q->blocks; block; block = block->link) {
