@@ -12,7 +12,10 @@ test('testmblockalloc',
 
 # See bug #101, test requires +RTS -c (or equivalently +RTS -M<something>)
 # only GHCi triggers the bug, but we run the test all ways for completeness.
-test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
+test('bug1010',
+     # Non-moving GC doesn't support -c
+     omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']),
+     compile_and_run, ['+RTS -c -RTS'])
 
 def normalise_address(str):
     return re.sub('Access violation in generated code when reading [0]+',
