@@ -24,7 +24,7 @@ import Name
 import Module
 import SrcLoc
 import Outputable
-import PrelNames ( mkUnboundName, forall_tv_RDR, isUnboundName, getUnique)
+import PrelNames ( mkUnboundName, isUnboundName, getUnique)
 import Util
 import Maybes
 import DynFlags
@@ -78,13 +78,10 @@ unboundNameX where_look rdr_name extra
 
 notInScopeErr :: RdrName -> SDoc
 notInScopeErr rdr_name
-  = vcat [ hang (text "Not in scope:")
-              2 (what <+> quotes (ppr rdr_name))
-         , extra ]
+  = hang (text "Not in scope:")
+       2 (what <+> quotes (ppr rdr_name))
   where
     what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
-    extra | rdr_name == forall_tv_RDR = perhapsForallMsg
-          | otherwise                 = Outputable.empty
 
 type HowInScope = Either SrcSpan ImpDeclSpec
      -- Left loc    =>  locally bound at loc
