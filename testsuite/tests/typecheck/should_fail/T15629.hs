@@ -23,5 +23,5 @@ sg _ _ = Proxy
 f :: forall (x :: Type). Proxy x -> ()
 f _ = ()
   where
-    g :: forall ab. Proxy ((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)
+    g :: forall z ab. Proxy ((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)
     g = sg Proxy Proxy

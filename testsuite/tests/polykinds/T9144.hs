@@ -8,7 +8,7 @@ import GHC.TypeLits
 data family Sing (a :: k)
 
 data SomeSing :: KProxy k -> * where
-  SomeSing :: forall (a :: k). Sing a -> SomeSing ('KProxy :: KProxy k)
+  SomeSing :: forall k (a :: k). Sing a -> SomeSing ('KProxy :: KProxy k)
 
 class kproxy ~ 'KProxy => SingKind (kproxy :: KProxy k) where
   fromSing :: forall (a :: k). Sing a -> DemoteRep ('KProxy :: KProxy k)

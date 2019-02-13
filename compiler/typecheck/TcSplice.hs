@@ -1252,7 +1252,7 @@ reifyInstances th_nm th_tys
         ; rdr_ty <- cvt loc (mkThAppTs (TH.ConT th_nm) th_tys)
           -- #9262 says to bring vars into scope, like in HsForAllTy case
           -- of rnHsTyKi
-        ; let tv_rdrs = freeKiTyVarsAllVars (extractHsTyRdrTyVars rdr_ty)
+        ; let tv_rdrs = extractHsTyRdrTyVars rdr_ty
           -- Rename  to HsType Name
         ; ((tv_names, rn_ty), _fvs)
             <- checkNoErrs $ -- If there are out-of-scope Names here, then we
