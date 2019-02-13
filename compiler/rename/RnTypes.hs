@@ -44,7 +44,6 @@ import DynFlags
 import HsSyn
 import RnHsDoc          ( rnLHsDoc, rnMbLHsDoc )
 import RnEnv
-import RnUnbound        ( perhapsForallMsg )
 import RnUtils          ( HsDocContext(..), withHsDocContext, mapFvRn
                         , pprHsDocContext, bindLocalNamesFV, typeAppErr
                         , newLocalBndrRn, checkDupRdrNames, checkShadowedRdrNames )

@@ -12,7 +12,6 @@ module RnUnbound ( mkUnboundName
                  , WhereLooking(..)
                  , unboundName
                  , unboundNameX
-                 , perhapsForallMsg
                  , notInScopeErr ) where
 
 import GhcPrelude
@@ -348,11 +347,6 @@ extensionSuggestions rdrName
     rdrName == mkUnqual varName (fsLit "rec")
       = text "Perhaps you meant to use RecursiveDo"
   | otherwise = Outputable.empty
-
-perhapsForallMsg :: SDoc
-perhapsForallMsg
-  = vcat [ text "Perhaps you intended to use ExplicitForAll or similar flag"
-         , text "to enable explicit-forall syntax: forall <tvs>. <type>"]
 
 qualsInScope :: GlobalRdrElt -> [(ModuleName, HowInScope)]
 -- Ones for which the qualified version is in scope
