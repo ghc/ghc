@@ -120,8 +120,8 @@ fixedParts p base iPart fPart =
 -- /necessarily/ return Nothing, but it is good enough to fix the
 -- space problems in #5688
 -- Ways this is conservative:
--- * the floatRange is in base 2, but we pretend it is in base 10
--- * we pad the floatRange a bit, just in case it is very small
+-- * The floatRange is in base 2, but we pretend it is in base 10
+-- * We pad the floatRange a bit, just in case it is very small
 --   and we would otherwise hit an edge case
 -- * We only worry about numbers that have an exponent. If they don't
 --   have an exponent then the Rational won't be much larger than the
@@ -129,63 +129,46 @@ fixedParts p base iPart fPart =
 -- | @since 4.5.1.0
 numberToRangedRational :: (Int, Int) -> Number
                        -> Maybe Rational -- Nothing = Inf
-numberToRangedRational (neg, pos) n@(MkDecimal iPart mFPart (Just exp))
-    -- if exp is out of integer bounds,
-    -- then the number is definitely out of range
-    | exp > fromIntegral (maxBound :: Int) ||
-      exp < fromIntegral (minBound :: Int)
-    = Nothing
-    | otherwise
-    = let mFirstDigit = case dropWhile (0 ==) iPart of
-                        iPart'@(_ : _) -> Just (length iPart')
-                        [] -> case mFPart of
-                              Nothing -> Nothing
-                              Just fPart ->
-                                  case span (0 ==) fPart of
-                                  (_, []) -> Nothing
-                                  (zeroes, _) ->
-                                      Just (negate (length zeroes))
-      in case mFirstDigit of
-         Nothing -> Just 0
-         Just firstDigit ->
-             let firstDigit' = firstDigit + fromInteger exp
-             in if firstDigit' > (pos + 3)
-                then Nothing
-                else if firstDigit' < (neg - 3)
-                then Just 0
-                else Just (numberToRational n)
-numberToRangedRational (neg, pos) n@(MkHexadecimal iPart mFPart (Just exp))
-    -- if exp is out of integer bounds,
-    -- then the number is definitely out of range
-    | exp > fromIntegral (maxBound :: Int) ||
-      exp < fromIntegral (minBound :: Int)
-    = Nothing
-    | otherwise
-    = let mFirstDigit = case dropWhile (0 ==) iPart of
-                        iPart'@(_ : _) -> Just (length iPart')
-                        [] -> case mFPart of
-                              Nothing -> Nothing
-                              Just fPart ->
-                                  case span (0 ==) fPart of
-                                  (_, []) -> Nothing
-                                  (zeroes, _) ->
-                                      Just (negate (length zeroes))
-      in case mFirstDigit of
-         Nothing -> Just 0
-         Just firstDigit ->
-             let firstDigit' = firstDigit + fromInteger exp
-             in if firstDigit' > (pos + 3)
-                   -- TODO: I have no idea whether the +/- 3 padding makes
-                   --       sense for hexadecimal numbers too.
-                   --       I think firstDigit does have to be brought down
-                   --       to powers of 2 rather than 16 though.
-                   --       On the plus side we'd no longer be pretending
-                   --       that the base 2 bounds are base 10.
-                then Nothing
-                else if firstDigit' < (neg - 3)
-                then Just 0
-                else Just (numberToRational n)
+numberToRangedRational bounds n@(MkDecimal iPart mFPart (Just exp))
+  = exponentedToRangedRational bounds n iPart mFPart exp
+numberToRangedRational bounds n@(MkHexadecimal iPart mFPart (Just exp))
+  -- TODO: I have no idea whether the +/- 3 padding makes
+  --       sense for hexadecimal numbers too.
+  --       I think firstDigit does have to be brought down
+  --       to powers of 2 rather than 16 though.
+  --       On the plus side we'd no longer be pretending
+  --       that the base 2 bounds are base 10.
+  = exponentedToRangedRational bounds n iPart mFPart exp
 numberToRangedRational _ n = Just (numberToRational n)
+
+exponentedToRangedRational :: (Int, Int) -> Number
+                           -> Digits -> Maybe Digits -> Integer
+                           -> Maybe Rational
+exponentedToRangedRational (neg, pos) n iPart mFPart exp
+  -- if exp is out of integer bounds,
+  -- then the number is definitely out of range
+  | exp > fromIntegral (maxBound :: Int) ||
+    exp < fromIntegral (minBound :: Int)
+  = Nothing
+  | otherwise
+  = let mFirstDigit = case dropWhile (0 ==) iPart of
+                      iPart'@(_ : _) -> Just (length iPart')
+                      [] -> case mFPart of
+                            Nothing -> Nothing
+                            Just fPart ->
+                                case span (0 ==) fPart of
+                                (_, []) -> Nothing
+                                (zeroes, _) ->
+                                    Just (negate (length zeroes))
+    in case mFirstDigit of
+       Nothing -> Just 0
+       Just firstDigit ->
+           let firstDigit' = firstDigit + fromInteger exp
+           in if firstDigit' > (pos + 3)
+              then Nothing
+              else if firstDigit' < (neg - 3)
+              then Just 0
+              else Just (numberToRational n)
 
 -- | @since 4.6.0.0
 numberToRational :: Number -> Rational
