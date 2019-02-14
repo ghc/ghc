@@ -2,16 +2,3 @@
 T14232.hs:3:6: error:
     • Expected kind ‘* -> *’, but ‘String -> a’ has kind ‘*’
     • In the type signature: f :: (String -> a) String -> a
-
-T14232.hs:4:9: error:
-    • Couldn't match type ‘String -> a’ with ‘(->) t0’
-      Expected type: t0 -> [Char]
-        Actual type: (String -> a) String
-    • The function ‘g’ is applied to one argument,
-      but its type ‘(String -> a) String’ has none
-      In the expression: g s
-      In an equation for ‘f’: f g s = g s
-    • Relevant bindings include
-        s :: t0 (bound at T14232.hs:4:5)
-        g :: (String -> a) String (bound at T14232.hs:4:3)
-        f :: (String -> a) String -> a (bound at T14232.hs:4:1)

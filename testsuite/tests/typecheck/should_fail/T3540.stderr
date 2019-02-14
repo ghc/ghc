@@ -3,16 +3,6 @@ T3540.hs:4:12: error:
     • Expected a type, but ‘a ~ Int’ has kind ‘Constraint’
     • In the type signature: thing :: (a ~ Int)
 
-T3540.hs:5:9: error:
-    • Couldn't match kind ‘Constraint’ with ‘*’
-      When matching types
-        a0 :: *
-        a ~ Int :: Constraint
-    • In the expression: undefined
-      In an equation for ‘thing’: thing = undefined
-    • Relevant bindings include
-        thing :: a ~ Int (bound at T3540.hs:5:1)
-
 T3540.hs:7:20: error:
     • Expected a type, but ‘a ~ Int’ has kind ‘Constraint’
     • In the type signature: thing1 :: Int -> (a ~ Int)

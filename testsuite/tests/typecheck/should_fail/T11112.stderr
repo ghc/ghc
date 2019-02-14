@@ -2,12 +2,3 @@
 T11112.hs:3:9: error:
     • Expected a type, but ‘Ord s’ has kind ‘Constraint’
     • In the type signature: sort :: Ord s -> [s] -> [s]
-
-T11112.hs:4:11: error:
-    • Couldn't match expected type ‘[s] -> [s]’
-                  with actual type ‘Ord s’
-    • In the expression: xs
-      In an equation for ‘sort’: sort xs = xs
-    • Relevant bindings include
-        xs :: Ord s (bound at T11112.hs:4:6)
-        sort :: Ord s => [s] -> [s] (bound at T11112.hs:4:1)

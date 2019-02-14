@@ -1,15 +1,4 @@
 
-T13819.hs:12:10: error:
-    • Couldn't match type ‘_0 -> A _0’ with ‘A a’
-      Expected type: a -> A a
-        Actual type: (_1 -> WrappedMonad A _2) (_0 -> A _0)
-    • In the expression: pure @(_ -> WrappedMonad A _) @(_ -> A _) pure
-      In an equation for ‘pure’:
-          pure = pure @(_ -> WrappedMonad A _) @(_ -> A _) pure
-      In the instance declaration for ‘Applicative A’
-    • Relevant bindings include
-        pure :: a -> A a (bound at T13819.hs:12:3)
-
 T13819.hs:12:17: error:
     • Expected kind ‘* -> *’, but ‘_ -> WrappedMonad A _’ has kind ‘*’
     • In the type ‘(_ -> WrappedMonad A _)’

@@ -3,11 +3,3 @@ tcfail161.hs:5:7: error:
     • Expecting one more argument to ‘Maybe’
       Expected a type, but ‘Maybe’ has kind ‘* -> *’
     • In the type signature: f :: [Maybe]
-
-tcfail161.hs:6:1: error:
-    • Couldn't match expected type ‘[Maybe]’
-                  with actual type ‘p0 -> p0’
-    • The equation(s) for ‘f’ have one argument,
-      but its type ‘[Maybe]’ has none
-    • Relevant bindings include
-        f :: [Maybe] (bound at tcfail161.hs:6:1)

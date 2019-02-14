@@ -4,32 +4,11 @@ tcfail113.hs:12:7: error:
       Expected a type, but ‘Maybe’ has kind ‘* -> *’
     • In the type signature: f :: [Maybe]
 
-tcfail113.hs:13:1: error:
-    • Couldn't match expected type ‘[Maybe]’
-                  with actual type ‘p1 -> p1’
-    • The equation(s) for ‘f’ have one argument,
-      but its type ‘[Maybe]’ has none
-    • Relevant bindings include
-        f :: [Maybe] (bound at tcfail113.hs:13:1)
-
 tcfail113.hs:15:8: error:
     • Expected kind ‘* -> *’, but ‘Int’ has kind ‘*’
     • In the first argument of ‘T’, namely ‘Int’
       In the type signature: g :: T Int
 
-tcfail113.hs:16:1: error:
-    • Couldn't match expected type ‘T Int’ with actual type ‘p0 -> p0’
-    • The equation(s) for ‘g’ have one argument,
-      but its type ‘T Int’ has none
-    • Relevant bindings include g :: T Int (bound at tcfail113.hs:16:1)
-
 tcfail113.hs:18:6: error:
     • Expected kind ‘* -> *’, but ‘Int’ has kind ‘*’
     • In the type signature: h :: Int Int
-
-tcfail113.hs:19:1: error:
-    • Couldn't match type ‘Int’ with ‘(->) Int’
-      Expected type: Int Int
-        Actual type: Int -> Int
-    • The equation(s) for ‘h’ have one argument,
-      but its type ‘Int Int’ has none
