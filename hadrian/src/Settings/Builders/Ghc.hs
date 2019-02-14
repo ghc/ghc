@@ -40,6 +40,27 @@ compileC = builder (Ghc CompileCWithGhc) ? do
             , arg "-o"
             , arg =<< getOutput ]
 
+-- Extra bundled libraries adhear to the cabal documentation in
+-- developing-packages.rst. The names must be translated accordingly to generate
+-- a valid linking argument. This is only partially implemented, as the only use
+-- case is linking ffi into the rts package. E.g. In the dynamic case:
+--     bundledLibLinkerName True "Cffi" == "ffi"
+-- This means the linker option "-lffi" should be used to link rts.
+bundledLibLinkerName
+    :: Bool     -- ^ True iff the library is to be linked dynamically
+    -> String   -- ^ The library name as listed in extra-bundled-libraries.
+    -> String   -- ^ The library name to pass to the linker (via the "-l" arg)
+bundledLibLinkerName dynamic lib
+    | Just _ <- stripPrefix "HS" lib
+        = error $ "Unimplemented: Hadrian doesn't yet support linking "
+                ++ "with extra bundled haskell library: " ++ lib
+    | Just lib' <- stripPrefix "C" lib
+        = if dynamic
+            then lib'
+            else lib
+    | otherwise
+        = error $ "Don't understand extra bundled library name " ++ lib
+
 ghcLinkArgs :: Args
 ghcLinkArgs = builder (Ghc LinkHs) ? do
     pkg     <- getPackage
@@ -61,6 +82,9 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
         rpath | darwin = "@loader_path" -/- originToLibsDir
               | otherwise = "$ORIGIN" -/- originToLibsDir
 
+    bundLibs <- fmap (bundledLibLinkerName dynamic)
+                <$> getContextData extraBundledLibs
+
     mconcat [ dynamic ? mconcat
                 [ arg "-dynamic"
                 -- TODO what about windows?
@@ -71,8 +95,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
             , not (nonHsMainPackage pkg) ? arg "-rtsopts"
-            , pure [ "-l" ++ lib    | lib <-    libs    ]
-            , pure [ "-L" ++ libDir | libDir <- libDirs ]
+            , pure [ "-l" ++ lib    | lib    <- libs ++ bundLibs ]
+            , pure [ "-L" ++ libDir | libDir <- libDirs          ]
             , darwin ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             ]
 
