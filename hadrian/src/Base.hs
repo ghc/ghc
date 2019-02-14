@@ -24,7 +24,8 @@ module Base (
     -- * Paths
     hadrianPath, configPath, configFile, sourcePath, shakeFilesDir,
     generatedDir, generatedPath, stageBinPath, stageLibPath, templateHscPath,
-    ghcDeps, haddockDeps, relativePackageDbPath, packageDbPath, packageDbStamp,
+    ghcDeps, includesDependencies, haddockDeps, relativePackageDbPath,
+    packageDbPath, packageDbStamp,
     ghcSplitPath
     ) where
 
@@ -106,15 +107,20 @@ stageBinPath stage = buildRoot <&> (-/- stageString stage -/- "bin")
 stageLibPath :: Stage -> Action FilePath
 stageLibPath stage = buildRoot <&> (-/- stageString stage -/- "lib")
 
--- | Files the `ghc` binary depends on
+-- | Files the GHC binary depends on.
 ghcDeps :: Stage -> Action [FilePath]
 ghcDeps stage = mapM (\f -> stageLibPath stage <&> (-/- f))
-      [ "ghc-usage.txt"
-      , "ghci-usage.txt"
-      , "llvm-targets"
-      , "llvm-passes"
-      , "platformConstants"
-      , "settings" ]
+    [ "ghc-usage.txt"
+    , "ghci-usage.txt"
+    , "llvm-targets"
+    , "llvm-passes"
+    , "platformConstants"
+    , "settings" ]
+
+includesDependencies :: Action [FilePath]
+includesDependencies = do
+    path <- generatedPath
+    return $ (path -/-) <$> [ "ghcautoconf.h", "ghcplatform.h", "ghcversion.h" ]
 
 -- | Files the `haddock` binary depends on
 haddockDeps :: Stage -> Action [FilePath]
