@@ -9,7 +9,7 @@ import Expression
 import Hadrian.BuildPath
 import Oracles.ModuleFiles
 import Rules.Generate
-import Settings.Default
+import Settings
 import Target
 import Utilities
 
@@ -19,17 +19,15 @@ buildPackageDependencies :: [(Resource, Int)] -> Rules ()
 buildPackageDependencies rs = do
     root <- buildRootRules
     root -/- "**/.dependencies.mk" %> \mk -> do
-        depfile <- getDepMkFile root mk
-        context <- depMkFileContext depfile
+        DepMkFile stage pkgpath <- getDepMkFile root mk
+        let context = Context stage (unsafeFindPackageByPath pkgpath) vanilla
         srcs <- hsSources context
-        need srcs
-        orderOnly =<< interpretInContext context generatedDependencies
+        gens <- interpretInContext context generatedDependencies
+        need (srcs ++ gens)
         if null srcs
         then writeFileChanged mk ""
-        else buildWithResources rs $
-            target context
-                   (Ghc FindHsDependencies $ Context.stage context)
-                   srcs [mk]
+        else buildWithResources rs $ target context
+            (Ghc FindHsDependencies $ Context.stage context) srcs [mk]
         removeFile $ mk <.> "bak"
 
     root -/- "**/.dependencies" %> \deps -> do
@@ -43,22 +41,16 @@ buildPackageDependencies rs = do
                               $ parseMakefile mkDeps
 
 
-data DepMkFile = DepMkFile Stage FilePath
-  deriving (Eq, Show)
+data DepMkFile = DepMkFile Stage FilePath deriving (Eq, Show)
 
 parseDepMkFile :: FilePath -> Parsec.Parsec String () DepMkFile
 parseDepMkFile root = do
-  _ <- Parsec.string root *> Parsec.optional (Parsec.char '/')
-  stage <- parseStage
-  _ <- Parsec.char '/'
-  pkgPath <- Parsec.manyTill Parsec.anyChar
-    (Parsec.try $ Parsec.string "/.dependencies.mk")
-  return (DepMkFile stage pkgPath)
+    _ <- Parsec.string root *> Parsec.optional (Parsec.char '/')
+    stage <- parseStage
+    _ <- Parsec.char '/'
+    pkgPath <- Parsec.manyTill Parsec.anyChar
+        (Parsec.try $ Parsec.string "/.dependencies.mk")
+    return (DepMkFile stage pkgPath)
 
 getDepMkFile :: FilePath -> FilePath -> Action DepMkFile
 getDepMkFile root = parsePath (parseDepMkFile root) "<dependencies file>"
-
-depMkFileContext :: DepMkFile -> Action Context
-depMkFileContext (DepMkFile stage pkgpath) = do
-  pkg <- getPackageByPath pkgpath
-  return (Context stage pkg vanilla)

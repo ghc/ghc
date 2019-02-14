@@ -11,8 +11,7 @@
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Cabal (
     pkgVersion, pkgIdentifier, pkgSynopsis, pkgDescription, pkgDependencies,
-    pkgGenericDescription,
-    cabalArchString, cabalOsString,
+    pkgGenericDescription, cabalArchString, cabalOsString,
     ) where
 
 import Development.Shake
