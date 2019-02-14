@@ -1179,6 +1179,11 @@ etaBodyForJoinPoint need_args body
       | Just (arg_ty, res_ty) <- splitFunTy_maybe ty
       , let (subst', b) = freshEtaId n subst arg_ty
       = go (n-1) res_ty subst' (b : rev_bs) (e `App` Var b)
+
+      | Just (arg_ty, res_ty) <- splitFunTildeTy_maybe ty
+      , let (subst', b) = freshEtaId n subst arg_ty
+      = go (n-1) res_ty subst' (b : rev_bs) (e `App` Var b)
+
       | otherwise
       = pprPanic "etaBodyForJoinPoint" $ int need_args $$
                                          ppr body $$ ppr (exprType body)

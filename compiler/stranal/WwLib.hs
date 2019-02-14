@@ -184,6 +184,12 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands res_info
       , Just (arg_ty1, _) <- splitFunTy_maybe fun_ty
       , isAbsDmd d && isVoidTy arg_ty1
       = True
+
+      | [d] <- demands
+      , Just (arg_ty1, _) <- splitFunTildeTy_maybe fun_ty
+      , isAbsDmd d && isVoidTy arg_ty1
+      = True
+
       | otherwise
       = False
 
@@ -413,6 +419,18 @@ mkWWargs subst fun_ty demands
 
   | (dmd:demands') <- demands
   , Just (arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
+  = do  { uniq <- getUniqueM
+        ; let arg_ty' = substTy subst arg_ty
+              id = mk_wrap_arg uniq arg_ty' dmd
+        ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
+              <- mkWWargs subst fun_ty' demands'
+        ; return (id : wrap_args,
+                  Lam id . wrap_fn_args,
+                  apply_or_bind_then work_fn_args (varToCoreExpr id),
+                  res_ty) }
+
+  | (dmd:demands') <- demands
+  , Just (arg_ty, fun_ty') <- splitFunTildeTy_maybe fun_ty
   = do  { uniq <- getUniqueM
         ; let arg_ty' = substTy subst arg_ty
               id = mk_wrap_arg uniq arg_ty' dmd
