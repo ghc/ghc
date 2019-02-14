@@ -42,12 +42,13 @@ compileC = builder (Ghc CompileCWithGhc) ? do
 
 ghcLinkArgs :: Args
 ghcLinkArgs = builder (Ghc LinkHs) ? do
-    pkg     <- getPackage
-    libs    <- getContextData extraLibs
-    libDirs <- getContextData extraLibDirs
-    fmwks   <- getContextData frameworks
-    darwin  <- expr osxHost
-    way     <- getWay
+    pkg       <- getPackage
+    bundLibs  <- getContextData extraBundledLibs
+    libs      <- getContextData extraLibs
+    libDirs   <- getContextData extraLibDirs
+    fmwks     <- getContextData frameworks
+    darwin    <- expr osxHost
+    way       <- getWay
 
     -- Relative path from the output (rpath $ORIGIN).
     originPath <- dropFileName <$> getOutput
@@ -71,8 +72,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
             , not (nonHsMainPackage pkg) ? arg "-rtsopts"
-            , pure [ "-l" ++ lib    | lib <-    libs    ]
-            , pure [ "-L" ++ libDir | libDir <- libDirs ]
+            , pure [ "-l" ++ lib    | lib    <- libs ++ bundLibs ]
+            , pure [ "-L" ++ libDir | libDir <- libDirs          ]
             , darwin ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             ]
 

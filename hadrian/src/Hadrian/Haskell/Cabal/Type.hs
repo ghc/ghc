@@ -38,33 +38,34 @@ data PackageData = PackageData
 -- See 'PackageData' for metadata that can be obtained without resolving package
 -- configuration flags and conditionals.
 data ContextData = ContextData
-    { dependencies    :: [PackageName]
-    , componentId     :: String
-    , mainIs          :: Maybe (String, FilePath)  -- ("Main", filepath)
-    , modules         :: [String]
-    , otherModules    :: [String]
-    , srcDirs         :: [String]
-    , depIds          :: [String]
-    , depNames        :: [String]
-    , includeDirs     :: [String]
-    , includes        :: [String]
-    , installIncludes :: [String]
-    , extraLibs       :: [String]
-    , extraLibDirs    :: [String]
-    , asmSrcs         :: [String]
-    , cSrcs           :: [String]
-    , cmmSrcs         :: [String]
-    , hcOpts          :: [String]
-    , asmOpts         :: [String]
-    , ccOpts          :: [String]
-    , cmmOpts         :: [String]
-    , cppOpts         :: [String]
-    , ldOpts          :: [String]
-    , depIncludeDirs  :: [String]
-    , depCcOpts       :: [String]
-    , depLdOpts       :: [String]
-    , buildGhciLib    :: Bool
-    , frameworks      :: [String]
+    { dependencies       :: [PackageName]
+    , componentId        :: String
+    , mainIs             :: Maybe (String, FilePath)  -- ("Main", filepath)
+    , modules            :: [String]
+    , otherModules       :: [String]
+    , srcDirs            :: [String]
+    , depIds             :: [String]
+    , depNames           :: [String]
+    , includeDirs        :: [String]
+    , includes           :: [String]
+    , installIncludes    :: [String]
+    , extraBundledLibs   :: [String]
+    , extraLibs          :: [String]
+    , extraLibDirs       :: [String]
+    , asmSrcs            :: [String]
+    , cSrcs              :: [String]
+    , cmmSrcs            :: [String]
+    , hcOpts             :: [String]
+    , asmOpts            :: [String]
+    , ccOpts             :: [String]
+    , cmmOpts            :: [String]
+    , cppOpts            :: [String]
+    , ldOpts             :: [String]
+    , depIncludeDirs     :: [String]
+    , depCcOpts          :: [String]
+    , depLdOpts          :: [String]
+    , buildGhciLib       :: Bool
+    , frameworks         :: [String]
     } deriving (Eq, Generic, Show, Typeable)
 
 instance Binary   PackageData
