@@ -126,6 +126,7 @@ extern bool nonmoving_write_barrier_enabled;
 void nonmovingMarkInitUpdRemSet(void);
 
 void init_upd_rem_set(UpdRemSet *rset);
+void reset_upd_rem_set(UpdRemSet *rset);
 void updateRemembSetPushThunk(Capability *cap, StgThunk *origin);
 void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *origin);
 void updateRemembSetPushTSO(Capability *cap, StgTSO *tso);

@@ -253,7 +253,7 @@ void nonmovingBeginFlush(Task *task)
     // task suspended due to a foreign call) in which case our requestSync
     // logic won't have been hit. Make sure that everyone so far has flushed.
     // Ideally we want to mark asynchronously with syncing.
-    for (unsigned int i = 0; i < n_capabilities; i++) {
+    for (uint32_t i = 0; i < n_capabilities; i++) {
         nonmovingFlushCapUpdRemSetBlocks(capabilities[i]);
     }
 }
@@ -278,6 +278,22 @@ bool nonmovingWaitForFlush()
  */
 void nonmovingFinishFlush(Task *task)
 {
+    // This is kind of a hack to deal with this problem: sometimes we run write
+    // barriers from the mark thread, and during a pause. Those write barriers
+    // add stuff that are normally not reachable to UpdRemSets. If we don't
+    // reset those sets before releasing capabilities, in the next mark we end
+    // up marking those objects that are otherwise not reachable. This causes
+    // problems in thread resurrection and weak finalization as marking an
+    // otherwise unreachable thread/weak prevents resurrection/finalization.
+    for (uint32_t i = 0; i < n_capabilities; i++) {
+        reset_upd_rem_set(&capabilities[i]->upd_rem_set);
+    }
+    // Also reset upd_rem_set_block_list in case some of the UpdRemSets were
+    // filled and we flushed them
+    // (no need for locking here as all capabilities are held)
+    freeChain(upd_rem_set_block_list);
+    upd_rem_set_block_list = NULL;
+
     debugTrace(DEBUG_nonmoving_gc, "Finished update remembered set flush...");
     traceConcSyncEnd();
     releaseAllCapabilities(n_capabilities, NULL, task);
@@ -697,17 +713,17 @@ void init_upd_rem_set (UpdRemSet *rset)
     rset->queue.is_upd_rem_set = true;
 }
 
+void reset_upd_rem_set(UpdRemSet *rset)
+{
+    // UpdRemSets always have one block for the mark queue. This assertion is to
+    // update this code if we change that.
+    ASSERT(rset->queue.blocks->link == NULL);
+    rset->queue.top->head = 0;
+}
+
 void freeMarkQueue (MarkQueue *queue)
 {
-    bdescr* b = queue->blocks;
-    ACQUIRE_SM_LOCK;
-    while (b)
-    {
-        bdescr* b_ = b->link;
-        freeGroup(b);
-        b = b_;
-    }
-    RELEASE_SM_LOCK;
+    freeChain_lock(queue->blocks);
     freeHashTable(queue->marked_objects, NULL);
 }
 
