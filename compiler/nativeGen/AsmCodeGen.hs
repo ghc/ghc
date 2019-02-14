@@ -587,9 +587,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
                 initUs usGen
-                        $ mapM (regLiveness platform)
-                        -- TODO: Only use CFG for x86
-                        $ map (natCmmTopToLive livenessCfg) native
+                        $ mapM (cmmTopLiveness livenessCfg platform) native
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_liveness "Liveness annotations added"

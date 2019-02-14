@@ -89,7 +89,8 @@ regAlloc dflags regsFree slotsFree slotsCount code cfg
 --   and try to colour it again. After `maxSpinCount` iterations we give up.
 --
 regAlloc_spin
-        :: (Instruction instr,
+        :: forall instr statics.
+           (Instruction instr,
             Outputable instr,
             Outputable statics)
         => DynFlags
@@ -180,7 +181,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                 | otherwise
                 = reg
 
-        let code_coalesced
+        let (code_coalesced :: [LiveCmmDecl statics instr])
                 = map (patchEraseLive patchF) code
 
         -- Check whether we've found a coloring.

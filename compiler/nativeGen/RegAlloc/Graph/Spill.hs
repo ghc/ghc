@@ -105,12 +105,8 @@ regSpill_top platform regSlotMap cmm
          -> return cmm
 
         CmmProc info label live sccs
-         |  LiveInfo static firstId mLiveVRegsOnEntry liveSlotsOnEntry <- info
+         |  LiveInfo static firstId liveVRegsOnEntry liveSlotsOnEntry <- info
          -> do
-                -- We should only passed Cmms with the liveness maps filled in,
-                -- but we'll create empty ones if they're not there just in case.
-                let liveVRegsOnEntry    = fromMaybe mapEmpty mLiveVRegsOnEntry
-
                 -- The liveVRegsOnEntry contains the set of vregs that are live
                 -- on entry to each basic block. If we spill one of those vregs
                 -- we remove it from that set and add the corresponding slot
@@ -124,7 +120,7 @@ regSpill_top platform regSlotMap cmm
 
                 let info'
                         = LiveInfo static firstId
-                                (Just liveVRegsOnEntry)
+                                liveVRegsOnEntry
                                 liveSlotsOnEntry'
 
                 -- Apply the spiller to all the basic blocks in the CmmProc.
