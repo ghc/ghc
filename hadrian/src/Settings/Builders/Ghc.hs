@@ -146,6 +146,8 @@ includeGhcArgs = do
     context <- getContext
     srcDirs <- getContextData srcDirs
     autogen <- expr $ autogenPath context
+    let cabalMacros = autogen -/- "cabal_macros.h"
+    expr $ need [cabalMacros]
     mconcat [ arg "-i"
             , arg $ "-i" ++ path
             , arg $ "-i" ++ autogen
@@ -153,7 +155,7 @@ includeGhcArgs = do
             , cIncludeArgs
             , arg $      "-I" ++ root -/- generatedDir
             , arg $ "-optc-I" ++ root -/- generatedDir
-            , pure ["-optP-include", "-optP" ++ autogen -/- "cabal_macros.h"] ]
+            , pure ["-optP-include", "-optP" ++ cabalMacros] ]
 
 -- Check if building dynamically is required. GHC is a special case that needs
 -- to be built dynamically if any of the RTS ways is dynamic.
