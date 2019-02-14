@@ -162,7 +162,7 @@ regAlloc _ (CmmProc (LiveInfo info _ _ _) lbl live [])
                  , Nothing )
 
 regAlloc dflags (CmmProc static lbl live sccs)
-        | LiveInfo info entry_ids@(first_id:_) (Just block_live) _ <- static
+        | LiveInfo info entry_ids@(first_id:_) block_live _ <- static
         = do
                 -- do register allocation on each component.
                 (final_blocks, stats, stack_use)
