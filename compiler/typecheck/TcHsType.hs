@@ -250,6 +250,10 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
        ; emitResidualTvConstraint skol_info Nothing (kvs ++ spec_tkvs)
                                   tc_lvl wanted
 
+       -- See Note [Fail fast if there are insoluble kind equalities]
+       --     in TcSimplify
+       ; when (insolubleWC wanted) failM
+
        ; return (mkInvForAllTys kvs ty1) }
 
 tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type"

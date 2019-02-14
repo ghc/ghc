@@ -3,23 +3,3 @@ tcfail058.hs:6:7: error:
     • Expecting one more argument to ‘Array a’
       Expected a constraint, but ‘Array a’ has kind ‘* -> *’
     • In the type signature: f :: (Array a) => a -> b
-
-tcfail058.hs:7:7: error:
-    • Could not deduce: a ~ b
-      from the context: Array a
-        bound by the type signature for:
-                   f :: forall a b. Array a => a -> b
-        at tcfail058.hs:6:1-24
-      ‘a’ is a rigid type variable bound by
-        the type signature for:
-          f :: forall a b. Array a => a -> b
-        at tcfail058.hs:6:1-24
-      ‘b’ is a rigid type variable bound by
-        the type signature for:
-          f :: forall a b. Array a => a -> b
-        at tcfail058.hs:6:1-24
-    • In the expression: x
-      In an equation for ‘f’: f x = x
-    • Relevant bindings include
-        x :: a (bound at tcfail058.hs:7:3)
-        f :: a -> b (bound at tcfail058.hs:7:1)

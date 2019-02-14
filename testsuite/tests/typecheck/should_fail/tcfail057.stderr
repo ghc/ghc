@@ -2,12 +2,3 @@
 tcfail057.hs:5:7: error:
     • Expected a type, but ‘RealFrac a’ has kind ‘Constraint’
     • In the type signature: f :: (RealFrac a) -> a -> a
-
-tcfail057.hs:6:7: error:
-    • Couldn't match expected type ‘a -> a’
-                  with actual type ‘RealFrac a’
-    • In the expression: x
-      In an equation for ‘f’: f x = x
-    • Relevant bindings include
-        x :: RealFrac a (bound at tcfail057.hs:6:3)
-        f :: RealFrac a => a -> a (bound at tcfail057.hs:6:1)

@@ -25,17 +25,6 @@ VtaFail.hs:26:15: error:
       In the expression: first @Int F
       In an equation for ‘fInt’: fInt = first @Int F
 
-VtaFail.hs:26:19: error:
-    • Couldn't match kind ‘*’ with ‘* -> *’
-      When matching types
-        a1 :: * -> *
-        Int :: *
-      Expected type: First Int
-        Actual type: First a1
-    • In the second argument of ‘first’, namely ‘F’
-      In the expression: first @Int F
-      In an equation for ‘fInt’: fInt = first @Int F
-
 VtaFail.hs:33:18: error:
     • Couldn't match type ‘Int’ with ‘Bool’
       Expected type: Proxy Bool
@@ -47,17 +36,6 @@ VtaFail.hs:33:18: error:
 VtaFail.hs:40:17: error:
     • Expected kind ‘* -> k0 -> *’, but ‘Maybe’ has kind ‘* -> *’
     • In the type ‘Maybe’
-      In the expression: too @Maybe T
-      In an equation for ‘threeBad’: threeBad = too @Maybe T
-
-VtaFail.hs:40:23: error:
-    • Couldn't match kind ‘*’ with ‘k0 -> *’
-      When matching types
-        a0 :: * -> k0 -> *
-        Maybe :: * -> *
-      Expected type: Three Maybe
-        Actual type: Three a0
-    • In the second argument of ‘too’, namely ‘T’
       In the expression: too @Maybe T
       In an equation for ‘threeBad’: threeBad = too @Maybe T
 
