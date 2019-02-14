@@ -81,7 +81,9 @@ findGenerator Context {..} file = do
 -- | Find all Haskell source files for a given 'Context'.
 hsSources :: Context -> Action [FilePath]
 hsSources context = do
-    let modFile (m, Nothing   ) = generatedFile context m
+    let modFile (m, Nothing)
+            | "Paths_" `isPrefixOf` m = autogenFile context m
+            | otherwise               = generatedFile context m
         modFile (m, Just file )
             | takeExtension file `elem` haskellExtensions = return file
             | otherwise = generatedFile context m
@@ -98,6 +100,10 @@ hsObjects context = do
 -- | Generated module files live in the 'Context' specific build directory.
 generatedFile :: Context -> ModuleName -> Action FilePath
 generatedFile context moduleName = buildPath context <&> (-/- moduleSource moduleName)
+
+-- | Generated module files live in the 'Context' specific build directory.
+autogenFile :: Context -> ModuleName -> Action FilePath
+autogenFile context modName = autogenPath context <&> (-/- moduleSource modName)
 
 -- | Turn a module name (e.g. @Data.Functor@) to a path (e.g. @Data/Functor.hs@).
 moduleSource :: ModuleName -> FilePath
@@ -125,6 +131,7 @@ moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $ do
     void . addOracleCache $ \(ModuleFiles (stage, package)) -> do
         let context = vanillaContext stage package
+        ensureConfigured context
         srcDirs <- interpretInContext context (getContextData PD.srcDirs)
         mainIs  <- interpretInContext context (getContextData PD.mainIs)
         let removeMain = case mainIs of

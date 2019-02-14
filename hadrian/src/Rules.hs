@@ -82,8 +82,8 @@ packageTargets includeGhciLib stage pkg = do
             ways  <- interpretInContext context pkgWays
             libs  <- mapM (pkgLibraryFile . Context stage pkg) ways
             more  <- libraryTargets includeGhciLib context
-            setup <- pkgSetupConfigFile context
-            return $ [setup] ++ libs ++ more
+            setupConfig <- pkgSetupConfigFile context
+            return $ [setupConfig] ++ libs ++ more
         else do -- The only target of a program package is the executable.
             prgContext <- programContext stage pkg
             prgPath    <- programPath prgContext
