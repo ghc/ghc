@@ -29,6 +29,7 @@ module MkId (
         nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, magicDictId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
+        coerceName,
 
         -- Re-export error Ids
         module PrelRules
@@ -71,6 +72,7 @@ import DynFlags
 import Outputable
 import FastString
 import ListSetOps
+import Var (VarBndr(Bndr))
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Maybe       ( maybeToList )
@@ -1372,18 +1374,22 @@ coerceId = pcMiscPrelId coerceName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-                       `setNeverLevPoly`   ty
-    eqRTy     = mkTyConApp coercibleTyCon [ liftedTypeKind
-                                          , alphaTy, betaTy ]
-    eqRPrimTy = mkTyConApp eqReprPrimTyCon [ liftedTypeKind
-                                           , liftedTypeKind
-                                           , alphaTy, betaTy ]
-    ty        = mkSpecForAllTys [alphaTyVar, betaTyVar] $
-                mkFunTys [eqRTy, alphaTy] betaTy
+    eqRTy     = mkTyConApp coercibleTyCon [ tYPE r , a, b ]
+    eqRPrimTy = mkTyConApp eqReprPrimTyCon [ tYPE r, tYPE r, a, b ]
+    ty        = mkForAllTys
+                  [ Bndr rv Inferred
+                  , Bndr av Specified
+                  , Bndr bv Specified
+                  ] $ mkFunTys [eqRTy, a] b
 
-    [eqR,x,eq] = mkTemplateLocals [eqRTy, alphaTy, eqRPrimTy]
-    rhs = mkLams [alphaTyVar, betaTyVar, eqR, x] $
-          mkWildCase (Var eqR) eqRTy betaTy $
+    bndrs@[rv,av,bv] = mkTemplateKiTyVar runtimeRepTy
+                        (\r -> [tYPE r, tYPE r])
+
+    [r, a, b] = mkTyVarTys bndrs
+
+    [eqR,x,eq] = mkTemplateLocals [eqRTy, a, eqRPrimTy]
+    rhs = mkLams (bndrs ++ [eqR, x]) $
+          mkWildCase (Var eqR) eqRTy b $
           [(DataAlt coercibleDataCon, [eq], Cast (Var x) (mkCoVarCo eq))]
 
 {-

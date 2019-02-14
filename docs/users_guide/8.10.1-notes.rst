@@ -1,0 +1,30 @@
+.. _release-8-10-1:
+
+Release notes for version 8.10.1
+===============================
+
+The significant changes to the various parts of the compiler are listed in the
+following sections. There have also been numerous bug fixes and performance
+improvements over the 8.8.1 release.
+
+
+Highlights
+----------
+
+The highlights, since the 8.8.1 release, are:
+
+- Many, many bug fixes.
+- The `UnliftedNewtypes` extension.
+
+
+Full details
+------------
+
+Language
+~~~~~~~~
+
+- A new extension :extension:`UnliftedNewtypes` that relaxes restrictions
+  around what kinds of types can appear inside of the data constructor
+  for a `newtype`. This was proposed in
+  `GHC proposal #13 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`__.
+

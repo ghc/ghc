@@ -2036,13 +2036,17 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
         -> empty
 
     thing_msg = case maybe_thing of
-                  Just thing -> \_ -> quotes thing <+> text "is"
-                  Nothing    -> \vowel -> text "got a" <>
-                                          if vowel then char 'n' else empty
+                  Just thing -> \_ levity ->
+                    quotes thing <+> text "is" <+> levity
+                  Nothing    -> \vowel levity ->
+                    text "got a" <>
+                    (if vowel then char 'n' else empty) <+>
+                    levity <+>
+                    text "type"
     msg2 = sep [ text "Expecting a lifted type, but"
-               , thing_msg True, text "unlifted" ]
+               , thing_msg True (text "unlifted") ]
     msg3 = sep [ text "Expecting an unlifted type, but"
-               , thing_msg False, text "lifted" ]
+               , thing_msg False (text "lifted") ]
     msg4 = maybe_num_args_msg $$
            sep [ text "Expected a type, but"
                , maybe (text "found something with kind")
