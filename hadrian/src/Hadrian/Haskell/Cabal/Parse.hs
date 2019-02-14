@@ -251,37 +251,38 @@ resolveContextData context@Context {..} = do
         (buildInfo, modules, mainIs) = biModules pd'
 
       in return $ ContextData
-          { dependencies    = deps
-          , componentId     = C.localCompatPackageKey lbi'
-          , mainIs          = fmap (first C.display) mainIs
-          , modules         = map C.display modules
-          , otherModules    = map C.display $ C.otherModules buildInfo
-          , srcDirs         = C.hsSourceDirs buildInfo
-          , depIds          = depIds
-          , depNames        = map (C.display . C.mungedName . snd) extDeps
-          , includeDirs     = C.includeDirs     buildInfo
-          , includes        = C.includes        buildInfo
-          , installIncludes = C.installIncludes buildInfo
-          , extraLibs       = C.extraLibs       buildInfo
-          , extraLibDirs    = C.extraLibDirs    buildInfo
-          , asmSrcs         = C.asmSources      buildInfo
-          , cSrcs           = C.cSources        buildInfo
-          , cmmSrcs         = C.cmmSources      buildInfo
-          , hcOpts          = C.programDefaultArgs ghcProg
+          { dependencies      = deps
+          , componentId       = C.localCompatPackageKey lbi'
+          , mainIs            = fmap (first C.display) mainIs
+          , modules           = map C.display modules
+          , otherModules      = map C.display $ C.otherModules buildInfo
+          , srcDirs           = C.hsSourceDirs buildInfo
+          , depIds            = depIds
+          , depNames          = map (C.display . C.mungedName . snd) extDeps
+          , includeDirs       = C.includeDirs       buildInfo
+          , includes          = C.includes          buildInfo
+          , installIncludes   = C.installIncludes   buildInfo
+          , extraBundledLibs  = C.extraBundledLibs  buildInfo
+          , extraLibs         = C.extraLibs         buildInfo
+          , extraLibDirs      = C.extraLibDirs      buildInfo
+          , asmSrcs           = C.asmSources        buildInfo
+          , cSrcs             = C.cSources          buildInfo
+          , cmmSrcs           = C.cmmSources        buildInfo
+          , hcOpts            = C.programDefaultArgs ghcProg
               ++ C.hcOptions C.GHC buildInfo
               ++ C.languageToFlags   (C.compiler lbi') (C.defaultLanguage buildInfo)
               ++ C.extensionsToFlags (C.compiler lbi') (C.usedExtensions  buildInfo)
               ++ C.programOverrideArgs ghcProg
-          , asmOpts         = C.asmOptions buildInfo
-          , ccOpts          = C.ccOptions  buildInfo
-          , cmmOpts         = C.cmmOptions buildInfo
-          , cppOpts         = C.cppOptions buildInfo
-          , ldOpts          = C.ldOptions  buildInfo
-          , depIncludeDirs  = forDeps Installed.includeDirs
-          , depCcOpts       = forDeps Installed.ccOptions
-          , depLdOpts       = forDeps Installed.ldOptions
-          , buildGhciLib    = C.withGHCiLib lbi'
-          , frameworks      = C.frameworks buildInfo }
+          , asmOpts           = C.asmOptions buildInfo
+          , ccOpts            = C.ccOptions  buildInfo
+          , cmmOpts           = C.cmmOptions buildInfo
+          , cppOpts           = C.cppOptions buildInfo
+          , ldOpts            = C.ldOptions  buildInfo
+          , depIncludeDirs    = forDeps Installed.includeDirs
+          , depCcOpts         = forDeps Installed.ccOptions
+          , depLdOpts         = forDeps Installed.ldOptions
+          , buildGhciLib      = C.withGHCiLib lbi'
+          , frameworks        = C.frameworks buildInfo }
 
 -- | Look for a @.buildinfo@ in all of the specified directories, stopping on
 -- the first one we find.
