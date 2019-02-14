@@ -42,6 +42,8 @@ configureRules = do
             when System.isWindows $ do
                 root <- buildRoot
                 copyDirectory "inplace/mingw" (root -/- "mingw")
+                mingwFiles <- liftIO $ getDirectoryFilesIO "." [root -/- "mingw/**"]
+                produces mingwFiles
 
     ["configure", configH <.> "in"] &%> \_ -> do
         skip <- not <$> cmdConfigure

@@ -1,6 +1,7 @@
 module Rules.Generate (
-    isGeneratedCmmFile, generatePackageCode, generateRules, copyRules,
-    includesDependencies, generatedDependencies, ghcPrimDependencies
+    isGeneratedCmmFile, compilerDependencies, generatePackageCode,
+    generateRules, copyRules, generatedDependencies, generatedGhcDependencies,
+    ghcPrimDependencies
     ) where
 
 import Base
@@ -26,17 +27,8 @@ primopsSource = "compiler/prelude/primops.txt.pp"
 primopsTxt :: Stage -> FilePath
 primopsTxt stage = buildDir (vanillaContext stage compiler) -/- "primops.txt"
 
-platformH :: Stage -> FilePath
-platformH stage = buildDir (vanillaContext stage compiler) -/- "ghc_boot_platform.h"
-
 isGeneratedCmmFile :: FilePath -> Bool
 isGeneratedCmmFile file = takeBaseName file == "AutoApply"
-
-includesDependencies :: [FilePath]
-includesDependencies = fmap (generatedDir -/-)
-    [ "ghcautoconf.h"
-    , "ghcplatform.h"
-    , "ghcversion.h" ]
 
 ghcPrimDependencies :: Expr [FilePath]
 ghcPrimDependencies = do
@@ -59,9 +51,7 @@ compilerDependencies = do
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
     gmpPath <- expr gmpBuildPath
     rtsPath <- expr (rtsBuildPath stage)
-    mconcat [ return [root -/- platformH stage]
-            , return ((root -/-) <$> includesDependencies)
-            , return ((root -/-) <$> derivedConstantsDependencies)
+    mconcat [ return ((root -/-) <$> derivedConstantsDependencies)
             , notStage0 ? isGmp ? return [gmpPath -/- gmpLibraryH]
             , notStage0 ? return ((rtsPath -/-) <$> libffiDependencies)
             , return $ fmap (ghcPath -/-)
@@ -83,15 +73,16 @@ compilerDependencies = do
 
 generatedDependencies :: Expr [FilePath]
 generatedDependencies = do
-    root    <- getBuildRoot
-    stage   <- getStage
-    rtsPath <- expr (rtsBuildPath stage)
+    root     <- getBuildRoot
+    stage    <- getStage
+    rtsPath  <- expr (rtsBuildPath stage)
+    includes <- expr includesDependencies
     mconcat [ package compiler ? compilerDependencies
             , package ghcPrim  ? ghcPrimDependencies
             , package rts      ? return (fmap (rtsPath -/-) libffiDependencies
-                ++ fmap (root -/-) includesDependencies
+                ++ includes
                 ++ fmap (root -/-) derivedConstantsDependencies)
-            , stage0 ? return (fmap (root -/-) includesDependencies) ]
+            , stage0 ? return includes ]
 
 generate :: FilePath -> Context -> Expr String -> Action ()
 generate file context expr = do
@@ -111,40 +102,38 @@ generatePackageCode context@(Context stage pkg _) = do
         need [src]
         build $ target context builder [src] [file]
         let boot = src -<.> "hs-boot"
-        whenM (doesFileExist boot) . copyFile boot $ file -<.> "hs-boot"
+        whenM (doesFileExist boot) $ do
+            let target = file -<.> "hs-boot"
+            copyFile boot target
+            produces [target]
 
     priority 2.0 $ do
-        when (pkg == compiler) $ do root <//> dir -/- "Config.hs" %> go generateConfigHs
-                                    root <//> dir -/- "*.hs-incl" %> genPrimopCode context
-        when (pkg == ghcPrim) $ do (root <//> dir -/- "GHC/Prim.hs") %> genPrimopCode context
-                                   (root <//> dir -/- "GHC/PrimopWrappers.hs") %> genPrimopCode context
-        when (pkg == ghcPkg) $ do root <//> dir -/- "Version.hs" %> go generateVersionHs
+        when (pkg == compiler) $ do
+            root <//> dir -/- "Config.hs" %> go generateConfigHs
+            root <//> dir -/- "*.hs-incl" %> genPrimopCode context
+        when (pkg == ghcPrim) $ do
+            root <//> dir -/- "GHC/Prim.hs" %> genPrimopCode context
+            root <//> dir -/- "GHC/PrimopWrappers.hs" %> genPrimopCode context
+        when (pkg == ghcPkg) $
+            root <//> dir -/- "Version.hs" %> go generateVersionHs
 
-    -- TODO: needing platformH is ugly and fragile
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
-            root <- buildRoot
-            need $ [ root -/- platformH stage
-                   , primopsSource]
-                ++ fmap (root -/-) includesDependencies
+            includes <- includesDependencies
+            need $ [primopsSource] ++ includes
             build $ target context HsCpp [primopsSource] [file]
 
-        -- only generate this once! Until we have the include logic fixed.
-        -- See the note on `platformH`
-        when (stage == Stage0) $ do
-            root <//> "compiler/ghc_boot_platform.h" %> go generateGhcBootPlatformH
-        root <//> platformH stage %> go generateGhcBootPlatformH
+        root -/- stageString stage <//> "ghc_boot_platform.h" %>
+            go generateGhcBootPlatformH
 
     when (pkg == rts) $ do
         root <//> dir -/- "cmm/AutoApply.cmm" %> \file ->
             build $ target context GenApply [] [file]
-        -- XXX: this should be fixed properly, e.g. generated here on demand.
+        -- TODO: This should be fixed properly, e.g. generated here on demand.
         (root <//> dir -/- "DerivedConstants.h") <~ (buildRoot <&> (-/- generatedDir))
         (root <//> dir -/- "ghcautoconf.h") <~ (buildRoot <&> (-/- generatedDir))
         (root <//> dir -/- "ghcplatform.h") <~ (buildRoot <&> (-/- generatedDir))
         (root <//> dir -/- "ghcversion.h") <~ (buildRoot <&> (-/- generatedDir))
-    when (pkg == integerGmp) $ do
-        (root <//> dir -/- "ghc-gmp.h") <~ (buildRoot <&> (-/- "include"))
  where
     pattern <~ mdir = pattern %> \file -> do
         dir <- mdir

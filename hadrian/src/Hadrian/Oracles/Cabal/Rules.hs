@@ -19,7 +19,7 @@ import Distribution.Simple.Program.Db
 import Distribution.Verbosity
 
 import Builder
-import Context.Type
+import Context
 import Hadrian.Haskell.Cabal.Parse
 import Hadrian.Oracles.Cabal.Type
 import Hadrian.Package
@@ -46,6 +46,11 @@ cabalOracle = do
         putLoud $ "| ContextData oracle: resolving data for "
                ++ quote (pkgName package) ++ " (" ++ show stage
                ++ ", " ++ show way ++ ")..."
+        -- Calling 'need' on @setup-config@ triggers 'configurePackage'. Why
+        -- this indirection? Going via @setup-config@ allows us to cache the
+        -- configuration step, i.e. not to repeat it if it's already been done.
+        setupConfig <- pkgSetupConfigFile context
+        need [setupConfig]
         resolveContextData context
 
     void $ addOracleCache $ \(PackageConfigurationKey (pkg, stage)) -> do

@@ -75,13 +75,13 @@ instance Hashable ConfigurationInfo
 instance NFData   ConfigurationInfo
 
 -- TODO: Do we really need all these modes? Why do we need 'Dependencies'? We
--- can extract dependencies using the Cabal library.
+-- can extract dependencies using the Cabal library. Note: we used to also have
+-- the @Init@ mode for initialising a new package database but we've deleted it.
 -- | 'GhcPkg' can initialise a package database and register packages in it.
-data GhcPkgMode = Init         -- ^ Initialize a new database.
-                | Update       -- ^ Update a package.
-                | Copy         -- ^ Copy a package from one database to another.
-                | Unregister   -- ^ Unregister a package.
+data GhcPkgMode = Copy         -- ^ Copy a package from one database to another.
                 | Dependencies -- ^ Compute package dependencies.
+                | Unregister   -- ^ Unregister a package.
+                | Update       -- ^ Update a package.
                 deriving (Eq, Generic, Show)
 
 instance Binary   GhcPkgMode
@@ -173,16 +173,18 @@ instance H.Builder Builder where
         Autoreconf dir -> return [dir -/- "configure.ac"]
         Configure  dir -> return [dir -/- "configure"]
 
-        Ghc _ Stage0 -> return []
+        Ghc _ Stage0 -> generatedGhcDependencies Stage0
         Ghc _ stage -> do
             root <- buildRoot
             win <- windowsHost
             touchyPath <- programPath (vanillaContext Stage0 touchy)
             unlitPath  <- builderPath Unlit
             ghcdeps <- ghcDeps stage
+            ghcgens <- generatedGhcDependencies stage
             return $ [ root -/- ghcSplitPath stage -- TODO: Make conditional on --split-objects
                      , unlitPath ]
                   ++ ghcdeps
+                  ++ ghcgens
                   ++ [ touchyPath | win ]
 
         Hsc2Hs stage -> (\p -> [p]) <$> templateHscPath stage

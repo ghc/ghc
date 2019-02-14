@@ -40,6 +40,8 @@ getCFlags :: Expr [String]
 getCFlags = do
     context <- getContext
     autogen <- expr $ autogenPath context
+    let cabalMacros = autogen -/- "cabal_macros.h"
+    expr $ need [cabalMacros]
     mconcat [ remove ["-O"] (cArgs <> getStagedSettingList ConfCcArgs)
             , getStagedSettingList ConfCppArgs
             , cIncludeArgs
@@ -48,7 +50,7 @@ getCFlags = do
             , getContextData cppOpts
             , getContextData depCcOpts
             , cWarnings
-            , arg "-include", arg $ autogen -/- "cabal_macros.h" ]
+            , arg "-include", arg cabalMacros ]
 
 getLFlags :: Expr [String]
 getLFlags =

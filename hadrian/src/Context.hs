@@ -8,7 +8,7 @@ module Context (
     -- * Paths
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
     pkgHaddockFile, pkgLibraryFile, pkgGhciLibraryFile, pkgConfFile, objectPath,
-    contextPath, getContextPath, libDir, libPath, distDir
+    contextPath, getContextPath, libPath, distDir
     ) where
 
 import Base
@@ -43,12 +43,9 @@ getWay = way <$> getContext
 getStagedSettingList :: (Stage -> SettingList) -> Args Context b
 getStagedSettingList f = getSettingList . f =<< getStage
 
-libDir :: Context -> FilePath
-libDir Context {..} = stageString stage -/- "lib"
-
 -- | Path to the directory containg the final artifact in a given 'Context'.
 libPath :: Context -> Action FilePath
-libPath context = buildRoot <&> (-/- libDir context)
+libPath Context {..} = buildRoot <&> (-/- (stageString stage -/- "lib"))
 
 -- | Get the directory name for binary distribution files
 -- @<arch>-<os>-ghc-<version>@.
@@ -70,16 +67,11 @@ pkgFile context@Context {..} prefix suffix = do
 
 -- | Path to inplace package configuration file of a given 'Context'.
 pkgInplaceConfig :: Context -> Action FilePath
-pkgInplaceConfig context = do
-    path <- contextPath context
-    return $ path -/- "inplace-pkg-config"
+pkgInplaceConfig context = contextPath context <&> (-/- "inplace-pkg-config")
 
--- TODO: Add a @Rules FilePath@ alternative.
 -- | Path to the @setup-config@ of a given 'Context'.
 pkgSetupConfigFile :: Context -> Action FilePath
-pkgSetupConfigFile context = do
-    path <- contextPath context
-    return $ path -/- "setup-config"
+pkgSetupConfigFile context = contextPath context <&> (-/- "setup-config")
 
 -- | Path to the haddock file of a given 'Context', e.g.:
 -- @_build/stage1/libraries/array/doc/html/array/array.haddock@.

@@ -4,9 +4,11 @@ import Base
 import Context
 import Hadrian.BuildPath
 import Hadrian.Expression
+import Hadrian.Haskell.Cabal
+import Oracles.Setting
 import Packages
+import Rules.Gmp
 import Settings
-import Settings.Default
 import Target
 import Utilities
 
@@ -21,27 +23,41 @@ import qualified Text.Parsec                 as Parsec
 
 -- * Configuring
 
--- | Configure a package and build its @setup-config@ file.
+-- | Configure a package and build its @setup-config@ file, as well as files in
+-- the @build/pkgName/build/autogen@ directory.
 configurePackageRules :: Rules ()
 configurePackageRules = do
     root <- buildRootRules
-    root -/- "**/setup-config" %> \path ->
-        parsePath (parseSetupConfig root) "<setup config path parser>" path
-          >>= configurePackage
+    root -/- "**/setup-config" %> \out -> do
+        (stage, path) <- parsePath (parseSetupConfig root) "<setup config path parser>" out
+        let pkg = unsafeFindPackageByPath path
+        Cabal.configurePackage (Context stage pkg vanilla)
+
+    root -/- "**/autogen/cabal_macros.h" %> \out -> do
+        (stage, path) <- parsePath (parseToBuildSubdirectory root) "<cabal macros path parser>" out
+        let pkg = unsafeFindPackageByPath path
+        Cabal.buildAutogenFiles (Context stage pkg vanilla)
+
+    root -/- "**/autogen/Paths_*.hs" %> \out ->
+        need [takeDirectory out -/- "cabal_macros.h"]
 
 parseSetupConfig :: FilePath -> Parsec.Parsec String () (Stage, FilePath)
 parseSetupConfig root = do
-  _ <- Parsec.string root *> Parsec.optional (Parsec.char '/')
-  stage <- parseStage
-  _ <- Parsec.char '/'
-  pkgPath <- Parsec.manyTill Parsec.anyChar
-    (Parsec.try $ Parsec.string "/setup-config")
-  return (stage, pkgPath)
+    _ <- Parsec.string root *> Parsec.optional (Parsec.char '/')
+    stage <- parseStage
+    _ <- Parsec.char '/'
+    pkgPath <- Parsec.manyTill Parsec.anyChar
+        (Parsec.try $ Parsec.string "/setup-config")
+    return (stage, pkgPath)
 
-configurePackage :: (Stage, FilePath) -> Action ()
-configurePackage (stage, pkgpath) = do
-  pkg <- getPackageByPath pkgpath
-  Cabal.configurePackage (Context stage pkg vanilla)
+parseToBuildSubdirectory :: FilePath -> Parsec.Parsec String () (Stage, FilePath)
+parseToBuildSubdirectory root = do
+    _ <- Parsec.string root *> Parsec.optional (Parsec.char '/')
+    stage <- parseStage
+    _ <- Parsec.char '/'
+    pkgPath <- Parsec.manyTill Parsec.anyChar
+        (Parsec.try $ Parsec.string "/build/")
+    return (stage, pkgPath)
 
 -- * Registering
 
@@ -57,6 +73,7 @@ registerPackageRules rs stage = do
 
     -- Register a package.
     root -/- relativePackageDbPath stage -/- "*.conf" %> \conf -> do
+        historyDisable
         let libpath = takeDirectory (takeDirectory conf)
             settings = libpath -/- "settings"
             platformConstants = libpath -/- "platformConstants"
@@ -64,7 +81,7 @@ registerPackageRules rs stage = do
         need [settings, platformConstants]
 
         pkgName <- getPackageNameFromConfFile conf
-        pkg <- getPackageByName pkgName
+        let pkg = unsafeFindPackageByName pkgName
         isBoot <- (pkg `notElem`) <$> stagePackages Stage0
 
         let ctx = Context stage pkg vanilla
@@ -73,12 +90,9 @@ registerPackageRules rs stage = do
             _               -> buildConf rs ctx conf
 
 buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
-buildConf _ context@Context {..} _conf = do
+buildConf _ context@Context {..} conf = do
     depPkgIds <- cabalDependencies context
-
-    -- Calling 'need' on @setupConfig@, triggers the package configuration.
-    setupConfig <- pkgSetupConfigFile context
-    need [setupConfig]
+    ensureConfigured context
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
 
     ways <- interpretInContext context (getLibraryWays <> if package == rts then getRtsWays else mempty)
@@ -97,11 +111,27 @@ buildConf _ context@Context {..} _conf = do
              , path -/- "ghcversion.h"
              , path -/- "ffi.h" ]
 
-    when (package == integerGmp) $ need [path -/- "ghc-gmp.h"]
+    when (package == integerGmp) $ need [path -/- gmpLibraryH]
 
     -- Copy and register the package.
     Cabal.copyPackage context
     Cabal.registerPackage context
+
+    -- The above two steps produce an entry in the package database, with copies
+    -- of many of the files we have build, e.g. Haskell interface files. We need
+    -- to record this side effect so that Shake can cache these files too.
+    -- See why we need 'fixWindows': https://ghc.haskell.org/trac/ghc/ticket/16073
+    let fixWindows path = do
+            win <- windowsHost
+            version  <- setting GhcVersion
+            hostOs   <- cabalOsString <$> setting BuildOs
+            hostArch <- cabalArchString <$> setting BuildArch
+            let dir = hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
+            return $ if win then path -/- "../.." -/- dir else path
+    pkgDbPath <- fixWindows =<< packageDbPath stage
+    let dir = pkgDbPath -/- takeBaseName conf
+    files <- liftIO $ getDirectoryFilesIO "." [dir -/- "**"]
+    produces files
 
 copyConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 copyConf rs context@Context {..} conf = do
@@ -126,18 +156,14 @@ copyConf rs context@Context {..} conf = do
 
 getPackageNameFromConfFile :: FilePath -> Action String
 getPackageNameFromConfFile conf
-  | takeBaseName conf == "rts" = return "rts"
-  | otherwise = case parseCabalName (takeBaseName conf) of
-      Left err -> error $ "getPackageNameFromConfFile: couldn't parse " ++ takeBaseName conf ++ ": " ++ err
-      Right (name, _) -> return name
+    | takeBaseName conf == "rts" = return "rts"
+    | otherwise = case parseCabalName (takeBaseName conf) of
+        Left err -> error $ "getPackageNameFromConfFile: Couldn't parse " ++
+                            takeBaseName conf ++ ": " ++ err
+        Right (name, _) -> return name
 
 parseCabalName :: String -> Either String (String, Version)
 parseCabalName = fmap f . Cabal.eitherParsec
   where
     f :: Cabal.PackageId -> (String, Version)
     f pkg_id = (Cabal.unPackageName $ Cabal.pkgName pkg_id, Cabal.pkgVersion pkg_id)
-
-getPackageByName :: String -> Action Package
-getPackageByName n = case findPackageByName n of
-  Nothing -> error $ "getPackageByName: couldn't find " ++ n
-  Just p  -> return p

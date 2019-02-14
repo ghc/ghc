@@ -141,7 +141,7 @@ buildPackageDocumentation = do
 
     -- Per-package haddocks
     root -/- htmlRoot -/- "libraries/*/haddock-prologue.txt" %> \file -> do
-        ctx <- getPkgDocTarget root file >>= pkgDocContext
+        ctx <- pkgDocContext <$> getPkgDocTarget root file
         -- This is how @ghc-cabal@ used to produces "haddock-prologue.txt" files.
         syn  <- pkgSynopsis    (Context.package ctx)
         desc <- pkgDescription (Context.package ctx)
@@ -149,7 +149,7 @@ buildPackageDocumentation = do
         liftIO $ writeFile file prologue
 
     root -/- htmlRoot -/- "libraries/*/*.haddock" %> \file -> do
-        context <- getPkgDocTarget root file >>= pkgDocContext
+        context <- pkgDocContext <$> getPkgDocTarget root file
         need [ takeDirectory file  -/- "haddock-prologue.txt"]
         haddocks <- haddockDependencies context
 
@@ -172,14 +172,11 @@ buildPackageDocumentation = do
 data PkgDocTarget = DotHaddock PackageName | HaddockPrologue PackageName
   deriving (Eq, Show)
 
-pkgDocContext :: PkgDocTarget -> Action Context
-pkgDocContext target = case findPackageByName pkgname of
-  Nothing -> error $ "pkgDocContext: couldn't find package " ++ pkgname
-  Just p  -> return (Context Stage1 p vanilla)
-
-  where pkgname = case target of
-          DotHaddock n      -> n
-          HaddockPrologue n -> n
+pkgDocContext :: PkgDocTarget -> Context
+pkgDocContext target = Context Stage1 (unsafeFindPackageByName name) vanilla
+  where
+    name = case target of DotHaddock n      -> n
+                          HaddockPrologue n -> n
 
 parsePkgDocTarget :: FilePath -> Parsec.Parsec String () PkgDocTarget
 parsePkgDocTarget root = do

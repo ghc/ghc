@@ -1,6 +1,6 @@
 module Settings.Default (
     -- * Packages that are build by default and for the testsuite
-    defaultPackages, testsuitePackages, getPackageByPath,
+    defaultPackages, testsuitePackages,
 
     -- * Default build ways
     defaultLibraryWays, defaultRtsWays,
@@ -138,13 +138,6 @@ testsuitePackages = do
              , runGhc
              , unlit         ] ++
              [ timeout | win ]
-
-getPackageByPath :: FilePath -> Action Package
-getPackageByPath pkgpath = do
-  case filter (\p -> pkgPath p == pkgpath) knownPackages of
-    (p:_) -> return p
-    _     -> error $
-      "getPackageByPath: couldn't find a package with path: " ++ pkgpath
 
 -- | Default build ways for library packages:
 -- * We always build 'vanilla' way.
