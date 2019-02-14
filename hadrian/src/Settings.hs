@@ -1,7 +1,7 @@
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
-    findPackageByName, isLibrary, stagePackages, programContext,
-    getIntegerPackage
+    findPackageByName, unsafeFindPackageByName, unsafeFindPackageByPath,
+    isLibrary, stagePackages, programContext, getIntegerPackage
     ) where
 
 import CommandLine
@@ -66,3 +66,13 @@ knownPackages = sort $ ghcPackages ++ userPackages
 -- Note: this is slow but we keep it simple as there are just ~50 packages
 findPackageByName :: PackageName -> Maybe Package
 findPackageByName name = find (\pkg -> pkgName pkg == name) knownPackages
+
+unsafeFindPackageByName :: PackageName -> Package
+unsafeFindPackageByName name = fromMaybe (error msg) $ findPackageByName name
+  where
+    msg = "unsafeFindPackageByName: No package with name " ++ name
+
+unsafeFindPackageByPath :: FilePath -> Package
+unsafeFindPackageByPath path = err $ find (\pkg -> pkgPath pkg == path) knownPackages
+  where
+    err = fromMaybe $ error ("findPackageByPath: No package for path " ++ path)

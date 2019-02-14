@@ -10,7 +10,7 @@ Description: XXX
 Category: Development
 build-type: Simple
 
-Executable unlit
+Executable touchy
     Default-Language: Haskell2010
     Main-Is: touchy.c
     C-Sources: touchy.c
