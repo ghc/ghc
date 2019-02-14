@@ -3,9 +3,3 @@ tcfail160.hs:7:8: error:
     • Expected kind ‘* -> *’, but ‘Int’ has kind ‘*’
     • In the first argument of ‘T’, namely ‘Int’
       In the type signature: g :: T Int
-
-tcfail160.hs:8:1: error:
-    • Couldn't match expected type ‘T Int’ with actual type ‘p0 -> p0’
-    • The equation(s) for ‘g’ have one argument,
-      but its type ‘T Int’ has none
-    • Relevant bindings include g :: T Int (bound at tcfail160.hs:8:1)
