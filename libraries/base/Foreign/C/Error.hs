@@ -255,11 +255,15 @@ isValidErrno (Errno errno)  = errno /= -1
 
 -- | Get the current value of @errno@ in the current thread.
 --
+-- On GHC, the runtime will ensure that any Haskell thread will only see "its own"
+-- @errno@, by saving and restoring the value when Haskell threads are scheduled
+-- across OS threads.
 getErrno :: IO Errno
 
 -- We must call a C function to get the value of errno in general.  On
 -- threaded systems, errno is hidden behind a C macro so that each OS
--- thread gets its own copy.
+-- thread gets its own copy (`saved_errno`, which `rts/Schedule.c` restores
+-- back into the thread-local `errno` when a Haskell thread is rescheduled).
 getErrno = do e <- get_errno; return (Errno e)
 foreign import ccall unsafe "HsBase.h __hscore_get_errno" get_errno :: IO CInt
 
