@@ -33,7 +33,7 @@ module RegAlloc.Liveness (
         patchRegsLiveInstr,
         reverseBlocksInTops,
         regLiveness,
-        natCmmTopToLive
+        cmmTopLiveness
   ) where
 import GhcPrelude
 
@@ -178,7 +178,7 @@ data LiveInfo
                 (LabelMap CmmStatics)     -- cmm info table static stuff
                 [BlockId]                 -- entry points (first one is the
                                           -- entry point for the proc).
-                (Maybe (BlockMap RegSet)) -- argument locals live on entry to this block
+                (BlockMap RegSet)         -- argument locals live on entry to this block
                 (BlockMap IntSet)         -- stack slots live on entry to this block
 
 
@@ -319,7 +319,7 @@ slurpConflicts live
                 = foldl'  (slurpBlock info) rs bs
 
         slurpBlock info rs (BasicBlock blockId instrs)
-                | LiveInfo _ _ (Just blockLive) _ <- info
+                | LiveInfo _ _ blockLive _        <- info
                 , Just rsLiveEntry                <- mapLookup blockId blockLive
                 , (conflicts, moves)              <- slurpLIs rsLiveEntry rs instrs
                 = (consBag rsLiveEntry conflicts, moves)
@@ -577,17 +577,14 @@ patchEraseLive patchF cmm
         patchCmm cmm@CmmData{}  = cmm
 
         patchCmm (CmmProc info label live sccs)
-         | LiveInfo static id (Just blockMap) mLiveSlots <- info
+         | LiveInfo static id blockMap mLiveSlots <- info
          = let
                 patchRegSet set = mkUniqSet $ map patchF $ nonDetEltsUFM set
                   -- See Note [Unique Determinism and code generation]
                 blockMap'       = mapMap (patchRegSet . getUniqSet) blockMap
 
-                info'           = LiveInfo static id (Just blockMap') mLiveSlots
+                info'           = LiveInfo static id blockMap' mLiveSlots
            in   CmmProc info' label live $ map patchSCC sccs
-
-         | otherwise
-         = panic "RegAlloc.Liveness.patchEraseLive: no blockMap"
 
         patchSCC (AcyclicSCC b)  = AcyclicSCC (patchBlock b)
         patchSCC (CyclicSCC  bs) = CyclicSCC  (map patchBlock bs)
@@ -644,7 +641,15 @@ patchRegsLiveInstr patchF li
 
 
 --------------------------------------------------------------------------------
--- | Convert a NatCmmDecl to a LiveCmmDecl, with empty liveness information
+-- | Convert a NatCmmDecl to a LiveCmmDecl, with liveness information
+
+cmmTopLiveness
+        :: (Outputable instr, Instruction instr)
+        => Maybe CFG -> Platform
+        -> NatCmmDecl statics instr
+        -> UniqSM (LiveCmmDecl statics instr)
+cmmTopLiveness cfg platform cmm
+        = regLiveness platform $ natCmmTopToLive cfg cmm
 
 natCmmTopToLive
         :: (Instruction instr, Outputable instr)
@@ -655,10 +660,10 @@ natCmmTopToLive _ (CmmData i d)
         = CmmData i d
 
 natCmmTopToLive _ (CmmProc info lbl live (ListGraph []))
-        = CmmProc (LiveInfo info [] Nothing mapEmpty) lbl live []
+        = CmmProc (LiveInfo info [] mapEmpty mapEmpty) lbl live []
 
 natCmmTopToLive mCfg proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
-        = CmmProc (LiveInfo info' (first_id : entry_ids) Nothing mapEmpty)
+        = CmmProc (LiveInfo info' (first_id : entry_ids) mapEmpty mapEmpty)
                 lbl live sccsLive
    where
         first_id        = blockId first
@@ -731,6 +736,7 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
 --------------------------------------------------------------------------------
 -- Annotate code with register liveness information
 --
+
 regLiveness
         :: (Outputable instr, Instruction instr)
         => Platform
@@ -743,14 +749,14 @@ regLiveness _ (CmmData i d)
 regLiveness _ (CmmProc info lbl live [])
         | LiveInfo static mFirst _ _    <- info
         = return $ CmmProc
-                        (LiveInfo static mFirst (Just mapEmpty) mapEmpty)
+                        (LiveInfo static mFirst mapEmpty mapEmpty)
                         lbl live []
 
 regLiveness platform (CmmProc info lbl live sccs)
         | LiveInfo static mFirst _ liveSlotsOnEntry     <- info
         = let   (ann_sccs, block_live)  = computeLiveness platform sccs
 
-          in    return $ CmmProc (LiveInfo static mFirst (Just block_live) liveSlotsOnEntry)
+          in    return $ CmmProc (LiveInfo static mFirst block_live liveSlotsOnEntry)
                            lbl live ann_sccs
 
 
