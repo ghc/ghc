@@ -159,6 +159,7 @@ _darcs/
 /libraries/plus.gif
 /libraries/synopsis.png
 /libraries/stamp/
+/libraries/template-haskell/template-haskell.cabal
 /linter.log
 /mk/are-validating.mk
 /mk/build.mk
