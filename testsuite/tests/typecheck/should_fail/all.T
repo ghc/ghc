@@ -143,7 +143,7 @@ test('tcfail156', normal, compile_fail, [''])
 test('tcfail157', normal, compile_fail, [''])
 # Skip tcfail158 until Trac ticket #15899 fixes the broken test
 test('tcfail158', skip, compile_fail, [''])
-test('tcfail159', when(compiler_debugged(), expect_broken(16113)), compile_fail, [''])
+test('tcfail159', normal, compile_fail, [''])
 test('tcfail160', normal, compile_fail, [''])
 test('tcfail161', normal, compile_fail, [''])
 test('tcfail162', normal, compile_fail, [''])
