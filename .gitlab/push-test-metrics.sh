@@ -11,18 +11,20 @@ fail() {
 }
 
 # Check that private key is available (Set on all GitLab protected branches).
-if ! [ -v PERF_NOTE_KEY ] || [ "$PERF_NOTE_KEY" = "" ]; then
+if [ -z ${PERF_NOTE_KEY+"$PERF_NOTE_KEY"} ]
+then
   echo "Not pushing performance git notes: PERF_NOTE_KEY is not set."
   exit 0
 fi
 
 # TEST_ENV must be set.
-if ! [ -v TEST_ENV ] || [ "$TEST_ENV" = "" ]; then
+if [ -z ${TEST_ENV+"$TEST_ENV"} ]
+then
   fail "Not pushing performance git notes: TEST_ENV must be set."
 fi
 
 # Assert that the METRICS_FILE exists and can be read.
-if ! [ -v TEST_ENV ] || [ "$METRICS_FILE" = "" ]
+if [ -z ${METRICS_FILE+"$METRICS_FILE"} ]
 then
   fail "\$METRICS_FILE not set."
 fi
