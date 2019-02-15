@@ -60,10 +60,13 @@ module Var (
         isGlobalId, isExportedId,
         mustHaveLocalBinding,
 
+        -- * ArgFlags
+        ArgFlag(..), isVisibleArgFlag, isInvisibleArgFlag, sameVis,
+        AnonArgFlag(..),
+
         -- * TyVar's
-        VarBndr(..), ArgFlag(..), TyCoVarBinder, TyVarBinder,
+        VarBndr(..), TyCoVarBinder, TyVarBinder,
         binderVar, binderVars, binderArgFlag, binderType,
-        isVisibleArgFlag, isInvisibleArgFlag, sameVis,
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinder, mkTyVarBinders,
         isTyVarBinder,
@@ -421,6 +424,31 @@ instance Binary ArgFlag where
       0 -> return Required
       1 -> return Specified
       _ -> return Inferred
+
+-- The non-dependent version of ArgFlag, namely AnonArgFlag,
+-- appears here partly so that it's together with its friend ArgFlag,
+-- but also because it is used in IfaceType, rather early in the
+-- compilation chain
+data AnonArgFlag
+  = VisArg    -- Used for (->): an ordinary non-dependent arrow
+              -- The argument is visible in source code
+  | InvisArg  -- Used for (=>): a non-dependent predicate arrow
+              -- The argument is invisible in source code
+  deriving (Eq, Ord, Data)
+
+instance Outputable AnonArgFlag where
+  ppr VisArg   = text "[vis]"
+  ppr InvisArg = text "[invis]"
+
+instance Binary AnonArgFlag where
+  put_ bh VisArg   = putByte bh 0
+  put_ bh InvisArg = putByte bh 1
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return VisArg
+      _ -> return InvisArg
 
 {- *********************************************************************
 *                                                                      *
