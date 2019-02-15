@@ -273,18 +273,61 @@ bool nonmovingWaitForFlush()
     return finished;
 }
 
+/* Note [Unintentional marking in resurrectThreads]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * In both moving and non-moving collectors threads found to be unreachable are
+ * evacuated/marked and then resurrected with resurrectThreads. resurrectThreads
+ * raises an exception in the unreachable thread via raiseAsync, which does
+ * mutations on the heap. These mutations cause adding stuff to UpdRemSet of the
+ * thread's capability. Here's an example backtrace where this happens:
+ *
+ *     #0  updateRemembSetPushClosure
+ *     #1  0x000000000072b363 in dirty_TVAR
+ *     #2  0x00000000007162e5 in remove_watch_queue_entries_for_trec
+ *     #3  0x0000000000717098 in stmAbortTransaction
+ *     #4  0x000000000070c6eb in raiseAsync
+ *     #5  0x000000000070b473 in throwToSingleThreaded__
+ *     #6  0x000000000070b4ab in throwToSingleThreaded
+ *     #7  0x00000000006fce82 in resurrectThreads
+ *     #8  0x00000000007215db in nonmovingMark_
+ *     #9  0x0000000000721438 in nonmovingConcurrentMark
+ *     #10 0x00007f1ee81cd6db in start_thread
+ *     #11 0x00007f1ee850688f in clone
+ *
+ * However we don't really want to run write barriers when calling
+ * resurrectThreads here, because we're in a GC pause, and overwritten values
+ * are definitely gone forever (as opposed to being inserted in a marked object
+ * or kept in registers and used later).
+ *
+ * When this happens, if we don't reset the UpdRemSets, what happens is in the
+ * next mark we see these objects that were added in previous mark's
+ * resurrectThreads in UpdRemSets, and mark those. This causes keeping
+ * unreachable objects alive, and effects weak finalization and thread resurrect
+ * (which rely on things become unreachable). As an example, stm048 fails when
+ * we get this wrong, because when we do raiseAsync on a thread that was blocked
+ * on an STM transaction we mutate a TVAR_WATCH_QUEUE, which has a reference to
+ * the TSO that was running the STM transaction. If the TSO becomes unreachable
+ * again in the next GC we don't realize this, because it was added to an
+ * UpdRemSet in the previous GC's mark phase, because of raiseAsync.
+ *
+ * To fix this we clear all UpdRemSets in nonmovingFinishFlush, right before
+ * releasing capabilities. This is somewhat inefficient (we allow adding objects
+ * to UpdRemSets, only to later reset them), but the only case where we add to
+ * UpdRemSets during mark is resurrectThreads, and I don't think we do so many
+ * resurrection in a thread that we fill UpdRemSets and allocate new blocks. So
+ * pushing an UpdRemSet in this case is really fast, and resetting is even
+ * faster (we just update a pointer).
+ *
+ * TODO (osa): What if we actually marked UpdRemSets in this case, in the mark
+ * loop? Would that work? Or what would break?
+ */
+
 /* Notify capabilities that the synchronisation is finished; they may resume
  * execution.
  */
 void nonmovingFinishFlush(Task *task)
 {
-    // This is kind of a hack to deal with this problem: sometimes we run write
-    // barriers from the mark thread, and during a pause. Those write barriers
-    // add stuff that are normally not reachable to UpdRemSets. If we don't
-    // reset those sets before releasing capabilities, in the next mark we end
-    // up marking those objects that are otherwise not reachable. This causes
-    // problems in thread resurrection and weak finalization as marking an
-    // otherwise unreachable thread/weak prevents resurrection/finalization.
+    // See Note [Unintentional marking in resurrectThreads]
     for (uint32_t i = 0; i < n_capabilities; i++) {
         reset_upd_rem_set(&capabilities[i]->upd_rem_set);
     }

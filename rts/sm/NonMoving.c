@@ -625,6 +625,9 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     // Just pick a random capability. Not sure if this is a good idea -- we use
     // only one capability for all finalizers.
     scheduleFinalizers(capabilities[0], *dead_weaks);
+    // Note that this mutates heap and causes running write barriers.
+    // See Note [Unintentional marking in resurrectThreads] in NonMovingMark.c
+    // for how we deal with this.
     resurrectThreads(*resurrected_threads);
 #endif
 
