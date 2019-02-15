@@ -31,7 +31,7 @@ import Name                       ( Name, nameSrcSpan, setNameLoc )
 import NameEnv                    ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import SrcLoc
 import TcHsSyn                    ( hsLitType, hsPatType )
-import Type                       ( mkFunTys, Type )
+import Type                       ( mkVisFunTys, Type )
 import TysWiredIn                 ( mkListTy, mkSumTy )
 import Var                        ( Id, Var, setVarName, varName, varType )
 import TcRnTypes
@@ -488,7 +488,7 @@ instance HasType (LHsExpr GhcTc) where
       fallback = makeNode e' spn
 
       matchGroupType :: MatchGroupTc -> Type
-      matchGroupType (MatchGroupTc args res) = mkFunTys args res
+      matchGroupType (MatchGroupTc args res) = mkVisFunTys args res
 
       -- | Skip desugaring of these expressions for performance reasons.
       --
