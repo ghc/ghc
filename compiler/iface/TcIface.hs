@@ -1140,12 +1140,11 @@ tcIfaceCompleteSig (IfaceCompleteMatch ms t) = return (CompleteMatch ms t)
 tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType = go
   where
-    go (IfaceTyVar n)         = TyVarTy <$> tcIfaceTyVar n
-    go (IfaceFreeTyVar n)     = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
-    go (IfaceLitTy l)         = LitTy <$> tcIfaceTyLit l
-    go (IfaceFunTy t1 t2)     = FunTy <$> go t1 <*> go t2
-    go (IfaceDFunTy t1 t2)    = FunTy <$> go t1 <*> go t2
-    go (IfaceTupleTy s i tks) = tcIfaceTupleTy s i tks
+    go (IfaceTyVar n)          = TyVarTy <$> tcIfaceTyVar n
+    go (IfaceFreeTyVar n)      = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
+    go (IfaceLitTy l)          = LitTy <$> tcIfaceTyLit l
+    go (IfaceFunTy flag t1 t2) = FunTy flag <$> go t1 <*> go t2
+    go (IfaceTupleTy s i tks)  = tcIfaceTupleTy s i tks
     go (IfaceAppTy t ts)
       = do { t'  <- go t
            ; ts' <- traverse go (appArgsIfaceTypes ts)

@@ -217,6 +217,7 @@ tcUserTypeSig :: SrcSpan -> LHsSigWcType GhcRn -> Maybe Name
 tcUserTypeSig loc hs_sig_ty mb_name
   | isCompleteHsSig hs_sig_ty
   = do { sigma_ty <- tcHsSigWcType ctxt_F hs_sig_ty
+       ; traceTc "tcuser" (ppr sigma_ty)
        ; return $
          CompleteSig { sig_bndr  = mkLocalId name sigma_ty
                      , sig_ctxt  = ctxt_T
@@ -449,9 +450,9 @@ tcPatSynSig name sig_ty
     build_patsyn_type kvs imp univ req ex prov body
       = mkInvForAllTys kvs $
         mkSpecForAllTys (imp ++ univ) $
-        mkFunTys req $
+        mkPhiTy req $
         mkSpecForAllTys ex $
-        mkFunTys prov $
+        mkPhiTy prov $
         body
 tcPatSynSig _ (XHsImplicitBndrs _) = panic "tcPatSynSig"
 

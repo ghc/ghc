@@ -9276,6 +9276,28 @@ distinction). GHC does not consider ``forall k. k -> Type`` and
 ``forall {k}. k -> Type`` to be equal at the kind level, and thus rejects
 ``Foo Proxy`` as ill-kinded.
 
+Constraints in kinds
+--------------------
+
+As kinds and types are the same, kinds can (with :extension:`TypeInType`)
+contain type constraints. However, only equality constraints are supported.
+
+Here is an example of a constrained kind: ::
+
+  type family IsTypeLit a where
+    IsTypeLit Nat    = 'True
+    IsTypeLit Symbol = 'True
+    IsTypeLit a      = 'False
+
+  data T :: forall a. (IsTypeLit a ~ 'True) => a -> Type where
+    MkNat    :: T 42
+    MkSymbol :: T "Don't panic!"
+
+The declarations above are accepted. However, if we add ``MkOther :: T Int``,
+we get an error that the equality constraint is not satisfied; ``Int`` is
+not a type literal. Note that explicitly quantifying with ``forall a`` is
+not necessary here.
+
 The kind ``Type``
 -----------------
 

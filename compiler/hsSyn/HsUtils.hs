@@ -645,13 +645,14 @@ typeToLHsType ty
   = go ty
   where
     go :: Type -> LHsType GhcPs
-    go ty@(FunTy arg _)
-      | isPredTy arg
-      , (theta, tau) <- tcSplitPhiTy ty
-      = noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
-                        , hst_xqual = noExt
-                        , hst_body = go tau })
-    go (FunTy arg res) = nlHsFunTy (go arg) (go res)
+    go ty@(FunTy { ft_af = af, ft_arg = arg, ft_res = res })
+      = case af of
+          VisArg   -> nlHsFunTy (go arg) (go res)
+          InvisArg | (theta, tau) <- tcSplitPhiTy ty
+                   -> noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
+                                      , hst_xqual = noExt
+                                      , hst_body = go tau })
+
     go ty@(ForAllTy {})
       | (tvs, tau) <- tcSplitForAllTys ty
       = noLoc (HsForAllTy { hst_bndrs = map go_tv tvs

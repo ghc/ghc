@@ -104,7 +104,6 @@ module TyCon(
 
         -- ** Manipulating TyCons
         expandSynTyCon_maybe,
-        makeRecoveryTyCon,
         newTyConCo, newTyConCo_maybe,
         pprPromotionQuote, mkTyConKind,
 
@@ -133,10 +132,9 @@ module TyCon(
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType )
+import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType, mkForAllTy, mkFunTy )
 import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
-                                 , vecCountTyCon, vecElemTyCon, liftedTypeKind
-                                 , mkFunKind, mkForAllKind )
+                                 , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyCoVars, dataConFieldLabels
                                  , dataConTyCon, dataConFullSig
                                  , isUnboxedSumCon )
@@ -403,18 +401,18 @@ type TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
 
 data TyConBndrVis
   = NamedTCB ArgFlag
-  | AnonTCB
+  | AnonTCB  AnonArgFlag
 
 instance Outputable TyConBndrVis where
-  ppr (NamedTCB flag) = text "NamedTCB" <+> ppr flag
-  ppr AnonTCB         = text "AnonTCB"
+  ppr (NamedTCB flag) = text "NamedTCB" <> ppr flag
+  ppr (AnonTCB af)    = text "AnonTCB"  <> ppr af
 
-mkAnonTyConBinder :: TyVar -> TyConBinder
-mkAnonTyConBinder tv = ASSERT( isTyVar tv)
-                       Bndr tv AnonTCB
+mkAnonTyConBinder :: AnonArgFlag -> TyVar -> TyConBinder
+mkAnonTyConBinder af tv = ASSERT( isTyVar tv)
+                          Bndr tv (AnonTCB af)
 
-mkAnonTyConBinders :: [TyVar] -> [TyConBinder]
-mkAnonTyConBinders tvs = map mkAnonTyConBinder tvs
+mkAnonTyConBinders :: AnonArgFlag -> [TyVar] -> [TyConBinder]
+mkAnonTyConBinders af tvs = map (mkAnonTyConBinder af) tvs
 
 mkNamedTyConBinder :: ArgFlag -> TyVar -> TyConBinder
 -- The odd argument order supports currying
@@ -432,14 +430,15 @@ mkRequiredTyConBinder :: TyCoVarSet  -- these are used dependently
                       -> TyConBinder
 mkRequiredTyConBinder dep_set tv
   | tv `elemVarSet` dep_set = mkNamedTyConBinder Required tv
-  | otherwise               = mkAnonTyConBinder tv
+  | otherwise               = mkAnonTyConBinder  VisArg   tv
 
 tyConBinderArgFlag :: TyConBinder -> ArgFlag
 tyConBinderArgFlag (Bndr _ vis) = tyConBndrVisArgFlag vis
 
 tyConBndrVisArgFlag :: TyConBndrVis -> ArgFlag
-tyConBndrVisArgFlag (NamedTCB vis) = vis
-tyConBndrVisArgFlag AnonTCB        = Required
+tyConBndrVisArgFlag (NamedTCB vis)     = vis
+tyConBndrVisArgFlag (AnonTCB VisArg)   = Required
+tyConBndrVisArgFlag (AnonTCB InvisArg) = Inferred    -- See Note [AnonTCB InvisArg]
 
 isNamedTyConBinder :: TyConBinder -> Bool
 -- Identifies kind variables
@@ -453,8 +452,9 @@ isVisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 isVisibleTyConBinder (Bndr _ tcb_vis) = isVisibleTcbVis tcb_vis
 
 isVisibleTcbVis :: TyConBndrVis -> Bool
-isVisibleTcbVis (NamedTCB vis) = isVisibleArgFlag vis
-isVisibleTcbVis AnonTCB        = True
+isVisibleTcbVis (NamedTCB vis)     = isVisibleArgFlag vis
+isVisibleTcbVis (AnonTCB VisArg)   = True
+isVisibleTcbVis (AnonTCB InvisArg) = False
 
 isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
@@ -464,8 +464,8 @@ mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: TyConBinder -> Kind -> Kind
-    mk (Bndr tv AnonTCB)        k = mkFunKind (varType tv) k
-    mk (Bndr tv (NamedTCB vis)) k = mkForAllKind tv vis k
+    mk (Bndr tv (AnonTCB af))   k = mkFunTy af (varType tv) k
+    mk (Bndr tv (NamedTCB vis)) k = mkForAllTy tv vis k
 
 tyConTyVarBinders :: [TyConBinder]   -- From the TyCon
                   -> [TyVarBinder]   -- Suitable for the foralls of a term function
@@ -476,7 +476,8 @@ tyConTyVarBinders tc_bndrs
    mk_binder (Bndr tv tc_vis) = mkTyVarBinder vis tv
       where
         vis = case tc_vis of
-                AnonTCB           -> Specified
+                AnonTCB VisArg    -> Specified
+                AnonTCB InvisArg  -> Inferred   -- See Note [AnonTCB InvisArg]
                 NamedTCB Required -> Specified
                 NamedTCB vis      -> vis
 
@@ -486,7 +487,26 @@ tyConVisibleTyVars tc
   = [ tv | Bndr tv vis <- tyConBinders tc
          , isVisibleTcbVis vis ]
 
-{- Note [Building TyVarBinders from TyConBinders]
+{- Note [AnonTCB InivsArg]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's pretty rare to have an (AnonTCB InvisArg) binder.  The
+only way it can occur is in a PromotedDataCon whose
+kind has an equality constraint:
+  'MkT :: forall a b. (a~b) => blah
+See Note [Constraints in kinds] in TyCoRep, and
+Note [Promoted data constructors] in this module.
+
+When mapping an (AnonTCB InvisArg) to an ArgFlag, in
+tyConBndrVisArgFlag, we use "Inferred" to mean "the user cannot
+specify this arguments, even with visible type/kind application;
+instead the type checker must fill it in.
+
+We map (AnonTCB VisArg) to Required, of course: the user must
+provide it. It would be utterly wrong to do this for constraint
+arguments, which is why AnonTCB must have the AnonArgFlag in
+the first place.
+
+Note [Building TyVarBinders from TyConBinders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We sometimes need to build the quantified type of a value from
 the TyConBinders of a type or class.  For that we need not
@@ -597,18 +617,21 @@ They fit together like so:
 -}
 
 instance Outputable tv => Outputable (VarBndr tv TyConBndrVis) where
-  ppr (Bndr v AnonTCB)              = text "anon" <+> parens (ppr v)
-  ppr (Bndr v (NamedTCB Required))  = text "req"  <+> parens (ppr v)
-  ppr (Bndr v (NamedTCB Specified)) = text "spec" <+> parens (ppr v)
-  ppr (Bndr v (NamedTCB Inferred))  = text "inf"  <+> parens (ppr v)
+  ppr (Bndr v bi) = ppr_bi bi <+> parens (ppr v)
+    where
+      ppr_bi (AnonTCB VisArg)     = text "anon-vis"
+      ppr_bi (AnonTCB InvisArg)   = text "anon-invis"
+      ppr_bi (NamedTCB Required)  = text "req"
+      ppr_bi (NamedTCB Specified) = text "spec"
+      ppr_bi (NamedTCB Inferred)  = text "inf"
 
 instance Binary TyConBndrVis where
-  put_ bh AnonTCB        = putByte bh 0
+  put_ bh (AnonTCB af)   = do { putByte bh 0; put_ bh af }
   put_ bh (NamedTCB vis) = do { putByte bh 1; put_ bh vis }
 
   get bh = do { h <- getByte bh
               ; case h of
-                  0 -> return AnonTCB
+                  0 -> do { af  <- get bh; return (AnonTCB af) }
                   _ -> do { vis <- get bh; return (NamedTCB vis) } }
 
 
@@ -1119,12 +1142,20 @@ via the PromotedDataCon alternative in TyCon.
   the DataCon.  Eg. If the data constructor Data.Maybe.Just(unique 78,
   say) is promoted to a TyCon whose name is Data.Maybe.Just(unique 78)
 
-* Small note: We promote the *user* type of the DataCon.  Eg
+* We promote the *user* type of the DataCon.  Eg
      data T = MkT {-# UNPACK #-} !(Bool, Bool)
   The promoted kind is
-     MkT :: (Bool,Bool) -> T
+     'MkT :: (Bool,Bool) -> T
   *not*
-     MkT :: Bool -> Bool -> T
+     'MkT :: Bool -> Bool -> T
+
+* Similarly for GADTs:
+     data G a where
+       MkG :: forall b. b -> G [b]
+  The promoted data constructor has kind
+       'MkG :: forall b. b -> G [b]
+  *not*
+       'MkG :: forall a b. (a ~# [b]) => b -> G a
 
 Note [Enumeration types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1711,16 +1742,6 @@ isFunTyCon _             = False
 isAbstractTyCon :: TyCon -> Bool
 isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon }) = True
 isAbstractTyCon _ = False
-
--- | Make a fake, recovery 'TyCon' from an existing one.
--- Used when recovering from errors
-makeRecoveryTyCon :: TyCon -> TyCon
-makeRecoveryTyCon tc
-  = mkTcTyCon (tyConName tc)
-              (tyConBinders tc) (tyConResKind tc)
-              [{- no scoped vars -}]
-              True
-              (tyConFlavour tc)
 
 -- | Does this 'TyCon' represent something that cannot be defined in Haskell?
 isPrimTyCon :: TyCon -> Bool

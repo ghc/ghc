@@ -1031,7 +1031,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
              mono_tvs1 = mono_tvs0 `unionVarSet` co_var_tvs
 
-             eq_constraints = filter isEqPred candidates
+             eq_constraints = filter isEqPrimPred candidates
              mono_tvs2      = growThetaTyVars eq_constraints mono_tvs1
 
              constrained_tvs = (growThetaTyVars eq_constraints

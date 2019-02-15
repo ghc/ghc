@@ -172,8 +172,8 @@ newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
 -- Deals with both equality and non-equality predicates
 newWanted orig t_or_k pty
   = do loc <- getCtLocM orig t_or_k
-       d <- if isEqPred pty then HoleDest  <$> newCoercionHole pty
-                            else EvVarDest <$> newEvVar pty
+       d <- if isEqPrimPred pty then HoleDest  <$> newCoercionHole pty
+                                else EvVarDest <$> newEvVar pty
        return $ CtWanted { ctev_dest = d
                          , ctev_pred = pty
                          , ctev_nosh = WDeriv
@@ -1198,13 +1198,13 @@ collect_cand_qtvs is_dep bound dvs ty
     -----------------
     go :: CandidatesQTvs -> TcType -> TcM CandidatesQTvs
     -- Uses accumulating-parameter style
-    go dv (AppTy t1 t2)    = foldlM go dv [t1, t2]
-    go dv (TyConApp _ tys) = foldlM go dv tys
-    go dv (FunTy arg res)  = foldlM go dv [arg, res]
-    go dv (LitTy {})       = return dv
-    go dv (CastTy ty co)   = do dv1 <- go dv ty
-                                collect_cand_qtvs_co bound dv1 co
-    go dv (CoercionTy co)  = collect_cand_qtvs_co bound dv co
+    go dv (AppTy t1 t2)     = foldlM go dv [t1, t2]
+    go dv (TyConApp _ tys)  = foldlM go dv tys
+    go dv (FunTy _ arg res) = foldlM go dv [arg, res]
+    go dv (LitTy {})        = return dv
+    go dv (CastTy ty co)    = do dv1 <- go dv ty
+                                 collect_cand_qtvs_co bound dv1 co
+    go dv (CoercionTy co)   = collect_cand_qtvs_co bound dv co
 
     go dv (TyVarTy tv)
       | is_bound tv = return dv
@@ -2156,8 +2156,8 @@ tidySigSkol env cx ty tv_prs
       where
         (env', tv') = tidy_tv_bndr env tv
 
-    tidy_ty env (FunTy arg res)
-      = FunTy (tidyType env arg) (tidy_ty env res)
+    tidy_ty env ty@(FunTy _ arg res)
+      = ty { ft_arg = tidyType env arg, ft_res = tidy_ty env res }
 
     tidy_ty env ty = tidyType env ty
 

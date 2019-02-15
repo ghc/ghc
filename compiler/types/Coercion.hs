@@ -702,7 +702,7 @@ mkFunCo r co1 co2
     -- See Note [Refl invariant]
   | Just (ty1, _) <- isReflCo_maybe co1
   , Just (ty2, _) <- isReflCo_maybe co2
-  = mkReflCo r (mkFunTy ty1 ty2)
+  = mkReflCo r (mkVisFunTy ty1 ty2)
   | otherwise = FunCo r co1 co2
 
 -- | Apply a 'Coercion' to another 'Coercion'.
@@ -1900,7 +1900,7 @@ ty_co_subst lc role ty
                              liftCoSubstTyVar lc r tv
     go r (AppTy ty1 ty2)   = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys) = mkTyConAppCo r tc (zipWith go (tyConRolesX r tc) tys)
-    go r (FunTy ty1 ty2)   = mkFunCo r (go r ty1) (go r ty2)
+    go r (FunTy _ ty1 ty2) = mkFunCo r (go r ty1) (go r ty2)
     go r t@(ForAllTy (Bndr v _) ty)
        = let (lc', v', h) = liftCoSubstVarBndr lc v
              body_co = ty_co_subst lc' r ty in
@@ -2196,7 +2196,7 @@ coercionKind co =
        | otherwise                = go_forall empty_subst co
        where
          empty_subst = mkEmptyTCvSubst (mkInScopeSet $ tyCoVarsOfCo co)
-    go (FunCo _ co1 co2)    = mkFunTy <$> go co1 <*> go co2
+    go (FunCo _ co1 co2)    = mkVisFunTy <$> go co1 <*> go co2
     go (CoVarCo cv)         = coVarTypes cv
     go (HoleCo h)           = coVarTypes (coHoleCoVar h)
     go (AxiomInstCo ax ind cos)
@@ -2374,7 +2374,8 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
                   ; _           -> False      } )
         mkNomReflCo ty1
 
-    go (FunTy arg1 res1) (FunTy arg2 res2)
+    go (FunTy { ft_arg = arg1, ft_res = res1 })
+       (FunTy { ft_arg = arg2, ft_res = res2 })
       = mkFunCo Nominal (go arg1 arg2) (go res1 res2)
 
     go (TyConApp tc1 args1) (TyConApp tc2 args2)
@@ -2742,7 +2743,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
     go acc_xis acc_cos lc binders inner_ki _ []
       = (reverse acc_xis, reverse acc_cos, kind_co)
       where
-        final_kind = mkTyCoPiTys binders inner_ki
+        final_kind = mkPiTys binders inner_ki
         kind_co = liftCoSubst Nominal lc final_kind
 
     go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) ((xi,co):args)

@@ -824,7 +824,6 @@ is flattened, but this is left as future work. (Mar '15)
 
 Note [FunTy and decomposing tycon applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When can_eq_nc' attempts to decompose a tycon application we haven't yet zonked.
 This means that we may very well have a FunTy containing a type of some unknown
 kind. For instance, we may have,
@@ -923,8 +922,8 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- Including FunTy (s -> t)
 can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
     --- See Note [FunTy and decomposing type constructor applications].
-  | Just (tc1, tys1) <- tcRepSplitTyConApp_maybe' ty1
-  , Just (tc2, tys2) <- tcRepSplitTyConApp_maybe' ty2
+  | Just (tc1, tys1) <- repSplitTyConApp_maybe ty1
+  , Just (tc2, tys2) <- repSplitTyConApp_maybe ty2
   , not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
@@ -1080,7 +1079,7 @@ zonk_eq_types = go
       , Just (arg2, res2) <- split2
       = do { res_a <- go arg1 arg2
            ; res_b <- go res1 res2
-           ; return $ combine_rev mkFunTy res_b res_a
+           ; return $ combine_rev mkVisFunTy res_b res_a
            }
       | isJust split1 || isJust split2
       = bale_out ty1 ty2
@@ -1089,8 +1088,8 @@ zonk_eq_types = go
         split2 = tcSplitFunTy_maybe ty2
 
     go ty1 ty2
-      | Just (tc1, tys1) <- tcRepSplitTyConApp_maybe ty1
-      , Just (tc2, tys2) <- tcRepSplitTyConApp_maybe ty2
+      | Just (tc1, tys1) <- repSplitTyConApp_maybe ty1
+      , Just (tc2, tys2) <- repSplitTyConApp_maybe ty2
       = if tc1 == tc2 && tys1 `equalLength` tys2
           -- Crucial to check for equal-length args, because
           -- we cannot assume that the two args to 'go' have
@@ -2386,7 +2385,7 @@ unifyWanted loc role orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
-    go (FunTy s1 t1) (FunTy s2 t2)
+    go (FunTy _ s1 t1) (FunTy _ s2 t2)
       = do { co_s <- unifyWanted loc role s1 s2
            ; co_t <- unifyWanted loc role t1 t2
            ; return (mkFunCo role co_s co_t) }
@@ -2437,7 +2436,7 @@ unify_derived loc role    orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
-    go (FunTy s1 t1) (FunTy s2 t2)
+    go (FunTy _ s1 t1) (FunTy _ s2 t2)
       = do { unify_derived loc role s1 s2
            ; unify_derived loc role t1 t2 }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)

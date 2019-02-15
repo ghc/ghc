@@ -670,7 +670,7 @@ matchHasField dflags short_cut clas tys
                          -- the HasField x r a dictionary.  The preds will
                          -- typically be empty, but if the datatype has a
                          -- "stupid theta" then we have to include it here.
-                   ; let theta = mkPrimEqPred sel_ty (mkFunTy r_ty a_ty) : preds
+                   ; let theta = mkPrimEqPred sel_ty (mkVisFunTy r_ty a_ty) : preds
 
                          -- Use the equality proof to cast the selector Id to
                          -- type (r -> a), then use the newtype coercion to cast

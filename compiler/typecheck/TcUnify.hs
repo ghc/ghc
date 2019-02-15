@@ -153,8 +153,8 @@ matchExpectedFunTys herald arity orig_ty thing_inside
     go acc_arg_tys n ty
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
-    go acc_arg_tys n (FunTy arg_ty res_ty)
-      = ASSERT( not (isPredTy arg_ty) )
+    go acc_arg_tys n (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+      = ASSERT( af == VisArg )
         do { (result, wrap_res) <- go (mkCheckExpType arg_ty : acc_arg_tys)
                                       (n-1) res_ty
            ; return ( result
@@ -196,7 +196,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
            ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkFunTys more_arg_tys res_ty
+           ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
            ; wrap <- tcSubTypeDS AppOrigin GenSigCtxt unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (result, wrap) }
@@ -282,8 +282,8 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     go n acc_args ty
       | Just ty' <- tcView ty = go n acc_args ty'
 
-    go n acc_args (FunTy arg_ty res_ty)
-      = ASSERT( not (isPredTy arg_ty) )
+    go n acc_args (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+      = ASSERT( af == VisArg )
         do { (wrap_res, tys, ty_r) <- go (n-1) (arg_ty : acc_args) res_ty
            ; return ( mkWpFun idHsWrapper wrap_res arg_ty ty_r doc
                     , arg_ty : tys, ty_r ) }
@@ -320,14 +320,14 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     defer n fun_ty
       = do { arg_tys <- replicateM n newOpenFlexiTyVarTy
            ; res_ty  <- newOpenFlexiTyVarTy
-           ; let unif_fun_ty = mkFunTys arg_tys res_ty
+           ; let unif_fun_ty = mkVisFunTys arg_tys res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
            ; return (mkWpCastN co, arg_tys, res_ty) }
 
     ------------
     mk_ctxt :: [TcSigmaType] -> TcSigmaType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
     mk_ctxt arg_tys res_ty env
-      = do { let ty = mkFunTys arg_tys res_ty
+      = do { let ty = mkVisFunTys arg_tys res_ty
            ; (env1, zonked) <- zonkTidyTcType env ty
                    -- zonking might change # of args
            ; let (zonked_args, _) = tcSplitFunTys zonked
@@ -441,7 +441,7 @@ matchExpectedAppTy orig_ty
            ; return (co, (ty1, ty2)) }
 
     orig_kind = tcTypeKind orig_ty
-    kind1 = mkFunTy liftedTypeKind orig_kind
+    kind1 = mkVisFunTy liftedTypeKind orig_kind
     kind2 = liftedTypeKind    -- m :: * -> k
                               -- arg type :: *
 
@@ -754,9 +754,8 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     -- caused Trac #12616 because (also bizarrely) 'deriving' code had
     -- -XImpredicativeTypes on.  I deleted the entire case.
 
-    go (FunTy act_arg act_res) (FunTy exp_arg exp_res)
-      | not (isPredTy act_arg)
-      , not (isPredTy exp_arg)
+    go (FunTy { ft_af = VisArg, ft_arg = act_arg, ft_res = act_res })
+       (FunTy { ft_af = VisArg, ft_arg = exp_arg, ft_res = exp_res })
       = -- See Note [Co/contra-variance of subsumption checking]
         do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt       act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
@@ -1416,7 +1415,7 @@ uType t_or_k origin orig_ty1 orig_ty2
       | Just ty2' <- tcView ty2 = go ty1  ty2'
 
         -- Functions (or predicate functions) just check the two parts
-    go (FunTy fun1 arg1) (FunTy fun2 arg2)
+    go (FunTy _ fun1 arg1) (FunTy _ fun2 arg2)
       = do { co_l <- uType t_or_k origin fun1 fun2
            ; co_r <- uType t_or_k origin arg1 arg2
            ; return $ mkFunCo Nominal co_l co_r }
@@ -2039,7 +2038,7 @@ matchExpectedFunKind hs_ty n k = go n k
                 Indirect fun_kind -> go n fun_kind
                 Flexi ->             defer n k }
 
-    go n (FunTy arg res)
+    go n (FunTy _ arg res)
       = do { co <- go (n-1) res
            ; return (mkTcFunCo Nominal (mkTcNomReflCo arg) co) }
 
@@ -2049,7 +2048,7 @@ matchExpectedFunKind hs_ty n k = go n k
     defer n k
       = do { arg_kinds <- newMetaKindVars n
            ; res_kind  <- newMetaKindVar
-           ; let new_fun = mkFunTys arg_kinds res_kind
+           ; let new_fun = mkVisFunTys arg_kinds res_kind
                  origin  = TypeEqOrigin { uo_actual   = k
                                         , uo_expected = new_fun
                                         , uo_thing    = Just (ppr hs_ty)
@@ -2205,7 +2204,7 @@ preCheck dflags ty_fam_ok tv ty
       | bad_tc tc              = OC_Bad
       | otherwise              = mapM fast_check tys >> ok
     fast_check (LitTy {})      = ok
-    fast_check (FunTy a r)     = fast_check a   >> fast_check r
+    fast_check (FunTy _ a r)   = fast_check a   >> fast_check r
     fast_check (AppTy fun arg) = fast_check fun >> fast_check arg
     fast_check (CastTy ty co)  = fast_check ty  >> fast_check_co co
     fast_check (CoercionTy co) = fast_check_co co

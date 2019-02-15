@@ -137,7 +137,6 @@ import qualified TcMType as TcM
 import qualified ClsInst as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified TcEnv as TcM
        ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl )
-import PrelNames( heqTyConKey, eqTyConKey )
 import ClsInst( InstanceWhat(..) )
 import Kind
 import TcType
@@ -328,8 +327,7 @@ extendWorkListCt ct wl
        -> extendWorkListEq ct wl
 
      ClassPred cls _  -- See Note [Prioritise class equalities]
-       |  cls `hasKey` heqTyConKey
-       || cls `hasKey` eqTyConKey
+       |  isEqPredClass cls
        -> extendWorkListEq ct wl
 
      _ -> extendWorkListNonEq ct wl
@@ -2765,7 +2763,7 @@ checkForCyclicBinds ev_binds_map
     cycles = [c | CyclicSCC c <- stronglyConnCompFromEdgedVerticesUniq edges]
 
     coercion_cycles = [c | c <- cycles, any is_co_bind c]
-    is_co_bind (EvBind { eb_lhs = b }) = isEqPred (varType b)
+    is_co_bind (EvBind { eb_lhs = b }) = isEqPrimPred (varType b)
 
     edges :: [ Node EvVar EvBind ]
     edges = [ DigraphNode bind bndr (nonDetEltsUniqSet (evVarsOfTerm rhs))

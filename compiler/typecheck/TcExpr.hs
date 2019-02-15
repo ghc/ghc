@@ -439,7 +439,7 @@ tcExpr expr@(SectionR x op arg2) res_ty
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
                   <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
        ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
-                                 (mkFunTy arg1_ty op_res_ty) res_ty
+                                 (mkVisFunTy arg1_ty op_res_ty) res_ty
        ; arg2' <- tcArg op arg2 arg2_ty 2
        ; return ( mkHsWrap wrap_res $
                   SectionR x (mkLHsWrap wrap_fun op') arg2' ) }
@@ -459,7 +459,7 @@ tcExpr expr@(SectionL x arg1 op) res_ty
            <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op))
                                 n_reqd_args op_ty
        ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
-                                 (mkFunTys arg_tys op_res_ty) res_ty
+                                 (mkVisFunTys arg_tys op_res_ty) res_ty
        ; arg1' <- tcArg op arg1 arg1_ty 1
        ; return ( mkHsWrap wrap_res $
                   SectionL x arg1' (mkLHsWrap wrap_fn op') ) }
@@ -491,7 +491,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
            { Boxed   -> newFlexiTyVarTys arity liftedTypeKind
            ; Unboxed -> replicateM arity newOpenFlexiTyVarTy }
        ; let actual_res_ty
-                 = mkFunTys [ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
+                 = mkVisFunTys [ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
                             (mkTupleTy boxity arg_tys)
 
        ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")
@@ -1169,7 +1169,7 @@ tcApp m_herald fun@(L loc (HsVar _ (L _ fun_id))) args res_ty
   = do { rep <- newFlexiTyVarTy runtimeRepTy
        ; let [alpha, beta] = mkTemplateTyVars [liftedTypeKind, tYPE rep]
              seq_ty = mkSpecForAllTys [alpha,beta]
-                      (mkTyVarTy alpha `mkFunTy` mkTyVarTy beta `mkFunTy` mkTyVarTy beta)
+                      (mkTyVarTy alpha `mkVisFunTy` mkTyVarTy beta `mkVisFunTy` mkTyVarTy beta)
              seq_fun = L loc (HsVar noExt (L loc seqId))
              -- seq_ty = forall (a:*) (b:TYPE r). a -> b -> b
              -- where 'r' is a meta type variable
@@ -1451,9 +1451,11 @@ tcSyntaxOpGen :: CtOrigin
               -> TcM (a, SyntaxExpr GhcTcId)
 tcSyntaxOpGen orig op arg_tys res_ty thing_inside
   = do { (expr, sigma) <- tcInferSigma $ noLoc $ syn_expr op
+       ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)
            <- tcSynArgA orig sigma arg_tys res_ty $
               thing_inside
+       ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma )
        ; return (result, SyntaxExpr { syn_expr = mkHsWrap expr_wrap $ unLoc expr
                                     , syn_arg_wraps = arg_wraps
                                     , syn_res_wrap  = res_wrap }) }
