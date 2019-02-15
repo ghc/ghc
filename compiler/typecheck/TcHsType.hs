@@ -80,7 +80,7 @@ import TyCoRep  ( Type(..) )
 import TcErrors ( reportAllUnsolved )
 import TcType
 import Inst   ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
-import TyCoRep( TyCoBinder(..), tyCoBinderArgFlag )  -- Used in etaExpandAlgTyCon
+import TyCoRep( TyCoBinder(..) )  -- Used in etaExpandAlgTyCon
 import Type
 import TysPrim
 import Coercion
@@ -622,7 +622,6 @@ tc_lhs_type mode (L span ty) exp_kind
   = setSrcSpan span $
     tc_hs_type mode ty exp_kind
 
-------------------------------------------
 tc_hs_type :: TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
 -- See Note [Bidirectional type checking]
 
@@ -822,12 +821,12 @@ tc_fun_type mode ty1 ty2 exp_kind = case mode_level mode of
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; checkExpectedKind (HsFunTy noExt ty1 ty2) (mkFunTy ty1' ty2')
+       ; checkExpectedKind (HsFunTy noExt ty1 ty2) (mkVisFunTy ty1' ty2')
                            liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
-       ; checkExpectedKind (HsFunTy noExt ty1 ty2) (mkFunTy ty1' ty2')
+       ; checkExpectedKind (HsFunTy noExt ty1 ty2) (mkVisFunTy ty1' ty2')
                            liftedTypeKind exp_kind }
 
 ---------------------------
@@ -1047,17 +1046,17 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
 
       ---------------- HsTypeArg: a kind application (fun @ki)
       (HsTypeArg _ hs_ki_arg : hs_args, Just (ki_binder, inner_ki)) ->
-        case tyCoBinderArgFlag ki_binder of
+        case ki_binder of
 
         -- FunTy with PredTy on LHS, or ForAllTy with Inferred
-        Inferred  -> instantiate ki_binder inner_ki
+        Named (Bndr _ Inferred) -> instantiate ki_binder inner_ki
+        Anon InvisArg _         -> instantiate ki_binder inner_ki
 
-        -- Specified (invisible) binder with visible kind argument
-        Specified ->
+        Named (Bndr _ Specified) ->  -- Visible kind application
           do { traceTc "tcInferApps (vis kind app)"
                        (vcat [ ppr ki_binder, ppr hs_ki_arg
                              , ppr (tyBinderType ki_binder)
-                             , ppr subst, ppr (tyCoBinderArgFlag ki_binder) ])
+                             , ppr subst ])
 
              ; let exp_kind = substTy subst $ tyBinderType ki_binder
 
@@ -1072,17 +1071,10 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
              ; (subst', fun') <- mkAppTyM subst fun ki_binder ki_arg
              ; go (n+1) fun' subst' inner_ki hs_args }
 
-        -- Visible kind application, but we need a normal type application; error.
-        -- This happens when we have (fun @ki) but (fun :: k1 -> k2),
-        -- that is, without a forall
-        Required ->
-          do { traceTc "tcInferApps (error)"
-                       (vcat [ ppr ki_binder
-                             , ppr hs_ki_arg
-                             , ppr (tyBinderType ki_binder)
-                             , ppr subst
-                             , ppr (isInvisibleBinder ki_binder) ])
-             ; ty_app_err hs_ki_arg $ substTy subst fun_ki }
+        -- Attempted visible kind application (fun @ki), but fun_ki is
+        --   forall k -> blah   or   k1 -> k2
+        -- So we need a normal application.  Error.
+        _ -> ty_app_err hs_ki_arg $ substTy subst fun_ki
 
       -- No binder; try applying the substitution, or fail if that's not possible
       (HsTypeArg _ ki_arg : _, Nothing) -> try_again_after_substing_or $
@@ -1091,7 +1083,7 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
       ---------------- HsValArg: a nomal argument (fun ty)
       (HsValArg arg : args, Just (ki_binder, inner_ki))
         -- next binder is invisible; need to instantiate it
-        | isInvisibleBinder ki_binder   -- FunTy with PredTy on LHS;
+        | isInvisibleBinder ki_binder   -- FunTy with InvisArg on LHS;
                                         -- or ForAllTy with Inferred or Specified
          -> instantiate ki_binder inner_ki
 
@@ -1129,9 +1121,7 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
       where
         instantiate ki_binder inner_ki
           = do { traceTc "tcInferApps (need to instantiate)"
-                         (vcat [ ppr ki_binder
-                               , ppr subst
-                               , ppr (tyCoBinderArgFlag ki_binder)])
+                         (vcat [ ppr ki_binder, ppr subst])
                ; (subst', arg') <- tcInstInvisibleTyBinder subst ki_binder
                ; go n (mkAppTy fun arg') subst' inner_ki all_args }
                  -- Because tcInvisibleTyBinder instantiate ki_binder,
@@ -1438,6 +1428,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                        -- see Trac #15245
                        promotionErr name FamDataConPE
                    ; let (_, _, _, theta, _, _) = dataConFullSig dc
+                   ; traceTc "tcTyVar" (ppr dc <+> ppr theta $$ ppr (dc_theta_illegal_constraint theta))
                    ; case dc_theta_illegal_constraint theta of
                        Just pred -> promotionErr name $
                                     ConstrainedDataConPE pred
@@ -1458,15 +1449,9 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
     -- We cannot promote a data constructor with a context that contains
     -- constraints other than equalities, so error if we find one.
-    -- See Note [Constraints handled in types] in Inst.
+    -- See Note [Constraints in kinds] in TyCoRep
     dc_theta_illegal_constraint :: ThetaType -> Maybe PredType
-    dc_theta_illegal_constraint = find go
-      where
-        go :: PredType -> Bool
-        go pred | Just tc <- tyConAppTyCon_maybe pred
-                = not $  tc `hasKey` eqTyConKey
-                      || tc `hasKey` heqTyConKey
-                | otherwise = True
+    dc_theta_illegal_constraint = find (not . isEqPred)
 
 {-
 Note [GADT kind self-reference]
@@ -1960,7 +1945,7 @@ kcLHsQTyVars_NonCusk name flav
        | hsLTyVarName hs_tv `elemNameSet` dep_names
        = mkNamedTyConBinder Required tv
        | otherwise
-       = mkAnonTyConBinder tv
+       = mkAnonTyConBinder VisArg tv
 
 kcLHsQTyVars_NonCusk _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
 
@@ -2388,13 +2373,13 @@ etaExpandAlgTyCon tc_bndrs kind
       = case splitPiTy_maybe kind of
           Nothing -> (reverse acc, substTy subst kind)
 
-          Just (Anon arg, kind')
+          Just (Anon _ arg, kind')
             -> go loc occs' uniqs' subst' (tcb : acc) kind'
             where
               arg'   = substTy subst arg
               tv     = mkTyVar (mkInternalName uniq occ loc) arg'
               subst' = extendTCvInScope subst tv
-              tcb    = Bndr tv AnonTCB
+              tcb    = Bndr tv (AnonTCB VisArg)
               (uniq:uniqs') = uniqs
               (occ:occs')   = occs
 
@@ -2423,7 +2408,7 @@ tcbVisibilities tc orig_args
     go fun_kind subst all_args@(arg : args)
       | Just (tcb, inner_kind) <- splitPiTy_maybe fun_kind
       = case tcb of
-          Anon _              -> AnonTCB      : go inner_kind subst  args
+          Anon af _           -> AnonTCB af   : go inner_kind subst  args
           Named (Bndr tv vis) -> NamedTCB vis : go inner_kind subst' args
                  where
                     subst' = extendTCvSubst subst tv arg

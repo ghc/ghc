@@ -752,9 +752,9 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
          traceTR (text "Following a MutVar")
          contents_tv <- newVar liftedTypeKind
          MASSERT(isUnliftedType my_ty)
-         (mutvar_ty,_) <- instScheme $ quantifyType $ mkFunTy
+         (mutvar_ty,_) <- instScheme $ quantifyType $ mkVisFunTy
                             contents_ty (mkTyConApp tycon [world,contents_ty])
-         addConstraint (mkFunTy contents_tv my_ty) mutvar_ty
+         addConstraint (mkVisFunTy contents_tv my_ty) mutvar_ty
          x <- go (pred max_depth) contents_tv contents_ty contents
          return (RefWrap my_ty x)
 
@@ -1259,7 +1259,7 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
     , Just (r1,r2) <- splitFunTy_maybe r
     = do r2' <- go l2 r2
          r1' <- go l1 r1
-         return (mkFunTy r1' r2')
+         return (mkVisFunTy r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
     | Just (tycon_l, _) <- tcSplitTyConApp_maybe lhs
     , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs
