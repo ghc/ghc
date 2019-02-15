@@ -291,6 +291,12 @@ simple_app env (Var v) as
     -- See Note [Unfold compulsory unfoldings in LHSs]
   = simple_app (soeZapSubst env) (unfoldingTemplate unf) as
 
+  | let unf = idUnfolding v
+  , Just a <- isDataConWrapId_maybe v
+  , isNewTyCon (dataConTyCon a)
+    -- See note [Unfold newtype wrappers in LHSs]
+  = simple_app (soeZapSubst env) (unfoldingTemplate unf) as
+
   | otherwise
   , let out_fn = lookupIdSubst (text "simple_app") (soe_subst env) v
   = finish_app env out_fn as
@@ -581,6 +587,19 @@ unfolding. Also see Note [Desugaring coerce as cast] in Desugar.
 However, we don't want to inline 'seq', which happens to also have a
 compulsory unfolding, so we only do this unfolding only for things
 that are always-active.  See Note [User-defined RULES for seq] in MkId.
+
+Note [Unfold newtype wrappers in LHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Newtypes may have wrappers, e.g.
+
+newtype Age a b where
+ MkAge :: forall b a. Int -> Age a b
+
+(the wrapper reorders the type arguments)
+
+In order for the `map coerce = coerce` rule to match `map MkAge` (as
+it should!), we need to unfold newtype wrappers in simple_app. See also Note
+[Unfold compulsory unfoldings in LHSs] and Trac #16208.
 
 Note [Getting the map/coerce RULE to work]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
