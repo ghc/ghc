@@ -10,10 +10,11 @@ import GhcPrelude
 import Binary
 import FastString                 ( FastString )
 import IfaceType
-import Module                     ( ModuleName )
+import Module                     ( ModuleName, Module )
 import Name                       ( Name )
 import Outputable hiding ( (<>) )
 import SrcLoc                     ( RealSrcSpan )
+import Avail
 
 import qualified Data.Array as A
 import qualified Data.Map as M
@@ -56,6 +57,9 @@ data HieFile = HieFile
     , hie_hs_file :: FilePath
     -- ^ Initial Haskell source file path
 
+    , hie_module :: Module
+    -- ^ The module this HIE file is for
+
     , hie_types :: A.Array TypeIndex HieTypeFlat
     -- ^ Types referenced in the 'hie_asts'.
     --
@@ -63,6 +67,9 @@ data HieFile = HieFile
 
     , hie_asts :: HieASTs TypeIndex
     -- ^ Type-annotated abstract syntax trees
+
+    , hie_exports :: [AvailInfo]
+    -- ^ The names that this module exports
 
     , hie_hs_src :: ByteString
     -- ^ Raw bytes of the initial Haskell source
@@ -73,12 +80,16 @@ instance Binary HieFile where
     put_ bh $ hie_version hf
     put_ bh $ hie_ghc_version hf
     put_ bh $ hie_hs_file hf
+    put_ bh $ hie_module hf
     put_ bh $ hie_types hf
     put_ bh $ hie_asts hf
+    put_ bh $ hie_exports hf
     put_ bh $ hie_hs_src hf
 
   get bh = HieFile
     <$> get bh
+    <*> get bh
+    <*> get bh
     <*> get bh
     <*> get bh
     <*> get bh
