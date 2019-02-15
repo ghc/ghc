@@ -408,8 +408,9 @@ extract_renamed_stuff mod_summary tc_result = do
 
     -- Create HIE files
     when (gopt Opt_WriteHie dflags) $ do
-        hieFile <- mkHieFile mod_summary (tcg_binds tc_result)
-                                         (fromJust rn_info)
+        -- I assume this fromJust is safe because `-fwrite-hie-file`
+        -- enables the option which keeps the renamed source.
+        hieFile <- mkHieFile mod_summary tc_result (fromJust rn_info)
         let out_file = ml_hie_file $ ms_location mod_summary
         liftIO $ writeHieFile out_file hieFile
 

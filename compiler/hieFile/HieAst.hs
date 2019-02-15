@@ -34,6 +34,8 @@ import TcHsSyn                    ( hsLitType, hsPatType )
 import Type                       ( mkFunTys, Type )
 import TysWiredIn                 ( mkListTy, mkSumTy )
 import Var                        ( Id, Var, setVarName, varName, varType )
+import TcRnTypes
+import MkIface                    ( mkIfaceExports )
 
 import HieTypes
 import HieUtils
@@ -87,17 +89,23 @@ modifyState = foldr go id
 type HieM = ReaderT HieState Hsc
 
 -- | Construct an 'HieFile' from the outputs of the typechecker.
-mkHieFile :: ModSummary -> TypecheckedSource -> RenamedSource -> Hsc HieFile
+mkHieFile :: ModSummary
+          -> TcGblEnv
+          -> RenamedSource -> Hsc HieFile
 mkHieFile ms ts rs = do
-  (asts', arr) <- getCompressedAsts ts rs
+  let tc_binds = tcg_binds ts
+  (asts', arr) <- getCompressedAsts tc_binds rs
   let Just src_file = ml_hs_file $ ms_location ms
   src <- liftIO $ BS.readFile src_file
   return $ HieFile
       { hie_version = curHieVersion
       , hie_ghc_version = BSC.pack cProjectVersion
       , hie_hs_file = src_file
+      , hie_module = ms_mod ms
       , hie_types = arr
       , hie_asts = asts'
+      -- mkIfaceExports sorts the AvailInfos for stability
+      , hie_exports = mkIfaceExports (tcg_exports ts)
       , hie_hs_src = src
       }
 
