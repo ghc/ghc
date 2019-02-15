@@ -106,7 +106,7 @@ import {-# SOURCE #-} TysWiredIn
   , doubleElemRepDataConTy
   , mkPromotedListTy )
 
-import Var              ( TyVar, VarBndr(Bndr), mkTyVar )
+import Var              ( TyVar, mkTyVar )
 import Name
 import TyCon
 import SrcLoc
@@ -320,10 +320,10 @@ mkTemplateKindTyConBinders :: [Kind] -> [TyConBinder]
 mkTemplateKindTyConBinders kinds = [mkNamedTyConBinder Specified tv | tv <- mkTemplateKindVars kinds]
 
 mkTemplateAnonTyConBinders :: [Kind] -> [TyConBinder]
-mkTemplateAnonTyConBinders kinds = map mkAnonTyConBinder (mkTemplateTyVars kinds)
+mkTemplateAnonTyConBinders kinds = mkAnonTyConBinders VisArg (mkTemplateTyVars kinds)
 
 mkTemplateAnonTyConBindersFrom :: Int -> [Kind] -> [TyConBinder]
-mkTemplateAnonTyConBindersFrom n kinds = map mkAnonTyConBinder (mkTemplateTyVarsFrom n kinds)
+mkTemplateAnonTyConBindersFrom n kinds = mkAnonTyConBinders VisArg (mkTemplateTyVarsFrom n kinds)
 
 alphaTyVars :: [TyVar]
 alphaTyVars = mkTemplateTyVars $ repeat liftedTypeKind
@@ -383,9 +383,8 @@ funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
 funTyCon :: TyCon
 funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
-    tc_bndrs = [ Bndr runtimeRep1TyVar (NamedTCB Inferred)
-               , Bndr runtimeRep2TyVar (NamedTCB Inferred)
-               ]
+    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
+               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
                ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
                                              , tYPE runtimeRep2Ty
                                              ]
@@ -680,7 +679,7 @@ Let's take these one at a time:
     --------------------------
 This is The Type Of Equality in GHC. It classifies nominal coercions.
 This type is used in the solver for recording equality constraints.
-It responds "yes" to Type.isEqPred and classifies as an EqPred in
+It responds "yes" to Type.isEqPrimPred and classifies as an EqPred in
 Type.classifyPredType.
 
 All wanted constraints of this type are built with coercion holes.
