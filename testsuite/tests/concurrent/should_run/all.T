@@ -133,7 +133,7 @@ test('conc013', normal, compile_and_run, [''])
 test('conc014', normal, compile_and_run, [''])
 test('conc015', normal, compile_and_run, [''])
 test('conc015a', normal, compile_and_run, [''])
-test('conc016', omit_ways(['threaded2']), # see comment in conc016.hs
+test('conc016', omit_ways(['threaded2', 'nonmoving_thr', 'nonmoving_thr_ghc']), # see comment in conc016.hs
                 compile_and_run, [''])
 test('conc017', normal, compile_and_run, [''])
 test('conc017a', normal, compile_and_run, [''])
@@ -239,7 +239,8 @@ test('conc067', ignore_stdout, compile_and_run, [''])
 
 # omit threaded2, the behaviour of this test is non-deterministic with more
 # than one CPU.
-test('conc068', [ omit_ways('threaded2'), exit_code(1) ], compile_and_run, [''])
+test('conc068', [ omit_ways(['threaded2', 'nonmoving_thr', 'nonmoving_thr_ghc']),
+     exit_code(1) ], compile_and_run, [''])
 
 test('setnumcapabilities001',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr']),
