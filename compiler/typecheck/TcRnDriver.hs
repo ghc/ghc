@@ -2377,7 +2377,8 @@ tcRnExpr hsc_env mode rdr_expr
     _ <- perhaps_disable_default_warnings $
          simplifyInteractive residual ;
 
-    let { all_expr_ty = mkInvForAllTys qtvs (mkLamTypes dicts res_ty) } ;
+    let { all_expr_ty = mkInvForAllTys qtvs $
+                        mkPhiTy (map idType dicts) res_ty } ;
     ty <- zonkTcType all_expr_ty ;
 
     -- We normalise type families, so that the type of an expression is the

@@ -2772,7 +2772,7 @@ wrapTypeWithImplication ty impl = wrapType ty mentioned_skols givens
           mentioned_skols = filter (`elemVarSet` freeVars) skols
 
 wrapType :: Type -> [TyVar] -> [PredType] -> Type
-wrapType ty skols givens = mkSpecForAllTys skols $ mkFunTys givens ty
+wrapType ty skols givens = mkSpecForAllTys skols $ mkPhiTy givens ty
 
 
 {-

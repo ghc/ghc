@@ -2,10 +2,6 @@
 
 {-# LANGUAGE CPP #-}
 
--- The default iteration limit is a bit too low for the definitions
--- in this module.
-{-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
-
 module OptCoercion ( optCoercion, checkAxInstCo ) where
 
 #include "HsVersions.h"
