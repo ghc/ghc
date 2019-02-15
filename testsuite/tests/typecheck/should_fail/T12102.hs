@@ -1,7 +1,8 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+
 module T12102 where
 
 import Data.Kind

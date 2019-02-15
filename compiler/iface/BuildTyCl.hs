@@ -247,8 +247,7 @@ buildClass tycon_name binders roles fds Nothing
     do  { traceIf (text "buildClass")
 
         ; tc_rep_name  <- newTyConRepName tycon_name
-        ; let univ_bndrs = tyConTyVarBinders binders
-              univ_tvs   = binderVars univ_bndrs
+        ; let univ_tvs = binderVars binders
               tycon = mkClassTyCon tycon_name binders roles
                                    AbstractTyCon rec_clas tc_rep_name
               result = mkAbstractClass tycon_name univ_tvs fds tycon
