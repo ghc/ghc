@@ -599,7 +599,7 @@ tyCoFVsOfType' (TyVarTy v)        a b c = (FV.unitFV v `unionFV` tyCoFVsOfType' 
 tyCoFVsOfType' (TyConApp _ tys)   a b c = tyCoFVsOfTypes' tys a b c
 tyCoFVsOfType' (LitTy {})         a b c = emptyFV a b c
 tyCoFVsOfType' (AppTy fun arg)    a b c = (tyCoFVsOfType' arg `unionFV` tyCoFVsOfType' fun) a b c
-tyCoFVsOfType' (FunTy arg res)    a b c = (tyCoFVsOfType' res `unionFV` tyCoFVsOfType' arg) a b c
+tyCoFVsOfType' (FunTy _ arg res)  a b c = (tyCoFVsOfType' res `unionFV` tyCoFVsOfType' arg) a b c
 tyCoFVsOfType' (ForAllTy bndr ty) a b c = tyCoFVsBndr' bndr (tyCoFVsOfType' ty)  a b c
 tyCoFVsOfType' (CastTy ty _)      a b c = (tyCoFVsOfType' ty) a b c
 tyCoFVsOfType' (CoercionTy _ )    a b c = emptyFV a b c
@@ -645,8 +645,8 @@ defaultRuntimeRepVars = go emptyVarEnv
     go subs (TyConApp tc tc_args)
       = TyConApp tc (map (go subs) tc_args)
 
-    go subs (FunTy arg res)
-      = FunTy (go subs arg) (go subs res)
+    go subs (FunTy af arg res)
+      = FunTy af (go subs arg) (go subs res)
 
     go subs (AppTy t u)
       = AppTy (go subs t) (go subs u)
