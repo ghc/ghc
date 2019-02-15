@@ -2712,7 +2712,7 @@ exitScheduler (bool wait_foreign USED_IF_THREADS)
     // If we haven't killed all the threads yet, do it now.
     if (sched_state < SCHED_SHUTTING_DOWN) {
         sched_state = SCHED_INTERRUPTING;
-        nonmovingWaitUntilFinished();
+        nonmovingExit();
         Capability *cap = task->cap;
         waitForCapability(&cap,task);
         scheduleDoGC(&cap,task,true);

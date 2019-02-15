@@ -295,21 +295,6 @@ void nonmovingExit(void)
 }
 
 /*
- * Wait for any concurrent collections to finish. Called during shutdown to
- * ensure we don't steal capabilities that the nonmoving collector still has yet
- * to synchronize with.
- */
-void nonmovingWaitUntilFinished(void)
-{
-#if defined(THREADED_RTS)
-    ACQUIRE_LOCK(&concurrent_coll_finished_lock);
-    if (mark_thread)
-        waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
-    RELEASE_LOCK(&concurrent_coll_finished_lock);
-#endif
-}
-
-/*
  * Assumes that no garbage collector or mutator threads are running to safely
  * resize the nonmoving_allocators.
  *
@@ -564,6 +549,16 @@ static void* nonmovingConcurrentMark(void *data)
 }
 #endif
 
+// TODO: Not sure where to put this function.
+// Append w2 to the end of w1.
+static void appendWeakList( StgWeak **w1, StgWeak *w2 )
+{
+    while (*w1) {
+        w1 = &(*w1)->link;
+    }
+    *w1 = w2;
+}
+
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads)
 {
     ACQUIRE_LOCK(&nonmoving_collection_mutex);
@@ -581,6 +576,19 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
         // nonmovingHeap.sweep_list, don't free nonmoving_large_objects etc.
         // However because we won't be running mark-sweep in the final GC this
         // is OK.
+
+        // This is a RTS shutdown so we need to move our copy (snapshot) of
+        // weaks (nonmoving_old_weak_ptr_list and nonmoving_weak_ptr_list) to
+        // oldest_gen->threads to be able to run C finalizers in hs_exit_. Note
+        // that there may be more weaks added to oldest_gen->threads since we
+        // started mark, so we need to append our list to the tail of
+        // oldest_gen->threads.
+        appendWeakList(&nonmoving_old_weak_ptr_list, nonmoving_weak_ptr_list);
+        appendWeakList(&oldest_gen->weak_ptr_list, nonmoving_old_weak_ptr_list);
+        // These lists won't be used again so this is not necessary, but still
+        nonmoving_old_weak_ptr_list = NULL;
+        nonmoving_weak_ptr_list = NULL;
+
         goto finish;
     }
 
@@ -620,7 +628,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
                "Done marking, resurrecting threads before releasing capabilities");
 
 
-    // Schedule fianlizers and resurrect 
+    // Schedule finalizers and resurrect threads
 #if defined(THREADED_RTS)
     // Just pick a random capability. Not sure if this is a good idea -- we use
     // only one capability for all finalizers.
