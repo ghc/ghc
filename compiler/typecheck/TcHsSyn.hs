@@ -1848,12 +1848,11 @@ zonkCoHole env hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
 
 zonk_tycomapper :: TyCoMapper ZonkEnv TcM
 zonk_tycomapper = TyCoMapper
-  { tcm_smart = True   -- Establish type invariants
-  , tcm_tyvar = zonkTyVarOcc
-  , tcm_covar = zonkCoVarOcc
-  , tcm_hole  = zonkCoHole
+  { tcm_tyvar      = zonkTyVarOcc
+  , tcm_covar      = zonkCoVarOcc
+  , tcm_hole       = zonkCoHole
   , tcm_tycobinder = \env tv _vis -> zonkTyBndrX env tv
-  , tcm_tycon = zonkTcTyConToTyCon }
+  , tcm_tycon      = zonkTcTyConToTyCon }
 
 -- Zonk a TyCon by changing a TcTyCon to a regular TyCon
 zonkTcTyConToTyCon :: TcTyCon -> TcM TyCon

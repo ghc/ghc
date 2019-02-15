@@ -1939,12 +1939,11 @@ zonkCoVar = zonkId
 -- before all metavars are filled in.
 zonkTcTypeMapper :: TyCoMapper () TcM
 zonkTcTypeMapper = TyCoMapper
-  { tcm_smart = True
-  , tcm_tyvar = const zonkTcTyVar
+  { tcm_tyvar = const zonkTcTyVar
   , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
   , tcm_hole  = hole
   , tcm_tycobinder = \_env tv _vis -> ((), ) <$> zonkTyCoVarKind tv
-  , tcm_tycon = zonk_tc_tycon }
+  , tcm_tycon      = zonkTcTyCon }
   where
     hole :: () -> CoercionHole -> TcM Coercion
     hole _ hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
@@ -1955,11 +1954,14 @@ zonkTcTypeMapper = TyCoMapper
                Nothing -> do { cv' <- zonkCoVar cv
                              ; return $ HoleCo (hole { ch_co_var = cv' }) } }
 
-    zonk_tc_tycon tc  -- A non-poly TcTyCon may have unification
-                      -- variables that need zonking, but poly ones cannot
-      | tcTyConIsPoly tc = return tc
-      | otherwise        = do { tck' <- zonkTcType (tyConKind tc)
-                              ; return (setTcTyConKind tc tck') }
+zonkTcTyCon :: TcTyCon -> TcM TcTyCon
+-- Only called on TcTyCons
+-- A non-poly TcTyCon may have unification
+-- variables that need zonking, but poly ones cannot
+zonkTcTyCon tc
+ | tcTyConIsPoly tc = return tc
+ | otherwise        = do { tck' <- zonkTcType (tyConKind tc)
+                         ; return (setTcTyConKind tc tck') }
 
 -- For unbound, mutable tyvars, zonkType uses the function given to it
 -- For tyvars bound at a for-all, zonkType zonks them to an immutable

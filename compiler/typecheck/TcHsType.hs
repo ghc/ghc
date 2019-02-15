@@ -2809,8 +2809,7 @@ zonkPromoteType = mapType zonkPromoteMapper ()
 
 -- cf. TcMType.zonkTcTypeMapper
 zonkPromoteMapper :: TyCoMapper () TcM
-zonkPromoteMapper = TyCoMapper { tcm_smart    = True
-                               , tcm_tyvar    = const zonkPromoteTcTyVar
+zonkPromoteMapper = TyCoMapper { tcm_tyvar    = const zonkPromoteTcTyVar
                                , tcm_covar    = const covar
                                , tcm_hole     = const hole
                                , tcm_tycobinder = const tybinder
