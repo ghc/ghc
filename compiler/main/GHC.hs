@@ -1363,9 +1363,9 @@ getTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts  -> return ts
-    PFailed _ span err ->
+    PFailed pst ->
         do dflags <- getDynFlags
-           liftIO $ throwIO $ mkSrcErr (unitBag $ mkPlainErrMsg dflags span err)
+           throwErrors (getErrorMessages pst dflags)
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1376,9 +1376,9 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts -> return $ addSourceToTokens startLoc source ts
-    PFailed _ span err ->
+    PFailed pst ->
         do dflags <- getDynFlags
-           liftIO $ throwIO $ mkSrcErr (unitBag $ mkPlainErrMsg dflags span err)
+           throwErrors (getErrorMessages pst dflags)
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1444,7 +1444,8 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
       res <- findImportedModule hsc_env mod_name maybe_pkg
       case res of
         Found _ m -> return m
-        err       -> throwOneError $ noModError dflags noSrcSpan mod_name err
+        err       -> throwErrors $ unitBag $
+                     noModError dflags noSrcSpan mod_name err
     _otherwise -> do
       home <- lookupLoadedHomeModule mod_name
       case home of
@@ -1454,7 +1455,8 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
            case res of
              Found loc m | moduleUnitId m /= this_pkg -> return m
                          | otherwise -> modNotLoadedError dflags m loc
-             err -> throwOneError $ noModError dflags noSrcSpan mod_name err
+             err -> throwErrors $ unitBag $
+                    noModError dflags noSrcSpan mod_name err
 
 modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
 modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc dflags $
@@ -1479,7 +1481,8 @@ lookupModule mod_name Nothing = withSession $ \hsc_env -> do
       res <- findExposedPackageModule hsc_env mod_name Nothing
       case res of
         Found _ m -> return m
-        err       -> throwOneError $ noModError (hsc_dflags hsc_env) noSrcSpan mod_name err
+        err       -> throwErrors $ unitBag $
+                     noModError (hsc_dflags hsc_env) noSrcSpan mod_name err
 
 lookupLoadedHomeModule :: GhcMonad m => ModuleName -> m (Maybe Module)
 lookupLoadedHomeModule mod_name = withSession $ \hsc_env ->
@@ -1553,9 +1556,9 @@ parser str dflags filename =
    in
    case unP Parser.parseModule (mkPState dflags buf loc) of
 
-     PFailed warnFn span err   ->
-         let (warns,_) = warnFn dflags in
-         (warns, Left $ unitBag (mkPlainErrMsg dflags span err))
+     PFailed pst ->
+         let (warns,errs) = getMessages pst dflags in
+         (warns, Left errs)
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst dflags in

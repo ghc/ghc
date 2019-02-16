@@ -50,7 +50,7 @@ thenPD :: PD a -> (a -> PD b) -> PD b
 (PD m) `thenPD` k = PD $ \d s ->
         case m d s of
                 POk s1 a         -> unPD (k a) d s1
-                PFailed warnFn span err -> PFailed warnFn span err
+                PFailed s1 -> PFailed s1
 
 failPD :: String -> PD a
 failPD = liftP . fail

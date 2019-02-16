@@ -46,7 +46,7 @@ import TcIface          ( typecheckIface )
 import TcRnMonad        ( initIfaceCheck )
 import HscMain
 
-import Bag              ( listToBag )
+import Bag              ( listToBag, unitBag )
 import BasicTypes
 import Digraph
 import Exception        ( tryIO, gbracket, gfinally )
@@ -2364,7 +2364,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                   | otherwise -> HsSrcFile
 
         when (mod_name /= wanted_mod) $
-                throwOneError $ mkPlainErrMsg dflags' mod_loc $
+                throwErrors $ unitBag $
+                              mkPlainErrMsg dflags' mod_loc $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2376,7 +2377,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((mod_name, mkHoleModule mod_name)
                                 : thisUnitIdInsts dflags)
                         ])
-            in throwOneError $ mkPlainErrMsg dflags' mod_loc $
+            in throwErrors $ unitBag $
+                mkPlainErrMsg dflags' mod_loc $
                 text "Unexpected signature:" <+> quotes (ppr mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr mod_name)
@@ -2512,7 +2514,8 @@ moduleNotFoundErr dflags mod
 multiRootsErr :: DynFlags -> [ModSummary] -> IO ()
 multiRootsErr _      [] = panic "multiRootsErr"
 multiRootsErr dflags summs@(summ1:_)
-  = throwOneError $ mkPlainErrMsg dflags noSrcSpan $
+  = throwErrors $ unitBag $
+        mkPlainErrMsg dflags noSrcSpan $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>
         sep (map text files)

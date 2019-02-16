@@ -31,6 +31,7 @@ import SrcLoc
 import Data.List
 import FastString
 import FileCleanup
+import Bag (unitBag)
 
 import Exception
 import ErrUtils
@@ -259,7 +260,8 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
 
             fail ->
                 let dflags = hsc_dflags hsc_env
-                in throwOneError $ mkPlainErrMsg dflags srcloc $
+                in throwErrors $ unitBag $
+                        mkPlainErrMsg dflags srcloc $
                         cannotFindModule dflags imp fail
         }
 
