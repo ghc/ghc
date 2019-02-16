@@ -60,7 +60,7 @@ module   RdrHsSyn (
         checkRuleTyVarBndrNames,
         checkRecordSyntax,
         checkEmptyGADTs,
-        parseErrorSDoc, hintBangPat,
+        addFatalError, hintBangPat,
         TyEl(..), mergeOps, mergeDataCon,
 
         -- Help with processing exports
@@ -357,7 +357,7 @@ mkRoleAnnotDecl loc tycon roles
             let nearby = fuzzyLookup (unpackFS role)
                   (mapFst unpackFS possible_roles)
             in
-            parseErrorSDoc loc_role
+            addFatalError loc_role
               (text "Illegal role name" <+> quotes (ppr role) $$
                suggestions nearby)
     parse_role _ = panic "parse_role: Impossible Match"
@@ -427,7 +427,7 @@ cvBindsAndSigs fb = go (fromOL fb)
                DocD _ d
                  -> return (bs, ss, ts, tfis, dfis, cL l d : docs)
                SpliceD _ d
-                 -> parseErrorSDoc l $
+                 -> addFatalError l $
                     hang (text "Declaration splices are allowed only" <+>
                           text "at the top level:")
                        2 (ppr d)
@@ -620,23 +620,23 @@ mkPatSynMatchGroup (dL->L loc patsyn_name) (dL->L _ decls) =
     fromDecl (dL->L loc decl) = extraDeclErr loc decl
 
     extraDeclErr loc decl =
-        parseErrorSDoc loc $
+        addFatalError loc $
         text "pattern synonym 'where' clause must contain a single binding:" $$
         ppr decl
 
     wrongNameBindingErr loc decl =
-      parseErrorSDoc loc $
+      addFatalError loc $
       text "pattern synonym 'where' clause must bind the pattern synonym's name"
       <+> quotes (ppr patsyn_name) $$ ppr decl
 
     wrongNumberErr loc =
-      parseErrorSDoc loc $
+      addFatalError loc $
       text "pattern synonym 'where' clause cannot be empty" $$
       text "In the pattern synonym declaration for: " <+> ppr (patsyn_name)
 
 recordPatSynErr :: SrcSpan -> LPat GhcPs -> P a
 recordPatSynErr loc pat =
-    parseErrorSDoc loc $
+    addFatalError loc $
     text "record syntax not supported for pattern synonym declarations:" $$
     ppr pat
 
@@ -816,7 +816,7 @@ checkTyVarsP pp_what equals_or_where tc tparms
 
 eitherToP :: Either (SrcSpan, SDoc) a -> P a
 -- Adapts the Either monad to the P monad
-eitherToP (Left (loc, doc)) = parseErrorSDoc loc doc
+eitherToP (Left (loc, doc)) = addFatalError loc doc
 eitherToP (Right thing)     = return thing
 
 checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsTypeArg GhcPs]
@@ -915,7 +915,7 @@ checkRuleTyVarBndrNames :: [LHsTyVarBndr GhcPs] -> P ()
 checkRuleTyVarBndrNames = mapM_ (check . fmap hsTyVarName)
   where check (dL->L loc (Unqual occ)) = do
           when ((occNameString occ ==) `any` ["forall","family","role"])
-               (parseErrorSDoc loc (text $ "parse error on input "
+               (addFatalError loc (text $ "parse error on input "
                                     ++ occNameString occ))
         check _ = panic "checkRuleTyVarBndrNames"
 
@@ -977,7 +977,7 @@ checkTyClHdr is_cls ty
                  | otherwise = getName (tupleTyCon Boxed arity)
           -- See Note [Unit tuples] in HsTypes  (TODO: is this still relevant?)
     go l _ _ _ _
-      = parseErrorSDoc l (text "Malformed head of type or class declaration:"
+      = addFatalError l (text "Malformed head of type or class declaration:"
                           <+> ppr ty)
 
 -- | Yield a parse error if we have a function applied directly to a do block
@@ -1087,7 +1087,7 @@ checkAPat msg loc e0 = do
    EWildPat _ -> return (WildPat noExt)
    HsVar _ x  -> return (VarPat noExt x)
    HsLit _ (HsStringPrim _ _) -- (#13260)
-       -> parseErrorSDoc loc (text "Illegal unboxed string literal in pattern:"
+       -> addFatalError loc (text "Illegal unboxed string literal in pattern:"
                               $$ ppr e0)
 
    HsLit _ l  -> return (LitPat noExt l)
@@ -1137,7 +1137,7 @@ checkAPat msg loc e0 = do
      | all tupArgPresent es  -> do ps <- mapM (checkLPat msg)
                                            [e | (dL->L _ (Present _ e)) <- es]
                                    return (TuplePat noExt ps b)
-     | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:"
+     | otherwise -> addFatalError loc (text "Illegal tuple section in pattern:"
                                         $$ ppr e0)
 
    ExplicitSum _ alt arity expr -> do
@@ -1168,7 +1168,7 @@ checkPatField msg (dL->L l fld) = do p <- checkLPat msg (hsRecFieldArg fld)
                                      return (cL l (fld { hsRecFieldArg = p }))
 
 patFail :: SDoc -> SrcSpan -> HsExpr GhcPs -> P a
-patFail msg loc e = parseErrorSDoc loc err
+patFail msg loc e = addFatalError loc err
     where err = text "Parse error in pattern:" <+> ppr e
              $$ msg
 
@@ -1250,7 +1250,7 @@ checkValSigLhs (dL->L _ (HsVar _ lrdr@(dL->L _ v)))
   = return lrdr
 
 checkValSigLhs lhs@(dL->L l _)
-  = parseErrorSDoc l ((text "Invalid type signature:" <+>
+  = addFatalError l ((text "Invalid type signature:" <+>
                        ppr lhs <+> text ":: ...")
                       $$ text hint)
   where
@@ -1482,7 +1482,7 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
                     bt = HsBangTy noExt strictMark a
               ; addAnnsAt bl anns
               ; return (cL bl bt) }
-      else parseErrorSDoc l unpkError
+      else addFatalError l unpkError
       where
         unpkSDoc = case unpkSrc of
           NoSourceText -> ppr unpk
@@ -1951,9 +1951,9 @@ checkCmdGRHS = locMap $ const convert
 
 
 cmdFail :: SrcSpan -> HsExpr GhcPs -> P a
-cmdFail loc e = parseErrorSDoc loc (text "Parse error in command:" <+> ppr e)
+cmdFail loc e = addFatalError loc (text "Parse error in command:" <+> ppr e)
 cmdStmtFail :: SrcSpan -> Stmt GhcPs (LHsExpr GhcPs) -> P a
-cmdStmtFail loc e = parseErrorSDoc loc
+cmdStmtFail loc e = addFatalError loc
                     (text "Parse error in command statement:" <+> ppr e)
 
 ---------------------------------------------------------------------------
@@ -1968,7 +1968,7 @@ checkPrecP
 checkPrecP (dL->L l (_,i)) (dL->L _ ol)
  | 0 <= i, i <= maxPrecedence = pure ()
  | all specialOp ol = pure ()
- | otherwise = parseErrorSDoc l (text ("Precedence out of range: " ++ show i))
+ | otherwise = addFatalError l (text ("Precedence out of range: " ++ show i))
   where
     specialOp op = unLoc op `elem` [ eqTyCon_RDR
                                    , getRdrName funTyCon ]
@@ -1983,7 +1983,7 @@ mkRecConstrOrUpdate (dL->L l (HsVar _ (dL->L _ c))) _ (fs,dd)
   | isRdrDataCon c
   = return (mkRdrRecordCon (cL l c) (mk_rec_fields fs dd))
 mkRecConstrOrUpdate exp _ (fs,dd)
-  | Just dd_loc <- dd = parseErrorSDoc dd_loc (text "You cannot use `..' in a record update")
+  | Just dd_loc <- dd = addFatalError dd_loc (text "You cannot use `..' in a record update")
   | otherwise = return (mkRdrRecordUpd exp (map (fmap mk_rec_upd_field) fs))
 
 mkRdrRecordUpd :: LHsExpr GhcPs -> [LHsRecUpdField GhcPs] -> HsExpr GhcPs
@@ -2051,7 +2051,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity), v, ty) =
     mkCImport = do
       let e = unpackFS entity
       case parseCImport cconv safety (mkExtName (unLoc v)) e (cL loc esrc) of
-        Nothing         -> parseErrorSDoc loc (text "Malformed entity string")
+        Nothing         -> addFatalError loc (text "Malformed entity string")
         Just importSpec -> returnSpec importSpec
 
     -- currently, all the other import conventions only support a symbol name in
@@ -2189,13 +2189,13 @@ mkModuleImpExp (dL->L l specname) subs =
             in (\newName
                         -> IEThingWith noExt (cL l newName) pos ies [])
                <$> nameT
-          else parseErrorSDoc l
+          else addFatalError l
             (text "Illegal export form (use PatternSynonyms to enable)")
   where
     name = ieNameVal specname
     nameT =
       if isVarNameSpace (rdrNameSpace name)
-        then parseErrorSDoc l
+        then addFatalError l
               (text "Expecting a type constructor but found a variable,"
                <+> quotes (ppr name) <> text "."
               $$ if isSymOcc $ rdrNameOcc name
@@ -2230,7 +2230,7 @@ checkImportSpec ie@(dL->L _ specs) =
       (l:_) -> importSpecError l
   where
     importSpecError l =
-      parseErrorSDoc l
+      addFatalError l
         (text "Illegal import form, this syntax can only be used to bundle"
         $+$ text "pattern synonyms with types in module exports.")
 
@@ -2275,39 +2275,36 @@ failOpFewArgs :: Located RdrName -> P a
 failOpFewArgs (dL->L loc op) =
   do { star_is_type <- getBit StarIsTypeBit
      ; let msg = too_few $$ starInfo star_is_type op
-     ; parseErrorSDoc loc msg }
+     ; addFatalError loc msg }
   where
     too_few = text "Operator applied to too few arguments:" <+> ppr op
 
 failOpDocPrev :: SrcSpan -> P a
-failOpDocPrev loc = parseErrorSDoc loc msg
+failOpDocPrev loc = addFatalError loc msg
   where
     msg = text "Unexpected documentation comment."
 
 failOpStrictnessCompound :: Located SrcStrictness -> LHsType GhcPs -> P a
-failOpStrictnessCompound (dL->L _ str) (dL->L loc ty) = parseErrorSDoc loc msg
+failOpStrictnessCompound (dL->L _ str) (dL->L loc ty) = addFatalError loc msg
   where
     msg = text "Strictness annotation applied to a compound type." $$
           text "Did you mean to add parentheses?" $$
           nest 2 (ppr str <> parens (ppr ty))
 
 failOpStrictnessPosition :: Located SrcStrictness -> P a
-failOpStrictnessPosition (dL->L loc _) = parseErrorSDoc loc msg
+failOpStrictnessPosition (dL->L loc _) = addFatalError loc msg
   where
     msg = text "Strictness annotation cannot appear in this position."
 
 -----------------------------------------------------------------------------
 -- Misc utils
 
-parseErrorSDoc :: SrcSpan -> SDoc -> P a
-parseErrorSDoc span s = failSpanMsgP span s
-
 -- | Hint about bang patterns, assuming @BangPatterns@ is off.
 hintBangPat :: SrcSpan -> HsExpr GhcPs -> P ()
 hintBangPat span e = do
     bang_on <- getBit BangPatBit
     unless bang_on $
-      parseErrorSDoc span
+      addFatalError span
         (text "Illegal bang-pattern (use BangPatterns):" $$ ppr e)
 
 data SumOrTuple
@@ -2323,7 +2320,7 @@ mkSumOrTuple boxity _ (Tuple es) = return (ExplicitTuple noExt es boxity)
 mkSumOrTuple Unboxed _ (Sum alt arity e) =
     return (ExplicitSum noExt alt arity e)
 mkSumOrTuple Boxed l (Sum alt arity (dL->L _ e)) =
-    parseErrorSDoc l (hang (text "Boxed sums not supported:") 2
+    addFatalError l (hang (text "Boxed sums not supported:") 2
                       (ppr_boxed_sum alt arity e))
   where
     ppr_boxed_sum :: ConTag -> Arity -> HsExpr GhcPs -> SDoc

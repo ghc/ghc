@@ -1424,8 +1424,8 @@ parseCmmFile dflags filename = withTiming (pure dflags) (text "ParseCmm"<+>brack
                 -- reset the lex_state: the Lexer monad leaves some stuff
                 -- in there we don't want.
   case unPD cmmParse dflags init_state of
-    PFailed warnFn span err -> do
-        let msg = mkPlainErrMsg dflags span err
+    PFailed warnFn lastErr -> do
+        let msg = lastErr dflags
             errMsgs = (emptyBag, unitBag msg)
             warnMsgs = warnFn dflags
         return (unionMessages warnMsgs errMsgs, Nothing)

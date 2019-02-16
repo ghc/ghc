@@ -66,9 +66,9 @@ getImports :: DynFlags
 getImports dflags buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
   case unP parseHeader (mkPState dflags buf loc) of
-    PFailed _ span err -> do
+    PFailed pst -> do
         -- assuming we're not logging warnings here as per below
-      parseError dflags span err
+      throwErrors (getErrorMessages pst dflags)
     POk pst rdr_module -> do
       let _ms@(_warns, errs) = getMessages pst dflags
       -- don't log warnings: they'll be reported when we parse the file
@@ -135,9 +135,6 @@ mkPrelImports this_mod loc implicit_prelude import_decls
                                 ideclImplicit  = True,   -- Implicit!
                                 ideclAs        = Nothing,
                                 ideclHiding    = Nothing  }
-
-parseError :: DynFlags -> SrcSpan -> MsgDoc -> IO a
-parseError dflags span err = throwOneError $ mkPlainErrMsg dflags span err
 
 --------------------------------------------------------------
 -- Get options

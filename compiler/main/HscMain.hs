@@ -233,9 +233,15 @@ logWarningsReportErrors (warns,errs) = do
     logWarnings warns
     when (not $ isEmptyBag errs) $ throwErrors errs
 
--- | Throw some errors.
-throwErrors :: ErrorMessages -> Hsc a
-throwErrors = liftIO . throwIO . mkSrcErr
+-- | Log warnings and throw errors, assuming the messages
+-- contain at least one error (e.g. coming from PFailed)
+handleWarningsThrowErrors :: Messages -> Hsc a
+handleWarningsThrowErrors (warns, errs) = do
+    logWarnings warns
+    dflags <- getDynFlags
+    (wWarns, wErrs) <- warningsToMessages dflags <$> getWarnings
+    liftIO $ printBagOfErrors dflags wWarns
+    throwErrors (unionBags errs wErrs)
 
 -- | Deal with errors and warnings returned by a compilation step
 --
@@ -341,19 +347,18 @@ hscParse' mod_summary
                  | otherwise = parseModule
 
     case unP parseMod (mkPState dflags buf loc) of
-        PFailed warnFn span err -> do
-            logWarningsReportErrors (warnFn dflags)
-            handleWarnings
-            liftIO $ throwOneError (mkPlainErrMsg dflags span err)
-
+        PFailed pst ->
+            handleWarningsThrowErrors (getMessages pst dflags)
         POk pst rdr_module -> do
-            logWarningsReportErrors (getMessages pst dflags)
+            let (warns, errs) = getMessages pst dflags
+            logWarnings warns
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" $
                                    ppr rdr_module
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST" $
                                    showAstData NoBlankSrcSpan rdr_module
             liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics" $
                                    ppSourceStats False rdr_module
+            when (not $ isEmptyBag errs) $ throwErrors errs
 
             -- To get the list of extra source files, we take the list
             -- that the parser gave us,
@@ -1728,7 +1733,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
        hscParseThing parseModule str
     case is of
         [L _ i] -> return i
-        _ -> liftIO $ throwOneError $
+        _ -> liftIO $ throwErrors $ unitBag $
                  mkPlainErrMsg (hsc_dflags hsc_env) noSrcSpan $
                      text "parse error in import declaration"
 
@@ -1793,11 +1798,8 @@ hscParseThingWithLocation source linenumber parser str
         loc = mkRealSrcLoc (fsLit source) linenumber 1
 
     case unP parser (mkPState dflags buf loc) of
-        PFailed warnFn span err -> do
-            logWarningsReportErrors (warnFn dflags)
-            handleWarnings
-            let msg = mkPlainErrMsg dflags span err
-            throwErrors $ unitBag msg
+        PFailed pst -> do
+            handleWarningsThrowErrors (getMessages pst dflags)
 
         POk pst thing -> do
             logWarningsReportErrors (getMessages pst dflags)

@@ -49,6 +49,7 @@ import UniqDSet
 import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
 import Finder
+import Bag (unitBag)
 import Util
 
 import qualified GHC.LanguageExtensions as LangExt
@@ -82,8 +83,7 @@ doBackpack [src_filename] = do
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (mkPState dflags buf loc) of
-        PFailed _ span err -> do
-            liftIO $ throwOneError (mkPlainErrMsg dflags span err)
+        PFailed pst -> throwErrors (getErrorMessages pst dflags)
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
@@ -729,8 +729,10 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of
-            Nothing -> throwOneError (mkPlainErrMsg dflags loc (text "module" <+> ppr modname <+> text "was not found"))
-            Just (Left err) -> throwOneError err
+            Nothing -> throwErrors $ unitBag $
+                       mkPlainErrMsg dflags loc $
+                       text "module" <+> ppr modname <+> text "was not found"
+            Just (Left err) -> throwErrors (unitBag err)
             Just (Right summary) -> return summary
 
 -- | Up until now, GHC has assumed a single compilation target per source file.
