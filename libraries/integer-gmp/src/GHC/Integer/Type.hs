@@ -138,8 +138,8 @@ instance Ord BigNat where
 
 -- | Arbitrary precision integers.
 
--- [Implementation notes]
-
+-- $invariant
+--
 -- Invariant: 'Jn#' and 'Jp#' are used iff value doesn't fit in 'S#'
 --
 -- Useful properties resulting from the invariants:
