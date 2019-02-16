@@ -1,0 +1,11 @@
+
+T16270h.hs:8:22: error:
+    Illegal keyword 'type' (use ExplicitNamespaces to enable)
+
+T16270h.hs:10:8: error:
+    Parse error: ‘pkg?’
+    Version number or non-alphanumeric character in package name
+
+T16270h.hs:11:8: error:
+    Parse error: ‘pkg!’
+    Version number or non-alphanumeric character in package name

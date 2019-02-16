@@ -1424,11 +1424,8 @@ parseCmmFile dflags filename = withTiming (pure dflags) (text "ParseCmm"<+>brack
                 -- reset the lex_state: the Lexer monad leaves some stuff
                 -- in there we don't want.
   case unPD cmmParse dflags init_state of
-    PFailed warnFn span err -> do
-        let msg = mkPlainErrMsg dflags span err
-            errMsgs = (emptyBag, unitBag msg)
-            warnMsgs = warnFn dflags
-        return (unionMessages warnMsgs errMsgs, Nothing)
+    PFailed pst ->
+        return (getMessages pst dflags, Nothing)
     POk pst code -> do
         st <- initC
         let fcode = getCmm $ unEC code "global" (initEnv dflags) [] >> return ()

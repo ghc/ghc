@@ -22,6 +22,7 @@ module ErrUtils (
         errMsgSpan, errMsgContext,
         errorsFound, isEmptyMessages,
         isWarnMsgFatal,
+        warningsToMessages,
 
         -- ** Formatting
         pprMessageBag, pprErrMsgBagWithLoc,
@@ -358,6 +359,15 @@ isEmptyMessages (warns, errs) = isEmptyBag warns && isEmptyBag errs
 
 errorsFound :: DynFlags -> Messages -> Bool
 errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
+
+warningsToMessages :: DynFlags -> WarningMessages -> Messages
+warningsToMessages dflags =
+  partitionBagWith $ \warn ->
+    case isWarnMsgFatal dflags warn of
+      Nothing -> Left warn
+      Just err_reason ->
+        Right warn{ errMsgSeverity = SevError
+                  , errMsgReason = ErrReason err_reason }
 
 printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
 printBagOfErrors dflags bag_of_errors

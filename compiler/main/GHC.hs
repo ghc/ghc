@@ -337,7 +337,7 @@ import Annotations
 import Module
 import Panic
 import Platform
-import Bag              ( listToBag, unitBag )
+import Bag              ( listToBag )
 import ErrUtils
 import MonadUtils
 import Util
@@ -1363,9 +1363,9 @@ getTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts  -> return ts
-    PFailed _ span err ->
+    PFailed pst ->
         do dflags <- getDynFlags
-           liftIO $ throwIO $ mkSrcErr (unitBag $ mkPlainErrMsg dflags span err)
+           throwErrors (getErrorMessages pst dflags)
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1376,9 +1376,9 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts -> return $ addSourceToTokens startLoc source ts
-    PFailed _ span err ->
+    PFailed pst ->
         do dflags <- getDynFlags
-           liftIO $ throwIO $ mkSrcErr (unitBag $ mkPlainErrMsg dflags span err)
+           throwErrors (getErrorMessages pst dflags)
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1553,9 +1553,9 @@ parser str dflags filename =
    in
    case unP Parser.parseModule (mkPState dflags buf loc) of
 
-     PFailed warnFn span err   ->
-         let (warns,_) = warnFn dflags in
-         (warns, Left $ unitBag (mkPlainErrMsg dflags span err))
+     PFailed pst ->
+         let (warns,errs) = getMessages pst dflags in
+         (warns, Left errs)
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst dflags in

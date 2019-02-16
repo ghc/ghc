@@ -1,38 +1,61 @@
 
-T16270.hs:14:6: error:
+T16270.hs:7:1: warning: [-Wtabs (in -Wdefault)]
+    Tab character found here, and in five further locations.
+    Please use spaces instead.
+
+T16270.hs:7:12: error:
     Unexpected semi-colons in conditional:
         if c then False; else True
     Perhaps you meant to use DoAndIfThenElse?
 
-T16270.hs:19:8: error:
+T16270.hs:12:8: error:
     Unexpected do block in function application:
         do 1
     You could write it with parentheses
     Or perhaps you meant to enable BlockArguments?
 
-T16270.hs:20:8: error:
+T16270.hs:13:8: error:
     Unexpected lambda expression in function application:
         \ x -> x
     You could write it with parentheses
     Or perhaps you meant to enable BlockArguments?
 
-T16270.hs:22:6: error:
+T16270.hs:15:6: error:
     Illegal datatype context (use DatatypeContexts): Num a =>
 
-T16270.hs:24:22: error:
+T16270.hs:17:22: error:
     Illegal record syntax (use TraditionalRecordSyntax): {fst :: a,
                                                           snd :: b}
 
-T16270.hs:25:5: error:
+T16270.hs:18:5: error:
     Illegal record syntax (use TraditionalRecordSyntax): p {fst = 1,
                                                             snd = True}
 
-T16270.hs:27:8: error:
+T16270.hs:20:6: error:
+    Illegal symbol ‘forall’ in type
+    Perhaps you intended to use RankNTypes or a similar language
+    extension to enable explicit-forall syntax: forall <tvs>. <type>
+
+T16270.hs:21:8: error:
     Unexpected semi-colons in conditional:
         if True; then (); else ()
     Perhaps you meant to use DoAndIfThenElse?
 
-T16270.hs:29:10: error:
+T16270.hs:23:10: error:
     Illegal keyword 'where' in data declaration
     Perhaps you intended to use GADTs or a similar language
     extension to enable syntax: data T where
+
+T16270.hs:25:12: error: [-Wmissing-space-after-bang (in -Wdefault), -Werror=missing-space-after-bang]
+    Did you forget to enable BangPatterns?
+    If you mean to bind (!) then perhaps you want
+    to add a space after the bang for clarity.
+
+T16270.hs:27:9: error:
+    Multi-way if-expressions need MultiWayIf turned on
+
+T16270.hs:29:9: error:
+    Multi-way if-expressions need MultiWayIf turned on
+
+T16270.hs:36:1: error:
+    parse error (possibly incorrect indentation or mismatched brackets)

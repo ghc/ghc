@@ -1,4 +1,4 @@
 
-T9225.hs:4:8:
-    parse error: ‘some-package-0.1.2.3’
+T9225.hs:4:8: error:
+    Parse error: ‘some-package-0.1.2.3’
     Version number or non-alphanumeric character in package name

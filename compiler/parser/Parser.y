@@ -973,13 +973,13 @@ maybe_safe :: { ([AddAnn],Bool) }
         | {- empty -}                           { ([],False) }
 
 maybe_pkg :: { ([AddAnn],Maybe StringLiteral) }
-        : STRING  {% let pkgFS = getSTRING $1 in
-                     if looksLikePackageName (unpackFS pkgFS)
-                        then return ([mj AnnPackageName $1], Just (StringLiteral (getSTRINGs $1) pkgFS))
-                        else parseErrorSDoc (getLoc $1) $ vcat [
-                             text "parse error" <> colon <+> quotes (ppr pkgFS),
+        : STRING  {% do { let { pkgFS = getSTRING $1 }
+                        ; unless (looksLikePackageName (unpackFS pkgFS)) $
+                             addError (getLoc $1) $ vcat [
+                             text "Parse error" <> colon <+> quotes (ppr pkgFS),
                              text "Version number or non-alphanumeric" <+>
-                             text "character in package name"] }
+                             text "character in package name"]
+                        ; return ([mj AnnPackageName $1], Just (StringLiteral (getSTRINGs $1) pkgFS)) } }
         | {- empty -}                           { ([],Nothing) }
 
 optqualified :: { ([AddAnn],Bool) }
@@ -3668,7 +3668,7 @@ getSCC lt = do let s = getSTRING lt
                    err = "Spaces are not allowed in SCCs"
                -- We probably actually want to be more restrictive than this
                if ' ' `elem` unpackFS s
-                   then failSpanMsgP (getLoc lt) (text err)
+                   then addFatalError (getLoc lt) (text err)
                    else return s
 
 -- Utilities for combining source spans
@@ -3756,23 +3756,15 @@ fileSrcSpan = do
 hintMultiWayIf :: SrcSpan -> P ()
 hintMultiWayIf span = do
   mwiEnabled <- getBit MultiWayIfBit
-  unless mwiEnabled $ parseErrorSDoc span $
+  unless mwiEnabled $ addError span $
     text "Multi-way if-expressions need MultiWayIf turned on"
-
--- Hint about if usage for beginners
-hintIf :: SrcSpan -> String -> P (LHsExpr GhcPs)
-hintIf span msg = do
-  mwiEnabled <- getBit MultiWayIfBit
-  if mwiEnabled
-    then parseErrorSDoc span $ text $ "parse error in if statement"
-    else parseErrorSDoc span $ text $ "parse error in if statement: "++msg
 
 -- Hint about explicit-forall
 hintExplicitForall :: Located Token -> P ()
 hintExplicitForall tok = do
     forall   <- getBit ExplicitForallBit
     rulePrag <- getBit InRulePragBit
-    unless (forall || rulePrag) $ parseErrorSDoc (getLoc tok) $ vcat
+    unless (forall || rulePrag) $ addError (getLoc tok) $ vcat
       [ text "Illegal symbol" <+> quotes forallSymDoc <+> text "in type"
       , text "Perhaps you intended to use RankNTypes or a similar language"
       , text "extension to enable explicit-forall syntax:" <+>
@@ -3803,13 +3795,13 @@ reportEmptyDoubleQuotes :: SrcSpan -> P a
 reportEmptyDoubleQuotes span = do
     thQuotes <- getBit ThQuotesBit
     if thQuotes
-      then parseErrorSDoc span $ vcat
+      then addFatalError span $ vcat
         [ text "Parser error on `''`"
         , text "Character literals may not be empty"
         , text "Or perhaps you intended to use quotation syntax of TemplateHaskell,"
         , text "but the type variable or constructor is missing"
         ]
-      else parseErrorSDoc span $ vcat
+      else addFatalError span $ vcat
         [ text "Parser error on `''`"
         , text "Character literals may not be empty"
         ]
