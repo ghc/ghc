@@ -31,7 +31,7 @@ def set_config(config_file, key, value):
     subprocess.check_call(args)
 
 upstreams = {
-    'utils/haddock': 'https://github.com/haskell/haddock'
+    # 'utils/haddock': 'https://github.com/haskell/haddock'
 }
 
 modules_config = Path('.gitmodules')
