@@ -86,8 +86,8 @@ instance (Typeable a) => Data (Fixed a) where
 class HasResolution a where
     resolution :: p a -> Integer
 
-withType :: (p a -> f a) -> f a
-withType foo = foo undefined
+withType :: (Proxy a -> f a) -> f a
+withType foo = foo Proxy
 
 withResolution :: (HasResolution a) => (Integer -> f a) -> f a
 withResolution foo = withType (foo . resolution)
