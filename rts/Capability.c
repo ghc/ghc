@@ -522,8 +522,6 @@ releaseCapability_ (Capability* cap,
 
     cap->running_task = NULL;
 
-    nonmovingFlushCapUpdRemSetBlocks(cap);
-
     // Check to see whether a worker thread can be given
     // the go-ahead to return the result of an external call..
     if (cap->n_returning_tasks != 0) {
@@ -885,7 +883,6 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
 
             case SYNC_FLUSH_UPD_REM_SET:
                 debugTrace(DEBUG_nonmoving_gc, "Flushing update remembered set blocks...");
-                nonmovingFlushCapUpdRemSetBlocks(cap);
                 break;
 
             default:
