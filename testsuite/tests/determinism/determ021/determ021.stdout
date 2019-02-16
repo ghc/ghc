@@ -5,7 +5,7 @@ TYPE SIGNATURES
     (Applicative f, Num t, Num b) =>
     (t -> f b) -> f b
 Dependent modules: []
-Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
+Dependent packages: [base-4.13.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]
 [1 of 1] Compiling A                ( A.hs, A.o )
 TYPE SIGNATURES
@@ -14,5 +14,5 @@ TYPE SIGNATURES
     (Applicative f, Num t, Num b) =>
     (t -> f b) -> f b
 Dependent modules: []
-Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
+Dependent packages: [base-4.13.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]
