@@ -52,7 +52,7 @@ import Packages   ( lookupModuleInAllPackages, PackageName(..) )
 import Bag
 import RdrName
 import TcRnTypes
-import FastString ( unpackFS, fastStringToByteString)
+import FastString ( unpackFS, bytesFS )
 import BasicTypes ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
 import qualified Outputable as O
 
@@ -296,8 +296,8 @@ moduleWarning dflags gre (WarnAll w) = Just <$> parseWarning dflags gre w
 
 parseWarning :: DynFlags -> GlobalRdrEnv -> WarningTxt -> ErrMsgM (Doc Name)
 parseWarning dflags gre w = case w of
-  DeprecatedTxt _ msg -> format "Deprecated: " (foldMap (fastStringToByteString . sl_fs . unLoc) msg)
-  WarningTxt    _ msg -> format "Warning: "    (foldMap (fastStringToByteString . sl_fs . unLoc) msg)
+  DeprecatedTxt _ msg -> format "Deprecated: " (foldMap (bytesFS . sl_fs . unLoc) msg)
+  WarningTxt    _ msg -> format "Warning: "    (foldMap (bytesFS . sl_fs . unLoc) msg)
   where
     format x bs = DocWarning . DocParagraph . DocAppend (DocString x)
                   <$> processDocString dflags gre (mkHsDocStringUtf8ByteString bs)

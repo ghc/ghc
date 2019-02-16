@@ -44,7 +44,7 @@ import TysWiredIn ( eqTyConName, listTyConName, liftedTypeKindTyConName
 import PrelNames ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
                  , liftedRepDataConKey )
 import Unique ( getUnique )
-import Util ( chkAppend,dropList, filterByList, filterOut, splitAtList )
+import Util ( chkAppend,dropList, filterByList, filterOut )
 import Var
 import VarSet
 
