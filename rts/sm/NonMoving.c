@@ -437,10 +437,6 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     if (concurrent_coll_running || sched_state > SCHED_RUNNING) {
         return;
     }
-
-    for (unsigned int i = 0; i < n_capabilities; i++) {
-        capabilities[i]->upd_rem_set_syncd = false;
-    }
 #endif
 
     nonmovingPrepareMark();

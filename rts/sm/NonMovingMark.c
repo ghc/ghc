@@ -222,18 +222,15 @@ static void nonmovingAddUpdRemSetBlocks(MarkQueue *rset)
  */
 void nonmovingFlushCapUpdRemSetBlocks(Capability *cap)
 {
-    if (! cap->upd_rem_set_syncd) {
-        debugTrace(DEBUG_nonmoving_gc,
-                   "Capability %d flushing update remembered set: %d",
-                   cap->no, markQueueLength(&cap->upd_rem_set.queue));
-        traceConcUpdRemSetFlush(cap);
-        nonmovingAddUpdRemSetBlocks(&cap->upd_rem_set.queue);
-        atomic_inc(&upd_rem_set_flush_count, 1);
-        cap->upd_rem_set_syncd = true;
-        signalCondition(&upd_rem_set_flushed_cond);
-        // After this mutation will remain suspended until nonmovingFinishFlush
-        // releases its capabilities.
-    }
+    debugTrace(DEBUG_nonmoving_gc,
+               "Capability %d flushing update remembered set: %d",
+               cap->no, markQueueLength(&cap->upd_rem_set.queue));
+    traceConcUpdRemSetFlush(cap);
+    nonmovingAddUpdRemSetBlocks(&cap->upd_rem_set.queue);
+    atomic_inc(&upd_rem_set_flush_count, 1);
+    signalCondition(&upd_rem_set_flushed_cond);
+    // After this mutation will remain suspended until nonmovingFinishFlush
+    // releases its capabilities.
 }
 
 /* Request that all capabilities flush their update remembered sets and suspend
@@ -243,9 +240,6 @@ void nonmovingBeginFlush(Task *task)
 {
     debugTrace(DEBUG_nonmoving_gc, "Starting update remembered set flush...");
     traceConcSyncBegin();
-    for (unsigned int i = 0; i < n_capabilities; i++) {
-        capabilities[i]->upd_rem_set_syncd = false;
-    }
     upd_rem_set_flush_count = 0;
     stopAllCapabilitiesWith(NULL, task, SYNC_FLUSH_UPD_REM_SET);
 
