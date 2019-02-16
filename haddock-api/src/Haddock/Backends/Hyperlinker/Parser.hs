@@ -9,11 +9,12 @@ import qualified Data.ByteString as BS
 
 import BasicTypes          ( IntegralLit(..) )
 import DynFlags
-import ErrUtils            ( emptyMessages )
+import ErrUtils            ( emptyMessages, pprLocErrMsg )
 import FastString          ( mkFastString )
 import Lexer               ( P(..), ParseResult(..), PState(..), Token(..)
-                           , mkPStatePure, lexer, mkParserFlags' )
-import Outputable          ( showSDoc, panic )
+                           , mkPStatePure, lexer, mkParserFlags', getErrorMessages, addFatalError )
+import Bag                 ( bagToList )
+import Outputable          ( showSDoc, panic, text, ($$) )
 import SrcLoc
 import StringBuffer        ( StringBuffer, atEnd )
 
@@ -31,8 +32,10 @@ parse
   -> [T.Token]
 parse dflags fpath bs = case unP (go False []) initState of
     POk _ toks -> reverse toks
-    PFailed _ ss errMsg -> panic $ "Hyperlinker parse error at " ++ show ss ++
-                                   ": " ++ showSDoc dflags errMsg
+    PFailed pst ->
+      let err:_ = bagToList (getErrorMessages pst dflags) in
+      panic $ showSDoc dflags $
+        text "Hyperlinker parse error:" $$ pprLocErrMsg err
   where
 
     initState = mkPStatePure pflags buf start
@@ -154,7 +157,7 @@ setInput (buf, srcLoc) = P $ \p -> POk (p { buffer = buf, loc = srcLoc }) ()
 
 -- | Orphan instance that adds backtracking to 'P'
 instance Alternative P where
-  empty = P $ \_ -> PFailed (const emptyMessages) noSrcSpan "Alterative.empty"
+  empty = addFatalError noSrcSpan (text "Alterative.empty")
   P x <|> P y = P $ \s -> case x s of { p@POk{} -> p
                                       ; _ -> y s }
 
