@@ -1341,7 +1341,10 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         let local_includes = [ SysTools.Option ("-iquote" ++ p)
                              | p <- includePathsQuote cmdline_include_paths ]
         let runAssembler inputFilename outputFilename
-                = liftIO $ as_prog dflags
+              = liftIO $ do
+                  withAtomicRename outputFilename $ \temp_outputFilename -> do
+                    as_prog
+                       dflags
                        (local_includes ++ global_includes
                        -- See Note [-fPIC for assembler]
                        ++ map SysTools.Option pic_c_flags
@@ -1371,15 +1374,11 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
                           , SysTools.Option "-c"
                           , SysTools.FileOption "" inputFilename
                           , SysTools.Option "-o"
-                          , SysTools.FileOption "" outputFilename
+                          , SysTools.FileOption "" temp_outputFilename
                           ])
 
         liftIO $ debugTraceMsg dflags 4 (text "Running the assembler")
-
-        -- Atomic write by writing to temp file and then renaming
-        let temp_output_fn = output_fn <.> "tmp"
-        runAssembler input_fn temp_output_fn
-        liftIO $ renameFile temp_output_fn output_fn
+        runAssembler input_fn output_fn
 
         return (RealPhase next_phase, output_fn)
 
