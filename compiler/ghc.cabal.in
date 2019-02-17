@@ -593,6 +593,7 @@ Library
             Instruction
             BlockLayout
             CFG
+            Dominators
             Format
             Reg
             RegClass

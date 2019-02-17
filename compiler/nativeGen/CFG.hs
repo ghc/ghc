@@ -6,31 +6,40 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 
 module CFG
     ( CFG, CfgEdge(..), EdgeInfo(..), EdgeWeight(..)
     , TransitionSource(..)
 
     --Modify the CFG
-    , addWeightEdge, addEdge, delEdge
+    , addWeightEdge, addEdge
+    , delEdge, delNode
     , addNodesBetween, shortcutWeightMap
     , reverseEdges, filterEdges
     , addImmediateSuccessor
-    , mkWeightInfo, adjustEdgeWeight
+    , mkWeightInfo, adjustEdgeWeight, setEdgeWeight
 
     --Query the CFG
     , infoEdgeList, edgeList
     , getSuccessorEdges, getSuccessors
-    , getSuccEdgesSorted, weightedEdgeList
+    , getSuccEdgesSorted
     , getEdgeInfo
     , getCfgNodes, hasNode
-    , loopMembers
+
+    -- Loop Information
+    , loopMembers, loopLevels, loopInfo
 
     --Construction/Misc
     , getCfg, getCfgProc, pprEdgeWeights, sanityCheckCfg
 
     --Find backedges and update their weight
-    , optimizeCFG )
+    , optimizeCFG
+    , mkGlobalWeights
+
+     )
 where
 
 #include "HsVersions.h"
@@ -38,9 +47,8 @@ where
 import GhcPrelude
 
 import BlockId
-import Cmm ( RawCmmDecl, GenCmmDecl( .. ), CmmBlock, succ, g_entry
-           , CmmGraph )
-import CmmNode
+import Cmm
+
 import CmmUtils
 import CmmSwitch
 import Hoopl.Collections
@@ -50,10 +58,24 @@ import qualified Hoopl.Graph as G
 
 import Util
 import Digraph
+import Maybes
+
+import Unique
+import qualified Dominators as Dom
+import Data.IntMap.Strict (IntMap)
+import Data.IntSet (IntSet)
+
+import qualified Data.IntMap.Strict as IM
+import qualified Data.Map as M
+import qualified Data.IntSet as IS
+import qualified Data.Set as S
+import Data.Tree
+import Data.Bifunctor
 
 import Outputable
 -- DEBUGGING ONLY
 --import Debug
+-- import Debug.Trace
 --import OrdList
 --import Debug.Trace
 import PprCmm () -- For Outputable instances
@@ -61,17 +83,28 @@ import qualified DynFlags as D
 
 import Data.List
 
--- import qualified Data.IntMap.Strict as M --TODO: LabelMap
+import Data.STRef.Strict
+import Control.Monad.ST
+
+import Data.Array.MArray
+import Data.Array.ST
+import Data.Array.IArray
+import Data.Array.Unsafe (unsafeFreeze)
+import Data.Array.Base (unsafeRead, unsafeWrite)
+
+import Control.Monad
+
+type Prob = Double
 
 type Edge = (BlockId, BlockId)
 type Edges = [Edge]
 
 newtype EdgeWeight
-  = EdgeWeight Int
-  deriving (Eq,Ord,Enum,Num,Real,Integral)
+  = EdgeWeight { weightToDouble :: Double }
+  deriving (Eq,Ord,Enum,Num,Real,Fractional)
 
 instance Outputable EdgeWeight where
-  ppr (EdgeWeight w) = ppr w
+  ppr (EdgeWeight w) = doublePrec 5 w
 
 type EdgeInfoMap edgeInfo = LabelMap (LabelMap edgeInfo)
 
@@ -108,14 +141,27 @@ instance Outputable CfgEdge where
     = parens (ppr from1 <+> text "-(" <> ppr edgeInfo <> text ")->" <+> ppr to1)
 
 -- | Can we trace back a edge to a specific Cmm Node
--- or has it been introduced for codegen. We use this to maintain
+-- or has it been introduced during assembly codegen. We use this to maintain
 -- some information which would otherwise be lost during the
 -- Cmm <-> asm transition.
 -- See also Note [Inverting Conditional Branches]
 data TransitionSource
-  = CmmSource (CmmNode O C)
+  = CmmSource { trans_cmmNode :: (CmmNode O C)
+              , trans_info :: BranchInfo }
   | AsmCodeGen
   deriving (Eq)
+
+data BranchInfo = NoInfo         -- ^ Unknown, but not heap or stack check.
+                | HeapStackCheck -- ^ Heap or stack check
+    deriving Eq
+
+instance Outputable BranchInfo where
+    ppr NoInfo = text "regular"
+    ppr HeapStackCheck = text "heap/stack"
+
+isHeapOrStackCheck :: TransitionSource -> Bool
+isHeapOrStackCheck (CmmSource { trans_info = HeapStackCheck}) = True
+isHeapOrStackCheck _ = False
 
 -- | Information about edges
 data EdgeInfo
@@ -127,12 +173,10 @@ data EdgeInfo
 instance Outputable EdgeInfo where
   ppr edgeInfo = text "weight:" <+> ppr (edgeWeight edgeInfo)
 
--- Allow specialization
-{-# INLINEABLE mkWeightInfo #-}
 -- | Convenience function, generate edge info based
 --   on weight not originating from cmm.
-mkWeightInfo :: Integral n => n -> EdgeInfo
-mkWeightInfo = EdgeInfo AsmCodeGen . fromIntegral
+mkWeightInfo :: EdgeWeight -> EdgeInfo
+mkWeightInfo = EdgeInfo AsmCodeGen
 
 -- | Adjust the weight between the blocks using the given function.
 --   If there is no such edge returns the original map.
@@ -140,12 +184,25 @@ adjustEdgeWeight :: CFG -> (EdgeWeight -> EdgeWeight)
                  -> BlockId -> BlockId -> CFG
 adjustEdgeWeight cfg f from to
   | Just info <- getEdgeInfo from to cfg
-  , weight <- edgeWeight info
-  = addEdge from to (info { edgeWeight = f weight}) cfg
+  , !weight <- edgeWeight info
+  , !newWeight <- f weight
+  = addEdge from to (info { edgeWeight = newWeight}) cfg
   | otherwise = cfg
 
+-- | Set the weight between the blocks to the given weight.
+--   If there is no such edge returns the original map.
+setEdgeWeight :: CFG -> EdgeWeight
+              -> BlockId -> BlockId -> CFG
+setEdgeWeight cfg !weight from to
+  | Just info <- getEdgeInfo from to cfg
+  = addEdge from to (info { edgeWeight = weight}) cfg
+  | otherwise = cfg
+
+
+
 getCfgNodes :: CFG -> LabelSet
-getCfgNodes m = mapFoldMapWithKey (\k v -> setFromList (k:mapKeys v)) m
+getCfgNodes m =
+    mapFoldlWithKey (\s k toMap -> mapFoldlWithKey (\s k _ -> setInsert k s) (setInsert k s) toMap ) setEmpty m
 
 hasNode :: CFG -> BlockId -> Bool
 hasNode m node = mapMember node m || any (mapMember node) m
@@ -294,6 +351,11 @@ delEdge from to m =
         remDest Nothing = Nothing
         remDest (Just wm) = Just $ mapDelete to wm
 
+delNode :: BlockId -> CFG -> CFG
+delNode node cfg =
+  fmap (mapDelete node)  -- < Edges to the node
+    (mapDelete node cfg) -- < Edges from the node
+
 -- | Destinations from bid ordered by weight (descending)
 getSuccEdgesSorted :: CFG -> BlockId -> [(BlockId,EdgeInfo)]
 getSuccEdgesSorted m bid =
@@ -315,36 +377,54 @@ getEdgeInfo from to m
     | otherwise
     = Nothing
 
+getEdgeWeight :: CFG -> BlockId -> BlockId -> EdgeWeight
+getEdgeWeight cfg from to =
+    edgeWeight $ expectJust "Edgeweight for noexisting block" $
+                 getEdgeInfo from to cfg
+
+getTransitionSource :: BlockId -> BlockId -> CFG -> TransitionSource
+getTransitionSource from to cfg = transitionSource $ expectJust "Source info for noexisting block" $
+                        getEdgeInfo from to cfg
+
 reverseEdges :: CFG -> CFG
-reverseEdges cfg = foldr add mapEmpty flatElems
+reverseEdges cfg = mapFoldlWithKey (\cfg from toMap -> go (addNode cfg from) from toMap) mapEmpty cfg
   where
-    elems = mapToList $ fmap mapToList cfg :: [(BlockId,[(BlockId,EdgeInfo)])]
-    flatElems =
-        concatMap (\(from,ws) -> map (\(to,info) -> (to,from,info)) ws ) elems
-    add (to,from,info) m = addEdge to from info m
+    -- We preserve nodes without outgoing edges!
+    addNode :: CFG -> BlockId -> CFG
+    addNode cfg b = mapInsertWith mapUnion b mapEmpty cfg
+    go :: CFG -> BlockId -> (LabelMap EdgeInfo) -> CFG
+    go cfg from toMap = mapFoldlWithKey (\cfg to info -> addEdge to from info cfg) cfg toMap  :: CFG
+
 
 -- | Returns a unordered list of all edges with info
 infoEdgeList :: CFG -> [CfgEdge]
 infoEdgeList m =
-  mapFoldMapWithKey
-    (\from toMap ->
-      map (\(to,info) -> CfgEdge from to info) (mapToList toMap))
-    m
-
--- | Unordered list of edges with weight as Tuple (from,to,weight)
-weightedEdgeList :: CFG -> [(BlockId,BlockId,EdgeWeight)]
-weightedEdgeList m =
-  mapFoldMapWithKey
-    (\from toMap ->
-      map (\(to,info) ->
-        (from,to, edgeWeight info)) (mapToList toMap))
-    m
-      --  (\(from, tos) -> map (\(to,info) -> (from,to, edgeWeight info)) tos )
+    go (mapToList m) []
+  where
+    -- We avoid foldMap to avoid thunk buildup
+    go :: [(BlockId,LabelMap EdgeInfo)] -> [CfgEdge] -> [CfgEdge]
+    go [] acc = acc
+    go ((from,toMap):xs) acc
+      = go' xs from (mapToList toMap) acc
+    go' :: [(BlockId,LabelMap EdgeInfo)] -> BlockId -> [(BlockId,EdgeInfo)] -> [CfgEdge] -> [CfgEdge]
+    go' froms _    []              acc = go froms acc
+    go' froms from ((to,info):tos) acc
+      = go' froms from tos (CfgEdge from to info : acc)
 
 -- | Returns a unordered list of all edges without weights
 edgeList :: CFG -> [Edge]
 edgeList m =
-        mapFoldMapWithKey (\from toMap -> fmap (from,) (mapKeys toMap)) m
+    go (mapToList m) []
+  where
+    -- We avoid foldMap to avoid thunk buildup
+    go :: [(BlockId,LabelMap EdgeInfo)] -> [Edge] -> [Edge]
+    go [] acc = acc
+    go ((from,toMap):xs) acc
+      = go' xs from (mapKeys toMap) acc
+    go' :: [(BlockId,LabelMap EdgeInfo)] -> BlockId -> [BlockId] -> [Edge] -> [Edge]
+    go' froms _    []              acc = go froms acc
+    go' froms from (to:tos) acc
+      = go' froms from tos ((from,to) : acc)
 
 -- | Get successors of a given node without edge weights.
 getSuccessors :: CFG -> BlockId -> [BlockId]
@@ -355,8 +435,8 @@ getSuccessors m bid
 
 pprEdgeWeights :: CFG -> SDoc
 pprEdgeWeights m =
-    let edges = sort $ weightedEdgeList m
-        printEdge (from, to, weight)
+    let edges = sort $ infoEdgeList m :: [CfgEdge]
+        printEdge (CfgEdge from to (EdgeInfo { edgeWeight = weight }))
             = text "\t" <> ppr from <+> text "->" <+> ppr to <>
               text "[label=\"" <> ppr weight <> text "\",weight=\"" <>
               ppr weight <> text "\"];\n"
@@ -365,7 +445,7 @@ pprEdgeWeights m =
         --to immediately see it when it does.
         printNode node
             = text "\t" <> ppr node <> text ";\n"
-        getEdgeNodes (from, to, _weight) = [from,to]
+        getEdgeNodes (CfgEdge from to _) = [from,to]
         edgeNodes = setFromList $ concatMap getEdgeNodes edges :: LabelSet
         nodes = filter (\n -> (not . setMember n) edgeNodes) . mapKeys $ mapFilter null m
     in
@@ -378,8 +458,8 @@ pprEdgeWeights m =
 updateEdgeWeight :: (EdgeWeight -> EdgeWeight) -> Edge -> CFG -> CFG
 updateEdgeWeight f (from, to) cfg
     | Just oldInfo <- getEdgeInfo from to cfg
-    = let oldWeight = edgeWeight oldInfo
-          newWeight = f oldWeight
+    = let !oldWeight = edgeWeight oldInfo
+          !newWeight = f oldWeight
       in addEdge from to (oldInfo {edgeWeight = newWeight}) cfg
     | otherwise
     = panic "Trying to update invalid edge"
@@ -448,9 +528,7 @@ addNodesBetween m updates =
 
   Should A or B be placed in front of C? The block layout algorithm
   decides this based on which edge (A,C)/(B,C) is heavier. So we
-  make a educated guess how often execution will transer control
-  along each edge as well as how much we gain by placing eg A before
-  C.
+  make a educated guess on which branch should be preferred.
 
   We rank edges in this order:
   * Unconditional Control Transfer - They will always
@@ -478,7 +556,6 @@ addNodesBetween m updates =
         * Calls always require a info table in front of their return
           address. This reduces the chance that we return to the same
           cache line further.
-
 
 -}
 -- | Generate weights for a Cmm proc based on some simple heuristics.
@@ -515,13 +592,24 @@ getCfg weights graph =
     getBlockEdges block =
       case branch of
         CmmBranch dest -> [mkEdge dest uncondWeight]
-        CmmCondBranch _c t f l
+        CmmCondBranch cond t f l
           | l == Nothing ->
               [mkEdge f condBranchWeight,   mkEdge t condBranchWeight]
           | l == Just True ->
               [mkEdge f unlikelyCondWeight, mkEdge t likelyCondWeight]
           | l == Just False ->
               [mkEdge f likelyCondWeight,   mkEdge t unlikelyCondWeight]
+          where
+            mkEdgeInfo = -- pprTrace "Info" (ppr branchInfo <+> ppr cond)
+                         EdgeInfo (CmmSource branch branchInfo) . fromIntegral
+            mkEdge target weight = ((bid,target), mkEdgeInfo weight)
+            branchInfo =
+              foldRegsUsed
+                (panic "foldRegsDynFlags")
+                (\info r -> if r == SpLim || r == HpLim || r == BaseReg
+                    then HeapStackCheck else info)
+                NoInfo cond
+
         (CmmSwitch _e ids) ->
           let switchTargets = switchTargetsToList ids
               --Compiler performance hack - for very wide switches don't
@@ -539,7 +627,7 @@ getCfg weights graph =
             map (\x -> ((bid,x),mkEdgeInfo 0)) $ G.successors other
       where
         bid = G.entryLabel block
-        mkEdgeInfo = EdgeInfo (CmmSource branch) . fromIntegral
+        mkEdgeInfo = EdgeInfo (CmmSource branch NoInfo) . fromIntegral
         mkEdge target weight = ((bid,target), mkEdgeInfo weight)
         branch = lastNode block :: CmmNode O C
 
@@ -561,6 +649,11 @@ findBackEdges root cfg =
 optimizeCFG :: D.CfgWeights -> RawCmmDecl -> CFG -> CFG
 optimizeCFG _ (CmmData {}) cfg = cfg
 optimizeCFG weights (CmmProc info _lab _live graph) cfg =
+    {-# SCC optimizeCFG #-}
+    -- pprTrace "Initial:" (pprEdgeWeights cfg) $
+    -- pprTrace "Initial:" (ppr $ mkGlobalWeights (g_entry graph) cfg) $
+
+    -- pprTrace "LoopInfo:" (ppr $ loopInfo cfg (g_entry graph)) $
     favourFewerPreds  .
     penalizeInfoTables info .
     increaseBackEdgeWeight (g_entry graph) $ cfg
@@ -590,12 +683,8 @@ optimizeCFG weights (CmmProc info _lab _live graph) cfg =
           = weight - (fromIntegral $ D.infoTablePenalty weights)
           | otherwise = weight
 
-
-{- Note [Optimize for Fallthrough]
-
--}
     -- | If a block has two successors, favour the one with fewer
-    -- predecessors. (As that one is more likely to become a fallthrough)
+    -- predecessors and/or the one allowing fall through.
     favourFewerPreds :: CFG -> CFG
     favourFewerPreds cfg =
         let
@@ -612,16 +701,17 @@ optimizeCFG weights (CmmProc info _lab _live graph) cfg =
               | preds1 == preds2 = ( 0, 0)
               | otherwise        = (-1, 1)
 
+            update :: CFG -> BlockId -> CFG
             update cfg node
               | [(s1,e1),(s2,e2)] <- getSuccessorEdges cfg node
-              , w1 <- edgeWeight e1
-              , w2 <- edgeWeight e2
+              , !w1 <- edgeWeight e1
+              , !w2 <- edgeWeight e2
               --Only change the weights if there isn't already a ordering.
               , w1 == w2
               , (mod1,mod2) <- modifiers (predCount s1) (predCount s2)
               = (\cfg' ->
                   (adjustEdgeWeight cfg' (+mod2) node s2))
-                  (adjustEdgeWeight cfg  (+mod1) node s1)
+                    (adjustEdgeWeight cfg  (+mod1) node s1)
               | otherwise
               = cfg
         in setFoldl update cfg nodes
@@ -630,13 +720,12 @@ optimizeCFG weights (CmmProc info _lab _live graph) cfg =
         fallthroughTarget to (EdgeInfo source _weight)
           | mapMember to info = False
           | AsmCodeGen <- source = True
-          | CmmSource (CmmBranch {}) <- source = True
-          | CmmSource (CmmCondBranch {}) <- source = True
+          | CmmSource { trans_cmmNode = CmmBranch {} } <- source = True
+          | CmmSource { trans_cmmNode = CmmCondBranch {} } <- source = True
           | otherwise = False
 
 -- | Determine loop membership of blocks based on SCC analysis
---   Ideally we would replace this with a variant giving us loop
---   levels instead but the SCC code will do for now.
+--   This is faster but only gives yes/no answers.
 loopMembers :: CFG -> LabelMap Bool
 loopMembers cfg =
     foldl' (flip setLevel) mapEmpty sccs
@@ -650,3 +739,534 @@ loopMembers cfg =
     setLevel :: SCC BlockId -> LabelMap Bool -> LabelMap Bool
     setLevel (AcyclicSCC bid) m = mapInsert bid False m
     setLevel (CyclicSCC bids) m = foldl' (\m k -> mapInsert k True m) m bids
+
+loopLevels :: CFG -> BlockId -> LabelMap Int
+loopLevels cfg root = liLevels $ loopInfo cfg root
+
+data LoopInfo = LoopInfo
+  { liBackEdges :: [(Edge)] -- ^ List of back edges
+  , liLevels :: LabelMap Int -- ^ BlockId -> LoopLevel mapping
+  , liLoops :: [(Edge, LabelSet)] -- ^ (backEdge, loopBody), body includes header
+  }
+
+instance Outputable LoopInfo where
+    ppr (LoopInfo _ _lvls loops) =
+        text "Loops:(backEdge, bodyNodes)" $$
+            (vcat $ map ppr loops)
+
+-- | Determine loop membership of blocks based on Dominator analysis.
+--   This is slower but gives loop levels instead of just loop membership.
+--   However it only detects natural loops. Irreducible control flow is not
+--   recognized even if it loops. But that is rare enough that we don't have
+--   to care about that special case.
+loopInfo :: CFG -> BlockId -> LoopInfo
+loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
+                              , liLevels = mapFromList loopCounts
+                              , liLoops = loopBodies }
+  where
+    revCfg = reverseEdges cfg
+    graph = fmap (setFromList . mapKeys ) cfg :: LabelMap LabelSet
+
+    --TODO - This should be a no op: Export constructors? Use unsafeCoerce? ...
+    rooted = ( fromBlockId root
+              , toIntMap $ fmap toIntSet graph) :: (Int, IntMap IntSet)
+    -- rooted = unsafeCoerce (root, graph)
+    tree = fmap toBlockId $ Dom.domTree rooted :: Tree BlockId
+
+    -- Map from Nodes to their dominators
+    domMap :: LabelMap LabelSet
+    domMap = mkDomMap tree
+
+    edges = edgeList cfg :: [(BlockId, BlockId)]
+    -- We can't recompute this from the edges, there might be blocks not connected via edges.
+    nodes = getCfgNodes cfg :: LabelSet
+
+    -- identify back edges
+    isBackEdge (from,to)
+      | Just doms <- mapLookup from domMap
+      , setMember to doms
+      = True
+      | otherwise = False
+
+    -- determine the loop body for a back edge
+    findBody edge@(tail, head)
+      = ( edge, setInsert head $ go (setSingleton tail) (setSingleton tail) )
+      where
+        -- The reversed cfg makes it easier to look up predecessors
+        cfg' = delNode head revCfg
+        go :: LabelSet -> LabelSet -> LabelSet
+        go found current
+          | setNull current = found
+          | otherwise = go  (setUnion newSuccessors found)
+                            newSuccessors
+          where
+            newSuccessors = setFilter (\n -> not $ setMember n found) successors :: LabelSet
+            successors = setFromList $ concatMap
+                                      (getSuccessors cfg')
+                                      (setElems current) :: LabelSet
+
+    backEdges = filter isBackEdge edges
+    loopBodies = map findBody backEdges :: [(Edge, LabelSet)]
+
+    -- Block b is part of n loop bodies => loop nest level of n
+    loopCounts =
+      let bodies = map (first snd) loopBodies -- [(Header, Body)]
+          loopCount n = length $ nub . map fst . filter (setMember n . snd) $ bodies
+      in  map (\n -> (n, loopCount n)) $ setElems nodes :: [(BlockId, Int)]
+
+    toIntSet :: LabelSet -> IntSet
+    toIntSet s = IS.fromList . map fromBlockId . setElems $ s
+    toIntMap :: LabelMap a -> IntMap a
+    toIntMap m = IM.fromList $ map (\(x,y) -> (fromBlockId x,y)) $ mapToList m
+
+    mkDomMap :: Tree BlockId -> LabelMap LabelSet
+    mkDomMap root = mapFromList $ go setEmpty root
+      where
+        go :: LabelSet -> Tree BlockId -> [(Label,LabelSet)]
+        go parents (Node lbl [])
+          =  [(lbl, parents)]
+        go parents (Node _ leaves)
+          = let nodes = map rootLabel leaves
+                entries = map (\x -> (x,parents)) nodes
+            in  entries ++ concatMap
+                            (\n -> go (setInsert (rootLabel n) parents) n)
+                            leaves
+
+    fromBlockId :: BlockId -> Int
+    fromBlockId = getKey . getUnique
+
+    toBlockId :: Int -> BlockId
+    toBlockId = mkBlockId . mkUniqueGrimily
+
+-- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
+newtype BlockNode (e :: Extensibility) (x :: Extensibility) = BN (BlockId,[BlockId])
+
+instance G.NonLocal (BlockNode) where
+  entryLabel (BN (lbl,_))   = lbl
+  successors (BN (_,succs)) = succs
+
+revPostorderFrom :: CFG -> BlockId -> [BlockId]
+revPostorderFrom cfg root =
+    map fromNode $ G.revPostorderFrom hooplGraph root
+  where
+    nodes = getCfgNodes cfg
+    hooplGraph = setFoldl (\m n -> mapInsert n (toNode n) m) mapEmpty nodes
+
+    fromNode :: BlockNode C C -> BlockId
+    fromNode (BN x) = fst x
+
+    toNode :: BlockId -> BlockNode C C
+    toNode bid =
+        BN (bid,getSuccessors cfg $ bid)
+
+
+-- | We take in a CFG which has on its edges weights which are
+--   relative only to other edges originating from the same node.
+--
+--   We return a CFG for which each edge represents a GLOBAL weight.
+--   This means edge weights are comparable across the whole graph.
+--
+--   For irreducible control flow results might be imprecise, otherwise they
+--   are reliable.
+--
+--   The algorithm is based on the Paper
+--   "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus
+--   The only big change is that we go over the nodes in the body of loops in
+--   reverse post order. Which is required for diamond control flow to work probably.
+--
+--   We also apply a few prediction heuristics (based on the same paper)
+
+{-# SCC mkGlobalWeights #-}
+mkGlobalWeights :: BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
+mkGlobalWeights root localCfg
+  | null localCfg = panic "Error - Empty CFG"
+  | otherwise
+  = --pprTrace "revOrder" (ppr revOrder) $
+    -- undefined --propagate (mapSingleton root 1) (revOrder)
+    (blockFreqs', edgeFreqs')
+  where
+    -- Calculate fixpoints
+    (blockFreqs, edgeFreqs) = calcFreqs nodeProbs backEdges' bodies' revOrder'
+    blockFreqs' = mapFromList $ map (first fromVertex) (assocs blockFreqs) :: LabelMap Double
+    edgeFreqs' = fmap fromVertexMap $ fromVertexMap edgeFreqs
+
+    fromVertexMap :: IM.IntMap x -> LabelMap x
+    fromVertexMap m = mapFromList . map (first fromVertex) $ IM.toList m
+
+    revOrder = revPostorderFrom localCfg root :: [BlockId]
+    loopinfo@(LoopInfo backedges _levels bodies) = loopInfo localCfg root
+
+    revOrder' = map toVertex revOrder
+    backEdges' = map (bimap toVertex toVertex) backedges
+    bodies' = map calcBody bodies
+
+    estimatedCfg = staticBranchPrediction root loopinfo localCfg
+    -- Normalize the weights to probabilities and apply heuristics
+    nodeProbs = cfgEdgeProbabilities estimatedCfg toVertex
+
+    -- By mapping vertices to numbers in reverse post order we can bring any subset into reverse post
+    -- order simply by sorting.
+    -- TODO: The sort is redundant if we can guarantee that setElems returns elements ascending
+    calcBody (backedge, blocks) =
+        (toVertex $ snd backedge, sort . map toVertex $ (setElems blocks))
+
+    vertexMapping = mapFromList $ zip revOrder [0..] :: LabelMap Int
+    blockMapping = listArray (0,mapSize vertexMapping - 1) revOrder :: Array Int BlockId
+    -- Map from blockId to indicies starting at zero
+    toVertex :: BlockId -> Int
+    toVertex   blockId  = expectJust "mkGlobalWeights" $ mapLookup blockId vertexMapping
+    -- Map from indicies starting at zero to blockIds
+    fromVertex :: Int -> BlockId
+    fromVertex vertex   = blockMapping ! vertex
+
+{- Note [Static Branch Prediction]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The work here has been based on the paper
+"Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus.
+
+The primary differences are that if we branch on the result of a heap
+check we do not apply any of the heuristics.
+The reason is simple: They look like loops in the control flow graph
+but are usually never entered, and if at most once.
+
+Currently implemented is a heuristic to predict that we do not exit
+loops (lehPredicts) and one to predict that backedges are more likely
+than any other edge.
+
+The back edge case is special as it superceeds any other heuristic if it
+applies.
+
+Do NOT rely solely on nofib results for benchmarking this. I recommend at least
+comparing megaparsec and container benchmarks. Nofib does not seeem to have
+many instances of "loopy" Cmm where these make a difference.
+
+TODO:
+* The paper containers more benchmarks which should be implemented.
+* If we turn the likelyhood on if/else branches into a probability
+  instead of true/false we could implement this as a Cmm pass.
+  + The complete Cmm code still exists and can be accessed by the heuristics
+  + There is no chance of register allocation/codegen inserting branches/blocks
+  + making the TransitionSource info wrong.
+  + potential to use this information in CmmPasses.
+  - Requires refactoring of all the code relying on the binary nature of likelyhood.
+  - Requires refactoring `loopInfo` to work on both, Cmm Graphs and the backend CFG.
+-}
+
+-- | Combination of target node id and information about the branch
+--   we are looking at.
+type TargetNodeInfo = (BlockId, EdgeInfo)
+
+
+-- | Update branch weights based on certain heuristics.
+-- See Note [Static Branch Prediction]
+-- TODO: This should be combined with optimizeCFG
+{-# SCC staticBranchPrediction #-}
+staticBranchPrediction :: BlockId -> LoopInfo -> CFG -> CFG
+staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
+    -- pprTrace "staticEstimatesOn" (ppr (cfg)) $
+    setFoldl update cfg nodes
+  where
+    nodes = getCfgNodes cfg
+    backedges = S.fromList $ l_backEdges
+    -- Loops keyed by their back edge
+    loops = M.fromList $ l_loops :: M.Map Edge LabelSet
+    loopHeads = S.fromList $ map snd $ M.keys loops
+
+    update :: CFG -> BlockId -> CFG
+    update cfg node
+        -- No successors, nothing to do.
+        | null successors = cfg
+
+        -- Mix of backedges and others:
+        -- Always predict the backedges.
+        | not (null m) && length m < length successors
+        -- Heap/Stack checks "loop", but only once.
+        -- So we simply exclude any case involving them.
+        , not $ any (isHeapOrStackCheck  . transitionSource . snd) successors
+        = let   loopChance = repeat $! pred_LBH / (fromIntegral $ length m)
+                exitChance = repeat $! (1 - pred_LBH) / fromIntegral (length not_m)
+                updates = zip (map fst m) loopChance ++ zip (map fst not_m) exitChance
+        in  -- pprTrace "mix" (ppr (node,successors)) $
+            foldl' (\cfg (to,weight) -> setEdgeWeight cfg weight node to) cfg updates
+
+        -- For (regular) non-binary branches we keep the weights from the STG -> Cmm translation.
+        | length successors /= 2
+        = cfg
+
+        -- Only backedges - no need to adjust
+        | length m > 0
+        = cfg
+
+        -- A regular binary branch, we can plug addition predictors in here.
+        | [(s1,s1_info),(s2,s2_info)] <- successors
+        , not $ any (isHeapOrStackCheck  . transitionSource . snd) successors
+        = -- Normalize weights to total of 1
+            let !w1 = max (edgeWeight s1_info) (0)
+                !w2 = max (edgeWeight s2_info) (0)
+                -- Of both weights are <= 0 we set both to 0.5
+                normalizeWeight w = if w1 + w2 == 0 then 0.5 else w/(w1+w2)
+                !cfg'  = setEdgeWeight cfg  (normalizeWeight w1) node s1
+                !cfg'' = setEdgeWeight cfg' (normalizeWeight w2) node s2
+
+                -- Figure out which heuristics apply to these successors
+                heuristics = map ($ ((s1,s1_info),(s2,s2_info)))
+                            [lehPredicts, phPredicts, ohPredicts, ghPredicts, lhhPredicts, chPredicts
+                            , shPredicts, rhPredicts]
+                -- Apply result of a heuristic. Argument is the likelyhood
+                -- predicted for s1.
+                applyHeuristic :: CFG -> Maybe Prob -> CFG
+                applyHeuristic cfg Nothing = cfg
+                applyHeuristic cfg (Just (s1_pred :: Double))
+                  | s1_old == 0 || s2_old == 0 ||
+                    isHeapOrStackCheck (transitionSource s1_info) ||
+                    isHeapOrStackCheck (transitionSource s2_info)
+                  = cfg
+                  | otherwise =
+                    let -- Predictions from heuristic
+                        s1_prob = EdgeWeight s1_pred :: EdgeWeight
+                        s2_prob = 1.0 - s1_prob
+                        -- Update
+                        d = (s1_old * s1_prob) + (s2_old * s2_prob) :: EdgeWeight
+                        s1_prob' = s1_old * s1_prob / d
+                        !s2_prob' = s2_old * s2_prob / d
+                        !cfg_s1 = setEdgeWeight cfg    s1_prob' node s1
+                    in  -- pprTrace "Applying heuristic!" (ppr (node,s1,s2) $$ ppr (s1_prob', s2_prob')) $
+                        setEdgeWeight cfg_s1 s2_prob' node s2
+                  where
+                    -- Old weights
+                    s1_old = getEdgeWeight cfg node s1
+                    s2_old = getEdgeWeight cfg node s2
+
+            in
+            -- pprTraceIt "RegularCfgResult" $
+            foldl' applyHeuristic cfg'' heuristics
+
+        -- Branch on heap/stack check
+        | otherwise = cfg
+
+      where
+        -- Chance that loops are taken.
+        pred_LBH = 0.875
+        -- successors
+        successors = getSuccessorEdges cfg node
+        -- backedges
+        (m,not_m) = partition (\succ -> S.member (node, fst succ) backedges) successors
+
+        -- Heuristics return nothing if they don't say anything about this branch
+        -- or Just (prob_s1) where prob_s1 is the likelyhood for s1 to be the
+        -- taken branch. s1 is the branch in the true case.
+
+        -- Loop exit heuristic.
+        -- We are unlikely to leave a loop unless it's to enter another one.
+        pred_LEH = 0.75
+        -- If and only if no successor is a loopheader,
+        -- then we will likely not exit the current loop body.
+        lehPredicts :: (TargetNodeInfo,TargetNodeInfo) -> Maybe Prob
+        lehPredicts ((s1,_s1_info),(s2,_s2_info))
+          | S.member s1 loopHeads || S.member s2 loopHeads
+          = Nothing
+
+          | otherwise
+          = --pprTrace "lehPredict:" (ppr $ compare s1Level s2Level) $
+            case compare s1Level s2Level of
+                EQ -> Nothing
+                LT -> Just (1-pred_LEH) --s1 exits to a shallower loop level (exits loop)
+                GT -> Just (pred_LEH)   --s1 exits to a deeper loop level
+            where
+                s1Level = mapLookup s1 loopLevels
+                s2Level = mapLookup s2 loopLevels
+
+        -- Comparing to a constant is unlikely to be equal.
+        ohPredicts (s1,_s2)
+            | CmmSource { trans_cmmNode = src1 } <- getTransitionSource node (fst s1) cfg
+            , CmmCondBranch cond ltrue _lfalse likely <- src1
+            , likely == Nothing
+            , CmmMachOp mop args <- cond
+            , MO_Eq {} <- mop
+            , not (null [x | x@CmmLit{} <- args])
+            = if fst s1 == ltrue then Just 0.3 else Just 0.7
+
+            | otherwise
+            = Nothing
+
+        -- TODO: These are all the other heuristics from the paper.
+        -- Not all will apply, for now we just stub them out as Nothing.
+        phPredicts = const Nothing
+        ghPredicts = const Nothing
+        lhhPredicts = const Nothing
+        chPredicts = const Nothing
+        shPredicts = const Nothing
+        rhPredicts = const Nothing
+
+-- We normalize all edge weights as probabilities between 0 and 1.
+-- Ignoring rounding errors all outgoing edges sum up to 1.
+cfgEdgeProbabilities :: CFG -> (BlockId -> Int) -> IM.IntMap (IM.IntMap Prob)
+cfgEdgeProbabilities cfg toVertex
+    = mapFoldlWithKey foldEdges IM.empty cfg
+  where
+    foldEdges = (\m from toMap -> IM.insert (toVertex from) (normalize toMap) m)
+
+    normalize :: (LabelMap EdgeInfo) -> (IM.IntMap Prob)
+    normalize weightMap
+        | edgeCount <= 1 = mapFoldlWithKey (\m k _ -> IM.insert (toVertex k) 1.0 m) IM.empty weightMap
+        | otherwise = mapFoldlWithKey (\m k _ -> IM.insert (toVertex k) (normalWeight k) m) IM.empty weightMap
+      where
+        edgeCount = mapSize weightMap
+        -- Negative weights are generally allowed but are mapped to zero.
+        -- We then check if there is at least one non-zero edge and if not
+        -- assign uniform weights to all branches.
+        minWeight = 0 :: Prob
+        weightMap' = fmap (\w -> max (weightToDouble . edgeWeight $ w) minWeight) weightMap
+        totalWeight = sum weightMap'
+
+        normalWeight :: BlockId -> Prob
+        normalWeight bid
+         | totalWeight == 0
+         = 1.0 / fromIntegral edgeCount
+         | Just w <- mapLookup bid weightMap'
+         = w/totalWeight
+         | otherwise = panic "impossible"
+
+-- This is the fixpoint algorithm from
+--   "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus
+-- The adaption to Haskell is my own.
+calcFreqs :: IM.IntMap (IM.IntMap Prob) -> [(Int,Int)] -> [(Int, [Int])] -> [Int]
+          -> (Array Int Double, IM.IntMap (IM.IntMap Prob))
+calcFreqs graph backEdges loops revPostOrder = runST $ do
+    visitedNodes <- newArray (0,nodeCount-1) False :: ST s (STUArray s Int Bool)
+    blockFreqs <- newArray (0,nodeCount-1) 0.0 :: ST s (STUArray s Int Double)
+    edgeProbs <- newSTRef graph
+    edgeBackProbs <- newSTRef graph
+
+    -- let traceArray a = do
+    --       vs <- forM [0..nodeCount-1] $ \i -> readArray a i >>= (\v -> return (i,v))
+          -- trace ("array: " ++ show vs) $ return ()
+
+    let  -- See #1600, we need to inline or unboxing makes perf worse.
+        -- {-# INLINE getFreq #-}
+        {-# INLINE visited #-}
+        visited b = unsafeRead visitedNodes b
+        getFreq b = unsafeRead blockFreqs b
+        -- setFreq :: forall s. Int -> Double -> ST s ()
+        setFreq b f = unsafeWrite blockFreqs b f
+        -- setVisited :: forall s. Node -> ST s ()
+        setVisited b = unsafeWrite visitedNodes b True
+        -- Frequency/probability that edge is taken.
+        getProb' arr b1 b2 = readSTRef arr >>=
+            (\graph ->
+                return .
+                        fromMaybe (error "getFreq 1") .
+                        IM.lookup b2 .
+                        fromMaybe (error "getFreq 2") $
+                        (IM.lookup b1 graph)
+            )
+        setProb' arr b1 b2 prob = do
+          g <- readSTRef arr
+          let !m = fromMaybe (error "Foo") $ IM.lookup b1 g
+              !m' = IM.insert b2 prob m
+          writeSTRef arr $! (IM.insert b1 m' g)
+
+        getEdgeFreq b1 b2 = getProb' edgeProbs b1 b2
+        setEdgeFreq b1 b2 = setProb' edgeProbs b1 b2
+        getProb b1 b2 = fromMaybe (error "getProb") $ do
+            m' <- IM.lookup b1 graph
+            IM.lookup b2 m'
+
+        getBackProb b1 b2 = getProb' edgeBackProbs b1 b2
+        setBackProb b1 b2 = setProb' edgeBackProbs b1 b2
+
+
+    let -- calcOutFreqs :: Node -> ST s ()
+        calcOutFreqs bhead block = do
+          !f <- getFreq block
+          forM (successors block) $ \bi -> do
+            let !prob = getProb block bi
+            let !succFreq = f * prob
+            setEdgeFreq block bi succFreq
+            -- traceM $ "SetOut: " ++ show (block, bi, f, prob, succFreq)
+            when (bi == bhead) $ setBackProb block bi succFreq
+
+
+    let propFreq block head = do
+            -- traceM ("prop:" ++ show (block,head))
+            -- traceShowM block
+
+            !v <- visited block
+            if v then
+                return () --Dont look at nodes twice
+            else if block == head then
+                setFreq block 1.0 -- Loop header frequency is always 1
+            else do
+                let preds = IS.elems $ predecessors block
+                irreducible <- (fmap or) $ forM preds $ \bp -> do
+                    !bp_visited <- visited bp
+                    let bp_backedge = isBackEdge bp block
+                    return (not bp_visited && not bp_backedge)
+
+                if irreducible
+                then return () -- Rare we don't care
+                else do
+                    setFreq block 0
+                    !cycleProb <- sum <$> (forM preds $ \pred -> do
+                        if isBackEdge pred block
+                            then
+                                getBackProb pred block
+                            else do
+                                !f <- getFreq block
+                                !prob <- getEdgeFreq pred block
+                                setFreq block $! f + prob
+                                return 0)
+                    -- traceM $ "cycleProb:" ++ show cycleProb
+                    let limit = 1 - 1/512 -- Paper uses 1 - epsilon, but this works.
+                                          -- determines how large likelyhoods in loops can grow.
+                    !cycleProb <- return $ min cycleProb limit -- <- return $ if cycleProb > limit then limit else cycleProb
+                    -- traceM $ "cycleProb:" ++ show cycleProb
+
+                    !f <- getFreq block
+                    setFreq block (f / (1.0 - cycleProb))
+
+            setVisited block
+            calcOutFreqs head block
+
+    -- Loops, by nesting, inner to outer
+    forM_ loops $ \(head, body) -> do
+        forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i True) -- Mark all nodes as visited.
+        forM_ body (\i -> unsafeWrite visitedNodes i False) -- Mark all blocks reachable from head as not visited
+        forM_ body $ \block -> propFreq block head
+
+    -- After dealing with all loops, deal with non-looping parts of the CFG
+    forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i False) -- Everything in revPostOrder is reachable
+    forM_ revPostOrder $ \block -> propFreq block (head revPostOrder)
+
+    -- trace ("Final freqs:") $ return ()
+    -- let freqString = pprFreqs freqs
+    -- trace (unlines freqString) $ return ()
+    -- trace (pprFre) $ return ()
+    graph' <- readSTRef edgeProbs
+    freqs' <- unsafeFreeze  blockFreqs
+
+    return (freqs', graph')
+  where
+    predecessors :: Int -> IS.IntSet
+    predecessors b = fromMaybe IS.empty $ IM.lookup b revGraph
+    successors b = fromMaybe (lookupError "succ" b graph)$ IM.keys <$> IM.lookup b graph
+    lookupError s b g = pprPanic ("Lookup error " ++ s) $
+                            ( text "node" <+> ppr b $$
+                                text "graph" <+>
+                                vcat (map (\(k,m) -> ppr (k,m :: IM.IntMap Double)) $ IM.toList g)
+                            )
+
+    nodeCount = IM.foldl' (\count toMap -> IM.foldlWithKey' countTargets count toMap) (IM.size graph) graph
+      where
+        countTargets = (\count k _ -> countNode k + count )
+        countNode n = if IM.member n graph then 0 else 1
+
+    isBackEdge from to = S.member (from,to) backEdgeSet
+    backEdgeSet = S.fromList backEdges
+
+    revGraph :: IntMap IntSet
+    revGraph = IM.foldlWithKey' (\m from toMap -> addEdges m from toMap) IM.empty graph
+        where
+            addEdges m0 from toMap = IM.foldlWithKey' (\m k _ -> addEdge m from k) m0 toMap
+            addEdge m0 from to = IM.insertWith IS.union to (IS.singleton from) m0
