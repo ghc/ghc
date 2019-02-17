@@ -6,13 +6,15 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE Rank2Types #-}
 
 module CFG
     ( CFG, CfgEdge(..), EdgeInfo(..), EdgeWeight(..)
     , TransitionSource(..)
 
     --Modify the CFG
-    , addWeightEdge, addEdge, delEdge
+    , addWeightEdge, addEdge
+    , delEdge, delNode
     , addNodesBetween, shortcutWeightMap
     , reverseEdges, filterEdges
     , addImmediateSuccessor
@@ -24,13 +26,17 @@ module CFG
     , getSuccEdgesSorted, weightedEdgeList
     , getEdgeInfo
     , getCfgNodes, hasNode
-    , loopMembers
+
+    -- Loop Information
+    , loopMembers, loopInfo
 
     --Construction/Misc
     , getCfg, getCfgProc, pprEdgeWeights, sanityCheckCfg
 
     --Find backedges and update their weight
-    , optimizeCFG )
+    , optimizeCFG
+
+     )
 where
 
 #include "HsVersions.h"
@@ -51,17 +57,25 @@ import qualified Hoopl.Graph as G
 import Util
 import Digraph
 
+import Unique
+import qualified Dominators as Dom
+import Data.IntMap (IntMap)
+import Data.IntSet (IntSet)
+
+import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
+import Data.Tree
+import Data.Bifunctor
+
 import Outputable
 -- DEBUGGING ONLY
 --import Debug
+-- import Debug.Trace
 --import OrdList
---import Debug.Trace
 import PprCmm ()
 import qualified DynFlags as D
 
 import Data.List
-
--- import qualified Data.IntMap.Strict as M --TODO: LabelMap
 
 type Edge = (BlockId, BlockId)
 type Edges = [Edge]
@@ -293,6 +307,11 @@ delEdge from to m =
     where
         remDest Nothing = Nothing
         remDest (Just wm) = Just $ mapDelete to wm
+
+delNode :: BlockId -> CFG -> CFG
+delNode node cfg =
+  fmap (mapDelete node)  -- < Edges to the node
+    (mapDelete node cfg) -- < Edges from the node
 
 -- | Destinations from bid ordered by weight (descending)
 getSuccEdgesSorted :: CFG -> BlockId -> [(BlockId,EdgeInfo)]
@@ -560,6 +579,7 @@ findBackEdges root cfg =
 optimizeCFG :: D.CfgWeights -> RawCmmDecl -> CFG -> CFG
 optimizeCFG _ (CmmData {}) cfg = cfg
 optimizeCFG weights (CmmProc info _lab _live graph) cfg =
+    -- pprTrace "LoopInfo:" (ppr $ loopInfo cfg (g_entry graph)) $
     favourFewerPreds  .
     penalizeInfoTables info .
     increaseBackEdgeWeight (g_entry graph) $ cfg
@@ -634,8 +654,7 @@ optimizeCFG weights (CmmProc info _lab _live graph) cfg =
           | otherwise = False
 
 -- | Determine loop membership of blocks based on SCC analysis
---   Ideally we would replace this with a variant giving us loop
---   levels instead but the SCC code will do for now.
+--   This is faster but only gives yes/no answers.
 loopMembers :: CFG -> LabelMap Bool
 loopMembers cfg =
     foldl' (flip setLevel) mapEmpty sccs
@@ -649,3 +668,84 @@ loopMembers cfg =
     setLevel :: SCC BlockId -> LabelMap Bool -> LabelMap Bool
     setLevel (AcyclicSCC bid) m = mapInsert bid False m
     setLevel (CyclicSCC bids) m = foldl' (\m k -> mapInsert k True m) m bids
+
+-- | Determine loop membership of blocks based on Dominator analysis.
+--   This is slower but gives loop levels.
+--   Only works for reducible control flow.
+loopInfo :: CFG -> BlockId -> LabelMap Int
+loopInfo cfg root =
+  let revCfg = reverseEdges cfg
+      graph = fmap (setFromList . mapKeys ) cfg :: LabelMap LabelSet
+
+      --TODO - This should be a no op: Export constructors? Use unsafeCoerce? ...
+      rooted = ( fromBlockId root
+               , toIntMap $ fmap toIntSet graph) :: (Int, IntMap IntSet)
+      -- rooted = unsafeCoerce (root, graph)
+      tree = fmap toBlockId $ Dom.domTree rooted :: Tree BlockId
+
+      -- Map from Nodes to their dominators
+      domMap :: LabelMap LabelSet
+      domMap = mkDomMap tree
+
+      edges = edgeList cfg :: [(BlockId, BlockId)]
+      nodes = getCfgNodes cfg :: LabelSet --[BlockId]
+
+      -- identify back edges
+      isBackEdge (from,to)
+        | Just doms <- mapLookup from domMap
+        , setMember to doms
+        = True
+        | otherwise = False
+
+      -- determine the loop body for a back edge
+      findBody edge@(tail, head)
+        = ( edge, setInsert head $ go (setSingleton tail) (setSingleton tail) )
+        where
+          -- The reversed cfg makes it easier to look up predecessors
+          cfg' = delNode head revCfg
+          go :: LabelSet -> LabelSet -> LabelSet
+          go found current
+            | setNull current = found
+            | otherwise = go  (setUnion newSuccessors found)
+                              newSuccessors
+            where
+              newSuccessors = setFilter (\n -> not $ setMember n found) successors :: LabelSet
+              successors = setFromList $ concatMap
+                                        (getSuccessors cfg')
+                                        (setElems current) :: LabelSet
+
+      backEdges = filter isBackEdge edges
+      loopBodies = map findBody backEdges :: [(Edge, LabelSet)]
+
+      -- Block b is part of n loop bodies => loop nest level of n
+      loopCounts =
+        let bodies = map (first snd) loopBodies -- [(Header, Body)]
+            loopCount n = length $ nub . map fst . filter (setMember n . snd) $ bodies
+        in  map (\n -> (n, loopCount n)) $ setElems nodes :: [(BlockId, Int)]
+
+  in -- pprTrace "Bodies" (ppr loopBodies) $
+     mapFromList loopCounts
+  where
+    toIntSet :: LabelSet -> IntSet
+    toIntSet s = IS.fromList . map fromBlockId . setElems $ s
+    toIntMap :: LabelMap a -> IntMap a
+    toIntMap m = IM.fromList $ map (\(x,y) -> (fromBlockId x,y)) $ mapToList m
+
+    mkDomMap :: Tree BlockId -> LabelMap LabelSet
+    mkDomMap root = mapFromList $ go setEmpty root
+      where
+        go :: LabelSet -> Tree BlockId -> [(Label,LabelSet)]
+        go parents (Node lbl [])
+          =  [(lbl, parents)]
+        go parents (Node _ leaves)
+          = let nodes = map rootLabel leaves
+                entries = map (\x -> (x,parents)) nodes
+            in  entries ++ concatMap
+                            (\n -> go (setInsert (rootLabel n) parents) n)
+                            leaves
+
+    fromBlockId :: BlockId -> Int
+    fromBlockId = getKey . getUnique
+
+    toBlockId :: Int -> BlockId
+    toBlockId = mkBlockId . mkUniqueGrimily
