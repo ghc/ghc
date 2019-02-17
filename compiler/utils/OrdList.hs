@@ -10,14 +10,18 @@ can be appended in linear time.
 -}
 {-# LANGUAGE DeriveFunctor #-}
 
+{-# LANGUAGE BangPatterns #-}
+
 module OrdList (
         OrdList,
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL, lastOL,
         headOL,
-        mapOL, fromOL, toOL, foldrOL, foldlOL, reverseOL, fromOLReverse
+        mapOL, fromOL, toOL, foldrOL, foldlOL, reverseOL, fromOLReverse,
+        strictlyEqOL, strictlyOrdOL
 ) where
 
 import GhcPrelude
+import Data.Foldable
 
 import Outputable
 
@@ -49,7 +53,11 @@ instance Monoid (OrdList a) where
   mconcat = concatOL
 
 instance Foldable OrdList where
-  foldr = foldrOL
+  foldr   = foldrOL
+  foldl'  = foldlOL
+  toList  = fromOL
+  null    = isNilOL
+  length  = lengthOL
 
 instance Traversable OrdList where
   traverse f xs = toOL <$> traverse f (fromOL xs)
@@ -64,7 +72,7 @@ appOL    :: OrdList a   -> OrdList a -> OrdList a
 concatOL :: [OrdList a] -> OrdList a
 headOL   :: OrdList a   -> a
 lastOL   :: OrdList a   -> a
-
+lengthOL :: OrdList a   -> Int
 
 nilOL        = None
 unitOL as    = One as
@@ -85,6 +93,13 @@ lastOL (Many as)   = last as
 lastOL (Cons _ as) = lastOL as
 lastOL (Snoc _ a)  = a
 lastOL (Two _ as)  = lastOL as
+
+lengthOL None        = 0
+lengthOL (One _)     = 1
+lengthOL (Many as)   = length as
+lengthOL (Cons _ as) = 1 + length as
+lengthOL (Snoc as _) = 1 + length as
+lengthOL (Two as bs) = length as + length bs
 
 isNilOL None = True
 isNilOL _    = False
@@ -126,13 +141,14 @@ foldrOL k z (Snoc xs x) = foldrOL k (k x z) xs
 foldrOL k z (Two b1 b2) = foldrOL k (foldrOL k z b2) b1
 foldrOL k z (Many xs)   = foldr k z xs
 
+-- | Strict left fold.
 foldlOL :: (b->a->b) -> b -> OrdList a -> b
 foldlOL _ z None        = z
 foldlOL k z (One x)     = k z x
-foldlOL k z (Cons x xs) = foldlOL k (k z x) xs
-foldlOL k z (Snoc xs x) = k (foldlOL k z xs) x
-foldlOL k z (Two b1 b2) = foldlOL k (foldlOL k z b1) b2
-foldlOL k z (Many xs)   = foldl k z xs
+foldlOL k z (Cons x xs) = let !z' = (k z x) in foldlOL k z' xs
+foldlOL k z (Snoc xs x) = let !z' = (foldlOL k z xs) in k z' x
+foldlOL k z (Two b1 b2) = let !z' = (foldlOL k z b1) in foldlOL k z' b2
+foldlOL k z (Many xs)   = foldl' k z xs
 
 toOL :: [a] -> OrdList a
 toOL [] = None
@@ -146,3 +162,33 @@ reverseOL (Cons a b) = Snoc (reverseOL b) a
 reverseOL (Snoc a b) = Cons b (reverseOL a)
 reverseOL (Two a b)  = Two (reverseOL b) (reverseOL a)
 reverseOL (Many xs)  = Many (reverse xs)
+
+-- | Compare not only the values but also the structure of two lists
+strictlyEqOL :: Eq a => OrdList a   -> OrdList a -> Bool
+strictlyEqOL None         None       = True
+strictlyEqOL (One x)     (One y)     = x == y
+strictlyEqOL (Cons a as) (Cons b bs) = a == b && as `strictlyEqOL` bs
+strictlyEqOL (Snoc as a) (Snoc bs b) = a == b && as `strictlyEqOL` bs
+strictlyEqOL (Two a1 a2) (Two b1 b2) = a1 `strictlyEqOL` b1 && a2 `strictlyEqOL` b2
+strictlyEqOL (Many as)   (Many bs)   = as == bs
+strictlyEqOL _            _          = False
+
+-- | Compare not only the values but also the structure of two lists
+strictlyOrdOL :: Ord a => OrdList a   -> OrdList a -> Ordering
+strictlyOrdOL None         None       = EQ
+strictlyOrdOL None         _          = LT
+strictlyOrdOL (One x)     (One y)     = compare x y
+strictlyOrdOL (One _)      _          = LT
+strictlyOrdOL (Cons a as) (Cons b bs) =
+  compare a b `mappend` strictlyOrdOL as bs
+strictlyOrdOL (Cons _ _)   _          = LT
+strictlyOrdOL (Snoc as a) (Snoc bs b) =
+  compare a b `mappend` strictlyOrdOL as bs
+strictlyOrdOL (Snoc _ _)   _          = LT
+strictlyOrdOL (Two a1 a2) (Two b1 b2) =
+  (strictlyOrdOL a1 b1) `mappend` (strictlyOrdOL a2 b2)
+strictlyOrdOL (Two _ _)    _          = LT
+strictlyOrdOL (Many as)   (Many bs)   = compare as bs
+strictlyOrdOL (Many _ )   _           = GT
+
+

@@ -4,7 +4,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -fprof-auto-top #-}
 
 --
 -- Copyright (c) 2010, João Dias, Simon Marlow, Simon Peyton Jones,
@@ -106,6 +105,7 @@ analyzeCmm
     -> FactBase f
     -> FactBase f
 analyzeCmm dir lattice transfer cmmGraph initFact =
+    {-# SCC analyzeCmm #-}
     let entry = g_entry cmmGraph
         hooplGraph = g_graph cmmGraph
         blockMap =
@@ -167,7 +167,7 @@ rewriteCmm
     -> CmmGraph
     -> FactBase f
     -> UniqSM (CmmGraph, FactBase f)
-rewriteCmm dir lattice rwFun cmmGraph initFact = do
+rewriteCmm dir lattice rwFun cmmGraph initFact = {-# SCC rewriteCmm #-} do
     let entry = g_entry cmmGraph
         hooplGraph = g_graph cmmGraph
         blockMap1 =
