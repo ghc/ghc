@@ -78,10 +78,11 @@ test('cgrun069',
      multi_compile_and_run,
      ['cgrun069', [('cgrun069_cmm.cmm', '')], ''])
 test('cgrun070', normal, compile_and_run, [''])
-test('cgrun071', normal, compile_and_run, [''])
+test('cgrun071', [when(have_cpu_feature('sse4_2'), extra_hc_opts('-msse4.2'))], compile_and_run, [''])
 test('cgrun072', normal, compile_and_run, [''])
 test('cgrun075', normal, compile_and_run, [''])
 test('cgrun076', normal, compile_and_run, [''])
+test('cgrun077', [when(have_cpu_feature('bmi2'), extra_hc_opts('-mbmi2'))], compile_and_run, [''])
 
 test('T1852', normal, compile_and_run, [''])
 test('T1861', extra_run_opts('0'), compile_and_run, [''])
