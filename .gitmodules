@@ -107,6 +107,3 @@
 [submodule "gmp-tarballs"]
 	path = libraries/integer-gmp/gmp/gmp-tarballs
 	url = ../gmp-tarballs.git
-[submodule ".arc-linters/arcanist-external-json-linter"]
-	path = .arc-linters/arcanist-external-json-linter
-	url = ../arcanist-external-json-linter.git
