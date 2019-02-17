@@ -1375,7 +1375,12 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
                           ])
 
         liftIO $ debugTraceMsg dflags 4 (text "Running the assembler")
-        runAssembler input_fn output_fn
+
+        -- Atomic write by writing to temp file and then renaming
+        let temp_output_fn = output_fn <.> "tmp"
+        runAssembler input_fn temp_output_fn
+        liftIO $ renameFile temp_output_fn output_fn
+
         return (RealPhase next_phase, output_fn)
 
 
