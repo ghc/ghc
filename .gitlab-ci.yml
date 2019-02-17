@@ -360,6 +360,8 @@ validate-x86_64-linux-deb9-unreg:
     - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
     - bash -c 'make clean || true'
   dependencies: []
+  variables:
+    FORCE_SYMLINKS: 1
   cache:
     paths:
       - cabal-cache
