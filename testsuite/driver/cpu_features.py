@@ -54,6 +54,7 @@ def have_cpu_feature(feature):
     A testsuite predicate for testing the availability of CPU features.
     """
     assert feature in SUPPORTED_CPU_FEATURES
+    global cpu_feature_cache
     if cpu_feature_cache is None:
         cpu_feature_cache = get_cpu_features()
         print('Found CPU features:', ' '.join(cpu_feature_cache))
