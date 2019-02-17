@@ -1,0 +1,4 @@
+
+T16334.hs:5:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_t’ standing for ‘Type’
+    • In the type signature: k :: (Int :: _t)
