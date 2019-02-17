@@ -563,7 +563,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 Opt_D_dump_asm_native "Native code"
                 (vcat $ map (pprNatCmmDecl ncgImpl) native)
 
-        dumpIfSet_dyn dflags
+        when (not $ null nativeCfgWeights) $ dumpIfSet_dyn dflags
                 Opt_D_dump_cfg_weights "CFG Weights"
                 (pprEdgeWeights nativeCfgWeights)
 
@@ -691,7 +691,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 {-# SCC "generateJumpTables" #-}
                 generateJumpTables ncgImpl alloced
 
-        dumpIfSet_dyn dflags
+        when (not $ null nativeCfgWeights) $ dumpIfSet_dyn dflags
                 Opt_D_dump_cfg_weights "CFG Update information"
                 ( text "stack:" <+> ppr stack_updt_blks $$
                   text "linearAlloc:" <+> ppr cfgRegAllocUpdates )
@@ -704,7 +704,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         let optimizedCFG =
                 optimizeCFG (cfgWeightInfo dflags) cmm postShortCFG
 
-        dumpIfSet_dyn dflags
+        when (not $ null nativeCfgWeights) $ dumpIfSet_dyn dflags
                 Opt_D_dump_cfg_weights "CFG Final Weights"
                 ( pprEdgeWeights optimizedCFG )
 
