@@ -13,7 +13,7 @@ import Data.Kind
 
 class Ríki (obj :: Type) where
   type Obj :: obj -> Constraint
-  type Obj = Bæ @obj
+  type Obj = Bæ
 
 class    Bæ    (a :: k)
 instance Bæ @k (a :: k)

@@ -13,7 +13,7 @@ data family Fam
 data instance Fam = MkFam (forall (a :: k). Proxy a)
 
 type family T
-type instance T = Proxy (Nothing :: Maybe a)
+type instance T = (Proxy (Nothing :: Maybe a) :: Proxy (Maybe a))
 
 class C k where
   data CD :: k
@@ -21,8 +21,8 @@ class C k where
 
 instance C Type where
   data CD = forall (a :: k). CD (Proxy a)
-  type CT = Proxy (Nothing :: Maybe a)
+  type CT = (Proxy (Nothing :: Maybe a) :: Proxy (Maybe a))
 
 class Z a where
   type ZT a
-  type ZT a = Proxy (Nothing :: Maybe x)
+  type ZT a = (Proxy (Nothing :: Maybe x) :: Proxy (Maybe x))

@@ -727,11 +727,10 @@ rnFamInstEqn doc mb_cls rhs_kvars
        ; let pat_kity_vars_with_dups = extractHsTyArgRdrKiTyVarsDup pats
              -- Use the "...Dups" form because it's needed
              -- below to report unsed binder on the LHS
-       ; let pat_kity_vars = rmDupsInRdrTyVars pat_kity_vars_with_dups
 
          -- Implicitly bound variables, empty if we have an explicit 'forall' according
          -- to the "forall-or-nothing" rule.
-       ; let imp_vars | isNothing mb_bndrs = freeKiTyVarsAllVars pat_kity_vars
+       ; let imp_vars | isNothing mb_bndrs = nubL pat_kity_vars_with_dups
                       | otherwise = []
        ; imp_var_names <- mapM (newTyVarNameRn mb_cls) imp_vars
 
@@ -763,7 +762,7 @@ rnFamInstEqn doc mb_cls rhs_kvars
                        -- See Note [Unused type variables in family instances]
                     ; let groups :: [NonEmpty (Located RdrName)]
                           groups = equivClasses cmpLocated $
-                                   freeKiTyVarsAllVars pat_kity_vars_with_dups
+                                   pat_kity_vars_with_dups
                     ; nms_dups <- mapM (lookupOccRn . unLoc) $
                                      [ tv | (tv :| (_:_)) <- groups ]
                           -- Add to the used variables
@@ -1578,7 +1577,7 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
                       tcdFixity = fixity, tcdRhs = rhs })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
        ; let kvs = extractHsTyRdrTyVarsKindVars rhs
-             doc = TySynCtx tycon
+       ; let doc = TySynCtx tycon
        ; traceRn "rntycl-ty" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' _ ->
     do { (rhs', fvs) <- rnTySyn doc rhs
@@ -2145,8 +2144,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- That order governs the order the implicitly-quantified type
           -- variable, and hence the order needed for visible type application
           -- See Trac #14808.
-              free_tkvs = freeKiTyVarsAllVars $
-                          extractHsTvBndrs explicit_tkvs $
+              free_tkvs = extractHsTvBndrs explicit_tkvs $
                           extractHsTysRdrTyVarsDups (theta ++ arg_tys ++ [res_ty])
 
               ctxt    = ConDeclCtx new_names
