@@ -1,0 +1,1 @@
+f = \ (@ p) _ [Occ=Dead] -> GHC.Types.True
