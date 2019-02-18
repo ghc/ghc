@@ -14,6 +14,13 @@ stages:
   - full-build
   - cleanup # See Note [Cleanup on Windows]
 
+.only-default: &only-default
+  only:
+    - master
+    - merge_requests
+    - tags
+    - branches
+
 ############################################################
 # Runner Tags
 ############################################################
@@ -34,24 +41,31 @@ ghc-linters:
   stage: lint
   image: ghcci/linters:0.1
   script:
-    - |
-      if [ -n "$CI_MERGE_REQUEST_ID" ]; then
-        base="$(git merge-base $CI_MERGE_REQUEST_BRANCH_NAME HEAD)"
-        validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
-        submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
-        validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
-        .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
-        .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
-      fi
+    - git fetch origin
+    - git checkout $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - git reset --hard origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - echo $CI_MERGE_REQUEST_ID
+    - echo $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - echo $CI_COMMIT_SHA
+    - base="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME $CI_COMMIT_SHA)"
+    - echo $base
+    #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
+    - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
+    - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
+    - .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
+    - submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
   dependencies: []
   tags:
     - lint
+  only:
+   - merge_requests
 
 ############################################################
 # Validation via Pipelines (hadrian)
 ############################################################
 
 .validate-hadrian:
+  <<: *only-default
   allow_failure: true
   script:
     - git clean -xdf && git submodule foreach git clean -xdf
@@ -86,6 +100,7 @@ validate-x86_64-linux-deb8-hadrian:
 ############################################################
 
 .validate:
+  <<: *only-default
   variables:
     TEST_TYPE: test
   before_script:
@@ -95,7 +110,7 @@ validate-x86_64-linux-deb8-hadrian:
     - ./configure $CONFIGURE_ARGS
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make V=0 -j$THREADS WERROR=-Werror 
+      make V=0 -j$THREADS WERROR=-Werror
     - |
       make binary-dist TAR_COMP_OPTS="-1"
       mv ghc-*.tar.xz ghc.tar.xz
@@ -336,6 +351,7 @@ validate-x86_64-linux-deb9-unreg:
 ############################################################
 
 .validate-windows:
+  <<: *only-default
   before_script:
     - git clean -xdf
     - git submodule foreach git clean -xdf
@@ -432,6 +448,7 @@ validate-x86_64-windows:
 
 # See Note [Cleanup after shell executor]
 cleanup-windows:
+  <<: *only-default
   stage: cleanup
   tags:
     - x86_64-windows
@@ -454,6 +471,7 @@ cleanup-windows:
 
 # See Note [Cleanup after shell executor]
 cleanup-darwin:
+  <<: *only-default
   stage: cleanup
   tags:
     - x86_64-darwin
