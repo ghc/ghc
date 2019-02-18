@@ -29,12 +29,16 @@ ENV PATH /usr/libexec/python3-sphinx:$PATH
 RUN sed -i -e 's/systemd//g' /etc/nsswitch.conf
 
 # Install GHC and cabal
-RUN cd /tmp && curl https://downloads.haskell.org/~ghc/8.4.2/ghc-8.4.2-x86_64-deb8-linux.tar.xz | tar -Jx
-RUN cd /tmp/ghc-8.4.2 && ./configure --prefix=/opt/ghc/8.4.2
-RUN cd /tmp/ghc-8.4.2 && make install
-RUN mkdir -p /opt/cabal/bin
-RUN cd /opt/cabal/bin && curl https://www.haskell.org/cabal/release/cabal-install-2.2.0.0/cabal-install-2.2.0.0-x86_64-unknown-linux.tar.gz | tar -zx
-ENV PATH /opt/ghc/8.4.2/bin:/opt/cabal/bin:$PATH
+RUN cd /tmp && curl https://downloads.haskell.org/~ghc/8.4.4/ghc-8.4.4-x86_64-fedora27-linux.tar.xz | tar -Jx; \
+    cd /tmp/ghc-8.4.4 && ./configure --prefix=/opt/ghc/8.4.4; \
+    cd /tmp/ghc-8.4.4 && make install; \
+    rm -rf /tmp/ghc-8.4.4
+ENV PATH /opt/ghc/8.4.4/bin:$PATH
+
+# Get Cabal
+RUN cd /tmp && \
+    curl https://downloads.haskell.org/cabal/cabal-install-2.4.1.0/cabal-install-2.4.1.0-x86_64-unknown-linux.tar.xz | tar -Jx && \
+    mv cabal /usr/local/bin/cabal
 
 # Create a normal user.
 RUN adduser ghc --comment "GHC builds"
@@ -42,9 +46,9 @@ RUN echo "ghc ALL = NOPASSWD : ALL" > /etc/sudoers.d/ghc
 USER ghc
 WORKDIR /home/ghc/
 
-# Install Alex, Happy, and HsColor with Cabal
-RUN cabal update && \
-    cabal install hscolour happy alex
+# Build Haskell tools
+RUN cabal v2-update && \
+    cabal v2-install hscolour happy alex
 ENV PATH /home/ghc/.cabal/bin:$PATH
 
 CMD ["bash"]
