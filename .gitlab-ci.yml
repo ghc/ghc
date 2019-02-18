@@ -54,6 +54,8 @@ ghc-linters:
   dependencies: []
   tags:
     - lint
+  only:
+   - merge_requests
 
 ############################################################
 # Validation via Pipelines (hadrian)
