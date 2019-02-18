@@ -136,10 +136,10 @@ testsuitePackages = do
              , hp2ps
              , hpcBin
              , hsc2hs
-             , iserv
              , parallel
              , runGhc
              , unlit         ] ++
+             concat [ [iserv, libiserv] | not win ] ++
              [ timeout | win ]
 
 getPackageByPath :: FilePath -> Action Package
