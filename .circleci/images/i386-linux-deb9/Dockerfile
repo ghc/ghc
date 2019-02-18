@@ -1,4 +1,4 @@
-FROM i386/debian:jessie
+FROM i386/debian:stretch
 
 ENV LANG C.UTF-8
 
@@ -19,27 +19,26 @@ RUN apt-get install -qy python3-sphinx texlive-xetex texlive-latex-extra
 RUN apt-get install -qy libgmp-dev:i386
 
 # Get i386 GHC bindist for 32 bit CI builds.
-RUN cd /tmp && curl https://downloads.haskell.org/~ghc/8.4.2/ghc-8.4.2-i386-deb8-linux.tar.xz | tar -Jx
-RUN cd /tmp/ghc-8.4.2 && setarch i386 ./configure --prefix=/opt/ghc-i386/8.4.2 CFLAGS=-m32 --target=i386-unknown-linux --build=i386-unknown-linux --host=i386-unknown-linux
-RUN cd /tmp/ghc-8.4.2 && make install
-RUN rm -rf /tmp/ghc-8.4.2
-ENV PATH /opt/ghc-i386/8.4.2/bin:$PATH
+RUN cd /tmp && curl https://downloads.haskell.org/~ghc/8.4.4/ghc-8.4.4-i386-deb8-linux.tar.xz | tar -Jx; \
+    cd /tmp/ghc-8.4.4 && setarch i386 ./configure --prefix=/opt/ghc-i386/8.4.4 CFLAGS=-m32 --target=i386-unknown-linux --build=i386-unknown-linux --host=i386-unknown-linux; \
+    cd /tmp/ghc-8.4.4 && make install; \
+    rm -rf /tmp/ghc-8.4.4
+ENV PATH /opt/ghc-i386/8.4.4/bin:$PATH
 
 # Get Cabal
 RUN cd /tmp && \
-    curl https://www.haskell.org/cabal/release/cabal-install-2.2.0.0/cabal-install-2.2.0.0-i386-unknown-linux.tar.gz | tar -zx && \
+    curl https://downloads.haskell.org/cabal/cabal-install-2.4.1.0/cabal-install-2.4.1.0-i386-unknown-linux.tar.xz | tar -Jx && \
     mv cabal /usr/local/bin/cabal
 
 # Create a normal user.
 RUN adduser ghc --gecos "GHC builds" --disabled-password
 RUN echo "ghc ALL = NOPASSWD : ALL" > /etc/sudoers.d/ghc
 USER ghc
+WORKDIR /home/ghc/
 
 # Build Haskell tools
-RUN cabal update && \
-    cabal install hscolour happy alex
+RUN cabal v2-update && \
+    cabal v2-install hscolour happy alex
 ENV PATH /home/ghc/.cabal/bin:$PATH
-
-WORKDIR /home/ghc/
 
 CMD ["bash"]
