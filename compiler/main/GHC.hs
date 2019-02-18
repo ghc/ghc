@@ -13,7 +13,7 @@
 
 module GHC (
         -- * Initialisation
-        defaultErrorHandler,
+        defaultErrorHandler,      
         defaultCleanupHandler,
         prettyPrintGhcErrors,
         withSignalHandlers,
