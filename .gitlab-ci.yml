@@ -19,6 +19,13 @@ stages:
   - packaging
   - hackage
 
+.only-default: &only-default
+  only:
+    - master
+    - merge_requests
+    - tags
+    - branches
+
 ############################################################
 # Runner Tags
 ############################################################
@@ -39,24 +46,31 @@ ghc-linters:
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
-    - |
-      if [ -n "$CI_MERGE_REQUEST_ID" ]; then
-        base="$(git merge-base $CI_MERGE_REQUEST_BRANCH_NAME HEAD)"
-        validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
-        submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
-        validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
-        .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
-        .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
-      fi
+    - git fetch origin
+    - git checkout $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - git reset --hard origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - echo $CI_MERGE_REQUEST_ID
+    - echo $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - echo $CI_COMMIT_SHA
+    - base="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME $CI_COMMIT_SHA)"
+    - echo $base
+    #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
+    - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
+    - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
+    - .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
+    - submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
   dependencies: []
   tags:
     - lint
+  only:
+   - merge_requests
 
 ############################################################
 # Validation via Pipelines (hadrian)
 ############################################################
 
 .validate-hadrian:
+  <<: *only-default
   allow_failure: true
   script:
     - cabal update
@@ -122,6 +136,7 @@ hadrian-ghc-in-ghci:
 ############################################################
 
 .validate:
+  <<: *only-default
   variables:
     TEST_TYPE: test
   before_script:
@@ -395,6 +410,7 @@ validate-x86_64-linux-fedora27:
 ############################################################
 
 .build-windows:
+  <<: *only-default
   before_script:
     - git clean -xdf
     - git submodule foreach git clean -xdf
@@ -534,6 +550,7 @@ nightly-i386-windows:
 
 # See Note [Cleanup after shell executor]
 cleanup-windows:
+  <<: *only-default
   stage: cleanup
   tags:
     - x86_64-windows
@@ -556,6 +573,7 @@ cleanup-windows:
 
 # See Note [Cleanup after shell executor]
 cleanup-darwin:
+  <<: *only-default
   stage: cleanup
   tags:
     - x86_64-darwin
