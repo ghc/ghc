@@ -1,0 +1,17 @@
+Single outer cell:
+
++-------------+
+|   outer     |
+|             |
++-------+     |
+| inner |     |
++-------+-----+
+
+Broken (only inner cell is rendered):
+
++-------+-----+
+| inner |     |
++-------+     |
+|             |
+|   outer     |
++-------------+

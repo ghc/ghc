@@ -1,0 +1,5 @@
+DocParagraph
+  (DocHyperlink
+     Hyperlink
+       {hyperlinkLabel = Just (DocString "link"),
+        hyperlinkUrl = "http://example.com"})
