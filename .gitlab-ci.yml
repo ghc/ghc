@@ -45,7 +45,7 @@ ghc-linters:
     - echo $CI_MERGE_REQUEST_ID
     - echo $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - echo $CI_COMMIT_SHA
-    - git log
+    - git rev-parse origin
     - |
       if [ -n "$CI_MERGE_REQUEST_ID" ]; then
         base="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME $CI_COMMIT_SHA)"
