@@ -18,14 +18,14 @@ ghcConfigHsPath :: FilePath
 ghcConfigHsPath = "testsuite/mk/ghc-config.hs"
 
 ghcConfigProgPath :: FilePath
-ghcConfigProgPath = "test/bin/ghc-config"
+ghcConfigProgPath = "test/bin/ghc-config" <.> exe
 
 checkPprProgPath, checkPprSourcePath :: FilePath
-checkPprProgPath = "test/bin/check-ppr"
+checkPprProgPath = "test/bin/check-ppr" <.> exe
 checkPprSourcePath = "utils/check-ppr/Main.hs"
 
 checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath :: FilePath
-checkApiAnnotationsProgPath = "test/bin/check-api-annotations"
+checkApiAnnotationsProgPath = "test/bin/check-api-annotations" <.> exe
 checkApiAnnotationsSourcePath = "utils/check-api-annotations/Main.hs"
 
 checkPrograms :: [(FilePath, FilePath)]
@@ -44,9 +44,11 @@ testRules = do
 
     -- Using program shipped with testsuite to generate ghcconfig file.
     root -/- ghcConfigProgPath %> \_ -> do
-        ghc0Path <- getCompilerPath "stage0"
+        ghc0Path <- (<.> exe) <$> getCompilerPath "stage0"
+        liftIO (putStrLn ghc0Path)
+        topDirectory >>= liftIO . putStrLn
         createDirectory $ takeDirectory (root -/- ghcConfigProgPath)
-        cmd ghc0Path [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
+        cmd [ghc0Path] [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
 
     -- Rules for building check-ppr and check-ppr-annotations with the compiler
     -- we are going to test (in-tree or out-of-tree).
@@ -58,7 +60,7 @@ testRules = do
                 let stg = stageOf testGhc
                 need . (:[]) =<< programPath (Context stg ghc vanilla)
             bindir <- getBinaryDirectory testGhc
-            cmd [Cwd bindir] ("./ghc"++exe)
+            cmd [bindir </> "ghc" <.> exe]
                 ["-package", "ghc", "-o", top -/- path, top -/- sourcePath]
 
     root -/- ghcConfigPath %> \_ -> do
