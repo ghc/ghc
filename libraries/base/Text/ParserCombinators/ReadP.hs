@@ -99,7 +99,7 @@ data P a
   | Look (String -> P a)
   | Fail
   | Result a (P a)
-  | Final [(a,String)] -- invariant: list is non-empty!
+  | Final (NonEmpty (a,String))
   deriving Functor -- ^ @since 4.8.0.0
 
 -- Monad, MonadPlus
@@ -114,11 +114,11 @@ instance MonadPlus P
 
 -- | @since 2.01
 instance Monad P where
-  (Get f)      >>= k = Get (\c -> f c >>= k)
-  (Look f)     >>= k = Look (\s -> f s >>= k)
-  Fail         >>= _ = Fail
-  (Result x p) >>= k = k x <|> (p >>= k)
-  (Final r)    >>= k = final [ys' | (x,s) <- r, ys' <- run (k x) s]
+  (Get f)         >>= k = Get (\c -> f c >>= k)
+  (Look f)        >>= k = Look (\s -> f s >>= k)
+  Fail            >>= _ = Fail
+  (Result x p)    >>= k = k x <|> (p >>= k)
+  (Final (r:|rs)) >>= k = final [ys' | (x,s) <- (r:rs), ys' <- run (k x) s]
 
   fail _ = Fail
 
@@ -144,11 +144,15 @@ instance Alternative P where
   -- two finals are combined
   -- final + look becomes one look and one final (=optimization)
   -- final + sthg else becomes one look and one final
-  Final r    <|> Final t    = Final (r ++ t)
-  Final r    <|> Look f     = Look (\s -> Final (r ++ run (f s) s))
-  Final r    <|> p          = Look (\s -> Final (r ++ run p s))
-  Look f     <|> Final r    = Look (\s -> Final (run (f s) s ++ r))
-  p          <|> Final r    = Look (\s -> Final (run p s ++ r))
+  Final r       <|> Final t = Final (r <> t)
+  Final (r:|rs) <|> Look f  = Look (\s -> Final (r:|(rs ++ run (f s) s)))
+  Final (r:|rs) <|> p       = Look (\s -> Final (r:|(rs ++ run p s)))
+  Look f        <|> Final r = Look (\s -> Final (case run (f s) s of
+                                []     -> r
+                                (x:xs) -> (x:|xs) <> r))
+  p             <|> Final r = Look (\s -> Final (case run p s of
+                                []     -> r
+                                (x:xs) -> (x:|xs) <> r))
 
   -- two looks are combined (=optimization)
   -- look + sthg else floats upwards
@@ -192,16 +196,15 @@ instance MonadPlus ReadP
 -- Operations over P
 
 final :: [(a,String)] -> P a
--- Maintains invariant for Final constructor
-final [] = Fail
-final r  = Final r
+final []     = Fail
+final (r:rs) = Final (r:|rs)
 
 run :: P a -> ReadS a
-run (Get f)      (c:s) = run (f c) s
-run (Look f)     s     = run (f s) s
-run (Result x p) s     = (x,s) : run p s
-run (Final r)    _     = r
-run _            _     = []
+run (Get f)         (c:s) = run (f c) s
+run (Look f)        s     = run (f s) s
+run (Result x p)    s     = (x,s) : run p s
+run (Final (r:|rs)) _     = (r:rs)
+run _               _     = []
 
 -- ---------------------------------------------------------------------------
 -- Operations over ReadP
