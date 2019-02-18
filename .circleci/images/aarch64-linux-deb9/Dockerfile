@@ -57,6 +57,7 @@ ENV PATH /home/ghc/.local/bin:/opt/cabal/2.2/bin:/opt/ghc/8.4.2/bin:$PATH
 RUN adduser ghc --gecos "GHC builds" --disabled-password
 RUN echo "ghc ALL = NOPASSWD : ALL" > /etc/sudoers.d/ghc
 USER ghc
+WORKDIR /home/ghc/
 
 # Build Haskell tools
 RUN cabal update && \
