@@ -34,16 +34,15 @@ ghc-linters:
   stage: lint
   image: ghcci/linters:0.1
   script:
-    - |
-      echo $CI_MERGE_REQUEST_ID
-      base="$(git merge-base $CI_MERGE_REQUEST_BRANCH_NAME HEAD)"
-      validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
-      validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
-      .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
-      .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
-      if [ -n "$CI_MERGE_REQUEST_ID" ]; then
-        submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
-      fi
+    - echo $CI_MERGE_REQUEST_ID
+    - base="$(git merge-base $CI_MERGE_REQUEST_BRANCH_NAME HEAD)"
+    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
+    - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
+    - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
+    - .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
+    - | if [ -n "$CI_MERGE_REQUEST_ID" ]; then
+          submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
+        fi
   dependencies: []
   tags:
     - lint
