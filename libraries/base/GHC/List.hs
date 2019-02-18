@@ -925,14 +925,14 @@ foldr2 k z = go
         go []    _ys     = z
         go _xs   []      = z
         go (x:xs) (y:ys) = k x y (go xs ys)
-{-# INLINE [0] foldr2 #-}
+{-# INLINE [0] foldr2 #-}  -- See Note [Fusion for foldrN]
 
 foldr2_left :: (a -> b -> c -> d) -> d -> a -> ([b] -> c) -> [b] -> d
 foldr2_left _k  z _x _r []     = z
 foldr2_left  k _z  x  r (y:ys) = k x y (r ys)
 
 -- foldr2 k z xs ys = foldr (foldr2_left k z)  (\_ -> z) xs ys
-{-# RULES
+{-# RULES   -- See Note [Fusion for foldrN]
 "foldr2/left"   forall k z ys (g::forall b.(a->b->b)->b->b) .
                   foldr2 k z (build g) ys = g (foldr2_left  k z) (\_ -> z) ys
  #-}
@@ -944,7 +944,7 @@ foldr3 k z = go
     go  _     []     _      = z
     go  _     _      []     = z
     go (a:as) (b:bs) (c:cs) = k a b c (go as bs cs)
-{-# INLINE [0] foldr3 #-}
+{-# INLINE [0] foldr3 #-}  -- See Note [Fusion for foldrN]
 
 
 foldr3_left :: (a -> b -> c -> d -> e) -> e -> a ->
@@ -953,28 +953,63 @@ foldr3_left k _z a r (b:bs) (c:cs) = k a b c (r bs cs)
 foldr3_left _  z _ _  _      _     = z
 
 -- foldr3 k n xs ys zs = foldr (foldr3_left k n) (\_ _ -> n) xs ys zs
-{-# RULES
+{-# RULES   -- See Note [Fusion for foldrN]
 "foldr3/left"   forall k z (g::forall b.(a->b->b)->b->b).
                   foldr3 k z (build g) = g (foldr3_left k z) (\_ _ -> z)
  #-}
 
--- There used to be a foldr2/right rule, allowing foldr2 to fuse with a build
--- form on the right. However, this causes trouble if the right list ends in
--- a bottom that is only avoided by the left list ending at that spot. That is,
--- foldr2 f z [a,b,c] (d:e:f:_|_), where the right list is produced by a build
--- form, would cause the foldr2/right rule to introduce bottom. Example:
---
--- zip [1,2,3,4] (unfoldr (\s -> if s > 4 then undefined else Just (s,s+1)) 1)
---
--- should produce
---
--- [(1,1),(2,2),(3,3),(4,4)]
---
--- but with the foldr2/right rule it would instead produce
---
--- (1,1):(2,2):(3,3):(4,4):_|_
+{- Note [Fusion for foldrN]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We arrange that foldr2, foldr3, etc is a good consumer for its first
+(left) list argument. Here's how. See below for the second, third
+etc list arguments
 
--- Zips for larger tuples are in the List module.
+* The rule "foldr2/left" (active only before phase 1) does this:
+     foldr2 k z (build g) ys = g (foldr2_left  k z) (\_ -> z) ys
+  thereby fusing away the 'build' on the left argument
+
+* To ensure this rule has a chance to fire, foldr2 has a NOINLINE[1] pragma
+
+There used to be a "foldr2/right" rule, allowing foldr2 to fuse with a build
+form on the right. However, this causes trouble if the right list ends in
+a bottom that is only avoided by the left list ending at that spot. That is,
+foldr2 f z [a,b,c] (d:e:f:_|_), where the right list is produced by a build
+form, would cause the foldr2/right rule to introduce bottom. Example:
+  zip [1,2,3,4] (unfoldr (\s -> if s > 4 then undefined else Just (s,s+1)) 1)
+should produce
+  [(1,1),(2,2),(3,3),(4,4)]
+but with the foldr2/right rule it would instead produce
+  (1,1):(2,2):(3,3):(4,4):_|_
+
+Note [Fusion for zipN/zipWithN]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We arrange that zip, zip3, etc, and zipWith, zipWit3 etc, are all
+good consumers for their first (left) argument, and good producers.
+Here's how.  See Note [Fusion for foldr2] for why it can't fuse its
+second (right) list argument.
+
+NB: Zips for larger tuples are in the List module.
+
+* Rule "zip" (active only before phase 1) rewrites
+    zip xs ys = build (\c n -> foldr2 (zipFB c) n xs ys)
+  See also Note [Inline FB functions]
+
+  Ditto rule "zipWith".
+
+* To give this rule a chance to fire, we give zip a NOLINLINE[1]
+  pragma (although since zip is recursive it might not need it)
+
+* Now the rules for foldr2 (see Note [Fusion for foldr2]) may fire,
+  or rules that fuse the build-produced output of zip.
+
+* If none of these fire, rule "zipList" (active only in phase 1)
+  rewrites the foldr2 call back to zip
+     foldr2 (zipFB (:)) []   = zip
+  This rule will only fire when build has inlined, which also
+  happens in phase 1.
+
+  Ditto rule "zipWithList".
+-}
 
 ----------------------------------------------
 -- | /O(min(m,n))/. 'zip' takes two lists and returns a list of corresponding
@@ -995,7 +1030,7 @@ foldr3_left _  z _ _  _      _     = z
 --
 -- 'zip' is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
-{-# NOINLINE [1] zip #-}
+{-# NOINLINE [1] zip #-}  -- See Note [Fusion for zipN/zipWithN]
 zip :: [a] -> [b] -> [(a,b)]
 zip []     _bs    = []
 zip _as    []     = []
@@ -1005,7 +1040,7 @@ zip (a:as) (b:bs) = (a,b) : zip as bs
 zipFB :: ((a, b) -> c -> d) -> a -> b -> c -> d
 zipFB c = \x y r -> (x,y) `c` r
 
-{-# RULES
+{-# RULES  -- See Note [Fusion for zipN/zipWithN]
 "zip"      [~1] forall xs ys. zip xs ys = build (\c n -> foldr2 (zipFB c) n xs ys)
 "zipList"  [1]  foldr2 (zipFB (:)) []   = zip
  #-}
@@ -1026,7 +1061,7 @@ zip3 _      _      _      = []
 zip3FB :: ((a,b,c) -> xs -> xs') -> a -> b -> c -> xs -> xs'
 zip3FB cons = \a b c r -> (a,b,c) `cons` r
 
-{-# RULES
+{-# RULES    -- See Note [Fusion for zipN/zipWithN]
 "zip3"       [~1] forall as bs cs. zip3 as bs cs = build (\c n -> foldr3 (zip3FB c) n as bs cs)
 "zip3List"   [1]          foldr3 (zip3FB (:)) [] = zip3
  #-}
@@ -1049,7 +1084,7 @@ zip3FB cons = \a b c r -> (a,b,c) `cons` r
 --
 -- 'zipWith' is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
-{-# NOINLINE [1] zipWith #-}
+{-# NOINLINE [1] zipWith #-}  -- See Note [Fusion for zipN/zipWithN]
 zipWith :: (a->b->c) -> [a]->[b]->[c]
 zipWith f = go
   where
@@ -1063,7 +1098,7 @@ zipWith f = go
 zipWithFB :: (a -> b -> c) -> (d -> e -> a) -> d -> e -> b -> c
 zipWithFB c f = \x y r -> (x `f` y) `c` r
 
-{-# RULES
+{-# RULES       -- See Note [Fusion for zipN/zipWithN]
 "zipWith"       [~1] forall f xs ys.    zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
 "zipWithList"   [1]  forall f.  foldr2 (zipWithFB (:) f) [] = zipWith f
   #-}
