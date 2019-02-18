@@ -36,7 +36,7 @@ ghc-linters:
   script:
     - echo $CI_MERGE_REQUEST_ID
     - echo $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
-    -
+    - |
       if [ -n "$CI_MERGE_REQUEST_ID" ]; then
         base="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME HEAD)"
       else
