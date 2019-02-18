@@ -906,30 +906,36 @@ isUnliftedTypeKind kind
       Just rep -> isUnliftedRuntimeRep rep
       Nothing  -> False
 
-isLiftedRuntimeRep, isUnliftedRuntimeRep :: Type -> Bool
+isLiftedRuntimeRep :: Type -> Bool
 -- isLiftedRuntimeRep is true of LiftedRep :: RuntimeRep
--- Similarly isUnliftedRuntimeRep
+-- False of type variables (a :: RuntimeRep)
+--   and of other reps e.g. (IntRep :: RuntimeRep)
 isLiftedRuntimeRep rep
   | Just rep' <- coreView rep          = isLiftedRuntimeRep rep'
   | TyConApp rr_tc args <- rep
   , rr_tc `hasKey` liftedRepDataConKey = ASSERT( null args ) True
   | otherwise                          = False
 
+isUnliftedRuntimeRep :: Type -> Bool
+-- True of definitely-unlifted RuntimeReps
+-- False of           (LiftedRep :: RuntimeRep)
+--   and of variables (a :: RuntimeRep)
 isUnliftedRuntimeRep rep
-  | Just rep' <- coreView rep          = isUnliftedRuntimeRep rep'
+  | Just rep' <- coreView rep = isUnliftedRuntimeRep rep'
   | TyConApp rr_tc _ <- rep   -- NB: args might be non-empty
-                              --     e.g. TupleRep
-  , isUnliftedRuntimeRepTyCon rr_tc    = True
-  | otherwise                          = False
-
-isUnliftedRuntimeRepTyCon :: TyCon -> Bool
-isUnliftedRuntimeRepTyCon rr_tc
-  = elem (getUnique rr_tc) unliftedRepDataConKeys
+                              --     e.g. TupleRep [r1, .., rn]
+  = isPromotedDataCon rr_tc && not (rr_tc `hasKey` liftedRepDataConKey)
+        -- Avoid searching all the unlifted RuntimeRep type cons
+        -- In the RuntimeRep data type, only LiftedRep is lifted
+        -- But be careful of type families (F tys) :: RuntimeRep
+  | otherwise {- Variables, applications -}
+  = False
 
 -- | Is this the type 'RuntimeRep'?
 isRuntimeRepTy :: Type -> Bool
 isRuntimeRepTy ty | Just ty' <- coreView ty = isRuntimeRepTy ty'
-isRuntimeRepTy (TyConApp tc []) = tc `hasKey` runtimeRepTyConKey
+isRuntimeRepTy (TyConApp tc args)
+  | tc `hasKey` runtimeRepTyConKey = ASSERT( null args ) True
 isRuntimeRepTy _ = False
 
 -- | Is a tyvar of type 'RuntimeRep'?
