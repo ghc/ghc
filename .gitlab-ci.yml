@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 07bd4acf4f91b56e22389d7b7f6c13486a7b63de
+  DOCKER_REV: cefaee3c742af193e0f7783f87edb0d35374515c
 
 before_script:
   - python3 .gitlab/fix-submodules.py
@@ -18,6 +18,13 @@ stages:
   - cleanup    # See Note [Cleanup on Windows]
   - packaging  # Source distribution, etc.
   - hackage    # head.hackage testing
+
+.only-default: &only-default
+  only:
+    - master
+    - /ghc-[0-9]+\.[0-9]+/
+    - merge_requests
+    - tags
 
 ############################################################
 # Runner Tags
@@ -39,24 +46,58 @@ ghc-linters:
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
-    - |
-      if [ -n "$CI_MERGE_REQUEST_ID" ]; then
-        base="$(git merge-base $CI_MERGE_REQUEST_BRANCH_NAME HEAD)"
-        validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
-        submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
-        validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
-        .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
-        .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
-      fi
+    - git fetch origin
+    - git checkout "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - git reset --hard "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - echo "$CI_MERGE_REQUEST_ID"
+    - echo "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - echo "$CI_COMMIT_SHA"
+    - base="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME $CI_COMMIT_SHA)"
+    - echo $base
+    #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
+    - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
+    - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
+    - .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
   dependencies: []
   tags:
     - lint
+  only:
+    refs:
+      - merge_requests
+
+# We allow the submodule checker to fail when run on merge requests (to
+# accomodate, e.g., haddock changes not yet upstream) but not on `master` or
+# Marge jobs.
+.lint-submods:
+  stage: lint
+  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  script:
+    - submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
+  dependencies: []
+  tags:
+    - lint
+
+lint-submods:
+  extends: .lint-submods
+  only:
+    refs:
+      - master
+      - /ghc-[0-9]+\.[0-9]+/
+      - wip/marge_bot_batch_merge_job
+
+lint-submods-mr:
+  extends: .lint-submods
+  allow_failure: true
+  only:
+    refs:
+      - merge_requests
 
 ############################################################
 # Validation via Pipelines (hadrian)
 ############################################################
 
 .validate-hadrian:
+  <<: *only-default
   allow_failure: true
   script:
     - cabal update
@@ -92,6 +133,7 @@ validate-x86_64-linux-deb8-hadrian:
     - x86_64-linux
 
 hadrian-ghc-in-ghci:
+  <<: *only-default
   stage: build
   image: ghcci/x86_64-linux-deb8:0.1
   before_script:
@@ -122,6 +164,7 @@ hadrian-ghc-in-ghci:
 ############################################################
 
 .validate:
+  <<: *only-default
   variables:
     TEST_TYPE: test
   before_script:
@@ -396,6 +439,7 @@ validate-x86_64-linux-fedora27:
 ############################################################
 
 .build-windows:
+  <<: *only-default
   before_script:
     - git clean -xdf
     - git submodule foreach git clean -xdf
@@ -535,6 +579,7 @@ nightly-i386-windows:
 
 # See Note [Cleanup after shell executor]
 cleanup-windows:
+  <<: *only-default
   stage: cleanup
   tags:
     - x86_64-windows
@@ -557,6 +602,7 @@ cleanup-windows:
 
 # See Note [Cleanup after shell executor]
 cleanup-darwin:
+  <<: *only-default
   stage: cleanup
   tags:
     - x86_64-darwin
@@ -578,6 +624,7 @@ cleanup-darwin:
 ############################################################
 
 doc-tarball:
+  <<: *only-default
   stage: packaging
   tags:
     - x86_64-linux
@@ -629,6 +676,7 @@ source-tarball:
 # pipeline.
 
 .hackage:
+  <<: *only-default
   stage: hackage
   image: ghcci/x86_64-linux-deb9:0.2
   tags:
