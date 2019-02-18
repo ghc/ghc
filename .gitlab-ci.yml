@@ -42,6 +42,8 @@ ghc-linters:
   image: ghcci/linters:0.1
   script:
     - git fetch origin
+    - git checkout $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - git reset --hard origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - echo $CI_MERGE_REQUEST_ID
     - echo $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - echo $CI_COMMIT_SHA
