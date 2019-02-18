@@ -87,11 +87,6 @@
 	path = libraries/stm
 	url = ../packages/stm.git
 	ignore = untracked
-[submodule "utils/haddock"]
-	path = utils/haddock
-	url = ../haddock.git
-	ignore = untracked
-	branch = ghc-head
 [submodule "nofib"]
 	path = nofib
 	url = ../nofib.git
