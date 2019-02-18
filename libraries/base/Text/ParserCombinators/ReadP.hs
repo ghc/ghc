@@ -72,6 +72,7 @@ module Text.ParserCombinators.ReadP
   )
  where
 
+import Data.Maybe ( maybe )
 import GHC.Unicode ( isSpace )
 import GHC.List ( replicate, null )
 import GHC.Base hiding ( many )
@@ -79,6 +80,13 @@ import GHC.Base hiding ( many )
 import Control.Monad.Fail
 
 infixr 5 +++, <++
+
+toList :: NonEmpty a -> [a]
+toList (a:|as) = (a:as)
+
+nonEmpty :: [a] -> Maybe (NonEmpty a)
+nonEmpty [] = Nothing
+nonEmpty (a:as) = Just (a:|as)
 
 ------------------------------------------------------------------------
 -- ReadS
@@ -99,7 +107,7 @@ data P a
   | Look (String -> P a)
   | Fail
   | Result a (P a)
-  | Final [(a,String)] -- invariant: list is non-empty!
+  | Final (NonEmpty (a,String))
   deriving Functor -- ^ @since 4.8.0.0
 
 -- Monad, MonadPlus
@@ -118,7 +126,7 @@ instance Monad P where
   (Look f)     >>= k = Look (\s -> f s >>= k)
   Fail         >>= _ = Fail
   (Result x p) >>= k = k x <|> (p >>= k)
-  (Final r)    >>= k = final [ys' | (x,s) <- r, ys' <- run (k x) s]
+  (Final r)    >>= k = final [ys' | (x,s) <- toList r, ys' <- run (k x) s]
 
   fail _ = Fail
 
@@ -144,11 +152,11 @@ instance Alternative P where
   -- two finals are combined
   -- final + look becomes one look and one final (=optimization)
   -- final + sthg else becomes one look and one final
-  Final r    <|> Final t    = Final (r ++ t)
-  Final r    <|> Look f     = Look (\s -> Final (r ++ run (f s) s))
-  Final r    <|> p          = Look (\s -> Final (r ++ run p s))
-  Look f     <|> Final r    = Look (\s -> Final (run (f s) s ++ r))
-  p          <|> Final r    = Look (\s -> Final (run p s ++ r))
+  Final r       <|> Final t    = Final (r <> t)
+  Final (r:|rs) <|> Look f     = Look (\s -> Final (r:|(rs ++ run (f s) s)))
+  Final (r:|rs) <|> p          = Look (\s -> Final (r:|(rs ++ run p s)))
+  Look f        <|> Final r    = Look (\s -> Final (maybe r (<>r) (nonEmpty (run (f s) s))))
+  p             <|> Final r    = Look (\s -> Final (maybe r (<>r) (nonEmpty (run p s))))
 
   -- two looks are combined (=optimization)
   -- look + sthg else floats upwards
@@ -193,14 +201,15 @@ instance MonadPlus ReadP
 
 final :: [(a,String)] -> P a
 -- Maintains invariant for Final constructor
-final [] = Fail
-final r  = Final r
+final ls = case nonEmpty ls of
+  Nothing -> Fail
+  Just r  -> Final r
 
 run :: P a -> ReadS a
 run (Get f)      (c:s) = run (f c) s
 run (Look f)     s     = run (f s) s
 run (Result x p) s     = (x,s) : run p s
-run (Final r)    _     = r
+run (Final r)    _     = toList r
 run _            _     = []
 
 -- ---------------------------------------------------------------------------
