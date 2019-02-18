@@ -40,9 +40,10 @@ ghc-linters:
     - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
     - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
     - .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
-    - | if [ -n "$CI_MERGE_REQUEST_ID" ]; then
-          submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
-        fi
+    - |
+      if [ -n "$CI_MERGE_REQUEST_ID" ]; then
+        submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
+      fi
   dependencies: []
   tags:
     - lint
