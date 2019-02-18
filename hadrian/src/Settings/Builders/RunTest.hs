@@ -202,8 +202,8 @@ setTestSpeed TestFast   = "2"
 inferLibraryWays :: String -> Action [Way]
 inferLibraryWays compiler = do
   bindir <- getBinaryDirectory compiler
-  Stdout ghcPrimLibdirDirty <- cmd [Cwd bindir]
-    ("./ghc-pkg"++exe)
+  Stdout ghcPrimLibdirDirty <- cmd
+    [bindir </> "ghc-pkg" <.> exe]
     ["field", "ghc-prim", "library-dirs", "--simple-output"]
   let ghcPrimLibdir = fixup ghcPrimLibdirDirty
   ways <- catMaybes <$> traverse (lookForWay ghcPrimLibdir) candidateWays
