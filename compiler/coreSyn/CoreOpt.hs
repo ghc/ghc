@@ -308,6 +308,16 @@ simple_app env (Tick t e) as
   | t `tickishScopesLike` SoftScope
   = mkTick t $ simple_app env e as
 
+-- (let x = e in b) a1 .. an  =>  let x = e in (b a1 .. an)
+-- The let might appear there as a result of inlining
+-- e.g.   let f = let x = e in b
+--        in f a1 a2
+-- (Trac #13208)
+simple_app env (Let bind body) as
+  = case simple_opt_bind env bind of
+      (env', Nothing)   -> simple_app env' body as
+      (env', Just bind) -> Let bind (simple_app env' body as)
+
 simple_app env e as
   = finish_app env (simple_opt_expr env e) as
 

@@ -2,6 +2,12 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+# Should show that function f has been optimised by
+# the simple CoreOpt optimiser run by the desugarer
+T13208:
+	$(RM) -f T13028.hi T13208.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T13208.hs -ddump-ds -dsuppress-uniques | grep True
+
 T5252:
 	$(RM) -f T5252.hi  T5252.o
 	$(RM) -f T5252a.hi T5252a.o
