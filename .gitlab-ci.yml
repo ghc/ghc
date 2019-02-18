@@ -45,9 +45,9 @@ ghc-linters:
     - echo $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - |
       if [ -n "$CI_MERGE_REQUEST_ID" ]; then
-        base="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME HEAD)"
+        base="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME $CI_COMMIT_SHA)"
       else
-        base="$(git merge-base $CI_COMMIT_BEFORE_SHA HEAD)"
+        base="$(git merge-base $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA)"
       fi
     - echo $base
     - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
