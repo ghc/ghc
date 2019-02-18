@@ -136,7 +136,6 @@ testsuitePackages = do
              , hp2ps
              , hpcBin
              , hsc2hs
-             , parallel
              , runGhc
              , unlit         ] ++
              concat [ [iserv, libiserv] | not win ] ++
