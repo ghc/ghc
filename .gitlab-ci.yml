@@ -452,6 +452,7 @@ validate-x86_64-windows:
 
 # See Note [Cleanup after shell executor]
 cleanup-windows:
+  <<: *only-default
   stage: cleanup
   tags:
     - x86_64-windows
@@ -474,6 +475,7 @@ cleanup-windows:
 
 # See Note [Cleanup after shell executor]
 cleanup-darwin:
+  <<: *only-default
   stage: cleanup
   tags:
     - x86_64-darwin
