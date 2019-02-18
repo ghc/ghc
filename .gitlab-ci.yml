@@ -54,6 +54,7 @@ ghc-linters:
 .validate-hadrian:
   allow_failure: true
   script:
+    - cabal update
     - git clean -xdf && git submodule foreach git clean -xdf
     - bash .circleci/prepare-system.sh
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
