@@ -206,7 +206,6 @@ validate-i386-linux-deb9:
   extends: .validate-linux
   stage: full-build
   image: ghcci/i386-linux-deb9:0.1
-  allow_failure: true
   variables:
     TEST_ENV: "i386-linux-deb9"
   artifacts:
