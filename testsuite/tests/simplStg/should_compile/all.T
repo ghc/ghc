@@ -9,12 +9,4 @@ def f( name, opts ):
 
 setTestOpts(f)
 
-def checkStgString(needle):
-    def norm(str):
-        if needle in str:
-            return "%s contained in -ddump-simpl\n" % needle
-        else:
-            return "%s not contained in -ddump-simpl\n" % needle
-    return normalise_errmsg_fun(norm)
-
-test('T13588', [ checkStgString('case') ] , compile, ['-dverbose-stg2stg'])
+test('T13588', [ grep_errmsg('case') ] , compile, ['-dverbose-stg2stg -fno-worker-wrapper'])
