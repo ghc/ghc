@@ -48,3 +48,4 @@ test('T13077a', normal, compile, [''])
 test('T15627',  [ grep_errmsg(r'(wmutVar|warray).*Int#') ], compile, ['-dppr-cols=200 -ddump-simpl'])
 
 test('T16029', normal, makefile_test, [])
+test('T10069',  [ grep_errmsg(r'(wc1).*Int#$') ], compile, ['-dppr-cols=200 -ddump-simpl'])

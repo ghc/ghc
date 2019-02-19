@@ -611,7 +611,13 @@ gen_wrappers (Info _ entries)
    =    "{-# LANGUAGE MagicHash, NoImplicitPrelude, UnboxedTuples #-}\n"
         -- Dependencies on Prelude must be explicit in libraries/base, but we
         -- don't need the Prelude here so we add NoImplicitPrelude.
-     ++ "{-# OPTIONS_GHC -Wno-deprecations #-}\n"
+     ++ "{-# OPTIONS_GHC -Wno-deprecations -O0 #-}\n"
+        -- No point in optimising this at all.
+        -- Performing WW on this module is harmful even, two reasons:
+        --   1. Inferred strictness signatures are all bottom, which is a lie
+        --   2. Doing the worker/wrapper split based on that information will
+        --      introduce references to Control.Exception.Base.absentError,
+        --      which isn't available at this point.
      ++ "module GHC.PrimopWrappers where\n"
      ++ "import qualified GHC.Prim\n"
      ++ "import GHC.Tuple ()\n"
