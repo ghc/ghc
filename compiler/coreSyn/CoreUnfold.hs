@@ -1118,13 +1118,14 @@ smallEnoughToInline _ _
 ----------------
 
 certainlyWillInline :: DynFlags -> IdInfo -> Maybe Unfolding
--- Sees if the unfolding is pretty certain to inline
--- If so, return a *stable* unfolding for it, that will always inline
+-- ^ Sees if the unfolding is pretty certain to inline.
+-- If so, return a *stable* unfolding for it, that will always inline.
 certainlyWillInline dflags fn_info
   = case unfoldingInfo fn_info of
       CoreUnfolding { uf_tmpl = e, uf_guidance = g }
-        | loop_breaker -> Nothing       -- Won't inline, so try w/w
-        | otherwise    -> do_cunf e g   -- Depends on size, so look at that
+        | loop_breaker -> Nothing      -- Won't inline, so try w/w
+        | noinline     -> Nothing      -- See Note [Worker-wrapper for NOINLINE functions]
+        | otherwise    -> do_cunf e g  -- Depends on size, so look at that
 
       DFunUnfolding {} -> Just fn_unf  -- Don't w/w DFuns; it never makes sense
                                        -- to do so, and even if it is currently a
@@ -1134,6 +1135,7 @@ certainlyWillInline dflags fn_info
 
   where
     loop_breaker = isStrongLoopBreaker (occInfo fn_info)
+    noinline     = inlinePragmaSpec (inlinePragInfo fn_info) == NoInline
     fn_unf       = unfoldingInfo fn_info
 
     do_cunf :: CoreExpr -> UnfoldingGuidance -> Maybe Unfolding
@@ -1148,9 +1150,6 @@ certainlyWillInline dflags fn_info
         --    See Note [certainlyWillInline: INLINABLE]
     do_cunf expr (UnfIfGoodArgs { ug_size = size, ug_args = args })
       | not (null args)  -- See Note [certainlyWillInline: be careful of thunks]
-      , case inlinePragmaSpec (inlinePragInfo fn_info) of
-          NoInline -> False -- NOINLINE; do not say certainlyWillInline!
-          _        -> True  -- INLINE, INLINABLE, or nothing
       , not (isBottomingSig (strictnessInfo fn_info))
               -- Do not unconditionally inline a bottoming functions even if
               -- it seems smallish. We've carefully lifted it out to top level,

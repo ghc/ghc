@@ -8,7 +8,7 @@ g (p,q) = p+q
 
 f :: Int -> Int -> Int -> Int
 f x p q
-  = g (let j y = (p,q)
+  = g (let j y = (y+p,q)
            {-# NOINLINE j #-}
           in
           case x of
