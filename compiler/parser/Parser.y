@@ -88,7 +88,7 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 237 -- shift/reduce conflicts
+%expect 236 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -1989,15 +1989,14 @@ tyapps :: { [Located TyEl] } -- NB: This list is reversed
 tyapp :: { Located TyEl }
         : atype                         { sL1 $1 $ TyElOpd (unLoc $1) }
         | TYPEAPP atype                 { sLL $1 $> $ (TyElKindApp (comb2 $1 $2) $2) }
-        | qtyconop                      { sL1 $1 $ if isBangRdr (unLoc $1)
-                                                   then TyElBang
-                                                   else TyElOpr (unLoc $1) }
+        | qtyconop                      { sL1 $1 $ if isBangRdr (unLoc $1) then TyElBang else
+                                                   if isTildeRdr (unLoc $1) then TyElTilde else
+                                                   TyElOpr (unLoc $1) }
         | tyvarop                       { sL1 $1 $ TyElOpr (unLoc $1) }
         | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
                                                [mj AnnSimpleQuote $1,mj AnnVal $2] }
         | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
                                                [mj AnnSimpleQuote $1,mj AnnVal $2] }
-        | '~'                           { sL1 $1 TyElTilde }
         | unpackedness                  { sL1 $1 $ TyElUnpackedness (unLoc $1) }
 
 atype :: { LHsType GhcPs }
@@ -3251,8 +3250,6 @@ oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
         : qtycon                        { $1 }
         | '(' qtyconsym ')'             {% ams (sLL $1 $> (unLoc $2))
                                                [mop $1,mj AnnVal $2,mcp $3] }
-        | '(' '~' ')'                   {% ams (sLL $1 $> $ eqTyCon_RDR)
-                                               [mop $1,mj AnnVal $2,mcp $3] }
 
 oqtycon_no_varcon :: { Located RdrName }  -- Type constructor which cannot be mistaken
                                           -- for variable constructor in export lists
@@ -3318,6 +3315,7 @@ tyconsym :: { Located RdrName }
         | '-'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "-") }
         | '!'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "!") }
         | '.'                   { sL1 $1 $! mkUnqual tcClsName (fsLit ".") }
+        | '~'                   { sL1 $1 $ eqTyCon_RDR }
 
 
 -----------------------------------------------------------------------------

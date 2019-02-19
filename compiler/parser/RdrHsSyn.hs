@@ -50,6 +50,7 @@ module   RdrHsSyn (
         checkPattern,         -- HsExp -> P HsPat
         bang_RDR,
         isBangRdr,
+        isTildeRdr,
         checkPatterns,        -- SrcLoc -> [HsExp] -> P [HsPat]
         checkMonadComp,       -- P (HsStmtContext RdrName)
         checkCommand,         -- LHsExpr RdrName -> P (LHsCmd RdrName)
@@ -1163,9 +1164,10 @@ plus_RDR = mkUnqual varName (fsLit "+") -- Hack
 bang_RDR = mkUnqual varName (fsLit "!") -- Hack
 pun_RDR  = mkUnqual varName (fsLit "pun-right-hand-side")
 
-isBangRdr :: RdrName -> Bool
+isBangRdr, isTildeRdr :: RdrName -> Bool
 isBangRdr (Unqual occ) = occNameFS occ == fsLit "!"
 isBangRdr _ = False
+isTildeRdr = (==eqTyCon_RDR)
 
 checkPatField :: SDoc -> LHsRecField GhcPs (LHsExpr GhcPs)
               -> P (LHsRecField GhcPs (LPat GhcPs))
