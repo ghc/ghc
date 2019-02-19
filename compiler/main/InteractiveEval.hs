@@ -397,7 +397,8 @@ resumeExec canLogSpan step
             new_names = [ n | thing <- ic_tythings ic
                             , let n = getName thing
                             , not (n `elem` old_names) ]
-        liftIO $ Linker.deleteFromLinkEnv new_names
+            dl        = hsc_dynLinker hsc_env
+        liftIO $ Linker.deleteFromLinkEnv dl new_names
 
         case r of
           Resume { resumeStmt = expr, resumeContext = fhv
