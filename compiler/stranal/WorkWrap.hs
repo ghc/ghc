@@ -242,6 +242,37 @@ NOINLINE pragma to the worker.
 
 (See Trac #13143 for a real-world example.)
 
+It is crucial that we do this for *all* NOINLINE functions. Trac #10069
+demonstrates what happens when we promise to w/w a (NOINLINE) leaf function, but
+fail to deliver:
+
+  data C = C Int# Int#
+
+  {-# NOINLINE c1 #-}
+  c1 :: C -> Int#
+  c1 (C _ n) = n
+
+  {-# NOINLINE fc #-}
+  fc :: C -> Int#
+  fc c = 2 *# c1 c
+
+Failing to w/w `c1`, but still w/wing `fc` leads to the following code:
+
+  c1 :: C -> Int#
+  c1 (C _ n) = n
+
+  $wfc :: Int# -> Int#
+  $wfc n = let c = C 0# n in 2 #* c1 c
+
+  fc :: C -> Int#
+  fc (C _ n) = $wfc n
+
+Yikes! The reboxed `C` in `$wfc` can't cancel out, so we are in a bad place.
+This generalises to any function that derives its strictness signature from
+its callees, so we have to make sure that when a function announces particular
+strictness properties, we have to w/w them accordingly, even if it means
+splitting a NOINLINE function.
+
 Note [Worker activation]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Follows on from Note [Worker-wrapper for INLINABLE functions]
