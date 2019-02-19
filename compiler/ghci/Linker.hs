@@ -110,7 +110,7 @@ SHARED_GLOBAL_VAR_M( v_PersistentLinkerState
 newtype DynLinker = DynLinker { dl_mpls :: IORef (MVar (Maybe PersistentLinkerState)) }
 
 uninitializedLinker :: IO DynLinker
-uninitializedLinker = DynLinker `fmap` newIORef Nothing
+uninitializedLinker = DynLinker `fmap` newIORef (newMVar Nothing)
 
 uninitialised :: a
 uninitialised = panic "Dynamic linker not initialised"
