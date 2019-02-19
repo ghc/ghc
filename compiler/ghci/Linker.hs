@@ -107,7 +107,7 @@ SHARED_GLOBAL_VAR_M( v_PersistentLinkerState
                    , MVar (Maybe PersistentLinkerState))
 #endif
 
-newtype DynLinker = DynLinker { dl_mpls :: IORef (Maybe PersistentLinkerState) }
+newtype DynLinker = DynLinker { dl_mpls :: IORef (MVar (Maybe PersistentLinkerState)) }
 
 uninitializedLinker :: IO DynLinker
 uninitializedLinker = DynLinker `fmap` newIORef Nothing
@@ -116,21 +116,21 @@ uninitialised :: a
 uninitialised = panic "Dynamic linker not initialised"
 
 modifyPLS_ :: DynLinker -> (PersistentLinkerState -> IO PersistentLinkerState) -> IO ()
-modifyPLS_ dl f = readIORef v_PersistentLinkerState
+modifyPLS_ dl f = readIORef (dl_mpls dl)
   >>= flip modifyMVar_ (fmap pure . f . fromMaybe uninitialised)
 
 modifyPLS :: DynLinker -> (PersistentLinkerState -> IO (PersistentLinkerState, a)) -> IO a
-modifyPLS dl f = readIORef v_PersistentLinkerState
+modifyPLS dl f = readIORef (dl_mpls dl)
   >>= flip modifyMVar (fmapFst pure . f . fromMaybe uninitialised)
   where fmapFst f = fmap (\(x, y) -> (f x, y))
 
-readPLS :: IO PersistentLinkerState
-readPLS = readIORef v_PersistentLinkerState
+readPLS :: DynLinker -> IO PersistentLinkerState
+readPLS dl = readIORef (dl_mpls dl)
   >>= fmap (fromMaybe uninitialised) . readMVar
 
 modifyMbPLS_
-  :: (Maybe PersistentLinkerState -> IO (Maybe PersistentLinkerState)) -> IO ()
-modifyMbPLS_ f = readIORef v_PersistentLinkerState >>= flip modifyMVar_ f
+  :: DynLinker -> (Maybe PersistentLinkerState -> IO (Maybe PersistentLinkerState)) -> IO ()
+modifyMbPLS_ dl f = readIORef (dl_mpls dl) >>= flip modifyMVar_ f
 
 data PersistentLinkerState
    = PersistentLinkerState {
