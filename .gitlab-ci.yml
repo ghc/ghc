@@ -445,6 +445,22 @@ doc-tarball:
     - rm -Rf docs
     - distrib/mkDocs/mkDocs ghc-bindist-x86_64-unknown-linux.tar.xz ghc-bindist-x86_64-unknown-mingw32.tar.xz
 
+source-tarball:
+  stage: packaging
+  tags:
+    - x86_64-linux
+  image: ghcci/x86_64-linux-deb9:0.2
+  only: tags
+  artifacts:
+    paths:
+      - ghc-*.tar.xz
+  script:
+    - mk/get-win32-tarballs.sh download all
+    - ./boot
+    - ./configure
+    - make sdist
+    - mv sdistprep/*.xz  .
+
 # Note [Cleaning up after shell executor]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
