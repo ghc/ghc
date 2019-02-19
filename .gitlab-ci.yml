@@ -528,3 +528,21 @@ doc-tarball:
     - rm -Rf docs
     - distrib/mkDocs/mkDocs ghc-x86_64-deb9-linux.tar.xz ghc-x86_64-unknown-mingw32.tar.xz
 
+source-tarball:
+  stage: packaging
+  tags:
+    - x86_64-linux
+  image: ghcci/x86_64-linux-deb9:0.2
+  only:
+    - tags
+  artifacts:
+    paths:
+      - ghc-*.tar.xz
+      - version
+  script:
+    - mk/get-win32-tarballs.sh download all
+    - ./boot
+    - ./configure
+    - make sdist
+    - mv sdistprep/*.xz  .
+    - make show VALUE=version > version
