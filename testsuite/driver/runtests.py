@@ -122,8 +122,7 @@ if args.verbose is not None:
 # Note force skip perf tests: skip if this is not a git repo (estimated with inside_git_repo)
 # and no metrics file is given. In this case there is no way to read the previous commit's
 # perf test results, nor a way to store new perf test results.
-canGitStatus = inside_git_repo()
-forceSkipPerfTests = not hasMetricsFile and not canGitStatus
+forceSkipPerfTests = not hasMetricsFile and not inside_git_repo()
 config.skip_perf_tests = args.skip_perf_tests or forceSkipPerfTests
 config.only_perf_tests = args.only_perf_tests
 
@@ -371,14 +370,14 @@ else:
     spacing = "       "
     if forceSkipPerfTests and not args.skip_perf_tests:
         print()
-        print(str_warn('Skipping All Performance Tests') + ' `git status` exited with non-zero exit code.')
-        print(spacing + 'Git is required because performance test results are compared with the previous git commit\'s results (stored with git notes).')
+        print(str_warn('Skipping All Performance Tests') + ' `git` exited with non-zero exit code.')
+        print(spacing + 'Git is required because performance test results are compared with ancestor git commits\' results (stored with git notes).')
         print(spacing + 'You can still run the tests without git by specifying an output file with --metrics-file FILE.')
 
     # Warn of new metrics.
     new_metrics = [metric for (change, metric) in t.metrics if change == MetricChange.NewMetric]
     if any(new_metrics):
-        if canGitStatus:
+        if inside_git_repo():
             reason = 'a baseline (expected value) cannot be recovered from' + \
                 ' previous git commits. This may be due to HEAD having' + \
                 ' new tests or having expected changes, the presence of' + \
@@ -421,7 +420,7 @@ else:
         print('Appending ' + str(len(stats)) + ' stats to file: ' + config.metrics_file)
         with open(config.metrics_file, 'a') as file:
             file.write("\n" + Perf.format_perf_stat(stats))
-    elif canGitStatus and any(stats):
+    elif inside_git_repo() and any(stats):
         if is_worktree_dirty():
             print()
             print(str_warn('Performance Metrics NOT Saved') + \

@@ -1182,7 +1182,7 @@ def metric_dict(name, way, metric, value):
 # Returns a pass/fail object. Passes if the stats are withing the expected value ranges.
 # This prints the results for the user.
 def check_stats(name, way, stats_file, range_fields):
-    head_commit = Perf.commit_hash('HEAD')
+    head_commit = Perf.commit_hash('HEAD') if Perf.inside_git_repo() else None
     result = passed()
     if range_fields:
         try:
@@ -1205,7 +1205,8 @@ def check_stats(name, way, stats_file, range_fields):
                 change = None
 
                 # If this is the first time running the benchmark, then pass.
-                baseline = baseline_and_dev[0](way, head_commit)
+                baseline = baseline_and_dev[0](way, head_commit) \
+                    if Perf.inside_git_repo() else None
                 if baseline == None:
                     metric_result = passed()
                     change = MetricChange.NewMetric
