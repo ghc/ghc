@@ -178,8 +178,10 @@ showTerm term = do
                expr = "Prelude.return (Prelude.show " ++
                          showPpr dflags bname ++
                       ") :: Prelude.IO Prelude.String"
+               dl   = hsc_dynLinker hsc_env
            _ <- GHC.setSessionDynFlags dflags{log_action=noop_log}
-           txt_ <- withExtendedLinkEnv [(bname, fhv)]
+           txt_ <- withExtendedLinkEnv dl
+                                       [(bname, fhv)]
                                        (GHC.compileExprRemote expr)
            let myprec = 10 -- application precedence. TODO Infix constructors
            txt <- liftIO $ evalString hsc_env txt_
