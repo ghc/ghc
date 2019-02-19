@@ -1,14 +1,12 @@
 variables:
   GIT_SSL_NO_VERIFY: "1"
 
+  GIT_SUBMODULE_STRATEGY: normal
+
   # Commit of ghc/ci-images repository from which to pull Docker images
   DOCKER_REV: 6d19c3adc1f5c28c82aed8c5b1ac40931ac60f3f
 
 before_script:
-  - python3 .gitlab/fix-submodules.py
-  - git submodule sync --recursive
-  - git submodule update --init --recursive
-  - git checkout .gitmodules
   - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
 stages:
@@ -81,10 +79,6 @@ validate-x86_64-linux-deb8-hadrian:
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
-    - python3 .gitlab/fix-submodules.py
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
   tags:
     - x86_64-linux
@@ -95,10 +89,6 @@ hadrian-ghc-in-ghci:
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
-    - python3 .gitlab/fix-submodules.py
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
   tags:
     - x86_64-linux
   script:
@@ -172,10 +162,6 @@ validate-x86_64-darwin:
     TEST_ENV: "x86_64-darwin"
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
-    - python3 .gitlab/fix-submodules.py
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
     - bash .gitlab/darwin-init.sh
@@ -197,10 +183,6 @@ validate-x86_64-darwin:
     - x86_64-linux
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
-    - python3 .gitlab/fix-submodules.py
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
     - bash .circleci/prepare-system.sh
@@ -401,10 +383,6 @@ release-x86_64-linux-fedora27:
       set TEMP=%cd%\tmp
 
     - set PATH=C:\msys64\usr\bin;%PATH%
-    - python .gitlab/fix-submodules.py
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
     - bash .gitlab/win32-init.sh
   after_script:
