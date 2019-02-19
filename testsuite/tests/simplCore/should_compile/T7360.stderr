@@ -20,15 +20,7 @@ T7360.$WFoo3
 
 -- RHS size: {terms: 5, types: 2, coercions: 0, joins: 0/0}
 fun1 [InlPrag=NOINLINE] :: Foo -> ()
-[GblId,
- Arity=1,
- Caf=NoCafRefs,
- Str=<S,1*U>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
-         Tmpl= \ (x [Occ=Once] :: Foo) ->
-                 case x of { __DEFAULT -> GHC.Tuple.() }}]
+[GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>, Unf=OtherCon []]
 fun1 = \ (x :: Foo) -> case x of { __DEFAULT -> GHC.Tuple.() }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}

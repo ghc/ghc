@@ -58,7 +58,7 @@ test('T5654b-O0', [only_ways(['prof'])], compile_and_run, [''])
 
 test('T5654b-O1', [only_ways(['profasm'])], compile_and_run, [''])
 
-test('scc005', [], compile_and_run, [''])
+test('scc005', [], compile_and_run, ['-fno-worker-wrapper'])
 
 test('T5314', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 
