@@ -107,10 +107,12 @@ SHARED_GLOBAL_VAR_M( v_PersistentLinkerState
                    , MVar (Maybe PersistentLinkerState))
 #endif
 
-newtype DynLinker = DynLinker { dl_mpls :: IORef (MVar (Maybe PersistentLinkerState)) }
+newtype DynLinker =
+  DynLinker { dl_mpls :: IORef (MVar (Maybe PersistentLinkerState)) }
 
 uninitializedLinker :: IO DynLinker
-uninitializedLinker = DynLinker `fmap` newIORef Nothing
+uninitializedLinker =
+  newMVar Nothing >>= newIORef >>= (pure . DynLinker)
 
 uninitialised :: a
 uninitialised = panic "Dynamic linker not initialised"
@@ -202,9 +204,10 @@ deleteFromLinkEnv dl to_remove =
 -- May cause loading the module that contains the name.
 --
 -- Throws a 'ProgramError' if loading fails or the name cannot be found.
-getHValue :: DynLinker -> HscEnv -> Name -> IO ForeignHValue
-getHValue dl hsc_env name = do
-  initDynLinker hsc_env dl
+getHValue :: HscEnv -> Name -> IO ForeignHValue
+getHValue hsc_env name = do
+  let dl = hsc_dynLinker hsc_env
+  initDynLinker hsc_env
   pls <- modifyPLS dl $ \pls -> do
            if (isExternalName name) then do
              (pls', ok) <- linkDependencies hsc_env pls noSrcSpan
@@ -268,9 +271,9 @@ withExtendedLinkEnv dl new_env action
 
 
 -- | Display the persistent linker state.
-showLinkerState :: DynFlags -> IO ()
-showLinkerState dflags
-  = do pls <- readPLS
+showLinkerState :: DynLinker -> DynFlags -> IO ()
+showLinkerState dl dflags
+  = do pls <- readPLS dl
        putLogMsg dflags NoReason SevDump noSrcSpan
           (defaultDumpStyle dflags)
                  (vcat [text "----- Linker state -----",
@@ -303,15 +306,16 @@ showLinkerState dflags
 -- nothing.  This is useful in Template Haskell, where we call it before
 -- trying to link.
 --
-initDynLinker :: HscEnv -> DynLinker -> IO ()
-initDynLinker hsc_env dl =
+initDynLinker :: HscEnv -> IO ()
+initDynLinker hsc_env = do
+  let dl = hsc_dynLinker hsc_env
   modifyMbPLS_ dl $ \pls -> do
     case pls of
       Just  _ -> return pls
-      Nothing -> Just <$> reallyInitDynLinker hsc_env dl
+      Nothing -> Just <$> reallyInitDynLinker hsc_env
 
-reallyInitDynLinker :: HscEnv -> DynLinker -> IO PersistentLinkerState
-reallyInitDynLinker hsc_env dl = do
+reallyInitDynLinker :: HscEnv -> IO PersistentLinkerState
+reallyInitDynLinker hsc_env = do
   -- Initialise the linker state
   let dflags = hsc_dflags hsc_env
       pls0 = emptyPLS dflags
@@ -326,9 +330,10 @@ reallyInitDynLinker hsc_env dl = do
   linkCmdLineLibs' hsc_env pls
 
 
-linkCmdLineLibs :: HscEnv -> DynLinker -> IO ()
-linkCmdLineLibs hsc_env dl = do
-  initDynLinker hsc_env dl
+linkCmdLineLibs :: HscEnv -> IO ()
+linkCmdLineLibs hsc_env = do
+  let dl = hsc_dynLinker hsc_env
+  initDynLinker hsc_env
   modifyPLS_ dl $ \pls -> do
     linkCmdLineLibs' hsc_env pls
 
@@ -547,11 +552,14 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
 -- Raises an IO exception ('ProgramError') if it can't find a compiled
 -- version of the dependents to link.
 --
-linkExpr :: DynLinker -> HscEnv -> SrcSpan -> UnlinkedBCO -> IO ForeignHValue
-linkExpr dl hsc_env span root_ul_bco
+linkExpr :: HscEnv -> SrcSpan -> UnlinkedBCO -> IO ForeignHValue
+linkExpr hsc_env span root_ul_bco
   = do {
      -- Initialise the linker (if it's not been done already)
-   ; initDynLinker hsc_env dl
+   ; initDynLinker hsc_env
+
+     -- Extract the DynLinker value for passing into required places
+   ; let dl = hsc_dynLinker hsc_env
 
      -- Take lock for the actual work.
    ; modifyPLS dl $ \pls0 -> do {
@@ -778,10 +786,13 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
   ********************************************************************* -}
 
-linkDecls :: DynLinker -> HscEnv -> SrcSpan -> CompiledByteCode -> IO ()
-linkDecls dl hsc_env span cbc@CompiledByteCode{..} = do
+linkDecls :: HscEnv -> SrcSpan -> CompiledByteCode -> IO ()
+linkDecls hsc_env span cbc@CompiledByteCode{..} = do
     -- Initialise the linker (if it's not been done already)
-    initDynLinker hsc_env dl
+    initDynLinker hsc_env
+
+    -- Extract the DynLinker for passing into required places
+    let dl = hsc_dynLinker hsc_env
 
     -- Take lock for the actual work.
     modifyPLS dl $ \pls0 -> do
@@ -822,9 +833,10 @@ linkDecls dl hsc_env span cbc@CompiledByteCode{..} = do
 
   ********************************************************************* -}
 
-linkModule :: DynLinker -> HscEnv -> Module -> IO ()
-linkModule dl hsc_env mod = do
-  initDynLinker hsc_env dl
+linkModule :: HscEnv -> Module -> IO ()
+linkModule hsc_env mod = do
+  initDynLinker hsc_env
+  let dl = hsc_dynLinker hsc_env
   modifyPLS_ dl $ \pls -> do
     (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [mod]
     if (failed ok) then throwGhcExceptionIO (ProgramError "could not link module")
@@ -1080,15 +1092,17 @@ makeForeignNamedHValueRefs hsc_env bindings =
 --
 --   * we also implicitly unload all temporary bindings at this point.
 --
-unload :: DynLinker
-       -> HscEnv
+unload :: HscEnv
        -> [Linkable] -- ^ The linkables to *keep*.
        -> IO ()
-unload dl hsc_env linkables
+unload hsc_env linkables
   = mask_ $ do -- mask, so we're safe from Ctrl-C in here
 
         -- Initialise the linker (if it's not been done already)
-        initDynLinker hsc_env dl
+        initDynLinker hsc_env
+
+        -- Extract DynLinker for passing into required places
+        let dl = hsc_dynLinker hsc_env
 
         new_pls
             <- modifyPLS dl $ \pls -> do
@@ -1220,7 +1234,7 @@ type LinkerUnitId = InstalledUnitId
 -- automatically, and it doesn't matter what order you specify the input
 -- packages.
 --
-linkPackages :: DynLinker -> HscEnv -> [LinkerUnitId] -> IO ()
+linkPackages :: HscEnv -> [LinkerUnitId] -> IO ()
 -- NOTE: in fact, since each module tracks all the packages it depends on,
 --       we don't really need to use the package-config dependencies.
 --
@@ -1229,10 +1243,11 @@ linkPackages :: DynLinker -> HscEnv -> [LinkerUnitId] -> IO ()
 -- perhaps makes the error message a bit more localised if we get a link
 -- failure.  So the dependency walking code is still here.
 
-linkPackages dl hsc_env new_pkgs = do
+linkPackages hsc_env new_pkgs = do
   -- It's probably not safe to try to load packages concurrently, so we take
   -- a lock.
-  initDynLinker hsc_env dl
+  initDynLinker hsc_env
+  let dl = hsc_dynLinker hsc_env
   modifyPLS_ dl $ \pls -> do
     linkPackages' hsc_env new_pkgs pls
 
