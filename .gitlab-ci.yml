@@ -561,3 +561,21 @@ doc-tarball:
     - ls -lh
     - mv docs/*.tar.xz .
 
+source-tarball:
+  stage: packaging
+  tags:
+    - x86_64-linux
+  image: ghcci/x86_64-linux-deb9:0.2
+  only:
+    - tags
+  artifacts:
+    paths:
+      - ghc-*.tar.xz
+      - version
+  script:
+    - mk/get-win32-tarballs.sh download all
+    - ./boot
+    - ./configure
+    - make sdist
+    - mv sdistprep/*.xz  .
+    - make show VALUE=version > version
