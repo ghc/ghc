@@ -255,6 +255,19 @@ validate-x86_64-linux-deb9:
   cache:
     key: linux-x86_64-deb9
 
+release-x86_64-linux-deb9-dwarf:
+  extends: .validate-linux
+  stage: build
+  image: ghcci/x86_64-linux-deb9:0.2
+  variables:
+    BUILD_FLAVOUR: dwarf
+    TEST_ENV: "x86_64-linux-deb9"
+  artifacts:
+    when: always
+    expire_in: 2 week
+  cache:
+    key: linux-x86_64-deb9
+
 nightly-x86_64-linux-deb9:
   extends: validate-x86_64-linux-deb9
   stage: build
