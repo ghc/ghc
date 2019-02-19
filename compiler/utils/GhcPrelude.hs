@@ -5,7 +5,11 @@
 -- This module serves as a replacement for the "Prelude" module
 -- and abstracts over differences between the bootstrapping
 -- GHC version, and may also provide a common default vocabulary.
---
+
+-- Every module in GHC
+--   * Is compiled with -XNoImplicitPrelude
+--   * Explicitly imports GhcPrelude
+
 module GhcPrelude (module X) where
 
 -- We export the 'Semigroup' class but w/o the (<>) operator to avoid
