@@ -12,7 +12,7 @@ RUN apt-get update -qq
 RUN apt-get install -qy zlib1g-dev libtinfo-dev libsqlite3-0 libsqlite3-dev \
     ca-certificates g++ git make automake autoconf gcc \
     perl python3 texinfo xz-utils lbzip2 patch openssh-client sudo \
-    jq wget curl
+    jq wget curl libdw1
 
 # Documentation tools
 RUN apt-get install -qy python3-sphinx texlive-xetex texlive-latex-extra

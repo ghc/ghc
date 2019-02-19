@@ -237,7 +237,7 @@ nightly-i386-linux-deb9:
 validate-x86_64-linux-deb9-debug:
   extends: .validate-linux
   stage: build
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: ghcci/x86_64-linux-deb9:0.3
   variables:
     BUILD_FLAVOUR: devel2
     TEST_ENV: "x86_64-linux-deb9-debug"
@@ -247,8 +247,22 @@ validate-x86_64-linux-deb9-debug:
 validate-x86_64-linux-deb9:
   extends: .validate-linux
   stage: build
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: ghcci/x86_64-linux-deb9:0.3
   variables:
+    TEST_ENV: "x86_64-linux-deb9"
+  artifacts:
+    when: always
+    expire_in: 2 week
+  cache:
+    key: linux-x86_64-deb9
+
+release-x86_64-linux-deb9-dwarf:
+  extends: .validate-linux
+  stage: build
+  image: ghcci/x86_64-linux-deb9:0.3
+  variables:
+    CONFIGURE_ARGS: "--enable-dwarf-unwind"
+    BUILD_FLAVOUR: dwarf
     TEST_ENV: "x86_64-linux-deb9"
   artifacts:
     when: always
@@ -270,7 +284,7 @@ nightly-x86_64-linux-deb9:
 validate-x86_64-linux-deb9-llvm:
   extends: .validate-linux
   stage: full-build
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: ghcci/x86_64-linux-deb9:0.3
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
@@ -307,7 +321,7 @@ validate-x86_64-linux-deb9-integer-simple:
   variables:
     INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: ghcci/x86_64-linux-deb9:0.3
   cache:
     key: linux-x86_64-deb9
 
@@ -328,7 +342,7 @@ validate-x86_64-linux-deb9-unreg:
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg"
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: ghcci/x86_64-linux-deb9:0.3
   cache:
     key: linux-x86_64-deb9
 
