@@ -1989,14 +1989,15 @@ tyapps :: { [Located TyEl] } -- NB: This list is reversed
 tyapp :: { Located TyEl }
         : atype                         { sL1 $1 $ TyElOpd (unLoc $1) }
         | TYPEAPP atype                 { sLL $1 $> $ (TyElKindApp (comb2 $1 $2) $2) }
-        | qtyconop                      { sL1 $1 $ TyElOpr (unLoc $1) }
+        | qtyconop                      { sL1 $1 $ if isBangRdr (unLoc $1)
+                                                   then TyElBang
+                                                   else TyElOpr (unLoc $1) }
         | tyvarop                       { sL1 $1 $ TyElOpr (unLoc $1) }
         | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
                                                [mj AnnSimpleQuote $1,mj AnnVal $2] }
         | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
                                                [mj AnnSimpleQuote $1,mj AnnVal $2] }
         | '~'                           { sL1 $1 TyElTilde }
-        | '!'                           { sL1 $1 TyElBang }
         | unpackedness                  { sL1 $1 $ TyElUnpackedness (unLoc $1) }
 
 atype :: { LHsType GhcPs }
@@ -3310,13 +3311,13 @@ qtyconsym :: { Located RdrName }
         | QVARSYM            { sL1 $1 $! mkQual tcClsName (getQVARSYM $1) }
         | tyconsym           { $1 }
 
--- Does not include "!", because that is used for strictness marks
---               or ".", because that separates the quantified type vars from the rest
 tyconsym :: { Located RdrName }
         : CONSYM                { sL1 $1 $! mkUnqual tcClsName (getCONSYM $1) }
         | VARSYM                { sL1 $1 $! mkUnqual tcClsName (getVARSYM $1) }
         | ':'                   { sL1 $1 $! consDataCon_RDR }
         | '-'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "-") }
+        | '!'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "!") }
+        | '.'                   { sL1 $1 $! mkUnqual tcClsName (fsLit ".") }
 
 
 -----------------------------------------------------------------------------
@@ -3371,7 +3372,6 @@ tyvarop :: { Located RdrName }
 tyvarop : '`' tyvarid '`'       {% ams (sLL $1 $> (unLoc $2))
                                        [mj AnnBackquote $1,mj AnnVal $2
                                        ,mj AnnBackquote $3] }
-        | '.'                   { sL1 $1 $ mkUnqual tcClsName (fsLit ".") }
 
 tyvarid :: { Located RdrName }
         : VARID            { sL1 $1 $! mkUnqual tvName (getVARID $1) }
