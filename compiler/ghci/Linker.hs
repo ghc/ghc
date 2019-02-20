@@ -207,7 +207,7 @@ deleteFromLinkEnv dl to_remove =
 getHValue :: HscEnv -> Name -> IO ForeignHValue
 getHValue hsc_env name = do
   let dl = hsc_dynLinker hsc_env
-  initDynLinker hsc_env dl
+  initDynLinker hsc_env
   pls <- modifyPLS dl $ \pls -> do
            if (isExternalName name) then do
              (pls', ok) <- linkDependencies hsc_env pls noSrcSpan
