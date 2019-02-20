@@ -271,9 +271,9 @@ withExtendedLinkEnv dl new_env action
 
 
 -- | Display the persistent linker state.
-showLinkerState :: DynFlags -> IO ()
-showLinkerState dflags
-  = do pls <- readPLS
+showLinkerState :: DynLinker -> DynFlags -> IO ()
+showLinkerState dl dflags
+  = do pls <- readPLS dl
        putLogMsg dflags NoReason SevDump noSrcSpan
           (defaultDumpStyle dflags)
                  (vcat [text "----- Linker state -----",
