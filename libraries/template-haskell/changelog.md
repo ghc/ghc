@@ -20,6 +20,8 @@
 
   * Add `Lift` instances for `NonEmpty` and `Void`
 
+  * `addForeignFilePath` now support assembler sources (#16180).
+
 ## 2.14.0.0 *TBA*
 
   * Introduce an `addForeignFilePath` function, as well as a corresponding

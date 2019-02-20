@@ -132,6 +132,8 @@ Template Haskell
 
 - Template Haskell now supports implicit parameters and recursive do.
 
+- Template Haskell splices can now embed assembler source (:ghc-ticket:`16180`)
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
