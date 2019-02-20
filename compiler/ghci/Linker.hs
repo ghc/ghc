@@ -556,7 +556,7 @@ linkExpr :: HscEnv -> SrcSpan -> UnlinkedBCO -> IO ForeignHValue
 linkExpr hsc_env span root_ul_bco
   = do {
      -- Initialise the linker (if it's not been done already)
-   ; initDynLinker hsc_env dl
+   ; initDynLinker hsc_env
 
      -- Extract the DynLinker value for passing into required places
    ; let dl = hsc_dynLinker hsc_env
