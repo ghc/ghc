@@ -28,7 +28,7 @@ import CoreSyn
 import CoreSubst
 import CoreUtils
 import CoreFVs
-import MkCore ( FloatBind(..), mkCoreLet )
+import MkCore ( FloatBind(..) )
 import PprCore  ( pprCoreBindings, pprRules )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import Literal  ( Literal(LitString) )
@@ -232,7 +232,7 @@ simple_opt_expr env expr
     go (Case e b ty as)
        -- See Note [Getting the map/coerce RULE to work]
       | isDeadBinder b
-      , Just ([], con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
+      , Just (_, [], con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
         -- We don't need to be concerned about floats when looking for coerce.
       , Just (altcon, bs, rhs) <- findAlt (DataAlt con) as
       = case altcon of
@@ -889,42 +889,58 @@ data ConCont = CC [CoreExpr] Coercion
 -- are unfolded late, but we really want to trigger case-of-known-constructor as
 -- early as possible. See also Note [Activation for data constructor wrappers]
 -- in MkId.
-exprIsConApp_maybe :: InScopeEnv -> CoreExpr -> Maybe ([FloatBind], DataCon, [Type], [CoreExpr])
+--
+-- We also return the incoming InScopeSet, augmented with
+-- the binders from any [FloatBind] that we return
+exprIsConApp_maybe :: InScopeEnv -> CoreExpr
+                   -> Maybe (InScopeSet, [FloatBind], DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe (in_scope, id_unf) expr
-  = do
-    (floats, con, ty, args) <- go (Left in_scope) [] expr (CC [] (mkRepReflCo (exprType expr)))
-    return $ (reverse floats, con, ty, args)
+  = go (Left in_scope) [] expr (CC [] (mkRepReflCo (exprType expr)))
   where
     go :: Either InScopeSet Subst
              -- Left in-scope  means "empty substitution"
              -- Right subst    means "apply this substitution to the CoreExpr"
+             -- NB: in the call (go subst floats expr cont)
+             --     the substitution applies to 'expr', but /not/ to 'floats' or 'cont'
        -> [FloatBind] -> CoreExpr -> ConCont
              -- Notice that the floats here are in reverse order
-       -> Maybe ([FloatBind], DataCon, [Type], [CoreExpr])
+       -> Maybe (InScopeSet, [FloatBind], DataCon, [Type], [CoreExpr])
     go subst floats (Tick t expr) cont
        | not (tickishIsCode t) = go subst floats expr cont
+
     go subst floats (Cast expr co1) (CC args co2)
        | Just (args', m_co1') <- pushCoArgs (subst_co subst co1) args
             -- See Note [Push coercions in exprIsConApp_maybe]
        = case m_co1' of
            MCo co1' -> go subst floats expr (CC args' (co1' `mkTransCo` co2))
            MRefl    -> go subst floats expr (CC args' co2)
+
     go subst floats (App fun arg) (CC args co)
-       = go subst floats fun (CC (subst_arg subst arg : args) co)
-    go subst floats (Lam var body) (CC (arg:args) co)
+       = go subst floats fun (CC (subst_expr subst arg : args) co)
+
+    go subst floats (Lam bndr body) (CC (arg:args) co)
        | exprIsTrivial arg          -- Don't duplicate stuff!
-       = go (extend subst var arg) floats body (CC args co)
-    go subst floats (Lam var body) (CC (arg:args) co)
-       = go subst floats (mkCoreLet (NonRec var arg) body) (CC args co)
-    go subst floats (Let bndr@(NonRec _ _) expr) cont
-       = let (subst', bndr') = subst_bind subst bndr in
-           go subst' (FloatLet bndr' : floats) expr cont
+       = go (extend subst bndr arg) floats body (CC args co)
+       | otherwise
+       = let (subst', bndr') = subst_bndr subst bndr
+             float           = FloatLet (NonRec bndr' arg)
+         in go subst' (float:floats) body (CC args co)
+
+    go subst floats (Let (NonRec bndr rhs) expr) cont
+       = let rhs'            = subst_expr subst rhs
+             (subst', bndr') = subst_bndr subst bndr
+             float           = FloatLet (NonRec bndr' rhs')
+         in go subst' (float:floats) expr cont
+
     go subst floats (Case scrut b _ [(con, vars, expr)]) cont
        = let
-          (subst', b') = subst_bndr subst b
+          scrut'           = subst_expr subst scrut
+          (subst', b')     = subst_bndr subst b
           (subst'', vars') = subst_bndrs subst' vars
+          float            = FloatCase scrut' b' con vars'
          in
-           go subst'' (FloatCase (subst_arg subst scrut) b' con vars' : floats) expr cont
+           go subst'' (float:floats) expr cont
+
     go (Right sub) floats (Var v) cont
        = go (Left (substInScope sub))
             floats
@@ -935,7 +951,8 @@ exprIsConApp_maybe (in_scope, id_unf) expr
 
         | Just con <- isDataConWorkId_maybe fun
         , count isValArg args == idArity fun
-        = pushFloats floats $ pushCoDataCon con args co
+        = succeedWith in_scope floats $
+          pushCoDataCon con args co
 
         -- See Note [Special case for newtype wrappers]
         | Just a <- isDataConWrapId_maybe fun
@@ -954,7 +971,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         | DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = dfun_args } <- unfolding
         , bndrs `equalLength` args    -- See Note [DFun arity check]
         , let subst = mkOpenSubst in_scope (bndrs `zip` args)
-        = pushFloats floats $
+        = succeedWith in_scope floats $
           pushCoDataCon con (map (substExpr (text "exprIsConApp1") subst) dfun_args) co
 
         -- Look through unfoldings, but only arity-zero one;
@@ -972,42 +989,44 @@ exprIsConApp_maybe (in_scope, id_unf) expr
           (fun `hasKey` unpackCStringUtf8IdKey)
         , [arg]              <- args
         , Just (LitString str) <- exprIsLiteral_maybe (in_scope, id_unf) arg
-        = pushFloats floats $ dealWithStringLiteral fun str co
+        = succeedWith in_scope floats $
+          dealWithStringLiteral fun str co
         where
           unfolding = id_unf fun
 
     go _ _ _ _ = Nothing
 
-    pushFloats :: [FloatBind] -> Maybe (DataCon, [Type], [CoreExpr]) -> Maybe ([FloatBind], DataCon, [Type], [CoreExpr])
-    pushFloats floats x = do
-      (c, tys, args) <- x
-      return (floats, c, tys, args)
+    succeedWith :: InScopeSet -> [FloatBind]
+                -> Maybe (DataCon, [Type], [CoreExpr])
+                -> Maybe (InScopeSet, [FloatBind], DataCon, [Type], [CoreExpr])
+    succeedWith in_scope rev_floats x
+      = do { (con, tys, args) <- x
+           ; let floats = reverse rev_floats
+           ; return (in_scope, floats, con, tys, args) }
 
-    dealWithNewtypeWrapper scope floats (Lam v body) (CC (arg:args) co) =
-      dealWithNewtypeWrapper (extend scope v arg) floats body (CC args co)
-    dealWithNewtypeWrapper scope floats expr args = go scope floats expr args
+    ----------------------------
+    -- Unconditionally substitute the argument of a newtype
+    dealWithNewtypeWrapper scope floats (Lam v body) (CC (arg:args) co)
+      = dealWithNewtypeWrapper (extend scope v arg) floats body (CC args co)
+    dealWithNewtypeWrapper scope floats expr args
+      = go scope floats expr args
+
     ----------------------------
     -- Operations on the (Either InScopeSet CoreSubst)
     -- The Left case is wildly dominant
     subst_co (Left {}) co = co
     subst_co (Right s) co = CoreSubst.substCo s co
 
-    subst_arg (Left {}) e = e
-    subst_arg (Right s) e = substExpr (text "exprIsConApp2") s e
+    subst_expr (Left {}) e = e
+    subst_expr (Right s) e = substExpr (text "exprIsConApp2") s e
 
-    subst_bind (Left in_scope) bndr@(NonRec b _) =
-      (Left (extendInScopeSet in_scope b), bndr)
-    subst_bind (Left _) _ =
-      error "CoreOpt.exprIsConApp_maybe: recursive float."
-    subst_bind (Right subst) bndr =
-      let (subst', bndr') = substBind subst bndr in
-      (Right subst', bndr')
-
-    subst_bndr (Left in_scope) b =
-      (Left (extendInScopeSet in_scope b), b)
-    subst_bndr (Right subst) b =
-      let (subst', b') = substBndr subst b in
-      (Right subst', b')
+    subst_bndr msubst bndr
+      = (Right subst', bndr')
+      where
+        (subst', bndr') = substBndr subst bndr
+        subst = case msubst of
+                  Left in_scope -> mkEmptySubst in_scope
+                  Right subst   -> subst
 
     subst_bndrs subst bs = mapAccumL subst_bndr subst bs
 
