@@ -2402,9 +2402,14 @@ mkAltEnv env@(OccEnv { occ_gbl_scrut = pe }) scrut case_bndr
       _               -> (env { occ_encl = OccVanilla }, Nothing)
 
   where
-    add_scrut v rhs = ( env { occ_encl = OccVanilla
-                            , occ_gbl_scrut = pe `extendVarSet` v }
-                      , Just (localise v, rhs) )
+    add_scrut v rhs
+      | isGlobalId v = (env { occ_encl = OccVanilla }, Nothing)
+      | otherwise    = ( env { occ_encl = OccVanilla
+                             , occ_gbl_scrut = pe `extendVarSet` v }
+                       , Just (localise v, rhs) )
+      -- ToDO: this isGlobalId stuff is a TEMPORARY FIX
+      --       to avoid the binder-swap for GlobalIds
+      --       See Trac #16346
 
     case_bndr' = Var (zapIdOccInfo case_bndr)
                    -- See Note [Zap case binders in proxy bindings]
