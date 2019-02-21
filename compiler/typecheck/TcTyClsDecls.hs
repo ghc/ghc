@@ -540,7 +540,6 @@ generaliseTcTyCon tc
              tc_flav     = tyConFlavour tc
              tc_res_kind = tyConResKind tc
              tc_tvs      = tyConTyVars  tc
-             user_tyvars = tcTyConUserTyVars tc  -- ToDo: nuke
 
              (scoped_tv_names, scoped_tvs) = unzip (tcTyConScopedTyVars tc)
              -- NB: scoped_tvs includes both specified and required (tc_tvs)
@@ -596,7 +595,7 @@ generaliseTcTyCon tc
              scoped_tv_pairs = scoped_tv_names `zip` scoped_tvs
 
        -- Step 7: Make the result TcTyCon
-             tycon = mkTcTyCon tc_name user_tyvars final_tcbs tc_res_kind
+             tycon = mkTcTyCon tc_name final_tcbs tc_res_kind
                             scoped_tv_pairs
                             True {- it's generalised now -}
                             (tyConFlavour tc)
@@ -1497,7 +1496,6 @@ tcFamDecl1 :: Maybe Class -> FamilyDecl GhcRn -> TcM TyCon
 tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               , fdLName = tc_lname@(dL->L _ tc_name)
                               , fdResultSig = (dL->L _ sig)
-                              , fdTyVars = user_tyvars
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
   = bindTyClTyVars tc_name $ \ binders res_kind -> do
@@ -1559,7 +1557,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
            Just eqns -> do {
 
          -- Process the equations, creating CoAxBranches
-       ; let tc_fam_tc = mkTcTyCon tc_name (ppr user_tyvars) binders res_kind
+       ; let tc_fam_tc = mkTcTyCon tc_name binders res_kind
                                    [] False {- this doesn't matter here -}
                                    ClosedTypeFamilyFlavour
 
