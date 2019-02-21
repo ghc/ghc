@@ -1474,7 +1474,7 @@ instance ToHie (TVScoped (LHsTyVarBndr GhcRn)) where
       XTyVarBndr _ -> []
 
 instance ToHie (TScoped (LHsQTyVars GhcRn)) where
-  toHie (TS sc (HsQTvs (HsQTvsRn implicits _) vars)) = concatM $
+  toHie (TS sc (HsQTvs implicits vars)) = concatM $
     [ pure $ bindingsOnly bindings
     , toHie $ tvScopes sc NoScope vars
     ]
