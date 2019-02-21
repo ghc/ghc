@@ -92,7 +92,7 @@ import ConLike
 import DataCon
 import Class
 import Name
-import NameSet
+-- import NameSet
 import VarEnv
 import TysWiredIn
 import BasicTypes
@@ -1609,48 +1609,6 @@ addTypeCtxt (L _ ty) thing
 %*                                                                      *
 %************************************************************************
 
-Note [Dependent LHsQTyVars]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We track (in the renamer) which explicitly bound variables in a
-LHsQTyVars are manifestly dependent; only precisely these variables
-may be used within the LHsQTyVars. We must do this so that kcLHsQTyVars
-can produce the right TyConBinders, and tell Anon vs. Required.
-
-Example   data T k1 (a:k1) (b:k2) c
-               = MkT (Proxy a) (Proxy b) (Proxy c)
-
-Here
-  (a:k1),(b:k2),(c:k3)
-       are Anon     (explicitly specified as a binder, not used
-                     in the kind of any other binder
-  k1   is Required  (explicitly specifed as a binder, but used
-                     in the kind of another binder i.e. dependently)
-  k2   is Specified (not explicitly bound, but used in the kind
-                     of another binder)
-  k3   in Inferred  (not lexically in scope at all, but inferred
-                     by kind inference)
-and
-  T :: forall {k3} k1. forall k3 -> k1 -> k2 -> k3 -> *
-
-See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility]
-in TyCoRep.
-
-kcLHsQTyVars uses the hsq_dependent field to decide whether
-k1, a, b, c should be Required or Anon.
-
-Earlier, thought it would work simply to do a free-variable check
-during kcLHsQTyVars, but this is bogus, because there may be
-unsolved equalities about. And we don't want to eagerly solve the
-equalities, because we may get further information after
-kcLHsQTyVars is called.  (Recall that kcLHsQTyVars is called
-only from getInitialKind.)
-This is what implements the rule that all variables intended to be
-dependent must be manifestly so.
-
-Sidenote: It's quite possible that later, we'll consider (t -> s)
-as a degenerate case of some (pi (x :: t) -> s) and then this will
-all get more permissive.
-
 Note [Keeping scoped variables in order: Explicit]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When the user writes `forall a b c. blah`, we bring a, b, and c into
@@ -1820,8 +1778,7 @@ kcLHsQTyVars_Cusk, kcLHsQTyVars_NonCusk
 
 ------------------------------
 kcLHsQTyVars_Cusk name flav
-              (HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kv_ns
-                                           , hsq_dependent = dep_names }
+              (HsQTvs { hsq_ext = kv_ns
                       , hsq_explicit = hs_tvs }) thing_inside
   -- CUSK case
   -- See note [Required, Specified, and Inferred for types] in TcTyClsDecls
@@ -1882,7 +1839,6 @@ kcLHsQTyVars_Cusk name flav
          vcat [ text "name" <+> ppr name
               , text "kv_ns" <+> ppr kv_ns
               , text "hs_tvs" <+> ppr hs_tvs
-              , text "dep_names" <+> ppr dep_names
               , text "scoped_kvs" <+> ppr scoped_kvs
               , text "tc_tvs" <+> ppr tc_tvs
               , text "res_kind" <+> ppr res_kind
@@ -1903,8 +1859,7 @@ kcLHsQTyVars_Cusk _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
 
 ------------------------------
 kcLHsQTyVars_NonCusk name flav
-              (HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kv_ns
-                                           , hsq_dependent = dep_names }
+              (HsQTvs { hsq_ext = kv_ns
                       , hsq_explicit = hs_tvs }) thing_inside
   -- Non_CUSK case
   -- See note [Required, Specified, and Inferred for types] in TcTyClsDecls
@@ -1921,17 +1876,21 @@ kcLHsQTyVars_NonCusk name flav
                -- might unify with kind vars in other types in a mutually
                -- recursive group.
                -- See Note [Inferring kinds for type declarations] in TcTyClsDecls
-             tc_binders = zipWith mk_tc_binder hs_tvs tc_tvs
+
+             tc_binders = mkAnonTyConBinders VisArg tc_tvs
                -- Also, note that tc_binders has the tyvars from only the
                -- user-written tyvarbinders. See S1 in Note [How TcTyCons work]
                -- in TcTyClsDecls
+               --
+               -- mkAnonTyConBinder: see Note [No polymorphic recursion]
+
              tycon = mkTcTyCon name tc_binders res_kind
                                (mkTyVarNamePairs (scoped_kvs ++ tc_tvs))
                                False -- not yet generalised
                                flav
 
        ; traceTc "kcLHsQTyVars: not-cusk" $
-         vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
+         vcat [ ppr name, ppr kv_ns, ppr hs_tvs
               , ppr scoped_kvs
               , ppr tc_tvs, ppr (mkTyConKind tc_binders res_kind) ]
        ; return tycon }
@@ -1939,18 +1898,38 @@ kcLHsQTyVars_NonCusk name flav
     ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
               | otherwise            = AnyKind
 
-    mk_tc_binder :: LHsTyVarBndr GhcRn -> TyVar -> TyConBinder
-    -- See Note [Dependent LHsQTyVars]
-    mk_tc_binder hs_tv tv
-       | hsLTyVarName hs_tv `elemNameSet` dep_names
-       = mkNamedTyConBinder Required tv
-       | otherwise
-       = mkAnonTyConBinder VisArg tv
-
 kcLHsQTyVars_NonCusk _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
 
 
-{- Note [Kind-checking tyvar binders for associated types]
+{- No polymorphic recursion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Should this kind-check?
+  data T ka (a::ka) b  = MkT (T Type           Int   Bool)
+                             (T (Type -> Type) Maybe Bool)
+
+Notice that T is used at two different kinds in its RHS.  No!
+This should not kind-check.  Polymorphic recursion is known to
+be a tough nut.
+
+Previously, we laboriously (with help from the renamer)
+tried to give T the polymoprhic kind
+   T :: forall ka -> ka -> kappa -> Type
+where kappe is a unification variable, even in the getInitialKinds
+phase (which is what kcLHsQTyVars_NonCusk is all about).  But
+that is dangerously fragile (see the ticket).
+
+Solution: simply make kcLHsQTyVars_NonCusk give T a straightforward
+monomorphic kind.
+
+That's why we use mkAnonTyConBinder for all arguments when
+figuring out tc_binders.
+
+NB: this algorithm still accepts
+  data T3 ka (a::ka) = forall b. MkT3 (T3 Type b)
+which is really polymorphic recursive too.  Perhaps we should
+somehow reject that (#16344 comment:3).
+
+Note [Kind-checking tyvar binders for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When kind-checking the type-variable binders for associated
    data/newtype decls
