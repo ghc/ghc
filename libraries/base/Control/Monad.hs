@@ -191,6 +191,8 @@ forever a   = let a' = a *> a' in a'
 -- data structures or a state monad.
 mapAndUnzipM      :: (Applicative m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
 {-# INLINE mapAndUnzipM #-}
+-- Inline so that fusion with 'unzip' and 'traverse' has a chance to fire.
+-- See Note [Inline @unzipN@ functions] in GHC/OldList.hs.
 mapAndUnzipM f xs =  unzip <$> traverse f xs
 
 -- | The 'zipWithM' function generalizes 'zipWith' to arbitrary applicative functors.
