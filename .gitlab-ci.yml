@@ -60,11 +60,17 @@ ghc-linters:
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
-    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh`
+    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` $HADRIAN_OPTS
     - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` docs-haddock
+      # Support for testing Hadrian caching
+    - if [[ -d ./_cache ]]; then
+        rm -R ./_build
+        hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` $HADRIAN_OPTS
+      fi
   cache:
     key: hadrian
     paths:
+      - _cache
       - cabal-cache
 
 validate-x86_64-linux-deb8-hadrian:
@@ -81,6 +87,11 @@ validate-x86_64-linux-deb8-hadrian:
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
   tags:
     - x86_64-linux
+
+validate-x86_64-linux-deb8-hadrian-cached:
+  extends: validate-x86_64-linux-deb8-hadrian
+  variables:
+    HADRIAN_OPTS: --shared=_cache
 
 ############################################################
 # Validation via Pipelines (make)
