@@ -60,10 +60,14 @@ ghc-linters:
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
+
+    # Clear cache if Hadrian itself has changed
+    - bash .gitlab/clear-hadrian-cache.sh
+
     - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --shared=_cache
     - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` docs-haddock
-      # Make sure that caching works properly: _build should be recreated from
-      # the _cache if deleted
+    # Make sure that caching works properly: _build should be recreated from
+    # the _cache if deleted
     - |
       rm -R ./_build
       hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --shared=_cache
@@ -71,6 +75,7 @@ ghc-linters:
     key: hadrian
     paths:
       - _cache
+      - hadrian.sha256
       - cabal-cache
 
 validate-x86_64-linux-deb8-hadrian:
