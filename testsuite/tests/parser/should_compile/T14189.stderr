@@ -7,25 +7,22 @@
    (NoExt)
    (XValBindsLR
     (NValBinds
-      []
-      []))
+     []
+     []))
    []
    [(TyClGroup
      (NoExt)
      [({ T14189.hs:6:1-42 }
        (DataDecl
         (DataDeclRn
-          (True)
-          {NameSet:
-           [{Name: GHC.Types.Int}]})
+         (True)
+         {NameSet:
+          [{Name: GHC.Types.Int}]})
         ({ T14189.hs:6:6-11 }
          {Name: T14189.MyType})
         (HsQTvs
-         (HsQTvsRn
          []
-         {NameSet:
-          []})
-          [])
+         [])
         (Prefix)
         (HsDataDefn
          (NoExt)

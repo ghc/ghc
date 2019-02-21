@@ -20,7 +20,9 @@ type DComp a
            (x :: a) =
   f (g x)
 
-type family ElimList a
+-- Ensure that ElimList has a CUSK, beuas it is
+-- is used polymorphically its RHS (c.f. Trac #16344)
+type family ElimList (a :: Type)
                      (p :: [a] -> Type)
                      (s :: [a])
                      (pNil :: p '[])
