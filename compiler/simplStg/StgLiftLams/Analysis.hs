@@ -484,13 +484,12 @@ rhsLambdaBndrs (StgRhsClosure _ _ _ bndrs _) = map binderInfoBndr bndrs
 -- | The size in words of a function closure closing over the given 'Id's,
 -- including the header.
 closureSize :: DynFlags -> [Id] -> WordOff
-closureSize dflags ids = words
+closureSize dflags ids = words + sTD_HDR_SIZE dflags
+  -- We go through sTD_HDR_SIZE rather than fixedHdrSizeW so that we don't
+  -- optimise differently when profiling is enabled.
   where
     (words, _, _)
       -- Functions have a StdHeader (as opposed to ThunkHeader).
-      -- Note that mkVirtHeadOffsets will account for profiling headers, so
-      -- lifting decisions vary if we begin to profile stuff. Maybe we shouldn't
-      -- do this or deactivate profiling in @dflags@?
       = StgCmmLayout.mkVirtHeapOffsets dflags StgCmmLayout.StdHeader
       . StgCmmClosure.addIdReps
       . StgCmmClosure.nonVoidIds
