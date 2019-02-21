@@ -68,3 +68,5 @@ test('T14729kind', normal, ghci_script, ['T14729kind.script'])
 test('T16326_Compile1', normal, compile, [''])
 test('T16326_Compile2', normal, compile, [''])
 test('T16391a', normal, compile, [''])
+test('T16344b', normal, compile, [''])
+
