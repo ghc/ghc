@@ -1128,12 +1128,16 @@ zipWith3FB cons func = \a b c r -> (func a b c) `cons` r
 -- and a list of second components.
 unzip    :: [(a,b)] -> ([a],[b])
 {-# INLINE unzip #-}
+-- Inline so that fusion `foldr` has an opportunity to fire.
+-- See Note [Inline @unzipN@ functions] in GHC/OldList.hs.
 unzip    =  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[])
 
 -- | The 'unzip3' function takes a list of triples and returns three
 -- lists, analogous to 'unzip'.
 unzip3   :: [(a,b,c)] -> ([a],[b],[c])
 {-# INLINE unzip3 #-}
+-- Inline so that fusion `foldr` has an opportunity to fire.
+-- See Note [Inline @unzipN@ functions] in GHC/OldList.hs.
 unzip3   =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
                   ([],[],[])
 

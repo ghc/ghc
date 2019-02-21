@@ -34,6 +34,8 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.IO.Class
+import Data.Foldable (sequenceA_)
+import Data.List (unzip4, unzip5, zipWith4)
 
 -------------------------------------------------------------------------------
 -- Lift combinators
@@ -61,32 +63,50 @@ liftIO4 = (((.).(.)).((.).(.))) liftIO
 --  These are used throughout the compiler
 -------------------------------------------------------------------------------
 
+{-
+
+Note [Inline @zipWithNM@ functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The inline principle for 'zipWith3M', 'zipWith4M' and 'zipWith3M_' is the same
+as for 'zipWithM' and 'zipWithM_' in "Control.Monad", see
+Note [Fusion for zipN/zipWithN] in GHC/List.hs for more details.
+
+The 'zipWithM'/'zipWithM_' functions are inlined so that the `zipWith` and
+`sequenceA` functions with which they are defined have an opportunity to fuse.
+
+Furthermore, 'zipWith3M'/'zipWith4M' and 'zipWith3M_' have been explicitly
+rewritten in a non-recursive way similarly to 'zipWithM'/'zipWithM_', and for
+more than just uniformity: after [D5241](https://phabricator.haskell.org/D5241)
+for Trac ticket #14037, all @zipN@/@zipWithN@ functions fuse, meaning
+'zipWith3M'/'zipWIth4M' and 'zipWith3M_'@ now behave like 'zipWithM' and
+'zipWithM_', respectively, with regards to fusion.
+
+As such, since there are not any differences between 2-ary 'zipWithM'/
+'zipWithM_' and their n-ary counterparts below aside from the number of
+arguments, the `INLINE` pragma should be replicated in the @zipWithNM@
+functions below as well.
+
+-}
+
 zipWith3M :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
-zipWith3M _ []     _      _      = return []
-zipWith3M _ _      []     _      = return []
-zipWith3M _ _      _      []     = return []
-zipWith3M f (x:xs) (y:ys) (z:zs)
-  = do { r  <- f x y z
-       ; rs <- zipWith3M f xs ys zs
-       ; return $ r:rs
-       }
+{-# INLINE zipWith3M #-}
+-- Inline so that fusion with 'zipWith3' and 'sequenceA' has a chance to fire.
+-- See Note [Inline @zipWithNM@ functions] above.
+zipWith3M f xs ys zs = sequenceA (zipWith3 f xs ys zs)
 
 zipWith3M_ :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m ()
-zipWith3M_ f as bs cs = do { _ <- zipWith3M f as bs cs
-                           ; return () }
+{-# INLINE zipWith3M_ #-}
+-- Inline so that fusion with 'zipWith4' and 'sequenceA' has a chance to fire.
+-- See  Note [Inline @zipWithNM@ functions] above.
+zipWith3M_ f xs ys zs = sequenceA_ (zipWith3 f xs ys zs)
 
 zipWith4M :: Monad m => (a -> b -> c -> d -> m e)
           -> [a] -> [b] -> [c] -> [d] -> m [e]
-zipWith4M _ []     _      _      _      = return []
-zipWith4M _ _      []     _      _      = return []
-zipWith4M _ _      _      []     _      = return []
-zipWith4M _ _      _      _      []     = return []
-zipWith4M f (x:xs) (y:ys) (z:zs) (a:as)
-  = do { r  <- f x y z a
-       ; rs <- zipWith4M f xs ys zs as
-       ; return $ r:rs
-       }
-
+{-# INLINE zipWith4M #-}
+-- Inline so that fusion with 'zipWith5' and 'sequenceA' has a chance to fire.
+-- See  Note [Inline @zipWithNM@ functions] above.
+zipWith4M f xs ys ws zs = sequenceA (zipWith4 f xs ys ws zs)
 
 zipWithAndUnzipM :: Monad m
                  => (a -> b -> m (c, d)) -> [a] -> [b] -> m ([c], [d])
@@ -99,27 +119,47 @@ zipWithAndUnzipM f (x:xs) (y:ys)
        ; return (c:cs, d:ds) }
 zipWithAndUnzipM _ _ _ = return ([], [])
 
+{-
+
+Note [Inline @mapAndUnzipNM@ functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The inline principle is the same as 'mapAndUnzipM' in "Control.Monad".
+The 'mapAndUnzipM' function is inlined so that the `unzip` and `traverse`
+functions with which it is defined have an opportunity to fuse, see
+Note [Inline @unzipN@ functions] in Data/OldList.hs for more details.
+
+Furthermore, the @mapAndUnzipNM@ functions have been explicitly rewritten in a
+non-recursive way similarly to 'mapAndUnzipM', and for more than just
+uniformity: after [D5249](https://phabricator.haskell.org/D5249) for Trac
+ticket #14037, all @unzipN@ functions fuse, meaning 'mapAndUnzip3M',
+'mapAndUnzip4M' and 'mapAndUnzip5M' now behave like 'mapAndUnzipM' with regards
+to fusion.
+
+As such, since there are not any differences between 2-ary 'mapAndUnzipM' and
+its n-ary counterparts below aside from the number of arguments, the `INLINE`
+pragma should be replicated in the @mapAndUnzipNM@ functions below as well.
+
+-}
+
 -- | mapAndUnzipM for triples
 mapAndUnzip3M :: Monad m => (a -> m (b,c,d)) -> [a] -> m ([b],[c],[d])
-mapAndUnzip3M _ []     = return ([],[],[])
-mapAndUnzip3M f (x:xs) = do
-    (r1,  r2,  r3)  <- f x
-    (rs1, rs2, rs3) <- mapAndUnzip3M f xs
-    return (r1:rs1, r2:rs2, r3:rs3)
+{-# INLINE mapAndUnzip3M #-}
+-- Inline so that fusion with 'unzip3' and 'traverse' has a chance to fire.
+-- See Note [Inline @mapAndUnzipNM@ functions] above.
+mapAndUnzip3M f xs =  unzip3 <$> traverse f xs
 
 mapAndUnzip4M :: Monad m => (a -> m (b,c,d,e)) -> [a] -> m ([b],[c],[d],[e])
-mapAndUnzip4M _ []     = return ([],[],[],[])
-mapAndUnzip4M f (x:xs) = do
-    (r1,  r2,  r3,  r4)  <- f x
-    (rs1, rs2, rs3, rs4) <- mapAndUnzip4M f xs
-    return (r1:rs1, r2:rs2, r3:rs3, r4:rs4)
+{-# INLINE mapAndUnzip4M #-}
+-- Inline so that fusion with 'unzip4' and 'traverse' has a chance to fire.
+-- See Note [Inline @mapAndUnzipNM@ functions] above.
+mapAndUnzip4M f xs =  unzip4 <$> traverse f xs
 
 mapAndUnzip5M :: Monad m => (a -> m (b,c,d,e,f)) -> [a] -> m ([b],[c],[d],[e],[f])
-mapAndUnzip5M _ [] = return ([],[],[],[],[])
-mapAndUnzip5M f (x:xs) = do
-    (r1, r2, r3, r4, r5)      <- f x
-    (rs1, rs2, rs3, rs4, rs5) <- mapAndUnzip5M f xs
-    return (r1:rs1, r2:rs2, r3:rs3, r4:rs4, r5:rs5)
+{-# INLINE mapAndUnzip5M #-}
+-- Inline so that fusion with 'unzip5' and 'traverse' has a chance to fire.
+-- See Note [Inline @mapAndUnzipNM@ functions] above.
+mapAndUnzip5M f xs =  unzip5 <$> traverse f xs
 
 -- | Monadic version of mapAccumL
 mapAccumLM :: Monad m

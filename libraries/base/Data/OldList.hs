@@ -929,8 +929,27 @@ foldr7_left _  z _ _ _      _      _      _      _      _      = z
 
  #-}
 
+{-
+
+Note [Inline @unzipN@ functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The inline principle for @unzip{4,5,6,7}@ is the same as 'unzip'/'unzip3' in
+"GHC.List".
+The 'unzip'/'unzip3' functions are inlined so that the `foldr` with which they
+are defined has an opportunity to fuse.
+
+As such, since there are not any differences between 2/3-ary 'unzip' and its
+n-ary counterparts below aside from the number of arguments, the `INLINE`
+pragma should be replicated in the @unzipN@ functions below as well.
+
+-}
+
 -- | The 'unzip4' function takes a list of quadruples and returns four
 -- lists, analogous to 'unzip'.
+{-# INLINE unzip4 #-}
+-- Inline so that fusion with `foldr` has an opportunity to fire.
+-- See Note [Inline @unzipN@ functions] above.
 unzip4                  :: [(a,b,c,d)] -> ([a],[b],[c],[d])
 unzip4                  =  foldr (\(a,b,c,d) ~(as,bs,cs,ds) ->
                                         (a:as,b:bs,c:cs,d:ds))
@@ -938,6 +957,9 @@ unzip4                  =  foldr (\(a,b,c,d) ~(as,bs,cs,ds) ->
 
 -- | The 'unzip5' function takes a list of five-tuples and returns five
 -- lists, analogous to 'unzip'.
+{-# INLINE unzip5 #-}
+-- Inline so that fusion with `foldr` has an opportunity to fire.
+-- See Note [Inline @unzipN@ functions] above.
 unzip5                  :: [(a,b,c,d,e)] -> ([a],[b],[c],[d],[e])
 unzip5                  =  foldr (\(a,b,c,d,e) ~(as,bs,cs,ds,es) ->
                                         (a:as,b:bs,c:cs,d:ds,e:es))
@@ -945,6 +967,9 @@ unzip5                  =  foldr (\(a,b,c,d,e) ~(as,bs,cs,ds,es) ->
 
 -- | The 'unzip6' function takes a list of six-tuples and returns six
 -- lists, analogous to 'unzip'.
+{-# INLINE unzip6 #-}
+-- Inline so that fusion with `foldr` has an opportunity to fire.
+-- See Note [Inline @unzipN@ functions] above.
 unzip6                  :: [(a,b,c,d,e,f)] -> ([a],[b],[c],[d],[e],[f])
 unzip6                  =  foldr (\(a,b,c,d,e,f) ~(as,bs,cs,ds,es,fs) ->
                                         (a:as,b:bs,c:cs,d:ds,e:es,f:fs))
@@ -952,6 +977,9 @@ unzip6                  =  foldr (\(a,b,c,d,e,f) ~(as,bs,cs,ds,es,fs) ->
 
 -- | The 'unzip7' function takes a list of seven-tuples and returns
 -- seven lists, analogous to 'unzip'.
+{-# INLINE unzip7 #-}
+-- Inline so that fusion with `foldr` has an opportunity to fire.
+-- See Note [Inline @unzipN@ functions] above.
 unzip7          :: [(a,b,c,d,e,f,g)] -> ([a],[b],[c],[d],[e],[f],[g])
 unzip7          =  foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
                                 (a:as,b:bs,c:cs,d:ds,e:es,f:fs,g:gs))
