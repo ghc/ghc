@@ -68,10 +68,7 @@
         ({ DumpRenamedAst.hs:9:6-10 }
          {Name: DumpRenamedAst.Peano})
         (HsQTvs
-         (HsQTvsRn
-          []
-          {NameSet:
-           []})
+         []
          [])
         (Prefix)
         (HsDataDefn
@@ -205,10 +202,7 @@
          ({ DumpRenamedAst.hs:11:13-18 }
           {Name: DumpRenamedAst.Length})
          (HsQTvs
-          (HsQTvsRn
-           [{Name: k}]
-           {NameSet:
-            []})
+          [{Name: k}]
           [({ DumpRenamedAst.hs:11:21-29 }
             (KindedTyVar
              (NoExt)
@@ -247,10 +241,7 @@
          ({ DumpRenamedAst.hs:15:13-15 }
           {Name: DumpRenamedAst.Nat})
          (HsQTvs
-          (HsQTvsRn
-           [{Name: k}]
-           {NameSet:
-            []})
+          [{Name: k}]
           [])
          (Prefix)
          ({ DumpRenamedAst.hs:15:17-33 }
@@ -365,11 +356,8 @@
                ({ DumpRenamedAst.hs:19:10-45 }
                 (False))
                (HsQTvs
-                (HsQTvsRn
-                 [{Name: f}
-                 ,{Name: g}]
-                 {NameSet:
-                  []})
+                [{Name: f}
+                ,{Name: g}]
                 [])
                (Nothing)
                (PrefixCon
@@ -457,10 +445,7 @@
         ({ DumpRenamedAst.hs:21:6 }
          {Name: DumpRenamedAst.T})
         (HsQTvs
-         (HsQTvsRn
-          [{Name: k}]
-          {NameSet:
-           []})
+         [{Name: k}]
          [({ DumpRenamedAst.hs:21:8 }
            (UserTyVar
             (NoExt)
@@ -595,10 +580,7 @@
          ({ DumpRenamedAst.hs:23:13-14 }
           {Name: DumpRenamedAst.F1})
          (HsQTvs
-          (HsQTvsRn
-           [{Name: k}]
-           {NameSet:
-            []})
+          [{Name: k}]
           [({ DumpRenamedAst.hs:23:17-22 }
             (KindedTyVar
              (NoExt)

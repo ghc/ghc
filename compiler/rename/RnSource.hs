@@ -2166,9 +2166,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                                       -- See Note [GADT abstract syntax] in HsDecls
                                       (PrefixCon arg_tys, final_res_ty)
 
-              new_qtvs =  HsQTvs { hsq_ext = HsQTvsRn
-                                     { hsq_implicit  = implicit_tkvs
-                                     , hsq_dependent = emptyNameSet }
+              new_qtvs =  HsQTvs { hsq_ext = implicit_tkvs
                                  , hsq_explicit  = explicit_tkvs }
 
         ; traceRn "rnConDecl2" (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
