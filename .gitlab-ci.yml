@@ -277,24 +277,28 @@ validate-x86_64-linux-deb9-llvm:
   cache:
     key: linux-x86_64-deb9
 
-validate-x86_64-linux-deb8:
+release-x86_64-linux-deb8:
   extends: .validate-linux
   stage: full-build
   image: ghcci/x86_64-linux-deb8:0.1
   variables:
     TEST_ENV: "x86_64-linux-deb8"
+  only:
+    - tags
   cache:
     key: linux-x86_64-deb8
   artifacts:
     when: always
     expire_in: 2 week
 
-validate-x86_64-linux-fedora27:
+release-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
   image: ghcci/x86_64-linux-fedora27:0.1
   variables:
     TEST_ENV: "x86_64-linux-fedora27"
+  only:
+    - tags
   cache:
     key: linux-x86_64-fedora27
   artifacts:
