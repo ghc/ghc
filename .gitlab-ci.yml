@@ -344,7 +344,7 @@ validate-x86_64-linux-deb9-unreg:
     TEST_ENV: "x86_64-linux-deb9-unreg"
   image: ghcci/x86_64-linux-deb9:0.3
   cache:
-    key: linux-x86_64-deb9
+    key: linux-x86_64-deb9-unreg
 
 ############################################################
 # Validation via Pipelines (Windows)
