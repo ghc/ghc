@@ -34,10 +34,10 @@ module GHC.Word (
     -- * Equality operators
     -- | See GHC.Classes#matching_overloaded_methods_in_rules
     eqWord, neWord, gtWord, geWord, ltWord, leWord,
-    eqWord8, neWord8, gtWord8, geWord8, ltWord8, leWord8,
-    eqWord16, neWord16, gtWord16, geWord16, ltWord16, leWord16,
-    eqWord32, neWord32, gtWord32, geWord32, ltWord32, leWord32,
-    eqWord64, neWord64, gtWord64, geWord64, ltWord64, leWord64
+    eqWord8, neWord8, gtWord8, geWord8, ltWord8, leWord8, minWord8, maxWord8,
+    eqWord16, neWord16, gtWord16, geWord16, ltWord16, leWord16, minWord16, maxWord16,
+    eqWord32, neWord32, gtWord32, geWord32, ltWord32, leWord32, minWord32, maxWord32,
+    eqWord64, neWord64, gtWord64, geWord64, ltWord64, leWord64, minWord64, maxWord64,
     ) where
 
 import Data.Bits

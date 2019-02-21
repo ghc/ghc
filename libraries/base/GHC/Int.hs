@@ -25,10 +25,10 @@ module GHC.Int (
         -- * Equality operators
         -- | See GHC.Classes#matching_overloaded_methods_in_rules
         eqInt, neInt, gtInt, geInt, ltInt, leInt,
-        eqInt8, neInt8, gtInt8, geInt8, ltInt8, leInt8,
-        eqInt16, neInt16, gtInt16, geInt16, ltInt16, leInt16,
-        eqInt32, neInt32, gtInt32, geInt32, ltInt32, leInt32,
-        eqInt64, neInt64, gtInt64, geInt64, ltInt64, leInt64
+        eqInt8, neInt8, gtInt8, geInt8, ltInt8, leInt8, minInt8, maxInt8,
+        eqInt16, neInt16, gtInt16, geInt16, ltInt16, leInt16, minInt16, maxInt16,
+        eqInt32, neInt32, gtInt32, geInt32, ltInt32, leInt32, minInt32, maxInt32,
+        eqInt64, neInt64, gtInt64, geInt64, ltInt64, leInt64, minInt64, maxInt64,
     ) where
 
 import Data.Bits

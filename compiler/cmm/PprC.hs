@@ -434,9 +434,9 @@ pprMachOpApp op args
         -- (a < b ? a : b)
     in case isMaxOp op of
         True  -> parens (val1 <+> text ">" <+> val2 <+> text "?" <+>
-                                               val1 <+> dcolon <+> val2 )
+                                               val1 <+> colon <+> val2 )
         False -> parens (val1 <+> text "<" <+> val2 <+> text "?" <+>
-                                               val1 <+> dcolon <+> val2 )
+                                               val1 <+> colon <+> val2 )
   where isMulMayOfloOp (MO_U_MulMayOflo _) = True
         isMulMayOfloOp (MO_S_MulMayOflo _) = True
         isMulMayOfloOp _ = False
