@@ -1154,7 +1154,7 @@ kcConDecl (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
 kcConDecl (ConDeclGADT { con_names = names
                        , con_qvars = qtvs, con_mb_cxt = cxt
                        , con_args = args, con_res_ty = res_ty })
-  | HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = implicit_tkv_nms }
+  | HsQTvs { hsq_ext = implicit_tkv_nms
            , hsq_explicit = explicit_tkv_nms } <- qtvs
   = -- Even though the data constructor's type is closed, we
     -- must still kind-check the type, because that may influence
@@ -1492,7 +1492,7 @@ tcDefaultAssocDecl _ (d1:_:_)
 tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
                                              , feqn_pats = hs_tvs
                                              , feqn_rhs = hs_rhs_ty })]
-  | HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = imp_vars}
+  | HsQTvs { hsq_ext = imp_vars
            , hsq_explicit = exp_vars } <- hs_tvs
   = -- See Note [Type-checking default assoc decls]
     setSrcSpan loc $
@@ -2281,7 +2281,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
                        , con_qvars = qtvs
                        , con_mb_cxt = cxt, con_args = hs_args
                        , con_res_ty = hs_res_ty })
-  | HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = implicit_tkv_nms }
+  | HsQTvs { hsq_ext = implicit_tkv_nms
            , hsq_explicit = explicit_tkv_nms } <- qtvs
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)

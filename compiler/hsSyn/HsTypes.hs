@@ -20,7 +20,7 @@ HsTypes: Abstract syntax: user-defined types
 module HsTypes (
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr, ForallVisFlag(..),
-        LHsQTyVars(..), HsQTvsRn(..),
+        LHsQTyVars(..),
         HsImplicitBndrs(..),
         HsWildCardBndrs(..),
         LHsSigType, LHsSigWcType, LHsWcType,
@@ -79,7 +79,6 @@ import HsLit () -- for instances
 import Id ( Id )
 import Name( Name )
 import RdrName ( RdrName )
-import NameSet ( NameSet, emptyNameSet )
 import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
 import TysPrim( funTyConName )
@@ -322,21 +321,13 @@ data LHsQTyVars pass   -- See Note [HsType binders]
     }
   | XLHsQTyVars (XXLHsQTyVars pass)
 
-data HsQTvsRn
-  = HsQTvsRn
-           { hsq_implicit :: [Name]
-                -- Implicit (dependent) variables
+type HsQTvsRn = [Name]  -- Implicit variables
+  -- For example, in   data T (a :: k1 -> k2) = ...
+  -- the 'a' is explicit while 'k1', 'k2' are implicit
 
-           , hsq_dependent :: NameSet
-               -- Which members of hsq_explicit are dependent; that is,
-               -- mentioned in the kind of a later hsq_explicit,
-               -- or mentioned in a kind in the scope of this HsQTvs
-               -- See Note [Dependent LHsQTyVars] in TcHsType
-           } deriving Data
-
-type instance XHsQTvs       GhcPs = NoExt
-type instance XHsQTvs       GhcRn = HsQTvsRn
-type instance XHsQTvs       GhcTc = HsQTvsRn
+type instance XHsQTvs GhcPs = NoExt
+type instance XHsQTvs GhcRn = HsQTvsRn
+type instance XHsQTvs GhcTc = HsQTvsRn
 
 type instance XXLHsQTyVars  (GhcPass _) = NoExt
 
@@ -347,11 +338,12 @@ hsQTvExplicit :: LHsQTyVars pass -> [LHsTyVarBndr pass]
 hsQTvExplicit = hsq_explicit
 
 emptyLHsQTvs :: LHsQTyVars GhcRn
-emptyLHsQTvs = HsQTvs (HsQTvsRn [] emptyNameSet) []
+emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 
 isEmptyLHsQTvs :: LHsQTyVars GhcRn -> Bool
-isEmptyLHsQTvs (HsQTvs (HsQTvsRn [] _) []) = True
-isEmptyLHsQTvs _                = False
+isEmptyLHsQTvs (HsQTvs { hsq_ext = imp, hsq_explicit = exp })
+  = null imp && null exp
+isEmptyLHsQTvs _ = False
 
 ------------------------------------------------
 --            HsImplicitBndrs
@@ -997,7 +989,7 @@ hsExplicitLTyVarNames qtvs = map hsLTyVarName (hsQTvExplicit qtvs)
 
 hsAllLTyVarNames :: LHsQTyVars GhcRn -> [Name]
 -- All variables
-hsAllLTyVarNames (HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kvs }
+hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
                          , hsq_explicit = tvs })
   = kvs ++ hsLTyVarNames tvs
 hsAllLTyVarNames (XLHsQTyVars _) = panic "hsAllLTyVarNames"

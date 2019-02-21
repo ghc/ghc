@@ -33,7 +33,8 @@ data EffElem :: (Type ~> Type ~> Type ~> Type) -> Type -> [EFFECT] -> Type where
 data instance Sing (elem :: EffElem x a xs) where
   SHere :: Sing Here
 
-type family UpdateResTy b t (xs :: [EFFECT]) (elem :: EffElem e a xs)
+type family UpdateResTy (b :: Type) (t :: Type)
+                        (xs :: [EFFECT]) (elem :: EffElem e a xs)
                         (thing :: e @@ a @@ b @@ t) :: [EFFECT] where
   UpdateResTy b _ (MkEff a e ': xs) Here n = MkEff b e ': xs
 
