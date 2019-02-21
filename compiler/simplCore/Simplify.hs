@@ -2399,26 +2399,27 @@ rebuildCase env scrut case_bndr alts cont
   = do  { tick (KnownBranch case_bndr)
         ; case findAlt (LitAlt lit) alts of
             Nothing           -> missingAlt env case_bndr alts cont
-            Just (_, bs, rhs) -> simple_rhs [] scrut bs rhs }
+            Just (_, bs, rhs) -> simple_rhs env [] scrut bs rhs }
 
-  | Just (wfloats, con, ty_args, other_args) <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
+  | Just (in_scope', wfloats, con, ty_args, other_args)
+      <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
         -- Works when the scrutinee is a variable with a known unfolding
         -- as well as when it's an explicit constructor application
+  , let env0 = setInScopeSet env in_scope'
   = do  { tick (KnownBranch case_bndr)
         ; case findAlt (DataAlt con) alts of
-            Nothing  -> missingAlt env case_bndr alts cont
+            Nothing  -> missingAlt env0 case_bndr alts cont
             Just (DEFAULT, bs, rhs) -> let con_app = Var (dataConWorkId con)
                                                  `mkTyApps` ty_args
                                                  `mkApps`   other_args
-                                       in simple_rhs wfloats con_app bs rhs
-            Just (_, bs, rhs)       -> knownCon env scrut wfloats con ty_args other_args
+                                       in simple_rhs env0 wfloats con_app bs rhs
+            Just (_, bs, rhs)       -> knownCon env0 scrut wfloats con ty_args other_args
                                                 case_bndr bs rhs cont
         }
   where
-    simple_rhs wfloats scrut' bs rhs =
+    simple_rhs env wfloats scrut' bs rhs =
       ASSERT( null bs )
-      do { let env0 = addNewInScopeIds env (concatMap MkCore.floatBindings wfloats)
-         ; (floats1, env') <- simplNonRecX env0 case_bndr scrut'
+      do { (floats1, env') <- simplNonRecX env case_bndr scrut'
              -- scrut is a constructor application,
              -- hence satisfies let/app invariant
          ; (floats2, expr') <- simplExprF env' rhs cont
@@ -2863,8 +2864,7 @@ knownCon :: SimplEnv
          -> SimplM (SimplFloats, OutExpr)
 
 knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
-  = do  { let env0 = addNewInScopeIds env (concatMap MkCore.floatBindings dc_floats)
-        ; (floats1, env1)  <- bind_args env0 bs dc_args
+  = do  { (floats1, env1)  <- bind_args env bs dc_args
         ; (floats2, env2) <- bind_case_bndr env1
         ; (floats3, expr') <- simplExprF env2 rhs cont
         ; case dc_floats of

@@ -301,3 +301,4 @@ test('T15631',
      makefile_test, ['T15631'])
 test('T15673', normal, compile, ['-O'])
 test('T16288', normal, multimod_compile, ['T16288B', '-O -dcore-lint -v0'])
+test('T16348', normal, compile, ['-O'])
