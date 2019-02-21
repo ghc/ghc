@@ -149,6 +149,7 @@ SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
 #endif /* powerpc_HOST_ARCH */
 #if defined(x86_64_HOST_ARCH)
     // jmp *-14(%rip)
+    // 0xFF 25 is opcode + ModRM of near absolute indirect jump
     static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
     extra->addr = target;
     memcpy(extra->jumpIsland, jmp, 6);
