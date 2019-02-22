@@ -298,7 +298,7 @@ static StgClosure *lock_tvar(Capability *cap,
                (StgWord)result, (StgWord)trec) != (StgWord)result);
 
   if (nonmoving_write_barrier_enabled && result) {
-      updateRemembSetPushClosure(cap, result, NULL);
+      updateRemembSetPushClosure(cap, result);
   }
   return result;
 }
@@ -324,7 +324,7 @@ static StgBool cond_lock_tvar(Capability *cap,
   w = cas((void *)&(s -> current_value), (StgWord)expected, (StgWord)trec);
   result = (StgClosure *)w;
   if (nonmoving_write_barrier_enabled && result) {
-      updateRemembSetPushClosure(cap, expected, NULL);
+      updateRemembSetPushClosure(cap, expected);
   }
   TRACE("%p : %s", trec, result ? "success" : "failure");
   return (result == expected);

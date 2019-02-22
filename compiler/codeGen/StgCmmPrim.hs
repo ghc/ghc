@@ -1623,7 +1623,7 @@ doWritePtrArrayOp addr idx val
            hdr_size = arrPtrsHdrSize dflags
        -- Update remembered set for non-moving collector
        whenUpdRemSetEnabled
-           $ emitUpdRemSetPush dflags (cmmLoadIndexOffExpr dflags hdr_size ty addr ty idx)
+           $ emitUpdRemSetPush (cmmLoadIndexOffExpr dflags hdr_size ty addr ty idx)
        -- This write barrier is to ensure that the heap writes to the object
        -- referred to by val have happened before we write val into the array.
        -- See #12469 for details.
@@ -2569,19 +2569,15 @@ whenUpdRemSetEnabled = id -- TODO
 
 -- | Emit code to add an entry to a now-overwritten pointer to the update
 -- remembered set.
-emitUpdRemSetPush :: DynFlags
-                  -> CmmExpr   -- ^ value of pointer which was overwritten
+emitUpdRemSetPush :: CmmExpr   -- ^ value of pointer which was overwritten
                   -> FCode ()
-emitUpdRemSetPush dflags ptr = do
+emitUpdRemSetPush ptr = do
     emitRtsCall
       rtsUnitId
       (fsLit "updateRemembSetPushClosure_")
       [(CmmReg (CmmGlobal BaseReg), AddrHint),
-       (ptr, AddrHint),
-       (origin, AddrHint)]
+       (ptr, AddrHint)]
       False
-  where
-    origin = zeroExpr dflags
 
 -- | Push a range of pointer-array elements that are about to be copied over to
 -- the update remembered set.

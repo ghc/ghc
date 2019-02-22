@@ -127,8 +127,8 @@ void nonmovingMarkInitUpdRemSet(void);
 
 void init_upd_rem_set(UpdRemSet *rset);
 void reset_upd_rem_set(UpdRemSet *rset);
-void updateRemembSetPushThunk(Capability *cap, StgThunk *origin);
-void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *origin);
+void updateRemembSetPushThunk(Capability *cap, StgThunk *p);
+void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *p);
 void updateRemembSetPushTSO(Capability *cap, StgTSO *tso);
 void updateRemembSetPushStack(Capability *cap, StgStack *stack);
 // Debug only -- count number of blocks in global UpdRemSet

@@ -355,9 +355,7 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
 
         // Concurrent GC write barrier
         if (nonmoving_write_barrier_enabled != 0) (likely: False) {
-            ccall updateRemembSetPushClosure_(BaseReg "ptr",
-                                            old "ptr",
-                                            p "ptr");
+            ccall updateRemembSetPushClosure_(BaseReg "ptr", old "ptr");
         }
 
         return (0,new);
@@ -478,9 +476,7 @@ stg_copyArray_barrier ( W_ hdr_size, gcptr dst, W_ dst_off, W_ n)
     end = p + WDS(n);
 
 again:
-    ccall updateRemembSetPushClosure_(BaseReg "ptr",
-                                    W_[p] "ptr",
-                                    p "ptr");
+    ccall updateRemembSetPushClosure_(BaseReg "ptr", W_[p] "ptr");
     p = p + WDS(1);
     if (p < end) {
         goto again;
@@ -553,7 +549,7 @@ stg_casSmallArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
         SET_HDR(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info, CCCS);
 
         // Concurrent GC write barrier
-        recordMutatedPtr(old, p);
+        recordMutatedPtr(old);
 
         return (0,new);
     }
@@ -801,8 +797,7 @@ stg_addCFinalizzerToWeakzh ( W_ fptr,   // finalizer
 
     // Write barrier for concurrent non-moving collector
     if (nonmoving_write_barrier_enabled != 0) (likely: False) {
-        ccall updateRemembSetPushClosure(MyCapability() "ptr",
-                                         StgWeak_cfinalizers(w) "ptr", NULL);
+        ccall updateRemembSetPushClosure(MyCapability() "ptr", StgWeak_cfinalizers(w) "ptr");
     }
 
     StgCFinalizerList_link(c) = StgWeak_cfinalizers(w);
@@ -886,8 +881,7 @@ stg_deRefWeakzh ( gcptr w )
         val = StgWeak_value(w);
         // See Note [Concurrent read barrier on deRefWeak#] in NonMovingMark.c
         if (nonmoving_write_barrier_enabled != 0) (likely: False) {
-            ccall updateRemembSetPushClosure(MyCapability() "ptr",
-                                           val "ptr", NULL);
+            ccall updateRemembSetPushClosure(MyCapability() "ptr", val "ptr");
         }
     } else {
         code = 0;
@@ -1599,8 +1593,7 @@ loop:
         // However, we do need to ensure that the nonmoving collector
         // knows about the reference to the value that we just removed...
         if (nonmoving_write_barrier_enabled != 0) (likely: False) {
-            ccall updateRemembSetPushClosure(MyCapability() "ptr",
-                                             val "ptr", NULL);
+            ccall updateRemembSetPushClosure(MyCapability() "ptr", val "ptr");
         }
         return (val);
     }
@@ -1993,9 +1986,7 @@ stg_makeStableNamezh ( P_ obj )
         if (nonmoving_write_barrier_enabled != 0) (likely: False) {
             // We only need to push obj itself to the update remembered set
             // since we know that sn_obj will be on the nursery anyways.
-            ccall updateRemembSetPushClosure_(BaseReg "ptr",
-                                              obj "ptr",
-                                              NULL "ptr");
+            ccall updateRemembSetPushClosure_(BaseReg "ptr", obj "ptr");
         }
     } else {
         sn_obj = snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry);

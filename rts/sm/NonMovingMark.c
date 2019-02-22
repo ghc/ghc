@@ -517,32 +517,24 @@ void updateRemembSetPushThunkEager(Capability *cap,
     }
 }
 
-void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *origin)
+void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *p)
 {
     // TODO: Eliminate this conditional once it's folded into codegen
     if (!nonmoving_write_barrier_enabled) return;
-    updateRemembSetPushThunk(regTableToCapability(reg), origin);
+    updateRemembSetPushThunk(regTableToCapability(reg), p);
 }
 
-void updateRemembSetPushClosure(Capability *cap,
-                                StgClosure *p,
-                                StgClosure **origin)
+void updateRemembSetPushClosure(Capability *cap, StgClosure *p)
 {
     if (!nonmoving_write_barrier_enabled) return;
     if (!check_in_nonmoving_heap(p)) return;
     MarkQueue *queue = &cap->upd_rem_set.queue;
-    // We only shortcut things living in the nonmoving heap.
-    if (! check_in_nonmoving_heap((StgClosure *) origin))
-        origin = NULL;
-
-    push_closure(queue, p, origin);
+    push_closure(queue, p, NULL);
 }
 
-void updateRemembSetPushClosure_(StgRegTable *reg,
-                                 StgClosure *p,
-                                 StgClosure **origin)
+void updateRemembSetPushClosure_(StgRegTable *reg, StgClosure *p)
 {
-    updateRemembSetPushClosure(regTableToCapability(reg), p, origin);
+    updateRemembSetPushClosure(regTableToCapability(reg), p);
 }
 
 STATIC_INLINE bool needs_upd_rem_set_mark(StgClosure *p)
