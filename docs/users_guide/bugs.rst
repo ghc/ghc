@@ -42,6 +42,13 @@ Lexical syntax
    as a single qualified operator rather than the two lexemes ``M`` and
    ``.\``.
 
+-  ``forall`` is always a reserved keyword at the type level, contrary
+   to the Haskell Report, which allows type variables to be named ``forall``.
+   Note that this does not imply that GHC always enables the
+   :ghc-flag:`-XExplicitForAll` extension. Even without this extension enabled,
+   reserving ``forall`` as a keyword has significance. For instance, GHC will
+   not parse the type signature ``foo :: forall x``.
+
 .. _infelicities-syntax:
 
 Context-free syntax
