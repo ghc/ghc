@@ -243,18 +243,30 @@ if [ $speed != "FAST" ]; then
     then
 	$make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir"
     else
-	cd libraries/xhtml
-	"$thisdir/$bindistdir/bin/ghc" --make Setup
-	# TODO: Add --with-haddock=...
-	./Setup configure --with-ghc="$thisdir/$bindistdir/bin/ghc" \
-		--global --builddir=dist-bindist \
-		--prefix="$thisdir/$bindistdir"
-	./Setup build --builddir=dist-bindist
-	# TODO: ./Setup haddock
-	./Setup install --builddir=dist-bindist
-	./Setup clean --builddir=dist-bindist
-	rm -f Setup Setup.exe Setup.hi Setup.o
-	cd ../../
+        cd libraries/xhtml
+
+        dynamicGhc=$("../../$ghc" --info | grep "GHC Dynamic" | cut -d',' -f3 | cut -d'"' -f2)
+        if [ "$dynamicGhc" = "NO" ]
+        then
+            libFlags="--enable-shared --disable-library-vanilla"
+        else
+            libFlags="--disable-shared --enable-library-vanilla"
+        fi
+        libFlags="$libFlags --disable-library-prof"
+
+       "../../$ghc" --make Setup
+       ./Setup configure \
+            --with-ghc="$thisdir/$ghc" \
+            --with-haddock="$thisdir/$bindistdir/bin/haddock" \
+            $libFlags \
+		    --global --builddir=dist-bindist \
+		    --prefix="$thisdir/$bindistdir"
+	    ./Setup build --builddir=dist-bindist
+	    ./Setup haddock -v0 --ghc-options=-optP-P --builddir=dist-bindist
+	    ./Setup install --builddir=dist-bindist
+	    ./Setup clean --builddir=dist-bindist
+	    rm -f Setup Setup.exe Setup.hi Setup.o
+	    cd ../../
     fi
 
     check_packages post-xhtml

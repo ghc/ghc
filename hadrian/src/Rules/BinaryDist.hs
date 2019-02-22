@@ -105,6 +105,7 @@ bindistRules = do
         targetPlatform <- setting TargetPlatformFull
         distDir        <- Context.distDir
         rtsDir         <- pkgIdentifier rts
+        windows        <- windowsHost
 
         let ghcBuildDir      = root -/- stageString Stage1
             bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
@@ -125,6 +126,7 @@ bindistRules = do
         copyDirectory (ghcBuildDir -/- "bin") bindistFilesDir
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
+        when windows $ copyDirectory (root -/- "mingw") bindistFilesDir
         need ["docs"]
         copyDirectory (root -/- "docs") bindistFilesDir
 
@@ -143,10 +145,11 @@ bindistRules = do
                    , "ghci-script", "ghci", "haddock", "hpc", "hp2ps", "hsc2hs"
                    , "runghc"]
 
-        command [Cwd $ root -/- "bindist"] "tar"
-                [ "-c", "--xz", "-f"
-                , takeFileName archivePath
-                , ghcVersionPretty ]
+        tarPath <- builderPath (Tar Create)
+        cmd [Cwd $ root -/- "bindist"] tarPath
+            [ "-c", "-J", "-f"
+            , takeFileName archivePath
+            , ghcVersionPretty ]
 
     -- Prepare binary distribution configure script
     -- (generated under <ghc root>/distrib/configure by 'autoreconf')
@@ -264,11 +267,10 @@ bindistMakefile = unlines
     , ""
     , "# QUESTION : should we use shell commands?"
     , ""
-    , ""
     , ".PHONY: install"
     , "install: install_lib install_bin install_includes"
     , "install: install_docs install_wrappers install_ghci"
-    , "install: update_package_db"
+    , "install: install_mingw update_package_db"
     , ""
     , "ActualBinsDir=${ghclibdir}/bin"
     , "WrapperBinsDir=${bindir}"
@@ -328,9 +330,16 @@ bindistMakefile = unlines
     , "\t$(foreach p, $(PKG_CONFS),\\"
     , "\t\t$(call patchpackageconf," ++
       "$(shell echo $(notdir $p) | sed 's/-\\([0-9]*[0-9]\\.\\)*conf//g')," ++
-      "$p,$(docdir)))"
+      "$(p),$(docdir)))"
     , "\t'$(WrapperBinsDir)/ghc-pkg' recache"
+    , "\techo DONE!"
     , ""
+    , "MINGW = $(wildcard ./mingw)"
+    , "install_mingw:"
+    , "\t@echo \"Installing MingGW\""
+    , "\t$(INSTALL_DIR) \"$(prefix)/mingw\""
+    , "\t$(foreach d, $(MINGW),\\"
+    , "\t\tcp -R ./mingw \"$(prefix)\")"
     , "# END INSTALL"
     , "# ----------------------------------------------------------------------"
     ]
@@ -399,13 +408,15 @@ ghciScriptWrapper = unlines
 
 needIservBins :: Action ()
 needIservBins = do
-    rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
-    need =<< traverse programPath
-               [ Context Stage1 iserv w
-               | w <- [vanilla, profiling
-                    -- TODO dynamic way has been reverted as the dynamic build
-                    --      is broken. See #15837.
-                    -- , dynamic
-                    ]
-               , w `elem` rtsways
-               ]
+    windows <- windowsHost
+    when (not windows) $ do
+        rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
+        need =<< traverse programPath
+                   [ Context Stage1 iserv w
+                   | w <- [vanilla, profiling
+                      -- TODO dynamic way has been reverted as the dynamic build
+                      --      is broken. See #15837.
+                      -- , dynamic
+                      ]
+                   , w `elem` rtsways
+                   ]
