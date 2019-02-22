@@ -96,7 +96,7 @@ validate-x86_64-linux-deb8-hadrian:
     - ./configure $CONFIGURE_ARGS
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make V=0 -j$THREADS WERROR=-Werror 
+      make V=0 -j$THREADS WERROR=-Werror
     - |
       make binary-dist TAR_COMP_OPTS="-1"
       mv ghc-*.tar.xz ghc.tar.xz
@@ -409,7 +409,15 @@ validate-x86_64-windows:
     - |
       bash -c "make binary-dist TAR_COMP_OPTS=-1"
       mv ghc-*.tar.xz ghc.tar.xz
-    - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
+    - |
+      # Prepare to push git notes.
+      METRICS_FILE=$(mktemp)
+      git config user.email "ben+ghc-ci@smart-cactus.org"
+      git config user.name "GHC GitLab CI"
+    - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml METRICS_FILE='$METRICS_FILE
+    - |
+      # Push git notes.
+      bash -c 'METRICS_FILE='$METRICS_FILE' .gitlab/push-test-metrics.sh'
   cache:
     key: x86_64-windows
   tags:
