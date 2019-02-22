@@ -2236,9 +2236,10 @@ The following syntax is stolen:
     .. index::
        single: forall
 
-    Stolen (in types) by: :extension:`ExplicitForAll`, and hence by
-    :extension:`ScopedTypeVariables`, :extension:`LiberalTypeSynonyms`,
-    :extension:`RankNTypes`, :extension:`ExistentialQuantification`
+    Stolen (in types) by default (see :ref:`infelicities-lexical`). ``forall`` is
+    a reserved keyword and never a type variable, in accordance with `GHC Proposal #43
+    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0043-forall-keyword.rst>`__.
+
 
 ``mdo``
     .. index::
@@ -10104,9 +10105,6 @@ in :ref:`data-instance-declarations`, :ref:`type-instance-declarations`,
 :ref:`closed-type-families`, :ref:`assoc-inst`, and :ref:`rewrite-rules`.
 
 Notes:
-
-- With :extension:`ExplicitForAll`, ``forall`` becomes a keyword; you can't use ``forall`` as a
-  type variable any more!
 
 - As well in type signatures, you can also use an explicit ``forall``
   in an instance declaration: ::
