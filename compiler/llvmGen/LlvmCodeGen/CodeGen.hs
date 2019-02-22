@@ -1422,11 +1422,11 @@ genMachOp_slow opt op [x, y] = case op of
     MO_U_Quot _ -> genBinMach LM_MO_UDiv
     MO_U_Rem  _ -> genBinMach LM_MO_URem
 
-    MO_U_Min  _ -> genMinMax op
-    MO_S_Min  _ -> genMinMax op
+    MO_U_Min  _ -> genMinMax
+    MO_S_Min  _ -> genMinMax
 
-    MO_U_Max  _ -> genMinMax op
-    MO_S_Max  _ -> genMinMax op
+    MO_U_Max  _ -> genMinMax
+    MO_S_Max  _ -> genMinMax
 
     MO_F_Eq _ -> genBinComp opt LM_CMP_Feq
     MO_F_Ne _ -> genBinComp opt LM_CMP_Fne
@@ -1486,8 +1486,8 @@ genMachOp_slow opt op [x, y] = case op of
     MO_AlignmentCheck {} -> panicOp
 
     where
-        genMinMax :: MachOp -> LlvmM ExprData
-        genMinMax cmpKind = do
+        genMinMax :: LlvmM ExprData
+        genMinMax = do
 
             -- Generate branching code
             lblTrue  <- mkBlockId <$> getUniqueM

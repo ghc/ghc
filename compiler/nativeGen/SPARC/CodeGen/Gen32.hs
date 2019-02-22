@@ -24,7 +24,6 @@ import Format
 import Reg
 
 import Cmm
-import CmmMachOp
 
 import Control.Monad (liftM)
 import DynFlags
@@ -284,7 +283,7 @@ codeMinMax w mop x y = do
     --jmp to lblTrue if the condition we test is true.
     brCode <- do
           -- Logic taken from `genCondJump` dropping the float case.
-          CondCode is_float cond code <- getCondCode (CmmMachOp (mop) [x,y])
+          CondCode _is_float cond code <- getCondCode (CmmMachOp (mop) [x,y])
           return (
             code `appOL`
             toOL [BI cond False lblTrue, NOP]

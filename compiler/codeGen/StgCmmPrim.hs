@@ -1402,8 +1402,8 @@ translateOp _      Word16LeOp       = Just (MO_U_Le W16)
 translateOp _      Word16LtOp       = Just (MO_U_Lt W16)
 translateOp _      Word16NeOp       = Just (MO_Ne W16)
 
-translateOp dflags Word16MinOp      = Just (MO_U_Min W16)
-translateOp dflags Word16MaxOp      = Just (MO_U_Max W16)
+translateOp _      Word16MinOp      = Just (MO_U_Min W16)
+translateOp _      Word16MaxOp      = Just (MO_U_Max W16)
 
 -- Char# ops
 
