@@ -619,9 +619,9 @@ checkGlobalTSOList (bool checkTSOs)
 
               stack = tso->stackobj;
               while (1) {
-                  if (stack->dirty & 1) {
-                      ASSERT(Bdescr((P_)stack)->gen_no == 0 || (stack->dirty & TSO_MARKED));
-                      stack->dirty &= ~TSO_MARKED;
+                  if (stack->dirty & STACK_DIRTY) {
+                      ASSERT(Bdescr((P_)stack)->gen_no == 0 || (stack->dirty & STACK_SANE));
+                      stack->dirty &= ~STACK_SANE;
                   }
                   frame = (StgUnderflowFrame*) (stack->stack + stack->stack_size
                                                 - sizeofW(StgUnderflowFrame));
@@ -656,7 +656,7 @@ checkMutableList( bdescr *mut_bd, uint32_t gen )
                 ((StgTSO *)p)->flags |= TSO_MARKED;
                 break;
             case STACK:
-                ((StgStack *)p)->dirty |= TSO_MARKED;
+                ((StgStack *)p)->dirty |= STACK_SANE;
                 break;
             }
         }

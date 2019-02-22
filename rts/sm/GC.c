@@ -416,15 +416,20 @@ GarbageCollect (uint32_t collect_gen,
    * Repeatedly scavenge all the areas we know about until there's no
    * more scavenging to be done.
    */
+
+  StgWeak *dead_weak_ptr_list = NULL;
+  StgTSO *resurrected_threads = END_TSO_QUEUE;
+
   for (;;)
   {
       scavenge_until_all_done();
+
       // The other threads are now stopped.  We might recurse back to
       // here, but from now on this is the only thread.
 
       // must be last...  invariant is that everything is fully
       // scavenged at this point.
-      if (traverseWeakPtrList()) { // returns true if evaced something
+      if (traverseWeakPtrList(&dead_weak_ptr_list, &resurrected_threads)) { // returns true if evaced something
           inc_running();
           continue;
       }
@@ -468,7 +473,7 @@ GarbageCollect (uint32_t collect_gen,
   // Finally: compact or sweep the oldest generation.
   if (major_gc && oldest_gen->mark) {
       if (oldest_gen->compact)
-          compact(gct->scavenged_static_objects);
+          compact(gct->scavenged_static_objects, dead_weak_ptr_list, resurrected_threads);
       else
           sweep(oldest_gen);
   }
@@ -1836,21 +1841,16 @@ resize_nursery (void)
 
 #if defined(DEBUG)
 
-static void gcCAFs(void)
+void gcCAFs(void)
 {
-    StgIndStatic *p, *prev;
+    uint32_t i = 0;
+    StgIndStatic *prev = NULL;
 
-    const StgInfoTable *info;
-    uint32_t i;
-
-    i = 0;
-    p = debug_caf_list;
-    prev = NULL;
-
-    for (p = debug_caf_list; p != (StgIndStatic*)END_OF_CAF_LIST;
-         p = (StgIndStatic*)p->saved_info) {
-
-        info = get_itbl((StgClosure*)p);
+    for (StgIndStatic *p = debug_caf_list;
+         p != (StgIndStatic*) END_OF_CAF_LIST;
+         p = (StgIndStatic*) p->saved_info)
+    {
+        const StgInfoTable *info = get_itbl((StgClosure*)p);
         ASSERT(info->type == IND_STATIC);
 
         // See Note [STATIC_LINK fields] in Storage.h
