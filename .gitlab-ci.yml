@@ -1,5 +1,7 @@
 variables:
   GIT_SSL_NO_VERIFY: "1"
+  # Commit of ghc/ci-images repository from which to pull Docker images
+  DOCKER_REV: 2757db588256b0f96dd44d602f0857ae8f86a704
 
 before_script:
   - python3 .gitlab/fix-submodules.py
@@ -32,7 +34,7 @@ stages:
 
 ghc-linters:
   stage: lint
-  image: ghcci/linters:0.1
+  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - |
       if [ -n "$CI_MERGE_REQUEST_ID" ]; then
@@ -70,7 +72,7 @@ ghc-linters:
 validate-x86_64-linux-deb8-hadrian:
   extends: .validate-hadrian
   stage: build
-  image: ghcci/x86_64-linux-deb8:0.1
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -180,7 +182,7 @@ validate-x86_64-darwin:
 validate-aarch64-linux-deb9:
   extends: .validate-linux
   stage: full-build
-  image: ghcci/aarch64-linux-deb9:0.1
+  image: "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb9:$DOCKER_REV"
   allow_failure: true
   variables:
     TEST_ENV: "aarch64-linux-deb9"
@@ -206,7 +208,7 @@ nightly-aarch64-linux-deb9:
 validate-i386-linux-deb9:
   extends: .validate-linux
   stage: full-build
-  image: ghcci/i386-linux-deb9:0.1
+  image: "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV"
   allow_failure: true
   variables:
     TEST_ENV: "i386-linux-deb9"
@@ -219,7 +221,7 @@ validate-i386-linux-deb9:
 nightly-i386-linux-deb9:
   extends: .validate-linux
   stage: full-build
-  image: ghcci/i386-linux-deb9:0.1
+  image: "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV"
   allow_failure: true
   variables:
     TEST_TYPE: slowtest
@@ -237,7 +239,7 @@ nightly-i386-linux-deb9:
 validate-x86_64-linux-deb9-debug:
   extends: .validate-linux
   stage: build
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     BUILD_FLAVOUR: validate
     TEST_ENV: "x86_64-linux-deb9-debug"
@@ -247,7 +249,7 @@ validate-x86_64-linux-deb9-debug:
 validate-x86_64-linux-deb9:
   extends: .validate-linux
   stage: build
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9"
   artifacts:
@@ -270,7 +272,7 @@ nightly-x86_64-linux-deb9:
 validate-x86_64-linux-deb9-llvm:
   extends: .validate-linux
   stage: full-build
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
@@ -280,7 +282,7 @@ validate-x86_64-linux-deb9-llvm:
 release-x86_64-linux-deb8:
   extends: .validate-linux
   stage: full-build
-  image: ghcci/x86_64-linux-deb8:0.1
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb8"
   only:
@@ -294,7 +296,7 @@ release-x86_64-linux-deb8:
 release-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
-  image: ghcci/x86_64-linux-fedora27:0.1
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-fedora27"
   only:
@@ -311,7 +313,7 @@ validate-x86_64-linux-deb9-integer-simple:
   variables:
     INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   cache:
     key: linux-x86_64-deb9
 
@@ -332,7 +334,7 @@ validate-x86_64-linux-deb9-unreg:
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg"
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   cache:
     key: linux-x86_64-deb9
 
