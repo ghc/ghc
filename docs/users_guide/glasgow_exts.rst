@@ -8881,18 +8881,18 @@ using kind signatures: ::
 
 The general principle is this:
 
--  *When there is a right-hand side, GHC infers the most polymorphic
-   kind consistent with the right-hand side.* Examples: ordinary data
+-  When there is a right-hand side, GHC infers the most polymorphic
+   kind consistent with the right-hand side. Examples: ordinary data
    type and GADT declarations, class declarations. In the case of a
    class declaration the role of "right hand side" is played by the
    class method signatures.
 
--  *When there is no right hand side, GHC defaults argument and result
-   kinds to ``Type``, except when directed otherwise by a kind signature*.
+-  When there is no right hand side, GHC defaults argument and result
+   kinds to ``Type``, except when directed otherwise by a kind signature.
    Examples: data and open type family declarations.
 
 This rule has occasionally-surprising consequences (see
-:ghc-ticket:`10132`. ::
+:ghc-ticket:`10132`). ::
 
     class C a where    -- Class declarations are generalised
                        -- so C :: forall k. k -> Constraint
@@ -8956,21 +8956,21 @@ is implicitly declared in ``c``\'s kind. Thus, according to our general
 principle, ``b`` must come *before* ``k``. However, ``b`` *depends on*
 ``k``. We thus reject ``T2`` with a suitable error message.
 
-In keeping with the way that class methods list their class variables
-first, associated types also list class variables before others. This
-means that the inferred variables from the class come before the
-specified variables from the class, which come before other implicitly
-bound variables. Here is an example::
+In associated types, we order the type variables as if the type family was a
+top-level declaration, ignoring the visibilities of the class's type variable
+binders. Here is an example: ::
 
   class C (a :: k) b where
     type F (c :: j) (d :: Proxy m) a b
 
 We infer these kinds::
 
-  C :: forall {k2 :: Type} (k :: Type). k -> k2 -> Constraint
-  F :: forall {k2 :: Type} (k :: Type)
-              {k3 :: Type} (j :: Type) (m :: k3).
-	      j -> Proxy m -> k -> k2 -> Type
+  C :: forall {k1 :: Type} (k :: Type). k -> k1 -> Constraint
+  F :: forall {k1 :: Type} {k2 :: Type} {k3 :: Type} j (m :: k1).
+       j -> Proxy m -> k2 -> k3 -> Type
+
+Note that the kind of ``a`` is specified in the kind of ``C`` but inferred in
+the kind of ``F``.
 
 The "general principle" described here is meant to make all this more
 predictable for users. It would not be hard to extend GHC to relax
@@ -9433,8 +9433,8 @@ Here are the key definitions, all available from ``GHC.Exts``: ::
   data RuntimeRep = LiftedRep     -- for things like `Int`
                   | UnliftedRep   -- for things like `Array#`
                   | IntRep        -- for `Int#`
-		  | TupleRep [RuntimeRep]  -- unboxed tuples, indexed by the representations of the elements
-		  | SumRep [RuntimeRep]    -- unboxed sums, indexed by the representations of the disjuncts
+                  | TupleRep [RuntimeRep]  -- unboxed tuples, indexed by the representations of the elements
+                  | SumRep [RuntimeRep]    -- unboxed sums, indexed by the representations of the disjuncts
                   | ...
 
   type Type = TYPE LiftedRep    -- Type is just an ordinary type synonym
@@ -10819,10 +10819,10 @@ application. This isn't true, however! Be sure to use :ghci-cmd:`:type +v`
 if you want the most accurate information with respect to visible type
 application properties.
 
-.. _ScopedSort:
-
 .. index::
    single: ScopedSort
+
+.. _ScopedSort:
 
 Ordering of specified variables
 -------------------------------
