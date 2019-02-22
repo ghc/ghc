@@ -256,6 +256,9 @@ loop:
 
         // point to the BLOCKING_QUEUE from the BLACKHOLE
         write_barrier(); // make the BQ visible
+        if (nonmoving_write_barrier_enabled) {
+            updateRemembSetPushThunk(cap, (StgThunk*)p1);
+        }
         ((StgInd*)bh)->indirectee = (StgClosure *)bq;
         recordClosureMutated(cap,bh); // bh was mutated
 
@@ -284,6 +287,9 @@ loop:
         }
 #endif
 
+        if (nonmoving_write_barrier_enabled) {
+            updateRemembSetPushClosure_(cap, p);
+        }
         msg->link = bq->queue;
         bq->queue = msg;
         recordClosureMutated(cap,(StgClosure*)msg);
