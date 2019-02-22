@@ -10,6 +10,7 @@ module LlvmCodeGen.CodeGen ( genLlvmProc ) where
 import GhcPrelude
 
 import Llvm
+import Llvm.PpLlvm
 import LlvmCodeGen.Base
 import LlvmCodeGen.Regs
 
@@ -1488,44 +1489,28 @@ genMachOp_slow opt op [x, y] = case op of
     where
         genMinMax :: LlvmM ExprData
         genMinMax = do
-
-            -- Generate branching code
-            lblTrue  <- mkBlockId <$> getUniqueM
-            lblFalse <- mkBlockId <$> getUniqueM
-            -- Here we join up again
-            lblRet   <- mkBlockId <$> getUniqueM
-
-            let cond = CmmMachOp cmpOp [x,y]
-            (branchStmts, decBranch) <- genCondBranch cond lblTrue lblFalse Nothing
-
             -- Generate True Branch
             (vx,sx,decx) <- exprToVar x
-            let trueStmts = unitOL (MkLabel (getUnique lblTrue)) `appOL` sx `appOL`
-                            unitOL (Branch (mkVarLabel lblRet))
 
             -- Generate False Branch
             (vy,sy,decy) <- exprToVar y
-            let falseStmts = unitOL (MkLabel (getUnique lblFalse)) `appOL` sy `appOL`
-                             unitOL (Branch (mkVarLabel lblRet))
 
-            -- "Return" Branch
+            -- Generate appropriate comparison between x and y
+            (vcmp,scmp,deccmp) <- genBinComp i1Option cmpOp
+
             vRet <- mkLocalVar (getVarType vy)
-            let phiExpr = Phi (getVarType vy)
-                              [(vx, mkVarLabel lblTrue), (vy, mkVarLabel lblFalse)]
-            let retStmts = toOL $ [ MkLabel (getUnique lblRet)
-                                  , Assignment vRet phiExpr]
+            let selExpr = Select vcmp vx vy
+            let stmts = mconcat [sx,sy,scmp, unitOL (Assignment vRet selExpr)]
+            let decls = mconcat [decx, decy, deccmp]
 
-            return (vRet, mconcat [branchStmts, trueStmts, falseStmts, retStmts], mconcat [decBranch,decx,decy])
+            return (vRet, stmts, decls)
           where
-            mkVarLabel :: BlockId -> LlvmVar
-            mkVarLabel lbl = (LMLocalVar (getUnique lbl) LMLabel)
-
-            cmpOp :: MachOp
+            cmpOp :: LlvmCmpOp
             cmpOp = case op of
-                (MO_U_Min w) -> MO_U_Le w
-                (MO_S_Min w) -> MO_S_Le w
-                (MO_U_Max w) -> MO_U_Ge w
-                (MO_S_Max w) -> MO_S_Ge w
+                (MO_U_Min w) -> LM_CMP_Ult
+                (MO_S_Min w) -> LM_CMP_Slt
+                (MO_U_Max w) -> LM_CMP_Uge
+                (MO_S_Max w) -> LM_CMP_Uge
                 _            -> pprPanic "invalid minMax op" (text $ show op)
 
         binLlvmOp ty binOp = runExprData $ do
@@ -1556,6 +1541,7 @@ genMachOp_slow opt op [x, y] = case op of
         -- | Need to use EOption here as Cmm expects word size results from
         -- comparisons while LLVM return i1. Need to extend to llvmWord type
         -- if expected. See Note [Literals and branch conditions].
+        genBinComp :: EOption -> LlvmCmpOp -> LlvmM ExprData
         genBinComp opt cmp = do
             ed@(v1, stmts, top) <- binLlvmOp (\_ -> i1) (Compare cmp)
             dflags <- getDynFlags

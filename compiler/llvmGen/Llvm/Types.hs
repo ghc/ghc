@@ -122,7 +122,7 @@ instance Outputable LlvmVar where
 --
 -- These can be used inline in expressions.
 data LlvmLit
-  -- | Refers to an integer constant (i64 42).
+  -- | Refers to an integer constant eg (i64 42).
   = LMIntLit Integer LlvmType
   -- | Floating point literal
   | LMFloatLit Double LlvmType

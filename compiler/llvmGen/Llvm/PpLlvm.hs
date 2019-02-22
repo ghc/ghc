@@ -20,6 +20,7 @@ module Llvm.PpLlvm (
     ppLlvmFunctionDecl,
     ppLlvmFunctions,
     ppLlvmFunction,
+    ppLlvmStatement
 
     ) where
 
@@ -200,7 +201,6 @@ ppLlvmBlock (LlvmBlock blockId stmts) =
 ppLlvmBlockLabel :: LlvmBlockId -> SDoc
 ppLlvmBlockLabel id = pprUniqueAlways id <> colon
 
-
 -- | Print out an LLVM statement.
 ppLlvmStatement :: LlvmStatement -> SDoc
 ppLlvmStatement stmt =
@@ -219,7 +219,6 @@ ppLlvmStatement stmt =
         Unreachable               -> ind $ text "unreachable"
         Nop                       -> empty
         MetaStmt    meta s        -> ppMetaStatement meta s
-
 
 -- | Print out an LLVM expression.
 ppLlvmExpression :: LlvmExpression -> SDoc
@@ -241,6 +240,7 @@ ppLlvmExpression expr
         AtomicRMW  aop tgt src ordering -> ppAtomicRMW aop tgt src ordering
         CmpXChg    addr old new s_ord f_ord -> ppCmpXChg addr old new s_ord f_ord
         Phi        tp predecessors  -> ppPhi tp predecessors
+        Select     cond v1 v2       -> ppSelect cond v1 v2
         Asm        asm c ty v se sk -> ppAsm asm c ty v se sk
         MExpr      meta expr        -> ppMetaExpr meta expr
 
@@ -436,6 +436,10 @@ ppSwitch scrut dflt targets =
       ppTargets  xs        = brackets $ vcat (map ppTarget xs)
   in text "switch" <+> ppr scrut <> comma <+> ppr dflt
         <+> ppTargets targets
+
+ppSelect :: LlvmVar -> LlvmVar -> LlvmVar -> SDoc
+ppSelect cond v1 v2 =
+  text "select" <+> ppr cond <> comma <+> ppr v1 <> comma <+> ppr v2
 
 
 ppAsm :: LMString -> LMString -> LlvmType -> [LlvmVar] -> Bool -> Bool -> SDoc

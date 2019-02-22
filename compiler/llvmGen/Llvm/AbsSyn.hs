@@ -331,6 +331,14 @@ data LlvmExpression
   | Phi LlvmType [(LlvmVar,LlvmVar)]
 
   {- |
+    Select value based on condition branch
+      * condition: Value determining which value is selected.
+      * val1:      Value selected for true/1.
+      * val2:      Value selected otherwise.
+  -}
+  | Select LlvmVar LlvmVar LlvmVar
+
+  {- |
     Inline assembly expression. Syntax is very similar to the style used by GCC.
       * assembly:    Actual inline assembly code.
       * constraints: Operand constraints.
