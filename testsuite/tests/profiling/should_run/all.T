@@ -88,7 +88,9 @@ test('prof-doc-fib', [], compile_and_run, [''])
 test('prof-doc-last', [], compile_and_run, ['-fno-full-laziness'])
 
 # unicode in cost centre names
-test('T5559', [], compile_and_run, [''])
+test('T5559',
+     [ skip # Skip due to non-deterministic failures on CI, see Trac #16350
+     ], compile_and_run, [''])
 
 # Note [consistent stacks]
 #  Certain optimisations can change the stacks we get out of the
