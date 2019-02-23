@@ -1601,7 +1601,7 @@ def check_hp_ok(name):
                 if (gsResult == 0):
                     return (True)
                 else:
-                    print("hp2ps output for " + name + "is not valid PostScript")
+                    print("hp2ps output for " + name + " is not valid PostScript")
             else: return (True) # assume postscript is valid without ghostscript
         else:
             print("hp2ps did not generate PostScript for " + name)
