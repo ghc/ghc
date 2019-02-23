@@ -106,9 +106,13 @@ test('atomicinc', [ c_src, only_ways(['normal','threaded1', 'threaded2']) ], com
 test('atomicxchg', [ c_src, only_ways(['threaded1', 'threaded2']) ],
 compile_and_run, [''])
 
-test('T3424', # it's slow:
-              [ when(fast(), skip), only_ways(['normal','threaded1','ghci']) ],
-              compile_and_run, [''])
+test('T3424',
+     [ # Skip due to non-deterministic timeouts on CI, see Trac #16349
+       when(unregisterised(), skip),
+       # And it's slow in general
+       only_ways(['normal','threaded1','ghci'])
+     ],
+     compile_and_run, [''])
 
 # Test for out-of-range heap size
 test('rtsflags001', [ only_ways(['normal']), exit_code(1), extra_run_opts('+RTS -H0m -RTS') ], compile_and_run, [''])
