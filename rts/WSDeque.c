@@ -195,7 +195,9 @@ stealWSDeque_ (WSDeque *q)
     if ((long)b - (long)t <= 0 ) {
         return NULL; /* already looks empty, abort */
   }
-
+    // NB. these loads must be ordered so writes from pushWSDeque
+    // will be seen.
+    load_load_barrier();
     /* now access array, see pushBottom() */
     stolen = q->elements[t & q->moduloSize];
 
