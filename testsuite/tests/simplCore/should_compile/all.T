@@ -15,7 +15,7 @@ test('simpl011', normal, compile, [''])
 test('simpl012', normal, compile, [''])
 test('simpl013', normal, compile, [''])
 test('simpl014', normal, compile, [''])
-test('simpl016', normal, compile, ['-dsuppress-uniques'])
+test('simpl016', normal, compile, ['-dsuppress-uniques -dsuppress-ticks'])
 test('simpl017', normal, compile_fail, [''])
 test('simpl018', normal, compile, [''])
 test('simpl019', normal, compile, [''])
@@ -29,7 +29,7 @@ test('spec002', normal, compile, [''])
 test('spec003', normal, compile, [''])
 
 test('rule1', normal, compile, [''])
-test('rule2', only_ways(['optasm']), compile, ['-dsuppress-uniques'])
+test('rule2', only_ways(['optasm']), compile, ['-dsuppress-uniques -dsuppress-ticks'])
 test('T7162', normal, compile, [''])
 
 test('dfun-loop', normal, compile, [''])
@@ -49,18 +49,18 @@ test('T3234',
 
 test('T3717', only_ways(['optasm']),
               compile,
-              ['-ddump-simpl -dsuppress-uniques'])
+              ['-ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
 
 test('spec-inline', only_ways(['optasm']),
               	    compile,
-              	    ['-O2 -ddump-simpl -dsuppress-uniques'])
+              	    ['-O2 -ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
 test('T4908', only_ways(['optasm']),
               compile,
-              ['-O2 -ddump-simpl -dsuppress-uniques'])
+              ['-O2 -ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
 
 test('T4930', only_ways(['optasm']),
               compile,
-              ['-O -ddump-simpl -dsuppress-uniques'])
+              ['-O -ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
 
 test('T3055', [], makefile_test, ['T3055'])
 
@@ -83,7 +83,7 @@ test('EvalTest',
 
 test('T3831', normal, compile, [''])
 test('T4345', normal, compile, [''])
-test('T4398', normal, compile, ['-dsuppress-uniques'])
+test('T4398', normal, compile, ['-dsuppress-uniques -dsuppress-ticks'])
 
 test('T4903', [], makefile_test, ['T4903'])
 
@@ -128,7 +128,7 @@ test('T7088', normal, compile, [''])
 test('T6082-RULE', normal, compile, [''])
 test('T7165', [], makefile_test, ['T7165'])
 test('T7287', normal, compile, [''])
-test('T7360', only_ways(['optasm']), compile, ['-ddump-simpl -dsuppress-uniques'])
+test('T7360', only_ways(['optasm']), compile, ['-ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
 test('T5366',
      normal,
      makefile_test, ['T5366'])
@@ -182,8 +182,8 @@ test('T8848', normal,
 test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T8331', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T6056', only_ways(['optasm']), multimod_compile, ['T6056', '-v0 -ddump-rule-firings'])
-test('T9400', only_ways(['optasm']), compile, ['-O0 -ddump-simpl -dsuppress-uniques'])
-test('T9441a', [only_ways(['optasm']), check_errmsg(r'f1 = f2') ], compile, ['-ddump-simpl'])
+test('T9400', only_ways(['optasm']), compile, ['-O0 -ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
+test('T9441a', [only_ways(['optasm']), check_errmsg(r'f1 = f2') ], compile, ['-ddump-simpl -dsuppress-ticks'])
 test('T9441b', [only_ways(['optasm']), check_errmsg(r'Rec {') ], compile, ['-ddump-simpl'])
 test('T9441c', [only_ways(['optasm']), check_errmsg(r'Rec {') ], compile, ['-ddump-simpl'])
 test('T9583', only_ways(['optasm']), compile, [''])
@@ -214,8 +214,8 @@ test('T12076lit', normal, compile, ['-O'])
 test('T12076sat', normal, compile, ['-O'])
 test('T12212', normal, compile, ['-O'])
 
-test('noinline01', only_ways(['optasm']), compile, ['-ddump-stg -dsuppress-uniques -O'])
-test('par01', only_ways(['optasm']), compile, ['-ddump-prep -dsuppress-uniques -O2'])
+test('noinline01', only_ways(['optasm']), compile, ['-ddump-stg -dsuppress-uniques -dsuppress-ticks -O'])
+test('par01', only_ways(['optasm']), compile, ['-ddump-prep -dsuppress-uniques -dsuppress-ticks -O2'])
 test('T12776', normal, compile, ['-O2'])
 test('T9509',
      normal,
@@ -228,7 +228,7 @@ test('T13027', normal, compile, [''])
 test('T13025',
      normal,
      makefile_test, ['T13025'])
-test('T13143', only_ways(['optasm']), compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('T13143', only_ways(['optasm']), compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
 test('T13156', normal, makefile_test, ['T13156'])
 test('T11444', normal, compile, [''])
 test('str-rules',
@@ -267,9 +267,9 @@ test('T13708', normal, compile, [''])
 
 # thunk should inline here, so check whether or not it appears in the Core
 # (we skip profasm because it might not inline there)
-test('T14137', [ check_errmsg(r'thunk'), omit_ways(['profasm']) ], compile, ['-dsuppress-uniques -ddump-simpl'])
+test('T14137', [ check_errmsg(r'thunk'), omit_ways(['profasm']) ], compile, ['-dsuppress-uniques -dsuppress-ticks -ddump-simpl'])
 # bar and foo should CSEd here, so check for that in the Core
-test('T14186', [ only_ways(['optasm']), check_errmsg(r'bar = foo') ], compile, ['-ddump-simpl'])
+test('T14186', [ only_ways(['optasm']), check_errmsg(r'bar = foo') ], compile, ['-ddump-simpl -dsuppress-ticks'])
 
 test('T14140',
      normal,
