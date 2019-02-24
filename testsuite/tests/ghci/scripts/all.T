@@ -104,7 +104,7 @@ test('ghci061', normal, ghci_script, ['ghci061.script'])
 test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
                  when(config.have_ext_interp, extra_ways(['ghci-ext']))],
 		ghci_script, ['ghci062.script'])
-test('ghci063', when(opsys('darwin'), expect_broken(16201)), ghci_script, ['ghci063.script'])
+test('ghci063', normal, ghci_script, ['ghci063.script'])
 
 test('T2452', [extra_hc_opts("-fno-implicit-import-qualified")],
     ghci_script, ['T2452.script'])
