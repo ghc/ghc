@@ -40,16 +40,16 @@ T13317:
 
 T13367:
 	$(RM) -f T13317.o T13317.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl T13367.hs | grep 'foo'
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl -dsuppress-ticks T13367.hs | grep 'foo'
         # There should be only one copy of the string "foo"#
 
 T8832:
 	$(RM) -f T8832.o T8832.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl T8832.hs | grep '^[a-zA-Z0-9]\+ ='
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl -dsuppress-ticks T8832.hs | grep '^[a-zA-Z0-9]\+ ='
 
 T12603:
 	$(RM) -f T12603.o T12603.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques T12603.hs | grep 'GHC.Real'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques -dsuppress-ticks T12603.hs | grep 'GHC.Real'
          # Horribly delicate; looking for a top-level shared call to 2^8
 
 T11155:
@@ -61,11 +61,11 @@ T11155:
 T8274:
 	$(RM) -f T8274.o T8274.hi
 	# Set -dppr-cols to ensure things don't wrap
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques -dppr-cols=200 T8274.hs | grep '#'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques -dsuppress-ticks -dppr-cols=200 T8274.hs | grep '#'
 
 T7865:
 	$(RM) -f T7865.o T7865.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -dsuppress-uniques -O2 -c -ddump-simpl T7865.hs | grep expensive
+	'$(TEST_HC)' $(TEST_HC_OPTS) -dsuppress-uniques -dsuppress-ticks -O2 -c -ddump-simpl T7865.hs | grep expensive
 
 T3055:
 	$(RM) -f T3055.o T3055.hi T3055.simpl
@@ -85,7 +85,7 @@ T5776:
 T3772:
 	$(RM) -f T3772*.hi T3772*.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T3772_A.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T3772.hs -dsuppress-uniques -ddump-simpl
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T3772.hs -dsuppress-uniques -dsuppress-ticks -ddump-simpl
 
 T4306:
 	$(RM) -f T4306.hi T4306.o
@@ -225,7 +225,7 @@ T13025:
 .PHONY: str-rules
 str-rules:
 	$(RM) -f str-rules.hi str-rules.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O str-rules.hs -ddump-simpl | grep -o '"@@@[^"].*"#' | sort
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O str-rules.hs -ddump-simpl -dsuppress-ticks | grep -o '"@@@[^"].*"#' | sort
 
 # We expect there to be precisely one use of +# in the simplified Core as f and
 # g should have been collapsed into one defininition by CSE.
@@ -254,5 +254,5 @@ T14140:
 
 T15631:
 	$(RM) -f T15631.o T15631.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques T15631.hs | grep 'case'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques -dsuppress-ticks T15631.hs | grep 'case'
 # Expecting one fewwer case expressions after fixing Trac #15631
