@@ -194,14 +194,17 @@ stealWSDeque_ (WSDeque *q)
     // concurrent popWSQueue() operation.
     if ((long)b - (long)t <= 0 ) {
         return NULL; /* already looks empty, abort */
-  }
-
+    }
+    // NB. the load of q->bottom must be ordered before the load of
+    // q->elements[t & q-> moduloSize]. See comment "KG:..." below
+    // and Ticket #13633.
+    load_load_barrier();
     /* now access array, see pushBottom() */
     stolen = q->elements[t & q->moduloSize];
 
     /* now decide whether we have won */
     if ( !(CASTOP(&(q->top),t,t+1)) ) {
-        /* lost the race, someon else has changed top in the meantime */
+        /* lost the race, someone else has changed top in the meantime */
         return NULL;
     }  /* else: OK, top has been incremented by the cas call */
 
