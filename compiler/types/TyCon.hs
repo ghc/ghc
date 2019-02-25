@@ -854,13 +854,18 @@ data TyCon
         tyConArity   :: Arity,            -- ^ Arity
 
         tcTyConScopedTyVars :: [(Name,TyVar)],
-                           -- ^ Scoped tyvars over the tycon's body
-                           -- See Note [How TcTyCons work] in TcTyClsDecls
-                           -- Order *does* matter: for TcTyCons with a CUSK,
-                           -- it's the correct dependency order. For TcTyCons
-                           -- without a CUSK, it's the original left-to-right
-                           -- that the user wrote. Nec'y for getting Specified
-                           -- variables in the right order.
+          -- ^ Scoped tyvars over the tycon's body
+          -- See Note [How TcTyCons work] in TcTyClsDecls
+          -- 
+          -- This list is specified_tvs ++ required_tvs
+          -- where required_tvs teh same as tyConTyVars
+          --
+          -- Order *does* matter: for TcTyCons with a CUSK,
+          -- it's the correct dependency order. For TcTyCons
+          -- without a CUSK, it's the original left-to-right
+          -- that the user wrote. Nec'y for getting Specified
+          -- variables in the right order.
+
         tcTyConUserTyVars :: SDoc, -- ^ Original, user-written tycon tyvars
         tcTyConIsPoly     :: Bool, -- ^ Is this TcTyCon already generalized?
 
