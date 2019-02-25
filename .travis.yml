@@ -34,7 +34,7 @@ matrix:
     - os: linux
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head], sources: [hvr-ghc]}}
       env:
-        - GHC_ZIP='https://gitlab.haskell.org/ghc/ghc/-/jobs/artifacts/master/download?job=validate-x86_64-linux-deb8'
+        - GHC_ZIP='https://gitlab.haskell.org/ghc/ghc/-/jobs/artifacts/master/download?job=validate-x86_64-linux-deb9'
 
 before_install:
  # Manually install GHC validate artifact
