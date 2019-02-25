@@ -871,24 +871,42 @@ data TyCon
 
         -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyConBinder], -- ^ Full binders
-        tyConTyVars  :: [TyVar],          -- ^ TyVar binders
-        tyConResKind :: Kind,             -- ^ Result kind
-        tyConKind    :: Kind,             -- ^ Kind of this TyCon
-        tyConArity   :: Arity,            -- ^ Arity
+        tyConTyVars  :: [TyVar],       -- ^ TyVar binders
+        tyConResKind :: Kind,          -- ^ Result kind
+        tyConKind    :: Kind,          -- ^ Kind of this TyCon
+        tyConArity   :: Arity,         -- ^ Arity
+
+          -- NB: the TyConArity of a TcTyCon must match
+          -- the number of Required (positional, user-specified)
+          -- arguments to the type constructor; see the use
+          -- of tyConArity in generaliseTcTyCon
 
         tcTyConScopedTyVars :: [(Name,TyVar)],
-                           -- ^ Scoped tyvars over the tycon's body
-                           -- See Note [How TcTyCons work] in TcTyClsDecls
-                           -- Order *does* matter: for TcTyCons with a CUSK,
-                           -- it's the correct dependency order. For TcTyCons
-                           -- without a CUSK, it's the original left-to-right
-                           -- that the user wrote. Nec'y for getting Specified
-                           -- variables in the right order.
+          -- ^ Scoped tyvars over the tycon's body
+          -- See Note [Scoped tyvars in a TcTyCon]
+
         tcTyConIsPoly     :: Bool, -- ^ Is this TcTyCon already generalized?
 
         tcTyConFlavour :: TyConFlavour
                            -- ^ What sort of 'TyCon' this represents.
       }
+{- Note [Scoped tyvars in a TcTyCon]
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The tcTyConScopedTyVars field records the lexicial-binding connection
+between the original, user-specified Name (i.e. thing in scope) and
+the TcTyVar that the Name is bound to.
+
+Order *does* matter; the tcTyConScopedTyvars list consists of
+     specified_tvs ++ required_tvs
+
+where
+   * specified ones first
+   * required_tvs the same as tyConTyVars
+   * tyConArity = length required_tvs
+
+See also Note [How TcTyCons work] in TcTyClsDecls
+-}
 
 -- | Represents right-hand-sides of 'TyCon's for algebraic types
 data AlgTyConRhs

@@ -208,7 +208,7 @@ get_scoped_tvs (dL->L _ signature)
       | HsIB { hsib_ext = implicit_vars
              , hsib_body = hs_ty } <- sig
       , (explicit_vars, _) <- splitLHsForAllTy hs_ty
-      = implicit_vars ++ map hsLTyVarName explicit_vars
+      = implicit_vars ++ hsLTyVarNames explicit_vars
     get_scoped_tvs_from_sig (XHsImplicitBndrs _)
       = panic "get_scoped_tvs_from_sig"
 
@@ -1037,7 +1037,7 @@ addHsTyVarBinds :: [LHsTyVarBndr GhcRn]  -- the binders to be added
                 -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))  -- action in the ext env
                 -> DsM (Core (TH.Q a))
 addHsTyVarBinds exp_tvs thing_inside
-  = do { fresh_exp_names <- mkGenSyms (map hsLTyVarName exp_tvs)
+  = do { fresh_exp_names <- mkGenSyms (hsLTyVarNames exp_tvs)
        ; term <- addBinds fresh_exp_names $
                  do { kbs <- repList tyVarBndrQTyConName mk_tv_bndr
                                      (exp_tvs `zip` fresh_exp_names)

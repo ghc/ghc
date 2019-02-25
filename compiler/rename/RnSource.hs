@@ -776,8 +776,7 @@ rnFamInstEqn doc mb_cls rhs_kvars
                           inst_tvs = case mb_cls of
                                        Nothing            -> []
                                        Just (_, inst_tvs) -> inst_tvs
-                          all_nms = all_imp_var_names
-                                      ++ map hsLTyVarName bndrs'
+                          all_nms = all_imp_var_names ++ hsLTyVarNames bndrs'
                     ; warnUnusedTypePatterns all_nms nms_used
 
                     ; return ((bndrs', pats', payload'), rhs_fvs `plusFV` pat_fvs) }
@@ -1809,7 +1808,7 @@ rnLDerivStrategy doc mds thing_inside
              let HsIB { hsib_ext  = via_imp_tvs
                       , hsib_body = via_body } = via_ty'
                  (via_exp_tv_bndrs, _, _) = splitLHsSigmaTy via_body
-                 via_exp_tvs = map hsLTyVarName via_exp_tv_bndrs
+                 via_exp_tvs = hsLTyVarNames via_exp_tv_bndrs
                  via_tvs = via_imp_tvs ++ via_exp_tvs
              (thing, fvs2) <- extendTyVarEnvFVRn via_tvs $
                               thing_inside via_tvs (ppr via_ty')

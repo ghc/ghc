@@ -7,22 +7,22 @@ tc141.hs:11:12: error:
       In a pattern binding: (p :: a, q :: a) = x
 
 tc141.hs:11:31: error:
-    • Couldn't match expected type ‘a2’ with actual type ‘a’
-      ‘a2’ is a rigid type variable bound by
+    • Couldn't match expected type ‘a1’ with actual type ‘b’
+      ‘a1’ is a rigid type variable bound by
         an expression type signature:
-          forall a2. a2
+          forall a1. a1
         at tc141.hs:11:34
-      ‘a’ is a rigid type variable bound by
-        the inferred type of f :: (a, a) -> (a1, a)
+      ‘b’ is a rigid type variable bound by
+        the inferred type of f :: (b, b) -> (a, b)
         at tc141.hs:11:1-37
     • In the expression: q :: a
       In the expression: (q :: a, p)
       In the expression: let (p :: a, q :: a) = x in (q :: a, p)
     • Relevant bindings include
-        p :: a (bound at tc141.hs:11:12)
-        q :: a (bound at tc141.hs:11:17)
-        x :: (a, a) (bound at tc141.hs:11:3)
-        f :: (a, a) -> (a1, a) (bound at tc141.hs:11:1)
+        p :: b (bound at tc141.hs:11:12)
+        q :: b (bound at tc141.hs:11:17)
+        x :: (b, b) (bound at tc141.hs:11:3)
+        f :: (b, b) -> (a, b) (bound at tc141.hs:11:1)
 
 tc141.hs:13:13: error:
     • You cannot bind scoped type variable ‘a’
