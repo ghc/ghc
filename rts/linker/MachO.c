@@ -1141,9 +1141,9 @@ ocBuildSegments_MachO(ObjectCode *oc)
         initSegment(rwSegment,
                     curMem,
                     roundUpToPage(size_rwSegment),
-                    SEGMENT_PROT_RW,
+                    SEGMENT_PROT_RWO,
                     n_rwSections);
-        IF_DEBUG(linker, debugBelch("ocBuildSegments_MachO: init segment %d (RW) at %p size %zu\n",
+        IF_DEBUG(linker, debugBelch("ocBuildSegments_MachO: init segment %d (RWO) at %p size %zu\n",
                                     curSegment, rwSegment->start, rwSegment->size));
         curMem = (char *)curMem + rwSegment->size;
         curSegment++;
@@ -1155,7 +1155,7 @@ ocBuildSegments_MachO(ObjectCode *oc)
         initSegment(gbZerofillSegment,
                     curMem,
                     roundUpToPage(size_gbZerofillSegment),
-                    SEGMENT_PROT_RW,
+                    SEGMENT_PROT_RWO,
                     n_gbZerofills);
         IF_DEBUG(linker, debugBelch("ocBuildSegments_MachO: init segment %d (GB_ZEROFILL) at %p size %zu\n",
                                     curSegment, gbZerofillSegment->start, gbZerofillSegment->size));

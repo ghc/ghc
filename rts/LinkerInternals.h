@@ -62,9 +62,24 @@ typedef
         }
    SectionAlloc;
 
+/* Indicates a desired memory protection for pages within a segment. Defined as
+ * enum since it's more explicit and look nicer in a debugger.
+ *
+ * Can be used directly as a substitution for a combination of PROT_X flags on
+ * POSIX systems.
+ */
 typedef enum {
+#if RTS_LINKER_USE_MMAP
+    SEGMENT_PROT_RO  = PROT_READ,
+    SEGMENT_PROT_RX  = PROT_READ | PROT_EXEC,
+    SEGMENT_PROT_RWO = PROT_READ | PROT_WRITE,
+    SEGMENT_PROT_RWX = PROT_READ | PROT_WRITE | PROT_EXEC
+#else
+    SEGMENT_PROT_RO,
     SEGMENT_PROT_RX,
-    SEGMENT_PROT_RW
+    SEGMENT_PROT_RWO,
+    SEGMENT_PROT_RWX
+#endif
 } SegmentProt;
 
 /*
