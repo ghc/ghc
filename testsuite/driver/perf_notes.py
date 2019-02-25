@@ -308,9 +308,11 @@ def baseline_commit_log(commit):
 # (bool          , str   ) -> (str     , str , str   , str) -> float
 _commit_metric_cache = {}
 
-# Get the baseline (expected value) of a test at a given commit. This searches
-# git notes from older commits for recorded metrics (locally and from ci). More
-# recent commits are favoured, then local results over ci results are favoured.
+# Get the baseline of a test at a given commit. This is the expected value
+# *before* the commit is applied (i.e. on the parent commit).
+# This searches git notes from older commits for recorded metrics (locally and
+# from ci). More recent commits are favoured, then local results over ci results
+# are favoured.
 #
 # commit: str - must be a commit hash (see commit_has())
 # name: str - test name
@@ -319,7 +321,8 @@ _commit_metric_cache = {}
 # metric: str - test metric
 # way: str - test way
 # returns: the Baseline named tuple or None if no metric was found within
-#          BaselineSearchDepth commits and since the last expected change.
+#          BaselineSearchDepth commits and since the last expected change
+#          (ignoring any expected change in the given commit).
 def baseline_metric(commit, name, test_env, metric, way):
     # For performance reasons (in order to avoid calling commit_hash), we assert
     # commit is already a commit hash.
@@ -393,14 +396,8 @@ def baseline_metric(commit, name, test_env, metric, way):
 
     # Searches through previous commits trying local then ci for each commit in.
     def search(useCiNamespace, depth):
-        # Stop if reached the max search depth, or if
-        # there is an expected change at the child commit (depth-1). This is a
-        # subtlety: Metrics recorded on commit x incorporate the expected
-        # changes for commit x. Hence metrics from x are still a valid baseline,
-        # while older commits are not. This is why we check for expected changes
-        # on depth-1 rather than depth.
-        if depth >= BaselineSearchDepth or has_expected_change( \
-                        depth_to_commit(depth - 1)):
+        # Stop if reached the max search depth.
+        if depth >= BaselineSearchDepth:
             return None
 
         # Check for a metric on this commit.
@@ -409,11 +406,17 @@ def baseline_metric(commit, name, test_env, metric, way):
             return current_metric
 
         # Metric is not available.
-        # If tried local, now try CI. Else move to the parent commit.
+        # If tried local, now try CI.
         if not useCiNamespace:
             return search(True, depth)
-        else:
-            return search(False, depth + 1)
+
+        # Stop if there is an expected change at this commit. In that case
+        # metrics on ancestor commits will not be a valid baseline.
+        if has_expected_change(depth_to_commit(depth)):
+            return None
+
+        # Move to the parent commit.
+        return search(False, depth + 1)
 
     # Start search from parent commit using local name space.
     return search(False, 1)
