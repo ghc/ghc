@@ -53,7 +53,7 @@ module HsTypes (
         isHsKindedTyVar, hsTvbAllKinded, isLHsForAllTy,
         hsScopedTvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
-        hsLTyVarName, hsLTyVarLocName, hsExplicitLTyVarNames,
+        hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
         splitLHsForAllTy, splitLHsForAllTyInvis,
@@ -949,7 +949,7 @@ hsWcScopedTvs sig_ty
          , hsib_body = sig_ty2 } <- sig_ty1
   = case sig_ty2 of
       L _ (HsForAllTy { hst_bndrs = tvs }) -> vars ++ nwcs ++
-                                              map hsLTyVarName tvs
+                                              hsLTyVarNames tvs
                -- include kind variables only if the type is headed by forall
                -- (this is consistent with GHC 7 behaviour)
       _                                    -> nwcs
@@ -962,7 +962,7 @@ hsScopedTvs sig_ty
   | HsIB { hsib_ext = vars
          , hsib_body = sig_ty2 } <- sig_ty
   , L _ (HsForAllTy { hst_bndrs = tvs }) <- sig_ty2
-  = vars ++ map hsLTyVarName tvs
+  = vars ++ hsLTyVarNames tvs
   | otherwise
   = []
 
@@ -988,6 +988,9 @@ hsTyVarName (XTyVarBndr{}) = panic "hsTyVarName"
 hsLTyVarName :: LHsTyVarBndr pass -> IdP pass
 hsLTyVarName = hsTyVarName . unLoc
 
+hsLTyVarNames :: [LHsTyVarBndr pass] -> [IdP pass]
+hsLTyVarNames = map hsLTyVarName
+
 hsExplicitLTyVarNames :: LHsQTyVars pass -> [IdP pass]
 -- Explicit variables only
 hsExplicitLTyVarNames qtvs = map hsLTyVarName (hsQTvExplicit qtvs)
@@ -996,7 +999,7 @@ hsAllLTyVarNames :: LHsQTyVars GhcRn -> [Name]
 -- All variables
 hsAllLTyVarNames (HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kvs }
                          , hsq_explicit = tvs })
-  = kvs ++ map hsLTyVarName tvs
+  = kvs ++ hsLTyVarNames tvs
 hsAllLTyVarNames (XLHsQTyVars _) = panic "hsAllLTyVarNames"
 
 hsLTyVarLocName :: LHsTyVarBndr pass -> Located (IdP pass)
@@ -1255,7 +1258,7 @@ splitLHsInstDeclTy :: LHsSigType GhcRn
 splitLHsInstDeclTy (HsIB { hsib_ext = itkvs
                          , hsib_body = inst_ty })
   | (tvs, cxt, body_ty) <- splitLHsSigmaTyInvis inst_ty
-  = (itkvs ++ map hsLTyVarName tvs, cxt, body_ty)
+  = (itkvs ++ hsLTyVarNames tvs, cxt, body_ty)
          -- Return implicitly bound type and kind vars
          -- For an instance decl, all of them are in scope
 splitLHsInstDeclTy (XHsImplicitBndrs _) = panic "splitLHsInstDeclTy"

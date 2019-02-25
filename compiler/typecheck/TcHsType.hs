@@ -190,9 +190,9 @@ tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 kcHsSigType :: [Located Name] -> LHsSigType GhcRn -> TcM ()
 kcHsSigType names (HsIB { hsib_body = hs_ty
                                   , hsib_ext = sig_vars })
-  = addSigCtxt (funsSigCtxt names) hs_ty $
-    discardResult $
-    bindImplicitTKBndrs_Skol sig_vars $
+  = discardResult                        $
+    addSigCtxt (funsSigCtxt names) hs_ty $
+    bindImplicitTKBndrs_Skol sig_vars    $
     tc_lhs_type typeLevelMode hs_ty liftedTypeKind
 
 kcHsSigType _ (XHsImplicitBndrs _) = panic "kcHsSigType"
@@ -238,7 +238,6 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
                  solveLocalEqualitiesX "tc_hs_sig_type" $
                  bindImplicitTKBndrs_Skol sig_vars      $
                  do { kind <- newExpectedKind ctxt_kind
-
                     ; tc_lhs_type typeLevelMode hs_ty kind }
        -- Any remaining variables (unsolved in the solveLocalEqualities)
        -- should be in the global tyvars, and therefore won't be quantified
@@ -1864,15 +1863,12 @@ kcLHsQTyVars_Cusk name flav
                               ++ map (mkRequiredTyConBinder mentioned_kv_set) tc_tvs
 
              all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
-             tycon = mkTcTyCon name
-                               final_tc_binders
-                               res_kind
-                               all_tv_prs
+             tycon = mkTcTyCon name final_tc_binders res_kind all_tv_prs
                                True {- it is generalised -} flav
          -- If the ordering from
          -- Note [Required, Specified, and Inferred for types] in TcTyClsDecls
          -- doesn't work, we catch it here, before an error cascade
-       ; checkValidTelescope tycon
+       ; checkTyConTelescope tycon
 
        ; traceTc "kcLHsQTyVars: cusk" $
          vcat [ text "name" <+> ppr name
@@ -1921,8 +1917,13 @@ kcLHsQTyVars_NonCusk name flav
                -- Also, note that tc_binders has the tyvars from only the
                -- user-written tyvarbinders. See S1 in Note [How TcTyCons work]
                -- in TcTyClsDecls
-             tycon = mkTcTyCon name tc_binders res_kind
-                               (mkTyVarNamePairs (scoped_kvs ++ tc_tvs))
+
+             all_tv_prs = (kv_ns                `zip` scoped_kvs) ++
+                          (hsLTyVarNames hs_tvs `zip` tc_tvs)
+               -- NB: bindIplicitTKBndrs_Q_Tv makes /freshly-named/ unification
+               --     variables, hence the need to zip here.  Ditto bindExplicit..
+               -- See TcMType Note [Unification variables need fresh Names]
+             tycon = mkTcTyCon name tc_binders res_kind all_tv_prs
                                False -- not yet generalised
                                flav
 
@@ -2046,32 +2047,24 @@ expectedKindInCtxt _                   = OpenKind
 
 bindImplicitTKBndrs_Skol, bindImplicitTKBndrs_Tv,
   bindImplicitTKBndrs_Q_Skol, bindImplicitTKBndrs_Q_Tv
-  :: [Name]
-  -> TcM a
-  -> TcM ([TcTyVar], a)
+  :: [Name] -> TcM a -> TcM ([TcTyVar], a)
 bindImplicitTKBndrs_Skol   = bindImplicitTKBndrsX newFlexiKindedSkolemTyVar
 bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX newFlexiKindedTyVarTyVar
 bindImplicitTKBndrs_Q_Skol = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKindedSkolemTyVar)
 bindImplicitTKBndrs_Q_Tv   = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKindedTyVarTyVar)
 
-bindImplicitTKBndrsX :: (Name -> TcM TcTyVar) -- new_tv function
-                    -> [Name]
-                    -> TcM a
-                    -> TcM ([TcTyVar], a)   -- these tyvars are dependency-ordered
--- * Guarantees to call solveLocalEqualities to unify
---   all constraints from thing_inside.
---
--- * Returned TcTyVars have the supplied HsTyVarBndrs,
---   but may be in different order to the original [Name]
---   (because of sorting to respect dependency)
---
--- * Returned TcTyVars have zonked kinds
---   See Note [Keeping scoped variables in order: Implicit]
+bindImplicitTKBndrsX
+   :: (Name -> TcM TcTyVar) -- new_tv function
+   -> [Name]
+   -> TcM a
+   -> TcM ([TcTyVar], a)   -- Returned [TcTyVar] are in 1-1 correspondence
+                           -- with the passed in [Name]
 bindImplicitTKBndrsX new_tv tv_names thing_inside
   = do { tkvs <- mapM new_tv tv_names
-       ; result <- tcExtendTyVarEnv tkvs thing_inside
        ; traceTc "bindImplicitTKBndrs" (ppr tv_names $$ ppr tkvs)
-       ; return (tkvs, result) }
+       ; res <- tcExtendNameTyVarEnv (tv_names `zip` tkvs)
+                thing_inside
+       ; return (tkvs, res) }
 
 newImplicitTyVarQ :: (Name -> TcM TcTyVar) ->  Name -> TcM TcTyVar
 -- Behave like new_tv, except that if the tyvar is in scope, use it
@@ -2091,6 +2084,7 @@ newFlexiKindedSkolemTyVar = newFlexiKindedTyVar newSkolemTyVar
 
 newFlexiKindedTyVarTyVar :: Name -> TcM TyVar
 newFlexiKindedTyVarTyVar = newFlexiKindedTyVar newTyVarTyVar
+   -- See Note [Unification variables need fresh Names] in TcMType
 
 --------------------------------------
 -- Explicit binders
@@ -2119,7 +2113,8 @@ bindExplicitTKBndrsX
     :: (HsTyVarBndr GhcRn -> TcM TcTyVar)
     -> [LHsTyVarBndr GhcRn]
     -> TcM a
-    -> TcM ([TcTyVar], a)
+    -> TcM ([TcTyVar], a)  -- Returned [TcTyVar] are in 1-1 correspondence
+                           -- with the passed-in [LHsTyVarBndr]
 bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
   = do { traceTc "bindExplicTKBndrs" (ppr hs_tvs)
        ; go hs_tvs }
@@ -2128,7 +2123,13 @@ bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
                ; return ([], res) }
     go (L _ hs_tv : hs_tvs)
        = do { tv <- tc_tv hs_tv
-            ; (tvs, res) <- tcExtendTyVarEnv [tv] (go hs_tvs)
+            -- Extend the environment as we go, in case a binder
+            -- is mentioned in the kind of a later binder
+            --   e.g. forall k (a::k). blah
+            -- NB: tv's Name may differ from hs_tv's
+            -- See TcMType Note [Unification variables need fresh Names]
+            ; (tvs,res) <- tcExtendNameTyVarEnv [(hsTyVarName hs_tv, tv)] $
+                           go hs_tvs
             ; return (tv:tvs, res) }
 
 -----------------
@@ -2192,7 +2193,7 @@ bindTyClTyVars tycon_name thing_inside
        ; let scoped_prs = tcTyConScopedTyVars tycon
              res_kind   = tyConResKind tycon
              binders    = tyConBinders tycon
-       ; traceTc "bindTyClTyVars" (ppr tycon_name <+> ppr binders)
+       ; traceTc "bindTyClTyVars" (ppr tycon_name <+> ppr binders $$ ppr scoped_prs)
        ; tcExtendNameTyVarEnv scoped_prs $
          thing_inside binders res_kind }
 
@@ -2215,8 +2216,8 @@ kcLookupTcTyCon nm
 
 zonkAndScopedSort :: [TcTyVar] -> TcM [TcTyVar]
 zonkAndScopedSort spec_tkvs
-  = do { spec_tkvs <- mapM zonkTcTyCoVarBndr spec_tkvs
-          -- Use zonkTcTyCoVarBndr because a skol_tv might be a TyVarTv
+  = do { spec_tkvs <- mapM zonkAndSkolemise spec_tkvs
+          -- Use zonkAndSkolemise because a skol_tv might be a TyVarTv
 
        -- Do a stable topological sort, following
        -- Note [Ordering of implicit variables] in RnTypes
@@ -2503,7 +2504,7 @@ tcHsPartialSigType ctxt sig_ty
          -- in partial type signatures that bind scoped type variables, as
          -- we bring the wrong name into scope in the function body.
          -- Test case: partial-sigs/should_compile/LocalDefinitionBug
-       ; let tv_names = map tyVarName (implicit_tvs ++ explicit_tvs)
+       ; let tv_names = implicit_hs_tvs ++ hsLTyVarNames explicit_hs_tvs
 
        -- Spit out the wildcards (including the extra-constraints one)
        -- as "hole" constraints, so that they'll be reported if necessary
@@ -2520,7 +2521,7 @@ tcHsPartialSigType ctxt sig_ty
          -- we need to promote the TyVarTvs so we don't violate the TcLevel
          -- invariant
        ; implicit_tvs <- zonkAndScopedSort implicit_tvs
-       ; explicit_tvs <- mapM zonkTcTyCoVarBndr explicit_tvs
+       ; explicit_tvs <- mapM zonkAndSkolemise explicit_tvs
        ; theta        <- mapM zonkTcType theta
        ; tau          <- zonkTcType tau
 
@@ -2605,17 +2606,17 @@ tcHsPatSigType :: UserTypeCtxt
 -- See Note [Recipe for checking a signature]
 tcHsPatSigType ctxt sig_ty
   | HsWC { hswc_ext = sig_wcs,   hswc_body = ib_ty } <- sig_ty
-  , HsIB { hsib_ext = sig_vars
+  , HsIB { hsib_ext = sig_ns
          , hsib_body = hs_ty } <- ib_ty
   = addSigCtxt ctxt hs_ty $
-    do { sig_tkvs <- mapM new_implicit_tv sig_vars
+    do { sig_tkv_prs <- mapM new_implicit_tv sig_ns
        ; (wcs, sig_ty)
             <- solveLocalEqualities "tcHsPatSigType" $
                  -- Always solve local equalities if possible,
                  -- else casts get in the way of deep skolemisation
                  -- (Trac #16033)
-               tcWildCardBinders sig_wcs  $ \ wcs ->
-               tcExtendTyVarEnv sig_tkvs                           $
+               tcWildCardBinders sig_wcs        $ \ wcs ->
+               tcExtendNameTyVarEnv sig_tkv_prs $
                do { sig_ty <- tcHsOpenType hs_ty
                   ; return (wcs, sig_ty) }
 
@@ -2629,19 +2630,17 @@ tcHsPatSigType ctxt sig_ty
         ; sig_ty <- zonkPromoteType sig_ty
         ; checkValidType ctxt sig_ty
 
-        ; let tv_pairs = mkTyVarNamePairs sig_tkvs
-
-        ; traceTc "tcHsPatSigType" (ppr sig_vars)
-        ; return (wcs, tv_pairs, sig_ty) }
+        ; traceTc "tcHsPatSigType" (ppr sig_tkv_prs)
+        ; return (wcs, sig_tkv_prs, sig_ty) }
   where
-    new_implicit_tv name = do { kind <- newMetaKindVar
-                              ; new_tv name kind }
-
-    new_tv = case ctxt of
-               RuleSigCtxt {} -> newSkolemTyVar
-               _              -> newTauTyVar
-      -- See Note [Pattern signature binders]
-
+    new_implicit_tv name
+      = do { kind <- newMetaKindVar
+           ; tv   <- case ctxt of
+                       RuleSigCtxt {} -> newSkolemTyVar name kind
+                       _              -> newPatSigTyVar name kind
+                       -- See Note [Pattern signature binders]
+             -- NB: tv's Name may be fresh (in the case of newPatSigTyVar)
+           ; return (name, tv) }
 
 tcHsPatSigType _ (HsWC _ (XHsImplicitBndrs _)) = panic "tcHsPatSigType"
 tcHsPatSigType _ (XHsWildCardBndrs _)          = panic "tcHsPatSigType"

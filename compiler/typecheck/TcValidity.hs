@@ -13,7 +13,7 @@ module TcValidity (
   checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn, checkConsistentFamInst,
   badATErr, arityErr,
-  checkValidTelescope,
+  checkTyConTelescope,
   allDistinctTyVars
   ) where
 
@@ -40,7 +40,7 @@ import TyCon
 
 -- others:
 import IfaceType( pprIfaceType, pprIfaceTypeApp )
-import ToIface( toIfaceType, toIfaceTyCon, toIfaceTcArgs )
+import ToIface  ( toIfaceTyCon, toIfaceTcArgs, toIfaceType )
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
 import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )
@@ -2033,7 +2033,20 @@ checkValidTyFamEqn :: TyCon   -- ^ of the type family
                    -> Type    -- ^ Rhs
                    -> TcM ()
 checkValidTyFamEqn fam_tc qvs typats rhs
-  = do { checkValidFamPats fam_tc qvs typats rhs
+  = do { checkValidTypePats fam_tc typats
+
+         -- Check for things used on the right but not bound on the left
+       ; checkFamPatBinders fam_tc qvs typats rhs
+
+         -- Check for oversaturated visible kind arguments in a type family
+         -- equation.
+         -- See Note [Oversaturated type family equations]
+       ; when (isTypeFamilyTyCon fam_tc) $
+           case drop (tyConArity fam_tc) typats of
+             [] -> pure ()
+             spec_arg:_ ->
+               addErr $ text "Illegal oversaturated visible kind argument:"
+                    <+> quotes (char '@' <> pprParendType spec_arg)
 
          -- The argument patterns, and RHS, are all boxed tau types
          -- E.g  Reject type family F (a :: k1) :: k2
@@ -2078,23 +2091,6 @@ checkFamInstRhs lhs_tc lhs_tys famInsts
                        --   [a,b,a,a] \\ [a,a] = [b,a]
                        -- So we are counting repetitions
 
-checkValidFamPats :: TyCon -> [Var]
-                  -> [Type]   -- ^ patterns
-                  -> Type     -- ^ RHS
-                  -> TcM ()
--- Patterns in a 'type instance' or 'data instance' decl should
--- a) Shoule contain no type family applications
---    (vanilla synonyms are fine, though)
--- b) For associated types, are consistently instantiated
-checkValidFamPats fam_tc qvs pats rhs
-  = do { checkValidTypePats fam_tc pats
-
-         -- Check for things used on the right but not bound on the left
-       ; checkFamPatBinders fam_tc qvs pats rhs
-
-       ; traceTc "checkValidFamPats" (ppr fam_tc <+> ppr pats)
-       }
-
 -----------------
 checkFamPatBinders :: TyCon
                    -> [TcTyVar]   -- Bound on LHS of family instance
@@ -2122,24 +2118,17 @@ checkFamPatBinders fam_tc qtvs pats rhs
          --    data family D Int = MkD (forall (a::k). blah)
          -- In both cases, 'k' is not bound on the LHS, but is used on the RHS
          -- We catch the former in kcLHsQTyVars, and the latter right here
+         -- See Note [Check type-family instance binders]
        ; check_tvs bad_rhs_tvs (text "mentioned in the RHS")
                                (text "bound on the LHS of")
 
          -- Check for explicitly forall'd variable that is not bound on LHS
          --    data instance forall a.  T Int = MkT Int
          -- See Note [Unused explicitly bound variables in a family pattern]
+         -- See Note [Check type-family instance binders]
        ; check_tvs bad_qtvs (text "bound by a forall")
                             (text "used in")
-
-         -- Check for oversaturated visible kind arguments in a type family
-         -- equation.
-         -- See Note [Oversaturated type family equations]
-       ; when (isTypeFamilyTyCon fam_tc) $
-           case drop (tyConArity fam_tc) pats of
-             [] -> pure ()
-             spec_arg:_ ->
-               addErr $ text "Illegal oversaturated visible kind argument:"
-                    <+> quotes (char '@' <> pprParendType spec_arg) }
+       }
   where
     pat_tvs       = tyCoVarsOfTypes pats
     exact_pat_tvs = exactTyCoVarsOfTypes pats
@@ -2166,21 +2155,26 @@ checkFamPatBinders fam_tc qtvs pats rhs
                       2 (pprTypeApp fam_tc (map expandTypeSynonyms pats))
 
 
--- | Checks for occurrences of type families in class instances and type/data
--- family instances.
+-- | Checks that a list of type patterns is valid in a matching (LHS)
+-- position of a class instances or type/data family instance.
+--
+-- Specifically:
+--    * All monotypes
+--    * No type-family applications
 checkValidTypePats :: TyCon -> [Type] -> TcM ()
-checkValidTypePats tc pat_ty_args = do
-  -- Check that each of pat_ty_args is a monotype.
-  -- One could imagine generalising to allow
-  --      instance C (forall a. a->a)
-  -- but we don't know what all the consequences might be.
-  traverse_ checkValidMonoType pat_ty_args
+checkValidTypePats tc pat_ty_args
+  = do { -- Check that each of pat_ty_args is a monotype.
+         -- One could imagine generalising to allow
+         --      instance C (forall a. a->a)
+         -- but we don't know what all the consequences might be.
+         traverse_ checkValidMonoType pat_ty_args
 
-  -- Ensure that no type family instances occur a type pattern
-  case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
-    [] -> pure ()
-    ((tf_is_invis_arg, tf_tc, tf_args):_) -> failWithTc $
-      ty_fam_inst_illegal_err tf_is_invis_arg (mkTyConApp tf_tc tf_args)
+       -- Ensure that no type family applications occur a type pattern
+       ; case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
+            [] -> pure ()
+            ((tf_is_invis_arg, tf_tc, tf_args):_) -> failWithTc $
+               ty_fam_inst_illegal_err tf_is_invis_arg
+                                       (mkTyConApp tf_tc tf_args) }
   where
     inst_ty = mkTyConApp tc pat_ty_args
 
@@ -2294,8 +2288,52 @@ checkConsistentFamInst (InClsInst { ai_class = clas
                | otherwise                   = BindMe
 
 
-{- Note [Matching in the consistent-instantation check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Check type-family instance binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a type family instance, we require (of course), type variables
+used on the RHS are matched on the LHS. This is checked by
+checkFamPatBinders.  Here is an interesting example:
+
+    type family   T :: k
+    type instance T = (Nothing :: Maybe a)
+
+Upon a cursory glance, it may appear that the kind variable `a` is
+free-floating above, since there are no (visible) LHS patterns in
+`T`. However, there is an *invisible* pattern due to the return kind,
+so inside of GHC, the instance looks closer to this:
+
+    type family T @k :: k
+    type instance T @(Maybe a) = (Nothing :: Maybe a)
+
+Here, we can see that `a` really is bound by a LHS type pattern, so `a` is in
+fact not unbound. Contrast that with this example (Trac #13985)
+
+    type instance T = Proxy (Nothing :: Maybe a)
+
+This would looks like this inside of GHC:
+
+    type instance T @(*) = Proxy (Nothing :: Maybe a)
+
+So this time, `a` is neither bound by a visible nor invisible type pattern on
+the LHS, so it would be reported as free-floating.
+
+Finally, here's one more brain-teaser (from #9574). In the example below:
+
+    class Funct f where
+      type Codomain f :: *
+    instance Funct ('KProxy :: KProxy o) where
+      type Codomain 'KProxy = NatTr (Proxy :: o -> *)
+
+As it turns out, `o` is not free-floating in this example. That is because `o`
+bound by the kind signature of the LHS type pattern 'KProxy. To make this more
+obvious, one can also write the instance like so:
+
+    instance Funct ('KProxy :: KProxy o) where
+      type Codomain ('KProxy :: KProxy o) = NatTr (Proxy :: o -> *)
+
+
+Note [Matching in the consistent-instantation check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Matching the class-instance header to family-instance tyvars is
 tricker than it sounds.  Consider (Trac #13972)
     class C (a :: k) where
@@ -2547,8 +2585,8 @@ family instance equations: see Note [Arity of data families] in FamInstEnv.
 *                                                                      *
 ************************************************************************
 
-Note [Bad telescopes]
-~~~~~~~~~~~~~~~~~~~~~
+Note [Bad TyCon telescopes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Now that we can mix type and kind variables, there are an awful lot of
 ways to shoot yourself in the foot. Here are some.
 
@@ -2566,54 +2604,93 @@ Note that b is not bound. Yet its kind mentions a. Because we have
 a nice rule that all implicitly bound variables come before others,
 this is bogus.
 
-To catch these errors, we call checkValidTelescope during kind-checking
-datatype declarations. See also
-Note [Required, Specified, and Inferred for types] in TcTyClsDecls.
+To catch these errors, we call checkTyConTelescope during kind-checking
+datatype declarations.  This checks for
 
-Note [Keeping scoped variables in order: Explicit] discusses how this
-check works for `forall x y z.` written in a type.
+* Ill-scoped binders. From (1) and (2) above we can get putative
+  kinds like
+       T1 :: forall (a:k) (k:*) (b:k). SameKind a b -> *
+  where 'k' is mentioned a's kind before k is bound
 
+  This is easy to check for: just look for
+  out-of-scope variables in the kind
+
+* We should arguably also check for ambiguous binders
+  but we don't.  See Note [Ambiguous kind vars].
+
+See also
+  * Note [Required, Specified, and Inferred for types] in TcTyClsDecls.
+  * Note [Keeping scoped variables in order: Explicit] discusses how
+    this check works for `forall x y z.` written in a type.
+
+Note [Ambiguous kind vars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to be concerned about ambiguous binders. Suppose we have the kind
+     S1 :: forall k -> * -> *
+     S2 :: forall k. * -> *
+Here S1 is OK, because k is Required, and at a use of S1 we will
+see (S1 *) or (S1 (*->*)) or whatever.
+
+But S2 is /not/ OK because 'k' is Specfied (and hence invisible) and
+we have no way (ever) to figure out how 'k' should be instantiated.
+For example if we see (S2 Int), that tells us nothing about k's
+instantiation.  (In this case we'll instantiate it to Any, but that
+seems wrong.)  This is really the same test as we make for ambiguous
+type in term type signatures.
+
+Now, it's impossible for a Specified variable not to occur
+at all in the kind -- after all, it is Specified so it must have
+occurred.  (It /used/ to be possible; see tests T13983 and T7873.  But
+with the advent of the forall-or-nothing rule for kind variables,
+those strange cases went away.)
+
+But one might worry about
+    type v k = *
+    S3 :: forall k. V k -> *
+which appears to mention 'k' but doesn't really.  Or
+    S4 :: forall k. F k -> *
+where F is a type function.  But we simply don't check for
+those cases of ambiguity, yet anyway.  The worst that can happen
+is ambiguity at the call sites.
+
+Historical note: this test used to be called reportFloatingKvs.
 -}
 
 -- | Check a list of binders to see if they make a valid telescope.
--- The key property we're checking for is scoping. For example:
--- > data SameKind :: k -> k -> *
--- > data X a k (b :: k) (c :: SameKind a b)
--- Kind inference says that a's kind should be k. But that's impossible,
--- because k isn't in scope when a is bound. This check has to come before
--- general validity checking, because once we kind-generalise, this sort
--- of problem is harder to spot (as we'll generalise over the unbound
--- k in a's type.)
---
--- See Note [Generalisation for type constructors] in TcTyClsDecls for
---     data type declarations
--- and Note [Keeping scoped variables in order: Explicit] in TcHsType
---     for foralls
-checkValidTelescope :: TyCon -> TcM ()
-checkValidTelescope tc
-  = unless (null bad_tcbs) $ addErr $
+-- See Note [Bad TyCon telescopes]
+type TelescopeAcc
+      = ( TyVarSet   -- Bound earlier in the telescope
+        , Bool       -- At least one binder occurred (in a kind) before
+                     -- it was bound in the telescope.  E.g.
+        )            --    T :: forall (a::k) k. blah
+
+checkTyConTelescope :: TyCon -> TcM ()
+checkTyConTelescope tc
+  | bad_scope
+  = -- See "Ill-scoped binders" in Note [Bad TyCon telescopes]
+    addErr $
     vcat [ hang (text "The kind of" <+> quotes (ppr tc) <+> text "is ill-scoped")
-              2 (text "Inferred kind:" <+> ppr tc <+> dcolon <+> ppr_untidy (tyConKind tc))
+              2 pp_tc_kind
          , extra
          , hang (text "Perhaps try this order instead:")
-              2 (pprTyVars sorted_tidied_tvs) ]
+              2 (pprTyVars sorted_tvs) ]
+
+  | otherwise
+  = return ()
   where
-    ppr_untidy ty = pprIfaceType (toIfaceType ty)
     tcbs = tyConBinders tc
-    tvs = binderVars tcbs
-    (_, sorted_tidied_tvs) = tidyVarBndrs emptyTidyEnv (scopedSort tvs)
+    tvs  = binderVars tcbs
+    sorted_tvs = scopedSort tvs
 
-    (_, bad_tcbs) = foldl add_one (mkVarSet tvs, []) tcbs
+    (_, bad_scope) = foldl add_one (emptyVarSet, False) tcbs
 
-    add_one :: (TyVarSet, [TyConBinder])
-            -> TyConBinder -> (TyVarSet, [TyConBinder])
-    add_one (bad_bndrs, acc) tvb
-      | fkvs `intersectsVarSet` bad_bndrs = (bad', tvb : acc)
-      | otherwise                         = (bad', acc)
+    add_one :: TelescopeAcc -> TyConBinder -> TelescopeAcc
+    add_one (bound, bad_scope) tcb
+      = ( bound `extendVarSet` tv
+        , bad_scope || not (isEmptyVarSet (fkvs `minusVarSet` bound)) )
       where
-        tv = binderVar tvb
+        tv = binderVar tcb
         fkvs = tyCoVarsOfType (tyVarKind tv)
-        bad' = bad_bndrs `delVarSet` tv
 
     inferred_tvs  = [ binderVar tcb
                     | tcb <- tcbs, Inferred == tyConBinderArgFlag tcb ]
@@ -2622,6 +2699,14 @@ checkValidTelescope tc
 
     pp_inf  = parens (text "namely:" <+> pprTyVars inferred_tvs)
     pp_spec = parens (text "namely:" <+> pprTyVars specified_tvs)
+
+    pp_tc_kind = text "Inferred kind:" <+> ppr tc <+> dcolon <+> ppr_untidy (tyConKind tc)
+    ppr_untidy ty = pprIfaceType (toIfaceType ty)
+      -- We need ppr_untidy here because pprType will tidy the type, which
+      -- will turn the bogus kind we are trying to report
+      --     T :: forall (a::k) k (b::k) -> blah
+      -- into a misleadingly sanitised version
+      --     T :: forall (a::k) k1 (b::k1) -> blah
 
     extra
       | null inferred_tvs && null specified_tvs

@@ -52,7 +52,7 @@ module TcMType (
   -- Instantiation
   newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
   newMetaTyVarTyVars, newMetaTyVarTyVarX,
-  newTyVarTyVar, newTauTyVar, newSkolemTyVar, newWildCardX,
+  newTyVarTyVar, newPatSigTyVar, newSkolemTyVar, newWildCardX,
   tcInstType,
   tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
   tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
@@ -70,9 +70,8 @@ module TcMType (
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
   candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
   CandidatesQTvs(..), delCandidates, candidateKindVars,
-  skolemiseQuantifiedTyVar, defaultTyVar,
-  quantifyTyVars,
-  zonkTcTyCoVarBndr, zonkTyConBinders,
+  zonkAndSkolemise, skolemiseQuantifiedTyVar,
+  defaultTyVar, quantifyTyVars,
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind,
 
@@ -141,11 +140,12 @@ kind_var_occ :: OccName -- Just one for all MetaKindVars
 kind_var_occ = mkOccName tvName "k"
 
 newMetaKindVar :: TcM TcKind
-newMetaKindVar = do { uniq <- newUnique
-                    ; details <- newMetaDetails TauTv
-                    ; let kv = mkTcTyVar (mkKindName uniq) liftedTypeKind details
-                    ; traceTc "newMetaKindVar" (ppr kv)
-                    ; return (mkTyVarTy kv) }
+newMetaKindVar
+  = do { details <- newMetaDetails TauTv
+       ; uniq <- newUnique
+       ; let kv = mkTcTyVar (mkKindName uniq) liftedTypeKind details
+       ; traceTc "newMetaKindVar" (ppr kv)
+       ; return (mkTyVarTy kv) }
 
 newMetaKindVars :: Int -> TcM [TcKind]
 newMetaKindVars n = mapM (\ _ -> newMetaKindVar) (nOfThem n ())
@@ -661,42 +661,118 @@ The remaining uses of newTyVarTyVars are
 * In partial type signatures, see Note [Quantified variables in partial type signatures]
 -}
 
--- see Note [TyVarTv]
-newTyVarTyVar :: Name -> Kind -> TcM TcTyVar
-newTyVarTyVar name kind
-  = do { details <- newMetaDetails TyVarTv
-       ; let tyvar = mkTcTyVar name kind details
-       ; traceTc "newTyVarTyVar" (ppr tyvar)
-       ; return tyvar }
+newMetaTyVarName :: FastString -> TcM Name
+-- Makes a /System/ Name, which is eagerly eliminated by
+-- the unifier; see TcUnify.nicer_to_update_tv1, and
+-- TcCanonical.canEqTyVarTyVar (nicer_to_update_tv2)
+newMetaTyVarName str
+  = do { uniq <- newUnique
+       ; return (mkSystemName uniq (mkTyVarOccFS str)) }
 
+cloneMetaTyVarName :: Name -> TcM Name
+cloneMetaTyVarName name
+  = do { uniq <- newUnique
+       ; return (mkSystemName uniq (nameOccName name)) }
+         -- See Note [Name of an instantiated type variable]
+
+{- Note [Name of an instantiated type variable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At the moment we give a unification variable a System Name, which
+influences the way it is tidied; see TypeRep.tidyTyVarBndr.
+
+Note [Unification variables need fresh Names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Whenever we allocate a unification variable (MetaTyVar) we give
+it a fresh name.   Trac #16221 is a very tricky case that illustrates
+why this is important:
+
+   data SameKind :: k -> k -> *
+   data T0 a = forall k2 (b :: k2). MkT0 (SameKind a b) !Int
+
+When kind-checking T0, we give (a :: kappa1). Then, in kcConDecl
+we allocate a unification variable kappa2 for k2, and then we
+end up unifying kappa1 := kappa2 (because of the (SameKind a b).
+
+Now we generalise over kappa2; but if kappa2's Name is k2,
+we'll end up giving T0 the kind forall k2. k2 -> *.  Nothing
+directly wrong with that but when we typecheck the data constrautor
+we end up giving it the type
+  MkT0 :: forall k1 (a :: k1) k2 (b :: k2).
+          SameKind @k2 a b -> Int -> T0 @{k2} a
+which is bogus.  The result type should be T0 @{k1} a.
+
+And there no reason /not/ to clone the Name when making a
+unification variable.  So that's what we do.
+-}
+
+newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
+-- Make a new meta tyvar out of thin air
+newAnonMetaTyVar meta_info kind
+  = do  { let s = case meta_info of
+                        TauTv       -> fsLit "t"
+                        FlatMetaTv  -> fsLit "fmv"
+                        FlatSkolTv  -> fsLit "fsk"
+                        TyVarTv      -> fsLit "a"
+        ; name    <- newMetaTyVarName s
+        ; details <- newMetaDetails meta_info
+        ; let tyvar = mkTcTyVar name kind details
+        ; traceTc "newAnonMetaTyVar" (ppr tyvar)
+        ; return tyvar }
 
 -- makes a new skolem tv
 newSkolemTyVar :: Name -> Kind -> TcM TcTyVar
-newSkolemTyVar name kind = do { lvl <- getTcLevel
-                              ; return (mkTcTyVar name kind (SkolemTv lvl False)) }
+newSkolemTyVar name kind
+  = do { lvl <- getTcLevel
+       ; return (mkTcTyVar name kind (SkolemTv lvl False)) }
+
+newTyVarTyVar :: Name -> Kind -> TcM TcTyVar
+-- See Note [TyVarTv]
+-- See Note [Unification variables need fresh Names]
+newTyVarTyVar name kind
+  = do { details <- newMetaDetails TyVarTv
+       ; uniq <- newUnique
+       ; let name' = name `setNameUnique` uniq
+             tyvar = mkTcTyVar name' kind details
+         -- Don't use cloneMetaTyVar, which makes a SystemName
+         -- We want to keep the original more user-friendly Name
+         -- In practical terms that means that in error messages,
+         -- when the Name is tidied we get 'a' rather than 'a0'
+       ; traceTc "newTyVarTyVar" (ppr tyvar)
+       ; return tyvar }
+
+newPatSigTyVar :: Name -> Kind -> TcM TcTyVar
+newPatSigTyVar name kind
+  = do { details <- newMetaDetails TauTv
+       ; uniq <- newUnique
+       ; let name' = name `setNameUnique` uniq
+             tyvar = mkTcTyVar name' kind details
+         -- Don't use cloneMetaTyVar;
+         -- same reasoning as in newTyVarTyVar
+       ; traceTc "newPatSigTyVar" (ppr tyvar)
+       ; return tyvar }
+
+cloneAnonMetaTyVar :: MetaInfo -> TyVar -> TcKind -> TcM TcTyVar
+-- Make a fresh MetaTyVar, basing the name
+-- on that of the supplied TyVar
+cloneAnonMetaTyVar info tv kind
+  = do  { details <- newMetaDetails info
+        ; name    <- cloneMetaTyVarName (tyVarName tv)
+        ; let tyvar = mkTcTyVar name kind details
+        ; traceTc "cloneAnonMetaTyVar" (ppr tyvar)
+        ; return tyvar }
 
 newFskTyVar :: TcType -> TcM TcTyVar
 newFskTyVar fam_ty
-  = do { uniq <- newUnique
-       ; ref  <- newMutVar Flexi
-       ; tclvl <- getTcLevel
-       ; let details = MetaTv { mtv_info  = FlatSkolTv
-                              , mtv_ref   = ref
-                              , mtv_tclvl = tclvl }
-             name = mkMetaTyVarName uniq (fsLit "fsk")
+  = do { details <- newMetaDetails FlatSkolTv
+       ; name <- newMetaTyVarName (fsLit "fsk")
        ; return (mkTcTyVar name (tcTypeKind fam_ty) details) }
 
 newFmvTyVar :: TcType -> TcM TcTyVar
 -- Very like newMetaTyVar, except sets mtv_tclvl to one less
 -- so that the fmv is untouchable.
 newFmvTyVar fam_ty
-  = do { uniq <- newUnique
-       ; ref  <- newMutVar Flexi
-       ; tclvl <- getTcLevel
-       ; let details = MetaTv { mtv_info  = FlatMetaTv
-                              , mtv_ref   = ref
-                              , mtv_tclvl = tclvl }
-             name = mkMetaTyVarName uniq (fsLit "s")
+  = do { details <- newMetaDetails FlatMetaTv
+       ; name <- newMetaTyVarName (fsLit "s")
        ; return (mkTcTyVar name (tcTypeKind fam_ty) details) }
 
 newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
@@ -710,10 +786,9 @@ newMetaDetails info
 cloneMetaTyVar :: TcTyVar -> TcM TcTyVar
 cloneMetaTyVar tv
   = ASSERT( isTcTyVar tv )
-    do  { uniq <- newUnique
-        ; ref  <- newMutVar Flexi
-        ; let name'    = setNameUnique (tyVarName tv) uniq
-              details' = case tcTyVarDetails tv of
+    do  { ref  <- newMutVar Flexi
+        ; name' <- cloneMetaTyVarName (tyVarName tv)
+        ; let details' = case tcTyVarDetails tv of
                            details@(MetaTv {}) -> details { mtv_ref = ref }
                            _ -> pprPanic "cloneMetaTyVar" (ppr tv)
               tyvar = mkTcTyVar name' (tyVarKind tv) details'
@@ -859,51 +934,6 @@ coercion variables, except for the special case of the promoted Eq#. But,
 that can't ever appear in user code, so we're safe!
 -}
 
-newTauTyVar :: Name -> Kind -> TcM TcTyVar
-newTauTyVar name kind
-  = do { details <- newMetaDetails TauTv
-       ; let tyvar = mkTcTyVar name kind details
-       ; traceTc "newTauTyVar" (ppr tyvar)
-       ; return tyvar }
-
-
-mkMetaTyVarName :: Unique -> FastString -> Name
--- Makes a /System/ Name, which is eagerly eliminated by
--- the unifier; see TcUnify.nicer_to_update_tv1, and
--- TcCanonical.canEqTyVarTyVar (nicer_to_update_tv2)
-mkMetaTyVarName uniq str = mkSystemName uniq (mkTyVarOccFS str)
-
-newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
--- Make a new meta tyvar out of thin air
-newAnonMetaTyVar meta_info kind
-  = do  { uniq <- newUnique
-        ; let name = mkMetaTyVarName uniq s
-              s = case meta_info of
-                        TauTv       -> fsLit "t"
-                        FlatMetaTv  -> fsLit "fmv"
-                        FlatSkolTv  -> fsLit "fsk"
-                        TyVarTv      -> fsLit "a"
-        ; details <- newMetaDetails meta_info
-        ; let tyvar = mkTcTyVar name kind details
-        ; traceTc "newAnonMetaTyVar" (ppr tyvar)
-        ; return tyvar }
-
-cloneAnonMetaTyVar :: MetaInfo -> TyVar -> TcKind -> TcM TcTyVar
--- Same as newAnonMetaTyVar, but use a supplied TyVar as the source of the print-name
-cloneAnonMetaTyVar info tv kind
-  = do  { uniq    <- newUnique
-        ; details <- newMetaDetails info
-        ; let name = mkSystemName uniq (getOccName tv)
-                       -- See Note [Name of an instantiated type variable]
-              tyvar = mkTcTyVar name kind details
-        ; traceTc "cloneAnonMetaTyVar" (ppr tyvar)
-        ; return tyvar }
-
-{- Note [Name of an instantiated type variable]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-At the moment we give a unification variable a System Name, which
-influences the way it is tidied; see TypeRep.tidyTyVarBndr.
--}
 
 newFlexiTyVar :: Kind -> TcM TcTyVar
 newFlexiTyVar kind = newAnonMetaTyVar TauTv kind
@@ -978,10 +1008,9 @@ new_meta_tv_x info subst tv
 
 newMetaTyVarTyAtLevel :: TcLevel -> TcKind -> TcM TcType
 newMetaTyVarTyAtLevel tc_lvl kind
-  = do  { uniq <- newUnique
-        ; ref  <- newMutVar Flexi
-        ; let name = mkMetaTyVarName uniq (fsLit "p")
-              details = MetaTv { mtv_info  = TauTv
+  = do  { ref  <- newMutVar Flexi
+        ; name <- newMetaTyVarName (fsLit "p")
+        ; let details = MetaTv { mtv_info  = TauTv
                                , mtv_ref   = ref
                                , mtv_tclvl = tc_lvl }
         ; return (mkTyVarTy (mkTcTyVar name kind details)) }
@@ -1471,6 +1500,24 @@ quantifiableTv outer_tclvl tcv
   = tcTyVarLevel tcv > outer_tclvl
   | otherwise
   = False
+
+zonkAndSkolemise :: TcTyCoVar -> TcM TcTyCoVar
+-- A tyvar binder is never a unification variable (TauTv),
+-- rather it is always a skolem. It *might* be a TyVarTv.
+-- (Because non-CUSK type declarations use TyVarTvs.)
+-- Regardless, it may have a kind that has not yet been zonked,
+-- and may include kind unification variables.
+zonkAndSkolemise tyvar
+  | isTyVarTyVar tyvar
+     -- We want to preserve the binding location of the original TyVarTv.
+     -- This is important for error messages. If we don't do this, then
+     -- we get bad locations in, e.g., typecheck/should_fail/T2688
+  = do { zonked_tyvar <- zonkTcTyVarToTyVar tyvar
+       ; skolemiseQuantifiedTyVar zonked_tyvar }
+
+  | otherwise
+  = ASSERT2( isImmutableTyVar tyvar || isCoVar tyvar, pprTyVar tyvar )
+    zonkTyCoVarKind tyvar
 
 skolemiseQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 -- The quantified type variables often include meta type variables
@@ -1972,35 +2019,6 @@ zonkTcType = mapType zonkTcTypeMapper ()
 -- | "Zonk" a coercion -- really, just zonk any types in the coercion
 zonkCo :: Coercion -> TcM Coercion
 zonkCo = mapCoercion zonkTcTypeMapper ()
-
-zonkTcTyCoVarBndr :: TcTyCoVar -> TcM TcTyCoVar
--- A tyvar binder is never a unification variable (TauTv),
--- rather it is always a skolem. It *might* be a TyVarTv.
--- (Because non-CUSK type declarations use TyVarTvs.)
--- Regardless, it may have a kind
--- that has not yet been zonked, and may include kind
--- unification variables.
-zonkTcTyCoVarBndr tyvar
-  | isTyVarTyVar tyvar
-     -- We want to preserve the binding location of the original TyVarTv.
-     -- This is important for error messages. If we don't do this, then
-     -- we get bad locations in, e.g., typecheck/should_fail/T2688
-  = do { zonked_ty <- zonkTcTyVar tyvar
-       ; let zonked_tyvar = tcGetTyVar "zonkTcTyCoVarBndr TyVarTv" zonked_ty
-             zonked_name  = getName zonked_tyvar
-             reloc'd_name = setNameLoc zonked_name (getSrcSpan tyvar)
-       ; return (setTyVarName zonked_tyvar reloc'd_name) }
-
-  | otherwise
-  = ASSERT2( isImmutableTyVar tyvar || isCoVar tyvar, pprTyVar tyvar )
-    zonkTyCoVarKind tyvar
-
-zonkTyConBinders :: [TyConBinder] -> TcM [TyConBinder]
-zonkTyConBinders = mapM zonk1
-  where
-    zonk1 (Bndr tv vis)
-      = do { tv' <- zonkTcTyCoVarBndr tv
-           ; return (Bndr tv' vis) }
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
 -- Simply look through all Flexis

@@ -536,94 +536,121 @@ generaliseTcTyCon tc
   -- See Note [Required, Specified, and Inferred for types]
   = setSrcSpan (getSrcSpan tc) $
     addTyConCtxt tc $
-    do { let tc_name     = tyConName tc
-             tc_res_kind = tyConResKind tc
-             tc_tvs      = tyConTyVars  tc
+    do { let tc_name      = tyConName tc
+             tc_res_kind  = tyConResKind tc
+             spec_req_prs = tcTyConScopedTyVars tc
 
-             (scoped_tv_names, scoped_tvs) = unzip (tcTyConScopedTyVars tc)
-             -- NB: scoped_tvs includes both specified and required (tc_tvs)
-             -- ToDo: Is this a good idea?
+             (spec_req_names, spec_req_tvs) = unzip spec_req_prs
+             -- NB: spec_req_tvs includes both Specified and Required
+             -- Running example in Note [Inferring kinds for type declarations]
+             --    spec_req_prs = [ ("k1",kk1), ("a", (aa::kk1))
+             --                   , ("k2",kk2), ("x", (xx::kk2))]
+             -- where "k1" dnotes the Name k1, and kk1, aa, etc are MetaTyVarss,
+             -- specifically TyVarTvs
 
-       -- Step 1: find all the variables we want to quantify over,
-       --         including Inferred, Specfied, and Required
-       ; dvs <- candidateQTyVarsOfKinds $
-                (tc_res_kind : map tyVarKind scoped_tvs)
-       ; tc_tvs      <- mapM zonkTcTyVarToTyVar tc_tvs
-       ; let full_dvs = dvs { dv_tvs = mkDVarSet tc_tvs }
+       -- Step 0: zonk and skolemise the Specified and Required binders
+       -- It's essential that they are skolems, not MetaTyVars,
+       -- for Step 3 to work right
+       ; spec_req_tvs <- mapM zonkAndSkolemise spec_req_tvs
+             -- Running example, where kk1 := kk2, so we get
+             --   [kk2,kk2]
 
-       -- Step 2: quantify, mainly meaning skolemise the free variables
-       ; qtkvs <- quantifyTyVars emptyVarSet full_dvs
-                  -- Returned 'qtkvs' are scope-sorted and skolemised
+       -- Step 1: Check for duplicates
+       -- E.g. data SameKind (a::k) (b::k)
+       --      data T (a::k1) (b::k2) = MkT (SameKind a b)
+       -- Here k1 and k2 start as TyVarTvs, and get unified with each other
+       -- If this happens, things get very confused later, so fail fast
+       ; checkDuplicateTyConBinders spec_req_names spec_req_tvs
 
-       -- Step 3: find the final identity of the Specified and Required tc_tvs
+       -- Step 2a: find all the Inferred variables we want to quantify over
+       -- NB: candidateQTyVarsOfKinds zonks as it goes
+       ; dvs1 <- candidateQTyVarsOfKinds $
+                (tc_res_kind : map tyVarKind spec_req_tvs)
+       ; let dvs2 = dvs1 `delCandidates` spec_req_tvs
+
+       -- Step 2b: quantify, mainly meaning skolemise the free variables
+       -- Returned 'inferred' are scope-sorted and skolemised
+       ; inferred <- quantifyTyVars emptyVarSet dvs2
+
+       -- Step 3a: rename all the Specified and Required tyvars back to
+       -- TyVars with their oroginal user-specified name.  Example
+       --     class C a_r23 where ....
+       -- By this point we have scoped_prs = [(a_r23, a_r89[TyVarTv])]
+       -- We return with the TyVar a_r23[TyVar],
+       --    and ze mapping a_r89 :-> a_r23[TyVar]
+       ; traceTc "generaliseTcTyCon: before zonkRec"
+           (vcat [ text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
+                 , text "inferred =" <+> pprTyVars inferred ])
+       ; (ze, final_spec_req_tvs) <- zonkRecTyVarBndrs spec_req_names spec_req_tvs
+           -- So ze maps from the tyvars that have ended up
+
+       -- Step 3b: Apply that mapping to the other variables
        -- (remember they all started as TyVarTvs).
        -- They have been skolemised by quantifyTyVars.
-       ; scoped_tvs  <- mapM zonkTcTyVarToTyVar scoped_tvs
-       ; tc_tvs      <- mapM zonkTcTyVarToTyVar tc_tvs
-       ; tc_res_kind <- zonkTcType tc_res_kind
+       ; (ze, inferred) <- zonkTyBndrsX ze inferred
+       ; tc_res_kind    <- zonkTcTypeToTypeX ze tc_res_kind
 
-       ; traceTc "Generalise kind pre" $
+       ; traceTc "generaliseTcTyCon: post zonk" $
          vcat [ text "tycon =" <+> ppr tc
-              , text "tc_tvs =" <+> pprTyVars tc_tvs
-              , text "scoped_tvs =" <+> pprTyVars scoped_tvs ]
+              , text "inferred =" <+> pprTyVars inferred
+              , text "ze =" <+> ppr ze
+              , text "spec_req_prs =" <+> ppr spec_req_prs
+              , text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
+              , text "final_spec_req_tvs =" <+> pprTyVars final_spec_req_tvs ]
 
        -- Step 4: Find the Specified and Inferred variables
-       -- First, delete the Required tc_tvs from qtkvs; then
-       -- partition by whether they are scoped (if so, Specified)
-       ; let qtkv_set      = mkVarSet qtkvs
-             tc_tv_set     = mkVarSet tc_tvs
-             specified     = scopedSort $
-                             [ tv | tv <- scoped_tvs
-                                  , not (tv `elemVarSet` tc_tv_set)
-                                  , tv `elemVarSet` qtkv_set ]
+       -- NB: spec_req_tvs = spec_tvs ++ req_tvs
+       --     And req_tvs is 1-1 with tyConTyVars
+       --     See Note [Scoped tyvars in a TcTyCon] in TyCon
+       ; let n_spec        = length final_spec_req_tvs - tyConArity tc
+             (spec_tvs, req_tvs) = splitAt n_spec final_spec_req_tvs
+             specified     = scopedSort spec_tvs
                              -- NB: maintain the L-R order of scoped_tvs
-             spec_req_set  = mkVarSet specified `unionVarSet` tc_tv_set
-             inferred      = filterOut (`elemVarSet` spec_req_set) qtkvs
 
        -- Step 5: Make the TyConBinders.
-             dep_fv_set     = candidateKindVars dvs
+             to_user tv     = lookupTyVarOcc ze tv `orElse` tv
+             dep_fv_set     = mapVarSet to_user (candidateKindVars dvs1)
              inferred_tcbs  = mkNamedTyConBinders Inferred inferred
              specified_tcbs = mkNamedTyConBinders Specified specified
-             required_tcbs  = map (mkRequiredTyConBinder dep_fv_set) tc_tvs
+             required_tcbs  = map (mkRequiredTyConBinder dep_fv_set) req_tvs
 
        -- Step 6: Assemble the final list.
              final_tcbs = concat [ inferred_tcbs
                                  , specified_tcbs
                                  , required_tcbs ]
 
-             scoped_tv_pairs = scoped_tv_names `zip` scoped_tvs
-
        -- Step 7: Make the result TcTyCon
              tycon = mkTcTyCon tc_name final_tcbs tc_res_kind
-                            scoped_tv_pairs
+                            (mkTyVarNamePairs final_spec_req_tvs)
                             True {- it's generalised now -}
                             (tyConFlavour tc)
 
-       ; traceTc "Generalise kind" $
+       ; traceTc "generaliseTcTyCon done" $
          vcat [ text "tycon =" <+> ppr tc
-              , text "tc_tvs =" <+> pprTyVars tc_tvs
               , text "tc_res_kind =" <+> ppr tc_res_kind
-              , text "scoped_tvs =" <+> pprTyVars scoped_tvs
+              , text "dep_fv_set =" <+> ppr dep_fv_set
+              , text "final_spec_req_tvs =" <+> pprTyVars final_spec_req_tvs
               , text "inferred =" <+> pprTyVars inferred
               , text "specified =" <+> pprTyVars specified
               , text "required_tcbs =" <+> ppr required_tcbs
               , text "final_tcbs =" <+> ppr final_tcbs ]
 
-       -- Step 8: Check for duplicates
-       -- E.g. data SameKind (a::k) (b::k)
-       --      data T (a::k1) (b::k2) = MkT (SameKind a b)
-       -- Here k1 and k2 start as TyVarTvs, and get unified with each other
-       ; mapM_ report_sig_tv_err (findDupTyVarTvs scoped_tv_pairs)
-
-       -- Step 9: Check for validity.
-       -- We do this here because we're about to put the tycon into
-       -- the environment, and we don't want anything malformed in the
-       -- environment.
-       ; checkValidTelescope tycon
+       -- Step 8: Check for validity.
+       -- We do this here because we're about to put the tycon into the
+       -- the environment, and we don't want anything malformed there
+       ; checkTyConTelescope tycon
 
        ; return tycon }
+
+checkDuplicateTyConBinders :: [Name] -> [TcTyVar] -> TcM ()
+checkDuplicateTyConBinders spec_req_names spec_req_tvs
+  | null dups = return ()
+  | otherwise = mapM_ report_dup dups >> failM
   where
-    report_sig_tv_err (n1, n2)
+    dups :: [(Name,Name)]
+    dups = findDupTyVarTvs $ spec_req_names `zip` spec_req_tvs
+
+    report_dup (n1, n2)
       = setSrcSpan (getSrcSpan n2) $
         addErrTc (text "Couldn't match" <+> quotes (ppr n1)
                         <+> text "with" <+> quotes (ppr n2))
@@ -669,7 +696,7 @@ Example:
   data SameKind :: k -> k -> *
   data Bad a (c :: Proxy b) (d :: Proxy a) (x :: SameKind b d)
 
-For X:
+For Bad:
   - a, c, d, x are Required; they are explicitly listed by the user
     as the positional arguments of Bad
   - b is Specified; it appears explicitly in a kind signature
@@ -711,7 +738,7 @@ How it works
 These design choices are implemented by two completely different code
 paths for
 
-  * Declarations with a compulete user-specified kind signature (CUSK)
+  * Declarations with a complete user-specified kind signature (CUSK)
     Handed by the CUSK case of kcLHsQTyVars.
 
   * Declarations without a CUSK are handled by kcTyClDecl; see
@@ -726,7 +753,6 @@ tyvars; Specified are always included there.
 
 Design alternatives
 ~~~~~~~~~~~~~~~~~~~
-
 * For associated types we considered putting the class variables
   before the local variables, in a nod to the treatment for class
   methods. But it got too compilicated; see Trac #15592, comment:21ff.
@@ -761,41 +787,62 @@ that do not have a CUSK.  Consider
 
 We do kind inference as follows:
 
-* Step 1: Assign initial monomorophic kinds to S, T
+* Step 1: getInitialKinds, and in particular kcLHsQTyVars_NonCusk.
+  Make a unification variable for each of the Required and Specified
+  type varialbes in the header.
+
+  Record the connection between the Names the user wrote and the
+  fresh unification variables in the tcTyConScopedTyVars field
+  of the TcTyCon we are making
+      [ (a,  aa)
+      , (k1, kk1)
+      , (k2, kk2)
+      , (x,  xx) ]
+  (I'm using the convention that double letter like 'aa' or 'kk'
+  mean a unification variable.)
+
+  These unification variables
+    - Are TyVarTvs: that is, unification variables that can
+      unify only with other type variables.
+      See Note [Signature skolems] in TcType
+
+    - Have complete fresh Names; see TcMType
+      Note [Unification variables need fresh Names]
+
+  Assign initial monomorophic kinds to S, T
           S :: kk1 -> * -> kk2 -> *
           T :: kk3 -> * -> kk4 -> *
-  Here kk1 etc are TyVarTvs: that is, unification variables that
-  are allowed to unify only with other type variables. See
-  Note [Signature skolems] in TcType
 
-* Step 2: Extend the environment with a TcTyCon for S and T, with
-  these monomophic kinds.  Now kind-check the declarations, and solve
-  the resulting equalities.  The goal here is to discover constraints
-  on all these unification variables.
+* Step 2: kcTyClDecl. Extend the environment with a TcTyCon for S and
+  T, with these monomophic kinds.  Now kind-check the declarations,
+  and solve the resulting equalities.  The goal here is to discover
+  constraints on all these unification variables.
 
   Here we find that kk1 := kk3, and kk2 := kk4.
 
   This is why we can't use skolems for kk1 etc; they have to
   unify with each other.
 
-* Step 3. Generalise each TyCon in turn (generaliseTcTyCon).
+* Step 3: generaliseTcTyCon. Generalise each TyCon in turn.
   We find the free variables of the kind, skolemise them,
   sort them out into Inferred/Required/Specified (see the above
   Note [Required, Specified, and Inferred for types]),
   and perform some validity checks.
 
-  This makes the utterly-final TyConBinders for the TyCon
+  This makes the utterly-final TyConBinders for the TyCon.
 
   All this is very similar at the level of terms: see TcBinds
   Note [Quantified variables in partial type signatures]
+
+  But there some tricky corners: Note [Tricky scoping in generaliseTcTyCon]
 
 * Step 4.  Extend the type environment with a TcTyCon for S and T, now
   with their utterly-final polymorphic kinds (needed for recursive
   occurrences of S, T).  Now typecheck the declarations, and build the
   final AlgTyCOn for S and T resp.
 
-The first three steps are in kcTyClGroup;
-the fourth is in tcTyClDecls.
+The first three steps are in kcTyClGroup; the fourth is in
+tcTyClDecls.
 
 There are some wrinkles
 
@@ -834,7 +881,51 @@ There are some wrinkles
     a) when collecting quantification candidates, in
        candidateQTyVarsOfKind, we must collect skolems
     b) quantifyTyVars should be a no-op on such a skolem
--}
+
+Note [Tricky scoping in generaliseTcTyCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider Trac #16342
+  class C (a::ka) x where
+    cop :: D a x => x -> Proxy a -> Proxy a
+    cop _ x = x :: Proxy (a::ka)
+
+  class D (b::kb) y where
+    dop :: C b y => y -> Proxy b -> Proxy b
+    dop _ x = x :: Proxy (b::kb)
+
+C and D are mutually recursive, by the time we get to
+generaliseTcTyCon we'll have unified kka := kkb.
+
+But when typechecking the default declarations for 'cop' and 'dop' in
+tcDlassDecl2 we need {a, ka} and {b, kb} respectively to be in scope.
+But at that point all we have is the utterly-final Class itself.
+
+Conclusion: the classTyVars of a class must have the same Mame as
+that originally assigned by the user.  In our example, C must have
+classTyVars {a, ka, x} while D has classTyVars {a, kb, y}.  Despite
+the fact that kka and kkb got unified!
+
+We achieve this sleight of hand in generaliseTcTyCon, using
+the specialised function zonkRecTyVarBndrs.  We make the call
+   zonkRecTyVarBndrs [ka,a,x] [kkb,aa,xxx]
+where the [ka,a,x] are the Names originally assigned by the user, and
+[kkb,aa,xx] are the corresponding (post-zonking, skolemised) TcTyVars.
+zonkRecTyVarBndrs builds a recursive ZonkEnv that binds
+   kkb :-> (ka :: <zonked kind of kkb>)
+   aa  :-> (a  :: <konked kind of aa>)
+   etc
+That is, it maps each skolemised TcTyVars to the utterly-final
+TyVar to put in the class, with its correct user-specified name.
+When generalising D we'll do the same thing, but the ZonkEnv will map
+   kkb :-> (kb :: <zonked kind of kkb>)
+   bb  :-> (b  :: <konked kind of bb>)
+   etc
+Note that 'kkb' again appears in the domain of the mapping, but this
+time mapped to 'kb'.  That's how C and D end up with differently-named
+final TyVars despite the fact that we unified kka:=kkb
+
+zonkRecTyVarBndrs we need to do knot-tying because of the need to
+apply this same substitution to the kind of each.  -}
 
 --------------
 tcExtendKindEnvWithTyCons :: [TcTyCon] -> TcM a -> TcM a
@@ -1051,7 +1142,7 @@ kcConDecl (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                       , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (dataConCtxtName [name]) $
     discardResult                   $
-    bindExplicitTKBndrs_Skol ex_tvs $
+    bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
        ; traceTc "kcConDecl {" (ppr name $$ ppr args)
        ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)

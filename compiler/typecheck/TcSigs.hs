@@ -382,8 +382,8 @@ tcPatSynSig name sig_ty
                      -- e.g. pattern Zero <- 0#   (Trac #12094)
                  ; return (req, prov, body_ty) }
 
-       ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvs req
-                                                 ex_tvs prov body_ty
+       ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvs
+                                                 req ex_tvs prov body_ty
 
        -- Kind generalisation
        ; kvs <- kindGeneralize ungen_patsyn_ty
