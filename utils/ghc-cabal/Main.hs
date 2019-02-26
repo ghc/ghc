@@ -338,14 +338,22 @@ generate directory distdir config_args
               [(_,[rts])] ->
                  PackageIndex.insert rts{
                      Installed.ldOptions = [],
-                     Installed.libraryDirs = filter (not . ("gcc-lib" `isSuffixOf`)) (Installed.libraryDirs rts)} index
-                        -- GHC <= 6.12 had $topdir/gcc-lib in their
-                        -- library-dirs for the rts package, which causes
-                        -- problems when we try to use the in-tree mingw,
-                        -- due to accidentally picking up the incompatible
-                        -- libraries there.  So we filter out gcc-lib from
-                        -- the RTS's library-dirs here.
+                     Installed.libraryDirs = filter_dirs (Installed.libraryDirs rts),
+                     Installed.includeDirs = filter_dirs (Installed.includeDirs rts)
+                  } index
               _ -> error "No (or multiple) ghc rts package is registered!!"
+          filter_dirs = filter (\dir -> not (or [is_gcc_lib dir, is_libffi dir]))
+          -- GHC <= 6.12 had $topdir/gcc-lib in their
+          -- library-dirs for the rts package, which causes
+          -- problems when we try to use the in-tree mingw,
+          -- due to accidentally picking up the incompatible
+          -- libraries there.  So we filter out gcc-lib from
+          -- the RTS's library-dirs here.
+          is_gcc_lib = ("gcc-lib" `isSuffixOf`)
+          -- In Trac #16368, we noticed that libffi paths
+          -- from the boot GHC shadow the local libffi tarballs
+          -- in a similar manner.
+          is_libffi = ("libffi" `isInfixOf`)
 
           dep_ids  = map snd (externalPackageDeps lbi)
           deps     = map display dep_ids
