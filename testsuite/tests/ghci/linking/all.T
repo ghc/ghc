@@ -6,8 +6,7 @@ test('ghcilink001',
      makefile_test, ['ghcilink001'])
 
 test('ghcilink002', [extra_files(['TestLink.hs', 'f.c']),
-                     # Fragile when unregisterised; see #16085
-                     when(unregisterised(), skip),
+                     when(unregisterised(), fragile(16085)),
                      unless(doing_ghci, skip)],
      makefile_test, ['ghcilink002'])
 
@@ -21,8 +20,7 @@ test('ghcilink004',
 
 test('ghcilink005',
      [extra_files(['TestLink.hs', 'f.c']),
-      # Fragile when unregisterised; see #16085
-      when(unregisterised(), skip),
+      when(unregisterised(), fragile(16085)),
       unless(doing_ghci, skip)],
      makefile_test, ['ghcilink005'])
 
