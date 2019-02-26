@@ -1,5 +1,6 @@
 test('hie001',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
-test('hie002',       collect_compiler_stats(), compile, ['-fno-code -fwrite-ide-info'])
+test('hie002',       collect_compiler_stats('bytes allocated',10),
+                                               compile, ['-fno-code -fwrite-ide-info'])
 test('hie003',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 test('hie004',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 test('hie005',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
