@@ -132,8 +132,8 @@ createInterface tm flags modMap instIfaceMap = do
       fixMap = mkFixMap group_
       (decls, _) = unzip declsWithDocs
       localInsts = filter (nameIsLocalOrFrom sem_mdl)
-                        $  map getName instances
-                        ++ map getName fam_instances
+                        $  map getName fam_instances
+                        ++ map getName instances
       -- Locations of all TH splices
       splices = [ l | L l (SpliceD _ _) <- hsmodDecls hsm ]
 
