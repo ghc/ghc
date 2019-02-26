@@ -87,8 +87,7 @@ test('ffi018', [omit_ways(['ghci'])], compile_and_run, ['ffi018_c.c'])
 test('ffi018_ghci',
      [extra_files(['ffi018.h']),
       only_ways(['ghci']),
-      # This test is fragile when unregisterised; see #16085
-      when(unregisterised(), skip),
+      when(unregisterised(), fragile(16085)),
       pre_cmd('$MAKE -s --no-print-directory ffi018_ghci_setup')],
      compile_and_run, ['ffi018_ghci_c.o'])
 
@@ -100,8 +99,7 @@ test('T1679', normal, compile_and_run, [''])
 test('T1288', [omit_ways(['ghci'])], compile_and_run, ['T1288_c.c'])
 test('T1288_ghci',
      [only_ways(['ghci']),
-      # This test is fragile when unregisterised; see #16085
-      when(unregisterised(), skip),
+      when(unregisterised(), fragile(16085)),
       pre_cmd('$MAKE -s --no-print-directory T1288_ghci_setup')],
      compile_and_run, ['T1288_ghci_c.o'])
 

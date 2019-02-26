@@ -11,7 +11,7 @@ test('T2881',      just_ghci, compile_and_run, [''])
 
 test('T3171',
      [when(opsys('mingw32'),skip),
-      skip, # This test is quite flaky (#15383)
+      fragile(15383),
       req_interp,
       combined_output],
      makefile_test, [])

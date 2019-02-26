@@ -74,8 +74,7 @@ test('T5558',
      compile_and_run, [''])
 
 test('T5421', normal, compile_and_run, [''])
-# See #12751, the test fails non-deterministically so we skip it.
-test('T5611', when ( opsys('darwin'), skip) , compile_and_run, [''])
+test('T5611', when(opsys('darwin'), fragile(12751)) , compile_and_run, [''])
 test('T5238', normal, compile_and_run, [''])
 test('T5866', exit_code(1), compile_and_run, [''])
 
@@ -196,8 +195,7 @@ test('conc036', skip, compile_and_run, [''])
 # Interrupting foreign calls only makes sense if we are threaded
 test('foreignInterruptible', [when(fast(), skip),
                               when(opsys('mingw32'),expect_fail),
-                              # Fragile in unregisterised way; see #15467.
-                              when(unregisterised(), skip),
+                              when(unregisterised(), fragile(15467)),
                               # I don't think we support interrupting Sleep()
                               # on Windows.  --SDM
                               only_threaded_ways,
