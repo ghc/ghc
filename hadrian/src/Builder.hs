@@ -288,7 +288,7 @@ systemBuilderPath builder = case builder of
     Alex            -> fromKey "alex"
     Ar _ Stage0     -> fromKey "system-ar"
     Ar _ _          -> fromKey "ar"
-    Autoreconf _    -> fromKey "autoreconf"
+    Autoreconf _    -> stripExe =<< fromKey "autoreconf"
     Cc  _  Stage0   -> fromKey "system-cc"
     Cc  _  _        -> fromKey "cc"
     -- We can't ask configure for the path to configure!
@@ -328,6 +328,18 @@ systemBuilderPath builder = case builder of
                 (False, _    ) -> return fullPath
                 (True , True ) -> fixAbsolutePathOnWindows fullPath
                 (True , False) -> fixAbsolutePathOnWindows fullPath <&> (<.> exe)
+
+    -- Without this function, on Windows we can observe a bad builder path
+    -- for 'autoreconf'. If the relevant system.config field is set to
+    -- /usr/bin/autoreconf in the file, the path that we read
+    -- is C:/msys64/usr/bin/autoreconf.exe. A standard msys2 set up happens
+    -- to have an executable named 'autoreconf' there, without the 'exe'
+    -- extension. Hence this function.
+    stripExe s = do
+        let sNoExt = dropExtension s
+        exists <- doesFileExist s
+        if exists then return s else return sNoExt
+
 
 -- | Was the path to a given system 'Builder' specified in configuration files?
 isSpecified :: Builder -> Action Bool

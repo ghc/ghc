@@ -817,6 +817,9 @@ dnl ** check for patch
 dnl if GNU patch is named gpatch, look for it first
 AC_PATH_PROGS(PatchCmd,gpatch patch, patch)
 
+dnl ** check for autoreconf
+AC_PATH_PROG(AutoreconfCmd, autoreconf, autoreconf)
+
 dnl ** check for dtrace (currently only implemented for Mac OS X)
 AC_ARG_ENABLE(dtrace,
     [AC_HELP_STRING([--enable-dtrace],
