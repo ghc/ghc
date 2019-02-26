@@ -42,7 +42,7 @@ import OptCoercion ( optCoercion )
 import Type     hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
 import Coercion hiding ( substCo, substCoVarBndr )
-import TyCon        ( tyConArity, isNewTyCon )
+import TyCon        ( tyConArity )
 import TysWiredIn
 import PrelNames
 import BasicTypes
@@ -793,7 +793,7 @@ Here's how exprIsConApp_maybe achieves this:
       scrutinee = (\n. case n of n' -> MkT n') e
 
 2.  Beta-reduce the application, generating a floated 'let'.
-    See Note [Special case for newtype wrappers] below.  Now we have
+    See Note [beta-reduction in exprIsConApp_maybe] below.  Now we have
       scrutinee = case n of n' -> MkT n'
       with floats {Let n = e}
 
@@ -806,8 +806,8 @@ And now we have a known-constructor MkT that we can return.
 Notice that both (2) and (3) require exprIsConApp_maybe to gather and return
 a bunch of floats, both let and case bindings.
 
-Note [Special case for newtype wrappers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [beta-reduction in exprIsConApp_maybe]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The unfolding a definition (_e.g._ a let-bound variable or a datacon wrapper) is
 typically a function. For instance, take the wrapper for MkT in Note
 [exprIsConApp_maybe on data constructors with wrappers]:
@@ -838,7 +838,8 @@ Is transformed into
 Which, effectively, means emitting a float `let x = arg` and recursively
 analysing the body.
 
-This strategy requires a special case for newtypes. Suppose we have
+For newtypes, this strategy requires that their wrappers have compulsory unfoldings.
+Suppose we have
    newtype T a b where
      MkT :: a -> T b a   -- Note args swapped
 
@@ -853,7 +854,8 @@ This defines a worker function MkT, a wrapper function $WMkT, and an axT:
 
 Now we are optimising
    case $WMkT (I# 3) |> sym axT of I# y -> ...
-we clearly want to simplify this.  The danger is that we'll end up with
+we clearly want to simplify this. If $WMkT did not have a compulsory
+unfolding, we would end up with
    let a = I#3 in case a of I# y -> ...
 because in general, we do this on-the-fly beta-reduction
    (\x. e) blah  -->  let x = blah in e
@@ -862,14 +864,6 @@ and then float the the let.  (Substitution would risk duplicating 'blah'.)
 But if the case-of-known-constructor doesn't actually fire (i.e.
 exprIsConApp_maybe does not return Just) then nothing happens, and nothing
 will happen the next time either.
-
-For newtype wrappers we know for sure that the argument of the beta-redex
-is used exactly once, so we can substitute aggressively rather than use a let.
-Hence the special case, implemented in dealWithNewtypeWrapper.
-(It's sound for any beta-redex where the argument is used once, of course.)
-
-dealWithNewtypeWrapper is recursive since newtypes can have
-multiple type arguments.
 
 See test T16254, which checks the behavior of newtypes.
 -}
@@ -954,12 +948,6 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         = succeedWith in_scope floats $
           pushCoDataCon con args co
 
-        -- See Note [Special case for newtype wrappers]
-        | Just a <- isDataConWrapId_maybe fun
-        , isNewTyCon (dataConTyCon a)
-        , let rhs = uf_tmpl (realIdUnfolding fun)
-        = dealWithNewtypeWrapper (Left in_scope) floats rhs cont
-
         -- Look through data constructor wrappers: they inline late (See Note
         -- [Activation for data constructor wrappers]) but we want to do
         -- case-of-known-constructor optimisation eagerly.
@@ -1003,13 +991,6 @@ exprIsConApp_maybe (in_scope, id_unf) expr
       = do { (con, tys, args) <- x
            ; let floats = reverse rev_floats
            ; return (in_scope, floats, con, tys, args) }
-
-    ----------------------------
-    -- Unconditionally substitute the argument of a newtype
-    dealWithNewtypeWrapper scope floats (Lam v body) (CC (arg:args) co)
-      = dealWithNewtypeWrapper (extend scope v arg) floats body (CC args co)
-    dealWithNewtypeWrapper scope floats expr args
-      = go scope floats expr args
 
     ----------------------------
     -- Operations on the (Either InScopeSet CoreSubst)

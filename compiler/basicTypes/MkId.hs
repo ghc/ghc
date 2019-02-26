@@ -298,6 +298,27 @@ so the data constructor for T:C had a single argument, namely the
 predicate (C a).  But now we treat that as an ordinary argument, not
 part of the theta-type, so all is well.
 
+Note [Compulsory newtype unfolding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Newtype wrappers, just like workers, have compulsory unfoldings.
+This is needed so that two optimizations involving newtypes have the same
+effect whether a wrapper is present or not:
+
+(1) Case-of-known constructor.
+    See Note [beta-reduction in exprIsConApp_maybe].
+
+(2) Matching against the map/coerce RULE. Suppose we have the RULE
+
+    {-# RULE "map/coerce" map coerce = ... #-}
+
+    As described in Note [Getting the map/coerce RULE to work],
+    the occurrence of 'coerce' is transformed into:
+
+    {-# RULE "map/coerce" forall (c :: T1 ~R# T2).
+                          map ((\v -> v) `cast` c) = ... #-}
+
+    We'd like 'map Age' to match the LHS. For this to happen, Age
+    must be unfolded, otherwise we'll be stuck. This is tested in T16208.
 
 ************************************************************************
 *                                                                      *
@@ -607,7 +628,9 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- See Note [Inline partially-applied constructor wrappers]
              -- Passing Nothing here allows the wrapper to inline when
              -- unsaturated.
-             wrap_unf = mkInlineUnfolding wrap_rhs
+             wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding wrap_rhs
+                        -- See Note [Compulsory newtype unfolding]
+                      | otherwise        = mkInlineUnfolding wrap_rhs
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
                         wrapFamInstBody tycon res_ty_args $
