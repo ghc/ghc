@@ -1,0 +1,5 @@
+packages: ../../../libraries/libiserv
+	  ../../../utils/iserv-proxy
+	  ../../../utils/remote-iserv
+
+constraints: libiserv +network
