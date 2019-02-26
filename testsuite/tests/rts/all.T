@@ -110,6 +110,7 @@ test('T3424',
      [ # Skip due to non-deterministic timeouts on CI, see Trac #16349
        when(unregisterised(), skip),
        # And it's slow in general
+       when(fast(), skip),
        only_ways(['normal','threaded1','ghci'])
      ],
      compile_and_run, [''])
