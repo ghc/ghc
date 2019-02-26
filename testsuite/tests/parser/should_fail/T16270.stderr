@@ -57,5 +57,13 @@ T16270.hs:27:9: error:
 T16270.hs:29:9: error:
     Multi-way if-expressions need MultiWayIf turned on
 
-T16270.hs:36:1: error:
+T16270.hs:32:6: Illegal lambda-case (use LambdaCase)
+
+T16270.hs:35:5:
+    Use NumericUnderscores to allow underscores in integer literals
+
+T16270.hs:37:5:
+    primitive string literal must contain only characters <= '/xFF'
+
+T16270.hs:43:1: error:
     parse error (possibly incorrect indentation or mismatched brackets)
