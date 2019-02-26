@@ -19,7 +19,6 @@ module Haddock.Interface.LexParseRn
   , processModuleHeader
   ) where
 
-import Avail
 import Control.Arrow
 import Control.Monad
 import Data.Functor (($>))
@@ -200,10 +199,9 @@ ambiguous :: DynFlags
           -> [GlobalRdrElt] -- ^ More than one @gre@s sharing the same `RdrName` above.
           -> ErrMsgM (Doc Name)
 ambiguous dflags x gres = do
-  let noChildren = map availName (gresToAvailInfo gres)
-      dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
+  let dflt = maximumBy (comparing (gre_lcl &&& isTyConName . gre_name)) gres
       msg = "Warning: " ++ showNsRdrName dflags x ++ " is ambiguous. It is defined\n" ++
-            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") (map gre_name gres) ++
+            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") gres ++
             "    You may be able to disambiguate the identifier by qualifying it or\n" ++
             "    by specifying the type/value namespace explicitly.\n" ++
             "    Defaulting to the one defined " ++ defnLoc dflt
@@ -212,12 +210,10 @@ ambiguous dflags x gres = do
   -- of the same name, but not the only constructor.
   -- For example, for @data D = C | D@, someone may want to reference the @D@
   -- constructor.
-  when (length noChildren > 1) $ tell [msg]
-  pure (DocIdentifier (x $> dflt))
+  when (length (gresToAvailInfo gres) > 1) $ tell [msg]
+  pure (DocIdentifier (x $> gre_name dflt))
   where
-    isLocalName (nameSrcLoc -> RealSrcLoc {}) = True
-    isLocalName _ = False
-    defnLoc = showSDoc dflags . pprNameDefnLoc
+    defnLoc = showSDoc dflags . pprNameDefnLoc . gre_name
 
 -- | Handle value-namespaced names that cannot be for values.
 --
