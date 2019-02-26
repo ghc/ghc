@@ -88,7 +88,7 @@ test('prof-doc-last', [], compile_and_run, ['-fno-full-laziness'])
 
 # unicode in cost centre names
 test('T5559',
-     [ skip # Skip due to non-deterministic failures on CI, see Trac #16350
+     [ fragile(16350) # Skip due to non-deterministic failures on CI
      ], compile_and_run, [''])
 
 # Note [consistent stacks]
@@ -151,5 +151,5 @@ test('T15897',
      [extra_ways(['profasm']), only_ways(['profasm']),
       run_timeout_multiplier(2),
       # Takes too long and is quite fragile (#15467, #16193)
-      skip],
+      fragile(15467)],
      makefile_test, ['T15897'])
