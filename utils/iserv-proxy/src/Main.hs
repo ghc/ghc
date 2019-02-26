@@ -116,13 +116,14 @@ main = do
     trace ("Trying to connect to " ++ host_ip ++ ":" ++ (show port))
 
   out_pipe <- do
-    let go n = E.try (connectTo host_ip port >>= socketToPipe) >>= \case
+    let go n = E.try (connectTo verbose host_ip port >>= socketToPipe) >>= \case
           Left e | n == 0 -> E.throw (e :: E.SomeException)
                  | n >  0 -> threadDelay 500000 >> go (n - 1)
           Right a -> return a
       in go 120 -- wait for up to 60seconds (polling every 0.5s).
 
-  trace "Starting proxy"
+  when verbose $
+    trace "Starting proxy"
   proxy verbose in_pipe out_pipe
 
 -- | A hook, to transform outgoing (proxy -> slave)
@@ -205,7 +206,8 @@ fwdLoadCall verbose _ remote msg = do
       case msg' of
         Done -> return ()
         Missing path -> do
-          trace $ "fwdLoadCall: missing path: " ++ path
+          when verbose $
+            trace $ "fwdLoadCall: missing path: " ++ path
           reply =<< BS.readFile path
           loopLoad
         Have path remoteHash -> do
@@ -281,8 +283,8 @@ proxy verbose local remote = loop
         _other        -> fwdCall msg' >>= reply >> loop
 
 
-connectTo :: String -> PortNumber -> IO Socket
-connectTo host port = do
+connectTo :: Bool -> String -> PortNumber -> IO Socket
+connectTo verbose host port = do
   addr <- resolve host (show port)
   open addr
   where
@@ -292,9 +294,11 @@ connectTo host port = do
         return addr
     open addr = do
         sock <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
-        trace $ "Created socket for " ++ host ++ ":" ++ show port
+        when verbose $
+          trace $ "Created socket for " ++ host ++ ":" ++ show port
         connect sock $ addrAddress addr
-        trace "connected"
+        when verbose $
+          trace "connected"
         return sock
 
 -- | Turn a socket into an unbuffered pipe.
