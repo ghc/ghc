@@ -1,4 +1,4 @@
-{-# LANGUAGE NoTraditionalRecordSyntax, NoDoAndIfThenElse, NoMultiWayIf #-}
+{-# LANGUAGE NoTraditionalRecordSyntax, NoDoAndIfThenElse, NoMultiWayIf, NoLambdaCase, NoNumericUnderscores, MagicHash #-}
 {-# OPTIONS -Werror=missing-space-after-bang #-}
 
 module T16270 where
@@ -28,6 +28,13 @@ multiWayIf !i = (a, b)
            | otherwise -> False
     b = if | i -> False
            | otherwise -> True
+
+w = \case _ : _ -> True
+          _     -> False
+
+n = 123_456
+
+s = "hello ωorld"#   -- note the omega
 
 -- a fatal error.
 k = let
