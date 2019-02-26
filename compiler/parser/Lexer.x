@@ -1312,9 +1312,11 @@ varid span buf len =
       keyword <- case lastTk of
         Just ITlam -> do
           lambdaCase <- getBit LambdaCaseBit
-          if lambdaCase
-            then return ITlcase
-            else failMsgP "Illegal lambda-case (use -XLambdaCase)"
+          unless lambdaCase $ do
+            pState <- getPState
+            addError (RealSrcSpan (last_loc pState)) $ text
+                     "Illegal lambda-case (use LambdaCase)"
+          return ITlcase
         _ -> return ITcase
       maybe_layout keyword
       return $ L span keyword
@@ -1379,9 +1381,11 @@ tok_integral :: (SourceText -> Integer -> Token)
 tok_integral itint transint transbuf translen (radix,char_to_int) span buf len = do
   numericUnderscores <- getBit NumericUnderscoresBit  -- #14473
   let src = lexemeToString buf len
-  if (not numericUnderscores) && ('_' `elem` src)
-    then failMsgP "Use NumericUnderscores to allow underscores in integer literals"
-    else return $ L span $ itint (SourceText src)
+  when ((not numericUnderscores) && ('_' `elem` src)) $ do
+    pState <- getPState
+    addError (RealSrcSpan (last_loc pState)) $ text
+             "Use NumericUnderscores to allow underscores in integer literals"
+  return $ L span $ itint (SourceText src)
        $! transint $ parseUnsignedInteger
        (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
 
@@ -1419,9 +1423,11 @@ tok_frac :: Int -> (String -> Token) -> Action
 tok_frac drop f span buf len = do
   numericUnderscores <- getBit NumericUnderscoresBit  -- #14473
   let src = lexemeToString buf (len-drop)
-  if (not numericUnderscores) && ('_' `elem` src)
-    then failMsgP "Use NumericUnderscores to allow underscores in floating literals"
-    else return (L span $! (f $! src))
+  when ((not numericUnderscores) && ('_' `elem` src)) $ do
+    pState <- getPState
+    addError (RealSrcSpan (last_loc pState)) $ text
+             "Use NumericUnderscores to allow underscores in floating literals"
+  return (L span $! (f $! src))
 
 tok_float, tok_primfloat, tok_primdouble :: String -> Token
 tok_float        str = ITrational   $! readFractionalLit str
@@ -1618,23 +1624,23 @@ lex_string s = do
 
     Just ('"',i)  -> do
         setInput i
+        let s' = reverse s
         magicHash <- getBit MagicHashBit
         if magicHash
           then do
             i <- getInput
             case alexGetChar' i of
               Just ('#',i) -> do
-                   setInput i
-                   if any (> '\xFF') s
-                    then failMsgP "primitive string literal must contain only characters <= \'\\xFF\'"
-                    else let bs = unsafeMkByteString (reverse s)
-                         in return (ITprimstring (SourceText (reverse s)) bs)
+                setInput i
+                when (any (> '\xFF') s') $ do
+                  pState <- getPState
+                  addError (RealSrcSpan (last_loc pState)) $ text
+                     "primitive string literal must contain only characters <= \'\\xFF\'"
+                return (ITprimstring (SourceText s') (unsafeMkByteString s'))
               _other ->
-                return (ITstring (SourceText (reverse s))
-                                 (mkFastString (reverse s)))
+                return (ITstring (SourceText s') (mkFastString s'))
           else
-                return (ITstring (SourceText (reverse s))
-                                 (mkFastString (reverse s)))
+                return (ITstring (SourceText s') (mkFastString s'))
 
     Just ('\\',i)
         | Just ('&',i) <- next -> do
