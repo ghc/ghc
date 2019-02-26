@@ -23,7 +23,7 @@ expect_broken_for_10037 = expect_broken_for(
 
 test('heapprof001',
      [when(have_profiling(), extra_ways(extra_prof_ways)),
-      when(arch('i386'), expect_broken_for(15382, ['prof_hc_hb'])),
+      when(arch('i386'), fragile(15382)),
       extra_run_opts('7')],
      compile_and_run, [''])
 
