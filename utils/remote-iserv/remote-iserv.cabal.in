@@ -1,6 +1,6 @@
--- WARNING: iserv-proxy.cabal is automatically generated from iserv-proxy.cabal.in by
--- ../../configure.  Make sure you are editing iserv-proxy.cabal.in, not
--- iserv-proxy.cabal.
+-- WARNING: iserv-proxy.cabal is automatically generated from remote-iserv.cabal.in by
+-- ../../configure.  Make sure you are editing remote-iserv.cabal.in, not
+-- remote-iserv.cabal.
 
 Name: remote-iserv
 Version: @ProjectVersion@
