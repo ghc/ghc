@@ -9,6 +9,11 @@ T3807:
 	$(RM) T3807-export.o T3807-load.o
 	$(RM) T3807test.so
 	$(RM) T3807-load
+
+	# GHC does not automatically link with the RTS when building shared
+	# libraries. This is done to allow the RTS flavour to be chosen later (i.e.
+	# when linking an executable).
+	# Hence we must explicitly linking with the RTS here.
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 --make -dynamic -fPIC -shared T3807Export.hs T3807-export.c -o T3807test.so -lHSrts-ghc`'$(TEST_HC)' $(TEST_HC_OPTS) --numeric-version`
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -no-auto-link-packages -no-hs-main T3807-load.c -o T3807-load -ldl
 	./T3807-load
