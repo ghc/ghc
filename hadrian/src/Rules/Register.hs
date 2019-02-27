@@ -8,6 +8,7 @@ import Hadrian.Haskell.Cabal
 import Oracles.Setting
 import Packages
 import Rules.Gmp
+import Rules.Rts
 import Settings
 import Target
 import Utilities
@@ -116,6 +117,9 @@ buildConf _ context@Context {..} conf = do
     -- Copy and register the package.
     Cabal.copyPackage context
     Cabal.registerPackage context
+
+    -- | Dynamic RTS library files need symlinks (Rules.Rts.rtsRules).
+    when (package == rts) (needRtsSymLinks stage ways)
 
     -- The above two steps produce an entry in the package database, with copies
     -- of many of the files we have build, e.g. Haskell interface files. We need

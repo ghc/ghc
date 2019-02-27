@@ -20,6 +20,7 @@ import qualified Rules.Libffi
 import qualified Rules.Library
 import qualified Rules.Program
 import qualified Rules.Register
+import qualified Rules.Rts
 import qualified Rules.SimpleTargets
 import Settings
 import Target
@@ -125,6 +126,7 @@ buildRules = do
     Rules.Gmp.gmpRules
     Rules.Libffi.libffiRules
     Rules.Library.libraryRules
+    Rules.Rts.rtsRules
     packageRules
 
 oracleRules :: Rules ()
