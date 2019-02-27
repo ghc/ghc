@@ -150,7 +150,7 @@ addConDets (RecCon r)     = addPatterns $ map (hsRecFieldArg . unLoc) (rec_flds 
 
 explainWrapper :: HsWrapper -> Maybe (HieM ())
 explainWrapper (WpEvApp e@(EvExpr a)) = Just $ do
-      liftIO $ putStrLn $ "-----------------------------"
+      liftIO $ putStrLn $ "============================="
       liftIO $ putStrLn $ "Evidence of " ++ showSDocUnsafe (ppr (exprType a))
       bs <- asks hie_ev_binds
       vs <- asks hie_ev_vars
@@ -159,7 +159,7 @@ explainWrapper (WpEvApp e@(EvExpr a)) = Just $ do
       liftIO $ putStrLn $ showSDocUnsafe $ ppr bs
       liftIO $ putStrLn $ "Constructed using: "
       for_ (nonDetEltsUniqSet $ findRootEvVars bmap $ evVarsOfTerm e) $ \v -> do
-        liftIO $ putStrLn $ "============================="
+        liftIO $ putStrLn $ "-----------------------------"
         liftIO $ putStrLn $ "Evidence of " ++ showSDocUnsafe (ppr (varType v))
         liftIO $ putStrLn $ "Evidence variable: " ++ showSDocUnsafe (ppr v)
         liftIO $ putStrLn $ "Introduced at: " ++ show (lookupVarEnv vs v)
@@ -341,6 +341,14 @@ listScopes rhsScope (pat : pats) = RS sc pat : pats'
   where
     pats'@((RS scope p):_) = listScopes rhsScope pats
     sc = combineScopes scope $ mkScope $ getLoc p
+
+goStmts
+  :: ToHie (RScoped (LStmt (GhcPass p) body)) => [RScoped (LStmt (GhcPass p) body)]
+  -> HieM [HieAST Type]
+goStmts [] = return []
+goStmts (x:xs) = case x of
+  (RS _ (L _ (BindStmt _ pat _ _ _))) -> concatM [toHie x, local (addPattern pat) $ goStmts xs]
+  _ -> concatM [toHie x, goStmts xs]
 
 -- | 'listScopes' specialised to 'PScoped' things
 patScopes
@@ -822,12 +830,12 @@ instance ( ToHie body
     XGRHSs _ -> []
 
 instance ( ToHie (Located body)
-         , ToHie (RScoped (GuardLStmt a))
-         , Data (GRHS a (Located body))
-         ) => ToHie (LGRHS a (Located body)) where
+         , ToHie (RScoped (GuardLStmt (GhcPass a)))
+         , Data (GRHS (GhcPass a) (Located body))
+         ) => ToHie (LGRHS (GhcPass a) (Located body)) where
   toHie (L span g) = concatM $ makeNode g span : case g of
     GRHS _ guards body ->
-      [ toHie $ listScopes (mkLScope body) guards
+      [ goStmts $ listScopes (mkLScope body) guards
       , toHie body
       ]
     XGRHS _ -> []
@@ -925,7 +933,7 @@ instance ( a ~ GhcPass p
         ]
       HsDo _ _ (L ispan stmts) ->
         [ pure $ locOnly ispan
-        , toHie $ listScopes NoScope stmts
+        , goStmts $ listScopes NoScope stmts
         ]
       ExplicitList _ _ exprs ->
         [ toHie exprs
@@ -1013,7 +1021,7 @@ instance ( a ~ GhcPass p
         ]
       BindStmt _ pat body _ _ ->
         [ toHie $ PS (getRealSpan $ getLoc body) scope NoScope pat
-        , local (addPattern pat) $ toHie body
+        , toHie body
         ]
       ApplicativeStmt _ stmts _ ->
         [ concatMapM (toHie . RS scope . snd) stmts
@@ -1026,11 +1034,11 @@ instance ( a ~ GhcPass p
         ]
       ParStmt _ parstmts _ _ ->
         [ concatMapM (\(ParStmtBlock _ stmts _ _) ->
-                          toHie $ listScopes NoScope stmts)
+                          goStmts $ listScopes NoScope stmts)
                      parstmts
         ]
       TransStmt {trS_stmts = stmts, trS_using = using, trS_by = by} ->
-        [ toHie $ listScopes scope stmts
+        [ goStmts $ listScopes scope stmts
         , toHie using
         , toHie by
         ]
@@ -1146,7 +1154,7 @@ instance ( a ~ GhcPass p
     , local (addPattern pat) $ toHie expr
     ]
   toHie (RS sc (ApplicativeArgMany _ stmts _ pat)) = concatM
-    [ toHie $ listScopes NoScope stmts
+    [ goStmts $ listScopes NoScope stmts
     , toHie $ PS Nothing sc NoScope pat
     ]
   toHie (RS _ (XApplicativeArg _)) = pure []
@@ -1212,7 +1220,7 @@ instance ( a ~ GhcPass p
         ]
       HsCmdDo _ (L ispan stmts) ->
         [ pure $ locOnly ispan
-        , toHie $ listScopes NoScope stmts
+        , goStmts $ listScopes NoScope stmts
         ]
       HsCmdWrap _ _ _ -> []
       XCmd _ -> []
