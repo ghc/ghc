@@ -16,8 +16,9 @@ module Hadrian.Utilities (
     BuildRoot (..), buildRoot, buildRootRules, isGeneratedSource,
 
     -- * File system operations
-    copyFile, copyFileUntracked, fixFile, makeExecutable, moveFile, removeFile,
-    createDirectory, copyDirectory, moveDirectory, removeDirectory,
+    copyFile, copyFileUntracked, createFileLinkUntracked, fixFile,
+    makeExecutable, moveFile, removeFile, createDirectory, copyDirectory,
+    moveDirectory, removeDirectory,
 
     -- * Diagnostic info
     UseColour (..), Colour (..), ANSIColour (..), putColoured,
@@ -288,6 +289,14 @@ infixl 1 <&>
 isGeneratedSource :: FilePath -> Action Bool
 isGeneratedSource file = buildRoot <&> (`isPrefixOf` file)
 
+-- | Link a file tracking the source. Create the target directory if missing.
+createFileLinkUntracked :: FilePath -> FilePath -> Action ()
+createFileLinkUntracked linkTarget link = do
+    let dir = takeDirectory linkTarget
+    liftIO $ IO.createDirectoryIfMissing True dir
+    putProgressInfo =<< renderCreateFileLink linkTarget link
+    quietly . liftIO $ IO.createFileLink linkTarget link
+
 -- | Copy a file tracking the source. Create the target directory if missing.
 copyFile :: FilePath -> FilePath -> Action ()
 copyFile source target = do
@@ -460,8 +469,12 @@ renderAction what input output = do
     return $ case progressInfo of
         None    -> ""
         Brief   -> "| " ++ what ++ ": " ++ i ++ " => " ++ o
-        Normal  -> renderBox [ what, "     input: " ++ i, " => output: " ++ o ]
-        Unicorn -> renderUnicorn [ what, "     input: " ++ i, " => output: " ++ o ]
+        Normal  -> renderBox [ what
+                             , "     input: " ++ i
+                             , " => output: " ++ o ]
+        Unicorn -> renderUnicorn [ what
+                                 , "     input: " ++ i
+                                 , " => output: " ++ o ]
   where
     i = unifyPath input
     o = unifyPath output
@@ -477,6 +490,24 @@ renderActionNoOutput what input = do
         Unicorn -> renderUnicorn [ what, "     input: " ++ i ]
   where
     i = unifyPath input
+
+-- | Render creating a file link.
+renderCreateFileLink :: String -> FilePath -> Action String
+renderCreateFileLink linkTarget link' = do
+    progressInfo <- userSetting Brief
+    let what = "Creating file link"
+        linkString = link ++ " -> " ++ linkTarget
+    return $ case progressInfo of
+        None    -> ""
+        Brief   -> "| " ++ what ++ ": " ++ linkString
+        Normal  -> renderBox [ what
+                             , "      link name: " ++ link
+                             , " -> link target: " ++ linkTarget ]
+        Unicorn -> renderUnicorn [ what
+                                 , "      link name: " ++ link
+                                 , " -> link target: " ++ linkTarget ]
+    where
+        link = unifyPath link'
 
 -- | Render the successful build of a program.
 renderProgram :: String -> String -> String -> String
