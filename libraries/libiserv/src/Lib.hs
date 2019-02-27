@@ -68,7 +68,7 @@ serv verbose hook pipe restore = loop
   -- lurking inside it.  If so, we return the inner exception instead.
   showException :: SomeException -> IO String
   showException e0 = do
-     when $ trace "showException"
+     when verbose $ trace "showException"
      r <- try $ evaluate (force (show (e0::SomeException)))
      case r of
        Left e -> showException e
