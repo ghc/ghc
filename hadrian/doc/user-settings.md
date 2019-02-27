@@ -32,7 +32,10 @@ data Flavour = Flavour {
     -- | Build profiled GHC.
     ghcProfiled :: Bool,
     -- | Build GHC with debug information.
-    ghcDebugged :: Bool }
+    ghcDebugged :: Bool
+    -- | Whether to build docs and which ones
+    --   (haddocks, user manual, haddock manual)
+    ghcDocs :: Action DocTargets }
 ```
 Hadrian provides several built-in flavours (`default`, `quick`, and a few
 others; see `hadrian/doc/flavours.md`), which can be activated from the command line,
@@ -226,6 +229,45 @@ verboseCommand = output "//rts/sm/*" &&^ way threaded
 -- Print all commands:
 verboseCommand = return True
 ```
+
+## Documentation
+
+`Flavour`'s `ghcDocs :: Action DocTargets` field lets you
+customize the "groups" of documentation targets that should
+run when running `build docs` (or, transitively,
+`build binary-dist`).
+
+```haskell
+type DocTargets = Set DocTarget
+data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | SphinxMan
+```
+
+By default, `ghcDocs` contains all of them and `build docs` would
+therefore attempt to build all the haddocks, manuals and manpages.
+If, for some reason (e.g no easy way to install `sphinx-build` or
+`xelatex` on your system), you're just interested in building the
+haddocks, you could define a custom flavour as follows:
+
+```haskell
+justHaddocksFlavour :: Flavour
+justHaddocksFlavour = defaultFlavour
+    { name = "default-haddocks"
+	, ghcDocs = Set.singleton Haddocks }
+```
+
+and then run `build --flavour=default-haddocks`. Alternatively,
+you can use the `--docs` CLI flag to selectively disable some or
+all of the documentation targets:
+
+- `--docs=none`: don't build any docs
+- `--docs=no-haddocks`: don't build haddocks
+- `--docs=no-sphinx`: don't build any user manual or manpage
+- `--docs=no-sphinx-html`: don't build HTML versions of manuals
+- `--docs=no-sphinx-pdfs`: don't build PDF versions of manuals
+- `--docs=no-sphinx-man`: don't build the manpage
+
+You can pass several `--docs=...` flags, Hadrian will combine
+their effects.
 
 ## Miscellaneous
 
