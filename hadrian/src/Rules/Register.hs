@@ -117,6 +117,23 @@ buildConf _ context@Context {..} conf = do
     Cabal.copyPackage context
     Cabal.registerPackage context
 
+    -- Dynamic RTS also needs syslinks without the rts dummy version number.
+    -- This is for backwards compatability (the old make buid system omitted the
+    -- dummy version number).
+    when (package == rts) . forM_ (filter (wayUnit Dynamic) ways) $ \ way -> do
+        let rtsCxt = context { Context.way = way }
+        libPath     <- Context.libPath rtsCxt
+        distDir     <- Context.distDir
+        rtsLibFile  <- takeFileName <$> pkgLibraryFile rtsCxt
+        let versionlessPrefix = "libHSrts"
+            prefix = versionlessPrefix ++ "-1.0"
+            rtsLibFile' = maybe
+                (error $ "Expected RTS library file to start with " ++ prefix)
+                (versionlessPrefix ++)
+                (stripPrefix prefix rtsLibFile)
+            rtsLibFilePath' = libPath </> distDir </> rtsLibFile'
+        need [rtsLibFilePath']
+
     -- The above two steps produce an entry in the package database, with copies
     -- of many of the files we have build, e.g. Haskell interface files. We need
     -- to record this side effect so that Shake can cache these files too.
