@@ -8,3 +8,5 @@ REMOTE="$!"
 
 (>&2 echo "starting iserv-proxy with $@")
 ./inst/bin/iserv-proxy $@ 127.0.0.1 $PORT
+
+kill $REMOTE
