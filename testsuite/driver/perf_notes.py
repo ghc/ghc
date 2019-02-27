@@ -140,7 +140,7 @@ def parse_allowed_perf_changes(commitMsg):
     matches = re.findall(exp, commitMsg, re.M)
     changes = {}
     for (direction, metrics_str, opts_str, tests_str) in matches:
-        tests = re.findall(r"(\w+)", tests_str)
+        tests = tests_str.split()
         for test in tests:
             changes.setdefault(test, []).append({
                 'direction': direction,
