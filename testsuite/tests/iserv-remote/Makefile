@@ -8,8 +8,6 @@ CONFIGURE=$(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --gh
 remote-iserv: clean
 	'$(GHC_PKG)' init tmp.d
 
-	'$(GHC_PKG)' describe network | $(GHC_PKG) -v0 --global-package-db='$(PWD)/tmp.d' register --force -
-
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 
 	cp -r $(TOP)/../libraries/libiserv .
