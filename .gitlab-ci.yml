@@ -61,7 +61,7 @@ ghc-linters:
     - ./boot
     - ./configure $CONFIGURE_ARGS
     - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh`
-    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` docs-haddock
+    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx docs
   cache:
     key: hadrian
     paths:
@@ -386,6 +386,7 @@ validate-x86_64-windows-hadrian:
       mkdir -p _build
       cp -R inplace/mingw _build/mingw
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx docs
     # FIXME: Bindist disabled due to #16073
     #- bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh binary-dist"
     # FIXME: Testsuite disabled due to #16156.
