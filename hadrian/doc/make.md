@@ -174,6 +174,22 @@ time you fire up a build. This is not possible with the Make build system.
   build docs
   ```
 
+- Build documentation, but without haddocks (resp. without HTML or PDF manuals)
+
+  ``` sh
+  # Make
+  echo 'HADDOCKS_DOCS = NO' > mk/build.mk
+  # For HTML manuals: BUILD_SPHINX_HTML = NO
+  # For PDF manuals: BUILD_SPHINX_PDF = NO
+  make
+
+  # Hadrian
+  build docs --docs=no-haddocks
+  # Append --docs=no-sphinx-pdfs, --docs=no-sphinx-html or
+  # --docs=no-sphinx-man (or --docs=no-sphinx to encompass them all)
+  # to further reduce or even completely disable documentation targets.
+  ```
+
 - Running nofib
 
   ``` sh
