@@ -10358,6 +10358,20 @@ function that can *never* be called, such as this one: ::
 
       f :: (Int ~ Bool) => a -> a
 
+:extension:`AllowAmbiguousTypes` is not compatible now with :extension:`RankNTypes`
+It does not mean that you can't use both extensions in one module, but you can't use
+both features simultaneously. For example: :: 
+      foo :: forall r. (forall i. (KnownNat i) => r) -> r
+      foo f = f @1
+
+      boo :: forall i. (KnownNat i) => Int
+      boo = ....
+          
+      h :: Int
+      h = foo boo
+
+This program will be rejected due to failing ambiguity check, when we will try to apply "``foo``" to "``boo``".
+
 .. note::
     *A historical note.* GHC used to impose some more restrictive and less
     principled conditions on type signatures. For type
@@ -11264,6 +11278,8 @@ The obsolete language options :extension:`PolymorphicComponents` and
 specify finer distinctions that GHC no longer makes. (They should really elicit
 a deprecation warning, but they don't, purely to avoid the need to library
 authors to change their old flags specifications.)
+
+Also the :extension:`RankNTypes` is not compatible with :extension:`AllowAmbiguousTypes`.
 
 .. _univ:
 
