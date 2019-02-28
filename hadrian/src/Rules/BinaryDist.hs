@@ -100,6 +100,7 @@ bindistRules = do
         targetPlatform <- setting TargetPlatformFull
         distDir        <- Context.distDir
         rtsDir         <- pkgIdentifier rts
+        windows        <- windowsHost
 
         let ghcBuildDir      = root -/- stageString Stage1
             bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
@@ -115,6 +116,12 @@ bindistRules = do
         copyDirectory (rtsIncludeDir)         bindistFilesDir
         need ["docs"]
         copyDirectory (root -/- "docs") bindistFilesDir
+        when windows $ do
+          copyDirectory (root -/- "mingw") bindistFilesDir
+          -- we use that opportunity to delete the .stamp file that we use
+          -- as a proxy for the whole mingw toolchain, there's no point in
+          -- shipping it
+          removeFile (bindistFilesDir -/- mingwStamp)
 
         -- We copy the binary (<build root>/stage1/bin/haddock) to
         -- the bindist's bindir (<build root>/bindist/ghc-.../bin/).
@@ -132,7 +139,8 @@ bindistRules = do
                    , "runghc"]
 
         -- Finally, we create the archive <root>/bindist/ghc-X.Y.Z-platform.tar.xz
-        command [Cwd $ root -/- "bindist"] "tar"
+        tarPath <- builderPath (Tar Create)
+        cmd [Cwd $ root -/- "bindist"] tarPath
             [ "-c", "--xz", "-f"
             , ghcVersionPretty <.> "tar.xz"
             , ghcVersionPretty ]
@@ -224,19 +232,19 @@ bindistMakefile = unlines
     , "# to it. This implementation is a bit hacky and depends on consistency"
     , "# of program names. For hadrian build this will work as programs have a"
     , "# consistent naming procedure."
-    , "\trm -f $2"
-    , "\t$(CREATE_SCRIPT) $2"
-    , "\t@echo \"#!$(SHELL)\" >>  $2"
-    , "\t@echo \"exedir=\\\"$4\\\"\" >> $2"
-    , "\t@echo \"exeprog=\\\"$1\\\"\" >> $2"
-    , "\t@echo \"executablename=\\\"$5\\\"\" >> $2"
-    , "\t@echo \"bindir=\\\"$3\\\"\" >> $2"
-    , "\t@echo \"libdir=\\\"$6\\\"\" >> $2"
-    , "\t@echo \"docdir=\\\"$7\\\"\" >> $2"
-    , "\t@echo \"includedir=\\\"$8\\\"\" >> $2"
-    , "\t@echo \"\" >> $2 "
-    , "\tcat wrappers/$1 >> $2"
-    , "\t$(EXECUTABLE_FILE) $2 ;"
+    , "\trm -f '$2'"
+    , "\t$(CREATE_SCRIPT) '$2'"
+    , "\t@echo \"#!$(SHELL)\" >>  '$2'"
+    , "\t@echo \"exedir=\\\"$4\\\"\" >> '$2'"
+    , "\t@echo \"exeprog=\\\"$1\\\"\" >> '$2'"
+    , "\t@echo \"executablename=\\\"$5\\\"\" >> '$2'"
+    , "\t@echo \"bindir=\\\"$3\\\"\" >> '$2'"
+    , "\t@echo \"libdir=\\\"$6\\\"\" >> '$2'"
+    , "\t@echo \"docdir=\\\"$7\\\"\" >> '$2'"
+    , "\t@echo \"includedir=\\\"$8\\\"\" >> '$2'"
+    , "\t@echo \"\" >> '$2'"
+    , "\tcat wrappers/$1 >> '$2'"
+    , "\t$(EXECUTABLE_FILE) '$2' ;"
     , "endef"
     , ""
     , "# Hacky function to patch up the 'haddock-interfaces' and 'haddock-html'"
@@ -245,10 +253,10 @@ bindistMakefile = unlines
     , "# $1 = package name (ex: 'bytestring')"
     , "# $2 = path to .conf file"
     , "# $3 = Docs Directory"
-    , "\tcat $2 | sed 's|haddock-interfaces.*|haddock-interfaces: $3/html/libraries/$1/$1.haddock|' \\"
-    , "\t       | sed 's|haddock-html.*|haddock-html: $3/html/libraries/$1|' \\"
-    , "\t       > $2.copy"
-    , "\tmv $2.copy $2"
+    , "\tcat '$2' | sed 's|haddock-interfaces.*|haddock-interfaces: $3/html/libraries/$1/$1.haddock|' \\"
+    , "\t         | sed 's|haddock-html.*|haddock-html: $3/html/libraries/$1|' \\"
+    , "\t       > '$2.copy'"
+    , "\tmv '$2.copy' '$2'"
     , "endef"
     , ""
     , "# QUESTION : should we use shell commands?"
@@ -257,7 +265,7 @@ bindistMakefile = unlines
     , ".PHONY: install"
     , "install: install_lib install_bin install_includes"
     , "install: install_docs install_wrappers install_ghci"
-    , "install: update_package_db"
+    , "install: install_mingw update_package_db"
     , ""
     , "ActualBinsDir=${ghclibdir}/bin"
     , "WrapperBinsDir=${bindir}"
@@ -273,10 +281,10 @@ bindistMakefile = unlines
     , ""
     , "install_ghci:"
     , "\t@echo \"Copying and installing ghci\""
-    , "\t$(CREATE_SCRIPT) $(WrapperBinsDir)/ghci"
-    , "\t@echo \"#!$(SHELL)\" >>  $(WrapperBinsDir)/ghci"
-    , "\tcat wrappers/ghci-script >> $(WrapperBinsDir)/ghci"
-    , "\t$(EXECUTABLE_FILE) $(WrapperBinsDir)/ghci"
+    , "\t$(CREATE_SCRIPT) '$(WrapperBinsDir)/ghci'"
+    , "\t@echo \"#!$(SHELL)\" >>  '$(WrapperBinsDir)/ghci'"
+    , "\tcat wrappers/ghci-script >> '$(WrapperBinsDir)/ghci'"
+    , "\t$(EXECUTABLE_FILE) '$(WrapperBinsDir)/ghci'"
     , ""
     , "LIBRARIES = $(wildcard ./lib/*)"
     , "install_lib:"
@@ -302,7 +310,7 @@ bindistMakefile = unlines
     , "\t\tcp -R $$i \"$(docdir)/\"; \\"
     , "\tdone"
     , ""
-    , "BINARY_NAMES=$(shell ls ./bin/)"
+    , "BINARY_NAMES=$(shell ls ./wrappers/)"
     , "install_wrappers:"
     , "\t@echo \"Installing Wrapper scripts\""
     , "\t$(INSTALL_DIR) \"$(WrapperBinsDir)\""
@@ -318,8 +326,16 @@ bindistMakefile = unlines
     , "\t\t$(call patchpackageconf," ++
       "$(shell echo $(notdir $p) | sed 's/-\\([0-9]*[0-9]\\.\\)*conf//g')," ++
       "$p,$(docdir)))"
-    , "\t$(WrapperBinsDir)/ghc-pkg recache"
+    , "\t'$(WrapperBinsDir)/ghc-pkg' recache"
     , ""
+    , "# The 'foreach' that copies the mingw directory will only trigger a copy"
+    , "# when the wildcard matches, therefore only on Windows."
+    , "MINGW = $(wildcard ./mingw)"
+    , "install_mingw:"
+    , "\t@echo \"Installing MingGW\""
+    , "\t$(INSTALL_DIR) \"$(prefix)/mingw\""
+    , "\t$(foreach d, $(MINGW),\\"
+    , "\t\tcp -R ./mingw \"$(prefix)\")"
     , "# END INSTALL"
     , "# ----------------------------------------------------------------------"
     ]
@@ -385,3 +401,19 @@ ghciScriptWrapper = unlines
     [ "DIR=`dirname \"$0\"`"
     , "executable=\"$DIR/ghc\""
     , "exec $executable --interactive \"$@\"" ]
+
+-- | When not on Windows, we want to ship the 3 flavours of the iserv program
+--   in binary distributions. This isn't easily achievable by just asking for
+--   the package to be built, since here we're generating 3 different
+--   executables out of just one package, so we need to specify all 3 contexts
+--   explicitly and 'need' the result of building them.
+needIservBins :: Action ()
+needIservBins = do
+    windows <- windowsHost
+    when (not windows) $ do
+        rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
+        need =<< traverse programPath
+                   [ Context Stage1 iserv w
+                   | w <- [vanilla, profiling, dynamic]
+                   , w `elem` rtsways
+                   ]
