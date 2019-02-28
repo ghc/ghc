@@ -468,42 +468,10 @@ table.info {
   text-align: right;
 }
 
-div#style-menu-holder {
-  position: relative;
-  z-index: 2;
-  display: inline;
-}
-
-#style-menu {
-  position: absolute;
-  z-index: 1;
-  overflow: visible;
-  background: #374c5e;
-  margin: 0;
-  text-align: center;
-  right: 0;
-  padding: 0;
-  top: 1.25em;
-}
-
 #style-menu li {
-	display: inline-block;
+	display: block;
 	border-style: none;
-	margin: 0;
-	padding: 0;
-	color: #000;
 	list-style-type: none;
-	border-top: 1px solid #919191
-}
-
-#style-menu li + li {
-	border-left: 1px solid #919191;
-}
-
-#style-menu a {
-  width: 6em;
-  padding: 3px;
-  display: block;
 }
 
 #footer {
@@ -893,6 +861,15 @@ div#style-menu-holder {
   background: -o-linear-gradient(top, transparent 0%, transparent 0%, #fbf36d 0%, #fbf36d 100%);
   background: -ms-linear-gradient(top, transparent 0%, transparent 0%, #fbf36d 0%, #fbf36d 100%);
   background: linear-gradient(to bottom, transparent 0%, transparent 0%, #fbf36d 0%, #fbf36d 100%);
+}
+
+/* @end */
+
+/* @group Dropdown menus */
+
+#preferences-menu, #style-menu {
+  width: 25em;
+  overflow-y: auto;
 }
 
 /* @end */
