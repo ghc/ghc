@@ -164,12 +164,16 @@ INLINE_HEADER unsigned int nonmovingSegmentBlockCount(struct NonmovingSegment *s
 // Get a pointer to the given block index
 INLINE_HEADER void *nonmovingSegmentGetBlock(struct NonmovingSegment *seg, nonmoving_block_idx i)
 {
+  // Block size in bytes
   int blk_size = nonmovingSegmentBlockSize(seg);
-  unsigned int bitmap_size = nonmovingSegmentBlockCount(seg);
-  // Use ROUNDUP_BYTES_TO_WDS: bitmap size must be aligned to word size
-  W_ res = ROUNDUP_BYTES_TO_WDS(((W_)seg) + sizeof(struct NonmovingSegment) + bitmap_size)
-              * sizeof(W_) + i * blk_size;
-  return (void*)res;
+  // Bitmap size in bytes
+  W_ bitmap_size = nonmovingSegmentBlockCount(seg) * sizeof(uint8_t);
+  // Where the actual data starts (address of the first block).
+  // Use ROUNDUP_BYTES_TO_WDS to align to word size. Note that
+  // ROUNDUP_BYTES_TO_WDS returns in _words_, not in _bytes_, so convert it back
+  // back to bytes by multiplying with word size.
+  W_ data = ROUNDUP_BYTES_TO_WDS(((W_)seg) + sizeof(struct NonmovingSegment) + bitmap_size) * sizeof(W_);
+  return (void*)(data + i*blk_size);
 }
 
 // Get the segment which a closure resides in. Assumes that pointer points into
