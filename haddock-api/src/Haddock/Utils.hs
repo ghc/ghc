@@ -217,9 +217,7 @@ emptyHsQTvs :: LHsQTyVars GhcRn
 -- This function is here, rather than in HsTypes, because it *renamed*, but
 -- does not necessarily have all the rigt kind variables.  It is used
 -- in Haddock just for printing, so it doesn't matter
-emptyHsQTvs = HsQTvs { hsq_ext = HsQTvsRn
-                       { hsq_implicit = error "haddock:emptyHsQTvs"
-                       , hsq_dependent = error "haddock:emptyHsQTvs" }
+emptyHsQTvs = HsQTvs { hsq_ext = error "haddock:emptyHsQTvs"
                      , hsq_explicit = [] }
 
 
