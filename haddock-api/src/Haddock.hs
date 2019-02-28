@@ -76,6 +76,7 @@ import Packages
 import Panic (handleGhcException)
 import Module
 import FastString
+import Outputable (defaultUserStyle)
 
 --------------------------------------------------------------------------------
 -- * Exception handling
@@ -171,7 +172,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
       mIfaceFile <- readInterfaceFiles freshNameCache [(("", Nothing), path)]
       forM_ mIfaceFile $ \(_, ifaceFile) -> do
-        putMsg dflags (renderJson (jsonInterfaceFile ifaceFile))
+        logOutput dflags (defaultUserStyle dflags) (renderJson (jsonInterfaceFile ifaceFile))
 
     if not (null files) then do
       (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
