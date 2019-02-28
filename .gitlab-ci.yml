@@ -13,6 +13,7 @@ stages:
   - build
   - full-build
   - cleanup # See Note [Cleanup on Windows]
+  - hackage
 
 ############################################################
 # Runner Tags
@@ -425,6 +426,10 @@ validate-x86_64-windows:
       - ghc.tar.xz
       - junit.xml
 
+############################################################
+# Cleanup
+############################################################
+
 # Note [Cleaning up after shell executor]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
@@ -476,3 +481,41 @@ cleanup-darwin:
     - rm -Rf $BUILD_DIR/*
     - exit 0
 
+
+############################################################
+# Testing via head.hackage
+############################################################
+
+.hackage:
+  stage: hackage
+  image: ghcci/x86_64-linux-deb9:0.2
+  tags:
+    - x86_64-linux
+  dependencies:
+    - validate-x86_64-linux-fedora27
+  script:
+    # Here we need an access token (namely $HEAD_HACKAGE_ACCESS_TOKEN) so we
+    # can query the GitLab API to determine the job ID of the fedora27 job of
+    # the current pipeline. @head.hackage owns this token as well.
+    - |
+      job_id=$( \
+        curl \
+        --header "PRIVATE-TOKEN: $HEAD_HACKAGE_ACCESS_TOKEN" \
+        https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID \
+        | jq '. | map(select(.name == "validate-x86_64-linux-deb9-llvm")) | .[0].id')
+      GHC_TARBALL="https://gitlab.haskell.org/ghc/ghc/-/jobs/$job_id/artifacts/raw/ghc.tar.xz"
+    - |
+      curl --request POST --form "token=$CI_JOB_TOKEN" \
+        -F "ref=gitlab-ci-nix" \
+        -F "variables[GHC_TARBALL]=$GHC_TARBALL" \
+        https://gitlab.haskell.org/api/v4/projects/78/trigger/pipeline \
+
+hackage:
+  extends: .hackage
+  when: manual
+
+nightly-hackage:
+  extends: .hackage
+  only:
+    variables:
+      - $NIGHTLY
