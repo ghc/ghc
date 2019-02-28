@@ -17,6 +17,7 @@ stages:
   - full-build
   - cleanup # See Note [Cleanup on Windows]
   - packaging
+  - hackage
 
 ############################################################
 # Runner Tags
@@ -577,3 +578,41 @@ source-tarball:
     - make sdist
     - mv sdistprep/*.xz  .
     - make show VALUE=version > version
+
+
+############################################################
+# Testing via head.hackage
+############################################################
+
+# Triggering jobs in the ghc/head.hackage project requires that we have a job
+# token for that repository. Furthermore the head.hackage CI job must have
+# access to an unprivileged access token with the ability to query the ghc/ghc
+# project such that it can find the job ID of the fedora27 job for the current
+# pipeline.
+
+.hackage:
+  stage: hackage
+  image: ghcci/x86_64-linux-deb9:0.2
+  tags:
+    - x86_64-linux
+  dependencies: []
+  variables:
+    HEAD_HACKAGE_PROJECT_ID: "78"
+  script:
+    - bash .gitlab/start-head.hackage.sh
+
+hackage:
+  extends: .hackage
+  when: manual
+
+hackage-label:
+  extends: .hackage
+  only:
+    variables:
+      - $CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/
+
+nightly-hackage:
+  extends: .hackage
+  only:
+    variables:
+      - $NIGHTLY
