@@ -25,7 +25,7 @@ module Base (
     hadrianPath, configPath, configFile, sourcePath, shakeFilesDir,
     generatedDir, generatedPath, stageBinPath, stageLibPath, templateHscPath,
     ghcDeps, includesDependencies, haddockDeps, relativePackageDbPath,
-    packageDbPath, packageDbStamp,
+    packageDbPath, packageDbStamp, mingwStamp,
     ghcSplitPath
     ) where
 
@@ -143,3 +143,9 @@ templateHscPath stage = stageLibPath stage <&> (-/- "template-hsc.h")
 -- to the build root under which we will copy @ghc-split@.
 ghcSplitPath :: Stage -> FilePath
 ghcSplitPath stage = stageString stage -/- "bin" -/- "ghc-split"
+
+-- | We use this stamp file to track whether we've moved the mingw toolchain
+--   under the build root (to make it accessible to the GHCs we build on
+--   Windows). See "Rules.Program".
+mingwStamp :: FilePath
+mingwStamp = "mingw" -/- ".stamp"
