@@ -32,7 +32,6 @@ newtype RegularM m a = RegularM{unRM :: m a}
 
 instance Prelude.Monad m => MN2 (RegularM m) a where
     return = RegularM . Prelude.return
-    fail   = RegularM . Prelude.fail
 
 instance Prelude.Monad m => MN3 (RegularM m) a b where
     m >>= f = RegularM ((Prelude.>>=) (unRM m) (unRM . f))
