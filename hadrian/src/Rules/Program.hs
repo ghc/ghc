@@ -8,6 +8,7 @@ import Context
 import Expression hiding (stage, way)
 import Oracles.Flag
 import Oracles.ModuleFiles
+import Oracles.Setting (topDirectory)
 import Packages
 import Settings
 import Settings.Default
@@ -18,6 +19,18 @@ import Utilities
 buildProgramRules :: [(Resource, Int)] -> Rules ()
 buildProgramRules rs = do
     root <- buildRootRules
+
+    -- Proxy rule for the whole mingw toolchain on Windows.
+    -- We 'need' configure  because that's when the inplace/mingw
+    -- folder gets filled with the toolchain. This "proxy" rule
+    -- is listed as a runtime dependency for stage >= 1 GHCs.
+    root -/- mingwStamp %> \stampPath -> do
+        top <- topDirectory
+        need [ top -/- "configure" ]
+        copyDirectory (top -/- "inplace" -/- "mingw") root
+        writeFile' stampPath "OK"
+
+    -- Rules for programs that are actually built by hadrian.
     forM_ [Stage0 ..] $ \stage ->
         [ root -/- stageString stage -/- "bin"     -/- "*"
         , root -/- stageString stage -/- "lib/bin" -/- "*" ] |%> \bin -> do

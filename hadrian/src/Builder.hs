@@ -186,6 +186,10 @@ instance H.Builder Builder where
                   ++ ghcdeps
                   ++ ghcgens
                   ++ [ touchyPath | win ]
+                  ++ [ root -/- mingwStamp | win ]
+                     -- proxy for the entire mingw toolchain that
+                     -- we have in inplace/mingw initially, and then at
+                     -- root -/- mingw.
 
         Hsc2Hs stage -> (\p -> [p]) <$> templateHscPath stage
         Make dir  -> return [dir -/- "Makefile"]
