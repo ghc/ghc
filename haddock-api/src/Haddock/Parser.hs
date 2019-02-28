@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 -- |
 -- Module      :  Haddock.Parser
 -- Copyright   :  (c) Mateusz Kowalczyk 2013,
@@ -19,8 +20,10 @@ import Haddock.Types
 
 import DynFlags     ( DynFlags )
 import FastString   ( fsLit )
-import Lexer        ( mkPState, unP, ParseResult(POk) )
+import Lexer        ( mkPState, unP, ParseResult(..) )
+import OccName      ( occNameString )
 import Parser       ( parseIdentifier )
+import RdrName      ( RdrName(Qual) )
 import SrcLoc       ( mkRealSrcLoc, GenLocated(..) )
 import StringBuffer ( stringToStringBuffer )
 
@@ -33,14 +36,21 @@ parseString d = P.overIdentifier (parseIdent d) . P.parseString
 
 parseIdent :: DynFlags -> Namespace -> String -> Maybe (Wrap NsRdrName)
 parseIdent dflags ns str0 =
-  let buffer = stringToStringBuffer str1
-      realSrcLc = mkRealSrcLoc (fsLit "<unknown file>") 0 0
-      pstate = mkPState dflags buffer realSrcLc
-      (wrap,str1) = case str0 of
-                      '(' : s@(c : _) | c /= ',', c /= ')'  -- rule out tuple names
-                                      -> (Parenthesized, init s)
-                      '`' : s@(_ : _) -> (Backticked,    init s)
-                      _               -> (Unadorned,     str0)
-  in case unP parseIdentifier pstate of
-    POk _ (L _ name) -> Just (wrap (NsRdrName ns name))
-    _ -> Nothing
+  case unP parseIdentifier (pstate str1) of
+    POk _ (L _ name)
+      -- Guards against things like 'Q.--', 'Q.case', etc.
+      -- See https://github.com/haskell/haddock/issues/952 and Trac #14109
+      | Qual _ occ <- name
+      , PFailed{} <- unP parseIdentifier (pstate (occNameString occ))
+      -> Nothing
+      | otherwise
+      -> Just (wrap (NsRdrName ns name))
+    PFailed{} -> Nothing
+  where
+    realSrcLc = mkRealSrcLoc (fsLit "<unknown file>") 0 0
+    pstate str = mkPState dflags (stringToStringBuffer str) realSrcLc
+    (wrap,str1) = case str0 of
+                    '(' : s@(c : _) | c /= ',', c /= ')'  -- rule out tuple names
+                                    -> (Parenthesized, init s)
+                    '`' : s@(_ : _) -> (Backticked,    init s)
+                    _               -> (Unadorned,     str0)
