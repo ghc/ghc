@@ -34,8 +34,6 @@ static void nonmovingBumpEpoch(void) {
     nonmovingMarkEpoch = nonmovingMarkEpoch == 1 ? 2 : 1;
 }
 
-struct NonmovingSegment * const END_NONMOVING_TODO_LIST = (struct NonmovingSegment*)1;
-
 #if defined(THREADED_RTS)
 /*
  * This mutex ensures that only one non-moving collection is active at a time.
