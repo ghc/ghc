@@ -42,8 +42,9 @@ struct NonmovingSegment {
     uint8_t block_size;                 // log2 of block size in bytes
     uint8_t bitmap[];                   // liveness bitmap
     // After the liveness bitmap comes the data blocks. Note that we need to
-    // ensure that the size of the liveness bitmap is a multiple of the word size
-    // since GHC assumes that all object pointers are so-aligned.
+    // ensure that the size of this struct (including the bitmap) is a multiple
+    // of the word size since GHC assumes that all object pointers are
+    // so-aligned.
 };
 
 // This is how we mark end of todo lists. Not NULL because todo_link == NULL
