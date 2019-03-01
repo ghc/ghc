@@ -68,7 +68,7 @@ ghc-linters:
     paths:
       - cabal-cache
 
-validate-x86_64-linux-deb8-hadrian:
+.validate-x86_64-linux-deb8-hadrian:
   extends: .validate-hadrian
   stage: build
   image: ghcci/x86_64-linux-deb8:0.1
@@ -125,7 +125,7 @@ validate-x86_64-linux-deb8-hadrian:
 # x86_64-darwin
 #################################
 
-validate-x86_64-darwin:
+.validate-x86_64-darwin:
   extends: .validate
   stage: full-build
   tags:
@@ -198,7 +198,7 @@ validate-x86_64-darwin:
   tags:
     - aarch64-linux
 
-validate-aarch64-linux-deb9:
+.validate-aarch64-linux-deb9:
   extends: .build-aarch64-linux-deb9
   artifacts:
     when: always
@@ -228,7 +228,7 @@ nightly-aarch64-linux-deb9:
   cache:
     key: linux-i386-deb9
 
-validate-i386-linux-deb9:
+.validate-i386-linux-deb9:
   extends: .build-i386-linux-deb9
   artifacts:
     when: always
@@ -258,7 +258,7 @@ nightly-i386-linux-deb9:
   cache:
     key: linux-x86_64-deb9
 
-validate-x86_64-linux-deb9:
+.validate-x86_64-linux-deb9:
   extends: .build-x86_64-linux-deb9
   artifacts:
     when: always
@@ -275,20 +275,20 @@ nightly-x86_64-linux-deb9:
       - $NIGHTLY
 
 # N.B. Has DEBUG assertions enabled in stage2
-validate-x86_64-linux-deb9-debug:
+.validate-x86_64-linux-deb9-debug:
   extends: .build-x86_64-linux-deb9
   variables:
     BUILD_FLAVOUR: validate
     TEST_ENV: "x86_64-linux-deb9-debug"
 
-validate-x86_64-linux-deb9-llvm:
+.validate-x86_64-linux-deb9-llvm:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
 
-validate-x86_64-linux-deb9-integer-simple:
+.validate-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
@@ -308,7 +308,7 @@ nightly-x86_64-linux-deb9-integer-simple:
     variables:
       - $NIGHTLY
 
-validate-x86_64-linux-deb9-unreg:
+.validate-x86_64-linux-deb9-unreg:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
@@ -387,7 +387,7 @@ validate-x86_64-linux-fedora27:
       - ghc-8.6.2
       - ghc-tarballs
 
-validate-x86_64-windows-hadrian:
+.validate-x86_64-windows-hadrian:
   extends: .validate-windows
   stage: full-build
   variables:
@@ -411,7 +411,7 @@ validate-x86_64-windows-hadrian:
   tags:
     - x86_64-windows
 
-validate-x86_64-windows:
+.validate-x86_64-windows:
   extends: .validate-windows
   stage: full-build
   # due to #16084
