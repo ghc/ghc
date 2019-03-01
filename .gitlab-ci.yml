@@ -376,15 +376,13 @@ release-x86_64-linux-deb8:
 # x86_64-linux-fedora27
 #################################
 
-release-x86_64-linux-fedora27:
+validate-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-fedora27"
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-fedora27-linux.tar.xz"
-  only:
-    - tags
   cache:
     key: linux-x86_64-fedora27
   artifacts:
