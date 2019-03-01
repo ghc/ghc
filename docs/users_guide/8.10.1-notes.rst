@@ -61,6 +61,10 @@ Compiler
   :ghc-flag:`-Wredundant-record-wildcards`  which warn users when they have
   redundant or unused uses of a record wildcard match.
 
+- The Linker now no longer uses global state, which marks the final missing
+  piece in allowing GHC to be embedded within its programs recursively to
+  multiple levels.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
