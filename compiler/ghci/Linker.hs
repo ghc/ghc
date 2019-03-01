@@ -38,6 +38,7 @@ import Name
 import NameEnv
 import Module
 import ListSetOps
+import LinkerTypes (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
 import DynFlags
 import BasicTypes
 import Outputable
@@ -107,9 +108,6 @@ SHARED_GLOBAL_VAR_M( v_PersistentLinkerState
                    , MVar (Maybe PersistentLinkerState))
 #endif
 
-newtype DynLinker =
-  DynLinker { dl_mpls :: IORef (MVar (Maybe PersistentLinkerState)) }
-
 uninitializedLinker :: IO DynLinker
 uninitializedLinker =
   newMVar Nothing >>= newIORef >>= (pure . DynLinker)
@@ -133,35 +131,6 @@ readPLS dl = readIORef (dl_mpls dl)
 modifyMbPLS_
   :: DynLinker -> (Maybe PersistentLinkerState -> IO (Maybe PersistentLinkerState)) -> IO ()
 modifyMbPLS_ dl f = readIORef (dl_mpls dl) >>= flip modifyMVar_ f
-
-data PersistentLinkerState
-   = PersistentLinkerState {
-
-        -- Current global mapping from Names to their true values
-        closure_env :: ClosureEnv,
-
-        -- The current global mapping from RdrNames of DataCons to
-        -- info table addresses.
-        -- When a new Unlinked is linked into the running image, or an existing
-        -- module in the image is replaced, the itbl_env must be updated
-        -- appropriately.
-        itbl_env    :: !ItblEnv,
-
-        -- The currently loaded interpreted modules (home package)
-        bcos_loaded :: ![Linkable],
-
-        -- And the currently-loaded compiled modules (home package)
-        objs_loaded :: ![Linkable],
-
-        -- The currently-loaded packages; always object code
-        -- Held, as usual, in dependency order; though I am not sure if
-        -- that is really important
-        pkgs_loaded :: ![LinkerUnitId],
-
-        -- we need to remember the name of previous temporary DLL/.so
-        -- libraries so we can link them (see #10322)
-        temp_sos :: ![(FilePath, String)] }
-
 
 emptyPLS :: DynFlags -> PersistentLinkerState
 emptyPLS _ = PersistentLinkerState {
@@ -1225,9 +1194,6 @@ showLS (Archive nm)   = "(static archive) " ++ nm
 showLS (DLL nm)       = "(dynamic) " ++ nm
 showLS (DLLPath nm)   = "(dynamic) " ++ nm
 showLS (Framework nm) = "(framework) " ++ nm
-
--- TODO: Make this type more precise
-type LinkerUnitId = InstalledUnitId
 
 -- | Link exactly the specified packages, and their dependents (unless of
 -- course they are already linked).  The dependents are linked
