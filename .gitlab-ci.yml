@@ -291,14 +291,12 @@ release-x86_64-linux-deb8:
     when: always
     expire_in: 2 week
 
-release-x86_64-linux-fedora27:
+validate-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
   image: ghcci/x86_64-linux-fedora27:0.1
   variables:
     TEST_ENV: "x86_64-linux-fedora27"
-  only:
-    - tags
   cache:
     key: linux-x86_64-fedora27
   artifacts:
