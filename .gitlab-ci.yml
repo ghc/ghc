@@ -193,7 +193,7 @@ ghc-linters:
   tags:
     - aarch64-linux
 
-.nightly-aarch64-linux-deb9:
+nightly-aarch64-linux-deb9:
   extends: validate-aarch64-linux-deb9
   stage: full-build
   artifacts:
@@ -217,7 +217,7 @@ ghc-linters:
   cache:
     key: linux-i386-deb9
 
-.nightly-i386-linux-deb9:
+nightly-i386-linux-deb9:
   extends: .validate-linux
   stage: full-build
   image: ghcci/i386-linux-deb9:0.1
