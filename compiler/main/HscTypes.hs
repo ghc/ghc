@@ -180,6 +180,7 @@ import TysWiredIn
 import Packages hiding  ( Version(..) )
 import CmdLineParser
 import DynFlags
+import LinkerTypes (DynLinker)
 import DriverPhases     ( Phase, HscSource(..), hscSourceString
                         , isHsBootOrSig, isHsigFile )
 import BasicTypes
@@ -437,10 +438,9 @@ data HscEnv
         , hsc_iserv :: MVar (Maybe IServ)
                 -- ^ interactive server process.  Created the first
                 -- time it is needed.
-#ifdef GHCI
+
         , hsc_dynLinker :: DynLinker
                 -- ^ dynamic linker. 
-#endif
 
  }
 
