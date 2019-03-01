@@ -11,7 +11,7 @@ html {
 
 body {
   background: #fefefe;
-  color: #333;
+  color: #111;
   text-align: left;
   min-height: 100vh;
   position: relative;
@@ -234,7 +234,7 @@ Display the package name on top of the menu links and center both elements:
  */
 
  body, button {
-   font: 400 15px/1.4 'PT Sans',
+   font: 400 14px/1.4 'PT Sans',
      /* Fallback Font Stack */
      -apple-system,
 	  BlinkMacSystemFont,
@@ -390,6 +390,8 @@ pre {
   margin: 1em 0 0 0;
   background-color: #f7f7f7;
   overflow: auto;
+  border: 1px solid #ddd;
+  border-radius: 0.3em;
 }
 
 pre + p {
@@ -408,7 +410,7 @@ blockquote {
 }
 
 .src {
-  background: #f4f4f4;
+  background: #f2f2f2;
   padding: 0.2em 0.5em;
 }
 
@@ -501,7 +503,7 @@ table.info {
 }
 
 #contents-list {
-  background:  #f7f7f7;
+  background: #f4f4f4;
   padding: 1em;
   margin: 0;
 }
