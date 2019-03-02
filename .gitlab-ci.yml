@@ -505,36 +505,25 @@ cleanup-darwin:
 .hackage:
   stage: hackage
   image: ghcci/x86_64-linux-deb9:0.2
-  #only:
-  #  variables:
-  #    - $HEAD_HACKAGE_ACCESS_TOKEN
+  only:
+    variables:
+      - $HEAD_HACKAGE_ACCESS_TOKEN
   tags:
     - x86_64-linux
   script:
     # Here we need an access token (namely $HEAD_HACKAGE_ACCESS_TOKEN) so we
     # can query the GitLab API to determine the job ID of the fedora27 job of
     # the current pipeline. @head.hackage owns this token as well.
-    - echo $CI_PROJECT_ID $CI_PIPELINE_ID
-    - echo $HEAD_HACKAGE_ACCESS_TOKEN
-    - CI_PROJECT_ID=1
-    - CI_PIPELINE_ID=2939
-    - |
-      echo curl \
-        --header "PRIVATE-TOKEN: $HEAD_HACKAGE_ACCESS_TOKEN" \
-        https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs
-    - |
-      curl \
-        --header "PRIVATE-TOKEN: $HEAD_HACKAGE_ACCESS_TOKEN" \
-        https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs
     - |
       job_id=$( \
-        curl \
+        curl --silent --show-error \
         --header "PRIVATE-TOKEN: $HEAD_HACKAGE_ACCESS_TOKEN" \
         https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs \
         | jq '. | map(select(.name == "validate-x86_64-linux-fedora27")) | .[0].id')
       GHC_TARBALL="https://gitlab.haskell.org/ghc/ghc/-/jobs/$job_id/artifacts/raw/ghc.tar.xz"
     - |
-      curl --request POST --form "token=$CI_JOB_TOKEN" \
+      curl --silent --show-error \
+        --request POST --form "token=$CI_JOB_TOKEN" \
         -F "ref=gitlab-ci-nix" \
         -F "variables[GHC_TARBALL]=$GHC_TARBALL" \
         https://gitlab.haskell.org/api/v4/projects/78/trigger/pipeline \
