@@ -18,13 +18,7 @@ if [ -z "$HEAD_HACKAGE_PROJECT_ID" ]; then
   HEAD_HACKAGE_PROJECT_ID="78"
 fi
 
-echo curl --silent --show-error \
-  --request POST \
-  -F "token=$HEAD_HACKAGE_TRIGGER_TOKEN" \
-  -F "ref=gitlab-ci-nix" \
-  -F "variables[GHC_PIPELINE_ID]=$CI_PIPELINE_ID" \
-  https://gitlab.haskell.org/api/v4/projects/$HEAD_HACKAGE_PROJECT_ID/trigger/pipeline
-
+# Start pipeline
 curl --silent --show-error \
   --request POST \
   -F "token=$HEAD_HACKAGE_TRIGGER_TOKEN" \
@@ -37,13 +31,14 @@ pipeline_id=$(jq .id < resp.json)
 url=$(jq .web_url < resp.json)
 echo "Started head.hackage pipeline $pipeline_id: $url"
 
+# Wait for completion
 running=
 echo "Waiting for build to complete..."
 while true; do
   sleep 10
   curl --silent --show-error \
     --request GET \
-    -H "JOB_TOKEN=$CI_JOB_TOKEN" \
+    -H "JOB_TOKEN: $CI_JOB_TOKEN" \
     https://gitlab.haskell.org/api/v4/projects/$HEAD_HACKAGE_PROJECT_ID/pipelines/$pipeline_id \
     | tee resp.json
   status=$(jq .status < resp.json)
