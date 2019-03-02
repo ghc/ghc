@@ -31,7 +31,7 @@ stages:
 # Linting
 ############################################################
 
-ghc-linters:
+.ghc-linters:
   stage: lint
   image: ghcci/linters:0.1
   script:
