@@ -521,11 +521,11 @@ cleanup-darwin:
     - |
       echo curl \
         --header "PRIVATE-TOKEN: $HEAD_HACKAGE_ACCESS_TOKEN" \
-        https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs \
+        https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs
     - |
       curl \
         --header "PRIVATE-TOKEN: $HEAD_HACKAGE_ACCESS_TOKEN" \
-        https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs \
+        https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs
     - |
       job_id=$( \
         curl \
