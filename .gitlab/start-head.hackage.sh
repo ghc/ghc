@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-# Start a head.hackage job and wait for completion.
+# Start a head.hackage job and wait for completion. Expected to be called from
+# GitLab CI.
 
 if [ -z "$HEAD_HACKAGE_TRIGGER_TOKEN" ]; then
   echo "Error: Expected head.hackage trigger token in HEAD_HACKAGE_TRIGGER_TOKEN"
@@ -42,7 +43,7 @@ while true; do
   sleep 10
   curl --silent --show-error \
     --request GET \
-    -F "token=$HEAD_HACKAGE_TRIGGER_TOKEN" \
+    -H "JOB_TOKEN=$CI_JOB_TOKEN" \
     https://gitlab.haskell.org/api/v4/projects/$HEAD_HACKAGE_PROJECT_ID/pipelines/$pipeline_id \
     | tee resp.json
   status=$(jq .status < resp.json)
