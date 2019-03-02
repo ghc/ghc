@@ -1,0 +1,3 @@
+
+T13839b.hs:1:1: error:
+    The IO action ‘main’ is not defined in module ‘Main’

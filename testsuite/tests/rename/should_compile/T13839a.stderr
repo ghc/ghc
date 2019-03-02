@@ -1,0 +1,3 @@
+
+T13839a.hs:10:1: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘nonUsed’
