@@ -514,7 +514,7 @@ release-x86_64-linux-deb8:
   tags:
     - x86_64-linux
   variables:
-    HEAD_HACKAGE_PROJECT_ID: "ghc%2Fhead.hackage"
+    HEAD_HACKAGE_PROJECT_ID: "78"
   script:
     - CI_PIPELINE_ID=2939 # XXX
     - bash .gitlab/start-head.hackage.sh

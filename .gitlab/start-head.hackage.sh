@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 set -e
 
+# Start a head.hackage job and wait for completion.
+
 if [ -z "$HEAD_HACKAGE_TRIGGER_TOKEN" ]; then
   echo "Error: Expected head.hackage trigger token in HEAD_HACKAGE_TRIGGER_TOKEN"
   exit 1
 fi
 
-if [ -z "$GHC_PIPELINE_ID" ]; then
-  echo "Error: Expected pipeline id in GHC_PIPELINE_ID"
+if [ -z "$CI_PIPELINE_ID" ]; then
+  echo "Error: Expected pipeline id in CI_PIPELINE_ID"
   exit 1
 fi
 
 if [ -z "$HEAD_HACKAGE_PROJECT_ID" ]; then
-  HEAD_HACKAGE_PROJECT_ID="ghc%2Fhead.hackage"
+  HEAD_HACKAGE_PROJECT_ID="78"
 fi
 
 echo curl --silent --show-error \
@@ -50,7 +52,7 @@ while true; do
     ;;
   running)
     if [ -z "$running" ]; then
-      echo "Pipeline $pipeline_id is running."
+      echo "Pipeline $pipeline_id is now running."
       running=1
     fi
     ;;
