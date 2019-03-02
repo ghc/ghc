@@ -170,22 +170,24 @@ tcRnExports explicit_mod exports
        -- list, to avoid bleating about re-exporting a deprecated
        -- thing (especially via 'module Foo' export item)
    do   {
-        -- In interactive mode, we behave as if he had
-        -- written "module Main where ..."
         ; dflags <- getDynFlags
         ; let is_main_mod = mainModIs dflags == this_mod
         ; let default_main = case mainFunIs dflags of
                  Just main_fun
                      | is_main_mod -> mkUnqual varName (fsLit main_fun)
                  _                 -> main_RDR_Unqual
+        ; has_main <- lookupGlobalOccRn_maybe default_main >>= return . isJust
+        -- If the module has no explicit header, and it has a main function,
+        -- then we add a header like "module Main(main) where ..." (#13839)
+        -- See Note [Modules without a module header]
         ; let real_exports
                  | explicit_mod = exports
-                 | ghcLink dflags == LinkInMemory = Nothing
-                 | otherwise
+                 | has_main
                           = Just (noLoc [noLoc (IEVar noExt
                                      (noLoc (IEName $ noLoc default_main)))])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
+                 | otherwise = Nothing
 
         ; let do_it = exports_from_avail real_exports rdr_env imports this_mod
         ; (rn_exports, final_avails)
@@ -436,6 +438,34 @@ isDoc _ = False
 -- Renaming and typechecking of exports happens after everything else has
 -- been typechecked.
 
+{-
+Note [Modules without a module header]
+--------------------------------------------------
+
+The Haskell 2010 report says in section 5.1:
+
+>> An abbreviated form of module, consisting only of the module body, is
+>> permitted. If this is used, the header is assumed to be
+>> ‘module Main(main) where’.
+
+For modules without a module header, this is implemented the
+following way:
+
+If the module has a main function:
+   Then create a module header and export the main function.
+   This has the effect to mark the main function and all top level
+   functions called directly or indirectly via main as 'used',
+   and later on, unused top-level functions can be reported correctly.
+   There is no distinction between GHC and GHCi.
+If the module has NO main function:
+   Then export all top-level functions. This marks all top level
+   functions as 'used'.
+   In GHCi this has the effect, that we don't get any 'non-used' warnings.
+   In GHC, however, the 'has-main-module' check in the module
+   compiler/typecheck/TcRnDriver (functions checkMain / check-main) fires,
+   and we get the error:
+      The IO action ‘main’ is not defined in module ‘Main’
+-}
 
 
 -- Renaming exports lists is a minefield. Five different things can appear in
