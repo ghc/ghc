@@ -507,8 +507,6 @@ cleanup-darwin:
   image: ghcci/x86_64-linux-deb9:0.2
   tags:
     - x86_64-linux
-  dependencies:
-    - validate-x86_64-linux-fedora27
   script:
     # Here we need an access token (namely $HEAD_HACKAGE_ACCESS_TOKEN) so we
     # can query the GitLab API to determine the job ID of the fedora27 job of
