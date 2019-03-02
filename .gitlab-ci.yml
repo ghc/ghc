@@ -517,8 +517,8 @@ cleanup-darwin:
       job_id=$( \
         curl \
         --header "PRIVATE-TOKEN: $HEAD_HACKAGE_ACCESS_TOKEN" \
-        https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID \
-        | jq '. | map(select(.name == "validate-x86_64-linux-deb9-llvm")) | .[0].id')
+        https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs \
+        | jq '. | map(select(.name == "validate-x86_64-linux-fedora27")) | .[0].id')
       GHC_TARBALL="https://gitlab.haskell.org/ghc/ghc/-/jobs/$job_id/artifacts/raw/ghc.tar.xz"
     - |
       curl --request POST --form "token=$CI_JOB_TOKEN" \
