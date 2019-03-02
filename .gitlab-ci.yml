@@ -505,6 +505,9 @@ cleanup-darwin:
 .hackage:
   stage: hackage
   image: ghcci/x86_64-linux-deb9:0.2
+  only:
+    variables:
+      #- $HEAD_HACKAGE_ACCESS_TOKEN
   tags:
     - x86_64-linux
   script:
@@ -512,6 +515,7 @@ cleanup-darwin:
     # can query the GitLab API to determine the job ID of the fedora27 job of
     # the current pipeline. @head.hackage owns this token as well.
     - echo $CI_PROJECT_ID $CI_PIPELINE_ID
+    - echo $HEAD_HACKAGE_ACCESS_TOKEN
     - CI_PROJECT_ID=1
     - CI_PIPELINE_ID=2939
     - |
@@ -540,3 +544,4 @@ nightly-hackage:
   only:
     variables:
       - $NIGHTLY
+      - $HEAD_HACKAGE_ACCESS_TOKEN
