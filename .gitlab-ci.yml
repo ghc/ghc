@@ -339,7 +339,7 @@ release-x86_64-linux-deb8:
 # x86_64-linux-fedora27
 #################################
 
-validate-x86_64-linux-fedora27:
+.validate-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
   image: ghcci/x86_64-linux-fedora27:0.1
@@ -513,6 +513,13 @@ cleanup-darwin:
     # Here we need an access token (namely $HEAD_HACKAGE_ACCESS_TOKEN) so we
     # can query the GitLab API to determine the job ID of the fedora27 job of
     # the current pipeline. @head.hackage owns this token as well.
+    - echo $CI_PROJECT_ID $CI_PIPELINE_ID
+    - CI_PROJECT_ID=1
+    - CI_PIPELINE_ID=2939
+    - |
+      curl \
+        --header "PRIVATE-TOKEN: $HEAD_HACKAGE_ACCESS_TOKEN" \
+        https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs \
     - |
       job_id=$( \
         curl \
