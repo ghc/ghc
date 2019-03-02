@@ -513,18 +513,11 @@ release-x86_64-linux-deb8:
   image: ghcci/x86_64-linux-deb9:0.2
   tags:
     - x86_64-linux
+  variables:
+    HEAD_HACKAGE_PROJECT_ID: "ghc%2Fhead.hackage"
   script:
     - CI_PIPELINE_ID=2939 # XXX
-    - |
-      curl --silent --show-error \
-        --request POST \
-        -F "token=$HEAD_HACKAGE_TRIGGER_TOKEN" \
-        -F "ref=gitlab-ci-nix" \
-        -F "variables[GHC_PIPELINE_ID]=$CI_PIPELINE_ID" \
-        https://gitlab.haskell.org/api/v4/projects/78/trigger/pipeline \
-        | tee resp.json
-      url=$(jq .web_url < resp.json)
-      echo "Started head.hackage pipeline $url"
+    - bash .gitlab/start-head.hackage.sh
 
 hackage:
   extends: .hackage
