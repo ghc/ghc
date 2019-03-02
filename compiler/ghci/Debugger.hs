@@ -124,7 +124,8 @@ bindSuspensions t = do
       let ids = [ mkVanillaGlobal name ty
                 | (name,ty) <- zip names tys]
           new_ic = extendInteractiveContextWithIds ictxt ids
-      liftIO $ extendLinkEnv (zip names fhvs)
+          dl = hsc_dynLinker hsc_env
+      liftIO $ extendLinkEnv dl (zip names fhvs)
       setSession hsc_env {hsc_IC = new_ic }
       return t'
      where
