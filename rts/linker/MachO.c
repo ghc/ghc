@@ -945,9 +945,9 @@ relocateSection(
 /* Note [mmap r+w+x]
  * ~~~~~~~~~~~~~~~~~
  *
- * iOS does not permit to mmap r+w+x, hence wo only mmap r+w, and later change
- * to r+x via mprotect.  While this could would be nice to have for all hosts
- * and not just for iOS, it entail that the rest of the linker code supports
+ * iOS does not permit to mmap r+w+x, hence we only mmap r+w, and later change
+ * to r+x via mprotect. While this could/would be nice to have for all hosts
+ * and not just for iOS, it entails that the rest of the linker code supports
  * that, this includes:
  *
  * - mmap and mprotect need to be available.
