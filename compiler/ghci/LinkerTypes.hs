@@ -8,9 +8,16 @@ import GhcPrelude (FilePath, String)
 import Data.Maybe (Maybe)
 import Data.IORef (IORef)
 import Control.Concurrent.MVar (MVar)
-import BasicTypes (InstalledUnitId)
+import Module (InstalledUnitId)
 import ByteCodeTypes (ItblEnv)
-import ByteCodeLink (ClosureEnv)
+
+-- import ByteCodeLink (ClosureEnv)
+import NameEnv (NameEnv) -- for ClosureEnv
+import Name (Name) -- for ClosureEnv
+import GHCi.RemoteTypes (ForeignHValue) -- for ClosureEnv
+
+-- ClosureEnv came from ByteCodeLink. Should I replicate like this, or extract?
+type ClosureEnv = NameEnv (Name, ForeignHValue) 
 
 newtype DynLinker =
   DynLinker { dl_mpls :: IORef (MVar (Maybe PersistentLinkerState)) }
