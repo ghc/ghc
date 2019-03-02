@@ -38,7 +38,7 @@ import Name
 import NameEnv
 import Module
 import ListSetOps
-import LinkerTypes (DynLinker(..), LinkerUnitId(..))
+import LinkerTypes (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
 import DynFlags
 import BasicTypes
 import Outputable
