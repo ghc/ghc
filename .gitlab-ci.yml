@@ -458,7 +458,7 @@ release-x86_64-linux-deb8:
 # [1] https://gitlab.com/gitlab-org/gitlab-runner/issues/3856
 
 # See Note [Cleanup after shell executor]
-cleanup-windows:
+.cleanup-windows:
   stage: cleanup
   tags:
     - x86_64-windows
@@ -480,7 +480,7 @@ cleanup-windows:
     - exit /b 0
 
 # See Note [Cleanup after shell executor]
-cleanup-darwin:
+.cleanup-darwin:
   stage: cleanup
   tags:
     - x86_64-darwin
