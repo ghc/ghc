@@ -522,6 +522,9 @@ cleanup-darwin:
         -F "ref=gitlab-ci-nix" \
         -F "variables[GHC_PIPELINE_ID]=$CI_PIPELINE_ID" \
         https://gitlab.haskell.org/api/v4/projects/78/trigger/pipeline \
+        | tee resp.json
+      url=$(jq .web_url < resp.json)
+      echo "Started head.hackage pipeline $url"
 
 hackage:
   extends: .hackage
