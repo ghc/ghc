@@ -44,27 +44,27 @@ while true; do
   status=$(jq .status < resp.json)
 
   case $status in
-  pending)
+  "pending")
     ;;
-  running)
+  "running")
     if [ -z "$running" ]; then
       echo "Pipeline $pipeline_id is now running."
       running=1
     fi
     ;;
-  success)
+  "success")
     echo "Pipeline $pipeline_id finished successfully."
     exit 0
     ;;
-  failed)
+  "failed")
     echo "Pipeline $pipeline_id failed."
     exit 1
     ;;
-  canceled)
+  "canceled")
     echo "Pipeline $pipeline_id was canceled."
     exit 1
     ;;
-  skipped)
+  "skipped")
     echo "Pipeline $pipeline_id was skipped."
     exit 1
     ;;
