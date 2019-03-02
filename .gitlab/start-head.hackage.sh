@@ -1,6 +1,27 @@
 #!/usr/bin/env bash
 set -e
 
+if [ -z "$HEAD_HACKAGE_TRIGGER_TOKEN" ]; then
+  echo "Error: Expected head.hackage trigger token in HEAD_HACKAGE_TRIGGER_TOKEN"
+  exit 1
+fi
+
+if [ -z "$GHC_PIPELINE_ID" ]; then
+  echo "Error: Expected pipeline id in GHC_PIPELINE_ID"
+  exit 1
+fi
+
+if [ -z "$HEAD_HACKAGE_PROJECT_ID" ]; then
+  HEAD_HACKAGE_PROJECT_ID="ghc%2Fhead.hackage"
+fi
+
+echo curl --silent --show-error \
+  --request POST \
+  -F "token=$HEAD_HACKAGE_TRIGGER_TOKEN" \
+  -F "ref=gitlab-ci-nix" \
+  -F "variables[GHC_PIPELINE_ID]=$CI_PIPELINE_ID" \
+  https://gitlab.haskell.org/api/v4/projects/$HEAD_HACKAGE_PROJECT_ID/trigger/pipeline
+
 curl --silent --show-error \
   --request POST \
   -F "token=$HEAD_HACKAGE_TRIGGER_TOKEN" \
@@ -13,7 +34,7 @@ pipeline_id=$(jq .id < resp.json)
 url=$(jq .web_url < resp.json)
 echo "Started head.hackage pipeline $pipeline_id: $url"
 
-running=0
+running=
 echo "Waiting for build to complete..."
 while true; do
   sleep 10
@@ -28,7 +49,7 @@ while true; do
   pending)
     ;;
   running)
-    if [ "$running" = "0" ]; then
+    if [ -z "$running" ]; then
       echo "Pipeline $pipeline_id is running."
       running=1
     fi
