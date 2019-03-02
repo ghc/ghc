@@ -505,9 +505,9 @@ cleanup-darwin:
 .hackage:
   stage: hackage
   image: ghcci/x86_64-linux-deb9:0.2
-  only:
-    variables:
-      #- $HEAD_HACKAGE_ACCESS_TOKEN
+  #only:
+  #  variables:
+  #    - $HEAD_HACKAGE_ACCESS_TOKEN
   tags:
     - x86_64-linux
   script:
