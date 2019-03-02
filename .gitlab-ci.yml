@@ -519,6 +519,10 @@ cleanup-darwin:
     - CI_PROJECT_ID=1
     - CI_PIPELINE_ID=2939
     - |
+      echo curl \
+        --header "PRIVATE-TOKEN: $HEAD_HACKAGE_ACCESS_TOKEN" \
+        https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs \
+    - |
       curl \
         --header "PRIVATE-TOKEN: $HEAD_HACKAGE_ACCESS_TOKEN" \
         https://gitlab.haskell.org/api/v4/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs \
