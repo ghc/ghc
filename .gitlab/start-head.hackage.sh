@@ -38,7 +38,7 @@ while true; do
   sleep 10
   curl --silent --show-error \
     --request GET \
-    -H "JOB_TOKEN: $CI_JOB_TOKEN" \
+    -H "JOB-TOKEN: $CI_JOB_TOKEN" \
     https://gitlab.haskell.org/api/v4/projects/$HEAD_HACKAGE_PROJECT_ID/pipelines/$pipeline_id \
     | tee resp.json
   status=$(jq .status < resp.json)
