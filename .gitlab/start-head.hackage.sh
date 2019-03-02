@@ -40,7 +40,7 @@ while true; do
     --request GET \
     -F "job_token=$CI_JOB_TOKEN" \
     https://gitlab.haskell.org/api/v4/projects/$HEAD_HACKAGE_PROJECT_ID/pipelines/$pipeline_id \
-    | tee resp.json
+    > resp.json
   status=$(jq .status < resp.json)
 
   case $status in
@@ -69,6 +69,7 @@ while true; do
     exit 1
     ;;
   *)
+    cat resp.json
     echo "Error: Unknown pipeline status $status"
     exit 2
     ;;
