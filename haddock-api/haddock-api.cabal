@@ -34,8 +34,8 @@ data-files:
   html/Ocean.theme/ocean.css
   html/Ocean.theme/plus.gif
   html/Ocean.theme/synopsis.png
-  html/NewOcean.std-theme/new-ocean.css
-  html/NewOcean.std-theme/synopsis.png
+  html/Linuwial.std-theme/linuwial.css
+  html/Linuwial.std-theme/synopsis.png
   latex/haddock.sty
 
 library
@@ -172,8 +172,8 @@ test-suite spec
                , ghc-paths       ^>= 0.1.0.9
                , haddock-library ^>= 1.8.0
                , xhtml           ^>= 3000.2.2
-               , hspec           >= 2.4.4 && < 2.6
-               , QuickCheck      ^>= 2.11
+               , hspec           >= 2.4.4 && < 2.7
+               , QuickCheck      >= 2.11  && < 2.13
 
   -- Versions for the dependencies below are transitively pinned by
   -- the non-reinstallable `ghc` package and hence need no version
@@ -190,7 +190,7 @@ test-suite spec
                , transformers
 
   build-tool-depends:
-    hspec-discover:hspec-discover >= 2.4.4 && < 2.6
+    hspec-discover:hspec-discover >= 2.4.4 && < 2.7
 
 source-repository head
   type:     git

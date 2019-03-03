@@ -75,7 +75,7 @@ test-suite spec
 
   build-depends:
     , base-compat  ^>= 0.9.3 || ^>= 0.10.0
-    , QuickCheck   ^>= 2.11.3
+    , QuickCheck   ^>= 2.11  || ^>= 2.12
     , deepseq      ^>= 1.3.0.0 || ^>= 1.4.0.0
 
   -- NB: build-depends & build-tool-depends have independent
@@ -83,10 +83,10 @@ test-suite spec
   --     version of `hspec` & `hspec-discover` to ensure
   --     intercompatibility
   build-depends:
-    , hspec                         ^>= 2.5.5
+    , hspec                          >= 2.4.4    && < 2.7
 
   build-tool-depends:
-    , hspec-discover:hspec-discover ^>= 2.5.5
+    , hspec-discover:hspec-discover  >= 2.4.4    && < 2.7
 
 test-suite fixtures
   type:             exitcode-stdio-1.0
@@ -94,7 +94,6 @@ test-suite fixtures
   main-is:          Fixtures.hs
   ghc-options:      -Wall
   hs-source-dirs:   fixtures
-  buildable:        False
   build-depends:
       -- intra-package dependency
     , haddock-library

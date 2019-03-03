@@ -11,7 +11,7 @@ html {
 
 body {
   background: #fefefe;
-  color: #333;
+  color: #111;
   text-align: left;
   min-height: 100vh;
   position: relative;
@@ -234,7 +234,7 @@ Display the package name on top of the menu links and center both elements:
  */
 
  body, button {
-   font: 400 15px/1.4 'PT Sans',
+   font: 400 14px/1.4 'PT Sans',
      /* Fallback Font Stack */
      -apple-system,
 	  BlinkMacSystemFont,
@@ -390,6 +390,8 @@ pre {
   margin: 1em 0 0 0;
   background-color: #f7f7f7;
   overflow: auto;
+  border: 1px solid #ddd;
+  border-radius: 0.3em;
 }
 
 pre + p {
@@ -400,8 +402,15 @@ pre + pre {
   margin-top: 0.5em;
 }
 
+blockquote {
+  border-left: 3px solid #c7a5d3;
+  background-color: #eee4f1;
+  margin: 0.5em;
+  padding: 0.0005em 0.3em 0.5em 0.5em;
+}
+
 .src {
-  background: #f4f4f4;
+  background: #f2f2f2;
   padding: 0.2em 0.5em;
 }
 
@@ -461,42 +470,10 @@ table.info {
   text-align: right;
 }
 
-div#style-menu-holder {
-  position: relative;
-  z-index: 2;
-  display: inline;
-}
-
-#style-menu {
-  position: absolute;
-  z-index: 1;
-  overflow: visible;
-  background: #374c5e;
-  margin: 0;
-  text-align: center;
-  right: 0;
-  padding: 0;
-  top: 1.25em;
-}
-
 #style-menu li {
-	display: inline-block;
+	display: block;
 	border-style: none;
-	margin: 0;
-	padding: 0;
-	color: #000;
 	list-style-type: none;
-	border-top: 1px solid #919191
-}
-
-#style-menu li + li {
-	border-left: 1px solid #919191;
-}
-
-#style-menu a {
-  width: 6em;
-  padding: 3px;
-  display: block;
 }
 
 #footer {
@@ -526,7 +503,7 @@ div#style-menu-holder {
 }
 
 #contents-list {
-  background:  #f7f7f7;
+  background: #f4f4f4;
   padding: 1em;
   margin: 0;
 }
@@ -886,6 +863,15 @@ div#style-menu-holder {
   background: -o-linear-gradient(top, transparent 0%, transparent 0%, #fbf36d 0%, #fbf36d 100%);
   background: -ms-linear-gradient(top, transparent 0%, transparent 0%, #fbf36d 0%, #fbf36d 100%);
   background: linear-gradient(to bottom, transparent 0%, transparent 0%, #fbf36d 0%, #fbf36d 100%);
+}
+
+/* @end */
+
+/* @group Dropdown menus */
+
+#preferences-menu, #style-menu {
+  width: 25em;
+  overflow-y: auto;
 }
 
 /* @end */

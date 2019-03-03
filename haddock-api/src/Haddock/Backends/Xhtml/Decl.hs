@@ -133,8 +133,8 @@ ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep)
     curname = getName <$> listToMaybe docnames
 
 
--- This splits up a type signature along `->` and adds docs (when they exist) to
--- the arguments.
+-- | This splits up a type signature along @->@ and adds docs (when they exist)
+-- to the arguments.
 --
 -- If one passes in a list of the available subdocs, any top-level `HsRecTy`
 -- found will be expanded out into their fields.
@@ -152,9 +152,7 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_args 0 sep typ
 
     do_args :: Int -> Html -> HsType DocNameI -> [SubDecl]
     do_args n leader (HsForAllTy _ tvs ltype)
-      = do_largs n leader' ltype
-      where
-        leader' = leader <+> ppForAll tvs unicode qual
+      = do_largs n (leader <+> ppForAllPart unicode qual tvs) ltype
 
     do_args n leader (HsQualTy _ lctxt ltype)
       | null (unLoc lctxt)
@@ -187,15 +185,6 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_args 0 sep typ
     gadtEnd = concatHtml (replicate (if unicode then 2 else 3) spaceHtml) <> toHtml "}"
     gadtOpen = toHtml "{"
 
-
-
-ppForAll :: [LHsTyVarBndr DocNameI] -> Unicode -> Qualification -> Html
-ppForAll tvs unicode qual =
-  case [ppKTv n k | L _ (KindedTyVar _ (L _ n) k) <- tvs] of
-    [] -> noHtml
-    ts -> forallSymbol unicode <+> hsep ts +++ dot
-  where ppKTv n k = parens $
-          ppTyName (getName n) <+> dcolon unicode <+> ppLKind unicode qual k
 
 ppFixities :: [(DocName, Fixity)] -> Qualification -> Html
 ppFixities [] _ = noHtml
@@ -259,10 +248,6 @@ ppTypeSig summary nms pp_ty unicode =
   concatHtml htmlNames <+> dcolon unicode <+> pp_ty
   where
     htmlNames = intersperse (stringToHtml ", ") $ map (ppBinder summary) nms
-
-
-ppTyName :: Name -> Html
-ppTyName = ppName Prefix
 
 
 ppSimpleSig :: LinksInfo -> Splice -> Unicode -> Qualification -> HideEmptyContexts -> SrcSpan
@@ -821,24 +806,23 @@ ppShortConstrParts :: Bool -> Bool -> ConDecl DocNameI -> Unicode -> Qualificati
 ppShortConstrParts summary dataInst con unicode qual
   = case con of
       ConDeclH98{ con_args = det
-                , con_ex_tvs = vars
+                , con_ex_tvs = tyVars
+                , con_forall = L _ forall_
                 , con_mb_cxt = cxt
-                } -> let tyVars = map (getName . hsLTyVarName) vars
-                         context = unLoc (fromMaybe (noLoc []) cxt)
-                         forall_ = False
+                } -> let context = unLoc (fromMaybe (noLoc []) cxt)
                          header_ = ppConstrHdr forall_ tyVars context unicode qual
                      in case det of
 
         -- Prefix constructor, e.g. 'Just a'
         PrefixCon args ->
-          ( header_ +++ hsep (ppOcc : map (ppLParendType unicode qual HideEmptyContexts) args)
+          ( header_ <+> hsep (ppOcc : map (ppLParendType unicode qual HideEmptyContexts) args)
           , noHtml
           , noHtml
           )
 
         -- Record constructor, e.g. 'Identity { runIdentity :: a }'
         RecCon (L _ fields) ->
-          ( header_ +++ ppOcc <+> char '{'
+          ( header_ <+> ppOcc <+> char '{'
           , shortSubDecls dataInst [ ppShortField summary unicode qual field
                                    | L _ field <- fields
                                    ]
@@ -847,7 +831,7 @@ ppShortConstrParts summary dataInst con unicode qual
 
         -- Infix constructor, e.g. 'a :| [a]'
         InfixCon arg1 arg2 ->
-          ( header_ +++ hsep [ ppLParendType unicode qual HideEmptyContexts arg1
+          ( header_ <+> hsep [ ppLParendType unicode qual HideEmptyContexts arg1
                              , ppOccInfix
                              , ppLParendType unicode qual HideEmptyContexts arg2
                              ]
@@ -895,28 +879,27 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
 
     decl = case con of
       ConDeclH98{ con_args = det
-                , con_ex_tvs = vars
+                , con_ex_tvs = tyVars
+                , con_forall = L _ forall_
                 , con_mb_cxt = cxt
-                } -> let tyVars = map (getName . hsLTyVarName) vars
-                         context = unLoc (fromMaybe (noLoc []) cxt)
-                         forall_ = False
+                } -> let context = unLoc (fromMaybe (noLoc []) cxt)
                          header_ = ppConstrHdr forall_ tyVars context unicode qual
                      in case det of
         -- Prefix constructor, e.g. 'Just a'
         PrefixCon args
-          | hasArgDocs -> header_ +++ ppOcc <+> fixity
-          | otherwise -> hsep [ header_ +++ ppOcc
+          | hasArgDocs -> header_ <+> ppOcc <+> fixity
+          | otherwise -> hsep [ header_ <+> ppOcc
                               , hsep (map (ppLParendType unicode qual HideEmptyContexts) args)
                               , fixity
                               ]
 
         -- Record constructor, e.g. 'Identity { runIdentity :: a }'
-        RecCon _ -> header_ +++ ppOcc <+> fixity
+        RecCon _ -> header_ <+> ppOcc <+> fixity
 
         -- Infix constructor, e.g. 'a :| [a]'
         InfixCon arg1 arg2
-          | hasArgDocs -> header_ +++ ppOcc <+> fixity
-          | otherwise -> hsep [ header_ +++ ppLParendType unicode qual HideEmptyContexts arg1
+          | hasArgDocs -> header_ <+> ppOcc <+> fixity
+          | otherwise -> hsep [ header_ <+> ppLParendType unicode qual HideEmptyContexts arg1
                               , ppOccInfix
                               , ppLParendType unicode qual HideEmptyContexts arg2
                               , fixity
@@ -969,17 +952,17 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
 
 
 -- ppConstrHdr is for (non-GADT) existentials constructors' syntax
-ppConstrHdr :: Bool               -- ^ print explicit foralls
-            -> [Name]             -- ^ type variables
-            -> HsContext DocNameI -- ^ context
-            -> Unicode -> Qualification -> Html
+ppConstrHdr
+  :: Bool                    -- ^ print explicit foralls
+  -> [LHsTyVarBndr DocNameI] -- ^ type variables
+  -> HsContext DocNameI      -- ^ context
+  -> Unicode -> Qualification
+  -> Html
 ppConstrHdr forall_ tvs ctxt unicode qual = ppForall +++ ppCtxt
   where
     ppForall
       | null tvs || not forall_ = noHtml
-      | otherwise = forallSymbol unicode
-                      <+> hsep (map (ppName Prefix) tvs)
-                      <+> toHtml ". "
+      | otherwise = ppForAllPart unicode qual tvs
 
     ppCtxt
       | null ctxt = noHtml
@@ -1186,7 +1169,7 @@ ppr_mono_ty (HsTupleTy _ con tys) u q _ =
 ppr_mono_ty (HsSumTy _ tys) u q _ =
   sumParens (map (ppLType u q HideEmptyContexts) tys)
 ppr_mono_ty (HsKindSig _ ty kind) u q e =
-  parens (ppr_mono_lty ty u q e <+> dcolon u <+> ppLKind u q kind)
+  ppr_mono_lty ty u q e <+> dcolon u <+> ppLKind u q kind
 ppr_mono_ty (HsListTy _ ty)       u q _ = brackets (ppr_mono_lty ty u q HideEmptyContexts)
 ppr_mono_ty (HsIParamTy _ (L _ n) ty) u q _ =
   ppIPName n <+> dcolon u <+> ppr_mono_lty ty u q HideEmptyContexts

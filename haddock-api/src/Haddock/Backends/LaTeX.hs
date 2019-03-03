@@ -461,7 +461,7 @@ ppTypeOrFunSig typ (doc, argDocs) (pref1, pref2, sep0) unicode
         text "\\end{tabulary}\\par" $$
         fromMaybe empty (documentationToLaTeX doc)
 
--- This splits up a type signature along `->` and adds docs (when they exist)
+-- | This splits up a type signature along @->@ and adds docs (when they exist)
 -- to the arguments. The output is a list of (leader/seperator, argument and
 -- its doc)
 ppSubSigLike :: Bool                  -- ^ unicode
@@ -477,13 +477,10 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_args 0 leader typ
     arg_doc n = rDoc . fmap _doc $ Map.lookup n argDocs
 
     do_args :: Int -> LaTeX -> HsType DocNameI -> [(LaTeX, LaTeX)]
-    do_args _n leader (HsForAllTy _ tvs ltype)
-      = [ ( decltt leader
-          , decltt (hsep (forallSymbol unicode : ppTyVars tvs ++ [dot]))
-              <+> ppLType unicode ltype
-          ) ]
+    do_args n leader (HsForAllTy _ tvs ltype)
+      = do_largs n (leader <+> decltt (ppForAllPart unicode tvs)) ltype
     do_args n leader (HsQualTy _ lctxt ltype)
-      = (decltt leader, ppLContextNoArrow lctxt unicode <+> nl)
+      = (decltt leader, decltt (ppLContextNoArrow lctxt unicode) <+> nl)
         : do_largs n (darrow unicode) ltype
 
     do_args n leader (HsFunTy _ (L _ (HsRecTy _ fields)) r)
@@ -515,8 +512,9 @@ ppTypeSig nms ty unicode =
     <+> ppType unicode ty
 
 
-ppTyVars :: [LHsTyVarBndr DocNameI] -> [LaTeX]
-ppTyVars = map (ppSymName . getName . hsLTyVarName)
+-- | Pretty-print type variables.
+ppTyVars :: Bool -> [LHsTyVarBndr DocNameI] -> [LaTeX]
+ppTyVars unicode tvs = map (ppHsTyVarBndr unicode . unLoc) tvs
 
 
 tyvarNames :: LHsQTyVars DocNameI -> [Name]
@@ -719,15 +717,21 @@ ppDataDecl pats instances subdocs doc dataDecl unicode =
 
 
 -- ppConstrHdr is for (non-GADT) existentials constructors' syntax
-ppConstrHdr :: Bool -> [Name] -> HsContext DocNameI -> Bool -> LaTeX
-ppConstrHdr forall tvs ctxt unicode
- = (if null tvs then empty else ppForall)
-   <+>
-   (if null ctxt then empty else ppContextNoArrow ctxt unicode <+> darrow unicode <+> text " ")
+ppConstrHdr
+  :: Bool                    -- ^ print explicit foralls
+  -> [LHsTyVarBndr DocNameI] -- ^ type variables
+  -> HsContext DocNameI      -- ^ context
+  -> Bool                    -- ^ unicode
+  -> LaTeX
+ppConstrHdr forall_ tvs ctxt unicode = ppForall <> ppCtxt
   where
-    ppForall = case forall of
-      True  -> forallSymbol unicode <+> hsep (map ppName tvs) <+> text ". "
-      False -> empty
+    ppForall
+      | null tvs || not forall_ = empty
+      | otherwise = ppForAllPart unicode tvs
+
+    ppCtxt
+      | null ctxt = empty
+      | otherwise = ppContextNoArrow ctxt unicode <+> darrow unicode <> space
 
 
 -- | Pretty-print a constructor
@@ -756,11 +760,10 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
     -- First line of the constructor (no doc, no fields, single-line)
     decl = case con of
       ConDeclH98{ con_args = det
-                , con_ex_tvs = vars
+                , con_ex_tvs = tyVars
+                , con_forall = L _ forall_
                 , con_mb_cxt = cxt
-                } -> let tyVars = map (getName . hsLTyVarName) vars
-                         context = unLoc (fromMaybe (noLoc []) cxt)
-                         forall_ = False
+                } -> let context = unLoc (fromMaybe (noLoc []) cxt)
                          header_ = ppConstrHdr forall_ tyVars context unicode
                      in case det of
         -- Prefix constructor, e.g. 'Just a'
@@ -1023,13 +1026,17 @@ ppKind unicode ki = ppr_mono_ty (reparenTypePrec PREC_TOP ki) unicode
 -- Drop top-level for-all type variables in user style
 -- since they are implicit in Haskell
 
+ppForAllPart :: Bool -> [LHsTyVarBndr DocNameI] -> LaTeX
+ppForAllPart unicode tvs = hsep (forallSymbol unicode : ppTyVars unicode tvs) <> dot
+
+
 ppr_mono_lty :: LHsType DocNameI -> Bool -> LaTeX
 ppr_mono_lty ty unicode = ppr_mono_ty (unLoc ty) unicode
 
 
 ppr_mono_ty :: HsType DocNameI -> Bool -> LaTeX
 ppr_mono_ty (HsForAllTy _ tvs ty) unicode
-  = sep [ hsep (forallSymbol unicode : ppTyVars tvs) <> dot
+  = sep [ ppForAllPart unicode tvs
         , ppr_mono_lty ty unicode ]
 ppr_mono_ty (HsQualTy _ ctxt ty) unicode
   = sep [ ppLContext ctxt unicode
@@ -1043,7 +1050,7 @@ ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
 ppr_mono_ty (HsTyVar _ IsPromoted  (L _ name)) _ = char '\'' <> ppDocName name
 ppr_mono_ty (HsTupleTy _ con tys) u = tupleParens con (map (ppLType u) tys)
 ppr_mono_ty (HsSumTy _ tys) u       = sumParens (map (ppLType u) tys)
-ppr_mono_ty (HsKindSig _ ty kind) u = parens (ppr_mono_lty ty u <+> dcolon u <+> ppLKind u kind)
+ppr_mono_ty (HsKindSig _ ty kind) u = ppr_mono_lty ty u <+> dcolon u <+> ppLKind u kind
 ppr_mono_ty (HsListTy _ ty)       u = brackets (ppr_mono_lty ty u)
 ppr_mono_ty (HsIParamTy _ (L _ n) ty) u = ppIPName n <+> dcolon u <+> ppr_mono_lty ty u
 ppr_mono_ty (HsSpliceTy {})     _ = error "ppr_mono_ty HsSpliceTy"

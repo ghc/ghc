@@ -4,7 +4,7 @@
      /><meta name="viewport" content="width=device-width, initial-scale=1"
      /><title
     >FunArgs</title
-    ><link href="#" rel="stylesheet" type="text/css" title="NewOcean"
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
      /><link rel="stylesheet" type="text/css" href="#"
      /><link rel="stylesheet" type="text/css" href="#"
      /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
@@ -58,7 +58,9 @@
 	    ><table
 	    ><tr
 	      ><td class="src"
-		>:: <a href="#" title="Data.Ord"
+		>:: <span class="keyword"
+		  >forall</span
+		  > a. <a href="#" title="Data.Ord"
 		  >Ord</a
 		  > a</td
 		><td class="doc empty"
@@ -170,7 +172,9 @@
 	    ><table
 	    ><tr
 	      ><td class="src"
-		>:: a</td
+		>:: <span class="keyword"
+		  >forall</span
+		  > a b c. a</td
 		><td class="doc"
 		><p
 		  >First argument</p
@@ -194,7 +198,9 @@
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; d</td
+		>-&gt; <span class="keyword"
+		  >forall</span
+		  > d. d</td
 		><td class="doc"
 		><p
 		  >Result</p
@@ -218,7 +224,7 @@
 	      ><td class="src"
 		>:: <span class="keyword"
 		  >forall</span
-		  > (b :: ()). d ~ '<a href="#" title="GHC.Tuple"
+		  > a (b :: ()) d. d ~ '<a href="#" title="GHC.Tuple"
 		  >()</a
 		  ></td
 		><td class="doc empty"
@@ -226,7 +232,9 @@
 		></tr
 	      ><tr
 	      ><td class="src"
-		>=&gt; a b c d</td
+		>=&gt; <span class="keyword"
+		  >forall</span
+		  > c. a b c d</td
 		><td class="doc"
 		><p
 		  >abcd</p
@@ -258,7 +266,7 @@
 	      ><td class="src"
 		>:: <span class="keyword"
 		  >forall</span
-		  > (a :: ()). proxy a</td
+		  > proxy (a :: ()) b. proxy a</td
 		><td class="doc"
 		><p
 		  >First argument</p

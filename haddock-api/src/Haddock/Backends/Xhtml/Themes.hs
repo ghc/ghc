@@ -58,7 +58,7 @@ standardTheme :: FilePath -> IO PossibleThemes
 standardTheme libDir = liftM (liftEither (take 1)) (defaultThemes libDir)
 
 
--- | Default themes that are part of Haddock; added with --default-themes
+-- | Default themes that are part of Haddock; added with @--built-in-themes@
 -- The first theme in this list is considered the standard theme.
 -- Themes are "discovered" by scanning the html sub-dir of the libDir,
 -- and looking for directories with the extension .theme or .std-theme.

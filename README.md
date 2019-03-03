@@ -82,9 +82,9 @@ cabal test
 
 ```bash
 stack init
-stack install
+stack build
 # run the test suite
-export HADDOCK_PATH="$HOME/.local/bin/haddock"
+export HADDOCK_PATH="$(stack exec which haddock)"
 stack test
 ```
 
