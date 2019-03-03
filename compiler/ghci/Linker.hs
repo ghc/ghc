@@ -16,7 +16,8 @@ module Linker ( getHValue, showLinkerState,
                 extendLinkEnv, deleteFromLinkEnv,
                 extendLoadedPkgs,
                 linkPackages, initDynLinker, linkModule,
-                linkCmdLineLibs
+                linkCmdLineLibs,
+                uninitializedLinker
         ) where
 
 #include "HsVersions.h"
@@ -86,9 +87,9 @@ import Foreign (Ptr)
 
 {-
 The persistent linker state *must* match the actual state of the
-C dynamic linker at all times, so we keep it in a private global variable.
+C dynamic linker at all times.
 
-The global IORef used for PersistentLinkerState actually contains another MVar,
+The IORef used for PersistentLinkerState actually contains another MVar,
 which in turn contains a Maybe PersistentLinkerState. The MVar serves to ensure
 mutual exclusion between multiple loaded copies of the GHC library. The Maybe
 may be Nothing to indicate that the linker has not yet been initialised.
@@ -96,17 +97,6 @@ may be Nothing to indicate that the linker has not yet been initialised.
 The PersistentLinkerState maps Names to actual closures (for
 interpreted code only), for use during linking.
 -}
-#if STAGE < 2
-GLOBAL_VAR_M( v_PersistentLinkerState
-            , newMVar Nothing
-            , MVar (Maybe PersistentLinkerState))
-#else
-SHARED_GLOBAL_VAR_M( v_PersistentLinkerState
-                   , getOrSetLibHSghcPersistentLinkerState
-                   , "getOrSetLibHSghcPersistentLinkerState"
-                   , newMVar Nothing
-                   , MVar (Maybe PersistentLinkerState))
-#endif
 
 uninitializedLinker :: IO DynLinker
 uninitializedLinker =
