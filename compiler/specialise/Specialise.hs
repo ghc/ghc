@@ -706,7 +706,8 @@ specImport dflags this_mod top_env done callers rb fn calls_for_fn
        ; hsc_env <- getHscEnv
        ; eps <- liftIO $ hscEPS hsc_env
        ; vis_orphs <- getVisibleOrphanMods
-       ; let full_rb = unionRuleBase rb (eps_rule_base eps)
+       ; let ignore_pragmas = gopt Opt_IgnoreInterfacePragmas dflags
+       ; let full_rb = unionRuleBase rb (epsRuleBase ignore_pragmas eps)
              rules_for_fn = getRules (RuleEnv full_rb vis_orphs) fn
 
        ; (rules1, spec_pairs, uds)

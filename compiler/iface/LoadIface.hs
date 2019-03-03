@@ -78,6 +78,7 @@ import FieldLabel
 import RnModIface
 import UniqDSet
 import Plugins
+import CoreSyn (CoreRule)
 
 import Control.Monad
 import Control.Exception
@@ -399,8 +400,11 @@ loadInterface doc_str mod from
        -- Redo search for our local hole module
        loadInterface doc_str (mkModule (thisPackage dflags) (moduleName mod)) from
   | otherwise
-  = do  {       -- Read the state
-          (eps,hpt) <- getEpsAndHpt
+  = do  { -- Check if there are modules, where the optimization info has not yet
+          -- been loaded. See Note [Changing Optimization Level]
+        ; condLoadAllIgnoredIfOptData doc_str
+          -- Read the state
+        ; (eps,hpt) <- getEpsAndHpt
         ; gbl_env <- getGblEnv
 
         ; traceIf (text "Considering whether to load" <+> ppr mod <+> ppr from)
@@ -486,6 +490,19 @@ loadInterface doc_str mod from
                             -- See Note [Loading your own hi-boot file]
                             -- in MkIface.
 
+
+        ; let add_mod = ignore_prags && not (mi_boot iface)
+              has_opt_data =  not (null (mi_decls iface))
+                           || not (null (mi_decls iface))
+              -- Do not add a module that has no optimization data
+              addModToIgnored add_mod has_opt_data mod ignored_mods
+                | add_mod && has_opt_data  = mod : ignored_mods
+                | otherwise                = ignored_mods
+              msg True  True  = "added to list of modules with ignored opt data."
+              msg _     False = "ignored (no optimizaton data available)."
+              msg False True  = "optimization data processed."
+        ; traceIf (ppr mod <+> text (msg add_mod has_opt_data))
+
         ; WARN( bad_boot, ppr mod )
           updateEps_  $ \ eps ->
            if elemModuleEnv mod (eps_PIT eps) || is_external_sig dflags iface
@@ -499,6 +516,8 @@ loadInterface doc_str mod from
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
+                  eps_ignored_mods = addModToIgnored add_mod has_opt_data
+                                         mod (eps_ignored_mods eps),
                   eps_complete_matches
                                    = extendCompleteMatchMap
                                          (eps_complete_matches eps)
@@ -729,6 +748,82 @@ badSourceImport mod
   = hang (text "You cannot {-# SOURCE #-} import a module from another package")
        2 (text "but" <+> quotes (ppr mod) <+> ptext (sLit "is from package")
           <+> quotes (ppr (moduleUnitId mod)))
+
+{-
+Note [Changing Optimization Level]
+-----------------------------------
+
+When the optimization level is -O0 then the flag
+Opt_IgnoreInterfacePragmas is True, and GHC ignores
+optimization data like rewrite rules or inline pragmas from the
+interface files.
+
+Later when the optmization level of a GHC run changes from -O0 to
+-O1 or O2 (either in GHCi with a :set command or in GHC with different
+OPTIONS_GHC pragmas for different modules) then the flag
+Opt_IgnoreInterfacePragmas is set to False and GHC will process the
+interface file and store the optimization data from the interface files.
+
+However the optimization data from interface modules processed
+while the Opt_IgnoreInterfacePragmas was True is missing!
+
+Therefore, when we don't process the optimization data then we add the module
+to the list eps_ignored_mods. When the flag Opt_IgnoreInterfacePragmas
+changes, we reprocess the interface files for the modules in eps_ignored_mods
+and store the optimization data.
+
+In compiler/main/HscTypes.hs there are wrapper functions epsRuleBase and
+epsPTE to access the fields eps_rule_base and eps_PTE. They return the data
+according to the Opt_IgnoreInterfacePragmas flag.
+
+A simpler solution would be, just to read and store always ALL the optimization
+data and just to use the wrapper functions. This was rejected in patch
+https://phabricator.haskell.org/D2485 due to performance considerations.
+However, there Simon Marlow suggested the solution now implemented.
+
+See also #13002.
+-}
+
+-- | Check, whether ignored optimization data from the interface files
+--   should be loaded.
+condLoadAllIgnoredIfOptData :: SDoc -> IfM lcl ()
+condLoadAllIgnoredIfOptData doc_str = do
+    ignore_pragmas <- goptM Opt_IgnoreInterfacePragmas
+    unless ignore_pragmas $ do
+        eps <- getEps
+        let ignored_mods = eps_ignored_mods eps
+        unless (null ignored_mods)
+            (loadAllIgnoredIfOptData doc_str ignored_mods)
+
+-- | Load and store all the ignored optmization data from the interface files.
+loadAllIgnoredIfOptData :: SDoc -> [Module] -> IfM lcl ()
+loadAllIgnoredIfOptData doc_str mods = do
+    declrules <- mapM (loadIgnoredModuleOptData doc_str) $ reverse mods
+    let (decls, rules) = unzip declrules
+    updateEps_ (\eps -> eps {
+        eps_PTE = foldl addDeclsToPTE (eps_PTE eps) decls,
+        eps_rule_base = foldl extendRuleBaseList  (eps_rule_base eps) rules,
+        eps_ignored_mods = [] })
+
+-- | Load and return optmization data from one module.
+loadIgnoredModuleOptData  ::
+    SDoc -> Module -> IfM lcl ([(Name,TyThing)], [CoreRule])
+loadIgnoredModuleOptData doc_str mod = do
+  read_result <- computeInterface doc_str False mod
+  case read_result of
+      Failed err -> panic
+                      "Couldn't reload iface from previously loaded module "
+                        (ppr mod <+> err)
+      Succeeded (iface, loc) ->
+        let
+          loc_doc = text loc
+        in
+          initIfaceLcl (mi_semantic_module iface) loc_doc (mi_boot iface) $ do
+              traceIf (text "Module" <+> ppr mod
+                    <+> text "Performance pragmas reprocessed.")
+              decls <- loadDecls False $ mi_decls iface
+              rules <- tcIfaceRules False $ mi_rules iface
+              return (decls, rules)
 
 -----------------------------------------------------
 --      Loading type/class/value decls
@@ -1017,8 +1112,10 @@ initExternalPackageState
       eps_PTE              = emptyTypeEnv,
       eps_inst_env         = emptyInstEnv,
       eps_fam_inst_env     = emptyFamInstEnv,
-      eps_rule_base        = mkRuleBase builtinRules,
+      eps_rule_base        = defaultRules,
+      eps_rule_builtin     = defaultRules,
         -- Initialise the EPS rule pool with the built-in rules
+      eps_ignored_mods      = [],
       eps_mod_fam_inst_env
                            = emptyModuleEnv,
       eps_complete_matches = emptyUFM,
@@ -1027,6 +1124,8 @@ initExternalPackageState
                            , n_insts_in = 0, n_insts_out = 0
                            , n_rules_in = length builtinRules, n_rules_out = 0 }
     }
+    where
+      defaultRules = mkRuleBase builtinRules
 
 {-
 *********************************************************
