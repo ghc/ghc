@@ -703,7 +703,9 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                 -- behind the scenes.  Otherwise there's a danger we'll simply
                 -- miss the rules for Ids hidden inside imported inlinings
            eps <- hscEPS hsc_env ;
-           let  { rule_base1 = unionRuleBase hpt_rule_base (eps_rule_base eps)
+           let { ignore_pragmas = gopt Opt_IgnoreInterfacePragmas dflags
+                ; rule_base1 = unionRuleBase hpt_rule_base
+                                     (epsRuleBase ignore_pragmas eps)
                 ; rule_base2 = extendRuleBaseList rule_base1 rules
                 ; fam_envs = (eps_fam_inst_env eps, fam_inst_env)
                 ; vis_orphs = this_mod : dep_orphs deps } ;

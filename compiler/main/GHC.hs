@@ -1146,7 +1146,9 @@ getPackageModuleInfo hsc_env mdl
         iface <- hscGetModuleInterface hsc_env mdl
         let
             avails = mi_exports iface
-            pte    = eps_PTE eps
+            dflags = hsc_dflags hsc_env
+            ignore_pragmas = gopt Opt_IgnoreInterfacePragmas dflags
+            pte    = epsPTE ignore_pragmas eps
             tys    = [ ty | name <- concatMap availNames avails,
                             Just ty <- [lookupTypeEnv pte name] ]
         --
@@ -1213,8 +1215,10 @@ modInfoLookupName minf name = withSession $ \hsc_env -> do
      Just tyThing -> return (Just tyThing)
      Nothing      -> do
        eps <- liftIO $ readIORef (hsc_EPS hsc_env)
+       dflags <- getDynFlags
+       let ignore_pragmas = gopt Opt_IgnoreInterfacePragmas dflags
        return $! lookupType (hsc_dflags hsc_env)
-                            (hsc_HPT hsc_env) (eps_PTE eps) name
+                            (hsc_HPT hsc_env) (epsPTE ignore_pragmas eps) name
 
 modInfoIface :: ModuleInfo -> Maybe ModIface
 modInfoIface = minf_iface

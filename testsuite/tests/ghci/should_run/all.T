@@ -32,6 +32,8 @@ test('T12128',     just_ghci, ghci_script, ['T12128.script'])
 test('T12456',     just_ghci, ghci_script, ['T12456.script'])
 test('T12525',     just_ghci, ghci_script, ['T12525.script'])
 test('T12549',     just_ghci, ghci_script, ['T12549.script'])
+test('T13002', [just_ghci, extra_hc_opts("-fobject-code -ddump-rule-firings")],
+                              ghci_script, ['T13002.script'])
 test('BinaryArray', normal, compile_and_run, [''])
 test('T14125a',    just_ghci, ghci_script, ['T14125a.script'])
 test('T13825-ghci',just_ghci, ghci_script, ['T13825-ghci.script'])
