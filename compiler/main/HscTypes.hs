@@ -51,6 +51,7 @@ module HscTypes (
         ExternalPackageState(..), EpsStats(..), addEpsInStats,
         PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
         lookupIfaceByModule, emptyModIface, lookupHptByModule,
+        epsRuleBase, epsPTE,
 
         PackageInstEnv, PackageFamInstEnv, PackageRuleBase,
         PackageCompleteMatchMap,
@@ -2592,6 +2593,11 @@ data ExternalPackageState
                                                -- from all the external-package modules
         eps_rule_base    :: !PackageRuleBase,  -- ^ The total 'RuleEnv' accumulated
                                                -- from all the external-package modules
+
+        eps_rule_builtin :: !PackageRuleBase,  -- ^ The 'RuleEnv' containing only
+                                               -- the Builtin rules
+        eps_ignored_mods :: ![Module],        -- ^ Modules, where we ignored the
+                                               -- optimization data from the mi record
         eps_ann_env      :: !PackageAnnEnv,    -- ^ The total 'AnnEnv' accumulated
                                                -- from all the external-package modules
         eps_complete_matches :: !PackageCompleteMatchMap,
@@ -2603,6 +2609,22 @@ data ExternalPackageState
 
         eps_stats :: !EpsStats                 -- ^ Stastics about what was loaded from external packages
   }
+
+-- | Wrapper function for read access to the field eps_rule_base.
+-- As a boolean parameter the dyn flag Opt_IgnoreInterfacePragmas is expected.
+-- See Note [Changing Optimization Level] in compiler/iface/LoadIface.hs
+epsRuleBase :: Bool ->  ExternalPackageState -> PackageRuleBase
+epsRuleBase ignore_prags
+   | ignore_prags = eps_rule_builtin
+   | otherwise    = eps_rule_base
+
+-- Wrapper function for read access to the field eps_PTE.
+-- As a boolean parameter the dyn flag Opt_IgnoreInterfacePragmas is expected.
+-- See Note [Changing Optimization Level] in compiler/iface/LoadIface.hs
+epsPTE :: Bool -> ExternalPackageState -> PackageTypeEnv
+epsPTE ignore_prags eps
+   | ignore_prags = emptyTypeEnv
+   | otherwise    = eps_PTE eps
 
 -- | Accumulated statistics about what we are putting into the 'ExternalPackageState'.
 -- \"In\" means stuff that is just /read/ from interface files,

@@ -1,0 +1,3 @@
+putStrLn "Start processing .ghci file"
+:set -O
+putStrLn "End processing .ghci file"

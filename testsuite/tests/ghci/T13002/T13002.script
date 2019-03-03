@@ -1,0 +1,5 @@
+:l T13002a.hs
+testa 5
+:set -O0
+:l T13002b.hs
+testb 5
