@@ -55,7 +55,8 @@ import HscMain (hscParseDeclsWithLocation, hscParseStmtWithLocation)
 import HsImpExp
 import HsSyn
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
-                  setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc )
+                  setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
+                  hsc_dynLinker )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
