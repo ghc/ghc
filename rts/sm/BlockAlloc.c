@@ -519,7 +519,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
         slop_low = group_size - ((uintptr_t)bd->start % group_size);
     }
 
-    W_ slop_high = (bd->blocks*BLOCK_SIZE) - group_size - slop_low;
+    W_ slop_high = (num_blocks * BLOCK_SIZE) - group_size - slop_low;
 
     ASSERT((slop_low % BLOCK_SIZE) == 0);
     ASSERT((slop_high % BLOCK_SIZE) == 0);
@@ -553,7 +553,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
 
     if (slop_high_blocks != 0) {
         bd = split_block_low(bd, n);
-        ASSERT(countBlocks(bd) == n);
+        ASSERT(bd->blocks == n);
     }
 
 #ifdef DEBUG
