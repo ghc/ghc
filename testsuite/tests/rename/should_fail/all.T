@@ -39,7 +39,7 @@ test('rnfail035', normal, compile_fail, [''])
 
 test('rnfail039', normal, compile_fail, [''])
 
-test('rnfail040', [extra_files(['Rnfail040_A.hs'])], multimod_compile_fail, ['rnfail040', '-v0'])
+test('rnfail040', [extra_files(['Rnfail040_A.hs']), normalise_version('base')], multimod_compile_fail, ['rnfail040', '-v0'])
 test('rnfail041', normal, compile_fail, [''])
 test('rnfail042', normal, compile_fail, [''])
 

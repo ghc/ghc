@@ -259,7 +259,7 @@ test('T12955', normal, makefile_test, [])
 
 test('T12971', ignore_stdout, makefile_test, [])
 test('json', normal, compile_fail, ['-ddump-json'])
-test('json2', normal, compile, ['-ddump-types -ddump-json'])
+test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddump-json'])
 test('T13604', [], makefile_test, [])
 test('T13604a', [], makefile_test, [])
 # omitting hpc and profasm because they affect the

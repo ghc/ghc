@@ -22,7 +22,8 @@ test('ghci006', [ combined_output,
                   unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
                 ghci_script, ['ghci006.script'])
 test('ghci007', combined_output, ghci_script, ['ghci007.script'])
-test('ghci008', combined_output, ghci_script, ['ghci008.script'])
+test('ghci008', [ combined_output,
+                  normalise_version('base') ], ghci_script, ['ghci008.script'])
 test('ghci009', combined_output, ghci_script, ['ghci009.script'])
 
 # Skip this test: deadlock cannot be detected now, because we wait for
