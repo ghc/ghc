@@ -74,10 +74,12 @@ import System.Win32.Info (getSystemDirectory)
 
 import Exception
 
+-- JL: temporarily commenting this out to see the effect on CI
+-- as it's currently complaining that it's included.
 -- needed for 2nd stage
-#if STAGE >= 2
-import Foreign (Ptr)
-#endif
+-- #if STAGE >= 2
+-- import Foreign (Ptr)
+-- #endif
 
 {- **********************************************************************
 
