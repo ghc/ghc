@@ -136,7 +136,9 @@ test('GhciKinds', normal, ghci_script, ['GhciKinds.script'])
 test('T5564', normal, ghci_script, ['T5564.script'])
 test('Defer02', extra_files(['../../typecheck/should_run/Defer01.hs']), ghci_script, ['Defer02.script'])
 test('T5820', normal, ghci_script, ['T5820.script'])
-test('T5836', normal, ghci_script, ['T5836.script'])
+test('T5836',
+     when(opsys('mingw32'), expect_broken(16387)),
+     ghci_script, ['T5836.script'])
 test('T5979',
     [reqlib('transformers'),
      normalise_slashes,
