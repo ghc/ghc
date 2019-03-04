@@ -245,7 +245,7 @@ test('T6006', [ omit_ways(prof_ways + ['ghci']),
 test('T7037', [], run_command, ['$MAKE -s --no-print-directory T7037'])
 
 test('T7087', exit_code(1), compile_and_run, [''])
-test('T7160', normal, compile_and_run, [''])
+test('T7160', [omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc'])], compile_and_run, [''])
 
 test('T7040', [omit_ways(['ghci'])], compile_and_run, ['T7040_c.c'])
 
