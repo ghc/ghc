@@ -45,4 +45,5 @@ test('big-obj', [extra_files(['big-obj-c.c', 'big-obj.hs']),
                     unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
      makefile_test, ['big-obj'])
 
-test('T3372', [unless(doing_ghci, skip)])
+test('T3372', [unless(doing_ghci, skip)],
+     makefile_test, ['T3372'])
