@@ -69,7 +69,7 @@ validate-x86_64-windows:
     - |
       git config user.email "ben+ghc-ci@smart-cactus.org"
       git config user.name "GHC GitLab CI"
-    - bash -c 'METRICS_FILE=`mktemp` && make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE && METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh'
+    - bash -c 'METRICS_FILE=`mktemp` && echo \$METRICS_FILE THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml && .gitlab/push-test-metrics.sh'
   cache:
     key: x86_64-windows
   tags:
