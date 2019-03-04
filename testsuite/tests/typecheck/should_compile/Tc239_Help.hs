@@ -20,4 +20,3 @@ instance Monad (WrapIO e) where
   m >>= f  = MkWrapIO (do x <- unwrap m
                           unwrap (f x) )
 
-  fail str = error str
