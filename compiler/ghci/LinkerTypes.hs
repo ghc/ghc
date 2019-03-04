@@ -15,21 +15,12 @@ import Control.Concurrent.MVar ( MVar )
 import Module                  ( InstalledUnitId, Module )
 import ByteCodeTypes           ( ItblEnv, CompiledByteCode )
 import Outputable
+import Var                     ( Id )
+import GHC.Fingerprint.Type    ( Fingerprint )
+import NameEnv                 ( NameEnv )
+import Name                    ( Name )
+import GHCi.RemoteTypes        ( ForeignHValue )
 
--- JDL: commented out the ByteCodeLink import because it was
--- creating a cyclic import, then manually extracted the code in
--- import ByteCodeLink (ClosureEnv)
-import NameEnv (NameEnv) -- for ClosureEnv
-import Name (Name) -- for ClosureEnv
-import GHCi.RemoteTypes (ForeignHValue) -- for ClosureEnv
-
-import Var (Id) -- for PersistentLinkerState
-import GHC.Fingerprint.Type (Fingerprint) -- for PersistentLinkerState
-
--- ClosureEnv came from ByteCodeLink, and is still in there.
--- Should I replicate like this, or extract? (my preference would be extract,
--- however I'd appreciate guidance for good module names / practice to extract to,
--- necessarily).
 type ClosureEnv = NameEnv (Name, ForeignHValue) 
 
 newtype DynLinker =
@@ -66,8 +57,6 @@ data PersistentLinkerState
 -- TODO: Make this type more precise
 type LinkerUnitId = InstalledUnitId
 
--- JL: From HscTypes, for PersistentLinkerState (moved)
-
 -- | Information we can use to dynamically link modules into the compiler
 data Linkable = LM {
   linkableTime     :: UTCTime,          -- ^ Time at which this linkable was built
@@ -89,8 +78,6 @@ instance Outputable Linkable where
      = (text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod)
        $$ nest 3 (ppr unlinkeds)
 
--- JL: From HscTypes, for PersistentLinkerState (moved)
-
 -- | Objects which have yet to be linked by the compiler
 data Unlinked
   = DotO FilePath      -- ^ An object file (.o)
@@ -102,13 +89,12 @@ data Unlinked
                        -- should be loaded along with the BCOs.
                        -- See Note [Grant plan for static forms] in
                        -- StaticPtrTable.
+
 instance Outputable Unlinked where
   ppr (DotO path)   = text "DotO" <+> text path
   ppr (DotA path)   = text "DotA" <+> text path
   ppr (DotDLL path) = text "DotDLL" <+> text path
   ppr (BCOs bcos spt) = text "BCOs" <+> ppr bcos <+> ppr spt
-
--- JL: From HscTypes, for PersistentLinkerState (moved)
 
 -- | An entry to be inserted into a module's static pointer table.
 -- See Note [Grand plan for static forms] in StaticPtrTable.

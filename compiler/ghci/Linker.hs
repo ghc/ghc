@@ -8,9 +8,8 @@
 --
 -- | The dynamic linker for GHCi.
 --
--- This module deals with the top-level issues of dynamic linking,
--- calling the object-code linker and the byte-code linker where
--- necessary.
+-- This module deals with the issues of dynamic linking, calling
+-- the object-code linker and the byte-code linker where necessary.
 module Linker ( getHValue, showLinkerState,
                 linkExpr, linkDecls, unload, withExtendedLinkEnv,
                 extendLinkEnv, deleteFromLinkEnv,
@@ -74,13 +73,6 @@ import System.Win32.Info (getSystemDirectory)
 
 import Exception
 
--- JL: temporarily commenting this out to see the effect on CI
--- as it's currently complaining that it's included.
--- needed for 2nd stage
--- #if STAGE >= 2
--- import Foreign (Ptr)
--- #endif
-
 {- **********************************************************************
 
                         The Linker's state
@@ -139,7 +131,6 @@ emptyPLS _ = PersistentLinkerState {
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
   where init_pkgs = map toInstalledUnitId [rtsUnitId]
-
 
 extendLoadedPkgs :: DynLinker -> [InstalledUnitId] -> IO ()
 extendLoadedPkgs dl pkgs =
