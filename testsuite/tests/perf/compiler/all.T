@@ -394,7 +394,8 @@ test ('T15164',
       ['-v0 -O'])
 
 test('T16190',
-      [ collect_stats()
+      [ collect_stats(),
+        when(opsys('mingw32'), expect_broken(16389))
       ],
       multimod_compile,
       ['T16190.hs', '-v0'])
