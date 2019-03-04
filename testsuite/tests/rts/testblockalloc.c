@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 extern bdescr *allocGroup_lock_lock(uint32_t n);
+extern bdescr *allocAlignedGroupOnNode (uint32_t node, W_ n);
 extern void freeGroup_lock(bdescr *p);
 
 const int ARRSIZE  = 256;
@@ -68,6 +69,34 @@ static void test_sequential_alloc(void)
     }
 }
 
+static void test_aligned_alloc(void)
+{
+    bdescr *a[ARRSIZE];
+
+    // this time, sweep forwards allocating new blocks, and then
+    // backwards deallocating them.
+    for (int i=0; i < LOOPS; i++)
+    {
+        for (int j=0; j < ARRSIZE; j++)
+        {
+            int b = (rand() % MAXALLOC) + 1;
+            a[j] = allocAlignedGroupOnNode(0, b);
+            if ((uintptr_t) a[j]->start % b != 0)
+            {
+                barf("%p is not aligned to allocation size %d", a[j], b);
+            }
+            IF_DEBUG(block_alloc, debugBelch("B%d,%d: allocated %p, %d blocks @ %p\n", i, j, a[j], b, a[j]->start));
+            DEBUG_ONLY(checkFreeListSanity());
+        }
+        for (int j=ARRSIZE-1; j >= 0; j--)
+        {
+            IF_DEBUG(block_alloc, debugBelch("B%d,%d: freeing %p, %d blocks @ %p\n", i, j, a[j], a[j]->blocks, a[j]->start));
+            freeGroup_lock(a[j]);
+            DEBUG_ONLY(checkFreeListSanity());
+        }
+    }
+}
+
 int main (int argc, char *argv[])
 {
     int i, j, b;
@@ -84,6 +113,7 @@ int main (int argc, char *argv[])
 
     test_random_alloc();
     test_sequential_alloc();
+    test_aligned_alloc();
 
     DEBUG_ONLY(checkFreeListSanity());
 
