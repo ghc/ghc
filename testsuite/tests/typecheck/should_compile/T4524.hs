@@ -174,6 +174,8 @@ instance  Monad Perhaps where
     (Succeeded _) >> k  =  k
     Unknown  >> k       =  k
     return              =  Succeeded
+
+instance MonadFail Perhaps where
     fail _              =  Unknown
 
 instance Alternative Perhaps where
