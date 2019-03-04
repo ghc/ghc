@@ -1,3 +1,4 @@
+-- | Types for the dynamic linker
 module LinkerTypes (
       DynLinker(..),
       PersistentLinkerState(..),
