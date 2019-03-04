@@ -36,7 +36,7 @@ test('SafeFlags14', normal, compile_fail, [''])
 
 test('SafeFlags15', normal, compile, [''])
 test('SafeFlags16', normal, compile, [''])
-test('SafeFlags17', normal, compile_fail, ['-distrust base'])
+test('SafeFlags17', normalise_version('base'), compile_fail, ['-distrust base'])
 test('SafeFlags18', normal, compile_fail, ['-trust base -Werror'])
 test('SafeFlags19', normal, compile_fail, [''])
 test('SafeFlags20', normal, compile, ['-trust base'])

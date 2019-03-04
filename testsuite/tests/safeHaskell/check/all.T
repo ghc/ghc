@@ -6,6 +6,7 @@ def f( name, opts ):
   opts.only_ways = ['normal']
 
 setTestOpts(f)
+setTestOpts(normalise_version('base'))
 
 test('CheckA', normal, compile, [''])
 test('CheckB', [], multimod_compile, ['CheckB', '-trust base'])
