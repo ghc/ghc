@@ -733,14 +733,30 @@ getLocalNonValBinders fixity_env
            ; return ([avail], flds) }
     new_assoc overload_ok (L _ (ClsInstD _ (ClsInstDecl { cid_poly_ty = inst_ty
                                                       , cid_datafam_insts = adts })))
-      | Just (L loc cls_rdr) <- getLHsInstDeclClass_maybe inst_ty
-      = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
-           ; (avails, fldss)
-                    <- mapAndUnzipM (new_loc_di overload_ok (Just cls_nm)) adts
-           ; return (avails, concat fldss) }
-      | otherwise
-      = return ([], [])    -- Do not crash on ill-formed instances
-                           -- Eg   instance !Show Int   Trac #3811c
+      = do -- First, attempt to grab the name of the class from the instance.
+           -- This step could fail if the instance is not headed by a class,
+           -- such as in the following examples:
+           --
+           -- (1) The class is headed by a bang pattern, such as in
+           --     `instance !Show Int` (Trac #3811c)
+           -- (2) The class is headed by a type variable, such as in
+           --     `instance c` (Trac #16385)
+           --
+           -- If looking up the class name fails, then mb_cls_nm will
+           -- be Nothing.
+           mb_cls_nm <- runMaybeT $ do
+             -- See (1) above
+             L loc cls_rdr <- MaybeT $ pure $ getLHsInstDeclClass_maybe inst_ty
+             -- See (2) above
+             MaybeT $ setSrcSpan loc $ lookupGlobalOccRn_maybe cls_rdr
+           -- Assuming the previous step succeeded, process any associated data
+           -- family instances. If the previous step failed, bail out.
+           case mb_cls_nm of
+             Nothing -> pure ([], [])
+             Just cls_nm -> do
+               (avails, fldss)
+                 <- mapAndUnzipM (new_loc_di overload_ok (Just cls_nm)) adts
+               pure (avails, concat fldss)
     new_assoc _ (L _ (ClsInstD _ (XClsInstDecl _))) = panic "new_assoc"
     new_assoc _ (L _ (XInstDecl _))                 = panic "new_assoc"
 
