@@ -29,12 +29,12 @@ stages:
       set TEMP=%cd%\tmp
 
     - set PATH=C:\msys64\usr\bin;%PATH%
-    - python .gitlab/fix-submodules.py
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
-    - bash .gitlab/win32-init.sh
+#    - python .gitlab/fix-submodules.py
+#    - git submodule sync --recursive
+#    - git submodule update --init --recursive
+#    - git checkout .gitmodules
+#    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+#    - bash .gitlab/win32-init.sh
   after_script:
     - rd /s /q tmp
     - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
@@ -60,16 +60,16 @@ validate-x86_64-windows:
     - |
       set MSYSTEM=MINGW64
       python boot
-      bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
+  #    bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
     - bash -c "echo include mk/flavours/quick.mk > mk/build.mk"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
-    - |
-      bash -c "make binary-dist TAR_COMP_OPTS=-1"
-      mv ghc-*.tar.xz ghc.tar.xz
+  #  - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
+  #  - |
+  #    bash -c "make binary-dist TAR_COMP_OPTS=-1"
+  #    mv ghc-*.tar.xz ghc.tar.xz
     - |
       git config user.email "ben+ghc-ci@smart-cactus.org"
       git config user.name "GHC GitLab CI"
-    - bash -c 'METRICS_FILE=`mktemp` && make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE && METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh'
+    - bash -c "METRICS_FILE=`mktemp` && echo \$METRICS_FILE THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml && .gitlab/push-test-metrics.sh"
   cache:
     key: x86_64-windows
   tags:
@@ -114,22 +114,3 @@ cleanup-windows:
     - del %BUILD_DIR%\* /F /Q
     - for /d %%p in (%BUILD_DIR%\*) do rd /Q /S "%%p"
     - exit /b 0
-
-# See Note [Cleanup after shell executor]
-cleanup-darwin:
-  stage: cleanup
-  tags:
-    - x86_64-darwin
-  when: always
-  dependencies: []
-  before_script:
-    - echo "Time to clean up"
-  script:
-    - echo "Let's go"
-  after_script:
-    - BUILD_DIR=$CI_PROJECT_DIR
-    - echo "Cleaning $BUILD_DIR"
-    - cd $HOME
-    - rm -Rf $BUILD_DIR/*
-    - exit 0
-
