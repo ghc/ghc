@@ -511,7 +511,10 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
     uint32_t num_blocks = 2*n - 1;
     W_ group_size = n * BLOCK_SIZE;
 
-    bdescr *bd = allocGroupOnNode(node, num_blocks);
+    // It's okay if we get a group larger than what we request; we will end up
+    // splitting it anyways. By using allocLargeChunk we reduce the potential
+    // for fragmentation.
+    bdescr *bd = allocLargeChunkOnNode(node, num_blocks, 3*n);
 
     // slop on the low side
     W_ slop_low = 0;
