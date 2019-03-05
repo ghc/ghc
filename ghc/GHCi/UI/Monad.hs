@@ -456,14 +456,13 @@ printStats dflags ActionStats{actionAllocs = mallocs, actionElapsedTime = secs}
 
 revertCAFs :: GhciMonad m => m ()
 revertCAFs = do
-  liftIO rts_revertCAFs
+  hsc_env <- GHC.getSession
+  liftIO $ iservCmd hsc_env RtsRevertCAFs
   s <- getGHCiState
   when (not (ghc_e s)) turnOffBuffering
      -- Have to turn off buffering again, because we just
      -- reverted stdout, stderr & stdin to their defaults.
 
-foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()
-        -- Make it "safe", just in case
 
 -----------------------------------------------------------------------------
 -- To flush buffers for the *interpreted* computation we need
