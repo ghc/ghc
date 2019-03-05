@@ -92,6 +92,8 @@ else ifeq "$(INTEGER_LIBRARY)" "integer-simple"
 else ifneq "$(CLEANING)" "YES"
 $(error Unknown integer library)
 endif
+	@echo 'cSupportsSplitObjs    :: String'                             >> $@
+	@echo 'cSupportsSplitObjs    = "$(SupportsSplitObjs)"'              >> $@
 	@echo 'cGhcWithInterpreter   :: String'                             >> $@
 	@echo 'cGhcWithInterpreter   = "$(GhcWithInterpreter)"'             >> $@
 	@echo 'cGhcWithNativeCodeGen :: String'                             >> $@
@@ -112,6 +114,8 @@ endif
 	@echo 'cLeadingUnderscore    = "$(LeadingUnderscore)"'              >> $@
 	@echo 'cGHC_UNLIT_PGM        :: String'                             >> $@
 	@echo 'cGHC_UNLIT_PGM        = "$(utils/unlit_dist_PROG)"'          >> $@
+	@echo 'cGHC_SPLIT_PGM        :: String'                             >> $@
+	@echo 'cGHC_SPLIT_PGM        = "$(driver/split_dist_PROG)"'         >> $@
 	@echo 'cLibFFI               :: Bool'                               >> $@
 ifeq "$(UseLibFFIForAdjustors)" "YES"
 	@echo 'cLibFFI               = True'                                >> $@
