@@ -1,4 +1,5 @@
 {-# LANGUAGE MagicHash #-}
+
 module Main where
 
 import Prelude hiding ( init )
@@ -17,15 +18,15 @@ import qualified GHC.Exts
 main :: IO ()
 main = do let test1 = "TestMain1.hs"
           let test2 = "TestMain2.hs"
-          writeFile test1 "module Main where test1 = (1,2,3)"
-          writeFile test2 "module Main where test1 = (3,2,1)"
+          writeFile test1 "module Main where main = return () ; test1 = (1,2,3)"
+          writeFile test2 "module Main where main = return () ; test2 = (3,2,1)"
           --
           ghc_1 <- newGhcServer
           ghc_2 <- newGhcServer
           line "1" $ runInServer ghc_1 $ load (test1, "Main")
           line "2" $ runInServer ghc_2 $ load (test2, "Main")
           line "3" $ runInServer ghc_1 $ eval "test1"
-          line "4" $ runInServer ghc_2 $ eval "test1"
+          line "4" $ runInServer ghc_2 $ eval "test2"
   where line n a = putStr (n ++ ": ") >> a 
 
 type ModuleName = String
@@ -57,7 +58,7 @@ load (f,mn) = do target <- GHC.guessTarget f Nothing
                  --
                  m <- GHC.findModule (GHC.mkModuleName mn) Nothing
                  GHC.setContext [GHC.IIModule $ GHC.moduleName $ m]
-    where showSuccessFlag GHC.Succeeded = "succeded"
+    where showSuccessFlag GHC.Succeeded = "succeeded"
           showSuccessFlag GHC.Failed    = "failed"
 
 eval :: String -> Ghc ()
