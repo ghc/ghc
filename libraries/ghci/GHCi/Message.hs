@@ -61,6 +61,7 @@ import System.IO.Error
 data Message a where
   -- | Exit the iserv process
   Shutdown :: Message ()
+  RtsRevertCAFs :: Message ()
 
   -- RTS Linker -------------------------------------------
 
@@ -485,7 +486,8 @@ getMessage = do
       33 -> Msg <$> (AddSptEntry <$> get <*> get)
       34 -> Msg <$> (RunTH <$> get <*> get <*> get <*> get)
       35 -> Msg <$> (GetClosure <$> get)
-      _  -> Msg <$> (Seq <$> get)
+      36  -> Msg <$> (Seq <$> get)
+      _  -> Msg <$> return RtsRevertCAFs
 
 putMessage :: Message a -> Put
 putMessage m = case m of
@@ -526,6 +528,7 @@ putMessage m = case m of
   RunTH st q loc ty           -> putWord8 34 >> put st >> put q >> put loc >> put ty
   GetClosure a                -> putWord8 35 >> put a
   Seq a                       -> putWord8 36 >> put a
+  RtsRevertCAFs               -> putWord8 37
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages
