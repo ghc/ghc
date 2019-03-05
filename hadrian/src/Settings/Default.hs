@@ -100,6 +100,7 @@ stage1Packages = do
              , ghcPkg
              , ghcPrim
              , haskeline
+             , hp2ps
              , hsc2hs
              , intLib
              , pretty
@@ -132,7 +133,7 @@ testsuitePackages = do
              , ghci
              , ghcCompact
              , ghcPkg
-             , hp2ps
+             , hpcBin
              , hsc2hs
              , iserv
              , runGhc

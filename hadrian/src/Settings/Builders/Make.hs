@@ -37,6 +37,6 @@ validateBuilderArgs = builder (Make "testsuite/tests") ? do
 
 -- | Support for speed of validation
 setTestSpeed :: TestSpeed -> String
-setTestSpeed Fast    = "fasttest"
-setTestSpeed Average = "test"
-setTestSpeed Slow    = "slowtest"
+setTestSpeed TestFast   = "fasttest"
+setTestSpeed TestNormal = "test"
+setTestSpeed TestSlow   = "slowtest"
