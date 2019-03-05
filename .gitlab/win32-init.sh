@@ -10,7 +10,19 @@ if [ -d "`pwd`/cabal-cache" ]; then
 fi
 
 if [ ! -e $toolchain/bin/ghc ]; then
-    curl https://downloads.haskell.org/~ghc/$GHC_VERSION/ghc-$GHC_VERSION-x86_64-unknown-mingw32.tar.xz | tar -xJ
+    case $MSYSTEM in
+      MINGW32)
+        triple="i386-unknown-mingw32"
+        ;;
+      MINGW64)
+        triple="x86_64-unknown-mingw32"
+        ;;
+      *)
+        echo "win32-init: Unknown MSYSTEM $MSYSTEM"
+        exit 1
+        ;;
+    esac
+    curl https://downloads.haskell.org/~ghc/$GHC_VERSION/ghc-$GHC_VERSION-$triple.tar.xz | tar -xJ
     mv ghc-$GHC_VERSION toolchain
 fi
 
