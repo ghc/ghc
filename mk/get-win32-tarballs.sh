@@ -111,7 +111,7 @@ download_tarballs() {
     download_mingw "${format_url}-gmp-6.1.2-1-any.pkg.tar.xz"
     if test "$mingw_arch" = "x86_64"; then
         # Try using Tamar's branch
-        download_mingw "${format_url}-binutils-git-2.25.r93824.012da41a23-1-any.pkg.tar.xz"
+        download_mingw "${format_url}-binutils-phyx.r6.1b62f9f9-1-any.pkg.tar.xz"
     else
         download_mingw "${format_url}-binutils-2.29.1-1-any.pkg.tar.xz"
     fi
