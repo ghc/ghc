@@ -370,7 +370,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
         -- See Note [Resolving never-exported Names in TcIface]
         type_env <- fixM $ \type_env -> do
             setImplicitEnvM type_env $ do
-                decls <- loadDecls ignore_prags (mi_decls iface)
+                decls <- loadDecls (mi_decls iface)
                 return (mkNameEnv decls)
         -- But note that we use this type_env to typecheck references to DFun
         -- in 'IfaceInst'
@@ -415,6 +415,7 @@ typecheckIfaceForInstantiate nsubst iface =
     setImplicitEnvM type_env $ do
     insts     <- mapM tcIfaceInst (mi_insts iface)
     fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+    rules     <- tcIfaceRules (mi_rules iface)
     anns      <- tcIfaceAnnotations (mi_anns iface)
     exports   <- ifaceExportNames (mi_exports iface)
     complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
@@ -619,7 +620,6 @@ tcIfaceDecl :: IfaceDecl
 tcIfaceDecl = tc_iface_decl Nothing
 
 tc_iface_decl :: Maybe Class  -- ^ For associated type/data family declarations
-              -> Bool         -- ^ True <=> discard IdInfo on IfaceId bindings
               -> IfaceDecl
               -> IfL TyThing
 tc_iface_decl _ (IfaceId {ifName = name, ifType = iface_type,
@@ -715,7 +715,7 @@ tc_iface_decl _parent
     ; cls  <- buildClass tc_name binders' roles fds Nothing
     ; return (ATyCon (classTyCon cls)) }
 
-tc_iface_decl _parent ignore_prags
+tc_iface_decl _parent
             (IfaceClass {ifName = tc_name,
                          ifRoles = roles,
                          ifBinders = binders,
@@ -1431,7 +1431,7 @@ tcIdDetails ty IfDFunId
 
 tcIdDetails _ (IfRecSelId tc naughty)
   = do { tc' <- either (fmap RecSelData . tcIfaceTyCon)
-                       (fmap (RecSelPatSyn . tyThingPatSyn) . tcIfaceDecl False)
+                       (fmap (RecSelPatSyn . tyThingPatSyn) . tcIfaceDecl)
                        tc
        ; return (RecSelId { sel_tycon = tc', sel_naughty = naughty }) }
   where
