@@ -1,0 +1,7 @@
+
+T15918.hs:19:19: error:
+    • Expected kind ‘(k0 -> *) -> Constraint’,
+        but ‘[]’ has kind ‘* -> *’
+    • In the first argument of ‘Build’, namely ‘[]’
+      In an expression type signature: Build [] a
+      In the expression: rev :: Build [] a
