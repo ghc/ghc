@@ -18,7 +18,6 @@ import GhcPrelude
 import DynFlags
 import WwLib            ( findTypeShape, deepSplitProductType_maybe )
 import Demand   -- All of it
-import CoreArity        ( exprArity )
 import CoreSyn
 import CoreSeq          ( seqBinds )
 import Outputable
@@ -287,7 +286,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
 -- This is used for a non-recursive local let without manifest lambdas.
 -- This is the LetUp rule in the paper “Higher-Order Cardinality Analysis”.
 dmdAnal' env dmd (Let (NonRec id rhs) body)
-  | useLetUp id rhs
+  | useLetUp id
   = (final_ty, Let (NonRec id' rhs') body')
   where
     (body_ty, body')   = dmdAnal env dmd body
@@ -602,7 +601,7 @@ dmdAnalRhsLetDown :: TopLevelFlag
 dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
   = (lazy_fv, id', mkLams bndrs' body')
   where
-    rhs_arity        = exprArity rhs
+    rhs_arity        = idArity id
     (bndrs, body, body_dmd)
        = case isJoinId_maybe id of
            Just join_arity  -- See Note [Demand analysis for join points]
@@ -610,7 +609,8 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
                    -> (bndrs, body, let_dmd)
 
            Nothing | (bndrs, body) <- collectBinders rhs
-                   -> (bndrs, body, mkBodyDmd env (exprArity body) body)
+                   , let body_arity = rhs_arity - count isId bndrs
+                   -> (bndrs, body, mkBodyDmd env body_arity body)
 
     env_body         = foldl' extendSigsWithLam env bndrs
     (body_ty, body') = dmdAnal env_body body_dmd body
@@ -618,7 +618,7 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
     DmdType rhs_fv rhs_dmds rhs_res
                      = ensureArgs rhs_arity rhs_ty -- zap possible deep CPR info
     sig_ty           = mkStrictSig (mkDmdType sig_fv rhs_dmds rhs_res')
-    id'              = set_idStrictness env id rhs_arity sig_ty
+    id'              = set_idStrictness env id sig_ty
         -- See Note [NOINLINE and strictness]
 
 
@@ -658,7 +658,7 @@ mkBodyDmd env arity body
 --
 -- We use LetDown if there is a chance to get a useful strictness signature.
 -- This is the case when it takes any arguments before performing meaningful
--- work (cf. 'exprArity') or the binding is a join point (hence always acts like
+-- work (cf. 'idArity') or the binding is a join point (hence always acts like
 -- a function, not a value).
 --
 -- Thus, if the binding is not a join point and its arity is 0, we use LetUp.
@@ -667,8 +667,8 @@ mkBodyDmd env arity body
 -- makes a real difference wrt. usage demands. The other reason is being able to
 -- unleash a more precise product demand on its RHS once we know how the thunk
 -- was used in the let body.
-useLetUp :: Var -> CoreExpr -> Bool
-useLetUp f rhs = exprArity rhs == 0 && not (isJoinId f)
+useLetUp :: Var -> Bool
+useLetUp f = idArity f == 0 && not (isJoinId f)
 
 {- Note [Demand analysis for join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1206,10 +1206,9 @@ findBndrDmd env arg_of_dfun dmd_ty id
 
     fam_envs = ae_fam_envs env
 
-set_idStrictness :: AnalEnv -> Id -> Arity -> StrictSig -> Id
-set_idStrictness env id arity sig
+set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
+set_idStrictness env id sig
   = id `setIdStrictness` (killUsageSig (ae_dflags env) sig)
-       `setIdArity` arity -- computed by exprArity and must match sig
 
 dumpStrSig :: CoreProgram -> SDoc
 dumpStrSig binds = vcat (map printId ids)
