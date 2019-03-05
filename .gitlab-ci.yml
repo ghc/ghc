@@ -63,12 +63,16 @@ ghc-linters:
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
-    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh`
-    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx docs
+    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
+    - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
   cache:
     key: hadrian
     paths:
       - cabal-cache
+  artifacts:
+    when: always
+    paths:
+      - ghc.tar.xz
 
 validate-x86_64-linux-deb8-hadrian:
   extends: .validate-hadrian
@@ -427,16 +431,18 @@ validate-x86_64-windows-hadrian:
       set MSYSTEM=MINGW64
       python boot
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx docs
-    # FIXME: Bindist disabled due to #16073
-    #- bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh binary-dist"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx binary-dist"
+    - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
     # FIXME: Testsuite disabled due to #16156.
-    #- bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
+    # - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   cache:
     key: x86_64-windows
   tags:
     - x86_64-windows
+  artifacts:
+    when: always
+    paths:
+      - ghc.tar.xz
 
 validate-x86_64-windows:
   extends: .validate-windows
