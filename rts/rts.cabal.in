@@ -104,6 +104,7 @@ library
                       DerivedConstants.h ffi.h ffitarget.h
                       GHCConstantsHaskellType.hs GHCConstantsHaskellWrappers.hs
                       platformConstants
+                      config.hs-incl
                       -- ^ generated
                       rts/Adjustor.h
                       rts/BlockSignals.h

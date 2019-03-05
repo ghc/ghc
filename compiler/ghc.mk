@@ -30,9 +30,7 @@ compiler_stage1_C_FILES_NODEPS = compiler/parser/cutils.c
 compiler_NO_CHECK = YES
 
 ifneq "$(BINDIST)" "YES"
-compiler/stage1/package-data.mk : compiler/stage1/build/Config.hs
-compiler/stage2/package-data.mk : compiler/stage2/build/Config.hs
-compiler/stage3/package-data.mk : compiler/stage3/build/Config.hs
+compiler/main/Config.hs : rts/build/config.hs-incl
 
 compiler/stage1/build/PlatformConstants.o: $(includes_GHCCONSTANTS_HASKELL_TYPE)
 compiler/stage2/build/PlatformConstants.o: $(includes_GHCCONSTANTS_HASKELL_TYPE)
@@ -44,103 +42,6 @@ compiler/stage1/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
 compiler/stage2/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
 compiler/stage3/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
 endif
-
-compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
-	$(call removeFiles,$@)
-	@echo 'Creating $@ ... '
-	@echo '{-# LANGUAGE CPP #-}'                                        >> $@
-	@echo 'module Config where'                                         >> $@
-	@echo                                                               >> $@
-	@echo 'import GhcPrelude'                                           >> $@
-	@echo                                                               >> $@
-	@echo '#include "ghc_boot_platform.h"'                              >> $@
-	@echo                                                               >> $@
-	@echo 'data IntegerLibrary = IntegerGMP'                            >> $@
-	@echo '                    | IntegerSimple'                         >> $@
-	@echo '                    deriving Eq'                             >> $@
-	@echo                                                               >> $@
-	@echo 'cBuildPlatformString :: String'                              >> $@
-	@echo 'cBuildPlatformString = BuildPlatform_NAME'                   >> $@
-	@echo 'cHostPlatformString :: String'                               >> $@
-	@echo 'cHostPlatformString = HostPlatform_NAME'                     >> $@
-	@echo 'cTargetPlatformString :: String'                             >> $@
-	@echo 'cTargetPlatformString = TargetPlatform_NAME'                 >> $@
-	@echo                                                               >> $@
-	@echo 'cProjectName          :: String'                             >> $@
-	@echo 'cProjectName          = "$(ProjectName)"'                    >> $@
-	@echo 'cProjectGitCommitId   :: String'				    >> $@
-	@echo 'cProjectGitCommitId   = "$(ProjectGitCommitId)"'		    >> $@
-	@echo 'cProjectVersion       :: String'                             >> $@
-	@echo 'cProjectVersion       = "$(ProjectVersion)"'                 >> $@
-	@echo 'cProjectVersionInt    :: String'                             >> $@
-	@echo 'cProjectVersionInt    = "$(ProjectVersionInt)"'              >> $@
-	@echo 'cProjectPatchLevel    :: String'                             >> $@
-	@echo 'cProjectPatchLevel    = "$(ProjectPatchLevel)"'              >> $@
-	@echo 'cProjectPatchLevel1   :: String'                             >> $@
-	@echo 'cProjectPatchLevel1   = "$(ProjectPatchLevel1)"'             >> $@
-	@echo 'cProjectPatchLevel2   :: String'                             >> $@
-	@echo 'cProjectPatchLevel2   = "$(ProjectPatchLevel2)"'             >> $@
-	@echo 'cBooterVersion        :: String'                             >> $@
-	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $@
-	@echo 'cStage                :: String'                             >> $@
-	@echo 'cStage                = show (STAGE :: Int)'                 >> $@
-	@echo 'cIntegerLibrary       :: String'                             >> $@
-	@echo 'cIntegerLibrary       = "$(INTEGER_LIBRARY)"'                >> $@
-	@echo 'cIntegerLibraryType   :: IntegerLibrary'                     >> $@
-ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
-	@echo 'cIntegerLibraryType   = IntegerGMP'                          >> $@
-else ifeq "$(INTEGER_LIBRARY)" "integer-simple"
-	@echo 'cIntegerLibraryType   = IntegerSimple'                       >> $@
-else ifneq "$(CLEANING)" "YES"
-$(error Unknown integer library)
-endif
-	@echo 'cSupportsSplitObjs    :: String'                             >> $@
-	@echo 'cSupportsSplitObjs    = "$(SupportsSplitObjs)"'              >> $@
-	@echo 'cGhcWithInterpreter   :: String'                             >> $@
-	@echo 'cGhcWithInterpreter   = "$(GhcWithInterpreter)"'             >> $@
-	@echo 'cGhcWithNativeCodeGen :: String'                             >> $@
-	@echo 'cGhcWithNativeCodeGen = "$(GhcWithNativeCodeGen)"'           >> $@
-	@echo 'cGhcWithSMP           :: String'                             >> $@
-	@echo 'cGhcWithSMP           = "$(GhcWithSMP)"'                     >> $@
-	@echo 'cGhcRTSWays           :: String'                             >> $@
-	@echo 'cGhcRTSWays           = "$(GhcRTSWays)"'                     >> $@
-	@echo 'cGhcRtsWithLibdw      :: Bool'                               >> $@
-ifeq "$(GhcRtsWithLibdw)" "YES"
-	@echo 'cGhcRtsWithLibdw      = True'                                >> $@
-else
-	@echo 'cGhcRtsWithLibdw      = False'                               >> $@
-endif
-	@echo 'cGhcEnableTablesNextToCode :: String'                        >> $@
-	@echo 'cGhcEnableTablesNextToCode = "$(GhcEnableTablesNextToCode)"' >> $@
-	@echo 'cLeadingUnderscore    :: String'                             >> $@
-	@echo 'cLeadingUnderscore    = "$(LeadingUnderscore)"'              >> $@
-	@echo 'cGHC_UNLIT_PGM        :: String'                             >> $@
-	@echo 'cGHC_UNLIT_PGM        = "$(utils/unlit_dist_PROG)"'          >> $@
-	@echo 'cGHC_SPLIT_PGM        :: String'                             >> $@
-	@echo 'cGHC_SPLIT_PGM        = "$(driver/split_dist_PROG)"'         >> $@
-	@echo 'cLibFFI               :: Bool'                               >> $@
-ifeq "$(UseLibFFIForAdjustors)" "YES"
-	@echo 'cLibFFI               = True'                                >> $@
-else
-	@echo 'cLibFFI               = False'                               >> $@
-endif
-# Note that GhcThreaded just reflects the Makefile variable setting.
-# In particular, the stage1 compiler is never actually compiled with
-# -threaded, but it will nevertheless have cGhcThreaded = True.
-# The "+RTS --info" output will show what RTS GHC is really using.
-	@echo 'cGhcThreaded :: Bool'                                        >> $@
-ifeq "$(GhcThreaded)" "YES"
-	@echo 'cGhcThreaded = True'                                         >> $@
-else
-	@echo 'cGhcThreaded = False'                                        >> $@
-endif
-	@echo 'cGhcDebugged :: Bool'                                        >> $@
-ifeq "$(GhcDebugged)" "YES"
-	@echo 'cGhcDebugged = True'                                         >> $@
-else
-	@echo 'cGhcDebugged = False'                                        >> $@
-endif
-	@echo done.
 
 # -----------------------------------------------------------------------------
 # Configuration
