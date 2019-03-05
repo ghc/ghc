@@ -44,9 +44,13 @@ import Unsafe.Coerce
 -- -----------------------------------------------------------------------------
 -- Implement messages
 
+foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()
+        -- Make it "safe", just in case
+
 run :: Message a -> IO a
 run m = case m of
   InitLinker -> initObjLinker RetainCAFs
+  RtsRevertCAFs -> rts_revertCAFs
   LookupSymbol str -> fmap toRemotePtr <$> lookupSymbol str
   LookupClosure str -> lookupClosure str
   LoadDLL str -> loadDLL str
