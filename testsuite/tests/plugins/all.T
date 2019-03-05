@@ -1,9 +1,15 @@
-setTestOpts([req_interp, when(opsys('mingw32'), multi_cpu_race)])
+setTestOpts([
+    req_interp,
+    # The implementation of ghc-pkg doesn't seem to be multi-concurrent process
+    # safe on windows. These tests which mutate the package db need to be run
+    # sequentially until this is fixed.  This likely means that #13194 isn't fully
+    # solved.  See also #15313.
+    when(opsys('mingw32'), multi_cpu_race),
+    # The Windows toolchain, particularly linking, is remarkably slow, give it
+    # time to do its thing
+    when(opsys('mingw32'), compile_timeout_multiplier(2))
+])
 
-# The implementation of ghc-pkg doesn't seem to be multi-concurrent process safe
-# on windows. These tests which mutate the package db need to be run
-# sequentially until this is fixed.  This likely means that #13194 isn't fully
-# solved.  See also #15313.
 
 test('plugins01',
      [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
