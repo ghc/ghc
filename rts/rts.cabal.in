@@ -120,6 +120,8 @@ library
                       ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                       -- ^ from ../includes
                       DerivedConstants.h ffi.h ffitarget.h
+                      GHCConstantsHaskellType.hs GHCConstantsHaskellWrappers.hs
+                      platformConstants
                       -- ^ generated
                       rts/Adjustor.h
                       rts/BlockSignals.h
