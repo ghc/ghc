@@ -15,7 +15,7 @@ import System.Environment
 
 import qualified Data.Set as Set
 
-data TestSpeed = Slow | Average | Fast deriving (Show, Eq)
+data TestSpeed = TestSlow | TestNormal | TestFast deriving (Show, Eq)
 
 -- | All arguments that can be passed to Hadrian via the command line.
 data CommandLineArgs = CommandLineArgs
@@ -47,7 +47,8 @@ defaultCommandLineArgs = CommandLineArgs
 
 -- | These arguments are used by the `test` target.
 data TestArgs = TestArgs
-    { testCompiler   :: String
+    { testKeepFiles  :: Bool
+    , testCompiler   :: String
     , testConfigFile :: String
     , testConfigs    :: [String]
     , testJUnit      :: Maybe FilePath
@@ -63,14 +64,15 @@ data TestArgs = TestArgs
 -- | Default value for `TestArgs`.
 defaultTestArgs :: TestArgs
 defaultTestArgs = TestArgs
-    { testCompiler   = "stage2"
+    { testKeepFiles  = False
+    , testCompiler   = "stage2"
     , testConfigFile = "testsuite/config/ghc"
     , testConfigs    = []
     , testJUnit      = Nothing
     , testOnly       = []
     , testOnlyPerf   = False
     , testSkipPerf   = False
-    , testSpeed      = Fast
+    , testSpeed      = TestNormal
     , testSummary    = Nothing
     , testVerbosity  = Nothing
     , testWays       = [] }
@@ -124,6 +126,9 @@ readProgressInfo ms =
 readSplitObjects :: Either String (CommandLineArgs -> CommandLineArgs)
 readSplitObjects = Right $ \flags -> flags { splitObjects = True }
 
+readTestKeepFiles :: Either String (CommandLineArgs -> CommandLineArgs)
+readTestKeepFiles = Right $ \flags -> flags { testArgs = (testArgs flags) { testKeepFiles = True } }
+
 readTestCompiler :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestCompiler compiler = maybe (Left "Cannot parse compiler") (Right . set) compiler
   where
@@ -163,9 +168,9 @@ readTestSpeed ms =
     maybe (Left "Cannot parse test-speed") (Right . set) (go =<< lower <$> ms)
   where
     go :: String -> Maybe TestSpeed
-    go "fast"    = Just Fast
-    go "slow"    = Just Slow
-    go "average" = Just Average
+    go "fast"    = Just TestFast
+    go "slow"    = Just TestSlow
+    go "normal"  = Just TestNormal
     go _         = Nothing
     set :: TestSpeed -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { testArgs = (testArgs flags) {testSpeed = flag} }
@@ -224,6 +229,8 @@ optDescrs =
       "Generate split objects (requires a full clean rebuild)."
     , Option [] ["docs"] (OptArg readDocsArg "TARGET")
       "Strip down docs targets (none, no-haddocks, no-sphinx[-{html, pdfs, man}]."
+    , Option ['k'] ["keep-test-files"] (NoArg readTestKeepFiles)
+      "Keep all the files generated when running the testsuite."
     , Option [] ["test-compiler"] (OptArg readTestCompiler "TEST_COMPILER")
       "Use given compiler [Default=stage2]."
     , Option [] ["test-config-file"] (OptArg readTestConfigFile "CONFIG_FILE")

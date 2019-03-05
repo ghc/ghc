@@ -3,8 +3,11 @@ module Rules.Test (testRules) where
 import System.Environment
 
 import Base
+import CommandLine
 import Expression
+import Flavour
 import Oracles.Setting
+import Oracles.TestSettings
 import Packages
 import Settings
 import Settings.Default
@@ -16,7 +19,21 @@ ghcConfigHsPath :: FilePath
 ghcConfigHsPath = "testsuite/mk/ghc-config.hs"
 
 ghcConfigProgPath :: FilePath
-ghcConfigProgPath = "test/bin/ghc-config"
+ghcConfigProgPath = "test/bin/ghc-config" <.> exe
+
+checkPprProgPath, checkPprSourcePath :: FilePath
+checkPprProgPath = "test/bin/check-ppr" <.> exe
+checkPprSourcePath = "utils/check-ppr/Main.hs"
+
+checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath :: FilePath
+checkApiAnnotationsProgPath = "test/bin/check-api-annotations" <.> exe
+checkApiAnnotationsSourcePath = "utils/check-api-annotations/Main.hs"
+
+checkPrograms :: [(FilePath, FilePath)]
+checkPrograms =
+    [ (checkPprProgPath, checkPprSourcePath)
+    , (checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath)
+    ]
 
 ghcConfigPath :: FilePath
 ghcConfigPath = "test/ghcconfig"
@@ -27,23 +44,35 @@ testRules = do
     root <- buildRootRules
 
     -- Using program shipped with testsuite to generate ghcconfig file.
-    root -/- ghcConfigProgPath ~> do
-        ghc <- builderPath $ Ghc CompileHs Stage0
-        createDirectory $ takeDirectory (root -/- ghcConfigProgPath)
-        cmd ghc [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
+    root -/- ghcConfigProgPath %> \_ -> do
+        ghc0Path <- (<.> exe) <$> getCompilerPath "stage0"
+        cmd [ghc0Path] [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
 
-    -- TODO : Use input test compiler and not just stage2 compiler.
-    root -/- ghcConfigPath ~> do
-        ghcPath <- needFile Stage1 ghc
+    -- Rules for building check-ppr and check-ppr-annotations with the compiler
+    -- we are going to test (in-tree or out-of-tree).
+    forM_ checkPrograms $ \(progPath, sourcePath) ->
+        root -/- progPath %> \path -> do
+            testGhc <- testCompiler <$> userSetting defaultTestArgs
+            top <- topDirectory
+            when (testGhc `elem` ["stage1", "stage2", "stage3"]) $ do
+                let stg = stageOf testGhc
+                need . (:[]) =<< programPath (Context stg ghc vanilla)
+            bindir <- getBinaryDirectory testGhc
+            cmd [bindir </> "ghc" <.> exe]
+                ["-package", "ghc", "-o", top -/- path, top -/- sourcePath]
+
+    root -/- ghcConfigPath %> \_ -> do
+        args <- userSetting defaultTestArgs
+        let testGhc = testCompiler args
+            stg = stageOf testGhc
+        ghcPath <- getCompilerPath testGhc
+        when (testGhc `elem` ["stage1", "stage2", "stage3"]) $
+            need . (:[]) =<< programPath (Context stg ghc vanilla)
         need [root -/- ghcConfigProgPath]
         cmd [FileStdout $ root -/- ghcConfigPath] (root -/- ghcConfigProgPath)
             [ghcPath]
 
-    root -/- timeoutPath ~> timeoutProgBuilder
-
-    "validate" ~> do
-        needTestBuilders
-        build $ target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
+    root -/- timeoutPath %> \_ -> timeoutProgBuilder
 
     "test" ~> do
         needTestBuilders
@@ -51,6 +80,9 @@ testRules = do
         -- TODO : Should we remove the previosly generated config file?
         -- Prepare Ghc configuration file for input compiler.
         need [root -/- ghcConfigPath, root -/- timeoutPath]
+
+        args <- userSetting defaultTestArgs
+        ghcPath <- getCompilerPath (testCompiler args)
 
         -- TODO This approach doesn't work.
         -- Set environment variables for test's Makefile.
@@ -61,33 +93,34 @@ testRules = do
 
         makePath        <- builderPath $ Make ""
         top             <- topDirectory
-        ghcPath         <- (top -/-) <$> builderPath (Ghc CompileHs Stage2)
         ghcFlags        <- runTestGhcFlags
-        checkPprPath    <- (top -/-) <$> needFile Stage1 checkPpr
-        annotationsPath <- (top -/-) <$> needFile Stage1 checkApiAnnotations
+        let ghciFlags = ghcFlags ++ unwords
+              [ "--interactive", "-v0", "-ignore-dot-ghci"
+              , "-fno-ghci-history"
+              ]
+
+        pythonPath      <- builderPath Python
+        need [ root -/- checkPprProgPath, root -/- checkApiAnnotationsProgPath ]
 
         -- Set environment variables for test's Makefile.
+        -- TODO: Ideally we would define all those env vars in 'env', so that
+        --       Shake can keep track of them, but it is not as easy as it seems
+        --       to get that to work.
         liftIO $ do
             setEnv "MAKE" makePath
+            setEnv "PYTHON" pythonPath
             setEnv "TEST_HC" ghcPath
             setEnv "TEST_HC_OPTS" ghcFlags
-            setEnv "CHECK_PPR" checkPprPath
-            setEnv "CHECK_API_ANNOTATIONS" annotationsPath
+            setEnv "TEST_HC_OPTS_INTERACTIVE" ghciFlags
+            setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
+            setEnv "CHECK_API_ANNOTATIONS"
+                   (top -/- root -/- checkApiAnnotationsProgPath)
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
         -- the test output: https://ghc.haskell.org/trac/ghc/ticket/15951.
         withVerbosity Loud $ buildWithCmdOptions env $
             target (vanillaContext Stage2 compiler) RunTest [] []
-
--- | Build extra programs and libraries required by testsuite
-needTestsuitePackages :: Action ()
-needTestsuitePackages = do
-    targets   <- mapM (needFile Stage1) =<< testsuitePackages
-    -- iserv is not supported under Windows
-    windows <- windowsHost
-    when (not windows) needIservBins
-    need targets
 
 -- | Build the timeout program.
 -- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
@@ -108,27 +141,47 @@ timeoutProgBuilder = do
             writeFile' (root -/- timeoutPath) script
             makeExecutable (root -/- timeoutPath)
 
-needIservBins :: Action ()
-needIservBins = do
-    rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
-    need =<< traverse programPath
-               [ Context Stage1 iserv w
-               | w <- [vanilla, profiling, dynamic]
-               , w `elem` rtsways
-               ]
-
 needTestBuilders :: Action ()
 needTestBuilders = do
-    needBuilder $ Ghc CompileHs Stage2
-    needBuilder $ GhcPkg Update Stage1
-    needBuilder Hpc
-    needBuilder $ Hsc2Hs Stage1
-    needTestsuitePackages
+    testGhc <- testCompiler <$> userSetting defaultTestArgs
+    when (testGhc `elem` ["stage1", "stage2", "stage3"]) needTestsuitePackages
+
+-- | Build extra programs and libraries required by testsuite
+needTestsuitePackages :: Action ()
+needTestsuitePackages = do
+    testGhc <- testCompiler <$> userSetting defaultTestArgs
+    when (testGhc `elem` ["stage1", "stage2", "stage3"]) $ do
+        let stg = stageOf testGhc
+        allpkgs   <- packages <$> flavour
+        stgpkgs   <- allpkgs (succ stg)
+        testpkgs  <- testsuitePackages
+        targets <- mapM (needFile stg) (stgpkgs ++ testpkgs)
+        needIservBins
+        need targets
+
+-- stage 1 ghc lives under stage0/bin,
+-- stage 2 ghc lives under stage1/bin, etc
+stageOf :: String -> Stage
+stageOf "stage1" = Stage0
+stageOf "stage2" = Stage1
+stageOf "stage3" = Stage2
+stageOf _ = error "unexpected stage argument"
+
+needIservBins :: Action ()
+needIservBins = do
+    -- iserv is not supported under Windows
+    windows <- windowsHost
+    when (not windows) $ do
+        testGhc <- testCompiler <$> userSetting defaultTestArgs
+        let stg = stageOf testGhc
+        rtsways <- interpretInContext (vanillaContext stg ghc) getRtsWays
+        need =<< traverse programPath
+            [ Context stg iserv w
+            | w <- [vanilla, profiling, dynamic]
+            , w `elem` rtsways
+            ]
 
 needFile :: Stage -> Package -> Action FilePath
 needFile stage pkg
--- TODO (Alp): we might sometimes need more than vanilla!
--- This should therefore depend on what test ways
--- we are going to use, I suppose?
     | isLibrary pkg = pkgConfFile (Context stage pkg profilingDynamic)
     | otherwise     = programPath =<< programContext stage pkg
