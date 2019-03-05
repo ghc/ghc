@@ -46,7 +46,7 @@ is_marked(StgPtr p, bdescr *bd)
 }
 
 void compact (StgClosure *static_objects,
-              StgWeak *dead_weak_ptr_list,
-              StgTSO *resurrected_threads);
+              StgWeak **dead_weak_ptr_list,
+              StgTSO **resurrected_threads);
 
 #include "EndPrivate.h"

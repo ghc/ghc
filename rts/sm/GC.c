@@ -473,7 +473,9 @@ GarbageCollect (uint32_t collect_gen,
   // Finally: compact or sweep the oldest generation.
   if (major_gc && oldest_gen->mark) {
       if (oldest_gen->compact)
-          compact(gct->scavenged_static_objects, dead_weak_ptr_list, resurrected_threads);
+          compact(gct->scavenged_static_objects,
+                  &dead_weak_ptr_list,
+                  &resurrected_threads);
       else
           sweep(oldest_gen);
   }
