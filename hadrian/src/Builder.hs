@@ -238,7 +238,7 @@ instance H.Builder Builder where
 
                 Ar Unpack _ -> cmd echo [Cwd output] [path] buildArgs
 
-                Autoreconf dir -> cmd echo [Cwd dir] [path] buildArgs
+                Autoreconf dir -> cmd echo [Cwd dir] ["sh", path] buildArgs
                 Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
                     -- otherwise Windows breaks. TODO: Figure out why.
