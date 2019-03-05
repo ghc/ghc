@@ -168,7 +168,8 @@ exprArity has the following invariant:
 
   (2) exprArity e <= typeArity (exprType e)
 
-  (3) Hence if (exprArity e) = n, then manifestArity (etaExpand e n) = n
+  (3) Hence if (exprArity e) = n and e is non-trivial
+            then manifestArity (etaExpand e n) = n
 
       That is, if exprArity says "the arity is n" then etaExpand really
       can get "n" manifest lambdas to the top.

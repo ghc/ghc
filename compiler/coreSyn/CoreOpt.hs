@@ -37,7 +37,7 @@ import Var      ( isNonCoVarId )
 import VarSet
 import VarEnv
 import DataCon
-import Demand( ensureArgs, nopSig, StrictSig(..) )
+import Demand( etaExpandStrictSig, nopSig )
 import OptCoercion ( optCoercion )
 import Type     hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
@@ -678,13 +678,15 @@ joinPointBinding_maybe bndr rhs
 
   | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
   , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
-  , let StrictSig dmd_ty = idStrictness bndr
-        str_arity        = count isId bndrs -- Strictness demands are for Ids only
+  , let str_sig   = idStrictness bndr
+        str_arity = count isId bndrs -- Strictness demands are for Ids only
+        -- See Note [Strictness signatures and arity decreases]
         new_str_sig
           | str_arity < idArity bndr = nopSig
-          | otherwise                = StrictSig $ ensureArgs str_arity dmd_ty
-        join_bndr        = bndr `asJoinId`        join_arity
-                                `setIdStrictness` new_str_sig
+          | otherwise                = etaExpandStrictSig str_arity str_sig
+        join_bndr = bndr `asJoinId`        join_arity
+                         `setIdStrictness` new_str_sig
+                         `setIdArity`      str_arity -- Conservative approximation, matching new_str_sig
   = Just (join_bndr, mkLams bndrs body)
 
   | otherwise
@@ -714,6 +716,31 @@ A more common case is when
    f = \x. error ".."
 
 and again its arity increses (Trac #15517)
+
+Note [Strictness signatures and arity decreases]
+
+Since we look at idArity to determine whether to unleash a strictness signature
+or not, we have to be careful to zap the signature when there was an arity
+decrease.
+
+Consider the following expression:
+
+    (let go x y = `x` seq ... in go) |> co
+
+The simplifier will identify `go` as a nullary join point through
+`joinPointBinding_maybe` and float the coercion into the binding, leading to an
+arity decrease:
+
+    join go = (\x y -> `x` seq ...) |> co in go
+
+Now consider what happens if we simply re-used the strictness signature of `go`.
+Prior to the arity decrease, the strictness demands of the signature might have
+been `<S><L>`. If we hit a call site of arity 1 like `go (error "boom")`, we'd
+happily unleash the strictness signature, because `idArity go` is only 0.
+This means we conclude that `error "boom"` was used strictly, which leads to all
+kinds of unsoundness!
+
+So, in case of an arity decrease, we simply zap the signature.
 -}
 
 {- *********************************************************************

@@ -38,7 +38,7 @@ module Demand (
         nopSig, botSig, cprProdSig,
         isTopSig, hasDemandEnvSig,
         splitStrictSig, strictSigDmdEnv,
-        increaseStrictSigArity,
+        increaseStrictSigArity, etaExpandStrictSig,
 
         seqDemand, seqDemandList, seqDmdType, seqStrictSig,
 
@@ -1590,8 +1590,8 @@ splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
 
 increaseStrictSigArity :: Int -> StrictSig -> StrictSig
 -- ^ Add extra arguments to a strictness signature.
--- In contrast to 'ensureArgs', this /prepends/ additional argument demands
--- and leaves the 'DmdResult' intact.
+-- In contrast to 'etaExpandStrictSig', this /prepends/ additional argument
+-- demands and leaves CPR info intact.
 increaseStrictSigArity arity_increase sig@(StrictSig dmd_ty@(DmdType env dmds res))
   | isTopDmdType dmd_ty = sig
   | arity_increase == 0 = sig
@@ -1600,6 +1600,13 @@ increaseStrictSigArity arity_increase sig@(StrictSig dmd_ty@(DmdType env dmds re
   | otherwise           = StrictSig (DmdType env dmds' res)
   where
     dmds' = replicate arity_increase topDmd ++ dmds
+
+etaExpandStrictSig :: Arity -> StrictSig -> StrictSig
+-- ^ We are expanding (\x y. e) to (\x y z. e z).
+-- In contrast to 'increaseStrictSigArity', this /appends/ extra arg demands if
+-- necessary, potentially destroying the signature's CPR property.
+etaExpandStrictSig arity (StrictSig dmd_ty)
+  = StrictSig $ ensureArgs arity dmd_ty
 
 isTopSig :: StrictSig -> Bool
 isTopSig (StrictSig ty) = isTopDmdType ty
