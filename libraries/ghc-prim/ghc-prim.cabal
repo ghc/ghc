@@ -81,3 +81,20 @@ Library
     -- We need to set the unit ID to ghc-prim (without a version number)
     -- as it's magic.
     ghc-options: -this-unit-id ghc-prim
+
+    install-includes:
+        primop-data-decl.hs-incl
+        primop-tag.hs-incl
+        primop-list.hs-incl
+        primop-has-side-effects.hs-incl
+        primop-out-of-line.hs-incl
+        primop-commutable.hs-incl
+        primop-code-size.hs-incl
+        primop-can-fail.hs-incl
+        primop-strictness.hs-incl
+        primop-fixity.hs-incl
+        primop-primop-info.hs-incl
+        primop-vector-uniques.hs-incl
+        primop-vector-tys.hs-incl
+        primop-vector-tys-exports.hs-incl
+        primop-vector-tycons.hs-incl
