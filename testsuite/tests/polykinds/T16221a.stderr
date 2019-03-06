@@ -1,0 +1,6 @@
+
+T16221a.hs:6:49: error:
+    • Expected kind ‘k1’, but ‘b’ has kind ‘k’
+    • In the second argument of ‘SameKind’, namely ‘b’
+      In the type ‘(SameKind a b)’
+      In the definition of data constructor ‘MkT2’
