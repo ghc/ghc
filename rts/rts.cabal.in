@@ -103,6 +103,7 @@ library
                       -- ^ from ../includes
                       DerivedConstants.h ffi.h ffitarget.h
                       GHCConstantsHaskellType.hs GHCConstantsHaskellWrappers.hs
+                      CodeGen.Platform.hs
                       platformConstants
                       config.hs-incl
                       -- ^ generated

@@ -215,10 +215,6 @@ ifneq "$(BINDIST)" "YES"
 compiler_stage2_TAGS_HC_OPTS = -package ghc
 $(eval $(call tags-package,compiler,stage2))
 
-$(compiler_stage1_depfile_haskell) : compiler/stage1/$(PLATFORM_H)
-$(compiler_stage2_depfile_haskell) : compiler/stage2/$(PLATFORM_H)
-$(compiler_stage3_depfile_haskell) : compiler/stage3/$(PLATFORM_H)
-
 COMPILER_INCLUDES_DEPS += $(includes_H_CONFIG)
 COMPILER_INCLUDES_DEPS += $(includes_H_PLATFORM)
 COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)
@@ -227,9 +223,13 @@ COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
 COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_EXPORTS)
 COMPILER_INCLUDES_DEPS += $(includes_DERIVEDCONSTANTS)
 
-$(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE1)
-$(compiler_stage2_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE2)
-$(compiler_stage3_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE3)
+$(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE1) libraries/ghc-prim/dist-boot/ghc_boot_platform.h
+$(compiler_stage2_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE2) libraries/ghc-prim/dist-install/ghc_boot_platform.h
+$(compiler_stage3_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE3) libraries/ghc-prim/dist-install/ghc_boot_platform.h
+
+compiler_stage1_HC_OPTS += -Ilibraries/ghc-prim/dist-boot -Irts/build
+compiler_stage2_HC_OPTS += -Ilibraries/ghc-prim/dist-install -Irts/build
+compiler_stage3_HC_OPTS += -Ilibraries/ghc-prim/dist-install -Irts/build
 
 $(foreach way,$(compiler_stage1_WAYS),\
       compiler/stage1/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE1)

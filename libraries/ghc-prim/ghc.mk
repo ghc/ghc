@@ -133,9 +133,9 @@ PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
                     primop-vector-tys-exports.hs-incl \
                     primop-vector-tycons.hs-incl
 
-PRIMOP_BITS_STAGE1 = $(addprefix libraries/ghc-prim/dist-boot/build/,$(PRIMOP_BITS_NAMES))
-PRIMOP_BITS_STAGE2 = $(addprefix libraries/ghc-prim/dist-install/build/,$(PRIMOP_BITS_NAMES))
-PRIMOP_BITS_STAGE3 = $(addprefix libraries/ghc-prim/dist-install/build/,$(PRIMOP_BITS_NAMES))
+PRIMOP_BITS_STAGE1 = $(addprefix libraries/ghc-prim/dist-boot/,$(PRIMOP_BITS_NAMES))
+PRIMOP_BITS_STAGE2 = $(addprefix libraries/ghc-prim/dist-install/,$(PRIMOP_BITS_NAMES))
+PRIMOP_BITS_STAGE3 = $(addprefix libraries/ghc-prim/dist-install/,$(PRIMOP_BITS_NAMES))
 
 compiler_CPP_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 compiler_CPP_OPTS += ${GhcCppOpts}
@@ -147,49 +147,48 @@ compiler_HC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 
 define preprocessCompilerFiles
 # $0 = stage
-libraries/ghc-prim/$1/build/primops.txt: libraries/ghc-prim/primops.txt.pp libraries/ghc-prim/$1/$$(PLATFORM_H)
+libraries/ghc-prim/$1/primops.txt: libraries/ghc-prim/primops.txt.pp libraries/ghc-prim/$1/$$(PLATFORM_H)
 	$$(HS_CPP) -P $$(compiler_CPP_OPTS) -Ilibraries/ghc-prim/$1 -x c $$< | grep -v '^#pragma GCC' > $$@
 
-libraries/ghc-prim/$1/build/primop-data-decl.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-data-decl.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --data-decl          < $$< > $$@
-libraries/ghc-prim/$1/build/primop-tag.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-tag.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-tag         < $$< > $$@
-libraries/ghc-prim/$1/build/primop-list.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-list.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-list        < $$< > $$@
-libraries/ghc-prim/$1/build/primop-has-side-effects.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-has-side-effects.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --has-side-effects   < $$< > $$@
-libraries/ghc-prim/$1/build/primop-out-of-line.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-out-of-line.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --out-of-line        < $$< > $$@
-libraries/ghc-prim/$1/build/primop-commutable.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-commutable.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --commutable         < $$< > $$@
-libraries/ghc-prim/$1/build/primop-code-size.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-code-size.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --code-size          < $$< > $$@
-libraries/ghc-prim/$1/build/primop-can-fail.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-can-fail.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --can-fail           < $$< > $$@
-libraries/ghc-prim/$1/build/primop-strictness.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-strictness.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --strictness         < $$< > $$@
-libraries/ghc-prim/$1/build/primop-fixity.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-fixity.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --fixity             < $$< > $$@
-libraries/ghc-prim/$1/build/primop-primop-info.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-primop-info.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-primop-info < $$< > $$@
-libraries/ghc-prim/$1/build/primop-vector-uniques.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-vector-uniques.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-vector-uniques     < $$< > $$@
-libraries/ghc-prim/$1/build/primop-vector-tys.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-vector-tys.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-vector-tys         < $$< > $$@
-libraries/ghc-prim/$1/build/primop-vector-tys-exports.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-vector-tys-exports.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-vector-tys-exports < $$< > $$@
-libraries/ghc-prim/$1/build/primop-vector-tycons.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-vector-tycons.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-vector-tycons      < $$< > $$@
 
 # Usages aren't used any more; but the generator
 # can still generate them if we want them back
-libraries/ghc-prim/$1/build/primop-usage.hs-incl: libraries/ghc-prim/$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+libraries/ghc-prim/$1/primop-usage.hs-incl: libraries/ghc-prim/$1/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --usage              < $$< > $$@
 
 endef
 
 $(eval $(call preprocessCompilerFiles,dist-boot))
-$(eval $(call preprocessCompilerFiles,dist-install))
 $(eval $(call preprocessCompilerFiles,dist-install))
 
 
