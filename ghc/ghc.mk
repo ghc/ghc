@@ -178,6 +178,12 @@ INSTALL_LIBS += settings
 INSTALL_LIBS += llvm-targets
 INSTALL_LIBS += llvm-passes
 
+# A rather nasty hack needed because we still have headers in
+# ghc-prim and rts.
+ghc_stage1_HC_OPTS += -Irts/build -Ilibraries/ghc-prim/dist-boot
+ghc_stage2_HC_OPTS += -Irts/build -Ilibraries/ghc-prim/dist-install
+ghc_stage3_HC_OPTS += -Irts/build -Ilibraries/ghc-prim/dist-install
+
 ifeq "$(Windows_Host)" "NO"
 install: install_ghc_link
 .PHONY: install_ghc_link

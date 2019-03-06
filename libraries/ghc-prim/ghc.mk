@@ -13,7 +13,7 @@ define libraries/ghc-prim_PACKAGE_MAGIC
 libraries/ghc-prim_dist-install_MODULES := $$(filter-out GHC.Prim,$$(libraries/ghc-prim_dist-install_MODULES))
 endef
 
-PRIMOPS_TXT_STAGE1 = libraries/ghc-prim/dist-boot/build/primops.txt
+PRIMOPS_TXT_STAGE1 = libraries/ghc-prim/dist-boot/primops.txt
 
 libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $$(genprimopcode_INPLACE) $(PRIMOPS_TXT_STAGE1) | $$(dir $$@)/.
 	"$(genprimopcode_INPLACE)" --make-haskell-wrappers < $(PRIMOPS_TXT_STAGE1) >$@
