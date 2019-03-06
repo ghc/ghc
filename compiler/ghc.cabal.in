@@ -20,6 +20,12 @@ Category: Development
 Build-Type: Simple
 Cabal-Version: >=1.10
 
+extra-source-files:
+    utils/md5.h
+    Unique.h
+    nativeGen/NCG.h
+    parser/cutils.h
+
 Flag ghci
     Description: Build GHCi support.
     Default: False

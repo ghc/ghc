@@ -526,7 +526,7 @@ mkVirtConstrSizes dflags field_reps
 -------------------------------------------------------------------------
 
 -- bring in ARG_P, ARG_N, etc.
-#include "../includes/rts/storage/FunTypes.h"
+#include "rts/storage/FunTypes.h"
 
 mkArgDescr :: DynFlags -> [Id] -> ArgDescr
 mkArgDescr dflags args

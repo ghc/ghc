@@ -230,5 +230,5 @@ install_includes :
 	) true
 	$(INSTALL_HEADER) $(INSTALL_OPTS) $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_H_VERSION) $(includes_DERIVEDCONSTANTS) "$(DESTDIR)$(ghcheaderdir)/"
 	$(INSTALL_HEADER) rts/build/*.h rts/build/*.hs-incl includes/CodeGen.Platform.hs "$(DESTDIR)$(ghcheaderdir)/"
-	$(INSTALL_HEADER $(includes_GHCCONSTANTS_HASKELL_TYPE) $(includes_GHCCONSTANTS_HASKELL_VALUE) $(includes_GHCCONSTANTS_HASKELL_WRAPPERS) $(includes_GHCCONSTANTS_HASKELL_EXPORTS) "$(DESTDIR)$(ghcheaderdir)/"
+	$(INSTALL_HEADER) $(includes_GHCCONSTANTS_HASKELL_TYPE) $(includes_GHCCONSTANTS_HASKELL_VALUE) $(includes_GHCCONSTANTS_HASKELL_WRAPPERS) $(includes_GHCCONSTANTS_HASKELL_EXPORTS) "$(DESTDIR)$(ghcheaderdir)/"
 
