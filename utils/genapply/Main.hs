@@ -17,7 +17,7 @@ module Main(main) where
 #include "../../includes/rts/Constants.h"
 
 -- Needed for TAG_BITS
-#include "../MachDeps.h"
+#include "MachDeps.h"
 
 #if MIN_VERSION_base(4,11,0)
 import Prelude hiding ((<>))
