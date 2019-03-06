@@ -1,0 +1,5 @@
+T16394.hs:6:10: error:
+    Illegal class instance: ‘C a => C b => C (a, b)’
+      Class instances must be of the form
+        context => C ty_1 ... ty_n
+      where ‘C’ is a class
