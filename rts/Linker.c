@@ -1031,6 +1031,10 @@ mmap_again:
        return NULL;
    }
 
+   IF_DEBUG(linker,
+            debugBelch("mprotectForLinker: \tprotection %#0x\n",
+                       PROT_EXEC | PROT_READ));
+
 #if defined(x86_64_HOST_ARCH)
    if (RtsFlags.MiscFlags.linkerAlwaysPic) {
    } else if (mmap_32bit_base != 0) {
@@ -1084,6 +1088,15 @@ mmap_again:
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: done\n"));
 
+   /* This `mprotect` is because of Trac issue #14069. In short, after creating
+   a mapping with both execution and writing permissions, such a memory
+   location should be `mprotect`ed after it is used to remove write access (but
+   keep execution access if necessary). This is to avoid arbitrary code
+   execution.
+   */
+   if(mprotect(result, size, PROT_READ | PROT_EXEC) != 0) {
+       sysErrorBelch("unable to protect memory");
+   }
    return result;
 }
 #endif
