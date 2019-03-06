@@ -106,6 +106,7 @@ library
                       CodeGen.Platform.hs
                       platformConstants
                       config.hs-incl
+                      HsVersions.h
                       -- ^ generated
                       rts/Adjustor.h
                       rts/BlockSignals.h

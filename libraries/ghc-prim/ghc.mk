@@ -1,6 +1,11 @@
 libraries/ghc-prim_PACKAGE = ghc-prim
 libraries/ghc-prim_dist-install_GROUP = libraries
 
+libraries/ghc-prim_stage1_CONFIGURE_OPTS += --flags=boot
+libraries/ghc-prim_stage2_CONFIGURE_OPTS += --flags=install
+libraries/ghc-prim_stage3_CONFIGURE_OPTS += --flags=install
+
+
 # ----------------------------------------
 # Special magic for the ghc-prim package
 
