@@ -486,8 +486,9 @@ getMessage = do
       33 -> Msg <$> (AddSptEntry <$> get <*> get)
       34 -> Msg <$> (RunTH <$> get <*> get <*> get <*> get)
       35 -> Msg <$> (GetClosure <$> get)
-      36  -> Msg <$> (Seq <$> get)
-      _  -> Msg <$> return RtsRevertCAFs
+      36 -> Msg <$> (Seq <$> get)
+      37 -> Msg <$> return RtsRevertCAFs
+      _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
 putMessage m = case m of
