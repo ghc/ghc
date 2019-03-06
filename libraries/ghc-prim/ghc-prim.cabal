@@ -99,6 +99,7 @@ Library
         include-dirs: dist-install
 
     install-includes:
+        ghc_boot_platform.h
         primop-data-decl.hs-incl
         primop-tag.hs-incl
         primop-list.hs-incl
