@@ -102,7 +102,6 @@ validate-x86_64-linux-deb8-hadrian:
       make V=0 -j$THREADS WERROR=-Werror 
     - |
       make binary-dist TAR_COMP_OPTS="-1"
-      mv ghc-*.tar.xz ghc.tar.xz
     - |
       # Prepare to push git notes.
       METRICS_FILE=$(mktemp)
@@ -120,7 +119,7 @@ validate-x86_64-linux-deb8-hadrian:
       junit: junit.xml
     expire_in: 2 week
     paths:
-      - ghc.tar.xz
+      - ghc-*.tar.xz
       - junit.xml
 
 #################################
@@ -134,6 +133,7 @@ validate-x86_64-darwin:
     - x86_64-darwin
   variables:
     GHC_VERSION: 8.6.3
+    BIN_DIST_NAME: "ghc-x86_64-apple-darwin"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
@@ -195,6 +195,7 @@ validate-x86_64-darwin:
   allow_failure: true
   variables:
     TEST_ENV: "aarch64-linux-deb9"
+    BIN_DIST_NAME: "ghc-aarch64-linux-deb9"
   cache:
     key: linux-aarch64-deb9
   tags:
@@ -226,6 +227,7 @@ nightly-aarch64-linux-deb9:
   image: "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "i386-linux-deb9"
+    BIN_DIST_NAME: "ghc-i386-deb9-linux"
   cache:
     key: linux-i386-deb9
 
@@ -256,6 +258,7 @@ nightly-i386-linux-deb9:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9"
+    BIN_DIST_NAME: "ghc-x86_64-deb9-linux"
   cache:
     key: linux-x86_64-deb9
 
@@ -295,6 +298,7 @@ validate-x86_64-linux-deb9-integer-simple:
   variables:
     INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
+    BIN_DIST_NAME: "ghc-x86_64-deb9-linux-integer-simple"
 
 nightly-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
@@ -327,6 +331,7 @@ release-x86_64-linux-deb8:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb8"
+    BIN_DIST_NAME: "ghc-x86_64-deb8-linux"
   only:
     - tags
   cache:
@@ -346,6 +351,7 @@ release-x86_64-linux-fedora27:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-fedora27"
+    BIN_DIST_NAME: "ghc-x86_64-fedora27-linux"
   only:
     - tags
   cache:
@@ -420,6 +426,7 @@ validate-x86_64-windows:
   variables:
     GHC_VERSION: "8.6.2"
     LANG: "en_US.UTF-8"
+    BIN_DIST_NAME: "ghc-x86_64-windows-hadrian"
   script:
     - |
       set MSYSTEM=MINGW64
@@ -427,9 +434,7 @@ validate-x86_64-windows:
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
     - bash -c "echo include mk/flavours/quick.mk > mk/build.mk"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
-    - |
-      bash -c "make binary-dist TAR_COMP_OPTS=-1"
-      mv ghc-*.tar.xz ghc.tar.xz
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist TAR_COMP_OPTS=-1"
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   cache:
     key: x86_64-windows
@@ -440,7 +445,7 @@ validate-x86_64-windows:
     reports:
       junit: junit.xml
     paths:
-      - ghc.tar.xz
+      - ghc-*.tar.xz
       - junit.xml
 
 ############################################################
