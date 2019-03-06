@@ -1,0 +1,2 @@
+
+T16263.hs:7:1: error: Illegal constraint in a kind: Eq a => *
