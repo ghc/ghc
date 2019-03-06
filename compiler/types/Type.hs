@@ -2712,6 +2712,30 @@ In tcTypeKind we consider Constraint and (TYPE LiftedRep) to be distinct:
 Note that:
 * The only way we distinguish '->' from '=>' is by the fact
   that the argument is a PredTy.  Both are FunTys
+
+Note [Phantom type variables in kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  type K (r :: RuntimeRep) = Type   -- Note 'r' is unused
+  data T r :: K r                   -- T :: forall r -> K r
+  foo :: forall r. T r
+
+The body of the forall in foo's type has kind (K r), and
+normally it would make no sense to have
+   forall r. (ty :: K r)
+because the kind of the forall would escape the binding
+of 'r'.  But in this case it's fine because (K r) exapands
+to Type, so we expliclity /permit/ the type
+   forall r. T r
+
+To accommodate such a type, in typeKind (forall a.ty) we use
+occCheckExpand to expand any type synonyms in the kind of 'ty'
+to eliminate 'a'.  See kinding rule (FORALL) in
+Note [Kinding rules for types]
+
+And in TcValidity.checkEscapingKind, we use also use
+occCheckExpand, for the same reason.
 -}
 
 -----------------------------
@@ -2734,8 +2758,11 @@ typeKind (AppTy fun arg)
     go fun             args = piResultTys (typeKind fun) args
 
 typeKind ty@(ForAllTy {})
-  = case occCheckExpand tvs body_kind of   -- We must make sure tv does not occur in kind
-      Just k' -> k'                        -- As it is already out of scope!
+  = case occCheckExpand tvs body_kind of
+      -- We must make sure tv does not occur in kind
+      -- As it is already out of scope!
+      -- See Note [Phantom type variables in kinds]
+      Just k' -> k'
       Nothing -> pprPanic "typeKind"
                   (ppr ty $$ ppr tvs $$ ppr body <+> dcolon <+> ppr body_kind)
   where
@@ -2772,8 +2799,11 @@ tcTypeKind ty@(ForAllTy {})
   = constraintKind
 
   | otherwise
-  = case occCheckExpand tvs body_kind of   -- We must make sure tv does not occur in kind
-      Just k' -> k'                        -- As it is already out of scope!
+  = case occCheckExpand tvs body_kind of
+      -- We must make sure tv does not occur in kind
+      -- As it is already out of scope!
+      -- See Note [Phantom type variables in kinds]
+      Just k' -> k'
       Nothing -> pprPanic "tcTypeKind"
                   (ppr ty $$ ppr tvs $$ ppr body <+> dcolon <+> ppr body_kind)
   where
