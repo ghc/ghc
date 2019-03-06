@@ -25,21 +25,6 @@ Flag ghci
     Default: False
     Manual: True
 
-Flag stage1
-    Description: Is this stage 1?
-    Default: False
-    Manual: True
-
-Flag stage2
-    Description: Is this stage 2?
-    Default: False
-    Manual: True
-
-Flag stage3
-    Description: Is this stage 3?
-    Default: False
-    Manual: True
-
 Flag terminfo
     Description: Build GHC with terminfo support on non-Windows platforms.
     Default: True
@@ -118,17 +103,6 @@ Library
     -- We need to set the unit id to ghc (without a version number)
     -- as it's magic.
     GHC-Options: -this-unit-id ghc
-
-    if flag(stage1)
-        Include-Dirs: stage1
-    else
-        if flag(stage2)
-            Include-Dirs: stage2
-        else
-            if flag(stage3)
-                Include-Dirs: stage2
-
-    Install-Includes: HsVersions.h, ghc_boot_platform.h
 
     c-sources:
         parser/cutils.c
