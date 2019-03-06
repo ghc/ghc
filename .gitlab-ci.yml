@@ -16,6 +16,7 @@ stages:
   - build
   - full-build
   - cleanup # See Note [Cleanup on Windows]
+  - packaging
 
 ############################################################
 # Runner Tags
@@ -534,4 +535,29 @@ cleanup-darwin:
     - cd $HOME
     - rm -Rf $BUILD_DIR/*
     - exit 0
+
+############################################################
+# Packaging
+############################################################
+
+doc-tarball:
+  stage: packaging
+  tags:
+    - x86_64-linux
+  image: ghcci/x86_64-linux-deb9:0.2
+  dependencies:
+    - validate-x86_64-linux-deb9
+    - validate-x86_64-windows
+  artifacts:
+    paths:
+      - haddock.html.tar.xz
+      - libraries.html.tar.xz
+      - users_guide.html.tar.xz
+      - index.html
+      - "*.pdf"
+  script:
+    - rm -Rf docs
+    - distrib/mkDocs/mkDocs ghc-x86_64-deb9-linux.tar.xz ghc-x86_64-mingw32.tar.xz
+    - ls -lh
+    - mv docs/*.tar.xz .
 
