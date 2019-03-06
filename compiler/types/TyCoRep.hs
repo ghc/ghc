@@ -3909,7 +3909,7 @@ tidyVarBndr tidy_env@(occ_env, subst) var
 
 avoidNameClashes :: [TyCoVar] -> TidyEnv -> TidyEnv
 -- Seed the occ_env with clashes among the names, see
--- Node [Tidying multiple names at once] in OccName
+-- Note [Tidying multiple names at once] in OccName
 avoidNameClashes tvs (occ_env, subst)
   = (avoidClashesOccEnv occ_env occs, subst)
   where
@@ -3939,7 +3939,9 @@ tidyTyCoVarBinder tidy_env (Bndr tv vis)
 
 tidyTyCoVarBinders :: TidyEnv -> [VarBndr TyCoVar vis]
                    -> (TidyEnv, [VarBndr TyCoVar vis])
-tidyTyCoVarBinders = mapAccumL tidyTyCoVarBinder
+tidyTyCoVarBinders tidy_env tvbs
+  = mapAccumL tidyTyCoVarBinder
+              (avoidNameClashes (binderVars tvbs) tidy_env) tvbs
 
 ---------------
 tidyFreeTyCoVars :: TidyEnv -> [TyCoVar] -> TidyEnv
