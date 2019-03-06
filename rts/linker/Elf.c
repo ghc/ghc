@@ -766,6 +766,15 @@ ocGetNames_ELF ( ObjectCode* oc )
           mapped_size = roundUpToPage(size+stub_space);
           start = mem;
           mapped_start = mem;
+          /* This `mprotect` is because of Trac issue #14069. In short, after
+          creating a mapping with both execution and writing permissions, such
+          a memory location should be `mprotect`ed after it is used to remove
+          write access (but keep execution access if necessary). This is to
+          avoid arbitrary code execution.
+         */
+          if(mprotect(mem, size+stub_space, PROT_READ | PROT_EXEC) != 0) {
+              sysErrorBelch("unable to protect memory");
+          }
 #else
           if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
               // already mapped.
