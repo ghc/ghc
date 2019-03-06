@@ -1,0 +1,6 @@
+
+T16391b.hs:10:8: error:
+    • Quantified type's kind mentions quantified type variable
+        type: ‘forall (r :: RuntimeRep). T r’
+      where the body of the forall has this kind: ‘TYPE r’
+    • In the type signature: foo :: T r

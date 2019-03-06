@@ -20,9 +20,9 @@ T11213.hs:23:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
 
 T11213.hs:24:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
     Pattern synonym with no type signature:
-      pattern Purp :: forall a a1.
-                      (Eq a, Num a) =>
-                      Show a1 => a -> a1 -> ([a], UnivProv a1)
+      pattern Purp :: forall a1 a2.
+                      (Eq a1, Num a1) =>
+                      Show a2 => a1 -> a2 -> ([a1], UnivProv a2)
 
 T11213.hs:25:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
     Pattern synonym with no type signature:

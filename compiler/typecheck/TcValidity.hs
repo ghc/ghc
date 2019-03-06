@@ -689,20 +689,11 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
         ; check_type (ve{ve_tidy_env = env'}) tau
                 -- Allow foralls to right of arrow
 
-        ; checkTcM (not (any (`elemVarSet` tyCoVarsOfType phi_kind) tvs))
-                   (forAllEscapeErr env' ty tau_kind)
-        }
+        ; checkEscapingKind env' tvbs' theta tau }
   where
-    (tvbs, phi)  = tcSplitForAllVarBndrs ty
-    (theta, tau) = tcSplitPhiTy phi
-
-    tvs          = binderVars tvbs
-    (env', _)    = tidyVarBndrs env tvs
-
-    tau_kind              = tcTypeKind tau
-    phi_kind | null theta = tau_kind
-             | otherwise  = liftedTypeKind
-        -- If there are any constraints, the kind is *. (#11405)
+    (tvbs, phi)   = tcSplitForAllVarBndrs ty
+    (theta, tau)  = tcSplitPhiTy phi
+    (env', tvbs') = tidyTyCoVarBinders env tvbs
 
 check_type (ve@ValidityEnv{ve_rank = rank}) (FunTy _ arg_ty res_ty)
   = do  { check_type (ve{ve_rank = arg_rank}) arg_ty
@@ -877,13 +868,52 @@ forAllTyErr env rank ty
                    MonoType d     -> d
                    _              -> Outputable.empty -- Polytype is always illegal
 
-forAllEscapeErr :: TidyEnv -> Type -> Kind -> (TidyEnv, SDoc)
-forAllEscapeErr env ty tau_kind
+-- | Reject type variables that would escape their escape through a kind.
+-- See @Note [Type variables escaping through kinds]@.
+checkEscapingKind :: TidyEnv -> [TyVarBinder] -> ThetaType -> Type -> TcM ()
+checkEscapingKind env tvbs theta tau =
+  case occCheckExpand (binderVars tvbs) phi_kind of
+    -- Ensure that none of the tvs occur in the kind of the forall
+    -- /after/ expanding type synonyms.
+    -- See Note [Phantom type variables in kinds] in Type
+    Nothing -> failWithTcM $ forAllEscapeErr env tvbs theta tau tau_kind
+    Just _  -> pure ()
+  where
+    tau_kind              = tcTypeKind tau
+    phi_kind | null theta = tau_kind
+             | otherwise  = liftedTypeKind
+        -- If there are any constraints, the kind is *. (#11405)
+
+forAllEscapeErr :: TidyEnv -> [TyVarBinder] -> ThetaType -> Type -> Kind
+                -> (TidyEnv, SDoc)
+forAllEscapeErr env tvbs theta tau tau_kind
   = ( env
-    , hang (vcat [ text "Quantified type's kind mentions quantified type variable"
-                 , text "(skolem escape)" ])
-         2 (vcat [ text "   type:" <+> ppr_tidy env ty
-                 , text "of kind:" <+> ppr_tidy env tau_kind ]) )
+    , vcat [ hang (text "Quantified type's kind mentions quantified type variable")
+                2 (text "type:" <+> quotes (ppr (mkSigmaTy tvbs theta tau)))
+                -- NB: Don't tidy this type since the tvbs were already tidied
+                -- previously, and re-tidying them will make the names of type
+                -- variables different from tau_kind.
+           , hang (text "where the body of the forall has this kind:")
+                2 (quotes (ppr_tidy env tau_kind)) ] )
+
+{-
+Note [Type variables escaping through kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider:
+
+  type family T (r :: RuntimeRep) :: TYPE r
+  foo :: forall r. T r
+
+Something smells funny about the type of `foo`. If you spell out the kind
+explicitly, it becomes clearer from where the smell originates:
+
+  foo :: ((forall r. T r) :: TYPE r)
+
+The type variable `r` appears in the result kind, which escapes the scope of
+its binding site! This is not desirable, so we establish a validity check
+(`checkEscapingKind`) to catch any type variables that might escape through
+kinds in this way.
+-}
 
 ubxArgTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
 ubxArgTyErr env ty

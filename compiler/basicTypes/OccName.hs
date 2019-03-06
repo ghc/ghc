@@ -806,7 +806,7 @@ starting the search; and we make sure to update the starting point for "a"
 after we allocate a new one.
 
 
-Node [Tidying multiple names at once]
+Note [Tidying multiple names at once]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Consider
