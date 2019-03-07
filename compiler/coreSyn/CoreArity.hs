@@ -1153,7 +1153,7 @@ freshEtaId :: Int -> TCvSubst -> Type -> (TCvSubst, Id)
 freshEtaId n subst ty
       = (subst', eta_id')
       where
-        ty'     = Type.substTy subst ty
+        ty'     = Type.substTyUnchecked subst ty
         eta_id' = uniqAway (getTCvInScope subst) $
                   mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) ty'
         subst'  = extendTCvInScope subst eta_id'

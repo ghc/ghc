@@ -3196,8 +3196,7 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 -- Note [The substitution invariant].
 checkValidSubst :: HasCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
--- TODO (RAE): Change back to ASSERT
-  = WARN( not (isValidTCvSubst subst),
+  = ASSERT2( isValidTCvSubst subst,
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$
              text "tenvFVs" <+> ppr (tyCoVarsOfTypesSet tenv) $$
@@ -3205,7 +3204,7 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
              text "cenvFVs" <+> ppr (tyCoVarsOfCosSet cenv) $$
              text "tys" <+> ppr tys $$
              text "cos" <+> ppr cos )
-    WARN( not tysCosFVsInScope,
+    ASSERT2( tysCosFVsInScope,
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$
              text "cenv" <+> ppr cenv $$
