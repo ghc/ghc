@@ -5,9 +5,11 @@ setTestOpts([
     # sequentially until this is fixed.  This likely means that #13194 isn't fully
     # solved.  See also #15313.
     when(opsys('mingw32'), multi_cpu_race),
-    # The Windows toolchain, particularly linking, is remarkably slow, give it
-    # time to do its thing
-    when(opsys('mingw32'), compile_timeout_multiplier(2))
+    # Unfortunately even with the above these tests are incredibly flaky on Windows.
+    # In any given testsuite run at least half a dozen fail for one reason of another
+    # (typically a cmmbination of timeouts, some missing static archive errors from ld,
+    # and a few plain crashes).
+    when(opsys('mingw32'), fragile(16405))
 ])
 
 
