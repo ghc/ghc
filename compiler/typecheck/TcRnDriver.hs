@@ -399,8 +399,8 @@ tcRnSrcDecls explicit_mod_hdr decls
 
         -- Check for the 'main' declaration
         -- Must do this inside the captureTopConstraints
+        -- NB: always set envs *before* captureTopConstraints
       ; (tcg_env, lie_main) <- setEnvs (tcg_env, tcl_env) $
-                               -- always set envs *before* captureTopConstraints
                                captureTopConstraints $
                                checkMain explicit_mod_hdr
 
@@ -502,10 +502,13 @@ run_th_modfinalizers = do
     let run_finalizer (lcl_env, f) =
             setLclEnv lcl_env (runRemoteModFinalizers f)
 
-    (_, lie_th) <- captureTopConstraints $ mapM_ run_finalizer th_modfinalizers
+    (_, lie_th) <- captureTopConstraints $
+                   mapM_ run_finalizer th_modfinalizers
+
       -- Finalizers can add top-level declarations with addTopDecls, so
       -- we have to run tc_rn_src_decls to get them
     (tcg_env, tcl_env, lie_top_decls) <- tc_rn_src_decls []
+
     setEnvs (tcg_env, tcl_env) $ do
       -- Subsequent rounds of finalizers run after any new constraints are
       -- simplified, or some types might not be complete when using reify
@@ -616,11 +619,12 @@ tcRnHsBootDecls hsc_src decls
                             , hs_defds  = def_decls
                             , hs_ruleds = rule_decls
                             , hs_annds  = _
-                            , hs_valds
-                                 = XValBindsLR (NValBinds val_binds val_sigs) })
+                            , hs_valds  = XValBindsLR (NValBinds val_binds val_sigs) })
               <- rnTopSrcDecls first_group
+
         -- The empty list is for extra dependencies coming from .hs-boot files
         -- See Note [Extra dependencies from .hs-boot files] in RnSource
+
         ; (gbl_env, lie) <- setGblEnv tcg_env $ captureTopConstraints $ do {
               -- NB: setGblEnv **before** captureTopConstraints so that
               -- if the latter reports errors, it knows what's in scope
@@ -2360,8 +2364,9 @@ tcRnExpr hsc_env mode rdr_expr
     uniq <- newUnique ;
     let { fresh_it  = itName uniq (getLoc rdr_expr)
         ; orig = lexprCtOrigin rn_expr } ;
-    (tclvl, lie, res_ty)
-          <- pushLevelAndCaptureConstraints $
+    ((tclvl, res_ty), lie)
+          <- captureTopConstraints $
+             pushTcLevelM          $
              do { (_tc_expr, expr_ty) <- tcInferSigma rn_expr
                 ; if inst
                   then snd <$> deeplyInstantiate orig expr_ty
@@ -2430,7 +2435,7 @@ tcRnType hsc_env normalise rdr_type
         -- First bring into scope any wildcards
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
        ; ((ty, kind), lie)  <-
-                       captureConstraints $
+                       captureTopConstraints $
                        tcWildCardBinders wcs $ \ wcs' ->
                        do { emitWildCardHoleConstraints wcs'
                           ; tcLHsTypeUnsaturated rn_type }

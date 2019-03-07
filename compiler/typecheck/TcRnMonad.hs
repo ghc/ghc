@@ -1684,7 +1684,7 @@ Hence:
   - insolublesOnly in tryCaptureConstraints
   - emitConstraints in the Left case of captureConstraints
 
-Hover note that fresly-generated constraints like (Int ~ Bool), or
+However note that freshly-generated constraints like (Int ~ Bool), or
 ((a -> b) ~ Int) are all CNonCanonical, and hence won't be flagged as
 insoluble.  The constraint solver does that.  So they'll be discarded.
 That's probably ok; but see th/5358 as a not-so-good example:

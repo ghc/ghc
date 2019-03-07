@@ -81,8 +81,21 @@ captureTopConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- generates plus the constraints produced by static forms inside.
 -- If it fails with an exception, it reports any insolubles
 -- (out of scope variables) before doing so
--- NB: bring any environments into scope before calling this, so that
--- the reportUnsolved has access to the most complete GlobalRdrEnv
+--
+-- captureTopConstraints is used exclusively by TcRnDriver at the top
+-- level of a module.
+--
+-- Importantly, if captureTopConstraints propagates an exception, it
+-- reports any insoluble constraints first, lest they be lost
+-- altogether.  This is important, because solveLocalEqualities (maybe
+-- other things too) throws an exception without adding any error
+-- messages; it just puts the unsolved constraints back into the
+-- monad. See TcRnMonad Note [Constraints and errors]
+-- Trac #16376 is an example of what goes wrong if you don't do this.
+--
+-- NB: the caller should bring any environments into scope before
+-- calling this, so that the reportUnsolved has access to the most
+-- complete GlobalRdrEnv
 captureTopConstraints thing_inside
   = do { static_wc_var <- TcM.newTcRef emptyWC ;
        ; (mb_res, lie) <- TcM.updGblEnv (\env -> env { tcg_static_wc = static_wc_var } ) $
