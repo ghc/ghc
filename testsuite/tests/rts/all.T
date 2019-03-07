@@ -74,7 +74,7 @@ test('T2047', [ignore_stdout, extra_run_opts('+RTS -c -RTS')],
 # Skip GHCi due to #2786
 test('T2783', [ omit_ways(['ghci']), exit_code(1)
               , expect_broken_for(2783, ['threaded1'])
-	      ], compile_and_run, [''])
+              ], compile_and_run, [''])
 
 # Test the work-stealing deque implementation.  We run this test in
 # both threaded1 (-threaded -debug) and threaded2 (-threaded) ways.
@@ -99,17 +99,15 @@ test('stack003', [ omit_ways('ghci'), # uses unboxed tuples
 
 # Test that +RTS -K0 (e.g. no stack limit) parses correctly
 test('stack004', [ extra_run_opts('+RTS -K0 -RTS')
-		 , expect_broken_for(14913, ['ghci'])
-		 ], compile_and_run, [''])
+                 , expect_broken_for(14913, ['ghci'])
+                 ], compile_and_run, [''])
 
 test('atomicinc', [ c_src, only_ways(['normal','threaded1', 'threaded2']) ], compile_and_run, [''])
 test('atomicxchg', [ c_src, only_ways(['threaded1', 'threaded2']) ],
 compile_and_run, [''])
 
 test('T3424',
-     [ # Skip due to non-deterministic timeouts on CI, see Trac #16349
-       when(unregisterised(), skip),
-       # And it's slow in general
+     [ when(unregisterised(), fragile(16349)),
        when(fast(), skip),
        only_ways(['normal','threaded1','ghci'])
      ],
@@ -219,7 +217,7 @@ test('T5435_v_asm_a', [extra_files(['T5435.hs', 'T5435_asm.c']),
 test('T5435_v_asm_b', [extra_files(['T5435.hs', 'T5435_asm.c']),
                       when(arch('powerpc64') or arch('powerpc64le'),
                           expect_broken(11259)),
-		      when(opsys('darwin') or opsys('mingw32'), skip)],
+                      when(opsys('darwin') or opsys('mingw32'), skip)],
      makefile_test, ['T5435_v_asm_b'])
 test('T5435_v_gcc', [extra_files(['T5435.hs', 'T5435_gcc.c']),
                      when(arch('powerpc64') or arch('powerpc64le'),
@@ -413,8 +411,8 @@ test('T13617', [ unless(opsys('mingw32'), skip)],
 # Test is being skipped on darwin due to it's flakiness.
 test('T12903', [ when(opsys('mingw32'), skip)
                , when(opsys('darwin'), skip)
-	           , omit_ways(['ghci', 'profasm'])]
-	       , compile_and_run, [''])
+               , omit_ways(['ghci', 'profasm'])]
+               , compile_and_run, [''])
 
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])
 test('T13894', normal, compile_and_run, [''])
