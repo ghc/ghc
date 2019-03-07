@@ -232,13 +232,13 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 
 dsLExpr (dL->L loc e)
-  = do core_expr <- putSrcSpanDs loc $ dsExpr e
-   -- uncomment this check to test the hsExprType function in TcHsSyn
-   --    ; MASSERT2( exprType core_expr `eqType` hsExprType e
-   --              , ppr e <+> dcolon <+> ppr (hsExprType e) $$
-   --                ppr core_expr <+> dcolon <+> ppr (exprType core_expr) )
+  = do { core_expr <- putSrcSpanDs loc $ dsExpr e
+       -- uncomment this check to test the hsExprType function in TcHsSyn
+       --    ; MASSERT2( exprType core_expr `eqType` hsExprType e
+       --              , ppr e <+> dcolon <+> ppr (hsExprType e) $$
+       --                ppr core_expr <+> dcolon <+> ppr (exprType core_expr) )
        ; m <- getModule
-       ; return $ Tick (srcSpanTick m loc) core_expr 
+       ; return $ Tick (srcSpanTick m loc) core_expr }
 
 srcSpanTick :: Module -> SrcSpan -> Tickish a
 srcSpanTick m loc
