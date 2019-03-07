@@ -1402,7 +1402,7 @@ def simple_run(name, way, prog, extra_run_opts):
             print('Wrong exit code for ' + name + '(' + way + ')' + '(expected', opts.exit_code, ', actual', exit_code, ')')
             dump_stdout(name)
             dump_stderr(name)
-        return failBecause('bad exit code')
+        return failBecause('bad exit code (%d)' % exit_code)
 
     if not (opts.ignore_stderr or stderr_ok(name, way) or opts.combined_output):
         return failBecause('bad stderr')
