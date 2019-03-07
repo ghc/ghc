@@ -134,7 +134,7 @@ validate-x86_64-darwin:
     - x86_64-darwin
   variables:
     GHC_VERSION: 8.6.3
-    BIN_DIST_NAME: "ghc-x86_64-apple-darwin"
+    BIN_DIST_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
@@ -196,7 +196,7 @@ validate-x86_64-darwin:
   allow_failure: true
   variables:
     TEST_ENV: "aarch64-linux-deb9"
-    BIN_DIST_NAME: "ghc-aarch64-linux-deb9"
+    BIN_DIST_TAR_COMP: "ghc-aarch64-linux-deb9.tar.xz"
   cache:
     key: linux-aarch64-deb9
   tags:
@@ -228,7 +228,7 @@ nightly-aarch64-linux-deb9:
   image: "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "i386-linux-deb9"
-    BIN_DIST_NAME: "ghc-i386-deb9-linux"
+    BIN_DIST_TAR_COMP: "ghc-i386-deb9-linux.tar.xz"
   cache:
     key: linux-i386-deb9
 
@@ -259,7 +259,7 @@ nightly-i386-linux-deb9:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9"
-    BIN_DIST_NAME: "ghc-x86_64-deb9-linux"
+    BIN_DIST_TAR_COMP: "ghc-x86_64-deb9-linux.tar.xz"
   cache:
     key: linux-x86_64-deb9
 
@@ -299,7 +299,7 @@ validate-x86_64-linux-deb9-integer-simple:
   variables:
     INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
-    BIN_DIST_NAME: "ghc-x86_64-deb9-linux-integer-simple"
+    BIN_DIST_TAR_COMP: "ghc-x86_64-deb9-linux-integer-simple.tar.xz"
 
 nightly-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
@@ -332,7 +332,7 @@ release-x86_64-linux-deb8:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb8"
-    BIN_DIST_NAME: "ghc-x86_64-deb8-linux"
+    BIN_DIST_TAR_COMP: "ghc-x86_64-deb8-linux.tar.xz"
   only:
     - tags
   cache:
@@ -352,7 +352,7 @@ release-x86_64-linux-fedora27:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-fedora27"
-    BIN_DIST_NAME: "ghc-x86_64-fedora27-linux"
+    BIN_DIST_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
   only:
     - tags
   cache:
@@ -427,7 +427,7 @@ validate-x86_64-windows:
   variables:
     GHC_VERSION: "8.6.2"
     LANG: "en_US.UTF-8"
-    BIN_DIST_NAME: "ghc-x86_64-windows-hadrian"
+    BIN_DIST_TAR_COMP: "ghc-x86_64-windows-hadrian.tar.xz"
   script:
     - |
       set MSYSTEM=MINGW64
