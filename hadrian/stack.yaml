@@ -1,7 +1,7 @@
 # For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-13.6
+resolver: lts-13.14
 
 # Local packages, usually specified by relative directory name
 packages:
@@ -17,10 +17,6 @@ packages:
 #
 # TODO: Remove this once it's no longer necessary
 allow-newer: true
-
-# shake-0.17.4 and below depend on heaps, which depends on a specific Cabal
-extra-deps:
-- shake-0.17.5
 
 nix:
    enable: false
