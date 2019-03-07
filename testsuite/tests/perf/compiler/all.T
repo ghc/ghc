@@ -356,10 +356,9 @@ test('T13719',
 test('T14697',
      [ collect_compiler_stats('bytes allocated',10),
        # This generates too large of a command-line for poor Windows and
-       # Darwin. The failure is non-deterministic, so we 'skip' it rather than
-       # 'expect_broken'. The solution is to teach the testsuite driver to
-       # invoke GHC with a response file, see Trac #15072
-       when(opsys('mingw32') or opsys('darwin'), skip),
+       # Darwin. The solution is to teach the testsuite driver to
+       # invoke GHC with a response file.
+       when(opsys('mingw32') or opsys('darwin'), fragile(15072)),
        pre_cmd('./genT14697'),
        extra_files(['genT14697']),
        extra_hc_opts('$(cat T14697-flags)'), # 10k -optP arguments
