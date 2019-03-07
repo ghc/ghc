@@ -20,7 +20,7 @@ allow-newer: true
 
 # shake-0.17.4 and below depend on heaps, which depends on a specific Cabal
 extra-deps:
-- shake-0.17.5
+- shake-0.17.7
 
 nix:
    enable: false
