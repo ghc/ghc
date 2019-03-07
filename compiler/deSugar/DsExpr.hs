@@ -232,13 +232,13 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 
 dsLExpr (dL->L loc e)
-  = putSrcSpanDs loc $
-    do { core_expr <- dsExpr e
-   -- uncomment this check to test the hsExprType function in TcHsSyn
-   --    ; MASSERT2( exprType core_expr `eqType` hsExprType e
-   --              , ppr e <+> dcolon <+> ppr (hsExprType e) $$
-   --                ppr core_expr <+> dcolon <+> ppr (exprType core_expr) )
-       ; return core_expr }
+  = do ce <- putSrcSpanDs loc $ dsExpr e
+       m <- getModule
+       return $ Tick (srcSpanTick m loc) ce 
+
+srcSpanTick :: Module -> SrcSpan -> Tickish a
+srcSpanTick m loc
+  = ProfNote (AllCafsCC m loc) False True
 
 -- | Variant of 'dsLExpr' that ensures that the result is not levity
 -- polymorphic. This should be used when the resulting expression will
