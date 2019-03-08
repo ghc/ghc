@@ -51,16 +51,6 @@ Unregisterised="@Unregisterised@"
 AC_SUBST(Unregisterised)
 
 #
-dnl ** Check Perl installation **
-#
-AC_PATH_PROG(PerlCmd,perl)
-if test -z "$PerlCmd"; then
-   echo "You must install perl before you can continue"
-   echo "Perhaps it is already installed, but not in your PATH?"
-   exit 1
-fi
-
-#
 dnl ** figure out how to do a BSD-ish install **
 #
 AC_PROG_INSTALL

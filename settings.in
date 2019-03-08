@@ -19,7 +19,6 @@
  ("dllwrap command", "@SettingsDllWrapCommand@"),
  ("windres command", "@SettingsWindresCommand@"),
  ("libtool command", "@SettingsLibtoolCommand@"),
- ("perl command", "@SettingsPerlCommand@"),
  ("cross compiling", "@CrossCompiling@"),
  ("target os", "@HaskellTargetOs@"),
  ("target arch", "@HaskellTargetArch@"),

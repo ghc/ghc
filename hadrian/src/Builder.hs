@@ -127,7 +127,6 @@ data Builder = Alex
              | Nm
              | Objdump
              | Patch
-             | Perl
              | Python
              | Ranlib
              | RunTest
@@ -305,7 +304,6 @@ systemBuilderPath builder = case builder of
     Nm              -> fromKey "nm"
     Objdump         -> fromKey "objdump"
     Patch           -> fromKey "patch"
-    Perl            -> fromKey "perl"
     Python          -> fromKey "python"
     Ranlib          -> fromKey "ranlib"
     RunTest         -> fromKey "python"

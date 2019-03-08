@@ -19,7 +19,6 @@ INPLACE_BIN             = $(INPLACE)/bin
 INPLACE_LIB             = $(INPLACE)/lib
 INPLACE_TOPDIR          = $(INPLACE)/lib
 INPLACE_MINGW           = $(INPLACE)/mingw
-INPLACE_PERL            = $(INPLACE)/perl
 
 ################################################################################
 #

@@ -117,7 +117,6 @@ download_tarballs() {
     if test "$mingw_arch" != "sources"; then
         download_mingw "${format_url}-mpc-1.0.3-2-any.pkg.tar.xz"
         download_mingw "${format_url}-gcc-libs-7.2.0-1-any.pkg.tar.xz"
-        download_file "https://downloads.haskell.org/~ghc/mingw/ghc-perl-1.tar.gz" "ghc-tarballs/perl/ghc-perl-1.tar.gz" "Windows Perl binary distributions" "" ""
     else
         local format_url="${mingw_base_url}/${mingw_arch}/${package_prefix}"
         download_mingw "${format_url}-i686-mpc-1.0.3-2.src.tar.gz"
