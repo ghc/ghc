@@ -143,7 +143,9 @@ pprBytes bs = sdocWithDynFlags $ \dflags ->
     else unsafePerformIO $ do
       bFile <- newTempName dflags TFL_CurrentModule ".dat"
       BS.writeFile bFile bs
-      return $ text "\t.incbin \"" <> text bFile <> text "\"\n\t.byte 0"
+      return $ text "\t.incbin "
+         <> pprFilePathString bFile -- proper escape (see #16389)
+         <> text "\n\t.byte 0"
 
 {-
 Note [Embedding large binary blobs]

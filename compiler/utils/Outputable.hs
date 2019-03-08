@@ -56,7 +56,7 @@ module Outputable (
 
         pprPrimChar, pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64,
 
-        pprFastFilePath,
+        pprFastFilePath, pprFilePathString,
 
         -- * Controlling the style in which output is printed
         BindingSite(..),
@@ -998,6 +998,16 @@ pprInfixVar is_operator pp_v
 ---------------------
 pprFastFilePath :: FastString -> SDoc
 pprFastFilePath path = text $ normalise $ unpackFS path
+
+-- | Normalise, escape and render a string representing a path
+--
+-- e.g. "c:\\whatever"
+pprFilePathString :: FilePath -> SDoc
+pprFilePathString path = doubleQuotes $ text (escape (normalise path))
+   where
+      escape []        = []
+      escape ('\\':xs) = '\\':'\\':escape xs
+      escape (x:xs)    = x:escape xs
 
 {-
 ************************************************************************
