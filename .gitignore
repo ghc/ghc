@@ -8,6 +8,12 @@
 /latex-test/out/
 /hoogle-test/out/
 
+*.o
+*.hi
+*.dyn_o
+*.dyn_hi
+*.hp
+
 /doc/haddock
 /doc/haddock.ps
 /doc/haddock.pdf
