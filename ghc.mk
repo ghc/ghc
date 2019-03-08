@@ -665,7 +665,6 @@ BUILD_DIRS += utils/hpc
 BUILD_DIRS += utils/runghc
 BUILD_DIRS += ghc
 BUILD_DIRS += docs/users_guide
-BUILD_DIRS += utils/count_lines
 BUILD_DIRS += utils/compare_sizes
 BUILD_DIRS += utils/iserv
 
