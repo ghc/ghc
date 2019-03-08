@@ -23,6 +23,9 @@
 
  * `--show-interface` now outputs to stdout (instead of stderr)
 
+ * Render associated type defaults and also improve rendering of
+   default method signatures
+
 ## Changes in version 2.22.0
 
  * Make `--package-version` optional for `--hoogle` (#899)

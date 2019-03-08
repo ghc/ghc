@@ -35,6 +35,7 @@ module Haddock.Backends.Xhtml.Layout (
   subInstances, subOrphanInstances,
   subInstHead, subInstDetails, subFamInstDetails,
   subMethods,
+  subDefaults,
   subMinimal,
 
   topDeclElem, declElem,
@@ -258,6 +259,9 @@ instAnchorId iid = makeAnchorId $ "i:" ++ iid
 
 subMethods :: [Html] -> Html
 subMethods = divSubDecls "methods" "Methods" . subBlock
+
+subDefaults :: [Html] -> Html
+subDefaults = divSubDecls "default" "" . subBlock
 
 subMinimal :: Html -> Html
 subMinimal = divSubDecls "minimal" "Minimal complete definition" . Just . declElem

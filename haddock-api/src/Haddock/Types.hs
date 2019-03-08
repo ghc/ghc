@@ -355,6 +355,9 @@ showWrapped f (Unadorned n) = f n
 showWrapped f (Parenthesized n) = "(" ++ f n ++ ")"
 showWrapped f (Backticked n) = "`" ++ f n ++ "`"
 
+instance HasOccName DocName where
+
+    occName = occName . getName
 
 -----------------------------------------------------------------------------
 -- * Instances

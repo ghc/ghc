@@ -295,7 +295,7 @@ ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
 --    | Just _  <- tcdTyPats d    -> ppTyInst False loc doc d unicode
 -- Family instances happen via FamInst now
   TyClD _ d@ClassDecl{}          -> ppClassDecl instances doc subdocs d unicode
-  SigD _ (TypeSig _ lnames ty)   -> ppFunSig (doc, fnArgsDoc) (map unLoc lnames) (hsSigWcType ty) unicode
+  SigD _ (TypeSig _ lnames ty)   -> ppFunSig Nothing (doc, fnArgsDoc) (map unLoc lnames) (hsSigWcType ty) unicode
   SigD _ (PatSynSig _ lnames ty) -> ppLPatSig (doc, fnArgsDoc) (map unLoc lnames) ty unicode
   ForD _ d                       -> ppFor (doc, fnArgsDoc) d unicode
   InstD _ _                      -> empty
@@ -307,7 +307,7 @@ ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
 
 ppFor :: DocForDecl DocName -> ForeignDecl DocNameI -> Bool -> LaTeX
 ppFor doc (ForeignImport _ (L _ name) typ _) unicode =
-  ppFunSig doc [name] (hsSigType typ) unicode
+  ppFunSig Nothing doc [name] (hsSigType typ) unicode
 ppFor _ _ _ = error "ppFor error in Haddock.Backends.LaTeX"
 --  error "foreign declarations are currently not supported by --latex"
 
@@ -414,17 +414,23 @@ ppTySyn _ _ _ = error "declaration not supported by ppTySyn"
 -------------------------------------------------------------------------------
 
 
-ppFunSig :: DocForDecl DocName -> [DocName] -> LHsType DocNameI
-         -> Bool -> LaTeX
-ppFunSig doc docnames (L _ typ) unicode =
+ppFunSig
+  :: Maybe LaTeX         -- ^ a prefix to put right before the signature
+  -> DocForDecl DocName  -- ^ documentation
+  -> [DocName]           -- ^ pattern names in the pattern signature
+  -> LHsType DocNameI    -- ^ type of the pattern synonym
+  -> Bool                -- ^ unicode
+  -> LaTeX
+ppFunSig leader doc docnames (L _ typ) unicode =
   ppTypeOrFunSig typ doc
-    ( ppTypeSig names typ False
-    , hsep . punctuate comma $ map ppSymName names
+    ( lead $ ppTypeSig names typ False
+    , lead $ hsep . punctuate comma $ map ppSymName names
     , dcolon unicode
     )
     unicode
  where
    names = map getName docnames
+   lead = maybe id (<+>) leader
 
 -- | Pretty-print a pattern synonym
 ppLPatSig :: DocForDecl DocName  -- ^ documentation
@@ -433,15 +439,7 @@ ppLPatSig :: DocForDecl DocName  -- ^ documentation
           -> Bool                -- ^ unicode
           -> LaTeX
 ppLPatSig doc docnames ty unicode
-  = ppTypeOrFunSig typ doc
-      ( keyword "pattern" <+> ppTypeSig names typ False
-      , keyword "pattern" <+> (hsep . punctuate comma $ map ppSymName names)
-      , dcolon unicode
-      )
-      unicode
-  where
-    typ = unLoc (hsSigType ty)
-    names = map getName docnames
+  = ppFunSig (Just (keyword "pattern")) doc docnames (hsSigType ty) unicode
 
 -- | Pretty-print a type, adding documentation to the whole type and its
 -- arguments as needed.
@@ -585,6 +583,7 @@ ppFds fds unicode =
                            hsep (map (ppDocName . unLoc) vars2)
 
 
+-- TODO: associated types, associated type defaults, docs on default methods
 ppClassDecl :: [DocInstance DocNameI]
             -> Documentation DocName -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocNameI -> Bool -> LaTeX
@@ -610,13 +609,15 @@ ppClassDecl instances doc subdocs
 
     methodTable =
       text "\\haddockpremethods{}" <> emph (text "Methods") $$
-      vcat  [ ppFunSig doc names (hsSigWcType typ) unicode
-            | L _ (TypeSig _ lnames typ) <- lsigs
-            , let doc = lookupAnySubdoc (head names) subdocs
-                  names = map unLoc lnames ]
-              -- FIXME: is taking just the first name ok? Is it possible that
-              -- there are different subdocs for different names in a single
-              -- type signature?
+      vcat  [ ppFunSig leader doc names (hsSigType typ) unicode
+            | L _ (ClassOpSig _ is_def lnames typ) <- lsigs
+            , let doc | is_def = noDocForDecl
+                      | otherwise = lookupAnySubdoc (head names) subdocs
+                  names = map unLoc lnames
+                  leader = if is_def then Just (keyword "default") else Nothing
+            ]
+            -- N.B. taking just the first name is ok. Signatures with multiple
+            -- names are expanded so that each name gets its own signature.
 
     instancesBit = ppDocInstances unicode instances
 
