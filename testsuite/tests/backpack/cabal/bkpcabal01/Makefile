@@ -21,13 +21,13 @@ bkpcabal01: clean
 	$(SETUP) build
 	$(SETUP) copy
 	$(SETUP) register
-	# typecheck q
-	$(CONFIGURE) --cid "q-0.1" q
+	# build p
+	$(CONFIGURE) --cid "p-0.1" p --instantiate-with "H=impl-0.1:H"
 	$(SETUP) build
 	$(SETUP) copy
 	$(SETUP) register
-	# build p
-	$(CONFIGURE) --cid "p-0.1" p --instantiate-with "H=impl-0.1:H"
+	# typecheck q
+	$(CONFIGURE) --cid "q-0.1" q
 	$(SETUP) build
 	$(SETUP) copy
 	$(SETUP) register
@@ -44,13 +44,13 @@ bkpcabal01: clean
 	$(SETUP) build
 	$(SETUP) copy
 	$(SETUP) register
-	# re-typecheck q (if buggy, this is what would fail)
-	$(CONFIGURE) --cid "q-0.1" q
+	# re-build p
+	$(CONFIGURE) --cid "p-0.1" p --instantiate-with "H=impl-0.1:H"
 	$(SETUP) build
 	$(SETUP) copy
 	$(SETUP) register
-	# re-build p
-	$(CONFIGURE) --cid "p-0.1" p --instantiate-with "H=impl-0.1:H"
+	# re-typecheck q (if buggy, this is what would fail)
+	$(CONFIGURE) --cid "q-0.1" q
 	$(SETUP) build
 	$(SETUP) copy
 	$(SETUP) register
