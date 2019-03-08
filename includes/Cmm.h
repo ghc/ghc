@@ -836,15 +836,6 @@
    Update remembered set write barrier
    -------------------------------------------------------------------------- */
 
-/* Record that a reference to object `p`, residing at word `origin_field` of
- * object `origin` has been overwritten. This implements the nonmoving collector's
- * update remembered set write barrier.
- */
-#define recordMutatedPtr(p)                             \
-    if (nonmoving_write_barrier_enabled != 0) (likely: False) { \
-        ccall updateRemembSetPushClosure_(BaseReg "ptr", (p) "ptr"); \
-    }
-
 /* -----------------------------------------------------------------------------
    Arrays
    -------------------------------------------------------------------------- */
@@ -947,3 +938,11 @@
     prim %memcpy(dst_p, src_p, n * SIZEOF_W, SIZEOF_W);        \
                                                                \
     return (dst);
+
+
+// A useful helper for pushing a pointer to the update remembered set.
+// See Note [Update remembered set] in NonMovingMark.c.
+#define updateRemembSetPushPtr(p)                                \
+    if (nonmoving_write_barrier_enabled != 0) (likely: False) {  \
+      ccall updateRemembSetPushClosure_(BaseReg "ptr", p "ptr"); \
+    }

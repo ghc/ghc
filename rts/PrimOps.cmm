@@ -354,9 +354,7 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
         I8[arr + SIZEOF_StgMutArrPtrs + WDS(len) + (ind >> MUT_ARR_PTRS_CARD_BITS )] = 1;
 
         // Concurrent GC write barrier
-        if (nonmoving_write_barrier_enabled != 0) (likely: False) {
-            ccall updateRemembSetPushClosure_(BaseReg "ptr", old "ptr");
-        }
+        updateRemembSetPushPtr(old);
 
         return (0,new);
     }
@@ -549,7 +547,7 @@ stg_casSmallArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
         SET_HDR(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info, CCCS);
 
         // Concurrent GC write barrier
-        recordMutatedPtr(old);
+        updateRemembSetPushPtr(old);
 
         return (0,new);
     }
@@ -796,9 +794,7 @@ stg_addCFinalizzerToWeakzh ( W_ fptr,   // finalizer
     }
 
     // Write barrier for concurrent non-moving collector
-    if (nonmoving_write_barrier_enabled != 0) (likely: False) {
-        ccall updateRemembSetPushClosure(MyCapability() "ptr", StgWeak_cfinalizers(w) "ptr");
-    }
+    updateRemembSetPushPtr(StgWeak_cfinalizers(w))
 
     StgCFinalizerList_link(c) = StgWeak_cfinalizers(w);
     StgWeak_cfinalizers(w) = c;
@@ -880,9 +876,7 @@ stg_deRefWeakzh ( gcptr w )
         code = 1;
         val = StgWeak_value(w);
         // See Note [Concurrent read barrier on deRefWeak#] in NonMovingMark.c
-        if (nonmoving_write_barrier_enabled != 0) (likely: False) {
-            ccall updateRemembSetPushClosure(MyCapability() "ptr", val "ptr");
-        }
+        updateRemembSetPushPtr(val);
     } else {
         code = 0;
         val = w;
@@ -1592,9 +1586,7 @@ loop:
         unlockClosure(mvar, info);
         // However, we do need to ensure that the nonmoving collector
         // knows about the reference to the value that we just removed...
-        if (nonmoving_write_barrier_enabled != 0) (likely: False) {
-            ccall updateRemembSetPushClosure(MyCapability() "ptr", val "ptr");
-        }
+        updateRemembSetPushPtr(val);
         return (val);
     }
     if (StgHeader_info(q) == stg_IND_info ||
@@ -1983,11 +1975,9 @@ stg_makeStableNamezh ( P_ obj )
         snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) = sn_obj;
 
         // Concurrent GC write barrier
-        if (nonmoving_write_barrier_enabled != 0) (likely: False) {
-            // We only need to push obj itself to the update remembered set
-            // since we know that sn_obj will be on the nursery anyways.
-            ccall updateRemembSetPushClosure_(BaseReg "ptr", obj "ptr");
-        }
+        // We only need to push obj itself to the update remembered set
+        // since we know that sn_obj will be on the nursery anyways.
+        updateRemembSetPushPtr(obj);
     } else {
         sn_obj = snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry);
     }

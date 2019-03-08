@@ -77,10 +77,6 @@ static void* nonmovingConcurrentMark(void *mark_queue);
 static void nonmovingClearBitmap(struct NonmovingSegment *seg);
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads);
 
-/* Signals to mutators that they should stop to synchronize with the nonmoving
- * collector so it can proceed to sweep phase. */
-bool nonmoving_syncing = false;
-
 static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t block_size)
 {
     seg->link = NULL;
