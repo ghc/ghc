@@ -461,7 +461,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
                          nonDetEltsUFM $ fileIds' `minusUFM` fileIds
             -- See Note [Unique Determinism and code generation]
             pprDecl (f,n) = text "\t.file " <> ppr n <+>
-                            doubleQuotes (ftext f)
+                            pprFilePathString (unpackFS f)
 
         emitNativeCode dflags h $ vcat $
           map pprDecl newFileIds ++
