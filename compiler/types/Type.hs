@@ -54,6 +54,7 @@ module Type (
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
         mkFamilyTyConApp,
+        liftFunTildeTys,
 
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
@@ -1133,7 +1134,18 @@ applyTysX tvs body_ty arg_tys
     pp_stuff = vcat [ppr tvs, ppr body_ty, ppr arg_tys]
     n_tvs = length tvs
 
-
+liftFunTildeTys :: Type -> Type
+liftFunTildeTys ty | Just ty' <- coreView ty = liftFunTildeTys ty'
+liftFunTildeTys (TyVarTy v) = TyVarTy v
+liftFunTildeTys (AppTy a b) = AppTy (liftFunTildeTys a) (liftFunTildeTys b)
+liftFunTildeTys (TyConApp k tys) = TyConApp k (map liftFunTildeTys tys)
+liftFunTildeTys (ForAllTy bndr ty) = ForAllTy bndr (liftFunTildeTys ty)
+liftFunTildeTys (FunTy arg res) = FunTy (liftFunTildeTys arg) (liftFunTildeTys res)
+liftFunTildeTys (FunTildeTy arg res) = FunTy (liftFunTildeTys arg) (liftFunTildeTys res)
+liftFunTildeTys (LitTy l) = LitTy l
+liftFunTildeTys (CastTy ty co) = CastTy (liftFunTildeTys ty) co
+liftFunTildeTys (CoercionTy co) = CoercionTy co
+-- TODO: handle coercions in @liftFunTildeTys@
 
 {- Note [Care with kind instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1160,8 +1172,9 @@ We have
 So again we must instantiate.
 
 The same thing happens in ToIface.toIfaceAppArgsX.
+-}
 
-
+{-
 ---------------------------------------------------------------------
                                 TyConApp
                                 ~~~~~~~~
@@ -1175,6 +1188,10 @@ mkTyConApp tycon tys
   , [_rep1,_rep2,ty1,ty2] <- tys
   = FunTy { ft_af = VisArg, ft_arg = ty1, ft_res = ty2 }
     -- The FunTyCon (->) is always a visible one
+
+  | isFunTildeTyCon tycon
+  , [_rep1,_rep2,ty1,ty2] <- tys
+  = FunTildeTy ty1 ty2
 
   | otherwise
   = TyConApp tycon tys

@@ -56,6 +56,7 @@ module Coercion (
         splitTyConAppCo_maybe,
         splitAppCo_maybe,
         splitFunCo_maybe,
+        splitFunTildeCo_maybe,
         splitForAllCo_maybe,
         splitForAllCo_ty_maybe, splitForAllCo_co_maybe,
 
@@ -453,6 +454,10 @@ splitAppCo_maybe _ = Nothing
 splitFunCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
 splitFunCo_maybe (FunCo _ arg res) = Just (arg, res)
 splitFunCo_maybe _ = Nothing
+
+splitFunTildeCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
+splitFunTildeCo_maybe (FunTildeCo _ arg res) = Just (arg, res)
+splitFunTildeCo_maybe _ = Nothing
 
 splitForAllCo_maybe :: Coercion -> Maybe (TyCoVar, Coercion, Coercion)
 splitForAllCo_maybe (ForAllCo tv k_co co) = Just (tv, k_co, co)

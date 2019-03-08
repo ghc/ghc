@@ -20,7 +20,7 @@ import GhcPrelude
 import CoreSyn
 import CoreUtils        ( exprType, findDefault, isJoinBind
                         , exprIsTickedString_maybe )
-import CoreArity        ( manifestArity )
+import CoreArity        ( manifestArity, funTildeTypeArity )
 import StgSyn
 
 import Type
@@ -548,7 +548,12 @@ coreToStgApp f args ticks = do
                                     StgOpApp (StgFCallOp call (idType f)) args' res_ty
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
-                _other           -> StgApp f args'
+                _other           ->
+                  let b = if isFunTildeTy (idType f) then saturated else True
+                  in StgApp (ASSERT2 ( b
+                                     , (hsep [ppr f,text "expects",ppr f_arity,text "args"]
+                                        $$ text "given" <+> ppr n_val_args
+                                        $$ ppr (mkApps (Var f) args))) f) args'
 
         tapp = foldr StgTick app (ticks ++ ticks')
 
@@ -934,6 +939,7 @@ myCollectArgs expr
 -- It all seems a bit yukky to me.
 
 stgArity :: Id -> HowBound -> Arity
+stgArity f _ | isFunTildeTy (idType f) = funTildeTypeArity (idType f)
 stgArity _ (LetBound _ arity) = arity
 stgArity f ImportBound        = idArity f
 stgArity _ LambdaBound        = 0

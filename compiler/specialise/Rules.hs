@@ -839,6 +839,11 @@ match_co renv subst co1 co2
       Just (arg2, res2)
         -> match_cos renv subst [arg1, res1] [arg2, res2]
       _ -> Nothing
+  | Just (arg1, res1) <- splitFunTildeCo_maybe co1
+  = case splitFunTildeCo_maybe co2 of
+      Just (arg2, res2)
+        -> match_cos renv subst [arg1, res1] [arg2, res2]
+      _ -> Nothing
 match_co _ _ _co1 _co2
     -- Currently just deals with CoVarCo, TyConAppCo and Refl
 #if defined(DEBUG)

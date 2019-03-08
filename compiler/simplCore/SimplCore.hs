@@ -267,6 +267,12 @@ getCoreToDo dflags
                 -- Don't stop now!
         simpl_phase 0 ["main"] (max max_iter 3),
 
+        runWhen eta_arity $ CoreDoPasses
+            [ CoreDoEtaArity
+            , simpl_phase 0 ["post-eta-arity"] max_iter
+            ],
+            -- This "so far" has been the best place to put this pass
+
         runWhen do_float_in CoreDoFloatInwards,
             -- Run float-inwards immediately before the strictness analyser
             -- Doing so pushes bindings nearer their use site and hence makes
@@ -302,11 +308,6 @@ getCoreToDo dflags
                 -- succeed in commoning up things floated out by full laziness.
                 -- CSE used to rely on the no-shadowing invariant, but it doesn't any more
 
-        runWhen eta_arity $ CoreDoPasses
-            [ CoreDoEtaArity
-            , simpl_phase 0 ["post-eta-arity"] max_iter
-            ],
-
         runWhen do_float_in CoreDoFloatInwards,
 
         maybe_rule_check (Phase 0),
@@ -319,7 +320,6 @@ getCoreToDo dflags
             ]),         -- Run the simplifier after LiberateCase to vastly
                         -- reduce the possibility of shadowing
                         -- Reason: see Note [Shadowing] in SpecConstr.hs
-
         runWhen spec_constr CoreDoSpecConstr,
 
         maybe_rule_check (Phase 0),

@@ -525,6 +525,10 @@ mkArgInfo env fun rules n_val_args call_cont
           -- strict. isLiftedType_maybe will return Just False only when
           -- we're sure the type is unlifted.
 
+      | Just (arg_ty, fun_ty') <- splitFunTildeTy_maybe fun_ty
+      = (str || Just False == isLiftedType_maybe arg_ty)
+        : add_type_str fun_ty' strs
+
       | Just (_, fun_ty') <- splitForAllTy_maybe fun_ty
       = add_type_str fun_ty' all_strs     -- Look through foralls
 

@@ -259,12 +259,6 @@ flatEtaType 0 (FunTy arg res) = FunTy arg (flatEtaType 0 res)
 flatEtaType n (FunTy arg res) = FunTildeTy arg (flatEtaType (n-1) res)
 flatEtaType _ ty = ty
 
--- ^ Uses only extensional functions to derive arity
-etaTypeArity :: Type -> Arity
-etaTypeArity (FunTildeTy _ res) = 1 + etaTypeArity res
-etaTypeArity (ForAllTy _ body_ty) = etaTypeArity body_ty
-etaTypeArity _ = 0
-
 -- ^ Given an expression and it's name, generate a new expression with a
 -- tilde-lambda type. This is the exact same code, but we have encoded the arity
 -- in the type.

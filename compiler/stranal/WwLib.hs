@@ -982,6 +982,9 @@ findTypeShape fam_envs ty
   | Just (_, res) <- splitFunTy_maybe ty
   = TsFun (findTypeShape fam_envs res)
 
+  | Just (_, res) <- splitFunTildeTy_maybe ty
+  = TsFun (findTypeShape fam_envs res)
+
   | Just (_, ty') <- splitForAllTy_maybe ty
   = findTypeShape fam_envs ty'
 
