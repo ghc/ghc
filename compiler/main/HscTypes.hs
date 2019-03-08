@@ -375,7 +375,8 @@ shouldPrintWarning _ _
 -- | HscEnv is like 'Session', except that some of the fields are immutable.
 -- An HscEnv is used to compile a single module from plain Haskell source
 -- code (after preprocessing) to either C, assembly or C--. It's also used
--- to store the dynamic linker state to allow for multiple linkers.
+-- to store the dynamic linker state to allow for multiple linkers in the
+-- same address space.
 -- Things like the module graph don't change during a single compilation.
 --
 -- Historical note: \"hsc\" used to be the name of the compiler binary,
