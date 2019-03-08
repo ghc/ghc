@@ -1,4 +1,4 @@
 #!/bin/sh
 yum update -y
 yum install -y glibc-devel ncurses-devel gmp-devel autoconf automake libtool \
- gcc make perl python ghc git
+ gcc make python ghc git

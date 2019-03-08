@@ -29,7 +29,6 @@ nofibRules = do
         makePath <- builderPath (Make "nofib")
         top      <- topDirectory
         ghcPath  <- builderPath (Ghc CompileHs Stage2)
-        perlPath <- builderPath Perl
 
         -- some makefiles in nofib rely on a $MAKE
         -- env var being defined
@@ -39,7 +38,7 @@ nofibRules = do
         -- subdirectory, passing the path to
         -- the GHC to benchmark and perl to
         -- nofib's makefiles.
-        let nofibArgs = ["WithNofibHc=" ++ (top -/- ghcPath), "PERL=" ++ perlPath]
+        let nofibArgs = ["WithNofibHc=" ++ (top -/- ghcPath)]
         unit $ cmd (Cwd "nofib") [makePath] ["clean"]
         unit $ cmd (Cwd "nofib") [makePath] (nofibArgs ++ ["boot"])
         (Exit e, Stdouterr log) <- cmd (Cwd "nofib") [makePath] nofibArgs

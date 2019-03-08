@@ -815,11 +815,6 @@ install : install_mingw
 install_mingw : $(INPLACE_MINGW)
 	"$(CP)" -Rp $(INPLACE_MINGW) $(prefix)
 
-install : install_perl
-.PHONY: install_perl
-install_perl : $(INPLACE_PERL)
-	"$(CP)" -Rp $(INPLACE_PERL) $(prefix)
-
 endif # Windows_Host
 
 ifneq "$(BINDIST)" "YES"
@@ -1025,7 +1020,6 @@ $(eval $(call bindist-list,.,\
     $(INPLACE_BIN)/mkdirhier \
     utils/ghc-cabal/dist-install/build/tmp/ghc-cabal \
     $(BINDIST_WRAPPERS) \
-    $(BINDIST_PERL_SOURCES) \
     $(BINDIST_LIBS) \
     $(BINDIST_HI) \
     $(BINDIST_EXTRAS) \

@@ -701,7 +701,6 @@ INSTALL			:= $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
 
 LN_S			= @LN_S@
 MV			= mv
-PERL 			= @PerlCmd@
 PIC			= pic
 RANLIB_CMD = @RANLIB_CMD@
 REAL_RANLIB_CMD = @REAL_RANLIB_CMD@
