@@ -515,13 +515,14 @@ nightly-i386-windows-hadrian:
   # due to #16084
   allow_failure: true
   variables:
+    BUILD_FLAVOUR: "quick"
     GHC_VERSION: "8.6.2"
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-mingw32.tar.xz"
   script:
     - |
       python boot
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
-    - bash -c "echo include mk/flavours/quick.mk > mk/build.mk"
+    - bash -c "echo include mk/flavours/${BUILD_FLAVOUR}.mk > mk/build.mk"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist TAR_COMP_OPTS=-1"
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
@@ -543,12 +544,22 @@ validate-x86_64-windows:
   cache:
     key: x86_64-windows
 
+# Normal Windows validate builds are profiled; that won't do for releases.
+release-x86_64-windows:
+  extends: validate-x86_64-windows
+  variables:
+    MSYSTEM: MINGW64
+    BUILD_FLAVOUR: "perf"
+  only:
+    - tags
+
 release-i386-windows:
   extends: .build-windows-make
   only:
     - tags
   variables:
     MSYSTEM: MINGW32
+    BUILD_FLAVOUR: "perf"
   cache:
     key: i386-windows
 
