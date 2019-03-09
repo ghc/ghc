@@ -1403,10 +1403,13 @@ dataConCannotMatch tys con
 
     -- TODO: could gather equalities from superclasses too
     predEqs pred = case classifyPredType pred of
-                     EqPred NomEq ty1 ty2       -> [(ty1, ty2)]
-                     ClassPred eq [_, ty1, ty2]
-                       | eq `hasKey` eqTyConKey -> [(ty1, ty2)]
-                     _                          -> []
+                     EqPred NomEq ty1 ty2         -> [(ty1, ty2)]
+                     ClassPred eq args
+                       | eq `hasKey` eqTyConKey
+                       , [_, ty1, ty2] <- args    -> [(ty1, ty2)]
+                       | eq `hasKey` heqTyConKey
+                       , [_, _, ty1, ty2] <- args -> [(ty1, ty2)]
+                     _                            -> []
 
 -- | Were the type variables of the data con written in a different order
 -- than the regular order (universal tyvars followed by existential tyvars)?
