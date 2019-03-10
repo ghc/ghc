@@ -210,6 +210,10 @@ ghcCanonVersion = do
 topDirectory :: Action FilePath
 topDirectory = fixAbsolutePathOnWindows =<< setting GhcSourcePath
 
+ghcVersionStage :: Stage -> Action String
+ghcVersionStage Stage0 = setting GhcVersion
+ghcVersionStage _      = setting ProjectVersion
+
 -- | The file suffix used for libraries of a given build 'Way'. For example,
 -- @_p.a@ corresponds to a static profiled library, and @-ghc7.11.20141222.so@
 -- is a dynamic vanilly library. Why do we need GHC version number in the
@@ -219,11 +223,11 @@ topDirectory = fixAbsolutePathOnWindows =<< setting GhcSourcePath
 -- live in their own per-package directory and hence do not need a unique
 -- filename. We also need to respect the system's dynamic extension, e.g. @.dll@
 -- or @.so@.
-libsuf :: Way -> Action String
-libsuf way
+libsuf :: Stage -> Way -> Action String
+libsuf st way
     | not (wayUnit Dynamic way) = return (waySuffix way ++ ".a") -- e.g., _p.a
     | otherwise = do
         extension <- setting DynamicExtension -- e.g., .dll or .so
-        version   <- setting ProjectVersion   -- e.g., 7.11.20141222
+        version   <- ghcVersionStage st -- e.g. 8.4.4 or 8.9.xxxx
         let suffix = waySuffix (removeWayUnit Dynamic way)
         return (suffix ++ "-ghc" ++ version ++ extension)
