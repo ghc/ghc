@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 CABAL=cabal
-CABFLAGS="--disable-documentation --disable-profiling --disable-library-profiling"
+CABFLAGS="--disable-documentation --disable-profiling --disable-library-profiling $CABFLAGS"
 
 # It is currently more robust to pass Cabal an absolute path to the project file.
 PROJ="$PWD/hadrian/cabal.project"
