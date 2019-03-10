@@ -82,8 +82,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                 [ arg "-dynamic"
                 -- TODO what about windows?
                 , isLibrary pkg ? pure [ "-shared", "-dynload", "deploy" ]
-                , notStage0 ?
-                  hostSupportsRPaths ? arg ("-optl-Wl,-rpath," ++ rpath)
+                , hostSupportsRPaths ? arg ("-optl-Wl,-rpath," ++ rpath)
+                , hostSupportsRPaths ? arg ("-optl-Wl,-rpath,$ORIGIN")
                 ]
             , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
