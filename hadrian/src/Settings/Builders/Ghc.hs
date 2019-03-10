@@ -53,7 +53,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     originPath <- dropFileName <$> getOutput
     context <- getContext
     libPath' <- expr (libPath context)
-    distDir <- expr Context.distDir
+    st <- getStage
+    distDir <- expr (Context.distDir st)
 
     useSystemFfi <- expr (flag UseSystemFfi)
     buildPath <- getBuildPath

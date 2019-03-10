@@ -52,9 +52,9 @@ libPath Context {..} = buildRoot <&> (-/- (stageString stage -/- "lib"))
 --
 -- We preform some renaming to accomodate Cabal's slightly different naming
 -- conventions (see 'cabalOsString' and 'cabalArchString').
-distDir :: Action FilePath
-distDir = do
-    version        <- setting ProjectVersion
+distDir :: Stage -> Action FilePath
+distDir st = do
+    version        <- ghcVersionStage st
     hostOs         <- cabalOsString <$> setting BuildOs
     hostArch       <- cabalArchString <$> setting BuildArch
     return $ hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
@@ -85,7 +85,7 @@ pkgHaddockFile Context {..} = do
 -- @_build/stage1/libraries/array/build/libHSarray-0.5.1.0.a@.
 pkgLibraryFile :: Context -> Action FilePath
 pkgLibraryFile context@Context {..} = do
-    extension <- libsuf way
+    extension <- libsuf stage way
     pkgFile context "libHS" extension
 
 -- | Path to the GHCi library file of a given 'Context', e.g.:

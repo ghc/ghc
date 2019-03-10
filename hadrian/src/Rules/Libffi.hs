@@ -60,7 +60,7 @@ libffiLibrary = "inst/lib/libffi.a"
 rtsLibffiLibrary :: Stage -> Way -> Action FilePath
 rtsLibffiLibrary stage way = do
     name    <- libffiLibraryName
-    suf     <- libsuf way
+    suf     <- libsuf stage way
     rtsPath <- rtsBuildPath stage
     return $ rtsPath -/- "lib" ++ name ++ suf
 
