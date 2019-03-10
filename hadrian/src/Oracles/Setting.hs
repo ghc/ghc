@@ -3,7 +3,7 @@ module Oracles.Setting (
     getSettingList,  anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
     ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
     ghcCanonVersion, cmdLineLengthLimit, iosHost, osxHost, windowsHost,
-    hostSupportsRPaths, topDirectory, libsuf
+    hostSupportsRPaths, topDirectory, libsuf, ghcVersionStage
     ) where
 
 import Hadrian.Expression

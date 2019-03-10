@@ -45,7 +45,11 @@ instance NFData   CcMode
 -- * Compile a C source file.
 -- * Extract source dependencies by passing @-M@ command line argument.
 -- * Link object files & static libraries into an executable.
-data GhcMode = CompileHs | CompileCWithGhc | FindHsDependencies | LinkHs
+data GhcMode = CompileHs
+             | CompileCWithGhc
+             | FindHsDependencies
+             | LinkHs
+             | ToolArgs
     deriving (Eq, Generic, Show)
 
 instance Binary   GhcMode

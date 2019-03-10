@@ -11,7 +11,18 @@ import qualified Context as Context
 import Rules.Libffi (libffiName)
 
 ghcBuilderArgs :: Args
-ghcBuilderArgs = mconcat [compileAndLinkHs, compileC, findHsDependencies]
+ghcBuilderArgs = mconcat [ compileAndLinkHs, compileC, findHsDependencies
+                         , toolArgs]
+
+toolArgs :: Args
+toolArgs = do
+  builder (Ghc ToolArgs) ? mconcat
+              [ packageGhcArgs
+              , includeGhcArgs
+              , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
+              , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
+              , map ("-optP" ++) <$> getContextData cppOpts
+              ]
 
 compileAndLinkHs :: Args
 compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
