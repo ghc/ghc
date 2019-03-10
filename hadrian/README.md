@@ -158,6 +158,17 @@ build stage2:lib:text
 build stage1:exe:haddock
 ```
 
+#### Fast feedback using ghci
+
+Running the `./hadrian/ghci` target will load the main compiler into
+a ghci session. This is intended for fast development feedback, modules are only
+typechecked so it isn't possible to run any functions in the repl.
+
+You can also use this target with `ghcid`.
+
+The first time this command is run hadrian will need to compile a few dependencies
+which will take 1-2 minutes. Loading GHC into GHCi itself takes about 30 seconds.
+
 #### Testing
 
 To run GHC testsuite, use `build test`. See

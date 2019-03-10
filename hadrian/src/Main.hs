@@ -50,6 +50,7 @@ main = do
             Rules.SourceDist.sourceDistRules
             Rules.Test.testRules
             Rules.topLevelTargets
+            Rules.dumpArgsTarget
 
     shakeArgsWith options CommandLine.optDescrs $ \_ targets -> do
         Environment.setupEnvironment
