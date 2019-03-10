@@ -98,7 +98,7 @@ bindistRules = do
 
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
-        distDir        <- Context.distDir
+        distDir        <- Context.distDir Stage1
         rtsDir         <- pkgIdentifier rts
         windows        <- windowsHost
 
