@@ -8,7 +8,13 @@
 --
 -----------------------------------------------------------------------------
 
-module CgUtils ( fixStgRegisters ) where
+module CgUtils (
+        fixStgRegisters,
+        baseRegOffset,
+        get_Regtable_addr_from_offset,
+        regTableOffset,
+        get_GlobalReg_addr,
+  ) where
 
 import GhcPrelude
 
@@ -104,8 +110,7 @@ baseRegOffset _      UnwindReturnReg     = panic "CgUtils.baseRegOffset:UnwindRe
 get_GlobalReg_addr :: DynFlags -> GlobalReg -> CmmExpr
 get_GlobalReg_addr dflags BaseReg = regTableOffset dflags 0
 get_GlobalReg_addr dflags mid
-    = get_Regtable_addr_from_offset dflags
-                                    (globalRegType dflags mid) (baseRegOffset dflags mid)
+    = get_Regtable_addr_from_offset dflags (baseRegOffset dflags mid)
 
 -- Calculate a literal representing an offset into the register table.
 -- Used when we don't have an actual BaseReg to offset from.
@@ -113,8 +118,8 @@ regTableOffset :: DynFlags -> Int -> CmmExpr
 regTableOffset dflags n =
   CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r dflags + n))
 
-get_Regtable_addr_from_offset :: DynFlags -> CmmType -> Int -> CmmExpr
-get_Regtable_addr_from_offset dflags _ offset =
+get_Regtable_addr_from_offset :: DynFlags -> Int -> CmmExpr
+get_Regtable_addr_from_offset dflags offset =
     if haveRegBase (targetPlatform dflags)
     then CmmRegOff baseReg offset
     else regTableOffset dflags offset
@@ -179,4 +184,3 @@ fixStgRegStmt dflags stmt = fixAssign $ mapExpDeep fixExpr stmt
                                                    (wordWidth dflags))]
 
         other_expr -> other_expr
-
