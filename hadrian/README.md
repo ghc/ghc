@@ -248,14 +248,23 @@ Here are a few simple suggestions that might help you fix the build:
 
 * If Hadrian fails with the message
   `Configuration file hadrian/cfg/system.config is missing`, you have probably
-  forgotten to pass the `--configure` flag during the first build.
+  forgotten to pass the `--configure` flag during the first build. 
 
-* If you need help in debugging Hadrian, read the
-  [wiki](https://github.com/snowleopard/hadrian/wiki)
-  and Shake's [debugging tutorial](https://shakebuild.com/debugging).
+* With the `--configure` (`-c`) flag, Hadrian sometimes fetches a wrong 
+  Happy saying something like: `HappyTemplate-arrays-coerce: openFile: does not exist`
+  (as mentioned [here](https://github.com/haskell/cabal/issues/5867)), in 
+  which case you might be better off running `./configure` manually before Hadrian.
 
-If nothing helps, don't hesitate to create a GHC issue, choosing the
-component `Build System (Hadrian)`.
+* The call to `build test` sometimes fails with 
+  `libCffi_p.a: copyFile: does not exist` (as noticed 
+  [here](https://gitlab.haskell.org/ghc/ghc/issues/15877#note_166739)). 
+  The workaround is to `rm _build/stage1/libffi/build/inst/lib/libffi.a` and 
+  start over.
+
+If you need help in debugging Hadrian, read the 
+[wiki](https://github.com/snowleopard/hadrian/wiki)
+and Shake's [debugging tutorial](https://shakebuild.com/debugging).
+If nothing helps, don't hesitate to create a GHC issue.
 
 Current limitations
 -------------------
