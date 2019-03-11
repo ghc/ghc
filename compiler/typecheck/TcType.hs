@@ -2011,8 +2011,25 @@ isInsolubleOccursCheck eq_rel tv ty
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we expand superclasses, we use the following algorithm:
 
-expand( so_far, pred ) returns the transitive superclasses of pred,
-                               not including pred itself
+transSuperClasses( C tys ) returns the transitive superclasses
+                           of (C tys), not including C itself
+
+For example
+  class C a b => D a b
+  class D b a => C a b
+
+Then
+  transSuperClasses( Ord ty )  = [Eq ty]
+  transSuperClasses( C ta tb ) = [D tb ta, C tb ta]
+
+Notice that in the recursive-superclass case we include C again at
+the end of the chain.  One could exclude C in this case, but
+the code is more awkward and there seems no good reason to do so.
+(However C.f. TcCanonical.mk_strict_superclasses, which /does/
+appear to do so.)
+
+The algorithm is expand( so_far, pred ):
+
  1. If pred is not a class constraint, return empty set
        Otherwise pred = C ts
  2. If C is in so_far, return empty set (breaks loops)
@@ -2023,6 +2040,8 @@ Notice that
 
  * With normal Haskell-98 classes, the loop-detector will never bite,
    so we'll get all the superclasses.
+
+ * We need the loop-breaker in case we have UndecidableSuperClasses on
 
  * Since there is only a finite number of distinct classes, expansion
    must terminate.
