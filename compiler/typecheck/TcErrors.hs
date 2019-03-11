@@ -2577,15 +2577,15 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                             2 (sep [ text "bound by" <+> ppr skol_info
                                    , text "at" <+>
                                      ppr (tcl_loc (implicLclEnv implic)) ])
-        where ev_vars_matching = filter ev_var_matches (map evVarPred evvars)
-              ev_var_matches ty = case getClassPredTys_maybe ty of
-                 Just (clas', tys')
-                   | clas' == clas
-                   , Just _ <- tcMatchTys tys tys'
-                   -> True
-                   | otherwise
-                   -> any ev_var_matches (immSuperClasses clas' tys')
-                 Nothing -> False
+        where ev_vars_matching = [ pred
+                                 | ev_var <- evvars
+                                 , let pred = evVarPred ev_var
+                                 , any can_match (pred : transSuperClasses pred) ]
+              can_match pred
+                 = case getClassPredTys_maybe pred of
+                     Just (clas', tys') -> clas' == clas
+                                          && isJust (tcMatchTys tys tys')
+                     Nothing -> False
 
     -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)
@@ -2716,7 +2716,7 @@ the alleged "provided" constraints, Show a.
 
 So we suppress that Implication in discardProvCtxtGivens.  It's
 painfully ad-hoc but the truth is that adding it to the "required"
-constraints would work.  Suprressing it solves two problems.  First,
+constraints would work.  Suppressing it solves two problems.  First,
 we never tell the user that we could not deduce a "provided"
 constraint from the "required" context. Second, we never give a
 possible fix that suggests to add a "provided" constraint to the
