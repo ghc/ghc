@@ -842,7 +842,7 @@ ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
 ppr_ty ctxt_prec (IfaceFunTy _ ty1 ty2)  -- Should be VisArg
   = -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
     maybeParen ctxt_prec funPrec $
-    sep [ppr_ty funPrec ty1, sep (ppr_fun_tail ty2)]
+    sep (ppr_ty funPrec ty1 : ppr_fun_tail ty2)
   where
     ppr_fun_tail (IfaceFunTy VisArg ty1 ty2)
       = (arrow <+> ppr_ty funPrec ty1) : ppr_fun_tail ty2
