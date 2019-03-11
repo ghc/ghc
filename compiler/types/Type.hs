@@ -1668,6 +1668,8 @@ splitPiTy_maybe ty = go ty
     go (ForAllTy bndr ty) = Just (Named bndr, ty)
     go (FunTy { ft_af = af, ft_arg = arg, ft_res = res})
                           = Just (Anon af arg, res)
+    go (FunTildeTy { ft_arg = arg, ft_res = res})
+                          = Just (Anon af arg, res)
     go _                  = Nothing
 
 -- | Takes a forall type apart, or panics
