@@ -36,6 +36,21 @@ Flag terminfo
     Default: True
     Manual: True
 
+Flag stage1
+    Description: Build Stage1 GHC (STAGE=1)
+    Default: False
+    Manual: True
+
+Flag stage2
+    Description: Build Stage1 GHC (STAGE=2)
+    Default: True
+    Manual: True
+
+Flag stage3
+    Description: Build Stage1 GHC (STAGE=3)
+    Default: False
+    Manual: True
+
 Library
     Default-Language: Haskell2010
     Exposed: False
@@ -70,6 +85,15 @@ Library
                  -Wnoncanonical-monad-instances
                  -Wnoncanonical-monadfail-instances
                  -Wnoncanonical-monoid-instances
+
+    if flag(stage1)
+        CPP-Options: -DSTAGE=1
+    else 
+        if flag(stage2)
+            CPP-Options: -DSTAGE=2
+        else
+            if flag(stage3)
+                CPP-Options: -DSTAGE=3
 
     if flag(ghci)
         CPP-Options: -DGHCI
