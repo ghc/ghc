@@ -69,4 +69,4 @@ test('T16326_Compile1', normal, compile, [''])
 test('T16326_Compile2', normal, compile, [''])
 test('T16391a', normal, compile, [''])
 test('T16344b', normal, compile, [''])
-
+test('T16347', normal, compile, [''])
