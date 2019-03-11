@@ -1,8 +1,10 @@
 type GHC.TypeLits.AppendSymbol :: GHC.Types.Symbol
-                                  -> GHC.Types.Symbol -> GHC.Types.Symbol
+                                  -> GHC.Types.Symbol
+                                  -> GHC.Types.Symbol
 type family GHC.TypeLits.AppendSymbol a b
 type GHC.TypeLits.CmpSymbol :: GHC.Types.Symbol
-                               -> GHC.Types.Symbol -> Ordering
+                               -> GHC.Types.Symbol
+                               -> Ordering
 type family GHC.TypeLits.CmpSymbol a b
 type GHC.TypeLits.ErrorMessage :: *
 data GHC.TypeLits.ErrorMessage
@@ -40,25 +42,31 @@ GHC.TypeLits.symbolVal ::
 GHC.TypeLits.symbolVal' ::
   GHC.TypeLits.KnownSymbol n => GHC.Prim.Proxy# n -> String
 type (GHC.TypeNats.*) :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+                         -> GHC.Types.Nat
+                         -> GHC.Types.Nat
 type family (GHC.TypeNats.*) a b
 type (GHC.TypeNats.+) :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+                         -> GHC.Types.Nat
+                         -> GHC.Types.Nat
 type family (GHC.TypeNats.+) a b
 type (GHC.TypeNats.-) :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+                         -> GHC.Types.Nat
+                         -> GHC.Types.Nat
 type family (GHC.TypeNats.-) a b
 type (GHC.TypeNats.<=) :: GHC.Types.Nat
-                          -> GHC.Types.Nat -> Constraint
+                          -> GHC.Types.Nat
+                          -> Constraint
 type (GHC.TypeNats.<=) x y =
   (x GHC.TypeNats.<=? y) ~ 'True :: Constraint
 type (GHC.TypeNats.<=?) :: GHC.Types.Nat -> GHC.Types.Nat -> Bool
 type family (GHC.TypeNats.<=?) a b
 type GHC.TypeNats.CmpNat :: GHC.Types.Nat
-                            -> GHC.Types.Nat -> Ordering
+                            -> GHC.Types.Nat
+                            -> Ordering
 type family GHC.TypeNats.CmpNat a b
 type GHC.TypeNats.Div :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+                         -> GHC.Types.Nat
+                         -> GHC.Types.Nat
 type family GHC.TypeNats.Div a b
 type GHC.TypeNats.KnownNat :: GHC.Types.Nat -> Constraint
 class GHC.TypeNats.KnownNat n where
@@ -67,7 +75,8 @@ class GHC.TypeNats.KnownNat n where
 type GHC.TypeNats.Log2 :: GHC.Types.Nat -> GHC.Types.Nat
 type family GHC.TypeNats.Log2 a
 type GHC.TypeNats.Mod :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+                         -> GHC.Types.Nat
+                         -> GHC.Types.Nat
 type family GHC.TypeNats.Mod a b
 type GHC.Types.Nat :: *
 data GHC.Types.Nat
@@ -79,7 +88,8 @@ data GHC.TypeNats.SomeNat
 type GHC.Types.Symbol :: *
 data GHC.Types.Symbol
 type (GHC.TypeNats.^) :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+                         -> GHC.Types.Nat
+                         -> GHC.Types.Nat
 type family (GHC.TypeNats.^) a b
 GHC.TypeNats.sameNat ::
   (GHC.TypeNats.KnownNat a, GHC.TypeNats.KnownNat b) =>
