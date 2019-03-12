@@ -74,8 +74,15 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
         dynamic = Dynamic `wayUnit` way
         distPath = libPath' -/- distDir
         originToLibsDir = makeRelativeNoSysLink originPath distPath
-        rpath | darwin = "@loader_path" -/- originToLibsDir
-              | otherwise = "$ORIGIN" -/- originToLibsDir
+        rpath
+            -- Programs will end up in the bin dir ($ORIGIN) and will link to
+            -- libraries in the lib dir.
+            | isProgram pkg = metaOrigin -/- originToLibsDir
+            -- libraries will all end up in the lib dir, so just use $ORIGIN
+            | otherwise     = metaOrigin
+            where
+                metaOrigin | darwin    = "@loader_path"
+                           | otherwise = "$ORIGIN"
 
         -- TODO: an alternative would be to generalize by linking with extra
         -- bundled libraries, but currently the rts is the only use case. It is
@@ -92,8 +99,10 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                 [ arg "-dynamic"
                 -- TODO what about windows?
                 , isLibrary pkg ? pure [ "-shared", "-dynload", "deploy" ]
-                , hostSupportsRPaths ? arg ("-optl-Wl,-rpath," ++ rpath)
-                , hostSupportsRPaths ? arg ("-optl-Wl,-rpath,$ORIGIN")
+                , hostSupportsRPaths ? pure
+                    [ "-optl-Wl,-rpath," ++ rpath
+                    , "-optl-Wl,-zorigin"
+                    ]
                 ]
             , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
