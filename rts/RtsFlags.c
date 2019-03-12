@@ -839,7 +839,8 @@ error = true;
 # define THREADED_BUILD_ONLY(x)      x
 #else
 # define THREADED_BUILD_ONLY(x) \
-errorBelch("the flag %s requires the program to be built with -threaded", \
+errorBelch("the flag %s requires the program to be built with threaded RTS, " \
+           "which is the default but might have been reverted with -non-threaded", \
            rts_argv[arg]);                                              \
 error = true;
 #endif
