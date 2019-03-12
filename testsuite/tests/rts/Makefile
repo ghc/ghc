@@ -34,7 +34,7 @@ exec_signals-prep:
 .PHONY: T4850
 T4850:
 	$(RM) T4850.o T4850.hi T4850$(exeext)
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -rtsopts -debug -threaded --make T4850
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -rtsopts -debug --make T4850
 	./T4850 +RTS -s 2>&1 | grep TASKS | sed 's/^ *TASKS: *\([0-9]*\).*$$/\1/'
 
 .PHONY: T5423
@@ -118,7 +118,7 @@ T7040_ghci_setup :
 .PHONY: T10296a
 T10296a:
 	$(RM) T10296a_c.o T10296a.o T10296a.hi T10296a_stub.h
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -threaded T10296a.hs T10296a_c.c -o T10296a
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T10296a.hs T10296a_c.c -o T10296a
 	./T10296a +RTS -N2
 
 .PHONY: linker_unload

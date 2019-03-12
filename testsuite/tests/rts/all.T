@@ -394,7 +394,7 @@ test('T9405', [when(msys(), expect_broken(12714))], makefile_test, ['T9405'])
 test('T11788', when(ghc_dynamic(), skip),
               makefile_test, ['T11788'])
 
-test('T10296a', [req_smp], makefile_test, ['T10296a'])
+test('T10296a', [], makefile_test, ['T10296a'])
 
 test('T10296b', [only_ways('threaded2')], compile_and_run, [''])
 
