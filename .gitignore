@@ -50,6 +50,7 @@ stage0
 stage1
 stage2
 _build
+.hadrian_ghci
 
 # -----------------------------------------------------------------------------
 # Ignore any overlapped darcs repos and back up files
