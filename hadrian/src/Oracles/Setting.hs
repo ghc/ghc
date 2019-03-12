@@ -55,6 +55,7 @@ data Setting = BuildArch
              | ProjectPatchLevel1
              | ProjectPatchLevel2
              | SystemGhc
+             | SystemCabal
              | TargetArch
              | TargetOs
              | TargetPlatform
@@ -138,6 +139,7 @@ setting key = lookupValueOrError configFile $ case key of
     ProjectPatchLevel1 -> "project-patch-level1"
     ProjectPatchLevel2 -> "project-patch-level2"
     SystemGhc          -> "system-ghc"
+    SystemCabal        -> "system-cabal"
     TargetArch         -> "target-arch"
     TargetOs           -> "target-os"
     TargetPlatform     -> "target-platform"

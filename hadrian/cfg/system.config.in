@@ -21,6 +21,7 @@ system-ar      = @AR_STAGE0@
 system-cc      = @CC_STAGE0@
 system-ghc     = @WithGhc@
 system-ghc-pkg = @GhcPkgCmd@
+system-cabal   = cabal
 tar            = @TarCmd@
 patch          = @PatchCmd@
 xelatex        = @XELATEX@

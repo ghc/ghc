@@ -88,6 +88,7 @@ executable hadrian
                        , Settings.Builders.Ld
                        , Settings.Builders.Make
                        , Settings.Builders.RunTest
+                       , Settings.Builders.SysCabal
                        , Settings.Builders.Xelatex
                        , Settings.Default
                        , Settings.Flavours.Benchmark
