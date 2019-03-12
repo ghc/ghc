@@ -13,13 +13,16 @@ test('ghci003', combined_output, ghci_script, ['ghci003.script'])
 test('ghci004', [ combined_output,
 		  when(arch('powerpc64') or arch('powerpc64le'),
                        expect_broken_for(11259,['ghci-ext'])),
-                  unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
+                  unless(opsys('mingw32'),extra_ways(['ghci-ext'])) #,
+                  #extra_hc_opts('-single-threaded')
+		 ],
                 ghci_script, ['ghci004.script'])
 test('ghci005', combined_output, ghci_script, ['ghci005.script'])
 test('ghci006', [ combined_output,
                   when(arch('powerpc64') or arch('powerpc64le'),
                        expect_broken_for(11259,['ghci-ext'])),
-                  unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
+                  unless(opsys('mingw32'),extra_ways(['ghci-ext'])),
+                  extra_hc_opts('-single-threaded') ],
                 ghci_script, ['ghci006.script'])
 test('ghci007', combined_output, ghci_script, ['ghci007.script'])
 test('ghci008', combined_output, ghci_script, ['ghci008.script'])
@@ -102,7 +105,8 @@ test('ghci057', extra_hc_opts("-fno-ghci-leak-check"), ghci_script, ['ghci057.sc
 test('ghci060', normal, ghci_script, ['ghci060.script'])
 test('ghci061', normal, ghci_script, ['ghci061.script'])
 test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
-                 when(config.have_ext_interp, extra_ways(['ghci-ext']))],
+                 when(config.have_ext_interp, extra_ways(['ghci-ext'])),
+		 extra_hc_opts('-single-threaded')],
 		ghci_script, ['ghci062.script'])
 test('ghci063', normal, ghci_script, ['ghci063.script'])
 

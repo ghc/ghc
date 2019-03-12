@@ -176,10 +176,6 @@ def req_interp( name, opts ):
     if not config.have_interp:
         opts.expect = 'fail'
 
-def req_smp( name, opts ):
-    if not config.have_smp:
-        opts.expect = 'fail'
-
 def ignore_stdout(name, opts):
     opts.ignore_stdout = True
 
