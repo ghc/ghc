@@ -1,4 +1,4 @@
-setTestOpts([extra_run_opts('-ignore-dot-ghci'),
+setTestOpts([extra_run_opts('-ignore-dot-ghci -non-threaded'),
              when(config.have_ext_interp, extra_ways(['ghci-ext'])), # test with -fexternal-interpreter
              normalise_slashes])
 
