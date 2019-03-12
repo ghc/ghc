@@ -118,7 +118,7 @@ testRules = do
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
-        -- the test output: https://ghc.haskell.org/trac/ghc/ticket/15951.
+        -- the test output: https://gitlab.haskell.org/ghc/ghc/issues/15951.
         withVerbosity Loud $ buildWithCmdOptions env $
             target (vanillaContext Stage2 compiler) RunTest [] []
 

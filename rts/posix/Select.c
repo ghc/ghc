@@ -417,7 +417,7 @@ awaitEvent(bool wait)
               case RTS_FD_IS_INVALID:
                   /*
                    * Don't let RTS loop on such descriptors,
-                   * pass an IOError to blocked threads (Trac #4934)
+                   * pass an IOError to blocked threads (#4934)
                    */
                   IF_DEBUG(scheduler,
                       debugBelch("Killing blocked thread %lu on bad fd=%i\n",

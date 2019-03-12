@@ -718,7 +718,7 @@ substTickish _subst other = other
 The functions that substitute over IdInfo must be pretty lazy, because
 they are knot-tied by substRecBndrs.
 
-One case in point was Trac #10627 in which a rule for a function 'f'
+One case in point was #10627 in which a rule for a function 'f'
 referred to 'f' (at a different type) on the RHS.  But instead of just
 substituting in the rhs of the rule, we were calling simpleOptExpr, which
 looked at the idInfo for 'f'; result <<loop>>.

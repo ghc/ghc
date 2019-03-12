@@ -1372,7 +1372,7 @@ extern void __clear_cache(void * begin, void * end);
 #elif defined(__GNUC__)
 /* __clear_cache is a libgcc function.
  * It existed before __builtin___clear_cache was introduced.
- * See Trac #8562.
+ * See #8562.
  */
 extern void __clear_cache(char * begin, char * end);
 #endif /* __GNUC__ */

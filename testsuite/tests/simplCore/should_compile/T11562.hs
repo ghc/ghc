@@ -4,7 +4,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- Trac #11562 reported an ASSERT error
+-- #11562 reported an ASSERT error
 -- It only showed up /without/ -O, and obviously
 -- with a compiler built with -DDEBUG
 

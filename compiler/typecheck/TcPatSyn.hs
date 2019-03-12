@@ -110,14 +110,14 @@ If type inference for a pattern synonym fails, we can't continue with
 the rest of tc_patsyn_finish, because we may get knock-on errors, or
 even a crash.  E.g. from
    pattern What = True :: Maybe
-we get a kind error; and we must stop right away (Trac #15289).
+we get a kind error; and we must stop right away (#15289).
 
 We stop if there are /any/ unsolved constraints, not just insoluble
 ones; because pattern synonyms are top-level things, we will never
 solve them later if we can't solve them now.  And if we were to carry
 on, tc_patsyn_finish does zonkTcTypeToType, which defaults any
 unsolved unificatdion variables to Any, which confuses the error
-reporting no end (Trac #15685).
+reporting no end (#15685).
 
 So we use simplifyTop to completely solve the constraint, report
 any errors, throw an exception.
@@ -151,7 +151,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(dL->L _ name), psb_args = details
              named_taus = (name, pat_ty) : map mk_named_tau args
              mk_named_tau arg
                = (getName arg, mkSpecForAllTys ex_tvs (varType arg))
-               -- The mkSpecForAllTys is important (Trac #14552), albeit
+               -- The mkSpecForAllTys is important (#14552), albeit
                -- slightly artifical (there is no variable with this funny type).
                -- We do not want to quantify over variable (alpha::k)
                -- that mention the existentially-bound type variables
@@ -246,7 +246,7 @@ No problem.  But note that 's' is not fixed by the type of the
 pattern (AST a), nor is it existentially bound.  It's really only
 fixed by the type of the continuation.
 
-Trac #14552 showed that this can go wrong if the kind of 's' mentions
+#14552 showed that this can go wrong if the kind of 's' mentions
 existentially bound variables.  We obviously can't make a type like
   $mP :: forall (s::k->*) a. Prj s => AST a -> (forall k. s a -> r)
                                    -> r -> r
@@ -270,7 +270,7 @@ Recall that
 (NB: technically the (k1~k2) existential dictionary is not necessary,
 but it's there at the moment.)
 
-Now consider (Trac #14394):
+Now consider (#14394):
    pattern Foo = HRefl
 in a non-poly-kinded module.  We don't want to get
     pattern Foo :: () => (* ~ *, b ~ a) => a :~~: b
@@ -310,7 +310,7 @@ See also Note [Lift equality constaints when quantifying] in TcType
 
 Note [Coercions that escape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Trac #14507 showed an example where the inferred type of the matcher
+#14507 showed an example where the inferred type of the matcher
 for the pattern synonym was somethign like
    $mSO :: forall (r :: TYPE rep) kk (a :: k).
            TypeRep k a
@@ -409,7 +409,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(dL->L _ name), psb_args = details
        ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info univ_tvs req_dicts wanted
 
        -- Solve the constraints now, because we are about to make a PatSyn,
-       -- which should not contain unification variables and the like (Trac #10997)
+       -- which should not contain unification variables and the like (#10997)
        ; simplifyTopImplic implics
 
        -- ToDo: in the bidirectional case, check that the ex_tvs' are all distinct
@@ -446,7 +446,7 @@ Consider
 
 This should work.  But in the matcher we must match against MkT, and then
 instantiate its argument 'x', to get a function of type (Int -> Int).
-Equality is not enough!  Trac #13752 was an example.
+Equality is not enough!  #13752 was an example.
 
 
 Note [The pattern-synonym signature splitting rule]
@@ -455,7 +455,7 @@ Given a pattern signature, we must split
      the kind-generalised variables, and
      the implicitly-bound variables
 into universal and existential.  The rule is this
-(see discussion on Trac #11224):
+(see discussion on #11224):
 
      The universal tyvars are the ones mentioned in
           - univ_tvs: the user-specified (forall'd) universals
@@ -476,7 +476,7 @@ how do we split the arg_tys from req_ty?  Consider
 
 This is an odd example because Q has only one syntactic argument, and
 so presumably is defined by a view pattern matching a function.  But
-it can happen (Trac #11977, #12108).
+it can happen (#11977, #12108).
 
 We don't know Q's arity from the pattern signature, so we have to wait
 until we see the pattern declaration itself before deciding res_ty is,
@@ -549,7 +549,7 @@ a pattern synonym.  What about the /building/ side?
   TauTvs) in tcCheckPatSynDecl.  But (a) strengthening the check here
   is redundant since tcPatSynBuilderBind does the job, (b) it was
   still incomplete (TyVarTvs can unify with each other), and (c) it
-  didn't even work (Trac #13441 was accepted with
+  didn't even work (#13441 was accepted with
   ExplicitBidirectional, but rejected if expressed in
   ImplicitBidirectional form.  Conclusion: trying to be too clever is
   a bad idea.
@@ -1007,12 +1007,12 @@ tcPatToExpr name args pat = go pat
 
     -- We should really be able to invert list patterns, even when
     -- rebindable syntax is on, but doing so involves a bit of
-    -- refactoring; see Trac #14380.  Until then we reject with a
+    -- refactoring; see #14380.  Until then we reject with a
     -- helpful error message.
     notInvertibleListPat p
       = Left (vcat [ not_invertible_msg p
                    , text "Reason: rebindable syntax is on."
-                   , text "This is fixable: add use-case to Trac #14380" ])
+                   , text "This is fixable: add use-case to #14380" ])
 
 {- Note [Builder for a bidirectional pattern synonym]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1081,7 +1081,7 @@ When making the binding for the *builder*, though, we don't want
   $buildL x = Left x :: Either [a] [b]
 because that wil either mean (forall a b. Either [a] [b]), or we'll
 get a complaint that 'a' and 'b' are out of scope. (Actually the
-latter; Trac #9867.)  No, the job of the signature is done, so when
+latter; #9867.)  No, the job of the signature is done, so when
 converting the pattern to an expression (for the builder RHS) we
 simply discard the signature.
 

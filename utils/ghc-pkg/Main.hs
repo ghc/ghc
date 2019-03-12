@@ -1312,7 +1312,7 @@ So, instead, we do two things here:
   - We recompute it: we simply look up the unit ID of the package in the original
     database, and use *its* abi-depends.
 
-See Trac #14381, and Cabal issue #4728.
+See #14381, and Cabal issue #4728.
 
 Additionally, because we are throwing away the original (declared) ABI deps, we
 return a boolean that indicates whether any abi-depends were actually

@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 
 
--- See Trac #3403: interaction of pattern match failure and CPR
+-- See #3403: interaction of pattern match failure and CPR
 -- The point is that this should run in constant space, with no
 -- stack growth.  In GHC 6.10 the tail call optimisation didn't work.
 

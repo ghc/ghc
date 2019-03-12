@@ -458,7 +458,7 @@ Consider this GHCi command
 We will only get the 'forall' if we /refrain/ from saturating those
 invisible binders. But generally we /do/ saturate those invisible
 binders (see tcInferApps), and we want to do so for nested application
-even in GHCi.  Consider for example (Trac #16287)
+even in GHCi.  Consider for example (#16287)
   ghci> type family F :: k
   ghci> data T :: (forall k. k) -> Type
   ghci> :kind T F
@@ -585,7 +585,7 @@ tc_infer_hs_type mode (HsKindSig _ ty sig)
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
                  -- things like instantiate its foralls, so it needs
-                 -- to be fully determined (Trac #14904)
+                 -- to be fully determined (#14904)
        ; traceTc "tc_infer_hs_type:sig" (ppr ty $$ ppr sig')
        ; ty' <- tc_lhs_type mode ty sig'
        ; return (ty', sig') }
@@ -721,7 +721,7 @@ tc_hs_type mode rn_ty@(HsTupleTy _ HsBoxedOrConstraintTuple hs_tys) exp_kind
        ; (tys, kinds) <- mapAndUnzipM (tc_infer_lhs_type mode) hs_tys
        ; kinds <- mapM zonkTcType kinds
            -- Infer each arg type separately, because errors can be
-           -- confusing if we give them a shared kind.  Eg Trac #7410
+           -- confusing if we give them a shared kind.  Eg #7410
            -- (Either Int, Int), we do not want to get an error saying
            -- "the second argument of a tuple should have kind *->*"
 
@@ -1244,7 +1244,7 @@ a's kind, so we'll call matchExpectedFunKind, and unify
 At this point we must zonk the function type to expose the arrrow, so
 that (a Int) will satisfy (PKTI).
 
-The absence of this caused Trac #14174 and #14520.
+The absence of this caused #14174 and #14520.
 
 The calls to mkAppTyM is the other place we are very careful.
 
@@ -1427,7 +1427,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                    ; unless (data_kinds || specialPromotedDc dc) $
                        promotionErr name NoDataKindsDC
                    ; when (isFamInstTyCon (dataConTyCon dc)) $
-                       -- see Trac #15245
+                       -- see #15245
                        promotionErr name FamDataConPE
                    ; let (_, _, _, theta, _, _) = dataConFullSig dc
                    ; traceTc "tcTyVar" (ppr dc <+> ppr theta $$ ppr (dc_theta_illegal_constraint theta))
@@ -1460,7 +1460,7 @@ Note [GADT kind self-reference]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A promoted type cannot be used in the body of that type's declaration.
-Trac #11554 shows this example, which made GHC loop:
+#11554 shows this example, which made GHC loop:
 
   import Data.Kind
   data P (x :: k) = Q
@@ -1473,7 +1473,7 @@ TyConPE promotion error is given when tcTyVar checks an ATcTyCon in kind mode.
 Any ATcTyCon is a TyCon being defined in the current recursive group (see data
 type decl for TcTyThing), and all such TyCons are illegal in kinds.
 
-Trac #11962 proposes checking the head of a data declaration separately from
+#11962 proposes checking the head of a data declaration separately from
 its constructors. This would allow the example above to pass.
 
 Note [Body kind of a HsForAllTy]
@@ -1920,7 +1920,7 @@ monomorphic kind, with no quantification whatsoever. That's why
 we use mkAnonTyConBinder for all arguments when figuring out
 tc_binders.
 
-But notice that (Trac #16322 comment:3)
+But notice that (#16322 comment:3)
 
 * The algorithm successfully kind-checks this declaration:
     data T2 ka (a::ka) = MkT2 (T2 Type a)
@@ -2437,7 +2437,7 @@ And also see Note [Avoid name clashes for associated data types].
 For (b) suppose we have
    data T :: forall k. k -> forall k. k -> *
 where the two k's are identical even up to their uniques.  Surprisingly,
-this can happen: see Trac #14515.
+this can happen: see #14515.
 
 It's reasonably easy to solve all this; just run down the list with a
 substitution; hence the recursive 'go' function.  But it has to be
@@ -2564,7 +2564,7 @@ An annoying difficulty happens if there are more than 62 inferred
 constraints. Then we need to fill in the TcTyVar with (say) a 70-tuple.
 Where do we find the TyCon?  For good reasons we only have constraint
 tuples up to 62 (see Note [How tuples work] in TysWiredIn).  So how
-can we make a 70-tuple?  This was the root cause of Trac #14217.
+can we make a 70-tuple?  This was the root cause of #14217.
 
 It's incredibly tiresome, because we only need this type to fill
 in the hole, to communicate to the error reporting machinery.  Nothing
@@ -2612,7 +2612,7 @@ tcHsPatSigType ctxt sig_ty
             <- solveLocalEqualities "tcHsPatSigType" $
                  -- Always solve local equalities if possible,
                  -- else casts get in the way of deep skolemisation
-                 -- (Trac #16033)
+                 -- (#16033)
                tcWildCardBinders sig_wcs        $ \ wcs ->
                tcExtendNameTyVarEnv sig_tkv_prs $
                do { sig_ty <- tcHsOpenType hs_ty
@@ -2733,7 +2733,7 @@ Here
  * Finally, in '<blah>' we have the envt "b" :-> beta, "c" :-> gamma,
    so we return the pairs ("b" :-> beta, "c" :-> gamma) from tcHsPatSigType,
 
-Another example (Trac #13881):
+Another example (#13881):
    fl :: forall (l :: [a]). Sing l -> Sing l
    fl (SNil :: Sing (l :: [y])) = SNil
 When we reach the pattern signature, 'l' is in scope from the
@@ -2854,7 +2854,7 @@ tcLHsKindSig ctxt hs_kind
        -- No generalization, so we must promote
        ; kind <- zonkPromoteType kind
          -- This zonk is very important in the case of higher rank kinds
-         -- E.g. Trac #13879    f :: forall (p :: forall z (y::z). <blah>).
+         -- E.g. #13879    f :: forall (p :: forall z (y::z). <blah>).
          --                          <more blah>
          --      When instantiating p's kind at occurrences of p in <more blah>
          --      it's crucial that the kind we instantiate is fully zonked,

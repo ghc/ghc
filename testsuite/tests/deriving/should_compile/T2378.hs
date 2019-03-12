@@ -1,7 +1,7 @@
 {-# LANGUAGE StandaloneDeriving, DeriveDataTypeable #-}
 module Foo( T ) where
 
--- Trac 2378
+-- #2378
 
 import Data.Data
 

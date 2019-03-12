@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -ddump-types -dsuppress-module-prefixes #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts #-}
 
--- See Trac #1456
+-- See #1456
 
 -- The key thing here is that foo should get the type
 --     foo :: forall b s t1. (Zork s (Z [Char]) b)

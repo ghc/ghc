@@ -160,7 +160,7 @@ depanal excluded_mods allow_dup_roots = do
 -- but "A" imports some other module "C", then GHC will issue a warning
 -- about module "C" not being listed in a command line.
 --
--- The warning in enabled by `-Wmissing-home-modules`. See Trac #13129
+-- The warning in enabled by `-Wmissing-home-modules`. See #13129
 warnMissingHomeModules :: GhcMonad m => HscEnv -> ModuleGraph -> m ()
 warnMissingHomeModules hsc_env mod_graph =
     when (wopt Opt_WarnMissingHomeModules dflags && not (null missing)) $
@@ -178,7 +178,7 @@ warnMissingHomeModules hsc_env mod_graph =
     -- For instance, `ghc --make src-exe/Main.hs` and
     -- `ghc --make -isrc-exe Main` are supposed to be equivalent.
     -- Note also that we can't always infer the associated module name
-    -- directly from the filename argument.  See Trac #13727.
+    -- directly from the filename argument.  See #13727.
     is_my_target mod (TargetModule name)
       = moduleName (ms_mod mod) == name
     is_my_target mod (TargetFile target_file _)
@@ -868,7 +868,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
             n_cpus <- getNumProcessors
             -- Setting number of capabilities more than
             -- CPU count usually leads to high userspace
-            -- lock contention. Trac #9221
+            -- lock contention. #9221
             let n_caps = min n_jobs n_cpus
             unless (n_capabilities /= 1) $ setNumCapabilities n_caps
             return n_capabilities
@@ -1629,7 +1629,7 @@ Potential TODOS:
 -- be any object code that we can compare against, nor should there
 -- be: we're *just* generating interface files.  In this case, we
 -- want to check if the interface file is new, in lieu of the object
--- file.  See also Trac #9243.
+-- file.  See also #9243.
 
 -- Filter modules in the HPT
 retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> HomePackageTable

@@ -1,6 +1,6 @@
 {-# LANGUAGE EmptyDataDecls #-}
 
--- Trac #3572
+-- #3572
 
 module Main where
 

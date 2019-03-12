@@ -474,7 +474,7 @@ hasStockDeriving clas
 {-
 Note [Deriving and unused record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (see Trac #13919):
+Consider this (see #13919):
 
   module Main (main) where
 
@@ -505,7 +505,7 @@ getDataConFixityFun :: TyCon -> TcM (Name -> Fixity)
 -- If the TyCon is locally defined, we want the local fixity env;
 -- but if it is imported (which happens for standalone deriving)
 -- we need to get the fixity env from the interface file
--- c.f. RnEnv.lookupFixity, and Trac #9830
+-- c.f. RnEnv.lookupFixity, and #9830
 getDataConFixityFun tc
   = do { this_mod <- getModule
        ; if nameIsLocalOrFrom this_mod name
@@ -938,7 +938,7 @@ of the type constructor is used truly universally quantified.  Example
      T6 :: T a (b,b)            -- No!  'b' is constrained
 
 Notice that only the first of these constructors is vanilla H-98. We only
-need to take care about the last argument (b in this case).  See Trac #8678.
+need to take care about the last argument (b in this case).  See #8678.
 Eg. for T1-T3 we can write
 
      fmap f (T1 a b) = T1 a (f b)
@@ -970,5 +970,5 @@ Here, the existential context (C (Show a) b) does technically mention the last
 type variable b. But this is OK, because expanding the type synonym C would
 give us the context (Show a), which doesn't mention b. Therefore, we must make
 sure to expand type synonyms before performing this check. Not doing so led to
-Trac #13813.
+#13813.
 -}

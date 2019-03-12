@@ -75,7 +75,7 @@ T3055:
 T5658b:
 	$(RM) -f T5658b.o T5658b.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T5658b.hs -ddump-simpl | grep -c indexIntArray
-# Trac 5658 meant that there were three calls to indexIntArray instead of two
+# #5658 meant that there were three calls to indexIntArray instead of two
 # (now four due to join-point discount causing W/W to stabilize unfolding)
 
 T5776:
@@ -255,4 +255,4 @@ T14140:
 T15631:
 	$(RM) -f T15631.o T15631.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques -dsuppress-ticks T15631.hs | grep 'case'
-# Expecting one fewwer case expressions after fixing Trac #15631
+# Expecting one fewwer case expressions after fixing #15631

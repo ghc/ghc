@@ -53,7 +53,7 @@ merge x y = mkMerge (merger x y) x y
 
 
 {- ------------- NASTY TYPE FOR merge -----------------
-   -- See Trac #11408
+   -- See #11408
 
    x:tx, y:ty
    mkMerge @ gamma

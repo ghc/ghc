@@ -249,7 +249,7 @@ Things like the coercion axiom for newtypes. These bindings all get
 OccNames that users can't write, to avoid the possibility of name
 clashes (in linker symbols).  That gives a convenient way to suppress
 them. The relevant predicate is OccName.isDerivedOccName.
-See Trac #11051 for more background and examples.
+See #11051 for more background and examples.
 -}
 
 withVirtualCWD :: GhcMonad m => m a -> m a
@@ -756,7 +756,7 @@ moduleIsInterpreted modl = withSession $ \h ->
 -- Filter the instances by the ones whose tycons (or clases resp)
 -- are in scope (qualified or otherwise).  Otherwise we list a whole lot too many!
 -- The exact choice of which ones to show, and which to hide, is a judgement call.
---      (see Trac #1581)
+--      (see #1581)
 getInfo :: GhcMonad m => Bool -> Name
         -> m (Maybe (TyThing,Fixity,[ClsInst],[FamInst], SDoc))
 getInfo allInfo name
@@ -800,7 +800,7 @@ getRdrNamesInScope = withSession $ \hsc_env -> do
       ic = hsc_IC hsc_env
       gbl_rdrenv = ic_rn_gbl_env ic
       gbl_names = concatMap greRdrNames $ globalRdrEnvElts gbl_rdrenv
-  -- Exclude internally generated names; see e.g. Trac #11328
+  -- Exclude internally generated names; see e.g. #11328
   return (filter (not . isDerivedOccName . rdrNameOcc) gbl_names)
 
 

@@ -789,7 +789,7 @@ GHC's parser only recognises a kind signature in a type when there are
 parens around it.  E.g. the parens are required here:
    f :: (Int :: *)
    type instance F Int = (Bool :: *)
-So we always print a SigT with parens (see Trac #10050). -}
+So we always print a SigT with parens (see #10050). -}
 
 pprTyApp :: (Type, [TypeArg]) -> Doc
 pprTyApp (ArrowT, [TANormal arg1, TANormal arg2]) = sep [pprFunArgType arg1 <+> text "->", ppr arg2]

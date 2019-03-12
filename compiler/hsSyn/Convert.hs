@@ -1570,7 +1570,7 @@ points so that the code is readable with its original meaning.
 
 So scattered through Convert.hs are various points where parens are added.
 
-See (among other closed issued) https://ghc.haskell.org/trac/ghc/ticket/14289
+See (among other closed issued) https://gitlab.haskell.org/ghc/ghc/issues/14289
 -}
 -- ---------------------------------------------------------------------
 
@@ -1730,7 +1730,7 @@ mkHsForAllTy tvs loc fvf tvs' rho_ty
 
 -- It's important that we don't build an HsQualTy if the context is empty,
 -- as the pretty-printer for HsType _always_ prints contexts, even if
--- they're empty. See Trac #13183.
+-- they're empty. See #13183.
 mkHsQualTy :: TH.Cxt
            -- ^ The original Template Haskell context
            -> SrcSpan
@@ -1820,7 +1820,7 @@ thRdrName :: SrcSpan -> OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
 --
 -- We pass in a SrcSpan (gotten from the monad) because this function
 -- is used for *binders* and if we make an Exact Name we want it
--- to have a binding site inside it.  (cf Trac #5434)
+-- to have a binding site inside it.  (cf #5434)
 --
 -- ToDo: we may generate silly RdrNames, by passing a name space
 --       that doesn't match the string, like VarName ":+",
@@ -1842,7 +1842,7 @@ thRdrName loc ctxt_ns th_occ th_name
     occ = mk_occ ctxt_ns th_occ
 
 -- Return an unqualified exact RdrName if we're dealing with built-in syntax.
--- See Trac #13776.
+-- See #13776.
 thOrigRdrName :: String -> TH.NameSpace -> PkgName -> ModName -> RdrName
 thOrigRdrName occ th_ns pkg mod =
   let occ' = mk_occ (mk_ghc_ns th_ns) occ

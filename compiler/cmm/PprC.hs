@@ -179,7 +179,7 @@ pprAlignment words =
 --
 -- It's a reasonable assumption also known as natural alignment.
 -- Although some architectures have different alignment rules.
--- One of known exceptions is m68k (Trac #11395, comment:16) where:
+-- One of known exceptions is m68k (#11395, comment:16) where:
 --   __alignof__(StgWord) == 2, sizeof(StgWord) == 4
 --
 -- Thus we explicitly increase alignment by using

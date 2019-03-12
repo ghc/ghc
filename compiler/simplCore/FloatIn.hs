@@ -210,7 +210,7 @@ only way that can happen is if the binding wrapped the literal
 /in the original input program/.  e.g.
    case x of { DEFAULT -> 1# }
 But, while this may be unusual it is not actually wrong, and it did
-once happen (Trac #15696).
+once happen (#15696).
 
 Note [Do not destroy the let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -307,7 +307,7 @@ be dropped right away.
 
 fiExpr dflags to_drop lam@(_, AnnLam _ _)
   | noFloatIntoLam bndrs       -- Dump it all here
-     -- NB: Must line up with noFloatIntoRhs (AnnLam...); see Trac #7088
+     -- NB: Must line up with noFloatIntoRhs (AnnLam...); see #7088
   = wrapFloats to_drop (mkLams bndrs (fiExpr dflags [] body))
 
   | otherwise           -- Float inside
@@ -391,7 +391,7 @@ fiExpr dflags to_drop (_,AnnLet bind body)
 {- Note [Floating primops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 We try to float-in a case expression over an unlifted type.  The
-motivating example was Trac #5658: in particular, this change allows
+motivating example was #5658: in particular, this change allows
 array indexing operations, which have a single DEFAULT alternative
 without any binders, to be floated inward.
 
@@ -421,10 +421,10 @@ But there are wrinkles
   Solution: only float cases into the branches of other cases, and
   not into the arguments of an application, or the RHS of a let. This
   is somewhat conservative, but it's simple.  And it still hits the
-  cases like Trac #5658.   This is implemented in sepBindsByJoinPoint;
+  cases like #5658.   This is implemented in sepBindsByJoinPoint;
   if is_case is False we dump all floating cases right here.
 
-* Trac #14511 is another example of why we want to restrict float-in
+* #14511 is another example of why we want to restrict float-in
   of case-expressions.  Consider
      case indexArray# a n of (# r #) -> writeArray# ma i (f r)
   Now, floating that indexing operation into the (f r) thunk will
@@ -613,7 +613,7 @@ would destroy the let/app invariant.
      (a) any non-one-shot value lambdas
   or (b) all type lambdas
   In both cases we'll float straight back out again
-  NB: Must line up with fiExpr (AnnLam...); see Trac #7088
+  NB: Must line up with fiExpr (AnnLam...); see #7088
 
   (a) is important: we /must/ float into a one-shot lambda group
   (which includes join points). This makes a big difference

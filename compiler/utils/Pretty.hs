@@ -32,7 +32,7 @@ source tree:
  * `compiler/utils/Pretty.hs` (this module). It is used by GHC only.
 
 There is an ongoing effort in https://github.com/haskell/pretty/issues/1 and
-https://ghc.haskell.org/trac/ghc/ticket/10735 to try to get rid of GHC's copy
+https://gitlab.haskell.org/ghc/ghc/issues/10735 to try to get rid of GHC's copy
 of Pretty.
 
 Currently, GHC's copy of Pretty resembles pretty-1.1.2.0, with the following
@@ -435,7 +435,7 @@ Note [Print Hexadecimal Literals]
 
 Relevant discussions:
  * Phabricator: https://phabricator.haskell.org/D4465
- * GHC Trac: https://ghc.haskell.org/trac/ghc/ticket/14872
+ * GHC Trac: https://gitlab.haskell.org/ghc/ghc/issues/14872
 
 There is a flag `-dword-hex-literals` that causes literals of
 type `Word#` or `Word64#` to be displayed in hexadecimal instead

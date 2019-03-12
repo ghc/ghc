@@ -1,4 +1,4 @@
--- Test for Trac #2414
+-- Test for #2414
 -- Should provoke an occurs-check error
 
 module ShouldFail where

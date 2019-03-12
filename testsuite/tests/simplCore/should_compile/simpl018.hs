@@ -3,7 +3,7 @@
 -- See Note [Float coercions (unlifted)] in Simplify
 -- This one gave a CoreLint error when compiled optimised
 --
--- See also Trac #1718, of which this is a simplified version
+-- See also #1718, of which this is a simplified version
 
 module ShouldCompile where
 

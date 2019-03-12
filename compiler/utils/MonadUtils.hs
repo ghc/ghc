@@ -78,7 +78,7 @@ The 'zipWithM'/'zipWithM_' functions are inlined so that the `zipWith` and
 Furthermore, 'zipWith3M'/'zipWith4M' and 'zipWith3M_' have been explicitly
 rewritten in a non-recursive way similarly to 'zipWithM'/'zipWithM_', and for
 more than just uniformity: after [D5241](https://phabricator.haskell.org/D5241)
-for Trac ticket #14037, all @zipN@/@zipWithN@ functions fuse, meaning
+for issue #14037, all @zipN@/@zipWithN@ functions fuse, meaning
 'zipWith3M'/'zipWIth4M' and 'zipWith3M_'@ now behave like 'zipWithM' and
 'zipWithM_', respectively, with regards to fusion.
 

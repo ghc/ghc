@@ -1,7 +1,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
--- Test Trac #2433
+-- Test #2433
 
 module T2433 where
 

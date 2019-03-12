@@ -64,7 +64,7 @@ main = do
 -- a scenario, we must guess where ghc lives. Given a path where ghc might
 -- live, we check for the existence of ghc. If we can't find it, we assume that
 -- we're building ghc from source, in which case we fall back on ghc-stage2.
--- (See Trac #1185.)
+-- (See #1185.)
 findGhc :: FilePath -> IO FilePath
 findGhc path = do
     let ghcDir = takeDirectory (normalise path)

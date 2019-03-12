@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 
--- Test for Trac #3955
+-- Test for #3955
 
 module T3955 where
 

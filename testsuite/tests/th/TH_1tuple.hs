@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- Trac #2358
+-- #2358
 
 module ShouldFail where
 import Language.Haskell.TH

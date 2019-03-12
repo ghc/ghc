@@ -160,7 +160,7 @@ And then translate it to:
 
 Note [Newtype deriving superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(See also Trac #1220 for an interesting exchange on newtype
+(See also #1220 for an interesting exchange on newtype
 deriving and superclasses.)
 
 The 'tys' here come from the partial application in the deriving
@@ -184,7 +184,7 @@ when the dict is constructed in TcInstDcls.tcInstDecl2
 
 Note [Unused constructors and deriving clauses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See Trac #3221.  Consider
+See #3221.  Consider
    data T = T1 | T2 deriving( Show )
 Are T1 and T2 unused?  Well, no: the deriving clause expands to mention
 both of them.  So we gather defs/uses from deriving just like anything else.
@@ -373,7 +373,7 @@ renameDeriv is_boot inst_infos bagBinds
 {-
 Note [Newtype deriving and unused constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (see Trac #1954):
+Consider this (see #1954):
 
   module Bug(P) where
   newtype P a = MkP (IO a) deriving Monad
@@ -392,7 +392,7 @@ of genInst.
 
 Note [Staging of tcDeriving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here's a tricky corner case for deriving (adapted from Trac #2721):
+Here's a tricky corner case for deriving (adapted from #2721):
 
     class C a where
       type T a
@@ -468,7 +468,7 @@ Note [Avoid RebindableSyntax when deriving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The RebindableSyntax extension interacts awkwardly with the derivation of
 any stock class whose methods require the use of string literals. The Show
-class is a simple example (see Trac #12688):
+class is a simple example (see #12688):
 
   {-# LANGUAGE RebindableSyntax, OverloadedStrings #-}
   newtype Text = Text String
@@ -532,7 +532,7 @@ makeDerivSpecs is_boot deriv_infos deriv_decls
 {-
 Note [Flattening deriving clauses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider what happens if you run this program (from Trac #10684) without
+Consider what happens if you run this program (from #10684) without
 DeriveGeneric enabled:
 
     data A = A deriving (Show, Generic)
@@ -914,7 +914,7 @@ Notice that the arg tys might not be the same as the family tycon arity
 
 Note [Unify kinds in deriving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #8534)
+Consider (#8534)
     data T a b = MkT a deriving( Functor )
     -- where Functor :: (*->*) -> Constraint
 
@@ -923,7 +923,7 @@ So T :: forall k. * -> k -> *.   We want to get
 Notice the '*' argument to T.
 
 Moreover, as well as instantiating T's kind arguments, we may need to instantiate
-C's kind args.  Consider (Trac #8865):
+C's kind args.  Consider (#8865):
   newtype T a b = MkT (Either a b) deriving( Category )
 where
   Category :: forall k. (k -> k -> *) -> Constraint
@@ -957,7 +957,7 @@ Now we get a kind substitution.  We then need to:
   3. Apply that extended substitution to the non-dropped args (types and
      kinds) of the type and class
 
-Forgetting step (2) caused Trac #8893:
+Forgetting step (2) caused #8893:
   data V a = V [a] deriving Functor
   data P (x::k->*) (a:k) = P (x a) deriving Functor
   data C (x::k->*) (a:k) = C (V (P x a)) deriving Functor
@@ -969,7 +969,7 @@ and occurrence sites.
 
 This can lead to some surprising results when *visible* kind binder is
 unified (in contrast to the above examples, in which only non-visible kind
-binders were considered). Consider this example from Trac #11732:
+binders were considered). Consider this example from #11732:
 
     data T k (a :: k) = MkT deriving Functor
 
@@ -1000,7 +1000,7 @@ The only distinction is that GHC instantiates equality constraints directly
 during the deriving process.
 
 Another quirk of this design choice manifests when typeclasses have visible
-kind parameters. Consider this code (also from Trac #11732):
+kind parameters. Consider this code (also from #11732):
 
     class Cat k (cat :: k -> k -> *) where
       catId   :: cat a a
@@ -1027,7 +1027,7 @@ Functor (* -> *). But that's not enough: the `via` type, Proxy, has the kind
 unify (k -> *) with (* -> *).
 
 Currently, all of this unification is implemented kludgily with the pure
-unifier, which is rather tiresome. Trac #14331 lays out a plan for how this
+unifier, which is rather tiresome. #14331 lays out a plan for how this
 might be made cleaner.
 
 Note [Unification of two kind variables in deriving]
@@ -1061,7 +1061,7 @@ This is bad, because applying that substitution yields the following instance:
    instance Category k_new (T k1 c) where ...
 
 In other words, keeping k1 in unmapped_tvks taints the substitution, resulting
-in an ill-kinded instance (this caused Trac #11837).
+in an ill-kinded instance (this caused #11837).
 
 To prevent this, we need to filter out any variable from all_tkvs which either
 
@@ -1089,7 +1089,7 @@ When deriving, we need to perform eta-reduction analysis to ensure that none of
 the eta-reduced type variables are mentioned elsewhere in the declaration. But
 we need to be careful, because if we don't expand through the Const type
 synonym, we will mistakenly believe that f is an eta-reduced type variable and
-fail to derive Functor, even though the code above is correct (see Trac #11416,
+fail to derive Functor, even though the code above is correct (see #11416,
 where this was first noticed). For this reason, we expand the type synonyms in
 the eta-reduced types before doing any analysis.
 -}
@@ -1317,7 +1317,7 @@ mk_coerce_based_eqn mk_mechanism coerced_ty
            meths = classMethods cls
            meth_preds ty
              | null meths = [] -- No methods => no constraints
-                               -- (Trac #12814)
+                               -- (#12814)
              | otherwise = rep_pred_o ty : coercible_constraints ty
            coercible_constraints ty
              = [ mkPredOrigin (DerivOriginCoerce meth t1 t2 sa_wildcard)
@@ -1612,7 +1612,7 @@ mkNewTypeEqn
                  --    (such as Functor)
                  --
                  -- and the previous cases won't catch it. This fixes the bug
-                 -- reported in Trac #10598.
+                 -- reported in #10598.
                  | might_be_newtype_derivable && newtype_deriving
                 -> mk_eqn_newtype rep_inst_ty
                  -- Otherwise, throw an error for a stock class
@@ -1627,7 +1627,7 @@ mkNewTypeEqn
                  | newtype_deriving           -> bale_out cant_derive_err
                  -- Try newtype deriving!
                  -- Here we suggest GeneralizedNewtypeDeriving even in cases
-                 -- where it may not be applicable. See Trac #9600.
+                 -- where it may not be applicable. See #9600.
                  | otherwise                  -> bale_out (non_std $$ suggest_gnd)
 
                -- DeriveAnyClass
@@ -2063,7 +2063,7 @@ Note [Deriving strategies]
 GHC has a notion of deriving strategies, which allow the user to explicitly
 request which approach to use when deriving an instance (enabled with the
 -XDerivingStrategies language extension). For more information, refer to the
-original Trac ticket (#10598) or the associated wiki page:
+original issue (#10598) or the associated wiki page:
 https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/DerivingStrategies
 
 A deriving strategy can be specified in a deriving clause:

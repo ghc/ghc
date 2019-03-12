@@ -589,7 +589,7 @@ Like types and classes, we build axioms fully quantified over all
 their variables, and tidy them when we build them. For example,
 we print out axioms and don't want to print stuff like
     F k k a b = ...
-Instead we must tidy those kind variables.  See Trac #7524.
+Instead we must tidy those kind variables.  See #7524.
 
 We could instead tidy when we print, but that makes it harder to get
 things like injectivity errors to come out right. Danger of
@@ -1233,7 +1233,7 @@ That's what the CoercionTy case is doing within normalise_type.
 Note [Normalisation and type synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We need to be a bit careful about normalising in the presence of type
-synonyms (Trac #13035).  Suppose S is a type synonym, and we have
+synonyms (#13035).  Suppose S is a type synonym, and we have
    S t1 t2
 If S is family-free (on its RHS) we can just normalise t1 and t2 and
 reconstruct (S t1' t2').   Expanding S could not reveal any new redexes
@@ -1241,7 +1241,7 @@ because type families are saturated.
 
 But if S has a type family on its RHS we expand /before/ normalising
 the args t1, t2.  If we normalise t1, t2 first, we'll re-normalise them
-after expansion, and that can lead to /exponential/ behavour; see Trac #13035.
+after expansion, and that can lead to /exponential/ behavour; see #13035.
 
 Notice, though, that expanding first can in principle duplicate t1,t2,
 which might contain redexes. I'm sure you could conjure up an exponential

@@ -486,7 +486,7 @@ askNoErrsDs thing_inside
       ; env <- getGblEnv
       ; mb_res <- tryM $  -- Be careful to catch exceptions
                           -- so that we propagate errors correctly
-                          -- (Trac #13642)
+                          -- (#13642)
                   setGblEnv (env { ds_msgs = errs_var }) $
                   thing_inside
 

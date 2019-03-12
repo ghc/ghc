@@ -1,6 +1,6 @@
 module Main where
 
--- Trac #15559: Add HasCallStack to fromJust
+-- #15559: Add HasCallStack to fromJust
 
 import Data.Maybe ( fromJust )
 

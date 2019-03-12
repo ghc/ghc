@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 
--- Trac #2334
+-- #2334
 
 module Test where
 

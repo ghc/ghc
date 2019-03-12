@@ -1723,7 +1723,7 @@ mkUnusableModuleToPkgConfAll unusables =
 -- | Add a list of key/value pairs to a nested map.
 --
 -- The outer map is processed with 'Data.Map.Strict' to prevent memory leaks
--- when reloading modules in GHCi (see Trac #4029). This ensures that each
+-- when reloading modules in GHCi (see #4029). This ensures that each
 -- value is forced before installing into the map.
 addListTo :: (Monoid a, Ord k1, Ord k2)
           => Map k1 (Map k2 a)

@@ -97,7 +97,7 @@ to float. This means that
  * When floating an equality outwards, we don't need to worry about floating its
    associated flattening constraints.
 
- * Another tricky case becomes easy: Trac #4935
+ * Another tricky case becomes easy: #4935
        type instance F True a b = a
        type instance F False a b = b
 
@@ -628,7 +628,7 @@ we keep?  More subtle than you might think!
            Binds:     d3 = sc_sel d2, d2 = sc_sel d1
            Work item: d3 :: C a
            Then it'd be ridiculous to replace d1 with d3 in the inert set!
-           Hence the findNeedEvVars test.  See Trac #14774.
+           Hence the findNeedEvVars test.  See #14774.
 
   * Finally, when there is still a choice, use KeepInert rather than
     KeepWork, for two reasons:
@@ -744,7 +744,7 @@ findMatchingIrreds irreds ev
 
 {- Note [Solving irreducible equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #14333)
+Consider (#14333)
   [G] a b ~R# c d
   [W] c d ~R# a b
 Clearly we should be able to solve this! Even though the constraints are
@@ -905,7 +905,7 @@ Which, because solving `Eq [a]` demands `Eq a` which we cannot solve, produces:
 
 Note [Shortcut solving: type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have (Trac #13943)
+Suppose we have (#13943)
   class Take (n :: Nat) where ...
   instance {-# OVERLAPPING #-}                    Take 0 where ..
   instance {-# OVERLAPPABLE #-} (Take (n - 1)) => Take n where ..
@@ -1008,7 +1008,7 @@ Passing along the solved_dicts important for two reasons:
   solved_dicts state  ensures that we remember what we have already
   tried to solve to avoid looping.
 
-* As Trac #15164 showed, it can be important to exploit sharing between
+* As #15164 showed, it can be important to exploit sharing between
   goals. E.g. To solve G we may need G1 and G2. To solve G1 we may need H;
   and to solve G2 we may need H. If we don't spot this sharing we may
   solve H twice; and if this pattern repeats we may get exponentially bad
@@ -1671,7 +1671,7 @@ where
   newtype N b = MkN b
 and we want to get alpha := N b.
 
-See also Trac #15144, which was caused by unifying a representational
+See also #15144, which was caused by unifying a representational
 equality (in the unflattener).
 
 
@@ -1688,7 +1688,7 @@ constraint right away.  This avoids two dangers
  Danger 1: If we send the original constraint on down the pipeline
            it may react with an instance declaration, and in delicate
            situations (when a Given overlaps with an instance) that
-           may produce new insoluble goals: see Trac #4952
+           may produce new insoluble goals: see #4952
 
  Danger 2: If we don't rewrite the constraint, it may re-react
            with the same thing later, and produce the same equality
@@ -1763,7 +1763,7 @@ And there's a risk of complaining about Bool ~ [a].  But in fact
 the Wanted matches the second instance, so we never get as far
 as the fundeps.
 
-Trac #7875 is a case in point.
+#7875 is a case in point.
 -}
 
 emitFunDepDeriveds :: [FunDepEqn CtLoc] -> TcS ()
@@ -1924,7 +1924,7 @@ improveTopFunEqs ev fam_tc args fsk
        ; mapM_ (unifyDerived loc Nominal) eqns }
   where
     loc = ctEvLoc ev  -- ToDo: this location is wrong; it should be FunDepOrigin2
-                      -- See Trac #14778
+                      -- See #14778
 
 improve_top_fun_eqs :: FamInstEnvs
                     -> TyCon -> [TcType] -> TcType
@@ -1988,7 +1988,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
                   -- If the current substitution bind [k -> *], and
                   -- one of the un-substituted tyvars is (a::k), we'd better
                   -- be sure to apply the current substitution to a's kind.
-                  -- Hence instFlexiX.   Trac #13135 was an example.
+                  -- Hence instFlexiX.   #13135 was an example.
 
              ; return [ Pair (substTyUnchecked subst ax_arg) arg
                         -- NB: the ax_arg part is on the left
@@ -2100,12 +2100,12 @@ very well is this:
 
 Examples:
 
-* Trac #5837 has [G] a ~ TF (a,Int), with an instance
+* #5837 has [G] a ~ TF (a,Int), with an instance
     type instance TF (a,b) = (TF a, TF b)
   This readily loops when solving givens.  But with the FunEq occurs
   check principle, it rapidly gets stuck which is fine.
 
-* Trac #12444 is a good example, explained in comment:2.  We have
+* #12444 is a good example, explained in comment:2.  We have
     type instance F (Succ x) = Succ (F x)
     [W] alpha ~ Succ (F alpha)
   If we allow the reduction to happen, we get an infinite loop
@@ -2127,7 +2127,7 @@ we do *not* need to expand type synonyms because the matcher will do that for us
 Note [Improvement orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A very delicate point is the orientation of derived equalities
-arising from injectivity improvement (Trac #12522).  Suppse we have
+arising from injectivity improvement (#12522).  Suppse we have
   type family F x = t | t -> x
   type instance F (a, Int) = (Int, G a)
 where G is injective; and wanted constraints
@@ -2342,7 +2342,7 @@ checkInstanceOK loc what pred
 
 {- Note [Instances in no-evidence implications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In Trac #15290 we had
+In #15290 we had
   [G] forall p q. Coercible p q => Coercible (m p) (m q))
   [W] forall <no-ev> a. m (Int, IntStateT m a)
                           ~R#
@@ -2441,7 +2441,7 @@ The partial solution is that:
 The end effect is that, much as we do for overlapping instances, we
 delay choosing a class instance if there is a possibility of another
 instance OR a given to match our constraint later on. This fixes
-Trac #4981 and #5002.
+#4981 and #5002.
 
 Other notes:
 
@@ -2463,10 +2463,10 @@ Other notes:
   constraints, but it is possible. I've added a test case in
   typecheck/should-compile/GivenOverlapping.hs
 
-* Another "live" example is Trac #10195; another is #10177.
+* Another "live" example is #10195; another is #10177.
 
 * We ignore the overlap problem if -XIncoherentInstances is in force:
-  see Trac #6002 for a worked-out example where this makes a
+  see #6002 for a worked-out example where this makes a
   difference.
 
 * Moreover notice that our goals here are different than the goals of
@@ -2487,7 +2487,7 @@ Other notes:
   and suppose we have -XNoMonoLocalBinds, so that we attempt to find the most
   general type for 'v'.  When generalising v's type we'll simplify its
   Q [alpha] constraint, but we don't have Q [a] in the 'givens', so we
-  will use the instance declaration after all. Trac #11948 was a case
+  will use the instance declaration after all. #11948 was a case
   in point.
 
 All of this is disgustingly delicate, so to discourage people from writing
@@ -2530,7 +2530,7 @@ And less obviously to:
   superclasses invert the instance;  e.g.
       class (c1, c2) => (% c1, c2 %)
       instance (c1, c2) => (% c1, c2 %)
-  Example in Trac #14218
+  Example in #14218
 
 Exammples: T5853, T10432, T5315, T9222, T2627b, T3028b
 

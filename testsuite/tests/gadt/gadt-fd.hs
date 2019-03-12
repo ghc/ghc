@@ -5,7 +5,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- Trac #345
+-- #345
 
 module ShouldCompile where
 

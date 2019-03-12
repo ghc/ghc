@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 
--- Trac #2494, should generate an error message
+-- #2494, should generate an error message
 
 module Foo where
 

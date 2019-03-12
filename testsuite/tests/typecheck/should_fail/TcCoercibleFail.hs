@@ -23,7 +23,7 @@ foo5 = coerce :: Void -> ()
 
 ------------------------------------
 -- This next one generates an exponentally big type as it
--- tries to unwrap.  See comment:15 in Trac #11518
+-- tries to unwrap.  See comment:15 in #11518
 -- Adding asserions that force the types can make us
 -- run out of space.
 newtype VoidBad a = VoidBad (VoidBad (a,a))

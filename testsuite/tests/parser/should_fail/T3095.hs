@@ -1,5 +1,5 @@
 {-# LANGUAGE KindSignatures #-}
--- Trac #3095
+-- #3095
 module T3095 where
 
 import Data.Kind (Type)

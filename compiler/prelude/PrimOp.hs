@@ -323,7 +323,7 @@ data dependencies of the state token to enforce write-effect ordering
 
  * NB1: if you inline unsafePerformIO, you may end up with
    side-effecting ops whose 'state' output is discarded.
-   And programmers may do that by hand; see Trac #9390.
+   And programmers may do that by hand; see #9390.
    That is why we (conservatively) do not discard write-effecting
    primops even if both their state and result is discarded.
 
@@ -367,13 +367,13 @@ Duplicate      YES           NO
   Arguably you should be able to discard this, since the
   returned stat token is not used, but that relies on NEVER
   inlining unsafePerformIO, and programmers sometimes write
-  this kind of stuff by hand (Trac #9390).  So we (conservatively)
+  this kind of stuff by hand (#9390).  So we (conservatively)
   never discard a has_side_effects primop.
 
   However, it's fine to discard a can_fail primop.  For example
      case (indexIntArray# a i) of _ -> True
   We can discard indexIntArray#; it has can_fail, but not
-  has_side_effects; see Trac #5658 which was all about this.
+  has_side_effects; see #5658 which was all about this.
   Notice that indexIntArray# is (in a more general handling of
   effects) read effect, but we don't care about that here, and
   treat read effects as *not* has_side_effects.
@@ -424,7 +424,7 @@ Duplicate      YES           NO
   (All these bindings are boxed.)  If we inline p at its two call
   sites, we get a catastrophe: because the read is performed once when
   s' is demanded, and once when 'r' is demanded, which may be much
-  later.  Utterly wrong.  Trac #3207 is real example of this happening.
+  later.  Utterly wrong.  #3207 is real example of this happening.
 
   However, it's fine to duplicate a can_fail primop.  That is really
   the only difference between can_fail and has_side_effects.

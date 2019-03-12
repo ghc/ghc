@@ -50,7 +50,7 @@ In this case, B's dep_orphs will contain A due to its SOURCE import of A.
 Consequently, A will contain itself in its imp_orphs due to its import of B.
 This fact would end up being recorded in A's interface file. This would then
 break the invariant asserted by calculateAvails that a module does not itself in
-its dep_orphs. This was the cause of Trac #14128.
+its dep_orphs. This was the cause of #14128.
 
 -}
 

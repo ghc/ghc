@@ -84,7 +84,7 @@ Let-bindings have two cases, implemented by addBinding.
 
     - First, the original RHS might have been (g z) which has CSE'd
       with an enclosing (let y = g z in ...).  This is super-important.
-      See Trac #5996:
+      See #5996:
          x1 = C a b
          x2 = C x1 b
          y1 = C a b
@@ -104,7 +104,7 @@ Let-bindings have two cases, implemented by addBinding.
 
   Note that we use EXTEND even for a trivial expression, provided it
   is not a variable or literal. In particular this /includes/ type
-  applications. This can be important (Trac #13156); e.g.
+  applications. This can be important (#13156); e.g.
      case f @ Int of { r1 ->
      case f @ Int of { r2 -> ...
   Here we want to common-up the two uses of (f @ Int) so we can
@@ -419,7 +419,7 @@ addBinding env in_id out_id rhs'
        -- Putting the Id into the cs_map makes it possible that
        -- it'll become shared more than it is now, which would
        -- invalidate (the usage part of) its demand info.
-       --    This caused Trac #100218.
+       --    This caused #100218.
        -- Easiest thing is to zap the usage info; subsequently
        -- performing late demand-analysis will restore it.  Don't zap
        -- the strictness info; it's not necessary to do so, and losing
@@ -475,11 +475,11 @@ The net effect is that for the y-binding we want to
   - Use SUBSTITUTE, by extending the substitution with  y :-> x
   - but leave the original binding for y undisturbed
 
-This is done by cse_bind.  I got it wrong the first time (Trac #13367).
+This is done by cse_bind.  I got it wrong the first time (#13367).
 
 Note [Delay inlining after CSE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose (Trac #15445) we have
+Suppose (#15445) we have
    f,g :: Num a => a -> a
    f x = ...f (x-1).....
    g y = ...g (y-1) ....

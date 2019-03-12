@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -XDeriveDataTypeable -XStandaloneDeriving #-}
 
--- Test Trac #2394
+-- Test #2394
 
 module Foo where
 

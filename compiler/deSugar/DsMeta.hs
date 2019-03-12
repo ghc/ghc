@@ -524,7 +524,7 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
             -- But we do NOT bring the binders of 'binds' into scope
             -- because they are properly regarded as occurrences
             -- For example, the method names should be bound to
-            -- the selector Ids, not to fresh names (Trac #5410)
+            -- the selector Ids, not to fresh names (#5410)
             --
             do { cxt1     <- repLContext cxt
                ; inst_ty1 <- repLTy inst_ty

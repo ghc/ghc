@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
--- Trac #1402
+-- #1402
 -- Broke the specialiser
 
 module ShouldCompile where

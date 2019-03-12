@@ -368,7 +368,7 @@ test('PolytypeDecomp', normal, compile, [''])
 test('T6011', normal, compile, [''])
 test('T6055', normal, compile, [''])
 test('DfltProb1', normal, compile, ['-O'])
-# Add -O for DfltProb1 to expose Trac #11291
+# Add -O for DfltProb1 to expose #11291
 test('DfltProb2', normal, compile, [''])
 test('T6134', normal, compile, [''])
 test('T6018', [], multimod_compile, ['T6018', ''])

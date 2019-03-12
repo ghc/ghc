@@ -1,4 +1,4 @@
--- Trac #2632
+-- #2632
 
 module MkData where
 

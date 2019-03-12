@@ -1,6 +1,6 @@
 Name:           T7702plugin
 Version:        0.1
-Synopsis:       Plugin which tests space leak fix in Trac #7702
+Synopsis:       Plugin which tests space leak fix in #7702
 Cabal-Version:  >= 1.2
 Build-Type:     Simple
 Author:         Andrew Farmer

@@ -1483,7 +1483,7 @@ AC_SUBST([GhcPkgCmd])
 # to compile .hc code.
 #
 # -fwrapv is needed for gcc to emit well-behaved code in the presence of
-# integer wrap around. (Trac #952)
+# integer wrap around. (#952)
 #
 AC_DEFUN([FP_GCC_EXTRA_FLAGS],
 [AC_REQUIRE([FP_GCC_VERSION])

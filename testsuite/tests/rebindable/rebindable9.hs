@@ -1,7 +1,7 @@
 {-# LANGUAGE RebindableSyntax, FlexibleInstances,
              MultiParamTypeClasses, FunctionalDependencies #-}
 
--- Trac #1537
+-- #1537
 
 module Foo where
 import qualified Prelude

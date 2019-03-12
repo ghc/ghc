@@ -5,7 +5,7 @@
 -- Record syntax in GADTs has been deprecated since July 2009
 -- see commit 432b9c9322181a3644083e3c19b7e240d90659e7 by simonpj:
 -- "New syntax for GADT-style record declarations, and associated refactoring"
--- and Trac #3306
+-- and #3306
 
 -- It's been removed in August 2015
 -- see Phab D1118

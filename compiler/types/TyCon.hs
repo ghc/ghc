@@ -972,7 +972,7 @@ data AlgTyConRhs
                              -- Invariant: arity = #tvs in nt_etad_rhs;
                              -- See Note [Newtype eta]
                              -- Watch out!  If any newtypes become transparent
-                             -- again check Trac #1072.
+                             -- again check #1072.
     }
 
 mkSumTyConRhs :: [DataCon] -> AlgTyConRhs
@@ -1193,7 +1193,7 @@ For example consider
       T2 :: T Bool
       T3 :: T a
 What would [T1 ..] be?  [T1,T3] :: T Int? Easiest thing is to exclude them.
-See Trac #4528.
+See #4528.
 
 Note [Newtype coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2642,7 +2642,7 @@ strictness analyser doesn't unbox infinitely deeply.
 More precisely, we keep a *count* of how many times we've seen it.
 This is to account for
    data instance T (a,b) = MkT (T a) (T b)
-Then (Trac #10482) if we have a type like
+Then (#10482) if we have a type like
         T (Int,(Int,(Int,(Int,Int))))
 we can still unbox deeply enough during strictness analysis.
 We have to treat T as potentially recursive, but it's still

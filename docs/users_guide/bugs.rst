@@ -487,7 +487,7 @@ Known bugs or infelicities
 --------------------------
 
 The bug tracker lists bugs that have been reported in GHC but not yet
-fixed: see the `GHC Trac <http://ghc.haskell.org/trac/ghc/>`__. In
+fixed: see the `GHC issue tracker <https://gitlab.haskell.org/ghc/ghc/issues>`__. In
 addition to those, GHC also has the following known bugs or
 infelicities. These bugs are more permanent; it is unlikely that any of
 them will be fixed in the short term.

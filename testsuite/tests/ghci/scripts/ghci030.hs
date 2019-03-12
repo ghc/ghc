@@ -1,4 +1,4 @@
--- Trac #2082
+-- #2082
 -- If we :i D or C, we should see parentheses around (Int -> a)
 
 {-# LANGUAGE ExistentialQuantification #-}

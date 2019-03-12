@@ -8,7 +8,7 @@ environment for the Haskell functional programming language.
 
 For more information, visit [GHC's web site][1].
 
-Information for developers of GHC can be found on the [GHC Trac][2].
+Information for developers of GHC can be found on the [GHC issue tracker][2].
 
 
 Getting the Source

@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
--- Trac #1072
+-- #1072
 
 module ShouldCompile where
 

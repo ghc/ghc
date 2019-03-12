@@ -1,4 +1,4 @@
--- Test for Trac #1899
+-- Test for #1899
 
 module T1899 where
 

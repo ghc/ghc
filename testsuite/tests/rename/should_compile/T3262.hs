@@ -1,6 +1,6 @@
 {-# OPTIONS -fwarn-name-shadowing #-}
 
--- Trac #3262: report shadowing in g but not f
+-- #3262: report shadowing in g but not f
  
 module T3262 where
 

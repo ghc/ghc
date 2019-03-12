@@ -183,7 +183,7 @@ getFinalPath path = withCWString path $ \s ->
           | "\\\\?\\" `isPrefixOf` s = drop 4 s
           | otherwise                = s
 
-        -- see https://ghc.haskell.org/trac/ghc/ticket/14460
+        -- see https://gitlab.haskell.org/ghc/ghc/issues/14460
         rejectUNCPath s
           | "\\\\?\\UNC\\" `isPrefixOf` s = path
           | otherwise                     = s

@@ -1,5 +1,5 @@
 -- Ensure that tuple instances are brought into scope
--- See Trac #1385
+-- See #1385
 
 module ShouldCompile where
 
