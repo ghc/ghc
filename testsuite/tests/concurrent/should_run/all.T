@@ -106,7 +106,7 @@ test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS'),
                       omit_ways(['ghci']) ],
                     compile_and_run, [''])
 
-test('performGC', [ only_ways(['threaded1','threaded2']), req_smp,
+test('performGC', [ only_ways(['threaded1','threaded2']),
                     reqlib('random'),
                     extra_run_opts('400 +RTS -qg -RTS') ],
                     compile_and_run, [''])
@@ -245,8 +245,7 @@ test('conc068', [ omit_ways('threaded2'), exit_code(1) ], compile_and_run, [''])
 
 test('setnumcapabilities001',
      [ only_ways(['threaded1','threaded2']),
-       extra_run_opts('8 12 2000'),
-       req_smp ],
+       extra_run_opts('8 12 2000') ],
      compile_and_run, [''])
 
 # omit ghci, which can't handle unboxed tuples:

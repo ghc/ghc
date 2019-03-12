@@ -12,8 +12,8 @@ support libraries for Concurrent Haskell, just import
 :base-ref:`Control.Concurrent.`. More information on Concurrent Haskell is
 provided in the documentation for that module.
 
-Optionally, the program may be linked with the :ghc-flag:`-threaded` option (see
-:ref:`options-linker`. This provides two benefits:
+By default, the program is linked with the :ghc-flag:`-threaded` option (see
+:ref:`options-linker`). This provides two benefits:
 
 - It enables the :rts-flag:`-N ⟨x⟩` to be used, which allows threads to run in
   parallelism on a multi-processor or multi-core machine. See :ref:`using-smp`.
@@ -72,8 +72,8 @@ Compile-time options for SMP parallelism
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In order to make use of multiple CPUs, your program must be linked with
-the :ghc-flag:`-threaded` option (see :ref:`options-linker`). Additionally, the
-following compiler options affect parallelism:
+the :ghc-flag:`-threaded` option (see :ref:`options-linker`), which is the
+default today. Additionally, the following compiler options affect parallelism:
 
 .. ghc-flag:: -feager-blackholing
     :shortdesc: Turn on :ref:`eager blackholing <parallel-compile-options>`
