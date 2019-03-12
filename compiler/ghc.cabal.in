@@ -73,6 +73,9 @@ Library
                    ghc-heap   == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
 
+    build-tool-depends: alex:alex,
+                        happy:happy
+
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.7
     else
