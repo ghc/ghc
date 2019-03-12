@@ -196,10 +196,6 @@ def req_th( name, opts ):
     if ghc_dynamic():
         return _omit_ways(name, opts, ['profasm', 'profthreaded'])
 
-def req_smp( name, opts ):
-    if not config.have_smp:
-        opts.expect = 'fail'
-
 def ignore_stdout(name, opts):
     opts.ignore_stdout = True
 

@@ -62,25 +62,25 @@ if (ghc_with_llvm and not config.unregisterised):
     config.run_ways.append('optllvm')
 
 config.way_flags = {
-    'normal'       : [],
-    'normal_h'     : [],
+    'normal'       : ['-non-threaded'],
+    'normal_h'     : ['-non-threaded'],
     'g1'           : [],
     'nursery_chunks' : [],
-    'debug_numa'   : ['-threaded', '-debug'],
+    'debug_numa'   : ['-debug'],
     'optasm'       : ['-O', '-fasm'],
     'llvm'         : ['-fllvm'],
     'optllvm'      : ['-O', '-fllvm'],
     'debugllvm'    : ['-fllvm', '-keep-llvm-files'],
     'prof'         : ['-prof', '-static', '-fprof-auto', '-fasm'],
     'prof_no_auto' : ['-prof', '-static', '-fasm'],
-    'profasm'      : ['-O', '-prof', '-static', '-fprof-auto'],
-    'profthreaded' : ['-O', '-prof', '-static', '-fprof-auto', '-threaded'],
+    'profasm'      : ['-O', '-prof', '-static', '-fprof-auto', '-non-threaded'],
+    'profthreaded' : ['-O', '-prof', '-static', '-fprof-auto'],
     'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '+RTS', '-I0.1', '-RTS'] + (['-fghci-leak-check'] if not config.compiler_debugged else []),
     'sanity'       : ['-debug'],
-    'threaded1'    : ['-threaded', '-debug'],
-    'threaded1_ls' : ['-threaded', '-debug'],
-    'threaded2'    : ['-O', '-threaded', '-eventlog'],
-    'threaded2_hT' : ['-O', '-threaded'],
+    'threaded1'    : ['-debug'],
+    'threaded1_ls' : ['-debug'],
+    'threaded2'    : ['-O', '-eventlog'],
+    'threaded2_hT' : ['-O'],
     'hpc'          : ['-O', '-fhpc'],
     'prof_hc_hb'   : ['-O', '-prof', '-static', '-fprof-auto'],
     'prof_hb'      : ['-O', '-prof', '-static', '-fprof-auto'],
@@ -93,7 +93,7 @@ config.way_flags = {
     # llvm variants...
     'profllvm'         : ['-prof', '-static', '-fprof-auto', '-fllvm'],
     'profoptllvm'      : ['-O', '-prof', '-static', '-fprof-auto', '-fllvm'],
-    'profthreadedllvm' : ['-O', '-prof', '-static', '-fprof-auto', '-threaded', '-fllvm'],
+    'profthreadedllvm' : ['-O', '-prof', '-static', '-fprof-auto', '-fllvm'],
     'ghci-ext'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '-fexternal-interpreter', '+RTS', '-I0.1', '-RTS'],
     'ghci-ext-prof'    : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '-fexternal-interpreter', '-prof', '+RTS', '-I0.1', '-RTS'],
     'ext-interp' : ['-fexternal-interpreter'],
@@ -144,7 +144,7 @@ prof_ways     = [x[0] for x in config.way_flags.items()
                       if '-prof' in x[1]]
 
 threaded_ways = [x[0] for x in config.way_flags.items()
-                      if '-threaded' in x[1] or 'ghci' == x[0]]
+                      if 'ghci' == x[0]]
 
 # Ways which run with multiple capabilities
 concurrent_ways = [name for name, flags in config.way_flags.items()
