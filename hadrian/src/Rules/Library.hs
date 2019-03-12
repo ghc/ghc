@@ -3,18 +3,15 @@ module Rules.Library (libraryRules) where
 import Hadrian.BuildPath
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
-import qualified System.Directory as IO
 import qualified Text.Parsec      as Parsec
 
 import Base
 import Context
 import Expression hiding (way, package)
-import Flavour
 import Oracles.ModuleFiles
 import Packages
 import Rules.Gmp
 import Rules.Libffi (libffiDependencies)
-import Settings
 import Target
 import Utilities
 

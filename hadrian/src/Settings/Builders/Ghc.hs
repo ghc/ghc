@@ -3,7 +3,6 @@ module Settings.Builders.Ghc (ghcBuilderArgs, haddockGhcArgs) where
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 
-import Flavour
 import Packages
 import Settings.Builders.Common
 import Settings.Warnings
