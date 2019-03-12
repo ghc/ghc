@@ -16,7 +16,8 @@ module Hadrian.Package (
     Package (..), PackageName, PackageType,
 
     -- * Construction and properties
-    library, program, dummyPackage, isLibrary, isProgram,
+    library, program, external, dummyPackage
+    , isLibrary, isProgram, isExternalLibrary,
 
     -- * Package directory structure
     pkgCabalFile
@@ -30,7 +31,9 @@ import Hadrian.Utilities
 
 -- TODO: Make PackageType more precise.
 -- See https://github.com/snowleopard/hadrian/issues/12.
-data PackageType = Library | Program deriving (Eq, Generic, Ord, Show)
+data PackageType = Library InternalExternal | Program deriving (Eq, Generic, Ord, Show)
+
+data InternalExternal = Internal | External deriving (Eq, Generic, Ord, Show)
 
 type PackageName = String
 
@@ -49,7 +52,10 @@ data Package = Package {
 
 -- | Construct a library package.
 library :: PackageName -> FilePath -> Package
-library = Package Library
+library = Package (Library Internal)
+
+external :: PackageName -> FilePath -> Package
+external = Package (Library External)
 
 -- | Construct a program package.
 program :: PackageName -> FilePath -> Package
@@ -63,13 +69,17 @@ dummyPackage = library "dummy" "dummy/path/"
 
 -- | Is this a library package?
 isLibrary :: Package -> Bool
-isLibrary (Package Library _ _) = True
+isLibrary (Package (Library {}) _ _) = True
 isLibrary _ = False
 
 -- | Is this a program package?
 isProgram :: Package -> Bool
 isProgram (Package Program _ _) = True
 isProgram _ = False
+
+isExternalLibrary :: Package -> Bool
+isExternalLibrary (Package (Library External) _ _) = True
+isExternalLibrary _ = False
 
 -- | The path to the Cabal file of a Haskell package, e.g. @ghc/ghc-bin.cabal@.
 pkgCabalFile :: Package -> FilePath
@@ -78,6 +88,10 @@ pkgCabalFile p = pkgPath p -/- pkgName p <.> "cabal"
 instance Binary   PackageType
 instance Hashable PackageType
 instance NFData   PackageType
+
+instance Binary   InternalExternal
+instance Hashable InternalExternal
+instance NFData   InternalExternal
 
 instance Binary   Package
 instance Hashable Package
