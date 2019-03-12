@@ -190,7 +190,7 @@ not much used, except in the output of the desugarer.
 Example:
      let a = Int in (\x:a. x)
 Given this, exprType must be careful to substitute 'a' in the
-result type (Trac #8522).
+result type (#8522).
 
 Note [Existential variables and silly type synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -202,7 +202,7 @@ Consider
 
 Now, the type of 'x' is (Funny a), where 'a' is existentially quantified.
 That means that 'exprType' and 'coreAltsType' may give a result that *appears*
-to mention an out-of-scope type variable.  See Trac #3409 for a more real-world
+to mention an out-of-scope type variable.  See #3409 for a more real-world
 example.
 
 Various possibilities suggest themselves:
@@ -571,7 +571,7 @@ that cannot match.  For example:
 
 Suppose that for some silly reason, x isn't substituted in the case
 expression.  (Perhaps there's a NOINLINE on it, or profiling SCC stuff
-gets in the way; cf Trac #3118.)  Then the full-lazines pass might produce
+gets in the way; cf #3118.)  Then the full-lazines pass might produce
 this
 
      x = Red
@@ -827,11 +827,11 @@ and similarly in cascade for all the join points!
 NB: it's important that all this is done in [InAlt], *before* we work
 on the alternatives themselves, because Simplify.simplAlt may zap the
 occurrence info on the binders in the alternatives, which in turn
-defeats combineIdenticalAlts (see Trac #7360).
+defeats combineIdenticalAlts (see #7360).
 
 Note [Care with impossible-constructors when combining alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have (Trac #10538)
+Suppose we have (#10538)
    data T = A | B | C | D
 
       case x::T of   (Imposs-default-cons {A,B})
@@ -867,7 +867,7 @@ Then when combining the A and C alternatives we get
 
 Note that we have a new DEFAULT branch that we didn't have before.  So
 we need delete from the "impossible-default-constructors" all the
-known-con alternatives that we have eliminated. (In Trac #11172 we
+known-con alternatives that we have eliminated. (In #11172 we
 missed the first one.)
 
 -}
@@ -950,7 +950,7 @@ it as trivial we may land up with let-bindings like
    let v = case x of {} in ...
 and after CoreToSTG that gives
    let v = x in ...
-and that confuses the code generator (Trac #11155). So best to kill
+and that confuses the code generator (#11155). So best to kill
 it off at source.
 -}
 
@@ -1102,7 +1102,7 @@ dupAppSize :: Int
 dupAppSize = 8   -- Size of term we are prepared to duplicate
                  -- This is *just* big enough to make test MethSharing
                  -- inline enough join points.  Really it should be
-                 -- smaller, and could be if we fixed Trac #4960.
+                 -- smaller, and could be if we fixed #4960.
 
 {-
 ************************************************************************
@@ -1116,7 +1116,7 @@ Note [exprIsWorkFree]
 exprIsWorkFree is used when deciding whether to inline something; we
 don't inline it if doing so might duplicate work, by peeling off a
 complete copy of the expression.  Here we do not want even to
-duplicate a primop (Trac #5623):
+duplicate a primop (#5623):
    eg   let x = a #+ b in x +# x
    we do not want to inline/duplicate x
 
@@ -1276,7 +1276,7 @@ expansion.  Specifically:
 
 * False of case-expressions.  If we have
     let x = case ... in ...(case x of ...)...
-  we won't simplify.  We have to inline x.  See Trac #14688.
+  we won't simplify.  We have to inline x.  See #14688.
 
 * False of let-expressions (same reason); and in any case we
   float lets out of an RHS if doing so will reveal an expandable
@@ -1657,7 +1657,7 @@ But we restrict it sharply:
   add unlifted algebraic types in due course.
 
 
------ Historical note: Trac #15696: --------
+----- Historical note: #15696: --------
   Previously SetLevels used exprOkForSpeculation to guide
   floating of single-alternative cases; it now uses exprIsHNF
   Note [Floating single-alternative cases].
@@ -1676,9 +1676,9 @@ But we restrict it sharply:
     ...(case x of y
             A -> ...
             _ -> ...blah...)...
-  which is utterly bogus (seg fault); see Trac #5453.
+  which is utterly bogus (seg fault); see #5453.
 
------ Historical note: Trac #3717: --------
+----- Historical note: #3717: --------
     foo :: Int -> Int
     foo 0 = 0
     foo n = (if n < 5 then 1 else 2) `seq` foo (n-1)
@@ -1703,7 +1703,7 @@ points do the job nicely.
 
 Note [Primops with lifted arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Is this ok-for-speculation (see Trac #13027)?
+Is this ok-for-speculation (see #13027)?
    reallyUnsafePtrEq# a b
 Well, yes.  The primop accepts lifted arguments and does not
 evaluate them.  Indeed, in general primops are, well, primitive
@@ -2279,7 +2279,7 @@ There are some particularly delicate points here:
   *keeps* arity 1 (perhaps also wrongly).  So CorePrep eta-expands
   the definition again, so that it does not termninate after all.
   Result: seg-fault because the boolean case actually gets a function value.
-  See Trac #1947.
+  See #1947.
 
   So it's important to do the right thing.
 
@@ -2434,7 +2434,7 @@ to the rule that
   * f is not bottom
 we can eta-reduce    \x. f x  ===>  f
 
-This turned up in Trac #7542.
+This turned up in #7542.
 
 
 ************************************************************************

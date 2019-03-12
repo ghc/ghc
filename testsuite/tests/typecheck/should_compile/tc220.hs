@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
--- See Trac #1033
+-- See #1033
 
 module Pointful' where
 

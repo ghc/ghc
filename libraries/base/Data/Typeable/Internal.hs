@@ -830,7 +830,7 @@ splitApps = go []
 -- appropriate module and constructor names.
 --
 -- The ticket to find a better way to deal with this is
--- Trac #14480.
+-- #14480.
 tyConTYPE :: TyCon
 tyConTYPE = mkTyCon (tyConPackage liftedRepTyCon) "GHC.Prim" "TYPE" 0
        (KindRepFun (KindRepTyConApp liftedRepTyCon []) (KindRepTYPE LiftedRep))

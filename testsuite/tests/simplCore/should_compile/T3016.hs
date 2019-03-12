@@ -1,9 +1,9 @@
--- Test Trac #3016.
+-- Test #3016.
 -- The issue here is whether it compiles in a reasonable time
 -- With GHC 6.10 it took hours!  After fixing the bug (which
 -- was too much inlining) it went down to 30s.
 
--- This also tests Trac #5652, a complexity issue with the LLVM
+-- This also tests #5652, a complexity issue with the LLVM
 -- backend for this module. Compile time down from 10 min to
 -- 12 seconds.
 

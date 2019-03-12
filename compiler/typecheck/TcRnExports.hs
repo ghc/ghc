@@ -65,7 +65,7 @@ it re-exports @GHC@, which includes @takeMVar#@, whose type includes
 
 Note [Exports of data families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose you see (Trac #5306)
+Suppose you see (#5306)
         module M where
           import X( F )
           data instance F Int = FInt
@@ -92,7 +92,7 @@ You just have to use an explicit export list:
 
 Note [Avails of associated data families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose you have (Trac #16077)
+Suppose you have (#16077)
 
     {-# LANGUAGE TypeFamilies #-}
     module A (module A) where
@@ -718,12 +718,12 @@ dupExport_ok :: Name -> IE GhcPs -> IE GhcPs -> Bool
 --        import A( f )
 --        import B( f )
 --
--- Example of "yes" (Trac #2436)
+-- Example of "yes" (#2436)
 --    module M( C(..), T(..) ) where
 --         class C a where { data T a }
 --         instance C Int where { data T Int = TInt }
 --
--- Example of "yes" (Trac #2436)
+-- Example of "yes" (#2436)
 --    module Foo ( T ) where
 --      data family T a
 --    module Bar ( T(..), module Foo ) where

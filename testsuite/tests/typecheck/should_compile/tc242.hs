@@ -7,7 +7,7 @@ f1 (x:xs) = xs ++ [ x :: a ]   -- OK
 f2 :: forall a. [a] -> [a]
 f2 = \(x:xs) -> xs ++ [ x :: a ]   -- OK
 
--- This pair is a cut-down version of Trac #2030
+-- This pair is a cut-down version of #2030
 isSafe alts = isSafeAlts alts
 
 isSafeAlts :: forall m . Int -> m Int

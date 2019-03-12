@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- See Trac #1678
+-- See #1678
 
 module TH where 
 

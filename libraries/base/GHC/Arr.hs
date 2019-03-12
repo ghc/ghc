@@ -126,7 +126,7 @@ Note [Inlining index]
 We inline the 'index' operation,
 
  * Partly because it generates much faster code
-   (although bigger); see Trac #1216
+   (although bigger); see #1216
 
  * Partly because it exposes the bounds checks to the simplifier which
    might help a big.
@@ -151,13 +151,13 @@ is a property of the particular instances of index, bounds, and inRange,
 so GHC cannot guarantee it.
 
  * If you do (A) and not (B), then you might get a seg-fault,
-   by indexing at some bizarre location.  Trac #1610
+   by indexing at some bizarre location.  #1610
 
  * If you do (B) but not (A), you may get no complaint when you index
-   an array out of its semantic bounds.  Trac #2120
+   an array out of its semantic bounds.  #2120
 
 At various times we have had (A) and not (B), or (B) and not (A); both
-led to complaints.  So now we implement *both* checks (Trac #2669).
+led to complaints.  So now we implement *both* checks (#2669).
 
 For 1-d, 2-d, and 3-d arrays of Int we have specialised instances to avoid this.
 
@@ -787,7 +787,7 @@ There are two problems:
 2. This implementation relies on list fusion for efficiency. In order
    to implement the "amap/coerce" rule, we need to delay inlining amap
    until simplifier phase 1, which is when the eftIntList rule kicks
-   in and makes that impossible.  (c.f. Trac #8767)
+   in and makes that impossible.  (c.f. #8767)
 -}
 
 

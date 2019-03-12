@@ -103,7 +103,7 @@ pprASCII :: ByteString -> SDoc
 pprASCII str
   -- Transform this given literal bytestring to escaped string and construct
   -- the literal SDoc directly.
-  -- See Trac #14741
+  -- See #14741
   -- and Note [Pretty print ASCII when AsmCodeGen]
   = text $ BS.foldr (\w s -> do1 w ++ s) "" str
     where
@@ -189,7 +189,7 @@ high memory usage.
 Now we escape the given bytestring to string directly and construct
 SDoc only once. This improvement could dramatically decrease the
 memory allocation from 4.7GB to 1.3GB when embedding a 3MB literal
-string in source code. See Trac #14741 for profiling results.
+string in source code. See #14741 for profiling results.
 -}
 
 -- ----------------------------------------------------------------------------

@@ -239,7 +239,7 @@ Why do we use this different strategy?  Because otherwise we
 end up with non-inlined dictionaries that look like
     $df = $cop |> blah
 which adds an extra indirection to every use, which seems stupid.  See
-Trac #4138 for an example (although the regression reported there
+#4138 for an example (although the regression reported there
 wasn't due to the indirection).
 
 There is an awkward wrinkle though: we want to be very
@@ -254,7 +254,7 @@ above.  We ensure that this doesn't happen by putting an INLINE
 pragma on the dfun itself; after all, it ends up being just a cast.
 
 There is one more dark corner to the INLINE story, even more deeply
-buried.  Consider this (Trac #3772):
+buried.  Consider this (#3772):
 
     class DeepSeq a => C a where
       gen :: Int -> a
@@ -433,7 +433,7 @@ Given a declaration bracket
 
 there is really no point in generating the derived code for deriving(
 Show) and then type-checking it. This will happen at the call site
-anyway, and the type check should never fail!  Moreover (Trac #6005)
+anyway, and the type check should never fail!  Moreover (#6005)
 the scoping of the generated code inside the bracket does not seem to
 work out.
 
@@ -677,7 +677,7 @@ tcDataFamInstDecl mb_clsinfo
                  -- Put the eta-removed tyvars at the end
                  -- Remember, qtvs is in arbitrary order, except kind vars are
                  -- first, so there is no reason to suppose that the eta_tvs
-                 -- (obtained from the pats) are at the end (Trac #11148)
+                 -- (obtained from the pats) are at the end (#11148)
 
        -- Eta-expand the representation tycon until it has reult kind *
        -- See also Note [Arity of data families] in FamInstEnv
@@ -910,7 +910,7 @@ There are several fiddly subtleties lurking here
   the TyConBndrVis on Drep's arguments. In particular do we have
     (forall (k::*). blah) or (* -> blah)?
 
-  We must match whatever D does!  In Trac #15817 we had
+  We must match whatever D does!  In #15817 we had
       data family X a :: forall k. * -> *   -- Note: a forall that is not used
       data instance X Int b = MkX
 
@@ -1257,11 +1257,11 @@ checkInstConstraints thing_inside
 {-
 Note [Recursive superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See Trac #3731, #4809, #5751, #5913, #6117, #6161, which all
+See #3731, #4809, #5751, #5913, #6117, #6161, which all
 describe somewhat more complicated situations, but ones
 encountered in practice.
 
-See also tests tcrun020, tcrun021, tcrun033, and Trac #11427.
+See also tests tcrun020, tcrun021, tcrun033, and #11427.
 
 ----- THE PROBLEM --------
 The problem is that it is all too easy to create a class whose
@@ -1326,7 +1326,7 @@ since it is smaller than the thing we are building (UserOfRegs r (Maybe a).
 But for (i2) that isn't the case, so we must add an explicit, and
 perhaps surprising, (Ord r) argument to the instance declaration.
 
-Here's another example from Trac #6161:
+Here's another example from #6161:
 
        class       Super a => Duper a  where ...
        class Duper (Fam a) => Foo a    where ...
@@ -1934,8 +1934,8 @@ to disambiguate:
    fooIntInt = $dmfoo @Int @Int
 
 Lacking VTA we'd get ambiguity errors involving the default method.  This applies
-equally to vanilla default methods (Trac #1061) and generic default methods
-(Trac #12220).
+equally to vanilla default methods (#1061) and generic default methods
+(#12220).
 
 Historical note: before we had VTA we had to generate
 post-type-checked code, which took a lot more code, and didn't work for
@@ -2052,7 +2052,7 @@ Note that
 
   * The specialised dictionary $s$dfIxPair is very much needed, in case we
     call a function that takes a dictionary, but in a context where the
-    specialised dictionary can be used.  See Trac #7797.
+    specialised dictionary can be used.  See #7797.
 
   * The ClassOp rule for 'range' works equally well on $s$dfIxPair, because
     it still has a DFunUnfolding.  See Note [ClassOp/DFun selection]

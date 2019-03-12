@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, GeneralizedNewtypeDeriving #-}
 
--- See Trac #1251 and the comments
+-- See #1251 and the comments
 -- Note [Pruning dead case alternatives] in types/Unify.lhs
 
 module Main( main ) where

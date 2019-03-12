@@ -233,7 +233,7 @@ These data types are the heart of the compiler
 --       can't be @Red@ at that program point.
 --
 --    5. Floating-point values must not be scrutinised against literals.
---       See Trac #9238 and Note [Rules for floating-point comparisons]
+--       See #9238 and Note [Rules for floating-point comparisons]
 --       in PrelRules for rationale.
 --
 -- *  Cast an expression to a particular type.
@@ -338,7 +338,7 @@ Note [Literal alternatives]
 Literal alternatives (LitAlt lit) are always for *un-lifted* literals.
 We have one literal, a literal Integer, that is lifted, and we don't
 allow in a LitAlt, because LitAlt cases don't do any evaluation. Also
-(see Trac #5603) if you say
+(see #5603) if you say
     case 3 of
       S# x -> ...
       J# _ _ -> ...
@@ -348,7 +348,7 @@ literals are an opaque encoding of an algebraic data type, not of
 an unlifted literal, like all the others.
 
 Also, we do not permit case analysis with literal patterns on floating-point
-types. See Trac #9238 and Note [Rules for floating-point comparisons] in
+types. See #9238 and Note [Rules for floating-point comparisons] in
 PrelRules for the rationale for this restriction.
 
 -------------------------- CoreSyn INVARIANTS ---------------------------
@@ -386,7 +386,7 @@ Consider,
 
 In order to be able to inline `f`, we would like to float `a` to the top.
 Another option would be to inline `a`, but that would lead to duplicating string
-literals, which we want to avoid. See Trac #8472.
+literals, which we want to avoid. See #8472.
 
 The solution is simply to allow top-level unlifted binders. We can't allow
 arbitrary unlifted expression at the top-level though, unlifted binders cannot
@@ -395,7 +395,7 @@ be thunks, so we just allow string literals.
 We allow the top-level primitive string literals to be wrapped in Ticks
 in the same way they can be wrapped when nested in an expression.
 CoreToSTG currently discards Ticks around top-level primitive string literals.
-See Trac #14779.
+See #14779.
 
 Also see Note [Compilation plan for top-level string literals].
 
@@ -518,7 +518,7 @@ this exhaustive list can be empty!
   we do NOT want to replace
     case (x::T) of Bool {}   -->   error Bool "Inaccessible case"
   because x might raise an exception, and *that*'s what we want to see!
-  (Trac #6067 is an example.) To preserve semantics we'd have to say
+  (#6067 is an example.) To preserve semantics we'd have to say
      x `seq` error Bool "Inaccessible case"
   but the 'seq' is just a case, so we are back to square 1.  Or I suppose
   we could say
@@ -626,7 +626,7 @@ However, join points have simpler invariants in other ways
 
   6. A join point can have a levity-polymorphic RHS
      e.g.  let j :: r :: TYPE l = fail void# in ...
-     This happened in an intermediate program Trac #13394
+     This happened in an intermediate program #13394
 
 Examples:
 
@@ -1113,7 +1113,7 @@ chooseOrphanAnchor :: NameSet -> IsOrphan
 -- Something (rule, instance) is relate to all the Names in this
 -- list. Choose one of them to be an "anchor" for the orphan.  We make
 -- the choice deterministic to avoid gratuitious changes in the ABI
--- hash (Trac #4012).  Specifically, use lexicographic comparison of
+-- hash (#4012).  Specifically, use lexicographic comparison of
 -- OccName rather than comparing Uniques
 --
 -- NB: 'minimum' use Ord, and (Ord OccName) works lexicographically
@@ -1641,7 +1641,7 @@ ones are
 
    OtherCon {}    If we know this binder (say a lambda binder) will be
                   bound to an evaluated thing, we want to retain that
-                  info in simpleOptExpr; see Trac #13077.
+                  info in simpleOptExpr; see #13077.
 
 We consider even a StableUnfolding as fragile, because it needs substitution.
 

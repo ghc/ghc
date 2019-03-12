@@ -37,7 +37,7 @@ popcnt64 (W64# w#) =
     W# (popCnt# w#)
 #endif
 
--- Cribbed from http://ghc.haskell.org/trac/ghc/ticket/3563
+-- Cribbed from https://gitlab.haskell.org/ghc/ghc/issues/3563
 slowPopcnt :: Word -> Word
 slowPopcnt x = count' (bitSize x) x 0
   where

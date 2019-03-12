@@ -5,7 +5,7 @@
   gen-dll is a replacement for dll-split which aims to solve a simple problem
   during the building of stage2. The issue is that the PE image format only has
   a 16-bit field for the symbol count. This means we can't have more than 2^16-1
-  symbols in a single PE file. See Trac #5987.
+  symbols in a single PE file. See #5987.
 
   gen-dll solves this issue by partitioning the object files in such a way that
   a single dll never has more than the allowed amount of symbols. The general

@@ -1,4 +1,4 @@
--- Trac #3219.  Lint error in GHC 6.10
+-- #3219.  Lint error in GHC 6.10
 
 module T3219 where
 

@@ -7,5 +7,5 @@ f x | null x    = 1
     | otherwise = 2
 
 -- Should not give a non-exhaustive-patterns error
--- See Trac #1759
+-- See #1759
 

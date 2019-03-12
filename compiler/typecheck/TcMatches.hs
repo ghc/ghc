@@ -823,7 +823,7 @@ tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax:
                 --       (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
                 -- This level of generality is needed for using do-notation
-                -- in full generality; see Trac #1537
+                -- in full generality; see #1537
 
           ((rhs', pat', new_res_ty, thing), bind_op')
             <- tcSyntaxOp DoOrigin bind_op [SynRho, SynFun SynAny SynRho] res_ty $
@@ -987,7 +987,7 @@ we want to typecheck 'bar' in the knowledge that it should be an IO thing,
 pushing info from the context into the RHS.  To do this, we check the
 rebindable syntax first, and push that information into (tcMonoExprNC rhs).
 Otherwise the error shows up when checking the rebindable syntax, and
-the expected/inferred stuff is back to front (see Trac #3613).
+the expected/inferred stuff is back to front (see #3613).
 
 Note [typechecking ApplicativeStmt]
 
@@ -1084,7 +1084,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An applicative-do is supposed to take place in parallel, so
 constraints bound in one arm can't possibly be available in another
-(Trac #13242).  Our current rule is this (more details and discussion
+(#13242).  Our current rule is this (more details and discussion
 on the ticket). Consider
 
    ...stmts...

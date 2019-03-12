@@ -26,7 +26,7 @@ import SysTools.Process
 
 {- Note [Run-time linker info]
 
-See also: Trac #5240, Trac #6063, Trac #10110
+See also: #5240, #6063, #10110
 
 Before 'runLink', we need to be sure to get the relevant information
 about the linker we're using at runtime to see if we need any extra
@@ -127,8 +127,8 @@ getLinkerInfo' dflags = do
       parseLinkerInfo stdo _stde _exitc
         | any ("GNU ld" `isPrefixOf`) stdo =
           -- GNU ld specifically needs to use less memory. This especially
-          -- hurts on small object files. Trac #5240.
-          -- Set DT_NEEDED for all shared libraries. Trac #10110.
+          -- hurts on small object files. #5240.
+          -- Set DT_NEEDED for all shared libraries. #10110.
           -- TODO: Investigate if these help or hurt when using split sections.
           return (GnuLD $ map Option ["-Wl,--hash-size=31",
                                       "-Wl,--reduce-memory-overheads",
@@ -137,7 +137,7 @@ getLinkerInfo' dflags = do
                                       "-Wl,--no-as-needed"])
 
         | any ("GNU gold" `isPrefixOf`) stdo =
-          -- GNU gold only needs --no-as-needed. Trac #10110.
+          -- GNU gold only needs --no-as-needed. #10110.
           -- ELF specific flag, see Note [ELF needed shared libs]
           return (GnuGold [Option "-Wl,--no-as-needed"])
 

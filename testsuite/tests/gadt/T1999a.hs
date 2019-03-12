@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs #-}
--- Trac #1999
+-- #1999
 
 module ShouldCompile where
 

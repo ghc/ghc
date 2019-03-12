@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes, NamedWildCards #-}
 
--- See Trac #11098
+-- See #11098
 
 module NamedWildcardExplicitForall where
 

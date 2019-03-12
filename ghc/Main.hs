@@ -872,7 +872,7 @@ to get a hash of the package's ABI.
 
 -- | Print ABI hash of input modules.
 --
--- The resulting hash is the MD5 of the GHC version used (Trac #5328,
+-- The resulting hash is the MD5 of the GHC version used (#5328,
 -- see 'hiVersion') and of the existing ABI hash from each module (see
 -- 'mi_mod_hash').
 abiHash :: [String] -- ^ List of module names

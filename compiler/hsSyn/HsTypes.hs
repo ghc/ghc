@@ -213,7 +213,7 @@ Note carefully:
   Or even:
         f :: forall _a. _a -> _b
   Here _a is an ordinary forall'd binder, but (With NamedWildCards)
-  _b is a named wildcard.  (See the comments in Trac #10982)
+  _b is a named wildcard.  (See the comments in #10982)
 
 * Named wildcards are bound by the HsWildCardBndrs construct, which wraps
   types that are allowed to have wildcards. Unnamed wildcards however are left
@@ -757,7 +757,7 @@ After renaming
 Qualified currently behaves exactly as Implicit,
 but it is deprecated to use it for implicit quantification.
 In this case, GHC 7.10 gives a warning; see
-Note [Context quantification] in RnTypes, and Trac #4426.
+Note [Context quantification] in RnTypes, and #4426.
 In GHC 8.0, Qualified will no longer bind variables
 and this will become an error.
 
@@ -1065,7 +1065,7 @@ mkHsAppKindTy ext ty k
 -- Breaks up any parens in the result type:
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
 -- Also deals with (->) t1 t2; that is why it only works on LHsType Name
---   (see Trac #9096)
+--   (see #9096)
 splitHsFunType :: LHsType GhcRn -> ([LHsType GhcRn], LHsType GhcRn)
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
@@ -1483,7 +1483,7 @@ pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
 {-
 Note [Printing KindedTyVars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Trac #3830 reminded me that we should really only print the kind
+#3830 reminded me that we should really only print the kind
 signature on a KindedTyVar if the kind signature was put there by the
 programmer.  During kind inference GHC now adds a PostTcKind to UserTyVars,
 rather than converting to KindedTyVars as before.

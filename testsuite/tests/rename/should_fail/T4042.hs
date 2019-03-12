@@ -1,4 +1,4 @@
--- Test Trac #4042
+-- Test #4042
 
 module T4042 where
 

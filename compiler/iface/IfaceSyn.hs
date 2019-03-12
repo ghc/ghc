@@ -745,7 +745,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                                         (occName tycon))
                                     binders roles
             -- Don't display roles for data family instances (yet)
-            -- See discussion on Trac #8672.
+            -- See discussion on #8672.
 
     add_bars []     = Outputable.empty
     add_bars (c:cs) = sep ((equals <+> c) : map (vbar <+>) cs)

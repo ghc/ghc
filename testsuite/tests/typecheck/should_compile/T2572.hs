@@ -1,6 +1,6 @@
  {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 
--- Trac #2572
+-- #2572
 
 module Foo where
 

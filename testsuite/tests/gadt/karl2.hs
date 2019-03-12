@@ -2,7 +2,7 @@
 
 module Expr0 where
 
--- See Trac #301
+-- See #301
 -- This one *does* use GADTs (Fct)
 
 import Data.Kind (Type)

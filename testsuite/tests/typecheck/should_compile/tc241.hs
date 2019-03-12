@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -XGADTs -XRankNTypes -O1 #-}
--- Trac #2018
+-- #2018
 
 module Bug1 where
 

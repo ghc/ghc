@@ -247,7 +247,7 @@ When it calls RnEnv.unknownNameSuggestions to identify these alternatives, the
 typechecker must provide a GlobalRdrEnv.  If it provided the current one, which
 contains top-level declarations for the entire module, the error message would
 incorrectly suggest the out-of-scope `bar` and `bad` as possible alternatives
-for `bar` (see Trac #11680).  Instead, the typechecker must use the same
+for `bar` (see #11680).  Instead, the typechecker must use the same
 GlobalRdrEnv the renamer used when it determined that `bar` is out-of-scope.
 
 To obtain this GlobalRdrEnv, can the typechecker simply use the out-of-scope
@@ -2012,7 +2012,7 @@ Note [The type of bind in Stmts]
 Some Stmts, notably BindStmt, keep the (>>=) bind operator.
 We do NOT assume that it has type
     (>>=) :: m a -> (a -> m b) -> m b
-In some cases (see Trac #303, #1537) it might have a more
+In some cases (see #303, #1537) it might have a more
 exotic type, such as
     (>>=) :: m i j a -> (a -> m j k b) -> m i k b
 So we must be careful not to make assumptions about the type.
@@ -2306,7 +2306,7 @@ pprComp quals     -- Prints:  body | qual1, ..., qualn
        -- one, we simply treat it like a normal list. This does arise
        -- occasionally in code that GHC generates, e.g., in implementations of
        -- 'range' for derived 'Ix' instances for product datatypes with exactly
-       -- one constructor (e.g., see Trac #12583).
+       -- one constructor (e.g., see #12583).
        then ppr body
        else hang (ppr body <+> vbar) 2 (pprQuals initStmts)
   | otherwise

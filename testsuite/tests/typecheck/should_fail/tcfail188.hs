@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes, KindSignatures #-}
 {-# OPTIONS_GHC -Werror #-}
 
--- Trac #959
+-- #959
 
 module ShouldFail where
 

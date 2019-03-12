@@ -1,4 +1,4 @@
--- Trac #2735
+-- #2735
 
 module Bug where
 

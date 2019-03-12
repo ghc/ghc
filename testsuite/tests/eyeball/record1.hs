@@ -1,7 +1,7 @@
 -- Check that the record selector for maskMB unfolds in the body of f
 -- At one stage it didn't because the implicit unfolding looked too big
 
--- Trac #2581
+-- #2581
 
 module ShouldCompile where
 import Data.Array.Base

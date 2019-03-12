@@ -159,9 +159,9 @@ okConIdOcc str = okIdOcc str ||
                  is_tuple_name1 True  str ||
                    -- Is it a boxed tuple...
                  is_tuple_name1 False str ||
-                   -- ...or an unboxed tuple (Trac #12407)...
+                   -- ...or an unboxed tuple (#12407)...
                  is_sum_name1 str
-                   -- ...or an unboxed sum (Trac #12514)?
+                   -- ...or an unboxed sum (#12514)?
   where
     -- check for tuple name, starting at the beginning
     is_tuple_name1 True  ('(' : rest)       = is_tuple_name2 True  rest

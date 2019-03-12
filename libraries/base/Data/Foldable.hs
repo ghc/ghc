@@ -127,7 +127,7 @@ class Foldable t where
     -- and combine the results.
     foldMap :: Monoid m => (a -> m) -> t a -> m
     {-# INLINE foldMap #-}
-    -- This INLINE allows more list functions to fuse. See Trac #9848.
+    -- This INLINE allows more list functions to fuse. See #9848.
     foldMap f = foldr (mappend . f) mempty
 
     -- | A variant of 'foldMap' that is strict in the accumulator.
@@ -718,7 +718,7 @@ GHC used to proceed like this:
     in ...(c x1 y1)...(c x2 y2)....n...
 
 The trouble is that `c`, being big, will not be inlined.  And that can
-be absolutely terrible for performance, as we saw in Trac #8763.
+be absolutely terrible for performance, as we saw in #8763.
 
 It's much better to define
 
@@ -776,7 +776,7 @@ foldr1. This was problematic for space usage, as the semantics of maximumBy
 and minimumBy essentially require that they examine every element of the
 data structure. Using foldr1 to examine every element results in space usage
 proportional to the size of the data structure. For the common case of lists,
-this could be particularly bad (see Trac #10830).
+this could be particularly bad (see #10830).
 
 For the common case of lists, switching the implementations of maximumBy and
 minimumBy to foldl1 solves the issue, as GHC's strictness analysis can then
@@ -784,7 +784,7 @@ make these functions only use O(1) stack space. It is perhaps not the optimal
 way to fix this problem, as there are other conceivable data structures
 (besides lists) which might benefit from specialized implementations for
 maximumBy and minimumBy (see
-https://ghc.haskell.org/trac/ghc/ticket/10830#comment:26 for a further
+https://gitlab.haskell.org/ghc/ghc/issues/10830#note_129843 for a further
 discussion). But using foldl1 is at least always better than using foldr1, so
 GHC has chosen to adopt that approach for now.
 -}

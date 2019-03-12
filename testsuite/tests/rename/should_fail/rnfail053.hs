@@ -1,4 +1,4 @@
--- Test Trac #2114 (error message)
+-- Test #2114 (error message)
 
 module ShouldFail where
 

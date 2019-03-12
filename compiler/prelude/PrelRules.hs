@@ -344,7 +344,7 @@ to
   case x of
     3.8#::Float# -> this
     _            -> that
-See Trac #9238.  Reason: comparing floating-point values for equality
+See #9238.  Reason: comparing floating-point values for equality
 delicate, and we don't want to implement that delicacy in the code for
 case expressions.  So we make it an invariant of Core that a case
 expression never scrutinises a Float# or Double#.
@@ -1070,7 +1070,7 @@ is:
      case e of <transformed alts>
   by PrelRules.caseRules; see Note [caseRules for dataToTag]
 
-See Trac #15696 for a long saga.
+See #15696 for a long saga.
 
 
 ************************************************************************
@@ -1103,7 +1103,7 @@ Things to note
   why not instead say this?
       case x of { DEFAULT -> blah)
 
-  Reason (see Trac #5129): if we saw
+  Reason (see #5129): if we saw
     catch# (\s -> case x of { DEFAULT -> raiseIO# exn s }) handler
 
   then we'd drop the 'case x' because the body of the case is bottom
@@ -1511,7 +1511,7 @@ match_WordToNatural _ _ _ _ = Nothing
 For most types the bitInteger operation can be implemented in terms of shifts.
 The integer-gmp package, however, can do substantially better than this if
 allowed to provide its own implementation. However, in so doing it previously lost
-constant-folding (see Trac #8832). The bitInteger rule above provides constant folding
+constant-folding (see #8832). The bitInteger rule above provides constant folding
 specifically for this function.
 
 There is, however, a bit of trickiness here when it comes to ranges. While the
@@ -1531,7 +1531,7 @@ match_bitInteger dflags id_unf fn [arg]
     -- Make sure x is small enough to yield a decently small iteger
     -- Attempting to construct the Integer for
     --    (bitInteger 9223372036854775807#)
-    -- would be a bad idea (Trac #14959)
+    -- would be a bad idea (#14959)
   , let x_int = fromIntegral x :: Int
   = case splitFunTy_maybe (idType fn) of
     Just (_, integerTy)
@@ -1617,7 +1617,7 @@ match_Integer_shift_op binop _ id_unf _ [xl,yl]
   , y >= 0
   , y <= 4   -- Restrict constant-folding of shifts on Integers, somewhat
              -- arbitrary.  We can get huge shifts in inaccessible code
-             -- (Trac #15673)
+             -- (#15673)
   = Just (Lit (mkLitInteger (x `binop` fromIntegral y) i))
 match_Integer_shift_op _ _ _ _ _ = Nothing
 
@@ -2114,7 +2114,7 @@ we generate
     True  -> e2
 and it is nice to then get rid of the tagToEnum.
 
-Beware (Trac #14768): avoid the temptation to map constructor 0 to
+Beware (#14768): avoid the temptation to map constructor 0 to
 DEFAULT, in the hope of getting this
   case (x ># y) of
     DEFAULT -> e1
@@ -2168,5 +2168,5 @@ out-of-range alterantive is dead code -- we know the range of tags for x.
 Hence caseRules returns (AltCon -> Maybe AltCon), with Nothing indicating
 an alternative that is unreachable.
 
-You may wonder how this can happen: check out Trac #15436.
+You may wonder how this can happen: check out #15436.
 -}

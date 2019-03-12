@@ -1,4 +1,4 @@
--- Test Trac #2766
+-- Test #2766
 :set -XTypeOperators
 :m Control.Arrow
 :t first :: Arrow to => b `to` c -> (b, d) `to` (c, d)

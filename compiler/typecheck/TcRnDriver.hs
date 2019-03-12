@@ -24,7 +24,7 @@ module TcRnDriver (
         getModuleInterface,
         tcRnDeclsi,
         isGHCiMonad,
-        runTcInteractive,    -- Used by GHC API clients (Trac #8878)
+        runTcInteractive,    -- Used by GHC API clients (#8878)
         tcRnLookupName,
         tcRnGetInfo,
         tcRnModule, tcRnModuleTcRnM,
@@ -535,7 +535,7 @@ tc_rn_src_decls ds
         -- Get TH-generated top-level declarations and make sure they don't
         -- contain any splices since we don't handle that at the moment
         --
-        -- The plumbing here is a bit odd: see Trac #10853
+        -- The plumbing here is a bit odd: see #10853
       ; th_topdecls_var <- fmap tcg_th_topdecls getGblEnv
       ; th_ds <- readTcRef th_topdecls_var
       ; writeTcRef th_topdecls_var []
@@ -763,7 +763,7 @@ type env, do a setGloblaTypeEnv etc; but that all seems very indirect.
 It is much more directly simply to extract the DFunIds from the
 md_types of the SelfBootInfo.
 
-See Trac #4003, #16038 for why we need to take care here.
+See #4003, #16038 for why we need to take care here.
 -}
 
 checkHiBootIface' :: [ClsInst] -> TypeEnv -> [AvailInfo]
@@ -854,12 +854,12 @@ checkHiBootIface'
           --    That ensures that the TyCon etc inside the type are
           --    the ones defined in this module, not the ones gotten
           --    from the hi-boot file, which may have a lot less info
-          --    (Trac #8743, comment:10).
+          --    (#8743, comment:10).
           --
           --  * The DFunIds from boot_details are /GlobalIds/, because
           --    they come from typechecking M.hi-boot.
           --    But all bindings in this module should be for /LocalIds/,
-          --    otherwise dependency analysis fails (Trac #16038). This
+          --    otherwise dependency analysis fails (#16038). This
           --    is another reason for using mkExportedVanillaId, rather
           --    that modifying boot_dfun, to make local_boot_fun.
 
@@ -1754,7 +1754,7 @@ check_main dflags tcg_env explicit_mod_hdr
               -- The ev_binds of the `main` function may contain deferred
               -- type error when type of `main` is not `IO a`. The `ev_binds`
               -- must be put inside `runMainIO` to ensure the deferred type
-              -- error can be emitted correctly. See Trac #13838.
+              -- error can be emitted correctly. See #13838.
               ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) $
                         mkHsDictLet ev_binds main_expr
               ; main_bind = mkVarBind root_main_id rhs }
@@ -2154,10 +2154,10 @@ naked expressions. Deferring type errors here is unhelpful because the
 expression gets evaluated right away anyway. It also would potentially emit
 two redundant type-error warnings, one from each plan.
 
-Trac #14963 reveals another bug that when deferred type errors is enabled
+#14963 reveals another bug that when deferred type errors is enabled
 in GHCi, any reference of imported/loaded variables (directly or indirectly)
 in interactively issued naked expressions will cause ghc panic. See more
-detailed dicussion in Trac #14963.
+detailed dicussion in #14963.
 
 The interactively issued declarations, statements, as well as the modules
 loaded into GHCi, are not affected. That means, for declaration, you could

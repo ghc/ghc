@@ -174,7 +174,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
        -- However unlike the meta-tyvar case, we are sure that the
        -- number of arguments doesn't match arity of the original
        -- type, so we can add a bit more context to the error message
-       -- (cf Trac #7869).
+       -- (cf #7869).
        --
        -- It is not always an error, because specialized type may have
        -- different arity, for example:
@@ -184,7 +184,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
        -- > f2 = undefined
        --
        -- But in that case we add specialized type into error context
-       -- anyway, because it may be useful. See also Trac #9605.
+       -- anyway, because it may be useful. See also #9605.
     go acc_arg_tys n ty = addErrCtxtM mk_ctxt $
                           defer acc_arg_tys n (mkCheckExpType ty)
 
@@ -302,7 +302,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
        -- However unlike the meta-tyvar case, we are sure that the
        -- number of arguments doesn't match arity of the original
        -- type, so we can add a bit more context to the error message
-       -- (cf Trac #7869).
+       -- (cf #7869).
        --
        -- It is not always an error, because specialized type may have
        -- different arity, for example:
@@ -312,7 +312,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
        -- > f2 = undefined
        --
        -- But in that case we add specialized type into error context
-       -- anyway, because it may be useful. See also Trac #9605.
+       -- anyway, because it may be useful. See also #9605.
     go n acc_args ty = addErrCtxtM (mk_ctxt (reverse acc_args) ty) $
                        defer n ty
 
@@ -399,7 +399,7 @@ matchExpectedTyConApp tc orig_ty
     -- Then we don't want to instantiate T's data constructors with
     --    (a::*) ~ Maybe
     -- because that'll make types that are utterly ill-kinded.
-    -- This happened in Trac #7368
+    -- This happened in #7368
     defer
       = do { (_, arg_tvs) <- newMetaTyVars (tyConTyVars tc)
            ; traceTc "matchExpectedTyConApp" (ppr tc $$ ppr (tyConTyVars tc) $$ ppr arg_tvs)
@@ -517,7 +517,7 @@ tcSubTypeDS_NC_O, and is the sole reason for the WpFun form of
 HsWrapper.
 
 Another powerful reason for doing this co/contra stuff is visible
-in Trac #9569, involving instantiation of constraint variables,
+in #9569, involving instantiation of constraint variables,
 and again involving eta-expansion.
 
 Wrinkle 3: Note [Higher rank types]
@@ -714,7 +714,7 @@ These examples are all fine:
      ty_expected isn't really polymorphic
 
 If we prematurely go to equality we'll reject a program we should
-accept (e.g. Trac #13752).  So the test (which is only to improve
+accept (e.g. #13752).  So the test (which is only to improve
 error message) is very conservative:
  * ty_actual is /definitely/ monomorphic
  * ty_expected is /definitely/ polymorphic
@@ -751,7 +751,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     -- which, in the impredicative case unified  alpha := ty_a
     -- where th_a is a polytype.  Not only is this probably bogus (we
     -- simply do not have decent story for impredicative types), but it
-    -- caused Trac #12616 because (also bizarrely) 'deriving' code had
+    -- caused #12616 because (also bizarrely) 'deriving' code had
     -- -XImpredicativeTypes on.  I deleted the entire case.
 
     go (FunTy { ft_af = VisArg, ft_arg = act_arg, ft_res = act_res })
@@ -1003,7 +1003,7 @@ promoteTcType dest_lvl ty
 
 {- Note [Promoting a type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #12427)
+Consider (#12427)
 
   data T where
     MkT :: (Int -> Int) -> a -> T
@@ -1213,7 +1213,7 @@ alwaysBuildImplication :: SkolemInfo -> Bool
 alwaysBuildImplication _ = False
 
 {-  Commmented out for now while I figure out about error messages.
-    See Trac #14185
+    See #14185
 
 alwaysBuildImplication (SigSkol ctxt _ _)
   = case ctxt of
@@ -1269,7 +1269,7 @@ take care:
   top-level unlifted bindings, which are verboten. This only matters
   at top level, so we check for that
   See also Note [Deferred errors for coercion holes] in TcErrors.
-  cf Trac #14149 for an example of what goes wrong.
+  cf #14149 for an example of what goes wrong.
 
 * If you have
      f :: Int;  f = f_blah
@@ -1280,7 +1280,7 @@ take care:
       [W] C Int b1    -- from f_blah
       [W] C Int b2    -- from g_blan
   and fundpes can yield [D] b1 ~ b2, even though the two functions have
-  literally nothing to do with each other.  Trac #14185 is an example.
+  literally nothing to do with each other.  #14185 is an example.
   Building an implication keeps them separage.
 -}
 
@@ -1409,7 +1409,7 @@ uType t_or_k origin orig_ty1 orig_ty2
         --   type Foo = Int
         -- and we try to unify  Foo ~ Bool
         -- we'll end up saying "can't match Foo with Bool"
-        -- rather than "can't match "Int with Bool".  See Trac #4535.
+        -- rather than "can't match "Int with Bool".  See #4535.
     go ty1 ty2
       | Just ty1' <- tcView ty1 = go ty1' ty2
       | Just ty2' <- tcView ty2 = go ty1  ty2'
@@ -1509,7 +1509,7 @@ are guaranteed equal length.  But they aren't. Consider matching
         w (T x) ~ Foo (T x y)
 We do match (w ~ Foo) first, but in some circumstances we simply create
 a deferred constraint; and then go ahead and match (T x ~ T x y).
-This came up in Trac #3950.
+This came up in #3950.
 
 So either
    (a) either we must check for identical argument kinds
@@ -1768,7 +1768,7 @@ Wanteds and Givens, but either way, deepest wins!  Simple.
   skolems, so it's important that skolems have (accurate) level
   numbers.
 
-See Trac #15009 for an further analysis of why "deepest on the left"
+See #15009 for an further analysis of why "deepest on the left"
 is a good plan.
 
 Note [Fmv Orientation Invariant]
@@ -1824,7 +1824,7 @@ then we'll reduce the second constraint to
 and then replace all uses of 'a' with fsk.  That's bad because
 in error messages instead of saying 'a' we'll say (F [a]).  In all
 places, including those where the programmer wrote 'a' in the first
-place.  Very confusing!  See Trac #7862.
+place.  Very confusing!  See #7862.
 
 Solution: re-orient a~fsk to fsk~a, so that we preferentially eliminate
 the fsk.
@@ -1852,7 +1852,7 @@ an existing inert constraint, and hence we are less likely to be forced
 into kicking out and rewriting inert constraints.
 
 This is a performance optimisation only.  It turns out to fix
-Trac #14723 all by itself, but clearly not reliably so!
+#14723 all by itself, but clearly not reliably so!
 
 It's simple to implement (see nicer_to_update_tv2 in swapOverTyVars).
 But, to my surprise, it didn't seem to make any significant difference

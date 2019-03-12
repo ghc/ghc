@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
--- Test Trac #2851
+-- Test #2851
 
 module T2851 where
 

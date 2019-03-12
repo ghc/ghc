@@ -1,6 +1,6 @@
 {-# OPTIONS -XImpredicativeTypes -fno-warn-deprecated-flags -XEmptyDataDecls -XGADTs -XLiberalTypeSynonyms -XFlexibleInstances -XScopedTypeVariables #-}
 
--- See Trac #1627.  The point is that we should get nice
+-- See #1627.  The point is that we should get nice
 --                  compact code for Foo
 
 -- In GHC 7.0 this fails, and rightly so.

@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 
--- Trac #1795
+-- #1795
 
 module ShouldCompile where
 

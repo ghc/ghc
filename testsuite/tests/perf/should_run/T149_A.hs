@@ -1,6 +1,6 @@
 module Main (main) where
 
--- See Trac #149
+-- See #149
 
 -- Currently (with GHC 7.0) the CSE works, just,
 -- but it's delicate.

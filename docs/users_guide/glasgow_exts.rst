@@ -5737,7 +5737,7 @@ Note also the following points
          pattern P x y v <- MkT True x y (v::a)
 
    Here the universal type variable `a` scopes over the definition of `P`,
-   but the existential `b` does not.  (c.f. discussion on Trac #14998.)
+   but the existential `b` does not.  (c.f. discussion on #14998.)
 
 -  For a bidirectional pattern synonym, a use of the pattern synonym as
    an expression has the type
@@ -7422,7 +7422,7 @@ But superclass constraints like these are sometimes useful, and the conservative
 check is annoying where no actual recursion is involved.
 
 Moreover genuninely-recursive superclasses are sometimes useful. Here's a real-life
-example (Trac #10318) ::
+example (#10318) ::
 
      class (Frac (Frac a) ~ Frac a,
             Fractional (Frac a),
@@ -10045,7 +10045,7 @@ Notes:
    instance (forall xx. c (Free c xx)) => Monad (Free c) where
        Free f >>= g = f g
 
-  See `Iceland Jack's summary <https://ghc.haskell.org/trac/ghc/ticket/14733#comment:6>`_.  The key point is that the bit to the right of the ``=>`` may be headed by a type *variable* (``c`` in this case), rather than a class.  It should not be one of the forall'd variables, though.
+  See `Iceland Jack's summary <https://gitlab.haskell.org/ghc/ghc/issues/14733#note_148352>`_.  The key point is that the bit to the right of the ``=>`` may be headed by a type *variable* (``c`` in this case), rather than a class.  It should not be one of the forall'd variables, though.
 
   (NB: this goes beyond what is described in `the paper <http://i.cs.hku.hk/~bruno//papers/hs2017.pdf>`_, but does not seem to introduce any new technical difficulties.)
 
@@ -12600,7 +12600,7 @@ In a few cases, even equality constraints cannot be deferred.  Specifically:
 
   This type signature contains a kind error which cannot be deferred.
 
-- Type equalities under a forall cannot be deferred (c.f. Trac #14605).
+- Type equalities under a forall cannot be deferred (c.f. #14605).
 
 .. _template-haskell:
 

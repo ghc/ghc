@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Arrow may never fire
-    -- e.g. compose/arr;  see Trac #10528
+    -- e.g. compose/arr;  see #10528
 
 -----------------------------------------------------------------------------
 -- |

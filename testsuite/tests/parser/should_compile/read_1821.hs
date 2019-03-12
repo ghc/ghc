@@ -1,5 +1,5 @@
 
--- Trac #1821
+-- #1821
 
 module Par where
 
