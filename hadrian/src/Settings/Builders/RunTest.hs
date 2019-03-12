@@ -4,8 +4,6 @@ import Hadrian.Utilities
 import System.Environment
 
 import CommandLine
-import Flavour
-import Oracles.Setting (setting)
 import Oracles.TestSettings
 import Packages
 import Settings.Builders.Common
