@@ -77,8 +77,7 @@ pprintClosureCommand bindThings force str = do
        let id' = id `setIdType` substTy subst (idType id)
        term_    <- GHC.obtainTermFromId maxBound force id'
        term     <- tidyTermTyVars term_
-       term'    <- if bindThings &&
-                      (not (isUnliftedType (termType term)))
+       term'    <- if bindThings
                      then bindSuspensions term
                      else return term
      -- Before leaving, we compare the type obtained to see if it's more specific
