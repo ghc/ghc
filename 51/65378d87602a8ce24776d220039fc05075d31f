@@ -648,3 +648,134 @@ x86_64-linux-deb9-integer-simple	T8766	normal	bytes allocated	41994104
 x86_64-linux-deb9-integer-simple	T9848	normal	bytes allocated	51616
 x86_64-linux-deb9-integer-simple	T13191	normal	bytes allocated	185942592
 x86_64-linux-deb9-integer-simple	T3474	normal	max_bytes_used	44408
+
+x86_64-linux-deb9-llvm	T3924	normal	bytes allocated	50616
+x86_64-linux-deb9-llvm	T10858	normal	bytes allocated	226385760
+x86_64-linux-deb9-llvm	hie002	normal	bytes allocated	22531952472
+x86_64-linux-deb9-llvm	T5030	normal	bytes allocated	746423216
+x86_64-linux-deb9-llvm	T3064	normal	bytes allocated	258507416
+x86_64-linux-deb9-llvm	T3064	normal	peak_megabytes_allocated	65
+x86_64-linux-deb9-llvm	parsing001	normal	bytes allocated	549818144
+x86_64-linux-deb9-llvm	T4801	normal	bytes allocated	392170936
+x86_64-linux-deb9-llvm	T5837	normal	bytes allocated	52346384
+x86_64-linux-deb9-llvm	T6048	optasm	bytes allocated	98366216
+x86_64-linux-deb9-llvm	T5321FD	normal	bytes allocated	363643296
+x86_64-linux-deb9-llvm	T1969	normal	bytes allocated	672713384
+x86_64-linux-deb9-llvm	T1969	normal	max_bytes_used	19216184
+x86_64-linux-deb9-llvm	T1969	normal	peak_megabytes_allocated	71
+x86_64-linux-deb9-llvm	T783	normal	bytes allocated	478510792
+x86_64-linux-deb9-llvm	T5631	normal	bytes allocated	1043187864
+x86_64-linux-deb9-llvm	T5321Fun	normal	bytes allocated	468194632
+x86_64-linux-deb9-llvm	T9020	optasm	bytes allocated	374957064
+x86_64-linux-deb9-llvm	T5642	normal	bytes allocated	767038944
+x86_64-linux-deb9-llvm	T9961	normal	bytes allocated	499580616
+x86_64-linux-deb9-llvm	T3294	normal	bytes allocated	1840972800
+x86_64-linux-deb9-llvm	T3294	normal	max_bytes_used	36386752
+x86_64-linux-deb9-llvm	T9872d	normal	bytes allocated	616053032
+x86_64-linux-deb9-llvm	T9675	optasm	bytes allocated	677167712
+x86_64-linux-deb9-llvm	T9675	optasm	max_bytes_used	19091944
+x86_64-linux-deb9-llvm	T9675	optasm	peak_megabytes_allocated	72
+x86_64-linux-deb9-llvm	T10547	normal	bytes allocated	37204688
+x86_64-linux-deb9-llvm	T12425	optasm	bytes allocated	142938968
+x86_64-linux-deb9-llvm	T12234	optasm	bytes allocated	84181608
+x86_64-linux-deb9-llvm	T9233	normal	bytes allocated	1048743336
+x86_64-linux-deb9-llvm	T13035	normal	bytes allocated	124354760
+x86_64-linux-deb9-llvm	T12227	normal	bytes allocated	740435064
+x86_64-linux-deb9-llvm	T12150	optasm	bytes allocated	75452128
+x86_64-linux-deb9-llvm	T13056	optasm	bytes allocated	431544184
+x86_64-linux-deb9-llvm	T13379	normal	bytes allocated	423494656
+x86_64-linux-deb9-llvm	T12707	normal	bytes allocated	1159984296
+x86_64-linux-deb9-llvm	T9872a	normal	bytes allocated	2663395192
+x86_64-linux-deb9-llvm	T9872c	normal	bytes allocated	3002620336
+x86_64-linux-deb9-llvm	T12545	normal	bytes allocated	3199227256
+x86_64-linux-deb9-llvm	ManyAlternatives	normal	bytes allocated	1415739456
+x86_64-linux-deb9-llvm	T9872b	normal	bytes allocated	3725812272
+x86_64-linux-deb9-llvm	Naperian	optasm	bytes allocated	55048864
+x86_64-linux-deb9-llvm	T10370	optasm	max_bytes_used	30204840
+x86_64-linux-deb9-llvm	T10370	optasm	peak_megabytes_allocated	105
+x86_64-linux-deb9-llvm	T14697	normal	bytes allocated	346809936
+x86_64-linux-deb9-llvm	haddock.base	normal	bytes allocated	23929444400
+x86_64-linux-deb9-llvm	haddock.Cabal	normal	bytes allocated	23598319616
+x86_64-linux-deb9-llvm	haddock.compiler	normal	bytes allocated	62198191848
+x86_64-linux-deb9-llvm	T15164	normal	bytes allocated	1994214880
+x86_64-linux-deb9-llvm	T9630	normal	max_bytes_used	40636752
+x86_64-linux-deb9-llvm	join002	optasm	bytes allocated	2000050712
+x86_64-linux-deb9-llvm	ManyConstructors	normal	bytes allocated	4285889376
+x86_64-linux-deb9-llvm	join003	optasm	bytes allocated	2000050712
+x86_64-linux-deb9-llvm	join004	optasm	bytes allocated	16050576
+x86_64-linux-deb9-llvm	join007	optasm	bytes allocated	50896
+x86_64-linux-deb9-llvm	T12791	normal	max_bytes_used	44408
+x86_64-linux-deb9-llvm	T5835	normal	max_bytes_used	44408
+x86_64-linux-deb9-llvm	T10359	normal	bytes allocated	450680
+x86_64-linux-deb9-llvm	T4830	normal	bytes allocated	97936
+x86_64-linux-deb9-llvm	T14955	normal	bytes allocated	48050592
+x86_64-linux-deb9-llvm	T3586	normal	bytes allocated	16102016
+x86_64-linux-deb9-llvm	T3586	normal	peak_megabytes_allocated	18
+x86_64-linux-deb9-llvm	T876	normal	bytes allocated	57400
+x86_64-linux-deb9-llvm	lazy-bs-alloc	normal	bytes allocated	428608
+x86_64-linux-deb9-llvm	lazy-bs-alloc	normal	peak_megabytes_allocated	2
+x86_64-linux-deb9-llvm	T3738	normal	bytes allocated	50376
+x86_64-linux-deb9-llvm	T3738	normal	peak_megabytes_allocated	2
+x86_64-linux-deb9-llvm	MethSharing	normal	bytes allocated	480097920
+x86_64-linux-deb9-llvm	MethSharing	normal	peak_megabytes_allocated	2
+x86_64-linux-deb9-llvm	T14683	normal	bytes allocated	10034103944
+x86_64-linux-deb9-llvm	T5113	normal	bytes allocated	8058464
+x86_64-linux-deb9-llvm	T13719	normal	bytes allocated	4581618112
+x86_64-linux-deb9-llvm	T4978	normal	bytes allocated	10136416
+x86_64-linux-deb9-llvm	T5205	normal	bytes allocated	54160
+x86_64-linux-deb9-llvm	T5237	normal	bytes allocated	104280
+x86_64-linux-deb9-llvm	T5536	normal	bytes allocated	890357080
+x86_64-linux-deb9-llvm	T4474a	normal	bytes allocated	4831889872
+x86_64-linux-deb9-llvm	T4474b	normal	bytes allocated	4831889872
+x86_64-linux-deb9-llvm	T4474c	normal	bytes allocated	4831889872
+x86_64-linux-deb9-llvm	T5549	normal	bytes allocated	5793139976
+x86_64-linux-deb9-llvm	T7257	normal	bytes allocated	1297292288
+x86_64-linux-deb9-llvm	T7257	normal	peak_megabytes_allocated	228
+x86_64-linux-deb9-llvm	Conversions	normal	bytes allocated	107512
+x86_64-linux-deb9-llvm	T7797	normal	bytes allocated	480050408
+x86_64-linux-deb9-llvm	T7436	normal	max_bytes_used	60272
+x86_64-linux-deb9-llvm	T7954	normal	bytes allocated	1280050896
+x86_64-linux-deb9-llvm	T5949	normal	bytes allocated	200920
+x86_64-linux-deb9-llvm	T7619	normal	bytes allocated	40904
+x86_64-linux-deb9-llvm	InlineArrayAlloc	normal	bytes allocated	1600040904
+x86_64-linux-deb9-llvm	T4267	normal	bytes allocated	40904
+x86_64-linux-deb9-llvm	InlineByteArrayAlloc	normal	bytes allocated	1440040904
+x86_64-linux-deb9-llvm	InlineCloneArrayAlloc	normal	bytes allocated	1600041064
+x86_64-linux-deb9-llvm	T9203	normal	bytes allocated	45571392
+x86_64-linux-deb9-llvm	T9339	normal	bytes allocated	50632
+x86_64-linux-deb9-llvm	T8472	normal	bytes allocated	50640
+x86_64-linux-deb9-llvm	T12996	normal	bytes allocated	78904
+x86_64-linux-deb9-llvm	T13001	normal	bytes allocated	50520
+x86_64-linux-deb9-llvm	T8763	normal	bytes allocated	40904
+x86_64-linux-deb9-llvm	T12990	normal	bytes allocated	20840920
+x86_64-linux-deb9-llvm	T13218	normal	bytes allocated	82005432
+x86_64-linux-deb9-llvm	T13218	normal	max_bytes_used	332488
+x86_64-linux-deb9-llvm	DeriveNull	normal	bytes allocated	112050712
+x86_64-linux-deb9-llvm	MultiLayerModules	normal	bytes allocated	5754859072
+x86_64-linux-deb9-llvm	T15226	normal	bytes allocated	40928
+x86_64-linux-deb9-llvm	T14936	normal	bytes allocated	51072
+x86_64-linux-deb9-llvm	T15226a	normal	bytes allocated	40928
+x86_64-linux-deb9-llvm	T13623	normal	bytes allocated	50704
+x86_64-linux-deb9-llvm	T15263	normal	bytes allocated	1302032
+x86_64-linux-deb9-llvm	T15426	normal	bytes allocated	41168
+x86_64-linux-deb9-llvm	T13701	normal	bytes allocated	2400110568
+x86_64-linux-deb9-llvm	T4334	normal	peak_megabytes_allocated	3
+x86_64-linux-deb9-llvm	T2762	normal	peak_megabytes_allocated	2
+x86_64-linux-deb9-llvm	space_leak_001	normal	bytes allocated	11315396232
+x86_64-linux-deb9-llvm	space_leak_001	normal	max_bytes_used	441848
+x86_64-linux-deb9-llvm	space_leak_001	normal	peak_megabytes_allocated	4
+x86_64-linux-deb9-llvm	T15578	normal	bytes allocated	800041224
+x86_64-linux-deb9-llvm	T14052	ghci	bytes allocated	2259404544
+x86_64-linux-deb9-llvm	T7850	normal	peak_megabytes_allocated	5
+x86_64-linux-deb9-llvm	T11276	normal	bytes allocated	163019256
+x86_64-linux-deb9-llvm	T11303b	normal	bytes allocated	54384808
+x86_64-linux-deb9-llvm	T11374	normal	bytes allocated	284407432
+x86_64-linux-deb9-llvm	T4029	ghci	max_bytes_used	21016176
+x86_64-linux-deb9-llvm	T4029	ghci	peak_megabytes_allocated	71
+x86_64-linux-deb9-llvm	T10678	normal	bytes allocated	64041352
+x86_64-linux-deb9-llvm	T11195	normal	bytes allocated	8120092544
+x86_64-linux-deb9-llvm	T13536a	optasm	bytes allocated	86576
+x86_64-linux-deb9-llvm	T8766	normal	bytes allocated	16827928
+x86_64-linux-deb9-llvm	T9848	normal	bytes allocated	51616
+x86_64-linux-deb9-llvm	T13191	normal	bytes allocated	185942592
+x86_64-linux-deb9-llvm	T3474	normal	max_bytes_used	44408
