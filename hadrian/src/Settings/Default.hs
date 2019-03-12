@@ -40,6 +40,7 @@ import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.Builders.Make
 import Settings.Builders.RunTest
+import Settings.Builders.SysCabal
 import Settings.Builders.Xelatex
 import Settings.Packages
 import Settings.Warnings
@@ -248,6 +249,7 @@ defaultBuilderArgs = mconcat
     , makeBuilderArgs
     , runTestBuilderArgs
     , validateBuilderArgs
+    , sysCabalBuilderArgs
     , xelatexBuilderArgs
     -- Generic builders from the Hadrian library:
     , builder (Ar Pack     ) ? Hadrian.Builder.Ar.args Pack
