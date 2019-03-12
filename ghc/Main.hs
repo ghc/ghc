@@ -342,7 +342,7 @@ checkOptions mode dflags srcs objs = do
 
    when (notNull (filter wayRTSOnly (ways dflags))
          && isInterpretiveMode mode) $
-        hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
+        hPutStrLn stderr ("Warning: -debug, -single-threaded and -ticky are ignored by GHCi")
 
         -- -prof and --interactive are not a good combination
    when ((filter (not . wayRTSOnly) (ways dflags) /= interpWays)

@@ -216,7 +216,7 @@ test('T11555', normal, compile_and_run, [''])
 test('T12494', normal, compile_and_run, [''])
 test('T12852', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('lazySTexamples', normal, compile_and_run, [''])
-test('T11760', req_smp, compile_and_run, ['-threaded -with-rtsopts=-N2'])
+test('T11760', normal, compile_and_run, ['-threaded -with-rtsopts=-N2'])
 test('T12874', normal, compile_and_run, [''])
 test('T13191',
         [ collect_stats('bytes allocated', 5)
