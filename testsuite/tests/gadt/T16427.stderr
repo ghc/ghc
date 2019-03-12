@@ -1,0 +1,14 @@
+
+T16427.hs:5:15: error:
+    • GADT constructor type signature cannot contain nested ‘forall’s or contexts
+      Suggestion: instead use this type signature:
+        C1 :: forall b. Int -> b -> D1
+    • In the definition of data constructor ‘C1’
+      In the data type declaration for ‘D1’
+
+T16427.hs:6:15: error:
+    • GADT constructor type signature cannot contain nested ‘forall’s or contexts
+      Suggestion: instead use this type signature:
+        C2 :: forall a b. Int -> b -> D2
+    • In the definition of data constructor ‘C2’
+      In the data type declaration for ‘D2’

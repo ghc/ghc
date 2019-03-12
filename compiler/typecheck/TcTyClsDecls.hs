@@ -3784,15 +3784,25 @@ badDataConTyCon data_con res_ty_tmpl actual_res_ty
     --    context) using tcSplitNestedSigmaTys, collecting the type variables
     --    and class predicates we find, as well as the rho type lurking
     --    underneath the nested foralls and contexts.
+    --
+    --    Note that the rho type itself might contain some of the function
+    --    arguments of the constructor, as in the following example (#16427):
+    --
+    --      data D where
+    --        C :: Int -> forall b . b -> D
+    --
+    --    Here, the rho type will be `b -> D`, so to ensure that we also
+    --    report the earlier `Int` argument, we grab it from dataConOrigArgTys.
     -- 3) Smash together the type variables and class predicates from 1) and
-    --    2), and prepend them to the rho type from 2).
+    --    2), and prepend them to the function arguments and rho type from 2).
     actual_ex_tvs = dataConExTyCoVars data_con
     actual_theta  = dataConTheta data_con
     (actual_res_tvs, actual_res_theta, actual_res_rho)
       = tcSplitNestedSigmaTys actual_res_ty
+    actual_arg_tys = dataConOrigArgTys data_con
     suggested_ty = mkSpecForAllTys (actual_ex_tvs ++ actual_res_tvs) $
-                   mkPhiTy (actual_theta ++ actual_res_theta)
-                   actual_res_rho
+                   mkPhiTy (actual_theta ++ actual_res_theta) $
+                   mkVisFunTys actual_arg_tys actual_res_rho
 
 badGadtDecl :: Name -> SDoc
 badGadtDecl tc_name
