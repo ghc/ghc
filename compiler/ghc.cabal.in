@@ -87,13 +87,13 @@ Library
                  -Wnoncanonical-monoid-instances
 
     if flag(stage1)
-        CPP-Options: -DSTAGE=1
-    else 
+        ghc-options: -DSTAGE=1
+    else
         if flag(stage2)
-            CPP-Options: -DSTAGE=2
+            ghc-options: -DSTAGE=2
         else
             if flag(stage3)
-                CPP-Options: -DSTAGE=3
+                ghc-options: -DSTAGE=3
 
     if flag(ghci)
         CPP-Options: -DGHCI
