@@ -254,7 +254,8 @@ my_mmap (void *addr, W_ size, int operation)
     // Map in committed pages rather than take a fault for each chunk.
     // Also arrange to include them in core-dump files.
     post_mmap_madvise(operation, size, ret);
-
+    if(mprotect(ret, size, PROT_READ | PROT_EXEC) != 0) {
+            errorBelch("unable to protect memory");
     return ret;
 }
 
@@ -464,7 +465,7 @@ void setExecutable (void *p, W_ len, bool exec)
     StgWord startOfLastPage  = ((StgWord)p + len - 1) & mask;
     StgWord size             = startOfLastPage - startOfFirstPage + pageSize;
     if (mprotect((void*)startOfFirstPage, (size_t)size,
-                 (exec ? PROT_EXEC : 0) | PROT_READ | PROT_WRITE) != 0) {
+                 (exec ? PROT_EXEC : PROT_WRITE) | PROT_READ) != 0) {
         barf("setExecutable: failed to protect 0x%p\n", p);
     }
 }

@@ -1016,13 +1016,13 @@ mmap_again:
 
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: \tprotection %#0x\n",
-                       PROT_EXEC | PROT_READ | PROT_WRITE));
+                       PROT_READ | PROT_WRITE));
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: \tflags      %#0x\n",
                        MAP_PRIVATE | tryMap32Bit | fixed | flags));
 
    result = mmap(map_addr, size,
-                 PROT_EXEC|PROT_READ|PROT_WRITE,
+                 PROT_READ|PROT_WRITE,
                  MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
 
    if (result == MAP_FAILED) {
@@ -1030,10 +1030,6 @@ mmap_again:
        errorBelch("Try specifying an address with +RTS -xm<addr> -RTS");
        return NULL;
    }
-
-   IF_DEBUG(linker,
-            debugBelch("mprotectForLinker: \tprotection %#0x\n",
-                       PROT_EXEC | PROT_READ));
 
 #if defined(x86_64_HOST_ARCH)
    if (RtsFlags.MiscFlags.linkerAlwaysPic) {
@@ -1087,6 +1083,10 @@ mmap_again:
                        " bytes starting at %p\n", (W_)size, result));
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: done\n"));
+
+   IF_DEBUG(linker,
+            debugBelch("mprotectForLinker: \tprotection %#0x\n",
+                       PROT_EXEC | PROT_READ));
 
    /* This `mprotect` is because of Trac issue #14069. In short, after creating
    a mapping with both execution and writing permissions, such a memory
@@ -1376,12 +1376,7 @@ preloadObjectFile (pathchar *path)
     *
     * See also the misalignment logic for darwin below.
     */
-#if defined(ios_HOST_OS)
    image = mmap(NULL, fileSize, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
-#else
-   image = mmap(NULL, fileSize, PROT_READ|PROT_WRITE|PROT_EXEC,
-                MAP_PRIVATE, fd, 0);
-#endif
 
    if (image == MAP_FAILED) {
        errorBelch("mmap: failed. errno = %d", errno);
