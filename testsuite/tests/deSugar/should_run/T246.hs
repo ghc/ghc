@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
--- Test Trac #246
+-- Test #246
 
 module Main where
 

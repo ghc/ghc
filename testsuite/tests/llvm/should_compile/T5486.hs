@@ -1,7 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface, UnliftedFFITypes, UnboxedTuples,
              BangPatterns, MagicHash #-}
 
--- | Test case for Trac #5486
+-- | Test case for #5486
 -- Test case reduced from HsOpenSSL package BN module
 module Bad where
 

@@ -1,6 +1,6 @@
 
 -- Crashed GHC 6.6!
--- Trac #1153
+-- #1153
  
 module ShouldFail where
 

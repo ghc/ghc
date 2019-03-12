@@ -4,7 +4,7 @@
 -- enabled and the identifiers starting with _ are parsed as type variables.
 -- They should remain valid when the extension is on.
 --
--- See Trac #11098 and comments in #10982
+-- See #11098 and comments in #10982
 
 module NamedWildcardsAsTyVars where
 

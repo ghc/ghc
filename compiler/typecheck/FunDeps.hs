@@ -322,7 +322,7 @@ improveClsFD clas_tvs fd
                         --          (b) we must apply 'subst' to the kinds, in case we have
                         --              matched out a kind variable, but not a type variable
                         --              whose kind mentions that kind variable!
-                        --          Trac #6015, #6068
+                        --          #6015, #6068
   where
     (ltys1, rtys1) = instFD fd clas_tvs tys_inst
     (ltys2, rtys2) = instFD fd clas_tvs tys_actual
@@ -427,15 +427,15 @@ Then if 'a' is instantiated to (x y), where x:k2->*, y:k2,
 then fixing x really fixes k2 as well, and so k2 should be added to
 the lhs tyvars in the fundep check.
 
-Example (Trac #8391), using liberal coverage
+Example (#8391), using liberal coverage
       data Foo a = ...  -- Foo :: forall k. k -> *
       class Bar a b | a -> b
       instance Bar a (Foo a)
 
     In the instance decl, (a:k) does fix (Foo k a), but only if we notice
-    that (a:k) fixes k.  Trac #10109 is another example.
+    that (a:k) fixes k.  #10109 is another example.
 
-Here is a more subtle example, from HList-0.4.0.0 (Trac #10564)
+Here is a more subtle example, from HList-0.4.0.0 (#10564)
 
   class HasFieldM (l :: k) r (v :: Maybe *)
         | l r -> v where ...
@@ -468,7 +468,7 @@ Is the instance OK? Does {l,r,xs} determine v?  Well:
   * And that fixes v.
 
 However, we must closeOverKinds whenever augmenting the seed set
-in oclose!  Consider Trac #10109:
+in oclose!  Consider #10109:
 
   data Succ a   -- Succ :: forall k. k -> *
   class Add (a :: k1) (b :: k2) (ab :: k3) | a b -> ab
@@ -516,11 +516,11 @@ Remember from Note [The equality types story] in TysPrim, that
 So when oclose expands superclasses we'll get a (a ~# [b]) superclass.
 But that's an EqPred not a ClassPred, and we jolly well do want to
 account for the mutual functional dependencies implied by (t1 ~# t2).
-Hence the EqPred handling in oclose.  See Trac #10778.
+Hence the EqPred handling in oclose.  See #10778.
 
 Note [Care with type functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #12803)
+Consider (#12803)
   class C x y | x -> y
   type family F a b
   type family G c d = r | r -> d
@@ -603,7 +603,7 @@ Note [Bogus consistency check]
 In checkFunDeps we check that a new ClsInst is consistent with all the
 ClsInsts in the environment.
 
-The bogus aspect is discussed in Trac #10675. Currenty it if the two
+The bogus aspect is discussed in #10675. Currenty it if the two
 types are *contradicatory*, using (isNothing . tcUnifyTys).  But all
 the papers say we should check if the two types are *equal* thus
    not (substTys subst rtys1 `eqTypes` substTys subst rtys2)
@@ -638,7 +638,7 @@ checkFunDeps inst_envs (ClsInst { is_tvs = qtvs1, is_cls = cls
       = case tcUnifyTyKis bind_fn ltys1 ltys2 of
           Nothing         -> False
           Just subst
-            -> isNothing $   -- Bogus legacy test (Trac #10675)
+            -> isNothing $   -- Bogus legacy test (#10675)
                              -- See Note [Bogus consistency check]
                tcUnifyTyKis bind_fn (substTysUnchecked subst rtys1) (substTysUnchecked subst rtys2)
 

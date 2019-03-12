@@ -3,7 +3,7 @@ module Main where
 
 import GHC.Base
 
--- In Trac #12595 a bogus desugaring led (bizarrely)
+-- In #12595 a bogus desugaring led (bizarrely)
 -- to a top-level binding maxInt = maxInt
 -- This test just checks that doesn't happen again
 

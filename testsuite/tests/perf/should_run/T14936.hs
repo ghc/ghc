@@ -16,7 +16,7 @@ intSize :: Int
 intSize = Storable.sizeOf (undefined :: Int)
 
 -- This 'go' loop should allocate nothing, because it specialises
--- for the shape of the state.  But in 8.4 it did (Trac #14936)
+-- for the shape of the state.  But in 8.4 it did (#14936)
 
 slow :: Int -> IO ()
 slow i = do let go 0 = pure ()

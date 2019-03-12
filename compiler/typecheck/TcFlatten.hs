@@ -222,7 +222,7 @@ v:alpha in common envt).)
 
 Note [Unflattening can force the solver to iterate]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Look at Trac #10340:
+Look at #10340:
    type family Any :: *   -- No instances
    get :: MonadState s m => m s
    instance MonadState s (State s) where ...
@@ -426,7 +426,7 @@ Maybe that doesn't matter: we would still be left with unsolved
 G a ~ Bool.
 
 --------------------------
-Trac #9318 has a very simple program leading to
+#9318 has a very simple program leading to
 
   [W] F Int ~ Int
   [W] F Int ~ Bool
@@ -625,7 +625,7 @@ is this.  Consider flattening (Eq (F (G Int) (H Bool)):
 
   * Processing w3 first is BAD, because we can't reduce i t,so it'll
     get put into the inert set, and later kicked out when w1, w2 are
-    solved.  In Trac #9872 this led to inert sets containing hundreds
+    solved.  In #9872 this led to inert sets containing hundreds
     of suspended calls.
 
   * So we want to process w1, w2 first.
@@ -894,7 +894,7 @@ faster. This doesn't seem quite worth it, yet.
 Note [flatten_exact_fam_app_fully performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The refactor of GRefl seems to cause performance trouble for T9872x: the allocation of flatten_exact_fam_app_fully_performance increased. See note [Generalized reflexive coercion] in TyCoRep for more information about GRefl and Trac #15192 for the current state.
+The refactor of GRefl seems to cause performance trouble for T9872x: the allocation of flatten_exact_fam_app_fully_performance increased. See note [Generalized reflexive coercion] in TyCoRep for more information about GRefl and #15192 for the current state.
 
 The explicit pattern match in homogenise_result helps with T9872a, b, c.
 
@@ -1269,7 +1269,7 @@ the (F a) to a skolem, and return (T fsk).  We don't need to expand the
 synonym.  This works because TcTyConAppCo can deal with synonyms
 (unlike TyConAppCo), see Note [TcCoercions] in TcEvidence.
 
-But (Trac #8979) for
+But (#8979) for
    type T a = (F a, a)    where F is a type function
 we must expand the synonym in (say) T Int, to expose the type function
 to the flattener.
@@ -1617,7 +1617,7 @@ only if (a) the work item can rewrite the inert AND
         (b) the inert cannot rewrite the work item
 
 This is significantly harder to think about. It can save a LOT of work
-in occurs-check cases, but we don't care about them much.  Trac #5837
+in occurs-check cases, but we don't care about them much.  #5837
 is an example; all the constraints here are Givens
 
              [G] a ~ TF (a,Int)

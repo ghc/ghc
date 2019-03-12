@@ -132,8 +132,8 @@ primTyCons = unexposedPrimTyCons ++ exposedPrimTyCons
 
 -- | Primitive 'TyCon's that are defined in "GHC.Prim" but not exposed.
 -- It's important to keep these separate as we don't want users to be able to
--- write them (see Trac #15209) or see them in GHCi's @:browse@ output
--- (see Trac #12023).
+-- write them (see #15209) or see them in GHCi's @:browse@ output
+-- (see #12023).
 unexposedPrimTyCons :: [TyCon]
 unexposedPrimTyCons
   = [ eqPrimTyCon

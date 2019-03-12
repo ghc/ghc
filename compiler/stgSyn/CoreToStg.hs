@@ -336,7 +336,7 @@ coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
         -- It's vital that the arity on a top-level Id matches
         -- the arity of the generated STG binding, else an importing
         -- module will use the wrong calling convention
-        --      (Trac #2844 was an example where this happened)
+        --      (#2844 was an example where this happened)
         -- NB1: we can't move the assertion further out without
         --      blocking the "knot" tied in coreTopBindsToStg
         -- NB2: the arity check is only needed for Ids with External

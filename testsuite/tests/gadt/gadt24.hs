@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Test for Trac #1396
+-- Test for #1396
 -- Panics in GHC 6.6.1
 
 module ShouldCompile where

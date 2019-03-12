@@ -3,7 +3,7 @@
 -- The thing to look for here is that the implementation
 -- of 'length' does not allocate in the inner loop
 --
--- See Trac #3116
+-- See #3116
 
 module T3116 where
 

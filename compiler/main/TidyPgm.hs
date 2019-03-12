@@ -486,7 +486,7 @@ extendTypeEnvWithPatSyns tidy_patsyns type_env
 Note [Don't attempt to trim data types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For some time GHC tried to avoid exporting the data constructors
-of a data type if it wasn't strictly necessary to do so; see Trac #835.
+of a data type if it wasn't strictly necessary to do so; see #835.
 But "strictly necessary" accumulated a longer and longer list
 of exceptions, and finally I gave up the battle:
 
@@ -501,7 +501,7 @@ of exceptions, and finally I gave up the battle:
     there are a lot of exceptions, notably when Template Haskell is
     involved or, more recently, DataKinds.
 
-    However Trac #7445 shows that even without TemplateHaskell, using
+    However #7445 shows that even without TemplateHaskell, using
     the Data class and invoking Language.Haskell.TH.Quote.dataToExpQ
     is enough to require us to expose the data constructors.
 
@@ -528,7 +528,7 @@ Then the unfolding looks like
 This generates bad code unless it's first simplified a bit.  That is
 why CoreUnfold.mkImplicitUnfolding uses simpleOptExpr to do a bit of
 optimisation first.  (Only matters when the selector is used curried;
-eg map x ys.)  See Trac #2070.
+eg map x ys.)  See #2070.
 
 [Oct 09: in fact, record selectors are no longer implicit Ids at all,
 because we really do want to optimise them properly. They are treated
@@ -541,7 +541,7 @@ because GlobalIds are supposed to have *fixed* IdInfo, but the
 simplifier and other core-to-core passes mess with IdInfo all the
 time.  The straw that broke the camels back was when a class selector
 got the wrong arity -- ie the simplifier gave it arity 2, whereas
-importing modules were expecting it to have arity 1 (Trac #2844).
+importing modules were expecting it to have arity 1 (#2844).
 It's much safer just to inject them right at the end, after tidying.
 
 Oh: two other reasons for injecting them late:
@@ -1251,7 +1251,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     --     marked NOINLINE or something like that
     -- This is important: if you expose the worker for a loop-breaker
     -- then you can make the simplifier go into an infinite loop, because
-    -- in effect the unfolding is exposed.  See Trac #1709
+    -- in effect the unfolding is exposed.  See #1709
     --
     -- You might think that if show_unfold is False, then the thing should
     -- not be w/w'd in the first place.  But a legitimate reason is this:
@@ -1371,7 +1371,7 @@ not exported, to reduce the size of interface files, at least without
 -O.  But that is not always possible: see the old Note [When we can't
 trim types] below for exceptions.
 
-Then (Trac #7445) I realised that the TH problem arises for any data type
+Then (#7445) I realised that the TH problem arises for any data type
 that we have deriving( Data ), because we can invoke
    Language.Haskell.TH.Quote.dataToExpQ
 to get a TH Exp representation of a value built from that data type.
@@ -1396,7 +1396,7 @@ now.
 
 But there are some times we can't do that, indicated by the 'no_trim_types' flag.
 
-First, Template Haskell.  Consider (Trac #2386) this
+First, Template Haskell.  Consider (#2386) this
         module M(T, makeOne) where
           data T = Yay String
           makeOne = [| Yay "Yep" |]
@@ -1405,7 +1405,7 @@ A module that splices in $(makeOne) will then look for a declaration of Yay,
 so it'd better be there.  Hence, brutally but simply, we switch off type
 constructor trimming if TH is enabled in this module.
 
-Second, data kinds.  Consider (Trac #5912)
+Second, data kinds.  Consider (#5912)
      {-# LANGUAGE DataKinds #-}
      module M() where
      data UnaryTypeC a = UnaryDataC a

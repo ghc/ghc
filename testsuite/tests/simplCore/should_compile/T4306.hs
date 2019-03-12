@@ -1,4 +1,4 @@
--- Trac #4306
+-- #4306
 -- Check that the worker for 'upd' has only one argument
 
 module T4306 where

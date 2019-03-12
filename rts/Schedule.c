@@ -2122,7 +2122,7 @@ forkProcess(HsStablePtr *entry
 
         // Install toplevel exception handlers, so interruption
         // signal will be sent to the main thread.
-        // See Trac #12903
+        // See #12903
         rts_evalStableIOMain(&cap, entry, NULL);  // run the action
         rts_checkSchedStatus("forkProcess",cap);
 

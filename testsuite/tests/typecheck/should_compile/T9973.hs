@@ -3,7 +3,7 @@
 module T9973 where
 
 duplicateDecl :: (Eq t) => t -> IO ()
--- Trac #9973 was a bogus "redundant constraint" here
+-- #9973 was a bogus "redundant constraint" here
 duplicateDecl sigs
  = do { newSpan <- return typeSig
 

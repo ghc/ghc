@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 
--- Trac #2494, should compile ok
+-- #2494, should compile ok
 
 module Foo where
 

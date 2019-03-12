@@ -17,7 +17,7 @@ type family ExpandField (args :: [Field]) :: [Type]
 type family AppVars (t :: k) (vs :: [Type]) :: Type
 
 -- This function fails to compile, because we discard
--- 'given' kind equalities.  See comment 7 in Trac #8566
+-- 'given' kind equalities.  See comment 7 in #8566
 -- This is really a bug, I claim
 unA :: InField (APP t args) -> AppVars t (ExpandField args)
 unA (A x) = x

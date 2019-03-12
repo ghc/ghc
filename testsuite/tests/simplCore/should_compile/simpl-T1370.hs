@@ -1,5 +1,5 @@
 
--- See Trac #1370
+-- See #1370
 -- THis made GHC 6.6 diverge!
 
 module ShouldCompile where

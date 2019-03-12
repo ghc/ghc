@@ -3,7 +3,7 @@ module T8392a where
 
 -- Should complain even with AllowAmbiguousTypes
 --
--- But (Trac #12466) we now don't complain about
+-- But (#12466) we now don't complain about
 -- contradictory signatures
 -- Instead we get a redundant pattern-match warning,
 -- in the post-typechecking pattern-match checks

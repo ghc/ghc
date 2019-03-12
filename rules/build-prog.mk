@@ -200,7 +200,7 @@ $1/$2/build/tmp/$$($1_$2_PROG) $1/$2/build/tmp/$$($1_$2_PROG).dll : \
     $$(foreach dep,$$($1_$2_TRANSITIVE_DEP_COMPONENT_IDS),\
         $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB))
 # Workaround: We use TRANSITIVE_DEP_COMPONENT_IDS here as a workaround for
-# Trac #12078.
+# #12078.
 
 $1_$2_PROG_NEEDS_C_WRAPPER = NO
 $1_$2_PROG_INPLACE = $$($1_$2_PROG)

@@ -220,7 +220,7 @@ Looking up a name in the RnEnv.
 
 Note [Type and class operator definitions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to reject all of these unless we have -XTypeOperators (Trac #3265)
+We want to reject all of these unless we have -XTypeOperators (#3265)
    data a :*: b  = ...
    class a :*: b where ...
    data (:*:) a b  = ....
@@ -518,7 +518,7 @@ Note [Fall back on lookupGlobalOccRn in lookupRecFieldOcc]
 Whenever we fail to find the field or it is not in scope, mb_field
 will be False, and we fall back on looking it up normally using
 lookupGlobalOccRn.  We don't report an error immediately because the
-actual problem might be located elsewhere.  For example (Trac #9975):
+actual problem might be located elsewhere.  For example (#9975):
 
    data Test = Test { x :: Int }
    pattern Test wat = Test { x = wat }
@@ -531,7 +531,7 @@ the environment first, we will try and fail to find `x` amongst the
 (nonexistent) fields of the pattern synonym.
 
 Alternatively, the scope check can fail due to Template Haskell.
-Consider (Trac #12130):
+Consider (#12130):
 
    module Foo where
      import M
@@ -844,7 +844,7 @@ This is guaranteed by extendGlobalRdrEnvRn (the dups check in add_gre).
 
 So how can we get multiple gres in lookupExactOcc_maybe?  Because in
 TH we might use the same TH NameU in two different name spaces.
-eg (Trac #7241):
+eg (#7241):
    $(newName "Foo" >>= \o -> return [DataD [] o [] [RecC o []] [''Show]])
 Here we generate a type constructor and data constructor with the same
 unique, but different name spaces.
@@ -972,7 +972,7 @@ badVarInType rdr_name
 
 {- Note [Promoted variables in types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (Trac #12686):
+Consider this (#12686):
    x = True
    data Bad = Bad 'x
 
@@ -1054,7 +1054,7 @@ lookupInfoOccRn :: RdrName -> RnM [Name]
 -- lookupInfoOccRn is intended for use in GHCi's ":info" command
 -- It finds all the GREs that RdrName could mean, not complaining
 -- about ambiguity, but rather returning them all
--- C.f. Trac #9881
+-- C.f. #9881
 lookupInfoOccRn rdr_name =
   lookupExactOrOrig rdr_name (:[]) $
     do { rdr_env <- getGlobalRdrEnv
@@ -1188,7 +1188,7 @@ lookupGreAvailRn rdr_name
 Note [Handling of deprecations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * We report deprecations at each *occurrence* of the deprecated thing
-  (see Trac #5867)
+  (see #5867)
 
 * We do not report deprecations for locally-defined names. For a
   start, we may be exporting a deprecated thing. Also we may use a
@@ -1203,7 +1203,7 @@ Note [Handling of deprecations]
 -}
 
 addUsedDataCons :: GlobalRdrEnv -> TyCon -> RnM ()
--- Remember use of in-scope data constructors (Trac #7969)
+-- Remember use of in-scope data constructors (#7969)
 addUsedDataCons rdr_env tycon
   = addUsedGREs [ gre
                 | dc <- tyConDataCons tycon
@@ -1660,6 +1660,6 @@ badOrigBinding name
     --
     --   $(pure [ValD (VarP 'succ) (NormalB (ConE 'True)) []])
     --
-    -- (See Trac #13968.)
+    -- (See #13968.)
   where
     occ = rdrNameOcc $ filterCTuple name

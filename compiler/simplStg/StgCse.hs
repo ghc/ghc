@@ -78,7 +78,7 @@ Consider two unboxed sum terms:
 These two terms are not equal as they unarise to different unboxed
 tuples. However if we run StgCse before Unarise, it'll think the two
 terms (# 1 | #) are equal, and replace one of these with a binder to
-the other. That's bad -- Trac #15300.
+the other. That's bad -- #15300.
 
 Solution: do unarise first.
 

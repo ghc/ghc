@@ -2021,7 +2021,7 @@ dropDerivedCt ct
 When we discard Derived constraints, in dropDerivedSimples, we must
 set the cc_pend_sc flag to True, so that if we re-process this
 CDictCan we will re-generate its derived superclasses. Otherwise
-we might miss some fundeps.  Trac #13662 showed this up.
+we might miss some fundeps.  #13662 showed this up.
 
 See Note [The superclass story] in TcCanonical.
 -}
@@ -2108,15 +2108,15 @@ But (tiresomely) we do keep *some* Derived constraints:
 
         Others not-definitely-insoluble ones like [D] a ~ Int do not
         reflect unreachable code; indeed if fundeps generated proofs, it'd
-        be a useful equality.  See Trac #14763.   So we discard them.
+        be a useful equality.  See #14763.   So we discard them.
 
       - Given/Wanted interacGiven or Wanted interacting with an
         instance declaration (FunDepOrigin2)
 
-      - Given/Wanted interactions (FunDepOrigin1); see Trac #9612
+      - Given/Wanted interactions (FunDepOrigin1); see #9612
 
       - But for Wanted/Wanted interactions we do /not/ want to report an
-        error (Trac #13506).  Consider [W] C Int Int, [W] C Int Bool, with
+        error (#13506).  Consider [W] C Int Int, [W] C Int Bool, with
         a fundep on class C.  We don't want to report an insoluble Int~Bool;
         c.f. "wanteds do not rewrite wanteds".
 
@@ -2302,7 +2302,7 @@ Note that
   * Superclasses help only for Wanted constraints.  Derived constraints
     are not really "unsolved" and we certainly don't want them to
     trigger superclass expansion. This was a good part of the loop
-    in  Trac #11523
+    in  #11523
 
   * Even for Wanted constraints, we say "no" for implicit parameters.
     we have [W] ?x::ty, expanding superclasses won't help:
@@ -2315,7 +2315,7 @@ Note that
     is low because the unsolved set is usually empty anyway (errors
     aside), and the first non-imlicit-parameter will terminate the search.
 
-    The special case is worth it (Trac #11480, comment:2) because it
+    The special case is worth it (#11480, comment:2) because it
     applies to CallStack constraints, which aren't type errors. If we have
        f :: (C a) => blah
        f x = ...undefined...
@@ -2492,7 +2492,7 @@ ppr_bag doc bag
 
 {- Note [Given insolubles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #14325, comment:)
+Consider (#14325, comment:)
     class (a~b) => C a b
 
     foo :: C a c => a -> c
@@ -2516,7 +2516,7 @@ The same applies to Derived constraints that /arise from/ Givens.
 E.g.   f :: (C Int [a]) => blah
 where a fundep means we get
        [D] Int ~ [a]
-By the same reasoning we must not suppress other errors (Trac #15767)
+By the same reasoning we must not suppress other errors (#15767)
 
 Bottom line: insolubleWC (called in TcSimplify.setImplicationStatus)
              should ignore givens even if they are insoluble.
@@ -3015,7 +3015,7 @@ a representational equality to rewrite a nominal one.
 Note [Wanteds do not rewrite Wanteds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We don't allow Wanteds to rewrite Wanteds, because that can give rise
-to very confusing type error messages.  A good example is Trac #8450.
+to very confusing type error messages.  A good example is #8450.
 Here's another
    f :: a -> Bool
    f x = ( [x,'c'], [x,True] ) `seq` True

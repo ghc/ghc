@@ -1,7 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# OPTIONS_GHC -fwarn-unused-imports #-}
 
--- Trac #1386
+-- #1386
 -- We do not want a warning about unused imports
 
 module Foo () where

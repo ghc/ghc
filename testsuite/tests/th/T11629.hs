@@ -50,7 +50,7 @@ do
   let [ty3', ty4'] = map (withoutSig . getType) insts
 
   when (ty3 /= ty3') $ failMsg "C" ty3 ty3'
-  -- The following won't work. See https://ghc.haskell.org/trac/ghc/ticket/12853
+  -- The following won't work. See https://gitlab.haskell.org/ghc/ghc/issues/12853
   -- when (ty4 /= ty4') $ failMsg "D" ty4 ty4'
 
   -- test #3: type quotations and reified types should agree wrt to

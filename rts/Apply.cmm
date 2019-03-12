@@ -461,7 +461,7 @@ for:
 /*
  Note [AP_STACKs must be eagerly blackholed]
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Trac #13615 describes a nasty concurrency issue where we can enter into the
+#13615 describes a nasty concurrency issue where we can enter into the
 middle of an ST action multiple times, resulting in duplication of effects.
 In short, the construction of an AP_STACK allows us to suspend a computation
 which should not be duplicated. When running with lazy blackholing, we can then

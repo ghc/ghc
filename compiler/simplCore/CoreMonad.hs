@@ -558,7 +558,7 @@ data CoreReader = CoreReader {
 
 -- Note: CoreWriter used to be defined with data, rather than newtype.  If it
 -- is defined that way again, the cw_simpl_count field, at least, must be
--- strict to avoid a space leak (Trac #7702).
+-- strict to avoid a space leak (#7702).
 newtype CoreWriter = CoreWriter {
         cw_simpl_count :: SimplCount
 }
@@ -589,7 +589,7 @@ instance Monad CoreM where
             let w = w1 `plusWriter` w2
             return $ seq w (y, s'', w)
             -- forcing w before building the tuple avoids a space leak
-            -- (Trac #7702)
+            -- (#7702)
 
 instance Applicative CoreM where
     pure x = CoreM $ \s -> nop s x

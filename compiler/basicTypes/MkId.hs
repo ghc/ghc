@@ -746,7 +746,7 @@ constructor has no wrapper, but whether a constructor has a wrapper depends, for
 instance, on the order of type argument of that constructors. Therefore changing
 the order of type argument could make previously working RULEs fail.
 
-See also https://ghc.haskell.org/trac/ghc/ticket/15840 .
+See also https://gitlab.haskell.org/ghc/ghc/issues/15840 .
 
 
 Note [Bangs on imported data constructors]
@@ -778,7 +778,7 @@ We certainly do not want to make a wrapper
 For a start, it's still to generate a no-op.  But worse, since wrappers
 are currently injected at TidyCore, we don't even optimise it away!
 So the stupid case expression stays there.  This actually happened for
-the Integer data type (see Trac #1600 comment:66)!
+the Integer data type (see #1600 comment:66)!
 
 Note [Data con wrappers and GADT syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -821,7 +821,7 @@ strictness/unpackedness to use for the fields of a data type constructor. But
 there is an exception to this rule: newtype constructors. You might not think
 that newtypes would pose a challenge, since newtypes are seemingly forbidden
 from having strictness annotations in the first place. But consider this
-(from Trac #16141):
+(from #16141):
 
   {-# LANGUAGE StrictData #-}
   {-# OPTIONS_GHC -O #-}
@@ -1045,7 +1045,7 @@ And it'd be fine to unpack a product type with existential components
 too, but that would require a bit more plumbing, so currently we don't.
 
 So for now we require: null (dataConExTyCoVars data_con)
-See Trac #14978
+See #14978
 
 Note [Unpack one-wide fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1175,7 +1175,7 @@ mkPrimOpId prim_op
                -- We give PrimOps a NOINLINE pragma so that we don't
                -- get silly warnings from Desugar.dsRule (the inline_shadows_rule
                -- test) about a RULE conflicting with a possible inlining
-               -- cf Trac #7287
+               -- cf #7287
 
 -- For each ccall we manufacture a separate CCallOpId, giving it
 -- a fresh unique, a type that is correct for this particular ccall,
@@ -1209,7 +1209,7 @@ mkFCallId dflags uniq fcall ty
     strict_sig = mkClosedStrictSig (replicate arity topDmd) topRes
     -- the call does not claim to be strict in its arguments, since they
     -- may be lifted (foreign import prim) and the called code doesn't
-    -- necessarily force them. See Trac #11076.
+    -- necessarily force them. See #11076.
 {-
 ************************************************************************
 *                                                                      *
@@ -1499,7 +1499,7 @@ are truly used call-by-need, with no code motion.  Key examples:
   Again, it's clear that 'a' will be evaluated strictly (and indeed
   applied to a state token) but we want to make sure that any exceptions
   arising from the evaluation of 'a' are caught by the catch (see
-  Trac #11555).
+  #11555).
 
 Implementing 'lazy' is a bit tricky:
 
@@ -1513,7 +1513,7 @@ Implementing 'lazy' is a bit tricky:
   are exposed in the interface file.  Otherwise, the unfolding for
   (say) pseq in the interface file will not mention 'lazy', so if we
   inline 'pseq' we'll totally miss the very thing that 'lazy' was
-  there for in the first place. See Trac #3259 for a real world
+  there for in the first place. See #3259 for a real world
   example.
 
 * Suppose CorePrep sees (catch# (lazy e) b).  At all costs we must
@@ -1550,7 +1550,7 @@ if library authors could explicitly tell the compiler that a certain lambda is
 called at most once. The oneShot function allows that.
 
 'oneShot' is levity-polymorphic, i.e. the type variables can refer to unlifted
-types as well (Trac #10744); e.g.
+types as well (#10744); e.g.
    oneShot (\x:Int# -> x +# 1#)
 
 Like most magic functions it has a compulsory unfolding, so there is no need

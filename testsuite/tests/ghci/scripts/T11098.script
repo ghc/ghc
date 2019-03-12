@@ -1,4 +1,4 @@
--- See Trac #11098
+-- See #11098
 
 :set -XTemplateHaskell
 :set -XNamedWildCards

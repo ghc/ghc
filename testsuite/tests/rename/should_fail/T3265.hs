@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
--- Test Trac #3265
+-- Test #3265
 
 module T3265 where
 

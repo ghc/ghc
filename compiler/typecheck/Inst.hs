@@ -287,7 +287,7 @@ deeply_instantiate orig subst ty
 instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM TCvSubst
 -- Use this when you want to instantiate (forall a b c. ty) with
 -- types [ta, tb, tc], but when the kinds of 'a' and 'ta' might
--- not yet match (perhaps because there are unsolved constraints; Trac #14154)
+-- not yet match (perhaps because there are unsolved constraints; #14154)
 -- If they don't match, emit a kind-equality to promise that they will
 -- eventually do so, and thus make a kind-homongeneous substitution.
 instTyVarsWith orig tvs tys

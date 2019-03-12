@@ -1,7 +1,7 @@
 {-# LANGUAGE Arrows #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 
--- Test for Trac #1662
+-- Test for #1662
 
 module Arrow where
 

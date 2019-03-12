@@ -102,7 +102,7 @@ canonicalize (CQuantCan (QCI { qci_ev = ev, qci_pend_sc = pend_sc }))
 canonicalize (CIrredCan { cc_ev = ev })
   | EqPred eq_rel ty1 ty2 <- classifyPredType (ctEvPred ev)
   = -- For insolubles (all of which are equalities, do /not/ flatten the arguments
-    -- In Trac #14350 doing so led entire-unnecessary and ridiculously large
+    -- In #14350 doing so led entire-unnecessary and ridiculously large
     -- type function expansion.  Instead, canEqNC just applies
     -- the substitution to the predicate, and may do decomposition;
     --    e.g. a ~ [a], where [G] a ~ [Int], can decompose
@@ -248,7 +248,7 @@ Givens and Wanteds. But:
   is a waste of time.
 
 * (Major) if we want recursive superclasses, there would be an infinite
-  number of them.  Here is a real-life example (Trac #10318);
+  number of them.  Here is a real-life example (#10318);
 
      class (Frac (Frac a) ~ Frac a,
             Fractional (Frac a),
@@ -275,7 +275,7 @@ So here's the plan:
    solveSimpleWanteds; Note [Danger of adding superclasses during solving]
 
    However, /do/ continue to eagerly expand superlasses for new /given/
-   /non-canonical/ constraints (canClassNC does this).  As Trac #12175
+   /non-canonical/ constraints (canClassNC does this).  As #12175
    showed, a type-family application can expand to a class constraint,
    and we want to see its superclasses for just the same reason as
    Note [Eagerly expand given superclasses].
@@ -296,7 +296,7 @@ So here's the plan:
         of the implication tree
       - We may be inside a type where we can't create term-level
         evidence anyway, so we can't superclass-expand, say,
-        (a ~ b) to get (a ~# b).  This happened in Trac #15290.
+        (a ~ b) to get (a ~# b).  This happened in #15290.
 
 4. Go round to (2) again.  This loop (2,3,4) is implemented
    in TcSimplify.simpl_loop.
@@ -409,7 +409,7 @@ Examples of how adding superclasses can help:
 
 Note [Danger of adding superclasses during solving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here's a serious, but now out-dated example, from Trac #4497:
+Here's a serious, but now out-dated example, from #4497:
 
    class Num (RealOf t) => Normed t
    type family RealOf x
@@ -509,7 +509,7 @@ mk_strict_superclasses rec_clss ev tvs theta cls tys
        = loc   -- For tuple predicates, just take them apart, without
                -- adding their (large) size into the chain.  When we
                -- get down to a base predicate, we'll include its size.
-               -- Trac #10335
+               -- #10335
 
        | GivenOrigin skol_info <- ctLocOrigin loc
          -- See Note [Solving superclass constraints] in TcInstDcls
@@ -582,7 +582,7 @@ mk_superclasses_of rec_clss ev tvs theta cls tys
 
 {- Note [Equality superclasses in quantified constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #15359, #15593, #15625)
+Consider (#15359, #15593, #15625)
   f :: (forall a. theta => a ~ b) => stuff
 
 It's a bit odd to have a local, quantified constraint for `(a~b)`,
@@ -964,7 +964,7 @@ If we have an unsolved equality like
   (a b ~R# Int)
 that is not necessarily insoluble!  Maybe 'a' will turn out to be a newtype.
 So we want to make it a potentially-soluble Irred not an insoluble one.
-Missing this point is what caused Trac #15431
+Missing this point is what caused #15431
 -}
 
 ---------------------------------
@@ -977,7 +977,7 @@ can_eq_nc_forall :: CtEvidence -> EqRel
 -- But remember also to unify the kinds of as and bs
 --  (this is the 'go' loop), and actually substitute phi2[as |> cos / bs]
 -- Remember also that we might have forall z (a:z). blah
---  so we must proceed one binder at a time (Trac #13879)
+--  so we must proceed one binder at a time (#13879)
 
 can_eq_nc_forall ev eq_rel s1 s2
  | CtWanted { ctev_loc = loc, ctev_dest = orig_dest } <- ev
@@ -1096,7 +1096,7 @@ zonk_eq_types = go
           -- the same kind.  E.g go (Proxy *      (Maybe Int))
           --                        (Proxy (*->*) Maybe)
           -- We'll call (go (Maybe Int) Maybe)
-          -- See Trac #13083
+          -- See #13083
         then tycon tc1 tys1 tys2
         else bale_out ty1 ty2
 
@@ -1198,7 +1198,7 @@ which in turn gives us
 which is easier to satisfy.
 
 Bottom line: unwrap newtypes before decomposing them!
-c.f. Trac #9123 comment:52,53 for a compelling example.
+c.f. #9123 comment:52,53 for a compelling example.
 
 Note [Newtypes can blow the stack]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1768,7 +1768,7 @@ allow more constraints to be solved.
 
 We use `isTcReflexiveCo`, to ensure that we only use the hetero-kinded case
 if we really need to.  Of course `flattenArgsNom` should return `Refl`
-whenever possible, but Trac #15577 was an infinite loop because even
+whenever possible, but #15577 was an infinite loop because even
 though the coercion was homo-kinded, `kind_co` was not `Refl`, so we
 made a new (identical) CFunEqCan, and then the entire process repeated.
 -}
@@ -2003,7 +2003,7 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 rhs
   | Just rhs' <- metaTyVarUpdateOK dflags tv1 rhs  -- No occurs check
      -- Must do the occurs check even on tyvar/tyvar
      -- equalities, in case have  x ~ (y :: ..x...)
-     -- Trac #12593
+     -- #12593
   = do { new_ev <- rewriteEqEvidence ev swapped lhs rhs' rewrite_co1 rewrite_co2
        ; continueWith (CTyEqCan { cc_ev = new_ev, cc_tyvar = tv1
                                 , cc_rhs = rhs', cc_eq_rel = eq_rel }) }
@@ -2268,7 +2268,7 @@ rewriteEvidence old_ev@(CtDerived {}) new_pred _co
     -- Why?  Because for *Derived* constraints, c, the coercion, which
     -- was produced by flattening, may contain suspended calls to
     -- (ctEvExpr c), which fails for Derived constraints.
-    -- (Getting this wrong caused Trac #7384.)
+    -- (Getting this wrong caused #7384.)
     continueWith (old_ev { ctev_pred = new_pred })
 
 rewriteEvidence old_ev new_pred co

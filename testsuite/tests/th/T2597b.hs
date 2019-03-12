@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- Test Trac #2597 (second bug)
+-- Test #2597 (second bug)
 
 module ShouldCompile where
 import T2597b_Lib

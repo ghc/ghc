@@ -89,7 +89,7 @@ main = do
     print $ gcdExtInteger (-x) y
     print $ gcdExtInteger (-x) (-y)
 
-    -- see Trac #15350
+    -- see #15350
     do
         let a = 2
             b = 2^65 + 1

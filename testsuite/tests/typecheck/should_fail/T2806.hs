@@ -2,7 +2,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# OPTIONS_GHC -Wunbanged-strict-patterns #-}
 
--- Trac #2806
+-- #2806
 
 module Foo where
 

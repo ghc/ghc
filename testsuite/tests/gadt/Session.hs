@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, KindSignatures #-}
 
--- See Trac #1323; crashed GHC 6.6
+-- See #1323; crashed GHC 6.6
 
 module Main where
 

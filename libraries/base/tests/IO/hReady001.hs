@@ -1,6 +1,6 @@
 -- !!! hReady test
 
- -- hReady should throw and EOF exception at the end of a file. Trac #1063.
+ -- hReady should throw and EOF exception at the end of a file. #1063.
 
 import System.IO
 import System.IO.Error

@@ -124,7 +124,7 @@ mkJointDmds ss as = zipWithEqual "mkJointDmds" mkJointDmd ss as
 Note [Exceptions and strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to smart about catching exceptions, but we aren't anymore.
-See Trac #14998 for the way it's resolved at the moment.
+See #14998 for the way it's resolved at the moment.
 
 Here's a historic breakdown:
 
@@ -138,17 +138,17 @@ their argument, which is useful information for usage analysis. Still with a
 
 In 7c0fff4 (July 15), Simon argued that giving `catch#` et al. a
 'strictApply1Dmd' leads to substantial performance gains. That was at the cost
-of correctness, as Trac #10712 proved. So, back to 'lazyApply1Dmd' in
+of correctness, as #10712 proved. So, back to 'lazyApply1Dmd' in
 28638dfe79e (Dec 15).
 
-Motivated to reproduce the gains of 7c0fff4 without the breakage of Trac #10712,
-Ben opened Trac #11222. Simon made the demand analyser "understand catch" in
+Motivated to reproduce the gains of 7c0fff4 without the breakage of #10712,
+Ben opened #11222. Simon made the demand analyser "understand catch" in
 9915b656 (Jan 16) by adding a new 'catchArgDmd', which basically said to call
 its argument strictly, but also swallow any thrown exceptions in
 'postProcessDmdResult'. This was realized by extending the 'Str' constructor of
 'ArgStr' with a 'ExnStr' field, indicating that it catches the exception, and
 adding a 'ThrowsExn' constructor to the 'Termination' lattice as an element
-between 'Dunno' and 'Diverges'. Then along came Trac #11555 and finally #13330,
+between 'Dunno' and 'Diverges'. Then along came #11555 and finally #13330,
 so we had to revert to 'lazyApply1Dmd' again in 701256df88c (Mar 17).
 
 This left the other variants like 'catchRetry#' having 'catchArgDmd', which is
@@ -159,10 +159,10 @@ there was none. We removed the last usages of 'catchArgDmd' in 00b8ecb7
 removed in ef6b283 (Jan 19): We got rid of 'ThrowsExn' and 'ExnStr' again and
 removed any code that was dealing with the peculiarities.
 
-Where did the speed-ups vanish to? In Trac #14998, item 3 established that
+Where did the speed-ups vanish to? In #14998, item 3 established that
 turning 'catch#' strict in its first argument didn't bring back any of the
 alleged performance benefits. Item 2 of that ticket finally found out that it
-was entirely due to 'catchException's new (since Trac #11555) definition, which
+was entirely due to 'catchException's new (since #11555) definition, which
 was simply
 
     catchException !io handler = catch io handler
@@ -312,7 +312,7 @@ splitStrProdDmd n (SProd ds) = WARN( not (ds `lengthIs` n),
                                Just ds
 splitStrProdDmd _ (SCall {}) = Nothing
       -- This can happen when the programmer uses unsafeCoerce,
-      -- and we don't then want to crash the compiler (Trac #9208)
+      -- and we don't then want to crash the compiler (#9208)
 
 {-
 ************************************************************************
@@ -482,7 +482,7 @@ addCaseBndrDmd (JD { sd = ms, ud = mu }) alt_dmds
 The demand on a binder in a case alternative comes
   (a) From the demand on the binder itself
   (b) From the demand on the case binder
-Forgetting (b) led directly to Trac #10148.
+Forgetting (b) led directly to #10148.
 
 Example. Source code:
   f x@(p,_) = if p then foo x else True
@@ -500,7 +500,7 @@ After strictness analysis:
         True -> foo wild_X7 }
 
 It's true that ds_dnz is *itself* absent, but the use of wild_X7 means
-that it is very much alive and demanded.  See Trac #10148 for how the
+that it is very much alive and demanded.  See #10148 for how the
 consequences play out.
 
 This is needed even for non-product types, in case the case-binder
@@ -603,7 +603,7 @@ splitUseProdDmd n (UProd ds)  = WARN( not (ds `lengthIs` n),
                                 Just ds
 splitUseProdDmd _ (UCall _ _) = Nothing
       -- This can happen when the programmer uses unsafeCoerce,
-      -- and we don't then want to crash the compiler (Trac #9208)
+      -- and we don't then want to crash the compiler (#9208)
 
 useCount :: Use u -> Count
 useCount Abs         = One
@@ -627,7 +627,7 @@ isStrictDmd returns true only of demands that are
    both strict
    and  used
 In particular, it is False for <HyperStr, Abs>, which can and does
-arise in, say (Trac #7319)
+arise in, say (#7319)
    f x = raise# <some exception>
 Then 'x' is not used, so f gets strictness <HyperStr,Abs> -> .
 Now the w/w generates
@@ -637,7 +637,7 @@ At this point we really don't want to convert to
    fx = case absentError "unused" of x -> raise <some exception>
 Since the program is going to diverge, this swaps one error for another,
 but it's really a bad idea to *ever* evaluate an absent argument.
-In Trac #7319 we get
+In #7319 we get
    T7319.exe: Oops!  Entered absent arg w_s1Hd{v} [lid] [base:GHC.Base.String{tc 36u}]
 
 Note [Dealing with call demands]
@@ -844,7 +844,7 @@ Consider this:
 where A,B are the constructors of a GADT.  We'll get a U(U,U) demand
 on x from the A branch, but that's a stupid demand for x itself, which
 has type 'a'. Indeed we get ASSERTs going off (notably in
-splitUseProdDmd, Trac #8569).
+splitUseProdDmd, #8569).
 
 Bottom line: we really don't want to have a binder whose demand is more
 deeply-nested than its type.  There are various ways to tackle this.
@@ -1501,7 +1501,7 @@ There are several wrinkles:
 
 * In a previous incarnation of GHC we needed to be extra careful in the
   case of an *unlifted type*, because unlifted values are evaluated
-  even if they are not used.  Example (see Trac #9254):
+  even if they are not used.  Example (see #9254):
      f :: (() -> (# Int#, () #)) -> ()
           -- Strictness signature is
           --    <C(S(LS)), 1*C1(U(A,1*U()))>
@@ -1696,7 +1696,7 @@ That's fine: if we are doing strictness analysis we are also doing inlining,
 so we'll have inlined 'op' into a cast.  So we can bale out in a conservative
 way, returning nopDmdType.
 
-It is (just.. Trac #8329) possible to be running strictness analysis *without*
+It is (just.. #8329) possible to be running strictness analysis *without*
 having inlined class ops from single-method classes.  Suppose you are using
 ghc --make; and the first module has a local -O0 flag.  So you may load a class
 without interface pragmas, ie (currently) without an unfolding for the class

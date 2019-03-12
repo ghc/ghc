@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, StandaloneDeriving, FlexibleInstances #-}
 
--- Test Trac #2856
+-- Test #2856
 
 module T2856 where
 

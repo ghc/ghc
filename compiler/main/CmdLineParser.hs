@@ -235,12 +235,12 @@ processOneArg opt_kind rest arg args
                                     []               -> missingArgErr dash_arg
                                     (L _ arg1:args1) -> Right (f arg1, args1)
 
-        -- See Trac #9776
+        -- See #9776
         SepArg f -> case args of
                         []               -> missingArgErr dash_arg
                         (L _ arg1:args1) -> Right (f arg1, args1)
 
-        -- See Trac #12625
+        -- See #12625
         Prefix f | notNull rest_no_eq -> Right (f rest_no_eq, args)
                  | otherwise          -> missingArgErr  dash_arg
 
@@ -277,7 +277,7 @@ arg_ok (NoArg           _)  rest _   = null rest
 arg_ok (HasArg          _)  _    _   = True
 arg_ok (SepArg          _)  rest _   = null rest
 arg_ok (Prefix          _)  _    _   = True -- Missing argument checked for in processOneArg t
-                                            -- to improve error message (Trac #12625)
+                                            -- to improve error message (#12625)
 arg_ok (OptIntSuffix    _)  _    _   = True
 arg_ok (IntSuffix       _)  _    _   = True
 arg_ok (FloatSuffix     _)  _    _   = True

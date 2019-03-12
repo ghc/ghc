@@ -1108,7 +1108,7 @@ ratioDataType = mkDataType "GHC.Real.Ratio" [ratioConstr]
 
 -- NB: This Data instance intentionally uses the (%) smart constructor instead
 -- of the internal (:%) constructor to preserve the invariant that a Ratio
--- value is reduced to normal form. See Trac #10011.
+-- value is reduced to normal form. See #10011.
 
 -- | @since 4.0.0.0
 instance (Data a, Integral a) => Data (Ratio a) where

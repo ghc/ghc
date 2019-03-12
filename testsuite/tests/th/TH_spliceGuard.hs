@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -XTemplateHaskell #-}
 
--- Trac #2017
+-- #2017
 
 module ShouldCompile where
 

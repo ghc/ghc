@@ -1,4 +1,4 @@
--- Trac #2409
+-- #2409
 
 module ShouldCompile where
 

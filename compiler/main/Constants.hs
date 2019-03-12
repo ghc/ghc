@@ -26,7 +26,7 @@ mAX_SUM_SIZE :: Int
 mAX_SUM_SIZE = 62
 
 -- | Default maximum depth for both class instance search and type family
--- reduction. See also Trac #5395.
+-- reduction. See also #5395.
 mAX_REDUCTION_DEPTH :: Int
 mAX_REDUCTION_DEPTH = 200
 

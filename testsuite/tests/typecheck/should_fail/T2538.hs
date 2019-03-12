@@ -1,5 +1,5 @@
 
--- Trac #2538
+-- #2538
 module ShouldFail where
 import Data.Ix
 

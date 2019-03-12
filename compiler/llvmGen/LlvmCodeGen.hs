@@ -138,7 +138,7 @@ cmmDataLlvmGens statics
 -- | LLVM can't handle entry blocks which loop back to themselves (could be
 -- seen as an LLVM bug) so we rearrange the code to keep the original entry
 -- label which branches to a newly generated second label that branches back
--- to itself. See: Trac #11649
+-- to itself. See: #11649
 fixBottom :: RawCmmDecl -> LlvmM RawCmmDecl
 fixBottom cp@(CmmProc hdr entry_lbl live g) =
     maybe (pure cp) fix_block $ mapLookup (g_entry g) blk_map

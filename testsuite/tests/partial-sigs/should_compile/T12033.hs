@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, PartialTypeSignatures #-}
 
--- In Trac #12033 this was called HsakellBug.hs
+-- In #12033 this was called HsakellBug.hs
 
 module T12033 where
 tripleStoreToRuleSet :: v -> v

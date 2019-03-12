@@ -365,7 +365,7 @@ Note [Simplifying the instance context].
 
 In the functor-like case, we may need to unify some kind variables with * in
 order for the generated instance to be well-kinded. An example from
-Trac #10524:
+#10524:
 
   newtype Compose (f :: k2 -> *) (g :: k1 -> k2) (a :: k1)
     = Compose (f (g a)) deriving Functor
@@ -848,7 +848,7 @@ Here:
 Note that it is vital that we instantiate the `c` in $gdm_bar's type with a new
 unification variable for each iteration of simplifyDeriv. If we re-use the same
 unification variable across multiple iterations, then bad things can happen,
-such as Trac #14933.
+such as #14933.
 
 Similarly for 'baz', givng the constraint C2
 

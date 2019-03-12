@@ -23,7 +23,7 @@
 -- in "GHC.Float", we must expose this module, but it should not show
 -- up in the docs.
 --
--- See https://ghc.haskell.org/trac/ghc/ticket/5122
+-- See https://gitlab.haskell.org/ghc/ghc/issues/5122
 -- for the origin of the code in this module
 module GHC.Integer.Logarithms.Internals
     ( wordLog2#

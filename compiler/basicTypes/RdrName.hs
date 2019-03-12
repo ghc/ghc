@@ -509,7 +509,7 @@ gre_lcl is True, or gre_imp is non-empty.
 
 It is just possible to have *both* if there is a module loop: a Name
 is defined locally in A, and also brought into scope by importing a
-module that SOURCE-imported A.  Exapmle (Trac #7672):
+module that SOURCE-imported A.  Exapmle (#7672):
 
  A.hs-boot   module A where
                data T
@@ -1256,7 +1256,7 @@ Rationale for (a).  Consider
 The unqualified 'x' can only come from import #2.  The qualified 'M.x'
 could come from either, but bestImport picks import #2, because it is
 more likely to be useful in other imports, as indeed it is in this
-case (see Trac #5211 for a concrete example).
+case (see #5211 for a concrete example).
 
 But the rules are not perfect; consider
    import qualified M  -- Import #1

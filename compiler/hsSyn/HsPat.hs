@@ -292,7 +292,7 @@ type instance XParPat  (GhcPass _) = NoExt
 type instance XBangPat (GhcPass _) = NoExt
 
 -- Note: XListPat cannot be extended when using GHC 8.0.2 as the bootstrap
--- compiler, as it triggers https://ghc.haskell.org/trac/ghc/ticket/14396 for
+-- compiler, as it triggers https://gitlab.haskell.org/ghc/ghc/issues/14396 for
 -- `SyntaxExpr`
 type instance XListPat GhcPs = NoExt
 type instance XListPat GhcRn = Maybe (SyntaxExpr GhcRn)
@@ -735,7 +735,7 @@ isIrrefutableHsPat
                            =
       isJust (tyConSingleDataCon_maybe (dataConTyCon con))
       -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because
-      -- the latter is false of existentials. See Trac #4439
+      -- the latter is false of existentials. See #4439
       && all goL (hsConPatArgs details)
     go (ConPatOut
         { pat_con = (dL->L _ (PatSynCon _pat)) })

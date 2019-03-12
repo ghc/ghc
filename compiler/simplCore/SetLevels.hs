@@ -548,7 +548,7 @@ must be careful to test the *result* scrutinee ('x' in this case), not
 the *input* one 'y'.  The latter *is* in HNF here (because y is
 evaluated), but the former is not -- and indeed we can't float the
 inner case out, at least not unless x is also evaluated at its binding
-site.  See Trac #5453.
+site.  See #5453.
 
 That's why we apply exprIsHNF to scrut' and not to scrut.
 
@@ -755,7 +755,7 @@ I think this is obselete; the flag seems always on.]
 Note [Floating join point bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Mostly we only float a join point if it can /stay/ a join point.  But
-there is one exception: if it can go to the top level (Trac #13286).
+there is one exception: if it can go to the top level (#13286).
 Consider
   f x = joinrec j y n = <...j y' n'...>
         in jump j x 0
@@ -808,7 +808,7 @@ and replace the original (f x) with
    case (case y of I# r -> r) of r -> blah
 
 Being able to float unboxed expressions is sometimes important; see
-Trac #12603.  I'm not sure how /often/ it is important, but it's
+#12603.  I'm not sure how /often/ it is important, but it's
 not hard to achieve.
 
 We only do it for a fixed collection of types for which we have a
@@ -912,7 +912,7 @@ Id, *immediately*, for three reasons:
     errors, e.g. via a case with empty alternatives:  (case x of {})
     Lint complains unless the scrutinee of such a case is clearly bottom.
 
-    This was reported in Trac #11290.   But since the whole bottoming-float
+    This was reported in #11290.   But since the whole bottoming-float
     thing is based on the cheap-and-cheerful exprIsBottom, I'm not sure
     that it'll nail all such cases.
 
@@ -1267,7 +1267,7 @@ Conclusion: use lvlMFE if there are
   * any value lambdas in the original function, and
   * this is not a bottoming function (the is_bot argument)
 Use lvlExpr otherwise.  A little subtle, and I got it wrong at least twice
-(e.g. Trac #13369).
+(e.g. #13369).
 -}
 
 {-
@@ -1398,7 +1398,7 @@ That's why we have this as_far_as_poss stuff.  Usually as_far_as_poss
 is just tOP_LEVEL; but occasionally a coercion variable (which is an
 Id) mentioned in type prevents this.
 
-Example Trac #14270 comment:15.
+Example #14270 comment:15.
 -}
 
 

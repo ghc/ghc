@@ -1,4 +1,4 @@
--- See Trac #1221
+-- See #1221
 
 module ShouldFail where
 

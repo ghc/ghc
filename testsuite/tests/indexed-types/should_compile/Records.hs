@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 
--- See Trac #1204
+-- See #1204
 
 module ShouldCompile where
 

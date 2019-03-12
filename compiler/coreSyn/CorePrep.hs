@@ -344,7 +344,7 @@ partial applications. But it's easier to let them through.
 
 Note [Dead code in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Imagine that we got an input program like this (see Trac #4962):
+Imagine that we got an input program like this (see #4962):
 
   f :: Show b => Int -> (Int, b -> Maybe Int -> Int)
   f x = (g True (Just x) + g () (Just x), g)
@@ -790,7 +790,7 @@ data ArgInfo = CpeApp  CoreArg
 ~~~~~~~~~~~~~~~~~~~
 If we got, say
    runRW# (case bot of {})
-which happened in Trac #11291, we do /not/ want to turn it into
+which happened in #11291, we do /not/ want to turn it into
    (case bot of {}) realWorldPrimId#
 because that gives a panic in CoreToStg.myCollectArgs, which expects
 only variables in function position.  But if we are sure to make
@@ -1051,7 +1051,7 @@ Note [Floating unlifted arguments]
 Consider    C (let v* = expensive in v)
 
 where the "*" indicates "will be demanded".  Usually v will have been
-inlined by now, but let's suppose it hasn't (see Trac #2756).  Then we
+inlined by now, but let's suppose it hasn't (see #2756).  Then we
 do *not* want to get
 
      let v* = expensive in C v
@@ -1183,7 +1183,7 @@ tryEtaReducePrep bndrs (Let bind@(NonRec _ r) body)
 -- Otherwise we risk reducing
 --       \x. (Tick (Breakpoint {x}) f x)
 --   ==> Tick (breakpoint {x}) f
--- which is bogus (Trac #17228)
+-- which is bogus (#17228)
 -- tryEtaReducePrep bndrs (Tick tickish e)
 --   = fmap (mkTick tickish) $ tryEtaReducePrep bndrs e
 

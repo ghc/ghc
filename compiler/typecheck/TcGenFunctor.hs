@@ -391,7 +391,7 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
          -- When folding over an unboxed tuple, we must explicitly drop the
          -- runtime rep arguments, or else GHC will generate twice as many
          -- variables in a unboxed tuple pattern match and expression as it
-         -- actually needs. See Trac #12399
+         -- actually needs. See #12399
          (xrs,xcs) = unzip (map (go co) (dropRuntimeRepArgs args))
     go co (ForAllTy (Bndr v vis) x)
        | isVisibleArgFlag vis = panic "unexpected visible binder"
@@ -1051,7 +1051,7 @@ Only E1's argument is an occurrence of a universally quantified type variable
 that is syntactically equivalent to the last type parameter, so only E1's
 argument will be folded over in a derived Foldable instance.
 
-See Trac #10447 for the original discussion on this feature. Also see
+See #10447 for the original discussion on this feature. Also see
 https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/DeriveFunctor
 for a more in-depth explanation.
 
@@ -1154,7 +1154,7 @@ This is unsatisfying for two reasons:
 1. The Traversable instance doesn't typecheck! Int# is of kind #, but pure
    expects an argument whose type is of kind *. This effectively prevents
    Traversable from being derived for any datatype with an unlifted argument
-   type (Trac #11174).
+   type (#11174).
 
 2. The generated code contains superfluous expressions. By the Monoid laws,
    we can reduce (f a <> mempty) to (f a), and by the Applicative laws, we can

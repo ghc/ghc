@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, RankNTypes #-}
 
--- Trac #2714
+-- #2714
 
 module T2714 where
 

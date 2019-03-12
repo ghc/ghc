@@ -341,7 +341,7 @@ linkCmdLineLibs' hsc_env pls =
       -- However because we don't know the actual name of pthread's dll we
       -- need to defer this to the locateLib call so we can't initialize it
       -- inside of the rts. Instead we do it here to be able to find the
-      -- import library for pthreads. See Trac #13210.
+      -- import library for pthreads. See #13210.
       let platform = targetPlatform dflags
           os       = platformOS platform
           minus_ls = case os of

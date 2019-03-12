@@ -17,7 +17,7 @@
 
 -- This code, supplied by Edward Kmett, uses UndecidableSuperClasses along
 -- with a bunch of other stuff, so it's a useful stress test.
--- See Trac #11480 comment:12.
+-- See #11480 comment:12.
 
 module T11480b where
 

@@ -5,7 +5,7 @@
         MultiParamTypeClasses,
         FlexibleInstances #-}
 
--- See Trac #4178
+-- See #4178
 
 module T4178 where
 

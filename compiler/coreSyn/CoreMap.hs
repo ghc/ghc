@@ -133,7 +133,7 @@ Note [Empty case alternatives]
 * For a key (Case e b ty []) we MUST look at the return type 'ty', because
   otherwise (Case (error () "urk") _ Int  []) would compare equal to
             (Case (error () "urk") _ Bool [])
-  which is utterly wrong (Trac #6097)
+  which is utterly wrong (#6097)
 
 We could compare the return type regardless, but the wildly common case
 is that it's unnecessary, so we have two fields (cm_case and cm_ecase)

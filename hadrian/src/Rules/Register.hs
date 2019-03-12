@@ -120,7 +120,7 @@ buildConf _ context@Context {..} conf = do
     -- The above two steps produce an entry in the package database, with copies
     -- of many of the files we have build, e.g. Haskell interface files. We need
     -- to record this side effect so that Shake can cache these files too.
-    -- See why we need 'fixWindows': https://ghc.haskell.org/trac/ghc/ticket/16073
+    -- See why we need 'fixWindows': https://gitlab.haskell.org/ghc/ghc/issues/16073
     let fixWindows path = do
             win <- windowsHost
             version  <- setting GhcVersion

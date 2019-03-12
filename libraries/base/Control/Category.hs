@@ -4,7 +4,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Category may never fire
-    -- e.g. identity/left, identity/right, association;  see Trac #10528
+    -- e.g. identity/left, identity/right, association;  see #10528
 
 -----------------------------------------------------------------------------
 -- |
@@ -16,7 +16,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 
--- http://ghc.haskell.org/trac/ghc/ticket/1773
+-- https://gitlab.haskell.org/ghc/ghc/issues/1773
 
 module Control.Category where
 

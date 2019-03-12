@@ -1030,7 +1030,7 @@ translatePat fam_insts pat = case pat of
     --
     --     - Otherwise, we treat the `ListPat` as ordinary view pattern.
     --
-    -- See Trac #14547, especially comment#9 and comment#10.
+    -- See #14547, especially comment#9 and comment#10.
     --
     -- Here we construct CanFailPmPat directly, rather can construct a view
     -- pattern and do further translation as an optimization, for the reason,
@@ -1100,7 +1100,7 @@ from translation in pattern matcher.
     `HsOverLit` inside `NPat` to HsIntPrim/HsWordPrim. If we do
     the same thing in `translatePat` as in `tidyNPat`, the exhaustiveness
     checker will fail to match the literals patterns correctly. See
-    Trac #14546.
+    #14546.
 
   In Note [Undecidable Equality for Overloaded Literals], we say: "treat
   overloaded literals that look different as different", but previously we
@@ -1121,7 +1121,7 @@ from translation in pattern matcher.
     in value position as PmOLit, but translate the 0 and 1 in pattern position
     as PmSLit. The inconsistency leads to the failure of eqPmLit to detect the
     equality and report warning of "Pattern match is redundant" on pattern 0,
-    as reported in Trac #14546. In this patch we remove the specialization of
+    as reported in #14546. In this patch we remove the specialization of
     OverLit patterns, and keep the overloaded number literal in pattern as it
     is to maintain the consistency. We know nothing about the `fromInteger`
     method (see Note [Undecidable Equality for Overloaded Literals]). Now we
@@ -1141,7 +1141,7 @@ from translation in pattern matcher.
     non-overloaded string values are translated to PmSLit. However the string
     patterns, both overloaded and non-overloaded, are translated to list of
     characters. The inconsistency leads to wrong warnings about redundant and
-    non-exhaustive pattern matching warnings, as reported in Trac #14546.
+    non-exhaustive pattern matching warnings, as reported in #14546.
 
     In order to catch the redundant pattern in following case:
 
@@ -1167,7 +1167,7 @@ from translation in pattern matcher.
 
   We must ensure that doing the same translation to literal values and patterns
   in `translatePat` and `hsExprToPmExpr`. The previous inconsistent work led to
-  Trac #14546.
+  #14546.
 -}
 
 -- | Translate a list of patterns (Note: each pattern is translated
@@ -2511,7 +2511,7 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
 
 {- Note [Inaccessible warnings for record updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #12957)
+Consider (#12957)
   data T a where
     T1 :: { x :: Int } -> T Bool
     T2 :: { x :: Int } -> T a

@@ -323,7 +323,7 @@ If -XScopedTypeVariables is enabled, this hole fit can even be copied verbatim.
 Note [Relevant Constraints]
 ~~~~~~~~~~~~~~~~~~~
 
-As highlighted by Trac #14273, we need to check any relevant constraints as well
+As highlighted by #14273, we need to check any relevant constraints as well
 as checking for subsumption. Relevant constraints are the simple constraints
 whose free unification variables are mentioned in the type of the hole.
 

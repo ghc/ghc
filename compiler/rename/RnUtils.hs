@@ -149,7 +149,7 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
   where
     check_shadow n
         | startsWithUnderscore occ = return ()  -- Do not report shadowing for "_x"
-                                                -- See Trac #3262
+                                                -- See #3262
         | Just n <- mb_local = complain [text "bound at" <+> ppr (nameSrcLoc n)]
         | otherwise = do { gres' <- filterM is_shadowed_gre gres
                          ; complain (map pprNameProvenance gres') }
@@ -167,7 +167,7 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
 
     is_shadowed_gre :: GlobalRdrElt -> RnM Bool
         -- Returns False for record selectors that are shadowed, when
-        -- punning or wild-cards are on (cf Trac #2723)
+        -- punning or wild-cards are on (cf #2723)
     is_shadowed_gre gre | isRecFldGRE gre
         = do { dflags <- getDynFlags
              ; return $ not (xopt LangExt.RecordPuns dflags
@@ -385,7 +385,7 @@ addNameClashErrRn rdr_name gres
     --   It could refer to either ‘T15487a.null’,
     --                            imported from ‘Prelude’ at T15487.hs:1:8-13
     --                     or ...
-    -- See Trac #15487
+    -- See #15487
     pp_gre_name gre@(GRE { gre_name = name, gre_par = parent
                          , gre_lcl = lcl, gre_imp = iss })
       | FldParent { par_lbl = Just lbl } <- parent

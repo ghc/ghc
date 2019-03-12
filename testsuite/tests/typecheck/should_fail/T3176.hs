@@ -1,6 +1,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
 
--- Trac #3176
+-- #3176
 
 module Foo where
 

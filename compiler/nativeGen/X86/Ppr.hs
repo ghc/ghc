@@ -726,7 +726,7 @@ pprInstr (TEST format src dst) = sdocWithPlatform $ \platform ->
         -- The mask must have the high bit clear for this smaller encoding
         -- to be completely equivalent to the original; in particular so
         -- that the signed comparison condition bits are the same as they
-        -- would be if doing a full word comparison. See Trac #13425.
+        -- would be if doing a full word comparison. See #13425.
         (OpImm (ImmInteger mask), OpReg dstReg)
           | 0 <= mask && mask < 128 -> minSizeOfReg platform dstReg
         _ -> format

@@ -743,7 +743,7 @@ tcDataConPat penv (dL->L con_span con_name) data_con pat_ty
         ; checkExistentials ex_tvs all_arg_tys penv
 
         ; tenv <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
-                  -- NB: Do not use zipTvSubst!  See Trac #14154
+                  -- NB: Do not use zipTvSubst!  See #14154
                   -- We want to create a well-kinded substitution, so
                   -- that the instantiated type is well-kinded
 
@@ -795,7 +795,7 @@ tcDataConPat penv (dL->L con_span con_name) data_con pat_ty
         ; checkTc (no_equalities || gadts_on || families_on)
                   (text "A pattern match on a GADT requires the" <+>
                    text "GADTs or TypeFamilies language extension")
-                  -- Trac #2905 decided that a *pattern-match* of a GADT
+                  -- #2905 decided that a *pattern-match* of a GADT
                   -- should require the GADT language flag.
                   -- Re TypeFamilies see also #7156
 
@@ -1006,7 +1006,7 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
 
                 -- No matching field; chances are this field label comes from some
                 -- other record type (or maybe none).  If this happens, just fail,
-                -- otherwise we get crashes later (Trac #8570), and similar:
+                -- otherwise we get crashes later (#8570), and similar:
                 --      f (R { foo = (a,b) }) = a+b
                 -- If foo isn't one of R's fields, we don't want to crash when
                 -- typechecking the "a+b".

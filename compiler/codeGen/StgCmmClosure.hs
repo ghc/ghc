@@ -732,7 +732,7 @@ blackHoleOnEntry cl_info
 {- Note [Black-holing non-updatable thunks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We must not black-hole non-updatable (single-entry) thunks otherwise
-we run into issues like Trac #10414. Specifically:
+we run into issues like #10414. Specifically:
 
   * There is no reason to black-hole a non-updatable thunk: it should
     not be competed for by multiple threads
@@ -745,7 +745,7 @@ we run into issues like Trac #10414. Specifically:
      - is not updated (of course)
      - hence, if it is black-holed and another thread tries to evaluate
        it, that thread will block forever
-    This actually happened in Trac #10414.  So we do not black-hole
+    This actually happened in #10414.  So we do not black-hole
     non-updatable thunks.
 
   * How could two threads evaluate the same non-updatable (single-entry)
@@ -755,7 +755,7 @@ we run into issues like Trac #10414. Specifically:
     thunk, because lazy black-holing only affects thunks with an
     update frame on the stack.
 
-Here is and example due to Reid Barton (Trac #10414):
+Here is and example due to Reid Barton (#10414):
     x = \u []  concat [[1], []]
 with the following definitions,
 

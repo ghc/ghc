@@ -2,7 +2,7 @@ module Main where
 
 newtype T a = MkT a
 
--- Trac #9128: we treated x as absent!!!!
+-- #9128: we treated x as absent!!!!
 
 f x = let {-# NOINLINE h #-}
           h = case x of MkT g -> g

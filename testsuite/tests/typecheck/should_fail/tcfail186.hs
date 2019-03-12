@@ -1,4 +1,4 @@
--- Trac #1814
+-- #1814
 
 module ShouldFail where
 

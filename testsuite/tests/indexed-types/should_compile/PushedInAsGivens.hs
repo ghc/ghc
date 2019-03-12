@@ -21,7 +21,7 @@ bar y = let foo :: (F Int ~ [a]) => a -> Int
 -- we will not be able to solve the implication constraint.
 
 -- Oct 14: actually this example is _really_ strange, and doesn't illustrate
--- the real issue in Trac #4935, for which there is a separate test
+-- the real issue in #4935, for which there is a separate test
 --
 -- The example here requires us to infer a type
 --   bar :: F Int ~ [a] => ...

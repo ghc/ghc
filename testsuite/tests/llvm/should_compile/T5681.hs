@@ -1,5 +1,5 @@
 {-# LANGUAGE MagicHash, UnboxedTuples #-}
--- Test case for Trac #5681
+-- Test case for #5681
 module Main where
 
 import GHC.Prim

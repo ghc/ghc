@@ -245,7 +245,7 @@ exitifyRec in_scope pairs
                                | otherwise           = (fvs',               acc)
 
         -- We are going to abstract over these variables, so we must
-        -- zap any IdInfo they have; see Trac #15005
+        -- zap any IdInfo they have; see #15005
         -- cf. SetLevels.abstractVars
         zap v | isId v = setIdInfo v vanillaIdInfo
               | otherwise = v

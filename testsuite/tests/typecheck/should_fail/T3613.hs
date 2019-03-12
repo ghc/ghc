@@ -1,4 +1,4 @@
--- c.f Trac #3613
+-- c.f #3613
 
 module T3613 where
 

@@ -142,7 +142,7 @@ hs_atomic_and64(StgWord x, StgWord64 val)
 // See also:
 //
 //  * https://bugs.llvm.org/show_bug.cgi?id=8842
-//  * https://ghc.haskell.org/trac/ghc/ticket/9678
+//  * https://gitlab.haskell.org/ghc/ghc/issues/9678
 //
 
 #define CAS_NAND(x, val)                                            \

@@ -306,7 +306,7 @@ void printRtsInfo(const RtsConfig rts_config) {
     mkRtsInfoPair("Word size",               TOSTRING(WORD_SIZE_IN_BITS));
     mkRtsInfoPair("Compiler unregisterised", GhcUnregisterised);
     mkRtsInfoPair("Tables next to code",     GhcEnableTablesNextToCode);
-    mkRtsInfoPair("Flag -with-rtsopts",      /* See Trac #15261 */
+    mkRtsInfoPair("Flag -with-rtsopts",      /* See #15261 */
         rts_config.rts_opts != NULL ? rts_config.rts_opts : "");
     printf(" ]\n");
 }

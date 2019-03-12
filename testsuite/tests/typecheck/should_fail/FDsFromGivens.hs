@@ -7,7 +7,7 @@ class C a b | a -> b where
 
 {- Failing, as it righteously should! It's inaccessible code -}
 -- But (c.f. test T5236) we no longer reject this in the
--- typechecker (see Trac #12466)
+-- typechecker (see #12466)
 -- Instead we get a redundant pattern-match warning,
 -- in the post-typechecking pattern-match checks
 g1 :: (C Char [a], C Char Bool) => a -> ()

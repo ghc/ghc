@@ -1,4 +1,4 @@
--- From comment:76 in Trac #9858
+-- From comment:76 in #9858
 -- This exploit still works in GHC 7.10.1.
 -- By Shachaf Ben-Kiki, Ørjan Johansen and Nathan van Doorn
 

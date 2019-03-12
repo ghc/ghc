@@ -199,7 +199,7 @@ import {-# SOURCE #-} Packages (componentIdString, improveUnitId, PackageConfigM
 --        only ever ComponentIds, and some ComponentIds happen to have
 --        more information (UnitIds).
 --      - Same as Language.Haskell.TH.Syntax:PkgName, see
---          https://ghc.haskell.org/trac/ghc/ticket/10279
+--          https://gitlab.haskell.org/ghc/ghc/issues/10279
 --      - The same as PackageKey in GHC 7.10 (we renamed it because
 --        they don't necessarily identify packages anymore.)
 --      - Same as -this-package-key/-package-name flags
@@ -217,7 +217,7 @@ import {-# SOURCE #-} Packages (componentIdString, improveUnitId, PackageConfigM
 -- PackageName: The "name" field in a Cabal file, something like "lens".
 --      - Same as Distribution.Package.PackageName
 --      - DIFFERENT FROM Language.Haskell.TH.Syntax:PkgName, see
---          https://ghc.haskell.org/trac/ghc/ticket/10279
+--          https://gitlab.haskell.org/ghc/ghc/issues/10279
 --      - DIFFERENT FROM -package-name flag
 --      - DIFFERENT FROM the 'name' field in an installed package
 --        information.  This field could more accurately be described

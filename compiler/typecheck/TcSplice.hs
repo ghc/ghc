@@ -572,7 +572,7 @@ tcTopSpliceExpr isTypedSplice tc_action
                    -- going to run this code, but we do an unsafe
                    -- coerce, so we get a seg-fault if, say we
                    -- splice a type into a place where an expression
-                   -- is expected (Trac #7276)
+                   -- is expected (#7276)
     setStage (Splice isTypedSplice) $
     do {    -- Typecheck the expression
          (expr', wanted) <- captureConstraints tc_action
@@ -753,7 +753,7 @@ runMeta' show_code ppr_hs run_and_convert expr
         -- recovered giving it type f :: forall a.a, it'd be very dodgy
         -- to carry ont.  Mind you, the staging restrictions mean we won't
         -- actually run f, but it still seems wrong. And, more concretely,
-        -- see Trac #5358 for an example that fell over when trying to
+        -- see #5358 for an example that fell over when trying to
         -- reify a function with a "?" kind in it.  (These don't occur
         -- in type-correct programs.
         ; failIfErrsM
@@ -888,7 +888,7 @@ like that.  Here's how it's processed:
 
  * 'qReport' forces the message to ensure any exception hidden in unevaluated
    thunk doesn't get into the bag of errors. Otherwise the following splice
-   will triger panic (Trac #8987):
+   will triger panic (#8987):
         $(fail undefined)
    See also Note [Concealed TH exceptions]
 
@@ -1270,11 +1270,11 @@ reifyInstances th_nm th_tys
         ; ty <- zonkTcTypeToType ty
                 -- Substitute out the meta type variables
                 -- In particular, the type might have kind
-                -- variables inside it (Trac #7477)
+                -- variables inside it (#7477)
 
         ; traceTc "reifyInstances" (ppr ty $$ ppr (tcTypeKind ty))
         ; case splitTyConApp_maybe ty of   -- This expands any type synonyms
-            Just (tc, tys)                 -- See Trac #7910
+            Just (tc, tys)                 -- See #7910
                | Just cls <- tyConClass_maybe tc
                -> do { inst_envs <- tcGetInstEnvs
                      ; let (matches, unifies, _) = lookupInstEnv False inst_envs cls tys
@@ -1790,7 +1790,7 @@ reifyFamilyInstance is_poly_tvs (FamInst { fi_flavor = flavor
 
       DataFamilyInst rep_tc ->
         do { let -- eta-expand lhs types, because sometimes data/newtype
-                 -- instances are eta-reduced; See Trac #9692
+                 -- instances are eta-reduced; See #9692
                  -- See Note [Eta reduction for data families] in FamInstEnv
                  (ee_tvs, ee_lhs, _) = etaExpandCoAxBranch branch
                  fam'     = reifyName fam

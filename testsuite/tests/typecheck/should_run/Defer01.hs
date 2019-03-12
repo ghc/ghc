@@ -42,7 +42,7 @@ class MyClass a where myOp :: a -> String
 
 j = myOp 23 -- Two errors, should not combine them
 
--- No longer reported as an error: Trac #12466
+-- No longer reported as an error: #12466
 k :: (Int ~ Bool) => Int -> Bool
 k x = x
 

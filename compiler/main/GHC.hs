@@ -138,7 +138,7 @@ module GHC (
         getDocs, GetDocsFailure(..),
 
         -- ** Other
-        runTcInteractive,   -- Desired by some clients (Trac #8878)
+        runTcInteractive,   -- Desired by some clients (#8878)
         isStmt, hasImport, isImport, isDecl,
 
         -- ** The debugger
@@ -516,7 +516,7 @@ initGhcMonad mb_top_dir
 -- check should be more selective but there is currently no released
 -- version where this bug is fixed.
 -- See https://sourceware.org/bugzilla/show_bug.cgi?id=16177 and
--- https://ghc.haskell.org/trac/ghc/ticket/4210#comment:29
+-- https://gitlab.haskell.org/ghc/ghc/issues/4210#note_78333
 checkBrokenTablesNextToCode :: MonadIO m => DynFlags -> m ()
 checkBrokenTablesNextToCode dflags
   = do { broken <- checkBrokenTablesNextToCode' dflags

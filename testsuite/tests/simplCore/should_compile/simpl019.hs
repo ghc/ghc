@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs, FlexibleInstances #-}
 {-# OPTIONS_GHC -O2 #-}
 
--- See Trac #1746
+-- See #1746
 
 module Foo where
 

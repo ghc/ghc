@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fwarn-unused-matches #-}
 
--- Trac #17
+-- #17
 
 module Temp (foo, bar, quux) where
 

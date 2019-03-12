@@ -217,7 +217,7 @@ gen_Eq_binds loc tycon = do
         nested_eq_expr tys as bs
           = foldr1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
           -- Using 'foldr1' here ensures that the derived code is correctly
-          -- associated. See Trac #10859.
+          -- associated. See #10859.
           where
             nested_eq ty a b = nlHsPar (eq_Expr ty (nlHsVar a) (nlHsVar b))
 
@@ -278,7 +278,7 @@ Several special cases:
 Note [Game plan for deriving Ord]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's a bad idea to define only 'compare', and build the other binary
-comparisons on top of it; see Trac #2130, #4019.  Reason: we don't
+comparisons on top of it; see #2130, #4019.  Reason: we don't
 want to laboriously make a three-way comparison, only to extract a
 binary result, something like this:
      (>) (I# x) (I# y) = case <# x y of
@@ -870,7 +870,7 @@ gen_Ix_binds loc tycon = do
                  con_pat cs_needed] $
           if con_arity == 0
              -- If the product type has no fields, inRange is trivially true
-             -- (see Trac #12853).
+             -- (see #12853).
              then true_Expr
              else foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range
                     as_needed bs_needed cs_needed)
@@ -927,12 +927,12 @@ rather than
    Ident "T1" <- lexP
 The latter desugares to inline code for matching the Ident and the
 string, and this can be very voluminous. The former is much more
-compact.  Cf Trac #7258, although that also concerned non-linearity in
+compact.  Cf #7258, although that also concerned non-linearity in
 the occurrence analyser, a separate issue.
 
 Note [Read for empty data types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-What should we get for this?  (Trac #7931)
+What should we get for this?  (#7931)
    data Emp deriving( Read )   -- No data constructors
 
 Here we want
@@ -1060,7 +1060,7 @@ gen_Read_binds get_fixity loc tycon
 
     -- For constructors and field labels ending in '#', we hackily
     -- let the lexer generate two tokens, and look for both in sequence
-    -- Thus [Ident "I"; Symbol "#"].  See Trac #5041
+    -- Thus [Ident "I"; Symbol "#"].  See #5041
     ident_h_pat s | Just (ss, '#') <- snocView s = [ ident_pat ss, symbol_pat "#" ]
                   | otherwise                    = [ ident_pat s ]
 
@@ -1313,7 +1313,7 @@ gen_Data_binds loc rep_tc
 
        -- Make unique names for the data type and constructor
        -- auxiliary bindings.  Start with the name of the TyCon/DataCon
-       -- but that might not be unique: see Trac #12245.
+       -- but that might not be unique: see #12245.
        ; dt_occ  <- chooseUniqueOccTc (mkDataTOcc (getOccName rep_tc))
        ; dc_occs <- mapM (chooseUniqueOccTc . mkDataCOcc . getOccName)
                          (tyConDataCons rep_tc)
@@ -1430,7 +1430,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
         -- because D :: * -> *
         -- even though rep_tc has kind * -> * -> * -> *
         -- Hence looking for the kind of fam_tc not rep_tc
-        -- See Trac #4896
+        -- See #4896
     tycon_kind = case tyConFamInst_maybe rep_tc of
                     Just (fam_tc, _) -> tyConKind fam_tc
                     Nothing          -> tyConKind rep_tc
@@ -1684,7 +1684,7 @@ TcDeriv.genInst. See #8503 for more discussion.
 
 Note [Newtype-deriving trickiness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #12768):
+Consider (#12768):
   class C a where { op :: D a => a -> a }
 
   instance C a  => C [a] where { op = opList }
@@ -2091,7 +2091,7 @@ mkRdrFunBindEC arity catch_all
    --     foldMap _ z = mempty
    -- It's needed if there no data cons at all,
    -- which can happen with -XEmptyDataDecls
-   -- See Trac #4302
+   -- See #4302
    matches' = if null matches
               then [mkMatch (mkPrefixFunRhs fun)
                             (replicate (arity - 1) nlWildPat ++ [z_Pat])
@@ -2111,7 +2111,7 @@ mkRdrFunBindSE arity
    --     compare _ _ = error "Void compare"
    -- It's needed if there no data cons at all,
    -- which can happen with -XEmptyDataDecls
-   -- See Trac #4302
+   -- See #4302
    matches' = if null matches
               then [mkMatch (mkPrefixFunRhs fun)
                             (replicate arity nlWildPat)
@@ -2425,7 +2425,7 @@ We often want to make a top-level auxiliary binding.  E.g. for comparison we hae
 Of course these top-level bindings should all have distinct name, and we are
 generating RdrNames here.  We can't just use the TyCon or DataCon to distinguish
 because with standalone deriving two imported TyCons might both be called T!
-(See Trac #7947.)
+(See #7947.)
 
 So we use package name, module name and the name of the parent
 (T in this example) as part of the OccName we generate for the new binding.

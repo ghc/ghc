@@ -73,7 +73,7 @@ fingerprintOptFlags :: DynFlags
                       -> IO Fingerprint
 fingerprintOptFlags DynFlags{..} nameio =
       let
-        -- See https://ghc.haskell.org/trac/ghc/ticket/10923
+        -- See https://gitlab.haskell.org/ghc/ghc/issues/10923
         -- We used to fingerprint the optimisation level, but as Joachim
         -- Breitner pointed out in comment 9 on that ticket, it's better
         -- to ignore that and just look at the individual optimisation flags.
@@ -91,7 +91,7 @@ fingerprintHpcFlags :: DynFlags
                       -> IO Fingerprint
 fingerprintHpcFlags dflags@DynFlags{..} nameio =
       let
-        -- -fhpc, see https://ghc.haskell.org/trac/ghc/ticket/11798
+        -- -fhpc, see https://gitlab.haskell.org/ghc/ghc/issues/11798
         -- hpcDir is output-only, so we should recompile if it changes
         hpc = if gopt Opt_Hpc dflags then Just hpcDir else Nothing
 

@@ -312,7 +312,7 @@ simple_app env (Tick t e) as
 -- The let might appear there as a result of inlining
 -- e.g.   let f = let x = e in b
 --        in f a1 a2
--- (Trac #13208)
+-- (#13208)
 simple_app env (Let bind body) as
   = case simple_opt_bind env bind of
       (env', Nothing)   -> simple_app env' body as
@@ -490,7 +490,7 @@ rhss here.
 Note [Preserve join-binding arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Be careful /not/ to eta-reduce the RHS of a join point, lest we lose
-the join-point arity invariant.  Trac #15108 was caused by simplifying
+the join-point arity invariant.  #15108 was caused by simplifying
 the RHS with simple_opt_expr, which does eta-reduction.  Solution:
 simplify the RHS of a join point by simplifying under the lambdas
 (which of course should be there).
@@ -710,7 +710,7 @@ A more common case is when
 
    f = \x. error ".."
 
-and again its arity increses (Trac #15517)
+and again its arity increses (#15517)
 -}
 
 {- *********************************************************************
@@ -759,7 +759,7 @@ dealWithStringLiteral.
 
 Note [Push coercions in exprIsConApp_maybe]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In Trac #13025 I found a case where we had
+In #13025 I found a case where we had
     op (df @t1 @t2)     -- op is a ClassOp
 where
     df = (/\a b. K e1 e2) |> g
@@ -1181,7 +1181,7 @@ pushCoTyArg :: CoercionR -> Type -> Maybe (Type, MCoercionR)
 -- it's faster not to compute it, though.
 pushCoTyArg co ty
   -- The following is inefficient - don't do `eqType` here, the coercion
-  -- optimizer will take care of it. See Trac #14737.
+  -- optimizer will take care of it. See #14737.
   -- -- | tyL `eqType` tyR
   -- -- = Just (ty, Nothing)
 
@@ -1219,7 +1219,7 @@ pushCoValArg :: CoercionR -> Maybe (Coercion, MCoercion)
 -- the returned coercion would have been reflexive.
 pushCoValArg co
   -- The following is inefficient - don't do `eqType` here, the coercion
-  -- optimizer will take care of it. See Trac #14737.
+  -- optimizer will take care of it. See #14737.
   -- -- | tyL `eqType` tyR
   -- -- = Just (mkRepReflCo arg, Nothing)
 

@@ -1,4 +1,4 @@
--- Trac #2529
+-- #2529
 -- The example below successfully performed the {{{show}}}, but {{{reads}}}
 -- returns an empty list. It fails in both GHCi and GHC. It succeeds if you
 -- replaces the infix symbol with a name.

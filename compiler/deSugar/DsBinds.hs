@@ -776,7 +776,7 @@ we might have
 
 We might want to specialise 'f' so that we in turn specialise '$wf'.
 We can't even /name/ '$wf' in the source code, so we can't specialise
-it even if we wanted to.  Trac #10721 is a case in point.
+it even if we wanted to.  #10721 is a case in point.
 
 Note [Activation pragmas for SPECIALISE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -792,7 +792,7 @@ We need two pragma-like things:
 * Activation of RULE: from SPECIALISE pragma (if activation given)
                       otherwise from f's inline pragma
 
-This is not obvious (see Trac #5237)!
+This is not obvious (see #5237)!
 
 Examples      Rule activation   Inline prag on spec'd fn
 ---------------------------------------------------------------------
@@ -875,7 +875,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
                            , not (v `elemVarSet` orig_bndr_set)
                            , not (v == fn_id) ]
          -- fn_id: do not quantify over the function itself, which may
-         -- itself be a dictionary (in pathological cases, Trac #10251)
+         -- itself be a dictionary (in pathological cases, #10251)
 
    decompose (Var fn_id) args
       | not (fn_id `elemVarSet` orig_bndr_set)
@@ -1018,7 +1018,7 @@ drop_dicts drops dictionary bindings on the LHS where possible.
 
     NB3: In the common case of a non-overloaded, but perhaps-polymorphic
          specialisation, we don't need to bind *any* dictionaries for use
-         in the RHS. For example (Trac #8331)
+         in the RHS. For example (#8331)
              {-# SPECIALIZE INLINE useAbstractMonad :: ReaderST s Int #-}
              useAbstractMonad :: MonadAbstractIOST m => m Int
          Here, deriving (MonadAbstractIOST (ReaderST s)) is a lot of code
@@ -1026,7 +1026,7 @@ drop_dicts drops dictionary bindings on the LHS where possible.
              RULE forall s (d :: MonadAbstractIOST (ReaderT s)).
                 useAbstractMonad (ReaderT s) d = $suseAbstractMonad s
 
-   Trac #8848 is a good example of where there are some interesting
+   #8848 is a good example of where there are some interesting
    dictionary bindings to discard.
 
 The drop_dicts algorithm is based on these observations:

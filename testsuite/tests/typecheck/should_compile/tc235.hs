@@ -4,7 +4,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
     -- 'x' and 'v' are ambiguous
 
--- Trac #1564
+-- #1564
 
 module Foo where
 

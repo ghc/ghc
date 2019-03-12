@@ -83,7 +83,7 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
                                                     initial_uds
           -- It's crucial to re-analyse the glommed-together bindings
           -- so that we establish the right loop breakers. Otherwise
-          -- we can easily create an infinite loop (Trac #9583 is an example)
+          -- we can easily create an infinite loop (#9583 is an example)
 
     initial_uds = addManyOccsSet emptyDetails
                             (rulesFreeVars imp_rules)
@@ -124,7 +124,7 @@ occurAnalyseExpr' enable_binder_swap expr
 
 {- Note [Plugin rules]
 ~~~~~~~~~~~~~~~~~~~~~~
-Conal Elliott (Trac #11651) built a GHC plugin that added some
+Conal Elliott (#11651) built a GHC plugin that added some
 BuiltinRules (for imported Ids) to the mg_rules field of ModGuts, to
 do some domain-specific transformations that could not be expressed
 with an ordinary pattern-matching CoreRule.  But then we can't extract
@@ -1020,7 +1020,7 @@ terminate in a constant number of iterations, rather than O(N)
 iterations.
 
 You might thing that it's very unlikely, but RULES make it much
-more likely.  Here's a real example from Trac #1969:
+more likely.  Here's a real example from #1969:
   Rec { $dm = \d.\x. op d
         {-# RULES forall d. $dm Int d  = $s$dm1
                   forall d. $dm Bool d = $s$dm2 #-}
@@ -1439,7 +1439,7 @@ Note [Loop breakers, node scoring, and stability]
 To choose a loop breaker, we give a NodeScore to each node in the SCC,
 and pick the one with the best score (according to 'betterLB').
 
-We need to be jolly careful (Trac #12425, #12234) about the stability
+We need to be jolly careful (#12425, #12234) about the stability
 of this choice. Suppose we have
 
     let rec { f = ...g...g...
@@ -1610,10 +1610,10 @@ Consider
    join j = Just x
 
 We want to inline x into j right away, so we don't want to give
-the join point a RhsCtxt (Trac #14137).  It's not a huge deal, because
+the join point a RhsCtxt (#14137).  It's not a huge deal, because
 the FloatIn pass knows to float into join point RHSs; and the simplifier
 does not float things out of join point RHSs.  But it's a simple, cheap
-thing to do.  See Trac #14137.
+thing to do.  See #14137.
 
 Note [Cascading inlines]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1932,7 +1932,7 @@ A': Non-obviously saturated applications: eg    build (f (\x y -> expensive))
     that sense, f is saturated, and we may proceed as described above.
 
     Hence the computation of 'guaranteed_val_args' in occAnalApp, using
-    '(occ_one_shots env)'.  See also Trac #13227, comment:9
+    '(occ_one_shots env)'.  See also #13227, comment:9
 
 B:  Let-bindings:  eg   let f = \c. let ... in \n -> blah
                         in (build f, build f)
@@ -2322,7 +2322,7 @@ we will get
 
 Core Lint never expects to find an *occurrence* of an Id marked
 as Dead, so we must zap the OccInfo on cb before making the
-binding x = cb.  See Trac #5028.
+binding x = cb.  See #5028.
 
 NB: the OccInfo on /occurrences/ really doesn't matter much; the simplifier
 doesn't use it. So this is only to satisfy the perhpas-over-picky Lint.
@@ -2409,7 +2409,7 @@ mkAltEnv env@(OccEnv { occ_gbl_scrut = pe }) scrut case_bndr
                        , Just (localise v, rhs) )
       -- ToDO: this isGlobalId stuff is a TEMPORARY FIX
       --       to avoid the binder-swap for GlobalIds
-      --       See Trac #16346
+      --       See #16346
 
     case_bndr' = Var (zapIdOccInfo case_bndr)
                    -- See Note [Zap case binders in proxy bindings]
@@ -2556,7 +2556,7 @@ It's obviously wrong to mark CoVars as dead if they are used.
 Currently we don't traverse types to gather usase info for CoVars,
 so we had better treat them as having noOccInfo.
 
-This showed up in Trac #15696 we had something like
+This showed up in #15696 we had something like
   case eq_sel d of co -> ...(typeError @(...co...) "urk")...
 
 Then 'd' was substitued by a dictionary, so the expression
@@ -2828,7 +2828,7 @@ unfolding captured by the INLINE pragma has arity 1.  If we try to
 convert g to be a join point, its unfolding will still have arity 1
 (since it is stable, and we don't meddle with stable unfoldings), and
 Lint will complain (see Note [Invariants on join points], (2a), in
-CoreSyn.  Trac #13413.
+CoreSyn.  #13413.
 
 Moreover, since g is going to be inlined anyway, there is no benefit
 from making it a join point.

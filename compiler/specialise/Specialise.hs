@@ -628,7 +628,7 @@ which explodes in size when aggressively optimized. The
 -fno-cross-module-specialise option was introduced to allow users to being
 bitten by such instances to revert to the pre-7.10 behavior.
 
-See Trac #10491
+See #10491
 -}
 
 -- | Specialise a set of calls to imported bindings
@@ -793,7 +793,7 @@ What imported functions do we specialise?  The basic set is
 but with -fspecialise-aggressively we add
  * Anything with an unfolding template
 
-Trac #8874 has a good example of why we want to auto-specialise DFuns.
+#8874 has a good example of why we want to auto-specialise DFuns.
 
 We have the -fspecialise-aggressively flag (usually off), because we
 risk lots of orphan modules from over-vigorous specialisation.
@@ -1384,7 +1384,7 @@ defeated specialisation!  Hence the use of collectBindersPushingCo.
 
 Note [Evidence foralls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose (Trac #12212) that we are specialising
+Suppose (#12212) that we are specialising
    f :: forall a b. (Num a, F a ~ F b) => blah
 with a=b=Int. Then the RULE will be something like
    RULE forall (d:Num Int) (g :: F Int ~ F Int).
@@ -1506,7 +1506,7 @@ In general, we need only make this Rec if
 Note [Avoiding loops]
 ~~~~~~~~~~~~~~~~~~~~~
 When specialising /dictionary functions/ we must be very careful to
-avoid building loops. Here is an example that bit us badly: Trac #3591
+avoid building loops. Here is an example that bit us badly: #3591
 
      class Eq a => C a
      instance Eq [a] => C [a]
@@ -1547,7 +1547,7 @@ Solution:
 
 --------------
 Here's another example, this time for an imported dfun, so the call
-to filterCalls is in specImports (Trac #13429). Suppose we have
+to filterCalls is in specImports (#13429). Suppose we have
   class Monoid v => C v a where ...
 
 We start with a call
@@ -1785,7 +1785,7 @@ all they should be inlined, right?  Two reasons:
    This particular example had a huge effect on the call to replicateM_
    in nofib/shootout/n-body.
 
-Why (b): discard INLINABLE pragmas? See Trac #4874 for persuasive examples.
+Why (b): discard INLINABLE pragmas? See #4874 for persuasive examples.
 Suppose we have
     {-# INLINABLE f #-}
     f :: Ord a => [a] -> Int
@@ -1803,7 +1803,7 @@ So we simply drop INLINABLE pragmas when specialising. It's not really
 a complete solution; ignoring specialisation for now, INLINABLE functions
 don't get properly strictness analysed, for example. But it works well
 for examples involving specialisation, which is the dominant use of
-INLINABLE.  See Trac #4874.
+INLINABLE.  See #4874.
 
 
 ************************************************************************
@@ -2009,7 +2009,7 @@ mkCallUDs' env f args
             ClassPred cls _ -> not (isIPClass cls)  -- Superclasses can't be IPs
             EqPred {}       -> True
             IrredPred {}    -> True   -- Things like (D []) where D is a
-                                      -- Constraint-ranged family; Trac #7785
+                                      -- Constraint-ranged family; #7785
             ForAllPred {}   -> True
 
 {-
@@ -2018,7 +2018,7 @@ Note [Type determines value]
 Only specialise if all overloading is on non-IP *class* params,
 because these are the ones whose *type* determines their *value*.  In
 parrticular, with implicit params, the type args *don't* say what the
-value of the implicit param is!  See Trac #7101
+value of the implicit param is!  See #7101
 
 However, consider
          type family D (v::*->*) :: Constraint
@@ -2032,7 +2032,7 @@ So the question is: can an implicit parameter "hide inside" a
 type-family constraint like (D a).  Well, no.  We don't allow
         type instance D Maybe = ?x:Int
 Hence the IrredPred case in type_determines_value.
-See Trac #7785.
+See #7785.
 
 Note [Interesting dictionary arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2058,7 +2058,7 @@ variables?
 
 We accidentally lost accurate tracking of local variables for a long
 time, because cloned variables don't have unfoldings. But makes a
-massive difference in a few cases, eg Trac #5113. For nofib as a
+massive difference in a few cases, eg #5113. For nofib as a
 whole it's only a small win: 2.2% improvement in allocation for ansi,
 1.2% for bspt, but mostly 0.0!  Average 0.1% increase in binary size.
 -}
@@ -2117,7 +2117,7 @@ pair_fvs (bndr, rhs) = exprSomeFreeVars interesting rhs
         --         involving an imported dfun.  We must know whether
         --         a dictionary binding depends on an imported dfun,
         --         in case we try to specialise that imported dfun
-        --         Trac #13429 illustrates
+        --         #13429 illustrates
 
 -- | Flatten a set of "dumped" 'DictBind's, and some other binding
 -- pairs, into a single recursive binding.

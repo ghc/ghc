@@ -118,7 +118,7 @@ In a pattern synonym signature we write
 Note that the "required" context comes first, then the "provided"
 context.  Moreover, the "required" context must not mention
 existentially-bound type variables; that is, ones not mentioned in
-res_ty.  See lots of discussion in Trac #10928.
+res_ty.  See lots of discussion in #10928.
 
 If there is no "provided" context, you can omit it; but you
 can't omit the "required" part (unless you omit both).

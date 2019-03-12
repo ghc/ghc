@@ -20,7 +20,7 @@
 -- So, today, this program fails.  It's trivial to fix by adding a fundep for C
 --      class (G a, L a b) => C a b | a -> b
 
--- Note: Sept 08: when fixing Trac #1470, tc138 started working!
+-- Note: Sept 08: when fixing #1470, tc138 started working!
 -- This test is a very strange one (fundeps, undecidable instances),
 -- so I'm just marking it as "should-succeed".  It's not very clear to
 -- me what the "right" answer should be; when we have the type equality

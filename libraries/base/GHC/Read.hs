@@ -383,7 +383,7 @@ readField fieldName readVal = do
 -- second argument is a parser for the field value.
 --
 -- Note that 'readField' does not suffice for this purpose due to
--- <https://ghc.haskell.org/trac/ghc/ticket/5041 Trac #5041>.
+-- <https://gitlab.haskell.org/ghc/ghc/issues/5041 #5041>.
 readFieldHash :: String -> ReadPrec a -> ReadPrec a
 readFieldHash fieldName readVal = do
         expectP (L.Ident fieldName)
@@ -420,7 +420,7 @@ readSymField fieldName readVal = do
 -- parsers. For large record types (e.g. 500 fields), this produces a
 -- significant performance boost.
 --
--- See also Trac #14364.
+-- See also #14364.
 
 
 --------------------------------------------------------------

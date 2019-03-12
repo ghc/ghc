@@ -4,7 +4,7 @@
 -- This one showed up a bug that required type refinement in TcIface
 -- See the call to coreRefineTys in TcIface
 --
--- Tests for bug: http://ghc.haskell.org/trac/ghc/ticket/685
+-- Tests for bug: https://gitlab.haskell.org/ghc/ghc/issues/685
 
 module ShouldCompile where
 

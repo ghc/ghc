@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs, TypeOperators #-}
 module T3155 where
 
--- Test Trac #3155
+-- Test #3155
 -- Gave bad error message in GHC 6.10
 
 data Any s where

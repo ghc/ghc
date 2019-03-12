@@ -1,4 +1,4 @@
-This is a test for https://ghc.haskell.org/trac/ghc/ticket/9646
+This is a test for https://gitlab.haskell.org/ghc/ghc/issues/9646
 
 The problem addressed in that ticket was that under some circumstances,
 GHC < 7.10.3 was failing to perform eta reduction deterministically.

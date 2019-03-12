@@ -27,7 +27,7 @@ q :: ColD (Show :&: Real)
 q = ColD (1.2 :: Double)
 
 bar = app print q
--- This one works, as a result of fixing Trac #8644,
+-- This one works, as a result of fixing #8644,
 -- because the given constraint is
 --   (Show :&: Real) a, which has no equality superclasses
 

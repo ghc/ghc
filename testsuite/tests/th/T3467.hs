@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- Test Trac #3467
+-- Test #3467
 
 module T3467 where
 

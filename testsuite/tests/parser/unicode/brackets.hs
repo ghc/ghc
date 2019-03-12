@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnicodeSyntax   #-}
 
--- See Trac #10162 and #11743 for details
+-- See #10162 and #11743 for details
 
 module ShouldCompile where
 

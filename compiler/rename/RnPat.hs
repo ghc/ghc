@@ -160,7 +160,7 @@ Consider
 
 Arguably we should report T2 as unused, even though it appears in a
 pattern, because it never occurs in a constructed position.  See
-Trac #7336.
+#7336.
 However, implementing this in the face of pattern synonyms would be
 less straightforward, since given two pattern synonyms
 
@@ -258,7 +258,7 @@ Consider
 Here the pattern binds 'r', and then uses it *only* in the view pattern.
 We want to "see" this use, and in let-bindings we collect all uses and
 report unused variables at the binding level. So we must use bindLocalNames
-here, *not* bindLocalNameFV.  Trac #3943.
+here, *not* bindLocalNameFV.  #3943.
 
 
 Note [Don't report shadowing for pattern synonyms]
@@ -853,7 +853,7 @@ inside IntegralLit and FractionalLit. These types cannot represent negative
 zero value. So we had to add explicit field 'neg' which would hold information
 about literal sign. Here in rnOverLit we use it to detect negative zeroes and
 in this case return not only literal itself but also negateName so that users
-can apply it explicitly. In this case it stays negative zero.  Trac #13211
+can apply it explicitly. In this case it stays negative zero.  #13211
 -}
 
 rnOverLit :: HsOverLit t ->

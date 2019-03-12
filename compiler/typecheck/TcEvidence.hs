@@ -584,7 +584,7 @@ data EvTypeable
     -- ^ Dictionary for a type literal,
     -- e.g. @Typeable "foo"@ or @Typeable 3@
     -- The 'EvTerm' is evidence of, e.g., @KnownNat 3@
-    -- (see Trac #10348)
+    -- (see #10348)
   deriving Data.Data
 
 -- | Evidence for @CallStack@ implicit parameters.
@@ -633,7 +633,7 @@ Instead we make a binding
     g1 :: a~Bool = g |> ax7 a
 and the constraint
     [G] g1 :: a~Bool
-See Trac [7238] and Note [Bind new Givens immediately] in TcRnTypes
+See #7238 and Note [Bind new Givens immediately] in TcRnTypes
 
 Note [EvBinds/EvTerm]
 ~~~~~~~~~~~~~~~~~~~~~

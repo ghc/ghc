@@ -349,7 +349,7 @@ We implement this by making 'coreView' convert 'Constraint' to 'TYPE
 LiftedRep' on the fly.  The function tcView (used in the type checker)
 does not do this.
 
-See also Trac #11715, which tracks removing this inconsistency.
+See also #11715, which tracks removing this inconsistency.
 
 -}
 
@@ -415,7 +415,7 @@ expandTypeSynonyms ty
             --     /idempotent/ substitution, even in the nested case
             --        type T a b = a -> b
             --        type S x y = T y x
-            -- (Trac #11665)
+            -- (#11665)
         in  mkAppTys (go subst' rhs) tys'
       | otherwise
       = TyConApp tc expanded_tys
@@ -686,7 +686,7 @@ Note [Decomposing fat arrow c=>t]
 Can we unify (a b) with (Eq a => ty)?   If we do so, we end up with
 a partial application like ((=>) Eq a) which doesn't make sense in
 source Haskell.  In contrast, we *can* unify (a b) with (t1 -> t2).
-Here's an example (Trac #9858) of how you might do it:
+Here's an example (#9858) of how you might do it:
    i :: (Typeable a, Typeable b) => Proxy (a b) -> TypeRep
    i p = typeRep p
 
@@ -1066,7 +1066,7 @@ piResultTys ty orig_args@(arg:args)
         -- have the right kind to apply to them; so panic.
         -- Without the explicit isEmptyVarEnv test, an ill-kinded type
         -- would give an infniite loop, which is very unhelpful
-        -- c.f. Trac #15473
+        -- c.f. #15473
         pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
 
 applyTysX :: [TyVar] -> Type -> [Type] -> Type
@@ -1098,7 +1098,7 @@ So
 
 In other words we must intantiate the forall!
 
-Similarly (Trac #15428)
+Similarly (#15428)
    S :: forall k f. k -> f k
 and we are finding the kind of
    S * (* ->) Int Bool
@@ -1400,7 +1400,7 @@ with a fat arrow; that is, using mkInvisFunTy, not mkVisFunTy.
 
 Why? After all, we are in Core, where (=>) and (->) behave the same.
 Yes, but the /specialiser/ does treat dictionary arguments specially.
-Suppose we do w/w on 'foo' in module A, thus (Trac #11272, #6056)
+Suppose we do w/w on 'foo' in module A, thus (#11272, #6056)
    foo :: Ord a => Int -> blah
    foo a d x = case x of I# x' -> $wfoo @a d x'
 
@@ -1679,7 +1679,7 @@ tyConArgFlags tc = fun_kind_arg_flags (tyConKind tc)
 -- 'Specified' and the second argument (@Bool@) is 'Required'. It is precisely
 -- this sort of higher-rank situation in which 'appTyArgFlags' comes in handy,
 -- since @f Type Bool@ would be represented in Core using 'AppTy's.
--- (See also Trac #15792).
+-- (See also #15792).
 appTyArgFlags :: Type -> [Type] -> [ArgFlag]
 appTyArgFlags ty = fun_kind_arg_flags (typeKind ty)
 
@@ -2429,7 +2429,7 @@ and now we can make f' a join point:
   in ... jump f' 1 'b' ... jump f' 2 'c' ...
 
 It's not clear that this comes up often, however. TODO: Measure how often and
-add this analysis if necessary.  See Trac #14620.
+add this analysis if necessary.  See #14620.
 
 
 ************************************************************************

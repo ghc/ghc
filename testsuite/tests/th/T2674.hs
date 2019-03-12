@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- Trac #2674
+-- #2674
 
 module ShouldFail where
 

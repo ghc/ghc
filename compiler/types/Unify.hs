@@ -330,7 +330,7 @@ failure.
 tcUnifyTysFG ("fine-grained") returns one of three results: success, occurs-check
 failure ("MaybeApart"), or general failure ("SurelyApart").
 
-See also Trac #8162.
+See also #8162.
 
 It's worth noting that unification in the presence of infinite types is not
 complete. This means that, sometimes, a closed type family does not reduce
@@ -554,9 +554,9 @@ We also want to substitute inside f's kind, to get
    , g -> H k (f:*) ]
 If we don't do this, we may apply the substitution to something,
 and get an ill-formed type, i.e. one where typeKind will fail.
-This happened, for example, in Trac #9106.
+This happened, for example, in #9106.
 
-It gets worse.  In Trac #14164 we wanted to take the fixpoint of
+It gets worse.  In #14164 we wanted to take the fixpoint of
 this substitution
    [ xs_asV :-> F a_aY6 (z_aY7 :: a_aY6)
                         (rest_aWF :: G a_aY6 (z_aY7 :: a_aY6))
@@ -887,7 +887,7 @@ Previously, wrongly, we pushed 'co' in the (horrid) accumulating
 But that is obviously wrong because 'co' (from the template) ends
 up in 'kco', which in turn ends up in the range of the substitution.
 
-This all came up in Trac #13910.  Because we match tycon arguments
+This all came up in #13910.  Because we match tycon arguments
 left-to-right, the ambient substitution will already have a matching
 substitution for any kinds; so there is an easy fix: just apply
 the substitution-so-far to the coercion from the LHS.
@@ -901,7 +901,7 @@ Note that
   better way.
 
 * One better way is to ensure that type patterns (the template
-  in the matching process) have no casts.  See Trac #14119.
+  in the matching process) have no casts.  See #14119.
 
 Note [Polykinded tycon applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -913,7 +913,7 @@ and we are unifying
 These two TyConApps have the same TyCon at the front but they
 (legitimately) have different numbers of arguments.  They
 are surelyApart, so we can report that without looking any
-further (see Trac #15704).
+further (see #15704).
 -}
 
 -------------- unify_ty: the main workhorse -----------
@@ -1141,7 +1141,7 @@ bindTv env tv1 ty2
         ; checkRnEnv env free_tvs2
 
         -- Occurs check, see Note [Fine-grained unification]
-        -- Make sure you include 'kco' (which ty2 does) Trac #14846
+        -- Make sure you include 'kco' (which ty2 does) #14846
         ; occurs <- occursCheck env tv1 free_tvs2
 
         ; if occurs then maybeApart

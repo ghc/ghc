@@ -1148,7 +1148,7 @@ instance Ix Int64 where
 
 {- Note [Order of tests]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-(See Trac #3065, #5161.) Suppose we had a definition like:
+(See #3065, #5161.) Suppose we had a definition like:
 
     quot x y
      | y == 0                     = divZeroError

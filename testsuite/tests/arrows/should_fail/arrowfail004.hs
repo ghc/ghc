@@ -1,6 +1,6 @@
 {-# LANGUAGE Arrows, ExistentialQuantification #-}
 
--- Trac #1662
+-- #1662
 
 module ShouldFail where
 

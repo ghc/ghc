@@ -352,7 +352,7 @@ Variables in type signatures are implicitly quantified
 when (1) they are in a type signature not beginning
 with "forall" or (2) in any qualified type T => R.
 We are phasing out (2) since it leads to inconsistencies
-(Trac #4426):
+(#4426):
 
 data A = A (a -> a)           is an error
 data A = A (Eq a => a -> a)   binds "a"
@@ -1335,7 +1335,7 @@ checkSectionPrec direction section op arg
 
 -- | Look up the fixity for an operator name.  Be careful to use
 -- 'lookupFieldFixityRn' for (possibly ambiguous) record fields
--- (see Trac #13132).
+-- (see #13132).
 lookupFixityOp :: OpName -> RnM Fixity
 lookupFixityOp (NormalOp n)  = lookupFixityRn n
 lookupFixityOp NegateOp      = lookupFixityRn negateName

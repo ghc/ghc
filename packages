@@ -4,7 +4,7 @@
 # * rules/foreachLibrary.mk
 #
 # Some of this information is duplicated elsewhere in the build system:
-#    See Trac #3896
+#    See #3896
 # In particular when adding libraries to this file, you also need to add
 # the library to the SUBDIRS variable in libraries/Makefile so that they
 # actually get built

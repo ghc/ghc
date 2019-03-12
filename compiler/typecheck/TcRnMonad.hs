@@ -358,7 +358,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
       -- If we succeed (maybe_res = Just r), there should be
       -- no unsolved constraints.  But if we exit via an
       -- exception (maybe_res = Nothing), we may have skipped
-      -- solving, so don't panic then (Trac #13466)
+      -- solving, so don't panic then (#13466)
       ; lie <- readIORef (tcl_lie lcl_env)
       ; when (isJust maybe_res && not (isEmptyWC lie)) $
         pprPanic "initTc: unsolved constraints" (ppr lie)
@@ -1645,7 +1645,7 @@ emitWildCardHoleConstraints wcs
 
 {- Note [Constraints and errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (Trac #12124):
+Consider this (#12124):
 
   foo :: Maybe Int
   foo = return (case Left 3 of
@@ -1673,7 +1673,7 @@ However suppose we throw an exception inside an invocation of
 captureConstraints, and discard all the constraints. Some of those
 constraints might be "variable out of scope" Hole constraints, and that
 might have been the actual original cause of the exception!  For
-example (Trac #12529):
+example (#12529):
    f = p @ Int
 Here 'p' is out of scope, so we get an insolube Hole constraint. But
 the visible type application fails in the monad (thows an exception).

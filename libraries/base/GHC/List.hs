@@ -226,7 +226,7 @@ ensures that calls to FB functions can be written back to the original form
 when no fusion happens.
 
 Without these inline pragmas, the loop in perf/should_run/T13001 won't be
-allocation-free. Also see Trac #13001.
+allocation-free. Also see #13001.
 -}
 
 -- ----------------------------------------------------------------------------

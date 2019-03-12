@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -XArrows -XRecursiveDo#-}
--- Test Trac #2111
+-- Test #2111
 
 module Foo where
 

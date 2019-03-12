@@ -8,9 +8,9 @@ information to help you get started right away.
 The GHC Developer's Wiki
 ========================
 
-The home for GHC hackers is our Trac instance, located here:
+The home for GHC hackers is our GitLab instance, located here:
 
-<http://ghc.haskell.org/trac/ghc>
+<https://gitlab.haskell.org/ghc/ghc>
 
 From here, you can file bugs (or look them up,) use the wiki, view the
 `git` history, among other things. Of particular note is the building
@@ -64,8 +64,8 @@ Now, hack on your copy and rebuild (with `make`) as necessary.
 Then start by making your commits however you want. When you're done, you can submit
  a pull request on Github for small changes. For larger changes the patch needs to be
  submitted to [Phabricator](https://phabricator.haskell.org/) for code review.
- The GHC Trac Wiki has a good summary for the [overall process](https://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBugs)
- as well as a guide on 
+ The GHC Wiki has a good summary for the [overall process](https://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBugs)
+ as well as a guide on
  [how to use Phabricator/arcanist](https://ghc.haskell.org/trac/ghc/wiki/Phabricator).
 
 

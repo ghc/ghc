@@ -12,9 +12,9 @@ instance Eq (a -> b) where
 instance Show (a -> b) where
      show = const "<fun>"
 
--- This is the example from Trac #179
+-- This is the example from #179
 foo x = show (\_ -> True)
 
--- This is the example from Trac #963
+-- This is the example from #963
 instance (Num a, Monad m, Eq (m a), Show (m a)) => Num (m a) where
 test = 1 True

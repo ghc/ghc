@@ -418,7 +418,7 @@ like normal functions. This is ok.
 The analysis *could* make use of the fact that join points are always evaluated
 in the same context as the join-binding they are defined in and are always
 one-shot, and handle join points separately, as suggested in
-https://ghc.haskell.org/trac/ghc/ticket/13479#comment:10.
+https://gitlab.haskell.org/ghc/ghc/issues/13479#note_134870.
 This *might* be more efficient (for example, join points would not have to be
 considered interesting variables), but it would also add redundant code. So for
 now we do not do that.

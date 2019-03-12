@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs, ExistentialQuantification #-}
 {-# OPTIONS_GHC -O -fno-warn-overlapping-patterns #-}
 
--- Trac #2587
+-- #2587
 -- Actually this bug related to free variables and
 -- type lets, but ostensibly it has a GADT flavour
 -- Hence being in the GADT directory.

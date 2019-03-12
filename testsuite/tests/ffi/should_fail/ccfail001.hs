@@ -1,7 +1,7 @@
 
 {-# LANGUAGE ForeignFunctionInterface, MagicHash #-}
 
--- Trac #1037 
+-- #1037 
 
 module Foo where
 

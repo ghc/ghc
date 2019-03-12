@@ -382,10 +382,10 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
 
        -- Make sure that the argument type has kind '*'
        --   ($) :: forall (r:RuntimeRep) (a:*) (b:TYPE r). (a->b) -> a -> b
-       -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
+       -- Eg we do not want to allow  (D#  $  4.0#)   #5570
        --    (which gives a seg fault)
        --
-       -- The *result* type can have any kind (Trac #8739),
+       -- The *result* type can have any kind (#8739),
        -- so we don't need to check anything for that
        ; _ <- unifyKind (Just (XHsType $ NHsCoreTy arg2_sigma))
                         (tcTypeKind arg2_sigma) liftedTypeKind
@@ -447,7 +447,7 @@ tcExpr expr@(SectionR x op arg2) res_ty
     fn_orig = lexprCtOrigin op
     -- It's important to use the origin of 'op', so that call-stacks
     -- come out right; they are driven by the OccurrenceOf CtOrigin
-    -- See Trac #13285
+    -- See #13285
 
 tcExpr expr@(SectionL x arg1 op) res_ty
   = do { (op', op_ty) <- tcInferFun op
@@ -467,7 +467,7 @@ tcExpr expr@(SectionL x arg1 op) res_ty
     fn_orig = lexprCtOrigin op
     -- It's important to use the origin of 'op', so that call-stacks
     -- come out right; they are driven by the OccurrenceOf CtOrigin
-    -- See Trac #13285
+    -- See #13285
 
 tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
   | all tupArgPresent tup_args
@@ -700,7 +700,7 @@ The result type should be (T a b' c)
 not (T a b c),   because 'b' *is not* mentioned in a non-updated field
 not (T a b' c'), because 'c' *is*     mentioned in a non-updated field
 NB that it's not good enough to look at just one constructor; we must
-look at them all; cf Trac #3219
+look at them all; cf #3219
 
 After all, upd should be equivalent to:
         upd t x = case t of
@@ -1362,7 +1362,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
 
 {- Note [Required quantifiers in the type of a term]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #15859)
+Consider (#15859)
 
   data A k :: k -> Type      -- A      :: forall k -> k -> Type
   type KindOf (a :: k) = k   -- KindOf :: forall k. k -> Type
@@ -1390,7 +1390,7 @@ Note [Visible type application zonk]
 
 So we must zonk inner_ty as well, to guarantee consistency between zonk(tv)
 and inner_ty.  Otherwise we can build an ill-kinded type.  An example was
-Trac #14158, where we had:
+#14158, where we had:
    id :: forall k. forall (cat :: k -> k -> *). forall (a :: k). cat a a
 and we had the visible type application
   id @(->)
@@ -1405,7 +1405,7 @@ and we had the visible type application
   but we must first zonk the inner_ty to get
       forall (a :: TYPE q1). cat a a
   so that the result of substitution is well-kinded
-  Failing to do so led to Trac #14158.
+  Failing to do so led to #14158.
 -}
 
 ----------------
@@ -1704,7 +1704,7 @@ So for partial signatures we apply the MR if no context is given.  So
    e :: _ => IO _     do not apply the MR
 just like in TcBinds.decideGeneralisationPlan
 
-This makes a difference (Trac #11670):
+This makes a difference (#11670):
    peek :: Ptr a -> IO CLong
    peek ptr = peekElemOff undefined 0 :: _
 from (peekElemOff undefined 0) we get
@@ -1844,7 +1844,7 @@ tcUnboundId :: HsExpr GhcRn -> UnboundVar -> ExpRhoType -> TcM (HsExpr GhcTcId)
 -- Id; and indeed the evidence for the CHoleCan does bind it, so it's
 -- not unbound any more!
 tcUnboundId rn_expr unbound res_ty
- = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (Trac #12531)
+ = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (#12531)
       ; let occ = unboundVarOcc unbound
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
@@ -2691,7 +2691,7 @@ with update
    r { x=e1, y=e2, z=e3 }, we
 
 Finding the smallest subset is hard, so the code here makes
-a decent stab, no more.  See Trac #7989.
+a decent stab, no more.  See #7989.
 -}
 
 naughtyRecordSel :: RdrName -> SDoc

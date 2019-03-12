@@ -611,7 +611,7 @@ mkHsSigEnv get_info sigs
    `extendNameEnvList` (mk_pairs gen_dm_sigs)
    -- The subtlety is this: in a class decl with a
    -- default-method signature as well as a method signature
-   -- we want the latter to win (Trac #12533)
+   -- we want the latter to win (#12533)
    --    class C x where
    --       op :: forall a . x a -> x a
    --       default op :: forall b . x b -> x b
@@ -693,7 +693,7 @@ typeToLHsType ty
     go (CoercionTy co)      = pprPanic "toLHsSigWcType" (ppr co)
 
          -- Source-language types have _invisible_ kind arguments,
-         -- so we must remove them here (Trac #8563)
+         -- so we must remove them here (#8563)
 
     go_tv :: TyVar -> LHsTyVarBndr GhcPs
     go_tv tv = noLoc $ KindedTyVar noExt (noLoc (getRdrName tv))
@@ -703,7 +703,7 @@ typeToLHsType ty
 Note [Kind signatures in typeToLHsType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are types that typeToLHsType can produce which require explicit kind
-signatures in order to kind-check. Here is an example from Trac #14579:
+signatures in order to kind-check. Here is an example from #14579:
 
   -- type P :: forall {k} {t :: k}. Proxy t
   type P = 'Proxy
@@ -1302,7 +1302,7 @@ main name (the TyCon of a type declaration etc), we want to give it
 the @SrcSpan@ of the whole /declaration/, not just the name itself
 (which is how it appears in the syntax tree).  This SrcSpan (for the
 entire declaration) is used as the SrcSpan for the Name that is
-finally produced, and hence for error messages.  (See Trac #8607.)
+finally produced, and hence for error messages.  (See #8607.)
 
 Note [Binders in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -97,7 +97,7 @@ computeMaxTicks dflags size
         -- MAGIC NUMBER, multiplies the simplTickFactor
         -- We can afford to be generous; this is really
         -- just checking for loops, and shouldn't usually fire
-        -- A figure of 20 was too small: see Trac #5539.
+        -- A figure of 20 was too small: see #5539.
 
 {-# INLINE thenSmpl #-}
 {-# INLINE thenSmpl_ #-}

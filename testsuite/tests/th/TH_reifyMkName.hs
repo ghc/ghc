@@ -1,4 +1,4 @@
--- Trac #2339
+-- #2339
 
 module Foo where
 

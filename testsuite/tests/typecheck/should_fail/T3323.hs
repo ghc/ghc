@@ -1,4 +1,4 @@
--- Trac #3323
+-- #3323
 module T3323 where
 
 import GHC.IO.Handle.Types

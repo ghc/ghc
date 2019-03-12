@@ -1,4 +1,4 @@
--- Trac #8806
+-- #8806
 
 module T8806 where
 

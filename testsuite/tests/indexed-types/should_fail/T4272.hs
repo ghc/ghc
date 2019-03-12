@@ -1,6 +1,6 @@
  {-# LANGUAGE TypeFamilies, ScopedTypeVariables, FlexibleContexts #-}  
 
--- See also Trac #5763 for why we don't really want to see
+-- See also #5763 for why we don't really want to see
 -- an occurs-check error from this program
 
 module T4272 where

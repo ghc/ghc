@@ -447,16 +447,16 @@ rnSpliceExpr splice
 {- Note [Running splices in the Renamer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Splices used to be run in the typechecker, which led to (Trac #4364). Since the
+Splices used to be run in the typechecker, which led to (#4364). Since the
 renamer must decide which expressions depend on which others, and it cannot
 reliably do this for arbitrary splices, we used to conservatively say that
 splices depend on all other expressions in scope. Unfortunately, this led to
-the problem of cyclic type declarations seen in (Trac #4364). Instead, by
+the problem of cyclic type declarations seen in (#4364). Instead, by
 running splices in the renamer, we side-step the problem of determining
 dependencies: by the time the dependency analysis happens, any splices have
 already been run, and expression dependencies can be determined as usual.
 
-However, see (Trac #9813), for an example where we would like to run splices
+However, see (#9813), for an example where we would like to run splices
 *after* performing dependency analysis (that is, after renaming). It would be
 desirable to typecheck "non-splicy" expressions (those expressions that do not
 contain splices directly or via dependence on an expression that does) before
@@ -477,7 +477,7 @@ we wish to first determine dependencies and typecheck certain expressions,
 making them available to reify, but cannot accurately determine dependencies
 without running splices in the renamer!
 
-Indeed, the conclusion of (Trac #9813) was that it is not worth the complexity
+Indeed, the conclusion of (#9813) was that it is not worth the complexity
 to try and
  a) implement and maintain the code for renaming/typechecking non-splicy
     expressions before splicy expressions,
@@ -490,7 +490,7 @@ to try and
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When splices run in the renamer, 'reify' does not have access to the local
-type environment (Trac #11832, [1]).
+type environment (#11832, [1]).
 
 For instance, in
 
@@ -856,7 +856,7 @@ ensures that 'f' stays as a top level binding.
 
 This must be done by the renamer, not the type checker (as of old),
 because the type checker doesn't typecheck the body of untyped
-brackets (Trac #8540).
+brackets (#8540).
 
 A thing can have a bind_lvl of outerLevel, but have an internal name:
    foo = [d| op = 3

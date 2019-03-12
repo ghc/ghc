@@ -5,7 +5,7 @@
 -- there is a predicate but no 'forall'
 --
 -- There are two tests in here; both should be fine
--- Trac ticket: #3100
+-- Ticket: #3100
 
 module T3100 where
 

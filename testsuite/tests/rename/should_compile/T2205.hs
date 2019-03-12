@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -XTypeOperators #-}
 
 -- Test fixity of type operators
--- Trac #2205
+-- #2205
 
 module ShouldCompile where
 

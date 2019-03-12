@@ -1,5 +1,5 @@
 module Main where
--- See Trac #5549
+-- See #5549
 -- The issue here is allocating integer constants inside a loop
 
 

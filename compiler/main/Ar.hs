@@ -106,7 +106,7 @@ getBSDArchEntries = do
                         return $ C.unpack $ C.takeWhile (/= ' ') name
         off2    <- liftM fromIntegral bytesRead :: Get Int
         file    <- getByteString (st_size - (off2 - off1))
-        -- data sections are two byte aligned (see Trac #15396)
+        -- data sections are two byte aligned (see #15396)
         when (odd st_size) $
           void (getByteString 1)
 
@@ -135,7 +135,7 @@ getGNUArchEntries extInfo = do
         fail ("[BSD Archive] Invalid archive header end marker for name: " ++
               C.unpack name)
       file <- getByteString st_size
-      -- data sections are two byte aligned (see Trac #15396)
+      -- data sections are two byte aligned (see #15396)
       when (odd st_size) $
         void (getByteString 1)
       name <- return . C.unpack $

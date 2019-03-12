@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
--- Test Trac #2944
+-- Test #2944
 
 module T2944 where
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE RebindableSyntax, MultiParamTypeClasses #-}
 
--- Trac #1537
+-- #1537
 
 module Foo where
 import Prelude hiding (Monad(..))

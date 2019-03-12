@@ -1,4 +1,4 @@
--- Trac #2931
+-- #2931
 
 module Foo where
 a = 1

@@ -876,7 +876,7 @@ It is possible (though hard) to get this error through user behaviour.
     is a home-package module which is not yet in the HPT!  Disaster.
 
 This actually happened with P=base, Q=ghc-prim, via the AMP warnings.
-See Trac #8320.
+See #8320.
 -}
 
 findAndReadIface :: SDoc

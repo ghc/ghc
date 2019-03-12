@@ -411,7 +411,7 @@ mkErrorAppDs err_id ty msg = do
 {-
 'mkCoreAppDs' and 'mkCoreAppsDs' hand the special-case desugaring of 'seq'.
 
-Note [Desugaring seq (1)]  cf Trac #1031
+Note [Desugaring seq (1)]  cf #1031
 ~~~~~~~~~~~~~~~~~~~~~~~~~
    f x y = x `seq` (y `seq` (# x,y #))
 
@@ -427,7 +427,7 @@ But that is bad for two reasons:
 Seq is very, very special!  So we recognise it right here, and desugar to
         case x of _ -> case y of _ -> (# x,y #)
 
-Note [Desugaring seq (2)]  cf Trac #2273
+Note [Desugaring seq (2)]  cf #2273
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    let chp = case b of { True -> fst x; False -> 0 }
@@ -467,7 +467,7 @@ And now all is well.
 The reason it's a hack is because if you define mySeq=seq, the hack
 won't work on mySeq.
 
-Note [Desugaring seq (3)] cf Trac #2409
+Note [Desugaring seq (3)] cf #2409
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The isLocalId ensures that we don't turn
         True `seq` e
@@ -879,7 +879,7 @@ Reason: we know that a failure point is always a "join point" and is
 entered at most once.  Adding a dummy 'realWorld' token argument makes
 it clear that sharing is not an issue.  And that in turn makes it more
 CPR-friendly.  This matters a lot: if you don't get it right, you lose
-the tail call property.  For example, see Trac #3403.
+the tail call property.  For example, see #3403.
 
 
 ************************************************************************

@@ -440,7 +440,7 @@ isMoreSpecific :: CoreRule -> CoreRule -> Bool
 -- anything else, because we want user-define rules to "win"
 -- In particular, class ops have a built-in rule, but we
 -- any user-specific rules to win
---   eg (Trac #4397)
+--   eg (#4397)
 --      truncate :: (RealFrac a, Integral b) => a -> b
 --      {-# RULES "truncate/Double->Int" truncate = double2Int #-}
 --      double2Int :: Double -> Int
@@ -619,7 +619,7 @@ It can be the case that the binder in a rule is not actually
 bound on the LHS:
 
 * Type variables.  Type synonyms with phantom args can give rise to
-  unbound template type variables.  Consider this (Trac #10689,
+  unbound template type variables.  Consider this (#10689,
   simplCore/should_compile/T10689):
 
     type Foo a b = b
@@ -653,7 +653,7 @@ bound on the LHS:
   fires we can substitute <t> for c.
 
   This actually happened (in a RULE for a local function)
-  in Trac #13410, and also in test T10602.
+  in #13410, and also in test T10602.
 
 
 Note [Cloning the template binders]
@@ -674,11 +674,11 @@ binders if they are already in scope.
 ------ Historical note -------
 At one point I tried simply adding the template binders to the
 in-scope set /without/ cloning them, but that failed in a horribly
-obscure way in Trac #14777.  Problem was that during matching we look
+obscure way in #14777.  Problem was that during matching we look
 up target-term variables in the in-scope set (see Note [Lookup
 in-scope]).  If a target-term variable happens to name-clash with a
 template variable, that lookup will find the template variable, which
-is /utterly/ bogus.  In Trac #14777, this transformed a term variable
+is /utterly/ bogus.  In #14777, this transformed a term variable
 into a type variable, and then crashed when we wanted its idInfo.
 ------ End of historical note -------
 

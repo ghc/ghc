@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -O2 #-}
 
--- Trac #3437
+-- #3437
 -- When we do SpecConstr on 'go', we want the specialised
 -- function to *still* be strict in k.  Otherwise we get
 -- a bad space leak!

@@ -1,5 +1,5 @@
 -- Error messages when you use 'forall' *without* the RankN flags
--- Test cases similar to Trac #2114
+-- Test cases similar to #2114
 
 module ShouldFail where
 

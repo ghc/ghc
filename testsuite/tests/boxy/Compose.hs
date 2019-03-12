@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags -XEmptyDataDecls -XGADTs #-}
 
--- Trac #1118
+-- #1118
 
 module Compose where
 

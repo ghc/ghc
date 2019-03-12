@@ -3,7 +3,7 @@
               IncoherentInstances,
               FlexibleInstances #-}
 
--- Trac #2307
+-- #2307
 
 module ShouldFail where
 

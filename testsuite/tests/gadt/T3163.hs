@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, RankNTypes, ImpredicativeTypes #-}
 
--- Test Trac #3163
+-- Test #3163
 
 module Report where
 

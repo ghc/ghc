@@ -671,7 +671,7 @@ tcInitTidyEnv
             ; tyvar2 <- zonkTcTyVarToTyVar tyvar1
               -- Be sure to zonk here!  Tidying applies to zonked
               -- types, so if we don't zonk we may create an
-              -- ill-kinded type (Trac #14175)
+              -- ill-kinded type (#14175)
             ; go (env', extendVarEnv subst tyvar tyvar2) bs }
       | otherwise
       = go (env, subst) bs
@@ -758,20 +758,20 @@ So to check for this we put in the TcLclEnv a binding for all the family
 constructors, bound to AFamDataCon, so that if we trip over 'MkT' when
 type checking 'S' we'll produce a decent error message.
 
-Trac #12088 describes this limitation. Of course, when MkT and S live in
+#12088 describes this limitation. Of course, when MkT and S live in
 different modules then all is well.
 
 Note [Don't promote pattern synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We never promote pattern synonyms.
 
-Consider this (Trac #11265):
+Consider this (#11265):
   pattern A = True
   instance Eq A
 We want a civilised error message from the occurrence of 'A'
 in the instance, yet 'A' really has not yet been type checked.
 
-Similarly (Trac #9161)
+Similarly (#9161)
   {-# LANGUAGE PatternSynonyms, DataKinds #-}
   pattern A = ()
   b :: A
@@ -879,7 +879,7 @@ tcGetDefaultTys
   = do  { dflags <- getDynFlags
         ; let ovl_strings = xopt LangExt.OverloadedStrings dflags
               extended_defaults = xopt LangExt.ExtendedDefaultRules dflags
-                                        -- See also Trac #1974
+                                        -- See also #1974
               flags = (ovl_strings, extended_defaults)
 
         ; mb_defaults <- getDeclaredDefaultTys
@@ -913,7 +913,7 @@ This has type (forall a. IO a); it prints "hello", and returns 'undefined'.  We 
 want the GHCi repl loop to try to print that 'undefined'.  The neatest thing is to
 default the 'a' to (), rather than to Integer (which is what would otherwise happen;
 and then GHCi doesn't attempt to print the ().  So in interactive mode, we add
-() to the list of defaulting types.  See Trac #1200.
+() to the list of defaulting types.  See #1200.
 
 Additionally, the list type [] is added as a default specialization for
 Traversable and Foldable. As such the default default list now has types of
@@ -1112,7 +1112,7 @@ notFound name
        ; case stage of   -- See Note [Out of scope might be a staging error]
            Splice {}
              | isUnboundName name -> failM  -- If the name really isn't in scope
-                                            -- don't report it again (Trac #11941)
+                                            -- don't report it again (#11941)
              | otherwise -> stageRestrictionError (quotes (ppr name))
            _ -> failWithTc $
                 vcat[text "GHC internal error:" <+> quotes (ppr name) <+>
@@ -1145,5 +1145,5 @@ This is really a staging error, because we can't run code involving 'x'.
 But in fact the type checker processes types first, so 'x' won't even be
 in the type envt when we look for it in $(foo x).  So inside splices we
 report something missing from the type env as a staging error.
-See Trac #5752 and #5795.
+See #5752 and #5795.
 -}

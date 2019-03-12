@@ -133,7 +133,7 @@ elemLRegSet l = IntSet.member (getKey (getUnique l))
 --
 -- a nice loop, but we didn't eliminate the silly assignment at the end.
 -- See Note [dependent assignments], which would probably fix this.
--- This is #8336 on Trac.
+-- This is #8336.
 --
 -- -----------
 -- (2) From stg_atomically_frame in PrimOps.cmm

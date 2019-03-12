@@ -370,7 +370,7 @@ Consider
 
 We cannot represent this by a newtype, even though it's not
 existential, because there are two value fields (the equality
-predicate and op. See Trac #2238
+predicate and op. See #2238
 
 Moreover,
           class (a ~ F b) => C a b where {}

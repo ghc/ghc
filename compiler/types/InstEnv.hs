@@ -136,7 +136,7 @@ We avoid this as follows:
   inside the DFunId. The rough-match fields allow us to say "definitely does not
   match", based only on Names.
 
-  This laziness is very important; see Trac #12367. Try hard to avoid pulling on
+  This laziness is very important; see #12367. Try hard to avoid pulling on
   the structured fields unless you really need the instance.
 
 * Another place to watch is InstEnv.instIsVisible, which needs the module to
@@ -517,7 +517,7 @@ match in module 'X' from package 'p', should be "in scope"; that is,
 The difficulty is that the "zillion packages" might include ones loaded
 through earlier invocations of the GHC API, or earlier module loads in GHCi.
 They might not be in the dependencies of M itself; and if not, the instances
-in them should not be visible.  Trac #2182, #8427.
+in them should not be visible.  #2182, #8427.
 
 There are two cases:
   * If the instance is *not an orphan*, then module X defines C, T, or W.
@@ -939,8 +939,8 @@ insert_overlapping new_item@(new_inst,_) (old_item@(old_inst,_) : old_items)
        -- Overlap permitted if either the more specific instance
        -- is marked as overlapping, or the more general one is
        -- marked as overlappable.
-       -- Latest change described in: Trac #9242.
-       -- Previous change: Trac #3877, Dec 10.
+       -- Latest change described in: #9242.
+       -- Previous change: #3877, Dec 10.
 
 {-
 Note [Incoherent instances]

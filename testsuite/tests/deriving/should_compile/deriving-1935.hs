@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -XDeriveDataTypeable #-}
 
--- Trac #1935
+-- #1935
 -- See Note [Superclasses of derived instance] in TcDeriv
 
 {-# OPTIONS -fno-warn-redundant-constraints #-}

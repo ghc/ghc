@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- Trac #3406
+-- #3406
 -- A pattern signature that discards the bound variables
 
 module T3406 where

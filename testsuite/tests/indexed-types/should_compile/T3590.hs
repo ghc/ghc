@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, FlexibleContexts #-}
 
--- Trac #3590: a bug in typechecking of sections
+-- #3590: a bug in typechecking of sections
 
 module T3590 where
 

@@ -506,13 +506,13 @@ sc_force to True when calling specLoop. This flag does four things:
   * Ignore specConstrCount, to make arbitrary numbers of specialisations
         (see specialise)
   * Specialise even for arguments that are not scrutinised in the loop
-        (see argToPat; Trac #4448)
+        (see argToPat; #4448)
   * Only specialise on recursive types a finite number of times
-        (see is_too_recursive; Trac #5550; Note [Limit recursive specialisation])
+        (see is_too_recursive; #5550; Note [Limit recursive specialisation])
 
 The flag holds only for specialising a single binding group, and NOT
 for nested bindings.  (So really it should be passed around explicitly
-and not stored in ScEnv.)  Trac #14379 turned out to be caused by
+and not stored in ScEnv.)  #14379 turned out to be caused by
    f SPEC x = let g1 x = ...
               in ...
 We force-specialise f (because of the SPEC), but that generates a specialised
@@ -599,7 +599,7 @@ more than N times (controlled by -fspec-constr-recursive=N) we check
     specialisations.  If sc_count is "no limit" then we arbitrarily
     choose 10 as the limit (ugh).
 
-See Trac #5550.   Also Trac #13623, where this test had become over-aggressive,
+See #5550.   Also #13623, where this test had become over-aggressive,
 and we lost a wonderful specialisation that we really wanted!
 
 Note [NoSpecConstr]
@@ -746,7 +746,7 @@ because the x-binding still exists and we've now duplicated (expensive v).
 
 This seldom happens because let-bound constructor applications are
 ANF-ised, but it can happen as a result of on-the-fly transformations in
-SpecConstr itself.  Here is Trac #7865:
+SpecConstr itself.  Here is #7865:
 
         let {
           a'_shr =
@@ -946,7 +946,7 @@ extendBndr  env bndr  = (env { sc_subst = subst' }, bndr')
 extendValEnv :: ScEnv -> Id -> Maybe Value -> ScEnv
 extendValEnv env _  Nothing   = env
 extendValEnv env id (Just cv)
- | valueIsWorkFree cv      -- Don't duplicate work!!  Trac #7865
+ | valueIsWorkFree cv      -- Don't duplicate work!!  #7865
  = env { sc_vals = extendVarEnv (sc_vals env) id cv }
 extendValEnv env _ _ = env
 
@@ -1048,7 +1048,7 @@ So in extendCaseBndrs we must *also* add the binding
 else we lose a useful specialisation for f.  This is necessary even
 though the simplifier has systematically replaced uses of 'x' with 'y'
 and 'b' with 'c' in the code.  The use of 'b' in the ValueEnv came
-from outside the case.  See Trac #4908 for the live example.
+from outside the case.  See #4908 for the live example.
 
 Note [Avoiding exponential blowup]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1786,7 +1786,7 @@ the passed-in SpecInfo, unless there are no calls at all to the function.
 The caller can, indeed must, assume this.  He should not combine in rhs_usg
 himself, or he'll get rhs_usg twice -- and that can lead to an exponential
 blowup of duplicates in the CallEnv.  This is what gave rise to the massive
-performance loss in Trac #8852.
+performance loss in #8852.
 
 Note [Specialise original body]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1827,7 +1827,7 @@ Now we want f_spec to have strictness  LLS, otherwise we'll use call-by-need
 when calling f_spec instead of call-by-value.  And that can result in
 unbounded worsening in space (cf the classic foldl vs foldl')
 
-See Trac #3437 for a good example.
+See #3437 for a good example.
 
 The function calcSpecStrictness performs the calculation.
 
@@ -1862,7 +1862,7 @@ via 'a' itself, or be in scope at f's defn.  Hence we just take
 BUT phantom type synonyms can mess this reasoning up,
   eg   x::T b   with  type T b = Int
 So we apply expandTypeSynonyms to the bound Ids.
-See Trac # 5458.  Yuk.
+See # 5458.  Yuk.
 
 Note [SpecConstr call patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1875,7 +1875,7 @@ because both of these will be optimised by Simplify.simplRule. In the
 former case such optimisation benign, because the rule will match more
 terms; but in the latter we may lose a binding of 'g1' or 'g2', and
 end up with a rule LHS that doesn't bind the template variables
-(Trac #10602).
+(#10602).
 
 The simplifier eliminates such things, but SpecConstr itself constructs
 new terms by substituting.  So the 'mkCast' in the Cast case of scExpr
@@ -1902,7 +1902,7 @@ by trim_pats.
 
 Note [SpecConstr and casts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #14270) a call like
+Consider (#14270) a call like
 
     let f = e
     in ... f (K @(a |> co)) ...
@@ -1925,7 +1925,7 @@ call patterns that
 
 I think this is very rare.
 
-It is important (e.g. Trac #14936) that this /only/ applies to
+It is important (e.g. #14936) that this /only/ applies to
 coercions mentioned in casts.  We don't want to be discombobulated
 by casts in terms!  For example, consider
    f ((e1,e2) |> sym co)
@@ -2049,7 +2049,7 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
 
     emit_trace result
        | debugIsOn || hasPprDebug (sc_dflags env)
-         -- Suppress this scary message for ordinary users!  Trac #5125
+         -- Suppress this scary message for ordinary users!  #5125
        = pprTrace "SpecConstr" msg result
        | otherwise
        = result

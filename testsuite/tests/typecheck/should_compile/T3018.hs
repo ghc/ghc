@@ -48,7 +48,7 @@ instance Data (SubstD_B a t) t' => Subst_B a t t' where
     subst_B = undefined
 
 
-{- Commentary from Trac #3018
+{- Commentary from #3018
 
 Here are the key lines of code:
 

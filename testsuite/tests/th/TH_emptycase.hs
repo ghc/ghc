@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, EmptyCase #-}
--- Trac #2431: empty case expression
+-- #2431: empty case expression
 --             now accepted
 
 module Main where

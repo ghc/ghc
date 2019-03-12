@@ -1,4 +1,4 @@
--- This one come from lehins, between comment:22 and 23 of Trac #13429
+-- This one come from lehins, between comment:22 and 23 of #13429
 module Main where
 
 import T13429_2a as Array

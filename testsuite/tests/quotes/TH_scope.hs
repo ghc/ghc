@@ -1,4 +1,4 @@
--- Test for Trac #2188
+-- Test for #2188
 
 module TH_scope where
 

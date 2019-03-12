@@ -8,7 +8,7 @@ hiddenError = error "hidden error"
 
 main = print $ seq (head (map (\a -> \b -> hiddenError) (hiddenError::[] Bool))) id [1]
 
-{-  See notes in Trac #5587
+{-  See notes in #5587
 f a b =  a
 he = hiddenError::[Bool]
 main = print $ seq (head (map f he)) id [1]

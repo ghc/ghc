@@ -790,7 +790,7 @@ type TidyOccEnv = UniqFM Int
      - We use trailing digits to subtly indicate a unification variable
        in typechecker error message; see TypeRep.tidyTyVarBndr
 
-We have to take care though! Consider a machine-generated module (Trac #10370)
+We have to take care though! Consider a machine-generated module (#10370)
   module Foo where
      a1 = e1
      a2 = e2

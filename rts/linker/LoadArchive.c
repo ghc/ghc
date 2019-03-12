@@ -459,7 +459,7 @@ static HsInt loadArchive_ (pathchar *path)
         DEBUG_LOG("Found member file `%s'\n", fileName);
 
         /* TODO: Stop relying on file extensions to determine input formats.
-                 Instead try to match file headers. See Trac #13103.  */
+                 Instead try to match file headers. See #13103.  */
         isObject = (thisFileNameSize >= 2 && strncmp(fileName + thisFileNameSize - 2, ".o"  , 2) == 0)
                 || (thisFileNameSize >= 4 && strncmp(fileName + thisFileNameSize - 4, ".p_o", 4) == 0)
                 || (thisFileNameSize >= 4 && strncmp(fileName + thisFileNameSize - 4, ".obj", 4) == 0);

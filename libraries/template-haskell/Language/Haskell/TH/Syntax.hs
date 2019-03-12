@@ -255,7 +255,7 @@ unsafeTExpCoerce m = do { e <- m
 {- Note [Role of TExp]
 ~~~~~~~~~~~~~~~~~~~~~~
 TExp's argument must have a nominal role, not phantom as would
-be inferred (Trac #8459).  Consider
+be inferred (#8459).  Consider
 
   e :: TExp Age
   e = MkAge 3
@@ -912,12 +912,12 @@ function.  Two complications
 
 * In such a case, we must take care to build the Name using
   mkNameG_v (for values), not mkNameG_d (for data constructors).
-  See Trac #10796.
+  See #10796.
 
 * The pseudo-constructor is named only by its string, here "pack".
   But 'dataToQa' needs the TyCon of its defining module, and has
   to assume it's defined in the same module as the TyCon itself.
-  But nothing enforces that; Trac #12596 shows what goes wrong if
+  But nothing enforces that; #12596 shows what goes wrong if
   "pack" is defined in a different module than the data type "Text".
   -}
 
@@ -933,7 +933,7 @@ dataToExpQ = dataToQa varOrConE litE (foldl appE)
     where
           -- Make sure that VarE is used if the Constr value relies on a
           -- function underneath the surface (instead of a constructor).
-          -- See Trac #10796.
+          -- See #10796.
           varOrConE s =
             case nameSpace s of
                  Just VarName  -> return (VarE s)
@@ -1226,7 +1226,7 @@ mkName str
         --      mkName "&." = Name "&." NameS
         -- The 'is_rev_mod' guards ensure that
         --      mkName ".&" = Name ".&" NameS
-        --      mkName "^.." = Name "^.." NameS      -- Trac #8633
+        --      mkName "^.." = Name "^.." NameS      -- #8633
         --      mkName "Data.Bits..&" = Name ".&" (NameQ "Data.Bits")
         -- This rather bizarre case actually happened; (.&.) is in Data.Bits
     split occ (c:rev)   = split (c:occ) rev

@@ -1,4 +1,4 @@
--- Trac #3263.  New kind of warning on ignored monadic bindings
+-- #3263.  New kind of warning on ignored monadic bindings
 
 module T3263 where
 

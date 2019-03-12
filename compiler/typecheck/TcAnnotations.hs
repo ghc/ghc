@@ -36,7 +36,7 @@ tcAnnotations anns = do
     True  -> tcAnnotations' anns
     False -> warnAnns anns
 warnAnns :: [LAnnDecl GhcRn] -> TcM [Annotation]
---- No GHCI; emit a warning (not an error) and ignore. cf Trac #4268
+--- No GHCI; emit a warning (not an error) and ignore. cf #4268
 warnAnns [] = return []
 warnAnns anns@(L loc _ : _)
   = do { setSrcSpan loc $ addWarnTc NoReason $
@@ -65,7 +65,7 @@ tcAnnotation (L loc ann@(HsAnnotation _ _ provenance expr)) = do
       runAnnotation target expr
     where
       safeHsErr = vcat [ text "Annotations are not compatible with Safe Haskell."
-                  , text "See https://ghc.haskell.org/trac/ghc/ticket/10826" ]
+                  , text "See https://gitlab.haskell.org/ghc/ghc/issues/10826" ]
 tcAnnotation (L _ (XAnnDecl _)) = panic "tcAnnotation"
 
 annProvenanceToTarget :: Module -> AnnProvenance Name

@@ -239,7 +239,7 @@ convert it back to a list. One nice side effect of this approach is that
 if there's a lot of overlap in the imp_finsts of imports, the
 Set doesn't really need to grow and we don't need to allocate.
 
-Running generateModules from Trac #14693 with DEPTH=16, WIDTH=30 finishes in
+Running generateModules from #14693 with DEPTH=16, WIDTH=30 finishes in
 23s before, and 11s after.
 -}
 
@@ -280,7 +280,7 @@ rnImportDecl this_mod
     let imp_mod_name = unLoc loc_imp_mod_name
         doc = ppr imp_mod_name <+> text "is directly imported"
 
-    -- Check for self-import, which confuses the typechecker (Trac #9032)
+    -- Check for self-import, which confuses the typechecker (#9032)
     -- ghc --make rejects self-import cycles already, but batch-mode may not
     -- at least not until TcIface.tcHiBootIface, which is too late to avoid
     -- typechecker crashes.  (Indirect self imports are not caught until
@@ -296,7 +296,7 @@ rnImportDecl this_mod
           (case mb_pkg of  -- If we have import "<pkg>" M, then we should
                            -- check that "<pkg>" is "this" (which is magic)
                            -- or the name of this_mod's package.  Yurgh!
-                           -- c.f. GHC.findModule, and Trac #9997
+                           -- c.f. GHC.findModule, and #9997
              Nothing         -> True
              Just (StringLiteral _ pkg_fs) -> pkg_fs == fsLit "this" ||
                             fsToUnitId pkg_fs == moduleUnitId this_mod))
@@ -738,9 +738,9 @@ getLocalNonValBinders fixity_env
            -- such as in the following examples:
            --
            -- (1) The class is headed by a bang pattern, such as in
-           --     `instance !Show Int` (Trac #3811c)
+           --     `instance !Show Int` (#3811c)
            -- (2) The class is headed by a type variable, such as in
-           --     `instance c` (Trac #16385)
+           --     `instance c` (#16385)
            --
            -- If looking up the class name fails, then mb_cls_nm will
            -- be Nothing.
@@ -905,7 +905,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
         -- 'combine' is only called for associated data types which appear
         -- twice in the all_avails. In the example, we combine
         --    T(T,T1,T2,T3) and C(C,T)  to give   (T, T(T,T1,T2,T3), Just C)
-        -- NB: the AvailTC can have fields as well as data constructors (Trac #12127)
+        -- NB: the AvailTC can have fields as well as data constructors (#12127)
         combine (name1, a1@(AvailTC p1 _ _), mp1)
                 (name2, a2@(AvailTC p2 _ _), mp2)
           = ASSERT2( name1 == name2 && isNothing mp1 && isNothing mp2
@@ -1030,7 +1030,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                                 -- We are trying to import T( a,b,c,d ), and failed
                                 -- to find 'b' and 'd'.  So we make up an import item
                                 -- to report as failing, namely T( b, d ).
-                                -- c.f. Trac #15412
+                                -- c.f. #15412
 
              Succeeded (childnames, childflds) ->
                case mb_parent of
@@ -1358,7 +1358,7 @@ findImportUsage imports used_gres
         used_names   = mkNameSet (map      gre_name        used_gres)
         used_parents = mkNameSet (mapMaybe greParent_maybe used_gres)
 
-        unused_imps   -- Not trivial; see eg Trac #7454
+        unused_imps   -- Not trivial; see eg #7454
           = case imps of
               Just (False, L _ imp_ies) ->
                                  foldr (add_unused . unLoc) emptyNameSet imp_ies
@@ -1403,7 +1403,7 @@ declaration is actually used in the module.
 
 The SrcLoc is the location of the END of a particular 'import'
 declaration.  Why *END*?  Because we don't want to get confused
-by the implicit Prelude import. Consider (Trac #7476) the module
+by the implicit Prelude import. Consider (#7476) the module
     import Foo( foo )
     main = print foo
 There is an implicit 'import Prelude(print)', and it gets a SrcSpan
@@ -1493,7 +1493,7 @@ Note [Do not warn about Prelude hiding]
 We do not warn about
    import Prelude hiding( x, y )
 because even if nothing else from Prelude is used, it may be essential to hide
-x,y to avoid name-shadowing warnings.  Example (Trac #9061)
+x,y to avoid name-shadowing warnings.  Example (#9061)
    import Prelude hiding( log )
    f x = log where log = ()
 

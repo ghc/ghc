@@ -325,7 +325,7 @@ in addition to type variables! As a result, there are some places in TcType
 where we must take care to check that a variable is a _type_ variable (using
 isTyVar) before calling tcTyVarDetails--a partial function that is not defined
 for coercion variables--on the variable. Failing to do so led to
-GHC Trac #12785.
+GHC #12785.
 -}
 
 -- See Note [TcTyVars and TyVars in the typechecker]
@@ -863,7 +863,7 @@ promoteSkolemsX tclvl = mapAccumL (promoteSkolemX tclvl)
 --     (F, [Int]), not (F, [Int,Bool])
 --
 -- This is important for its use in deciding termination of type
--- instances (see Trac #11581).  E.g.
+-- instances (see #11581).  E.g.
 --    type instance G [Int] = ...(F Int <big type>)...
 -- we don't need to take <big type> into account when asking if
 -- the calls on the RHS are smaller than the LHS
@@ -970,7 +970,7 @@ which type variables are mentioned in a type.  It only matters
 occasionally -- see the calls to exactTyCoVarsOfType.
 
 Historical note: years and years ago this function was used during
-generalisation -- see Trac #1813.  But that code has long since died.
+generalisation -- see #1813.  But that code has long since died.
 -}
 
 exactTyCoVarsOfType :: Type -> TyCoVarSet
@@ -1077,7 +1077,7 @@ free in [G] b ~R f a.  But because the role of a type variable ('f' in
 this case) is nominal, the work item can't actually rewrite the inert item.
 Moreover, if we were to kick out the inert item the exact same situation
 would re-occur and we end up with an infinite loop in which each kicks
-out the other (Trac #14363).
+out the other (#14363).
 -}
 
 {-
@@ -1813,7 +1813,7 @@ pickQuantifiablePreds
 -- quantified over, given the type variables that are being quantified
 pickQuantifiablePreds qtvs theta
   = let flex_ctxt = True in  -- Quantify over non-tyvar constraints, even without
-                             -- -XFlexibleContexts: see Trac #10608, #10351
+                             -- -XFlexibleContexts: see #10608, #10351
          -- flex_ctxt <- xoptM Opt_FlexibleContexts
     mapMaybe (pick_me flex_ctxt) theta
   where
@@ -1852,7 +1852,7 @@ pickQuantifiablePreds qtvs theta
       = tyCoVarsOfTypes tys `intersectsVarSet` qtvs
         && (checkValidClsArgs flex_ctxt cls tys)
            -- Only quantify over predicates that checkValidType
-           -- will pass!  See Trac #10351.
+           -- will pass!  See #10351.
 
     -- See Note [Quantifying over equality constraints]
     quantify_equality NomEq  ty1 ty2 = quant_fun ty1 || quant_fun ty2
@@ -2557,11 +2557,11 @@ this actually is. There are two main tricks:
 
  2. Once we get into an implicit parameter or equality we
     can't get back to a class constraint, so it's safe
-    to say "size 0".  See Trac #4200.
+    to say "size 0".  See #4200.
 
 NB: we don't want to detect PredTypes in sizeType (and then call
 sizePred on them), or we might get an infinite loop if that PredType
-is irreducible. See Trac #5581.
+is irreducible. See #5581.
 -}
 
 type TypeSize = IntWithInf

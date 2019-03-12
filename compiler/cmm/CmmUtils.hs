@@ -448,7 +448,7 @@ regsOverlap _ reg reg' = reg == reg'
 --
 -- We must check for overlapping registers and not just equal
 -- registers here, otherwise CmmSink may incorrectly reorder
--- assignments that conflict due to overlap. See Trac #10521 and Note
+-- assignments that conflict due to overlap. See #10521 and Note
 -- [Overlapping global registers].
 regUsedIn :: DynFlags -> CmmReg -> CmmExpr -> Bool
 regUsedIn dflags = regUsedIn_ where

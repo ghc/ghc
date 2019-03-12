@@ -1,4 +1,4 @@
--- Test Trac #1495
+-- Test #1495
 
 module CompilerBug where
 

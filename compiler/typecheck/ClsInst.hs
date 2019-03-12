@@ -161,7 +161,7 @@ matchInstEnv dflags short_cut_solver clas tys
                 , isOverlappable ispec
                 -- If the instance has OVERLAPPABLE or OVERLAPS or INCOHERENT
                 -- then don't let the short-cut solver choose it, because a
-                -- later instance might overlap it.  Trac #14434 is an example
+                -- later instance might overlap it.  #14434 is an example
                 -- See Note [Shortcut solving: overlap]
                 -> do { traceTc "matchClass: ignoring overlappable" (ppr pred)
                       ; return NotSure }
@@ -206,13 +206,13 @@ and we are typechecking
 
 We don't want to solve the wanted constraint with the overlappable
 instance; rather we want to use the supplied (C a)! That was the whole
-point of it being overlappable!  Trac #14434 wwas an example.
+point of it being overlappable!  #14434 wwas an example.
 
 Alas even if the instance has no overlap flag, thus
   instance C a where ...
 there is nothing to stop it being overlapped. GHC provides no way to
 declare an instance as "final" so it can't be overlapped.  But really
-only final instances are OK for short-cut solving.  Sigh. Trac #15135
+only final instances are OK for short-cut solving.  Sigh. #15135
 was a puzzling example.
 -}
 
@@ -513,7 +513,7 @@ We do not support impredicative typeable, such as
    Typeable (() => Int)
    Typeable (((),()) => Int)
 
-See Trac #9858.  For forall's the case is clear: we simply don't have
+See #9858.  For forall's the case is clear: we simply don't have
 a TypeRep for them.  For qualified but not polymorphic types, like
 (Eq a => a -> a), things are murkier.  But:
 

@@ -1,4 +1,4 @@
--- Test Trac #3118
+-- Test #3118
 
 -- The test is quite delicate.  It aims to get 'f' to look like
 --   f y = case x of

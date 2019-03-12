@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
--- Trac #2994
+-- #2994
 
 module T2994 where
 

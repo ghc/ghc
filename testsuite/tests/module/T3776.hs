@@ -2,7 +2,7 @@
 
 -- Check that although 'index' is apparently only used
 -- unqualified, we nevertheless do not get a redundant-import warning
---   Trac #3776
+--   #3776
 
 module T3776 where
 
