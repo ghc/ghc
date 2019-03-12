@@ -897,10 +897,11 @@ for example).
     :type: dynamic
     :category: linking
 
-    Link the program with the "threaded" version of the runtime system.
+    Link the program with the “threaded” version of the runtime system.
+    This is the default.
     The threaded runtime system is so-called because it manages multiple
-    OS threads, as opposed to the default runtime system which is purely
-    single-threaded.
+    OS threads, as opposed to the single-threaded runtime. If the
+    single-threaded runtime is desirable, use :ghc-flag:`-single-threaded`.
 
     Note that you do *not* need ``-threaded`` in order to use
     concurrency; the single-threaded runtime supports concurrency
@@ -918,6 +919,14 @@ for example).
        Additionally, ``foreign export``\ ed Haskell functions may be
        called from multiple OS threads simultaneously. See
        :ref:`ffi-threads`.
+
+.. ghc-flag:: -single-threaded
+    :shortdesc: Use the threaded runtime
+    :type: dynamic
+    :category: linking
+
+    Switch to the single-threaded version of the runtime, which used to be
+    the default for a long time.
 
 .. ghc-flag:: -eventlog
     :shortdesc: Enable runtime event tracing

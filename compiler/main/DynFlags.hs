@@ -2072,7 +2072,7 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
 defaultWays :: Settings -> [Way]
 defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
                        then [WayDyn]
-                       else []
+                       else [WayThreaded]
 
 interpWays :: [Way]
 interpWays
@@ -2965,10 +2965,16 @@ dynamic_flags_deps = [
     ------- ways ---------------------------------------------------------------
   , make_ord_flag defGhcFlag "prof"           (NoArg (addWay WayProf))
   , make_ord_flag defGhcFlag "eventlog"       (NoArg (addWay WayEventLog))
-  , make_dep_flag defGhcFlag "smp"
-      (NoArg $ addWay WayThreaded) "Use -threaded instead"
   , make_ord_flag defGhcFlag "debug"          (NoArg (addWay WayDebug))
+
+  , make_ord_flag defGhcFlag "smp"            (NoArg (addWay WayThreaded))
+--      ("The -smp flag has no effect because RTS is threaded by default." ++
+--       " To switch back to single-threaded RTS use -single-threaded.")
   , make_ord_flag defGhcFlag "threaded"       (NoArg (addWay WayThreaded))
+--      ("The -threaded flag has no effect because RTS is threaded by default." ++
+--       " To switch back to single-threaded RTS use -single-threaded.")
+  , make_ord_flag defGhcFlag "single-threaded"
+      (NoArg (removeWay WayThreaded))
 
   , make_ord_flag defGhcFlag "ticky"
       (NoArg (setGeneralFlag Opt_Ticky >> addWay WayDebug))
@@ -2977,7 +2983,7 @@ dynamic_flags_deps = [
     -- is required to get the RTS ticky support.
 
         ----- Linker --------------------------------------------------------
-  , make_ord_flag defGhcFlag "static"         (NoArg removeWayDyn)
+  , make_ord_flag defGhcFlag "static"         (NoArg (removeWay WayDyn))
   , make_ord_flag defGhcFlag "dynamic"        (NoArg (addWay WayDyn))
   , make_ord_flag defGhcFlag "rdynamic" $ noArg $
 #if defined(linux_HOST_OS)
@@ -4998,8 +5004,8 @@ addWay' w dflags0 = let platform = targetPlatform dflags0
                                         (wayUnsetGeneralFlags platform w)
                     in dflags3
 
-removeWayDyn :: DynP ()
-removeWayDyn = upd (\dfs -> dfs { ways = filter (WayDyn /=) (ways dfs) })
+removeWay :: Way -> DynP ()
+removeWay w = upd (\dfs -> dfs { ways = filter (w /=) (ways dfs) })
 
 --------------------------
 setGeneralFlag, unSetGeneralFlag :: GeneralFlag -> DynP ()
