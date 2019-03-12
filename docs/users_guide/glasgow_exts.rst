@@ -10045,7 +10045,7 @@ Notes:
    instance (forall xx. c (Free c xx)) => Monad (Free c) where
        Free f >>= g = f g
 
-  See `Iceland Jack's summary <https://ghc.haskell.org/trac/ghc/ticket/14733#comment:6>`_.  The key point is that the bit to the right of the ``=>`` may be headed by a type *variable* (``c`` in this case), rather than a class.  It should not be one of the forall'd variables, though.
+  See `Iceland Jack's summary <https://gitlab.haskell.org/ghc/ghc/issues/14733#note_148352>`_.  The key point is that the bit to the right of the ``=>`` may be headed by a type *variable* (``c`` in this case), rather than a class.  It should not be one of the forall'd variables, though.
 
   (NB: this goes beyond what is described in `the paper <http://i.cs.hku.hk/~bruno//papers/hs2017.pdf>`_, but does not seem to introduce any new technical difficulties.)
 

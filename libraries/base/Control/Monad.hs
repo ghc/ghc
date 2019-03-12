@@ -261,7 +261,7 @@ inline the entire definition (as happens for foldr, for example) thereby
 specialising for the particular action.
 
 For further information, see this Trac comment, which includes side-by-side
-Core: https://ghc.haskell.org/trac/ghc/ticket/11795#comment:6
+Core: https://gitlab.haskell.org/ghc/ghc/issues/11795#note_118976
 -}
 
 -- | @'replicateM' n act@ performs the action @n@ times,

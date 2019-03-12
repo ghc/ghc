@@ -1112,7 +1112,7 @@ and possibly to bear similarities to a 1982 paper by Richard O'Keefe:
 "A smooth applicative merge sort".
 
 Benchmarks show it to be often 2x the speed of the previous implementation.
-Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/2143
+Fixes ticket https://gitlab.haskell.org/ghc/ghc/issues/2143
 -}
 
 sort = sortBy compare

@@ -784,7 +784,7 @@ make these functions only use O(1) stack space. It is perhaps not the optimal
 way to fix this problem, as there are other conceivable data structures
 (besides lists) which might benefit from specialized implementations for
 maximumBy and minimumBy (see
-https://ghc.haskell.org/trac/ghc/ticket/10830#comment:26 for a further
+https://gitlab.haskell.org/ghc/ghc/issues/10830#note_129843 for a further
 discussion). But using foldl1 is at least always better than using foldr1, so
 GHC has chosen to adopt that approach for now.
 -}

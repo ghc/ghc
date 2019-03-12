@@ -54,7 +54,7 @@
 
   * Reduce short-lived heap allocation and try to demote `J#` back
     to `S#` more aggressively.  See also
-    [#8647](https://ghc.haskell.org/trac/ghc/ticket/8647)
+    [#8647](https://gitlab.haskell.org/ghc/ghc/issues/8647)
     for more details.
 
   * New GMP-specific binary (de)serialization primitives added to

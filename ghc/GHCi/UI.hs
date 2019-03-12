@@ -3075,9 +3075,9 @@ implemented above.
 The same filter was also implemented to fix Trac #11051 [3]. See the
 Note [What to show to users] in compiler/main/InteractiveEval.hs
 
-[1] https://ghc.haskell.org/trac/ghc/ticket/12525
-[2] https://ghc.haskell.org/trac/ghc/ticket/12525#comment:1
-[3] https://ghc.haskell.org/trac/ghc/ticket/11051
+[1] https://gitlab.haskell.org/ghc/ghc/issues/12525
+[2] https://gitlab.haskell.org/ghc/ghc/issues/12525#note_123489
+[3] https://gitlab.haskell.org/ghc/ghc/issues/11051
 -}
 
 

@@ -1570,7 +1570,7 @@ points so that the code is readable with its original meaning.
 
 So scattered through Convert.hs are various points where parens are added.
 
-See (among other closed issued) https://ghc.haskell.org/trac/ghc/ticket/14289
+See (among other closed issued) https://gitlab.haskell.org/ghc/ghc/issues/14289
 -}
 -- ---------------------------------------------------------------------
 

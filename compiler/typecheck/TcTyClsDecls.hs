@@ -759,7 +759,7 @@ Design alternatives
 
 * We rigidly require the ordering above, even though we could be much more
   permissive. Relevant musings are at
-  https://ghc.haskell.org/trac/ghc/ticket/15743#comment:7
+  https://gitlab.haskell.org/ghc/ghc/issues/15743#note_161623
   The bottom line conclusion is that, if the user wants a different ordering,
   then can specify it themselves, and it is better to be predictable and dumb
   than clever and capricious.

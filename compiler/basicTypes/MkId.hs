@@ -746,7 +746,7 @@ constructor has no wrapper, but whether a constructor has a wrapper depends, for
 instance, on the order of type argument of that constructors. Therefore changing
 the order of type argument could make previously working RULEs fail.
 
-See also https://ghc.haskell.org/trac/ghc/ticket/15840 .
+See also https://gitlab.haskell.org/ghc/ghc/issues/15840 .
 
 
 Note [Bangs on imported data constructors]

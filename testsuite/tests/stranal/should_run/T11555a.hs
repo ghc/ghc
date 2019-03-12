@@ -8,7 +8,7 @@ import GHC.Exts
 
 type RAW a = ContT () IO a
 
--- See https://ghc.haskell.org/trac/ghc/ticket/11555
+-- See https://gitlab.haskell.org/ghc/ghc/issues/11555
 catchSafe1, catchSafe2 :: IO a -> (SomeException -> IO a) -> IO a
 catchSafe1 a b = lazy a `catch` b
 catchSafe2 a b = join (evaluate a) `catch` b

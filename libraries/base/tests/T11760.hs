@@ -1,6 +1,6 @@
 -- Written by Bertram Felgenhauer
 --
--- https://ghc.haskell.org/trac/ghc/ticket/11760#comment:14
+-- https://gitlab.haskell.org/ghc/ghc/issues/11760#note_131217
 --
 -- Compile with -threaded -with-rtsopts=-N2
 

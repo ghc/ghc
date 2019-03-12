@@ -329,7 +329,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   -- valid) stub object file for signatures.  However,
   -- we make sure this object file has a unique symbol,
   -- so that ranlib on OS X doesn't complain, see
-  -- http://ghc.haskell.org/trac/ghc/ticket/12673
+  -- https://gitlab.haskell.org/ghc/ghc/issues/12673
   -- and https://github.com/haskell/cabal/issues/2257
   empty_stub <- newTempName dflags TFL_CurrentModule "c"
   let src = text "int" <+> ppr (mkModule (thisPackage dflags) mod_name) <+> text "= 0;"

@@ -1,5 +1,5 @@
 extlinks = {
-    'ghc-ticket': ('https://ghc.haskell.org/trac/ghc/ticket/%s', 'Trac #'),
+    'ghc-ticket': ('https://gitlab.haskell.org/ghc/ghc/issues/%s', 'Trac #'),
     'ghc-wiki': ('https://ghc.haskell.org/trac/ghc/wiki/%s', 'Trac #'),
 }
 

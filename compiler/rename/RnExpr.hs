@@ -1305,7 +1305,7 @@ Note [Segmenting mdo]
 ~~~~~~~~~~~~~~~~~~~~~
 NB. June 7 2012: We only glom segments that appear in an explicit mdo;
 and leave those found in "do rec"'s intact.  See
-http://ghc.haskell.org/trac/ghc/ticket/4148 for the discussion
+https://gitlab.haskell.org/ghc/ghc/issues/4148 for the discussion
 leading to this design choice.  Hence the test in segmentRecStmts.
 
 Note [Glomming segments]

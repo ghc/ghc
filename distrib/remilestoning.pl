@@ -101,11 +101,11 @@ EOF
             my $title = $ticketsfor{$email}{$ticket}{"title"};
             print FH "\n";
             print FH "#$ticket $title:\n";
-            print FH "    http://ghc.haskell.org/trac/ghc/ticket/$ticket\n";
+            print FH "    https://gitlab.haskell.org/ghc/ghc/issues/$ticket\n";
         }
         print FH <<'EOF';
 
--- 
+--
 The GHC Team
 http://www.haskell.org/ghc/
 EOF
