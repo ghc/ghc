@@ -242,7 +242,7 @@ my_mmap (void *addr, W_ size, int operation)
     if (ret == MAP_FAILED && errno == EPERM) {
         // Linux may return EPERM if it tried to give us
         // a chunk of address space below mmap_min_addr,
-        // See Trac #7500.
+        // See #7500.
         ret = linux_retry_mmap(operation, size, ret, addr, prot, flags);
     }
 # endif

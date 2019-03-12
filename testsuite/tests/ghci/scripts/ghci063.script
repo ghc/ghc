@@ -1,7 +1,7 @@
 :! echo module A where {} >A.hs
 :! echo module B where { import A } >B.hs
 
--- Workaround for Trac #16201. We use "touch -r" to set modification
+-- Workaround for #16201. We use "touch -r" to set modification
 -- timestamps, which leads to precision loss on Darwin. For example,
 --
 --    before: 2019-02-25 01:11:23.807627350 +0300

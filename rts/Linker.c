@@ -249,7 +249,7 @@ static void ghciRemoveSymbolTable(HashTable *table, const SymbolName* key,
 
  Some test have been written for weak symbols but have been disabled
  mostly because it's unsure how the weak symbols support should look.
- See Trac #11223
+ See #11223
  */
 int ghciInsertSymbolTable(
    pathchar* obj_name,
@@ -679,7 +679,7 @@ addDLL( pathchar *dll_name )
       return NULL;
    }
 
-   // GHC Trac ticket #2615
+   // GHC #2615
    // On some systems (e.g., Gentoo Linux) dynamic files (e.g. libc.so)
    // contain linker scripts rather than ELF-format object code. This
    // code handles the situation by recognizing the real object code

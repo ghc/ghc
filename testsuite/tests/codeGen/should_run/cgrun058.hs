@@ -1,5 +1,5 @@
 -- Not really a code-gen test, but this program gave
--- incorrect results in Hugs (Hugs Trac #37), so I
+-- incorrect results in Hugs (Hugs #37), so I
 -- thought I'd add it to GHC's test suite.
 
 module Main where

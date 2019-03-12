@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, KindSignatures #-}
 
--- See Trac #301
+-- See #301
 -- This particular one doesn't use GADTs per se,
 -- but it does use dictionaries in constructors
 

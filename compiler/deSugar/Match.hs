@@ -154,7 +154,7 @@ Most of the matching functions take an Id or [Id] as argument.  This Id
 is the scrutinee(s) of the match. The desugared expression may
 sometimes use that Id in a local binding or as a case binder.  So it
 should not have an External name; Lint rejects non-top-level binders
-with External names (Trac #13043).
+with External names (#13043).
 
 See also Note [Localise pattern binders] in DsUtils
 -}
@@ -515,7 +515,7 @@ tidy_bang_pat v o _ p@(SumPat {})    = tidy1 v o p
 tidy_bang_pat v o l p@(ConPatOut { pat_con = (dL->L _ (RealDataCon dc))
                                  , pat_args = args
                                  , pat_arg_tys = arg_tys })
-  -- Newtypes: push bang inwards (Trac #9844)
+  -- Newtypes: push bang inwards (#9844)
   =
     if isNewTyCon (dataConTyCon dc)
       then tidy1 v o (p { pat_args = push_bang_into_newtype_arg l ty args })
@@ -534,7 +534,7 @@ tidy_bang_pat v o l p@(ConPatOut { pat_con = (dL->L _ (RealDataCon dc))
 --    NPlusKPat
 --
 -- For LazyPat, remember that it's semantically like a VarPat
---  i.e.  !(~p) is not like ~p, or p!  (Trac #8952)
+--  i.e.  !(~p) is not like ~p, or p!  (#8952)
 --
 -- NB: SigPatIn, ConPatIn should not happen
 
@@ -568,7 +568,7 @@ Note [Bang patterns and newtypes]
 For the pattern  !(Just pat)  we can discard the bang, because
 the pattern is strict anyway. But for !(N pat), where
   newtype NT = N Int
-we definitely can't discard the bang.  Trac #9844.
+we definitely can't discard the bang.  #9844.
 
 So what we do is to push the bang inwards, in the hope that it will
 get discarded there.  So we transform
@@ -926,7 +926,7 @@ If we see
     ...
 where P is a pattern synonym, can we put (P a -> e1) and (P b -> e2) in the
 same group?  We can if P is a constructor, but /not/ if P is a pattern synonym.
-Consider (Trac #11224)
+Consider (#11224)
    -- readMaybe :: Read a => String -> Maybe a
    pattern PRead :: Read a => () => a -> String
    pattern PRead a <- (readMaybe -> Just a)

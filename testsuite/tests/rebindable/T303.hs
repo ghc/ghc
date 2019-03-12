@@ -1,6 +1,6 @@
 {-# LANGUAGE RebindableSyntax #-}
 
--- Trac #303
+-- #303
 
 module T where
 import qualified Prelude as P

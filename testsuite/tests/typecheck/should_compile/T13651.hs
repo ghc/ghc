@@ -14,7 +14,7 @@ foo :: (F cr cu ~ Bar h (Bar r u),
 foo = undefined
 
 {-  Typechecking this program used to /just/ succeed in GHC 8.2,
-    (see Trac #14745 for why), but doesn't in 8.4.
+    (see #14745 for why), but doesn't in 8.4.
 
 [G]  F cr cu ~ Bar h (Bar r u),
      F cu cs ~ Bar (Foo h) (Bar u s))

@@ -120,7 +120,7 @@ messages by Shake oracles.
 * `--lint`: run [Shake Lint](https://shakebuild.com/manual#lint) during the
 build to check that the build system is well formed. Note that the Lint check
 currently fails under certain circumstances, as discussed in
-[this ticket](https://ghc.haskell.org/trac/ghc/ticket/15971).
+[this ticket](https://gitlab.haskell.org/ghc/ghc/issues/15971).
 
 #### User settings
 
@@ -254,7 +254,7 @@ Here are a few simple suggestions that might help you fix the build:
   [wiki](https://github.com/snowleopard/hadrian/wiki)
   and Shake's [debugging tutorial](https://shakebuild.com/debugging).
 
-If nothing helps, don't hesitate to create a GHC Trac ticket, choosing the
+If nothing helps, don't hesitate to create a GHC issue, choosing the
 component `Build System (Hadrian)`.
 
 Current limitations

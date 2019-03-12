@@ -14,7 +14,7 @@ gmpObjects = do
     need [gmpPath -/- gmpLibraryH]
     -- The line below causes a Shake Lint failure on Windows, which forced us to
     -- disable Lint by default. See more details here:
-    -- https://ghc.haskell.org/trac/ghc/ticket/15971.
+    -- https://gitlab.haskell.org/ghc/ghc/issues/15971.
     map (unifyPath . (gmpPath -/-)) <$>
         liftIO (getDirectoryFilesIO gmpPath [gmpObjectsDir -/- "*.o"])
 

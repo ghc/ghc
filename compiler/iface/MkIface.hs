@@ -625,7 +625,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
 
    -- Note [Do not update EPS with your own hi-boot]
    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   -- (See also Trac #10182).  When your hs-boot file includes an orphan
+   -- (See also #10182).  When your hs-boot file includes an orphan
    -- instance declaration, you may find that the dep_orphs of a module you
    -- import contains reference to yourself.  DO NOT actually load this module
    -- or add it to the orphan hashes: you're going to provide the orphan
@@ -991,7 +991,7 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env decl
             insts = (map ifDFun $ (concatMap at_extras ats)
                                     ++ lookupOccEnvL inst_env n)
                            -- Include instances of the associated types
-                           -- as well as instances of the class (Trac #5147)
+                           -- as well as instances of the class (#5147)
             meths = [id_extras (getOccName op) | IfaceClassOp op _ _ <- sigs]
             -- Names of all the default methods (see Note [default method Name])
             defms = [ dmName
@@ -1136,7 +1136,7 @@ Note [Internal used_names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Most of the used_names are External Names, but we can have Internal
 Names too: see Note [Binders in Template Haskell] in Convert, and
-Trac #5362 for an example.  Such Names are always
+#5362 for an example.  Such Names are always
   - Such Names are always for locally-defined things, for which we
     don't gather usage info, so we can just ignore them in ent_map
   - They are always System Names, hence the assert, just as a double check.

@@ -7,7 +7,7 @@
 -- and unsafe-coerces it to a function, and applies it.
 -- This is caught by an ASSERT with a debug compiler.
 --
--- See Trac #9208 for discussion
+-- See #9208 for discussion
 --
 --------------------------------------------
 

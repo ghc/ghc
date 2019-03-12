@@ -4,7 +4,7 @@
 {-# LANGUAGE NegativeLiterals #-}
 
 -- Test for NumericUnderscores extension.
--- See Trac #14473
+-- See #14473
 -- This is a testcase for unboxed literals.
 
 import GHC.Types

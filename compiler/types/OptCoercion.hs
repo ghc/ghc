@@ -484,7 +484,7 @@ of arguments in a `CoTyConApp` can differ. Consider
   Any * Int                      :: *
   Any (*->*) Maybe Int  :: *
 
-Hence the need to compare argument lengths; see Trac #13658
+Hence the need to compare argument lengths; see #13658
  -}
 
 opt_univ :: LiftingContext -> SymFlag -> UnivCoProvenance -> Role
@@ -1164,7 +1164,7 @@ etaTyConAppCo_maybe tc co
   , let n = length tys1
   , tys2 `lengthIs` n      -- This can fail in an erroneous progam
                            -- E.g. T a ~# T a b
-                           -- Trac #14607
+                           -- #14607
   = ASSERT( tc == tc1 )
     Just (decomposeCo n co (tyConRolesX r tc1))
     -- NB: n might be <> tyConArity tc

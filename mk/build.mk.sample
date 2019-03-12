@@ -34,7 +34,7 @@
 # Even faster build.  NOT RECOMMENDED: the libraries will be
 # completely unoptimised, so any code built with this compiler
 # (including stage2) will run very slowly, and many GHC tests
-# will fail with this profile (see Trac #12141):
+# will fail with this profile (see #12141):
 #BuildFlavour = quickest
 
 # Profile the stage2 compiler:

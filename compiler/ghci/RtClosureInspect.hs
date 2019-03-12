@@ -1056,7 +1056,7 @@ getDataConArgTys dc con_app_ty
 
 {- Note [Constructor arg types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider a GADT (cf Trac #7386)
+Consider a GADT (cf #7386)
    data family D a b
    data instance D [a] a where
      MkT :: a -> D [a] (Maybe a)

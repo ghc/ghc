@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -O -ddump-rules #-}
 
--- Trac #2486
+-- #2486
 --
 -- The thing to look for here is that specialisations for fib and tak 
 -- at both Int and Double are indeed generated; hence -ddump-rules

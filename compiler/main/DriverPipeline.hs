@@ -329,7 +329,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   -- valid) stub object file for signatures.  However,
   -- we make sure this object file has a unique symbol,
   -- so that ranlib on OS X doesn't complain, see
-  -- http://ghc.haskell.org/trac/ghc/ticket/12673
+  -- https://gitlab.haskell.org/ghc/ghc/issues/12673
   -- and https://github.com/haskell/cabal/issues/2257
   empty_stub <- newTempName dflags TFL_CurrentModule "c"
   let src = text "int" <+> ppr (mkModule (thisPackage dflags) mod_name) <+> text "= 0;"
@@ -777,7 +777,7 @@ getOutputFilename stop_phase output basename dflags next_phase maybe_location
                        As _    | keep_s     -> True
                        LlvmOpt | keep_bc    -> True
                        HCc     | keep_hc    -> True
-                       HsPp _  | keep_hscpp -> True   -- See Trac #10869
+                       HsPp _  | keep_hscpp -> True   -- See #10869
                        _other               -> False
 
           suffix = myPhaseInputExt next_phase
@@ -1958,7 +1958,7 @@ doCpp dflags raw input_fn output_fn = do
                     -- Include version macros for every *exposed* package.
                     -- Without -hide-all-packages and with a package database
                     -- size of 1000 packages, it takes cpp an estimated 2
-                    -- milliseconds to process this file. See Trac #10970
+                    -- milliseconds to process this file. See #10970
                     -- comment 8.
                     return [SysTools.FileOption "-include" macro_stub]
             else return []
@@ -2011,7 +2011,7 @@ getBackendDefs _ =
 
 generatePackageVersionMacros :: [PackageConfig] -> String
 generatePackageVersionMacros pkgs = concat
-  -- Do not add any C-style comments. See Trac #3389.
+  -- Do not add any C-style comments. See #3389.
   [ generateMacros "" pkgname version
   | pkg <- pkgs
   , let version = packageVersion pkg

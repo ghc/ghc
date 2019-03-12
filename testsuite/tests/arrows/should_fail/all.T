@@ -4,7 +4,7 @@ test('arrowfail001',
      [''])
  # arrowfail001 got an ASSERT error in the stage1 compiler
  # because we simply are not typechecking arrow commands
- # correctly.  See Trac #5267, #5609, #5605
+ # correctly.  See #5267, #5609, #5605
  # The fix is patch 'Fix the scope-nesting for arrows' Dec 2014
 
 test('arrowfail002', normal, compile_fail, [''])

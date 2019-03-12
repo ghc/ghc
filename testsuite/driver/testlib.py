@@ -1820,7 +1820,7 @@ def normalise_errmsg( str ):
     str = str.replace(bullet, '')
 
     # Windows only, this is a bug in hsc2hs but it is preventing
-    # stable output for the testsuite. See Trac #9775. For now we filter out this
+    # stable output for the testsuite. See #9775. For now we filter out this
     # warning message to get clean output.
     if config.msys:
         str = re.sub('Failed to remove file (.*); error= (.*)$', '', str)
@@ -2091,7 +2091,7 @@ if config.msys:
         # still locked then abort the current test by throwing an exception, this so it won't fail
         # with an even more cryptic error.
         #
-        # See Trac #13162
+        # See #13162
         exception = None
         while retries > 0 and os.path.exists(testdir):
             time.sleep((max_attempts-retries)*6)

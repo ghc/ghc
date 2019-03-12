@@ -52,7 +52,7 @@ For this single-method class we may generate a newtype, which in turn
 generates an axiom witnessing
     C a ~ (a -> a)
 so on the left we have Constraint, and on the right we have Type.
-See Trac #7451.
+See #7451.
 
 Bottom line: although 'Type' and 'Constraint' are distinct TyCons, with
 distinct uniques, they are treated as equal at all times except

@@ -1,6 +1,6 @@
 module ShouldFail where
 
--- See Trac #1176
+-- See #1176
 -- This is really a pretty-printer test, not a typechecker test
 --
 -- Before ghc-7.2 the error messages looked like this (notice the wrong

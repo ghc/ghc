@@ -52,7 +52,7 @@ class Monad m => MonadZip m where
     munzip mab = (liftM fst mab, liftM snd mab)
     -- munzip is a member of the class because sometimes
     -- you can implement it more efficiently than the
-    -- above default code.  See Trac #4370 comment by giorgidze
+    -- above default code.  See #4370 comment by giorgidze
 
 -- | @since 4.3.1.0
 instance MonadZip [] where

@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 
--- Trac #2993
+-- #2993
 
 module T2993 where
 

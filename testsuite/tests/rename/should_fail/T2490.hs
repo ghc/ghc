@@ -1,4 +1,4 @@
--- Trac #2490
+-- #2490
 module ShouldFail where
 
 -- All these sections are illegal

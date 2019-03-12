@@ -180,10 +180,10 @@ from other points in the document,
     See :ref:`options-platform` for details.
 
 
-To GHC Trac resources
-^^^^^^^^^^^^^^^^^^^^^
+To GHC resources
+^^^^^^^^^^^^^^^^
 
-There are special macros for conveniently linking to GHC Trac
+There are special macros for conveniently linking to GHC
 Wiki articles and tickets,
 
 .. code-block:: rest
@@ -250,7 +250,7 @@ Index entries
 
 Index entries can be included anywhere in the document as a block element.
 They look like,
-    
+
 .. code-block:: rest
 
     Here is some discussion on the Strict Haskell extension.
@@ -374,7 +374,7 @@ must match the definition exactly, including the arguments. A quick way to find
 the exact names and special characters is,
 
 .. code-block:: sh
-    
+
     $ git grep -- "flag:: -o "
 
 which will generate the appropriate,

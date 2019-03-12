@@ -2584,7 +2584,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
 --     (# s2, a #) -> e
 -- with:
 --   retry# s1
--- where 'e' would be unreachable anyway.  See Trac #8091.
+-- where 'e' would be unreachable anyway.  See #8091.
 primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
    with
@@ -3079,7 +3079,7 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 -- conservative, but it prevented reallyUnsafePtrEquality# from floating out of
 -- places where its arguments were known to be forced. Unfortunately, GHC could
 -- sometimes lose track of whether those arguments were forced, leading to let/app
--- invariant failures (see Trac 13027 and the discussion in Trac 11444). Now that
+-- invariant failures (see #13027 and the discussion in #11444). Now that
 -- ok_for_speculation skips over lifted arguments, we need to explicitly prevent
 -- reallyUnsafePtrEquality# from floating out. Imagine if we had
 --

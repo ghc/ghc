@@ -81,7 +81,7 @@ traceIO :: String -> IO ()
 traceIO msg = do
     withCString "%s\n" $ \cfmt -> do
      -- NB: debugBelch can't deal with null bytes, so filter them
-     -- out so we don't accidentally truncate the message.  See Trac #9395
+     -- out so we don't accidentally truncate the message.  See #9395
      let (nulls, msg') = partition (=='\0') msg
      withCString msg' $ \cmsg ->
       debugBelch cfmt cmsg

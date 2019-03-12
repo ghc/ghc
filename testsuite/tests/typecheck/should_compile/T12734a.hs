@@ -78,7 +78,7 @@ test_ghc_err = test_gr @(KT A '[Ty] IO)
                        @(Expr Net '[Ty])
 -}
 
-{-  Some notes.  See comment:10 on Trac #12734
+{-  Some notes.  See comment:10 on #12734
 
 [W] Con m (TStk t lrs)
 [W] Inferable A lrs m

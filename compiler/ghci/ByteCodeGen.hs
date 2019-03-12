@@ -614,7 +614,7 @@ schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
           -- type and hence won't be bound in the environment, but the
           -- breakpoint will otherwise work fine.
           --
-          -- NB (Trac #12007) this /also/ applies for if (ty :: TYPE r), where
+          -- NB (#12007) this /also/ applies for if (ty :: TYPE r), where
           --    r :: RuntimeRep is a variable. This can happen in the
           --    continuations for a pattern-synonym matcher
           --    match = /\(r::RuntimeRep) /\(a::TYPE r).
@@ -962,7 +962,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
                 return (my_discr alt, rhs_code)
            -- If an alt attempts to match on an unboxed tuple or sum, we must
            -- bail out, as the bytecode compiler can't handle them.
-           -- (See Trac #14608.)
+           -- (See #14608.)
            | any (\bndr -> typePrimRep (idType bndr) `lengthExceeds` 1) bndrs
            = multiValException
            -- algebraic alt with some binders
@@ -1398,7 +1398,7 @@ to have an info-table, and the next word to have the value to be
 tested.  This is very weird, but it's the way it is right now.  See
 Interpreter.c.  We don't acutally need an info-table here; we just
 need to have the argument to be one-from-top on the stack, hence pushing
-a 1-word null. See Trac #8383.
+a 1-word null. See #8383.
 -}
 
 
@@ -1825,7 +1825,7 @@ atomPrimRep e | Just e' <- bcView e = atomPrimRep e'
 atomPrimRep (AnnVar v)              = bcIdPrimRep v
 atomPrimRep (AnnLit l)              = typePrimRep1 (literalType l)
 
--- Trac #12128:
+-- #12128:
 -- A case expression can be an atom because empty cases evaluate to bottom.
 -- See Note [Empty case alternatives] in coreSyn/CoreSyn.hs
 atomPrimRep (AnnCase _ _ ty _)      = ASSERT(typePrimRep ty == [LiftedRep]) LiftedRep

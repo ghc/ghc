@@ -1,4 +1,4 @@
--- Trac #1888 
+-- #1888 
 -- Pretty printing for pragmas
 
 module ShouldFail where

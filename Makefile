@@ -22,7 +22,7 @@ MAKEFLAGS += --no-builtin-rules
 # -----------------------------------------------------------------------------
 # Sanitize environment
 
-# See Trac #11530
+# See #11530
 export GREP_OPTIONS :=
 
 ifneq "$(filter maintainer-clean distclean clean clean_% help,$(MAKECMDGOALS))" ""

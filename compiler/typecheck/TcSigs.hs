@@ -321,7 +321,7 @@ which is over-conservative
 
 Note [Pattern synonym signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Pattern synonym signatures are surprisingly tricky (see Trac #11224 for example).
+Pattern synonym signatures are surprisingly tricky (see #11224 for example).
 In general they look like this:
 
    pattern P :: forall univ_tvs. req_theta
@@ -347,7 +347,7 @@ It's important that we solve /all/ the equalities in a pattern
 synonym signature, because we are going to zonk the signature to
 a Type (not a TcType), in TcPatSyn.tc_patsyn_finish, and that
 fails if there are un-filled-in coercion variables mentioned
-in the type (Trac #15694).
+in the type (#15694).
 
 The best thing is simply to use solveEqualities to solve all the
 equalites, rather than leaving them in the ambient constraints
@@ -379,7 +379,7 @@ tcPatSynSig name sig_ty
                  ; prov    <- tcHsContext hs_prov
                  ; body_ty <- tcHsOpenType hs_body_ty
                      -- A (literal) pattern can be unlifted;
-                     -- e.g. pattern Zero <- 0#   (Trac #12094)
+                     -- e.g. pattern Zero <- 0#   (#12094)
                  ; return (req, prov, body_ty) }
 
        ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvs
@@ -495,7 +495,7 @@ tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
         --         two separate signatures.  Cloning here seems like
         --         the easiest way to do so, and is very similar to
         --         the tcInstType in the CompleteSig case
-        -- See Trac #14643
+        -- See #14643
        ; (subst, tvs') <- newMetaTyVarTyVars tvs
                          -- Why newMetaTyVarTyVars?  See TcBinds
                          -- Note [Quantified variables in partial type signatures]
@@ -687,7 +687,7 @@ Some wrinkles
    the "deeply" stuff may be too much, because it introduces lambdas,
    though I think it can be made to work without too much trouble.)
 
-2. We need to take care with type families (Trac #5821).  Consider
+2. We need to take care with type families (#5821).  Consider
       type instance F Int = Bool
       f :: Num a => a -> F a
       {-# SPECIALISE foo :: Int -> Bool #-}
@@ -754,7 +754,7 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
 -- Example: SPECIALISE for a class method: the Name in the SpecSig is
 --          for the selector Id, but the poly_id is something like $cop
 -- However we want to use fun_name in the error message, since that is
--- what the user wrote (Trac #8537)
+-- what the user wrote (#8537)
   = addErrCtxt (spec_ctxt prag) $
     do  { warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl))
                  (text "SPECIALISE pragma for non-overloaded function"

@@ -2,7 +2,7 @@ module Settings.Flavours.Common where
 
 import Expression
 
--- See https://ghc.haskell.org/trac/ghc/ticket/15286 and
+-- See https://gitlab.haskell.org/ghc/ghc/issues/15286 and
 -- https://phabricator.haskell.org/D4880
 naturalInBaseFixArgs :: Args
 naturalInBaseFixArgs = mconcat

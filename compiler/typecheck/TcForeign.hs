@@ -206,7 +206,7 @@ used even though it is not mentioned expclitly in the source, so we don't
 want to report it as "defined but not used" or "imported but not used".
 eg     newtype D = MkD Int
        foreign import foo :: D -> IO ()
-Here 'MkD' us used.  See Trac #7408.
+Here 'MkD' us used.  See #7408.
 
 GHC also expands type functions during this process, so it's not enough
 just to look at the free variables of the declaration.

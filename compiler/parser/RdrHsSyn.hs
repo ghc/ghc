@@ -1304,7 +1304,7 @@ checkValSigLhs lhs@(dL->L l _)
          = "Should be of form <variable> :: <type>"
 
     -- A common error is to forget the ForeignFunctionInterface flag
-    -- so check for that, and suggest.  cf Trac #3805
+    -- so check for that, and suggest.  cf #3805
     -- Sadly 'foreign import' still barfs 'parse error' because
     --  'import' is a keyword
     looks_like s (dL->L _ (HsVar _ (dL->L _ v))) = v == s
@@ -2132,7 +2132,7 @@ There are several issues with this:
     HsCmd or HsPat with extra constructors instead?
 
   * We cannot handle corner cases. For instance, the following function
-    declaration LHS is not a valid expression (see Trac #1087):
+    declaration LHS is not a valid expression (see #1087):
 
       !a + !b = ...
 

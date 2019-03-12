@@ -1,7 +1,7 @@
 {-# LANGUAGE ExistentialQuantification #-}
 
 -- Without a type sig this is slightly tricky.
--- See Trac #1430
+-- See #1430
 
 -- Reason: we get an implication constraint (forall a. Typeable a => Typeable b),
 -- when generalising unExTypeable.  We want to infer a context for the 

@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, PolyKinds, NamedWildCards #-}
 
--- See Trac #10982
+-- See #10982
 
 module UnusedTyVarWarningsNamedWCs where
 

@@ -93,7 +93,7 @@ seqBinds over the output before returning it, to ensure that there are
 no references holding on to the input Core program.
 
 This makes a ~30% reduction in peak memory usage when compiling
-DynFlags (cf Trac #9675 and #13426).
+DynFlags (cf #9675 and #13426).
 
 This is particularly important when we are doing late demand analysis,
 since we don't do a seqBinds at any point thereafter. Hence code
@@ -189,7 +189,7 @@ dmdAnal' env dmd (App fun (Type ty))
 dmdAnal' env dmd (App fun arg)
   = -- This case handles value arguments (type args handled above)
     -- Crucially, coercions /are/ handled here, because they are
-    -- value arguments (Trac #10288)
+    -- value arguments (#10288)
     let
         call_dmd          = mkCallDmd dmd
         (fun_ty, fun')    = dmdAnal env call_dmd fun
@@ -376,7 +376,7 @@ as if we had
         other      -> return ()
 So the 'y' isn't necessarily going to be evaluated
 
-A more complete example (Trac #148, #1592) where this shows up is:
+A more complete example (#148, #1592) where this shows up is:
      do { let len = <expensive> ;
         ; when (...) (exitWith ExitSuccess)
         ; print len }
@@ -596,7 +596,7 @@ dmdAnalTrivialRhs env id rhs fn
     -- Note [Remember to demand the function itself]
     -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     -- fn_fv: don't forget to produce a demand for fn itself
-    -- Lacking this caused Trac #9128
+    -- Lacking this caused #9128
     -- The demand is very conservative (topDmd), but that doesn't
     -- matter; trivial bindings are usually inlined, so it only
     -- kicks in for top-level bindings and NOINLINE bindings
@@ -726,7 +726,7 @@ The implementation is easy.  When analysing a join point, we can
 analyse its body with the demand from the entire join-binding (written
 let_dmd here).
 
-Another win for join points!  Trac #13543.
+Another win for join points!  #13543.
 
 Note [Demand analysis for trivial right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -743,7 +743,7 @@ Note that this can mean that 'foo' has an arity that is smaller than that
 indicated by its demand info.  e.g. if co :: (Int->Int->Int) ~ T, then
 foo's arity will be zero (see Note [exprArity invariant] in CoreArity),
 but its demand signature will be that of plusInt. A small example is the
-test case of Trac #8963.
+test case of #8963.
 
 
 Note [Product demands for function body]
@@ -1304,7 +1304,7 @@ binders the CPR property.  Specifically
    Slightly ad-hoc, because even if the scrutinee *is* a variable it
    might not be a onre of the arguments to the original function, or a
    sub-component thereof.  But it's simple, and nothing terrible
-   happens if we get it wrong.  e.g. Trac #10694.
+   happens if we get it wrong.  e.g. #10694.
 
 
 Note [Initial CPR for strict binders]

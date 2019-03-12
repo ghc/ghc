@@ -124,7 +124,7 @@ lookupFixityRn_help' name occ
   = return (False, Fixity NoSourceText minPrecedence InfixL)
     -- Minimise errors from ubound names; eg
     --    a>0 `foo` b>0
-    -- where 'foo' is not in scope, should not give an error (Trac #7937)
+    -- where 'foo' is not in scope, should not give an error (#7937)
 
   | otherwise
   = do { local_fix_env <- getFixityEnv
@@ -178,7 +178,7 @@ lookupTyFixityRn = lookupFixityRn . unLoc
 -- | Look up the fixity of a (possibly ambiguous) occurrence of a record field
 -- selector.  We use 'lookupFixityRn'' so that we can specifiy the 'OccName' as
 -- the field label, which might be different to the 'OccName' of the selector
--- 'Name' if @DuplicateRecordFields@ is in use (Trac #1173). If there are
+-- 'Name' if @DuplicateRecordFields@ is in use (#1173). If there are
 -- multiple possible selectors with different fixities, generate an error.
 lookupFieldFixityRn :: AmbiguousFieldOcc GhcRn -> RnM Fixity
 lookupFieldFixityRn (Unambiguous n lrdr)

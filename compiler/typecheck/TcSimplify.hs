@@ -91,7 +91,7 @@ captureTopConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- other things too) throws an exception without adding any error
 -- messages; it just puts the unsolved constraints back into the
 -- monad. See TcRnMonad Note [Constraints and errors]
--- Trac #16376 is an example of what goes wrong if you don't do this.
+-- #16376 is an example of what goes wrong if you don't do this.
 --
 -- NB: the caller should bring any environments into scope before
 -- calling this, so that the reportUnsolved has access to the most
@@ -321,7 +321,7 @@ than just accumulate an error message, for two reasons:
            <type> |> co-hole
     where co-hole is not filled in.  Eeek!  That un-filled-in
     hole actually causes GHC to crash with "fvProv falls into a hole"
-    See Trac #11563, #11520, #11516, #11399
+    See #11563, #11520, #11516, #11399
 
 So it's important to use 'checkNoErrs' here!
 
@@ -333,12 +333,12 @@ constraints.  But if we *don't* do defaulting we may report a whole
 lot of errors that would be solved by defaulting; these errors are
 quite spurious because fixing the single insoluble error means that
 defaulting happens again, which makes all the other errors go away.
-This is jolly confusing: Trac #9033.
+This is jolly confusing: #9033.
 
 So it seems better to always do type-class defaulting.
 
 However, always doing defaulting does mean that we'll do it in
-situations like this (Trac #5934):
+situations like this (#5934):
    run :: (forall s. GenST s) -> Int
    run = fromInteger 0
 We don't unify the return type of fromInteger with the given function
@@ -359,7 +359,7 @@ We may have a deeply buried constraint
 which we couldn't solve because of the kind incompatibility, and 'a' is free.
 Then when we default 'a' we can solve the constraint.  And we want to do
 that before starting in on type classes.  We MUST do it before reporting
-errors, because it isn't an error!  Trac #7967 was due to this.
+errors, because it isn't an error!  #7967 was due to this.
 
 Note [Top-level Defaulting Plan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -510,7 +510,7 @@ Note [No defaulting in the ambiguity check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When simplifying constraints for the ambiguity check, we use
 solveWantedsAndDrop, not simpl_top, so that we do no defaulting.
-Trac #11947 was an example:
+#11947 was an example:
    f :: Num a => Int -> Int
 This is ambiguous of course, but we don't want to default the
 (Num alpha) constraint to (Num Int)!  Doing so gives a defaulting
@@ -623,11 +623,11 @@ If we fail to prove unsatisfiability we (arbitrarily) try just once to
 find superclasses, using try_harder.  Reason: we might have a type
 signature
    f :: F op (Implements push) => ..
-where F is a type function.  This happened in Trac #3972.
+where F is a type function.  This happened in #3972.
 
 We could do more than once but we'd have to have /some/ limit: in the
 the recursive case, we would go on forever in the common case where
-the constraints /are/ satisfiable (Trac #10592 comment:12!).
+the constraints /are/ satisfiable (#10592 comment:12!).
 
 For stratightforard situations without type functions the try_harder
 step does nothing.
@@ -780,7 +780,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
 
        -- We must produce bindings for the psig_theta_vars, because we may have
        -- used them in evidence bindings constructed by solveWanteds earlier
-       -- Easiest way to do this is to emit them as new Wanteds (Trac #14643)
+       -- Easiest way to do this is to emit them as new Wanteds (#14643)
        ; ct_loc <- getCtLocM AnnOrigin Nothing
        ; let psig_wanted = [ CtWanted { ctev_pred = idType psig_theta_var
                                       , ctev_dest = EvVarDest psig_theta_var
@@ -880,11 +880,11 @@ That is the reason for the partitionBag in emitResidualConstraints,
 which takes the CoVars free in the inferred type, and pulls their
 constraints out.  (NB: this set of CoVars should be closed-over-kinds.)
 
-All rather subtle; see Trac #14584.
+All rather subtle; see #14584.
 
 Note [Add signature contexts as givens]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (Trac #11016):
+Consider this (#11016):
   f2 :: (?x :: Int) => _
   f2 = ?x
 or this
@@ -934,7 +934,7 @@ If the monomorphism restriction does not apply, then we quantify as follows:
   not going to become further constrained), and re-simplify the
   candidate constraints.
 
-  Motivation for re-simplification (Trac #7857): imagine we have a
+  Motivation for re-simplification (#7857): imagine we have a
   constraint (C (a->b)), where 'a :: TYPE l1' and 'b :: TYPE l2' are
   not free in the envt, and instance forall (a::*) (b::*). (C a) => C
   (a -> b) The instance doesn't match while l1,l2 are polymorphic, but
@@ -991,7 +991,7 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
                = pickQuantifiablePreds (mkVarSet qtvs) candidates
              -- NB: do /not/ run pickQuantifiablePreds over psig_theta,
              -- because we always want to quantify over psig_theta, and not
-             -- drop any of them; e.g. CallStack constraints.  c.f Trac #14658
+             -- drop any of them; e.g. CallStack constraints.  c.f #14658
 
              theta = mkMinimalBySCs id $  -- See Note [Minimize by Superclasses]
                      (psig_theta ++ quantifiable_candidates)
@@ -1056,13 +1056,13 @@ decideMonoTyVars infer_mode name_taus psigs candidates
              --
              -- (`minusVarSet` mono_tvs1`): a type variable is only
              --   "constrained" (so that the MR bites) if it is not
-             --   free in the environment (Trac #13785)
+             --   free in the environment (#13785)
              --
              -- (`delVarSetList` psig_qtvs): if the user has explicitly
              --   asked for quantification, then that request "wins"
              --   over the MR.  Note: do /not/ delete psig_qtvs from
              --   mono_tvs1, because mono_tvs1 cannot under any circumstances
-             --   be quantified (Trac #14479); see
+             --   be quantified (#14479); see
              --   Note [Quantification and partial signatures], Wrinkle 3, 4
 
              mono_tvs = mono_tvs2 `unionVarSet` constrained_tvs
@@ -1194,7 +1194,7 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
        --
        -- Keep the psig_tys first, so that candidateQTyVarsOfTypes produces
        -- them in that order, so that the final qtvs quantifies in the same
-       -- order as the partial signatures do (Trac #13524)
+       -- order as the partial signatures do (#13524)
        ; dv@DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs} <- candidateQTyVarsOfTypes $
                                                          psig_tys ++ candidates ++ tau_tys
        ; let pick     = (`dVarSetIntersectVarSet` grown_tcvs)
@@ -1290,14 +1290,14 @@ sure to quantify over them.  This leads to several wrinkles:
   Bottom line: Try to quantify over any variable free in psig_theta,
   just like the tau-part of the type.
 
-* Wrinkle 3 (Trac #13482). Also consider
+* Wrinkle 3 (#13482). Also consider
     f :: forall a. _ => Int -> Int
     f x = if (undefined :: a) == undefined then x else 0
   Here we get an (Eq a) constraint, but it's not mentioned in the
   psig_theta nor the type of 'f'.  But we still want to quantify
   over 'a' even if the monomorphism restriction is on.
 
-* Wrinkle 4 (Trac #14479)
+* Wrinkle 4 (#14479)
     foo :: Num a => a -> a
     foo xxx = g xxx
       where
@@ -1340,7 +1340,7 @@ Reasons:
     - Avoid downstream errors
     - Do not perform an ambiguity test on a bogus type, which might well
       fail spuriously, thereby obfuscating the original insoluble error.
-      Trac #14000 is an example
+      #14000 is an example
 
 I tried an alternative approach: simply failM, after emitting the
 residual implication constraint; the exception will be caught in
@@ -1353,7 +1353,7 @@ NB that we must include *derived* errors in the check for insolubles.
 Example:
     (a::*) ~ Int#
 We get an insoluble derived error *~#, and we don't want to discard
-it before doing the isInsolubleWC test!  (Trac #8262)
+it before doing the isInsolubleWC test!  (#8262)
 
 Note [Default while Inferring]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1405,7 +1405,7 @@ to check the original wanted.
 Note [Avoid unnecessary constraint simplification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     -------- NB NB NB (Jun 12) -------------
-    This note not longer applies; see the notes with Trac #4361.
+    This note not longer applies; see the notes with #4361.
     But I'm leaving it in here so we remember the issue.)
     ----------------------------------------
 When inferring the type of a let-binding, with simplifyInfer,
@@ -1768,7 +1768,7 @@ warnRedundantGivens (SigSkol ctxt _ _)
        _                           -> False
 
   -- To think about: do we want to report redundant givens for
-  -- pattern synonyms, PatSynSigSkol? c.f Trac #9953, comment:21.
+  -- pattern synonyms, PatSynSigSkol? c.f #9953, comment:21.
 warnRedundantGivens (InstSkol {}) = True
 warnRedundantGivens _             = False
 
@@ -1854,7 +1854,7 @@ Now d2 is available for solving.  But it may not be needed!  Usually
 such dead superclass selections will eventually be dropped as dead
 code, but:
 
- * It won't always be dropped (Trac #13032).  In the case of an
+ * It won't always be dropped (#13032).  In the case of an
    unlifted-equality superclass like d2 above, we generate
        case heq_sc d1 of d2 -> ...
    and we can't (in general) drop that case exrpession in case
@@ -1877,7 +1877,7 @@ This led to a remarkable 25% overall compiler allocation decrease in
 test T12227.
 
 But we don't get to discard all redundant equality superclasses, alas;
-see Trac #15205.
+see #15205.
 
 Note [Tracking redundant constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1969,7 +1969,7 @@ works:
 
 ----- Shortcomings
 
-Consider (see Trac #9939)
+Consider (see #9939)
     f2 :: (Eq a, Ord a) => a -> a -> Bool
     -- Ord a redundant, but Eq a is reported
     f2 x y = (x == y)
@@ -1981,7 +1981,7 @@ really not easy to detect that!
 Note [Cutting off simpl_loop]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is very important not to iterate in simpl_loop unless there is a chance
-of progress.  Trac #8474 is a classic example:
+of progress.  #8474 is a classic example:
 
   * There's a deeply-nested chain of implication constraints.
        ?x:alpha => ?y1:beta1 => ... ?yn:betan => [W] ?x:Int
@@ -2117,12 +2117,12 @@ There is one caveat:
     float out of such implications, which meant it would happily infer
     non-principal types.)
 
-   HOWEVER (Trac #12797) in findDefaultableGroups we are not worried about
+   HOWEVER (#12797) in findDefaultableGroups we are not worried about
    the most-general type; and we /do/ want to float out of equalities.
    Hence the boolean flag to approximateWC.
 
 ------ Historical note -----------
-There used to be a second caveat, driven by Trac #8155
+There used to be a second caveat, driven by #8155
 
    2. We do not float out an inner constraint that shares a type variable
       (transitively) with one that is trapped by a skolem.  Eg
@@ -2141,7 +2141,7 @@ There used to be a second caveat, driven by Trac #8155
 
 But this transitive closure stuff gives rise to a complex rule for
 when defaulting actually happens, and one that was never documented.
-Moreover (Trac #12923), the more complex rule is sometimes NOT what
+Moreover (#12923), the more complex rule is sometimes NOT what
 you want.  So I simply removed the extra code to implement the
 contamination stuff.  There was zero effect on the testsuite (not even
 #8155).
@@ -2185,8 +2185,8 @@ To see (b), suppose the constraint is (C ((a :: OpenKind) -> Int)), and we
 have an instance (C ((x:*) -> Int)).  The instance doesn't match -- but it
 should!  If we don't solve the constraint, we'll stupidly quantify over
 (C (a->Int)) and, worse, in doing so skolemiseQuantifiedTyVar will quantify over
-(b:*) instead of (a:OpenKind), which can lead to disaster; see Trac #7332.
-Trac #7641 is a simpler example.
+(b:*) instead of (a:OpenKind), which can lead to disaster; see #7332.
+#7641 is a simpler example.
 
 Note [Promoting unification variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2482,7 +2482,7 @@ Here (1,2,3) are handled by the "seed_skols" calculation, and
 (4) is done by the transCloVarSet call.
 
 The possible dependence on givens, and evidence bindings, is more
-subtle than we'd realised at first.  See Trac #14584.
+subtle than we'd realised at first.  See #14584.
 
 
 *********************************************************************************
@@ -2541,7 +2541,7 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
 
         -- Finds unary type-class constraints
         -- But take account of polykinded classes like Typeable,
-        -- which may look like (Typeable * (a:*))   (Trac #8931)
+        -- which may look like (Typeable * (a:*))   (#8931)
     find_unary :: Ct -> Either (Ct, Class, TyVar) Ct
     find_unary cc
         | Just (cls,tys)   <- getClassPredTys_maybe (ctPred cc)

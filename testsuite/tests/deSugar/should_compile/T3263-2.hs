@@ -1,4 +1,4 @@
--- Trac #3263.  New kind of warning on monadic bindings that discard a monadic result
+-- #3263.  New kind of warning on monadic bindings that discard a monadic result
 
 module T3263 where
 

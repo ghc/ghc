@@ -209,7 +209,7 @@ pprCoAxBranchLHS :: TyCon -> CoAxBranch -> SDoc
 --   a conflict between equations (FamInst.conflictInstErr)
 -- For type families the RHS is important; for data families not so.
 --   Indeed for data families the RHS is a mysterious internal
---   type constructor, so we suppress it (Trac #14179)
+--   type constructor, so we suppress it (#14179)
 -- See FamInstEnv Note [Family instance overlap conflicts]
 pprCoAxBranchLHS = ppr_co_ax_branch pp_rhs
   where
@@ -342,7 +342,7 @@ Notes:
   where co :: (forall a. ty) ~ (ty1 -> ty2)
   Here 'co' is insoluble, but we don't want to crash in decoposePiCos.
   So decomposePiCos carefully tests both sides of the coercion to check
-  they are both foralls or both arrows.  Not doing this caused Trac #15343.
+  they are both foralls or both arrows.  Not doing this caused #15343.
 -}
 
 decomposePiCos :: HasDebugCallStack
@@ -718,7 +718,7 @@ mkAppCo co arg
 
   | Just (ty1, r) <- isReflCo_maybe co
   , Just (tc, tys) <- splitTyConApp_maybe ty1
-    -- Expand type synonyms; a TyConAppCo can't have a type synonym (Trac #9102)
+    -- Expand type synonyms; a TyConAppCo can't have a type synonym (#9102)
   = mkTyConAppCo r tc (zip_roles (tyConRolesX r tc) tys)
   where
     zip_roles (r1:_)  []            = [downgradeRole r1 Nominal arg]
@@ -2292,10 +2292,10 @@ Suppose we need `coercionKind (ForAllCo a1 (ForAllCo a2 ... (ForAllCo an
 co)...) )`.   We do not want to perform `n` single-type-variable
 substitutions over the kind of `co`; rather we want to do one substitution
 which substitutes for all of `a1`, `a2` ... simultaneously.  If we do one
-at a time we get the performance hole reported in Trac #11735.
+at a time we get the performance hole reported in #11735.
 
 Solution: gather up the type variables for nested `ForAllCos`, and
-substitute for them all at once.  Remarkably, for Trac #11735 this single
+substitute for them all at once.  Remarkably, for #11735 this single
 change reduces /total/ compile time by a factor of more than ten.
 
 -}
@@ -2334,7 +2334,7 @@ coercionRole = go
 {-
 Note [Nested InstCos]
 ~~~~~~~~~~~~~~~~~~~~~
-In Trac #5631 we found that 70% of the entire compilation time was
+In #5631 we found that 70% of the entire compilation time was
 being spent in coercionKind!  The reason was that we had
    (g @ ty1 @ ty2 .. @ ty100)    -- The "@s" are InstCos
 where
@@ -2342,7 +2342,7 @@ where
 If we deal with the InstCos one at a time, we'll do this:
    1.  Find the kind of (g @ ty1 .. @ ty99) : forall a100. phi'
    2.  Substitute phi'[ ty100/a100 ], a single tyvar->type subst
-But this is a *quadratic* algorithm, and the blew up Trac #5631.
+But this is a *quadratic* algorithm, and the blew up #5631.
 So it's very important to do the substitution simultaneously;
 cf Type.piResultTys (which in fact we call here).
 

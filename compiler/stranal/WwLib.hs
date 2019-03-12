@@ -214,12 +214,12 @@ Note [CPR for thunks] in DmdAnal.
 And if something *has* been given the CPR property and we don't w/w, it's
 a disaster, because then the enclosing function might say it has the CPR
 property, but now doesn't and there a cascade of disaster.  A good example
-is Trac #5920.
+is #5920.
 
 Note [Limit w/w arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Guard against high worker arity as it generates a lot of stack traffic.
-A simplified example is Trac #11565#comment:6
+A simplified example is #11565#comment:6
 
 Current strategy is very simple: don't perform w/w transformation at all
 if the result produces a wrapper with arity higher than -fmax-worker-args=.
@@ -483,7 +483,7 @@ To avoid this:
 
   * We use a fresh unique for both type-variable and term-variable binders
     Originally we lacked this freshness for type variables, and that led
-    to the very obscure Trac #12562.  (A type variable in the worker shadowed
+    to the very obscure #12562.  (A type variable in the worker shadowed
     an outer term-variable binding.)
 
   * Because of this cloning we have to substitute in the type/kind of the
@@ -621,7 +621,7 @@ unbox_one dflags fam_envs arg cs
                                          data_con unpk_args
                 arg_no_unf = zapStableUnfolding arg
                              -- See Note [Zap unfolding when beta-reducing]
-                             -- in Simplify.hs; and see Trac #13890
+                             -- in Simplify.hs; and see #13890
                 rebox_fn   = Let (NonRec arg_no_unf con_app)
                 con_app    = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
          ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False unpk_args
@@ -836,7 +836,7 @@ the case on `x` up through the case on `burble`.
 Note [mkWWstr and unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 By using unsafeCoerce, it is possible to make the number of demands fail to
-match the number of constructor arguments; this happened in Trac #8037.
+match the number of constructor arguments; this happened in #8037.
 If so, the worker/wrapper split doesn't work right and we get a Core Lint
 bug.  The fix here is simply to decline to do w/w if that happens.
 
@@ -875,10 +875,10 @@ opportunities for optimisation.
 
 Solution: use setCaseBndrEvald when creating
  (A) The arg binders x1,x2 in mkWstr_one
-         See Trac #13077, test T13077
+         See #13077, test T13077
  (B) The result binders r1,r2 in mkWWcpr_help
          See Trace #13077, test T13077a
-         And Trac #13027 comment:20, item (4)
+         And #13027 comment:20, item (4)
 to record that the relevant binder is evaluated.
 
 
@@ -901,13 +901,13 @@ can still be specialised by the type-class specialiser, something like
 BUT if f is strict in the Ord dictionary, we might unpack it, to get
    fw :: (a->a->Bool) -> [a] -> Int# -> a
 and the type-class specialiser can't specialise that.  An example is
-Trac #6056.
+#6056.
 
 But in any other situation a dictionary is just an ordinary value,
 and can be unpacked.  So we track the INLINABLE pragma, and switch
 off the unpacking in mkWWstr_one (see the isClassPred test).
 
-Historical note: Trac #14955 describes how I got this fix wrong
+Historical note: #14955 describes how I got this fix wrong
 the first time.
 -}
 
@@ -1030,7 +1030,7 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
                 , \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)]
                 , \ body     -> mkUnpackCase body co work_uniq data_con [arg] (varToCoreExpr arg)
                                 -- varToCoreExpr important here: arg can be a coercion
-                                -- Lacking this caused Trac #10658
+                                -- Lacking this caused #10658
                 , arg_ty1 ) }
 
   | otherwise   -- The general case
@@ -1115,7 +1115,7 @@ The idea is that this binding will never be used; but if it
 buggily is used we'll get a runtime error message.
 
 Coping with absence for *unlifted* types is important; see, for
-example, Trac #4306 and Trac #15627.  In the UnliftedRep case, we can
+example, #4306 and #15627.  In the UnliftedRep case, we can
 use LitRubbish, which we need to apply to the required type.
 For the unlifted types of singleton kind like Float#, Addr#, etc. we
 also find a suitable literal, using Literal.absentLiteralOf.  We don't

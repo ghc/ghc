@@ -373,7 +373,7 @@ interactiveInScope :: HscEnv -> [Var]
 -- When we are not in GHCi, the interactive context (hsc_IC hsc_env) is empty
 -- so this is a (cheap) no-op.
 --
--- See Trac #8215 for an example
+-- See #8215 for an example
 interactiveInScope hsc_env
   = tyvars ++ ids
   where
@@ -806,7 +806,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; checkL (not $ isFloatingTy scrut_ty && any isLitPat alts)
          (ptext (sLit $ "Lint warning: Scrutinising floating-point " ++
                         "expression with literal pattern in case " ++
-                        "analysis (see Trac #9238).")
+                        "analysis (see #9238).")
           $$ text "scrut" <+> ppr scrut)
 
      ; case tyConAppTyCon_maybe (idType var) of
@@ -927,7 +927,7 @@ checkJoinOcc var n_args
 Note [No alternatives lint check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Case expressions with no alternatives are odd beasts, and it would seem
-like they would worth be looking at in the linter (cf Trac #10180). We
+like they would worth be looking at in the linter (cf #10180). We
 used to check two things:
 
 * exprIsHNF is false: it would *seem* to be terribly wrong if
@@ -937,7 +937,7 @@ used to check two things:
   scrutinee is diverging for sure.
 
 It was already known that the second test was not entirely reliable.
-Unfortunately (Trac #13990), the first test turned out not to be reliable
+Unfortunately (#13990), the first test turned out not to be reliable
 either. Getting the checks right turns out to be somewhat complicated.
 
 For example, suppose we have (comment 8)
@@ -1395,7 +1395,7 @@ lintType (CoercionTy co)
 
 {- Note [Stupid type synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #14939)
+Consider (#14939)
    type Alg cls ob = ob
    f :: forall (cls :: * -> Constraint) (b :: Alg cls *). b
 
@@ -1572,18 +1572,18 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
 It's very bad if simplifying a rule means that one of the template
 variables (ru_bndrs) that /is/ mentioned on the RHS becomes
 not-mentioned in the LHS (ru_args).  How can that happen?  Well, in
-Trac #10602, SpecConstr stupidly constructed a rule like
+#10602, SpecConstr stupidly constructed a rule like
 
   forall x,c1,c2.
      f (x |> c1 |> c2) = ....
 
 But simplExpr collapses those coercions into one.  (Indeed in
-Trac #10602, it collapsed to the identity and was removed altogether.)
+#10602, it collapsed to the identity and was removed altogether.)
 
 We don't have a great story for what to do here, but at least
 this check will nail it.
 
-NB (Trac #11643): it's possible that a variable listed in the
+NB (#11643): it's possible that a variable listed in the
 binders becomes not-mentioned on both LHS and RHS.  Here's a silly
 example:
    RULE forall x y. f (g x y) = g (x+1) (y-1)
@@ -2088,7 +2088,7 @@ type WarnsAndErrs = (Bag MsgDoc, Bag MsgDoc)
 {- Note [Checking for global Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Before CoreTidy, all locally-bound Ids must be LocalIds, even
-top-level ones. See Note [Exported LocalIds] and Trac #9857.
+top-level ones. See Note [Exported LocalIds] and #9857.
 
 Note [Checking StaticPtrs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2124,7 +2124,7 @@ Note [Linting type synonym applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When linting a type-synonym, or type-family, application
   S ty1 .. tyn
-we behave as follows (Trac #15057, #T15664):
+we behave as follows (#15057, #T15664):
 
 * If lf_report_unsat_syns = True, and S has arity < n,
   complain about an unsaturated type synonym or type family

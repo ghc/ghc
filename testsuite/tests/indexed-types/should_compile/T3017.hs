@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 
--- Trac #3017
+-- #3017
 
 module Foo where
  class Coll c where

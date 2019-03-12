@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fwarn-name-shadowing -fwarn-unused-binds #-}
 
--- Trac #1972
+-- #1972
 
 module Temp where
 

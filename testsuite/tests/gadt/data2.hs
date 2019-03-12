@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, ExistentialQuantification #-}
 
--- Trac #289
+-- #289
 
 module ShouldCompile where
 

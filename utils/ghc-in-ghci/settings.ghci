@@ -54,7 +54,7 @@
 :set -i_build/stage1/compiler/build
 
 -- -fobject-code is required because bytecode doesn't support unboxed tuples
--- https://ghc.haskell.org/trac/ghc/ticket/1257
+-- https://gitlab.haskell.org/ghc/ghc/issues/1257
 :set -odir ./.ghci-objects
 :set -hidir ./.ghci-objects
 :set -fobject-code
