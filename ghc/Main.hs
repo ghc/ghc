@@ -343,9 +343,16 @@ checkOptions mode dflags srcs objs = do
    let unknown_opts = [ f | (f@('-':_), _) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
-   when (notNull (filter wayRTSOnly (ways dflags))
+   let rtsWays = filter wayRTSOnly (ways dflags)
+   when (notNull (filter (/= WayThreaded) rtsWays) -- if no filter produce warning for (--interactive + WayThreaded by default)
          && isInterpretiveMode mode) $
-        hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
+        hPutStrLn stderr ("Warning: -debug and -ticky are ignored by GHCi")
+
+   -- how to correctly detect -single-threaded + --interactive? When uncommented, lines below
+   -- do produce warning for (--interactive + WayThreaded by default), which is wrong.
+   -- when (not (WayThreaded `elem` rtsWays)
+   --      && isInterpretiveMode mode) $
+   --     hPutStrLn stderr ("Warning: -single-threaded is ignored by GHCi")
 
         -- -prof and --interactive are not a good combination
    when ((filter (not . wayRTSOnly) (ways dflags) /= interpWays)

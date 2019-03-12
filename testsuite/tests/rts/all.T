@@ -80,7 +80,6 @@ test('T2783', [ omit_ways(['ghci']), exit_code(1)
 # both threaded1 (-threaded -debug) and threaded2 (-threaded) ways.
 test('testwsdeque', [extra_files(['../../../rts/WSDeque.h']),
                      unless(in_tree_compiler(), skip),
-                    req_smp, # needs atomic 'cas'
                     c_src, only_ways(['threaded1', 'threaded2'])],
                     compile_and_run, [''])
 
@@ -206,7 +205,6 @@ test('stablename001', expect_fail_for(['hpc']), compile_and_run, [''])
 
 test('T7815', [ multi_cpu_race,
                 extra_run_opts('50000 +RTS -N2 -RTS'),
-                req_smp,
                 only_ways(['threaded1', 'threaded2']) ], compile_and_run, [''] )
 
 # ignore_stderr because it contains a unique:
@@ -220,10 +218,10 @@ test('T7919', [when(fast(), skip), omit_ways(['ghci'] + prof_ways)], compile_and
 
 test('T8035', normal, compile_and_run, [''])
 
-test('T8209', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
+test('T8209', [ only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
-test('T8242', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
+test('T8242', [ only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
 test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
@@ -245,7 +243,6 @@ test('T9078', only_ways(['threaded1']), compile_and_run, [''])
 
 test('T10017', [ when(opsys('mingw32'), skip)
                , when(unregisterised(), skip)
-               , req_smp
                , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
 test('T11108', normal, compile_and_run, [''])
@@ -314,7 +311,7 @@ test('T9405', [when(msys(), expect_broken(12714))], makefile_test, ['T9405'])
 test('T11788', when(ghc_dynamic(), skip),
               makefile_test, ['T11788'])
 
-test('T10296a', [req_smp], makefile_test, ['T10296a'])
+test('T10296a', [], makefile_test, ['T10296a'])
 
 test('T10296b', [only_ways(['threaded2'])], compile_and_run, [''])
 
@@ -360,7 +357,6 @@ test('alloccounter1', normal, compile_and_run,
 
 test('nursery-chunks1',
   [ extra_run_opts('4 100 +RTS -n32k -A1m -RTS')
-  , req_smp
   , only_ways(['threaded1','threaded2'])
   ],
   compile_and_run,
