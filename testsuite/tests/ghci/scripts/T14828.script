@@ -16,3 +16,7 @@
 
 :m + Data.List
 :p foldl'
+
+:set -XRankNTypes
+f :: (forall a. a -> a) -> b -> b; f g x = g x
+:p f
