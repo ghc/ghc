@@ -1,5 +1,5 @@
 
-T14715.hs:13:20: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T14715.hs:13:53: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Reduce (LiftOf zq) zq’
       Where: ‘zq’ is a rigid type variable bound by
                the inferred type of
