@@ -13,6 +13,7 @@ module GHC.Exts.Heap.Closures (
     , GenClosure(..)
     , PrimType(..)
     , allClosures
+    , closureSize
 
     -- * Boxes
     , Box(..)
@@ -37,6 +38,7 @@ import GHC.Exts.Heap.InfoTableProf ()
 import Data.Bits
 import Data.Int
 import Data.Word
+import GHC.Prim ( closureSize# )
 import GHC.Exts
 import GHC.Generics
 import Numeric
@@ -321,3 +323,9 @@ allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (OtherClosure {..}) = hvalues
 allClosures _ = []
+
+-- | Get the size of a closure in words.
+--
+-- @since 8.10.1
+closureSize :: Box -> Int
+closureSize (Box x) = I# (closureSize# x)
