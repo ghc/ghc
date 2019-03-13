@@ -1458,21 +1458,36 @@ mkPackageState dflags dbs preload0 = do
   --
   -- Calculate the initial set of packages, prior to any package flags.
   -- This set contains the latest version of all valid (not unusable) packages,
-  -- or is empty if we have -hide-all-packages
+  -- or is empty if we have -hide-all-packages.
+  --
+  -- Then create an initial visibility map with default visibilities for all
+  -- exposed, definite units.
   --
   let preferLater pkg pkg' =
         case compareByPreference prec_map pkg pkg' of
             GT -> pkg
             _  -> pkg'
-      calcInitial m pkg = addToUDFM_C preferLater m (fsPackageName pkg) pkg
-      initial = if gopt Opt_HideAllPackages dflags
+      -- Inter-database comparisons are keyed by package name. Consequently we
+      -- key this map by the package name, storing a representative "winning" package
+      -- by preference.
+      addIfMorePreferable m pkg = addToUDFM_C preferLater m (fsPackageName pkg) pkg
+      maximallyPreferableReps = if gopt Opt_HideAllPackages dflags
                     then emptyUDFM
-                    else foldl' calcInitial emptyUDFM pkgs1
-      vis_map1 = foldUDFM (\p vm ->
+                    else foldl' addIfMorePreferable emptyUDFM pkgs1
+      maximallyPreferable p =
+        case lookupUDFM maximallyPreferableReps (fsPackageName p) of
+          Nothing -> False
+          Just p' -> compareByPreference prec_map p p' == EQ
+      vis_map1 = foldl' (\vm p ->
                             -- Note: we NEVER expose indefinite packages by
                             -- default, because it's almost assuredly not
                             -- what you want (no mix-in linking has occurred).
-                            if exposed p && unitIdIsDefinite (packageConfigId p)
+                            -- Note: we consider all units that are equally
+                            -- preferable to the maximally preferable unit
+                            -- with that package name. This means we include
+                            -- other units in the same package in the same db,
+                            -- see #16228.
+                            if exposed p && unitIdIsDefinite (packageConfigId p) && maximallyPreferable p
                                then Map.insert (packageConfigId p)
                                                UnitVisibility {
                                                  uv_expose_all = True,
@@ -1483,7 +1498,7 @@ mkPackageState dflags dbs preload0 = do
                                                }
                                                vm
                                else vm)
-                         Map.empty initial
+                         Map.empty pkgs1
 
   --
   -- Compute a visibility map according to the command-line flags (-package,
