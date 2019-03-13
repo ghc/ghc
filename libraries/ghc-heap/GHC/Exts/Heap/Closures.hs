@@ -13,6 +13,12 @@ module GHC.Exts.Heap.Closures (
     , GenClosure(..)
     , PrimType(..)
     , allClosures
+#if __GLASGOW_HASKELL__ >= 809
+    -- The closureSize# primop is unsupported on earlier GHC releases but we
+    -- build ghc-heap as a boot library so it must be buildable. Drop this once
+    -- we are guaranteed to bootstsrap with GHC >= 8.9.
+    , closureSize
+#endif
 
     -- * Boxes
     , Box(..)
@@ -40,6 +46,9 @@ import Data.Word
 import GHC.Exts
 import GHC.Generics
 import Numeric
+#if __GLASGOW_HASKELL__ >= 809
+import GHC.Prim ( closureSize# )
+#endif
 
 ------------------------------------------------------------------------
 -- Boxes
@@ -321,3 +330,11 @@ allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (OtherClosure {..}) = hvalues
 allClosures _ = []
+
+#if __GLASGOW_HASKELL__ >= 809
+-- | Get the size of a closure in words.
+--
+-- @since 8.10.1
+closureSize :: Box -> Int
+closureSize (Box x) = I# (closureSize# x)
+#endif
