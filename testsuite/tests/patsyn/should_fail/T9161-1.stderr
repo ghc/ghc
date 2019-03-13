@@ -1,5 +1,5 @@
 
-T9161-1.hs:6:14: error:
+T9161-1.hs:8:14: error:
     • Pattern synonym ‘PATTERN’ cannot be used here
         (pattern synonyms cannot be promoted)
     • In the type signature: wrongLift :: PATTERN
