@@ -3208,6 +3208,13 @@ primop  UnpackClosureOp "unpackClosure#" GenPrimOp
    with
    out_of_line = True
 
+primop  ClosureSizeOp "closureSize#" GenPrimOp
+   a -> Int#
+   { {\tt closureSize\# closure} returns the size of the given closure in
+     machine words. }
+   with
+   out_of_line = True
+
 primop  GetApStackValOp "getApStackVal#" GenPrimOp
    a -> Int# -> (# Int#, b #)
    with
