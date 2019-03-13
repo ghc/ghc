@@ -11,3 +11,10 @@ reallyUnsafePtrEqualityUpToTag (W_ clos1, W_  clos2)
     clos2 = UNTAG(clos2);
     return (clos1 == clos2);
 }
+
+closureSizezh (P_ clos)
+{
+    W_ len;
+    (len) = foreign "C" heap_view_closureSize(clos "ptr");
+    return (len);
+}

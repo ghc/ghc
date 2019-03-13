@@ -13,6 +13,7 @@ module GHC.Exts.Heap.Closures (
     , GenClosure(..)
     , PrimType(..)
     , allClosures
+    , closureSize
 
     -- * Boxes
     , Box(..)
@@ -48,6 +49,9 @@ foreign import prim "aToWordzh" aToWord# :: Any -> Word#
 
 foreign import prim "reallyUnsafePtrEqualityUpToTag"
     reallyUnsafePtrEqualityUpToTag# :: Any -> Any -> Int#
+
+foreign import prim "closureSizezh"
+    closureSize# :: Any -> Int#
 
 -- | An arbitrary Haskell value in a safe Box. The point is that even
 -- unevaluated thunks can safely be moved around inside the Box, and when
@@ -321,3 +325,9 @@ allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (OtherClosure {..}) = hvalues
 allClosures _ = []
+
+-- | Get the size of a closure in words.
+--
+-- @since 8.10.1
+closureSize :: Box -> Int
+closureSize (Box a) = I# (closureSize# x)
