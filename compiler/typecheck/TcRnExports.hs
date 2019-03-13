@@ -140,10 +140,10 @@ accumExports :: (ExportAccum -> x -> TcRn (Maybe (ExportAccum, y)))
              -> TcRn [y]
 accumExports f = fmap (catMaybes . snd) . mapAccumLM f' emptyExportAccum
   where f' acc x = do
-          m <- try_m (f acc x)
+          m <- attemptM (f acc x)
           pure $ case m of
-            Right (Just (acc', y)) -> (acc', Just y)
-            _                      -> (acc, Nothing)
+            Just (Just (acc', y)) -> (acc', Just y)
+            _                     -> (acc, Nothing)
 
 type ExportOccMap = OccEnv (Name, IE GhcPs)
         -- Tracks what a particular exported OccName
@@ -192,7 +192,7 @@ tcRnExports explicit_mod exports
         ; let do_it = exports_from_avail real_exports rdr_env imports this_mod
         ; (rn_exports, final_avails)
             <- if hsc_src == HsigFile
-                then do (msgs, mb_r) <- tryTc do_it
+                then do (mb_r, msgs) <- tryTc do_it
                         case mb_r of
                             Just r  -> return r
                             Nothing -> addMessages msgs >> failM
