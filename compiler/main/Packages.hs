@@ -1458,13 +1458,18 @@ mkPackageState dflags dbs preload0 = do
   --
   -- Calculate the initial set of packages, prior to any package flags.
   -- This set contains the latest version of all valid (not unusable) packages,
-  -- or is empty if we have -hide-all-packages
+  -- or is empty if we have -hide-all-packages.
+  --
+  -- Then create an initial visibility map with default visibilities for all
+  -- exposed, definite units.
   --
   let preferLater pkg pkg' =
         case compareByPreference prec_map pkg pkg' of
             GT -> pkg
             _  -> pkg'
-      calcInitial m pkg = addToUDFM_C preferLater m (fsPackageName pkg) pkg
+      -- We must key this set by the UnitId, since there may be multiple units
+      -- with the same name.
+      calcInitial m pkg = addToUDFM_C preferLater m (packageConfigId pkg) pkg
       initial = if gopt Opt_HideAllPackages dflags
                     then emptyUDFM
                     else foldl' calcInitial emptyUDFM pkgs1
