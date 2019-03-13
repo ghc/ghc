@@ -2479,7 +2479,7 @@ tcHsPartialSigType
          , TcType )           -- Tau part
 -- See Note [Recipe for checking a signature]
 tcHsPartialSigType ctxt sig_ty
-  | HsWC { hswc_ext  = sig_wcs,         hswc_body = ib_ty } <- sig_ty
+  | HsWC { hswc_ext  = sig_wcs, hswc_body = ib_ty } <- sig_ty
   , HsIB { hsib_ext = implicit_hs_tvs
          , hsib_body = hs_ty } <- ib_ty
   , (explicit_hs_tvs, L _ hs_ctxt, hs_tau) <- splitLHsSigmaTy hs_ty
@@ -2536,8 +2536,9 @@ tcHsPartialSigType _ (XHsWildCardBndrs _) = panic "tcHsPartialSigType"
 tcPartialContext :: HsContext GhcRn -> TcM (TcThetaType, Maybe TcType)
 tcPartialContext hs_theta
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
-  , L _ wc@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
-  = do { wc_tv_ty <- tcWildCardOcc wc constraintKind
+  , L wc_loc wc@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
+  = do { wc_tv_ty <- setSrcSpan wc_loc $
+                     tcWildCardOcc wc constraintKind
        ; theta <- mapM tcLHsPredType hs_theta1
        ; return (theta, Just wc_tv_ty) }
   | otherwise
