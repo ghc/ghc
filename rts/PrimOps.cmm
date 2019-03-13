@@ -2041,6 +2041,13 @@ for:
     return (info, dat_arr, ptrArray);
 }
 
+stg_closureSizezh (P_ clos)
+{
+    W_ len;
+    (len) = foreign "C" heap_view_closureSize(clos "ptr");
+    return (len);
+}
+
 /* -----------------------------------------------------------------------------
    Thread I/O blocking primitives
    -------------------------------------------------------------------------- */
