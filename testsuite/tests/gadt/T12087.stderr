@@ -9,27 +9,27 @@ T12087.hs:6:3: error:
 T12087.hs:9:3: error:
     • GADT constructor type signature cannot contain nested ‘forall’s or contexts
       Suggestion: instead use this type signature:
-        MkF2 :: forall a. (Ord a, Eq a) => F2 a
+        MkF2 :: forall a. (Ord a, Eq a) => a -> F2 a
     • In the definition of data constructor ‘MkF2’
       In the data type declaration for ‘F2’
 
 T12087.hs:12:3: error:
     • GADT constructor type signature cannot contain nested ‘forall’s or contexts
       Suggestion: instead use this type signature:
-        MkF3 :: forall a b. (Eq a, Eq b) => b -> F3 a
+        MkF3 :: forall a b. (Eq a, Eq b) => a -> b -> F3 a
     • In the definition of data constructor ‘MkF3’
       In the data type declaration for ‘F3’
 
 T12087.hs:15:3: error:
     • GADT constructor type signature cannot contain nested ‘forall’s or contexts
       Suggestion: instead use this type signature:
-        MkF4 :: forall a b. (Eq a, Eq b) => b -> F4 a
+        MkF4 :: forall a b. (Eq a, Eq b) => a -> b -> F4 a
     • In the definition of data constructor ‘MkF4’
       In the data type declaration for ‘F4’
 
 T12087.hs:18:3: error:
     • GADT constructor type signature cannot contain nested ‘forall’s or contexts
       Suggestion: instead use this type signature:
-        MkF5 :: forall a b. a -> Int -> Int -> b -> F5 a
+        MkF5 :: forall a b. Int -> Int -> a -> Int -> Int -> b -> F5 a
     • In the definition of data constructor ‘MkF5’
       In the data type declaration for ‘F5’

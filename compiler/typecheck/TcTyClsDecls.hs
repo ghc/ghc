@@ -3021,9 +3021,8 @@ checkValidDataCon dflags existential_ok tc con
               , ppr orig_res_ty <+> dcolon <+> ppr (tcTypeKind orig_res_ty)])
 
 
-        ; checkTc (isJust (tcMatchTy res_ty_tmpl
-                                     orig_res_ty))
-                  (badDataConTyCon con res_ty_tmpl orig_res_ty)
+        ; checkTc (isJust (tcMatchTy res_ty_tmpl orig_res_ty))
+                  (badDataConTyCon con res_ty_tmpl)
             -- Note that checkTc aborts if it finds an error. This is
             -- critical to avoid panicking when we call dataConUserType
             -- on an un-rejiggable datacon!
@@ -3745,9 +3744,9 @@ noClassTyVarErr clas fam_tc
         , text "mentions none of the type or kind variables of the class" <+>
                 quotes (ppr clas <+> hsep (map ppr (classTyVars clas)))]
 
-badDataConTyCon :: DataCon -> Type -> Type -> SDoc
-badDataConTyCon data_con res_ty_tmpl actual_res_ty
-  | ASSERT( all isTyVar actual_ex_tvs )
+badDataConTyCon :: DataCon -> Type -> SDoc
+badDataConTyCon data_con res_ty_tmpl
+  | ASSERT( all isTyVar tvs )
     tcIsForAllTy actual_res_ty
   = nested_foralls_contexts_suggestion
   | isJust (tcSplitPredFunTy_maybe actual_res_ty)
@@ -3757,6 +3756,8 @@ badDataConTyCon data_con res_ty_tmpl actual_res_ty
                 text "returns type" <+> quotes (ppr actual_res_ty))
        2 (text "instead of an instance of its parent type" <+> quotes (ppr res_ty_tmpl))
   where
+    actual_res_ty = dataConOrigResTy data_con
+
     -- This suggestion is useful for suggesting how to correct code like what
     -- was reported in #12087:
     --
@@ -3786,13 +3787,8 @@ badDataConTyCon data_con res_ty_tmpl actual_res_ty
     --    underneath the nested foralls and contexts.
     -- 3) Smash together the type variables and class predicates from 1) and
     --    2), and prepend them to the rho type from 2).
-    actual_ex_tvs = dataConExTyCoVars data_con
-    actual_theta  = dataConTheta data_con
-    (actual_res_tvs, actual_res_theta, actual_res_rho)
-      = tcSplitNestedSigmaTys actual_res_ty
-    suggested_ty = mkSpecForAllTys (actual_ex_tvs ++ actual_res_tvs) $
-                   mkPhiTy (actual_theta ++ actual_res_theta)
-                   actual_res_rho
+    (tvs, theta, rho) = tcSplitNestedSigmaTys (dataConUserType data_con)
+    suggested_ty = mkSpecSigmaTy tvs theta rho
 
 badGadtDecl :: Name -> SDoc
 badGadtDecl tc_name
