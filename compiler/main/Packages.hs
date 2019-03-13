@@ -1456,23 +1456,42 @@ mkPackageState dflags dbs preload0 = do
   let prelim_pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs1
 
   --
-  -- Calculate the initial set of packages, prior to any package flags.
-  -- This set contains the latest version of all valid (not unusable) packages,
-  -- or is empty if we have -hide-all-packages
+  -- Calculate the initial set of units from package databases, prior to any package flags.
   --
-  let preferLater pkg pkg' =
-        case compareByPreference prec_map pkg pkg' of
-            GT -> pkg
-            _  -> pkg'
-      calcInitial m pkg = addToUDFM_C preferLater m (fsPackageName pkg) pkg
-      initial = if gopt Opt_HideAllPackages dflags
+  -- Conceptually, we select the latest versions of all valid (not unusable) *packages*
+  -- (not units). This is empty if we have -hide-all-packages.
+  --
+  -- Then we create an initial visibility map with default visibilities for all
+  -- exposed, definite units which belong to the latest valid packages.
+  --
+  let preferLater unit unit' =
+        case compareByPreference prec_map unit unit' of
+            GT -> unit
+            _  -> unit'
+      addIfMorePreferable m unit = addToUDFM_C preferLater m (fsPackageName unit) unit
+      -- This is the set of maximally preferable packages. In fact, it is a set of
+      -- most preferable *units* keyed by package name, which act as stand-ins in 
+      -- for "a package in a database". We use units here because we don't have 
+      -- "a package in a database" as a type currently.
+      mostPreferablePackageReps = if gopt Opt_HideAllPackages dflags
                     then emptyUDFM
-                    else foldl' calcInitial emptyUDFM pkgs1
-      vis_map1 = foldUDFM (\p vm ->
+                    else foldl' addIfMorePreferable emptyUDFM pkgs1
+      -- When exposing units, we want to consider all of those in the most preferable
+      -- packages. We can implement that by looking for units that are equi-preferable
+      -- with the most preferable unit for package. Being equi-preferable means that
+      -- they must be in the same database, with the same version, and the same pacakge name.
+      --
+      -- We must take care to consider all these units and not just the most 
+      -- preferable one, otherwise we can end up with problems like #16228.
+      mostPreferable u =
+        case lookupUDFM mostPreferablePackageReps (fsPackageName u) of
+          Nothing -> False
+          Just u' -> compareByPreference prec_map u u' == EQ
+      vis_map1 = foldl' (\vm p ->
                             -- Note: we NEVER expose indefinite packages by
                             -- default, because it's almost assuredly not
                             -- what you want (no mix-in linking has occurred).
-                            if exposed p && unitIdIsDefinite (packageConfigId p)
+                            if exposed p && unitIdIsDefinite (packageConfigId p) && mostPreferable p
                                then Map.insert (packageConfigId p)
                                                UnitVisibility {
                                                  uv_expose_all = True,
@@ -1483,7 +1502,7 @@ mkPackageState dflags dbs preload0 = do
                                                }
                                                vm
                                else vm)
-                         Map.empty initial
+                         Map.empty pkgs1
 
   --
   -- Compute a visibility map according to the command-line flags (-package,
