@@ -168,14 +168,19 @@ completeSigPolyId_maybe sig
 
 tcTySigs :: [LSig GhcRn] -> TcM ([TcId], TcSigFun)
 tcTySigs hs_sigs
-  = checkNoErrs $   -- See Note [Fail eagerly on bad signatures]
-    do { ty_sigs_s <- mapAndRecoverM tcTySig hs_sigs
-       ; let ty_sigs  = concat ty_sigs_s
+  = checkNoErrs $
+    do { -- Fail if any of the signatures is duff
+         -- Hence mapAndReportM
+         -- See Note [Fail eagerly on bad signatures]
+         ty_sigs_s <- mapAndReportM tcTySig hs_sigs
+
+       ; let ty_sigs = concat ty_sigs_s
              poly_ids = mapMaybe completeSigPolyId_maybe ty_sigs
                         -- The returned [TcId] are the ones for which we have
                         -- a complete type signature.
                         -- See Note [Complete and partial type signatures]
              env = mkNameEnv [(tcSigInfoName sig, sig) | sig <- ty_sigs]
+
        ; return (poly_ids, lookupNameEnv env) }
 
 tcTySig :: LSig GhcRn -> TcM [TcSigInfo]
@@ -308,9 +313,15 @@ If a type signature is wrong, fail immediately:
    the code against the signature will give a very similar error
    to the ambiguity error.
 
-ToDo: this means we fall over if any type sig
-is wrong (eg at the top level of the module),
-which is over-conservative
+ToDo: this means we fall over if any top-level type signature in the
+module is wrong, because we typecheck all the signatures together
+(see TcBinds.tcValBinds).  Moreover, because of top-level
+captureTopConstraints, only insoluble constraints will be reported.
+We typecheck all signatures at the same time because a signature
+like   f,g :: blah   might have f and g from different SCCs.
+
+So it's a bit awkward to get better error recovery, and no one
+has complained!
 -}
 
 {- *********************************************************************

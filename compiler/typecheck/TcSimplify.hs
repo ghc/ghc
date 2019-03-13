@@ -107,10 +107,12 @@ captureTopConstraints thing_inside
        -- constraints, report the latter before propagating the exception
        -- Otherwise they will be lost altogether
        ; case mb_res of
-           Right res -> return (res, lie `andWC` stWC)
-           Left {}   -> do { _ <- reportUnsolved lie; failM } }
-                -- This call to reportUnsolved is the reason
+           Just res -> return (res, lie `andWC` stWC)
+           Nothing  -> do { _ <- simplifyTop lie; failM } }
+                -- This call to simplifyTop is the reason
                 -- this function is here instead of TcRnMonad
+                -- We call simplifyTop so that it does defaulting
+                -- (esp of runtime-reps) before reporting errors
 
 simplifyTopImplic :: Bag Implication -> TcM ()
 simplifyTopImplic implics
