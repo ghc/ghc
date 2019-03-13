@@ -1,3 +1,11 @@
+## 0.6.1
+
+- Shipped with GHC 8.10.1
+
+- Added to `GHC.Prim`:
+
+        closureSize# :: a -> Int#
+
 ## 0.6.0
 
 - Shipped with GHC 8.8.1

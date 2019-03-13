@@ -6,3 +6,6 @@ test('heap_all',
       omit_ways(['ghci', 'hpc'])
      ],
      compile_and_run, [''])
+test('closure_size',
+     omit_ways(['ghci', 'hpc', 'prof']),
+     compile_and_run, [''])
