@@ -1179,8 +1179,15 @@ emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
   | otherwise
   = do { ev_binds <- newNoTcEvBinds
        ; implic   <- newImplication
+       ; let status | insolubleWC wanted = IC_Insoluble
+                    | otherwise          = IC_Unsolved
+             -- If the inner constraints are insoluble,
+             -- we should mark the outer one similarly,
+             -- so that insolubleWC works on the outer one
+
        ; emitImplication $
-         implic { ic_tclvl     = tclvl
+         implic { ic_status    = status
+                , ic_tclvl     = tclvl
                 , ic_skols     = skol_tvs
                 , ic_no_eqs    = True
                 , ic_telescope = m_telescope

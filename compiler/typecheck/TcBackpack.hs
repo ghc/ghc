@@ -582,7 +582,7 @@ mergeSignatures
                         -- signatures that are merged in, we will discover this
                         -- when we run exports_from_avail on the final merged
                         -- export list.
-                        (msgs, mb_r) <- tryTc $ do
+                        (mb_r, msgs) <- tryTc $ do
                             -- Suppose that we have written in a signature:
                             --  signature A ( module A ) where {- empty -}
                             -- If I am also inheriting a signature from a
