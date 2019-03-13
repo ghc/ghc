@@ -115,22 +115,25 @@ INLINE_HEADER void nonmovingPushActiveSegment(struct NonmovingSegment *seg)
     struct NonmovingAllocator *alloc =
         nonmovingHeap.allocators[seg->block_size - NONMOVING_ALLOCA0];
     while (true) {
-        seg->link = alloc->active;
-        if (cas((StgVolatilePtr) &alloc->active, (StgWord) seg->link, (StgWord) seg) == (StgWord) seg->link)
+        struct NonmovingSegment *current_active = (struct NonmovingSegment*)VOLATILE_LOAD(&alloc->active);
+        seg->link = current_active;
+        if (cas((StgVolatilePtr) &alloc->active, (StgWord) current_active, (StgWord) seg) == (StgWord) current_active) {
             break;
+        }
     }
 }
 
-// Add a segment to the appropriate active list.
+// Add a segment to the appropriate filled list.
 INLINE_HEADER void nonmovingPushFilledSegment(struct NonmovingSegment *seg)
 {
     struct NonmovingAllocator *alloc =
         nonmovingHeap.allocators[seg->block_size - NONMOVING_ALLOCA0];
     while (true) {
-        seg->link = alloc->filled;
-        ASSERT(seg->link != seg);
-        if (cas((StgVolatilePtr) &alloc->filled, (StgWord) seg->link, (StgWord) seg) == (StgWord) seg->link)
+        struct NonmovingSegment *current_filled = (struct NonmovingSegment*)VOLATILE_LOAD(&alloc->filled);
+        seg->link = current_filled;
+        if (cas((StgVolatilePtr) &alloc->filled, (StgWord) current_filled, (StgWord) seg) == (StgWord) current_filled) {
             break;
+        }
     }
 }
 // Assert that the pointer can be traced by the non-moving collector (e.g. in
