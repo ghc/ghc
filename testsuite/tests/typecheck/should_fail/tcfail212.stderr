@@ -16,25 +16,3 @@ tcfail212.hs:13:7: error:
 tcfail212.hs:13:13: error:
     • Expecting a lifted type, but ‘Int#’ is unlifted
     • In the type signature: g :: (Int#, Int#)
-
-tcfail212.hs:14:6: error:
-    • Couldn't match a lifted type with an unlifted type
-      When matching types
-        a :: *
-        Int# :: TYPE 'IntRep
-    • In the expression: 1#
-      In the expression: (1#, 2#)
-      In an equation for ‘g’: g = (1#, 2#)
-    • Relevant bindings include
-        g :: (a, b) (bound at tcfail212.hs:14:1)
-
-tcfail212.hs:14:10: error:
-    • Couldn't match a lifted type with an unlifted type
-      When matching types
-        b :: *
-        Int# :: TYPE 'IntRep
-    • In the expression: 2#
-      In the expression: (1#, 2#)
-      In an equation for ‘g’: g = (1#, 2#)
-    • Relevant bindings include
-        g :: (a, b) (bound at tcfail212.hs:14:1)
