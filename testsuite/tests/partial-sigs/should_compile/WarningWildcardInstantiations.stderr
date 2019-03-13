@@ -5,15 +5,15 @@ Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]
 
-WarningWildcardInstantiations.hs:5:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Enum a’
+WarningWildcardInstantiations.hs:5:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_a’ standing for ‘a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of foo :: (Show a, Enum a) => a -> String
                at WarningWildcardInstantiations.hs:6:1-21
     • In the type signature: foo :: (Show _a, _) => _a -> _
 
-WarningWildcardInstantiations.hs:5:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_a’ standing for ‘a’
+WarningWildcardInstantiations.hs:5:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Enum a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of foo :: (Show a, Enum a) => a -> String
                at WarningWildcardInstantiations.hs:6:1-21
