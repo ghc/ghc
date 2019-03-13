@@ -392,13 +392,12 @@ tcValBinds :: TopLevelFlag
            -> TcM ([(RecFlag, LHsBinds GhcTcId)], thing)
 
 tcValBinds top_lvl binds sigs thing_inside
-  = do  { let patsyns = getPatSynBinds binds
-
-            -- Typecheck the signature
+  = do  {   -- Typecheck the signatures
+            -- It's easier to do so now, once for all the SCCs together
+            -- because a single signature  f,g :: <type>
+            -- might relate to more than one SCC
         ; (poly_ids, sig_fn) <- tcAddPatSynPlaceholders patsyns $
                                 tcTySigs sigs
-
-        ; let prag_fn = mkPragEnv sigs (foldr (unionBags . snd) emptyBag binds)
 
                 -- Extend the envt right away with all the Ids
                 -- declared with complete type signatures
@@ -413,6 +412,9 @@ tcValBinds top_lvl binds sigs thing_inside
                    ; let extra_binds = [ (NonRecursive, builder) | builder <- patsyn_builders ]
                    ; return (extra_binds, thing) }
             ; return (binds' ++ extra_binds', thing) }}
+  where
+    patsyns = getPatSynBinds binds
+    prag_fn = mkPragEnv sigs (foldr (unionBags . snd) emptyBag binds)
 
 ------------------------
 tcBindGroups :: TopLevelFlag -> TcSigFun -> TcPragEnv
