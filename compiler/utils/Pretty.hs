@@ -115,16 +115,13 @@ import GhcPrelude hiding (error)
 
 import BufWrite
 import FastString
-import Panic
+import PlainPanic
 import System.IO
 import Numeric (showHex)
 
 --for a RULES
 import GHC.Base ( unpackCString#, unpackNBytes#, Int(..) )
 import GHC.Ptr  ( Ptr(..) )
-
--- Don't import Util( assertPanic ) because it makes a loop in the module structure
-
 
 -- ---------------------------------------------------------------------------
 -- The Doc calculus
