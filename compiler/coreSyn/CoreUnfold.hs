@@ -1177,7 +1177,11 @@ was certainlyWillInline, so the addition got duplicated.
 
 Note that we check arityInfo instead of the arity of the unfolding to detect
 this case. This is so that we don't accidentally fail to inline small partial
-applications, like `f = g 42` (where `g` recurses into `f`).
+applications, like `f = g 42` (where `g` recurses into `f`) where g has arity 2
+(say). Here there is no risk of work duplication, and the RHS is tiny, so
+certainlyWillInline should return True. But `unf_arity` is zero! However f's
+arity, gotten from `arityInfo fn_info`, is 1.
+
 Failing to say that `f` will inline forces W/W to generate a potentially huge
 worker for f that will immediately cancel with `g`'s wrapper anyway, causing
 unnecessary churn in the Simplifier while arriving at the same result.
