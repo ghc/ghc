@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, UnboxedTuples,
+{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation,
     RecordWildCards, BangPatterns #-}
 
 -- -----------------------------------------------------------------------------
