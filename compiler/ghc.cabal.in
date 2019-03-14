@@ -558,6 +558,7 @@ Library
         Outputable
         Pair
         Panic
+        PlainPanic
         PprColour
         Pretty
         State

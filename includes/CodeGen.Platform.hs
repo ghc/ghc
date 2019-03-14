@@ -2,7 +2,7 @@
 import CmmExpr
 #if !(defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
     || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc))
-import Panic
+import PlainPanic
 #endif
 import Reg
 
