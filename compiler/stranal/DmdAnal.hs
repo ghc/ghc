@@ -1326,7 +1326,7 @@ findBndrDmd env arg_of_dfun dmd_ty id
 
 set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
 set_idStrictness env id sig
-  = id `setIdStrictness` (killUsageSig (ae_dflags env) sig)
+  = setIdStrictness id (killUsageSig (ae_dflags env) sig)
 
 dumpStrSig :: CoreProgram -> SDoc
 dumpStrSig binds = vcat (map printId ids)
