@@ -55,7 +55,8 @@ import Settings
 -- "Hadrian.Oracles.TextFile.readPackageData" oracle.
 parsePackageData :: Package -> Action PackageData
 parsePackageData pkg = do
-    gpd <- liftIO $ C.readGenericPackageDescription C.verbose (pkgCabalFile pkg)
+    gpd <- traced "cabal-read" $
+        C.readGenericPackageDescription C.verbose (pkgCabalFile pkg)
     let pd      = C.packageDescription gpd
         pkgId   = C.package pd
         name    = C.unPackageName (C.pkgName pkgId)
@@ -141,8 +142,9 @@ configurePackage context@Context {..} = do
     argList     <- interpret (target context (Cabal Setup stage) [] []) flavourArgs
     verbosity   <- getVerbosity
     let v = if verbosity >= Loud then "-v3" else "-v0"
-    liftIO $ C.defaultMainWithHooksNoReadArgs hooks gpd
-        (argList ++ ["--flags=" ++ unwords flagList, v])
+    traced "cabal-configure" $
+        C.defaultMainWithHooksNoReadArgs hooks gpd
+            (argList ++ ["--flags=" ++ unwords flagList, v])
 
     dir <- Context.buildPath context
     files <- liftIO $ getDirectoryFilesIO "." [ dir -/- "include" <//> "*"
@@ -161,8 +163,9 @@ copyPackage context@Context {..} = do
     pkgDbPath <- packageDbPath stage
     verbosity <- getVerbosity
     let v = if verbosity >= Loud then "-v3" else "-v0"
-    liftIO $ C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
-        [ "copy", "--builddir", ctxPath, "--target-package-db", pkgDbPath, v ]
+    traced "cabal-copy" $
+        C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
+            [ "copy", "--builddir", ctxPath, "--target-package-db", pkgDbPath, v ]
 
 -- | Register the 'Package' of a given 'Context' into the package database.
 registerPackage :: Context -> Action ()
@@ -172,8 +175,9 @@ registerPackage context@Context {..} = do
     gpd <- pkgGenericDescription package
     verbosity <- getVerbosity
     let v = if verbosity >= Loud then "-v3" else "-v0"
-    liftIO $ C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
-        [ "register", "--builddir", ctxPath, v ]
+    traced "cabal-register" $
+        C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
+            [ "register", "--builddir", ctxPath, v ]
 
 -- | Parse the 'ContextData' of a given 'Context'.
 resolveContextData :: Context -> Action ContextData
@@ -293,7 +297,7 @@ buildAutogenFiles context = do
     pd <- packageDescription <$> readContextData context
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
-    liftIO $ do
+    traced "cabal-autogen" $ do
         lbi <- C.getPersistBuildConfig cPath
         C.initialBuildSteps cPath pd (lbi { C.localPkgDescr = pd }) C.silent
 
