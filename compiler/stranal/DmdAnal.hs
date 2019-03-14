@@ -657,17 +657,46 @@ mkBodyDmd env arity body
 -- | If given the let-bound 'Id', 'useLetUp' determines whether we should
 -- process the binding up (body before rhs) or down (rhs before body).
 --
--- We use LetDown if there is a chance to get a useful strictness signature.
--- This is the case when it takes any arguments before performing meaningful
--- work (cf. 'idArity') or the binding is a join point (hence always acts like
--- a function, not a value).
+-- We use LetDown if there is a chance to get a useful strictness signature to
+-- unleash at call sites. LetDown is generally more precise than LetUp if we can
+-- correctly guess how it will be used in the body, that is, for which incoming
+-- demand the strictness signature should be computed, which allows us to
+-- unleash higher-order demands on arguments at call sites. This is mostly the
+-- case when
 --
--- Thus, if the binding is not a join point and its arity is 0, we use LetUp.
--- In that case, it's a thunk and we want to unleash its 'DmdEnv' of free vars
--- at most once, regardless of how many times it was forced in the body. This
--- makes a real difference wrt. usage demands. The other reason is being able to
--- unleash a more precise product demand on its RHS once we know how the thunk
--- was used in the let body.
+--   * The binding takes any arguments before performing meaningful work (cf.
+--     'idArity'), in which case we are interested to see how it uses them.
+--   * The binding is a join point, hence acting like a function, not a value.
+--     As a big plus, we know *precisely* how it will be used in the body; since
+--     it's always tail-called, we can directly unleash the incoming demand of
+--     the let binding on its RHS when computing a strictness signature. See
+--     [Demand analysis for join points].
+--
+-- Thus, if the binding is not a join point and its arity is 0, we have a thunk
+-- and use LetUp, implying that we have no usable demand signature available
+-- when we analyse the let body.
+--
+-- Since thunk evaluation is memoised, we want to unleash its 'DmdEnv' of free
+-- vars at most once, regardless of how many times it was forced in the body.
+-- This makes a real difference wrt. usage demands. The other reason is being
+-- able to unleash a more precise product demand on its RHS once we know how the
+-- thunk was used in the let body.
+--
+-- Characteristic examples, always assuming a single evaluation:
+--
+--   * @let x = 2*y in x + x@ => LetUp. Compared to LetDown, we find out that
+--     the expression uses @y@ at most once.
+--   * @let x = (a,b) in fst x@ => LetUp. Compared to LetDown, we find out that
+--     @b@ is absent.
+--   * @let f x = x*2 in f y@ => LetDown. Compared to LetUp, we find out that
+--     the expression uses @y@ strictly, because we have @f@'s demand signature
+--     available at the call site.
+--   * @join exit = 2*y in if a then exit else if b then exit else 3*y@ =>
+--     LetDown. Compared to LetUp, we find out that the expression uses @y@
+--     strictly, because we can unleash @exit@'s signature at each call site.
+--   * For a more convincing example with join points, see Note [Demand analysis
+--     for join points].
+--
 useLetUp :: Var -> Bool
 useLetUp f = idArity f == 0 && not (isJoinId f)
 
@@ -704,28 +733,20 @@ Another win for join points!  Trac #13543.
 
 Note [Demand signatures are computed for idArity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We try hard to preserve the following invariants:
+We compute demand signatures assuming idArity incoming arguments to approximate
+behavior for when we have a call site with at least that many arguments.
 
-  (1) Demand signatures are computed assuming 'idArity' incoming arguments
-  (2) The number of args ('dmdTypeDepth') of a strictness signature
-      must never exceed 'idArity'
+Because idArity of a function varies independently of its strictness properties,
+we implicitly encode the arity for when a demand signature is sound to unleash
+in its 'dmdTypeDepth'. It is unsound to unleash a strictness signature when
+the incoming call demand is less than that. See [What are demand signatures?]
+for more details in that regard.
 
 Why idArity arguments? Because that's a conservative estimate of how many
-arguments we must feed a function before it does anything useful with them.
+arguments we must feed a function before it does anything interesting with them.
 
-A direct consequence of (1) is that demand signatures may be soundly
-unleashed at call sites when there are *at least* idArity incoming arguments.
-See [What are demand signatures?] for more details in that regard.
-
-NB: It's safe to reuse an arity 1 strictness signature of a function that has
-arity 2 after eta expansion. If the resulting function was applied to two
-arguments, it's still sound to unleash the original strictness signature, which
-needed one incoming argument as a precodition. The same is not true for
-eta reduction, see Note [Demand signatures and arity decreases] in CoreOpt.
-
-(2) captures the observation that there is no sense in a strictness signature
-declaring more argument demands than there are incoming arguments.
-Consider
+There might be functions for which having multiple signatures for different
+arities would be useful. Example:
 
   f x =
     if expensive
@@ -733,22 +754,20 @@ Consider
       else \y -> ... y ...
 
 We'd analyse `f` under a unary call demand `C(S)`. Enough to look under the
-manifest lambda, but not enough to look into the lambdas in the if branches.
+manifest lambda and find out how a unary call would use `x`, but not enough to
+look into the lambdas in the if branches.
 
-But why couldn't we just look into the lambdas nonetheless? For calls to `f`
-with arity 1, it shouldn't make a difference, right? We'd get useful information
-on how `f` uses a potential second argument strictly, while the first argument
-demand should be unaffected, so it's still safe to unleash at unary call sites.
+On the other hand, if we analysed for call demand `C(C(S))`, we'd get useful
+strictness info for `y` (and more precise info on `x`), but
 
-But that's wrong! Consider that both lambda bodies were `x + y`. Now, suddenly
-`f` is also strict in `x`! There might be ways to work around this (i.e. a
-"graded" strictness signature, depending on how many arguments were supplied),
-but let's not overthink it for now.
+  * We would no longer be able to unleash the signature at unary call sites
+  * Performing the worker/wrapper split based on this information would be
+    implicitly eta-expanding `f`, playing fast and loose with divergence, so we
+    refrain from doing so.
 
-Another reason why we don't do it: The worker/wrapper transformation would
-look at the signature and split it for the call with two arguments, effectively
-eta expanding the worker for f where the expensive computation hides. Ergo we
-would still have to use the signature for arity 1 to guide w/w.
+Since we only compute one signature, we do so for arity 1, but a "graded"
+signature for multiple arities would be entirely possible, if it weren't for the
+additional runtime and implementation complexity.
 
 Thus, we trim the demand signature with 'ensureArgs' when analysing bindings
 with LetDown.
