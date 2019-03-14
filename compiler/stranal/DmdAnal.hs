@@ -758,7 +758,8 @@ manifest lambda and find out how a unary call would use `x`, but not enough to
 look into the lambdas in the if branches.
 
 On the other hand, if we analysed for call demand `C(C(S))`, we'd get useful
-strictness info for `y` (and more precise info on `x`), but
+strictness info for `y` (and more precise info on `x`) and possibly CPR
+information, but
 
   * We would no longer be able to unleash the signature at unary call sites
   * Performing the worker/wrapper split based on this information would be
