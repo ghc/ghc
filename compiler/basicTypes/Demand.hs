@@ -675,10 +675,12 @@ mkProdDmd dx
   = JD { sd = mkSProd $ map getStrDmd dx
        , ud = mkUProd $ map getUseDmd dx }
 
+-- | Wraps the 'CleanDemand' with a one-shot call demand: @d@ -> @C1(d)@.
 mkCallDmd :: CleanDemand -> CleanDemand
 mkCallDmd (JD {sd = d, ud = u})
   = JD { sd = mkSCall d, ud = mkUCall One u }
 
+-- | @mkCallDmds n d@ returns @C1(C1...(C1 d))@ where there are @n@ @C1@'s.
 mkCallDmds :: Arity -> CleanDemand -> CleanDemand
 mkCallDmds arity cd = iterate mkCallDmd cd !! arity
 
