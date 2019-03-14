@@ -768,14 +768,14 @@ makeInjectivityErrors fi_ax axiom inj conflicts
 -- declaration. The returned Pair includes invisible vars followed by visible ones
 unusedInjTvsInRHS :: TyCon -> [Bool] -> [Type] -> Type -> Pair TyVarSet
 -- INVARIANT: [Bool] list contains at least one True value
--- See Note [Verifying injectivity annotation]. This function implements fourth
--- check described there.
+-- See Note [Verifying injectivity annotation] in FamInstEnv.
+-- This function implements check (4) described there.
 -- In theory, instead of implementing this whole check in this way, we could
 -- attempt to unify equation with itself.  We would reject exactly the same
 -- equations but this method gives us more precise error messages by returning
 -- precise names of variables that are not mentioned in the RHS.
 unusedInjTvsInRHS tycon injList lhs rhs =
-  (`minusVarSet` injRhsVars) <$> injLHSVars
+  (`minusVarSet` injRhsVars) <$> injLhsVars
     where
       inj_pairs :: [(Type, ArgFlag)]
       -- All the injective arguments, paired with their visibility
@@ -789,7 +789,7 @@ unusedInjTvsInRHS tycon injList lhs rhs =
 
       invis_vars = tyCoVarsOfTypes invis_lhs
       Pair invis_vars' vis_vars = splitVisVarsOfTypes vis_lhs
-      injLHSVars
+      injLhsVars
         = Pair (invis_vars `minusVarSet` vis_vars `unionVarSet` invis_vars')
                vis_vars
 
@@ -813,7 +813,7 @@ injTyVarsOfType (TyVarTy v)
   = unitVarSet v `unionVarSet` injTyVarsOfType (tyVarKind v)
 injTyVarsOfType (TyConApp tc tys)
   | isTypeFamilyTyCon tc
-   = case tyConInjectivityInfo tc of
+  = case tyConInjectivityInfo tc of
         NotInjective  -> emptyVarSet
         Injective inj -> injTyVarsOfTypes (filterByList inj tys)
   | otherwise
@@ -835,8 +835,7 @@ injTyVarsOfTypes tys = mapUnionVarSet injTyVarsOfType tys
 
 -- | Is type headed by a type family application?
 isTFHeaded :: Type -> Bool
--- See Note [Verifying injectivity annotation]. This function implements third
--- check described there.
+-- See Note [Verifying injectivity annotation], case 3.
 isTFHeaded ty | Just ty' <- coreView ty
               = isTFHeaded ty'
 isTFHeaded ty | (TyConApp tc args) <- ty
@@ -848,8 +847,7 @@ isTFHeaded _  = False
 -- | If a RHS is a bare type variable return a set of LHS patterns that are not
 -- bare type variables.
 bareTvInRHSViolated :: [Type] -> Type -> [Type]
--- See Note [Verifying injectivity annotation]. This function implements second
--- check described there.
+-- See Note [Verifying injectivity annotation], case 2.
 bareTvInRHSViolated pats rhs | isTyVarTy rhs
    = filter (not . isTyVarTy) pats
 bareTvInRHSViolated _ _ = []
