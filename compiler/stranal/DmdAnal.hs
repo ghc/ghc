@@ -703,8 +703,7 @@ let_dmd here).
 Another win for join points!  Trac #13543.
 
 Note [Demand signatures are computed for idArity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We try hard to preserve the following invariants:
 
   (1) Demand signatures are computed assuming 'idArity' incoming arguments
@@ -755,8 +754,7 @@ Thus, we trim the demand signature with 'ensureArgs' when analysing bindings
 with LetDown.
 
 Note [What are demand signatures?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Demand signatures are single-point approximations of an (the best?) abstract
 transformer of a binding's right-hand side. We only compute a single
 point because it's quite costly to analyse bindings multiple times,

@@ -722,8 +722,7 @@ A more common case is when
 and again its arity increses (Trac #15517)
 
 Note [Demand signatures and arity decreases]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Since we look at idArity to determine whether to unleash a demand signature
 or not (See Note [Demand signatures are computed for idArity] in DmdAnal),
 we have to be careful to zap the signature when there was an arity decrease.
