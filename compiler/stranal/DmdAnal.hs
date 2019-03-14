@@ -738,9 +738,9 @@ behavior for when we have a call site with at least that many arguments.
 
 Because idArity of a function varies independently of its strictness properties,
 we implicitly encode the arity for when a demand signature is sound to unleash
-in its 'dmdTypeDepth'. It is unsound to unleash a strictness signature when
-the incoming call demand is less than that. See [What are demand signatures?]
-for more details in that regard.
+in its 'dmdTypeDepth'. It is unsound to unleash a strictness signature when the
+incoming call demand is less than that. See [What are demand signatures?] for
+more details in that regard.
 
 Why idArity arguments? Because that's a conservative estimate of how many
 arguments we must feed a function before it does anything interesting with them.
@@ -762,8 +762,8 @@ strictness info for `y` (and more precise info on `x`), but
 
   * We would no longer be able to unleash the signature at unary call sites
   * Performing the worker/wrapper split based on this information would be
-    implicitly eta-expanding `f`, playing fast and loose with divergence, so we
-    refrain from doing so.
+    implicitly eta-expanding `f`, playing fast and loose with divergence and
+    even being unsound in the presence of newtypes, so we refrain from doing so.
 
 Since we only compute one signature, we do so for arity 1, but a "graded"
 signature for multiple arities would be entirely possible, if it weren't for the
