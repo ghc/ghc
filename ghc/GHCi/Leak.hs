@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, LambdaCase, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE RecordWildCards, LambdaCase #-}
 module GHCi.Leak
   ( LeakIndicators
   , getLeakIndicators
@@ -10,9 +10,8 @@ import Data.Bits
 import DynFlags ( sTargetPlatform )
 import Foreign.Ptr (ptrToIntPtr, intPtrToPtr)
 import GHC
-import GHC.Exts (anyToAddr#)
 import GHC.Ptr (Ptr (..))
-import GHC.Types (IO (..))
+import GHCi.Util
 import HscTypes
 import Outputable
 import Platform (target32Bit)
@@ -64,8 +63,7 @@ checkLeakIndicators dflags (LeakIndicators leakmods)  = do
   report :: String -> Maybe a -> IO ()
   report _ Nothing = return ()
   report msg (Just a) = do
-    addr <- IO (\s -> case anyToAddr# a s of
-                        (# s', addr #) -> (# s', Ptr addr #)) :: IO (Ptr ())
+    addr <- anyToPtr a
     putStrLn ("-fghci-leak-check: " ++ msg ++ " is still alive at " ++
               show (maskTagBits addr))
 

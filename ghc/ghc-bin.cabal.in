@@ -71,6 +71,7 @@ Executable ghc
             GHCi.UI.Info
             GHCi.UI.Monad
             GHCi.UI.Tags
+            GHCi.Util
         Other-Extensions:
             BangPatterns
             FlexibleInstances
