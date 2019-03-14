@@ -534,12 +534,12 @@ injectiveBranches :: [Bool] -> CoAxBranch -> CoAxBranch
 injectiveBranches injectivity
                   ax1@(CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                   ax2@(CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
-  -- See Note [Verifying injectivity annotation]. This function implements first
-  -- check described there.
+  -- See Note [Verifying injectivity annotation], case 1.
   = let getInjArgs  = filterByList injectivity
     in case tcUnifyTyWithTFs True rhs1 rhs2 of -- True = two-way pre-unification
-       Nothing -> InjectivityAccepted -- RHS are different, so equations are
-                                      -- injective.
+       Nothing -> InjectivityAccepted
+         -- RHS are different, so equations are injective.
+         -- This is case 1A from Note [Verifying injectivity annotation]
        Just subst -> -- RHS unify under a substitution
         let lhs1Subst = Type.substTys subst (getInjArgs lhs1)
             lhs2Subst = Type.substTys subst (getInjArgs lhs2)
@@ -548,12 +548,14 @@ injectiveBranches injectivity
         -- equal under that substitution then this pair of equations violates
         -- injectivity annotation, but for closed type families it still might
         -- be the case that one LHS after substitution is unreachable.
-        in if eqTypes lhs1Subst lhs2Subst
+        in if eqTypes lhs1Subst lhs2Subst  -- check case 1B1 from Note.
            then InjectivityAccepted
            else InjectivityUnified ( ax1 { cab_lhs = Type.substTys subst lhs1
                                          , cab_rhs = Type.substTy  subst rhs1 })
                                    ( ax2 { cab_lhs = Type.substTys subst lhs2
                                          , cab_rhs = Type.substTy  subst rhs2 })
+                -- payload of InjectivityUnified used only for check 1B2, only
+                -- for closed type families
 
 -- takes a CoAxiom with unknown branch incompatibilities and computes
 -- the compatibilities
@@ -826,7 +828,7 @@ conditions hold:
 1. For each pair of *different* equations of a type family, one of the following
    conditions holds:
 
-   A:  RHSs are different.
+   A:  RHSs are different. (Check done in FamInstEnv.injectiveBranches)
 
    B1: OPEN TYPE FAMILIES: If the RHSs can be unified under some substitution
        then it must be possible to unify the LHSs under the same substitution.
@@ -838,7 +840,7 @@ conditions hold:
 
        RHSs of these two equations unify under [ a |-> Int ] substitution.
        Under this substitution LHSs are equal therefore these equations don't
-       violate injectivity annotation.
+       violate injectivity annotation. (Check done in FamInstEnv.injectiveBranches)
 
    B2: CLOSED TYPE FAMILIES: If the RHSs can be unified under some
        substitution then either the LHSs unify under the same substitution or
@@ -855,7 +857,7 @@ conditions hold:
        of last equation and check whether it is overlapped by any of previous
        equations. Since it is overlapped by the first equation we conclude
        that pair of last two equations does not violate injectivity
-       annotation.
+       annotation. (Check done in TcValidity.checkValidCoAxiom#gather_conflicts)
 
    A special case of B is when RHSs unify with an empty substitution ie. they
    are identical.
@@ -869,7 +871,7 @@ conditions hold:
    Note that we only take into account these LHS patterns that were declared
    as injective.
 
-2. If a RHS of a type family equation is a bare type variable then
+2. If an RHS of a type family equation is a bare type variable then
    all LHS variables (including implicit kind variables) also have to be bare.
    In other words, this has to be a sole equation of that type family and it has
    to cover all possible patterns.  So for example this definition will be
@@ -880,15 +882,16 @@ conditions hold:
 
    If it were accepted we could call `W1 [W1 Int]`, which would reduce to
    `W1 Int` and then by injectivity we could conclude that `[W1 Int] ~ Int`,
-   which is bogus.
+   which is bogus. Checked FamInst.bareTvInRHSViolated.
 
-3. If a RHS of a type family equation is a type family application then the type
-   family is rejected as not injective.
+3. If the RHS of a type family equation is a type family application then the type
+   family is rejected as not injective. This is checked by FamInst.isTFHeaded.
 
 4. If a LHS type variable that is declared as injective is not mentioned on
    injective position in the RHS then the type family is rejected as not
    injective.  "Injective position" means either an argument to a type
    constructor or argument to a type family on injective position.
+   This is checked by FamInst.unusedInjTvsInRHS.
 
 See also Note [Injective type families] in TyCon
 -}
