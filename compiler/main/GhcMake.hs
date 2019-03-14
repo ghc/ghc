@@ -1430,6 +1430,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                         && (not (isObjectTarget prevailing_target)
                             || not (isObjectTarget local_target))
                         && not (prevailing_target == HscNothing)
+                        && not (prevailing_target == HscInterpreted)
                         then prevailing_target
                         else local_target
 
@@ -1955,7 +1956,11 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
          then enableCodeGenForTH
            (defaultObjectTarget (targetPlatform dflags))
            map0
-         else return map0
+         else if hscTarget dflags == HscInterpreted
+           then enableCodeGenForUnboxedTuples
+             (defaultObjectTarget (targetPlatform dflags))
+             map0
+           else return map0
        return $ concat $ nodeMapElts map1
      where
         calcDeps = msDeps
@@ -2034,7 +2039,50 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 enableCodeGenForTH :: HscTarget
   -> NodeMap [Either ErrMsg ModSummary]
   -> IO (NodeMap [Either ErrMsg ModSummary])
-enableCodeGenForTH target nodemap =
+enableCodeGenForTH =
+  enableCodeGenWhen condition should_modify TFL_CurrentModule TFL_GhcSession
+  where
+    condition = isTemplateHaskellOrQQNonBoot
+    should_modify (ModSummary { ms_hspp_opts = dflags }) =
+      hscTarget dflags == HscNothing &&
+      -- Don't enable codegen for TH on indefinite packages; we
+      -- can't compile anything anyway! See #16219.
+      not (isIndefinite dflags)
+
+-- | Update the every ModSummary that is depended on
+-- by a module that needs unboxed tuples. We enable codegen to
+-- the specified target, disable optimization and change the .hi
+-- and .o file locations to be temporary files.
+--
+-- This is used used in order to load code that uses unboxed tuples
+-- into GHCi while still allowing some code to be interpreted.
+enableCodeGenForUnboxedTuples :: HscTarget
+  -> NodeMap [Either ErrMsg ModSummary]
+  -> IO (NodeMap [Either ErrMsg ModSummary])
+enableCodeGenForUnboxedTuples =
+  enableCodeGenWhen condition should_modify TFL_GhcSession TFL_CurrentModule
+  where
+    condition ms =
+      xopt LangExt.UnboxedTuples (ms_hspp_opts ms) &&
+      not (isBootSummary ms)
+    should_modify (ModSummary { ms_hspp_opts = dflags }) =
+      hscTarget dflags == HscInterpreted
+
+-- | Helper used to implement 'enableCodeGenForTH' and
+-- 'enableCodeGenForUnboxedTuples'. In particular, this enables
+-- unoptimized code generation for all modules that meet some
+-- condition (first parameter), or are dependencies of those
+-- modules. The second parameter is a condition to check before
+-- marking modules for code generation.
+enableCodeGenWhen
+  :: (ModSummary -> Bool)
+  -> (ModSummary -> Bool)
+  -> TempFileLifetime
+  -> TempFileLifetime
+  -> HscTarget
+  -> NodeMap [Either ErrMsg ModSummary]
+  -> IO (NodeMap [Either ErrMsg ModSummary])
+enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
   traverse (traverse (traverse enable_code_gen)) nodemap
   where
     enable_code_gen ms
@@ -2042,18 +2090,15 @@ enableCodeGenForTH target nodemap =
         { ms_mod = ms_mod
         , ms_location = ms_location
         , ms_hsc_src = HsSrcFile
-        , ms_hspp_opts = dflags@DynFlags
-          {hscTarget = HscNothing}
+        , ms_hspp_opts = dflags
         } <- ms
-      -- Don't enable codegen for TH on indefinite packages; we
-      -- can't compile anything anyway! See #16219.
-      , not (isIndefinite dflags)
+      , should_modify ms
       , ms_mod `Set.member` needs_codegen_set
       = do
         let new_temp_file suf dynsuf = do
-              tn <- newTempName dflags TFL_CurrentModule suf
+              tn <- newTempName dflags staticLife suf
               let dyn_tn = tn -<.> dynsuf
-              addFilesToClean dflags TFL_GhcSession [dyn_tn]
+              addFilesToClean dflags dynLife [dyn_tn]
               return tn
           -- We don't want to create .o or .hi files unless we have been asked
           -- to by the user. But we need them, so we patch their locations in
@@ -2076,7 +2121,7 @@ enableCodeGenForTH target nodemap =
       [ ms
       | mss <- Map.elems nodemap
       , Right ms <- mss
-      , isTemplateHaskellOrQQNonBoot ms
+      , condition ms
       ]
 
     -- find the set of all transitive dependencies of a list of modules.
