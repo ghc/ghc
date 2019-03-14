@@ -765,6 +765,7 @@ information, but
   * Performing the worker/wrapper split based on this information would be
     implicitly eta-expanding `f`, playing fast and loose with divergence and
     even being unsound in the presence of newtypes, so we refrain from doing so.
+    Also see Note [Don't eta expand in w/w] in WorkWrap.
 
 Since we only compute one signature, we do so for arity 1, but a "graded"
 signature for multiple arities would be entirely possible, if it weren't for the
@@ -805,9 +806,9 @@ we want plusInt's strictness to propagate to foo!  But because it has
 no manifest lambdas, it won't do so automatically, and indeed 'co' might
 have type (Int->Int->Int) ~ T.
 
-Fortunately, CoreArity gives 'foo' arity 2 and all is well (see the definition
-of 'manifestArity' and Note [Newtype arity] in CoreArity)! A small example is
-the test case NewtypeArity.
+Fortunately, CoreArity gives 'foo' arity 2, which is enough for LetDown to
+forward plusInt's demand signature, and all is well (see Note [Newtype arity] in
+CoreArity)! A small example is the test case NewtypeArity.
 
 
 Note [Product demands for function body]
