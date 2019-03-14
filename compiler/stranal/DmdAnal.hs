@@ -599,25 +599,26 @@ dmdAnalRhsLetDown :: TopLevelFlag
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
-  = (lazy_fv, id', mkLams bndrs' body')
+  = (lazy_fv, id', rhs')
   where
-    rhs_arity        = idArity id
-    (bndrs, body, body_dmd)
-       = case isJoinId_maybe id of
-           Just join_arity  -- See Note [Demand analysis for join points]
-                   | (bndrs, body) <- collectNBinders join_arity rhs
-                   -> (bndrs, body, let_dmd)
+    rhs_arity      = idArity id
+    rhs_dmd
+      -- See Note [Demand analysis for join points]
+      | Just join_arity <- isJoinId_maybe id
+      , (bndrs, _) <- collectNBinders join_arity rhs
+      = mkCallDmds (count isId bndrs) let_dmd
+      | otherwise
+      , (_, body) <- collectBinders rhs
+      = mkCallDmds rhs_arity (mkBodyDmd env body)
+    (rhs_ty, rhs') = dmdAnal env rhs_dmd rhs
 
-           Nothing | (bndrs, body) <- collectBinders rhs
-                   , let body_arity = rhs_arity - count isId bndrs
-                   -> (bndrs, body, mkBodyDmd env body_arity body)
-
-    env_body         = foldl' extendSigsWithLam env bndrs
-    (body_ty, body') = dmdAnal env_body body_dmd body
-    (rhs_ty, bndrs') = annotateLamBndrs env (isDFunId id) body_ty bndrs
-    -- Set Note [Demand signatures are computed for idArity]
+    -- The resulting rhs_ty might have depth > idArity, which means we wouldn't
+    -- unleash it at call sites with idArity incoming arguments, although that
+    -- would've been perfectly safe. Hence we trim the demand signature with
+    -- ensureArgs, also zapping possible deep CPR info in the process.
+    -- See Note [Demand signatures are computed for idArity].
     DmdType rhs_fv rhs_dmds rhs_res
-                     = ensureArgs rhs_arity rhs_ty -- zap possible deep CPR info
+                     = ensureArgs rhs_arity rhs_ty
     sig_ty           = mkStrictSig (mkDmdType sig_fv rhs_dmds rhs_res')
     id'              = set_idStrictness env id sig_ty
         -- See Note [NOINLINE and strictness]
@@ -644,15 +645,12 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
           -- See Note [Optimistic CPR in the "virgin" case]
 
 -- | Creates a 'CleanDemand' appropriate for unleashing on the given function
--- body, by wrapping a head demand into @arity@ many calls.
--- See Note [Product demands for function body]
-mkBodyDmd :: AnalEnv -> Arity -> CoreExpr -> CleanDemand
-mkBodyDmd env arity body
-  = mkCallDmds arity base
-  where
-    base = case deepSplitProductType_maybe (ae_fam_envs env) (exprType body) of
-       Nothing            -> cleanEvalDmd
-       Just (dc, _, _, _) -> cleanEvalProdDmd (dataConRepArity dc)
+-- body. See Note [Product demands for function body].
+mkBodyDmd :: AnalEnv -> CoreExpr -> CleanDemand
+mkBodyDmd env body
+  = case deepSplitProductType_maybe (ae_fam_envs env) (exprType body) of
+      Nothing            -> cleanEvalDmd
+      Just (dc, _, _, _) -> cleanEvalProdDmd (dataConRepArity dc)
 
 -- | If given the let-bound 'Id', 'useLetUp' determines whether we should
 -- process the binding up (body before rhs) or down (rhs before body).
