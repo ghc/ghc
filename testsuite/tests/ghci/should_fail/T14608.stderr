@@ -1,3 +1,0 @@
-Error: bytecode compiler can't handle unboxed tuples and sums.
-  Possibly due to foreign import/export decls in source.
-  Workaround: use -fobject-code, or compile this module to .o separately.

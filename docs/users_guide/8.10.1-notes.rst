@@ -67,6 +67,13 @@ Compiler
   `copyByteArray#` calls that were not optimized before, now will
   be. See :ghc-ticket:`16052`.
 
+- When loading modules that use :extension:`UnboxedTuples` into GHCi,
+  it will now automatically enable `-fobject-code` for these modules
+  and all modules they depend on. Before this change, attempting to
+  load these modules into the interpreter would just fail, and the
+  only convenient workaround was to enable `-fobject-code` for all
+  modules.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
