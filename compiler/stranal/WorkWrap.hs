@@ -476,7 +476,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Zapping Used Once info in WorkWrap]
 
     is_fun     = notNull wrap_dmds || isJoinId fn_id
-    -- See Note [Don't eta-expand in w/w]
+    -- See Note [Don't eta expand in w/w]
     is_eta_exp = length wrap_dmds == manifestArity rhs
     is_thunk   = not is_fun && not (exprIsHNF rhs) && not (isJoinId fn_id)
                             && not (isUnliftedType (idType fn_id))
