@@ -496,7 +496,7 @@ vdqAllowed (ConArgCtxt {}) = False
 vdqAllowed (FunSigCtxt {}) = False
 vdqAllowed (InfSigCtxt {}) = False
 vdqAllowed (ExprSigCtxt {}) = False
-vdqAllowed (TypeAppCtxt {}) = False
+vdqAllowed (TypeAppCtxt {}) = True
 vdqAllowed (PatSynCtxt {}) = False
 vdqAllowed (PatSigCtxt {}) = False
 vdqAllowed (RuleSigCtxt {}) = False
@@ -2031,6 +2031,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
     gather_conflicts inj prev_branches cur_branch (acc, n) branch
                -- n is 0-based index of branch in prev_branches
       = case injectiveBranches inj cur_branch branch of
+           -- Case 1B2 in Note [Verifying injectivity annotation] in FamInstEnv
           InjectivityUnified ax1 ax2
             | ax1 `isDominatedBy` (replace_br prev_branches n ax2)
                 -> (acc, n + 1)
