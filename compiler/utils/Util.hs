@@ -133,7 +133,7 @@ module Util (
 import GhcPrelude
 
 import Exception
-import Panic
+import PlainPanic
 
 import Data.Data
 import Data.IORef       ( IORef, newIORef, atomicModifyIORef' )

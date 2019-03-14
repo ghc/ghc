@@ -14,7 +14,7 @@ module Panic (
      GhcException(..), showGhcException,
      throwGhcException, throwGhcExceptionIO,
      handleGhcException,
-     progName,
+     PlainPanic.progName,
      pgmError,
 
      panic, sorry, assertPanic, trace,
@@ -27,20 +27,19 @@ module Panic (
 
      withSignalHandlers,
 ) where
-#include "HsVersions.h"
 
 import GhcPrelude
 
 import {-# SOURCE #-} Outputable (SDoc, showSDocUnsafe)
+import PlainPanic
 
-import Config
 import Exception
 
 import Control.Monad.IO.Class
 import Control.Concurrent
+import Data.Typeable      ( cast )
 import Debug.Trace        ( trace )
 import System.IO.Unsafe
-import System.Environment
 
 #if !defined(mingw32_HOST_OS)
 import System.Posix.Signals as S
@@ -50,7 +49,6 @@ import System.Posix.Signals as S
 import GHC.ConsoleHandler as S
 #endif
 
-import GHC.Stack
 import System.Mem.Weak  ( deRefWeak )
 
 -- | GHC's own exception type
@@ -91,24 +89,24 @@ data GhcException
   | ProgramError    String
   | PprProgramError String SDoc
 
-instance Exception GhcException
+instance Exception GhcException where
+  fromException (SomeException e)
+    | Just ge <- cast e = Just ge
+    | Just pge <- cast e = Just $
+        case pge of
+          PlainSignal n -> Signal n
+          PlainUsageError str -> UsageError str
+          PlainCmdLineError str -> CmdLineError str
+          PlainPanic str -> Panic str
+          PlainSorry str -> Sorry str
+          PlainInstallationError str -> InstallationError str
+          PlainProgramError str -> ProgramError str
+    | otherwise = Nothing
 
 instance Show GhcException where
   showsPrec _ e@(ProgramError _) = showGhcException e
   showsPrec _ e@(CmdLineError _) = showString "<command line>: " . showGhcException e
   showsPrec _ e = showString progName . showString ": " . showGhcException e
-
-
--- | The name of this GHC.
-progName :: String
-progName = unsafePerformIO (getProgName)
-{-# NOINLINE progName #-}
-
-
--- | Short usage information to display when we are given the wrong cmd line arguments.
-short_usage :: String
-short_usage = "Usage: For basic information, try the `--help' option."
-
 
 -- | Show an exception as a string.
 showException :: Exception e => e -> String
@@ -134,42 +132,21 @@ safeShowException e = do
 -- If the error message to be printed includes a pretty-printer document
 -- which forces one of these fields this call may bottom.
 showGhcException :: GhcException -> ShowS
-showGhcException exception
- = case exception of
-        UsageError str
-         -> showString str . showChar '\n' . showString short_usage
+showGhcException = showPlainGhcException . \case
+  Signal n -> PlainSignal n
+  UsageError str -> PlainUsageError str
+  CmdLineError str -> PlainCmdLineError str
+  Panic str -> PlainPanic str
+  Sorry str -> PlainSorry str
+  InstallationError str -> PlainInstallationError str
+  ProgramError str -> PlainProgramError str
 
-        CmdLineError str        -> showString str
-        PprProgramError str  sdoc  ->
-            showString str . showString "\n\n" .
-            showString (showSDocUnsafe sdoc)
-        ProgramError str        -> showString str
-        InstallationError str   -> showString str
-        Signal n                -> showString "signal: " . shows n
-
-        PprPanic  s sdoc ->
-            panicMsg $ showString s . showString "\n\n"
-                     . showString (showSDocUnsafe sdoc)
-        Panic s -> panicMsg (showString s)
-
-        PprSorry  s sdoc ->
-            sorryMsg $ showString s . showString "\n\n"
-                     . showString (showSDocUnsafe sdoc)
-        Sorry s -> sorryMsg (showString s)
-  where
-    sorryMsg :: ShowS -> ShowS
-    sorryMsg s =
-        showString "sorry! (unimplemented feature or known bug)\n"
-      . showString ("  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t")
-      . s . showString "\n"
-
-    panicMsg :: ShowS -> ShowS
-    panicMsg s =
-        showString "panic! (the 'impossible' happened)\n"
-      . showString ("  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t")
-      . s . showString "\n\n"
-      . showString "Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug\n"
-
+  PprPanic str sdoc -> PlainPanic $
+      concat [str, "\n\n", showSDocUnsafe sdoc]
+  PprSorry str sdoc -> PlainProgramError $
+      concat [str, "\n\n", showSDocUnsafe sdoc]
+  PprProgramError str sdoc -> PlainProgramError $
+      concat [str, "\n\n", showSDocUnsafe sdoc]
 
 throwGhcException :: GhcException -> a
 throwGhcException = Exception.throw
@@ -180,41 +157,10 @@ throwGhcExceptionIO = Exception.throwIO
 handleGhcException :: ExceptionMonad m => (GhcException -> m a) -> m a -> m a
 handleGhcException = ghandle
 
-
--- | Panics and asserts.
-panic, sorry, pgmError :: String -> a
-panic    x = unsafeDupablePerformIO $ do
-   stack <- ccsToStrings =<< getCurrentCCS x
-   if null stack
-      then throwGhcException (Panic x)
-      else throwGhcException (Panic (x ++ '\n' : renderStack stack))
-
-sorry    x = throwGhcException (Sorry x)
-pgmError x = throwGhcException (ProgramError x)
-
 panicDoc, sorryDoc, pgmErrorDoc :: String -> SDoc -> a
 panicDoc    x doc = throwGhcException (PprPanic        x doc)
 sorryDoc    x doc = throwGhcException (PprSorry        x doc)
 pgmErrorDoc x doc = throwGhcException (PprProgramError x doc)
-
-cmdLineError :: String -> a
-cmdLineError = unsafeDupablePerformIO . cmdLineErrorIO
-
-cmdLineErrorIO :: String -> IO a
-cmdLineErrorIO x = do
-  stack <- ccsToStrings =<< getCurrentCCS x
-  if null stack
-    then throwGhcException (CmdLineError x)
-    else throwGhcException (CmdLineError (x ++ '\n' : renderStack stack))
-
-
-
--- | Throw a failed assertion exception for a given filename and line number.
-assertPanic :: String -> Int -> a
-assertPanic file line =
-  Exception.throw (Exception.AssertionFailed
-           ("ASSERT failed! file " ++ file ++ ", line " ++ show line))
-
 
 -- | Like try, but pass through UserInterrupt and Panic exceptions.
 --   Used when we want soft failures when reading interface files, for example.
