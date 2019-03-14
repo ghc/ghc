@@ -798,26 +798,42 @@ signature.
 
 Note [What are demand signatures?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Demand signatures are single-point approximations of an (the best?) abstract
+Demand signatures are single-point approximations of the most precise abstract
 transformer of a binding's right-hand side. We only compute a single
 point because it's quite costly to analyse bindings multiple times,
-also because it's simple and works well in the majority of the cases.
+also because it's simple and works well in the majority of cases.
 
-The question is: Which is the right call demand (i.e. point of the abstract
+Here's an example:
+
+  f x y =
+    if x + expensive
+      then \z -> z + y * ...
+      else \z -> z * ...
+
+The abstract transformer provides the best approximation of `f`'s demand
+properties for every possible way (i.e., incoming call demand) `f` is called.
+For an incoming call demand of `C(C(S))`, it will provide the signature <S><L>,
+for `C(C(C(S)))` it would provide <S><L><S>.
+
+Since approximating the abstract transformer of `f` in every point is unviable,
+the question is: Which is the right call demand (i.e. point of the abstract
 transformer) to compute the demand signature for? We argue that idArity is
 the right choice in Note [Demand signatures are computed for idArity].
 
-In a call with less than idArity incoming arguments, the resulting call demand
-is too weak to unleash the pre-computed demand signature. In this case, just
-unleashing nopSig (the top of the domain) is a safe bet that won't cost us
-much precision. Most importantly, it's also a sound approximation of the
-abstract transformer at those points.
+Suppose `f` is called with less than two arguments, like in `seq (f 42) True`.
+The resulting call demand `C(S)` on `f` is too weak to unleash the pre-computed
+demand signature. In this case, just unleashing nopSig (the top of the domain)
+is a safe bet that won't cost us much precision. Most importantly, it's also a
+sound approximation of the abstract transformer at those points.
 
-For a call with at least idArity incoming arguments, the resulting call demand
-is strong enough to unleash the demand signature. This will be a
-conservative choice even for stronger call demands, as abstract transformers are
-monotone functions, so any approximation for a weaker point (incoming arity 2,
-for example) is also an approximation for stronger point (incoming arity 3).
+For a call with at least two incoming arguments, like in `f a b`, the
+resulting call demand `C(C(S))` is strong enough to unleash the recorded
+demand signature <S><L>.
+
+<S><L> is a conservative choice even for stronger call demands, like
+`C(C(C(S)))` as in `f a b c`. Ideally we would have liked <S><L><S>, but since
+abstract transformers are monotone functions, any approximation for a weaker
+point like `C(C(S))` will do.
 
 Note [Demand analysis for trivial right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -927,13 +943,6 @@ annotateBndr env dmd_ty var
   | otherwise = (dmd_ty, var)
   where
     (dmd_ty', dmd) = findBndrDmd env False dmd_ty var
-
-annotateLamBndrs :: AnalEnv -> DFunFlag -> DmdType -> [Var] -> (DmdType, [Var])
-annotateLamBndrs env args_of_dfun ty bndrs = mapAccumR annotate ty bndrs
-  where
-    annotate dmd_ty bndr
-      | isId bndr = annotateLamIdBndr env args_of_dfun dmd_ty bndr
-      | otherwise = (dmd_ty, bndr)
 
 annotateLamIdBndr :: AnalEnv
                   -> DFunFlag   -- is this lambda at the top of the RHS of a dfun?
