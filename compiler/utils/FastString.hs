@@ -101,7 +101,7 @@ import GhcPrelude as Prelude
 
 import Encoding
 import FastFunctions
-import Panic
+import PlainPanic
 import Util
 
 import Control.Concurrent.MVar
