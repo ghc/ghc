@@ -734,11 +734,12 @@ Note [Demand signatures are computed for idArity]
 We compute demand signatures assuming idArity incoming arguments to approximate
 behavior for when we have a call site with at least that many arguments.
 
-Because idArity of a function varies independently of its strictness properties,
-we implicitly encode the arity for when a demand signature is sound to unleash
-in its 'dmdTypeDepth'. It is unsound to unleash a strictness signature when the
-incoming call demand is less than that. See [What are demand signatures?] for
-more details in that regard.
+Because idArity of a function varies independently of its cardinality properties
+(cf. Note [idArity varies independently of dmdTypeDepth]), we implicitly encode
+the arity for when a demand signature is sound to unleash in its 'dmdTypeDepth'.
+It is unsound to unleash a demand signature when the incoming number of
+arguments is less than that. See [What are demand signatures?] for more details
+in that regard.
 
 Why idArity arguments? Because that's a conservative estimate of how many
 arguments we must feed a function before it does anything interesting with them.
@@ -771,6 +772,29 @@ additional runtime and implementation complexity.
 
 Thus, we trim the demand signature with 'ensureArgs' when analysing bindings
 with LetDown.
+
+Note [idArity varies independently of dmdTypeDepth]
+
+We used to check in CoreLint that dmdTypeDepth <= idArity. But that means we
+would have to zap demand signatures every time we reset or decrease arity.
+That's an unnecessary dependency, because
+
+  * The demand signature captures a semantic property that is independent of what the binding's current arity is
+  * idArity is analysis information itself, capturing a different semantic property
+  * We already *have* dmdTypeDepth, wo why not just use it.
+
+Consider the following expression, for example:
+
+    (let go x y = `x` seq ... in go) |> co
+
+`go` might have a strictness signature of `<S><L>`. The simplifier will identify
+`go` as a nullary join point through `joinPointBinding_maybe` and float the
+coercion into the binding, leading to an arity decrease:
+
+    join go = (\x y -> `x` seq ...) |> co in go
+
+With the CoreLint check, we would have to zap `go`'s perfectly viable strictness
+signature.
 
 Note [What are demand signatures?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

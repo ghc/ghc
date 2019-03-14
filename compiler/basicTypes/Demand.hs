@@ -1212,8 +1212,8 @@ mkDmdType fv ds res = DmdType fv ds res
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
 
--- | This makes sure we can use the demand type with n arguments,
--- It extends the argument list with the correct resTypeArgDmd
+-- | This makes sure we can use the demand type with n arguments.
+-- It extends the argument list with the correct resTypeArgDmd.
 -- It also adjusts the DmdResult: Divergence survives additional arguments,
 -- CPR information does not (and definite converge also would not).
 ensureArgs :: Arity -> DmdType -> DmdType
@@ -1610,6 +1610,11 @@ etaExpandStrictSig :: Arity -> StrictSig -> StrictSig
 -- In contrast to 'increaseStrictSigArity', this /appends/ extra arg demands if
 -- necessary, potentially destroying the signature's CPR property.
 etaExpandStrictSig arity (StrictSig dmd_ty)
+  | arity < dmdTypeDepth dmd_ty
+  -- an arity decrease must zap the whole signature, because it was possibly
+  -- computed for a higher incoming call demand.
+  = nopSig
+  | otherwise
   = StrictSig $ ensureArgs arity dmd_ty
 
 isTopSig :: StrictSig -> Bool
