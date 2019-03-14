@@ -61,7 +61,7 @@ import InstEnv     ( instanceDFunId )
 import OptCoercion ( checkAxInstCo )
 import UniqSupply
 import CoreArity ( typeArity )
-import Demand
+import Demand ( splitStrictSig, isBotRes )
 
 import HscTypes
 import DynFlags
