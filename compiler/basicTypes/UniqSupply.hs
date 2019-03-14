@@ -37,7 +37,7 @@ module UniqSupply (
 import GhcPrelude
 
 import Unique
-import Panic (panic)
+import PlainPanic (panic)
 
 import GHC.IO
 
