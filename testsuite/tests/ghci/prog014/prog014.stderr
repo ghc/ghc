@@ -1,2 +1,0 @@
-Error: bytecode compiler can't handle some foreign calling conventions
-  Workaround: use -fobject-code, or compile this module to .o separately.
