@@ -259,3 +259,134 @@ x86_64-linux-deb9-debug	T8766	normal	bytes allocated	16828096
 x86_64-linux-deb9-debug	T9848	normal	bytes allocated	51800
 x86_64-linux-deb9-debug	T13191	normal	bytes allocated	185942760
 x86_64-linux-deb9-debug	T3474	normal	max_bytes_used	44504
+
+i386-linux-deb9	T3924	normal	bytes allocated	46832
+i386-linux-deb9	T10858	normal	bytes allocated	114854484
+i386-linux-deb9	hie002	normal	bytes allocated	1412805232
+i386-linux-deb9	T4801	normal	bytes allocated	199900992
+i386-linux-deb9	T3064	normal	bytes allocated	129644932
+i386-linux-deb9	T3064	normal	peak_megabytes_allocated	34
+i386-linux-deb9	T5030	normal	bytes allocated	375210564
+i386-linux-deb9	parsing001	normal	bytes allocated	273427124
+i386-linux-deb9	T1969	normal	bytes allocated	329060168
+i386-linux-deb9	T1969	normal	peak_megabytes_allocated	36
+i386-linux-deb9	T1969	normal	max_bytes_used	10207844
+i386-linux-deb9	T5837	normal	bytes allocated	28054804
+i386-linux-deb9	T5321FD	normal	bytes allocated	183189908
+i386-linux-deb9	T6048	optasm	bytes allocated	49343740
+i386-linux-deb9	T783	normal	bytes allocated	235106160
+i386-linux-deb9	T5321Fun	normal	bytes allocated	233007688
+i386-linux-deb9	T5631	normal	bytes allocated	522439872
+i386-linux-deb9	T5642	normal	bytes allocated	382907476
+i386-linux-deb9	T3294	normal	bytes allocated	911220948
+i386-linux-deb9	T3294	normal	max_bytes_used	18895636
+i386-linux-deb9	T9020	optasm	bytes allocated	189562700
+i386-linux-deb9	T9872d	normal	bytes allocated	301765720
+i386-linux-deb9	T9961	normal	bytes allocated	253179788
+i386-linux-deb9	T9675	optasm	bytes allocated	335961640
+i386-linux-deb9	T9675	optasm	peak_megabytes_allocated	39
+i386-linux-deb9	T9675	optasm	max_bytes_used	10570176
+i386-linux-deb9	T10547	normal	bytes allocated	19408508
+i386-linux-deb9	T12425	optasm	bytes allocated	73575656
+i386-linux-deb9	T9233	normal	bytes allocated	520869032
+i386-linux-deb9	T12234	optasm	bytes allocated	43805492
+i386-linux-deb9	T12227	normal	bytes allocated	372676940
+i386-linux-deb9	T13035	normal	bytes allocated	63953200
+i386-linux-deb9	T13056	optasm	bytes allocated	217071600
+i386-linux-deb9	T12150	optasm	bytes allocated	39560812
+i386-linux-deb9	T9872a	normal	bytes allocated	1309259796
+i386-linux-deb9	T13379	normal	bytes allocated	211412620
+i386-linux-deb9	T12707	normal	bytes allocated	584752496
+i386-linux-deb9	T9872c	normal	bytes allocated	1480080844
+i386-linux-deb9	ManyAlternatives	normal	bytes allocated	695715360
+i386-linux-deb9	T12545	normal	bytes allocated	1587157212
+i386-linux-deb9	T9872b	normal	bytes allocated	1839419956
+i386-linux-deb9	Naperian	optasm	bytes allocated	28152888
+i386-linux-deb9	T10370	optasm	peak_megabytes_allocated	56
+i386-linux-deb9	T10370	optasm	max_bytes_used	16493616
+i386-linux-deb9	T9630	normal	max_bytes_used	23069504
+i386-linux-deb9	T15164	normal	bytes allocated	996119228
+i386-linux-deb9	haddock.base	normal	bytes allocated	751906280
+i386-linux-deb9	haddock.Cabal	normal	bytes allocated	246213420
+i386-linux-deb9	haddock.compiler	normal	bytes allocated	3157088892
+i386-linux-deb9	ManyConstructors	normal	bytes allocated	2188979016
+i386-linux-deb9	join002	optasm	bytes allocated	1000046880
+i386-linux-deb9	join003	optasm	bytes allocated	1000046880
+i386-linux-deb9	join004	optasm	bytes allocated	8046812
+i386-linux-deb9	T14697	normal	bytes allocated	240811388
+i386-linux-deb9	T14683	normal	bytes allocated	605896332
+i386-linux-deb9	join007	optasm	bytes allocated	46900
+i386-linux-deb9	T5835	normal	max_bytes_used	42724
+i386-linux-deb9	T10359	normal	bytes allocated	351384
+i386-linux-deb9	T12791	normal	max_bytes_used	42724
+i386-linux-deb9	T14955	normal	bytes allocated	24046820
+i386-linux-deb9	T4830	normal	bytes allocated	70884
+i386-linux-deb9	T3586	normal	bytes allocated	16073880
+i386-linux-deb9	T3586	normal	peak_megabytes_allocated	18
+i386-linux-deb9	lazy-bs-alloc	normal	bytes allocated	419816
+i386-linux-deb9	lazy-bs-alloc	normal	peak_megabytes_allocated	2
+i386-linux-deb9	T876	normal	bytes allocated	50224
+i386-linux-deb9	T3738	normal	bytes allocated	46712
+i386-linux-deb9	T3738	normal	peak_megabytes_allocated	2
+i386-linux-deb9	MethSharing	normal	bytes allocated	240070900
+i386-linux-deb9	MethSharing	normal	peak_megabytes_allocated	2
+i386-linux-deb9	T5113	normal	bytes allocated	4050756
+i386-linux-deb9	T4978	normal	bytes allocated	10105692
+i386-linux-deb9	T5205	normal	bytes allocated	49484
+i386-linux-deb9	T5237	normal	bytes allocated	76200
+i386-linux-deb9	T4474a	normal	bytes allocated	2415966460
+i386-linux-deb9	T4474b	normal	bytes allocated	2415966460
+i386-linux-deb9	T4474c	normal	bytes allocated	2415966460
+i386-linux-deb9	T5536	normal	bytes allocated	445172756
+i386-linux-deb9	Conversions	normal	bytes allocated	77696
+i386-linux-deb9	T5549	normal	bytes allocated	2896607896
+i386-linux-deb9	T13719	normal	bytes allocated	2468495920
+i386-linux-deb9	T7257	normal	bytes allocated	811050228
+i386-linux-deb9	T7257	normal	peak_megabytes_allocated	217
+i386-linux-deb9	T7436	normal	max_bytes_used	42724
+i386-linux-deb9	T7797	normal	bytes allocated	240046728
+i386-linux-deb9	T5949	normal	bytes allocated	117900
+i386-linux-deb9	T7954	normal	bytes allocated	720047004
+i386-linux-deb9	T4267	normal	bytes allocated	37892
+i386-linux-deb9	T7619	normal	bytes allocated	37892
+i386-linux-deb9	InlineArrayAlloc	normal	bytes allocated	800037892
+i386-linux-deb9	InlineByteArrayAlloc	normal	bytes allocated	1360037892
+i386-linux-deb9	InlineCloneArrayAlloc	normal	bytes allocated	800037972
+i386-linux-deb9	T9203	normal	bytes allocated	72200740
+i386-linux-deb9	T9339	normal	bytes allocated	46840
+i386-linux-deb9	T8472	normal	bytes allocated	46844
+i386-linux-deb9	T12996	normal	bytes allocated	60976
+i386-linux-deb9	T13001	normal	bytes allocated	46784
+i386-linux-deb9	T12990	normal	bytes allocated	10437900
+i386-linux-deb9	T8763	normal	bytes allocated	37892
+i386-linux-deb9	MultiLayerModules	normal	bytes allocated	3283542044
+i386-linux-deb9	T13218	normal	bytes allocated	41036540
+i386-linux-deb9	T13218	normal	max_bytes_used	166288
+i386-linux-deb9	DeriveNull	normal	bytes allocated	56046880
+i386-linux-deb9	T13623	normal	bytes allocated	46876
+i386-linux-deb9	T15226	normal	bytes allocated	37904
+i386-linux-deb9	T15226a	normal	bytes allocated	37904
+i386-linux-deb9	T14936	normal	bytes allocated	47060
+i386-linux-deb9	T15263	normal	bytes allocated	688924
+i386-linux-deb9	T13701	normal	bytes allocated	1803920976
+i386-linux-deb9	T15426	normal	bytes allocated	38024
+i386-linux-deb9	T4334	normal	peak_megabytes_allocated	3
+i386-linux-deb9	T2762	normal	peak_megabytes_allocated	2
+i386-linux-deb9	space_leak_001	normal	bytes allocated	661907740
+i386-linux-deb9	space_leak_001	normal	peak_megabytes_allocated	4
+i386-linux-deb9	space_leak_001	normal	max_bytes_used	428112
+i386-linux-deb9	T14052	ghci	bytes allocated	1188271004
+i386-linux-deb9	T15578	normal	bytes allocated	800038056
+i386-linux-deb9	T7850	normal	peak_megabytes_allocated	3
+i386-linux-deb9	T11303b	normal	bytes allocated	28786956
+i386-linux-deb9	T11276	normal	bytes allocated	83878212
+i386-linux-deb9	T11374	normal	bytes allocated	142663852
+i386-linux-deb9	T4029	ghci	peak_megabytes_allocated	37
+i386-linux-deb9	T4029	ghci	max_bytes_used	11700628
+i386-linux-deb9	T11195	normal	bytes allocated	4060205116
+i386-linux-deb9	T10678	normal	bytes allocated	40038184
+i386-linux-deb9	T13536a	optasm	bytes allocated	48428
+i386-linux-deb9	T8766	normal	bytes allocated	8435488
+i386-linux-deb9	T9848	normal	bytes allocated	47332
+i386-linux-deb9	T13191	normal	bytes allocated	92976436
+i386-linux-deb9	T3474	normal	max_bytes_used	42724
