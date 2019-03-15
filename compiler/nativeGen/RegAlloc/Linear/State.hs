@@ -1,4 +1,8 @@
+{-# LANGUAGE CPP, PatternSynonyms #-}
+
+#if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
+#endif
 
 -- | State monad for the linear register allocator.
 
@@ -48,22 +52,36 @@ import UniqSupply
 
 import Control.Monad (liftM, ap)
 
+-- Avoids using unboxed tuples when loading into GHCi
+#if !defined(GHC_LOADED_INTO_GHCI)
+
+type RA_Result freeRegs a = (# RA_State freeRegs, a #)
+
+pattern RA_Result :: a -> b -> (# a, b #)
+pattern RA_Result a b = (# a, b #)
+{-# COMPLETE RA_Result #-}
+#else
+
+data RA_Result freeRegs a = RA_Result {-# UNPACK #-} !(RA_State freeRegs) !a
+
+#endif
+
 -- | The register allocator monad type.
 newtype RegM freeRegs a
-        = RegM { unReg :: RA_State freeRegs -> (# RA_State freeRegs, a #) }
+        = RegM { unReg :: RA_State freeRegs -> RA_Result freeRegs a }
 
 instance Functor (RegM freeRegs) where
       fmap = liftM
 
 instance Applicative (RegM freeRegs) where
-      pure a  =  RegM $ \s -> (# s, a #)
+      pure a  =  RegM $ \s -> RA_Result s a
       (<*>) = ap
 
 instance Monad (RegM freeRegs) where
-  m >>= k   =  RegM $ \s -> case unReg m s of { (# s, a #) -> unReg (k a) s }
+  m >>= k   =  RegM $ \s -> case unReg m s of { RA_Result s a -> unReg (k a) s }
 
 instance HasDynFlags (RegM a) where
-    getDynFlags = RegM $ \s -> (# s, ra_DynFlags s #)
+    getDynFlags = RegM $ \s -> RA_Result s (ra_DynFlags s)
 
 
 -- | Run a computation in the RegM register allocator monad.
@@ -89,12 +107,8 @@ runR dflags block_assig freeregs assig stack us thing =
                 , ra_DynFlags   = dflags
                 , ra_fixups     = [] })
    of
-        (# state'@RA_State
-                { ra_blockassig = block_assig
-                , ra_stack      = stack' }
-                , returned_thing #)
-
-         ->     (block_assig, stack', makeRAStats state', returned_thing)
+        RA_Result state returned_thing
+         ->     (ra_blockassig state, ra_stack state, makeRAStats state, returned_thing)
 
 
 -- | Make register allocator stats from its final state.
@@ -108,12 +122,12 @@ makeRAStats state
 spillR :: Instruction instr
        => Reg -> Unique -> RegM freeRegs (instr, Int)
 
-spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
+spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack0} ->
   let dflags = ra_DynFlags s
-      (stack',slot) = getStackSlotFor stack temp
+      (stack1,slot) = getStackSlotFor stack0 temp
       instr  = mkSpillInstr dflags reg delta slot
   in
-  (# s{ra_stack=stack'}, (instr,slot) #)
+  RA_Result s{ra_stack=stack1} (instr,slot)
 
 
 loadR :: Instruction instr
@@ -121,51 +135,51 @@ loadR :: Instruction instr
 
 loadR reg slot = RegM $ \ s@RA_State{ra_delta=delta} ->
   let dflags = ra_DynFlags s
-  in (# s, mkLoadInstr dflags reg delta slot #)
+  in RA_Result s (mkLoadInstr dflags reg delta slot)
 
 getFreeRegsR :: RegM freeRegs freeRegs
 getFreeRegsR = RegM $ \ s@RA_State{ra_freeregs = freeregs} ->
-  (# s, freeregs #)
+  RA_Result s freeregs
 
 setFreeRegsR :: freeRegs -> RegM freeRegs ()
 setFreeRegsR regs = RegM $ \ s ->
-  (# s{ra_freeregs = regs}, () #)
+  RA_Result s{ra_freeregs = regs} ()
 
 getAssigR :: RegM freeRegs (RegMap Loc)
 getAssigR = RegM $ \ s@RA_State{ra_assig = assig} ->
-  (# s, assig #)
+  RA_Result s assig
 
 setAssigR :: RegMap Loc -> RegM freeRegs ()
 setAssigR assig = RegM $ \ s ->
-  (# s{ra_assig=assig}, () #)
+  RA_Result s{ra_assig=assig} ()
 
 getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
 getBlockAssigR = RegM $ \ s@RA_State{ra_blockassig = assig} ->
-  (# s, assig #)
+  RA_Result s assig
 
 setBlockAssigR :: BlockAssignment freeRegs -> RegM freeRegs ()
 setBlockAssigR assig = RegM $ \ s ->
-  (# s{ra_blockassig = assig}, () #)
+  RA_Result s{ra_blockassig = assig} ()
 
 setDeltaR :: Int -> RegM freeRegs ()
 setDeltaR n = RegM $ \ s ->
-  (# s{ra_delta = n}, () #)
+  RA_Result s{ra_delta = n} ()
 
 getDeltaR :: RegM freeRegs Int
-getDeltaR = RegM $ \s -> (# s, ra_delta s #)
+getDeltaR = RegM $ \s -> RA_Result s (ra_delta s)
 
 getUniqueR :: RegM freeRegs Unique
 getUniqueR = RegM $ \s ->
   case takeUniqFromSupply (ra_us s) of
-    (uniq, us) -> (# s{ra_us = us}, uniq #)
+    (uniq, us) -> RA_Result s{ra_us = us} uniq
 
 
 -- | Record that a spill instruction was inserted, for profiling.
 recordSpill :: SpillReason -> RegM freeRegs ()
 recordSpill spill
-    = RegM $ \s -> (# s { ra_spills = spill : ra_spills s}, () #)
+    = RegM $ \s -> RA_Result (s { ra_spills = spill : ra_spills s }) ()
 
 -- | Record a created fixup block
 recordFixupBlock :: BlockId -> BlockId -> BlockId -> RegM freeRegs ()
 recordFixupBlock from between to
-    = RegM $ \s -> (# s { ra_fixups = (from,between,to) : ra_fixups s}, () #)
+    = RegM $ \s -> RA_Result (s { ra_fixups = (from,between,to) : ra_fixups s }) ()
