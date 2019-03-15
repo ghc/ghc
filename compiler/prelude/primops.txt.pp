@@ -656,15 +656,15 @@ primop   BSwapOp     "byteSwap#"     Monadic   Word# -> Word#
     {Swap bytes in a word.}
 
 primop   BRev8Op    "bitReverse8#"   Monadic   Word# -> Word#
-    {Reverse the bit pattern of a 8-bit word.}
+    {Reverse the order of the bits in a 8-bit word.}
 primop   BRev16Op   "bitReverse16#"   Monadic   Word# -> Word#
-    {Reverse the bit pattern of a 16-bit word.}
+    {Reverse the order of the bits in a 16-bit word.}
 primop   BRev32Op   "bitReverse32#"   Monadic   Word# -> Word#
-    {Reverse the bit pattern of a 32-bit word.}
+    {Reverse the order of the bits in a 32-bit word.}
 primop   BRev64Op   "bitReverse64#"   Monadic   WORD64 -> WORD64
-    {Reverse the bit pattern of a 64-bit word.}
+    {Reverse the order of the bits in a 64-bit word.}
 primop   BRevOp     "bitReverse#"     Monadic   Word# -> Word#
-    {Reverse the bit pattern of a word.}
+    {Reverse the order of the bits in a word.}
 
 ------------------------------------------------------------------------
 section "Narrowings"

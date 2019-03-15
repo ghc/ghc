@@ -2936,7 +2936,10 @@ outOfLineCmmOp bid mop res args
 
               MO_PopCnt _  -> fsLit "popcnt"
               MO_BSwap _   -> fsLit "bswap"
-              MO_BRev _    -> unsupported
+              {- Here the C implementation is used as there is no x86
+              instruction to reverse a word's bit order.
+              -}
+              MO_BRev w    -> fsLit $ bRevLabel w
               MO_Clz w     -> fsLit $ clzLabel w
               MO_Ctz _     -> unsupported
 
