@@ -21,6 +21,8 @@
     \[3\] Brisk, Sarrafzadeh,
       /Interference Graphs for Procedures in Static Single/
       /Information Form are Interval Graphs/, 2007.
+
+  Originally taken from the dom-lt package.
 -}
 
 module Dominators (
@@ -77,7 +79,7 @@ pdom = ancestors . pdomTree
 -- | /Dominator tree/.
 -- Complexity as for @idom@.
 domTree :: Rooted -> Tree Node
-domTree a@(r,_) =
+domTree a@(r,_) = {-# SCC domTree #-}
   let is = filter ((/=r).fst) (idom a)
       tg = fromEdges (fmap swap is)
   in asTree (r,tg)
@@ -85,7 +87,7 @@ domTree a@(r,_) =
 -- | /Post-dominator tree/.
 -- Complexity as for @idom@.
 pdomTree :: Rooted -> Tree Node
-pdomTree a@(r,_) =
+pdomTree a@(r,_) = {-# SCC pdomTree #-}
   let is = filter ((/=r).fst) (ipdom a)
       tg = fromEdges (fmap swap is)
   in asTree (r,tg)

@@ -50,9 +50,6 @@ type SpillCostRecord
 type SpillCostInfo
         = UniqFM SpillCostRecord
 
--- | Block membership in a loop level -> 0: no loop
-type LoopLevel = Int
-
 type SpillCostState = State (UniqFM SpillCostRecord) ()
 
 -- | An empty map of spill costs.
@@ -89,38 +86,38 @@ slurpSpillCostInfo platform cfg cmm
  where
         countCmm CmmData{}              = return ()
         countCmm (CmmProc info _ _ sccs)
-                = mapM_ (countBlock info loopLevelMap)
+                = mapM_ (countBlock info freqMap)
                 $ flattenSCCs sccs
             where
-                LiveInfo _ entries _ _ = info --TODO: Just unwrap blockLive here
-                loopLevelMap = CFG.loopInfo <$> cfg <*> Just (head entries) :: Maybe (LabelMap Int)
+                LiveInfo _ entries _ _ = info
+                freqMap = (fst . mkGlobalWeights (head entries)) <$> cfg
 
         -- Lookup the regs that are live on entry to this block in
         --      the info table from the CmmProc.
-        countBlock info loopLevelMap (BasicBlock blockId instrs)
-                | LiveInfo _ _ (Just blockLive) _ <- info
+        countBlock info freqMap (BasicBlock blockId instrs)
+                | LiveInfo _ _ blockLive _ <- info
                 , Just rsLiveEntry  <- mapLookup blockId blockLive
                 , rsLiveEntry_virt  <- takeVirtuals rsLiveEntry
-                = countLIs (loopLevel loopLevelMap blockId) rsLiveEntry_virt instrs
+                = countLIs (ceiling $ blockFreq freqMap blockId) rsLiveEntry_virt instrs
 
                 | otherwise
                 = error "RegAlloc.SpillCost.slurpSpillCostInfo: bad block"
 
 
-        countLIs :: LoopLevel -> UniqSet VirtualReg -> [LiveInstr instr] -> SpillCostState
+        countLIs :: Int -> UniqSet VirtualReg -> [LiveInstr instr] -> SpillCostState
         countLIs _      _      []
                 = return ()
 
         -- Skip over comment and delta pseudo instrs.
-        countLIs loopLevel rsLive (LiveInstr instr Nothing : lis)
+        countLIs scale rsLive (LiveInstr instr Nothing : lis)
                 | isMetaInstr instr
-                = countLIs loopLevel rsLive lis
+                = countLIs scale rsLive lis
 
                 | otherwise
                 = pprPanic "RegSpillCost.slurpSpillCostInfo"
                 $ text "no liveness information on instruction " <> ppr instr
 
-        countLIs loopLevel rsLiveEntry (LiveInstr instr (Just live) : lis)
+        countLIs scale rsLiveEntry (LiveInstr instr (Just live) : lis)
          = do
                 -- Increment the lifetime counts for regs live on entry to this instr.
                 mapM_ incLifetime $ nonDetEltsUniqSet rsLiveEntry
@@ -130,8 +127,8 @@ slurpSpillCostInfo platform cfg cmm
 
                 -- Increment counts for what regs were read/written from.
                 let (RU read written)   = regUsageOfInstr platform instr
-                mapM_ (incUses (loopCount loopLevel)) $ catMaybes $ map takeVirtualReg $ nub read
-                mapM_ (incDefs (loopCount loopLevel)) $ catMaybes $ map takeVirtualReg $ nub written
+                mapM_ (incUses scale) $ catMaybes $ map takeVirtualReg $ nub read
+                mapM_ (incDefs scale) $ catMaybes $ map takeVirtualReg $ nub written
 
                 -- Compute liveness for entry to next instruction.
                 let liveDieRead_virt    = takeVirtuals (liveDieRead  live)
@@ -145,21 +142,18 @@ slurpSpillCostInfo platform cfg cmm
                         = (rsLiveAcross `unionUniqSets` liveBorn_virt)
                                         `minusUniqSet`  liveDieWrite_virt
 
-                countLIs loopLevel rsLiveNext lis
-
-        -- We assume each loop body is iterated 10 times.
-        loopCount loopLevel = 10 ^ loopLevel
+                countLIs scale rsLiveNext lis
 
         incDefs     count reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, count, 0, 0)
         incUses     count reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, count, 0)
         incLifetime       reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, 0, 1)
 
-        loopLevel :: Maybe (LabelMap Int) -> Label -> Int
-        loopLevel levelMap bid
-          | Just level <- join (mapLookup bid <$> levelMap)
-          = level
+        blockFreq :: Maybe (LabelMap Double) -> Label -> Double
+        blockFreq freqs bid
+          | Just freq <- join (mapLookup bid <$> freqs)
+          = max 1.0 (10000 * freq)
           | otherwise
-          = 0
+          = 1.0 -- Only if no cfg given
 
 -- | Take all the virtual registers from this set.
 takeVirtuals :: UniqSet Reg -> UniqSet VirtualReg
@@ -220,39 +214,39 @@ chooseSpill info graph
 --  Without live range splitting, its's better to spill from the outside
 --  in so set the cost of very long live ranges to zero
 --
-{-
-spillCost_chaitin
-        :: SpillCostInfo
-        -> Graph VirtualReg RegClass RealReg
-        -> VirtualReg
-        -> Float
 
-spillCost_chaitin info graph reg
-        -- Spilling a live range that only lives for 1 instruction
-        -- isn't going to help us at all - and we definitely want to avoid
-        -- trying to re-spill previously inserted spill code.
-        | lifetime <= 1         = 1/0
+-- spillCost_chaitin
+--         :: SpillCostInfo
+--         -> Graph VirtualReg RegClass RealReg
+--         -> VirtualReg
+--         -> Float
 
-        -- It's unlikely that we'll find a reg for a live range this long
-        -- better to spill it straight up and not risk trying to keep it around
-        -- and have to go through the build/color cycle again.
+-- spillCost_chaitin info graph reg
+--         -- Spilling a live range that only lives for 1 instruction
+--         -- isn't going to help us at all - and we definitely want to avoid
+--         -- trying to re-spill previously inserted spill code.
+--         | lifetime <= 1         = 1/0
 
-        -- To facility this we scale down the spill cost of long ranges.
-        -- This makes sure long ranges are still spilled first.
-        -- But this way spill cost remains relevant for long live
-        -- ranges.
-        | lifetime >= 128
-        = (spillCost / conflicts) / (fromIntegral (div lifetime 32))
+--         -- It's unlikely that we'll find a reg for a live range this long
+--         -- better to spill it straight up and not risk trying to keep it around
+--         -- and have to go through the build/color cycle again.
+
+--         -- To facility this we scale down the spill cost of long ranges.
+--         -- This makes sure long ranges are still spilled first.
+--         -- But this way spill cost remains relevant for long live
+--         -- ranges.
+--         | lifetime >= 128
+--         = (spillCost / conflicts) / 10.0
 
 
-        -- Otherwise revert to chaitin's regular cost function.
-        | otherwise = (spillCost / conflicts)
-        where
-            !spillCost = fromIntegral (uses + defs) :: Float
-            conflicts = fromIntegral (nodeDegree classOfVirtualReg graph reg)
-            (_, defs, uses, lifetime)
-                = fromMaybe (reg, 0, 0, 0) $ lookupUFM info reg
--}
+--         -- Otherwise revert to chaitin's regular cost function.
+--         | otherwise = (spillCost / conflicts)
+--         where
+--             !spillCost = fromIntegral (uses + defs) :: Float
+--             conflicts = fromIntegral (nodeDegree classOfVirtualReg graph reg)
+--             (_, defs, uses, lifetime)
+--                 = fromMaybe (reg, 0, 0, 0) $ lookupUFM info reg
+
 
 -- Just spill the longest live range.
 spillCost_length

@@ -8,6 +8,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE Rank2Types #-}
 
+{-# OPTIONS_GHC -fprof-auto-exported #-}
+
 module CFG
     ( CFG, CfgEdge(..), EdgeInfo(..), EdgeWeight(..)
     , TransitionSource(..)
@@ -18,7 +20,7 @@ module CFG
     , addNodesBetween, shortcutWeightMap
     , reverseEdges, filterEdges
     , addImmediateSuccessor
-    , mkWeightInfo, adjustEdgeWeight
+    , mkWeightInfo, adjustEdgeWeight, setEdgeWeight
 
     --Query the CFG
     , infoEdgeList, edgeList
@@ -28,13 +30,14 @@ module CFG
     , getCfgNodes, hasNode
 
     -- Loop Information
-    , loopMembers, loopInfo
+    , loopMembers, loopLevels, loopInfo
 
     --Construction/Misc
     , getCfg, getCfgProc, pprEdgeWeights, sanityCheckCfg
 
     --Find backedges and update their weight
     , optimizeCFG
+    , mkGlobalWeights
 
      )
 where
@@ -56,6 +59,7 @@ import qualified Hoopl.Graph as G
 
 import Util
 import Digraph
+import Maybes
 
 import Unique
 import qualified Dominators as Dom
@@ -64,6 +68,7 @@ import Data.IntSet (IntSet)
 
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import qualified Data.Set as S
 import Data.Tree
 import Data.Bifunctor
 
@@ -77,12 +82,23 @@ import qualified DynFlags as D
 
 import Data.List
 
+import Data.STRef
+import Control.Monad.ST
+
+import Data.Array.MArray
+import Data.Array.ST
+import Data.Array
+
+import Control.Monad
+
+type Prob = Double
+
 type Edge = (BlockId, BlockId)
 type Edges = [Edge]
 
 newtype EdgeWeight
-  = EdgeWeight Int
-  deriving (Eq,Ord,Enum,Num,Real,Integral)
+  = EdgeWeight { weightToDouble :: Double }
+  deriving (Eq,Ord,Enum,Num,Real,Fractional)
 
 instance Outputable EdgeWeight where
   ppr (EdgeWeight w) = ppr w
@@ -141,12 +157,10 @@ data EdgeInfo
 instance Outputable EdgeInfo where
   ppr edgeInfo = text "weight:" <+> ppr (edgeWeight edgeInfo)
 
--- Allow specialization
-{-# INLINEABLE mkWeightInfo #-}
 -- | Convenience function, generate edge info based
 --   on weight not originating from cmm.
-mkWeightInfo :: Integral n => n -> EdgeInfo
-mkWeightInfo = EdgeInfo AsmCodeGen . fromIntegral
+mkWeightInfo :: EdgeWeight -> EdgeInfo
+mkWeightInfo = EdgeInfo AsmCodeGen
 
 -- | Adjust the weight between the blocks using the given function.
 --   If there is no such edge returns the original map.
@@ -157,6 +171,17 @@ adjustEdgeWeight cfg f from to
   , weight <- edgeWeight info
   = addEdge from to (info { edgeWeight = f weight}) cfg
   | otherwise = cfg
+
+-- | Set the weight between the blocks to the given weight.
+--   If there is no such edge returns the original map.
+setEdgeWeight :: CFG -> EdgeWeight
+              -> BlockId -> BlockId -> CFG
+setEdgeWeight cfg weight from to
+  | Just info <- getEdgeInfo from to cfg
+  = addEdge from to (info { edgeWeight = weight}) cfg
+  | otherwise = cfg
+
+
 
 getCfgNodes :: CFG -> LabelSet
 getCfgNodes m = mapFoldMapWithKey (\k v -> setFromList (k:mapKeys v)) m
@@ -579,6 +604,9 @@ findBackEdges root cfg =
 optimizeCFG :: D.CfgWeights -> RawCmmDecl -> CFG -> CFG
 optimizeCFG _ (CmmData {}) cfg = cfg
 optimizeCFG weights (CmmProc info _lab _live graph) cfg =
+    -- pprTrace "Initial:" (pprEdgeWeights cfg) $
+    -- pprTrace "Initial:" (ppr $ mkGlobalWeights (g_entry graph) cfg) $
+
     -- pprTrace "LoopInfo:" (ppr $ loopInfo cfg (g_entry graph)) $
     favourFewerPreds  .
     penalizeInfoTables info .
@@ -669,63 +697,73 @@ loopMembers cfg =
     setLevel (AcyclicSCC bid) m = mapInsert bid False m
     setLevel (CyclicSCC bids) m = foldl' (\m k -> mapInsert k True m) m bids
 
+loopLevels :: CFG -> BlockId -> LabelMap Int
+loopLevels cfg root = liLevels $ loopInfo cfg root
+
+data LoopInfo = LoopInfo
+  { liBackEdges :: [(Edge)] -- ^ List of back edges
+  , liLevels :: LabelMap Int -- ^ BlockId -> LoopLevel mapping
+  , liLoops :: [(Edge, LabelSet)] -- ^ (backEdge, loopBody), body includes header
+  }
+
 -- | Determine loop membership of blocks based on Dominator analysis.
 --   This is slower but gives loop levels.
---   Only works for reducible control flow.
-loopInfo :: CFG -> BlockId -> LabelMap Int
-loopInfo cfg root =
-  let revCfg = reverseEdges cfg
-      graph = fmap (setFromList . mapKeys ) cfg :: LabelMap LabelSet
-
-      --TODO - This should be a no op: Export constructors? Use unsafeCoerce? ...
-      rooted = ( fromBlockId root
-               , toIntMap $ fmap toIntSet graph) :: (Int, IntMap IntSet)
-      -- rooted = unsafeCoerce (root, graph)
-      tree = fmap toBlockId $ Dom.domTree rooted :: Tree BlockId
-
-      -- Map from Nodes to their dominators
-      domMap :: LabelMap LabelSet
-      domMap = mkDomMap tree
-
-      edges = edgeList cfg :: [(BlockId, BlockId)]
-      nodes = getCfgNodes cfg :: LabelSet --[BlockId]
-
-      -- identify back edges
-      isBackEdge (from,to)
-        | Just doms <- mapLookup from domMap
-        , setMember to doms
-        = True
-        | otherwise = False
-
-      -- determine the loop body for a back edge
-      findBody edge@(tail, head)
-        = ( edge, setInsert head $ go (setSingleton tail) (setSingleton tail) )
-        where
-          -- The reversed cfg makes it easier to look up predecessors
-          cfg' = delNode head revCfg
-          go :: LabelSet -> LabelSet -> LabelSet
-          go found current
-            | setNull current = found
-            | otherwise = go  (setUnion newSuccessors found)
-                              newSuccessors
-            where
-              newSuccessors = setFilter (\n -> not $ setMember n found) successors :: LabelSet
-              successors = setFromList $ concatMap
-                                        (getSuccessors cfg')
-                                        (setElems current) :: LabelSet
-
-      backEdges = filter isBackEdge edges
-      loopBodies = map findBody backEdges :: [(Edge, LabelSet)]
-
-      -- Block b is part of n loop bodies => loop nest level of n
-      loopCounts =
-        let bodies = map (first snd) loopBodies -- [(Header, Body)]
-            loopCount n = length $ nub . map fst . filter (setMember n . snd) $ bodies
-        in  map (\n -> (n, loopCount n)) $ setElems nodes :: [(BlockId, Int)]
-
-  in -- pprTrace "Bodies" (ppr loopBodies) $
-     mapFromList loopCounts
+--   Only detects natural loops. Irreducible control flow is not
+--   recognized even if it loops.
+loopInfo :: CFG -> BlockId -> LoopInfo
+loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
+                              , liLevels = mapFromList loopCounts
+                              , liLoops = loopBodies }
   where
+    revCfg = reverseEdges cfg
+    graph = fmap (setFromList . mapKeys ) cfg :: LabelMap LabelSet
+
+    --TODO - This should be a no op: Export constructors? Use unsafeCoerce? ...
+    rooted = ( fromBlockId root
+              , toIntMap $ fmap toIntSet graph) :: (Int, IntMap IntSet)
+    -- rooted = unsafeCoerce (root, graph)
+    tree = fmap toBlockId $ Dom.domTree rooted :: Tree BlockId
+
+    -- Map from Nodes to their dominators
+    domMap :: LabelMap LabelSet
+    domMap = mkDomMap tree
+
+    edges = edgeList cfg :: [(BlockId, BlockId)]
+    nodes = getCfgNodes cfg :: LabelSet --[BlockId]
+
+    -- identify back edges
+    isBackEdge (from,to)
+      | Just doms <- mapLookup from domMap
+      , setMember to doms
+      = True
+      | otherwise = False
+
+    -- determine the loop body for a back edge
+    findBody edge@(tail, head)
+      = ( edge, setInsert head $ go (setSingleton tail) (setSingleton tail) )
+      where
+        -- The reversed cfg makes it easier to look up predecessors
+        cfg' = delNode head revCfg
+        go :: LabelSet -> LabelSet -> LabelSet
+        go found current
+          | setNull current = found
+          | otherwise = go  (setUnion newSuccessors found)
+                            newSuccessors
+          where
+            newSuccessors = setFilter (\n -> not $ setMember n found) successors :: LabelSet
+            successors = setFromList $ concatMap
+                                      (getSuccessors cfg')
+                                      (setElems current) :: LabelSet
+
+    backEdges = filter isBackEdge edges
+    loopBodies = map findBody backEdges :: [(Edge, LabelSet)]
+
+    -- Block b is part of n loop bodies => loop nest level of n
+    loopCounts =
+      let bodies = map (first snd) loopBodies -- [(Header, Body)]
+          loopCount n = length $ nub . map fst . filter (setMember n . snd) $ bodies
+      in  map (\n -> (n, loopCount n)) $ setElems nodes :: [(BlockId, Int)]
+
     toIntSet :: LabelSet -> IntSet
     toIntSet s = IS.fromList . map fromBlockId . setElems $ s
     toIntMap :: LabelMap a -> IntMap a
@@ -749,3 +787,272 @@ loopInfo cfg root =
 
     toBlockId :: Int -> BlockId
     toBlockId = mkBlockId . mkUniqueGrimily
+
+-- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
+newtype BlockNode e x = BN (BlockId,[BlockId])
+instance G.NonLocal (BlockNode) where
+  entryLabel (BN (lbl,_))   = lbl
+  successors (BN (_,succs)) = succs
+
+revPostorderFrom :: CFG -> BlockId -> [BlockId]
+revPostorderFrom cfg root =
+    map fromNode $ G.revPostorderFrom hooplGraph root
+  where
+    --TODO: Use fromSet instead.
+    nodes = setElems $ getCfgNodes cfg
+    hooplGraph = mapFromList $ map (\n -> (n,toNode n)) nodes
+
+    fromNode :: BlockNode C C -> BlockId
+    fromNode (BN x) = fst x
+
+    toNode :: BlockId -> BlockNode C C
+    toNode bid =
+        -- sorted such that heavier successors come first.
+        BN (bid,map fst . getSuccEdgesSorted cfg $ bid)
+
+
+-- | We take in a CFG which has on it's edges weights which are
+--   relative only to other edges originating from the same node.
+--
+--   We return a CFG for which each edge represents a GLOBAL weight.
+--   This means edge weights are comparable across the whole graph.
+--
+--   For irreducible control flow results might be imprecise, otherwise they
+--   are reliably.
+
+mkGlobalWeights :: BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
+mkGlobalWeights root localCfg
+  | null localCfg = panic "Error - Empty CFG"
+  | otherwise
+  = --pprTrace "revOrder" (ppr revOrder) $
+    -- undefined --propagate (mapSingleton root 1) (revOrder)
+    (blockFreqs', edgeFreqs')
+  where
+    (blockFreqs, edgeFreqs) = calcFreqs nodeProbs' backEdges' bodies' revOrder'
+    blockFreqs' = mapFromList $ map (first fromVertex) (assocs blockFreqs) :: LabelMap Double
+    edgeFreqs' = fmap fromVertexMap $ fromVertexMap edgeFreqs
+
+    fromVertexMap :: IM.IntMap x -> LabelMap x
+    fromVertexMap m = mapFromList . map (first fromVertex) $ IM.toList m
+
+
+
+    revOrder = revPostorderFrom localCfg root :: [BlockId]
+    LoopInfo backedges _levels bodies = loopInfo localCfg root
+
+    revOrder' = map toVertex revOrder
+    backEdges' = map (bimap toVertex toVertex) backedges
+    bodies' = map calcBody bodies
+    nodeProbs' = map (bimap
+                        toVertex
+                        (map (first toVertex))
+                     )
+                     nodeProbs
+    nodeProbs = cfgEdgeProbabilities localCfg
+
+    -- TODO: The sort is redundant if we can guarantee that setElems returns elements ascending
+    -- By mapping vertices to numbers in reverse post order we can bring any subset into reverse post
+    -- order simply by sorting.
+    calcBody (backedge, blocks) = (toVertex $ snd backedge, sort . map toVertex $ (setElems blocks))
+    vertexMapping = mapFromList $ zip revOrder [0..] :: LabelMap Int
+    blockMapping = IM.fromList $ zip [0 ..] revOrder :: IM.IntMap BlockId
+    toVertex :: BlockId -> Int
+    toVertex   blockId  = expectJust "mkGlobalWeights" $ mapLookup blockId vertexMapping
+    fromVertex :: Int -> BlockId
+    fromVertex vertex   = expectJust "mkGlobalWeights" $ IM.lookup vertex blockMapping
+
+cfgEdgeProbabilities :: CFG -> [(BlockId, [(BlockId, Prob)])]
+cfgEdgeProbabilities cfg
+    = normalized
+  where
+    nodeInfos = mapToList cfg :: [(BlockId, LabelMap EdgeInfo)]
+    weightInfo = map (second (fmap (weightToDouble . edgeWeight))) nodeInfos :: [(BlockId, LabelMap Double)]
+    normalized = map (second normalize) weightInfo :: [(BlockId, [(BlockId, Double)])]
+    normalize :: (LabelMap Double) -> [(BlockId, Double)]
+    normalize weightMap
+        | edgeCount <= 1 = zip (mapKeys weightMap) [1.0]
+        | otherwise = map normalWeight (mapKeys weightMap)
+      where
+        edgeCount = mapSize weightMap
+        -- Negative weights are generally allowed but lead to nonsense results
+        -- when we want *probabilities*.
+        -- TODO:
+        -- Zeros could be okay if we would check if there is at least one non-zero edge
+        -- but for simplicity/performance we just treat all edges <= zero as having a minimal chance of
+        -- being taken for now.
+        minWeight = 0.01
+        weightMap' = fmap (\w -> max w minWeight) weightMap
+        normalWeight bid
+         | Just w <- mapLookup bid weightMap'
+         = (bid, w/totalWeight)
+         | otherwise = panic "impossible"
+
+        totalWeight = sum weightMap'
+
+
+calcFreqs :: [(Int,[(Int,Prob)])] -> [(Int,Int)] -> [(Int, [Int])] -> [Int]
+          -> (Array Int Double, IM.IntMap (IM.IntMap Prob))
+calcFreqs edges backEdges loops revPostOrder = runST $ do
+    visitedNodes <- newArray (0,nodeCount-1) False :: ST s (STArray s Int Bool)
+    blockFreqs <- newArray (0,nodeCount-1) 0.0 :: ST s (STArray s Int Double)
+    edgeProbs <- newSTRef graph
+    edgeBackProbs <- newSTRef graph
+
+    -- let traceArray a = do
+    --       vs <- forM [0..nodeCount-1] $ \i -> readArray a i >>= (\v -> return (i,v))
+          -- trace ("array: " ++ show vs) $ return ()
+
+    let visited b = readArray visitedNodes b
+        getFreq b = readArray blockFreqs b
+        -- setFreq :: forall s. Int -> Double -> ST s ()
+        setFreq b f = writeArray blockFreqs b f
+        -- setVisited :: forall s. Node -> ST s ()
+        setVisited b = writeArray visitedNodes b True
+        -- Frequency/probability that edge is taken.
+        getProb' arr b1 b2 = readSTRef arr >>=
+            (\graph ->
+                return .
+                        fromMaybe (error "getFreq 1") .
+                        IM.lookup b2 .
+                        fromMaybe (error "getFreq 2") $
+                        (IM.lookup b1 graph)
+            )
+        setProb' arr b1 b2 prob = do
+          g <- readSTRef arr
+          let m = fromMaybe (error "Foo") $ IM.lookup b1 g
+              m' = IM.insert b2 prob m
+          writeSTRef arr (IM.insert b1 m' g)
+
+        getEdgeFreq b1 b2 = getProb' edgeProbs b1 b2
+        setEdgeFreq b1 b2 = setProb' edgeProbs b1 b2
+        getProb b1 b2 = fromMaybe (error "getProb") $ do
+            m' <- IM.lookup b1 graph
+            IM.lookup b2 m'
+
+        getBackProb b1 b2 = getProb' edgeBackProbs b1 b2
+        setBackProb b1 b2 = setProb' edgeBackProbs b1 b2
+
+
+    let -- calcOutFreqs :: Node -> ST s ()
+        calcOutFreqs bhead block = do
+          f <- getFreq block
+          forM (successors block) $ \bi -> do
+            let prob = getProb block bi
+            let succFreq = f * prob
+            setEdgeFreq block bi succFreq
+            -- traceM $ "SetOut: " ++ show (block, bi, f, prob, succFreq)
+            when (bi == bhead) $ setBackProb block bi succFreq
+
+
+    let propFreq block head = do
+            -- traceM ("prop:" ++ show (block,head))
+            -- traceShowM block
+
+            v <- visited block
+            if v then
+                return () --Dont look at nodes twice
+            else if block == head then
+                setFreq block 1.0 -- Loop header frequency is always 1
+            else do
+                irreducible <- (fmap or) $ forM (predecessors block) $ \bp -> do
+                    bp_visited <- visited bp
+                    let bp_backedge = isBackEdge bp block
+                    return (not bp_visited && not bp_backedge)
+
+                if irreducible
+                then return () -- Rare we don't care
+                else do
+                    setFreq block 0
+                    cycleProb <- sum <$> (forM (predecessors block) $ \pred -> do
+                        if isBackEdge pred block
+                            then
+                                getBackProb pred block
+                            else do
+                                f <- getFreq block
+                                prob <- getEdgeFreq pred block
+                                setFreq block $ f + prob
+                                return 0)
+                    -- traceM $ "cycleProb:" ++ show cycleProb
+                    let limit = 0.9999999999 -- Paper uses 1 - epsilon, but this works
+                    cycleProb <- return $ min cycleProb limit -- <- return $ if cycleProb > limit then limit else cycleProb
+                    -- traceM $ "cycleProb:" ++ show cycleProb
+
+                    f <- getFreq block
+                    setFreq block (f / (1.0 - cycleProb))
+
+
+            setVisited block
+            calcOutFreqs head block
+            -- traceArray blockFreqs
+
+            -- traceM ""
+
+        --   forM_ (successors block) $ \bi -> do
+        --     if (isBackEdge block bi)
+        --       then return ()
+        --       else do
+        --         -- Find unvisited successors
+        --         propFreq bi head
+
+
+
+    -- Set backedge probs to edge probs - WHY?
+    -- Just skip
+
+    -- Loops, by nesting, inner to outer
+
+
+    forM_ loops $ \(head, body) -> do
+        forM_ [0 .. nodeCount - 1] (\i -> writeArray visitedNodes i True) -- Mark all nodes as visited.
+        forM_ body (\i -> writeArray visitedNodes i False) -- Mark all blocks reachable from head as not visited
+        forM_ body $ \block -> propFreq block head
+
+    -- After dealing with all loops, deal with non-looping parts of the CFG
+    forM_ [0 .. nodeCount - 1] (\i -> writeArray visitedNodes i False) -- Everything in revPostOrder is reachable
+    forM_ revPostOrder $ \block -> propFreq block (head revPostOrder)
+
+    -- trace ("Final freqs:") $ return ()
+    -- let freqString = pprFreqs freqs
+    -- trace (unlines freqString) $ return ()
+    -- trace (pprFre) $ return ()
+    graph' <- readSTRef edgeProbs
+    freqs' <- freeze blockFreqs
+
+    return (freqs', graph')
+  where
+    predecessors :: Int -> [Int]
+    predecessors b = fromMaybe (lookupError "pred" b revGraph) $ IM.keys <$> IM.lookup b revGraph :: [Int]
+    successors b = fromMaybe (lookupError "succ" b graph)$ IM.keys <$> IM.lookup b graph
+    lookupError s b g = pprPanic ("Lookup error " ++ s) $
+                            ( text "node" <+> ppr b $$
+                                text "graph" <+>
+                                vcat (map (\(k,m) -> ppr (k,m :: IM.IntMap Double)) $ IM.toList g) $$
+
+                                text "inputGraph" $$
+                                vcat (map ppr $ sort edges)
+                                )
+    -- visited :: Node ->
+    nodeCount = length nodes
+    nodes = ordNub $ concatMap (\(x,ys)-> x:ys) $ IM.toList $ fmap (IM.keys) graph
+
+    isBackEdge from to = S.member (from,to) backEdgeSet
+    backEdgeSet = S.fromList backEdges
+
+    graph = let inner = map (second IM.fromList) edges
+            in IM.fromList inner :: IM.IntMap (IM.IntMap Prob)
+
+    revGraph = foldr add nodeMap flatElems
+      where
+        nodeMap = IM.fromList $ zip (map fst edges) (repeat IM.empty)
+        elems = IM.toList $ fmap IM.toList graph :: [(Int,[(Int,Prob)])]
+        flatElems =
+            concatMap
+                (\(from,ws) ->
+                    map (\(to,info) -> (to,from,info)) ws
+                ) elems
+        add (to,from,info) m = addEdge to from info m
+        addEdge from to info cfg =
+            IM.alter addDest from cfg
+            where
+                addDest Nothing = Just $ IM.singleton to info
+                addDest (Just wm) = Just $ IM.insert to info wm
