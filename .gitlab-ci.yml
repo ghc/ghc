@@ -473,6 +473,7 @@ nightly-i386-windows-hadrian:
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
     - |
       bash -c "make binary-dist TAR_COMP_OPTS=-1"
+      ls
       mv ghc-*.tar.xz ghc.tar.xz
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   tags:
