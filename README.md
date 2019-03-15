@@ -82,8 +82,7 @@ Filing bugs and feature requests
 ================================
 
 If you've encountered what you believe is a bug in GHC, or you'd like
-to propose a feature request, please let us know! Submit a ticket in
-our [bug tracker][10] and we'll be sure to look into it. Remember:
+to propose a feature request, please let us know! Submit an [issue][10] and we'll be sure to look into it. Remember:
 **Filing a bug is the best way to make sure your issue isn't lost over
 time**, so please feel free.
 
@@ -120,8 +119,8 @@ you to join!
   [8]:  http://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
           "http://ghc.haskell.org/trac/ghc/wiki/Building/Preparation"
   [9]:  http://www.haskell.org/cabal/          "http://www.haskell.org/cabal/"
-  [10]: http://ghc.haskell.org/trac/ghc/
-          "http://ghc.haskell.org/trac/ghc/"
+  [10]: https://gitlab.haskell.org/ghc/ghc/issues
+          "https://gitlab.haskell.org/ghc/ghc/issues"
   [11]: http://www.haskell.org/pipermail/glasgow-haskell-users/
           "http://www.haskell.org/pipermail/glasgow-haskell-users/"
   [12]: http://ghc.haskell.org/trac/ghc/wiki/TeamGHC
