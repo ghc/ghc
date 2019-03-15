@@ -56,9 +56,9 @@ bSwapLabel w = "hs_bswap" ++ pprWidth w
     pprWidth w   = pprPanic "bSwapLabel: Unsupported word width " (ppr w)
 
 bRevLabel :: Width -> String
-bRevLabel w = "hs_brev" ++ pprWidth w
+bRevLabel w = "hs_bitrev" ++ pprWidth w
   where
-    pprWidth W8 = "8"
+    pprWidth W8  = "8"
     pprWidth W16 = "16"
     pprWidth W32 = "32"
     pprWidth W64 = "64"

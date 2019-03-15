@@ -56,6 +56,14 @@ StgWord16 hs_bswap16(StgWord16 x);
 StgWord32 hs_bswap32(StgWord32 x);
 StgWord64 hs_bswap64(StgWord64 x);
 
+/* libraries/ghc-prim/cbits/bitrev.c
+This was done as part of issue #16164.
+See Note [Bit reversal primop] for more details about the implementation.*/
+StgWord hs_bitrev8(StgWord x);
+StgWord16 hs_bitrev16(StgWord16 x);
+StgWord32 hs_bitrev32(StgWord32 x);
+StgWord64 hs_bitrev64(StgWord64 x);
+
 /* TODO: longlong.c */
 
 /* libraries/ghc-prim/cbits/pdep.c */
