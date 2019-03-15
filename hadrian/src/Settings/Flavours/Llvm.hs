@@ -1,4 +1,5 @@
 module Settings.Flavours.Llvm (
+  benchmarkLlvmFlavour,
   performanceLlvmFlavour,
   profiledLlvmFlavour,
   quickLlvmFlavour,
@@ -7,12 +8,14 @@ module Settings.Flavours.Llvm (
 import Expression
 import Flavour
 
+import Settings.Flavours.Benchmark
 import Settings.Flavours.Performance
 import Settings.Flavours.Profiled
 import Settings.Flavours.Quick
 
 -- Please update doc/flavours.md when changing this file.
-performanceLlvmFlavour, profiledLlvmFlavour, quickLlvmFlavour :: Flavour
+benchmarkLlvmFlavour, performanceLlvmFlavour, profiledLlvmFlavour, quickLlvmFlavour :: Flavour
+benchmarkLlvmFlavour   = mkLlvmFlavour benchmarkFlavour
 performanceLlvmFlavour = mkLlvmFlavour performanceFlavour
 profiledLlvmFlavour    = mkLlvmFlavour profiledFlavour
 quickLlvmFlavour       = mkLlvmFlavour quickFlavour

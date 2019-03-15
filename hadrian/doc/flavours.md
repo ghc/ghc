@@ -88,6 +88,17 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O</td>
   </tr>
   <tr>
+    <th>bench</td>
+    <td>-O<br>-H64m</td>
+    <td>-O<br>-H64m</td>
+    <td></td>
+    <td>-O2</td>
+    <td>-O2</td>
+    <td>-O0</td>
+    <td>-O2</td>
+    <td>-O2</td>
+  </tr>
+  <tr>
     <th>devel1</td>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
@@ -109,40 +120,15 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td></td>
     <td>-O0<br>-DDEBUG</td>
   </tr>
-  <tr>
-    <th>quick-llvm</td>
-    <td>-O0<br>-H64m<br>-fllvm</td>
-    <td>-O0<br>-H64m<br>-fllvm</td>
-    <td></td>
-    <td>-O</td>
-    <td>-O</td>
-    <td></td>
-    <td>-O</td>
-    <td></td>
-  </tr>
-  <tr>
-    <th>perf-llvm</td>
-    <td>-O<br>-H64m<br>-fllvm</td>
-    <td>-O<br>-H64m<br>-fllvm</td>
-    <td></td>
-    <td>-O2</td>
-    <td>-O</td>
-    <td>-O2</td>
-    <td>-O</td>
-    <td>-O2</td>
-  </tr>
-  <tr>
-    <th>prof-llvm</td>
-    <td>-O0<br>-H64m<br>-fllvm</td>
-    <td>-O0<br>-H64m<br>-fllvm</td>
-    <td></td>
-    <td>-O</td>
-    <td>-O</td>
-    <td>-O</td>
-    <td>-O</td>
-    <td>-O</td>
-  </tr>
 </table>
+
+### LLVM variants
+
+In addition to the above, there are LLVM variants for the flavours `quick`,
+`prof`, `perf` and `bench`, available by appending a `-llvm` suffix (i.e.,
+`quick-llvm` for the LLVM variant of `quick`). These differ only in that there
+is an additional `-fllvm` flag in `hsDefault` when the stage0 compiler is GHC.
+See `src/Settings/Flavours/Llvm.hs` for details.
 
 ## Ways
 
@@ -197,7 +183,7 @@ information. The following table lists ways that are built in different flavours
     <td>No</td>
 </tr>
 <tr>
-    <th>quickest</th>
+    <th>quickest<br>bench</th>
     <td>vanilla</td>
     <td>vanilla</td>
     <td>vanilla<br>threaded</td>

@@ -89,6 +89,7 @@ executable hadrian
                        , Settings.Builders.RunTest
                        , Settings.Builders.Xelatex
                        , Settings.Default
+                       , Settings.Flavours.Benchmark
                        , Settings.Flavours.Common
                        , Settings.Flavours.Development
                        , Settings.Flavours.Llvm
