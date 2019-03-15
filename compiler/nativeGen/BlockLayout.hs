@@ -2,10 +2,9 @@
 -- Copyright (c) 2018 Andreas Klebinger
 --
 
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables, CPP #-}
+{-# LANGUAGE TypeFamilies, ScopedTypeVariables, CPP, GeneralizedNewtypeDeriving #-}
 
-{-# OPTIONS_GHC -fprof-auto #-}
---{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -ddump-cmm #-}
+-- {-# OPTIONS_GHC -fprof-auto #-}
 
 module BlockLayout
     ( sequenceTop )
@@ -22,7 +21,6 @@ import BlockId
 import Cmm
 import Hoopl.Collections
 import Hoopl.Label
-import Hoopl.Block
 
 import DynFlags (gopt, GeneralFlag(..), DynFlags, backendMaintainsCfg)
 import UniqFM
@@ -42,9 +40,10 @@ import PprCmm ()
 import OrdList
 import Data.List
 import Data.Foldable (toList)
-import Hoopl.Graph
 
 import qualified Data.Set as Set
+import Data.STRef
+import Control.Monad.ST.Strict
 
 {-
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -61,8 +60,8 @@ import qualified Data.Set as Set
   but also how much a block would benefit from being placed sequentially after
   it's predecessor.
   For example blocks which are preceeded by an info table are more likely to end
-  up in a different cache line than their predecessor. So there is less benefit
-  in placing them sequentially.
+  up in a different cache line than their predecessor and we can't eliminate the jump
+  so there is less benefit to placing them sequentially.
 
   For example consider this example:
 
@@ -82,48 +81,47 @@ import qualified Data.Set as Set
   Eg for our example we might end up with two chains like:
   [A->B->C->X],[D]. Blocks inside chains will always be placed sequentially.
   However there is no particular order in which chains are placed since
-  (hopefully) the blocks for which sequentially is important have already
+  (hopefully) the blocks for which sequentiality is important have already
   been placed in the same chain.
 
   -----------------------------------------------------------------------------
-      First try to create a lists of good chains.
+     1) First try to create a lists of good chains.
   -----------------------------------------------------------------------------
 
-  We do so by taking a block not yet placed in a chain and
-  looking at these cases:
+  We do so by looking at edges in order of frequency taken. Ignoring
+  certain edges (edges across calls, edges jumping over info tables).
 
-  *)  Check if the best predecessor of the block is at the end of a chain.
-      If so add the current block to the end of that chain.
+  *)  If source and target have not been placed build a new chain from them.
 
-      Eg if we look at block C and already have the chain (A -> B)
+  *)  If source and target have been placed, and are ends of differing chains
+      try to merge the two chains.
+
+  *)  If one side of the edge is a end/front of a chain, add the other block of
+      to edge to the same chain
+
+      Eg if we look at edge (B -> C) and already have the chain (A -> B)
       then we extend the chain to (A -> B -> C).
 
-      Combined with the fact that we process blocks in reverse post order
-      this means loop bodies and trivially sequential control flow already
-      ends up as a single chain.
+  We process edges by their taken frequency, this means if two edges compete
+  for fall through on the same target block, the one taken more often will
+  automatically win out.
 
-  *)  Otherwise we create a singleton chain from the block we are looking at.
-      Eg if we have from the example above already constructed (A->B)
-      and look at D we create the chain (D) resulting in the chains [A->B, D]
+  At the end we build up singleton chains from any blocks not having been placed.
+  These mostly result from blocks only connected via edges we ignore because of
+  eg info tables.
 
   -----------------------------------------------------------------------------
-      We then try to fuse chains.
+     2) We also try to fuse chains.
   -----------------------------------------------------------------------------
 
-  There are edge cases which result in two chains being created which trivially
-  represent linear control flow. For example we might have the chains
-  [(A-B-C),(D-E)] with an cfg triangle:
-
-      A----->C->D->E
-       \->B-/
-
-  We also get three independent chains if two branches end with a jump
-  to a common successor.
+  As a result from the above step we still end up with multiple chains which
+  represent sequential control flow but haven't been combined because they are
+  crossing calls or are sperarated by info tables.
 
   We take care of these cases by fusing chains which are connected by an
   edge.
 
-  We do so by looking at the list of edges sorted by weight.
+  We do so by looking at the list of all edges sorted by weight.
   Given the edge (C -> D) we try to find two chains such that:
       * C is at the end of chain one.
       * D is in front of chain two.
@@ -131,7 +129,7 @@ import qualified Data.Set as Set
   We then remove the edge and repeat the process for the rest of the edges.
 
   -----------------------------------------------------------------------------
-      Place indirect successors (neighbours) after each other
+     3) Place indirect successors (neighbours) after each other
   -----------------------------------------------------------------------------
 
   We might have chains [A,B,C,X],[E] in a CFG of the sort:
@@ -141,10 +139,6 @@ import qualified Data.Set as Set
 
   While E does not follow X it's still beneficial to place them near each other.
   This can be advantageous if eg C,X,E will end up in the same cache line.
-
-  TODO: If we remove edges as we use them (eg if we build up A->B remove A->B
-        from the list) we could save some more work in later phases.
-
 
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ~~~ Note [Triangle Control Flow]
@@ -205,11 +199,6 @@ import qualified Data.Set as Set
 neighbourOverlapp :: Int
 neighbourOverlapp = 2
 
--- | Only edges heavier than this are considered
---   for fusing two chains into a single chain.
-fuseEdgeThreshold :: EdgeWeight
-fuseEdgeThreshold = 0
-
 -- | Maps blocks near the end of a chain to it's chain AND
 -- the other blocks near the end.
 -- [A,B,C,D,E] Gives entries like (B -> ([A,B], [A,B,C,D,E]))
@@ -239,26 +228,8 @@ instance Outputable (BlockChain) where
     ppr (BlockChain blks) =
         parens (text "Chain:" <+> ppr (fromOL $ blks) )
 
-data WeightedEdge = WeightedEdge !BlockId !BlockId EdgeWeight deriving (Eq)
-
-
--- | Non deterministic! (Uniques) Sorts edges by weight and nodes.
-instance Ord WeightedEdge where
-  compare (WeightedEdge from1 to1 weight1)
-          (WeightedEdge from2 to2 weight2)
-    | weight1 < weight2 || weight1 == weight2 && from1 < from2 ||
-      weight1 == weight2 && from1 == from2 && to1 < to2
-    = LT
-    | from1 == from2 && to1 == to2 && weight1 == weight2
-    = EQ
-    | otherwise
-    = GT
-
-instance Outputable WeightedEdge where
-    ppr (WeightedEdge from to info) =
-        ppr from <> text "->" <> ppr to <> brackets (ppr info)
-
-type WeightedEdgeList = [WeightedEdge]
+chainFoldl :: (b -> BlockId -> b) -> b -> BlockChain -> b
+chainFoldl f z (BlockChain blocks) = foldl' f z blocks
 
 noDups :: [BlockChain] -> Bool
 noDups chains =
@@ -271,18 +242,24 @@ inFront :: BlockId -> BlockChain -> Bool
 inFront bid (BlockChain seq)
   = headOL seq == bid
 
-chainMember :: BlockId -> BlockChain -> Bool
-chainMember bid chain
-  = elem bid $ fromOL . chainBlocks $ chain
---   = setMember bid . chainMembers $ chain
+-- chainMember :: BlockId -> BlockChain -> Bool
+-- chainMember bid chain
+--   = elem bid $ fromOL . chainBlocks $ chain
 
 chainSingleton :: BlockId -> BlockChain
 chainSingleton lbl
     = BlockChain (unitOL lbl)
 
+chainFromList :: [BlockId] -> BlockChain
+chainFromList = BlockChain . toOL
+
 chainSnoc :: BlockChain -> BlockId -> BlockChain
 chainSnoc (BlockChain blks) lbl
   = BlockChain (blks `snocOL` lbl)
+
+chainCons :: BlockId -> BlockChain -> BlockChain
+chainCons lbl (BlockChain blks)
+  = BlockChain (lbl `consOL` blks)
 
 chainConcat :: BlockChain -> BlockChain -> BlockChain
 chainConcat (BlockChain blks1) (BlockChain blks2)
@@ -312,47 +289,6 @@ takeL :: Int -> BlockChain -> [BlockId]
 takeL n (BlockChain blks) =
     take n . fromOL $ blks
 
--- | For a given list of chains try to fuse chains with strong
---   edges between them into a single chain.
---   Returns the list of fused chains together with a set of
---   used edges. The set of edges is indirectly encoded in the
---   chains so doesn't need to be considered for later passes.
-fuseChains :: WeightedEdgeList -> LabelMap BlockChain
-           -> (LabelMap BlockChain, Set.Set WeightedEdge)
-fuseChains weights chains
-    = let fronts = mapFromList $
-                    map (\chain -> (headOL . chainBlocks $ chain,chain)) $
-                    mapElems chains :: LabelMap BlockChain
-          (chains', used, _) = applyEdges weights chains fronts Set.empty
-      in (chains', used)
-    where
-        applyEdges :: WeightedEdgeList -> LabelMap BlockChain
-                   -> LabelMap BlockChain -> Set.Set WeightedEdge
-                   -> (LabelMap BlockChain, Set.Set WeightedEdge, LabelMap BlockChain)
-        applyEdges [] chainsEnd chainsFront used
-            = (chainsEnd, used, chainsFront)
-        applyEdges (edge@(WeightedEdge from to w):edges) chainsEnd chainsFront used
-            --Since we order edges descending by weight we can stop here
-            | w <= fuseEdgeThreshold
-            = ( chainsEnd, used, chainsFront)
-            --Fuse the two chains
-            | Just c1 <- mapLookup from chainsEnd
-            , Just c2 <- mapLookup to chainsFront
-            , c1 /= c2
-            = let newChain = chainConcat c1 c2
-                  front = headOL . chainBlocks $ newChain
-                  end = lastOL . chainBlocks $ newChain
-                  chainsFront' = mapInsert front newChain $
-                                 mapDelete to chainsFront
-                  chainsEnd'   = mapInsert end newChain $
-                                 mapDelete from chainsEnd
-              in applyEdges edges chainsEnd' chainsFront'
-                            (Set.insert edge used)
-            | otherwise
-            --Check next edge
-            = applyEdges edges chainsEnd chainsFront used
-
-
 -- See also Note [Chain based CFG serialization]
 -- We have the chains (A-B-C-D) and (E-F) and an Edge C->E.
 --
@@ -379,11 +315,12 @@ fuseChains weights chains
 
 -- | For a given list of chains and edges try to combine chains with strong
 --   edges between them.
-combineNeighbourhood :: WeightedEdgeList -> [BlockChain]
-                     -> [BlockChain]
+combineNeighbourhood :: [CfgEdge] -> [BlockChain]
+                     -> ([BlockChain], Set.Set (BlockId,BlockId))
 combineNeighbourhood edges chains
     = -- pprTraceIt "Neigbours" $
-      applyEdges edges endFrontier startFrontier
+    --   pprTrace "combineNeighbours" (ppr edges) $
+      applyEdges edges endFrontier startFrontier (Set.empty)
     where
         --Build maps from chain ends to chains
         endFrontier, startFrontier :: FrontierMap
@@ -397,11 +334,11 @@ combineNeighbourhood edges chains
                                 let front = getFronts chain
                                     entry = (front,chain)
                                 in map (\x -> (x,entry)) front) chains
-        applyEdges :: WeightedEdgeList -> FrontierMap -> FrontierMap
-                   -> [BlockChain]
-        applyEdges [] chainEnds _chainFronts =
-            ordNub $ map snd $ mapElems chainEnds
-        applyEdges ((WeightedEdge from to _w):edges) chainEnds chainFronts
+        applyEdges :: [CfgEdge] -> FrontierMap -> FrontierMap -> Set.Set (BlockId, BlockId)
+                   -> ([BlockChain], Set.Set (BlockId,BlockId))
+        applyEdges [] chainEnds _chainFronts combined =
+            (ordNub $ map snd $ mapElems chainEnds, combined)
+        applyEdges ((CfgEdge from to _w):edges) chainEnds chainFronts combined
             | Just (c1_e,c1) <- mapLookup from chainEnds
             , Just (c2_f,c2) <- mapLookup to chainFronts
             , c1 /= c2 -- Avoid trying to concat a short chain with itself.
@@ -438,165 +375,298 @@ combineNeighbourhood edges chains
                 --   text "fronts" <+> ppr newFronts $$
                 --   text "ends" <+> ppr newEnds
                 --   )
-                 applyEdges edges newEnds newFronts
+                 applyEdges edges newEnds newFronts (Set.insert (from,to) combined)
             | otherwise
-            = --pprTrace "noNeigbours" (ppr ()) $
-              applyEdges edges chainEnds chainFronts
+            = applyEdges edges chainEnds chainFronts combined
          where
 
         getFronts chain = takeL neighbourOverlapp chain
         getEnds chain = takeR neighbourOverlapp chain
 
+-- In the last stop we combine all chains into a single one.
+-- Trying to place chains with strong edges next to each other.
+
+mergeChains :: [CfgEdge] -> [BlockChain]
+                     -> (BlockChain)
+mergeChains edges chains
+    = -- pprTrace "combine" (ppr edges) $
+      merge edges chainMap
+    where
+        -- Look up block -> chain quickly
+        -- Find position of block inside chain (optional)
+
+        chainMap :: LabelMap BlockChain
+        chainMap = foldl' addChain mapEmpty chains
+        addChain m chain = chainFoldl addBlock m chain
+          where
+            addBlock m' b = mapInsert b chain m'
+
+        merge :: [CfgEdge] -> LabelMap BlockChain -> BlockChain
+        merge [] chains = let chains' = ordNub $ mapElems chains
+                          in foldl' chainConcat (head chains') (tail chains')
+        merge ((CfgEdge from to _):edges) chains
+        --   | pprTrace "merge" (ppr (from,to) <> ppr chains) False
+        --   = undefined
+          | cFrom == cTo
+          = merge edges chains
+          | otherwise
+          = let chain = chainConcat cFrom cTo
+                chains' = addChain chains chain
+            in  -- pprTrace "merged:" (ppr chains') $
+                merge edges chains'
+          where
+            cFrom = expectJust "mergeChains:chainMap:from" $ mapLookup from chains
+            cTo = expectJust "mergeChains:chainMap:to"   $ mapLookup to   chains
 
 
--- See [Chain based CFG serialization]
-buildChains :: CFG -> [BlockId]
-            -> ( LabelMap BlockChain  -- Resulting chains.
+
+
+
+
+-- See Note [Chain based CFG serialization] for the general idea.
+-- This creates and fuses chains at the same time for performance reasons.
+
+-- Try to build chains from a list of edges.
+-- Edges must be sorted **descending** by their priority.
+-- Returns the constructed chains, along with all edges which
+-- are irrelevant past this point, this information doesn't need
+-- to be complete - it's only used to speed up the process.
+-- An Edge is irrelevant if the ends are part of the same chain.
+-- We say these edges are already linked
+buildChains :: [CfgEdge] -> [BlockId]
+            -> ( LabelMap BlockChain  -- Resulting chains, indexd by end if chain.
                , Set.Set (BlockId, BlockId)) --List of fused edges.
-buildChains succWeights blocks
-  = let (_, fusedEdges, chains) = buildNext setEmpty mapEmpty blocks Set.empty
-    in (chains, fusedEdges)
+buildChains edges blocks
+  = runST $ buildNext setEmpty mapEmpty mapEmpty edges Set.empty
   where
-    -- We keep a map from the last block in a chain to the chain itself.
+    -- buildNext builds up chains from one edge of a time.
+
+    -- We keep a map from the ends of chains to the chains.
     -- This we we can easily check if an block should be appened to an
     -- existing chain!
-    buildNext :: LabelSet
-              -> LabelMap BlockChain -- Map from last element to chain.
-              -> [BlockId] -- Blocks to place
-              -> Set.Set (BlockId, BlockId)
-              -> ( [BlockChain]  -- Placed Blocks
-                 , Set.Set (BlockId, BlockId) --List of fused edges
-                 , LabelMap BlockChain
-                 )
-    buildNext _placed chains [] linked =
-        ([], linked, chains)
-    buildNext placed chains (block:todo) linked
-        | setMember block placed
-        = buildNext placed chains todo linked
+    -- We store them using STRefs so we don't have to rebuild the spine of both
+    -- maps every time we update a chain.
+    buildNext :: forall s. LabelSet
+              -> LabelMap (STRef s BlockChain) -- Map from end of chain to chain.
+              -> LabelMap (STRef s BlockChain) -- Map from start of chain to chain.
+              -> [CfgEdge] -- Edges to check - ordered by decreasing weight
+              -> Set.Set (BlockId, BlockId) -- Used edges
+              -> ST s   ( LabelMap BlockChain -- Chains by end
+                        , Set.Set (BlockId, BlockId) --List of fused edges
+                        )
+    buildNext placed _chainStarts chainEnds  [] linked = do
+        ends' <- sequence $ mapMap readSTRef chainEnds :: ST s (LabelMap BlockChain)
+        -- Any remaining blocks have to be made to singleton chains.
+        -- They might be combined with other chains later on outside this function.
+        let unplaced = filter (\x -> not (setMember x placed)) blocks
+            singletons = map (\x -> (x,chainSingleton x)) unplaced :: [(BlockId,BlockChain)]
+        return (foldl' (\m (k,v) -> mapInsert k v m) ends' singletons , linked)
+    buildNext placed chainStarts chainEnds (edge:todo) linked
+        | from == to
+        -- We skip self edges
+        = buildNext placed chainStarts chainEnds todo (Set.insert (from,to) linked)
+        | not (alreadyPlaced from) &&
+          not (alreadyPlaced to)
+        = do
+            --pprTraceM "Edge-Chain:" (ppr edge)
+            chain' <- newSTRef $ chainFromList [from,to]
+            buildNext
+                (setInsert to (setInsert from placed))
+                (mapInsert from chain' chainStarts)
+                (mapInsert to chain' chainEnds)
+                todo
+                (Set.insert (from,to) linked)
+
+        | (alreadyPlaced from) &&
+          (alreadyPlaced to)
+        , Just predChain <- mapLookup from chainEnds
+        , Just succChain <- mapLookup to chainStarts
+        , predChain /= succChain -- Otherwise we try to create a cycle.
+        = do
+            -- pprTraceM "Fusing edge" (ppr edge)
+            fuseChain predChain succChain
+
+        | (alreadyPlaced from) &&
+          (alreadyPlaced to)
+        =   --pprTraceM "Skipping:" (ppr edge) >>
+            buildNext placed chainStarts chainEnds todo linked
+
         | otherwise
-        = buildNext placed' chains' todo linked'
+        = do -- pprTraceM "Finding chain for:" (ppr edge $$
+             --         text "placed" <+> ppr placed)
+             findChain
       where
-        placed' = (foldl' (flip setInsert) placed placedBlocks)
-        linked' = Set.union linked linkedEdges
-        (placedBlocks, chains', linkedEdges) = findChain block
+        from = edgeFrom edge
+        to   = edgeTo   edge
+        alreadyPlaced blkId = (setMember blkId placed)
 
-        --Add the block to a existing or new chain
-        --Returns placed blocks, list of resulting chains
-        --and fused edges
-        findChain :: BlockId
-                -> ([BlockId],LabelMap BlockChain, Set.Set (BlockId, BlockId))
-        findChain block
-        -- B) place block at end of existing chain if
-        -- there is no better block to append.
-          | (pred:_) <- preds
-          , alreadyPlaced pred
-          , Just predChain <- mapLookup pred chains
-          , (best:_) <- filter (not . alreadyPlaced) $ getSuccs pred
-          , best == lbl
-          = --pprTrace "B.2)" (ppr (pred,lbl)) $
-            let newChain = chainSnoc predChain block
-                chainMap = mapInsert lbl newChain $ mapDelete pred chains
-            in  ( [lbl]
-                , chainMap
-                , Set.singleton (pred,lbl) )
+        -- Combine two chains into a single one.
+        fuseChain :: STRef s BlockChain -> STRef s BlockChain
+                  -> ST s   ( LabelMap BlockChain -- Chains by end
+                            , Set.Set (BlockId, BlockId) --List of fused edges
+                            )
+        fuseChain fromRef toRef = do
+            fromChain <- readSTRef fromRef
+            toChain <- readSTRef toRef
+            let newChain = chainConcat fromChain toChain
+            ref <- newSTRef newChain
+            let start = head $ takeL 1 newChain
+            let end = head $ takeR 1 newChain
+            -- chains <- sequence $ mapMap readSTRef chainStarts
+            -- pprTraceM "pre-fuse chains:" $ ppr chains
+            buildNext
+                placed
+                (mapInsert start ref $ mapDelete to $ chainStarts)
+                (mapInsert end ref $ mapDelete from $ chainEnds)
+                todo
+                (Set.insert (from,to) linked)
 
+
+        --Add the block to a existing chain or creates a new chain
+        findChain :: ST s   ( LabelMap BlockChain -- Chains by end
+                            , Set.Set (BlockId, BlockId) --List of fused edges
+                            )
+        findChain
+          -- We can attach the block to the end of a chain
+          | alreadyPlaced from
+          , Just predChain <- mapLookup from chainEnds
+          = do
+            chain <- readSTRef predChain
+            let newChain = chainSnoc chain to
+            writeSTRef predChain newChain
+            let chainEnds' = mapInsert to predChain $ mapDelete from chainEnds
+            -- chains <- sequence $ mapMap readSTRef chainStarts
+            -- pprTraceM "from chains:" $ ppr chains
+            buildNext (setInsert to placed) chainStarts chainEnds' todo (Set.insert (from,to) linked)
+          -- We can attack it to the front of a chain
+          | alreadyPlaced to
+          , Just succChain <- mapLookup to chainStarts
+          = do
+            chain <- readSTRef succChain
+            let newChain = from `chainCons` chain
+            writeSTRef succChain newChain
+            let chainStarts' = mapInsert from succChain $ mapDelete to chainStarts
+            -- chains <- sequence $ mapMap readSTRef chainStarts'
+            -- pprTraceM "to chains:" $ ppr chains
+            buildNext (setInsert from placed) chainStarts' chainEnds todo (Set.insert (from,to) linked)
+          -- The placed end of the edge is part of a chain already and not an end.
           | otherwise
-          = --pprTrace "single" (ppr lbl)
-            ( [lbl]
-            , mapInsert lbl (chainSingleton lbl) chains
-            , Set.empty)
-            where
-              alreadyPlaced blkId = (setMember blkId placed)
-              lbl = block
-              getSuccs = map fst . getSuccEdgesSorted succWeights
-              preds = map fst $ getSuccEdgesSorted predWeights lbl
-    --For efficiency we also create the map to look up predecessors here
-    predWeights = reverseEdges succWeights
+          = do
+            let block    = if alreadyPlaced to then from else to
+            --pprTraceM "Singleton" $ ppr block
+            let newChain = chainSingleton block
+            ref <- newSTRef newChain
+            buildNext (setInsert block placed) (mapInsert block ref chainStarts)
+                      (mapInsert block ref chainEnds) todo (linked)
 
+-- -- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
+-- newtype BlockNode e x = BN (BlockId,[BlockId])
+-- instance NonLocal (BlockNode) where
+--   entryLabel (BN (lbl,_))   = lbl
+--   successors (BN (_,succs)) = succs
 
-
--- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
-newtype BlockNode e x = BN (BlockId,[BlockId])
-instance NonLocal (BlockNode) where
-  entryLabel (BN (lbl,_))   = lbl
-  successors (BN (_,succs)) = succs
-
-fromNode :: BlockNode C C -> BlockId
-fromNode (BN x) = fst x
+-- fromNode :: BlockNode C C -> BlockId
+-- fromNode (BN x) = fst x
 
 sequenceChain :: forall a i. (Instruction i, Outputable i) => LabelMap a -> CFG
             -> [GenBasicBlock i] -> [GenBasicBlock i]
 sequenceChain _info _weights    [] = []
 sequenceChain _info _weights    [x] = [x]
 sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
-    --Optimization, delete edges of weight <= 0.
-    --This significantly improves performance whenever
-    --we iterate over all edges, which is a few times!
     let weights :: CFG
-        weights
-            = filterEdges (\_f _t edgeInfo -> edgeWeight edgeInfo > 0) weights'
+        weights = --pprTrace "cfg'" (pprEdgeWeights cfg')
+                  cfg'
+          where
+            (_, globalEdgeWeights) = mkGlobalWeights entry weights'
+            cfg' = mapFoldlWithKey
+                        (\cfg from m ->
+                            mapFoldlWithKey
+                                (\cfg to w ->
+                                    setEdgeWeight cfg (EdgeWeight w) from to
+                                )
+                                cfg m
+                        )
+                        weights'
+                        globalEdgeWeights
+
+        directEdges :: [CfgEdge]
+        directEdges = sortBy (flip compare) $ catMaybes . map relevantWeight $ (infoEdgeList weights)
+          where
+            relevantWeight :: CfgEdge -> Maybe CfgEdge
+            relevantWeight edge@(CfgEdge from to edgeInfo)
+                | (EdgeInfo (CmmSource (CmmCall {})) _) <- edgeInfo
+                -- Ignore edges across calls
+                = Nothing
+                | mapMember to info
+                , w <- edgeWeight edgeInfo
+                -- The payoff is small of we jump over an info table
+                = Just (CfgEdge from to edgeInfo { edgeWeight = w/8 })
+                | otherwise
+                = Just edge
+
         blockMap :: LabelMap (GenBasicBlock i)
         blockMap
             = foldl' (\m blk@(BasicBlock lbl _ins) ->
                         mapInsert lbl blk m)
                      mapEmpty blocks
 
-        toNode :: BlockId -> BlockNode C C
-        toNode bid =
-            -- sorted such that heavier successors come first.
-            BN (bid,map fst . getSuccEdgesSorted weights' $ bid)
-
-        orderedBlocks :: [BlockId]
-        orderedBlocks
-            = map fromNode $
-              revPostorderFrom (fmap (toNode . blockId) blockMap) entry
+        -- toNode :: BlockId -> BlockNode C C
+        -- toNode bid =
+        --     -- sorted such that heavier successors come first.
+        --     BN (bid,map fst . getSuccEdgesSorted weights' $ bid)
 
         (builtChains, builtEdges)
             = {-# SCC "buildChains" #-}
               --pprTraceIt "generatedChains" $
-              --pprTrace "orderedBlocks" (ppr orderedBlocks) $
-              buildChains weights orderedBlocks
+              --pprTrace "blocks" (ppr (mapKeys blockMap)) $
+              buildChains directEdges (mapKeys blockMap)
 
-        rankedEdges :: WeightedEdgeList
+        rankedEdges :: [CfgEdge]
         -- Sort edges descending, remove fused eges
         rankedEdges =
-            map (\(from, to, weight) -> WeightedEdge from to weight) .
-            filter (\(from, to, _)
-                        -> not (Set.member (from,to) builtEdges)) .
-            sortWith (\(_,_,w) -> - w) $ weightedEdgeList weights
+            filter (\edge -> not (Set.member (edgeFrom edge,edgeTo edge) builtEdges)) $
+            directEdges
 
-        (fusedChains, fusedEdges)
+        (neighbourChains, combined)
             = ASSERT(noDups $ mapElems builtChains)
-              {-# SCC "fuseChains" #-}
-              --(pprTrace "RankedEdges" $ ppr rankedEdges) $
-              --pprTraceIt "FusedChains" $
-              fuseChains rankedEdges builtChains
-
-        rankedEdges' =
-            filter (\edge -> not $ Set.member edge fusedEdges) $ rankedEdges
-
-        neighbourChains
-            = ASSERT(noDups $ mapElems fusedChains)
               {-# SCC "groupNeighbourChains" #-}
-              --pprTraceIt "ResultChains" $
-              combineNeighbourhood rankedEdges' (mapElems fusedChains)
+            --   pprTraceIt "NeighbourChains" $
+              combineNeighbourhood rankedEdges (mapElems builtChains)
+
+
+        allEdges :: [CfgEdge]
+        allEdges = sortOn (relevantWeight) $ filter (not . deadEdge) $ (infoEdgeList weights)
+          where
+            deadEdge :: CfgEdge -> Bool
+            deadEdge (CfgEdge from to _) = let e = (from,to) in Set.member e combined || Set.member e builtEdges
+            relevantWeight :: CfgEdge -> EdgeWeight
+            relevantWeight (CfgEdge _ _ edgeInfo)
+                | (EdgeInfo (CmmSource (CmmCall {})) _) <- edgeInfo
+                -- Penalize edges across calls
+                = weight/(64.0)
+                | otherwise
+                = weight
+              where
+                -- negate to sort descending
+                weight = negate (edgeWeight edgeInfo)
+
+        masterChain =
+            {-# SCC "mergeChains" #-}
+            -- pprTraceIt "MergedChains" $
+            mergeChains allEdges neighbourChains
 
         --Make sure the first block stays first
-        ([entryChain],chains')
-            = ASSERT(noDups $ neighbourChains)
-              partition (chainMember entry) neighbourChains
-        (entryChain':entryRest)
-            | inFront entry entryChain = [entryChain]
-            | (rest,entry) <- breakChainAt entry entryChain
+        prepedChains
+            | inFront entry masterChain
+            = [masterChain]
+            | (rest,entry) <- breakChainAt entry masterChain
             = [entry,rest]
             | otherwise = pprPanic "Entry point eliminated" $
-                            ppr ([entryChain],chains')
+                            ppr masterChain
 
-        prepedChains
-            = entryChain':(entryRest++chains') :: [BlockChain]
         blockList
-            -- = (concatMap chainToBlocks prepedChains)
-            = (concatMap fromOL $ map chainBlocks prepedChains)
+            = ASSERT(noDups [masterChain])
+              (concatMap fromOL $ map chainBlocks prepedChains)
 
         --chainPlaced = setFromList $ map blockId blockList :: LabelSet
         chainPlaced = setFromList $ blockList :: LabelSet
@@ -606,8 +676,13 @@ sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
             in filter (\block -> not (isPlaced block)) blocks
 
         placedBlocks =
+            -- We want debug builds to catch this as it's a good indicator for
+            -- issues with CFG invariants. But we don't want to blow up production
+            -- builds if something slips through.
+            ASSERT(null unplaced)
             --pprTraceIt "placedBlocks" $
-            blockList ++ unplaced
+            -- ++ [] is stil kinda expensive
+            if null unplaced then blockList else blockList ++ unplaced
         getBlock bid = expectJust "Block placment" $ mapLookup bid blockMap
     in
         --Assert we placed all blocks given as input
@@ -649,10 +724,12 @@ sequenceTop dflags ncgImpl edgeWeights
   | (gopt Opt_CfgBlocklayout dflags) && backendMaintainsCfg dflags
   --Use chain based algorithm
   = CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
+                            {-# SCC layoutBlocks #-}
                             sequenceChain info edgeWeights blocks )
   | otherwise
   --Use old algorithm
   = CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
+                            {-# SCC layoutBlocks #-}
                             sequenceBlocks cfg info blocks)
   where
     cfg

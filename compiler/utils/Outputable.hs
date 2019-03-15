@@ -809,6 +809,12 @@ instance Outputable Word32 where
 instance Outputable Word where
     ppr n = integer $ fromIntegral n
 
+instance Outputable Float where
+    ppr n = float n
+
+instance Outputable Double where
+    ppr n = double n
+
 instance Outputable () where
     ppr _ = text "()"
 
