@@ -1,10 +1,12 @@
 module Flavour
   ( Flavour (..), werror
   , DocTargets, DocTarget(..)
+  , splitSections, splitSectionsIf
   ) where
 
 import Expression
 import Data.Set (Set)
+import Packages
 
 -- Please update doc/{flavours.md, user-settings.md} when changing this file.
 -- | 'Flavour' is a collection of build settings that fully define a GHC build.
@@ -63,3 +65,26 @@ data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | SphinxMan
 -- It mimics the CI settings so is useful to turn on when developing.
 werror :: Flavour -> Flavour
 werror fl = fl { args = args fl <> (builder Ghc ? notStage0 ? arg "-Werror") }
+
+-- | Transform the input 'Flavour' so as to build with
+--   @-split-sections@ whenever appropriate. You can
+--   select which package gets built with split sections
+--   by passing a suitable predicate. If the predicate holds
+--   for a given package, then @split-sections@ is used when
+--   building it. If the given flavour doesn't build
+--   anything in a @dyn@-enabled way, then 'splitSections' is a no-op.
+splitSectionsIf :: (Package -> Bool) -> Flavour -> Flavour
+splitSectionsIf pkgPredicate fl = fl { args = args fl <> splitSectionsArg }
+
+  where splitSectionsArg = do
+          way <- getWay
+          pkg <- getPackage
+          (Dynamic `wayUnit` way) ? pkgPredicate pkg ?
+            builder (Ghc CompileHs) ? arg "-split-sections"
+
+-- | Like 'splitSectionsIf', but with a fixed predicate: use
+--   split sections for all packages but the GHC library.
+splitSections :: Flavour -> Flavour
+splitSections = splitSectionsIf (/=ghc)
+-- Disable section splitting for the GHC library. It takes too long and
+-- there is little benefit.
