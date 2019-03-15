@@ -1085,7 +1085,7 @@ permutations xs0        =  xs0 : perms xs0 []
 -- It is a special case of 'sortBy', which allows the programmer to supply
 -- their own comparison function.
 --
--- Elements are arranged from from lowest to highest, keeping duplicates in
+-- Elements are arranged from lowest to highest, keeping duplicates in
 -- the order they appeared in the input.
 --
 -- >>> sort [1,6,4,3,2,5]
