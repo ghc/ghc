@@ -286,7 +286,7 @@ nightly-i386-linux-deb9:
 
 .build-x86_64-linux-deb9:
   extends: .validate-linux
-  stage: build
+  stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9"
@@ -313,6 +313,7 @@ nightly-x86_64-linux-deb9:
 # N.B. Has DEBUG assertions enabled in stage2
 validate-x86_64-linux-deb9-debug:
   extends: .build-x86_64-linux-deb9
+  stage: build
   variables:
     BUILD_FLAVOUR: validate
     TEST_ENV: "x86_64-linux-deb9-debug"
