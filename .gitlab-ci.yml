@@ -480,6 +480,7 @@ nightly-i386-windows-hadrian:
     - bash -c "echo include mk/flavours/quick.mk > mk/build.mk"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist TAR_COMP_OPTS=-1"
+    - ls
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   tags:
     - x86_64-windows
