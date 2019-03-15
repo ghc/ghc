@@ -271,6 +271,55 @@ all of the documentation targets:
 You can pass several `--docs=...` flags, Hadrian will combine
 their effects.
 
+## Split sections
+
+You can build all or just a few packages with
+[`-split-sections`][split-sections] by tweaking an existing
+flavour (whichever matches your needs) using
+`splitSections` or `splitSectionsIf`:
+
+``` haskell
+splitSections :: Flavour -> Flavour
+splitSectionsIf :: (Package -> Bool) -> Flavour -> Flavour
+```
+
+For example, you can easily start with the `quick` flavour and
+additionally build all Haskell packages with `-split-sections` by modifying
+your `UserSettings` as follows:
+
+``` diff
+diff --git a/hadrian/src/UserSettings.hs b/hadrian/src/UserSettings.hs
+index c92dd11d44..40dfe75b87 100644
+--- a/hadrian/src/UserSettings.hs
++++ b/hadrian/src/UserSettings.hs
+@@ -14,6 +14,7 @@ module UserSettings (
+ import Flavour
+ import Expression
+ import {-# SOURCE #-} Settings.Default
++import Settings.Flavours.Quick
+
+ -- See doc/user-settings.md for instructions.
+ -- Please update doc/user-settings.md when committing changes to this file.
+@@ -30,7 +31,7 @@ userFlavours = [userFlavour] -- Add more build flavours if need be.
+ -- | This is an example user-defined build flavour. Feel free to modify it and
+ -- use by passing @--flavour=user@ from the command line.
+ userFlavour :: Flavour
+-userFlavour = defaultFlavour { name = "user" } -- Modify other settings here.
++userFlavour = (splitSectionsIf (const True) quickFlavour) { name = "quick-split" }
+
+ -- | Add user-defined packages. Note, this only lets Hadrian know about the
+ -- existence of a new package; to actually build it you need to create a new
+```
+
+You can then start a build with this flavour with `build --flavour=quick-split`.
+
+Changing `(const True)` to `(== base)` would only build `base` with
+`-split-sections`, not all Haskell packages as with the diff above.
+`splitSections` is simply `splitSectionsIf` applied to the predicate
+`not . (==ghc)`, i.e it builds all Haskell packages but the `ghc`
+library with `-split-sections` (it is usually not worth using that
+option with the `ghc` library).
+
 ## Miscellaneous
 
 Hadrian prints various progress info during the build. You can change the colours
@@ -295,3 +344,5 @@ Dull Blue
 Vivid Cyan
 Extended "203"
 ```
+
+[split-sections]: https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/phases.html#ghc-flag--split-sections
