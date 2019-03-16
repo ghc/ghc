@@ -977,11 +977,15 @@ relocateSection(ObjectCode* oc, int curSection)
         }
 
         IF_DEBUG(linker, debugBelch("relocateSection: thing = %p\n", (void *) thing));
+
+        /* Thing points to memory within one of the relocated sections. We can
+         * probe the first byte to sanity check internal relocations.
+         */
         if (0 == reloc->r_extern) {
             if (reloc->r_pcrel) {
-                checkProddableBlock(oc, (void *)((char *)thing + baseValue), relocLenBytes);
+                checkProddableBlock(oc, (void *)((char *)thing + baseValue), 1);
             } else {
-                checkProddableBlock(oc, (void *)thing, relocLenBytes);
+                checkProddableBlock(oc, (void *)thing, 1);
             }
         }
 
