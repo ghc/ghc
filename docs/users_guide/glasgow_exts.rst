@@ -7921,6 +7921,9 @@ other hand, the two equations are compatible. Thus, GHC can ignore the
 first equation when looking at the second. So, ``G a`` will simplify to
 ``a``.
 
+Incompatibilities between closed type family equations can be displayed
+in :ghci-cmd:`:info` when :ghc-flag:`-fprint-axiom-incomps` is enabled.
+
 However see :ref:`ghci-decls` for the overlap rules in GHCi.
 
 .. _type-family-decidability:
