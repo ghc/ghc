@@ -814,7 +814,11 @@ relocateSection(ObjectCode* oc, int curSection)
                     // symbol address (symbol->n_value)
 
                     if ((symbol->nlist->n_type & N_TYPE) == N_SECT) {
-                        ASSERT(symbol->addr != NULL);
+                        if (symbol->addr == NULL) {
+                            errorBelch("relocateSection: address of internal symbol %s was not resolved\n", nm);
+                            return 0;
+                        }
+
                         addr = symbol->addr;
 
                         IF_DEBUG(linker, debugBelch("relocateSection: calculated relocation of "
@@ -823,6 +827,7 @@ relocateSection(ObjectCode* oc, int curSection)
                     } else {
                         errorBelch("\nrelocateSection: %s is not exported,"
                                    " and should be defined in a section, but isn't!\n", nm);
+                        return 0;
                     }
             }
 
