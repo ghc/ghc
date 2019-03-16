@@ -1,2 +1,0 @@
-Linking: path = aligned_mem_access.o, symname = _foo
-42
