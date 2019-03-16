@@ -10358,20 +10358,24 @@ function that can *never* be called, such as this one: ::
 
       f :: (Int ~ Bool) => a -> a
 
-:extension:`AllowAmbiguousTypes` is not compatible now with :extension:`RankNTypes`
-It does not mean that you can't use both extensions in one module, but you can't use
-both features simultaneously. For example: :: 
+Sometimes :extension:`AllowAmbiguousTypes` does not mix well with :extension:`RankNTypes`
+For example: :: 
       foo :: forall r. (forall i. (KnownNat i) => r) -> r
       foo f = f @1
 
-      boo :: forall i. (KnownNat i) => Int
+      boo :: forall j. (KnownNat j) => Int
       boo = ....
           
       h :: Int
       h = foo boo
 
-This program will be rejected due to failing ambiguity check, when we will try to apply "``foo``" to "``boo``".
+This program will be rejected due to failing ambiguity check because GHC would not unify
+type variables `j` and `i`.
 
+The cause is that `i` does not appear to the right of `=>` arrow, 
+and if there is no defaulting (like in case of `Num` constraint) 
+the compiler will make new type variable and fail to deduce `KnownNat` constraint for it.
+       
 .. note::
     *A historical note.* GHC used to impose some more restrictive and less
     principled conditions on type signatures. For type
@@ -11278,8 +11282,6 @@ The obsolete language options :extension:`PolymorphicComponents` and
 specify finer distinctions that GHC no longer makes. (They should really elicit
 a deprecation warning, but they don't, purely to avoid the need to library
 authors to change their old flags specifications.)
-
-Also the :extension:`RankNTypes` is not compatible with :extension:`AllowAmbiguousTypes`.
 
 .. _univ:
 
@@ -14258,23 +14260,7 @@ assertion failed, but which and where?
 
 One way out is to define an extended ``assert`` function which also
 takes a descriptive string to include in the error message and perhaps
-combine this with the use of a pre-processor which inserts the source
-location where ``assert`` was used.
-
-GHC offers a helping hand here, doing all of this for you. For every use
-of ``assert`` in the user's source: ::
-
-    kelvinToC :: Double -> Double
-    kelvinToC k = assert (k >= 0.0) (k-273.15)
-
-GHC will rewrite this to also include the source location where the
-assertion was made, ::
-
-    assert pred val ==> assertError "Main.hs|15" pred val
-
-The rewrite is only performed by the compiler when it spots applications
-of ``Control.Exception.assert``, so you can still define and use your
-own versions of ``assert``, should you so wish. If not, import
+combs of ``assert``, should you so wish. If not, import
 ``Control.Exception`` to make use ``assert`` in your code.
 
 .. index::
@@ -16097,6 +16083,22 @@ Six type synonyms are provided for convenience: ::
 As an example, this data declaration: ::
 
     data IntHash = IntHash Int#
+      deriving Generic
+
+results in the following ``Generic`` instance: ::
+
+    instance 'Generic' IntHash where
+      type 'Rep' IntHash =
+        'D1' ('MetaData "IntHash" "Main" "package-name" 'False)
+          ('C1' ('MetaCons "IntHash" 'PrefixI 'False)
+            ('S1' ('MetaSel 'Nothing
+                            'NoSourceUnpackedness
+                            'NoSourceStrictness
+                            'DecidedLazy)
+                  'UInt'))
+
+A user could provide, for example, a ``GSerialize UInt`` instance so that a
+``Serialize IntHash`` instance could be easily defined in t Int#
       deriving Generic
 
 results in the following ``Generic`` instance: ::
