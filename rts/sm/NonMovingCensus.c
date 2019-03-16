@@ -14,17 +14,14 @@
 #include "Trace.h"
 #include "NonMovingCensus.h"
 
-struct NonmovingAllocCensus {
-    uint32_t n_active_segs;
-    uint32_t n_filled_segs;
-    uint32_t n_live_blocks;
-    uint32_t n_live_words;
-};
-
 // N.B. This may miss segments in the event of concurrent mutation (e.g. if a
 // mutator retires its current segment to the filled list).
-static struct NonmovingAllocCensus
-nonmovingAllocatorCensus(struct NonmovingAllocator *alloc)
+//
+// all_stopped is whether we can guarantee that all mutators and minor GCs are
+// stopped. In this case is safe to look at active and current segments so we can
+// also collect statistics on live words.
+static inline struct NonmovingAllocCensus
+nonmovingAllocatorCensus_(struct NonmovingAllocator *alloc, bool collect_live_words)
 {
     struct NonmovingAllocCensus census = {0, 0, 0, 0};
 
@@ -32,12 +29,14 @@ nonmovingAllocatorCensus(struct NonmovingAllocator *alloc)
          seg != NULL;
          seg = seg->link)
     {
-        census.n_filled_segs++;
-        census.n_live_blocks += nonmovingSegmentBlockCount(seg);
         unsigned int n = nonmovingSegmentBlockCount(seg);
-        for (unsigned int i=0; i < n; i++) {
-            StgClosure *c = (StgClosure *) nonmovingSegmentGetBlock(seg, i);
-            census.n_live_words += closure_sizeW(c);
+        census.n_filled_segs++;
+        census.n_live_blocks += n;
+        if (collect_live_words) {
+            for (unsigned int i=0; i < n; i++) {
+                StgClosure *c = (StgClosure *) nonmovingSegmentGetBlock(seg, i);
+                census.n_live_words += closure_sizeW(c);
+            }
         }
     }
 
@@ -50,7 +49,8 @@ nonmovingAllocatorCensus(struct NonmovingAllocator *alloc)
         for (unsigned int i=0; i < n; i++) {
             if (nonmovingGetMark(seg, i)) {
                 StgClosure *c = (StgClosure *) nonmovingSegmentGetBlock(seg, i);
-                census.n_live_words += closure_sizeW(c);
+                if (collect_live_words)
+                    census.n_live_words += closure_sizeW(c);
                 census.n_live_blocks++;
             }
         }
@@ -63,13 +63,30 @@ nonmovingAllocatorCensus(struct NonmovingAllocator *alloc)
         for (unsigned int i=0; i < n; i++) {
             if (nonmovingGetMark(seg, i)) {
                 StgClosure *c = (StgClosure *) nonmovingSegmentGetBlock(seg, i);
-                census.n_live_words += closure_sizeW(c);
+                if (collect_live_words)
+                    census.n_live_words += closure_sizeW(c);
                 census.n_live_blocks++;
             }
         }
     }
     return census;
 }
+
+/* This must not be used when mutators are active since it assumes that
+ * all blocks in nonmoving heap are valid closures.
+ */
+struct NonmovingAllocCensus
+nonmovingAllocatorCensusWithWords(struct NonmovingAllocator *alloc)
+{
+    return nonmovingAllocatorCensus_(alloc, true);
+}
+
+struct NonmovingAllocCensus
+nonmovingAllocatorCensus(struct NonmovingAllocator *alloc)
+{
+    return nonmovingAllocatorCensus_(alloc, false);
+}
+
 
 void nonmovingPrintAllocatorCensus()
 {
