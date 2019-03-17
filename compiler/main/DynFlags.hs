@@ -823,6 +823,7 @@ data WarningFlag =
    | Opt_WarnDeferredTypeErrors
    | Opt_WarnDeferredOutOfScopeVariables
    | Opt_WarnNonCanonicalMonadInstances   -- since 8.0
+   | Opt_WarnNonCanonicalMonadFailInstances   -- since 8.0, removed 8.8
    | Opt_WarnNonCanonicalMonoidInstances  -- since 8.0
    | Opt_WarnMissingPatternSynonymSignatures -- since 8.0
    | Opt_WarnUnrecognisedWarningFlags     -- since 8.0
@@ -4003,6 +4004,8 @@ wWarningFlagsDeps = [
   flagSpec "monomorphism-restriction"    Opt_WarnMonomorphism,
   flagSpec "name-shadowing"              Opt_WarnNameShadowing,
   flagSpec "noncanonical-monad-instances"
+                                         Opt_WarnNonCanonicalMonadInstances,
+  depFlagSpec "noncanonical-monadfail-instances"
                                          Opt_WarnNonCanonicalMonadInstances,
   flagSpec "noncanonical-monoid-instances"
                                          Opt_WarnNonCanonicalMonoidInstances,
