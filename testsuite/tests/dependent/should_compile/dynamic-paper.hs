@@ -34,7 +34,7 @@ fromInteger = Prelude.fromInteger
 
 insertStore = undefined
 schema = undefined
-withTypeable = undefined
+withTypeable _ _ = undefined
 throw# = undefined
 
 toDynamicST = undefined

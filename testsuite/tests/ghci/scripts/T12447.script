@@ -4,6 +4,6 @@ import Data.Typeable
 
 class Deferrable p where deferEither :: proxy p -> (p => r) -> Either String r
 
-instance (Typeable a, Typeable b) => Deferrable (a ~ b) where deferEither = undefined
+instance (Typeable a, Typeable b) => Deferrable (a ~ b) where deferEither _ _ = undefined
 
 :t deferEither @(_ ~ _)

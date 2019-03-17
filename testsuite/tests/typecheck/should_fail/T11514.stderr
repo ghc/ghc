@@ -1,0 +1,9 @@
+
+T11514.hs:6:7: error:
+    • Cannot instantiate unification variable ‘a0’
+      with a type involving polytypes: (Show a => a -> a) -> ()
+        GHC doesn't yet support impredicative polymorphism
+    • In the expression: undefined
+      In an equation for ‘foo’: foo = undefined
+    • Relevant bindings include
+        foo :: (Show a => a -> a) -> () (bound at T11514.hs:6:1)
