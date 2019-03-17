@@ -1,7 +1,7 @@
 
 T10194.hs:7:8: error:
-    Cannot instantiate unification variable ‘b0’
-    with a type involving foralls: X
-      GHC doesn't yet support impredicative polymorphism
-    In the expression: (.)
-    In an equation for ‘comp’: comp = (.)
+    • Cannot instantiate unification variable ‘b0’
+      with a type involving polytypes: X
+        GHC doesn't yet support impredicative polymorphism
+    • In the expression: (.)
+      In an equation for ‘comp’: comp = (.)

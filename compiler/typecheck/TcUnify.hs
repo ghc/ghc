@@ -31,7 +31,7 @@ module TcUnify (
   matchActualFunTys, matchActualFunTysPart,
   matchExpectedFunKind,
 
-  metaTyVarUpdateOK, occCheckForErrors, OccCheckResult(..)
+  metaTyVarUpdateOK, occCheckForErrors, MetaTyVarUpdateResult(..)
 
   ) where
 
@@ -2115,43 +2115,43 @@ with (forall k. k->*)
 
 -}
 
-data OccCheckResult a
-  = OC_OK a
-  | OC_Bad     -- Forall or type family
-  | OC_Occurs
+data MetaTyVarUpdateResult a
+  = MTVU_OK a
+  | MTVU_Bad     -- Forall, predicate, or type family
+  | MTVU_Occurs
 
-instance Functor OccCheckResult where
+instance Functor MetaTyVarUpdateResult where
       fmap = liftM
 
-instance Applicative OccCheckResult where
-      pure = OC_OK
+instance Applicative MetaTyVarUpdateResult where
+      pure = MTVU_OK
       (<*>) = ap
 
-instance Monad OccCheckResult where
-  OC_OK x    >>= k = k x
-  OC_Bad     >>= _ = OC_Bad
-  OC_Occurs  >>= _ = OC_Occurs
+instance Monad MetaTyVarUpdateResult where
+  MTVU_OK x    >>= k = k x
+  MTVU_Bad     >>= _ = MTVU_Bad
+  MTVU_Occurs  >>= _ = MTVU_Occurs
 
-occCheckForErrors :: DynFlags -> TcTyVar -> Type -> OccCheckResult ()
--- Just for error-message generation; so we return OccCheckResult
+occCheckForErrors :: DynFlags -> TcTyVar -> Type -> MetaTyVarUpdateResult ()
+-- Just for error-message generation; so we return MetaTyVarUpdateResult
 -- so the caller can report the right kind of error
 -- Check whether
 --   a) the given variable occurs in the given type.
 --   b) there is a forall in the type (unless we have -XImpredicativeTypes)
 occCheckForErrors dflags tv ty
   = case preCheck dflags True tv ty of
-      OC_OK _   -> OC_OK ()
-      OC_Bad    -> OC_Bad
-      OC_Occurs -> case occCheckExpand [tv] ty of
-                     Nothing -> OC_Occurs
-                     Just _  -> OC_OK ()
+      MTVU_OK _   -> MTVU_OK ()
+      MTVU_Bad    -> MTVU_Bad
+      MTVU_Occurs -> case occCheckExpand [tv] ty of
+                       Nothing -> MTVU_Occurs
+                       Just _  -> MTVU_OK ()
 
 ----------------
 metaTyVarUpdateOK :: DynFlags
                   -> TcTyVar             -- tv :: k1
                   -> TcType              -- ty :: k2
                   -> Maybe TcType        -- possibly-expanded ty
--- (metaTyFVarUpdateOK tv ty)
+-- (metaTyVarUpdateOK tv ty)
 -- We are about to update the meta-tyvar tv with ty
 -- Check (a) that tv doesn't occur in ty (occurs check)
 --       (b) that ty does not have any foralls
@@ -2178,17 +2178,18 @@ metaTyVarUpdateOK dflags tv ty
   = case preCheck dflags False tv ty of
          -- False <=> type families not ok
          -- See Note [Prevent unification with type families]
-      OC_OK _   -> Just ty
-      OC_Bad    -> Nothing  -- forall or type function
-      OC_Occurs -> occCheckExpand [tv] ty
+      MTVU_OK _   -> Just ty
+      MTVU_Bad    -> Nothing  -- forall, predicate, or type function
+      MTVU_Occurs -> occCheckExpand [tv] ty
 
-preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> OccCheckResult ()
+preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
 -- A quick check for
---   (a) a forall type (unless -XImpredivativeTypes)
---   (b) a type family
---   (c) an occurrence of the type variable (occurs check)
+--   (a) a forall type (unless -XImpredicativeTypes)
+--   (b) a predicate type (unless -XImpredicativeTypes)
+--   (c) a type family
+--   (d) an occurrence of the type variable (occurs check)
 --
--- For (a) and (b) we check only the top level of the type, NOT
+-- For (a), (b), and (c) we check only the top level of the type, NOT
 -- inside the kinds of variables it mentions.  But for (c) we do
 -- look in the kinds of course.
 
@@ -2198,25 +2199,28 @@ preCheck dflags ty_fam_ok tv ty
     details          = tcTyVarDetails tv
     impredicative_ok = canUnifyWithPolyType dflags details
 
-    ok :: OccCheckResult ()
-    ok = OC_OK ()
+    ok :: MetaTyVarUpdateResult ()
+    ok = MTVU_OK ()
 
-    fast_check :: TcType -> OccCheckResult ()
+    fast_check :: TcType -> MetaTyVarUpdateResult ()
     fast_check (TyVarTy tv')
-      | tv == tv' = OC_Occurs
+      | tv == tv' = MTVU_Occurs
       | otherwise = fast_check_occ (tyVarKind tv')
            -- See Note [Occurrence checking: look inside kinds]
 
     fast_check (TyConApp tc tys)
-      | bad_tc tc              = OC_Bad
+      | bad_tc tc              = MTVU_Bad
       | otherwise              = mapM fast_check tys >> ok
     fast_check (LitTy {})      = ok
-    fast_check (FunTy _ a r)   = fast_check a   >> fast_check r
+    fast_check (FunTy{ft_af = af, ft_arg = a, ft_res = r})
+      | InvisArg <- af
+      , not impredicative_ok   = MTVU_Bad
+      | otherwise              = fast_check a   >> fast_check r
     fast_check (AppTy fun arg) = fast_check fun >> fast_check arg
     fast_check (CastTy ty co)  = fast_check ty  >> fast_check_co co
     fast_check (CoercionTy co) = fast_check_co co
     fast_check (ForAllTy (Bndr tv' _) ty)
-       | not impredicative_ok = OC_Bad
+       | not impredicative_ok = MTVU_Bad
        | tv == tv'            = ok
        | otherwise = do { fast_check_occ (tyVarKind tv')
                         ; fast_check_occ ty }
@@ -2226,13 +2230,13 @@ preCheck dflags ty_fam_ok tv ty
      -- For kinds, we only do an occurs check; we do not worry
      -- about type families or foralls
      -- See Note [Checking for foralls]
-    fast_check_occ k | tv `elemVarSet` tyCoVarsOfType k = OC_Occurs
+    fast_check_occ k | tv `elemVarSet` tyCoVarsOfType k = MTVU_Occurs
                      | otherwise                        = ok
 
      -- For coercions, we are only doing an occurs check here;
      -- no bother about impredicativity in coercions, as they're
      -- inferred
-    fast_check_co co | tv `elemVarSet` tyCoVarsOfCo co = OC_Occurs
+    fast_check_co co | tv `elemVarSet` tyCoVarsOfCo co = MTVU_Occurs
                      | otherwise                       = ok
 
     bad_tc :: TyCon -> Bool

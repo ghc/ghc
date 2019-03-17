@@ -3,7 +3,8 @@ T12427a.hs:17:29: error:
     • Couldn't match expected type ‘p’
                   with actual type ‘(forall b. [b] -> [b]) -> Int’
       ‘p’ is a rigid type variable bound by
-        the inferred type of h11 :: T -> p at T12427a.hs:17:1-29
+        the inferred type of h11 :: T -> p
+        at T12427a.hs:17:1-29
     • In the expression: v
       In a case alternative: T1 _ v -> v
       In the expression: case y of { T1 _ v -> v }
@@ -12,7 +13,7 @@ T12427a.hs:17:29: error:
 
 T12427a.hs:28:6: error:
     • Cannot instantiate unification variable ‘p0’
-      with a type involving foralls: (forall b. [b] -> [b]) -> Int
+      with a type involving polytypes: (forall b. [b] -> [b]) -> Int
         GHC doesn't yet support impredicative polymorphism
     • In the pattern: T1 _ x1
       In a pattern binding: T1 _ x1 = undefined
