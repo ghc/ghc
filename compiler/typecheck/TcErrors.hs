@@ -16,7 +16,7 @@ import GhcPrelude
 import TcRnTypes
 import TcRnMonad
 import TcMType
-import TcUnify( occCheckForErrors, OccCheckResult(..) )
+import TcUnify( occCheckForErrors, OccCheckResult(..), OccCheckBadness(..) )
 import TcEnv( tcInitTidyEnv )
 import TcType
 import RnUnbound ( unknownNameSuggestions )
@@ -1657,10 +1657,18 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
        ; mkErrorMsgFromCt ctxt ct $
          mconcat [important main_msg, extra2, extra3, report] }
 
-  | OC_Bad <- occ_check_expand
-  = do { let msg = vcat [ text "Cannot instantiate unification variable"
+  | OC_Bad ocb <- occ_check_expand
+  = do { let impred_reason =
+               case ocb of
+                 OCB_Forall     -> "foralls"
+                 OCB_Predicate  -> "predicates"
+                 OCB_TypeFamily -> pprPanic "mkTyVarEqErr'" (ppr ocb)
+                   -- Invariant: this case will never be reached since
+                   -- occ_check_expand permits occurrences of type families
+             msg = vcat [ text "Cannot instantiate unification variable"
                           <+> quotes (ppr tv1)
-                        , hang (text "with a" <+> what <+> text "involving foralls:") 2 (ppr ty2)
+                        , hang (text "with a" <+> what <+> text "involving"
+                                              <+> text impred_reason <> colon) 2 (ppr ty2)
                         , nest 2 (text "GHC doesn't yet support impredicative polymorphism") ]
        -- Unlike the other reports, this discards the old 'report_important'
        -- instead of augmenting it.  This is because the details are not likely
