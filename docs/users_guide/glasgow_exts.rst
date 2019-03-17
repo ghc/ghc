@@ -10358,7 +10358,7 @@ function that can *never* be called, such as this one: ::
 
       f :: (Int ~ Bool) => a -> a
 
-Sometimes :extension:`AllowAmbiguousTypes` does not mix well with :extension:`RankNTypes`
+Sometimes :extension:`AllowAmbiguousTypes` does not mix well with :extension:`RankNTypes`.
 For example: :: 
       foo :: forall r. (forall i. (KnownNat i) => r) -> r
       foo f = f @1
@@ -10369,12 +10369,13 @@ For example: ::
       h :: Int
       h = foo boo
 
-This program will be rejected due to failing ambiguity check because GHC would not unify
+This program will be rejected due to failing ambiguity check because GHC will not unify
 type variables `j` and `i`.
 
-The cause is that `i` does not appear to the right of `=>` arrow, 
-and if there is no defaulting (like in case of `Num` constraint) 
-the compiler will make new type variable and fail to deduce `KnownNat` constraint for it.
+Unlike the previous examples, it is not possible(currently) to resolve manually 
+by using :extension:`TypeApplications` the sort of ambiguity, 
+that occurs within a rank-n type, like `(forall i. (KnownNat i) => r)`.
+
        
 .. note::
     *A historical note.* GHC used to impose some more restrictive and less
