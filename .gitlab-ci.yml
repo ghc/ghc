@@ -149,8 +149,8 @@ hadrian-ghc-in-ghci:
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
-    # Load ghc-in-ghci then immediately exit
-    - echo ":q" | hadrian/ghci.sh
+    # Load ghc-in-ghci then immediately exit and check the modules loaded
+    - echo ":q" | hadrian/ghci.sh | tail -n2 | grep "Ok,"
   cache:
     key: hadrian-ghci
     paths:
