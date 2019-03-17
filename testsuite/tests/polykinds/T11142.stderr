@@ -7,7 +7,7 @@ T11142.hs:9:49: error:
 
 T11142.hs:10:7: error:
     • Cannot instantiate unification variable ‘a0’
-      with a type involving foralls:
+      with a type involving polytypes:
         (forall k1 (a :: k1). SameKind a b) -> ()
         GHC doesn't yet support impredicative polymorphism
     • In the expression: undefined

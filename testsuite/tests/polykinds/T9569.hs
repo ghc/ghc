@@ -11,7 +11,7 @@ class Deferrable (c :: Constraint) where
 
 deferPair :: (Deferrable c1, Deferrable c2) =>
                   Proxy (c1,c2) -> ((c1,c2) => a) -> a
-deferPair = undefined
+deferPair _ _ = undefined
 
 instance (Deferrable c1, Deferrable c2) => Deferrable (c1,c2) where
     -- defer p f = deferPair p f     -- Succeeds

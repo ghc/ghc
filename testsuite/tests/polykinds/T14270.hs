@@ -76,7 +76,7 @@ splitApp rep@(TrFun _ a b) = Just (IsApp (mkTrApp arr a) b)
 splitApp (TrTyCon{})       = Nothing
 
 withTypeable :: forall a r. TypeRep a -> (Typeable a => r) -> r
-withTypeable = undefined
+withTypeable _ _ = undefined
 
 eqTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
              TypeRep a -> TypeRep b -> Maybe (a :~~: b)

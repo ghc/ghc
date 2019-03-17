@@ -1,7 +1,7 @@
 
 T12563.hs:7:15: error:
     • Cannot instantiate unification variable ‘p0’
-      with a type involving foralls: (forall a. f0 a) -> f0 r0
+      with a type involving polytypes: (forall a. f0 a) -> f0 r0
         GHC doesn't yet support impredicative polymorphism
     • In the first argument of ‘foo’, namely ‘g’
       In the expression: foo g
