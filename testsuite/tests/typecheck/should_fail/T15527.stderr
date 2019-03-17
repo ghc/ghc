@@ -1,4 +1,4 @@
 
 T15527.hs:4:6: error:
-    Pattern syntax in expression context: (.)@Int
+    @-syntax in expression context
     Did you mean to enable TypeApplications?

@@ -63,6 +63,7 @@ data PmExpr = PmExprVar   Name
             | PmExprLit   PmLit
             | PmExprEq    PmExpr PmExpr  -- Syntactic equality
             | PmExprOther (HsExpr GhcTc)  -- Note [PmExprOther in PmExpr]
+            | PmExprFake
 
 
 mkPmExprData :: DataCon -> [PmExpr] -> PmExpr

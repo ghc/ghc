@@ -541,10 +541,6 @@ type family XArrForm        x
 type family XTick           x
 type family XBinTick        x
 type family XTickPragma     x
-type family XEWildPat       x
-type family XEAsPat         x
-type family XEViewPat       x
-type family XELazyPat       x
 type family XWrap           x
 type family XXExpr          x
 
@@ -591,10 +587,6 @@ type ForallXExpr (c :: * -> Constraint) (x :: *) =
        , c (XTick           x)
        , c (XBinTick        x)
        , c (XTickPragma     x)
-       , c (XEWildPat       x)
-       , c (XEAsPat         x)
-       , c (XEViewPat       x)
-       , c (XELazyPat       x)
        , c (XWrap           x)
        , c (XXExpr          x)
        )

@@ -57,7 +57,6 @@ module   RdrHsSyn (
         bang_RDR,
         isBangRdr,
         isTildeRdr,
-        checkPatterns,        -- SrcLoc -> [HsExp] -> P [HsPat]
         checkMonadComp,       -- P (HsStmtContext RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
@@ -93,15 +92,33 @@ module   RdrHsSyn (
         ExpCmdP(ExpCmdP, runExpCmdP),
         ExpCmdI(..),
         ecFromExp,
+        ecFromExp',
         ecFromCmd,
         ecHsLam,
         ecHsLet,
         ecOpApp,
         ecHsCase,
-        ecHsApp,
+        mkHsAppPV,
         ecHsIf,
         ecHsDo,
         ecHsPar,
+        patBuilderBang,
+        HoleyOp(..),
+        holeyOpToExpr,
+        epFromPat,
+        epHsVar,
+        epHsLit,
+        epHsOverLit,
+        epWild,
+        epViewPat,
+        epTySig,
+        epExplicitList,
+        epSplice,
+        epRecord,
+        epNegApp,
+        epSectionR,
+        epLazyPat,
+        epAsPat,
 
     ) where
 
@@ -1005,7 +1022,11 @@ checkTyClHdr is_cls ty
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
 checkBlockArguments :: forall b. ExpCmdI b => Located (b GhcPs) -> PV ()
-checkBlockArguments = case expCmdG @b of { ExpG -> checkExpr; CmdG -> checkCmd }
+checkBlockArguments =
+  case expCmdG @b of
+    ExpG -> checkExpr
+    CmdG -> checkCmd
+    PatG -> \_ -> return ()
   where
     checkExpr :: LHsExpr GhcPs -> P ()
     checkExpr expr = case unLoc expr of
@@ -1085,112 +1106,87 @@ checkNoDocs msg ty = go ty
 -- We parse patterns as expressions and check for valid patterns below,
 -- converting the expression into a pattern at the same time.
 
-checkPattern :: SDoc -> LHsExpr GhcPs -> P (LPat GhcPs)
-checkPattern msg e = checkLPat msg e
+checkPattern :: SDoc -> Located (PatBuilder GhcPs) -> P (LPat GhcPs)
+checkPattern msg (dL -> L l pb) = checkLPat msg (cL l pb)
 
-checkPatterns :: SDoc -> [LHsExpr GhcPs] -> P [LPat GhcPs]
-checkPatterns msg es = mapM (checkPattern msg) es
+checkPatterns :: SDoc -> [Located (PatBuilder GhcPs)] -> P [LPat GhcPs]
+checkPatterns msg es = mapM (checkLPat msg) es
 
-checkLPat :: SDoc -> LHsExpr GhcPs -> P (LPat GhcPs)
+checkLPat :: SDoc -> Located (PatBuilder GhcPs) -> P (LPat GhcPs)
 checkLPat msg e@(dL->L l _) = checkPat msg l e []
 
-checkPat :: SDoc -> SrcSpan -> LHsExpr GhcPs -> [LPat GhcPs]
+checkPat :: SDoc -> SrcSpan -> Located (PatBuilder GhcPs) -> [LPat GhcPs]
          -> P (LPat GhcPs)
-checkPat _ loc (dL->L l e@(HsVar _ (dL->L _ c))) args
+checkPat _ loc (dL->L l e@(PatBuilderVar (dL->L _ c))) args
   | isRdrDataCon c = return (cL loc (ConPatIn (cL l c) (PrefixCon args)))
   | not (null args) && patIsRec c =
-      patFail (text "Perhaps you intended to use RecursiveDo") l e
+      patFail (text "Perhaps you intended to use RecursiveDo") l (ppr e)
 checkPat msg loc e args     -- OK to let this happen even if bang-patterns
                         -- are not enabled, because there is no valid
                         -- non-bang-pattern parse of (C ! e)
   | Just (e', args') <- splitBang e
   = do  { args'' <- checkPatterns msg args'
         ; checkPat msg loc e' (args'' ++ args) }
-checkPat msg loc (dL->L _ (HsApp _ f e)) args
+checkPat msg loc (dL->L _ (PatBuilderApp f e)) args
   = do p <- checkLPat msg e
        checkPat msg loc f (p : args)
 checkPat msg loc (dL->L _ e) []
   = do p <- checkAPat msg loc e
        return (cL loc p)
 checkPat msg loc e _
-  = patFail msg loc (unLoc e)
+  = patFail msg loc (ppr (unLoc e))
 
-checkAPat :: SDoc -> SrcSpan -> HsExpr GhcPs -> P (Pat GhcPs)
+checkAPat :: SDoc -> SrcSpan -> PatBuilder GhcPs -> P (Pat GhcPs)
 checkAPat msg loc e0 = do
  nPlusKPatterns <- getBit NPlusKPatternsBit
  case e0 of
-   EWildPat _ -> return (WildPat noExt)
-   HsVar _ x  -> return (VarPat noExt x)
-   HsLit _ (HsStringPrim _ _) -- (#13260)
-       -> addFatalError loc (text "Illegal unboxed string literal in pattern:"
-                              $$ ppr e0)
-
-   HsLit _ l  -> return (LitPat noExt l)
+   PatBuilderPat p  -> return p
+   PatBuilderVar x  -> return (VarPat noExt x)
 
    -- Overloaded numeric patterns (e.g. f 0 x = x)
    -- Negation is recorded separately, so that the literal is zero or +ve
    -- NB. Negative *primitive* literals are already handled by the lexer
-   HsOverLit _ pos_lit          -> return (mkNPat (cL loc pos_lit) Nothing)
-   NegApp _ (dL->L l (HsOverLit _ pos_lit)) _
+   PatBuilderOverLit pos_lit          -> return (mkNPat (cL loc pos_lit) Nothing)
+   PatBuilderNegApp (dL->L l (PatBuilderOverLit pos_lit))
                         -> return (mkNPat (cL l pos_lit) (Just noSyntaxExpr))
 
-   SectionR _ (dL->L lb (HsVar _ (dL->L _ bang))) e    -- (! x)
-        | bang == bang_RDR
+   PatBuilderBang lb p   -- (! x)
         -> do { hintBangPat loc e0
-              ; e' <- checkLPat msg e
+              ; p' <- checkLPat msg p
               ; addAnnotation loc AnnBang lb
-              ; return  (BangPat noExt e') }
+              ; return (BangPat noExt p') }
 
-   ELazyPat _ e         -> checkLPat msg e >>= (return . (LazyPat noExt))
-   EAsPat _ n e         -> checkLPat msg e >>= (return . (AsPat noExt) n)
-   -- view pattern is well-formed if the pattern is
-   EViewPat _ expr patE -> checkLPat msg patE >>=
-                            (return . (\p -> ViewPat noExt expr p))
-   ExprWithTySig _ e t  -> do e <- checkLPat msg e
-                              return (SigPat noExt e t)
+   PatBuilderWithTySig e t  -> do
+     e <- checkLPat msg e
+     return (SigPat noExt e t)
 
    -- n+k patterns
-   OpApp _ (dL->L nloc (HsVar _ (dL->L _ n)))
-           (dL->L _    (HsVar _ (dL->L _ plus)))
-           (dL->L lloc (HsOverLit _ lit@(OverLit {ol_val = HsIntegral {}})))
+   PatBuilderOpApp (dL->L nloc (PatBuilderVar (dL->L _ n)))
+           (dL->L _    (HoleyOp (dL->L _ plus)))
+           (dL->L lloc (PatBuilderOverLit lit@(OverLit {ol_val = HsIntegral {}})))
                       | nPlusKPatterns && (plus == plus_RDR)
                       -> return (mkNPlusKPat (cL nloc n) (cL lloc lit))
-   OpApp _ l (dL->L cl (HsVar _ (dL->L _ c))) r
+   PatBuilderOpApp l (dL->L cl (HoleyOp (dL->L _ c))) r
      | isDataOcc (rdrNameOcc c) -> do
          l <- checkLPat msg l
          r <- checkLPat msg r
          return (ConPatIn (cL cl c) (InfixCon l r))
 
-   OpApp {}           -> patFail msg loc e0
+   PatBuilderOpApp {}           -> patFail msg loc (ppr e0)
 
-   ExplicitList _ _ es -> do ps <- mapM (checkLPat msg) es
-                             return (ListPat noExt ps)
+   PatBuilderPar e          -> checkLPat msg e >>= (return . (ParPat noExt))
 
-   HsPar _ e          -> checkLPat msg e >>= (return . (ParPat noExt))
+   _           -> patFail msg loc (ppr e0)
 
-   ExplicitTuple _ es b
-     | all tupArgPresent es  -> do ps <- mapM (checkLPat msg)
-                                           [e | (dL->L _ (Present _ e)) <- es]
-                                   return (TuplePat noExt ps b)
-     | otherwise -> addFatalError loc (text "Illegal tuple section in pattern:"
-                                        $$ ppr e0)
-
-   ExplicitSum _ alt arity expr -> do
-     p <- checkLPat msg expr
-     return (SumPat noExt p alt arity)
-
-   RecordCon { rcon_con_name = c, rcon_flds = HsRecFields fs dd }
-                        -> do fs <- mapM (checkPatField msg) fs
-                              return (ConPatIn c (RecCon (HsRecFields fs dd)))
-   HsSpliceE _ s | not (isTypedSplice s)
-               -> return (SplicePat noExt s)
-   _           -> patFail msg loc e0
-
-placeHolderPunRhs :: LHsExpr GhcPs
+placeHolderPunRhs :: forall b. ExpCmdI b => Located (b GhcPs)
 -- The RHS of a punned record field will be filled in by the renamer
 -- It's better not to make it an error, in case we want to print it when
 -- debugging
-placeHolderPunRhs = noLoc (HsVar noExt (noLoc pun_RDR))
+placeHolderPunRhs =
+  case expCmdG @b of
+    ExpG -> noLoc (HsVar noExt (noLoc pun_RDR))
+    CmdG -> panic "placeHolderPunRhs in command context"
+    PatG -> noLoc (PatBuilderVar (noLoc pun_RDR))
 
 plus_RDR, bang_RDR, pun_RDR :: RdrName
 plus_RDR = mkUnqual varName (fsLit "+") -- Hack
@@ -1202,14 +1198,14 @@ isBangRdr (Unqual occ) = occNameFS occ == fsLit "!"
 isBangRdr _ = False
 isTildeRdr = (==eqTyCon_RDR)
 
-checkPatField :: SDoc -> LHsRecField GhcPs (LHsExpr GhcPs)
+checkPatField :: SDoc -> LHsRecField GhcPs (Located (PatBuilder GhcPs))
               -> P (LHsRecField GhcPs (LPat GhcPs))
 checkPatField msg (dL->L l fld) = do p <- checkLPat msg (hsRecFieldArg fld)
                                      return (cL l (fld { hsRecFieldArg = p }))
 
-patFail :: SDoc -> SrcSpan -> HsExpr GhcPs -> P a
+patFail :: SDoc -> SrcSpan -> SDoc -> P a
 patFail msg loc e = addFatalError loc err
-    where err = text "Parse error in pattern:" <+> ppr e
+    where err = text "Parse error in pattern:" <+> e
              $$ msg
 
 patIsRec :: RdrName -> Bool
@@ -1221,7 +1217,7 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 
 checkValDef :: SDoc
             -> SrcStrictness
-            -> LHsExpr GhcPs
+            -> Located (PatBuilder GhcPs)
             -> Maybe (LHsType GhcPs)
             -> Located (a,GRHSs GhcPs (LHsExpr GhcPs))
             -> P ([AddAnn],HsBind GhcPs)
@@ -1229,7 +1225,7 @@ checkValDef :: SDoc
 checkValDef msg _strictness lhs (Just sig) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
   = checkPatBind msg (cL (combineLocs lhs sig)
-                        (ExprWithTySig noExt lhs (mkLHsSigWcType sig))) grhss
+                        (PatBuilderWithTySig lhs (mkLHsSigWcType sig))) grhss
 
 checkValDef msg strictness lhs Nothing g@(dL->L l (_,grhss))
   = do  { mb_fun <- isFunLhs lhs
@@ -1245,7 +1241,7 @@ checkFunBind :: SDoc
              -> SrcSpan
              -> Located RdrName
              -> LexicalFixity
-             -> [LHsExpr GhcPs]
+             -> [Located (PatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P ([AddAnn],HsBind GhcPs)
 checkFunBind msg strictness ann lhs_loc fun is_infix pats (dL->L rhs_span grhss)
@@ -1275,11 +1271,11 @@ makeFunBind fn ms
               fun_tick = [] }
 
 checkPatBind :: SDoc
-             -> LHsExpr GhcPs
+             -> Located (PatBuilder GhcPs)
              -> Located (a,GRHSs GhcPs (LHsExpr GhcPs))
              -> P ([AddAnn],HsBind GhcPs)
 checkPatBind msg lhs (dL->L _ (_,grhss))
-  = do  { lhs <- checkPattern msg lhs
+  = do  { lhs <- checkLPat msg lhs
         ; return ([],PatBind noExt lhs grhss
                     ([],[])) }
 
@@ -1327,6 +1323,7 @@ checkDoAndIfThenElse =
   case expCmdG @b of
     ExpG -> checkDoAndIfThenElse'
     CmdG -> checkDoAndIfThenElse'
+    PatG -> \_ _ _ _ _ -> return ()
 
 checkDoAndIfThenElse'
   :: (HasSrcSpan a, Outputable a, Outputable b, HasSrcSpan c, Outputable c)
@@ -1349,20 +1346,20 @@ checkDoAndIfThenElse' guardExpr semiThen thenExpr semiElse elseExpr
 
         -- The parser left-associates, so there should
         -- not be any OpApps inside the e's
-splitBang :: LHsExpr GhcPs -> Maybe (LHsExpr GhcPs, [LHsExpr GhcPs])
+splitBang :: Located (PatBuilder GhcPs) -> Maybe (Located (PatBuilder  GhcPs), [Located (PatBuilder GhcPs)])
 -- Splits (f ! g a b) into (f, [(! g), a, b])
-splitBang (dL->L _ (OpApp _ l_arg bang@(dL->L _ (HsVar _ (dL->L _ op))) r_arg))
-  | op == bang_RDR = Just (l_arg, cL l' (SectionR noExt bang arg1) : argns)
+splitBang (dL->L _ (PatBuilderOpApp l_arg (dL->L bang (HoleyOp (dL->L _ op))) r_arg))
+  | op == bang_RDR = Just (l_arg, cL l' (PatBuilderBang bang arg1) : argns)
   where
-    l' = combineLocs bang arg1
+    l' = combineSrcSpans bang (getLoc arg1)
     (arg1,argns) = split_bang r_arg []
-    split_bang (dL->L _ (HsApp _ f e)) es = split_bang f (e:es)
+    split_bang (dL->L _ (PatBuilderApp f e)) es = split_bang f (e:es)
     split_bang e                       es = (e,es)
 splitBang _ = Nothing
 
 -- See Note [isFunLhs vs mergeDataCon]
-isFunLhs :: LHsExpr GhcPs
-      -> P (Maybe (Located RdrName, LexicalFixity, [LHsExpr GhcPs],[AddAnn]))
+isFunLhs :: Located (PatBuilder GhcPs)
+      -> P (Maybe (Located RdrName, LexicalFixity, [Located (PatBuilder GhcPs)],[AddAnn]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 --
@@ -1377,17 +1374,15 @@ isFunLhs :: LHsExpr GhcPs
 
 isFunLhs e = go e [] []
  where
-   go (dL->L loc (HsVar _ (dL->L _ f))) es ann
+   go (dL->L loc (PatBuilderVar (L _ f))) es ann
        | not (isRdrDataCon f)        = return (Just (cL loc f, Prefix, es, ann))
-   go (dL->L _ (HsApp _ f e)) es       ann = go f (e:es) ann
-   go (dL->L l (HsPar _ e))   es@(_:_) ann = go e es (ann ++ mkParensApiAnn l)
+   go (dL->L _ (PatBuilderApp f e)) es       ann = go f (e:es) ann
+   go (dL->L l (PatBuilderPar e))   es@(_:_) ann = go e es (ann ++ mkParensApiAnn l)
 
         -- Things of the form `!x` are also FunBinds
         -- See Note [FunBind vs PatBind]
-   go (dL->L _ (SectionR _ (dL->L _ (HsVar _ (dL->L _ bang)))
-                (dL->L l (HsVar _ (L _ var))))) [] ann
-        | bang == bang_RDR
-        , not (isRdrDataCon var)     = return (Just (cL l var, Prefix, [], ann))
+   go (dL->L _ (PatBuilderBang _ (L _ (PatBuilderVar (dL -> L l var))))) [] ann
+        | not (isRdrDataCon var)     = return (Just (cL l var, Prefix, [], ann))
 
       -- For infix function defns, there should be only one infix *function*
       -- (though there may be infix *datacons* involved too).  So we don't
@@ -1402,7 +1397,7 @@ isFunLhs e = go e [] []
       -- ToDo: what about this?
       --              x + 1 `op` y = ...
 
-   go e@(L loc (OpApp _ l (dL->L loc' (HsVar _ (dL->L _ op))) r)) es ann
+   go e@(L loc (PatBuilderOpApp l (dL->L loc' (HoleyOp (L _ op))) r)) es ann
         | Just (e',es') <- splitBang e
         = do { bang_on <- getBit BangPatBit
              ; if bang_on then go e' (es' ++ es) ann
@@ -1416,8 +1411,8 @@ isFunLhs e = go e [] []
                  Just (op', Infix, j : k : es', ann')
                    -> return (Just (op', Infix, j : op_app : es', ann'))
                    where
-                     op_app = cL loc (OpApp noExt k
-                               (cL loc' (HsVar noExt (cL loc' op))) r)
+                     op_app = cL loc (PatBuilderOpApp k
+                               (cL loc' (HoleyOp (cL loc' op))) r)
                  _ -> return Nothing }
    go _ _ _ = return Nothing
 
@@ -1914,6 +1909,44 @@ checkMonadComp = do
 -- See Note [Ambiguous syntactic categories]
 --
 
+data HoleyOp = HoleyOp (Located RdrName) | InfixHole
+
+instance Outputable HoleyOp where
+  ppr (HoleyOp v) = ppr v
+  ppr InfixHole = text "`_`"
+
+holeyOpToExpr :: HoleyOp -> HsExpr GhcPs
+holeyOpToExpr = \case
+  InfixHole -> hsHoleExpr
+  HoleyOp op -> HsVar noExt op
+
+data PatBuilder p
+  = PatBuilderPat (Pat p)
+  | PatBuilderBang SrcSpan (Located (PatBuilder p))
+  | PatBuilderPar (Located (PatBuilder p))
+  | PatBuilderApp (Located (PatBuilder p)) (Located (PatBuilder p))
+  | PatBuilderOpApp (Located (PatBuilder p)) (Located HoleyOp) (Located (PatBuilder p))
+  | PatBuilderVar (Located RdrName)
+  | PatBuilderWithTySig (Located (PatBuilder p)) (LHsSigWcType (NoGhcTc p))
+  | PatBuilderOverLit (HsOverLit p)
+  | PatBuilderNegApp (Located (PatBuilder p))
+
+patBuilderBang :: SrcSpan -> Located (PatBuilder GhcPs) -> Located (PatBuilder GhcPs)
+patBuilderBang bang p =
+  cL (bang `combineSrcSpans` getLoc p) $
+  PatBuilderBang bang p
+
+instance p ~ GhcPs => Outputable (PatBuilder p) where
+  ppr (PatBuilderPat p) = ppr p
+  ppr (PatBuilderBang _ (L _ p)) = text "!" <> ppr p
+  ppr (PatBuilderPar (L _ p)) = parens (ppr p)
+  ppr (PatBuilderApp (L _ p1) (L _ p2)) = ppr p1 <+> ppr p2
+  ppr (PatBuilderOpApp (L _ p1) op (L _ p2)) = ppr p1 <+> ppr op <+> ppr p2
+  ppr (PatBuilderVar v) = ppr v
+  ppr (PatBuilderWithTySig (L _ p) t) = ppr p <+> text "::" <+> ppr t
+  ppr (PatBuilderOverLit l) = ppr l
+  ppr (PatBuilderNegApp p) = text "-" <> ppr p
+
 -- ExpCmdP as defined is isomorphic to a pair of parsers:
 --
 --   data ExpCmdP = ExpCmdP { expP :: PV (LHsExpr GhcPs)
@@ -1928,69 +1961,312 @@ newtype ExpCmdP =
 data ExpCmdG b where
   ExpG :: ExpCmdG HsExpr
   CmdG :: ExpCmdG HsCmd
+  PatG :: ExpCmdG PatBuilder
 
 -- See Note [Ambiguous syntactic categories]
 class    ExpCmdI b      where expCmdG :: ExpCmdG b
 instance ExpCmdI HsExpr where expCmdG = ExpG
 instance ExpCmdI HsCmd  where expCmdG = CmdG
+instance ExpCmdI PatBuilder where expCmdG = PatG
 
 ecFromCmd :: LHsCmd GhcPs -> ExpCmdP
 ecFromCmd c@(getLoc -> l) = ExpCmdP onB
   where
     onB :: forall b. ExpCmdI b => PV (Located (b GhcPs))
-    onB = case expCmdG @b of { ExpG -> onExp; CmdG -> return c }
+    onB = case expCmdG @b of
+      CmdG -> return c
+      ExpG -> onExp
+      PatG -> onPat
     onExp :: P (LHsExpr GhcPs)
     onExp = do
       addError l $ vcat
         [ text "Arrow command found where an expression was expected:",
           nest 2 (ppr c) ]
       return (cL l hsHoleExpr)
+    onPat :: P (Located (PatBuilder GhcPs))
+    onPat = do
+      addFatalError l $ vcat
+        [ text "Arrow command found where a pattern was expected:",
+          nest 2 (ppr c) ]
 
 ecFromExp :: LHsExpr GhcPs -> ExpCmdP
 ecFromExp e@(getLoc -> l) = ExpCmdP onB
   where
     onB :: forall b. ExpCmdI b => PV (Located (b GhcPs))
-    onB = case expCmdG @b of { ExpG -> return e; CmdG -> onCmd }
+    onB = case expCmdG @b of
+      ExpG -> return e
+      PatG -> onPat
+      CmdG -> onCmd
     onCmd :: P (LHsCmd GhcPs)
     onCmd =
       addFatalError l $
         text "Parse error in command:" <+> ppr e
+    onPat :: P (Located (PatBuilder GhcPs))
+    onPat =
+      addFatalError l $
+        text "Parse error in pattern:" <+> ppr e
+
+ecFromExp' :: ExpCmdI b => PV (LHsExpr GhcPs) -> PV (Located (b GhcPs))
+ecFromExp' ePV = ePV >>= \e -> runExpCmdP (ecFromExp e)
+
+epFromPat :: LPat GhcPs -> ExpCmdP
+epFromPat p@(getLoc -> l) = ExpCmdP onB
+  where
+    onB :: forall b. ExpCmdI b => PV (Located (b GhcPs))
+    onB = case expCmdG @b of
+      PatG -> return (cL l (PatBuilderPat (unLoc p)))
+      ExpG -> onExp
+      CmdG -> onCmd
+    onCmd :: P (LHsCmd GhcPs)
+    onCmd =
+      addFatalError l $
+        text "Parse error in command:" <+> ppr p
+    onExp :: P (LHsExpr GhcPs)
+    onExp =
+      addFatalError l $
+        text "Parse error in expression:" <+> ppr p
 
 hsHoleExpr :: HsExpr (GhcPass id)
 hsHoleExpr = HsUnboundVar noExt (TrueExprHole (mkVarOcc "_"))
 
-ecHsLam :: forall b. ExpCmdI b => MatchGroup GhcPs (Located (b GhcPs)) -> b GhcPs
-ecHsLam = case expCmdG @b of { ExpG -> HsLam noExt; CmdG -> HsCmdLam noExt }
+ecHsLam :: forall b. ExpCmdI b =>
+  SrcSpan -> MatchGroup GhcPs (Located (b GhcPs)) -> PV (Located (b GhcPs))
+ecHsLam rLoc =
+  case expCmdG @b of
+    ExpG -> \mg -> return (cL rLoc $ HsLam noExt mg)
+    CmdG -> \mg -> return (cL rLoc $ HsCmdLam noExt mg)
+    PatG -> \_ -> addFatalError rLoc (text "Parse error in pattern: lambda expression")
 
-ecHsLet :: forall b. ExpCmdI b => LHsLocalBinds GhcPs -> Located (b GhcPs) -> b GhcPs
-ecHsLet = case expCmdG @b of { ExpG -> HsLet noExt; CmdG -> HsCmdLet noExt }
+ecHsLet :: forall b. ExpCmdI b =>
+  SrcSpan -> LHsLocalBinds GhcPs -> Located (b GhcPs) -> PV (Located (b GhcPs))
+ecHsLet rLoc =
+  case expCmdG @b of
+    ExpG -> \lb b -> return (cL rLoc $ HsLet noExt lb b)
+    CmdG -> \lb b -> return (cL rLoc $ HsCmdLet noExt lb b)
+    PatG -> \_ _ -> addFatalError rLoc (text "Parse error in pattern: let expression")
 
-ecOpApp :: forall b. ExpCmdI b => Located (b GhcPs) -> LHsExpr GhcPs
+ecOpApp :: forall b. ExpCmdI b => Located (b GhcPs) -> Located (HoleyOp)
         -> Located (b GhcPs) -> b GhcPs
-ecOpApp = case expCmdG @b of { ExpG -> OpApp noExt; CmdG -> cmdOpApp }
+ecOpApp =
+  case expCmdG @b of
+    ExpG -> expOpApp
+    CmdG -> cmdOpApp
+    PatG -> PatBuilderOpApp
   where
+    expOpApp e1 op e2 = OpApp noExt e1 (mapLoc holeyOpToExpr op) e2
     cmdOpApp c1 op c2 =
       let cmdArg c = cL (getLoc c) $ HsCmdTop noExt c in
-      HsCmdArrForm noExt op Infix Nothing [cmdArg c1, cmdArg c2]
+      HsCmdArrForm noExt (mapLoc holeyOpToExpr op) Infix Nothing [cmdArg c1, cmdArg c2]
 
 ecHsCase :: forall b. ExpCmdI b =>
-  LHsExpr GhcPs -> MatchGroup GhcPs (Located (b GhcPs)) -> b GhcPs
-ecHsCase = case expCmdG @b of { ExpG -> HsCase noExt; CmdG -> HsCmdCase noExt }
+  SrcSpan -> LHsExpr GhcPs -> MatchGroup GhcPs (Located (b GhcPs)) ->
+    PV (Located (b GhcPs))
+ecHsCase rLoc =
+  case expCmdG @b of
+    ExpG -> \s mg -> return (cL rLoc $ HsCase noExt s mg)
+    CmdG -> \s mg -> return (cL rLoc $ HsCmdCase noExt s mg)
+    PatG -> \_ _ -> addFatalError rLoc (text "Parse error in pattern: case expression")
 
-ecHsApp :: forall b. ExpCmdI b =>
-  Located (b GhcPs) -> LHsExpr GhcPs -> b GhcPs
-ecHsApp = case expCmdG @b of { ExpG -> HsApp noExt; CmdG -> HsCmdApp noExt }
+mkHsAppPV :: forall b. ExpCmdI b => ExpCmdP -> ExpCmdP -> PV (Located (b GhcPs))
+mkHsAppPV a b =
+  case expCmdG @b of
+    ExpG -> do
+      a' <- runExpCmdP a; checkBlockArguments a'
+      b' <- runExpCmdP b; checkBlockArguments b'
+      return (cL (combineSrcSpans (getLoc a') (getLoc b')) $ HsApp noExt a' b')
+    CmdG -> do
+      a' <- runExpCmdP a; checkBlockArguments a'
+      b' <- runExpCmdP b; checkBlockArguments b'
+      return (cL (combineSrcSpans (getLoc a') (getLoc b')) $ HsCmdApp noExt a' b')
+    PatG -> do
+      a' <- runExpCmdP a
+      b' <- runExpCmdP b
+      return (cL (combineSrcSpans (getLoc a') (getLoc b')) $ PatBuilderApp a' b')
 
 ecHsIf :: forall b. ExpCmdI b =>
-   LHsExpr GhcPs -> Located (b GhcPs) -> Located (b GhcPs) -> b GhcPs
-ecHsIf = case expCmdG @b of { ExpG -> mkHsIf; CmdG -> mkHsCmdIf }
+   SrcSpan -> LHsExpr GhcPs -> Located (b GhcPs) -> Located (b GhcPs) ->
+     PV (Located (b GhcPs))
+ecHsIf rLoc =
+  case expCmdG @b of
+    ExpG -> \c a b -> return (cL rLoc $ mkHsIf c a b)
+    CmdG -> \c a b -> return (cL rLoc $ mkHsCmdIf c a b)
+    PatG -> \_ _ _ -> addFatalError rLoc (text "Parse error in pattern: if expression")
 
 ecHsDo :: forall b. ExpCmdI b =>
-  Located [LStmt GhcPs (Located (b GhcPs))] -> b GhcPs
-ecHsDo = case expCmdG @b of { ExpG -> HsDo noExt DoExpr; CmdG -> HsCmdDo noExt }
+  SrcSpan -> Located [LStmt GhcPs (Located (b GhcPs))] ->
+    PV (Located (b GhcPs))
+ecHsDo rLoc =
+  case expCmdG @b of
+    ExpG -> \stmts -> return (cL rLoc $ HsDo noExt DoExpr stmts)
+    CmdG -> \stmts -> return (cL rLoc $ HsCmdDo noExt stmts)
+    PatG -> \_ ->  addFatalError rLoc (text "Parse error in pattern: do block")
 
 ecHsPar :: forall b. ExpCmdI b => Located (b GhcPs) -> b GhcPs
-ecHsPar = case expCmdG @b of { ExpG -> HsPar noExt; CmdG -> HsCmdPar noExt }
+ecHsPar =
+  case expCmdG @b of
+    ExpG -> HsPar noExt
+    CmdG -> HsCmdPar noExt
+    PatG -> PatBuilderPar
+
+epHsVar :: forall b. ExpCmdI b => Located RdrName -> PV (Located (b GhcPs))
+epHsVar v =
+  case expCmdG @b of
+    ExpG -> return $ cL (getLoc v) (HsVar noExt v)
+    PatG -> return $ cL (getLoc v) (PatBuilderVar v)
+    CmdG -> addFatalError (getLoc v) $ text "Parse error in command:" <+> ppr v
+
+epHsLit :: forall b. ExpCmdI b => Located (HsLit GhcPs) -> PV (Located (b GhcPs))
+epHsLit l =
+  case expCmdG @b of
+    ExpG -> return $ cL (getLoc l) (HsLit noExt (unLoc l))
+    PatG -> do
+      checkUnboxedStringLitPat l
+      return $ cL (getLoc l) (PatBuilderPat (LitPat noExt (unLoc l)))
+    CmdG -> addFatalError (getLoc l) $ text "Parse error in command:" <+> ppr l
+
+checkUnboxedStringLitPat :: Located (HsLit GhcPs) -> PV ()
+checkUnboxedStringLitPat (dL -> L loc lit) =
+  case lit of
+    HsStringPrim _ _  -- Trac #13260
+      -> addFatalError loc (text "Illegal unboxed string literal in pattern:" $$ ppr lit)
+    _ -> return ()
+
+epHsOverLit :: forall b. ExpCmdI b => Located (HsOverLit GhcPs) -> PV (Located (b GhcPs))
+epHsOverLit l =
+  case expCmdG @b of
+    ExpG -> return $ cL (getLoc l) (HsOverLit noExt (unLoc l))
+    PatG -> return $ cL (getLoc l) (PatBuilderOverLit (unLoc l))
+    CmdG -> addFatalError (getLoc l) $ text "Parse error in command:" <+> ppr l
+
+epWild :: forall b. ExpCmdI b => SrcSpan -> PV (Located (b GhcPs))
+epWild wspan =
+  case expCmdG @b of
+    ExpG -> return $ cL wspan hsHoleExpr
+    PatG -> return $ cL wspan (PatBuilderPat (WildPat noExt))
+    CmdG -> addFatalError wspan $ text "Parse error in command"
+
+epViewPat :: forall b. ExpCmdI b =>
+  LHsExpr GhcPs -> SrcSpan -> Located (PatBuilder GhcPs) -> PV (Located (b GhcPs))
+epViewPat e arrspan pb =
+  case expCmdG @b of
+    ExpG -> addFatalError arrspan $ text "Parse error in expression"
+    CmdG -> addFatalError arrspan $ text "Parse error in command"
+    PatG -> do
+      p <- checkLPat empty pb
+      let loc = combineSrcSpans (getLoc e) (getLoc p)
+      return $ cL loc $ PatBuilderPat (ViewPat noExt e p)
+
+epTySig :: forall b. ExpCmdI b =>
+  Located (b GhcPs) -> SrcSpan -> LHsType GhcPs -> PV (Located (b GhcPs))
+epTySig a colonspan sig =
+  case expCmdG @b of
+    ExpG -> return $ cL loc $ ExprWithTySig noExt a (mkLHsSigWcType sig)
+    PatG -> return $ cL loc $ PatBuilderWithTySig a (mkLHsSigWcType sig)
+    CmdG -> addFatalError colonspan $ text "Parse error in command"
+  where
+    loc = combineSrcSpans (getLoc a) (getLoc sig)
+
+epExplicitList :: forall b. ExpCmdI b =>
+  SrcSpan -> [Located (b GhcPs)] -> PV (Located (b GhcPs))
+epExplicitList l xs =
+  case expCmdG @b of
+    ExpG -> return (cL l (ExplicitList noExt Nothing xs))
+    PatG -> do
+     ps <- traverse (checkLPat empty) xs
+     return (cL l (PatBuilderPat (ListPat noExt ps)))
+    CmdG -> addFatalError l $ text "Parse error in command"
+
+epSplice :: forall b. ExpCmdI b => Located (HsSplice GhcPs) -> PV (Located (b GhcPs))
+epSplice sp =
+  case expCmdG @b of
+    ExpG -> return (mapLoc (HsSpliceE noExt) sp)
+    PatG -> return (mapLoc (PatBuilderPat . SplicePat noExt) sp)
+    CmdG -> addFatalError (getLoc sp) $ text "Parse error in command"
+
+epRecord :: forall b. ExpCmdI b =>
+  SrcSpan ->
+  SrcSpan ->
+  Located (b GhcPs) ->
+  ([LHsRecField GhcPs (Located (b GhcPs))], Maybe SrcSpan) ->
+  PV (Located (b GhcPs))
+epRecord l lrec a (fbinds, ddLoc) =
+  case expCmdG @b of
+    ExpG -> do
+      r <- mkRecConstrOrUpdate a lrec (fbinds, ddLoc)
+      checkRecordSyntax (cL l r)
+    PatG -> do
+      r <- mkPatRec a (mk_rec_fields fbinds ddLoc)
+      checkRecordSyntax (cL l r)
+    CmdG -> addFatalError l $ text "Record syntax in command context"
+
+mkPatRec ::
+  Located (PatBuilder GhcPs) ->
+  HsRecFields GhcPs (Located (PatBuilder GhcPs)) ->
+  PV (PatBuilder GhcPs)
+mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields fs dd)
+  | isRdrDataCon (unLoc c)
+  = do fs <- mapM (checkPatField empty) fs
+       return (PatBuilderPat (ConPatIn c (RecCon (HsRecFields fs dd))))
+mkPatRec p _ =
+  addFatalError (getLoc p) $ text "Not a record constructor:" <+> ppr p
+
+epNegApp :: forall b. ExpCmdI b =>
+  SrcSpan ->
+  Located (b GhcPs) ->
+  PV (Located (b GhcPs))
+epNegApp l a =
+  case expCmdG @b of
+    ExpG -> return $ cL l $ NegApp noExt a noSyntaxExpr
+    PatG -> return $ cL l $ PatBuilderNegApp a
+    CmdG -> addFatalError l $ text "Unary minus in command context"
+
+epSectionR :: forall b. ExpCmdI b =>
+  SrcSpan ->
+  Located HoleyOp ->
+  Located (b GhcPs) ->
+  PV (Located (b GhcPs))
+epSectionR l op a =
+  case expCmdG @b of
+    ExpG -> return $ cL l $ SectionR noExt (mapLoc holeyOpToExpr op) a
+    PatG -> case unLoc op of
+      HoleyOp v | isBangRdr (unLoc v) ->
+        return $ cL l $ PatBuilderBang (getLoc op) a
+      _ ->  addFatalError l $ text "Operator section in pattern context"
+    CmdG -> addFatalError l $ text "Prefix bang in command context"
+
+epAsPat :: forall b. ExpCmdI b =>
+  SrcSpan ->
+  Located RdrName ->
+  LPat GhcPs ->
+  PV (Located (b GhcPs))
+epAsPat l v p =
+  case expCmdG @b of
+    PatG -> return $ cL l $ PatBuilderPat (AsPat noExt v p)
+    ExpG ->
+
+      do { opt_TypeApplications <- getBit TypeApplicationsBit
+         ; let msg | opt_TypeApplications
+                      = "Type application syntax requires a space before '@'"
+                   | otherwise
+                      = "Did you mean to enable TypeApplications?"
+         ; addError l $
+            text "@-syntax in expression context" $$
+            text msg
+         ; return (cL l hsHoleExpr)
+         }
+    CmdG -> addFatalError l $ text "@-syntax in command context"
+
+epLazyPat :: forall b. ExpCmdI b =>
+  SrcSpan ->
+  LPat GhcPs ->
+  PV (Located (b GhcPs))
+epLazyPat l a =
+  case expCmdG @b of
+    PatG -> return $ cL l $ PatBuilderPat (LazyPat noExt a)
+    ExpG -> do
+      addError l $ text "Tilde in expression context"
+      return (cL l hsHoleExpr)
+    CmdG -> addFatalError l $ text "Tilde in command context"
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2709,35 +2985,65 @@ not consume any input, but may fail or use other effects. Thus we have:
 -}
 
 -- | Hint about bang patterns, assuming @BangPatterns@ is off.
-hintBangPat :: SrcSpan -> HsExpr GhcPs -> P ()
+hintBangPat :: SrcSpan -> PatBuilder GhcPs -> P ()
 hintBangPat span e = do
     bang_on <- getBit BangPatBit
     unless bang_on $
       addFatalError span
         (text "Illegal bang-pattern (use BangPatterns):" $$ ppr e)
 
-data SumOrTuple
-  = Sum ConTag Arity (LHsExpr GhcPs)
-  | Tuple [LHsTupArg GhcPs]
+data SumOrTuple b
+  = Sum ConTag Arity (Located (b GhcPs))
+  | Tuple [Located (Maybe (Located (b GhcPs)))]
 
-mkSumOrTuple :: Boxity -> SrcSpan -> SumOrTuple -> P (HsExpr GhcPs)
+mkSumOrTupleExpr :: Boxity -> SrcSpan -> SumOrTuple HsExpr -> PV (HsExpr GhcPs)
 
 -- Tuple
-mkSumOrTuple boxity _ (Tuple es) = return (ExplicitTuple noExt es boxity)
+mkSumOrTupleExpr boxity _ (Tuple es) = return (ExplicitTuple noExt (map toTupArg es) boxity)
+  where
+    toTupArg :: Located (Maybe (LHsExpr GhcPs)) -> LHsTupArg GhcPs
+    toTupArg = mapLoc (maybe missingTupArg (Present noExt))
 
 -- Sum
-mkSumOrTuple Unboxed _ (Sum alt arity e) =
+mkSumOrTupleExpr Unboxed _ (Sum alt arity e) =
     return (ExplicitSum noExt alt arity e)
-mkSumOrTuple Boxed l (Sum alt arity (dL->L _ e)) =
+mkSumOrTupleExpr Boxed l (Sum alt arity (dL->L _ e)) =
     addFatalError l (hang (text "Boxed sums not supported:") 2
                       (ppr_boxed_sum alt arity e))
-  where
-    ppr_boxed_sum :: ConTag -> Arity -> HsExpr GhcPs -> SDoc
-    ppr_boxed_sum alt arity e =
-      text "(" <+> ppr_bars (alt - 1) <+> ppr e <+> ppr_bars (arity - alt)
-      <+> text ")"
 
+mkSumOrTuplePat :: Boxity -> SrcSpan -> SumOrTuple PatBuilder -> PV (PatBuilder GhcPs)
+-- Tuple
+mkSumOrTuplePat boxity _ (Tuple ps) = do
+  ps' <- traverse toTupPat ps
+  return (PatBuilderPat (TuplePat noExt ps' boxity))
+  where
+    toTupPat :: Located (Maybe (Located (PatBuilder GhcPs))) -> PV (LPat GhcPs)
+    toTupPat (dL -> L l p) = case p of
+      Nothing -> addFatalError l (text "Tuple section in pattern context")
+      Just p' -> checkPattern empty p'
+
+-- Sum
+mkSumOrTuplePat Unboxed _ (Sum alt arity p) = do
+   p' <- checkLPat empty p
+   return (PatBuilderPat (SumPat noExt p' alt arity))
+mkSumOrTuplePat Boxed l (Sum alt arity (dL->L _ p)) =
+    addFatalError l (hang (text "Boxed sums not supported:") 2
+                      (ppr_boxed_sum alt arity p))
+
+ppr_boxed_sum :: Outputable a => ConTag -> Arity -> a -> SDoc
+ppr_boxed_sum alt arity e =
+  text "(" <+> ppr_bars (alt - 1) <+> ppr e <+> ppr_bars (arity - alt)
+           <+> text ")"
+  where
     ppr_bars n = hsep (replicate n (Outputable.char '|'))
+
+mkSumOrTuple :: forall b. ExpCmdI b =>
+  Boxity -> SrcSpan -> SumOrTuple b -> P (b GhcPs)
+mkSumOrTuple boxity loc sot =
+  case expCmdG @b of
+    ExpG -> mkSumOrTupleExpr boxity loc sot
+    PatG -> mkSumOrTuplePat boxity loc sot
+    CmdG -> addFatalError loc (text "Tuple syntax in command context")
 
 mkLHsOpTy :: LHsType GhcPs -> Located RdrName -> LHsType GhcPs -> LHsType GhcPs
 mkLHsOpTy x op y =

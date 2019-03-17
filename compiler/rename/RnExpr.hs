@@ -140,6 +140,9 @@ rnExpr (HsVar _ (L l v))
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
 
+rnExpr (HsUnboundVar x v)
+  = return (HsUnboundVar x v, emptyFVs)
+
 rnExpr (HsOverLabel x _ v)
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
@@ -346,24 +349,6 @@ rnExpr (ArithSeq x _ seq)
             return (ArithSeq x Nothing new_seq, fvs) }
 
 {-
-These three are pattern syntax appearing in expressions.
-Since all the symbols are reservedops we can simply reject them.
-We return a (bogus) EWildPat in each case.
--}
-
-rnExpr (EWildPat _)  = return (hsHoleExpr, emptyFVs)   -- "_" is just a hole
-rnExpr e@(EAsPat {})
-  = do { opt_TypeApplications <- xoptM LangExt.TypeApplications
-       ; let msg | opt_TypeApplications
-                    = "Type application syntax requires a space before '@'"
-                 | otherwise
-                    = "Did you mean to enable TypeApplications?"
-       ; patSynErr e (text msg)
-       }
-rnExpr e@(EViewPat {}) = patSynErr e empty
-rnExpr e@(ELazyPat {}) = patSynErr e empty
-
-{-
 ************************************************************************
 *                                                                      *
         Static values
@@ -414,9 +399,6 @@ rnExpr (HsProc x pat body)
 
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
         -- HsWrap
-
-hsHoleExpr :: HsExpr (GhcPass id)
-hsHoleExpr = HsUnboundVar noExt (TrueExprHole (mkVarOcc "_"))
 
 ----------------------
 -- See Note [Parsing sections] in Parser.y
@@ -2086,12 +2068,6 @@ sectionErr :: HsExpr GhcPs -> SDoc
 sectionErr expr
   = hang (text "A section must be enclosed in parentheses")
        2 (text "thus:" <+> (parens (ppr expr)))
-
-patSynErr :: HsExpr GhcPs -> SDoc -> RnM (HsExpr GhcRn, FreeVars)
-patSynErr e explanation = do { addErr (sep [text "Pattern syntax in expression context:",
-                                nest 4 (ppr e)] $$
-                                  explanation)
-                 ; return (EWildPat noExt, emptyFVs) }
 
 badIpBinds :: Outputable a => SDoc -> a -> SDoc
 badIpBinds what binds

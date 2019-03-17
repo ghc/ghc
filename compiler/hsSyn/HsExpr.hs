@@ -625,32 +625,6 @@ data HsExpr p
      (LHsExpr p)
 
   ---------------------------------------
-  -- These constructors only appear temporarily in the parser.
-  -- The renamer translates them into the Right Thing.
-
-  | EWildPat (XEWildPat p)        -- wildcard
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | EAsPat      (XEAsPat p)
-                (Located (IdP p)) -- as pattern
-                (LHsExpr p)
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | EViewPat    (XEViewPat p)
-                (LHsExpr p) -- view pattern
-                (LHsExpr p)
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | ELazyPat    (XELazyPat p) (LHsExpr p) -- ~ pattern
-
-
-  ---------------------------------------
   -- Finally, HsWrap appears only in typechecker output
   -- The contained Expr is *NOT* itself an HsWrap.
   -- See Note [Detecting forced eta expansion] in DsExpr. This invariant
@@ -766,10 +740,6 @@ type instance XArrForm       (GhcPass _) = NoExt
 type instance XTick          (GhcPass _) = NoExt
 type instance XBinTick       (GhcPass _) = NoExt
 type instance XTickPragma    (GhcPass _) = NoExt
-type instance XEWildPat      (GhcPass _) = NoExt
-type instance XEAsPat        (GhcPass _) = NoExt
-type instance XEViewPat      (GhcPass _) = NoExt
-type instance XELazyPat      (GhcPass _) = NoExt
 type instance XWrap          (GhcPass _) = NoExt
 type instance XXExpr         (GhcPass _) = NoExt
 
@@ -940,7 +910,6 @@ ppr_expr (OpApp _ e1 op e2)
     should_print_infix (HsRecFld _ f)    = Just (pprInfixOcc f)
     should_print_infix (HsUnboundVar _ h@TrueExprHole{})
                                        = Just (pprInfixOcc (unboundVarOcc h))
-    should_print_infix (EWildPat _)    = Just (text "`_`")
     should_print_infix (HsWrap _ _ e)  = should_print_infix e
     should_print_infix _               = Nothing
 
@@ -1061,11 +1030,6 @@ ppr_expr (ExprWithTySig _ expr sig)
          4 (ppr sig)
 
 ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
-
-ppr_expr (EWildPat _)     = char '_'
-ppr_expr (ELazyPat _ e)   = char '~' <> ppr e
-ppr_expr (EAsPat _ (L _ v) e) = pprPrefixOcc v <> char '@' <> ppr e
-ppr_expr (EViewPat _ p e) = ppr p <+> text "->" <+> ppr e
 
 ppr_expr (HsSCC _ st (StringLiteral stl lbl) expr)
   = sep [ pprWithSourceText st (text "{-# SCC")
@@ -1201,10 +1165,6 @@ hsExprNeedsParens p = go
     go (RecordUpd{})                  = False
     go (ExprWithTySig{})              = p >= sigPrec
     go (ArithSeq{})                   = False
-    go (EWildPat{})                   = False
-    go (ELazyPat{})                   = False
-    go (EAsPat{})                     = False
-    go (EViewPat{})                   = True
     go (HsSCC{})                      = p >= appPrec
     go (HsWrap _ _ e)                 = go e
     go (HsSpliceE{})                  = False
