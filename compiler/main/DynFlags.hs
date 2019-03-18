@@ -4006,7 +4006,8 @@ wWarningFlagsDeps = [
   flagSpec "noncanonical-monad-instances"
                                          Opt_WarnNonCanonicalMonadInstances,
   depFlagSpec "noncanonical-monadfail-instances"
-                                         Opt_WarnNonCanonicalMonadInstances,
+                                         Opt_WarnNonCanonicalMonadInstances
+    "fail is no longer a method of Monad",
   flagSpec "noncanonical-monoid-instances"
                                          Opt_WarnNonCanonicalMonoidInstances,
   flagSpec "orphans"                     Opt_WarnOrphans,
