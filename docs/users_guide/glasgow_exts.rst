@@ -10370,7 +10370,7 @@ For example: ::
       h = foo boo
 
 This program will be rejected as ambiguous because GHC will not unify
-type variables `j` and `i`.
+the type variables `j` and `i`.
 
 Unlike the previous examples, it is not currently possible
 to resolve the ambiguity manually by using :extension:`TypeApplications`.
