@@ -1,6 +1,6 @@
 extlinks = {
     'ghc-ticket': ('https://gitlab.haskell.org/ghc/ghc/issues/%s', '#'),
-    'ghc-wiki': ('https://ghc.haskell.org/trac/ghc/wiki/%s', '#'),
+    'ghc-wiki': ('https://gitlab.haskell.org/ghc/ghc/wikis/%s', '#'),
 }
 
 libs_base_uri = '../libraries'

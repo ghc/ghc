@@ -205,7 +205,7 @@ Newtypes are better than datatypes:
     Look for your function in the interface file, then for the third
     field in the pragma; it should say ``Strictness: ⟨string⟩``. The
     ⟨string⟩ gives the strictness of the function's arguments: see
-    :ghc-wiki:`the GHC Commentary <Commentary/Compiler/Demand>`
+    :ghc-wiki:`the GHC Commentary <commentary/compiler/demand>`
     for a description of the strictness notation.
 
     For an "unpackable" ``U(...)`` argument, the info inside tells the
