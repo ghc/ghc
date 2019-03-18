@@ -456,7 +456,7 @@ nlNullaryConPat con = noLoc (ConPatIn (noLoc con) (PrefixCon []))
 
 nlWildConPat :: DataCon -> LPat GhcPs
 nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
-                         (PrefixCon (nOfThem (dataConSourceArity con)
+                         (PrefixCon (replicate (dataConSourceArity con)
                                              nlWildPat)))
 
 nlWildPat :: LPat GhcPs

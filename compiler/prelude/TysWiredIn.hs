@@ -870,7 +870,7 @@ mk_tuple Boxed arity = (tycon, tuple_con)
     tycon = mkTupleTyCon tc_name tc_binders tc_res_kind tc_arity tuple_con
                          BoxedTuple flavour
 
-    tc_binders  = mkTemplateAnonTyConBinders (nOfThem arity liftedTypeKind)
+    tc_binders  = mkTemplateAnonTyConBinders (replicate arity liftedTypeKind)
     tc_res_kind = liftedTypeKind
     tc_arity    = arity
     flavour     = VanillaAlgTyCon (mkPrelTyConRepName tc_name)
@@ -895,7 +895,7 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
 
     -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
     -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k1 -> TYPE k2 -> #
-    tc_binders = mkTemplateTyConBinders (nOfThem arity runtimeRepTy)
+    tc_binders = mkTemplateTyConBinders (replicate arity runtimeRepTy)
                                         (\ks -> map tYPE ks)
 
     tc_res_kind = unboxedTupleKind rr_tys
@@ -1015,7 +1015,7 @@ mk_sum arity = (tycon, sum_cons)
     -- Unboxed sums are currently not Typeable due to efficiency concerns. See #13276.
     rep_name = Nothing -- Just $ mkPrelTyConRepName tc_name
 
-    tc_binders = mkTemplateTyConBinders (nOfThem arity runtimeRepTy)
+    tc_binders = mkTemplateTyConBinders (replicate arity runtimeRepTy)
                                         (\ks -> map tYPE ks)
 
     tyvars = binderVars tc_binders
