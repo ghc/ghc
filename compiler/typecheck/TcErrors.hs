@@ -829,11 +829,11 @@ maybeReportHoleError :: ReportErrCtxt -> Ct -> ErrMsg -> TcM ()
 maybeReportHoleError ctxt ct err
   -- When -XPartialTypeSignatures is on, warnings (instead of errors) are
   -- generated for holes in partial type signatures.
-  -- Unless -fwarn_partial_type_signatures is not on,
+  -- Unless -fwarn-partial-type-signatures is not on,
   -- in which case the messages are discarded.
   | isTypeHoleCt ct
   = -- For partial type signatures, generate warnings only, and do that
-    -- only if -fwarn_partial_type_signatures is on
+    -- only if -fwarn-partial-type-signatures is on
     case cec_type_holes ctxt of
        HoleError -> reportError err
        HoleWarn  -> reportWarning (Reason Opt_WarnPartialTypeSignatures) err

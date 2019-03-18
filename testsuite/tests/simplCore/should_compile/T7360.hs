@@ -15,7 +15,7 @@ fun1 x = case x of
                Foo3 {} -> ()
 
 fun2 x = (fun1 Foo1,  -- Keep -ddump-simpl output 
-                      -- in a predicatable order
+                      -- in a predictable order
          case x of
           [] -> L.length x
           (_:_) -> L.length x)
