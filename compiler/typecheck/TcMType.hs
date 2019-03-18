@@ -148,7 +148,7 @@ newMetaKindVar
        ; return (mkTyVarTy kv) }
 
 newMetaKindVars :: Int -> TcM [TcKind]
-newMetaKindVars n = mapM (\ _ -> newMetaKindVar) (nOfThem n ())
+newMetaKindVars n = replicateM n newMetaKindVar
 
 {-
 ************************************************************************
@@ -944,7 +944,7 @@ newFlexiTyVarTy kind = do
     return (mkTyVarTy tc_tyvar)
 
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
-newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
+newFlexiTyVarTys n kind = replicateM n (newFlexiTyVarTy kind)
 
 newOpenTypeKind :: TcM TcKind
 newOpenTypeKind
