@@ -1283,12 +1283,11 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
   = do
         -- LLVM from version 3.0 onwards doesn't support the OS X system
         -- assembler, so we use clang as the assembler instead. (#5636)
-        let whichAsProg | hscTarget dflags == HscLlvm &&
-                          platformOS (targetPlatform dflags) == OSDarwin
-                        = return SysTools.runClang
-                        | otherwise = return SysTools.runAs
+        let as_prog | hscTarget dflags == HscLlvm &&
+                      platformOS (targetPlatform dflags) == OSDarwin
+                    = SysTools.runClang
+                    | otherwise = SysTools.runAs
 
-        as_prog <- whichAsProg
         let cmdline_include_paths = includePaths dflags
         let pic_c_flags = picCCOpts dflags
 
