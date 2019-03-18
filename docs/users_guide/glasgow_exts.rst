@@ -10369,12 +10369,11 @@ For example: ::
       h :: Int
       h = foo boo
 
-This program will be rejected due to failing ambiguity check because GHC will not unify
+This program will be rejected as ambiguous because GHC will not unify
 type variables `j` and `i`.
 
-Unlike the previous examples, it is not possible(currently) to resolve manually 
-by using :extension:`TypeApplications` the sort of ambiguity, 
-that occurs within a rank-n type, like `(forall i. (KnownNat i) => r)`.
+Unlike the previous examples, it is not currently possible
+to resolve the ambiguity manually by using :extension:`TypeApplications`.
 
        
 .. note::
