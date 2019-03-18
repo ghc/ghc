@@ -509,7 +509,7 @@ by saying ``-fno-wombat``.
     that were not visible earlier; and optimisations like
     :ghc-flag:`-fspec-constr` can create functions with unused arguments which
     are eliminated by late demand analysis. Improvements are modest, but
-    so is the cost. See notes on the :ghc-wiki:`wiki page <LateDmd>`.
+    so is the cost. See notes on the :ghc-wiki:`wiki page <late-dmd>`.
 
 .. ghc-flag:: -fliberate-case
     :shortdesc: Turn on the liberate-case transformation. Implied by :ghc-flag:`-O2`.

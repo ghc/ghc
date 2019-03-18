@@ -810,7 +810,7 @@ taken:
 
 There is a more detailed discussion of the issues involved in
 compilation safety and some potential solutions on the
-:ghc-wiki:`GHC Wiki <SafeHaskell/SafeCompilation>`.
+:ghc-wiki:`GHC Wiki <safe-haskell/safe-compilation>`.
 
 Additionally, the use of :ref:`annotations <annotation-pragmas>` is forbidden,
 as that would allow bypassing Safe Haskell restrictions. See :ghc-ticket:`10826`

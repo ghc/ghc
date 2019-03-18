@@ -69,7 +69,7 @@ A number of restrictions apply to use of annotations:
    albeit redundant).
 
 If you feel strongly that any of these restrictions are too onerous,
-:ghc-wiki:`please give the GHC team a shout <MailingListsAndIRC>`.
+:ghc-wiki:`please give the GHC team a shout <mailing-lists-and-irc>`.
 
 However, apart from these restrictions, many things are allowed,
 including expressions which are not fully evaluated! Annotation
@@ -183,7 +183,7 @@ Plugins cannot optimize/inspect C-\\-, nor can they implement things like
 parser/front-end modifications like GCC, apart from limited changes to
 the constraint solver. If you feel strongly that any of these
 restrictions are too onerous,
-:ghc-wiki:`please give the GHC team a shout <MailingListsAndIRC>`.
+:ghc-wiki:`please give the GHC team a shout <mailing-lists-and-irc>`.
 
 Plugins do not work with ``-fexternal-interpreter``. If you need to run plugins
 with ``-fexternal-interpreter`` let GHC developers know in :ghc-ticket:`14335`.

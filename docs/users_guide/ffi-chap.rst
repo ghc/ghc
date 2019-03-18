@@ -120,7 +120,7 @@ or the type ``Any``.
 
 This feature is not intended for use outside of the core libraries that
 come with GHC. For more details see the
-:ghc-wiki:`GHC developer wiki <Commentary/PrimOps>`.
+:ghc-wiki:`GHC developer wiki <commentary/prim-ops>`.
 
 .. _ffi-interruptible:
 

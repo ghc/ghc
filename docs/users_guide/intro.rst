@@ -49,7 +49,7 @@ Go to the `GHC home page <http://www.haskell.org/ghc/>`__ and follow the
 "download" link to download GHC for your platform.
 
 Alternatively, if you want to build GHC yourself, head on over to the
-:ghc-wiki:`GHC Building Guide <Building>` to find out how to get the sources,
+:ghc-wiki:`GHC Building Guide <building>` to find out how to get the sources,
 and build it on your system. Note that GHC itself is written in Haskell, so you
 will still need to install GHC in order to build it.
 
@@ -66,7 +66,7 @@ On the World-Wide Web, there are several URLs of likely interest:
 
 -  `GHC home page <http://www.haskell.org/ghc/>`__
 
--  `GHC Developers Home <http://ghc.haskell.org/trac/ghc/>`__ (developer
+-  `GHC Developers Home <https://gitlab.haskell.org/ghc/ghc>`__ (developer
    documentation, wiki, and bug tracker)
 
 We run the following mailing lists about GHC. We encourage you to join,
@@ -104,7 +104,7 @@ Reporting bugs in GHC
    single: reporting bugs
 
 Glasgow Haskell is a changing system so there are sure to be bugs in it.
-If you find one, please see :ghc-wiki:`this wiki page <ReportABug>` for
+If you find one, please see :ghc-wiki:`this wiki page <report-a-bug>` for
 information on how to report it.
 
 .. _version-numbering:
@@ -138,7 +138,7 @@ numbering GHC versions:
     `available for
     download <http://www.haskell.org/ghc/dist/stable/dist/>`__, and the
     latest sources are available from
-    :ghc-wiki:`the git repositories <Repositories>`.
+    :ghc-wiki:`the git repositories <repositories>`.
 
     Stable snapshot releases are named ``x.y.z.YYYYMMDD``. where
     ``YYYYMMDD`` is the date of the sources from which the snapshot was
@@ -149,7 +149,7 @@ numbering GHC versions:
     We may make snapshot releases of the HEAD `available for
     download <http://www.haskell.org/ghc/dist/current/dist/>`__, and the
     latest sources are available from
-    :ghc-wiki:`the git repositories <Repositories>`.
+    :ghc-wiki:`the git repositories <repositories>`.
 
     Unstable snapshot releases are named ``x.y.YYYYMMDD``. where
     ``YYYYMMDD`` is the date of the sources from which the snapshot was
