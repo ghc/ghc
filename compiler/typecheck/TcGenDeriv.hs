@@ -687,9 +687,9 @@ gen_Bounded_binds loc tycon
     arity          = dataConSourceArity data_con_1
 
     min_bound_1con = mkHsVarBind loc minBound_RDR $
-                     nlHsVarApps data_con_1_RDR (nOfThem arity minBound_RDR)
+                     nlHsVarApps data_con_1_RDR (replicate arity minBound_RDR)
     max_bound_1con = mkHsVarBind loc maxBound_RDR $
-                     nlHsVarApps data_con_1_RDR (nOfThem arity maxBound_RDR)
+                     nlHsVarApps data_con_1_RDR (replicate arity maxBound_RDR)
 
 {-
 ************************************************************************

@@ -26,7 +26,7 @@ module Util (
 
         mapFst, mapSnd, chkAppend,
         mapAndUnzip, mapAndUnzip3, mapAccumL2,
-        nOfThem, filterOut, partitionWith,
+        filterOut, partitionWith,
 
         dropWhileEndLE, spanEnd, last2, lastMaybe,
 
@@ -457,9 +457,6 @@ mapAccumL2 f s1 s2 xs = (s1', s2', ys)
   where ((s1', s2'), ys) = mapAccumL (\(s1, s2) x -> case f s1 s2 x of
                                                        (s1', s2', y) -> ((s1', s2'), y))
                                      (s1, s2) xs
-
-nOfThem :: Int -> a -> [a]
-nOfThem n thing = replicate n thing
 
 -- | @atLength atLen atEnd ls n@ unravels list @ls@ to position @n@. Precisely:
 --
