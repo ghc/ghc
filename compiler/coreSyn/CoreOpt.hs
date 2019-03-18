@@ -710,7 +710,7 @@ A more common case is when
 
    f = \x. error ".."
 
-and again its arity increses (#15517)
+and again its arity increases (#15517)
 -}
 
 {- *********************************************************************

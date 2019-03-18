@@ -1084,7 +1084,7 @@ Note [CandidatesQTvs determinism and order]
   accumulating-parameter style for candidateQTyVarsOfType so that we
   add variables one at a time, left to right.  That means we tend to
   produce the variables in left-to-right order.  This is just to make
-  it bit more predicatable for the programmer.
+  it bit more predictable for the programmer.
 
 Note [Naughty quantification candidates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
