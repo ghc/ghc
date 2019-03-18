@@ -889,9 +889,9 @@ tupKindSort_maybe k
 tc_tuple :: HsType GhcRn -> TcTyMode -> TupleSort -> [LHsType GhcRn] -> TcKind -> TcM TcType
 tc_tuple rn_ty mode tup_sort tys exp_kind
   = do { arg_kinds <- case tup_sort of
-           BoxedTuple      -> return (nOfThem arity liftedTypeKind)
-           UnboxedTuple    -> mapM (\_ -> newOpenTypeKind) tys
-           ConstraintTuple -> return (nOfThem arity constraintKind)
+           BoxedTuple      -> return (replicate arity liftedTypeKind)
+           UnboxedTuple    -> replicateM arity newOpenTypeKind
+           ConstraintTuple -> return (replicate arity constraintKind)
        ; tau_tys <- zipWithM (tc_lhs_type mode) tys arg_kinds
        ; finish_tuple rn_ty tup_sort tau_tys arg_kinds exp_kind }
   where
