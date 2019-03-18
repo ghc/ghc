@@ -657,9 +657,7 @@ this time with the fingerprints on the things it needed last time
 are all the same it stops compiling early in the process saying
 “Compilation IS NOT required”. What a beautiful sight!
 
-You can read about `how all this
-works <http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance>`__
-in the GHC commentary.
+You can read about :ghc-wiki:`how all this works <commentary/compiler/recompilation-avoidance>` in the GHC commentary.
 
 .. _mutual-recursion:
 

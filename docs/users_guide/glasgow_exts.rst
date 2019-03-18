@@ -679,7 +679,7 @@ View patterns
 
 View patterns are enabled by the language extension :extension:`ViewPatterns`. More
 information and examples of view patterns can be found on the
-:ghc-wiki:`Wiki page <ViewPatterns>`.
+:ghc-wiki:`Wiki page <view-patterns>`.
 
 View patterns are somewhat like pattern guards that can be nested inside
 of other patterns. They are a convenient way of pattern-matching against
@@ -4459,7 +4459,7 @@ types containing a function type on the right-hand side.
 
 For a full specification of the algorithms used in :extension:`DeriveFunctor`,
 :extension:`DeriveFoldable`, and :extension:`DeriveTraversable`, see
-:ghc-wiki:`this wiki page <Commentary/Compiler/DeriveFunctor>`.
+:ghc-wiki:`this wiki page <commentary/compiler/derive-functor>`.
 
 .. _deriving-data:
 
@@ -5333,7 +5333,7 @@ Pattern synonyms
 
 Pattern synonyms are enabled by the language extension :extension:`PatternSynonyms`, which is
 required for defining them, but *not* for using them. More information and
-examples of pattern synonyms can be found on the :ghc-wiki:`Wiki page <PatternSynonyms>`.
+examples of pattern synonyms can be found on the :ghc-wiki:`Wiki page <pattern-synonyms>`.
 
 Pattern synonyms enable giving names to parametrized pattern schemes.
 They can also be thought of as abstract constructors that don't have a
@@ -5535,7 +5535,7 @@ following subsections.
 There are also lots more details in the `paper
 <https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/pattern-synonyms-Haskell16.pdf>`_.
 
-See the :ghc-wiki:`Wiki page <PatternSynonyms>` for more
+See the :ghc-wiki:`Wiki page <pattern-synonyms>` for more
 details.
 
 Syntax and scoping of pattern synonyms
@@ -5644,7 +5644,7 @@ incompatible with ``T``.
 A module which imports ``MyNum(..)`` from ``Example`` and then re-exports
 ``MyNum(..)`` will also export any pattern synonyms bundled with ``MyNum`` in
 ``Example``. A more complete specification can be found on the
-:ghc-wiki:`wiki. <PatternSynonyms/AssociatingSynonyms>`
+:ghc-wiki:`wiki. <pattern-synonyms/associating-synonyms>`
 
 
 .. _patsyn-typing:
@@ -11498,7 +11498,7 @@ Notice here that the ``Maybe`` type is parameterised by the
 should be considered highly experimental, and certainly un-supported*.
 You are welcome to try it, but please don't rely on it working
 consistently, or working the same in subsequent releases. See
-:ghc-wiki:`this wiki page <ImpredicativePolymorphism>` for more details.
+:ghc-wiki:`this wiki page <impredicative-polymorphism>` for more details.
 
 If you want impredicative polymorphism, the main workaround is to use a
 newtype wrapper. The ``id runST`` example can be written using this
@@ -12504,7 +12504,7 @@ that we're interested in is ``main`` it can be useful to be able to
 ignore the problems in ``a``.
 
 For more motivation and details please refer to the
-:ghc-wiki:`Wiki <DeferErrorsToRuntime>` page or the `original
+:ghc-wiki:`Wiki <defer-errors-to-runtime>` page or the `original
 paper <http://dreixel.net/research/pdf/epdtecp.pdf>`__.
 
 Enabling deferring of type errors
