@@ -35,7 +35,7 @@ Package system
 ~~~~~~~~~~~~~~
 
 - The long awaited Backpack module system is now fully usable. See
-  :ghc-wiki:`the GHC Wiki <Backpack>` for details.
+  :ghc-wiki:`the GHC Wiki <backpack>` for details.
 
 Language
 ~~~~~~~~
