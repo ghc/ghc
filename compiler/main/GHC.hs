@@ -683,14 +683,12 @@ checkNewInteractiveDynFlags :: MonadIO m => DynFlags -> m DynFlags
 checkNewInteractiveDynFlags dflags0 = do
   -- We currently don't support use of StaticPointers in expressions entered on
   -- the REPL. See #12356.
-  dflags1 <-
-      if xopt LangExt.StaticPointers dflags0
-      then do liftIO $ printOrThrowWarnings dflags0 $ listToBag
-                [mkPlainWarnMsg dflags0 interactiveSrcSpan
-                 $ text "StaticPointers is not supported in GHCi interactive expressions."]
-              return $ xopt_unset dflags0 LangExt.StaticPointers
-      else return dflags0
-  return dflags1
+  if xopt LangExt.StaticPointers dflags0
+  then do liftIO $ printOrThrowWarnings dflags0 $ listToBag
+            [mkPlainWarnMsg dflags0 interactiveSrcSpan
+             $ text "StaticPointers is not supported in GHCi interactive expressions."]
+          return $ xopt_unset dflags0 LangExt.StaticPointers
+  else return dflags0
 
 
 -- %************************************************************************
