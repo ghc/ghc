@@ -37,9 +37,6 @@ module CoreMonad (
     liftIO, liftIOWithCount,
     liftIO1, liftIO2, liftIO3, liftIO4,
 
-    -- ** Global initialization
-    reinitializeGlobals,
-
     -- ** Dealing with annotations
     getAnnotations, getFirstAnnotations,
 
@@ -726,10 +723,6 @@ getPackageFamInstEnv = do
     hsc_env <- getHscEnv
     eps <- liftIO $ hscEPS hsc_env
     return $ eps_fam_inst_env eps
-
-{-# DEPRECATED reinitializeGlobals "It is not necessary to call reinitializeGlobals. Since GHC 8.2, this function is a no-op and will be removed in GHC 8.4" #-}
-reinitializeGlobals :: CoreM ()
-reinitializeGlobals = return ()
 
 {-
 ************************************************************************
