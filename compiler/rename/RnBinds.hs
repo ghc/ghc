@@ -215,19 +215,19 @@ rnLocalBindsAndThen (HsIPBinds x binds) thing_inside = do
     (thing, fvs_thing) <- thing_inside (HsIPBinds x binds') fv_binds
     return (thing, fvs_thing `plusFV` fv_binds)
 
-rnLocalBindsAndThen (XHsLocalBindsLR _) _ = panic "rnLocalBindsAndThen"
+rnLocalBindsAndThen (XHsLocalBindsLR nec) _ = noExtCon nec
 
 rnIPBinds :: HsIPBinds GhcPs -> RnM (HsIPBinds GhcRn, FreeVars)
 rnIPBinds (IPBinds _ ip_binds ) = do
     (ip_binds', fvs_s) <- mapAndUnzipM (wrapLocFstM rnIPBind) ip_binds
-    return (IPBinds noExt ip_binds', plusFVs fvs_s)
-rnIPBinds (XHsIPBinds _) = panic "rnIPBinds"
+    return (IPBinds noExtField ip_binds', plusFVs fvs_s)
+rnIPBinds (XHsIPBinds nec) = noExtCon nec
 
 rnIPBind :: IPBind GhcPs -> RnM (IPBind GhcRn, FreeVars)
 rnIPBind (IPBind _ ~(Left n) expr) = do
     (expr',fvExpr) <- rnLExpr expr
-    return (IPBind noExt (Left n) expr', fvExpr)
-rnIPBind (XIPBind _) = panic "rnIPBind"
+    return (IPBind noExtField (Left n) expr', fvExpr)
+rnIPBind (XIPBind nec) = noExtCon nec
 
 {-
 ************************************************************************
@@ -422,19 +422,19 @@ rnBindLHS name_maker _ bind@(PatBind { pat_lhs = pat })
 rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
   = do { name <- applyNameMaker name_maker rdr_name
        ; return (bind { fun_id = name
-                      , fun_ext = noExt }) }
+                      , fun_ext = noExtField }) }
 
 rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
   = do { addLocM checkConName rdrname
        ; name <- lookupLocatedTopBndrRn rdrname   -- Should be in scope already
-       ; return (PatSynBind x psb{ psb_ext = noExt, psb_id = name }) }
+       ; return (PatSynBind x psb{ psb_ext = noExtField, psb_id = name }) }
 
   | otherwise  -- Pattern synonym, not at top level
   = do { addErr localPatternSynonymErr  -- Complain, but make up a fake
                                         -- name so that we can carry on
        ; name <- applyNameMaker name_maker rdrname
-       ; return (PatSynBind x psb{ psb_ext = noExt, psb_id = name }) }
+       ; return (PatSynBind x psb{ psb_ext = noExtField, psb_id = name }) }
   where
     localPatternSynonymErr :: SDoc
     localPatternSynonymErr
@@ -629,7 +629,7 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
    add_one_sig env (L loc (FixitySig _ names fixity)) =
      foldlM add_one env [ (loc,name_loc,name,fixity)
                         | L name_loc name <- names ]
-   add_one_sig _ (L _ (XFixitySig _)) = panic "makeMiniFixityEnv"
+   add_one_sig _ (L _ (XFixitySig nec)) = noExtCon nec
 
    add_one env (loc, name_loc, name,fixity) = do
      { -- this fixity decl is a duplicate iff
@@ -740,7 +740,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
       = hang (text "Illegal pattern synonym declaration")
            2 (text "Use -XPatternSynonyms to enable this extension")
 
-rnPatSynBind _ (XPatSynBind _) = panic "rnPatSynBind"
+rnPatSynBind _ (XPatSynBind nec) = noExtCon nec
 
 {-
 Note [Renaming pattern synonym variables]
@@ -895,7 +895,7 @@ rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
   = setSrcSpan loc $ do
     do { sel_name <- wrapLocM (lookupInstDeclBndr cls (text "method")) name
                      -- We use the selector name as the binder
-       ; let bind' = bind { fun_id = sel_name, fun_ext = noExt }
+       ; let bind' = bind { fun_id = sel_name, fun_ext = noExtField }
        ; return (L loc bind' `consBag` rest ) }
 
 -- Report error for all other forms of bindings
@@ -959,13 +959,13 @@ renameSigs ctxt sigs
 
 renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeVars)
 renameSig _ (IdSig _ x)
-  = return (IdSig noExt x, emptyFVs)    -- Actually this never occurs
+  = return (IdSig noExtField x, emptyFVs)    -- Actually this never occurs
 
 renameSig ctxt sig@(TypeSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
         ; (new_ty, fvs) <- rnHsSigWcType BindUnlessForall doc ty
-        ; return (TypeSig noExt new_vs new_ty, fvs) }
+        ; return (TypeSig noExtField new_vs new_ty, fvs) }
 
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures
@@ -973,7 +973,7 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
           addErr (defaultSigErr sig)
         ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
         ; (new_ty, fvs) <- rnHsSigType ty_ctxt ty
-        ; return (ClassOpSig noExt is_deflt new_v new_ty, fvs) }
+        ; return (ClassOpSig noExtField is_deflt new_v new_ty, fvs) }
   where
     (v1:_) = vs
     ty_ctxt = GenericCtx (text "a class method signature for"
@@ -981,7 +981,7 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
 
 renameSig _ (SpecInstSig _ src ty)
   = do  { (new_ty, fvs) <- rnHsSigType SpecInstSigCtx ty
-        ; return (SpecInstSig noExt src new_ty,fvs) }
+        ; return (SpecInstSig noExtField src new_ty,fvs) }
 
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
 -- so, in the top-level case (when mb_names is Nothing)
@@ -992,7 +992,7 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
                      TopSigCtxt {} -> lookupLocatedOccRn v
                      _             -> lookupSigOccRn ctxt sig v
         ; (new_ty, fvs) <- foldM do_one ([],emptyFVs) tys
-        ; return (SpecSig noExt new_v new_ty inl, fvs) }
+        ; return (SpecSig noExtField new_v new_ty inl, fvs) }
   where
     ty_ctxt = GenericCtx (text "a SPECIALISE signature for"
                           <+> quotes (ppr v))
@@ -1002,27 +1002,27 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
 
 renameSig ctxt sig@(InlineSig _ v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
-        ; return (InlineSig noExt new_v s, emptyFVs) }
+        ; return (InlineSig noExtField new_v s, emptyFVs) }
 
 renameSig ctxt (FixSig _ fsig)
   = do  { new_fsig <- rnSrcFixityDecl ctxt fsig
-        ; return (FixSig noExt new_fsig, emptyFVs) }
+        ; return (FixSig noExtField new_fsig, emptyFVs) }
 
 renameSig ctxt sig@(MinimalSig _ s (L l bf))
   = do new_bf <- traverse (lookupSigOccRn ctxt sig) bf
-       return (MinimalSig noExt s (L l new_bf), emptyFVs)
+       return (MinimalSig noExtField s (L l new_bf), emptyFVs)
 
 renameSig ctxt sig@(PatSynSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; (ty', fvs) <- rnHsSigType ty_ctxt ty
-        ; return (PatSynSig noExt new_vs ty', fvs) }
+        ; return (PatSynSig noExtField new_vs ty', fvs) }
   where
     ty_ctxt = GenericCtx (text "a pattern synonym signature for"
                           <+> ppr_sig_bndrs vs)
 
 renameSig ctxt sig@(SCCFunSig _ st v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
-        ; return (SCCFunSig noExt st new_v s, emptyFVs) }
+        ; return (SCCFunSig noExtField st new_v s, emptyFVs) }
 
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
@@ -1035,7 +1035,7 @@ renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
          -- Why 'any'? See Note [Orphan COMPLETE pragmas]
          addErrCtxt (text "In" <+> ppr sig) $ failWithTc orphanError
 
-       return (CompleteMatchSig noExt s (L l new_bf) new_mty, emptyFVs)
+       return (CompleteMatchSig noExtField s (L l new_bf) new_mty, emptyFVs)
   where
     orphanError :: SDoc
     orphanError =
@@ -1043,7 +1043,7 @@ renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
       text "A COMPLETE pragma must mention at least one data constructor" $$
       text "or pattern synonym defined in the same module."
 
-renameSig _ (XSig _) = panic "renameSig"
+renameSig _ (XSig nec) = noExtCon nec
 
 {-
 Note [Orphan COMPLETE pragmas]
@@ -1070,7 +1070,7 @@ complexity of supporting them properly doesn't seem worthwhile.
 ppr_sig_bndrs :: [Located RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
 
-okHsSig :: HsSigCtxt -> LSig a -> Bool
+okHsSig :: HsSigCtxt -> LSig (GhcPass a) -> Bool
 okHsSig ctxt (L _ sig)
   = case (sig, ctxt) of
      (ClassOpSig {}, ClsDeclCtxt {})  -> True
@@ -1111,7 +1111,7 @@ okHsSig ctxt (L _ sig)
      (CompleteMatchSig {}, TopSigCtxt {} ) -> True
      (CompleteMatchSig {}, _)              -> False
 
-     (XSig _, _) -> panic "okHsSig"
+     (XSig nec, _) -> noExtCon nec
 
 -------------------
 findDupSigs :: [LSig GhcPs] -> [NonEmpty (Located RdrName, Sig GhcPs)]
@@ -1167,7 +1167,7 @@ rnMatchGroup ctxt rnBody (MG { mg_alts = L _ ms, mg_origin = origin })
        ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
        ; return (mkMatchGroup origin new_ms, ms_fvs) }
-rnMatchGroup _ _ (XMatchGroup {}) = panic "rnMatchGroup"
+rnMatchGroup _ _ (XMatchGroup nec) = noExtCon nec
 
 rnMatch :: Outputable (body GhcPs) => HsMatchContext Name
         -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
@@ -1187,9 +1187,9 @@ rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
                       (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ })
                                             -> mf { mc_fun = L lf funid }
                       _                     -> ctxt
-        ; return (Match { m_ext = noExt, m_ctxt = mf', m_pats = pats'
+        ; return (Match { m_ext = noExtField, m_ctxt = mf', m_pats = pats'
                         , m_grhss = grhss'}, grhss_fvs ) }}
-rnMatch' _ _ (XMatch _) = panic "rnMatch'"
+rnMatch' _ _ (XMatch nec) = noExtCon nec
 
 emptyCaseErr :: HsMatchContext Name -> SDoc
 emptyCaseErr ctxt = hang (text "Empty list of alternatives in" <+> pp_ctxt)
@@ -1215,8 +1215,8 @@ rnGRHSs :: HsMatchContext Name
 rnGRHSs ctxt rnBody (GRHSs _ grhss (L l binds))
   = rnLocalBindsAndThen binds   $ \ binds' _ -> do
     (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt rnBody) grhss
-    return (GRHSs noExt grhss' (L l binds'), fvGRHSs)
-rnGRHSs _ _ (XGRHSs _) = panic "rnGRHSs"
+    return (GRHSs noExtField grhss' (L l binds'), fvGRHSs)
+rnGRHSs _ _ (XGRHSs nec) = noExtCon nec
 
 rnGRHS :: HsMatchContext Name
        -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
@@ -1236,7 +1236,7 @@ rnGRHS' ctxt rnBody (GRHS _ guards rhs)
         ; unless (pattern_guards_allowed || is_standard_guard guards')
                  (addWarn NoReason (nonStdGuardErr guards'))
 
-        ; return (GRHS noExt guards' rhs', fvs) }
+        ; return (GRHS noExtField guards' rhs', fvs) }
   where
         -- Standard Haskell 1.4 guards are just a single boolean
         -- expression, rather than a list of qualifiers as in the
@@ -1244,7 +1244,7 @@ rnGRHS' ctxt rnBody (GRHS _ guards rhs)
     is_standard_guard []                  = True
     is_standard_guard [L _ (BodyStmt {})] = True
     is_standard_guard _                   = False
-rnGRHS' _ _ (XGRHS _) = panic "rnGRHS'"
+rnGRHS' _ _ (XGRHS nec) = noExtCon nec
 
 {-
 *********************************************************
@@ -1267,8 +1267,8 @@ rnSrcFixityDecl sig_ctxt = rn_decl
         -- return a fixity sig for each (slightly odd)
     rn_decl (FixitySig _ fnames fixity)
       = do names <- concatMapM lookup_one fnames
-           return (FixitySig noExt names fixity)
-    rn_decl (XFixitySig _) = panic "rnSrcFixityDecl"
+           return (FixitySig noExtField names fixity)
+    rn_decl (XFixitySig nec) = noExtCon nec
 
     lookup_one :: Located RdrName -> RnM [Located Name]
     lookup_one (L name_loc rdr_name)

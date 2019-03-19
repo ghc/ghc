@@ -283,7 +283,7 @@ type family ProtectedSig a where
   ProtectedSig GhcRn = HsWildCardBndrs GhcRn (HsImplicitBndrs
                                                 GhcRn
                                                 (Shielded (LHsType GhcRn)))
-  ProtectedSig GhcTc = NoExt
+  ProtectedSig GhcTc = NoExtField
 
 class ProtectSig a where
   protectSig :: Scope -> LHsSigWcType (NoGhcTc a) -> ProtectedSig a
@@ -295,7 +295,7 @@ instance (ToHie (TScoped a)) => ToHie (TScoped (Shielded a)) where
   toHie (TS _ (SH sc a)) = toHie (TS (ResolvedScopes [sc]) a)
 
 instance ProtectSig GhcTc where
-  protectSig _ _ = NoExt
+  protectSig _ _ = noExtField
 
 instance ProtectSig GhcRn where
   protectSig sc (HsWC a (HsIB b sig)) =
@@ -368,10 +368,10 @@ instance (ToHie a) => ToHie (Bag a) where
 instance (ToHie a) => ToHie (Maybe a) where
   toHie = maybe (pure []) toHie
 
-instance ToHie (Context (Located NoExt)) where
+instance ToHie (Context (Located NoExtField)) where
   toHie _ = pure []
 
-instance ToHie (TScoped NoExt) where
+instance ToHie (TScoped NoExtField) where
   toHie _ = pure []
 
 instance ToHie (IEContext (Located ModuleName)) where

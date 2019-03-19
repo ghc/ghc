@@ -955,7 +955,7 @@ decideBangHood dflags lpat
            ParPat x p    -> cL l (ParPat x (go p))
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
-           _             -> cL l (BangPat noExt lp)
+           _             -> cL l (BangPat noExtField lp)
 
 -- | Unconditionally make a 'Pat' strict.
 addBang :: LPat GhcTc -- ^ Original pattern
@@ -965,10 +965,10 @@ addBang = go
     go lp@(dL->L l p)
       = case p of
            ParPat x p    -> cL l (ParPat x (go p))
-           LazyPat _ lp' -> cL l (BangPat noExt lp')
+           LazyPat _ lp' -> cL l (BangPat noExtField lp')
                                   -- Should we bring the extension value over?
            BangPat _ _   -> lp
-           _             -> cL l (BangPat noExt lp)
+           _             -> cL l (BangPat noExtField lp)
 
 isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 

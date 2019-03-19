@@ -194,7 +194,7 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; return (gbl_env', inst_info, deriv_info) }
 
 
-tcTyClGroup (XTyClGroup _) = panic "tcTyClGroup"
+tcTyClGroup (XTyClGroup nec) = noExtCon nec
 
 tcTyClDecls
   :: [LTyClDecl GhcRn]
@@ -1079,8 +1079,8 @@ getInitialKind cusk (SynDecl { tcdLName = dL->L _ name
           HsKindSig _ _ k   -> Just k
           _                 -> Nothing
 
-getInitialKind _ (DataDecl _ _ _ _ (XHsDataDefn _)) = panic "getInitialKind"
-getInitialKind _ (XTyClDecl _) = panic "getInitialKind"
+getInitialKind _ (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
+getInitialKind _ (XTyClDecl nec) = noExtCon nec
 
 ---------------------------------
 getFamDeclInitialKinds
@@ -1121,7 +1121,7 @@ getFamDeclInitialKind parent_cusk mb_parent_tycon
       ClosedTypeFamily _ -> ASSERT( isNothing mb_parent_tycon )
                             ClosedTypeFamilyFlavour
     ctxt  = TyFamResKindCtxt name
-getFamDeclInitialKind _ _ (XFamilyDecl _) = panic "getFamDeclInitialKind"
+getFamDeclInitialKind _ _ (XFamilyDecl nec) = noExtCon nec
 
 ------------------------------------------------------------------------
 kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
@@ -1193,9 +1193,9 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdLName  = (dL->L _ fam_tc_name)
         do { fam_tc <- kcLookupTcTyCon fam_tc_name
            ; mapM_ (kcTyFamInstEqn fam_tc) eqns }
       _ -> return ()
-kcTyClDecl (FamDecl _ (XFamilyDecl _))              = panic "kcTyClDecl"
-kcTyClDecl (DataDecl _ _ _ _ (XHsDataDefn _)) = panic "kcTyClDecl"
-kcTyClDecl (XTyClDecl _)                            = panic "kcTyClDecl"
+kcTyClDecl (FamDecl _ (XFamilyDecl nec))        = noExtCon nec
+kcTyClDecl (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
+kcTyClDecl (XTyClDecl nec)                      = noExtCon nec
 
 -------------------
 
@@ -1276,8 +1276,8 @@ kcConDecl new_or_data res_kind (ConDeclGADT
        ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty
        ; return () }
-kcConDecl _ _ (ConDeclGADT _ _ _ (XLHsQTyVars _) _ _ _ _) = panic "kcConDecl"
-kcConDecl _ _ (XConDecl _) = panic "kcConDecl"
+kcConDecl _ _ (ConDeclGADT _ _ _ (XLHsQTyVars nec) _ _ _ _) = noExtCon nec
+kcConDecl _ _ (XConDecl nec) = noExtCon nec
 
 {-
 Note [Recursion and promoting data constructors]
@@ -1594,7 +1594,7 @@ tcTyClDecl1 _parent roles_info
                               meths fundeps sigs ats at_defs
        ; return (noDerivInfos (classTyCon clas)) }
 
-tcTyClDecl1 _ _ (XTyClDecl _) = panic "tcTyClDecl1"
+tcTyClDecl1 _ _ (XTyClDecl nec) = noExtCon nec
 
 
 {- *********************************************************************
@@ -1972,7 +1972,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
        ; return fam_tc } }
 
   | otherwise = panic "tcFamInst1"  -- Silence pattern-exhaustiveness checker
-tcFamDecl1 _ (XFamilyDecl _) = panic "tcFamDecl1"
+tcFamDecl1 _ (XFamilyDecl nec) = noExtCon nec
 
 -- | Maybe return a list of Bools that say whether a type family was declared
 -- injective in the corresponding type arguments. Length of the list is equal to
@@ -2115,7 +2115,7 @@ tcDataDefn err_ctxt
           DataType -> return (mkDataTyConRhs data_cons)
           NewType  -> ASSERT( not (null data_cons) )
                       mkNewTyConRhs tc_name tycon (head data_cons)
-tcDataDefn _ _ _ _ _ (XHsDataDefn _) = panic "tcDataDefn"
+tcDataDefn _ _ _ _ _ (XHsDataDefn nec) = noExtCon nec
 
 
 -------------------------
@@ -2153,8 +2153,8 @@ kcTyFamInstEqn tc_fam_tc
   where
     vis_arity = length (tyConVisibleTyVars tc_fam_tc)
 
-kcTyFamInstEqn _ (dL->L _ (XHsImplicitBndrs _)) = panic "kcTyFamInstEqn"
-kcTyFamInstEqn _ (dL->L _ (HsIB _ (XFamEqn _))) = panic "kcTyFamInstEqn"
+kcTyFamInstEqn _ (dL->L _ (XHsImplicitBndrs nec)) = noExtCon nec
+kcTyFamInstEqn _ (dL->L _ (HsIB _ (XFamEqn nec))) = noExtCon nec
 kcTyFamInstEqn _ _ = panic "kcTyFamInstEqn: Impossible Match" -- due to #15884
 
 
@@ -2320,7 +2320,7 @@ tcFamTyPats fam_tc hs_pats
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    lhs_fun   = noLoc (HsTyVar noExt NotPromoted (noLoc fam_name))
+    lhs_fun   = noLoc (HsTyVar noExtField NotPromoted (noLoc fam_name))
 
 unravelFamInstPats :: TcType -> [TcType]
 -- Decompose fam_app to get the argument patterns
@@ -2684,9 +2684,9 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        ; traceTc "tcConDecl 2" (ppr names)
        ; mapM buildOneDataCon names
        }
-tcConDecl _ _ _ _ _ _ (ConDeclGADT _ _ _ (XLHsQTyVars _) _ _ _ _)
-  = panic "tcConDecl"
-tcConDecl _ _ _ _ _ _ (XConDecl _) = panic "tcConDecl"
+tcConDecl _ _ _ _ _ _ (ConDeclGADT _ _ _ (XLHsQTyVars nec) _ _ _ _)
+  = noExtCon nec
+tcConDecl _ _ _ _ _ _ (XConDecl nec) = noExtCon nec
 
 tcConIsInfixH98 :: Name
              -> HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn])
@@ -4006,8 +4006,8 @@ tcMkDataFamInstCtxt decl@(DataFamInstDecl { dfid_eqn =
                             HsIB { hsib_body = eqn }})
   = tcMkFamInstCtxt (pprDataFamInstFlavour decl <+> text "instance")
                     (unLoc (feqn_tycon eqn))
-tcMkDataFamInstCtxt (DataFamInstDecl (XHsImplicitBndrs _))
-  = panic "tcMkDataFamInstCtxt"
+tcMkDataFamInstCtxt (DataFamInstDecl (XHsImplicitBndrs nec))
+  = noExtCon nec
 
 tcAddDataFamInstCtxt :: DataFamInstDecl GhcRn -> TcM a -> TcM a
 tcAddDataFamInstCtxt decl
@@ -4199,7 +4199,7 @@ wrongNumberOfRoles tyvars d@(dL->L _ (RoleAnnotDecl _ _ annots))
           text "Expected" <+> (ppr $ length tyvars) <> comma <+>
           text "got" <+> (ppr $ length annots) <> colon)
        2 (ppr d)
-wrongNumberOfRoles _ (dL->L _ (XRoleAnnotDecl _)) = panic "wrongNumberOfRoles"
+wrongNumberOfRoles _ (dL->L _ (XRoleAnnotDecl nec)) = noExtCon nec
 wrongNumberOfRoles _ _ = panic "wrongNumberOfRoles: Impossible Match"
                          -- due to #15884
 
@@ -4210,7 +4210,7 @@ illegalRoleAnnotDecl (dL->L loc (RoleAnnotDecl _ tycon _))
     setSrcSpan loc $
     addErrTc (text "Illegal role annotation for" <+> ppr tycon <> char ';' $$
               text "they are allowed only for datatypes and classes.")
-illegalRoleAnnotDecl (dL->L _ (XRoleAnnotDecl _)) = panic "illegalRoleAnnotDecl"
+illegalRoleAnnotDecl (dL->L _ (XRoleAnnotDecl nec)) = noExtCon nec
 illegalRoleAnnotDecl _ = panic "illegalRoleAnnotDecl: Impossible Match"
                          -- due to #15884
 

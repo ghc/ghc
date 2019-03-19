@@ -108,12 +108,12 @@ data ImportDecl pass
 
      -- For details on above see note [Api annotations] in ApiAnnotation
 
-type instance XCImportDecl  (GhcPass _) = NoExt
-type instance XXImportDecl  (GhcPass _) = NoExt
+type instance XCImportDecl  (GhcPass _) = NoExtField
+type instance XXImportDecl  (GhcPass _) = NoExtCon
 
 simpleImportDecl :: ModuleName -> ImportDecl (GhcPass p)
 simpleImportDecl mn = ImportDecl {
-      ideclExt       = noExt,
+      ideclExt       = noExtField,
       ideclSourceSrc = NoSourceText,
       ideclName      = noLoc mn,
       ideclPkgQual   = Nothing,
@@ -254,15 +254,15 @@ data IE pass
   | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
   | XIE (XXIE pass)
 
-type instance XIEVar             (GhcPass _) = NoExt
-type instance XIEThingAbs        (GhcPass _) = NoExt
-type instance XIEThingAll        (GhcPass _) = NoExt
-type instance XIEThingWith       (GhcPass _) = NoExt
-type instance XIEModuleContents  (GhcPass _) = NoExt
-type instance XIEGroup           (GhcPass _) = NoExt
-type instance XIEDoc             (GhcPass _) = NoExt
-type instance XIEDocNamed        (GhcPass _) = NoExt
-type instance XXIE               (GhcPass _) = NoExt
+type instance XIEVar             (GhcPass _) = NoExtField
+type instance XIEThingAbs        (GhcPass _) = NoExtField
+type instance XIEThingAll        (GhcPass _) = NoExtField
+type instance XIEThingWith       (GhcPass _) = NoExtField
+type instance XIEModuleContents  (GhcPass _) = NoExtField
+type instance XIEGroup           (GhcPass _) = NoExtField
+type instance XIEDoc             (GhcPass _) = NoExtField
+type instance XIEDocNamed        (GhcPass _) = NoExtField
+type instance XXIE               (GhcPass _) = NoExtCon
 
 -- | Imported or Exported Wildcard
 data IEWildcard = NoIEWildcard | IEWildcard Int deriving (Eq, Data)
@@ -284,14 +284,14 @@ gives rise to
 See Note [Representing fields in AvailInfo] in Avail for more details.
 -}
 
-ieName :: IE pass -> IdP pass
+ieName :: IE (GhcPass p) -> IdP (GhcPass p)
 ieName (IEVar _ (L _ n))              = ieWrappedName n
 ieName (IEThingAbs  _ (L _ n))        = ieWrappedName n
 ieName (IEThingWith _ (L _ n) _ _ _)  = ieWrappedName n
 ieName (IEThingAll  _ (L _ n))        = ieWrappedName n
 ieName _ = panic "ieName failed pattern match!"
 
-ieNames :: IE pass -> [IdP pass]
+ieNames :: IE (GhcPass p) -> [IdP (GhcPass p)]
 ieNames (IEVar       _ (L _ n)   )     = [ieWrappedName n]
 ieNames (IEThingAbs  _ (L _ n)   )     = [ieWrappedName n]
 ieNames (IEThingAll  _ (L _ n)   )     = [ieWrappedName n]
@@ -301,7 +301,7 @@ ieNames (IEModuleContents {})     = []
 ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
 ieNames (IEDocNamed       {})     = []
-ieNames (XIE {}) = panic "ieNames"
+ieNames (XIE nec) = noExtCon nec
 
 ieWrappedName :: IEWrappedName name -> name
 ieWrappedName (IEName    (L _ n)) = n

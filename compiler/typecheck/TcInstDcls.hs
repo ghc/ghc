@@ -458,7 +458,7 @@ tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
   = do { (insts, fam_insts, deriv_infos) <- tcClsInstDecl (L loc decl)
        ; return (insts, fam_insts, deriv_infos) }
 
-tcLocalInstDecl (L _ (XInstDecl _)) = panic "tcLocalInstDecl"
+tcLocalInstDecl (L _ (XInstDecl nec)) = noExtCon nec
 
 tcClsInstDecl :: LClsInstDecl GhcRn
               -> TcM ([InstInfo GhcRn], [FamInst], [DerivInfo])
@@ -535,7 +535,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                                         . dfid_eqn
                                         . unLoc) adts)
 
-tcClsInstDecl (L _ (XClsInstDecl _)) = panic "tcClsInstDecl"
+tcClsInstDecl (L _ (XClsInstDecl nec)) = noExtCon nec
 
 {-
 ************************************************************************
@@ -1091,14 +1091,14 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      --    con_app_scs  = MkD ty1 ty2 sc1 sc2
                      --    con_app_args = MkD ty1 ty2 sc1 sc2 op1 op2
              con_app_tys  = mkHsWrap (mkWpTyApps inst_tys)
-                                  (HsConLikeOut noExt (RealDataCon dict_constr))
+                                  (HsConLikeOut noExtField (RealDataCon dict_constr))
                        -- NB: We *can* have covars in inst_tys, in the case of
                        -- promoted GADT constructors.
 
              con_app_args = foldl' app_to_meth con_app_tys sc_meth_ids
 
              app_to_meth :: HsExpr GhcTc -> Id -> HsExpr GhcTc
-             app_to_meth fun meth_id = HsApp noExt (L loc fun)
+             app_to_meth fun meth_id = HsApp noExtField (L loc fun)
                                             (L loc (wrapId arg_wrapper meth_id))
 
              inst_tv_tys = mkTyVarTys inst_tyvars
@@ -1112,13 +1112,13 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                     -- Newtype dfuns just inline unconditionally,
                     -- so don't attempt to specialise them
 
-             export = ABE { abe_ext  = noExt
+             export = ABE { abe_ext  = noExtField
                           , abe_wrap = idHsWrapper
                           , abe_poly = dfun_id_w_prags
                           , abe_mono = self_dict
                           , abe_prags = dfun_spec_prags }
                           -- NB: see Note [SPECIALISE instance pragmas]
-             main_bind = AbsBinds { abs_ext = noExt
+             main_bind = AbsBinds { abs_ext = noExtField
                                   , abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [export]
@@ -1165,7 +1165,7 @@ addDFunPrags dfun_id sc_meth_ids
    is_newtype  = isNewTyCon clas_tc
 
 wrapId :: HsWrapper -> IdP (GhcPass id) -> HsExpr (GhcPass id)
-wrapId wrapper id = mkHsWrap wrapper (HsVar noExt (noLoc id))
+wrapId wrapper id = mkHsWrap wrapper (HsVar noExtField (noLoc id))
 
 {- Note [Typechecking plan for instance declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1264,13 +1264,13 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
            ; let sc_top_ty = mkInvForAllTys tyvars $
                              mkPhiTy (map idType dfun_evs) sc_pred
                  sc_top_id = mkLocalId sc_top_name sc_top_ty
-                 export = ABE { abe_ext  = noExt
+                 export = ABE { abe_ext  = noExtField
                               , abe_wrap = idHsWrapper
                               , abe_poly = sc_top_id
                               , abe_mono = sc_ev_id
                               , abe_prags = noSpecPrags }
                  local_ev_binds = TcEvBinds ev_binds_var
-                 bind = AbsBinds { abs_ext      = noExt
+                 bind = AbsBinds { abs_ext      = noExtField
                                  , abs_tvs      = tyvars
                                  , abs_ev_vars  = dfun_evs
                                  , abs_exports  = [export]
@@ -1563,12 +1563,12 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                              mkLHsWrap lam_wrapper (error_rhs dflags)
            ; return (meth_id, meth_bind, Nothing) }
       where
-        error_rhs dflags = L inst_loc $ HsApp noExt error_fun (error_msg dflags)
+        error_rhs dflags = L inst_loc $ HsApp noExtField error_fun (error_msg dflags)
         error_fun    = L inst_loc $
                        wrapId (mkWpTyApps
                                 [ getRuntimeRep meth_tau, meth_tau])
                               nO_METHOD_BINDING_ERROR_ID
-        error_msg dflags = L inst_loc (HsLit noExt (HsStringPrim NoSourceText
+        error_msg dflags = L inst_loc (HsLit noExtField (HsStringPrim NoSourceText
                                               (unsafeMkByteString (error_string dflags))))
         meth_tau     = funResultTy (piResultTys (idType sel_id) inst_tys)
         error_string dflags = showSDoc dflags
@@ -1696,14 +1696,14 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
        ; spec_prags     <- tcSpecPrags global_meth_id prags
 
         ; let specs  = mk_meth_spec_prags global_meth_id spec_inst_prags spec_prags
-              export = ABE { abe_ext   = noExt
+              export = ABE { abe_ext   = noExtField
                            , abe_poly  = global_meth_id
                            , abe_mono  = local_meth_id
                            , abe_wrap  = idHsWrapper
                            , abe_prags = specs }
 
               local_ev_binds = TcEvBinds ev_binds_var
-              full_bind = AbsBinds { abs_ext      = noExt
+              full_bind = AbsBinds { abs_ext      = noExtField
                                    , abs_tvs      = tyvars
                                    , abs_ev_vars  = dfun_ev_vars
                                    , abs_exports  = [export]
@@ -1746,14 +1746,14 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
 
        ; (tc_bind, [inner_id]) <- tcPolyCheck no_prag_fn inner_meth_sig meth_bind
 
-       ; let export = ABE { abe_ext   = noExt
+       ; let export = ABE { abe_ext   = noExtField
                           , abe_poly  = local_meth_id
                           , abe_mono  = inner_id
                           , abe_wrap  = hs_wrap
                           , abe_prags = noSpecPrags }
 
        ; return (unitBag $ L (getLoc meth_bind) $
-                 AbsBinds { abs_ext = noExt, abs_tvs = [], abs_ev_vars = []
+                 AbsBinds { abs_ext = noExtField, abs_tvs = [], abs_ev_vars = []
                           , abs_exports = [export]
                           , abs_binds = tc_bind, abs_ev_binds = []
                           , abs_sig = True }) }
@@ -1899,7 +1899,7 @@ mkDefMethBind clas inst_tys sel_id dm_name
         ; dm_id <- tcLookupId dm_name
         ; let inline_prag = idInlinePragma dm_id
               inline_prags | isAnyInlinePragma inline_prag
-                           = [noLoc (InlineSig noExt fn inline_prag)]
+                           = [noLoc (InlineSig noExtField fn inline_prag)]
                            | otherwise
                            = []
                  -- Copy the inline pragma (if any) from the default method
@@ -1919,7 +1919,7 @@ mkDefMethBind clas inst_tys sel_id dm_name
        ; return (bind, inline_prags) }
   where
     mk_vta :: LHsExpr GhcRn -> Type -> LHsExpr GhcRn
-    mk_vta fun ty = noLoc (HsAppType noExt fun (mkEmptyWildCardBndrs $ nlHsParTy
+    mk_vta fun ty = noLoc (HsAppType noExtField fun (mkEmptyWildCardBndrs $ nlHsParTy
                                                 $ noLoc $ XHsType $ NHsCoreTy ty))
        -- NB: use visible type application
        -- See Note [Default methods in instances]
