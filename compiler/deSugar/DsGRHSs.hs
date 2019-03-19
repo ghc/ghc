@@ -64,13 +64,13 @@ dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty
              match_result2 = adjustMatchResultDs (dsLocalBinds binds) match_result1
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
-dsGRHSs _ (XGRHSs _) _ = panic "dsGRHSs"
+dsGRHSs _ (XGRHSs nec) _ = noExtCon nec
 
 dsGRHS :: HsMatchContext Name -> Type -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM MatchResult
 dsGRHS hs_ctx rhs_ty (dL->L _ (GRHS _ guards rhs))
   = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
-dsGRHS _ _ (dL->L _ (XGRHS _)) = panic "dsGRHS"
+dsGRHS _ _ (dL->L _ (XGRHS nec)) = noExtCon nec
 dsGRHS _ _ _ = panic "dsGRHS: Impossible Match" -- due to #15884
 
 {-
@@ -138,8 +138,8 @@ matchGuards (TransStmt {} : _) _ _ _ = panic "matchGuards TransStmt"
 matchGuards (RecStmt   {} : _) _ _ _ = panic "matchGuards RecStmt"
 matchGuards (ApplicativeStmt {} : _) _ _ _ =
   panic "matchGuards ApplicativeLastStmt"
-matchGuards (XStmtLR {} : _) _ _ _ =
-  panic "matchGuards XStmtLR"
+matchGuards (XStmtLR nec : _) _ _ _ =
+  noExtCon nec
 
 {-
 Should {\em fail} if @e@ returns @D@

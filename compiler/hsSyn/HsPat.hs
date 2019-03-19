@@ -281,51 +281,51 @@ data ListPatTc
       Type                             -- The type of the elements
       (Maybe (Type, SyntaxExpr GhcTc)) -- For rebindable syntax
 
-type instance XWildPat GhcPs = NoExt
-type instance XWildPat GhcRn = NoExt
+type instance XWildPat GhcPs = NoExtField
+type instance XWildPat GhcRn = NoExtField
 type instance XWildPat GhcTc = Type
 
-type instance XVarPat  (GhcPass _) = NoExt
-type instance XLazyPat (GhcPass _) = NoExt
-type instance XAsPat   (GhcPass _) = NoExt
-type instance XParPat  (GhcPass _) = NoExt
-type instance XBangPat (GhcPass _) = NoExt
+type instance XVarPat  (GhcPass _) = NoExtField
+type instance XLazyPat (GhcPass _) = NoExtField
+type instance XAsPat   (GhcPass _) = NoExtField
+type instance XParPat  (GhcPass _) = NoExtField
+type instance XBangPat (GhcPass _) = NoExtField
 
 -- Note: XListPat cannot be extended when using GHC 8.0.2 as the bootstrap
 -- compiler, as it triggers https://gitlab.haskell.org/ghc/ghc/issues/14396 for
 -- `SyntaxExpr`
-type instance XListPat GhcPs = NoExt
+type instance XListPat GhcPs = NoExtField
 type instance XListPat GhcRn = Maybe (SyntaxExpr GhcRn)
 type instance XListPat GhcTc = ListPatTc
 
-type instance XTuplePat GhcPs = NoExt
-type instance XTuplePat GhcRn = NoExt
+type instance XTuplePat GhcPs = NoExtField
+type instance XTuplePat GhcRn = NoExtField
 type instance XTuplePat GhcTc = [Type]
 
-type instance XSumPat GhcPs = NoExt
-type instance XSumPat GhcRn = NoExt
+type instance XSumPat GhcPs = NoExtField
+type instance XSumPat GhcRn = NoExtField
 type instance XSumPat GhcTc = [Type]
 
-type instance XViewPat GhcPs = NoExt
-type instance XViewPat GhcRn = NoExt
+type instance XViewPat GhcPs = NoExtField
+type instance XViewPat GhcRn = NoExtField
 type instance XViewPat GhcTc = Type
 
-type instance XSplicePat (GhcPass _) = NoExt
-type instance XLitPat    (GhcPass _) = NoExt
+type instance XSplicePat (GhcPass _) = NoExtField
+type instance XLitPat    (GhcPass _) = NoExtField
 
-type instance XNPat GhcPs = NoExt
-type instance XNPat GhcRn = NoExt
+type instance XNPat GhcPs = NoExtField
+type instance XNPat GhcRn = NoExtField
 type instance XNPat GhcTc = Type
 
-type instance XNPlusKPat GhcPs = NoExt
-type instance XNPlusKPat GhcRn = NoExt
+type instance XNPlusKPat GhcPs = NoExtField
+type instance XNPlusKPat GhcRn = NoExtField
 type instance XNPlusKPat GhcTc = Type
 
-type instance XSigPat GhcPs = NoExt
-type instance XSigPat GhcRn = NoExt
+type instance XSigPat GhcPs = NoExtField
+type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
-type instance XCoPat  (GhcPass _) = NoExt
+type instance XCoPat  (GhcPass _) = NoExtField
 type instance XXPat   (GhcPass p) = Located (Pat (GhcPass p))
 
 
@@ -460,11 +460,11 @@ data HsRecField' id arg = HsRecField {
 --
 -- The parsed HsRecUpdField corresponding to the record update will have:
 --
---     hsRecFieldLbl = Unambiguous "x" NoExt :: AmbiguousFieldOcc RdrName
+--     hsRecFieldLbl = Unambiguous "x" noExtField :: AmbiguousFieldOcc RdrName
 --
 -- After the renamer, this will become:
 --
---     hsRecFieldLbl = Ambiguous   "x" NoExt :: AmbiguousFieldOcc Name
+--     hsRecFieldLbl = Ambiguous   "x" noExtField :: AmbiguousFieldOcc Name
 --
 -- (note that the Unambiguous constructor is not type-correct here).
 -- The typechecker will determine the particular selector:
@@ -630,7 +630,7 @@ mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 
 mkCharLitPat :: SourceText -> Char -> OutPat (GhcPass p)
 mkCharLitPat src c = mkPrefixConPat charDataCon
-                          [noLoc $ LitPat NoExt (HsCharPrim src c)] []
+                          [noLoc $ LitPat noExtField (HsCharPrim src c)] []
 
 {-
 ************************************************************************
@@ -811,7 +811,7 @@ conPatNeedsParens p = go
 -- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.
 parenthesizePat :: PprPrec -> LPat (GhcPass p) -> LPat (GhcPass p)
 parenthesizePat p lpat@(dL->L loc pat)
-  | patNeedsParens p pat = cL loc (ParPat NoExt lpat)
+  | patNeedsParens p pat = cL loc (ParPat noExtField lpat)
   | otherwise            = lpat
 
 {-

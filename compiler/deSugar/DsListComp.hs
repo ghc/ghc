@@ -91,7 +91,7 @@ dsInnerListComp (ParStmtBlock _ stmts bndrs _)
        ; expr <- dsListComp (stmts ++ [noLoc $ mkLastStmt (mkBigLHsVarTupId bndrs)]) list_ty
 
        ; return (expr, bndrs_tuple_type) }
-dsInnerListComp (XParStmtBlock{}) = panic "dsInnerListComp"
+dsInnerListComp (XParStmtBlock nec) = noExtCon nec
 
 -- This function factors out commonality between the desugaring strategies for GroupStmt.
 -- Given such a statement it gives you back an expression representing how to compute the transformed
@@ -107,7 +107,7 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
         to_bndrs_tup_ty = mkBigCoreTupTy to_bndrs_tys
 
     -- Desugar an inner comprehension which outputs a list of tuples of the "from" binders
-    (expr', from_tup_ty) <- dsInnerListComp (ParStmtBlock noExt stmts
+    (expr', from_tup_ty) <- dsInnerListComp (ParStmtBlock noExtField stmts
                                                         from_bndrs noSyntaxExpr)
 
     -- Work out what arguments should be supplied to that expression: i.e. is an extraction
@@ -267,8 +267,8 @@ deListComp (RecStmt {} : _) _ = panic "deListComp RecStmt"
 deListComp (ApplicativeStmt {} : _) _ =
   panic "deListComp ApplicativeStmt"
 
-deListComp (XStmtLR {} : _) _ =
-  panic "deListComp XStmtLR"
+deListComp (XStmtLR nec : _) _ =
+  noExtCon nec
 
 deBindComp :: OutPat GhcTc
            -> CoreExpr
@@ -364,8 +364,8 @@ dfListComp _ _ (ParStmt {} : _) = panic "dfListComp ParStmt"
 dfListComp _ _ (RecStmt {} : _) = panic "dfListComp RecStmt"
 dfListComp _ _ (ApplicativeStmt {} : _) =
   panic "dfListComp ApplicativeStmt"
-dfListComp _ _ (XStmtLR {} : _) =
-  panic "dfListComp XStmtLR"
+dfListComp _ _ (XStmtLR nec : _) =
+  noExtCon nec
 
 dfBindComp :: Id -> Id             -- 'c' and 'n'
            -> (LPat GhcTc, CoreExpr)
@@ -596,7 +596,7 @@ dsMcStmt (ParStmt bind_ty blocks mzip_op bind_op) stmts_rest
     ds_inner (ParStmtBlock _ stmts bndrs return_op)
        = do { exp <- dsInnerMonadComp stmts bndrs return_op
             ; return (exp, mkBigCoreVarTupTy bndrs) }
-    ds_inner (XParStmtBlock{}) = panic "dsMcStmt"
+    ds_inner (XParStmtBlock nec) = noExtCon nec
 
 dsMcStmt stmt _ = pprPanic "dsMcStmt: unexpected stmt" (ppr stmt)
 
@@ -655,7 +655,7 @@ dsInnerMonadComp :: [ExprLStmt GhcTc]
                  -> DsM CoreExpr
 dsInnerMonadComp stmts bndrs ret_op
   = dsMcStmts (stmts ++
-                 [noLoc (LastStmt noExt (mkBigLHsVarTupId bndrs) False ret_op)])
+                 [noLoc (LastStmt noExtField (mkBigLHsVarTupId bndrs) False ret_op)])
 
 
 -- The `unzip` function for `GroupStmt` in a monad comprehensions

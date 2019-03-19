@@ -82,16 +82,16 @@ type instance XHsChar       (GhcPass _) = SourceText
 type instance XHsCharPrim   (GhcPass _) = SourceText
 type instance XHsString     (GhcPass _) = SourceText
 type instance XHsStringPrim (GhcPass _) = SourceText
-type instance XHsInt        (GhcPass _) = NoExt
+type instance XHsInt        (GhcPass _) = NoExtField
 type instance XHsIntPrim    (GhcPass _) = SourceText
 type instance XHsWordPrim   (GhcPass _) = SourceText
 type instance XHsInt64Prim  (GhcPass _) = SourceText
 type instance XHsWord64Prim (GhcPass _) = SourceText
 type instance XHsInteger    (GhcPass _) = SourceText
-type instance XHsRat        (GhcPass _) = NoExt
-type instance XHsFloatPrim  (GhcPass _) = NoExt
-type instance XHsDoublePrim (GhcPass _) = NoExt
-type instance XXLit         (GhcPass _) = NoExt
+type instance XHsRat        (GhcPass _) = NoExtField
+type instance XHsFloatPrim  (GhcPass _) = NoExtField
+type instance XHsDoublePrim (GhcPass _) = NoExtField
+type instance XXLit         (GhcPass _) = NoExtCon
 
 instance Eq (HsLit x) where
   (HsChar _ x1)       == (HsChar _ x2)       = x1==x2
@@ -125,11 +125,11 @@ data OverLitTc
         ol_type :: Type }
   deriving Data
 
-type instance XOverLit GhcPs = NoExt
+type instance XOverLit GhcPs = NoExtField
 type instance XOverLit GhcRn = Bool            -- Note [ol_rebindable]
 type instance XOverLit GhcTc = OverLitTc
 
-type instance XXOverLit (GhcPass _) = NoExt
+type instance XXOverLit (GhcPass _) = NoExtCon
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
@@ -147,7 +147,7 @@ negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
 
 overLitType :: HsOverLit GhcTc -> Type
 overLitType (OverLit (OverLitTc _ ty) _ _) = ty
-overLitType XOverLit{} = panic "overLitType"
+overLitType (XOverLit nec) = noExtCon nec
 
 -- | Convert a literal from one index type to another, updating the annotations
 -- according to the relevant 'Convertable' instance

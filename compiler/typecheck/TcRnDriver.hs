@@ -554,7 +554,7 @@ tc_rn_src_decls ds
                                 ("Declaration splices are not "
                                   ++ "permitted inside top-level "
                                   ++ "declarations added with addTopDecls"))
-                        ; Just (XSpliceDecl _, _) -> panic "tc_rn_src_decls"
+                        ; Just (XSpliceDecl nec, _) -> noExtCon nec
                         }
                       -- Rename TH-generated top-level declarations
                     ; (tcg_env, th_rn_decls) <- setGblEnv tcg_env
@@ -597,7 +597,7 @@ tc_rn_src_decls ds
 
                ; return (tcg_env, tcl_env, lie1 `andWC` lie2)
                }
-          ; Just (XSpliceDecl _, _) -> panic "tc_rn_src_decls"
+          ; Just (XSpliceDecl nec, _) -> noExtCon nec
           }
       }
 
@@ -634,8 +634,8 @@ tcRnHsBootDecls hsc_src decls
                 -- Check for illegal declarations
         ; case group_tail of
              Just (SpliceDecl _ d _, _) -> badBootDecl hsc_src "splice" d
-             Just (XSpliceDecl _, _) -> panic "tcRnHsBootDecls"
-             Nothing                  -> return ()
+             Just (XSpliceDecl nec, _)  -> noExtCon nec
+             Nothing                    -> return ()
         ; mapM_ (badBootDecl hsc_src "foreign") for_decls
         ; mapM_ (badBootDecl hsc_src "default") def_decls
         ; mapM_ (badBootDecl hsc_src "rule")    rule_decls
@@ -1739,7 +1739,7 @@ check_main dflags tcg_env explicit_mod_hdr
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcMonoExpr (cL loc (HsVar noExt (cL loc main_name)))
+                  tcMonoExpr (cL loc (HsVar noExtField (cL loc main_name)))
                              (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
@@ -2068,35 +2068,35 @@ tcUserStmt (dL->L loc (BodyStmt _ expr _ _))
               -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = cL loc $ LetStmt noExt $ noLoc $ HsValBinds noExt
+              let_stmt  = cL loc $ LetStmt noExtField $ noLoc $ HsValBinds noExtField
                            $ XValBindsLR
                                (NValBinds [(NonRecursive,unitBag the_bind)] [])
 
               -- [it <- e]
-              bind_stmt = cL loc $ BindStmt noExt
-                                       (cL loc (VarPat noExt (cL loc fresh_it)))
+              bind_stmt = cL loc $ BindStmt noExtField
+                                       (cL loc (VarPat noExtField (cL loc fresh_it)))
                                        (nlHsApp ghciStep rn_expr)
                                        (mkRnSyntaxExpr bindIOName)
                                        noSyntaxExpr
 
               -- [; print it]
-              print_it  = cL loc $ BodyStmt noExt
+              print_it  = cL loc $ BodyStmt noExtField
                                            (nlHsApp (nlHsVar interPrintName)
                                            (nlHsVar fresh_it))
                                            (mkRnSyntaxExpr thenIOName)
                                                   noSyntaxExpr
 
               -- NewA
-              no_it_a = cL loc $ BodyStmt noExt (nlHsApps bindIOName
+              no_it_a = cL loc $ BodyStmt noExtField (nlHsApps bindIOName
                                        [rn_expr , nlHsVar interPrintName])
                                        (mkRnSyntaxExpr thenIOName)
                                        noSyntaxExpr
 
-              no_it_b = cL loc $ BodyStmt noExt (rn_expr)
+              no_it_b = cL loc $ BodyStmt noExtField (rn_expr)
                                        (mkRnSyntaxExpr thenIOName)
                                        noSyntaxExpr
 
-              no_it_c = cL loc $ BodyStmt noExt
+              no_it_c = cL loc $ BodyStmt noExtField
                                       (nlHsApp (nlHsVar interPrintName) rn_expr)
                                       (mkRnSyntaxExpr thenIOName)
                                       noSyntaxExpr
@@ -2230,7 +2230,7 @@ tcUserStmt rdr_stmt@(dL->L loc _)
            ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
            ; return stuff }
       where
-        print_v  = cL loc $ BodyStmt noExt (nlHsApp (nlHsVar printName)
+        print_v  = cL loc $ BodyStmt noExtField (nlHsApp (nlHsVar printName)
                                     (nlHsVar v))
                                     (mkRnSyntaxExpr thenIOName) noSyntaxExpr
 
@@ -2317,14 +2317,14 @@ getGhciStepIO = do
 
         step_ty = noLoc $ HsForAllTy
                      { hst_fvf = ForallInvis
-                     , hst_bndrs = [noLoc $ UserTyVar noExt (noLoc a_tv)]
-                     , hst_xforall = noExt
+                     , hst_bndrs = [noLoc $ UserTyVar noExtField (noLoc a_tv)]
+                     , hst_xforall = noExtField
                      , hst_body  = nlHsFunTy ghciM ioM }
 
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
 
-    return (noLoc $ ExprWithTySig noExt (nlHsVar ghciStepIoMName) stepTy)
+    return (noLoc $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)
 isGHCiMonad hsc_env ty

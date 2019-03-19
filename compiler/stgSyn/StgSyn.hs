@@ -25,7 +25,7 @@ module StgSyn (
         GenStgAlt, AltType(..),
 
         StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
-        NoExtSilent, noExtSilent,
+        NoExtFieldSilent, noExtFieldSilent,
         OutputablePass,
 
         UpdateFlag(..), isUpdatable,
@@ -450,19 +450,19 @@ data StgPass
   | LiftLams
   | CodeGen
 
--- | Like 'HsExpression.NoExt', but with an 'Outputable' instance that returns
--- 'empty'.
-data NoExtSilent = NoExtSilent
+-- | Like 'HsExtension.NoExtField', but with an 'Outputable' instance that
+-- returns 'empty'.
+data NoExtFieldSilent = NoExtFieldSilent
   deriving (Data, Eq, Ord)
 
-instance Outputable NoExtSilent where
+instance Outputable NoExtFieldSilent where
   ppr _ = empty
 
 -- | Used when constructing a term with an unused extension point that should
 -- not appear in pretty-printed output at all.
-noExtSilent :: NoExtSilent
-noExtSilent = NoExtSilent
--- TODO: Maybe move this to HsExtensions? I'm not sure about the implications
+noExtFieldSilent :: NoExtFieldSilent
+noExtFieldSilent = NoExtFieldSilent
+-- TODO: Maybe move this to HsExtension? I'm not sure about the implications
 -- on build time...
 
 -- TODO: Do we really want to the extension point type families to have a closed
@@ -472,17 +472,17 @@ type instance BinderP 'Vanilla = Id
 type instance BinderP 'CodeGen = Id
 
 type family XRhsClosure (pass :: StgPass)
-type instance XRhsClosure 'Vanilla = NoExtSilent
+type instance XRhsClosure 'Vanilla = NoExtFieldSilent
 -- | Code gen needs to track non-global free vars
 type instance XRhsClosure 'CodeGen = DIdSet
 
 type family XLet (pass :: StgPass)
-type instance XLet 'Vanilla = NoExtSilent
-type instance XLet 'CodeGen = NoExtSilent
+type instance XLet 'Vanilla = NoExtFieldSilent
+type instance XLet 'CodeGen = NoExtFieldSilent
 
 type family XLetNoEscape (pass :: StgPass)
-type instance XLetNoEscape 'Vanilla = NoExtSilent
-type instance XLetNoEscape 'CodeGen = NoExtSilent
+type instance XLetNoEscape 'Vanilla = NoExtFieldSilent
+type instance XLetNoEscape 'CodeGen = NoExtFieldSilent
 
 stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ bndrs _)

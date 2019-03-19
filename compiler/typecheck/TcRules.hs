@@ -66,10 +66,10 @@ tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTcId)
 tcRuleDecls (HsRules { rds_src = src
                      , rds_rules = decls })
    = do { tc_decls <- mapM (wrapLocM tcRule) decls
-        ; return $ HsRules { rds_ext   = noExt
+        ; return $ HsRules { rds_ext   = noExtField
                            , rds_src   = src
                            , rds_rules = tc_decls } }
-tcRuleDecls (XRuleDecls _) = panic "tcRuleDecls"
+tcRuleDecls (XRuleDecls nec) = noExtCon nec
 
 tcRule :: RuleDecl GhcRn -> TcM (RuleDecl GhcTcId)
 tcRule (HsRule { rd_ext  = ext
@@ -141,10 +141,11 @@ tcRule (HsRule { rd_ext  = ext
                          , rd_name = rname
                          , rd_act = act
                          , rd_tyvs = ty_bndrs -- preserved for ppr-ing
-                         , rd_tmvs = map (noLoc . RuleBndr noExt . noLoc) (all_qtkvs ++ tpl_ids)
+                         , rd_tmvs = map (noLoc . RuleBndr noExtField . noLoc)
+                                         (all_qtkvs ++ tpl_ids)
                          , rd_lhs  = mkHsDictLet lhs_binds lhs'
                          , rd_rhs  = mkHsDictLet rhs_binds rhs' } }
-tcRule (XRuleDecl _) = panic "tcRule"
+tcRule (XRuleDecl nec) = noExtCon nec
 
 generateRuleConstraints :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]
                         -> LHsExpr GhcRn -> LHsExpr GhcRn
@@ -203,7 +204,7 @@ tcRuleTmBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
         ; (tyvars, tmvars) <- tcExtendNameTyVarEnv tvs $
                                    tcRuleTmBndrs rule_bndrs
         ; return (map snd tvs ++ tyvars, id : tmvars) }
-tcRuleTmBndrs (L _ (XRuleBndr _) : _) = panic "tcRuleTmBndrs"
+tcRuleTmBndrs (L _ (XRuleBndr nec) : _) = noExtCon nec
 
 ruleCtxt :: FastString -> SDoc
 ruleCtxt name = text "When checking the transformation rule" <+>

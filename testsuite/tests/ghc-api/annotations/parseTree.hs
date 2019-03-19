@@ -52,9 +52,9 @@ testOneFile libdir fileName = do
 
      doLHsTupArg :: LHsTupArg GhcPs -> [(SrcSpan,String,HsExpr GhcPs)]
      doLHsTupArg (L l arg@(Present {}))
-                                = [(l,"p",ExplicitTuple noExt [L l arg] Boxed)]
+                                = [(l,"p",ExplicitTuple noExtField [L l arg] Boxed)]
      doLHsTupArg (L l arg@(Missing {}))
-                                = [(l,"m",ExplicitTuple noExt [L l arg] Boxed)]
+                                = [(l,"m",ExplicitTuple noExtField [L l arg] Boxed)]
 
 
 showAnns anns = "[\n" ++ (intercalate "\n"

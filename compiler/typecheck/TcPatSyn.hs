@@ -102,7 +102,7 @@ recoverPSB (PSB { psb_id = (dL->L _ name)
          matcher_id = mkLocalId matcher_name $
                       mkSpecForAllTys [alphaTyVar] alphaTy
 
-recoverPSB (XPatSynBind {}) = panic "recoverPSB"
+recoverPSB (XPatSynBind nec) = noExtCon nec
 
 {- Note [Pattern synonym error recovery]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -187,7 +187,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(dL->L _ name), psb_args = details
                             , mkTyVarTys ex_tvs, prov_theta, prov_evs)
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields } }
-tcInferPatSynDecl (XPatSynBind _) = panic "tcInferPatSynDecl"
+tcInferPatSynDecl (XPatSynBind nec) = noExtCon nec
 
 mkProvEvidence :: EvId -> Maybe (PredType, EvTerm)
 -- See Note [Equality evidence in pattern synonyms]
@@ -434,7 +434,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(dL->L _ name), psb_args = details
                 -- Why do we need tcSubType here?
                 -- See Note [Pattern synonyms and higher rank types]
            ; return (mkLHsWrap wrap $ nlHsVar arg_id) }
-tcCheckPatSynDecl (XPatSynBind _) _ = panic "tcCheckPatSynDecl"
+tcCheckPatSynDecl (XPatSynBind nec) _ = noExtCon nec
 
 {- [Pattern synonyms and higher rank types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -726,13 +726,13 @@ tcPatSynMatcher (dL->L loc name) lpat
                            mkHsCaseAlt lwpat fail']
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     cL (getLoc lpat) $
-                    HsCase noExt (nlHsVar scrutinee) $
+                    HsCase noExtField (nlHsVar scrutinee) $
                     MG{ mg_alts = cL (getLoc lpat) cases
                       , mg_ext = MatchGroupTc [pat_ty] res_ty
                       , mg_origin = Generated
                       }
              body' = noLoc $
-                     HsLam noExt $
+                     HsLam noExtField $
                      MG{ mg_alts = noLoc [mkSimpleMatch LambdaExpr
                                                         args body]
                        , mg_ext = MatchGroupTc [pat_ty, cont_ty, fail_ty] res_ty
@@ -741,7 +741,7 @@ tcPatSynMatcher (dL->L loc name) lpat
              match = mkMatch (mkPrefixFunRhs (cL loc name)) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                                        req_dicts body')
-                             (noLoc (EmptyLocalBinds noExt))
+                             (noLoc (EmptyLocalBinds noExtField))
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
              mg = MG{ mg_alts = cL (getLoc match) [match]
                     , mg_ext = MatchGroupTc [] res_ty
@@ -863,11 +863,11 @@ tcPatSynBuilderBind (PSB { psb_id = (dL->L loc name)
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup Generated [builder_match]
           where
-            builder_args  = [cL loc (VarPat noExt (cL loc n))
+            builder_args  = [cL loc (VarPat noExtField (cL loc n))
                             | (dL->L loc n) <- args]
             builder_match = mkMatch (mkPrefixFunRhs (cL loc name))
                                     builder_args body
-                                    (noLoc (EmptyLocalBinds noExt))
+                                    (noLoc (EmptyLocalBinds noExtField))
 
     args = case details of
               PrefixCon args     -> args
@@ -882,13 +882,13 @@ tcPatSynBuilderBind (PSB { psb_id = (dL->L loc name)
       = mg { mg_alts = cL l [cL loc (match { m_pats = nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
-tcPatSynBuilderBind (XPatSynBind _) = panic "tcPatSynBuilderBind"
+tcPatSynBuilderBind (XPatSynBind nec) = noExtCon nec
 
 tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTcId, TcSigmaType)
 -- monadic only for failure
 tcPatSynBuilderOcc ps
   | Just (builder_id, add_void_arg) <- builder
-  , let builder_expr = HsConLikeOut noExt (PatSynCon ps)
+  , let builder_expr = HsConLikeOut noExtField (PatSynCon ps)
         builder_ty   = idType builder_id
   = return $
     if add_void_arg
@@ -927,14 +927,14 @@ tcPatToExpr name args pat = go pat
                     -> Either MsgDoc (HsExpr GhcRn)
     mkPrefixConExpr lcon@(dL->L loc _) pats
       = do { exprs <- mapM go pats
-           ; return (foldl' (\x y -> HsApp noExt (cL loc x) y)
-                            (HsVar noExt lcon) exprs) }
+           ; return (foldl' (\x y -> HsApp noExtField (cL loc x) y)
+                            (HsVar noExtField lcon) exprs) }
 
     mkRecordConExpr :: Located Name -> HsRecFields GhcRn (LPat GhcRn)
                     -> Either MsgDoc (HsExpr GhcRn)
     mkRecordConExpr con fields
       = do { exprFields <- mapM go fields
-           ; return (RecordCon noExt con exprFields) }
+           ; return (RecordCon noExtField con exprFields) }
 
     go :: LPat GhcRn -> Either MsgDoc (LHsExpr GhcRn)
     go (dL->L loc p) = cL loc <$> go1 p
@@ -951,27 +951,27 @@ tcPatToExpr name args pat = go pat
 
     go1 (VarPat _ (dL->L l var))
         | var `elemNameSet` lhsVars
-        = return $ HsVar noExt (cL l var)
+        = return $ HsVar noExtField (cL l var)
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
-    go1 (ParPat _ pat)          = fmap (HsPar noExt) $ go pat
+    go1 (ParPat _ pat)          = fmap (HsPar noExtField) $ go pat
     go1 p@(ListPat reb pats)
       | Nothing <- reb = do { exprs <- mapM go pats
-                            ; return $ ExplicitList noExt Nothing exprs }
+                            ; return $ ExplicitList noExtField Nothing exprs }
       | otherwise                   = notInvertibleListPat p
     go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
-                                         ; return $ ExplicitTuple noExt
-                                           (map (noLoc . (Present noExt)) exprs)
+                                         ; return $ ExplicitTuple noExtField
+                                           (map (noLoc . (Present noExtField)) exprs)
                                                                            box }
     go1 (SumPat _ pat alt arity)    = do { expr <- go1 (unLoc pat)
-                                         ; return $ ExplicitSum noExt alt arity
+                                         ; return $ ExplicitSum noExtField alt arity
                                                                    (noLoc expr)
                                          }
-    go1 (LitPat _ lit)              = return $ HsLit noExt lit
+    go1 (LitPat _ lit)              = return $ HsLit noExtField lit
     go1 (NPat _ (dL->L _ n) mb_neg _)
         | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg
-                                                     [noLoc (HsOverLit noExt n)]
-        | otherwise                 = return $ HsOverLit noExt n
+                                                     [noLoc (HsOverLit noExtField n)]
+        | otherwise                 = return $ HsOverLit noExtField n
     go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
     go1 (CoPat{})                   = panic "CoPat in output of renamer"
     go1 (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))

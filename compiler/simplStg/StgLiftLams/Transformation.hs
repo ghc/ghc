@@ -107,12 +107,12 @@ liftRhs mb_former_fvs rhs@(StgRhsCon ccs con args)
 liftRhs Nothing (StgRhsClosure _ ccs upd infos body) = do
   -- This RHS wasn't lifted.
   withSubstBndrs (map binderInfoBndr infos) $ \bndrs' ->
-    StgRhsClosure noExtSilent ccs upd bndrs' <$> liftExpr body
+    StgRhsClosure noExtFieldSilent ccs upd bndrs' <$> liftExpr body
 liftRhs (Just former_fvs) (StgRhsClosure _ ccs upd infos body) = do
   -- This RHS was lifted. Insert extra binders for @former_fvs@.
   withSubstBndrs (map binderInfoBndr infos) $ \bndrs' -> do
     let bndrs'' = dVarSetElems former_fvs ++ bndrs'
-    StgRhsClosure noExtSilent ccs upd bndrs'' <$> liftExpr body
+    StgRhsClosure noExtFieldSilent ccs upd bndrs'' <$> liftExpr body
 
 liftArgs :: InStgArg -> LiftM OutStgArg
 liftArgs a@(StgLitArg _) = pure a
@@ -142,13 +142,13 @@ liftExpr (StgLet scope bind body)
       body' <- liftExpr body
       case mb_bind' of
         Nothing -> pure body' -- withLiftedBindPairs decided to lift it and already added floats
-        Just bind' -> pure (StgLet noExtSilent bind' body')
+        Just bind' -> pure (StgLet noExtFieldSilent bind' body')
 liftExpr (StgLetNoEscape scope bind body)
   = withLiftedBind NotTopLevel bind scope $ \mb_bind' -> do
       body' <- liftExpr body
       case mb_bind' of
         Nothing -> pprPanic "stgLiftLams" (text "Should never decide to lift LNEs")
-        Just bind' -> pure (StgLetNoEscape noExtSilent bind' body')
+        Just bind' -> pure (StgLetNoEscape noExtFieldSilent bind' body')
 
 liftAlt :: LlStgAlt -> LiftM OutStgAlt
 liftAlt (con, infos, rhs) = withSubstBndrs (map binderInfoBndr infos) $ \bndrs' ->
