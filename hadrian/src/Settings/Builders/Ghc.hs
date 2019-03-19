@@ -99,10 +99,9 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                 [ arg "-dynamic"
                 -- TODO what about windows?
                 , isLibrary pkg ? pure [ "-shared", "-dynload", "deploy" ]
-                , hostSupportsRPaths ? pure
-                    [ "-optl-Wl,-rpath," ++ rpath
-                    , "-optl-Wl,-zorigin"
-                    ]
+                , hostSupportsRPaths ? arg ("-optl-Wl,-rpath," ++ rpath)
+                -- The darwin linker doesn't support/require the -zorigin option
+                , hostSupportsRPaths ? not darwin ? arg "-optl-Wl,-zorigin"
                 ]
             , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
