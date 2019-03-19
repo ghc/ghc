@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 6d19c3adc1f5c28c82aed8c5b1ac40931ac60f3f
+  DOCKER_REV: 7cbd823abe7eddd9c52a2e93062035b1c863605f
 
 before_script:
   - python3 .gitlab/fix-submodules.py
