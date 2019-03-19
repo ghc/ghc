@@ -448,7 +448,7 @@ gen_Ord_binds loc tycon = do
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
       where
         tag     = get_tag data_con
-        tag_lit = noLoc (HsLit noExt (HsIntPrim NoSourceText (toInteger tag)))
+        tag_lit = noLoc (HsLit noExtField (HsIntPrim NoSourceText (toInteger tag)))
 
     mkInnerEqAlt :: OrdOp -> DataCon -> LMatch GhcPs (LHsExpr GhcPs)
     -- First argument 'a' known to be built with K
@@ -615,7 +615,7 @@ gen_Enum_binds loc tycon = do
              (nlHsApp (nlHsVar (tag2con_RDR dflags tycon))
                       (nlHsApps plus_RDR
                             [ nlHsVarApps intDataCon_RDR [ah_RDR]
-                            , nlHsLit (HsInt noExt
+                            , nlHsLit (HsInt noExtField
                                                 (mkIntegralLit (-1 :: Int)))]))
 
     to_enum dflags
@@ -776,7 +776,7 @@ gen_Ix_binds loc tycon = do
 
     enum_index dflags
       = mk_easy_FunBind loc unsafeIndex_RDR
-                [noLoc (AsPat noExt (noLoc c_RDR)
+                [noLoc (AsPat noExtField (noLoc c_RDR)
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
            untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
@@ -1148,7 +1148,7 @@ gen_Show_binds get_fixity loc tycon
       | otherwise   =
          ([a_Pat, con_pat],
           showParen_Expr (genOpApp a_Expr ge_RDR (nlHsLit
-                         (HsInt noExt (mkIntegralLit con_prec_plus_one))))
+                         (HsInt noExtField (mkIntegralLit con_prec_plus_one))))
                          (nlHsPar (nested_compose_Expr show_thingies)))
         where
              data_con_RDR  = getRdrName data_con
@@ -1241,7 +1241,7 @@ mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString st
 -- | showsPrec :: Show a => Int -> a -> ShowS
 mk_showsPrec_app :: Integer -> LHsExpr GhcPs -> LHsExpr GhcPs
 mk_showsPrec_app p x
-  = nlHsApps showsPrec_RDR [nlHsLit (HsInt noExt (mkIntegralLit p)), x]
+  = nlHsApps showsPrec_RDR [nlHsLit (HsInt noExtField (mkIntegralLit p)), x]
 
 -- | shows :: Show a => a -> ShowS
 mk_shows_app :: LHsExpr GhcPs -> LHsExpr GhcPs
@@ -1338,7 +1338,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
     genDataTyCon :: DerivStuff
     genDataTyCon        --  $dT
       = DerivHsBind (mkHsVarBind loc data_type_name rhs,
-                     L loc (TypeSig noExt [L loc data_type_name] sig_ty))
+                     L loc (TypeSig noExtField [L loc data_type_name] sig_ty))
 
     sig_ty = mkLHsSigWcType (nlHsTyVar dataType_RDR)
     rhs    = nlHsVar mkDataType_RDR
@@ -1348,7 +1348,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
     genDataDataCon :: DataCon -> RdrName -> DerivStuff
     genDataDataCon dc constr_name       --  $cT1 etc
       = DerivHsBind (mkHsVarBind loc constr_name rhs,
-                     L loc (TypeSig noExt [L loc constr_name] sig_ty))
+                     L loc (TypeSig noExtField [L loc constr_name] sig_ty))
       where
         sig_ty   = mkLHsSigWcType (nlHsTyVar constr_RDR)
         rhs      = nlHsApps mkConstr_RDR constr_args
@@ -1573,8 +1573,8 @@ gen_Lift_binds loc tycon = (listToBag [lift_bind, liftTyped_bind], emptyBag)
     liftTyped_bind = mkFunBindEC 1 loc liftTyped_RDR (nlHsApp pure_Expr)
                                  (map (pats_etc mk_texp) data_cons)
 
-    mk_exp = ExpBr NoExt
-    mk_texp = TExpBr NoExt
+    mk_exp = ExpBr noExtField
+    mk_texp = TExpBr noExtField
     data_cons = tyConDataCons tycon
 
     pats_etc mk_bracket data_con
@@ -1584,7 +1584,7 @@ gen_Lift_binds loc tycon = (listToBag [lift_bind, liftTyped_bind], emptyBag)
             data_con_RDR = getRdrName data_con
             con_arity    = dataConSourceArity data_con
             as_needed    = take con_arity as_RDRs
-            lift_Expr    = noLoc (HsBracket NoExt (mk_bracket br_body))
+            lift_Expr    = noLoc (HsBracket noExtField (mk_bracket br_body))
             br_body      = nlHsApps (Exact (dataConName data_con))
                                     (map nlHsVar as_needed)
 
@@ -1861,12 +1861,12 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
     underlying_inst_tys = changeLast inst_tys rhs_ty
 
 nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlHsAppType e s = noLoc (HsAppType noExt e hs_ty)
+nlHsAppType e s = noLoc (HsAppType noExtField e hs_ty)
   where
     hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec (typeToLHsType s)
 
 nlExprWithTySig :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlExprWithTySig e s = noLoc $ ExprWithTySig noExt (parenthesizeHsExpr sigPrec e) hs_ty
+nlExprWithTySig e s = noLoc $ ExprWithTySig noExtField (parenthesizeHsExpr sigPrec e) hs_ty
   where
     hs_ty = mkLHsSigWcType (typeToLHsType s)
 
@@ -1916,7 +1916,7 @@ genAuxBindSpec :: DynFlags -> SrcSpan -> AuxBindSpec
                   -> (LHsBind GhcPs, LSig GhcPs)
 genAuxBindSpec dflags loc (DerivCon2Tag tycon)
   = (mkFunBindSE 0 loc rdr_name eqns,
-     L loc (TypeSig noExt [L loc rdr_name] sig_ty))
+     L loc (TypeSig noExtField [L loc rdr_name] sig_ty))
   where
     rdr_name = con2tag_RDR dflags tycon
 
@@ -1942,7 +1942,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
   = (mkFunBindSE 0 loc rdr_name
         [([nlConVarPat intDataCon_RDR [a_RDR]],
            nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
-     L loc (TypeSig noExt [L loc rdr_name] sig_ty))
+     L loc (TypeSig noExtField [L loc rdr_name] sig_ty))
   where
     sig_ty = mkLHsSigWcType $ L loc $
              XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
@@ -1952,7 +1952,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
 
 genAuxBindSpec dflags loc (DerivMaxTag tycon)
   = (mkHsVarBind loc rdr_name rhs,
-     L loc (TypeSig noExt [L loc rdr_name] sig_ty))
+     L loc (TypeSig noExtField [L loc rdr_name] sig_ty))
   where
     rdr_name = maxtag_RDR dflags tycon
     sig_ty = mkLHsSigWcType (L loc (XHsType (NHsCoreTy intTy)))

@@ -644,8 +644,8 @@ coreToStgLet bind body = do
 
         -- Compute the new let-expression
     let
-        new_let | isJoinBind bind = StgLetNoEscape noExtSilent bind2 body2
-                | otherwise       = StgLet noExtSilent bind2 body2
+        new_let | isJoinBind bind = StgLetNoEscape noExtFieldSilent bind2 body2
+                | otherwise       = StgLet noExtFieldSilent bind2 body2
 
     return new_let
   where
@@ -688,7 +688,7 @@ mkTopStgRhs :: DynFlags -> Module -> CollectedCCs
 mkTopStgRhs dflags this_mod ccs bndr rhs
   | StgLam bndrs body <- rhs
   = -- StgLam can't have empty arguments, so not CAF
-    ( StgRhsClosure noExtSilent
+    ( StgRhsClosure noExtFieldSilent
                     dontCareCCS
                     ReEntrant
                     (toList bndrs) body
@@ -704,13 +704,13 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | gopt Opt_AutoSccsOnIndividualCafs dflags
-  = ( StgRhsClosure noExtSilent
+  = ( StgRhsClosure noExtFieldSilent
                     caf_ccs
                     upd_flag [] rhs
     , collectCC caf_cc caf_ccs ccs )
 
   | otherwise
-  = ( StgRhsClosure noExtSilent
+  = ( StgRhsClosure noExtFieldSilent
                     all_cafs_ccs
                     upd_flag [] rhs
     , ccs )
@@ -738,14 +738,14 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
 mkStgRhs :: Id -> StgExpr -> StgRhs
 mkStgRhs bndr rhs
   | StgLam bndrs body <- rhs
-  = StgRhsClosure noExtSilent
+  = StgRhsClosure noExtFieldSilent
                   currentCCS
                   ReEntrant
                   (toList bndrs) body
 
   | isJoinId bndr -- must be a nullary join point
   = ASSERT(idJoinArity bndr == 0)
-    StgRhsClosure noExtSilent
+    StgRhsClosure noExtFieldSilent
                   currentCCS
                   ReEntrant -- ignored for LNE
                   [] rhs
@@ -754,7 +754,7 @@ mkStgRhs bndr rhs
   = StgRhsCon currentCCS con args
 
   | otherwise
-  = StgRhsClosure noExtSilent
+  = StgRhsClosure noExtFieldSilent
                   currentCCS
                   upd_flag [] rhs
   where

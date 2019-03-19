@@ -384,7 +384,7 @@ rnLPatAndThen :: NameMaker -> LPat GhcPs -> CpsRn (LPat GhcRn)
 rnLPatAndThen nm lpat = wrapSrcSpanCps (rnPatAndThen nm) lpat
 
 rnPatAndThen :: NameMaker -> Pat GhcPs -> CpsRn (Pat GhcRn)
-rnPatAndThen _  (WildPat _)   = return (WildPat noExt)
+rnPatAndThen _  (WildPat _)   = return (WildPat noExtField)
 rnPatAndThen mk (ParPat x pat)  = do { pat' <- rnLPatAndThen mk pat
                                      ; return (ParPat x pat') }
 rnPatAndThen mk (LazyPat x pat) = do { pat' <- rnLPatAndThen mk pat
@@ -471,7 +471,7 @@ rnPatAndThen mk (ConPatIn con stuff)
    -- The pattern for the empty list needs to be replaced by an empty explicit list pattern when overloaded lists is turned on.
   = case unLoc con == nameRdrName (dataConName nilDataCon) of
       True    -> do { ol_flag <- liftCps $ xoptM LangExt.OverloadedLists
-                    ; if ol_flag then rnPatAndThen mk (ListPat noExt [])
+                    ; if ol_flag then rnPatAndThen mk (ListPat noExtField [])
                                  else rnConPatAndThen mk con stuff}
       False   -> rnConPatAndThen mk con stuff
 
@@ -548,7 +548,7 @@ rnHsRecPatsAndThen mk (dL->L _ con)
        ; check_unused_wildcard (implicit_binders flds' <$> dd)
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where
-    mkVarPat l n = VarPat noExt (cL l n)
+    mkVarPat l n = VarPat noExtField (cL l n)
     rn_field (dL->L l fld, n') =
       do { arg' <- rnLPatAndThen (nested_mk dd mk n') (hsRecFieldArg fld)
          ; return (cL l (fld { hsRecFieldArg = arg' })) }
@@ -747,7 +747,7 @@ rnHsRecUpdFields flds
                      then do { checkErr pun_ok (badPun (cL loc lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
-                             ; return (cL loc (HsVar noExt (cL loc arg_rdr))) }
+                             ; return (cL loc (HsVar noExtField (cL loc arg_rdr))) }
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
@@ -757,10 +757,10 @@ rnHsRecUpdFields flds
                           Right _       -> fvs
                  lbl' = case sel of
                           Left sel_name ->
-                                     cL loc (Unambiguous sel_name  (cL loc lbl))
+                                     cL loc (Unambiguous sel_name   (cL loc lbl))
                           Right [sel_name] ->
-                                     cL loc (Unambiguous sel_name  (cL loc lbl))
-                          Right _ -> cL loc (Ambiguous   noExt     (cL loc lbl))
+                                     cL loc (Unambiguous sel_name   (cL loc lbl))
+                          Right _ -> cL loc (Ambiguous   noExtField (cL loc lbl))
 
            ; return (cL l (HsRecField { hsRecFieldLbl = lbl'
                                       , hsRecFieldArg = arg''

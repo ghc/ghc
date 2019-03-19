@@ -1252,7 +1252,7 @@ runStmt input step = do
     mk_stmt :: SrcSpan -> HsBind GhcPs -> GhciLStmt GhcPs
     mk_stmt loc bind =
       let l = L loc
-      in l (LetStmt noExt (l (HsValBinds noExt (ValBinds noExt (unitBag (l bind)) []))))
+      in l (LetStmt noExtField (l (HsValBinds noExtField (ValBinds noExtField (unitBag (l bind)) []))))
 
 -- | Clean up the GHCi environment after a statement has run
 afterRunStmt :: GhciMonad m
@@ -1662,7 +1662,7 @@ defineMacro overwrite s = do
           body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
                                      `mkHsApp` (nlHsPar expr)
           tySig = mkLHsSigWcType (stringTy `nlHsFunTy` ioM)
-          new_expr = L (getLoc expr) $ ExprWithTySig noExt body tySig
+          new_expr = L (getLoc expr) $ ExprWithTySig noExtField body tySig
       hv <- GHC.compileParsedExprRemote new_expr
 
       let newCmd = Command { cmdName = macro_name
@@ -1730,7 +1730,7 @@ getGhciStepIO = do
       ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)
       tySig = mkLHsSigWcType (ghciM `nlHsFunTy` ioM)
-  return $ noLoc $ ExprWithTySig noExt body tySig
+  return $ noLoc $ ExprWithTySig noExtField body tySig
 
 -----------------------------------------------------------------------------
 -- :check

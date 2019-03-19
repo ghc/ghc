@@ -263,7 +263,7 @@ Running generateModules from #14693 with DEPTH=16, WIDTH=30 finishes in
 rnImportDecl  :: Module -> LImportDecl GhcPs
              -> RnM (LImportDecl GhcRn, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImportDecl this_mod
-             (L loc decl@(ImportDecl { ideclExt = noExt
+             (L loc decl@(ImportDecl { ideclExt = noExtField
                                      , ideclName = loc_imp_mod_name
                                      , ideclPkgQual = mb_pkg
                                      , ideclSource = want_boot, ideclSafe = mod_safe
@@ -376,11 +376,11 @@ rnImportDecl this_mod
           _           -> return ()
      )
 
-    let new_imp_decl = L loc (decl { ideclExt = noExt, ideclSafe = mod_safe'
+    let new_imp_decl = L loc (decl { ideclExt = noExtField, ideclSafe = mod_safe'
                                    , ideclHiding = new_imp_details })
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
-rnImportDecl _ (L _ (XImportDecl _)) = panic "rnImportDecl"
+rnImportDecl _ (L _ (XImportDecl nec)) = noExtCon nec
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
@@ -723,7 +723,7 @@ getLocalNonValBinders fixity_env
           = expectJust "getLocalNonValBinders/find_con_decl_fld" $
               find (\ fl -> flLabel fl == lbl) flds
           where lbl = occNameFS (rdrNameOcc rdr)
-        find_con_decl_fld (L _ (XFieldOcc _)) = panic "getLocalNonValBinders"
+        find_con_decl_fld (L _ (XFieldOcc nec)) = noExtCon nec
 
     new_assoc :: Bool -> LInstDecl GhcPs
               -> RnM ([AvailInfo], [(Name, [FieldLabel])])
@@ -759,8 +759,8 @@ getLocalNonValBinders fixity_env
                (avails, fldss)
                  <- mapAndUnzipM (new_loc_di overload_ok (Just cls_nm)) adts
                pure (avails, concat fldss)
-    new_assoc _ (L _ (ClsInstD _ (XClsInstDecl _))) = panic "new_assoc"
-    new_assoc _ (L _ (XInstDecl _))                 = panic "new_assoc"
+    new_assoc _ (L _ (ClsInstD _ (XClsInstDecl nec))) = noExtCon nec
+    new_assoc _ (L _ (XInstDecl nec))                 = noExtCon nec
 
     new_di :: Bool -> Maybe Name -> DataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
@@ -774,16 +774,16 @@ getLocalNonValBinders fixity_env
                                   -- main_name is not bound here!
                    fld_env  = mk_fld_env (feqn_rhs ti_decl) sub_names flds'
              ; return (avail, fld_env) }
-    new_di _ _ (DataFamInstDecl (XHsImplicitBndrs _)) = panic "new_di"
+    new_di _ _ (DataFamInstDecl (XHsImplicitBndrs nec)) = noExtCon nec
 
     new_loc_di :: Bool -> Maybe Name -> LDataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
     new_loc_di overload_ok mb_cls (L _ d) = new_di overload_ok mb_cls d
-getLocalNonValBinders _ (XHsGroup _) = panic "getLocalNonValBinders"
+getLocalNonValBinders _ (XHsGroup nec) = noExtCon nec
 
 newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
-newRecordSelector _ _ (L _ (XFieldOcc _)) = panic "newRecordSelector"
+newRecordSelector _ _ (L _ (XFieldOcc nec)) = noExtCon nec
 newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
   = do { selName <- newTopSrcBinder $ L loc $ field
        ; return $ qualFieldLbl { flSelector = selName } }
@@ -966,7 +966,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
       case ie of
         IEVar _ (L l n) -> do
             (name, avail, _) <- lookup_name ie $ ieWrappedName n
-            return ([(IEVar noExt (L l (replaceWrappedName n name)),
+            return ([(IEVar noExtField (L l (replaceWrappedName n name)),
                                                   trimAvail avail name)], [])
 
         IEThingAll _ (L l tc) -> do
@@ -985,7 +985,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                             | otherwise
                             -> []
 
-                renamed_ie = IEThingAll noExt (L l (replaceWrappedName tc name))
+                renamed_ie = IEThingAll noExtField (L l (replaceWrappedName tc name))
                 sub_avails = case avail of
                                Avail {}              -> []
                                AvailTC name2 subs fs -> [(renamed_ie, AvailTC name2 (subs \\ [name]) fs)]
@@ -1014,7 +1014,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
         IEThingWith xt ltc@(L l rdr_tc) wc rdr_ns rdr_fs ->
           ASSERT2(null rdr_fs, ppr rdr_fs) do
            (name, avail, mb_parent)
-               <- lookup_name (IEThingAbs noExt ltc) (ieWrappedName rdr_tc)
+               <- lookup_name (IEThingAbs noExtField ltc) (ieWrappedName rdr_tc)
 
            let (ns,subflds) = case avail of
                                 AvailTC _ ns' subflds' -> (ns',subflds')
@@ -1038,7 +1038,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                case mb_parent of
                  -- non-associated ty/cls
                  Nothing
-                   -> return ([(IEThingWith noExt (L l name') wc childnames'
+                   -> return ([(IEThingWith noExtField (L l name') wc childnames'
                                                                  childflds,
                                AvailTC name (name:map unLoc childnames) (map unLoc childflds))],
                               [])
@@ -1047,10 +1047,10 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                          -- childnames' = postrn_ies childnames
                  -- associated ty
                  Just parent
-                   -> return ([(IEThingWith noExt (L l name') wc childnames'
+                   -> return ([(IEThingWith noExtField (L l name') wc childnames'
                                                            childflds,
                                 AvailTC name (map unLoc childnames) (map unLoc childflds)),
-                               (IEThingWith noExt (L l name') wc childnames'
+                               (IEThingWith noExtField (L l name') wc childnames'
                                                            childflds,
                                 AvailTC parent [name] [])],
                               [])
@@ -1063,9 +1063,9 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
 
       where
         mkIEThingAbs tc l (n, av, Nothing    )
-          = (IEThingAbs noExt (L l (replaceWrappedName tc n)), trimAvail av n)
+          = (IEThingAbs noExtField (L l (replaceWrappedName tc n)), trimAvail av n)
         mkIEThingAbs tc l (n, _,  Just parent)
-          = (IEThingAbs noExt (L l (replaceWrappedName tc n))
+          = (IEThingAbs noExtField (L l (replaceWrappedName tc n))
              , AvailTC parent [n] [])
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
@@ -1394,7 +1394,7 @@ findImportUsage imports used_gres
        -- If you use 'signum' from Num, then the user may well have
        -- imported Num(signum).  We don't want to complain that
        -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
-    unused_decl (L _ (XImportDecl _)) = panic "unused_decl"
+    unused_decl (L _ (XImportDecl nec)) = noExtCon nec
 
 
 {- Note [The ImportMap]
@@ -1535,25 +1535,25 @@ getMinimalImports = mapM mk_minimal
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
     to_ie _ (Avail n)
-       = [IEVar noExt (to_ie_post_rn $ noLoc n)]
+       = [IEVar noExtField (to_ie_post_rn $ noLoc n)]
     to_ie _ (AvailTC n [m] [])
-       | n==m = [IEThingAbs noExt (to_ie_post_rn $ noLoc n)]
+       | n==m = [IEThingAbs noExtField (to_ie_post_rn $ noLoc n)]
     to_ie iface (AvailTC n ns fs)
       = case [(xs,gs) |  AvailTC x xs gs <- mi_exports iface
                  , x == n
                  , x `elem` xs    -- Note [Partial export]
                  ] of
-           [xs] | all_used xs -> [IEThingAll noExt (to_ie_post_rn $ noLoc n)]
+           [xs] | all_used xs -> [IEThingAll noExtField (to_ie_post_rn $ noLoc n)]
                 | otherwise   ->
-                   [IEThingWith noExt (to_ie_post_rn $ noLoc n) NoIEWildcard
+                   [IEThingWith noExtField (to_ie_post_rn $ noLoc n) NoIEWildcard
                                 (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
                                 (map noLoc fs)]
                                           -- Note [Overloaded field import]
            _other | all_non_overloaded fs
-                           -> map (IEVar noExt . to_ie_post_rn_var . noLoc) $ ns
+                           -> map (IEVar noExtField . to_ie_post_rn_var . noLoc) $ ns
                                  ++ map flSelector fs
                   | otherwise ->
-                      [IEThingWith noExt (to_ie_post_rn $ noLoc n) NoIEWildcard
+                      [IEThingWith noExtField (to_ie_post_rn $ noLoc n) NoIEWildcard
                                 (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
                                 (map noLoc fs)]
         where
@@ -1718,7 +1718,7 @@ dodgyMsg kind tc ie
           text "but it has none" ]
 
 dodgyMsgInsert :: forall p . IdP (GhcPass p) -> IE (GhcPass p)
-dodgyMsgInsert tc = IEThingAll noExt ii
+dodgyMsgInsert tc = IEThingAll noExtField ii
   where
     ii :: LIEWrappedName (IdP (GhcPass p))
     ii = noLoc (IEName $ noLoc tc)

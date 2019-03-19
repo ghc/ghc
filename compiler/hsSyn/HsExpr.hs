@@ -110,13 +110,14 @@ data SyntaxExpr p = SyntaxExpr { syn_expr      :: HsExpr p
 -- | This is used for rebindable-syntax pieces that are too polymorphic
 -- for tcSyntaxOp (trS_fmap and the mzip in ParStmt)
 noExpr :: HsExpr (GhcPass p)
-noExpr = HsLit noExt (HsString (SourceText  "noExpr") (fsLit "noExpr"))
+noExpr = HsLit noExtField (HsString (SourceText  "noExpr") (fsLit "noExpr"))
 
 noSyntaxExpr :: SyntaxExpr (GhcPass p)
                               -- Before renaming, and sometimes after,
                               -- (if the syntax slot makes no sense)
-noSyntaxExpr = SyntaxExpr { syn_expr      = HsLit noExt (HsString NoSourceText
-                                                        (fsLit "noSyntaxExpr"))
+noSyntaxExpr = SyntaxExpr { syn_expr      = HsLit noExtField
+                                                  (HsString NoSourceText
+                                                  (fsLit "noSyntaxExpr"))
                           , syn_arg_wraps = []
                           , syn_res_wrap  = WpHole }
 
@@ -129,7 +130,7 @@ mkSyntaxExpr expr = SyntaxExpr { syn_expr      = expr
 -- | Make a 'SyntaxExpr Name' (the "rn" is because this is used in the
 -- renamer), missing its HsWrappers.
 mkRnSyntaxExpr :: Name -> SyntaxExpr GhcRn
-mkRnSyntaxExpr name = mkSyntaxExpr $ HsVar noExt $ noLoc name
+mkRnSyntaxExpr name = mkSyntaxExpr $ HsVar noExtField $ noLoc name
   -- don't care about filling in syn_arg_wraps because we're clearly
   -- not past the typechecker
 
@@ -659,84 +660,84 @@ data RecordUpdTc = RecordUpdTc
 
 -- ---------------------------------------------------------------------
 
-type instance XVar           (GhcPass _) = NoExt
-type instance XUnboundVar    (GhcPass _) = NoExt
-type instance XConLikeOut    (GhcPass _) = NoExt
-type instance XRecFld        (GhcPass _) = NoExt
-type instance XOverLabel     (GhcPass _) = NoExt
-type instance XIPVar         (GhcPass _) = NoExt
-type instance XOverLitE      (GhcPass _) = NoExt
-type instance XLitE          (GhcPass _) = NoExt
-type instance XLam           (GhcPass _) = NoExt
-type instance XLamCase       (GhcPass _) = NoExt
-type instance XApp           (GhcPass _) = NoExt
+type instance XVar           (GhcPass _) = NoExtField
+type instance XUnboundVar    (GhcPass _) = NoExtField
+type instance XConLikeOut    (GhcPass _) = NoExtField
+type instance XRecFld        (GhcPass _) = NoExtField
+type instance XOverLabel     (GhcPass _) = NoExtField
+type instance XIPVar         (GhcPass _) = NoExtField
+type instance XOverLitE      (GhcPass _) = NoExtField
+type instance XLitE          (GhcPass _) = NoExtField
+type instance XLam           (GhcPass _) = NoExtField
+type instance XLamCase       (GhcPass _) = NoExtField
+type instance XApp           (GhcPass _) = NoExtField
 
-type instance XAppTypeE      (GhcPass _) = NoExt
+type instance XAppTypeE      (GhcPass _) = NoExtField
 
-type instance XOpApp         GhcPs = NoExt
+type instance XOpApp         GhcPs = NoExtField
 type instance XOpApp         GhcRn = Fixity
 type instance XOpApp         GhcTc = Fixity
 
-type instance XNegApp        (GhcPass _) = NoExt
-type instance XPar           (GhcPass _) = NoExt
-type instance XSectionL      (GhcPass _) = NoExt
-type instance XSectionR      (GhcPass _) = NoExt
-type instance XExplicitTuple (GhcPass _) = NoExt
+type instance XNegApp        (GhcPass _) = NoExtField
+type instance XPar           (GhcPass _) = NoExtField
+type instance XSectionL      (GhcPass _) = NoExtField
+type instance XSectionR      (GhcPass _) = NoExtField
+type instance XExplicitTuple (GhcPass _) = NoExtField
 
-type instance XExplicitSum   GhcPs = NoExt
-type instance XExplicitSum   GhcRn = NoExt
+type instance XExplicitSum   GhcPs = NoExtField
+type instance XExplicitSum   GhcRn = NoExtField
 type instance XExplicitSum   GhcTc = [Type]
 
-type instance XCase          (GhcPass _) = NoExt
-type instance XIf            (GhcPass _) = NoExt
+type instance XCase          (GhcPass _) = NoExtField
+type instance XIf            (GhcPass _) = NoExtField
 
-type instance XMultiIf       GhcPs = NoExt
-type instance XMultiIf       GhcRn = NoExt
+type instance XMultiIf       GhcPs = NoExtField
+type instance XMultiIf       GhcRn = NoExtField
 type instance XMultiIf       GhcTc = Type
 
-type instance XLet           (GhcPass _) = NoExt
+type instance XLet           (GhcPass _) = NoExtField
 
-type instance XDo            GhcPs = NoExt
-type instance XDo            GhcRn = NoExt
+type instance XDo            GhcPs = NoExtField
+type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
 
-type instance XExplicitList  GhcPs = NoExt
-type instance XExplicitList  GhcRn = NoExt
+type instance XExplicitList  GhcPs = NoExtField
+type instance XExplicitList  GhcRn = NoExtField
 type instance XExplicitList  GhcTc = Type
 
-type instance XRecordCon     GhcPs = NoExt
-type instance XRecordCon     GhcRn = NoExt
+type instance XRecordCon     GhcPs = NoExtField
+type instance XRecordCon     GhcRn = NoExtField
 type instance XRecordCon     GhcTc = RecordConTc
 
-type instance XRecordUpd     GhcPs = NoExt
-type instance XRecordUpd     GhcRn = NoExt
+type instance XRecordUpd     GhcPs = NoExtField
+type instance XRecordUpd     GhcRn = NoExtField
 type instance XRecordUpd     GhcTc = RecordUpdTc
 
-type instance XExprWithTySig (GhcPass _) = NoExt
+type instance XExprWithTySig (GhcPass _) = NoExtField
 
-type instance XArithSeq      GhcPs = NoExt
-type instance XArithSeq      GhcRn = NoExt
+type instance XArithSeq      GhcPs = NoExtField
+type instance XArithSeq      GhcRn = NoExtField
 type instance XArithSeq      GhcTc = PostTcExpr
 
-type instance XSCC           (GhcPass _) = NoExt
-type instance XCoreAnn       (GhcPass _) = NoExt
-type instance XBracket       (GhcPass _) = NoExt
+type instance XSCC           (GhcPass _) = NoExtField
+type instance XCoreAnn       (GhcPass _) = NoExtField
+type instance XBracket       (GhcPass _) = NoExtField
 
-type instance XRnBracketOut  (GhcPass _) = NoExt
-type instance XTcBracketOut  (GhcPass _) = NoExt
+type instance XRnBracketOut  (GhcPass _) = NoExtField
+type instance XTcBracketOut  (GhcPass _) = NoExtField
 
-type instance XSpliceE       (GhcPass _) = NoExt
-type instance XProc          (GhcPass _) = NoExt
+type instance XSpliceE       (GhcPass _) = NoExtField
+type instance XProc          (GhcPass _) = NoExtField
 
-type instance XStatic        GhcPs = NoExt
+type instance XStatic        GhcPs = NoExtField
 type instance XStatic        GhcRn = NameSet
 type instance XStatic        GhcTc = NameSet
 
-type instance XTick          (GhcPass _) = NoExt
-type instance XBinTick       (GhcPass _) = NoExt
-type instance XTickPragma    (GhcPass _) = NoExt
-type instance XWrap          (GhcPass _) = NoExt
-type instance XXExpr         (GhcPass _) = NoExt
+type instance XTick          (GhcPass _) = NoExtField
+type instance XBinTick       (GhcPass _) = NoExtField
+type instance XTickPragma    (GhcPass _) = NoExtField
+type instance XWrap          (GhcPass _) = NoExtField
+type instance XXExpr         (GhcPass _) = NoExtCon
 
 -- ---------------------------------------------------------------------
 
@@ -757,13 +758,13 @@ data HsTupArg id
   | Missing (XMissing id)    -- ^ The argument is missing, but this is its type
   | XTupArg (XXTupArg id)    -- ^ Note [Trees that Grow] extension point
 
-type instance XPresent         (GhcPass _) = NoExt
+type instance XPresent         (GhcPass _) = NoExtField
 
-type instance XMissing         GhcPs = NoExt
-type instance XMissing         GhcRn = NoExt
+type instance XMissing         GhcPs = NoExtField
+type instance XMissing         GhcRn = NoExtField
 type instance XMissing         GhcTc = Type
 
-type instance XXTupArg         (GhcPass _) = NoExt
+type instance XXTupArg         (GhcPass _) = NoExtCon
 
 tupArgPresent :: LHsTupArg id -> Bool
 tupArgPresent (L _ (Present {})) = True
@@ -1173,7 +1174,7 @@ hsExprNeedsParens p = go
 -- and if so, surrounds @e@ with an 'HsPar'. Otherwise, it simply returns @e@.
 parenthesizeHsExpr :: PprPrec -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
 parenthesizeHsExpr p le@(L loc e)
-  | hsExprNeedsParens p e = L loc (HsPar NoExt le)
+  | hsExprNeedsParens p e = L loc (HsPar noExtField le)
   | otherwise             = le
 
 isAtomicHsExpr :: HsExpr id -> Bool
@@ -1298,24 +1299,24 @@ data HsCmd id
                                -- Then (HsCmdWrap wrap cmd) :: arg2 --> res
   | XCmd        (XXCmd id)     -- Note [Trees that Grow] extension point
 
-type instance XCmdArrApp  GhcPs = NoExt
-type instance XCmdArrApp  GhcRn = NoExt
+type instance XCmdArrApp  GhcPs = NoExtField
+type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
-type instance XCmdArrForm (GhcPass _) = NoExt
-type instance XCmdApp     (GhcPass _) = NoExt
-type instance XCmdLam     (GhcPass _) = NoExt
-type instance XCmdPar     (GhcPass _) = NoExt
-type instance XCmdCase    (GhcPass _) = NoExt
-type instance XCmdIf      (GhcPass _) = NoExt
-type instance XCmdLet     (GhcPass _) = NoExt
+type instance XCmdArrForm (GhcPass _) = NoExtField
+type instance XCmdApp     (GhcPass _) = NoExtField
+type instance XCmdLam     (GhcPass _) = NoExtField
+type instance XCmdPar     (GhcPass _) = NoExtField
+type instance XCmdCase    (GhcPass _) = NoExtField
+type instance XCmdIf      (GhcPass _) = NoExtField
+type instance XCmdLet     (GhcPass _) = NoExtField
 
-type instance XCmdDo      GhcPs = NoExt
-type instance XCmdDo      GhcRn = NoExt
+type instance XCmdDo      GhcPs = NoExtField
+type instance XCmdDo      GhcRn = NoExtField
 type instance XCmdDo      GhcTc = Type
 
-type instance XCmdWrap    (GhcPass _) = NoExt
-type instance XXCmd       (GhcPass _) = NoExt
+type instance XCmdWrap    (GhcPass _) = NoExtField
+type instance XXCmd       (GhcPass _) = NoExtCon
 
 -- | Haskell Array Application Type
 data HsArrAppType = HsHigherOrderApp | HsFirstOrderApp
@@ -1341,11 +1342,11 @@ data CmdTopTc
              Type    -- return type of the command
              (CmdSyntaxTable GhcTc) -- See Note [CmdSyntaxTable]
 
-type instance XCmdTop  GhcPs = NoExt
+type instance XCmdTop  GhcPs = NoExtField
 type instance XCmdTop  GhcRn = CmdSyntaxTable GhcRn -- See Note [CmdSyntaxTable]
 type instance XCmdTop  GhcTc = CmdTopTc
 
-type instance XXCmdTop (GhcPass _) = NoExt
+type instance XXCmdTop (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmd p) where
     ppr cmd = pprCmd cmd
@@ -1491,11 +1492,11 @@ data MatchGroupTc
        , mg_res_ty  :: Type    -- Type of the result, tr
        } deriving Data
 
-type instance XMG         GhcPs b = NoExt
-type instance XMG         GhcRn b = NoExt
+type instance XMG         GhcPs b = NoExtField
+type instance XMG         GhcRn b = NoExtField
 type instance XMG         GhcTc b = MatchGroupTc
 
-type instance XXMatchGroup (GhcPass _) b = NoExt
+type instance XXMatchGroup (GhcPass _) b = NoExtCon
 
 -- | Located Match
 type LMatch id body = Located (Match id body)
@@ -1513,8 +1514,8 @@ data Match p body
   }
   | XMatch (XXMatch p body)
 
-type instance XCMatch (GhcPass _) b = NoExt
-type instance XXMatch (GhcPass _) b = NoExt
+type instance XCMatch (GhcPass _) b = NoExtField
+type instance XXMatch (GhcPass _) b = NoExtCon
 
 instance (idR ~ GhcPass pr, OutputableBndrId idR, Outputable body)
             => Outputable (Match idR body) where
@@ -1564,7 +1565,7 @@ isInfixMatch match = case m_ctxt match of
 
 isEmptyMatchGroup :: MatchGroup id body -> Bool
 isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
-isEmptyMatchGroup (XMatchGroup{}) = panic "isEmptyMatchGroup"
+isEmptyMatchGroup (XMatchGroup {})      = False
 
 -- | Is there only one RHS in this list of matches?
 isSingletonMatchGroup :: [LMatch id body] -> Bool
@@ -1575,17 +1576,17 @@ isSingletonMatchGroup matches
   | otherwise
   = False
 
-matchGroupArity :: MatchGroup id body -> Arity
+matchGroupArity :: MatchGroup (GhcPass id) body -> Arity
 -- Precondition: MatchGroup is non-empty
 -- This is called before type checking, when mg_arg_tys is not set
 matchGroupArity (MG { mg_alts = alts })
   | L _ (alt1:_) <- alts = length (hsLMatchPats alt1)
   | otherwise        = panic "matchGroupArity"
-matchGroupArity (XMatchGroup{}) = panic "matchGroupArity"
+matchGroupArity (XMatchGroup nec) = noExtCon nec
 
-hsLMatchPats :: LMatch id body -> [LPat id]
+hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
 hsLMatchPats (L _ (Match { m_pats = pats })) = pats
-hsLMatchPats (L _ (XMatch _)) = panic "hsLMatchPats"
+hsLMatchPats (L _ (XMatch nec)) = noExtCon nec
 
 -- | Guarded Right-Hand Sides
 --
@@ -1605,8 +1606,8 @@ data GRHSs p body
     }
   | XGRHSs (XXGRHSs p body)
 
-type instance XCGRHSs (GhcPass _) b = NoExt
-type instance XXGRHSs (GhcPass _) b = NoExt
+type instance XCGRHSs (GhcPass _) b = NoExtField
+type instance XXGRHSs (GhcPass _) b = NoExtCon
 
 -- | Located Guarded Right-Hand Side
 type LGRHS id body = Located (GRHS id body)
@@ -1617,8 +1618,8 @@ data GRHS p body = GRHS (XCGRHS p body)
                         body           -- Right hand side
                   | XGRHS (XXGRHS p body)
 
-type instance XCGRHS (GhcPass _) b = NoExt
-type instance XXGRHS (GhcPass _) b = NoExt
+type instance XCGRHS (GhcPass _) b = NoExtField
+type instance XXGRHS (GhcPass _) b = NoExtCon
 
 -- We know the list must have at least one @Match@ in it.
 
@@ -1887,35 +1888,35 @@ data RecStmtTc =
       }
 
 
-type instance XLastStmt        (GhcPass _) (GhcPass _) b = NoExt
+type instance XLastStmt        (GhcPass _) (GhcPass _) b = NoExtField
 
-type instance XBindStmt        (GhcPass _) GhcPs b = NoExt
-type instance XBindStmt        (GhcPass _) GhcRn b = NoExt
+type instance XBindStmt        (GhcPass _) GhcPs b = NoExtField
+type instance XBindStmt        (GhcPass _) GhcRn b = NoExtField
 type instance XBindStmt        (GhcPass _) GhcTc b = Type
 
-type instance XApplicativeStmt (GhcPass _) GhcPs b = NoExt
-type instance XApplicativeStmt (GhcPass _) GhcRn b = NoExt
+type instance XApplicativeStmt (GhcPass _) GhcPs b = NoExtField
+type instance XApplicativeStmt (GhcPass _) GhcRn b = NoExtField
 type instance XApplicativeStmt (GhcPass _) GhcTc b = Type
 
-type instance XBodyStmt        (GhcPass _) GhcPs b = NoExt
-type instance XBodyStmt        (GhcPass _) GhcRn b = NoExt
+type instance XBodyStmt        (GhcPass _) GhcPs b = NoExtField
+type instance XBodyStmt        (GhcPass _) GhcRn b = NoExtField
 type instance XBodyStmt        (GhcPass _) GhcTc b = Type
 
-type instance XLetStmt         (GhcPass _) (GhcPass _) b = NoExt
+type instance XLetStmt         (GhcPass _) (GhcPass _) b = NoExtField
 
-type instance XParStmt         (GhcPass _) GhcPs b = NoExt
-type instance XParStmt         (GhcPass _) GhcRn b = NoExt
+type instance XParStmt         (GhcPass _) GhcPs b = NoExtField
+type instance XParStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XParStmt         (GhcPass _) GhcTc b = Type
 
-type instance XTransStmt       (GhcPass _) GhcPs b = NoExt
-type instance XTransStmt       (GhcPass _) GhcRn b = NoExt
+type instance XTransStmt       (GhcPass _) GhcPs b = NoExtField
+type instance XTransStmt       (GhcPass _) GhcRn b = NoExtField
 type instance XTransStmt       (GhcPass _) GhcTc b = Type
 
-type instance XRecStmt         (GhcPass _) GhcPs b = NoExt
-type instance XRecStmt         (GhcPass _) GhcRn b = NoExt
+type instance XRecStmt         (GhcPass _) GhcPs b = NoExtField
+type instance XRecStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XRecStmt         (GhcPass _) GhcTc b = RecStmtTc
 
-type instance XXStmtLR         (GhcPass _) (GhcPass _) b = NoExt
+type instance XXStmtLR         (GhcPass _) (GhcPass _) b = NoExtCon
 
 data TransForm   -- The 'f' below is the 'using' function, 'e' is the by function
   = ThenForm     -- then f               or    then f by e             (depending on trS_by)
@@ -1931,8 +1932,8 @@ data ParStmtBlock idL idR
         (SyntaxExpr idR)   -- The return operator
   | XParStmtBlock (XXParStmtBlock idL idR)
 
-type instance XParStmtBlock  (GhcPass pL) (GhcPass pR) = NoExt
-type instance XXParStmtBlock (GhcPass pL) (GhcPass pR) = NoExt
+type instance XParStmtBlock  (GhcPass pL) (GhcPass pR) = NoExtField
+type instance XXParStmtBlock (GhcPass pL) (GhcPass pR) = NoExtCon
 
 -- | Applicative Argument
 data ApplicativeArg idL
@@ -1951,9 +1952,9 @@ data ApplicativeArg idL
       (LPat idL)           -- (v1,...,vn)
   | XApplicativeArg (XXApplicativeArg idL)
 
-type instance XApplicativeArgOne  (GhcPass _) = NoExt
-type instance XApplicativeArgMany (GhcPass _) = NoExt
-type instance XXApplicativeArg    (GhcPass _) = NoExt
+type instance XApplicativeArgOne  (GhcPass _) = NoExtField
+type instance XApplicativeArgMany (GhcPass _) = NoExtField
+type instance XXApplicativeArg    (GhcPass _) = NoExtCon
 
 {-
 Note [The type of bind in Stmts]
@@ -2184,7 +2185,7 @@ pprStmt (ApplicativeStmt _ args mb_join)
              :: ExprStmt (GhcPass idL))]
    flattenArg (_, ApplicativeArgMany _ stmts _ _) =
      concatMap flattenStmt stmts
-   flattenArg (_, XApplicativeArg _) = panic "flattenArg"
+   flattenArg (_, XApplicativeArg nec) = noExtCon nec
 
    pp_debug =
      let
@@ -2207,7 +2208,7 @@ pprStmt (ApplicativeStmt _ args mb_join)
      text "<-" <+>
      ppr (HsDo (panic "pprStmt") DoExpr (noLoc
                (stmts ++
-                   [noLoc (LastStmt noExt (noLoc return) False noSyntaxExpr)])))
+                   [noLoc (LastStmt noExtField (noLoc return) False noSyntaxExpr)])))
    pp_arg (_, XApplicativeArg x) = ppr x
 
 pprStmt (XStmtLR x) = ppr x
@@ -2308,11 +2309,11 @@ data HsSplice id
       DelayedSplice
    | XSplice (XXSplice id)  -- Note [Trees that Grow] extension point
 
-type instance XTypedSplice   (GhcPass _) = NoExt
-type instance XUntypedSplice (GhcPass _) = NoExt
-type instance XQuasiQuote    (GhcPass _) = NoExt
-type instance XSpliced       (GhcPass _) = NoExt
-type instance XXSplice       (GhcPass _) = NoExt
+type instance XTypedSplice   (GhcPass _) = NoExtField
+type instance XUntypedSplice (GhcPass _) = NoExtField
+type instance XQuasiQuote    (GhcPass _) = NoExtField
+type instance XSpliced       (GhcPass _) = NoExtField
+type instance XXSplice       (GhcPass _) = NoExtCon
 
 -- | A splice can appear with various decorations wrapped around it. This data
 -- type captures explicitly how it was originally written, for use in the pretty
@@ -2515,14 +2516,14 @@ data HsBracket p
   | TExpBr (XTExpBr p) (LHsExpr p)    -- [||  expr  ||]
   | XBracket (XXBracket p)            -- Note [Trees that Grow] extension point
 
-type instance XExpBr      (GhcPass _) = NoExt
-type instance XPatBr      (GhcPass _) = NoExt
-type instance XDecBrL     (GhcPass _) = NoExt
-type instance XDecBrG     (GhcPass _) = NoExt
-type instance XTypBr      (GhcPass _) = NoExt
-type instance XVarBr      (GhcPass _) = NoExt
-type instance XTExpBr     (GhcPass _) = NoExt
-type instance XXBracket   (GhcPass _) = NoExt
+type instance XExpBr      (GhcPass _) = NoExtField
+type instance XPatBr      (GhcPass _) = NoExtField
+type instance XDecBrL     (GhcPass _) = NoExtField
+type instance XDecBrG     (GhcPass _) = NoExtField
+type instance XTypBr      (GhcPass _) = NoExtField
+type instance XVarBr      (GhcPass _) = NoExtField
+type instance XTExpBr     (GhcPass _) = NoExtField
+type instance XXBracket   (GhcPass _) = NoExtCon
 
 isTypedBracket :: HsBracket id -> Bool
 isTypedBracket (TExpBr {}) = True

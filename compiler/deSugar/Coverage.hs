@@ -327,7 +327,7 @@ addTickLHsBind (dL->L pos (funBind@(FunBind { fun_id = (dL->L _ id)  }))) = do
    where
    -- a binding is a simple pattern binding if it is a funbind with
    -- zero patterns
-   isSimplePatBind :: HsBind a -> Bool
+   isSimplePatBind :: HsBind GhcTc -> Bool
    isSimplePatBind funBind = matchGroupArity (fun_matches funBind) == 0
 
 -- TODO: Revisit this
@@ -640,7 +640,7 @@ addTickTupArg :: LHsTupArg GhcTc -> TM (LHsTupArg GhcTc)
 addTickTupArg (dL->L l (Present x e))  = do { e' <- addTickLHsExpr e
                                             ; return (cL l (Present x e')) }
 addTickTupArg (dL->L l (Missing ty)) = return (cL l (Missing ty))
-addTickTupArg (dL->L _ (XTupArg _)) = panic "addTickTupArg"
+addTickTupArg (dL->L _ (XTupArg nec)) = noExtCon nec
 addTickTupArg _  = panic "addTickTupArg: Impossible Match" -- due to #15884
 
 
@@ -650,7 +650,7 @@ addTickMatchGroup is_lam mg@(MG { mg_alts = dL->L l matches }) = do
   let isOneOfMany = matchesOneOfMany matches
   matches' <- mapM (liftL (addTickMatch isOneOfMany is_lam)) matches
   return $ mg { mg_alts = cL l matches' }
-addTickMatchGroup _ (XMatchGroup _) = panic "addTickMatchGroup"
+addTickMatchGroup _ (XMatchGroup nec) = noExtCon nec
 
 addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
@@ -659,7 +659,7 @@ addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats
   bindLocals (collectPatsBinders pats) $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
     return $ match { m_grhss = gRHSs' }
-addTickMatch _ _ (XMatch _) = panic "addTickMatch"
+addTickMatch _ _ (XMatch nec) = noExtCon nec
 
 addTickGRHSs :: Bool -> Bool -> GRHSs GhcTc (LHsExpr GhcTc)
              -> TM (GRHSs GhcTc (LHsExpr GhcTc))
@@ -670,7 +670,7 @@ addTickGRHSs isOneOfMany isLambda (GRHSs x guarded (dL->L l local_binds)) = do
     return $ GRHSs x guarded' (cL l local_binds')
   where
     binders = collectLocalBinders local_binds
-addTickGRHSs _ _ (XGRHSs _) = panic "addTickGRHSs"
+addTickGRHSs _ _ (XGRHSs nec) = noExtCon nec
 
 addTickGRHS :: Bool -> Bool -> GRHS GhcTc (LHsExpr GhcTc)
             -> TM (GRHS GhcTc (LHsExpr GhcTc))
@@ -678,7 +678,7 @@ addTickGRHS isOneOfMany isLambda (GRHS x stmts expr) = do
   (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox) stmts
                         (addTickGRHSBody isOneOfMany isLambda expr)
   return $ GRHS x stmts' expr'
-addTickGRHS _ _ (XGRHS _) = panic "addTickGRHS"
+addTickGRHS _ _ (XGRHS nec) = noExtCon nec
 
 addTickGRHSBody :: Bool -> Bool -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
 addTickGRHSBody isOneOfMany isLambda expr@(dL->L pos e0) = do
@@ -757,7 +757,7 @@ addTickStmt isGuard stmt@(RecStmt {})
        ; return (stmt { recS_stmts = stmts', recS_ret_fn = ret'
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
 
-addTickStmt _ (XStmtLR _) = panic "addTickStmt"
+addTickStmt _ (XStmtLR nec) = noExtCon nec
 
 addTick :: Maybe (Bool -> BoxLabel) -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
 addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e
@@ -779,7 +779,7 @@ addTickApplicativeArg isGuard (op, arg) =
       <$> addTickLStmts isGuard stmts
       <*> (unLoc <$> addTickLHsExpr (cL hpcSrcSpan ret))
       <*> addTickLPat pat
-  addTickArg (XApplicativeArg _) = panic "addTickApplicativeArg"
+  addTickArg (XApplicativeArg nec) = noExtCon nec
 
 addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ParStmtBlock GhcTc GhcTc
                       -> TM (ParStmtBlock GhcTc GhcTc)
@@ -788,7 +788,7 @@ addTickStmtAndBinders isGuard (ParStmtBlock x stmts ids returnExpr) =
         (addTickLStmts isGuard stmts)
         (return ids)
         (addTickSyntaxExpr hpcSrcSpan returnExpr)
-addTickStmtAndBinders _ (XParStmtBlock{}) = panic "addTickStmtAndBinders"
+addTickStmtAndBinders _ (XParStmtBlock nec) = noExtCon nec
 
 addTickHsLocalBinds :: HsLocalBinds GhcTc -> TM (HsLocalBinds GhcTc)
 addTickHsLocalBinds (HsValBinds x binds) =
@@ -841,7 +841,7 @@ addTickHsCmdTop (HsCmdTop x cmd) =
         liftM2 HsCmdTop
                 (return x)
                 (addTickLHsCmd cmd)
-addTickHsCmdTop (XCmdTop{}) = panic "addTickHsCmdTop"
+addTickHsCmdTop (XCmdTop nec) = noExtCon nec
 
 addTickLHsCmd ::  LHsCmd GhcTc -> TM (LHsCmd GhcTc)
 addTickLHsCmd (dL->L pos c0) = do
@@ -897,7 +897,7 @@ addTickHsCmd (HsCmdArrForm x e f fix cmdtop) =
 addTickHsCmd (HsCmdWrap x w cmd)
   = liftM2 (HsCmdWrap x) (return w) (addTickHsCmd cmd)
 
-addTickHsCmd e@(XCmd {})  = pprPanic "addTickHsCmd" (ppr e)
+addTickHsCmd (XCmd nec) = noExtCon nec
 
 -- Others should never happen in a command context.
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)
@@ -907,14 +907,14 @@ addTickCmdMatchGroup :: MatchGroup GhcTc (LHsCmd GhcTc)
 addTickCmdMatchGroup mg@(MG { mg_alts = (dL->L l matches) }) = do
   matches' <- mapM (liftL addTickCmdMatch) matches
   return $ mg { mg_alts = cL l matches' }
-addTickCmdMatchGroup (XMatchGroup _) = panic "addTickCmdMatchGroup"
+addTickCmdMatchGroup (XMatchGroup nec) = noExtCon nec
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
 addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
   bindLocals (collectPatsBinders pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
     return $ match { m_grhss = gRHSs' }
-addTickCmdMatch (XMatch _) = panic "addTickCmdMatch"
+addTickCmdMatch (XMatch nec) = noExtCon nec
 
 addTickCmdGRHSs :: GRHSs GhcTc (LHsCmd GhcTc) -> TM (GRHSs GhcTc (LHsCmd GhcTc))
 addTickCmdGRHSs (GRHSs x guarded (dL->L l local_binds)) = do
@@ -924,7 +924,7 @@ addTickCmdGRHSs (GRHSs x guarded (dL->L l local_binds)) = do
     return $ GRHSs x guarded' (cL l local_binds')
   where
     binders = collectLocalBinders local_binds
-addTickCmdGRHSs (XGRHSs _) = panic "addTickCmdGRHSs"
+addTickCmdGRHSs (XGRHSs nec) = noExtCon nec
 
 addTickCmdGRHS :: GRHS GhcTc (LHsCmd GhcTc) -> TM (GRHS GhcTc (LHsCmd GhcTc))
 -- The *guards* are *not* Cmds, although the body is
@@ -933,7 +933,7 @@ addTickCmdGRHS (GRHS x stmts cmd)
   = do { (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox)
                                    stmts (addTickLHsCmd cmd)
        ; return $ GRHS x stmts' expr' }
-addTickCmdGRHS (XGRHS _) = panic "addTickCmdGRHS"
+addTickCmdGRHS (XGRHS nec) = noExtCon nec
 
 addTickLCmdStmts :: [LStmt GhcTc (LHsCmd GhcTc)]
                  -> TM [LStmt GhcTc (LHsCmd GhcTc)]
@@ -980,8 +980,8 @@ addTickCmdStmt stmt@(RecStmt {})
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
 addTickCmdStmt ApplicativeStmt{} =
   panic "ToDo: addTickCmdStmt ApplicativeLastStmt"
-addTickCmdStmt XStmtLR{} =
-  panic "addTickCmdStmt XStmtLR"
+addTickCmdStmt (XStmtLR nec) =
+  noExtCon nec
 
 -- Others should never happen in a command context.
 addTickCmdStmt stmt  = pprPanic "addTickHsCmd" (ppr stmt)
@@ -1175,7 +1175,7 @@ allocTickBox boxLabel countEntries topOnly pos m =
     (fvs, e) <- getFreeVars m
     env <- getEnv
     tickish <- mkTickish boxLabel countEntries topOnly pos fvs (declPath env)
-    return (cL pos (HsTick noExt tickish (cL pos e)))
+    return (cL pos (HsTick noExtField tickish (cL pos e)))
   ) (do
     e <- m
     return (cL pos e)
@@ -1262,8 +1262,8 @@ mkBinTickBoxHpc boxLabel pos e =
       c = tickBoxCount st
       mes = mixEntries st
   in
-     ( cL pos $ HsTick noExt (HpcTick (this_mod env) c)
-          $ cL pos $ HsBinTick noExt (c+1) (c+2) e
+     ( cL pos $ HsTick noExtField (HpcTick (this_mod env) c)
+          $ cL pos $ HsBinTick noExtField (c+1) (c+2) e
    -- notice that F and T are reversed,
    -- because we are building the list in
    -- reverse...
@@ -1292,9 +1292,9 @@ matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
   where
         matchCount (dL->L _ (Match { m_grhss = GRHSs _ grhss _ }))
           = length grhss
-        matchCount (dL->L _ (Match { m_grhss = XGRHSs _ }))
-          = panic "matchesOneOfMany"
-        matchCount (dL->L _ (XMatch _)) = panic "matchesOneOfMany"
+        matchCount (dL->L _ (Match { m_grhss = XGRHSs nec }))
+          = noExtCon nec
+        matchCount (dL->L _ (XMatch nec)) = noExtCon nec
         matchCount _ = panic "matchCount: Impossible Match" -- due to #15884
 
 type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)

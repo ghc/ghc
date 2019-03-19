@@ -832,8 +832,8 @@ tcRecSelBinds sel_bind_prs
                                      tcValBinds TopLevel binds sigs getGblEnv
        ; return (tcg_env `addTypecheckedBinds` map snd rec_sel_binds) }
   where
-    sigs = [ cL loc (IdSig noExt sel_id)   | (sel_id, _) <- sel_bind_prs
-                                          , let loc = getSrcSpan sel_id ]
+    sigs = [ cL loc (IdSig noExtField sel_id) | (sel_id, _) <- sel_bind_prs
+                                              , let loc = getSrcSpan sel_id ]
     binds = [(NonRecursive, unitBag bind) | (_, bind) <- sel_bind_prs]
 
 mkRecSelBinds :: [TyCon] -> [(Id, LHsBind GhcRn)]
@@ -892,7 +892,7 @@ mkOneRecordSelector all_cons idDetails fl
              | otherwise =  map mk_match cons_w_field ++ deflt
     mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
                                  [cL loc (mk_sel_pat con)]
-                                 (cL loc (HsVar noExt (cL loc field_var)))
+                                 (cL loc (HsVar noExtField (cL loc field_var)))
     mk_sel_pat con = ConPatIn (cL loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLoc (HsRecField
@@ -900,7 +900,7 @@ mkOneRecordSelector all_cons idDetails fl
                            = cL loc (FieldOcc sel_name
                                      (cL loc $ mkVarUnqual lbl))
                         , hsRecFieldArg
-                           = cL loc (VarPat noExt (cL loc field_var))
+                           = cL loc (VarPat noExtField (cL loc field_var))
                         , hsRecPun = False })
     sel_lname = cL loc sel_name
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
@@ -910,10 +910,10 @@ mkOneRecordSelector all_cons idDetails fl
     -- mentions this particular record selector
     deflt | all dealt_with all_cons = []
           | otherwise = [mkSimpleMatch CaseAlt
-                            [cL loc (WildPat noExt)]
-                            (mkHsApp (cL loc (HsVar noExt
+                            [cL loc (WildPat noExtField)]
+                            (mkHsApp (cL loc (HsVar noExtField
                                          (cL loc (getName rEC_SEL_ERROR_ID))))
-                                     (cL loc (HsLit noExt msg_lit)))]
+                                     (cL loc (HsLit noExtField msg_lit)))]
 
         -- Do not add a default case unless there are unmatched
         -- constructors.  We must take account of GADTs, else we

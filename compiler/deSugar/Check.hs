@@ -375,12 +375,12 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
     let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
         dsMatchContext = DsMatchContext hs_ctx combinedLoc
         match = cL combinedLoc $
-                  Match { m_ext = noExt
+                  Match { m_ext = noExtField
                         , m_ctxt = hs_ctx
                         , m_pats = []
                         , m_grhss = guards }
     checkMatches dflags dsMatchContext [] [match]
-checkGuardMatches _ (XGRHSs _) = panic "checkGuardMatches"
+checkGuardMatches _ (XGRHSs nec) = noExtCon nec
 
 -- | Check a matchgroup (case, functions, etc.)
 checkMatches :: DynFlags -> DsMatchContext
@@ -1008,7 +1008,7 @@ translatePat fam_insts pat = case pat of
     case res of
       True  -> do
         (xp,xe) <- mkPmId2Forms arg_ty
-        g <- mkGuard ps (HsApp noExt lexpr xe)
+        g <- mkGuard ps (HsApp noExtField lexpr xe)
         return [xp,g]
       False -> mkCanFailPmPat arg_ty
 
@@ -1066,7 +1066,7 @@ translatePat fam_insts pat = case pat of
     , isStringTy ty ->
         foldr (mkListPatVec charTy) [nilPattern charTy] <$>
           translatePatVec fam_insts
-            (map (LitPat noExt . HsChar src) (unpackFS s))
+            (map (LitPat noExtField . HsChar src) (unpackFS s))
     | otherwise -> return [PmLit { pm_lit_lit = PmOLit (isJust mb_neg) olit }]
 
   -- See Note [Translate Overloaded Literal for Exhaustiveness Checking]
@@ -1074,7 +1074,7 @@ translatePat fam_insts pat = case pat of
     | HsString src s <- lit ->
         foldr (mkListPatVec charTy) [nilPattern charTy] <$>
           translatePatVec fam_insts
-            (map (LitPat noExt . HsChar src) (unpackFS s))
+            (map (LitPat noExtField . HsChar src) (unpackFS s))
     | otherwise -> return [mkLitPattern lit]
 
   TuplePat tys ps boxity -> do
@@ -1312,7 +1312,7 @@ translateGuard fam_insts guard = case guard of
   TransStmt       {} -> panic "translateGuard TransStmt"
   RecStmt         {} -> panic "translateGuard RecStmt"
   ApplicativeStmt {} -> panic "translateGuard ApplicativeLastStmt"
-  XStmtLR         {} -> panic "translateGuard RecStmt"
+  XStmtLR nec        -> noExtCon nec
 
 -- | Translate let-bindings
 translateLet :: HsLocalBinds GhcTc -> DsM PatVec
@@ -1713,7 +1713,7 @@ mkPmId ty = getUniqueM >>= \unique ->
 mkPmId2Forms :: Type -> DsM (Pattern, LHsExpr GhcTc)
 mkPmId2Forms ty = do
   x <- mkPmId ty
-  return (PmVar x, noLoc (HsVar noExt (noLoc x)))
+  return (PmVar x, noLoc (HsVar noExtField (noLoc x)))
 
 -- ----------------------------------------------------------------------------
 -- * Converting between Value Abstractions, Patterns and PmExpr

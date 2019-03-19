@@ -94,10 +94,10 @@ data HsLocalBindsLR idL idR
   | XHsLocalBindsLR
         (XXHsLocalBindsLR idL idR)
 
-type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = NoExt
-type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = NoExt
-type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExt
-type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = NoExt
+type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = NoExtField
+type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = NoExtField
+type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
+type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
 
 type LHsLocalBindsLR idL idR = Located (HsLocalBindsLR idL idR)
 
@@ -135,7 +135,7 @@ data NHsValBindsLR idL
       [(RecFlag, LHsBinds idL)]
       [LSig GhcRn]
 
-type instance XValBinds    (GhcPass pL) (GhcPass pR) = NoExt
+type instance XValBinds    (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XXValBindsLR (GhcPass pL) (GhcPass pR)
             = NHsValBindsLR (GhcPass pL)
 
@@ -319,18 +319,18 @@ data NPatBindTc = NPatBindTc {
      pat_rhs_ty :: Type  -- ^ Type of the GRHSs
      } deriving Data
 
-type instance XFunBind    (GhcPass pL) GhcPs = NoExt
+type instance XFunBind    (GhcPass pL) GhcPs = NoExtField
 type instance XFunBind    (GhcPass pL) GhcRn = NameSet -- Free variables
 type instance XFunBind    (GhcPass pL) GhcTc = NameSet -- Free variables
 
-type instance XPatBind    GhcPs (GhcPass pR) = NoExt
+type instance XPatBind    GhcPs (GhcPass pR) = NoExtField
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- Free variables
 type instance XPatBind    GhcTc (GhcPass pR) = NPatBindTc
 
-type instance XVarBind    (GhcPass pL) (GhcPass pR) = NoExt
-type instance XAbsBinds   (GhcPass pL) (GhcPass pR) = NoExt
-type instance XPatSynBind (GhcPass pL) (GhcPass pR) = NoExt
-type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = NoExt
+type instance XVarBind    (GhcPass pL) (GhcPass pR) = NoExtField
+type instance XAbsBinds   (GhcPass pL) (GhcPass pR) = NoExtField
+type instance XPatSynBind (GhcPass pL) (GhcPass pR) = NoExtField
+type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
 
 
         -- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
@@ -356,8 +356,8 @@ data ABExport p
         }
    | XABExport (XXABExport p)
 
-type instance XABE       (GhcPass p) = NoExt
-type instance XXABExport (GhcPass p) = NoExt
+type instance XABE       (GhcPass p) = NoExtField
+type instance XXABExport (GhcPass p) = NoExtCon
 
 
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
@@ -379,11 +379,11 @@ data PatSynBind idL idR
      }
    | XPatSynBind (XXPatSynBind idL idR)
 
-type instance XPSB         (GhcPass idL) GhcPs = NoExt
+type instance XPSB         (GhcPass idL) GhcPs = NoExtField
 type instance XPSB         (GhcPass idL) GhcRn = NameSet
 type instance XPSB         (GhcPass idL) GhcTc = NameSet
 
-type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = NoExt
+type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = NoExtCon
 
 {-
 Note [AbsBinds]
@@ -682,7 +682,7 @@ pprDeclList ds = pprDeeperList vcat ds
 
 ------------
 emptyLocalBinds :: HsLocalBindsLR (GhcPass a) (GhcPass b)
-emptyLocalBinds = EmptyLocalBinds noExt
+emptyLocalBinds = EmptyLocalBinds noExtField
 
 -- AZ:These functions do not seem to be used at all?
 isEmptyLocalBindsTc :: HsLocalBindsLR (GhcPass a) GhcTc -> Bool
@@ -706,7 +706,7 @@ isEmptyValBinds (ValBinds _ ds sigs)  = isEmptyLHsBinds ds && null sigs
 isEmptyValBinds (XValBindsLR (NValBinds ds sigs)) = null ds && null sigs
 
 emptyValBindsIn, emptyValBindsOut :: HsValBindsLR (GhcPass a) (GhcPass b)
-emptyValBindsIn  = ValBinds noExt emptyBag []
+emptyValBindsIn  = ValBinds noExtField emptyBag []
 emptyValBindsOut = XValBindsLR (NValBinds [] [])
 
 emptyLHsBinds :: LHsBindsLR idL idR
@@ -719,7 +719,7 @@ isEmptyLHsBinds = isEmptyBag
 plusHsValBinds :: HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
                -> HsValBinds(GhcPass a)
 plusHsValBinds (ValBinds _ ds1 sigs1) (ValBinds _ ds2 sigs2)
-  = ValBinds noExt (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
+  = ValBinds noExtField (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
 plusHsValBinds (XValBindsLR (NValBinds ds1 sigs1))
                (XValBindsLR (NValBinds ds2 sigs2))
   = XValBindsLR (NValBinds (ds1 ++ ds2) (sigs1 ++ sigs2))
@@ -824,13 +824,13 @@ data HsIPBinds id
         --                 -- uses of the implicit parameters
   | XHsIPBinds (XXHsIPBinds id)
 
-type instance XIPBinds       GhcPs = NoExt
-type instance XIPBinds       GhcRn = NoExt
+type instance XIPBinds       GhcPs = NoExtField
+type instance XIPBinds       GhcRn = NoExtField
 type instance XIPBinds       GhcTc = TcEvBinds -- binds uses of the
                                                -- implicit parameters
 
 
-type instance XXHsIPBinds    (GhcPass p) = NoExt
+type instance XXHsIPBinds    (GhcPass p) = NoExtCon
 
 isEmptyIPBindsPR :: HsIPBinds (GhcPass p) -> Bool
 isEmptyIPBindsPR (IPBinds _ is) = null is
@@ -864,8 +864,8 @@ data IPBind id
         (LHsExpr id)
   | XIPBind (XXIPBind id)
 
-type instance XCIPBind    (GhcPass p) = NoExt
-type instance XXIPBind    (GhcPass p) = NoExt
+type instance XCIPBind    (GhcPass p) = NoExtField
+type instance XXIPBind    (GhcPass p) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsIPBinds p) where
@@ -1047,18 +1047,18 @@ data Sig pass
                      (Maybe (Located (IdP pass)))
   | XSig (XXSig pass)
 
-type instance XTypeSig          (GhcPass p) = NoExt
-type instance XPatSynSig        (GhcPass p) = NoExt
-type instance XClassOpSig       (GhcPass p) = NoExt
-type instance XIdSig            (GhcPass p) = NoExt
-type instance XFixSig           (GhcPass p) = NoExt
-type instance XInlineSig        (GhcPass p) = NoExt
-type instance XSpecSig          (GhcPass p) = NoExt
-type instance XSpecInstSig      (GhcPass p) = NoExt
-type instance XMinimalSig       (GhcPass p) = NoExt
-type instance XSCCFunSig        (GhcPass p) = NoExt
-type instance XCompleteMatchSig (GhcPass p) = NoExt
-type instance XXSig             (GhcPass p) = NoExt
+type instance XTypeSig          (GhcPass p) = NoExtField
+type instance XPatSynSig        (GhcPass p) = NoExtField
+type instance XClassOpSig       (GhcPass p) = NoExtField
+type instance XIdSig            (GhcPass p) = NoExtField
+type instance XFixSig           (GhcPass p) = NoExtField
+type instance XInlineSig        (GhcPass p) = NoExtField
+type instance XSpecSig          (GhcPass p) = NoExtField
+type instance XSpecInstSig      (GhcPass p) = NoExtField
+type instance XMinimalSig       (GhcPass p) = NoExtField
+type instance XSCCFunSig        (GhcPass p) = NoExtField
+type instance XCompleteMatchSig (GhcPass p) = NoExtField
+type instance XXSig             (GhcPass p) = NoExtCon
 
 -- | Located Fixity Signature
 type LFixitySig pass = Located (FixitySig pass)
@@ -1067,8 +1067,8 @@ type LFixitySig pass = Located (FixitySig pass)
 data FixitySig pass = FixitySig (XFixitySig pass) [Located (IdP pass)] Fixity
                     | XFixitySig (XXFixitySig pass)
 
-type instance XFixitySig  (GhcPass p) = NoExt
-type instance XXFixitySig (GhcPass p) = NoExt
+type instance XFixitySig  (GhcPass p) = NoExtField
+type instance XXFixitySig (GhcPass p) = NoExtCon
 
 -- | Type checker Specialisation Pragmas
 --

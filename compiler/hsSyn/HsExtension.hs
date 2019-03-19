@@ -1,5 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE EmptyDataDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -53,16 +55,79 @@ haskell-src-exts ASTs as well.
 
 -}
 
--- | used as place holder in TTG values
-data NoExt = NoExt
+-- | A placeholder type for TTG extension points that are not currently
+-- unused to represent any particular value.
+--
+-- This should not be confused with 'NoExtCon', which are found in unused
+-- extension /constructors/ and therefore should never be inhabited. In
+-- contrast, 'NoExtField' is used in extension /points/ (e.g., as the field of
+-- some constructor), so it must have an inhabitant to construct AST passes
+-- that manipulate fields with that extension point as their type.
+data NoExtField = NoExtField
   deriving (Data,Eq,Ord)
 
-instance Outputable NoExt where
-  ppr _ = text "NoExt"
+instance Outputable NoExtField where
+  ppr _ = text "NoExtField"
 
 -- | Used when constructing a term with an unused extension point.
-noExt :: NoExt
-noExt = NoExt
+noExtField :: NoExtField
+noExtField = NoExtField
+
+-- | Used in TTG extension constructors that have yet to be extended with
+-- anything. If an extension constructor has 'NoExtCon' as its field, it is
+-- not intended to ever be constructed anywhere, and any function that consumes
+-- the extension constructor can eliminate it by way of 'noExtCon'.
+--
+-- This should not be confused with 'NoExtField', which are found in unused
+-- extension /points/ (not /constructors/) and therefore can be inhabited.
+
+-- See also [NoExtCon and strict fields].
+data NoExtCon
+  deriving (Data,Eq,Ord)
+
+instance Outputable NoExtCon where
+  ppr = noExtCon
+
+-- | Eliminate a 'NoExtCon'. Much like 'Data.Void.absurd'.
+noExtCon :: NoExtCon -> a
+noExtCon x = case x of {}
+
+{-
+Note [NoExtCon and strict fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently, any unused TTG extension constructor will generally look like the
+following:
+
+  type instance XXHsDecl (GhcPass _) = NoExtCon
+  data HsDecl p
+    = ...
+    | XHsDecl (XXHsDecl p)
+
+This means that any function that wishes to consume an HsDecl will need to
+have a case for XHsDecl. This might look like this:
+
+  ex :: HsDecl GhcPs -> HsDecl GhcRn
+  ...
+  ex (XHsDecl nec) = noExtCon nec
+
+Ideally, we wouldn't need a case for XHsDecl at all (it /is/ supposed to be
+an unused extension constructor, after all). There is a way to achieve this
+on GHC 8.8 or later: make the field of XHsDecl strict:
+
+  data HsDecl p
+    = ...
+    | XHsDecl !(XXHsDecl p)
+
+If this is done, GHC's pattern-match coverage checker is clever enough to
+figure out that the XHsDecl case of `ex` is unreachable, so it can simply be
+omitted. (See Note [Extensions to GADTs Meet Their Match] in Check for more on
+how this works.)
+
+When GHC drops support for bootstrapping with GHC 8.6 and earlier, we can make
+the strict field changes described above and delete gobs of code involving
+`noExtCon`. Until then, it is necessary to use, so be aware of it when writing
+code that consumes unused extension constructors.
+-}
 
 -- | Used as a data type index for the hsSyn AST
 data GhcPass (c :: Pass)
@@ -1068,7 +1133,7 @@ type ConvertIdX a b =
 --
 -- So
 --
---   type instance XXHsIPBinds    (GhcPass p) = NoExt
+--   type instance XXHsIPBinds    (GhcPass p) = NoExtCon
 --
 -- will correctly deduce Outputable for (GhcPass p), but
 --

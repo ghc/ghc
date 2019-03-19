@@ -104,7 +104,7 @@ rnBracket e br_body
                         ; (body', fvs_e) <-
                           setStage (Brack cur_stage RnPendingTyped) $
                                    rn_bracket cur_stage br_body
-                        ; return (HsBracket noExt body', fvs_e) }
+                        ; return (HsBracket noExtField body', fvs_e) }
 
             False -> do { traceRn "Renaming untyped TH bracket" empty
                         ; ps_var <- newMutVar []
@@ -112,7 +112,7 @@ rnBracket e br_body
                           setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
                                    rn_bracket cur_stage br_body
                         ; pendings <- readMutVar ps_var
-                        ; return (HsRnBracketOut noExt body' pendings, fvs_e) }
+                        ; return (HsRnBracketOut noExtField body' pendings, fvs_e) }
        }
 
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
@@ -180,7 +180,7 @@ rn_bracket _ (DecBrG {}) = panic "rn_bracket: unexpected DecBrG"
 rn_bracket _ (TExpBr x e) = do { (e', fvs) <- rnLExpr e
                                ; return (TExpBr x e', fvs) }
 
-rn_bracket _ (XBracket {}) = panic "rn_bracket: unexpected XBracket"
+rn_bracket _ (XBracket nec) = noExtCon nec
 
 quotationCtxtDoc :: HsBracket GhcPs -> SDoc
 quotationCtxtDoc br_body
@@ -303,7 +303,7 @@ runRnSplice flavour run_meta ppr_res splice
                 HsTypedSplice {}          -> pprPanic "runRnSplice" (ppr splice)
                 HsSpliced {}              -> pprPanic "runRnSplice" (ppr splice)
                 HsSplicedT {}             -> pprPanic "runRnSplice" (ppr splice)
-                XSplice {}                -> pprPanic "runRnSplice" (ppr splice)
+                XSplice nec               -> noExtCon nec
 
              -- Typecheck the expression
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
@@ -352,8 +352,8 @@ makePending _ splice@(HsSpliced {})
   = pprPanic "makePending" (ppr splice)
 makePending _ splice@(HsSplicedT {})
   = pprPanic "makePending" (ppr splice)
-makePending _ splice@(XSplice {})
-  = pprPanic "makePending" (ppr splice)
+makePending _ (XSplice nec)
+  = noExtCon nec
 
 ------------------
 mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name -> SrcSpan -> FastString
@@ -361,13 +361,13 @@ mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name -> SrcSpan -> FastString
 -- Return the expression (quoter "...quote...")
 -- which is what we must run in a quasi-quote
 mkQuasiQuoteExpr flavour quoter q_span quote
-  = cL q_span $ HsApp noExt (cL q_span
-              $ HsApp noExt (cL q_span (HsVar noExt (cL q_span quote_selector)))
-                            quoterExpr)
+  = cL q_span $ HsApp noExtField (cL q_span
+              $ HsApp noExtField (cL q_span (HsVar noExtField (cL q_span quote_selector)))
+                                 quoterExpr)
                      quoteExpr
   where
-    quoterExpr = cL q_span $! HsVar noExt $! (cL q_span quoter)
-    quoteExpr  = cL q_span $! HsLit noExt $! HsString NoSourceText quote
+    quoterExpr = cL q_span $! HsVar noExtField $! (cL q_span quoter)
+    quoteExpr  = cL q_span $! HsLit noExtField $! HsString NoSourceText quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName
                        UntypedPatSplice  -> quotePatName
@@ -404,7 +404,7 @@ rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
 
 rnSplice splice@(HsSpliced {}) = pprPanic "rnSplice" (ppr splice)
 rnSplice splice@(HsSplicedT {}) = pprPanic "rnSplice" (ppr splice)
-rnSplice splice@(XSplice {})   = pprPanic "rnSplice" (ppr splice)
+rnSplice        (XSplice nec)   = noExtCon nec
 
 ---------------------
 rnSpliceExpr :: HsSplice GhcPs -> RnM (HsExpr GhcRn, FreeVars)
@@ -413,7 +413,7 @@ rnSpliceExpr splice
   where
     pend_expr_splice :: HsSplice GhcRn -> (PendingRnSplice, HsExpr GhcRn)
     pend_expr_splice rn_splice
-        = (makePending UntypedExpSplice rn_splice, HsSpliceE noExt rn_splice)
+        = (makePending UntypedExpSplice rn_splice, HsSpliceE noExtField rn_splice)
 
     run_expr_splice :: HsSplice GhcRn -> RnM (HsExpr GhcRn, FreeVars)
     run_expr_splice rn_splice
@@ -426,7 +426,7 @@ rnSpliceExpr splice
                                                      , isLocalGRE gre]
                  lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
 
-           ; return (HsSpliceE noExt rn_splice, lcl_names `plusFV` gbl_names) }
+           ; return (HsSpliceE noExtField rn_splice, lcl_names `plusFV` gbl_names) }
 
       | otherwise  -- Run it here, see Note [Running splices in the Renamer]
       = do { traceRn "rnSpliceExpr: untyped expression splice" empty
@@ -434,8 +434,8 @@ rnSpliceExpr splice
                 runRnSplice UntypedExpSplice runMetaE ppr rn_splice
            ; (lexpr3, fvs) <- checkNoErrs (rnLExpr rn_expr)
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( HsPar noExt $ HsSpliceE noExt
-                            . HsSpliced noExt (ThModFinalizers mod_finalizers)
+           ; return ( HsPar noExtField $ HsSpliceE noExtField
+                            . HsSpliced noExtField (ThModFinalizers mod_finalizers)
                             . HsSplicedExpr <$>
                             lexpr3
                     , fvs)
@@ -538,7 +538,7 @@ rnSpliceType splice
   where
     pend_type_splice rn_splice
        = ( makePending UntypedTypeSplice rn_splice
-         , HsSpliceTy noExt rn_splice)
+         , HsSpliceTy noExtField rn_splice)
 
     run_type_splice rn_splice
       = do { traceRn "rnSpliceType: untyped type splice" empty
@@ -548,8 +548,9 @@ rnSpliceType splice
                                  ; checkNoErrs $ rnLHsType doc hs_ty2 }
                                     -- checkNoErrs: see Note [Renamer errors]
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( HsParTy noExt $ HsSpliceTy noExt
-                              . HsSpliced noExt (ThModFinalizers mod_finalizers)
+           ; return ( HsParTy noExtField
+                              $ HsSpliceTy noExtField
+                              . HsSpliced noExtField (ThModFinalizers mod_finalizers)
                               . HsSplicedTy <$>
                               hs_ty3
                     , fvs
@@ -608,7 +609,7 @@ rnSplicePat splice
                        (PendingRnSplice, Either b (Pat GhcRn))
     pend_pat_splice rn_splice
       = (makePending UntypedPatSplice rn_splice
-        , Right (SplicePat noExt rn_splice))
+        , Right (SplicePat noExtField rn_splice))
 
     run_pat_splice :: HsSplice GhcRn ->
                       RnM (Either (Pat GhcPs) (Pat GhcRn), FreeVars)
@@ -617,8 +618,8 @@ rnSplicePat splice
            ; (pat, mod_finalizers) <-
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( Left $ ParPat noExt $ ((SplicePat noExt)
-                              . HsSpliced noExt (ThModFinalizers mod_finalizers)
+           ; return ( Left $ ParPat noExtField $ ((SplicePat noExtField)
+                              . HsSpliced noExtField (ThModFinalizers mod_finalizers)
                               . HsSplicedPat)  `onHasSrcSpan`
                               pat
                     , emptyFVs
@@ -633,10 +634,10 @@ rnSpliceDecl (SpliceDecl _ (dL->L loc splice) flg)
   where
     pend_decl_splice rn_splice
        = ( makePending UntypedDeclSplice rn_splice
-         , SpliceDecl noExt (cL loc rn_splice) flg)
+         , SpliceDecl noExtField (cL loc rn_splice) flg)
 
-    run_decl_splice rn_splice = pprPanic "rnSpliceDecl" (ppr rn_splice)
-rnSpliceDecl (XSpliceDecl _) = panic "rnSpliceDecl"
+    run_decl_splice rn_splice  = pprPanic "rnSpliceDecl" (ppr rn_splice)
+rnSpliceDecl (XSpliceDecl nec) = noExtCon nec
 
 rnTopSpliceDecls :: HsSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeVars)
 -- Declaration splice at the very top level of the module

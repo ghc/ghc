@@ -66,7 +66,7 @@ tcDefaults [L locn (DefaultDecl _ mono_tys)]
 tcDefaults decls@(L locn (DefaultDecl _ _) : _)
   = setSrcSpan locn $
     failWithTc (dupDefaultDeclErr decls)
-tcDefaults (L _ (XDefaultDecl _):_) = panic "tcDefaults"
+tcDefaults (L _ (XDefaultDecl nec):_) = noExtCon nec
 
 
 tc_default_ty :: [Class] -> LHsType GhcRn -> TcM Type
@@ -100,8 +100,8 @@ dupDefaultDeclErr (L _ (DefaultDecl _ _) : dup_things)
   where
     pp (L locn (DefaultDecl _ _))
       = text "here was another default declaration" <+> ppr locn
-    pp (L _ (XDefaultDecl _)) = panic "dupDefaultDeclErr"
-dupDefaultDeclErr (L _ (XDefaultDecl _) : _) = panic "dupDefaultDeclErr"
+    pp (L _ (XDefaultDecl nec)) = noExtCon nec
+dupDefaultDeclErr (L _ (XDefaultDecl nec) : _) = noExtCon nec
 dupDefaultDeclErr [] = panic "dupDefaultDeclErr []"
 
 badDefaultTy :: Type -> [Class] -> SDoc

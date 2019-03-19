@@ -965,11 +965,13 @@ hscCheckSafeImports tcg_env = do
               -> return tcg_env'
 
     warns dflags rules = listToBag $ map (warnRules dflags) rules
+
+    warnRules :: DynFlags -> GenLocated SrcSpan (RuleDecl GhcTc) -> ErrMsg
     warnRules dflags (L loc (HsRule { rd_name = n })) =
         mkPlainWarnMsg dflags loc $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
-    warnRules _ (L _ (XRuleDecl _)) = panic "hscCheckSafeImports"
+    warnRules _ (L _ (XRuleDecl nec)) = noExtCon nec
 
 -- | Validate that safe imported modules are actually safe.  For modules in the
 -- HomePackage (the package the module we are compiling in resides) this just

@@ -183,7 +183,7 @@ tcRnExports explicit_mod exports
         ; let real_exports
                  | explicit_mod = exports
                  | has_main
-                          = Just (noLoc [noLoc (IEVar noExt
+                          = Just (noLoc [noLoc (IEVar noExtField
                                      (noLoc (IEName $ noLoc default_main)))])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
@@ -317,7 +317,7 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
                              , ppr new_exports ])
 
              ; return (Just ( ExportAccum occs' mods
-                            , ( cL loc (IEModuleContents noExt lmod)
+                            , ( cL loc (IEModuleContents noExtField lmod)
                               , new_exports))) }
 
     exports_from_item acc@(ExportAccum occs mods) (dL->L loc ie)
@@ -340,18 +340,18 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
     lookup_ie :: IE GhcPs -> RnM (IE GhcRn, AvailInfo)
     lookup_ie (IEVar _ (dL->L l rdr))
         = do (name, avail) <- lookupGreAvailRn $ ieWrappedName rdr
-             return (IEVar noExt (cL l (replaceWrappedName rdr name)), avail)
+             return (IEVar noExtField (cL l (replaceWrappedName rdr name)), avail)
 
     lookup_ie (IEThingAbs _ (dL->L l rdr))
         = do (name, avail) <- lookupGreAvailRn $ ieWrappedName rdr
-             return (IEThingAbs noExt (cL l (replaceWrappedName rdr name))
+             return (IEThingAbs noExtField (cL l (replaceWrappedName rdr name))
                     , avail)
 
     lookup_ie ie@(IEThingAll _ n')
         = do
             (n, avail, flds) <- lookup_ie_all ie n'
             let name = unLoc n
-            return (IEThingAll noExt (replaceLWrappedName n' (unLoc n))
+            return (IEThingAll noExtField (replaceLWrappedName n' (unLoc n))
                    , AvailTC name (name:avail) flds)
 
 
@@ -364,7 +364,7 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
                 NoIEWildcard -> return (lname, [], [])
                 IEWildcard _ -> lookup_ie_all ie l
             let name = unLoc lname
-            return (IEThingWith noExt (replaceLWrappedName l name) wc subs
+            return (IEThingWith noExtField (replaceLWrappedName l name) wc subs
                                 (flds ++ (map noLoc all_flds)),
                     AvailTC name (name : avails ++ all_avail)
                                  (map unLoc flds ++ all_flds))
@@ -406,10 +406,10 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
     -------------
     lookup_doc_ie :: IE GhcPs -> RnM (IE GhcRn)
     lookup_doc_ie (IEGroup _ lev doc) = do rn_doc <- rnHsDoc doc
-                                           return (IEGroup noExt lev rn_doc)
+                                           return (IEGroup noExtField lev rn_doc)
     lookup_doc_ie (IEDoc _ doc)       = do rn_doc <- rnHsDoc doc
-                                           return (IEDoc noExt rn_doc)
-    lookup_doc_ie (IEDocNamed _ str)  = return (IEDocNamed noExt str)
+                                           return (IEDoc noExtField rn_doc)
+    lookup_doc_ie (IEDocNamed _ str)  = return (IEDocNamed noExtField str)
     lookup_doc_ie _ = panic "lookup_doc_ie"    -- Other cases covered earlier
 
     -- In an export item M.T(A,B,C), we want to treat the uses of

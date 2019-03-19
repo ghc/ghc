@@ -126,7 +126,7 @@ tcCmdTop env (L loc (HsCmdTop names cmd)) cmd_ty@(cmd_stk, res_ty)
     do  { cmd'   <- tcCmd env cmd cmd_ty
         ; names' <- mapM (tcSyntaxName ProcOrigin (cmd_arr env)) names
         ; return (L loc $ HsCmdTop (CmdTopTc cmd_stk res_ty names') cmd') }
-tcCmdTop _ (L _ XCmdTop{}) _ = panic "tcCmdTop"
+tcCmdTop _ (L _ (XCmdTop nec)) _ = noExtCon nec
 
 ----------------------------------------
 tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTcId)
@@ -254,7 +254,7 @@ tc_cmd env
                              tcPats LambdaExpr pats (map mkCheckExpType arg_tys) $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
-        ; let match' = L mtch_loc (Match { m_ext = noExt
+        ; let match' = L mtch_loc (Match { m_ext = noExtField
                                          , m_ctxt = LambdaExpr, m_pats = pats'
                                          , m_grhss = grhss' })
               arg_tys = map hsLPatType pats'
@@ -271,14 +271,14 @@ tc_cmd env
         = do { (binds', grhss') <- tcLocalBinds binds $
                                    mapM (wrapLocM (tc_grhs stk_ty res_ty)) grhss
              ; return (GRHSs x grhss' (L l binds')) }
-    tc_grhss (XGRHSs _) _ _ = panic "tc_grhss"
+    tc_grhss (XGRHSs nec) _ _ = noExtCon nec
 
     tc_grhs stk_ty res_ty (GRHS x guards body)
         = do { (guards', rhs') <- tcStmtsAndThen pg_ctxt tcGuardStmt guards res_ty $
                                   \ res_ty -> tcCmd env body
                                                 (stk_ty, checkingExpType "tc_grhs" res_ty)
              ; return (GRHS x guards' rhs') }
-    tc_grhs _ _ (XGRHS _) = panic "tc_grhs"
+    tc_grhs _ _ (XGRHS nec) = noExtCon nec
 
 -------------------------------------------
 --              Do notation
@@ -323,7 +323,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
             ; cmd' <- tcCmdTop env' cmd (stk_ty, res_ty)
             ; return (cmd',  mkCmdArrTy env' (mkPairTy alphaTy stk_ty) res_ty) }
 
-tc_cmd _ (XCmd {}) _ = panic "tc_cmd"
+tc_cmd _ (XCmd nec) _ = noExtCon nec
 
 -----------------------------------------------------------------
 --              Base case for illegal commands

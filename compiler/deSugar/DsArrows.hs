@@ -592,11 +592,11 @@ dsCmd ids local_vars stack_ty res_ty
     left_con <- dsLookupDataCon leftDataConName
     right_con <- dsLookupDataCon rightDataConName
     let
-        left_id  = HsConLikeOut noExt (RealDataCon left_con)
-        right_id = HsConLikeOut noExt (RealDataCon right_con)
-        left_expr  ty1 ty2 e = noLoc $ HsApp noExt
+        left_id  = HsConLikeOut noExtField (RealDataCon left_con)
+        right_id = HsConLikeOut noExtField (RealDataCon right_con)
+        left_expr  ty1 ty2 e = noLoc $ HsApp noExtField
                            (noLoc $ mkHsWrap (mkWpTyApps [ty1, ty2]) left_id ) e
-        right_expr ty1 ty2 e = noLoc $ HsApp noExt
+        right_expr ty1 ty2 e = noLoc $ HsApp noExtField
                            (noLoc $ mkHsWrap (mkWpTyApps [ty1, ty2]) right_id) e
 
         -- Prefix each tuple with a distinct series of Left's and Right's,
@@ -616,7 +616,7 @@ dsCmd ids local_vars stack_ty res_ty
         (_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
         in_ty = envStackType env_ids stack_ty
 
-    core_body <- dsExpr (HsCase noExt exp
+    core_body <- dsExpr (HsCase noExtField exp
                          (MG { mg_alts = cL l matches'
                              , mg_ext = MatchGroupTc arg_tys sum_ty
                              , mg_origin = origin }))
@@ -1167,7 +1167,7 @@ replaceLeavesMatch _res_ty leaves
   = let
         (leaves', grhss') = mapAccumL replaceLeavesGRHS leaves grhss
     in
-    (leaves', cL loc (match { m_ext = noExt, m_grhss = GRHSs x grhss' binds }))
+    (leaves', cL loc (match { m_ext = noExtField, m_grhss = GRHSs x grhss' binds }))
 replaceLeavesMatch _ _ _ = panic "replaceLeavesMatch"
 
 replaceLeavesGRHS
