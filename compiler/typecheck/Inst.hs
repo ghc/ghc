@@ -534,7 +534,7 @@ newOverloadedLit
   = newNonTrivialOverloadedLit orig lit res_ty
   where
     orig = LiteralOrigin lit
-newOverloadedLit XOverLit{} _ = panic "newOverloadedLit"
+newOverloadedLit (XOverLit nec) _ = noExtCon nec
 
 -- Does not handle things that 'shortCutLit' can handle. See also
 -- newOverloadedLit in TcUnify

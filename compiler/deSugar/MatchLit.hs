@@ -95,7 +95,7 @@ dsLit l = do
     HsString _ str   -> mkStringExprFS str
     HsInteger _ i _  -> mkIntegerExpr i
     HsInt _ i        -> return (mkIntExpr dflags (il_value i))
-    XLit x           -> pprPanic "dsLit" (ppr x)
+    XLit nec         -> noExtCon nec
     HsRat _ (FL _ _ val) ty -> do
       num   <- mkIntegerExpr (numerator val)
       denom <- mkIntegerExpr (denominator val)
@@ -116,7 +116,7 @@ dsOverLit (OverLit { ol_val = val, ol_ext = OverLitTc rebindable ty
   case shortCutLit dflags val ty of
     Just expr | not rebindable -> dsExpr expr        -- Note [Literal short cut]
     _                          -> dsExpr witness
-dsOverLit XOverLit{} = panic "dsOverLit"
+dsOverLit (XOverLit nec) = noExtCon nec
 {-
 Note [Literal short cut]
 ~~~~~~~~~~~~~~~~~~~~~~~~

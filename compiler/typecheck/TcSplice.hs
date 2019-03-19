@@ -207,9 +207,9 @@ tcBrackTy (ExpBr {})  = tcMetaTy expQTyConName  -- Result type is ExpQ (= Q Exp)
 tcBrackTy (TypBr {})  = tcMetaTy typeQTyConName -- Result type is Type (= Q Typ)
 tcBrackTy (DecBrG {}) = tcMetaTy decsQTyConName -- Result type is Q [Dec]
 tcBrackTy (PatBr {})  = tcMetaTy patQTyConName  -- Result type is PatQ (= Q Pat)
-tcBrackTy (DecBrL {})   = panic "tcBrackTy: Unexpected DecBrL"
-tcBrackTy (TExpBr {})   = panic "tcUntypedBracket: Unexpected TExpBr"
-tcBrackTy (XBracket {}) = panic "tcUntypedBracket: Unexpected XBracket"
+tcBrackTy (DecBrL {}) = panic "tcBrackTy: Unexpected DecBrL"
+tcBrackTy (TExpBr {}) = panic "tcUntypedBracket: Unexpected TExpBr"
+tcBrackTy (XBracket nec) = noExtCon nec
 
 ---------------
 tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice

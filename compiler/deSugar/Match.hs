@@ -752,13 +752,13 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
            ; return (EqnInfo { eqn_pats = upats
                              , eqn_orig = FromSource
                              , eqn_rhs = match_result }) }
-    mk_eqn_info _ (dL->L _ (XMatch _)) = panic "matchWrapper"
+    mk_eqn_info _ (dL->L _ (XMatch nec)) = noExtCon nec
     mk_eqn_info _ _  = panic "mk_eqn_info: Impossible Match" -- due to #15884
 
     handleWarnings = if isGenerated origin
                      then discardWarningsDs
                      else id
-matchWrapper _ _ (XMatchGroup _) = panic "matchWrapper"
+matchWrapper _ _ (XMatchGroup nec) = noExtCon nec
 
 matchEquations  :: HsMatchContext Name
                 -> [MatchId] -> [EquationInfo] -> Type

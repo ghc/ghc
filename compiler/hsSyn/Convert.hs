@@ -587,7 +587,7 @@ cvtConstr (ForallC tvs ctxt con)
       where
         all_tvs = hsQTvExplicit tvs' ++ ex_tvs
 
-    add_forall _ _ (XConDecl _) = panic "cvtConstr"
+    add_forall _ _ (XConDecl nec) = noExtCon nec
 
 cvtConstr (GadtC c strtys ty)
   = do  { c'      <- mapM cNameL c

@@ -380,7 +380,7 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
                         , m_pats = []
                         , m_grhss = guards }
     checkMatches dflags dsMatchContext [] [match]
-checkGuardMatches _ (XGRHSs _) = panic "checkGuardMatches"
+checkGuardMatches _ (XGRHSs nec) = noExtCon nec
 
 -- | Check a matchgroup (case, functions, etc.)
 checkMatches :: DynFlags -> DsMatchContext
@@ -1312,7 +1312,7 @@ translateGuard fam_insts guard = case guard of
   TransStmt       {} -> panic "translateGuard TransStmt"
   RecStmt         {} -> panic "translateGuard RecStmt"
   ApplicativeStmt {} -> panic "translateGuard ApplicativeLastStmt"
-  XStmtLR         {} -> panic "translateGuard RecStmt"
+  XStmtLR nec        -> noExtCon nec
 
 -- | Translate let-bindings
 translateLet :: HsLocalBinds GhcTc -> DsM PatVec

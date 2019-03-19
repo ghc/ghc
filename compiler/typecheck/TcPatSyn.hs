@@ -102,7 +102,7 @@ recoverPSB (PSB { psb_id = (dL->L _ name)
          matcher_id = mkLocalId matcher_name $
                       mkSpecForAllTys [alphaTyVar] alphaTy
 
-recoverPSB (XPatSynBind {}) = panic "recoverPSB"
+recoverPSB (XPatSynBind nec) = noExtCon nec
 
 {- Note [Pattern synonym error recovery]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -187,7 +187,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(dL->L _ name), psb_args = details
                             , mkTyVarTys ex_tvs, prov_theta, prov_evs)
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields } }
-tcInferPatSynDecl (XPatSynBind _) = panic "tcInferPatSynDecl"
+tcInferPatSynDecl (XPatSynBind nec) = noExtCon nec
 
 mkProvEvidence :: EvId -> Maybe (PredType, EvTerm)
 -- See Note [Equality evidence in pattern synonyms]
@@ -434,7 +434,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(dL->L _ name), psb_args = details
                 -- Why do we need tcSubType here?
                 -- See Note [Pattern synonyms and higher rank types]
            ; return (mkLHsWrap wrap $ nlHsVar arg_id) }
-tcCheckPatSynDecl (XPatSynBind _) _ = panic "tcCheckPatSynDecl"
+tcCheckPatSynDecl (XPatSynBind nec) _ = noExtCon nec
 
 {- [Pattern synonyms and higher rank types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -882,7 +882,7 @@ tcPatSynBuilderBind (PSB { psb_id = (dL->L loc name)
       = mg { mg_alts = cL l [cL loc (match { m_pats = nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
-tcPatSynBuilderBind (XPatSynBind _) = panic "tcPatSynBuilderBind"
+tcPatSynBuilderBind (XPatSynBind nec) = noExtCon nec
 
 tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTcId, TcSigmaType)
 -- monadic only for failure
