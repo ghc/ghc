@@ -42,7 +42,6 @@ import TcEvidence
 import Outputable
 import Util
 import SrcLoc
-import PrelNames (monadFailClassName)
 
 -- Create chunkified tuple tybes for monad comprehensions
 import MkCore
