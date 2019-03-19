@@ -1327,7 +1327,10 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 
     if exit_code != 0 and not should_fail:
         if config.verbose >= 1 and _expect_pass(way):
-            print('Compile failed (exit code {0}) errors were:'.format(exit_code))
+            if exit_code == 99:
+                print('Compile timed out, errors were:')
+            else:
+                print('Compile failed (exit code {0}) errors were:'.format(exit_code))
             dump_file(actual_stderr_path)
 
     # ToDo: if the sub-shell was killed by ^C, then exit
@@ -1342,7 +1345,9 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
             stderr_contents = open(actual_stderr_path, 'rb').read()
             return failBecauseStderr('exit code 0', stderr_contents)
     else:
-        if exit_code != 0:
+        if exit_code == 99:
+            return failBecause('timeout')
+        elif exit_code != 0:
             stderr_contents = open(actual_stderr_path, 'rb').read()
             return failBecauseStderr('exit code non-0', stderr_contents)
 
@@ -1399,10 +1404,16 @@ def simple_run(name, way, prog, extra_run_opts):
     # check the exit code
     if exit_code != opts.exit_code:
         if config.verbose >= 1 and _expect_pass(way):
-            print('Wrong exit code for ' + name + '(' + way + ')' + '(expected', opts.exit_code, ', actual', exit_code, ')')
-            dump_stdout(name)
-            dump_stderr(name)
-        return failBecause('bad exit code')
+            if exit_code == 99:
+                print(name + '(' + way + ') timed out')
+            else:
+                print('Wrong exit code for ' + name + '(' + way + ')' + '(expected', opts.exit_code, ', actual', exit_code, ')')
+                dump_stdout(name)
+                dump_stderr(name)
+        if exit_code == 99:
+            return failBecause('timeout')
+        else:
+            return failBecause('bad exit code')
 
     if not (opts.ignore_stderr or stderr_ok(name, way) or opts.combined_output):
         return failBecause('bad stderr')
@@ -1486,10 +1497,16 @@ def interpreter_run(name, way, extra_hc_opts, top_mod):
 
     # check the exit code
     if exit_code != getTestOpts().exit_code:
-        print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
-        dump_stdout(name)
-        dump_stderr(name)
-        return failBecause('bad exit code')
+        if exit_code == 99:
+            print(name + '(' + way + ') timed out')
+            dump_stdout(name)
+            dump_stderr(name)
+            return failBecause('timeout')
+        else:
+            print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
+            dump_stdout(name)
+            dump_stderr(name)
+            return failBecause('bad exit code')
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
