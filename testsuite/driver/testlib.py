@@ -2214,7 +2214,7 @@ def printUnexpectedTests(file, testInfoss):
 
 def printTestInfosSummary(file, testInfos):
     maxDirLen = max(len(tr.directory) for tr in testInfos)
-    for result in testInfos:
+    for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.way, r.directory)):
         directory = result.directory.ljust(maxDirLen)
         file.write('   {directory}  {r.testname} [{r.reason}] ({r.way})\n'.format(
             r = result,
