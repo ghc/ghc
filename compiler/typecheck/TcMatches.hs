@@ -42,9 +42,7 @@ import TcEvidence
 import Outputable
 import Util
 import SrcLoc
-import DynFlags
 import PrelNames (monadFailClassName)
-import qualified GHC.LanguageExtensions as LangExt
 
 -- Create chunkified tuple tybes for monad comprehensions
 import MkCore
