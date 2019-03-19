@@ -377,11 +377,11 @@ validate-x86_64-windows:
   variables:
     GHC_VERSION: "8.6.2"
     LANG: "en_US.UTF-8"
+    MSYSTEM: MINGW64
   script:
     - |
-      set MSYSTEM=MINGW64
       python boot
-      bash -c './configure --with-ghc=`pwd`/toolchain/bin/ghc --enable-tarballs-autodownload HappyCmd=`pwd`/toolchain/bin/happy AlexCmd=`pwd`/toolchain/bin/alex'
+      bash -c './configure --with-ghc=`pwd`/toolchain/bin/ghc --enable-tarballs-autodownload HappyCmd=`pwd`/toolchain/bin/happy AlexCmd=`pwd`/toolchain/bin/alex --target=x86_64-unknown-mingw32'
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
     - |
       bash -c "make binary-dist TAR_COMP_OPTS=-1"
@@ -389,6 +389,36 @@ validate-x86_64-windows:
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   cache:
     key: x86_64-windows
+  tags:
+    - x86_64-windows
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+    paths:
+      - ghc.tar.xz
+      - junit.xml
+
+validate-i386-windows:
+  extends: .validate-windows
+  stage: build
+  # due to #16084
+  allow_failure: true
+  variables:
+    GHC_VERSION: "8.6.2"
+    LANG: "en_US.UTF-8"
+    MSYSTEM: MINGW32
+  script:
+    - |
+      python boot
+      bash -c './configure --with-ghc=`pwd`/toolchain/bin/ghc --enable-tarballs-autodownload HappyCmd=`pwd`/toolchain/bin/happy AlexCmd=`pwd`/toolchain/bin/alex --target=i386-unknown-mingw32'
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
+    - |
+      bash -c "make binary-dist TAR_COMP_OPTS=-1"
+      mv ghc-*.tar.xz ghc.tar.xz
+    - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
+  cache:
+    key: i386-windows
   tags:
     - x86_64-windows
   artifacts:
