@@ -1,5 +1,4 @@
-{-# LANGUAGE RebindableSyntax, MonadFailDesugaring #-}
-{-# OPTIONS_GHC -Wno-missing-monadfail-instances #-}
+{-# LANGUAGE RebindableSyntax #-}
 
 -- Test that rebindable clash warnings are not displayed. This program
 -- should not generate anything on stderr at compile time.

@@ -1,8 +1,6 @@
 -- Test purpose:
 -- Break properly if MonadFail is live
 
-{-# LANGUAGE MonadFailDesugaring #-}
-
 module MonadFailWarnings where
 
 import Control.Monad.Fail
