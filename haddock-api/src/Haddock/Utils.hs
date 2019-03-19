@@ -135,17 +135,17 @@ mkEmptySigWcType ty = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs ty)
 addClassContext :: Name -> LHsQTyVars GhcRn -> LSig GhcRn -> LSig GhcRn
 -- Add the class context to a class-op signature
 addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype))
-  = L pos (TypeSig noExt lname (mkEmptySigWcType (go (hsSigType ltype))))
+  = L pos (TypeSig noExtField lname (mkEmptySigWcType (go (hsSigType ltype))))
           -- The mkEmptySigWcType is suspicious
   where
     go (L loc (HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs, hst_body = ty }))
-       = L loc (HsForAllTy { hst_fvf = fvf, hst_xforall = noExt
+       = L loc (HsForAllTy { hst_fvf = fvf, hst_xforall = noExtField
                            , hst_bndrs = tvs, hst_body = go ty })
     go (L loc (HsQualTy { hst_ctxt = ctxt, hst_body = ty }))
-       = L loc (HsQualTy { hst_xqual = noExt
+       = L loc (HsQualTy { hst_xqual = noExtField
                          , hst_ctxt = add_ctxt ctxt, hst_body = ty })
     go (L loc ty)
-       = L loc (HsQualTy { hst_xqual = noExt
+       = L loc (HsQualTy { hst_xqual = noExtField
                          , hst_ctxt = add_ctxt (L loc []), hst_body = L loc ty })
 
     extra_pred = nlHsTyConApp cls (lHsQTyVarsToTypes tvs0)
@@ -155,7 +155,7 @@ addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 
 lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsType GhcRn]
 lHsQTyVarsToTypes tvs
-  = [ noLoc (HsTyVar NoExt NotPromoted (noLoc (hsLTyVarName tv)))
+  = [ noLoc (HsTyVar noExtField NotPromoted (noLoc (hsLTyVarName tv)))
     | tv <- hsQTvExplicit tvs ]
 
 --------------------------------------------------------------------------------
@@ -201,7 +201,7 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
         field_avail :: LConDeclField GhcRn -> Bool
         field_avail (L _ (ConDeclField _ fs _ _))
             = all (\f -> extFieldOcc (unLoc f) `elem` names) fs
-        field_avail (L _ (XConDeclField _)) = panic "haddock:field_avail"
+        field_avail (L _ (XConDeclField nec)) = noExtCon nec
         field_types flds = [ t | ConDeclField _ _ t _ <- flds ]
 
     keep _ = Nothing

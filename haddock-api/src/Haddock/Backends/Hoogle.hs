@@ -196,7 +196,7 @@ ppFam dflags decl@(FamilyDecl { fdInfo = info })
               -- for Hoogle, so pretend it doesn't have any.
               ClosedTypeFamily{} -> decl { fdInfo = OpenTypeFamily }
               _                  -> decl
-ppFam _ XFamilyDecl {} = panic "ppFam"
+ppFam _ (XFamilyDecl nec) = noExtCon nec
 
 ppInstance :: DynFlags -> ClsInst -> [String]
 ppInstance dflags x =
@@ -245,8 +245,8 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
                            [out dflags (map (extFieldOcc . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
                           | r <- map unLoc recs]
 
-        funs = foldr1 (\x y -> reL $ HsFunTy NoExt x y)
-        apps = foldl1 (\x y -> reL $ HsAppTy NoExt x y)
+        funs = foldr1 (\x y -> reL $ HsFunTy noExtField x y)
+        apps = foldl1 (\x y -> reL $ HsAppTy noExtField x y)
 
         typeSig nm flds = operator nm ++ " :: " ++ outHsType dflags (unL $ funs flds)
 
@@ -254,12 +254,12 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         -- docs for con_names on why it is a list to begin with.
         name = commaSeparate dflags . map unL $ getConNames con
 
-        tyVarArg (UserTyVar _ n) = HsTyVar NoExt NotPromoted n
-        tyVarArg (KindedTyVar _ n lty) = HsKindSig NoExt (reL (HsTyVar NoExt NotPromoted n)) lty
+        tyVarArg (UserTyVar _ n) = HsTyVar noExtField NotPromoted n
+        tyVarArg (KindedTyVar _ n lty) = HsKindSig noExtField (reL (HsTyVar noExtField NotPromoted n)) lty
         tyVarArg _ = panic "ppCtor"
 
         resType = apps $ map reL $
-                        (HsTyVar NoExt NotPromoted (reL (tcdName dat))) :
+                        (HsTyVar noExtField NotPromoted (reL (tcdName dat))) :
                         map (tyVarArg . unLoc) (hsQTvExplicit $ tyClDeclTyVars dat)
 
 ppCtor dflags _dat subdocs con@(ConDeclGADT { })
@@ -269,10 +269,10 @@ ppCtor dflags _dat subdocs con@(ConDeclGADT { })
 
         typeSig nm ty = operator nm ++ " :: " ++ outHsType dflags (unL ty)
         name = out dflags $ map unL $ getConNames con
-ppCtor _ _ _ XConDecl {} = panic "haddock:ppCtor"
+ppCtor _ _ _ (XConDecl nec) = noExtCon nec
 
 ppFixity :: DynFlags -> (Name, Fixity) -> [String]
-ppFixity dflags (name, fixity) = [out dflags ((FixitySig noExt [noLoc name] fixity) :: FixitySig GhcRn)]
+ppFixity dflags (name, fixity) = [out dflags ((FixitySig noExtField [noLoc name] fixity) :: FixitySig GhcRn)]
 
 
 ---------------------------------------------------------------------

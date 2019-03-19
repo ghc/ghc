@@ -204,14 +204,14 @@ renameMaybeLKind = traverse renameLKind
 
 renameFamilyResultSig :: LFamilyResultSig GhcRn -> RnM (LFamilyResultSig DocNameI)
 renameFamilyResultSig (L loc (NoSig _))
-    = return (L loc (NoSig noExt))
+    = return (L loc (NoSig noExtField))
 renameFamilyResultSig (L loc (KindSig _ ki))
     = do { ki' <- renameLKind ki
-         ; return (L loc (KindSig noExt ki')) }
+         ; return (L loc (KindSig noExtField ki')) }
 renameFamilyResultSig (L loc (TyVarSig _ bndr))
     = do { bndr' <- renameLTyVarBndr bndr
-         ; return (L loc (TyVarSig noExt bndr')) }
-renameFamilyResultSig (L _ (XFamilyResultSig _)) = panic "haddock:renameFamilyResultSig"
+         ; return (L loc (TyVarSig noExtField bndr')) }
+renameFamilyResultSig (L _ (XFamilyResultSig nec)) = noExtCon nec
 
 renameInjectivityAnn :: LInjectivityAnn GhcRn -> RnM (LInjectivityAnn DocNameI)
 renameInjectivityAnn (L loc (InjectivityAnn lhs rhs))
@@ -228,61 +228,61 @@ renameType t = case t of
   HsForAllTy { hst_fvf = fvf, hst_bndrs = tyvars, hst_body = ltype } -> do
     tyvars'   <- mapM renameLTyVarBndr tyvars
     ltype'    <- renameLType ltype
-    return (HsForAllTy { hst_fvf = fvf, hst_xforall = NoExt
+    return (HsForAllTy { hst_fvf = fvf, hst_xforall = noExtField
                        , hst_bndrs = tyvars', hst_body = ltype' })
 
   HsQualTy { hst_ctxt = lcontext , hst_body = ltype } -> do
     lcontext' <- renameLContext lcontext
     ltype'    <- renameLType ltype
-    return (HsQualTy { hst_xqual = NoExt, hst_ctxt = lcontext', hst_body = ltype' })
+    return (HsQualTy { hst_xqual = noExtField, hst_ctxt = lcontext', hst_body = ltype' })
 
-  HsTyVar _ ip (L l n) -> return . HsTyVar NoExt ip . L l =<< rename n
-  HsBangTy _ b ltype -> return . HsBangTy NoExt b =<< renameLType ltype
+  HsTyVar _ ip (L l n) -> return . HsTyVar noExtField ip . L l =<< rename n
+  HsBangTy _ b ltype -> return . HsBangTy noExtField b =<< renameLType ltype
 
-  HsStarTy _ isUni -> return (HsStarTy NoExt isUni)
+  HsStarTy _ isUni -> return (HsStarTy noExtField isUni)
 
   HsAppTy _ a b -> do
     a' <- renameLType a
     b' <- renameLType b
-    return (HsAppTy NoExt a' b')
+    return (HsAppTy noExtField a' b')
 
   HsAppKindTy _ a b -> do
     a' <- renameLType a
     b' <- renameLKind b
-    return (HsAppKindTy NoExt a' b')
+    return (HsAppKindTy noExtField a' b')
 
   HsFunTy _ a b -> do
     a' <- renameLType a
     b' <- renameLType b
-    return (HsFunTy NoExt a' b')
+    return (HsFunTy noExtField a' b')
 
-  HsListTy _ ty -> return . (HsListTy NoExt) =<< renameLType ty
-  HsIParamTy _ n ty -> liftM (HsIParamTy NoExt n) (renameLType ty)
+  HsListTy _ ty -> return . (HsListTy noExtField) =<< renameLType ty
+  HsIParamTy _ n ty -> liftM (HsIParamTy noExtField n) (renameLType ty)
 
-  HsTupleTy _ b ts -> return . HsTupleTy NoExt b =<< mapM renameLType ts
-  HsSumTy _ ts -> HsSumTy NoExt <$> mapM renameLType ts
+  HsTupleTy _ b ts -> return . HsTupleTy noExtField b =<< mapM renameLType ts
+  HsSumTy _ ts -> HsSumTy noExtField <$> mapM renameLType ts
 
   HsOpTy _ a (L loc op) b -> do
     op' <- rename op
     a'  <- renameLType a
     b'  <- renameLType b
-    return (HsOpTy NoExt a' (L loc op') b')
+    return (HsOpTy noExtField a' (L loc op') b')
 
-  HsParTy _ ty -> return . (HsParTy NoExt) =<< renameLType ty
+  HsParTy _ ty -> return . (HsParTy noExtField) =<< renameLType ty
 
   HsKindSig _ ty k -> do
     ty' <- renameLType ty
     k' <- renameLKind k
-    return (HsKindSig NoExt ty' k')
+    return (HsKindSig noExtField ty' k')
 
   HsDocTy _ ty doc -> do
     ty' <- renameLType ty
     doc' <- renameLDocHsSyn doc
-    return (HsDocTy NoExt ty' doc')
+    return (HsDocTy noExtField ty' doc')
 
-  HsTyLit _ x -> return (HsTyLit NoExt x)
+  HsTyLit _ x -> return (HsTyLit noExtField x)
 
-  HsRecTy _ a               -> HsRecTy NoExt <$> mapM renameConDeclFieldField a
+  HsRecTy _ a               -> HsRecTy noExtField <$> mapM renameConDeclFieldField a
   (XHsType (NHsCoreTy a))   -> pure (XHsType (NHsCoreTy a))
   HsExplicitListTy i a b  -> HsExplicitListTy i a <$> mapM renameLType b
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
@@ -303,9 +303,9 @@ renameHsSpliceTy _ = error "renameHsSpliceTy: not an HsSpliced"
 renameLHsQTyVars :: LHsQTyVars GhcRn -> RnM (LHsQTyVars DocNameI)
 renameLHsQTyVars (HsQTvs { hsq_explicit = tvs })
   = do { tvs' <- mapM renameLTyVarBndr tvs
-       ; return (HsQTvs { hsq_ext = noExt
+       ; return (HsQTvs { hsq_ext = noExtField
                         , hsq_explicit = tvs' }) }
-renameLHsQTyVars (XLHsQTyVars _) = panic "haddock:renameLHsQTyVars"
+renameLHsQTyVars (XLHsQTyVars nec) = noExtCon nec
 
 renameLTyVarBndr :: LHsTyVarBndr GhcRn -> RnM (LHsTyVarBndr DocNameI)
 renameLTyVarBndr (L loc (UserTyVar x (L l n)))
@@ -353,19 +353,19 @@ renameDecl :: HsDecl GhcRn -> RnM (HsDecl DocNameI)
 renameDecl decl = case decl of
   TyClD _ d -> do
     d' <- renameTyClD d
-    return (TyClD noExt d')
+    return (TyClD noExtField d')
   SigD _ s -> do
     s' <- renameSig s
-    return (SigD noExt s')
+    return (SigD noExtField s')
   ForD _ d -> do
     d' <- renameForD d
-    return (ForD noExt d')
+    return (ForD noExtField d')
   InstD _ d -> do
     d' <- renameInstD d
-    return (InstD noExt d')
+    return (InstD noExtField d')
   DerivD _ d -> do
     d' <- renameDerivD d
-    return (DerivD noExt d')
+    return (DerivD noExtField d')
   _ -> error "renameDecl"
 
 renameLThing :: (a GhcRn -> RnM (a DocNameI)) -> Located (a GhcRn) -> RnM (Located (a DocNameI))
@@ -376,20 +376,20 @@ renameTyClD d = case d of
 --  TyFamily flav lname ltyvars kind tckind -> do
   FamDecl { tcdFam = decl } -> do
     decl' <- renameFamilyDecl decl
-    return (FamDecl { tcdFExt = noExt, tcdFam = decl' })
+    return (FamDecl { tcdFExt = noExtField, tcdFam = decl' })
 
   SynDecl { tcdLName = lname, tcdTyVars = tyvars, tcdFixity = fixity, tcdRhs = rhs } -> do
     lname'    <- renameL lname
     tyvars'   <- renameLHsQTyVars tyvars
     rhs'     <- renameLType rhs
-    return (SynDecl { tcdSExt = noExt, tcdLName = lname', tcdTyVars = tyvars'
+    return (SynDecl { tcdSExt = noExtField, tcdLName = lname', tcdTyVars = tyvars'
                     , tcdFixity = fixity, tcdRhs = rhs' })
 
   DataDecl { tcdLName = lname, tcdTyVars = tyvars, tcdFixity = fixity, tcdDataDefn = defn } -> do
     lname'    <- renameL lname
     tyvars'   <- renameLHsQTyVars tyvars
     defn'     <- renameDataDefn defn
-    return (DataDecl { tcdDExt = noExt, tcdLName = lname', tcdTyVars = tyvars'
+    return (DataDecl { tcdDExt = noExtField, tcdLName = lname', tcdTyVars = tyvars'
                      , tcdFixity = fixity, tcdDataDefn = defn' })
 
   ClassDecl { tcdCtxt = lcontext, tcdLName = lname, tcdTyVars = ltyvars, tcdFixity = fixity
@@ -405,8 +405,8 @@ renameTyClD d = case d of
     return (ClassDecl { tcdCtxt = lcontext', tcdLName = lname', tcdTyVars = ltyvars'
                       , tcdFixity = fixity
                       , tcdFDs = lfundeps', tcdSigs = lsigs', tcdMeths= emptyBag
-                      , tcdATs = ats', tcdATDefs = at_defs', tcdDocs = [], tcdCExt = NoExt })
-  XTyClDecl _ -> panic "haddock:renameTyClD"
+                      , tcdATs = ats', tcdATDefs = at_defs', tcdDocs = [], tcdCExt = noExtField })
+  XTyClDecl nec -> noExtCon nec
 
   where
     renameLFunDep (L loc (xs, ys)) = do
@@ -427,12 +427,12 @@ renameFamilyDecl (FamilyDecl { fdInfo = info, fdLName = lname
     ltyvars'     <- renameLHsQTyVars ltyvars
     result'      <- renameFamilyResultSig result
     injectivity' <- renameMaybeInjectivityAnn injectivity
-    return (FamilyDecl { fdExt = noExt, fdInfo = info', fdLName = lname'
+    return (FamilyDecl { fdExt = noExtField, fdInfo = info', fdLName = lname'
                        , fdTyVars = ltyvars'
                        , fdFixity = fixity
                        , fdResultSig = result'
                        , fdInjectivityAnn = injectivity' })
-renameFamilyDecl (XFamilyDecl _) = panic "renameFamilyDecl"
+renameFamilyDecl (XFamilyDecl nec) = noExtCon nec
 
 
 renamePseudoFamilyDecl :: PseudoFamilyDecl GhcRn
@@ -458,11 +458,11 @@ renameDataDefn (HsDataDefn { dd_ND = nd, dd_ctxt = lcontext, dd_cType = cType
     k'        <- renameMaybeLKind k
     cons'     <- mapM (mapM renameCon) cons
     -- I don't think we need the derivings, so we return Nothing
-    return (HsDataDefn { dd_ext = noExt
+    return (HsDataDefn { dd_ext = noExtField
                        , dd_ND = nd, dd_ctxt = lcontext', dd_cType = cType
                        , dd_kindSig = k', dd_cons = cons'
                        , dd_derivs = noLoc [] })
-renameDataDefn (XHsDataDefn _) = panic "haddock:renameDataDefn"
+renameDataDefn (XHsDataDefn nec) = noExtCon nec
 
 renameCon :: ConDecl GhcRn -> RnM (ConDecl DocNameI)
 renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
@@ -473,7 +473,7 @@ renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
       lcontext' <- traverse renameLContext lcontext
       details'  <- renameDetails details
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
-      return (decl { con_ext = noExt, con_name = lname', con_ex_tvs = ltyvars'
+      return (decl { con_ext = noExtField, con_name = lname', con_ex_tvs = ltyvars'
                    , con_mb_cxt = lcontext'
                    , con_args = details', con_doc = mbldoc' })
 
@@ -487,10 +487,10 @@ renameCon decl@(ConDeclGADT { con_names = lnames, con_qvars = ltyvars
       details'  <- renameDetails details
       res_ty'   <- renameLType res_ty
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
-      return (decl { con_g_ext = noExt, con_names = lnames', con_qvars = ltyvars'
+      return (decl { con_g_ext = noExtField, con_names = lnames', con_qvars = ltyvars'
                    , con_mb_cxt = lcontext', con_args = details'
                    , con_res_ty = res_ty', con_doc = mbldoc' })
-renameCon (XConDecl _) = panic "haddock:renameCon"
+renameCon (XConDecl nec) = noExtCon nec
 
 renameDetails :: HsConDeclDetails GhcRn -> RnM (HsConDeclDetails DocNameI)
 renameDetails (RecCon (L l fields)) = do
@@ -507,8 +507,8 @@ renameConDeclFieldField (L l (ConDeclField _ names t doc)) = do
   names' <- mapM renameLFieldOcc names
   t'   <- renameLType t
   doc' <- mapM renameLDocHsSyn doc
-  return $ L l (ConDeclField noExt names' t' doc')
-renameConDeclFieldField (L _ (XConDeclField _)) = panic "haddock:renameConDeclFieldField"
+  return $ L l (ConDeclField noExtField names' t' doc')
+renameConDeclFieldField (L _ (XConDeclField nec)) = noExtCon nec
 
 renameLFieldOcc :: LFieldOcc GhcRn -> RnM (LFieldOcc DocNameI)
 renameLFieldOcc (L l (FieldOcc sel lbl)) = do
@@ -521,21 +521,21 @@ renameSig sig = case sig of
   TypeSig _ lnames ltype -> do
     lnames' <- mapM renameL lnames
     ltype' <- renameLSigWcType ltype
-    return (TypeSig noExt lnames' ltype')
+    return (TypeSig noExtField lnames' ltype')
   ClassOpSig _ is_default lnames sig_ty -> do
     lnames' <- mapM renameL lnames
     ltype' <- renameLSigType sig_ty
-    return (ClassOpSig noExt is_default lnames' ltype')
+    return (ClassOpSig noExtField is_default lnames' ltype')
   PatSynSig _ lnames sig_ty -> do
     lnames' <- mapM renameL lnames
     sig_ty' <- renameLSigType sig_ty
-    return $ PatSynSig noExt lnames' sig_ty'
+    return $ PatSynSig noExtField lnames' sig_ty'
   FixSig _ (FixitySig _ lnames fixity) -> do
     lnames' <- mapM renameL lnames
-    return $ FixSig noExt (FixitySig noExt lnames' fixity)
+    return $ FixSig noExtField (FixitySig noExtField lnames' fixity)
   MinimalSig _ src (L l s) -> do
     s' <- traverse renameL s
-    return $ MinimalSig noExt src (L l s')
+    return $ MinimalSig noExtField src (L l s')
   -- we have filtered out all other kinds of signatures in Interface.Create
   _ -> error "expected TypeSig"
 
@@ -544,25 +544,25 @@ renameForD :: ForeignDecl GhcRn -> RnM (ForeignDecl DocNameI)
 renameForD (ForeignImport _ lname ltype x) = do
   lname' <- renameL lname
   ltype' <- renameLSigType ltype
-  return (ForeignImport noExt lname' ltype' x)
+  return (ForeignImport noExtField lname' ltype' x)
 renameForD (ForeignExport _ lname ltype x) = do
   lname' <- renameL lname
   ltype' <- renameLSigType ltype
-  return (ForeignExport noExt lname' ltype' x)
-renameForD (XForeignDecl _) = panic "haddock:renameForD"
+  return (ForeignExport noExtField lname' ltype' x)
+renameForD (XForeignDecl nec) = noExtCon nec
 
 
 renameInstD :: InstDecl GhcRn -> RnM (InstDecl DocNameI)
 renameInstD (ClsInstD { cid_inst = d }) = do
   d' <- renameClsInstD d
-  return (ClsInstD { cid_d_ext = noExt, cid_inst = d' })
+  return (ClsInstD { cid_d_ext = noExtField, cid_inst = d' })
 renameInstD (TyFamInstD { tfid_inst = d }) = do
   d' <- renameTyFamInstD d
-  return (TyFamInstD { tfid_ext = noExt, tfid_inst = d' })
+  return (TyFamInstD { tfid_ext = noExtField, tfid_inst = d' })
 renameInstD (DataFamInstD { dfid_inst = d }) = do
   d' <- renameDataFamInstD d
-  return (DataFamInstD { dfid_ext = noExt, dfid_inst = d' })
-renameInstD (XInstDecl _) = panic "haddock:renameInstD"
+  return (DataFamInstD { dfid_ext = noExtField, dfid_inst = d' })
+renameInstD (XInstDecl nec) = noExtCon nec
 
 renameDerivD :: DerivDecl GhcRn -> RnM (DerivDecl DocNameI)
 renameDerivD (DerivDecl { deriv_type = ty
@@ -570,11 +570,11 @@ renameDerivD (DerivDecl { deriv_type = ty
                         , deriv_overlap_mode = omode }) = do
   ty'    <- renameLSigWcType ty
   strat' <- mapM (mapM renameDerivStrategy) strat
-  return (DerivDecl { deriv_ext = noExt
+  return (DerivDecl { deriv_ext = noExtField
                     , deriv_type = ty'
                     , deriv_strategy = strat'
                     , deriv_overlap_mode = omode })
-renameDerivD (XDerivDecl _) = panic "haddock:renameDerivD"
+renameDerivD (XDerivDecl nec) = noExtCon nec
 
 renameDerivStrategy :: DerivStrategy GhcRn -> RnM (DerivStrategy DocNameI)
 renameDerivStrategy StockStrategy    = pure StockStrategy
@@ -589,11 +589,11 @@ renameClsInstD (ClsInstDecl { cid_overlap_mode = omode
   ltype' <- renameLSigType ltype
   lATs'  <- mapM (mapM renameTyFamInstD) lATs
   lADTs' <- mapM (mapM renameDataFamInstD) lADTs
-  return (ClsInstDecl { cid_ext = noExt, cid_overlap_mode = omode
+  return (ClsInstDecl { cid_ext = noExtField, cid_overlap_mode = omode
                       , cid_poly_ty = ltype', cid_binds = emptyBag
                       , cid_sigs = []
                       , cid_tyfam_insts = lATs', cid_datafam_insts = lADTs' })
-renameClsInstD (XClsInstDecl _) = panic "haddock:renameClsInstD"
+renameClsInstD (XClsInstDecl nec) = noExtCon nec
 
 
 renameTyFamInstD :: TyFamInstDecl GhcRn -> RnM (TyFamInstDecl DocNameI)
@@ -615,13 +615,13 @@ renameTyFamInstEqn eqn
            ; bndrs' <- traverse (mapM renameLTyVarBndr) bndrs
            ; pats' <- mapM renameLTypeArg pats
            ; rhs' <- renameLType rhs
-           ; return (FamEqn { feqn_ext    = noExt
+           ; return (FamEqn { feqn_ext    = noExtField
                             , feqn_tycon  = tc'
                             , feqn_bndrs  = bndrs'
                             , feqn_pats   = pats'
                             , feqn_fixity = fixity
                             , feqn_rhs    = rhs' }) }
-    rename_ty_fam_eqn (XFamEqn _) = panic "haddock:renameTyFamInstEqn"
+    rename_ty_fam_eqn (XFamEqn nec) = noExtCon nec
 
 renameTyFamDefltD :: TyFamDefltDecl GhcRn -> RnM (TyFamDefltDecl DocNameI)
 renameTyFamDefltD = renameTyFamInstD
@@ -641,13 +641,13 @@ renameDataFamInstD (DataFamInstDecl { dfid_eqn = eqn })
            ; bndrs' <- traverse (mapM renameLTyVarBndr) bndrs
            ; pats' <- mapM renameLTypeArg pats
            ; defn' <- renameDataDefn defn
-           ; return (FamEqn { feqn_ext    = noExt
+           ; return (FamEqn { feqn_ext    = noExtField
                             , feqn_tycon  = tc'
                             , feqn_bndrs  = bndrs'
                             , feqn_pats   = pats'
                             , feqn_fixity = fixity
                             , feqn_rhs    = defn' }) }
-    rename_data_fam_eqn (XFamEqn _) = panic "haddock:renameDataFamInstD"
+    rename_data_fam_eqn (XFamEqn nec) = noExtCon nec
 
 renameImplicit :: (in_thing -> RnM out_thing)
                -> HsImplicitBndrs GhcRn in_thing
@@ -655,8 +655,8 @@ renameImplicit :: (in_thing -> RnM out_thing)
 renameImplicit rn_thing (HsIB { hsib_body = thing })
   = do { thing' <- rn_thing thing
        ; return (HsIB { hsib_body = thing'
-                      , hsib_ext = noExt }) }
-renameImplicit _ (XHsImplicitBndrs _) = panic "haddock:renameImplicit"
+                      , hsib_ext = noExtField }) }
+renameImplicit _ (XHsImplicitBndrs nec) = noExtCon nec
 
 renameWc :: (in_thing -> RnM out_thing)
          -> HsWildCardBndrs GhcRn in_thing
@@ -664,8 +664,8 @@ renameWc :: (in_thing -> RnM out_thing)
 renameWc rn_thing (HsWC { hswc_body = thing })
   = do { thing' <- rn_thing thing
        ; return (HsWC { hswc_body = thing'
-                      , hswc_ext = noExt }) }
-renameWc _ (XHsWildCardBndrs _) = panic "haddock:renameWc"
+                      , hswc_ext = noExtField }) }
+renameWc _ (XHsWildCardBndrs nec) = noExtCon nec
 
 renameDocInstance :: DocInstance GhcRn -> RnM (DocInstance DocNameI)
 renameDocInstance (inst, idoc, L l n, m) = do
