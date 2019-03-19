@@ -906,12 +906,12 @@ addDeferredBinding ctxt err ct
              ev_binds_var = cec_binds ctxt
 
        ; case dest of
-           EvVarDest evar
-             -> addTcEvBind ev_binds_var $ mkWantedEvBind evar err_tm
+           EvVarDest _ st evar
+             -> addTcEvBind ev_binds_var $ mkWantedEvBind evar st err_tm
            HoleDest hole
              -> do { -- See Note [Deferred errors for coercion holes]
                      let co_var = coHoleCoVar hole
-                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var err_tm
+                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var (ctLevel ct) err_tm
                    ; fillCoercionHole hole (mkTcCoVarCo co_var) }}
 
   | otherwise   -- Do not set any evidence for Given/Derived
@@ -1102,7 +1102,8 @@ mkIrredErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkIrredErr ctxt cts
   = do { (ctxt, binds_msg, ct1) <- relevantBindings True ctxt ct1
        ; let orig = ctOrigin ct1
-             msg  = couldNotDeduce (getUserGivens ctxt) (map ctPred cts, orig)
+             lvl  = ctLevel ct1
+             msg  = couldNotDeduce (getUserGivens ctxt) (map ctPred cts, orig, lvl)
        ; mkErrorMsgFromCt ctxt ct1 $
             important msg `mappend` relevant_bindings binds_msg }
   where
@@ -1245,6 +1246,7 @@ mkIPErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkIPErr ctxt cts
   = do { (ctxt, binds_msg, ct1) <- relevantBindings True ctxt ct1
        ; let orig    = ctOrigin ct1
+             lvl     = ctLevel ct1
              preds   = map ctPred cts
              givens  = getUserGivens ctxt
              msg | null givens
@@ -1252,7 +1254,7 @@ mkIPErr ctxt cts
                    sep [ text "Unbound implicit parameter" <> plural cts
                        , nest 2 (pprParendTheta preds) ]
                  | otherwise
-                 = couldNotDeduce givens (preds, orig)
+                 = couldNotDeduce givens (preds, orig, lvl)
 
        ; mkErrorMsgFromCt ctxt ct1 $
             important msg `mappend` relevant_bindings binds_msg }
@@ -1652,18 +1654,20 @@ misMatchOrCND ctxt ct oriented ty1 ty2
        -- or there is no context, don't report the context
   = misMatchMsg ct oriented ty1 ty2
   | otherwise
-  = couldNotDeduce givens ([eq_pred], orig)
+  = couldNotDeduce givens ([eq_pred], orig, lvl)
   where
     ev      = ctEvidence ct
     eq_pred = ctEvPred ev
     orig    = ctEvOrigin ev
+    lvl     = ctEvLevel ev
     givens  = [ given | given <- getUserGivens ctxt, not (ic_no_eqs given)]
               -- Keep only UserGivens that have some equalities.
               -- See Note [Suppress redundant givens during error reporting]
 
-couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin) -> SDoc
-couldNotDeduce givens (wanteds, orig)
+couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin, ThLevel) -> SDoc
+couldNotDeduce givens (wanteds, orig, lvl)
   = vcat [ addArising orig (text "Could not deduce:" <+> pprTheta wanteds)
+         , text "level" <+> ppr lvl
          , vcat (pp_givens givens)]
 
 pp_givens :: [UserGiven] -> [SDoc]
@@ -1678,7 +1682,8 @@ pp_givens givens
              -- See Note [Suppress redundant givens during error reporting]
              -- for why we use mkMinimalBySCs above.
                 2 (sep [ text "bound by" <+> ppr skol_info
-                       , text "at" <+> ppr (tcl_loc (ic_env implic)) ])
+                       , text "at" <+> ppr (tcl_loc (ic_env implic))
+                       , text "level" <+> ppr (getLclEnvThLevel $ ic_env implic) ])
 
 -- These are for the "blocked" equalities, as described in TcCanonical
 -- Note [Equalities with incompatible kinds], wrinkle (2). There should
@@ -2283,6 +2288,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
   where
     orig          = ctOrigin ct
     pred          = ctPred ct
+    lvl           = ctLevel ct
     (clas, tys)   = getClassPredTys pred
     ispecs        = [ispec | (ispec, _) <- matches]
     unsafe_ispecs = [ispec | (ispec, _) <- unsafe_overlapped]
@@ -2313,6 +2319,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
     cannot_resolve_msg :: Ct -> [ClsInst] -> SDoc -> SDoc
     cannot_resolve_msg ct candidate_insts binds_msg
       = vcat [ no_inst_msg
+             , text "level" <+> ppr lvl
              , nest 2 extra_note
              , vcat (pp_givens useful_givens)
              , mb_patsyn_prov `orElse` empty

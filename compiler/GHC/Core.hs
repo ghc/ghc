@@ -17,6 +17,9 @@ module GHC.Core (
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
 
+        -- * ExprHole
+        CExprHole(..), newExprHole, fillExprHole, readExprHole, exprHoleFV,
+
         -- * In/Out type synonyms
         InId, InBind, InExpr, InAlt, InArg, InType, InKind,
                InBndr, InVar, InCoercion, InTyVar, InCoVar,
@@ -119,6 +122,9 @@ import Util
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan )
 import Binary
+import Data.IORef
+import Control.Monad.IO.Class
+import Maybes
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -264,8 +270,31 @@ data Expr b
   | Cast  (Expr b) Coercion
   | Tick  (Tickish Id) (Expr b)
   | Type  Type
+  | EHole (CExprHole b) -- No longer present after typechecking, only used for CodeC evidence
   | Coercion Coercion
   deriving Data
+
+data CExprHole b = CExprHole b (IORef (Maybe (Expr b)))
+
+exprHoleFV :: CExprHole b -> b
+exprHoleFV (CExprHole b _) = b
+
+fillExprHole :: MonadIO m => CExprHole b -> Expr b -> m ()
+fillExprHole (CExprHole _v hole) e =  liftIO (writeIORef hole (Just e))
+
+readExprHole :: (Outputable b, MonadIO m) => CExprHole b -> m (Expr b)
+readExprHole (CExprHole v hole) = do
+  res <- liftIO (expectJust "readExprHole" <$> readIORef hole)
+  pprTraceM "Read from expr hole" (ppr v)
+  return res
+
+
+newExprHole :: MonadIO m => b -> m (CExprHole b)
+newExprHole b =
+  liftIO (CExprHole b <$> newIORef Nothing)
+
+-- TODO: Provide implementation like CoercionHole
+instance Typeable b => Data (CExprHole b) where
 
 -- | Type synonym for expressions that occur in function argument positions.
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not

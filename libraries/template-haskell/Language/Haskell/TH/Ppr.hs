@@ -42,6 +42,21 @@ class Ppr a where
     ppr_list :: [a] -> Doc
     ppr_list = vcat . map ppr
 
+instance Ppr (TExp a) where
+  ppr (TExp m) = ppr m
+
+instance Ppr TExpU where
+  ppr (TExpU zs es e) = text e $$ vcat (map ppr es) $$ vcat (map ppr zs)
+
+instance Ppr TTExp where
+  ppr (TTExp es e) = text e $$ vcat (map ppr es)
+
+instance Ppr Int where
+  ppr n = int n
+
+instance (Ppr a, Ppr b) => Ppr (a, b) where
+  ppr (a, b) = ppr a <+> ppr b
+
 instance Ppr a => Ppr [a] where
     ppr x = ppr_list x
 

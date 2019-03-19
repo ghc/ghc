@@ -6,6 +6,7 @@
 module Main where
 
 import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Lift
 import GHC.LanguageExtensions
 
 main = do

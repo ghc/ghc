@@ -49,6 +49,7 @@ import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
 import Hadrian.Oracles.ArgsHash
 import Hadrian.Target
+import Debug.Trace
 
 import Base
 import Builder
@@ -262,7 +263,7 @@ resolveContextData context@Context {..} = do
         hackRtsPackage index | null (C.allPackages index) = index
         -- ^ do not hack the empty index
         hackRtsPackage index = case C.lookupPackageName index (C.mkPackageName "rts") of
-            [(_, [rts])] -> C.insert rts {
+            [(_, (rts:_))] -> C.insert rts {
                 Installed.ldOptions   = [],
                 Installed.libraryDirs = filter (not . ("gcc-lib" `isSuffixOf`))
                                                (Installed.libraryDirs rts)} index

@@ -17,12 +17,17 @@ module GHC.HsToCore.Expr
    ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds
    , dsValBinds, dsLit, dsSyntaxExpr
    , dsHandleMonadicFailure
+   , dsSplicedD
+   , dsSplicedT
    )
 where
 
 #include "HsVersions.h"
 
 import GhcPrelude
+
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
 
 import GHC.HsToCore.Match
 import GHC.HsToCore.Match.Literal
@@ -36,8 +41,11 @@ import GHC.HsToCore.PmCheck ( checkGuardMatches )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Core.FamInstEnv( topNormaliseType )
-import GHC.HsToCore.Quote
 import GHC.Hs
+-- For typed quotes
+import qualified GHC.HsToCore.DsMetaTc
+-- For untyped quotes
+import qualified GHC.HsToCore.Quote
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types
@@ -71,6 +79,14 @@ import GHC.Core.PatSyn
 import Control.Monad
 import Data.List.NonEmpty ( nonEmpty )
 
+import Binary
+import GHC.Iface.Binary
+import {-# SOURCE #-} GHC.IfaceToCore
+import GHC.Iface.Env
+
+import Data.IORef
+import GHC.Driver.Types (hsc_NC)
+import Language.Haskell.TH.Syntax(TExpU(..), TTExp(..))
 {-
 ************************************************************************
 *                                                                      *
@@ -728,9 +744,14 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 
 -- Template Haskell stuff
 
-dsExpr (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
-dsExpr (HsTcBracketOut _ hs_wrapper x ps) = dsBracket hs_wrapper x ps
-dsExpr (HsSpliceE _ s)         = pprPanic "dsExpr:splice" (ppr s)
+dsExpr  (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
+dsExpr (HsTcUntypedBracketOut _ w x ps) = GHC.HsToCore.Quote.dsBracket w x ps
+dsExpr (HsTcZonkedBracketOut _ x ps ev_zs zs) = GHC.HsToCore.DsMetaTc.dsBracketTc x ps ev_zs zs
+dsExpr (HsSpliceE _ (HsSplicedD zs env s))
+  = dsSplicedD (TExpU zs env s)
+dsExpr (HsSpliceE {})         =
+  pprTrace "ds_expr" (text "About to panic") $
+  pprPanic "dsExpr:splice" (empty)
 
 -- Arrow notation extension
 dsExpr (HsProc _ pat cmd) = dsProcExpr pat cmd
@@ -778,6 +799,65 @@ ds_prag_expr (HsPragTick _ _ _ _) expr = do
   if gopt Opt_Hpc dflags
     then panic "dsExpr:HsPragTick"
     else dsLExpr expr
+
+dsSplicedD :: TExpU -> DsM CoreExpr
+dsSplicedD (TExpU zs env e) = do
+      let es = map (\(a, b) -> (mkUniqueGrimily a, b)) env
+          zs' = map (\(a, b) -> (mkUniqueGrimily a, b)) zs
+      loadCoreExpr zs' es e
+
+dsSplicedT :: TTExp -> DsM Type
+dsSplicedT (TTExp zs t) =
+  let zs' = map (\(a, b) -> (mkUniqueGrimily a, b)) zs
+  in loadCoreType zs' t
+
+-- Load a core expr from a file
+loadCoreType :: [(Unique, TTExp)] -> String -> DsM Type
+loadCoreType zs s = do
+  env <- getGblEnv
+  hs_env <- env_top <$> getEnv
+  nc <- liftIO $ readIORef (hsc_NC hs_env)
+  let
+      ncu = NCU (\f -> return $ snd (f nc))
+  i <- liftIO $ do
+    bh <- readBinMem s
+    getWithUserData ncu bh
+  dsm_envs <- getEnvs
+  let (if_gbl, if_lcl) = ds_if_env env
+      if_lcl' = if_lcl { if_ty_meta_env = addListToUFM_Directly (if_ty_meta_env if_lcl) zs
+                       , if_dsm_env  = Just dsm_envs }
+  pprTrace "loadCoreExpr" (ppr i) (return ())
+  setEnvs (if_gbl, if_lcl') $
+    pprTrace "lcl_env" (ppr $ if_id_env $ snd $ ds_if_env env)
+      tcIfaceType i
+
+instance Outputable TTExp where
+  ppr (TTExp t t') = ppr t <+> ppr t'
+
+instance Outputable TExpU where
+  ppr (TExpU t t' t'') = ppr t <+> ppr t' <+> ppr t''
+
+-- Load a core expr from a file
+loadCoreExpr :: [(Unique, TTExp)] -> [(Unique, TExpU)] -> String -> DsM CoreExpr
+loadCoreExpr zs menv s =  pprTrace "LOADING" (ppr (map (getKey . fst) zs) $$ ppr menv $$ ppr s) $ do
+  env <- getGblEnv
+  hs_env <- env_top <$> getEnv
+  nc <- liftIO $ readIORef (hsc_NC hs_env)
+  let
+      ncu = NCU (\f -> return $ snd (f nc))
+  i <- liftIO $ do
+    bh <- readBinMem s
+    getWithUserData ncu bh
+  dsm_envs <- getEnvs
+  let (if_gbl, if_lcl) = ds_if_env env
+      if_lcl' = if_lcl { if_meta_env = addListToUFM_Directly (if_meta_env if_lcl) menv
+                       , if_ty_meta_env = addListToUFM_Directly (if_ty_meta_env if_lcl) zs
+                       , if_dsm_env  = Just dsm_envs }
+  pprTrace "loadCoreExpr" (ppr i) (return ())
+  setEnvs (if_gbl, if_lcl') $
+    pprTrace "lcl_env" (ppr $ if_id_env $ snd $ ds_if_env env)
+      tcIfaceExpr i
+
 
 ------------------------------
 dsSyntaxExpr :: SyntaxExpr GhcTc -> [CoreExpr] -> DsM CoreExpr

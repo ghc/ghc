@@ -64,6 +64,7 @@ import GHC.Settings.Constants
 import GHC.Platform
 import GHC.Types.Unique.FM
 import Util
+import {-# SOURCE #-} GHC.Core (CoreExpr)
 
 import Data.ByteString (ByteString)
 import Data.Int
@@ -146,7 +147,9 @@ data Literal
                                 --
                                 -- 3) Flag indicating whether the symbol
                                 --    references a function or a data
-  deriving Data
+  | LitRepr () CoreExpr -- Code literal from typed template haskell
+
+instance Data Literal where
 
 -- | Numeric literal type
 data LitNumType

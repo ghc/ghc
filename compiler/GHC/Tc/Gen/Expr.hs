@@ -36,7 +36,7 @@ where
 import GhcPrelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Splice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
-import GHC.Builtin.Names.TH( liftStringName, liftName )
+import GHC.Builtin.Names.TH as THNames ( liftStringTypedName, liftTypedName)
 
 import GHC.Hs
 import GHC.Tc.Types.Constraint ( HoleSort(..) )
@@ -167,6 +167,7 @@ tcInferRho expr = addErrCtxt (exprCtxt expr) (tcInferRhoNC expr)
 
 tcInferRhoNC expr
   = do { (expr', sigma) <- tcInferSigmaNC expr
+       --; pprTraceM "tcInferRho" (ppr expr' $$ ppr sigma)
        ; (wrap, rho) <- topInstantiate (lexprCtOrigin expr) sigma
        ; return (mkLHsWrap wrap expr', rho) }
 
@@ -1767,8 +1768,8 @@ tc_infer_id lbl id_name
       ; case thing of
              ATcId { tct_id = id }
                -> do { check_naughty id        -- Note [Local record selectors]
-                     ; checkThLocalId id
-                     ; return_id id }
+                     ; id' <- checkThLocalId id
+                     ; return_id id' }
 
              AGlobal (AnId id)
                -> do { check_naughty id
@@ -1965,80 +1966,43 @@ too_many_args fun args
 ************************************************************************
 -}
 
-checkThLocalId :: Id -> TcM ()
+checkThLocalId :: Id -> TcM Id
+checkThLocalId id = do
 -- The renamer has already done checkWellStaged,
 --   in RnSplice.checkThLocalName, so don't repeat that here.
 -- Here we just just add constraints fro cross-stage lifting
-checkThLocalId id
-  = do  { mb_local_use <- getStageAndBindLevel (idName id)
-        ; case mb_local_use of
-             Just (top_lvl, bind_lvl, use_stage)
-                | thLevel use_stage > bind_lvl
-                -> checkCrossStageLifting top_lvl id use_stage
-             _  -> return ()   -- Not a locally-bound thing, or
-                               -- no cross-stage link
-    }
+  sp_id <- newSysLocalId (mkFastString "$splice") (idType id)
+  checkThLocalIdX sp_id (mkSpliceExpr sp_id) (idName id) id
 
 --------------------------------------
-checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
--- If we are inside typed brackets, and (use_lvl > bind_lvl)
--- we must check whether there's a cross-stage lift to do
--- Examples   \x -> [|| x ||]
---            [|| map ||]
---
--- This is similar to checkCrossStageLifting in GHC.Rename.Splice, but
--- this code is applied to *typed* brackets.
-
-checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
-  | isTopLevel top_lvl
-  = when (isExternalName id_name) (keepAlive id_name)
-    -- See Note [Keeping things alive for Template Haskell] in GHC.Rename.Splice
-
-  | otherwise
-  =     -- Nested identifiers, such as 'x' in
-        -- E.g. \x -> [|| h x ||]
-        -- We must behave as if the reference to x was
-        --      h $(lift x)
-        -- We use 'x' itself as the splice proxy, used by
-        -- the desugarer to stitch it all back together.
-        -- If 'x' occurs many times we may get many identical
-        -- bindings of the same splice proxy, but that doesn't
-        -- matter, although it's a mite untidy.
-    do  { let id_ty = idType id
-        ; checkTc (isTauTy id_ty) (polySpliceErr id)
-               -- If x is polymorphic, its occurrence sites might
-               -- have different instantiations, so we can't use plain
-               -- 'x' as the splice proxy name.  I don't know how to
-               -- solve this, and it's probably unimportant, so I'm
-               -- just going to flag an error for now
-
-        ; lift <- if isStringTy id_ty then
-                     do { sid <- tcLookupId GHC.Builtin.Names.TH.liftStringName
-                                     -- See Note [Lifting strings]
-                        ; return (HsVar noExtField (noLoc sid)) }
-                  else
-                     setConstraintVar lie_var   $
-                          -- Put the 'lift' constraint into the right LIE
-                     newMethodFromName (OccurrenceOf id_name)
-                                       GHC.Builtin.Names.TH.liftName
-                                       [getRuntimeRep id_ty, id_ty]
-
-                   -- Update the pending splices
-        ; ps <- readMutVar ps_var
-        ; let pending_splice = PendingTcSplice id_name
-                                 (nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLoc lift))
-                                          (nlHsVar id))
-        ; writeMutVar ps_var (pending_splice : ps)
-
-        ; return () }
-  where
-    id_name = idName id
-
-checkCrossStageLifting _ _ _ = return ()
 
 polySpliceErr :: Id -> SDoc
 polySpliceErr id
   = text "Can't splice the polymorphic local variable" <+> quotes (ppr id)
+
+--------------------------------------
+
+-- Construct the expression for `lift x`
+mkSpliceExpr :: Id -> Name -> Id -> TcM (Either PendingTcTypedSplice a)
+mkSpliceExpr sp_id id_name id = do
+  let id_ty = idType id
+      rep = getRuntimeRep id_ty
+  checkTc (isTauTy id_ty) (polySpliceErr id)
+  -- If x is polymorphic, its occurrence sites might
+  -- have different instantiations, so we can't use plain
+  -- 'x' as the splice proxy name.  I don't know how to
+  -- solve this, and it's probably unimportant, so I'm
+  -- just going to flag an error for now
+  lift <- if isStringTy id_ty
+    then do
+      sid <- tcLookupId THNames.liftStringTypedName
+      -- See Note [Lifting strings]
+      return (HsVar noExtField (noLoc sid))
+    else do
+      newMethodFromName (OccurrenceOf id_name) THNames.liftTypedName [rep, id_ty]
+  let liftExpr = (nlHsApp (noLoc lift) (nlHsVar id))
+  return (Left (PendingTcSplice sp_id liftExpr))
+
 
 {-
 Note [Lifting strings]

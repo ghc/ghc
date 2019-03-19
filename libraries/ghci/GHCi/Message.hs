@@ -420,7 +420,7 @@ data THResult a
 
 instance Binary a => Binary (THResult a)
 
-data THResultType = THExp | THPat | THType | THDec | THAnnWrapper
+data THResultType = THExp | THPat | THType | THDec | THAnnWrapper | THCore
   deriving (Enum, Show, Generic)
 
 instance Binary THResultType

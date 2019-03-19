@@ -13,7 +13,7 @@ ghcInGhciFlavour = defaultFlavour
     -- We can't build DLLs on Windows (yet). Actually we should only
     -- include the dynamic way when we have a dynamic host GHC, but just
     -- checking for Windows seems simpler for now.
-    , libraryWays = pure [vanilla] <> pure [ dynamic | not windowsHost ]
+    , libraryWays = pure [vanilla, profiling] <> pure [ dynamic]
     , rtsWays     = pure [vanilla, threaded] <> pure [ dynamic | not windowsHost ]
     , dynamicGhcPrograms = return False }
 

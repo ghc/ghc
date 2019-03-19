@@ -15,7 +15,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TupleSections #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans -Wno-missing-methods #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -29,13 +29,14 @@ module GHC.Tc.Gen.Splice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQuasi,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH, runTopSplice
+     finishTH, runTopSplice, runMetaCore, runMetaCoreT
       ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
+import GHC.HsToCore.DsMetaTc
 import GHC.Hs
 import GHC.Types.Annotations
 import GHC.Driver.Finder
@@ -116,7 +117,6 @@ import GHC.Driver.Session
 import Panic
 import GHC.Utils.Lexeme
 import qualified EnumSet
-import GHC.Driver.Plugins
 import Bag
 
 import qualified Language.Haskell.TH as TH
@@ -139,6 +139,8 @@ import qualified Data.Map as Map
 import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
 import Data.Data (Data)
 import Data.Proxy    ( Proxy (..) )
+
+import GHC.Core
 
 {-
 ************************************************************************
@@ -170,36 +172,45 @@ runAnnotation     :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
 
 -- See Note [How brackets and nested splices are handled]
 -- tcTypedBracket :: HsBracket Name -> TcRhoType -> TcM (HsExpr TcId)
-tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
+tcTypedBracket rn_expr brack@(TExpBr e expr) res_ty
   = addErrCtxt (quotationCtxtDoc brack) $
     do { cur_stage <- getStage
        ; ps_ref <- newMutVar []
-       ; lie_var <- getConstraintVar   -- Any constraints arising from nested splices
-                                       -- should get thrown into the constraint set
-                                       -- from outside the bracket
+       ; zz_ref <- newMutVar []
 
        -- Make a new type variable for the type of the overall quote
-       ; m_var <- mkTyVarTy <$> mkMetaTyVar
+      -- ; m_var <- mkTyVarTy <$> mkMetaTyVar
        -- Make sure the type variable satisfies Quote
-       ; ev_var <- emitQuoteWanted m_var
+      -- ; ev_var <- emitQuoteWanted m_var
        -- Bundle them together so they can be used in GHC.HsToCore.Quote for desugaring
        -- brackets.
-       ; let wrapper = QuoteWrapper ev_var m_var
+      -- ; let wrapper = QuoteWrapper ev_var m_var
        -- Typecheck expr to make sure it is valid,
        -- Throw away the typechecked expression but return its type.
        -- We'll typecheck it again when we splice it in somewhere
-       ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var wrapper)) $
+       ; ((tc_expr, expr_ty), ev_binds) <- mkQuoteImplication $
+                                setStage (Brack cur_stage (TcPending ps_ref zz_ref undefined)) $
                                 tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
        ; let rep = getRuntimeRep expr_ty
-       ; meta_ty <- tcTExpTy m_var expr_ty
+       ; let brack' = TExpBr e (mkHsDictLet ev_binds tc_expr)
+       ; meta_ty <- tcTExpTy expr_ty
+       ; pprTraceM "tcTypedBracket" (ppr expr_ty)
+       ; let fvs = tyCoVarsOfTypeList expr_ty
+       ; ts <- forM fvs $ \tv ->  do
+                v <- emitTypeable (mkTyVarTy tv)
+                return (PendingZonkSplice2 tv v)
+       ; pprTraceM "tcTypedBracket" (ppr fvs)
+       ; pprTraceM "tcTypedBracket" (ppr meta_ty)
        ; ps' <- readMutVar ps_ref
+       ; pprTraceM "tcTypedBracket" (ppr ps')
+       ; zz <- readMutVar zz_ref
+       ; pprTraceM "tcTypedBracket" (ppr zz)
        ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
-                       (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
-                                                  (nlHsTyApp texpco [rep, expr_ty]))
-                                      (noLoc (HsTcBracketOut noExtField (Just wrapper) brack ps'))))
+                       (unLoc (mkHsApp ((nlHsTyApp texpco [rep, expr_ty]))
+                                      (noLoc (HsTcTypedBracketOut noExtField brack' ps' (zz ++ ts)))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
@@ -228,7 +239,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- Unify the overall type of the bracket with the expected result
        -- type
        ; tcWrapResultO BracketOrigin rn_expr
-            (HsTcBracketOut noExtField brack_info brack ps')
+            (HsTcUntypedBracketOut noExtField brack_info brack ps')
             expected_type res_ty
 
        }
@@ -280,7 +291,7 @@ brackTy b =
 tcPendingSplice :: TcType -- Metavariable for the expected overall type of the
                           -- quotation.
                 -> PendingRnSplice
-                -> TcM PendingTcSplice
+                -> TcM PendingTcUntypedSplice
 tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
   -- See Note [Typechecking Overloaded Quotes]
   = do { meta_ty <- tcMetaTy meta_ty_name
@@ -297,12 +308,13 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
 
 ---------------
 -- Takes a m and tau and returns the type m (TExp tau)
-tcTExpTy :: TcType -> TcType -> TcM TcType
-tcTExpTy m_ty exp_ty
+tcTExpTy :: TcType -> TcM TcType
+tcTExpTy exp_ty
   = do { unless (isTauTy exp_ty) $ addErr (err_msg exp_ty)
+       ; q <- tcLookupTyCon qTyConName
        ; texp <- tcLookupTyCon tExpTyConName
        ; let rep = getRuntimeRep exp_ty
-       ; return (mkAppTy m_ty (mkTyConApp texp [rep, exp_ty])) }
+       ; return (mkTyConApp q [mkTyConApp texp [rep, exp_ty]]) }
   where
     err_msg ty
       = vcat [ text "Illegal polytype:" <+> ppr ty
@@ -605,27 +617,35 @@ finalizer list in the global environment and set them to use the current local
 environment (with 'addModFinalizersWithLclEnv').
 
 -}
+{-
+         (expr', wanted) <- captureConstraints tc_action
+       ; (wcs, wrap) <- promoteSpliceWanted 0 wanted
+       ; emitConstraints wcs
+          -- Zonk it and tie the knot of dictionary bindings
+       ; return $ mkLHsWrap wrap expr' }
+
+-}
 
 tcNestedSplice :: ThStage -> PendingStuff -> Name
                 -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
     -- See Note [How brackets and nested splices are handled]
     -- A splice inside brackets
-tcNestedSplice pop_stage (TcPending ps_var lie_var q@(QuoteWrapper _ m_var)) splice_name expr res_ty
+tcNestedSplice pop_stage (TcPending ps_var  _zz_var _) splice_name expr res_ty
   = do { res_ty <- expTypeToType res_ty
-       ; let rep = getRuntimeRep res_ty
-       ; meta_exp_ty <- tcTExpTy m_var res_ty
-       ; expr' <- setStage pop_stage $
-                  setConstraintVar lie_var $
-                  tcMonoExpr expr (mkCheckExpType meta_exp_ty)
-       ; untypeq <- tcLookupId unTypeQName
-       ; let expr'' = mkHsApp
-                        (mkLHsWrap (applyQuoteWrapper q)
-                          (nlHsTyApp untypeq [rep, res_ty])) expr'
+       ; meta_exp_ty <- tcTExpTy res_ty
+       ; (expr', ev) <- mkSpliceImplication
+                              $ setStage pop_stage
+                  --setConstraintVar lie_var $
+                              $ tcMonoExpr expr (mkCheckExpType meta_exp_ty)
+       ; pprTraceM "tcNestedSplice" (ppr expr')
+          -- Zonk it and tie the knot of dictionary bindings
        ; ps <- readMutVar ps_var
-       ; writeMutVar ps_var (PendingTcSplice splice_name expr'' : ps)
+       ; let splice_id = mkLocalId splice_name res_ty
+       ; pprTraceM "tcNEstedSplice" (ppr res_ty $$ ppr meta_exp_ty $$ ppr splice_id)
+       ; writeMutVar ps_var (PendingTcSplice splice_id (mkHsDictLet ev expr') : ps)
 
        -- The returned expression is ignored; it's in the pending splices
-       ; return (panic "tcSpliceExpr") }
+       ; return (HsVar noExtField (noLoc splice_id)) }
 
 tcNestedSplice _ _ splice_name _ _
   = pprPanic "tcNestedSplice: rename stage found" (ppr splice_name)
@@ -637,7 +657,7 @@ tcTopSplice expr res_ty
          res_ty <- expTypeToType res_ty
        ; q_type <- tcMetaTy qTyConName
        -- Top level splices must still be of type Q (TExp a)
-       ; meta_exp_ty <- tcTExpTy q_type res_ty
+       ; meta_exp_ty <- tcTExpTy res_ty
        ; q_expr <- tcTopSpliceExpr Typed $
                           tcMonoExpr expr (mkCheckExpType meta_exp_ty)
        ; lcl_env <- getLclEnv
@@ -651,15 +671,23 @@ tcTopSplice expr res_ty
 -- This is called in the zonker
 -- See Note [Running typed splices in the zonker]
 runTopSplice :: DelayedSplice -> TcM (HsExpr GhcTc)
-runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
+runTopSplice (DelayedSplice lcl_env orig_expr _res_ty q_expr)
   = setLclEnv lcl_env $ do {
-         zonked_ty <- zonkTcType res_ty
        ; zonked_q_expr <- zonkTopLExpr q_expr
         -- See Note [Collecting modFinalizers in typed splices].
        ; modfinalizers_ref <- newTcRef []
          -- Run the expression
-       ; expr2 <- setStage (RunSplice modfinalizers_ref) $
-                    runMetaE zonked_q_expr
+       ; pprTrace "runTopSplice" (ppr orig_expr) (return ())
+       ; TH.TExpU zs env expr2 <- setStage (RunSplice modfinalizers_ref) $
+                                    runMetaC zonked_q_expr
+       ; pprTraceM "RUN" (ppr expr2)
+                                    {-
+       ; let rn_one rdr_name =
+              case isExact_maybe rdr_name of
+                        Just n -> n
+                        Nothing -> error "I made this"
+                        -}
+       ; let env' = env
        ; mod_finalizers <- readTcRef modfinalizers_ref
        ; addModFinalizersWithLclEnv $ ThModFinalizers mod_finalizers
        -- We use orig_expr here and not q_expr when tracing as a call to
@@ -669,17 +697,7 @@ runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
                                  , spliceIsDecl      = False
                                  , spliceSource      = Just orig_expr
                                  , spliceGenerated   = ppr expr2 })
-        -- Rename and typecheck the spliced-in expression,
-        -- making sure it has type res_ty
-        -- These steps should never fail; this is a *typed* splice
-       ; (res, wcs) <-
-            captureConstraints $
-              addErrCtxt (spliceResultDoc zonked_q_expr) $ do
-                { (exp3, _fvs) <- rnLExpr expr2
-                ; tcMonoExpr exp3 (mkCheckExpType zonked_ty)}
-       ; ev <- simplifyTop wcs
-       ; return $ unLoc (mkHsDictLet (EvBinds ev) res)
-       }
+       ; return (HsSpliceE noExtField (HsSplicedD zs env' expr2)) }
 
 
 {-
@@ -694,12 +712,6 @@ spliceCtxtDoc :: HsSplice GhcRn -> SDoc
 spliceCtxtDoc splice
   = hang (text "In the Template Haskell splice")
          2 (pprSplice splice)
-
-spliceResultDoc :: LHsExpr GhcTc -> SDoc
-spliceResultDoc expr
-  = sep [ text "In the result of the splice:"
-        , nest 2 (char '$' <> ppr expr)
-        , text "To see what the splice expanded to, use -ddump-splices"]
 
 -------------------
 tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr GhcTc) -> TcM (LHsExpr GhcTc)
@@ -723,11 +735,25 @@ tcTopSpliceExpr isTypedSplice tc_action
                    -- is expected (#7276)
     setStage (Splice isTypedSplice) $
     do {    -- Typecheck the expression
-         (expr', wanted) <- captureConstraints tc_action
-       ; const_binds     <- simplifyTop wanted
-
+          (res, ev) <- mkSpliceImplication tc_action
           -- Zonk it and tie the knot of dictionary bindings
-       ; return $ mkHsDictLet (EvBinds const_binds) expr' }
+       ; return $ mkHsDictLet ev res }
+
+
+mkQuoteImplication :: TcM a -> TcM (a, TcEvBinds)
+mkQuoteImplication = mkTHImplication TypedBracketSkol
+mkSpliceImplication :: TcM a -> TcM (a, TcEvBinds)
+mkSpliceImplication = mkTHImplication TypedSpliceSkol
+
+mkTHImplication :: (ThLevel -> SkolemInfo) -> TcM a -> TcM (a, TcEvBinds)
+mkTHImplication info thing_inside = do
+  { (result, wanted) <- captureConstraints thing_inside
+  ; lvl <- tcl_tclvl <$> getLclEnv
+  ; th_lvl <- thLevel <$> getStage
+  ; (implics, ev_binds) <- buildImplicationFor lvl (info th_lvl) [] [] wanted
+  ; pprTraceM "mkSpliceImplication" (ppr wanted)
+  ; emitImplications implics
+  ; return (result, ev_binds) }
 
 {-
 ************************************************************************
@@ -806,6 +832,9 @@ seqSerialized (Serialized the_type bytes) = the_type `seq` bytes `seqList` ()
 runQuasi :: TH.Q a -> TcM a
 runQuasi act = TH.runQ act
 
+runQuasiDS :: TH.Q a -> DsM a
+runQuasiDS act = TH.runQ act
+
 runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 runRemoteModFinalizers (ThModFinalizers finRefs) = do
   let withForeignRefs [] f = f []
@@ -844,6 +873,17 @@ runQResult show_th f runQ expr_span hval
        ; traceTc "Got TH result:" (text (show_th th_result))
        ; return (f th_origin expr_span th_result) }
 
+runQResultDS
+  :: (a -> String)
+  -> (Origin -> SrcSpan -> a -> b)
+  -> (ForeignHValue -> DsM a)
+  -> SrcSpan
+  -> ForeignHValue {- TH.Q a -}
+  -> DsM b
+runQResultDS _show_th f runQ expr_span hval
+  = do { th_result <- runQ hval
+       ; return (f Generated expr_span th_result) }
+
 
 -----------------
 runMeta :: (MetaHook TcM -> LHsExpr GhcTc -> TcM hs_syn)
@@ -853,20 +893,39 @@ runMeta unwrap e
   = do { h <- getHooked runMetaHook defaultRunMeta
        ; unwrap h e }
 
+runMetaCore :: CoreExpr
+        -> DsM TH.TExpU
+runMetaCore e
+  = do { runMetaDS (runQResultDS TH.pprint convertEnv runTHCoreDS) e
+       }
+
+runMetaCoreT :: CoreExpr -> DsM TH.TTExp
+runMetaCoreT e
+  = do { runMetaDS (runQResultDS TH.pprint convertTy runTHCoreTDS) e
+       }
+
+defaultDesugar :: LHsExpr GhcTc -> TcM (SrcSpan, CoreExpr)
+defaultDesugar e = do
+  r <- initDsTc . dsLExpr $ e
+  return (getLoc e, r)
+
 defaultRunMeta :: MetaHook TcM
 defaultRunMeta (MetaE r)
-  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsExpr runTHExp)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsExpr runTHExp) defaultDesugar
+defaultRunMeta (MetaC r)
+  = fmap r . runMeta' True (const empty) (runQResult TH.pprint convertEnv runTHCore) defaultDesugar
 defaultRunMeta (MetaP r)
-  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToPat runTHPat)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToPat runTHPat) defaultDesugar
 defaultRunMeta (MetaT r)
-  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsType runTHType)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsType runTHType) defaultDesugar
 defaultRunMeta (MetaD r)
-  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsDecls runTHDec)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsDecls runTHDec) defaultDesugar
 defaultRunMeta (MetaAW r)
-  = fmap r . runMeta' False (const empty) (const convertAnnotationWrapper)
+  = fmap r . runMeta' False (const empty) (const convertAnnotationWrapper) defaultDesugar
+defaultRunMeta (MetaCT {}) = panic "not used"
     -- We turn off showing the code in meta-level exceptions because doing so exposes
     -- the toAnnotationWrapper function that we slap around the user's code
-
+    --
 ----------------
 runMetaAW :: LHsExpr GhcTc         -- Of type AnnotationWrapper
           -> TcM Serialized
@@ -875,6 +934,10 @@ runMetaAW = runMeta metaRequestAW
 runMetaE :: LHsExpr GhcTc          -- Of type (Q Exp)
          -> TcM (LHsExpr GhcPs)
 runMetaE = runMeta metaRequestE
+
+runMetaC :: LHsExpr GhcTc
+         -> TcM TH.TExpU
+runMetaC = runMeta metaRequestC
 
 runMetaP :: LHsExpr GhcTc          -- Of type (Q Pat)
          -> TcM (LPat GhcPs)
@@ -888,14 +951,17 @@ runMetaD :: LHsExpr GhcTc          -- Of type Q [Dec]
          -> TcM [LHsDecl GhcPs]
 runMetaD = runMeta metaRequestD
 
+
 ---------------
-runMeta' :: Bool                 -- Whether code should be printed in the exception message
+runMeta' :: (Outputable expr)
+         => Bool                 -- Whether code should be printed in the exception message
          -> (hs_syn -> SDoc)                                    -- how to print the code
          -> (SrcSpan -> ForeignHValue -> TcM (Either MsgDoc hs_syn))        -- How to run x
-         -> LHsExpr GhcTc        -- Of type x; typically x = Q TH.Exp, or
+         -> (expr -> TcM (SrcSpan, CoreExpr))        -- Of type x; typically x = Q TH.Exp, or
                                  --    something like that
+         -> expr
          -> TcM hs_syn           -- Of type t
-runMeta' show_code ppr_hs run_and_convert expr
+runMeta' show_code ppr_hs run_and_convert desugar expr
   = do  { traceTc "About to run" (ppr expr)
         ; recordThSpliceUse -- seems to be the best place to do this,
                             -- we catch all kinds of splices and annotations.
@@ -909,18 +975,16 @@ runMeta' show_code ppr_hs run_and_convert expr
         -- reify a function with a "?" kind in it.  (These don't occur
         -- in type-correct programs.
         ; failIfErrsM
-
-        -- run plugins
         ; hsc_env <- getTopEnv
-        ; expr' <- withPlugins (hsc_dflags hsc_env) spliceRunAction expr
-
         -- Desugar
-        ; ds_expr <- initDsTc (dsLExpr expr')
+--        ; ds_expr <- initDsTc (dsLExpr expr')
+        ; (loc, ds_expr) <- desugar expr
         -- Compile and link it; might fail if linking fails
         ; src_span <- getSrcSpanM
         ; traceTc "About to run (desugared)" (ppr ds_expr)
         ; either_hval <- tryM $ liftIO $
                          GHC.Driver.Main.hscCompileCoreExpr hsc_env src_span ds_expr
+        ; pprTraceM "Run desugared" (ppr ds_expr)
         ; case either_hval of {
             Left exn   -> fail_with_exn "compile and link" exn ;
             Right hval -> do
@@ -936,11 +1000,8 @@ runMeta' show_code ppr_hs run_and_convert expr
                 -- encounter them inside the try
                 --
                 -- See Note [Exceptions in TH]
-          let expr_span = getLoc expr
-        ; either_tval <- tryAllM $
-                         setSrcSpan expr_span $ -- Set the span so that qLocation can
-                                                -- see where this splice is
-             do { mb_result <- run_and_convert expr_span hval
+        ; either_tval <- tryAllM $ setSrcSpan loc $
+             do { mb_result <- run_and_convert loc hval
                 ; case mb_result of
                     Left err     -> failWithTc err
                     Right result -> do { traceTc "Got HsSyn result:" (ppr_hs result)
@@ -961,6 +1022,51 @@ runMeta' show_code ppr_hs run_and_convert expr
                         nest 2 (text exn_msg),
                         if show_code then text "Code:" <+> ppr expr else empty]
         failWithTc msg
+
+---------------
+runMetaDS :: (SrcSpan -> ForeignHValue -> DsM (Either MsgDoc hs_syn))        -- How to run x
+         -> CoreExpr
+         -> DsM hs_syn           -- Of type t
+runMetaDS run_and_convert ds_expr
+  = do  { hsc_env <- getTopEnv
+        ; either_hval <- tryM $ liftIO $
+                         hscCompileCoreExpr hsc_env noSrcSpan ds_expr
+        ; case either_hval of {
+            Left exn   -> fail_with_exn "compile and link" exn ;
+            Right hval -> do
+
+        {       -- Coerce it to Q t, and run it
+
+                -- Running might fail if it throws an exception of any kind (hence tryAllM)
+                -- including, say, a pattern-match exception in the code we are running
+                --
+                -- We also do the TH -> HS syntax conversion inside the same
+                -- exception-cacthing thing so that if there are any lurking
+                -- exceptions in the data structure returned by hval, we'll
+                -- encounter them inside the try
+                --
+                -- See Note [Exceptions in TH]
+        ; either_tval <- tryAllM $
+             do { mb_result <- run_and_convert noSrcSpan hval
+                ; case mb_result of
+                    Left err     -> failWithDs err
+                    Right result -> do { return $! result } }
+
+        ; case either_tval of
+            Right v -> return v
+            Left se -> case fromException se of
+                         Just IOEnvFailure -> failM -- Error already in Tc monad
+                         _ -> fail_with_exn "run" se -- Exception
+        }}}
+  where
+    -- see Note [Concealed TH exceptions]
+    fail_with_exn :: Exception e => String -> e -> DsM a
+    fail_with_exn phase exn = do
+        exn_msg <- liftIO $ Panic.safeShowException exn
+        let msg = vcat [text "Exception when trying to" <+> text phase <+> text "compile-time code:",
+                        nest 2 (text exn_msg),
+                        text "Code:" <+> ppr ds_expr]
+        failWithDs msg
 
 {-
 Note [Running typed splices in the zonker]
@@ -1068,6 +1174,8 @@ when showing an error message.
 
 To call runQ in the Tc monad, we need to make TcM an instance of Quasi:
 -}
+
+instance TH.Quasi DsM where
 
 instance TH.Quasi TcM where
   qNewName s = do { u <- newUnique
@@ -1195,6 +1303,26 @@ instance TH.Quasi TcM where
   qExtsEnabled =
     EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
 
+  qTypecheck t e = do
+    ty <- initDsTc $ dsSplicedT t
+    res <- checkNoErrs $ do
+      let Right e' = convertToHsExpr Generated noSrcSpan e
+      pprTraceM "qTypecheck" (ppr e')
+      (e'', _) <- rnLExpr e'
+      pprTraceM "qTypecheck" (ppr e'')
+      (e''', wcs) <- captureConstraints (tcMonoExpr e'' (mkCheckExpType ty) )
+      ev <- simplifyTop wcs
+      let e'''' = mkHsDictLet (EvBinds ev) e'''
+      pprTraceM "qTypecheck" (ppr e'''')
+      return e''''
+    fp <- initDsTc $ repEFPE (unLoc res)
+    -- Internal splices in renamed expression were dealt with a long time
+    -- ago.
+    return (TH.TExp (TH.TExpU [] [] fp))
+
+
+
+
 -- | Adds a mod finalizer reference to the local environment.
 addModFinalizerRef :: ForeignRef (TH.Q ()) -> TcM ()
 addModFinalizerRef finRef = do
@@ -1222,6 +1350,16 @@ finishTH = do
       writeTcRef (tcg_th_remote_state tcg) Nothing
 
 
+runTHCore :: ForeignHValue -> TcM (TH.TExp a)
+runTHCore = runTH THCore
+
+runTHCoreDS :: ForeignHValue -> DsM (TH.TExp a)
+runTHCoreDS = runTHDS THCore
+
+runTHCoreTDS :: ForeignHValue -> DsM TH.TTExp
+runTHCoreTDS = runTHDS THCore
+
+
 runTHExp :: ForeignHValue -> TcM TH.Exp
 runTHExp = runTH THExp
 
@@ -1233,6 +1371,20 @@ runTHType = runTH THType
 
 runTHDec :: ForeignHValue -> TcM [TH.Dec]
 runTHDec = runTH THDec
+
+runTHDS :: Binary a => THResultType -> ForeignHValue -> DsM a
+runTHDS _ty fhv = do
+  -- dflags <- getDynFlags
+  interp <- tcGetInterp
+  case interp of
+#if defined(HAVE_INTERNAL_INTERPRETER)
+    InternalInterp -> do
+      -- Run it in the local TcM
+      hv <- liftIO $ wormhole InternalInterp fhv
+      r <- runQuasiDS (unsafeCoerce hv :: TH.Q a)
+      return r
+#endif
+    ExternalInterp {} -> panic "TODO"
 
 runTH :: Binary a => THResultType -> ForeignHValue -> TcM a
 runTH ty fhv = do
@@ -2375,7 +2527,7 @@ overloadedrecflds/should_fail/T11103.hs).  The "proper" fix requires changes to
 the TH AST to make it able to represent duplicate record fields.
 -}
 
-tcGetInterp :: TcM Interp
+tcGetInterp :: IOEnv (Env gbl lvl) Interp
 tcGetInterp = do
    hsc_env <- getTopEnv
    case hsc_interp hsc_env of

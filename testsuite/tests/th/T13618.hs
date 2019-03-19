@@ -4,7 +4,7 @@
 module Main where
 
 import Language.Haskell.TH
-import Language.Haskell.TH.Syntax (lift)
+import Language.Haskell.TH.Lift (lift)
 
 data family DF a
 data    instance DF [a]       = DFList a

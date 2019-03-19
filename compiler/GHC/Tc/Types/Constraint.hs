@@ -17,11 +17,11 @@ module GHC.Tc.Types.Constraint (
         isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
         isUserTypeErrorCt, getUserTypeErrorMsg,
-        ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
+        ctEvidence, ctLoc, setCtLoc, ctPred, ctLevel, ctFlavour, ctEqRel, ctOrigin,
         ctEvId, mkTcEqPredLikeEv,
         mkNonCanonical, mkNonCanonicalCt, mkGivens,
         mkIrredCt,
-        ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
+        ctEvPred, ctEvLevel, ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
@@ -38,7 +38,7 @@ module GHC.Tc.Types.Constraint (
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
-        CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
+        CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocTHLevel, ctLocOrigin,
         ctLocTypeOrKind_maybe,
         ctLocDepth, bumpCtLocDepth, isGivenLoc,
         setCtLocOrigin, updateCtLocOrigin, setCtLocEnv, setCtLocSpan,
@@ -73,7 +73,8 @@ module GHC.Tc.Types.Constraint (
 import GhcPrelude
 
 import {-# SOURCE #-} GHC.Tc.Types ( TcLclEnv, setLclEnvTcLevel, getLclEnvTcLevel
-                                   , setLclEnvLoc, getLclEnvLoc )
+                                , setLclEnvLoc, getLclEnvLoc, ThLevel
+                                , getLclEnvThLevel )
 
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -100,6 +101,7 @@ import GHC.Types.SrcLoc
 import Bag
 import Util
 
+import GHC.Stack
 import Control.Monad ( msum )
 
 {-
@@ -361,13 +363,14 @@ mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct }
 mkIrredCt :: CtIrredStatus -> CtEvidence -> Ct
 mkIrredCt status ev = CIrredCan { cc_ev = ev, cc_status = status }
 
-mkGivens :: CtLoc -> [EvId] -> [Ct]
-mkGivens loc ev_ids
+mkGivens :: ThLevel -> CtLoc -> [EvId] -> [Ct]
+mkGivens st loc ev_ids
   = map mk ev_ids
   where
     mk ev_id = mkNonCanonical (CtGiven { ctev_evar = ev_id
                                        , ctev_pred = evVarPred ev_id
-                                       , ctev_loc = loc })
+                                       , ctev_loc = loc
+                                       , ctev_stage = st })
 
 ctEvidence :: Ct -> CtEvidence
 ctEvidence (CQuantCan (QCI { qci_ev = ev })) = ev
@@ -385,6 +388,9 @@ ctOrigin = ctLocOrigin . ctLoc
 ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (ctEvidence ct)
+
+ctLevel :: Ct -> ThLevel
+ctLevel ct = ctEvLevel (ctEvidence ct)
 
 ctEvId :: Ct -> EvVar
 -- The evidence Id for this Ct
@@ -1331,37 +1337,45 @@ So a Given has EvVar inside it rather than (as previously) an EvTerm.
 -- Wanted equalities are always HoleDest; other wanteds are always
 -- EvVarDest.
 data TcEvDest
-  = EvVarDest EvVar         -- ^ bind this var to the evidence
+  = EvVarDest CallStack ThLevel EvVar         -- ^ bind this var to the evidence
               -- EvVarDest is always used for non-type-equalities
               -- e.g. class constraints
+              -- The ThLevel is the level the evidence needs to be bound
 
   | HoleDest  CoercionHole  -- ^ fill in this hole with the evidence
               -- HoleDest is always used for type-equalities
               -- See Note [Coercion holes] in GHC.Core.TyCo.Rep
+  | QuoteDest (CExprHole EvVar)
 
 data CtEvidence
   = CtGiven    -- Truly given, not depending on subgoals
       { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
       , ctev_evar :: EvVar           -- See Note [Evidence field of CtEvidence]
-      , ctev_loc  :: CtLoc }
+      , ctev_loc  :: CtLoc
+      , ctev_stage :: ThLevel }
 
 
   | CtWanted   -- Wanted goal
       { ctev_pred :: TcPredType     -- See Note [Ct/evidence invariant]
       , ctev_dest :: TcEvDest
       , ctev_nosh :: ShadowInfo     -- See Note [Constraint flavours]
-      , ctev_loc  :: CtLoc }
+      , ctev_loc  :: CtLoc
+      , ctev_stage :: ThLevel }
 
   | CtDerived  -- A goal that we don't really have to solve and can't
                -- immediately rewrite anything other than a derived
                -- (there's no evidence!) but if we do manage to solve
                -- it may help in solving other goals.
       { ctev_pred :: TcPredType
-      , ctev_loc  :: CtLoc }
+      , ctev_loc  :: CtLoc
+      , ctev_stage :: ThLevel }
 
 ctEvPred :: CtEvidence -> TcPredType
 -- The predicate of a flavor
 ctEvPred = ctev_pred
+
+ctEvLevel :: CtEvidence -> ThLevel
+ctEvLevel = ctev_stage
 
 ctEvLoc :: CtEvidence -> CtLoc
 ctEvLoc = ctev_loc
@@ -1383,6 +1397,8 @@ ctEvTerm ev = EvExpr (ctEvExpr ev)
 ctEvExpr :: CtEvidence -> EvExpr
 ctEvExpr ev@(CtWanted { ctev_dest = HoleDest _ })
             = Coercion $ ctEvCoercion ev
+ctEvExpr (CtWanted { ctev_dest = QuoteDest h })
+            = EHole h
 ctEvExpr ev = evId (ctEvEvId ev)
 
 ctEvCoercion :: HasDebugCallStack => CtEvidence -> TcCoercion
@@ -1397,14 +1413,16 @@ ctEvCoercion ev
   = pprPanic "ctEvCoercion" (ppr ev)
 
 ctEvEvId :: CtEvidence -> EvVar
-ctEvEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
+ctEvEvId (CtWanted { ctev_dest = EvVarDest _ _ ev }) = ev
 ctEvEvId (CtWanted { ctev_dest = HoleDest h })   = coHoleCoVar h
+ctEvEvId (CtWanted { ctev_dest = QuoteDest _ } ) = pprPanic "ctEvId: Quote" (ppr "q")
 ctEvEvId (CtGiven  { ctev_evar = ev })           = ev
 ctEvEvId ctev@(CtDerived {}) = pprPanic "ctEvId:" (ppr ctev)
 
 instance Outputable TcEvDest where
   ppr (HoleDest h)   = text "hole" <> ppr h
-  ppr (EvVarDest ev) = ppr ev
+  ppr (EvVarDest cs n ev) = text (prettyCallStack cs) <+> ppr ev <+> text "@" <+> ppr n
+  ppr (QuoteDest {}) = text "quote_dest"
 
 instance Outputable CtEvidence where
   ppr ev = ppr (ctEvFlavour ev)
@@ -1412,6 +1430,7 @@ instance Outputable CtEvidence where
            <+> braces (ppr (ctl_depth (ctEvLoc ev))) <> dcolon
                   -- Show the sub-goal depth too
            <+> ppr (ctEvPred ev)
+           <+> ppr (ctEvLevel ev)
     where
       pp_ev = case ev of
              CtGiven { ctev_evar = v } -> ppr v
@@ -1429,6 +1448,7 @@ isGiven _ = False
 isDerived :: CtEvidence -> Bool
 isDerived (CtDerived {}) = True
 isDerived _              = False
+
 
 {-
 %************************************************************************
@@ -1777,6 +1797,9 @@ ctLocEnv = ctl_env
 
 ctLocLevel :: CtLoc -> TcLevel
 ctLocLevel loc = getLclEnvTcLevel (ctLocEnv loc)
+
+ctLocTHLevel :: CtLoc -> ThLevel
+ctLocTHLevel = getLclEnvThLevel . ctLocEnv
 
 ctLocDepth :: CtLoc -> SubGoalDepth
 ctLocDepth = ctl_depth

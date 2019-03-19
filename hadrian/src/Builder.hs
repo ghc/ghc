@@ -230,6 +230,7 @@ instance H.Builder Builder where
                 -- Suppress stdout depending on the Shake's verbosity setting.
                 echo = EchoStdout (verbosity >= Loud)
                 -- Capture stdout and write it to the output file.
+                fancyEcho = [WithStdout True, WithStderr True, echo]
                 captureStdout = do
                     Stdout stdout <- cmd [path] buildArgs
                     writeFileChanged output stdout
@@ -269,7 +270,7 @@ instance H.Builder Builder where
                 GhcPkg Unregister _ -> do
                     Exit _ <- cmd echo [path] (buildArgs ++ [input])
                     return ()
-
+                Ghc _ _ -> cmd fancyEcho [path] buildArgs
                 HsCpp    -> captureStdout
 
                 Make dir -> cmd echo path ["-C", dir] buildArgs

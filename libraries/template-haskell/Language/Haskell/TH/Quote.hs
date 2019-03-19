@@ -21,6 +21,7 @@ module Language.Haskell.TH.Quote(
     ) where
 
 import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Lift
 import Prelude
 
 -- | The 'QuasiQuoter' type, a value @q@ of this type can be used
@@ -48,10 +49,10 @@ data QuasiQuoter = QuasiQuoter {
 -- the quote [asmq_f|foo.s|] will take input from file @"foo.s"@ instead
 -- of the inline text
 quoteFile :: QuasiQuoter -> QuasiQuoter
-quoteFile (QuasiQuoter { quoteExp = qe, quotePat = qp, quoteType = qt, quoteDec = qd }) 
+quoteFile (QuasiQuoter { quoteExp = qe, quotePat = qp, quoteType = qt, quoteDec = qd })
   = QuasiQuoter { quoteExp = get qe, quotePat = get qp, quoteType = get qt, quoteDec = get qd }
   where
    get :: (String -> Q a) -> String -> Q a
-   get old_quoter file_name = do { file_cts <- runIO (readFile file_name) 
+   get old_quoter file_name = do { file_cts <- runIO (readFile file_name)
                                  ; addDependentFile file_name
                                  ; old_quoter file_cts }

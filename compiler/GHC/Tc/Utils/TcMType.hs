@@ -25,9 +25,10 @@ module GHC.Tc.Utils.TcMType (
   newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
   cloneMetaTyVar,
   newFmvTyVar, newFskTyVar,
+  mkSpliceId,
 
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
-  newMetaDetails, isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar,
+  newMetaDetails, isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar, newMetaTyVarName,
 
   --------------------------------
   -- Expected types
@@ -41,7 +42,7 @@ module GHC.Tc.Utils.TcMType (
   --------------------------------
   -- Creating new evidence variables
   newEvVar, newEvVars, newDict,
-  newWanted, newWanteds, newHoleCt, cloneWanted, cloneWC,
+  newWanted, newWantedAt, newWanteds, newHoleCt, cloneWanted, cloneWC,
   emitWanted, emitWantedEq, emitWantedEvVar, emitWantedEvVars,
   emitDerivedEqs,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
@@ -128,6 +129,7 @@ import GHC.Types.Unique.Set
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Basic ( TypeOrKind(..) )
+import GHC.Stack
 
 import Control.Monad
 import Maybes
@@ -179,16 +181,22 @@ newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
 newEvVar ty = do { name <- newSysName (predTypeOccName ty)
                  ; return (mkLocalIdOrCoVar name ty) }
 
-newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
+newWanted :: HasCallStack => CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
+newWanted orig t_or_k pty = do
+  st <- getStage
+  newWantedAt (thLevel st) orig t_or_k pty
+
+newWantedAt :: HasCallStack => ThLevel -> CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
 -- Deals with both equality and non-equality predicates
-newWanted orig t_or_k pty
+newWantedAt n orig t_or_k pty
   = do loc <- getCtLocM orig t_or_k
        d <- if isEqPrimPred pty then HoleDest  <$> newCoercionHole YesBlockSubst pty
-                                else EvVarDest <$> newEvVar pty
+                                else EvVarDest callStack n <$> newEvVar pty
        return $ CtWanted { ctev_dest = d
                          , ctev_pred = pty
                          , ctev_nosh = WDeriv
-                         , ctev_loc = loc }
+                         , ctev_loc = loc
+                         , ctev_stage = n }
 
 newWanteds :: CtOrigin -> ThetaType -> TcM [CtEvidence]
 newWanteds orig = mapM (newWanted orig Nothing)
@@ -197,10 +205,12 @@ newWanteds orig = mapM (newWanted orig Nothing)
 newHoleCt :: HoleSort -> Id -> Type -> TcM Ct
 newHoleCt hole ev ty = do
   loc <- getCtLocM HoleOrigin Nothing
+  st <- getStage
   pure $ CHoleCan { cc_ev = CtWanted { ctev_pred = ty
-                                     , ctev_dest = EvVarDest ev
+                                     , ctev_dest = EvVarDest callStack (thLevel st) ev
                                      , ctev_nosh = WDeriv
-                                     , ctev_loc  = loc }
+                                     , ctev_loc  = loc
+                                     , ctev_stage = thLevel st }
                   , cc_occ = getOccName ev
                   , cc_hole = hole }
 
@@ -251,21 +261,25 @@ emitDerivedEqs origin pairs
   = return ()
   | otherwise
   = do { loc <- getCtLocM origin Nothing
-       ; emitSimples (listToBag (map (mk_one loc) pairs)) }
+       ; st <- thLevel <$> getStage
+       ; emitSimples (listToBag (map (mk_one st loc) pairs)) }
   where
-    mk_one loc (ty1, ty2)
+    mk_one st loc (ty1, ty2)
        = mkNonCanonical $
          CtDerived { ctev_pred = mkPrimEqPred ty1 ty2
-                   , ctev_loc = loc }
+                   , ctev_loc = loc
+                   , ctev_stage = st }
 
 -- | Emits a new equality constraint
 emitWantedEq :: CtOrigin -> TypeOrKind -> Role -> TcType -> TcType -> TcM Coercion
 emitWantedEq origin t_or_k role ty1 ty2
   = do { hole <- newCoercionHole YesBlockSubst pty
        ; loc <- getCtLocM origin (Just t_or_k)
+       ; st <- getStage
        ; emitSimple $ mkNonCanonical $
          CtWanted { ctev_pred = pty, ctev_dest = HoleDest hole
-                  , ctev_nosh = WDeriv, ctev_loc = loc }
+                  , ctev_nosh = WDeriv, ctev_loc = loc
+                  , ctev_stage = thLevel st }
        ; return (HoleCo hole) }
   where
     pty = mkPrimEqPredRole role ty1 ty2
@@ -276,10 +290,13 @@ emitWantedEvVar :: CtOrigin -> TcPredType -> TcM EvVar
 emitWantedEvVar origin ty
   = do { new_cv <- newEvVar ty
        ; loc <- getCtLocM origin Nothing
-       ; let ctev = CtWanted { ctev_dest = EvVarDest new_cv
+       ; st <- getStage
+       ; let ctev = CtWanted { ctev_dest = EvVarDest callStack (thLevel st) new_cv
                              , ctev_pred = ty
                              , ctev_nosh = WDeriv
-                             , ctev_loc  = loc }
+                             , ctev_loc  = loc
+                             , ctev_stage = thLevel st }
+       ; pprTraceM "emitWanted" (ppr ctev)
        ; emitSimple $ mkNonCanonical ctev
        ; return new_cv }
 
@@ -958,6 +975,19 @@ coercion variables, except for the special case of the promoted Eq#. But,
 that can't ever appear in user code, so we're safe!
 -}
 
+mkSpliceId :: Kind -> TcM Id
+mkSpliceId kind = do
+  name    <- newMetaTyVarName (fsLit "$splice")
+  details <- newMetaDetails TauTv
+  let tyvar = mkTcTyVar name kind details
+  traceTc "newAnonMetaTyVar" (ppr tyvar)
+  return tyvar
+
+{- Note [Name of an instantiated type variable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At the moment we give a unification variable a System Name, which
+influences the way it is tidied; see TypeRep.tidyTyVarBndr.
+-}
 
 newFlexiTyVar :: Kind -> TcM TcTyVar
 newFlexiTyVar kind = newAnonMetaTyVar TauTv kind
@@ -2083,7 +2113,7 @@ zonkCtEvidence ctev@(CtGiven { ctev_pred = pred })
 zonkCtEvidence ctev@(CtWanted { ctev_pred = pred, ctev_dest = dest })
   = do { pred' <- zonkTcType pred
        ; let dest' = case dest of
-                       EvVarDest ev -> EvVarDest $ setVarType ev pred'
+                       EvVarDest cs n ev -> EvVarDest cs n $ setVarType ev pred'
                          -- necessary in simplifyInfer
                        HoleDest h   -> HoleDest h
        ; return (ctev { ctev_pred = pred', ctev_dest = dest' }) }

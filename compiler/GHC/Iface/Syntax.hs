@@ -486,6 +486,8 @@ ifaceDeclFingerprints hash decl
 data IfaceExpr
   = IfaceLcl    IfLclName
   | IfaceExt    IfExtName
+  | IfaceSplice Int                     -- A splice point
+  | IfaceExactLocal Int IfLclName IfaceType      -- A local name from TH
   | IfaceType   IfaceType
   | IfaceCo     IfaceCoercion
   | IfaceTuple  TupleSort [IfaceExpr]   -- Saturated; type arguments omitted
@@ -1288,6 +1290,8 @@ pprIfaceExpr :: (SDoc -> SDoc) -> IfaceExpr -> SDoc
 
 pprIfaceExpr _       (IfaceLcl v)       = ppr v
 pprIfaceExpr _       (IfaceExt v)       = ppr v
+pprIfaceExpr _       (IfaceExactLocal u fs t) = brackets (ppr u <+> ppr fs <+> ppr t)
+pprIfaceExpr _       (IfaceSplice n)    = ppr n
 pprIfaceExpr _       (IfaceLit l)       = ppr l
 pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
 pprIfaceExpr _       (IfaceType ty)     = char '@' <> pprParendIfaceType ty
@@ -1558,8 +1562,10 @@ freeNamesIfAppArgs (IA_Arg t _ ts) = freeNamesIfType t &&& freeNamesIfAppArgs ts
 freeNamesIfAppArgs IA_Nil          = emptyNameSet
 
 freeNamesIfType :: IfaceType -> NameSet
-freeNamesIfType (IfaceFreeTyVar _)    = emptyNameSet
-freeNamesIfType (IfaceTyVar _)        = emptyNameSet
+freeNamesIfType (IfaceFreeTyVar {})    = emptyNameSet
+freeNamesIfType (IfaceSpliceTyVar {})  = emptyNameSet
+freeNamesIfType (IfaceTyVar {})        = emptyNameSet
+freeNamesIfType (IfaceExactLocalTy {}) = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs t
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs ts
 freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfAppArgs ts
@@ -1640,7 +1646,7 @@ freeNamesIfTvBndr (_fs,k) = freeNamesIfKind k
     -- kinds can have Names inside, because of promotion
 
 freeNamesIfIdBndr :: IfaceIdBndr -> NameSet
-freeNamesIfIdBndr (_fs,k) = freeNamesIfKind k
+freeNamesIfIdBndr (_fs,k ) = freeNamesIfKind k
 
 freeNamesIfIdInfo :: IfaceIdInfo -> NameSet
 freeNamesIfIdInfo = fnList freeNamesItem
@@ -2256,6 +2262,14 @@ instance Binary IfaceExpr where
         putByte bh 13
         put_ bh a
         put_ bh b
+    put_ bh (IfaceSplice n) = do
+        putByte bh 14
+        put_ bh n
+    put_ bh (IfaceExactLocal u fs t) = do
+        putByte bh 15
+        put_ bh u
+        put_ bh fs
+        put_ bh t
     get bh = do
         h <- getByte bh
         case h of
@@ -2298,6 +2312,12 @@ instance Binary IfaceExpr where
             13 -> do a <- get bh
                      b <- get bh
                      return (IfaceECase a b)
+            14 -> do n <- get bh
+                     return (IfaceSplice n)
+            15 -> do u <- get bh
+                     fs <- get bh
+                     t <- get bh
+                     return (IfaceExactLocal u fs t)
             _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceTickish where
@@ -2523,6 +2543,7 @@ instance NFData IfaceExpr where
     IfaceLit l -> l `seq` () -- FIXME
     IfaceFCall fc ty -> fc `seq` rnf ty
     IfaceTick tick e -> rnf tick `seq` rnf e
+    _ -> ()
 
 instance NFData IfaceBinding where
   rnf = \case

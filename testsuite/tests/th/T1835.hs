@@ -4,11 +4,12 @@ module Main where
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Lift
 
-class Eq a => MyClass a 
+class Eq a => MyClass a
 data Foo = Foo deriving Eq
 
-instance MyClass Foo 
+instance MyClass Foo
 
 data Bar = Bar
   deriving Eq

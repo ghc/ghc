@@ -463,7 +463,7 @@ test('T15843', [], multimod_compile_and_run,
      ['T15843.hs',
       '-v0 ' + config.ghc_th_way_flags])
 test('T15845', normal, compile, ['-v0 -dsuppress-uniques'])
-test('T15437', expect_broken(15437), multimod_compile,
+test('T15437', normal, multimod_compile,
      ['T15437', '-v0 ' + config.ghc_th_way_flags])
 test('T15985', normal, compile, [''])
 test('T16133', normal, compile_fail, [''])
@@ -504,3 +504,5 @@ test('T17688a', normal, compile, [''])
 test('T17688b', normal, compile, [''])
 test('TH_PprStar', normal, compile, ['-v0 -dsuppress-uniques'])
 test('TH_StringLift', normal, compile, [''])
+test('LiftTInstance', normal, compile_fail, ['-v0'])
+test('Lift_String', normal, compile, ['-v0'])

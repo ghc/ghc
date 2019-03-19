@@ -357,7 +357,7 @@ mkHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
 mkHsOpApp e1 op e2 = OpApp noExtField e1 (noLoc (HsVar noExtField (noLoc op))) e2
 
 unqualSplice :: RdrName
-unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
+unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "$splice"))
 
 mkUntypedSplice :: SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
 mkUntypedSplice hasParen e = HsUntypedSplice noExtField hasParen unqualSplice e

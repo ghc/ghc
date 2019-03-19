@@ -4,6 +4,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -22,7 +23,10 @@
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
-module GHC.HsToCore.Quote( dsBracket ) where
+module GHC.HsToCore.Quote( dsBracket,
+
+               -- Functions used in ClsInst to generate evidence for LiftT
+               globalVar, Core(..)) where
 
 #include "HsVersions.h"
 
@@ -68,7 +72,7 @@ import GHC.Core.Class
 import GHC.Driver.Types ( MonadThings )
 import GHC.Core.DataCon
 import GHC.Types.Var
-import GHC.HsToCore.Binds
+import {-# SOURCE #-} GHC.HsToCore.Binds
 
 import GHC.TypeLits
 import Data.Kind (Constraint)
@@ -140,7 +144,7 @@ getPlatform = targetPlatform <$> getDynFlags
 -----------------------------------------------------------------------------
 dsBracket :: Maybe QuoteWrapper -- ^ This is Nothing only when we are dealing with a VarBr
           -> HsBracket GhcRn
-          -> [PendingTcSplice]
+          -> [PendingTcUntypedSplice]
           -> DsM CoreExpr
 -- See Note [Desugaring Brackets]
 -- Returns a CoreExpr of type (M TH.Exp)
@@ -159,7 +163,7 @@ dsBracket wrap brack splices
       runReaderT (mapReaderT (dsExtendMetaEnv new_bit) act) mw
 
 
-    new_bit = mkNameEnv [(n, DsSplice (unLoc e))
+    new_bit = mkNameEnv [(getName n, DsSplice (unLoc e))
                         | PendingTcSplice n e <- splices]
 
     do_brack (VarBr _ _ n) = do { MkC e1  <- lookupOccDsM n ; return e1 }
@@ -1252,13 +1256,21 @@ repTy (HsTyVar _ _ (L _ n))
   | isLiftedTypeKindTyConName n       = repTStar
   | n `hasKey` constraintKindTyConKey = repTConstraint
   | n `hasKey` funTyConKey            = repArrowTyCon
-  | isTvOcc occ   = do tv1 <- lookupOcc n
-                       repTvar tv1
-  | isDataOcc occ = do tc1 <- lookupOcc n
-                       repPromotedDataCon tc1
-  | n == eqTyConName = repTequality
-  | otherwise     = do tc1 <- lookupOcc n
-                       repNamedTyCon tc1
+  | n == eqTyConName                  = repTequality
+  | otherwise = do
+    -- Have to lookup the variable in the environment before the calls to
+    -- `isTvOcc` as the variables for splice points return true for
+    -- `isTvOcc` as well.
+    mb_val <- lift $ dsLookupMetaEnv n
+    if
+      | Just (DsSplice t) <- mb_val -> lift (MkC <$> dsExpr t)
+      | isTvOcc occ   -> do tv1 <- lookupOcc n
+                            repTvar tv1
+      | isDataOcc occ -> do tc1 <- lookupOcc n
+                            repPromotedDataCon tc1
+      | otherwise  ->   do tc1 <- lookupOcc n
+                           repNamedTyCon tc1
+
   where
     occ = nameOccName n
 
@@ -1347,6 +1359,7 @@ repSplice (HsTypedSplice   _ _ n _) = rep_splice n
 repSplice (HsUntypedSplice _ _ n _) = rep_splice n
 repSplice (HsQuasiQuote _ n _ _ _)  = rep_splice n
 repSplice e@(HsSpliced {})          = pprPanic "repSplice" (ppr e)
+repSplice e@(HsSplicedD {})         = pprPanic "repSpliceD" (ppr e)
 
 rep_splice :: Name -> MetaM (Core a)
 rep_splice splice_name

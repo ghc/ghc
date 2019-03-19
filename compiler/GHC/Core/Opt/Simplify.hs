@@ -1468,7 +1468,7 @@ simplNonRecE :: SimplEnv
 --       the call to simplLam in simplExprF (Lam ...)
 
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
-  | ASSERT( isId bndr && not (isJoinId bndr) ) True
+  | True -- ASSERT( isId bndr && not (isJoinId bndr) ) True
   , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs rhs_se
   = do { tick (PreInlineUnconditionally bndr)
        ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $

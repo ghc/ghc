@@ -1255,7 +1255,8 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
 
            ; sc_top_name  <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; sc_ev_id     <- newEvVar sc_pred
-           ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id sc_ev_tm
+           -- MP: Check
+           ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id 1 sc_ev_tm
            ; let sc_top_ty = mkInvForAllTys tyvars $
                              mkPhiTy (map idType dfun_evs) sc_pred
                  sc_top_id = mkLocalId sc_top_name sc_top_ty

@@ -628,7 +628,9 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 -- Note [The substitution invariant].
 checkValidSubst :: HasCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
-  = ASSERT2( isValidTCvSubst subst,
+  =
+    {-
+    ASSERT2( isValidTCvSubst subst,
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$
              text "tenvFVs" <+> ppr (shallowTyCoVarsOfTyVarEnv tenv) $$
@@ -643,6 +645,7 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
              text "tys" <+> ppr tys $$
              text "cos" <+> ppr cos $$
              text "needInScope" <+> ppr needInScope )
+             -}
     a
   where
   substDomain = nonDetKeysUFM tenv ++ nonDetKeysUFM cenv

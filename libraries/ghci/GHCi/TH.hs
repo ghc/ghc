@@ -50,7 +50,7 @@ For each splice
    :: RemoteRef (IORef QState)
         -- The state returned by StartTH in step1
    -> HValueRef
-        -- The HValueRef we got in step 4, points to the code for the splice
+        -- The HValueRef we got in step 2, points to the code for the splice
    -> THResultType
         -- Tells us what kind of splice this is (decl, expr, type, etc.)
    -> Maybe TH.Loc
@@ -251,6 +251,7 @@ runTH pipe rstate rhv ty mb_loc = do
     THPat -> runTHQ pipe rstate mb_loc (unsafeCoerce hv :: TH.Q TH.Pat)
     THType -> runTHQ pipe rstate mb_loc (unsafeCoerce hv :: TH.Q TH.Type)
     THDec -> runTHQ pipe rstate mb_loc (unsafeCoerce hv :: TH.Q [TH.Dec])
+    THCore -> error "not implemented"
     THAnnWrapper -> do
       hv <- unsafeCoerce <$> localRef rhv
       case hv :: AnnotationWrapper of

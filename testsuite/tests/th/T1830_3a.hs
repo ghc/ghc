@@ -5,7 +5,7 @@
 module T1830_3a where
 
 import GHC.Exts
-import Language.Haskell.TH.Syntax (Lift(..))
+import Language.Haskell.TH.Lift (Lift(..))
 
 data AlgDT a b c = NormalCon a b
                  | RecCon { recCon1 :: a, recCon2 :: b}

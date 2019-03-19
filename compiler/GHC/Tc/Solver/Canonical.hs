@@ -1496,11 +1496,12 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
     loc  = ctEvLoc ev
     pred = ctEvPred ev
+    n = ctEvLevel ev
 
      -- See Note [Decomposing equality]
     can_decompose inerts
       =  isInjectiveTyCon tc1 (eqRelRole eq_rel)
-      || (ctEvFlavour ev /= Given && isEmptyBag (matchableGivens loc pred inerts))
+      || (ctEvFlavour ev /= Given && isEmptyBag (matchableGivens loc n pred inerts))
 
 {-
 Note [Use canEqFailure in canDecomposableTyConApp]

@@ -67,6 +67,9 @@ instance Binary TH.FamilyResultSig
 instance Binary TH.TypeFamilyHead
 instance Binary TH.PatSynDir
 instance Binary TH.PatSynArgs
+instance Binary (TH.TExp a)
+instance Binary (TH.TExpU)
+instance Binary (TH.TTExp)
 
 -- We need Binary TypeRep for serializing annotations
 

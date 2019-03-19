@@ -69,6 +69,7 @@ module GHC.Driver.Types (
         MetaRequest(..),
         MetaResult, -- data constructors not exported to ensure correct response type
         metaRequestE, metaRequestP, metaRequestT, metaRequestD, metaRequestAW,
+        metaRequestC, metaRequestCT,
         MetaHook,
 
         -- * Annotations
@@ -232,6 +233,7 @@ import System.FilePath
 import Control.DeepSeq
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
+import Language.Haskell.TH.Syntax (TExpU, TTExp)
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -803,7 +805,9 @@ data MetaRequest
   | MetaP  (LPat GhcPs      -> MetaResult)
   | MetaT  (LHsType GhcPs   -> MetaResult)
   | MetaD  ([LHsDecl GhcPs] -> MetaResult)
-  | MetaAW (Serialized     -> MetaResult)
+  | MetaC  (TExpU           -> MetaResult)
+  | MetaCT (TTExp           -> MetaResult)
+  | MetaAW (Serialized      -> MetaResult)
 
 -- | data constructors not exported to ensure correct result type
 data MetaResult
@@ -811,12 +815,20 @@ data MetaResult
   | MetaResP  { unMetaResP  :: LPat GhcPs      }
   | MetaResT  { unMetaResT  :: LHsType GhcPs   }
   | MetaResD  { unMetaResD  :: [LHsDecl GhcPs] }
-  | MetaResAW { unMetaResAW :: Serialized        }
+  | MetaResC  { unMetaResC  :: TExpU           }
+  | MetaResCT { unMetaResCT :: TTExp           }
+  | MetaResAW { unMetaResAW :: Serialized      }
 
-type MetaHook f = MetaRequest -> LHsExpr GhcTc -> f MetaResult
+type MetaHook f = MetaRequest -> (LHsExpr GhcTc) -> f MetaResult
 
 metaRequestE :: Functor f => MetaHook f -> LHsExpr GhcTc -> f (LHsExpr GhcPs)
 metaRequestE h = fmap unMetaResE . h (MetaE MetaResE)
+
+metaRequestC :: Functor f => MetaHook f -> LHsExpr GhcTc -> f TExpU
+metaRequestC h = fmap unMetaResC . h (MetaC MetaResC)
+
+metaRequestCT :: Functor f => MetaHook f -> LHsExpr GhcTc -> f TTExp
+metaRequestCT h = fmap unMetaResCT . h (MetaCT MetaResCT)
 
 metaRequestP :: Functor f => MetaHook f -> LHsExpr GhcTc -> f (LPat GhcPs)
 metaRequestP h = fmap unMetaResP . h (MetaP MetaResP)

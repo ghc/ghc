@@ -141,7 +141,9 @@ type IfaceKind     = IfaceType
 -- before being printed. See Note [Pretty printing via Iface syntax] in GHC.Core.Ppr.TyThing
 data IfaceType
   = IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
+  | IfaceExactLocalTy Int IfLclName IfaceType (Maybe TyVar)     -- A local name from TH
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
+  | IfaceSpliceTyVar Int                -- Point to insert spliced expression
   | IfaceLitTy     IfaceTyLit
   | IfaceAppTy     IfaceType IfaceAppArgs
                              -- See Note [Suppressing invisible arguments] for
@@ -460,6 +462,7 @@ ifTypeIsVarFree :: IfaceType -> Bool
 ifTypeIsVarFree ty = go ty
   where
     go (IfaceTyVar {})         = False
+    go (IfaceSpliceTyVar {})   = False
     go (IfaceFreeTyVar {})     = False
     go (IfaceAppTy fun args)   = go fun && go_args args
     go (IfaceFunTy _ arg res)  = go arg && go res
@@ -495,6 +498,7 @@ substIfaceType env ty
   = go ty
   where
     go (IfaceFreeTyVar tv)    = IfaceFreeTyVar tv
+    go sty@(IfaceSpliceTyVar {}) = sty
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
     go (IfaceFunTy af t1 t2)  = IfaceFunTy af (go t1) (go t2)
@@ -834,7 +838,12 @@ ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty ctxt_prec ty@(IfaceForAllTy {})        = ppr_sigma ctxt_prec ty
 ppr_ty ctxt_prec ty@(IfaceFunTy InvisArg _ _) = ppr_sigma ctxt_prec ty
 
+ppr_ty _         (IfaceSpliceTyVar x)   = ppr x
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
+ppr_ty _         (IfaceExactLocalTy u fs k mtyvar) =
+  case mtyvar of
+    Just tyvar -> ppr tyvar
+    Nothing -> brackets (ppr u <+> ppr fs <+> ppr k)
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [TcTyVars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys
@@ -972,6 +981,13 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
       = IfaceTyConApp liftedRep IA_Nil
       | otherwise
       = ty
+    go in_kind _ ty@(IfaceExactLocalTy _ _ _ mtv)
+      -- See Note [Defaulting RuntimeRep variables], about free vars
+      | Just tv <- mtv
+      , in_kind && GHC.Core.Type.isRuntimeRepTy (tyVarKind tv)
+      = IfaceTyConApp liftedRep IA_Nil
+      | otherwise
+      = ty
 
     go ink subs (IfaceTyConApp tc tc_args)
       = IfaceTyConApp tc (go_args ink subs tc_args)
@@ -989,6 +1005,7 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
       = IfaceCastTy (go ink subs x) co
 
     go _ _ ty@(IfaceLitTy {}) = ty
+    go _ _ ty@(IfaceSpliceTyVar {}) = ty
     go _ _ ty@(IfaceCoercionTy {}) = ty
 
     go_ifacebndr :: FastStringEnv () -> IfaceForAllBndr -> IfaceForAllBndr
@@ -1741,7 +1758,7 @@ ppr_parend_preds preds = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
     put_ _ (IfaceFreeTyVar tv)
-       = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
+       = pprPanic "undefined" (ppr tv)
 
     put_ bh (IfaceForAllTy aa ab) = do
             putByte bh 0
@@ -1769,6 +1786,13 @@ instance Binary IfaceType where
       = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
     put_ bh (IfaceLitTy n)
       = do { putByte bh 9; put_ bh n }
+    put_ bh (IfaceSpliceTyVar x)
+      = do { putByte bh 10; put_ bh x }
+    put_ bh (IfaceExactLocalTy k fs kind _) = do
+      putByte bh 11
+      put_ bh k
+      put_ bh fs
+      put_ bh kind
 
     get bh = do
             h <- getByte bh
@@ -1794,8 +1818,16 @@ instance Binary IfaceType where
 
               8 -> do { s <- get bh; i <- get bh; tys <- get bh
                       ; return (IfaceTupleTy s i tys) }
-              _  -> do n <- get bh
+              9  -> do n <- get bh
                        return (IfaceLitTy n)
+              10 -> do n <- get bh
+                       return (IfaceSpliceTyVar n)
+
+              11 -> do u <- get bh
+                       fs <- get bh
+                       k <- get bh
+                       return (IfaceExactLocalTy u fs k Nothing)
+              _ -> panic "get:IfaceType"
 
 instance Binary IfaceMCoercion where
   put_ bh IfaceMRefl = do
@@ -1991,6 +2023,7 @@ instance NFData IfaceType where
     IfaceCastTy f1 f2 -> rnf f1 `seq` rnf f2
     IfaceCoercionTy f1 -> rnf f1
     IfaceTupleTy f1 f2 f3 -> f1 `seq` f2 `seq` rnf f3
+    IfaceSpliceTyVar f1 -> f1 `seq` ()
 
 instance NFData IfaceTyLit where
   rnf = \case

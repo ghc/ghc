@@ -11,6 +11,7 @@ This module converts Template Haskell syntax into Hs syntax
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -21,6 +22,8 @@ module GHC.ThToHs
    , convertToHsDecls
    , convertToHsType
    , thRdrNameGuesses
+   , convertEnv
+   , convertTy
    )
 where
 
@@ -60,6 +63,14 @@ import System.IO.Unsafe
 
 -------------------------------------------------------------------
 --              The external interface
+convertEnv :: Origin -> SrcSpan -> TExp a
+                      -> Either MsgDoc TExpU
+convertEnv o loc (TExp u) =
+  initCvt o loc $ do
+    return u
+
+convertTy :: Origin -> SrcSpan -> TH.TTExp -> Either MsgDoc TTExp
+convertTy _o _loc t = return t
 
 convertToHsDecls :: Origin -> SrcSpan -> [TH.Dec] -> Either MsgDoc [LHsDecl GhcPs]
 convertToHsDecls origin loc ds = initCvt origin loc (fmap catMaybes (mapM cvt_dec ds))

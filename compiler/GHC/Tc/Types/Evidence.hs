@@ -55,6 +55,7 @@ module GHC.Tc.Types.Evidence (
 
 import GhcPrelude
 
+import {-# SOURCE #-} GHC.Tc.Types
 import GHC.Types.Var
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
@@ -507,6 +508,7 @@ instance Outputable EvBindMap where
 -- All evidence is bound by EvBinds; no side effects
 data EvBind
   = EvBind { eb_lhs      :: EvVar
+           , eb_level    :: ThLevel
            , eb_rhs      :: EvTerm
            , eb_is_given :: Bool  -- True <=> given
                  -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
@@ -515,12 +517,12 @@ data EvBind
 evBindVar :: EvBind -> EvVar
 evBindVar = eb_lhs
 
-mkWantedEvBind :: EvVar -> EvTerm -> EvBind
-mkWantedEvBind ev tm = EvBind { eb_is_given = False, eb_lhs = ev, eb_rhs = tm }
+mkWantedEvBind :: EvVar -> ThLevel -> EvTerm -> EvBind
+mkWantedEvBind ev n tm = EvBind { eb_is_given = False, eb_lhs = ev, eb_rhs = tm, eb_level = n }
 
 -- EvTypeable are never given, so we can work with EvExpr here instead of EvTerm
-mkGivenEvBind :: EvVar -> EvTerm -> EvBind
-mkGivenEvBind ev tm = EvBind { eb_is_given = True, eb_lhs = ev, eb_rhs = tm }
+mkGivenEvBind :: EvVar -> ThLevel -> EvTerm -> EvBind
+mkGivenEvBind ev n tm = EvBind { eb_is_given = True, eb_lhs = ev, eb_rhs = tm, eb_level = n }
 
 
 -- An EvTerm is, conceptually, a CoreExpr that implements the constraint.
@@ -538,6 +540,9 @@ data EvTerm
       , et_binds :: TcEvBinds -- This field is why we need an EvFun
                               -- constructor, and can't just use EvExpr
       , et_body  :: EvVar }
+
+  | EvQuote EvExpr EvExpr
+  | EvSplice Type EvTerm
 
   deriving Data.Data
 
@@ -868,6 +873,8 @@ evVarsOfTerm :: EvTerm -> VarSet
 evVarsOfTerm (EvExpr e)         = exprSomeFreeVars isEvVar e
 evVarsOfTerm (EvTypeable _ ev)  = evVarsOfTypeable ev
 evVarsOfTerm (EvFun {})         = emptyVarSet -- See Note [Free vars of EvFun]
+evVarsOfTerm (EvQuote ss e)        = exprSomeFreeVars isEvVar ss `unionVarSet` exprSomeFreeVars isEvVar e
+evVarsOfTerm (EvSplice _t e)       = evVarsOfTerm e
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = mapUnionVarSet evVarsOfTerm
@@ -951,11 +958,12 @@ instance Uniquable EvBindsVar where
   getUnique = ebv_uniq
 
 instance Outputable EvBind where
-  ppr (EvBind { eb_lhs = v, eb_rhs = e, eb_is_given = is_given })
-     = sep [ pp_gw <+> ppr v
+  ppr (EvBind { eb_lhs = v, eb_rhs = e, eb_is_given = is_given, eb_level = n })
+     = sep [ pp_gw <> pp_l <+> ppr v
            , nest 2 $ equals <+> ppr e ]
      where
        pp_gw = brackets (if is_given then char 'G' else char 'W')
+       pp_l  = brackets (ppr n)
    -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
 
 instance Outputable EvTerm where
@@ -964,6 +972,8 @@ instance Outputable EvTerm where
   ppr (EvFun { et_tvs = tvs, et_given = gs, et_binds = bs, et_body = w })
       = hang (text "\\" <+> sep (map pprLamBndr (tvs ++ gs)) <+> arrow)
            2 (ppr bs $$ ppr w)   -- Not very pretty
+  ppr (EvQuote ss e)        = text "[|" <+> ppr e <+> text "|]" <+> dcolon <+> ppr ss
+  ppr (EvSplice _t e)        = text "$(" <+> ppr e <+> text ")"
 
 instance Outputable EvCallStack where
   ppr EvCsEmpty

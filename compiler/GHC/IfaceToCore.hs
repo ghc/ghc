@@ -18,13 +18,17 @@ module GHC.IfaceToCore (
         typecheckIfaceForInstantiate,
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceAnnotations, tcIfaceCompleteSigs,
-        tcIfaceExpr,    -- Desired by HERMIT (#7683)
+        tcIfaceExpr, tcIfaceType,    -- Desired by HERMIT (#7683)
         tcIfaceGlobal
  ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
+
+import GHC.Types.Unique
+import GHC.HsToCore.Expr
+
 
 import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
 import GHC.Iface.Syntax
@@ -1143,7 +1147,27 @@ tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType = go
   where
     go (IfaceTyVar n)          = TyVarTy <$> tcIfaceTyVar n
+    go (IfaceSpliceTyVar n)    = do
+      lcl_env <- getLclEnv
+      let il = if_ty_meta_env lcl_env
+      case lookupUFM_Directly il (mkUniqueGrimily n) of
+        Just mm -> case if_dsm_env lcl_env of
+                     Just (ds_gbl, ds_lcl) -> do
+                      if_envs <- getEnvs
+                      let ds_gbl' = ds_gbl { ds_if_env = if_envs }
+                      setEnvs (ds_gbl', ds_lcl) $
+                        dsSplicedT mm
+
+                     Nothing -> error "Must be desugaring to run a splice"
+        Nothing -> pprPanic "out of scope:" (ppr n)
     go (IfaceFreeTyVar n)      = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
+    go (IfaceExactLocalTy uniq n kind _) = do
+      let name = mkInternalName (mkUniqueGrimily uniq) (mkTyVarOccFS n) noSrcSpan
+      kind' <- tcIfaceType kind
+      return (TyVarTy $ mkTyVar name kind')
+
+
+
     go (IfaceLitTy l)          = LitTy <$> tcIfaceTyLit l
     go (IfaceFunTy flag t1 t2) = FunTy flag <$> go t1 <*> go t2
     go (IfaceTupleTy s i tks)  = tcIfaceTupleTy s i tks
@@ -1273,8 +1297,29 @@ tcIfaceExpr (IfaceCast expr co)
 tcIfaceExpr (IfaceLcl name)
   = Var <$> tcIfaceLclId name
 
+tcIfaceExpr (IfaceExactLocal u fs ty)
+  = do {
+        let name = mkInternalName (mkUniqueGrimily u) (mkVarOccFS fs) noSrcSpan
+       ; ty'  <- tcIfaceType ty
+       ; return (Var  (mkLocalId name ty')) }
+
 tcIfaceExpr (IfaceExt gbl)
   = Var <$> tcIfaceExtId gbl
+tcIfaceExpr (IfaceSplice n)
+  = do
+      lcl_env <- getLclEnv
+      let il = if_meta_env lcl_env
+      pprTraceM "il" (ppr (nonDetKeysUFM il))
+      case lookupUFM_Directly il (mkUniqueGrimily n) of
+        Just mm -> case if_dsm_env lcl_env of
+                     Just (ds_gbl, ds_lcl) -> do
+                      if_envs <- getEnvs
+                      let ds_gbl' = ds_gbl { ds_if_env = if_envs }
+                      setEnvs (ds_gbl', ds_lcl) $
+                        dsSplicedD mm
+
+                     Nothing -> error "Must be desugaring to run a splice"
+        Nothing -> error "out of scope"
 
 tcIfaceExpr (IfaceLit lit)
   = do lit' <- tcIfaceLit lit

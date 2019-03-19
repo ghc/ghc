@@ -49,7 +49,7 @@ module Language.Haskell.TH(
         reifyConStrictness,
 
         -- * Typed expressions
-        TExp, unType,
+        TExp, unType, TExpU(..), unTypeQ,
 
         -- * Names
         Name, NameSpace,        -- Abstract
@@ -89,6 +89,7 @@ module Language.Haskell.TH(
 
     -- * Library functions
     module Language.Haskell.TH.Lib,
+    module Language.Haskell.TH.Lift,
 
     -- * Pretty-printer
     Ppr(..), pprint, pprExp, pprLit, pprPat, pprParendType
@@ -98,3 +99,4 @@ module Language.Haskell.TH(
 import Language.Haskell.TH.Syntax as Syntax
 import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Ppr
+import Language.Haskell.TH.Lift

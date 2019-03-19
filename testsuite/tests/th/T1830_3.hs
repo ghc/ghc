@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main where
 
-import Language.Haskell.TH.Syntax (lift)
+import Language.Haskell.TH.Lift (lift)
 import T1830_3a
 
 main :: IO ()

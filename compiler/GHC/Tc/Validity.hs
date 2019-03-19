@@ -69,6 +69,7 @@ import Outputable
 import GHC.Types.Unique  ( mkAlphaTyVarUnique )
 import Bag               ( emptyBag )
 import qualified GHC.LanguageExtensions as LangExt
+import qualified GHC.Builtin.Names.TH as THNames
 
 import Control.Monad
 import Data.Foldable
@@ -208,7 +209,8 @@ so we can take their type variables into account as part of the
 
 checkAmbiguity :: UserTypeCtxt -> Type -> TcM ()
 checkAmbiguity ctxt ty
-  | wantAmbiguityCheck ctxt
+  -- TODO: The ambiguity check causes an infinite loop
+  | wantAmbiguityCheck ctxt && False
   = do { traceTc "Ambiguity check for" (ppr ty)
          -- Solve the constraints eagerly because an ambiguous type
          -- can cause a cascade of further errors.  Since the free
@@ -216,6 +218,7 @@ checkAmbiguity ctxt ty
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
                             captureConstraints $
+                            setStage Comp $
                             tcSubType_NC ctxt ty ty
        ; simplifyAmbiguityCheck ty wanted
 
@@ -1267,7 +1270,7 @@ checkSimplifiableClassConstraint env dflags ctxt cls tys
                 -- (Coercible a b) to (a ~R# b)
 
   | otherwise
-  = do { result <- matchGlobalInst dflags False cls tys
+  = do { result <- matchGlobalInst dflags False 1 cls tys
        ; case result of
            OneInst { cir_what = what }
               -> addWarnTc (Reason Opt_WarnSimplifiableClassConstraints)
@@ -1525,9 +1528,11 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
   , hand_written_bindings
   = failWithTc rejected_class_msg
 
-  -- Handwritten instances of KnownNat/KnownSymbol class
+  -- Handwritten instances of LiftT/KnownNat/KnownSymbol class
   -- are always forbidden (#12837)
-  | clas_nm `elem` [ knownNatClassName, knownSymbolClassName ]
+  | clas_nm `elem` [ THNames.liftTClassName
+                   , knownNatClassName
+                   , knownSymbolClassName ]
   , not is_sig
     -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings

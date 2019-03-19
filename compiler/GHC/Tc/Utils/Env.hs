@@ -50,7 +50,7 @@ module GHC.Tc.Utils.Env(
         tcInitTidyEnv, tcInitOpenTidyEnv,
 
         -- Instances
-        tcLookupInstance, tcGetInstEnvs,
+        tcLookupInstance, tcGetInstEnvs, emitTypeable,
 
         -- Rules
         tcExtendRules,
@@ -73,6 +73,7 @@ module GHC.Tc.Utils.Env(
 
 import GhcPrelude
 
+import GHC.Tc.Types.Origin
 import GHC.Hs
 import GHC.Iface.Env
 import GHC.Tc.Utils.Monad
@@ -110,6 +111,7 @@ import ErrUtils
 import Maybes( MaybeErr(..), orElse )
 import qualified GHC.LanguageExtensions as LangExt
 import Util ( HasDebugCallStack )
+import GHC.Builtin.Names.TH (liftTClassName)
 
 import Data.IORef
 import Data.List (intercalate)
@@ -610,7 +612,11 @@ tc_extend_local_env top_lvl extra_env thing_inside
                                 -- The LocalRdrEnv contains only non-top-level names
                                 -- (GlobalRdrEnv handles the top level)
             , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
-                                 [(n, thlvl) | (n, ATcId {}) <- pairs] }
+                                 ([(n, thlvl) | (n, ATcId {}) <- pairs] ++
+                                 -- pprTraceIt "tysVars"
+                                  [(n, thlvl) | (n, ATyVar {}) <- pairs] ++
+                                 --pprTraceIt "tysVars"
+                                  [(idName tc, thlvl) | (n, ATyVar _ tc) <- pairs]) }
 
 tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
@@ -1030,6 +1036,14 @@ mkWrapperName what nameBase
              in (mod_env', num)
          let components = [what, show wrapperNum, pkg, mod, nameBase]
          return $ mkFastString $ zEncodeString $ intercalate ":" components
+
+emitTypeable :: Type -> TcM EvVar
+emitTypeable t = do
+  pprTraceM "EMITTING" (ppr t)
+  typeableClass <- tcLookupTyCon liftTClassName
+ -- cc_tycon <- tcLookupTyCon codeCTyConName
+  emitWantedEvVar StaticOrigin $
+                      mkTyConApp typeableClass [typeKind t, t ]
 
 {-
 Note [Generating fresh names for FFI wrappers]

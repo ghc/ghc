@@ -222,6 +222,7 @@ check_inst sig_inst = do
                           -- Doesn't matter, make something up
                           , ctev_evar = new_ev
                           , ctev_loc = loc
+                          , ctev_stage = thLevel (tcl_th_ctxt (ctl_env loc))
                           }
        return $ wanted : givens
     unsolved <- simplifyWantedsTcM cts

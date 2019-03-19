@@ -9,7 +9,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Iface.Tidy (
-       mkBootModDetailsTc, tidyProgram
+       mkBootModDetailsTc, tidyProgram, tidyExpr
    ) where
 
 #include "HsVersions.h"

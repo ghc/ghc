@@ -163,7 +163,7 @@ newWanted loc pty
 
 -- | Create a new derived constraint.
 newDerived :: CtLoc -> PredType -> TcPluginM CtEvidence
-newDerived loc pty = return CtDerived { ctev_pred = pty, ctev_loc = loc }
+newDerived loc pty = return CtDerived { ctev_pred = pty, ctev_loc = loc, ctev_stage = 0}
 
 -- | Create a new given constraint, with the supplied evidence.  This
 -- must not be invoked from 'tcPluginInit' or 'tcPluginStop', or it
@@ -171,8 +171,9 @@ newDerived loc pty = return CtDerived { ctev_pred = pty, ctev_loc = loc }
 newGiven :: CtLoc -> PredType -> EvExpr -> TcPluginM CtEvidence
 newGiven loc pty evtm = do
    new_ev <- newEvVar pty
-   setEvBind $ mkGivenEvBind new_ev (EvExpr evtm)
-   return CtGiven { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc }
+   -- MP: TODO
+   setEvBind $ mkGivenEvBind new_ev 0 (EvExpr evtm)
+   return CtGiven { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc, ctev_stage = 0}
 
 -- | Create a fresh evidence variable.
 newEvVar :: PredType -> TcPluginM EvVar

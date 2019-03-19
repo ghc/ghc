@@ -43,6 +43,7 @@ import GHC.Types.SrcLoc
 import FastString
 import Outputable
 import GHC.Types.Basic
+import {-# SOURCE #-} GHC.Tc.Types
 
 {- *********************************************************************
 *                                                                      *
@@ -216,7 +217,9 @@ data SkolemInfo
                         -- polymorphic Ids, and are now checking that their RHS
                         -- constraints are satisfied.
 
-  | BracketSkol         -- Template Haskell bracket
+  | BracketSkol         -- Template Haskell bracket, this supresses unsolved constraints warnings
+  | TypedBracketSkol ThLevel    -- Typed Template Haskell bracket
+  | TypedSpliceSkol ThLevel
 
   | UnifyForAllSkol     -- We are unifying two for-all types
        TcType           -- The instantiated type *inside* the forall
@@ -250,6 +253,8 @@ pprSkolInfo InstSkol          = text "the instance declaration"
 pprSkolInfo (InstSC n)        = text "the instance declaration" <> whenPprDebug (parens (ppr n))
 pprSkolInfo FamInstSkol       = text "a family instance declaration"
 pprSkolInfo BracketSkol       = text "a Template Haskell bracket"
+pprSkolInfo (TypedBracketSkol n) = text "a Typed Template Haskell bracket at " <+> ppr n
+pprSkolInfo (TypedSpliceSkol n) = text "a Typed Template Haskell splice at " <+> ppr n
 pprSkolInfo (RuleSkol name)   = text "the RULE" <+> pprRuleName name
 pprSkolInfo ArrowSkol         = text "an arrow form"
 pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
@@ -504,7 +509,8 @@ exprCtOrigin (ArithSeq {})       = Shouldn'tHappenOrigin "arithmetic sequence"
 exprCtOrigin (HsPragE _ _ e)     = lexprCtOrigin e
 exprCtOrigin (HsBracket {})      = Shouldn'tHappenOrigin "TH bracket"
 exprCtOrigin (HsRnBracketOut {})= Shouldn'tHappenOrigin "HsRnBracketOut"
-exprCtOrigin (HsTcBracketOut {})= panic "exprCtOrigin HsTcBracketOut"
+exprCtOrigin (HsTcUntypedBracketOut {})= panic "exprCtOrigin HsTcBracketOut"
+exprCtOrigin (HsTcTypedBracketOut {})= panic "exprCtOrigin HsTcBracketOut"
 exprCtOrigin (HsSpliceE {})      = Shouldn'tHappenOrigin "TH splice"
 exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"

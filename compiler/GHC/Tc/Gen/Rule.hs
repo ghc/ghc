@@ -430,11 +430,12 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
     mk_quant_ev ct
       | CtWanted { ctev_dest = dest, ctev_pred = pred } <- ctEvidence ct
       = case dest of
-          EvVarDest ev_id -> return ev_id
+          EvVarDest _cs _n ev_id -> return ev_id
           HoleDest hole   -> -- See Note [Quantifying over coercion holes]
                              do { ev_id <- newEvVar pred
                                 ; fillCoercionHole hole (mkTcCoVarCo ev_id)
                                 ; return ev_id }
+          QuoteDest {} -> pprPanic "MP: No idea, help me" empty
     mk_quant_ev ct = pprPanic "mk_quant_ev" (ppr ct)
 
 

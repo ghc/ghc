@@ -557,6 +557,7 @@ data MetaInfo
                    -- It is filled in /only/ by unflattenGivens
                    -- See Note [The flattening story] in GHC.Tc.Solver.Flatten
 
+
 instance Outputable MetaDetails where
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty

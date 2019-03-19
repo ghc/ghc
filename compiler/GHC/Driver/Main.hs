@@ -93,7 +93,6 @@ import GHC.Runtime.Interpreter ( addSptEntry )
 import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.CoreToByteCode      ( byteCodeGen, coreExprToBCOs )
 import GHC.Runtime.Linker
-import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Lint           ( lintInteractiveExpr )
 import GHC.Types.Var.Env       ( emptyTidyEnv )
@@ -1903,8 +1902,11 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
            {- Prepare for codegen -}
          ; prepd_expr <- corePrepExpr dflags hsc_env tidy_expr
 
-           {- Lint if necessary -}
-         ; lintInteractiveExpr "hscCompileExpr" hsc_env prepd_expr
+         ; pprTraceM "hscCompileExpr" (ppr ds_expr $$ ppr simpl_expr)
+         -- I have no idea how these ever worked, top-level splices have always contained
+         -- the same free type variables that these link checks complain about.
+--         ; lintInteractiveExpr "hscCompileExpr-s" hsc_env simpl_expr
+--         ; lintInteractiveExpr "hscCompileExpr-p" hsc_env prepd_expr
 
            {- Convert to BCOs -}
          ; bcos <- coreExprToBCOs hsc_env

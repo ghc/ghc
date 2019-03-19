@@ -1,5 +1,10 @@
-{-# LANGUAGE Safe #-}
-
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE FlexibleInstances #-}
 -- |
 -- Language.Haskell.TH.Lib contains lots of useful helper functions for
 -- generating and manipulating Template Haskell terms
@@ -120,8 +125,10 @@ module Language.Haskell.TH.Lib (
     implicitParamBindD,
 
     -- ** Reify
-    thisModule
+    thisModule,
 
+    -- ** Lifting types
+    LiftT(..), typecheck
    ) where
 
 import Language.Haskell.TH.Lib.Internal hiding
@@ -165,6 +172,7 @@ import Control.Applicative ( liftA2 )
 import Foreign.ForeignPtr
 import Data.Word
 import Prelude
+import GHC.Types (TYPE)
 
 -- All definitions below represent the "old" API, since their definitions are
 -- different in Language.Haskell.TH.Lib.Internal. Please think carefully before
@@ -333,3 +341,15 @@ tupE es = do { es1 <- sequenceA es; return (TupE $ map Just es1)}
 
 unboxedTupE :: Quote m => [m Exp] -> m Exp
 unboxedTupE es = do { es1 <- sequenceA es; return (UnboxedTupE $ map Just es1)}
+
+#if __GLASGOW_HASKELL__ < 811
+typecheck :: forall r (a :: TYPE r) . Exp -> Q (TExp a)
+typecheck = error "not possible"
+
+instance LiftT a where
+#else
+typecheck :: forall r (a :: TYPE r) . LiftT a => Exp -> Q (TExp a)
+typecheck e = do
+  t <- (liftTyCl @_ @a)
+  Q (qTypecheck t e)
+#endif

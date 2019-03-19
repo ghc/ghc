@@ -511,6 +511,7 @@ Library
         GHC.Core.Coercion
         GHC.HsToCore.Quote
         GHC.Builtin.Names.TH
+        GHC.HsToCore.DsMetaTc
         GHC.Core.FamInstEnv
         GHC.Tc.Instance.FunDeps
         GHC.Core.InstEnv

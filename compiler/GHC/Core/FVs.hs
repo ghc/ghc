@@ -251,6 +251,8 @@ addBndrs bndrs fv = foldr addBndr fv bndrs
 expr_fvs :: CoreExpr -> FV
 expr_fvs (Type ty) fv_cand in_scope acc =
   tyCoFVsOfType ty fv_cand in_scope acc
+expr_fvs (EHole h) fv_cand in_scope acc =
+  FV.unitFV (exprHoleFV h) fv_cand in_scope acc
 expr_fvs (Coercion co) fv_cand in_scope acc =
   tyCoFVsOfCo co fv_cand in_scope acc
 expr_fvs (Var var) fv_cand in_scope acc = FV.unitFV var fv_cand in_scope acc

@@ -52,11 +52,14 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Builtin.Types ( liftedRepTy )
 import GHC.Core.Unify    ( tcMatchTyKi )
+import GHC.Core.TyCon
 import Util
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Set
 import GHC.Types.Basic    ( IntWithInf, intGtLimit )
+import GHC.Builtin.Names.TH
+import GHC.Tc.Utils.Env
 import ErrUtils           ( emptyMessages )
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -64,7 +67,8 @@ import Control.Monad
 import Data.Foldable      ( toList )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Maybes             ( isJust )
+import Maybes             (expectJust,  isJust )
+import GHC.Stack
 
 {-
 *********************************************************************************
@@ -293,7 +297,7 @@ defaultCallStacks wanteds
     | isSolvedStatus (ic_status implic)
     = return (Just implic)
     | otherwise
-    = do { wanteds <- setEvBindsTcS (ic_binds implic) $
+    = do { wanteds <- setEvBindsTcS 1 (ic_binds implic) $
                       -- defaultCallStack sets a binding, so
                       -- we must set the correct binding group
                       defaultCallStacks (ic_wanted implic)
@@ -607,10 +611,11 @@ tcCheckSatisfiability :: Bag EvVar -> TcM Bool
 -- Return True if satisfiable, False if definitely contradictory
 tcCheckSatisfiability given_ids
   = do { lcl_env <- TcM.getLclEnv
+       ; st <- getStage
        ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
        ; (res, _ev_binds) <- runTcS $
              do { traceTcS "checkSatisfiability {" (ppr given_ids)
-                ; let given_cts = mkGivens given_loc (bagToList given_ids)
+                ; let given_cts = mkGivens (thLevel st) given_loc (bagToList given_ids)
                      -- See Note [Superclasses and satisfiability]
                 ; solveSimpleGivens given_cts
                 ; insols <- getInertInsols
@@ -639,9 +644,10 @@ tcNormalise given_ids ty
   = do { lcl_env <- TcM.getLclEnv
        ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
        ; wanted_ct <- mk_wanted_ct
+       ; st <- getStage
        ; (res, _ev_binds) <- runTcS $
              do { traceTcS "tcNormalise {" (ppr given_ids)
-                ; let given_cts = mkGivens given_loc (bagToList given_ids)
+                ; let given_cts = mkGivens (thLevel st) given_loc (bagToList given_ids)
                 ; solveSimpleGivens given_cts
                 ; wcs <- solveSimpleWanteds (unitBag wanted_ct)
                   -- It's an invariant that this wc_simple will always be
@@ -791,12 +797,13 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        ; tc_env          <- TcM.getEnv
        ; ev_binds_var    <- TcM.newTcEvBinds
        ; psig_theta_vars <- mapM TcM.newEvVar psig_theta
+       ; st <- getStage
        ; wanted_transformed_incl_derivs
             <- setTcLevel rhs_tclvl $
                runTcSWithEvBinds ev_binds_var $
                do { let loc         = mkGivenLoc rhs_tclvl UnkSkol $
                                       env_lcl tc_env
-                        psig_givens = mkGivens loc psig_theta_vars
+                        psig_givens = mkGivens (thLevel st) loc psig_theta_vars
                   ; _ <- solveSimpleGivens psig_givens
                          -- See Note [Add signature contexts as givens]
                   ; solveWanteds wanteds }
@@ -832,9 +839,10 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        -- Easiest way to do this is to emit them as new Wanteds (#14643)
        ; ct_loc <- getCtLocM AnnOrigin Nothing
        ; let psig_wanted = [ CtWanted { ctev_pred = idType psig_theta_var
-                                      , ctev_dest = EvVarDest psig_theta_var
+                                      , ctev_dest = EvVarDest callStack (thLevel st) psig_theta_var
                                       , ctev_nosh = WDeriv
-                                      , ctev_loc  = ct_loc }
+                                      , ctev_loc  = ct_loc
+                                      , ctev_stage = thLevel st }
                            | psig_theta_var <- psig_theta_vars ]
 
        -- Now construct the residual constraint
@@ -1533,7 +1541,7 @@ solveWanteds wc@(WC { wc_simple = simples, wc_impl = implics })
        ; final_wc <- simpl_loop 0 (solverIterations dflags) floated_eqs
                                 (wc1 { wc_impl = implics2 })
 
-       ; ev_binds_var <- getTcEvBindsVar
+       ; ev_binds_var <- getCurTcEvBindsVar
        ; bb <- TcS.getTcEvBindsMap ev_binds_var
        ; traceTcS "solveWanteds }" $
                  vcat [ text "final wc =" <+> ppr final_wc
@@ -1637,6 +1645,11 @@ solveNestedImplications implics
 
        ; return (floated_eqs, catBagMaybes unsolved_implics) }
 
+skolToLevel :: SkolemInfo -> Maybe ThLevel
+skolToLevel (TypedBracketSkol n) = Just (n + 1)
+skolToLevel (TypedSpliceSkol n) = Just n
+skolToLevel _ = Nothing
+
 solveImplication :: Implication    -- Wanted
                  -> TcS (Cts,      -- All wanted or derived floated equalities: var = type
                          Maybe Implication) -- Simplified implication (empty or singleton)
@@ -1648,7 +1661,8 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                              , ic_given  = given_ids
                              , ic_wanted = wanteds
                              , ic_info   = info
-                             , ic_status = status })
+                             , ic_status = status
+                             , ic_env = lcl })
   | isSolvedStatus status
   = return (emptyCts, Just imp)  -- Do nothing
 
@@ -1662,12 +1676,19 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
        -- commented out; see `where` clause below
        -- ; when debugIsOn check_tc_level
 
+       ; cur_lcl <- TcS.getLclEnv
+       ; let lcl' = cur_lcl { tcl_th_bndrs = tcl_th_bndrs lcl}
          -- Solve the nested constraints
        ; (no_given_eqs, given_insols, residual_wanted)
-            <- nestImplicTcS ev_binds_var tclvl $
+            <- TcS.setLclEnv lcl' $ nestImplicTcS ev_binds_var tclvl (skolToLevel info) $
                do { let loc    = mkGivenLoc tclvl info (ic_env imp)
-                        givens = mkGivens loc given_ids
-                  ; solveSimpleGivens givens
+                        givens = mkGivens (thLevel $ tcl_th_ctxt lcl) loc given_ids
+                  ; codec_givens <- case info of
+                                      TypedBracketSkol n -> mkCodeCGivens n inerts
+                                      _ -> return emptyBag
+                  ; let final_givens = givens ++ (bagToList codec_givens)
+
+                  ; solveSimpleGivens final_givens
 
                   ; residual_wanted <- solveWanteds wanteds
                         -- solveWanteds, *not* solveWantedsAndDrop, because
@@ -1716,6 +1737,20 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
     check_tc_level = do { cur_lvl <- TcS.getTcLevel
                         ; MASSERT2( tclvl == pushTcLevel cur_lvl , text "Cur lvl =" <+> ppr cur_lvl $$ text "Imp lvl =" <+> ppr tclvl ) }
     -}
+
+mkCodeCGivens :: ThLevel -> InertSet -> TcS (Bag Ct)
+mkCodeCGivens lvl is = do
+  ccClass <- wrapErrTcS (expectJust "mkCodeCGivens" . tyConClass_maybe <$> tcLookupTyCon codeCTyConName)
+  let dmap = inert_dicts (inert_cans is)
+      gs = findDictsByClass dmap lvl ccClass
+  pprTraceM "gs" (ppr gs)
+  let do_one ct = do
+        let ct_ev = ctEvidence ct
+        let (_, [body]) = splitTyConApp (ctPred ct)
+        let loc = ctev_loc ct_ev
+        res <- newGivenEvVarWithStage (ctEvLevel ct_ev + 1) loc (body, EvSplice body (ctEvTerm ct_ev))
+        return (mkNonCanonical res)
+  mapM do_one gs
 
 ----------------------
 setImplicationStatus :: Implication -> TcS (Maybe Implication)
@@ -2637,7 +2672,7 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
   = do { traceTcS "disambigGroup {" (vcat [ ppr default_ty, ppr the_tv, ppr wanteds ])
        ; fake_ev_binds_var <- TcS.newTcEvBinds
        ; tclvl             <- TcS.getTcLevel
-       ; success <- nestImplicTcS fake_ev_binds_var (pushTcLevel tclvl) try_group
+       ; success <- nestImplicTcS fake_ev_binds_var (pushTcLevel tclvl) Nothing try_group
 
        ; if success then
              -- Success: record the type variable binding, and return

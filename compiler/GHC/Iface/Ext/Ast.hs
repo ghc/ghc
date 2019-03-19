@@ -1010,7 +1010,11 @@ instance ( a ~ GhcPass p
         [ toHie b
         , toHie p
         ]
-      HsTcBracketOut _ _wrap b p ->
+      HsTcTypedBracketOut _ b p _ ->
+        [ toHie b
+        , toHie p
+        ]
+      HsTcUntypedBracketOut _ _wrap b p ->
         [ toHie b
         , toHie p
         ]
@@ -1650,7 +1654,7 @@ instance ToHie (HsBracket a) where
 instance ToHie PendingRnSplice where
   toHie _ = pure []
 
-instance ToHie PendingTcSplice where
+instance ToHie (PendingTcSplice p) where
   toHie _ = pure []
 
 instance ToHie (LBooleanFormula (Located Name)) where
@@ -1695,6 +1699,8 @@ instance ( a ~ GhcPass p
 #endif
                      GhcTc -> case x of
                                 HsSplicedT _ -> []
+      HsSplicedD {} ->
+        []
 
 instance ToHie (LRoleAnnotDecl GhcRn) where
   toHie (L span annot) = concatM $ makeNode annot span : case annot of

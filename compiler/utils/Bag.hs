@@ -21,7 +21,7 @@ module Bag (
         concatMapBag, concatMapBagPair, mapMaybeBag,
         mapBagM, mapBagM_,
         flatMapBagM, flatMapBagPairM,
-        mapAndUnzipBagM, mapAccumBagLM,
+        mapAndUnzipBagM, mapAndUnzipBag3M, mapAccumBagLM,
         anyBagM, filterBagM
     ) where
 
@@ -268,6 +268,17 @@ mapAndUnzipBagM f (TwoBags b1 b2) = do (r1,s1) <- mapAndUnzipBagM f b1
 mapAndUnzipBagM f (ListBag xs)    = do ts <- mapM f xs
                                        let (rs,ss) = unzip ts
                                        return (ListBag rs, ListBag ss)
+
+mapAndUnzipBag3M :: Monad m => (a -> m (b,c,d)) -> Bag a -> m (Bag b, Bag c, Bag d)
+mapAndUnzipBag3M _ EmptyBag        = return (EmptyBag, EmptyBag, EmptyBag)
+mapAndUnzipBag3M f (UnitBag x)     = do (r,s,t) <- f x
+                                        return (UnitBag r, UnitBag s, UnitBag t)
+mapAndUnzipBag3M f (TwoBags b1 b2) = do (r1,s1, t1) <- mapAndUnzipBag3M f b1
+                                        (r2,s2, t2) <- mapAndUnzipBag3M f b2
+                                        return (TwoBags r1 r2, TwoBags s1 s2, TwoBags t1 t2)
+mapAndUnzipBag3M f (ListBag xs)    = do xs' <- mapM f xs
+                                        let (rs,ss, ts) = unzip3 xs'
+                                        return (ListBag rs, ListBag ss, ListBag ts)
 
 mapAccumBagL ::(acc -> x -> (acc, y)) -- ^ combining function
             -> acc                    -- ^ initial state

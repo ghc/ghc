@@ -60,7 +60,7 @@ import GHC.Core
 import GHC.Core.Make  ( unitExpr )
 import GHC.Core.Utils ( exprType, isExprLevPoly )
 import GHC.Hs
-import GHC.IfaceToCore
+import {-# SOURCE #-} GHC.IfaceToCore
 import GHC.Tc.Utils.TcMType ( checkForLevPolyX, formatLevPolyErr )
 import GHC.Builtin.Names
 import GHC.Types.Name.Reader

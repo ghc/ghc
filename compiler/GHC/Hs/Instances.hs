@@ -330,9 +330,12 @@ deriving instance Data RecordConTc
 deriving instance Data RecordUpdTc
 deriving instance Data CmdTopTc
 deriving instance Data PendingRnSplice
-deriving instance Data PendingTcSplice
 deriving instance Data SyntaxExprRn
 deriving instance Data SyntaxExprTc
+deriving instance                   Data PendingTcUntypedSplice
+deriving instance                   Data PendingTcTypedSplice
+deriving instance                   Data PendingZonkSplice
+deriving instance                   Data PendingZonkSplice2
 
 deriving instance Data XBindStmtRn
 deriving instance Data XBindStmtTc

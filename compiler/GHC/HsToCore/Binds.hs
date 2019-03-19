@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -76,6 +77,8 @@ import MonadUtils
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Data.List.NonEmpty ( nonEmpty )
+import qualified GHC.HsToCore.DsMetaTc as DsMetaTc
+import GHC.Builtin.Names.TH
 
 {-**********************************************************************
 *                                                                      *
@@ -189,7 +192,8 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports
                           , abs_ev_binds = ev_binds
                           , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- applyWhen (needToRunPmCheck dflags FromSource)
+  = do { ds_ev_binds <- dsTcEvBinds_s ev_binds
+       ; ds_binds <- applyWhen (needToRunPmCheck dflags FromSource)
                                -- FromSource might not be accurate, but at worst
                                -- we do superfluous calls to the pattern match
                                -- oracle.
@@ -198,8 +202,6 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                                -- See Check, Note [Type and Term Equality Propagation]
                                (addTyCsDs (listToBag dicts))
                                (dsLHsBinds binds)
-
-       ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 
        -- dsAbsBinds does the hard work
        ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds has_sig }
@@ -1197,9 +1199,18 @@ dsEvTerm (EvFun { et_tvs = tvs, et_given = given
        ; return $ (mkLams (tvs ++ given) $
                    mkCoreLets ds_ev_binds $
                    Var wanted_id) }
+dsEvTerm (EvQuote lt_ev e) = do
+  b <- DsMetaTc.repCodeCEv e
+  tc <- dsLookupTyCon codeCTyConName
+  let cc_dc = tyConSingleDataCon tc
+  return $ mkConApp cc_dc [Type (exprType e), lt_ev,  b]
+-- EvSplice is eliminated during zonking
+dsEvTerm (EvSplice t e) = pprPanic "dsEvTerm-splice" (ppr e $$ ppr t)
+dsEvTerm e = pprPanic "dsEvTerm" (ppr e)
 
 
 {-**********************************************************************
+Joey Bada$$ - 95 Til Infinity
 *                                                                      *
            Desugaring Typeable dictionaries
 *                                                                      *

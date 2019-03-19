@@ -1,5 +1,8 @@
-{-# LANGUAGE Safe #-}
-
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ExistentialQuantification #-}
 -- |
 -- Language.Haskell.TH.Lib.Internal exposes some additional functionality that
 -- is used internally in GHC's integration with Template Haskell. This is not a
@@ -20,6 +23,8 @@ import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
 import qualified Language.Haskell.TH.Syntax as TH
 import Control.Applicative(liftA, liftA2)
 import Data.Word( Word8 )
+import GHC.Types        ( Int(..), Word(..), Char(..), Double(..), Float(..),
+                          TYPE, RuntimeRep(..), Constraint )
 import Prelude
 
 ----------------------------------------------------------
@@ -950,3 +955,30 @@ thisModule :: Q Module
 thisModule = do
   loc <- location
   pure $ Module (mkPkgName $ loc_package loc) (mkModName $ loc_module loc)
+
+-----------------------------------------------------
+--
+--              Lifting types
+--
+-----------------------------------------------------
+
+
+-- | This class provides a way to turn a type into its
+-- representation.
+--
+-- It is the type analogue to `Lift`.
+--
+-- It is solved automatically by the compiler so it is forbidden
+-- to write instances for it. As such, unlike `Lift`, there is not
+-- one instance per kind but one instance per type as we just create the
+-- representation directly from the type.
+class LiftT (t :: k) where
+  liftTyCl :: Q TTExp -- A CoreTyWrapper
+  m2 :: ()
+
+class LiftT c => CodeC (c :: Constraint) where
+  codeCevidence :: Q TExpU
+
+
+data CoreTyWrapper where
+  CoreTyWrapper :: forall (t :: *) . CoreTyWrapper

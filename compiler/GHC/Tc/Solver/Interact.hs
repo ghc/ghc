@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -31,7 +32,7 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
-import GHC.Tc.Instance.Class( InstanceWhat(..), safeOverlap )
+import GHC.Tc.Instance.Class (FromCodeC, sameLevel, NewTheta, getNewLeveledPred, getNewPred,  InstanceWhat(..), safeOverlap )
 import GHC.Core.FamInstEnv
 import GHC.Core.Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 
@@ -550,7 +551,7 @@ solveOneFromTheOther ev_i ev_w
   -- See Note [Replacement vs keeping]
 
   | lvl_i == lvl_w
-  = do { ev_binds_var <- getTcEvBindsVar
+  = do { ev_binds_var <- getCurTcEvBindsVar
        ; binds <- getTcEvBindsMap ev_binds_var
        ; return (same_level_strategy binds) }
 
@@ -731,8 +732,11 @@ findMatchingIrreds irreds ev
   = partitionBagWith match_non_eq irreds
   where
     pred = ctEvPred ev
+    st   = tcl_th_ctxt (ctl_env (ctEvLoc ev))
     match_non_eq ct
-      | ctPred ct `tcEqTypeNoKindCheck` pred = Left (ct, NotSwapped)
+      | ctPred ct `tcEqTypeNoKindCheck` pred
+        && thLevel (tcl_th_ctxt (ctl_env (ctLoc ct)))
+            == thLevel st = Left (ct, NotSwapped)
       | otherwise                            = Right ct
 
     match_eq eq_rel1 lty1 rty1 ct
@@ -1026,7 +1030,7 @@ Passing along the solved_dicts important for two reasons:
 
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
-  | Just ev_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
+  | Just ev_i <- lookupInertDict inerts (ctEvLoc ev_w) (ctEvLevel ev_w) cls tys
   = -- There is a matching dictionary in the inert set
     do { -- First to try to solve it /completely/ from top level instances
          -- See Note [Shortcut solving]
@@ -1044,7 +1048,7 @@ interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs
            KeepInert -> do { setEvBindIfWanted ev_w (ctEvTerm ev_i)
                            ; return $ Stop ev_w (text "Dict equal" <+> parens (ppr what_next)) }
            KeepWork  -> do { setEvBindIfWanted ev_i (ctEvTerm ev_w)
-                           ; updInertDicts $ \ ds -> delDict ds cls tys
+                           ; updInertDicts $ \ ds -> delDict ds  cls tys (ctEvLevel ev_w)
                            ; continueWith workItem } } }
 
   | cls `hasKey` ipClassKey
@@ -1079,7 +1083,7 @@ shortCutSolver dflags ev_w ev_i
 
  && gopt Opt_SolveConstantDicts dflags
  -- Enabled by the -fsolve-constant-dicts flag
-  = do { ev_binds_var <- getTcEvBindsVar
+  = do { ev_binds_var <- getCurTcEvBindsVar
        ; ev_binds <- ASSERT2( not (isCoEvBindsVar ev_binds_var ), ppr ev_w )
                      getTcEvBindsMap ev_binds_var
        ; solved_dicts <- getSolvedDicts
@@ -1108,6 +1112,8 @@ shortCutSolver dflags ev_w ev_i
     try_solve_from_instance (ev_binds, solved_dicts) ev
       | let pred = ctEvPred ev
             loc  = ctEvLoc  ev
+            n    = ctEvLevel  ev
+            lvl  = ctEvLevel ev
       , ClassPred cls tys <- classifyPredType pred
       = do { inst_res <- lift $ matchGlobalInst dflags True cls tys
            ; case inst_res of
@@ -1115,8 +1121,8 @@ shortCutSolver dflags ev_w ev_i
                        , cir_mk_ev     = mk_ev
                        , cir_what      = what }
                  | safeOverlap what
-                 , all isTyFamFree preds  -- Note [Shortcut solving: type families]
-                 -> do { let solved_dicts' = addDict solved_dicts cls tys ev
+                 , all (isTyFamFree . getNewPred) preds  -- Note [Shortcut solving: type families]
+                 -> do { let solved_dicts' = addDict solved_dicts cls tys (lvl, ev)
                              -- solved_dicts': it is important that we add our goal
                              -- to the cache before we solve! Otherwise we may end
                              -- up in a loop while solving recursive dictionaries.
@@ -1124,13 +1130,13 @@ shortCutSolver dflags ev_w ev_i
                        ; lift $ traceTcS "shortCutSolver: found instance" (ppr preds)
                        ; loc' <- lift $ checkInstanceOK loc what pred
 
-                       ; evc_vs <- mapM (new_wanted_cached loc' solved_dicts') preds
+                       ; evc_vs <- mapM (new_wanted_cached loc' solved_dicts') (map (getNewLeveledPred n) preds)
                                   -- Emit work for subgoals but use our local cache
                                   -- so we can solve recursive dictionaries.
 
                        ; let ev_tm     = mk_ev (map getEvExpr evc_vs)
                              ev_binds' = extendEvBinds ev_binds $
-                                         mkWantedEvBind (ctEvEvId ev) ev_tm
+                                         mkWantedEvBind (ctEvEvId ev) (ctEvLevel ev) ev_tm
 
                        ; foldlM try_solve_from_instance
                                 (ev_binds', solved_dicts')
@@ -1143,19 +1149,19 @@ shortCutSolver dflags ev_w ev_i
     -- Use a local cache of solved dicts while emitting EvVars for new work
     -- We bail out of the entire computation if we need to emit an EvVar for
     -- a subgoal that isn't a ClassPred.
-    new_wanted_cached :: CtLoc -> DictMap CtEvidence -> TcPredType -> MaybeT TcS MaybeNew
-    new_wanted_cached loc cache pty
+    new_wanted_cached :: CtLoc -> DictMap CtEvidence -> (ThLevel, TcPredType, FromCodeC) -> MaybeT TcS MaybeNew
+    new_wanted_cached loc cache (n, pty, fcc)
       | ClassPred cls tys <- classifyPredType pty
-      = lift $ case findDict cache loc_w cls tys of
+      = lift $ case findDict cache loc_w n cls tys of
           Just ctev -> return $ Cached (ctEvExpr ctev)
-          Nothing   -> Fresh <$> newWantedNC loc pty
+          Nothing   -> Fresh <$> newWantedNCWithStage loc fcc n pty
       | otherwise = mzero
 
 addFunDepWork :: InertCans -> CtEvidence -> Class -> TcS ()
 -- Add derived constraints from type-class functional dependencies.
 addFunDepWork inerts work_ev cls
   | isImprovable work_ev
-  = mapBagM_ add_fds (findDictsByClass (inert_dicts inerts) cls)
+  = mapBagM_ add_fds (findDictsByClass (inert_dicts inerts) work_n cls)
                -- No need to check flavour; fundeps work between
                -- any pair of constraints, regardless of flavour
                -- Importantly we don't throw workitem back in the
@@ -1165,7 +1171,7 @@ addFunDepWork inerts work_ev cls
   where
     work_pred = ctEvPred work_ev
     work_loc  = ctEvLoc work_ev
-
+    work_n    = ctEvLevel work_ev
     add_fds inert_ct
       | isImprovable inert_ev
       = do { traceTcS "addFunDepWork" (vcat
@@ -1209,13 +1215,13 @@ interactGivenIP :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 -- See Note [Shadowing of Implicit Parameters]
 interactGivenIP inerts workItem@(CDictCan { cc_ev = ev, cc_class = cls
                                           , cc_tyargs = tys@(ip_str:_) })
-  = do { updInertCans $ \cans -> cans { inert_dicts = addDict filtered_dicts cls tys workItem }
+  = do { updInertCans $ \cans -> cans { inert_dicts = addDict filtered_dicts cls tys (ctLevel workItem, workItem) }
        ; stopWith ev "Given IP" }
   where
     dicts           = inert_dicts inerts
-    ip_dicts        = findDictsByClass dicts cls
+    ip_dicts        = findDictsByClass dicts (ctLevel workItem) cls
     other_ip_dicts  = filterBag (not . is_this_ip) ip_dicts
-    filtered_dicts  = addDictsByClass dicts cls other_ip_dicts
+    filtered_dicts  = addDictsByClass dicts cls (fmap (ctLevel workItem,) other_ip_dicts)
 
     -- Pick out any Given constraints for the same implicit parameter
     is_this_ip (CDictCan { cc_ev = ev, cc_tyargs = ip_str':_ })
@@ -1563,7 +1569,7 @@ inertsCanDischarge :: InertCans -> TcTyVar -> TcType -> CtFlavourRole
 inertsCanDischarge inerts tv rhs fr
   | (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i
                                     , cc_eq_rel = eq_rel }
-                             <- findTyEqs inerts tv
+                             <- (findTyEqs inerts tv)
                          , (ctEvFlavour ev_i, eq_rel) `eqCanDischargeFR` fr
                          , rhs_i `tcEqType` rhs ]
   =  -- Inert:     a ~ ty
@@ -1606,7 +1612,8 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
                                      (ctEvCoercion ev_i))
 
        ; let deriv_ev = CtDerived { ctev_pred = ctEvPred ev
-                                  , ctev_loc  = ctEvLoc  ev }
+                                  , ctev_loc  = ctEvLoc  ev
+                                  , ctev_stage = ctEvLevel ev }
        ; when keep_deriv $
          emitWork [workItem { cc_ev = deriv_ev }]
          -- As a Derived it might not be fully rewritten,
@@ -2328,13 +2335,13 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
   = do { try_fundep_improvement
        ; continueWith work_item }
 
-  | Just solved_ev <- lookupSolvedDict inerts dict_loc cls xis   -- Cached
+  | Just solved_ev <- lookupSolvedDict inerts dict_loc n cls xis   -- Cached
   = do { setEvBindIfWanted ev (ctEvTerm solved_ev)
        ; stopWith ev "Dict/Top (cached)" }
 
   | otherwise  -- Wanted or Derived, but not cached
    = do { dflags <- getDynFlags
-        ; lkup_res <- matchClassInst dflags inerts cls xis dict_loc
+        ; lkup_res <- matchClassInst dflags inerts cls xis dict_loc n
         ; case lkup_res of
                OneInst { cir_what = what }
                   -> do { insertSafeOverlapFailureTcS what work_item
@@ -2347,6 +2354,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
    where
      dict_pred   = mkClassPred cls xis
      dict_loc    = ctEvLoc ev
+     n = ctEvLevel ev
      dict_origin = ctLocOrigin dict_loc
 
      -- We didn't solve it; so try functional dependencies with
@@ -2381,17 +2389,20 @@ chooseInstance work_item
      ev         = ctEvidence work_item
      pred       = ctEvPred ev
      loc        = ctEvLoc ev
+     n          = ctEvLevel ev
 
-     finish_wanted :: CtLoc -> [TcPredType]
+     finish_wanted :: CtLoc -> [NewTheta]
                    -> ([EvExpr] -> EvTerm) -> TcS (StopOrContinue Ct)
       -- Precondition: evidence term matches the predicate workItem
      finish_wanted loc theta mk_ev
-        = do { evb <- getTcEvBindsVar
+        = do { evb <- getCurTcEvBindsVar
              ; if isCoEvBindsVar evb
                then -- See Note [Instances in no-evidence implications]
                     continueWith work_item
                else
-          do { evc_vars <- mapM (newWanted loc) theta
+          do { let theta_lvls = --pprTraceIt "new_theta"
+                                  (map (getNewLeveledPred n) theta)
+             ; evc_vars <- mapM (uncurry3 (newWantedWithStage loc)) theta_lvls
              ; setEvBindIfWanted ev (mk_ev (map getEvExpr evc_vars))
              ; emitWorkNC (freshGoals evc_vars)
              ; stopWith ev "Dict/Top (solved wanted)" } }
@@ -2401,7 +2412,8 @@ chooseInstance work_item
          -- of generating some improvements
          -- C.f. Example 3 of Note [The improvement story]
          -- It's easy because no evidence is involved
-         do { emitNewDeriveds loc theta
+         do { let theta_lvls = map ((\(a, b, _) -> (a, b)) . getNewLeveledPred n) theta
+            ; emitNewDeriveds loc theta_lvls
             ; traceTcS "finish_derived" (ppr (ctl_depth loc))
             ; stopWith ev "Dict/Top (solved derived)" }
 
@@ -2451,15 +2463,15 @@ This test arranges to ignore the instance-based solution under these
 
 matchClassInst :: DynFlags -> InertSet
                -> Class -> [Type]
-               -> CtLoc -> TcS ClsInstResult
-matchClassInst dflags inerts clas tys loc
+               -> CtLoc -> ThLevel -> TcS ClsInstResult
+matchClassInst dflags inerts clas tys loc n
 -- First check whether there is an in-scope Given that could
 -- match this constraint.  In that case, do not use any instance
 -- whether top level, or local quantified constraints.
 -- ee Note [Instance and Given overlap]
   | not (xopt LangExt.IncoherentInstances dflags)
   , not (naturallyCoherentClass clas)
-  , let matchable_givens = matchableGivens loc pred inerts
+  , let matchable_givens = matchableGivens loc n pred inerts
   , not (isEmptyBag matchable_givens)
   = do { traceTcS "Delaying instance application" $
            vcat [ text "Work item=" <+> pprClassPred clas tys
@@ -2664,7 +2676,7 @@ matchLocalInst pred loc
              | not unifs
              -> do { let dfun_id = ctEvEvId dfun_ev
                    ; (tys, theta) <- instDFunType dfun_id inst_tys
-                   ; let result = OneInst { cir_new_theta = theta
+                   ; let result = OneInst { cir_new_theta = map sameLevel theta
                                           , cir_mk_ev     = evDFunApp dfun_id tys
                                           , cir_what      = LocalInstance }
                    ; traceTcS "Local inst found:" (ppr result)
