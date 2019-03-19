@@ -442,20 +442,6 @@ $(eval $(call build-package,compiler,stage1,0))
 $(eval $(call build-package,compiler,stage2,1))
 $(eval $(call build-package,compiler,stage3,2))
 
-# We only want to turn keepCAFs on if we will be loading dynamic
-# Haskell libraries with GHCi. We therefore filter the object file
-# out for non-dynamic ways.
-define keepCAFsForGHCiDynOnly
-# $1 = stage
-# $2 = way
-ifeq "$$(findstring dyn, $2)" ""
-compiler_stage$1_$2_C_OBJS := $$(filter-out %/keepCAFsForGHCi.$$($2_osuf),$$(compiler_stage$1_$2_C_OBJS))
-endif
-endef
-$(foreach w,$(compiler_stage1_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,1,$w)))
-$(foreach w,$(compiler_stage2_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,2,$w)))
-$(foreach w,$(compiler_stage3_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,3,$w)))
-
 # after build-package, because that adds --enable-library-for-ghci
 # to compiler_stage*_CONFIGURE_OPTS:
 # We don't build the GHCi library for the ghc package. We can load it
