@@ -940,20 +940,8 @@ tcMonadFailOp orig pat fail_op res_ty
   = return noSyntaxExpr
 
   | otherwise
-  = do { -- Issue MonadFail warnings
-         rebindableSyntax <- xoptM LangExt.RebindableSyntax
-       ; desugarFlag      <- xoptM LangExt.MonadFailDesugaring
-       ; missingWarning   <- woptM Opt_WarnMissingMonadFailInstances
-       ; if | rebindableSyntax && desugarFlag && missingWarning
-              -> warnRebindableClash pat
-            | not desugarFlag && missingWarning
-              -> emitMonadFailConstraint pat res_ty
-            | otherwise
-              -> return ()
-
-        -- Get the fail op itself
-        ; snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
-                             (mkCheckExpType res_ty) $ \_ -> return ()) }
+  = snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
+                             (mkCheckExpType res_ty) $ \_ -> return ())
 
 emitMonadFailConstraint :: LPat GhcTcId -> TcType -> TcRn ()
 emitMonadFailConstraint pat res_ty
@@ -966,17 +954,6 @@ emitMonadFailConstraint pat res_ty
        ; _ <- emitWanted (FailablePattern pat)
                          (mkClassPred monadFailClass [monad_ty])
        ; return () }
-
-warnRebindableClash :: LPat GhcTcId -> TcRn ()
-warnRebindableClash pattern = addWarnAt
-    (Reason Opt_WarnMissingMonadFailInstances)
-    (getLoc pattern)
-    (text "The failable pattern" <+> quotes (ppr pattern)
-     $$
-     nest 2 (text "is used together with -XRebindableSyntax."
-             <+> text "If this is intentional,"
-             $$
-             text "compile with -Wno-missing-monadfail-instances."))
 
 {-
 Note [Treat rebindable syntax first]
