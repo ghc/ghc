@@ -1,5 +1,0 @@
-
-MonadFailWarningsWithRebindableSyntax.hs:13:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)]
-    The failable pattern ‘Just x’
-      is used together with -XRebindableSyntax. If this is intentional,
-      compile with -Wno-missing-monadfail-instances.
