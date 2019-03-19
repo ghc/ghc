@@ -335,8 +335,8 @@ checkSingle' locn var p = do
   fam_insts <- liftD dsGetFamInstEnvs
   clause    <- liftD $ translatePat fam_insts p
   missing   <- mkInitialUncovered [var]
-  tracePm "checkSingle: missing" (vcat (map pprValVecDebug missing))
-                                 -- no guards
+  tracePm "checkSingle': missing" (vcat (map pprValVecDebug missing))
+                                  -- no guards
   PartialResult prov cs us ds <- runMany (pmcheckI clause []) missing
   let us' = UncoveredPatterns us
   return $ case (cs,ds) of
@@ -403,12 +403,12 @@ checkMatches' vars matches
               , [LMatch GhcTc (LHsExpr GhcTc)])
     go []     missing = return (mempty, [], missing, [])
     go (m:ms) missing = do
-      tracePm "checMatches': go" (ppr m $$ ppr missing)
+      tracePm "checkMatches': go" (ppr m $$ ppr missing)
       fam_insts          <- liftD dsGetFamInstEnvs
       (clause, guards)   <- liftD $ translateMatch fam_insts m
       r@(PartialResult prov cs missing' ds)
         <- runMany (pmcheckI clause guards) missing
-      tracePm "checMatches': go: res" (ppr r)
+      tracePm "checkMatches': go: res" (ppr r)
       (ms_prov, rs, final_u, is)  <- go ms missing'
       let final_prov = prov `mappend` ms_prov
       return $ case (cs, ds) of
@@ -421,7 +421,7 @@ checkMatches' vars matches
 
     hsLMatchToLPats :: LMatch id body -> Located [LPat id]
     hsLMatchToLPats (dL->L l (Match { m_pats = pats })) = cL l pats
-    hsLMatchToLPats _                                   = panic "checMatches'"
+    hsLMatchToLPats _                                   = panic "checkMatches'"
 
 -- | Check an empty case expression. Since there are no clauses to process, we
 --   only compute the uncovered set. See Note [Checking EmptyCase Expressions]
