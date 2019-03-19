@@ -1138,8 +1138,8 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   -- create a new binding.
   let expr_fs = fsLit "_compileParsedExpr"
       expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc
-      let_stmt = L loc . LetStmt noExt . L loc . (HsValBinds noExt) $
-        ValBinds noExt
+      let_stmt = L loc . LetStmt noExtField . L loc . (HsValBinds noExtField) $
+        ValBinds noExtField
                      (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
 
   pstmt <- liftIO $ hscParsedStmt hsc_env let_stmt
@@ -1167,7 +1167,7 @@ dynCompileExpr expr = do
   parsed_expr <- parseExpr expr
   -- > Data.Dynamic.toDyn expr
   let loc = getLoc parsed_expr
-      to_dyn_expr = mkHsApp (L loc . HsVar noExt . L loc $ getRdrName toDynName)
+      to_dyn_expr = mkHsApp (L loc . HsVar noExtField . L loc $ getRdrName toDynName)
                             parsed_expr
   hval <- compileParsedExpr to_dyn_expr
   return (unsafeCoerce# hval :: Dynamic)

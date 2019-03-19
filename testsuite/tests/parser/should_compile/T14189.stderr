@@ -4,14 +4,14 @@
 (Just
  ((,,,)
   (HsGroup
-   (NoExt)
+   (NoExtField)
    (XValBindsLR
     (NValBinds
      []
      []))
    []
    [(TyClGroup
-     (NoExt)
+     (NoExtField)
      [({ T14189.hs:6:1-42 }
        (DataDecl
         (DataDeclRn
@@ -25,7 +25,7 @@
          [])
         (Prefix)
         (HsDataDefn
-         (NoExt)
+         (NoExtField)
          (DataType)
          ({ <no location info> }
           [])
@@ -33,7 +33,7 @@
          (Nothing)
          [({ T14189.hs:6:15-20 }
            (ConDeclH98
-            (NoExt)
+            (NoExtField)
             ({ T14189.hs:6:15-16 }
              {Name: T14189.MT})
             ({ <no location info> }
@@ -43,14 +43,14 @@
             (PrefixCon
              [({ T14189.hs:6:18-20 }
                (HsTyVar
-                (NoExt)
+                (NoExtField)
                 (NotPromoted)
                 ({ T14189.hs:6:18-20 }
                  {Name: GHC.Types.Int})))])
             (Nothing)))
          ,({ T14189.hs:6:24-25 }
            (ConDeclH98
-            (NoExt)
+            (NoExtField)
             ({ T14189.hs:6:24-25 }
              {Name: T14189.NT})
             ({ <no location info> }
@@ -62,7 +62,7 @@
             (Nothing)))
          ,({ T14189.hs:6:29-42 }
            (ConDeclH98
-            (NoExt)
+            (NoExtField)
             ({ T14189.hs:6:29 }
              {Name: T14189.F})
             ({ <no location info> }
@@ -73,7 +73,7 @@
              ({ T14189.hs:6:31-42 }
               [({ T14189.hs:6:33-40 }
                 (ConDeclField
-                 (NoExt)
+                 (NoExtField)
                  [({ T14189.hs:6:33 }
                    (FieldOcc
                     {Name: T14189.f}
@@ -82,7 +82,7 @@
                       {OccName: f}))))]
                  ({ T14189.hs:6:38-40 }
                   (HsTyVar
-                   (NoExt)
+                   (NoExtField)
                    (NotPromoted)
                    ({ T14189.hs:6:38-40 }
                     {Name: GHC.Types.Int})))
@@ -102,7 +102,7 @@
    [])
   [({ T14189.hs:1:8-13 }
     (ImportDecl
-     (NoExt)
+     (NoExtField)
      (NoSourceText)
      ({ T14189.hs:1:8-13 }
       {ModuleName: Prelude})
@@ -117,7 +117,7 @@
    [((,)
      ({ T14189.hs:3:3-15 }
       (IEThingWith
-       (NoExt)
+       (NoExtField)
        ({ T14189.hs:3:3-8 }
         (IEName
          ({ T14189.hs:3:3-8 }
@@ -141,3 +141,5 @@
          (False)
          {Name: T14189.f})])])])
   (Nothing)))
+
+

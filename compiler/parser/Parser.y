@@ -869,9 +869,9 @@ expdoclist :: { OrdList (LIE GhcPs) }
         | {- empty -}                                  { nilOL }
 
 exp_doc :: { OrdList (LIE GhcPs) }
-        : docsection    { unitOL (sL1 $1 (case (unLoc $1) of (n, doc) -> IEGroup noExt n doc)) }
-        | docnamed      { unitOL (sL1 $1 (IEDocNamed noExt ((fst . unLoc) $1))) }
-        | docnext       { unitOL (sL1 $1 (IEDoc noExt (unLoc $1))) }
+        : docsection    { unitOL (sL1 $1 (case (unLoc $1) of (n, doc) -> IEGroup noExtField n doc)) }
+        | docnamed      { unitOL (sL1 $1 (IEDocNamed noExtField ((fst . unLoc) $1))) }
+        | docnext       { unitOL (sL1 $1 (IEDoc noExtField (unLoc $1))) }
 
 
    -- No longer allow things like [] and (,,,) to be exported
@@ -879,9 +879,9 @@ exp_doc :: { OrdList (LIE GhcPs) }
 export  :: { OrdList (LIE GhcPs) }
         : qcname_ext export_subspec  {% mkModuleImpExp $1 (snd $ unLoc $2)
                                           >>= \ie -> amsu (sLL $1 $> ie) (fst $ unLoc $2) }
-        |  'module' modid            {% amsu (sLL $1 $> (IEModuleContents noExt $2))
+        |  'module' modid            {% amsu (sLL $1 $> (IEModuleContents noExtField $2))
                                              [mj AnnModule $1] }
-        |  'pattern' qcon            {% amsu (sLL $1 $> (IEVar noExt (sLL $1 $> (IEPattern $2))))
+        |  'pattern' qcon            {% amsu (sLL $1 $> (IEVar noExtField (sLL $1 $> (IEPattern $2))))
                                              [mj AnnPattern $1] }
 
 export_subspec :: { Located ([AddAnn],ImpExpSubSpec) }
@@ -960,7 +960,7 @@ importdecl :: { LImportDecl GhcPs }
                 {% do {
                   ; checkImportDecl $4 $7
                   ; ams (cL (comb4 $1 $6 (snd $8) $9) $
-                      ImportDecl { ideclExt = noExt
+                      ImportDecl { ideclExt = noExtField
                                   , ideclSourceSrc = snd $ fst $2
                                   , ideclName = $6, ideclPkgQual = snd $5
                                   , ideclSource = snd $2, ideclSafe = snd $3
@@ -1047,21 +1047,21 @@ topdecls_semi :: { OrdList (LHsDecl GhcPs) }
         | {- empty -}                  { nilOL }
 
 topdecl :: { LHsDecl GhcPs }
-        : cl_decl                               { sL1 $1 (TyClD noExt (unLoc $1)) }
-        | ty_decl                               { sL1 $1 (TyClD noExt (unLoc $1)) }
-        | inst_decl                             { sL1 $1 (InstD noExt (unLoc $1)) }
-        | stand_alone_deriving                  { sLL $1 $> (DerivD noExt (unLoc $1)) }
-        | role_annot                            { sL1 $1 (RoleAnnotD noExt (unLoc $1)) }
-        | 'default' '(' comma_types0 ')'    {% ams (sLL $1 $> (DefD noExt (DefaultDecl noExt $3)))
+        : cl_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
+        | ty_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
+        | inst_decl                             { sL1 $1 (InstD noExtField (unLoc $1)) }
+        | stand_alone_deriving                  { sLL $1 $> (DerivD noExtField (unLoc $1)) }
+        | role_annot                            { sL1 $1 (RoleAnnotD noExtField (unLoc $1)) }
+        | 'default' '(' comma_types0 ')'    {% ams (sLL $1 $> (DefD noExtField (DefaultDecl noExtField $3)))
                                                          [mj AnnDefault $1
                                                          ,mop $2,mcp $4] }
         | 'foreign' fdecl          {% ams (sLL $1 $> (snd $ unLoc $2))
                                            (mj AnnForeign $1:(fst $ unLoc $2)) }
-        | '{-# DEPRECATED' deprecations '#-}'   {% ams (sLL $1 $> $ WarningD noExt (Warnings noExt (getDEPRECATED_PRAGs $1) (fromOL $2)))
+        | '{-# DEPRECATED' deprecations '#-}'   {% ams (sLL $1 $> $ WarningD noExtField (Warnings noExtField (getDEPRECATED_PRAGs $1) (fromOL $2)))
                                                        [mo $1,mc $3] }
-        | '{-# WARNING' warnings '#-}'          {% ams (sLL $1 $> $ WarningD noExt (Warnings noExt (getWARNING_PRAGs $1) (fromOL $2)))
+        | '{-# WARNING' warnings '#-}'          {% ams (sLL $1 $> $ WarningD noExtField (Warnings noExtField (getWARNING_PRAGs $1) (fromOL $2)))
                                                        [mo $1,mc $3] }
-        | '{-# RULES' rules '#-}'               {% ams (sLL $1 $> $ RuleD noExt (HsRules noExt (getRULES_PRAGs $1) (fromOL $2)))
+        | '{-# RULES' rules '#-}'               {% ams (sLL $1 $> $ RuleD noExtField (HsRules noExtField (getRULES_PRAGs $1) (fromOL $2)))
                                                        [mo $1,mc $3] }
         | annotation { $1 }
         | decl_no_th                            { $1 }
@@ -1134,13 +1134,13 @@ ty_decl :: { LTyClDecl GhcPs }
 inst_decl :: { LInstDecl GhcPs }
         : 'instance' overlap_pragma inst_type where_inst
        {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (snd $ unLoc $4)
-             ; let cid = ClsInstDecl { cid_ext = noExt
+             ; let cid = ClsInstDecl { cid_ext = noExtField
                                      , cid_poly_ty = $3, cid_binds = binds
                                      , cid_sigs = mkClassOpSigs sigs
                                      , cid_tyfam_insts = ats
                                      , cid_overlap_mode = $2
                                      , cid_datafam_insts = adts }
-             ; ams (cL (comb3 $1 (hsSigType $3) $4) (ClsInstD { cid_d_ext = noExt, cid_inst = cid }))
+             ; ams (cL (comb3 $1 (hsSigType $3) $4) (ClsInstD { cid_d_ext = noExtField, cid_inst = cid }))
                    (mj AnnInstance $1 : (fst $ unLoc $4)) } }
 
            -- type instance declarations
@@ -1362,22 +1362,22 @@ opt_kind_sig :: { Located ([AddAnn], Maybe (LHsKind GhcPs)) }
         | '::' kind     { sLL $1 $> ([mu AnnDcolon $1], Just $2) }
 
 opt_datafam_kind_sig :: { Located ([AddAnn], LFamilyResultSig GhcPs) }
-        :               { noLoc     ([]               , noLoc (NoSig noExt)         )}
-        | '::' kind     { sLL $1 $> ([mu AnnDcolon $1], sLL $1 $> (KindSig noExt $2))}
+        :               { noLoc     ([]               , noLoc (NoSig noExtField)         )}
+        | '::' kind     { sLL $1 $> ([mu AnnDcolon $1], sLL $1 $> (KindSig noExtField $2))}
 
 opt_tyfam_kind_sig :: { Located ([AddAnn], LFamilyResultSig GhcPs) }
-        :              { noLoc     ([]               , noLoc     (NoSig    noExt)   )}
-        | '::' kind    { sLL $1 $> ([mu AnnDcolon $1], sLL $1 $> (KindSig  noExt $2))}
-        | '='  tv_bndr { sLL $1 $> ([mj AnnEqual $1] , sLL $1 $> (TyVarSig noExt $2))}
+        :              { noLoc     ([]               , noLoc     (NoSig    noExtField)   )}
+        | '::' kind    { sLL $1 $> ([mu AnnDcolon $1], sLL $1 $> (KindSig  noExtField $2))}
+        | '='  tv_bndr { sLL $1 $> ([mj AnnEqual $1] , sLL $1 $> (TyVarSig noExtField $2))}
 
 opt_at_kind_inj_sig :: { Located ([AddAnn], ( LFamilyResultSig GhcPs
                                             , Maybe (LInjectivityAnn GhcPs)))}
-        :            { noLoc ([], (noLoc (NoSig noExt), Nothing)) }
+        :            { noLoc ([], (noLoc (NoSig noExtField), Nothing)) }
         | '::' kind  { sLL $1 $> ( [mu AnnDcolon $1]
-                                 , (sLL $2 $> (KindSig noExt $2), Nothing)) }
+                                 , (sLL $2 $> (KindSig noExtField $2), Nothing)) }
         | '='  tv_bndr '|' injectivity_cond
                 { sLL $1 $> ([mj AnnEqual $1, mj AnnVbar $3]
-                            , (sLL $1 $2 (TyVarSig noExt $2), Just $4))}
+                            , (sLL $1 $2 (TyVarSig noExtField $2), Just $4))}
 
 -- tycl_hdr parses the header of a class or data type decl,
 -- which takes the form
@@ -1430,7 +1430,7 @@ stand_alone_deriving :: { LDerivDecl GhcPs }
                 {% do { let { err = text "in the stand-alone deriving instance"
                                     <> colon <+> quotes (ppr $5) }
                       ; ams (sLL $1 (hsSigType $>)
-                                 (DerivDecl noExt (mkHsWildCardBndrs $5) $2 $4))
+                                 (DerivDecl noExtField (mkHsWildCardBndrs $5) $2 $4))
                             [mj AnnDeriving $1, mj AnnInstance $3] } }
 
 -----------------------------------------------------------------------------
@@ -1461,20 +1461,20 @@ role : VARID             { sL1 $1 $ Just $ getVARID $1 }
 pattern_synonym_decl :: { LHsDecl GhcPs }
         : 'pattern' pattern_synonym_lhs '=' pat
          {%      let (name, args,as ) = $2 in
-                 ams (sLL $1 $> . ValD noExt $ mkPatSynBind name args $4
+                 ams (sLL $1 $> . ValD noExtField $ mkPatSynBind name args $4
                                                     ImplicitBidirectional)
                (as ++ [mj AnnPattern $1, mj AnnEqual $3])
          }
 
         | 'pattern' pattern_synonym_lhs '<-' pat
          {%    let (name, args, as) = $2 in
-               ams (sLL $1 $> . ValD noExt $ mkPatSynBind name args $4 Unidirectional)
+               ams (sLL $1 $> . ValD noExtField $ mkPatSynBind name args $4 Unidirectional)
                (as ++ [mj AnnPattern $1,mu AnnLarrow $3]) }
 
         | 'pattern' pattern_synonym_lhs '<-' pat where_decls
             {% do { let (name, args, as) = $2
                   ; mg <- mkPatSynMatchGroup name (snd $ unLoc $5)
-                  ; ams (sLL $1 $> . ValD noExt $
+                  ; ams (sLL $1 $> . ValD noExtField $
                            mkPatSynBind name args $4 (ExplicitBidirectional mg))
                        (as ++ ((mj AnnPattern $1:mu AnnLarrow $3:(fst $ unLoc $5))) )
                    }}
@@ -1502,7 +1502,7 @@ where_decls :: { Located ([AddAnn]
 
 pattern_synonym_sig :: { LSig GhcPs }
         : 'pattern' con_list '::' sigtypedoc
-                   {% ams (sLL $1 $> $ PatSynSig noExt (unLoc $2) (mkLHsSigType $4))
+                   {% ams (sLL $1 $> $ PatSynSig noExtField (unLoc $2) (mkLHsSigType $4))
                           [mj AnnPattern $1, mu AnnDcolon $3] }
 
 -----------------------------------------------------------------------------
@@ -1520,7 +1520,7 @@ decl_cls  : at_decl_cls                 { $1 }
                        do { v <- checkValSigLhs $2
                           ; let err = text "in default signature" <> colon <+>
                                       quotes (ppr $2)
-                          ; ams (sLL $1 $> $ SigD noExt $ ClassOpSig noExt True [v] $ mkLHsSigType $4)
+                          ; ams (sLL $1 $> $ SigD noExtField $ ClassOpSig noExtField True [v] $ mkLHsSigType $4)
                                 [mj AnnDefault $1,mu AnnDcolon $3] } }
 
 decls_cls :: { Located ([AddAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
@@ -1558,7 +1558,7 @@ where_cls :: { Located ([AddAnn]
 -- Declarations in instance bodies
 --
 decl_inst  :: { Located (OrdList (LHsDecl GhcPs)) }
-decl_inst  : at_decl_inst               { sLL $1 $> (unitOL (sL1 $1 (InstD noExt (unLoc $1)))) }
+decl_inst  : at_decl_inst               { sLL $1 $> (unitOL (sL1 $1 (InstD noExtField (unLoc $1)))) }
            | decl                       { sLL $1 $> (unitOL $1) }
 
 decls_inst :: { Located ([AddAnn],OrdList (LHsDecl GhcPs)) }   -- Reversed
@@ -1626,13 +1626,13 @@ binds   ::  { Located ([AddAnn],Located (HsLocalBinds GhcPs)) }
                                                 -- No type declarations
         : decllist          {% do { val_binds <- cvBindGroup (unLoc $ snd $ unLoc $1)
                                   ; return (sL1 $1 (fst $ unLoc $1
-                                                    ,sL1 $1 $ HsValBinds noExt val_binds)) } }
+                                                    ,sL1 $1 $ HsValBinds noExtField val_binds)) } }
 
         | '{'            dbinds '}'     { sLL $1 $> ([moc $1,mcc $3]
-                                             ,sL1 $2 $ HsIPBinds noExt (IPBinds noExt (reverse $ unLoc $2))) }
+                                             ,sL1 $2 $ HsIPBinds noExtField (IPBinds noExtField (reverse $ unLoc $2))) }
 
         |     vocurly    dbinds close   { cL (getLoc $2) ([]
-                                            ,sL1 $2 $ HsIPBinds noExt (IPBinds noExt (reverse $ unLoc $2))) }
+                                            ,sL1 $2 $ HsIPBinds noExtField (IPBinds noExtField (reverse $ unLoc $2))) }
 
 
 wherebinds :: { Located ([AddAnn],Located (HsLocalBinds GhcPs)) }
@@ -1658,7 +1658,7 @@ rule    :: { LRuleDecl GhcPs }
         : STRING rule_activation rule_foralls infixexp '=' exp
          {%runECP_P $4 >>= \ $4 ->
            runECP_P $6 >>= \ $6 ->
-           ams (sLL $1 $> $ HsRule { rd_ext = noExt
+           ams (sLL $1 $> $ HsRule { rd_ext = noExtField
                                    , rd_name = cL (gl $1) (getSTRINGs $1, getSTRING $1)
                                    , rd_act = (snd $2) `orElse` AlwaysActive
                                    , rd_tyvs = sndOf3 $3, rd_tmvs = thdOf3 $3
@@ -1735,7 +1735,7 @@ warnings :: { OrdList (LWarnDecl GhcPs) }
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 warning :: { OrdList (LWarnDecl GhcPs) }
         : namelist strings
-                {% amsu (sLL $1 $> (Warning noExt (unLoc $1) (WarningTxt (noLoc NoSourceText) $ snd $ unLoc $2)))
+                {% amsu (sLL $1 $> (Warning noExtField (unLoc $1) (WarningTxt (noLoc NoSourceText) $ snd $ unLoc $2)))
                      (fst $ unLoc $2) }
 
 deprecations :: { OrdList (LWarnDecl GhcPs) }
@@ -1750,7 +1750,7 @@ deprecations :: { OrdList (LWarnDecl GhcPs) }
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 deprecation :: { OrdList (LWarnDecl GhcPs) }
         : namelist strings
-             {% amsu (sLL $1 $> $ (Warning noExt (unLoc $1) (DeprecatedTxt (noLoc NoSourceText) $ snd $ unLoc $2)))
+             {% amsu (sLL $1 $> $ (Warning noExtField (unLoc $1) (DeprecatedTxt (noLoc NoSourceText) $ snd $ unLoc $2)))
                      (fst $ unLoc $2) }
 
 strings :: { Located ([AddAnn],[Located StringLiteral]) }
@@ -1768,19 +1768,19 @@ stringlist :: { Located (OrdList (Located StringLiteral)) }
 -- Annotations
 annotation :: { LHsDecl GhcPs }
     : '{-# ANN' name_var aexp '#-}'      {% runECP_P $3 >>= \ $3 ->
-                                            ams (sLL $1 $> (AnnD noExt $ HsAnnotation noExt
+                                            ams (sLL $1 $> (AnnD noExtField $ HsAnnotation noExtField
                                             (getANN_PRAGs $1)
                                             (ValueAnnProvenance $2) $3))
                                             [mo $1,mc $4] }
 
     | '{-# ANN' 'type' tycon aexp '#-}'  {% runECP_P $4 >>= \ $4 ->
-                                            ams (sLL $1 $> (AnnD noExt $ HsAnnotation noExt
+                                            ams (sLL $1 $> (AnnD noExtField $ HsAnnotation noExtField
                                             (getANN_PRAGs $1)
                                             (TypeAnnProvenance $3) $4))
                                             [mo $1,mj AnnType $2,mc $5] }
 
     | '{-# ANN' 'module' aexp '#-}'      {% runECP_P $3 >>= \ $3 ->
-                                            ams (sLL $1 $> (AnnD noExt $ HsAnnotation noExt
+                                            ams (sLL $1 $> (AnnD noExtField $ HsAnnotation noExtField
                                                 (getANN_PRAGs $1)
                                                  ModuleAnnProvenance $3))
                                                 [mo $1,mj AnnModule $2,mc $4] }
@@ -1866,12 +1866,12 @@ forall_vis_flag :: { (AddAnn, ForallVisFlag) }
 -- A ktype/ktypedoc is a ctype/ctypedoc, possibly with a kind annotation
 ktype :: { LHsType GhcPs }
         : ctype                { $1 }
-        | ctype '::' kind      {% ams (sLL $1 $> $ HsKindSig noExt $1 $3)
+        | ctype '::' kind      {% ams (sLL $1 $> $ HsKindSig noExtField $1 $3)
                                       [mu AnnDcolon $2] }
 
 ktypedoc :: { LHsType GhcPs }
          : ctypedoc            { $1 }
-         | ctypedoc '::' kind  {% ams (sLL $1 $> $ HsKindSig noExt $1 $3)
+         | ctypedoc '::' kind  {% ams (sLL $1 $> $ HsKindSig noExtField $1 $3)
                                       [mu AnnDcolon $2] }
 
 -- A ctype is a for-all type
@@ -1882,15 +1882,15 @@ ctype   :: { LHsType GhcPs }
                                            ams (sLL $1 $> $
                                                 HsForAllTy { hst_fvf = fv_flag
                                                            , hst_bndrs = $2
-                                                           , hst_xforall = noExt
+                                                           , hst_xforall = noExtField
                                                            , hst_body = $4 })
                                                [mu AnnForall $1,fv_ann] }
         | context '=>' ctype          {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
-                                                     , hst_xqual = noExt
+                                                     , hst_xqual = noExtField
                                                      , hst_body = $3 }) }
-        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy noExt $1 $3))
+        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy noExtField $1 $3))
                                              [mu AnnDcolon $2] }
         | type                        { $1 }
 
@@ -1912,15 +1912,15 @@ ctypedoc :: { LHsType GhcPs }
                                             ams (sLL $1 $> $
                                                  HsForAllTy { hst_fvf = fv_flag
                                                             , hst_bndrs = $2
-                                                            , hst_xforall = noExt
+                                                            , hst_xforall = noExtField
                                                             , hst_body = $4 })
                                                 [mu AnnForall $1,fv_ann] }
         | context '=>' ctypedoc       {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
-                                                     , hst_xqual = noExt
+                                                     , hst_xqual = noExtField
                                                      , hst_body = $3 }) }
-        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy noExt $1 $3))
+        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy noExtField $1 $3))
                                              [mu AnnDcolon $2] }
         | typedoc                     { $1 }
 
@@ -1968,27 +1968,27 @@ is connected to the first type too.
 type :: { LHsType GhcPs }
         : btype                        { $1 }
         | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy noExt $1 $3)
+                                       >> ams (sLL $1 $> $ HsFunTy noExtField $1 $3)
                                               [mu AnnRarrow $2] }
 
 
 typedoc :: { LHsType GhcPs }
         : btype                          { $1 }
-        | btype docprev                  { sLL $1 $> $ HsDocTy noExt $1 $2 }
-        | docnext btype                  { sLL $1 $> $ HsDocTy noExt $2 $1 }
+        | btype docprev                  { sLL $1 $> $ HsDocTy noExtField $1 $2 }
+        | docnext btype                  { sLL $1 $> $ HsDocTy noExtField $2 $1 }
         | btype '->'     ctypedoc        {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
-                                         >> ams (sLL $1 $> $ HsFunTy noExt $1 $3)
+                                         >> ams (sLL $1 $> $ HsFunTy noExtField $1 $3)
                                                 [mu AnnRarrow $2] }
         | btype docprev '->' ctypedoc    {% ams $1 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
                                          >> ams (sLL $1 $> $
-                                                 HsFunTy noExt (cL (comb2 $1 $2)
-                                                            (HsDocTy noExt $1 $2))
+                                                 HsFunTy noExtField (cL (comb2 $1 $2)
+                                                            (HsDocTy noExtField $1 $2))
                                                          $4)
                                                 [mu AnnRarrow $3] }
         | docnext btype '->' ctypedoc    {% ams $2 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
                                          >> ams (sLL $1 $> $
-                                                 HsFunTy noExt (cL (comb2 $1 $2)
-                                                            (HsDocTy noExt $2 $1))
+                                                 HsFunTy noExtField (cL (comb2 $1 $2)
+                                                            (HsDocTy noExtField $2 $1))
                                                          $4)
                                                 [mu AnnRarrow $3] }
 
@@ -2027,42 +2027,42 @@ tyapp :: { Located TyEl }
         | unpackedness                  { sL1 $1 $ TyElUnpackedness (unLoc $1) }
 
 atype :: { LHsType GhcPs }
-        : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
-        | tyvar                          { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- (See Note [Unit tuples])
+        : ntgtycon                       { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- Not including unit tuples
+        | tyvar                          { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
-                                               ; return $ sL1 $1 (HsStarTy noExt (isUnicode $1)) } }
+                                               ; return $ sL1 $1 (HsStarTy noExtField (isUnicode $1)) } }
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
-                                                    (sLL $1 $> $ HsRecTy noExt $2))
+                                                    (sLL $1 $> $ HsRecTy noExtField $2))
                                                         -- Constructor sigs only
                                                  [moc $1,mcc $3] }
-        | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy noExt
+        | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy noExtField
                                                     HsBoxedOrConstraintTuple [])
                                                 [mop $1,mcp $2] }
         | '(' ktype ',' comma_types1 ')' {% addAnnotation (gl $2) AnnComma
                                                           (gl $3) >>
-                                            ams (sLL $1 $> $ HsTupleTy noExt
+                                            ams (sLL $1 $> $ HsTupleTy noExtField
 
                                              HsBoxedOrConstraintTuple ($2 : $4))
                                                 [mop $1,mcp $5] }
-        | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple [])
+        | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy noExtField HsUnboxedTuple [])
                                              [mo $1,mc $2] }
-        | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple $2)
+        | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy noExtField HsUnboxedTuple $2)
                                              [mo $1,mc $3] }
-        | '(#' bar_types2 '#)'        {% ams (sLL $1 $> $ HsSumTy noExt $2)
+        | '(#' bar_types2 '#)'        {% ams (sLL $1 $> $ HsSumTy noExtField $2)
                                              [mo $1,mc $3] }
-        | '[' ktype ']'               {% ams (sLL $1 $> $ HsListTy  noExt $2) [mos $1,mcs $3] }
-        | '(' ktype ')'               {% ams (sLL $1 $> $ HsParTy   noExt $2) [mop $1,mcp $3] }
-        | quasiquote                  { mapLoc (HsSpliceTy noExt) $1 }
-        | splice_untyped              { mapLoc (HsSpliceTy noExt) $1 }
+        | '[' ktype ']'               {% ams (sLL $1 $> $ HsListTy  noExtField $2) [mos $1,mcs $3] }
+        | '(' ktype ')'               {% ams (sLL $1 $> $ HsParTy   noExtField $2) [mop $1,mcp $3] }
+        | quasiquote                  { mapLoc (HsSpliceTy noExtField) $1 }
+        | splice_untyped              { mapLoc (HsSpliceTy noExtField) $1 }
                                       -- see Note [Promotion] for the followings
-        | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar noExt IsPromoted $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar noExtField IsPromoted $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | SIMPLEQUOTE  '(' ktype ',' comma_types1 ')'
                              {% addAnnotation (gl $3) AnnComma (gl $4) >>
-                                ams (sLL $1 $> $ HsExplicitTupleTy noExt ($3 : $5))
+                                ams (sLL $1 $> $ HsExplicitTupleTy noExtField ($3 : $5))
                                     [mj AnnSimpleQuote $1,mop $2,mcp $6] }
-        | SIMPLEQUOTE  '[' comma_types0 ']'     {% ams (sLL $1 $> $ HsExplicitListTy noExt IsPromoted $3)
+        | SIMPLEQUOTE  '[' comma_types0 ']'     {% ams (sLL $1 $> $ HsExplicitListTy noExtField IsPromoted $3)
                                                        [mj AnnSimpleQuote $1,mos $2,mcs $4] }
-        | SIMPLEQUOTE var                       {% ams (sLL $1 $> $ HsTyVar noExt IsPromoted $2)
+        | SIMPLEQUOTE var                       {% ams (sLL $1 $> $ HsTyVar noExtField IsPromoted $2)
                                                        [mj AnnSimpleQuote $1,mj AnnName $2] }
 
         -- Two or more [ty, ty, ty] must be a promoted list type, just as
@@ -2071,11 +2071,11 @@ atype :: { LHsType GhcPs }
         -- so you have to quote those.)
         | '[' ktype ',' comma_types1 ']'  {% addAnnotation (gl $2) AnnComma
                                                            (gl $3) >>
-                                             ams (sLL $1 $> $ HsExplicitListTy noExt NotPromoted ($2 : $4))
+                                             ams (sLL $1 $> $ HsExplicitListTy noExtField NotPromoted ($2 : $4))
                                                  [mos $1,mcs $5] }
-        | INTEGER              { sLL $1 $> $ HsTyLit noExt $ HsNumTy (getINTEGERs $1)
+        | INTEGER              { sLL $1 $> $ HsTyLit noExtField $ HsNumTy (getINTEGERs $1)
                                                            (il_value (getINTEGER $1)) }
-        | STRING               { sLL $1 $> $ HsTyLit noExt $ HsStrTy (getSTRINGs $1)
+        | STRING               { sLL $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
                                                                      (getSTRING  $1) }
         | '_'                  { sL1 $1 $ mkAnonWildCardTy }
 
@@ -2111,8 +2111,8 @@ tv_bndrs :: { [LHsTyVarBndr GhcPs] }
          | {- empty -}                  { [] }
 
 tv_bndr :: { LHsTyVarBndr GhcPs }
-        : tyvar                         { sL1 $1 (UserTyVar noExt $1) }
-        | '(' tyvar '::' kind ')'       {% ams (sLL $1 $>  (KindedTyVar noExt $2 $4))
+        : tyvar                         { sL1 $1 (UserTyVar noExtField $1) }
+        | '(' tyvar '::' kind ')'       {% ams (sLL $1 $>  (KindedTyVar noExtField $2 $4))
                                                [mop $1,mu AnnDcolon $3
                                                ,mcp $5] }
 
@@ -2323,7 +2323,7 @@ fielddecl :: { LConDeclField GhcPs }
                                               -- A list because of   f,g :: Int
         : maybe_docnext sig_vars '::' ctype maybe_docprev
             {% ams (cL (comb2 $2 $4)
-                      (ConDeclField noExt (reverse (map (\ln@(dL->L l n) -> cL l $ FieldOcc noExt ln) (unLoc $2))) $4 ($1 `mplus` $5)))
+                      (ConDeclField noExtField (reverse (map (\ln@(dL->L l n) -> cL l $ FieldOcc noExtField ln) (unLoc $2))) $4 ($1 `mplus` $5)))
                    [mu AnnDcolon $3] }
 
 -- Reversed!
@@ -2341,17 +2341,17 @@ derivings :: { HsDeriving GhcPs }
 deriving :: { LHsDerivingClause GhcPs }
         : 'deriving' deriv_clause_types
               {% let { full_loc = comb2 $1 $> }
-                 in ams (cL full_loc $ HsDerivingClause noExt Nothing $2)
+                 in ams (cL full_loc $ HsDerivingClause noExtField Nothing $2)
                         [mj AnnDeriving $1] }
 
         | 'deriving' deriv_strategy_no_via deriv_clause_types
               {% let { full_loc = comb2 $1 $> }
-                 in ams (cL full_loc $ HsDerivingClause noExt (Just $2) $3)
+                 in ams (cL full_loc $ HsDerivingClause noExtField (Just $2) $3)
                         [mj AnnDeriving $1] }
 
         | 'deriving' deriv_clause_types deriv_strategy_via
               {% let { full_loc = comb2 $1 $> }
-                 in ams (cL full_loc $ HsDerivingClause noExt (Just $3) $2)
+                 in ams (cL full_loc $ HsDerivingClause noExtField (Just $3) $2)
                         [mj AnnDeriving $1] }
 
 deriv_clause_types :: { Located [LHsSigType GhcPs] }
@@ -2389,7 +2389,7 @@ There's an awkward overlap with a type signature.  Consider
 -}
 
 docdecl :: { LHsDecl GhcPs }
-        : docdecld { sL1 $1 (DocD noExt (unLoc $1)) }
+        : docdecld { sL1 $1 (DocD noExtField (unLoc $1)) }
 
 docdecld :: { LDocDecl }
         : docnext                               { sL1 $1 (DocCommentNext (unLoc $1)) }
@@ -2415,7 +2415,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                                 amsL l [] >> return () } ;
 
                                         _ <- amsL l (ann ++ fst (unLoc $3) ++ [mj AnnBang $1]) ;
-                                        return $! (sL l $ ValD noExt r) } }
+                                        return $! (sL l $ ValD noExtField r) } }
 
         | infixexp_top opt_sig rhs  {% runECP_P $1 >>= \ $1 ->
                                        do { (ann,r) <- checkValDef NoSrcStrict $1 (snd $2) $3;
@@ -2429,7 +2429,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                           (PatBind _ (dL->L lh _lhs) _rhs _) ->
                                                 amsL lh (fst $2) >> return () } ;
                                         _ <- amsL l (ann ++ (fst $ unLoc $3));
-                                        return $! (sL l $ ValD noExt r) } }
+                                        return $! (sL l $ ValD noExtField r) } }
         | pattern_synonym_decl  { $1 }
         | docdecl               { $1 }
 
@@ -2445,10 +2445,10 @@ rhs     :: { Located ([AddAnn],GRHSs GhcPs (LHsExpr GhcPs)) }
         : '=' exp wherebinds    {% runECP_P $2 >>= \ $2 -> return $
                                   sL (comb3 $1 $2 $3)
                                     ((mj AnnEqual $1 : (fst $ unLoc $3))
-                                    ,GRHSs noExt (unguardedRHS (comb3 $1 $2 $3) $2)
+                                    ,GRHSs noExtField (unguardedRHS (comb3 $1 $2 $3) $2)
                                    (snd $ unLoc $3)) }
         | gdrhs wherebinds      { sLL $1 $>  (fst $ unLoc $2
-                                    ,GRHSs noExt (reverse (unLoc $1))
+                                    ,GRHSs noExtField (reverse (unLoc $1))
                                                     (snd $ unLoc $2)) }
 
 gdrhs :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
@@ -2457,7 +2457,7 @@ gdrhs :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
 
 gdrh :: { LGRHS GhcPs (LHsExpr GhcPs) }
         : '|' guardquals '=' exp  {% runECP_P $4 >>= \ $4 ->
-                                     ams (sL (comb2 $1 $>) $ GRHS noExt (unLoc $2) $4)
+                                     ams (sL (comb2 $1 $>) $ GRHS noExtField (unLoc $2) $4)
                                          [mj AnnVbar $1,mj AnnEqual $3] }
 
 sigdecl :: { LHsDecl GhcPs }
@@ -2467,70 +2467,70 @@ sigdecl :: { LHsDecl GhcPs }
                         {% do { $1 <- runECP_P $1
                               ; v <- checkValSigLhs $1
                               ; _ <- amsL (comb2 $1 $>) [mu AnnDcolon $2]
-                              ; return (sLL $1 $> $ SigD noExt $
-                                  TypeSig noExt [v] (mkLHsSigWcType $3))} }
+                              ; return (sLL $1 $> $ SigD noExtField $
+                                  TypeSig noExtField [v] (mkLHsSigWcType $3))} }
 
         | var ',' sig_vars '::' sigtypedoc
-           {% do { let sig = TypeSig noExt ($1 : reverse (unLoc $3))
+           {% do { let sig = TypeSig noExtField ($1 : reverse (unLoc $3))
                                      (mkLHsSigWcType $5)
                  ; addAnnotation (gl $1) AnnComma (gl $2)
-                 ; ams ( sLL $1 $> $ SigD noExt sig )
+                 ; ams ( sLL $1 $> $ SigD noExtField sig )
                        [mu AnnDcolon $4] } }
 
         | infix prec ops
               {% checkPrecP $2 $3 >>
-                 ams (sLL $1 $> $ SigD noExt
-                        (FixSig noExt (FixitySig noExt (fromOL $ unLoc $3)
+                 ams (sLL $1 $> $ SigD noExtField
+                        (FixSig noExtField (FixitySig noExtField (fromOL $ unLoc $3)
                                 (Fixity (fst $ unLoc $2) (snd $ unLoc $2) (unLoc $1)))))
                      [mj AnnInfix $1,mj AnnVal $2] }
 
-        | pattern_synonym_sig   { sLL $1 $> . SigD noExt . unLoc $ $1 }
+        | pattern_synonym_sig   { sLL $1 $> . SigD noExtField . unLoc $ $1 }
 
         | '{-# COMPLETE' con_list opt_tyconsig  '#-}'
                 {% let (dcolon, tc) = $3
                    in ams
                        (sLL $1 $>
-                         (SigD noExt (CompleteMatchSig noExt (getCOMPLETE_PRAGs $1) $2 tc)))
+                         (SigD noExtField (CompleteMatchSig noExtField (getCOMPLETE_PRAGs $1) $2 tc)))
                     ([ mo $1 ] ++ dcolon ++ [mc $4]) }
 
         -- This rule is for both INLINE and INLINABLE pragmas
         | '{-# INLINE' activation qvar '#-}'
-                {% ams ((sLL $1 $> $ SigD noExt (InlineSig noExt $3
+                {% ams ((sLL $1 $> $ SigD noExtField (InlineSig noExtField $3
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
                                             (snd $2)))))
                        ((mo $1:fst $2) ++ [mc $4]) }
 
         | '{-# SCC' qvar '#-}'
-          {% ams (sLL $1 $> (SigD noExt (SCCFunSig noExt (getSCC_PRAGs $1) $2 Nothing)))
+          {% ams (sLL $1 $> (SigD noExtField (SCCFunSig noExtField (getSCC_PRAGs $1) $2 Nothing)))
                  [mo $1, mc $3] }
 
         | '{-# SCC' qvar STRING '#-}'
           {% do { scc <- getSCC $3
                 ; let str_lit = StringLiteral (getSTRINGs $3) scc
-                ; ams (sLL $1 $> (SigD noExt (SCCFunSig noExt (getSCC_PRAGs $1) $2 (Just ( sL1 $3 str_lit)))))
+                ; ams (sLL $1 $> (SigD noExtField (SCCFunSig noExtField (getSCC_PRAGs $1) $2 (Just ( sL1 $3 str_lit)))))
                       [mo $1, mc $4] } }
 
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% ams (
                  let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
                                              (NoUserInline, FunLike) (snd $2)
-                  in sLL $1 $> $ SigD noExt (SpecSig noExt $3 (fromOL $5) inl_prag))
+                  in sLL $1 $> $ SigD noExtField (SpecSig noExtField $3 (fromOL $5) inl_prag))
                     (mo $1:mu AnnDcolon $4:mc $6:(fst $2)) }
 
         | '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
-             {% ams (sLL $1 $> $ SigD noExt (SpecSig noExt $3 (fromOL $5)
+             {% ams (sLL $1 $> $ SigD noExtField (SpecSig noExtField $3 (fromOL $5)
                                (mkInlinePragma (getSPEC_INLINE_PRAGs $1)
                                                (getSPEC_INLINE $1) (snd $2))))
                        (mo $1:mu AnnDcolon $4:mc $6:(fst $2)) }
 
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
                 {% ams (sLL $1 $>
-                                  $ SigD noExt (SpecInstSig noExt (getSPEC_PRAGs $1) $3))
+                                  $ SigD noExtField (SpecInstSig noExtField (getSPEC_PRAGs $1) $3))
                        [mo $1,mj AnnInstance $2,mc $4] }
 
         -- A minimal complete definition
         | '{-# MINIMAL' name_boolformula_opt '#-}'
-            {% ams (sLL $1 $> $ SigD noExt (MinimalSig noExt (getMINIMAL_PRAGs $1) $2))
+            {% ams (sLL $1 $> $ SigD noExtField (MinimalSig noExtField (getMINIMAL_PRAGs $1) $2))
                    [mo $1,mc $3] }
 
 activation :: { ([AddAnn],Maybe Activation) }
@@ -2565,25 +2565,25 @@ exp   :: { ECP }
         | infixexp '-<' exp     {% runECP_P $1 >>= \ $1 ->
                                    runECP_P $3 >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   ams (sLL $1 $> $ HsCmdArrApp noExt $1 $3
+                                   ams (sLL $1 $> $ HsCmdArrApp noExtField $1 $3
                                                         HsFirstOrderApp True)
                                        [mu Annlarrowtail $2] }
         | infixexp '>-' exp     {% runECP_P $1 >>= \ $1 ->
                                    runECP_P $3 >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   ams (sLL $1 $> $ HsCmdArrApp noExt $3 $1
+                                   ams (sLL $1 $> $ HsCmdArrApp noExtField $3 $1
                                                       HsFirstOrderApp False)
                                        [mu Annrarrowtail $2] }
         | infixexp '-<<' exp    {% runECP_P $1 >>= \ $1 ->
                                    runECP_P $3 >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   ams (sLL $1 $> $ HsCmdArrApp noExt $1 $3
+                                   ams (sLL $1 $> $ HsCmdArrApp noExtField $1 $3
                                                       HsHigherOrderApp True)
                                        [mu AnnLarrowtail $2] }
         | infixexp '>>-' exp    {% runECP_P $1 >>= \ $1 ->
                                    runECP_P $3 >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   ams (sLL $1 $> $ HsCmdArrApp noExt $3 $1
+                                   ams (sLL $1 $> $ HsCmdArrApp noExtField $3 $1
                                                       HsHigherOrderApp False)
                                        [mu AnnRarrowtail $2] }
         | infixexp              { $1 }
@@ -2619,13 +2619,13 @@ exp10_top :: { ECP }
 
         | hpc_annot exp        {% runECP_P $2 >>= \ $2 ->
                                   fmap ecpFromExp $
-                                  ams (sLL $1 $> $ HsTickPragma noExt (snd $ fst $ fst $ unLoc $1)
+                                  ams (sLL $1 $> $ HsTickPragma noExtField (snd $ fst $ fst $ unLoc $1)
                                                                 (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
                                       (fst $ fst $ fst $ unLoc $1) }
 
         | '{-# CORE' STRING '#-}' exp  {% runECP_P $4 >>= \ $4 ->
                                           fmap ecpFromExp $
-                                          ams (sLL $1 $> $ HsCoreAnn noExt (getCORE_PRAGs $1) (getStringLiteral $2) $4)
+                                          ams (sLL $1 $> $ HsCoreAnn noExtField (getCORE_PRAGs $1) (getStringLiteral $2) $4)
                                               [mo $1,mj AnnVal $2
                                               ,mc $3] }
                                           -- hdaume: core annotation
@@ -2635,7 +2635,7 @@ exp10 :: { ECP }
         : exp10_top            { $1 }
         | scc_annot exp        {% runECP_P $2 >>= \ $2 ->
                                   fmap ecpFromExp $
-                                  ams (sLL $1 $> $ HsSCC noExt (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
+                                  ams (sLL $1 $> $ HsSCC noExtField (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
                                       (fst $ fst $ unLoc $1) }
 
 optSemi :: { ([Located Token],Bool) }
@@ -2686,11 +2686,11 @@ fexp    :: { ECP }
         | fexp TYPEAPP atype         {% runECP_P $1 >>= \ $1 ->
                                         runPV (checkExpBlockArguments $1) >>= \_ ->
                                         fmap ecpFromExp $
-                                        ams (sLL $1 $> $ HsAppType noExt $1 (mkHsWildCardBndrs $3))
+                                        ams (sLL $1 $> $ HsAppType noExtField $1 (mkHsWildCardBndrs $3))
                                             [mj AnnAt $2] }
         | 'static' aexp              {% runECP_P $2 >>= \ $2 ->
                                         fmap ecpFromExp $
-                                        ams (sLL $1 $> $ HsStatic noExt $2)
+                                        ams (sLL $1 $> $ HsStatic noExtField $2)
                                             [mj AnnStatic $1] }
         | aexp                       { $1 }
 
@@ -2709,7 +2709,7 @@ aexp    :: { ECP }
                    {  ECP $
                       runECP_PV $5 >>= \ $5 ->
                       amms (mkHsLamPV (comb2 $1 $>) (mkMatchGroup FromSource
-                            [sLL $1 $> $ Match { m_ext = noExt
+                            [sLL $1 $> $ Match { m_ext = noExtField
                                                , m_ctxt = LambdaExpr
                                                , m_pats = $2:$3
                                                , m_grhss = unguardedGRHSs $5 }]))
@@ -2722,7 +2722,7 @@ aexp    :: { ECP }
         | '\\' 'lcase' altslist
             {% runPV $3 >>= \ $3 ->
                fmap ecpFromExp $
-               ams (sLL $1 $> $ HsLamCase noExt
+               ams (sLL $1 $> $ HsLamCase noExtField
                                    (mkMatchGroup FromSource (snd $ unLoc $3)))
                    (mj AnnLam $1:mj AnnCase $2:(fst $ unLoc $3)) }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp
@@ -2737,7 +2737,7 @@ aexp    :: { ECP }
                                     ++(map (\l -> mj AnnSemi l) (fst $6))) }
         | 'if' ifgdpats                 {% hintMultiWayIf (getLoc $1) >>= \_ ->
                                            fmap ecpFromExp $
-                                           ams (sLL $1 $> $ HsMultiIf noExt
+                                           ams (sLL $1 $> $ HsMultiIf noExtField
                                                      (reverse $ snd $ unLoc $2))
                                                (mj AnnIf $1:(fst $ unLoc $2)) }
         | 'case' exp 'of' altslist    {% runECP_P $2 >>= \ $2 ->
@@ -2760,7 +2760,7 @@ aexp    :: { ECP }
                        {% (checkPattern <=< runECP_P) $2 >>= \ p ->
                            runECP_P $4 >>= \ $4@cmd ->
                            fmap ecpFromExp $
-                           ams (sLL $1 $> $ HsProc noExt p (sLL $1 $> $ HsCmdTop noExt cmd))
+                           ams (sLL $1 $> $ HsProc noExtField p (sLL $1 $> $ HsCmdTop noExtField cmd))
                                             -- TODO: is LL right here?
                                [mj AnnProc $1,mu AnnRarrow $3] }
 
@@ -2777,13 +2777,13 @@ aexp1   :: { ECP }
 aexp2   :: { ECP }
         : qvar                          { ECP $ mkHsVarPV $! $1 }
         | qcon                          { ECP $ mkHsVarPV $! $1 }
-        | ipvar                         { ecpFromExp $ sL1 $1 (HsIPVar noExt $! unLoc $1) }
-        | overloaded_label              { ecpFromExp $ sL1 $1 (HsOverLabel noExt Nothing $! unLoc $1) }
+        | ipvar                         { ecpFromExp $ sL1 $1 (HsIPVar noExtField $! unLoc $1) }
+        | overloaded_label              { ecpFromExp $ sL1 $1 (HsOverLabel noExtField Nothing $! unLoc $1) }
         | literal                       { ECP $ mkHsLitPV $! $1 }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
 -- into HsOverLit when -foverloaded-strings is on.
 --      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
---                                       (getSTRING $1) noExt) }
+--                                       (getSTRING $1) noExtField) }
         | INTEGER   { ECP $ mkHsOverLitPV (sL1 $1 $ mkHsIntegral   (getINTEGER  $1)) }
         | RATIONAL  { ECP $ mkHsOverLitPV (sL1 $1 $ mkHsFractional (getRATIONAL $1)) }
 
@@ -2813,47 +2813,47 @@ aexp2   :: { ECP }
 
         -- Template Haskell Extension
         | splice_untyped { ECP $ mkHsSplicePV $1 }
-        | splice_typed   { ecpFromExp $ mapLoc (HsSpliceE noExt) $1 }
+        | splice_typed   { ecpFromExp $ mapLoc (HsSpliceE noExtField) $1 }
 
-        | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExt (VarBr noExt True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExt (VarBr noExt True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE tyvar     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExt (VarBr noExt False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE gtycon    {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExt (VarBr noExt False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | TH_TY_QUOTE tyvar     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
+        | TH_TY_QUOTE gtycon    {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE {- nothing -} {% reportEmptyDoubleQuotes (getLoc $1) }
         | '[|' exp '|]'       {% runECP_P $2 >>= \ $2 ->
                                  fmap ecpFromExp $
-                                 ams (sLL $1 $> $ HsBracket noExt (ExpBr noExt $2))
+                                 ams (sLL $1 $> $ HsBracket noExtField (ExpBr noExtField $2))
                                       (if (hasE $1) then [mj AnnOpenE $1, mu AnnCloseQ $3]
                                                     else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) }
         | '[||' exp '||]'     {% runECP_P $2 >>= \ $2 ->
                                  fmap ecpFromExp $
-                                 ams (sLL $1 $> $ HsBracket noExt (TExpBr noExt $2))
+                                 ams (sLL $1 $> $ HsBracket noExtField (TExpBr noExtField $2))
                                       (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
         | '[t|' ktype '|]'    {% fmap ecpFromExp $
-                                 ams (sLL $1 $> $ HsBracket noExt (TypBr noExt $2)) [mo $1,mu AnnCloseQ $3] }
+                                 ams (sLL $1 $> $ HsBracket noExtField (TypBr noExtField $2)) [mo $1,mu AnnCloseQ $3] }
         | '[p|' infixexp '|]' {% (checkPattern <=< runECP_P) $2 >>= \p ->
                                       fmap ecpFromExp $
-                                      ams (sLL $1 $> $ HsBracket noExt (PatBr noExt p))
+                                      ams (sLL $1 $> $ HsBracket noExtField (PatBr noExtField p))
                                           [mo $1,mu AnnCloseQ $3] }
         | '[d|' cvtopbody '|]' {% fmap ecpFromExp $
-                                  ams (sLL $1 $> $ HsBracket noExt (DecBrL noExt (snd $2)))
+                                  ams (sLL $1 $> $ HsBracket noExtField (DecBrL noExtField (snd $2)))
                                       (mo $1:mu AnnCloseQ $3:fst $2) }
         | quasiquote          { ECP $ mkHsSplicePV $1 }
 
         -- arrow notation extension
         | '(|' aexp2 cmdargs '|)'  {% runECP_P $2 >>= \ $2 ->
                                       fmap ecpFromCmd $
-                                      ams (sLL $1 $> $ HsCmdArrForm noExt $2 Prefix
+                                      ams (sLL $1 $> $ HsCmdArrForm noExtField $2 Prefix
                                                            Nothing (reverse $3))
                                           [mu AnnOpenB $1,mu AnnCloseB $4] }
 
 splice_exp :: { LHsExpr GhcPs }
-        : splice_untyped { mapLoc (HsSpliceE noExt) $1 }
-        | splice_typed   { mapLoc (HsSpliceE noExt) $1 }
+        : splice_untyped { mapLoc (HsSpliceE noExtField) $1 }
+        | splice_typed   { mapLoc (HsSpliceE noExtField) $1 }
 
 splice_untyped :: { Located (HsSplice GhcPs) }
         : TH_ID_SPLICE          {% ams (sL1 $1 $ mkUntypedSplice HasDollar
-                                        (sL1 $1 $ HsVar noExt (sL1 $1 (mkUnqual varName
+                                        (sL1 $1 $ HsVar noExtField (sL1 $1 (mkUnqual varName
                                                            (getTH_ID_SPLICE $1)))))
                                        [mj AnnThIdSplice $1] }
         | '$(' exp ')'          {% runECP_P $2 >>= \ $2 ->
@@ -2862,7 +2862,7 @@ splice_untyped :: { Located (HsSplice GhcPs) }
 
 splice_typed :: { Located (HsSplice GhcPs) }
         : TH_ID_TY_SPLICE       {% ams (sL1 $1 $ mkTypedSplice HasDollar
-                                        (sL1 $1 $ HsVar noExt (sL1 $1 (mkUnqual varName
+                                        (sL1 $1 $ HsVar noExtField (sL1 $1 (mkUnqual varName
                                                         (getTH_ID_TY_SPLICE $1)))))
                                        [mj AnnThIdTySplice $1] }
         | '$$(' exp ')'         {% runECP_P $2 >>= \ $2 ->
@@ -2875,7 +2875,7 @@ cmdargs :: { [LHsCmdTop GhcPs] }
 
 acmd    :: { LHsCmdTop GhcPs }
         : aexp2                 {% runECP_P $1 >>= \ cmd ->
-                                    return (sL1 cmd $ HsCmdTop noExt cmd) }
+                                    return (sL1 cmd $ HsCmdTop noExtField cmd) }
 
 cvtopbody :: { ([AddAnn],[LHsDecl GhcPs]) }
         :  '{'            cvtopdecls0 '}'      { ([mj AnnOpenC $1
@@ -2909,7 +2909,7 @@ texp :: { ECP }
         | infixexp qop       {% runECP_P $1 >>= \ $1 ->
                                 runPV $2 >>= \ $2 ->
                                 return $ ecpFromExp $
-                                sLL $1 $> $ SectionL noExt $1 $2 }
+                                sLL $1 $> $ SectionL noExtField $1 $2 }
         | qopm infixexp      { ECP $
                                 superInfixOp $
                                 runECP_PV $2 >>= \ $2 ->
@@ -2973,25 +2973,25 @@ list :: { forall b. DisambECP b => SrcSpan -> PV (Located b) }
         | lexps   { \loc -> $1 >>= \ $1 ->
                             mkHsExplicitListPV loc (reverse $1) }
         | texp '..'  { \loc ->    runECP_PV $1 >>= \ $1 ->
-                                  ams (cL loc $ ArithSeq noExt Nothing (From $1))
+                                  ams (cL loc $ ArithSeq noExtField Nothing (From $1))
                                       [mj AnnDotdot $2]
                                       >>= ecpFromExp' }
         | texp ',' exp '..' { \loc ->
                                    runECP_PV $1 >>= \ $1 ->
                                    runECP_PV $3 >>= \ $3 ->
-                                   ams (cL loc $ ArithSeq noExt Nothing (FromThen $1 $3))
+                                   ams (cL loc $ ArithSeq noExtField Nothing (FromThen $1 $3))
                                        [mj AnnComma $2,mj AnnDotdot $4]
                                        >>= ecpFromExp' }
         | texp '..' exp  { \loc -> runECP_PV $1 >>= \ $1 ->
                                    runECP_PV $3 >>= \ $3 ->
-                                   ams (cL loc $ ArithSeq noExt Nothing (FromTo $1 $3))
+                                   ams (cL loc $ ArithSeq noExtField Nothing (FromTo $1 $3))
                                        [mj AnnDotdot $2]
                                        >>= ecpFromExp' }
         | texp ',' exp '..' exp { \loc ->
                                    runECP_PV $1 >>= \ $1 ->
                                    runECP_PV $3 >>= \ $3 ->
                                    runECP_PV $5 >>= \ $5 ->
-                                   ams (cL loc $ ArithSeq noExt Nothing (FromThenTo $1 $3 $5))
+                                   ams (cL loc $ ArithSeq noExtField Nothing (FromThenTo $1 $3 $5))
                                        [mj AnnComma $2,mj AnnDotdot $4]
                                        >>= ecpFromExp' }
         | texp '|' flattenedpquals
@@ -3022,7 +3022,7 @@ flattenedpquals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
                     -- We just had one thing in our "parallel" list so
                     -- we simply return that thing directly
 
-                    qss -> sL1 $1 [sL1 $1 $ ParStmt noExt [ParStmtBlock noExt qs [] noSyntaxExpr |
+                    qss -> sL1 $1 [sL1 $1 $ ParStmt noExtField [ParStmtBlock noExtField qs [] noSyntaxExpr |
                                             qs <- qss]
                                             noExpr noSyntaxExpr]
                     -- We actually found some actual parallel lists so
@@ -3135,7 +3135,7 @@ alts1   :: { forall b. DisambECP b => PV (Located ([AddAnn],[LMatch GhcPs (Locat
 
 alt     :: { forall b. DisambECP b => PV (LMatch GhcPs (Located b)) }
            : pat alt_rhs  { $2 >>= \ $2 ->
-                            ams (sLL $1 $> (Match { m_ext = noExt
+                            ams (sLL $1 $> (Match { m_ext = noExtField
                                                   , m_ctxt = CaseAlt
                                                   , m_pats = [$1]
                                                   , m_grhss = snd $ unLoc $2 }))
@@ -3143,7 +3143,7 @@ alt     :: { forall b. DisambECP b => PV (LMatch GhcPs (Located b)) }
 
 alt_rhs :: { forall b. DisambECP b => PV (Located ([AddAnn],GRHSs GhcPs (Located b))) }
         : ralt wherebinds           { $1 >>= \alt ->
-                                      return $ sLL alt $> (fst $ unLoc $2, GRHSs noExt (unLoc alt) (snd $ unLoc $2)) }
+                                      return $ sLL alt $> (fst $ unLoc $2, GRHSs noExtField (unLoc alt) (snd $ unLoc $2)) }
 
 ralt :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (Located b)]) }
         : '->' exp            { runECP_PV $2 >>= \ $2 ->
@@ -3170,7 +3170,7 @@ ifgdpats :: { Located ([AddAnn],[LGRHS GhcPs (LHsExpr GhcPs)]) }
 gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (Located b)) }
         : '|' guardquals '->' exp
                                    { runECP_PV $4 >>= \ $4 ->
-                                     ams (sL (comb2 $1 $>) $ GRHS noExt (unLoc $2) $4)
+                                     ams (sL (comb2 $1 $>) $ GRHS noExtField (unLoc $2) $4)
                                          [mj AnnVbar $1,mu AnnRarrow $3] }
 
 -- 'pat' recognises a pattern, including one with a bang at the top
@@ -3264,7 +3264,7 @@ qual  :: { forall b. DisambECP b => PV (LStmt GhcPs (Located b)) }
                                                [mu AnnLarrow $2] }
     | exp                                { runECP_PV $1 >>= \ $1 ->
                                            return $ sL1 $1 $ mkBodyStmt $1 }
-    | 'let' binds                        { ams (sLL $1 $> $ LetStmt noExt (snd $ unLoc $2))
+    | 'let' binds                        { ams (sLL $1 $> $ LetStmt noExtField (snd $ unLoc $2))
                                                (mj AnnLet $1:(fst $ unLoc $2)) }
 
 -----------------------------------------------------------------------------
@@ -3312,7 +3312,7 @@ dbinds  :: { Located [LIPBind GhcPs] }
 
 dbind   :: { LIPBind GhcPs }
 dbind   : ipvar '=' exp                {% runECP_P $3 >>= \ $3 ->
-                                          ams (sLL $1 $> (IPBind noExt (Left $1) $3))
+                                          ams (sLL $1 $> (IPBind noExtField (Left $1) $3))
                                               [mj AnnEqual $2] }
 
 ipvar   :: { Located HsIPName }
@@ -3489,8 +3489,8 @@ qtycon :: { Located RdrName }   -- Qualified or unqualified
         | tycon             { $1 }
 
 qtycondoc :: { LHsType GhcPs } -- Qualified or unqualified
-        : qtycon            { sL1 $1                           (HsTyVar noExt NotPromoted $1)      }
-        | qtycon docprev    { sLL $1 $> (HsDocTy noExt (sL1 $1 (HsTyVar noExt NotPromoted $1)) $2) }
+        : qtycon            { sL1 $1                           (HsTyVar noExtField NotPromoted $1)      }
+        | qtycon docprev    { sLL $1 $> (HsDocTy noExtField (sL1 $1 (HsTyVar noExtField NotPromoted $1)) $2) }
 
 tycon   :: { Located RdrName }  -- Unqualified
         : CONID                   { sL1 $1 $! mkUnqual tcClsName (getCONID $1) }
@@ -3700,8 +3700,8 @@ literal :: { Located (HsLit GhcPs) }
                                                     $ getPRIMCHAR $1 }
         | PRIMSTRING        { sL1 $1 $ HsStringPrim (getPRIMSTRINGs $1)
                                                     $ getPRIMSTRING $1 }
-        | PRIMFLOAT         { sL1 $1 $ HsFloatPrim  noExt $ getPRIMFLOAT $1 }
-        | PRIMDOUBLE        { sL1 $1 $ HsDoublePrim noExt $ getPRIMDOUBLE $1 }
+        | PRIMFLOAT         { sL1 $1 $ HsFloatPrim  noExtField $ getPRIMFLOAT $1 }
+        | PRIMDOUBLE        { sL1 $1 $ HsDoublePrim noExtField $ getPRIMDOUBLE $1 }
 
 -----------------------------------------------------------------------------
 -- Layout

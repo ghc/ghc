@@ -100,7 +100,7 @@ finishHsVar (L l name)
  = do { this_mod <- getModule
       ; when (nameIsLocalOrFrom this_mod name) $
         checkThLocalName name
-      ; return (HsVar noExt (L l name), unitFV name) }
+      ; return (HsVar noExtField (L l name), unitFV name) }
 
 rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar v
@@ -112,11 +112,11 @@ rnUnboundVar v
                 ; uv <- if startsWithUnderscore occ
                         then return (TrueExprHole occ)
                         else OutOfScope occ <$> getGlobalRdrEnv
-                ; return (HsUnboundVar noExt uv, emptyFVs) }
+                ; return (HsUnboundVar noExtField uv, emptyFVs) }
 
         else -- Fail immediately (qualified name)
              do { n <- reportUnboundName v
-                ; return (HsVar noExt (noLoc n), emptyFVs) } }
+                ; return (HsVar noExtField (noLoc n), emptyFVs) } }
 
 rnExpr (HsVar _ (L l v))
   = do { opt_DuplicateRecordFields <- xoptM LangExt.DuplicateRecordFields
@@ -126,14 +126,14 @@ rnExpr (HsVar _ (L l v))
            Just (Left name)
               | name == nilDataConName -- Treat [] as an ExplicitList, so that
                                        -- OverloadedLists works correctly
-              -> rnExpr (ExplicitList noExt Nothing [])
+              -> rnExpr (ExplicitList noExtField Nothing [])
 
               | otherwise
               -> finishHsVar (L l name) ;
             Just (Right [s]) ->
-              return ( HsRecFld noExt (Unambiguous s (L l v) ), unitFV s) ;
+              return ( HsRecFld noExtField (Unambiguous s (L l v) ), unitFV s) ;
            Just (Right fs@(_:_:_)) ->
-              return ( HsRecFld noExt (Ambiguous noExt (L l v))
+              return ( HsRecFld noExtField (Ambiguous noExtField (L l v))
                      , mkFVs fs);
            Just (Right [])         -> panic "runExpr/HsVar" } }
 
@@ -290,9 +290,9 @@ rnExpr (ExplicitTuple x tup_args boxity)
   where
     rnTupArg (L l (Present x e)) = do { (e',fvs) <- rnLExpr e
                                       ; return (L l (Present x e'), fvs) }
-    rnTupArg (L l (Missing _)) = return (L l (Missing noExt)
+    rnTupArg (L l (Missing _)) = return (L l (Missing noExtField)
                                         , emptyFVs)
-    rnTupArg (L _ (XTupArg {})) = panic "rnExpr.XTupArg"
+    rnTupArg (L _ (XTupArg nec)) = noExtCon nec
 
 rnExpr (ExplicitSum x alt arity expr)
   = do { (expr', fvs) <- rnLExpr expr
@@ -304,18 +304,18 @@ rnExpr (RecordCon { rcon_con_name = con_id
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
        ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
-       ; return (RecordCon { rcon_ext = noExt
+       ; return (RecordCon { rcon_ext = noExtField
                            , rcon_con_name = con_lname, rcon_flds = rec_binds' }
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
-    mk_hs_var l n = HsVar noExt (L l n)
+    mk_hs_var l n = HsVar noExtField (L l n)
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
 rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
   = do  { (expr', fvExpr) <- rnLExpr expr
         ; (rbinds', fvRbinds) <- rnHsRecUpdFields rbinds
-        ; return (RecordUpd { rupd_ext = noExt, rupd_expr = expr'
+        ; return (RecordUpd { rupd_ext = noExtField, rupd_expr = expr'
                             , rupd_flds = rbinds' }
                  , fvExpr `plusFV` fvRbinds) }
 
@@ -323,7 +323,7 @@ rnExpr (ExprWithTySig _ expr pty)
   = do  { (pty', fvTy)    <- rnHsSigWcType BindUnlessForall ExprWithTySigCtx pty
         ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
                              rnLExpr expr
-        ; return (ExprWithTySig noExt expr' pty', fvExpr `plusFV` fvTy) }
+        ; return (ExprWithTySig noExtField expr' pty', fvExpr `plusFV` fvTy) }
 
 rnExpr (HsIf x _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
@@ -444,7 +444,7 @@ rnCmdTop = wrapLocFstM rnCmdTop'
 
         ; return (HsCmdTop (cmd_names `zip` cmd_names') cmd',
                   fvCmd `plusFV` cmd_fvs) }
-  rnCmdTop' (XCmdTop{}) = panic "rnCmdTop"
+  rnCmdTop' (XCmdTop nec) = noExtCon nec
 
 rnLCmd :: LHsCmd GhcPs -> RnM (LHsCmd GhcRn, FreeVars)
 rnLCmd = wrapLocFstM rnCmd
@@ -518,7 +518,7 @@ rnCmd (HsCmdDo x (L l stmts))
         ; return ( HsCmdDo x (L l stmts'), fvs ) }
 
 rnCmd cmd@(HsCmdWrap {}) = pprPanic "rnCmd" (ppr cmd)
-rnCmd cmd@(XCmd {})      = pprPanic "rnCmd" (ppr cmd)
+rnCmd     (XCmd nec)     = noExtCon nec
 
 ---------------------------------------------------
 type CmdNeeds = FreeVars        -- Only inhabitants are
@@ -550,7 +550,7 @@ methodNamesCmd (HsCmdLam _ match)        = methodNamesMatch match
 methodNamesCmd (HsCmdCase _ _ matches)
   = methodNamesMatch matches `addOneFV` choiceAName
 
-methodNamesCmd (XCmd {}) = panic "methodNamesCmd"
+methodNamesCmd (XCmd nec) = noExtCon nec
 
 --methodNamesCmd _ = emptyFVs
    -- Other forms can't occur in commands, but it's not convenient
@@ -563,20 +563,20 @@ methodNamesMatch (MG { mg_alts = L _ ms })
   = plusFVs (map do_one ms)
  where
     do_one (L _ (Match { m_grhss = grhss })) = methodNamesGRHSs grhss
-    do_one (L _ (XMatch _)) = panic "methodNamesMatch.XMatch"
-methodNamesMatch (XMatchGroup _) = panic "methodNamesMatch"
+    do_one (L _ (XMatch nec)) = noExtCon nec
+methodNamesMatch (XMatchGroup nec) = noExtCon nec
 
 -------------------------------------------------
 -- gaw 2004
 methodNamesGRHSs :: GRHSs GhcRn (LHsCmd GhcRn) -> FreeVars
 methodNamesGRHSs (GRHSs _ grhss _) = plusFVs (map methodNamesGRHS grhss)
-methodNamesGRHSs (XGRHSs _) = panic "methodNamesGRHSs"
+methodNamesGRHSs (XGRHSs nec) = noExtCon nec
 
 -------------------------------------------------
 
 methodNamesGRHS :: Located (GRHS GhcRn (LHsCmd GhcRn)) -> CmdNeeds
 methodNamesGRHS (L _ (GRHS _ _ rhs)) = methodNamesLCmd rhs
-methodNamesGRHS (L _ (XGRHS _)) = panic "methodNamesGRHS"
+methodNamesGRHS (L _ (XGRHS nec)) = noExtCon nec
 
 ---------------------------------------------------
 methodNamesStmts :: [Located (StmtLR GhcRn GhcRn (LHsCmd GhcRn))] -> FreeVars
@@ -598,7 +598,7 @@ methodNamesStmt (TransStmt {})                 = emptyFVs
 methodNamesStmt ApplicativeStmt{}              = emptyFVs
    -- ParStmt and TransStmt can't occur in commands, but it's not
    -- convenient to error here so we just do what's convenient
-methodNamesStmt (XStmtLR {}) = panic "methodNamesStmt"
+methodNamesStmt (XStmtLR nec) = noExtCon nec
 
 {-
 ************************************************************************
@@ -811,7 +811,7 @@ rnStmt ctxt rnBody (L loc (LastStmt _ body noret _)) thing_inside
                             -- #15607
 
         ; (thing,  fvs3) <- thing_inside []
-        ; return (([(L loc (LastStmt noExt body' noret ret_op), fv_expr)]
+        ; return (([(L loc (LastStmt noExtField body' noret ret_op), fv_expr)]
                   , thing), fv_expr `plusFV` fvs1 `plusFV` fvs3) }
 
 rnStmt ctxt rnBody (L loc (BodyStmt _ body _ _)) thing_inside
@@ -826,7 +826,7 @@ rnStmt ctxt rnBody (L loc (BodyStmt _ body _ _)) thing_inside
                               -- Here "gd" is a guard
 
         ; (thing, fvs3)    <- thing_inside []
-        ; return ( ([(L loc (BodyStmt noExt body' then_op guard_op), fv_expr)]
+        ; return ( ([(L loc (BodyStmt noExtField body' then_op guard_op), fv_expr)]
                   , thing), fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }
 
 rnStmt ctxt rnBody (L loc (BindStmt _ pat body _ _)) thing_inside
@@ -838,7 +838,7 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat body _ _)) thing_inside
 
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
         { (thing, fvs3) <- thing_inside (collectPatBinders pat')
-        ; return (( [( L loc (BindStmt noExt pat' body' bind_op fail_op)
+        ; return (( [( L loc (BindStmt noExtField pat' body' bind_op fail_op)
                      , fv_expr )]
                   , thing),
                   fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
@@ -848,7 +848,7 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat body _ _)) thing_inside
 rnStmt _ _ (L loc (LetStmt _ (L l binds))) thing_inside
   = do  { rnLocalBindsAndThen binds $ \binds' bind_fvs -> do
         { (thing, fvs) <- thing_inside (collectLocalBinders binds')
-        ; return ( ([(L loc (LetStmt noExt (L l binds')), bind_fvs)], thing)
+        ; return ( ([(L loc (LetStmt noExtField (L l binds')), bind_fvs)], thing)
                  , fvs) }  }
 
 rnStmt ctxt rnBody (L loc (RecStmt { recS_stmts = rec_stmts })) thing_inside
@@ -886,7 +886,7 @@ rnStmt ctxt _ (L loc (ParStmt _ segs _ _)) thing_inside
         ; (bind_op, fvs2)   <- lookupStmtName ctxt bindMName
         ; (return_op, fvs3) <- lookupStmtName ctxt returnMName
         ; ((segs', thing), fvs4) <- rnParallelStmts (ParStmtCtxt ctxt) return_op segs thing_inside
-        ; return (([(L loc (ParStmt noExt segs' mzip_op bind_op), fvs4)], thing)
+        ; return (([(L loc (ParStmt noExtField segs' mzip_op bind_op), fvs4)], thing)
                  , fvs1 `plusFV` fvs2 `plusFV` fvs3 `plusFV` fvs4) }
 
 rnStmt ctxt _ (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = form
@@ -919,7 +919,7 @@ rnStmt ctxt _ (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = for
              -- See Note [TransStmt binder map] in HsExpr
 
        ; traceRn "rnStmt: implicitly rebound these used binders:" (ppr bndr_map)
-       ; return (([(L loc (TransStmt { trS_ext = noExt
+       ; return (([(L loc (TransStmt { trS_ext = noExtField
                                     , trS_stmts = stmts', trS_bndrs = bndr_map
                                     , trS_by = by', trS_using = using', trS_form = form
                                     , trS_ret = return_op, trS_bind = bind_op
@@ -928,8 +928,8 @@ rnStmt ctxt _ (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = for
 rnStmt _ _ (L _ ApplicativeStmt{}) _ =
   panic "rnStmt: ApplicativeStmt"
 
-rnStmt _ _ (L _ XStmtLR{}) _ =
-  panic "rnStmt: XStmtLR"
+rnStmt _ _ (L _ (XStmtLR nec)) _ =
+  noExtCon nec
 
 rnParallelStmts :: forall thing. HsStmtContext Name
                 -> SyntaxExpr GhcRn
@@ -960,7 +960,7 @@ rnParallelStmts ctxt return_op segs thing_inside
 
            ; let seg' = ParStmtBlock x stmts' used_bndrs return_op
            ; return ((seg':segs', thing), fvs) }
-    rn_segs _ _ (XParStmtBlock{}:_) = panic "rnParallelStmts"
+    rn_segs _ _ (XParStmtBlock nec:_) = noExtCon nec
 
     cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
     dupErr vs = addErr (text "Duplicate binding in parallel list comprehension for:"
@@ -980,12 +980,12 @@ lookupStmtNamePoly ctxt name
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
          then do { fm <- lookupOccRn (nameRdrName name)
-                 ; return (HsVar noExt (noLoc fm), unitFV fm) }
+                 ; return (HsVar noExtField (noLoc fm), unitFV fm) }
          else not_rebindable }
   | otherwise
   = not_rebindable
   where
-    not_rebindable = return (HsVar noExt (noLoc name), emptyFVs)
+    not_rebindable = return (HsVar noExtField (noLoc name), emptyFVs)
 
 -- | Is this a context where we respect RebindableSyntax?
 -- but ListComp are never rebindable
@@ -1093,23 +1093,23 @@ rn_rec_stmt_lhs :: Outputable body => MiniFixityEnv
                 -> RnM [(LStmtLR GhcRn GhcPs body, FreeVars)]
 
 rn_rec_stmt_lhs _ (L loc (BodyStmt _ body a b))
-  = return [(L loc (BodyStmt noExt body a b), emptyFVs)]
+  = return [(L loc (BodyStmt noExtField body a b), emptyFVs)]
 
 rn_rec_stmt_lhs _ (L loc (LastStmt _ body noret a))
-  = return [(L loc (LastStmt noExt body noret a), emptyFVs)]
+  = return [(L loc (LastStmt noExtField body noret a), emptyFVs)]
 
 rn_rec_stmt_lhs fix_env (L loc (BindStmt _ pat body a b))
   = do
       -- should the ctxt be MDo instead?
       (pat', fv_pat) <- rnBindPat (localRecNameMaker fix_env) pat
-      return [(L loc (BindStmt noExt pat' body a b), fv_pat)]
+      return [(L loc (BindStmt noExtField pat' body a b), fv_pat)]
 
 rn_rec_stmt_lhs _ (L _ (LetStmt _ (L _ binds@(HsIPBinds {}))))
   = failWith (badIpBinds (text "an mdo expression") binds)
 
 rn_rec_stmt_lhs fix_env (L loc (LetStmt _ (L l (HsValBinds x binds))))
     = do (_bound_names, binds') <- rnLocalValBindsLHS fix_env binds
-         return [(L loc (LetStmt noExt (L l (HsValBinds x binds'))),
+         return [(L loc (LetStmt noExtField (L l (HsValBinds x binds'))),
                  -- Warning: this is bogus; see function invariant
                  emptyFVs
                  )]
@@ -1129,10 +1129,10 @@ rn_rec_stmt_lhs _ stmt@(L _ (ApplicativeStmt {})) -- Shouldn't appear yet
 
 rn_rec_stmt_lhs _ (L _ (LetStmt _ (L _ (EmptyLocalBinds _))))
   = panic "rn_rec_stmt LetStmt EmptyLocalBinds"
-rn_rec_stmt_lhs _ (L _ (LetStmt _ (L _ (XHsLocalBindsLR _))))
-  = panic "rn_rec_stmt LetStmt XHsLocalBindsLR"
-rn_rec_stmt_lhs _ (L _ (XStmtLR _))
-  = panic "rn_rec_stmt XStmtLR"
+rn_rec_stmt_lhs _ (L _ (LetStmt _ (L _ (XHsLocalBindsLR nec))))
+  = noExtCon nec
+rn_rec_stmt_lhs _ (L _ (XStmtLR nec))
+  = noExtCon nec
 
 rn_rec_stmts_lhs :: Outputable body => MiniFixityEnv
                  -> [LStmt GhcPs body]
@@ -1161,13 +1161,13 @@ rn_rec_stmt rnBody _ (L loc (LastStmt _ body noret _), _)
   = do  { (body', fv_expr) <- rnBody body
         ; (ret_op, fvs1)   <- lookupSyntaxName returnMName
         ; return [(emptyNameSet, fv_expr `plusFV` fvs1, emptyNameSet,
-                   L loc (LastStmt noExt body' noret ret_op))] }
+                   L loc (LastStmt noExtField body' noret ret_op))] }
 
 rn_rec_stmt rnBody _ (L loc (BodyStmt _ body _ _), _)
   = do { (body', fvs) <- rnBody body
        ; (then_op, fvs1) <- lookupSyntaxName thenMName
        ; return [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
-                 L loc (BodyStmt noExt body' then_op noSyntaxExpr))] }
+                 L loc (BodyStmt noExtField body' then_op noSyntaxExpr))] }
 
 rn_rec_stmt rnBody _ (L loc (BindStmt _ pat' body _ _), fv_pat)
   = do { (body', fv_expr) <- rnBody body
@@ -1178,7 +1178,7 @@ rn_rec_stmt rnBody _ (L loc (BindStmt _ pat' body _ _), fv_pat)
        ; let bndrs = mkNameSet (collectPatBinders pat')
              fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
        ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
-                  L loc (BindStmt noExt pat' body' bind_op fail_op))] }
+                  L loc (BindStmt noExtField pat' body' bind_op fail_op))] }
 
 rn_rec_stmt _ _ (L _ (LetStmt _ (L _ binds@(HsIPBinds {}))), _)
   = failWith (badIpBinds (text "an mdo expression") binds)
@@ -1188,7 +1188,7 @@ rn_rec_stmt _ all_bndrs (L loc (LetStmt _ (L l (HsValBinds x binds'))), _)
            -- fixities and unused are handled above in rnRecStmtsAndThen
        ; let fvs = allUses du_binds
        ; return [(duDefs du_binds, fvs, emptyNameSet,
-                 L loc (LetStmt noExt (L l (HsValBinds x binds'))))] }
+                 L loc (LetStmt noExtField (L l (HsValBinds x binds'))))] }
 
 -- no RecStmt case because they get flattened above when doing the LHSes
 rn_rec_stmt _ _ stmt@(L _ (RecStmt {}), _)
@@ -1200,8 +1200,8 @@ rn_rec_stmt _ _ stmt@(L _ (ParStmt {}), _)       -- Syntactically illegal in mdo
 rn_rec_stmt _ _ stmt@(L _ (TransStmt {}), _)     -- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: TransStmt" (ppr stmt)
 
-rn_rec_stmt _ _ (L _ (LetStmt _ (L _ (XHsLocalBindsLR _))), _)
-  = panic "rn_rec_stmt: LetStmt XHsLocalBindsLR"
+rn_rec_stmt _ _ (L _ (LetStmt _ (L _ (XHsLocalBindsLR nec))), _)
+  = noExtCon nec
 
 rn_rec_stmt _ _ (L _ (LetStmt _ (L _ (EmptyLocalBinds _))), _)
   = panic "rn_rec_stmt: LetStmt EmptyLocalBinds"
@@ -1209,8 +1209,8 @@ rn_rec_stmt _ _ (L _ (LetStmt _ (L _ (EmptyLocalBinds _))), _)
 rn_rec_stmt _ _ stmt@(L _ (ApplicativeStmt {}), _)
   = pprPanic "rn_rec_stmt: ApplicativeStmt" (ppr stmt)
 
-rn_rec_stmt _ _ stmt@(L _ (XStmtLR {}), _)
-  = pprPanic "rn_rec_stmt: XStmtLR" (ppr stmt)
+rn_rec_stmt _ _ (L _ (XStmtLR nec), _)
+  = noExtCon nec
 
 rn_rec_stmts :: Outputable (body GhcPs) =>
                 (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
@@ -1647,12 +1647,12 @@ stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt _ pat rhs _ _), _))
                 tail _tail_fvs
   | not (isStrictPattern pat), (False,tail') <- needJoin monad_names tail
   -- See Note [ApplicativeDo and strict patterns]
-  = mkApplicativeStmt ctxt [ApplicativeArgOne noExt pat rhs False] False tail'
+  = mkApplicativeStmt ctxt [ApplicativeArgOne noExtField pat rhs False] False tail'
 stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ _),_))
                 tail _tail_fvs
   | (False,tail') <- needJoin monad_names tail
   = mkApplicativeStmt ctxt
-      [ApplicativeArgOne noExt nlWildPatName rhs True] False tail'
+      [ApplicativeArgOne noExtField nlWildPatName rhs True] False tail'
 
 stmtTreeToStmts _monad_names _ctxt (StmtTreeOne (s,_)) tail _tail_fvs =
   return (s : tail, emptyNameSet)
@@ -1671,9 +1671,9 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
    return (stmts, unionNameSets (fvs:fvss))
  where
    stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BindStmt _ pat exp _ _), _))
-     = return (ApplicativeArgOne noExt pat exp False, emptyFVs)
+     = return (ApplicativeArgOne noExtField pat exp False, emptyFVs)
    stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BodyStmt _ exp _ _), _)) =
-     return (ApplicativeArgOne noExt nlWildPatName exp True, emptyFVs)
+     return (ApplicativeArgOne noExtField nlWildPatName exp True, emptyFVs)
    stmtTreeArg ctxt tail_fvs tree = do
      let stmts = flattenStmtTree tree
          pvarset = mkNameSet (concatMap (collectStmtBinders.unLoc.fst) stmts)
@@ -1688,8 +1688,8 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
              return (unLoc tup, emptyNameSet)
            | otherwise -> do
              (ret,fvs) <- lookupStmtNamePoly ctxt returnMName
-             return (HsApp noExt (noLoc ret) tup, fvs)
-     return ( ApplicativeArgMany noExt stmts' mb_ret pat
+             return (HsApp noExtField (noLoc ret) tup, fvs)
+     return ( ApplicativeArgMany noExtField stmts' mb_ret pat
             , fvs1 `plusFV` fvs2)
 
 
@@ -1832,7 +1832,7 @@ slurpIndependentStmts stmts = go [] [] emptyNameSet stmts
   -- an infinite loop (#14163).
   go lets indep bndrs ((L loc (BindStmt _ pat body bind_op fail_op), fvs): rest)
     | isEmptyNameSet (bndrs `intersectNameSet` fvs) && not (isStrictPattern pat)
-    = go lets ((L loc (BindStmt noExt pat body bind_op fail_op), fvs) : indep)
+    = go lets ((L loc (BindStmt noExtField pat body bind_op fail_op), fvs) : indep)
          bndrs' rest
     where bndrs' = bndrs `unionNameSet` mkNameSet (collectPatBinders pat)
   -- If we encounter a LetStmt that doesn't depend on a BindStmt in this
@@ -1840,9 +1840,9 @@ slurpIndependentStmts stmts = go [] [] emptyNameSet stmts
   -- grouping more BindStmts.
   -- TODO: perhaps we shouldn't do this if there are any strict bindings,
   -- because we might be moving evaluation earlier.
-  go lets indep bndrs ((L loc (LetStmt noExt binds), fvs) : rest)
+  go lets indep bndrs ((L loc (LetStmt noExtField binds), fvs) : rest)
     | isEmptyNameSet (bndrs `intersectNameSet` fvs)
-    = go ((L loc (LetStmt noExt binds), fvs) : lets) indep bndrs rest
+    = go ((L loc (LetStmt noExtField binds), fvs) : lets) indep bndrs rest
   go _ []  _ _ = Nothing
   go _ [_] _ _ = Nothing
   go lets indep _ stmts = Just (reverse lets, reverse indep, stmts)
@@ -1875,7 +1875,7 @@ mkApplicativeStmt ctxt args need_join body_stmts
                 ; return (Just join_op, fvs) }
            else
              return (Nothing, emptyNameSet)
-       ; let applicative_stmt = noLoc $ ApplicativeStmt noExt
+       ; let applicative_stmt = noLoc $ ApplicativeStmt noExtField
                (zip (fmap_op : repeat ap_op) args)
                mb_join
        ; return ( applicative_stmt : body_stmts
@@ -1889,7 +1889,7 @@ needJoin :: MonadNames
 needJoin _monad_names [] = (False, [])  -- we're in an ApplicativeArg
 needJoin monad_names  [L loc (LastStmt _ e _ t)]
  | Just arg <- isReturnApp monad_names e =
-       (False, [L loc (LastStmt noExt arg True t)])
+       (False, [L loc (LastStmt noExtField arg True t)])
 needJoin _monad_names stmts = (True, stmts)
 
 -- | @Just e@, if the expression is @return e@ or @return $ e@,
@@ -1978,7 +1978,7 @@ checkStmt ctxt (L _ stmt)
    msg = sep [ text "Unexpected" <+> pprStmtCat stmt <+> ptext (sLit "statement")
              , text "in" <+> pprAStmtContext ctxt ]
 
-pprStmtCat :: Stmt a body -> SDoc
+pprStmtCat :: Stmt (GhcPass a) body -> SDoc
 pprStmtCat (TransStmt {})     = text "transform"
 pprStmtCat (LastStmt {})      = text "return expression"
 pprStmtCat (BodyStmt {})      = text "body"
@@ -1987,7 +1987,7 @@ pprStmtCat (LetStmt {})       = text "let"
 pprStmtCat (RecStmt {})       = text "rec"
 pprStmtCat (ParStmt {})       = text "parallel"
 pprStmtCat (ApplicativeStmt {}) = panic "pprStmtCat: ApplicativeStmt"
-pprStmtCat (XStmtLR {})         = panic "pprStmtCat: XStmtLR"
+pprStmtCat (XStmtLR nec)        = noExtCon nec
 
 ------------
 emptyInvalid :: Validity  -- Payload is the empty document
@@ -2053,7 +2053,7 @@ okCompStmt dflags _ stmt
        RecStmt {}  -> emptyInvalid
        LastStmt {} -> emptyInvalid  -- Should not happen (dealt with by checkLastStmt)
        ApplicativeStmt {} -> emptyInvalid
-       XStmtLR{} -> panic "okCompStmt"
+       XStmtLR nec -> noExtCon nec
 
 ---------
 checkTupleSection :: [LHsTupArg GhcPs] -> RnM ()
@@ -2134,7 +2134,7 @@ getMonadFailOp
                       (nlHsApp (noLoc $ syn_expr fromStringExpr)
                                 (noLoc $ syn_expr arg_syn_expr))
         let failAfterFromStringExpr :: HsExpr GhcRn =
-              unLoc $ mkHsLam [noLoc $ VarPat noExt $ noLoc arg_name] body
+              unLoc $ mkHsLam [noLoc $ VarPat noExtField $ noLoc arg_name] body
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
               mkSyntaxExpr failAfterFromStringExpr
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)

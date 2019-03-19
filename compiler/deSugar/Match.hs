@@ -501,9 +501,9 @@ tidy_bang_pat v o _ (SigPat _ (dL->L l p) _) = tidy_bang_pat v o l p
 -- Push the bang-pattern inwards, in the hope that
 -- it may disappear next time
 tidy_bang_pat v o l (AsPat x v' p)
-  = tidy1 v o (AsPat x v' (cL l (BangPat noExt p)))
+  = tidy1 v o (AsPat x v' (cL l (BangPat noExtField p)))
 tidy_bang_pat v o l (CoPat x w p t)
-  = tidy1 v o (CoPat x w (BangPat noExt (cL l p)) t)
+  = tidy1 v o (CoPat x w (BangPat noExtField (cL l p)) t)
 
 -- Discard bang around strict pattern
 tidy_bang_pat v o _ p@(LitPat {})    = tidy1 v o p
@@ -538,7 +538,7 @@ tidy_bang_pat v o l p@(ConPatOut { pat_con = (dL->L _ (RealDataCon dc))
 --
 -- NB: SigPatIn, ConPatIn should not happen
 
-tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noExt (cL l p))
+tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noExtField (cL l p))
 
 -------------------
 push_bang_into_newtype_arg :: SrcSpan
@@ -549,16 +549,16 @@ push_bang_into_newtype_arg :: SrcSpan
 -- We are transforming   !(N p)   into   (N !p)
 push_bang_into_newtype_arg l _ty (PrefixCon (arg:args))
   = ASSERT( null args)
-    PrefixCon [cL l (BangPat noExt arg)]
+    PrefixCon [cL l (BangPat noExtField arg)]
 push_bang_into_newtype_arg l _ty (RecCon rf)
   | HsRecFields { rec_flds = (dL->L lf fld) : flds } <- rf
   , HsRecField { hsRecFieldArg = arg } <- fld
   = ASSERT( null flds)
     RecCon (rf { rec_flds = [cL lf (fld { hsRecFieldArg
-                                           = cL l (BangPat noExt arg) })] })
+                                           = cL l (BangPat noExtField arg) })] })
 push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
   | HsRecFields { rec_flds = [] } <- rf
-  = PrefixCon [cL l (BangPat noExt (noLoc (WildPat ty)))]
+  = PrefixCon [cL l (BangPat noExtField (noLoc (WildPat ty)))]
 push_bang_into_newtype_arg _ _ cd
   = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
 
@@ -752,13 +752,13 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
            ; return (EqnInfo { eqn_pats = upats
                              , eqn_orig = FromSource
                              , eqn_rhs = match_result }) }
-    mk_eqn_info _ (dL->L _ (XMatch _)) = panic "matchWrapper"
+    mk_eqn_info _ (dL->L _ (XMatch nec)) = noExtCon nec
     mk_eqn_info _ _  = panic "mk_eqn_info: Impossible Match" -- due to #15884
 
     handleWarnings = if isGenerated origin
                      then discardWarningsDs
                      else id
-matchWrapper _ _ (XMatchGroup _) = panic "matchWrapper"
+matchWrapper _ _ (XMatchGroup nec) = noExtCon nec
 
 matchEquations  :: HsMatchContext Name
                 -> [MatchId] -> [EquationInfo] -> Type

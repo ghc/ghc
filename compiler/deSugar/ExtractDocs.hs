@@ -137,7 +137,7 @@ sigNameNoLoc _                             = []
 -- Extract the source location where an instance is defined. This is used
 -- to correlate InstDecls with their Instance/CoAxiom Names, via the
 -- instanceMap.
-getInstLoc :: InstDecl name -> SrcSpan
+getInstLoc :: InstDecl (GhcPass p) -> SrcSpan
 getInstLoc = \case
   ClsInstD _ (ClsInstDecl { cid_poly_ty = ty }) -> getLoc (hsSigType ty)
   DataFamInstD _ (DataFamInstDecl
@@ -234,10 +234,10 @@ classDecls :: TyClDecl GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
 classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
-    docs  = mkDecls tcdDocs (DocD noExt) class_
-    defs  = mkDecls (bagToList . tcdMeths) (ValD noExt) class_
-    sigs  = mkDecls tcdSigs (SigD noExt) class_
-    ats   = mkDecls tcdATs (TyClD noExt . FamDecl noExt) class_
+    docs  = mkDecls tcdDocs (DocD noExtField) class_
+    defs  = mkDecls (bagToList . tcdMeths) (ValD noExtField) class_
+    sigs  = mkDecls tcdSigs (SigD noExtField) class_
+    ats   = mkDecls tcdATs (TyClD noExtField . FamDecl noExtField) class_
 
 -- | Extract function argument docs from inside top-level decls.
 declTypeDocs :: HsDecl GhcRn -> Map Int (HsDocString)
@@ -280,14 +280,14 @@ topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup GhcRn -> [LHsDecl GhcRn]
 ungroup group_ =
-  mkDecls (tyClGroupTyClDecls . hs_tyclds) (TyClD noExt)  group_ ++
-  mkDecls hs_derivds             (DerivD noExt) group_ ++
-  mkDecls hs_defds               (DefD noExt)   group_ ++
-  mkDecls hs_fords               (ForD noExt)   group_ ++
-  mkDecls hs_docs                (DocD noExt)   group_ ++
-  mkDecls (tyClGroupInstDecls . hs_tyclds) (InstD noExt)  group_ ++
-  mkDecls (typesigs . hs_valds)  (SigD noExt)   group_ ++
-  mkDecls (valbinds . hs_valds)  (ValD noExt)   group_
+  mkDecls (tyClGroupTyClDecls . hs_tyclds) (TyClD noExtField)  group_ ++
+  mkDecls hs_derivds             (DerivD noExtField) group_ ++
+  mkDecls hs_defds               (DefD noExtField)   group_ ++
+  mkDecls hs_fords               (ForD noExtField)   group_ ++
+  mkDecls hs_docs                (DocD noExtField)   group_ ++
+  mkDecls (tyClGroupInstDecls . hs_tyclds) (InstD noExtField)  group_ ++
+  mkDecls (typesigs . hs_valds)  (SigD noExtField)   group_ ++
+  mkDecls (valbinds . hs_valds)  (ValD noExtField)   group_
   where
     typesigs (XValBindsLR (NValBinds _ sigs)) = filter (isUserSig . unLoc) sigs
     typesigs ValBinds{} = error "expected XValBindsLR"

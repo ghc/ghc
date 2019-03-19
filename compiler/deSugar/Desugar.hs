@@ -412,7 +412,7 @@ dsRule (dL->L loc (HsRule { rd_name = name
 
         ; return (Just rule)
         } } }
-dsRule (dL->L _ (XRuleDecl _)) = panic "dsRule"
+dsRule (dL->L _ (XRuleDecl nec)) = noExtCon nec
 dsRule _ = panic "dsRule: Impossible Match" -- due to #15884
 
 warnRuleShadowing :: RuleName -> Activation -> Id -> [Id] -> DsM ()

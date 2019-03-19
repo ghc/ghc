@@ -135,15 +135,15 @@ hsLitType (HsInteger _ _ ty) = ty
 hsLitType (HsRat _ _ ty)     = ty
 hsLitType (HsFloatPrim _ _)  = floatPrimTy
 hsLitType (HsDoublePrim _ _) = doublePrimTy
-hsLitType (XLit p)           = pprPanic "hsLitType" (ppr p)
+hsLitType (XLit nec)         = noExtCon nec
 
 -- Overloaded literals. Here mainly because it uses isIntTy etc
 
 shortCutLit :: DynFlags -> OverLitVal -> TcType -> Maybe (HsExpr GhcTcId)
 shortCutLit dflags (HsIntegral int@(IL src neg i)) ty
-  | isIntTy ty  && inIntRange  dflags i = Just (HsLit noExt (HsInt noExt int))
+  | isIntTy ty  && inIntRange  dflags i = Just (HsLit noExtField (HsInt noExtField int))
   | isWordTy ty && inWordRange dflags i = Just (mkLit wordDataCon (HsWordPrim src i))
-  | isIntegerTy ty = Just (HsLit noExt (HsInteger src i ty))
+  | isIntegerTy ty = Just (HsLit noExtField (HsInteger src i ty))
   | otherwise = shortCutLit dflags (HsFractional (integralFractionalLit neg i)) ty
         -- The 'otherwise' case is important
         -- Consider (3 :: Float).  Syntactically it looks like an IntLit,
@@ -152,16 +152,16 @@ shortCutLit dflags (HsIntegral int@(IL src neg i)) ty
         -- literals, compiled without -O
 
 shortCutLit _ (HsFractional f) ty
-  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim noExt f))
-  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim noExt f))
+  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim noExtField f))
+  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim noExtField f))
   | otherwise     = Nothing
 
 shortCutLit _ (HsIsString src s) ty
-  | isStringTy ty = Just (HsLit noExt (HsString src s))
+  | isStringTy ty = Just (HsLit noExtField (HsString src s))
   | otherwise     = Nothing
 
 mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc
-mkLit con lit = HsApp noExt (nlHsDataCon con) (nlHsLit lit)
+mkLit con lit = HsApp noExtField (nlHsDataCon con) (nlHsLit lit)
 
 ------------------------------
 hsOverLitName :: OverLitVal -> Name
@@ -389,7 +389,7 @@ zonkTopBndrs ids = initZonkEnv $ \ ze -> zonkIdBndrs ze ids
 zonkFieldOcc :: ZonkEnv -> FieldOcc GhcTcId -> TcM (FieldOcc GhcTc)
 zonkFieldOcc env (FieldOcc sel lbl)
   = fmap ((flip FieldOcc) lbl) $ zonkIdBndr env sel
-zonkFieldOcc _ (XFieldOcc _) = panic "zonkFieldOcc"
+zonkFieldOcc _ (XFieldOcc nec) = noExtCon nec
 
 zonkEvBndrsX :: ZonkEnv -> [EvVar] -> TcM (ZonkEnv, [Var])
 zonkEvBndrsX = mapAccumLM zonkEvBndrX
@@ -532,12 +532,12 @@ zonkLocalBinds env (HsIPBinds x (IPBinds dict_binds binds )) = do
         = do n' <- mapIPNameTc (zonkIdBndr env) n
              e' <- zonkLExpr env e
              return (IPBind x n' e')
-    zonk_ip_bind (XIPBind _) = panic "zonkLocalBinds : XCIPBind"
+    zonk_ip_bind (XIPBind nec) = noExtCon nec
 
-zonkLocalBinds _ (HsIPBinds _ (XHsIPBinds _))
-  = panic "zonkLocalBinds" -- Not in typechecker output
-zonkLocalBinds _ (XHsLocalBindsLR _)
-  = panic "zonkLocalBinds" -- Not in typechecker output
+zonkLocalBinds _ (HsIPBinds _ (XHsIPBinds nec))
+  = noExtCon nec
+zonkLocalBinds _ (XHsLocalBindsLR nec)
+  = noExtCon nec
 
 ---------------------------------------------
 zonkRecMonoBinds :: ZonkEnv -> LHsBinds GhcTcId -> TcM (ZonkEnv, LHsBinds GhcTc)
@@ -597,7 +597,7 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
             ; new_val_binds <- mapBagM (zonk_val_bind env3) val_binds
             ; new_exports   <- mapM (zonk_export env3) exports
             ; return (new_val_binds, new_exports) }
-       ; return (AbsBinds { abs_ext = noExt
+       ; return (AbsBinds { abs_ext = noExtField
                           , abs_tvs = new_tyvars, abs_ev_vars = new_evs
                           , abs_ev_binds = new_ev_binds
                           , abs_exports = new_exports, abs_binds = new_val_bind
@@ -633,7 +633,7 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                         , abe_poly = new_poly_id
                         , abe_mono = zonkIdOcc env mono_id
                         , abe_prags = new_prags })
-    zonk_export _ (XABExport _) = panic "zonk_bind: XABExport"
+    zonk_export _ (XABExport nec) = noExtCon nec
 
 zonk_bind env (PatSynBind x bind@(PSB { psb_id = (dL->L loc id)
                                       , psb_args = details
@@ -649,8 +649,8 @@ zonk_bind env (PatSynBind x bind@(PSB { psb_id = (dL->L loc id)
                        , psb_def = lpat'
                        , psb_dir = dir' } }
 
-zonk_bind _ (PatSynBind _ (XPatSynBind _)) = panic "zonk_bind"
-zonk_bind _ (XHsBindsLR _)                 = panic "zonk_bind"
+zonk_bind _ (PatSynBind _ (XPatSynBind nec)) = noExtCon nec
+zonk_bind _ (XHsBindsLR nec)                 = noExtCon nec
 
 zonkPatSynDetails :: ZonkEnv
                   -> HsPatSynDetails (Located TcId)
@@ -704,7 +704,7 @@ zonkMatchGroup env zBody (MG { mg_alts = (dL->L l ms)
         ; return (MG { mg_alts = cL l ms'
                      , mg_ext = MatchGroupTc arg_tys' res_ty'
                      , mg_origin = origin }) }
-zonkMatchGroup _ _ (XMatchGroup {}) = panic "zonkMatchGroup"
+zonkMatchGroup _ _ (XMatchGroup nec) = noExtCon nec
 
 zonkMatch :: ZonkEnv
           -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
@@ -715,7 +715,7 @@ zonkMatch env zBody (dL->L loc match@(Match { m_pats = pats
   = do  { (env1, new_pats) <- zonkPats env pats
         ; new_grhss <- zonkGRHSs env1 zBody grhss
         ; return (cL loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
-zonkMatch _ _ (dL->L  _ (XMatch _)) = panic "zonkMatch"
+zonkMatch _ _ (dL->L  _ (XMatch nec)) = noExtCon nec
 zonkMatch _ _ _ = panic "zonkMatch: Impossible Match"
                              -- due to #15884
 
@@ -732,10 +732,10 @@ zonkGRHSs env zBody (GRHSs x grhss (dL->L l binds)) = do
           = do (env2, new_guarded) <- zonkStmts new_env zonkLExpr guarded
                new_rhs <- zBody env2 rhs
                return (GRHS xx new_guarded new_rhs)
-        zonk_grhs (XGRHS _) = panic "zonkGRHSs"
+        zonk_grhs (XGRHS nec) = noExtCon nec
     new_grhss <- mapM (wrapLocM zonk_grhs) grhss
     return (GRHSs x new_grhss (cL l new_binds))
-zonkGRHSs _ _ (XGRHSs _) = panic "zonkGRHSs"
+zonkGRHSs _ _ (XGRHSs nec) = noExtCon nec
 
 {-
 ************************************************************************
@@ -841,7 +841,7 @@ zonkExpr env (ExplicitTuple x tup_args boxed)
                                               ; return (cL l (Present x e')) }
     zonk_tup_arg (dL->L l (Missing t)) = do { t' <- zonkTcTypeToTypeX env t
                                             ; return (cL l (Missing t')) }
-    zonk_tup_arg (dL->L _ (XTupArg{})) = panic "zonkExpr.XTupArg"
+    zonk_tup_arg (dL->L _ (XTupArg nec)) = noExtCon nec
     zonk_tup_arg _ = panic "zonk_tup_arg: Impossible Match"
                              -- due to #15884
 
@@ -877,7 +877,7 @@ zonkExpr env (HsMultiIf ty alts)
           = do { (env', guard') <- zonkStmts env zonkLExpr guard
                ; expr'          <- zonkLExpr env' expr
                ; return $ GRHS x guard' expr' }
-        zonk_alt (XGRHS _) = panic "zonkExpr.HsMultiIf"
+        zonk_alt (XGRHS nec) = noExtCon nec
 
 zonkExpr env (HsLet x (dL->L l binds) expr)
   = do (new_env, new_binds) <- zonkLocalBinds env binds
@@ -921,7 +921,7 @@ zonkExpr env (RecordUpd { rupd_flds = rbinds
 
 zonkExpr env (ExprWithTySig _ e ty)
   = do { e' <- zonkLExpr env e
-       ; return (ExprWithTySig noExt e' ty) }
+       ; return (ExprWithTySig noExtField e' ty) }
 
 zonkExpr env (ArithSeq expr wit info)
   = do (env1, new_wit) <- zonkWit env wit
@@ -1057,7 +1057,7 @@ zonkCmd env (HsCmdDo ty (dL->L l stmts))
        new_ty <- zonkTcTypeToTypeX env ty
        return (HsCmdDo new_ty (cL l new_stmts))
 
-zonkCmd _ (XCmd{}) = panic "zonkCmd"
+zonkCmd _ (XCmd nec) = noExtCon nec
 
 
 
@@ -1077,7 +1077,7 @@ zonk_cmd_top env (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
          -- rules for arrows
 
        return (HsCmdTop (CmdTopTc new_stack_tys new_ty new_ids) new_cmd)
-zonk_cmd_top _ (XCmdTop {}) = panic "zonk_cmd_top"
+zonk_cmd_top _ (XCmdTop nec) = noExtCon nec
 
 -------------------------------------------------------------------------
 zonkCoFn :: ZonkEnv -> HsWrapper -> TcM (ZonkEnv, HsWrapper)
@@ -1110,7 +1110,7 @@ zonkOverLit env lit@(OverLit {ol_ext = OverLitTc r ty, ol_witness = e })
         ; e' <- zonkExpr env e
         ; return (lit { ol_witness = e', ol_ext = OverLitTc r ty' }) }
 
-zonkOverLit _ XOverLit{} = panic "zonkOverLit"
+zonkOverLit _ (XOverLit nec) = noExtCon nec
 
 -------------------------------------------------------------------------
 zonkArithSeq :: ZonkEnv -> ArithSeqInfo GhcTcId -> TcM (ArithSeqInfo GhcTc)
@@ -1166,7 +1166,7 @@ zonkStmt env _ (ParStmt bind_ty stmts_w_bndrs mzip_op bind_op)
             ; (env3, new_return) <- zonkSyntaxExpr env2 return_op
             ; return (ParStmtBlock x new_stmts (zonkIdOccs env3 bndrs)
                                                                    new_return) }
-    zonk_branch _ (XParStmtBlock{}) = panic "zonkStmt"
+    zonk_branch _ (XParStmtBlock nec) = noExtCon nec
 
 zonkStmt env zBody (RecStmt { recS_stmts = segStmts, recS_later_ids = lvs, recS_rec_ids = rvs
                             , recS_ret_fn = ret_id, recS_mfix_fn = mfix_id
@@ -1264,13 +1264,13 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
 
     get_pat (_, ApplicativeArgOne _ pat _ _) = pat
     get_pat (_, ApplicativeArgMany _ _ _ pat) = pat
-    get_pat (_, XApplicativeArg _) = panic "zonkStmt"
+    get_pat (_, XApplicativeArg nec) = noExtCon nec
 
     replace_pat pat (op, ApplicativeArgOne x _ a isBody)
       = (op, ApplicativeArgOne x pat a isBody)
     replace_pat pat (op, ApplicativeArgMany x a b _)
       = (op, ApplicativeArgMany x a b pat)
-    replace_pat _ (_, XApplicativeArg _) = panic "zonkStmt"
+    replace_pat _ (_, XApplicativeArg nec) = noExtCon nec
 
     zonk_args env args
       = do { (env1, new_args_rev) <- zonk_args_rev env (reverse args)
@@ -1294,9 +1294,9 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
       = do { (env1, new_stmts) <- zonkStmts env zonkLExpr stmts
            ; new_ret           <- zonkExpr env1 ret
            ; return (ApplicativeArgMany x new_stmts new_ret pat) }
-    zonk_arg _ (XApplicativeArg _) = panic "zonkStmt.XApplicativeArg"
+    zonk_arg _ (XApplicativeArg nec) = noExtCon nec
 
-zonkStmt _ _ (XStmtLR _) = panic "zonkStmt"
+zonkStmt _ _ (XStmtLR nec) = noExtCon nec
 
 -------------------------------------------------------------------------
 zonkRecFields :: ZonkEnv -> HsRecordBinds GhcTcId -> TcM (HsRecordBinds GhcTcId)
@@ -1540,7 +1540,7 @@ zonkRule env rule@(HsRule { rd_tmvs = tm_bndrs{-::[RuleBndr TcId]-}
       = do { (env', v') <- zonk_it env v
            ; return (env', cL l (RuleBndr x (cL loc v'))) }
    zonk_tm_bndr _ (dL->L _ (RuleBndrSig {})) = panic "zonk_tm_bndr RuleBndrSig"
-   zonk_tm_bndr _ (dL->L _ (XRuleBndr {})) = panic "zonk_tm_bndr XRuleBndr"
+   zonk_tm_bndr _ (dL->L _ (XRuleBndr nec)) = noExtCon nec
    zonk_tm_bndr _ _ = panic "zonk_tm_bndr: Impossible Match"
                             -- due to #15884
 
@@ -1552,7 +1552,7 @@ zonkRule env rule@(HsRule { rd_tmvs = tm_bndrs{-::[RuleBndr TcId]-}
                     -- DV: used to be return (env,v) but that is plain
                     -- wrong because we may need to go inside the kind
                     -- of v and zonk there!
-zonkRule _ (XRuleDecl _) = panic "zonkRule"
+zonkRule _ (XRuleDecl nec) = noExtCon nec
 
 {-
 ************************************************************************
