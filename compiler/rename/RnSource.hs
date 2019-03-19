@@ -229,7 +229,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    traceRn "finish Dus" (ppr src_dus ) ;
    return (final_tcg_env, rn_group)
                     }}}}
-rnSrcDecls (XHsGroup _) = panic "rnSrcDecls"
+rnSrcDecls (XHsGroup nec) = noExtCon nec
 
 addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv
 -- This function could be defined lower down in the module hierarchy,
@@ -297,7 +297,7 @@ rnSrcWarnDecls bndr_set decls'
      = do { names <- concatMapM (lookupLocalTcNames sig_ctxt what . unLoc)
                                 rdr_names
           ; return [(rdrNameOcc rdr, txt) | (rdr, _) <- names] }
-   rn_deprec (XWarnDecl _) = panic "rnSrcWarnDecls"
+   rn_deprec (XWarnDecl nec) = noExtCon nec
 
    what = text "deprecation"
 
@@ -333,7 +333,7 @@ rnAnnDecl ann@(HsAnnotation _ s provenance expr)
                               rnLExpr expr
        ; return (HsAnnotation noExt s provenance' expr',
                  provenance_fvs `plusFV` expr_fvs) }
-rnAnnDecl (XAnnDecl _) = panic "rnAnnDecl"
+rnAnnDecl (XAnnDecl nec) = noExtCon nec
 
 rnAnnProvenance :: AnnProvenance RdrName
                 -> RnM (AnnProvenance Name, FreeVars)
@@ -355,7 +355,7 @@ rnDefaultDecl (DefaultDecl _ tys)
        ; return (DefaultDecl noExt tys', fvs) }
   where
     doc_str = DefaultDeclCtx
-rnDefaultDecl (XDefaultDecl _) = panic "rnDefaultDecl"
+rnDefaultDecl (XDefaultDecl nec) = noExtCon nec
 
 {-
 *********************************************************
@@ -390,7 +390,7 @@ rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
         --     we add it to the free-variable list.  It might, for example,
         --     be imported from another module
 
-rnHsForeignDecl (XForeignDecl _) = panic "rnHsForeignDecl"
+rnHsForeignDecl (XForeignDecl nec) = noExtCon nec
 
 -- | For Windows DLLs we need to know what packages imported symbols are from
 --      to generate correct calls. Imported symbols are tagged with the current
@@ -437,7 +437,7 @@ rnSrcInstDecl (ClsInstD { cid_inst = cid })
        ; traceRn "rnSrcIstDecl end }" empty
        ; return (ClsInstD { cid_d_ext = noExt, cid_inst = cid' }, fvs) }
 
-rnSrcInstDecl (XInstDecl _) = panic "rnSrcInstDecl"
+rnSrcInstDecl (XInstDecl nec) = noExtCon nec
 
 -- | Warn about non-canonical typeclass instance declarations
 --
@@ -663,7 +663,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
              --     the instance context after renaming.  This is a bit
              --     strange, but should not matter (and it would be more work
              --     to remove the context).
-rnClsInstDecl (XClsInstDecl _) = panic "rnClsInstDecl"
+rnClsInstDecl (XClsInstDecl nec) = noExtCon nec
 
 rnFamInstEqn :: HsDocContext
              -> AssocTyFamInfo
@@ -752,8 +752,8 @@ rnFamInstEqn doc atfi rhs_kvars
                                    , feqn_fixity = fixity
                                    , feqn_rhs    = payload' } },
                  all_fvs) }
-rnFamInstEqn _ _ _ (HsIB _ (XFamEqn _)) _ = panic "rnFamInstEqn"
-rnFamInstEqn _ _ _ (XHsImplicitBndrs _) _ = panic "rnFamInstEqn"
+rnFamInstEqn _ _ _ (HsIB _ (XFamEqn nec)) _ = noExtCon nec
+rnFamInstEqn _ _ _ (XHsImplicitBndrs nec) _ = noExtCon nec
 
 rnTyFamInstDecl :: AssocTyFamInfo
                 -> TyFamInstDecl GhcPs
@@ -801,8 +801,8 @@ rnTyFamInstEqn atfi ctf_info
              withHsDocContext (TyFamilyCtx fam_rdr_name) $
              wrongTyFamName fam_name tycon'
        ; pure (eqn', fvs) }
-rnTyFamInstEqn _ _ (HsIB _ (XFamEqn _)) = panic "rnTyFamInstEqn"
-rnTyFamInstEqn _ _ (XHsImplicitBndrs _) = panic "rnTyFamInstEqn"
+rnTyFamInstEqn _ _ (HsIB _ (XFamEqn nec)) = noExtCon nec
+rnTyFamInstEqn _ _ (XHsImplicitBndrs nec) = noExtCon nec
 
 rnTyFamDefltDecl :: Name
                  -> TyFamDefltDecl GhcPs
@@ -819,10 +819,10 @@ rnDataFamInstDecl atfi (DataFamInstDecl { dfid_eqn = eqn@(HsIB { hsib_body =
        ; (eqn', fvs) <-
            rnFamInstEqn (TyDataCtx tycon) atfi rhs_kvs eqn rnDataDefn
        ; return (DataFamInstDecl { dfid_eqn = eqn' }, fvs) }
-rnDataFamInstDecl _ (DataFamInstDecl (HsIB _ (XFamEqn _)))
-  = panic "rnDataFamInstDecl"
-rnDataFamInstDecl _ (DataFamInstDecl (XHsImplicitBndrs _))
-  = panic "rnDataFamInstDecl"
+rnDataFamInstDecl _ (DataFamInstDecl (HsIB _ (XFamEqn nec)))
+  = noExtCon nec
+rnDataFamInstDecl _ (DataFamInstDecl (XHsImplicitBndrs nec))
+  = noExtCon nec
 
 -- Renaming of the associated types in instances.
 
@@ -977,7 +977,7 @@ rnSrcDerivDecl (DerivDecl _ ty mds overlap)
        ; return (DerivDecl noExt ty' mds' overlap, fvs) }
   where
     loc = getLoc $ hsib_body $ hswc_body ty
-rnSrcDerivDecl (XDerivDecl _) = panic "rnSrcDerivDecl"
+rnSrcDerivDecl (XDerivDecl nec) = noExtCon nec
 
 standaloneDerivErr :: SDoc
 standaloneDerivErr
@@ -999,7 +999,7 @@ rnHsRuleDecls (HsRules { rds_src = src
        ; return (HsRules { rds_ext = noExt
                          , rds_src = src
                          , rds_rules = rn_rules }, fvs) }
-rnHsRuleDecls (XRuleDecls _) = panic "rnHsRuleDecls"
+rnHsRuleDecls (XRuleDecls nec) = noExtCon nec
 
 rnHsRuleDecl :: RuleDecl GhcPs -> RnM (RuleDecl GhcRn, FreeVars)
 rnHsRuleDecl (HsRule { rd_name = rule_name
@@ -1028,9 +1028,9 @@ rnHsRuleDecl (HsRule { rd_name = rule_name
   where
     get_var (RuleBndrSig _ v _) = v
     get_var (RuleBndr _ v)      = v
-    get_var (XRuleBndr _)       = panic "rnHsRuleDecl"
+    get_var (XRuleBndr nec)     = noExtCon nec
     in_rule = text "in the rule" <+> pprFullRuleName rule_name
-rnHsRuleDecl (XRuleDecl _) = panic "rnHsRuleDecl"
+rnHsRuleDecl (XRuleDecl nec) = noExtCon nec
 
 bindRuleTmVars :: HsDocContext -> Maybe ty_bndrs
                -> [LRuleBndr GhcPs] -> [Name]
@@ -1405,7 +1405,7 @@ rnRoleAnnots tc_names role_annots
                                           (text "role annotation")
                                           tycon
            ; return $ RoleAnnotDecl noExt tycon' roles }
-    rn_role_annot1 (XRoleAnnotDecl _) = panic "rnRoleAnnots"
+    rn_role_annot1 (XRoleAnnotDecl nec) = noExtCon nec
 
 dupRoleAnnotErr :: NonEmpty (LRoleAnnotDecl GhcPs) -> RnM ()
 dupRoleAnnotErr list
@@ -1628,7 +1628,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
   where
     cls_doc  = ClassDeclCtx lcls
 
-rnTyClDecl (XTyClDecl _) = panic "rnTyClDecl"
+rnTyClDecl (XTyClDecl nec) = noExtCon nec
 
 -- Does the data type declaration include a CUSK?
 dataDeclHasCUSK :: LHsQTyVars pass -> NewOrData -> Bool -> Bool -> RnM Bool
@@ -1714,7 +1714,7 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                multipleDerivClausesErr
            ; (ds', fvs) <- mapFvRn (rnLHsDerivingClause doc) ds
            ; return (cL loc ds', fvs) }
-rnDataDefn _ (XHsDataDefn _) = panic "rnDataDefn"
+rnDataDefn _ (XHsDataDefn nec) = noExtCon nec
 
 warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)
                  -> SrcSpan
@@ -1760,9 +1760,9 @@ rnLHsDerivingClause doc
     rn_deriv_ty strat_tvs ppr_via_ty deriv_ty@(HsIB {hsib_body = dL->L loc _}) =
       rnAndReportFloatingViaTvs strat_tvs loc ppr_via_ty "class" $
       rnHsSigType doc deriv_ty
-    rn_deriv_ty _ _ (XHsImplicitBndrs _) = panic "rn_deriv_ty"
-rnLHsDerivingClause _ (dL->L _ (XHsDerivingClause _))
-  = panic "rnLHsDerivingClause"
+    rn_deriv_ty _ _ (XHsImplicitBndrs nec) = noExtCon nec
+rnLHsDerivingClause _ (dL->L _ (XHsDerivingClause nec))
+  = noExtCon nec
 rnLHsDerivingClause _ _ = panic "rnLHsDerivingClause: Impossible Match"
                                 -- due to #15884
 
@@ -1928,7 +1928,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
        = return (ClosedTypeFamily Nothing, emptyFVs)
      rn_info _ OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
      rn_info _ DataFamily     = return (DataFamily, emptyFVs)
-rnFamDecl _ (XFamilyDecl _) = panic "rnFamDecl"
+rnFamDecl _ (XFamilyDecl nec) = noExtCon nec
 
 rnFamResultSig :: HsDocContext
                -> FamilyResultSig GhcPs
@@ -1960,7 +1960,7 @@ rnFamResultSig doc (TyVarSig _ tvbndr)
                                       -- scoping checks that are irrelevant here
                           tvbndr $ \ tvbndr' ->
          return (TyVarSig noExt tvbndr', unitFV (hsLTyVarName tvbndr')) }
-rnFamResultSig _ (XFamilyResultSig _) = panic "rnFamResultSig"
+rnFamResultSig _ (XFamilyResultSig nec) = noExtCon nec
 
 -- Note [Renaming injectivity annotation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2170,7 +2170,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                        , con_doc = mb_doc' },
                   all_fvs) } }
 
-rnConDecl (XConDecl _) = panic "rnConDecl"
+rnConDecl (XConDecl nec) = noExtCon nec
 
 
 rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)
@@ -2365,9 +2365,9 @@ add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD _ d) ds
   = addl (gp { hs_ruleds = cL l d : ts }) ds
 add gp l (DocD _ d) ds
   = addl (gp { hs_docs = (cL l d) : (hs_docs gp) })  ds
-add (HsGroup {}) _ (SpliceD _ (XSpliceDecl _)) _ = panic "RnSource.add"
-add (HsGroup {}) _ (XHsDecl _)                 _ = panic "RnSource.add"
-add (XHsGroup _) _ _                           _ = panic "RnSource.add"
+add (HsGroup {}) _ (SpliceD _ (XSpliceDecl nec)) _ = noExtCon nec
+add (HsGroup {}) _ (XHsDecl nec)                 _ = noExtCon nec
+add (XHsGroup nec) _ _                           _ = noExtCon nec
 
 add_tycld :: LTyClDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
           -> [TyClGroup (GhcPass p)]
@@ -2379,7 +2379,7 @@ add_tycld d []       = [TyClGroup { group_ext    = noExt
                        ]
 add_tycld d (ds@(TyClGroup { group_tyclds = tyclds }):dss)
   = ds { group_tyclds = d : tyclds } : dss
-add_tycld _ (XTyClGroup _: _) = panic "add_tycld"
+add_tycld _ (XTyClGroup nec: _) = noExtCon nec
 
 add_instd :: LInstDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
           -> [TyClGroup (GhcPass p)]
@@ -2391,7 +2391,7 @@ add_instd d []       = [TyClGroup { group_ext    = noExt
                        ]
 add_instd d (ds@(TyClGroup { group_instds = instds }):dss)
   = ds { group_instds = d : instds } : dss
-add_instd _ (XTyClGroup _: _) = panic "add_instd"
+add_instd _ (XTyClGroup nec: _) = noExtCon nec
 
 add_role_annot :: LRoleAnnotDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
                -> [TyClGroup (GhcPass p)]
@@ -2403,7 +2403,7 @@ add_role_annot d [] = [TyClGroup { group_ext    = noExt
                       ]
 add_role_annot d (tycls@(TyClGroup { group_roles = roles }) : rest)
   = tycls { group_roles = d : roles } : rest
-add_role_annot _ (XTyClGroup _: _) = panic "add_role_annot"
+add_role_annot _ (XTyClGroup nec: _) = noExtCon nec
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
 add_bind b (ValBinds x bs sigs) = ValBinds x (bs `snocBag` b) sigs

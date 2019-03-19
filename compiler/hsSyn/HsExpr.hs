@@ -736,7 +736,7 @@ type instance XTick          (GhcPass _) = NoExt
 type instance XBinTick       (GhcPass _) = NoExt
 type instance XTickPragma    (GhcPass _) = NoExt
 type instance XWrap          (GhcPass _) = NoExt
-type instance XXExpr         (GhcPass _) = NoExt
+type instance XXExpr         (GhcPass _) = NoExtCon
 
 -- ---------------------------------------------------------------------
 
@@ -763,7 +763,7 @@ type instance XMissing         GhcPs = NoExt
 type instance XMissing         GhcRn = NoExt
 type instance XMissing         GhcTc = Type
 
-type instance XXTupArg         (GhcPass _) = NoExt
+type instance XXTupArg         (GhcPass _) = NoExtCon
 
 tupArgPresent :: LHsTupArg id -> Bool
 tupArgPresent (L _ (Present {})) = True
@@ -1315,7 +1315,7 @@ type instance XCmdDo      GhcRn = NoExt
 type instance XCmdDo      GhcTc = Type
 
 type instance XCmdWrap    (GhcPass _) = NoExt
-type instance XXCmd       (GhcPass _) = NoExt
+type instance XXCmd       (GhcPass _) = NoExtCon
 
 -- | Haskell Array Application Type
 data HsArrAppType = HsHigherOrderApp | HsFirstOrderApp
@@ -1345,7 +1345,7 @@ type instance XCmdTop  GhcPs = NoExt
 type instance XCmdTop  GhcRn = CmdSyntaxTable GhcRn -- See Note [CmdSyntaxTable]
 type instance XCmdTop  GhcTc = CmdTopTc
 
-type instance XXCmdTop (GhcPass _) = NoExt
+type instance XXCmdTop (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmd p) where
     ppr cmd = pprCmd cmd
@@ -1495,7 +1495,7 @@ type instance XMG         GhcPs b = NoExt
 type instance XMG         GhcRn b = NoExt
 type instance XMG         GhcTc b = MatchGroupTc
 
-type instance XXMatchGroup (GhcPass _) b = NoExt
+type instance XXMatchGroup (GhcPass _) b = NoExtCon
 
 -- | Located Match
 type LMatch id body = Located (Match id body)
@@ -1514,7 +1514,7 @@ data Match p body
   | XMatch (XXMatch p body)
 
 type instance XCMatch (GhcPass _) b = NoExt
-type instance XXMatch (GhcPass _) b = NoExt
+type instance XXMatch (GhcPass _) b = NoExtCon
 
 instance (idR ~ GhcPass pr, OutputableBndrId idR, Outputable body)
             => Outputable (Match idR body) where
@@ -1564,7 +1564,7 @@ isInfixMatch match = case m_ctxt match of
 
 isEmptyMatchGroup :: MatchGroup id body -> Bool
 isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
-isEmptyMatchGroup (XMatchGroup{}) = panic "isEmptyMatchGroup"
+isEmptyMatchGroup (XMatchGroup {})      = False
 
 -- | Is there only one RHS in this list of matches?
 isSingletonMatchGroup :: [LMatch id body] -> Bool
@@ -1575,17 +1575,17 @@ isSingletonMatchGroup matches
   | otherwise
   = False
 
-matchGroupArity :: MatchGroup id body -> Arity
+matchGroupArity :: MatchGroup (GhcPass id) body -> Arity
 -- Precondition: MatchGroup is non-empty
 -- This is called before type checking, when mg_arg_tys is not set
 matchGroupArity (MG { mg_alts = alts })
   | L _ (alt1:_) <- alts = length (hsLMatchPats alt1)
   | otherwise        = panic "matchGroupArity"
-matchGroupArity (XMatchGroup{}) = panic "matchGroupArity"
+matchGroupArity (XMatchGroup nec) = noExtCon nec
 
-hsLMatchPats :: LMatch id body -> [LPat id]
+hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
 hsLMatchPats (L _ (Match { m_pats = pats })) = pats
-hsLMatchPats (L _ (XMatch _)) = panic "hsLMatchPats"
+hsLMatchPats (L _ (XMatch nec)) = noExtCon nec
 
 -- | Guarded Right-Hand Sides
 --
@@ -1606,7 +1606,7 @@ data GRHSs p body
   | XGRHSs (XXGRHSs p body)
 
 type instance XCGRHSs (GhcPass _) b = NoExt
-type instance XXGRHSs (GhcPass _) b = NoExt
+type instance XXGRHSs (GhcPass _) b = NoExtCon
 
 -- | Located Guarded Right-Hand Side
 type LGRHS id body = Located (GRHS id body)
@@ -1618,7 +1618,7 @@ data GRHS p body = GRHS (XCGRHS p body)
                   | XGRHS (XXGRHS p body)
 
 type instance XCGRHS (GhcPass _) b = NoExt
-type instance XXGRHS (GhcPass _) b = NoExt
+type instance XXGRHS (GhcPass _) b = NoExtCon
 
 -- We know the list must have at least one @Match@ in it.
 
@@ -1915,7 +1915,7 @@ type instance XRecStmt         (GhcPass _) GhcPs b = NoExt
 type instance XRecStmt         (GhcPass _) GhcRn b = NoExt
 type instance XRecStmt         (GhcPass _) GhcTc b = RecStmtTc
 
-type instance XXStmtLR         (GhcPass _) (GhcPass _) b = NoExt
+type instance XXStmtLR         (GhcPass _) (GhcPass _) b = NoExtCon
 
 data TransForm   -- The 'f' below is the 'using' function, 'e' is the by function
   = ThenForm     -- then f               or    then f by e             (depending on trS_by)
@@ -1932,7 +1932,7 @@ data ParStmtBlock idL idR
   | XParStmtBlock (XXParStmtBlock idL idR)
 
 type instance XParStmtBlock  (GhcPass pL) (GhcPass pR) = NoExt
-type instance XXParStmtBlock (GhcPass pL) (GhcPass pR) = NoExt
+type instance XXParStmtBlock (GhcPass pL) (GhcPass pR) = NoExtCon
 
 -- | Applicative Argument
 data ApplicativeArg idL
@@ -1953,7 +1953,7 @@ data ApplicativeArg idL
 
 type instance XApplicativeArgOne  (GhcPass _) = NoExt
 type instance XApplicativeArgMany (GhcPass _) = NoExt
-type instance XXApplicativeArg    (GhcPass _) = NoExt
+type instance XXApplicativeArg    (GhcPass _) = NoExtCon
 
 {-
 Note [The type of bind in Stmts]
@@ -2184,7 +2184,7 @@ pprStmt (ApplicativeStmt _ args mb_join)
              :: ExprStmt (GhcPass idL))]
    flattenArg (_, ApplicativeArgMany _ stmts _ _) =
      concatMap flattenStmt stmts
-   flattenArg (_, XApplicativeArg _) = panic "flattenArg"
+   flattenArg (_, XApplicativeArg nec) = noExtCon nec
 
    pp_debug =
      let
@@ -2312,7 +2312,7 @@ type instance XTypedSplice   (GhcPass _) = NoExt
 type instance XUntypedSplice (GhcPass _) = NoExt
 type instance XQuasiQuote    (GhcPass _) = NoExt
 type instance XSpliced       (GhcPass _) = NoExt
-type instance XXSplice       (GhcPass _) = NoExt
+type instance XXSplice       (GhcPass _) = NoExtCon
 
 -- | A splice can appear with various decorations wrapped around it. This data
 -- type captures explicitly how it was originally written, for use in the pretty
@@ -2522,7 +2522,7 @@ type instance XDecBrG     (GhcPass _) = NoExt
 type instance XTypBr      (GhcPass _) = NoExt
 type instance XVarBr      (GhcPass _) = NoExt
 type instance XTExpBr     (GhcPass _) = NoExt
-type instance XXBracket   (GhcPass _) = NoExt
+type instance XXBracket   (GhcPass _) = NoExtCon
 
 isTypedBracket :: HsBracket id -> Bool
 isTypedBracket (TExpBr {}) = True

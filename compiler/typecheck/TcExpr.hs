@@ -1419,7 +1419,7 @@ tcTupArgs args tys
     go (L l (Missing {}),   arg_ty) = return (L l (Missing arg_ty))
     go (L l (Present x expr), arg_ty) = do { expr' <- tcPolyExpr expr arg_ty
                                            ; return (L l (Present x expr')) }
-    go (L _ (XTupArg{}), _) = panic "tcTupArgs"
+    go (L _ (XTupArg nec), _) = noExtCon nec
 
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary
@@ -1736,7 +1736,7 @@ tcCheckRecSelId rn_expr (Ambiguous _ lbl) res_ty
       Just (arg, _) -> do { sel_name <- disambiguateSelector lbl arg
                           ; tcCheckRecSelId rn_expr (Unambiguous sel_name lbl)
                                                     res_ty }
-tcCheckRecSelId _ (XAmbiguousFieldOcc _) _ = panic "tcCheckRecSelId"
+tcCheckRecSelId _ (XAmbiguousFieldOcc nec) _ = noExtCon nec
 
 ------------------------
 tcInferRecSelId :: AmbiguousFieldOcc GhcRn -> TcM (HsExpr GhcTcId, TcRhoType)
@@ -1745,7 +1745,7 @@ tcInferRecSelId (Unambiguous sel (L _ lbl))
        ; return (expr', ty) }
 tcInferRecSelId (Ambiguous _ lbl)
   = ambiguousSelector lbl
-tcInferRecSelId (XAmbiguousFieldOcc _) = panic "tcInferRecSelId"
+tcInferRecSelId (XAmbiguousFieldOcc nec) = noExtCon nec
 
 ------------------------
 tcInferId :: Name -> TcM (HsExpr GhcTcId, TcSigmaType)
@@ -1970,7 +1970,7 @@ too_many_args fun args
   where
     pp (HsValArg e)                             = ppr e
     pp (HsTypeArg _ (HsWC { hswc_body = L _ t })) = pprHsType t
-    pp (HsTypeArg _ (XHsWildCardBndrs _)) = panic "too_many_args"
+    pp (HsTypeArg _ (XHsWildCardBndrs nec)) = noExtCon nec
     pp (HsArgPar _) = empty
 
 
@@ -2446,7 +2446,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
            ; return Nothing }
   where
         field_lbl = occNameFS $ rdrNameOcc (unLoc lbl)
-tcRecordField _ _ (L _ (XFieldOcc _)) _ = panic "tcRecordField"
+tcRecordField _ _ (L _ (XFieldOcc nec)) _ = noExtCon nec
 
 
 checkMissingFields ::  ConLike -> HsRecordBinds GhcRn -> TcM ()

@@ -219,7 +219,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
        ; return (MG { mg_alts = L l matches'
                     , mg_ext = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
-tcMatches _ _ _ (XMatchGroup {}) = panic "tcMatches"
+tcMatches _ _ _ (XMatchGroup nec) = noExtCon nec
 
 -------------
 tcMatch :: (Outputable (body GhcRn)) => TcMatchCtxt body
@@ -239,7 +239,7 @@ tcMatch ctxt pat_tys rhs_ty match
            ; return (Match { m_ext = noExt
                            , m_ctxt = mc_what ctxt, m_pats = pats'
                            , m_grhss = grhss' }) }
-    tc_match  _ _ _ (XMatch _) = panic "tcMatch"
+    tc_match  _ _ _ (XMatch nec) = noExtCon nec
 
         -- For (\x -> e), tcExpr has already said "In the expression \x->e"
         -- so we don't want to add "In the lambda abstraction \x->e"
@@ -264,7 +264,7 @@ tcGRHSs ctxt (GRHSs _ grhss (L l binds)) res_ty
                mapM (wrapLocM (tcGRHS ctxt res_ty)) grhss
 
         ; return (GRHSs noExt grhss' (L l binds')) }
-tcGRHSs _ (XGRHSs _) _ = panic "tcGRHSs"
+tcGRHSs _ (XGRHSs nec) _ = noExtCon nec
 
 -------------
 tcGRHS :: TcMatchCtxt body -> ExpRhoType -> GRHS GhcRn (Located (body GhcRn))
@@ -277,7 +277,7 @@ tcGRHS ctxt res_ty (GRHS _ guards rhs)
         ; return (GRHS noExt guards' rhs') }
   where
     stmt_ctxt  = PatGuard (mc_what ctxt)
-tcGRHS _ _ (XGRHS _) = panic "tcGRHS"
+tcGRHS _ _ (XGRHS nec) = noExtCon nec
 
 {-
 ************************************************************************
@@ -467,7 +467,7 @@ tcLcStmt m_tc ctxt (ParStmt _ bndr_stmts_s _ _) elt_ty thing_inside
                       ; (pairs', thing) <- loop pairs
                       ; return (ids, pairs', thing) }
            ; return ( ParStmtBlock x stmts' ids noSyntaxExpr : pairs', thing ) }
-    loop (XParStmtBlock{}:_) = panic "tcLcStmt"
+    loop (XParStmtBlock nec:_) = noExtCon nec
 
 tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
                               , trS_bndrs =  bindersMap
@@ -1034,12 +1034,12 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                   }
            ; return (ApplicativeArgMany x stmts' ret' pat') }
 
-    goArg (XApplicativeArg _, _, _) = panic "tcApplicativeStmts"
+    goArg (XApplicativeArg nec, _, _) = noExtCon nec
 
     get_arg_bndrs :: ApplicativeArg GhcTcId -> [Id]
     get_arg_bndrs (ApplicativeArgOne _ pat _ _)  = collectPatBinders pat
     get_arg_bndrs (ApplicativeArgMany _ _ _ pat) = collectPatBinders pat
-    get_arg_bndrs (XApplicativeArg _)            = panic "tcApplicativeStmts"
+    get_arg_bndrs (XApplicativeArg nec)          = noExtCon nec
 
 
 {- Note [ApplicativeDo and constraints]
@@ -1096,5 +1096,5 @@ checkArgs fun (MG { mg_alts = L _ (match1:matches) })
 
     args_in_match :: LMatch GhcRn body -> Int
     args_in_match (L _ (Match { m_pats = pats })) = length pats
-    args_in_match (L _ (XMatch _)) = panic "checkArgs"
-checkArgs _ (XMatchGroup{}) = panic "checkArgs"
+    args_in_match (L _ (XMatch nec)) = noExtCon nec
+checkArgs _ (XMatchGroup nec) = noExtCon nec

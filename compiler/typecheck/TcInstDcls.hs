@@ -461,7 +461,7 @@ tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
   = do { (insts, fam_insts, deriv_infos) <- tcClsInstDecl (L loc decl)
        ; return (insts, fam_insts, deriv_infos) }
 
-tcLocalInstDecl (L _ (XInstDecl _)) = panic "tcLocalInstDecl"
+tcLocalInstDecl (L _ (XInstDecl nec)) = noExtCon nec
 
 tcClsInstDecl :: LClsInstDecl GhcRn
               -> TcM ([InstInfo GhcRn], [FamInst], [DerivInfo])
@@ -538,7 +538,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                                         . dfid_eqn
                                         . unLoc) adts)
 
-tcClsInstDecl (L _ (XClsInstDecl _)) = panic "tcClsInstDecl"
+tcClsInstDecl (L _ (XClsInstDecl nec)) = noExtCon nec
 
 {-
 ************************************************************************

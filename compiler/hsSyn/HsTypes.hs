@@ -338,7 +338,7 @@ type instance XHsQTvs GhcPs = NoExt
 type instance XHsQTvs GhcRn = HsQTvsRn
 type instance XHsQTvs GhcTc = HsQTvsRn
 
-type instance XXLHsQTyVars  (GhcPass _) = NoExt
+type instance XXLHsQTyVars  (GhcPass _) = NoExtCon
 
 mkHsQTvs :: [LHsTyVarBndr GhcPs] -> LHsQTyVars GhcPs
 mkHsQTvs tvs = HsQTvs { hsq_ext = noExt, hsq_explicit = tvs }
@@ -376,7 +376,7 @@ type instance XHsIB              GhcPs _ = NoExt
 type instance XHsIB              GhcRn _ = [Name]
 type instance XHsIB              GhcTc _ = [Name]
 
-type instance XXHsImplicitBndrs  (GhcPass _) _ = NoExt
+type instance XXHsImplicitBndrs  (GhcPass _) _ = NoExtCon
 
 -- | Haskell Wildcard Binders
 data HsWildCardBndrs pass thing
@@ -398,7 +398,7 @@ type instance XHsWC              GhcPs b = NoExt
 type instance XHsWC              GhcRn b = [Name]
 type instance XHsWC              GhcTc b = [Name]
 
-type instance XXHsWildCardBndrs  (GhcPass _) b = NoExt
+type instance XXHsWildCardBndrs  (GhcPass _) b = NoExtCon
 
 -- | Located Haskell Signature Type
 type LHsSigType   pass = HsImplicitBndrs pass (LHsType pass)    -- Implicit only
@@ -411,11 +411,11 @@ type LHsSigWcType pass = HsWildCardBndrs pass (LHsSigType pass) -- Both
 
 -- See Note [Representing type signatures]
 
-hsImplicitBody :: HsImplicitBndrs pass thing -> thing
+hsImplicitBody :: HsImplicitBndrs (GhcPass p) thing -> thing
 hsImplicitBody (HsIB { hsib_body = body }) = body
-hsImplicitBody (XHsImplicitBndrs _) = panic "hsImplicitBody"
+hsImplicitBody (XHsImplicitBndrs nec) = noExtCon nec
 
-hsSigType :: LHsSigType pass -> LHsType pass
+hsSigType :: LHsSigType (GhcPass p) -> LHsType (GhcPass p)
 hsSigType = hsImplicitBody
 
 hsSigWcType :: LHsSigWcType pass -> LHsType pass
@@ -504,13 +504,13 @@ data HsTyVarBndr pass
 
 type instance XUserTyVar    (GhcPass _) = NoExt
 type instance XKindedTyVar  (GhcPass _) = NoExt
-type instance XXTyVarBndr   (GhcPass _) = NoExt
+type instance XXTyVarBndr   (GhcPass _) = NoExtCon
 
 -- | Does this 'HsTyVarBndr' come with an explicit kind annotation?
 isHsKindedTyVar :: HsTyVarBndr pass -> Bool
 isHsKindedTyVar (UserTyVar {})   = False
 isHsKindedTyVar (KindedTyVar {}) = True
-isHsKindedTyVar (XTyVarBndr{})   = panic "isHsKindedTyVar"
+isHsKindedTyVar (XTyVarBndr {})  = False
 
 -- | Do all type variables in this 'LHsQTyVars' come with kind annotations?
 hsTvbAllKinded :: LHsQTyVars pass -> Bool
@@ -891,7 +891,7 @@ data ConDeclField pass  -- Record fields have Haddoc docs on them
   | XConDeclField (XXConDeclField pass)
 
 type instance XConDeclField  (GhcPass _) = NoExt
-type instance XXConDeclField (GhcPass _) = NoExt
+type instance XXConDeclField (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (ConDeclField p) where
@@ -962,8 +962,8 @@ hsWcScopedTvs sig_ty
                -- include kind variables only if the type is headed by forall
                -- (this is consistent with GHC 7 behaviour)
       _                                    -> nwcs
-hsWcScopedTvs (HsWC _ (XHsImplicitBndrs _)) = panic "hsWcScopedTvs"
-hsWcScopedTvs (XHsWildCardBndrs _) = panic "hsWcScopedTvs"
+hsWcScopedTvs (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
+hsWcScopedTvs (XHsWildCardBndrs nec) = noExtCon nec
 
 hsScopedTvs :: LHsSigType GhcRn -> [Name]
 -- Same as hsWcScopedTvs, but for a LHsSigType
@@ -989,18 +989,18 @@ I don't know if this is a good idea, but there it is.
 -}
 
 ---------------------
-hsTyVarName :: HsTyVarBndr pass -> IdP pass
+hsTyVarName :: HsTyVarBndr (GhcPass p) -> IdP (GhcPass p)
 hsTyVarName (UserTyVar _ (L _ n))     = n
 hsTyVarName (KindedTyVar _ (L _ n) _) = n
-hsTyVarName (XTyVarBndr{}) = panic "hsTyVarName"
+hsTyVarName (XTyVarBndr nec) = noExtCon nec
 
-hsLTyVarName :: LHsTyVarBndr pass -> IdP pass
+hsLTyVarName :: LHsTyVarBndr (GhcPass p) -> IdP (GhcPass p)
 hsLTyVarName = hsTyVarName . unLoc
 
-hsLTyVarNames :: [LHsTyVarBndr pass] -> [IdP pass]
+hsLTyVarNames :: [LHsTyVarBndr (GhcPass p)] -> [IdP (GhcPass p)]
 hsLTyVarNames = map hsLTyVarName
 
-hsExplicitLTyVarNames :: LHsQTyVars pass -> [IdP pass]
+hsExplicitLTyVarNames :: LHsQTyVars (GhcPass p) -> [IdP (GhcPass p)]
 -- Explicit variables only
 hsExplicitLTyVarNames qtvs = map hsLTyVarName (hsQTvExplicit qtvs)
 
@@ -1009,12 +1009,12 @@ hsAllLTyVarNames :: LHsQTyVars GhcRn -> [Name]
 hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
                          , hsq_explicit = tvs })
   = kvs ++ hsLTyVarNames tvs
-hsAllLTyVarNames (XLHsQTyVars _) = panic "hsAllLTyVarNames"
+hsAllLTyVarNames (XLHsQTyVars nec) = noExtCon nec
 
-hsLTyVarLocName :: LHsTyVarBndr pass -> Located (IdP pass)
+hsLTyVarLocName :: LHsTyVarBndr (GhcPass p) -> Located (IdP (GhcPass p))
 hsLTyVarLocName = onHasSrcSpan hsTyVarName
 
-hsLTyVarLocNames :: LHsQTyVars pass -> [Located (IdP pass)]
+hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [Located (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 
 -- | Convert a LHsTyVarBndr to an equivalent LHsType.
@@ -1024,13 +1024,13 @@ hsLTyVarBndrToType = onHasSrcSpan cvt
         cvt (KindedTyVar _ (L name_loc n) kind)
           = HsKindSig noExt
                    (L name_loc (HsTyVar noExt NotPromoted (L name_loc n))) kind
-        cvt (XTyVarBndr{}) = panic "hsLTyVarBndrToType"
+        cvt (XTyVarBndr nec) = noExtCon nec
 
 -- | Convert a LHsTyVarBndrs to a list of types.
 -- Works on *type* variable only, no kind vars.
 hsLTyVarBndrsToTypes :: LHsQTyVars (GhcPass p) -> [LHsType (GhcPass p)]
 hsLTyVarBndrsToTypes (HsQTvs { hsq_explicit = tvbs }) = map hsLTyVarBndrToType tvbs
-hsLTyVarBndrsToTypes (XLHsQTyVars _) = panic "hsLTyVarBndrsToTypes"
+hsLTyVarBndrsToTypes (XLHsQTyVars nec) = noExtCon nec
 
 ---------------------
 ignoreParens :: LHsType pass -> LHsType pass
@@ -1270,9 +1270,9 @@ splitLHsInstDeclTy (HsIB { hsib_ext = itkvs
   = (itkvs ++ hsLTyVarNames tvs, cxt, body_ty)
          -- Return implicitly bound type and kind vars
          -- For an instance decl, all of them are in scope
-splitLHsInstDeclTy (XHsImplicitBndrs _) = panic "splitLHsInstDeclTy"
+splitLHsInstDeclTy (XHsImplicitBndrs nec) = noExtCon nec
 
-getLHsInstDeclHead :: LHsSigType pass -> LHsType pass
+getLHsInstDeclHead :: LHsSigType (GhcPass p) -> LHsType (GhcPass p)
 getLHsInstDeclHead inst_ty
   | (_tvs, _cxt, body_ty) <- splitLHsSigmaTyInvis (hsSigType inst_ty)
   = body_ty
@@ -1315,7 +1315,7 @@ type instance XCFieldOcc GhcPs = NoExt
 type instance XCFieldOcc GhcRn = Name
 type instance XCFieldOcc GhcTc = Id
 
-type instance XXFieldOcc (GhcPass _) = NoExt
+type instance XXFieldOcc (GhcPass _) = NoExtCon
 
 instance Outputable (FieldOcc pass) where
   ppr = ppr . rdrNameFieldOcc
@@ -1349,7 +1349,7 @@ type instance XAmbiguous GhcPs = NoExt
 type instance XAmbiguous GhcRn = NoExt
 type instance XAmbiguous GhcTc = Id
 
-type instance XXAmbiguousFieldOcc (GhcPass _) = NoExt
+type instance XXAmbiguousFieldOcc (GhcPass _) = NoExtCon
 
 instance p ~ GhcPass pass => Outputable (AmbiguousFieldOcc p) where
   ppr = ppr . rdrNameAmbiguousFieldOcc
@@ -1364,23 +1364,23 @@ mkAmbiguousFieldOcc rdr = Unambiguous noExt rdr
 rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc (GhcPass p) -> RdrName
 rdrNameAmbiguousFieldOcc (Unambiguous _ (L _ rdr)) = rdr
 rdrNameAmbiguousFieldOcc (Ambiguous   _ (L _ rdr)) = rdr
-rdrNameAmbiguousFieldOcc (XAmbiguousFieldOcc _)
-  = panic "rdrNameAmbiguousFieldOcc"
+rdrNameAmbiguousFieldOcc (XAmbiguousFieldOcc nec)
+  = noExtCon nec
 
 selectorAmbiguousFieldOcc :: AmbiguousFieldOcc GhcTc -> Id
 selectorAmbiguousFieldOcc (Unambiguous sel _) = sel
 selectorAmbiguousFieldOcc (Ambiguous   sel _) = sel
-selectorAmbiguousFieldOcc (XAmbiguousFieldOcc _)
-  = panic "selectorAmbiguousFieldOcc"
+selectorAmbiguousFieldOcc (XAmbiguousFieldOcc nec)
+  = noExtCon nec
 
 unambiguousFieldOcc :: AmbiguousFieldOcc GhcTc -> FieldOcc GhcTc
 unambiguousFieldOcc (Unambiguous rdr sel) = FieldOcc rdr sel
 unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
-unambiguousFieldOcc (XAmbiguousFieldOcc _) = panic "unambiguousFieldOcc"
+unambiguousFieldOcc (XAmbiguousFieldOcc nec) = noExtCon nec
 
 ambiguousFieldOcc :: FieldOcc GhcTc -> AmbiguousFieldOcc GhcTc
 ambiguousFieldOcc (FieldOcc sel rdr) = Unambiguous sel rdr
-ambiguousFieldOcc (XFieldOcc _) = panic "ambiguousFieldOcc"
+ambiguousFieldOcc (XFieldOcc nec) = noExtCon nec
 
 {-
 ************************************************************************

@@ -693,7 +693,7 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mbl_deriv_strat overlap_mode))
                  bale_out $
                  text "The last argument of the instance must be a data or newtype application"
         }
-deriveStandalone (L _ (XDerivDecl _)) = panic "deriveStandalone"
+deriveStandalone (L _ (XDerivDecl nec)) = noExtCon nec
 
 -- Typecheck the type in a standalone deriving declaration.
 --
@@ -738,10 +738,10 @@ tcStandaloneDerivInstType ctxt
        let (tvs, theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
        pure (tvs, SupplyContext theta, cls, inst_tys)
 
-tcStandaloneDerivInstType _ (HsWC _ (XHsImplicitBndrs _))
-  = panic "tcStandaloneDerivInstType"
-tcStandaloneDerivInstType _ (XHsWildCardBndrs _)
-  = panic "tcStandaloneDerivInstType"
+tcStandaloneDerivInstType _ (HsWC _ (XHsImplicitBndrs nec))
+  = noExtCon nec
+tcStandaloneDerivInstType _ (XHsWildCardBndrs nec)
+  = noExtCon nec
 
 warnUselessTypeable :: TcM ()
 warnUselessTypeable

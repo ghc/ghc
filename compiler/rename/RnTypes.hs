@@ -137,10 +137,10 @@ rn_hs_sig_wc_type scoping ctxt
                             , hsib_body = hs_ty' }
        ; (res, fvs2) <- thing_inside sig_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
-rn_hs_sig_wc_type _ _ (HsWC _ (XHsImplicitBndrs _)) _
-  = panic "rn_hs_sig_wc_type"
-rn_hs_sig_wc_type _ _ (XHsWildCardBndrs _) _
-  = panic "rn_hs_sig_wc_type"
+rn_hs_sig_wc_type _ _ (HsWC _ (XHsImplicitBndrs nec)) _
+  = noExtCon nec
+rn_hs_sig_wc_type _ _ (XHsWildCardBndrs nec) _
+  = noExtCon nec
 
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeVars)
 rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
@@ -149,7 +149,7 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
        ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
-rnHsWcType _ (XHsWildCardBndrs _) = panic "rnHsWcType"
+rnHsWcType _ (XHsWildCardBndrs nec) = noExtCon nec
 
 rnWcBody :: HsDocContext -> [Located RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
@@ -307,7 +307,7 @@ rnHsSigType ctx (HsIB { hsib_body = hs_ty })
        ; return ( HsIB { hsib_ext = vars
                        , hsib_body = body' }
                 , fvs ) } }
-rnHsSigType _ (XHsImplicitBndrs _) = panic "rnHsSigType"
+rnHsSigType _ (XHsImplicitBndrs nec) = noExtCon nec
 
 rnImplicitBndrs :: Bool    -- True <=> bring into scope any free type variables
                            -- E.g.  f :: forall a. a->b
@@ -1000,7 +1000,7 @@ bindLHsTyVarBndr doc mb_assoc (dL->L loc (KindedTyVar x lrdr@(dL->L lv _) kind))
                $ thing_inside (cL loc (KindedTyVar x (cL lv tv_nm) kind'))
            ; return (b, fvs1 `plusFV` fvs2) }
 
-bindLHsTyVarBndr _ _ (dL->L _ (XTyVarBndr{})) _ = panic "bindLHsTyVarBndr"
+bindLHsTyVarBndr _ _ (dL->L _ (XTyVarBndr nec)) _ = noExtCon nec
 bindLHsTyVarBndr _ _ _ _ = panic "bindLHsTyVarBndr: Impossible Match"
                              -- due to #15884
 
@@ -1051,8 +1051,8 @@ rnField fl_env env (dL->L l (ConDeclField _ names ty haddock_doc))
       where
         lbl = occNameFS $ rdrNameOcc rdr
         fl  = expectJust "rnField" $ lookupFsEnv fl_env lbl
-    lookupField (XFieldOcc{}) = panic "rnField"
-rnField _ _ (dL->L _ (XConDeclField _)) = panic "rnField"
+    lookupField (XFieldOcc nec) = noExtCon nec
+rnField _ _ (dL->L _ (XConDeclField nec)) = noExtCon nec
 rnField _ _ _ = panic "rnField: Impossible Match"
                              -- due to #15884
 
@@ -1296,7 +1296,7 @@ checkPrecMatch op (MG { mg_alts = (dL->L _ ms) })
         -- but the second eqn has no args (an error, but not discovered
         -- until the type checker).  So we don't want to crash on the
         -- second eqn.
-checkPrecMatch _ (XMatchGroup {}) = panic "checkPrecMatch"
+checkPrecMatch _ (XMatchGroup nec) = noExtCon nec
 
 checkPrec :: Name -> Pat GhcRn -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
 checkPrec op (ConPatIn op1 (InfixCon _ _)) right = do
@@ -1677,7 +1677,7 @@ extractRdrKindSigVars (dL->L _ resultSig)
 extractDataDefnKindVars :: HsDataDefn GhcPs ->  FreeKiTyVarsNoDups
 extractDataDefnKindVars (HsDataDefn { dd_kindSig = ksig })
   = maybe [] extractHsTyRdrTyVars ksig
-extractDataDefnKindVars (XHsDataDefn _) = panic "extractDataDefnKindVars"
+extractDataDefnKindVars (XHsDataDefn nec) = noExtCon nec
 
 extract_lctxt :: LHsContext GhcPs
               -> FreeKiTyVarsWithDups -> FreeKiTyVarsWithDups

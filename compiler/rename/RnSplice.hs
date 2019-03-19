@@ -180,7 +180,7 @@ rn_bracket _ (DecBrG {}) = panic "rn_bracket: unexpected DecBrG"
 rn_bracket _ (TExpBr x e) = do { (e', fvs) <- rnLExpr e
                                ; return (TExpBr x e', fvs) }
 
-rn_bracket _ (XBracket {}) = panic "rn_bracket: unexpected XBracket"
+rn_bracket _ (XBracket nec) = noExtCon nec
 
 quotationCtxtDoc :: HsBracket GhcPs -> SDoc
 quotationCtxtDoc br_body
@@ -303,7 +303,7 @@ runRnSplice flavour run_meta ppr_res splice
                 HsTypedSplice {}          -> pprPanic "runRnSplice" (ppr splice)
                 HsSpliced {}              -> pprPanic "runRnSplice" (ppr splice)
                 HsSplicedT {}             -> pprPanic "runRnSplice" (ppr splice)
-                XSplice {}                -> pprPanic "runRnSplice" (ppr splice)
+                XSplice nec               -> noExtCon nec
 
              -- Typecheck the expression
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
@@ -352,8 +352,8 @@ makePending _ splice@(HsSpliced {})
   = pprPanic "makePending" (ppr splice)
 makePending _ splice@(HsSplicedT {})
   = pprPanic "makePending" (ppr splice)
-makePending _ splice@(XSplice {})
-  = pprPanic "makePending" (ppr splice)
+makePending _ (XSplice nec)
+  = noExtCon nec
 
 ------------------
 mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name -> SrcSpan -> FastString
@@ -404,7 +404,7 @@ rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
 
 rnSplice splice@(HsSpliced {}) = pprPanic "rnSplice" (ppr splice)
 rnSplice splice@(HsSplicedT {}) = pprPanic "rnSplice" (ppr splice)
-rnSplice splice@(XSplice {})   = pprPanic "rnSplice" (ppr splice)
+rnSplice        (XSplice nec)   = noExtCon nec
 
 ---------------------
 rnSpliceExpr :: HsSplice GhcPs -> RnM (HsExpr GhcRn, FreeVars)
@@ -635,8 +635,8 @@ rnSpliceDecl (SpliceDecl _ (dL->L loc splice) flg)
        = ( makePending UntypedDeclSplice rn_splice
          , SpliceDecl noExt (cL loc rn_splice) flg)
 
-    run_decl_splice rn_splice = pprPanic "rnSpliceDecl" (ppr rn_splice)
-rnSpliceDecl (XSpliceDecl _) = panic "rnSpliceDecl"
+    run_decl_splice rn_splice  = pprPanic "rnSpliceDecl" (ppr rn_splice)
+rnSpliceDecl (XSpliceDecl nec) = noExtCon nec
 
 rnTopSpliceDecls :: HsSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeVars)
 -- Declaration splice at the very top level of the module

@@ -122,7 +122,7 @@ ppSourceStats short (dL->L _ (HsModule _ exports imports ldecls _ _))
     import_info (dL->L _ (ImportDecl { ideclSafe = safe, ideclQualified = qual
                                      , ideclAs = as, ideclHiding = spec }))
         = add7 (1, safe_info safe, qual_info qual, as_info as, 0,0,0) (spec_info spec)
-    import_info (dL->L _ (XImportDecl _)) = panic "import_info"
+    import_info (dL->L _ (XImportDecl nec)) = noExtCon nec
     import_info _ = panic " import_info: Impossible Match"
                              -- due to #15884
 
@@ -163,8 +163,8 @@ ppSourceStats short (dL->L _ (HsModule _ exports imports ldecls _ _))
                    ss, is, length ats, length adts)
       where
         methods = map unLoc $ bagToList inst_meths
-    inst_info (ClsInstD _ (XClsInstDecl _)) = panic "inst_info"
-    inst_info (XInstDecl _)                 = panic "inst_info"
+    inst_info (ClsInstD _ (XClsInstDecl nec)) = noExtCon nec
+    inst_info (XInstDecl nec)                 = noExtCon nec
 
     -- TODO: use Sum monoid
     addpr :: (Int,Int,Int) -> Int

@@ -91,7 +91,7 @@ type instance XHsInteger    (GhcPass _) = SourceText
 type instance XHsRat        (GhcPass _) = NoExt
 type instance XHsFloatPrim  (GhcPass _) = NoExt
 type instance XHsDoublePrim (GhcPass _) = NoExt
-type instance XXLit         (GhcPass _) = NoExt
+type instance XXLit         (GhcPass _) = NoExtCon
 
 instance Eq (HsLit x) where
   (HsChar _ x1)       == (HsChar _ x2)       = x1==x2
@@ -129,7 +129,7 @@ type instance XOverLit GhcPs = NoExt
 type instance XOverLit GhcRn = Bool            -- Note [ol_rebindable]
 type instance XOverLit GhcTc = OverLitTc
 
-type instance XXOverLit (GhcPass _) = NoExt
+type instance XXOverLit (GhcPass _) = NoExtCon
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
@@ -147,7 +147,7 @@ negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
 
 overLitType :: HsOverLit GhcTc -> Type
 overLitType (OverLit (OverLitTc _ ty) _ _) = ty
-overLitType XOverLit{} = panic "overLitType"
+overLitType (XOverLit nec) = noExtCon nec
 
 -- | Convert a literal from one index type to another, updating the annotations
 -- according to the relevant 'Convertable' instance

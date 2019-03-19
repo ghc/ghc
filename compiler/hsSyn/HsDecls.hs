@@ -159,7 +159,7 @@ type instance XRuleD      (GhcPass _) = NoExt
 type instance XSpliceD    (GhcPass _) = NoExt
 type instance XDocD       (GhcPass _) = NoExt
 type instance XRoleAnnotD (GhcPass _) = NoExt
-type instance XXHsDecl    (GhcPass _) = NoExt
+type instance XXHsDecl    (GhcPass _) = NoExtCon
 
 -- NB: all top-level fixity decls are contained EITHER
 -- EITHER SigDs
@@ -207,7 +207,7 @@ data HsGroup p
   | XHsGroup (XXHsGroup p)
 
 type instance XCHsGroup (GhcPass _) = NoExt
-type instance XXHsGroup (GhcPass _) = NoExt
+type instance XXHsGroup (GhcPass _) = NoExtCon
 
 
 emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup (GhcPass p)
@@ -331,7 +331,7 @@ data SpliceDecl p
   | XSpliceDecl (XXSpliceDecl p)
 
 type instance XSpliceDecl      (GhcPass _) = NoExt
-type instance XXSpliceDecl     (GhcPass _) = NoExt
+type instance XXSpliceDecl     (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (SpliceDecl p) where
@@ -590,7 +590,7 @@ type instance XClassDecl    GhcPs = NoExt
 type instance XClassDecl    GhcRn = NameSet -- FVs
 type instance XClassDecl    GhcTc = NameSet -- FVs
 
-type instance XXTyClDecl    (GhcPass _) = NoExt
+type instance XXTyClDecl    (GhcPass _) = NoExtCon
 
 -- Simple classifiers for TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -641,17 +641,17 @@ isDataFamilyDecl _other      = False
 
 -- Dealing with names
 
-tyFamInstDeclName :: TyFamInstDecl pass -> (IdP pass)
+tyFamInstDeclName :: TyFamInstDecl (GhcPass p) -> IdP (GhcPass p)
 tyFamInstDeclName = unLoc . tyFamInstDeclLName
 
-tyFamInstDeclLName :: TyFamInstDecl pass -> Located (IdP pass)
+tyFamInstDeclLName :: TyFamInstDecl (GhcPass p) -> Located (IdP (GhcPass p))
 tyFamInstDeclLName (TyFamInstDecl { tfid_eqn =
                      (HsIB { hsib_body = FamEqn { feqn_tycon = ln }}) })
   = ln
-tyFamInstDeclLName (TyFamInstDecl (HsIB _ (XFamEqn _)))
-  = panic "tyFamInstDeclLName"
-tyFamInstDeclLName (TyFamInstDecl (XHsImplicitBndrs _))
-  = panic "tyFamInstDeclLName"
+tyFamInstDeclLName (TyFamInstDecl (HsIB _ (XFamEqn nec)))
+  = noExtCon nec
+tyFamInstDeclLName (TyFamInstDecl (XHsImplicitBndrs nec))
+  = noExtCon nec
 
 tyClDeclLName :: TyClDecl pass -> Located (IdP pass)
 tyClDeclLName (FamDecl { tcdFam = FamilyDecl { fdLName = ln } }) = ln
@@ -699,7 +699,7 @@ hsDeclHasCusk _cusks_enabled@True (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
       _              -> False
 hsDeclHasCusk _cusks_enabled@True (DataDecl { tcdDExt = DataDeclRn { tcdDataCusk = cusk }}) = cusk
 hsDeclHasCusk _cusks_enabled@True (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
-hsDeclHasCusk _ (XTyClDecl _) = panic "hsDeclHasCusk"
+hsDeclHasCusk _ (XTyClDecl nec) = noExtCon nec
 
 -- Pretty-printing TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -913,7 +913,7 @@ data TyClGroup pass  -- See Note [TyClGroups and dependency analysis]
   | XTyClGroup (XXTyClGroup pass)
 
 type instance XCTyClGroup (GhcPass _) = NoExt
-type instance XXTyClGroup (GhcPass _) = NoExt
+type instance XXTyClGroup (GhcPass _) = NoExtCon
 
 
 emptyTyClGroup :: TyClGroup (GhcPass p)
@@ -1036,7 +1036,7 @@ data FamilyResultSig pass = -- see Note [FamilyResultSig]
 type instance XNoSig            (GhcPass _) = NoExt
 type instance XCKindSig         (GhcPass _) = NoExt
 type instance XTyVarSig         (GhcPass _) = NoExt
-type instance XXFamilyResultSig (GhcPass _) = NoExt
+type instance XXFamilyResultSig (GhcPass _) = NoExtCon
 
 
 -- | Located type Family Declaration
@@ -1064,7 +1064,7 @@ data FamilyDecl pass = FamilyDecl
   -- For details on above see note [Api annotations] in ApiAnnotation
 
 type instance XCFamilyDecl    (GhcPass _) = NoExt
-type instance XXFamilyDecl    (GhcPass _) = NoExt
+type instance XXFamilyDecl    (GhcPass _) = NoExtCon
 
 
 -- | Located Injectivity Annotation
@@ -1097,7 +1097,7 @@ data FamilyInfo pass
 famDeclHasCusk :: Bool -- ^ True <=> the -XCUSKs extension is enabled
                -> Bool -- ^ True <=> this is an associated type family,
                        --            and the parent class has /no/ CUSK
-               -> FamilyDecl pass
+               -> FamilyDecl (GhcPass pass)
                -> Bool
 famDeclHasCusk _cusks_enabled@False _ _ = False
 famDeclHasCusk _cusks_enabled@True assoc_with_no_cusk
@@ -1111,7 +1111,7 @@ famDeclHasCusk _cusks_enabled@True assoc_with_no_cusk
             -- Un-associated open type/data families have CUSKs
             -- Associated type families have CUSKs iff the parent class does
 
-famDeclHasCusk _ _ (XFamilyDecl {}) = panic "famDeclHasCusk"
+famDeclHasCusk _ _ (XFamilyDecl nec) = noExtCon nec
 
 -- | Does this family declaration have user-supplied return kind signature?
 hasReturnKindSignature :: FamilyResultSig a -> Bool
@@ -1120,7 +1120,7 @@ hasReturnKindSignature (TyVarSig _ (L _ (UserTyVar{}))) = False
 hasReturnKindSignature _                                = True
 
 -- | Maybe return name of the result type variable
-resultVariableName :: FamilyResultSig a -> Maybe (IdP a)
+resultVariableName :: FamilyResultSig (GhcPass a) -> Maybe (IdP (GhcPass a))
 resultVariableName (TyVarSig _ sig) = Just $ hsLTyVarName sig
 resultVariableName _                = Nothing
 
@@ -1214,7 +1214,7 @@ data HsDataDefn pass   -- The payload of a data type defn
   | XHsDataDefn (XXHsDataDefn pass)
 
 type instance XCHsDataDefn    (GhcPass _) = NoExt
-type instance XXHsDataDefn    (GhcPass _) = NoExt
+type instance XXHsDataDefn    (GhcPass _) = NoExtCon
 
 -- | Haskell Deriving clause
 type HsDeriving pass = Located [LHsDerivingClause pass]
@@ -1254,7 +1254,7 @@ data HsDerivingClause pass
   | XHsDerivingClause (XXHsDerivingClause pass)
 
 type instance XCHsDerivingClause    (GhcPass _) = NoExt
-type instance XXHsDerivingClause    (GhcPass _) = NoExt
+type instance XXHsDerivingClause    (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsDerivingClause p) where
@@ -1365,7 +1365,7 @@ data ConDecl pass
 
 type instance XConDeclGADT (GhcPass _) = NoExt
 type instance XConDeclH98  (GhcPass _) = NoExt
-type instance XXConDecl    (GhcPass _) = NoExt
+type instance XXConDecl    (GhcPass _) = NoExtCon
 
 {- Note [GADT abstract syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1408,10 +1408,10 @@ There's a wrinkle in ConDeclGADT
 type HsConDeclDetails pass
    = HsConDetails (LBangType pass) (Located [LConDeclField pass])
 
-getConNames :: ConDecl pass -> [Located (IdP pass)]
+getConNames :: ConDecl (GhcPass p) -> [Located (IdP (GhcPass p))]
 getConNames ConDeclH98  {con_name  = name}  = [name]
 getConNames ConDeclGADT {con_names = names} = names
-getConNames XConDecl {} = panic "getConNames"
+getConNames (XConDecl nec) = noExtCon nec
 
 getConArgs :: ConDecl pass -> HsConDeclDetails pass
 getConArgs d = con_args d
@@ -1649,7 +1649,7 @@ data FamEqn pass rhs
     -- For details on above see note [Api annotations] in ApiAnnotation
 
 type instance XCFamEqn    (GhcPass _) r = NoExt
-type instance XXFamEqn    (GhcPass _) r = NoExt
+type instance XXFamEqn    (GhcPass _) r = NoExtCon
 
 ----------------- Class instances -------------
 
@@ -1682,7 +1682,7 @@ data ClsInstDecl pass
   | XClsInstDecl (XXClsInstDecl pass)
 
 type instance XCClsInstDecl    (GhcPass _) = NoExt
-type instance XXClsInstDecl    (GhcPass _) = NoExt
+type instance XXClsInstDecl    (GhcPass _) = NoExtCon
 
 ----------------- Instances of all kinds -------------
 
@@ -1705,7 +1705,7 @@ data InstDecl pass  -- Both class and family instances
 type instance XClsInstD     (GhcPass _) = NoExt
 type instance XDataFamInstD (GhcPass _) = NoExt
 type instance XTyFamInstD   (GhcPass _) = NoExt
-type instance XXInstDecl    (GhcPass _) = NoExt
+type instance XXInstDecl    (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (TyFamInstDecl p) where
@@ -1841,7 +1841,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (InstDecl p) where
 
 -- Extract the declarations of associated data types from an instance
 
-instDeclDataFamInsts :: [LInstDecl pass] -> [DataFamInstDecl pass]
+instDeclDataFamInsts :: [LInstDecl (GhcPass p)] -> [DataFamInstDecl (GhcPass p)]
 instDeclDataFamInsts inst_decls
   = concatMap do_one inst_decls
   where
@@ -1849,8 +1849,8 @@ instDeclDataFamInsts inst_decls
       = map unLoc fam_insts
     do_one (L _ (DataFamInstD { dfid_inst = fam_inst }))      = [fam_inst]
     do_one (L _ (TyFamInstD {}))                              = []
-    do_one (L _ (ClsInstD _ (XClsInstDecl _))) = panic "instDeclDataFamInsts"
-    do_one (L _ (XInstDecl _))                 = panic "instDeclDataFamInsts"
+    do_one (L _ (ClsInstD _ (XClsInstDecl nec))) = noExtCon nec
+    do_one (L _ (XInstDecl nec))                 = noExtCon nec
 
 {-
 ************************************************************************
@@ -1890,7 +1890,7 @@ data DerivDecl pass = DerivDecl
   | XDerivDecl (XXDerivDecl pass)
 
 type instance XCDerivDecl    (GhcPass _) = NoExt
-type instance XXDerivDecl    (GhcPass _) = NoExt
+type instance XXDerivDecl    (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (DerivDecl p) where
@@ -1973,7 +1973,7 @@ data DefaultDecl pass
   | XDefaultDecl (XXDefaultDecl pass)
 
 type instance XCDefaultDecl    (GhcPass _) = NoExt
-type instance XXDefaultDecl    (GhcPass _) = NoExt
+type instance XXDefaultDecl    (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (DefaultDecl p) where
@@ -2036,7 +2036,7 @@ type instance XForeignExport   GhcPs = NoExt
 type instance XForeignExport   GhcRn = NoExt
 type instance XForeignExport   GhcTc = Coercion
 
-type instance XXForeignDecl    (GhcPass _) = NoExt
+type instance XXForeignDecl    (GhcPass _) = NoExtCon
 
 -- Specification Of an imported external entity in dependence on the calling
 -- convention
@@ -2144,7 +2144,7 @@ data RuleDecls pass = HsRules { rds_ext   :: XCRuleDecls pass
   | XRuleDecls (XXRuleDecls pass)
 
 type instance XCRuleDecls    (GhcPass _) = NoExt
-type instance XXRuleDecls    (GhcPass _) = NoExt
+type instance XXRuleDecls    (GhcPass _) = NoExtCon
 
 -- | Located Rule Declaration
 type LRuleDecl pass = Located (RuleDecl pass)
@@ -2181,7 +2181,7 @@ type instance XHsRule       GhcPs = NoExt
 type instance XHsRule       GhcRn = HsRuleRn
 type instance XHsRule       GhcTc = HsRuleRn
 
-type instance XXRuleDecl    (GhcPass _) = NoExt
+type instance XXRuleDecl    (GhcPass _) = NoExtCon
 
 flattenRuleDecls :: [LRuleDecls pass] -> [LRuleDecl pass]
 flattenRuleDecls decls = concatMap (rds_rules . unLoc) decls
@@ -2202,7 +2202,7 @@ data RuleBndr pass
 
 type instance XCRuleBndr    (GhcPass _) = NoExt
 type instance XRuleBndrSig  (GhcPass _) = NoExt
-type instance XXRuleBndr    (GhcPass _) = NoExt
+type instance XXRuleBndr    (GhcPass _) = NoExtCon
 
 collectRuleBndrSigTys :: [RuleBndr pass] -> [LHsSigWcType pass]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ _ ty <- bndrs]
@@ -2291,7 +2291,7 @@ data WarnDecls pass = Warnings { wd_ext      :: XWarnings pass
   | XWarnDecls (XXWarnDecls pass)
 
 type instance XWarnings      (GhcPass _) = NoExt
-type instance XXWarnDecls    (GhcPass _) = NoExt
+type instance XXWarnDecls    (GhcPass _) = NoExtCon
 
 -- | Located Warning pragma Declaration
 type LWarnDecl pass = Located (WarnDecl pass)
@@ -2301,7 +2301,7 @@ data WarnDecl pass = Warning (XWarning pass) [Located (IdP pass)] WarningTxt
                    | XWarnDecl (XXWarnDecl pass)
 
 type instance XWarning      (GhcPass _) = NoExt
-type instance XXWarnDecl    (GhcPass _) = NoExt
+type instance XXWarnDecl    (GhcPass _) = NoExtCon
 
 
 instance (p ~ GhcPass pass,OutputableBndr (IdP p))
@@ -2343,7 +2343,7 @@ data AnnDecl pass = HsAnnotation
   | XAnnDecl (XXAnnDecl pass)
 
 type instance XHsAnnotation (GhcPass _) = NoExt
-type instance XXAnnDecl     (GhcPass _) = NoExt
+type instance XXAnnDecl     (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (AnnDecl p) where
     ppr (HsAnnotation _ _ provenance expr)
@@ -2396,7 +2396,7 @@ data RoleAnnotDecl pass
   | XRoleAnnotDecl (XXRoleAnnotDecl pass)
 
 type instance XCRoleAnnotDecl (GhcPass _) = NoExt
-type instance XXRoleAnnotDecl (GhcPass _) = NoExt
+type instance XXRoleAnnotDecl (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndr (IdP p))
        => Outputable (RoleAnnotDecl p) where
@@ -2408,6 +2408,6 @@ instance (p ~ GhcPass pass, OutputableBndr (IdP p))
       pp_role (Just r) = ppr r
   ppr (XRoleAnnotDecl x) = ppr x
 
-roleAnnotDeclName :: RoleAnnotDecl pass -> (IdP pass)
+roleAnnotDeclName :: RoleAnnotDecl (GhcPass p) -> IdP (GhcPass p)
 roleAnnotDeclName (RoleAnnotDecl _ (L _ name) _) = name
-roleAnnotDeclName (XRoleAnnotDecl _) = panic "roleAnnotDeclName"
+roleAnnotDeclName (XRoleAnnotDecl nec) = noExtCon nec
