@@ -941,18 +941,6 @@ tcMonadFailOp orig pat fail_op res_ty
   = snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
                              (mkCheckExpType res_ty) $ \_ -> return ())
 
-emitMonadFailConstraint :: LPat GhcTcId -> TcType -> TcRn ()
-emitMonadFailConstraint pat res_ty
-  = do { -- We expect res_ty to be of form (monad_ty arg_ty)
-         (_co, (monad_ty, _arg_ty)) <- matchExpectedAppTy res_ty
-
-         -- Emit (MonadFail m), but ignore the evidence; it's
-         -- just there to generate a warning
-       ; monadFailClass <- tcLookupClass monadFailClassName
-       ; _ <- emitWanted (FailablePattern pat)
-                         (mkClassPred monadFailClass [monad_ty])
-       ; return () }
-
 {-
 Note [Treat rebindable syntax first]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
