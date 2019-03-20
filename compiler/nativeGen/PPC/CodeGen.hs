@@ -949,6 +949,7 @@ condIntCode' True cond W64 x y
                  , BCC LE cmp_lo Nothing
                  , CMPL II32 x_lo (RIReg y_lo)
                  , BCC ALWAYS end_lbl Nothing
+                 , NEWBLOCK cmp_lo
                  , CMPL II32 y_lo (RIReg x_lo)
                  , BCC ALWAYS end_lbl Nothing
 
