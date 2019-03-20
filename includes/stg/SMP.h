@@ -82,7 +82,7 @@ EXTERN_INLINE void busy_wait_nop(void);
  * Various kinds of memory barrier.
  *  write_barrier: prevents future stores occurring before prededing stores.
  *  store_load_barrier: prevents future loads occurring before preceding stores.
- *  load_load_barrier: prevents future loads occurring before earlier stores.
+ *  load_load_barrier: prevents future loads occurring before earlier loads.
  *
  * Reference for these: "The JSR-133 Cookbook for Compiler Writers"
  * http://gee.cs.oswego.edu/dl/jmm/cookbook.html
