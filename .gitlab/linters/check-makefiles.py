@@ -16,4 +16,4 @@ linters = [
 ]
 
 if __name__ == '__main__':
-    run_linters(linters) #$, subdir='testsuite')
+    run_linters(linters, subdir='testsuite')
