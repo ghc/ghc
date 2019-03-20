@@ -1405,9 +1405,9 @@ def simple_run(name, way, prog, extra_run_opts):
     if exit_code != opts.exit_code:
         if config.verbose >= 1 and _expect_pass(way):
             if exit_code == 99:
-                print(name + '(' + way + ') timed out')
+                print('{0} ({1}) timed out'.format(name, way))
             else:
-                print('Wrong exit code for ' + name + '(' + way + ')' + '(expected', opts.exit_code, ', actual', exit_code, ')')
+                print('Wrong exit code for {0} ({1}) (expected {2}, actual {3})'.format(name, way, opts.exit_code, exit_code))
                 dump_stdout(name)
                 dump_stderr(name)
         if exit_code == 99:
@@ -1498,12 +1498,12 @@ def interpreter_run(name, way, extra_hc_opts, top_mod):
     # check the exit code
     if exit_code != getTestOpts().exit_code:
         if exit_code == 99:
-            print(name + '(' + way + ') timed out')
+            print('{0} ({1}) timed out'.format(name, way))
             dump_stdout(name)
             dump_stderr(name)
             return failBecause('timeout')
         else:
-            print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
+            print('Wrong exit code for {0} ({1}) (expected {2}, actual {3})'.format(name, way, getTestOpts().exit_code, exit_code))
             dump_stdout(name)
             dump_stderr(name)
             return failBecause('bad exit code')
