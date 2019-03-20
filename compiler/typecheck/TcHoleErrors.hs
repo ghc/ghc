@@ -28,10 +28,11 @@ import FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
 
 import Control.Arrow ( (&&&) )
 
-import Control.Monad    ( filterM, replicateM )
+import Control.Monad    ( filterM, replicateM, when )
 import Data.List        ( partition, sort, sortOn, nubBy )
 import Data.Graph       ( graphFromEdges, topSort )
 import Data.Function    ( on )
+import System.IO        ( hPutStrLn, stderr )
 
 
 import TcSimplify    ( simpl_top, runTcSDeriveds )
@@ -39,9 +40,11 @@ import TcUnify       ( tcSubType_NC )
 
 import ExtractDocs ( extractDocs )
 import qualified Data.Map as Map
-import HsDoc           ( HsDocString, unpackHDS, DeclDocMap(..) )
+import qualified Data.Set as Set
+import HsDoc           ( HsDoc(..), HsDocString, unpackHDS, Docs(..) )
 import HscTypes        ( ModIface(..) )
-import LoadIface       ( loadInterfaceForNameMaybe )
+import LoadIface       ( loadInterfaceForName )
+import SrcLoc
 
 import PrelInfo (knownKeyNames)
 
@@ -492,20 +495,44 @@ addDocs :: [HoleFit] -> TcM [HoleFit]
 addDocs fits =
   do { showDocs <- goptM Opt_ShowDocsOfHoleFits
      ; if showDocs
-       then do { (_, DeclDocMap lclDocs, _) <- extractDocs <$> getGblEnv
-               ; mapM (upd lclDocs) fits }
+       then do { dflags <- getDynFlags
+               ; mb_local_docs <- extractDocs dflags <$> getGblEnv
+               ; mods_without_docs_ref <- newTcRef Set.empty
+               ; fits' <- mapM (upd mods_without_docs_ref mb_local_docs) fits
+               ; mods_without_docs <- readTcRef mods_without_docs_ref
+               ; report mods_without_docs
+               ; return fits' }
        else return fits }
   where
    msg = text "TcHoleErrors addDocs"
-   lookupInIface name (ModIface { mi_decl_docs = DeclDocMap dmap })
-     = Map.lookup name dmap
-   upd lclDocs fit =
+   upd mods_without_docs_ref mb_local_docs fit =
      let name = hfName fit in
-     do { doc <- if hfIsLcl fit
-                 then pure (Map.lookup name lclDocs)
-                 else do { mbIface <- loadInterfaceForNameMaybe msg name
-                         ; return $ mbIface >>= lookupInIface name }
-        ; return $ fit {hfDoc = doc} }
+     do { mb_docs <- if hfIsLcl fit
+                     then pure mb_local_docs
+                     else mi_docs <$> loadInterfaceForName msg name
+        ; case mb_docs of
+            { Nothing -> do
+                { updTcRef mods_without_docs_ref (Set.insert (nameOrigin name))
+                ; return fit }
+            ; Just docs -> do
+                { let doc = Map.lookup name (docs_decls docs)
+                ; return $ fit {hfDoc = hsDocString <$> doc} }}}
+   nameOrigin name = case nameModule_maybe name of
+     Just m  -> Right m
+     Nothing ->
+       Left $ case nameSrcLoc name of
+         RealSrcLoc r   -> srcLocFile r
+         UnhelpfulLoc s -> s
+   report mods = do
+     { let warning =
+             text "WARNING: Couldn't find any documentation for the following modules:" $+$
+             nest 2
+                  (fsep (punctuate comma
+                                   (either ftext ppr <$> Set.toList mods)) $+$
+                   text "Make sure the modules are compiled with '-haddock'.")
+     ; when (not $ Set.null mods) $ do
+         { dflags <- getDynFlags
+         ; liftIO $ hPutStrLn stderr (showSDoc dflags warning) }}
 
 -- For pretty printing hole fits, we display the name and type of the fit,
 -- with added '_' to represent any extra arguments in case of a non-zero

@@ -1,0 +1,58 @@
+docs:
+  Just module header:
+         Just text:
+                " Module header"
+              identifiers:
+       declaration docs:
+         fα:
+           text:
+             " Documentation for 'R'\'s 'fα' field."
+           identifiers:
+             20-21: [R, R]
+             27-29: [fα]
+         $fEqR:
+           text:
+             " A very lazy Eq instance"
+           identifiers:
+       arg docs:
+       documentation structure:
+         section heading, level 1:
+           text:
+             " Types"
+           identifiers:
+         documentation chunk:
+           text:
+             "
+
+ Actually we have only one type."
+           identifiers:
+         avails:
+           [R{R, R; fβ, fα}]
+         section heading, level 1:
+           text:
+             " Functions"
+           identifiers:
+         documentation chunk:
+           text:
+             "
+
+ We have them too."
+           identifiers:
+         avails:
+           [add]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         DoAndIfThenElse
+         EmptyDataDecls
+         PatternGuards
+         NondecreasingIndentation
+         TraditionalRecordSyntax
+         MonadFailDesugaring
+         StarIsType

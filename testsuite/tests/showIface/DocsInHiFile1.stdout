@@ -1,36 +1,119 @@
-module header:
-  Just " `elem`, 'print',
+docs:
+  Just module header:
+         Just text:
+                " `elem`, 'print',
 `Unknown',
 '<>', ':=:', 'Bool'
 "
-declaration docs:
-  elem:
-    " '()', 'elem'."
-  D:
-    " A datatype."
-  D0:
-    " A constructor for 'D'. '"
-  D1:
-    " Another constructor"
-  P:
-    " A class"
-  p:
-    " A class method"
-  $fShowD:
-    " 'Show' instance"
-  D':
-    " Another datatype...
+              identifiers:
+                2-6: [Data.Foldable.elem, elem]
+                10-15: [System.IO.print]
+                19-26: []
+                30-32: [GHC.Base.<>]
+                36-39: []
+                43-47: [GHC.Types.Bool]
+       declaration docs:
+         elem:
+           text:
+             " '()', 'elem'."
+           identifiers:
+             8-12: [Data.Foldable.elem, elem]
+         D:
+           text:
+             " A datatype."
+           identifiers:
+         D0:
+           text:
+             " A constructor for 'D'. '"
+           identifiers:
+             20-21: [D]
+         D1:
+           text:
+             " Another constructor"
+           identifiers:
+         P:
+           text:
+             " A class"
+           identifiers:
+         p:
+           text:
+             " A class method"
+           identifiers:
+         $fShowD:
+           text:
+             " 'Show' instance"
+           identifiers:
+             2-6: [GHC.Show.Show]
+         D':
+           text:
+             " Another datatype...
 
  ...with two docstrings."
-arg docs:
-  add:
-    0:
-      " First summand for 'add'"
-    1:
-      " Second summand"
-    2:
-      " Sum"
-  p:
-    0:
-      " An argument"
+           identifiers:
+       arg docs:
+         add:
+           0:
+             text:
+               " First summand for 'add'"
+             identifiers:
+               20-23: [add]
+           1:
+             text:
+               " Second summand"
+             identifiers:
+           2:
+             text:
+               " Sum"
+             identifiers:
+         p:
+           0:
+             text:
+               " An argument"
+             identifiers:
+       documentation structure:
+         section heading, level 1:
+           text:
+             " First section heading"
+           identifiers:
+         documentation chunk:
+           text:
+             " A small chunk of documentation"
+           identifiers:
+         avails:
+           [elem]
+         reference to named chunk: namedchunk
+         avails:
+           [D{D, D0, D1;}]
+         avails:
+           [add]
+         section heading, level 1:
+           text:
+             " Another section heading"
+           identifiers:
+         avails:
+           [P{P, p;}]
+         avails:
+           [GHC.Show.Show{GHC.Show.Show, GHC.Show.show, GHC.Show.showList,
+                          GHC.Show.showsPrec;}]
+       named chunks:
+         "namedchunk":
+           text:
+             "
+ This chunk of documentation is named "namedchunk"."
+           identifiers:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         DoAndIfThenElse
+         EmptyDataDecls
+         PatternGuards
+         NondecreasingIndentation
+         TraditionalRecordSyntax
+         MonadFailDesugaring
+         StarIsType
 

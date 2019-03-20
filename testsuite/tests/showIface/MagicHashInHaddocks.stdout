@@ -1,0 +1,32 @@
+docs:
+  Just module header:
+         Just text:
+                " 'foo#' `Bar##` `*##`"
+              identifiers:
+                2-6: [foo#]
+                9-14: [Bar##]
+                17-20: []
+       declaration docs:
+       arg docs:
+       documentation structure:
+         avails:
+           [foo#]
+         avails:
+           [Bar##{Bar##;}]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         DoAndIfThenElse
+         MagicHash
+         EmptyDataDecls
+         PatternGuards
+         NondecreasingIndentation
+         TraditionalRecordSyntax
+         MonadFailDesugaring
+         StarIsType

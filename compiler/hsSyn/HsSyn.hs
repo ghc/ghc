@@ -88,7 +88,7 @@ data HsModule pass
         -- downstream.
       hsmodDecls :: [LHsDecl pass],
         -- ^ Type, class, value, and interface signature decls
-      hsmodDeprecMessage :: Maybe (Located WarningTxt),
+      hsmodDeprecMessage :: Maybe (Located (WarningTxt (HsDoc (IdP pass)))),
         -- ^ reason\/explanation for warning/deprecation of this module
         --
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
@@ -96,8 +96,8 @@ data HsModule pass
         --
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-      hsmodHaddockModHeader :: Maybe LHsDocString
-        -- ^ Haddock module info and description, unparsed
+      hsmodHaddockModHeader :: Maybe (LHsDoc (IdP pass))
+        -- ^ Haddock module info and description
         --
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
         --                                   ,'ApiAnnotation.AnnClose'

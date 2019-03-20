@@ -1,5 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
+  -- Show the levity-polymorphic signature of '$'
 
 -----------------------------------------------------------------------------
 -- |

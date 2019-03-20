@@ -1,0 +1,31 @@
+docs:
+  Just module header:
+         Nothing
+       declaration docs:
+       arg docs:
+       documentation structure:
+         re-exported module(s): [Data.Functor.Identity]
+           []
+         re-exported module(s): [Data.Maybe]
+           [GHC.Maybe.Maybe{GHC.Maybe.Maybe, GHC.Maybe.Nothing,
+                            GHC.Maybe.Just;},
+            Data.Maybe.maybe]
+         re-exported module(s): [Data.Tuple]
+           [Data.Tuple.fst, Data.Tuple.snd, Data.Tuple.curry,
+            Data.Tuple.uncurry, Data.Tuple.swap]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         DoAndIfThenElse
+         EmptyDataDecls
+         PatternGuards
+         NondecreasingIndentation
+         TraditionalRecordSyntax
+         MonadFailDesugaring
+         StarIsType

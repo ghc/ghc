@@ -13,6 +13,7 @@ import Outputable
 import HsImpExp
 import HsDecls
 import HsDoc
+import Name
 
 plugin :: Plugin
 plugin = defaultPlugin { parsedResultAction = parsedPlugin

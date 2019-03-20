@@ -56,9 +56,18 @@ testOneFile libdir fileName = do
                                `extQ` doHsExpr
                               ) ast
 
-     doWarningTxt :: WarningTxt -> [(String,[Located (SourceText,FastString)])]
-     doWarningTxt ((WarningTxt _ ss))    = [("w",map conv ss)]
-     doWarningTxt ((DeprecatedTxt _ ss)) = [("d",map conv ss)]
+     doWarningTxt :: WarningTxt (HsDoc RdrName)
+                  -> [(String,[Located (SourceText,FastString)])]
+     doWarningTxt (WarningTxt lsort lws) =
+         [(tag, map (fmap (\(WithSourceText st ws) -> (st, hsDocFS ws))) lws)]
+       where
+         tag =
+             case unWithSourceText (unLoc lsort) of
+               WsWarning -> "w"
+               WsDeprecated -> "d"
+         hsDocFS = mkFastStringByteString .
+                   hsDocStringToByteString .
+                   hsDocString
 
      doImportDecl :: ImportDecl GhcPs
                   -> [(String,[Located (SourceText,FastString)])]

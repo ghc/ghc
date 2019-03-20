@@ -16,7 +16,7 @@ module LoadIface (
         -- RnM/TcM functions
         loadModuleInterface, loadModuleInterfaces,
         loadSrcInterface, loadSrcInterface_maybe,
-        loadInterfaceForName, loadInterfaceForNameMaybe, loadInterfaceForModule,
+        loadInterfaceForName, loadInterfaceForModule,
 
         -- IfM functions
         loadInterface,
@@ -312,15 +312,6 @@ loadInterfaceForName doc name
             ; MASSERT2( not (nameIsLocalOrFrom this_mod name), ppr name <+> parens doc ) }
       ; ASSERT2( isExternalName name, ppr name )
         initIfaceTcRn $ loadSysInterface doc (nameModule name) }
-
--- | Only loads the interface for external non-local names.
-loadInterfaceForNameMaybe :: SDoc -> Name -> TcRn (Maybe ModIface)
-loadInterfaceForNameMaybe doc name
-  = do { this_mod <- getModule
-       ; if nameIsLocalOrFrom this_mod name || not (isExternalName name)
-         then return Nothing
-         else Just <$> (initIfaceTcRn $ loadSysInterface doc (nameModule name))
-       }
 
 -- | Loads the interface for a given Module.
 loadInterfaceForModule :: SDoc -> Module -> TcRn ModIface
@@ -1149,9 +1140,7 @@ pprModIface iface
         , pprTrustInfo (mi_trust iface)
         , pprTrustPkg (mi_trust_pkg iface)
         , vcat (map ppr (mi_complete_sigs iface))
-        , text "module header:" $$ nest 2 (ppr (mi_doc_hdr iface))
-        , text "declaration docs:" $$ nest 2 (ppr (mi_decl_docs iface))
-        , text "arg docs:" $$ nest 2 (ppr (mi_arg_docs iface))
+        , text "docs:" $$ nest 2 (ppr (mi_docs iface))
         ]
   where
     pp_hsc_src HsBootFile = text "[boot]"
@@ -1226,16 +1215,6 @@ pprTrustInfo trust = text "trusted:" <+> ppr trust
 
 pprTrustPkg :: Bool -> SDoc
 pprTrustPkg tpkg = text "require own pkg trusted:" <+> ppr tpkg
-
-instance Outputable Warnings where
-    ppr = pprWarns
-
-pprWarns :: Warnings -> SDoc
-pprWarns NoWarnings         = Outputable.empty
-pprWarns (WarnAll txt)  = text "Warn all" <+> ppr txt
-pprWarns (WarnSome prs) = text "Warnings"
-                        <+> vcat (map pprWarning prs)
-    where pprWarning (name, txt) = ppr name <+> ppr txt
 
 pprIfaceAnnotation :: IfaceAnnotation -> SDoc
 pprIfaceAnnotation (IfaceAnnotation { ifAnnotatedTarget = target, ifAnnotatedValue = serialized })

@@ -1,0 +1,30 @@
+docs:
+  Just module header:
+         Nothing
+       declaration docs:
+       arg docs:
+       documentation structure:
+         re-exported module(s): [Inner0]
+           [Inner0.inner0_0]
+         re-exported module(s): [Inner1]
+           [Inner1.inner1_1]
+         avails:
+           [Inner2.inner2_0]
+         re-exported module(s): [Inner3, Inner4]
+           [Inner3.inner3_0, Inner4.inner4_1]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         DoAndIfThenElse
+         EmptyDataDecls
+         PatternGuards
+         NondecreasingIndentation
+         TraditionalRecordSyntax
+         MonadFailDesugaring
+         StarIsType

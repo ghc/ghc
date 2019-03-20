@@ -1,0 +1,23 @@
+docs:
+  Just module header:
+         Nothing
+       declaration docs:
+       arg docs:
+       documentation structure:
+       named chunks:
+       haddock options:
+         not-home, show-extensions
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         DoAndIfThenElse
+         EmptyDataDecls
+         PatternGuards
+         NondecreasingIndentation
+         TraditionalRecordSyntax
+         MonadFailDesugaring
+         StarIsType

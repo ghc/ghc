@@ -248,7 +248,7 @@ rnList f xs = mapFvRn (wrapLocFstM f) xs
 *********************************************************
 -}
 
-rnDocDecl :: DocDecl -> RnM DocDecl
+rnDocDecl :: DocDecl GhcPs -> RnM (DocDecl GhcRn)
 rnDocDecl (DocCommentNext doc) = do
   rn_doc <- rnHsDoc doc
   return (DocCommentNext rn_doc)
@@ -277,7 +277,7 @@ gather them together.
 -}
 
 -- checks that the deprecations are defined locally, and that there are no duplicates
-rnSrcWarnDecls :: NameSet -> [LWarnDecls GhcPs] -> RnM Warnings
+rnSrcWarnDecls :: NameSet -> [LWarnDecls GhcPs] -> RnM (Warnings (HsDoc Name))
 rnSrcWarnDecls _ []
   = return NoWarnings
 
@@ -297,7 +297,8 @@ rnSrcWarnDecls bndr_set decls'
        -- ensures that the names are defined locally
      = do { names <- concatMapM (lookupLocalTcNames sig_ctxt what . unLoc)
                                 rdr_names
-          ; return [(rdrNameOcc rdr, txt) | (rdr, _) <- names] }
+          ; txt' <- traverse rnHsDoc txt
+          ; return [(rdrNameOcc rdr, txt') | (rdr, _) <- names] }
    rn_deprec (XWarnDecl _) = panic "rnSrcWarnDecls"
 
    what = text "deprecation"

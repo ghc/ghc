@@ -7,83 +7,223 @@
 module ExtractDocs (extractDocs) where
 
 import GhcPrelude
+
+import Avail
 import Bag
+import DynFlags
 import HsBinds
 import HsDoc
 import HsDecls
 import HsExtension
+import HsImpExp
 import HsTypes
 import HsUtils
+import HscTypes
+import Module
 import Name
 import NameSet
 import SrcLoc
 import TcRnTypes
 
 import Control.Applicative
+import Control.Arrow
 import Data.List
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
 import qualified Data.Map as M
+import qualified Data.Set as Set
 import Data.Maybe
 import Data.Semigroup
 
 -- | Extract docs from renamer output.
-extractDocs :: TcGblEnv
-            -> (Maybe HsDocString, DeclDocMap, ArgDocMap)
-            -- ^
-            -- 1. Module header
-            -- 2. Docs on top level declarations
-            -- 3. Docs on arguments
-extractDocs TcGblEnv { tcg_semantic_mod = mod
-                     , tcg_rn_decls = mb_rn_decls
-                     , tcg_insts = insts
-                     , tcg_fam_insts = fam_insts
-                     , tcg_doc_hdr = mb_doc_hdr
-                     } =
-    (unLoc <$> mb_doc_hdr, DeclDocMap doc_map, ArgDocMap arg_map)
+extractDocs :: DynFlags -> TcGblEnv -> Maybe Docs
+extractDocs dflags tc_gbl_env
+  | gopt Opt_Haddock dflags = Just (extractDocs' dflags tc_gbl_env)
+  | otherwise = Nothing
+
+extractDocs' :: DynFlags
+             -> TcGblEnv
+             -> Docs
+extractDocs' dflags
+             TcGblEnv { tcg_mod = mdl
+                      , tcg_semantic_mod = semantic_mdl
+                      , tcg_rn_exports = mb_rn_exports
+                      , tcg_exports = all_exports
+                      , tcg_imports = import_avails
+                      , tcg_rn_decls = Just rn_decls
+                      , tcg_insts = insts
+                      , tcg_fam_insts = fam_insts
+                      , tcg_doc_hdr = mb_doc_hdr
+                      } =
+    Docs { docs_mod_hdr = unLoc <$> mb_doc_hdr
+         , docs_decls = doc_map
+         , docs_args = arg_map
+         , docs_structure = doc_structure
+         , docs_named_chunks = named_chunks
+         , docs_haddock_opts = haddockOptions dflags
+         , docs_language = language_
+         , docs_extensions = exts
+         }
   where
-    (doc_map, arg_map) = maybe (M.empty, M.empty)
-                               (mkMaps local_insts)
-                               mb_decls_with_docs
-    mb_decls_with_docs = topDecls <$> mb_rn_decls
-    local_insts = filter (nameIsLocalOrFrom mod)
+    exts = extensionFlags dflags
+    language_ = language dflags
+
+    (doc_map, arg_map) = mkMaps local_insts decls_with_docs
+    decls_with_docs = topDecls rn_decls
+    local_insts = filter (nameIsLocalOrFrom semantic_mdl)
                          $ map getName insts ++ map getName fam_insts
+    doc_structure = mkDocStructure mdl import_avails mb_rn_exports rn_decls
+                                   all_exports
+    named_chunks = getNamedChunks (isJust mb_rn_exports) rn_decls
+
+extractDocs' _ _ = error "extractDocs': tcg_rn_decls is Nothing"
+
+-- | If we have an explicit export list, we extract the documentation structure
+-- from that.
+-- Otherwise we use the renamed exports and declarations.
+mkDocStructure :: Module                               -- ^ The current module
+               -> ImportAvails                         -- ^ Imports
+               -> Maybe [(Located (IE GhcRn), Avails)] -- ^ Explicit export list
+               -> HsGroup GhcRn
+               -> [AvailInfo]                          -- ^ All exports
+               -> DocStructure
+mkDocStructure mdl import_avails (Just export_list) _ _ =
+    mkDocStructureFromExportList mdl import_avails export_list
+mkDocStructure _ _ Nothing rn_decls all_exports =
+    mkDocStructureFromDecls all_exports rn_decls
+
+-- TODO:
+-- * Maybe remove items that export nothing?
+-- * Combine sequences of DsiExports?
+-- * Check the ordering of avails in DsiModExport
+mkDocStructureFromExportList
+  :: Module                         -- ^ The current module
+  -> ImportAvails
+  -> [(Located (IE GhcRn), Avails)] -- ^ Explicit export list
+  -> DocStructure
+mkDocStructureFromExportList mdl import_avails export_list =
+    toDocStructure . first unLoc <$> export_list
+  where
+    toDocStructure :: (IE GhcRn, Avails) -> DocStructureItem
+    toDocStructure = \case
+      (IEModuleContents _ lmn, avails) -> moduleExport (unLoc lmn) avails
+      (IEGroup _ level doc, _)         -> DsiSectionHeading level doc
+      (IEDoc _ doc, _)                 -> DsiDocChunk doc
+      (IEDocNamed _ name, _)           -> DsiNamedChunkRef name
+      (_, avails)                      -> DsiExports (nubAvails avails)
+
+    moduleExport :: ModuleName -- Alias
+                 -> Avails
+                 -> DocStructureItem
+    moduleExport alias avails =
+        DsiModExport (nubSortNE orig_names) (nubAvails avails)
+      where
+        orig_names = M.findWithDefault aliasErr alias aliasMap
+        aliasErr = error $ "mkDocStructureFromExportList: "
+                           ++ (moduleNameString . moduleName) mdl
+                           ++ ": Can't find alias " ++ moduleNameString alias
+        nubSortNE = NonEmpty.fromList .
+                    Set.toList .
+                    Set.fromList .
+                    NonEmpty.toList
+
+    -- Map from aliases to true module names.
+    aliasMap :: Map ModuleName (NonEmpty ModuleName)
+    aliasMap =
+        M.fromListWith (<>) $
+          (this_mdl_name, this_mdl_name :| [])
+          : (flip concatMap (moduleEnvToList imported) $ \(mdl, imvs) ->
+              [(imv_name imv, moduleName mdl :| []) | imv <- imvs])
+      where
+        this_mdl_name = moduleName mdl
+
+    imported :: ModuleEnv [ImportedModsVal]
+    imported = mapModuleEnv importedByUser (imp_mods import_avails)
+
+-- | Figure out the documentation structure by correlating
+-- the module exports with the located declarations.
+mkDocStructureFromDecls :: [AvailInfo] -- ^ All exports, unordered
+                        -> HsGroup GhcRn
+                        -> DocStructure
+mkDocStructureFromDecls all_exports decls =
+    map unLoc (sortByLoc (docs ++ avails))
+  where
+    avails :: [Located DocStructureItem]
+    avails = flip fmap all_exports $ \avail ->
+      case M.lookup (availName avail) name_locs of
+        Just loc -> L loc (DsiExports [avail])
+        -- FIXME: This is just a workaround that we use when handling e.g.
+        -- associated data families like in the html-test Instances.hs.
+        Nothing -> noLoc (DsiExports [avail])
+        -- Nothing -> panicDoc "mkDocStructureFromDecls: No loc found for"
+        --                     (ppr avail)
+
+    docs = mapMaybe structuralDoc (hs_docs decls)
+
+    structuralDoc :: LDocDecl GhcRn
+                  -> Maybe (Located DocStructureItem)
+    structuralDoc = \case
+      L loc (DocCommentNamed _name doc) ->
+        -- TODO: Is this correct?
+        -- NB: There is no export list where we could reference the named chunk.
+        Just (L loc (DsiDocChunk doc))
+
+      L loc (DocGroup level doc) ->
+        Just (L loc (DsiSectionHeading level doc))
+
+      _ -> Nothing
+
+    name_locs = M.fromList (concatMap ldeclNames (ungroup decls))
+    ldeclNames (L loc d) = zip (getMainDeclBinder d) (repeat loc)
+
+-- | Extract named documentation chunks from the renamed declarations.
+--
+-- If there is no explicit export list, we simply return an empty map
+-- since there would be no way to link to a named chunk.
+getNamedChunks :: Bool -- ^ Do we have an explicit export list?
+               -> HsGroup pass
+               -> Map String (HsDoc (IdP pass))
+getNamedChunks True decls =
+  M.fromList $ flip mapMaybe (unLoc <$> hs_docs decls) $ \case
+    DocCommentNamed name doc -> Just (name, doc)
+    _                        -> Nothing
+getNamedChunks False _ = M.empty
 
 -- | Create decl and arg doc-maps by looping through the declarations.
 -- For each declaration, find its names, its subordinates, and its doc strings.
 mkMaps :: [Name]
-       -> [(LHsDecl GhcRn, [HsDocString])]
-       -> (Map Name (HsDocString), Map Name (Map Int (HsDocString)))
+       -> [(LHsDecl GhcRn, [HsDoc Name])]
+       -> ( Map Name (HsDoc Name)
+          , Map Name (Map Int (HsDoc Name))
+          )
 mkMaps instances decls =
-    ( f' (map (nubByName fst) decls')
-    , f  (filterMapping (not . M.null) args)
+    ( listsToMapWith appendHsDoc (map (nubByName fst) decls')
+    , listsToMapWith (<>) (filterMapping (not . M.null) args)
     )
   where
     (decls', args) = unzip (map mappings decls)
 
-    f :: (Ord a, Semigroup b) => [[(a, b)]] -> Map a b
-    f = M.fromListWith (<>) . concat
-
-    f' :: Ord a => [[(a, HsDocString)]] -> Map a HsDocString
-    f' = M.fromListWith appendDocs . concat
+    listsToMapWith f = M.fromListWith f . concat
 
     filterMapping :: (b -> Bool) ->  [[(a, b)]] -> [[(a, b)]]
     filterMapping p = map (filter (p . snd))
 
-    mappings :: (LHsDecl GhcRn, [HsDocString])
-             -> ( [(Name, HsDocString)]
-                , [(Name, Map Int (HsDocString))]
+    mappings :: (LHsDecl GhcRn, [HsDoc Name])
+             -> ( [(Name, HsDoc Name)]
+                , [(Name, Map Int (HsDoc Name))]
                 )
     mappings (L l decl, docStrs) =
            (dm, am)
       where
-        doc = concatDocs docStrs
+        doc = concatHsDoc docStrs
         args = declTypeDocs decl
 
-        subs :: [(Name, [(HsDocString)], Map Int (HsDocString))]
+        subs :: [(Name, [(HsDoc Name)], Map Int (HsDoc Name))]
         subs = subordinates instanceMap decl
 
         (subDocs, subArgs) =
-          unzip (map (\(_, strs, m) -> (concatDocs strs, m)) subs)
+          unzip (map (\(_, strs, m) -> (concatHsDoc strs, m)) subs)
 
         ns = names l decl
         subNs = [ n | (n, _, _) <- subs ]
@@ -94,12 +234,15 @@ mkMaps instances decls =
     instanceMap = M.fromList [(getSrcSpan n, n) | n <- instances]
 
     names :: SrcSpan -> HsDecl GhcRn -> [Name]
-    names l (InstD _ d) = maybeToList (M.lookup loc instanceMap) -- See
+    names _ (InstD _ d) = maybeToList (M.lookup loc instanceMap) -- See
                                                                  -- Note [1].
-      where loc = case d of
-              TyFamInstD _ _ -> l -- The CoAx's loc is the whole line, but only
-                                  -- for TFs
-              _ -> getInstLoc d
+      where
+        loc = case d of
+          -- The CoAx's loc is the whole line, but only for TFs. The
+          -- workaround is to dig into the family instance declaration and
+          -- get the identifier with the right location.
+          TyFamInstD _ (TyFamInstDecl d') -> getLoc (feqn_tycon (hsib_body d'))
+          _ -> getInstLoc d
     names l (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See Note [1].
     names _ decl = getMainDeclBinder decl
 
@@ -159,7 +302,7 @@ getInstLoc = \case
 -- family of a type class.
 subordinates :: Map SrcSpan Name
              -> HsDecl GhcRn
-             -> [(Name, [(HsDocString)], Map Int (HsDocString))]
+             -> [(Name, [(HsDoc Name)], Map Int (HsDoc Name))]
 subordinates instMap decl = case decl of
   InstD _ (ClsInstD _ d) -> do
     DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
@@ -178,7 +321,7 @@ subordinates instMap decl = case decl of
                    , name <- getMainDeclBinder d, not (isValD d)
                    ]
     dataSubs :: HsDataDefn GhcRn
-             -> [(Name, [HsDocString], Map Int (HsDocString))]
+             -> [(Name, [HsDoc Name], Map Int (HsDoc Name))]
     dataSubs dd = constrs ++ fields ++ derivs
       where
         cons = map unLoc $ (dd_cons dd)
@@ -197,13 +340,15 @@ subordinates instMap decl = case decl of
                   , Just instName <- [M.lookup l instMap] ]
 
 -- | Extract constructor argument docs from inside constructor decls.
-conArgDocs :: ConDecl GhcRn -> Map Int (HsDocString)
+conArgDocs :: ConDecl pass -> Map Int (HsDoc (IdP pass))
 conArgDocs con = case getConArgs con of
                    PrefixCon args -> go 0 (map unLoc args ++ ret)
                    InfixCon arg1 arg2 -> go 0 ([unLoc arg1, unLoc arg2] ++ ret)
                    RecCon _ -> go 1 ret
   where
     go n (HsDocTy _ _ (dL->L _ ds) : tys) = M.insert n ds $ go (n+1) tys
+    go n (HsBangTy _ _ (dL->L _ (HsDocTy _ _ (L _ ds))) : tys)
+      = M.insert n ds $ go (n+1) tys
     go n (_ : tys) = go (n+1) tys
     go _ [] = M.empty
 
@@ -217,7 +362,7 @@ isValD _ = False
 
 -- | All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists.
-classDecls :: TyClDecl GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
+classDecls :: TyClDecl GhcRn -> [(LHsDecl GhcRn, [HsDoc Name])]
 classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
@@ -227,7 +372,7 @@ classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
     ats   = mkDecls tcdATs (TyClD noExt . FamDecl noExt) class_
 
 -- | Extract function argument docs from inside top-level decls.
-declTypeDocs :: HsDecl GhcRn -> Map Int (HsDocString)
+declTypeDocs :: HsDecl pass -> Map Int (HsDoc (IdP pass))
 declTypeDocs = \case
   SigD  _ (TypeSig _ _ ty)          -> typeDocs (unLoc (hsSigWcType ty))
   SigD  _ (ClassOpSig _ _ _ ty)     -> typeDocs (unLoc (hsSigType ty))
@@ -248,7 +393,7 @@ nubByName f ns = go emptyNameSet ns
         y = f x
 
 -- | Extract function argument docs from inside types.
-typeDocs :: HsType GhcRn -> Map Int (HsDocString)
+typeDocs :: HsType pass -> Map Int (HsDoc (IdP pass))
 typeDocs = go 0
   where
     go n (HsForAllTy { hst_body = ty }) = go n (unLoc ty)
@@ -262,7 +407,7 @@ typeDocs = go 0
 
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.
-topDecls :: HsGroup GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
+topDecls :: HsGroup GhcRn -> [(LHsDecl GhcRn, [HsDoc Name])]
 topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
@@ -291,7 +436,7 @@ sortByLoc = sortOn getLoc
 -- | Collect docs and attach them to the right declarations.
 --
 -- A declaration may have multiple doc strings attached to it.
-collectDocs :: [LHsDecl pass] -> [(LHsDecl pass, [HsDocString])]
+collectDocs :: [LHsDecl pass] -> [(LHsDecl pass, [HsDoc (IdP pass)])]
 -- ^ This is an example.
 collectDocs = go Nothing []
   where

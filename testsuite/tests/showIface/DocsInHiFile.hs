@@ -3,12 +3,21 @@
 '<>', ':=:', 'Bool'
 -}
 module DocsInHiFile
-  ( DocsInHiFile.elem
+  ( -- * First section heading
+
+    -- | A small chunk of documentation
+    DocsInHiFile.elem
+
+    -- $namedchunk
   , D(..)
   , add
+    -- * Another section heading
   , P(..)
   , Show(..)
   ) where
+
+-- $namedchunk
+-- This chunk of documentation is named "namedchunk".
 
 -- | '()', 'elem'.
 elem :: ()

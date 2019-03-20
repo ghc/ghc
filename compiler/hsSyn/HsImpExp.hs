@@ -8,6 +8,7 @@ HsImpExp: Abstract syntax: imports, exports, interfaces
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
@@ -18,9 +19,10 @@ module HsImpExp where
 import GhcPrelude
 
 import Module           ( ModuleName )
-import HsDoc            ( HsDocString )
+import HsDoc            ( HsDoc )
 import OccName          ( HasOccName(..), isTcOcc, isSymOcc )
-import BasicTypes       ( SourceText(..), StringLiteral(..), pprWithSourceText )
+import BasicTypes       ( SourceText(..), StringLiteral, pattern StringLiteral
+                        , pprWithSourceText )
 import FieldLabel       ( FieldLbl(..) )
 
 import Outputable
@@ -222,8 +224,10 @@ data IE pass
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnModule'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | IEGroup             (XIEGroup pass) Int HsDocString -- ^ Doc section heading
-  | IEDoc               (XIEDoc pass) HsDocString       -- ^ Some documentation
+  | IEGroup             (XIEGroup pass) Int (HsDoc (IdP pass))
+        -- ^ Doc section heading
+  | IEDoc               (XIEDoc pass) (HsDoc (IdP pass))
+        -- ^ Some documentation
   | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
   | XIE (XXIE pass)
 

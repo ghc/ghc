@@ -5,6 +5,7 @@
 
 {-# LANGUAGE CPP, NondecreasingIndentation #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | Module for constructing @ModIface@ values (interface files),
 -- writing them to disk and comparing two versions to see if
@@ -155,15 +156,12 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                       mg_hpc_info     = hpc_info,
                       mg_safe_haskell = safe_mode,
                       mg_trust_pkg    = self_trust,
-                      mg_doc_hdr      = doc_hdr,
-                      mg_decl_docs    = decl_docs,
-                      mg_arg_docs     = arg_docs
+                      mg_docs         = docs
                     }
         = mkIface_ hsc_env maybe_old_fingerprint
                    this_mod hsc_src used_th deps rdr_env fix_env
                    warns hpc_info self_trust
-                   safe_mode usages
-                   doc_hdr decl_docs arg_docs
+                   safe_mode usages docs
                    mod_details
 
 -- | make an interface from the results of typechecking only.  Useful
@@ -188,11 +186,11 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
                       tcg_dependent_files = dependent_files
                     }
   = do
+          let dflags = hsc_dflags hsc_env
           let used_names = mkUsedNames tc_result
-          let pluginModules =
-                map lpModule (cachedPlugins (hsc_dflags hsc_env))
+          let pluginModules = map lpModule (cachedPlugins dflags)
           deps <- mkDependencies
-                    (thisInstalledUnitId (hsc_dflags hsc_env))
+                    (thisInstalledUnitId dflags)
                     (map mi_module pluginModules) tc_result
           let hpc_info = emptyHpcInfo other_hpc_info
           used_th <- readIORef tc_splice_used
@@ -207,33 +205,27 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
           usages <- mkUsageInfo hsc_env this_mod (imp_mods imports) used_names
                       dep_files merged pluginModules
 
-          let (doc_hdr', doc_map, arg_map) = extractDocs tc_result
+          let docs = extractDocs dflags tc_result
 
           mkIface_ hsc_env maybe_old_fingerprint
                    this_mod hsc_src
                    used_th deps rdr_env
                    fix_env warns hpc_info
-                   (imp_trust_own_pkg imports) safe_mode usages
-                   doc_hdr' doc_map arg_map
+                   (imp_trust_own_pkg imports) safe_mode usages docs
                    mod_details
-
-
 
 mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
-         -> NameEnv FixItem -> Warnings -> HpcInfo
+         -> NameEnv FixItem -> Warnings (HsDoc Name) -> HpcInfo
          -> Bool
          -> SafeHaskellMode
          -> [Usage]
-         -> Maybe HsDocString
-         -> DeclDocMap
-         -> ArgDocMap
+         -> Maybe Docs
          -> ModDetails
          -> IO (ModIface, Bool)
 mkIface_ hsc_env maybe_old_fingerprint
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
-         hpc_info pkg_trust_req safe_mode usages
-         doc_hdr decl_docs arg_docs
+         hpc_info pkg_trust_req safe_mode usages docs
          ModDetails{  md_insts     = insts,
                       md_fam_insts = fam_insts,
                       md_rules     = rules,
@@ -322,9 +314,7 @@ mkIface_ hsc_env maybe_old_fingerprint
               mi_warn_fn     = mkIfaceWarnCache warns,
               mi_fix_fn      = mkIfaceFixCache fixities,
               mi_complete_sigs = icomplete_sigs,
-              mi_doc_hdr     = doc_hdr,
-              mi_decl_docs   = decl_docs,
-              mi_arg_docs    = arg_docs }
+              mi_docs        = docs }
 
     (new_iface, no_change_at_all)
           <- {-# SCC "versioninfo" #-}
@@ -1250,6 +1240,17 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
                 case maybe_iface' of
                     -- We can't retrieve the iface
                     Nothing    -> return (MustCompile, Nothing)
+
+                    -- TODO: We probably want to require haddocks with -haddock
+                    -- independently of Opt_SkipIfaceVersionCheck.
+                    Just iface | gopt Opt_SkipIfaceVersionCheck dflags ->
+                        if gopt Opt_Haddock dflags && isNothing (mi_docs iface)
+                            then (,Nothing) <$>
+                                   out_of_date ("requiring haddocks for " ++
+                                                moduleNameString (moduleName (ms_mod mod_summary)))
+                                               (text "mi_docs was Nothing")
+                            else (,Just iface) <$>
+                                   up_to_date (text "using the iface regardless of its version")
 
                     -- We have got the old iface; check its versions
                     -- even in the SourceUnmodifiedAndStable case we

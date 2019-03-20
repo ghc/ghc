@@ -74,6 +74,7 @@ import Class            ( FunDep )
 -- compiler/parser
 import RdrHsSyn
 import Lexer
+import HaddockLex
 import HaddockUtils
 import ApiAnnotation
 
@@ -769,7 +770,7 @@ module :: { Located (HsModule GhcPs) }
                                (fst $ snd $1) (snd $ snd $1) Nothing Nothing))
                        (fst $1) }
 
-maybedocheader :: { Maybe LHsDocString }
+maybedocheader :: { Maybe (LHsDoc RdrName) }
         : moduleheader            { $1 }
         | {- empty -}             { Nothing }
 
@@ -779,12 +780,22 @@ missing_module_keyword :: { () }
 implicit_top :: { () }
         : {- empty -}                           {% pushModuleContext }
 
-maybemodwarning :: { Maybe (Located WarningTxt) }
+maybemodwarning :: { Maybe (Located (WarningTxt (HsDoc RdrName))) }
     : '{-# DEPRECATED' strings '#-}'
-                      {% ajs (Just (sLL $1 $> $ DeprecatedTxt (sL1 $1 (getDEPRECATED_PRAGs $1)) (snd $ unLoc $2)))
+                      {% ajs (Just (sLL $1 $> $ WarningTxt (sL1 $1
+                                                             (WithSourceText
+                                                               (getDEPRECATED_PRAGs $1)
+                                                               WsDeprecated))
+                                                           (map stringLiteralToHsDocWst
+                                                                (snd $ unLoc $2))))
                              (mo $1:mc $3: (fst $ unLoc $2)) }
     | '{-# WARNING' strings '#-}'
-                         {% ajs (Just (sLL $1 $> $ WarningTxt (sL1 $1 (getWARNING_PRAGs $1)) (snd $ unLoc $2)))
+                      {% ajs (Just (sLL $1 $> $ WarningTxt (sL1 $1
+                                                             (WithSourceText
+                                                               (getWARNING_PRAGs $1)
+                                                               WsWarning))
+                                                           (map stringLiteralToHsDocWst
+                                                                (snd $ unLoc $2))))
                                 (mo $1:mc $3 : (fst $ unLoc $2)) }
     |  {- empty -}                  { Nothing }
 
@@ -1728,7 +1739,9 @@ warnings :: { OrdList (LWarnDecl GhcPs) }
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 warning :: { OrdList (LWarnDecl GhcPs) }
         : namelist strings
-                {% amsu (sLL $1 $> (Warning noExt (unLoc $1) (WarningTxt (noLoc NoSourceText) $ snd $ unLoc $2)))
+                {% amsu (sLL $1 $> (Warning noExt (unLoc $1) (WarningTxt
+                                                               (noLoc (noSourceText WsWarning))
+                                                               (map stringLiteralToHsDocWst $ snd $ unLoc $2))))
                      (fst $ unLoc $2) }
 
 deprecations :: { OrdList (LWarnDecl GhcPs) }
@@ -1743,7 +1756,9 @@ deprecations :: { OrdList (LWarnDecl GhcPs) }
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 deprecation :: { OrdList (LWarnDecl GhcPs) }
         : namelist strings
-             {% amsu (sLL $1 $> $ (Warning noExt (unLoc $1) (DeprecatedTxt (noLoc NoSourceText) $ snd $ unLoc $2)))
+             {% amsu (sLL $1 $> $ (Warning noExt (unLoc $1) (WarningTxt
+                                                              (noLoc (noSourceText  WsDeprecated))
+                                                              (map stringLiteralToHsDocWst $ snd $ unLoc $2))))
                      (fst $ unLoc $2) }
 
 strings :: { Located ([AddAnn],[Located StringLiteral]) }
@@ -2298,7 +2313,7 @@ forall :: { Located ([AddAnn], Maybe [LHsTyVarBndr GhcPs]) }
         : 'forall' tv_bndrs '.'       { sLL $1 $> ([mu AnnForall $1,mj AnnDot $3], Just $2) }
         | {- empty -}                 { noLoc ([], Nothing) }
 
-constr_stuff :: { Located (Located RdrName, HsConDeclDetails GhcPs, Maybe LHsDocString) }
+constr_stuff :: { Located (Located RdrName, HsConDeclDetails GhcPs, Maybe (LHsDoc RdrName)) }
         : constr_tyapps                    {% do { c <- mergeDataCon (unLoc $1)
                                                  ; return $ sL1 $1 c } }
 
@@ -2384,7 +2399,7 @@ There's an awkward overlap with a type signature.  Consider
 docdecl :: { LHsDecl GhcPs }
         : docdecld { sL1 $1 (DocD noExt (unLoc $1)) }
 
-docdecld :: { LDocDecl }
+docdecld :: { LDocDecl GhcPs }
         : docnext                               { sL1 $1 (DocCommentNext (unLoc $1)) }
         | docprev                               { sL1 $1 (DocCommentPrev (unLoc $1)) }
         | docnamed                              { sL1 $1 (case (unLoc $1) of (n, doc) -> DocCommentNamed n doc) }
@@ -3716,31 +3731,31 @@ bars :: { ([SrcSpan],Int) }     -- One or more bars
 -----------------------------------------------------------------------------
 -- Documentation comments
 
-docnext :: { LHsDocString }
-  : DOCNEXT {% return (sL1 $1 (mkHsDocString (getDOCNEXT $1))) }
+docnext :: { LHsDoc RdrName }
+  : DOCNEXT {% return (sL1 $1 (lexHsDoc' (getDOCNEXT $1))) }
 
-docprev :: { LHsDocString }
-  : DOCPREV {% return (sL1 $1 (mkHsDocString (getDOCPREV $1))) }
+docprev :: { LHsDoc RdrName }
+  : DOCPREV {% return (sL1 $1 (lexHsDoc' (getDOCPREV $1))) }
 
-docnamed :: { Located (String, HsDocString) }
+docnamed :: { Located (String, HsDoc RdrName) }
   : DOCNAMED {%
       let string = getDOCNAMED $1
           (name, rest) = break isSpace string
-      in return (sL1 $1 (name, mkHsDocString rest)) }
+      in return (sL1 $1 (name, lexHsDoc' rest)) }
 
-docsection :: { Located (Int, HsDocString) }
+docsection :: { Located (Int, HsDoc RdrName) }
   : DOCSECTION {% let (n, doc) = getDOCSECTION $1 in
-        return (sL1 $1 (n, mkHsDocString doc)) }
+        return (sL1 $1 (n, lexHsDoc' doc)) }
 
-moduleheader :: { Maybe LHsDocString }
+moduleheader :: { Maybe (LHsDoc RdrName) }
         : DOCNEXT {% let string = getDOCNEXT $1 in
-                     return (Just (sL1 $1 (mkHsDocString string))) }
+                     return (Just (sL1 $1 (lexHsDoc' string))) }
 
-maybe_docprev :: { Maybe LHsDocString }
+maybe_docprev :: { Maybe (LHsDoc RdrName) }
         : docprev                       { Just $1 }
         | {- empty -}                   { Nothing }
 
-maybe_docnext :: { Maybe LHsDocString }
+maybe_docnext :: { Maybe (LHsDoc RdrName) }
         : docnext                       { Just $1 }
         | {- empty -}                   { Nothing }
 
@@ -3840,6 +3855,13 @@ getSCC lt = do let s = getSTRING lt
                if ' ' `elem` unpackFS s
                    then addFatalError (getLoc lt) (text err)
                    else return s
+
+lexHsDoc' :: String -> HsDoc RdrName
+lexHsDoc' = lexHsDoc (unLoc <$> parseIdentifier)
+
+stringLiteralToHsDocWst :: Located StringLiteral -> Located (WithSourceText (HsDoc RdrName))
+stringLiteralToHsDocWst = fmap $ \(StringLiteral st fs) ->
+    WithSourceText st (lexHsDoc' (unpackFS fs))
 
 -- Utilities for combining source spans
 comb2 :: (HasSrcSpan a , HasSrcSpan b) => a -> b -> SrcSpan

@@ -1,0 +1,33 @@
+Warnings: x: "These are useless"
+          y: "These are useless"
+          contains: "Use `elem` instead."
+trusted: safe
+require own pkg trusted: False
+docs:
+  Just module header:
+         Nothing
+       declaration docs:
+       arg docs:
+       documentation structure:
+         avails:
+           [contains]
+         avails:
+           [x]
+         avails:
+           [y]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         DoAndIfThenElse
+         EmptyDataDecls
+         PatternGuards
+         NondecreasingIndentation
+         TraditionalRecordSyntax
+         MonadFailDesugaring
+         StarIsType

@@ -1725,11 +1725,11 @@ docCmd s  = do
   (liftIO . putStrLn . showSDocForUser dflags unqual) sdocs'
 
 -- TODO: also print arg docs.
-pprDocs :: (Maybe HsDocString, Map Int HsDocString) -> SDoc
+pprDocs :: (Maybe (HsDoc Name), Map Int (HsDoc Name)) -> SDoc
 pprDocs (mb_decl_docs, _arg_docs) =
   maybe
     (text "<has no documentation>")
-    (text . unpackHDS)
+    (text . unpackHDS . hsDocString)
     mb_decl_docs
 
 handleGetDocsFailure :: GHC.GhcMonad m => GetDocsFailure -> m SDoc

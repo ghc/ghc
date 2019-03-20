@@ -54,7 +54,7 @@ import Control.Monad.Trans.Class  ( lift )
 -- These synonyms match those defined in main/GHC.hs
 type RenamedSource     = ( HsGroup GhcRn, [LImportDecl GhcRn]
                          , Maybe [(LIE GhcRn, Avails)]
-                         , Maybe LHsDocString )
+                         , Maybe (LHsDoc Name) )
 type TypecheckedSource = LHsBinds GhcTc
 
 

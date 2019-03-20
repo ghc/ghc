@@ -407,6 +407,7 @@ Library
         Elf
         TidyPgm
         Ctype
+        HaddockLex
         HaddockUtils
         Lexer
         OptCoercion

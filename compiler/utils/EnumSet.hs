@@ -1,3 +1,4 @@
+{-# language BangPatterns #-}
 -- | A tiny wrapper around 'IntSet.IntSet' for representing sets of 'Enum'
 -- things.
 module EnumSet
@@ -5,6 +6,7 @@ module EnumSet
     , member
     , insert
     , delete
+    , difference
     , toList
     , fromList
     , empty
@@ -12,6 +14,9 @@ module EnumSet
 
 import GhcPrelude
 
+import Binary
+
+import Data.Bits
 import qualified Data.IntSet as IntSet
 
 newtype EnumSet a = EnumSet IntSet.IntSet
@@ -25,6 +30,9 @@ insert x (EnumSet s) = EnumSet $ IntSet.insert (fromEnum x) s
 delete :: Enum a => a -> EnumSet a -> EnumSet a
 delete x (EnumSet s) = EnumSet $ IntSet.delete (fromEnum x) s
 
+difference :: EnumSet a -> EnumSet a -> EnumSet a
+difference (EnumSet s0) (EnumSet s1) = EnumSet (IntSet.difference s0 s1)
+
 toList :: Enum a => EnumSet a -> [a]
 toList (EnumSet s) = map toEnum $ IntSet.toList s
 
@@ -33,3 +41,30 @@ fromList = EnumSet . IntSet.fromList . map fromEnum
 
 empty :: EnumSet a
 empty = EnumSet IntSet.empty
+
+-- | Represents the 'EnumSet' as a bit set.
+--
+-- Assumes that all elements are non-negative.
+--
+-- This is only efficient for values that are sufficiently small,
+-- for example in the lower hundreds.
+instance Binary (EnumSet a) where
+  put_ bh = put_ bh . enumSetToBitArray
+  get bh = bitArrayToEnumSet <$> get bh
+
+-- TODO: Using 'Natural' instead of 'Integer' should be slightly more efficient
+-- but we don't currently have a 'Binary' instance for 'Natural'.
+type BitArray = Integer
+
+enumSetToBitArray :: EnumSet a -> BitArray
+enumSetToBitArray (EnumSet int_set) =
+    IntSet.foldl' setBit 0 int_set
+
+bitArrayToEnumSet :: BitArray -> EnumSet a
+bitArrayToEnumSet ba = EnumSet (go (popCount ba) 0 IntSet.empty)
+  where
+    go 0 _ !int_set = int_set
+    go n i !int_set =
+      if ba `testBit` i
+        then go (pred n) (succ i) (IntSet.insert i int_set)
+        else go n        (succ i) int_set

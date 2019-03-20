@@ -1,6 +1,7 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
              MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
              PolyKinds #-}
+{-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types

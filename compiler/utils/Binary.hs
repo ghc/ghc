@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -48,6 +49,8 @@ module Binary
    -- * Lazy Binary I/O
    lazyGet,
    lazyPut,
+   lazyGetMaybe,
+   lazyPutMaybe,
 
    -- * User data
    UserData(..), getUserData, setUserData,
@@ -78,12 +81,18 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import Data.IORef
 import Data.Char                ( ord, chr )
+import Data.List.NonEmpty       ( NonEmpty(..))
+import qualified Data.List.NonEmpty as NonEmpty
+import Data.Map                 ( Map )
+import qualified Data.Map as Map
+import Data.Set                 ( Set )
+import qualified Data.Set as Set
 import Data.Time
 import Type.Reflection
 import Type.Reflection.Unsafe
 import Data.Kind (Type)
 import GHC.Exts (TYPE, RuntimeRep(..), VecCount(..), VecElem(..))
-import Control.Monad            ( when )
+import Control.Monad            ( (<$!>), when )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
@@ -408,6 +417,10 @@ instance Binary a => Binary [a] where
         let loop 0 = return []
             loop n = do a <- get bh; as <- loop (n-1); return (a:as)
         loop len
+
+instance Binary a => Binary (NonEmpty a) where
+    put_ bh = put_ bh . NonEmpty.toList
+    get bh = NonEmpty.fromList <$> get bh
 
 instance (Ix a, Binary a, Binary b) => Binary (Array a b) where
     put_ bh arr = do
@@ -813,6 +826,25 @@ lazyGet bh = do
     seekBin bh p -- skip over the object for now
     return a
 
+-- | Serialize the constructor strictly but lazily serialize a value inside a
+-- 'Just'.
+--
+-- This way we can check for the presence of a value without deserializing the
+-- value itself.
+lazyPutMaybe :: Binary a => BinHandle -> Maybe a -> IO ()
+lazyPutMaybe bh Nothing  = putWord8 bh 0
+lazyPutMaybe bh (Just x) = do
+  putWord8 bh 1
+  lazyPut bh x
+
+-- | Deserialize a value serialized by 'lazyPutMaybe'.
+lazyGetMaybe :: Binary a => BinHandle -> IO (Maybe a)
+lazyGetMaybe bh = do
+  h <- getWord8 bh
+  case h of
+    0 -> pure Nothing
+    _ -> Just <$> lazyGet bh
+
 -- -----------------------------------------------------------------------------
 -- UserData
 -- -----------------------------------------------------------------------------
@@ -1117,25 +1149,21 @@ instance Binary Fixity where
           ab <- get bh
           return (Fixity src aa ab)
 
-instance Binary WarningTxt where
-    put_ bh (WarningTxt s w) = do
-            putByte bh 0
-            put_ bh s
-            put_ bh w
-    put_ bh (DeprecatedTxt s d) = do
-            putByte bh 1
-            put_ bh s
-            put_ bh d
+-- | Ignores source locations and 'SourceText's.
+instance Binary text => Binary (WarningTxt text) where
+  put_ bh w = do
+    let (sort_, ws) = warningTxtContents w
+    put_ bh sort_
+    put_ bh ws
+  get bh = do
+    sort_ <- get bh
+    ws <- get bh
+    pure $ WarningTxt (noLoc $ noSourceText sort_)
+                      (map (noLoc . noSourceText) ws)
 
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do s <- get bh
-                      w <- get bh
-                      return (WarningTxt s w)
-              _ -> do s <- get bh
-                      d <- get bh
-                      return (DeprecatedTxt s d)
+instance Binary WarningSort where
+  put_ bh = putWord8 bh . fromIntegral . fromEnum
+  get  bh = toEnum . fromIntegral <$!> getWord8 bh
 
 instance Binary StringLiteral where
   put_ bh (StringLiteral st fs) = do
@@ -1213,3 +1241,19 @@ instance Binary SourceText where
         s <- get bh
         return (SourceText s)
       _ -> panic $ "Binary SourceText:" ++ show h
+
+--------------------------------------------------------------------------------
+-- Instances for the containers package
+--------------------------------------------------------------------------------
+
+-- | This instance doesn't rely on the determinism of the keys' 'Ord' instance,
+-- so it works e.g. for 'Name's too.
+instance (Binary k, Binary v, Ord k) => Binary (Map k v) where
+  put_ bh m = put_ bh (Map.toList m)
+  get bh = Map.fromList <$> get bh
+
+-- | This instance doesn't rely on the determinism of the keys' 'Ord' instance,
+-- so it works e.g. for 'Name's too.
+instance (Binary a, Ord a) => Binary (Set a) where
+  put_ bh s = put_ bh (Set.toList s)
+  get bh = Set.fromList <$> get bh
