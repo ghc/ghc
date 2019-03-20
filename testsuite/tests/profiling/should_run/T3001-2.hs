@@ -192,6 +192,7 @@ instance Monad Get where
                            in unGet (k a) s')
     {-# INLINE (>>=) #-}
 
+instance MonadFail Get where
     fail      = error "failDesc"
 
 instance Applicative Get where
