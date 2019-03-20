@@ -758,11 +758,6 @@ type instance XStatic        GhcPs = NoExt
 type instance XStatic        GhcRn = NameSet
 type instance XStatic        GhcTc = NameSet
 
-type instance XArrApp        GhcPs = NoExt
-type instance XArrApp        GhcRn = NoExt
-type instance XArrApp        GhcTc = Type
-
-type instance XArrForm       (GhcPass _) = NoExt
 type instance XTick          (GhcPass _) = NoExt
 type instance XBinTick       (GhcPass _) = NoExt
 type instance XTickPragma    (GhcPass _) = NoExt
