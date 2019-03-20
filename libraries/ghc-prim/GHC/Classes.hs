@@ -328,8 +328,8 @@ instance Ord TyCon where
 -- 4. @x < y@ = @compare x y == LT@
 -- 5. @x > y@ = @compare x y == GT@
 -- 6. @x == y@ = @compare x y == EQ@
--- 7. @min x y == if x <= y then x else y@ = 'True'
--- 8. @max x y == if x >= y then x else y@ = 'True'
+-- 7. @min x y@ = @if x <= y then x else y@
+-- 8. @max x y@ = @if x >= y then x else y@
 --
 -- Minimal complete definition: either 'compare' or '<='.
 -- Using 'compare' can be more efficient for complex types.
