@@ -365,7 +365,8 @@ Library
         -- mingw32: Unfortunately required because of a resource leak between
         --          mingwex and mingw32. the __math_err symbol is defined in
         --          mingw32 which is required by mingwex.
-        extra-libraries: wsock32, user32, shell32, msvcrt, mingw32, mingwex
+        -- shlwapi: provides PathFileExistsW
+        extra-libraries: wsock32, user32, shell32, msvcrt, mingw32, mingwex, shlwapi
         exposed-modules:
             GHC.IO.Encoding.CodePage.API
             GHC.IO.Encoding.CodePage.Table
