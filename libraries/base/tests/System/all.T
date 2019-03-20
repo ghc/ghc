@@ -7,3 +7,4 @@ test('T5930',   normal, compile_and_run, [''])
 test('system001',   when(opsys("mingw32"), skip), \
 	compile_and_run, [''])
 test('Timeout001', normal, compile_and_run, [''])
+test('T16466', normal, compile_and_run, [''])
