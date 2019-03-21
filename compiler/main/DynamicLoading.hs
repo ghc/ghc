@@ -97,8 +97,8 @@ initializePlugins hsc_env df
 
 loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env
-  = do { unless (null to_load) $
-           checkExternalInterpreter hsc_env
+  = do { -- unless (null to_load) $
+         --   checkExternalInterpreter hsc_env
        ; plugins <- mapM loadPlugin to_load
        ; return $ zipWith attachOptions to_load plugins }
   where
@@ -219,15 +219,22 @@ getHValueSafely hsc_env val_name expected_type = do
              then do
                 -- Link in the module that contains the value, if it has such a module
                 case nameModule_maybe val_name of
-                    Just mod -> do linkModule hsc_env mod
+                    Just mod -> do linkModule local_hsc_env mod
                                    return ()
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
-                hval <- getHValue hsc_env val_name >>= wormhole dflags
+                hval <- getHValue local_hsc_env val_name >>= wormhole local_dflags
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing
    where dflags = hsc_dflags hsc_env
+         -- unset Opt_ExternalInterpreter. This will ensure that
+         -- local_hsc_env and local_dflags go through the local linker.
+         -- if no -fexternal-interpreter is provided, this will be a no-op.
+         -- if however -fexteranl-interpreter is provided, we maintain two
+         -- linker states. The remote (iserv) one and the local one.
+         local_hsc_env = hsc_env { hsc_dflags = gopt_unset (hsc_dflags hsc_env) Opt_ExternalInterpreter }
+         local_dflags = hsc_dflags local_hsc_env
 
 -- | Coerce a value as usual, but:
 --

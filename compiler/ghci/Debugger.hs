@@ -125,7 +125,7 @@ bindSuspensions t = do
                 | (name,ty) <- zip names tys]
           new_ic = extendInteractiveContextWithIds ictxt ids
       fhvs <- liftIO $ mapM (mkFinalizedHValue hsc_env <=< mkRemoteRef) hvals
-      liftIO $ extendLinkEnv (zip names fhvs)
+      liftIO $ extendLinkEnv hsc_env (zip names fhvs)
       setSession hsc_env {hsc_IC = new_ic }
       return t'
      where
@@ -179,8 +179,8 @@ showTerm term = do
                expr = "show " ++ showPpr dflags bname
            _ <- GHC.setSessionDynFlags dflags{log_action=noop_log}
            fhv <- liftIO $ mkFinalizedHValue hsc_env =<< mkRemoteRef val
-           txt_ <- withExtendedLinkEnv [(bname, fhv)]
-                                       (GHC.compileExpr expr)
+           txt_ <- withExtendedLinkEnv hsc_env [(bname, fhv)]
+                                               (GHC.compileExpr expr)
            let myprec = 10 -- application precedence. TODO Infix constructors
            let txt = unsafeCoerce# txt_ :: [a]
            if not (null txt) then

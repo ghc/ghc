@@ -627,7 +627,7 @@ wormholeRef :: DynFlags -> RemoteRef a -> IO a
 wormholeRef dflags _r
   | gopt Opt_ExternalInterpreter dflags
   = throwIO (InstallationError
-      "this operation requires -fno-external-interpreter")
+      "wormholeRef: this operation requires -fno-external-interpreter")
 #if defined(GHCI)
   | otherwise
   = localRef _r

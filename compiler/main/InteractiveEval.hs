@@ -333,7 +333,7 @@ handleRunStatus step expr bindings final_ids status history
     = do hsc_env <- getSession
          let final_ic = extendInteractiveContextWithIds (hsc_IC hsc_env) final_ids
              final_names = map getName final_ids
-         liftIO $ Linker.extendLinkEnv (zip final_names hvals)
+         liftIO $ Linker.extendLinkEnv hsc_env (zip final_names hvals)
          hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
          setSession hsc_env'
          return (ExecComplete (Right final_names) allocs)
@@ -372,7 +372,7 @@ resumeExec canLogSpan step
             new_names = [ n | thing <- ic_tythings ic
                             , let n = getName thing
                             , not (n `elem` old_names) ]
-        liftIO $ Linker.deleteFromLinkEnv new_names
+        liftIO $ Linker.deleteFromLinkEnv hsc_env new_names
 
         case r of
           Resume { resumeStmt = expr, resumeContext = fhv
@@ -467,7 +467,7 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 [exn_id]
    --
-   Linker.extendLinkEnv [(exn_name, apStack)]
+   Linker.extendLinkEnv hsc_env [(exn_name, apStack)]
    return (hsc_env{ hsc_IC = ictxt1 }, [exn_name], span, "<exception thrown>")
 
 -- Just case: we stopped at a breakpoint, we have information about the location
@@ -526,8 +526,8 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
        names  = map idName new_ids
 
    let fhvs = catMaybes mb_hValues
-   Linker.extendLinkEnv (zip names fhvs)
-   when result_ok $ Linker.extendLinkEnv [(result_name, apStack_fhv)]
+   Linker.extendLinkEnv hsc_env (zip names fhvs)
+   when result_ok $ Linker.extendLinkEnv hsc_env [(result_name, apStack_fhv)]
    hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
    return (hsc_env1, if result_ok then result_name:names else names, span, decl)
   where
@@ -996,8 +996,12 @@ moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
 -- RTTI primitives
 
 obtainTermFromVal :: HscEnv -> Int -> Bool -> Type -> a -> IO Term
-obtainTermFromVal hsc_env bound force ty x =
-              cvObtainTerm hsc_env bound force ty (unsafeCoerce# x)
+obtainTermFromVal hsc_env bound force ty x
+  | gopt Opt_ExternalInterpreter (hsc_dflags hsc_env)
+  = throwIO (InstallationError
+      "obtainTermFromVal: this operation requires -fno-external-interpreter")
+  | otherwise
+  = cvObtainTerm hsc_env bound force ty (unsafeCoerce# x)
 
 obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
 obtainTermFromId hsc_env bound force id =  do
