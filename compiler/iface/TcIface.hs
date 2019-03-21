@@ -1214,7 +1214,7 @@ tcIfaceCo = \co0 -> do
     co <- go co0
     if shouldBuildCoercions dflags
       then return co
-      else do return $ zapCoercion dflags co
+      else return $ zapCoercion dflags co
   where
     go_mco IfaceMRefl    = pure MRefl
     go_mco (IfaceMCo co) = MCo <$> (go co)

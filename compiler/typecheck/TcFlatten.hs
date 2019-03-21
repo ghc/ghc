@@ -27,6 +27,7 @@ import TcSMonad as TcS
 import BasicTypes( SwapFlag(..) )
 
 import Util
+import Pair
 import Bag
 import Control.Monad
 import MonadUtils    ( zipWith3M )
@@ -1334,7 +1335,7 @@ flatten_exact_fam_app_fully tc tys
   -- See Note [Reduce type family applications eagerly]
      -- the following tcTypeKind should never be evaluated, as it's just used in
      -- casting, and casts by refl are dropped
-  = do { mOut <- try_to_reduce_nocache tc emptyDVarSet tys
+  = do { mOut <- try_to_reduce_nocache tc tys emptyDVarSet
        ; case mOut of
            Just out -> pure out
            Nothing -> do
@@ -1467,7 +1468,7 @@ flatten_exact_fam_app_fully tc tys
                           -> [Type]  -- args, not necessarily flattened
                           -> DTyCoVarSet -- free variables of ret_co
                           -> FlatM (Maybe (Xi, Coercion))
-    try_to_reduce_nocache tc tys fvs_ret_co update_co
+    try_to_reduce_nocache tc tys fvs_ret_co
       = do { let fvs = filterDVarSet isCoVar $ tyCoVarsOfTypesDSet tys
                        `unionDVarSet` fvs_ret_co
                      -- See Note [Zapping coercions] in TyCoRep
@@ -1481,10 +1482,10 @@ flatten_exact_fam_app_fully tc tys
                Just (norm_co, norm_ty)
                  -> do { (xi, final_co) <- bumpDepth $ flatten_one norm_ty
                        ; eq_rel <- getEqRel
-                       ; let co  = mkZappedCo dflags 
-                                 $ mkSymCo (maybeSubCo eq_rel norm_co
+                       ; let co  = mkSymCo (maybeSubCo eq_rel norm_co
                                             `mkTransCo` mkSymCo final_co)
-                       ; return $ Just (xi, co) }
+                             co' = mkZappedCoercion dflags co (Pair xi fam_ty) Nominal fvs
+                       ; return $ Just (xi, co') }
                Nothing -> pure Nothing }
 
 {- Note [Reduce type family applications eagerly]
