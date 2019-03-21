@@ -477,7 +477,7 @@ nightly-i386-windows-hadrian:
   script:
     - |
       python boot
-      bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
+      bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex $CONFIGURE_ARGS'
     - bash -c "echo include mk/flavours/${BUILD_FLAVOUR}.mk > mk/build.mk"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist TAR_COMP_OPTS=-1"
@@ -497,6 +497,7 @@ validate-x86_64-windows:
   extends: .build-windows-make
   variables:
     MSYSTEM: MINGW64
+    CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
   cache:
     key: x86_64-windows
 
@@ -506,6 +507,7 @@ release-x86_64-windows:
   variables:
     MSYSTEM: MINGW64
     BUILD_FLAVOUR: "perf"
+    CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
   only:
     - tags
 
@@ -516,6 +518,7 @@ release-i386-windows:
   variables:
     MSYSTEM: MINGW32
     BUILD_FLAVOUR: "perf"
+    CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
   cache:
     key: i386-windows
 
@@ -526,6 +529,7 @@ nightly-i386-windows:
       - $NIGHTLY
   variables:
     MSYSTEM: MINGW32
+    CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
   cache:
     key: i386-windows
 
