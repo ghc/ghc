@@ -476,6 +476,7 @@ lexOctNumber =
      return (Number (MkOctal digits))
 
 lexHexNumber :: ReadP Lexeme
+-- TODO: MkHexadecimal [] Nothing Nothing is nonsensical
 lexHexNumber =
   do _ <- char '0'
      _ <- char 'x' +++ char 'X'
@@ -591,10 +592,10 @@ fracBExp :: Integer -> Integer -> Digits -> Rational
 fracBExp exp mant []
   | exp < 0     = mant % (2 ^ (-exp))
   | otherwise   = fromInteger (mant * 2 ^ exp)
-fracBExp exp mant (d:ds) = exp' `seq` mant' `seq` fracExp exp' mant' ds
+fracBExp exp mant (d:ds) = exp' `seq` mant' `seq` fracBExp exp' mant' ds
   where
-    exp'  = exp - 1
-    mant' = mant * 2 + fromIntegral d
+    exp'  = exp - 4
+    mant' = mant * 16 + fromIntegral d
 
 valDig :: (Eq a, Num a) => a -> Char -> Maybe Int
 valDig 8 c
