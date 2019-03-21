@@ -18,6 +18,7 @@ stages:
   - cleanup    # See Note [Cleanup on Windows]
   - packaging  # Source distribution, etc.
   - hackage    # head.hackage testing
+  - deploy     # push documentation
 
 .only-default: &only-default
   only:
@@ -718,3 +719,23 @@ nightly-hackage:
   only:
     variables:
       - $NIGHTLY
+
+pages:
+  stage: deploy
+  dependencies:
+    - doc-tarball
+  image: ghcci/x86_64-linux-deb9:0.2
+  tags:
+    - x86_64-linux
+  script:
+    - mkdir -p public/doc
+    - tar -xf haddock.html.tar.xz -C public/doc
+    - tar -xf libraries.html.tar.xz -C public/doc
+    - tar -xf users_guide.html.tar.xz -C public/doc
+    - cp -f index.html public/doc
+  only:
+    - master
+  artifacts:
+    paths:
+      - public
+
