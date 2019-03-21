@@ -17,7 +17,7 @@ stages:
   - full-build # Build all the things
   - cleanup    # See Note [Cleanup on Windows]
   - packaging  # Source distribution, etc.
-  - hackage    # head.hackage testing
+  - testing    # head.hackage correctness and compiler performance testing
   - deploy     # push documentation
 
 .only-default: &only-default
@@ -720,7 +720,7 @@ source-tarball:
 
 .hackage:
   <<: *only-default
-  stage: hackage
+  stage: testing
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   tags:
     - x86_64-linux
@@ -745,6 +745,42 @@ nightly-hackage:
   only:
     variables:
       - $NIGHTLY
+
+############################################################
+# Nofib testing
+############################################################
+
+nofib:
+  stage: testing
+  dependencies:
+    - validate-x86_64-linux-deb9
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  tags:
+    - x86_64-linux
+  script:
+    - root=$(pwd)/ghc
+    - |
+      mkdir tmp
+      tar -xf ghc-x86_64-deb9-linux.tar.xz -C tmp
+      pushd tmp/ghc-*/
+      ./configure --prefix=$root
+      make install
+      popd
+      rm -Rf tmp
+    - export BOOT_HC=$(which ghc)
+    - cabal update; cabal install -w $BOOT_HC regex-compat
+    - export PATH=$root/bin:$PATH
+    - yum install time # TODO: Move to Docker?
+    - make -C nofib boot mode=fast -j$CPUS
+    - "make -C nofib EXTRA_RUNTEST_OPTS='-cachegrind +RTS -V0 -RTS' NoFibRuns=1 mode=fast -j$CPUS > nofib.log"
+  artifacts:
+    expire_in: 12 week
+    paths:
+      - nofib.log
+
+############################################################
+# Documentation deployment via GitLab Pages
+############################################################
 
 pages:
   stage: deploy
