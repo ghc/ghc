@@ -191,6 +191,7 @@ utils/unlit/fs.*
 rts/fs.*
 libraries/base/include/fs.h
 libraries/base/cbits/fs.c
+missing-win32-tarballs
 
 /extra-gcc-opts
 /sdistprep
