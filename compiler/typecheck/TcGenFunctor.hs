@@ -1052,7 +1052,7 @@ that is syntactically equivalent to the last type parameter, so only E1's
 argument will be folded over in a derived Foldable instance.
 
 See #10447 for the original discussion on this feature. Also see
-https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/DeriveFunctor
+https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/derive-functor
 for a more in-depth explanation.
 
 Note [FFoldType and functorLikeTraverse]

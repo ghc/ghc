@@ -3768,7 +3768,7 @@ pprCtOrigin (Shouldn'tHappenOrigin note)
     else
     vcat [ text "<< This should not appear in error messages. If you see this"
          , text "in an error message, please report a bug mentioning" <+> quotes (text note) <+> text "at"
-         , text "https://ghc.haskell.org/trac/ghc/wiki/ReportABug >>" ]
+         , text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug >>" ]
 
 pprCtOrigin (ProvCtxtOrigin PSB{ psb_id = (L _ name) })
   = hang (ctoHerald <+> text "the \"provided\" constraints claimed by")

@@ -235,7 +235,7 @@ and a provenance. The provenance states what created the universal coercion:
 Roles label what equality relation a coercion is a witness of. Nominal equality
 means that two types are identical (have the same name); representational equality
 means that two types have the same representation (introduced by newtypes); and
-phantom equality includes all types. See \url{http://ghc.haskell.org/trac/ghc/wiki/Roles} and \url{http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf}
+phantom equality includes all types. See \url{https://gitlab.haskell.org/ghc/ghc/wikis/roles} and \url{http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf}
 for more background.
 
 \gram{\ottR}
@@ -297,7 +297,7 @@ In \ottdrulename{Co\_UnivCo}, function $ \textsf{compatibleUnBoxedTys} $ stands 
     appropriate element of the target tuple;
 \end{itemize}
 For function implementation see \coderef{coreSyn/CoreLint.hs}{checkTypes}.
-For further discussion see \url{https://ghc.haskell.org/trac/ghc/wiki/BadUnsafeCoercions}.
+For further discussion see \url{https://gitlab.haskell.org/ghc/ghc/wikis/bad-unsafe-coercions}.
 
 \subsection{Type constructors}
 

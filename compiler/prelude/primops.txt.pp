@@ -5,7 +5,7 @@
 -- Primitive Operations and Types
 --
 -- For more information on PrimOps, see
---   http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps
+--   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/prim-ops
 --
 -----------------------------------------------------------------------
 
@@ -18,7 +18,7 @@
 -- Information on how PrimOps are implemented and the steps necessary to
 -- add a new one can be found in the Commentary:
 --
---  http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps
+--  https://gitlab.haskell.org/ghc/ghc/wikis/commentary/prim-ops
 --
 -- Note in particular that Haskell block-style comments are not recognized
 -- here, so stick to '--' (even for Notes spanning multiple lines).

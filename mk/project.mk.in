@@ -73,7 +73,7 @@ ProjectGitCommitId = @ProjectGitCommitId@
 #  - In the compiler itself, we should test HOST or TARGET depending
 #    on whether the conditional relates to the code being generated, or
 #    the platform on which the compiler is running.  See the section
-#    on "Coding Style" in the commentary for more details.
+#    on "coding-style" in the commentary for more details.
 #
 #  - In all other code, we should be testing HOST only.
 #

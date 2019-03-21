@@ -3,8 +3,8 @@
  *
  * The Static Pointer Table implementation.
  *
- * https://ghc.haskell.org/trac/ghc/wiki/StaticPointers
- * https://ghc.haskell.org/trac/ghc/wiki/StaticPointers/ImplementationPlan
+ * https://gitlab.haskell.org/ghc/ghc/wikis/static-pointers
+ * https://gitlab.haskell.org/ghc/ghc/wikis/static-pointers/implementation-plan
  *
  */
 

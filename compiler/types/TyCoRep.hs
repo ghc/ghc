@@ -1437,7 +1437,7 @@ Note [Roles]
 ~~~~~~~~~~~~
 Roles are a solution to the GeneralizedNewtypeDeriving problem, articulated
 in #1496. The full story is in docs/core-spec/core-spec.pdf. Also, see
-http://ghc.haskell.org/trac/ghc/wiki/RolesImplementation
+https://gitlab.haskell.org/ghc/ghc/wikis/roles-implementation
 
 Here is one way to phrase the problem:
 

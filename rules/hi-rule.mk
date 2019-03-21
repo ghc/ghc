@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
+#      https://gitlab.haskell.org/ghc/ghc/wikis/building/architecture
+#      https://gitlab.haskell.org/ghc/ghc/wikis/building/modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -20,7 +20,7 @@
 # they depend on have not changed.
 #
 # See:
-#   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
+#   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance
 #
 # So how do we express this dependency to make?  The exact form of
 # this rule is quite fragile.  Here are some versions that don't work

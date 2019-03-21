@@ -130,4 +130,4 @@ you checkout that commit and run the testsuite (or test).
     * Additionally, one will want to look at `compile_and_run`, `simple_run`,
       and `simple_build` in testutil.py
 
-  [1]: http://ghc.haskell.org/trac/ghc/wiki/Building/RunningTests
+  [1]: https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests

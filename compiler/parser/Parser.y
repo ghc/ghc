@@ -394,8 +394,8 @@ structured editors.
 The helper functions are defined at the bottom of this file.
 
 See
-  https://ghc.haskell.org/trac/ghc/wiki/ApiAnnotations and
-  https://ghc.haskell.org/trac/ghc/wiki/GhcAstAnnotations
+  https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations and
+  https://gitlab.haskell.org/ghc/ghc/wikis/ghc-ast-annotations
 for some background.
 
 If you modify the parser and want to ensure that the API annotations are processed

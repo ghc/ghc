@@ -115,7 +115,7 @@ import Control.Monad (liftM, ap)
 -- bitmap in each info table describing which entries of this table the closure
 -- references.
 --
--- See also: Commentary/Rts/Storage/GC/CAFs on the GHC Wiki.
+-- See also: commentary/rts/storage/gc/CAFs on the GHC Wiki.
 
 -- Note [What is a non-escaping let]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

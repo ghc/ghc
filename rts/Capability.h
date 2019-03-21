@@ -5,7 +5,7 @@
  * Capabilities
  *
  * For details on the high-level design, see
- *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Scheduler
+ *   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/scheduler
  *
  * A Capability holds all the state an OS thread/task needs to run
  * Haskell code: its STG registers, a pointer to its TSO, a nursery

@@ -32,7 +32,7 @@
   * Bundled with GHC 7.10.1
 
   * Complete rewrite of `integer-gmp`. For more details, see
-    https://ghc.haskell.org/trac/ghc/wiki/Design/IntegerGmp2
+    https://gitlab.haskell.org/ghc/ghc/wikis/design/integer-gmp2
 
 ## 0.5.1.0  *Feb 2014*
 
@@ -40,7 +40,7 @@
 
   * Improved Haddock documentation
 
-  * New [PrimBool](https://ghc.haskell.org/trac/ghc/wiki/PrimBool)
+  * New [PrimBool](https://gitlab.haskell.org/ghc/ghc/wikis/prim-bool)
     versions of comparison predicates in `GHC.Integer`:
 
         eqInteger# :: Integer -> Integer -> Int#

@@ -11,7 +11,7 @@
 {- OVERVIEW: ticky ticky profiling
 
 Please see
-http://ghc.haskell.org/trac/ghc/wiki/Debugging/TickyTicky and also
+https://gitlab.haskell.org/ghc/ghc/wikis/debugging/ticky-ticky and also
 edit it and the rest of this comment to keep them up-to-date if you
 change ticky-ticky. Thanks!
 

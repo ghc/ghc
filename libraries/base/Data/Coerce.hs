@@ -14,7 +14,7 @@
 -- Safe coercions between data types.
 --
 -- More in-depth information can be found on the
--- <https://ghc.haskell.org/trac/ghc/wiki/Roles Roles wiki page>
+-- <https://gitlab.haskell.org/ghc/ghc/wikis/roles Roles wiki page>
 --
 -- @since 4.7.0.0
 -----------------------------------------------------------------------------

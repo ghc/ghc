@@ -7,7 +7,7 @@
  * Documentation on the architecture of the Storage Manager can be
  * found in the online commentary:
  *
- *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage
+ *   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage
  *
  * ---------------------------------------------------------------------------*/
 

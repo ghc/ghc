@@ -670,7 +670,7 @@ This quantified constraint is needed to solve the
 constraint which arises form the (==) definition.
 
 The wiki page is
-  https://ghc.haskell.org/trac/ghc/wiki/QuantifiedConstraints
+  https://gitlab.haskell.org/ghc/ghc/wikis/quantified-constraints
 which in turn contains a link to the GHC Proposal where the change
 is specified, and a Haskell Symposium paper about it.
 

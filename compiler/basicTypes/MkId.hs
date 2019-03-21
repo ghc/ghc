@@ -1571,7 +1571,7 @@ It is only effective if the one-shot info survives as long as possible; in
 particular it must make it into the interface in unfoldings. See Note [Preserve
 OneShotInfo] in CoreTidy.
 
-Also see https://ghc.haskell.org/trac/ghc/wiki/OneShot.
+Also see https://gitlab.haskell.org/ghc/ghc/wikis/one-shot.
 
 
 Note [magicDictId magic]

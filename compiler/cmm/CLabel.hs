@@ -760,7 +760,7 @@ hasCAF _                            = False
 -- -----------------------------------------------------------------------------
 -- Does a CLabel need declaring before use or not?
 --
--- See wiki:Commentary/Compiler/Backends/PprC#Prototypes
+-- See wiki:commentary/compiler/backends/ppr-c#prototypes
 
 needsCDecl :: CLabel -> Bool
   -- False <=> it's pre-declared; don't bother

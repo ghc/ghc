@@ -426,7 +426,7 @@ eval_obj:
             // pointer to a FUN is tagged on the stack or elsewhere,
             // so we fix the tag here. (#13767)
             // For full details of the invariants on tagging, see
-            // https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/HaskellExecution/PointerTagging
+            // https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/haskell-execution/pointer-tagging
             tagged_obj =
                 newEmptyPAP(cap,
                             arity <= TAG_MASK

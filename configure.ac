@@ -1379,5 +1379,5 @@ To make changes to the default build configuration, copy the file
 mk/build.mk.sample to mk/build.mk, and edit the settings in there.
 
 For more information on how to configure your GHC build, see
-   http://ghc.haskell.org/trac/ghc/wiki/Building
+   https://gitlab.haskell.org/ghc/ghc/wikis/building
 "]

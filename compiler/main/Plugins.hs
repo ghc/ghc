@@ -120,7 +120,7 @@ data Plugin = Plugin {
 -- is supported by most build environment.
 --
 -- For the full discussion, check the full proposal at:
--- https://ghc.haskell.org/trac/ghc/wiki/ExtendedPluginsProposal
+-- https://gitlab.haskell.org/ghc/ghc/wikis/extended-plugins-proposal
 
 data PluginWithArgs = PluginWithArgs
   { paPlugin :: Plugin

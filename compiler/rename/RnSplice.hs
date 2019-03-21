@@ -525,7 +525,7 @@ global environment and exposes the current local environment to them [4, 5, 6].
 
 References:
 
-[1] https://ghc.haskell.org/trac/ghc/wiki/TemplateHaskell/Reify
+[1] https://gitlab.haskell.org/ghc/ghc/wikis/template-haskell/reify
 [2] 'rnSpliceExpr'
 [3] 'TcSplice.qAddModFinalizer'
 [4] 'TcExpr.tcExpr' ('HsSpliceE' ('HsSpliced' ...))

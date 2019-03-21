@@ -8,7 +8,7 @@
 -- The above warning suppression flags are a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
+--     https://gitlab.haskell.org/ghc/ghc/wikis/commentary/coding-style#warnings
 -- for details
 module Main(main) where
 

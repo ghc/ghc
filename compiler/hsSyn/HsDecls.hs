@@ -784,7 +784,7 @@ pprTyClDeclFlavour (XTyClDecl x) = ppr x
 We kind-check declarations differently if they have a complete, user-supplied
 kind signature (CUSK). This is because we can safely generalise a CUSKed
 declaration before checking all of the others, supporting polymorphic recursion.
-See ghc.haskell.org/trac/ghc/wiki/GhcKinds/KindInference#Proposednewstrategy
+See https://gitlab.haskell.org/ghc/ghc/wikis/ghc-kinds/kind-inference#proposed-new-strategy
 and #9200 for lots of discussion of how we got here.
 
 PRINCIPLE:

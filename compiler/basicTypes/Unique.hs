@@ -223,11 +223,11 @@ use `deriving' because we want {\em precise} control of ordering
 --
 -- As such, to get deterministic builds, the order of the allocated
 -- @Uniques@ should not affect the final result.
--- see also wiki/DeterministicBuilds
+-- see also wiki/deterministic-builds
 --
 -- Note [Unique Determinism and code generation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- The goal of the deterministic builds (wiki/DeterministicBuilds, #4012)
+-- The goal of the deterministic builds (wiki/deterministic-builds, #4012)
 -- is to get ABI compatible binaries given the same inputs and environment.
 -- The motivation behind that is that if the ABI doesn't change the
 -- binaries can be safely reused.

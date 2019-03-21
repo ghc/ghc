@@ -6,7 +6,7 @@
 --
 -- Fingerprints for recompilation checking and ABI versioning.
 --
--- http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
+-- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance
 --
 -- ----------------------------------------------------------------------------
 

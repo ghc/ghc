@@ -8,7 +8,7 @@
 --
 -- Print Cmm as real C, for -fvia-C
 --
--- See wiki:Commentary/Compiler/Backends/PprC
+-- See wiki:commentary/compiler/backends/ppr-c
 --
 -- This is simpler than the old PprAbsC, because Cmm is "macro-expanded"
 -- relative to the old AbstractC, and many oddities/decorations have
@@ -240,7 +240,7 @@ pprStmt stmt =
 
         cast_fn = parens (cCast (pprCFunType (char '*') cconv hresults hargs) fn)
 
-        -- See wiki:Commentary/Compiler/Backends/PprC#Prototypes
+        -- See wiki:commentary/compiler/backends/ppr-c#prototypes
         fnCall =
             case fn of
               CmmLit (CmmLabel lbl)

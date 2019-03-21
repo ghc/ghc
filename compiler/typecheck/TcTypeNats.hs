@@ -69,7 +69,7 @@ type-level literals.
 
 See also the Wiki page:
 
-    https://ghc.haskell.org/trac/ghc/wiki/TypeNats
+    https://gitlab.haskell.org/ghc/ghc/wikis/type-nats
 
 Note [Adding built-in type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

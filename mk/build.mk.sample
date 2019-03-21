@@ -96,7 +96,7 @@ endif
 #GhcRtsHcOpts += -g3
 
 # Build the "extra" packages (see ./packages). This enables more tests. See:
-# https://ghc.haskell.org/trac/ghc/wiki/Building/RunningTests/Running#AdditionalPackages
+# https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests/running#additional-packages
 #BUILD_EXTRA_PKGS=YES
 
 # Uncomment the following to force `integer-gmp` to use the in-tree GMP 6.1.2

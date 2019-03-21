@@ -7,7 +7,7 @@ show_help () {
 Usage: $0 [FLAGS]...
 
 Validate GHC source tree against testsuite; see
-http://ghc.haskell.org/trac/ghc/wiki/TestingPatches for more
+https://gitlab.haskell.org/ghc/ghc/wikis/testing-patches for more
 information.
 
 Flags:
@@ -160,7 +160,7 @@ echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
 
 # Note [Default build system verbosity].
 #
-# From https://ghc.haskell.org/trac/ghc/wiki/Design/BuildSystem:
+# From https://gitlab.haskell.org/ghc/ghc/wikis/design/build-system:
 #
 #   "The build system should clearly report what it's doing (and sometimes
 #   why), without being too verbose. It should emit actual command lines as

@@ -34,7 +34,7 @@ module MkIface (
 A complete description of how recompilation checking works can be
 found in the wiki commentary:
 
- http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
+ https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance
 
 Please read the above page for a top-down description of how this all
 works.  Notes below cover specific issues related to the implementation.
@@ -645,7 +645,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                        -- See Note [Export hash depends on non-orphan family instances]
                        dep_finsts (mi_deps iface0),
                         -- dep_pkgs: see "Package Version Changes" on
-                        -- wiki/Commentary/Compiler/RecompilationAvoidance
+                        -- wiki/commentary/compiler/recompilation-avoidance
                        mi_trust iface0)
                         -- Make sure change of Safe Haskell mode causes recomp.
 

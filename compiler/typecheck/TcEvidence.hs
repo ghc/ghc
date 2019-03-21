@@ -655,7 +655,7 @@ Conclusion: a new wanted coercion variable should be made mutable.
 
 Note [Overview of implicit CallStacks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(See https://ghc.haskell.org/trac/ghc/wiki/ExplicitCallStack/ImplicitLocations)
+(See https://gitlab.haskell.org/ghc/ghc/wikis/explicit-call-stack/implicit-locations)
 
 The goal of CallStack evidence terms is to reify locations
 in the program source as runtime values, without any support

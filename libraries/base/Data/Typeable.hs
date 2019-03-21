@@ -36,7 +36,7 @@
 -- Since GHC 7.8, 'Typeable' is poly-kinded. The changes required for this might
 -- break some old programs involving 'Typeable'. More details on this, including
 -- how to fix your code, can be found on the
--- <https://ghc.haskell.org/trac/ghc/wiki/GhcKinds/PolyTypeable PolyTypeable wiki page>
+-- <https://gitlab.haskell.org/ghc/ghc/wikis/ghc-kinds/poly-typeable PolyTypeable wiki page>
 --
 -----------------------------------------------------------------------------
 

@@ -65,9 +65,9 @@ Things to do:
 
  - See "CAFs" below; we want to totally refactor the way SRTs are calculated
 
- - Garbage-collect http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/CPS
+ - Garbage-collect https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/cps
    moving good stuff into 
-   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/NewCodeGenPipeline
+   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/new-code-gen-pipeline
 
  - Currently AsmCodeGen top level calls AsmCodeGen.cmmToCmm, which is a small
    C-- optimiser.  It has quite a lot of boilerplate folding code in AsmCodeGen

@@ -377,7 +377,7 @@ data IfaceIdDetails
 {-
 Note [Versioning of instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See [http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance#Instances]
+See [https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance#instances]
 
 
 ************************************************************************

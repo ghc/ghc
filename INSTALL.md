@@ -44,5 +44,5 @@ References
 ==========
 
  [1] http://www.haskell.org/ghc/
- [2] http://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
+ [2] https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation
  [3] http://www.haskell.org/haddock/

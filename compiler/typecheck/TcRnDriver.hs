@@ -4,7 +4,7 @@
 
 \section[TcRnDriver]{Typechecking a whole module}
 
-https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
+https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/type-checker
 -}
 
 {-# LANGUAGE CPP #-}

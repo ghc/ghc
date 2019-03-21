@@ -177,7 +177,7 @@ import {-# SOURCE #-} Packages (componentIdString, improveUnitId, PackageConfigM
 -- Unit IDs, installed package IDs, ABI hashes, package names,
 -- versions, there are a *lot* of different identifiers for closely
 -- related things.  What do they all mean? Here's what.  (See also
--- https://ghc.haskell.org/trac/ghc/wiki/Commentary/Packages/Concepts )
+-- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/packages/concepts )
 --
 -- THE IMPORTANT ONES
 --

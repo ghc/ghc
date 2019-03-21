@@ -759,13 +759,13 @@ sourceLazy         = return SourceLazy
 sourceStrict       = return SourceStrict
 
 {-# DEPRECATED isStrict
-    ["Use 'bang'. See https://ghc.haskell.org/trac/ghc/wiki/Migration/8.0. ",
+    ["Use 'bang'. See https://gitlab.haskell.org/ghc/ghc/wikis/migration/8.0. ",
      "Example usage: 'bang noSourceUnpackedness sourceStrict'"] #-}
 {-# DEPRECATED notStrict
-    ["Use 'bang'. See https://ghc.haskell.org/trac/ghc/wiki/Migration/8.0. ",
+    ["Use 'bang'. See https://gitlab.haskell.org/ghc/ghc/wikis/migration/8.0. ",
      "Example usage: 'bang noSourceUnpackedness noSourceStrictness'"] #-}
 {-# DEPRECATED unpacked
-    ["Use 'bang'. See https://ghc.haskell.org/trac/ghc/wiki/Migration/8.0. ",
+    ["Use 'bang'. See https://gitlab.haskell.org/ghc/ghc/wikis/migration/8.0. ",
      "Example usage: 'bang sourceUnpack sourceStrict'"] #-}
 isStrict, notStrict, unpacked :: Q Strict
 isStrict = bang noSourceUnpackedness sourceStrict

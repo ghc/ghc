@@ -1303,7 +1303,7 @@ warnMissingSignatures gbl_env
 
 This code finds which import declarations are unused.  The
 specification and implementation notes are here:
-  http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/UnusedImports
+  https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/unused-imports
 
 See also Note [Choosing the best import declaration] in RdrName
 -}

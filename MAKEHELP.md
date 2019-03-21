@@ -3,9 +3,9 @@ Quick `make` guide for GHC
 
 For a "Getting Started" guide, see:
 
-  https://ghc.haskell.org/trac/ghc/wiki/Building/QuickStart
-  https://ghc.haskell.org/trac/ghc/wiki/Building/Using
-  https://ghc.haskell.org/trac/ghc/wiki/Building/StandardTargets
+  https://gitlab.haskell.org/ghc/ghc/wikis/building/quick-start
+  https://gitlab.haskell.org/ghc/ghc/wikis/building/using
+  https://gitlab.haskell.org/ghc/ghc/wikis/building/standard-targets
 
 Common commands:
 

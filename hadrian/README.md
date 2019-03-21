@@ -291,11 +291,11 @@ projects), as well as Well-Typed.
 
 [ghc]: https://en.wikipedia.org/wiki/Glasgow_Haskell_Compiler
 [shake]: https://github.com/ndmitchell/shake
-[make]: https://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+[make]: https://gitlab.haskell.org/ghc/ghc/wikis/building/architecture
 [talk]: https://skillsmatter.com/skillscasts/8722-meet-hadrian-a-new-build-system-for-ghc
 [issues]: https://github.com/snowleopard/hadrian/issues
-[ghc-preparation]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
-[ghc-windows-quick-build]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows#AQuickBuild
+[ghc-preparation]: https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation
+[ghc-windows-quick-build]: https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation/windows#AQuickBuild
 [windows-build]: https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/windows.md
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
 [validation-issue]: https://github.com/snowleopard/hadrian/issues/187

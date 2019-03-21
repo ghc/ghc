@@ -1630,7 +1630,7 @@ tcIfaceGlobal name
 --
 -- There is also a wiki page on the subject, see:
 --
---      https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TyingTheKnot
+--      https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/tying-the-knot
 
 -- Note [Knot-tying fallback on boot]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

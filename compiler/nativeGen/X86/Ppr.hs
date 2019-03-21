@@ -212,7 +212,7 @@ pprLabelType' dflags lbl =
     "
 
     A good place to check for more
-    https://ghc.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
+    https://gitlab.haskell.org/ghc/ghc/wikis/commentary/position-independent-code
 
     Another possible hack is to create an extra local function symbol for
     every code-like thing to give the needed information for to the tools

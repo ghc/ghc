@@ -890,7 +890,7 @@ mark it. As a result, before we can generate K1 or unK1, we must first check
 to see if the type is actually one of the unlifted types for which URec has a
 data family instance; if so, we generate that instead.
 
-See wiki:Commentary/Compiler/GenericDeriving#Handlingunliftedtypes for more
+See wiki:commentary/compiler/generic-deriving#handling-unlifted-types for more
 details on why URec is implemented the way it is.
 
 Note [Generating a correctly typed Rep instance]
