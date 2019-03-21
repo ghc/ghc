@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 88e952f165f48cfb956ac9a2486a9263aa4f777c
+  DOCKER_REV: e517150438cd9df9564fb91adc4b42e2667b2bc1
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/win32-init.sh.
@@ -24,7 +24,7 @@ stages:
   - full-build # Build all the things
   - cleanup    # See Note [Cleanup after the shell executor]
   - packaging  # Source distribution, etc.
-  - hackage    # head.hackage testing
+  - testing    # head.hackage correctness and compiler performance testing
   - deploy     # push documentation
 
 # N.B.Don't run on wip/ branches, instead on run on merge requests.
@@ -903,7 +903,7 @@ source-tarball:
 
 .hackage:
   <<: *only-default
-  stage: hackage
+  stage: testing
   image: ghcci/x86_64-linux-deb9:0.2
   tags:
     - x86_64-linux
@@ -928,6 +928,47 @@ nightly-hackage:
   only:
     variables:
       - $NIGHTLY
+
+############################################################
+# Nofib testing
+############################################################
+
+perf-nofib:
+  stage: testing
+  dependencies:
+    - release-x86_64-linux-deb9-dwarf
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  only:
+    refs:
+      - merge_requests
+      - master
+      - /ghc-[0-9]+\.[0-9]+/
+  tags:
+    - x86_64-linux
+  script:
+    - root=$(pwd)/ghc
+    - |
+      mkdir tmp
+      tar -xf ghc-*-x86_64-unknown-linux.tar.xz -C tmp
+      pushd tmp/ghc-*/
+      ./configure --prefix=$root
+      make install
+      popd
+      rm -Rf tmp
+    - export BOOT_HC=$(which ghc)
+    - cabal update; cabal install -w $BOOT_HC regex-compat
+    - export PATH=$root/bin:$PATH
+    - make -C nofib boot mode=fast -j$CPUS
+    - "make -C nofib EXTRA_RUNTEST_OPTS='-cachegrind +RTS -V0 -RTS' NoFibRuns=1 mode=fast -j$CPUS 2>&1 | tee nofib.log"
+  artifacts:
+    expire_in: 12 week
+    when: always
+    paths:
+      - nofib.log
+
+############################################################
+# Documentation deployment via GitLab Pages
+############################################################
 
 pages:
   stage: deploy
