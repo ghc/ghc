@@ -13,7 +13,7 @@
 -- References:
 -- [1] https://www.haskell.org/onlinereport/haskell2010/haskellch2.html
 -- [2] http://www.haskell.org/alex/
--- [3] https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/Parser
+-- [3] https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/parser
 --
 -----------------------------------------------------------------------------
 

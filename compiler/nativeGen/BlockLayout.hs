@@ -52,7 +52,7 @@ import qualified Data.Set as Set
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   For additional information also look at
-  https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/CodeLayout
+  https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/code-layout
 
   We have a CFG with edge weights based on which we try to place blocks next to
   each other.

@@ -556,7 +556,7 @@ INSTALL_GHC_STAGE= $(if $(filter YES,$(Stage1Only)),1,2)
 # 4 CrossCompiling=YES Stage1Only=NO
 #   Cross-compiling GHC itself. See [1].
 #
-# [1] https://ghc.haskell.org/trac/ghc/wiki/Building/CrossCompiling
+# [1] https://gitlab.haskell.org/ghc/ghc/wikis/building/cross-compiling
 
 # Note [Stage1Only vs stage=1]
 #

@@ -5,7 +5,7 @@ import Data.Coerce
 import Data.Proxy
 import Data.Monoid (First(First)) -- check whether the implicit use of First is noted
 
--- see https://ghc.haskell.org/trac/ghc/wiki/Design/NewCoercibleSolver/V2
+-- see https://gitlab.haskell.org/ghc/ghc/wikis/design/new-coercible-solver/v2
 
 foo1 :: f a -> f a
 foo1 = coerce

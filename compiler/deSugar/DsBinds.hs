@@ -530,7 +530,7 @@ thought!
 
 Note [Desugar Strict binds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See https://ghc.haskell.org/trac/ghc/wiki/StrictPragma
+See https://gitlab.haskell.org/ghc/ghc/wikis/strict-pragma
 
 Desugaring strict variable bindings looks as follows (core below ==>)
 
@@ -598,7 +598,7 @@ tuple `t`, thus:
   in tm `seq` <body>
 
 
-See https://ghc.haskell.org/trac/ghc/wiki/StrictPragma for a more
+See https://gitlab.haskell.org/ghc/ghc/wikis/strict-pragma for a more
 detailed explanation of the desugaring of strict bindings.
 
 Note [Strict binds checks]

@@ -111,7 +111,7 @@ type Closure = GenClosure Box
 -- fields are the payload.
 --
 -- See
--- <https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/HeapObjects>
+-- <https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage/heap-objects>
 -- for more information.
 data GenClosure b
   = -- | A data constructor

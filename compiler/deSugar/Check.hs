@@ -280,7 +280,7 @@ instance Monoid PartialResult where
 -- More details about the classification of clauses into useful, redundant
 -- and with inaccessible right hand side can be found here:
 --
---     https://ghc.haskell.org/trac/ghc/wiki/PatternMatchCheck
+--     https://gitlab.haskell.org/ghc/ghc/wikis/pattern-match-check
 --
 data PmResult =
   PmResult {

@@ -17,7 +17,7 @@ From here, you can file bugs (or look them up,) use the wiki, view the
 page, which has the high level overview of the build process and how
 to get the source:
 
-<http://ghc.haskell.org/trac/ghc/wiki/Building>
+<https://gitlab.haskell.org/ghc/ghc/wikis/building>
 
 Contributing patches to GHC in a hurry
 ======================================
@@ -25,7 +25,7 @@ Contributing patches to GHC in a hurry
 Make sure your system has the necessary tools to compile GHC. You can
 find an overview here:
 
-<http://ghc.haskell.org/trac/ghc/wiki/Building/Preparation>
+<https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation>
 
 Next, clone the repository and all the associated libraries:
 
@@ -64,9 +64,9 @@ Now, hack on your copy and rebuild (with `make`) as necessary.
 Then start by making your commits however you want. When you're done, you can submit
  a pull request on Github for small changes. For larger changes the patch needs to be
  submitted to [Phabricator](https://phabricator.haskell.org/) for code review.
- The GHC Wiki has a good summary for the [overall process](https://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBugs)
+ The GHC Wiki has a good summary for the [overall process](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs)
  as well as a guide on
- [how to use Phabricator/arcanist](https://ghc.haskell.org/trac/ghc/wiki/Phabricator).
+ [how to use Phabricator/arcanist](https://gitlab.haskell.org/ghc/ghc/wikis/phabricator).
 
 
 Useful links:
@@ -75,22 +75,22 @@ Useful links:
 An overview of things like using git, the release process, filing bugs
 and more can be located here:
 
-<http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions>
+<https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions>
 
 You can find our coding conventions for the compiler and RTS here:
 
-<http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle>
-<http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Conventions>
+<https://gitlab.haskell.org/ghc/ghc/wikis/commentary/coding-style>
+<https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/conventions>
 
 A high level overview of the bug tracker:
 
-<http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/BugTracker>
+<https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/bug-tracker>
 
 If you're going to contribute regularly, **learning how to use the
 build system is important** and will save you lots of time. You should
 read over this page carefully:
 
-<http://ghc.haskell.org/trac/ghc/wiki/Building/Using>
+<https://gitlab.haskell.org/ghc/ghc/wikis/building/using>
 
 How to communicate with us
 ==========================

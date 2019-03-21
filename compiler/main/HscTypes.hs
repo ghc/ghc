@@ -2404,7 +2404,7 @@ noDependencies :: Dependencies
 noDependencies = Deps [] [] [] [] []
 
 -- | Records modules for which changes may force recompilation of this module
--- See wiki: http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
+-- See wiki: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance
 --
 -- This differs from Dependencies.  A module X may be in the dep_mods of this
 -- module (via an import chain) but if we don't use anything from X it won't

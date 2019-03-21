@@ -117,7 +117,7 @@ use a different "way", e.g. profiled or dynamic.  This means
   taking the performance hit on the compiler that profiling would
   entail.
 
-For other reasons see RemoteGHCi on the wiki.
+For other reasons see remote-GHCi on the wiki.
 
 Implementation Overview
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -152,7 +152,7 @@ message if it is used with -fexternal-interpreter.
 Other Notes on Remote GHCi
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
   * This wiki page has an implementation overview:
-    https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/ExternalInterpreter
+    https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/external-interpreter
   * Note [External GHCi pointers] in compiler/ghci/GHCi.hs
   * Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs
 -}

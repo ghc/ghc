@@ -17,7 +17,7 @@ import qualified StgLiftLams.Transformation as Transformation
 -- Note [Late lambda lifting in STG]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- $note
--- See also the <https://ghc.haskell.org/trac/ghc/wiki/LateLamLift wiki page>
+-- See also the <https://gitlab.haskell.org/ghc/ghc/wikis/late-lam-lift wiki page>
 -- and #9476.
 --
 -- The basic idea behind lambda lifting is to turn locally defined functions
