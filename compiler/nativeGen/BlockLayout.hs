@@ -2,9 +2,8 @@
 -- Copyright (c) 2018 Andreas Klebinger
 --
 
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables, CPP, GeneralizedNewtypeDeriving #-}
-
--- {-# OPTIONS_GHC -fprof-auto #-}
+{-# LANGUAGE TypeFamilies, ScopedTypeVariables, CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleContexts #-}
 
 module BlockLayout
     ( sequenceTop )
@@ -44,6 +43,7 @@ import Data.Foldable (toList)
 import qualified Data.Set as Set
 import Data.STRef
 import Control.Monad.ST.Strict
+import Control.Monad (foldM, liftM2)
 
 {-
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -214,15 +214,16 @@ type FrontierMap = LabelMap ([BlockId],BlockChain)
 newtype BlockChain
     = BlockChain { chainBlocks :: (OrdList BlockId) }
 
-instance Eq (BlockChain) where
-    (BlockChain blks1) == (BlockChain blks2)
-        = fromOL blks1 == fromOL blks2
+-- All chains are constructed the same way so comparison
+-- including structure is faster.
+instance Eq BlockChain where
+    BlockChain b1 == BlockChain b2 = strictlyEqOL b1 b2
 
 -- Useful for things like sets and debugging purposes, sorts by blocks
 -- in the chain.
 instance Ord (BlockChain) where
    (BlockChain lbls1) `compare` (BlockChain lbls2)
-       = (fromOL lbls1) `compare` (fromOL lbls2)
+       = strictlyOrdOL lbls1 lbls2
 
 instance Outputable (BlockChain) where
     ppr (BlockChain blks) =
@@ -341,7 +342,7 @@ combineNeighbourhood edges chains
         applyEdges ((CfgEdge from to _w):edges) chainEnds chainFronts combined
             | Just (c1_e,c1) <- mapLookup from chainEnds
             , Just (c2_f,c2) <- mapLookup to chainFronts
-            , c1 /= c2 -- Avoid trying to concat a short chain with itself.
+            , c1 /= c2 -- Avoid trying to concat a chain with itself.
             = let newChain = chainConcat c1 c2
                   newChainFrontier = getFronts newChain
                   newChainEnds = getEnds newChain
@@ -385,42 +386,51 @@ combineNeighbourhood edges chains
 
 -- In the last stop we combine all chains into a single one.
 -- Trying to place chains with strong edges next to each other.
-
 mergeChains :: [CfgEdge] -> [BlockChain]
                      -> (BlockChain)
 mergeChains edges chains
     = -- pprTrace "combine" (ppr edges) $
-      merge edges chainMap
+      runST $ do
+        let addChain m0 chain = do
+                ref <- newSTRef chain
+                return $ chainFoldl (\m' b -> mapInsert b ref m') m0 chain
+        chainMap' <- foldM (\m0 c -> addChain m0 c) mapEmpty chains
+        merge edges chainMap'
     where
-        -- Look up block -> chain quickly
-        -- Find position of block inside chain (optional)
+        -- We keep a list from ALL blocks to their respective chain (sigh)
+        -- This is required since when looking at an edge we need to find
+        -- the associated chains quickly.
+        -- We use a map of STRefs, maintaining a invariant of one STRef per chain.
+        -- When merging chains we can update the
+        -- STRef of one chain once (instead of writing to the map for each block).
+        -- We then overwrite the STRefs for the other chain so there is again only
+        -- a single STRef for the combined chain.
+        -- The difference in terms of allocations saved is ~0.2% with -O so actually
+        -- significant.
 
-        chainMap :: LabelMap BlockChain
-        chainMap = foldl' addChain mapEmpty chains
-        addChain m chain = chainFoldl addBlock m chain
-          where
-            addBlock m' b = mapInsert b chain m'
-
-        merge :: [CfgEdge] -> LabelMap BlockChain -> BlockChain
-        merge [] chains = let chains' = ordNub $ mapElems chains
-                          in foldl' chainConcat (head chains') (tail chains')
+        merge :: forall s. [CfgEdge] -> LabelMap (STRef s BlockChain) -> ST s BlockChain
+        merge [] chains = do
+            chains' <- ordNub <$> (mapM readSTRef $ mapElems chains) :: ST s [BlockChain]
+            return $ foldl' chainConcat (head chains') (tail chains')
         merge ((CfgEdge from to _):edges) chains
         --   | pprTrace "merge" (ppr (from,to) <> ppr chains) False
         --   = undefined
           | cFrom == cTo
           = merge edges chains
           | otherwise
-          = let chain = chainConcat cFrom cTo
-                chains' = addChain chains chain
-            in  -- pprTrace "merged:" (ppr chains') $
-                merge edges chains'
+          = do
+            chains' <- mergeComb cFrom cTo
+            merge edges chains'
           where
+            mergeComb :: STRef s BlockChain -> STRef s BlockChain -> ST s (LabelMap (STRef s BlockChain))
+            mergeComb refFrom refTo = do
+                cRight <- readSTRef refTo
+                chain <- pure chainConcat <*> readSTRef refFrom <*> pure cRight
+                writeSTRef refFrom chain
+                return $ chainFoldl (\m b -> mapInsert b refFrom m) chains cRight
+
             cFrom = expectJust "mergeChains:chainMap:from" $ mapLookup from chains
             cTo = expectJust "mergeChains:chainMap:to"   $ mapLookup to   chains
-
-
-
-
 
 
 -- See Note [Chain based CFG serialization] for the general idea.
@@ -581,11 +591,8 @@ sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
             cfg' = mapFoldlWithKey
                         (\cfg from m ->
                             mapFoldlWithKey
-                                (\cfg to w ->
-                                    setEdgeWeight cfg (EdgeWeight w) from to
-                                )
-                                cfg m
-                        )
+                                (\cfg to w -> setEdgeWeight cfg (EdgeWeight w) from to )
+                                cfg m )
                         weights'
                         globalEdgeWeights
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, BangPatterns, FlexibleContexts #-}
+{-# LANGUAGE RankNTypes, BangPatterns, FlexibleContexts, Strict #-}
 
 {- |
   Module      :  Dominators
@@ -38,23 +38,24 @@ module Dominators (
   ,parents,ancestors
 ) where
 
+import GhcPrelude
+
+import Data.Bifunctor
+import Data.Tuple (swap)
+
 import Data.Tree
-import Data.List
--- import Data.Map(Map)
--- import qualified Data.Map.Strict as SM
 import Data.IntMap(IntMap)
 import Data.IntSet(IntSet)
-import qualified Data.IntMap as IM
+import qualified Data.IntMap.Strict as IM
 import qualified Data.IntSet as IS
-import Control.Applicative
+
 import Control.Monad
+import Control.Monad.ST.Strict
+
 import Data.Array.ST
 import Data.Array.Base
   (unsafeNewArray_
   ,unsafeWrite,unsafeRead)
-import Control.Monad.ST.Strict
-
-import GhcPrelude
 
 -----------------------------------------------------------------------------
 
@@ -79,7 +80,7 @@ pdom = ancestors . pdomTree
 -- | /Dominator tree/.
 -- Complexity as for @idom@.
 domTree :: Rooted -> Tree Node
-domTree a@(r,_) = {-# SCC domTree #-}
+domTree a@(r,_) =
   let is = filter ((/=r).fst) (idom a)
       tg = fromEdges (fmap swap is)
   in asTree (r,tg)
@@ -87,7 +88,7 @@ domTree a@(r,_) = {-# SCC domTree #-}
 -- | /Post-dominator tree/.
 -- Complexity as for @idom@.
 pdomTree :: Rooted -> Tree Node
-pdomTree a@(r,_) = {-# SCC pdomTree #-}
+pdomTree a@(r,_) =
   let is = filter ((/=r).fst) (ipdom a)
       tg = fromEdges (fmap swap is)
   in asTree (r,tg)
@@ -105,7 +106,7 @@ idom rg = runST (evalS idomM =<< initEnv (pruneReach rg))
 -- | /Immediate post-dominators/.
 -- Complexity as for @idom@.
 ipdom :: Rooted -> [(Node,Node)]
-ipdom rg = runST (evalS idomM =<< initEnv (pruneReach (mapsnd predG rg)))
+ipdom rg = runST (evalS idomM =<< initEnv (pruneReach (second predG rg)))
 
 -----------------------------------------------------------------------------
 
@@ -442,25 +443,27 @@ writes a xs = forM_ xs (\(i,x) -> (a.=x) i)
 (!) g n = maybe mempty id (IM.lookup n g)
 
 fromAdj :: [(Node, [Node])] -> Graph
-fromAdj = IM.fromList . fmap (mapsnd IS.fromList)
+fromAdj = IM.fromList . fmap (second IS.fromList)
 
 fromEdges :: [Edge] -> Graph
 fromEdges = collectI IS.union fst (IS.singleton . snd)
 
 toAdj :: Graph -> [(Node, [Node])]
-toAdj = fmap (mapsnd IS.toList) . IM.toList
+toAdj = fmap (second IS.toList) . IM.toList
+
+toEdges :: Graph -> [Edge]
 toEdges = concatMap (uncurry (fmap . (,))) . toAdj
 
 predG :: Graph -> Graph
-
-toEdges :: Graph -> [Edge]
 predG g = IM.unionWith IS.union (go g) g0
   where g0 = fmap (const mempty) g
-        go = flip IM.foldrWithKey mempty (\i a m ->
-                foldl' (\m p -> IM.insertWith mappend p
+        f :: IntMap IntSet -> Int -> IntSet -> IntMap IntSet
+        f m i a = foldl' (\m p -> IM.insertWith mappend p
                                       (IS.singleton i) m)
                         m
-                       (IS.toList a))
+                       (IS.toList a)
+        go :: IntMap IntSet -> IntMap IntSet
+        go = flip IM.foldlWithKey' mempty f
 
 pruneReach :: Rooted -> Rooted
 pruneReach (r,g) = (r,g2)
@@ -468,7 +471,7 @@ pruneReach (r,g) = (r,g2)
               (maybe mempty id
                 . flip IM.lookup g) $ r
         g2 = IM.fromList
-            . fmap (mapsnd (IS.filter (`IS.member`is)))
+            . fmap (second (IS.filter (`IS.member`is)))
             . filter ((`IS.member`is) . fst)
             . IM.toList $ g
 
@@ -517,36 +520,31 @@ collectI (<>) f g
 --                                   (f a)
 --                                   (g a) m) mempty
 
-swap :: (a,b) -> (b,a)
-swap = uncurry (flip (,))
-
--- mapfst :: (a -> c) -> (a,b) -> (c,b)
--- mapfst f = \(a,b) -> (f a, b)
-
-mapsnd :: (b -> c) -> (a,b) -> (a,c)
-mapsnd f = \(a,b) -> (a, f b)
-
 -- (renamed, old -> new)
 renum :: Int -> Graph -> (Graph, NodeMap Node)
 renum from = (\(_,m,g)->(g,m))
-  . IM.foldrWithKey
-      (\i ss (!n,!env,!new)->
-          let (j,n2,env2) = go n env i
-              (n3,env3,ss2) = IS.fold
-                (\k (!n,!env,!new)->
-                    case go n env k of
-                      (l,n2,env2)-> (n2,env2,l `IS.insert` new))
-                (n2,env2,mempty) ss
-              new2 = IM.insertWith IS.union j ss2 new
-          in (n3,env3,new2)) (from,mempty,mempty)
-  where go :: Int
-           -> NodeMap Node
-           -> Node
-           -> (Node,Int,NodeMap Node)
-        go !n !env i =
-          case IM.lookup i env of
-            Just j -> (j,n,env)
-            Nothing -> (n,n+1,IM.insert i n env)
+  . IM.foldlWithKey'
+      f (from,mempty,mempty)
+  where
+    f :: (Int, NodeMap Node, IntMap IntSet) -> Node -> IntSet
+      -> (Int, NodeMap Node, IntMap IntSet)
+    f (!n,!env,!new) i ss =
+            let (j,n2,env2) = go n env i
+                (n3,env3,ss2) = IS.fold
+                  (\k (!n,!env,!new)->
+                      case go n env k of
+                        (l,n2,env2)-> (n2,env2,l `IS.insert` new))
+                  (n2,env2,mempty) ss
+                new2 = IM.insertWith IS.union j ss2 new
+            in (n3,env3,new2)
+    go :: Int
+        -> NodeMap Node
+        -> Node
+        -> (Node,Int,NodeMap Node)
+    go !n !env i =
+        case IM.lookup i env of
+        Just j -> (j,n,env)
+        Nothing -> (n,n+1,IM.insert i n env)
 
 -----------------------------------------------------------------------------
 
@@ -588,28 +586,3 @@ fetch f i = do
   a <- gets f
   st (a!:i)
 
------------------------------------------------------------------------------
-
--- g0 = fromAdj
---   [(1,[2,3])
---   ,(2,[3])
---   ,(3,[4])
---   ,(4,[3,5,6])
---   ,(5,[7])
---   ,(6,[7])
---   ,(7,[4,8])
---   ,(8,[3,9,10])
---   ,(9,[1])
---   ,(10,[7])]
-
--- g1 = fromAdj
---   [(0,[1])
---   ,(1,[2,3])
---   ,(2,[7])
---   ,(3,[4])
---   ,(4,[5,6])
---   ,(5,[7])
---   ,(6,[4])
---   ,(7,[])]
-
------------------------------------------------------------------------------
