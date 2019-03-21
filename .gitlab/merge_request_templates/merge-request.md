@@ -10,10 +10,10 @@ Please take a few moments to verify that your commits fulfill the following:
    likely should add a [Note][notes] and cross-reference it from the relevant
    places.
  * [ ] add a [testcase to the
-   testsuite](https://ghc.haskell.org/trac/ghc/wiki/Building/RunningTests/Adding).
+   testsuite](https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests/adding).
 
 If you have any questions don't hesitate to open your merge request and inquire
 in a comment. If your patch isn't quite done yet please do add prefix your MR
 title with `WIP:`.
 
-[notes]: https://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Commentsinthesourcecode
+[notes]: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/coding-style#comments-in-the-source-code

@@ -88,12 +88,12 @@ Supported Platforms
 
 The list of platforms we support, and the people responsible for them, is here:
 
-    https://ghc.haskell.org/trac/ghc/wiki/TeamGHC
+    https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc
 
 Ports to other platforms are possible with varying degrees of difficulty. The
 Building Guide describes how to go about porting to a new platform:
 
-    https://ghc.haskell.org/trac/ghc/wiki/Building
+    https://gitlab.haskell.org/ghc/ghc/wikis/building
 
 
 Developers

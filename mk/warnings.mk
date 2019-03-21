@@ -5,7 +5,7 @@ SRC_HC_OPTS     += -Wall
 # validate may unnecessarily fail when booting with an older compiler.
 # It would be better to only exclude certain warnings from becoming errors
 # (e.g. '-Werror -Wno-error=unused-imports -Wno-error=...'), but -Wno-error
-# isn't supported yet (https://ghc.haskell.org/trac/ghc/wiki/Design/Warnings).
+# isn't supported yet (https://gitlab.haskell.org/ghc/ghc/wikis/design/warnings).
 #
 # See Note [Stage number in build variables] in mk/config.mk.in.
 SRC_HC_OPTS_STAGE1 += $(WERROR)

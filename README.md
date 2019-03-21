@@ -31,7 +31,7 @@ There are two ways to get a source tree:
   Note: cloning GHC from Github requires a special setup. See [Getting a GHC
   repository from Github][7].
 
-  *See the GHC team's working conventions regarding [how to contribute a patch to GHC](http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBugs).* First time contributors are encouraged to get started by just sending a Pull Request.
+  *See the GHC team's working conventions regarding [how to contribute a patch to GHC](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs).* First time contributors are encouraged to get started by just sending a Pull Request.
 
 
 Building & Installing
@@ -109,19 +109,19 @@ you to join!
 
   [1]:  http://www.haskell.org/ghc/            "www.haskell.org/ghc/"
   [2]:  http://ghc.haskell.org/trac/ghc    "ghc.haskell.org/trac/ghc"
-  [3]:  http://ghc.haskell.org/trac/ghc/wiki/Building
-          "ghc.haskell.org/trac/ghc/wiki/Building"
+  [3]:  https://gitlab.haskell.org/ghc/ghc/wikis/building
+          "https://gitlab.haskell.org/ghc/ghc/wikis/building"
   [4]:  http://www.haskell.org/happy/          "www.haskell.org/happy/"
   [5]:  http://www.haskell.org/alex/           "www.haskell.org/alex/"
   [6]:  http://www.haskell.org/haddock/        "www.haskell.org/haddock/"
-  [7]: https://ghc.haskell.org/trac/ghc/wiki/Building/GettingTheSources#GettingaGHCrepositoryfromGitHub
-          "https://ghc.haskell.org/trac/ghc/wiki/Building/GettingTheSources#GettingaGHCrepositoryfromGitHub"
-  [8]:  http://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
-          "http://ghc.haskell.org/trac/ghc/wiki/Building/Preparation"
+  [7]: https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github
+          "https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github"
+  [8]:  https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation
+          "https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation"
   [9]:  http://www.haskell.org/cabal/          "http://www.haskell.org/cabal/"
   [10]: https://gitlab.haskell.org/ghc/ghc/issues
           "https://gitlab.haskell.org/ghc/ghc/issues"
   [11]: http://www.haskell.org/pipermail/glasgow-haskell-users/
           "http://www.haskell.org/pipermail/glasgow-haskell-users/"
-  [12]: http://ghc.haskell.org/trac/ghc/wiki/TeamGHC
-          "http://ghc.haskell.org/trac/ghc/wiki/TeamGHC"
+  [12]: https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc
+          "https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc"
