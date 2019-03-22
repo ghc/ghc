@@ -2332,7 +2332,7 @@ term constraints (respectively) as we go deeper.
 
 The type constraints we propagate inwards are collected by `collectEvVarsPats'
 in HsPat.hs. This handles bug #4139 ( see example
-  https://ghc.haskell.org/trac/ghc/attachment/ticket/4139/GADTbug.hs )
+  https://gitlab.haskell.org/ghc/ghc/snippets/672 )
 where this is needed.
 
 For term equalities we do less, we just generate equalities for HsCase. For

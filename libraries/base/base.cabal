@@ -6,7 +6,7 @@ version:        4.13.0.0
 license:        BSD-3-Clause
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
-bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=libraries/base
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       Basic libraries
 category:       Prelude
 build-type:     Configure

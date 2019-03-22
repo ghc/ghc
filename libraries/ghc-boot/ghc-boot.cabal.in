@@ -8,7 +8,7 @@ license:        BSD3
 license-file:   LICENSE
 category:       GHC
 maintainer:     ghc-devs@haskell.org
-bug-reports:    https://ghc.haskell.org/trac/ghc/newticket
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       Shared functionality between GHC and its boot libraries
 description:    This library is shared between GHC, ghc-pkg, and other boot
                 libraries.
