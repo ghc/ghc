@@ -163,9 +163,7 @@ static Condition upd_rem_set_flushed_cond;
 /* Indicates to mutators that the write barrier must be respected. Set while
  * concurrent mark is running.
  */
-#if defined(THREADED_RTS)
-bool nonmoving_write_barrier_enabled = false;
-#endif
+StgWord nonmoving_write_barrier_enabled = false;
 
 /* Used to provide the current mark queue to the young generation
  * collector for scavenging.

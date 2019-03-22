@@ -18,3 +18,5 @@ extern DLL_IMPORT_RTS
 void updateRemembSetPushClosure_(StgRegTable *reg, StgClosure *p);
 
 void updateRemembSetPushClosure(Capability *cap, StgClosure *p);
+
+extern StgWord DLL_IMPORT_DATA_VAR(nonmoving_write_barrier_enabled);

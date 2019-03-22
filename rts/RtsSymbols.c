@@ -14,6 +14,7 @@
 #include "HsFFI.h"
 
 #include "sm/Storage.h"
+#include "sm/NonMovingMark.h"
 #include <stdbool.h>
 
 #if !defined(mingw32_HOST_OS)
@@ -1039,6 +1040,7 @@ RtsSymbolVal rtsSyms[] = {
       RTS_OPENBSD_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
       RTS_LIBFFI_SYMBOLS
+      SymI_HasDataProto(nonmoving_write_barrier_enabled)
 #if defined(darwin_HOST_OS) && defined(i386_HOST_ARCH)
       // dyld stub code contains references to this,
       // but it should never be called because we treat
