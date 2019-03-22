@@ -453,6 +453,20 @@ validate-x86_64-linux-fedora27:
     - git clean -xdf
     - git submodule foreach git clean -xdf
 
+    # Find the next free drive letter to map a build on.
+    # This script is subjected to a slight race condition in case
+    # two builds on the same machine reach this point at the exact same time.
+    # but the chances of that are quite low.. and then the subst command would
+    # fail anyway.
+    # This script then maps the current gitlab directory to this drive letter,
+    # which will shorten the drive and give us length(cd)-2 lengths back from
+    # the MAX_PATH limit.
+    - |
+      for /f "delims=" %%a in ('.gitlab/find-free-drive-letter.bat') do @set ndir=%%a
+      subst %ndir% /D > nul
+      subst %ndir% .
+      pushd %ndir%
+
     # Use a local temporary directory to ensure that concurrent builds don't
     # interfere with one another
     - |
@@ -471,6 +485,11 @@ validate-x86_64-linux-fedora27:
     - rd /s /q tmp
     - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
     - bash -c 'make clean || true'
+
+    # Now clean up after the build
+    - |
+      popd
+      subst %ndir% /D > nul
   dependencies: []
   variables:
     FORCE_SYMLINKS: 1
