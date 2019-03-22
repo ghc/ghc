@@ -43,7 +43,7 @@ import Data.Foldable (toList)
 import qualified Data.Set as Set
 import Data.STRef
 import Control.Monad.ST.Strict
-import Control.Monad (foldM, liftM2)
+import Control.Monad (foldM)
 
 {-
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
