@@ -4,7 +4,7 @@ version:        0.1.0.0
 license:        BSD3
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
-bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=libraries/ghc-compact
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       In memory storage of deeply evaluated data structure
 category:       Data
 description:

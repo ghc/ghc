@@ -108,7 +108,8 @@ groups from around the world. We'd like to thank them all, and invite
 you to join!
 
   [1]:  http://www.haskell.org/ghc/            "www.haskell.org/ghc/"
-  [2]:  http://ghc.haskell.org/trac/ghc    "ghc.haskell.org/trac/ghc"
+  [2]:  https://gitlab.haskell.org/ghc/ghc/issues
+          "gitlab.haskell.org/ghc/ghc/issues"
   [3]:  http://ghc.haskell.org/trac/ghc/wiki/Building
           "ghc.haskell.org/trac/ghc/wiki/Building"
   [4]:  http://www.haskell.org/happy/          "www.haskell.org/happy/"
