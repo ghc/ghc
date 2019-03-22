@@ -27,6 +27,7 @@ module DynamicLoading (
 import GhcPrelude
 import HscTypes         ( HscEnv )
 import DynFlags
+import Platform
 
 #if defined(GHCI)
 import Linker           ( linkModule, getHValue )
@@ -233,7 +234,22 @@ getHValueSafely hsc_env val_name expected_type = do
          -- if no -fexternal-interpreter is provided, this will be a no-op.
          -- if however -fexteranl-interpreter is provided, we maintain two
          -- linker states. The remote (iserv) one and the local one.
-         local_hsc_env = hsc_env { hsc_dflags = gopt_unset (hsc_dflags hsc_env) Opt_ExternalInterpreter }
+         local_hsc_env = hsc_env
+           { hsc_dflags = (gopt_unset (hsc_dflags hsc_env) Opt_ExternalInterpreter)
+             { settings = (settings (hsc_dflags hsc_env))
+               { sTargetPlatform = Platform
+                 { platformArch = ArchX86_64
+                 , platformOS = OSDarwin
+                 , platformWordSize = 8
+                 , platformUnregisterised = False
+                 , platformHasGnuNonexecStack = error "platformGnuNonexecStack undefined"
+                 , platformHasIdentDirective = error "platformHasIdentDirective undefined"
+                 , platformHasSubsectionsViaSymbols = True
+                 , platformIsCrossCompiling = True
+                 }
+               }
+             }
+           }
          local_dflags = hsc_dflags local_hsc_env
 
 -- | Coerce a value as usual, but:
