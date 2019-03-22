@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, MagicHash #-}
-
+#define GHCI 1
 -- | Dynamically lookup up values from modules and loading them.
 module DynamicLoading (
         initializePlugins,
