@@ -735,6 +735,7 @@ checkStability hpt sccs all_home_mods =
 
         object_ok ms
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
+          | gopt Opt_ChecksumRecomp (ms_hspp_opts ms) = True
           | Just t <- ms_obj_date ms  =  t >= ms_hs_date ms
                                          && same_as_prev t
           | otherwise = False

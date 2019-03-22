@@ -307,6 +307,7 @@ mkIface_ hsc_env maybe_old_fingerprint
               mi_hpc_hash    = fingerprint0,
               mi_exp_hash    = fingerprint0,
               mi_plugin_hash = fingerprint0,
+              mi_file_hash   = fingerprint0,
               mi_used_th     = used_th,
               mi_orphan_hash = fingerprint0,
               mi_orphan      = False, -- Always set by addFingerprints, but
@@ -693,6 +694,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
 
    plugin_hash <- fingerprintPlugins hsc_env
 
+   file_hash <- fingerprintFiles hsc_env
+
    -- the ABI hash depends on:
    --   - decls
    --   - export list
@@ -729,6 +732,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 mi_opt_hash    = opt_hash,
                 mi_hpc_hash    = hpc_hash,
                 mi_plugin_hash = plugin_hash,
+                mi_file_hash   = file_hash,
                 mi_orphan      = not (   all ifRuleAuto orph_rules
                                            -- See Note [Orphans and auto-generated rules]
                                       && null orph_insts
@@ -1297,6 +1301,8 @@ checkVersions hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Just iface) else do {
        ; recomp <- checkPlugins hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; recomp <- checkSourceFingerprint hsc_env iface
+       ; if recompileRequired recomp then return (recomp, Nothing) else do {
 
 
        -- Source code unchanged and no errors yet... carry on
@@ -1315,12 +1321,44 @@ checkVersions hsc_env mod_summary iface
        ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
        ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
        ; return (recomp, Just iface)
-    }}}}}}}}}}
+    }}}}}}}}}}}
   where
     this_pkg = thisPackage (hsc_dflags hsc_env)
     -- This is a bit of a hack really
     mod_deps :: ModuleNameEnv (ModuleName, IsBootInterface)
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
+
+-- | Check if any file fingerprint changed, thus, requires recompilation
+checkSourceFingerprint :: HscEnv -> ModIface -> IfG RecompileRequired
+checkSourceFingerprint hsc iface = liftIO $ do
+  if not (gopt Opt_ChecksumRecomp (hsc_dflags hsc))
+    then do
+      -- Do not force recompilation unless the flag is set
+      return UpToDate
+    else do
+      new_fingerprint <- fingerprintFiles hsc
+      if new_fingerprint == mi_file_hash iface
+      then do
+        return UpToDate
+      else do
+        return $ RecompBecause "hash changed"
+
+fingerprintTargetId :: TargetId -> IO Fingerprint
+fingerprintTargetId target = do
+  let t =
+        case target of
+        -- TODO: What should I return here?
+        TargetModule _ -> error "Not a file"
+        TargetFile f _ -> f
+  getFileHash t
+
+-- |
+fingerprintFiles :: HscEnv -> IO Fingerprint
+fingerprintFiles hsc_env = do
+  let targetList = map targetId (hsc_targets hsc_env)
+  fingerprintList <- mapM fingerprintTargetId targetList
+  let finalFingerprint = fingerprintFingerprints fingerprintList
+  return finalFingerprint
 
 -- | Check if any plugins are requesting recompilation
 checkPlugins :: HscEnv -> ModIface -> IfG RecompileRequired

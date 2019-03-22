@@ -521,6 +521,7 @@ data GeneralFlag
    -- misc opts
    | Opt_Pp
    | Opt_ForceRecomp
+   | Opt_ChecksumRecomp
    | Opt_IgnoreOptimChanges
    | Opt_IgnoreHpcChanges
    | Opt_ExcessPrecision
@@ -3193,6 +3194,8 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "ticky-dyn-thunk"
         (NoArg (setGeneralFlag Opt_Ticky_Dyn_Thunk))
         ------- recompilation checker --------------------------------------
+  , make_ord_flag defGhcFlag "hash-recomp"
+        (NoArg $ setGeneralFlag Opt_ChecksumRecomp)
   , make_dep_flag defGhcFlag "recomp"
         (NoArg $ unSetGeneralFlag Opt_ForceRecomp)
              "Use -fno-force-recomp instead"
@@ -4128,6 +4131,7 @@ fFlagsDeps = [
   flagSpec "flat-cache"                       Opt_FlatCache,
   flagSpec "float-in"                         Opt_FloatIn,
   flagSpec "force-recomp"                     Opt_ForceRecomp,
+  flagSpec "hash-recomp"                      Opt_ChecksumRecomp,
   flagSpec "ignore-optim-changes"             Opt_IgnoreOptimChanges,
   flagSpec "ignore-hpc-changes"               Opt_IgnoreHpcChanges,
   flagSpec "full-laziness"                    Opt_FullLaziness,
