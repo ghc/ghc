@@ -49,7 +49,7 @@ ghc-linters:
   script:
     - git fetch origin
     - base="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME $CI_COMMIT_SHA)"
-    - echo "Merge base: $base"
+    - "echo Merge base $base"
     #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
     - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
     - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
