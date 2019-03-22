@@ -7,6 +7,7 @@ data DynFlags
 data DumpFlag
 data GeneralFlag
 
+integerLibrary           :: DynFlags -> IntegerLibrary
 targetPlatform           :: DynFlags -> Platform
 pprUserLength            :: DynFlags -> Int
 pprCols                  :: DynFlags -> Int

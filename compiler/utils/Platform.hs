@@ -9,6 +9,7 @@ module Platform (
         ArmISAExt(..),
         ArmABI(..),
         PPC_64ABI(..),
+        IntegerLibrary(..),
 
         target32Bit,
         isARM,
@@ -26,6 +27,7 @@ import GhcPrelude
 --      code for this platform.
 data Platform
         = Platform {
+              platformIntegerLibrary           :: IntegerLibrary,
               platformArch                     :: Arch,
               platformOS                       :: OS,
               -- Word size in bytes (i.e. normally 4 or 8,
@@ -38,6 +40,10 @@ data Platform
               platformIsCrossCompiling         :: Bool
           }
         deriving (Read, Show, Eq)
+
+data IntegerLibrary = IntegerGMP
+                    | IntegerSimple
+                    deriving (Read, Show, Eq)
 
 
 -- | Architectures that the native code generator knows about.
@@ -159,4 +165,3 @@ platformUsesFrameworks = osUsesFrameworks . platformOS
 osSubsectionsViaSymbols :: OS -> Bool
 osSubsectionsViaSymbols OSDarwin = True
 osSubsectionsViaSymbols _        = False
-

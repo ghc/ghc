@@ -84,6 +84,7 @@ module DynFlags (
 
         -- ** System tool settings and locations
         Settings(..),
+        integerLibrary,
         targetPlatform, programName, projectVersion,
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
         versionedAppDir,
@@ -1226,6 +1227,8 @@ data Settings = Settings {
   sPlatformConstants     :: PlatformConstants
  }
 
+integerLibrary :: DynFlags -> IntegerLibrary
+integerLibrary = platformIntegerLibrary . targetPlatform
 targetPlatform :: DynFlags -> Platform
 targetPlatform dflags = sTargetPlatform (settings dflags)
 programName :: DynFlags -> String

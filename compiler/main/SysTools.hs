@@ -266,8 +266,13 @@ initSysTools mbMinusB
        lcc_prog <- getSetting "LLVM clang command"
 
        let iserv_prog = libexec "ghc-iserv"
+       integer_library <- getSettings "integer library" >>= \case
+         "gmp" -> IntegerGMP
+         "simple" -> IntegerSimple
+         x -> error $ "Unknown integer-library: " ++ x
 
        let platform = Platform {
+                          platformIntegerLibrary = integer_library,
                           platformArch = targetArch,
                           platformOS   = targetOS,
                           platformWordSize = targetWordSize,
