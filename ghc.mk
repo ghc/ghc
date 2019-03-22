@@ -588,7 +588,7 @@ endif
 BOOT_LIBS = $(foreach lib,$(PACKAGES_STAGE0),$(libraries/$(lib)_dist-boot_v_LIB))
 
 # Only build internal interpreter support for the stage2 ghci lib
-libraries/ghci_CONFIGURE_OPTS += --flags=ghci
+libraries/ghci_dist-install_CONFIGURE_OPTS += --flags=ghci
 
 # ----------------------------------------
 # Special magic for the ghc-prim package
