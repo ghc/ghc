@@ -849,9 +849,6 @@ data DynFlags = DynFlags {
   ghcLink               :: GhcLink,
   hscTarget             :: HscTarget,
   settings              :: Settings,
-  integerLibrary        :: IntegerLibrary,
-    -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
-    --   by GHC-API users. See Note [The integer library] in PrelNames
   llvmTargets           :: LlvmTargets,
   llvmPasses            :: LlvmPasses,
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
@@ -1230,6 +1227,8 @@ data Settings = Settings {
   sPlatformConstants     :: PlatformConstants
  }
 
+-- | IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
+-- by GHC-API users. See Note [The integer library] in PrelNames
 integerLibrary :: DynFlags -> IntegerLibrary
 integerLibrary = platformIntegerLibrary . targetPlatform
 targetPlatform :: DynFlags -> Platform
@@ -1759,7 +1758,6 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
         hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
-        integerLibrary          = cIntegerLibraryType,
         verbosity               = 0,
         optLevel                = 0,
         debugLevel              = 0,
