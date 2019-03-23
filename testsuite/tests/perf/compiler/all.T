@@ -121,6 +121,10 @@ test('parsing001',
       ],
      compile_fail, [''])
 
+test('unlifted_specialise',
+     [extra_hc_opts('-dcore-lint -static')],
+     compile,
+     [''])
 
 test('T783',
      [ only_ways(['normal']),  # no optimisation for this one
