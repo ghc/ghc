@@ -108,7 +108,7 @@ dsFractionalLitToRational fl =
       mkRational <- dsLookupGlobalId mkRationalName
       litR <- dsRational fl_signi
       litE <- mkIntegerExpr fl_exp
-      return $ mkCoreApps (Var mkRational) [litR, litE]
+      return (mkCoreApps (Var mkRational) [litR, litE])
 
 dsRational :: Rational -> DsM CoreExpr
 dsRational (n :% d) = do
