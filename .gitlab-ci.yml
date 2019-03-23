@@ -48,6 +48,7 @@ ghc-linters:
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_SHA
+    - env
     - "echo Target branch SHA: $CI_MERGE_REQUEST_TARGET_BRANCH_SHA"
     - base="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_SHA $CI_COMMIT_SHA)"
     - "echo Merge base: $base"
