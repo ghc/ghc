@@ -844,7 +844,6 @@ isNegativeZeroOverLit lit
         -- to check if n = 0. b is equal to either 2 or 10. We don't call
         -- rationalFromFractionalLit here as it is expensive when e is big.
         HsFractional (fl@(FL {})) -> 0 == fl_signi fl && fl_neg fl
-        HsFractional (fl@(THFL {})) -> 0 == thfl_value fl && thfl_neg fl
         _               -> False
 
 {-

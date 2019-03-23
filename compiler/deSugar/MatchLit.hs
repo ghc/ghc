@@ -43,13 +43,13 @@ import TysWiredIn
 import TysPrim
 import Literal
 import SrcLoc
-import Data.Ratio
 import Outputable
 import BasicTypes
 import DynFlags
 import Util
 import FastString
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Real
 
 import Control.Monad
 import Data.Int
@@ -95,30 +95,27 @@ dsLit l = do
     HsString _ str    -> mkStringExprFS str
     HsInteger _ i _   -> mkIntegerExpr i
     HsInt _ i         -> return (mkIntExpr dflags (il_value i))
-    HsRat _ fl ty     -> dsFractionalLitToRational fl ty
+    HsRat _ fl _      -> dsFractionalLitToRational fl
     XLit x            -> pprPanic "dsLit" (ppr x)
 
-dsFractionalLitToRational :: FractionalLit -> Type -> DsM CoreExpr
-dsFractionalLitToRational fl ty =
+dsFractionalLitToRational :: FractionalLit -> DsM CoreExpr
+dsFractionalLitToRational fl =
   case fl of
     FL { fl_signi = fl_signi, fl_exp = fl_exp, fl_exp_base = feb } -> do
-      let mkRationalName = case feb of 
+      let mkRationalName = case feb of
                              Base2 -> mkRationalBase2Name
                              Base10 -> mkRationalBase10Name
       mkRational <- dsLookupGlobalId mkRationalName
-      litI <- mkIntegerExpr fl_signi
+      litR <- dsRational fl_signi
       litE <- mkIntegerExpr fl_exp
-      return ((Var mkRational) `App` litI `App` litE)
-    THFL { thfl_value = val } -> do
-      num   <- mkIntegerExpr (numerator val)
-      denom <- mkIntegerExpr (denominator val)
-      return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
-      where
-        (ratio_data_con, integer_ty)
-            = case tcSplitTyConApp ty of
-                    (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
-                                       (head (tyConDataCons tycon), i_ty)
-                    x -> pprPanic "dsLit" (ppr x)
+      return (mkCoreApps (Var mkRational) [litR, litE])
+
+dsRational :: Rational -> DsM CoreExpr
+dsRational (n :% d) = do
+  dcn <- dsLookupDataCon ratioDataConName
+  cn <- mkIntegerExpr n
+  dn <- mkIntegerExpr d
+  return $ mkCoreConApps dcn [cn, dn]
 
 
 dsOverLit :: HsOverLit GhcTc -> DsM CoreExpr

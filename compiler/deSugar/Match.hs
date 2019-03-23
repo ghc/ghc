@@ -847,7 +847,7 @@ data PatGroup
   | PgCon DataCon          -- Constructor patterns (incl list, tuple)
   | PgSyn PatSyn [Type]    -- See Note [Pattern synonym groups]
   | PgLit Literal          -- Literal patterns
-  | PgN   Integer Integer  -- Overloaded numeric literals;
+  | PgN   Rational Integer  -- Overloaded numeric literals;
                            -- see Note [Don't use Literal for PgN]
   | PgOverS FastString     -- Overloaded string literals
   | PgNpK Integer          -- n+k patterns
@@ -1092,8 +1092,8 @@ patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
 patGroup _ (NPat _ (dL->L _ (OverLit {ol_val=oval})) mb_neg _) =
   case (oval, isJust mb_neg) of
-   (HsIntegral   i, False) -> PgN (il_value i) 0
-   (HsIntegral   i, True ) -> PgN (-il_value i) 0
+   (HsIntegral   i, False) -> PgN (fromInteger $ il_value i) 0
+   (HsIntegral   i, True ) -> PgN (-(fromInteger $ il_value i)) 0
    (HsFractional r, False) -> PgN (fl_signi r) (fl_exp r)
    (HsFractional r, True ) -> PgN (-fl_signi r) (fl_exp r)
    (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
