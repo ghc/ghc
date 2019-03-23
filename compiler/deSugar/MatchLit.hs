@@ -49,7 +49,7 @@ import DynFlags
 import Util
 import FastString
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Real
+import GHC.Real hiding (FractionalExponentBase(..))
 
 import Control.Monad
 import Data.Int
@@ -116,7 +116,8 @@ dsRational (n :% d) = do
   dcn <- dsLookupDataCon ratioDataConName
   cn <- mkIntegerExpr n
   dn <- mkIntegerExpr d
-  return $ mkCoreConApps dcn [cn, dn]
+  t <- mkTyConTy <$> dsLookupTyCon integerTyConName
+  return $ mkCoreConApps dcn [Type t, cn, dn]
 
 
 dsOverLit :: HsOverLit GhcTc -> DsM CoreExpr
