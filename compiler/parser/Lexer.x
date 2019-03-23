@@ -104,7 +104,8 @@ import SrcLoc
 import Module
 import BasicTypes     ( InlineSpec(..), RuleMatchInfo(..),
                         IntegralLit(..), FractionalLit(..),
-                        FractionalExponentBase(..), SourceText(..) )
+                        FractionalExponentBase(..), SourceText(..),
+                        mkSourceFractionalLit )
 
 -- compiler/parser
 import Ctype
@@ -1435,24 +1436,20 @@ tok_hex_float    str = ITrational   $! readHexFractionalLit str
 tok_primfloat    str = ITprimfloat  $! readFractionalLit str
 tok_primdouble   str = ITprimdouble $! readFractionalLit str
 
-readFractionalLit :: String -> FractionalLit
-readFractionalLit str = ((((FL $! (SourceText str)) $! is_neg) $! i) $! e) $! eb
-                        where is_neg = case str of ('-':_) -> True
-                                                   _       -> False
-                              (i, e) = readSignificandExponentPair str
-                              eb     = Base10
+readFractionalLit, readHexFractionalLit :: String -> FractionalLit
+readHexFractionalLit = readFractionalLitX readHexSignificandExponentPair Base2
+readFractionalLit = readFractionalLitX readSignificandExponentPair Base10
 
-readHexFractionalLit :: String -> FractionalLit
-readHexFractionalLit str =
-  FL { fl_text  = SourceText str
-     , fl_neg   = case str of
+readFractionalLitX :: (String -> (Integer, Integer))
+                   -> FractionalExponentBase
+                   -> String -> FractionalLit
+readFractionalLitX readStr b str =
+  mkSourceFractionalLit str is_neg i e b
+  where
+    is_neg = case str of
                     '-' : _ -> True
-                    _       -> False
-     , fl_signi = i
-     , fl_exp = e
-     , fl_exp_base = Base2
-     }
-  where (i, e) = readHexSignificandExponentPair str
+                    _      -> False
+    (i, e) = readStr str
 
 -- -----------------------------------------------------------------------------
 -- Layout processing

@@ -15,6 +15,7 @@ types that
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns #-}
 
 module BasicTypes(
         Version, bumpVersion, initialVersion,
@@ -100,7 +101,7 @@ module BasicTypes(
         IntegralLit(..), FractionalLit(..), FractionalExponentBase(..),
         negateIntegralLit, negateFractionalLit, fractionalLitNeg,
         mkIntegralLit, mkTHFractionalLit, rationalFromFractionalLit,
-        integralFractionalLit,
+        integralFractionalLit, mkSourceFractionalLit,
 
         SourceText(..), pprWithSourceText,
 
@@ -1489,43 +1490,31 @@ negateIntegralLit (IL text neg value)
 data FractionalLit
   = FL { fl_text :: SourceText                 -- How the value was written in the source
        , fl_neg :: Bool                        -- See Note [Negative zero]
-       , fl_signi :: Integer                   -- The significand component of the literal
+       , fl_signi :: Rational                  -- The significand component of the literal
        , fl_exp :: Integer                     -- The exponent component of the literal
        , fl_exp_base :: FractionalExponentBase -- See Note [Fractional exponent bases]
        }
-  -- | TemplateHaskell fractional lit: we lose information during conversion
-  -- from Haskell syntax to TH syntax (happens when desugaring quasiquotes, in
-  -- DsMeta) where we convert a `FL` to a `Rational` because that's what TH
-  -- syntax wants.
-  | THFL { thfl_text :: SourceText -- How the value was written in the source
-         , thfl_neg :: Bool        -- See Note [Negative zero]
-         , thfl_value :: Rational  -- Numeric value of the literal
-         }
   deriving (Data, Show)
   -- The Show instance is required for the derived Lexer.x:Token instance when DEBUG is on
 
 fractionalLitNeg :: FractionalLit -> Bool
-fractionalLitNeg fl =
-  case fl of
-    FL {} -> fl_neg fl
-    THFL {} -> thfl_neg fl
-  
+fractionalLitNeg fl = fl_neg fl
+
 data FractionalExponentBase
   = Base2
   | Base10
   deriving (Eq, Ord, Data, Show)
 
-mkRationalWithExponentBase :: Integer -> Integer -> FractionalExponentBase -> Rational
-mkRationalWithExponentBase i e feb = (i :% 1) * (eb ^^ e)
+mkRationalWithExponentBase :: Rational -> Integer -> FractionalExponentBase -> Rational
+mkRationalWithExponentBase i e feb = i * (eb ^^ e)
   where eb = case feb of Base2 -> 2 ; Base10 -> 10
-  
+
 rationalFromFractionalLit :: FractionalLit -> Rational
 rationalFromFractionalLit (FL _ _ i e expBase) =
   mkRationalWithExponentBase i e expBase
-rationalFromFractionalLit (THFL _ _ r) = r
 
 mkTHFractionalLit :: Rational -> FractionalLit
-mkTHFractionalLit r = THFL { thfl_text = SourceText (show (realToFrac r::Double))
+mkTHFractionalLit r =  FL { fl_text = SourceText (show (realToFrac r::Double))
                              -- Converting to a Double here may technically lose
                              -- precision (see #15502). We could alternatively
                              -- convert to a Rational for the most accuracy, but
@@ -1533,8 +1522,10 @@ mkTHFractionalLit r = THFL { thfl_text = SourceText (show (realToFrac r::Double)
                              -- strangely, so we opt not to do this. (In contrast
                              -- to mkIntegralLit, where we always convert to an
                              -- Integer for the highest accuracy.)
-                           , thfl_neg = r < 0
-                           , thfl_value = r }
+                           , fl_neg = r < 0
+                           , fl_signi = r
+                           , fl_exp = 0
+                           , fl_exp_base = Base10 }
 
 negateFractionalLit :: FractionalLit -> FractionalLit
 negateFractionalLit (FL text neg i e eb)
@@ -1542,18 +1533,19 @@ negateFractionalLit (FL text neg i e eb)
       SourceText ('-':src) -> FL (SourceText src)       False i e eb
       SourceText      src  -> FL (SourceText ('-':src)) True  i e eb
       NoSourceText         -> FL NoSourceText (not neg) (negate i) e eb
-negateFractionalLit (THFL text neg r)
-  = case text of
-      SourceText ('-':src) -> THFL (SourceText src)       False r
-      SourceText      src  -> THFL (SourceText ('-':src)) True  r
-      NoSourceText         -> THFL NoSourceText (not neg) (negate r)
 
 integralFractionalLit :: Bool -> Integer -> FractionalLit
 integralFractionalLit neg i = FL { fl_text = SourceText (show i)
                                  , fl_neg = neg
-                                 , fl_signi = i
+                                 , fl_signi = i :% 1
                                  , fl_exp = 0
                                  , fl_exp_base = Base10 }
+
+mkSourceFractionalLit :: String -> Bool -> Integer -> Integer
+                      -> FractionalExponentBase
+                      -> FractionalLit
+
+mkSourceFractionalLit !str !b !r !i !ff = FL (SourceText str) b (r :% 1) i ff
 
 -- Note [fractional exponent bases] For hexadecimal rationals of
 -- the form 0x0.3p10 the exponent is given on base 2 rather than
@@ -1580,7 +1572,6 @@ instance Ord FractionalLit where
 
 instance Outputable FractionalLit where
   ppr (fl@(FL {})) = pprWithSourceText (fl_text fl) (rational $ mkRationalWithExponentBase (fl_signi fl) (fl_exp fl) (fl_exp_base fl))
-  ppr (fl@(THFL {})) = pprWithSourceText (thfl_text fl) (rational $ thfl_value fl)
 
 {-
 ************************************************************************

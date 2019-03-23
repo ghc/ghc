@@ -12,7 +12,7 @@ module MkCore (
         -- * Constructing boxed literals
         mkWordExpr, mkWordExprWord,
         mkIntExpr, mkIntExprInt,
-        mkIntegerExpr, mkNaturalExpr, mkRationalExpr,
+        mkIntegerExpr, mkNaturalExpr,
         mkFloatExpr, mkDoubleExpr,
         mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
 
@@ -257,11 +257,6 @@ mkWordExprWord dflags w = mkCoreConApps wordDataCon [mkWordLitWord dflags w]
 mkIntegerExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Integer
 mkIntegerExpr i = do t <- lookupTyCon integerTyConName
                      return (Lit (mkLitInteger i (mkTyConTy t)))
-
--- | Create a 'CoreExpr' which will evaluate to a @Rational@ with given significand and exponent
-mkRationalExpr  :: MonadThings m => Integer -> Integer -> m CoreExpr  -- Result :: Rational
-mkRationalExpr i e = do t <- lookupTyCon rationalTyConName
-                        return (Lit (LitRational i e (mkTyConTy t)))
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Natural@
 mkNaturalExpr  :: MonadThings m => Integer -> m CoreExpr

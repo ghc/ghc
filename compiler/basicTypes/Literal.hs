@@ -111,8 +111,6 @@ data Literal
   | LitNumber !LitNumType !Integer Type
                                 -- ^ Any numeric literal that can be
                                 -- internally represented with an Integer
-  | LitRational !Integer !Integer Type
-                                --  ^ Rationals expressed as significand and exponent
 
   | LitString  ByteString       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
@@ -227,11 +225,7 @@ instance Binary Literal where
         = do putByte bh 6
              put_ bh nt
              put_ bh i
-    put_ bh (LitRational i e _)
-        = do putByte bh 7
-             put_ bh i
-             put_ bh e
-    put_ bh (LitRubbish)      = do putByte bh 8
+    put_ bh (LitRubbish)      = do putByte bh 7
     get bh = do
             h <- getByte bh
             case h of
@@ -269,11 +263,6 @@ instance Binary Literal where
                             LitNumNatural ->
                               panic "Evaluated the place holder for mkNatural"
                     return (LitNumber nt i t)
-              7 -> do
-                    i <- get bh
-                    e <- get bh
-                    let t = panic "Evaluated the place holder for mkRational"
-                    return (LitRational i e t)
               _ -> do
                     return (LitRubbish)
 
@@ -635,7 +624,6 @@ litIsDupable dflags (LitNumber nt i _)  = case nt of
   LitNumInt64   -> True
   LitNumWord    -> True
   LitNumWord64  -> True
-litIsDupable _ (LitRational _ _ _)      = True
 litIsDupable _      _                   = True
 
 litFitsInChar :: Literal -> Bool
@@ -667,7 +655,6 @@ literalType (LitFloat _)        = floatPrimTy
 literalType (LitDouble _)       = doublePrimTy
 literalType (LitLabel _ _ _)    = addrPrimTy
 literalType (LitNumber _ _ t)   = t
-literalType (LitRational _ _ t) = t
 literalType (LitRubbish)        = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep
@@ -706,9 +693,6 @@ cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `compare` b
 cmpLit (LitNumber nt1 a _)  (LitNumber nt2  b _)
   | nt1 == nt2 = a   `compare` b
   | otherwise  = nt1 `compare` nt2
-cmpLit (LitRational i1 e1 _) (LitRational i2 e2 _)
-  | e1 == e2 = i1 `compare` i2
-  | otherwise = e1 `compare` e2
 cmpLit (LitRubbish)         (LitRubbish)          = EQ
 cmpLit lit1 lit2
   | litTag lit1 < litTag lit2 = LT
@@ -722,8 +706,7 @@ litTag (LitFloat     _)    = 4
 litTag (LitDouble    _)    = 5
 litTag (LitLabel _ _ _)    = 6
 litTag (LitNumber  {})     = 7
-litTag (LitRational _ _ _) = 8
-litTag (LitRubbish)        = 9
+litTag (LitRubbish)        = 8
 
 {-
         Printing
@@ -745,8 +728,6 @@ pprLiteral add_par (LitNumber nt i _)
        LitNumInt64   -> pprPrimInt64 i
        LitNumWord    -> pprPrimWord i
        LitNumWord64  -> pprPrimWord64 i
-pprLiteral add_par (LitRational i e _) =
-    (pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)
 pprLiteral add_par (LitLabel l mb fod) =
     add_par (text "__label" <+> b <+> ppr fod)
     where b = case mb of

@@ -156,10 +156,9 @@ shortCutLit _ (HsFractional f) ty
   | isDoubleTy ty && valueInRange = Just (mkLit doubleDataCon (HsDoublePrim noExt f))
   | otherwise     = Nothing
   where
-    valueInRange = 
-      case f of 
+    valueInRange =
+      case f of
         FL { fl_exp = e } -> (-100) <= e && e <= 100
-        THFL { thfl_value = val } -> val >= 0 && val <= 10 ^ (100 :: Int)
         -- We limit short-cutting Fractional Literals to when their power of 10
         -- is less than 100, which ensures desugaring isn't slow.
 
