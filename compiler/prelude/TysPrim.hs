@@ -658,6 +658,7 @@ doublePrimTy    = mkTyConTy doublePrimTyCon
 doublePrimTyCon :: TyCon
 doublePrimTyCon = pcPrimTyCon0 doublePrimTyConName DoubleRep
 
+
 {-
 ************************************************************************
 *                                                                      *
