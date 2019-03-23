@@ -801,14 +801,14 @@ data FractionalExponentBase
   deriving (Show)
 
 mkRationalBase2 :: Rational -> Integer -> Rational
-mkRationalBase2 r e = mkRationalWithExponentBase i j e Base2
+mkRationalBase2 r e = mkRationalWithExponentBase r e Base2
 
 mkRationalBase10 :: Rational -> Integer -> Rational
-mkRationalBase10 r e = mkRationalWithExponentBase i j e Base10
+mkRationalBase10 r e = mkRationalWithExponentBase r e Base10
 
 mkRationalWithExponentBase :: Rational -> Integer
                            -> FractionalExponentBase -> Rational
-mkRationalWithExponentBase r feb = r * (eb ^^ e)
+mkRationalWithExponentBase r e feb = r * (eb ^^ e)
   where eb = case feb of Base2 -> 2 ; Base10 -> 10
 
 -- Note [fractional exponent bases] For hexadecimal rationals of
