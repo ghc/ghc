@@ -47,8 +47,8 @@ ghc-linters:
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
-    - git fetch origin
-    - base="$(git merge-base origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME $CI_COMMIT_SHA)"
+    - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
     - "echo Merge base $base"
     #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
     - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
