@@ -43,23 +43,35 @@ stages:
 # Linting
 ############################################################
 
-ghc-linters:
+.lint:
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
-  script:
+  before_script:
     - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
     - "echo Merge base $base"
     #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
-    - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
-    - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
-    - .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
   dependencies: []
   tags:
     - lint
   only:
     refs:
       - merge_requests
+
+lint-whitespace:
+  extends: .lint
+  script:
+    - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
+
+lint-cpp:
+  extends: .lint
+  script:
+    - .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
+
+lint-makefiles:
+  extends: .lint
+  script:
+    - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
 
 # We allow the submodule checker to fail when run on merge requests (to
 # accomodate, e.g., haddock changes not yet upstream) but not on `master` or
