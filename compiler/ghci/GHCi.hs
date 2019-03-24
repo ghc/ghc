@@ -152,12 +152,6 @@ Other Notes on Remote GHCi
   * Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs
 -}
 
-#if !defined(GHCI)
-needExtInt :: IO a
-needExtInt = throwIO
-  (InstallationError "this operation requires -fexternal-interpreter")
-#endif
-
 -- | Run a command in the interpreter's context.  With
 -- @-fexternal-interpreter@, the command is serialized and sent to an
 -- external iserv process, and the response is deserialized (hence the
@@ -618,14 +612,8 @@ wormholeRef dflags _r
   | gopt Opt_ExternalInterpreter dflags
   = throwIO (InstallationError
       "wormholeRef: this operation requires -fno-external-interpreter")
-#if defined(GHCI)
   | otherwise
   = localRef _r
-#else
-  | otherwise
-  = throwIO (InstallationError
-      "can't wormhole a value in a stage1 compiler")
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Misc utils
