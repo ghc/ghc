@@ -1,6 +1,6 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.12.0.0 *TBA*
+## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
   * Fix `Show` instance of `Data.Fixed`: Negative numbers are now parenthesized
