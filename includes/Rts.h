@@ -58,7 +58,13 @@ extern "C" {
 #if __GNUC__ >= 4
 #define RTS_UNLIKELY(p) __builtin_expect((p),0)
 #else
-#define RTS_UNLIKELY(p) p
+#define RTS_UNLIKELY(p) (p)
+#endif
+
+#if __GNUC__ >= 4
+#define RTS_LIKELY(p) __builtin_expect(!!(p), 1)
+#else
+#define RTS_LIKELY(p) (p)
 #endif
 
 /* __builtin_unreachable is supported since GNU C 4.5 */

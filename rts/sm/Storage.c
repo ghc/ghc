@@ -856,7 +856,7 @@ allocateMightFail (Capability *cap, W_ n)
     bdescr *bd;
     StgPtr p;
 
-    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+    if (RTS_UNLIKELY(n >= LARGE_OBJECT_THRESHOLD/sizeof(W_))) {
         // The largest number of words such that
         // the computation of req_blocks will not overflow.
         W_ max_words = (HS_WORD_MAX & ~(BLOCK_SIZE-1)) / sizeof(W_);
@@ -897,7 +897,7 @@ allocateMightFail (Capability *cap, W_ n)
 
     accountAllocation(cap, n);
     bd = cap->r.rCurrentAlloc;
-    if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
+    if (RTS_UNLIKELY(bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W)) {
 
         if (bd) finishedNurseryBlock(cap,bd);
 
