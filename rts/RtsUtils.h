@@ -47,4 +47,9 @@ void checkFPUStack(void);
 #define xstr(s) str(s)
 #define str(s) #s
 
+// Wrappers inspired by ABSL_PREDICT_{FALSE,TRUE}
+// https://github.com/abseil/abseil-cpp/blob/master/absl/base/optimization.h
+#define PREDICT_FALSE(x) (__builtin_expect(x, 0))
+#define PREDICT_TRUE(x) (__builtin_expect(!!(x), 1))
+
 #include "EndPrivate.h"
