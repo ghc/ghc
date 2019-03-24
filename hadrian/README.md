@@ -168,6 +168,9 @@ typechecked so it isn't possible to run any functions in the repl.
 ./hadrian/ghci.sh
 ```
 
+If `build.stack.sh` is used to build GHC, `./hadrian/ghci.stack.sh` should be
+used to launch a ghci session and load GHC.
+
 You can also use this target with `ghcid`.
 
 ```
