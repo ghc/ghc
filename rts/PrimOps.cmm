@@ -403,7 +403,7 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
 
     words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;
     ("ptr" arr) = ccall allocateMightFail(MyCapability() "ptr",words);
-    if (arr == NULL) {
+    if (arr == NULL) (likely: False) {
         jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
     }
     TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
@@ -413,8 +413,11 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
 
     // Initialise all elements of the array with the value in R2
     p = arr + SIZEOF_StgSmallMutArrPtrs;
+    // Avoid the shift for `WDS(n)` in the inner loop
+    W_ limit;
+    limit = arr + SIZEOF_StgSmallMutArrPtrs + WDS(n);
   for:
-    if (p < arr + SIZEOF_StgSmallMutArrPtrs + WDS(n)) (likely: True) {
+    if (p < limit) (likely: True) {
         W_[p] = init;
         p = p + WDS(1);
         goto for;
