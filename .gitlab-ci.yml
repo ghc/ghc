@@ -664,7 +664,6 @@ cleanup-darwin:
 doc-tarball:
   <<: *only-default
   stage: packaging
-  allow_failure: true
   tags:
     - x86_64-linux
   image: ghcci/x86_64-linux-deb9:0.2
@@ -680,9 +679,9 @@ doc-tarball:
       - "*.pdf"
   script:
     - rm -Rf docs
-    - distrib/mkDocs/mkDocs ghc-x86_64-deb9-linux.tar.xz ghc-x86_64-mingw32.tar.xz
+    - bash -ex distrib/mkDocs/mkDocs ghc-x86_64-deb9-linux.tar.xz ghc-x86_64-mingw32.tar.xz
     - ls -lh
-    - mv docs/*.tar.xz .
+    - mv docs/*.tar.xz docs/index.html .
 
 source-tarball:
   stage: packaging
