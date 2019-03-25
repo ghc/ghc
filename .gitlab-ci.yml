@@ -653,9 +653,9 @@ doc-tarball:
       - "*.pdf"
   script:
     - rm -Rf docs
-    - distrib/mkDocs/mkDocs ghc-x86_64-deb9-linux.tar.xz ghc-x86_64-mingw32.tar.xz
+    - bash -ex distrib/mkDocs/mkDocs ghc-x86_64-deb9-linux.tar.xz ghc-x86_64-mingw32.tar.xz
     - ls -lh
-    - mv docs/*.tar.xz .
+    - mv docs/*.tar.xz index.html .
 
 source-tarball:
   stage: packaging
