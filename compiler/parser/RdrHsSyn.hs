@@ -15,6 +15,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module   RdrHsSyn (
         mkHsOpApp,
@@ -88,7 +89,9 @@ module   RdrHsSyn (
 
         -- Expression/command ambiguity resolution
         PV,
-        ExpCmdP(ExpCmdP, runExpCmdP),
+        runPV,
+        ExpCmdP(ExpCmdP, runExpCmdPV),
+        runExpCmdP,
         ExpCmdI(..),
         ecFromExp,
         ecFromCmd,
@@ -970,11 +973,11 @@ checkTyClHdr is_cls ty
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
-checkExpBlockArguments :: LHsExpr GhcPs -> P ()
-checkCmdBlockArguments :: LHsCmd GhcPs -> P ()
+checkExpBlockArguments :: LHsExpr GhcPs -> PV ()
+checkCmdBlockArguments :: LHsCmd GhcPs -> PV ()
 (checkExpBlockArguments, checkCmdBlockArguments) = (checkExpr, checkCmd)
   where
-    checkExpr :: LHsExpr GhcPs -> P ()
+    checkExpr :: LHsExpr GhcPs -> PV ()
     checkExpr expr = case unLoc expr of
       HsDo _ DoExpr _ -> check "do block" expr
       HsDo _ MDoExpr _ -> check "mdo block" expr
@@ -986,7 +989,7 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> P ()
       HsProc {} -> check "proc expression" expr
       _ -> return ()
 
-    checkCmd :: LHsCmd GhcPs -> P ()
+    checkCmd :: LHsCmd GhcPs -> PV ()
     checkCmd cmd = case unLoc cmd of
       HsCmdLam {} -> check "lambda command" cmd
       HsCmdCase {} -> check "case command" cmd
@@ -995,7 +998,7 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> P ()
       HsCmdDo {} -> check "do command" cmd
       _ -> return ()
 
-    check :: (HasSrcSpan a, Outputable a) => String -> a -> P ()
+    check :: (HasSrcSpan a, Outputable a) => String -> a -> PV ()
     check element a = do
       blockArguments <- getBit BlockArgumentsBit
       unless blockArguments $
@@ -1284,7 +1287,7 @@ checkValSigLhs lhs@(dL->L l _)
 
 checkDoAndIfThenElse'
   :: (HasSrcSpan a, Outputable a, Outputable b, HasSrcSpan c, Outputable c)
-  => a -> Bool -> b -> Bool -> c -> P ()
+  => a -> Bool -> b -> Bool -> c -> PV ()
 checkDoAndIfThenElse' guardExpr semiThen thenExpr semiElse elseExpr
  | semiThen || semiElse
     = do doAndIfThenElse <- getBit DoAndIfThenElseBit
@@ -1876,7 +1879,10 @@ checkMonadComp = do
 -- See Note [Parser-Validator]
 -- See Note [Ambiguous syntactic categories]
 newtype ExpCmdP =
-  ExpCmdP { runExpCmdP :: forall b. ExpCmdI b => PV (Located (b GhcPs)) }
+  ExpCmdP { runExpCmdPV :: forall b. ExpCmdI b => PV (Located (b GhcPs)) }
+
+runExpCmdP :: ExpCmdI b => ExpCmdP -> P (Located (b GhcPs))
+runExpCmdP p = runPV (runExpCmdPV p)
 
 ecFromExp :: LHsExpr GhcPs -> ExpCmdP
 ecFromExp a = ExpCmdP (ecFromExp' a)
@@ -1910,7 +1916,7 @@ class ExpCmdI b where
   checkBlockArguments :: Located (b GhcPs) -> PV ()
   -- | Check if -XDoAndIfThenElse is enabled.
   checkDoAndIfThenElse :: LHsExpr GhcPs -> Bool -> Located (b GhcPs)
-                                        -> Bool -> Located (b GhcPs) -> P ()
+                                        -> Bool -> Located (b GhcPs) -> PV ()
 
 instance ExpCmdI HsCmd where
   ecFromCmd' = return
@@ -2661,7 +2667,22 @@ failOpStrictnessPosition (dL->L loc _) = addFatalError loc msg
 -----------------------------------------------------------------------------
 -- Misc utils
 
-type PV = P -- See Note [Parser-Validator]
+-- See Note [Parser-Validator]
+newtype PV a = PV (P a)
+  deriving (Functor, Applicative, Monad)
+
+runPV :: PV a -> P a
+runPV (PV m) = m
+
+instance MonadP PV where
+  addError srcspan msg =
+    PV $ addError srcspan msg
+  addFatalError srcspan msg =
+    PV $ addFatalError srcspan msg
+  getBit ext =
+    PV $ getBit ext
+  addAnnsAt loc anns =
+    PV $ addAnnsAt loc anns
 
 {- Note [Parser-Validator]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
