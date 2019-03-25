@@ -264,8 +264,7 @@ Here are a few simple suggestions that might help you fix the build:
 If you need help in debugging Hadrian, read the 
 [wiki](https://github.com/snowleopard/hadrian/wiki)
 and Shake's [debugging tutorial](https://shakebuild.com/debugging).
-If nothing helps, don't hesitate to create a GHC issue, choosing the
-component `Build System (Hadrian)`.
+If nothing helps, don't hesitate to create a GHC issue.
 
 Current limitations
 -------------------
