@@ -11,7 +11,6 @@ module LinkerTypes (
 import GhcPrelude              ( FilePath, String, show )
 import Data.Time               ( UTCTime )
 import Data.Maybe              ( Maybe )
-import Data.IORef              ( IORef )
 import Control.Concurrent.MVar ( MVar )
 import Module                  ( InstalledUnitId, Module )
 import ByteCodeTypes           ( ItblEnv, CompiledByteCode )
@@ -25,7 +24,7 @@ import GHCi.RemoteTypes        ( ForeignHValue )
 type ClosureEnv = NameEnv (Name, ForeignHValue) 
 
 newtype DynLinker =
-  DynLinker { dl_mpls :: IORef (MVar (Maybe PersistentLinkerState)) }
+  DynLinker { dl_mpls :: MVar (Maybe PersistentLinkerState) }
 
 data PersistentLinkerState
   = PersistentLinkerState {
