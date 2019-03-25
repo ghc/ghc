@@ -89,6 +89,32 @@ lint-submods-mr:
     refs:
       - merge_requests
 
+.lint-changelogs:
+  stage: lint
+  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  dependencies: []
+  tags:
+    - lint
+  script:
+    - |
+      grep TBA libraries/*/changelog.md && (
+          echo "Error: Found \"TBA\"s in changelogs."
+          exit 1
+      )
+
+lint-changelogs:
+  extends: .lint-changelogs
+  allow_failure: true
+  only:
+    refs:
+      - /ghc-[0-9]+\.[0-9]+/
+
+lint-release-changelogs:
+  extends: .lint-changelogs
+  only:
+    - tags
+
+
 ############################################################
 # Validation via Pipelines (hadrian)
 ############################################################
