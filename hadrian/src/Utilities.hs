@@ -2,14 +2,17 @@ module Utilities (
     build, buildWithResources, buildWithCmdOptions,
     askWithResources,
     runBuilder, runBuilderWith,
-    needLibrary, contextDependencies, stage1Dependencies, libraryTargets,
-    topsortPackages, cabalDependencies
+    needLibrary, needBinDistLibrary, contextDependencies, stage1Dependencies,
+    libraryTargets, topsortPackages, cabalDependencies
     ) where
 
 import qualified Hadrian.Builder as H
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Utilities
+import System.Directory (getCurrentDirectory)
+import Development.Shake.FilePath (makeRelativeEx)
+import Control.Monad.Extra
 
 import Context
 import Expression hiding (stage)
@@ -69,6 +72,38 @@ libraryTargets includeGhciLib context@Context {..} = do
 -- | Coarse-grain 'need': make sure all given libraries are fully built.
 needLibrary :: [Context] -> Action ()
 needLibrary cs = need =<< concatMapM (libraryTargets True) cs
+
+-- | Coarse-grain 'need': make sure all given libraries are fully built and
+-- registered/copied to the package database.
+needBinDistLibrary :: [(Resource, Int)] -> [Context] -> Action ()
+needBinDistLibrary rs cs = do
+    hiDirs <- concatMapM (pkgImportDirs rs) cs
+    hiFiles <- nub <$> concatMapM
+                        (\ hiDir -> do
+                            hiFilesRel <- getDirectoryFiles hiDir
+                                    ["//*." ++ hisuf (Context.way c) | c <- cs]
+                            return $ fmap (hiDir -/-) hiFilesRel
+                            )
+                        hiDirs
+    need hiFiles
+
+-- | Path to package database include paths (contain the packages *.hi files).
+pkgImportDirs :: [(Resource, Int)] -> Context -> Action [FilePath]
+pkgImportDirs rs context@Context{..} = do
+    -- Needing the config file's ensures the libraries are registered.
+    confFile <- pkgConfFile context
+    -- need [confFile]
+    liftIO $ print confFile
+    stdOut <- askWithResources rs $
+                target context (GhcPkg ImportDirs stage) [pkgName package] []
+    let
+        -- Extract the path from stdout.
+        rawPaths = concatMap words $ lines stdOut
+    -- Ensure the path is relative. (That may not be possible of on a
+    -- diferent drive).
+    cwd <- liftIO $ getCurrentDirectory
+    paths <- liftIO $ mapMaybeM (makeRelativeEx cwd) rawPaths
+    return paths
 
 -- HACK (izgzhen), see https://github.com/snowleopard/hadrian/issues/344.
 -- | Topological sort of packages according to their dependencies.

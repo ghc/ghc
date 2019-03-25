@@ -84,6 +84,7 @@ instance NFData   ConfigurationInfo
 -- | 'GhcPkg' can initialise a package database and register packages in it.
 data GhcPkgMode = Copy         -- ^ Copy a package from one database to another.
                 | Dependencies -- ^ Compute package dependencies.
+                | ImportDirs   -- ^ Compute packgee include dirs (contain *.hi).
                 | Unregister   -- ^ Unregister a package.
                 | Update       -- ^ Update a package.
                 deriving (Eq, Generic, Show)
@@ -205,15 +206,34 @@ instance H.Builder Builder where
     -- dependencies.
     askBuilderWith :: Builder -> BuildInfo -> Action String
     askBuilderWith builder BuildInfo {..} = case builder of
-        GhcPkg Dependencies _ -> do
+        GhcPkg mode stage -> do
             let input  = fromSingleton msgIn buildInputs
                 msgIn  = "[askBuilder] Exactly one input file expected."
             needBuilder builder
             path <- H.builderPath builder
             need [path]
-            Stdout stdout <- cmd [path] ["--no-user-package-db", "field", input, "depends"]
+            Stdout stdout <- case mode of
+                Dependencies -> do
+                    cmd [path]
+                        [ "--no-user-package-db"
+                        , "field"
+                        , input
+                        , "depends" ]
+                ImportDirs   -> do
+                    pkgDbPath <- packageDbPath stage
+                    cmd [path]
+                        [ "--no-user-package-db"
+                        , "--global-package-db=" ++ pkgDbPath
+                        , "--simple-output"
+                        , "--expand-pkgroot"
+                        , "field"
+                        , input
+                        , "import-dirs" ]
+                _ -> err
             return stdout
-        _ -> error $ "Builder " ++ show builder ++ " can not be asked!"
+        _ -> err
+        where
+            err = error $ "Builder " ++ show builder ++ " can not be asked!"
 
     runBuilderWith :: Builder -> BuildInfo -> Action ()
     runBuilderWith builder BuildInfo {..} = do

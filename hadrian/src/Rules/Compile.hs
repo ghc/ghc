@@ -163,7 +163,7 @@ compileHsObject rs objpath b@(BuildPath _root stage _path _o) hsobj =
         ctxPath <- contextPath ctx
         (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
         need (src:deps)
-        needLibrary =<< contextDependencies ctx
+        needBinDistLibrary rs =<< contextDependencies ctx
         buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
         -- Andrey: It appears that the previous refactoring has broken
         -- multiple-output build rules. Ideally, we should bring multiple-output

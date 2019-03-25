@@ -9,7 +9,7 @@ import Hadrian.Haskell.Cabal.Type as PD
 
 import Base
 import Builder
-import Context
+import Context as C
 import Expression
 import Packages
 
