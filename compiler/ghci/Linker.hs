@@ -83,10 +83,10 @@ import Exception
 The persistent linker state *must* match the actual state of the
 C dynamic linker at all times.
 
-The IORef used for PersistentLinkerState actually contains another MVar,
-which in turn contains a Maybe PersistentLinkerState. The MVar serves to ensure
-mutual exclusion between multiple loaded copies of the GHC library. The Maybe
-may be Nothing to indicate that the linker has not yet been initialised.
+The MVar used to hold the PersistentLinkerState contains a Maybe
+PersistentLinkerState. The MVar serves to ensure mutual exclusion between
+multiple loaded copies of the GHC library. The Maybe may be Nothing to
+indicate that the linker has not yet been initialised.
 
 The PersistentLinkerState maps Names to actual closures (for
 interpreted code only), for use during linking.
@@ -94,27 +94,27 @@ interpreted code only), for use during linking.
 
 uninitializedLinker :: IO DynLinker
 uninitializedLinker =
-  newMVar Nothing >>= newIORef >>= (pure . DynLinker)
+  newMVar Nothing >>= (pure . DynLinker)
 
 uninitialised :: a
 uninitialised = panic "Dynamic linker not initialised"
 
 modifyPLS_ :: DynLinker -> (PersistentLinkerState -> IO PersistentLinkerState) -> IO ()
-modifyPLS_ dl f = readIORef (dl_mpls dl)
-  >>= flip modifyMVar_ (fmap pure . f . fromMaybe uninitialised)
+modifyPLS_ dl f =
+  modifyMVar_ (dl_mpls dl) (fmap pure . f . fromMaybe uninitialised)
 
 modifyPLS :: DynLinker -> (PersistentLinkerState -> IO (PersistentLinkerState, a)) -> IO a
-modifyPLS dl f = readIORef (dl_mpls dl)
-  >>= flip modifyMVar (fmapFst pure . f . fromMaybe uninitialised)
+modifyPLS dl f =
+  modifyMVar (dl_mpls dl) (fmapFst pure . f . fromMaybe uninitialised)
   where fmapFst f = fmap (\(x, y) -> (f x, y))
 
 readPLS :: DynLinker -> IO PersistentLinkerState
-readPLS dl = readIORef (dl_mpls dl)
-  >>= fmap (fromMaybe uninitialised) . readMVar
+readPLS dl =
+  (fmap (fromMaybe uninitialised) . readMVar) (dl_mpls dl)
 
 modifyMbPLS_
   :: DynLinker -> (Maybe PersistentLinkerState -> IO (Maybe PersistentLinkerState)) -> IO ()
-modifyMbPLS_ dl f = readIORef (dl_mpls dl) >>= flip modifyMVar_ f
+modifyMbPLS_ dl f = modifyMVar_ (dl_mpls dl) f 
 
 emptyPLS :: DynFlags -> PersistentLinkerState
 emptyPLS _ = PersistentLinkerState {
