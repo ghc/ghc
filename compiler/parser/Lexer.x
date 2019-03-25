@@ -50,16 +50,17 @@
 module Lexer (
    Token(..), lexer, pragState, mkPState, mkPStatePure, PState(..),
    P(..), ParseResult(..), mkParserFlags, mkParserFlags', ParserFlags,
+   MonadP(..),
    getRealSrcLoc, getPState, withThisPackage,
    failLocMsgP, srcParseFail,
    getErrorMessages, getMessages,
    popContext, pushModuleContext, setLastToken, setSrcLoc,
    activeContext, nextIsEOF,
    getLexState, popLexState, pushLexState,
-   ExtBits(..), getBit,
-   addWarning, addError, addFatalError,
+   ExtBits(..),
+   addWarning,
    lexTokenStream,
-   addAnnotation,AddAnn,addAnnsAt,mkParensApiAnn,
+   addAnnotation,AddAnn,mkParensApiAnn,
    commentToAnnotation
   ) where
 
@@ -2276,11 +2277,6 @@ setAlrExpectingOCurly b = P $ \s -> POk (s {alr_expecting_ocurly = b}) ()
 -- stored in a @Word64@.
 type ExtsBitmap = Word64
 
--- | Check if a given flag is currently set in the bitmap.
-getBit :: ExtBits -> P Bool
-getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
-                       in b `seq` POk s b
-
 xbit :: ExtBits -> ExtsBitmap
 xbit = bit . fromEnum
 
@@ -2474,34 +2470,52 @@ mkPStatePure options buf loc =
       annotations_comments = []
     }
 
--- | Add a non-fatal error. Use this when the parser can produce a result
---   despite the error.
+-- | An mtl-style class for monads that support parsing-related operations.
+-- For example, sometimes we make a second pass over the parsing results to validate,
+-- disambiguate, or rearrange them, and we do so in the PV monad which cannot consume
+-- input but can report parsing errors, check for extension bits, and accumulate
+-- parsing annotations. Both P and PV are instances of MonadP.
 --
---   For example, when GHC encounters a @forall@ in a type,
---   but @-XExplicitForAll@ is disabled, the parser constructs @ForAllTy@
---   as if @-XExplicitForAll@ was enabled, adding a non-fatal error to
---   the accumulator.
+-- MonadP grants us convenient overloading. The other option is to have separate operations
+-- for each monad: addErrorP vs addErrorPV, getBitP vs getBitPV, and so on.
 --
---   Control flow wise, non-fatal errors act like warnings: they are added
---   to the accumulator and parsing continues. This allows GHC to report
---   more than one parse error per file.
---
-addError :: SrcSpan -> SDoc -> P ()
-addError srcspan msg
- = P $ \s@PState{messages=m} ->
-       let
-           m' d =
-               let (ws, es) = m d
-                   errormsg = mkErrMsg d srcspan alwaysQualify msg
-                   es' = es `snocBag` errormsg
-               in (ws, es')
-       in POk s{messages=m'} ()
+class Monad m => MonadP m where
+  -- | Add a non-fatal error. Use this when the parser can produce a result
+  --   despite the error.
+  --
+  --   For example, when GHC encounters a @forall@ in a type,
+  --   but @-XExplicitForAll@ is disabled, the parser constructs @ForAllTy@
+  --   as if @-XExplicitForAll@ was enabled, adding a non-fatal error to
+  --   the accumulator.
+  --
+  --   Control flow wise, non-fatal errors act like warnings: they are added
+  --   to the accumulator and parsing continues. This allows GHC to report
+  --   more than one parse error per file.
+  --
+  addError :: SrcSpan -> SDoc -> m ()
+  -- | Add a fatal error. This will be the last error reported by the parser, and
+  --   the parser will not produce any result, ending in a 'PFailed' state.
+  addFatalError :: SrcSpan -> SDoc -> m a
+  -- | Check if a given flag is currently set in the bitmap.
+  getBit :: ExtBits -> m Bool
+  -- | Given a location and a list of AddAnn, apply them all to the location.
+  addAnnsAt :: SrcSpan -> [AddAnn] -> m ()
 
--- | Add a fatal error. This will be the last error reported by the parser, and
---   the parser will not produce any result, ending in a 'PFailed' state.
-addFatalError :: SrcSpan -> SDoc -> P a
-addFatalError span msg =
-  addError span msg >> P PFailed
+instance MonadP P where
+  addError srcspan msg
+   = P $ \s@PState{messages=m} ->
+         let
+             m' d =
+                 let (ws, es) = m d
+                     errormsg = mkErrMsg d srcspan alwaysQualify msg
+                     es' = es `snocBag` errormsg
+                 in (ws, es')
+         in POk s{messages=m'} ()
+  addFatalError span msg =
+    addError span msg >> P PFailed
+  getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
+                         in b `seq` POk s b
+  addAnnsAt loc anns = mapM_ (\a -> a loc) anns
 
 -- | Add a warning to the accumulator.
 --   Use 'getMessages' to get the accumulated warnings.
@@ -3054,10 +3068,6 @@ addAnnotationOnly :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
 addAnnotationOnly l a v = P $ \s -> POk s {
   annotations = ((l,a), [v]) : annotations s
   } ()
-
--- |Given a location and a list of AddAnn, apply them all to the location.
-addAnnsAt :: SrcSpan -> [AddAnn] -> P ()
-addAnnsAt loc anns = mapM_ (\a -> a loc) anns
 
 -- |Given a 'SrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
 -- 'AddAnn' values for the opening and closing bordering on the start
