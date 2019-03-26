@@ -1510,7 +1510,7 @@ decl_cls  : at_decl_cls                 { $1 }
           -- A 'default' signature used with the generic-programming extension
           | 'default' infixexp '::' sigtypedoc
                     {% runPV (runExpCmdP $2) >>= \ $2 ->
-                       do { v <- checkValSigLhs $2
+                       do { v <- runPV $ checkValSigLhs $2
                           ; let err = text "in default signature" <> colon <+>
                                       quotes (ppr $2)
                           ; ams (sLL $1 $> $ SigD noExt $ ClassOpSig noExt True [v] $ mkLHsSigType $4)
@@ -2396,8 +2396,8 @@ decl_no_th :: { LHsDecl GhcPs }
         | '!' aexp rhs          {% runPV (runExpCmdP $2) >>= \ $2 ->
                                    do { let { e = sLL $1 $2 (SectionR noExt (sL1 $1 (HsVar noExt (sL1 $1 bang_RDR))) $2)
                                             ; l = comb2 $1 $> };
-                                        (ann, r) <- checkValDef empty SrcStrict e Nothing $3 ;
-                                        hintBangPat (comb2 $1 $2) (unLoc e) ;
+                                        (ann, r) <- runPV $ checkValDef SrcStrict e Nothing $3 ;
+                                        runPV $ hintBangPat (comb2 $1 $2) (unLoc e) ;
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
                                         -- [FunBind vs PatBind]
@@ -2410,7 +2410,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                         _ <- amsL l (ann ++ fst (unLoc $3) ++ [mj AnnBang $1]) ;
                                         return $! (sL l $ ValD noExt r) } }
 
-        | infixexp_top opt_sig rhs  {% do { (ann,r) <- checkValDef empty NoSrcStrict $1 (snd $2) $3;
+        | infixexp_top opt_sig rhs  {% do { (ann,r) <- runPV $ checkValDef NoSrcStrict $1 (snd $2) $3;
                                         let { l = comb2 $1 $> };
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
@@ -2456,7 +2456,7 @@ sigdecl :: { LHsDecl GhcPs }
         :
         -- See Note [Declaration/signature overlap] for why we need infixexp here
           infixexp_top '::' sigtypedoc
-                        {% do { v <- checkValSigLhs $1
+                        {% do { v <- runPV $ checkValSigLhs $1
                               ; _ <- amsL (comb2 $1 $>) [mu AnnDcolon $2]
                               ; return (sLL $1 $> $ SigD noExt $
                                   TypeSig noExt [v] (mkLHsSigWcType $3))} }
@@ -2752,7 +2752,7 @@ aexp    :: { ExpCmdP }
                                               (mkHsDo MDoExpr (snd $ unLoc $2)))
                                            (mj AnnMdo $1:(fst $ unLoc $2)) }
         | 'proc' aexp '->' exp
-                       {% (checkPattern empty <=< runPV . runExpCmdP) $2 >>= \ p ->
+                       {% (runPV . checkPattern <=< runPV . runExpCmdP) $2 >>= \ p ->
                            runPV (runExpCmdP $4) >>= \ $4@cmd ->
                            fmap ecFromExp $
                            ams (sLL $1 $> $ HsProc noExt p (sLL $1 $> $ HsCmdTop noExt cmd))
@@ -2825,7 +2825,7 @@ aexp2   :: { ExpCmdP }
                                       (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
         | '[t|' ktype '|]'    {% fmap ecFromExp $
                                  ams (sLL $1 $> $ HsBracket noExt (TypBr noExt $2)) [mo $1,mu AnnCloseQ $3] }
-        | '[p|' infixexp '|]' {% (checkPattern empty <=< runPV . runExpCmdP) $2 >>= \p ->
+        | '[p|' infixexp '|]' {% (runPV . checkPattern <=< runPV . runExpCmdP) $2 >>= \p ->
                                       fmap ecFromExp $
                                       ams (sLL $1 $> $ HsBracket noExt (PatBr noExt p))
                                           [mo $1,mu AnnCloseQ $3] }
@@ -3158,26 +3158,27 @@ gdpat   :: { forall b. ExpCmdI b => PV (LGRHS GhcPs (Located (b GhcPs))) }
 -- Bangs inside are parsed as infix operator applications, so that
 -- we parse them right when bang-patterns are off
 pat     :: { LPat GhcPs }
-pat     :  exp          {% (checkPattern empty <=< runPV . runExpCmdP) $1 }
+pat     :  exp          {% (runPV . checkPattern <=< runPV . runExpCmdP) $1 }
         | '!' aexp      {% runPV (runExpCmdP $2) >>= \ $2 ->
-                           amms (checkPattern empty (sLL $1 $> (SectionR noExt
+                           amms (runPV $
+                                 checkPattern (sLL $1 $> (SectionR noExt
                                                      (sL1 $1 (HsVar noExt (sL1 $1 bang_RDR))) $2)))
                                 [mj AnnBang $1] }
 
 bindpat :: { LPat GhcPs }
 bindpat :  exp            {% runPV (runExpCmdP $1) >>= \ $1 ->
-                             checkPattern
-                                (text "Possibly caused by a missing 'do'?") $1 }
+                             runPV_msg (text "Possibly caused by a missing 'do'?") $
+                             checkPattern $1 }
         | '!' aexp        {% runPV (runExpCmdP $2) >>= \ $2 ->
-                             amms (checkPattern
-                                     (text "Possibly caused by a missing 'do'?")
+                             amms (runPV_msg (text "Possibly caused by a missing 'do'?") $
+                                   checkPattern
                                      (sLL $1 $> (SectionR noExt (sL1 $1 (HsVar noExt (sL1 $1 bang_RDR))) $2)))
                                   [mj AnnBang $1] }
 
 apat   :: { LPat GhcPs }
-apat    : aexp                  {% (checkPattern empty <=< runPV . runExpCmdP) $1 }
+apat    : aexp                  {% (runPV . checkPattern <=< runPV . runExpCmdP) $1 }
         | '!' aexp              {% runPV (runExpCmdP $2) >>= \ $2 ->
-                                   amms (checkPattern empty
+                                   amms (runPV $ checkPattern
                                             (sLL $1 $> (SectionR noExt
                                                 (sL1 $1 (HsVar noExt (sL1 $1 bang_RDR))) $2)))
                                         [mj AnnBang $1] }

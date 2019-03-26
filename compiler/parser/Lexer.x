@@ -60,7 +60,7 @@ module Lexer (
    ExtBits(..),
    addWarning,
    lexTokenStream,
-   addAnnotation,AddAnn,mkParensApiAnn,
+   AddAnn,mkParensApiAnn,
    commentToAnnotation
   ) where
 
@@ -2491,6 +2491,10 @@ class Monad m => MonadP m where
   getBit :: ExtBits -> m Bool
   -- | Given a location and a list of AddAnn, apply them all to the location.
   addAnnsAt :: SrcSpan -> [AddAnn] -> m ()
+  addAnnotation :: SrcSpan          -- SrcSpan of enclosing AST construct
+                -> AnnKeywordId     -- The first two parameters are the key
+                -> SrcSpan          -- The location of the keyword itself
+                -> m ()
 
 instance MonadP P where
   addError srcspan msg
@@ -2507,6 +2511,9 @@ instance MonadP P where
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
                          in b `seq` POk s b
   addAnnsAt loc anns = mapM_ (\a -> a loc) anns
+  addAnnotation l a v = do
+    addAnnotationOnly l a v
+    allocateComments l
 
 -- | Add a warning to the accumulator.
 --   Use 'getMessages' to get the accumulated warnings.
@@ -3046,14 +3053,6 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 --   The usual way an 'AddAnn' is created is using the 'mj' ("make jump")
 --   function, and then it can be discharged using the 'ams' function.
 type AddAnn = SrcSpan -> P ()
-
-addAnnotation :: SrcSpan          -- SrcSpan of enclosing AST construct
-              -> AnnKeywordId     -- The first two parameters are the key
-              -> SrcSpan          -- The location of the keyword itself
-              -> P ()
-addAnnotation l a v = do
-  addAnnotationOnly l a v
-  allocateComments l
 
 addAnnotationOnly :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
 addAnnotationOnly l a v = P $ \s -> POk s {
