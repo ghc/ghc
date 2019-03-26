@@ -48,9 +48,9 @@ import HscTypes
 import GHCi.RemoteTypes ( HValue )
 import Type             ( Type, eqType, mkTyConTy, pprTyThingCategory )
 import TyCon            ( TyCon )
-import Name             ( Name, nameModule_maybe )
+import Name             ( Name, nameModule_maybe, nameStableString )
 import Id               ( idType )
-import Module           ( Module, ModuleName )
+import Module           ( Module, ModuleName, moduleNameString )
 import Panic
 import FastString
 import ErrUtils
@@ -98,10 +98,14 @@ initializePlugins hsc_env df
 
 loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env
-  = do { -- unless (null to_load) $
+  = do
+  putStrLn "[loadPlugins] loading plugins..."
+  ret <- do { -- unless (null to_load) $
          --   checkExternalInterpreter hsc_env
        ; plugins <- mapM loadPlugin to_load
        ; return $ zipWith attachOptions to_load plugins }
+  putStrLn "[loadPlugins] done."
+  return ret
   where
     dflags  = hsc_dflags hsc_env
     to_load = pluginModNames dflags
@@ -130,7 +134,9 @@ checkExternalInterpreter hsc_env =
 
 loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface)
 loadPlugin' occ_name plugin_name hsc_env mod_name
-  = do { let plugin_rdr_name = mkRdrQual mod_name occ_name
+  = do
+    ret <- do { putStrLn $ "[loadPlugin'] loading `" ++ nameStableString plugin_name ++ "' from `" ++ moduleNameString mod_name ++ "' ... "
+       ; let plugin_rdr_name = mkRdrQual mod_name occ_name
              dflags = hsc_dflags hsc_env
        ; mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name
                         plugin_rdr_name
@@ -151,6 +157,8 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           , text "did not have the type"
                           , ppr pluginTyConName, text "as required"])
             Just plugin -> return (plugin, mod_iface) } } }
+    putStrLn "[loadPlugin'] done. "
+    return ret
 
 
 -- | Force the interfaces for the given modules to be loaded. The 'SDoc' parameter is used
@@ -208,10 +216,11 @@ getValueSafely hsc_env val_name expected_type = do
 
 getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
 getHValueSafely hsc_env val_name expected_type = do
+    putStrLn "[getHValueSafely]: loading ..."
     forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of getHValueSafely") val_name
     -- Now look up the names for the value and type constructor in the type environment
     mb_val_thing <- lookupTypeHscEnv hsc_env val_name
-    case mb_val_thing of
+    ret <- case mb_val_thing of
         Nothing -> throwCmdLineErrorS dflags $ missingTyThingError val_name
         Just (AnId id) -> do
             -- Check the value type in the interface against the type recovered from the type constructor
@@ -228,6 +237,8 @@ getHValueSafely hsc_env val_name expected_type = do
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing
+    putStrLn "[getHValueSafely]: done."
+    return ret
    where dflags = hsc_dflags hsc_env
          -- unset Opt_ExternalInterpreter. This will ensure that
          -- local_hsc_env and local_dflags go through the local linker.
@@ -246,6 +257,7 @@ getHValueSafely hsc_env val_name expected_type = do
                  , platformHasIdentDirective = error "platformHasIdentDirective undefined"
                  , platformHasSubsectionsViaSymbols = True
                  , platformIsCrossCompiling = True
+                 , platformString = "x86_64-apple-darwin"
                  }
                }
              }

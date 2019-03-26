@@ -836,11 +836,13 @@ linkDecls hsc_env span cbc@CompiledByteCode{..} = do
 
 linkModule :: HscEnv -> Module -> IO ()
 linkModule hsc_env mod = do
+  putStrLn "[linkModule] linking mod..."
   initDynLinker hsc_env
   modifyPLS_ hsc_env $ \pls -> do
     (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [mod]
     if (failed ok) then throwGhcExceptionIO (ProgramError "could not link module")
       else return pls'
+  putStrLn "[linkModule] done."
 
 {- **********************************************************************
 

@@ -280,7 +280,8 @@ initSysTools mbMinusB
                           platformHasGnuNonexecStack = targetHasGnuNonexecStack,
                           platformHasIdentDirective = targetHasIdentDirective,
                           platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols,
-                          platformIsCrossCompiling = crossCompiling
+                          platformIsCrossCompiling = crossCompiling,
+                          platformString = ""
                       }
 
        return $ Settings {

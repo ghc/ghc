@@ -579,11 +579,13 @@ checkBrokenTablesNextToCode' dflags
 --
 setSessionDynFlags :: GhcMonad m => DynFlags -> m [InstalledUnitId]
 setSessionDynFlags dflags = do
+  liftIO $ putStrLn "[setSessionDynFlags]"
   dflags' <- checkNewDynFlags dflags
   (dflags'', preload) <- liftIO $ initPackages dflags'
   modifySession $ \h -> h{ hsc_dflags = dflags''
                          , hsc_IC = (hsc_IC h){ ic_dflags = dflags'' } }
   invalidateModSummaryCache
+  liftIO $ putStrLn "[/setSessionDynFlags]"
   return preload
 
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
@@ -603,6 +605,7 @@ setLogAction action = do
 
 setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m [InstalledUnitId]
 setProgramDynFlags_ invalidate_needed dflags = do
+  liftIO $ putStrLn "[setProgramDynFlags_]"
   dflags' <- checkNewDynFlags dflags
   dflags_prev <- getProgramDynFlags
   (dflags'', preload) <-
@@ -611,6 +614,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
        else return (dflags', [])
   modifySession $ \h -> h{ hsc_dflags = dflags'' }
   when invalidate_needed $ invalidateModSummaryCache
+  liftIO $ putStrLn "[/setProgramDynFlags_]"
   return preload
 
 
