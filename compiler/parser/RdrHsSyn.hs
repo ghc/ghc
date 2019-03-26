@@ -54,10 +54,10 @@ module   RdrHsSyn (
         checkPrecP,           -- Int -> P Int
         checkContext,         -- HsType -> P HsContext
         checkPattern,         -- HsExp -> P HsPat
+        checkPattern_msg,
         bang_RDR,
         isBangRdr,
         isTildeRdr,
-        checkPatterns,        -- SrcLoc -> [HsExp] -> P [HsPat]
         checkMonadComp,       -- P (HsStmtContext RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
@@ -130,6 +130,7 @@ import Data.List
 import DynFlags ( WarningFlag(..) )
 
 import Control.Monad
+import Control.Monad.Trans.Reader
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
 import qualified Data.Monoid as Monoid
@@ -1055,38 +1056,39 @@ checkNoDocs msg ty = go ty
 -- We parse patterns as expressions and check for valid patterns below,
 -- converting the expression into a pattern at the same time.
 
-checkPattern :: SDoc -> LHsExpr GhcPs -> P (LPat GhcPs)
-checkPattern msg e = checkLPat msg e
+checkPattern :: LHsExpr GhcPs -> P (LPat GhcPs)
+checkPattern = runPV . checkLPat
 
-checkPatterns :: SDoc -> [LHsExpr GhcPs] -> P [LPat GhcPs]
-checkPatterns msg es = mapM (checkPattern msg) es
+checkPattern_msg :: SDoc -> LHsExpr GhcPs -> P (LPat GhcPs)
+checkPattern_msg msg = runPV_msg msg . checkLPat
 
-checkLPat :: SDoc -> LHsExpr GhcPs -> P (LPat GhcPs)
-checkLPat msg e@(dL->L l _) = checkPat msg l e []
+checkLPat :: LHsExpr GhcPs -> PV (LPat GhcPs)
+checkLPat e@(dL->L l _) = checkPat l e []
 
-checkPat :: SDoc -> SrcSpan -> LHsExpr GhcPs -> [LPat GhcPs]
-         -> P (LPat GhcPs)
-checkPat _ loc (dL->L l e@(HsVar _ (dL->L _ c))) args
+checkPat :: SrcSpan -> LHsExpr GhcPs -> [LPat GhcPs]
+         -> PV (LPat GhcPs)
+checkPat loc (dL->L l e@(HsVar _ (dL->L _ c))) args
   | isRdrDataCon c = return (cL loc (ConPatIn (cL l c) (PrefixCon args)))
   | not (null args) && patIsRec c =
-      patFail (text "Perhaps you intended to use RecursiveDo") l e
-checkPat msg loc e args     -- OK to let this happen even if bang-patterns
+      localPV_msg (\_ -> text "Perhaps you intended to use RecursiveDo") $
+      patFail l e
+checkPat loc e args     -- OK to let this happen even if bang-patterns
                         -- are not enabled, because there is no valid
                         -- non-bang-pattern parse of (C ! e)
   | Just (e', args') <- splitBang e
-  = do  { args'' <- checkPatterns msg args'
-        ; checkPat msg loc e' (args'' ++ args) }
-checkPat msg loc (dL->L _ (HsApp _ f e)) args
-  = do p <- checkLPat msg e
-       checkPat msg loc f (p : args)
-checkPat msg loc (dL->L _ e) []
-  = do p <- checkAPat msg loc e
+  = do  { args'' <- mapM checkLPat args'
+        ; checkPat loc e' (args'' ++ args) }
+checkPat loc (dL->L _ (HsApp _ f e)) args
+  = do p <- checkLPat e
+       checkPat loc f (p : args)
+checkPat loc (dL->L _ e) []
+  = do p <- checkAPat loc e
        return (cL loc p)
-checkPat msg loc e _
-  = patFail msg loc (unLoc e)
+checkPat loc e _
+  = patFail loc (unLoc e)
 
-checkAPat :: SDoc -> SrcSpan -> HsExpr GhcPs -> P (Pat GhcPs)
-checkAPat msg loc e0 = do
+checkAPat :: SrcSpan -> HsExpr GhcPs -> PV (Pat GhcPs)
+checkAPat loc e0 = do
  nPlusKPatterns <- getBit NPlusKPatternsBit
  case e0 of
    EWildPat _ -> return (WildPat noExt)
@@ -1107,16 +1109,16 @@ checkAPat msg loc e0 = do
    SectionR _ (dL->L lb (HsVar _ (dL->L _ bang))) e    -- (! x)
         | bang == bang_RDR
         -> do { hintBangPat loc e0
-              ; e' <- checkLPat msg e
+              ; e' <- checkLPat e
               ; addAnnotation loc AnnBang lb
               ; return  (BangPat noExt e') }
 
-   ELazyPat _ e         -> checkLPat msg e >>= (return . (LazyPat noExt))
-   EAsPat _ n e         -> checkLPat msg e >>= (return . (AsPat noExt) n)
+   ELazyPat _ e         -> checkLPat e >>= (return . (LazyPat noExt))
+   EAsPat _ n e         -> checkLPat e >>= (return . (AsPat noExt) n)
    -- view pattern is well-formed if the pattern is
-   EViewPat _ expr patE -> checkLPat msg patE >>=
+   EViewPat _ expr patE -> checkLPat patE >>=
                             (return . (\p -> ViewPat noExt expr p))
-   ExprWithTySig _ e t  -> do e <- checkLPat msg e
+   ExprWithTySig _ e t  -> do e <- checkLPat e
                               return (SigPat noExt e t)
 
    -- n+k patterns
@@ -1127,34 +1129,34 @@ checkAPat msg loc e0 = do
                       -> return (mkNPlusKPat (cL nloc n) (cL lloc lit))
    OpApp _ l (dL->L cl (HsVar _ (dL->L _ c))) r
      | isDataOcc (rdrNameOcc c) -> do
-         l <- checkLPat msg l
-         r <- checkLPat msg r
+         l <- checkLPat l
+         r <- checkLPat r
          return (ConPatIn (cL cl c) (InfixCon l r))
 
-   OpApp {}           -> patFail msg loc e0
+   OpApp {}           -> patFail loc e0
 
-   ExplicitList _ _ es -> do ps <- mapM (checkLPat msg) es
+   ExplicitList _ _ es -> do ps <- mapM checkLPat es
                              return (ListPat noExt ps)
 
-   HsPar _ e          -> checkLPat msg e >>= (return . (ParPat noExt))
+   HsPar _ e          -> checkLPat e >>= (return . (ParPat noExt))
 
    ExplicitTuple _ es b
-     | all tupArgPresent es  -> do ps <- mapM (checkLPat msg)
+     | all tupArgPresent es  -> do ps <- mapM checkLPat
                                            [e | (dL->L _ (Present _ e)) <- es]
                                    return (TuplePat noExt ps b)
      | otherwise -> addFatalError loc (text "Illegal tuple section in pattern:"
                                         $$ ppr e0)
 
    ExplicitSum _ alt arity expr -> do
-     p <- checkLPat msg expr
+     p <- checkLPat expr
      return (SumPat noExt p alt arity)
 
    RecordCon { rcon_con_name = c, rcon_flds = HsRecFields fs dd }
-                        -> do fs <- mapM (checkPatField msg) fs
+                        -> do fs <- mapM checkPatField fs
                               return (ConPatIn c (RecCon (HsRecFields fs dd)))
    HsSpliceE _ s | not (isTypedSplice s)
                -> return (SplicePat noExt s)
-   _           -> patFail msg loc e0
+   _           -> patFail loc e0
 
 placeHolderPunRhs :: LHsExpr GhcPs
 -- The RHS of a punned record field will be filled in by the renamer
@@ -1172,15 +1174,13 @@ isBangRdr (Unqual occ) = occNameFS occ == fsLit "!"
 isBangRdr _ = False
 isTildeRdr = (==eqTyCon_RDR)
 
-checkPatField :: SDoc -> LHsRecField GhcPs (LHsExpr GhcPs)
-              -> P (LHsRecField GhcPs (LPat GhcPs))
-checkPatField msg (dL->L l fld) = do p <- checkLPat msg (hsRecFieldArg fld)
-                                     return (cL l (fld { hsRecFieldArg = p }))
+checkPatField :: LHsRecField GhcPs (LHsExpr GhcPs)
+              -> PV (LHsRecField GhcPs (LPat GhcPs))
+checkPatField (dL->L l fld) = do p <- checkLPat (hsRecFieldArg fld)
+                                 return (cL l (fld { hsRecFieldArg = p }))
 
-patFail :: SDoc -> SrcSpan -> HsExpr GhcPs -> P a
-patFail msg loc e = addFatalError loc err
-    where err = text "Parse error in pattern:" <+> ppr e
-             $$ msg
+patFail :: SrcSpan -> HsExpr GhcPs -> PV a
+patFail loc e = addFatalError loc $ text "Parse error in pattern:" <+> ppr e
 
 patIsRec :: RdrName -> Bool
 patIsRec e = e == mkUnqual varName (fsLit "rec")
@@ -1189,28 +1189,26 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 ---------------------------------------------------------------------------
 -- Check Equation Syntax
 
-checkValDef :: SDoc
-            -> SrcStrictness
+checkValDef :: SrcStrictness
             -> LHsExpr GhcPs
             -> Maybe (LHsType GhcPs)
             -> Located (a,GRHSs GhcPs (LHsExpr GhcPs))
             -> P ([AddAnn],HsBind GhcPs)
 
-checkValDef msg _strictness lhs (Just sig) grhss
+checkValDef _strictness lhs (Just sig) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
-  = checkPatBind msg (cL (combineLocs lhs sig)
+  = checkPatBind (cL (combineLocs lhs sig)
                         (ExprWithTySig noExt lhs (mkLHsSigWcType sig))) grhss
 
-checkValDef msg strictness lhs Nothing g@(dL->L l (_,grhss))
+checkValDef strictness lhs Nothing g@(dL->L l (_,grhss))
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
             Just (fun, is_infix, pats, ann) ->
-              checkFunBind msg strictness ann (getLoc lhs)
+              checkFunBind strictness ann (getLoc lhs)
                            fun is_infix pats (cL l grhss)
-            Nothing -> checkPatBind msg lhs g }
+            Nothing -> checkPatBind lhs g }
 
-checkFunBind :: SDoc
-             -> SrcStrictness
+checkFunBind :: SrcStrictness
              -> [AddAnn]
              -> SrcSpan
              -> Located RdrName
@@ -1218,8 +1216,8 @@ checkFunBind :: SDoc
              -> [LHsExpr GhcPs]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P ([AddAnn],HsBind GhcPs)
-checkFunBind msg strictness ann lhs_loc fun is_infix pats (dL->L rhs_span grhss)
-  = do  ps <- checkPatterns msg pats
+checkFunBind strictness ann lhs_loc fun is_infix pats (dL->L rhs_span grhss)
+  = do  ps <- mapM checkPattern pats
         let match_span = combineSrcSpans lhs_loc rhs_span
         -- Add back the annotations stripped from any HsPar values in the lhs
         -- mapM_ (\a -> a match_span) ann
@@ -1244,12 +1242,11 @@ makeFunBind fn ms
               fun_co_fn = idHsWrapper,
               fun_tick = [] }
 
-checkPatBind :: SDoc
-             -> LHsExpr GhcPs
+checkPatBind :: LHsExpr GhcPs
              -> Located (a,GRHSs GhcPs (LHsExpr GhcPs))
              -> P ([AddAnn],HsBind GhcPs)
-checkPatBind msg lhs (dL->L _ (_,grhss))
-  = do  { lhs <- checkPattern msg lhs
+checkPatBind lhs (dL->L _ (_,grhss))
+  = do  { lhs <- checkPattern lhs
         ; return ([],PatBind noExt lhs grhss
                     ([],[])) }
 
@@ -2667,22 +2664,30 @@ failOpStrictnessPosition (dL->L loc _) = addFatalError loc msg
 -----------------------------------------------------------------------------
 -- Misc utils
 
--- See Note [Parser-Validator]
-newtype PV a = PV (P a)
+-- See Note [Parser-Validator] and Note [Parser-Validator ReaderT SDoc]
+newtype PV a = PV (ReaderT SDoc P a)
   deriving (Functor, Applicative, Monad)
 
 runPV :: PV a -> P a
-runPV (PV m) = m
+runPV (PV m) = runReaderT m empty
+
+runPV_msg :: SDoc -> PV a -> P a
+runPV_msg msg (PV m) = runReaderT m msg
+
+localPV_msg :: (SDoc -> SDoc) -> PV a -> PV a
+localPV_msg f (PV m) = PV (local f m)
 
 instance MonadP PV where
   addError srcspan msg =
-    PV $ addError srcspan msg
+    PV $ ReaderT $ \ctxMsg -> addError srcspan (msg $$ ctxMsg)
   addFatalError srcspan msg =
-    PV $ addFatalError srcspan msg
+    PV $ ReaderT $ \ctxMsg -> addFatalError srcspan (msg $$ ctxMsg)
   getBit ext =
-    PV $ getBit ext
+    PV $ ReaderT $ \_ -> getBit ext
   addAnnsAt loc anns =
-    PV $ addAnnsAt loc anns
+    PV $ ReaderT $ \_ -> addAnnsAt loc anns
+  addAnnotation l a v =
+    PV $ ReaderT $ \_ -> addAnnotation l a v
 
 {- Note [Parser-Validator]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2714,8 +2719,50 @@ not consume any input, but may fail or use other effects. Thus we have:
 
 -}
 
+{- Note [Parser-Validator ReaderT SDoc]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A PV computation is parametrized by a hint for error messages, which can be set
+depending on validation context. We use this in checkPattern to fix #984.
+
+Consider this example, where the user has forgotten a 'do':
+
+  f _ = do
+    x <- computation
+    case () of
+      _ ->
+        result <- computation
+        case () of () -> undefined
+
+GHC parses it as follows:
+
+  f _ = do
+    x <- computation
+    (case () of
+      _ ->
+        result) <- computation
+        case () of () -> undefined
+
+Note that this fragment is parsed as a pattern:
+
+  case () of
+    _ ->
+      result
+
+We attempt to detect such cases and add a hint to the error messages:
+
+  T984.hs:6:9:
+    Parse error in pattern: case () of { _ -> result }
+    Possibly caused by a missing 'do'?
+
+The "Possibly caused by a missing 'do'?" suggestion is the hint that is passed
+via ReaderT SDoc in PV. When validating in a context other than 'bindpat' (a
+pattern to the left of <-), we set the hint to 'empty' and it has no effect on
+the error messages.
+
+-}
+
 -- | Hint about bang patterns, assuming @BangPatterns@ is off.
-hintBangPat :: SrcSpan -> HsExpr GhcPs -> P ()
+hintBangPat :: SrcSpan -> HsExpr GhcPs -> PV ()
 hintBangPat span e = do
     bang_on <- getBit BangPatBit
     unless bang_on $
