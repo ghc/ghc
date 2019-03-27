@@ -87,6 +87,7 @@ module DynFlags (
 
         -- ** System tool settings and locations
         Settings(..),
+        IntegerLibrary(..),
         targetPlatform, programName, projectVersion,
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
         versionedAppDir,
@@ -1302,6 +1303,11 @@ type LlvmTargets = [(String, LlvmTarget)]
 type LlvmPasses = [(Int, String)]
 type LlvmConfig = (LlvmTargets, LlvmPasses)
 
+data IntegerLibrary
+    = IntegerGMP
+    | IntegerSimple
+    deriving (Read, Show, Eq)
+
 data Settings = Settings {
   sTargetPlatform        :: Platform,       -- Filled in by SysTools
   sGhcUsagePath          :: FilePath,       -- ditto
@@ -1358,7 +1364,18 @@ data Settings = Settings {
 
   -- Formerly Config.hs, target specific
   sTargetPlatformString :: String, -- TODO Recalculate string from richer info?
-  sTablesNextToCode :: Bool
+  sIntegerLibrary        :: String,
+  sIntegerLibraryType    :: IntegerLibrary,
+  sGhcWithInterpreter    :: Bool,
+  sGhcWithNativeCodeGen  :: Bool,
+  sGhcWithSMP            :: Bool,
+  sGhcRTSWays            :: String,
+  sTablesNextToCode      :: Bool,
+  sLeadingUnderscore     :: Bool,
+  sLibFFI                :: Bool,
+  sGhcThreaded           :: Bool,
+  sGhcDebugged           :: Bool,
+  sGhcRtsWithLibdw       :: Bool
  }
 
 targetPlatform :: DynFlags -> Platform
@@ -1615,16 +1632,18 @@ instance Outputable PackageFlag where
     ppr (ExposePackage n arg rn) = text n <> braces (ppr arg <+> ppr rn)
     ppr (HidePackage str) = text "-hide-package" <+> text str
 
-defaultHscTarget :: Platform -> HscTarget
+defaultHscTarget :: Settings -> HscTarget
 defaultHscTarget = defaultObjectTarget
 
 -- | The 'HscTarget' value corresponding to the default way to create
 -- object files on the current platform.
-defaultObjectTarget :: Platform -> HscTarget
-defaultObjectTarget platform
+defaultObjectTarget :: Settings -> HscTarget
+defaultObjectTarget settings
   | platformUnregisterised platform     =  HscC
-  | cGhcWithNativeCodeGen == "YES"      =  HscAsm
+  | sGhcWithNativeCodeGen settings      =  HscAsm
   | otherwise                           =  HscLlvm
+  where
+    platform = sTargetPlatform settings
 
 -- Determines whether we will be compiling
 -- info tables that reside just before the entry code, or with an
@@ -1887,8 +1906,8 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
      DynFlags {
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
-        hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
-        integerLibrary          = cIntegerLibraryType,
+        hscTarget               = defaultHscTarget mySettings,
+        integerLibrary          = sIntegerLibraryType mySettings,
         verbosity               = 0,
         optLevel                = 0,
         debugLevel              = 0,
@@ -3704,7 +3723,7 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
                   d { ghcLink=NoLink }) >> setTarget HscNothing))
   , make_ord_flag defFlag "fbyte-code"       (NoArg (setTarget HscInterpreted))
-  , make_ord_flag defFlag "fobject-code"     (NoArg (setTargetWithPlatform
+  , make_ord_flag defFlag "fobject-code"     (NoArg (setTargetWithSettings
                                                              defaultHscTarget))
   , make_dep_flag defFlag "fglasgow-exts"
       (NoArg enableGlasgowExts) "Use individual extensions instead"
@@ -5386,12 +5405,12 @@ interpretPackageEnv dflags = do
 -- If we're linking a binary, then only targets that produce object
 -- code are allowed (requests for other target types are ignored).
 setTarget :: HscTarget -> DynP ()
-setTarget l = setTargetWithPlatform (const l)
+setTarget l = setTargetWithSettings (const l)
 
-setTargetWithPlatform :: (Platform -> HscTarget) -> DynP ()
-setTargetWithPlatform f = upd set
+setTargetWithSettings :: (Settings -> HscTarget) -> DynP ()
+setTargetWithSettings f = upd set
   where
-   set dfs = let l = f (targetPlatform dfs)
+   set dfs = let l = f (settings dfs)
              in if ghcLink dfs /= LinkBinary || isObjectTarget l
                 then dfs{ hscTarget = l }
                 else dfs
@@ -5623,13 +5642,13 @@ compilerInfo dflags
        ("Build platform",              cBuildPlatformString),
        ("Host platform",               cHostPlatformString),
        ("Target platform",             sTargetPlatformString $ settings dflags),
-       ("Have interpreter",            cGhcWithInterpreter),
+       ("Have interpreter",            showBool $ sGhcWithInterpreter $ settings dflags),
        ("Object splitting supported",  showBool False),
-       ("Have native code generator",  cGhcWithNativeCodeGen),
-       ("Support SMP",                 cGhcWithSMP),
+       ("Have native code generator",  showBool $ sGhcWithNativeCodeGen $ settings dflags),
+       ("Support SMP",                 showBool $ sGhcWithSMP $ settings dflags),
        ("Tables next to code",         showBool $ sTablesNextToCode $ settings dflags),
-       ("RTS ways",                    cGhcRTSWays),
-       ("RTS expects libdw",           showBool cGhcRtsWithLibdw),
+       ("RTS ways",                    sGhcRTSWays $ settings dflags),
+       ("RTS expects libdw",           showBool $ sGhcRtsWithLibdw $ settings dflags),
        -- Whether or not we support @-dynamic-too@
        ("Support dynamic-too",         showBool $ not isWindows),
        -- Whether or not we support the @-j@ flag with @--make@.
@@ -5656,7 +5675,7 @@ compilerInfo dflags
        ("GHC Dynamic",                 showBool dynamicGhc),
        -- Whether or not GHC was compiled using -prof
        ("GHC Profiled",                showBool rtsIsProfiled),
-       ("Leading underscore",          cLeadingUnderscore),
+       ("Leading underscore",          showBool $ sLeadingUnderscore $ settings dflags),
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),
        -- The path of the global package database used by GHC
@@ -5747,7 +5766,7 @@ makeDynFlagsConsistent dflags
       in loop dflags' warn
  | hscTarget dflags == HscC &&
    not (platformUnregisterised (targetPlatform dflags))
-    = if cGhcWithNativeCodeGen == "YES"
+    = if sGhcWithNativeCodeGen $ settings dflags
       then let dflags' = dflags { hscTarget = HscAsm }
                warn = "Compiler not unregisterised, so using native code generator rather than compiling via C"
            in loop dflags' warn
@@ -5763,7 +5782,7 @@ makeDynFlagsConsistent dflags
     = loop (dflags { hscTarget = HscC })
            "Compiler unregisterised, so compiling via C"
  | hscTarget dflags == HscAsm &&
-   cGhcWithNativeCodeGen /= "YES"
+   not (sGhcWithNativeCodeGen $ settings dflags)
       = let dflags' = dflags { hscTarget = HscLlvm }
             warn = "No native code generator, so using LLVM"
         in loop dflags' warn

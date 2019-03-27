@@ -120,7 +120,6 @@ import Module
 import Name
 import Unique
 import PrimOp
-import Config
 import CostCentre
 import Outputable
 import FastString
@@ -1151,35 +1150,35 @@ and are not externally visible.
 -}
 
 instance Outputable CLabel where
-  ppr c = sdocWithPlatform $ \platform -> pprCLabel platform c
+  ppr c = sdocWithDynFlags $ \dynFlags -> pprCLabel dynFlags c
 
-pprCLabel :: Platform -> CLabel -> SDoc
+pprCLabel :: DynFlags -> CLabel -> SDoc
 
 pprCLabel _ (LocalBlockLabel u)
   =  tempLabelPrefixOrUnderscore <> pprUniqueAlways u
 
-pprCLabel platform (AsmTempLabel u)
- | not (platformUnregisterised platform)
+pprCLabel dynFlags (AsmTempLabel u)
+ | not (platformUnregisterised $ targetPlatform dynFlags)
   =  tempLabelPrefixOrUnderscore <> pprUniqueAlways u
 
-pprCLabel platform (AsmTempDerivedLabel l suf)
- | cGhcWithNativeCodeGen == "YES"
-   = ptext (asmTempLabelPrefix platform)
+pprCLabel dynFlags (AsmTempDerivedLabel l suf)
+ | sGhcWithNativeCodeGen $ settings dynFlags
+   = ptext (asmTempLabelPrefix $ targetPlatform dynFlags)
      <> case l of AsmTempLabel u    -> pprUniqueAlways u
                   LocalBlockLabel u -> pprUniqueAlways u
-                  _other            -> pprCLabel platform l
+                  _other            -> pprCLabel dynFlags l
      <> ftext suf
 
-pprCLabel platform (DynamicLinkerLabel info lbl)
- | cGhcWithNativeCodeGen == "YES"
-   = pprDynamicLinkerAsmLabel platform info lbl
+pprCLabel dynFlags (DynamicLinkerLabel info lbl)
+ | sGhcWithNativeCodeGen $ settings dynFlags
+   = pprDynamicLinkerAsmLabel (targetPlatform dynFlags) info lbl
 
-pprCLabel _ PicBaseLabel
- | cGhcWithNativeCodeGen == "YES"
+pprCLabel dynFlags PicBaseLabel
+ | sGhcWithNativeCodeGen $ settings dynFlags
    = text "1b"
 
-pprCLabel platform (DeadStripPreventer lbl)
- | cGhcWithNativeCodeGen == "YES"
+pprCLabel dynFlags (DeadStripPreventer lbl)
+ | sGhcWithNativeCodeGen $ settings dynFlags
    =
    {-
       `lbl` can be temp one but we need to ensure that dsp label will stay
@@ -1187,23 +1186,24 @@ pprCLabel platform (DeadStripPreventer lbl)
       optional `_` (underscore) because this is how you mark non-temp symbols
       on some platforms (Darwin)
    -}
-   maybe_underscore $ text "dsp_"
-   <> pprCLabel platform lbl <> text "_dsp"
+   maybe_underscore dynFlags $ text "dsp_"
+   <> pprCLabel dynFlags lbl <> text "_dsp"
 
-pprCLabel _ (StringLitLabel u)
- | cGhcWithNativeCodeGen == "YES"
+pprCLabel dynFlags (StringLitLabel u)
+ | sGhcWithNativeCodeGen $ settings dynFlags
   = pprUniqueAlways u <> ptext (sLit "_str")
 
-pprCLabel platform lbl
+pprCLabel dynFlags lbl
    = getPprStyle $ \ sty ->
-     if cGhcWithNativeCodeGen == "YES" && asmStyle sty
-     then maybe_underscore (pprAsmCLbl platform lbl)
+     if sGhcWithNativeCodeGen (settings dynFlags) && asmStyle sty
+     then maybe_underscore dynFlags $ pprAsmCLbl (targetPlatform dynFlags) lbl
      else pprCLbl lbl
 
-maybe_underscore :: SDoc -> SDoc
-maybe_underscore doc
-  | underscorePrefix = pp_cSEP <> doc
-  | otherwise        = doc
+maybe_underscore :: DynFlags -> SDoc -> SDoc
+maybe_underscore dynFlags doc =
+  if sLeadingUnderscore $ settings dynFlags
+  then pp_cSEP <> doc
+  else doc
 
 pprAsmCLbl :: Platform -> CLabel -> SDoc
 pprAsmCLbl platform (ForeignLabel fs (Just sz) _ _)
@@ -1362,9 +1362,6 @@ tempLabelPrefixOrUnderscore = sdocWithPlatform $ \platform ->
 
 -- -----------------------------------------------------------------------------
 -- Machine-dependent knowledge about labels.
-
-underscorePrefix :: Bool   -- leading underscore on assembler labels?
-underscorePrefix = (cLeadingUnderscore == "YES")
 
 asmTempLabelPrefix :: Platform -> PtrString  -- for formatting labels
 asmTempLabelPrefix platform = case platformOS platform of
