@@ -49,7 +49,6 @@ import Outputable
 import Module
 import ErrUtils
 import DynFlags
-import Config
 import Panic
 import Util
 import StringBuffer     ( hGetStringBuffer )
@@ -369,7 +368,7 @@ link ghcLink dflags
   = lookupHook linkHook l dflags ghcLink dflags
   where
     l LinkInMemory _ _ _
-      = if cGhcWithInterpreter == "YES"
+      = if sGhcWithInterpreter $ settings dflags
         then -- Not Linking...(demand linker will do the job)
              return Succeeded
         else panicBadLink LinkInMemory

@@ -55,7 +55,6 @@ import Pair
 import Outputable
 import Platform
 import FastString
-import Config
 import Name             ( NamedThing(..), nameSrcSpan )
 import SrcLoc           ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import Data.Bits
