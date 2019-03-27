@@ -35,6 +35,7 @@ import System.Directory (setCurrentDirectory, getCurrentDirectory, doesFileExist
 import System.Environment
 import System.Exit      (exitWith, ExitCode(..))
 import System.FilePath
+import qualified Data.Map as Map (lookup)
 
 main :: IO ()
 main = do hSetBuffering stdout LineBuffering
@@ -293,12 +294,18 @@ generate directory distdir config_args
           do cwd <- getCurrentDirectory
              let fixupIncludeDir dir | cwd `isPrefixOf` dir = [dir, cwd </> distdir </> "build" ++ drop (length cwd) dir]
                                      | otherwise            = [dir]
-             let ipid = mkUnitId (display (packageId pd))
+             let pid = case Map.lookup "Target platform" (compilerProperties . compiler $ lbi) of
+                   Just target -> target ++ "-" ++ (display (packageId pd))
+                   Nothing -> display (packageId pd)
+
+             putStrLn $ "PID: " ++ pid
+
+             let ipid = mkUnitId pid
              let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
                                         pd (mkAbiHash "inplace") lib lbi clbi
                  final_ipi = installedPkgInfo {
                                  Installed.installedUnitId = ipid,
-                                 Installed.compatPackageKey = display (packageId pd),
+                                 Installed.compatPackageKey = pid,
                                  Installed.haddockHTMLs = [],
                                  Installed.includeDirs = concatMap fixupIncludeDir (Installed.includeDirs installedPkgInfo)
                              }
@@ -393,9 +400,16 @@ generate directory distdir config_args
           mods      = map display modules
           otherMods = map display (otherModules bi)
           buildDir' = map (\c -> if c=='\\' then '/' else c) $ buildDir lbi
+
+      let pid = case Map.lookup "Target platform" (compilerProperties . compiler $ lbi) of
+                  Just target -> target ++ "-" ++ localCompatPackageKey lbi
+                  Nothing -> localCompatPackageKey lbi
+
+
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 -- TODO: move inside withLibLBI
-                variablePrefix ++ "_COMPONENT_ID = " ++ localCompatPackageKey lbi,
+                variablePrefix ++ "_COMPONENT_ID = " ++ pid,
+                variablePrefix ++ "_LIBRARY_NAME = " ++ localCompatPackageKey lbi,
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
                 variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ synopsis pd),

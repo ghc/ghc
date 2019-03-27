@@ -6,8 +6,8 @@
 
 name:           rts
 version:        1.0
-id:             rts
-key:            rts
+id:             x86_64-apple-darwin-rts-1.0
+key:            x86_64-apple-darwin-rts-1.0
 license:        BSD-3-Clause
 maintainer:     glasgow-haskell-users@haskell.org
 exposed:        True

@@ -23,7 +23,7 @@ $(call hs-objs,$1,$2,$3)
 # The .a/.so library file, indexed by two different sets of vars:
 # the first is indexed by the dir, distdir and way
 # the second is indexed by the package id, distdir and way
-$1_$2_$3_LIB_FILE = libHS$$($1_$2_COMPONENT_ID)$(subst .,%,$$($3_libsuf))
+$1_$2_$3_LIB_FILE = libHS$$($1_$2_LIBRARY_NAME)$(subst .,%,$$($3_libsuf))
 $1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_FILE)
 $$($1_$2_COMPONENT_ID)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
@@ -156,4 +156,3 @@ $(gen-dll_INPLACE) link "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$(call cmd,$1_$2_HC)
            -no-auto-link-packages" "$8" \
            "$9" "${10}"
 endef
-
