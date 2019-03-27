@@ -7,20 +7,22 @@ import Numeric          (showIntAtBase)
 
 -- | Given a word, check:
 --
--- * if its @String@ representation matches the reverse of itself with its bit
+-- * if the reverse of its @String@ representation in base 2 matches the
+--   @String@ representation of that word with its bit order reversed.
 --   order reversed, and
--- * if reversing its bits again yields the same word.
+-- * if reversing its bits and then reverse the resulting word's bits again
+--   yields the same word.
 -- Takes the bit reversion function as an argument so different word types
--- can be used with their own.
+-- can be used with their own functions.
 test :: (FiniteBits a, Integral a, Show a) => (a -> a) -> a -> Bool
 test bitReverter x =
     let -- These zeroes are to left-pad the base-2 representation of
-        -- @x@ so that the string has one character per bit in the
+        -- @x@ so that the string has one ASCII character per bit in the
         -- word type e.g. @Word8@s produce strings with 8 characters.
         leftPad = countLeadingZeros x
         -- These zeroes are to left-pad the base-2 representation of
-        -- bit-reversed @x@ so that the string has one character per bit in the
-        -- word type e.g. @Word8@s produce strings with 8 characters.
+        -- bit-reversed @x@ so that the string has one ASCII character per bit
+        -- in the word type e.g. @Word8@s produce strings with 8 characters.
         reverseLeftPad = countTrailingZeros x
         toBinaryString a = showIntAtBase 2 intToDigit a ""
         binaryX = replicate leftPad '0' ++ toBinaryString x
