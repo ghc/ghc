@@ -238,6 +238,14 @@ instance Traversable (Either a) where
 instance Traversable ((,) a) where
     traverse f (x, y) = (,) x <$> f y
 
+-- | @since 4.13.0.0
+instance Traversable ((,,) a b) where
+    traverse f (x, y, z) = (,,) x y <$> f z
+
+-- | @since 4.13.0.0
+instance Traversable ((,,,) a b c) where
+    traverse f (x, y, z, w) = (,,,) x y z <$> f w
+
 -- | @since 2.01
 instance Ix i => Traversable (Array i) where
     traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
