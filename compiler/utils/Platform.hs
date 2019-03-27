@@ -76,7 +76,7 @@ isARM _ = False
 data OS
         = OSUnknown
         | OSLinux
-        | OSDarwin
+        | OSDarwin -- ^ includes all variants, e.g. macOS, iOS, watchOS...
         | OSSolaris2
         | OSMinGW32
         | OSFreeBSD
