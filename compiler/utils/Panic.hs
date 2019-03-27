@@ -160,13 +160,13 @@ showGhcException exception
     sorryMsg :: ShowS -> ShowS
     sorryMsg s =
         showString "sorry! (unimplemented feature or known bug)\n"
-      . showString ("  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t")
+      . showString ("  (GHC version " ++ cProjectVersion ++ ":\n\t")
       . s . showString "\n"
 
     panicMsg :: ShowS -> ShowS
     panicMsg s =
         showString "panic! (the 'impossible' happened)\n"
-      . showString ("  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t")
+      . showString ("  (GHC version " ++ cProjectVersion ++ ":\n\t")
       . s . showString "\n\n"
       . showString "Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug\n"
 

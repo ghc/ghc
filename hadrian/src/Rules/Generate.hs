@@ -292,6 +292,7 @@ generateSettings = do
         , ("libtool command", settingsFileSetting SettingsFileSetting_LibtoolCommand)
         , ("unlit command", ("$topdir/bin/" <>) . takeFileName <$> builderPath Unlit)
         , ("cross compiling", flag' CrossCompiling)
+        , ("target platform string", setting TargetPlatform)
         , ("target os", lookupValueOrError configFile "haskell-target-os")
         , ("target arch", lookupValueOrError configFile "haskell-target-arch")
         , ("target word size", lookupValueOrError configFile "target-word-size")
@@ -357,8 +358,6 @@ generateConfigHs = do
         , "cBuildPlatformString = BuildPlatform_NAME"
         , "cHostPlatformString :: String"
         , "cHostPlatformString = HostPlatform_NAME"
-        , "cTargetPlatformString :: String"
-        , "cTargetPlatformString = TargetPlatform_NAME"
         , ""
         , "cProjectName          :: String"
         , "cProjectName          = " ++ show cProjectName
@@ -452,7 +451,6 @@ generateGhcBootPlatformH = do
         , ""
         , "#define BuildPlatform_NAME  " ++ show buildPlatform
         , "#define HostPlatform_NAME   " ++ show hostPlatform
-        , "#define TargetPlatform_NAME " ++ show targetPlatform
         , ""
         , "#define " ++ cppify buildPlatform  ++ "_BUILD 1"
         , "#define " ++ cppify hostPlatform   ++ "_HOST 1"
