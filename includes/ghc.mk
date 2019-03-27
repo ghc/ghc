@@ -197,7 +197,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("dllwrap command", "$(SettingsDllWrapCommand)")' >> $@
 	@echo ',("windres command", "$(SettingsWindresCommand)")' >> $@
 	@echo ',("libtool command", "$(SettingsLibtoolCommand)")' >> $@
-	@echo ',("unlit command", "$$topdir/bin/$(utils/unlit_dist_PROG)")' >> $@
+	@echo ',("unlit command", "\$$topdir/bin/$(utils/unlit_dist_PROG)")' >> $@
 	@echo ',("cross compiling", "$(CrossCompiling)")' >> $@
 	@echo ',("target os", "$(HaskellTargetOs)")' >> $@
 	@echo ',("target arch", "$(HaskellTargetArch)")' >> $@
@@ -210,8 +210,23 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
 	@echo ',("LLVM clang command", "$(SettingsClangCommand)")' >> $@
+	@echo
+	@echo ',("integer library", "$(INTEGER_LIBRARY)")' >> $@
+	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
+	@echo ',("Use native code generator", "$(GhcWithNativeCodeGen)")' >> $@
+	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
+	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Tables next to code", "$(GhcEnableTablesNextToCode)")' >> $@
-	@echo ']' >> $@
+	@echo ',("Leading underscore", "$(LeadingUnderscore)")' >> $@
+	@echo ',("Use LibFFI", "$(UseLibFFIForAdjustors)")' >> $@
+# Note that GhcThreaded just reflects the Makefile variable setting. In
+# particular, the stage1 compiler is never actually compiled with -threaded, but
+# it will nevertheless have cGhcThreaded = True. The "+RTS --info" output will
+# show what RTS GHC is really using.
+	@echo ",(\"Use Threads\", \"$(GhcThreaded)\")" >> $@
+	@echo ",(\"Use Debugging\", \"$(GhcDebugged)\")" >> $@
+	@echo ",(\"RTS expects libdw\", \"$(GhcRtsWithLibdw)\")" >> $@
+	@echo "]" >> $@
 
 
 # ---------------------------------------------------------------------------
