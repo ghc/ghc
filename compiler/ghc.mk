@@ -63,8 +63,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cBuildPlatformString = BuildPlatform_NAME'                   >> $@
 	@echo 'cHostPlatformString :: String'                               >> $@
 	@echo 'cHostPlatformString = HostPlatform_NAME'                     >> $@
-	@echo 'cTargetPlatformString :: String'                             >> $@
-	@echo 'cTargetPlatformString = TargetPlatform_NAME'                 >> $@
 	@echo                                                               >> $@
 	@echo 'cProjectName          :: String'                             >> $@
 	@echo 'cProjectName          = "$(ProjectName)"'                    >> $@
@@ -150,7 +148,6 @@ compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo                                                    >> $@
 	@echo "#define BuildPlatform_NAME  \"$(BUILDPLATFORM)\""  >> $@
 	@echo "#define HostPlatform_NAME   \"$(HOSTPLATFORM)\""   >> $@
-	@echo "#define TargetPlatform_NAME \"$(TARGETPLATFORM)\"" >> $@
 	@echo                                                     >> $@
 	@echo "#define $(BuildPlatform_CPP)_BUILD 1"              >> $@
 	@echo "#define $(HostPlatform_CPP)_HOST 1"                >> $@
@@ -192,7 +189,6 @@ compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo                                                     >> $@
 	@echo "#define BuildPlatform_NAME  \"$(HOSTPLATFORM)\""   >> $@
 	@echo "#define HostPlatform_NAME   \"$(TARGETPLATFORM)\"" >> $@
-	@echo "#define TargetPlatform_NAME \"$(TARGETPLATFORM)\"" >> $@
 	@echo                                                     >> $@
 	@echo "#define $(HostPlatform_CPP)_BUILD 1"               >> $@
 	@echo "#define $(TargetPlatform_CPP)_HOST 1"              >> $@
