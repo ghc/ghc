@@ -5616,7 +5616,6 @@ compilerInfo dflags
        ("Stage",                       cStage),
        ("Build platform",              cBuildPlatformString),
        ("Host platform",               cHostPlatformString),
-       ("Target platform",             cTargetPlatformString),
        ("Have interpreter",            cGhcWithInterpreter),
        ("Object splitting supported",  showBool False),
        ("Have native code generator",  cGhcWithNativeCodeGen),

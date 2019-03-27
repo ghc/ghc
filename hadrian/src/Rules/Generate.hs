@@ -357,8 +357,6 @@ generateConfigHs = do
         , "cBuildPlatformString = BuildPlatform_NAME"
         , "cHostPlatformString :: String"
         , "cHostPlatformString = HostPlatform_NAME"
-        , "cTargetPlatformString :: String"
-        , "cTargetPlatformString = TargetPlatform_NAME"
         , ""
         , "cProjectName          :: String"
         , "cProjectName          = " ++ show cProjectName
@@ -452,7 +450,6 @@ generateGhcBootPlatformH = do
         , ""
         , "#define BuildPlatform_NAME  " ++ show buildPlatform
         , "#define HostPlatform_NAME   " ++ show hostPlatform
-        , "#define TargetPlatform_NAME " ++ show targetPlatform
         , ""
         , "#define " ++ cppify buildPlatform  ++ "_BUILD 1"
         , "#define " ++ cppify hostPlatform   ++ "_HOST 1"
