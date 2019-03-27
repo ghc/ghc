@@ -12,6 +12,9 @@
 
   * Add `foldMap'`, a strict version of `foldMap`, to `Foldable`.
 
+  * Add `Functor`, `Applicative`, `Monad`, `Alternative`, `MonadPlus`, and
+    `Generic` instances to `Kleisli`
+
 ## 4.12.0.0 *21 September 2018*
   * Bundled with GHC 8.6.1
 
