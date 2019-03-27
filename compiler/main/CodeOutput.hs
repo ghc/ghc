@@ -24,7 +24,6 @@ import Packages
 import Cmm              ( RawCmmGroup )
 import HscTypes
 import DynFlags
-import Config
 import Stream           (Stream)
 import qualified Stream
 import FileCleanup
@@ -156,7 +155,7 @@ outputAsm :: DynFlags -> Module -> ModLocation -> FilePath
           -> Stream IO RawCmmGroup ()
           -> IO ()
 outputAsm dflags this_mod location filenm cmm_stream
- | cGhcWithNativeCodeGen == "YES"
+ | sGhcWithNativeCodeGen $ settings dflags
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
        debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
@@ -226,8 +225,9 @@ outputForeignStubs dflags mod location stubs
             mk_include i = "#include \"" ++ i ++ "\"\n"
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
-            ffi_includes | cLibFFI   = "#include \"ffi.h\"\n"
-                         | otherwise = ""
+            ffi_includes
+              | sLibFFI $ settings dflags = "#include \"ffi.h\"\n"
+              | otherwise = ""
 
         stub_h_file_exists
            <- outputForeignStubs_help stub_h stub_h_output_w

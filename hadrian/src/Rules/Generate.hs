@@ -271,47 +271,54 @@ generateGhcPlatformH = do
 
 generateSettings :: Expr String
 generateSettings = do
-    let flag' = flag >=> \case
-            True  -> pure "YES"
-            False -> pure "NO"
-    settings <- (traverse . traverse) expr $
-        [ ("GCC extra via C opts", lookupValueOrError configFile "gcc-extra-via-c-opts")
-        , ("C compiler command", settingsFileSetting SettingsFileSetting_CCompilerCommand)
-        , ("C compiler flags", settingsFileSetting SettingsFileSetting_CCompilerFlags)
-        , ("C compiler link flags", settingsFileSetting SettingsFileSetting_CCompilerLinkFlags)
-        , ("C compiler supports -no-pie", settingsFileSetting SettingsFileSetting_CCompilerSupportsNoPie)
-        , ("Haskell CPP command", settingsFileSetting SettingsFileSetting_HaskellCPPCommand)
-        , ("Haskell CPP flags", settingsFileSetting SettingsFileSetting_HaskellCPPFlags)
-        , ("ld command", settingsFileSetting SettingsFileSetting_LdCommand)
-        , ("ld flags", settingsFileSetting SettingsFileSetting_LdFlags)
-        , ("ld supports compact unwind", lookupValueOrError configFile "ld-has-no-compact-unwind")
-        , ("ld supports build-id", lookupValueOrError configFile "ld-has-build-id")
-        , ("ld supports filelist", lookupValueOrError configFile "ld-has-filelist")
-        , ("ld is GNU ld", lookupValueOrError configFile "ld-is-gnu-ld")
-        , ("ar command", settingsFileSetting SettingsFileSetting_ArCommand)
-        , ("ar flags", lookupValueOrError configFile "ar-args")
-        , ("ar supports at file", flag' ArSupportsAtFile)
-        , ("ranlib command", settingsFileSetting SettingsFileSetting_RanlibCommand)
-        , ("touch command", settingsFileSetting SettingsFileSetting_TouchCommand)
-        , ("dllwrap command", settingsFileSetting SettingsFileSetting_DllWrapCommand)
-        , ("windres command", settingsFileSetting SettingsFileSetting_WindresCommand)
-        , ("libtool command", settingsFileSetting SettingsFileSetting_LibtoolCommand)
-        , ("unlit command", ("$topdir/bin/" <>) . takeFileName <$> builderPath Unlit)
-        , ("cross compiling", flag' CrossCompiling)
-        , ("target platform string", setting TargetPlatform)
-        , ("target os", lookupValueOrError configFile "haskell-target-os")
-        , ("target arch", lookupValueOrError configFile "haskell-target-arch")
-        , ("target word size", lookupValueOrError configFile "target-word-size")
-        , ("target has GNU nonexec stack", lookupValueOrError configFile "haskell-have-gnu-nonexec-stack")
-        , ("target has .ident directive", lookupValueOrError configFile "haskell-have-ident-directive")
-        , ("target has subsections via symbols", lookupValueOrError configFile "haskell-have-subsections-via-symbols")
-        , ("target has RTS linker", lookupValueOrError configFile "haskell-have-rts-linker")
-        , ("Unregisterised", flag' GhcUnregisterised)
-        , ("LLVM llc command", settingsFileSetting SettingsFileSetting_LlcCommand)
-        , ("LLVM opt command", settingsFileSetting SettingsFileSetting_OptCommand)
-        , ("LLVM clang command", settingsFileSetting SettingsFileSetting_ClangCommand)
+    settings <- traverse sequence $
+        [ ("GCC extra via C opts", expr $ lookupValueOrError configFile "gcc-extra-via-c-opts")
+        , ("C compiler command", expr $ settingsFileSetting SettingsFileSetting_CCompilerCommand)
+        , ("C compiler flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerFlags)
+        , ("C compiler link flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerLinkFlags)
+        , ("C compiler supports -no-pie", expr $ settingsFileSetting SettingsFileSetting_CCompilerSupportsNoPie)
+        , ("Haskell CPP command", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPCommand)
+        , ("Haskell CPP flags", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPFlags)
+        , ("ld command", expr $ settingsFileSetting SettingsFileSetting_LdCommand)
+        , ("ld flags", expr $ settingsFileSetting SettingsFileSetting_LdFlags)
+        , ("ld supports compact unwind", expr $ lookupValueOrError configFile "ld-has-no-compact-unwind")
+        , ("ld supports build-id", expr $ lookupValueOrError configFile "ld-has-build-id")
+        , ("ld supports filelist", expr $ lookupValueOrError configFile "ld-has-filelist")
+        , ("ld is GNU ld", expr $ lookupValueOrError configFile "ld-is-gnu-ld")
+        , ("ar command", expr $ settingsFileSetting SettingsFileSetting_ArCommand)
+        , ("ar flags", expr $ lookupValueOrError configFile "ar-args")
+        , ("ar supports at file", expr $ yesNo <$> flag ArSupportsAtFile)
+        , ("ranlib command", expr $ settingsFileSetting SettingsFileSetting_RanlibCommand)
+        , ("touch command", expr $ settingsFileSetting SettingsFileSetting_TouchCommand)
+        , ("dllwrap command", expr $ settingsFileSetting SettingsFileSetting_DllWrapCommand)
+        , ("windres command", expr $ settingsFileSetting SettingsFileSetting_WindresCommand)
+        , ("libtool command", expr $ settingsFileSetting SettingsFileSetting_LibtoolCommand)
+        , ("unlit command", ("$topdir/bin/" <>) <$> getBuilderPath Unlit)
+        , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
+        , ("target platform string", getSetting TargetPlatform)
+        , ("target os", expr $ lookupValueOrError configFile "haskell-target-os")
+        , ("target arch", expr $ lookupValueOrError configFile "haskell-target-arch")
+        , ("target word size", expr $ lookupValueOrError configFile "target-word-size")
+        , ("target has GNU nonexec stack", expr $ lookupValueOrError configFile "haskell-have-gnu-nonexec-stack")
+        , ("target has .ident directive", expr $ lookupValueOrError configFile "haskell-have-ident-directive")
+        , ("target has subsections via symbols", expr $ lookupValueOrError configFile "haskell-have-subsections-via-symbols")
+        , ("target has RTS linker", expr $ lookupValueOrError configFile "haskell-have-rts-linker")
+        , ("Unregisterised", expr $ yesNo <$> flag GhcUnregisterised)
+        , ("LLVM llc command", expr $ settingsFileSetting SettingsFileSetting_LlcCommand)
+        , ("LLVM opt command", expr $ settingsFileSetting SettingsFileSetting_OptCommand)
+        , ("LLVM clang command", expr $ settingsFileSetting SettingsFileSetting_ClangCommand)
 
-        , ("Tables next to code", yesNo <$> ghcEnableTablesNextToCode)
+        , ("integer library", pkgName <$> getIntegerPackage)
+        , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
+        , ("Use native code generator", expr $ yesNo <$> ghcWithNativeCodeGen)
+        , ("Support SMP", expr $ yesNo <$> ghcWithSMP)
+        , ("RTS ways", expr $ yesNo <$> flag LeadingUnderscore)
+        , ("Tables next to code", expr $ yesNo <$> ghcEnableTablesNextToCode)
+        , ("Leading underscore", expr $ yesNo <$> useLibFFIForAdjustors)
+        , ("Use LibFFI", expr $ yesNo <$> useLibFFIForAdjustors)
+        , ("Use Threads", yesNo . any (wayUnit Threaded) <$> getRtsWays)
+        , ("Use Debugging", expr $ yesNo . ghcDebugged <$> flavour)
+        , ("RTS expects libdw", yesNo <$> getFlag WithLibdw)
         ]
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
     pure $ case settings of
@@ -334,20 +341,6 @@ generateConfigHs = do
     cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
     cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
     cBooterVersion      <- getSetting GhcVersion
-    intLib              <- getIntegerPackage
-    debugged            <- ghcDebugged    <$> expr flavour
-    let cIntegerLibraryType
-            | intLib == integerGmp    = "IntegerGMP"
-            | intLib == integerSimple = "IntegerSimple"
-            | otherwise = error $ "Unknown integer library: " ++ pkgName intLib
-    cGhcWithInterpreter        <- expr $ yesNo <$> ghcWithInterpreter
-    cGhcWithNativeCodeGen      <- expr $ yesNo <$> ghcWithNativeCodeGen
-    cGhcWithSMP                <- expr $ yesNo <$> ghcWithSMP
-    cLeadingUnderscore         <- expr $ yesNo <$> flag LeadingUnderscore
-    cLibFFI                    <- expr useLibFFIForAdjustors
-    rtsWays                    <- getRtsWays
-    cGhcRtsWithLibdw           <- getFlag WithLibdw
-    let cGhcRTSWays = unwords $ map show rtsWays
     return $ unlines
         [ "{-# LANGUAGE CPP #-}"
         , "module Config where"
@@ -355,10 +348,6 @@ generateConfigHs = do
         , "import GhcPrelude"
         , ""
         , "#include \"ghc_boot_platform.h\""
-        , ""
-        , "data IntegerLibrary = IntegerGMP"
-        , "                    | IntegerSimple"
-        , "                    deriving Eq"
         , ""
         , "cBuildPlatformString :: String"
         , "cBuildPlatformString = BuildPlatform_NAME"
@@ -383,28 +372,7 @@ generateConfigHs = do
         , "cBooterVersion        = " ++ show cBooterVersion
         , "cStage                :: String"
         , "cStage                = show (STAGE :: Int)"
-        , "cIntegerLibrary       :: String"
-        , "cIntegerLibrary       = " ++ show (pkgName intLib)
-        , "cIntegerLibraryType   :: IntegerLibrary"
-        , "cIntegerLibraryType   = " ++ cIntegerLibraryType
-        , "cGhcWithInterpreter   :: String"
-        , "cGhcWithInterpreter   = " ++ show cGhcWithInterpreter
-        , "cGhcWithNativeCodeGen :: String"
-        , "cGhcWithNativeCodeGen = " ++ show cGhcWithNativeCodeGen
-        , "cGhcWithSMP           :: String"
-        , "cGhcWithSMP           = " ++ show cGhcWithSMP
-        , "cGhcRTSWays           :: String"
-        , "cGhcRTSWays           = " ++ show cGhcRTSWays
-        , "cLeadingUnderscore    :: String"
-        , "cLeadingUnderscore    = " ++ show cLeadingUnderscore
-        , "cLibFFI               :: Bool"
-        , "cLibFFI               = " ++ show cLibFFI
-        , "cGhcThreaded :: Bool"
-        , "cGhcThreaded = " ++ show (any (wayUnit Threaded) rtsWays)
-        , "cGhcDebugged :: Bool"
-        , "cGhcDebugged = " ++ show debugged
-        , "cGhcRtsWithLibdw :: Bool"
-        , "cGhcRtsWithLibdw = " ++ show cGhcRtsWithLibdw ]
+        ]
 
 -- | Generate @ghcautoconf.h@ header.
 generateGhcAutoconfH :: Expr String

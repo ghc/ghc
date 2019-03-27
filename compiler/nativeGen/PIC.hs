@@ -565,19 +565,19 @@ pprGotDeclaration _ _ _
 --
 
 pprImportedSymbol :: DynFlags -> Platform -> CLabel -> SDoc
-pprImportedSymbol dflags platform@(Platform { platformArch = ArchX86, platformOS = OSDarwin }) importedLbl
+pprImportedSymbol dflags (Platform { platformArch = ArchX86, platformOS = OSDarwin }) importedLbl
         | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
         = case positionIndependent dflags of
            False ->
             vcat [
                 text ".symbol_stub",
-                text "L" <> pprCLabel platform lbl <> ptext (sLit "$stub:"),
-                    text "\t.indirect_symbol" <+> pprCLabel platform lbl,
-                    text "\tjmp *L" <> pprCLabel platform lbl
+                text "L" <> pprCLabel dflags lbl <> ptext (sLit "$stub:"),
+                    text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
+                    text "\tjmp *L" <> pprCLabel dflags lbl
                         <> text "$lazy_ptr",
-                text "L" <> pprCLabel platform lbl
+                text "L" <> pprCLabel dflags lbl
                     <> text "$stub_binder:",
-                    text "\tpushl $L" <> pprCLabel platform lbl
+                    text "\tpushl $L" <> pprCLabel dflags lbl
                         <> text "$lazy_ptr",
                     text "\tjmp dyld_stub_binding_helper"
             ]
@@ -585,16 +585,16 @@ pprImportedSymbol dflags platform@(Platform { platformArch = ArchX86, platformOS
             vcat [
                 text ".section __TEXT,__picsymbolstub2,"
                     <> text "symbol_stubs,pure_instructions,25",
-                text "L" <> pprCLabel platform lbl <> ptext (sLit "$stub:"),
-                    text "\t.indirect_symbol" <+> pprCLabel platform lbl,
+                text "L" <> pprCLabel dflags lbl <> ptext (sLit "$stub:"),
+                    text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
                     text "\tcall ___i686.get_pc_thunk.ax",
                 text "1:",
-                    text "\tmovl L" <> pprCLabel platform lbl
+                    text "\tmovl L" <> pprCLabel dflags lbl
                         <> text "$lazy_ptr-1b(%eax),%edx",
                     text "\tjmp *%edx",
-                text "L" <> pprCLabel platform lbl
+                text "L" <> pprCLabel dflags lbl
                     <> text "$stub_binder:",
-                    text "\tlea L" <> pprCLabel platform lbl
+                    text "\tlea L" <> pprCLabel dflags lbl
                         <> text "$lazy_ptr-1b(%eax),%eax",
                     text "\tpushl %eax",
                     text "\tjmp dyld_stub_binding_helper"
@@ -602,16 +602,16 @@ pprImportedSymbol dflags platform@(Platform { platformArch = ArchX86, platformOS
           $+$ vcat [        text ".section __DATA, __la_sym_ptr"
                     <> (if positionIndependent dflags then int 2 else int 3)
                     <> text ",lazy_symbol_pointers",
-                text "L" <> pprCLabel platform lbl <> ptext (sLit "$lazy_ptr:"),
-                    text "\t.indirect_symbol" <+> pprCLabel platform lbl,
-                    text "\t.long L" <> pprCLabel platform lbl
+                text "L" <> pprCLabel dflags lbl <> ptext (sLit "$lazy_ptr:"),
+                    text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
+                    text "\t.long L" <> pprCLabel dflags lbl
                     <> text "$stub_binder"]
 
         | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
         = vcat [
                 text ".non_lazy_symbol_pointer",
-                char 'L' <> pprCLabel platform lbl <> text "$non_lazy_ptr:",
-                text "\t.indirect_symbol" <+> pprCLabel platform lbl,
+                char 'L' <> pprCLabel dflags lbl <> text "$non_lazy_ptr:",
+                text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
                 text "\t.long\t0"]
 
         | otherwise
@@ -632,12 +632,12 @@ pprImportedSymbol _ (Platform { platformOS = OSDarwin }) _
 --
 -- NB: No DSO-support yet
 
-pprImportedSymbol _ platform@(Platform { platformOS = OSAIX }) importedLbl
+pprImportedSymbol dflags (Platform { platformOS = OSAIX }) importedLbl
         = case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
               -> vcat [
-                   text "LC.." <> pprCLabel platform lbl <> char ':',
-                   text "\t.long" <+> pprCLabel platform lbl ]
+                   text "LC.." <> pprCLabel dflags lbl <> char ':',
+                   text "\t.long" <+> pprCLabel dflags lbl ]
             _ -> empty
 
 -- ELF / Linux
@@ -669,15 +669,15 @@ pprImportedSymbol _ platform@(Platform { platformOS = OSAIX }) importedLbl
 -- the NCG will keep track of all DynamicLinkerLabels it uses
 -- and output each of them using pprImportedSymbol.
 
-pprImportedSymbol _ platform@(Platform { platformArch = ArchPPC_64 _ })
+pprImportedSymbol dflags platform@(Platform { platformArch = ArchPPC_64 _ })
                   importedLbl
         | osElfTarget (platformOS platform)
         = case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
               -> vcat [
                    text ".section \".toc\", \"aw\"",
-                   text ".LC_" <> pprCLabel platform lbl <> char ':',
-                   text "\t.quad" <+> pprCLabel platform lbl ]
+                   text ".LC_" <> pprCLabel dflags lbl <> char ':',
+                   text "\t.quad" <+> pprCLabel dflags lbl ]
             _ -> empty
 
 pprImportedSymbol dflags platform importedLbl
@@ -691,8 +691,8 @@ pprImportedSymbol dflags platform importedLbl
 
                  in vcat [
                       text ".section \".got2\", \"aw\"",
-                      text ".LC_" <> pprCLabel platform lbl <> char ':',
-                      ptext symbolSize <+> pprCLabel platform lbl ]
+                      text ".LC_" <> pprCLabel dflags lbl <> char ':',
+                      ptext symbolSize <+> pprCLabel dflags lbl ]
 
             -- PLT code stubs are generated automatically by the dynamic linker.
             _ -> empty

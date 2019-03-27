@@ -1953,7 +1953,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        -- See Note [-fno-code mode] #8025
        map1 <- if hscTarget dflags == HscNothing
          then enableCodeGenForTH
-           (defaultObjectTarget (targetPlatform dflags))
+           (defaultObjectTarget (settings dflags))
            map0
          else return map0
        return $ concat $ nodeMapElts map1

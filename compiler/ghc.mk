@@ -55,10 +55,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo                                                               >> $@
 	@echo '#include "ghc_boot_platform.h"'                              >> $@
 	@echo                                                               >> $@
-	@echo 'data IntegerLibrary = IntegerGMP'                            >> $@
-	@echo '                    | IntegerSimple'                         >> $@
-	@echo '                    deriving Eq'                             >> $@
-	@echo                                                               >> $@
 	@echo 'cBuildPlatformString :: String'                              >> $@
 	@echo 'cBuildPlatformString = BuildPlatform_NAME'                   >> $@
 	@echo 'cHostPlatformString :: String'                               >> $@
@@ -82,52 +78,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $@
 	@echo 'cStage                :: String'                             >> $@
 	@echo 'cStage                = show (STAGE :: Int)'                 >> $@
-	@echo 'cIntegerLibraryType   :: IntegerLibrary'                     >> $@
-ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
-	@echo 'cIntegerLibraryType   = IntegerGMP'                          >> $@
-else ifeq "$(INTEGER_LIBRARY)" "integer-simple"
-	@echo 'cIntegerLibraryType   = IntegerSimple'                       >> $@
-else ifneq "$(CLEANING)" "YES"
-$(error Unknown integer library)
-endif
-	@echo 'cGhcWithInterpreter   :: String'                             >> $@
-	@echo 'cGhcWithInterpreter   = "$(GhcWithInterpreter)"'             >> $@
-	@echo 'cGhcWithNativeCodeGen :: String'                             >> $@
-	@echo 'cGhcWithNativeCodeGen = "$(GhcWithNativeCodeGen)"'           >> $@
-	@echo 'cGhcWithSMP           :: String'                             >> $@
-	@echo 'cGhcWithSMP           = "$(GhcWithSMP)"'                     >> $@
-	@echo 'cGhcRTSWays           :: String'                             >> $@
-	@echo 'cGhcRTSWays           = "$(GhcRTSWays)"'                     >> $@
-	@echo 'cGhcRtsWithLibdw      :: Bool'                               >> $@
-ifeq "$(GhcRtsWithLibdw)" "YES"
-	@echo 'cGhcRtsWithLibdw      = True'                                >> $@
-else
-	@echo 'cGhcRtsWithLibdw      = False'                               >> $@
-endif
-	@echo 'cLeadingUnderscore    :: String'                             >> $@
-	@echo 'cLeadingUnderscore    = "$(LeadingUnderscore)"'              >> $@
-	@echo 'cLibFFI               :: Bool'                               >> $@
-ifeq "$(UseLibFFIForAdjustors)" "YES"
-	@echo 'cLibFFI               = True'                                >> $@
-else
-	@echo 'cLibFFI               = False'                               >> $@
-endif
-# Note that GhcThreaded just reflects the Makefile variable setting.
-# In particular, the stage1 compiler is never actually compiled with
-# -threaded, but it will nevertheless have cGhcThreaded = True.
-# The "+RTS --info" output will show what RTS GHC is really using.
-	@echo 'cGhcThreaded :: Bool'                                        >> $@
-ifeq "$(GhcThreaded)" "YES"
-	@echo 'cGhcThreaded = True'                                         >> $@
-else
-	@echo 'cGhcThreaded = False'                                        >> $@
-endif
-	@echo 'cGhcDebugged :: Bool'                                        >> $@
-ifeq "$(GhcDebugged)" "YES"
-	@echo 'cGhcDebugged = True'                                         >> $@
-else
-	@echo 'cGhcDebugged = False'                                        >> $@
-endif
 	@echo done.
 
 # -----------------------------------------------------------------------------
