@@ -15,6 +15,9 @@
   * Add `Functor`, `Applicative`, `Monad`, `Alternative`, `MonadPlus`, and
     `Generic` instances to `Kleisli`
 
+  * Add `Functor`, `Applicative`, `Monad`, `Foldable`, `Traversable` instances
+    to `(,,) a b` and `(,,,) a b c`
+
 ## 4.12.0.0 *21 September 2018*
   * Bundled with GHC 8.6.1
 
