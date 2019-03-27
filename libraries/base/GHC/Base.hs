@@ -519,7 +519,7 @@ class  Functor f  where
 --
 --   * @'pure' = 'return'@
 --
---   * @('<*>') = 'ap'@
+--   * @m1 '<*>' m2 = m1 '>>=' (\x1 -> m2 '>>=' (\x2 -> 'return' (x1 x2)))@
 --
 --   * @('*>') = ('>>')@
 --
@@ -639,7 +639,7 @@ Instances of 'Monad' should satisfy the following:
 Furthermore, the 'Monad' and 'Applicative' operations should relate as follows:
 
 * @'pure' = 'return'@
-* @('<*>') = 'ap'@
+* @m1 '<*>' m2 = m1 '>>=' (\x1 -> m2 '>>=' (\x2 -> 'return' (x1 x2)))@
 
 The above laws imply:
 
