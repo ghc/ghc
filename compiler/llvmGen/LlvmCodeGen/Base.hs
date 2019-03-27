@@ -390,17 +390,15 @@ ghcInternalFunctions = do
 -- | Pretty print a 'CLabel'.
 strCLabel_llvm :: CLabel -> LlvmM LMString
 strCLabel_llvm lbl = do
-    platform <- getLlvmPlatform
     dflags <- getDynFlags
-    let sdoc = pprCLabel platform lbl
+    let sdoc = pprCLabel dflags lbl
         str = Outp.renderWithStyle dflags sdoc (Outp.mkCodeStyle Outp.CStyle)
     return (fsLit str)
 
 strDisplayName_llvm :: CLabel -> LlvmM LMString
 strDisplayName_llvm lbl = do
-    platform <- getLlvmPlatform
     dflags <- getDynFlags
-    let sdoc = pprCLabel platform lbl
+    let sdoc = pprCLabel dflags lbl
         depth = Outp.PartWay 1
         style = Outp.mkUserStyle dflags Outp.reallyAlwaysQualify depth
         str = Outp.renderWithStyle dflags sdoc style
@@ -416,9 +414,8 @@ dropInfoSuffix = go
 
 strProcedureName_llvm :: CLabel -> LlvmM LMString
 strProcedureName_llvm lbl = do
-    platform <- getLlvmPlatform
     dflags <- getDynFlags
-    let sdoc = pprCLabel platform lbl
+    let sdoc = pprCLabel dflags lbl
         depth = Outp.PartWay 1
         style = Outp.mkUserStyle dflags Outp.neverQualify depth
         str = Outp.renderWithStyle dflags sdoc style
