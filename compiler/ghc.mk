@@ -106,8 +106,6 @@ ifeq "$(GhcRtsWithLibdw)" "YES"
 else
 	@echo 'cGhcRtsWithLibdw      = False'                               >> $@
 endif
-	@echo 'cGhcEnableTablesNextToCode :: String'                        >> $@
-	@echo 'cGhcEnableTablesNextToCode = "$(GhcEnableTablesNextToCode)"' >> $@
 	@echo 'cLeadingUnderscore    :: String'                             >> $@
 	@echo 'cLeadingUnderscore    = "$(LeadingUnderscore)"'              >> $@
 	@echo 'cLibFFI               :: Bool'                               >> $@
