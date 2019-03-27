@@ -1,5 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Arrow may never fire
     -- e.g. compose/arr;  see Trac #10528
@@ -51,6 +54,7 @@ import Data.Either
 import Control.Monad.Fix
 import Control.Category
 import GHC.Base hiding ( (.), id )
+import GHC.Generics (Generic)
 
 infixr 5 <+>
 infixr 3 ***
@@ -148,6 +152,31 @@ instance Arrow (->) where
 
 -- | Kleisli arrows of a monad.
 newtype Kleisli m a b = Kleisli { runKleisli :: a -> m b }
+  deriving Generic
+
+deriving instance Functor m => Functor (Kleisli m a)
+
+-- | @since 4.13.0.0
+instance Applicative m => Applicative (Kleisli m a) where
+  pure = Kleisli . const . pure
+  {-# INLINE pure #-}
+  Kleisli f <*> Kleisli g = Kleisli $ \x -> f x <*> g x
+  Kleisli f *> Kleisli g = Kleisli $ \x -> f x *> g x
+  Kleisli f <* Kleisli g = Kleisli $ \x -> f x <* g x
+
+-- | @since 4.13.0.0
+instance Alternative m => Alternative (Kleisli m a) where
+  empty = Kleisli $ const empty
+  {-# INLINE empty #-}
+  Kleisli f <|> Kleisli g = Kleisli $ \x -> f x <|> g x
+
+-- | @since 4.13.0.0
+instance Monad m => Monad (Kleisli m a) where
+  return = pure
+  Kleisli f >>= k = Kleisli $ \x -> f x >>= \a -> runKleisli (k a) x
+
+-- | @since 4.13.0.0
+instance (Alternative m, Monad m) => MonadPlus (Kleisli m a)
 
 -- | @since 3.0
 instance Monad m => Category (Kleisli m) where
