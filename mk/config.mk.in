@@ -143,7 +143,7 @@ DYNAMIC_BY_DEFAULT = NO
 
 # If building both v and dyn ways, then use -dynamic-too to build them.
 # This makes the build faster.
-DYNAMIC_TOO = YES
+DYNAMIC_TOO = NO
 
 # Use the dynamic way when building programs in the GHC tree. In
 # particular, this means that GHCi will use DLLs rather than loading
@@ -157,6 +157,8 @@ DYNAMIC_GHC_PROGRAMS = NO
 else
 DYNAMIC_GHC_PROGRAMS = YES
 endif
+
+DYNAMIC_GHC_PROGRAMS = NO
 
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and

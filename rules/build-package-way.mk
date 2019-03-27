@@ -25,7 +25,7 @@ $(call hs-objs,$1,$2,$3)
 # the second is indexed by the package id, distdir and way
 $1_$2_$3_LIB_FILE = libHS$$($1_$2_LIBRARY_NAME)$(subst .,%,$$($3_libsuf))
 $1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_FILE)
-$$($1_$2_COMPONENT_ID)_$2_$3_LIB = $$($1_$2_$3_LIB)
+$$($1_$2_LIBRARY_NAME)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
 # Note [inconsistent distdirs]
 #
@@ -38,7 +38,7 @@ $$($1_$2_COMPONENT_ID)_$2_$3_LIB = $$($1_$2_$3_LIB)
 # A similar hack is applied to the PROGRAM_DEP_LIB mechanism in
 # rules/build-package.mk.
 ifeq "$$($1_PACKAGE) $2" "ghc stage2"
-$$($1_$2_COMPONENT_ID)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
+$$($1_$2_LIBRARY_NAME)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
 endif
 
 # All the .a/.so library file dependencies for this library.
@@ -113,7 +113,7 @@ endif
 
 # Build the GHCi library
 ifeq "$3" "v"
-$1_$2_GHCI_LIB = $1/$2/build/HS$$($1_$2_COMPONENT_ID).$$($3_osuf)
+$1_$2_GHCI_LIB = $1/$2/build/HS$$($1_$2_LIBRARY_NAME).$$($3_osuf)
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 # Don't put bootstrapping packages in the bindist
 ifneq "$4" "0"
