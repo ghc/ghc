@@ -1351,7 +1351,10 @@ data Settings = Settings {
   sOpt_lcc               :: [String], -- LLVM: c compiler
   sOpt_i                 :: [String], -- iserv options
 
-  sPlatformConstants     :: PlatformConstants
+  sPlatformConstants     :: PlatformConstants,
+
+  -- Formerly Config.hs, target specific
+  sTablesNextToCode :: Bool
  }
 
 targetPlatform :: DynFlags -> Platform
@@ -1879,6 +1882,9 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         ghcLink                 = LinkBinary,
         hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
         integerLibrary          = cIntegerLibraryType,
+        tablesNextToCode        =
+            not (platformUnregisterised $ sTargetPlatform mySettings) &&
+            sTablesNextToCode mySettings,
         verbosity               = 0,
         optLevel                = 0,
         debugLevel              = 0,
@@ -5611,7 +5617,7 @@ compilerInfo dflags
        ("Object splitting supported",  showBool False),
        ("Have native code generator",  cGhcWithNativeCodeGen),
        ("Support SMP",                 cGhcWithSMP),
-       ("Tables next to code",         cGhcEnableTablesNextToCode),
+       ("Tables next to code",         showBool $ sTablesNextToCode $ settings dflags),
        ("RTS ways",                    cGhcRTSWays),
        ("RTS expects libdw",           showBool cGhcRtsWithLibdw),
        -- Whether or not we support @-dynamic-too@

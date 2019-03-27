@@ -184,6 +184,7 @@ initSysTools top_dir
        targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
        targetHasIdentDirective <- readSetting "target has .ident directive"
        targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
+       tablesNextToCode <- getBooleanSetting "Tables next to code"
        myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
        -- On Windows, mingw is distributed with GHC,
        -- so we look in TopDir/../mingw/bin,
@@ -309,7 +310,8 @@ initSysTools top_dir
                     sOpt_lo      = [],
                     sOpt_lc      = [],
                     sOpt_i       = [],
-                    sPlatformConstants = platformConstants
+                    sPlatformConstants = platformConstants,
+                    sTablesNextToCode = tablesNextToCode
              }
 
 
