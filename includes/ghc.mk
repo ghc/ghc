@@ -210,6 +210,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
 	@echo ',("LLVM clang command", "$(SettingsClangCommand)")' >> $@
+	@echo ',("Tables next to code", "$(GhcEnableTablesNextToCode)")' >> $@
 	@echo ']' >> $@
 
 

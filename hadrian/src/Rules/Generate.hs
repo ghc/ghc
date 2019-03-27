@@ -303,6 +303,8 @@ generateSettings = do
         , ("LLVM llc command", settingsFileSetting SettingsFileSetting_LlcCommand)
         , ("LLVM opt command", settingsFileSetting SettingsFileSetting_OptCommand)
         , ("LLVM clang command", settingsFileSetting SettingsFileSetting_ClangCommand)
+
+        , ("Tables next to code", yesNo <$> ghcEnableTablesNextToCode)
         ]
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
     pure $ case settings of
@@ -334,7 +336,6 @@ generateConfigHs = do
     cGhcWithInterpreter        <- expr $ yesNo <$> ghcWithInterpreter
     cGhcWithNativeCodeGen      <- expr $ yesNo <$> ghcWithNativeCodeGen
     cGhcWithSMP                <- expr $ yesNo <$> ghcWithSMP
-    cGhcEnableTablesNextToCode <- expr $ yesNo <$> ghcEnableTablesNextToCode
     cLeadingUnderscore         <- expr $ yesNo <$> flag LeadingUnderscore
     cLibFFI                    <- expr useLibFFIForAdjustors
     rtsWays                    <- getRtsWays
@@ -389,8 +390,6 @@ generateConfigHs = do
         , "cGhcWithSMP           = " ++ show cGhcWithSMP
         , "cGhcRTSWays           :: String"
         , "cGhcRTSWays           = " ++ show cGhcRTSWays
-        , "cGhcEnableTablesNextToCode :: String"
-        , "cGhcEnableTablesNextToCode = " ++ show cGhcEnableTablesNextToCode
         , "cLeadingUnderscore    :: String"
         , "cLeadingUnderscore    = " ++ show cLeadingUnderscore
         , "cLibFFI               :: Bool"
