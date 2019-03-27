@@ -177,6 +177,7 @@ initSysTools top_dir
                                  Nothing -> pgmError ("Failed to read " ++ show key ++ " value " ++ show xs)
                              Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
        crossCompiling <- getBooleanSetting "cross compiling"
+       targetPlatformString <- getSetting "target platform string"
        targetArch <- readSetting "target arch"
        targetOS <- readSetting "target os"
        targetWordSize <- readSetting "target word size"
@@ -305,6 +306,7 @@ initSysTools top_dir
                     sOpt_lc      = [],
                     sOpt_i       = [],
                     sPlatformConstants = platformConstants,
+                    sTargetPlatformString = targetPlatformString,
                     sTablesNextToCode = tablesNextToCode
              }
 

@@ -1357,6 +1357,7 @@ data Settings = Settings {
   sPlatformConstants     :: PlatformConstants,
 
   -- Formerly Config.hs, target specific
+  sTargetPlatformString :: String, -- TODO Recalculate string from richer info?
   sTablesNextToCode :: Bool
  }
 
@@ -5621,7 +5622,7 @@ compilerInfo dflags
        ("Stage",                       cStage),
        ("Build platform",              cBuildPlatformString),
        ("Host platform",               cHostPlatformString),
-       ("Target platform",             cTargetPlatformString),
+       ("Target platform",             sTargetPlatformString $ settings dflags),
        ("Have interpreter",            cGhcWithInterpreter),
        ("Object splitting supported",  showBool False),
        ("Have native code generator",  cGhcWithNativeCodeGen),

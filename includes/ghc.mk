@@ -199,6 +199,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("libtool command", "$(SettingsLibtoolCommand)")' >> $@
 	@echo ',("unlit command", "$$topdir/bin/$(utils/unlit_dist_PROG)")' >> $@
 	@echo ',("cross compiling", "$(CrossCompiling)")' >> $@
+	@echo ',("target platform string", "$(TARGETPLATFORM)")' >> $@
 	@echo ',("target os", "$(HaskellTargetOs)")' >> $@
 	@echo ',("target arch", "$(HaskellTargetArch)")' >> $@
 	@echo ',("target word size", "$(TargetWordSize)")' >> $@
