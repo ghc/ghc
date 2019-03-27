@@ -364,6 +364,22 @@ instance Foldable ((,) a) where
     foldMap f (_, y) = f y
 
     foldr f z (_, y) = f y z
+    length _  = 1
+    null _ = False
+
+-- | @since 4.13.0.0
+instance Foldable ((,,) a b) where
+    foldMap f (_, _, y) = f y
+    foldr f z (_, _, y) = f y z
+    length _ = 1
+    null _ = False
+
+-- | @since 4.13.0.0
+instance Foldable ((,,,) a b c) where
+    foldMap f (_, _, _, y) = f y
+    foldr f z (_, _, _, y) = f y z
+    length _ = 1
+    null _ = False
 
 -- | @since 4.8.0.0
 instance Foldable (Array i) where
