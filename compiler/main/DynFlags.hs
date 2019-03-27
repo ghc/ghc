@@ -1353,7 +1353,10 @@ data Settings = Settings {
   sOpt_lcc               :: [String], -- LLVM: c compiler
   sOpt_i                 :: [String], -- iserv options
 
-  sPlatformConstants     :: PlatformConstants
+  sPlatformConstants     :: PlatformConstants,
+
+  -- Formerly Config.hs, target specific
+  sTablesNextToCode :: Bool
  }
 
 targetPlatform :: DynFlags -> Platform
@@ -1621,17 +1624,14 @@ defaultObjectTarget platform
   | cGhcWithNativeCodeGen == "YES"      =  HscAsm
   | otherwise                           =  HscLlvm
 
-tablesNextToCode :: DynFlags -> Bool
-tablesNextToCode dflags
-    = mkTablesNextToCode (platformUnregisterised (targetPlatform dflags))
-
 -- Determines whether we will be compiling
 -- info tables that reside just before the entry code, or with an
 -- indirection to the entry code.  See TABLES_NEXT_TO_CODE in
 -- includes/rts/storage/InfoTables.h.
-mkTablesNextToCode :: Bool -> Bool
-mkTablesNextToCode unregisterised
-    = not unregisterised && cGhcEnableTablesNextToCode == "YES"
+tablesNextToCode :: DynFlags -> Bool
+tablesNextToCode dflags =
+    not (platformUnregisterised $ targetPlatform dflags) &&
+    sTablesNextToCode (settings dflags)
 
 data DynLibLoader
   = Deployable
@@ -5621,7 +5621,7 @@ compilerInfo dflags
        ("Object splitting supported",  showBool False),
        ("Have native code generator",  cGhcWithNativeCodeGen),
        ("Support SMP",                 cGhcWithSMP),
-       ("Tables next to code",         cGhcEnableTablesNextToCode),
+       ("Tables next to code",         showBool $ sTablesNextToCode $ settings dflags),
        ("RTS ways",                    cGhcRTSWays),
        ("RTS expects libdw",           showBool cGhcRtsWithLibdw),
        -- Whether or not we support @-dynamic-too@
