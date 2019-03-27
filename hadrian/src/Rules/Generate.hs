@@ -320,7 +320,6 @@ generateConfigHs = do
     cGhcWithSMP                <- expr $ yesNo <$> ghcWithSMP
     cGhcEnableTablesNextToCode <- expr $ yesNo <$> ghcEnableTablesNextToCode
     cLeadingUnderscore         <- expr $ yesNo <$> flag LeadingUnderscore
-    cGHC_UNLIT_PGM             <- fmap takeFileName $ getBuilderPath Unlit
     cLibFFI                    <- expr useLibFFIForAdjustors
     rtsWays                    <- getRtsWays
     cGhcRtsWithLibdw           <- getFlag WithLibdw
@@ -378,8 +377,6 @@ generateConfigHs = do
         , "cGhcEnableTablesNextToCode = " ++ show cGhcEnableTablesNextToCode
         , "cLeadingUnderscore    :: String"
         , "cLeadingUnderscore    = " ++ show cLeadingUnderscore
-        , "cGHC_UNLIT_PGM        :: String"
-        , "cGHC_UNLIT_PGM        = " ++ show cGHC_UNLIT_PGM
         , "cLibFFI               :: Bool"
         , "cLibFFI               = " ++ show cLibFFI
         , "cGhcThreaded :: Bool"
