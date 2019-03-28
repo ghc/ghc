@@ -2007,6 +2007,7 @@ genCCall' dflags gcp target dest_regs args
                     MO_Memcmp _  -> (fsLit "memcmp", False)
 
                     MO_BSwap w   -> (fsLit $ bSwapLabel w, False)
+                    MO_BRev w    -> (fsLit $ bRevLabel w, False)
                     MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
                     MO_Pdep w    -> (fsLit $ pdepLabel w, False)
                     MO_Pext w    -> (fsLit $ pextLabel w, False)

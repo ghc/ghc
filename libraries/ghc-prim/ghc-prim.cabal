@@ -69,6 +69,7 @@ Library
     c-sources:
         cbits/atomic.c
         cbits/bswap.c
+        cbits/bitrev.c
         cbits/clz.c
         cbits/ctz.c
         cbits/debug.c
