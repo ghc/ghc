@@ -531,7 +531,7 @@ getRegister' dflags is32Bit (CmmRegOff r n)
 getRegister' dflags is32Bit (CmmMachOp (MO_AlignmentCheck align _) [e])
   = addAlignmentCheck align <$> getRegister' dflags is32Bit e
 
--- for 32-bit architectuers, support some 64 -> 32 bit conversions:
+-- for 32-bit architectures, support some 64 -> 32 bit conversions:
 -- TO_W_(x), TO_W_(x >> 32)
 
 getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W32)
@@ -2936,6 +2936,10 @@ outOfLineCmmOp bid mop res args
 
               MO_PopCnt _  -> fsLit "popcnt"
               MO_BSwap _   -> fsLit "bswap"
+              {- Here the C implementation is used as there is no x86
+              instruction to reverse a word's bit order.
+              -}
+              MO_BRev w    -> fsLit $ bRevLabel w
               MO_Clz w     -> fsLit $ clzLabel w
               MO_Ctz _     -> unsupported
 
