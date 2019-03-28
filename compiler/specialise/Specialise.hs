@@ -5,7 +5,6 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# OPTIONS_GHC -fwarn-unused-binds #-}
 module Specialise ( specProgram, specUnfolding ) where
 
@@ -1153,7 +1152,10 @@ specDefn env body_uds fn rhs
                 -- spec_uds may mention dictionaries bound in
                 -- body_uds_without_me
 
-
+-- | An argument that we might want to specialise. Consider the following
+-- function     f = \x -> /\ a b c -> \d1 d2 y -> blah
+-- called with  f 5 @
+--
 data SpecArg
   = SpecSpecType Type
   | SpecUnspecType
@@ -1351,7 +1353,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                 orig_etas     = requiredEtaAbstractions orig_call
 
            ; lhs_arg_details <-
-                traverse (uncurry $ buildArgDetails rhs_env) orig_etas
+                traverse (uncurry $ buildArgDetails $ rhs_env) orig_etas
            ; let rhs_arg_details = fmap snd
                                  $ shuffleType fn_arity
                                  $ zip call_spec_args lhs_arg_details
@@ -1473,6 +1475,17 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                         `setIdUnfolding`  spec_unf
                                         `asJoinId_maybe`  spec_join_arity
 
+           ; pprTraceM "spec_call" $ vcat
+               [ ppr fn_type
+               , text "---"
+               , ppr shuffled_type
+               , text "---"
+               , ppr body_ty
+               , text "---"
+               , ppr call_spec_args
+               , text "---"
+               , ppr spec_rule
+               ]
            ; return ( spec_rule                  : rules_acc
                     , (spec_f_w_arity, spec_rhs) : pairs_acc
                     , spec_uds           `plusUDs` uds_acc
@@ -2519,8 +2532,9 @@ buildArgDetails
          )
 buildArgDetails _ (SpecSpecType t) _
   = pure ([], Type t, Nothing, Nothing)
-buildArgDetails _ SpecUnspecType tyVar
-  = pure ([tyVar], varToCoreExpr tyVar, Just tyVar, Nothing)
+buildArgDetails env SpecUnspecType tyVar
+  = let tyVar' = snd $ substBndr env tyVar
+     in pure ([tyVar'], varToCoreExpr tyVar', Just tyVar', Nothing)
 buildArgDetails env (SpecDict _) d
   = do { new_bndr <- newDictBndr env d
        ; let expr = varToCoreExpr new_bndr
