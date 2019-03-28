@@ -95,7 +95,7 @@ Library
         UnliftedFFITypes
         Unsafe
 
-    build-depends: rts == 1.0, ghc-prim ^>= 0.5.1.0
+    build-depends: rts == 1.0, ghc-prim >= 0.5.1.0 && <= 0.6.1
 
     -- sanity-check to ensure exactly one flag is set
     if !((flag(integer-gmp) && !flag(integer-simple)) || (!flag(integer-gmp) && flag(integer-simple)))
