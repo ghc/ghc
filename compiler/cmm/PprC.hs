@@ -814,6 +814,7 @@ pprCallishMachOp_for_C mop
         MO_Memmove _    -> text "memmove"
         MO_Memcmp _     -> text "memcmp"
         (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
+        (MO_BRev w)     -> ptext (sLit $ bRevLabel w)
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
         (MO_Pext w)     -> ptext (sLit $ pextLabel w)
         (MO_Pdep w)     -> ptext (sLit $ pdepLabel w)

@@ -230,6 +230,8 @@ genCall t@(PrimTarget (MO_Ctz w)) dsts args =
     genCallSimpleCast w t dsts args
 genCall t@(PrimTarget (MO_BSwap w)) dsts args =
     genCallSimpleCast w t dsts args
+genCall t@(PrimTarget (MO_BRev w)) dsts args =
+    genCallSimpleCast w t dsts args
 
 genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
@@ -791,10 +793,11 @@ cmmPrimOpFunctions mop = do
     MO_Memset _   -> fsLit $ "llvm.memset."  ++ intrinTy2
     MO_Memcmp _   -> fsLit $ "memcmp"
 
-    (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    (MO_BSwap w)  -> fsLit $ "llvm.bswap."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    (MO_Clz w)    -> fsLit $ "llvm.ctlz."   ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    (MO_Ctz w)    -> fsLit $ "llvm.cttz."   ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_PopCnt w) -> fsLit $ "llvm.ctpop."      ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_BSwap w)  -> fsLit $ "llvm.bswap."      ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_BRev w)   -> fsLit $ "llvm.bitreverse." ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_Clz w)    -> fsLit $ "llvm.ctlz."       ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_Ctz w)    -> fsLit $ "llvm.cttz."       ++ showSDoc dflags (ppr $ widthToLlvmInt w)
 
     (MO_Pdep w)   ->  let w' = showSDoc dflags (ppr $ widthInBits w)
                       in  if isBmi2Enabled dflags

@@ -617,6 +617,7 @@ data CallishMachOp
   | MO_Ctz Width
 
   | MO_BSwap Width
+  | MO_BRev Width
 
   -- Atomic read-modify-write.
   | MO_AtomicRMW Width AtomicMachOp

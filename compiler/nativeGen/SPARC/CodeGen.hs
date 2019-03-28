@@ -667,6 +667,7 @@ outOfLineMachOp_table mop
         MO_Memcmp _  -> fsLit "memcmp"
 
         MO_BSwap w   -> fsLit $ bSwapLabel w
+        MO_BRev w    -> fsLit $ bRevLabel w
         MO_PopCnt w  -> fsLit $ popCntLabel w
         MO_Pdep w    -> fsLit $ pdepLabel w
         MO_Pext w    -> fsLit $ pextLabel w

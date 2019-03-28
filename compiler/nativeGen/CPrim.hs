@@ -8,6 +8,7 @@ module CPrim
     , pdepLabel
     , pextLabel
     , bSwapLabel
+    , bRevLabel
     , clzLabel
     , ctzLabel
     , word2FloatLabel
@@ -53,6 +54,15 @@ bSwapLabel w = "hs_bswap" ++ pprWidth w
     pprWidth W32 = "32"
     pprWidth W64 = "64"
     pprWidth w   = pprPanic "bSwapLabel: Unsupported word width " (ppr w)
+
+bRevLabel :: Width -> String
+bRevLabel w = "hs_bitrev" ++ pprWidth w
+  where
+    pprWidth W8  = "8"
+    pprWidth W16 = "16"
+    pprWidth W32 = "32"
+    pprWidth W64 = "64"
+    pprWidth w   = pprPanic "bRevLabel: Unsupported word width " (ppr w)
 
 clzLabel :: Width -> String
 clzLabel w = "hs_clz" ++ pprWidth w

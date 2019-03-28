@@ -619,6 +619,12 @@ emitPrimOp _      [res] BSwap32Op [w] = emitBSwapCall res w W32
 emitPrimOp _      [res] BSwap64Op [w] = emitBSwapCall res w W64
 emitPrimOp dflags [res] BSwapOp   [w] = emitBSwapCall res w (wordWidth dflags)
 
+emitPrimOp _      [res] BRev8Op  [w] = emitBRevCall res w W8
+emitPrimOp _      [res] BRev16Op [w] = emitBRevCall res w W16
+emitPrimOp _      [res] BRev32Op [w] = emitBRevCall res w W32
+emitPrimOp _      [res] BRev64Op [w] = emitBRevCall res w W64
+emitPrimOp dflags [res] BRevOp   [w] = emitBRevCall res w (wordWidth dflags)
+
 -- Population count
 emitPrimOp _      [res] PopCnt8Op  [w] = emitPopCntCall res w W8
 emitPrimOp _      [res] PopCnt16Op [w] = emitPopCntCall res w W16
@@ -2509,6 +2515,13 @@ emitBSwapCall res x width = do
     emitPrimCall
         [ res ]
         (MO_BSwap width)
+        [ x ]
+
+emitBRevCall :: LocalReg -> CmmExpr -> Width -> FCode ()
+emitBRevCall res x width = do
+    emitPrimCall
+        [ res ]
+        (MO_BRev width)
         [ x ]
 
 emitPopCntCall :: LocalReg -> CmmExpr -> Width -> FCode ()

@@ -1277,6 +1277,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/primops/should_run/T6135
 /tests/primops/should_run/T7689
 /tests/primops/should_run/T9430
+/tests/primops/should_run/T16164
 /tests/profiling/should_compile/prof001
 /tests/profiling/should_compile/prof002
 /tests/profiling/should_run/2592
