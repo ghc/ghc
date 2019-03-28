@@ -44,6 +44,15 @@ main = do
             -- Enable linting file accesses in the build dir and ghc root dir
             -- (cwd) when using the `--lint-fsatrace` option.
             , shakeLintInside = [ cwd, buildRoot ]
+            , shakeLintIgnore =
+                -- Ignore access to the package database caches.
+                -- They are managed externally by the ghc-pkg tool.
+                [ buildRoot -/- "//package.conf.d/package.cache"
+
+                -- Ignore access to autom4te.cache directories.
+                -- They are managed externally by auto tools.
+                , "//autom4te.cache//*"
+                ]
             }
 
         rules :: Rules ()
