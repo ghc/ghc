@@ -5,5 +5,5 @@ TYPE CONSTRUCTORS
 DATA CONSTRUCTORS
   Foo :: forall x y z. x -> y -> z -> Foo x y z
 Dependent modules: []
-Dependent packages: [base-4.13.0.0, ghc-prim-0.5.3,
+Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
                      integer-gmp-1.0.2.0]

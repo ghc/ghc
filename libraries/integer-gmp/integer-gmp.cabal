@@ -58,7 +58,7 @@ library
     StandaloneDeriving
     UnboxedTuples
     UnliftedFFITypes
-  build-depends:       ghc-prim ^>= 0.5.1.0
+  build-depends:       ghc-prim >= 0.5.1.0 && <= 0.6.1
   hs-source-dirs:      src/
   -- We need to set the unit ID to integer-wired-in
   -- (without a version number) as it's magic.

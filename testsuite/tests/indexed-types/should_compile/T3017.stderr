@@ -18,5 +18,5 @@ CLASS INSTANCES
 FAMILY INSTANCES
   type instance Elem (ListColl a) = a -- Defined at T3017.hs:13:9
 Dependent modules: []
-Dependent packages: [base-4.13.0.0, ghc-prim-0.5.3,
+Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
                      integer-gmp-1.0.2.0]
