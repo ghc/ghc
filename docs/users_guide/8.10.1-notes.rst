@@ -70,6 +70,10 @@ Template Haskell
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
+- Add new `bitReverse#` primops that, for a `Word` of 8, 16, 32 or 64 bits,
+  reverse the order of its bits e.g. `0b110001` becomes `0b100011`.
+  These primitives use optimized machine instructions when available.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 

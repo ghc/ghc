@@ -31,6 +31,12 @@ module GHC.Word (
     byteSwap32,
     byteSwap64,
 
+    -- * Bit reversal
+    bitReverse8,
+    bitReverse16,
+    bitReverse32,
+    bitReverse64,
+
     -- * Equality operators
     -- | See GHC.Classes#matching_overloaded_methods_in_rules
     eqWord, neWord, gtWord, geWord, ltWord, leWord,
@@ -1004,6 +1010,35 @@ byteSwap64 (W64# w#) = W64# (byteSwap64# w#)
 #else
 byteSwap64 :: Word64 -> Word64
 byteSwap64 (W64# w#) = W64# (byteSwap# w#)
+#endif
+
+-- | Reverse the order of the bits in a 'Word8'.
+--
+-- @since 4.12.0.0
+bitReverse8 :: Word8 -> Word8
+bitReverse8 (W8# w#) = W8# (narrow8Word# (bitReverse8# w#))
+
+-- | Reverse the order of the bits in a 'Word16'.
+--
+-- @since 4.12.0.0
+bitReverse16 :: Word16 -> Word16
+bitReverse16 (W16# w#) = W16# (narrow16Word# (bitReverse16# w#))
+
+-- | Reverse the order of the bits in a 'Word32'.
+--
+-- @since 4.12.0.0
+bitReverse32 :: Word32 -> Word32
+bitReverse32 (W32# w#) = W32# (narrow32Word# (bitReverse32# w#))
+
+-- | Reverse the order of the bits in a 'Word64'.
+--
+-- @since 4.12.0.0
+#if WORD_SIZE_IN_BITS < 64
+bitReverse64 :: Word64 -> Word64
+bitReverse64 (W64# w#) = W64# (bitReverse64# w#)
+#else
+bitReverse64 :: Word64 -> Word64
+bitReverse64 (W64# w#) = W64# (bitReverse# w#)
 #endif
 
 -------------------------------------------------------------------------------
