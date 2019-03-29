@@ -244,6 +244,7 @@ type ForallXIPBind (c :: * -> Constraint) (x :: *) =
 
 -- Sig type families
 type family XTypeSig          x
+type family XTLKS             x
 type family XPatSynSig        x
 type family XClassOpSig       x
 type family XIdSig            x
@@ -258,6 +259,7 @@ type family XXSig             x
 
 type ForallXSig (c :: * -> Constraint) (x :: *) =
        ( c (XTypeSig          x)
+       , c (XTLKS             x)
        , c (XPatSynSig        x)
        , c (XClassOpSig       x)
        , c (XIdSig            x)
@@ -279,6 +281,10 @@ type ForallXFixitySig (c :: * -> Constraint) (x :: *) =
        ( c (XFixitySig         x)
        , c (XXFixitySig        x)
        )
+
+-- TopKindSig type families
+type family XTopKindSig  x
+type family XXTopKindSig x
 
 -- =====================================================================
 -- Type families for the HsDecls extension points

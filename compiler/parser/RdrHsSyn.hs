@@ -23,6 +23,7 @@ module   RdrHsSyn (
         mkClassDecl,
         mkTyData, mkDataFamInst,
         mkTySynonym, mkTyFamInstEqn,
+        mkTopLevelKindSig,
         mkTyFamInst,
         mkFamDecl, mkLHsSigType,
         mkInlinePragma,
@@ -238,6 +239,24 @@ mkTySynonym loc lhs rhs
                                  , tcdLName = tc, tcdTyVars = tyvars
                                  , tcdFixity = fixity
                                  , tcdRhs = rhs })) }
+
+mkTopLevelKindSig
+  :: SrcSpan
+  -> LHsType GhcPs  -- LHS
+  -> LHsKind GhcPs  -- RHS
+  -> P (LSig GhcPs)
+mkTopLevelKindSig loc lhs rhs =
+  do { v <- checkLhs lhs
+     ; return $ cL loc $
+        TLKS noExtField $ TopKindSig noExtField v (mkLHsSigWcType rhs)
+     }
+  where
+    checkLhs (unLoc->HsTyVar _ NotPromoted v@(unLoc->name))
+      | isUnqual name, isTcOcc (rdrNameOcc name)
+      = return v
+    checkLhs _ =
+      addFatalError (getLoc lhs) $
+        hang (text "Invalid left-hand side in a top-level kind signature:") 2 (ppr lhs)
 
 mkTyFamInstEqn :: Maybe [LHsTyVarBndr GhcPs]
                -> LHsType GhcPs

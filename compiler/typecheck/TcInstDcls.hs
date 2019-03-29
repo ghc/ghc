@@ -746,6 +746,7 @@ tcDataFamInstDecl mb_clsinfo
                L _ []    -> Nothing
                L _ preds ->
                  Just $ DerivInfo { di_rep_tc  = rep_tc
+                                  , di_extra_tvs = []
                                   , di_clauses = preds
                                   , di_ctxt    = tcMkDataFamInstCtxt decl }
 

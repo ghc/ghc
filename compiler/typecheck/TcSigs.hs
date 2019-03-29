@@ -17,7 +17,7 @@ module TcSigs(
        completeSigPolyId_maybe,
 
        tcTySigs, tcUserTypeSig, completeSigFromId,
-       tcInstSig,
+       tcInstSig, tcTLKS,
 
        TcPragEnv, emptyPragEnv, lookupPragEnv, extendPragEnv,
        mkPragEnv, tcSpecPrags, tcSpecWrapper, tcImpPrags, addInlinePrags
@@ -244,6 +244,30 @@ tcUserTypeSig loc hs_sig_ty mb_name
                Just n  -> FunSigCtxt n True
                Nothing -> ExprSigCtxt
 
+tcTLKS :: LTopKindSig GhcRn -> TcM (Name, Kind)
+tcTLKS (L _ tlks) = case tlks of
+  TopKindSig _ (L _ name) ksig ->
+    do { kind <-
+           tcHsSigType (TopKindSigCtxt name) $
+           dropWildCards ksig -- See Note [Wildcards in TLKS]
+       ; return (name, kind) }
+  XTopKindSig nec -> noExtCon nec
+
+{- Note [Wildcards in TLKS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Top-level kind signatures enable polymorphic recursion, and it is unclear how
+to reconcile this with partial type signatures, so we disallow wildcards in
+TLKSs.
+
+We reject wildcards in 'renameTLKS' by returning False for 'TopKindSigCtx' in
+'wildCardsAllowed'. By the time we are in 'tcTLKS', we know there are no
+wildcards left and can simply 'dropWildCards'.
+
+The alternative design is to have special treatment for partial TLKSs,
+much like we have special treatment for partial type signatures in terms.
+However, partial TLKSs are not a proper replacement for CUSKs, so this
+would be a separate feature.
+-}
 
 
 completeSigFromId :: UserTypeCtxt -> Id -> TcIdSigInfo

@@ -85,7 +85,7 @@ module Language.Haskell.TH.Lib (
     viaStrategy, DerivStrategy(..),
     -- **** Class
     classD, instanceD, instanceWithOverlapD, Overlap(..),
-    sigD, standaloneDerivD, standaloneDerivWithStrategyD, defaultSigD,
+    sigD, kiSigD, standaloneDerivD, standaloneDerivWithStrategyD, defaultSigD,
 
     -- **** Role annotations
     roleAnnotD,
