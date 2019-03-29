@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 module Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
@@ -31,7 +32,7 @@ import CoreArity        ( etaExpandToJoinPointRule )
 import UniqSupply
 import Name
 import MkId             ( voidArgId, voidPrimId )
-import Maybes           ( catMaybes, isJust )
+import Maybes           ( mapMaybe, isJust )
 import MonadUtils       ( foldlM )
 import BasicTypes
 import HscTypes
@@ -40,11 +41,14 @@ import DynFlags
 import Util
 import Outputable
 import FastString
-import State
 import UniqDFM
 
 import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State.Strict
+import Data.List (partition)
+import Data.Traversable
 
 {-
 ************************************************************************
@@ -631,6 +635,104 @@ bitten by such instances to revert to the pre-7.10 behavior.
 See #10491
 -}
 
+-- | An argument that we might want to specialise.
+--
+-- Consider the following
+-- function     f = \x -> /\ a b c -> \d1 d2 y -> blah
+-- called with  f 5 @T1 @b @T2 $dT1 $dT2 y
+--
+-- Here we'd like to specialise on (a ~ T1, c ~ T2). Thus the 'd1' and 'd2'
+-- dicts are relevant arguments to the specializatiom, but none of 'x', 'b' or
+-- 'y' are.
+--
+-- We construct a [UnspecArg, SpecType T1, UnspecType, SpecType T2,
+-- SpecDict d1, SpecDict d2, UnspecArg] corresponding to this call. The mapping
+-- is as follows:
+--
+--   * Types arguments that should be specialised become 'SpecType's
+--   * Types that should stay polymorphic become 'UnspecType's
+--   * Specialized dictionaries become 'SpecDict's
+--   * Everything else becomes an 'UnspecArg'
+data SpecArg
+  = SpecType Type
+  | UnspecType
+  | SpecDict DictExpr
+  | UnspecArg
+
+instance Outputable SpecArg where
+  ppr (SpecType t) = text "SpecType" <+> ppr t
+  ppr UnspecType   = text "UnspecType"
+  ppr (SpecDict d) = text "SpecDict" <+> ppr d
+  ppr UnspecArg    = text "UnspecArg"
+
+isSpecialized :: SpecArg -> Bool
+isSpecialized (SpecType _) = True
+isSpecialized (SpecDict _) = True
+isSpecialized UnspecType   = False
+isSpecialized UnspecArg    = False
+
+getSpecDicts :: [SpecArg] -> [DictExpr]
+getSpecDicts = mapMaybe go
+  where
+    go (SpecDict d) = Just d
+    go _            = Nothing
+
+getSpecTypes :: [SpecArg] -> [Type]
+getSpecTypes = mapMaybe go
+  where
+    go (SpecType t) = Just t
+    go _                = Nothing
+
+-- | When constructing a SPEC rule, we must keep track of which of the original
+-- call-to-be-specialised's arguments need to stay unspecialised. Both
+-- 'SpecRuleType' and 'SpecRuleDict' must appear only on the left side of
+-- a rewrite rule, while 'SpecRuleArg's must appear on both sides.
+data SpecRuleArg
+  = SpecRuleType CoreExpr
+  | SpecRuleDict CoreBndr  -- original binder
+                 CoreBndr  -- newly instantiated binder
+  | SpecRuleArg  CoreBndr
+
+instance Outputable SpecRuleArg where
+  ppr (SpecRuleType e)   = text "SpecRuleType" <+> ppr e
+  ppr (SpecRuleDict a b) = text "SpecRuleDict" <+> ppr a <+> ppr b
+  ppr (SpecRuleArg e)    = text "SpecRuleArg"  <+> ppr e
+
+isOnlyOnLeftSide :: SpecRuleArg -> Bool
+isOnlyOnLeftSide (SpecRuleArg _)    = False
+isOnlyOnLeftSide (SpecRuleType _)   = True
+isOnlyOnLeftSide (SpecRuleDict _ _) = True
+
+-- | Given a type, split it along its introdution of type variables, and along
+-- its arrows.
+--
+-- For example, given the type    forall a. Int -> forall b. a -> x
+-- return   [Left a, Right Int, Left b, Right a, Right x]
+unravelFun :: Type -> [Either TyVar Type]
+unravelFun t
+  | (fvs@(_:_),  t') <- tcSplitForAllTys t = fmap Left fvs   ++ unravelFun t'
+  | (args@(_:_), t') <- splitFunTys t      = fmap Right args ++ unravelFun t'
+  | otherwise = [Right t]
+
+-- | Given a type and a list of the arguments it wants to be specialised
+-- relative to, construct a new type with those specialised parameters first.
+-- It's trivial to beta-reduce away the specialised parameters from the
+-- resulting type.
+moveSpecArgsToFront :: Type -> [SpecArg] -> Type
+moveSpecArgsToFront ty args = ravelFun $ fmap snd (specs ++ unspecs) ++ [t_res]
+  where
+    unraveled            = unravelFun ty
+    Just (t_args, t_res) = snocView unraveled
+    (specs, unspecs)     = partition (isSpecialized . fst)
+                         $ zip (args ++ repeat UnspecArg) t_args
+
+    ravelFun :: [Either TyVar Type] -> Type
+    ravelFun []             = pprPanic "ravelFun" $ empty
+    ravelFun [Right t]      = t
+    ravelFun [Left tv]      = pprPanic "ravelFun" $ ppr tv
+    ravelFun (Left tv : ts) = mkForAllTy tv Specified $ ravelFun ts
+    ravelFun (Right t : ts) = mkVisFunTy t $ ravelFun ts
+
 -- | Specialise a set of calls to imported bindings
 specImports :: DynFlags
             -> Module
@@ -1165,7 +1267,7 @@ type SpecInfo = ( [CoreRule]       -- Specialisation rules
 specCalls mb_mod env existing_rules calls_for_me fn rhs
         -- The first case is the interesting one
   |  rhs_tyvars `lengthIs`      n_tyvars -- Rhs of fn's defn has right number of big lambdas
-  && rhs_bndrs1 `lengthAtLeast` n_dicts -- and enough dict args
+  && rhs_dict_ids `lengthAtLeast` n_dicts -- and enough dict args
   && notNull calls_for_me               -- And there are some calls to specialise
   && not (isNeverActive (idInlineActivation fn))
         -- Don't specialise NOINLINE things
@@ -1193,7 +1295,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
     fn_type                 = idType fn
     fn_arity                = idArity fn
     fn_unf                  = realIdUnfolding fn  -- Ignore loop-breaker-ness here
-    (tyvars, theta, _)      = tcSplitSigmaTy fn_type
+    (tyvars, theta, _)      = tcSplitNestedSigmaTys fn_type
     n_tyvars                = length tyvars
     n_dicts                 = length theta
     inl_prag                = idInlinePragma fn
@@ -1205,10 +1307,8 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
 
     (rhs_bndrs, rhs_body)      = collectBindersPushingCo rhs
                                  -- See Note [Account for casts in binding]
-    (rhs_tyvars, rhs_bndrs1)   = span isTyVar rhs_bndrs
-    (rhs_dict_ids, rhs_bndrs2) = splitAt n_dicts rhs_bndrs1
-    body                       = mkLams rhs_bndrs2 rhs_body
-                                 -- Glue back on the non-dict lambdas
+    rhs_tyvars   = filter isTyVar rhs_bndrs
+    rhs_dict_ids = filter (isPredTy . idType) rhs_bndrs
 
     in_scope = CoreSubst.substInScope (se_subst env)
 
@@ -1220,14 +1320,17 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
          -- NB: we look both in the new_rules (generated by this invocation
          --     of specCalls), and in existing_rules (passed in to specCalls)
 
-    mk_ty_args :: [Maybe Type] -> [TyVar] -> [CoreExpr]
-    mk_ty_args [] poly_tvs
-      = ASSERT( null poly_tvs ) []
-    mk_ty_args (Nothing : call_ts) (poly_tv : poly_tvs)
-      = Type (mkTyVarTy poly_tv) : mk_ty_args call_ts poly_tvs
-    mk_ty_args (Just ty : call_ts) poly_tvs
-      = Type ty : mk_ty_args call_ts poly_tvs
-    mk_ty_args (Nothing : _) [] = panic "mk_ty_args"
+    mk_spec_args :: [SpecRuleArg] -> [CoreExpr] -> [CoreExpr]
+    mk_spec_args [] args
+      = ASSERT( null args ) []
+    mk_spec_args (SpecRuleDict _ _ : rule_args) (arg : args)
+      = arg : mk_spec_args rule_args args
+    mk_spec_args rule_args@(SpecRuleDict _ _ : _) [] =
+      pprPanic "mk_spec_args" $ ppr rule_args
+    mk_spec_args (SpecRuleType ty : rule_args) args
+      = ty : mk_spec_args rule_args args
+    mk_spec_args (SpecRuleArg ty : rule_args) args
+      = varToCoreExpr ty : mk_spec_args rule_args args
 
     ----------------------------------------------------------
         -- Specialise to one particular call pattern
@@ -1235,16 +1338,22 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
               -> CallInfo                         -- Call instance
               -> SpecM SpecInfo
     spec_call spec_acc@(rules_acc, pairs_acc, uds_acc)
-              (CI { ci_key = CallKey call_ts, ci_args = call_ds })
-      = ASSERT( call_ts `lengthIs` n_tyvars  && call_ds `lengthIs` n_dicts )
+              (CI { ci_key = call_args })
+      = let call_ts = getSpecTypes call_args
+            call_ds = getSpecDicts call_args
+        in
 
-        -- Suppose f's defn is  f = /\ a b c -> \ d1 d2 -> rhs
-        -- Suppose the call is for f [Just t1, Nothing, Just t3] [dx1, dx2]
+        ASSERT( call_ts `lengthIs` n_tyvars  && call_ds `lengthIs` n_dicts )
+
+        -- Suppose f's defn is  f = \x -> /\ a b c -> \ d1 d2 -> rhs
+        -- Suppose the call is for f [ UnspecArg, SpecType T1, UnspecType
+        --                           , SpecType T2, SpecDict dx1, SpecDict dx2]
 
         -- Construct the new binding
-        --      f1 = SUBST[a->t1,c->t3, d1->d1', d2->d2'] (/\ b -> rhs)
+        --      f1 = SUBST[a->T1,c->T2, d1->d1', d2->d2'] (\x -> /\ b -> rhs)
         -- PLUS the rule
-        --      RULE "SPEC f" forall b d1' d2'. f b d1' d2' = f1 b
+        --      RULE "SPEC f" forall x @b d1' d2'.
+        --          f x @T1 @b @T2 d1' d2' = f1 x @b
         --      In the rule, d1' and d2' are just wildcards, not used in the RHS
         -- PLUS the usage-details
         --      { d1' = dx1; d2' = dx2 }
@@ -1255,23 +1364,53 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
         -- This is convenient, but just slightly fragile.  Notably:
         --      * There had better be no name clashes in a/b/c
         do { let
-                -- poly_tyvars = [b] in the example above
-                -- spec_tyvars = [a,c]
-                -- ty_args     = [t1,b,t3]
-                spec_tv_binds = [(tv,ty) | (tv, Just ty) <- rhs_tyvars `zip` call_ts]
+                spec_tv_binds = [(tv,ty) | (tv, SpecType ty) <- rhs_bndrs `zip` call_args]
                 env1          = extendTvSubstList env spec_tv_binds
-                (rhs_env, poly_tyvars) = substBndrs env1
-                                            [tv | (tv, Nothing) <- rhs_tyvars `zip` call_ts]
 
-             -- Clone rhs_dicts, including instantiating their types
-           ; inst_dict_ids <- mapM (newDictBndr rhs_env) rhs_dict_ids
-           ; let (rhs_env2, dx_binds, spec_dict_args)
+           ; let
+                 -- Take only need enough etas to bind each of the specialised arguments
+                 necessary_etas   = reverse
+                                  . dropWhile (not . isSpecialized . snd)
+                                  . reverse
+                                  $ rhs_bndrs `zip` (call_args ++ repeat UnspecArg)
+                 body = mkLams (drop (length necessary_etas) rhs_bndrs) rhs_body
+
+           ; (poly_bndrs, rhs_env)
+               <- flip runStateT env1
+                          $ for necessary_etas $ \(bndr, arg) ->
+                    case arg of
+                      UnspecArg  -> pure $ SpecRuleArg bndr
+                      SpecType t -> pure $ SpecRuleType $ Type t
+                      UnspecType -> do
+                        env <- get
+                        let (env', bndr') = substBndr env bndr
+                        put env'
+                        pure $ SpecRuleArg bndr'
+                      SpecDict _ -> do
+                        env <- get
+                        -- Clone rhs_dicts, including instantiating their types
+                        inst_dict_id <- lift $ newDictBndr env bndr
+                        pure $ SpecRuleDict bndr inst_dict_id
+
+           ; let poly_tyvars =
+                  [ bndr | SpecRuleArg bndr <- poly_bndrs ]
+                 (rhs_dict_ids, inst_dict_ids) = unzip
+                  [ (bndr, inst_bndr) | SpecRuleDict bndr inst_bndr <- poly_bndrs ]
+
+                 (rhs_env2, dx_binds, spec_dict_args)
                             = bindAuxiliaryDicts rhs_env rhs_dict_ids call_ds inst_dict_ids
-                 ty_args    = mk_ty_args call_ts poly_tyvars
-                 ev_args    = map varToCoreExpr inst_dict_ids  -- ev_args, ev_bndrs:
-                 ev_bndrs   = exprsFreeIdsList ev_args         -- See Note [Evidence foralls]
-                 rule_args  = ty_args     ++ ev_args
-                 rule_bndrs = poly_tyvars ++ ev_bndrs
+
+                 rule_bndrs = flip concatMap poly_bndrs $ \case
+                   SpecRuleType _   -> []
+                   SpecRuleDict _ x -> exprFreeIdsList $ varToCoreExpr x
+                   SpecRuleArg x    -> [x]
+
+                 rule_args = flip map poly_bndrs $ \case
+                   SpecRuleType x   -> x
+                   SpecRuleDict _ x -> varToCoreExpr x
+                   SpecRuleArg x    -> varToCoreExpr x
+
+                 shuffled_ty = moveSpecArgsToFront fn_type call_args
 
            ; dflags <- getDynFlags
            ; if already_covered dflags rules_acc rule_args
@@ -1281,13 +1420,16 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   --                           , ppr dx_binds ]) $
                   do
            {    -- Figure out the type of the specialised function
-             let body_ty = applyTypeToArgs rhs fn_type rule_args
-                 (lam_args, app_args)           -- Add a dummy argument if body_ty is unlifted
+             let body_ty = applyTypeToArgs rhs shuffled_ty
+                         . fmap fst
+                         . filter (isOnlyOnLeftSide . snd)
+                         $ rule_args `zip` poly_bndrs
+                 (lam_extra_args, app_args)     -- Add a dummy argument if body_ty is unlifted
                    | isUnliftedType body_ty     -- C.f. WwLib.mkWorkerArgs
                    , not (isJoinId fn)
-                   = (poly_tyvars ++ [voidArgId], poly_tyvars ++ [voidPrimId])
-                   | otherwise = (poly_tyvars, poly_tyvars)
-                 spec_id_ty = mkLamTypes lam_args body_ty
+                   = ([voidArgId], poly_tyvars ++ [voidPrimId])
+                   | otherwise = ([], poly_tyvars)
+                 spec_id_ty = mkLamTypes lam_extra_args body_ty
                  join_arity_change = length app_args - length rule_args
                  spec_join_arity | Just orig_join_arity <- isJoinId_maybe fn
                                  = Just (orig_join_arity + join_arity_change)
@@ -1295,11 +1437,12 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                  = Nothing
 
            ; spec_f <- newSpecIdSM fn spec_id_ty spec_join_arity
-           ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams lam_args body)
+           ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams (poly_tyvars ++ lam_extra_args) body)
            ; this_mod <- getModule
            ; let
                 -- The rule to put in the function's specialisation is:
-                --      forall b, d1',d2'.  f t1 b t3 d1' d2' = f1 b
+                --      forall x @b d1' d2'.
+                --          f x @T1 @b @T2 d1' d2' = f1 x @b
                 herald = case mb_mod of
                            Nothing        -- Specialising local fn
                                -> text "SPEC"
@@ -1308,7 +1451,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
 
                 rule_name = mkFastString $ showSDoc dflags $
                             herald <+> ftext (occNameFS (getOccName fn))
-                                   <+> hsep (map ppr_call_key_ty call_ts)
+                                   <+> hsep (mapMaybe ppr_call_key_ty call_args)
                             -- This name ends up in interface files, so use occNameString.
                             -- Otherwise uniques end up there, making builds
                             -- less deterministic (See #4012 comment:61 ff)
@@ -1349,7 +1492,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                              arity_decrease fn_unf)
 
                 arity_decrease = length spec_dict_args
-                spec_app e = (e `mkApps` ty_args) `mkApps` spec_dict_args
+                spec_app e = e `mkApps` mk_spec_args poly_bndrs spec_dict_args
 
                 --------------------------------------
                 -- Adding arity information just propagates it a bit faster
@@ -1361,7 +1504,12 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                         `setIdUnfolding`  spec_unf
                                         `asJoinId_maybe`  spec_join_arity
 
-           ; return ( spec_rule                  : rules_acc
+                _rule_trace_doc = vcat [ ppr spec_f, ppr fn_type, ppr shuffled_ty
+                                       , ppr rhs_bndrs, ppr spec_tv_binds, ppr call_args
+                                       , ppr spec_rule ]
+
+           ; -- pprTrace "spec_call: rule" _rule_trace_doc
+             return ( spec_rule                  : rules_acc
                     , (spec_f_w_arity, spec_rhs) : pairs_acc
                     , spec_uds           `plusUDs` uds_acc
                     ) } }
@@ -1881,15 +2029,11 @@ data CallInfoSet = CIS Id (Bag CallInfo)
   -- These dups are eliminated by already_covered in specCalls
 
 data CallInfo
-  = CI { ci_key  :: CallKey     -- Type arguments
-       , ci_args :: [DictExpr]  -- Dictionary arguments
-       , ci_fvs  :: VarSet      -- Free vars of the ci_key and ci_args
+  = CI { ci_key  :: [SpecArg]   -- All arguments
+       , ci_fvs  :: VarSet      -- Free vars of the ci_key
                                 -- call (including tyvars)
                                 -- [*not* include the main id itself, of course]
     }
-
-newtype CallKey   = CallKey [Maybe Type]
-  -- Nothing => unconstrained type argument
 
 type DictExpr = CoreExpr
 
@@ -1904,16 +2048,15 @@ pprCallInfo :: Id -> CallInfo -> SDoc
 pprCallInfo fn (CI { ci_key = key })
   = ppr fn <+> ppr key
 
-ppr_call_key_ty :: Maybe Type -> SDoc
-ppr_call_key_ty Nothing   = char '_'
-ppr_call_key_ty (Just ty) = char '@' <+> pprParendType ty
-
-instance Outputable CallKey where
-  ppr (CallKey ts) = brackets (fsep (map ppr_call_key_ty ts))
+ppr_call_key_ty :: SpecArg -> Maybe SDoc
+ppr_call_key_ty (SpecType ty) = Just $ char '@' <+> pprParendType ty
+ppr_call_key_ty UnspecType    = Just $ char '_'
+ppr_call_key_ty (SpecDict _)  = Nothing
+ppr_call_key_ty UnspecArg     = Nothing
 
 instance Outputable CallInfo where
-  ppr (CI { ci_key = key, ci_args = args, ci_fvs = fvs })
-    = text "CI" <> braces (hsep [ ppr key, ppr args, ppr fvs ])
+  ppr (CI { ci_key = key, ci_fvs = fvs })
+    = text "CI" <> braces (hsep [ fsep (mapMaybe ppr_call_key_ty key), ppr fvs ])
 
 unionCalls :: CallDetails -> CallDetails -> CallDetails
 unionCalls c1 c2 = plusDVarEnv_C unionCallInfoSet c1 c2
@@ -1933,16 +2076,17 @@ callInfoFVs (CIS _ call_info) =
   foldrBag (\(CI { ci_fvs = fv }) vs -> unionVarSet fv vs) emptyVarSet call_info
 
 ------------------------------------------------------------
-singleCall :: Id -> [Maybe Type] -> [DictExpr] -> UsageDetails
-singleCall id tys dicts
+singleCall :: Id -> [SpecArg] -> UsageDetails
+singleCall id args
   = MkUD {ud_binds = emptyBag,
           ud_calls = unitDVarEnv id $ CIS id $
-                     unitBag (CI { ci_key = CallKey tys
-                                 , ci_args = dicts
+                     unitBag (CI { ci_key  = args -- used to be tys
                                  , ci_fvs  = call_fvs }) }
   where
+    tys      = getSpecTypes args
+    dicts    = getSpecDicts args
     call_fvs = exprsFreeVars dicts `unionVarSet` tys_fvs
-    tys_fvs  = tyCoVarsOfTypes (catMaybes tys)
+    tys_fvs  = tyCoVarsOfTypes tys
         -- The type args (tys) are guaranteed to be part of the dictionary
         -- types, because they are just the constrained types,
         -- and the dictionary is therefore sure to be bound
@@ -1975,27 +2119,34 @@ mkCallUDs' env f args
 
   | otherwise
   = -- pprTrace "mkCallUDs: keeping" _trace_doc
-    singleCall f spec_tys dicts
+    singleCall f ci_key
   where
     _trace_doc = vcat [ppr f, ppr args, ppr n_tyvars, ppr n_dicts
                       , ppr (map (interestingDict env) dicts)]
-    (tyvars, theta, _)      = tcSplitSigmaTy (idType f)
+    (tyvars, theta, _)      = tcSplitNestedSigmaTys (idType f)
     constrained_tyvars      = tyCoVarsOfTypes theta
     n_tyvars                = length tyvars
     n_dicts                 = length theta
+    f_structure             = unravelFun (idType f)
 
-    spec_tys = [mk_spec_ty tv ty | (tv, ty) <- tyvars `type_zip` args]
-    dicts    = [dict_expr | (_, dict_expr) <- theta `zip` (drop n_tyvars args)]
+    ci_key :: [SpecArg]
+    ci_key = fmap (\(t, a) ->
+      case t of
+        Left tyVar ->
+          if tyVar `elemVarSet` constrained_tyvars
+             then
+              case a of
+                Type ty -> SpecType ty
+                _ -> pprPanic "ci_key" $ ppr a
+             else UnspecType
+        Right ty ->
+          if isPredTy ty
+             then SpecDict a
+             else UnspecArg
+                ) $ zip f_structure args
 
-    -- ignores Coercion arguments
-    type_zip :: [TyVar] -> [CoreExpr] -> [(TyVar, Type)]
-    type_zip tvs      (Coercion _ : args) = type_zip tvs args
-    type_zip (tv:tvs) (Type ty : args)    = (tv, ty) : type_zip tvs args
-    type_zip _        _                   = []
-
-    mk_spec_ty tyvar ty
-        | tyvar `elemVarSet` constrained_tyvars = Just ty
-        | otherwise                             = Nothing
+    spec_tys = getSpecTypes ci_key
+    dicts    = getSpecDicts ci_key
 
     want_calls_for f = isLocalId f || isJust (maybeUnfoldingTemplate (realIdUnfolding f))
          -- For imported things, we gather call instances if
