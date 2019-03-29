@@ -1,0 +1,9 @@
+{-# LANGUAGE TopLevelKindSignatures #-}
+{-# LANGUAGE PolyKinds, ExplicitForAll #-}
+
+module TLKS_Fail009 where
+
+import Data.Kind (Type)
+
+type T :: forall k -> k -> Type
+data T (k :: Type -> Type) (a :: k)

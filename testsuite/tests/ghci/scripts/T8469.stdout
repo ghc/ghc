@@ -1,4 +1,6 @@
-data Int = GHC.Types.I# GHC.Prim.Int# 	-- Defined in ‘GHC.Types’
+type Int :: *
+data Int = GHC.Types.I# GHC.Prim.Int#
+  	-- Defined in ‘GHC.Types’
 instance Eq Int -- Defined in ‘GHC.Classes’
 instance Ord Int -- Defined in ‘GHC.Classes’
 instance Enum Int -- Defined in ‘GHC.Enum’

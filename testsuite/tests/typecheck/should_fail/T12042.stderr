@@ -5,5 +5,7 @@
 T12042.hs-boot:2:1: error:
     Type constructor ‘S’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: type S = R
-    Boot file:   data S
+    Main module: type S :: *
+                 type S = R
+    Boot file:   type S :: *
+                 data S
