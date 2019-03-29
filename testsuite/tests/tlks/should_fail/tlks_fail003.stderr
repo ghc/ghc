@@ -1,0 +1,4 @@
+
+tlks_fail003.hs:6:11: error:
+    Wildcard ‘_w’ not allowed
+      in the top-level kind signature for T

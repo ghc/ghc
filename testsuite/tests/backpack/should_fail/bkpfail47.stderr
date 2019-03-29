@@ -9,8 +9,10 @@ bkpfail47.bkp:9:9: error:
     • Type constructor ‘T’ has conflicting definitions in the module
       and its hsig file
       Main module: type role T representational nominal
+                   type T :: * -> * -> *
                    data T a b = MkT
       Hsig file:  type role T nominal representational
+                  type T :: * -> * -> *
                   data T a b
       The roles are not compatible:
       Main module: [representational, nominal]

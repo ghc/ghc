@@ -232,6 +232,7 @@ wantAmbiguityCheck ctxt
       GhciCtxt {}  -> False
       TySynCtxt {} -> False
       TypeAppCtxt  -> False
+      TopKindSigCtxt{} -> False
       _            -> True
 
 checkUserTypeError :: Type -> TcM ()
@@ -280,6 +281,10 @@ In a few places we do not want to check a user-specified type for ambiguity
      f @ty
   No need to check ty for ambiguity
 
+* TopKindSigCtxt: type T :: ksig
+  Kinds need a different ambiguity check than types, and the currently
+  implemented check is only good for types. See #14419, in particular
+  https://gitlab.haskell.org/ghc/ghc/issues/14419#note_160844
 
 ************************************************************************
 *                                                                      *
@@ -343,6 +348,7 @@ checkValidType ctxt ty
 
                  ExprSigCtxt    -> rank1
                  KindSigCtxt    -> rank1
+                 TopKindSigCtxt{} -> rank1
                  TypeAppCtxt | impred_flag -> ArbitraryRank
                              | otherwise   -> tyConArgMonoType
                     -- Normally, ImpredicativeTypes is handled in check_arg_type,
@@ -463,6 +469,7 @@ allConstraintsAllowed (TyVarBndrKindCtxt {}) = False
 allConstraintsAllowed (DataKindCtxt {})      = False
 allConstraintsAllowed (TySynKindCtxt {})     = False
 allConstraintsAllowed (TyFamResKindCtxt {})  = False
+allConstraintsAllowed (TopKindSigCtxt {})    = False
 allConstraintsAllowed _ = True
 
 -- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
@@ -482,6 +489,7 @@ allConstraintsAllowed _ = True
 vdqAllowed :: UserTypeCtxt -> Bool
 -- Currently allowed in the kinds of types...
 vdqAllowed (KindSigCtxt {}) = True
+vdqAllowed (TopKindSigCtxt {}) = True
 vdqAllowed (TySynCtxt {}) = True
 vdqAllowed (ThBrackCtxt {}) = True
 vdqAllowed (GhciCtxt {}) = True
@@ -1329,6 +1337,7 @@ okIPCtxt (TySynCtxt {})         = True   -- e.g.   type Blah = ?x::Int
                                          -- #11466
 
 okIPCtxt (KindSigCtxt {})       = False
+okIPCtxt (TopKindSigCtxt {})    = False
 okIPCtxt (ClassSCCtxt {})       = False
 okIPCtxt (InstDeclCtxt {})      = False
 okIPCtxt (SpecInstCtxt {})      = False

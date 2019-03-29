@@ -8,8 +8,10 @@
 bkpfail04.bkp:7:9: error:
     • Type constructor ‘A’ has conflicting definitions in the module
       and its hsig file
-      Main module: data A = A {foo :: Int}
-      Hsig file:  data A = A {bar :: Bool}
+      Main module: type A :: *
+                   data A = A {foo :: Int}
+      Hsig file:  type A :: *
+                  data A = A {bar :: Bool}
       The constructors do not match:
         The record label lists for ‘A’ differ
         The types for ‘A’ differ

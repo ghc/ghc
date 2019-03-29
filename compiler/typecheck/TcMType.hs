@@ -1417,7 +1417,8 @@ Note [Deterministic UniqFM] in UniqDFM.
 -}
 
 quantifyTyVars
-  :: TcTyCoVarSet     -- Global tvs; already zonked
+  :: HasCallStack
+  => TcTyCoVarSet     -- Global tvs; already zonked
   -> CandidatesQTvs   -- See Note [Dependent type variables]
                       -- Already zonked
   -> TcM [TcTyVar]
@@ -1506,11 +1507,10 @@ quantifyTyVars gbl_tvs
       = return Nothing   -- this can happen for a covar that's associated with
                          -- a coercion hole. Test case: typecheck/should_compile/T2494
 
-      | not (isTcTyVar tkv)  -- I don't think this can ever happen.
-                             -- Hence the assert
-      = ASSERT2( False, text "quantifying over a TyVar" <+> ppr tkv)
-        return (Just tkv)
-
+      | not (isTcTyVar tkv)
+      = return (Just tkv)  -- For associated types in a class with a TLKS, we
+                           -- have the class variables in scope, and they are
+                           -- TyVars not TcTyVars
       | otherwise
       = do { deflt_done <- defaultTyVar default_kind tkv
            ; case deflt_done of
