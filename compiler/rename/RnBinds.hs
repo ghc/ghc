@@ -20,7 +20,7 @@ module RnBinds (
    rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
 
    -- Other bindings
-   rnMethodBinds, renameSigs,
+   rnMethodBinds, renameSigs, renameTLKS,
    rnMatchGroup, rnGRHSs, rnGRHS, rnSrcFixityDecl,
    makeMiniFixityEnv, MiniFixityEnv,
    HsSigCtxt(..)
@@ -965,7 +965,7 @@ renameSig _ (IdSig _ x)
 renameSig ctxt sig@(TypeSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
-        ; (new_ty, fvs) <- rnHsSigWcType BindUnlessForall doc ty
+        ; (new_ty, fvs) <- rnHsSigWcType BindUnlessForall doc TypeLevel ty
         ; return (TypeSig noExtField new_vs new_ty, fvs) }
 
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
@@ -1044,7 +1044,24 @@ renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
       text "A COMPLETE pragma must mention at least one data constructor" $$
       text "or pattern synonym defined in the same module."
 
+renameSig _ TLKS{} = panic "renameSig: TLKS"  -- See Note [TLKS relocation]
 renameSig _ (XSig nec) = noExtCon nec
+
+renameTLKS :: NameSet -> TopKindSig GhcPs -> RnM (TopKindSig GhcRn, FreeVars)
+renameTLKS tc_names sig@(TopKindSig _ v ki)
+  = do  { tlks_ok <- xoptM LangExt.TopLevelKindSignatures
+        ; unless tlks_ok $ addErr tlksErr
+        ; new_v <- lookupSigOccRn (TopSigCtxt tc_names) (TLKS noExtField sig) v
+        ; let doc = TopKindSigCtx (ppr v)
+        ; (new_ki, fvs) <- rnHsSigWcType BindUnlessForall doc KindLevel ki
+        ; return (TopKindSig noExtField new_v new_ki, fvs)
+        }
+  where
+    tlksErr :: SDoc
+    tlksErr =
+      hang (text "Illegal top-level kind signature")
+         2 (text "Use -XTopLevelKindSignatures to enable this extension")
+renameTLKS _ (XTopKindSig nec) = noExtCon nec
 
 {-
 Note [Orphan COMPLETE pragmas]
@@ -1112,7 +1129,32 @@ okHsSig ctxt (L _ sig)
      (CompleteMatchSig {}, TopSigCtxt {} ) -> True
      (CompleteMatchSig {}, _)              -> False
 
+     (TLKS{}, _) -> panic "okHsSig: TLKS"   -- See Note [TLKS relocation]
      (XSig nec, _) -> noExtCon nec
+
+{- Note [TLKS relocation]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The parser puts all top-level declarations in a flat list of 'HsDecl GhcPs'
+(see 'topdecls' in Parser.y). At this stage of the pipeline, top-level kind signatures
+and normal type signatures are elements of the same list, represented as SigD:
+
+  SigD (TLKS (TopKindSig name ki))    -- a top-level kind signature
+  SigD (TypeSig names ty)             -- a type signature
+
+Then in 'findSplice' their paths diverge. 'findSplice' partitions the
+declarations into various fields of 'HsGroup':
+
+  * TLKSs are stored in 'hs_tyclds' inside the 'group_tlkss' field of TyClGroup
+  * TypeSigs are stored in 'hs_valds' inside the [LSig idR] field of ValBinds
+
+They are then renamed by different code:
+
+  * TLKSs are renamed by 'rnTLKSs'
+  * TypeSigs are renamed by 'renameSigs'
+
+This means that 'renameSigs' (and 'okHsSig') will never encounter a TLKS, so it
+is safe to 'panic' on them.
+-}
 
 -------------------
 findDupSigs :: [LSig GhcPs] -> [NonEmpty (Located RdrName, Sig GhcPs)]

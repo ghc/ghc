@@ -24,6 +24,7 @@ module IfaceType (
         IfaceForAllBndr, ArgFlag(..), AnonArgFlag(..),
         ForallVisFlag(..), ShowForAllFlag(..),
         mkIfaceForAllTvBndr,
+        mkIfaceTyConKind,
 
         ifForAllBndrVar, ifForAllBndrName, ifaceBndrName,
         ifTyConBinderVar, ifTyConBinderName,
@@ -35,6 +36,8 @@ module IfaceType (
         appArgsIfaceTypes, appArgsIfaceTypesArgFlags,
 
         -- Printing
+        SuppressBndrSig(..),
+        UseBndrParens(..),
         pprIfaceType, pprParendIfaceType, pprPrecIfaceType,
         pprIfaceContext, pprIfaceContextArr,
         pprIfaceIdBndr, pprIfaceLamBndr, pprIfaceTvBndr, pprIfaceTyConBinders,
@@ -106,6 +109,10 @@ ifaceBndrName :: IfaceBndr -> IfLclName
 ifaceBndrName (IfaceTvBndr bndr) = ifaceTvBndrName bndr
 ifaceBndrName (IfaceIdBndr bndr) = ifaceIdBndrName bndr
 
+ifaceBndrType :: IfaceBndr -> IfaceType
+ifaceBndrType (IfaceIdBndr (_, t)) = t
+ifaceBndrType (IfaceTvBndr (_, t)) = t
+
 type IfaceLamBndr = (IfaceBndr, IfaceOneShot)
 
 data IfaceOneShot    -- See Note [Preserve OneShotInfo] in CoreTicy
@@ -163,6 +170,15 @@ type IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag
 -- | Make an 'IfaceForAllBndr' from an 'IfaceTvBndr'.
 mkIfaceForAllTvBndr :: ArgFlag -> IfaceTvBndr -> IfaceForAllBndr
 mkIfaceForAllTvBndr vis var = Bndr (IfaceTvBndr var) vis
+
+-- | Build the 'tyConKind' from the binders and the result kind.
+-- Keep in sync with 'mkTyConKind' in types/TyCon.
+mkIfaceTyConKind :: [IfaceTyConBinder] -> IfaceKind -> IfaceKind
+mkIfaceTyConKind bndrs res_kind = foldr mk res_kind bndrs
+  where
+    mk :: IfaceTyConBinder -> IfaceKind -> IfaceKind
+    mk (Bndr tv (AnonTCB af))   k = IfaceFunTy af (ifaceBndrType tv) k
+    mk (Bndr tv (NamedTCB vis)) k = IfaceForAllTy (Bndr tv vis) k
 
 -- | Stores the arguments in a type application as a list.
 -- See @Note [Suppressing invisible arguments]@.
@@ -690,7 +706,8 @@ pprIfacePrefixApp ctxt_prec pp_fun pp_tys
 
 instance Outputable IfaceBndr where
     ppr (IfaceIdBndr bndr) = pprIfaceIdBndr bndr
-    ppr (IfaceTvBndr bndr) = char '@' <+> pprIfaceTvBndr False bndr
+    ppr (IfaceTvBndr bndr) = char '@' <+> pprIfaceTvBndr bndr (SuppressBndrSig False)
+                                                              (UseBndrParens False)
 
 pprIfaceBndrs :: [IfaceBndr] -> SDoc
 pprIfaceBndrs bs = sep (map ppr bs)
@@ -702,31 +719,35 @@ pprIfaceLamBndr (b, IfaceOneShot)   = ppr b <> text "[OneShot]"
 pprIfaceIdBndr :: IfaceIdBndr -> SDoc
 pprIfaceIdBndr (name, ty) = parens (ppr name <+> dcolon <+> ppr ty)
 
-pprIfaceTvBndr :: Bool -> IfaceTvBndr -> SDoc
-pprIfaceTvBndr use_parens (tv, ki)
+newtype SuppressBndrSig = SuppressBndrSig Bool
+newtype UseBndrParens = UseBndrParens Bool
+
+pprIfaceTvBndr :: IfaceTvBndr -> SuppressBndrSig -> UseBndrParens -> SDoc
+pprIfaceTvBndr (tv, ki) (SuppressBndrSig suppress_sig) (UseBndrParens use_parens)
+  | suppress_sig             = ppr tv
   | isIfaceLiftedTypeKind ki = ppr tv
   | otherwise                = maybe_parens (ppr tv <+> dcolon <+> ppr ki)
   where
     maybe_parens | use_parens = parens
                  | otherwise  = id
 
-pprIfaceTyConBinders :: [IfaceTyConBinder] -> SDoc
-pprIfaceTyConBinders = sep . map go
+pprIfaceTyConBinders :: SuppressBndrSig -> [IfaceTyConBinder] -> SDoc
+pprIfaceTyConBinders suppress_sig = sep . map go
   where
     go :: IfaceTyConBinder -> SDoc
     go (Bndr (IfaceIdBndr bndr) _) = pprIfaceIdBndr bndr
     go (Bndr (IfaceTvBndr bndr) vis) =
       -- See Note [Pretty-printing invisible arguments]
       case vis of
-        AnonTCB  VisArg    -> ppr_bndr True
-        AnonTCB  InvisArg  -> char '@' <> braces (ppr_bndr False)
+        AnonTCB  VisArg    -> ppr_bndr (UseBndrParens True)
+        AnonTCB  InvisArg  -> char '@' <> braces (ppr_bndr (UseBndrParens False))
           -- The above case is rare. (See Note [AnonTCB InvisArg] in TyCon.)
           -- Should we print these differently?
-        NamedTCB Required  -> ppr_bndr True
-        NamedTCB Specified -> char '@' <> ppr_bndr True
-        NamedTCB Inferred  -> char '@' <> braces (ppr_bndr False)
+        NamedTCB Required  -> ppr_bndr (UseBndrParens True)
+        NamedTCB Specified -> char '@' <> ppr_bndr (UseBndrParens True)
+        NamedTCB Inferred  -> char '@' <> braces (ppr_bndr (UseBndrParens False))
       where
-        ppr_bndr use_parens = pprIfaceTvBndr use_parens bndr
+        ppr_bndr = pprIfaceTvBndr bndr suppress_sig
 
 instance Binary IfaceBndr where
     put_ bh (IfaceIdBndr aa) = do
@@ -1048,9 +1069,9 @@ pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
 pprIfaceForAllBndr (Bndr (IfaceTvBndr tv) Inferred)
   = sdocWithDynFlags $ \dflags ->
                           if gopt Opt_PrintExplicitForalls dflags
-                          then braces $ pprIfaceTvBndr False tv
-                          else pprIfaceTvBndr True tv
-pprIfaceForAllBndr (Bndr (IfaceTvBndr tv) _)  = pprIfaceTvBndr True tv
+                          then braces $ pprIfaceTvBndr tv (SuppressBndrSig False) (UseBndrParens False)
+                          else pprIfaceTvBndr tv (SuppressBndrSig False) (UseBndrParens True)
+pprIfaceForAllBndr (Bndr (IfaceTvBndr tv) _)  = pprIfaceTvBndr tv (SuppressBndrSig False) (UseBndrParens True)
 pprIfaceForAllBndr (Bndr (IfaceIdBndr idv) _) = pprIfaceIdBndr idv
 
 pprIfaceForAllCoBndr :: (IfLclName, IfaceCoercion) -> SDoc

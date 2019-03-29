@@ -175,6 +175,12 @@ cvtDec (TH.SigD nm typ)
         ; returnJustL $ Hs.SigD noExtField
                                     (TypeSig noExtField [nm'] (mkLHsSigWcType ty')) }
 
+cvtDec (TH.KiSigD nm ki)
+  = do  { nm' <- tconNameL nm
+        ; ki' <- cvtType ki
+        ; let sig' = TopKindSig noExtField nm' (mkLHsSigWcType ki')
+        ; returnJustL $ Hs.SigD noExtField (TLKS noExtField sig') }
+
 cvtDec (TH.InfixD fx nm)
   -- Fixity signatures are allowed for variables, constructors, and types
   -- the renamer automatically looks for types during renaming, even when

@@ -69,6 +69,10 @@ import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList, notNull, unzipWith )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
+import TysWiredIn ( constraintKindTyConName )
+
+import DynFlags (xopt)
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import System.IO.Unsafe
@@ -730,6 +734,14 @@ pprClassRoles ss clas binders roles =
              binders
              roles
 
+pprClassTLKS :: ShowSub -> IfaceTopBndr -> IfaceKind -> SDoc
+pprClassTLKS ss clas =
+  pprTLKS (pprPrefixIfDeclBndr (ss_how_much ss) (occName clas))
+
+classResKind :: IfaceKind
+classResKind =
+  IfaceTyConApp (IfaceTyCon constraintKindTyConName (IfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
+
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
 --     See Note [Pretty-printing TyThings] in PprTyThing
@@ -741,10 +753,12 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                              ifBinders = binders })
 
   | gadt      = vcat [ pp_roles
+                     , pp_tlks
                      , pp_nd <+> pp_lhs <+> pp_kind <+> pp_where
                      , nest 2 (vcat pp_cons)
                      , nest 2 $ ppShowIface ss pp_extra ]
   | otherwise = vcat [ pp_roles
+                     , pp_tlks
                      , hang (pp_nd <+> pp_lhs) 2 (add_bars pp_cons)
                      , nest 2 $ ppShowIface ss pp_extra ]
   where
@@ -759,9 +773,13 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     cons       = visibleIfConDecls condecls
     pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
-    pp_kind
-      | isIfaceLiftedTypeKind kind = empty
-      | otherwise = dcolon <+> ppr kind
+    pp_kind    =
+      sdocWithDynFlags $ \dflags ->
+        ppUnless (xopt LangExt.TopLevelKindSignatures dflags
+                    -- With -XTopLevelKindSignatures enabled, we print the full TLKS
+                    -- which obsoletes the inline result kind signature.
+                  || isIfaceLiftedTypeKind kind)
+                 (dcolon <+> ppr kind)
 
     pp_lhs = case parent of
                IfNoParent -> pprIfaceDeclHead context ss tycon binders Nothing
@@ -771,13 +789,13 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
 
     pp_roles
       | is_data_instance = empty
-      | otherwise        = pprRoles (== Representational)
-                                    (pprPrefixIfDeclBndr
-                                        (ss_how_much ss)
-                                        (occName tycon))
-                                    binders roles
+      | otherwise        = pprRoles (== Representational) name_doc binders roles
             -- Don't display roles for data family instances (yet)
             -- See discussion on #8672.
+
+    pp_tlks = pprTLKS name_doc (mkIfaceTyConKind binders kind)
+
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tycon)
 
     add_bars []     = Outputable.empty
     add_bars (c:cs) = sep ((equals <+> c) : map (vbar <+>) cs)
@@ -801,6 +819,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
                             , ifBinders = binders
                             , ifBody = IfAbstractClass })
   = vcat [ pprClassRoles ss clas binders roles
+         , pprClassTLKS ss clas (mkIfaceTyConKind binders classResKind)
          , text "class" <+> pprIfaceDeclHead [] ss clas binders Nothing
                                 <+> pprFundeps fds ]
 
@@ -815,6 +834,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
                                 ifMinDef = minDef
                               }})
   = vcat [ pprClassRoles ss clas binders roles
+         , pprClassTLKS ss clas (mkIfaceTyConKind binders classResKind)
          , text "class" <+> pprIfaceDeclHead context ss clas binders Nothing
                                 <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
@@ -846,27 +866,36 @@ pprIfaceDecl ss (IfaceSynonym { ifName    = tc
                               , ifBinders = binders
                               , ifSynRhs  = mono_ty
                               , ifResKind = res_kind})
-  = hang (text "type" <+> pprIfaceDeclHead [] ss tc binders Nothing <+> equals)
-       2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau
-              , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
+  = vcat [ pprTLKS name_doc (mkIfaceTyConKind binders res_kind)
+         , hang (text "type" <+> pprIfaceDeclHead [] ss tc binders Nothing <+> equals)
+           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau
+                  , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
+         ]
   where
     (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tc)
 
 pprIfaceDecl ss (IfaceFamily { ifName = tycon
                              , ifFamFlav = rhs, ifBinders = binders
                              , ifResKind = res_kind
                              , ifResVar = res_var, ifFamInj = inj })
   | IfaceDataFamilyTyCon <- rhs
-  = text "data family" <+> pprIfaceDeclHead [] ss tycon binders Nothing
+  = vcat [ pprTLKS name_doc (mkIfaceTyConKind binders res_kind)
+         , text "data family" <+> pprIfaceDeclHead [] ss tycon binders Nothing
+         ]
 
   | otherwise
-  = hang (text "type family"
-            <+> pprIfaceDeclHead [] ss tycon binders (Just res_kind)
-            <+> ppShowRhs ss (pp_where rhs))
-       2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
-    $$
-    nest 2 (ppShowRhs ss (pp_branches rhs))
+  = vcat [ pprTLKS name_doc (mkIfaceTyConKind binders res_kind)
+         , hang (text "type family"
+                   <+> pprIfaceDeclHead [] ss tycon binders (Just res_kind)
+                   <+> ppShowRhs ss (pp_where rhs))
+              2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
+           $$
+           nest 2 (ppShowRhs ss (pp_branches rhs))
+         ]
   where
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tycon)
+
     pp_where (IfaceClosedSynFamilyTyCon {}) = text "where"
     pp_where _                              = empty
 
@@ -948,6 +977,15 @@ pprRoles suppress_if tyCon bndrs roles
       in ppUnless (all suppress_if froles || null froles) $
          text "type role" <+> tyCon <+> hsep (map ppr froles)
 
+pprTLKS
+  :: SDoc
+  -> IfaceType
+  -> SDoc
+pprTLKS tyCon ty =
+  sdocWithDynFlags $ \dflags ->
+    ppWhen (xopt LangExt.TopLevelKindSignatures dflags) $
+    text "type" <+> tyCon <+> text "::" <+> ppr ty
+
 pprInfixIfDeclBndr :: ShowHowMuch -> OccName -> SDoc
 pprInfixIfDeclBndr (ShowSome _ (AltPpr (Just ppr_bndr))) name
   = pprInfixVar (isSymOcc name) (ppr_bndr name)
@@ -1006,8 +1044,15 @@ pprIfaceDeclHead context ss tc_occ bndrs m_res_kind
   = sdocWithDynFlags $ \ dflags ->
     sep [ pprIfaceContextArr context
         , pprPrefixIfDeclBndr (ss_how_much ss) (occName tc_occ)
-          <+> pprIfaceTyConBinders (suppressIfaceInvisibles dflags bndrs bndrs)
+          <+> pprIfaceTyConBinders
+                (suppress_bndr_sig dflags)
+                (suppressIfaceInvisibles dflags bndrs bndrs)
         , maybe empty (\res_kind -> dcolon <+> pprIfaceType res_kind) m_res_kind ]
+  where
+    suppress_bndr_sig dflags = SuppressBndrSig $
+      -- With -XTopLevelKindSignatures enabled, we print the full TLKS
+      -- which obsoletes individual inline binder signatures.
+      xopt LangExt.TopLevelKindSignatures dflags
 
 pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceTopBndr
