@@ -195,6 +195,8 @@ both of them.  So we gather defs/uses from deriving just like anything else.
 data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
                              -- ^ The data tycon for normal datatypes,
                              -- or the *representation* tycon for data families
+                           , di_scoped_tvs :: ![(Name,TyVar)]
+                             -- ^ Variables that scope over the deriving clause.
                            , di_clauses :: [LHsDerivingClause GhcRn]
                            , di_ctxt    :: SDoc -- ^ error context
                            }
@@ -493,8 +495,10 @@ makeDerivSpecs :: Bool
                -> TcM [EarlyDerivSpec]
 makeDerivSpecs is_boot deriv_infos deriv_decls
   = do  { eqns1 <- sequenceA
-                     [ deriveClause rep_tc dcs preds err_ctxt
-                     | DerivInfo { di_rep_tc = rep_tc, di_clauses = clauses
+                     [ deriveClause rep_tc scoped_tvs dcs preds err_ctxt
+                     | DerivInfo { di_rep_tc = rep_tc
+                                 , di_scoped_tvs = scoped_tvs
+                                 , di_clauses = clauses
                                  , di_ctxt = err_ctxt } <- deriv_infos
                      , L _ (HsDerivingClause { deriv_clause_strategy = dcs
                                              , deriv_clause_tys = L _ preds })
@@ -515,17 +519,21 @@ makeDerivSpecs is_boot deriv_infos deriv_decls
 
 ------------------------------------------------------------------
 -- | Process the derived classes in a single @deriving@ clause.
-deriveClause :: TyCon -> Maybe (LDerivStrategy GhcRn)
+deriveClause :: TyCon
+             -> [(Name, TcTyVar)]  -- Scoped type variables taken from tcTyConScopedTyVars
+                                   -- See Note [Scoped tyvars in a TcTyCon] in types/TyCon
+             -> Maybe (LDerivStrategy GhcRn)
              -> [LHsSigType GhcRn] -> SDoc
              -> TcM [EarlyDerivSpec]
-deriveClause rep_tc mb_lderiv_strat deriv_preds err_ctxt
+deriveClause rep_tc scoped_tvs mb_lderiv_strat deriv_preds err_ctxt
   = addErrCtxt err_ctxt $ do
       traceTc "deriveClause" $ vcat
         [ text "tvs"             <+> ppr tvs
+        , text "scoped_tvs"      <+> ppr scoped_tvs
         , text "tc"              <+> ppr tc
         , text "tys"             <+> ppr tys
         , text "mb_lderiv_strat" <+> ppr mb_lderiv_strat ]
-      tcExtendTyVarEnv tvs $ do
+      tcExtendNameTyVarEnv scoped_tvs $ do
         (mb_lderiv_strat', via_tvs) <- tcDerivStrategy mb_lderiv_strat
         tcExtendTyVarEnv via_tvs $
         -- Moreover, when using DerivingVia one can bind type variables in

@@ -70,8 +70,9 @@ import Control.Arrow ( first )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Data.Maybe ( isNothing, isJust, fromMaybe )
+import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
+import Data.Function ( on )
 
 {- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.
@@ -370,7 +371,7 @@ rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeVars)
 rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
   = do { topEnv :: HscEnv <- getTopEnv
        ; name' <- lookupLocatedTopBndrRn name
-       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) ty
+       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
 
         -- Mark any PackageTarget style imports as coming from the current package
        ; let unitId = thisPackage $ hsc_dflags topEnv
@@ -382,7 +383,7 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
 
 rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
   = do { name' <- lookupLocatedOccRn name
-       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) ty
+       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
        ; return (ForeignExport { fd_e_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
                                , fd_fe = spec }
@@ -607,7 +608,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_overlap_mode = oflag
                            , cid_datafam_insts = adts })
   = do { (inst_ty', inst_fvs)
-           <- rnHsSigType (GenericCtx $ text "an instance declaration") inst_ty
+           <- rnHsSigType (GenericCtx $ text "an instance declaration") TypeLevel inst_ty
        ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
        ; cls <-
            case hsTyGetAppHead_maybe head_ty' of
@@ -1288,17 +1289,17 @@ rnTyClDecls :: [TyClGroup GhcPs]
 -- Rename the declarations and do dependency analysis on them
 rnTyClDecls tycl_ds
   = do { -- Rename the type/class, instance, and role declaraations
-         tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl)
-                             (tyClGroupTyClDecls tycl_ds)
+       ; tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
        ; let tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
-
+       ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names (tyClGroupKindSigs tycl_ds)
        ; instds_w_fvs <- mapM (wrapLocFstM rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
        ; role_annots  <- rnRoleAnnots tc_names (tyClGroupRoleDecls tycl_ds)
 
        -- Do SCC analysis on the type/class decls
        ; rdr_env <- getGlobalRdrEnv
-       ; let tycl_sccs = depAnalTyClDecls rdr_env tycls_w_fvs
+       ; let tycl_sccs = depAnalTyClDecls rdr_env kisig_fv_env tycls_w_fvs
              role_annot_env = mkRoleAnnotEnv role_annots
+             (kisig_env, kisig_fv_env) = mkKindSig_fv_env kisigs_w_fvs
 
              inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
              (init_inst_ds, rest_inst_ds) = getInsts [] inst_ds_map
@@ -1307,15 +1308,16 @@ rnTyClDecls tycl_ds
                | null init_inst_ds = []
                | otherwise = [TyClGroup { group_ext    = noExtField
                                         , group_tyclds = []
+                                        , group_kisigs = []
                                         , group_roles  = []
                                         , group_instds = init_inst_ds }]
 
              (final_inst_ds, groups)
-                = mapAccumL (mk_group role_annot_env) rest_inst_ds tycl_sccs
+                = mapAccumL (mk_group role_annot_env kisig_env) rest_inst_ds tycl_sccs
 
-
-             all_fvs = plusFV (foldr (plusFV . snd) emptyFVs tycls_w_fvs)
-                              (foldr (plusFV . snd) emptyFVs instds_w_fvs)
+             all_fvs = foldr (plusFV . snd) emptyFVs tycls_w_fvs  `plusFV`
+                       foldr (plusFV . snd) emptyFVs instds_w_fvs `plusFV`
+                       foldr (plusFV . snd) emptyFVs kisigs_w_fvs
 
              all_groups = first_group ++ groups
 
@@ -1326,32 +1328,91 @@ rnTyClDecls tycl_ds
        ; return (all_groups, all_fvs) }
   where
     mk_group :: RoleAnnotEnv
+             -> KindSigEnv
              -> InstDeclFreeVarsMap
              -> SCC (LTyClDecl GhcRn)
              -> (InstDeclFreeVarsMap, TyClGroup GhcRn)
-    mk_group role_env inst_map scc
+    mk_group role_env kisig_env inst_map scc
       = (inst_map', group)
       where
         tycl_ds              = flattenSCC scc
         bndrs                = map (tcdName . unLoc) tycl_ds
         roles                = getRoleAnnots bndrs role_env
+        kisigs               = getKindSigs   bndrs kisig_env
         (inst_ds, inst_map') = getInsts      bndrs inst_map
         group = TyClGroup { group_ext    = noExtField
                           , group_tyclds = tycl_ds
+                          , group_kisigs = kisigs
                           , group_roles  = roles
                           , group_instds = inst_ds }
 
+-- | Free variables of standalone kind signatures.
+newtype KindSig_FV_Env = KindSig_FV_Env (NameEnv FreeVars)
+
+lookupKindSig_FV_Env :: KindSig_FV_Env -> Name -> FreeVars
+lookupKindSig_FV_Env (KindSig_FV_Env e) name
+  = fromMaybe emptyFVs (lookupNameEnv e name)
+
+-- | Standalone kind signatures.
+type KindSigEnv = NameEnv (LStandaloneKindSig GhcRn)
+
+mkKindSig_fv_env :: [(LStandaloneKindSig GhcRn, FreeVars)] -> (KindSigEnv, KindSig_FV_Env)
+mkKindSig_fv_env kisigs_w_fvs = (kisig_env, kisig_fv_env)
+  where
+    kisig_env = mapNameEnv fst compound_env
+    kisig_fv_env = KindSig_FV_Env (mapNameEnv snd compound_env)
+    compound_env :: NameEnv (LStandaloneKindSig GhcRn, FreeVars)
+      = mkNameEnvWith (standaloneKindSigName . unLoc . fst) kisigs_w_fvs
+
+getKindSigs :: [Name] -> KindSigEnv -> [LStandaloneKindSig GhcRn]
+getKindSigs bndrs kisig_env = mapMaybe (lookupNameEnv kisig_env) bndrs
+
+rnStandaloneKindSignatures
+  :: NameSet  -- names of types and classes in the current TyClGroup
+  -> [LStandaloneKindSig GhcPs]
+  -> RnM [(LStandaloneKindSig GhcRn, FreeVars)]
+rnStandaloneKindSignatures tc_names kisigs
+  = do { let (no_dups, dup_kisigs) = removeDups (compare `on` get_name) kisigs
+             get_name = standaloneKindSigName . unLoc
+       ; mapM_ dupKindSig_Err dup_kisigs
+       ; mapM (wrapLocFstM (rnStandaloneKindSignature tc_names)) no_dups
+       }
+
+rnStandaloneKindSignature
+  :: NameSet  -- names of types and classes in the current TyClGroup
+  -> StandaloneKindSig GhcPs
+  -> RnM (StandaloneKindSig GhcRn, FreeVars)
+rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
+  = do  { standalone_ki_sig_ok <- xoptM LangExt.StandaloneKindSignatures
+        ; unless standalone_ki_sig_ok $ addErr standaloneKiSigErr
+        ; new_v <- lookupSigCtxtOccRn (TopSigCtxt tc_names) (text "standalone kind signature") v
+        ; let doc = StandaloneKindSigCtx (ppr v)
+        ; (new_ki, fvs) <- rnHsSigType doc KindLevel ki
+        ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
+        }
+  where
+    standaloneKiSigErr :: SDoc
+    standaloneKiSigErr =
+      hang (text "Illegal standalone kind signature")
+         2 (text "Did you mean to enable StandaloneKindSignatures?")
+rnStandaloneKindSignature _ (XStandaloneKindSig nec) = noExtCon nec
 
 depAnalTyClDecls :: GlobalRdrEnv
+                 -> KindSig_FV_Env
                  -> [(LTyClDecl GhcRn, FreeVars)]
                  -> [SCC (LTyClDecl GhcRn)]
 -- See Note [Dependency analysis of type, class, and instance decls]
-depAnalTyClDecls rdr_env ds_w_fvs
+depAnalTyClDecls rdr_env kisig_fv_env ds_w_fvs
   = stronglyConnCompFromEdgedVerticesUniq edges
   where
     edges :: [ Node Name (LTyClDecl GhcRn) ]
-    edges = [ DigraphNode d (tcdName (unLoc d)) (map (getParent rdr_env) (nonDetEltsUniqSet fvs))
-            | (d, fvs) <- ds_w_fvs ]
+    edges = [ DigraphNode d name (map (getParent rdr_env) (nonDetEltsUniqSet deps))
+            | (d, fvs) <- ds_w_fvs,
+              let { name = tcdName (unLoc d)
+                  ; kisig_fvs = lookupKindSig_FV_Env kisig_fv_env name
+                  ; deps = fvs `plusFV` kisig_fvs
+                  }
+            ]
             -- It's OK to use nonDetEltsUFM here as
             -- stronglyConnCompFromEdgedVertices is still deterministic
             -- even if the edges are in nondeterministic order as explained
@@ -1391,9 +1452,8 @@ rnRoleAnnots :: NameSet
 rnRoleAnnots tc_names role_annots
   = do {  -- Check for duplicates *before* renaming, to avoid
           -- lumping together all the unboundNames
-         let (no_dups, dup_annots) = removeDups role_annots_cmp role_annots
-             role_annots_cmp (dL->L _ annot1) (dL->L _ annot2)
-               = roleAnnotDeclName annot1 `compare` roleAnnotDeclName annot2
+         let (no_dups, dup_annots) = removeDups (compare `on` get_name) role_annots
+             get_name = roleAnnotDeclName . unLoc
        ; mapM_ dupRoleAnnotErr dup_annots
        ; mapM (wrapLocM rn_role_annot1) no_dups }
   where
@@ -1421,6 +1481,20 @@ dupRoleAnnotErr list
 
       cmp_annot (dL->L loc1 _) (dL->L loc2 _) = loc1 `compare` loc2
 
+dupKindSig_Err :: NonEmpty (LStandaloneKindSig GhcPs) -> RnM ()
+dupKindSig_Err list
+  = addErrAt loc $
+    hang (text "Duplicate standalone kind signatures for" <+>
+          quotes (ppr $ standaloneKindSigName first_decl) <> colon)
+       2 (vcat $ map pp_kisig $ NE.toList sorted_list)
+    where
+      sorted_list = NE.sortBy cmp_loc list
+      ((dL->L loc first_decl) :| _) = sorted_list
+
+      pp_kisig (dL->L loc decl) =
+        hang (ppr decl) 4 (text "-- written at" <+> ppr loc)
+
+      cmp_loc (dL->L loc1 _) (dL->L loc2 _) = loc1 `compare` loc2
 
 {- Note [Role annotations in the renamer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1495,12 +1569,11 @@ getInsts bndrs inst_decl_map
 rnTyClDecl :: TyClDecl GhcPs
            -> RnM (TyClDecl GhcRn, FreeVars)
 
--- All flavours of type family declarations ("type family", "newtype family",
--- and "data family"), both top level and (for an associated type)
--- in a class decl
-rnTyClDecl (FamDecl { tcdFam = decl })
-  = do { (decl', fvs) <- rnFamDecl Nothing decl
-       ; return (FamDecl noExtField decl', fvs) }
+-- All flavours of top-level type family declarations ("type family", "newtype
+-- family", and "data family")
+rnTyClDecl (FamDecl { tcdFam = fam })
+  = do { (fam', fvs) <- rnFamDecl Nothing fam
+       ; return (FamDecl noExtField fam', fvs) }
 
 rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
                       tcdFixity = fixity, tcdRhs = rhs })
@@ -1515,9 +1588,7 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
                          , tcdRhs = rhs', tcdSExt = fvs }, fvs) } }
 
 -- "data", "newtype" declarations
--- both top level and (for an associated type) in an instance decl
-rnTyClDecl (DataDecl _ _ _ _ (XHsDataDefn _)) =
-  panic "rnTyClDecl: DataDecl with XHsDataDefn"
+rnTyClDecl (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
 rnTyClDecl (DataDecl
     { tcdLName = tycon, tcdTyVars = tyvars,
       tcdFixity = fixity,
@@ -1529,8 +1600,7 @@ rnTyClDecl (DataDecl
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
     do { (defn', fvs) <- rnDataDefn doc defn
-       ; cusk <- dataDeclHasCUSK
-           tyvars' new_or_data no_rhs_kvs (isJust kind_sig)
+       ; cusk <- data_decl_has_cusk tyvars' new_or_data no_rhs_kvs kind_sig
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
                                   , tcdFVs      = fvs }
        ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr no_rhs_kvs)
@@ -1608,19 +1678,17 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 rnTyClDecl (XTyClDecl nec) = noExtCon nec
 
 -- Does the data type declaration include a CUSK?
-dataDeclHasCUSK :: LHsQTyVars pass -> NewOrData -> Bool -> Bool -> RnM Bool
-dataDeclHasCUSK tyvars new_or_data no_rhs_kvs has_kind_sig = do
+data_decl_has_cusk :: LHsQTyVars pass -> NewOrData -> Bool -> Maybe (LHsKind pass') -> RnM Bool
+data_decl_has_cusk tyvars new_or_data no_rhs_kvs kind_sig = do
   { -- See Note [Unlifted Newtypes and CUSKs], and for a broader
     -- picture, see Note [Implementation of UnliftedNewtypes].
   ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
   ; let non_cusk_newtype
           | NewType <- new_or_data =
-              unlifted_newtypes && not has_kind_sig
+              unlifted_newtypes && isNothing kind_sig
           | otherwise = False
     -- See Note [CUSKs: complete user-supplied kind signatures] in GHC.Hs.Decls
-  ; cusks_enabled <- xoptM LangExt.CUSKs
-  ; return $ cusks_enabled && hsTvbAllKinded tyvars &&
-             no_rhs_kvs && not non_cusk_newtype
+  ; return $ hsTvbAllKinded tyvars && no_rhs_kvs && not non_cusk_newtype
   }
 
 {- Note [Unlifted Newtypes and CUSKs]
@@ -1724,7 +1792,7 @@ rnLHsDerivingClause doc
                               , deriv_clause_strategy = dcs
                               , deriv_clause_tys = (dL->L loc' dct) }))
   = do { (dcs', dct', fvs)
-           <- rnLDerivStrategy doc dcs $ mapFvRn (rnHsSigType doc) dct
+           <- rnLDerivStrategy doc dcs $ mapFvRn (rnHsSigType doc TypeLevel) dct
        ; warnNoDerivStrat dcs' loc
        ; pure ( cL loc (HsDerivingClause { deriv_clause_ext = noExtField
                                          , deriv_clause_strategy = dcs'
@@ -1766,7 +1834,7 @@ rnLDerivStrategy doc mds thing_inside
         AnyclassStrategy -> boring_case AnyclassStrategy
         NewtypeStrategy  -> boring_case NewtypeStrategy
         ViaStrategy via_ty ->
-          do (via_ty', fvs1) <- rnHsSigType doc via_ty
+          do (via_ty', fvs1) <- rnHsSigType doc TypeLevel via_ty
              let HsIB { hsib_ext  = via_imp_tvs
                       , hsib_body = via_body } = via_ty'
                  (via_exp_tv_bndrs, _, _) = splitLHsSigmaTy via_body
@@ -2249,6 +2317,11 @@ add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD _ d) ds
 -- Signatures: fixity sigs go a different place than all others
 add gp@(HsGroup {hs_fixds = ts}) l (SigD _ (FixSig _ f)) ds
   = addl (gp {hs_fixds = cL l f : ts}) ds
+
+-- Standalone kind signatures: added to the TyClGroup
+add gp@(HsGroup {hs_tyclds = ts}) l (KindSigD _ s) ds
+  = addl (gp {hs_tyclds = add_kisig (cL l s) ts}) ds
+
 add gp@(HsGroup {hs_valds = ts}) l (SigD _ d) ds
   = addl (gp {hs_valds = add_sig (cL l d) ts}) ds
 
@@ -2289,6 +2362,7 @@ add_tycld :: LTyClDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
           -> [TyClGroup (GhcPass p)]
 add_tycld d []       = [TyClGroup { group_ext    = noExtField
                                   , group_tyclds = [d]
+                                  , group_kisigs = []
                                   , group_roles  = []
                                   , group_instds = []
                                   }
@@ -2301,6 +2375,7 @@ add_instd :: LInstDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
           -> [TyClGroup (GhcPass p)]
 add_instd d []       = [TyClGroup { group_ext    = noExtField
                                   , group_tyclds = []
+                                  , group_kisigs = []
                                   , group_roles  = []
                                   , group_instds = [d]
                                   }
@@ -2313,6 +2388,7 @@ add_role_annot :: LRoleAnnotDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
                -> [TyClGroup (GhcPass p)]
 add_role_annot d [] = [TyClGroup { group_ext    = noExtField
                                  , group_tyclds = []
+                                 , group_kisigs = []
                                  , group_roles  = [d]
                                  , group_instds = []
                                  }
@@ -2320,6 +2396,19 @@ add_role_annot d [] = [TyClGroup { group_ext    = noExtField
 add_role_annot d (tycls@(TyClGroup { group_roles = roles }) : rest)
   = tycls { group_roles = d : roles } : rest
 add_role_annot _ (XTyClGroup nec: _) = noExtCon nec
+
+add_kisig :: LStandaloneKindSig (GhcPass p)
+         -> [TyClGroup (GhcPass p)] -> [TyClGroup (GhcPass p)]
+add_kisig d [] = [TyClGroup { group_ext    = noExtField
+                            , group_tyclds = []
+                            , group_kisigs = [d]
+                            , group_roles  = []
+                            , group_instds = []
+                            }
+                 ]
+add_kisig d (tycls@(TyClGroup { group_kisigs = kisigs }) : rest)
+  = tycls { group_kisigs = d : kisigs } : rest
+add_kisig _ (XTyClGroup nec : _) = noExtCon nec
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
 add_bind b (ValBinds x bs sigs) = ValBinds x (bs `snocBag` b) sigs

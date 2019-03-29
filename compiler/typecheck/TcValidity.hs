@@ -232,6 +232,7 @@ wantAmbiguityCheck ctxt
       GhciCtxt {}  -> False
       TySynCtxt {} -> False
       TypeAppCtxt  -> False
+      StandaloneKindSigCtxt{} -> False
       _            -> True
 
 checkUserTypeError :: Type -> TcM ()
@@ -280,6 +281,10 @@ In a few places we do not want to check a user-specified type for ambiguity
      f @ty
   No need to check ty for ambiguity
 
+* StandaloneKindSigCtxt: type T :: ksig
+  Kinds need a different ambiguity check than types, and the currently
+  implemented check is only good for types. See #14419, in particular
+  https://gitlab.haskell.org/ghc/ghc/issues/14419#note_160844
 
 ************************************************************************
 *                                                                      *
@@ -343,6 +348,7 @@ checkValidType ctxt ty
 
                  ExprSigCtxt    -> rank1
                  KindSigCtxt    -> rank1
+                 StandaloneKindSigCtxt{} -> rank1
                  TypeAppCtxt | impred_flag -> ArbitraryRank
                              | otherwise   -> tyConArgMonoType
                     -- Normally, ImpredicativeTypes is handled in check_arg_type,
@@ -463,6 +469,7 @@ allConstraintsAllowed (TyVarBndrKindCtxt {}) = False
 allConstraintsAllowed (DataKindCtxt {})      = False
 allConstraintsAllowed (TySynKindCtxt {})     = False
 allConstraintsAllowed (TyFamResKindCtxt {})  = False
+allConstraintsAllowed (StandaloneKindSigCtxt {}) = False
 allConstraintsAllowed _ = True
 
 -- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
@@ -482,6 +489,7 @@ allConstraintsAllowed _ = True
 vdqAllowed :: UserTypeCtxt -> Bool
 -- Currently allowed in the kinds of types...
 vdqAllowed (KindSigCtxt {}) = True
+vdqAllowed (StandaloneKindSigCtxt {}) = True
 vdqAllowed (TySynCtxt {}) = True
 vdqAllowed (ThBrackCtxt {}) = True
 vdqAllowed (GhciCtxt {}) = True
@@ -1329,6 +1337,7 @@ okIPCtxt (TySynCtxt {})         = True   -- e.g.   type Blah = ?x::Int
                                          -- #11466
 
 okIPCtxt (KindSigCtxt {})       = False
+okIPCtxt (StandaloneKindSigCtxt {}) = False
 okIPCtxt (ClassSCCtxt {})       = False
 okIPCtxt (InstDeclCtxt {})      = False
 okIPCtxt (SpecInstCtxt {})      = False
@@ -2149,7 +2158,7 @@ checkFamPatBinders fam_tc qtvs pats rhs
          --    data T            = MkT (forall (a::k). blah)
          --    data family D Int = MkD (forall (a::k). blah)
          -- In both cases, 'k' is not bound on the LHS, but is used on the RHS
-         -- We catch the former in kcLHsQTyVars, and the latter right here
+         -- We catch the former in kcDeclHeader, and the latter right here
          -- See Note [Check type-family instance binders]
        ; check_tvs bad_rhs_tvs (text "mentioned in the RHS")
                                (text "bound on the LHS of")
