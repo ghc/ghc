@@ -182,8 +182,12 @@ instance H.Builder Builder where
             win <- windowsHost
             touchyPath <- programPath (vanillaContext Stage0 touchy)
             unlitPath  <- builderPath Unlit
-            ghcdeps <- ghcDeps stage
             ghcgens <- generatedGhcDependencies stage
+
+            -- GHC from the previous stage is used to build artifacts in the
+            -- current stage. Need the previous stage's GHC deps.
+            ghcdeps <- ghcDeps (pred stage)
+
             return $ [ unlitPath ]
                   ++ ghcdeps
                   ++ ghcgens
