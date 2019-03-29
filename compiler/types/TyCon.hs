@@ -100,6 +100,7 @@ module TyCon(
         tyConRuntimeRepInfo,
         tyConBinders, tyConResKind, tyConTyVarBinders,
         tcTyConScopedTyVars, tcTyConIsPoly,
+        tcTyConHeaderKiVars,
         mkTyConTagMap,
 
         -- ** Manipulating TyCons
@@ -907,6 +908,9 @@ data TyCon
           -- ^ Scoped tyvars over the tycon's body
           -- See Note [Scoped tyvars in a TcTyCon]
 
+        tcTyConHeaderKiVars :: [(Name,TyVar)],
+          -- See Note [Header kind variables in a TcTyCon]
+
         tcTyConIsPoly     :: Bool, -- ^ Is this TcTyCon already generalized?
 
         tcTyConFlavour :: TyConFlavour
@@ -928,6 +932,40 @@ where
    * tyConArity = length required_tvs
 
 See also Note [How TcTyCons work] in TcTyClsDecls
+-}
+
+
+{- Note [Header kind variables in a TcTyCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the presence of a TLKS, kind variables in inline kind annotations are
+meta-variables that stand for other types:
+
+  type P :: Symbol -> Type
+  data P (a :: k1) :: k2 = ...   -- k1 ~ Symbol, k2 ~ Type
+
+This is done by analogy with term-level pattern variables in terms:
+
+  f :: Int -> Bool
+  f (a :: t1) :: t2 = ...   -- t1 ~ Int, t2 ~ Bool
+                            -- See GHC Proposals #29, #51
+
+We save this mapping in the TcTyCon in the 'tcTyConHeaderKiVars' field. These
+meta-variables are all filled-in (that is, all of them are Indirect, none of
+them are Flexi):
+
+  -- pseudo-code for the header variables of 'P' (defined above)
+  tcTyConHeaderKiVars =
+    [ ("k1", MetaTv { mtv_ref = Indirect (TyConApp "Symbol" []) })
+    , ("k2", MetaTv { mtv_ref = Indirect (TyConApp "Type"   []) }) ]
+
+In other words, while in practice we store [(Name, TcTyVar)],
+                    morally it ought to be [(Name, TcType)].
+
+Why store TcTyVar instead of TcType? Out of convenience: we use these
+tcTyConHeaderKiVars to extend the environment via tcExtendNameTyVarEnv, and the
+environment can be only extended with variables, not types.
+
+These variables are eliminated during zonking and don't make it to Core.
 -}
 
 -- | Represents right-hand-sides of 'TyCon's for algebraic types
@@ -1661,10 +1699,12 @@ mkTcTyCon :: Name
           -> Kind                -- ^ /result/ kind only
           -> [(Name,TcTyVar)]    -- ^ Scoped type variables;
                                  -- see Note [How TcTyCons work] in TcTyClsDecls
+          -> [(Name,TcTyVar)]    -- ^ Header kind variables;
+                                 -- see Note [Header kind variables in a TcTyCon]
           -> Bool                -- ^ Is this TcTyCon generalised already?
           -> TyConFlavour        -- ^ What sort of 'TyCon' this represents
           -> TyCon
-mkTcTyCon name binders res_kind scoped_tvs poly flav
+mkTcTyCon name binders res_kind scoped_tvs header_kvs poly flav
   = TcTyCon { tyConUnique  = getUnique name
             , tyConName    = name
             , tyConTyVars  = binderVars binders
@@ -1673,6 +1713,7 @@ mkTcTyCon name binders res_kind scoped_tvs poly flav
             , tyConKind    = mkTyConKind binders res_kind
             , tyConArity   = length binders
             , tcTyConScopedTyVars = scoped_tvs
+            , tcTyConHeaderKiVars = header_kvs
             , tcTyConIsPoly       = poly
             , tcTyConFlavour      = flav }
 

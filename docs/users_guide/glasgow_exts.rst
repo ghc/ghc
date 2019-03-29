@@ -9139,6 +9139,9 @@ Complete user-supplied kind signatures and polymorphic recursion
 
     :since: 8.10.1
 
+NB! This is a legacy feature, see :extension:`TopLevelKindSignatures` for the
+modern replacement.
+
 Just as in type inference, kind inference for recursive types can only
 use *monomorphic* recursion. Consider this (contrived) example: ::
 
@@ -9252,11 +9255,121 @@ According to the rules above ``X`` has a CUSK. Yet, the kind of ``k`` is undeter
 It is thus quantified over, giving ``X`` the kind ``forall k1 (k :: k1). Proxy k -> Type``.
 
 The detection of CUSKs is enabled by the :extension:`CUSKs` flag, which is
-switched on by default. When :extension:`CUSKs` is switched off, there is
-currently no way to enable polymorphic recursion in types. In the future, the
-notion of a CUSK will be replaced by top-level kind signatures
-(`GHC Proposal #36 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0036-kind-signatures.rst>`__),
-then, after a transition period, this extension will be turned off by default, and eventually removed.
+switched on by default. This extension is scheduled for deprecation to be
+replaced with :extension:`TopLevelKindSignatures`.
+
+.. index::
+   single: TLKS
+   single: top-level kind signature
+
+.. _top-level-kind-signatures:
+
+Top-level kind signatures and polymorphic recursion
+---------------------------------------------------
+
+.. extension:: TopLevelKindSignatures
+    :shortdesc: Allow the use of top-level kind signatures.
+
+    :implies: :extension:`NoCUSKs`
+    :since: 8.10.1
+
+Just as in type inference, kind inference for recursive types can only
+use *monomorphic* recursion. Consider this (contrived) example: ::
+
+    data T m a = MkT (m a) (T Maybe (m a))
+    -- GHC infers kind  T :: (Type -> Type) -> Type -> Type
+
+The recursive use of ``T`` forced the second argument to have kind
+``Type``. However, just as in type inference, you can achieve polymorphic
+recursion by giving a *top-level kind signature* (or TLKS)
+for ``T``: ::
+
+    type T :: (k -> Type) -> k -> Type
+    data T m a = MkT (m a) (T Maybe (m a))
+
+The top-level kind signature specifies the polymorphic kind
+for ``T``, and this signature is used for all the calls to ``T``
+including the recursive ones. In particular, the recursive use of ``T``
+is at kind ``Type``.
+
+Note that while a top-level kind signature determines the kind of a type
+constructor, it does not determine its arity. This is of particular importance
+for type families and type synonyms, as they cannot be partially applied. See
+type-family-declarations_ for more information about arity.
+
+Top-level kind signatures and declaration headers
+-------------------------------------------------
+
+GHC requires that in the presence of a top-level kind signature, data
+declarations must bind all their inputs. For example: ::
+
+    type Prox1 :: k -> Type
+    data Prox1 a = MkProx1
+      -- OK.
+
+    type Prox2 :: k -> Type
+    data Prox2 = MkProx2
+      -- Error:
+      --   • Expected a type, but found something with kind ‘k -> Type’
+      --   • In the data type declaration for ‘Prox2’
+
+
+GADT-style data declarations may either bind their inputs or use an inline
+signature in addition to the top-level kind signature: ::
+
+    type GProx1 :: k -> Type
+    data GProx1 a where MkGProx1 :: GProx1 a
+      -- OK.
+
+    type GProx2 :: k -> Type
+    data GProx2 where MkGProx2 :: GProx2 a
+      -- Error:
+      --   • Expected a type, but found something with kind ‘k -> Type’
+      --   • In the data type declaration for ‘GProx2’
+
+    type GProx3 :: k -> Type
+    data GProx3 :: k -> Type where MkGProx3 :: GProx3 a
+      -- OK.
+
+    type GProx4 :: k -> Type
+    data GProx4 :: w where MkGProx4 :: GProx4 a
+      -- OK, w ~ (k -> Type)
+
+Classes are subject to the same rules: ::
+
+    type C1 :: Type -> Constraint
+    class C1 a
+      -- OK.
+
+    type C2 :: Type -> Constraint
+    class C2
+      -- Error:
+      --   • Couldn't match expected kind ‘Constraint’
+      --                 with actual kind ‘Type -> Constraint’
+      --   • In the class declaration for ‘C2’
+
+On the other hand, type families are exempt from this rule: ::
+
+    type T :: Type -> Type
+    type family T
+      -- OK.
+
+Data families are tricky territory. Their headers are exempt from this rule,
+but their instances are not: ::
+
+    type T :: Type -> Type
+    data family T
+      -- OK.
+
+    data instance T Int = MkT1
+      -- OK.
+
+    data instance T = MkT2
+      -- Error:
+      --   • Expecting one more argument to ‘T’
+      --     Expected a type, but ‘T’ has kind ‘Type -> Type’
+      --   • In the data instance declaration for ‘T’
+
 
 Kind inference in closed type families
 --------------------------------------

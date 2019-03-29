@@ -93,7 +93,7 @@ module TysWiredIn (
         -- * Kinds
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
         isLiftedTypeKindTyConName, liftedTypeKind, constraintKind,
-        liftedTypeKindTyCon, constraintKindTyCon,
+        liftedTypeKindTyCon, constraintKindTyCon,  constraintKindTyConName,
         liftedTypeKindTyConName,
 
         -- * Equality predicates
@@ -405,6 +405,7 @@ makeRecoveryTyCon tc
   = mkTcTyCon (tyConName tc)
               bndrs res_kind
               []               -- No scoped vars
+              []               -- No header vars
               True             -- Fully generalised
               flavour          -- Keep old flavour
   where
