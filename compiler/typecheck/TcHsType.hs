@@ -37,6 +37,7 @@ module TcHsType (
         -- Kind-checking types
         -- No kind generalisation, no checkValidType
         kcLHsQTyVars,
+        kcLHsQTyVars_Cusk,
         tcNamedWildCardBinders,
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
@@ -206,7 +207,7 @@ tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType skol_info names sig_ty
   = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
-    snd <$> tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
+    snd <$> tc_hs_sig_type typeLevelMode skol_info sig_ty (TheKind liftedTypeKind)
        -- Do not zonk-to-Type, nor perform a validity check
        -- We are in a knot with the class and associated types
        -- Zonking and validity checking is done by tcClassDecl
@@ -229,9 +230,10 @@ tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 tcHsSigType ctxt sig_ty
   = addSigCtxt ctxt (hsSigType sig_ty) $
     do { traceTc "tcHsSigType {" (ppr sig_ty)
+       ; traceTc "mode =" (ppr mode)
 
           -- Generalise here: see Note [Kind generalisation]
-       ; (insol, ty) <- tc_hs_sig_type skol_info sig_ty
+       ; (insol, ty) <- tc_hs_sig_type mode skol_info sig_ty
                                        (expectedKindInCtxt ctxt)
        ; ty <- zonkTcType ty
 
@@ -242,9 +244,12 @@ tcHsSigType ctxt sig_ty
        ; traceTc "end tcHsSigType }" (ppr ty)
        ; return ty }
   where
+    mode = case ctxt of
+      TopKindSigCtxt{} -> kindLevelMode
+      _ -> typeLevelMode
     skol_info = SigTypeSkol ctxt
 
-tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
+tc_hs_sig_type :: TcTyMode -> SkolemInfo -> LHsSigType GhcRn
                -> ContextKind -> TcM (Bool, TcType)
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
@@ -253,14 +258,14 @@ tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 -- No validity checking or zonking
 -- Returns also a Bool indicating whether the type induced an insoluble constraint;
 -- True <=> constraint is insoluble
-tc_hs_sig_type skol_info hs_sig_type ctxt_kind
+tc_hs_sig_type mode skol_info hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { (tc_lvl, (wanted, (spec_tkvs, ty)))
               <- pushTcLevelM                           $
                  solveLocalEqualitiesX "tc_hs_sig_type" $
                  bindImplicitTKBndrs_Skol sig_vars      $
                  do { kind <- newExpectedKind ctxt_kind
-                    ; tc_lhs_type typeLevelMode hs_ty kind }
+                    ; tc_lhs_type mode hs_ty kind }
        -- Any remaining variables (unsolved in the solveLocalEqualities)
        -- should be in the global tyvars, and therefore won't be quantified
 
@@ -272,7 +277,7 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
 
        ; return (insolubleWC wanted, mkInvForAllTys kvs ty1) }
 
-tc_hs_sig_type _ (XHsImplicitBndrs nec) _ = noExtCon nec
+tc_hs_sig_type _ _ (XHsImplicitBndrs nec) _ = noExtCon nec
 
 tcTopLHsType :: LHsSigType GhcRn -> ContextKind -> TcM Type
 -- tcTopLHsType is used for kind-checking top-level HsType where
@@ -1759,7 +1764,6 @@ It has two cases:
    partial type signature), so we infer the type and generalise.
 -}
 
-
 ------------------------------
 -- | Kind-check a 'LHsQTyVars'. If the decl under consideration has a complete,
 -- user-supplied kind signature (CUSK), generalise the result.
@@ -2195,11 +2199,12 @@ bindTyClTyVars :: Name
 -- but not in the initial-kind run.
 bindTyClTyVars tycon_name thing_inside
   = do { tycon <- kcLookupTcTyCon tycon_name
-       ; let scoped_prs = tcTyConScopedTyVars tycon
+       ; let header_prs = tcTyConHeaderKiVars tycon
+             scoped_prs = tcTyConScopedTyVars tycon
              res_kind   = tyConResKind tycon
              binders    = tyConBinders tycon
-       ; traceTc "bindTyClTyVars" (ppr tycon_name <+> ppr binders $$ ppr scoped_prs)
-       ; tcExtendNameTyVarEnv scoped_prs $
+       ; traceTc "bindTyClTyVars" (ppr tycon_name <+> ppr binders $$ ppr header_prs $$ ppr scoped_prs)
+       ; tcExtendNameTyVarEnv (header_prs ++ scoped_prs) $
          thing_inside binders res_kind }
 
 -- getInitialKind has made a suitably-shaped kind for the type or class

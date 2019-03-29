@@ -945,6 +945,7 @@ instance TH.Quasi TcM where
   qLookupName       = lookupName
   qReify            = reify
   qReifyFixity nm   = lookupThName nm >>= reifyFixity
+  qReifyKiSig       = reifyKiSig
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
   qReifyAnnotations = reifyAnnotations
@@ -1210,6 +1211,7 @@ handleTHMessage msg = case msg of
   LookupName b str -> wrapTHResult $ TH.qLookupName b str
   Reify n -> wrapTHResult $ TH.qReify n
   ReifyFixity n -> wrapTHResult $ TH.qReifyFixity n
+  ReifyKiSig n -> wrapTHResult $ TH.qReifyKiSig n
   ReifyInstances n ts -> wrapTHResult $ TH.qReifyInstances n ts
   ReifyRoles n -> wrapTHResult $ TH.qReifyRoles n
   ReifyAnnotations lookup tyrep ->
@@ -2014,6 +2016,16 @@ reifyDecidedStrictness :: DataCon.HsImplBang -> TH.DecidedStrictness
 reifyDecidedStrictness HsLazy     = TH.DecidedLazy
 reifyDecidedStrictness HsStrict   = TH.DecidedStrict
 reifyDecidedStrictness HsUnpack{} = TH.DecidedUnpack
+
+------------------------------
+reifyKiSig :: TH.Name -> TcM (Maybe TH.Kind)
+reifyKiSig th_name =
+  do { thing <- getThing th_name
+     ; case thing of
+         -- TODO (int-index): check if tyConKind has any MetaTvs and report Nothing (#10541)
+         AGlobal (ATyCon tc) -> Just <$> reifyKind (tyConKind tc)
+         _ -> failWithTc (text "No kind  associated with" <+> (ppr thing))
+     }
 
 ------------------------------
 lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget

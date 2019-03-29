@@ -46,6 +46,19 @@ Language
     type T = Just (Nothing :: Maybe a)         -- no longer accepted
     type T = Just Nothing :: Maybe (Maybe a)   -- still accepted
 
+- A new extension :extension:`TopLevelKindSignatures` allows one to explicitly
+  specify the kind of a type constructor, as proposed in `GHC proposal #36
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0036-kind-signatures.rst>`__: ::
+
+    type TypeRep :: forall k. k -> Type
+    data TypeRep a where
+      TyInt   :: TypeRep Int
+      TyMaybe :: TypeRep Maybe
+      TyApp   :: TypeRep a -> TypeRep b -> TypeRep (a b)
+
+  Analogous to function type signatures, a top-level kind signature enables
+  polymorphic recursion.  This feature is a replacement for :extension:`CUSKs`.
+
 - GHC now parses visible, dependent quantifiers (as proposed in
   `GHC proposal 35
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0035-forall-arrow.rst>`__),
@@ -89,7 +102,7 @@ Language
   around what kinds of types can appear inside of the data constructor
   for a `newtype`. This was proposed in
   `GHC proposal #13 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`__.
-             
+
 Compiler
 ~~~~~~~~
 

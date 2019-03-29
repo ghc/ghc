@@ -77,6 +77,7 @@ class (MonadIO m, Fail.MonadFail m) => Quasi m where
   qReify          :: Name -> m Info
   qReifyFixity    :: Name -> m (Maybe Fixity)
   qReifyInstances :: Name -> [Type] -> m [Dec]
+  qReifyKiSig     :: Name -> m (Maybe Kind)
        -- Is (n tys) an instance?
        -- Returns list of matching instance Decs
        --    (with empty sub-Decs)
@@ -132,6 +133,7 @@ instance Quasi IO where
   qLookupName _ _       = badIO "lookupName"
   qReify _              = badIO "reify"
   qReifyFixity _        = badIO "reifyFixity"
+  qReifyKiSig _         = badIO "reifyKiSig"
   qReifyInstances _ _   = badIO "reifyInstances"
   qReifyRoles _         = badIO "reifyRoles"
   qReifyAnnotations _   = badIO "reifyAnnotations"
@@ -429,6 +431,9 @@ example, if the function @foo@ has the fixity declaration @infixr 7 foo@, then
 reifyFixity :: Name -> Q (Maybe Fixity)
 reifyFixity nm = Q (qReifyFixity nm)
 
+reifyKiSig :: Name -> Q (Maybe Kind)
+reifyKiSig nm = Q (qReifyKiSig nm)
+
 {- | @reifyInstances nm tys@ returns a list of visible instances of @nm tys@. That is,
 if @nm@ is the name of a type class, then all instances of this class at the types @tys@
 are returned. Alternatively, if @nm@ is the name of a data family or type family,
@@ -620,6 +625,7 @@ instance Quasi Q where
   qRecover            = recover
   qReify              = reify
   qReifyFixity        = reifyFixity
+  qReifyKiSig         = reifyKiSig
   qReifyInstances     = reifyInstances
   qReifyRoles         = reifyRoles
   qReifyAnnotations   = reifyAnnotations
@@ -2018,6 +2024,7 @@ data Dec
                                   -- ^ @{ instance {\-\# OVERLAPS \#-\}
                                   --        Show w => Show [w] where ds }@
   | SigD Name Type                -- ^ @{ length :: [a] -> Int }@
+  | KiSigD Name Kind              -- ^ @{ type TypeRep :: k -> Type }@
   | ForeignD Foreign              -- ^ @{ foreign import ... }
                                   --{ foreign export ... }@
 

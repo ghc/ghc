@@ -195,6 +195,7 @@ both of them.  So we gather defs/uses from deriving just like anything else.
 data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
                              -- ^ The data tycon for normal datatypes,
                              -- or the *representation* tycon for data families
+                           , di_extra_tvs :: ![(Name,TyVar)]
                            , di_clauses :: [LHsDerivingClause GhcRn]
                            , di_ctxt    :: SDoc -- ^ error context
                            }
@@ -493,8 +494,11 @@ makeDerivSpecs :: Bool
                -> TcM [EarlyDerivSpec]
 makeDerivSpecs is_boot deriv_infos deriv_decls
   = do  { eqns1 <- sequenceA
-                     [ deriveClause rep_tc dcs preds err_ctxt
-                     | DerivInfo { di_rep_tc = rep_tc, di_clauses = clauses
+                     [ tcExtendNameTyVarEnv extra_tvs $
+                       deriveClause rep_tc dcs preds err_ctxt
+                     | DerivInfo { di_rep_tc = rep_tc
+                                 , di_clauses = clauses
+                                 , di_extra_tvs = extra_tvs
                                  , di_ctxt = err_ctxt } <- deriv_infos
                      , L _ (HsDerivingClause { deriv_clause_strategy = dcs
                                              , deriv_clause_tys = L _ preds })

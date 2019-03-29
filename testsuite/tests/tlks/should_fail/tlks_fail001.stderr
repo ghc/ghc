@@ -1,0 +1,4 @@
+
+tlks_fail001.hs:7:1: error:
+    Illegal top-level kind signature.
+      Use -XTopLevelKindSignatures to enable this extension

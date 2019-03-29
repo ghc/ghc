@@ -100,6 +100,7 @@ module TyCon(
         tyConRuntimeRepInfo,
         tyConBinders, tyConResKind, tyConTyVarBinders,
         tcTyConScopedTyVars, tcTyConIsPoly,
+        tcTyConHeaderKiVars,
         mkTyConTagMap,
 
         -- ** Manipulating TyCons
@@ -907,6 +908,8 @@ data TyCon
           -- ^ Scoped tyvars over the tycon's body
           -- See Note [Scoped tyvars in a TcTyCon]
 
+        tcTyConHeaderKiVars :: [(Name,TyVar)],
+
         tcTyConIsPoly     :: Bool, -- ^ Is this TcTyCon already generalized?
 
         tcTyConFlavour :: TyConFlavour
@@ -1673,6 +1676,7 @@ mkTcTyCon name binders res_kind scoped_tvs poly flav
             , tyConKind    = mkTyConKind binders res_kind
             , tyConArity   = length binders
             , tcTyConScopedTyVars = scoped_tvs
+            , tcTyConHeaderKiVars = []
             , tcTyConIsPoly       = poly
             , tcTyConFlavour      = flav }
 

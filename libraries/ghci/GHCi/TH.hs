@@ -183,6 +183,7 @@ instance TH.Quasi GHCiQ where
   qLookupName isType occ = ghcCmd (LookupName isType occ)
   qReify name = ghcCmd (Reify name)
   qReifyFixity name = ghcCmd (ReifyFixity name)
+  qReifyKiSig name = ghcCmd (ReifyKiSig name)
   qReifyInstances name tys = ghcCmd (ReifyInstances name tys)
   qReifyRoles name = ghcCmd (ReifyRoles name)
 

@@ -20,7 +20,7 @@ module RnBinds (
    rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
 
    -- Other bindings
-   rnMethodBinds, renameSigs,
+   rnMethodBinds, renameSigs, renameTLKS,
    rnMatchGroup, rnGRHSs, rnGRHS, rnSrcFixityDecl,
    makeMiniFixityEnv, MiniFixityEnv,
    HsSigCtxt(..)
@@ -964,7 +964,8 @@ renameSig _ (IdSig _ x)
 renameSig ctxt sig@(TypeSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
-        ; (new_ty, fvs) <- rnHsSigWcType BindUnlessForall doc ty
+              lvl = TypeLevel
+        ; (new_ty, fvs) <- rnHsSigWcType BindUnlessForall doc lvl ty
         ; return (TypeSig noExtField new_vs new_ty, fvs) }
 
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
@@ -1043,7 +1044,25 @@ renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
       text "A COMPLETE pragma must mention at least one data constructor" $$
       text "or pattern synonym defined in the same module."
 
+renameSig _ TLKS{} = panic "renameSig: TLKS"
 renameSig _ (XSig nec) = noExtCon nec
+
+renameTLKS :: NameSet -> TopKindSig GhcPs -> RnM (TopKindSig GhcRn, FreeVars)
+renameTLKS tc_names sig@(TopKindSig _ v ki)
+  = do  { tlks_ok <- xoptM LangExt.TopLevelKindSignatures
+        ; unless tlks_ok $ addErr tlksErr
+        ; new_v <- lookupSigOccRn (TopSigCtxt tc_names) (TLKS noExtField sig) v
+        ; let doc = TopKindSigCtx (ppr v)
+              lvl = KindLevel
+        ; (new_ki, fvs) <- rnHsSigWcType BindUnlessForall doc lvl ki
+        ; return (TopKindSig noExtField new_v new_ki, fvs)
+        }
+  where
+    tlksErr :: SDoc
+    tlksErr =
+      hang (text "Illegal top-level kind signature.")
+         2 (text "Use -XTopLevelKindSignatures to enable this extension")
+renameTLKS _ (XTopKindSig nec) = noExtCon nec
 
 {-
 Note [Orphan COMPLETE pragmas]
@@ -1111,6 +1130,7 @@ okHsSig ctxt (L _ sig)
      (CompleteMatchSig {}, TopSigCtxt {} ) -> True
      (CompleteMatchSig {}, _)              -> False
 
+     (TLKS{}, _) -> panic "okHsSig: TLKS"
      (XSig nec, _) -> noExtCon nec
 
 -------------------

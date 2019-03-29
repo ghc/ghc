@@ -24,6 +24,7 @@ module IfaceType (
         IfaceForAllBndr, ArgFlag(..), AnonArgFlag(..),
         ForallVisFlag(..), ShowForAllFlag(..),
         mkIfaceForAllTvBndr,
+        mkIfaceTyConKind,
 
         ifForAllBndrVar, ifForAllBndrName, ifaceBndrName,
         ifTyConBinderVar, ifTyConBinderName,
@@ -106,6 +107,10 @@ ifaceBndrName :: IfaceBndr -> IfLclName
 ifaceBndrName (IfaceTvBndr bndr) = ifaceTvBndrName bndr
 ifaceBndrName (IfaceIdBndr bndr) = ifaceIdBndrName bndr
 
+ifaceBndrType :: IfaceBndr -> IfaceType
+ifaceBndrType (IfaceIdBndr (_, t)) = t
+ifaceBndrType (IfaceTvBndr (_, t)) = t
+
 type IfaceLamBndr = (IfaceBndr, IfaceOneShot)
 
 data IfaceOneShot    -- See Note [Preserve OneShotInfo] in CoreTicy
@@ -163,6 +168,13 @@ type IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag
 -- | Make an 'IfaceForAllBndr' from an 'IfaceTvBndr'.
 mkIfaceForAllTvBndr :: ArgFlag -> IfaceTvBndr -> IfaceForAllBndr
 mkIfaceForAllTvBndr vis var = Bndr (IfaceTvBndr var) vis
+
+mkIfaceTyConKind :: [IfaceTyConBinder] -> IfaceKind -> IfaceKind
+mkIfaceTyConKind bndrs res_kind = foldr mk res_kind bndrs
+  where
+    mk :: IfaceTyConBinder -> IfaceKind -> IfaceKind
+    mk (Bndr tv (AnonTCB af))   k = IfaceFunTy af (ifaceBndrType tv) k
+    mk (Bndr tv (NamedTCB vis)) k = IfaceForAllTy (Bndr tv vis) k
 
 -- | Stores the arguments in a type application as a list.
 -- See @Note [Suppressing invisible arguments]@.

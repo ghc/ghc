@@ -242,6 +242,7 @@ data THMessage a where
   LookupName :: Bool -> String -> THMessage (THResult (Maybe TH.Name))
   Reify :: TH.Name -> THMessage (THResult TH.Info)
   ReifyFixity :: TH.Name -> THMessage (THResult (Maybe TH.Fixity))
+  ReifyKiSig :: TH.Name -> THMessage (THResult (Maybe TH.Kind))
   ReifyInstances :: TH.Name -> [TH.Type] -> THMessage (THResult [TH.Dec])
   ReifyRoles :: TH.Name -> THMessage (THResult [TH.Role])
   ReifyAnnotations :: TH.AnnLookup -> TypeRep
@@ -295,7 +296,9 @@ getTHMessage = do
     18 -> return (THMsg RunTHDone)
     19 -> THMsg <$> AddModFinalizer <$> get
     20 -> THMsg <$> (AddForeignFilePath <$> get <*> get)
-    _  -> THMsg <$> AddCorePlugin <$> get
+    21 -> THMsg <$> AddCorePlugin <$> get
+    22 -> THMsg <$> ReifyKiSig <$> get
+    n -> error ("getTHMessage: unknown message " ++ show n)
 
 putTHMessage :: THMessage a -> Put
 putTHMessage m = case m of
@@ -321,6 +324,7 @@ putTHMessage m = case m of
   AddModFinalizer a           -> putWord8 19 >> put a
   AddForeignFilePath lang a   -> putWord8 20 >> put lang >> put a
   AddCorePlugin a             -> putWord8 21 >> put a
+  ReifyKiSig a                -> putWord8 22 >> put a
 
 
 data EvalOpts = EvalOpts

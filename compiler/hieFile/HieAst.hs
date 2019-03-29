@@ -1105,8 +1105,9 @@ instance ( a ~ GhcPass p
       XCmd _ -> []
 
 instance ToHie (TyClGroup GhcRn) where
-  toHie (TyClGroup _ classes roles instances) = concatM
+  toHie (TyClGroup _ classes roles sigs instances) = concatM
     [ toHie classes
+    , toHie sigs
     , toHie roles
     , toHie instances
     ]
@@ -1317,12 +1318,24 @@ instance ( HasLoc thing
     where span = loc a
   toHie (TS _ (XHsWildCardBndrs _)) = pure []
 
+instance ToHie (LTopKindSig GhcRn) where
+  toHie (L sp sig) = concatM [makeNode sig sp, toHie sig]
+
+instance ToHie (TopKindSig GhcRn) where
+  toHie sig = concatM $ case sig of
+    TopKindSig _ name typ ->
+      [ toHie $ [C TyDecl name]
+      , toHie $ TS (UnresolvedScope [unLoc name] Nothing) typ
+      ]
+    XTopKindSig _ -> []
+
 instance ToHie (SigContext (LSig GhcRn)) where
   toHie (SC (SI styp msp) (L sp sig)) = concatM $ makeNode sig sp : case sig of
       TypeSig _ names typ ->
         [ toHie $ map (C TyDecl) names
         , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
         ]
+      TLKS _ tlks -> [toHie tlks]
       PatSynSig _ names typ ->
         [ toHie $ map (C TyDecl) names
         , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
