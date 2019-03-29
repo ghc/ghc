@@ -22,16 +22,16 @@ module HsDecls (
   HsDerivingClause(..), LHsDerivingClause, NewOrData(..), newOrDataToFlavour,
 
   -- ** Class or type declarations
-  TyClDecl(..), LTyClDecl, DataDeclRn(..),
+  TyClDecl(..), LTyClDecl,
   TyClGroup(..),
-  tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
+  tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls, tyClGroupTLKSs,
   isClassDecl, isDataDecl, isSynDecl, tcdName,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
   tyFamInstDeclName, tyFamInstDeclLName,
   countTyClDecls, pprTyClDeclFlavour,
   tyClDeclLName, tyClDeclTyVars,
-  hsDeclHasCusk, famDeclHasCusk,
+  famResultKindSignature,
   FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
@@ -304,6 +304,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsGroup p) where
                 then Nothing
                 else Just (ppr val_decls),
              ppr_ds (tyClGroupRoleDecls tycl_decls),
+             ppr_ds (tyClGroupTLKSs tycl_decls),
              ppr_ds (tyClGroupTyClDecls tycl_decls),
              ppr_ds (tyClGroupInstDecls tycl_decls),
              ppr_ds deriv_decls,
@@ -550,12 +551,6 @@ data TyClDecl pass
 
 type LHsFunDep pass = Located (FunDep (Located (IdP pass)))
 
-data DataDeclRn = DataDeclRn
-             { tcdDataCusk :: Bool    -- ^ does this have a CUSK?
-                 -- See Note [CUSKs: complete user-supplied kind signatures]
-             , tcdFVs      :: NameSet }
-  deriving Data
-
 {- Note [TyVar binders for associated decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For an /associated/ data, newtype, or type-family decl, the LHsQTyVars
@@ -584,8 +579,8 @@ type instance XSynDecl      GhcRn = NameSet -- FVs
 type instance XSynDecl      GhcTc = NameSet -- FVs
 
 type instance XDataDecl     GhcPs = NoExtField
-type instance XDataDecl     GhcRn = DataDeclRn
-type instance XDataDecl     GhcTc = DataDeclRn
+type instance XDataDecl     GhcRn = NameSet -- FVs
+type instance XDataDecl     GhcTc = NameSet -- FVs
 
 type instance XClassDecl    GhcPs = NoExtField
 type instance XClassDecl    GhcRn = NameSet -- FVs
@@ -680,28 +675,6 @@ countTyClDecls decls
    isNewTy DataDecl{ tcdDataDefn = HsDataDefn { dd_ND = NewType } } = True
    isNewTy _                                                      = False
 
--- | Does this declaration have a complete, user-supplied kind signature?
--- See Note [CUSKs: complete user-supplied kind signatures]
-hsDeclHasCusk
-  :: Bool  -- True <=> the -XCUSKs extension is enabled
-  -> TyClDecl GhcRn
-  -> Bool
-hsDeclHasCusk _cusks_enabled@False _ = False
-hsDeclHasCusk cusks_enabled (FamDecl { tcdFam = fam_decl })
-  = famDeclHasCusk cusks_enabled False fam_decl
-    -- False: this is not: an associated type of a class with no cusk
-hsDeclHasCusk _cusks_enabled@True (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
-  -- NB: Keep this synchronized with 'getInitialKind'
-  = hsTvbAllKinded tyvars && rhs_annotated rhs
-  where
-    rhs_annotated (L _ ty) = case ty of
-      HsParTy _ lty  -> rhs_annotated lty
-      HsKindSig {}   -> True
-      _              -> False
-hsDeclHasCusk _cusks_enabled@True (DataDecl { tcdDExt = DataDeclRn { tcdDataCusk = cusk }}) = cusk
-hsDeclHasCusk _cusks_enabled@True (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
-hsDeclHasCusk _ (XTyClDecl nec) = noExtCon nec
-
 -- Pretty-printing TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -742,10 +715,13 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (TyClGroup p) where
   ppr (TyClGroup { group_tyclds = tyclds
                  , group_roles = roles
+                 , group_tlkss = tlkss
                  , group_instds = instds
                  }
       )
-    = ppr tyclds $$
+    = hang (text "TyClGroup") 2 $
+      ppr tlkss $$
+      ppr tyclds $$
       ppr roles $$
       ppr instds
   ppr (XTyClGroup x) = ppr x
@@ -777,8 +753,8 @@ pprTyClDeclFlavour (ClassDecl {})   = text "class"
 pprTyClDeclFlavour (SynDecl {})     = text "type"
 pprTyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
   = pprFlavour info <+> text "family"
-pprTyClDeclFlavour (FamDecl { tcdFam = XFamilyDecl x})
-  = ppr x
+pprTyClDeclFlavour (FamDecl { tcdFam = XFamilyDecl nec })
+  = noExtCon nec
 pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })
   = ppr nd
 pprTyClDeclFlavour (DataDecl { tcdDataDefn = XHsDataDefn x })
@@ -910,6 +886,7 @@ data TyClGroup pass  -- See Note [TyClGroups and dependency analysis]
   = TyClGroup { group_ext    :: XCTyClGroup pass
               , group_tyclds :: [LTyClDecl pass]
               , group_roles  :: [LRoleAnnotDecl pass]
+              , group_tlkss  :: [LTopKindSig pass]
               , group_instds :: [LInstDecl pass] }
   | XTyClGroup (XXTyClGroup pass)
 
@@ -926,6 +903,8 @@ tyClGroupInstDecls = concatMap group_instds
 tyClGroupRoleDecls :: [TyClGroup pass] -> [LRoleAnnotDecl pass]
 tyClGroupRoleDecls = concatMap group_roles
 
+tyClGroupTLKSs :: [TyClGroup pass] -> [LTopKindSig pass]
+tyClGroupTLKSs = concatMap group_tlkss
 
 
 {- *********************************************************************
@@ -1081,32 +1060,15 @@ data FamilyInfo pass
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
--- | Does this family declaration have a complete, user-supplied kind signature?
--- See Note [CUSKs: complete user-supplied kind signatures]
-famDeclHasCusk :: Bool -- ^ True <=> the -XCUSKs extension is enabled
-               -> Bool -- ^ True <=> this is an associated type family,
-                       --            and the parent class has /no/ CUSK
-               -> FamilyDecl (GhcPass pass)
-               -> Bool
-famDeclHasCusk _cusks_enabled@False _ _ = False
-famDeclHasCusk _cusks_enabled@True assoc_with_no_cusk
-               (FamilyDecl { fdInfo      = fam_info
-                           , fdTyVars    = tyvars
-                           , fdResultSig = L _ resultSig })
-  = case fam_info of
-      ClosedTypeFamily {} -> hsTvbAllKinded tyvars
-                          && hasReturnKindSignature resultSig
-      _ -> not assoc_with_no_cusk
-            -- Un-associated open type/data families have CUSKs
-            -- Associated type families have CUSKs iff the parent class does
-
-famDeclHasCusk _ _ (XFamilyDecl nec) = noExtCon nec
-
--- | Does this family declaration have user-supplied return kind signature?
-hasReturnKindSignature :: FamilyResultSig a -> Bool
-hasReturnKindSignature (NoSig _)                        = False
-hasReturnKindSignature (TyVarSig _ (L _ (UserTyVar{}))) = False
-hasReturnKindSignature _                                = True
+famResultKindSignature :: FamilyResultSig (GhcPass p) -> Maybe (LHsKind (GhcPass p))
+famResultKindSignature (NoSig _) = Nothing
+famResultKindSignature (KindSig _ ki) = Just ki
+famResultKindSignature (TyVarSig _ bndr) =
+  case unLoc bndr of
+    UserTyVar _ _ -> Nothing
+    KindedTyVar _ _ ki -> Just ki
+    XTyVarBndr nec -> noExtCon nec
+famResultKindSignature (XFamilyResultSig nec) = noExtCon nec
 
 -- | Maybe return name of the result type variable
 resultVariableName :: FamilyResultSig (GhcPass a) -> Maybe (IdP (GhcPass a))
@@ -1137,7 +1099,7 @@ pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
                 NoSig    _         -> empty
                 KindSig  _ kind    -> dcolon <+> ppr kind
                 TyVarSig _ tv_bndr -> text "=" <+> ppr tv_bndr
-                XFamilyResultSig x -> ppr x
+                XFamilyResultSig nec -> noExtCon nec
     pp_inj = case mb_inj of
                Just (L _ (InjectivityAnn lhs rhs)) ->
                  hsep [ vbar, ppr lhs, text "->", hsep (map ppr rhs) ]
@@ -1149,7 +1111,7 @@ pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
             Nothing   -> text ".."
             Just eqns -> vcat $ map (ppr_fam_inst_eqn . unLoc) eqns )
       _ -> (empty, empty)
-pprFamilyDecl _ (XFamilyDecl x) = ppr x
+pprFamilyDecl _ (XFamilyDecl nec) = noExtCon nec
 
 pprFlavour :: FamilyInfo pass -> SDoc
 pprFlavour DataFamily            = text "data"

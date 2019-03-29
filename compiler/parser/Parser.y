@@ -1049,6 +1049,7 @@ topdecls_semi :: { OrdList (LHsDecl GhcPs) }
 topdecl :: { LHsDecl GhcPs }
         : cl_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
         | ty_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
+        | top_level_kind_sig                    { sL1 $1 (SigD noExtField (unLoc $1)) }
         | inst_decl                             { sL1 $1 (InstD noExtField (unLoc $1)) }
         | stand_alone_deriving                  { sLL $1 $> (DerivD noExtField (unLoc $1)) }
         | role_annot                            { sL1 $1 (RoleAnnotD noExtField (unLoc $1)) }
@@ -1130,6 +1131,12 @@ ty_decl :: { LTyClDecl GhcPs }
                 {% amms (mkFamDecl (comb3 $1 $2 $4) DataFamily $3
                                    (snd $ unLoc $4) Nothing)
                         (mj AnnData $1:mj AnnFamily $2:(fst $ unLoc $4)) }
+
+-- top-level kind signature
+top_level_kind_sig :: { LSig GhcPs }
+  : 'type' type '::' ktypedoc
+      {% amms (mkTopLevelKindSig (comb2 $1 $3) $2 $4)
+              [mj AnnType $1,mu AnnDcolon $3] }
 
 inst_decl :: { LInstDecl GhcPs }
         : 'instance' overlap_pragma inst_type where_inst

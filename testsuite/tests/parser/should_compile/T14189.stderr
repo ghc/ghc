@@ -14,10 +14,8 @@
      (NoExtField)
      [({ T14189.hs:6:1-42 }
        (DataDecl
-        (DataDeclRn
-         (True)
-         {NameSet:
-          [{Name: GHC.Types.Int}]})
+        {NameSet:
+         [{Name: GHC.Types.Int}]}
         ({ T14189.hs:6:6-11 }
          {Name: T14189.MyType})
         (HsQTvs
@@ -91,6 +89,23 @@
          ({ <no location info> }
           []))))]
      []
+     [({ T14189.hs:6:1-42 }
+       (TopKindSig
+        (NoExtField)
+        (TopKindSigFromCusk
+         (True))
+        ({ T14189.hs:6:6-11 }
+         {Name: T14189.MyType})
+        (HsWC
+         []
+         (HsIB
+          []
+          ({ <no location info> }
+           (HsTyVar
+            (NoExtField)
+            (NotPromoted)
+            ({ <no location info> }
+             {Name: GHC.Types.Type})))))))]
      [])]
    []
    []

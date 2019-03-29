@@ -918,6 +918,13 @@ data Sig pass
        [Located (IdP pass)]  -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
 
+      -- | A top-level kind signature
+      --
+      -- > type TypeRep :: forall k. k -> Type
+  | TLKS
+      (XTLKS pass)
+      (TopKindSig pass)
+
       -- | A pattern synonym type signature
       --
       -- > pattern Single :: () => (Show a) => a -> [a]
@@ -1047,6 +1054,7 @@ data Sig pass
   | XSig (XXSig pass)
 
 type instance XTypeSig          (GhcPass p) = NoExtField
+type instance XTLKS             (GhcPass p) = NoExtField
 type instance XPatSynSig        (GhcPass p) = NoExtField
 type instance XClassOpSig       (GhcPass p) = NoExtField
 type instance XIdSig            (GhcPass p) = NoExtField
@@ -1068,6 +1076,25 @@ data FixitySig pass = FixitySig (XFixitySig pass) [Located (IdP pass)] Fixity
 
 type instance XFixitySig  (GhcPass p) = NoExtField
 type instance XXFixitySig (GhcPass p) = NoExtCon
+
+-- | Located Top-Level Kind Signature
+type LTopKindSig pass = Located (TopKindSig pass)
+
+data TopKindSigFromCusk = TopKindSigFromCusk Bool
+
+data TopKindSig pass
+  = TopKindSig (XTopKindSig pass)
+               TopKindSigFromCusk
+               (Located (IdP pass))
+               (LHsSigWcType pass)
+  | XTopKindSig (XXTopKindSig pass)
+
+type instance XTopKindSig (GhcPass p) = NoExtField
+type instance XXTopKindSig (GhcPass p) = NoExtCon
+
+tlksName :: TopKindSig (GhcPass p) -> IdP (GhcPass p)
+tlksName (TopKindSig _ _ lname _) = unLoc lname
+tlksName (XTopKindSig nec) = noExtCon nec
 
 -- | Type checker Specialisation Pragmas
 --
@@ -1148,6 +1175,7 @@ isCompleteMatchSig _                            = False
 
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {})           = text "type signature"
+hsSigDoc (TLKS{})               = text "top-level kind signature"
 hsSigDoc (PatSynSig {})         = text "pattern synonym signature"
 hsSigDoc (ClassOpSig _ is_deflt _ _)
  | is_deflt                     = text "default type signature"
@@ -1173,6 +1201,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Sig p) where
 
 ppr_sig :: (OutputableBndrId (GhcPass p)) => Sig (GhcPass p) -> SDoc
 ppr_sig (TypeSig _ vars ty)  = pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (TLKS _ tlks)        = ppr tlks
 ppr_sig (ClassOpSig _ is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
   | otherwise                = pprVarSig (map unLoc vars) (ppr ty)
@@ -1210,6 +1239,16 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
     where
       pprops = hsep $ punctuate comma (map (pprInfixOcc . unLoc) names)
   ppr (XFixitySig x) = ppr x
+
+instance (p ~ GhcPass pass, OutputableBndrId p)
+       => Outputable (TopKindSig p) where
+  ppr (TopKindSig _ prov v ki) =
+    text "type" <+> pprov <+> ppr v <+> text "::" <+> ppr ki
+    where
+      pprov = case prov of
+        TopKindSigFromCusk True -> text "{- CUSK -}"
+        TopKindSigFromCusk False -> empty
+  ppr (XTopKindSig nec) = noExtCon nec
 
 pragBrackets :: SDoc -> SDoc
 pragBrackets doc = text "{-#" <+> doc <+> text "#-}"
