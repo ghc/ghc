@@ -140,6 +140,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                      ; _        <- mapM no_splice splcds
                      ; tycl_ds  <- mapM repTyClD (tyClGroupTyClDecls tyclds)
                      ; role_ds  <- mapM repRoleD (concatMap group_roles tyclds)
+                     ; tlks_ds  <- mapM repTlksD (concatMap group_tlkss tyclds)
                      ; inst_ds  <- mapM repInstD instds
                      ; deriv_ds <- mapM repStandaloneDerivD derivds
                      ; fix_ds   <- mapM repFixD fixds
@@ -155,6 +156,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         -- more needed
                      ;  return (de_loc $ sort_by_loc $
                                 val_ds ++ catMaybes tycl_ds ++ role_ds
+                                       ++ tlks_ds
                                        ++ (concat fix_ds)
                                        ++ inst_ds ++ rule_ds ++ for_ds
                                        ++ ann_ds ++ deriv_ds) }) ;
@@ -346,6 +348,13 @@ repRoleD (dL->L loc (RoleAnnotDecl _ tycon roles))
        ; dec <- repRoleAnnotD tycon1 roles2
        ; return (loc, dec) }
 repRoleD _ = panic "repRoleD"
+
+-------------------------
+repTlksD :: LTopKindSig GhcRn -> DsM (SrcSpan, Core TH.DecQ)
+repTlksD (dL->L loc tlks) =
+  case tlks of
+    TopKindSig _ v ki -> rep_wc_ty_sig kiSigDName loc ki v
+    XTopKindSig nec -> noExtCon nec
 
 -------------------------
 repDataDefn :: Core TH.Name

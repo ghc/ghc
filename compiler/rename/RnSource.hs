@@ -70,7 +70,7 @@ import Control.Arrow ( first )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Data.Maybe ( isNothing, isJust, fromMaybe )
+import Data.Maybe ( isNothing, isJust, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
 {- | @rnSourceDecl@ "renames" declarations.
@@ -156,7 +156,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- means we'll only report a declaration as unused if it isn't
    -- mentioned at all.  Ah well.
    traceRn "Start rnTyClDecls" (ppr tycl_decls) ;
-   (rn_tycl_decls, src_fvs1) <- rnTyClDecls tycl_decls ;
+   (rn_tycl_decls, src_fvs1) <- rnTyClDecls tc_bndrs tycl_decls ;
 
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
@@ -972,7 +972,7 @@ rnSrcDerivDecl (DerivDecl _ ty mds overlap)
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
        ; (mds', ty', fvs)
            <- rnLDerivStrategy DerivDeclCtx mds $
-              rnHsSigWcType BindUnlessForall DerivDeclCtx ty
+              rnHsSigWcType BindUnlessForall DerivDeclCtx TypeLevel ty
        ; warnNoDerivStrat mds' loc
        ; return (DerivDecl noExtField ty' mds' overlap, fvs) }
   where
@@ -1283,23 +1283,24 @@ constructors] in TcEnv
 -}
 
 
-rnTyClDecls :: [TyClGroup GhcPs]
+rnTyClDecls :: NameSet
+            -> [TyClGroup GhcPs]
             -> RnM ([TyClGroup GhcRn], FreeVars)
 -- Rename the declarations and do dependency analysis on them
-rnTyClDecls tycl_ds
+rnTyClDecls tc_bndrs tycl_ds
   = do { -- Rename the type/class, instance, and role declaraations
-         tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl)
-                             (tyClGroupTyClDecls tycl_ds)
-       ; let tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
-
+         tlkss_w_fvs <- rnTLKSs tc_bndrs (tyClGroupTLKSs tycl_ds)
+       ; tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
        ; instds_w_fvs <- mapM (wrapLocFstM rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
-       ; role_annots  <- rnRoleAnnots tc_names (tyClGroupRoleDecls tycl_ds)
+       ; role_annots  <- rnRoleAnnots tc_bndrs (tyClGroupRoleDecls tycl_ds)
 
        -- Do SCC analysis on the type/class decls
        ; rdr_env <- getGlobalRdrEnv
-       ; let tycl_sccs = depAnalTyClDecls rdr_env tycls_w_fvs
+       ; let tycl_sccs = depAnalTyClDecls rdr_env tlks_env tycls_w_fvs
              role_annot_env = mkRoleAnnotEnv role_annots
+             tlks_env = mkTLKS_fv_env tlkss_w_fvs
 
+             tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
              inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
              (init_inst_ds, rest_inst_ds) = getInsts [] inst_ds_map
 
@@ -1307,15 +1308,16 @@ rnTyClDecls tycl_ds
                | null init_inst_ds = []
                | otherwise = [TyClGroup { group_ext    = noExtField
                                         , group_tyclds = []
+                                        , group_tlkss  = []
                                         , group_roles  = []
                                         , group_instds = init_inst_ds }]
 
              (final_inst_ds, groups)
-                = mapAccumL (mk_group role_annot_env) rest_inst_ds tycl_sccs
+                = mapAccumL (mk_group role_annot_env tlks_env) rest_inst_ds tycl_sccs
 
-
-             all_fvs = plusFV (foldr (plusFV . snd) emptyFVs tycls_w_fvs)
-                              (foldr (plusFV . snd) emptyFVs instds_w_fvs)
+             all_fvs = foldr (plusFV . snd) emptyFVs tycls_w_fvs  `plusFV`
+                       foldr (plusFV . snd) emptyFVs instds_w_fvs `plusFV`
+                       foldr (plusFV . snd) emptyFVs tlkss_w_fvs
 
              all_groups = first_group ++ groups
 
@@ -1326,32 +1328,63 @@ rnTyClDecls tycl_ds
        ; return (all_groups, all_fvs) }
   where
     mk_group :: RoleAnnotEnv
+             -> TLKS_FV_Env
              -> InstDeclFreeVarsMap
              -> SCC (LTyClDecl GhcRn)
              -> (InstDeclFreeVarsMap, TyClGroup GhcRn)
-    mk_group role_env inst_map scc
+    mk_group role_env tlks_env inst_map scc
       = (inst_map', group)
       where
         tycl_ds              = flattenSCC scc
         bndrs                = map (tcdName . unLoc) tycl_ds
         roles                = getRoleAnnots bndrs role_env
+        tlkss                = getTLKSs      bndrs tlks_env
         (inst_ds, inst_map') = getInsts      bndrs inst_map
         group = TyClGroup { group_ext    = noExtField
                           , group_tyclds = tycl_ds
+                          , group_tlkss  = tlkss
                           , group_roles  = roles
                           , group_instds = inst_ds }
 
 
+type TLKS_FV_Env = NameEnv (LTopKindSig GhcRn, FreeVars)
+
+mkTLKS_fv_env :: [(LTopKindSig GhcRn, FreeVars)] -> TLKS_FV_Env
+mkTLKS_fv_env tlkss_w_fvs =
+  mkNameEnv [ (tlksName tlks, tlks_w_fvs)
+            | tlks_w_fvs@(unLoc -> tlks, _fvs) <- tlkss_w_fvs ]
+
+getTLKSs :: [Name] -> TLKS_FV_Env -> [LTopKindSig GhcRn]
+getTLKSs bndrs tlks_env
+  = mapMaybe (fmap fst . lookupNameEnv tlks_env) bndrs
+
+rnTLKSs :: NameSet
+        -> [LTopKindSig GhcPs]
+        -> RnM [(LTopKindSig GhcRn, FreeVars)]
+rnTLKSs tc_names tlkss
+  = do { let (no_dups, dup_tlkss) = removeDups tlks_cmp tlkss
+             tlks_cmp a b = tlksName (unLoc a) `compare` tlksName (unLoc b)
+       ; mapM_ dupTLKS_Err dup_tlkss
+       ; mapM (wrapLocFstM (renameTLKS tc_names)) no_dups
+       }
+
 depAnalTyClDecls :: GlobalRdrEnv
+                 -> TLKS_FV_Env
                  -> [(LTyClDecl GhcRn, FreeVars)]
                  -> [SCC (LTyClDecl GhcRn)]
 -- See Note [Dependency analysis of type, class, and instance decls]
-depAnalTyClDecls rdr_env ds_w_fvs
+depAnalTyClDecls rdr_env tlks_env ds_w_fvs
   = stronglyConnCompFromEdgedVerticesUniq edges
   where
     edges :: [ Node Name (LTyClDecl GhcRn) ]
-    edges = [ DigraphNode d (tcdName (unLoc d)) (map (getParent rdr_env) (nonDetEltsUniqSet fvs))
-            | (d, fvs) <- ds_w_fvs ]
+    edges = [ DigraphNode d name (map (getParent rdr_env) (nonDetEltsUniqSet deps))
+            | (d, fvs) <- ds_w_fvs,
+              let { name = tcdName (unLoc d)
+                  ; deps = fvs `plusFV`
+                           -- depend on free variables from the top-level kind signature
+                           maybe emptyFVs snd (lookupNameEnv tlks_env name)
+                  }
+            ]
             -- It's OK to use nonDetEltsUFM here as
             -- stronglyConnCompFromEdgedVertices is still deterministic
             -- even if the edges are in nondeterministic order as explained
@@ -1421,6 +1454,20 @@ dupRoleAnnotErr list
 
       cmp_annot (dL->L loc1 _) (dL->L loc2 _) = loc1 `compare` loc2
 
+dupTLKS_Err :: NonEmpty (LTopKindSig GhcPs) -> RnM ()
+dupTLKS_Err list
+  = addErrAt loc $
+    hang (text "Duplicate top-level kind signatures for" <+>
+          quotes (ppr $ tlksName first_decl) <> colon)
+       2 (vcat $ map pp_tlks $ NE.toList sorted_list)
+    where
+      sorted_list = NE.sortBy cmp_loc list
+      ((dL->L loc first_decl) :| _) = sorted_list
+
+      pp_tlks (dL->L loc decl) =
+        hang (ppr decl) 4 (text "-- written at" <+> ppr loc)
+
+      cmp_loc (dL->L loc1 _) (dL->L loc2 _) = loc1 `compare` loc2
 
 {- Note [Role annotations in the renamer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2249,6 +2296,11 @@ add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD _ d) ds
 -- Signatures: fixity sigs go a different place than all others
 add gp@(HsGroup {hs_fixds = ts}) l (SigD _ (FixSig _ f)) ds
   = addl (gp {hs_fixds = cL l f : ts}) ds
+
+-- Top-level kind-signatures: added to the TyClGroup
+add gp@(HsGroup {hs_tyclds = ts}) l (SigD _ (TLKS _ s)) ds
+  = addl (gp {hs_tyclds = add_tlks (cL l s) ts}) ds
+
 add gp@(HsGroup {hs_valds = ts}) l (SigD _ d) ds
   = addl (gp {hs_valds = add_sig (cL l d) ts}) ds
 
@@ -2289,6 +2341,7 @@ add_tycld :: LTyClDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
           -> [TyClGroup (GhcPass p)]
 add_tycld d []       = [TyClGroup { group_ext    = noExtField
                                   , group_tyclds = [d]
+                                  , group_tlkss  = []
                                   , group_roles  = []
                                   , group_instds = []
                                   }
@@ -2301,6 +2354,7 @@ add_instd :: LInstDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
           -> [TyClGroup (GhcPass p)]
 add_instd d []       = [TyClGroup { group_ext    = noExtField
                                   , group_tyclds = []
+                                  , group_tlkss  = []
                                   , group_roles  = []
                                   , group_instds = [d]
                                   }
@@ -2313,6 +2367,7 @@ add_role_annot :: LRoleAnnotDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
                -> [TyClGroup (GhcPass p)]
 add_role_annot d [] = [TyClGroup { group_ext    = noExtField
                                  , group_tyclds = []
+                                 , group_tlkss  = []
                                  , group_roles  = [d]
                                  , group_instds = []
                                  }
@@ -2320,6 +2375,19 @@ add_role_annot d [] = [TyClGroup { group_ext    = noExtField
 add_role_annot d (tycls@(TyClGroup { group_roles = roles }) : rest)
   = tycls { group_roles = d : roles } : rest
 add_role_annot _ (XTyClGroup nec: _) = noExtCon nec
+
+add_tlks :: LTopKindSig (GhcPass p) -> [TyClGroup (GhcPass p)]
+         -> [TyClGroup (GhcPass p)]
+add_tlks d [] = [TyClGroup { group_ext    = noExtField
+                           , group_tyclds = []
+                           , group_tlkss  = [d]
+                           , group_roles  = []
+                           , group_instds = []
+                           }
+                ]
+add_tlks d (tycls@(TyClGroup { group_tlkss = tlkss }) : rest)
+  = tycls { group_tlkss = d : tlkss } : rest
+add_tlks _ (XTyClGroup nec : _) = noExtCon nec
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
 add_bind b (ValBinds x bs sigs) = ValBinds x (bs `snocBag` b) sigs

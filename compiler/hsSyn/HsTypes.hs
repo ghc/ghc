@@ -1449,7 +1449,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsTyVarBndr p) where
     ppr (UserTyVar _ n)     = ppr n
     ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
-    ppr (XTyVarBndr n)      = ppr n
+    ppr (XTyVarBndr nec)    = noExtCon nec
 
 instance (p ~ GhcPass pass,Outputable thing)
        => Outputable (HsImplicitBndrs p thing) where

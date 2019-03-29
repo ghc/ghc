@@ -1,0 +1,6 @@
+
+tlks_fail002.hs:9:1: error:
+    Duplicate top-level kind signatures for ‘D’:
+      type D :: Type -- written at tlks_fail002.hs:9:1-9
+      type D :: Type -- written at tlks_fail002.hs:10:1-9
+      type D :: Type -- written at tlks_fail002.hs:11:1-9

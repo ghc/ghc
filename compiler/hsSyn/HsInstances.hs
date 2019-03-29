@@ -86,6 +86,11 @@ deriving instance Data (FixitySig GhcPs)
 deriving instance Data (FixitySig GhcRn)
 deriving instance Data (FixitySig GhcTc)
 
+-- deriving instance (DataId p)       => Data (TopKindSig p)
+deriving instance Data (TopKindSig GhcPs)
+deriving instance Data (TopKindSig GhcRn)
+deriving instance Data (TopKindSig GhcTc)
+
 -- deriving instance (DataIdLR p p)   => Data (HsPatSynDir p)
 deriving instance Data (HsPatSynDir GhcPs)
 deriving instance Data (HsPatSynDir GhcRn)
