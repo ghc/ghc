@@ -195,9 +195,40 @@ both of them.  So we gather defs/uses from deriving just like anything else.
 data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
                              -- ^ The data tycon for normal datatypes,
                              -- or the *representation* tycon for data families
+                           , di_extra_tvs :: ![(Name,TyVar)]
+                             -- ^ Extra variables for the deriving context.
+                             -- See Note [Extra type variables in DerivInfo]
                            , di_clauses :: [LHsDerivingClause GhcRn]
                            , di_ctxt    :: SDoc -- ^ error context
                            }
+
+{- Note [Extra type variables in DerivInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The deriving clause may mention variables from inline kind annotations of a
+declaration:
+
+  type T :: a -> Type
+  data T (x :: z) deriving (C z)
+     -- the variable 'z' is bound in the inline kind annotation on 'x'
+
+In the presence of a TLKS, such variables are stored in the tcTyConHeaderKiVars
+field of the TcTyCon. However, the finalized (non-Tc) TyCon does not store
+these variables, so we need to put them alongside 'di_rep_tc' in a separate
+field.
+
+The only thing we do with these variables is extend the environment using
+tcExtendNameTyVarEnv. Not doing so led to #16731.
+
+Without a TLKS, di_extra_tvs are not needed and not used at the moment:
+
+  -- No TLKS,  tyConTyVars di_rep_tc = [j,k,a,b]
+  --           di_extra_tvs = []
+  data T (a :: j) (b :: k) deriving (C j k)
+
+There's nothing in particular that would tie 'di_extra_tvs' to TLKSs, this
+field can be easily repurposed to store other extra type variables for the
+deriving context if the need arises, hence the name.
+-}
 
 {-
 
@@ -493,8 +524,10 @@ makeDerivSpecs :: Bool
                -> TcM [EarlyDerivSpec]
 makeDerivSpecs is_boot deriv_infos deriv_decls
   = do  { eqns1 <- sequenceA
-                     [ deriveClause rep_tc dcs preds err_ctxt
-                     | DerivInfo { di_rep_tc = rep_tc, di_clauses = clauses
+                     [ deriveClause rep_tc extra_tvs dcs preds err_ctxt
+                     | DerivInfo { di_rep_tc = rep_tc
+                                 , di_clauses = clauses
+                                 , di_extra_tvs = extra_tvs
                                  , di_ctxt = err_ctxt } <- deriv_infos
                      , L _ (HsDerivingClause { deriv_clause_strategy = dcs
                                              , deriv_clause_tys = L _ preds })
@@ -515,27 +548,30 @@ makeDerivSpecs is_boot deriv_infos deriv_decls
 
 ------------------------------------------------------------------
 -- | Process the derived classes in a single @deriving@ clause.
-deriveClause :: TyCon -> Maybe (LDerivStrategy GhcRn)
+deriveClause :: TyCon -> [(Name,TyVar)]
+             -> Maybe (LDerivStrategy GhcRn)
              -> [LHsSigType GhcRn] -> SDoc
              -> TcM [EarlyDerivSpec]
-deriveClause rep_tc mb_lderiv_strat deriv_preds err_ctxt
+deriveClause rep_tc extra_tvs mb_lderiv_strat deriv_preds err_ctxt
   = addErrCtxt err_ctxt $ do
       traceTc "deriveClause" $ vcat
         [ text "tvs"             <+> ppr tvs
+        , text "extra_tvs"       <+> ppr extra_tvs
         , text "tc"              <+> ppr tc
         , text "tys"             <+> ppr tys
         , text "mb_lderiv_strat" <+> ppr mb_lderiv_strat ]
-      tcExtendTyVarEnv tvs $ do
-        (mb_lderiv_strat', via_tvs) <- tcDerivStrategy mb_lderiv_strat
-        tcExtendTyVarEnv via_tvs $
-        -- Moreover, when using DerivingVia one can bind type variables in
-        -- the `via` type as well, so these type variables must also be
-        -- brought into scope.
-          mapMaybeM (derivePred tc tys mb_lderiv_strat' via_tvs) deriv_preds
-          -- After typechecking the `via` type once, we then typecheck all
-          -- of the classes associated with that `via` type in the
-          -- `deriving` clause.
-          -- See also Note [Don't typecheck too much in DerivingVia].
+      tcExtendNameTyVarEnv extra_tvs $  -- See Note [Extra type variables in DerivInfo]
+        tcExtendTyVarEnv tvs $ do
+          (mb_lderiv_strat', via_tvs) <- tcDerivStrategy mb_lderiv_strat
+          tcExtendTyVarEnv via_tvs $
+          -- Moreover, when using DerivingVia one can bind type variables in
+          -- the `via` type as well, so these type variables must also be
+          -- brought into scope.
+            mapMaybeM (derivePred tc tys mb_lderiv_strat' via_tvs) deriv_preds
+            -- After typechecking the `via` type once, we then typecheck all
+            -- of the classes associated with that `via` type in the
+            -- `deriving` clause.
+            -- See also Note [Don't typecheck too much in DerivingVia].
   where
     tvs = tyConTyVars rep_tc
     (tc, tys) = case tyConFamInstSig_maybe rep_tc of

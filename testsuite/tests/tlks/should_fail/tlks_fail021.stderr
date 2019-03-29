@@ -1,0 +1,4 @@
+
+tlks_fail021.hs:11:3: error:
+    • Expected a skolem, but k stands for a type: *
+    • In the associated type family declaration for ‘F’

@@ -23,6 +23,9 @@ module RnTypes (
         mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
         checkPrecMatch, checkSectionPrec,
 
+        -- CUSK -> TLKS
+        extractTopKindSigFromCusk,
+
         -- Binding related stuff
         bindLHsTyVarBndr, bindLHsTyVarBndrs, rnImplicitBndrs,
         bindSigTyVarsFV, bindHsQTyVars, bindLRdrNames,
@@ -59,6 +62,8 @@ import Util
 import ListSetOps       ( deleteBys )
 import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
                           Fixity(..), FixityDirection(..), LexicalFixity(..) )
+import BasicTypes ( PromotionFlag(..) )
+import TysWiredIn ( constraintKindTyConName, liftedTypeKindTyConName )
 import Outputable
 import FastString
 import Maybes
@@ -89,12 +94,16 @@ data HsSigWcTypeScoping = AlwaysBind
                         | NeverBind
                           -- ^ Never bind any free tyvars
 
-rnHsSigWcType :: HsSigWcTypeScoping -> HsDocContext -> LHsSigWcType GhcPs
+rnHsSigWcType :: HsSigWcTypeScoping
+              -> HsDocContext
+              -> TypeOrKind
+              -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeVars)
-rnHsSigWcType scoping doc sig_ty
-  = rn_hs_sig_wc_type scoping doc sig_ty $ \sig_ty' ->
+rnHsSigWcType scoping doc level sig_ty
+  = rn_hs_sig_wc_type scoping doc level sig_ty $ \sig_ty' ->
     return (sig_ty', emptyFVs)
 
+-- Only used on types, never kinds (hence 'TypeLevel').
 rnHsSigWcTypeScoped :: HsSigWcTypeScoping
                        -- AlwaysBind: for pattern type sigs and rules we /do/ want
                        --             to bring those type variables into scope, even
@@ -113,14 +122,15 @@ rnHsSigWcTypeScoped :: HsSigWcTypeScoping
 rnHsSigWcTypeScoped scoping ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedTypeSigErr sig_ty)
-       ; rn_hs_sig_wc_type scoping ctx sig_ty thing_inside
+       ; rn_hs_sig_wc_type scoping ctx TypeLevel sig_ty thing_inside
        }
 
-rn_hs_sig_wc_type :: HsSigWcTypeScoping -> HsDocContext -> LHsSigWcType GhcPs
+rn_hs_sig_wc_type :: HsSigWcTypeScoping -> HsDocContext -> TypeOrKind
+                  -> LHsSigWcType GhcPs
                   -> (LHsSigWcType GhcRn -> RnM (a, FreeVars))
                   -> RnM (a, FreeVars)
 -- rn_hs_sig_wc_type is used for source-language type signatures
-rn_hs_sig_wc_type scoping ctxt
+rn_hs_sig_wc_type scoping ctxt level
                   (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
                   thing_inside
   = do { free_vars <- extractFilteredRdrTyVarsDups hs_ty
@@ -131,31 +141,32 @@ rn_hs_sig_wc_type scoping ctxt
                                BindUnlessForall -> not (isLHsForAllTy hs_ty)
                                NeverBind        -> False
        ; rnImplicitBndrs bind_free_tvs tv_rdrs $ \ vars ->
-    do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
+    do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt level nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = ib_ty' }
              ib_ty'  = HsIB { hsib_ext = vars
                             , hsib_body = hs_ty' }
        ; (res, fvs2) <- thing_inside sig_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
-rn_hs_sig_wc_type _ _ (HsWC _ (XHsImplicitBndrs nec)) _
+rn_hs_sig_wc_type _ _ _ (HsWC _ (XHsImplicitBndrs nec)) _
   = noExtCon nec
-rn_hs_sig_wc_type _ _ (XHsWildCardBndrs nec) _
+rn_hs_sig_wc_type _ _ _ (XHsWildCardBndrs nec) _
   = noExtCon nec
 
+-- Only used on types, never kinds (hence 'TypeLevel').
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeVars)
 rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
   = do { free_vars <- extractFilteredRdrTyVars hs_ty
        ; (nwc_rdrs, _) <- partition_nwcs free_vars
-       ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
+       ; (wcs, hs_ty', fvs) <- rnWcBody ctxt TypeLevel nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
 rnHsWcType _ (XHsWildCardBndrs nec) = noExtCon nec
 
-rnWcBody :: HsDocContext -> [Located RdrName] -> LHsType GhcPs
+rnWcBody :: HsDocContext -> TypeOrKind -> [Located RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
-rnWcBody ctxt nwc_rdrs hs_ty
+rnWcBody ctxt level nwc_rdrs hs_ty
   = do { nwcs <- mapM newLocalBndrRn nwc_rdrs
-       ; let env = RTKE { rtke_level = TypeLevel
+       ; let env = RTKE { rtke_level = level
                         , rtke_what  = RnTypeBody
                         , rtke_nwcs  = mkNameSet nwcs
                         , rtke_ctxt  = ctxt }
@@ -242,6 +253,7 @@ extraConstraintWildCardsAllowed env
       TypeSigCtx {}       -> True
       ExprWithTySigCtx {} -> True
       DerivDeclCtx {}     -> True
+      TopKindSigCtx {}    -> False  -- See Note [Wildcards in TLKS] in TcHsType
       _                   -> False
 
 -- | Finds free type and kind variables in a type,
@@ -563,9 +575,9 @@ rnHsTyKi env t@(HsKindSig _ ty k)
   = do { checkPolyKinds env t
        ; kind_sigs_ok <- xoptM LangExt.KindSignatures
        ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) ty)
-       ; (ty', fvs1) <- rnLHsTyKi env ty
-       ; (k', fvs2)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
-       ; return (HsKindSig noExtField ty' k', fvs1 `plusFV` fvs2) }
+       ; (ty', lhs_fvs) <- rnLHsTyKi env ty
+       ; (k', sig_fvs)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
+       ; return (HsKindSig sig_fvs ty' k', lhs_fvs `plusFV` sig_fvs) }
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
@@ -734,6 +746,7 @@ wildCardsAllowed env
        FamPatCtx {}        -> True   -- Not named wildcards though
        GHCiCtx {}          -> True
        HsTypeCtx {}        -> True
+       TopKindSigCtx {}    -> False  -- See Note [Wildcards in TLKS] in TcHsType
        _                   -> False
 
 
@@ -990,15 +1003,15 @@ bindLHsTyVarBndr _doc mb_assoc (dL->L loc
        ; bindLocalNamesFV [nm] $
          thing_inside (cL loc (UserTyVar x (cL lv nm))) }
 
-bindLHsTyVarBndr doc mb_assoc (dL->L loc (KindedTyVar x lrdr@(dL->L lv _) kind))
+bindLHsTyVarBndr doc mb_assoc (dL->L loc (KindedTyVar _ lrdr@(dL->L lv _) kind))
                  thing_inside
   = do { sig_ok <- xoptM LangExt.KindSignatures
            ; unless sig_ok (badKindSigErr doc kind)
-           ; (kind', fvs1) <- rnLHsKind doc kind
+           ; (kind', sig_fvs) <- rnLHsKind doc kind
            ; tv_nm  <- newTyVarNameRn mb_assoc lrdr
-           ; (b, fvs2) <- bindLocalNamesFV [tv_nm]
-               $ thing_inside (cL loc (KindedTyVar x (cL lv tv_nm) kind'))
-           ; return (b, fvs1 `plusFV` fvs2) }
+           ; (b, b_fvs) <- bindLocalNamesFV [tv_nm]
+               $ thing_inside (cL loc (KindedTyVar sig_fvs (cL lv tv_nm) kind'))
+           ; return (b, sig_fvs `plusFV` b_fvs) }
 
 bindLHsTyVarBndr _ _ (dL->L _ (XTyVarBndr nec)) _ = noExtCon nec
 bindLHsTyVarBndr _ _ _ _ = panic "bindLHsTyVarBndr: Impossible Match"
@@ -1012,6 +1025,115 @@ newTyVarNameRn mb_assoc (dL->L loc rdr)
               -- Use the same Name as the parent class decl
 
            _                -> newLocalBndrRn (cL loc rdr) }
+
+{- *****************************************************
+*                                                      *
+          Extracting a signature from a CUSK
+*                                                      *
+***************************************************** -}
+
+extractTopKindSigFromCusk
+  :: Located Name
+  -> TyClDecl GhcRn
+  -> RnM (TopKindSig GhcRn, FreeVars)
+extractTopKindSigFromCusk name decl =
+  do { (sig_ty, fvs) <- extractSigFromCusk decl
+     ; let fromCusk = TopKindSigFromCusk True -- this TLKS is extracted from a CUSK
+           sig = TopKindSig noExtField fromCusk name
+                            HsWC{ hswc_ext = []
+                                , hswc_body = sig_ty }
+     ; return (sig, fvs) }
+
+extractSigFromCusk :: TyClDecl GhcRn -> RnM (LHsSigType GhcRn, FreeVars)
+extractSigFromCusk ClassDecl{ tcdTyVars = ktvs } =
+  build_sig_from_cusk ktvs renamedConstraintKind
+extractSigFromCusk DataDecl { tcdTyVars = ktvs, tcdDataDefn = defn } =
+  build_sig_from_cusk ktvs $
+  case defn of
+    HsDataDefn { dd_kindSig = Just k, dd_ext = sig_fvs } -> (k, sig_fvs)
+    HsDataDefn { dd_kindSig = Nothing } -> renamedTypeKind
+    XHsDataDefn nec -> noExtCon nec
+extractSigFromCusk FamDecl { tcdFam = fam } =
+  case fam of
+    FamilyDecl{ fdTyVars = ktvs, fdResultSig = resultSig } ->
+      build_sig_from_cusk ktvs $
+      case unLoc resultSig of
+        NoSig _ -> renamedTypeKind
+        KindSig sig_fvs k -> (k, sig_fvs)
+        TyVarSig _ bndr ->
+          case unLoc bndr of
+            UserTyVar _ _ -> renamedTypeKind
+            KindedTyVar sig_fvs _ k -> (k, sig_fvs)
+            XTyVarBndr nec -> noExtCon nec
+        XFamilyResultSig nec -> noExtCon nec
+    XFamilyDecl nec -> noExtCon nec
+extractSigFromCusk SynDecl { tcdTyVars = ktvs, tcdRhs = rhs } =
+  build_sig_from_cusk ktvs (kind_annotation rhs)
+  where
+    kind_annotation (dL->L _ ty) =
+      case ty of
+        HsParTy _ lty          -> kind_annotation lty
+        HsKindSig sig_fvs _ k  -> (k, sig_fvs)
+        _                      -> renamedTypeKind
+extractSigFromCusk (XTyClDecl nec) = noExtCon nec
+
+build_sig_from_cusk
+  :: LHsQTyVars GhcRn
+  -> (LHsKind GhcRn, FreeVars)
+  -> RnM (LHsSigType GhcRn, FreeVars)
+build_sig_from_cusk hsq_bndrs@HsQTvs{ hsq_ext = implicit_vars
+                                    , hsq_explicit = explicit_bndrs }
+                    res_ki
+  = do { traceRn "build_sig_from_cusk" $
+         vcat [ text "hsq_bndrs" <+> ppr hsq_bndrs
+              , text "res_ki" <+> ppr res_ki ]
+       ; let (t, fvs) = foldr binder_to_sig res_ki explicit_bndrs
+       ; return ( HsIB { hsib_ext = implicit_vars
+                       , hsib_body = t }
+                , fvs ) }
+  where
+    binder_to_sig :: LHsTyVarBndr GhcRn -> (LHsKind GhcRn, FreeVars) -> (LHsKind GhcRn, FreeVars)
+    binder_to_sig bndr (body, b_fvs) =
+      case unLoc bndr of
+        UserTyVar _ name ->
+          case delete_dep_fv (unLoc name) b_fvs of
+            Nothing     -> (mkHsFunTy (fst renamedTypeKind) body, b_fvs)
+            Just b_fvs' -> (mkHsVisForAllTy name Nothing body, b_fvs')
+        KindedTyVar sig_fvs name kind ->
+          case delete_dep_fv (unLoc name) b_fvs of
+            Nothing     -> (mkHsFunTy kind body, sig_fvs `plusFV` b_fvs)
+            Just b_fvs' -> (mkHsVisForAllTy name (Just (kind, sig_fvs)) body, sig_fvs `plusFV` b_fvs')
+        XTyVarBndr nec -> noExtCon nec
+
+    -- Delete dependent free variable. 'Nothing' if it's not a dependent variable.
+    delete_dep_fv :: Name -> FreeVars -> Maybe FreeVars
+    delete_dep_fv name fvs
+      | elemNameSet name fvs = Just (delFV name fvs)
+      | otherwise = Nothing
+
+    mkHsFunTy :: LHsKind GhcRn -> LHsKind GhcRn -> LHsKind GhcRn
+    mkHsFunTy a b = cL (combineLocs a b) (HsFunTy noExtField a b)
+
+    mkHsVisForAllTy :: Located Name -> Maybe (LHsKind GhcRn, FreeVars) -> LHsKind GhcRn -> LHsKind GhcRn
+    mkHsVisForAllTy name m_sig t =
+      cL (combineLocs bndr t) $
+      HsForAllTy { hst_xforall = noExtField
+                 , hst_fvf = ForallVis
+                 , hst_bndrs = [bndr]
+                 , hst_body = t }
+      where
+        bndr = case m_sig of
+          Nothing -> cL (getLoc name) (UserTyVar noExtField name)
+          Just (sig, sig_fvs) -> cL (combineLocs name sig) (KindedTyVar sig_fvs name sig)
+
+build_sig_from_cusk (XLHsQTyVars nec) _ = noExtCon nec
+
+renamedTypeKind, renamedConstraintKind :: (LHsType GhcRn, FreeVars)
+renamedTypeKind = (noLoc (HsTyVar noExtField NotPromoted (noLoc name)), unitFV name)
+  where name = liftedTypeKindTyConName
+renamedConstraintKind = (noLoc (HsTyVar noExtField NotPromoted (noLoc name)), unitFV name)
+  where name = constraintKindTyConName
+
 {-
 *********************************************************
 *                                                       *

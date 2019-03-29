@@ -2537,7 +2537,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
 pprHsBracket :: (OutputableBndrId (GhcPass p)) => HsBracket (GhcPass p) -> SDoc
 pprHsBracket (ExpBr _ e)   = thBrackets empty (ppr e)
 pprHsBracket (PatBr _ p)   = thBrackets (char 'p') (ppr p)
-pprHsBracket (DecBrG _ gp) = thBrackets (char 'd') (ppr gp)
+pprHsBracket (DecBrG _ gp) = thBrackets (char 'd') (ppr (filter_out_cusk_sigs gp))
 pprHsBracket (DecBrL _ ds) = thBrackets (char 'd') (vcat (map ppr ds))
 pprHsBracket (TypBr _ t)   = thBrackets (char 't') (ppr t)
 pprHsBracket (VarBr _ True n)
@@ -2546,6 +2546,17 @@ pprHsBracket (VarBr _ False n)
   = text "''" <> pprPrefixOcc n
 pprHsBracket (TExpBr _ e)  = thTyBrackets (ppr e)
 pprHsBracket (XBracket e)  = ppr e
+
+-- remove TLKSs extracted from CUSKs to tidy up -ddump-splices output
+filter_out_cusk_sigs :: HsGroup (GhcPass p) -> HsGroup (GhcPass p)
+filter_out_cusk_sigs g =
+    g { hs_tyclds = map filter_out_cusk_sigs' (hs_tyclds g) }
+  where
+    filter_out_cusk_sigs' tg@TyClGroup{group_tlkss = tlkss} =
+      tg { group_tlkss = filterOut (is_cusk_sig . unLoc) tlkss }
+    filter_out_cusk_sigs' (XTyClGroup nec) = noExtCon nec
+    is_cusk_sig (TopKindSig _ (TopKindSigFromCusk fromCusk) _ _) = fromCusk
+    is_cusk_sig (XTopKindSig nec) = noExtCon nec
 
 thBrackets :: SDoc -> SDoc -> SDoc
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>

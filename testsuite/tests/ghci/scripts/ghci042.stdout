@@ -1,6 +1,14 @@
-data T = A {...} 	-- Defined at <interactive>:2:10
-data T = A {a :: Int} 	-- Defined at <interactive>:2:13
+type T :: *
+data T = A {...}
+  	-- Defined at <interactive>:2:10
+type T :: *
+data T = A {a :: Int}
+  	-- Defined at <interactive>:2:13
 a :: Integer 	-- Defined at <interactive>:5:5
 3
-data R = B {a :: Int} 	-- Defined at <interactive>:8:13
-data T = A {Ghci1.a :: Int} 	-- Defined at <interactive>:2:1
+type R :: *
+data R = B {a :: Int}
+  	-- Defined at <interactive>:8:13
+type T :: *
+data T = A {Ghci1.a :: Int}
+  	-- Defined at <interactive>:2:1

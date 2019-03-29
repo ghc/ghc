@@ -2,5 +2,7 @@
 T12035.hs-boot:2:1: error:
     Type constructor ‘T’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: type T = Bool
-    Boot file:   data T
+    Main module: type T :: *
+                 type T = Bool
+    Boot file:   type T :: *
+                 data T
