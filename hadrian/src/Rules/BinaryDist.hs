@@ -147,7 +147,7 @@ bindistRules = do
                    (["configure", "Makefile"] ++ bindistInstallFiles)
         need $ map ((bindistFilesDir -/- "wrappers") -/-) ["check-api-annotations"
                    , "check-ppr", "ghc", "ghc-iserv", "ghc-pkg"
-                   , "ghci-script", "ghci", "haddock", "hpc", "hp2ps", "hsc2hs"
+                   , "ghci-script", "haddock", "hpc", "hp2ps", "hsc2hs"
                    , "runghc"]
 
         -- Finally, we create the archive <root>/bindist/ghc-X.Y.Z-platform.tar.xz
@@ -293,9 +293,8 @@ bindistMakefile = unlines
     , "\tdone"
     , ""
     , "install_ghci:"
-    , "\t@echo \"Copying and installing ghci\""
-    , "\t$(CREATE_SCRIPT) '$(WrapperBinsDir)/ghci'"
-    , "\t@echo \"#!$(SHELL)\" >>  '$(WrapperBinsDir)/ghci'"
+    , "\t@echo \"Installing ghci wrapper\""
+    , "\t@echo \"#!$(SHELL)\" >  '$(WrapperBinsDir)/ghci'"
     , "\tcat wrappers/ghci-script >> '$(WrapperBinsDir)/ghci'"
     , "\t$(EXECUTABLE_FILE) '$(WrapperBinsDir)/ghci'"
     , ""
@@ -331,6 +330,7 @@ bindistMakefile = unlines
     , "\t\t$(call installscript,$p,$(WrapperBinsDir)/$p," ++
       "$(WrapperBinsDir),$(ActualBinsDir),$(ActualBinsDir)/$p," ++
       "$(ActualLibsDir),$(docdir),$(includedir)))"
+    , "\trm -f '$(WrapperBinsDir)/ghci-script'" -- FIXME: we shouldn't generate it in the first place
     , ""
     , "PKG_CONFS = $(wildcard $(ActualLibsDir)/package.conf.d/*)"
     , "update_package_db:"
@@ -356,7 +356,6 @@ bindistMakefile = unlines
 wrapper :: FilePath -> String
 wrapper "ghc"         = ghcWrapper
 wrapper "ghc-pkg"     = ghcPkgWrapper
-wrapper "ghci"        = ghciWrapper
 wrapper "ghci-script" = ghciScriptWrapper
 wrapper "haddock"     = haddockWrapper
 wrapper "hsc2hs"      = hsc2hsWrapper
@@ -372,9 +371,6 @@ ghcPkgWrapper :: String
 ghcPkgWrapper = unlines
     [ "PKGCONF=\"$libdir/package.conf.d\""
     , "exec \"$executablename\" --global-package-db \"$PKGCONF\" ${1+\"$@\"}" ]
-
-ghciWrapper :: String
-ghciWrapper = "exec \"$executablename\" --interactive \"$@\"\n"
 
 haddockWrapper :: String
 haddockWrapper = "exec \"$executablename\" -B\"$libdir\" -l\"$libdir\" ${1+\"$@\"}\n"
