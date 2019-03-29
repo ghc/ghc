@@ -367,3 +367,9 @@ test('T15578',
      only_ways(['normal'])],
     compile_and_run,
     ['-O2'])
+
+test('T16473',
+    [collect_stats('bytes allocated', 5),
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O2'])
