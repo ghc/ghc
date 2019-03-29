@@ -1,0 +1,2 @@
+C :: j -> Constraint
+T :: forall j -> j -> Type

@@ -14,7 +14,9 @@
 bkpfail06.bkp:10:9: error:
     • Type constructor ‘T’ has conflicting definitions in the module
       and its hsig file
-      Main module: data T = T GHC.Types.Bool
-      Hsig file:  data T = T GHC.Types.Int
+      Main module: type T :: *
+                   data T = T GHC.Types.Bool
+      Hsig file:  type T :: *
+                  data T = T GHC.Types.Int
       The constructors do not match: The types for ‘T’ differ
     • while checking that qimpl:H implements signature H in p[H=qimpl:H]

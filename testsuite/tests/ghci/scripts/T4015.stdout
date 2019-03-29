@@ -1,20 +1,31 @@
+type R :: *
 data R
   = R {x :: Char, y :: Int, z :: Float}
   | S {x :: Char}
   | T {y :: Int, z :: Float}
   | W
+type R :: *
 data R
   = R {x :: Char, y :: Int, z :: Float}
   | S {x :: Char}
   | T {y :: Int, z :: Float}
   | W
   	-- Defined at T4015.hs:3:1
-data R = ... | S {...} | ... 	-- Defined at T4015.hs:4:10
-data R = ... | T {...} | ... 	-- Defined at T4015.hs:5:10
-data R = ... | W 	-- Defined at T4015.hs:6:10
+type R :: *
+data R = ... | S {...} | ...
+  	-- Defined at T4015.hs:4:10
+type R :: *
+data R = ... | T {...} | ...
+  	-- Defined at T4015.hs:5:10
+type R :: *
+data R = ... | W
+  	-- Defined at T4015.hs:6:10
+type R :: *
 data R = R {x :: Char, ...} | S {x :: Char} | ...
   	-- Defined at T4015.hs:3:14
+type R :: *
 data R = R {..., y :: Int, ...} | ... | T {y :: Int, ...} | ...
   	-- Defined at T4015.hs:3:25
+type R :: *
 data R = R {..., z :: Float} | ... | T {..., z :: Float} | ...
   	-- Defined at T4015.hs:3:35

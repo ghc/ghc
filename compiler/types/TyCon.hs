@@ -41,6 +41,7 @@ module TyCon(
         mkFamilyTyCon,
         mkPromotedDataCon,
         mkTcTyCon,
+        noTcTyConScopedTyVars,
 
         -- ** Predicates on TyCons
         isAlgTyCon, isVanillaAlgTyCon,
@@ -475,6 +476,8 @@ isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
 isInvisibleTyConBinder tcb = not (isVisibleTyConBinder tcb)
 
+-- Build the 'tyConKind' from the binders and the result kind.
+-- Keep in sync with 'mkTyConKind' in iface/IfaceType.
 mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
@@ -1682,6 +1685,9 @@ mkTcTyCon name binders res_kind scoped_tvs poly flav
             , tcTyConScopedTyVars = scoped_tvs
             , tcTyConIsPoly       = poly
             , tcTyConFlavour      = flav }
+
+noTcTyConScopedTyVars :: [(Name, TcTyVar)]
+noTcTyConScopedTyVars = []
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@.
 mkPrimTyCon :: Name -> [TyConBinder]

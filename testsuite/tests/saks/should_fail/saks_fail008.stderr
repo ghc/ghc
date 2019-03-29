@@ -1,0 +1,5 @@
+
+saks_fail008.hs:9:1: error:
+    • Not a function kind: *
+      but extra binders found: x1 (x2 :: Type -> Type)
+    • In the data type declaration for ‘T’

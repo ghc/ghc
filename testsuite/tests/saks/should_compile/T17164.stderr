@@ -1,0 +1,7 @@
+T17164.hs:(12,3)-(14,6): Splicing declarations
+    [d| type T_ash :: forall k_aXc -> k_aXc -> Type
+        
+        type family T_ash :: forall k_asi -> k_asi -> Type |]
+  ======>
+    type T_a4bZ :: forall k_a4c0 -> k_a4c0 -> Type
+    type family T_a4bZ :: forall k_a4c1 -> k_a4c1 -> Type
