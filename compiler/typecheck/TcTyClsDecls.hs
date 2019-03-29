@@ -154,13 +154,17 @@ tcTyClGroup :: TyClGroup GhcRn
 -- See Note [TyClGroups and dependency analysis] in HsDecls
 tcTyClGroup (TyClGroup { group_tyclds = tyclds
                        , group_roles  = roles
+                       , group_tlkss  = tlkss
                        , group_instds = instds })
   = do { let role_annots = mkRoleAnnotEnv roles
 
-           -- Step 1: Typecheck the type/class declarations
+           -- Step 1: Typecheck the top-level kind signatures and type/class declarations
        ; traceTc "---- tcTyClGroup ---- {" empty
        ; traceTc "Decls for" (ppr (map (tcdName . unLoc) tyclds))
-       ; (tyclss, data_deriv_info) <- tcTyClDecls tyclds role_annots
+       ; (tyclss, data_deriv_info) <-
+           tcExtendKindEnv (mkPromotionErrorEnv tyclds) $ -- See Note [Type environment evolution]
+           do { tlks_env <- tcTLKSs tlkss
+              ; tcTyClDecls tyclds tlks_env role_annots }
 
            -- Step 1.5: Make sure we don't have any type synonym cycles
        ; traceTc "Starting synonym cycle check" (ppr tyclss)
@@ -196,16 +200,23 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
 
 tcTyClGroup (XTyClGroup nec) = noExtCon nec
 
+-- Gives the kind for every TyCon that has a top-level kind signature, either
+-- user-written or derived from a CUSK.
+type KindSigEnv = NameEnv Kind
+
+tcTLKSs :: [LTopKindSig GhcRn] -> TcM KindSigEnv
+tcTLKSs tlkss = mkNameEnv <$> traverse tcTLKS tlkss
+
 tcTyClDecls
   :: [LTyClDecl GhcRn]
+  -> KindSigEnv
   -> RoleAnnotEnv
   -> TcM ([TyCon], [DerivInfo])
-tcTyClDecls tyclds role_annots
-  = tcExtendKindEnv promotion_err_env $   --- See Note [Type environment evolution]
-    do {    -- Step 1: kind-check this group and returns the final
+tcTyClDecls tyclds tlks_env role_annots
+  = do {    -- Step 1: kind-check this group and returns the final
             -- (possibly-polymorphic) kind of each TyCon and Class
             -- See Note [Kind checking for type and class decls]
-         tc_tycons <- kcTyClGroup tyclds
+         tc_tycons <- kcTyClGroup tlks_env tyclds
        ; traceTc "tcTyAndCl generalized kinds" (vcat (map ppr_tc_tycon tc_tycons))
 
             -- Step 2: type-check all groups together, returning
@@ -236,7 +247,6 @@ tcTyClDecls tyclds role_annots
            ; return (tycons, concat data_deriv_infos)
            } }
   where
-    promotion_err_env = mkPromotionErrorEnv tyclds
     ppr_tc_tycon tc = parens (sep [ ppr (tyConName tc) <> comma
                                   , ppr (tyConBinders tc) <> comma
                                   , ppr (tyConResKind tc)
@@ -505,13 +515,13 @@ been generalized.
 
 -}
 
-kcTyClGroup :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
+kcTyClGroup :: KindSigEnv -> [LTyClDecl GhcRn] -> TcM [TcTyCon]
 
 -- Kind check this group, kind generalize, and return the resulting local env
 -- This binds the TyCons and Classes of the group, but not the DataCons
 -- See Note [Kind checking for type and class decls]
 -- and Note [Inferring kinds for type declarations]
-kcTyClGroup decls
+kcTyClGroup tlks_env decls
   = do  { mod <- getModule
         ; traceTc "---- kcTyClGroup ---- {"
                   (text "module" <+> ppr mod $$ vcat (map ppr decls))
@@ -522,20 +532,21 @@ kcTyClGroup decls
           --    3. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
-        ; cusks_enabled <- xoptM LangExt.CUSKs
-        ; let (cusk_decls, no_cusk_decls)
-                 = partition (hsDeclHasCusk cusks_enabled . unLoc) decls
+        ; let (kindless_decls, kinded_decls)
+                 = partitionWith getTLKS decls
+              getTLKS d | Just ki <- lookupNameEnv tlks_env (tcdName (unLoc d))
+                        = Right (d, ki)
+                        | otherwise = Left d
 
-        ; poly_cusk_tcs <- getInitialKinds True cusk_decls
-
+        ; kinded_tcs <- checkInitialKinds kinded_decls
         ; mono_tcs
-            <- tcExtendKindEnvWithTyCons poly_cusk_tcs $
+            <- tcExtendKindEnvWithTyCons kinded_tcs $
                pushTcLevelM_   $  -- We are going to kind-generalise, so
                                   -- unification variables in here must
                                   -- be one level in
                solveEqualities $
                do {  -- Step 1: Bind kind variables for all decls
-                    mono_tcs <- getInitialKinds False no_cusk_decls
+                    mono_tcs <- getInitialKinds kindless_decls
 
                   ; traceTc "kcTyClGroup: initial kinds" $
                     ppr_tc_kinds mono_tcs
@@ -546,7 +557,7 @@ kcTyClGroup decls
                     --     See Note [Type environment evolution]
                   ; poly_kinds  <- xoptM LangExt.PolyKinds
                   ; tcExtendKindEnvWithTyCons mono_tcs $
-                    mapM_ kcLTyClDecl (if poly_kinds then no_cusk_decls else decls)
+                    mapM_ kcLTyClDecl (if poly_kinds then kindless_decls else decls)
                     -- See Note [Skip decls with CUSKs in kcLTyClDecl]
 
                   ; return mono_tcs }
@@ -555,9 +566,9 @@ kcTyClGroup decls
         -- Finally, go through each tycon and give it its final kind,
         -- with all the required, specified, and inferred variables
         -- in order.
-        ; poly_no_cusk_tcs <- mapAndReportM generaliseTcTyCon mono_tcs
+        ; poly_kindless_tcs <- mapAndReportM generaliseTcTyCon mono_tcs
 
-        ; let poly_tcs = poly_cusk_tcs ++ poly_no_cusk_tcs
+        ; let poly_tcs = kinded_tcs ++ poly_kindless_tcs
         ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
         ; return poly_tcs }
 
@@ -656,6 +667,7 @@ generaliseTcTyCon tc
        -- Step 7: Make the result TcTyCon
              tycon = mkTcTyCon tc_name final_tcbs tc_res_kind
                             (mkTyVarNamePairs final_spec_req_tvs)
+                            noTcTyConHeaderKiVars
                             True {- it's generalised now -}
                             (tyConFlavour tc)
 
@@ -821,7 +833,7 @@ that do not have a CUSK.  Consider
 
 We do kind inference as follows:
 
-* Step 1: getInitialKinds, and in particular kcLHsQTyVars_NonCusk.
+* Step 1: getInitialKinds, and in particular kcLHsQTyVars.
   Make a unification variable for each of the Required and Specified
   type varialbes in the header.
 
@@ -997,17 +1009,17 @@ mk_prom_err_env decl
     -- Works for family declarations too
 
 --------------
-getInitialKinds :: Bool -> [LTyClDecl GhcRn] -> TcM [TcTyCon]
+getInitialKinds :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
 -- Returns a TcTyCon for each TyCon bound by the decls,
 -- each with its initial kind
 
-getInitialKinds cusk decls
+getInitialKinds decls
   = do { traceTc "getInitialKinds {" empty
-       ; tcs <- concatMapM (addLocM (getInitialKind cusk)) decls
+       ; tcs <- concatMapM (addLocM getInitialKind) decls
        ; traceTc "getInitialKinds done }" empty
        ; return tcs }
 
-getInitialKind :: Bool -> TyClDecl GhcRn -> TcM [TcTyCon]
+getInitialKind :: TyClDecl GhcRn -> TcM [TcTyCon]
 -- Allocate a fresh kind variable for each TyCon and Class
 -- For each tycon, return a TcTyCon with kind k
 -- where k is the kind of tc, derived from the LHS
@@ -1022,106 +1034,247 @@ getInitialKind :: Bool -> TyClDecl GhcRn -> TcM [TcTyCon]
 --
 -- No family instances are passed to getInitialKinds
 
-getInitialKind cusk
+getInitialKind
     (ClassDecl { tcdLName = dL->L _ name
                , tcdTyVars = ktvs
                , tcdATs = ats })
-  = do { tycon <- kcLHsQTyVars name ClassFlavour cusk ktvs $
+  = do { tycon <- kcLHsQTyVars name ClassFlavour ktvs $
                   return constraintKind
        ; let parent_tv_prs = tcTyConScopedTyVars tycon
             -- See Note [Don't process associated types in kcLHsQTyVars]
        ; inner_tcs <- tcExtendNameTyVarEnv parent_tv_prs $
-                      getFamDeclInitialKinds cusk (Just tycon) ats
+                      getFamDeclInitialKinds (Just tycon) ats
        ; return (tycon : inner_tcs) }
 
-getInitialKind cusk
+getInitialKind
     (DataDecl { tcdLName = dL->L _ name
               , tcdTyVars = ktvs
               , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
                                          , dd_ND = new_or_data } })
   = do  { let flav = newOrDataToFlavour new_or_data
-        ; tc <- kcLHsQTyVars name flav cusk ktvs $
-                -- See Note [Implementation of UnliftedNewtypes]
-                do { unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-                   ; case m_sig of
-                       Just ksig -> tcLHsKindSig (DataKindCtxt name) ksig
-                       Nothing
-                         |  NewType <- new_or_data
-                         ,  unlifted_newtypes -> newOpenTypeKind
-                         |  otherwise -> pure liftedTypeKind
-                   }
+        ; tc <- kcLHsQTyVars name flav ktvs $
+                case m_sig of
+                  Just ksig -> tcLHsKindSig (DataKindCtxt name) ksig
+                  Nothing -> dataDeclDefaultResultKind new_or_data
         ; return [tc] }
 
-getInitialKind cusk (FamDecl { tcdFam = decl })
-  = do { tc <- getFamDeclInitialKind cusk Nothing decl
+getInitialKind (FamDecl { tcdFam = decl })
+  = do { tc <- getFamDeclInitialKind Nothing decl
        ; return [tc] }
 
-getInitialKind cusk (SynDecl { tcdLName = dL->L _ name
-                             , tcdTyVars = ktvs
-                             , tcdRhs = rhs })
-  = do  { cusks_enabled <- xoptM LangExt.CUSKs
-        ; tycon <- kcLHsQTyVars name TypeSynonymFlavour cusk ktvs $
-                   case kind_annotation cusks_enabled rhs of
-                     Just ksig -> tcLHsKindSig (TySynKindCtxt name) ksig
-                     Nothing -> newMetaKindVar
-        ; return [tycon] }
-  where
-    -- Keep this synchronized with 'hsDeclHasCusk'.
-    kind_annotation
-      :: Bool           --  cusks_enabled?
-      -> LHsType GhcRn  --  rhs
-      -> Maybe (LHsKind GhcRn)
-    kind_annotation False = const Nothing
-    kind_annotation True = go
-      where
-        go (dL->L _ ty) = case ty of
-          HsParTy _ lty     -> go lty
-          HsKindSig _ _ k   -> Just k
-          _                 -> Nothing
+getInitialKind (SynDecl { tcdLName = dL->L _ name, tcdTyVars = ktvs })
+  = do  { tc <- kcLHsQTyVars name TypeSynonymFlavour ktvs newMetaKindVar
+        ; return [tc] }
 
-getInitialKind _ (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
-getInitialKind _ (XTyClDecl nec) = noExtCon nec
+getInitialKind (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
+getInitialKind (XTyClDecl nec) = noExtCon nec
+
+-- Check type/class declarations against their top-level kind signatures,
+-- producing a generalized TcTyCon for each.
+checkInitialKinds :: [(LTyClDecl GhcRn, Kind)] -> TcM [TcTyCon]
+checkInitialKinds = concatMapM check_initial_kind
+  where
+    check_initial_kind (dL -> L l d, ki) =
+      setSrcSpan l (checkInitialKind ki d)
+
+checkInitialKind :: Kind -> TyClDecl GhcRn -> TcM [TcTyCon]
+checkInitialKind ki
+    (ClassDecl { tcdLName = dL->L _ name
+               , tcdTyVars = ktvs
+               , tcdATs = ats })
+  = do { tycon <- kcDeclHeader name ClassFlavour ki ktvs $
+                  Just $ return constraintKind
+            -- See Note [Don't process associated types in kcLHsQTyVars]
+       ; inner_tcs <- mapM (addLocM (checkInitialKindAssocFam tycon)) ats
+       ; return (tycon : inner_tcs) }
+checkInitialKind ki
+    (DataDecl { tcdLName = dL->L _ name
+              , tcdTyVars = ktvs
+              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
+                                         , dd_ND = new_or_data } })
+  = do { let flav = newOrDataToFlavour new_or_data
+             ctxt = DataKindCtxt name
+       ; tc <- kcDeclHeader name flav ki ktvs $
+               Just $ case m_sig of
+                  Just ksig -> tcLHsKindSig ctxt ksig
+                  Nothing   -> dataDeclDefaultResultKind new_or_data
+       ; return [tc] }
+checkInitialKind ki (FamDecl { tcdFam =
+  FamilyDecl { fdLName     = unLoc -> name
+             , fdTyVars    = ktvs
+             , fdResultSig = unLoc -> resultSig
+             , fdInfo      = info } } )
+  = do { let flav = getFamFlav Nothing info
+             ctxt = TyFamResKindCtxt name
+       ; tc <- kcDeclHeader name flav ki ktvs $
+               fmap (tcLHsKindSig ctxt) (famResultKindSignature resultSig)
+       ; return [tc] }
+checkInitialKind ki
+    (SynDecl { tcdLName = dL->L _ name
+             , tcdTyVars = ktvs
+             , tcdRhs = rhs })
+  = do  { let ctxt = TySynKindCtxt name
+        ; tc <- kcDeclHeader name TypeSynonymFlavour ki ktvs $
+                fmap (tcLHsKindSig ctxt) (kind_annotation rhs)
+        ; return [tc] }
+  where
+    -- Needed to get the correct arity:
+    --
+    --  type T :: forall a. a -> Type
+    --  type T = (D :: forall a. a -> Type)
+    --
+    --  Without the signature, we would instantiate 'a'.
+    kind_annotation (dL->L _ ty) =
+      case ty of
+        HsParTy _ lty     -> kind_annotation lty
+        HsKindSig _ _ k   -> Just k
+        _                 -> Nothing
+
+checkInitialKind _ (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
+checkInitialKind _ (FamDecl {tcdFam = XFamilyDecl nec}) = noExtCon nec
+checkInitialKind _ (XTyClDecl nec) = noExtCon nec
+
+-- See Note [Top-level kind signatures for associated types]
+checkInitialKindAssocFam
+  :: TyCon -- parent class
+  -> FamilyDecl GhcRn
+  -> TcM TcTyCon
+checkInitialKindAssocFam cls
+  FamilyDecl
+    { fdLName     = unLoc -> name
+    , fdTyVars    = ktvs
+    , fdResultSig = unLoc -> resultSig
+    , fdInfo      = info }
+  = kcAssocFamDecl cls name flav ktvs (famResultKindSignature resultSig)
+  where
+    flav = getFamFlav (Just cls) info
+checkInitialKindAssocFam _ (XFamilyDecl nec) = noExtCon nec
+
+{- Note [Top-level kind signatures for associated types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If ATs had TLKSs, would they wear them
+
+  like this? (OUT)           ||       or like this? (IN)
+                             ||
+  type T :: Type -> Type     ||       class C a where
+  class C a where            ||         type T :: Type -> Type
+    type T a                 ||         type T a
+
+The (IN) variant is syntactically ambiguous:
+
+  class C a where
+    type T :: a   -- TLKS?
+    type T :: a   -- declaration header?
+
+The (OUT) variant does not suffer from this issue, but it might not be the
+direction in which we want to take Haskell: we seek to unify type families and
+functions, and, by extension, associated types with class methods. And yet we
+give class methods their signatures inside the class, not outside. Neither do
+we have the counterpart of InstanceSigs for TopLevelKindSignatures.
+
+For now, we dodge the question by using CUSKs for ATs instead of TLKSs. This
+is a simple addition to the rule we used to have before TLKSs:
+
+  AT has a CUSK iff its parent class has a CUSK           -- old rule
+  AT has a CUSK iff its parent class has a CUSK or a TLKS -- new rule
+
+This arrangement is intended as a temporary solution. Long term, we might add
+syntax for specifying /arity/ and /injectivity/ in the type signature (to allow
+standalone TLKSs in .hs-boot files). Then ATs will not need declaration
+headers, resolving the ambiguity of the (IN) variant.
+
+-}
+
+-- See Note [Data declaration default result kind]
+dataDeclDefaultResultKind :: NewOrData -> TcM Kind
+dataDeclDefaultResultKind new_or_data = do
+  -- See Note [Implementation of UnliftedNewtypes]
+  unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
+  case new_or_data of
+    NewType | unlifted_newtypes -> newOpenTypeKind
+    _ -> pure liftedTypeKind
+
+{- Note [Data declaration default result kind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the user has not written an inline result kind annotation on a data
+declaration, we assume it to be 'Type'. That is, the following declarations
+D1 and D2 are considered equivalent:
+
+  data D1         where ...
+  data D2 :: Type where ...
+
+The consequence of this assumption is that we reject D3 even though we
+accept D4:
+
+  data D3 where
+    MkD3 :: ... -> D3 param
+
+  data D4 :: Type -> Type where
+    MkD4 :: ... -> D4 param
+
+However, there's a twist: when -XUnliftedNewtypes are enabled, we must relax
+the assumed result kind to (TYPE r) for newtypes:
+
+  newtype D5 where
+    MkD5 :: Int# -> D5
+
+dataDeclDefaultResultKind takes care to produce the appropriate result kind.
+-}
 
 ---------------------------------
 getFamDeclInitialKinds
-  :: Bool        -- ^ True <=> cusk
-  -> Maybe TyCon -- ^ Just cls <=> this is an associated family of class cls
+  :: Maybe TyCon -- ^ Just cls <=> this is an associated family of class cls
   -> [LFamilyDecl GhcRn]
   -> TcM [TcTyCon]
-getFamDeclInitialKinds cusk mb_parent_tycon decls
-  = mapM (addLocM (getFamDeclInitialKind cusk mb_parent_tycon)) decls
+getFamDeclInitialKinds mb_parent_tycon decls
+  = mapM (addLocM (getFamDeclInitialKind mb_parent_tycon)) decls
 
 getFamDeclInitialKind
-  :: Bool        -- ^ True <=> cusk
-  -> Maybe TyCon -- ^ Just cls <=> this is an associated family of class cls
+  :: Maybe TyCon -- ^ Just cls <=> this is an associated family of class cls
   -> FamilyDecl GhcRn
   -> TcM TcTyCon
-getFamDeclInitialKind parent_cusk mb_parent_tycon
-    decl@(FamilyDecl { fdLName     = (dL->L _ name)
-                     , fdTyVars    = ktvs
-                     , fdResultSig = (dL->L _ resultSig)
-                     , fdInfo      = info })
-  = do { cusks_enabled <- xoptM LangExt.CUSKs
-       ; kcLHsQTyVars name flav (fam_cusk cusks_enabled) ktvs $
-         case resultSig of
-           KindSig _ ki                              -> tcLHsKindSig ctxt ki
-           TyVarSig _ (dL->L _ (KindedTyVar _ _ ki)) -> tcLHsKindSig ctxt ki
-           _ -- open type families have * return kind by default
-             | tcFlavourIsOpen flav              -> return liftedTypeKind
-                    -- closed type families have their return kind inferred
-                    -- by default
-             | otherwise                         -> newMetaKindVar
-       }
+getFamDeclInitialKind mb_parent_tycon
+    FamilyDecl { fdLName     = (dL->L _ name)
+               , fdTyVars    = ktvs
+               , fdResultSig = (dL->L _ resultSig)
+               , fdInfo      = info }
+  = kcLHsQTyVars name flav ktvs $
+    case resultSig of
+      KindSig _ ki                              -> tcLHsKindSig ctxt ki
+      TyVarSig _ (dL->L _ (KindedTyVar _ _ ki)) -> tcLHsKindSig ctxt ki
+      _ -- open type families have * return kind by default
+        | tcFlavourIsOpen flav              -> return liftedTypeKind
+               -- closed type families have their return kind inferred
+               -- by default
+        | otherwise                         -> newMetaKindVar
   where
-    assoc_with_no_cusk = isJust mb_parent_tycon && not parent_cusk
-    fam_cusk cusks_enabled = famDeclHasCusk cusks_enabled assoc_with_no_cusk decl
-    flav = case info of
-      DataFamily         -> DataFamilyFlavour mb_parent_tycon
-      OpenTypeFamily     -> OpenTypeFamilyFlavour mb_parent_tycon
-      ClosedTypeFamily _ -> ASSERT( isNothing mb_parent_tycon )
-                            ClosedTypeFamilyFlavour
+    flav = getFamFlav mb_parent_tycon info
     ctxt  = TyFamResKindCtxt name
-getFamDeclInitialKind _ _ (XFamilyDecl nec) = noExtCon nec
+getFamDeclInitialKind _ (XFamilyDecl nec) = noExtCon nec
+
+getFamFlav
+  :: Maybe TyCon      -- ^ Just cls <=> this is an associated family of class cls
+  -> FamilyInfo pass
+  -> TyConFlavour
+getFamFlav mb_parent_tycon info =
+  case info of
+    DataFamily         -> DataFamilyFlavour mb_parent_tycon
+    OpenTypeFamily     -> OpenTypeFamilyFlavour mb_parent_tycon
+    ClosedTypeFamily _ -> ASSERT( isNothing mb_parent_tycon ) -- See Note [Closed type family mb_parent_tycon]
+                          ClosedTypeFamilyFlavour
+
+{- Note [Closed type family mb_parent_tycon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There's no way to write a closed type family inside a class declaration:
+
+  class C a where
+    type family F a where  -- error: parse error on input ‘where’
+
+In fact, it is not clear what the meaning of such a declaration would be.
+Therefore, 'mb_parent_tycon' of any closed type family has to be Nothing.
+-}
 
 ------------------------------------------------------------------------
 kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
@@ -1304,7 +1457,7 @@ corner, to pass to kcConDecl c.f. #16828. Hence the splitPiTys here.
 I am a bit concerned about tycons with a declaration like
    data T a :: Type -> forall k. k -> Type  where ...
 
-It does not have a CUSK, so kcLHsQTyVars_NonCusk will make a TcTyCon
+It does not have a CUSK, so kcLHsQTyVars will make a TcTyCon
 with tyConResKind of Type -> forall k. k -> Type.  Even that is fine:
 the splitPiTys will look past the forall.  But I'm bothered about
 what if the type "in the corner" metions k?  This is incredibly
@@ -1587,6 +1740,7 @@ wiredInDerivInfo tycon decl
   | DataDecl { tcdDataDefn = dataDefn } <- decl
   , HsDataDefn { dd_derivs = derivs } <- dataDefn
   = [ DerivInfo { di_rep_tc = tycon
+                , di_extra_tvs = []
                 , di_clauses = unLoc derivs
                 , di_ctxt = tcMkDeclCtxt decl } ]
 wiredInDerivInfo _ _ = []
@@ -1645,8 +1799,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
   = fixM $ \ clas ->
     -- We need the knot because 'clas' is passed into tcClassATs
     bindTyClTyVars class_name $ \ binders res_kind ->
-    do { MASSERT2( tcIsConstraintKind res_kind
-                 , ppr class_name $$ ppr res_kind )
+    do { checkClassKindSig res_kind
        ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
        ; let tycon_name = class_name        -- We use the same name
              roles = roles_info tycon_name  -- for TyCon and Class
@@ -1981,7 +2134,9 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
 
          -- Process the equations, creating CoAxBranches
        ; let tc_fam_tc = mkTcTyCon tc_name binders res_kind
-                                   [] False {- this doesn't matter here -}
+                                   noTcTyConScopedTyVars
+                                   noTcTyConHeaderKiVars
+                                   False {- this doesn't matter here -}
                                    ClosedTypeFamilyFlavour
 
        ; branches <- mapAndReportM (tcTyFamInstEqn tc_fam_tc NotAssociated) eqns
@@ -2120,7 +2275,11 @@ tcDataDefn err_ctxt
                                   stupid_theta tc_rhs
                                   (VanillaAlgTyCon tc_rep_nm)
                                   gadt_syntax) }
+       ; ATcTyCon tctc <- tcLookup tc_name
+            -- 'tctc' is a 'TcTyCon' and has the 'tcTyConHeaderKiVars' that we need
+            -- unlike the finalized 'tycon' defined above which is an 'AlgTyCon'
        ; let deriv_info = DerivInfo { di_rep_tc = tycon
+                                    , di_extra_tvs = tcTyConHeaderKiVars tctc
                                     , di_clauses = unLoc derivs
                                     , di_ctxt = err_ctxt }
        ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
@@ -4112,7 +4271,7 @@ badMethPred sel_id pred
 
 noClassTyVarErr :: Class -> TyCon -> SDoc
 noClassTyVarErr clas fam_tc
-  = sep [ text "The associated type" <+> quotes (ppr fam_tc)
+  = sep [ text "The associated type" <+> quotes (ppr fam_tc <+> hsep (map ppr (tyConTyVars fam_tc)))
         , text "mentions none of the type or kind variables of the class" <+>
                 quotes (ppr clas <+> hsep (map ppr (classTyVars clas)))]
 

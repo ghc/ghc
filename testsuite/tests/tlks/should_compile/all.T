@@ -1,0 +1,48 @@
+setTestOpts(normalise_version('base','ghc-prim'))
+
+test('tlks001', normal, compile, [''])
+test('tlks002', normal, compile, [''])
+test('tlks003', normal, compile, [''])
+test('tlks004', normal, compile, [''])
+test('tlks005', normal, compile, [''])
+test('tlks006', normal, compile, [''])
+test('tlks007', normal, compile, [''])
+test('tlks008', normal, compile, [''])
+test('tlks009', normal, compile, [''])
+test('tlks010', normal, compile, [''])
+test('tlks014', normal, compile, [''])
+test('tlks015', normal, compile, [''])
+test('tlks016', normal, compile, [''])
+test('tlks017', normal, compile, [''])
+test('tlks018', normal, compile, [''])
+test('tlks019', normal, compile, [''])
+test('tlks020', normal, compile, [''])
+test('tlks021', normal, compile, [''])
+test('tlks023', normal, ghci_script, ['tlks023.script'])
+test('tlks024', normal, compile, [''])
+test('tlks025', extra_files(['tlks025.hs']), ghci_script, ['tlks025.script'])
+test('tlks026', normal, compile, [''])
+test('tlks029', normal, compile, [''])
+test('tlks030', normal, compile, [''])
+test('tlks031', normal, compile, [''])
+test('tlks032', normal, compile, [''])
+test('tlks033', normal, compile, [''])
+test('tlks034', extra_files(['tlks034.hs']), ghci_script, ['tlks034.script'])
+test('tlks035', extra_files(['tlks035.hs']), ghci_script, ['tlks035.script'])
+test('tlks036', normal, compile, [''])
+test('T16723', normal, compile, [''])
+test('T16724', extra_files(['T16724.hs']), ghci_script, ['T16724.script'])
+test('T16726', normal, compile, [''])
+test('T16731', normal, compile, [''])
+test('T16758', expect_broken(16758), compile, [''])
+test('T16721', normal, ghci_script, ['T16721.script'])
+test('T16756a', normal, compile, [''])
+
+# We omit 'profasm' because it fails with:
+# Cannot load -prof objects when GHC is built with -dynamic
+#     To fix this, either:
+#       (1) Use -fexternal-interpreter, or
+#       (2) Build the program twice: once with -dynamic, and then
+#           with -prof using -osuf to set a different object file suffix.
+test('tlks027', omit_ways(['profasm']), compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('tlks028', omit_ways(['profasm']), compile, [''])

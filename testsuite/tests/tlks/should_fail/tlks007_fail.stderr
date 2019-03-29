@@ -1,0 +1,8 @@
+
+tlks007_fail.hs:15:10: error:
+    • Couldn't match kind ‘'True’ with ‘'False’
+      Expected kind: G *
+        Actual kind: F *
+    • In the type ‘X Integer String’
+      In the definition of data constructor ‘MkX’
+      In the data declaration for ‘X’
