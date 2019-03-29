@@ -46,6 +46,20 @@ Language
     type T = Just (Nothing :: Maybe a)         -- no longer accepted
     type T = Just Nothing :: Maybe (Maybe a)   -- still accepted
 
+- A new extension :extension:`StandaloneKindSignatures` allows one to explicitly
+  specify the kind of a type constructor, as proposed in `GHC proposal #54
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0054-kind-signatures.rst>`__: ::
+
+    type TypeRep :: forall k. k -> Type
+    data TypeRep a where
+      TyInt   :: TypeRep Int
+      TyMaybe :: TypeRep Maybe
+      TyApp   :: TypeRep a -> TypeRep b -> TypeRep (a b)
+
+  Analogous to function type signatures, a :ref:`standalone kind signature
+  <standalone-kind-signatures>` enables polymorphic recursion. This feature is
+  a replacement for :extension:`CUSKs`.
+
 - GHC now parses visible, dependent quantifiers (as proposed in
   `GHC proposal 35
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0035-forall-arrow.rst>`__),

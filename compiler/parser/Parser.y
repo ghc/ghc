@@ -1049,6 +1049,7 @@ topdecls_semi :: { OrdList (LHsDecl GhcPs) }
 topdecl :: { LHsDecl GhcPs }
         : cl_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
         | ty_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
+        | standalone_kind_sig                   { sL1 $1 (KindSigD noExtField (unLoc $1)) }
         | inst_decl                             { sL1 $1 (InstD noExtField (unLoc $1)) }
         | stand_alone_deriving                  { sLL $1 $> (DerivD noExtField (unLoc $1)) }
         | role_annot                            { sL1 $1 (RoleAnnotD noExtField (unLoc $1)) }
@@ -1130,6 +1131,19 @@ ty_decl :: { LTyClDecl GhcPs }
                 {% amms (mkFamDecl (comb3 $1 $2 $4) DataFamily $3
                                    (snd $ unLoc $4) Nothing)
                         (mj AnnData $1:mj AnnFamily $2:(fst $ unLoc $4)) }
+
+-- standalone kind signature
+standalone_kind_sig :: { LStandaloneKindSig GhcPs }
+  : 'type' sks_vars '::' ktypedoc
+      {% amms (mkStandaloneKindSig (comb2 $1 $4) $2 $4)
+              [mj AnnType $1,mu AnnDcolon $3] }
+
+-- See also: sig_vars
+sks_vars :: { Located [Located RdrName] }  -- Returned in reverse order
+  : sks_vars ',' oqtycon
+      {% addAnnotation (gl $ head $ unLoc $1) AnnComma (gl $2) >>
+         return (sLL $1 $> ($3 : unLoc $1)) }
+  | oqtycon { sL1 $1 [$1] }
 
 inst_decl :: { LInstDecl GhcPs }
         : 'instance' overlap_pragma inst_type where_inst

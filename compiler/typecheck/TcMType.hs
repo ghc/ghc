@@ -1587,11 +1587,10 @@ quantifyTyVars dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
       = return Nothing   -- this can happen for a covar that's associated with
                          -- a coercion hole. Test case: typecheck/should_compile/T2494
 
-      | not (isTcTyVar tkv)  -- I don't think this can ever happen.
-                             -- Hence the assert
-      = ASSERT2( False, text "quantifying over a TyVar" <+> ppr tkv)
-        return (Just tkv)
-
+      | not (isTcTyVar tkv)
+      = return (Just tkv)  -- For associated types in a class with a standalone
+                           -- kind signature, we have the class variables in
+                           -- scope, and they are TyVars not TcTyVars
       | otherwise
       = do { deflt_done <- defaultTyVar default_kind tkv
            ; case deflt_done of

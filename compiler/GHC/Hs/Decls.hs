@@ -20,18 +20,20 @@ module GHC.Hs.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep,
   HsDerivingClause(..), LHsDerivingClause, NewOrData(..), newOrDataToFlavour,
+  StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, DataDeclRn(..),
   TyClGroup(..),
   tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
+  tyClGroupKindSigs,
   isClassDecl, isDataDecl, isSynDecl, tcdName,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
   tyFamInstDeclName, tyFamInstDeclLName,
   countTyClDecls, pprTyClDeclFlavour,
   tyClDeclLName, tyClDeclTyVars,
-  hsDeclHasCusk, famDeclHasCusk,
+  hsDeclHasCusk, famResultKindSignature,
   FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
@@ -136,6 +138,7 @@ data HsDecl p
   | DerivD     (XDerivD p)     (DerivDecl p)     -- ^ Deriving declaration
   | ValD       (XValD p)       (HsBind p)        -- ^ Value declaration
   | SigD       (XSigD p)       (Sig p)           -- ^ Signature declaration
+  | KindSigD   (XKindSigD p)   (StandaloneKindSig p) -- ^ Standalone kind signature
   | DefD       (XDefD p)       (DefaultDecl p)   -- ^ 'default' declaration
   | ForD       (XForD p)       (ForeignDecl p)   -- ^ Foreign declaration
   | WarningD   (XWarningD p)   (WarnDecls p)     -- ^ Warning declaration
@@ -152,6 +155,7 @@ type instance XInstD      (GhcPass _) = NoExtField
 type instance XDerivD     (GhcPass _) = NoExtField
 type instance XValD       (GhcPass _) = NoExtField
 type instance XSigD       (GhcPass _) = NoExtField
+type instance XKindSigD   (GhcPass _) = NoExtField
 type instance XDefD       (GhcPass _) = NoExtField
 type instance XForD       (GhcPass _) = NoExtField
 type instance XWarningD   (GhcPass _) = NoExtField
@@ -278,6 +282,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsDecl p) where
     ppr (DerivD _ deriv)          = ppr deriv
     ppr (ForD _ fd)               = ppr fd
     ppr (SigD _ sd)               = ppr sd
+    ppr (KindSigD _ ksd)          = ppr ksd
     ppr (RuleD _ rd)              = ppr rd
     ppr (WarningD _ wd)           = ppr wd
     ppr (AnnD _ ad)               = ppr ad
@@ -304,6 +309,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsGroup p) where
                 then Nothing
                 else Just (ppr val_decls),
              ppr_ds (tyClGroupRoleDecls tycl_decls),
+             ppr_ds (tyClGroupKindSigs  tycl_decls),
              ppr_ds (tyClGroupTyClDecls tycl_decls),
              ppr_ds (tyClGroupInstDecls tycl_decls),
              ppr_ds deriv_decls,
@@ -658,7 +664,7 @@ tyClDeclLName :: TyClDecl pass -> Located (IdP pass)
 tyClDeclLName (FamDecl { tcdFam = FamilyDecl { fdLName = ln } }) = ln
 tyClDeclLName decl = tcdLName decl
 
-tcdName :: TyClDecl pass -> (IdP pass)
+tcdName :: TyClDecl pass -> IdP pass
 tcdName = unLoc . tyClDeclLName
 
 tyClDeclTyVars :: TyClDecl pass -> LHsQTyVars pass
@@ -682,25 +688,21 @@ countTyClDecls decls
 
 -- | Does this declaration have a complete, user-supplied kind signature?
 -- See Note [CUSKs: complete user-supplied kind signatures]
-hsDeclHasCusk
-  :: Bool  -- True <=> the -XCUSKs extension is enabled
-  -> TyClDecl GhcRn
-  -> Bool
-hsDeclHasCusk _cusks_enabled@False _ = False
-hsDeclHasCusk cusks_enabled (FamDecl { tcdFam = fam_decl })
-  = famDeclHasCusk cusks_enabled False fam_decl
-    -- False: this is not: an associated type of a class with no cusk
-hsDeclHasCusk _cusks_enabled@True (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
-  -- NB: Keep this synchronized with 'getInitialKind'
-  = hsTvbAllKinded tyvars && rhs_annotated rhs
-  where
-    rhs_annotated (L _ ty) = case ty of
-      HsParTy _ lty  -> rhs_annotated lty
-      HsKindSig {}   -> True
-      _              -> False
-hsDeclHasCusk _cusks_enabled@True (DataDecl { tcdDExt = DataDeclRn { tcdDataCusk = cusk }}) = cusk
-hsDeclHasCusk _cusks_enabled@True (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
-hsDeclHasCusk _ (XTyClDecl nec) = noExtCon nec
+hsDeclHasCusk :: TyClDecl GhcRn -> Bool
+hsDeclHasCusk (FamDecl { tcdFam =
+    FamilyDecl { fdInfo      = fam_info
+               , fdTyVars    = tyvars
+               , fdResultSig = L _ resultSig } }) =
+    case fam_info of
+      ClosedTypeFamily {} -> hsTvbAllKinded tyvars
+                          && isJust (famResultKindSignature resultSig)
+      _ -> True -- Un-associated open type/data families have CUSKs
+hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
+  = hsTvbAllKinded tyvars && isJust (hsTyKindSig rhs)
+hsDeclHasCusk (DataDecl { tcdDExt = DataDeclRn { tcdDataCusk = cusk }}) = cusk
+hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
+hsDeclHasCusk (FamDecl { tcdFam = XFamilyDecl nec }) = noExtCon nec
+hsDeclHasCusk (XTyClDecl nec) = noExtCon nec
 
 -- Pretty-printing TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -742,10 +744,13 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (TyClGroup p) where
   ppr (TyClGroup { group_tyclds = tyclds
                  , group_roles = roles
+                 , group_kisigs = kisigs
                  , group_instds = instds
                  }
       )
-    = ppr tyclds $$
+    = hang (text "TyClGroup") 2 $
+      ppr kisigs $$
+      ppr tyclds $$
       ppr roles $$
       ppr instds
   ppr (XTyClGroup x) = ppr x
@@ -777,8 +782,8 @@ pprTyClDeclFlavour (ClassDecl {})   = text "class"
 pprTyClDeclFlavour (SynDecl {})     = text "type"
 pprTyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
   = pprFlavour info <+> text "family"
-pprTyClDeclFlavour (FamDecl { tcdFam = XFamilyDecl x})
-  = ppr x
+pprTyClDeclFlavour (FamDecl { tcdFam = XFamilyDecl nec })
+  = noExtCon nec
 pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })
   = ppr nd
 pprTyClDeclFlavour (DataDecl { tcdDataDefn = XHsDataDefn x })
@@ -910,6 +915,7 @@ data TyClGroup pass  -- See Note [TyClGroups and dependency analysis]
   = TyClGroup { group_ext    :: XCTyClGroup pass
               , group_tyclds :: [LTyClDecl pass]
               , group_roles  :: [LRoleAnnotDecl pass]
+              , group_kisigs :: [LStandaloneKindSig pass]
               , group_instds :: [LInstDecl pass] }
   | XTyClGroup (XXTyClGroup pass)
 
@@ -926,6 +932,8 @@ tyClGroupInstDecls = concatMap group_instds
 tyClGroupRoleDecls :: [TyClGroup pass] -> [LRoleAnnotDecl pass]
 tyClGroupRoleDecls = concatMap group_roles
 
+tyClGroupKindSigs :: [TyClGroup pass] -> [LStandaloneKindSig pass]
+tyClGroupKindSigs = concatMap group_kisigs
 
 
 {- *********************************************************************
@@ -1024,6 +1032,7 @@ data FamilyResultSig pass = -- see Note [FamilyResultSig]
 
 type instance XNoSig            (GhcPass _) = NoExtField
 type instance XCKindSig         (GhcPass _) = NoExtField
+
 type instance XTyVarSig         (GhcPass _) = NoExtField
 type instance XXFamilyResultSig (GhcPass _) = NoExtCon
 
@@ -1081,32 +1090,15 @@ data FamilyInfo pass
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
--- | Does this family declaration have a complete, user-supplied kind signature?
--- See Note [CUSKs: complete user-supplied kind signatures]
-famDeclHasCusk :: Bool -- ^ True <=> the -XCUSKs extension is enabled
-               -> Bool -- ^ True <=> this is an associated type family,
-                       --            and the parent class has /no/ CUSK
-               -> FamilyDecl (GhcPass pass)
-               -> Bool
-famDeclHasCusk _cusks_enabled@False _ _ = False
-famDeclHasCusk _cusks_enabled@True assoc_with_no_cusk
-               (FamilyDecl { fdInfo      = fam_info
-                           , fdTyVars    = tyvars
-                           , fdResultSig = L _ resultSig })
-  = case fam_info of
-      ClosedTypeFamily {} -> hsTvbAllKinded tyvars
-                          && hasReturnKindSignature resultSig
-      _ -> not assoc_with_no_cusk
-            -- Un-associated open type/data families have CUSKs
-            -- Associated type families have CUSKs iff the parent class does
-
-famDeclHasCusk _ _ (XFamilyDecl nec) = noExtCon nec
-
--- | Does this family declaration have user-supplied return kind signature?
-hasReturnKindSignature :: FamilyResultSig a -> Bool
-hasReturnKindSignature (NoSig _)                        = False
-hasReturnKindSignature (TyVarSig _ (L _ (UserTyVar{}))) = False
-hasReturnKindSignature _                                = True
+famResultKindSignature :: FamilyResultSig (GhcPass p) -> Maybe (LHsKind (GhcPass p))
+famResultKindSignature (NoSig _) = Nothing
+famResultKindSignature (KindSig _ ki) = Just ki
+famResultKindSignature (TyVarSig _ bndr) =
+  case unLoc bndr of
+    UserTyVar _ _ -> Nothing
+    KindedTyVar _ _ ki -> Just ki
+    XTyVarBndr nec -> noExtCon nec
+famResultKindSignature (XFamilyResultSig nec) = noExtCon nec
 
 -- | Maybe return name of the result type variable
 resultVariableName :: FamilyResultSig (GhcPass a) -> Maybe (IdP (GhcPass a))
@@ -1137,7 +1129,7 @@ pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
                 NoSig    _         -> empty
                 KindSig  _ kind    -> dcolon <+> ppr kind
                 TyVarSig _ tv_bndr -> text "=" <+> ppr tv_bndr
-                XFamilyResultSig x -> ppr x
+                XFamilyResultSig nec -> noExtCon nec
     pp_inj = case mb_inj of
                Just (L _ (InjectivityAnn lhs rhs)) ->
                  hsep [ vbar, ppr lhs, text "->", hsep (map ppr rhs) ]
@@ -1149,7 +1141,7 @@ pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
             Nothing   -> text ".."
             Just eqns -> vcat $ map (ppr_fam_inst_eqn . unLoc) eqns )
       _ -> (empty, empty)
-pprFamilyDecl _ (XFamilyDecl x) = ppr x
+pprFamilyDecl _ (XFamilyDecl nec) = noExtCon nec
 
 pprFlavour :: FamilyInfo pass -> SDoc
 pprFlavour DataFamily            = text "data"
@@ -1203,6 +1195,7 @@ data HsDataDefn pass   -- The payload of a data type defn
   | XHsDataDefn (XXHsDataDefn pass)
 
 type instance XCHsDataDefn    (GhcPass _) = NoExtField
+
 type instance XXHsDataDefn    (GhcPass _) = NoExtCon
 
 -- | Haskell Deriving clause
@@ -1269,6 +1262,37 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
             _                            -> (ppDerivStrategy dcs, empty)
   ppr (XHsDerivingClause x) = ppr x
 
+-- | Located Standalone Kind Signature
+type LStandaloneKindSig pass = Located (StandaloneKindSig pass)
+
+data StandaloneKindSig pass
+  = StandaloneKindSig (XStandaloneKindSig pass)
+      (Located (IdP pass))  -- Why a single binder? See #16754
+      (LHsSigType pass)     -- Why not LHsSigWcType? See Note [Wildcards in standalone kind signatures]
+  | XStandaloneKindSig (XXStandaloneKindSig pass)
+
+type instance XStandaloneKindSig (GhcPass p) = NoExtField
+type instance XXStandaloneKindSig (GhcPass p) = NoExtCon
+
+standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
+standaloneKindSigName (StandaloneKindSig _ lname _) = unLoc lname
+standaloneKindSigName (XStandaloneKindSig nec) = noExtCon nec
+
+{- Note [Wildcards in standalone kind signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Standalone kind signatures enable polymorphic recursion, and it is unclear how
+to reconcile this with partial type signatures, so we disallow wildcards in
+them.
+
+We reject wildcards in 'rnStandaloneKindSignature' by returning False for
+'StandaloneKindSigCtx' in 'wildCardsAllowed'.
+
+The alternative design is to have special treatment for partial standalone kind
+signatures, much like we have special treatment for partial type signatures in
+terms. However, partial standalone kind signatures are not a proper replacement
+for CUSKs, so this would be a separate feature.
+-}
+
 data NewOrData
   = NewType                     -- ^ @newtype Blah ...@
   | DataType                    -- ^ @data Blah ...@
@@ -1278,6 +1302,7 @@ data NewOrData
 newOrDataToFlavour :: NewOrData -> TyConFlavour
 newOrDataToFlavour NewType  = NewtypeFlavour
 newOrDataToFlavour DataType = DataTypeFlavour
+
 
 -- | Located data Constructor Declaration
 type LConDecl pass = Located (ConDecl pass)
@@ -1442,6 +1467,11 @@ pp_data_defn _ (XHsDataDefn x) = ppr x
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsDataDefn p) where
    ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d
+
+instance (p ~ GhcPass pass, OutputableBndrId p)
+       => Outputable (StandaloneKindSig p) where
+  ppr (StandaloneKindSig _ v ki) = text "type" <+> ppr v <+> text "::" <+> ppr ki
+  ppr (XStandaloneKindSig nec) = noExtCon nec
 
 instance Outputable NewOrData where
   ppr NewType  = text "newtype"

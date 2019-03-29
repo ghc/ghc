@@ -1,8 +1,10 @@
+type C :: * -> * -> Constraint
 class C a b where
   c1 :: Num b => a -> b
   c2 :: (Num b, Show b) => a -> b
   c3 :: a1 -> b
   {-# MINIMAL c1, c2, c3 #-}
+type C :: * -> * -> Constraint
 class C a b where
   c1 :: Num b => a -> b
   c2 :: (Num b, Show b) => a -> b
