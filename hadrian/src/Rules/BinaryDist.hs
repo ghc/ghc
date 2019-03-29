@@ -86,6 +86,12 @@ you can simply do:
   ./configure --prefix=<path> [... other configure options ...]
   make install
 
+In order to support @bin@ and @lib@ directories that don't sit next to each
+other, the install script:
+   * installs programs into @LIBDIR/ghc-VERSION/bin@
+   * installs libraries into @LIBDIR/ghc-VERSION/lib@
+   * installs the wrappers scripts into @BINDIR@ directory
+
 -}
 
 bindistRules :: Rules ()
@@ -268,6 +274,7 @@ bindistMakefile = unlines
     , "install: install_mingw update_package_db"
     , ""
     , "ActualBinsDir=${ghclibdir}/bin"
+    , "ActualLibsDir=${ghclibdir}/lib"
     , "WrapperBinsDir=${bindir}"
     , ""
     , "# We need to install binaries relative to libraries."
@@ -288,10 +295,10 @@ bindistMakefile = unlines
     , ""
     , "LIBRARIES = $(wildcard ./lib/*)"
     , "install_lib:"
-    , "\t@echo \"Copying libraries to $(libdir)\""
-    , "\t$(INSTALL_DIR) \"$(libdir)\""
+    , "\t@echo \"Copying libraries to $(ActualLibsDir)\""
+    , "\t$(INSTALL_DIR) \"$(ActualLibsDir)\""
     , "\tfor i in $(LIBRARIES); do \\"
-    , "\t\tcp -R $$i \"$(libdir)/\"; \\"
+    , "\t\tcp -R $$i \"$(ActualLibsDir)/\"; \\"
     , "\tdone"
     , ""
     , "INCLUDES = $(wildcard ./include/*)"
@@ -317,9 +324,9 @@ bindistMakefile = unlines
     , "\t$(foreach p, $(BINARY_NAMES),\\"
     , "\t\t$(call installscript,$p,$(WrapperBinsDir)/$p," ++
       "$(WrapperBinsDir),$(ActualBinsDir),$(ActualBinsDir)/$p," ++
-      "$(libdir),$(docdir),$(includedir)))"
+      "$(ActualLibsDir),$(docdir),$(includedir)))"
     , ""
-    , "PKG_CONFS = $(wildcard $(libdir)/package.conf.d/*)"
+    , "PKG_CONFS = $(wildcard $(ActualLibsDir)/package.conf.d/*)"
     , "update_package_db:"
     , "\t@echo \"Updating the package DB\""
     , "\t$(foreach p, $(PKG_CONFS),\\"
