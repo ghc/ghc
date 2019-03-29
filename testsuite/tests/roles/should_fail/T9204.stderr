@@ -3,7 +3,9 @@ T9204.hs:6:1: error:
     Type constructor ‘D’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type role D phantom
+                 type D :: * -> *
                  data D a
-    Boot file:   data D a
+    Boot file:   type D :: * -> *
+                 data D a
     The roles do not match.
     Roles on abstract types default to ‘representational’ in boot files.

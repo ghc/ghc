@@ -1,0 +1,5 @@
+
+tlks_fail023.hs:10:1: error:
+    • The associated type ‘F’
+      mentions none of the type or kind variables of the class ‘C a’
+    • In the class declaration for ‘C’

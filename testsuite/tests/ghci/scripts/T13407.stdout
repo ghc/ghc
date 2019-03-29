@@ -1,3 +1,4 @@
 type role Foo phantom phantom
-data Foo (a :: * -> *) (b :: k)
+type Foo :: (* -> *) -> forall k. k -> *
+data Foo a b
   	-- Defined at <interactive>:3:1
