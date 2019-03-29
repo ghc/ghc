@@ -10,10 +10,12 @@
 bkpfail41.bkp:10:9: error:
     • Class ‘C’ has conflicting definitions in the module
       and its hsig file
-      Main module: class C a where
+      Main module: type C :: * -> Constraint
+                   class C a where
                      f :: a -> a
                      {-# MINIMAL f #-}
-      Hsig file:  class C a where
+      Hsig file:  type C :: * -> Constraint
+                  class C a where
                     f :: a -> a
                     default f :: a -> a
       The methods do not match:
