@@ -973,7 +973,7 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
         ; when (is_deflt && not defaultSigs_on) $
           addErr (defaultSigErr sig)
         ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
-        ; (new_ty, fvs) <- rnHsSigType ty_ctxt ty
+        ; (new_ty, fvs) <- rnHsSigType ty_ctxt TypeLevel ty
         ; return (ClassOpSig noExtField is_deflt new_v new_ty, fvs) }
   where
     (v1:_) = vs
@@ -981,7 +981,7 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
                           <+> quotes (ppr v1))
 
 renameSig _ (SpecInstSig _ src ty)
-  = do  { (new_ty, fvs) <- rnHsSigType SpecInstSigCtx ty
+  = do  { (new_ty, fvs) <- rnHsSigType SpecInstSigCtx TypeLevel ty
         ; return (SpecInstSig noExtField src new_ty,fvs) }
 
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
@@ -998,7 +998,7 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
     ty_ctxt = GenericCtx (text "a SPECIALISE signature for"
                           <+> quotes (ppr v))
     do_one (tys,fvs) ty
-      = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt ty
+      = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt TypeLevel ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
 renameSig ctxt sig@(InlineSig _ v s)
@@ -1015,7 +1015,7 @@ renameSig ctxt sig@(MinimalSig _ s (L l bf))
 
 renameSig ctxt sig@(PatSynSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
-        ; (ty', fvs) <- rnHsSigType ty_ctxt ty
+        ; (ty', fvs) <- rnHsSigType ty_ctxt TypeLevel ty
         ; return (PatSynSig noExtField new_vs ty', fvs) }
   where
     ty_ctxt = GenericCtx (text "a pattern synonym signature for"

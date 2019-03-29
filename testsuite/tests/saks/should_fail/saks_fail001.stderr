@@ -1,0 +1,4 @@
+
+saks_fail001.hs:7:1: error:
+    Illegal standalone kind signature
+      Did you mean to enable StandaloneKindSignatures?

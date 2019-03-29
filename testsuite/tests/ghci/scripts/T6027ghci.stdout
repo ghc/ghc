@@ -1,1 +1,3 @@
-data (?) 	-- Defined at <interactive>:2:1
+type (?) :: *
+data (?)
+  	-- Defined at <interactive>:2:1

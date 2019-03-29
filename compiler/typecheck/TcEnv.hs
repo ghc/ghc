@@ -36,6 +36,7 @@ module TcEnv(
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupIdMaybe, tcLookupTyVar,
+        tcLookupTcTyCon,
         tcLookupLcl_maybe,
         getInLocalScope,
         wrongThingErr, pprBinders,
@@ -106,6 +107,7 @@ import ListSetOps
 import ErrUtils
 import Maybes( MaybeErr(..), orElse )
 import qualified GHC.LanguageExtensions as LangExt
+import Util ( HasDebugCallStack )
 
 import Data.IORef
 import Data.List
@@ -442,6 +444,13 @@ tcLookupLocalIds ns
         = case lookupNameEnv lenv name of
                 Just (ATcId { tct_id = id }) ->  id
                 _ -> pprPanic "tcLookupLocalIds" (ppr name)
+
+tcLookupTcTyCon :: HasDebugCallStack => Name -> TcM TcTyCon
+tcLookupTcTyCon name = do
+    thing <- tcLookup name
+    case thing of
+        ATcTyCon tc -> return tc
+        _           -> pprPanic "tcLookupTcTyCon" (ppr name)
 
 getInLocalScope :: TcM (Name -> Bool)
 getInLocalScope = do { lcl_env <- getLclTypeEnv

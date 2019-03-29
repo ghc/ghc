@@ -280,6 +280,10 @@ type ForallXFixitySig (c :: * -> Constraint) (x :: *) =
        , c (XXFixitySig        x)
        )
 
+-- StandaloneKindSig type families
+type family XStandaloneKindSig  x
+type family XXStandaloneKindSig x
+
 -- =====================================================================
 -- Type families for the HsDecls extension points
 
@@ -289,6 +293,7 @@ type family XInstD       x
 type family XDerivD      x
 type family XValD        x
 type family XSigD        x
+type family XKindSigD    x
 type family XDefD        x
 type family XForD        x
 type family XWarningD    x
@@ -305,6 +310,7 @@ type ForallXHsDecl (c :: * -> Constraint) (x :: *) =
        , c (XDerivD      x)
        , c (XValD        x)
        , c (XSigD        x)
+       , c (XKindSigD    x)
        , c (XDefD        x)
        , c (XForD        x)
        , c (XWarningD    x)

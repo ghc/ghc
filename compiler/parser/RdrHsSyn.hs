@@ -23,6 +23,7 @@ module   RdrHsSyn (
         mkClassDecl,
         mkTyData, mkDataFamInst,
         mkTySynonym, mkTyFamInstEqn,
+        mkStandaloneKindSig,
         mkTyFamInst,
         mkFamDecl, mkLHsSigType,
         mkInlinePragma,
@@ -238,6 +239,30 @@ mkTySynonym loc lhs rhs
                                  , tcdLName = tc, tcdTyVars = tyvars
                                  , tcdFixity = fixity
                                  , tcdRhs = rhs })) }
+
+mkStandaloneKindSig
+  :: SrcSpan
+  -> Located [Located RdrName] -- LHS
+  -> LHsKind GhcPs             -- RHS
+  -> P (LStandaloneKindSig GhcPs)
+mkStandaloneKindSig loc lhs rhs =
+  do { vs <- mapM check_lhs_name (unLoc lhs)
+     ; v <- check_singular_lhs (reverse vs)
+     ; return $ cL loc $ StandaloneKindSig noExtField v (mkLHsSigType rhs) }
+  where
+    check_lhs_name v@(unLoc->name) =
+      if isUnqual name && isTcOcc (rdrNameOcc name)
+      then return v
+      else addFatalError (getLoc v) $
+           hang (text "Expected an unqualified type constructor:") 2 (ppr v)
+    check_singular_lhs vs =
+      case vs of
+        [] -> panic "mkStandaloneKindSig: empty left-hand side"
+        [v] -> return v
+        _ -> addFatalError (getLoc lhs) $
+             vcat [ hang (text "Standalone kind signatures do not support multiple names at the moment:")
+                       2 (pprWithCommas ppr vs)
+                  , text "See https://gitlab.haskell.org/ghc/ghc/issues/16754 for details." ]
 
 mkTyFamInstEqn :: Maybe [LHsTyVarBndr GhcPs]
                -> LHsType GhcPs

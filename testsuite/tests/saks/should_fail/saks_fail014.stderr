@@ -1,0 +1,11 @@
+
+saks_fail014.hs:10:7: error:
+    • Expecting one more argument to ‘Maybe’
+      Expected kind ‘forall k. k’, but ‘Maybe’ has kind ‘* -> *’
+    • In the type ‘Maybe’
+      In the type family declaration for ‘T’
+
+saks_fail014.hs:11:7: error:
+    • Expected kind ‘forall k. k’, but ‘Integer’ has kind ‘*’
+    • In the type ‘Integer’
+      In the type family declaration for ‘T’

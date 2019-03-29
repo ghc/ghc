@@ -62,6 +62,7 @@ module GHC.Hs.Types (
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType,
         hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
+        hsTyKindSig,
         hsConDetailsArgs,
 
         -- Printing
@@ -79,7 +80,7 @@ import {-# SOURCE #-} GHC.Hs.Expr ( HsSplice, pprSplice )
 import GHC.Hs.Extension
 
 import Id ( Id )
-import Name( Name )
+import Name( Name, NamedThing(getName) )
 import RdrName ( RdrName )
 import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
@@ -505,6 +506,7 @@ data HsTyVarBndr pass
 
 type instance XUserTyVar    (GhcPass _) = NoExtField
 type instance XKindedTyVar  (GhcPass _) = NoExtField
+
 type instance XXTyVarBndr   (GhcPass _) = NoExtCon
 
 -- | Does this 'HsTyVarBndr' come with an explicit kind annotation?
@@ -516,6 +518,11 @@ isHsKindedTyVar (XTyVarBndr {})  = False
 -- | Do all type variables in this 'LHsQTyVars' come with kind annotations?
 hsTvbAllKinded :: LHsQTyVars pass -> Bool
 hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvExplicit
+
+instance NamedThing (HsTyVarBndr GhcRn) where
+  getName (UserTyVar _ v) = unLoc v
+  getName (KindedTyVar _ v _) = unLoc v
+  getName (XTyVarBndr nec) = noExtCon nec
 
 -- | Haskell Type
 data HsType pass
@@ -1076,6 +1083,24 @@ hsLTyVarBndrsToTypes :: LHsQTyVars (GhcPass p) -> [LHsType (GhcPass p)]
 hsLTyVarBndrsToTypes (HsQTvs { hsq_explicit = tvbs }) = map hsLTyVarBndrToType tvbs
 hsLTyVarBndrsToTypes (XLHsQTyVars nec) = noExtCon nec
 
+-- | Get the kind signature of a type, ignoring parentheses:
+--
+--   hsTyKindSig   `Maybe                    `   =   Nothing
+--   hsTyKindSig   `Maybe ::   Type -> Type  `   =   Just  `Type -> Type`
+--   hsTyKindSig   `Maybe :: ((Type -> Type))`   =   Just  `Type -> Type`
+--
+-- This is used to extract the result kind of type synonyms with a CUSK:
+--
+--  type S = (F :: res_kind)
+--                 ^^^^^^^^
+--
+hsTyKindSig :: LHsType pass -> Maybe (LHsKind pass)
+hsTyKindSig lty =
+  case unLoc lty of
+    HsParTy _ lty'    -> hsTyKindSig lty'
+    HsKindSig _ _ k   -> Just k
+    _                 -> Nothing
+
 ---------------------
 ignoreParens :: LHsType pass -> LHsType pass
 ignoreParens (L _ (HsParTy _ ty)) = ignoreParens ty
@@ -1449,7 +1474,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsTyVarBndr p) where
     ppr (UserTyVar _ n)     = ppr n
     ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
-    ppr (XTyVarBndr n)      = ppr n
+    ppr (XTyVarBndr nec)    = noExtCon nec
 
 instance (p ~ GhcPass pass,Outputable thing)
        => Outputable (HsImplicitBndrs p thing) where

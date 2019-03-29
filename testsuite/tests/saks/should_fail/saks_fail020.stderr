@@ -1,0 +1,6 @@
+
+saks_fail020.hs:9:49: error:
+    • Expected kind ‘k’, but ‘a’ has kind ‘k0’
+    • In the first argument of ‘Proxy’, namely ‘(a :: k)’
+      In a standalone kind signature for ‘Foo2’:
+        () -> forall (k :: Type) -> Proxy (a :: k)

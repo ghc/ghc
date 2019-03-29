@@ -1,19 +1,24 @@
+type Num :: * -> Constraint
 class Num a where
   (+) :: a -> a -> a
   ...
   	-- Defined in ‘GHC.Num’
 infixl 6 +
+type Num :: * -> Constraint
 class Num a where
   (+) :: a -> a -> a
   ...
   	-- Defined in ‘GHC.Num’
 infixl 6 +
+type Data.Complex.Complex :: * -> *
 data Data.Complex.Complex a = !a Data.Complex.:+ !a
   	-- Defined in ‘Data.Complex’
 infix 6 Data.Complex.:+
+type Data.Complex.Complex :: * -> *
 data Data.Complex.Complex a = !a Data.Complex.:+ !a
   	-- Defined in ‘Data.Complex’
 infix 6 Data.Complex.:+
+type RealFloat :: * -> Constraint
 class (RealFrac a, Floating a) => RealFloat a where
   floatRadix :: a -> Integer
   floatDigits :: a -> Int

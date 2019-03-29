@@ -69,6 +69,7 @@ import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList, notNull, unzipWith )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
+import TysWiredIn ( constraintKindTyConName )
 
 import Control.Monad
 import System.IO.Unsafe
@@ -730,6 +731,14 @@ pprClassRoles ss clas binders roles =
              binders
              roles
 
+pprClassStandaloneKindSig :: ShowSub -> IfaceTopBndr -> IfaceKind -> SDoc
+pprClassStandaloneKindSig ss clas =
+  pprStandaloneKindSig (pprPrefixIfDeclBndr (ss_how_much ss) (occName clas))
+
+constraintIfaceKind :: IfaceKind
+constraintIfaceKind =
+  IfaceTyConApp (IfaceTyCon constraintKindTyConName (IfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
+
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
 --     See Note [Pretty-printing TyThings] in PprTyThing
@@ -741,10 +750,12 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                              ifBinders = binders })
 
   | gadt      = vcat [ pp_roles
+                     , pp_ki_sig
                      , pp_nd <+> pp_lhs <+> pp_kind <+> pp_where
                      , nest 2 (vcat pp_cons)
                      , nest 2 $ ppShowIface ss pp_extra ]
   | otherwise = vcat [ pp_roles
+                     , pp_ki_sig
                      , hang (pp_nd <+> pp_lhs) 2 (add_bars pp_cons)
                      , nest 2 $ ppShowIface ss pp_extra ]
   where
@@ -759,25 +770,44 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     cons       = visibleIfConDecls condecls
     pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
-    pp_kind
-      | isIfaceLiftedTypeKind kind = empty
-      | otherwise = dcolon <+> ppr kind
+    pp_kind    = ppUnless (if ki_sig_printable
+                              then isIfaceTauType kind
+                                      -- Even in the presence of a standalone kind signature, a non-tau
+                                      -- result kind annotation cannot be discarded as it determines the arity.
+                                      -- See Note [Arity inference in kcDeclHeader_sig] in TcHsType
+                              else isIfaceLiftedTypeKind kind)
+                          (dcolon <+> ppr kind)
 
     pp_lhs = case parent of
-               IfNoParent -> pprIfaceDeclHead context ss tycon binders Nothing
+               IfNoParent -> pprIfaceDeclHead suppress_bndr_sig context ss tycon binders
                IfDataInstance{}
                           -> text "instance" <+> pp_data_inst_forall
                                              <+> pprIfaceTyConParent parent
 
     pp_roles
       | is_data_instance = empty
-      | otherwise        = pprRoles (== Representational)
-                                    (pprPrefixIfDeclBndr
-                                        (ss_how_much ss)
-                                        (occName tycon))
-                                    binders roles
+      | otherwise        = pprRoles (== Representational) name_doc binders roles
             -- Don't display roles for data family instances (yet)
             -- See discussion on #8672.
+
+    ki_sig_printable =
+      -- If we print a standalone kind signature for a data instance, we leak
+      -- the internal constructor name:
+      --
+      --    type T15827.R:Dka :: forall k. k -> *
+      --    data instance forall k (a :: k). D a = MkD (Proxy a)
+      --
+      -- This T15827.R:Dka is a compiler-generated type constructor for the
+      -- data instance.
+      not is_data_instance
+
+    pp_ki_sig = ppWhen ki_sig_printable $
+                pprStandaloneKindSig name_doc (mkIfaceTyConKind binders kind)
+
+    -- See Note [Suppressing binder signatures] in IfaceType
+    suppress_bndr_sig = SuppressBndrSig ki_sig_printable
+
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tycon)
 
     add_bars []     = Outputable.empty
     add_bars (c:cs) = sep ((equals <+> c) : map (vbar <+>) cs)
@@ -801,8 +831,11 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
                             , ifBinders = binders
                             , ifBody = IfAbstractClass })
   = vcat [ pprClassRoles ss clas binders roles
-         , text "class" <+> pprIfaceDeclHead [] ss clas binders Nothing
-                                <+> pprFundeps fds ]
+         , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
+         , text "class" <+> pprIfaceDeclHead suppress_bndr_sig [] ss clas binders <+> pprFundeps fds ]
+  where
+    -- See Note [Suppressing binder signatures] in IfaceType
+    suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl ss (IfaceClass { ifName  = clas
                             , ifRoles = roles
@@ -815,8 +848,8 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
                                 ifMinDef = minDef
                               }})
   = vcat [ pprClassRoles ss clas binders roles
-         , text "class" <+> pprIfaceDeclHead context ss clas binders Nothing
-                                <+> pprFundeps fds <+> pp_where
+         , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
+         , text "class" <+> pprIfaceDeclHead suppress_bndr_sig context ss clas binders <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
                         , ppShowAllSubs ss (pprMinDef minDef)])]
     where
@@ -842,31 +875,46 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
           (\_ def -> cparen (isLexSym def) (ppr def)) 0 minDef <+>
         text "#-}"
 
+      -- See Note [Suppressing binder signatures] in IfaceType
+      suppress_bndr_sig = SuppressBndrSig True
+
 pprIfaceDecl ss (IfaceSynonym { ifName    = tc
                               , ifBinders = binders
                               , ifSynRhs  = mono_ty
                               , ifResKind = res_kind})
-  = hang (text "type" <+> pprIfaceDeclHead [] ss tc binders Nothing <+> equals)
-       2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau
-              , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
+  = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
+         , hang (text "type" <+> pprIfaceDeclHead suppress_bndr_sig [] ss tc binders <+> equals)
+           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau
+                  , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
+         ]
   where
     (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tc)
+
+    -- See Note [Suppressing binder signatures] in IfaceType
+    suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl ss (IfaceFamily { ifName = tycon
                              , ifFamFlav = rhs, ifBinders = binders
                              , ifResKind = res_kind
                              , ifResVar = res_var, ifFamInj = inj })
   | IfaceDataFamilyTyCon <- rhs
-  = text "data family" <+> pprIfaceDeclHead [] ss tycon binders Nothing
+  = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
+         , text "data family" <+> pprIfaceDeclHead suppress_bndr_sig [] ss tycon binders
+         ]
 
   | otherwise
-  = hang (text "type family"
-            <+> pprIfaceDeclHead [] ss tycon binders (Just res_kind)
-            <+> ppShowRhs ss (pp_where rhs))
-       2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
-    $$
-    nest 2 (ppShowRhs ss (pp_branches rhs))
+  = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
+         , hang (text "type family"
+                   <+> pprIfaceDeclHead suppress_bndr_sig [] ss tycon binders
+                   <+> ppShowRhs ss (pp_where rhs))
+              2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
+           $$
+           nest 2 (ppShowRhs ss (pp_branches rhs))
+         ]
   where
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tycon)
+
     pp_where (IfaceClosedSynFamilyTyCon {}) = text "where"
     pp_where _                              = empty
 
@@ -899,6 +947,9 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
                   ) $ zip [0..] brs)
         $$ ppShowIface ss (text "axiom" <+> ppr ax)
     pp_branches _ = Outputable.empty
+
+    -- See Note [Suppressing binder signatures] in IfaceType
+    suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               ifPatUnivBndrs = univ_bndrs, ifPatExBndrs = ex_bndrs,
@@ -947,6 +998,9 @@ pprRoles suppress_if tyCon bndrs roles
       let froles = suppressIfaceInvisibles dflags bndrs roles
       in ppUnless (all suppress_if froles || null froles) $
          text "type role" <+> tyCon <+> hsep (map ppr froles)
+
+pprStandaloneKindSig :: SDoc -> IfaceType -> SDoc
+pprStandaloneKindSig tyCon ty = text "type" <+> tyCon <+> text "::" <+> ppr ty
 
 pprInfixIfDeclBndr :: ShowHowMuch -> OccName -> SDoc
 pprInfixIfDeclBndr (ShowSome _ (AltPpr (Just ppr_bndr))) name
@@ -998,16 +1052,16 @@ pprIfaceTyConParent IfNoParent
 pprIfaceTyConParent (IfDataInstance _ tc tys)
   = pprIfaceTypeApp topPrec tc tys
 
-pprIfaceDeclHead :: IfaceContext -> ShowSub -> Name
+pprIfaceDeclHead :: SuppressBndrSig
+                 -> IfaceContext -> ShowSub -> Name
                  -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
-                 -> Maybe IfaceKind
                  -> SDoc
-pprIfaceDeclHead context ss tc_occ bndrs m_res_kind
+pprIfaceDeclHead suppress_sig context ss tc_occ bndrs
   = sdocWithDynFlags $ \ dflags ->
     sep [ pprIfaceContextArr context
         , pprPrefixIfDeclBndr (ss_how_much ss) (occName tc_occ)
-          <+> pprIfaceTyConBinders (suppressIfaceInvisibles dflags bndrs bndrs)
-        , maybe empty (\res_kind -> dcolon <+> pprIfaceType res_kind) m_res_kind ]
+          <+> pprIfaceTyConBinders suppress_sig
+                (suppressIfaceInvisibles dflags bndrs bndrs) ]
 
 pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceTopBndr

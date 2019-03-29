@@ -1254,8 +1254,13 @@ instance ( a ~ GhcPass p
       XCmd _ -> []
 
 instance ToHie (TyClGroup GhcRn) where
-  toHie (TyClGroup _ classes roles instances) = concatM
+  toHie TyClGroup{ group_tyclds = classes
+                 , group_roles  = roles
+                 , group_kisigs = sigs
+                 , group_instds = instances } =
+    concatM
     [ toHie classes
+    , toHie sigs
     , toHie roles
     , toHie instances
     ]
@@ -1465,6 +1470,17 @@ instance ( HasLoc thing
       ]
     where span = loc a
   toHie (TS _ (XHsWildCardBndrs _)) = pure []
+
+instance ToHie (LStandaloneKindSig GhcRn) where
+  toHie (L sp sig) = concatM [makeNode sig sp, toHie sig]
+
+instance ToHie (StandaloneKindSig GhcRn) where
+  toHie sig = concatM $ case sig of
+    StandaloneKindSig _ name typ ->
+      [ toHie $ C TyDecl name
+      , toHie $ TS (ResolvedScopes []) typ
+      ]
+    XStandaloneKindSig _ -> []
 
 instance ToHie (SigContext (LSig GhcRn)) where
   toHie (SC (SI styp msp) (L sp sig)) = concatM $ makeNode sig sp : case sig of
