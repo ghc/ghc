@@ -1,0 +1,3 @@
+
+T16725.hs:8:6: error:
+    The standalone kind signature for ‘W’ lacks an accompanying binding

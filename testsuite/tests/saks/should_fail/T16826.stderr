@@ -1,0 +1,5 @@
+
+T16826.hs:14:1: error:
+    • Kind signature on a class must end with Constraint
+      unobscured by type families
+    • In the class declaration for ‘C’

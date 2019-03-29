@@ -11,7 +11,7 @@ module NameEnv (
         NameEnv,
 
         -- ** Manipulating these environments
-        mkNameEnv,
+        mkNameEnv, mkNameEnvWith,
         emptyNameEnv, isEmptyNameEnv,
         unitNameEnv, nameEnvElts,
         extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
@@ -92,6 +92,7 @@ type NameEnv a = UniqFM a       -- Domain is Name
 emptyNameEnv       :: NameEnv a
 isEmptyNameEnv     :: NameEnv a -> Bool
 mkNameEnv          :: [(Name,a)] -> NameEnv a
+mkNameEnvWith      :: (a -> Name) -> [a] -> NameEnv a
 nameEnvElts        :: NameEnv a -> [a]
 alterNameEnv       :: (Maybe a-> Maybe a) -> NameEnv a -> Name -> NameEnv a
 extendNameEnv_C    :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
@@ -121,6 +122,7 @@ extendNameEnvList x l = addListToUFM x l
 lookupNameEnv x y     = lookupUFM x y
 alterNameEnv          = alterUFM
 mkNameEnv     l       = listToUFM l
+mkNameEnvWith f       = mkNameEnv . map (\a -> (f a, a))
 elemNameEnv x y          = elemUFM x y
 plusNameEnv x y          = plusUFM x y
 plusNameEnv_C f x y      = plusUFM_C f x y

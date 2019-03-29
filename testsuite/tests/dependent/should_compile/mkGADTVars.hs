@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, PolyKinds #-}
+{-# LANGUAGE GADTs, PolyKinds, RankNTypes #-}
 
 module GADTVars where
 

@@ -1,0 +1,5 @@
+
+T16727b.hs:5:11: error:
+    • Type constructor ‘T’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In a standalone kind signature for ‘T’: T

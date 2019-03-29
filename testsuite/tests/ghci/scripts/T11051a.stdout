@@ -1,1 +1,2 @@
+type Hi :: *
 data Hi

@@ -7856,6 +7856,42 @@ using a parameter in the kind annotation: ::
 In this case the kind parameter ``k`` is actually an implicit parameter
 of the type family.
 
+At definition site, the arity determines what inputs can be matched on: ::
+
+    data PT (a :: Type)
+
+    type family F1 :: k -> Type
+    type instance F1 = PT
+      -- OK, 'k' can be matched on.
+
+    type family F0 :: forall k. k -> Type
+    type instance F0 = PT
+      -- Error:
+      --   • Expected kind ‘forall k. k -> Type’,
+      --       but ‘PT’ has kind ‘Type -> Type’
+      --   • In the type ‘PT’
+      --     In the type instance declaration for ‘F0’
+
+Both ``F1`` and ``F0`` have kind ``forall k. k -> Type``, but their arity
+differs.
+
+At use sites, the arity determines if the definition can be used in a
+higher-rank scenario: ::
+
+    type HRK (f :: forall k. k -> Type) = (f Int, f Maybe, f True)
+
+    type H1 = HRK F0  -- OK
+    type H2 = HRK F1
+      -- Error:
+      --   • Expected kind ‘forall k. k -> Type’,
+      --       but ‘F1’ has kind ‘k0 -> Type’
+      --   • In the first argument of ‘HRK’, namely ‘F1’
+      --     In the type ‘HRK F1’
+      --     In the type declaration for ‘H2’
+
+This is a consequence of the requirement that all applications of a type family
+must be fully saturated with respect to their arity.
+
 .. _type-instance-declarations:
 
 Type instance declarations
@@ -9148,6 +9184,9 @@ Complete user-supplied kind signatures and polymorphic recursion
 
     :since: 8.10.1
 
+NB! This is a legacy feature, see :extension:`StandaloneKindSignatures` for the
+modern replacement.
+
 Just as in type inference, kind inference for recursive types can only
 use *monomorphic* recursion. Consider this (contrived) example: ::
 
@@ -9261,11 +9300,164 @@ According to the rules above ``X`` has a CUSK. Yet, the kind of ``k`` is undeter
 It is thus quantified over, giving ``X`` the kind ``forall k1 (k :: k1). Proxy k -> Type``.
 
 The detection of CUSKs is enabled by the :extension:`CUSKs` flag, which is
-switched on by default. When :extension:`CUSKs` is switched off, there is
-currently no way to enable polymorphic recursion in types. In the future, the
-notion of a CUSK will be replaced by top-level kind signatures
-(`GHC Proposal #36 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0036-kind-signatures.rst>`__),
-then, after a transition period, this extension will be turned off by default, and eventually removed.
+switched on by default. This extension is scheduled for deprecation to be
+replaced with :extension:`StandaloneKindSignatures`.
+
+.. index::
+   single: standalone kind signature
+
+.. _standalone-kind-signatures:
+
+Standalone kind signatures and polymorphic recursion
+----------------------------------------------------
+
+.. extension:: StandaloneKindSignatures
+    :shortdesc: Allow the use of standalone kind signatures.
+
+    :implies: :extension:`NoCUSKs`
+    :since: 8.10.1
+
+Just as in type inference, kind inference for recursive types can only
+use *monomorphic* recursion. Consider this (contrived) example: ::
+
+    data T m a = MkT (m a) (T Maybe (m a))
+    -- GHC infers kind  T :: (Type -> Type) -> Type -> Type
+
+The recursive use of ``T`` forced the second argument to have kind
+``Type``. However, just as in type inference, you can achieve polymorphic
+recursion by giving a *standalone kind signature* for ``T``: ::
+
+    type T :: (k -> Type) -> k -> Type
+    data T m a = MkT (m a) (T Maybe (m a))
+
+The standalone kind signature specifies the polymorphic kind
+for ``T``, and this signature is used for all the calls to ``T``
+including the recursive ones. In particular, the recursive use of ``T``
+is at kind ``Type``.
+
+While a standalone kind signature determines the kind of a type constructor, it
+does not determine its arity. This is of particular importance for type
+families and type synonyms, as they cannot be partially applied. See
+:ref:`type-family-declarations` for more information about arity.
+
+The arity can be specified using explicit binders and inline kind annotations::
+
+    -- arity F0 = 0
+    type F0 :: forall k. k -> Type
+    type family F0 :: forall k. k -> Type
+
+    -- arity F1 = 1
+    type F1 :: forall k. k -> Type
+    type family F1 :: k -> Type
+
+    -- arity F2 = 2
+    type F2 :: forall k. k -> Type
+    type family F2 a :: Type
+
+In absence of an inline kind annotation, the inferred arity includes all
+explicitly bound parameters and all immediately following invisible
+parameters::
+
+    -- arity FD1 = 1
+    type FD1 :: forall k. k -> Type
+    type FD1
+
+    -- arity FD2 = 2
+    type FD2 :: forall k. k -> Type
+    type FD2 a
+
+Note that ``F0``, ``F1``, ``F2``, ``FD1``, and ``FD2`` all have identical
+standalone kind signatures. The arity is inferred from the type family header.
+
+Standalone kind signatures and declaration headers
+--------------------------------------------------
+
+GHC requires that in the presence of a standalone kind signature, data
+declarations must bind all their inputs. For example: ::
+
+    type Prox1 :: k -> Type
+    data Prox1 a = MkProx1
+      -- OK.
+
+    type Prox2 :: k -> Type
+    data Prox2 = MkProx2
+      -- Error:
+      --   • Expected a type, but found something with kind ‘k -> Type’
+      --   • In the data type declaration for ‘Prox2’
+
+
+GADT-style data declarations may either bind their inputs or use an inline
+signature in addition to the standalone kind signature: ::
+
+    type GProx1 :: k -> Type
+    data GProx1 a where MkGProx1 :: GProx1 a
+      -- OK.
+
+    type GProx2 :: k -> Type
+    data GProx2 where MkGProx2 :: GProx2 a
+      -- Error:
+      --   • Expected a type, but found something with kind ‘k -> Type’
+      --   • In the data type declaration for ‘GProx2’
+
+    type GProx3 :: k -> Type
+    data GProx3 :: k -> Type where MkGProx3 :: GProx3 a
+      -- OK.
+
+    type GProx4 :: k -> Type
+    data GProx4 :: w where MkGProx4 :: GProx4 a
+      -- OK, w ~ (k -> Type)
+
+Classes are subject to the same rules: ::
+
+    type C1 :: Type -> Constraint
+    class C1 a
+      -- OK.
+
+    type C2 :: Type -> Constraint
+    class C2
+      -- Error:
+      --   • Couldn't match expected kind ‘Constraint’
+      --                 with actual kind ‘Type -> Constraint’
+      --   • In the class declaration for ‘C2’
+
+On the other hand, type families are exempt from this rule: ::
+
+    type F :: Type -> Type
+    type family F
+      -- OK.
+
+Data families are tricky territory. Their headers are exempt from this rule,
+but their instances are not: ::
+
+    type T :: k -> Type
+    data family T
+      -- OK.
+
+    data instance T Int = MkT1
+      -- OK.
+
+    data instance T = MkT3
+      -- Error:
+      --   • Expecting one more argument to ‘T’
+      --     Expected a type, but ‘T’ has kind ‘k0 -> Type’
+      --   • In the data instance declaration for ‘T’
+
+This also applies to GADT-style data instances: ::
+
+    data instance T (a :: Nat) where MkN4 :: T 4
+                                     MKN9 :: T 9
+      -- OK.
+
+    data instance T :: Symbol -> Type where MkSN :: T "Neptune"
+                                            MkSJ :: T "Jupiter"
+      -- OK.
+
+    data instance T where MkT4 :: T x
+      -- Error:
+      --   • Expecting one more argument to ‘T’
+      --     Expected a type, but ‘T’ has kind ‘k0 -> Type’
+      --   • In the data instance declaration for ‘T’
+
 
 Kind inference in closed type families
 --------------------------------------

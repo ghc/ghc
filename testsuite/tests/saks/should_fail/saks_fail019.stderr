@@ -1,0 +1,6 @@
+
+saks_fail019.hs:9:1: error:
+    • Couldn't match kind ‘a’ with ‘*’
+      Expected kind: a -> *
+        Actual kind: * -> *
+    • In the data type declaration for ‘T’

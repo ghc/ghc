@@ -89,12 +89,16 @@ data HsSigWcTypeScoping = AlwaysBind
                         | NeverBind
                           -- ^ Never bind any free tyvars
 
-rnHsSigWcType :: HsSigWcTypeScoping -> HsDocContext -> LHsSigWcType GhcPs
+rnHsSigWcType :: HsSigWcTypeScoping
+              -> HsDocContext
+              -> TypeOrKind
+              -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeVars)
-rnHsSigWcType scoping doc sig_ty
-  = rn_hs_sig_wc_type scoping doc sig_ty $ \sig_ty' ->
+rnHsSigWcType scoping doc level sig_ty
+  = rn_hs_sig_wc_type scoping doc level sig_ty $ \sig_ty' ->
     return (sig_ty', emptyFVs)
 
+-- Only used on types, never kinds (hence 'TypeLevel').
 rnHsSigWcTypeScoped :: HsSigWcTypeScoping
                        -- AlwaysBind: for pattern type sigs and rules we /do/ want
                        --             to bring those type variables into scope, even
@@ -113,14 +117,15 @@ rnHsSigWcTypeScoped :: HsSigWcTypeScoping
 rnHsSigWcTypeScoped scoping ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedTypeSigErr sig_ty)
-       ; rn_hs_sig_wc_type scoping ctx sig_ty thing_inside
+       ; rn_hs_sig_wc_type scoping ctx TypeLevel sig_ty thing_inside
        }
 
-rn_hs_sig_wc_type :: HsSigWcTypeScoping -> HsDocContext -> LHsSigWcType GhcPs
+rn_hs_sig_wc_type :: HsSigWcTypeScoping -> HsDocContext -> TypeOrKind
+                  -> LHsSigWcType GhcPs
                   -> (LHsSigWcType GhcRn -> RnM (a, FreeVars))
                   -> RnM (a, FreeVars)
 -- rn_hs_sig_wc_type is used for source-language type signatures
-rn_hs_sig_wc_type scoping ctxt
+rn_hs_sig_wc_type scoping ctxt level
                   (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
                   thing_inside
   = do { free_vars <- extractFilteredRdrTyVarsDups hs_ty
@@ -131,31 +136,32 @@ rn_hs_sig_wc_type scoping ctxt
                                BindUnlessForall -> not (isLHsForAllTy hs_ty)
                                NeverBind        -> False
        ; rnImplicitBndrs bind_free_tvs tv_rdrs $ \ vars ->
-    do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
+    do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt level nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = ib_ty' }
              ib_ty'  = HsIB { hsib_ext = vars
                             , hsib_body = hs_ty' }
        ; (res, fvs2) <- thing_inside sig_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
-rn_hs_sig_wc_type _ _ (HsWC _ (XHsImplicitBndrs nec)) _
+rn_hs_sig_wc_type _ _ _ (HsWC _ (XHsImplicitBndrs nec)) _
   = noExtCon nec
-rn_hs_sig_wc_type _ _ (XHsWildCardBndrs nec) _
+rn_hs_sig_wc_type _ _ _ (XHsWildCardBndrs nec) _
   = noExtCon nec
 
+-- Only used on types, never kinds (hence 'TypeLevel').
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeVars)
 rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
   = do { free_vars <- extractFilteredRdrTyVars hs_ty
        ; (nwc_rdrs, _) <- partition_nwcs free_vars
-       ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
+       ; (wcs, hs_ty', fvs) <- rnWcBody ctxt TypeLevel nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
 rnHsWcType _ (XHsWildCardBndrs nec) = noExtCon nec
 
-rnWcBody :: HsDocContext -> [Located RdrName] -> LHsType GhcPs
+rnWcBody :: HsDocContext -> TypeOrKind -> [Located RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
-rnWcBody ctxt nwc_rdrs hs_ty
+rnWcBody ctxt level nwc_rdrs hs_ty
   = do { nwcs <- mapM newLocalBndrRn nwc_rdrs
-       ; let env = RTKE { rtke_level = TypeLevel
+       ; let env = RTKE { rtke_level = level
                         , rtke_what  = RnTypeBody
                         , rtke_nwcs  = mkNameSet nwcs
                         , rtke_ctxt  = ctxt }
@@ -242,6 +248,7 @@ extraConstraintWildCardsAllowed env
       TypeSigCtx {}       -> True
       ExprWithTySigCtx {} -> True
       DerivDeclCtx {}     -> True
+      StandaloneKindSigCtx {} -> False  -- See Note [Wildcards in standalone kind signatures] in TcHsType
       _                   -> False
 
 -- | Finds free type and kind variables in a type,
@@ -563,9 +570,9 @@ rnHsTyKi env t@(HsKindSig _ ty k)
   = do { checkPolyKinds env t
        ; kind_sigs_ok <- xoptM LangExt.KindSignatures
        ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) ty)
-       ; (ty', fvs1) <- rnLHsTyKi env ty
-       ; (k', fvs2)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
-       ; return (HsKindSig noExtField ty' k', fvs1 `plusFV` fvs2) }
+       ; (ty', lhs_fvs) <- rnLHsTyKi env ty
+       ; (k', sig_fvs)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
+       ; return (HsKindSig noExtField ty' k', lhs_fvs `plusFV` sig_fvs) }
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
@@ -734,6 +741,7 @@ wildCardsAllowed env
        FamPatCtx {}        -> True   -- Not named wildcards though
        GHCiCtx {}          -> True
        HsTypeCtx {}        -> True
+       StandaloneKindSigCtx {} -> False  -- See Note [Wildcards in standalone kind signatures] in TcHsType
        _                   -> False
 
 

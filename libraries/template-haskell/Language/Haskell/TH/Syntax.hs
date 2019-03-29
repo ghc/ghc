@@ -2029,6 +2029,7 @@ data Dec
                                   -- ^ @{ instance {\-\# OVERLAPS \#-\}
                                   --        Show w => Show [w] where ds }@
   | SigD Name Type                -- ^ @{ length :: [a] -> Int }@
+  | KiSigD Name Kind              -- ^ @{ type TypeRep :: k -> Type }@
   | ForeignD Foreign              -- ^ @{ foreign import ... }
                                   --{ foreign export ... }@
 

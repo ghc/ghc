@@ -1,1 +1,3 @@
-data Ghci1.T = A | ... 	-- Defined at <interactive>:2:10
+type Ghci1.T :: *
+data Ghci1.T = A | ...
+  	-- Defined at <interactive>:2:10
