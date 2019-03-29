@@ -4512,6 +4512,7 @@ xFlagsDeps = [
   flagSpec' "TemplateHaskell"                 LangExt.TemplateHaskell
                                               checkTemplateHaskellOk,
   flagSpec "TemplateHaskellQuotes"            LangExt.TemplateHaskellQuotes,
+  flagSpec "StandaloneKindSignatures"         LangExt.StandaloneKindSignatures,
   flagSpec "TraditionalRecordSyntax"          LangExt.TraditionalRecordSyntax,
   flagSpec "TransformListComp"                LangExt.TransformListComp,
   flagSpec "TupleSections"                    LangExt.TupleSections,
@@ -4638,6 +4639,9 @@ impliedXFlags
     , (LangExt.TypeInType,       turnOn, LangExt.DataKinds)
     , (LangExt.TypeInType,       turnOn, LangExt.PolyKinds)
     , (LangExt.TypeInType,       turnOn, LangExt.KindSignatures)
+
+    -- Standalone kind signatures are a replacement for CUSKs.
+    , (LangExt.StandaloneKindSignatures, turnOff, LangExt.CUSKs)
 
     -- AutoDeriveTypeable is not very useful without DeriveDataTypeable
     , (LangExt.AutoDeriveTypeable, turnOn, LangExt.DeriveDataTypeable)
