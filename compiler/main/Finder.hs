@@ -313,8 +313,10 @@ findInstalledHomeModule hsc_env mod_name =
       , ("lhsig",  mkHomeModLocationSearched dflags mod_name "lhsig")
       ]
 
-     hi_exts = [ (hisuf,                mkHiOnlyModLocation dflags hisuf)
-               , (addBootSuffix hisuf,  mkHiOnlyModLocation dflags hisuf)
+     -- we use mkHomeModHiOnlyLocation instead of mkHiOnlyModLocation so that
+     -- when hiDir field is set in dflags, we know to look there (see #16500)
+     hi_exts = [ (hisuf,                mkHomeModHiOnlyLocation dflags mod_name)
+               , (addBootSuffix hisuf,  mkHomeModHiOnlyLocation dflags mod_name)
                ]
 
         -- In compilation manager modes, we look for source files in the home
@@ -488,6 +490,15 @@ mkHomeModLocation2 dflags mod src_basename ext = do
                         ml_hi_file   = hi_fn,
                         ml_obj_file  = obj_fn,
                         ml_hie_file  = hie_fn })
+
+mkHomeModHiOnlyLocation :: DynFlags
+                        -> ModuleName
+                        -> FilePath
+                        -> BaseName
+                        -> IO ModLocation
+mkHomeModHiOnlyLocation dflags mod path basename = do
+   loc <- mkHomeModLocation2 dflags mod (path </> basename) ""
+   return loc { ml_hs_file = Nothing }
 
 mkHiOnlyModLocation :: DynFlags -> Suffix -> FilePath -> String
                     -> IO ModLocation
