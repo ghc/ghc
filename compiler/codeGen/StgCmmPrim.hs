@@ -2105,17 +2105,11 @@ doNewArrayOp res_r rep info payload n init = do
 
     -- Initialise all elements of the array
     p <- assignTemp $ cmmOffsetB dflags (CmmReg arr) (hdrSize dflags rep)
-    for <- newBlockId
-    emitLabel for
-    let loopBody =
-            [ mkStore (CmmReg (CmmLocal p)) init
-            , mkAssign (CmmLocal p) (cmmOffsetW dflags (CmmReg (CmmLocal p)) 1)
-            , mkBranch for ]
-    emit =<< mkCmmIfThen
-        (cmmULtWord dflags (CmmReg (CmmLocal p))
-         (cmmOffsetW dflags (CmmReg arr)
-          (hdrSizeW dflags rep + n)))
-        (catAGraphs loopBody)
+    let initialization =
+            [ mkStore (cmmOffsetW dflags (CmmReg (CmmLocal p)) off) init
+            | off <- [0.. n - 1]
+            ]
+    emit (catAGraphs initialization)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 

@@ -137,6 +137,7 @@ test('StaticByteArraySize', normal, compile_and_run, ['-O2'])
 test('CopySmallArray', normal, compile_and_run, [''])
 test('CopySmallArrayStressTest', reqlib('random'), compile_and_run, [''])
 test('SizeOfSmallArray', normal, compile_and_run, [''])
+test('NewSmallArray', normal, compile_and_run, [''])
 test('T9001', normal, compile_and_run, [''])
 test('T9013', omit_ways(['ghci']),  # ghci doesn't support unboxed tuples
      compile_and_run, [''])
