@@ -702,7 +702,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
          case Map.lookup "CONTROL_GROUP_CONST_291" m of
              Just 292   -> return () -- OK
              Nothing    -> die "CONTROL_GROUP_CONST_291 missing!"
-             Just 0x292 -> die $ "broken 'nm' detected, see https://ghc.haskell.org/ticket/11744.\n"
+             Just 0x292 -> die $ "broken 'nm' detected, see https://gitlab.haskell.org/ghc/ghc/issues/11744.\n"
                               ++ "\n"
                               ++ "Workaround: You may want to pass\n"
                               ++ "    --with-nm=$(xcrun --find nm-classic)\n"

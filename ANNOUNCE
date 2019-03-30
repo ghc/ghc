@@ -79,7 +79,7 @@ On-line GHC-related resources
 Relevant URLs:
 
 GHC home page              https://www.haskell.org/ghc/
-GHC developers' home page  https://ghc.haskell.org/trac/ghc/
+GHC developers' home page  https://gitlab.haskell.org/ghc/ghc/wikis/
 Haskell home page          https://www.haskell.org/
 
 
@@ -103,7 +103,7 @@ We welcome new contributors. Instructions on accessing our source code
 repository, and getting started with hacking on GHC, are available from the
 GHC's developer's site:
 
-    https://ghc.haskell.org/trac/ghc/
+    https://gitlab.haskell.org/ghc/ghc/wikis/
 
 
 Mailing lists
