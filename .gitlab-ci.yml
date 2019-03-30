@@ -477,7 +477,9 @@ validate-x86_64-linux-fedora27:
     # Now clean up after the build
     - |
       popd
-      subst %ndir% /D > nul
+      subst %ndir%: /D > nul
+      subst Z: /D > nul
+      subst Y: /D > nul
   dependencies: []
   variables:
     FORCE_SYMLINKS: 1
