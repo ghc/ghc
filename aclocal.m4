@@ -288,11 +288,31 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         esac
     }
 
+    dnl Note [autoconf assembler checks and -flto]
+    dnl ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    dnl
+    dnl Autoconf's AC_COMPILE_IFELSE macro is fragile in the case of checks
+    dnl which require that the assembler is run. Specifically, GCC does not run
+    dnl the assembler if invoked with `-c -flto`; it merely dumps its internal
+    dnl AST to the object file, to be compiled and assembled during the final
+    dnl link.
+    dnl
+    dnl This can cause configure checks like that for the
+    dnl .subsections_via_symbols directive to pass unexpected (see #16440),
+    dnl leading the build system to incorrectly conclude that the directive is
+    dnl supported.
+    dnl
+    dnl For this reason, it is important that configure checks that rely on the
+    dnl assembler failing use AC_LINK_IFELSE rather than AC_COMPILE_IFELSE,
+    dnl ensuring that the assembler sees the check.
+    dnl
+
     dnl ** check for Apple-style dead-stripping support
     dnl    (.subsections-via-symbols assembler directive)
 
     AC_MSG_CHECKING(for .subsections_via_symbols)
-    AC_COMPILE_IFELSE(
+    dnl See Note [autoconf assembler checks and -flto]
+    AC_LINK_IFELSE(
         [AC_LANG_PROGRAM([], [__asm__ (".subsections_via_symbols");])],
         [AC_MSG_RESULT(yes)
          HaskellHaveSubsectionsViaSymbols=True
@@ -305,7 +325,8 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
     dnl ** check for .ident assembler directive
 
     AC_MSG_CHECKING(whether your assembler supports .ident directive)
-    AC_COMPILE_IFELSE(
+    dnl See Note [autoconf assembler checks and -flto]
+    AC_LINK_IFELSE(
         [AC_LANG_SOURCE([__asm__ (".ident \"GHC x.y.z\"");])],
         [AC_MSG_RESULT(yes)
          HaskellHaveIdentDirective=True],
@@ -330,7 +351,8 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         ;;
     esac
     AC_MSG_CHECKING(for GNU non-executable stack support)
-    AC_COMPILE_IFELSE(
+    dnl See Note [autoconf assembler checks and -flto]
+    AC_LINK_IFELSE(
         [AC_LANG_PROGRAM([__asm__ (".section .note.GNU-stack,\"\",$progbits");], [0])],
         [AC_MSG_RESULT(yes)
          HaskellHaveGnuNonexecStack=True],
