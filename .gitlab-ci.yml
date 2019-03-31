@@ -270,6 +270,11 @@ validate-x86_64-darwin:
     - git submodule update --init --recursive
     - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+      # Build hyperlinked sources for documentation when building releases
+    - |
+      if [[ -n "$CI_COMMIT_TAG" ]]; then
+        echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
+      fi
 
     - bash .circleci/prepare-system.sh
     # workaround for docker permissions
