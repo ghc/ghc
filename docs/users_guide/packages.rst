@@ -579,6 +579,12 @@ must be relative to the location of the package environment file.
 
     Use the package environment in ⟨file⟩, or in
     ``$HOME/.ghc/arch-os-version/environments/⟨name⟩``
+    If set to ``-`` no package environment is read.
+
+.. envvar:: GHC_ENVIRONMENT
+
+    Specifies the path to the package environment file to be used by GHC.
+    Overridden by the :ghc-flag:`-package-env ⟨file⟩|⟨name⟩` flag if set.
 
 In order, ``ghc`` will look for the package environment in the following
 locations:
@@ -588,11 +594,11 @@ locations:
 -  File ``$HOME/.ghc/arch-os-version/environments/name`` if you pass the
    option ``-package-env ⟨name⟩``.
 
--  File ⟨file⟩ if the environment variable ``GHC_ENVIRONMENT`` is set to
+-  File ⟨file⟩ if the environment variable :envvar:`GHC_ENVIRONMENT` is set to
    ⟨file⟩.
 
 -  File ``$HOME/.ghc/arch-os-version/environments/name`` if the
-   environment variable ``GHC_ENVIRONMENT`` is set to ⟨name⟩.
+   environment variable :envvar:`GHC_ENVIRONMENT` is set to ⟨name⟩.
 
 Additionally, unless ``-hide-all-packages`` is specified ``ghc`` will also
 look for the package environment in the following locations:
