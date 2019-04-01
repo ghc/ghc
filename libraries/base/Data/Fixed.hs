@@ -1,10 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ExplicitNamespaces #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -42,7 +39,7 @@ module Data.Fixed
 ) where
 
 import Data.Data
-import GHC.TypeLits (KnownNat, natVal, type (^))
+import GHC.TypeLits (KnownNat, natVal)
 import GHC.Read
 import Text.ParserCombinators.ReadPrec
 import Text.Read.Lex
@@ -179,7 +176,7 @@ convertFixed :: forall a . HasResolution a => Lexeme -> ReadPrec (Fixed a)
 convertFixed (Number n)
  | Just (i, f) <- numberToFixed e n =
     return (fromInteger i + (fromInteger f / (10 ^ e)))
-    where r = resolution (undefined :: Fixed a)
+    where r = resolution (Proxy :: Proxy a)
           -- round 'e' up to help make the 'read . show == id' property
           -- possible also for cases where 'resolution' is not a
           -- power-of-10, such as e.g. when 'resolution = 128'
