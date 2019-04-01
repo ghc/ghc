@@ -6,7 +6,7 @@ We only assume that `git` and `stack` are installed (see
 
 ```
 # Get GHC sources; git core.autocrlf should be set to false (see Prerequisites section)
-git clone --recursive git://git.haskell.org/ghc.git
+git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
 cd ghc
 
 # Download and install the bootstrapping GHC and MSYS2

@@ -50,7 +50,7 @@ def check_for_url_rewrites():
 
             Or start over, and clone the GHC repository from the haskell server:
 
-              git clone --recursive git://git.haskell.org/ghc.git
+              git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
 
             For more information, see:
               * https://gitlab.haskell.org/ghc/ghc/wikis/newcomers or
