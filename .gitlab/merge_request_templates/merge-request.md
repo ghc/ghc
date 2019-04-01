@@ -11,6 +11,8 @@ Please take a few moments to verify that your commits fulfill the following:
    places.
  * [ ] add a [testcase to the
    testsuite](https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests/adding).
+ * [ ] if your MR affects library interfaces (e.g. changes `base`) please add
+   the ~"user facing" label.
 
 If you have any questions don't hesitate to open your merge request and inquire
 in a comment. If your patch isn't quite done yet please do add prefix your MR
