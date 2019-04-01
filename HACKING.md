@@ -30,7 +30,7 @@ find an overview here:
 Next, clone the repository and all the associated libraries:
 
 ```
-$ git clone --recursive git://git.haskell.org/ghc.git
+$ git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
 ```
 
 On Windows, you need an extra repository containing some build tools.
