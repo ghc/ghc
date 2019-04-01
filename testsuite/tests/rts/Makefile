@@ -129,6 +129,14 @@ linker_unload:
 	"$(TEST_HC)" LinkerUnload.hs -package ghc $(filter-out -rtsopts, $(TEST_HC_OPTS)) linker_unload.c -o linker_unload -no-hs-main -optc-Werror
 	./linker_unload "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
+.PHONY: linker_unload_profiled
+linker_unload_profiled:
+	$(RM) Test.o Test.hi
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c Test.hs -v0 -prof -fprof-auto
+	# -rtsopts causes a warning
+	"$(TEST_HC)" LinkerUnload.hs -package ghc $(filter-out -rtsopts, $(TEST_HC_OPTS)) -prof -fprof-auto linker_unload_profiled.c -o linker_unload_profiled -no-hs-main -optc-Werror
+	./linker_unload_profiled +RTS -p -RTS "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+
 # -----------------------------------------------------------------------------
 # Testing failures in the RTS linker.  We should be able to repeatedly
 # load bogus object files of various kinds without crashing and
