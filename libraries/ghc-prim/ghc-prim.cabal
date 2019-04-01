@@ -16,7 +16,7 @@ extra-source-files: changelog.md
 
 source-repository head
     type:     git
-    location: http://git.haskell.org/ghc.git
+    location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   libraries/ghc-prim
 
 custom-setup
