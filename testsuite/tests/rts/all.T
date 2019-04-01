@@ -277,6 +277,11 @@ test('T7919', [when(fast(), skip), omit_ways(prof_ways)], compile_and_run,
 
 test('T8035', normal, compile_and_run, [''])
 
+test('linker_unload_multiple_objs',
+     [extra_files(['LinkerUnload.hs', 'A.hs', 'B.hs', 'C.hs', 'D.hs',]),
+      when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259))],
+     run_command, ['$MAKE -s --no-print-directory linker_unload_multiple_objs'])
+
 test('linker_unload',
      [extra_files(['LinkerUnload.hs', 'Test.hs']),
       when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259))],
