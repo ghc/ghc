@@ -283,7 +283,7 @@ initProfilingLogFile(void)
 
     if (RtsFlags.ProfFlags.doHeapProfile) {
         /* Initialise the log file name */
-        hp_filename = arenaAlloc(prof_arena, strlen(stem) + 6);
+        hp_filename = arenaAlloc(prof_arena, strlen(stem) + 4);
         sprintf(hp_filename, "%s.hp", stem);
 
         /* open the log file */
@@ -718,12 +718,18 @@ ignoreCC (CostCentre const *cc)
 bool
 ignoreCCS (CostCentreStack const *ccs)
 {
-    return RtsFlags.CcFlags.doCostCentres < COST_CENTRES_ALL &&
-        (   ccs == CCS_OVERHEAD
-         || ccs == CCS_DONT_CARE
-         || ccs == CCS_GC
-         || ccs == CCS_SYSTEM
-         || ccs == CCS_IDLE);
+    return RtsFlags.CcFlags.doCostCentres < COST_CENTRES_ALL && specialCCS(ccs);
+}
+
+bool
+specialCCS (CostCentreStack const *ccs)
+{
+    return
+        ccs == CCS_OVERHEAD
+        || ccs == CCS_DONT_CARE
+        || ccs == CCS_GC
+        || ccs == CCS_SYSTEM
+        || ccs == CCS_IDLE;
 }
 
 void
