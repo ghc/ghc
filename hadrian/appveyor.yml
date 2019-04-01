@@ -14,7 +14,7 @@ install:
     # Note: AppVeyor has already cloned Hadrian into c:\new-hadrian
     # Fetch GHC sources into c:\ghc
     - cd ..
-    - git clone --recursive git://git.haskell.org/ghc.git
+    - git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
     # GHC comes with an older version of Hadrian, so we delete it
     - rm -rf ghc\hadrian
     # Copy new Hadrian into ./ghc/hadrian
