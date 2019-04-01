@@ -1,4 +1,3 @@
-{-# LANGUAGE PolyKinds #-}
 {-# OPTIONS_GHC -Wall -Werror #-}
 
 module Main where

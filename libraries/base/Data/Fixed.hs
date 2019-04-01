@@ -179,43 +179,65 @@ convertFixed :: forall a . HasResolution a => Lexeme -> ReadPrec (Fixed a)
 convertFixed (Number n)
  | Just (i, f) <- numberToFixed e n =
     return (fromInteger i + (fromInteger f / (10 ^ e)))
-    where r = resolution (Proxy :: Proxy a)
+    where r = resolution (undefined :: Fixed a)
           -- round 'e' up to help make the 'read . show == id' property
           -- possible also for cases where 'resolution' is not a
           -- power-of-10, such as e.g. when 'resolution = 128'
           e = ceiling (logBase 10 (fromInteger r) :: Double)
 convertFixed _ = pfail
 
-type E0 = 10 ^ 0
+data E0
 
+-- | @since 4.1.0.0
+instance HasResolution E0 where
+    resolution _ = 1
 -- | resolution of 1, this works the same as Integer
 type Uni = Fixed E0
 
-type E1 = 10 ^ 1
+data E1
 
+-- | @since 4.1.0.0
+instance HasResolution E1 where
+    resolution _ = 10
 -- | resolution of 10^-1 = .1
 type Deci = Fixed E1
 
-type E2 = 10 ^ 2
+data E2
 
+-- | @since 4.1.0.0
+instance HasResolution E2 where
+    resolution _ = 100
 -- | resolution of 10^-2 = .01, useful for many monetary currencies
 type Centi = Fixed E2
 
-type E3 = 10 ^ 3
+data E3
 
+-- | @since 4.1.0.0
+instance HasResolution E3 where
+    resolution _ = 1000
 -- | resolution of 10^-3 = .001
 type Milli = Fixed E3
 
-type E6 = 10 ^ 6
+data E6
 
+-- | @since 2.01
+instance HasResolution E6 where
+    resolution _ = 1000000
 -- | resolution of 10^-6 = .000001
 type Micro = Fixed E6
 
-type E9 = 10 ^ 9
+data E9
 
+-- | @since 4.1.0.0
+instance HasResolution E9 where
+    resolution _ = 1000000000
 -- | resolution of 10^-9 = .000000001
 type Nano = Fixed E9
 
-type E12 = 10 ^ 12
+data E12
+
+-- | @since 2.01
+instance HasResolution E12 where
+    resolution _ = 1000000000000
 -- | resolution of 10^-12 = .000000000001
 type Pico = Fixed E12
