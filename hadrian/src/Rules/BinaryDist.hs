@@ -91,7 +91,7 @@ you can simply do:
 bindistRules :: Rules ()
 bindistRules = do
     root <- buildRootRules
-    phony "binary-dist" $ do
+    phony "binary-dist-dir" $ do
         -- We 'need' all binaries and libraries
         targets <- mapM pkgTarget =<< stagePackages Stage1
         need targets
@@ -137,6 +137,16 @@ bindistRules = do
                    , "check-ppr", "ghc", "ghc-iserv", "ghc-pkg"
                    , "ghci-script", "ghci", "haddock", "hpc", "hp2ps", "hsc2hs"
                    , "runghc"]
+
+
+    phony "binary-dist" $ do
+
+        need ["binary-dist-dir"]
+
+        version        <- setting ProjectVersion
+        targetPlatform <- setting TargetPlatformFull
+
+        let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
 
         -- Finally, we create the archive <root>/bindist/ghc-X.Y.Z-platform.tar.xz
         tarPath <- builderPath (Tar Create)
