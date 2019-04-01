@@ -60,6 +60,8 @@ typedef struct CostCentreStack_ {
                                 // profile? (zero if excluded via -hc -hm etc.)
                                 // bit 1: show this CCS in profile report?
                                 // (set while printing report)
+                                // bit 2: is this CCS referenced by a live heap
+                                // object? (only set during checkUnload)
 
     StgWord    time_ticks;      // number of time ticks accumulated by
                                 // this CCS
@@ -179,10 +181,12 @@ CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
 void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
 CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
 void genCCSProfileReport (FILE *fp);
+bool specialCCS (CostCentreStack const *ccs);
 
 #define CCS_SELECTED 1
 #define CCS_VISIBLE 2
-// next flag would be 4
+#define CCS_REFERENCED 4
+// next flag would be 8
 
 void setCCSBitFlag(CostCentreStack *ccs, StgWord flag);
 bool testCCSBitFlag(CostCentreStack const *ccs, StgWord flag);
