@@ -33,6 +33,7 @@ import HsLit
 import TcHsSyn
 import MonadUtils
 import Util
+import Outputable
 
 import NameEnv
 
@@ -134,7 +135,8 @@ solveComplexEq solver_state@(standby, (unhandled, env)) eq@(e1, e2) = case eq of
 
   (PmExprEq _ _, PmExprEq _ _) -> Just (eq:standby, (unhandled, env))
 
-  _ -> Just (standby, (True, env)) -- I HATE CATCH-ALLS
+  _ -> WARN( True, text "solveComplexEq: Catch all" <+> ppr eq )
+       Just (standby, (True, env)) -- I HATE CATCH-ALLS
 
 -- | Extend the substitution and solve the (possibly updated) constraints.
 extendSubstAndSolve :: Name -> PmExpr -> TmState -> Maybe TmState
