@@ -54,9 +54,8 @@ typedef struct CostCentreStack_ {
     StgWord64  scc_count;       // Count of times this CCS is entered
                                 // align 8 (Note [struct alignment])
 
-    StgWord    selected;        // is this CCS shown in the heap
-                                // profile? (zero if excluded via -hc
-                                // -hm etc.)
+    StgWord    bitflags;        // bit 0 (lsb): is this CCS shown in the heap
+                                // profile? (zero if excluded via -hc -hm etc.)
 
     StgWord    time_ticks;      // number of time ticks accumulated by
                                 // this CCS
@@ -176,6 +175,13 @@ CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
 void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
 CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
 
+#define CCS_SELECTED 1
+// next flag would be 2
+
+void setCCSBitFlag(CostCentreStack *ccs, StgWord flag);
+bool testCCSBitFlag(CostCentreStack *ccs, StgWord flag);
+void clearCCSBitFlag(CostCentreStack *ccs, StgWord flag);
+
 extern CostCentre * RTS_VAR(CC_LIST);               // registered CC list
 
 /* -----------------------------------------------------------------------------
@@ -202,7 +208,7 @@ extern CostCentre * RTS_VAR(CC_LIST);               // registered CC list
             .indexTable          = NULL,                 \
             .root                = NULL,                 \
             .depth               = 0,                    \
-            .selected            = 0,                    \
+            .bitflags            = 0,                    \
             .scc_count           = 0,                    \
             .time_ticks          = 0,                    \
             .mem_alloc           = 0,                    \
