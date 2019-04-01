@@ -56,6 +56,8 @@ typedef struct CostCentreStack_ {
 
     StgWord    bitflags;        // bit 0 (lsb): is this CCS shown in the heap
                                 // profile? (zero if excluded via -hc -hm etc.)
+                                // bit 1: is this CCS referenced by a live heap
+                                // object? (only set during checkUnload)
 
     StgWord    time_ticks;      // number of time ticks accumulated by
                                 // this CCS
@@ -174,9 +176,11 @@ extern unsigned int RTS_VAR(era);
 CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
 void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
 CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
+bool specialCCS (CostCentreStack const *ccs);
 
 #define CCS_SELECTED 1
-// next flag would be 2
+#define CCS_REFERENCED 2
+// next flag would be 4
 
 void setCCSBitFlag(CostCentreStack *ccs, StgWord flag);
 bool testCCSBitFlag(CostCentreStack *ccs, StgWord flag);

@@ -58,7 +58,7 @@ int main (int argc, char *argv[])
 
         st = getObjectLoadStatus(OBJPATH);
         if (st != OBJECT_RESOLVED) {
-            errorBelch("object status != OBJECT_RESOLVED");
+            errorBelch("%d: object status != OBJECT_RESOLVED", i);
             exit(1);
         }
 
