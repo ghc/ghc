@@ -2118,15 +2118,22 @@ pmcheckHd (p@(PmLit l)) ps guards
 -- no information is lost
 
 -- LitCon
-pmcheckHd (PmLit l) ps guards (va@(PmCon {})) (ValVec vva delta)
+pmcheckHd p@PmLit{} ps guards va@PmCon{} (ValVec vva delta)
   = do y <- liftD $ mkPmId (pmPatType va)
-       let tm_state = extendSubst y (PmExprLit l) (delta_tm_cs delta)
+       -- Analogous to the ConVar case, we have to case split the value
+       -- abstraction on possible literals. We do so by introducing a fresh
+       -- variable that is equated to the constructor. LitVar will then take
+       -- care of the case split by resorting to NLit.
+       let tm_state = extendSubst y (vaToPmExpr va) (delta_tm_cs delta)
            delta'   = delta { delta_tm_cs = tm_state }
-       pmcheckHdI (PmVar y) ps guards va (ValVec vva delta')
+       pmcheckHdI p ps guards (PmVar y) (ValVec vva delta')
 
 -- ConLit
-pmcheckHd (p@(PmCon {})) ps guards (PmLit l) (ValVec vva delta)
+pmcheckHd p@PmCon{} ps guards (PmLit l) (ValVec vva delta)
   = do y <- liftD $ mkPmId (pmPatType p)
+       -- This desugars to the ConVar case by introducing a fresh variable that
+       -- is equated to the literal via a constraint. ConVar will then properly
+       -- case split on all possible constructors.
        let tm_state = extendSubst y (PmExprLit l) (delta_tm_cs delta)
            delta'   = delta { delta_tm_cs = tm_state }
        pmcheckHdI p ps guards (PmVar y) (ValVec vva delta')
