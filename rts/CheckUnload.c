@@ -102,6 +102,11 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd)
         p = bd->start;
         while (p < bd->free) {
             info = get_itbl((StgClosure *)p);
+#ifdef PROFILING
+            // mark CCS as referenced by the heap so it is not pruned while
+            // generating the profile snapshot
+            setCCSBitFlag(((StgClosure *)p)->header.prof.ccs, CCS_REFERENCED);
+#endif
             prim = false;
 
             switch (info->type) {
@@ -263,6 +268,38 @@ static void searchCostCentres (HashTable *addrs, CostCentreStack *ccs)
         }
     }
 }
+
+//
+// Prune CCSs which are not referenced in the heap and clears the reference
+// bit on remaining CCSs.
+//
+static CostCentreStack *
+pruneUnreferencedCCS (CostCentreStack *ccs)
+{
+    CostCentreStack *ccs1;
+    IndexTable *i, **prev;
+
+    prev = &ccs->indexTable;
+    for (i = ccs->indexTable; i != NULL; i = i->next) {
+        if (i->back_edge) { continue; }
+
+        ccs1 = pruneUnreferencedCCS(i->ccs);
+        if (ccs1 == NULL) {
+            *prev = i->next;
+        } else {
+            prev = &(i->next);
+        }
+    }
+
+    if (testCCSBitFlag(ccs, CCS_REFERENCED)
+        || ( ccs->indexTable != NULL )
+        || specialCCS(ccs)) {
+        clearCCSBitFlag(ccs, CCS_REFERENCED);
+        return ccs;
+    } else {
+        return NULL;
+    }
+}
 #endif
 
 //
@@ -325,10 +362,17 @@ void checkUnload (StgClosure *static_objects)
   }
 
 #if defined(PROFILING)
-  /* Traverse the cost centre tree, calling checkAddress on each CCS/CC */
+  // TODO: append a sample to program.ccp
+
+  // prune unreferenced CCS (which were marked in searchHeapBlocks)
+  // pruning resets referenced status on referenced CCS
+  pruneUnreferencedCCS(CCS_MAIN);
+
+  // The cost centre tree now only contains CCS pointed-to by the live heap.
+  // Traverse it and mark the owning objects as referenced.
   searchCostCentres(addrs, CCS_MAIN);
 
-  /* Also check each cost centre in the CC_LIST */
+  // Also check each cost centre in the CC_LIST
   CostCentre *cc;
   for (cc = CC_LIST; cc != NULL; cc = cc->link) {
       checkAddress(addrs, cc);
