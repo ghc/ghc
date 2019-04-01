@@ -282,6 +282,13 @@ test('linker_unload',
       when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259))],
      makefile_test, ['linker_unload'])
 
+test('linker_unload_profiled',
+     [req_profiling,
+      extra_files(['LinkerUnload.hs', 'Test.hs']),
+      when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259)),
+      expect_broken(11776)],
+     makefile_test, ['linker_unload_profiled'])
+
 test('T8209', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
