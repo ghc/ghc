@@ -25,7 +25,7 @@ tested-with:    GHC==7.11
 
 source-repository head
   type:     git
-  location: http://git.haskell.org/ghc.git
+  location: https://gitlab.haskell.org/ghc/ghc.git
   subdir:   libraries/ghc-compact
 
 library

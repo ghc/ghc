@@ -7,9 +7,8 @@ Here is how you can build GHC, from source, on Windows. We assume that `git` and
 
 ```sh
 # Get GHC and Hadrian sources; git core.autocrlf should be set to false (see Prerequisites section)
-git clone --recursive git://git.haskell.org/ghc.git
+git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
 cd ghc
-git clone git://github.com/snowleopard/hadrian
 
 # Download and install the bootstrapping GHC and MSYS2
 cd hadrian
@@ -35,7 +34,7 @@ optimisations. If you need an optimised GHC, drop the `--flavour=quickest` flag 
 the build command line (this will slow down the build to about an hour).
 
 These are currently not the
-[official GHC building instructions](https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows),
+[official GHC building instructions](https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation/windows),
 but are much simpler and may also be more robust.
 
 The `stack build` and `stack exec hadrian` commands can be replaced by an invocation
@@ -67,4 +66,4 @@ and are also routinely tested on
 
 ## Notes
 
-Beware of the [current limitations of Hadrian](https://github.com/snowleopard/hadrian#current-limitations).
+Beware of the [current limitations of Hadrian](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/README.md#current-limitations).
