@@ -636,27 +636,17 @@ See #10491
 -}
 
 -- | An argument that we might want to specialise.
---
--- Consider the following
--- function     f = \x -> /\ a b c -> \d1 d2 y -> blah
--- called with  f 5 @T1 @b @T2 $dT1 $dT2 y
---
--- Here we'd like to specialise on (a ~ T1, c ~ T2). Thus the 'd1' and 'd2'
--- dicts are relevant arguments to the specializatiom, but none of 'x', 'b' or
--- 'y' are.
---
--- We construct a [UnspecArg, SpecType T1, UnspecType, SpecType T2,
--- SpecDict d1, SpecDict d2, UnspecArg] corresponding to this call. The mapping
--- is as follows:
---
---   * Types arguments that should be specialised become 'SpecType's
---   * Types that should stay polymorphic become 'UnspecType's
---   * Specialized dictionaries become 'SpecDict's
---   * Everything else becomes an 'UnspecArg'
+-- See Note [Specialising Calls] for the nitty gritty details.
 data SpecArg
-  = SpecType Type
+  =
+    -- | Type arguments that should be specialised, due to appearing
+    -- free in the type of a 'SpecDict'.
+    SpecType Type
+    -- | Type arguments that should remain polymorphic.
   | UnspecType
+    -- | Dictionaries that should be specialised.
   | SpecDict DictExpr
+    -- | Value arguments that should not be specialised.
   | UnspecArg
 
 instance Outputable SpecArg where
@@ -728,6 +718,10 @@ isOnlyOnLeftSide (RuleSpecDict _ _) = True
 --     forall a. Int -> forall b. a -> x
 -- return
 --     [Left a, Right Int, Left b, Right a, Right x]
+--
+-- This function is used to determine which arguments are to be
+-- specialised on (see 'mkCallUDs') and for building the reordered
+-- to-be-speialised type (see Note [Specialising Calls]).
 splitTypeOnVarsAndArrows :: Type -> [Either TyVar Type]
 splitTypeOnVarsAndArrows t
   | (fvs@(_:_),  t') <- tcSplitForAllTys t =
