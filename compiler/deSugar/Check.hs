@@ -2023,7 +2023,9 @@ pmcheckHd :: Pattern -> PatVec -> [PatVec] -> ValAbs -> ValVec
 pmcheckHd (PmVar x) ps guards va (ValVec vva delta)
   | Just tm_state <- solveOneEq (delta_tm_cs delta)
                                 (PmExprVar (idName x), vaToPmExpr va)
-  = ucon va <$> pmcheckI ps guards (ValVec vva (delta {delta_tm_cs = tm_state}))
+  = do res <- pmcheckI ps guards (ValVec vva (delta {delta_tm_cs = tm_state}))
+       tracePm "pmcheckHd: Var" (vcat [ppr x, ppr (vaToPmExpr va), ppr (delta_tm_cs delta), pprValVecDebug (ValVec vva (delta {delta_tm_cs = tm_state})), ppr tm_state])
+       pure (ucon va res)
   | otherwise = return mempty
 
 -- ConCon
@@ -2070,6 +2072,8 @@ pmcheckHd (p@(PmCon { pm_con_con = con, pm_con_arg_tys = tys }))
                             , ic_strict_arg_tys = strict_arg_tys } -> do
     mb_sat <- pmIsSatisfiable delta tm_ct ty_cs strict_arg_tys
     pure $ fmap (ValVec (va:vva)) mb_sat
+
+  tracePm "pmcheckHd: ConVar" (vcat [ppr p, ppr vva, ppr inst_vsa])
 
   set_provenance prov .
     force_if (canDiverge (idName x) (delta_tm_cs delta)) <$>
@@ -2118,15 +2122,18 @@ pmcheckHd (p@(PmLit l)) ps guards
 -- no information is lost
 
 -- LitCon
-pmcheckHd (PmLit l) ps guards (va@(PmCon {})) (ValVec vva delta)
+pmcheckHd p@PmLit{} ps guards (va@(PmCon {})) (ValVec vva delta)
   = do y <- liftD $ mkPmId (pmPatType va)
-       let tm_state = extendSubst y (PmExprLit l) (delta_tm_cs delta)
+       -- Analogous to the VarCon case, we have to case split.
+       -- We do so by delegating to the LitVar case
+       let tm_state = extendSubst y (vaToPmExpr va) (delta_tm_cs delta)
            delta'   = delta { delta_tm_cs = tm_state }
-       pmcheckHdI (PmVar y) ps guards va (ValVec vva delta')
+       pmcheckHdI p ps guards (PmVar y) (ValVec vva delta')
 
 -- ConLit
-pmcheckHd (p@(PmCon {})) ps guards (PmLit l) (ValVec vva delta)
+pmcheckHd p@PmCon{} ps guards (PmLit l) (ValVec vva delta)
   = do y <- liftD $ mkPmId (pmPatType p)
+       -- TODO: ?
        let tm_state = extendSubst y (PmExprLit l) (delta_tm_cs delta)
            delta'   = delta { delta_tm_cs = tm_state }
        pmcheckHdI p ps guards (PmVar y) (ValVec vva delta')
