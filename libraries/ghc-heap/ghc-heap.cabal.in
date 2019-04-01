@@ -4,7 +4,7 @@ version:        @ProjectVersionMunged@
 license:        BSD-3-Clause
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
-bug-reports:    http://ghc.haskell.org/trac/ghc/newticket
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       Functions for walking GHC's heap
 category:       GHC
 description:

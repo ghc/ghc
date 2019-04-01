@@ -81,7 +81,7 @@ import Data.Maybe ( mapMaybe )
 --  "StgLiftLams.Analysis#clogro" and is what most of this module is ultimately
 --  concerned with.
 --
--- There's a <https://ghc.haskell.org/trac/ghc/wiki/LateLamLift wiki page> with
+-- There's a <https://gitlab.haskell.org/ghc/ghc/wikis/late-lam-lift wiki page> with
 -- some more background and history.
 
 -- Note [Estimating closure growth]
@@ -102,7 +102,7 @@ import Data.Maybe ( mapMaybe )
 --
 -- A more detailed treatment of computing closure growth, including examples,
 -- can be found in the paper referenced from the
--- <https://ghc.haskell.org/trac/ghc/wiki/LateLamLift wiki page>.
+-- <https://gitlab.haskell.org/ghc/ghc/wikis/late-lam-lift wiki page>.
 
 llTrace :: String -> SDoc -> a -> a
 llTrace _ _ c = c

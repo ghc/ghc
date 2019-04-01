@@ -73,7 +73,7 @@
 
 /*
  * The RTS must sometimes UNTAG a pointer before dereferencing it.
- * See the wiki page Commentary/Rts/HaskellExecution/PointerTagging
+ * See the wiki page commentary/rts/haskell-execution/pointer-tagging
  */
 #define TAG_MASK ((1 << TAG_BITS) - 1)
 #define UNTAG(p) (p & ~TAG_MASK)

@@ -44,11 +44,12 @@ stages:
 ############################################################
 
 ghc-linters:
+  allow_failure: true
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
-    - git fetch origin
-    - base="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME $CI_COMMIT_SHA)"
+    - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
     - "echo Merge base $base"
     #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
     - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
@@ -87,6 +88,32 @@ lint-submods-mr:
   only:
     refs:
       - merge_requests
+
+.lint-changelogs:
+  stage: lint
+  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  dependencies: []
+  tags:
+    - lint
+  script:
+    - |
+      grep TBA libraries/*/changelog.md && (
+          echo "Error: Found \"TBA\"s in changelogs."
+          exit 1
+      )
+
+lint-changelogs:
+  extends: .lint-changelogs
+  allow_failure: true
+  only:
+    refs:
+      - /ghc-[0-9]+\.[0-9]+/
+
+lint-release-changelogs:
+  extends: .lint-changelogs
+  only:
+    - tags
+
 
 ############################################################
 # Validation via Pipelines (hadrian)
@@ -148,8 +175,8 @@ hadrian-ghc-in-ghci:
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
-    # Load ghc-in-ghci then immediately exit
-    - echo ":q" | hadrian/ghci.sh
+    # Load ghc-in-ghci then immediately exit and check the modules loaded
+    - echo ":q" | hadrian/ghci.sh | tail -n2 | grep "Ok,"
   cache:
     key: hadrian-ghci
     paths:
@@ -637,7 +664,6 @@ cleanup-darwin:
 doc-tarball:
   <<: *only-default
   stage: packaging
-  allow_failure: true
   tags:
     - x86_64-linux
   image: ghcci/x86_64-linux-deb9:0.2
@@ -653,9 +679,9 @@ doc-tarball:
       - "*.pdf"
   script:
     - rm -Rf docs
-    - distrib/mkDocs/mkDocs ghc-x86_64-deb9-linux.tar.xz ghc-x86_64-mingw32.tar.xz
+    - bash -ex distrib/mkDocs/mkDocs ghc-x86_64-deb9-linux.tar.xz ghc-x86_64-mingw32.tar.xz
     - ls -lh
-    - mv docs/*.tar.xz .
+    - mv docs/*.tar.xz docs/index.html .
 
 source-tarball:
   stage: packaging

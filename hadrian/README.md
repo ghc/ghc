@@ -248,14 +248,23 @@ Here are a few simple suggestions that might help you fix the build:
 
 * If Hadrian fails with the message
   `Configuration file hadrian/cfg/system.config is missing`, you have probably
-  forgotten to pass the `--configure` flag during the first build.
+  forgotten to pass the `--configure` flag during the first build. 
 
-* If you need help in debugging Hadrian, read the
-  [wiki](https://github.com/snowleopard/hadrian/wiki)
-  and Shake's [debugging tutorial](https://shakebuild.com/debugging).
+* With the `--configure` (`-c`) flag, Hadrian sometimes fetches a wrong 
+  Happy saying something like: `HappyTemplate-arrays-coerce: openFile: does not exist`
+  (as mentioned [here](https://github.com/haskell/cabal/issues/5867)), in 
+  which case you might be better off running `./configure` manually before Hadrian.
 
-If nothing helps, don't hesitate to create a GHC issue, choosing the
-component `Build System (Hadrian)`.
+* The call to `build test` sometimes fails with 
+  `libCffi_p.a: copyFile: does not exist` (as noticed 
+  [here](https://gitlab.haskell.org/ghc/ghc/issues/15877#note_166739)). 
+  The workaround is to `rm _build/stage1/libffi/build/inst/lib/libffi.a` and 
+  start over.
+
+If you need help in debugging Hadrian, read the 
+[wiki](https://github.com/snowleopard/hadrian/wiki)
+and Shake's [debugging tutorial](https://shakebuild.com/debugging).
+If nothing helps, don't hesitate to create a GHC issue.
 
 Current limitations
 -------------------
@@ -291,11 +300,11 @@ projects), as well as Well-Typed.
 
 [ghc]: https://en.wikipedia.org/wiki/Glasgow_Haskell_Compiler
 [shake]: https://github.com/ndmitchell/shake
-[make]: https://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+[make]: https://gitlab.haskell.org/ghc/ghc/wikis/building/architecture
 [talk]: https://skillsmatter.com/skillscasts/8722-meet-hadrian-a-new-build-system-for-ghc
 [issues]: https://github.com/snowleopard/hadrian/issues
-[ghc-preparation]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
-[ghc-windows-quick-build]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows#AQuickBuild
+[ghc-preparation]: https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation
+[ghc-windows-quick-build]: https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation/windows#AQuickBuild
 [windows-build]: https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/windows.md
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
 [validation-issue]: https://github.com/snowleopard/hadrian/issues/187

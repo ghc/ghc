@@ -266,7 +266,7 @@ rtsPackageArgs = package rts ? do
             -- The above warning suppression flags are a temporary kludge.
             -- While working on this module you are encouraged to remove it and fix
             -- any warnings in the module. See:
-            -- http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
+            -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
 
             , (not <$> flag GccIsClang) ?
               inputs ["//Compact.c"] ? arg "-finline-limit=2500"

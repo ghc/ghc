@@ -189,7 +189,7 @@ ghcWithInterpreter = do
     return $ goodOs && goodArch
 
 -- | Check whether the target architecture supports placing info tables next to
--- code. See: https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/HeapObjects#TABLES_NEXT_TO_CODE.
+-- code. See: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage/heap-objects#tables_next_to_code.
 ghcEnableTablesNextToCode :: Action Bool
 ghcEnableTablesNextToCode = notM $ anyTargetArch ["ia64", "powerpc64", "powerpc64le"]
 

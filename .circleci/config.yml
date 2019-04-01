@@ -1,5 +1,5 @@
 # Questions about this file?
-# See https://ghc.haskell.org/trac/ghc/wiki/ContinuousIntegration/Usage.
+# See https://gitlab.haskell.org/ghc/ghc/wikis/continuous-integration/usage.
 
 version: 2
 

@@ -1216,7 +1216,7 @@ bestImport iss
 {- Note [Choosing the best import declaration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When reporting unused import declarations we use the following rules.
-   (see [wiki:Commentary/Compiler/UnusedImports])
+   (see [wiki:commentary/compiler/unused-imports])
 
 Say that an import-item is either
   * an entire import-all decl (eg import Foo), or

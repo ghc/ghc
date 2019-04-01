@@ -159,7 +159,7 @@ find an occurrence of an Id, we fetch it from the in-scope set.
 
 Note [Bad unsafe coercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-For discussion see https://ghc.haskell.org/trac/ghc/wiki/BadUnsafeCoercions
+For discussion see https://gitlab.haskell.org/ghc/ghc/wikis/bad-unsafe-coercions
 Linter introduces additional rules that checks improper coercion between
 different types, called bad coercions. Following coercions are forbidden:
 

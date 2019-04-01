@@ -322,7 +322,7 @@ import Foreign (Ptr) -- needed for 2nd stage
 --  * Adding the flag to the GHC Wiki
 --
 --    There is a change log tracking language extension additions and removals
---    on the GHC wiki:  https://ghc.haskell.org/trac/ghc/wiki/LanguagePragmaHistory
+--    on the GHC wiki:  https://gitlab.haskell.org/ghc/ghc/wikis/language-pragma-history
 --
 --  See #4437 and #8176.
 
@@ -5549,7 +5549,7 @@ picCCOpts dflags = pieOpts ++ picOpts
       -- otherwise things like stub.c files don't get compiled
       -- correctly.  They need to reference data in the Haskell
       -- objects, but can't without -fPIC.  See
-      -- http://ghc.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
+      -- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/position-independent-code
        | gopt Opt_PIC dflags || WayDyn `elem` ways dflags ->
           ["-fPIC", "-U__PIC__", "-D__PIC__"]
       -- gcc may be configured to have PIC on by default, let's be
