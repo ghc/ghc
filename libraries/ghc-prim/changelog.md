@@ -7,6 +7,7 @@
         closureSize# :: a -> Int#
 
 - Added to `GHC.Prim`:
+
         bitReverse# :: Word# -> Word#
         bitReverse8# :: Word# -> Word#
         bitReverse16# :: Word# -> Word#
