@@ -794,6 +794,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
 
 addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
+  | otherwise
   = new_bndr `setIdInfo` info5
   where
     AT oss div = new_arity_type
@@ -2580,6 +2581,8 @@ rebuildCase, reallyRebuildCase
 --------------------------------------------------
 
 rebuildCase env scrut case_bndr alts cont
+  -- | pprTrace "rebuildCase" (ppr scrut) False
+  -- = undefined
   | Lit lit <- scrut    -- No need for same treatment as constructors
                         -- because literals are inlined more vigorously
   , not (litIsLifted lit)
@@ -2708,8 +2711,8 @@ doCaseToLet scrut case_bndr
   = exprOkForSpeculation scrut
 
   | otherwise  -- Scrut has a lifted type
-  = exprIsHNF scrut
-    || isStrictDmd (idDemandInfo case_bndr)
+  = --pprTrace "doCaseToLet:" (ppr (scrut, case_bndr)) $
+    exprIsHNF scrut || isStrictDmd (idDemandInfo case_bndr)
     -- See Note [Case-to-let for strictly-used binders]
 
 --------------------------------------------------

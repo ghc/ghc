@@ -1245,6 +1245,9 @@ pprCLabel platform sty lbl =
 
     tempLabelPrefixOrUnderscore :: Platform -> SDoc
     tempLabelPrefixOrUnderscore platform = case sty of
+      AsmStyle -> empty
+      CStyle   -> char '_'
+    tempLabelPrefixOrUnderscore platform = case sty of
       AsmStyle -> ptext (asmTempLabelPrefix platform)
       CStyle   -> char '_'
 

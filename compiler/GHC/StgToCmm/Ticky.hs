@@ -97,7 +97,10 @@ module GHC.StgToCmm.Ticky (
   tickyUnboxedTupleReturn,
   tickyReturnOldCon, tickyReturnNewCon,
 
-  tickySlowCall
+  tickyKnownCallTooFewArgs, tickyKnownCallExact, tickyKnownCallExtraArgs,
+  tickySlowCall, tickySlowCallPat,
+
+  tickyTagged, tickyUntagged
   ) where
 
 import GHC.Prelude
@@ -542,6 +545,19 @@ tickyHeapCheck = ifTicky $ bumpTickyCounter (fsLit "HEAP_CHK_ctr")
 
 tickyStackCheck :: FCode ()
 tickyStackCheck = ifTicky $ bumpTickyCounter (fsLit "STK_CHK_ctr")
+
+-- -----------------------------------------------------------------------------
+-- Ticky for tag inferrence characterisation
+
+-- | Predicted a pointer would be tagged correctly (GHC will crash if not so no miss case)
+tickyTagged :: FCode ()
+tickyTagged         = ifTicky $ bumpTickyCounter (fsLit "TAG_TAGGED_pred")
+
+-- | Pass a boolean expr indicating if tag was present.
+tickyUntagged :: CmmExpr -> FCode ()
+tickyUntagged e     = do
+    ifTicky $ bumpTickyCounter (fsLit "TAG_UNTAGGED_pred")
+    ifTicky $ bumpTickyCounterByE (fsLit "TAG_UNTAGGED_miss") e
 
 -- -----------------------------------------------------------------------------
 -- Ticky utils

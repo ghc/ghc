@@ -1443,6 +1443,8 @@ lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
 
+
+
 ------------------------------------------------
 proxyHashId :: Id
 proxyHashId

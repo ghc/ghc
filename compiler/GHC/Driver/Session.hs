@@ -2594,6 +2594,8 @@ dynamic_flags_deps = [
   , make_dep_flag defGhcFlag "ddump-stg"
         (setDumpFlag Opt_D_dump_stg_from_core)
         "Use `-ddump-stg-from-core` or `-ddump-stg-final` instead"
+  , make_ord_flag defGhcFlag "ddump-stg-tag-nodes"
+        (setDumpFlag Opt_D_dump_stg_tag_nodes)
   , make_ord_flag defGhcFlag "ddump-call-arity"
         (setDumpFlag Opt_D_dump_call_arity)
   , make_ord_flag defGhcFlag "ddump-exitify"
@@ -2686,6 +2688,8 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_DoAsmLinting))
   , make_ord_flag defGhcFlag "dannot-lint"
         (NoArg (setGeneralFlag Opt_DoAnnotationLinting))
+  , make_ord_flag defGhcFlag "dtag-inference-checks"
+        (NoArg (setGeneralFlag Opt_DoTagInferenceChecks))
   , make_ord_flag defGhcFlag "dshow-passes"
         (NoArg $ forceRecompile >> (setVerbosity $ Just 2))
   , make_ord_flag defGhcFlag "dfaststring-stats"

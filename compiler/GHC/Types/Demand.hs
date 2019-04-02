@@ -53,7 +53,9 @@ module GHC.Types.Demand (
         useCount, isUsedOnce, reuseEnv,
         zapUsageDemand, zapUsageEnvSig,
         zapUsedOnceDemand, zapUsedOnceSig,
-        strictifyDictDmd, strictifyDmd
+        strictifyDictDmd, strictifyDmd,
+
+        strTop, strBot, useBot, JointDmd(..), useTop
 
      ) where
 
@@ -897,6 +899,8 @@ instance Outputable TypeShape where
 --            ExnOrDiv (nip)
 --                  |
 --            Diverges (ni)
+--                  |
+--             Absent (i)
 -- @
 --
 -- As you can see, we don't distinguish __n__ and __i__.
@@ -907,10 +911,14 @@ data Divergence
   | ExnOrDiv -- ^ Definitely throws a *precise* exception, an imprecise
              --   exception or diverges. Never converges, hence 'isDeadEndDiv'!
              --   See scenario 1 in Note [Precise exceptions and strictness analysis].
+  | Absent   -- ^ Will diverge upon entry, but will not be evaluated in absence of
+             --   compiler bugs.
   | Dunno    -- ^ Might diverge, throw any kind of exception or converge.
   deriving( Eq, Show )
 
 lubDivergence :: Divergence -> Divergence -> Divergence
+lubDivergence Absent   div      = div
+lubDivergence div      Absent   = div
 lubDivergence Diverges div      = div
 lubDivergence div      Diverges = div
 lubDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
@@ -927,7 +935,13 @@ bothDivergence :: Divergence -> Divergence -> Divergence
 -- worth it and is only relevant in higher-order scenarios
 -- (e.g. Divergence of @f (throwIO blah)@).
 -- So 'bothDivergence' currently is 'glbDivergence', really.
+-- bothDivergence x y
+--   | pprTrace "bothDivergence" (ppr x <+> ppr y) False
+--   = undefined
 bothDivergence Dunno    Dunno    = Dunno
+-- TODO: Absent - this is just based on "So 'bothDivergence' currently is 'glbDivergence', really."
+bothDivergence Absent   _        = Absent
+bothDivergence _        Absent   = Absent
 bothDivergence Diverges _        = Diverges
 bothDivergence _        Diverges = Diverges
 bothDivergence _        _        = ExnOrDiv
@@ -935,7 +949,9 @@ bothDivergence _        _        = ExnOrDiv
 instance Outputable Divergence where
   ppr Diverges = char 'b' -- for (b)ottom
   ppr ExnOrDiv = char 'x' -- for e(x)ception
-  ppr Dunno    = empty
+  ppr Absent   = char 'a' -- for (a)bsent
+  ppr Dunno    = char 'T'
+  -- ppr Dunno    = empty
 
 {- Note [Precise vs imprecise exceptions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1052,6 +1068,8 @@ botDiv = Diverges
 isDeadEndDiv :: Divergence -> Bool
 isDeadEndDiv Diverges = True
 isDeadEndDiv ExnOrDiv = True
+isDeadEndDiv Absent   = False -- Actually a dead end, but we pretent it isn't.
+                              -- See Note [aBSENT_ERROR_ID] for why.
 isDeadEndDiv Dunno    = False
 
 -- See Notes [Default demand on free variables and arguments]
@@ -1060,6 +1078,9 @@ defaultFvDmd :: Divergence -> Demand
 defaultFvDmd Dunno    = absDmd
 defaultFvDmd ExnOrDiv = absDmd -- This is the whole point of ExnOrDiv!
 defaultFvDmd Diverges = botDmd -- Diverges
+defaultFvDmd Absent   = absDmd -- While this diverges we compile under the assumption
+                               -- that it's never entered, so the free variables should
+                               -- never be demanded.
 
 defaultArgDmd :: Divergence -> Demand
 -- TopRes and BotRes are polymorphic, so that
@@ -1072,6 +1093,7 @@ defaultArgDmd Dunno    = topDmd
 -- argument. But it is still absent.
 defaultArgDmd ExnOrDiv = absDmd
 defaultArgDmd Diverges = botDmd
+defaultArgDmd Absent   = topDmd
 
 {- Note [Default demand on free variables and arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2049,9 +2071,11 @@ instance Binary Divergence where
   put_ bh Dunno    = putByte bh 0
   put_ bh ExnOrDiv = putByte bh 1
   put_ bh Diverges = putByte bh 2
+  put_ bh Absent   = putByte bh 3
 
   get bh = do { h <- getByte bh
               ; case h of
                   0 -> return Dunno
                   1 -> return ExnOrDiv
+                  3 -> return Absent
                   _ -> return Diverges }

@@ -1,6 +1,8 @@
 {-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy       #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# OPTIONS -O1 #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -106,6 +108,7 @@ import           GHC.IO.Exception
 import           GHC.Show
 -- import GHC.Exception hiding ( Exception )
 import           GHC.Conc.Sync
+import           GHC.Magic
 
 import           Data.Either
 
@@ -383,6 +386,10 @@ recSelError, recConError, runtimeError,
 recSelError              s = throw (RecSelError ("No match in record selector "
                                                  ++ unpackCStringUtf8# s))  -- No location info unfortunately
 runtimeError             s = errorWithoutStackTrace (unpackCStringUtf8# s)                   -- No location info unfortunately
+
+-- No point in inlining absentError. It would both make it harder to spot absentError
+-- applications and hurt performance as it's only executed in the error case.
+{-# NOINLINE absentError #-}
 absentError              s = errorWithoutStackTrace ("Oops!  Entered absent arg " ++ unpackCStringUtf8# s)
 
 nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))

@@ -1,0 +1,4760 @@
+
+==================== Desugar (before optimization) ====================
+2020-11-24 12:41:53.3451651 UTC
+
+Result size of Desugar (before optimization)
+  = {terms: 1,961, types: 1,710, coercions: 43, joins: 0/103}
+
+Rec {
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a18BT :: IsMap LabelMap
+[LclId]
+$dIsMap_a18BT = $dIsMap_a18yG
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a18Bx :: IsMap LabelMap
+[LclId]
+$dIsMap_a18Bx = $dIsMap_a18yG
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a18AV :: IsMap LabelMap
+[LclId]
+$dIsMap_a18AV = $dIsMap_a18yG
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a18AG :: IsMap LabelMap
+[LclId]
+$dIsMap_a18AG = $dIsMap_a18yG
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a18Ae :: IsMap LabelMap
+[LclId]
+$dIsMap_a18Ae = $dIsMap_a18yG
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a18A8 :: IsMap LabelMap
+[LclId]
+$dIsMap_a18A8 = $dIsMap_a18yG
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a18zS :: IsMap LabelMap
+[LclId]
+$dIsMap_a18zS = $dIsMap_a18yG
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a18zy :: IsMap LabelMap
+[LclId]
+$dIsMap_a18zy = $dIsMap_a18yG
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a18yG :: IsMap LabelMap
+[LclId]
+$dIsMap_a18yG = GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dFoldable_a18E7 :: Foldable []
+[LclId]
+$dFoldable_a18E7 = $dFoldable_a18yM
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dFoldable_a18DN :: Foldable []
+[LclId]
+$dFoldable_a18DN = $dFoldable_a18yM
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dFoldable_a18B6 :: Foldable []
+[LclId]
+$dFoldable_a18B6 = $dFoldable_a18yM
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dFoldable_a18yM :: Foldable []
+[LclId]
+$dFoldable_a18yM = Data.Foldable.$fFoldable[]
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a18Cj :: NonLocal (Block CmmNode)
+[LclId]
+$dNonLocal_a18Cj = $dNonLocal_a18yU
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a18Bi :: NonLocal (Block CmmNode)
+[LclId]
+$dNonLocal_a18Bi = $dNonLocal_a18yU
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a18Bb :: NonLocal (Block CmmNode)
+[LclId]
+$dNonLocal_a18Bb = $dNonLocal_a18yU
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a18A5 :: NonLocal (Block CmmNode)
+[LclId]
+$dNonLocal_a18A5 = $dNonLocal_a18yU
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+$dNonLocal_a18yU :: NonLocal (Block CmmNode)
+[LclId]
+$dNonLocal_a18yU
+  = GHC.Cmm.Dataflow.Graph.$fNonLocalBlock @ CmmNode $dNonLocal_a18IU
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a18BH :: NonLocal CmmNode
+[LclId]
+$dNonLocal_a18BH = $dNonLocal_a18IU
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a18IU :: NonLocal CmmNode
+[LclId]
+$dNonLocal_a18IU = GHC.Cmm.Node.$fNonLocalCmmNode
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$d(%%)_a18IC :: GHC.Utils.Misc.HasDebugCallStack
+[LclId]
+$d(%%)_a18IC = $d(%%)_a18yV
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$d(%%)_a18Iw :: GHC.Utils.Misc.HasDebugCallStack
+[LclId]
+$d(%%)_a18Iw = $d(%%)_a18yV
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$d(%%)_a18yV :: GHC.Utils.Misc.HasDebugCallStack
+[LclId]
+$d(%%)_a18yV = ghc-prim-0.6.1:GHC.Classes.C:(%%)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a18A2 :: Eq BlockId
+[LclId]
+$dEq_a18A2 = GHC.Cmm.Dataflow.Label.$fEqLabel
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsSet_a18BB :: IsSet LabelSet
+[LclId]
+$dIsSet_a18BB = $dIsSet_a18Bq
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsSet_a18Bu :: IsSet LabelSet
+[LclId]
+$dIsSet_a18Bu = $dIsSet_a18Bq
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsSet_a18Bq :: IsSet LabelSet
+[LclId]
+$dIsSet_a18Bq = GHC.Cmm.Dataflow.Label.$fIsSetLabelSet
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIntegral_a18HY :: Integral Int
+[LclId]
+$dIntegral_a18HY = $dIntegral_a18D0
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIntegral_a18FZ :: Integral Int
+[LclId]
+$dIntegral_a18FZ = $dIntegral_a18D0
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIntegral_a18FT :: Integral Int
+[LclId]
+$dIntegral_a18FT = $dIntegral_a18D0
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIntegral_a18Fe :: Integral Int
+[LclId]
+$dIntegral_a18Fe = $dIntegral_a18D0
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIntegral_a18D0 :: Integral Int
+[LclId]
+$dIntegral_a18D0 = GHC.Real.$fIntegralInt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18Ig :: Num WordOff
+[LclId]
+$dNum_a18Ig = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18I5 :: Num Int
+[LclId]
+$dNum_a18I5 = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18Gb :: Num Int
+[LclId]
+$dNum_a18Gb = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18G7 :: Num WordOff
+[LclId]
+$dNum_a18G7 = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18G2 :: Num Int
+[LclId]
+$dNum_a18G2 = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18FP :: Num Int
+[LclId]
+$dNum_a18FP = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18FN :: Num Int
+[LclId]
+$dNum_a18FN = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18FJ :: Num Int
+[LclId]
+$dNum_a18FJ = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18FA :: Num WordOff
+[LclId]
+$dNum_a18FA = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18Fw :: Num Int
+[LclId]
+$dNum_a18Fw = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18Fn :: Num WordOff
+[LclId]
+$dNum_a18Fn = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18F9 :: Num Int
+[LclId]
+$dNum_a18F9 = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18F7 :: Num Int
+[LclId]
+$dNum_a18F7 = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18F4 :: Num WordOff
+[LclId]
+$dNum_a18F4 = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18EZ :: Num Int
+[LclId]
+$dNum_a18EZ = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18E0 :: Num Int
+[LclId]
+$dNum_a18E0 = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18DW :: Num Int
+[LclId]
+$dNum_a18DW = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18DQ :: Num Int
+[LclId]
+$dNum_a18DQ = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18D8 :: Num Int
+[LclId]
+$dNum_a18D8 = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18D4 :: Num Int
+[LclId]
+$dNum_a18D4 = $dNum_a18D2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18D2 :: Num Int
+[LclId]
+$dNum_a18D2 = GHC.Num.$fNumInt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a18Do :: Eq GHC.Platform.Reg.RealReg
+[LclId]
+$dEq_a18Do = GHC.Platform.Reg.$fEqRealReg
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a18Dq :: Eq CmmReg
+[LclId]
+$dEq_a18Dq = GHC.Cmm.Expr.$fEqCmmReg
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a18In :: Bits Int
+[LclId]
+$dBits_a18In = $dBits_a18DS
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a18DS :: Bits Int
+[LclId]
+$dBits_a18DS = Data.Bits.$fBitsInt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a18Ev :: Eq Width
+[LclId]
+$dEq_a18Ev = GHC.Cmm.Type.$fEqWidth
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18FR :: Num Integer
+[LclId]
+$dNum_a18FR = $dNum_a18ED
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18Ff :: Num Integer
+[LclId]
+$dNum_a18Ff = $dNum_a18ED
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18Fb :: Num Integer
+[LclId]
+$dNum_a18Fb = $dNum_a18ED
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a18ED :: Num Integer
+[LclId]
+$dNum_a18ED = GHC.Num.$fNumInteger
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a18FF :: Eq Int
+[LclId]
+$dEq_a18FF = $dEq_a18EV
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a18Fs :: Eq Int
+[LclId]
+$dEq_a18Fs = $dEq_a18EV
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a18EV :: Eq Int
+[LclId]
+$dEq_a18EV = ghc-prim-0.6.1:GHC.Classes.$fEqInt
+
+-- RHS size: {terms: 20, types: 3, coercions: 7, joins: 0/0}
+$dIP_a18Fh :: GHC.Stack.Types.HasCallStack
+[LclId]
+$dIP_a18Fh
+  = (GHC.Stack.Types.pushCallStack
+       (ghc-prim-0.6.1:GHC.CString.unpackCString# "pprPanic"#,
+        GHC.Stack.Types.SrcLoc
+          (ghc-prim-0.6.1:GHC.CString.unpackCString# "ghc"#)
+          (ghc-prim-0.6.1:GHC.CString.unpackCString# "GHC.Cmm.Utils"#)
+          (ghc-prim-0.6.1:GHC.CString.unpackCString#
+             "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs"#)
+          (ghc-prim-0.6.1:GHC.Types.I# 284#)
+          (ghc-prim-0.6.1:GHC.Types.I# 43#)
+          (ghc-prim-0.6.1:GHC.Types.I# 284#)
+          (ghc-prim-0.6.1:GHC.Types.I# 81#))
+       ($dIP_a18IV
+        `cast` (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                    <"callStack">_N <GHC.Stack.Types.CallStack>_N
+                :: (?callStack::GHC.Stack.Types.CallStack)
+                   ~R# GHC.Stack.Types.CallStack)))
+    `cast` (Sym (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                     <"callStack">_N <GHC.Stack.Types.CallStack>_N)
+            :: GHC.Stack.Types.CallStack
+               ~R# (?callStack::GHC.Stack.Types.CallStack))
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dOutputable_a18Fj :: Outputable Int
+[LclId]
+$dOutputable_a18Fj = GHC.Utils.Outputable.$fOutputableInt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a18HT :: Bits Integer
+[LclId]
+$dBits_a18HT = $dBits_a18HN
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a18HR :: Bits Integer
+[LclId]
+$dBits_a18HR = $dBits_a18HN
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a18HP :: Bits Integer
+[LclId]
+$dBits_a18HP = $dBits_a18HN
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a18HN :: Bits Integer
+[LclId]
+$dBits_a18HN = Data.Bits.$fBitsInteger
+
+-- RHS size: {terms: 1, types: 0, coercions: 4, joins: 0/0}
+$dIP_a18IV :: GHC.Stack.Types.HasCallStack
+[LclId]
+$dIP_a18IV
+  = GHC.Stack.Types.emptyCallStack
+    `cast` (Sym (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                     <"callStack">_N <GHC.Stack.Types.CallStack>_N)
+            :: GHC.Stack.Types.CallStack
+               ~R# (?callStack::GHC.Stack.Types.CallStack))
+
+-- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
+GHC.Cmm.Utils.$trModule :: ghc-prim-0.6.1:GHC.Types.Module
+[LclIdX]
+GHC.Cmm.Utils.$trModule
+  = ghc-prim-0.6.1:GHC.Types.Module
+      (ghc-prim-0.6.1:GHC.Types.TrNameS "ghc"#)
+      (ghc-prim-0.6.1:GHC.Types.TrNameS "GHC.Cmm.Utils"#)
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+cccsExpr :: CmmExpr
+[LclIdX]
+cccsExpr = GHC.Cmm.Expr.$WCmmReg cccsReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+currentNurseryExpr :: CmmExpr
+[LclIdX]
+currentNurseryExpr = GHC.Cmm.Expr.$WCmmReg currentNurseryReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+currentTSOExpr :: CmmExpr
+[LclIdX]
+currentTSOExpr = GHC.Cmm.Expr.$WCmmReg currentTSOReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+hpLimExpr :: CmmExpr
+[LclIdX]
+hpLimExpr = GHC.Cmm.Expr.$WCmmReg hpLimReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+hpExpr :: CmmExpr
+[LclIdX]
+hpExpr = GHC.Cmm.Expr.$WCmmReg hpReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+spLimExpr :: CmmExpr
+[LclIdX]
+spLimExpr = GHC.Cmm.Expr.$WCmmReg spLimReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+spExpr :: CmmExpr
+[LclIdX]
+spExpr = GHC.Cmm.Expr.$WCmmReg spReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+baseExpr :: CmmExpr
+[LclIdX]
+baseExpr = GHC.Cmm.Expr.$WCmmReg baseReg
+
+-- RHS size: {terms: 32, types: 69, coercions: 17, joins: 0/4}
+blockTicks :: Block CmmNode C C -> [CmmTickish]
+[LclIdX]
+blockTicks
+  = \ (b_a18jX :: Block CmmNode C C) ->
+      letrec {
+        goStmt_a18jY
+          :: forall (e :: Extensibility) (x :: Extensibility).
+             CmmNode e x -> [CmmTickish] -> [CmmTickish]
+        [LclId]
+        goStmt_a18jY
+          = \ (@ (e_a18xu :: Extensibility))
+              (@ (x_a18xv :: Extensibility))
+              (ds_d18J1 :: CmmNode e_a18xu x_a18xv)
+              (ts_a18k2 :: [CmmTickish]) ->
+              let {
+                _other_a18k3 :: CmmNode e_a18xu x_a18xv
+                [LclId]
+                _other_a18k3 = ds_d18J1 } in
+              let {
+                fail_d18JT :: ghc-prim-0.6.1:GHC.Prim.Void# -> [CmmTickish]
+                [LclId]
+                fail_d18JT
+                  = \ (ds_d18JU [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                      let {
+                        ts_a18k4 :: [CmmTickish]
+                        [LclId]
+                        ts_a18k4 = ts_a18k2 } in
+                      ts_a18k4 } in
+              case ds_d18J1 of wild_00 {
+                __DEFAULT -> fail_d18JT ghc-prim-0.6.1:GHC.Prim.void#;
+                CmmTick co_a18y3 co_a18y4 t_a18k1 ->
+                  ghc-prim-0.6.1:GHC.Types.: @ CmmTickish t_a18k1 ts_a18k2
+              }; } in
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ [CmmTickish]
+        @ [CmmTickish]
+        (reverse @ CmmTickish)
+        (((\ (ds_d18J0
+                :: forall (e :: Extensibility) (x :: Extensibility).
+                   CmmNode e x -> [CmmTickish] -> [CmmTickish]) ->
+             foldBlockNodesF @ CmmNode @ [CmmTickish] ds_d18J0 @ C @ C)
+            (\ (@ (e_a18yn :: Extensibility)) (@ (x_a18yo :: Extensibility)) ->
+               goStmt_a18jY @ e_a18yn @ x_a18yo)
+            b_a18jX
+            ((ghc-prim-0.6.1:GHC.Types.[] @ CmmTickish)
+             `cast` (Sub (Sym (GHC.Cmm.Dataflow.Block.D:R:IndexedCOkCloseda_b[0]
+                                   <*>_N <[CmmTickish]>_N <[CmmTickish]>_N))
+                     :: [CmmTickish] ~R# IndexedCO C [CmmTickish] [CmmTickish])))
+         `cast` (Sub (GHC.Cmm.Dataflow.Block.D:R:IndexedCOkCloseda_b[0]
+                          <*>_N <[CmmTickish]>_N <[CmmTickish]>_N)
+                 :: IndexedCO C [CmmTickish] [CmmTickish] ~R# [CmmTickish]))
+
+-- RHS size: {terms: 4, types: 7, coercions: 0, joins: 0/0}
+bodyToBlockList :: Body CmmNode -> [CmmBlock]
+[LclIdX]
+bodyToBlockList
+  = \ (body_a18jO :: Body CmmNode) ->
+      mapElems @ LabelMap $dIsMap_a18yG @ (Block CmmNode C C) body_a18jO
+
+-- RHS size: {terms: 16, types: 35, coercions: 0, joins: 0/1}
+ofBlockList :: BlockId -> [CmmBlock] -> CmmGraph
+[LclIdX]
+ofBlockList
+  = \ (entry_a18jL :: BlockId) (blocks_a18jM :: [CmmBlock]) ->
+      letrec {
+        body_a18jN :: LabelMap (Block CmmNode C C)
+        [LclId]
+        body_a18jN
+          = foldr
+              @ []
+              $dFoldable_a18yM
+              @ (Block CmmNode C C)
+              @ (LabelMap (Block CmmNode C C))
+              (addBlock @ (Block CmmNode) $dNonLocal_a18yU $d(%%)_a18yV)
+              (emptyBody @ Block @ CmmNode)
+              blocks_a18jM; } in
+      GHC.Cmm.CmmGraph
+        @ CmmNode
+        entry_a18jL
+        (GHC.Cmm.Dataflow.Graph.$WGMany
+           @ 'Closed
+           @ Block
+           @ CmmNode
+           @ 'Closed
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode O C))
+           body_a18jN
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode C O)))
+
+-- RHS size: {terms: 8, types: 16, coercions: 0, joins: 0/0}
+ofBlockMap :: BlockId -> LabelMap CmmBlock -> CmmGraph
+[LclIdX]
+ofBlockMap
+  = \ (entry_a18jp :: BlockId)
+      (bodyMap_a18jq :: LabelMap CmmBlock) ->
+      GHC.Cmm.CmmGraph
+        @ CmmNode
+        entry_a18jp
+        (GHC.Cmm.Dataflow.Graph.$WGMany
+           @ 'Closed
+           @ Block
+           @ CmmNode
+           @ 'Closed
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode O C))
+           bodyMap_a18jq
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode C O)))
+
+-- RHS size: {terms: 27, types: 57, coercions: 0, joins: 0/1}
+toBlockMap :: CmmGraph -> LabelMap CmmBlock
+[LclIdX]
+toBlockMap
+  = \ (ds_d18JV :: GenCmmGraph CmmNode) ->
+      let {
+        fail_d18LC :: ghc-prim-0.6.1:GHC.Prim.Void# -> LabelMap CmmBlock
+        [LclId]
+        fail_d18LC
+          = \ (ds_d18LD [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              Control.Exception.Base.patError
+                @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                @ (LabelMap CmmBlock)
+                "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:525:1-67|function toBlockMap"# } in
+      case ds_d18JV of wild_00 { CmmGraph ds_d18Ly ds_d18Lz ->
+      case ds_d18Lz of wild_00 {
+        __DEFAULT -> fail_d18LC ghc-prim-0.6.1:GHC.Prim.void#;
+        GMany ds_d18LA body_a18jo ds_d18LB ->
+          case ds_d18LA of wild_00 {
+            __DEFAULT -> fail_d18LC ghc-prim-0.6.1:GHC.Prim.void#;
+            NothingO co_a18zq ->
+              case ds_d18LB of wild_00 {
+                __DEFAULT -> fail_d18LC ghc-prim-0.6.1:GHC.Prim.void#;
+                NothingO co_a18zr -> body_a18jo
+              }
+          }
+      }
+      }
+
+-- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
+toBlockList :: CmmGraph -> [CmmBlock]
+[LclIdX]
+toBlockList
+  = \ (g_a18jr :: CmmGraph) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ (LabelMap CmmBlock)
+        @ [CmmBlock]
+        (mapElems @ LabelMap $dIsMap_a18zy @ CmmBlock)
+        (toBlockMap g_a18jr)
+
+-- RHS size: {terms: 59, types: 58, coercions: 3, joins: 0/9}
+toBlockListEntryFirst :: CmmGraph -> [CmmBlock]
+[LclIdX]
+toBlockListEntryFirst
+  = \ (g_a18js :: CmmGraph) ->
+      letrec {
+        entry_id_a18ju :: BlockId
+        [LclId]
+        entry_id_a18ju = g_entry @ CmmNode g_a18js; } in
+      letrec {
+        m_a18jt :: LabelMap CmmBlock
+        [LclId]
+        m_a18jt = toBlockMap g_a18js; } in
+      letrec {
+        ds_d18LO :: Unit CmmBlock
+        [LclId]
+        ds_d18LO
+          = let {
+              fail_d18LW :: ghc-prim-0.6.1:GHC.Prim.Void# -> Unit CmmBlock
+              [LclId]
+              fail_d18LW
+                = \ (ds_d18LX [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                    Control.Exception.Base.patError
+                      @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                      @ (Unit CmmBlock)
+                      "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:541:5-43|Just entry_block"# } in
+            let {
+              ds_d18LP :: Maybe CmmBlock
+              [LclId]
+              ds_d18LP
+                = mapLookup
+                    @ LabelMap
+                    $dIsMap_a18zS
+                    @ CmmBlock
+                    (entry_id_a18ju
+                     `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                             :: Label ~R# KeyOf LabelMap))
+                    m_a18jt } in
+            case ds_d18LP of wild_00 {
+              __DEFAULT -> fail_d18LW ghc-prim-0.6.1:GHC.Prim.void#;
+              Just entry_block_a18jv -> (entry_block_a18jv)
+            };
+        entry_block_a18jv :: CmmBlock
+        [LclId]
+        entry_block_a18jv
+          = case ds_d18LO of ds_d18LO { (entry_block_a18jv) ->
+            entry_block_a18jv
+            }; } in
+      letrec {
+        others_a18jw :: [Block CmmNode C C]
+        [LclId]
+        others_a18jw
+          = filter
+              @ (Block CmmNode C C)
+              (. @ BlockId
+                 @ Bool
+                 @ (Block CmmNode C C)
+                 (let {
+                    ds_d18LN :: BlockId
+                    [LclId]
+                    ds_d18LN = entry_id_a18ju } in
+                  \ (ds_d18LM :: BlockId) ->
+                    /= @ BlockId $dEq_a18A2 ds_d18LM ds_d18LN)
+                 (entryLabel @ (Block CmmNode) $dNonLocal_a18A5 @ C))
+              (mapElems @ LabelMap $dIsMap_a18A8 @ CmmBlock m_a18jt); } in
+      let {
+        fail_d18LK :: ghc-prim-0.6.1:GHC.Prim.Void# -> [CmmBlock]
+        [LclId]
+        fail_d18LK
+          = \ (ds_d18LL [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              ghc-prim-0.6.1:GHC.Types.:
+                @ CmmBlock entry_block_a18jv others_a18jw } in
+      case mapNull @ LabelMap $dIsMap_a18Ae @ CmmBlock m_a18jt
+      of wild_00 {
+        False -> fail_d18LK ghc-prim-0.6.1:GHC.Prim.void#;
+        True -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock
+      }
+
+-- RHS size: {terms: 111, types: 94, coercions: 12, joins: 0/14}
+toBlockListEntryFirstFalseFallthrough :: CmmGraph -> [CmmBlock]
+[LclIdX]
+toBlockListEntryFirstFalseFallthrough
+  = \ (g_a18jx :: CmmGraph) ->
+      letrec {
+        entry_id_a18jz :: BlockId
+        [LclId]
+        entry_id_a18jz = g_entry @ CmmNode g_a18jx; } in
+      letrec {
+        m_a18jy :: LabelMap CmmBlock
+        [LclId]
+        m_a18jy = toBlockMap g_a18jx; } in
+      letrec {
+        ds_d18MF :: Unit CmmBlock
+        [LclId]
+        ds_d18MF
+          = let {
+              fail_d18MN :: ghc-prim-0.6.1:GHC.Prim.Void# -> Unit CmmBlock
+              [LclId]
+              fail_d18MN
+                = \ (ds_d18MO [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                    Control.Exception.Base.patError
+                      @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                      @ (Unit CmmBlock)
+                      "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:559:5-43|Just entry_block"# } in
+            let {
+              ds_d18MG :: Maybe CmmBlock
+              [LclId]
+              ds_d18MG
+                = mapLookup
+                    @ LabelMap
+                    $dIsMap_a18AG
+                    @ CmmBlock
+                    (entry_id_a18jz
+                     `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                             :: Label ~R# KeyOf LabelMap))
+                    m_a18jy } in
+            case ds_d18MG of wild_00 {
+              __DEFAULT -> fail_d18MN ghc-prim-0.6.1:GHC.Prim.void#;
+              Just entry_block_a18jA -> (entry_block_a18jA)
+            };
+        entry_block_a18jA :: CmmBlock
+        [LclId]
+        entry_block_a18jA
+          = case ds_d18MF of ds_d18MF { (entry_block_a18jA) ->
+            entry_block_a18jA
+            }; } in
+      letrec {
+        dfs_a18jB :: LabelSet -> [CmmBlock] -> [CmmBlock]
+        [LclId]
+        dfs_a18jB
+          = \ (ds_d18M9 :: LabelSet) (ds_d18Ma :: [CmmBlock]) ->
+              let {
+                visited_a18jC :: LabelSet
+                [LclId]
+                visited_a18jC = ds_d18M9 } in
+              case ds_d18Ma of wild_00 {
+                [] -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock;
+                : block_a18jD bs_a18jE ->
+                  letrec {
+                    add_id_a18jH :: Label -> [CmmBlock] -> [CmmBlock]
+                    [LclId]
+                    add_id_a18jH
+                      = \ (id_a18jI :: Label) (bs_a18jJ :: [CmmBlock]) ->
+                          let {
+                            ds_d18Mt :: Maybe CmmBlock
+                            [LclId]
+                            ds_d18Mt
+                              = mapLookup
+                                  @ LabelMap
+                                  $dIsMap_a18AV
+                                  @ CmmBlock
+                                  (id_a18jI
+                                   `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                                           :: Label ~R# KeyOf LabelMap))
+                                  m_a18jy } in
+                          case ds_d18Mt of wild_00 {
+                            Nothing -> bs_a18jJ;
+                            Just b_a18jK ->
+                              ghc-prim-0.6.1:GHC.Types.: @ CmmBlock b_a18jK bs_a18jJ
+                          }; } in
+                  letrec {
+                    bs'_a18jG :: [CmmBlock]
+                    [LclId]
+                    bs'_a18jG
+                      = foldr
+                          @ []
+                          $dFoldable_a18B6
+                          @ Label
+                          @ [CmmBlock]
+                          add_id_a18jH
+                          bs_a18jE
+                          (successors
+                             @ (Block CmmNode) $dNonLocal_a18Bb @ C block_a18jD); } in
+                  letrec {
+                    id_a18jF :: Label
+                    [LclId]
+                    id_a18jF
+                      = entryLabel
+                          @ (Block CmmNode) $dNonLocal_a18Bi @ C block_a18jD; } in
+                  let {
+                    fail_d18Mr :: ghc-prim-0.6.1:GHC.Prim.Void# -> [CmmBlock]
+                    [LclId]
+                    fail_d18Mr
+                      = \ (ds_d18Ms [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                          ghc-prim-0.6.1:GHC.Types.:
+                            @ CmmBlock
+                            block_a18jD
+                            (dfs_a18jB
+                               (setInsert
+                                  @ LabelSet
+                                  $dIsSet_a18Bu
+                                  (id_a18jF
+                                   `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:ElemOfLabelSet[0]))
+                                           :: Label ~R# ElemOf LabelSet))
+                                  visited_a18jC)
+                               bs'_a18jG) } in
+                  case setMember
+                         @ LabelSet
+                         $dIsSet_a18Bq
+                         (id_a18jF
+                          `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:ElemOfLabelSet[0]))
+                                  :: Label ~R# ElemOf LabelSet))
+                         visited_a18jC
+                  of wild_00 {
+                    False -> fail_d18Mr ghc-prim-0.6.1:GHC.Prim.void#;
+                    True -> dfs_a18jB visited_a18jC bs_a18jE
+                  }
+              }; } in
+      let {
+        fail_d18M7 :: ghc-prim-0.6.1:GHC.Prim.Void# -> [CmmBlock]
+        [LclId]
+        fail_d18M7
+          = \ (ds_d18M8 [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              dfs_a18jB
+                (setEmpty @ LabelSet $dIsSet_a18BB)
+                (GHC.Base.build
+                   @ CmmBlock
+                   (\ (@ a_d18LY)
+                      (c_d18LZ :: CmmBlock -> a_d18LY -> a_d18LY)
+                      (n_d18M0 :: a_d18LY) ->
+                      c_d18LZ entry_block_a18jA n_d18M0)) } in
+      case mapNull @ LabelMap $dIsMap_a18Bx @ CmmBlock m_a18jy
+      of wild_00 {
+        False -> fail_d18M7 ghc-prim-0.6.1:GHC.Prim.void#;
+        True -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock
+      }
+
+-- RHS size: {terms: 23, types: 100, coercions: 0, joins: 0/0}
+mapGraphNodes
+  :: (CmmNode C O -> CmmNode C O, CmmNode O O -> CmmNode O O,
+      CmmNode O C -> CmmNode O C)
+     -> CmmGraph -> CmmGraph
+[LclIdX]
+mapGraphNodes
+  = \ (funs_a18jP
+         :: (CmmNode C O -> CmmNode C O, CmmNode O O -> CmmNode O O,
+             CmmNode O C -> CmmNode O C))
+      (g_a18jR :: CmmGraph) ->
+      case funs_a18jP of wild_00 { (mf_a18jQ, ds_d18MZ, ds_d18N0) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ (LabelMap CmmBlock)
+        @ CmmGraph
+        (ofBlockMap
+           ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+              @ (CmmNode C O)
+              @ Label
+              (entryLabel @ CmmNode $dNonLocal_a18BH @ O)
+              ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                 @ (CmmNode C O)
+                 @ (CmmNode C O)
+                 mf_a18jQ
+                 (GHC.Cmm.Node.$WCmmEntry
+                    (g_entry @ CmmNode g_a18jR) GHC.Cmm.Node.GlobalScope))))
+        ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+           @ (LabelMap (Block CmmNode C C))
+           @ (LabelMap (Block CmmNode C C))
+           (mapMap
+              @ LabelMap
+              $dIsMap_a18BT
+              @ (Block CmmNode C C)
+              @ (Block CmmNode C C)
+              (mapBlock3' @ CmmNode @ CmmNode @ C @ C funs_a18jP))
+           (toBlockMap g_a18jR))
+      }
+
+-- RHS size: {terms: 13, types: 16, coercions: 0, joins: 0/1}
+foldlGraphBlocks
+  :: forall a. (a -> CmmBlock -> a) -> a -> CmmGraph -> a
+[LclIdX]
+foldlGraphBlocks
+  = \ (@ a_a18C5) ->
+      let {
+        $dIsMap_a18Cb :: IsMap LabelMap
+        [LclId]
+        $dIsMap_a18Cb = $dIsMap_a18yG } in
+      \ (k_a18jT :: a_a18C5 -> CmmBlock -> a_a18C5)
+        (z_a18jU :: a_a18C5)
+        (g_a18jV :: CmmGraph) ->
+        $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+          @ (LabelMap CmmBlock)
+          @ a_a18C5
+          (mapFoldl
+             @ LabelMap $dIsMap_a18Cb @ a_a18C5 @ CmmBlock k_a18jT z_a18jU)
+          (toBlockMap g_a18jV)
+
+-- RHS size: {terms: 7, types: 4, coercions: 0, joins: 0/0}
+revPostorder :: CmmGraph -> [CmmBlock]
+[LclIdX]
+revPostorder
+  = \ (g_a18jW :: CmmGraph) ->
+      revPostorderFrom
+        @ (Block CmmNode)
+        $dNonLocal_a18Cj
+        (toBlockMap g_a18jW)
+        (g_entry @ CmmNode g_a18jW)
+
+-- RHS size: {terms: 10, types: 19, coercions: 0, joins: 0/0}
+modifyGraph
+  :: forall (n :: Extensibility -> Extensibility -> *)
+            (n' :: Extensibility -> Extensibility -> *).
+     (Graph n C C -> Graph n' C C) -> GenCmmGraph n -> GenCmmGraph n'
+[LclIdX]
+modifyGraph
+  = \ (@ (n_a18Cl :: Extensibility -> Extensibility -> *))
+      (@ (n'_a18Cm :: Extensibility -> Extensibility -> *))
+      (f_a18jm :: Graph n_a18Cl C C -> Graph n'_a18Cm C C)
+      (g_a18jn :: GenCmmGraph n_a18Cl) ->
+      GHC.Cmm.CmmGraph
+        @ n'_a18Cm
+        (g_entry @ n_a18Cl g_a18jn)
+        (f_a18jm (g_graph @ n_a18Cl g_a18jn))
+
+-- RHS size: {terms: 6, types: 18, coercions: 0, joins: 0/0}
+mapGraphNodes1
+  :: (forall (e :: Extensibility) (x :: Extensibility).
+      CmmNode e x -> CmmNode e x)
+     -> CmmGraph -> CmmGraph
+[LclIdX]
+mapGraphNodes1
+  = \ (f_a18jS
+         :: forall (e :: Extensibility) (x :: Extensibility).
+            CmmNode e x -> CmmNode e x) ->
+      modifyGraph
+        @ CmmNode
+        @ CmmNode
+        (mapGraph
+           @ CmmNode
+           @ CmmNode
+           @ C
+           @ C
+           (\ (@ (e1_a18CE :: Extensibility))
+              (@ (x1_a18CF :: Extensibility)) ->
+              f_a18jS @ e1_a18CE @ x1_a18CF))
+
+-- RHS size: {terms: 42, types: 23, coercions: 0, joins: 0/5}
+mkLiveness :: Platform -> [LocalReg] -> Liveness
+[LclIdX]
+mkLiveness
+  = \ (ds_d18N1 :: Platform) (ds_d18N2 :: [LocalReg]) ->
+      let {
+        platform_a18jf :: Platform
+        [LclId]
+        platform_a18jf = ds_d18N1 } in
+      case ds_d18N2 of wild_00 {
+        [] -> ghc-prim-0.6.1:GHC.Types.[] @ Bool;
+        : reg_a18jg regs_a18jh ->
+          letrec {
+            is_non_ptr_a18jl :: Bool
+            [LclId]
+            is_non_ptr_a18jl
+              = $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                  @ Bool
+                  @ Bool
+                  not
+                  (isGcPtrType (localRegType reg_a18jg)); } in
+          letrec {
+            word_size_a18ji :: Int
+            [LclId]
+            word_size_a18ji = platformWordSizeInBytes platform_a18jf; } in
+          letrec {
+            sizeW_a18jj :: Int
+            [LclId]
+            sizeW_a18jj
+              = quot
+                  @ Int
+                  $dIntegral_a18D0
+                  (- @ Int
+                     $dNum_a18D2
+                     (+ @ Int
+                        $dNum_a18D4
+                        (widthInBytes (typeWidth (localRegType reg_a18jg)))
+                        word_size_a18ji)
+                     (ghc-prim-0.6.1:GHC.Types.I# 1#))
+                  word_size_a18ji; } in
+          letrec {
+            bits_a18jk :: [Bool]
+            [LclId]
+            bits_a18jk = replicate @ Bool sizeW_a18jj is_non_ptr_a18jl; } in
+          ++ @ Bool bits_a18jk (mkLiveness platform_a18jf regs_a18jh)
+      }
+
+-- RHS size: {terms: 55, types: 25, coercions: 0, joins: 0/5}
+regsOverlap :: Platform -> CmmReg -> CmmReg -> Bool
+[LclIdX]
+regsOverlap
+  = \ (platform_a18iY :: Platform)
+      (ds_d18Nd :: CmmReg)
+      (ds_d18Ne :: CmmReg) ->
+      let {
+        reg_a18j3 :: CmmReg
+        [LclId]
+        reg_a18j3 = ds_d18Nd } in
+      let {
+        fail_d18OD :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId]
+        fail_d18OD
+          = \ (ds_d18OE [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              let {
+                reg'_a18j4 :: CmmReg
+                [LclId]
+                reg'_a18j4 = ds_d18Ne } in
+              == @ CmmReg $dEq_a18Dq reg_a18j3 reg'_a18j4 } in
+      case ds_d18Nd of wild_00 {
+        __DEFAULT -> fail_d18OD ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmGlobal g_a18iZ ->
+          case ds_d18Ne of wild_00 {
+            __DEFAULT -> fail_d18OD ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmGlobal g'_a18j0 ->
+              let {
+                ds_d18Nj :: Maybe GHC.Platform.Reg.RealReg
+                [LclId]
+                ds_d18Nj = globalRegMaybe platform_a18iY g_a18iZ } in
+              case ds_d18Nj of wild_00 {
+                __DEFAULT -> fail_d18OD ghc-prim-0.6.1:GHC.Prim.void#;
+                Just real_a18j1 ->
+                  let {
+                    ds_d18Nn :: Maybe GHC.Platform.Reg.RealReg
+                    [LclId]
+                    ds_d18Nn = globalRegMaybe platform_a18iY g'_a18j0 } in
+                  case ds_d18Nn of wild_00 {
+                    __DEFAULT -> fail_d18OD ghc-prim-0.6.1:GHC.Prim.void#;
+                    Just real'_a18j2 ->
+                      case ==
+                             @ GHC.Platform.Reg.RealReg $dEq_a18Do real_a18j1 real'_a18j2
+                      of wild_00 {
+                        False -> fail_d18OD ghc-prim-0.6.1:GHC.Prim.void#;
+                        True -> ghc-prim-0.6.1:GHC.Types.True
+                      }
+                  }
+              }
+          }
+      }
+
+-- RHS size: {terms: 43, types: 26, coercions: 0, joins: 0/6}
+regUsedIn :: Platform -> CmmReg -> CmmExpr -> Bool
+[LclIdX]
+regUsedIn
+  = \ (platform_a18j5 :: Platform) ->
+      letrec {
+        regUsedIn__a18j6 :: CmmReg -> CmmExpr -> Bool
+        [LclId]
+        regUsedIn__a18j6
+          = \ (ds_d18OF :: CmmReg) (ds_d18OG :: CmmExpr) ->
+              let {
+                reg_a18j7 :: CmmReg
+                [LclId]
+                reg_a18j7 = ds_d18OF } in
+              let {
+                reg_a18j9 :: CmmReg
+                [LclId]
+                reg_a18j9 = ds_d18OF } in
+              let {
+                reg_a18jb :: CmmReg
+                [LclId]
+                reg_a18jb = ds_d18OF } in
+              let {
+                reg_a18jd :: CmmReg
+                [LclId]
+                reg_a18jd = ds_d18OF } in
+              case ds_d18OG of wild_00 {
+                CmmLit ds_d18R2 -> ghc-prim-0.6.1:GHC.Types.False;
+                CmmLoad e_a18j8 ds_d18R3 -> regUsedIn__a18j6 reg_a18j7 e_a18j8;
+                CmmReg reg'_a18ja ->
+                  regsOverlap platform_a18j5 reg_a18j9 reg'_a18ja;
+                CmmMachOp ds_d18R5 es_a18je ->
+                  any
+                    @ []
+                    @ CmmExpr
+                    $dFoldable_a18DN
+                    (let {
+                       ds_d18OV :: CmmReg
+                       [LclId]
+                       ds_d18OV = reg_a18jd } in
+                     \ (ds_d18OW :: CmmExpr) -> regUsedIn__a18j6 ds_d18OV ds_d18OW)
+                    es_a18je;
+                CmmStackSlot ds_d18R6 ds_d18R7 -> ghc-prim-0.6.1:GHC.Types.False;
+                CmmRegOff reg'_a18jc ds_d18R4 ->
+                  regsOverlap platform_a18j5 reg_a18jb reg'_a18jc
+              }; } in
+      regUsedIn__a18j6
+
+-- RHS size: {terms: 12, types: 3, coercions: 0, joins: 0/0}
+tAG_MASK :: Platform -> Int
+[LclIdX]
+tAG_MASK
+  = \ (platform_a18iM :: Platform) ->
+      - @ Int
+        $dNum_a18DQ
+        (shiftL
+           @ Int
+           $dBits_a18DS
+           (ghc-prim-0.6.1:GHC.Types.I# 1#)
+           (pc_TAG_BITS (platformConstants platform_a18iM)))
+        (ghc-prim-0.6.1:GHC.Types.I# 1#)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+mAX_PTR_TAG :: Platform -> Int
+[LclIdX]
+mAX_PTR_TAG = tAG_MASK
+
+-- RHS size: {terms: 12, types: 8, coercions: 0, joins: 0/1}
+isComparisonExpr :: CmmExpr -> Bool
+[LclIdX]
+isComparisonExpr
+  = \ (ds_d18R8 :: CmmExpr) ->
+      let {
+        fail_d18Rj :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId]
+        fail_d18Rj
+          = \ (ds_d18Rk [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              ghc-prim-0.6.1:GHC.Types.False } in
+      case ds_d18R8 of wild_00 {
+        __DEFAULT -> fail_d18Rj ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmMachOp op_a18iL ds_d18Ri -> isComparisonMachOp op_a18iL
+      }
+
+-- RHS size: {terms: 11, types: 6, coercions: 0, joins: 0/1}
+isLit :: CmmExpr -> Bool
+[LclIdX]
+isLit
+  = \ (ds_d18Rl :: CmmExpr) ->
+      let {
+        fail_d18RX :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId]
+        fail_d18RX
+          = \ (ds_d18RY [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              ghc-prim-0.6.1:GHC.Types.False } in
+      case ds_d18Rl of wild_00 {
+        __DEFAULT -> fail_d18RX ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d18RW -> ghc-prim-0.6.1:GHC.Types.True
+      }
+
+-- RHS size: {terms: 35, types: 20, coercions: 0, joins: 0/1}
+hasNoGlobalRegs :: CmmExpr -> Bool
+[LclIdX]
+hasNoGlobalRegs
+  = \ (ds_d18RZ :: CmmExpr) ->
+      let {
+        fail_d18UX :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId]
+        fail_d18UX
+          = \ (ds_d18UY [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              ghc-prim-0.6.1:GHC.Types.False } in
+      case ds_d18RZ of wild_00 {
+        __DEFAULT -> fail_d18UX ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d18UR -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmLoad e_a18iJ ds_d18UP -> hasNoGlobalRegs e_a18iJ;
+        CmmReg ds_d18US ->
+          case ds_d18US of wild_00 {
+            __DEFAULT -> fail_d18UX ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLocal ds_d18UT -> ghc-prim-0.6.1:GHC.Types.True
+          };
+        CmmMachOp ds_d18UQ es_a18iK ->
+          all @ [] @ CmmExpr $dFoldable_a18E7 hasNoGlobalRegs es_a18iK;
+        CmmRegOff ds_d18UU ds_d18UV ->
+          case ds_d18UU of wild_00 {
+            __DEFAULT -> fail_d18UX ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLocal ds_d18UW -> ghc-prim-0.6.1:GHC.Types.True
+          }
+      }
+
+-- RHS size: {terms: 17, types: 14, coercions: 0, joins: 0/0}
+isTrivialCmmExpr :: CmmExpr -> Bool
+[LclIdX]
+isTrivialCmmExpr
+  = \ (ds_d18UZ :: CmmExpr) ->
+      case ds_d18UZ of wild_00 {
+        CmmLit ds_d18X7 -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmLoad ds_d18X3 ds_d18X4 -> ghc-prim-0.6.1:GHC.Types.False;
+        CmmReg ds_d18X8 -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmMachOp ds_d18X5 ds_d18X6 -> ghc-prim-0.6.1:GHC.Types.False;
+        CmmStackSlot ds_d18Xb ds_d18Xc ->
+          panic
+            @ Bool
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "isTrivialCmmExpr CmmStackSlot"#);
+        CmmRegOff ds_d18X9 ds_d18Xa -> ghc-prim-0.6.1:GHC.Types.True
+      }
+
+-- RHS size: {terms: 21, types: 10, coercions: 0, joins: 0/2}
+cmmMkAssign
+  :: Platform -> CmmExpr -> Unique -> (CmmNode O O, CmmExpr)
+[LclIdX]
+cmmMkAssign
+  = \ (platform_a18iE :: Platform)
+      (expr_a18iF :: CmmExpr)
+      (uq_a18iG :: Unique) ->
+      letrec {
+        ty_a18iH :: CmmType
+        [LclId]
+        ty_a18iH = cmmExprType platform_a18iE expr_a18iF; } in
+      case ty_a18iH of ty_a18iH { __DEFAULT ->
+      letrec {
+        reg_a18iI :: CmmReg
+        [LclId]
+        reg_a18iI
+          = GHC.Cmm.Expr.$WCmmLocal
+              (GHC.Cmm.Expr.$WLocalReg uq_a18iG ty_a18iH); } in
+      (GHC.Cmm.Node.$WCmmAssign reg_a18iI expr_a18iF,
+       GHC.Cmm.Expr.$WCmmReg reg_a18iI)
+      }
+
+-- RHS size: {terms: 32, types: 16, coercions: 0, joins: 0/3}
+cmmToWord :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmToWord
+  = \ (platform_a18iA :: Platform) (e_a18iB :: CmmExpr) ->
+      letrec {
+        word_a18iD :: Width
+        [LclId]
+        word_a18iD = wordWidth platform_a18iA; } in
+      letrec {
+        w_a18iC :: Width
+        [LclId]
+        w_a18iC = cmmExprWidth platform_a18iA e_a18iB; } in
+      let {
+        fail_d18Xm :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d18Xm
+          = \ (ds_d18Xn [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              GHC.Cmm.Expr.CmmMachOp
+                (GHC.Cmm.MachOp.MO_UU_Conv w_a18iC word_a18iD)
+                (GHC.Base.build
+                   @ CmmExpr
+                   (\ (@ a_d18Xd)
+                      (c_d18Xe :: CmmExpr -> a_d18Xd -> a_d18Xd)
+                      (n_d18Xf :: a_d18Xd) ->
+                      c_d18Xe e_a18iB n_d18Xf)) } in
+      case == @ Width $dEq_a18Ev w_a18iC word_a18iD of wild_00 {
+        False -> fail_d18Xm ghc-prim-0.6.1:GHC.Prim.void#;
+        True -> e_a18iB
+      }
+
+-- RHS size: {terms: 36, types: 19, coercions: 0, joins: 0/2}
+cmmNegate :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmNegate
+  = \ (platform_a18iw :: Platform) (ds_d18Xo :: CmmExpr) ->
+      let {
+        e_a18iz :: CmmExpr
+        [LclId]
+        e_a18iz = ds_d18Xo } in
+      let {
+        fail_d18Ye :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d18Ye
+          = \ (ds_d18Yf [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              GHC.Cmm.Expr.CmmMachOp
+                (GHC.Cmm.MachOp.MO_S_Neg (cmmExprWidth platform_a18iw e_a18iz))
+                (GHC.Base.build
+                   @ CmmExpr
+                   (\ (@ a_d18Xu)
+                      (c_d18Xv :: CmmExpr -> a_d18Xu -> a_d18Xu)
+                      (n_d18Xw :: a_d18Xu) ->
+                      c_d18Xv e_a18iz n_d18Xw)) } in
+      case ds_d18Xo of wild_00 {
+        __DEFAULT -> fail_d18Ye ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d18Yd ->
+          case ds_d18Yd of wild_00 {
+            __DEFAULT -> fail_d18Ye ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a18ix rep_a18iy ->
+              GHC.Cmm.Expr.CmmLit
+                (GHC.Cmm.Expr.$WCmmInt
+                   (negate @ Integer $dNum_a18ED n_a18ix) rep_a18iy)
+          }
+      }
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmQuotWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmQuotWord
+  = \ (platform_a18it :: Platform)
+      (e1_a18iu :: CmmExpr)
+      (e2_a18iv :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUQuot platform_a18it)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Yg)
+              (c_d18Yh :: CmmExpr -> a_d18Yg -> a_d18Yg)
+              (n_d18Yi :: a_d18Yg) ->
+              c_d18Yh e1_a18iu (c_d18Yh e2_a18iv n_d18Yi)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmMulWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmMulWord
+  = \ (platform_a18iq :: Platform)
+      (e1_a18ir :: CmmExpr)
+      (e2_a18is :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordMul platform_a18iq)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Yj)
+              (c_d18Yk :: CmmExpr -> a_d18Yj -> a_d18Yj)
+              (n_d18Yl :: a_d18Yj) ->
+              c_d18Yk e1_a18ir (c_d18Yk e2_a18is n_d18Yl)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmSubWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmSubWord
+  = \ (platform_a18in :: Platform)
+      (e1_a18io :: CmmExpr)
+      (e2_a18ip :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordSub platform_a18in)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Ym)
+              (c_d18Yn :: CmmExpr -> a_d18Ym -> a_d18Ym)
+              (n_d18Yo :: a_d18Ym) ->
+              c_d18Yn e1_a18io (c_d18Yn e2_a18ip n_d18Yo)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmAddWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmAddWord
+  = \ (platform_a18ik :: Platform)
+      (e1_a18il :: CmmExpr)
+      (e2_a18im :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordAdd platform_a18ik)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Yp)
+              (c_d18Yq :: CmmExpr -> a_d18Yp -> a_d18Yp)
+              (n_d18Yr :: a_d18Yp) ->
+              c_d18Yq e1_a18il (c_d18Yq e2_a18im n_d18Yr)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUShrWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmUShrWord
+  = \ (platform_a18ih :: Platform)
+      (e1_a18ii :: CmmExpr)
+      (e2_a18ij :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUShr platform_a18ih)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Ys)
+              (c_d18Yt :: CmmExpr -> a_d18Ys -> a_d18Ys)
+              (n_d18Yu :: a_d18Ys) ->
+              c_d18Yt e1_a18ii (c_d18Yt e2_a18ij n_d18Yu)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmSLtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmSLtWord
+  = \ (platform_a18ie :: Platform)
+      (e1_a18if :: CmmExpr)
+      (e2_a18ig :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordSLt platform_a18ie)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Yv)
+              (c_d18Yw :: CmmExpr -> a_d18Yv -> a_d18Yv)
+              (n_d18Yx :: a_d18Yv) ->
+              c_d18Yw e1_a18if (c_d18Yw e2_a18ig n_d18Yx)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUGtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmUGtWord
+  = \ (platform_a18ib :: Platform)
+      (e1_a18ic :: CmmExpr)
+      (e2_a18id :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUGt platform_a18ib)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Yy)
+              (c_d18Yz :: CmmExpr -> a_d18Yy -> a_d18Yy)
+              (n_d18YA :: a_d18Yy) ->
+              c_d18Yz e1_a18ic (c_d18Yz e2_a18id n_d18YA)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUGeWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmUGeWord
+  = \ (platform_a18i8 :: Platform)
+      (e1_a18i9 :: CmmExpr)
+      (e2_a18ia :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUGe platform_a18i8)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YB)
+              (c_d18YC :: CmmExpr -> a_d18YB -> a_d18YB)
+              (n_d18YD :: a_d18YB) ->
+              c_d18YC e1_a18i9 (c_d18YC e2_a18ia n_d18YD)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmULtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmULtWord
+  = \ (platform_a18i5 :: Platform)
+      (e1_a18i6 :: CmmExpr)
+      (e2_a18i7 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordULt platform_a18i5)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YE)
+              (c_d18YF :: CmmExpr -> a_d18YE -> a_d18YE)
+              (n_d18YG :: a_d18YE) ->
+              c_d18YF e1_a18i6 (c_d18YF e2_a18i7 n_d18YG)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmEqWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmEqWord
+  = \ (platform_a18i2 :: Platform)
+      (e1_a18i3 :: CmmExpr)
+      (e2_a18i4 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordEq platform_a18i2)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YH)
+              (c_d18YI :: CmmExpr -> a_d18YH -> a_d18YH)
+              (n_d18YJ :: a_d18YH) ->
+              c_d18YI e1_a18i3 (c_d18YI e2_a18i4 n_d18YJ)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmNeWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmNeWord
+  = \ (platform_a18hZ :: Platform)
+      (e1_a18i0 :: CmmExpr)
+      (e2_a18i1 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordNe platform_a18hZ)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YK)
+              (c_d18YL :: CmmExpr -> a_d18YK -> a_d18YK)
+              (n_d18YM :: a_d18YK) ->
+              c_d18YL e1_a18i0 (c_d18YL e2_a18i1 n_d18YM)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmAndWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmAndWord
+  = \ (platform_a18hW :: Platform)
+      (e1_a18hX :: CmmExpr)
+      (e2_a18hY :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordAnd platform_a18hW)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YN)
+              (c_d18YO :: CmmExpr -> a_d18YN -> a_d18YN)
+              (n_d18YP :: a_d18YN) ->
+              c_d18YO e1_a18hX (c_d18YO e2_a18hY n_d18YP)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmOrWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmOrWord
+  = \ (platform_a18hT :: Platform)
+      (e1_a18hU :: CmmExpr)
+      (e2_a18hV :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordOr platform_a18hT)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YQ)
+              (c_d18YR :: CmmExpr -> a_d18YQ -> a_d18YQ)
+              (n_d18YS :: a_d18YQ) ->
+              c_d18YR e1_a18hU (c_d18YR e2_a18hV n_d18YS)))
+
+-- RHS size: {terms: 22, types: 10, coercions: 0, joins: 0/3}
+cmmLabelOff :: CLabel -> Int -> CmmLit
+[LclIdX]
+cmmLabelOff
+  = \ (lbl_a18hc :: CLabel) (ds_d18YT :: Int) ->
+      let {
+        lbl_a18hd :: CLabel
+        [LclId]
+        lbl_a18hd = lbl_a18hc } in
+      let {
+        byte_off_a18he :: Int
+        [LclId]
+        byte_off_a18he = ds_d18YT } in
+      let {
+        fail_d18Z1 :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmLit
+        [LclId]
+        fail_d18Z1
+          = \ (ds_d18Z2 [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              GHC.Cmm.Expr.CmmLabelOff lbl_a18hd byte_off_a18he } in
+      case ds_d18YT of wild_00 { ghc-prim-0.6.1:GHC.Types.I# ds_d18Z0 ->
+      case ds_d18Z0 of ds_d18Z0 {
+        __DEFAULT -> fail_d18Z1 ghc-prim-0.6.1:GHC.Prim.void#;
+        0# -> GHC.Cmm.Expr.CmmLabel lbl_a18hc
+      }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmLabelOffB :: CLabel -> ByteOff -> CmmLit
+[LclIdX]
+cmmLabelOffB = cmmLabelOff
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmLabelOffW :: Platform -> CLabel -> WordOff -> CmmLit
+[LclIdX]
+cmmLabelOffW
+  = \ (platform_a18hM :: Platform)
+      (lbl_a18hN :: CLabel)
+      (wd_off_a18hO :: WordOff) ->
+      cmmLabelOffB
+        lbl_a18hN
+        (wordsToBytes @ WordOff $dNum_a18F4 platform_a18hM wd_off_a18hO)
+
+-- RHS size: {terms: 54, types: 26, coercions: 0, joins: 0/5}
+cmmOffsetLit :: CmmLit -> Int -> CmmLit
+[LclIdX]
+cmmOffsetLit
+  = \ (ds_d18Z3 :: CmmLit) (byte_off_a18gZ :: Int) ->
+      let {
+        fail_d18ZV :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmLit
+        [LclId]
+        fail_d18ZV
+          = \ (ds_d18ZW [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              let {
+                byte_off_a18hb :: Int
+                [LclId]
+                byte_off_a18hb = byte_off_a18gZ } in
+              pprPanic
+                @ CmmLit
+                $dIP_a18Fh
+                (ghc-prim-0.6.1:GHC.CString.unpackCString# "cmmOffsetLit"#)
+                (ppr @ Int $dOutputable_a18Fj byte_off_a18hb) } in
+      case ds_d18Z3 of wild_00 {
+        __DEFAULT -> fail_d18ZV ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmInt m_a18h8 rep_a18h9 ->
+          let {
+            byte_off_a18ha :: Int
+            [LclId]
+            byte_off_a18ha = byte_off_a18gZ } in
+          GHC.Cmm.Expr.$WCmmInt
+            (+ @ Integer
+               $dNum_a18Fb
+               m_a18h8
+               (fromIntegral
+                  @ Int @ Integer $dIntegral_a18Fe $dNum_a18Ff byte_off_a18ha))
+            rep_a18h9;
+        CmmLabel l_a18gY -> cmmLabelOff l_a18gY byte_off_a18gZ;
+        CmmLabelOff l_a18h0 m_a18h1 ->
+          let {
+            byte_off_a18h2 :: Int
+            [LclId]
+            byte_off_a18h2 = byte_off_a18gZ } in
+          cmmLabelOff l_a18h0 (+ @ Int $dNum_a18F7 m_a18h1 byte_off_a18h2);
+        CmmLabelDiffOff l1_a18h3 l2_a18h4 m_a18h5 w_a18h6 ->
+          let {
+            byte_off_a18h7 :: Int
+            [LclId]
+            byte_off_a18h7 = byte_off_a18gZ } in
+          GHC.Cmm.Expr.CmmLabelDiffOff
+            l1_a18h3
+            l2_a18h4
+            (+ @ Int $dNum_a18F9 m_a18h5 byte_off_a18h7)
+            w_a18h6
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetLitB :: CmmLit -> ByteOff -> CmmLit
+[LclIdX]
+cmmOffsetLitB = cmmOffsetLit
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmOffsetLitW :: Platform -> CmmLit -> WordOff -> CmmLit
+[LclIdX]
+cmmOffsetLitW
+  = \ (platform_a18hJ :: Platform)
+      (lit_a18hK :: CmmLit)
+      (wd_off_a18hL :: WordOff) ->
+      cmmOffsetLitB
+        lit_a18hK
+        (wordsToBytes @ WordOff $dNum_a18Fn platform_a18hJ wd_off_a18hL)
+
+-- RHS size: {terms: 22, types: 10, coercions: 0, joins: 0/3}
+cmmRegOff :: CmmReg -> Int -> CmmExpr
+[LclIdX]
+cmmRegOff
+  = \ (reg_a18gV :: CmmReg) (ds_d18ZX :: Int) ->
+      let {
+        reg_a18gW :: CmmReg
+        [LclId]
+        reg_a18gW = reg_a18gV } in
+      let {
+        byte_off_a18gX :: Int
+        [LclId]
+        byte_off_a18gX = ds_d18ZX } in
+      let {
+        fail_d1905 :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d1905
+          = \ (ds_d1906 [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              GHC.Cmm.Expr.$WCmmRegOff reg_a18gW byte_off_a18gX } in
+      case ds_d18ZX of wild_00 { ghc-prim-0.6.1:GHC.Types.I# ds_d1904 ->
+      case ds_d1904 of ds_d1904 {
+        __DEFAULT -> fail_d1905 ghc-prim-0.6.1:GHC.Prim.void#;
+        0# -> GHC.Cmm.Expr.$WCmmReg reg_a18gV
+      }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmRegOffB :: CmmReg -> ByteOff -> CmmExpr
+[LclIdX]
+cmmRegOffB = cmmRegOff
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmRegOffW :: Platform -> CmmReg -> WordOff -> CmmExpr
+[LclIdX]
+cmmRegOffW
+  = \ (platform_a18hG :: Platform)
+      (reg_a18hH :: CmmReg)
+      (wd_off_a18hI :: WordOff) ->
+      cmmRegOffB
+        reg_a18hH
+        (wordsToBytes @ WordOff $dNum_a18FA platform_a18hG wd_off_a18hI)
+
+-- RHS size: {terms: 131, types: 65, coercions: 0, joins: 0/7}
+cmmOffset :: Platform -> CmmExpr -> Int -> CmmExpr
+[LclIdX]
+cmmOffset
+  = \ (_platform_a18gF :: Platform)
+      (e_a18gG :: CmmExpr)
+      (ds_d1907 :: Int) ->
+      let {
+        platform_a18gH :: Platform
+        [LclId]
+        platform_a18gH = _platform_a18gF } in
+      let {
+        e_a18gI :: CmmExpr
+        [LclId]
+        e_a18gI = e_a18gG } in
+      let {
+        byte_off_a18gJ :: Int
+        [LclId]
+        byte_off_a18gJ = ds_d1907 } in
+      let {
+        fail_d1949 :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d1949
+          = \ (ds_d194a [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              let {
+                ds_d190a :: CmmExpr
+                [LclId]
+                ds_d190a = e_a18gI } in
+              let {
+                fail_d1942 :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+                [LclId]
+                fail_d1942
+                  = \ (ds_d1943 [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                      letrec {
+                        width_a18gU :: Width
+                        [LclId]
+                        width_a18gU = cmmExprWidth platform_a18gH e_a18gI; } in
+                      GHC.Cmm.Expr.CmmMachOp
+                        (GHC.Cmm.MachOp.MO_Add width_a18gU)
+                        (GHC.Base.build
+                           @ CmmExpr
+                           (\ (@ a_d190G)
+                              (c_d190H :: CmmExpr -> a_d190G -> a_d190G)
+                              (n_d190I :: a_d190G) ->
+                              c_d190H
+                                e_a18gI
+                                (c_d190H
+                                   (GHC.Cmm.Expr.CmmLit
+                                      (GHC.Cmm.Expr.$WCmmInt
+                                         (toInteger @ Int $dIntegral_a18FZ byte_off_a18gJ)
+                                         width_a18gU))
+                                   n_d190I))) } in
+              case ds_d190a of wild_00 {
+                __DEFAULT -> fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                CmmLit lit_a18gN ->
+                  GHC.Cmm.Expr.CmmLit (cmmOffsetLit lit_a18gN byte_off_a18gJ);
+                CmmReg reg_a18gK -> cmmRegOff reg_a18gK byte_off_a18gJ;
+                CmmMachOp ds_d193W ds_d193X ->
+                  case ds_d193W of wild_00 {
+                    __DEFAULT -> fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                    MO_Add rep_a18gQ ->
+                      case ds_d193X of wild_00 {
+                        __DEFAULT -> fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                        : expr_a18gR ds_d193Y ->
+                          case ds_d193Y of wild_00 {
+                            __DEFAULT -> fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                            : ds_d193Z ds_d1940 ->
+                              case ds_d193Z of wild_00 {
+                                __DEFAULT -> fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                                CmmLit ds_d1941 ->
+                                  case ds_d1941 of wild_00 {
+                                    __DEFAULT -> fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                                    CmmInt byte_off1_a18gS _rep_a18gT ->
+                                      case ds_d1940 of wild_00 {
+                                        __DEFAULT -> fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                                        [] ->
+                                          GHC.Cmm.Expr.CmmMachOp
+                                            (GHC.Cmm.MachOp.MO_Add rep_a18gQ)
+                                            (GHC.Base.build
+                                               @ CmmExpr
+                                               (\ (@ a_d190D)
+                                                  (c_d190E :: CmmExpr -> a_d190D -> a_d190D)
+                                                  (n_d190F :: a_d190D) ->
+                                                  c_d190E
+                                                    expr_a18gR
+                                                    (c_d190E
+                                                       (GHC.Cmm.Expr.CmmLit
+                                                          (GHC.Cmm.Expr.$WCmmInt
+                                                             (+ @ Integer
+                                                                $dNum_a18FR
+                                                                byte_off1_a18gS
+                                                                (toInteger
+                                                                   @ Int
+                                                                   $dIntegral_a18FT
+                                                                   byte_off_a18gJ))
+                                                             rep_a18gQ))
+                                                       n_d190F)))
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                  };
+                CmmStackSlot area_a18gO off_a18gP ->
+                  GHC.Cmm.Expr.$WCmmStackSlot
+                    area_a18gO (- @ Int $dNum_a18FP off_a18gP byte_off_a18gJ);
+                CmmRegOff reg_a18gL m_a18gM ->
+                  cmmRegOff reg_a18gL (+ @ Int $dNum_a18FN m_a18gM byte_off_a18gJ)
+              } } in
+      case ds_d1907 of wild_00 { ghc-prim-0.6.1:GHC.Types.I# ds_d1948 ->
+      case ds_d1948 of ds_d1948 {
+        __DEFAULT -> fail_d1949 ghc-prim-0.6.1:GHC.Prim.void#;
+        0# -> e_a18gG
+      }
+      }
+
+-- RHS size: {terms: 12, types: 5, coercions: 0, joins: 0/0}
+cmmIndex :: Platform -> Width -> CmmExpr -> Int -> CmmExpr
+[LclIdX]
+cmmIndex
+  = \ (platform_a18hf :: Platform)
+      (width_a18hg :: Width)
+      (base_a18hh :: CmmExpr)
+      (idx_a18hi :: Int) ->
+      cmmOffset
+        platform_a18hf
+        base_a18hh
+        (* @ Int $dNum_a18G2 idx_a18hi (widthInBytes width_a18hg))
+
+-- RHS size: {terms: 12, types: 4, coercions: 0, joins: 0/0}
+cmmLoadIndex :: Platform -> CmmType -> CmmExpr -> Int -> CmmExpr
+[LclIdX]
+cmmLoadIndex
+  = \ (platform_a18ht :: Platform)
+      (ty_a18hu :: CmmType)
+      (expr_a18hv :: CmmExpr)
+      (ix_a18hw :: Int) ->
+      GHC.Cmm.Expr.$WCmmLoad
+        (cmmIndex platform_a18ht (typeWidth ty_a18hu) expr_a18hv ix_a18hw)
+        ty_a18hu
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetB :: Platform -> CmmExpr -> ByteOff -> CmmExpr
+[LclIdX]
+cmmOffsetB = cmmOffset
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+cmmOffsetW :: Platform -> CmmExpr -> WordOff -> CmmExpr
+[LclIdX]
+cmmOffsetW
+  = \ (platform_a18hD :: Platform)
+      (e_a18hE :: CmmExpr)
+      (n_a18hF :: WordOff) ->
+      cmmOffsetB
+        platform_a18hD
+        e_a18hE
+        (wordsToBytes @ WordOff $dNum_a18G7 platform_a18hD n_a18hF)
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+cmmLoadIndexW :: Platform -> CmmExpr -> Int -> CmmType -> CmmExpr
+[LclIdX]
+cmmLoadIndexW
+  = \ (platform_a18hP :: Platform)
+      (base_a18hQ :: CmmExpr)
+      (off_a18hR :: Int)
+      (ty_a18hS :: CmmType) ->
+      GHC.Cmm.Expr.$WCmmLoad
+        (cmmOffsetW platform_a18hP base_a18hQ off_a18hR) ty_a18hS
+
+-- RHS size: {terms: 43, types: 22, coercions: 0, joins: 0/4}
+cmmOffsetExpr :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmOffsetExpr
+  = \ (platform_a18gz :: Platform)
+      (e_a18gA :: CmmExpr)
+      (ds_d194b :: CmmExpr) ->
+      let {
+        platform_a18gC :: Platform
+        [LclId]
+        platform_a18gC = platform_a18gz } in
+      let {
+        e_a18gD :: CmmExpr
+        [LclId]
+        e_a18gD = e_a18gA } in
+      let {
+        byte_off_a18gE :: CmmExpr
+        [LclId]
+        byte_off_a18gE = ds_d194b } in
+      let {
+        fail_d1954 :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d1954
+          = \ (ds_d1955 [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              GHC.Cmm.Expr.CmmMachOp
+                (GHC.Cmm.MachOp.MO_Add (cmmExprWidth platform_a18gC e_a18gD))
+                (GHC.Base.build
+                   @ CmmExpr
+                   (\ (@ a_d194i)
+                      (c_d194j :: CmmExpr -> a_d194i -> a_d194i)
+                      (n_d194k :: a_d194i) ->
+                      c_d194j e_a18gD (c_d194j byte_off_a18gE n_d194k))) } in
+      case ds_d194b of wild_00 {
+        __DEFAULT -> fail_d1954 ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d1952 ->
+          case ds_d1952 of wild_00 {
+            __DEFAULT -> fail_d1954 ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a18gB ds_d1953 ->
+              cmmOffset
+                platform_a18gz e_a18gA (fromInteger @ Int $dNum_a18Gb n_a18gB)
+          }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetExprB :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmOffsetExprB = cmmOffsetExpr
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+mkLblExpr :: CLabel -> CmmExpr
+[LclIdX]
+mkLblExpr
+  = \ (lbl_a18gy :: CLabel) ->
+      GHC.Cmm.Expr.CmmLit (GHC.Cmm.Expr.CmmLabel lbl_a18gy)
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+mkStgWordCLit :: Platform -> StgWord -> CmmLit
+[LclIdX]
+mkStgWordCLit
+  = \ (platform_a18gr :: Platform) (wd_a18gs :: StgWord) ->
+      GHC.Cmm.Expr.$WCmmInt
+        (fromStgWord wd_a18gs) (wordWidth platform_a18gr)
+
+-- RHS size: {terms: 14, types: 21, coercions: 0, joins: 0/0}
+mkDataLits
+  :: forall (raw :: Bool) info stmt.
+     Section
+     -> CLabel -> [CmmLit] -> GenCmmDecl (GenCmmStatics raw) info stmt
+[LclIdX]
+mkDataLits
+  = \ (@ (raw_a18Gf :: Bool))
+      (@ info_a18Gg)
+      (@ stmt_a18Gh)
+      (section_a18gk :: Section)
+      (lbl_a18gl :: CLabel)
+      (lits_a18gm :: [CmmLit]) ->
+      GHC.Cmm.CmmData
+        @ (GenCmmStatics raw_a18Gf)
+        @ info_a18Gg
+        @ stmt_a18Gh
+        section_a18gk
+        ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+           @ [CmmStatic]
+           @ (GenCmmStatics raw_a18Gf)
+           (GHC.Cmm.CmmStaticsRaw @ raw_a18Gf lbl_a18gl)
+           (map @ CmmLit @ CmmStatic GHC.Cmm.CmmStaticLit lits_a18gm))
+
+-- RHS size: {terms: 45, types: 32, coercions: 0, joins: 0/6}
+mkRODataLits
+  :: forall (raw :: Bool) info stmt.
+     CLabel -> [CmmLit] -> GenCmmDecl (GenCmmStatics raw) info stmt
+[LclIdX]
+mkRODataLits
+  = \ (@ (raw_a18Gz :: Bool)) (@ info_a18GA) (@ stmt_a18GB) ->
+      let {
+        $dFoldable_a18GU :: Foldable []
+        [LclId]
+        $dFoldable_a18GU = $dFoldable_a18yM } in
+      \ (lbl_a18gn :: CLabel) (lits_a18go :: [CmmLit]) ->
+        letrec {
+          needsRelocation_a18gq :: CmmLit -> Bool
+          [LclId]
+          needsRelocation_a18gq
+            = letrec {
+                needsRelocation_a18GL :: CmmLit -> Bool
+                [LclId]
+                needsRelocation_a18GL
+                  = \ (ds_d195e :: CmmLit) ->
+                      let {
+                        fail_d195U :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+                        [LclId]
+                        fail_d195U
+                          = \ (ds_d195V [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                              ghc-prim-0.6.1:GHC.Types.False } in
+                      case ds_d195e of wild_00 {
+                        __DEFAULT -> fail_d195U ghc-prim-0.6.1:GHC.Prim.void#;
+                        CmmLabel ds_d195R -> ghc-prim-0.6.1:GHC.Types.True;
+                        CmmLabelOff ds_d195S ds_d195T -> ghc-prim-0.6.1:GHC.Types.True
+                      }; } in
+              needsRelocation_a18GL; } in
+        letrec {
+          section_a18gp :: Section
+          [LclId]
+          section_a18gp
+            = let {
+                fail_d195c :: ghc-prim-0.6.1:GHC.Prim.Void# -> Section
+                [LclId]
+                fail_d195c
+                  = \ (ds_d195d [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                      GHC.Cmm.Section GHC.Cmm.ReadOnlyData lbl_a18gn } in
+              case any
+                     @ [] @ CmmLit $dFoldable_a18GU needsRelocation_a18gq lits_a18go
+              of wild_00 {
+                False -> fail_d195c ghc-prim-0.6.1:GHC.Prim.void#;
+                True -> GHC.Cmm.Section GHC.Cmm.RelocatableReadOnlyData lbl_a18gn
+              }; } in
+        mkDataLits
+          @ raw_a18Gz
+          @ info_a18GA
+          @ stmt_a18GB
+          section_a18gp
+          lbl_a18gn
+          lits_a18go
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+mkFileEmbedLit
+  :: forall (raw :: Bool) info stmt.
+     CLabel
+     -> FilePath -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
+[LclIdX]
+mkFileEmbedLit
+  = \ (@ (raw_a18H8 :: Bool))
+      (@ info_a18H9)
+      (@ stmt_a18Ha)
+      (lbl_a18gi :: CLabel)
+      (path_a18gj :: FilePath) ->
+      (GHC.Cmm.Expr.CmmLabel lbl_a18gi,
+       GHC.Cmm.CmmData
+         @ (GenCmmStatics raw_a18H8)
+         @ info_a18H9
+         @ stmt_a18Ha
+         (GHC.Cmm.Section GHC.Cmm.ReadOnlyData lbl_a18gi)
+         (GHC.Cmm.CmmStaticsRaw
+            @ raw_a18H8
+            lbl_a18gi
+            (GHC.Base.build
+               @ CmmStatic
+               (\ (@ a_d195W)
+                  (c_d195X :: CmmStatic -> a_d195W -> a_d195W)
+                  (n_d195Y :: a_d195W) ->
+                  c_d195X (GHC.Cmm.CmmFileEmbed path_a18gj) n_d195Y))))
+
+-- RHS size: {terms: 36, types: 38, coercions: 0, joins: 0/2}
+mkByteStringCLit
+  :: forall (raw :: Bool) info stmt.
+     CLabel
+     -> ByteString -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
+[LclIdX]
+mkByteStringCLit
+  = \ (@ (raw_a18Hg :: Bool)) (@ info_a18Hh) (@ stmt_a18Hi) ->
+      let {
+        $dNum_a18Hp :: Num GHC.Word.Word8
+        [LclId]
+        $dNum_a18Hp = GHC.Word.$fNumWord8 } in
+      \ (lbl_a18gf :: CLabel) (bytes_a18gg :: ByteString) ->
+        letrec {
+          sec_a18gh :: SectionType
+          [LclId]
+          sec_a18gh
+            = case BS.elem
+                     (fromInteger @ GHC.Word.Word8 $dNum_a18Hp 0) bytes_a18gg
+              of wild_00 {
+                False -> GHC.Cmm.CString;
+                True -> GHC.Cmm.ReadOnlyData
+              }; } in
+        (GHC.Cmm.Expr.CmmLabel lbl_a18gf,
+         $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+           @ (GenCmmStatics raw_a18Hg)
+           @ (GenCmmDecl (GenCmmStatics raw_a18Hg) info_a18Hh stmt_a18Hi)
+           (GHC.Cmm.CmmData
+              @ (GenCmmStatics raw_a18Hg)
+              @ info_a18Hh
+              @ stmt_a18Hi
+              (GHC.Cmm.Section sec_a18gh lbl_a18gf))
+           (GHC.Cmm.CmmStaticsRaw
+              @ raw_a18Hg
+              lbl_a18gf
+              (GHC.Base.build
+                 @ CmmStatic
+                 (\ (@ a_d195Z)
+                    (c_d1960 :: CmmStatic -> a_d195Z -> a_d195Z)
+                    (n_d1961 :: a_d195Z) ->
+                    c_d1960 (GHC.Cmm.CmmString bytes_a18gg) n_d1961))))
+
+-- RHS size: {terms: 6, types: 2, coercions: 0, joins: 0/0}
+mkWordCLit :: Platform -> Integer -> CmmLit
+[LclIdX]
+mkWordCLit
+  = \ (platform_a18gd :: Platform) (wd_a18ge :: Integer) ->
+      GHC.Cmm.Expr.$WCmmInt wd_a18ge (wordWidth platform_a18gd)
+
+-- RHS size: {terms: 36, types: 11, coercions: 0, joins: 0/3}
+packHalfWordsCLit
+  :: Platform -> StgHalfWord -> StgHalfWord -> CmmLit
+[LclIdX]
+packHalfWordsCLit
+  = \ (platform_a18gt :: Platform)
+      (lower_half_word_a18gu :: StgHalfWord)
+      (upper_half_word_a18gv :: StgHalfWord) ->
+      letrec {
+        u_a18gx :: Integer
+        [LclId]
+        u_a18gx = fromStgHalfWord upper_half_word_a18gv; } in
+      letrec {
+        l_a18gw :: Integer
+        [LclId]
+        l_a18gw = fromStgHalfWord lower_half_word_a18gu; } in
+      let {
+        ds_d1962 :: ByteOrder
+        [LclId]
+        ds_d1962 = platformByteOrder platform_a18gt } in
+      case ds_d1962 of wild_00 {
+        BigEndian ->
+          mkWordCLit
+            platform_a18gt
+            (.|.
+               @ Integer
+               $dBits_a18HN
+               (shiftL
+                  @ Integer $dBits_a18HP l_a18gw (halfWordSizeInBits platform_a18gt))
+               u_a18gx);
+        LittleEndian ->
+          mkWordCLit
+            platform_a18gt
+            (.|.
+               @ Integer
+               $dBits_a18HR
+               l_a18gw
+               (shiftL
+                  @ Integer
+                  $dBits_a18HT
+                  u_a18gx
+                  (halfWordSizeInBits platform_a18gt)))
+      }
+
+-- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
+zeroCLit :: Platform -> CmmLit
+[LclIdX]
+zeroCLit
+  = \ (platform_a18gb :: Platform) ->
+      GHC.Cmm.Expr.$WCmmInt 0 (wordWidth platform_a18gb)
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+zeroExpr :: Platform -> CmmExpr
+[LclIdX]
+zeroExpr
+  = \ (platform_a18gc :: Platform) ->
+      GHC.Cmm.Expr.CmmLit (zeroCLit platform_a18gc)
+
+-- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
+mkIntCLit :: Platform -> Int -> CmmLit
+[LclIdX]
+mkIntCLit
+  = \ (platform_a18g7 :: Platform) (i_a18g8 :: Int) ->
+      GHC.Cmm.Expr.$WCmmInt
+        (toInteger @ Int $dIntegral_a18HY i_a18g8)
+        (wordWidth platform_a18g7)
+
+-- RHS size: {terms: 7, types: 5, coercions: 0, joins: 0/0}
+mkIntExpr :: Platform -> Int -> CmmExpr
+[LclIdX]
+mkIntExpr
+  = \ (platform_a18g9 :: Platform) (i_a18ga :: Int) ->
+      $!
+        @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ CmmLit
+        @ CmmExpr
+        GHC.Cmm.Expr.CmmLit
+        (mkIntCLit platform_a18g9 i_a18ga)
+
+-- RHS size: {terms: 57, types: 26, coercions: 0, joins: 0/7}
+cmmIndexExpr :: Platform -> Width -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmIndexExpr
+  = \ (platform_a18hj :: Platform)
+      (width_a18hk :: Width)
+      (base_a18hl :: CmmExpr)
+      (ds_d196e :: CmmExpr) ->
+      let {
+        platform_a18hn :: Platform
+        [LclId]
+        platform_a18hn = platform_a18hj } in
+      let {
+        width_a18ho :: Width
+        [LclId]
+        width_a18ho = width_a18hk } in
+      let {
+        base_a18hp :: CmmExpr
+        [LclId]
+        base_a18hp = base_a18hl } in
+      let {
+        idx_a18hq :: CmmExpr
+        [LclId]
+        idx_a18hq = ds_d196e } in
+      let {
+        fail_d1977 :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d1977
+          = \ (ds_d1978 [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              letrec {
+                idx_w_a18hr :: Width
+                [LclId]
+                idx_w_a18hr = cmmExprWidth platform_a18hn idx_a18hq; } in
+              letrec {
+                byte_off_a18hs :: CmmExpr
+                [LclId]
+                byte_off_a18hs
+                  = GHC.Cmm.Expr.CmmMachOp
+                      (GHC.Cmm.MachOp.MO_Shl idx_w_a18hr)
+                      (GHC.Base.build
+                         @ CmmExpr
+                         (\ (@ a_d1974)
+                            (c_d1975 :: CmmExpr -> a_d1974 -> a_d1974)
+                            (n_d1976 :: a_d1974) ->
+                            c_d1975
+                              idx_a18hq
+                              (c_d1975
+                                 (mkIntExpr platform_a18hn (widthInLog width_a18ho))
+                                 n_d1976))); } in
+              cmmOffsetExpr platform_a18hn base_a18hp byte_off_a18hs } in
+      case ds_d196e of wild_00 {
+        __DEFAULT -> fail_d1977 ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d1972 ->
+          case ds_d1972 of wild_00 {
+            __DEFAULT -> fail_d1977 ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a18hm ds_d1973 ->
+              cmmIndex
+                platform_a18hj
+                width_a18hk
+                base_a18hl
+                (fromInteger @ Int $dNum_a18I5 n_a18hm)
+          }
+      }
+
+-- RHS size: {terms: 35, types: 15, coercions: 0, joins: 0/4}
+cmmOffsetExprW :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmOffsetExprW
+  = \ (platform_a18hx :: Platform)
+      (e_a18hy :: CmmExpr)
+      (ds_d1979 :: CmmExpr) ->
+      let {
+        platform_a18hA :: Platform
+        [LclId]
+        platform_a18hA = platform_a18hx } in
+      let {
+        e_a18hB :: CmmExpr
+        [LclId]
+        e_a18hB = e_a18hy } in
+      let {
+        wd_off_a18hC :: CmmExpr
+        [LclId]
+        wd_off_a18hC = ds_d1979 } in
+      let {
+        fail_d197Z :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d197Z
+          = \ (ds_d1980 [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              cmmIndexExpr
+                platform_a18hA (wordWidth platform_a18hA) e_a18hB wd_off_a18hC } in
+      case ds_d1979 of wild_00 {
+        __DEFAULT -> fail_d197Z ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d197X ->
+          case ds_d197X of wild_00 {
+            __DEFAULT -> fail_d197Z ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a18hz ds_d197Y ->
+              cmmOffsetW
+                platform_a18hx e_a18hy (fromInteger @ WordOff $dNum_a18Ig n_a18hz)
+          }
+      }
+
+-- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
+cmmTagMask :: Platform -> CmmExpr
+[LclIdX]
+cmmTagMask
+  = \ (platform_a18iN :: Platform) ->
+      mkIntExpr platform_a18iN (tAG_MASK platform_a18iN)
+
+-- RHS size: {terms: 11, types: 2, coercions: 0, joins: 0/0}
+cmmIsTagged :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmIsTagged
+  = \ (platform_a18iS :: Platform) (e_a18iT :: CmmExpr) ->
+      cmmNeWord
+        platform_a18iS
+        (cmmAndWord platform_a18iS e_a18iT (cmmTagMask platform_a18iS))
+        (zeroExpr platform_a18iS)
+
+-- RHS size: {terms: 11, types: 2, coercions: 0, joins: 0/0}
+cmmIsNotTagged :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmIsNotTagged
+  = \ (platform_a18iU :: Platform) (e_a18iV :: CmmExpr) ->
+      cmmEqWord
+        platform_a18iU
+        (cmmAndWord platform_a18iU e_a18iV (cmmTagMask platform_a18iU))
+        (zeroExpr platform_a18iU)
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+cmmConstrTag1 :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmConstrTag1
+  = \ (platform_a18iW :: Platform) (e_a18iX :: CmmExpr) ->
+      cmmAndWord platform_a18iW e_a18iX (cmmTagMask platform_a18iW)
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+cmmPointerMask :: Platform -> CmmExpr
+[LclIdX]
+cmmPointerMask
+  = \ (platform_a18iO :: Platform) ->
+      mkIntExpr
+        platform_a18iO
+        (complement @ Int $dBits_a18In (tAG_MASK platform_a18iO))
+
+-- RHS size: {terms: 26, types: 11, coercions: 0, joins: 0/3}
+cmmUntag :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmUntag
+  = \ (ds_d1981 :: Platform) (e_a18iP :: CmmExpr) ->
+      let {
+        platform_a18iQ :: Platform
+        [LclId]
+        platform_a18iQ = ds_d1981 } in
+      let {
+        e_a18iR :: CmmExpr
+        [LclId]
+        e_a18iR = e_a18iP } in
+      let {
+        fail_d198Y :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d198Y
+          = \ (ds_d198Z [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              cmmAndWord
+                platform_a18iQ e_a18iR (cmmPointerMask platform_a18iQ) } in
+      case e_a18iP of wild_00 {
+        __DEFAULT -> fail_d198Y ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d198W ->
+          case ds_d198W of wild_00 {
+            __DEFAULT -> fail_d198Y ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLabel ds_d198X -> e_a18iP
+          }
+      }
+
+-- RHS size: {terms: 13, types: 2, coercions: 0, joins: 0/0}
+slotForeignHint :: SlotTy -> ForeignHint
+[LclIdX]
+slotForeignHint
+  = \ (ds_d1990 :: SlotTy) ->
+      case ds_d1990 of wild_00 {
+        PtrSlot -> GHC.Cmm.Type.AddrHint;
+        WordSlot -> GHC.Cmm.Type.NoHint;
+        Word64Slot -> GHC.Cmm.Type.NoHint;
+        FloatSlot -> GHC.Cmm.Type.NoHint;
+        DoubleSlot -> GHC.Cmm.Type.NoHint
+      }
+
+-- RHS size: {terms: 39, types: 5, coercions: 0, joins: 0/0}
+primRepForeignHint :: PrimRep -> ForeignHint
+[LclIdX]
+primRepForeignHint
+  = \ (ds_d199f :: PrimRep) ->
+      case ds_d199f of wild_00 {
+        VoidRep ->
+          panic
+            @ ForeignHint
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "primRepForeignHint:VoidRep"#);
+        LiftedRep -> GHC.Cmm.Type.AddrHint;
+        UnliftedRep -> GHC.Cmm.Type.AddrHint;
+        Int8Rep -> GHC.Cmm.Type.SignedHint;
+        Int16Rep -> GHC.Cmm.Type.SignedHint;
+        Int32Rep -> GHC.Cmm.Type.SignedHint;
+        Int64Rep -> GHC.Cmm.Type.SignedHint;
+        IntRep -> GHC.Cmm.Type.SignedHint;
+        Word8Rep -> GHC.Cmm.Type.NoHint;
+        Word16Rep -> GHC.Cmm.Type.NoHint;
+        Word32Rep -> GHC.Cmm.Type.NoHint;
+        Word64Rep -> GHC.Cmm.Type.NoHint;
+        WordRep -> GHC.Cmm.Type.NoHint;
+        AddrRep -> GHC.Cmm.Type.AddrHint;
+        FloatRep -> GHC.Cmm.Type.NoHint;
+        DoubleRep -> GHC.Cmm.Type.NoHint;
+        VecRep ds_d199Y ds_d199Z -> GHC.Cmm.Type.NoHint
+      }
+
+-- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
+typeForeignHint :: UnaryType -> ForeignHint
+[LclIdX]
+typeForeignHint
+  = . @ PrimRep
+      @ ForeignHint
+      @ UnaryType
+      primRepForeignHint
+      (typePrimRep1 $d(%%)_a18Iw)
+
+-- RHS size: {terms: 23, types: 2, coercions: 0, joins: 0/0}
+primElemRepCmmType :: PrimElemRep -> CmmType
+[LclIdX]
+primElemRepCmmType
+  = \ (ds_d19a0 :: PrimElemRep) ->
+      case ds_d19a0 of wild_00 {
+        Int8ElemRep -> b8;
+        Int16ElemRep -> b16;
+        Int32ElemRep -> b32;
+        Int64ElemRep -> b64;
+        Word8ElemRep -> b8;
+        Word16ElemRep -> b16;
+        Word32ElemRep -> b32;
+        Word64ElemRep -> b64;
+        FloatElemRep -> f32;
+        DoubleElemRep -> f64
+      }
+
+-- RHS size: {terms: 16, types: 3, coercions: 0, joins: 0/0}
+slotCmmType :: Platform -> SlotTy -> CmmType
+[LclIdX]
+slotCmmType
+  = \ (platform_a18g4 :: Platform) (ds_d19ap :: SlotTy) ->
+      case ds_d19ap of wild_00 {
+        PtrSlot -> gcWord platform_a18g4;
+        WordSlot -> bWord platform_a18g4;
+        Word64Slot -> b64;
+        FloatSlot -> f32;
+        DoubleSlot -> f64
+      }
+
+-- RHS size: {terms: 48, types: 6, coercions: 0, joins: 0/0}
+primRepCmmType :: Platform -> PrimRep -> CmmType
+[LclIdX]
+primRepCmmType
+  = \ (platform_a18g1 :: Platform) (ds_d19aE :: PrimRep) ->
+      case ds_d19aE of wild_00 {
+        VoidRep ->
+          panic
+            @ CmmType
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "primRepCmmType:VoidRep"#);
+        LiftedRep -> gcWord platform_a18g1;
+        UnliftedRep -> gcWord platform_a18g1;
+        Int8Rep -> b8;
+        Int16Rep -> b16;
+        Int32Rep -> b32;
+        Int64Rep -> b64;
+        IntRep -> bWord platform_a18g1;
+        Word8Rep -> b8;
+        Word16Rep -> b16;
+        Word32Rep -> b32;
+        Word64Rep -> b64;
+        WordRep -> bWord platform_a18g1;
+        AddrRep -> bWord platform_a18g1;
+        FloatRep -> f32;
+        DoubleRep -> f64;
+        VecRep len_a18g2 rep_a18g3 ->
+          vec len_a18g2 (primElemRepCmmType rep_a18g3)
+      }
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+typeCmmType :: Platform -> UnaryType -> CmmType
+[LclIdX]
+typeCmmType
+  = \ (platform_a18g5 :: Platform) (ty_a18g6 :: UnaryType) ->
+      primRepCmmType platform_a18g5 (typePrimRep1 $d(%%)_a18IC ty_a18g6)
+end Rec }
+
+
+
+==================== Desugar (before optimization) ====================
+2020-11-24 12:44:28.4384398 UTC
+
+Result size of Desugar (before optimization)
+  = {terms: 1,961, types: 1,710, coercions: 43, joins: 0/103}
+
+Rec {
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a5hgB :: IsMap LabelMap
+[LclId]
+$dIsMap_a5hgB = $dIsMap_a5hdt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a5hgf :: IsMap LabelMap
+[LclId]
+$dIsMap_a5hgf = $dIsMap_a5hdt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a5hfG :: IsMap LabelMap
+[LclId]
+$dIsMap_a5hfG = $dIsMap_a5hdt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a5hfr :: IsMap LabelMap
+[LclId]
+$dIsMap_a5hfr = $dIsMap_a5hdt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a5heZ :: IsMap LabelMap
+[LclId]
+$dIsMap_a5heZ = $dIsMap_a5hdt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a5heT :: IsMap LabelMap
+[LclId]
+$dIsMap_a5heT = $dIsMap_a5hdt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a5heD :: IsMap LabelMap
+[LclId]
+$dIsMap_a5heD = $dIsMap_a5hdt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a5hej :: IsMap LabelMap
+[LclId]
+$dIsMap_a5hej = $dIsMap_a5hdt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsMap_a5hdt :: IsMap LabelMap
+[LclId]
+$dIsMap_a5hdt = GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dFoldable_a5hiP :: Foldable []
+[LclId]
+$dFoldable_a5hiP = $dFoldable_a5hdz
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dFoldable_a5hiv :: Foldable []
+[LclId]
+$dFoldable_a5hiv = $dFoldable_a5hdz
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dFoldable_a5hfR :: Foldable []
+[LclId]
+$dFoldable_a5hfR = $dFoldable_a5hdz
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dFoldable_a5hdz :: Foldable []
+[LclId]
+$dFoldable_a5hdz = Data.Foldable.$fFoldable[]
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a5hh1 :: NonLocal (Block CmmNode)
+[LclId]
+$dNonLocal_a5hh1 = $dNonLocal_a5hdF
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a5hg3 :: NonLocal (Block CmmNode)
+[LclId]
+$dNonLocal_a5hg3 = $dNonLocal_a5hdF
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a5hfW :: NonLocal (Block CmmNode)
+[LclId]
+$dNonLocal_a5hfW = $dNonLocal_a5hdF
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a5heQ :: NonLocal (Block CmmNode)
+[LclId]
+$dNonLocal_a5heQ = $dNonLocal_a5hdF
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+$dNonLocal_a5hdF :: NonLocal (Block CmmNode)
+[LclId]
+$dNonLocal_a5hdF
+  = GHC.Cmm.Dataflow.Graph.$fNonLocalBlock @ CmmNode $dNonLocal_a5hnq
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a5hgp :: NonLocal CmmNode
+[LclId]
+$dNonLocal_a5hgp = $dNonLocal_a5hnq
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNonLocal_a5hnq :: NonLocal CmmNode
+[LclId]
+$dNonLocal_a5hnq = GHC.Cmm.Node.$fNonLocalCmmNode
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$d(%%)_a5hn8 :: GHC.Utils.Misc.HasDebugCallStack
+[LclId]
+$d(%%)_a5hn8 = $d(%%)_a5hdG
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$d(%%)_a5hn2 :: GHC.Utils.Misc.HasDebugCallStack
+[LclId]
+$d(%%)_a5hn2 = $d(%%)_a5hdG
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$d(%%)_a5hdG :: GHC.Utils.Misc.HasDebugCallStack
+[LclId]
+$d(%%)_a5hdG = ghc-prim-0.6.1:GHC.Classes.C:(%%)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a5heN :: Eq BlockId
+[LclId]
+$dEq_a5heN = GHC.Cmm.Dataflow.Label.$fEqLabel
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsSet_a5hgj :: IsSet LabelSet
+[LclId]
+$dIsSet_a5hgj = $dIsSet_a5hg8
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsSet_a5hgc :: IsSet LabelSet
+[LclId]
+$dIsSet_a5hgc = $dIsSet_a5hg8
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIsSet_a5hg8 :: IsSet LabelSet
+[LclId]
+$dIsSet_a5hg8 = GHC.Cmm.Dataflow.Label.$fIsSetLabelSet
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIntegral_a5hmu :: Integral Int
+[LclId]
+$dIntegral_a5hmu = $dIntegral_a5hhI
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIntegral_a5hkH :: Integral Int
+[LclId]
+$dIntegral_a5hkH = $dIntegral_a5hhI
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIntegral_a5hkB :: Integral Int
+[LclId]
+$dIntegral_a5hkB = $dIntegral_a5hhI
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIntegral_a5hjW :: Integral Int
+[LclId]
+$dIntegral_a5hjW = $dIntegral_a5hhI
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dIntegral_a5hhI :: Integral Int
+[LclId]
+$dIntegral_a5hhI = GHC.Real.$fIntegralInt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hmM :: Num WordOff
+[LclId]
+$dNum_a5hmM = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hmB :: Num Int
+[LclId]
+$dNum_a5hmB = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hkT :: Num Int
+[LclId]
+$dNum_a5hkT = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hkP :: Num WordOff
+[LclId]
+$dNum_a5hkP = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hkK :: Num Int
+[LclId]
+$dNum_a5hkK = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hkx :: Num Int
+[LclId]
+$dNum_a5hkx = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hkv :: Num Int
+[LclId]
+$dNum_a5hkv = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hkr :: Num Int
+[LclId]
+$dNum_a5hkr = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hki :: Num WordOff
+[LclId]
+$dNum_a5hki = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hke :: Num Int
+[LclId]
+$dNum_a5hke = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hk5 :: Num WordOff
+[LclId]
+$dNum_a5hk5 = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hjR :: Num Int
+[LclId]
+$dNum_a5hjR = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hjP :: Num Int
+[LclId]
+$dNum_a5hjP = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hjM :: Num WordOff
+[LclId]
+$dNum_a5hjM = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hjH :: Num Int
+[LclId]
+$dNum_a5hjH = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hiI :: Num Int
+[LclId]
+$dNum_a5hiI = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hiE :: Num Int
+[LclId]
+$dNum_a5hiE = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hiy :: Num Int
+[LclId]
+$dNum_a5hiy = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hhQ :: Num Int
+[LclId]
+$dNum_a5hhQ = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hhM :: Num Int
+[LclId]
+$dNum_a5hhM = $dNum_a5hhK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hhK :: Num Int
+[LclId]
+$dNum_a5hhK = GHC.Num.$fNumInt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a5hi6 :: Eq GHC.Platform.Reg.RealReg
+[LclId]
+$dEq_a5hi6 = GHC.Platform.Reg.$fEqRealReg
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a5hi8 :: Eq CmmReg
+[LclId]
+$dEq_a5hi8 = GHC.Cmm.Expr.$fEqCmmReg
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a5hmT :: Bits Int
+[LclId]
+$dBits_a5hmT = $dBits_a5hiA
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a5hiA :: Bits Int
+[LclId]
+$dBits_a5hiA = Data.Bits.$fBitsInt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a5hjd :: Eq Width
+[LclId]
+$dEq_a5hjd = GHC.Cmm.Type.$fEqWidth
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hkz :: Num Integer
+[LclId]
+$dNum_a5hkz = $dNum_a5hjl
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hjX :: Num Integer
+[LclId]
+$dNum_a5hjX = $dNum_a5hjl
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hjT :: Num Integer
+[LclId]
+$dNum_a5hjT = $dNum_a5hjl
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dNum_a5hjl :: Num Integer
+[LclId]
+$dNum_a5hjl = GHC.Num.$fNumInteger
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a5hkn :: Eq Int
+[LclId]
+$dEq_a5hkn = $dEq_a5hjD
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a5hka :: Eq Int
+[LclId]
+$dEq_a5hka = $dEq_a5hjD
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dEq_a5hjD :: Eq Int
+[LclId]
+$dEq_a5hjD = ghc-prim-0.6.1:GHC.Classes.$fEqInt
+
+-- RHS size: {terms: 20, types: 3, coercions: 7, joins: 0/0}
+$dIP_a5hjZ :: GHC.Stack.Types.HasCallStack
+[LclId]
+$dIP_a5hjZ
+  = (GHC.Stack.Types.pushCallStack
+       (ghc-prim-0.6.1:GHC.CString.unpackCString# "pprPanic"#,
+        GHC.Stack.Types.SrcLoc
+          (ghc-prim-0.6.1:GHC.CString.unpackCString# "ghc"#)
+          (ghc-prim-0.6.1:GHC.CString.unpackCString# "GHC.Cmm.Utils"#)
+          (ghc-prim-0.6.1:GHC.CString.unpackCString#
+             "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs"#)
+          (ghc-prim-0.6.1:GHC.Types.I# 284#)
+          (ghc-prim-0.6.1:GHC.Types.I# 43#)
+          (ghc-prim-0.6.1:GHC.Types.I# 284#)
+          (ghc-prim-0.6.1:GHC.Types.I# 81#))
+       ($dIP_a5hnr
+        `cast` (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                    <"callStack">_N <GHC.Stack.Types.CallStack>_N
+                :: (?callStack::GHC.Stack.Types.CallStack)
+                   ~R# GHC.Stack.Types.CallStack)))
+    `cast` (Sym (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                     <"callStack">_N <GHC.Stack.Types.CallStack>_N)
+            :: GHC.Stack.Types.CallStack
+               ~R# (?callStack::GHC.Stack.Types.CallStack))
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dOutputable_a5hk1 :: Outputable Int
+[LclId]
+$dOutputable_a5hk1 = GHC.Utils.Outputable.$fOutputableInt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a5hmp :: Bits Integer
+[LclId]
+$dBits_a5hmp = $dBits_a5hmj
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a5hmn :: Bits Integer
+[LclId]
+$dBits_a5hmn = $dBits_a5hmj
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a5hml :: Bits Integer
+[LclId]
+$dBits_a5hml = $dBits_a5hmj
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$dBits_a5hmj :: Bits Integer
+[LclId]
+$dBits_a5hmj = Data.Bits.$fBitsInteger
+
+-- RHS size: {terms: 1, types: 0, coercions: 4, joins: 0/0}
+$dIP_a5hnr :: GHC.Stack.Types.HasCallStack
+[LclId]
+$dIP_a5hnr
+  = GHC.Stack.Types.emptyCallStack
+    `cast` (Sym (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                     <"callStack">_N <GHC.Stack.Types.CallStack>_N)
+            :: GHC.Stack.Types.CallStack
+               ~R# (?callStack::GHC.Stack.Types.CallStack))
+
+-- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
+GHC.Cmm.Utils.$trModule :: ghc-prim-0.6.1:GHC.Types.Module
+[LclIdX]
+GHC.Cmm.Utils.$trModule
+  = ghc-prim-0.6.1:GHC.Types.Module
+      (ghc-prim-0.6.1:GHC.Types.TrNameS "ghc"#)
+      (ghc-prim-0.6.1:GHC.Types.TrNameS "GHC.Cmm.Utils"#)
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+cccsExpr :: CmmExpr
+[LclIdX]
+cccsExpr = GHC.Cmm.Expr.$WCmmReg cccsReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+currentNurseryExpr :: CmmExpr
+[LclIdX]
+currentNurseryExpr = GHC.Cmm.Expr.$WCmmReg currentNurseryReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+currentTSOExpr :: CmmExpr
+[LclIdX]
+currentTSOExpr = GHC.Cmm.Expr.$WCmmReg currentTSOReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+hpLimExpr :: CmmExpr
+[LclIdX]
+hpLimExpr = GHC.Cmm.Expr.$WCmmReg hpLimReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+hpExpr :: CmmExpr
+[LclIdX]
+hpExpr = GHC.Cmm.Expr.$WCmmReg hpReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+spLimExpr :: CmmExpr
+[LclIdX]
+spLimExpr = GHC.Cmm.Expr.$WCmmReg spLimReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+spExpr :: CmmExpr
+[LclIdX]
+spExpr = GHC.Cmm.Expr.$WCmmReg spReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+baseExpr :: CmmExpr
+[LclIdX]
+baseExpr = GHC.Cmm.Expr.$WCmmReg baseReg
+
+-- RHS size: {terms: 32, types: 69, coercions: 17, joins: 0/4}
+blockTicks :: Block CmmNode C C -> [CmmTickish]
+[LclIdX]
+blockTicks
+  = \ (b_a5gYU :: Block CmmNode C C) ->
+      letrec {
+        goStmt_a5gYV
+          :: forall (e :: Extensibility) (x :: Extensibility).
+             CmmNode e x -> [CmmTickish] -> [CmmTickish]
+        [LclId]
+        goStmt_a5gYV
+          = \ (@ (e_a5hco :: Extensibility))
+              (@ (x_a5hcp :: Extensibility))
+              (ds_d5hnw :: CmmNode e_a5hco x_a5hcp)
+              (ts_a5gYZ :: [CmmTickish]) ->
+              let {
+                _other_a5gZ0 :: CmmNode e_a5hco x_a5hcp
+                [LclId]
+                _other_a5gZ0 = ds_d5hnw } in
+              let {
+                fail_d5hoo :: ghc-prim-0.6.1:GHC.Prim.Void# -> [CmmTickish]
+                [LclId]
+                fail_d5hoo
+                  = \ (ds_d5hop [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                      let {
+                        ts_a5gZ1 :: [CmmTickish]
+                        [LclId]
+                        ts_a5gZ1 = ts_a5gYZ } in
+                      ts_a5gZ1 } in
+              case ds_d5hnw of wild_00 {
+                __DEFAULT -> fail_d5hoo ghc-prim-0.6.1:GHC.Prim.void#;
+                CmmTick co_a5hcX co_a5hcY t_a5gYY ->
+                  ghc-prim-0.6.1:GHC.Types.: @ CmmTickish t_a5gYY ts_a5gYZ
+              }; } in
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ [CmmTickish]
+        @ [CmmTickish]
+        (reverse @ CmmTickish)
+        (((\ (ds_d5hnv
+                :: forall (e :: Extensibility) (x :: Extensibility).
+                   CmmNode e x -> [CmmTickish] -> [CmmTickish]) ->
+             foldBlockNodesF @ CmmNode @ [CmmTickish] ds_d5hnv @ C @ C)
+            (\ (@ (e_a5hdd :: Extensibility)) (@ (x_a5hde :: Extensibility)) ->
+               goStmt_a5gYV @ e_a5hdd @ x_a5hde)
+            b_a5gYU
+            ((ghc-prim-0.6.1:GHC.Types.[] @ CmmTickish)
+             `cast` (Sub (Sym (GHC.Cmm.Dataflow.Block.D:R:IndexedCOkCloseda_b[0]
+                                   <*>_N <[CmmTickish]>_N <[CmmTickish]>_N))
+                     :: [CmmTickish] ~R# IndexedCO C [CmmTickish] [CmmTickish])))
+         `cast` (Sub (GHC.Cmm.Dataflow.Block.D:R:IndexedCOkCloseda_b[0]
+                          <*>_N <[CmmTickish]>_N <[CmmTickish]>_N)
+                 :: IndexedCO C [CmmTickish] [CmmTickish] ~R# [CmmTickish]))
+
+-- RHS size: {terms: 4, types: 7, coercions: 0, joins: 0/0}
+bodyToBlockList :: Body CmmNode -> [CmmBlock]
+[LclIdX]
+bodyToBlockList
+  = \ (body_a5gYL :: Body CmmNode) ->
+      mapElems @ LabelMap $dIsMap_a5hdt @ (Block CmmNode C C) body_a5gYL
+
+-- RHS size: {terms: 16, types: 35, coercions: 0, joins: 0/1}
+ofBlockList :: BlockId -> [CmmBlock] -> CmmGraph
+[LclIdX]
+ofBlockList
+  = \ (entry_a5gYI :: BlockId) (blocks_a5gYJ :: [CmmBlock]) ->
+      letrec {
+        body_a5gYK :: LabelMap (Block CmmNode C C)
+        [LclId]
+        body_a5gYK
+          = foldr
+              @ []
+              $dFoldable_a5hdz
+              @ (Block CmmNode C C)
+              @ (LabelMap (Block CmmNode C C))
+              (addBlock @ (Block CmmNode) $dNonLocal_a5hdF $d(%%)_a5hdG)
+              (emptyBody @ Block @ CmmNode)
+              blocks_a5gYJ; } in
+      GHC.Cmm.CmmGraph
+        @ CmmNode
+        entry_a5gYI
+        (GHC.Cmm.Dataflow.Graph.$WGMany
+           @ 'Closed
+           @ Block
+           @ CmmNode
+           @ 'Closed
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode O C))
+           body_a5gYK
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode C O)))
+
+-- RHS size: {terms: 8, types: 16, coercions: 0, joins: 0/0}
+ofBlockMap :: BlockId -> LabelMap CmmBlock -> CmmGraph
+[LclIdX]
+ofBlockMap
+  = \ (entry_a5gYm :: BlockId)
+      (bodyMap_a5gYn :: LabelMap CmmBlock) ->
+      GHC.Cmm.CmmGraph
+        @ CmmNode
+        entry_a5gYm
+        (GHC.Cmm.Dataflow.Graph.$WGMany
+           @ 'Closed
+           @ Block
+           @ CmmNode
+           @ 'Closed
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode O C))
+           bodyMap_a5gYn
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode C O)))
+
+-- RHS size: {terms: 27, types: 57, coercions: 0, joins: 0/1}
+toBlockMap :: CmmGraph -> LabelMap CmmBlock
+[LclIdX]
+toBlockMap
+  = \ (ds_d5hoq :: GenCmmGraph CmmNode) ->
+      let {
+        fail_d5hq7 :: ghc-prim-0.6.1:GHC.Prim.Void# -> LabelMap CmmBlock
+        [LclId]
+        fail_d5hq7
+          = \ (ds_d5hq8 [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              Control.Exception.Base.patError
+                @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                @ (LabelMap CmmBlock)
+                "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:525:1-67|function toBlockMap"# } in
+      case ds_d5hoq of wild_00 { CmmGraph ds_d5hq3 ds_d5hq4 ->
+      case ds_d5hq4 of wild_00 {
+        __DEFAULT -> fail_d5hq7 ghc-prim-0.6.1:GHC.Prim.void#;
+        GMany ds_d5hq5 body_a5gYl ds_d5hq6 ->
+          case ds_d5hq5 of wild_00 {
+            __DEFAULT -> fail_d5hq7 ghc-prim-0.6.1:GHC.Prim.void#;
+            NothingO co_a5heb ->
+              case ds_d5hq6 of wild_00 {
+                __DEFAULT -> fail_d5hq7 ghc-prim-0.6.1:GHC.Prim.void#;
+                NothingO co_a5hec -> body_a5gYl
+              }
+          }
+      }
+      }
+
+-- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
+toBlockList :: CmmGraph -> [CmmBlock]
+[LclIdX]
+toBlockList
+  = \ (g_a5gYo :: CmmGraph) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ (LabelMap CmmBlock)
+        @ [CmmBlock]
+        (mapElems @ LabelMap $dIsMap_a5hej @ CmmBlock)
+        (toBlockMap g_a5gYo)
+
+-- RHS size: {terms: 59, types: 58, coercions: 3, joins: 0/9}
+toBlockListEntryFirst :: CmmGraph -> [CmmBlock]
+[LclIdX]
+toBlockListEntryFirst
+  = \ (g_a5gYp :: CmmGraph) ->
+      letrec {
+        entry_id_a5gYr :: BlockId
+        [LclId]
+        entry_id_a5gYr = g_entry @ CmmNode g_a5gYp; } in
+      letrec {
+        m_a5gYq :: LabelMap CmmBlock
+        [LclId]
+        m_a5gYq = toBlockMap g_a5gYp; } in
+      letrec {
+        ds_d5hqj :: Unit CmmBlock
+        [LclId]
+        ds_d5hqj
+          = let {
+              fail_d5hqr :: ghc-prim-0.6.1:GHC.Prim.Void# -> Unit CmmBlock
+              [LclId]
+              fail_d5hqr
+                = \ (ds_d5hqs [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                    Control.Exception.Base.patError
+                      @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                      @ (Unit CmmBlock)
+                      "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:541:5-43|Just entry_block"# } in
+            let {
+              ds_d5hqk :: Maybe CmmBlock
+              [LclId]
+              ds_d5hqk
+                = mapLookup
+                    @ LabelMap
+                    $dIsMap_a5heD
+                    @ CmmBlock
+                    (entry_id_a5gYr
+                     `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                             :: Label ~R# KeyOf LabelMap))
+                    m_a5gYq } in
+            case ds_d5hqk of wild_00 {
+              __DEFAULT -> fail_d5hqr ghc-prim-0.6.1:GHC.Prim.void#;
+              Just entry_block_a5gYs -> (entry_block_a5gYs)
+            };
+        entry_block_a5gYs :: CmmBlock
+        [LclId]
+        entry_block_a5gYs
+          = case ds_d5hqj of ds_d5hqj { (entry_block_a5gYs) ->
+            entry_block_a5gYs
+            }; } in
+      letrec {
+        others_a5gYt :: [Block CmmNode C C]
+        [LclId]
+        others_a5gYt
+          = filter
+              @ (Block CmmNode C C)
+              (. @ BlockId
+                 @ Bool
+                 @ (Block CmmNode C C)
+                 (let {
+                    ds_d5hqi :: BlockId
+                    [LclId]
+                    ds_d5hqi = entry_id_a5gYr } in
+                  \ (ds_d5hqh :: BlockId) ->
+                    /= @ BlockId $dEq_a5heN ds_d5hqh ds_d5hqi)
+                 (entryLabel @ (Block CmmNode) $dNonLocal_a5heQ @ C))
+              (mapElems @ LabelMap $dIsMap_a5heT @ CmmBlock m_a5gYq); } in
+      let {
+        fail_d5hqf :: ghc-prim-0.6.1:GHC.Prim.Void# -> [CmmBlock]
+        [LclId]
+        fail_d5hqf
+          = \ (ds_d5hqg [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              ghc-prim-0.6.1:GHC.Types.:
+                @ CmmBlock entry_block_a5gYs others_a5gYt } in
+      case mapNull @ LabelMap $dIsMap_a5heZ @ CmmBlock m_a5gYq
+      of wild_00 {
+        False -> fail_d5hqf ghc-prim-0.6.1:GHC.Prim.void#;
+        True -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock
+      }
+
+-- RHS size: {terms: 111, types: 94, coercions: 12, joins: 0/14}
+toBlockListEntryFirstFalseFallthrough :: CmmGraph -> [CmmBlock]
+[LclIdX]
+toBlockListEntryFirstFalseFallthrough
+  = \ (g_a5gYu :: CmmGraph) ->
+      letrec {
+        entry_id_a5gYw :: BlockId
+        [LclId]
+        entry_id_a5gYw = g_entry @ CmmNode g_a5gYu; } in
+      letrec {
+        m_a5gYv :: LabelMap CmmBlock
+        [LclId]
+        m_a5gYv = toBlockMap g_a5gYu; } in
+      letrec {
+        ds_d5hra :: Unit CmmBlock
+        [LclId]
+        ds_d5hra
+          = let {
+              fail_d5hri :: ghc-prim-0.6.1:GHC.Prim.Void# -> Unit CmmBlock
+              [LclId]
+              fail_d5hri
+                = \ (ds_d5hrj [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                    Control.Exception.Base.patError
+                      @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                      @ (Unit CmmBlock)
+                      "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:559:5-43|Just entry_block"# } in
+            let {
+              ds_d5hrb :: Maybe CmmBlock
+              [LclId]
+              ds_d5hrb
+                = mapLookup
+                    @ LabelMap
+                    $dIsMap_a5hfr
+                    @ CmmBlock
+                    (entry_id_a5gYw
+                     `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                             :: Label ~R# KeyOf LabelMap))
+                    m_a5gYv } in
+            case ds_d5hrb of wild_00 {
+              __DEFAULT -> fail_d5hri ghc-prim-0.6.1:GHC.Prim.void#;
+              Just entry_block_a5gYx -> (entry_block_a5gYx)
+            };
+        entry_block_a5gYx :: CmmBlock
+        [LclId]
+        entry_block_a5gYx
+          = case ds_d5hra of ds_d5hra { (entry_block_a5gYx) ->
+            entry_block_a5gYx
+            }; } in
+      letrec {
+        dfs_a5gYy :: LabelSet -> [CmmBlock] -> [CmmBlock]
+        [LclId]
+        dfs_a5gYy
+          = \ (ds_d5hqE :: LabelSet) (ds_d5hqF :: [CmmBlock]) ->
+              let {
+                visited_a5gYz :: LabelSet
+                [LclId]
+                visited_a5gYz = ds_d5hqE } in
+              case ds_d5hqF of wild_00 {
+                [] -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock;
+                : block_a5gYA bs_a5gYB ->
+                  letrec {
+                    add_id_a5gYE :: Label -> [CmmBlock] -> [CmmBlock]
+                    [LclId]
+                    add_id_a5gYE
+                      = \ (id_a5gYF :: Label) (bs_a5gYG :: [CmmBlock]) ->
+                          let {
+                            ds_d5hqY :: Maybe CmmBlock
+                            [LclId]
+                            ds_d5hqY
+                              = mapLookup
+                                  @ LabelMap
+                                  $dIsMap_a5hfG
+                                  @ CmmBlock
+                                  (id_a5gYF
+                                   `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                                           :: Label ~R# KeyOf LabelMap))
+                                  m_a5gYv } in
+                          case ds_d5hqY of wild_00 {
+                            Nothing -> bs_a5gYG;
+                            Just b_a5gYH ->
+                              ghc-prim-0.6.1:GHC.Types.: @ CmmBlock b_a5gYH bs_a5gYG
+                          }; } in
+                  letrec {
+                    bs'_a5gYD :: [CmmBlock]
+                    [LclId]
+                    bs'_a5gYD
+                      = foldr
+                          @ []
+                          $dFoldable_a5hfR
+                          @ Label
+                          @ [CmmBlock]
+                          add_id_a5gYE
+                          bs_a5gYB
+                          (successors
+                             @ (Block CmmNode) $dNonLocal_a5hfW @ C block_a5gYA); } in
+                  letrec {
+                    id_a5gYC :: Label
+                    [LclId]
+                    id_a5gYC
+                      = entryLabel
+                          @ (Block CmmNode) $dNonLocal_a5hg3 @ C block_a5gYA; } in
+                  let {
+                    fail_d5hqW :: ghc-prim-0.6.1:GHC.Prim.Void# -> [CmmBlock]
+                    [LclId]
+                    fail_d5hqW
+                      = \ (ds_d5hqX [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                          ghc-prim-0.6.1:GHC.Types.:
+                            @ CmmBlock
+                            block_a5gYA
+                            (dfs_a5gYy
+                               (setInsert
+                                  @ LabelSet
+                                  $dIsSet_a5hgc
+                                  (id_a5gYC
+                                   `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:ElemOfLabelSet[0]))
+                                           :: Label ~R# ElemOf LabelSet))
+                                  visited_a5gYz)
+                               bs'_a5gYD) } in
+                  case setMember
+                         @ LabelSet
+                         $dIsSet_a5hg8
+                         (id_a5gYC
+                          `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:ElemOfLabelSet[0]))
+                                  :: Label ~R# ElemOf LabelSet))
+                         visited_a5gYz
+                  of wild_00 {
+                    False -> fail_d5hqW ghc-prim-0.6.1:GHC.Prim.void#;
+                    True -> dfs_a5gYy visited_a5gYz bs_a5gYB
+                  }
+              }; } in
+      let {
+        fail_d5hqC :: ghc-prim-0.6.1:GHC.Prim.Void# -> [CmmBlock]
+        [LclId]
+        fail_d5hqC
+          = \ (ds_d5hqD [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              dfs_a5gYy
+                (setEmpty @ LabelSet $dIsSet_a5hgj)
+                (GHC.Base.build
+                   @ CmmBlock
+                   (\ (@ a_d5hqt)
+                      (c_d5hqu :: CmmBlock -> a_d5hqt -> a_d5hqt)
+                      (n_d5hqv :: a_d5hqt) ->
+                      c_d5hqu entry_block_a5gYx n_d5hqv)) } in
+      case mapNull @ LabelMap $dIsMap_a5hgf @ CmmBlock m_a5gYv
+      of wild_00 {
+        False -> fail_d5hqC ghc-prim-0.6.1:GHC.Prim.void#;
+        True -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock
+      }
+
+-- RHS size: {terms: 23, types: 100, coercions: 0, joins: 0/0}
+mapGraphNodes
+  :: (CmmNode C O -> CmmNode C O, CmmNode O O -> CmmNode O O,
+      CmmNode O C -> CmmNode O C)
+     -> CmmGraph -> CmmGraph
+[LclIdX]
+mapGraphNodes
+  = \ (funs_a5gYM
+         :: (CmmNode C O -> CmmNode C O, CmmNode O O -> CmmNode O O,
+             CmmNode O C -> CmmNode O C))
+      (g_a5gYO :: CmmGraph) ->
+      case funs_a5gYM of wild_00 { (mf_a5gYN, ds_d5hru, ds_d5hrv) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ (LabelMap CmmBlock)
+        @ CmmGraph
+        (ofBlockMap
+           ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+              @ (CmmNode C O)
+              @ Label
+              (entryLabel @ CmmNode $dNonLocal_a5hgp @ O)
+              ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                 @ (CmmNode C O)
+                 @ (CmmNode C O)
+                 mf_a5gYN
+                 (GHC.Cmm.Node.$WCmmEntry
+                    (g_entry @ CmmNode g_a5gYO) GHC.Cmm.Node.GlobalScope))))
+        ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+           @ (LabelMap (Block CmmNode C C))
+           @ (LabelMap (Block CmmNode C C))
+           (mapMap
+              @ LabelMap
+              $dIsMap_a5hgB
+              @ (Block CmmNode C C)
+              @ (Block CmmNode C C)
+              (mapBlock3' @ CmmNode @ CmmNode @ C @ C funs_a5gYM))
+           (toBlockMap g_a5gYO))
+      }
+
+-- RHS size: {terms: 13, types: 16, coercions: 0, joins: 0/1}
+foldlGraphBlocks
+  :: forall a. (a -> CmmBlock -> a) -> a -> CmmGraph -> a
+[LclIdX]
+foldlGraphBlocks
+  = \ (@ a_a5hgN) ->
+      let {
+        $dIsMap_a5hgT :: IsMap LabelMap
+        [LclId]
+        $dIsMap_a5hgT = $dIsMap_a5hdt } in
+      \ (k_a5gYQ :: a_a5hgN -> CmmBlock -> a_a5hgN)
+        (z_a5gYR :: a_a5hgN)
+        (g_a5gYS :: CmmGraph) ->
+        $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+          @ (LabelMap CmmBlock)
+          @ a_a5hgN
+          (mapFoldl
+             @ LabelMap $dIsMap_a5hgT @ a_a5hgN @ CmmBlock k_a5gYQ z_a5gYR)
+          (toBlockMap g_a5gYS)
+
+-- RHS size: {terms: 7, types: 4, coercions: 0, joins: 0/0}
+revPostorder :: CmmGraph -> [CmmBlock]
+[LclIdX]
+revPostorder
+  = \ (g_a5gYT :: CmmGraph) ->
+      revPostorderFrom
+        @ (Block CmmNode)
+        $dNonLocal_a5hh1
+        (toBlockMap g_a5gYT)
+        (g_entry @ CmmNode g_a5gYT)
+
+-- RHS size: {terms: 10, types: 19, coercions: 0, joins: 0/0}
+modifyGraph
+  :: forall (n :: Extensibility -> Extensibility -> *)
+            (n' :: Extensibility -> Extensibility -> *).
+     (Graph n C C -> Graph n' C C) -> GenCmmGraph n -> GenCmmGraph n'
+[LclIdX]
+modifyGraph
+  = \ (@ (n_a5hh3 :: Extensibility -> Extensibility -> *))
+      (@ (n'_a5hh4 :: Extensibility -> Extensibility -> *))
+      (f_a5gYj :: Graph n_a5hh3 C C -> Graph n'_a5hh4 C C)
+      (g_a5gYk :: GenCmmGraph n_a5hh3) ->
+      GHC.Cmm.CmmGraph
+        @ n'_a5hh4
+        (g_entry @ n_a5hh3 g_a5gYk)
+        (f_a5gYj (g_graph @ n_a5hh3 g_a5gYk))
+
+-- RHS size: {terms: 6, types: 18, coercions: 0, joins: 0/0}
+mapGraphNodes1
+  :: (forall (e :: Extensibility) (x :: Extensibility).
+      CmmNode e x -> CmmNode e x)
+     -> CmmGraph -> CmmGraph
+[LclIdX]
+mapGraphNodes1
+  = \ (f_a5gYP
+         :: forall (e :: Extensibility) (x :: Extensibility).
+            CmmNode e x -> CmmNode e x) ->
+      modifyGraph
+        @ CmmNode
+        @ CmmNode
+        (mapGraph
+           @ CmmNode
+           @ CmmNode
+           @ C
+           @ C
+           (\ (@ (e1_a5hhm :: Extensibility))
+              (@ (x1_a5hhn :: Extensibility)) ->
+              f_a5gYP @ e1_a5hhm @ x1_a5hhn))
+
+-- RHS size: {terms: 42, types: 23, coercions: 0, joins: 0/5}
+mkLiveness :: Platform -> [LocalReg] -> Liveness
+[LclIdX]
+mkLiveness
+  = \ (ds_d5hrw :: Platform) (ds_d5hrx :: [LocalReg]) ->
+      let {
+        platform_a5gYc :: Platform
+        [LclId]
+        platform_a5gYc = ds_d5hrw } in
+      case ds_d5hrx of wild_00 {
+        [] -> ghc-prim-0.6.1:GHC.Types.[] @ Bool;
+        : reg_a5gYd regs_a5gYe ->
+          letrec {
+            is_non_ptr_a5gYi :: Bool
+            [LclId]
+            is_non_ptr_a5gYi
+              = $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                  @ Bool
+                  @ Bool
+                  not
+                  (isGcPtrType (localRegType reg_a5gYd)); } in
+          letrec {
+            word_size_a5gYf :: Int
+            [LclId]
+            word_size_a5gYf = platformWordSizeInBytes platform_a5gYc; } in
+          letrec {
+            sizeW_a5gYg :: Int
+            [LclId]
+            sizeW_a5gYg
+              = quot
+                  @ Int
+                  $dIntegral_a5hhI
+                  (- @ Int
+                     $dNum_a5hhK
+                     (+ @ Int
+                        $dNum_a5hhM
+                        (widthInBytes (typeWidth (localRegType reg_a5gYd)))
+                        word_size_a5gYf)
+                     (ghc-prim-0.6.1:GHC.Types.I# 1#))
+                  word_size_a5gYf; } in
+          letrec {
+            bits_a5gYh :: [Bool]
+            [LclId]
+            bits_a5gYh = replicate @ Bool sizeW_a5gYg is_non_ptr_a5gYi; } in
+          ++ @ Bool bits_a5gYh (mkLiveness platform_a5gYc regs_a5gYe)
+      }
+
+-- RHS size: {terms: 55, types: 25, coercions: 0, joins: 0/5}
+regsOverlap :: Platform -> CmmReg -> CmmReg -> Bool
+[LclIdX]
+regsOverlap
+  = \ (platform_a5gXV :: Platform)
+      (ds_d5hrI :: CmmReg)
+      (ds_d5hrJ :: CmmReg) ->
+      let {
+        reg_a5gY0 :: CmmReg
+        [LclId]
+        reg_a5gY0 = ds_d5hrI } in
+      let {
+        fail_d5ht8 :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId]
+        fail_d5ht8
+          = \ (ds_d5ht9 [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              let {
+                reg'_a5gY1 :: CmmReg
+                [LclId]
+                reg'_a5gY1 = ds_d5hrJ } in
+              == @ CmmReg $dEq_a5hi8 reg_a5gY0 reg'_a5gY1 } in
+      case ds_d5hrI of wild_00 {
+        __DEFAULT -> fail_d5ht8 ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmGlobal g_a5gXW ->
+          case ds_d5hrJ of wild_00 {
+            __DEFAULT -> fail_d5ht8 ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmGlobal g'_a5gXX ->
+              let {
+                ds_d5hrO :: Maybe GHC.Platform.Reg.RealReg
+                [LclId]
+                ds_d5hrO = globalRegMaybe platform_a5gXV g_a5gXW } in
+              case ds_d5hrO of wild_00 {
+                __DEFAULT -> fail_d5ht8 ghc-prim-0.6.1:GHC.Prim.void#;
+                Just real_a5gXY ->
+                  let {
+                    ds_d5hrS :: Maybe GHC.Platform.Reg.RealReg
+                    [LclId]
+                    ds_d5hrS = globalRegMaybe platform_a5gXV g'_a5gXX } in
+                  case ds_d5hrS of wild_00 {
+                    __DEFAULT -> fail_d5ht8 ghc-prim-0.6.1:GHC.Prim.void#;
+                    Just real'_a5gXZ ->
+                      case ==
+                             @ GHC.Platform.Reg.RealReg $dEq_a5hi6 real_a5gXY real'_a5gXZ
+                      of wild_00 {
+                        False -> fail_d5ht8 ghc-prim-0.6.1:GHC.Prim.void#;
+                        True -> ghc-prim-0.6.1:GHC.Types.True
+                      }
+                  }
+              }
+          }
+      }
+
+-- RHS size: {terms: 43, types: 26, coercions: 0, joins: 0/6}
+regUsedIn :: Platform -> CmmReg -> CmmExpr -> Bool
+[LclIdX]
+regUsedIn
+  = \ (platform_a5gY2 :: Platform) ->
+      letrec {
+        regUsedIn__a5gY3 :: CmmReg -> CmmExpr -> Bool
+        [LclId]
+        regUsedIn__a5gY3
+          = \ (ds_d5hta :: CmmReg) (ds_d5htb :: CmmExpr) ->
+              let {
+                reg_a5gY4 :: CmmReg
+                [LclId]
+                reg_a5gY4 = ds_d5hta } in
+              let {
+                reg_a5gY6 :: CmmReg
+                [LclId]
+                reg_a5gY6 = ds_d5hta } in
+              let {
+                reg_a5gY8 :: CmmReg
+                [LclId]
+                reg_a5gY8 = ds_d5hta } in
+              let {
+                reg_a5gYa :: CmmReg
+                [LclId]
+                reg_a5gYa = ds_d5hta } in
+              case ds_d5htb of wild_00 {
+                CmmLit ds_d5hvx -> ghc-prim-0.6.1:GHC.Types.False;
+                CmmLoad e_a5gY5 ds_d5hvy -> regUsedIn__a5gY3 reg_a5gY4 e_a5gY5;
+                CmmReg reg'_a5gY7 ->
+                  regsOverlap platform_a5gY2 reg_a5gY6 reg'_a5gY7;
+                CmmMachOp ds_d5hvA es_a5gYb ->
+                  any
+                    @ []
+                    @ CmmExpr
+                    $dFoldable_a5hiv
+                    (let {
+                       ds_d5htq :: CmmReg
+                       [LclId]
+                       ds_d5htq = reg_a5gYa } in
+                     \ (ds_d5htr :: CmmExpr) -> regUsedIn__a5gY3 ds_d5htq ds_d5htr)
+                    es_a5gYb;
+                CmmStackSlot ds_d5hvB ds_d5hvC -> ghc-prim-0.6.1:GHC.Types.False;
+                CmmRegOff reg'_a5gY9 ds_d5hvz ->
+                  regsOverlap platform_a5gY2 reg_a5gY8 reg'_a5gY9
+              }; } in
+      regUsedIn__a5gY3
+
+-- RHS size: {terms: 12, types: 3, coercions: 0, joins: 0/0}
+tAG_MASK :: Platform -> Int
+[LclIdX]
+tAG_MASK
+  = \ (platform_a5gXJ :: Platform) ->
+      - @ Int
+        $dNum_a5hiy
+        (shiftL
+           @ Int
+           $dBits_a5hiA
+           (ghc-prim-0.6.1:GHC.Types.I# 1#)
+           (pc_TAG_BITS (platformConstants platform_a5gXJ)))
+        (ghc-prim-0.6.1:GHC.Types.I# 1#)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+mAX_PTR_TAG :: Platform -> Int
+[LclIdX]
+mAX_PTR_TAG = tAG_MASK
+
+-- RHS size: {terms: 12, types: 8, coercions: 0, joins: 0/1}
+isComparisonExpr :: CmmExpr -> Bool
+[LclIdX]
+isComparisonExpr
+  = \ (ds_d5hvD :: CmmExpr) ->
+      let {
+        fail_d5hvO :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId]
+        fail_d5hvO
+          = \ (ds_d5hvP [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              ghc-prim-0.6.1:GHC.Types.False } in
+      case ds_d5hvD of wild_00 {
+        __DEFAULT -> fail_d5hvO ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmMachOp op_a5gXI ds_d5hvN -> isComparisonMachOp op_a5gXI
+      }
+
+-- RHS size: {terms: 11, types: 6, coercions: 0, joins: 0/1}
+isLit :: CmmExpr -> Bool
+[LclIdX]
+isLit
+  = \ (ds_d5hvQ :: CmmExpr) ->
+      let {
+        fail_d5hws :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId]
+        fail_d5hws
+          = \ (ds_d5hwt [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              ghc-prim-0.6.1:GHC.Types.False } in
+      case ds_d5hvQ of wild_00 {
+        __DEFAULT -> fail_d5hws ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hwr -> ghc-prim-0.6.1:GHC.Types.True
+      }
+
+-- RHS size: {terms: 35, types: 20, coercions: 0, joins: 0/1}
+hasNoGlobalRegs :: CmmExpr -> Bool
+[LclIdX]
+hasNoGlobalRegs
+  = \ (ds_d5hwu :: CmmExpr) ->
+      let {
+        fail_d5hzs :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId]
+        fail_d5hzs
+          = \ (ds_d5hzt [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              ghc-prim-0.6.1:GHC.Types.False } in
+      case ds_d5hwu of wild_00 {
+        __DEFAULT -> fail_d5hzs ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hzm -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmLoad e_a5gXG ds_d5hzk -> hasNoGlobalRegs e_a5gXG;
+        CmmReg ds_d5hzn ->
+          case ds_d5hzn of wild_00 {
+            __DEFAULT -> fail_d5hzs ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLocal ds_d5hzo -> ghc-prim-0.6.1:GHC.Types.True
+          };
+        CmmMachOp ds_d5hzl es_a5gXH ->
+          all @ [] @ CmmExpr $dFoldable_a5hiP hasNoGlobalRegs es_a5gXH;
+        CmmRegOff ds_d5hzp ds_d5hzq ->
+          case ds_d5hzp of wild_00 {
+            __DEFAULT -> fail_d5hzs ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLocal ds_d5hzr -> ghc-prim-0.6.1:GHC.Types.True
+          }
+      }
+
+-- RHS size: {terms: 17, types: 14, coercions: 0, joins: 0/0}
+isTrivialCmmExpr :: CmmExpr -> Bool
+[LclIdX]
+isTrivialCmmExpr
+  = \ (ds_d5hzu :: CmmExpr) ->
+      case ds_d5hzu of wild_00 {
+        CmmLit ds_d5hBC -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmLoad ds_d5hBy ds_d5hBz -> ghc-prim-0.6.1:GHC.Types.False;
+        CmmReg ds_d5hBD -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmMachOp ds_d5hBA ds_d5hBB -> ghc-prim-0.6.1:GHC.Types.False;
+        CmmStackSlot ds_d5hBG ds_d5hBH ->
+          panic
+            @ Bool
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "isTrivialCmmExpr CmmStackSlot"#);
+        CmmRegOff ds_d5hBE ds_d5hBF -> ghc-prim-0.6.1:GHC.Types.True
+      }
+
+-- RHS size: {terms: 21, types: 10, coercions: 0, joins: 0/2}
+cmmMkAssign
+  :: Platform -> CmmExpr -> Unique -> (CmmNode O O, CmmExpr)
+[LclIdX]
+cmmMkAssign
+  = \ (platform_a5gXB :: Platform)
+      (expr_a5gXC :: CmmExpr)
+      (uq_a5gXD :: Unique) ->
+      letrec {
+        ty_a5gXE :: CmmType
+        [LclId]
+        ty_a5gXE = cmmExprType platform_a5gXB expr_a5gXC; } in
+      case ty_a5gXE of ty_a5gXE { __DEFAULT ->
+      letrec {
+        reg_a5gXF :: CmmReg
+        [LclId]
+        reg_a5gXF
+          = GHC.Cmm.Expr.$WCmmLocal
+              (GHC.Cmm.Expr.$WLocalReg uq_a5gXD ty_a5gXE); } in
+      (GHC.Cmm.Node.$WCmmAssign reg_a5gXF expr_a5gXC,
+       GHC.Cmm.Expr.$WCmmReg reg_a5gXF)
+      }
+
+-- RHS size: {terms: 32, types: 16, coercions: 0, joins: 0/3}
+cmmToWord :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmToWord
+  = \ (platform_a5gXx :: Platform) (e_a5gXy :: CmmExpr) ->
+      letrec {
+        word_a5gXA :: Width
+        [LclId]
+        word_a5gXA = wordWidth platform_a5gXx; } in
+      letrec {
+        w_a5gXz :: Width
+        [LclId]
+        w_a5gXz = cmmExprWidth platform_a5gXx e_a5gXy; } in
+      let {
+        fail_d5hBR :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d5hBR
+          = \ (ds_d5hBS [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              GHC.Cmm.Expr.CmmMachOp
+                (GHC.Cmm.MachOp.MO_UU_Conv w_a5gXz word_a5gXA)
+                (GHC.Base.build
+                   @ CmmExpr
+                   (\ (@ a_d5hBI)
+                      (c_d5hBJ :: CmmExpr -> a_d5hBI -> a_d5hBI)
+                      (n_d5hBK :: a_d5hBI) ->
+                      c_d5hBJ e_a5gXy n_d5hBK)) } in
+      case == @ Width $dEq_a5hjd w_a5gXz word_a5gXA of wild_00 {
+        False -> fail_d5hBR ghc-prim-0.6.1:GHC.Prim.void#;
+        True -> e_a5gXy
+      }
+
+-- RHS size: {terms: 36, types: 19, coercions: 0, joins: 0/2}
+cmmNegate :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmNegate
+  = \ (platform_a5gXt :: Platform) (ds_d5hBT :: CmmExpr) ->
+      let {
+        e_a5gXw :: CmmExpr
+        [LclId]
+        e_a5gXw = ds_d5hBT } in
+      let {
+        fail_d5hCJ :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d5hCJ
+          = \ (ds_d5hCK [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              GHC.Cmm.Expr.CmmMachOp
+                (GHC.Cmm.MachOp.MO_S_Neg (cmmExprWidth platform_a5gXt e_a5gXw))
+                (GHC.Base.build
+                   @ CmmExpr
+                   (\ (@ a_d5hBZ)
+                      (c_d5hC0 :: CmmExpr -> a_d5hBZ -> a_d5hBZ)
+                      (n_d5hC1 :: a_d5hBZ) ->
+                      c_d5hC0 e_a5gXw n_d5hC1)) } in
+      case ds_d5hBT of wild_00 {
+        __DEFAULT -> fail_d5hCJ ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hCI ->
+          case ds_d5hCI of wild_00 {
+            __DEFAULT -> fail_d5hCJ ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a5gXu rep_a5gXv ->
+              GHC.Cmm.Expr.CmmLit
+                (GHC.Cmm.Expr.$WCmmInt
+                   (negate @ Integer $dNum_a5hjl n_a5gXu) rep_a5gXv)
+          }
+      }
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmQuotWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmQuotWord
+  = \ (platform_a5gXq :: Platform)
+      (e1_a5gXr :: CmmExpr)
+      (e2_a5gXs :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUQuot platform_a5gXq)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hCL)
+              (c_d5hCM :: CmmExpr -> a_d5hCL -> a_d5hCL)
+              (n_d5hCN :: a_d5hCL) ->
+              c_d5hCM e1_a5gXr (c_d5hCM e2_a5gXs n_d5hCN)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmMulWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmMulWord
+  = \ (platform_a5gXn :: Platform)
+      (e1_a5gXo :: CmmExpr)
+      (e2_a5gXp :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordMul platform_a5gXn)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hCO)
+              (c_d5hCP :: CmmExpr -> a_d5hCO -> a_d5hCO)
+              (n_d5hCQ :: a_d5hCO) ->
+              c_d5hCP e1_a5gXo (c_d5hCP e2_a5gXp n_d5hCQ)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmSubWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmSubWord
+  = \ (platform_a5gXk :: Platform)
+      (e1_a5gXl :: CmmExpr)
+      (e2_a5gXm :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordSub platform_a5gXk)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hCR)
+              (c_d5hCS :: CmmExpr -> a_d5hCR -> a_d5hCR)
+              (n_d5hCT :: a_d5hCR) ->
+              c_d5hCS e1_a5gXl (c_d5hCS e2_a5gXm n_d5hCT)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmAddWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmAddWord
+  = \ (platform_a5gXh :: Platform)
+      (e1_a5gXi :: CmmExpr)
+      (e2_a5gXj :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordAdd platform_a5gXh)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hCU)
+              (c_d5hCV :: CmmExpr -> a_d5hCU -> a_d5hCU)
+              (n_d5hCW :: a_d5hCU) ->
+              c_d5hCV e1_a5gXi (c_d5hCV e2_a5gXj n_d5hCW)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUShrWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmUShrWord
+  = \ (platform_a5gXe :: Platform)
+      (e1_a5gXf :: CmmExpr)
+      (e2_a5gXg :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUShr platform_a5gXe)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hCX)
+              (c_d5hCY :: CmmExpr -> a_d5hCX -> a_d5hCX)
+              (n_d5hCZ :: a_d5hCX) ->
+              c_d5hCY e1_a5gXf (c_d5hCY e2_a5gXg n_d5hCZ)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmSLtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmSLtWord
+  = \ (platform_a5gXb :: Platform)
+      (e1_a5gXc :: CmmExpr)
+      (e2_a5gXd :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordSLt platform_a5gXb)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hD0)
+              (c_d5hD1 :: CmmExpr -> a_d5hD0 -> a_d5hD0)
+              (n_d5hD2 :: a_d5hD0) ->
+              c_d5hD1 e1_a5gXc (c_d5hD1 e2_a5gXd n_d5hD2)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUGtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmUGtWord
+  = \ (platform_a5gX8 :: Platform)
+      (e1_a5gX9 :: CmmExpr)
+      (e2_a5gXa :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUGt platform_a5gX8)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hD3)
+              (c_d5hD4 :: CmmExpr -> a_d5hD3 -> a_d5hD3)
+              (n_d5hD5 :: a_d5hD3) ->
+              c_d5hD4 e1_a5gX9 (c_d5hD4 e2_a5gXa n_d5hD5)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUGeWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmUGeWord
+  = \ (platform_a5gX5 :: Platform)
+      (e1_a5gX6 :: CmmExpr)
+      (e2_a5gX7 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUGe platform_a5gX5)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hD6)
+              (c_d5hD7 :: CmmExpr -> a_d5hD6 -> a_d5hD6)
+              (n_d5hD8 :: a_d5hD6) ->
+              c_d5hD7 e1_a5gX6 (c_d5hD7 e2_a5gX7 n_d5hD8)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmULtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmULtWord
+  = \ (platform_a5gX2 :: Platform)
+      (e1_a5gX3 :: CmmExpr)
+      (e2_a5gX4 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordULt platform_a5gX2)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hD9)
+              (c_d5hDa :: CmmExpr -> a_d5hD9 -> a_d5hD9)
+              (n_d5hDb :: a_d5hD9) ->
+              c_d5hDa e1_a5gX3 (c_d5hDa e2_a5gX4 n_d5hDb)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmEqWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmEqWord
+  = \ (platform_a5gWZ :: Platform)
+      (e1_a5gX0 :: CmmExpr)
+      (e2_a5gX1 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordEq platform_a5gWZ)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hDc)
+              (c_d5hDd :: CmmExpr -> a_d5hDc -> a_d5hDc)
+              (n_d5hDe :: a_d5hDc) ->
+              c_d5hDd e1_a5gX0 (c_d5hDd e2_a5gX1 n_d5hDe)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmNeWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmNeWord
+  = \ (platform_a5gWW :: Platform)
+      (e1_a5gWX :: CmmExpr)
+      (e2_a5gWY :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordNe platform_a5gWW)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hDf)
+              (c_d5hDg :: CmmExpr -> a_d5hDf -> a_d5hDf)
+              (n_d5hDh :: a_d5hDf) ->
+              c_d5hDg e1_a5gWX (c_d5hDg e2_a5gWY n_d5hDh)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmAndWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmAndWord
+  = \ (platform_a5gWT :: Platform)
+      (e1_a5gWU :: CmmExpr)
+      (e2_a5gWV :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordAnd platform_a5gWT)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hDi)
+              (c_d5hDj :: CmmExpr -> a_d5hDi -> a_d5hDi)
+              (n_d5hDk :: a_d5hDi) ->
+              c_d5hDj e1_a5gWU (c_d5hDj e2_a5gWV n_d5hDk)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmOrWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmOrWord
+  = \ (platform_a5gWQ :: Platform)
+      (e1_a5gWR :: CmmExpr)
+      (e2_a5gWS :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordOr platform_a5gWQ)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hDl)
+              (c_d5hDm :: CmmExpr -> a_d5hDl -> a_d5hDl)
+              (n_d5hDn :: a_d5hDl) ->
+              c_d5hDm e1_a5gWR (c_d5hDm e2_a5gWS n_d5hDn)))
+
+-- RHS size: {terms: 22, types: 10, coercions: 0, joins: 0/3}
+cmmLabelOff :: CLabel -> Int -> CmmLit
+[LclIdX]
+cmmLabelOff
+  = \ (lbl_a5gW9 :: CLabel) (ds_d5hDo :: Int) ->
+      let {
+        lbl_a5gWa :: CLabel
+        [LclId]
+        lbl_a5gWa = lbl_a5gW9 } in
+      let {
+        byte_off_a5gWb :: Int
+        [LclId]
+        byte_off_a5gWb = ds_d5hDo } in
+      let {
+        fail_d5hDw :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmLit
+        [LclId]
+        fail_d5hDw
+          = \ (ds_d5hDx [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              GHC.Cmm.Expr.CmmLabelOff lbl_a5gWa byte_off_a5gWb } in
+      case ds_d5hDo of wild_00 { ghc-prim-0.6.1:GHC.Types.I# ds_d5hDv ->
+      case ds_d5hDv of ds_d5hDv {
+        __DEFAULT -> fail_d5hDw ghc-prim-0.6.1:GHC.Prim.void#;
+        0# -> GHC.Cmm.Expr.CmmLabel lbl_a5gW9
+      }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmLabelOffB :: CLabel -> ByteOff -> CmmLit
+[LclIdX]
+cmmLabelOffB = cmmLabelOff
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmLabelOffW :: Platform -> CLabel -> WordOff -> CmmLit
+[LclIdX]
+cmmLabelOffW
+  = \ (platform_a5gWJ :: Platform)
+      (lbl_a5gWK :: CLabel)
+      (wd_off_a5gWL :: WordOff) ->
+      cmmLabelOffB
+        lbl_a5gWK
+        (wordsToBytes @ WordOff $dNum_a5hjM platform_a5gWJ wd_off_a5gWL)
+
+-- RHS size: {terms: 54, types: 26, coercions: 0, joins: 0/5}
+cmmOffsetLit :: CmmLit -> Int -> CmmLit
+[LclIdX]
+cmmOffsetLit
+  = \ (ds_d5hDy :: CmmLit) (byte_off_a5gVW :: Int) ->
+      let {
+        fail_d5hEq :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmLit
+        [LclId]
+        fail_d5hEq
+          = \ (ds_d5hEr [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              let {
+                byte_off_a5gW8 :: Int
+                [LclId]
+                byte_off_a5gW8 = byte_off_a5gVW } in
+              pprPanic
+                @ CmmLit
+                $dIP_a5hjZ
+                (ghc-prim-0.6.1:GHC.CString.unpackCString# "cmmOffsetLit"#)
+                (ppr @ Int $dOutputable_a5hk1 byte_off_a5gW8) } in
+      case ds_d5hDy of wild_00 {
+        __DEFAULT -> fail_d5hEq ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmInt m_a5gW5 rep_a5gW6 ->
+          let {
+            byte_off_a5gW7 :: Int
+            [LclId]
+            byte_off_a5gW7 = byte_off_a5gVW } in
+          GHC.Cmm.Expr.$WCmmInt
+            (+ @ Integer
+               $dNum_a5hjT
+               m_a5gW5
+               (fromIntegral
+                  @ Int @ Integer $dIntegral_a5hjW $dNum_a5hjX byte_off_a5gW7))
+            rep_a5gW6;
+        CmmLabel l_a5gVV -> cmmLabelOff l_a5gVV byte_off_a5gVW;
+        CmmLabelOff l_a5gVX m_a5gVY ->
+          let {
+            byte_off_a5gVZ :: Int
+            [LclId]
+            byte_off_a5gVZ = byte_off_a5gVW } in
+          cmmLabelOff l_a5gVX (+ @ Int $dNum_a5hjP m_a5gVY byte_off_a5gVZ);
+        CmmLabelDiffOff l1_a5gW0 l2_a5gW1 m_a5gW2 w_a5gW3 ->
+          let {
+            byte_off_a5gW4 :: Int
+            [LclId]
+            byte_off_a5gW4 = byte_off_a5gVW } in
+          GHC.Cmm.Expr.CmmLabelDiffOff
+            l1_a5gW0
+            l2_a5gW1
+            (+ @ Int $dNum_a5hjR m_a5gW2 byte_off_a5gW4)
+            w_a5gW3
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetLitB :: CmmLit -> ByteOff -> CmmLit
+[LclIdX]
+cmmOffsetLitB = cmmOffsetLit
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmOffsetLitW :: Platform -> CmmLit -> WordOff -> CmmLit
+[LclIdX]
+cmmOffsetLitW
+  = \ (platform_a5gWG :: Platform)
+      (lit_a5gWH :: CmmLit)
+      (wd_off_a5gWI :: WordOff) ->
+      cmmOffsetLitB
+        lit_a5gWH
+        (wordsToBytes @ WordOff $dNum_a5hk5 platform_a5gWG wd_off_a5gWI)
+
+-- RHS size: {terms: 22, types: 10, coercions: 0, joins: 0/3}
+cmmRegOff :: CmmReg -> Int -> CmmExpr
+[LclIdX]
+cmmRegOff
+  = \ (reg_a5gVS :: CmmReg) (ds_d5hEs :: Int) ->
+      let {
+        reg_a5gVT :: CmmReg
+        [LclId]
+        reg_a5gVT = reg_a5gVS } in
+      let {
+        byte_off_a5gVU :: Int
+        [LclId]
+        byte_off_a5gVU = ds_d5hEs } in
+      let {
+        fail_d5hEA :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d5hEA
+          = \ (ds_d5hEB [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              GHC.Cmm.Expr.$WCmmRegOff reg_a5gVT byte_off_a5gVU } in
+      case ds_d5hEs of wild_00 { ghc-prim-0.6.1:GHC.Types.I# ds_d5hEz ->
+      case ds_d5hEz of ds_d5hEz {
+        __DEFAULT -> fail_d5hEA ghc-prim-0.6.1:GHC.Prim.void#;
+        0# -> GHC.Cmm.Expr.$WCmmReg reg_a5gVS
+      }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmRegOffB :: CmmReg -> ByteOff -> CmmExpr
+[LclIdX]
+cmmRegOffB = cmmRegOff
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmRegOffW :: Platform -> CmmReg -> WordOff -> CmmExpr
+[LclIdX]
+cmmRegOffW
+  = \ (platform_a5gWD :: Platform)
+      (reg_a5gWE :: CmmReg)
+      (wd_off_a5gWF :: WordOff) ->
+      cmmRegOffB
+        reg_a5gWE
+        (wordsToBytes @ WordOff $dNum_a5hki platform_a5gWD wd_off_a5gWF)
+
+-- RHS size: {terms: 131, types: 65, coercions: 0, joins: 0/7}
+cmmOffset :: Platform -> CmmExpr -> Int -> CmmExpr
+[LclIdX]
+cmmOffset
+  = \ (_platform_a5gVC :: Platform)
+      (e_a5gVD :: CmmExpr)
+      (ds_d5hEC :: Int) ->
+      let {
+        platform_a5gVE :: Platform
+        [LclId]
+        platform_a5gVE = _platform_a5gVC } in
+      let {
+        e_a5gVF :: CmmExpr
+        [LclId]
+        e_a5gVF = e_a5gVD } in
+      let {
+        byte_off_a5gVG :: Int
+        [LclId]
+        byte_off_a5gVG = ds_d5hEC } in
+      let {
+        fail_d5hIE :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d5hIE
+          = \ (ds_d5hIF [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              let {
+                ds_d5hEF :: CmmExpr
+                [LclId]
+                ds_d5hEF = e_a5gVF } in
+              let {
+                fail_d5hIx :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+                [LclId]
+                fail_d5hIx
+                  = \ (ds_d5hIy [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                      letrec {
+                        width_a5gVR :: Width
+                        [LclId]
+                        width_a5gVR = cmmExprWidth platform_a5gVE e_a5gVF; } in
+                      GHC.Cmm.Expr.CmmMachOp
+                        (GHC.Cmm.MachOp.MO_Add width_a5gVR)
+                        (GHC.Base.build
+                           @ CmmExpr
+                           (\ (@ a_d5hFb)
+                              (c_d5hFc :: CmmExpr -> a_d5hFb -> a_d5hFb)
+                              (n_d5hFd :: a_d5hFb) ->
+                              c_d5hFc
+                                e_a5gVF
+                                (c_d5hFc
+                                   (GHC.Cmm.Expr.CmmLit
+                                      (GHC.Cmm.Expr.$WCmmInt
+                                         (toInteger @ Int $dIntegral_a5hkH byte_off_a5gVG)
+                                         width_a5gVR))
+                                   n_d5hFd))) } in
+              case ds_d5hEF of wild_00 {
+                __DEFAULT -> fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                CmmLit lit_a5gVK ->
+                  GHC.Cmm.Expr.CmmLit (cmmOffsetLit lit_a5gVK byte_off_a5gVG);
+                CmmReg reg_a5gVH -> cmmRegOff reg_a5gVH byte_off_a5gVG;
+                CmmMachOp ds_d5hIr ds_d5hIs ->
+                  case ds_d5hIr of wild_00 {
+                    __DEFAULT -> fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                    MO_Add rep_a5gVN ->
+                      case ds_d5hIs of wild_00 {
+                        __DEFAULT -> fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                        : expr_a5gVO ds_d5hIt ->
+                          case ds_d5hIt of wild_00 {
+                            __DEFAULT -> fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                            : ds_d5hIu ds_d5hIv ->
+                              case ds_d5hIu of wild_00 {
+                                __DEFAULT -> fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                                CmmLit ds_d5hIw ->
+                                  case ds_d5hIw of wild_00 {
+                                    __DEFAULT -> fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                                    CmmInt byte_off1_a5gVP _rep_a5gVQ ->
+                                      case ds_d5hIv of wild_00 {
+                                        __DEFAULT -> fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                                        [] ->
+                                          GHC.Cmm.Expr.CmmMachOp
+                                            (GHC.Cmm.MachOp.MO_Add rep_a5gVN)
+                                            (GHC.Base.build
+                                               @ CmmExpr
+                                               (\ (@ a_d5hF8)
+                                                  (c_d5hF9 :: CmmExpr -> a_d5hF8 -> a_d5hF8)
+                                                  (n_d5hFa :: a_d5hF8) ->
+                                                  c_d5hF9
+                                                    expr_a5gVO
+                                                    (c_d5hF9
+                                                       (GHC.Cmm.Expr.CmmLit
+                                                          (GHC.Cmm.Expr.$WCmmInt
+                                                             (+ @ Integer
+                                                                $dNum_a5hkz
+                                                                byte_off1_a5gVP
+                                                                (toInteger
+                                                                   @ Int
+                                                                   $dIntegral_a5hkB
+                                                                   byte_off_a5gVG))
+                                                             rep_a5gVN))
+                                                       n_d5hFa)))
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                  };
+                CmmStackSlot area_a5gVL off_a5gVM ->
+                  GHC.Cmm.Expr.$WCmmStackSlot
+                    area_a5gVL (- @ Int $dNum_a5hkx off_a5gVM byte_off_a5gVG);
+                CmmRegOff reg_a5gVI m_a5gVJ ->
+                  cmmRegOff reg_a5gVI (+ @ Int $dNum_a5hkv m_a5gVJ byte_off_a5gVG)
+              } } in
+      case ds_d5hEC of wild_00 { ghc-prim-0.6.1:GHC.Types.I# ds_d5hID ->
+      case ds_d5hID of ds_d5hID {
+        __DEFAULT -> fail_d5hIE ghc-prim-0.6.1:GHC.Prim.void#;
+        0# -> e_a5gVD
+      }
+      }
+
+-- RHS size: {terms: 12, types: 5, coercions: 0, joins: 0/0}
+cmmIndex :: Platform -> Width -> CmmExpr -> Int -> CmmExpr
+[LclIdX]
+cmmIndex
+  = \ (platform_a5gWc :: Platform)
+      (width_a5gWd :: Width)
+      (base_a5gWe :: CmmExpr)
+      (idx_a5gWf :: Int) ->
+      cmmOffset
+        platform_a5gWc
+        base_a5gWe
+        (* @ Int $dNum_a5hkK idx_a5gWf (widthInBytes width_a5gWd))
+
+-- RHS size: {terms: 12, types: 4, coercions: 0, joins: 0/0}
+cmmLoadIndex :: Platform -> CmmType -> CmmExpr -> Int -> CmmExpr
+[LclIdX]
+cmmLoadIndex
+  = \ (platform_a5gWq :: Platform)
+      (ty_a5gWr :: CmmType)
+      (expr_a5gWs :: CmmExpr)
+      (ix_a5gWt :: Int) ->
+      GHC.Cmm.Expr.$WCmmLoad
+        (cmmIndex platform_a5gWq (typeWidth ty_a5gWr) expr_a5gWs ix_a5gWt)
+        ty_a5gWr
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetB :: Platform -> CmmExpr -> ByteOff -> CmmExpr
+[LclIdX]
+cmmOffsetB = cmmOffset
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+cmmOffsetW :: Platform -> CmmExpr -> WordOff -> CmmExpr
+[LclIdX]
+cmmOffsetW
+  = \ (platform_a5gWA :: Platform)
+      (e_a5gWB :: CmmExpr)
+      (n_a5gWC :: WordOff) ->
+      cmmOffsetB
+        platform_a5gWA
+        e_a5gWB
+        (wordsToBytes @ WordOff $dNum_a5hkP platform_a5gWA n_a5gWC)
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+cmmLoadIndexW :: Platform -> CmmExpr -> Int -> CmmType -> CmmExpr
+[LclIdX]
+cmmLoadIndexW
+  = \ (platform_a5gWM :: Platform)
+      (base_a5gWN :: CmmExpr)
+      (off_a5gWO :: Int)
+      (ty_a5gWP :: CmmType) ->
+      GHC.Cmm.Expr.$WCmmLoad
+        (cmmOffsetW platform_a5gWM base_a5gWN off_a5gWO) ty_a5gWP
+
+-- RHS size: {terms: 43, types: 22, coercions: 0, joins: 0/4}
+cmmOffsetExpr :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmOffsetExpr
+  = \ (platform_a5gVw :: Platform)
+      (e_a5gVx :: CmmExpr)
+      (ds_d5hIG :: CmmExpr) ->
+      let {
+        platform_a5gVz :: Platform
+        [LclId]
+        platform_a5gVz = platform_a5gVw } in
+      let {
+        e_a5gVA :: CmmExpr
+        [LclId]
+        e_a5gVA = e_a5gVx } in
+      let {
+        byte_off_a5gVB :: CmmExpr
+        [LclId]
+        byte_off_a5gVB = ds_d5hIG } in
+      let {
+        fail_d5hJz :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d5hJz
+          = \ (ds_d5hJA [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              GHC.Cmm.Expr.CmmMachOp
+                (GHC.Cmm.MachOp.MO_Add (cmmExprWidth platform_a5gVz e_a5gVA))
+                (GHC.Base.build
+                   @ CmmExpr
+                   (\ (@ a_d5hIN)
+                      (c_d5hIO :: CmmExpr -> a_d5hIN -> a_d5hIN)
+                      (n_d5hIP :: a_d5hIN) ->
+                      c_d5hIO e_a5gVA (c_d5hIO byte_off_a5gVB n_d5hIP))) } in
+      case ds_d5hIG of wild_00 {
+        __DEFAULT -> fail_d5hJz ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hJx ->
+          case ds_d5hJx of wild_00 {
+            __DEFAULT -> fail_d5hJz ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a5gVy ds_d5hJy ->
+              cmmOffset
+                platform_a5gVw e_a5gVx (fromInteger @ Int $dNum_a5hkT n_a5gVy)
+          }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetExprB :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmOffsetExprB = cmmOffsetExpr
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+mkLblExpr :: CLabel -> CmmExpr
+[LclIdX]
+mkLblExpr
+  = \ (lbl_a5gVv :: CLabel) ->
+      GHC.Cmm.Expr.CmmLit (GHC.Cmm.Expr.CmmLabel lbl_a5gVv)
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+mkStgWordCLit :: Platform -> StgWord -> CmmLit
+[LclIdX]
+mkStgWordCLit
+  = \ (platform_a5gVo :: Platform) (wd_a5gVp :: StgWord) ->
+      GHC.Cmm.Expr.$WCmmInt
+        (fromStgWord wd_a5gVp) (wordWidth platform_a5gVo)
+
+-- RHS size: {terms: 14, types: 21, coercions: 0, joins: 0/0}
+mkDataLits
+  :: forall (raw :: Bool) info stmt.
+     Section
+     -> CLabel -> [CmmLit] -> GenCmmDecl (GenCmmStatics raw) info stmt
+[LclIdX]
+mkDataLits
+  = \ (@ (raw_a5hkX :: Bool))
+      (@ info_a5hkY)
+      (@ stmt_a5hkZ)
+      (section_a5gVh :: Section)
+      (lbl_a5gVi :: CLabel)
+      (lits_a5gVj :: [CmmLit]) ->
+      GHC.Cmm.CmmData
+        @ (GenCmmStatics raw_a5hkX)
+        @ info_a5hkY
+        @ stmt_a5hkZ
+        section_a5gVh
+        ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+           @ [CmmStatic]
+           @ (GenCmmStatics raw_a5hkX)
+           (GHC.Cmm.CmmStaticsRaw @ raw_a5hkX lbl_a5gVi)
+           (map @ CmmLit @ CmmStatic GHC.Cmm.CmmStaticLit lits_a5gVj))
+
+-- RHS size: {terms: 45, types: 32, coercions: 0, joins: 0/6}
+mkRODataLits
+  :: forall (raw :: Bool) info stmt.
+     CLabel -> [CmmLit] -> GenCmmDecl (GenCmmStatics raw) info stmt
+[LclIdX]
+mkRODataLits
+  = \ (@ (raw_a5hld :: Bool)) (@ info_a5hle) (@ stmt_a5hlf) ->
+      let {
+        $dFoldable_a5hly :: Foldable []
+        [LclId]
+        $dFoldable_a5hly = $dFoldable_a5hdz } in
+      \ (lbl_a5gVk :: CLabel) (lits_a5gVl :: [CmmLit]) ->
+        letrec {
+          needsRelocation_a5gVn :: CmmLit -> Bool
+          [LclId]
+          needsRelocation_a5gVn
+            = letrec {
+                needsRelocation_a5hlp :: CmmLit -> Bool
+                [LclId]
+                needsRelocation_a5hlp
+                  = \ (ds_d5hJJ :: CmmLit) ->
+                      let {
+                        fail_d5hKp :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+                        [LclId]
+                        fail_d5hKp
+                          = \ (ds_d5hKq [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                              ghc-prim-0.6.1:GHC.Types.False } in
+                      case ds_d5hJJ of wild_00 {
+                        __DEFAULT -> fail_d5hKp ghc-prim-0.6.1:GHC.Prim.void#;
+                        CmmLabel ds_d5hKm -> ghc-prim-0.6.1:GHC.Types.True;
+                        CmmLabelOff ds_d5hKn ds_d5hKo -> ghc-prim-0.6.1:GHC.Types.True
+                      }; } in
+              needsRelocation_a5hlp; } in
+        letrec {
+          section_a5gVm :: Section
+          [LclId]
+          section_a5gVm
+            = let {
+                fail_d5hJH :: ghc-prim-0.6.1:GHC.Prim.Void# -> Section
+                [LclId]
+                fail_d5hJH
+                  = \ (ds_d5hJI [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+                      GHC.Cmm.Section GHC.Cmm.ReadOnlyData lbl_a5gVk } in
+              case any
+                     @ [] @ CmmLit $dFoldable_a5hly needsRelocation_a5gVn lits_a5gVl
+              of wild_00 {
+                False -> fail_d5hJH ghc-prim-0.6.1:GHC.Prim.void#;
+                True -> GHC.Cmm.Section GHC.Cmm.RelocatableReadOnlyData lbl_a5gVk
+              }; } in
+        mkDataLits
+          @ raw_a5hld
+          @ info_a5hle
+          @ stmt_a5hlf
+          section_a5gVm
+          lbl_a5gVk
+          lits_a5gVl
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+mkFileEmbedLit
+  :: forall (raw :: Bool) info stmt.
+     CLabel
+     -> FilePath -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
+[LclIdX]
+mkFileEmbedLit
+  = \ (@ (raw_a5hlE :: Bool))
+      (@ info_a5hlF)
+      (@ stmt_a5hlG)
+      (lbl_a5gVf :: CLabel)
+      (path_a5gVg :: FilePath) ->
+      (GHC.Cmm.Expr.CmmLabel lbl_a5gVf,
+       GHC.Cmm.CmmData
+         @ (GenCmmStatics raw_a5hlE)
+         @ info_a5hlF
+         @ stmt_a5hlG
+         (GHC.Cmm.Section GHC.Cmm.ReadOnlyData lbl_a5gVf)
+         (GHC.Cmm.CmmStaticsRaw
+            @ raw_a5hlE
+            lbl_a5gVf
+            (GHC.Base.build
+               @ CmmStatic
+               (\ (@ a_d5hKr)
+                  (c_d5hKs :: CmmStatic -> a_d5hKr -> a_d5hKr)
+                  (n_d5hKt :: a_d5hKr) ->
+                  c_d5hKs (GHC.Cmm.CmmFileEmbed path_a5gVg) n_d5hKt))))
+
+-- RHS size: {terms: 36, types: 38, coercions: 0, joins: 0/2}
+mkByteStringCLit
+  :: forall (raw :: Bool) info stmt.
+     CLabel
+     -> ByteString -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
+[LclIdX]
+mkByteStringCLit
+  = \ (@ (raw_a5hlM :: Bool)) (@ info_a5hlN) (@ stmt_a5hlO) ->
+      let {
+        $dNum_a5hlV :: Num GHC.Word.Word8
+        [LclId]
+        $dNum_a5hlV = GHC.Word.$fNumWord8 } in
+      \ (lbl_a5gVc :: CLabel) (bytes_a5gVd :: ByteString) ->
+        letrec {
+          sec_a5gVe :: SectionType
+          [LclId]
+          sec_a5gVe
+            = case BS.elem
+                     (fromInteger @ GHC.Word.Word8 $dNum_a5hlV 0) bytes_a5gVd
+              of wild_00 {
+                False -> GHC.Cmm.CString;
+                True -> GHC.Cmm.ReadOnlyData
+              }; } in
+        (GHC.Cmm.Expr.CmmLabel lbl_a5gVc,
+         $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+           @ (GenCmmStatics raw_a5hlM)
+           @ (GenCmmDecl (GenCmmStatics raw_a5hlM) info_a5hlN stmt_a5hlO)
+           (GHC.Cmm.CmmData
+              @ (GenCmmStatics raw_a5hlM)
+              @ info_a5hlN
+              @ stmt_a5hlO
+              (GHC.Cmm.Section sec_a5gVe lbl_a5gVc))
+           (GHC.Cmm.CmmStaticsRaw
+              @ raw_a5hlM
+              lbl_a5gVc
+              (GHC.Base.build
+                 @ CmmStatic
+                 (\ (@ a_d5hKu)
+                    (c_d5hKv :: CmmStatic -> a_d5hKu -> a_d5hKu)
+                    (n_d5hKw :: a_d5hKu) ->
+                    c_d5hKv (GHC.Cmm.CmmString bytes_a5gVd) n_d5hKw))))
+
+-- RHS size: {terms: 6, types: 2, coercions: 0, joins: 0/0}
+mkWordCLit :: Platform -> Integer -> CmmLit
+[LclIdX]
+mkWordCLit
+  = \ (platform_a5gVa :: Platform) (wd_a5gVb :: Integer) ->
+      GHC.Cmm.Expr.$WCmmInt wd_a5gVb (wordWidth platform_a5gVa)
+
+-- RHS size: {terms: 36, types: 11, coercions: 0, joins: 0/3}
+packHalfWordsCLit
+  :: Platform -> StgHalfWord -> StgHalfWord -> CmmLit
+[LclIdX]
+packHalfWordsCLit
+  = \ (platform_a5gVq :: Platform)
+      (lower_half_word_a5gVr :: StgHalfWord)
+      (upper_half_word_a5gVs :: StgHalfWord) ->
+      letrec {
+        u_a5gVu :: Integer
+        [LclId]
+        u_a5gVu = fromStgHalfWord upper_half_word_a5gVs; } in
+      letrec {
+        l_a5gVt :: Integer
+        [LclId]
+        l_a5gVt = fromStgHalfWord lower_half_word_a5gVr; } in
+      let {
+        ds_d5hKx :: ByteOrder
+        [LclId]
+        ds_d5hKx = platformByteOrder platform_a5gVq } in
+      case ds_d5hKx of wild_00 {
+        BigEndian ->
+          mkWordCLit
+            platform_a5gVq
+            (.|.
+               @ Integer
+               $dBits_a5hmj
+               (shiftL
+                  @ Integer $dBits_a5hml l_a5gVt (halfWordSizeInBits platform_a5gVq))
+               u_a5gVu);
+        LittleEndian ->
+          mkWordCLit
+            platform_a5gVq
+            (.|.
+               @ Integer
+               $dBits_a5hmn
+               l_a5gVt
+               (shiftL
+                  @ Integer
+                  $dBits_a5hmp
+                  u_a5gVu
+                  (halfWordSizeInBits platform_a5gVq)))
+      }
+
+-- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
+zeroCLit :: Platform -> CmmLit
+[LclIdX]
+zeroCLit
+  = \ (platform_a5gV8 :: Platform) ->
+      GHC.Cmm.Expr.$WCmmInt 0 (wordWidth platform_a5gV8)
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+zeroExpr :: Platform -> CmmExpr
+[LclIdX]
+zeroExpr
+  = \ (platform_a5gV9 :: Platform) ->
+      GHC.Cmm.Expr.CmmLit (zeroCLit platform_a5gV9)
+
+-- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
+mkIntCLit :: Platform -> Int -> CmmLit
+[LclIdX]
+mkIntCLit
+  = \ (platform_a5gV4 :: Platform) (i_a5gV5 :: Int) ->
+      GHC.Cmm.Expr.$WCmmInt
+        (toInteger @ Int $dIntegral_a5hmu i_a5gV5)
+        (wordWidth platform_a5gV4)
+
+-- RHS size: {terms: 7, types: 5, coercions: 0, joins: 0/0}
+mkIntExpr :: Platform -> Int -> CmmExpr
+[LclIdX]
+mkIntExpr
+  = \ (platform_a5gV6 :: Platform) (i_a5gV7 :: Int) ->
+      $!
+        @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ CmmLit
+        @ CmmExpr
+        GHC.Cmm.Expr.CmmLit
+        (mkIntCLit platform_a5gV6 i_a5gV7)
+
+-- RHS size: {terms: 57, types: 26, coercions: 0, joins: 0/7}
+cmmIndexExpr :: Platform -> Width -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmIndexExpr
+  = \ (platform_a5gWg :: Platform)
+      (width_a5gWh :: Width)
+      (base_a5gWi :: CmmExpr)
+      (ds_d5hKJ :: CmmExpr) ->
+      let {
+        platform_a5gWk :: Platform
+        [LclId]
+        platform_a5gWk = platform_a5gWg } in
+      let {
+        width_a5gWl :: Width
+        [LclId]
+        width_a5gWl = width_a5gWh } in
+      let {
+        base_a5gWm :: CmmExpr
+        [LclId]
+        base_a5gWm = base_a5gWi } in
+      let {
+        idx_a5gWn :: CmmExpr
+        [LclId]
+        idx_a5gWn = ds_d5hKJ } in
+      let {
+        fail_d5hLC :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d5hLC
+          = \ (ds_d5hLD [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              letrec {
+                idx_w_a5gWo :: Width
+                [LclId]
+                idx_w_a5gWo = cmmExprWidth platform_a5gWk idx_a5gWn; } in
+              letrec {
+                byte_off_a5gWp :: CmmExpr
+                [LclId]
+                byte_off_a5gWp
+                  = GHC.Cmm.Expr.CmmMachOp
+                      (GHC.Cmm.MachOp.MO_Shl idx_w_a5gWo)
+                      (GHC.Base.build
+                         @ CmmExpr
+                         (\ (@ a_d5hLz)
+                            (c_d5hLA :: CmmExpr -> a_d5hLz -> a_d5hLz)
+                            (n_d5hLB :: a_d5hLz) ->
+                            c_d5hLA
+                              idx_a5gWn
+                              (c_d5hLA
+                                 (mkIntExpr platform_a5gWk (widthInLog width_a5gWl))
+                                 n_d5hLB))); } in
+              cmmOffsetExpr platform_a5gWk base_a5gWm byte_off_a5gWp } in
+      case ds_d5hKJ of wild_00 {
+        __DEFAULT -> fail_d5hLC ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hLx ->
+          case ds_d5hLx of wild_00 {
+            __DEFAULT -> fail_d5hLC ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a5gWj ds_d5hLy ->
+              cmmIndex
+                platform_a5gWg
+                width_a5gWh
+                base_a5gWi
+                (fromInteger @ Int $dNum_a5hmB n_a5gWj)
+          }
+      }
+
+-- RHS size: {terms: 35, types: 15, coercions: 0, joins: 0/4}
+cmmOffsetExprW :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmOffsetExprW
+  = \ (platform_a5gWu :: Platform)
+      (e_a5gWv :: CmmExpr)
+      (ds_d5hLE :: CmmExpr) ->
+      let {
+        platform_a5gWx :: Platform
+        [LclId]
+        platform_a5gWx = platform_a5gWu } in
+      let {
+        e_a5gWy :: CmmExpr
+        [LclId]
+        e_a5gWy = e_a5gWv } in
+      let {
+        wd_off_a5gWz :: CmmExpr
+        [LclId]
+        wd_off_a5gWz = ds_d5hLE } in
+      let {
+        fail_d5hMu :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d5hMu
+          = \ (ds_d5hMv [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              cmmIndexExpr
+                platform_a5gWx (wordWidth platform_a5gWx) e_a5gWy wd_off_a5gWz } in
+      case ds_d5hLE of wild_00 {
+        __DEFAULT -> fail_d5hMu ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hMs ->
+          case ds_d5hMs of wild_00 {
+            __DEFAULT -> fail_d5hMu ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a5gWw ds_d5hMt ->
+              cmmOffsetW
+                platform_a5gWu e_a5gWv (fromInteger @ WordOff $dNum_a5hmM n_a5gWw)
+          }
+      }
+
+-- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
+cmmTagMask :: Platform -> CmmExpr
+[LclIdX]
+cmmTagMask
+  = \ (platform_a5gXK :: Platform) ->
+      mkIntExpr platform_a5gXK (tAG_MASK platform_a5gXK)
+
+-- RHS size: {terms: 11, types: 2, coercions: 0, joins: 0/0}
+cmmIsTagged :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmIsTagged
+  = \ (platform_a5gXP :: Platform) (e_a5gXQ :: CmmExpr) ->
+      cmmNeWord
+        platform_a5gXP
+        (cmmAndWord platform_a5gXP e_a5gXQ (cmmTagMask platform_a5gXP))
+        (zeroExpr platform_a5gXP)
+
+-- RHS size: {terms: 11, types: 2, coercions: 0, joins: 0/0}
+cmmIsNotTagged :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmIsNotTagged
+  = \ (platform_a5gXR :: Platform) (e_a5gXS :: CmmExpr) ->
+      cmmEqWord
+        platform_a5gXR
+        (cmmAndWord platform_a5gXR e_a5gXS (cmmTagMask platform_a5gXR))
+        (zeroExpr platform_a5gXR)
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+cmmConstrTag1 :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmConstrTag1
+  = \ (platform_a5gXT :: Platform) (e_a5gXU :: CmmExpr) ->
+      cmmAndWord platform_a5gXT e_a5gXU (cmmTagMask platform_a5gXT)
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+cmmPointerMask :: Platform -> CmmExpr
+[LclIdX]
+cmmPointerMask
+  = \ (platform_a5gXL :: Platform) ->
+      mkIntExpr
+        platform_a5gXL
+        (complement @ Int $dBits_a5hmT (tAG_MASK platform_a5gXL))
+
+-- RHS size: {terms: 26, types: 11, coercions: 0, joins: 0/3}
+cmmUntag :: Platform -> CmmExpr -> CmmExpr
+[LclIdX]
+cmmUntag
+  = \ (ds_d5hMw :: Platform) (e_a5gXM :: CmmExpr) ->
+      let {
+        platform_a5gXN :: Platform
+        [LclId]
+        platform_a5gXN = ds_d5hMw } in
+      let {
+        e_a5gXO :: CmmExpr
+        [LclId]
+        e_a5gXO = e_a5gXM } in
+      let {
+        fail_d5hNt :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId]
+        fail_d5hNt
+          = \ (ds_d5hNu [OS=OneShot] :: ghc-prim-0.6.1:GHC.Prim.Void#) ->
+              cmmAndWord
+                platform_a5gXN e_a5gXO (cmmPointerMask platform_a5gXN) } in
+      case e_a5gXM of wild_00 {
+        __DEFAULT -> fail_d5hNt ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hNr ->
+          case ds_d5hNr of wild_00 {
+            __DEFAULT -> fail_d5hNt ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLabel ds_d5hNs -> e_a5gXM
+          }
+      }
+
+-- RHS size: {terms: 13, types: 2, coercions: 0, joins: 0/0}
+slotForeignHint :: SlotTy -> ForeignHint
+[LclIdX]
+slotForeignHint
+  = \ (ds_d5hNv :: SlotTy) ->
+      case ds_d5hNv of wild_00 {
+        PtrSlot -> GHC.Cmm.Type.AddrHint;
+        WordSlot -> GHC.Cmm.Type.NoHint;
+        Word64Slot -> GHC.Cmm.Type.NoHint;
+        FloatSlot -> GHC.Cmm.Type.NoHint;
+        DoubleSlot -> GHC.Cmm.Type.NoHint
+      }
+
+-- RHS size: {terms: 39, types: 5, coercions: 0, joins: 0/0}
+primRepForeignHint :: PrimRep -> ForeignHint
+[LclIdX]
+primRepForeignHint
+  = \ (ds_d5hNK :: PrimRep) ->
+      case ds_d5hNK of wild_00 {
+        VoidRep ->
+          panic
+            @ ForeignHint
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "primRepForeignHint:VoidRep"#);
+        LiftedRep -> GHC.Cmm.Type.AddrHint;
+        UnliftedRep -> GHC.Cmm.Type.AddrHint;
+        Int8Rep -> GHC.Cmm.Type.SignedHint;
+        Int16Rep -> GHC.Cmm.Type.SignedHint;
+        Int32Rep -> GHC.Cmm.Type.SignedHint;
+        Int64Rep -> GHC.Cmm.Type.SignedHint;
+        IntRep -> GHC.Cmm.Type.SignedHint;
+        Word8Rep -> GHC.Cmm.Type.NoHint;
+        Word16Rep -> GHC.Cmm.Type.NoHint;
+        Word32Rep -> GHC.Cmm.Type.NoHint;
+        Word64Rep -> GHC.Cmm.Type.NoHint;
+        WordRep -> GHC.Cmm.Type.NoHint;
+        AddrRep -> GHC.Cmm.Type.AddrHint;
+        FloatRep -> GHC.Cmm.Type.NoHint;
+        DoubleRep -> GHC.Cmm.Type.NoHint;
+        VecRep ds_d5hOt ds_d5hOu -> GHC.Cmm.Type.NoHint
+      }
+
+-- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
+typeForeignHint :: UnaryType -> ForeignHint
+[LclIdX]
+typeForeignHint
+  = . @ PrimRep
+      @ ForeignHint
+      @ UnaryType
+      primRepForeignHint
+      (typePrimRep1 $d(%%)_a5hn2)
+
+-- RHS size: {terms: 23, types: 2, coercions: 0, joins: 0/0}
+primElemRepCmmType :: PrimElemRep -> CmmType
+[LclIdX]
+primElemRepCmmType
+  = \ (ds_d5hOv :: PrimElemRep) ->
+      case ds_d5hOv of wild_00 {
+        Int8ElemRep -> b8;
+        Int16ElemRep -> b16;
+        Int32ElemRep -> b32;
+        Int64ElemRep -> b64;
+        Word8ElemRep -> b8;
+        Word16ElemRep -> b16;
+        Word32ElemRep -> b32;
+        Word64ElemRep -> b64;
+        FloatElemRep -> f32;
+        DoubleElemRep -> f64
+      }
+
+-- RHS size: {terms: 16, types: 3, coercions: 0, joins: 0/0}
+slotCmmType :: Platform -> SlotTy -> CmmType
+[LclIdX]
+slotCmmType
+  = \ (platform_a5gV1 :: Platform) (ds_d5hOU :: SlotTy) ->
+      case ds_d5hOU of wild_00 {
+        PtrSlot -> gcWord platform_a5gV1;
+        WordSlot -> bWord platform_a5gV1;
+        Word64Slot -> b64;
+        FloatSlot -> f32;
+        DoubleSlot -> f64
+      }
+
+-- RHS size: {terms: 48, types: 6, coercions: 0, joins: 0/0}
+primRepCmmType :: Platform -> PrimRep -> CmmType
+[LclIdX]
+primRepCmmType
+  = \ (platform_a5gUY :: Platform) (ds_d5hP9 :: PrimRep) ->
+      case ds_d5hP9 of wild_00 {
+        VoidRep ->
+          panic
+            @ CmmType
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "primRepCmmType:VoidRep"#);
+        LiftedRep -> gcWord platform_a5gUY;
+        UnliftedRep -> gcWord platform_a5gUY;
+        Int8Rep -> b8;
+        Int16Rep -> b16;
+        Int32Rep -> b32;
+        Int64Rep -> b64;
+        IntRep -> bWord platform_a5gUY;
+        Word8Rep -> b8;
+        Word16Rep -> b16;
+        Word32Rep -> b32;
+        Word64Rep -> b64;
+        WordRep -> bWord platform_a5gUY;
+        AddrRep -> bWord platform_a5gUY;
+        FloatRep -> f32;
+        DoubleRep -> f64;
+        VecRep len_a5gUZ rep_a5gV0 ->
+          vec len_a5gUZ (primElemRepCmmType rep_a5gV0)
+      }
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+typeCmmType :: Platform -> UnaryType -> CmmType
+[LclIdX]
+typeCmmType
+  = \ (platform_a5gV2 :: Platform) (ty_a5gV3 :: UnaryType) ->
+      primRepCmmType platform_a5gV2 (typePrimRep1 $d(%%)_a5hn8 ty_a5gV3)
+end Rec }
+
+

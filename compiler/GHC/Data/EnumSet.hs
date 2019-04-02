@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 -- | A tiny wrapper around 'IntSet.IntSet' for representing sets of 'Enum'
 -- things.
 module GHC.Data.EnumSet
@@ -15,7 +17,7 @@ import GHC.Prelude
 
 import qualified Data.IntSet as IntSet
 
-newtype EnumSet a = EnumSet IntSet.IntSet
+newtype EnumSet a = EnumSet IntSet.IntSet deriving (Semigroup, Monoid)
 
 member :: Enum a => a -> EnumSet a -> Bool
 member x (EnumSet s) = IntSet.member (fromEnum x) s

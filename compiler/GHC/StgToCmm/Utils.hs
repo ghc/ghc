@@ -14,6 +14,7 @@ module GHC.StgToCmm.Utils (
         emitDataLits, emitRODataLits,
         emitDataCon,
         emitRtsCall, emitRtsCallWithResult, emitRtsCallGen,
+        emitBarf,
         assignTemp, newTemp,
 
         newUnboxedTupleRegs,
@@ -181,6 +182,11 @@ tagToClosure platform tycon tag
 --      Conditionals and rts calls
 --
 -------------------------------------------------------------------------
+
+emitBarf :: String -> FCode ()
+emitBarf msg = do
+  strLbl <- newStringCLit msg
+  emitRtsCall rtsUnitId (fsLit "barf") [(CmmLit strLbl,AddrHint)] False
 
 emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCall pkg fun args safe = emitRtsCallGen [] (mkCmmCodeLabel pkg fun) args safe

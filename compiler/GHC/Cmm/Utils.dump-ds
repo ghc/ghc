@@ -1,0 +1,3978 @@
+
+==================== Desugar (after optimization) ====================
+2020-11-24 12:41:53.3740878 UTC
+
+Result size of Desugar (after optimization)
+  = {terms: 1,627, types: 1,401, coercions: 43, joins: 9/24}
+
+-- RHS size: {terms: 16, types: 3, coercions: 0, joins: 0/0}
+slotCmmType :: Platform -> SlotTy -> CmmType
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 80] 90 0}]
+slotCmmType
+  = \ (platform_a18g4 :: Platform) (ds_d19ap :: SlotTy) ->
+      case ds_d19ap of {
+        PtrSlot -> gcWord platform_a18g4;
+        WordSlot -> bWord platform_a18g4;
+        Word64Slot -> b64;
+        FloatSlot -> f32;
+        DoubleSlot -> f64
+      }
+
+-- RHS size: {terms: 23, types: 2, coercions: 0, joins: 0/0}
+primElemRepCmmType :: PrimElemRep -> CmmType
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [110] 100 0}]
+primElemRepCmmType
+  = \ (ds_d19a0 :: PrimElemRep) ->
+      case ds_d19a0 of {
+        Int8ElemRep -> b8;
+        Int16ElemRep -> b16;
+        Int32ElemRep -> b32;
+        Int64ElemRep -> b64;
+        Word8ElemRep -> b8;
+        Word16ElemRep -> b16;
+        Word32ElemRep -> b32;
+        Word64ElemRep -> b64;
+        FloatElemRep -> f32;
+        DoubleElemRep -> f64
+      }
+
+-- RHS size: {terms: 48, types: 6, coercions: 0, joins: 0/0}
+primRepCmmType :: Platform -> PrimRep -> CmmType
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 330] 430 0}]
+primRepCmmType
+  = \ (platform_a18g1 :: Platform) (ds_d19aE :: PrimRep) ->
+      case ds_d19aE of {
+        VoidRep ->
+          panic
+            @ CmmType
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "primRepCmmType:VoidRep"#);
+        LiftedRep -> gcWord platform_a18g1;
+        UnliftedRep -> gcWord platform_a18g1;
+        Int8Rep -> b8;
+        Int16Rep -> b16;
+        Int32Rep -> b32;
+        Int64Rep -> b64;
+        IntRep -> bWord platform_a18g1;
+        Word8Rep -> b8;
+        Word16Rep -> b16;
+        Word32Rep -> b32;
+        Word64Rep -> b64;
+        WordRep -> bWord platform_a18g1;
+        AddrRep -> bWord platform_a18g1;
+        FloatRep -> f32;
+        DoubleRep -> f64;
+        VecRep len_a18g2 rep_a18g3 ->
+          vec len_a18g2 (primElemRepCmmType rep_a18g3)
+      }
+
+-- RHS size: {terms: 39, types: 5, coercions: 0, joins: 0/0}
+primRepForeignHint :: PrimRep -> ForeignHint
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [180] 290 160}]
+primRepForeignHint
+  = \ (ds_d199f :: PrimRep) ->
+      case ds_d199f of {
+        VoidRep ->
+          panic
+            @ ForeignHint
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "primRepForeignHint:VoidRep"#);
+        LiftedRep -> GHC.Cmm.Type.AddrHint;
+        UnliftedRep -> GHC.Cmm.Type.AddrHint;
+        Int8Rep -> GHC.Cmm.Type.SignedHint;
+        Int16Rep -> GHC.Cmm.Type.SignedHint;
+        Int32Rep -> GHC.Cmm.Type.SignedHint;
+        Int64Rep -> GHC.Cmm.Type.SignedHint;
+        IntRep -> GHC.Cmm.Type.SignedHint;
+        Word8Rep -> GHC.Cmm.Type.NoHint;
+        Word16Rep -> GHC.Cmm.Type.NoHint;
+        Word32Rep -> GHC.Cmm.Type.NoHint;
+        Word64Rep -> GHC.Cmm.Type.NoHint;
+        WordRep -> GHC.Cmm.Type.NoHint;
+        AddrRep -> GHC.Cmm.Type.AddrHint;
+        FloatRep -> GHC.Cmm.Type.NoHint;
+        DoubleRep -> GHC.Cmm.Type.NoHint;
+        VecRep _ [Occ=Dead] _ [Occ=Dead] -> GHC.Cmm.Type.NoHint
+      }
+
+-- RHS size: {terms: 13, types: 2, coercions: 0, joins: 0/0}
+slotForeignHint :: SlotTy -> ForeignHint
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [60] 50 50}]
+slotForeignHint
+  = \ (ds_d1990 :: SlotTy) ->
+      case ds_d1990 of {
+        PtrSlot -> GHC.Cmm.Type.AddrHint;
+        WordSlot -> GHC.Cmm.Type.NoHint;
+        Word64Slot -> GHC.Cmm.Type.NoHint;
+        FloatSlot -> GHC.Cmm.Type.NoHint;
+        DoubleSlot -> GHC.Cmm.Type.NoHint
+      }
+
+-- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
+zeroCLit :: Platform -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 150 0}]
+zeroCLit
+  = \ (platform_a18gb :: Platform) ->
+      GHC.Cmm.Expr.$WCmmInt 0 (wordWidth platform_a18gb)
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+zeroExpr :: Platform -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 30 20}]
+zeroExpr
+  = \ (platform_a18gc :: Platform) ->
+      GHC.Cmm.Expr.CmmLit (zeroCLit platform_a18gc)
+
+-- RHS size: {terms: 6, types: 2, coercions: 0, joins: 0/0}
+mkWordCLit :: Platform -> Integer -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 50 0}]
+mkWordCLit
+  = \ (platform_a18gd :: Platform) (wd_a18ge :: Integer) ->
+      GHC.Cmm.Expr.$WCmmInt wd_a18ge (wordWidth platform_a18gd)
+
+-- RHS size: {terms: 32, types: 35, coercions: 0, joins: 0/0}
+mkByteStringCLit
+  :: forall (raw :: Bool) info stmt.
+     CLabel
+     -> ByteString -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 320 30}]
+mkByteStringCLit
+  = \ (@ (raw_a18Hg :: Bool))
+      (@ info_a18Hh)
+      (@ stmt_a18Hi)
+      (lbl_a18gf :: CLabel)
+      (bytes_a18gg :: ByteString) ->
+      (GHC.Cmm.Expr.CmmLabel lbl_a18gf,
+       $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+         @ (GenCmmStatics raw_a18Hg)
+         @ (GenCmmDecl (GenCmmStatics raw_a18Hg) info_a18Hh stmt_a18Hi)
+         (GHC.Cmm.CmmData
+            @ (GenCmmStatics raw_a18Hg)
+            @ info_a18Hh
+            @ stmt_a18Hi
+            (GHC.Cmm.Section
+               (case BS.elem
+                       (fromInteger @ GHC.Word.Word8 GHC.Word.$fNumWord8 0) bytes_a18gg
+                of {
+                  False -> GHC.Cmm.CString;
+                  True -> GHC.Cmm.ReadOnlyData
+                })
+               lbl_a18gf))
+         (GHC.Cmm.CmmStaticsRaw
+            @ raw_a18Hg
+            lbl_a18gf
+            (GHC.Base.build
+               @ CmmStatic
+               (\ (@ a_d195Z)
+                  (c_d1960 :: CmmStatic -> a_d195Z -> a_d195Z)
+                  (n_d1961 :: a_d195Z) ->
+                  c_d1960 (GHC.Cmm.CmmString bytes_a18gg) n_d1961))))
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+mkFileEmbedLit
+  :: forall (raw :: Bool) info stmt.
+     CLabel
+     -> FilePath -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 110 30}]
+mkFileEmbedLit
+  = \ (@ (raw_a18H8 :: Bool))
+      (@ info_a18H9)
+      (@ stmt_a18Ha)
+      (lbl_a18gi :: CLabel)
+      (path_a18gj :: FilePath) ->
+      (GHC.Cmm.Expr.CmmLabel lbl_a18gi,
+       GHC.Cmm.CmmData
+         @ (GenCmmStatics raw_a18H8)
+         @ info_a18H9
+         @ stmt_a18Ha
+         (GHC.Cmm.Section GHC.Cmm.ReadOnlyData lbl_a18gi)
+         (GHC.Cmm.CmmStaticsRaw
+            @ raw_a18H8
+            lbl_a18gi
+            (GHC.Base.build
+               @ CmmStatic
+               (\ (@ a_d195W)
+                  (c_d195X :: CmmStatic -> a_d195W -> a_d195W)
+                  (n_d195Y :: a_d195W) ->
+                  c_d195X (GHC.Cmm.CmmFileEmbed path_a18gj) n_d195Y))))
+
+-- RHS size: {terms: 14, types: 21, coercions: 0, joins: 0/0}
+mkDataLits
+  :: forall (raw :: Bool) info stmt.
+     Section
+     -> CLabel -> [CmmLit] -> GenCmmDecl (GenCmmStatics raw) info stmt
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 80 30}]
+mkDataLits
+  = \ (@ (raw_a18Gf :: Bool))
+      (@ info_a18Gg)
+      (@ stmt_a18Gh)
+      (section_a18gk :: Section)
+      (lbl_a18gl :: CLabel)
+      (lits_a18gm :: [CmmLit]) ->
+      GHC.Cmm.CmmData
+        @ (GenCmmStatics raw_a18Gf)
+        @ info_a18Gg
+        @ stmt_a18Gh
+        section_a18gk
+        ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+           @ [CmmStatic]
+           @ (GenCmmStatics raw_a18Gf)
+           (GHC.Cmm.CmmStaticsRaw @ raw_a18Gf lbl_a18gl)
+           (map @ CmmLit @ CmmStatic GHC.Cmm.CmmStaticLit lits_a18gm))
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+mkStgWordCLit :: Platform -> StgWord -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 70 0}]
+mkStgWordCLit
+  = \ (platform_a18gr :: Platform) (wd_a18gs :: StgWord) ->
+      GHC.Cmm.Expr.$WCmmInt
+        (fromStgWord wd_a18gs) (wordWidth platform_a18gr)
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+mkLblExpr :: CLabel -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+mkLblExpr
+  = \ (lbl_a18gy :: CLabel) ->
+      GHC.Cmm.Expr.CmmLit (GHC.Cmm.Expr.CmmLabel lbl_a18gy)
+
+-- RHS size: {terms: 14, types: 5, coercions: 0, joins: 0/0}
+cmmRegOff :: CmmReg -> Int -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 20] 80 0}]
+cmmRegOff
+  = \ (reg_a18gV :: CmmReg) (ds_d18ZX :: Int) ->
+      case ds_d18ZX of { ghc-prim-0.6.1:GHC.Types.I# ds_d1904 ->
+      case ds_d1904 of {
+        __DEFAULT -> GHC.Cmm.Expr.$WCmmRegOff reg_a18gV ds_d18ZX;
+        0# -> GHC.Cmm.Expr.$WCmmReg reg_a18gV
+      }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmRegOffB :: CmmReg -> ByteOff -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+cmmRegOffB = cmmRegOff
+
+-- RHS size: {terms: 14, types: 5, coercions: 0, joins: 0/0}
+cmmLabelOff :: CLabel -> Int -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 20] 50 50}]
+cmmLabelOff
+  = \ (lbl_a18hc :: CLabel) (ds_d18YT :: Int) ->
+      case ds_d18YT of { ghc-prim-0.6.1:GHC.Types.I# ds_d18Z0 ->
+      case ds_d18Z0 of {
+        __DEFAULT -> GHC.Cmm.Expr.CmmLabelOff lbl_a18hc ds_d18YT;
+        0# -> GHC.Cmm.Expr.CmmLabel lbl_a18hc
+      }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmLabelOffB :: CLabel -> ByteOff -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+cmmLabelOffB = cmmLabelOff
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmOrWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmOrWord
+  = \ (platform_a18hT :: Platform)
+      (e1_a18hU :: CmmExpr)
+      (e2_a18hV :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordOr platform_a18hT)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YQ)
+              (c_d18YR :: CmmExpr -> a_d18YQ -> a_d18YQ)
+              (n_d18YS :: a_d18YQ) ->
+              c_d18YR e1_a18hU (c_d18YR e2_a18hV n_d18YS)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmAndWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmAndWord
+  = \ (platform_a18hW :: Platform)
+      (e1_a18hX :: CmmExpr)
+      (e2_a18hY :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordAnd platform_a18hW)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YN)
+              (c_d18YO :: CmmExpr -> a_d18YN -> a_d18YN)
+              (n_d18YP :: a_d18YN) ->
+              c_d18YO e1_a18hX (c_d18YO e2_a18hY n_d18YP)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmNeWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmNeWord
+  = \ (platform_a18hZ :: Platform)
+      (e1_a18i0 :: CmmExpr)
+      (e2_a18i1 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordNe platform_a18hZ)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YK)
+              (c_d18YL :: CmmExpr -> a_d18YK -> a_d18YK)
+              (n_d18YM :: a_d18YK) ->
+              c_d18YL e1_a18i0 (c_d18YL e2_a18i1 n_d18YM)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmEqWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmEqWord
+  = \ (platform_a18i2 :: Platform)
+      (e1_a18i3 :: CmmExpr)
+      (e2_a18i4 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordEq platform_a18i2)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YH)
+              (c_d18YI :: CmmExpr -> a_d18YH -> a_d18YH)
+              (n_d18YJ :: a_d18YH) ->
+              c_d18YI e1_a18i3 (c_d18YI e2_a18i4 n_d18YJ)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmULtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmULtWord
+  = \ (platform_a18i5 :: Platform)
+      (e1_a18i6 :: CmmExpr)
+      (e2_a18i7 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordULt platform_a18i5)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YE)
+              (c_d18YF :: CmmExpr -> a_d18YE -> a_d18YE)
+              (n_d18YG :: a_d18YE) ->
+              c_d18YF e1_a18i6 (c_d18YF e2_a18i7 n_d18YG)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUGeWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmUGeWord
+  = \ (platform_a18i8 :: Platform)
+      (e1_a18i9 :: CmmExpr)
+      (e2_a18ia :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUGe platform_a18i8)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18YB)
+              (c_d18YC :: CmmExpr -> a_d18YB -> a_d18YB)
+              (n_d18YD :: a_d18YB) ->
+              c_d18YC e1_a18i9 (c_d18YC e2_a18ia n_d18YD)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUGtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmUGtWord
+  = \ (platform_a18ib :: Platform)
+      (e1_a18ic :: CmmExpr)
+      (e2_a18id :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUGt platform_a18ib)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Yy)
+              (c_d18Yz :: CmmExpr -> a_d18Yy -> a_d18Yy)
+              (n_d18YA :: a_d18Yy) ->
+              c_d18Yz e1_a18ic (c_d18Yz e2_a18id n_d18YA)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmSLtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmSLtWord
+  = \ (platform_a18ie :: Platform)
+      (e1_a18if :: CmmExpr)
+      (e2_a18ig :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordSLt platform_a18ie)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Yv)
+              (c_d18Yw :: CmmExpr -> a_d18Yv -> a_d18Yv)
+              (n_d18Yx :: a_d18Yv) ->
+              c_d18Yw e1_a18if (c_d18Yw e2_a18ig n_d18Yx)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUShrWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmUShrWord
+  = \ (platform_a18ih :: Platform)
+      (e1_a18ii :: CmmExpr)
+      (e2_a18ij :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUShr platform_a18ih)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Ys)
+              (c_d18Yt :: CmmExpr -> a_d18Ys -> a_d18Ys)
+              (n_d18Yu :: a_d18Ys) ->
+              c_d18Yt e1_a18ii (c_d18Yt e2_a18ij n_d18Yu)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmAddWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmAddWord
+  = \ (platform_a18ik :: Platform)
+      (e1_a18il :: CmmExpr)
+      (e2_a18im :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordAdd platform_a18ik)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Yp)
+              (c_d18Yq :: CmmExpr -> a_d18Yp -> a_d18Yp)
+              (n_d18Yr :: a_d18Yp) ->
+              c_d18Yq e1_a18il (c_d18Yq e2_a18im n_d18Yr)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmSubWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmSubWord
+  = \ (platform_a18in :: Platform)
+      (e1_a18io :: CmmExpr)
+      (e2_a18ip :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordSub platform_a18in)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Ym)
+              (c_d18Yn :: CmmExpr -> a_d18Ym -> a_d18Ym)
+              (n_d18Yo :: a_d18Ym) ->
+              c_d18Yn e1_a18io (c_d18Yn e2_a18ip n_d18Yo)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmMulWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmMulWord
+  = \ (platform_a18iq :: Platform)
+      (e1_a18ir :: CmmExpr)
+      (e2_a18is :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordMul platform_a18iq)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Yj)
+              (c_d18Yk :: CmmExpr -> a_d18Yj -> a_d18Yj)
+              (n_d18Yl :: a_d18Yj) ->
+              c_d18Yk e1_a18ir (c_d18Yk e2_a18is n_d18Yl)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmQuotWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmQuotWord
+  = \ (platform_a18it :: Platform)
+      (e1_a18iu :: CmmExpr)
+      (e2_a18iv :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUQuot platform_a18it)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d18Yg)
+              (c_d18Yh :: CmmExpr -> a_d18Yg -> a_d18Yg)
+              (n_d18Yi :: a_d18Yg) ->
+              c_d18Yh e1_a18iu (c_d18Yh e2_a18iv n_d18Yi)))
+
+-- RHS size: {terms: 19, types: 9, coercions: 0, joins: 0/1}
+cmmMkAssign
+  :: Platform -> CmmExpr -> Unique -> (CmmNode O O, CmmExpr)
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 160 30}]
+cmmMkAssign
+  = \ (platform_a18iE :: Platform)
+      (expr_a18iF :: CmmExpr)
+      (uq_a18iG :: Unique) ->
+      case cmmExprType platform_a18iE expr_a18iF of ty_a18iH
+      { __DEFAULT ->
+      let {
+        reg_a18iI :: CmmReg
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 50 0}]
+        reg_a18iI
+          = GHC.Cmm.Expr.$WCmmLocal
+              (GHC.Cmm.Expr.$WLocalReg uq_a18iG ty_a18iH) } in
+      (GHC.Cmm.Node.$WCmmAssign reg_a18iI expr_a18iF,
+       GHC.Cmm.Expr.$WCmmReg reg_a18iI)
+      }
+
+-- RHS size: {terms: 17, types: 14, coercions: 0, joins: 0/0}
+isTrivialCmmExpr :: CmmExpr -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [70] 190 50}]
+isTrivialCmmExpr
+  = \ (ds_d18UZ :: CmmExpr) ->
+      case ds_d18UZ of {
+        CmmLit _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmLoad _ [Occ=Dead] _ [Occ=Dead] ->
+          ghc-prim-0.6.1:GHC.Types.False;
+        CmmReg _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmMachOp _ [Occ=Dead] _ [Occ=Dead] ->
+          ghc-prim-0.6.1:GHC.Types.False;
+        CmmStackSlot _ [Occ=Dead] _ [Occ=Dead] ->
+          panic
+            @ Bool
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "isTrivialCmmExpr CmmStackSlot"#);
+        CmmRegOff _ [Occ=Dead] _ [Occ=Dead] ->
+          ghc-prim-0.6.1:GHC.Types.True
+      }
+
+-- RHS size: {terms: 7, types: 3, coercions: 0, joins: 0/0}
+isLit :: CmmExpr -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+isLit
+  = \ (ds_d18Rl :: CmmExpr) ->
+      case ds_d18Rl of {
+        __DEFAULT -> ghc-prim-0.6.1:GHC.Types.False;
+        CmmLit _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True
+      }
+
+-- RHS size: {terms: 8, types: 5, coercions: 0, joins: 0/0}
+isComparisonExpr :: CmmExpr -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [30] 40 10}]
+isComparisonExpr
+  = \ (ds_d18R8 :: CmmExpr) ->
+      case ds_d18R8 of {
+        __DEFAULT -> ghc-prim-0.6.1:GHC.Types.False;
+        CmmMachOp op_a18iL _ [Occ=Dead] -> isComparisonMachOp op_a18iL
+      }
+
+-- RHS size: {terms: 10, types: 19, coercions: 0, joins: 0/0}
+modifyGraph
+  :: forall (n :: Extensibility -> Extensibility -> *)
+            (n' :: Extensibility -> Extensibility -> *).
+     (Graph n C C -> Graph n' C C) -> GenCmmGraph n -> GenCmmGraph n'
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 0] 70 30}]
+modifyGraph
+  = \ (@ (n_a18Cl :: Extensibility -> Extensibility -> *))
+      (@ (n'_a18Cm :: Extensibility -> Extensibility -> *))
+      (f_a18jm :: Graph n_a18Cl C C -> Graph n'_a18Cm C C)
+      (g_a18jn :: GenCmmGraph n_a18Cl) ->
+      GHC.Cmm.CmmGraph
+        @ n'_a18Cm
+        (g_entry @ n_a18Cl g_a18jn)
+        (f_a18jm (g_graph @ n_a18Cl g_a18jn))
+
+-- RHS size: {terms: 4, types: 14, coercions: 0, joins: 0/0}
+mapGraphNodes1
+  :: (forall (e :: Extensibility) (x :: Extensibility).
+      CmmNode e x -> CmmNode e x)
+     -> CmmGraph -> CmmGraph
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 40 0}]
+mapGraphNodes1
+  = \ (f_a18jS
+         :: forall (e :: Extensibility) (x :: Extensibility).
+            CmmNode e x -> CmmNode e x) ->
+      modifyGraph
+        @ CmmNode @ CmmNode (mapGraph @ CmmNode @ CmmNode @ C @ C f_a18jS)
+
+-- RHS size: {terms: 27, types: 57, coercions: 0, joins: 1/1}
+toBlockMap :: CmmGraph -> LabelMap CmmBlock
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 292 0}]
+toBlockMap
+  = \ (ds_d18JV :: GenCmmGraph CmmNode) ->
+      join {
+        fail_d18LC :: ghc-prim-0.6.1:GHC.Prim.Void# -> LabelMap CmmBlock
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 210 0}]
+        fail_d18LC _ [Occ=Dead, OS=OneShot]
+          = Control.Exception.Base.patError
+              @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+              @ (LabelMap CmmBlock)
+              "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:525:1-67|function toBlockMap"# } in
+      case ds_d18JV of { CmmGraph _ [Occ=Dead] ds_d18Lz ->
+      case ds_d18Lz of {
+        __DEFAULT -> jump fail_d18LC ghc-prim-0.6.1:GHC.Prim.void#;
+        GMany ds_d18LA body_a18jo ds_d18LB ->
+          case ds_d18LA of {
+            __DEFAULT -> jump fail_d18LC ghc-prim-0.6.1:GHC.Prim.void#;
+            NothingO co_a18zq ->
+              case ds_d18LB of {
+                __DEFAULT -> jump fail_d18LC ghc-prim-0.6.1:GHC.Prim.void#;
+                NothingO co_a18zr -> body_a18jo
+              }
+          }
+      }
+      }
+
+-- RHS size: {terms: 8, types: 16, coercions: 0, joins: 0/0}
+ofBlockMap :: BlockId -> LabelMap CmmBlock -> CmmGraph
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 50 30}]
+ofBlockMap
+  = \ (entry_a18jp :: BlockId)
+      (bodyMap_a18jq :: LabelMap CmmBlock) ->
+      GHC.Cmm.CmmGraph
+        @ CmmNode
+        entry_a18jp
+        (GHC.Cmm.Dataflow.Graph.$WGMany
+           @ 'Closed
+           @ Block
+           @ CmmNode
+           @ 'Closed
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode O C))
+           bodyMap_a18jq
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode C O)))
+
+-- RHS size: {terms: 18, types: 38, coercions: 17, joins: 0/0}
+blockTicks :: Block CmmNode C C -> [CmmTickish]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 120 0}]
+blockTicks
+  = \ (b_a18jX :: Block CmmNode C C) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ [CmmTickish]
+        @ [CmmTickish]
+        (reverse @ CmmTickish)
+        ((foldBlockNodesF
+            @ CmmNode
+            @ [CmmTickish]
+            (\ (@ (e_a18yn :: Extensibility))
+               (@ (x_a18yo :: Extensibility))
+               (ds_d18J1 :: CmmNode e_a18yn x_a18yo)
+               (ts_a18k2 :: [CmmTickish]) ->
+               case ds_d18J1 of {
+                 __DEFAULT -> ts_a18k2;
+                 CmmTick co_a18y3 co_a18y4 t_a18k1 ->
+                   ghc-prim-0.6.1:GHC.Types.: @ CmmTickish t_a18k1 ts_a18k2
+               })
+            @ C
+            @ C
+            b_a18jX
+            ((ghc-prim-0.6.1:GHC.Types.[] @ CmmTickish)
+             `cast` (Sub (Sym (GHC.Cmm.Dataflow.Block.D:R:IndexedCOkCloseda_b[0]
+                                   <*>_N <[CmmTickish]>_N <[CmmTickish]>_N))
+                     :: [CmmTickish] ~R# IndexedCO C [CmmTickish] [CmmTickish])))
+         `cast` (Sub (GHC.Cmm.Dataflow.Block.D:R:IndexedCOkCloseda_b[0]
+                          <*>_N <[CmmTickish]>_N <[CmmTickish]>_N)
+                 :: IndexedCO C [CmmTickish] [CmmTickish] ~R# [CmmTickish]))
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+baseExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+baseExpr = GHC.Cmm.Expr.$WCmmReg baseReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+spExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+spExpr = GHC.Cmm.Expr.$WCmmReg spReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+spLimExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+spLimExpr = GHC.Cmm.Expr.$WCmmReg spLimReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+hpExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+hpExpr = GHC.Cmm.Expr.$WCmmReg hpReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+hpLimExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+hpLimExpr = GHC.Cmm.Expr.$WCmmReg hpLimReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+currentTSOExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+currentTSOExpr = GHC.Cmm.Expr.$WCmmReg currentTSOReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+currentNurseryExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+currentNurseryExpr = GHC.Cmm.Expr.$WCmmReg currentNurseryReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+cccsExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+cccsExpr = GHC.Cmm.Expr.$WCmmReg cccsReg
+
+-- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
+GHC.Cmm.Utils.$trModule :: ghc-prim-0.6.1:GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 30}]
+GHC.Cmm.Utils.$trModule
+  = ghc-prim-0.6.1:GHC.Types.Module
+      (ghc-prim-0.6.1:GHC.Types.TrNameS "ghc"#)
+      (ghc-prim-0.6.1:GHC.Types.TrNameS "GHC.Cmm.Utils"#)
+
+-- RHS size: {terms: 34, types: 10, coercions: 0, joins: 0/2}
+packHalfWordsCLit
+  :: Platform -> StgHalfWord -> StgHalfWord -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 360 0}]
+packHalfWordsCLit
+  = \ (platform_a18gt :: Platform)
+      (lower_half_word_a18gu :: StgHalfWord)
+      (upper_half_word_a18gv :: StgHalfWord) ->
+      let {
+        u_a18gx :: Integer
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+        u_a18gx = fromStgHalfWord upper_half_word_a18gv } in
+      let {
+        l_a18gw :: Integer
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+        l_a18gw = fromStgHalfWord lower_half_word_a18gu } in
+      case platformByteOrder platform_a18gt of {
+        BigEndian ->
+          mkWordCLit
+            platform_a18gt
+            (.|.
+               @ Integer
+               Data.Bits.$fBitsInteger
+               (shiftL
+                  @ Integer
+                  Data.Bits.$fBitsInteger
+                  l_a18gw
+                  (halfWordSizeInBits platform_a18gt))
+               u_a18gx);
+        LittleEndian ->
+          mkWordCLit
+            platform_a18gt
+            (.|.
+               @ Integer
+               Data.Bits.$fBitsInteger
+               l_a18gw
+               (shiftL
+                  @ Integer
+                  Data.Bits.$fBitsInteger
+                  u_a18gx
+                  (halfWordSizeInBits platform_a18gt)))
+      }
+
+-- RHS size: {terms: 20, types: 3, coercions: 11, joins: 0/0}
+$dIP_a18Fh :: GHC.Stack.Types.HasCallStack
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 390 0}]
+$dIP_a18Fh
+  = (GHC.Stack.Types.pushCallStack
+       (ghc-prim-0.6.1:GHC.CString.unpackCString# "pprPanic"#,
+        GHC.Stack.Types.SrcLoc
+          (ghc-prim-0.6.1:GHC.CString.unpackCString# "ghc"#)
+          (ghc-prim-0.6.1:GHC.CString.unpackCString# "GHC.Cmm.Utils"#)
+          (ghc-prim-0.6.1:GHC.CString.unpackCString#
+             "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs"#)
+          (ghc-prim-0.6.1:GHC.Types.I# 284#)
+          (ghc-prim-0.6.1:GHC.Types.I# 43#)
+          (ghc-prim-0.6.1:GHC.Types.I# 284#)
+          (ghc-prim-0.6.1:GHC.Types.I# 81#))
+       ((GHC.Stack.Types.emptyCallStack
+         `cast` (Sym (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                          <"callStack">_N <GHC.Stack.Types.CallStack>_N)
+                 :: GHC.Stack.Types.CallStack
+                    ~R# (?callStack::GHC.Stack.Types.CallStack)))
+        `cast` (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                    <"callStack">_N <GHC.Stack.Types.CallStack>_N
+                :: (?callStack::GHC.Stack.Types.CallStack)
+                   ~R# GHC.Stack.Types.CallStack)))
+    `cast` (Sym (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                     <"callStack">_N <GHC.Stack.Types.CallStack>_N)
+            :: GHC.Stack.Types.CallStack
+               ~R# (?callStack::GHC.Stack.Types.CallStack))
+
+-- RHS size: {terms: 34, types: 18, coercions: 0, joins: 1/1}
+cmmNegate :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 34] 218 20}]
+cmmNegate
+  = \ (platform_a18iw :: Platform) (ds_d18Xo :: CmmExpr) ->
+      join {
+        fail_d18Ye :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 100 30}]
+        fail_d18Ye _ [Occ=Dead, OS=OneShot]
+          = GHC.Cmm.Expr.CmmMachOp
+              (GHC.Cmm.MachOp.MO_S_Neg (cmmExprWidth platform_a18iw ds_d18Xo))
+              (GHC.Base.build
+                 @ CmmExpr
+                 (\ (@ a_d18Xu)
+                    (c_d18Xv :: CmmExpr -> a_d18Xu -> a_d18Xu)
+                    (n_d18Xw :: a_d18Xu) ->
+                    c_d18Xv ds_d18Xo n_d18Xw)) } in
+      case ds_d18Xo of {
+        __DEFAULT -> jump fail_d18Ye ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d18Yd ->
+          case ds_d18Yd of {
+            __DEFAULT -> jump fail_d18Ye ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a18ix rep_a18iy ->
+              GHC.Cmm.Expr.CmmLit
+                (GHC.Cmm.Expr.$WCmmInt
+                   (negate @ Integer GHC.Num.$fNumInteger n_a18ix) rep_a18iy)
+          }
+      }
+
+-- RHS size: {terms: 28, types: 13, coercions: 0, joins: 0/2}
+cmmToWord :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 200 30}]
+cmmToWord
+  = \ (platform_a18iA :: Platform) (e_a18iB :: CmmExpr) ->
+      let {
+        word_a18iD :: Width
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+        word_a18iD = wordWidth platform_a18iA } in
+      let {
+        w_a18iC :: Width
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+        w_a18iC = cmmExprWidth platform_a18iA e_a18iB } in
+      case == @ Width GHC.Cmm.Type.$fEqWidth w_a18iC word_a18iD of {
+        False ->
+          GHC.Cmm.Expr.CmmMachOp
+            (GHC.Cmm.MachOp.MO_UU_Conv w_a18iC word_a18iD)
+            (GHC.Base.build
+               @ CmmExpr
+               (\ (@ a_d18Xd)
+                  (c_d18Xe :: CmmExpr -> a_d18Xd -> a_d18Xd)
+                  (n_d18Xf :: a_d18Xd) ->
+                  c_d18Xe e_a18iB n_d18Xf));
+        True -> e_a18iB
+      }
+
+-- RHS size: {terms: 47, types: 19, coercions: 0, joins: 1/1}
+regsOverlap :: Platform -> CmmReg -> CmmReg -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 34 34] 260 10}]
+regsOverlap
+  = \ (platform_a18iY :: Platform)
+      (ds_d18Nd :: CmmReg)
+      (ds_d18Ne :: CmmReg) ->
+      join {
+        fail_d18OD :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 40 0}]
+        fail_d18OD _ [Occ=Dead, OS=OneShot]
+          = == @ CmmReg GHC.Cmm.Expr.$fEqCmmReg ds_d18Nd ds_d18Ne } in
+      case ds_d18Nd of {
+        __DEFAULT -> jump fail_d18OD ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmGlobal g_a18iZ ->
+          case ds_d18Ne of {
+            __DEFAULT -> jump fail_d18OD ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmGlobal g'_a18j0 ->
+              case globalRegMaybe platform_a18iY g_a18iZ of {
+                __DEFAULT -> jump fail_d18OD ghc-prim-0.6.1:GHC.Prim.void#;
+                Just real_a18j1 ->
+                  case globalRegMaybe platform_a18iY g'_a18j0 of {
+                    __DEFAULT -> jump fail_d18OD ghc-prim-0.6.1:GHC.Prim.void#;
+                    Just real'_a18j2 ->
+                      case ==
+                             @ GHC.Platform.Reg.RealReg
+                             GHC.Platform.Reg.$fEqRealReg
+                             real_a18j1
+                             real'_a18j2
+                      of {
+                        False -> jump fail_d18OD ghc-prim-0.6.1:GHC.Prim.void#;
+                        True -> ghc-prim-0.6.1:GHC.Types.True
+                      }
+                  }
+              }
+          }
+      }
+
+-- RHS size: {terms: 12, types: 3, coercions: 0, joins: 0/0}
+tAG_MASK :: Platform -> Int
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 140 0}]
+tAG_MASK
+  = \ (platform_a18iM :: Platform) ->
+      - @ Int
+        GHC.Num.$fNumInt
+        (shiftL
+           @ Int
+           Data.Bits.$fBitsInt
+           (ghc-prim-0.6.1:GHC.Types.I# 1#)
+           (pc_TAG_BITS (platformConstants platform_a18iM)))
+        (ghc-prim-0.6.1:GHC.Types.I# 1#)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+mAX_PTR_TAG :: Platform -> Int
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+mAX_PTR_TAG = tAG_MASK
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmLabelOffW :: Platform -> CLabel -> WordOff -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 70 0}]
+cmmLabelOffW
+  = \ (platform_a18hM :: Platform)
+      (lbl_a18hN :: CLabel)
+      (wd_off_a18hO :: WordOff) ->
+      cmmLabelOffB
+        lbl_a18hN
+        (wordsToBytes
+           @ WordOff GHC.Num.$fNumInt platform_a18hM wd_off_a18hO)
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmRegOffW :: Platform -> CmmReg -> WordOff -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 70 0}]
+cmmRegOffW
+  = \ (platform_a18hG :: Platform)
+      (reg_a18hH :: CmmReg)
+      (wd_off_a18hI :: WordOff) ->
+      cmmRegOffB
+        reg_a18hH
+        (wordsToBytes
+           @ WordOff GHC.Num.$fNumInt platform_a18hG wd_off_a18hI)
+
+Rec {
+-- RHS size: {terms: 34, types: 18, coercions: 0, joins: 0/1}
+mkLiveness [Occ=LoopBreaker] :: Platform -> [LocalReg] -> Liveness
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 30] 400 10}]
+mkLiveness
+  = \ (ds_d18N1 :: Platform) (ds_d18N2 :: [LocalReg]) ->
+      case ds_d18N2 of {
+        [] -> ghc-prim-0.6.1:GHC.Types.[] @ Bool;
+        : reg_a18jg regs_a18jh ->
+          let {
+            word_size_a18ji :: Int
+            [LclId,
+             Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                     WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+            word_size_a18ji = platformWordSizeInBytes ds_d18N1 } in
+          ++
+            @ Bool
+            (replicate
+               @ Bool
+               (quot
+                  @ Int
+                  GHC.Real.$fIntegralInt
+                  (- @ Int
+                     GHC.Num.$fNumInt
+                     (+ @ Int
+                        GHC.Num.$fNumInt
+                        (widthInBytes (typeWidth (localRegType reg_a18jg)))
+                        word_size_a18ji)
+                     (ghc-prim-0.6.1:GHC.Types.I# 1#))
+                  word_size_a18ji)
+               ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                  @ Bool
+                  @ Bool
+                  not
+                  (isGcPtrType (localRegType reg_a18jg))))
+            (mkLiveness ds_d18N1 regs_a18jh)
+      }
+end Rec }
+
+-- RHS size: {terms: 42, types: 19, coercions: 0, joins: 0/0}
+cmmOffsetLit :: CmmLit -> Int -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [320 0] 440 50}]
+cmmOffsetLit
+  = \ (ds_d18Z3 :: CmmLit) (byte_off_a18gZ :: Int) ->
+      case ds_d18Z3 of {
+        __DEFAULT ->
+          pprPanic
+            @ CmmLit
+            $dIP_a18Fh
+            (ghc-prim-0.6.1:GHC.CString.unpackCString# "cmmOffsetLit"#)
+            (ppr @ Int GHC.Utils.Outputable.$fOutputableInt byte_off_a18gZ);
+        CmmInt m_a18h8 rep_a18h9 ->
+          GHC.Cmm.Expr.$WCmmInt
+            (+ @ Integer
+               GHC.Num.$fNumInteger
+               m_a18h8
+               (fromIntegral
+                  @ Int
+                  @ Integer
+                  GHC.Real.$fIntegralInt
+                  GHC.Num.$fNumInteger
+                  byte_off_a18gZ))
+            rep_a18h9;
+        CmmLabel l_a18gY -> cmmLabelOff l_a18gY byte_off_a18gZ;
+        CmmLabelOff l_a18h0 m_a18h1 ->
+          cmmLabelOff
+            l_a18h0 (+ @ Int GHC.Num.$fNumInt m_a18h1 byte_off_a18gZ);
+        CmmLabelDiffOff l1_a18h3 l2_a18h4 m_a18h5 w_a18h6 ->
+          GHC.Cmm.Expr.CmmLabelDiffOff
+            l1_a18h3
+            l2_a18h4
+            (+ @ Int GHC.Num.$fNumInt m_a18h5 byte_off_a18gZ)
+            w_a18h6
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetLitB :: CmmLit -> ByteOff -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+cmmOffsetLitB = cmmOffsetLit
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmOffsetLitW :: Platform -> CmmLit -> WordOff -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 70 0}]
+cmmOffsetLitW
+  = \ (platform_a18hJ :: Platform)
+      (lit_a18hK :: CmmLit)
+      (wd_off_a18hL :: WordOff) ->
+      cmmOffsetLitB
+        lit_a18hK
+        (wordsToBytes
+           @ WordOff GHC.Num.$fNumInt platform_a18hJ wd_off_a18hL)
+
+-- RHS size: {terms: 119, types: 58, coercions: 0, joins: 1/2}
+cmmOffset :: Platform -> CmmExpr -> Int -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=NEVER}]
+cmmOffset
+  = \ (_platform_a18gF :: Platform)
+      (e_a18gG :: CmmExpr)
+      (ds_d1907 :: Int) ->
+      case ds_d1907 of { ghc-prim-0.6.1:GHC.Types.I# ds_d1948 ->
+      case ds_d1948 of {
+        __DEFAULT ->
+          join {
+            fail_d1942 :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+            [LclId[JoinId(1)],
+             Str=<L,U>,
+             Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                     WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 210 30}]
+            fail_d1942 _ [Occ=Dead, OS=OneShot]
+              = let {
+                  width_a18gU :: Width
+                  [LclId,
+                   Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                           WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+                  width_a18gU = cmmExprWidth _platform_a18gF e_a18gG } in
+                GHC.Cmm.Expr.CmmMachOp
+                  (GHC.Cmm.MachOp.MO_Add width_a18gU)
+                  (GHC.Base.build
+                     @ CmmExpr
+                     (\ (@ a_d190G)
+                        (c_d190H :: CmmExpr -> a_d190G -> a_d190G)
+                        (n_d190I :: a_d190G) ->
+                        c_d190H
+                          e_a18gG
+                          (c_d190H
+                             (GHC.Cmm.Expr.CmmLit
+                                (GHC.Cmm.Expr.$WCmmInt
+                                   (toInteger @ Int GHC.Real.$fIntegralInt ds_d1907) width_a18gU))
+                             n_d190I))) } in
+          case e_a18gG of {
+            __DEFAULT -> jump fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLit lit_a18gN ->
+              GHC.Cmm.Expr.CmmLit (cmmOffsetLit lit_a18gN ds_d1907);
+            CmmReg reg_a18gK -> cmmRegOff reg_a18gK ds_d1907;
+            CmmMachOp ds_d193W ds_d193X ->
+              case ds_d193W of {
+                __DEFAULT -> jump fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                MO_Add rep_a18gQ ->
+                  case ds_d193X of {
+                    __DEFAULT -> jump fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                    : expr_a18gR ds_d193Y ->
+                      case ds_d193Y of {
+                        __DEFAULT -> jump fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                        : ds_d193Z ds_d1940 ->
+                          case ds_d193Z of {
+                            __DEFAULT -> jump fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                            CmmLit ds_d1941 ->
+                              case ds_d1941 of {
+                                __DEFAULT -> jump fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                                CmmInt byte_off1_a18gS _ [Occ=Dead] ->
+                                  case ds_d1940 of {
+                                    __DEFAULT -> jump fail_d1942 ghc-prim-0.6.1:GHC.Prim.void#;
+                                    [] ->
+                                      GHC.Cmm.Expr.CmmMachOp
+                                        (GHC.Cmm.MachOp.MO_Add rep_a18gQ)
+                                        (GHC.Base.build
+                                           @ CmmExpr
+                                           (\ (@ a_d190D)
+                                              (c_d190E :: CmmExpr -> a_d190D -> a_d190D)
+                                              (n_d190F :: a_d190D) ->
+                                              c_d190E
+                                                expr_a18gR
+                                                (c_d190E
+                                                   (GHC.Cmm.Expr.CmmLit
+                                                      (GHC.Cmm.Expr.$WCmmInt
+                                                         (+ @ Integer
+                                                            GHC.Num.$fNumInteger
+                                                            byte_off1_a18gS
+                                                            (toInteger
+                                                               @ Int
+                                                               GHC.Real.$fIntegralInt
+                                                               ds_d1907))
+                                                         rep_a18gQ))
+                                                   n_d190F)))
+                                  }
+                              }
+                          }
+                      }
+                  }
+              };
+            CmmStackSlot area_a18gO off_a18gP ->
+              GHC.Cmm.Expr.$WCmmStackSlot
+                area_a18gO (- @ Int GHC.Num.$fNumInt off_a18gP ds_d1907);
+            CmmRegOff reg_a18gL m_a18gM ->
+              cmmRegOff reg_a18gL (+ @ Int GHC.Num.$fNumInt m_a18gM ds_d1907)
+          };
+        0# -> e_a18gG
+      }
+      }
+
+-- RHS size: {terms: 12, types: 5, coercions: 0, joins: 0/0}
+cmmIndex :: Platform -> Width -> CmmExpr -> Int -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0 0] 100 0}]
+cmmIndex
+  = \ (platform_a18hf :: Platform)
+      (width_a18hg :: Width)
+      (base_a18hh :: CmmExpr)
+      (idx_a18hi :: Int) ->
+      cmmOffset
+        platform_a18hf
+        base_a18hh
+        (* @ Int GHC.Num.$fNumInt idx_a18hi (widthInBytes width_a18hg))
+
+-- RHS size: {terms: 12, types: 4, coercions: 0, joins: 0/0}
+cmmLoadIndex :: Platform -> CmmType -> CmmExpr -> Int -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0 0] 100 0}]
+cmmLoadIndex
+  = \ (platform_a18ht :: Platform)
+      (ty_a18hu :: CmmType)
+      (expr_a18hv :: CmmExpr)
+      (ix_a18hw :: Int) ->
+      GHC.Cmm.Expr.$WCmmLoad
+        (cmmIndex platform_a18ht (typeWidth ty_a18hu) expr_a18hv ix_a18hw)
+        ty_a18hu
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetB :: Platform -> CmmExpr -> ByteOff -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+cmmOffsetB = cmmOffset
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+cmmOffsetW :: Platform -> CmmExpr -> WordOff -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 80 0}]
+cmmOffsetW
+  = \ (platform_a18hD :: Platform)
+      (e_a18hE :: CmmExpr)
+      (n_a18hF :: WordOff) ->
+      cmmOffsetB
+        platform_a18hD
+        e_a18hE
+        (wordsToBytes @ WordOff GHC.Num.$fNumInt platform_a18hD n_a18hF)
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+cmmLoadIndexW :: Platform -> CmmExpr -> Int -> CmmType -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0 0] 70 0}]
+cmmLoadIndexW
+  = \ (platform_a18hP :: Platform)
+      (base_a18hQ :: CmmExpr)
+      (off_a18hR :: Int)
+      (ty_a18hS :: CmmType) ->
+      GHC.Cmm.Expr.$WCmmLoad
+        (cmmOffsetW platform_a18hP base_a18hQ off_a18hR) ty_a18hS
+
+-- RHS size: {terms: 37, types: 19, coercions: 0, joins: 1/1}
+cmmOffsetExpr :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 34] 248 0}]
+cmmOffsetExpr
+  = \ (platform_a18gz :: Platform)
+      (e_a18gA :: CmmExpr)
+      (ds_d194b :: CmmExpr) ->
+      join {
+        fail_d1954 :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 130 30}]
+        fail_d1954 _ [Occ=Dead, OS=OneShot]
+          = GHC.Cmm.Expr.CmmMachOp
+              (GHC.Cmm.MachOp.MO_Add (cmmExprWidth platform_a18gz e_a18gA))
+              (GHC.Base.build
+                 @ CmmExpr
+                 (\ (@ a_d194i)
+                    (c_d194j :: CmmExpr -> a_d194i -> a_d194i)
+                    (n_d194k :: a_d194i) ->
+                    c_d194j e_a18gA (c_d194j ds_d194b n_d194k))) } in
+      case ds_d194b of {
+        __DEFAULT -> jump fail_d1954 ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d1952 ->
+          case ds_d1952 of {
+            __DEFAULT -> jump fail_d1954 ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a18gB _ [Occ=Dead] ->
+              cmmOffset
+                platform_a18gz e_a18gA (fromInteger @ Int GHC.Num.$fNumInt n_a18gB)
+          }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetExprB :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+cmmOffsetExprB = cmmOffsetExpr
+
+-- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
+mkIntCLit :: Platform -> Int -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 80 0}]
+mkIntCLit
+  = \ (platform_a18g7 :: Platform) (i_a18g8 :: Int) ->
+      GHC.Cmm.Expr.$WCmmInt
+        (toInteger @ Int GHC.Real.$fIntegralInt i_a18g8)
+        (wordWidth platform_a18g7)
+
+-- RHS size: {terms: 7, types: 5, coercions: 0, joins: 0/0}
+mkIntExpr :: Platform -> Int -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 60 0}]
+mkIntExpr
+  = \ (platform_a18g9 :: Platform) (i_a18ga :: Int) ->
+      $!
+        @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ CmmLit
+        @ CmmExpr
+        GHC.Cmm.Expr.CmmLit
+        (mkIntCLit platform_a18g9 i_a18ga)
+
+-- RHS size: {terms: 47, types: 21, coercions: 0, joins: 1/2}
+cmmIndexExpr :: Platform -> Width -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0 34] 358 0}]
+cmmIndexExpr
+  = \ (platform_a18hj :: Platform)
+      (width_a18hk :: Width)
+      (base_a18hl :: CmmExpr)
+      (ds_d196e :: CmmExpr) ->
+      join {
+        fail_d1977 :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 230 0}]
+        fail_d1977 _ [Occ=Dead, OS=OneShot]
+          = let {
+              idx_w_a18hr :: Width
+              [LclId,
+               Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                       WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+              idx_w_a18hr = cmmExprWidth platform_a18hj ds_d196e } in
+            cmmOffsetExpr
+              platform_a18hj
+              base_a18hl
+              (GHC.Cmm.Expr.CmmMachOp
+                 (GHC.Cmm.MachOp.MO_Shl idx_w_a18hr)
+                 (GHC.Base.build
+                    @ CmmExpr
+                    (\ (@ a_d1974)
+                       (c_d1975 :: CmmExpr -> a_d1974 -> a_d1974)
+                       (n_d1976 :: a_d1974) ->
+                       c_d1975
+                         ds_d196e
+                         (c_d1975
+                            (mkIntExpr platform_a18hj (widthInLog width_a18hk))
+                            n_d1976)))) } in
+      case ds_d196e of {
+        __DEFAULT -> jump fail_d1977 ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d1972 ->
+          case ds_d1972 of {
+            __DEFAULT -> jump fail_d1977 ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a18hm _ [Occ=Dead] ->
+              cmmIndex
+                platform_a18hj
+                width_a18hk
+                base_a18hl
+                (fromInteger @ Int GHC.Num.$fNumInt n_a18hm)
+          }
+      }
+
+-- RHS size: {terms: 29, types: 12, coercions: 0, joins: 1/1}
+cmmOffsetExprW :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 34] 188 0}]
+cmmOffsetExprW
+  = \ (platform_a18hx :: Platform)
+      (e_a18hy :: CmmExpr)
+      (ds_d1979 :: CmmExpr) ->
+      join {
+        fail_d197Z :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 70 0}]
+        fail_d197Z _ [Occ=Dead, OS=OneShot]
+          = cmmIndexExpr
+              platform_a18hx (wordWidth platform_a18hx) e_a18hy ds_d1979 } in
+      case ds_d1979 of {
+        __DEFAULT -> jump fail_d197Z ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d197X ->
+          case ds_d197X of {
+            __DEFAULT -> jump fail_d197Z ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a18hz _ [Occ=Dead] ->
+              cmmOffsetW
+                platform_a18hx
+                e_a18hy
+                (fromInteger @ WordOff GHC.Num.$fNumInt n_a18hz)
+          }
+      }
+
+-- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
+cmmTagMask :: Platform -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 50 0}]
+cmmTagMask
+  = \ (platform_a18iN :: Platform) ->
+      mkIntExpr platform_a18iN (tAG_MASK platform_a18iN)
+
+-- RHS size: {terms: 11, types: 2, coercions: 0, joins: 0/0}
+cmmIsTagged :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 120 0}]
+cmmIsTagged
+  = \ (platform_a18iS :: Platform) (e_a18iT :: CmmExpr) ->
+      cmmNeWord
+        platform_a18iS
+        (cmmAndWord platform_a18iS e_a18iT (cmmTagMask platform_a18iS))
+        (zeroExpr platform_a18iS)
+
+-- RHS size: {terms: 11, types: 2, coercions: 0, joins: 0/0}
+cmmIsNotTagged :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 120 0}]
+cmmIsNotTagged
+  = \ (platform_a18iU :: Platform) (e_a18iV :: CmmExpr) ->
+      cmmEqWord
+        platform_a18iU
+        (cmmAndWord platform_a18iU e_a18iV (cmmTagMask platform_a18iU))
+        (zeroExpr platform_a18iU)
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+cmmConstrTag1 :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 60 0}]
+cmmConstrTag1
+  = \ (platform_a18iW :: Platform) (e_a18iX :: CmmExpr) ->
+      cmmAndWord platform_a18iW e_a18iX (cmmTagMask platform_a18iW)
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+cmmPointerMask :: Platform -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 80 0}]
+cmmPointerMask
+  = \ (platform_a18iO :: Platform) ->
+      mkIntExpr
+        platform_a18iO
+        (complement @ Int Data.Bits.$fBitsInt (tAG_MASK platform_a18iO))
+
+-- RHS size: {terms: 22, types: 9, coercions: 0, joins: 1/1}
+cmmUntag :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 34] 108 0}]
+cmmUntag
+  = \ (ds_d1981 :: Platform) (e_a18iP :: CmmExpr) ->
+      join {
+        fail_d198Y :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 60 0}]
+        fail_d198Y _ [Occ=Dead, OS=OneShot]
+          = cmmAndWord ds_d1981 e_a18iP (cmmPointerMask ds_d1981) } in
+      case e_a18iP of wild_00 {
+        __DEFAULT -> jump fail_d198Y ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d198W ->
+          case ds_d198W of {
+            __DEFAULT -> jump fail_d198Y ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLabel _ [Occ=Dead] -> wild_00
+          }
+      }
+
+-- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
+typeForeignHint :: UnaryType -> ForeignHint
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 50 0}]
+typeForeignHint
+  = . @ PrimRep
+      @ ForeignHint
+      @ UnaryType
+      primRepForeignHint
+      (typePrimRep1 ghc-prim-0.6.1:GHC.Classes.C:(%%))
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+typeCmmType :: Platform -> UnaryType -> CmmType
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 60 0}]
+typeCmmType
+  = \ (platform_a18g5 :: Platform) (ty_a18g6 :: UnaryType) ->
+      primRepCmmType
+        platform_a18g5
+        (typePrimRep1 ghc-prim-0.6.1:GHC.Classes.C:(%%) ty_a18g6)
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+$dNonLocal_a18yU :: NonLocal (Block CmmNode)
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$dNonLocal_a18yU
+  = GHC.Cmm.Dataflow.Graph.$fNonLocalBlock
+      @ CmmNode GHC.Cmm.Node.$fNonLocalCmmNode
+
+-- RHS size: {terms: 7, types: 4, coercions: 0, joins: 0/0}
+revPostorder :: CmmGraph -> [CmmBlock]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 80 0}]
+revPostorder
+  = \ (g_a18jW :: CmmGraph) ->
+      revPostorderFrom
+        @ (Block CmmNode)
+        $dNonLocal_a18yU
+        (toBlockMap g_a18jW)
+        (g_entry @ CmmNode g_a18jW)
+
+-- RHS size: {terms: 14, types: 30, coercions: 0, joins: 0/0}
+ofBlockList :: BlockId -> [CmmBlock] -> CmmGraph
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 130 30}]
+ofBlockList
+  = \ (entry_a18jL :: BlockId) (blocks_a18jM :: [CmmBlock]) ->
+      GHC.Cmm.CmmGraph
+        @ CmmNode
+        entry_a18jL
+        (GHC.Cmm.Dataflow.Graph.$WGMany
+           @ 'Closed
+           @ Block
+           @ CmmNode
+           @ 'Closed
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode O C))
+           (foldr
+              @ []
+              Data.Foldable.$fFoldable[]
+              @ (Block CmmNode C C)
+              @ (LabelMap (Block CmmNode C C))
+              (addBlock
+                 @ (Block CmmNode)
+                 $dNonLocal_a18yU
+                 ghc-prim-0.6.1:GHC.Classes.C:(%%))
+              (emptyBody @ Block @ CmmNode)
+              blocks_a18jM)
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode C O)))
+
+-- RHS size: {terms: 29, types: 19, coercions: 0, joins: 0/0}
+mkRODataLits
+  :: forall (raw :: Bool) info stmt.
+     CLabel -> [CmmLit] -> GenCmmDecl (GenCmmStatics raw) info stmt
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 160 0}]
+mkRODataLits
+  = \ (@ (raw_a18Gz :: Bool))
+      (@ info_a18GA)
+      (@ stmt_a18GB)
+      (lbl_a18gn :: CLabel)
+      (lits_a18go :: [CmmLit]) ->
+      mkDataLits
+        @ raw_a18Gz
+        @ info_a18GA
+        @ stmt_a18GB
+        (case any
+                @ []
+                @ CmmLit
+                Data.Foldable.$fFoldable[]
+                (\ (ds_d195e :: CmmLit) ->
+                   case ds_d195e of {
+                     __DEFAULT -> ghc-prim-0.6.1:GHC.Types.False;
+                     CmmLabel _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True;
+                     CmmLabelOff _ [Occ=Dead] _ [Occ=Dead] ->
+                       ghc-prim-0.6.1:GHC.Types.True
+                   })
+                lits_a18go
+         of {
+           False -> GHC.Cmm.Section GHC.Cmm.ReadOnlyData lbl_a18gn;
+           True -> GHC.Cmm.Section GHC.Cmm.RelocatableReadOnlyData lbl_a18gn
+         })
+        lbl_a18gn
+        lits_a18go
+
+-- RHS size: {terms: 33, types: 21, coercions: 0, joins: 0/1}
+regUsedIn :: Platform -> CmmReg -> CmmExpr -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 280 0}]
+regUsedIn
+  = \ (platform_a18j5 :: Platform) ->
+      letrec {
+        regUsedIn__a18j6 [Occ=LoopBreaker] :: CmmReg -> CmmExpr -> Bool
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 180] 250 20}]
+        regUsedIn__a18j6
+          = \ (ds_d18OF :: CmmReg) (ds_d18OG :: CmmExpr) ->
+              case ds_d18OG of {
+                CmmLit _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.False;
+                CmmLoad e_a18j8 _ [Occ=Dead] -> regUsedIn__a18j6 ds_d18OF e_a18j8;
+                CmmReg reg'_a18ja ->
+                  regsOverlap platform_a18j5 ds_d18OF reg'_a18ja;
+                CmmMachOp _ [Occ=Dead] es_a18je ->
+                  any
+                    @ []
+                    @ CmmExpr
+                    Data.Foldable.$fFoldable[]
+                    (\ (ds_d18OW :: CmmExpr) -> regUsedIn__a18j6 ds_d18OF ds_d18OW)
+                    es_a18je;
+                CmmStackSlot _ [Occ=Dead] _ [Occ=Dead] ->
+                  ghc-prim-0.6.1:GHC.Types.False;
+                CmmRegOff reg'_a18jc _ [Occ=Dead] ->
+                  regsOverlap platform_a18j5 ds_d18OF reg'_a18jc
+              }; } in
+      regUsedIn__a18j6
+
+Rec {
+-- RHS size: {terms: 35, types: 20, coercions: 0, joins: 1/1}
+hasNoGlobalRegs [Occ=LoopBreaker] :: CmmExpr -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [142] 172 30}]
+hasNoGlobalRegs
+  = \ (ds_d18RZ :: CmmExpr) ->
+      join {
+        fail_d18UX :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True,
+                 Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+        fail_d18UX _ [Occ=Dead, OS=OneShot]
+          = ghc-prim-0.6.1:GHC.Types.False } in
+      case ds_d18RZ of {
+        __DEFAULT -> jump fail_d18UX ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmLoad e_a18iJ _ [Occ=Dead] -> hasNoGlobalRegs e_a18iJ;
+        CmmReg ds_d18US ->
+          case ds_d18US of {
+            __DEFAULT -> jump fail_d18UX ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLocal _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True
+          };
+        CmmMachOp _ [Occ=Dead] es_a18iK ->
+          all
+            @ [] @ CmmExpr Data.Foldable.$fFoldable[] hasNoGlobalRegs es_a18iK;
+        CmmRegOff ds_d18UU _ [Occ=Dead] ->
+          case ds_d18UU of {
+            __DEFAULT -> jump fail_d18UX ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLocal _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True
+          }
+      }
+end Rec }
+
+-- RHS size: {terms: 4, types: 7, coercions: 0, joins: 0/0}
+bodyToBlockList :: Body CmmNode -> [CmmBlock]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 30 0}]
+bodyToBlockList
+  = \ (body_a18jO :: Body CmmNode) ->
+      mapElems
+        @ LabelMap
+        GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+        @ (Block CmmNode C C)
+        body_a18jO
+
+-- RHS size: {terms: 11, types: 14, coercions: 0, joins: 0/0}
+foldlGraphBlocks
+  :: forall a. (a -> CmmBlock -> a) -> a -> CmmGraph -> a
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 90 0}]
+foldlGraphBlocks
+  = \ (@ a_a18C5)
+      (k_a18jT :: a_a18C5 -> CmmBlock -> a_a18C5)
+      (z_a18jU :: a_a18C5)
+      (g_a18jV :: CmmGraph) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ (LabelMap CmmBlock)
+        @ a_a18C5
+        (mapFoldl
+           @ LabelMap
+           GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+           @ a_a18C5
+           @ CmmBlock
+           k_a18jT
+           z_a18jU)
+        (toBlockMap g_a18jV)
+
+-- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
+toBlockList :: CmmGraph -> [CmmBlock]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 70 0}]
+toBlockList
+  = \ (g_a18jr :: CmmGraph) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ (LabelMap CmmBlock)
+        @ [CmmBlock]
+        (mapElems
+           @ LabelMap GHC.Cmm.Dataflow.Label.$fIsMapLabelMap @ CmmBlock)
+        (toBlockMap g_a18jr)
+
+-- RHS size: {terms: 41, types: 39, coercions: 3, joins: 0/2}
+toBlockListEntryFirst :: CmmGraph -> [CmmBlock]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 560 40}]
+toBlockListEntryFirst
+  = \ (g_a18js :: CmmGraph) ->
+      let {
+        entry_id_a18ju :: BlockId
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+        entry_id_a18ju = g_entry @ CmmNode g_a18js } in
+      let {
+        m_a18jt :: LabelMap CmmBlock
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+        m_a18jt = toBlockMap g_a18js } in
+      case mapNull
+             @ LabelMap
+             GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+             @ CmmBlock
+             m_a18jt
+      of {
+        False ->
+          ghc-prim-0.6.1:GHC.Types.:
+            @ CmmBlock
+            (case case mapLookup
+                         @ LabelMap
+                         GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+                         @ CmmBlock
+                         (entry_id_a18ju
+                          `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                                  :: Label ~R# KeyOf LabelMap))
+                         m_a18jt
+                  of {
+                    __DEFAULT ->
+                      Control.Exception.Base.patError
+                        @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                        @ (Unit CmmBlock)
+                        "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:541:5-43|Just entry_block"#;
+                    Just entry_block_a18jv -> (entry_block_a18jv)
+                  }
+             of
+             { (entry_block_a18jv) ->
+             entry_block_a18jv
+             })
+            (filter
+               @ (Block CmmNode C C)
+               (. @ BlockId
+                  @ Bool
+                  @ (Block CmmNode C C)
+                  (\ (ds_d18LM :: BlockId) ->
+                     /=
+                       @ BlockId GHC.Cmm.Dataflow.Label.$fEqLabel ds_d18LM entry_id_a18ju)
+                  (entryLabel @ (Block CmmNode) $dNonLocal_a18yU @ C))
+               (mapElems
+                  @ LabelMap
+                  GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+                  @ CmmBlock
+                  m_a18jt));
+        True -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock
+      }
+
+-- RHS size: {terms: 85, types: 67, coercions: 12, joins: 0/4}
+toBlockListEntryFirstFalseFallthrough :: CmmGraph -> [CmmBlock]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=NEVER}]
+toBlockListEntryFirstFalseFallthrough
+  = \ (g_a18jx :: CmmGraph) ->
+      let {
+        m_a18jy :: LabelMap CmmBlock
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+        m_a18jy = toBlockMap g_a18jx } in
+      let {
+        entry_block_a18jA :: CmmBlock
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 300 0}]
+        entry_block_a18jA
+          = case case mapLookup
+                        @ LabelMap
+                        GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+                        @ CmmBlock
+                        ((g_entry @ CmmNode g_a18jx)
+                         `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                                 :: Label ~R# KeyOf LabelMap))
+                        m_a18jy
+                 of {
+                   __DEFAULT ->
+                     Control.Exception.Base.patError
+                       @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                       @ (Unit CmmBlock)
+                       "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:559:5-43|Just entry_block"#;
+                   Just entry_block_a18jA -> (entry_block_a18jA)
+                 }
+            of
+            { (entry_block_a18jA) ->
+            entry_block_a18jA
+            } } in
+      letrec {
+        dfs_a18jB [Occ=LoopBreaker] :: LabelSet -> [CmmBlock] -> [CmmBlock]
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 30] 400 40}]
+        dfs_a18jB
+          = \ (ds_d18M9 :: LabelSet) (ds_d18Ma :: [CmmBlock]) ->
+              case ds_d18Ma of {
+                [] -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock;
+                : block_a18jD bs_a18jE ->
+                  let {
+                    id_a18jF :: Label
+                    [LclId,
+                     Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                             WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+                    id_a18jF
+                      = entryLabel
+                          @ (Block CmmNode) $dNonLocal_a18yU @ C block_a18jD } in
+                  case setMember
+                         @ LabelSet
+                         GHC.Cmm.Dataflow.Label.$fIsSetLabelSet
+                         (id_a18jF
+                          `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:ElemOfLabelSet[0]))
+                                  :: Label ~R# ElemOf LabelSet))
+                         ds_d18M9
+                  of {
+                    False ->
+                      ghc-prim-0.6.1:GHC.Types.:
+                        @ CmmBlock
+                        block_a18jD
+                        (dfs_a18jB
+                           (setInsert
+                              @ LabelSet
+                              GHC.Cmm.Dataflow.Label.$fIsSetLabelSet
+                              (id_a18jF
+                               `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:ElemOfLabelSet[0]))
+                                       :: Label ~R# ElemOf LabelSet))
+                              ds_d18M9)
+                           (foldr
+                              @ []
+                              Data.Foldable.$fFoldable[]
+                              @ Label
+                              @ [CmmBlock]
+                              (\ (id_a18jI :: Label) (bs_a18jJ :: [CmmBlock]) ->
+                                 case mapLookup
+                                        @ LabelMap
+                                        GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+                                        @ CmmBlock
+                                        (id_a18jI
+                                         `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                                                 :: Label ~R# KeyOf LabelMap))
+                                        m_a18jy
+                                 of {
+                                   Nothing -> bs_a18jJ;
+                                   Just b_a18jK ->
+                                     ghc-prim-0.6.1:GHC.Types.: @ CmmBlock b_a18jK bs_a18jJ
+                                 })
+                              bs_a18jE
+                              (successors @ (Block CmmNode) $dNonLocal_a18yU @ C block_a18jD)));
+                    True -> dfs_a18jB ds_d18M9 bs_a18jE
+                  }
+              }; } in
+      case mapNull
+             @ LabelMap
+             GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+             @ CmmBlock
+             m_a18jy
+      of {
+        False ->
+          dfs_a18jB
+            (setEmpty @ LabelSet GHC.Cmm.Dataflow.Label.$fIsSetLabelSet)
+            (GHC.Base.build
+               @ CmmBlock
+               (\ (@ a_d18LY)
+                  (c_d18LZ :: CmmBlock -> a_d18LY -> a_d18LY)
+                  (n_d18M0 :: a_d18LY) ->
+                  c_d18LZ entry_block_a18jA n_d18M0));
+        True -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock
+      }
+
+-- RHS size: {terms: 23, types: 100, coercions: 0, joins: 0/0}
+mapGraphNodes
+  :: (CmmNode C O -> CmmNode C O, CmmNode O O -> CmmNode O O,
+      CmmNode O C -> CmmNode O C)
+     -> CmmGraph -> CmmGraph
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20 0] 290 0}]
+mapGraphNodes
+  = \ (funs_a18jP
+         :: (CmmNode C O -> CmmNode C O, CmmNode O O -> CmmNode O O,
+             CmmNode O C -> CmmNode O C))
+      (g_a18jR :: CmmGraph) ->
+      case funs_a18jP of wild_00
+      { (mf_a18jQ, _ [Occ=Dead], _ [Occ=Dead]) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ (LabelMap CmmBlock)
+        @ CmmGraph
+        (ofBlockMap
+           ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+              @ (CmmNode C O)
+              @ Label
+              (entryLabel @ CmmNode GHC.Cmm.Node.$fNonLocalCmmNode @ O)
+              ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                 @ (CmmNode C O)
+                 @ (CmmNode C O)
+                 mf_a18jQ
+                 (GHC.Cmm.Node.$WCmmEntry
+                    (g_entry @ CmmNode g_a18jR) GHC.Cmm.Node.GlobalScope))))
+        ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+           @ (LabelMap (Block CmmNode C C))
+           @ (LabelMap (Block CmmNode C C))
+           (mapMap
+              @ LabelMap
+              GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+              @ (Block CmmNode C C)
+              @ (Block CmmNode C C)
+              (mapBlock3' @ CmmNode @ CmmNode @ C @ C wild_00))
+           (toBlockMap g_a18jR))
+      }
+
+
+
+==================== Desugar (after optimization) ====================
+2020-11-24 12:44:28.4624015 UTC
+
+Result size of Desugar (after optimization)
+  = {terms: 1,627, types: 1,401, coercions: 43, joins: 9/24}
+
+-- RHS size: {terms: 16, types: 3, coercions: 0, joins: 0/0}
+slotCmmType :: Platform -> SlotTy -> CmmType
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 80] 90 0}]
+slotCmmType
+  = \ (platform_a5gV1 :: Platform) (ds_d5hOU :: SlotTy) ->
+      case ds_d5hOU of {
+        PtrSlot -> gcWord platform_a5gV1;
+        WordSlot -> bWord platform_a5gV1;
+        Word64Slot -> b64;
+        FloatSlot -> f32;
+        DoubleSlot -> f64
+      }
+
+-- RHS size: {terms: 23, types: 2, coercions: 0, joins: 0/0}
+primElemRepCmmType :: PrimElemRep -> CmmType
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [110] 100 0}]
+primElemRepCmmType
+  = \ (ds_d5hOv :: PrimElemRep) ->
+      case ds_d5hOv of {
+        Int8ElemRep -> b8;
+        Int16ElemRep -> b16;
+        Int32ElemRep -> b32;
+        Int64ElemRep -> b64;
+        Word8ElemRep -> b8;
+        Word16ElemRep -> b16;
+        Word32ElemRep -> b32;
+        Word64ElemRep -> b64;
+        FloatElemRep -> f32;
+        DoubleElemRep -> f64
+      }
+
+-- RHS size: {terms: 48, types: 6, coercions: 0, joins: 0/0}
+primRepCmmType :: Platform -> PrimRep -> CmmType
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 330] 430 0}]
+primRepCmmType
+  = \ (platform_a5gUY :: Platform) (ds_d5hP9 :: PrimRep) ->
+      case ds_d5hP9 of {
+        VoidRep ->
+          panic
+            @ CmmType
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "primRepCmmType:VoidRep"#);
+        LiftedRep -> gcWord platform_a5gUY;
+        UnliftedRep -> gcWord platform_a5gUY;
+        Int8Rep -> b8;
+        Int16Rep -> b16;
+        Int32Rep -> b32;
+        Int64Rep -> b64;
+        IntRep -> bWord platform_a5gUY;
+        Word8Rep -> b8;
+        Word16Rep -> b16;
+        Word32Rep -> b32;
+        Word64Rep -> b64;
+        WordRep -> bWord platform_a5gUY;
+        AddrRep -> bWord platform_a5gUY;
+        FloatRep -> f32;
+        DoubleRep -> f64;
+        VecRep len_a5gUZ rep_a5gV0 ->
+          vec len_a5gUZ (primElemRepCmmType rep_a5gV0)
+      }
+
+-- RHS size: {terms: 39, types: 5, coercions: 0, joins: 0/0}
+primRepForeignHint :: PrimRep -> ForeignHint
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [180] 290 160}]
+primRepForeignHint
+  = \ (ds_d5hNK :: PrimRep) ->
+      case ds_d5hNK of {
+        VoidRep ->
+          panic
+            @ ForeignHint
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "primRepForeignHint:VoidRep"#);
+        LiftedRep -> GHC.Cmm.Type.AddrHint;
+        UnliftedRep -> GHC.Cmm.Type.AddrHint;
+        Int8Rep -> GHC.Cmm.Type.SignedHint;
+        Int16Rep -> GHC.Cmm.Type.SignedHint;
+        Int32Rep -> GHC.Cmm.Type.SignedHint;
+        Int64Rep -> GHC.Cmm.Type.SignedHint;
+        IntRep -> GHC.Cmm.Type.SignedHint;
+        Word8Rep -> GHC.Cmm.Type.NoHint;
+        Word16Rep -> GHC.Cmm.Type.NoHint;
+        Word32Rep -> GHC.Cmm.Type.NoHint;
+        Word64Rep -> GHC.Cmm.Type.NoHint;
+        WordRep -> GHC.Cmm.Type.NoHint;
+        AddrRep -> GHC.Cmm.Type.AddrHint;
+        FloatRep -> GHC.Cmm.Type.NoHint;
+        DoubleRep -> GHC.Cmm.Type.NoHint;
+        VecRep _ [Occ=Dead] _ [Occ=Dead] -> GHC.Cmm.Type.NoHint
+      }
+
+-- RHS size: {terms: 13, types: 2, coercions: 0, joins: 0/0}
+slotForeignHint :: SlotTy -> ForeignHint
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [60] 50 50}]
+slotForeignHint
+  = \ (ds_d5hNv :: SlotTy) ->
+      case ds_d5hNv of {
+        PtrSlot -> GHC.Cmm.Type.AddrHint;
+        WordSlot -> GHC.Cmm.Type.NoHint;
+        Word64Slot -> GHC.Cmm.Type.NoHint;
+        FloatSlot -> GHC.Cmm.Type.NoHint;
+        DoubleSlot -> GHC.Cmm.Type.NoHint
+      }
+
+-- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
+zeroCLit :: Platform -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 150 0}]
+zeroCLit
+  = \ (platform_a5gV8 :: Platform) ->
+      GHC.Cmm.Expr.$WCmmInt 0 (wordWidth platform_a5gV8)
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+zeroExpr :: Platform -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 30 20}]
+zeroExpr
+  = \ (platform_a5gV9 :: Platform) ->
+      GHC.Cmm.Expr.CmmLit (zeroCLit platform_a5gV9)
+
+-- RHS size: {terms: 6, types: 2, coercions: 0, joins: 0/0}
+mkWordCLit :: Platform -> Integer -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 50 0}]
+mkWordCLit
+  = \ (platform_a5gVa :: Platform) (wd_a5gVb :: Integer) ->
+      GHC.Cmm.Expr.$WCmmInt wd_a5gVb (wordWidth platform_a5gVa)
+
+-- RHS size: {terms: 32, types: 35, coercions: 0, joins: 0/0}
+mkByteStringCLit
+  :: forall (raw :: Bool) info stmt.
+     CLabel
+     -> ByteString -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 320 30}]
+mkByteStringCLit
+  = \ (@ (raw_a5hlM :: Bool))
+      (@ info_a5hlN)
+      (@ stmt_a5hlO)
+      (lbl_a5gVc :: CLabel)
+      (bytes_a5gVd :: ByteString) ->
+      (GHC.Cmm.Expr.CmmLabel lbl_a5gVc,
+       $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+         @ (GenCmmStatics raw_a5hlM)
+         @ (GenCmmDecl (GenCmmStatics raw_a5hlM) info_a5hlN stmt_a5hlO)
+         (GHC.Cmm.CmmData
+            @ (GenCmmStatics raw_a5hlM)
+            @ info_a5hlN
+            @ stmt_a5hlO
+            (GHC.Cmm.Section
+               (case BS.elem
+                       (fromInteger @ GHC.Word.Word8 GHC.Word.$fNumWord8 0) bytes_a5gVd
+                of {
+                  False -> GHC.Cmm.CString;
+                  True -> GHC.Cmm.ReadOnlyData
+                })
+               lbl_a5gVc))
+         (GHC.Cmm.CmmStaticsRaw
+            @ raw_a5hlM
+            lbl_a5gVc
+            (GHC.Base.build
+               @ CmmStatic
+               (\ (@ a_d5hKu)
+                  (c_d5hKv :: CmmStatic -> a_d5hKu -> a_d5hKu)
+                  (n_d5hKw :: a_d5hKu) ->
+                  c_d5hKv (GHC.Cmm.CmmString bytes_a5gVd) n_d5hKw))))
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+mkFileEmbedLit
+  :: forall (raw :: Bool) info stmt.
+     CLabel
+     -> FilePath -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 110 30}]
+mkFileEmbedLit
+  = \ (@ (raw_a5hlE :: Bool))
+      (@ info_a5hlF)
+      (@ stmt_a5hlG)
+      (lbl_a5gVf :: CLabel)
+      (path_a5gVg :: FilePath) ->
+      (GHC.Cmm.Expr.CmmLabel lbl_a5gVf,
+       GHC.Cmm.CmmData
+         @ (GenCmmStatics raw_a5hlE)
+         @ info_a5hlF
+         @ stmt_a5hlG
+         (GHC.Cmm.Section GHC.Cmm.ReadOnlyData lbl_a5gVf)
+         (GHC.Cmm.CmmStaticsRaw
+            @ raw_a5hlE
+            lbl_a5gVf
+            (GHC.Base.build
+               @ CmmStatic
+               (\ (@ a_d5hKr)
+                  (c_d5hKs :: CmmStatic -> a_d5hKr -> a_d5hKr)
+                  (n_d5hKt :: a_d5hKr) ->
+                  c_d5hKs (GHC.Cmm.CmmFileEmbed path_a5gVg) n_d5hKt))))
+
+-- RHS size: {terms: 14, types: 21, coercions: 0, joins: 0/0}
+mkDataLits
+  :: forall (raw :: Bool) info stmt.
+     Section
+     -> CLabel -> [CmmLit] -> GenCmmDecl (GenCmmStatics raw) info stmt
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 80 30}]
+mkDataLits
+  = \ (@ (raw_a5hkX :: Bool))
+      (@ info_a5hkY)
+      (@ stmt_a5hkZ)
+      (section_a5gVh :: Section)
+      (lbl_a5gVi :: CLabel)
+      (lits_a5gVj :: [CmmLit]) ->
+      GHC.Cmm.CmmData
+        @ (GenCmmStatics raw_a5hkX)
+        @ info_a5hkY
+        @ stmt_a5hkZ
+        section_a5gVh
+        ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+           @ [CmmStatic]
+           @ (GenCmmStatics raw_a5hkX)
+           (GHC.Cmm.CmmStaticsRaw @ raw_a5hkX lbl_a5gVi)
+           (map @ CmmLit @ CmmStatic GHC.Cmm.CmmStaticLit lits_a5gVj))
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+mkStgWordCLit :: Platform -> StgWord -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 70 0}]
+mkStgWordCLit
+  = \ (platform_a5gVo :: Platform) (wd_a5gVp :: StgWord) ->
+      GHC.Cmm.Expr.$WCmmInt
+        (fromStgWord wd_a5gVp) (wordWidth platform_a5gVo)
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+mkLblExpr :: CLabel -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+mkLblExpr
+  = \ (lbl_a5gVv :: CLabel) ->
+      GHC.Cmm.Expr.CmmLit (GHC.Cmm.Expr.CmmLabel lbl_a5gVv)
+
+-- RHS size: {terms: 14, types: 5, coercions: 0, joins: 0/0}
+cmmRegOff :: CmmReg -> Int -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 20] 80 0}]
+cmmRegOff
+  = \ (reg_a5gVS :: CmmReg) (ds_d5hEs :: Int) ->
+      case ds_d5hEs of { ghc-prim-0.6.1:GHC.Types.I# ds_d5hEz ->
+      case ds_d5hEz of {
+        __DEFAULT -> GHC.Cmm.Expr.$WCmmRegOff reg_a5gVS ds_d5hEs;
+        0# -> GHC.Cmm.Expr.$WCmmReg reg_a5gVS
+      }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmRegOffB :: CmmReg -> ByteOff -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+cmmRegOffB = cmmRegOff
+
+-- RHS size: {terms: 14, types: 5, coercions: 0, joins: 0/0}
+cmmLabelOff :: CLabel -> Int -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 20] 50 50}]
+cmmLabelOff
+  = \ (lbl_a5gW9 :: CLabel) (ds_d5hDo :: Int) ->
+      case ds_d5hDo of { ghc-prim-0.6.1:GHC.Types.I# ds_d5hDv ->
+      case ds_d5hDv of {
+        __DEFAULT -> GHC.Cmm.Expr.CmmLabelOff lbl_a5gW9 ds_d5hDo;
+        0# -> GHC.Cmm.Expr.CmmLabel lbl_a5gW9
+      }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmLabelOffB :: CLabel -> ByteOff -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+cmmLabelOffB = cmmLabelOff
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmOrWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmOrWord
+  = \ (platform_a5gWQ :: Platform)
+      (e1_a5gWR :: CmmExpr)
+      (e2_a5gWS :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordOr platform_a5gWQ)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hDl)
+              (c_d5hDm :: CmmExpr -> a_d5hDl -> a_d5hDl)
+              (n_d5hDn :: a_d5hDl) ->
+              c_d5hDm e1_a5gWR (c_d5hDm e2_a5gWS n_d5hDn)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmAndWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmAndWord
+  = \ (platform_a5gWT :: Platform)
+      (e1_a5gWU :: CmmExpr)
+      (e2_a5gWV :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordAnd platform_a5gWT)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hDi)
+              (c_d5hDj :: CmmExpr -> a_d5hDi -> a_d5hDi)
+              (n_d5hDk :: a_d5hDi) ->
+              c_d5hDj e1_a5gWU (c_d5hDj e2_a5gWV n_d5hDk)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmNeWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmNeWord
+  = \ (platform_a5gWW :: Platform)
+      (e1_a5gWX :: CmmExpr)
+      (e2_a5gWY :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordNe platform_a5gWW)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hDf)
+              (c_d5hDg :: CmmExpr -> a_d5hDf -> a_d5hDf)
+              (n_d5hDh :: a_d5hDf) ->
+              c_d5hDg e1_a5gWX (c_d5hDg e2_a5gWY n_d5hDh)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmEqWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmEqWord
+  = \ (platform_a5gWZ :: Platform)
+      (e1_a5gX0 :: CmmExpr)
+      (e2_a5gX1 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordEq platform_a5gWZ)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hDc)
+              (c_d5hDd :: CmmExpr -> a_d5hDc -> a_d5hDc)
+              (n_d5hDe :: a_d5hDc) ->
+              c_d5hDd e1_a5gX0 (c_d5hDd e2_a5gX1 n_d5hDe)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmULtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmULtWord
+  = \ (platform_a5gX2 :: Platform)
+      (e1_a5gX3 :: CmmExpr)
+      (e2_a5gX4 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordULt platform_a5gX2)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hD9)
+              (c_d5hDa :: CmmExpr -> a_d5hD9 -> a_d5hD9)
+              (n_d5hDb :: a_d5hD9) ->
+              c_d5hDa e1_a5gX3 (c_d5hDa e2_a5gX4 n_d5hDb)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUGeWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmUGeWord
+  = \ (platform_a5gX5 :: Platform)
+      (e1_a5gX6 :: CmmExpr)
+      (e2_a5gX7 :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUGe platform_a5gX5)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hD6)
+              (c_d5hD7 :: CmmExpr -> a_d5hD6 -> a_d5hD6)
+              (n_d5hD8 :: a_d5hD6) ->
+              c_d5hD7 e1_a5gX6 (c_d5hD7 e2_a5gX7 n_d5hD8)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUGtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmUGtWord
+  = \ (platform_a5gX8 :: Platform)
+      (e1_a5gX9 :: CmmExpr)
+      (e2_a5gXa :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUGt platform_a5gX8)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hD3)
+              (c_d5hD4 :: CmmExpr -> a_d5hD3 -> a_d5hD3)
+              (n_d5hD5 :: a_d5hD3) ->
+              c_d5hD4 e1_a5gX9 (c_d5hD4 e2_a5gXa n_d5hD5)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmSLtWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmSLtWord
+  = \ (platform_a5gXb :: Platform)
+      (e1_a5gXc :: CmmExpr)
+      (e2_a5gXd :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordSLt platform_a5gXb)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hD0)
+              (c_d5hD1 :: CmmExpr -> a_d5hD0 -> a_d5hD0)
+              (n_d5hD2 :: a_d5hD0) ->
+              c_d5hD1 e1_a5gXc (c_d5hD1 e2_a5gXd n_d5hD2)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmUShrWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmUShrWord
+  = \ (platform_a5gXe :: Platform)
+      (e1_a5gXf :: CmmExpr)
+      (e2_a5gXg :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUShr platform_a5gXe)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hCX)
+              (c_d5hCY :: CmmExpr -> a_d5hCX -> a_d5hCX)
+              (n_d5hCZ :: a_d5hCX) ->
+              c_d5hCY e1_a5gXf (c_d5hCY e2_a5gXg n_d5hCZ)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmAddWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmAddWord
+  = \ (platform_a5gXh :: Platform)
+      (e1_a5gXi :: CmmExpr)
+      (e2_a5gXj :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordAdd platform_a5gXh)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hCU)
+              (c_d5hCV :: CmmExpr -> a_d5hCU -> a_d5hCU)
+              (n_d5hCW :: a_d5hCU) ->
+              c_d5hCV e1_a5gXi (c_d5hCV e2_a5gXj n_d5hCW)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmSubWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmSubWord
+  = \ (platform_a5gXk :: Platform)
+      (e1_a5gXl :: CmmExpr)
+      (e2_a5gXm :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordSub platform_a5gXk)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hCR)
+              (c_d5hCS :: CmmExpr -> a_d5hCR -> a_d5hCR)
+              (n_d5hCT :: a_d5hCR) ->
+              c_d5hCS e1_a5gXl (c_d5hCS e2_a5gXm n_d5hCT)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmMulWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmMulWord
+  = \ (platform_a5gXn :: Platform)
+      (e1_a5gXo :: CmmExpr)
+      (e2_a5gXp :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordMul platform_a5gXn)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hCO)
+              (c_d5hCP :: CmmExpr -> a_d5hCO -> a_d5hCO)
+              (n_d5hCQ :: a_d5hCO) ->
+              c_d5hCP e1_a5gXo (c_d5hCP e2_a5gXp n_d5hCQ)))
+
+-- RHS size: {terms: 15, types: 10, coercions: 0, joins: 0/0}
+cmmQuotWord :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 110 30}]
+cmmQuotWord
+  = \ (platform_a5gXq :: Platform)
+      (e1_a5gXr :: CmmExpr)
+      (e2_a5gXs :: CmmExpr) ->
+      GHC.Cmm.Expr.CmmMachOp
+        (mo_wordUQuot platform_a5gXq)
+        (GHC.Base.build
+           @ CmmExpr
+           (\ (@ a_d5hCL)
+              (c_d5hCM :: CmmExpr -> a_d5hCL -> a_d5hCL)
+              (n_d5hCN :: a_d5hCL) ->
+              c_d5hCM e1_a5gXr (c_d5hCM e2_a5gXs n_d5hCN)))
+
+-- RHS size: {terms: 19, types: 9, coercions: 0, joins: 0/1}
+cmmMkAssign
+  :: Platform -> CmmExpr -> Unique -> (CmmNode O O, CmmExpr)
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 160 30}]
+cmmMkAssign
+  = \ (platform_a5gXB :: Platform)
+      (expr_a5gXC :: CmmExpr)
+      (uq_a5gXD :: Unique) ->
+      case cmmExprType platform_a5gXB expr_a5gXC of ty_a5gXE
+      { __DEFAULT ->
+      let {
+        reg_a5gXF :: CmmReg
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 50 0}]
+        reg_a5gXF
+          = GHC.Cmm.Expr.$WCmmLocal
+              (GHC.Cmm.Expr.$WLocalReg uq_a5gXD ty_a5gXE) } in
+      (GHC.Cmm.Node.$WCmmAssign reg_a5gXF expr_a5gXC,
+       GHC.Cmm.Expr.$WCmmReg reg_a5gXF)
+      }
+
+-- RHS size: {terms: 17, types: 14, coercions: 0, joins: 0/0}
+isTrivialCmmExpr :: CmmExpr -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [70] 190 50}]
+isTrivialCmmExpr
+  = \ (ds_d5hzu :: CmmExpr) ->
+      case ds_d5hzu of {
+        CmmLit _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmLoad _ [Occ=Dead] _ [Occ=Dead] ->
+          ghc-prim-0.6.1:GHC.Types.False;
+        CmmReg _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmMachOp _ [Occ=Dead] _ [Occ=Dead] ->
+          ghc-prim-0.6.1:GHC.Types.False;
+        CmmStackSlot _ [Occ=Dead] _ [Occ=Dead] ->
+          panic
+            @ Bool
+            (ghc-prim-0.6.1:GHC.CString.unpackCString#
+               "isTrivialCmmExpr CmmStackSlot"#);
+        CmmRegOff _ [Occ=Dead] _ [Occ=Dead] ->
+          ghc-prim-0.6.1:GHC.Types.True
+      }
+
+-- RHS size: {terms: 7, types: 3, coercions: 0, joins: 0/0}
+isLit :: CmmExpr -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+isLit
+  = \ (ds_d5hvQ :: CmmExpr) ->
+      case ds_d5hvQ of {
+        __DEFAULT -> ghc-prim-0.6.1:GHC.Types.False;
+        CmmLit _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True
+      }
+
+-- RHS size: {terms: 8, types: 5, coercions: 0, joins: 0/0}
+isComparisonExpr :: CmmExpr -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [30] 40 10}]
+isComparisonExpr
+  = \ (ds_d5hvD :: CmmExpr) ->
+      case ds_d5hvD of {
+        __DEFAULT -> ghc-prim-0.6.1:GHC.Types.False;
+        CmmMachOp op_a5gXI _ [Occ=Dead] -> isComparisonMachOp op_a5gXI
+      }
+
+-- RHS size: {terms: 10, types: 19, coercions: 0, joins: 0/0}
+modifyGraph
+  :: forall (n :: Extensibility -> Extensibility -> *)
+            (n' :: Extensibility -> Extensibility -> *).
+     (Graph n C C -> Graph n' C C) -> GenCmmGraph n -> GenCmmGraph n'
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 0] 70 30}]
+modifyGraph
+  = \ (@ (n_a5hh3 :: Extensibility -> Extensibility -> *))
+      (@ (n'_a5hh4 :: Extensibility -> Extensibility -> *))
+      (f_a5gYj :: Graph n_a5hh3 C C -> Graph n'_a5hh4 C C)
+      (g_a5gYk :: GenCmmGraph n_a5hh3) ->
+      GHC.Cmm.CmmGraph
+        @ n'_a5hh4
+        (g_entry @ n_a5hh3 g_a5gYk)
+        (f_a5gYj (g_graph @ n_a5hh3 g_a5gYk))
+
+-- RHS size: {terms: 4, types: 14, coercions: 0, joins: 0/0}
+mapGraphNodes1
+  :: (forall (e :: Extensibility) (x :: Extensibility).
+      CmmNode e x -> CmmNode e x)
+     -> CmmGraph -> CmmGraph
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 40 0}]
+mapGraphNodes1
+  = \ (f_a5gYP
+         :: forall (e :: Extensibility) (x :: Extensibility).
+            CmmNode e x -> CmmNode e x) ->
+      modifyGraph
+        @ CmmNode @ CmmNode (mapGraph @ CmmNode @ CmmNode @ C @ C f_a5gYP)
+
+-- RHS size: {terms: 27, types: 57, coercions: 0, joins: 1/1}
+toBlockMap :: CmmGraph -> LabelMap CmmBlock
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 292 0}]
+toBlockMap
+  = \ (ds_d5hoq :: GenCmmGraph CmmNode) ->
+      join {
+        fail_d5hq7 :: ghc-prim-0.6.1:GHC.Prim.Void# -> LabelMap CmmBlock
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 210 0}]
+        fail_d5hq7 _ [Occ=Dead, OS=OneShot]
+          = Control.Exception.Base.patError
+              @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+              @ (LabelMap CmmBlock)
+              "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:525:1-67|function toBlockMap"# } in
+      case ds_d5hoq of { CmmGraph _ [Occ=Dead] ds_d5hq4 ->
+      case ds_d5hq4 of {
+        __DEFAULT -> jump fail_d5hq7 ghc-prim-0.6.1:GHC.Prim.void#;
+        GMany ds_d5hq5 body_a5gYl ds_d5hq6 ->
+          case ds_d5hq5 of {
+            __DEFAULT -> jump fail_d5hq7 ghc-prim-0.6.1:GHC.Prim.void#;
+            NothingO co_a5heb ->
+              case ds_d5hq6 of {
+                __DEFAULT -> jump fail_d5hq7 ghc-prim-0.6.1:GHC.Prim.void#;
+                NothingO co_a5hec -> body_a5gYl
+              }
+          }
+      }
+      }
+
+-- RHS size: {terms: 8, types: 16, coercions: 0, joins: 0/0}
+ofBlockMap :: BlockId -> LabelMap CmmBlock -> CmmGraph
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 50 30}]
+ofBlockMap
+  = \ (entry_a5gYm :: BlockId)
+      (bodyMap_a5gYn :: LabelMap CmmBlock) ->
+      GHC.Cmm.CmmGraph
+        @ CmmNode
+        entry_a5gYm
+        (GHC.Cmm.Dataflow.Graph.$WGMany
+           @ 'Closed
+           @ Block
+           @ CmmNode
+           @ 'Closed
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode O C))
+           bodyMap_a5gYn
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode C O)))
+
+-- RHS size: {terms: 18, types: 38, coercions: 17, joins: 0/0}
+blockTicks :: Block CmmNode C C -> [CmmTickish]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 120 0}]
+blockTicks
+  = \ (b_a5gYU :: Block CmmNode C C) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ [CmmTickish]
+        @ [CmmTickish]
+        (reverse @ CmmTickish)
+        ((foldBlockNodesF
+            @ CmmNode
+            @ [CmmTickish]
+            (\ (@ (e_a5hdd :: Extensibility))
+               (@ (x_a5hde :: Extensibility))
+               (ds_d5hnw :: CmmNode e_a5hdd x_a5hde)
+               (ts_a5gYZ :: [CmmTickish]) ->
+               case ds_d5hnw of {
+                 __DEFAULT -> ts_a5gYZ;
+                 CmmTick co_a5hcX co_a5hcY t_a5gYY ->
+                   ghc-prim-0.6.1:GHC.Types.: @ CmmTickish t_a5gYY ts_a5gYZ
+               })
+            @ C
+            @ C
+            b_a5gYU
+            ((ghc-prim-0.6.1:GHC.Types.[] @ CmmTickish)
+             `cast` (Sub (Sym (GHC.Cmm.Dataflow.Block.D:R:IndexedCOkCloseda_b[0]
+                                   <*>_N <[CmmTickish]>_N <[CmmTickish]>_N))
+                     :: [CmmTickish] ~R# IndexedCO C [CmmTickish] [CmmTickish])))
+         `cast` (Sub (GHC.Cmm.Dataflow.Block.D:R:IndexedCOkCloseda_b[0]
+                          <*>_N <[CmmTickish]>_N <[CmmTickish]>_N)
+                 :: IndexedCO C [CmmTickish] [CmmTickish] ~R# [CmmTickish]))
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+baseExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+baseExpr = GHC.Cmm.Expr.$WCmmReg baseReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+spExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+spExpr = GHC.Cmm.Expr.$WCmmReg spReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+spLimExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+spLimExpr = GHC.Cmm.Expr.$WCmmReg spLimReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+hpExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+hpExpr = GHC.Cmm.Expr.$WCmmReg hpReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+hpLimExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+hpLimExpr = GHC.Cmm.Expr.$WCmmReg hpLimReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+currentTSOExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+currentTSOExpr = GHC.Cmm.Expr.$WCmmReg currentTSOReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+currentNurseryExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+currentNurseryExpr = GHC.Cmm.Expr.$WCmmReg currentNurseryReg
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+cccsExpr :: CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+cccsExpr = GHC.Cmm.Expr.$WCmmReg cccsReg
+
+-- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
+GHC.Cmm.Utils.$trModule :: ghc-prim-0.6.1:GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 30}]
+GHC.Cmm.Utils.$trModule
+  = ghc-prim-0.6.1:GHC.Types.Module
+      (ghc-prim-0.6.1:GHC.Types.TrNameS "ghc"#)
+      (ghc-prim-0.6.1:GHC.Types.TrNameS "GHC.Cmm.Utils"#)
+
+-- RHS size: {terms: 34, types: 10, coercions: 0, joins: 0/2}
+packHalfWordsCLit
+  :: Platform -> StgHalfWord -> StgHalfWord -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 360 0}]
+packHalfWordsCLit
+  = \ (platform_a5gVq :: Platform)
+      (lower_half_word_a5gVr :: StgHalfWord)
+      (upper_half_word_a5gVs :: StgHalfWord) ->
+      let {
+        u_a5gVu :: Integer
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+        u_a5gVu = fromStgHalfWord upper_half_word_a5gVs } in
+      let {
+        l_a5gVt :: Integer
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+        l_a5gVt = fromStgHalfWord lower_half_word_a5gVr } in
+      case platformByteOrder platform_a5gVq of {
+        BigEndian ->
+          mkWordCLit
+            platform_a5gVq
+            (.|.
+               @ Integer
+               Data.Bits.$fBitsInteger
+               (shiftL
+                  @ Integer
+                  Data.Bits.$fBitsInteger
+                  l_a5gVt
+                  (halfWordSizeInBits platform_a5gVq))
+               u_a5gVu);
+        LittleEndian ->
+          mkWordCLit
+            platform_a5gVq
+            (.|.
+               @ Integer
+               Data.Bits.$fBitsInteger
+               l_a5gVt
+               (shiftL
+                  @ Integer
+                  Data.Bits.$fBitsInteger
+                  u_a5gVu
+                  (halfWordSizeInBits platform_a5gVq)))
+      }
+
+-- RHS size: {terms: 20, types: 3, coercions: 11, joins: 0/0}
+$dIP_a5hjZ :: GHC.Stack.Types.HasCallStack
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 390 0}]
+$dIP_a5hjZ
+  = (GHC.Stack.Types.pushCallStack
+       (ghc-prim-0.6.1:GHC.CString.unpackCString# "pprPanic"#,
+        GHC.Stack.Types.SrcLoc
+          (ghc-prim-0.6.1:GHC.CString.unpackCString# "ghc"#)
+          (ghc-prim-0.6.1:GHC.CString.unpackCString# "GHC.Cmm.Utils"#)
+          (ghc-prim-0.6.1:GHC.CString.unpackCString#
+             "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs"#)
+          (ghc-prim-0.6.1:GHC.Types.I# 284#)
+          (ghc-prim-0.6.1:GHC.Types.I# 43#)
+          (ghc-prim-0.6.1:GHC.Types.I# 284#)
+          (ghc-prim-0.6.1:GHC.Types.I# 81#))
+       ((GHC.Stack.Types.emptyCallStack
+         `cast` (Sym (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                          <"callStack">_N <GHC.Stack.Types.CallStack>_N)
+                 :: GHC.Stack.Types.CallStack
+                    ~R# (?callStack::GHC.Stack.Types.CallStack)))
+        `cast` (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                    <"callStack">_N <GHC.Stack.Types.CallStack>_N
+                :: (?callStack::GHC.Stack.Types.CallStack)
+                   ~R# GHC.Stack.Types.CallStack)))
+    `cast` (Sym (ghc-prim-0.6.1:GHC.Classes.N:IP[0]
+                     <"callStack">_N <GHC.Stack.Types.CallStack>_N)
+            :: GHC.Stack.Types.CallStack
+               ~R# (?callStack::GHC.Stack.Types.CallStack))
+
+-- RHS size: {terms: 34, types: 18, coercions: 0, joins: 1/1}
+cmmNegate :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 34] 218 20}]
+cmmNegate
+  = \ (platform_a5gXt :: Platform) (ds_d5hBT :: CmmExpr) ->
+      join {
+        fail_d5hCJ :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 100 30}]
+        fail_d5hCJ _ [Occ=Dead, OS=OneShot]
+          = GHC.Cmm.Expr.CmmMachOp
+              (GHC.Cmm.MachOp.MO_S_Neg (cmmExprWidth platform_a5gXt ds_d5hBT))
+              (GHC.Base.build
+                 @ CmmExpr
+                 (\ (@ a_d5hBZ)
+                    (c_d5hC0 :: CmmExpr -> a_d5hBZ -> a_d5hBZ)
+                    (n_d5hC1 :: a_d5hBZ) ->
+                    c_d5hC0 ds_d5hBT n_d5hC1)) } in
+      case ds_d5hBT of {
+        __DEFAULT -> jump fail_d5hCJ ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hCI ->
+          case ds_d5hCI of {
+            __DEFAULT -> jump fail_d5hCJ ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a5gXu rep_a5gXv ->
+              GHC.Cmm.Expr.CmmLit
+                (GHC.Cmm.Expr.$WCmmInt
+                   (negate @ Integer GHC.Num.$fNumInteger n_a5gXu) rep_a5gXv)
+          }
+      }
+
+-- RHS size: {terms: 28, types: 13, coercions: 0, joins: 0/2}
+cmmToWord :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 200 30}]
+cmmToWord
+  = \ (platform_a5gXx :: Platform) (e_a5gXy :: CmmExpr) ->
+      let {
+        word_a5gXA :: Width
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+        word_a5gXA = wordWidth platform_a5gXx } in
+      let {
+        w_a5gXz :: Width
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+        w_a5gXz = cmmExprWidth platform_a5gXx e_a5gXy } in
+      case == @ Width GHC.Cmm.Type.$fEqWidth w_a5gXz word_a5gXA of {
+        False ->
+          GHC.Cmm.Expr.CmmMachOp
+            (GHC.Cmm.MachOp.MO_UU_Conv w_a5gXz word_a5gXA)
+            (GHC.Base.build
+               @ CmmExpr
+               (\ (@ a_d5hBI)
+                  (c_d5hBJ :: CmmExpr -> a_d5hBI -> a_d5hBI)
+                  (n_d5hBK :: a_d5hBI) ->
+                  c_d5hBJ e_a5gXy n_d5hBK));
+        True -> e_a5gXy
+      }
+
+-- RHS size: {terms: 47, types: 19, coercions: 0, joins: 1/1}
+regsOverlap :: Platform -> CmmReg -> CmmReg -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 34 34] 260 10}]
+regsOverlap
+  = \ (platform_a5gXV :: Platform)
+      (ds_d5hrI :: CmmReg)
+      (ds_d5hrJ :: CmmReg) ->
+      join {
+        fail_d5ht8 :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 40 0}]
+        fail_d5ht8 _ [Occ=Dead, OS=OneShot]
+          = == @ CmmReg GHC.Cmm.Expr.$fEqCmmReg ds_d5hrI ds_d5hrJ } in
+      case ds_d5hrI of {
+        __DEFAULT -> jump fail_d5ht8 ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmGlobal g_a5gXW ->
+          case ds_d5hrJ of {
+            __DEFAULT -> jump fail_d5ht8 ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmGlobal g'_a5gXX ->
+              case globalRegMaybe platform_a5gXV g_a5gXW of {
+                __DEFAULT -> jump fail_d5ht8 ghc-prim-0.6.1:GHC.Prim.void#;
+                Just real_a5gXY ->
+                  case globalRegMaybe platform_a5gXV g'_a5gXX of {
+                    __DEFAULT -> jump fail_d5ht8 ghc-prim-0.6.1:GHC.Prim.void#;
+                    Just real'_a5gXZ ->
+                      case ==
+                             @ GHC.Platform.Reg.RealReg
+                             GHC.Platform.Reg.$fEqRealReg
+                             real_a5gXY
+                             real'_a5gXZ
+                      of {
+                        False -> jump fail_d5ht8 ghc-prim-0.6.1:GHC.Prim.void#;
+                        True -> ghc-prim-0.6.1:GHC.Types.True
+                      }
+                  }
+              }
+          }
+      }
+
+-- RHS size: {terms: 12, types: 3, coercions: 0, joins: 0/0}
+tAG_MASK :: Platform -> Int
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 140 0}]
+tAG_MASK
+  = \ (platform_a5gXJ :: Platform) ->
+      - @ Int
+        GHC.Num.$fNumInt
+        (shiftL
+           @ Int
+           Data.Bits.$fBitsInt
+           (ghc-prim-0.6.1:GHC.Types.I# 1#)
+           (pc_TAG_BITS (platformConstants platform_a5gXJ)))
+        (ghc-prim-0.6.1:GHC.Types.I# 1#)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+mAX_PTR_TAG :: Platform -> Int
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+mAX_PTR_TAG = tAG_MASK
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmLabelOffW :: Platform -> CLabel -> WordOff -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 70 0}]
+cmmLabelOffW
+  = \ (platform_a5gWJ :: Platform)
+      (lbl_a5gWK :: CLabel)
+      (wd_off_a5gWL :: WordOff) ->
+      cmmLabelOffB
+        lbl_a5gWK
+        (wordsToBytes
+           @ WordOff GHC.Num.$fNumInt platform_a5gWJ wd_off_a5gWL)
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmRegOffW :: Platform -> CmmReg -> WordOff -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 70 0}]
+cmmRegOffW
+  = \ (platform_a5gWD :: Platform)
+      (reg_a5gWE :: CmmReg)
+      (wd_off_a5gWF :: WordOff) ->
+      cmmRegOffB
+        reg_a5gWE
+        (wordsToBytes
+           @ WordOff GHC.Num.$fNumInt platform_a5gWD wd_off_a5gWF)
+
+Rec {
+-- RHS size: {terms: 34, types: 18, coercions: 0, joins: 0/1}
+mkLiveness [Occ=LoopBreaker] :: Platform -> [LocalReg] -> Liveness
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 30] 400 10}]
+mkLiveness
+  = \ (ds_d5hrw :: Platform) (ds_d5hrx :: [LocalReg]) ->
+      case ds_d5hrx of {
+        [] -> ghc-prim-0.6.1:GHC.Types.[] @ Bool;
+        : reg_a5gYd regs_a5gYe ->
+          let {
+            word_size_a5gYf :: Int
+            [LclId,
+             Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                     WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+            word_size_a5gYf = platformWordSizeInBytes ds_d5hrw } in
+          ++
+            @ Bool
+            (replicate
+               @ Bool
+               (quot
+                  @ Int
+                  GHC.Real.$fIntegralInt
+                  (- @ Int
+                     GHC.Num.$fNumInt
+                     (+ @ Int
+                        GHC.Num.$fNumInt
+                        (widthInBytes (typeWidth (localRegType reg_a5gYd)))
+                        word_size_a5gYf)
+                     (ghc-prim-0.6.1:GHC.Types.I# 1#))
+                  word_size_a5gYf)
+               ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                  @ Bool
+                  @ Bool
+                  not
+                  (isGcPtrType (localRegType reg_a5gYd))))
+            (mkLiveness ds_d5hrw regs_a5gYe)
+      }
+end Rec }
+
+-- RHS size: {terms: 42, types: 19, coercions: 0, joins: 0/0}
+cmmOffsetLit :: CmmLit -> Int -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [320 0] 440 50}]
+cmmOffsetLit
+  = \ (ds_d5hDy :: CmmLit) (byte_off_a5gVW :: Int) ->
+      case ds_d5hDy of {
+        __DEFAULT ->
+          pprPanic
+            @ CmmLit
+            $dIP_a5hjZ
+            (ghc-prim-0.6.1:GHC.CString.unpackCString# "cmmOffsetLit"#)
+            (ppr @ Int GHC.Utils.Outputable.$fOutputableInt byte_off_a5gVW);
+        CmmInt m_a5gW5 rep_a5gW6 ->
+          GHC.Cmm.Expr.$WCmmInt
+            (+ @ Integer
+               GHC.Num.$fNumInteger
+               m_a5gW5
+               (fromIntegral
+                  @ Int
+                  @ Integer
+                  GHC.Real.$fIntegralInt
+                  GHC.Num.$fNumInteger
+                  byte_off_a5gVW))
+            rep_a5gW6;
+        CmmLabel l_a5gVV -> cmmLabelOff l_a5gVV byte_off_a5gVW;
+        CmmLabelOff l_a5gVX m_a5gVY ->
+          cmmLabelOff
+            l_a5gVX (+ @ Int GHC.Num.$fNumInt m_a5gVY byte_off_a5gVW);
+        CmmLabelDiffOff l1_a5gW0 l2_a5gW1 m_a5gW2 w_a5gW3 ->
+          GHC.Cmm.Expr.CmmLabelDiffOff
+            l1_a5gW0
+            l2_a5gW1
+            (+ @ Int GHC.Num.$fNumInt m_a5gW2 byte_off_a5gVW)
+            w_a5gW3
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetLitB :: CmmLit -> ByteOff -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+cmmOffsetLitB = cmmOffsetLit
+
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
+cmmOffsetLitW :: Platform -> CmmLit -> WordOff -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 70 0}]
+cmmOffsetLitW
+  = \ (platform_a5gWG :: Platform)
+      (lit_a5gWH :: CmmLit)
+      (wd_off_a5gWI :: WordOff) ->
+      cmmOffsetLitB
+        lit_a5gWH
+        (wordsToBytes
+           @ WordOff GHC.Num.$fNumInt platform_a5gWG wd_off_a5gWI)
+
+-- RHS size: {terms: 119, types: 58, coercions: 0, joins: 1/2}
+cmmOffset :: Platform -> CmmExpr -> Int -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=NEVER}]
+cmmOffset
+  = \ (_platform_a5gVC :: Platform)
+      (e_a5gVD :: CmmExpr)
+      (ds_d5hEC :: Int) ->
+      case ds_d5hEC of { ghc-prim-0.6.1:GHC.Types.I# ds_d5hID ->
+      case ds_d5hID of {
+        __DEFAULT ->
+          join {
+            fail_d5hIx :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+            [LclId[JoinId(1)],
+             Str=<L,U>,
+             Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                     WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 210 30}]
+            fail_d5hIx _ [Occ=Dead, OS=OneShot]
+              = let {
+                  width_a5gVR :: Width
+                  [LclId,
+                   Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                           WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+                  width_a5gVR = cmmExprWidth _platform_a5gVC e_a5gVD } in
+                GHC.Cmm.Expr.CmmMachOp
+                  (GHC.Cmm.MachOp.MO_Add width_a5gVR)
+                  (GHC.Base.build
+                     @ CmmExpr
+                     (\ (@ a_d5hFb)
+                        (c_d5hFc :: CmmExpr -> a_d5hFb -> a_d5hFb)
+                        (n_d5hFd :: a_d5hFb) ->
+                        c_d5hFc
+                          e_a5gVD
+                          (c_d5hFc
+                             (GHC.Cmm.Expr.CmmLit
+                                (GHC.Cmm.Expr.$WCmmInt
+                                   (toInteger @ Int GHC.Real.$fIntegralInt ds_d5hEC) width_a5gVR))
+                             n_d5hFd))) } in
+          case e_a5gVD of {
+            __DEFAULT -> jump fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLit lit_a5gVK ->
+              GHC.Cmm.Expr.CmmLit (cmmOffsetLit lit_a5gVK ds_d5hEC);
+            CmmReg reg_a5gVH -> cmmRegOff reg_a5gVH ds_d5hEC;
+            CmmMachOp ds_d5hIr ds_d5hIs ->
+              case ds_d5hIr of {
+                __DEFAULT -> jump fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                MO_Add rep_a5gVN ->
+                  case ds_d5hIs of {
+                    __DEFAULT -> jump fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                    : expr_a5gVO ds_d5hIt ->
+                      case ds_d5hIt of {
+                        __DEFAULT -> jump fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                        : ds_d5hIu ds_d5hIv ->
+                          case ds_d5hIu of {
+                            __DEFAULT -> jump fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                            CmmLit ds_d5hIw ->
+                              case ds_d5hIw of {
+                                __DEFAULT -> jump fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                                CmmInt byte_off1_a5gVP _ [Occ=Dead] ->
+                                  case ds_d5hIv of {
+                                    __DEFAULT -> jump fail_d5hIx ghc-prim-0.6.1:GHC.Prim.void#;
+                                    [] ->
+                                      GHC.Cmm.Expr.CmmMachOp
+                                        (GHC.Cmm.MachOp.MO_Add rep_a5gVN)
+                                        (GHC.Base.build
+                                           @ CmmExpr
+                                           (\ (@ a_d5hF8)
+                                              (c_d5hF9 :: CmmExpr -> a_d5hF8 -> a_d5hF8)
+                                              (n_d5hFa :: a_d5hF8) ->
+                                              c_d5hF9
+                                                expr_a5gVO
+                                                (c_d5hF9
+                                                   (GHC.Cmm.Expr.CmmLit
+                                                      (GHC.Cmm.Expr.$WCmmInt
+                                                         (+ @ Integer
+                                                            GHC.Num.$fNumInteger
+                                                            byte_off1_a5gVP
+                                                            (toInteger
+                                                               @ Int
+                                                               GHC.Real.$fIntegralInt
+                                                               ds_d5hEC))
+                                                         rep_a5gVN))
+                                                   n_d5hFa)))
+                                  }
+                              }
+                          }
+                      }
+                  }
+              };
+            CmmStackSlot area_a5gVL off_a5gVM ->
+              GHC.Cmm.Expr.$WCmmStackSlot
+                area_a5gVL (- @ Int GHC.Num.$fNumInt off_a5gVM ds_d5hEC);
+            CmmRegOff reg_a5gVI m_a5gVJ ->
+              cmmRegOff reg_a5gVI (+ @ Int GHC.Num.$fNumInt m_a5gVJ ds_d5hEC)
+          };
+        0# -> e_a5gVD
+      }
+      }
+
+-- RHS size: {terms: 12, types: 5, coercions: 0, joins: 0/0}
+cmmIndex :: Platform -> Width -> CmmExpr -> Int -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0 0] 100 0}]
+cmmIndex
+  = \ (platform_a5gWc :: Platform)
+      (width_a5gWd :: Width)
+      (base_a5gWe :: CmmExpr)
+      (idx_a5gWf :: Int) ->
+      cmmOffset
+        platform_a5gWc
+        base_a5gWe
+        (* @ Int GHC.Num.$fNumInt idx_a5gWf (widthInBytes width_a5gWd))
+
+-- RHS size: {terms: 12, types: 4, coercions: 0, joins: 0/0}
+cmmLoadIndex :: Platform -> CmmType -> CmmExpr -> Int -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0 0] 100 0}]
+cmmLoadIndex
+  = \ (platform_a5gWq :: Platform)
+      (ty_a5gWr :: CmmType)
+      (expr_a5gWs :: CmmExpr)
+      (ix_a5gWt :: Int) ->
+      GHC.Cmm.Expr.$WCmmLoad
+        (cmmIndex platform_a5gWq (typeWidth ty_a5gWr) expr_a5gWs ix_a5gWt)
+        ty_a5gWr
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetB :: Platform -> CmmExpr -> ByteOff -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+cmmOffsetB = cmmOffset
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+cmmOffsetW :: Platform -> CmmExpr -> WordOff -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 80 0}]
+cmmOffsetW
+  = \ (platform_a5gWA :: Platform)
+      (e_a5gWB :: CmmExpr)
+      (n_a5gWC :: WordOff) ->
+      cmmOffsetB
+        platform_a5gWA
+        e_a5gWB
+        (wordsToBytes @ WordOff GHC.Num.$fNumInt platform_a5gWA n_a5gWC)
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+cmmLoadIndexW :: Platform -> CmmExpr -> Int -> CmmType -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0 0] 70 0}]
+cmmLoadIndexW
+  = \ (platform_a5gWM :: Platform)
+      (base_a5gWN :: CmmExpr)
+      (off_a5gWO :: Int)
+      (ty_a5gWP :: CmmType) ->
+      GHC.Cmm.Expr.$WCmmLoad
+        (cmmOffsetW platform_a5gWM base_a5gWN off_a5gWO) ty_a5gWP
+
+-- RHS size: {terms: 37, types: 19, coercions: 0, joins: 1/1}
+cmmOffsetExpr :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 34] 248 0}]
+cmmOffsetExpr
+  = \ (platform_a5gVw :: Platform)
+      (e_a5gVx :: CmmExpr)
+      (ds_d5hIG :: CmmExpr) ->
+      join {
+        fail_d5hJz :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 130 30}]
+        fail_d5hJz _ [Occ=Dead, OS=OneShot]
+          = GHC.Cmm.Expr.CmmMachOp
+              (GHC.Cmm.MachOp.MO_Add (cmmExprWidth platform_a5gVw e_a5gVx))
+              (GHC.Base.build
+                 @ CmmExpr
+                 (\ (@ a_d5hIN)
+                    (c_d5hIO :: CmmExpr -> a_d5hIN -> a_d5hIN)
+                    (n_d5hIP :: a_d5hIN) ->
+                    c_d5hIO e_a5gVx (c_d5hIO ds_d5hIG n_d5hIP))) } in
+      case ds_d5hIG of {
+        __DEFAULT -> jump fail_d5hJz ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hJx ->
+          case ds_d5hJx of {
+            __DEFAULT -> jump fail_d5hJz ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a5gVy _ [Occ=Dead] ->
+              cmmOffset
+                platform_a5gVw e_a5gVx (fromInteger @ Int GHC.Num.$fNumInt n_a5gVy)
+          }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+cmmOffsetExprB :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+cmmOffsetExprB = cmmOffsetExpr
+
+-- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
+mkIntCLit :: Platform -> Int -> CmmLit
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 80 0}]
+mkIntCLit
+  = \ (platform_a5gV4 :: Platform) (i_a5gV5 :: Int) ->
+      GHC.Cmm.Expr.$WCmmInt
+        (toInteger @ Int GHC.Real.$fIntegralInt i_a5gV5)
+        (wordWidth platform_a5gV4)
+
+-- RHS size: {terms: 7, types: 5, coercions: 0, joins: 0/0}
+mkIntExpr :: Platform -> Int -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 60 0}]
+mkIntExpr
+  = \ (platform_a5gV6 :: Platform) (i_a5gV7 :: Int) ->
+      $!
+        @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ CmmLit
+        @ CmmExpr
+        GHC.Cmm.Expr.CmmLit
+        (mkIntCLit platform_a5gV6 i_a5gV7)
+
+-- RHS size: {terms: 47, types: 21, coercions: 0, joins: 1/2}
+cmmIndexExpr :: Platform -> Width -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0 34] 358 0}]
+cmmIndexExpr
+  = \ (platform_a5gWg :: Platform)
+      (width_a5gWh :: Width)
+      (base_a5gWi :: CmmExpr)
+      (ds_d5hKJ :: CmmExpr) ->
+      join {
+        fail_d5hLC :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 230 0}]
+        fail_d5hLC _ [Occ=Dead, OS=OneShot]
+          = let {
+              idx_w_a5gWo :: Width
+              [LclId,
+               Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                       WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+              idx_w_a5gWo = cmmExprWidth platform_a5gWg ds_d5hKJ } in
+            cmmOffsetExpr
+              platform_a5gWg
+              base_a5gWi
+              (GHC.Cmm.Expr.CmmMachOp
+                 (GHC.Cmm.MachOp.MO_Shl idx_w_a5gWo)
+                 (GHC.Base.build
+                    @ CmmExpr
+                    (\ (@ a_d5hLz)
+                       (c_d5hLA :: CmmExpr -> a_d5hLz -> a_d5hLz)
+                       (n_d5hLB :: a_d5hLz) ->
+                       c_d5hLA
+                         ds_d5hKJ
+                         (c_d5hLA
+                            (mkIntExpr platform_a5gWg (widthInLog width_a5gWh))
+                            n_d5hLB)))) } in
+      case ds_d5hKJ of {
+        __DEFAULT -> jump fail_d5hLC ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hLx ->
+          case ds_d5hLx of {
+            __DEFAULT -> jump fail_d5hLC ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a5gWj _ [Occ=Dead] ->
+              cmmIndex
+                platform_a5gWg
+                width_a5gWh
+                base_a5gWi
+                (fromInteger @ Int GHC.Num.$fNumInt n_a5gWj)
+          }
+      }
+
+-- RHS size: {terms: 29, types: 12, coercions: 0, joins: 1/1}
+cmmOffsetExprW :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 34] 188 0}]
+cmmOffsetExprW
+  = \ (platform_a5gWu :: Platform)
+      (e_a5gWv :: CmmExpr)
+      (ds_d5hLE :: CmmExpr) ->
+      join {
+        fail_d5hMu :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 70 0}]
+        fail_d5hMu _ [Occ=Dead, OS=OneShot]
+          = cmmIndexExpr
+              platform_a5gWu (wordWidth platform_a5gWu) e_a5gWv ds_d5hLE } in
+      case ds_d5hLE of {
+        __DEFAULT -> jump fail_d5hMu ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hMs ->
+          case ds_d5hMs of {
+            __DEFAULT -> jump fail_d5hMu ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmInt n_a5gWw _ [Occ=Dead] ->
+              cmmOffsetW
+                platform_a5gWu
+                e_a5gWv
+                (fromInteger @ WordOff GHC.Num.$fNumInt n_a5gWw)
+          }
+      }
+
+-- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
+cmmTagMask :: Platform -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 50 0}]
+cmmTagMask
+  = \ (platform_a5gXK :: Platform) ->
+      mkIntExpr platform_a5gXK (tAG_MASK platform_a5gXK)
+
+-- RHS size: {terms: 11, types: 2, coercions: 0, joins: 0/0}
+cmmIsTagged :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 120 0}]
+cmmIsTagged
+  = \ (platform_a5gXP :: Platform) (e_a5gXQ :: CmmExpr) ->
+      cmmNeWord
+        platform_a5gXP
+        (cmmAndWord platform_a5gXP e_a5gXQ (cmmTagMask platform_a5gXP))
+        (zeroExpr platform_a5gXP)
+
+-- RHS size: {terms: 11, types: 2, coercions: 0, joins: 0/0}
+cmmIsNotTagged :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 120 0}]
+cmmIsNotTagged
+  = \ (platform_a5gXR :: Platform) (e_a5gXS :: CmmExpr) ->
+      cmmEqWord
+        platform_a5gXR
+        (cmmAndWord platform_a5gXR e_a5gXS (cmmTagMask platform_a5gXR))
+        (zeroExpr platform_a5gXR)
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+cmmConstrTag1 :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 60 0}]
+cmmConstrTag1
+  = \ (platform_a5gXT :: Platform) (e_a5gXU :: CmmExpr) ->
+      cmmAndWord platform_a5gXT e_a5gXU (cmmTagMask platform_a5gXT)
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+cmmPointerMask :: Platform -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 80 0}]
+cmmPointerMask
+  = \ (platform_a5gXL :: Platform) ->
+      mkIntExpr
+        platform_a5gXL
+        (complement @ Int Data.Bits.$fBitsInt (tAG_MASK platform_a5gXL))
+
+-- RHS size: {terms: 22, types: 9, coercions: 0, joins: 1/1}
+cmmUntag :: Platform -> CmmExpr -> CmmExpr
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 34] 108 0}]
+cmmUntag
+  = \ (ds_d5hMw :: Platform) (e_a5gXM :: CmmExpr) ->
+      join {
+        fail_d5hNt :: ghc-prim-0.6.1:GHC.Prim.Void# -> CmmExpr
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 60 0}]
+        fail_d5hNt _ [Occ=Dead, OS=OneShot]
+          = cmmAndWord ds_d5hMw e_a5gXM (cmmPointerMask ds_d5hMw) } in
+      case e_a5gXM of wild_00 {
+        __DEFAULT -> jump fail_d5hNt ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit ds_d5hNr ->
+          case ds_d5hNr of {
+            __DEFAULT -> jump fail_d5hNt ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLabel _ [Occ=Dead] -> wild_00
+          }
+      }
+
+-- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
+typeForeignHint :: UnaryType -> ForeignHint
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 50 0}]
+typeForeignHint
+  = . @ PrimRep
+      @ ForeignHint
+      @ UnaryType
+      primRepForeignHint
+      (typePrimRep1 ghc-prim-0.6.1:GHC.Classes.C:(%%))
+
+-- RHS size: {terms: 7, types: 2, coercions: 0, joins: 0/0}
+typeCmmType :: Platform -> UnaryType -> CmmType
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 60 0}]
+typeCmmType
+  = \ (platform_a5gV2 :: Platform) (ty_a5gV3 :: UnaryType) ->
+      primRepCmmType
+        platform_a5gV2
+        (typePrimRep1 ghc-prim-0.6.1:GHC.Classes.C:(%%) ty_a5gV3)
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+$dNonLocal_a5hdF :: NonLocal (Block CmmNode)
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$dNonLocal_a5hdF
+  = GHC.Cmm.Dataflow.Graph.$fNonLocalBlock
+      @ CmmNode GHC.Cmm.Node.$fNonLocalCmmNode
+
+-- RHS size: {terms: 7, types: 4, coercions: 0, joins: 0/0}
+revPostorder :: CmmGraph -> [CmmBlock]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 80 0}]
+revPostorder
+  = \ (g_a5gYT :: CmmGraph) ->
+      revPostorderFrom
+        @ (Block CmmNode)
+        $dNonLocal_a5hdF
+        (toBlockMap g_a5gYT)
+        (g_entry @ CmmNode g_a5gYT)
+
+-- RHS size: {terms: 14, types: 30, coercions: 0, joins: 0/0}
+ofBlockList :: BlockId -> [CmmBlock] -> CmmGraph
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 130 30}]
+ofBlockList
+  = \ (entry_a5gYI :: BlockId) (blocks_a5gYJ :: [CmmBlock]) ->
+      GHC.Cmm.CmmGraph
+        @ CmmNode
+        entry_a5gYI
+        (GHC.Cmm.Dataflow.Graph.$WGMany
+           @ 'Closed
+           @ Block
+           @ CmmNode
+           @ 'Closed
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode O C))
+           (foldr
+              @ []
+              Data.Foldable.$fFoldable[]
+              @ (Block CmmNode C C)
+              @ (LabelMap (Block CmmNode C C))
+              (addBlock
+                 @ (Block CmmNode)
+                 $dNonLocal_a5hdF
+                 ghc-prim-0.6.1:GHC.Classes.C:(%%))
+              (emptyBody @ Block @ CmmNode)
+              blocks_a5gYJ)
+           (GHC.Cmm.Dataflow.Block.$WNothingO @ (Block CmmNode C O)))
+
+-- RHS size: {terms: 29, types: 19, coercions: 0, joins: 0/0}
+mkRODataLits
+  :: forall (raw :: Bool) info stmt.
+     CLabel -> [CmmLit] -> GenCmmDecl (GenCmmStatics raw) info stmt
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 160 0}]
+mkRODataLits
+  = \ (@ (raw_a5hld :: Bool))
+      (@ info_a5hle)
+      (@ stmt_a5hlf)
+      (lbl_a5gVk :: CLabel)
+      (lits_a5gVl :: [CmmLit]) ->
+      mkDataLits
+        @ raw_a5hld
+        @ info_a5hle
+        @ stmt_a5hlf
+        (case any
+                @ []
+                @ CmmLit
+                Data.Foldable.$fFoldable[]
+                (\ (ds_d5hJJ :: CmmLit) ->
+                   case ds_d5hJJ of {
+                     __DEFAULT -> ghc-prim-0.6.1:GHC.Types.False;
+                     CmmLabel _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True;
+                     CmmLabelOff _ [Occ=Dead] _ [Occ=Dead] ->
+                       ghc-prim-0.6.1:GHC.Types.True
+                   })
+                lits_a5gVl
+         of {
+           False -> GHC.Cmm.Section GHC.Cmm.ReadOnlyData lbl_a5gVk;
+           True -> GHC.Cmm.Section GHC.Cmm.RelocatableReadOnlyData lbl_a5gVk
+         })
+        lbl_a5gVk
+        lits_a5gVl
+
+-- RHS size: {terms: 33, types: 21, coercions: 0, joins: 0/1}
+regUsedIn :: Platform -> CmmReg -> CmmExpr -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 280 0}]
+regUsedIn
+  = \ (platform_a5gY2 :: Platform) ->
+      letrec {
+        regUsedIn__a5gY3 [Occ=LoopBreaker] :: CmmReg -> CmmExpr -> Bool
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 180] 250 20}]
+        regUsedIn__a5gY3
+          = \ (ds_d5hta :: CmmReg) (ds_d5htb :: CmmExpr) ->
+              case ds_d5htb of {
+                CmmLit _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.False;
+                CmmLoad e_a5gY5 _ [Occ=Dead] -> regUsedIn__a5gY3 ds_d5hta e_a5gY5;
+                CmmReg reg'_a5gY7 ->
+                  regsOverlap platform_a5gY2 ds_d5hta reg'_a5gY7;
+                CmmMachOp _ [Occ=Dead] es_a5gYb ->
+                  any
+                    @ []
+                    @ CmmExpr
+                    Data.Foldable.$fFoldable[]
+                    (\ (ds_d5htr :: CmmExpr) -> regUsedIn__a5gY3 ds_d5hta ds_d5htr)
+                    es_a5gYb;
+                CmmStackSlot _ [Occ=Dead] _ [Occ=Dead] ->
+                  ghc-prim-0.6.1:GHC.Types.False;
+                CmmRegOff reg'_a5gY9 _ [Occ=Dead] ->
+                  regsOverlap platform_a5gY2 ds_d5hta reg'_a5gY9
+              }; } in
+      regUsedIn__a5gY3
+
+Rec {
+-- RHS size: {terms: 35, types: 20, coercions: 0, joins: 1/1}
+hasNoGlobalRegs [Occ=LoopBreaker] :: CmmExpr -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [142] 172 30}]
+hasNoGlobalRegs
+  = \ (ds_d5hwu :: CmmExpr) ->
+      join {
+        fail_d5hzs :: ghc-prim-0.6.1:GHC.Prim.Void# -> Bool
+        [LclId[JoinId(1)],
+         Str=<L,U>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True,
+                 Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+        fail_d5hzs _ [Occ=Dead, OS=OneShot]
+          = ghc-prim-0.6.1:GHC.Types.False } in
+      case ds_d5hwu of {
+        __DEFAULT -> jump fail_d5hzs ghc-prim-0.6.1:GHC.Prim.void#;
+        CmmLit _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True;
+        CmmLoad e_a5gXG _ [Occ=Dead] -> hasNoGlobalRegs e_a5gXG;
+        CmmReg ds_d5hzn ->
+          case ds_d5hzn of {
+            __DEFAULT -> jump fail_d5hzs ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLocal _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True
+          };
+        CmmMachOp _ [Occ=Dead] es_a5gXH ->
+          all
+            @ [] @ CmmExpr Data.Foldable.$fFoldable[] hasNoGlobalRegs es_a5gXH;
+        CmmRegOff ds_d5hzp _ [Occ=Dead] ->
+          case ds_d5hzp of {
+            __DEFAULT -> jump fail_d5hzs ghc-prim-0.6.1:GHC.Prim.void#;
+            CmmLocal _ [Occ=Dead] -> ghc-prim-0.6.1:GHC.Types.True
+          }
+      }
+end Rec }
+
+-- RHS size: {terms: 4, types: 7, coercions: 0, joins: 0/0}
+bodyToBlockList :: Body CmmNode -> [CmmBlock]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 30 0}]
+bodyToBlockList
+  = \ (body_a5gYL :: Body CmmNode) ->
+      mapElems
+        @ LabelMap
+        GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+        @ (Block CmmNode C C)
+        body_a5gYL
+
+-- RHS size: {terms: 11, types: 14, coercions: 0, joins: 0/0}
+foldlGraphBlocks
+  :: forall a. (a -> CmmBlock -> a) -> a -> CmmGraph -> a
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0 0] 90 0}]
+foldlGraphBlocks
+  = \ (@ a_a5hgN)
+      (k_a5gYQ :: a_a5hgN -> CmmBlock -> a_a5hgN)
+      (z_a5gYR :: a_a5hgN)
+      (g_a5gYS :: CmmGraph) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ (LabelMap CmmBlock)
+        @ a_a5hgN
+        (mapFoldl
+           @ LabelMap
+           GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+           @ a_a5hgN
+           @ CmmBlock
+           k_a5gYQ
+           z_a5gYR)
+        (toBlockMap g_a5gYS)
+
+-- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
+toBlockList :: CmmGraph -> [CmmBlock]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 70 0}]
+toBlockList
+  = \ (g_a5gYo :: CmmGraph) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ (LabelMap CmmBlock)
+        @ [CmmBlock]
+        (mapElems
+           @ LabelMap GHC.Cmm.Dataflow.Label.$fIsMapLabelMap @ CmmBlock)
+        (toBlockMap g_a5gYo)
+
+-- RHS size: {terms: 41, types: 39, coercions: 3, joins: 0/2}
+toBlockListEntryFirst :: CmmGraph -> [CmmBlock]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 560 40}]
+toBlockListEntryFirst
+  = \ (g_a5gYp :: CmmGraph) ->
+      let {
+        entry_id_a5gYr :: BlockId
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+        entry_id_a5gYr = g_entry @ CmmNode g_a5gYp } in
+      let {
+        m_a5gYq :: LabelMap CmmBlock
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+        m_a5gYq = toBlockMap g_a5gYp } in
+      case mapNull
+             @ LabelMap
+             GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+             @ CmmBlock
+             m_a5gYq
+      of {
+        False ->
+          ghc-prim-0.6.1:GHC.Types.:
+            @ CmmBlock
+            (case case mapLookup
+                         @ LabelMap
+                         GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+                         @ CmmBlock
+                         (entry_id_a5gYr
+                          `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                                  :: Label ~R# KeyOf LabelMap))
+                         m_a5gYq
+                  of {
+                    __DEFAULT ->
+                      Control.Exception.Base.patError
+                        @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                        @ (Unit CmmBlock)
+                        "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:541:5-43|Just entry_block"#;
+                    Just entry_block_a5gYs -> (entry_block_a5gYs)
+                  }
+             of
+             { (entry_block_a5gYs) ->
+             entry_block_a5gYs
+             })
+            (filter
+               @ (Block CmmNode C C)
+               (. @ BlockId
+                  @ Bool
+                  @ (Block CmmNode C C)
+                  (\ (ds_d5hqh :: BlockId) ->
+                     /=
+                       @ BlockId GHC.Cmm.Dataflow.Label.$fEqLabel ds_d5hqh entry_id_a5gYr)
+                  (entryLabel @ (Block CmmNode) $dNonLocal_a5hdF @ C))
+               (mapElems
+                  @ LabelMap
+                  GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+                  @ CmmBlock
+                  m_a5gYq));
+        True -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock
+      }
+
+-- RHS size: {terms: 85, types: 67, coercions: 12, joins: 0/4}
+toBlockListEntryFirstFalseFallthrough :: CmmGraph -> [CmmBlock]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=NEVER}]
+toBlockListEntryFirstFalseFallthrough
+  = \ (g_a5gYu :: CmmGraph) ->
+      let {
+        m_a5gYv :: LabelMap CmmBlock
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+        m_a5gYv = toBlockMap g_a5gYu } in
+      let {
+        entry_block_a5gYx :: CmmBlock
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 300 0}]
+        entry_block_a5gYx
+          = case case mapLookup
+                        @ LabelMap
+                        GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+                        @ CmmBlock
+                        ((g_entry @ CmmNode g_a5gYu)
+                         `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                                 :: Label ~R# KeyOf LabelMap))
+                        m_a5gYv
+                 of {
+                   __DEFAULT ->
+                     Control.Exception.Base.patError
+                       @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                       @ (Unit CmmBlock)
+                       "E:\\ghc_inferTags\\compiler\\GHC\\Cmm\\Utils.hs:559:5-43|Just entry_block"#;
+                   Just entry_block_a5gYx -> (entry_block_a5gYx)
+                 }
+            of
+            { (entry_block_a5gYx) ->
+            entry_block_a5gYx
+            } } in
+      letrec {
+        dfs_a5gYy [Occ=LoopBreaker] :: LabelSet -> [CmmBlock] -> [CmmBlock]
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 30] 400 40}]
+        dfs_a5gYy
+          = \ (ds_d5hqE :: LabelSet) (ds_d5hqF :: [CmmBlock]) ->
+              case ds_d5hqF of {
+                [] -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock;
+                : block_a5gYA bs_a5gYB ->
+                  let {
+                    id_a5gYC :: Label
+                    [LclId,
+                     Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                             WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+                    id_a5gYC
+                      = entryLabel
+                          @ (Block CmmNode) $dNonLocal_a5hdF @ C block_a5gYA } in
+                  case setMember
+                         @ LabelSet
+                         GHC.Cmm.Dataflow.Label.$fIsSetLabelSet
+                         (id_a5gYC
+                          `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:ElemOfLabelSet[0]))
+                                  :: Label ~R# ElemOf LabelSet))
+                         ds_d5hqE
+                  of {
+                    False ->
+                      ghc-prim-0.6.1:GHC.Types.:
+                        @ CmmBlock
+                        block_a5gYA
+                        (dfs_a5gYy
+                           (setInsert
+                              @ LabelSet
+                              GHC.Cmm.Dataflow.Label.$fIsSetLabelSet
+                              (id_a5gYC
+                               `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:ElemOfLabelSet[0]))
+                                       :: Label ~R# ElemOf LabelSet))
+                              ds_d5hqE)
+                           (foldr
+                              @ []
+                              Data.Foldable.$fFoldable[]
+                              @ Label
+                              @ [CmmBlock]
+                              (\ (id_a5gYF :: Label) (bs_a5gYG :: [CmmBlock]) ->
+                                 case mapLookup
+                                        @ LabelMap
+                                        GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+                                        @ CmmBlock
+                                        (id_a5gYF
+                                         `cast` (Sub (Sym (GHC.Cmm.Dataflow.Label.D:R:KeyOfLabelMap[0]))
+                                                 :: Label ~R# KeyOf LabelMap))
+                                        m_a5gYv
+                                 of {
+                                   Nothing -> bs_a5gYG;
+                                   Just b_a5gYH ->
+                                     ghc-prim-0.6.1:GHC.Types.: @ CmmBlock b_a5gYH bs_a5gYG
+                                 })
+                              bs_a5gYB
+                              (successors @ (Block CmmNode) $dNonLocal_a5hdF @ C block_a5gYA)));
+                    True -> dfs_a5gYy ds_d5hqE bs_a5gYB
+                  }
+              }; } in
+      case mapNull
+             @ LabelMap
+             GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+             @ CmmBlock
+             m_a5gYv
+      of {
+        False ->
+          dfs_a5gYy
+            (setEmpty @ LabelSet GHC.Cmm.Dataflow.Label.$fIsSetLabelSet)
+            (GHC.Base.build
+               @ CmmBlock
+               (\ (@ a_d5hqt)
+                  (c_d5hqu :: CmmBlock -> a_d5hqt -> a_d5hqt)
+                  (n_d5hqv :: a_d5hqt) ->
+                  c_d5hqu entry_block_a5gYx n_d5hqv));
+        True -> ghc-prim-0.6.1:GHC.Types.[] @ CmmBlock
+      }
+
+-- RHS size: {terms: 23, types: 100, coercions: 0, joins: 0/0}
+mapGraphNodes
+  :: (CmmNode C O -> CmmNode C O, CmmNode O O -> CmmNode O O,
+      CmmNode O C -> CmmNode O C)
+     -> CmmGraph -> CmmGraph
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20 0] 290 0}]
+mapGraphNodes
+  = \ (funs_a5gYM
+         :: (CmmNode C O -> CmmNode C O, CmmNode O O -> CmmNode O O,
+             CmmNode O C -> CmmNode O C))
+      (g_a5gYO :: CmmGraph) ->
+      case funs_a5gYM of wild_00
+      { (mf_a5gYN, _ [Occ=Dead], _ [Occ=Dead]) ->
+      $ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+        @ (LabelMap CmmBlock)
+        @ CmmGraph
+        (ofBlockMap
+           ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+              @ (CmmNode C O)
+              @ Label
+              (entryLabel @ CmmNode GHC.Cmm.Node.$fNonLocalCmmNode @ O)
+              ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+                 @ (CmmNode C O)
+                 @ (CmmNode C O)
+                 mf_a5gYN
+                 (GHC.Cmm.Node.$WCmmEntry
+                    (g_entry @ CmmNode g_a5gYO) GHC.Cmm.Node.GlobalScope))))
+        ($ @ 'ghc-prim-0.6.1:GHC.Types.LiftedRep
+           @ (LabelMap (Block CmmNode C C))
+           @ (LabelMap (Block CmmNode C C))
+           (mapMap
+              @ LabelMap
+              GHC.Cmm.Dataflow.Label.$fIsMapLabelMap
+              @ (Block CmmNode C C)
+              @ (Block CmmNode C C)
+              (mapBlock3' @ CmmNode @ CmmNode @ C @ C wild_00))
+           (toBlockMap g_a5gYO))
+      }
+
+
