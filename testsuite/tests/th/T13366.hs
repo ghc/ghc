@@ -1,6 +1,6 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -optc-DA_MACRO=1 #-}
+{-# OPTIONS_GHC -optc-DA_MACRO=1 -optcxx-DA_MACRO=1 #-}
 
 import Language.Haskell.TH.Syntax
 import System.IO (hFlush, stdout)
