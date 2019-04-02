@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -DFOO=2 -optP=-DBAR=3 -optc=-DBAZ=5 #-}
+{-# OPTIONS_GHC -DFOO=2 -optP=-DBAR=3 -optc=-DBAZ=5 -optcxx=-DBAZ=5 #-}
 
 import Language.Haskell.TH.Syntax
 
