@@ -26,8 +26,10 @@ module GHC.Stg.Syntax (
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt, AltType(..),
 
-        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
-        NoExtFieldSilent, noExtFieldSilent,
+        StgPass(..), BinderP, XRhsClosure, XRhsCon, XLet, XLetNoEscape, XStgApp,
+        XStgConApp,
+        NoExtFieldSilent, noExtFieldSilent, AppEnters(..), noEnterInfo,
+
         OutputablePass,
 
         UpdateFlag(..), isUpdatable,
@@ -37,6 +39,9 @@ module GHC.Stg.Syntax (
 
         -- a set of synonyms for the code gen parameterisation
         CgStgTopBinding, CgStgBinding, CgStgExpr, CgStgRhs, CgStgAlt,
+
+        -- Same for taggedness
+        TgStgTopBinding, TgStgBinding, TgStgExpr, TgStgRhs, TgStgAlt,
 
         -- a set of synonyms for the lambda lifting parameterisation
         LlStgTopBinding, LlStgBinding, LlStgExpr, LlStgRhs, LlStgAlt,
@@ -52,9 +57,11 @@ module GHC.Stg.Syntax (
         stgRhsArity,
         isDllConApp,
         stgArgType,
-        stripStgTicksTop, stripStgTicksTopE,
         stgCaseBndrInScope,
         bindersOf, bindersOfTop, bindersOfTopBinds,
+
+        -- todo: use bindersOf
+        stgBindIds,
 
         pprStgBinding, pprGenStgTopBindings, pprStgTopBindings
     ) where
@@ -108,6 +115,11 @@ data GenStgTopBinding pass
 data GenStgBinding pass
   = StgNonRec (BinderP pass) (GenStgRhs pass)
   | StgRec    [(BinderP pass, GenStgRhs pass)]
+
+stgBindIds :: GenStgBinding pass -> [BinderP pass]
+stgBindIds (StgNonRec b _) = [b]
+stgBindIds (StgRec bs    ) = map fst bs
+
 
 {-
 ************************************************************************
@@ -169,19 +181,6 @@ stgArgType :: StgArg -> Type
 stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
 
-
--- | Strip ticks of a given type from an STG expression.
-stripStgTicksTop :: (Tickish Id -> Bool) -> GenStgExpr p -> ([Tickish Id], GenStgExpr p)
-stripStgTicksTop p = go []
-   where go ts (StgTick t e) | p t = go (t:ts) e
-         go ts other               = (reverse ts, other)
-
--- | Strip ticks of a given type from an STG expression returning only the expression.
-stripStgTicksTopE :: (Tickish Id -> Bool) -> GenStgExpr p -> GenStgExpr p
-stripStgTicksTopE p = go
-   where go (StgTick t e) | p t = go e
-         go other               = other
-
 -- | Given an alt type and whether the program is unarised, return whether the
 -- case binder is in scope.
 --
@@ -221,6 +220,7 @@ There is no constructor for a lone variable; it would appear as @StgApp var []@.
 
 data GenStgExpr pass
   = StgApp
+        (XStgApp pass)
         Id       -- function
         [StgArg] -- arguments; may be empty
 
@@ -238,8 +238,9 @@ literals.
   | StgLit      Literal
 
         -- StgConApp is vital for returning unboxed tuples or sums
-        -- which can't be let-bound
-  | StgConApp   DataCon
+        -- which can't be let-bound first
+  | StgConApp   (XStgConApp pass)
+                DataCon
                 [StgArg] -- Saturated
                 [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
 
@@ -423,6 +424,7 @@ important):
 -}
 
   | StgRhsCon
+        (XRhsCon pass)
         CostCentreStack -- CCS to be attached (default is CurrentCCS).
                         -- Top-level (static) ones will end up with
                         -- DontCareCCS, because we don't count static
@@ -432,6 +434,7 @@ important):
                         -- are not allocated.
         [StgArg]        -- Args
 
+<<<<<<< HEAD:compiler/GHC/Stg/Syntax.hs
 -- | Used as a data type index for the stgSyn AST
 data StgPass
   = Vanilla
@@ -439,6 +442,9 @@ data StgPass
   | CodeGen
 
 -- | Like 'GHC.Hs.Extension.NoExtField', but with an 'Outputable' instance that
+=======
+-- | Like 'HsExtension.NoExtField', but with an 'Outputable' instance that
+>>>>>>> Tag inferrence work.:compiler/stgSyn/StgSyn.hs
 -- returns 'empty'.
 data NoExtFieldSilent = NoExtFieldSilent
   deriving (Data, Eq, Ord)
@@ -453,31 +459,91 @@ noExtFieldSilent = NoExtFieldSilent
 -- TODO: Maybe move this to GHC.Hs.Extension? I'm not sure about the
 -- implications on build time...
 
--- TODO: Do we really want to the extension point type families to have a closed
--- domain?
-type family BinderP (pass :: StgPass)
-type instance BinderP 'Vanilla = Id
-type instance BinderP 'CodeGen = Id
-
-type family XRhsClosure (pass :: StgPass)
-type instance XRhsClosure 'Vanilla = NoExtFieldSilent
--- | Code gen needs to track non-global free vars
-type instance XRhsClosure 'CodeGen = DIdSet
-
-type family XLet (pass :: StgPass)
-type instance XLet 'Vanilla = NoExtFieldSilent
-type instance XLet 'CodeGen = NoExtFieldSilent
-
-type family XLetNoEscape (pass :: StgPass)
-type instance XLetNoEscape 'Vanilla = NoExtFieldSilent
-type instance XLetNoEscape 'CodeGen = NoExtFieldSilent
-
 stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ bndrs _)
   = ASSERT( all isId bndrs ) length bndrs
   -- The arity never includes type parameters, but they should have gone by now
-stgRhsArity (StgRhsCon _ _ _) = 0
+stgRhsArity (StgRhsCon _ _ _ _) = 0
 
+<<<<<<< HEAD:compiler/GHC/Stg/Syntax.hs
+=======
+-- Note [CAF consistency]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+--
+-- `topStgBindHasCafRefs` is only used by an assert (`consistentCafInfo` in
+-- `CoreToStg`) to make sure CAF-ness predicted by `TidyPgm` is consistent with
+-- reality.
+--
+-- Specifically, if the RHS mentions any Id that itself is marked
+-- `MayHaveCafRefs`; or if the binding is a top-level updateable thunk; then the
+-- `Id` for the binding should be marked `MayHaveCafRefs`. The potential trouble
+-- is that `TidyPgm` computed the CAF info on the `Id` but some transformations
+-- have taken place since then.
+
+topStgBindHasCafRefs :: GenStgTopBinding pass -> Bool
+topStgBindHasCafRefs (StgTopLifted (StgNonRec _ rhs))
+  = topRhsHasCafRefs rhs
+topStgBindHasCafRefs (StgTopLifted (StgRec binds))
+  = any topRhsHasCafRefs (map snd binds)
+topStgBindHasCafRefs StgTopStringLit{}
+  = False
+
+topRhsHasCafRefs :: GenStgRhs pass -> Bool
+topRhsHasCafRefs (StgRhsClosure _ _ upd _ body)
+  = -- See Note [CAF consistency]
+    isUpdatable upd || exprHasCafRefs body
+topRhsHasCafRefs (StgRhsCon _ _ _ args)
+  = any stgArgHasCafRefs args
+
+exprHasCafRefs :: GenStgExpr pass -> Bool
+exprHasCafRefs (StgApp _ f args)
+  = stgIdHasCafRefs f || any stgArgHasCafRefs args
+exprHasCafRefs StgLit{}
+  = False
+exprHasCafRefs (StgConApp _ _ args _)
+  = any stgArgHasCafRefs args
+exprHasCafRefs (StgOpApp _ args _)
+  = any stgArgHasCafRefs args
+exprHasCafRefs (StgLam _ body)
+  = exprHasCafRefs body
+exprHasCafRefs (StgCase scrt _ _ alts)
+  = exprHasCafRefs scrt || any altHasCafRefs alts
+exprHasCafRefs (StgLet _ bind body)
+  = bindHasCafRefs bind || exprHasCafRefs body
+exprHasCafRefs (StgLetNoEscape _ bind body)
+  = bindHasCafRefs bind || exprHasCafRefs body
+exprHasCafRefs (StgTick _ expr)
+  = exprHasCafRefs expr
+
+bindHasCafRefs :: GenStgBinding pass -> Bool
+bindHasCafRefs (StgNonRec _ rhs)
+  = rhsHasCafRefs rhs
+bindHasCafRefs (StgRec binds)
+  = any rhsHasCafRefs (map snd binds)
+
+rhsHasCafRefs :: GenStgRhs pass -> Bool
+rhsHasCafRefs (StgRhsClosure _ _ _ _ body)
+  = exprHasCafRefs body
+rhsHasCafRefs (StgRhsCon _ _ _ args)
+  = any stgArgHasCafRefs args
+
+altHasCafRefs :: GenStgAlt pass -> Bool
+altHasCafRefs (_, _, rhs) = exprHasCafRefs rhs
+
+stgArgHasCafRefs :: StgArg -> Bool
+stgArgHasCafRefs (StgVarArg id)
+  = stgIdHasCafRefs id
+stgArgHasCafRefs _
+  = False
+
+stgIdHasCafRefs :: Id -> Bool
+stgIdHasCafRefs id =
+  -- We are looking for occurrences of an Id that is bound at top level, and may
+  -- have CAF refs. At this point (after TidyPgm) top-level Ids (whether
+  -- imported or defined in this module) are GlobalIds, so the test is easy.
+  isGlobalId id && mayHaveCafRefs (idCafInfo id)
+
+>>>>>>> Tag inferrence work.:compiler/stgSyn/StgSyn.hs
 {-
 ************************************************************************
 *                                                                      *
@@ -516,7 +582,31 @@ The Plain STG parameterisation
 *                                                                      *
 ************************************************************************
 
-This happens to be the only one we use at the moment.
+  Note [STG Extension points]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  We now make use of extension points in STG for different passes which want
+  to associate information with AST nodes.
+
+  Currently the pipeline is roughly:
+
+  CoreToStg: Core -> Stg
+  SimplCore: Stg -> Stg
+
+    As part of StgSimpl we run late lambda lifting (Ll).
+    Late lambda lift:
+    Stg -> FvStg -> LlStg -> Stg
+
+  CodeGen:
+    Stg -> TgStg (Predict taggs of bindings, stored in XStgApp)
+    TgStg -> CgStg (Add free variables, stored in XRhsClosure)
+
+  Finally CgStg is used to generate Cmm, using both XStgCase and XRhsClosure.
+
+  Extension point information only has to be retained from Tg onwards. So
+  for simple optimization passes run as part of SimplStg there is no need to
+  preserve extension point information.
+
 -}
 
 type StgTopBinding = GenStgTopBinding 'Vanilla
@@ -537,6 +627,12 @@ type CgStgExpr       = GenStgExpr       'CodeGen
 type CgStgRhs        = GenStgRhs        'CodeGen
 type CgStgAlt        = GenStgAlt        'CodeGen
 
+type TgStgTopBinding = GenStgTopBinding 'Tagged
+type TgStgBinding    = GenStgBinding    'Tagged
+type TgStgExpr       = GenStgExpr       'Tagged
+type TgStgRhs        = GenStgRhs        'Tagged
+type TgStgAlt        = GenStgAlt        'Tagged
+
 {- Many passes apply a substitution, and it's very handy to have type
    synonyms to remind us whether or not the substitution has been applied.
    See GHC.Core for precedence in Core land
@@ -554,6 +650,72 @@ type OutStgArg        = StgArg
 type OutStgExpr       = StgExpr
 type OutStgRhs        = StgRhs
 type OutStgAlt        = StgAlt
+
+
+-- | Used as a data type index for the stgSyn AST
+data StgPass
+  = Vanilla
+  | LiftLams
+  | CodeGen
+  | InferTags
+  | Tagged
+
+-- | Determines if this StgApp expression enters the "function"
+data AppEnters = NoEnter  -- ^ For tagged and evaluated lifted values
+               | AlwaysEnter -- ^ Always enter without looking at tag - currently not used.
+               | MayEnter -- ^ Otherwise
+               deriving (Eq)
+
+noEnterInfo :: AppEnters
+noEnterInfo = MayEnter
+
+instance Outputable AppEnters where
+  ppr NoEnter = char '!'
+  ppr MayEnter = empty
+  ppr AlwaysEnter = char '~'
+
+-- TODO: Do we really want to the extension point type families to have a closed
+-- domain?
+type family BinderP (pass :: StgPass)
+type instance BinderP 'Vanilla = Id
+type instance BinderP 'CodeGen = Id
+type instance BinderP 'Tagged = Id
+
+
+type family XRhsClosure (pass :: StgPass)
+type instance XRhsClosure 'Vanilla = NoExtFieldSilent
+type instance XRhsClosure 'Tagged = NoExtFieldSilent
+-- | Code gen needs to track non-global free vars
+type instance XRhsClosure 'CodeGen = DIdSet
+
+type family XRhsCon (pass :: StgPass)
+type instance XRhsCon 'Vanilla = NoExtFieldSilent
+type instance XRhsCon 'Tagged = NoExtFieldSilent
+type instance XRhsCon 'CodeGen = NoExtFieldSilent
+
+type family XLet (pass :: StgPass)
+type instance XLet 'Vanilla = NoExtFieldSilent
+type instance XLet 'Tagged = NoExtFieldSilent
+type instance XLet 'CodeGen = NoExtFieldSilent
+
+type family XLetNoEscape (pass :: StgPass)
+type instance XLetNoEscape 'Vanilla = NoExtFieldSilent
+type instance XLetNoEscape 'Tagged = NoExtFieldSilent
+type instance XLetNoEscape 'CodeGen = NoExtFieldSilent
+
+-- Binders used in StgApp, we mark some of these
+-- as strict to make sure we don't make redundant evaluatins.
+type family XStgApp (pass :: StgPass)
+type instance XStgApp 'Vanilla = AppEnters
+type instance XStgApp 'Tagged = AppEnters
+type instance XStgApp 'CodeGen = AppEnters
+
+type family XStgConApp (pass :: StgPass)
+type instance XStgConApp 'Vanilla = NoExtFieldSilent
+type instance XStgConApp 'Tagged = NoExtFieldSilent
+type instance XStgConApp 'CodeGen = NoExtFieldSilent
+
+
 
 {-
 
@@ -640,7 +802,10 @@ type OutputablePass pass =
   ( Outputable (XLet pass)
   , Outputable (XLetNoEscape pass)
   , Outputable (XRhsClosure pass)
+  , Outputable (XRhsCon pass)
   , OutputableBndr (BinderP pass)
+  , Outputable (XStgApp pass)
+  , Outputable (XStgConApp pass)
   )
 
 pprGenStgTopBinding
@@ -702,11 +867,11 @@ pprStgExpr :: OutputablePass pass => GenStgExpr pass -> SDoc
 pprStgExpr (StgLit lit)     = ppr lit
 
 -- general case
-pprStgExpr (StgApp func args)
-  = hang (ppr func) 4 (sep (map (ppr) args))
+pprStgExpr (StgApp ext func args)
+  = hang (ppr ext <> ppr func) 4 (sep (map (ppr) args))
 
-pprStgExpr (StgConApp con args _)
-  = hsep [ ppr con, brackets (interppSP args) ]
+pprStgExpr (StgConApp ext con args _)
+  = hsep [ pprExt ext, ppr con, brackets (interppSP args) ]
 
 pprStgExpr (StgOpApp op args _)
   = hsep [ pprStgOp op, brackets (interppSP args)]
@@ -803,6 +968,18 @@ instance Outputable AltType where
 
 pprStgRhs :: OutputablePass pass => GenStgRhs pass -> SDoc
 
+<<<<<<< HEAD:compiler/GHC/Stg/Syntax.hs
+=======
+-- special case
+pprStgRhs (StgRhsClosure ext cc upd_flag [{-no args-}] (StgApp _ func []))
+  = sdocWithDynFlags $ \dflags ->
+    hsep [ ppr cc,
+           if not $ gopt Opt_SuppressStgExts dflags
+             then ppr ext else empty,
+           text " \\", ppr upd_flag, ptext (sLit " [] "), ppr func ]
+
+-- general case
+>>>>>>> Tag inferrence work.:compiler/stgSyn/StgSyn.hs
 pprStgRhs (StgRhsClosure ext cc upd_flag args body)
   = sdocWithDynFlags $ \dflags ->
     hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,
@@ -810,6 +987,11 @@ pprStgRhs (StgRhsClosure ext cc upd_flag args body)
                 char '\\' <> ppr upd_flag, brackets (interppSP args)])
          4 (ppr body)
 
-pprStgRhs (StgRhsCon cc con args)
-  = hcat [ ppr cc,
-           space, ppr con, text "! ", brackets (interppSP args)]
+pprStgRhs (StgRhsCon ext cc con args)
+  = hcat [ pprExt ext, ppr cc
+         , space, ppr con, text "! ", brackets (interppSP args)]
+
+pprExt :: Outputable ext => ext -> SDoc
+pprExt ext = sdocWithDynFlags $ \dflags
+  -> if not $ gopt Opt_SuppressStgExts dflags
+      then ppr ext else empty

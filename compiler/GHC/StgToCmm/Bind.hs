@@ -89,8 +89,8 @@ cgTopRhsClosure dflags rec id ccs upd_flag args body =
   -- hole detection from working in that case.  Test
   -- concurrent/should_run/4030 fails, for instance.
   --
-  gen_code _ _ closure_label
-    | StgApp f [] <- body, null args, isNonRec rec
+  gen_code dflags _ closure_label
+    | StgApp _ext f [] <- body, null args, isNonRec rec
     = do
          cg_info <- getCgIdInfo f
          emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)]
@@ -200,8 +200,8 @@ cgRhs :: Id
                                   -- (see above)
                )
 
-cgRhs id (StgRhsCon cc con args)
-  = withNewTickyCounterCon (idName id) con $
+cgRhs id (StgRhsCon _ext cc con args)
+  = withNewTickyCounterCon (idName id) $
     buildDynCon id True cc con (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
@@ -264,11 +264,11 @@ mkRhsClosure    dflags bndr _cc
                 []                      -- A thunk
                 expr
   | let strip = stripStgTicksTopE (not . tickishIsCode)
-  , StgCase (StgApp scrutinee [{-no args-}])
+  , StgCase (StgApp _ext scrutinee [{-no args-}])
          _   -- ignore bndr
          (AlgAlt _)
          [(DataAlt _, params, sel_expr)] <- strip expr
-  , StgApp selectee [{-no args-}] <- strip sel_expr
+  , StgApp _ext selectee [{-no args-}] <- strip sel_expr
   , the_fv == scrutinee                -- Scrutinee is the only free variable
 
   , let (_, _, params_w_offsets) = mkVirtConstrOffsets dflags (addIdReps (assertNonVoidIds params))
@@ -295,7 +295,7 @@ mkRhsClosure    dflags bndr _cc
                 fvs
                 upd_flag
                 []                      -- No args; a thunk
-                (StgApp fun_id args)
+                (StgApp _ext fun_id args)
 
   -- We are looking for an "ApThunk"; see data con ApThunk in GHC.StgToCmm.Closure
   -- of form (x1 x2 .... xn), where all the xi are locals (not top-level)

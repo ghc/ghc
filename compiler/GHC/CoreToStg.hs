@@ -470,46 +470,6 @@ coreToStgExpr (Let bind body) = do
 
 coreToStgExpr e = pprPanic "coreToStgExpr" (ppr e)
 
-mkStgAltType :: Id -> [CoreAlt] -> AltType
-mkStgAltType bndr alts
-  | isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty
-  = MultiValAlt (length prim_reps)  -- always use MultiValAlt for unboxed tuples
-
-  | otherwise
-  = case prim_reps of
-      [LiftedRep] -> case tyConAppTyCon_maybe (unwrapType bndr_ty) of
-        Just tc
-          | isAbstractTyCon tc -> look_for_better_tycon
-          | isAlgTyCon tc      -> AlgAlt tc
-          | otherwise          -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
-                                  PolyAlt
-        Nothing                -> PolyAlt
-      [unlifted] -> PrimAlt unlifted
-      not_unary  -> MultiValAlt (length not_unary)
-  where
-   bndr_ty   = idType bndr
-   prim_reps = typePrimRep bndr_ty
-
-   _is_poly_alt_tycon tc
-        =  isFunTyCon tc
-        || isPrimTyCon tc   -- "Any" is lifted but primitive
-        || isFamilyTyCon tc -- Type family; e.g. Any, or arising from strict
-                            -- function application where argument has a
-                            -- type-family type
-
-   -- Sometimes, the TyCon is a AbstractTyCon which may not have any
-   -- constructors inside it.  Then we may get a better TyCon by
-   -- grabbing the one from a constructor alternative
-   -- if one exists.
-   look_for_better_tycon
-        | ((DataAlt con, _, _) : _) <- data_alts =
-                AlgAlt (dataConTyCon con)
-        | otherwise =
-                ASSERT(null data_alts)
-                PolyAlt
-        where
-                (data_alts, _deflt) = findDefault alts
-
 -- ---------------------------------------------------------------------------
 -- Applications
 -- ---------------------------------------------------------------------------
@@ -538,14 +498,23 @@ coreToStgApp f args ticks = do
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
-                  | saturated    -> StgConApp dc args'
+                  | saturated    -> StgConApp noExtFieldSilent dc args'
                                       (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
+<<<<<<< HEAD:compiler/GHC/CoreToStg.hs
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
                 -- we require that primop applications be saturated.
                 PrimOpId op      -> ASSERT( saturated )
                                     StgOpApp (StgPrimOp op) args' res_ty
+=======
+                -- As described in Note [Primop wrappers] in PrimOp.hs, here we
+                -- turn unsaturated primop applications into applications of
+                -- the primop's wrapper.
+                PrimOpId op
+                  | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
+                  | otherwise    -> StgApp MayEnter (primOpWrapperId op) args'
+>>>>>>> Tag inferrence work.:compiler/stgSyn/CoreToStg.hs
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
@@ -558,7 +527,7 @@ coreToStgApp f args ticks = do
                                     StgOpApp (StgFCallOp call (idType f)) args' res_ty
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
-                _other           -> StgApp f args'
+                _other           -> StgApp MayEnter f args'
 
         tapp = foldr StgTick app (ticks ++ ticks')
 
@@ -594,8 +563,8 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     let
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
         stg_arg = case arg'' of
-                       StgApp v []        -> StgVarArg v
-                       StgConApp con [] _ -> StgVarArg (dataConWorkId con)
+                       StgApp _ext v []   -> StgVarArg v
+                       StgConApp _ con [] _ -> StgVarArg (dataConWorkId con)
                        StgLit lit         -> StgLitArg lit
                        _                  -> pprPanic "coreToStgArgs" (ppr arg)
 
@@ -693,13 +662,13 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
                     (toList bndrs) body
     , ccs )
 
-  | StgConApp con args _ <- unticked_rhs
+  | StgConApp _ con args _ <- unticked_rhs
   , -- Dynamic StgConApps are updatable
     not (isDllConApp dflags this_mod con args)
   = -- CorePrep does this right, but just to make sure
     ASSERT2( not (isUnboxedTupleCon con || isUnboxedSumCon con)
            , ppr bndr $$ ppr con $$ ppr args)
-    ( StgRhsCon dontCareCCS con args, ccs )
+    ( StgRhsCon noExtFieldSilent dontCareCCS con args, ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | gopt Opt_AutoSccsOnIndividualCafs dflags
@@ -749,8 +718,8 @@ mkStgRhs bndr rhs
                   ReEntrant -- ignored for LNE
                   [] rhs
 
-  | StgConApp con args _ <- unticked_rhs
-  = StgRhsCon currentCCS con args
+  | StgConApp _ext con args _ <- unticked_rhs
+  = StgRhsCon noExtFieldSilent currentCCS con args
 
   | otherwise
   = StgRhsClosure noExtFieldSilent

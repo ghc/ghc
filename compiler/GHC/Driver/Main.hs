@@ -182,8 +182,17 @@ import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
 import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result, NameCacheUpdater(..))
 import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
+-- Tag infer perf debugging
+import System.CPUTime
+import StgUtil (seqTopBinds)
+
 #include "HsVersions.h"
 
+-- In ms
+getTime :: IO Double
+getTime = do
+    !time <- getCPUTime
+    return $! (fromIntegral time) / (1000000000 :: Double)
 
 {- **********************************************************************
 %*                                                                      *
@@ -1546,16 +1555,26 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
 doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
-
+    us <- mkSplitUniqSupply 't'
+    return $! seqTopBinds stg_binds
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
+
+    -- !start <- getTime
+    let !stg_binds_w_tags = {-# SCC "StgTagFields" #-}
+                          findTags this_mod us stg_binds :: [TgStgTopBinding]
+
+    -- !end <- getTime
+    -- putStrLn $! "Time(ms) taken by findTags:" ++ (show $ end - start)
+    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds_w_tags
 
     dumpIfSet_dyn dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings stg_binds_w_fvs)
 
     let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
-            lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod data_tycons
+            lookupHook stgToCmmHook StgCmm.codeGen dflags dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
+
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one

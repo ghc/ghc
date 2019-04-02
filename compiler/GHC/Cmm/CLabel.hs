@@ -1229,6 +1229,15 @@ pprCLabel dflags = \case
       | useNCG
       -> pprDynamicLinkerAsmLabel platform info lbl
 
+   -- TODO: Keeping local labels at g4 should be it's own patch.
+   (IdLabel name _cafs flavor) ->
+      prefix <> ppr name <> ppIdFlavor flavor
+        where
+          prefix = sdocWithDynFlags $ \dflags ->
+            if debugLevel dflags > 3
+              then empty
+              else internalNamePrefix platform name
+
    PicBaseLabel
       | useNCG
       -> text "1b"
@@ -1327,8 +1336,6 @@ pprCLbl platform = \case
       text "SLOW_CALL_fast_" <> text pat <> ptext (sLit "_ctr")
 
    (ForeignLabel str _ _ _) -> ftext str
-
-   (IdLabel name _cafs flavor) -> internalNamePrefix platform name <> ppr name <> ppIdFlavor flavor
 
    (CC_Label cc)       -> ppr cc
    (CCS_Label ccs)     -> ppr ccs

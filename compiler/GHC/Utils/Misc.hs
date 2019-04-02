@@ -51,6 +51,7 @@ module GHC.Utils.Misc (
         changeLast,
 
         whenNonEmpty,
+        selectIndices,
 
         -- * Tuples
         fstOf3, sndOf3, thdOf3,
@@ -604,6 +605,28 @@ changeLast (x:xs) x' = x : changeLast xs x'
 whenNonEmpty :: Applicative m => [a] -> (NonEmpty a -> m ()) -> m ()
 whenNonEmpty []     _ = pure ()
 whenNonEmpty (x:xs) f = f (x :| xs)
+
+-- | Given a list of increasing indices return only these.
+-- Equal to selectIndicies indices xs == map (xs !!) indices
+-- O(n) so only useful for small/dense selection
+-- Indices MUST be ordered and ascending and are 0 based.
+selectIndices :: [Int] -> [a] -> [a]
+selectIndices [] _ = []
+selectIndices is xs =
+    go 0 is xs
+  where
+    go :: Int -> [Int] -> [a] -> [a]
+    go _ [] _ = []
+    go _ _ [] = []
+    go n (i:is) (x:xs)
+      | n == i
+      = x : go (n+1) is xs
+      | n > i
+      = panic "Invalid input to selectIndices"
+      | otherwise
+      = go (n+1) (i:is) xs
+
+
 
 {-
 ************************************************************************

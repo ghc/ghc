@@ -51,8 +51,13 @@ stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes 
         -> IO [StgTopBinding]        -- output program
 
 stg2stg dflags this_mod binds
-  = do  { dump_when Opt_D_dump_stg "STG:" binds
+  = do  { -- TODO: Needed? It's been a while since I looked at this.
+          dump_when Opt_D_dump_stg "STG:" binds
         ; showPass dflags "Stg2Stg"
+        ; us <- mkSplitUniqSupply 'g'
+
+
+
         -- Do the main business!
         ; binds' <- runStgM 'g' $
             foldM do_stg_pass binds (getStgToDo dflags)

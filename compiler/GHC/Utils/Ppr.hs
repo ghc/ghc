@@ -1,6 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
 
+-- {-# OPTIONS_GHC -fno-stg-csr -ddump-stg-final -ddump-cmm -ddump-asm -ddump-cmm-from-stg #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Utils.Ppr
