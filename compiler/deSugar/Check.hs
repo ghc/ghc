@@ -2032,7 +2032,7 @@ pmcheckHd ( p@(PmCon { pm_con_con = c1, pm_con_tvs = ex_tvs1
           (va@(PmCon { pm_con_con = c2, pm_con_tvs = ex_tvs2
                      , pm_con_args = args2})) (ValVec vva delta)
   | c1 /= c2  =
-    return (usimple [ValVec (va:vva) delta])
+    return (coverIf (isPatSynCon c1) (usimple [ValVec (va:vva) delta]))
   | otherwise = do
     let to_evvar tv1 tv2 = nameType "pmConCon" $
                            mkPrimEqPred (mkTyVarTy tv1) (mkTyVarTy tv2)
@@ -2071,13 +2071,13 @@ pmcheckHd (p@(PmCon { pm_con_con = con, pm_con_arg_tys = tys }))
     mb_sat <- pmIsSatisfiable delta tm_ct ty_cs strict_arg_tys
     pure $ fmap (ValVec (va:vva)) mb_sat
 
-  set_provenance prov .
-    force_if (canDiverge (idName x) (delta_tm_cs delta)) <$>
+  setProvenance prov .
+    forceIf (canDiverge (idName x) (delta_tm_cs delta)) <$>
       runMany (pmcheckI (p:ps) guards) inst_vsa
 
 -- LitVar
 pmcheckHd (p@(PmLit l)) ps guards (PmVar x) (ValVec vva delta)
-  = force_if (canDiverge (idName x) (delta_tm_cs delta)) <$>
+  = forceIf (canDiverge (idName x) (delta_tm_cs delta)) <$>
       mkUnion non_matched <$>
         case solveOneEq (delta_tm_cs delta) (mkPosEq x l) of
           Just tm_state -> pmcheckHdI p ps guards (PmLit l) $
@@ -2313,12 +2313,17 @@ forces :: PartialResult -> PartialResult
 forces pres = pres { presultDivergent = Diverged }
 
 -- | Set the divergent set to non-empty if the flag is `True`
-force_if :: Bool -> PartialResult -> PartialResult
-force_if True  pres = forces pres
-force_if False pres = pres
+forceIf :: Bool -> PartialResult -> PartialResult
+forceIf True  pres = forces pres
+forceIf False pres = pres
 
-set_provenance :: Provenance -> PartialResult -> PartialResult
-set_provenance prov pr = pr { presultProvenance = prov }
+-- | Set the covered set to non-empty if the flag is `True`
+coverIf :: Bool -> PartialResult -> PartialResult
+coverIf True  pres = pres { presultCovered = Covered }
+coverIf False pres = pres
+
+setProvenance :: Provenance -> PartialResult -> PartialResult
+setProvenance prov pr = pr { presultProvenance = prov }
 
 -- ----------------------------------------------------------------------------
 -- * Propagation of term constraints inwards when checking nested matches
