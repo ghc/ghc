@@ -1698,6 +1698,12 @@ fun_kind_arg_flags = go emptyTCvSubst
         subst' = extendTvSubst subst tv arg_ty
     go subst (TyVarTy tv) arg_tys
       | Just ki <- lookupTyVar subst tv = go subst ki arg_tys
+    go subst (FunTy{ft_af = af, ft_res = res_ki}) (_:arg_tys) =
+      case af of
+        VisArg   -> Required : argfs
+        InvisArg -> Inferred : argfs
+      where
+        argfs = go subst res_ki arg_tys
     go _ _ arg_tys = map (const Required) arg_tys
                         -- something is ill-kinded. But this can happen
                         -- when printing errors. Assume everything is Required.
