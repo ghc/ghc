@@ -224,8 +224,17 @@ import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
 
+-- Tag infer perf debugging
+import System.CPUTime
+import GHC.Stg.Utils (seqTopBinds)
+import GHC.Stg.InferTags
 #include "HsVersions.h"
 
+-- In ms
+getTime :: IO Double
+getTime = do
+    !time <- getCPUTime
+    return $! (fromIntegral time) / (1000000000 :: Double)
 
 {- **********************************************************************
 %*                                                                      *
@@ -1644,8 +1653,18 @@ doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
         platform = targetPlatform dflags
+    return $! seqTopBinds stg_binds
+    -- let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
 
-    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
+    !start <- getTime
+
+    eps <- hscEPS hsc_env
+
+    let (!stg_binds_w_tags, _exports) = {-# SCC "StgTagFields" #-}
+                                        findTags dflags this_mod (eps_fam_inst_env eps) stg_binds
+    !end <- getTime
+    putStrLn $! "Time(ms) taken by findTags:" ++ (show $ end - start)
+    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds_w_tags
 
     dumpIfSet_dyn dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
 
@@ -1654,6 +1673,7 @@ doCodeGen hsc_env this_mod data_tycons
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
             lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
+
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one

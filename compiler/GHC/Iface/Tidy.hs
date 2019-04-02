@@ -1214,6 +1214,9 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
         `setCprInfo`        final_cpr
         `setUnfoldingInfo`  minimal_unfold_info  -- See note [Preserve evaluatedness]
                                                  -- in GHC.Core.Tidy
+                                                 -- in CoreTidy
+        -- `setOccInfo`           robust_occ_info   -- TODO: Explain why tag inference needs this.
+        -- Or even better use strictness info instead
 
   | otherwise           -- Externally-visible Ids get the whole lot
   = vanillaIdInfo

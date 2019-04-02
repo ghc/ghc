@@ -55,6 +55,10 @@ stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes 
 stg2stg dflags this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass dflags "Stg2Stg"
+        ; us <- mkSplitUniqSupply 'g'
+
+
+
         -- Do the main business!
         ; binds' <- runStgM 'g' $
             foldM do_stg_pass binds (getStgToDo dflags)

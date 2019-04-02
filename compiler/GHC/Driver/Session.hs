@@ -2594,6 +2594,8 @@ dynamic_flags_deps = [
   , make_dep_flag defGhcFlag "ddump-stg"
         (setDumpFlag Opt_D_dump_stg_from_core)
         "Use `-ddump-stg-from-core` or `-ddump-stg-final` instead"
+  , make_ord_flag defGhcFlag "ddump-stg-tag-nodes"
+        (setDumpFlag Opt_D_dump_stg_tag_nodes)
   , make_ord_flag defGhcFlag "ddump-call-arity"
         (setDumpFlag Opt_D_dump_call_arity)
   , make_ord_flag defGhcFlag "ddump-exitify"
@@ -2686,6 +2688,8 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_DoAsmLinting))
   , make_ord_flag defGhcFlag "dannot-lint"
         (NoArg (setGeneralFlag Opt_DoAnnotationLinting))
+  , make_ord_flag defGhcFlag "dtag-inference-checks"
+        (NoArg (setGeneralFlag Opt_DoTagInferenceChecks))
   , make_ord_flag defGhcFlag "dshow-passes"
         (NoArg $ forceRecompile >> (setVerbosity $ Just 2))
   , make_ord_flag defGhcFlag "dfaststring-stats"
@@ -3396,6 +3400,7 @@ fFlagsDeps = [
   flagSpec "cmm-static-pred"                  Opt_CmmStaticPred,
   flagSpec "cse"                              Opt_CSE,
   flagSpec "stg-cse"                          Opt_StgCSE,
+  flagSpec "stg-csr"                          Opt_StgCSR,
   flagSpec "stg-lift-lams"                    Opt_StgLiftLams,
   flagSpec "cpr-anal"                         Opt_CprAnal,
   flagSpec "defer-diagnostics"                Opt_DeferDiagnostics,
@@ -3993,6 +3998,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CmmStaticPred)
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_StgCSE)
+    , ([1,2],   Opt_StgCSR)
     , ([2],     Opt_StgLiftLams)
 
     , ([1,2],   Opt_EnableRewriteRules)

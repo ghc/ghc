@@ -32,6 +32,7 @@ module GHC.Types.Id.Make (
         nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, magicDictId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
+        impossibleId, impossibleIdKey, impossibleIdName,
         coerceName,
 
         -- Re-export error Ids
@@ -165,7 +166,7 @@ wiredInIds
   ++ errorIds           -- Defined in GHC.Core.Make
 
 magicIds :: [Id]    -- See Note [magicIds]
-magicIds = [lazyId, oneShotId, noinlineId]
+magicIds = [lazyId, oneShotId, noinlineId, impossibleId]
 
 ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
@@ -1438,10 +1439,13 @@ coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 
 -- Names listed in magicIds; see Note [magicIds]
-lazyIdName, oneShotName, noinlineIdName :: Name
+lazyIdName, oneShotName, noinlineIdName, impossibleIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
+impossibleIdName  = mkWiredInIdName gHC_MAGIC (fsLit "impossible")     impossibleIdKey    impossibleId
+
+
 
 ------------------------------------------------
 proxyHashId :: Id
@@ -1507,6 +1511,28 @@ noinlineId = pcMiscPrelId noinlineIdName ty info
   where
     info = noCafIdInfo `setNeverLevPoly` ty
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
+
+impossibleId :: Id -- TODO: See Note [absentError magic]
+impossibleId = --  pcMiscPrelId
+    -- pprTrace "fooInfoImp" (ppr info) $
+      mkVanillaGlobalWithInfo impossibleIdName ty info
+  -- setIdStrictness
+  -- setStrictnessInfo
+  where
+    info = (vanillaIdInfo
+                     `setStrictnessInfo` mkClosedStrictSig [] Absent
+                     `setCprInfo` mkCprSig 0 botCpr
+                     `setArityInfo` 0
+                     `setCafInfo` NoCafRefs)
+    -- info = noCafIdInfo `setNeverLevPoly` ty
+    --                    `setStrictnessInfo` strict_sig
+    --                    `setInlinePragInfo`  neverInlinePragma
+    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
+    -- -- I assume it doesn't matter what we put as argument demand.
+    -- -- We will terminate anyway
+    -- strict_sig = mkClosedStrictSig [dmd, dmd] Absent
+
+    -- dmd = JD { sd = strBot, ud = useBot }
 
 oneShotId :: Id -- See Note [The oneShot function]
 oneShotId = pcMiscPrelId oneShotName ty info

@@ -87,6 +87,7 @@ import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Builtin.Names( absentErrorIdKey, impossibleIdKey )
 import GHC.Core.Type as Type
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
@@ -1892,7 +1893,11 @@ exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
 -- or PAPs.
 --
 exprIsHNFlike :: (Var -> Bool) -> (Unfolding -> Bool) -> CoreExpr -> Bool
-exprIsHNFlike is_con is_con_unf = is_hnf_like
+exprIsHNFlike is_con is_con_unf expr =
+    let res = is_hnf_like expr
+    in
+    -- pprTrace "exprIsHNFlike:" (text "expr:" <+> ppr expr $$ text "res:" <+> ppr res)
+      res
   where
     is_hnf_like (Var v) -- NB: There are no value args at this point
       =  id_app_is_value v 0 -- Catches nullary constructors,
@@ -1937,6 +1942,7 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
        || idArity id > n_val_args
        || id `hasKey` absentErrorIdKey  -- See Note [aBSENT_ERROR_ID] in GHC.Core.Make
                       -- absentError behaves like an honorary data constructor
+       || id `hasKey` impossibleIdKey
 
 
 {-
