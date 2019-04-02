@@ -475,3 +475,4 @@ test('keep-cafs',
   run_command,
   ['$MAKE -s --no-print-directory KeepCafs'])
 
+test('T16514', unless(opsys('mingw32'), skip), compile_and_run, ['T16514_c.cpp -lstdc++'])
