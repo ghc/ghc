@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 
 -- | Implements a selective lambda lifter, running late in the optimisation
 -- pipeline.
@@ -137,7 +138,7 @@ liftTopLvl (StgTopStringLit bndr lit) rest = withSubstBndr bndr $ \bndr' -> do
 liftTopLvl (StgTopLifted bind) rest = do
   let is_rec = isRec $ fst $ decomposeStgBinding bind
   when is_rec startBindingGroup
-  let bind_w_fvs = annBindingFreeVars bind
+  let bind_w_fvs = annBindingFreeVars (bind :: GenStgBinding 'Vanilla) :: GenStgBinding 'CodeGen
   withLiftedBind TopLevel (tagSkeletonTopBind bind_w_fvs) NilSk $ \mb_bind' -> do
     -- We signal lifting of a binding through returning Nothing.
     -- Should never happen for a top-level binding, though, since we are already
@@ -199,9 +200,9 @@ liftRhs
   -- as lambda binders, discarding all free vars.
   -> LlStgRhs
   -> LiftM OutStgRhs
-liftRhs mb_former_fvs rhs@(StgRhsCon ccs con mn ts args)
+liftRhs mb_former_fvs rhs@(StgRhsCon ext ccs con mn ts args)
   = ASSERT2(isNothing mb_former_fvs, text "Should never lift a constructor" $$ pprStgRhs panicStgPprOpts rhs)
-    StgRhsCon ccs con mn ts <$> traverse liftArgs args
+    StgRhsCon ext ccs con mn ts <$> traverse liftArgs args
 liftRhs Nothing (StgRhsClosure _ ccs upd infos body) =
   -- This RHS wasn't lifted.
   withSubstBndrs (map binderInfoBndr infos) $ \bndrs' ->
@@ -221,13 +222,13 @@ liftArgs (StgVarArg occ) = do
 liftExpr :: LlStgExpr -> LiftM OutStgExpr
 liftExpr (StgLit lit) = pure (StgLit lit)
 liftExpr (StgTick t e) = StgTick t <$> liftExpr e
-liftExpr (StgApp f args) = do
+liftExpr (StgApp _ext f args) = do
   f' <- substOcc f
   args' <- traverse liftArgs args
   fvs' <- formerFreeVars f
   let top_lvl_args = map StgVarArg fvs' ++ args'
   pure (StgApp f' top_lvl_args)
-liftExpr (StgConApp con mn args tys) = StgConApp con mn <$> traverse liftArgs args <*> pure tys
+liftExpr (StgConApp ext con mn args tys) = StgConApp ext con mn <$> traverse liftArgs args <*> pure tys
 liftExpr (StgOpApp op args ty) = StgOpApp op <$> traverse liftArgs args <*> pure ty
 liftExpr (StgCase scrut info ty alts) = do
   scrut' <- liftExpr scrut

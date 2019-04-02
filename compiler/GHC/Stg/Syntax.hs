@@ -25,8 +25,10 @@ module GHC.Stg.Syntax (
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt, AltType(..),
 
-        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
-        NoExtFieldSilent, noExtFieldSilent,
+        StgPass(..), BinderP, XRhsClosure, XRhsCon, XLet, XLetNoEscape, XStgApp,
+        XStgConApp,
+        NoExtFieldSilent, noExtFieldSilent, AppEnters(..), noEnterInfo,
+
         OutputablePass,
 
         UpdateFlag(..), isUpdatable,
@@ -38,6 +40,9 @@ module GHC.Stg.Syntax (
 
         -- a set of synonyms for the code gen parameterisation
         CgStgTopBinding, CgStgBinding, CgStgExpr, CgStgRhs, CgStgAlt,
+
+        -- Same for taggedness
+        TgStgTopBinding, TgStgBinding, TgStgExpr, TgStgRhs, TgStgAlt,
 
         -- a set of synonyms for the lambda lifting parameterisation
         LlStgTopBinding, LlStgBinding, LlStgExpr, LlStgRhs, LlStgAlt,
@@ -53,9 +58,11 @@ module GHC.Stg.Syntax (
         stgRhsArity,
         isDllConApp,
         stgArgType,
-        stripStgTicksTop, stripStgTicksTopE,
         stgCaseBndrInScope,
-        bindersOf, bindersOfTop, bindersOfTopBinds,
+        -- bindersOf, bindersOfTop, bindersOfTopBinds,
+
+        -- todo: use bindersOf
+        stgBindIds,
 
         -- ppr
         StgPprOpts(..), initStgPprOpts,
@@ -114,6 +121,11 @@ data GenStgTopBinding pass
 data GenStgBinding pass
   = StgNonRec (BinderP pass) (GenStgRhs pass)
   | StgRec    [(BinderP pass, GenStgRhs pass)]
+
+stgBindIds :: GenStgBinding pass -> [BinderP pass]
+stgBindIds (StgNonRec b _) = [b]
+stgBindIds (StgRec bs    ) = map fst bs
+
 
 {-
 ************************************************************************
@@ -175,19 +187,6 @@ stgArgType :: StgArg -> Type
 stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
 
-
--- | Strip ticks of a given type from an STG expression.
-stripStgTicksTop :: (StgTickish -> Bool) -> GenStgExpr p -> ([StgTickish], GenStgExpr p)
-stripStgTicksTop p = go []
-   where go ts (StgTick t e) | p t = go (t:ts) e
-         go ts other               = (reverse ts, other)
-
--- | Strip ticks of a given type from an STG expression returning only the expression.
-stripStgTicksTopE :: (StgTickish -> Bool) -> GenStgExpr p -> GenStgExpr p
-stripStgTicksTopE p = go
-   where go (StgTick t e) | p t = go e
-         go other               = other
-
 -- | Given an alt type and whether the program is unarised, return whether the
 -- case binder is in scope.
 --
@@ -227,6 +226,7 @@ There is no constructor for a lone variable; it would appear as @StgApp var []@.
 
 data GenStgExpr pass
   = StgApp
+        (XStgApp pass)
         Id       -- function
         [StgArg] -- arguments; may be empty
 
@@ -245,7 +245,8 @@ literals.
 
         -- StgConApp is vital for returning unboxed tuples or sums
         -- which can't be let-bound
-  | StgConApp   DataCon
+  | StgConApp   (XStgConApp pass)
+                DataCon
                 ConstructorNumber
                 [StgArg] -- Saturated
                 [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
@@ -414,6 +415,7 @@ important):
 -}
 
   | StgRhsCon
+        (XRhsCon pass)
         CostCentreStack -- CCS to be attached (default is CurrentCCS).
                         -- Top-level (static) ones will end up with
                         -- DontCareCCS, because we don't count static
@@ -424,36 +426,6 @@ important):
         ConstructorNumber
         [StgTickish]
         [StgArg]        -- Args
-
-{-
-Note Stg Passes
-~~~~~~~~~~~~~~~
-Here is a short summary of the STG pipeline and where we use the different
-StgPass data type indexes:
-
-  1. CoreToStg.Prep performs several transformations that prepare the desugared
-     and simplified core to be converted to STG. One of these transformations is
-     making it so that value lambdas only exist as the RHS of a binding.
-
-  2. CoreToStg converts the prepared core to STG, specifically GenStg*
-     parameterised by 'Vanilla.
-
-  3. Stg.Pipeline does a number of passes on the generated STG. One of these is
-     the lambda-lifting pass, which internally uses the 'LiftLams
-     parameterisation to store information for deciding whether or not to lift
-     each binding.
-
-  4. Stg.FVs annotates closures with their free variables. To store these
-     annotations we use the 'CodeGen parameterisation.
-
-  5. Stg.StgToCmm generates Cmm from the annotated STG.
--}
-
--- | Used as a data type index for the stgSyn AST
-data StgPass
-  = Vanilla
-  | LiftLams
-  | CodeGen
 
 -- | Like 'GHC.Hs.Extension.NoExtField', but with an 'Outputable' instance that
 -- returns 'empty'.
@@ -470,40 +442,11 @@ noExtFieldSilent = NoExtFieldSilent
 -- TODO: Maybe move this to GHC.Hs.Extension? I'm not sure about the
 -- implications on build time...
 
--- TODO: Do we really want to the extension point type families to have a closed
--- domain?
-type family BinderP (pass :: StgPass)
-type instance BinderP 'Vanilla = Id
-type instance BinderP 'CodeGen = Id
-
-type family XRhsClosure (pass :: StgPass)
-type instance XRhsClosure 'Vanilla = NoExtFieldSilent
--- | Code gen needs to track non-global free vars
-type instance XRhsClosure 'CodeGen = DIdSet
-
-type family XLet (pass :: StgPass)
-type instance XLet 'Vanilla = NoExtFieldSilent
-type instance XLet 'CodeGen = NoExtFieldSilent
-
--- | When `-fdistinct-constructor-tables` is turned on then
--- each usage of a constructor is given an unique number and
--- an info table is generated for each different constructor.
-data ConstructorNumber =
-      NoNumber | Numbered Int
-
-instance Outputable ConstructorNumber where
-  ppr NoNumber = empty
-  ppr (Numbered n) = text "#" <> ppr n
-
-type family XLetNoEscape (pass :: StgPass)
-type instance XLetNoEscape 'Vanilla = NoExtFieldSilent
-type instance XLetNoEscape 'CodeGen = NoExtFieldSilent
-
 stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ bndrs _)
   = ASSERT( all isId bndrs ) length bndrs
   -- The arity never includes type parameters, but they should have gone by now
-stgRhsArity (StgRhsCon _ _ _ _ _) = 0
+stgRhsArity (StgRhsCon {}) = 0
 
 {-
 ************************************************************************
@@ -543,7 +486,31 @@ The Plain STG parameterisation
 *                                                                      *
 ************************************************************************
 
-This happens to be the only one we use at the moment.
+  Note [STG Extension points]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  We now make use of extension points in STG for different passes which want
+  to associate information with AST nodes.
+
+  Currently the pipeline is roughly:
+
+  CoreToStg: Core -> Stg
+  SimplCore: Stg -> Stg
+
+    As part of StgSimpl we run late lambda lifting (Ll).
+    Late lambda lift:
+    Stg -> FvStg -> LlStg -> Stg
+
+  CodeGen:
+    Stg -> TgStg (Predict taggs of bindings, stored in XStgApp)
+    TgStg -> CgStg (Add free variables, stored in XRhsClosure)
+
+  Finally CgStg is used to generate Cmm, using both XStgCase and XRhsClosure.
+
+  Extension point information only has to be retained from Tg onwards. So
+  for simple optimization passes run as part of SimplStg there is no need to
+  preserve extension point information.
+
 -}
 
 type StgTopBinding = GenStgTopBinding 'Vanilla
@@ -564,6 +531,12 @@ type CgStgExpr       = GenStgExpr       'CodeGen
 type CgStgRhs        = GenStgRhs        'CodeGen
 type CgStgAlt        = GenStgAlt        'CodeGen
 
+type TgStgTopBinding = GenStgTopBinding 'Tagged
+type TgStgBinding    = GenStgBinding    'Tagged
+type TgStgExpr       = GenStgExpr       'Tagged
+type TgStgRhs        = GenStgRhs        'Tagged
+type TgStgAlt        = GenStgAlt        'Tagged
+
 {- Many passes apply a substitution, and it's very handy to have type
    synonyms to remind us whether or not the substitution has been applied.
    See GHC.Core for precedence in Core land
@@ -581,6 +554,107 @@ type OutStgArg        = StgArg
 type OutStgExpr       = StgExpr
 type OutStgRhs        = StgRhs
 type OutStgAlt        = StgAlt
+
+-- | When `-fdistinct-constructor-tables` is turned on then
+-- each usage of a constructor is given an unique number and
+-- an info table is generated for each different constructor.
+data ConstructorNumber =
+      NoNumber | Numbered Int
+
+instance Outputable ConstructorNumber where
+  ppr NoNumber = empty
+  ppr (Numbered n) = text "#" <> ppr n
+
+{-
+Note Stg Passes
+~~~~~~~~~~~~~~~
+Here is a short summary of the STG pipeline and where we use the different
+StgPass data type indexes:
+
+  1. CoreToStg.Prep performs several transformations that prepare the desugared
+     and simplified core to be converted to STG. One of these transformations is
+     making it so that value lambdas only exist as the RHS of a binding.
+
+  2. CoreToStg converts the prepared core to STG, specifically GenStg*
+     parameterised by 'Vanilla.
+
+  3. Stg.Pipeline does a number of passes on the generated STG. One of these is
+     the lambda-lifting pass, which internally uses the 'LiftLams
+     parameterisation to store information for deciding whether or not to lift
+     each binding.
+
+  4. Stg.FVs annotates closures with their free variables. To store these
+     annotations we use the 'CodeGen parameterisation.
+
+  4. Tag inference takes in CodeGen and produces Tagged STG.
+
+  5. Stg.StgToCmm generates Cmm from the Tagged annotated STG.
+-}
+
+
+-- | Used as a data type index for the stgSyn AST
+data StgPass
+  = Vanilla
+  | LiftLams
+  | CodeGen
+  | InferTags
+  | Tagged
+
+-- | Determines if this StgApp expression enters the "function"
+data AppEnters = NoEnter  -- ^ For tagged and evaluated lifted values
+               | AlwaysEnter -- ^ Always enter without looking at tag - currently not used.
+               | MayEnter -- ^ Otherwise
+               deriving (Eq)
+
+noEnterInfo :: AppEnters
+noEnterInfo = MayEnter
+
+instance Outputable AppEnters where
+  ppr NoEnter = text "[tagged]"
+  ppr MayEnter = empty
+  ppr AlwaysEnter = text "[thunk]"
+
+-- TODO: Do we really want to the extension point type families to have a closed
+-- domain?
+type family BinderP (pass :: StgPass)
+type instance BinderP 'Vanilla = Id
+type instance BinderP 'CodeGen = Id
+type instance BinderP 'Tagged = Id
+
+type family XRhsClosure (pass :: StgPass)
+type instance XRhsClosure 'Vanilla = NoExtFieldSilent
+type instance XRhsClosure 'Tagged = NoExtFieldSilent
+-- | Code gen needs to track non-global free vars
+type instance XRhsClosure 'CodeGen = DIdSet
+
+type family XRhsCon (pass :: StgPass)
+type instance XRhsCon 'Vanilla = NoExtFieldSilent
+type instance XRhsCon 'Tagged = NoExtFieldSilent
+type instance XRhsCon 'CodeGen = NoExtFieldSilent
+
+type family XLet (pass :: StgPass)
+type instance XLet 'Vanilla = NoExtFieldSilent
+type instance XLet 'Tagged = NoExtFieldSilent
+type instance XLet 'CodeGen = NoExtFieldSilent
+
+type family XLetNoEscape (pass :: StgPass)
+type instance XLetNoEscape 'Vanilla = NoExtFieldSilent
+type instance XLetNoEscape 'Tagged = NoExtFieldSilent
+type instance XLetNoEscape 'CodeGen = NoExtFieldSilent
+
+-- Binders used in StgApp, we mark some of these
+-- as strict to make sure we don't make redundant evaluatins.
+type family XStgApp (pass :: StgPass)
+type instance XStgApp 'Vanilla = AppEnters
+type instance XStgApp 'Tagged = AppEnters
+type instance XStgApp 'CodeGen = AppEnters
+
+type family XStgConApp (pass :: StgPass)
+type instance XStgConApp 'Vanilla = NoExtFieldSilent
+type instance XStgConApp 'Tagged = NoExtFieldSilent
+type instance XStgConApp 'CodeGen = NoExtFieldSilent
+
+
 
 {-
 
@@ -641,16 +715,16 @@ Utilities
 ************************************************************************
 -}
 
-bindersOf :: BinderP a ~ Id => GenStgBinding a -> [Id]
-bindersOf (StgNonRec binder _) = [binder]
-bindersOf (StgRec pairs)       = [binder | (binder, _) <- pairs]
+-- bindersOf :: BinderP a ~ Id => GenStgBinding a -> [Id]
+-- bindersOf (StgNonRec binder _) = [binder]
+-- bindersOf (StgRec pairs)       = [binder | (binder, _) <- pairs]
 
-bindersOfTop :: BinderP a ~ Id => GenStgTopBinding a -> [Id]
-bindersOfTop (StgTopLifted bind) = bindersOf bind
-bindersOfTop (StgTopStringLit binder _) = [binder]
+-- bindersOfTop :: BinderP a ~ Id => GenStgTopBinding a -> [Id]
+-- bindersOfTop (StgTopLifted bind) = bindersOf bind
+-- bindersOfTop (StgTopStringLit binder _) = [binder]
 
-bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> [Id]
-bindersOfTopBinds = foldr ((++) . bindersOfTop) []
+-- bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> [Id]
+-- bindersOfTopBinds = foldr ((++) . bindersOfTop) []
 
 {-
 ************************************************************************
@@ -667,7 +741,10 @@ type OutputablePass pass =
   ( Outputable (XLet pass)
   , Outputable (XLetNoEscape pass)
   , Outputable (XRhsClosure pass)
+  , Outputable (XRhsCon pass)
   , OutputableBndr (BinderP pass)
+  , Outputable (XStgApp pass)
+  , Outputable (XStgConApp pass)
   )
 
 -- | STG pretty-printing options
@@ -736,8 +813,8 @@ pprStgExpr opts e = case e of
                            -- special case
    StgLit lit           -> ppr lit
                            -- general case
-   StgApp func args     -> hang (ppr func) 4 (interppSP args)
-   StgConApp con n args _ -> hsep [ ppr con, ppr n, brackets (interppSP args) ]
+   StgApp ext func args     -> hang (ppr func <> ppr ext) 4 (interppSP args)
+   StgConApp ext con args _ -> hsep [ ppr con, ppr ext, brackets (interppSP args) ]
    StgOpApp op args _   -> hsep [ pprStgOp op, brackets (interppSP args)]
 
 -- special case: let v = <very specific thing>
@@ -841,8 +918,8 @@ pprStgRhs opts rhs = case rhs of
                     ])
               4 (pprStgExpr opts body)
 
-   StgRhsCon cc con mid _ticks args
-      -> hcat [ ppr cc, space
+   StgRhsCon ext cc con mid _ticks args
+      -> hcat [ ppr cc, space, ppr ext, space
               , case mid of
                   NoNumber -> empty
                   Numbered n -> hcat [ppr n, space]

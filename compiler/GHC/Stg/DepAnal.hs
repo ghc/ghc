@@ -5,6 +5,7 @@ module GHC.Stg.DepAnal (depSortStgPgm) where
 import GHC.Prelude
 
 import GHC.Stg.Syntax
+import GHC.Stg.Utils
 import GHC.Types.Id
 import GHC.Types.Name (Name, nameIsLocalOrFrom)
 import GHC.Types.Name.Env
@@ -62,7 +63,7 @@ annTopBindingsDeps this_mod bs = zip bs (map top_bind bs)
     rhs bounds (StgRhsClosure _ _ _ as e) =
       expr (extendVarSetList bounds as) e
 
-    rhs bounds (StgRhsCon _ _ _ _ as) =
+    rhs bounds (StgRhsCon _ext _ _ _ _ as) =
       args bounds as
 
     var :: BVs -> Var -> FVs
@@ -81,7 +82,7 @@ annTopBindingsDeps this_mod bs = zip bs (map top_bind bs)
     args bounds as = unionVarSets (map (arg bounds) as)
 
     expr :: BVs -> StgExpr -> FVs
-    expr bounds (StgApp f as) =
+    expr bounds (StgApp _ f as) =
       var bounds f `unionVarSet` args bounds as
 
     expr _ StgLit{} =
