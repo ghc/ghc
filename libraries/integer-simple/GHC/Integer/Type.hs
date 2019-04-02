@@ -34,6 +34,9 @@ import GHC.Tuple ()
 import GHC.IntWord64
 #endif
 
+-- | Arbitrary precision integers. In contrast with fixed-size integral types
+-- such as 'Int', the 'Integer' type represents the entire infinite range of
+-- integers.
 data Integer = Positive !Positive | Negative !Positive | Naught
 
 -------------------------------------------------------------------
