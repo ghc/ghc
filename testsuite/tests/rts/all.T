@@ -469,3 +469,4 @@ test('keep-cafs',
   ],
   makefile_test, ['KeepCafs'])
 
+test('T16514', normal, compile_and_run, ['T16514.cpp'])
