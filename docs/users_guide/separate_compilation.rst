@@ -291,7 +291,7 @@ Redirecting the compilation output(s)
     Redirects all generated interface files into ⟨dir⟩, instead of the
     default.
 
-    Please also note that when doing incremental compilation (by `ghc --make`
+    Please also note that when doing incremental compilation (by ``ghc --make``
     or ``ghc -c``), this directory is where GHC looks into to find interface
     files.
 
@@ -303,8 +303,8 @@ Redirecting the compilation output(s)
     Redirects all generated extended interface files into ⟨dir⟩, instead of
     the default.
 
-    Please also note that when doing incremental compilation (by `ghc --make`
-    or `ghc -c`), this directory is where GHC looks into to find extended
+    Please also note that when doing incremental compilation (by ``ghc --make``
+    or ``ghc -c``), this directory is where GHC looks into to find extended
     interface files.
 
 .. ghc-flag:: -stubdir ⟨dir⟩
