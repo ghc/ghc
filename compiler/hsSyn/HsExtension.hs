@@ -529,6 +529,7 @@ type family XRecordUpd      x
 type family XExprWithTySig  x
 type family XArithSeq       x
 type family XSCC            x
+type family XOptionsLocal   x
 type family XCoreAnn        x
 type family XBracket        x
 type family XRnBracketOut   x
@@ -577,6 +578,7 @@ type ForallXExpr (c :: * -> Constraint) (x :: *) =
        , c (XExprWithTySig  x)
        , c (XArithSeq       x)
        , c (XSCC            x)
+       , c (XOptionsLocal   x)
        , c (XCoreAnn        x)
        , c (XBracket        x)
        , c (XRnBracketOut   x)

@@ -655,8 +655,9 @@ data Token
   | ITann_prag          SourceText
   | ITcomplete_prag     SourceText
   | ITclose_prag
-  | IToptions_prag String
-  | ITinclude_prag String
+  | IToptions_prag       String
+  | IToptions_local_prag String
+  | ITinclude_prag       String
   | ITlanguage_prag
   | ITminimal_prag      SourceText
   | IToverlappable_prag SourceText  -- instance overlap mode
@@ -2962,6 +2963,7 @@ oneWordPrags = Map.fromList [
      ("warning", strtoken (\s -> ITwarning_prag (SourceText s))),
      ("deprecated", strtoken (\s -> ITdeprecated_prag (SourceText s))),
      ("scc", strtoken (\s -> ITscc_prag (SourceText s))),
+     ("options_local", (lex_string_prag IToptions_local_prag)),
      ("generated", strtoken (\s -> ITgenerated_prag (SourceText s))),
      ("core", strtoken (\s -> ITcore_prag (SourceText s))),
      ("unpack", strtoken (\s -> ITunpack_prag (SourceText s))),

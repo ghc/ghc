@@ -21,6 +21,7 @@ module TcRnMonad(
   setGblEnv, getLclEnv, updLclEnv, setLclEnv,
   getEnvs, setEnvs,
   xoptM, doptM, goptM, woptM,
+  setFlags,
   setXOptM, unsetXOptM, unsetGOptM, unsetWOptM,
   whenDOptM, whenGOptM, whenWOptM,
   whenXOptM, unlessXOptM,
@@ -475,6 +476,10 @@ goptM flag = do { dflags <- getDynFlags; return (gopt flag dflags) }
 
 woptM :: WarningFlag -> TcRnIf gbl lcl Bool
 woptM flag = do { dflags <- getDynFlags; return (wopt flag dflags) }
+
+setFlags :: DynFlags -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+setFlags dflags =
+ updTopEnv (\top -> top { hsc_dflags = dflags})
 
 setXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setXOptM flag =

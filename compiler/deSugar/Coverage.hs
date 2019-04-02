@@ -614,6 +614,10 @@ addTickHsExpr (HsSCC x src nm e) =
                 (return src)
                 (return nm)
                 (addTickLHsExpr e)
+addTickHsExpr (HsOptionsLocal x src e) =
+        liftM2 (HsOptionsLocal x)
+                (return src)
+                (addTickLHsExpr e)
 addTickHsExpr (HsCoreAnn x src nm e) =
         liftM3 (HsCoreAnn x)
                 (return src)

@@ -529,6 +529,11 @@ data HsExpr p
                 StringLiteral         -- "set cost centre" SCC pragma
                 (LHsExpr p)           -- expr whose cost is to be measured
 
+  | HsOptionsLocal
+                (XOptionsLocal p)
+                [Located String]      -- compiler options
+                (LHsExpr p)
+
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CORE'@,
   --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose' @'\#-}'@
 
@@ -745,6 +750,7 @@ type instance XArithSeq      GhcRn = NoExt
 type instance XArithSeq      GhcTc = PostTcExpr
 
 type instance XSCC           (GhcPass _) = NoExt
+type instance XOptionsLocal  (GhcPass _) = NoExt
 type instance XCoreAnn       (GhcPass _) = NoExt
 type instance XBracket       (GhcPass _) = NoExt
 
@@ -1069,6 +1075,10 @@ ppr_expr (HsSCC _ st (StringLiteral stl lbl) expr)
           <+> pprWithSourceText stl (ftext lbl) <+> text "#-}",
           ppr expr ]
 
+ppr_expr (HsOptionsLocal _ src expr)
+  = sep [ text "{-# OPTIONS_LOCAL" <+> (fsep . map (text . unLoc) $ src) <+> text "#-}",
+          ppr expr ]
+
 ppr_expr (HsWrap _ co_fn e)
   = pprHsWrapper co_fn (\parens -> if parens then pprExpr e
                                              else pprExpr e)
@@ -1201,6 +1211,7 @@ hsExprNeedsParens p = go
     go (EAsPat{})                     = False
     go (EViewPat{})                   = True
     go (HsSCC{})                      = p >= appPrec
+    go (HsOptionsLocal{})             = p >= appPrec
     go (HsWrap _ _ e)                 = go e
     go (HsSpliceE{})                  = False
     go (HsBracket{})                  = False

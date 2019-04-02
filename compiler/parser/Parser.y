@@ -57,6 +57,7 @@ import BooleanFormula   ( BooleanFormula(..), LBooleanFormula(..), mkTrue )
 import FastString
 import Maybes           ( isJust, orElse )
 import Outputable
+import Util
 
 -- compiler/basicTypes
 import RdrName
@@ -514,6 +515,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '{-# RULES'              { L _ (ITrules_prag _) }
  '{-# CORE'               { L _ (ITcore_prag _) }      -- hdaume: annotated core
  '{-# SCC'                { L _ (ITscc_prag _)}
+ '{-# OPTIONS_LOCAL'      { L _ (IToptions_local_prag _)}
  '{-# GENERATED'          { L _ (ITgenerated_prag _) }
  '{-# DEPRECATED'         { L _ (ITdeprecated_prag _) }
  '{-# WARNING'            { L _ (ITwarning_prag _) }
@@ -2629,6 +2631,11 @@ exp10 :: { ExpCmdP }
                                   ams (sLL $1 $> $ HsSCC noExt (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
                                       (fst $ fst $ unLoc $1) }
 
+        | options_local_annot exp {% runExpCmdP $2 >>= \ $2 ->
+                                     fmap ecFromExp $
+                                     ams (sLL $1 $> $ HsOptionsLocal noExt (snd $ unLoc $1) $2)
+                                         (fst $ unLoc $1) }
+
 optSemi :: { ([Located Token],Bool) }
         : ';'         { ([$1],True) }
         | {- empty -} { ([],False) }
@@ -2641,6 +2648,11 @@ scc_annot :: { Located (([AddAnn],SourceText),StringLiteral) }
         | '{-# SCC' VARID  '#-}'      { sLL $1 $> (([mo $1,mj AnnVal $2
                                          ,mc $3],getSCC_PRAGs $1)
                                         ,(StringLiteral NoSourceText (getVARID $2))) }
+
+options_local_annot :: { Located ([AddAnn], [Located String]) }
+        : '{-# OPTIONS_LOCAL'  '#-}'  {% do args <- parseOptLocArgs $1
+                                            ; return $ sLL $1 $>
+                                               ([mu AnnValStr $1, mc $2], args) }
 
 hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,Int))),
                          ((SourceText,SourceText),(SourceText,SourceText))
@@ -3797,6 +3809,7 @@ getRULES_PRAGs        (dL->L _ (ITrules_prag        src)) = src
 getWARNING_PRAGs      (dL->L _ (ITwarning_prag      src)) = src
 getDEPRECATED_PRAGs   (dL->L _ (ITdeprecated_prag   src)) = src
 getSCC_PRAGs          (dL->L _ (ITscc_prag          src)) = src
+getOptionsLocal_PRAGs (dL->L _ (IToptions_local_prag src)) = src
 getGENERATED_PRAGs    (dL->L _ (ITgenerated_prag    src)) = src
 getCORE_PRAGs         (dL->L _ (ITcore_prag         src)) = src
 getUNPACK_PRAGs       (dL->L _ (ITunpack_prag       src)) = src
@@ -3876,6 +3889,13 @@ sL1 x = sL (getLoc x)   -- #define sL1   sL (getLoc $1)
 sLL :: (HasSrcSpan a , HasSrcSpan b , HasSrcSpan c) =>
        a -> b -> SrcSpanLess c -> c
 sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
+
+parseOptLocArgs :: Located Token -> P [Located String]
+parseOptLocArgs tok =
+  case toArgs $ getOptionsLocal_PRAGs tok of
+    Left err   -> addFatalError (getLoc tok) (text "Error while parsing OPTIONS_LOCAL pragma")
+    Right args -> return $ map (cL (getLoc tok)) args
+
 
 {- Note [Adding location info]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -65,6 +65,7 @@ test('ds058', normal, compile, ['-W'])
 test('ds059', normal, compile, ['-W'])
 test('ds062', normal, compile, [''])
 test('ds063', normal, compile, [''])
+test('ds064', normal, compile, [''])
 
 test('T2409', normal, compile, [''])
 test('T3263-1', normal, compile, ['-fwarn-unused-do-bind -XRecursiveDo'])

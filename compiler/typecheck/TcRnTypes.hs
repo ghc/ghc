@@ -3652,6 +3652,7 @@ exprCtOrigin (RecordUpd {})      = Shouldn'tHappenOrigin "record update"
 exprCtOrigin (ExprWithTySig {})  = ExprSigOrigin
 exprCtOrigin (ArithSeq {})       = Shouldn'tHappenOrigin "arithmetic sequence"
 exprCtOrigin (HsSCC _ _ _ e)     = lexprCtOrigin e
+exprCtOrigin (HsOptionsLocal _ _ e) = lexprCtOrigin e
 exprCtOrigin (HsCoreAnn _ _ _ e) = lexprCtOrigin e
 exprCtOrigin (HsBracket {})      = Shouldn'tHappenOrigin "TH bracket"
 exprCtOrigin (HsRnBracketOut {})= Shouldn'tHappenOrigin "HsRnBracketOut"

@@ -15,8 +15,9 @@
 module HeaderInfo ( getImports
                   , mkPrelImports -- used by the renamer too
                   , getOptionsFromFile, getOptions
-                  , optionsErrorMsgs,
-                    checkProcessArgsResult ) where
+                  , optionsErrorMsgs
+                  , checkProcessArgsResult
+                  , optLocDynFlags ) where
 
 #include "HsVersions.h"
 
@@ -285,6 +286,14 @@ getOptions' dflags toks
               _                      -> False
 
 -----------------------------------------------------------------------------
+
+optLocDynFlags :: MonadIO m => DynFlags -> [Located String] -> m DynFlags
+optLocDynFlags dflags src = do
+  (dflags2, unhandled_flags, warns) <- parseDynamicFlagsFull flagsAll False dflags src
+  liftIO $ checkProcessArgsResult dflags2 unhandled_flags
+  unless (gopt Opt_Pp dflags2) $ liftIO $ handleFlagWarnings dflags2 warns
+  return dflags2
+
 
 -- | Complain about non-dynamic flags in OPTIONS pragmas.
 --
