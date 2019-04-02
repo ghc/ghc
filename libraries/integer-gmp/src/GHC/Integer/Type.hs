@@ -145,8 +145,12 @@ instance Ord BigNat where
 --  - @abs ('S#' _) <= abs ('Jp#' _)@
 --  - @abs ('S#' _) <  abs ('Jn#' _)@
 
--- | Arbitrary precision integers. For more information about this datatype,
--- see the comments in its implementation.
+-- | Arbitrary precision integers. In contrast with fixed-size integral types
+-- such as 'Int', the 'Integer' type represents the entire infinite range of
+-- integers.
+--
+-- For more information about this type's representation, see the comments in
+-- its implementation.
 data Integer  = S#                !Int#
                 -- ^ iff value in @[minBound::'Int', maxBound::'Int']@ range
               | Jp# {-# UNPACK #-} !BigNat
