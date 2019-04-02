@@ -8,6 +8,7 @@
 -----------------------------------------------------------------------------
 module SysTools.Tasks where
 
+import DriverPhases
 import Exception
 import ErrUtils
 import DynFlags
@@ -58,11 +59,11 @@ runPp dflags args =   do
       opts = map Option (getOpts dflags opt_F)
   runSomething dflags "Haskell pre-processor" prog (args ++ opts)
 
-runCc :: DynFlags -> [Option] -> IO ()
-runCc dflags args =   do
+runCc :: Maybe Phase -> DynFlags -> [Option] -> IO ()
+runCc languagePhase dflags args =   do
   let (p,args0) = pgm_c dflags
       args1 = map Option (getOpts dflags opt_c)
-      args2 = args0 ++ args ++ args1
+      args2 = args0 ++ languageOptions ++ args ++ args1
       -- We take care to pass -optc flags in args1 last to ensure that the
       -- user can override flags passed by GHC. See #14452.
   mb_env <- getGccEnv args2
@@ -117,6 +118,15 @@ runCc dflags args =   do
   wantedWarning w
    | "warning: call-clobbered register used" `isContainedIn` w = False
    | otherwise = True
+
+  languageOptions = case languagePhase of
+    Nothing -> []
+    Just lp -> [Option "-x", Option languageName] where
+      languageName
+        | lp `eqPhase` Ccxx    = "c++"
+        | lp `eqPhase` Cobjc   = "objective-c"
+        | lp `eqPhase` Cobjcxx = "objective-c++"
+        | otherwise            = "c"
 
 isContainedIn :: String -> String -> Bool
 xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
