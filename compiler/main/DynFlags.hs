@@ -92,7 +92,8 @@ module DynFlags (
         extraGccViaCFlags, systemPackageConfig,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_dll, pgm_T,
         pgm_windres, pgm_libtool, pgm_ar, pgm_ranlib, pgm_lo, pgm_lc,
-        pgm_lcc, pgm_i, opt_L, opt_P, opt_F, opt_c, opt_a, opt_l, opt_i,
+        pgm_lcc, pgm_i,
+        opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_i,
         opt_P_signature,
         opt_windres, opt_lo, opt_lc, opt_lcc,
 
@@ -1340,6 +1341,7 @@ data Settings = Settings {
                                          -- See Note [Repeated -optP hashing]
   sOpt_F                 :: [String],
   sOpt_c                 :: [String],
+  sOpt_cxx               :: [String],
   sOpt_a                 :: [String],
   sOpt_l                 :: [String],
   sOpt_windres           :: [String],
@@ -1423,6 +1425,8 @@ opt_F dflags = sOpt_F (settings dflags)
 opt_c                 :: DynFlags -> [String]
 opt_c dflags = concatMap (wayOptc (targetPlatform dflags)) (ways dflags)
             ++ sOpt_c (settings dflags)
+opt_cxx               :: DynFlags -> [String]
+opt_cxx dflags = sOpt_cxx (settings dflags)
 opt_a                 :: DynFlags -> [String]
 opt_a dflags = sOpt_a (settings dflags)
 opt_l                 :: DynFlags -> [String]
@@ -2520,7 +2524,7 @@ setObjectDir, setHiDir, setHieDir, setStubDir, setDumpDir, setOutputDir,
          setDynObjectSuf, setDynHiSuf,
          setDylibInstallName,
          setObjectSuf, setHiSuf, setHieSuf, setHcSuf, parseDynLibLoaderMode,
-         setPgmP, addOptl, addOptc, addOptP,
+         setPgmP, addOptl, addOptc, addOptcxx, addOptP,
          addCmdlineFramework, addHaddockOpts, addGhciScript,
          setInteractivePrint
    :: String -> DynFlags -> DynFlags
@@ -2636,6 +2640,7 @@ setDumpPrefixForce f d = d { dumpPrefixForce = f}
 setPgmP   f = let (pgm:args) = words f in alterSettings (\s -> s { sPgm_P   = (pgm, map Option args)})
 addOptl   f = alterSettings (\s -> s { sOpt_l   = f : sOpt_l s})
 addOptc   f = alterSettings (\s -> s { sOpt_c   = f : sOpt_c s})
+addOptcxx f = alterSettings (\s -> s { sOpt_cxx = f : sOpt_cxx s})
 addOptP   f = alterSettings (\s -> s { sOpt_P   = f : sOpt_P s
                                      , sOpt_P_fingerprint = fingerprintStrings (f : sOpt_P s)
                                      })
@@ -3038,6 +3043,8 @@ dynamic_flags_deps = [
       (hasArg (\f -> alterSettings (\s -> s { sOpt_F   = f : sOpt_F s})))
   , make_ord_flag defFlag "optc"
       (hasArg addOptc)
+  , make_ord_flag defFlag "optcxx"
+      (hasArg addOptcxx)
   , make_ord_flag defFlag "opta"
       (hasArg (\f -> alterSettings (\s -> s { sOpt_a   = f : sOpt_a s})))
   , make_ord_flag defFlag "optl"

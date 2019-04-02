@@ -369,4 +369,3 @@ isHaskellSigFilename     f = isHaskellSigSuffix     (drop 1 $ takeExtension f)
 isObjectFilename, isDynLibFilename :: Platform -> FilePath -> Bool
 isObjectFilename platform f = isObjectSuffix platform (drop 1 $ takeExtension f)
 isDynLibFilename platform f = isDynLibSuffix platform (drop 1 $ takeExtension f)
-

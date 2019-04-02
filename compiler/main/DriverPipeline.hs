@@ -1218,17 +1218,8 @@ runPhase (RealPhase cc_phase) input_fn dflags
 
         ghcVersionH <- liftIO $ getGhcVersionPathName dflags
 
-        let gcc_lang_opt | cc_phase `eqPhase` Ccxx    = "c++"
-                         | cc_phase `eqPhase` Cobjc   = "objective-c"
-                         | cc_phase `eqPhase` Cobjcxx = "objective-c++"
-                         | otherwise                  = "c"
-        liftIO $ SysTools.runCc dflags (
-                -- force the C compiler to interpret this file as C when
-                -- compiling .hc files, by adding the -x c option.
-                -- Also useful for plain .c files, just in case GHC saw a
-                -- -x c option.
-                        [ SysTools.Option "-x", SysTools.Option gcc_lang_opt
-                        , SysTools.FileOption "" input_fn
+        liftIO $ SysTools.runCc (phaseForeignLanguage cc_phase) dflags (
+                        [ SysTools.FileOption "" input_fn
                         , SysTools.Option "-o"
                         , SysTools.FileOption "" output_fn
                         ]
@@ -1917,7 +1908,7 @@ doCpp dflags raw input_fn output_fn = do
     let verbFlags = getVerbFlags dflags
 
     let cpp_prog args | raw       = SysTools.runCpp dflags args
-                      | otherwise = SysTools.runCc dflags (SysTools.Option "-E" : args)
+                      | otherwise = SysTools.runCc Nothing dflags (SysTools.Option "-E" : args)
 
     let target_defs =
           [ "-D" ++ HOST_OS     ++ "_BUILD_OS",
