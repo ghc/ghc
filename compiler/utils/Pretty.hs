@@ -1,6 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
 
+-- {-# OPTIONS_GHC -fno-stg-csr -ddump-stg-final -ddump-cmm -ddump-asm -ddump-cmm-from-stg #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Pretty
@@ -20,7 +22,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-
+{--
 Note [Differences between libraries/pretty and compiler/utils/Pretty.hs]
 
 For historical reasons, there are two different copies of `Pretty` in the GHC

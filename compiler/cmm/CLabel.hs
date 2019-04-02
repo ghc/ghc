@@ -1298,7 +1298,8 @@ pprCLbl (ForeignLabel str _ _ _)
   = ftext str
 
 pprCLbl (IdLabel name _cafs flavor) =
-  internalNamePrefix name <> ppr name <> ppIdFlavor flavor
+  -- internalNamePrefix name <> --TODO: Reenable, just for debugging
+  ppr name <> ppIdFlavor flavor
 
 pprCLbl (CC_Label cc)           = ppr cc
 pprCLbl (CCS_Label ccs)         = ppr ccs

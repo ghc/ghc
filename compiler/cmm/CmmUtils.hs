@@ -47,7 +47,7 @@ module CmmUtils(
         blankWord,
 
         -- Tagging
-        cmmTagMask, cmmPointerMask, cmmUntag, cmmIsTagged,
+        cmmTagMask, cmmPointerMask, cmmUntag, cmmIsTagged, cmmIsNotTagged,
         cmmConstrTag1,
 
         -- Overlap and usage
@@ -430,14 +430,14 @@ cmmPointerMask dflags = mkIntExpr dflags (complement (tAG_MASK dflags))
 
 -- Used to untag a possibly tagged pointer
 -- A static label need not be untagged
-cmmUntag, cmmIsTagged, cmmConstrTag1 :: DynFlags -> CmmExpr -> CmmExpr
+cmmUntag, cmmIsTagged, cmmIsNotTagged, cmmConstrTag1 :: DynFlags -> CmmExpr -> CmmExpr
 cmmUntag _ e@(CmmLit (CmmLabel _)) = e
 -- Default case
 cmmUntag dflags e = cmmAndWord dflags e (cmmPointerMask dflags)
 
 -- Test if a closure pointer is untagged
 cmmIsTagged dflags e = cmmNeWord dflags (cmmAndWord dflags e (cmmTagMask dflags)) (zeroExpr dflags)
-
+cmmIsNotTagged dflags e = cmmEqWord dflags (cmmAndWord dflags e (cmmTagMask dflags)) (zeroExpr dflags)
 -- Get constructor tag, but one based.
 cmmConstrTag1 dflags e = cmmAndWord dflags e (cmmTagMask dflags)
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 --
@@ -15,6 +16,8 @@ module StgCmmExpr ( cgExpr ) where
 import GhcPrelude hiding ((<*>))
 
 import {-# SOURCE #-} StgCmmBind ( cgBind )
+
+import CmmUtils (cmmIsNotTagged)
 
 import StgCmmMonad
 import StgCmmHeap
@@ -36,6 +39,7 @@ import Cmm
 import CmmInfo
 import CoreSyn
 import DataCon
+import DynFlags
 import ForeignCall
 import Id
 import PrimOp
@@ -48,7 +52,7 @@ import Util
 import FastString
 import Outputable
 
-import Control.Monad (unless,void)
+import Control.Monad (unless,void, when)
 import Control.Arrow (first)
 import Data.Function ( on )
 
@@ -58,12 +62,12 @@ import Data.Function ( on )
 
 cgExpr  :: CgStgExpr -> FCode ReturnKind
 
-cgExpr (StgApp fun args)     = cgIdApp fun args
+cgExpr (StgApp evaled fun args)     = cgIdApp evaled fun args
 
 -- seq# a s ==> a
 -- See Note [seq# magic] in PrelRules
 cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
-  cgIdApp a []
+  cgIdApp MayEnter a []
 
 -- dataToTag# :: a -> Int#
 -- See Note [dataToTag#] in primops.txt.pp
@@ -71,12 +75,12 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   dflags <- getDynFlags
   emitComment (mkFastString "dataToTag#")
   tmp <- newTemp (bWord dflags)
-  _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
+  _ <- withSequel (AssignTo [tmp] False) (cgIdApp MayEnter a [])
   -- TODO: For small types look at the tag bits instead of reading info table
   emitReturn [getConstrTag dflags (cmmUntag dflags (CmmReg (CmmLocal tmp)))]
 
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
-cgExpr (StgConApp con args _)= cgConApp con args
+cgExpr (StgConApp _ext con args _)= cgConApp con args
 cgExpr (StgTick t e)         = cgTick t >> cgExpr e
 cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
                                emitReturn [CmmLit cmm_lit]
@@ -153,9 +157,9 @@ cgLetNoEscapeRhsBody
     -> FCode (CgIdInfo, FCode ())
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure _ cc _upd args body)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
-cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)
+cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon _ext cc con args)
   = cgLetNoEscapeClosure bndr local_cc cc []
-      (StgConApp con args (pprPanic "cgLetNoEscapeRhsBody" $
+      (StgConApp _ext con args (pprPanic "cgLetNoEscapeRhsBody" $
                            text "StgRhsCon doesn't have type args"))
         -- For a constructor RHS we want to generate a single chunk of
         -- code which can be jumped to from many places, which will
@@ -285,6 +289,53 @@ Hence: two basic plans for
 
         ...code for alts...
         ...no heap check...
+
+{- Note [Handle gc for evaluated scrutinees]
+
+   ------ Plan C: special case when ---------
+
+  (i)  e is already evaluated
+
+  Then heap allocation in the case branch
+  is replaced by an upstream check.
+  Very common example: Casing on strict fields.
+
+        ...heap check...
+        ...assign bindings...
+
+        ...code for alts...
+        ...no heap check...
+
+  -- Reasoning for Plan C:
+
+   When using GcInAlts the return point for heap checks and evaluating
+   the scrutinee is shared. This does mean we might execute the actual
+   branching code twice but it's rare enough to not matter.
+
+   The huge advantage of this pattern is that we do not require multiple
+   info tables for returning from gc as they can be shared between all
+   cases.
+
+   However when the scrutinee is already evaluated there is no evaluation
+   call. Instead we would end up with one info table per alternative.
+
+   To avoid this we unconditionally do gc outside of the alts with all
+   the pros and cons described in Note [Compiling case expressions].
+
+   For containers:Data/Sequence/Internal/Sorting.o the difference is
+   about 10% in terms of code size.
+
+   For nofib it's about -0.5% reduction in Module size with this approach
+   while the benefit without it is almost meaningless at a reported -0.1%.
+
+   There is still the issue with putting heap checks into loops,
+   but we are not really worse of than we would be when checking
+   if a scrutinee is evaluated.
+
+   TODO: Investigate what is required to instead create a shared return
+   point for all the GC calls in the alts.
+
+-}
 -}
 
 
@@ -405,7 +456,7 @@ exist, perhaps because the occurrence information preserved by
 job we deleted the hacks.
 -}
 
-cgCase (StgApp v []) _ (PrimAlt _) alts
+cgCase (StgApp _ext v []) _ (PrimAlt _) alts
   | isVoidRep (idPrimRep v)  -- See Note [Scrutinising VoidRep]
   , [(DEFAULT, _, rhs)] <- alts
   = cgExpr rhs
@@ -426,7 +477,7 @@ then we'll get a runtime panic, because the HValue really is a
 MutVar#.  The types are compatible though, so we can just generate an
 assignment.
 -}
-cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
+cgCase (StgApp _ext v []) bndr alt_type@(PrimAlt _) alts
   | isUnliftedType (idType v)  -- Note [Dodgy unsafeCoerce 1]
   || reps_compatible
   = -- assignment suffices for unlifted types
@@ -461,7 +512,7 @@ because bottom must be untagged, it will be entered.  The Sequel is a
 type-correct assignment, albeit bogus.  The (dead) continuation loops;
 it would be better to invoke some kind of panic function here.
 -}
-cgCase scrut@(StgApp v []) _ (PrimAlt _) _
+cgCase scrut@(StgApp _ext v []) _ (PrimAlt _) _
   = do { dflags <- getDynFlags
        ; mb_cc <- maybeSaveCostCentre True
        ; _ <- withSequel
@@ -493,7 +544,7 @@ cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
   = -- Note [Handle seq#]
     -- And see Note [seq# magic] in PrelRules
     -- Use the same return convention as vanilla 'a'.
-    cgCase (StgApp a []) bndr alt_type alts
+    cgCase (StgApp MayEnter a []) bndr alt_type alts
 
 cgCase scrut bndr alt_type alts
   = -- the general case
@@ -501,11 +552,15 @@ cgCase scrut bndr alt_type alts
        ; up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
              alt_regs  = map (idToReg dflags) ret_bndrs
+
+       -- Todo: Non evaluating cases always have simple scruts.
+
        ; simple_scrut <- isSimpleScrut scrut alt_type
        ; let do_gc  | is_cmp_op scrut  = False  -- See Note [GC for conditionals]
                     | not simple_scrut = True
                     | isSingleton alts = False
                     | up_hp_usg > 0    = False
+                    | evaluatedScrut   = False
                     | otherwise        = True
                -- cf Note [Compiling case expressions]
              gc_plan = if do_gc then GcInAlts alt_regs else NoGcInAlts
@@ -521,6 +576,11 @@ cgCase scrut bndr alt_type alts
   where
     is_cmp_op (StgOpApp (StgPrimOp op) _ _) = isComparisonPrimOp op
     is_cmp_op _                             = False
+    evaluatedScrut
+      | (StgApp NoEnter _v []) <- scrut = True
+      | otherwise = False
+
+
 
 {- Note [GC for conditionals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -570,10 +630,11 @@ isSimpleScrut :: CgStgExpr -> AltType -> FCode Bool
 -- heap usage from alternatives into the stuff before the case
 -- NB: if you get this wrong, and claim that the expression doesn't allocate
 --     when it does, you'll deeply mess up allocation
-isSimpleScrut (StgOpApp op args _) _       = isSimpleOp op args
-isSimpleScrut (StgLit _)       _           = return True       -- case 1# of { 0# -> ..; ... }
-isSimpleScrut (StgApp _ [])    (PrimAlt _) = return True       -- case x# of { 0# -> ..; ... }
-isSimpleScrut _                _           = return False
+isSimpleScrut (StgOpApp op args _) _         = isSimpleOp op args
+isSimpleScrut (StgLit _)           _         = return True       -- case 1# of { 0# -> ..; ... }
+isSimpleScrut (StgApp _ _ [])    (PrimAlt _) = return True       -- case x# of { 0# -> ..; ... }
+isSimpleScrut (StgApp NoEnter _ [])   _ = return True       -- case !x of { ... }
+isSimpleScrut _                    _         = return False
 
 isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
 -- True iff the op cannot block or allocate
@@ -753,27 +814,65 @@ cgConApp con stg_args
         ; tickyReturnNewCon (length stg_args)
         ; emitReturn [idInfoToAmode idinfo] }
 
-cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
-cgIdApp fun_id args = do
+-- | Cause memory fault on tag missprediction
+--   expectTag informs if we expect a tag or not.
+emitTagTrap :: Outputable what => what -> CmmExpr -> Bool -> FCode ()
+emitTagTrap what fun expectTag = do
+  { dflags <- getDynFlags
+
+  ; lret <- newBlockId
+  ; lfault <- newBlockId
+  ; tscope <- getTickScope
+  ; pprTraceM "emitTagTrap" (ppr what)
+  ; let check = if expectTag then cmmIsTagged else cmmIsNotTagged
+  ; emit $
+      -- The actual debug code block
+      mkCbranch (check dflags fun)
+                lret lfault Nothing <*>
+      outOfLine lfault (mkStore (CmmLit $ CmmInt 0 W64) (CmmLit $ CmmInt 0 W64) <*> mkBranch lret,tscope) <*>
+      mkLabel lret tscope
+  } 
+
+
+cgIdApp :: AppEnters -> Id -> [StgArg] -> FCode ReturnKind
+cgIdApp strict fun_id args = do
     dflags         <- getDynFlags
     fun_info       <- getCgIdInfo fun_id
     self_loop_info <- getSelfLoop
     let fun_arg     = StgVarArg fun_id
+        profiling   = WayProf `elem` ways dflags
         fun_name    = idName    fun_id
-        fun         = idInfoToAmode fun_info
+        fun         = idInfoToAmode fun_info :: CmmExpr
         lf_info     = cg_lf         fun_info
         n_args      = length args
         v_args      = length $ filter (isVoidTy . stgArgType) args
         node_points dflags = nodeMustPointToIt dflags lf_info
-    case getCallMethod dflags fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
-            -- A value in WHNF, so we can just return it.
+    case getCallMethod dflags fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info strict of
+        -- A value in WHNF, so we can just return it.
         ReturnIt
           | isVoidTy (idType fun_id) -> emitReturn []
           | otherwise                -> emitReturn [fun]
           -- ToDo: does ReturnIt guarantee tagged?
 
-        EnterIt -> ASSERT( null args )  -- Discarding arguments
-                   emitEnter fun
+        -- A value in WHNF, but determined by StgCSR.
+        -- See Note [CSR for Stg]
+        retKind
+          -- | isWHNF && isVoidTy (idType fun_id) ->
+            -- pprTrace "WHNFv:" (ppr fun_id) $
+          --   emitReturn []
+          | isWHNF && not (isVoidTy (idType fun_id))
+          -- , not profiling
+          -> do
+            -- TODO: Enable for debug
+            -- when debugIsOn
+            -- (emitTagTrap fun_id fun True)
+
+            tickyTagged
+            -- pprTraceM "WHNF:" (ppr fun_id <+> ppr args <+> ppr retKind)
+            emitReturn [fun]
+
+        EnterIt untagged -> ASSERT( null args )  -- Discarding arguments
+                   emitEnter untagged fun
 
         SlowCall -> do      -- A slow function call via the RTS apply routines
                 { tickySlowCall lf_info args
@@ -794,6 +893,16 @@ cgIdApp fun_id args = do
           ; emitMultiAssign lne_regs cmm_args
           ; emit (mkBranch blk_id)
           ; return AssignedDirectly }
+
+      where
+        isWHNF | not (null args)
+               = False
+              --  = pprPanic "Strict value applied to args:" (ppr fun_id <+> text "args:" <+> ppr args)
+               | NoEnter <- strict
+               = ASSERT( null args )
+                 True
+              --  | null args = True
+               | otherwise = False
 
 -- Note [Self-recursive tail calls]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -902,8 +1011,8 @@ cgIdApp fun_id args = do
 -- we can turn a call into a self-recursive jump.
 --
 
-emitEnter :: CmmExpr -> FCode ReturnKind
-emitEnter fun = do
+emitEnter :: AppEnters -> CmmExpr -> FCode ReturnKind
+emitEnter untagged fun = do
   { dflags <- getDynFlags
   ; adjustHpBackwards
   ; sequel <- getSequel
@@ -917,7 +1026,7 @@ emitEnter fun = do
       --
       -- Right now, we do what the old codegen did, and omit the tag
       -- test, just generating an enter.
-      Return -> do
+      Return -> when (untagged /= MayEnter) (pprTraceM "Return " $ ppr (untagged, fun)) >> do
         { let entry = entryCode dflags $ closureInfoPtr dflags $ CmmReg nodeReg
         ; emit $ mkJump dflags NativeNodeCall entry
                         [cmmUntag dflags fun] updfr_off
@@ -949,7 +1058,10 @@ emitEnter fun = do
       -- that the continuation can be reused by the heap-check failure
       -- code in the enclosing case expression.
       --
-      AssignTo res_regs _ -> do
+      -- If we statically know we have to enter the result then we omit
+      -- the tag check and the associated conditional jump.
+      --
+      AssignTo res_regs _ -> do -- when (untagged /= MayEnter) (pprTraceM "Assign " $ ppr (untagged, fun)) >> do
        { lret <- newBlockId
        ; let (off, _, copyin) = copyInOflow dflags NativeReturn (Young lret) res_regs []
        ; lcall <- newBlockId
@@ -960,14 +1072,25 @@ emitEnter fun = do
          -- refer to fun via nodeReg after the copyout, to avoid having
          -- both live simultaneously; this sometimes enables fun to be
          -- inlined in the RHS of the R1 assignment.
-       ; let entry = entryCode dflags (closureInfoPtr dflags (CmmReg nodeReg))
-             the_call = toCall entry (Just lret) updfr_off off outArgs regs
+       ; let entry :: Bool -> CmmExpr
+             entry untagNode
+                -- | untagNode = entryCode dflags (closureInfoPtr dflags (cmmUntag dflags (CmmReg nodeReg)))
+                | otherwise = entryCode dflags (closureInfoPtr dflags (CmmReg nodeReg))
+             the_call untagNode = toCall (entry untagNode) (Just lret) updfr_off off outArgs regs
        ; tscope <- getTickScope
+       -- We either jump directly when we can assume the pointer will be untagged,
+       -- or only after a tag check otherwise.
+       ; let untag = untagged == AlwaysEnter
+       ; when( untag ) $ do
+          tickyUntagged (cmmIsTagged dflags fun)
+          emit $ mkComment (fsLit "expect untagged")
        ; emit $
            copyout <*>
-           mkCbranch (cmmIsTagged dflags (CmmReg nodeReg))
-                     lret lcall Nothing <*>
-           outOfLine lcall (the_call,tscope) <*>
+           (if untag
+            then mkAssign (nodeReg) (cmmUntag dflags $ CmmReg nodeReg) <*> mkBranch lcall
+            else mkCbranch (cmmIsTagged dflags (CmmReg nodeReg))
+                     lret lcall Nothing) <*>
+           outOfLine lcall (the_call untag,tscope) <*>
            mkLabel lret tscope <*>
            copyin
        ; return (ReturnedTo lret off)

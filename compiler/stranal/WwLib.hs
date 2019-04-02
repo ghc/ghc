@@ -1173,7 +1173,7 @@ mk_absent_let dflags arg
               -- diverge for sure lint" warning)
     arg_ty       = idType arg
     abs_rhs      = mkAbsentErrorApp arg_ty msg
-    msg          = showSDoc (gopt_set dflags Opt_SuppressUniques)
+    msg          = showSDoc dflags
                           (ppr arg <+> ppr (idType arg))
               -- We need to suppress uniques here because otherwise they'd
               -- end up in the generated code as strings. This is bad for

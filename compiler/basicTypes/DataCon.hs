@@ -56,7 +56,11 @@ module DataCon (
         specialPromotedDc,
 
         -- ** Promotion related functions
-        promoteDataCon
+        promoteDataCon,
+
+        -- ** Utility functions
+        getStrictConArgs, mapStrictConArgs
+
     ) where
 
 #include "HsVersions.h"
@@ -1513,3 +1517,29 @@ buildSynTyCon name binders res_kind roles rhs
   where
     is_tau      = isTauTy rhs
     is_fam_free = isFamFreeTy rhs
+
+{-
+************************************************************************
+*                                                                      *
+              Data con utility functions
+*                                                                      *
+************************************************************************
+-}
+
+-- | Given a DataCon and list of args passed to it, return the ids we expect to be strict.
+-- We use this to determine which of these require evaluation
+-- MkT A1 !A2 A3
+-- getStrictConArgs MkT [1,2,3] = [2]
+getStrictConArgs :: DataCon -> [a] -> [a]
+getStrictConArgs con args =
+    filterByList strictArgs args
+  where
+    strictArgs = map isMarkedStrict $ dataConRepStrictness con
+
+-- | MkT A1 !A2 A3
+-- mapStrictConArgs MkT not [True,True,True] = [True,False,True]
+mapStrictConArgs :: DataCon -> (a -> a) -> [a] -> [a]
+mapStrictConArgs con f args =
+    zipWith (\arg s -> if isMarkedStrict s then f arg else arg) args conReps
+  where
+    conReps = dataConRepStrictness con

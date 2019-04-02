@@ -81,7 +81,6 @@ import Data.Data
 import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
 
-
 newtype UniqFM ele = UFM (M.IntMap ele)
   deriving (Data, Eq, Functor)
   -- We used to derive Traversable and Foldable, but they were nondeterministic

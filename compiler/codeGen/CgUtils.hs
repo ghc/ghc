@@ -14,7 +14,7 @@ module CgUtils (
         get_Regtable_addr_from_offset,
         regTableOffset,
         get_GlobalReg_addr,
-  ) where
+  ) where 
 
 import GhcPrelude
 

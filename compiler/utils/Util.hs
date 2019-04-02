@@ -46,6 +46,8 @@ module Util (
 
         changeLast,
 
+        selectIndices,
+
         -- * Tuples
         fstOf3, sndOf3, thdOf3,
         firstM, first3M, secondM,
@@ -611,6 +613,28 @@ changeLast :: [a] -> a -> [a]
 changeLast []     _  = panic "changeLast"
 changeLast [_]    x  = [x]
 changeLast (x:xs) x' = x : changeLast xs x'
+
+-- | Given a list of increasing indices return only these.
+-- Equal to selectIndicies indices xs == map (xs !!) indices
+-- O(n) so only useful for small/dense selection
+-- Indices MUST be ordered and ascending and are 0 based.
+selectIndices :: [Int] -> [a] -> [a]
+selectIndices [] _ = []
+selectIndices is xs =
+    go 0 is xs
+  where
+    go :: Int -> [Int] -> [a] -> [a]
+    go _ [] _ = []
+    go _ _ [] = []
+    go n (i:is) (x:xs)
+      | n == i
+      = x : go (n+1) is xs
+      | n > i
+      = panic "Invalid input to selectIndices"
+      | otherwise
+      = go (n+1) (i:is) xs
+
+
 
 {-
 ************************************************************************

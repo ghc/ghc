@@ -29,7 +29,7 @@
 -- (c) The GRASP/AQUA Project, Glasgow University, 1993-2000
 --
 -------------------------------------------------------------------------------
-
+--
 module HscMain
     (
     -- * Making an HscEnv
@@ -127,6 +127,7 @@ import CoreToStg        ( coreToStg )
 import qualified StgCmm ( codeGen )
 import StgSyn
 import StgFVs           ( annTopBindingsFreeVars )
+import StgInferTags     ( findTags )
 import CostCentre
 import ProfInit
 import TyCon
@@ -1503,13 +1504,18 @@ doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
 
-    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
+    us <- mkSplitUniqSupply 't'
+    let stg_binds_w_tags = {-# SCC "StgTagFields" #-} 
+                          findTags this_mod us stg_binds :: [TgStgTopBinding]
+    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds_w_tags
+
     dumpIfSet_dyn dflags Opt_D_dump_stg_final
                   "STG for code gen:" (pprGenStgTopBindings stg_binds_w_fvs)
     let cmm_stream :: Stream IO CmmGroup ()
         cmm_stream = {-# SCC "StgCmm" #-}
             StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
+
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one

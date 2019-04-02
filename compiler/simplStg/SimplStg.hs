@@ -51,6 +51,8 @@ stg2stg dflags this_mod binds
   = do  { showPass dflags "Stg2Stg"
         ; us <- mkSplitUniqSupply 'g'
 
+
+
         -- Do the main business!
         ; binds' <- runStgM us $
             foldM do_stg_pass binds (getStgToDo dflags)
