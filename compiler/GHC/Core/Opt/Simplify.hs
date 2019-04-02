@@ -2581,6 +2581,8 @@ rebuildCase, reallyRebuildCase
 --------------------------------------------------
 
 rebuildCase env scrut case_bndr alts cont
+  -- | pprTrace "rebuildCase" (ppr scrut) False
+  -- = undefined
   | Lit lit <- scrut    -- No need for same treatment as constructors
                         -- because literals are inlined more vigorously
   , not (litIsLifted lit)
