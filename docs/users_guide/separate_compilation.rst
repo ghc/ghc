@@ -292,7 +292,7 @@ Redirecting the compilation output(s)
     default.
 
     Please also note that when doing incremental compilation (by `ghc --make`
-    or `ghc -c`), this directory is where GHC looks into to find interface
+    or ``ghc -c``), this directory is where GHC looks into to find interface
     files.
 
 .. ghc-flag:: -hiedir ⟨dir⟩
