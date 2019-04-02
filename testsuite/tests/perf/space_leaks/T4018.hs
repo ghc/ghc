@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -ddump-simpl -dsuppress-all #-}
+
 module Main (main) where
 
  import Foreign
