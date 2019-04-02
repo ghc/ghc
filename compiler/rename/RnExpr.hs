@@ -51,6 +51,7 @@ import RdrName
 import UniqSet
 import Data.List
 import Util
+import HeaderInfo
 import ListSetOps       ( removeDups )
 import ErrUtils
 import Outputable
@@ -239,6 +240,13 @@ rnExpr (HsCoreAnn x src ann expr)
 rnExpr (HsSCC x src lbl expr)
   = do { (expr', fvs_expr) <- rnLExpr expr
        ; return (HsSCC x src lbl expr', fvs_expr) }
+
+rnExpr (HsOptionsLocal x src expr)
+  = do { dflags <- getDynFlags
+       ; dflags2 <- optLocDynFlags dflags src
+       ; (expr', fvs_expr) <- setFlags dflags2 $ rnLExpr expr
+       ; return (HsOptionsLocal x src expr', fvs_expr) }
+
 rnExpr (HsTickPragma x src info srcInfo expr)
   = do { (expr', fvs_expr) <- rnLExpr expr
        ; return (HsTickPragma x src info srcInfo expr', fvs_expr) }

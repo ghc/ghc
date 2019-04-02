@@ -67,6 +67,7 @@ import PrelNames
 import DynFlags
 import SrcLoc
 import Util
+import HeaderInfo
 import VarEnv  ( emptyTidyEnv, mkInScopeSet )
 import ListSetOps
 import Maybes
@@ -181,6 +182,12 @@ tcExpr (HsPar x expr) res_ty = do { expr' <- tcMonoExprNC expr res_ty
 tcExpr (HsSCC x src lbl expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
        ; return (HsSCC x src lbl expr') }
+
+tcExpr (HsOptionsLocal x src expr) res_ty
+  = do { dflags <- getDynFlags
+       ; dflags2 <- optLocDynFlags dflags src
+       ; expr'  <- setFlags dflags2 $ tcMonoExpr expr res_ty
+       ; return (HsOptionsLocal x src expr') }
 
 tcExpr (HsTickPragma x src info srcInfo expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
