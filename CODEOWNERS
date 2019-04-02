@@ -38,6 +38,7 @@
 
 # Core libraries
 /libraries/base/                  @hvr
+/libraries/ghci/                  @simonmar
 /libraries/template-haskell/      @goldfire
 
 # Internal utilities and libraries
