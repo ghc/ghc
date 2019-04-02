@@ -40,6 +40,7 @@ module GHC.Stg.Lint ( lintStgTopBindings ) where
 import GHC.Prelude
 
 import GHC.Stg.Syntax
+import GHC.Stg.Utils
 
 import GHC.Driver.Session
 import GHC.Core.Lint        ( interactiveInScope )
@@ -156,7 +157,7 @@ checkNoCurrentCCS rhs = do
       StgRhsClosure _ ccs _ _ _
          | isCurrentCCS ccs
          -> addErrL (text "Top-level StgRhsClosure with CurrentCCS" $$ rhs')
-      StgRhsCon ccs _ _ _ _
+      StgRhsCon _ext ccs _ _ _ _
          | isCurrentCCS ccs
          -> addErrL (text "Top-level StgRhsCon with CurrentCCS" $$ rhs')
       _ -> return ()
@@ -171,7 +172,7 @@ lintStgRhs (StgRhsClosure _ _ _ binders expr)
       addInScopeVars binders $
         lintStgExpr expr
 
-lintStgRhs rhs@(StgRhsCon _ con _ _ args) = do
+lintStgRhs rhs@(StgRhsCon _ext _ con _ _ args) = do
     when (isUnboxedTupleDataCon con || isUnboxedSumDataCon con) $ do
       opts <- getStgPprOpts
       addErrL (text "StgRhsCon is an unboxed tuple or sum application" $$
@@ -183,11 +184,11 @@ lintStgExpr :: (OutputablePass a, BinderP a ~ Id) => GenStgExpr a -> LintM ()
 
 lintStgExpr (StgLit _) = return ()
 
-lintStgExpr (StgApp fun args) = do
+lintStgExpr (StgApp _ fun args) = do
     lintStgVar fun
     mapM_ lintStgArg args
 
-lintStgExpr app@(StgConApp con _n args _arg_tys) = do
+lintStgExpr app@(StgConApp _ext con _n args _arg_tys) = do
     -- unboxed sums should vanish during unarise
     lf <- getLintFlags
     when (lf_unarised lf && isUnboxedSumDataCon con) $ do
