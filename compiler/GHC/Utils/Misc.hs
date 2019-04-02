@@ -54,6 +54,7 @@ module GHC.Utils.Misc (
         mapLastM,
 
         whenNonEmpty,
+        selectIndices,
 
         mergeListsBy,
         isSortedBy,
@@ -660,6 +661,29 @@ isSortedBy cmp = sorted
     sorted [] = True
     sorted [_] = True
     sorted (x:y:xs) = cmp x y /= GT && sorted (y:xs)
+
+-- | Given a list of increasing indices return only these.
+-- Equal to selectIndicies indices xs == map (xs !!) indices
+-- O(n) so only useful for small/dense selection
+-- Indices MUST be ordered ascending and are 0 based.
+selectIndices :: [Int] -> [a] -> [a]
+selectIndices [] _ = []
+selectIndices is xs =
+    go 0 is xs
+  where
+    go :: Int -> [Int] -> [a] -> [a]
+    go _ [] _ = []
+    go _ _ [] = []
+    go n (i:is) (x:xs)
+      | n == i
+      = x : go (n+1) is xs
+      | n > i
+      = panic "Invalid input to selectIndices"
+      | otherwise
+      = go (n+1) (i:is) xs
+
+
+
 {-
 ************************************************************************
 *                                                                      *

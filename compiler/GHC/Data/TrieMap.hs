@@ -11,6 +11,8 @@
 module GHC.Data.TrieMap(
    -- * Maps over 'Maybe' values
    MaybeMap,
+   -- * Maps over 'Either' values
+   EitherMap,
    -- * Maps over 'List' values
    ListMap,
    -- * Maps over 'Literal's
@@ -24,7 +26,7 @@ module GHC.Data.TrieMap(
    -- * Map for leaf compression
    GenMap,
    lkG, xtG, mapG, fdG,
-   xtList, lkList
+   xtList, lkList, deMaybe
 
  ) where
 
@@ -247,6 +249,30 @@ xtMaybe tr (Just x) f m = m { mm_just = mm_just m |> tr x f }
 fdMaybe :: TrieMap m => (a -> b -> b) -> MaybeMap m a -> b -> b
 fdMaybe k m = foldMaybe k (mm_nothing m)
             . foldTM k (mm_just m)
+
+{-
+************************************************************************
+*                                                                      *
+                   Either
+*                                                                      *
+************************************************************************
+-}
+
+data EitherMap ml mr a = EM { em_left  :: ml a, em_right :: mr a }
+
+instance (TrieMap ml, TrieMap mr) => Functor (EitherMap ml mr) where
+  fmap f (EM l r) = EM (mapTM f l) (mapTM f r)
+
+instance (TrieMap ml, TrieMap mr) => TrieMap (EitherMap ml mr) where
+   type Key (EitherMap ml mr) = Either (Key ml) (Key mr)
+   emptyTM  = EM { em_left = emptyTM, em_right = emptyTM }
+   lookupTM (Left k)  em = lookupTM k (em_left  em)
+   lookupTM (Right k) em = lookupTM k (em_right em)
+   alterTM  k f em
+    | Left  kl <- k = em { em_left  = alterTM kl f (em_left em) }
+    | Right kr <- k = em { em_right = alterTM kr f (em_right em) }
+   foldTM f (EM lm rm) acc = foldTM f lm (foldTM f rm acc)
+   mapTM    = fmap
 
 {-
 ************************************************************************

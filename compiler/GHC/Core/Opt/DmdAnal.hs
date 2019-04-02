@@ -44,6 +44,7 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
 
+-- Debugging
 -- import GHC.Driver.Ppr
 
 {-
@@ -170,7 +171,8 @@ dmdAnal' _ _ (Coercion co)
   = (unitDmdType (coercionDmdEnv co), Coercion co)
 
 dmdAnal' env dmd (Var var)
-  = (dmdTransform env var dmd, Var var)
+  = -- pprTrace "dmdAnalVar" (ppr var <+> (ppr $ dmdTransform env var dmd)) $
+    (dmdTransform env var dmd, Var var)
 
 dmdAnal' env dmd (Cast e co)
   = (dmd_ty `plusDmdType` mkPlusDmdArg (coercionDmdEnv co), Cast e' co)
@@ -183,7 +185,8 @@ dmdAnal' env dmd (Tick t e)
     (dmd_ty, e') = dmdAnal env dmd e
 
 dmdAnal' env dmd (App fun (Type ty))
-  = (fun_ty, App fun' (Type ty))
+  = -- pprTrace "dmdAnalAppTy" (ppr fun <+> ppr ty) $
+    (fun_ty, App fun' (Type ty))
   where
     (fun_ty, fun') = dmdAnal env dmd fun
 
@@ -308,7 +311,8 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
 -- This is the LetUp rule in the paper “Higher-Order Cardinality Analysis”.
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   | useLetUp id
-  = (final_ty, Let (NonRec id' rhs') body')
+  = -- pprTrace "LetUpOn" (ppr id)
+    (final_ty, Let (NonRec id' rhs') body')
   where
     (body_ty, body')   = dmdAnal env dmd body
     (body_ty', id_dmd) = findBndrDmd env notArgOfDfun body_ty id
@@ -565,7 +569,8 @@ dmdTransform :: AnalEnv         -- ^ The strictness environment
 dmdTransform env var dmd
   -- Data constructors
   | isDataConWorkId var
-  = dmdTransformDataConSig (idArity var) dmd
+  = -- pprTrace "dmdTransform1" empty $
+    dmdTransformDataConSig (idArity var) dmd
   -- Dictionary component selectors
   -- Used to be controlled by a flag.
   -- See #18429 for some perf measurements.
@@ -573,10 +578,18 @@ dmdTransform env var dmd
   = -- pprTrace "dmdTransform:DictSel" (ppr var $$ ppr dmd) $
     dmdTransformDictSelSig (idStrictness var) dmd
   -- Imported functions
+  -- | getUnique var == impossibleIdKey
+  -- = panic "impossible"
   | isGlobalId var
   , let res = dmdTransformSig (idStrictness var) dmd
-  = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
-    res
+  =
+    -- pprTrace "dmdTransform:import"
+    --   (vcat [ppr var
+    --         , ppr (idStrictness var)
+    --         , ppr dmd
+    --         , ppr res
+    --         ])
+      res
   -- Top-level or local let-bound thing for which we use LetDown ('useLetUp').
   -- In that case, we have a strictness signature to unleash in our AnalEnv.
   | Just (sig, top_lvl) <- lookupSigEnv env var
