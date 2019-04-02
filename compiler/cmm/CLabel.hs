@@ -1298,7 +1298,13 @@ pprCLbl (ForeignLabel str _ _ _)
   = ftext str
 
 pprCLbl (IdLabel name _cafs flavor) =
-  internalNamePrefix name <> ppr name <> ppIdFlavor flavor
+  prefix <> ppr name <> ppIdFlavor flavor
+    where
+      prefix = sdocWithDynFlags $ \dflags ->
+        if debugLevel dflags > 3 
+          then empty 
+          else internalNamePrefix name
+  
 
 pprCLbl (CC_Label cc)           = ppr cc
 pprCLbl (CCS_Label ccs)         = ppr ccs

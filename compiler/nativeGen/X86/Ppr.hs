@@ -8,7 +8,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans -ddump-stg -ddump-to-file -ddump-asm #-}
 module X86.Ppr (
         pprNatCmmDecl,
         pprData,

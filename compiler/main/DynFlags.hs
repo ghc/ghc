@@ -454,6 +454,7 @@ data DumpFlag
    | Opt_D_dump_prep
    | Opt_D_dump_stg
    | Opt_D_dump_stg_final
+   | Opt_D_dump_stg_tag_nodes
    | Opt_D_dump_call_arity
    | Opt_D_dump_exitify
    | Opt_D_dump_stranal
@@ -506,6 +507,8 @@ data GeneralFlag
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting
    | Opt_DoAnnotationLinting
+   | Opt_DoTagInferenceChecks          -- ^ Insert runtime checks confirming
+                                       -- the results of tag inference.
    | Opt_NoLlvmMangler                 -- hidden flag
    | Opt_FastLlvm                      -- hidden flag
 
@@ -540,6 +543,7 @@ data GeneralFlag
    | Opt_CSE
    | Opt_StgCSE
    | Opt_StgLiftLams
+   | Opt_StgCSR
    | Opt_LiberateCase
    | Opt_SpecConstr
    | Opt_SpecConstrKeen
@@ -3384,6 +3388,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_stg)
   , make_ord_flag defGhcFlag "ddump-stg-final"
         (setDumpFlag Opt_D_dump_stg_final)
+  , make_ord_flag defGhcFlag "ddump-stg-tag-nodes"
+        (setDumpFlag Opt_D_dump_stg_tag_nodes)
   , make_ord_flag defGhcFlag "ddump-call-arity"
         (setDumpFlag Opt_D_dump_call_arity)
   , make_ord_flag defGhcFlag "ddump-exitify"
@@ -3470,6 +3476,8 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_DoAsmLinting))
   , make_ord_flag defGhcFlag "dannot-lint"
         (NoArg (setGeneralFlag Opt_DoAnnotationLinting))
+  , make_ord_flag defGhcFlag "dtag-inference-checks"
+        (NoArg (setGeneralFlag Opt_DoTagInferenceChecks))
   , make_ord_flag defGhcFlag "dshow-passes"
         (NoArg $ forceRecompile >> (setVerbosity $ Just 2))
   , make_ord_flag defGhcFlag "dfaststring-stats"
@@ -4167,6 +4175,7 @@ fFlagsDeps = [
   flagSpec "cmm-sink"                         Opt_CmmSink,
   flagSpec "cse"                              Opt_CSE,
   flagSpec "stg-cse"                          Opt_StgCSE,
+  flagSpec "stg-csr"                          Opt_StgCSR,
   flagSpec "stg-lift-lams"                    Opt_StgLiftLams,
   flagSpec "cpr-anal"                         Opt_CprAnal,
   flagSpec "defer-diagnostics"                Opt_DeferDiagnostics,
@@ -4713,6 +4722,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CmmSink)
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_StgCSE)
+    , ([1,2],   Opt_StgCSR)
     , ([2],     Opt_StgLiftLams)
     , ([1,2],   Opt_EnableRewriteRules)  -- Off for -O0; see Note [Scoping for Builtin rules]
                                          --              in PrelRules

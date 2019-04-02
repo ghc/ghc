@@ -320,6 +320,7 @@ Library
         StgCmmTicky
         StgCmmUtils
         StgCmmExtCode
+        StgInferTags
         SMRep
         CoreArity
         CoreFVs
@@ -482,6 +483,7 @@ Library
         StgLint
         StgSyn
         StgFVs
+        StgUtil
         CallArity
         DmdAnal
         Exitify

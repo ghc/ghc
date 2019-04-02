@@ -82,6 +82,11 @@ PrintTickyInfo(void)
   unsigned long tot_old_updates   = UPD_OLD_IND_ctr + UPD_OLD_PERM_IND_ctr;
   unsigned long tot_gengc_updates = tot_new_updates + tot_old_updates;
 
+  unsigned long tot_tag_preds = TAG_UNTAGGED_pred + TAG_TAGGED_pred;
+  unsigned long tot_tag_hits  = TAG_TAGGED_pred + TAG_UNTAGGED_pred - TAG_UNTAGGED_miss - TAG_TAGGED_miss;
+  unsigned long tot_tag_misses = TAG_UNTAGGED_miss + TAG_TAGGED_miss;
+
+
   FILE *tf = RtsFlags.TickyFlags.tickyFile;
 
   /* If tf = NULL, that means the user passed in stderr for the ticky stats
@@ -188,6 +193,17 @@ PrintTickyInfo(void)
       fprintf(tf, "OLD GEN UPDATES: %9lu (%5.1f%%)\n",
               tot_old_updates,
               PC(INTAVG(tot_old_updates,tot_gengc_updates)));
+  }
+
+  if (tot_tag_preds != 0) {
+      fprintf(tf, "\nTOTAL TAG PREDICTIONS MADE: %9lu \n",
+              tot_tag_preds);
+      fprintf(tf, "TAGGED PREDICTIONS HIT:     %9lu \n",
+              TAG_TAGGED_pred);
+      fprintf(tf, "UNTAGGED PREDICTIONS HIT:   %9lu \n",
+              TAG_UNTAGGED_pred - TAG_UNTAGGED_miss);
+      fprintf(tf, "UNTAGGED PREDICTIONS MISS:  %9lu \n",
+              TAG_UNTAGGED_miss);
   }
 
   printRegisteredCounterInfo(tf);

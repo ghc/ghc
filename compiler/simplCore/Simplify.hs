@@ -2428,6 +2428,8 @@ rebuildCase, reallyRebuildCase
 --------------------------------------------------
 
 rebuildCase env scrut case_bndr alts cont
+  -- | pprTrace "rebuildCase" (ppr scrut) False
+  -- = undefined
   | Lit lit <- scrut    -- No need for same treatment as constructors
                         -- because literals are inlined more vigorously
   , not (litIsLifted lit)
@@ -2523,15 +2525,16 @@ doCaseToLet :: OutExpr          -- Scrutinee
 -- The situation is         case scrut of b { DEFAULT -> body }
 -- Can we transform thus?   let { b = scrut } in body
 doCaseToLet scrut case_bndr
-  | isTyCoVar case_bndr    -- Respect CoreSyn
+  | -- pprTrace "doCaseToLet:" (ppr (scrut, case_bndr)) $
+    isTyCoVar case_bndr    -- Respect CoreSyn
   = isTyCoArg scrut        -- Note [CoreSyn type and coercion invariant]
 
   | isUnliftedType (idType case_bndr)
   = exprOkForSpeculation scrut
 
   | otherwise  -- Scrut has a lifted type
-  = exprIsHNF scrut
-    || isStrictDmd (idDemandInfo case_bndr)
+  = --pprTrace "doCaseToLet:" (ppr (scrut, case_bndr)) $
+    exprIsHNF scrut || isStrictDmd (idDemandInfo case_bndr)
     -- See Note [Case-to-let for strictly-used binders]
 
 --------------------------------------------------

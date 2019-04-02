@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, RecordWildCards #-}
+{-# LANGUAGE CPP, RecordWildCards, ScopedTypeVariables #-}
 
 -----------------------------------------------------------------------------
 --
@@ -226,6 +226,23 @@ data LambdaFormInfo
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
 
+instance Outputable LambdaFormInfo where
+    ppr (LFReEntrant top oneshot rep fvs argdesc) =
+        text "LFReEntrant" <> brackets (ppr top <+> ppr oneshot <+>
+                                        ppr rep <+> ppr fvs <+> ppr argdesc)
+    ppr (LFThunk top hasfv updateable _sfi m_function) =
+        text "LFThunk" <> brackets (ppr top <+> ppr hasfv <+> ppr updateable <+>
+                                    text "TODO:StdFormInfo" <+> ppr m_function)
+    ppr (LFCon con) = text "LFCon" <> brackets (ppr con)
+    ppr (LFUnknown m_func) =
+        text "LFUnknown" <>
+            if m_func
+                then brackets (text "mf")
+                else empty
+    ppr (LFUnlifted) = text "LFUnlifted"
+    ppr (LFLetNoEscape) = text "LF-LNE"
+
+
 
 -------------------------
 -- StandardFormInfo tells whether this thunk has one of
@@ -322,12 +339,13 @@ mkApLFInfo id upd_flag arity
 -------------
 mkLFImported :: Id -> LambdaFormInfo
 mkLFImported id
-  | Just con <- isDataConWorkId_maybe id
+  | Just con <- (isDataConWorkId_maybe id)
   , isNullaryRepDataCon con
-  = LFCon con   -- An imported nullary constructor
-                -- We assume that the constructor is evaluated so that
+  = LFCon con   -- An imported constructor
+                -- We check if the constructor is evaluated so that
                 -- the id really does point directly to the constructor
 
+  -- Function
   | arity > 0
   = LFReEntrant TopLevel noOneShotInfo arity True (panic "arg_descr")
 
@@ -518,19 +536,32 @@ When black-holing, single-entry closures could also be entered via node
 (rather than directly) to catch double-entry. -}
 
 data CallMethod
-  = EnterIt             -- No args, not a function
+  = EnterIt             -- ^ No args, not a function
 
   | JumpToIt BlockId [LocalReg] -- A join point or a header of a local loop
 
   | ReturnIt            -- It's a value (function, unboxed value,
                         -- or constructor), so just return it.
 
-  | SlowCall                -- Unknown fun, or known fun with
+  | InferedReturnIt     -- Same as ReturnIt but based on tag inference.
+                        -- See Note [Tag Inferrence - The basic idea] in
+                        -- StgInferTags.
+
+  | SlowCall            -- Unknown fun, or known fun with
                         -- too few args.
 
   | DirectEntry         -- Jump directly, with args in regs
         CLabel          --   The code label
         RepArity        --   Its arity
+
+instance Outputable CallMethod where
+  ppr (EnterIt) = text "Enter"
+  ppr (JumpToIt {}) = text "JumpToIt"
+  ppr (ReturnIt ) = text "ReturnIt"
+  ppr (InferedReturnIt) = text "InferedReturnIt"
+  ppr (SlowCall ) = text "SlowCall"
+  ppr (DirectEntry {}) = text "DirectEntry"
+
 
 getCallMethod :: DynFlags
               -> Name           -- Function being applied
@@ -546,10 +577,11 @@ getCallMethod :: DynFlags
                                 -- JumpToIt. This saves us one case branch in
                                 -- cgIdApp
               -> Maybe SelfLoopInfo -- can we perform a self-recursive tail call?
+              -> AppEnters      -- Can we expect the id to be tagged or do we need to enter it?
               -> CallMethod
 
 getCallMethod dflags _ id _ n_args v_args _cg_loc
-              (Just (self_loop_id, block_id, args))
+              (Just (self_loop_id, block_id, args)) _appEnterInfo
   | gopt Opt_Loopification dflags
   , id == self_loop_id
   , args `lengthIs` (n_args - v_args)
@@ -562,7 +594,7 @@ getCallMethod dflags _ id _ n_args v_args _cg_loc
   = JumpToIt block_id args
 
 getCallMethod dflags name id (LFReEntrant _ _ arity _ _) n_args _v_args _cg_loc
-              _self_loop_info
+              _self_loop_info _appEnterInfo
   | n_args == 0 -- No args at all
   && not (gopt Opt_SccProfilingOn dflags)
      -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
@@ -570,21 +602,26 @@ getCallMethod dflags name id (LFReEntrant _ _ arity _ _) n_args _v_args _cg_loc
   | n_args < arity = SlowCall        -- Not enough args
   | otherwise      = DirectEntry (enterIdLabel dflags name (idCafInfo id)) arity
 
-getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
+getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info _appEnterInfo
   = ASSERT( n_args == 0 ) ReturnIt
 
-getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
+getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info _appEnterInfo
   = ASSERT( n_args == 0 ) ReturnIt
     -- n_args=0 because it'd be ill-typed to apply a saturated
     --          constructor application to anything
 
 getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
-              n_args _v_args _cg_loc _self_loop_info
+              n_args _v_args _cg_loc _self_loop_info appEnterInfo
+
+  | appEnterInfo == NoEnter -- Infered to be already evaluated by Tag Inference
+  , n_args == 0             -- See Note [Tag Inferrence - The basic idea]
+  = InferedReturnIt
+
   | is_fun      -- it *might* be a function, so we must "call" it (which is always safe)
   = SlowCall    -- We cannot just enter it [in eval/apply, the entry code
                 -- is the fast-entry code]
 
-  -- Since is_fun is False, we are *definitely* looking at a data value
+    -- Since is_fun is False, we are *definitely* looking at a data value
   | updatable || gopt Opt_Ticky dflags -- to catch double entry
       {- OLD: || opt_SMP
          I decided to remove this, because in SMP mode it doesn't matter
@@ -610,18 +647,29 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
     DirectEntry (thunkEntryLabel dflags name (idCafInfo id) std_form_info
                 updatable) 0
 
-getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
-  = SlowCall -- might be a function
+-- Imported Ids
+getCallMethod _ _name _ (LFUnknown True) n_args _v_args _cg_locs _self_loop_info appEnterInfo
+  | n_args == 0
+  , appEnterInfo == NoEnter
+  = InferedReturnIt
 
-getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
-  = ASSERT2( n_args == 0, ppr name <+> ppr n_args )
-    EnterIt -- Not a function
+  | otherwise = SlowCall
+
+getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info appEnterInfo
+  | n_args == 0
+  , appEnterInfo == NoEnter
+  = InferedReturnIt
+
+  | otherwise =
+    ASSERT2( n_args == 0, ppr name <+> ppr n_args )
+    EnterIt   -- Not a function
+
 
 getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs)
-              _self_loop_info
+              _self_loop_info _appEnterInfo
   = JumpToIt blk_id lne_regs
 
-getCallMethod _ _ _ _ _ _ _ _ = panic "Unknown call method"
+getCallMethod _ _ _ _ _ _ _ _ _ = panic "Unknown call method"
 
 -----------------------------------------------------------------------------
 --              Data types for closure information

@@ -40,6 +40,7 @@ module StgLint ( lintStgTopBindings ) where
 import GhcPrelude
 
 import StgSyn
+import StgUtil (bindersOfTopBinds)
 
 import DynFlags
 import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
@@ -86,7 +87,7 @@ lintStgTopBindings dflags this_mod unarised whodunnit binds
   where
     -- Bring all top-level binds into scope because CoreToStg does not generate
     -- bindings in dependency order (so we may see a use before its definition).
-    top_level_binds = mkVarSet (bindersOfTopBinds binds)
+    top_level_binds = (bindersOfTopBinds binds)
 
     lint_binds :: [GenStgTopBinding a] -> LintM ()
 
@@ -142,7 +143,7 @@ checkNoCurrentCCS
 checkNoCurrentCCS rhs@(StgRhsClosure _ ccs _ _ _)
   | isCurrentCCS ccs
   = addErrL (text "Top-level StgRhsClosure with CurrentCCS" $$ ppr rhs)
-checkNoCurrentCCS rhs@(StgRhsCon ccs _ _)
+checkNoCurrentCCS rhs@(StgRhsCon _ ccs _ _)
   | isCurrentCCS ccs
   = addErrL (text "Top-level StgRhsCon with CurrentCCS" $$ ppr rhs)
 checkNoCurrentCCS _
@@ -158,7 +159,7 @@ lintStgRhs (StgRhsClosure _ _ _ binders expr)
       addInScopeVars binders $
         lintStgExpr expr
 
-lintStgRhs rhs@(StgRhsCon _ con args) = do
+lintStgRhs rhs@(StgRhsCon _ _ con args) = do
     when (isUnboxedTupleCon con || isUnboxedSumCon con) $
       addErrL (text "StgRhsCon is an unboxed tuple or sum application" $$
                ppr rhs)
@@ -169,11 +170,11 @@ lintStgExpr :: (OutputablePass a, BinderP a ~ Id) => GenStgExpr a -> LintM ()
 
 lintStgExpr (StgLit _) = return ()
 
-lintStgExpr (StgApp fun args) = do
+lintStgExpr (StgApp _ fun args) = do
     lintStgVar fun
     mapM_ lintStgArg args
 
-lintStgExpr app@(StgConApp con args _arg_tys) = do
+lintStgExpr app@(StgConApp _ext con args _arg_tys) = do
     -- unboxed sums should vanish during unarise
     lf <- getLintFlags
     when (lf_unarised lf && isUnboxedSumCon con) $
@@ -223,25 +224,6 @@ lintAlt (LitAlt _, _, rhs) =
 lintAlt (DataAlt _, bndrs, rhs) = do
     mapM_ checkPostUnariseBndr bndrs
     addInScopeVars bndrs (lintStgExpr rhs)
-
-{-
-************************************************************************
-*                                                                      *
-Utilities
-*                                                                      *
-************************************************************************
--}
-
-bindersOf :: BinderP a ~ Id => GenStgBinding a -> [Id]
-bindersOf (StgNonRec binder _) = [binder]
-bindersOf (StgRec pairs)       = [binder | (binder, _) <- pairs]
-
-bindersOfTop :: BinderP a ~ Id => GenStgTopBinding a -> [Id]
-bindersOfTop (StgTopLifted bind) = bindersOf bind
-bindersOfTop (StgTopStringLit binder _) = [binder]
-
-bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> [Id]
-bindersOfTopBinds = foldr ((++) . bindersOfTop) []
 
 {-
 ************************************************************************
