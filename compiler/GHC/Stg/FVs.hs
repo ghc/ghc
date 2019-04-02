@@ -1,4 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE DataKinds #-}
 
 {- |
 Non-global free variable analysis on STG terms. This pass annotates
@@ -59,6 +62,33 @@ newtype Env
   { locals :: IdSet
   }
 
+{-
+    Note [The FVPass Constraint]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Currently the free variable pass is used in two places:
+* The late lambda lifting pass in order to estimate the size of closures
+* Before codegen to figure out the actual free variables.
+
+However we have a different parameterisation for each of these.
+In order to avoid code duplication I've added the `FVPass i o` constraint.
+
+The principle is simple: We don't modify the input except for replacing
+XRhsClosure extension points with DIdSet.
+
+FVPass encodes this fact in the form of a constraint.
+-}
+
+type FVPass i o = (BinderP i ~ Id,
+                   BinderP o ~ Id,
+
+                   -- The RhsClosure extension will contain the free variables afterwards
+                   XRhsClosure o ~ DIdSet,
+                   XLet i ~ XLet o,
+                   XLetNoEscape i ~ XLetNoEscape o,
+                   XStgApp i ~ XStgApp o
+                  )
+
 emptyEnv :: Env
 emptyEnv = Env emptyVarSet
 
@@ -67,7 +97,7 @@ addLocals bndrs env
   = env { locals = extendVarSetList (locals env) bndrs }
 
 -- | Annotates a top-level STG binding group with its free variables.
-annTopBindingsFreeVars :: [StgTopBinding] -> [CgStgTopBinding]
+annTopBindingsFreeVars :: FVPass i o => [GenStgTopBinding i] -> [GenStgTopBinding o]
 annTopBindingsFreeVars = map go
   where
     go (StgTopStringLit id bs) = StgTopStringLit id bs
@@ -75,10 +105,10 @@ annTopBindingsFreeVars = map go
       = StgTopLifted (annBindingFreeVars bind)
 
 -- | Annotates an STG binding with its free variables.
-annBindingFreeVars :: StgBinding -> CgStgBinding
+annBindingFreeVars :: FVPass i o => GenStgBinding i -> GenStgBinding o
 annBindingFreeVars = fst . binding emptyEnv emptyDVarSet
 
-boundIds :: StgBinding -> [Id]
+boundIds :: (BinderP i ~ Id) => GenStgBinding i -> [Id]
 boundIds (StgNonRec b _) = [b]
 boundIds (StgRec pairs)  = map fst pairs
 
@@ -106,7 +136,7 @@ args env = mkFreeVarSet env . mapMaybe f
     f (StgVarArg occ) = Just occ
     f _               = Nothing
 
-binding :: Env -> DIdSet -> StgBinding -> (CgStgBinding, DIdSet)
+binding :: FVPass i o => Env -> DIdSet -> GenStgBinding i -> (GenStgBinding o, DIdSet)
 binding env body_fv (StgNonRec bndr r) = (StgNonRec bndr r', fvs)
   where
     -- See Note [Tracking local binders]
@@ -120,11 +150,11 @@ binding env body_fv (StgRec pairs) = (StgRec pairs', fvs)
     pairs' = zip bndrs rhss
     fvs = delDVarSetList (unionDVarSets (body_fv:rhs_fvss)) bndrs
 
-expr :: Env -> StgExpr -> (CgStgExpr, DIdSet)
+expr :: FVPass i o => Env -> GenStgExpr i -> (GenStgExpr o, DIdSet)
 expr env = go
   where
-    go (StgApp occ as)
-      = (StgApp occ as, unionDVarSet (args env as) (mkFreeVarSet env [occ]))
+    go (StgApp ext occ as)
+      = (StgApp ext occ as, unionDVarSet (args env as) (mkFreeVarSet env [occ]))
     go (StgLit lit) = (StgLit lit, emptyDVarSet)
     go (StgConApp dc n as tys) = (StgConApp dc n as tys, args env as)
     go (StgOpApp op as ty) = (StgOpApp op as ty, args env as)
@@ -151,7 +181,7 @@ expr env = go
         (body', body_fvs) = expr env' body
         (bind', fvs) = binding env' body_fvs bind
 
-rhs :: Env -> StgRhs -> (CgStgRhs, DIdSet)
+rhs :: FVPass i o => Env -> GenStgRhs i -> (GenStgRhs o, DIdSet)
 rhs env (StgRhsClosure _ ccs uf bndrs body)
   = (StgRhsClosure fvs ccs uf bndrs body', fvs)
   where
@@ -160,7 +190,7 @@ rhs env (StgRhsClosure _ ccs uf bndrs body)
     fvs = delDVarSetList body_fvs bndrs
 rhs env (StgRhsCon ccs dc mu ts as) = (StgRhsCon ccs dc mu ts as, args env as)
 
-alt :: Env -> StgAlt -> (CgStgAlt, DIdSet)
+alt :: FVPass i o => Env -> GenStgAlt i -> (GenStgAlt o, DIdSet)
 alt env (con, bndrs, e) = ((con, bndrs, e'), fvs)
   where
     -- See Note [Tracking local binders]

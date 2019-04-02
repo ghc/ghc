@@ -104,7 +104,6 @@ import           GHC.Exception
 import           GHC.IO           hiding (bracket, finally, onException)
 import           GHC.IO.Exception
 import           GHC.Show
--- import GHC.Exception hiding ( Exception )
 import           GHC.Conc.Sync
 
 import           Data.Either
@@ -400,7 +399,6 @@ recSelError, recConError, runtimeError,
 recSelError              s = throw (RecSelError ("No match in record selector "
                                                  ++ unpackCStringUtf8# s))  -- No location info unfortunately
 runtimeError             s = errorWithoutStackTrace (unpackCStringUtf8# s)                   -- No location info unfortunately
-
 nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
 recConError              s = throw (RecConError      (untangle s "Missing field in record construction"))
 noMethodBindingError     s = throw (NoMethodError    (untangle s "No instance nor default method for class operation"))

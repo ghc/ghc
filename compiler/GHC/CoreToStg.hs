@@ -20,11 +20,12 @@ module GHC.CoreToStg ( coreToStg ) where
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
-                        , exprIsTickedString_maybe )
+import GHC.Core.Utils   ( exprType, isJoinBind
+                        , exprIsTickedString_maybe, findDefault )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Stg.Syntax
 import GHC.Stg.Debug
+import GHC.Stg.Utils
 
 import GHC.Core.Type
 import GHC.Types.RepType
@@ -52,7 +53,7 @@ import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
 import GHC.Types.IPE
 import GHC.Types.Demand    ( isUsedOnceDmd )
-import GHC.Builtin.PrimOps ( PrimCall(..) )
+import GHC.Builtin.PrimOps ( PrimCall(..), primOpWrapperId )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 
 import Control.Monad (ap)
@@ -544,8 +545,9 @@ coreToStgApp f args ticks = do
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
                 -- we require that primop applications be saturated.
-                PrimOpId op      -> ASSERT( saturated )
-                                    StgOpApp (StgPrimOp op) args' res_ty
+                PrimOpId op   -- TODO: Are calls guaranteed to be saturated already here?
+                  | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
+                  | otherwise    -> StgApp MayEnter (primOpWrapperId op) args'
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
@@ -558,7 +560,7 @@ coreToStgApp f args ticks = do
                                     StgOpApp (StgFCallOp call (idType f)) args' res_ty
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
-                _other           -> StgApp f args'
+                _other           -> StgApp MayEnter f args'
 
         add_tick !t !e = StgTick t e
         tapp = foldr add_tick app (map (coreToStgTick res_ty) ticks ++ ticks')
@@ -596,7 +598,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     let
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
         stg_arg = case arg'' of
-                       StgApp v []        -> StgVarArg v
+                       StgApp _ext v []        -> StgVarArg v
                        StgConApp con _ [] _ -> StgVarArg (dataConWorkId con)
                        StgLit lit         -> StgLitArg lit
                        _                  -> pprPanic "coreToStgArgs" (ppr arg)

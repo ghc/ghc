@@ -324,8 +324,8 @@ stgCseTopLvlRhs _ (StgRhsCon ccs dataCon mu ticks args)
 
 -- Trivial cases
 stgCseExpr :: CseEnv -> InStgExpr -> OutStgExpr
-stgCseExpr env (StgApp fun args)
-    = StgApp fun' args'
+stgCseExpr env (StgApp ext fun args)
+    = StgApp ext fun' args'
   where fun' = substVar env fun
         args' = substArgs env args
 stgCseExpr _ (StgLit lit)
@@ -341,7 +341,7 @@ stgCseExpr env (StgCase scrut bndr ty alts)
   where
     scrut' = stgCseExpr env scrut
     (env1, bndr') = substBndr env bndr
-    env2 | StgApp trivial_scrut [] <- scrut'
+    env2 | StgApp _ trivial_scrut [] <- scrut'
          = addTrivCaseBndr bndr trivial_scrut env1
                  -- See Note [Trivial case scrutinee]
          | otherwise
@@ -353,7 +353,7 @@ stgCseExpr env (StgCase scrut bndr ty alts)
 -- To be removed by a variable use when found in the CSE environment
 stgCseExpr env (StgConApp dataCon n args tys)
     | Just bndr' <- envLookup dataCon args' env
-    = StgApp bndr' []
+    = StgApp noEnterInfo bndr' []
     | otherwise
     = StgConApp dataCon n args' tys
   where args' = substArgs env args
@@ -445,8 +445,8 @@ mkStgCase scrut bndr ty alts | all isBndr alts = scrut
 
   where
     -- see Note [All alternatives are the binder]
-    isBndr (_, _, StgApp f []) = f == bndr
-    isBndr _                   = False
+    isBndr (_, _, StgApp _ f []) = f == bndr
+    isBndr _                     = False
 
 
 {- Note [Care with loop breakers]

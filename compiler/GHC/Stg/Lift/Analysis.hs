@@ -114,6 +114,7 @@ type instance BinderP      'LiftLams = BinderInfo
 type instance XRhsClosure  'LiftLams = DIdSet
 type instance XLet         'LiftLams = Skeleton
 type instance XLetNoEscape 'LiftLams = Skeleton
+type instance XStgApp      'LiftLams = AppEnters
 
 freeVarsOfRhs :: (XRhsClosure pass ~ DIdSet) => GenStgRhs pass -> DIdSet
 freeVarsOfRhs (StgRhsCon _ _ _ _ args) = mkDVarSet [ id | StgVarArg id <- args ]
@@ -214,8 +215,8 @@ tagSkeletonExpr (StgConApp con mn args tys)
   = (NilSk, mkArgOccs args, StgConApp con mn args tys)
 tagSkeletonExpr (StgOpApp op args ty)
   = (NilSk, mkArgOccs args, StgOpApp op args ty)
-tagSkeletonExpr (StgApp f args)
-  = (NilSk, arg_occs, StgApp f args)
+tagSkeletonExpr (StgApp ext f args)
+  = (NilSk, arg_occs, StgApp ext f args)
   where
     arg_occs
       -- This checks for nullary applications, which we treat the same as
@@ -314,8 +315,8 @@ tagSkeletonBinding is_lne body_skel body_arg_occs (StgRec pairs)
         bndr' = BindsClosure bndr (bndr `elemVarSet` scope_occs)
 
 tagSkeletonRhs :: Id -> CgStgRhs -> (Skeleton, IdSet, LlStgRhs)
-tagSkeletonRhs _ (StgRhsCon ccs dc mn ts args)
-  = (NilSk, mkArgOccs args, StgRhsCon ccs dc mn ts args)
+tagSkeletonRhs _ (StgRhsCon ccs dc cn ticks args)
+  = (NilSk, mkArgOccs args, StgRhsCon ccs dc cn ticks args)
 tagSkeletonRhs bndr (StgRhsClosure fvs ccs upd bndrs body)
   = (rhs_skel, body_arg_occs, StgRhsClosure fvs ccs upd bndrs' body')
   where

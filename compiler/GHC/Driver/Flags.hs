@@ -71,6 +71,7 @@ data DumpFlag
    | Opt_D_dump_stg_from_core -- ^ Initial STG (CoreToStg output)
    | Opt_D_dump_stg_unarised  -- ^ STG after unarise
    | Opt_D_dump_stg_final     -- ^ Final STG (after stg2stg)
+   | Opt_D_dump_stg_tags
    | Opt_D_dump_call_arity
    | Opt_D_dump_exitify
    | Opt_D_dump_stranal
@@ -205,6 +206,9 @@ data GeneralFlag
    | Opt_AlignmentSanitisation
    | Opt_CatchBottoms
    | Opt_NumConstantFolding
+
+   -- Inference flags
+   | Opt_DoTagInferenceChecks
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!

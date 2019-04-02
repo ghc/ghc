@@ -320,6 +320,8 @@ import Control.Monad    ( guard )
 --
 -- [Primitive]          Iff it is a built-in type that can't be expressed in Haskell.
 --
+-- [Unlifted]           Anything that isn't lifted is considerd unlifted.
+--
 -- Currently, all primitive types are unlifted, but that's not necessarily
 -- the case: for example, @Int@ could be primitive.
 --
@@ -2249,6 +2251,7 @@ buildSynTyCon name binders res_kind roles rhs
 isLiftedType_maybe :: HasDebugCallStack => Type -> Maybe Bool
 isLiftedType_maybe ty = case coreFullView (getRuntimeRep ty) of
   ty' | isLiftedRuntimeRep ty'  -> Just True
+      | isUnliftedRuntimeRep ty' -> Just False
   TyConApp {}                   -> Just False  -- Everything else is unlifted
   _                             -> Nothing     -- levity polymorphic
 
