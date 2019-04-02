@@ -28,6 +28,7 @@
 module Main (main) where
 
 import Version ( version, targetOS, targetARCH )
+import GHC.AtFile
 import qualified GHC.PackageDb as GhcPkg
 import GHC.PackageDb (BinaryStringRep(..))
 import GHC.HandleEncoding
@@ -118,9 +119,11 @@ anyM p (x:xs) = do
 main :: IO ()
 main = do
   configureHandleEncoding
-  args <- getArgs
-
-  case getOpt Permute (flags ++ deprecFlags) args of
+  expanded <- expandAtFile =<< getArgs
+  case expanded of
+    Left err -> die err
+    Right args ->
+      case getOpt Permute (flags ++ deprecFlags) args of
         (cli,_,[]) | FlagHelp `elem` cli -> do
            prog <- getProgramName
            bye (usageInfo (usageHeader prog) flags)
