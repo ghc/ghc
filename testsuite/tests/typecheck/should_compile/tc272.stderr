@@ -1,0 +1,15 @@
+
+tc272.hs:6:12: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘()’
+    • In the type signature: a :: _
+      In the expression:
+        let
+          a :: _
+          a = ()
+        in ()
+      In an equation for ‘x’:
+          x = let
+                a :: _
+                a = ()
+              in ()
+    • Relevant bindings include x :: () (bound at tc272.hs:5:1)

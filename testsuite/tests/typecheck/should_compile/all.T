@@ -344,6 +344,7 @@ test('tc268', normal, compile, [''])
 test('tc269', normal, compile, [''])
 test('tc270', normal, compile, [''])
 test('Tc271', [extra_files(['Tc271a.hs', 'Tc271.hs', 'Tc271.hs-boot'])], makefile_test, [])
+test('tc272', normal, compile, [''])
 
 test('GivenOverlapping', normal, compile, [''])
 test('GivenTypeSynonym', normal, compile, [''])

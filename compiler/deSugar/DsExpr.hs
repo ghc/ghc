@@ -25,6 +25,7 @@ import DsListComp
 import DsUtils
 import DsArrows
 import DsMonad
+import HeaderInfo
 import Check ( checkGuardMatches )
 import Name
 import NameEnv
@@ -412,6 +413,11 @@ ds_expr _ (HsSCC _ _ cc expr@(dL->L loc _)) = do
         Tick (ProfNote (mkUserCC nm mod_name loc flavour) count True)
                <$> dsLExpr expr
       else dsLExpr expr
+
+ds_expr _ (HsOptionsLocal _ src expr)
+  = do { dflags <- getDynFlags
+       ; dflags2 <- optLocDynFlags dflags src
+       ; setFlags dflags2 $ dsLExpr expr }
 
 ds_expr _ (HsCoreAnn _ _ _ expr)
   = dsLExpr expr

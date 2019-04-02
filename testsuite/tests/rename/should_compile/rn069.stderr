@@ -1,0 +1,4 @@
+
+rn069.hs:7:6: warning: [-Wname-shadowing (in -Wall)]
+    This binding for ‘a’ shadows the existing binding
+      bound at rn069.hs:6:6

@@ -55,6 +55,7 @@ test('readFail046', normal, compile_fail, [''])
 test('readFail047', normal, compile_fail, [''])
 # See comment attached to readFail032 above.
 test('readFail048', normal, compile_fail, ['-cpp -haddock'])
+test('readFail049', normal, compile_fail, [''])
 test('T3095', normal, compile_fail, [''])
 test('T3153', normal, compile_fail, [''])
 test('T3751', normal, compile_fail, [''])

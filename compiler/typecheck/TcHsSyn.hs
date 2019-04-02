@@ -935,6 +935,10 @@ zonkExpr env (HsSCC x src lbl expr)
   = do new_expr <- zonkLExpr env expr
        return (HsSCC x src lbl new_expr)
 
+zonkExpr env (HsOptionsLocal x src expr)
+  = do new_expr <- zonkLExpr env expr
+       return (HsOptionsLocal x src new_expr)
+
 zonkExpr env (HsTickPragma x src info srcInfo expr)
   = do new_expr <- zonkLExpr env expr
        return (HsTickPragma x src info srcInfo new_expr)
