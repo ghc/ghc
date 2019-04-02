@@ -9,6 +9,8 @@
 
 module ConLike (
           ConLike(..)
+        , isRealDataCon
+        , isPatSynCon
         , conLikeArity
         , conLikeFieldLabels
         , conLikeInstOrigArgTys
@@ -52,6 +54,14 @@ import qualified Data.Data as Data
 -- | A constructor-like thing
 data ConLike = RealDataCon DataCon
              | PatSynCon PatSyn
+
+isRealDataCon :: ConLike -> Bool
+isRealDataCon RealDataCon{} = True
+isRealDataCon _             = False
+
+isPatSynCon :: ConLike -> Bool
+isPatSynCon PatSynCon{} = True
+isPatSynCon _           = False
 
 {-
 ************************************************************************
