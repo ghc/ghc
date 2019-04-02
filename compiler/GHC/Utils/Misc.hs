@@ -673,6 +673,8 @@ isSortedBy cmp = sorted
     sorted [] = True
     sorted [_] = True
     sorted (x:y:xs) = cmp x y /= GT && sorted (y:xs)
+
+
 {-
 ************************************************************************
 *                                                                      *
