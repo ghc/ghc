@@ -999,15 +999,39 @@ It might seem a bit surprising that seq on absentError is simply erased
 
 but that should be okay; since there's no pattern match we can't really
 be relying on anything from it.
+
+We also want to give absentError a special strictness signature.
+This allows us to determine if a binding is just an absentError for imported
+ids. Especially when we don't have an unfolding or when there is an indirection
+involved.
+
+Why do we do this? Tag inference - See Note [Tag Inferrence - The basic idea]
+in GHC.STG.InferTags - relies critically on being able to reenter closures in
+order to tag them. Reentering a closure is always legal *except* in the case
+of absentError. In which case it will kill the program. We solve this as follows:
+
+If the use and definition site is the same the inference can just look at the
+functions key to check for absentError, just like the simplifier does.
+
+But if definition and use site are different modules the rhs might not be exposed.
+We solve this by giving `impossible` the "Absent" divergence property. In turn any
+binding that is a direct (or indirect) call to `impossible` will get the same
+property. And we can just check bindings for this during tag inference and things
+work out.
+
+These bindings are also constructed by the compiler itself. So their shape is fairly
+predictable and we can be sure that demand analysis will deal with them properly.
+
 -}
 
 aBSENT_ERROR_ID
- = mkVanillaGlobalWithInfo absentErrorName absent_ty arity_info
+ = mkVanillaGlobalWithInfo absentErrorName absent_ty id_info
  where
    absent_ty = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany addrPrimTy alphaTy)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent errors] in GHC.Core.Opt.WorkWrap.Utils
-   arity_info = vanillaIdInfo `setArityInfo` 1
+   id_info = vanillaIdInfo `setArityInfo` 1
+                           `setStrictnessInfo` mkClosedStrictSig [seqDmd] Absent
    -- NB: no bottoming strictness info, unlike other error-ids.
    -- See Note [aBSENT_ERROR_ID]
 

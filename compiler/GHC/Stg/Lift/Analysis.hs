@@ -113,11 +113,14 @@ llTrace _ _ c = c
 
 type instance BinderP      'LiftLams = BinderInfo
 type instance XRhsClosure  'LiftLams = DIdSet
+type instance XRhsCon      'LiftLams = NoExtFieldSilent
 type instance XLet         'LiftLams = Skeleton
 type instance XLetNoEscape 'LiftLams = Skeleton
+type instance XStgApp      'LiftLams = AppEnters
+type instance XStgConApp   'LiftLams = NoExtFieldSilent
 
 freeVarsOfRhs :: (XRhsClosure pass ~ DIdSet) => GenStgRhs pass -> DIdSet
-freeVarsOfRhs (StgRhsCon _ _ args) = mkDVarSet [ id | StgVarArg id <- args ]
+freeVarsOfRhs (StgRhsCon _ _ _ args) = mkDVarSet [ id | StgVarArg id <- args ]
 freeVarsOfRhs (StgRhsClosure fvs _ _ _ _) = fvs
 
 -- | Captures details of the syntax tree relevant to the cost model, such as
@@ -221,12 +224,12 @@ tagSkeletonTopBind bind = bind'
 tagSkeletonExpr :: CgStgExpr -> (Skeleton, IdSet, LlStgExpr)
 tagSkeletonExpr (StgLit lit)
   = (NilSk, emptyVarSet, StgLit lit)
-tagSkeletonExpr (StgConApp con args tys)
-  = (NilSk, mkArgOccs args, StgConApp con args tys)
+tagSkeletonExpr (StgConApp ext con args tys)
+  = (NilSk, mkArgOccs args, StgConApp ext con args tys)
 tagSkeletonExpr (StgOpApp op args ty)
   = (NilSk, mkArgOccs args, StgOpApp op args ty)
-tagSkeletonExpr (StgApp f args)
-  = (NilSk, arg_occs, StgApp f args)
+tagSkeletonExpr (StgApp ext f args)
+  = (NilSk, arg_occs, StgApp ext f args)
   where
     arg_occs
       -- This checks for nullary applications, which we treat the same as
@@ -326,8 +329,8 @@ tagSkeletonBinding is_lne body_skel body_arg_occs (StgRec pairs)
         bndr' = BindsClosure bndr (bndr `elemVarSet` scope_occs)
 
 tagSkeletonRhs :: Id -> CgStgRhs -> (Skeleton, IdSet, LlStgRhs)
-tagSkeletonRhs _ (StgRhsCon ccs dc args)
-  = (NilSk, mkArgOccs args, StgRhsCon ccs dc args)
+tagSkeletonRhs _ (StgRhsCon ext ccs dc args)
+  = (NilSk, mkArgOccs args, StgRhsCon ext ccs dc args)
 tagSkeletonRhs bndr (StgRhsClosure fvs ccs upd bndrs body)
   = (rhs_skel, body_arg_occs, StgRhsClosure fvs ccs upd bndrs' body')
   where

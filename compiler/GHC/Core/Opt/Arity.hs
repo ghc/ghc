@@ -569,6 +569,7 @@ instance Outputable ArityType where
       pp_div Diverges = char '⊥'
       pp_div ExnOrDiv = char 'x'
       pp_div Dunno    = char 'T'
+      pp_div Absent   = char 'A'
       pp_os OneShotLam    = char '1'
       pp_os NoOneShotInfo = char '?'
 

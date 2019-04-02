@@ -22,7 +22,8 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
+module GHC.Magic ( inline, noinline, lazy, oneShot, runRW#, impossible
+                 ) where
 
 --------------------------------------------------
 --        See Note [magicIds] in GHC.Types.Id.Make

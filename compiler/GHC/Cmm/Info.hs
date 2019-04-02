@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+
+
 module GHC.Cmm.Info (
   mkEmptyContInfoTable,
   cmmToRawCmm,
