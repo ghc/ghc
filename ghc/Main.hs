@@ -19,6 +19,8 @@ import qualified GHC
 import GHC              (parseTargetFiles,  Ghc, GhcMonad(..), Backend (..),
                           LoadHowMuch(..) )
 
+import GHC.AtFile
+
 import GHC.Driver.CmdLine
 import GHC.Driver.Env
 import GHC.Driver.Errors
@@ -76,6 +78,7 @@ import GHC.Tc.Utils.Monad      ( initIfaceCheck )
 import System.IO
 import System.Environment
 import System.Exit
+import Control.Exception
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
@@ -105,8 +108,10 @@ main = do
 
    configureHandleEncoding
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
+    expanded <- expandAtFile =<< getArgs
+
     -- 1. extract the -B flag from the args
-    argv0 <- getArgs
+    argv0 <- either (throwIO . CmdLineError) return expanded
 
     let (minusB_args, argv1) = partition ("-B" `isPrefixOf`) argv0
         mbMinusB | null minusB_args = Nothing

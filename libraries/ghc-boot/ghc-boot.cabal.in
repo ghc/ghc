@@ -38,6 +38,7 @@ Library
     default-extensions: NoImplicitPrelude
 
     exposed-modules:
+            GHC.AtFile
             GHC.BaseDir
             GHC.Data.ShortText
             GHC.Data.SizedSeq

@@ -33,6 +33,7 @@ module Main (main) where
 import qualified GHC.Unit.Database as GhcPkg
 import GHC.Unit.Database hiding (mkMungePathUrl)
 import GHC.HandleEncoding
+import GHC.AtFile
 import GHC.BaseDir (getBaseDir)
 import GHC.Settings.Utils (getTargetArchOS, maybeReadFuzzy)
 import GHC.Platform.Host (hostPlatformArchOS)
@@ -128,9 +129,11 @@ anyM p (x:xs) = do
 main :: IO ()
 main = do
   configureHandleEncoding
-  args <- getArgs
-
-  case getOpt Permute (flags ++ deprecFlags) args of
+  expanded <- expandAtFile =<< getArgs
+  case expanded of
+    Left err -> die err
+    Right args ->
+      case getOpt Permute (flags ++ deprecFlags) args of
         (cli,_,[]) | FlagHelp `elem` cli -> do
            prog <- getProgramName
            bye (usageInfo (usageHeader prog) flags)
