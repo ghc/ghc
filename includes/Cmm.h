@@ -308,7 +308,7 @@
 #define ENTER_(ret,x)                                   \
  again:                                                 \
   W_ info;                                              \
-  LOAD_INFO(ret,x)                                       \
+  LOAD_INFO(ret,x)                                      \
   switch [INVALID_OBJECT .. N_CLOSURE_TYPES]            \
          (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {       \
   case                                                  \
@@ -631,6 +631,11 @@
 #define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
 #endif
 
+#if defined(THREADED_RTS)
+#define prim_read_barrier prim %read_barrier()
+#else
+#define prim_read_barrier /* nothing */
+#endif
 #if defined(THREADED_RTS)
 #define prim_write_barrier prim %write_barrier()
 #else

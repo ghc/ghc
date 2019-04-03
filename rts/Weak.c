@@ -42,6 +42,7 @@ void
 runAllCFinalizers(StgWeak *list)
 {
     StgWeak *w;
+    const StgInfoTable *winfo;
     Task *task;
 
     task = myTask();
@@ -57,7 +58,9 @@ runAllCFinalizers(StgWeak *list)
         // If there's no major GC between the time that the finalizer for the
         // object from the oldest generation is manually called and shutdown
         // we end up running the same finalizer twice. See #7170.
-        if (w->header.info != &stg_DEAD_WEAK_info) {
+        winfo = w->header.info;
+        load_load_barrier();
+        if (winfo != &stg_DEAD_WEAK_info) {
             runCFinalizers((StgCFinalizerList *)w->cfinalizers);
         }
     }
@@ -126,6 +129,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
         // there's a later call to finalizeWeak# on this weak pointer,
         // we don't run the finalizer again.
         SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
+        write_barrier();
     }
 
     n_finalizers = i;
@@ -138,7 +142,6 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     size = n + mutArrPtrsCardTableSize(n);
     arr = (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
-    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCS_SYSTEM);
     arr->ptrs = n;
     arr->size = size;
 
@@ -153,6 +156,9 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     for (i = n; i < size; i++) {
         arr->payload[i] = (StgClosure *)(W_)(-1);
     }
+
+    write_barrier();
+    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCS_SYSTEM);
 
     t = createIOThread(cap,
                        RtsFlags.GcFlags.initialStkSize,

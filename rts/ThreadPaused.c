@@ -195,6 +195,7 @@ threadPaused(Capability *cap, StgTSO *tso)
     const StgRetInfoTable *info;
     const StgInfoTable *bh_info;
     const StgInfoTable *cur_bh_info USED_IF_THREADS;
+    const StgInfoTable *frame_info;
     StgClosure *bh;
     StgPtr stack_end;
     uint32_t words_to_squeeze = 0;
@@ -220,13 +221,16 @@ threadPaused(Capability *cap, StgTSO *tso)
 
     while ((P_)frame < stack_end) {
         info = get_ret_itbl(frame);
+        load_load_barrier();
 
         switch (info->i.type) {
 
         case UPDATE_FRAME:
 
             // If we've already marked this frame, then stop here.
-            if (frame->header.info == (StgInfoTable *)&stg_marked_upd_frame_info) {
+            frame_info = frame->header.info;
+            load_load_barrier();
+            if (frame_info == (StgInfoTable *)&stg_marked_upd_frame_info) {
                 if (prev_was_update_frame) {
                     words_to_squeeze += sizeofW(StgUpdateFrame);
                     weight += weight_pending;
@@ -235,10 +239,12 @@ threadPaused(Capability *cap, StgTSO *tso)
                 goto end;
             }
 
+            write_barrier();
             SET_INFO(frame, (StgInfoTable *)&stg_marked_upd_frame_info);
 
             bh = ((StgUpdateFrame *)frame)->updatee;
             bh_info = bh->header.info;
+            load_load_barrier();
 
 #if defined(THREADED_RTS)
         retry:

@@ -96,6 +96,57 @@ EXTERN_INLINE void write_barrier(void);
 EXTERN_INLINE void store_load_barrier(void);
 EXTERN_INLINE void load_load_barrier(void);
 
+/*
+ * Note [Heap memory barriers]
+ *
+ * Machines with weak memory ordering semantics have consequences for how
+ * closures are observed and mutated. For example, consider a closure that needs
+ * to be updated to an indirection. In order for the indirection to be safe for
+ * concurrent observers to enter, said observers must read the indirection's
+ * info table before they read the indirectee. Furthermore, the entering
+ * observer makes assumptions about the closure based on its info table
+ * contents, e.g. an INFO_TYPE of IND imples the closure has an indirectee
+ * pointer that is safe to follow.
+ *
+ * When a closure is updated with an indirection, both its info table and its
+ * indirectee must be written. With weak memory ordering, these two writes can
+ * be arbitrarily reordered, and perhaps even interleaved with other threads'
+ * reads and writes (in the absence of memory barrier instructions). Consider
+ * this example of a bad reordering:
+ *
+ * - An updater writes to a closure's info table (INFO_TYPE is now IND).
+ * - A concurrent observer branches upon reading the closure's INFO_TYPE as IND.
+ * - A concurrent observer reads the closure's indirectee and enters it.
+ * - An updater writes the closure's indirectee.
+ *
+ * Here the update to the indirectee comes too late and the concurrent observer
+ * has jumped off into the abyss. Speculative execution can also cause us
+ * issues, consider:
+ *
+ * - An observer is about to case on a value in closure's info table.
+ * - The observer speculatively reads one or more of closure's fields.
+ * - An updater writes to closure's info table.
+ * - The observer takes a branch based on the new info table value, but with the
+ *   old closure fields!
+ * - The updater writes to the closure's other fields, but its too late.
+ *
+ * Because of these effects, reads and writes to a closure's info table must be
+ * ordered carefully with respect to reads and writes to the closure's other
+ * fields, and memory barriers must be placed to ensure that reads and writes
+ * occur in program order. Specifically, updates to a closure must follow the
+ * following pattern:
+ *
+ * - Update the closure's (non-info table) fields.
+ * - Write barrier.
+ * - Update the closure's info table.
+ *
+ * Observing a closure's fields must follow the following pattern:
+ *
+ * - Read the closure's info pointer.
+ * - Read barrier.
+ * - Read the closure's (non-info table) fields.
+ */
+
 /* ----------------------------------------------------------------------------
    Implementations
    ------------------------------------------------------------------------- */
