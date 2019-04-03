@@ -828,12 +828,16 @@ rnLit :: HsLit p -> RnM ()
 rnLit (HsChar _ c) = checkErr (inCharRange c) (bogusCharError c)
 rnLit _ = return ()
 
--- Turn a Fractional-looking literal which happens to be an integer into an
+-- | Turn a Fractional-looking literal which happens to be an integer into an#
 -- Integer-looking literal.
+-- We only convert numbers where the exponent is between 0 and 100 to avoid
+-- converting huge numbers and incurring long compilation times.
+-- See #15646
 generalizeOverLitVal :: OverLitVal -> OverLitVal
 generalizeOverLitVal (HsFractional fl@(FL {fl_text=src,fl_neg=neg,fl_exp=e}))
-    | e >= 0 && e <= 100 = HsIntegral (IL {il_text=src,il_neg=neg,il_value=numerator val})
-  where val = rationalFromFractionalLit fl
+    | e >= -100 && e <= 100
+    , let val = rationalFromFractionalLit fl
+    , denominator val == 1 = HsIntegral (IL {il_text=src,il_neg=neg,il_value=numerator val})
 generalizeOverLitVal lit = lit
 
 isNegativeZeroOverLit :: HsOverLit t -> Bool

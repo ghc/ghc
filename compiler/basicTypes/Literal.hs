@@ -225,7 +225,7 @@ instance Binary Literal where
         = do putByte bh 6
              put_ bh nt
              put_ bh i
-    put_ bh (LitRubbish)      = do putByte bh 7
+    put_ bh (LitRubbish)     = do putByte bh 7
     get bh = do
             h <- getByte bh
             case h of
@@ -616,15 +616,15 @@ litIsTrivial _                  = True
 -- | True if code space does not go bad if we duplicate this literal
 litIsDupable :: DynFlags -> Literal -> Bool
 --      c.f. CoreUtils.exprIsDupable
-litIsDupable _      (LitString _)       = False
-litIsDupable dflags (LitNumber nt i _)  = case nt of
+litIsDupable _      (LitString _)      = False
+litIsDupable dflags (LitNumber nt i _) = case nt of
   LitNumInteger -> inIntRange dflags i
   LitNumNatural -> inIntRange dflags i
   LitNumInt     -> True
   LitNumInt64   -> True
   LitNumWord    -> True
   LitNumWord64  -> True
-litIsDupable _      _                   = True
+litIsDupable _      _                  = True
 
 litFitsInChar :: Literal -> Bool
 litFitsInChar (LitNumber _ i _) = i >= toInteger (ord minBound)
@@ -648,14 +648,14 @@ litIsLifted _                  = False
 
 -- | Find the Haskell 'Type' the literal occupies
 literalType :: Literal -> Type
-literalType LitNullAddr         = addrPrimTy
-literalType (LitChar _)         = charPrimTy
-literalType (LitString  _)      = addrPrimTy
-literalType (LitFloat _)        = floatPrimTy
-literalType (LitDouble _)       = doublePrimTy
-literalType (LitLabel _ _ _)    = addrPrimTy
-literalType (LitNumber _ _ t)   = t
-literalType (LitRubbish)        = mkForAllTy a Inferred (mkTyVarTy a)
+literalType LitNullAddr       = addrPrimTy
+literalType (LitChar _)       = charPrimTy
+literalType (LitString  _)    = addrPrimTy
+literalType (LitFloat _)      = floatPrimTy
+literalType (LitDouble _)     = doublePrimTy
+literalType (LitLabel _ _ _)  = addrPrimTy
+literalType (LitNumber _ _ t) = t
+literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep
 
@@ -699,14 +699,14 @@ cmpLit lit1 lit2
   | otherwise                 = GT
 
 litTag :: Literal -> Int
-litTag (LitChar      _)    = 1
-litTag (LitString    _)    = 2
-litTag (LitNullAddr)       = 3
-litTag (LitFloat     _)    = 4
-litTag (LitDouble    _)    = 5
-litTag (LitLabel _ _ _)    = 6
-litTag (LitNumber  {})     = 7
-litTag (LitRubbish)        = 8
+litTag (LitChar      _)   = 1
+litTag (LitString    _)   = 2
+litTag (LitNullAddr)      = 3
+litTag (LitFloat     _)   = 4
+litTag (LitDouble    _)   = 5
+litTag (LitLabel _ _ _)   = 6
+litTag (LitNumber  {})    = 7
+litTag (LitRubbish)       = 8
 
 {-
         Printing

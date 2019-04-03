@@ -19,7 +19,7 @@ import GhcPrelude
 
 import {-#SOURCE#-} DsExpr (dsLExpr, dsSyntaxExpr)
 
-import BasicTypes ( Origin(..) )
+import BasicTypes ( Origin(..), FractionalLit(..), integralFractionalLit )
 import DynFlags
 import HsSyn
 import TcHsSyn
@@ -49,7 +49,7 @@ import Maybes
 import Util
 import Name
 import Outputable
-import BasicTypes ( isGenerated, il_value, fl_signi, fl_exp )
+import BasicTypes ( isGenerated, il_value )
 import FastString
 import Unique
 import UniqDFM
@@ -847,7 +847,7 @@ data PatGroup
   | PgCon DataCon          -- Constructor patterns (incl list, tuple)
   | PgSyn PatSyn [Type]    -- See Note [Pattern synonym groups]
   | PgLit Literal          -- Literal patterns
-  | PgN   Rational Integer  -- Overloaded numeric literals;
+  | PgN   FractionalLit  -- Overloaded numeric literals;
                            -- see Note [Don't use Literal for PgN]
   | PgOverS FastString     -- Overloaded string literals
   | PgNpK Integer          -- n+k patterns
@@ -958,8 +958,10 @@ sameGroup (PgCon _)     (PgCon _)     = True    -- One case expression
 sameGroup (PgSyn p1 t1) (PgSyn p2 t2) = p1==p2 && eqTypes t1 t2
                                                 -- eqTypes: See Note [Pattern synonym groups]
 sameGroup (PgLit _)     (PgLit _)     = True    -- One case expression
-sameGroup (PgN i1 e1)   (PgN i2 e2)   = i1==i2 && e1==e2
-                                                -- Order is significant
+sameGroup (PgN fl1)     (PgN fl2)     = fl1 == fl2
+        -- Order is significant, match PgN after PgLit
+        -- If the exponents are small check for value equality rather than syntactic equality
+        -- This is implemented in the Eq instance for FractionalLit
 sameGroup (PgOverS s1)  (PgOverS s2)  = s1==s2
 sameGroup (PgNpK l1)    (PgNpK l2)    = l1==l2  -- See Note [Grouping overloaded literal patterns]
 sameGroup (PgCo t1)     (PgCo t2)     = t1 `eqType` t2
@@ -1092,10 +1094,8 @@ patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
 patGroup _ (NPat _ (dL->L _ (OverLit {ol_val=oval})) mb_neg _) =
   case (oval, isJust mb_neg) of
-   (HsIntegral   i, False) -> PgN (fromInteger $ il_value i) 0
-   (HsIntegral   i, True ) -> PgN (-(fromInteger $ il_value i)) 0
-   (HsFractional r, False) -> PgN (fl_signi r) (fl_exp r)
-   (HsFractional r, True ) -> PgN (-fl_signi r) (fl_exp r)
+   (HsIntegral   i, b) -> PgN (integralFractionalLit b (fromInteger (il_value i)))
+   (HsFractional f, _) -> PgN f
    (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
                           PgOverS s
 patGroup _ (NPlusKPat _ _ (dL->L _ (OverLit {ol_val=oval})) _ _ _) =

@@ -1564,11 +1564,20 @@ instance Outputable IntegralLit where
   ppr (IL (SourceText src) _ _) = text src
   ppr (IL NoSourceText _ value) = text (show value)
 
-instance Eq FractionalLit where
-  (==) = (==) `on` (\x -> (fl_signi x, fl_exp x, fl_exp_base x))
+-- | Compare fractional lits with small exponents for value equality but
+--   large values for syntactic equality.
+compareFractionalLit :: FractionalLit -> FractionalLit -> Ordering
+compareFractionalLit fl1 fl2
+  | fl_exp fl1 < 100 && fl_exp fl2 < 100 && fl_exp fl1 >= -100 && fl_exp fl2 >= -100
+    = rationalFromFractionalLit fl1 `compare` rationalFromFractionalLit fl2
+  | otherwise = (compare `on` (\x -> (fl_signi x, fl_exp x, fl_exp_base x))) fl1 fl2
 
+instance Eq FractionalLit where
+  (==) fl1 fl2 = case compare fl1 fl2 of
+          EQ -> True
+          _  -> False
 instance Ord FractionalLit where
-  compare = compare `on` (\x -> (fl_signi x, fl_exp x, fl_exp_base x))
+  compare = compareFractionalLit
 
 instance Outputable FractionalLit where
   ppr (fl@(FL {})) = pprWithSourceText (fl_text fl) (rational $ mkRationalWithExponentBase (fl_signi fl) (fl_exp fl) (fl_exp_base fl))
