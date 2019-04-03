@@ -161,7 +161,7 @@ copyRules = do
         prefix -/- "llvm-targets"      <~ return "."
         prefix -/- "llvm-passes"       <~ return "."
         prefix -/- "platformConstants" <~ (buildRoot <&> (-/- generatedDir))
-        prefix -/- "settings"          <~ return "."
+        prefix -/- "settings"          <~ (buildRoot <&> (-/- generatedDir))
         prefix -/- "template-hsc.h"    <~ return (pkgPath hsc2hs)
 
         prefix -/- "html//*"           <~ return "utils/haddock/haddock-api/resources"
