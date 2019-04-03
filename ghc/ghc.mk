@@ -129,6 +129,9 @@ all_ghc_stage1 : $(GHC_STAGE1)
 all_ghc_stage2 : $(GHC_STAGE2)
 all_ghc_stage3 : $(GHC_STAGE3)
 
+settings : $(includes_SETTINGS)
+	"$(CP)" $< $@
+
 $(INPLACE_LIB)/settings : settings
 	"$(CP)" $< $@
 

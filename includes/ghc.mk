@@ -166,6 +166,52 @@ endif
 
 endif
 
+# -----------------------------------------------------------------------------
+# Settings
+
+# These settings are read by GHC at runtime, so as to not cause spurious
+# rebuilds.
+
+includes_SETTINGS = includes/dist/build/settings
+
+$(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
+	$(call removeFiles,$@)
+	@echo '[("GCC extra via C opts", "$(GccExtraViaCOpts)")' >> $@
+	@echo ',("C compiler command", "$(SettingsCCompilerCommand)")' >> $@
+	@echo ',("C compiler flags", "$(SettingsCCompilerFlags)")' >> $@
+	@echo ',("C compiler link flags", "$(SettingsCCompilerLinkFlags)")' >> $@
+	@echo ',("C compiler supports -no-pie", "$(SettingsCCompilerSupportsNoPie)")' >> $@
+	@echo ',("Haskell CPP command", "$(SettingsHaskellCPPCommand)")' >> $@
+	@echo ',("Haskell CPP flags", "$(SettingsHaskellCPPFlags)")' >> $@
+	@echo ',("ld command", "$(SettingsLdCommand)")' >> $@
+	@echo ',("ld flags", "$(SettingsLdFlags)")' >> $@
+	@echo ',("ld supports compact unwind", "$(LdHasNoCompactUnwind)")' >> $@
+	@echo ',("ld supports build-id", "$(LdHasBuildId)")' >> $@
+	@echo ',("ld supports filelist", "$(LdHasFilelist)")' >> $@
+	@echo ',("ld is GNU ld", "$(LdIsGNULd)")' >> $@
+	@echo ',("ar command", "$(SettingsArCommand)")' >> $@
+	@echo ',("ar flags", "$(ArArgs)")' >> $@
+	@echo ',("ar supports at file", "$(ArSupportsAtFile)")' >> $@
+	@echo ',("ranlib command", "$(SettingsRanlibCommand)")' >> $@
+	@echo ',("touch command", "$(SettingsTouchCommand)")' >> $@
+	@echo ',("dllwrap command", "$(SettingsDllWrapCommand)")' >> $@
+	@echo ',("windres command", "$(SettingsWindresCommand)")' >> $@
+	@echo ',("libtool command", "$(SettingsLibtoolCommand)")' >> $@
+	@echo ',("cross compiling", "$(CrossCompiling)")' >> $@
+	@echo ',("target os", "$(HaskellTargetOs)")' >> $@
+	@echo ',("target arch", "$(HaskellTargetArch)")' >> $@
+	@echo ',("target word size", "$(TargetWordSize)")' >> $@
+	@echo ',("target has GNU nonexec stack", "$(HaskellHaveGnuNonexecStack)")' >> $@
+	@echo ',("target has .ident directive", "$(HaskellHaveIdentDirective)")' >> $@
+	@echo ',("target has subsections via symbols", "$(HaskellHaveSubsectionsViaSymbols)")' >> $@
+	@echo ',("target has RTS linker", "$(HaskellHaveRTSLinker)")' >> $@
+	@echo ',("Unregisterised", "$(Unregisterised)")' >> $@
+	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
+	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
+	@echo ',("LLVM clang command", "$(SettingsClangCommand)")' >> $@
+	@echo ']' >> $@
+
+
 # ---------------------------------------------------------------------------
 # Make DerivedConstants.h for the compiler
 

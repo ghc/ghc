@@ -497,16 +497,16 @@ AC_DEFUN([FP_SETTINGS],
 [
     if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"
     then
-        mingw_bin_prefix=mingw/bin/
-	SettingsCCompilerCommand="\$tooldir/${mingw_bin_prefix}gcc.exe"
-	SettingsHaskellCPPCommand="\$tooldir/${mingw_bin_prefix}gcc.exe"
+        mingw_bin_prefix='$$tooldir/mingw/bin/'
+        SettingsCCompilerCommand="${mingw_bin_prefix}gcc.exe"
+        SettingsHaskellCPPCommand="${mingw_bin_prefix}gcc.exe"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
-	SettingsLdCommand="\$tooldir/${mingw_bin_prefix}ld.exe"
-	SettingsArCommand="\$tooldir/${mingw_bin_prefix}ar.exe"
-	SettingsRanlibCommand="\$tooldir/${mingw_bin_prefix}ranlib.exe"
-	SettingsDllWrapCommand="\$tooldir/${mingw_bin_prefix}dllwrap.exe"
-	SettingsWindresCommand="\$tooldir/${mingw_bin_prefix}windres.exe"
-        SettingsTouchCommand='$topdir/bin/touchy.exe'
+        SettingsLdCommand="${mingw_bin_prefix}ld.exe"
+        SettingsArCommand="${mingw_bin_prefix}ar.exe"
+        SettingsRanlibCommand="${mingw_bin_prefix}ranlib.exe"
+        SettingsDllWrapCommand="${mingw_bin_prefix}dllwrap.exe"
+        SettingsWindresCommand="${mingw_bin_prefix}windres.exe"
+        SettingsTouchCommand='$$topdir/bin/touchy.exe'
     elif test "$EnableDistroToolchain" = "YES"
     then
         SettingsCCompilerCommand="$(basename $CC)"
@@ -517,7 +517,7 @@ AC_DEFUN([FP_SETTINGS],
         SettingsArCommand="$(basename $ArCmd)"
         SettingsDllWrapCommand="$(basename $DllWrapCmd)"
         SettingsWindresCommand="$(basename $WindresCmd)"
-        SettingsTouchCommand='$topdir/bin/touchy.exe'
+        SettingsTouchCommand='$$topdir/bin/touchy.exe'
     else
         SettingsCCompilerCommand="$CC"
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
