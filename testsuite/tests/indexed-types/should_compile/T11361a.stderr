@@ -1,5 +1,7 @@
 
 T11361a.hs:7:3: error:
-    • Kind mis-match on LHS of default declaration for ‘F’
+    • Illegal argument ‘*’ in:
+        ‘type F @* x = x’
+        The arguments to ‘F’ must all be type variables
     • In the default type instance declaration for ‘F’
       In the class declaration for ‘C’
