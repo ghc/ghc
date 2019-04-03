@@ -379,6 +379,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     StgInd *bh;
 
     orig_info = caf->header.info;
+    load_load_barrier();
 
 #if defined(THREADED_RTS)
     const StgInfoTable *cur_info;
@@ -407,8 +408,9 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
 
     // Allocate the blackhole indirection closure
     bh = (StgInd *)allocate(cap, sizeofW(*bh));
-    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
+    write_barrier();
+    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
 
     caf->indirectee = (StgClosure *)bh;
     write_barrier();
@@ -1081,8 +1083,10 @@ void
 dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 {
     Capability *cap = regTableToCapability(reg);
-    if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
-        p->header.info = &stg_MUT_VAR_DIRTY_info;
+    const StgInfoTable *pinfo = p->header.info;
+    load_load_barrier();
+    if (pinfo == &stg_MUT_VAR_CLEAN_info) {
+        pinfo = &stg_MUT_VAR_DIRTY_info;
         recordClosureMutated(cap,p);
     }
 }
@@ -1090,8 +1094,10 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 void
 dirty_TVAR(Capability *cap, StgTVar *p)
 {
-    if (p->header.info == &stg_TVAR_CLEAN_info) {
-        p->header.info = &stg_TVAR_DIRTY_info;
+    const StgInfoTable *pinfo = p->header.info;
+    load_load_barrier();
+    if (pinfo == &stg_TVAR_CLEAN_info) {
+        pinfo = &stg_TVAR_DIRTY_info;
         recordClosureMutated(cap,(StgClosure*)p);
     }
 }

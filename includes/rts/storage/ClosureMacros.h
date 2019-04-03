@@ -80,31 +80,43 @@ INLINE_HEADER StgThunkInfoTable *itbl_to_thunk_itbl(const StgInfoTable *i) {retu
 INLINE_HEADER StgConInfoTable *itbl_to_con_itbl(const StgInfoTable *i) {return (StgConInfoTable *)i;}
 #endif
 
+// There should always be a load-load barrier between reading an info table and
+// reading any other part of a closure, so these macros include such a barrier.
 EXTERN_INLINE const StgInfoTable *get_itbl(const StgClosure *c);
 EXTERN_INLINE const StgInfoTable *get_itbl(const StgClosure *c)
 {
-   return INFO_PTR_TO_STRUCT(c->header.info);
+   const StgInfoTable *x = INFO_PTR_TO_STRUCT(c->header.info);
+   load_load_barrier();
+   return x;
 }
 
 EXTERN_INLINE const StgRetInfoTable *get_ret_itbl(const StgClosure *c);
 EXTERN_INLINE const StgRetInfoTable *get_ret_itbl(const StgClosure *c)
 {
-   return RET_INFO_PTR_TO_STRUCT(c->header.info);
+   const StgRetInfoTable *x = RET_INFO_PTR_TO_STRUCT(c->header.info);
+   load_load_barrier();
+   return x;
 }
 
 INLINE_HEADER const StgFunInfoTable *get_fun_itbl(const StgClosure *c)
 {
-   return FUN_INFO_PTR_TO_STRUCT(c->header.info);
+   const StgFunInfoTable *x = FUN_INFO_PTR_TO_STRUCT(c->header.info);
+   load_load_barrier();
+   return x;
 }
 
 INLINE_HEADER const StgThunkInfoTable *get_thunk_itbl(const StgClosure *c)
 {
-   return THUNK_INFO_PTR_TO_STRUCT(c->header.info);
+   const StgThunkInfoTable *x = THUNK_INFO_PTR_TO_STRUCT(c->header.info);
+   load_load_barrier();
+   return x;
 }
 
 INLINE_HEADER const StgConInfoTable *get_con_itbl(const StgClosure *c)
 {
-   return CON_INFO_PTR_TO_STRUCT((c)->header.info);
+   const StgConInfoTable *x = CON_INFO_PTR_TO_STRUCT((c)->header.info);
+   load_load_barrier();
+   return x;
 }
 
 INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
