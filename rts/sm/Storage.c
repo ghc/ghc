@@ -500,9 +500,8 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
         bh = (StgInd *)allocate(cap, sizeofW(*bh));
     }
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
-    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
-    // Ensure that above writes are visible before we introduce reference as CAF indirectee.
     write_barrier();
+    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
 
     caf->indirectee = (StgClosure *)bh;
     write_barrier();
