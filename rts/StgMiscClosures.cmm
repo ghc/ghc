@@ -292,12 +292,14 @@ INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     TICK_ENT_DYN_IND(); /* tick */
 
 retry:
+    prim_read_barrier;
     p = StgInd_indirectee(node);
     if (GETTAG(p) != 0) {
         return (p);
     }
 
     info = StgHeader_info(p);
+    prim_read_barrier;
     if (info == stg_IND_info) {
         // This could happen, if e.g. we got a BLOCKING_QUEUE that has
         // just been replaced with an IND by another thread in
@@ -313,9 +315,11 @@ retry:
         ("ptr" msg) = ccall allocate(MyCapability() "ptr",
                                      BYTES_TO_WDS(SIZEOF_MessageBlackHole));
 
-        SET_HDR(msg, stg_MSG_BLACKHOLE_info, CCS_SYSTEM);
         MessageBlackHole_tso(msg) = CurrentTSO;
         MessageBlackHole_bh(msg) = node;
+        SET_HDR(msg, stg_MSG_BLACKHOLE_info, CCS_SYSTEM);
+        // messageBlackHole has appropriate memory barriers when this object is exposed.
+        // See Note [Heap memory barriers].
 
         (r) = ccall messageBlackHole(MyCapability() "ptr", msg "ptr");
 
