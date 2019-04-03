@@ -80,6 +80,9 @@ INLINE_HEADER StgThunkInfoTable *itbl_to_thunk_itbl(const StgInfoTable *i) {retu
 INLINE_HEADER StgConInfoTable *itbl_to_con_itbl(const StgInfoTable *i) {return (StgConInfoTable *)i;}
 #endif
 
+// There should always be a load-load barrier between reading an info table and
+// reading any other part of a closure, so these macros include such a barrier.
+// See [Heap memory barriers] in SMP.h
 EXTERN_INLINE const StgInfoTable *get_itbl(const StgClosure *c);
 EXTERN_INLINE const StgInfoTable *get_itbl(const StgClosure *c)
 {
