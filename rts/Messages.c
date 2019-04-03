@@ -28,6 +28,7 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
 #if defined(DEBUG)
     {
         const StgInfoTable *i = msg->header.info;
+        load_load_barrier();
         if (i != &stg_MSG_THROWTO_info &&
             i != &stg_MSG_BLACKHOLE_info &&
             i != &stg_MSG_TRY_WAKEUP_info &&
@@ -70,6 +71,7 @@ executeMessage (Capability *cap, Message *m)
 loop:
     write_barrier(); // allow m->header to be modified by another thread
     i = m->header.info;
+    load_load_barrier();
     if (i == &stg_MSG_TRY_WAKEUP_info)
     {
         StgTSO *tso = ((MessageWakeup *)m)->tso;
@@ -302,6 +304,7 @@ loop:
         recordClosureMutated(cap,(StgClosure*)msg);
 
         if (info == &stg_BLOCKING_QUEUE_CLEAN_info) {
+            write_barrier();
             bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
             // No barrier is necessary here: we are only exposing the
             // closure to the GC. See Note [Heap memory barriers] in SMP.h.
@@ -334,6 +337,7 @@ StgTSO * blackHoleOwner (StgClosure *bh)
     StgClosure *p;
 
     info = bh->header.info;
+    load_load_barrier();
 
     if (info != &stg_BLACKHOLE_info &&
         info != &stg_CAF_BLACKHOLE_info &&
@@ -349,6 +353,7 @@ loop:
     // and turns this into an infinite loop.
     p = UNTAG_CLOSURE((StgClosure*)VOLATILE_LOAD(&((StgInd*)bh)->indirectee));
     info = p->header.info;
+    load_load_barrier();
 
     if (info == &stg_IND_info) goto loop;
 

@@ -84,6 +84,7 @@ isAlive(StgClosure *p)
     }
 
     info = q->header.info;
+    load_load_barrier();
 
     if (IS_FORWARDING_PTR(info)) {
         // alive!
@@ -131,6 +132,7 @@ revertCAFs( void )
 
         SET_INFO((StgClosure *)c, c->saved_info);
         c->saved_info = NULL;
+        write_barrier();
         // We must reset static_link lest the major GC finds that
         // static_flag==3 and will consequently ignore references
         // into code that we are trying to unload. This would result
