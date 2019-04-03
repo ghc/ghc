@@ -82,14 +82,14 @@ createThread(Capability *cap, W_ size)
     stack_size = round_to_mblocks(size - sizeofW(StgTSO));
     stack = (StgStack *)allocate(cap, stack_size);
     TICK_ALLOC_STACK(stack_size);
-    SET_HDR(stack, &stg_STACK_info, cap->r.rCCCS);
     stack->stack_size   = stack_size - sizeofW(StgStack);
     stack->sp           = stack->stack + stack->stack_size;
     stack->dirty        = 1;
+    write_barrier();
+    SET_HDR(stack, &stg_STACK_info, cap->r.rCCCS);
 
     tso = (StgTSO *)allocate(cap, sizeofW(StgTSO));
     TICK_ALLOC_TSO();
-    SET_HDR(tso, &stg_TSO_info, CCS_SYSTEM);
 
     // Always start with the compiled code evaluator
     tso->what_next = ThreadRunGHC;
@@ -115,6 +115,9 @@ createThread(Capability *cap, W_ size)
 #if defined(PROFILING)
     tso->prof.cccs = CCS_MAIN;
 #endif
+
+    write_barrier();
+    SET_HDR(tso, &stg_TSO_info, CCS_SYSTEM);
 
     // put a stop frame on the stack
     stack->sp -= sizeofW(StgStopFrame);
@@ -257,8 +260,9 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
     {
         MessageWakeup *msg;
         msg = (MessageWakeup *)allocate(cap,sizeofW(MessageWakeup));
-        SET_HDR(msg, &stg_MSG_TRY_WAKEUP_info, CCS_SYSTEM);
         msg->tso = tso;
+        write_barrier();
+        SET_HDR(msg, &stg_MSG_TRY_WAKEUP_info, CCS_SYSTEM);
         sendMessage(cap, tso->cap, (Message*)msg);
         debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld on cap %d",
                       (W_)tso->id, tso->cap->no);
@@ -363,6 +367,7 @@ wakeBlockingQueue(Capability *cap, StgBlockingQueue *bq)
     for (msg = bq->queue; msg != (MessageBlackHole*)END_TSO_QUEUE;
          msg = msg->link) {
         i = msg->header.info;
+        load_load_barrier();
         if (i != &stg_IND_info) {
             ASSERT(i == &stg_MSG_BLACKHOLE_info);
             tryWakeupThread(cap,msg->tso);
@@ -384,6 +389,8 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
 {
     StgBlockingQueue *bq, *next;
     StgClosure *p;
+    const StgInfoTable *bqinfo;
+    const StgInfoTable *pinfo;
 
     debugTraceCap(DEBUG_sched, cap,
                   "collision occurred; checking blocking queues for thread %ld",
@@ -392,15 +399,18 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
     for (bq = tso->bq; bq != (StgBlockingQueue*)END_TSO_QUEUE; bq = next) {
         next = bq->link;
 
-        if (bq->header.info == &stg_IND_info) {
+        bqinfo = bq->header.info;
+        load_load_barrier();
+        if (bqinfo == &stg_IND_info) {
             // ToDo: could short it out right here, to avoid
             // traversing this IND multiple times.
             continue;
         }
 
         p = bq->bh;
-
-        if (p->header.info != &stg_BLACKHOLE_info ||
+        pinfo = p->header.info;
+        load_load_barrier();
+        if (pinfo != &stg_BLACKHOLE_info ||
             ((StgInd *)p)->indirectee != (StgClosure*)bq)
         {
             wakeBlockingQueue(cap,bq);
@@ -424,6 +434,7 @@ updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
     const StgInfoTable *i;
 
     i = thunk->header.info;
+    load_load_barrier();
     if (i != &stg_BLACKHOLE_info &&
         i != &stg_CAF_BLACKHOLE_info &&
         i != &__stg_EAGER_BLACKHOLE_info &&
@@ -444,6 +455,7 @@ updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
     }
 
     i = v->header.info;
+    load_load_barrier();
     if (i == &stg_TSO_info) {
         checkBlockingQueues(cap, tso);
         return;
@@ -597,12 +609,13 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     new_stack = (StgStack*) allocate(cap, chunk_size);
     cap->r.rCurrentTSO = NULL;
 
-    SET_HDR(new_stack, &stg_STACK_info, old_stack->header.prof.ccs);
     TICK_ALLOC_STACK(chunk_size);
 
     new_stack->dirty = 0; // begin clean, we'll mark it dirty below
     new_stack->stack_size = chunk_size - sizeofW(StgStack);
     new_stack->sp = new_stack->stack + new_stack->stack_size;
+    write_barrier();
+    SET_HDR(new_stack, &stg_STACK_info, old_stack->header.prof.ccs);
 
     tso->tot_stack_size += new_stack->stack_size;
 
@@ -651,8 +664,9 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
         } else {
             new_stack->sp -= sizeofW(StgUnderflowFrame);
             frame = (StgUnderflowFrame*)new_stack->sp;
-            frame->info = &stg_stack_underflow_frame_info;
             frame->next_chunk  = old_stack;
+            write_barrier();
+            frame->info = &stg_stack_underflow_frame_info;
         }
 
         // copy the stack chunk between tso->sp and sp to
@@ -738,6 +752,7 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
 bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value)
 {
     const StgInfoTable *info;
+    const StgInfoTable *qinfo;
     StgMVarTSOQueue *q;
     StgTSO *tso;
 
@@ -752,6 +767,8 @@ bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value)
 
     q = mvar->head;
 loop:
+    qinfo = q->header.info;
+    load_load_barrier();
     if (q == (StgMVarTSOQueue*)&stg_END_TSO_QUEUE_closure) {
         /* No further takes, the MVar is now full. */
         if (info == &stg_MVAR_CLEAN_info) {
@@ -762,8 +779,8 @@ loop:
         unlockClosure((StgClosure*)mvar, &stg_MVAR_DIRTY_info);
         return true;
     }
-    if (q->header.info == &stg_IND_info ||
-        q->header.info == &stg_MSG_NULL_info) {
+    if (qinfo == &stg_IND_info ||
+        qinfo == &stg_MSG_NULL_info) {
         q = (StgMVarTSOQueue*)((StgInd*)q)->indirectee;
         goto loop;
     }

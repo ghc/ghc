@@ -69,6 +69,7 @@ eval:
     tag = GETTAG(p);
     p = UNTAG(p);
     info  = %INFO_PTR(p);
+    prim_read_barrier;
     type = TO_W_(%INFO_TYPE(%STD_INFO(info)));
 
     switch [0 .. N_CLOSURE_TYPES] type {
@@ -168,7 +169,6 @@ eval:
         cards = SIZEOF_StgMutArrPtrs + WDS(ptrs);
         ALLOCATE(compact, BYTES_TO_WDS(size), p, to, tag);
         P_[pp] = tag | to;
-        SET_HDR(to, StgHeader_info(p), StgHeader_ccs(p));
         StgMutArrPtrs_ptrs(to) = ptrs;
         StgMutArrPtrs_size(to) = StgMutArrPtrs_size(p);
         prim %memcpy(to + cards, p + cards , size - cards, 1);
@@ -182,6 +182,7 @@ eval:
             i = i + 1;
             goto loop0;
         }
+        SET_HDR(to, StgHeader_info(p), StgHeader_ccs(p));
         return();
     }
 
@@ -198,7 +199,6 @@ eval:
         ptrs = StgSmallMutArrPtrs_ptrs(p);
         ALLOCATE(compact, BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + ptrs, p, to, tag);
         P_[pp] = tag | to;
-        SET_HDR(to, StgHeader_info(p), StgHeader_ccs(p));
         StgSmallMutArrPtrs_ptrs(to) = ptrs;
         i = 0;
       loop1:
@@ -210,6 +210,7 @@ eval:
             i = i + 1;
             goto loop1;
         }
+        SET_HDR(to, StgHeader_info(p), StgHeader_ccs(p));
         return();
     }
 
@@ -235,7 +236,6 @@ eval:
 
         ALLOCATE(compact, size, p, to, tag);
         P_[pp] = tag | to;
-        SET_HDR(to, StgHeader_info(p), StgHeader_ccs(p));
 
         // First, copy the non-pointers
         if (nptrs > 0) {
@@ -245,6 +245,7 @@ eval:
             i = i + 1;
             if (i < ptrs + nptrs) ( likely: True ) goto loop2;
         }
+        SET_HDR(to, StgHeader_info(p), StgHeader_ccs(p));
 
         // Next, recursively compact and copy the pointers
         if (ptrs == 0) { return(); }
