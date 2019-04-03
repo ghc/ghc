@@ -680,26 +680,44 @@ isSpecOrUnspecType _ = False
 
 {- Note [Arguments for Specialised Call Rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When constructing a SPEC rule, we must differentiate between
 (1) unspecialised arguments, (2) specialised types, and (3)
-specialised dicts.
+specialised dicts. These three cases correspond to the constructors
+of 'SpecRuleArg'.
 
   (1) Unspecialised arguments require a binder, and must occur on
-      both the left and righthand sides of the rule.
+      both the left and righthand sides of the rule. Corresponding
+      constructor: 'RuleUnspecArg'.
 
   (2) Specialised types appear only on the lefthand side, and do not
-      require a binder.
+      require a binder. Corresponding constructor: 'RuleSpecType'.
 
   (3) Specialised dicts appear only on the lefthand side, and _do_
       require a binder.  See Note [Specialising Calls] for why.
+      Corresponding constructor: 'RuleSpecDict'.
+
       *The binder to be used in the rule is the second 'CoreBndr'
       in 'RuleSpecDict'.*
 
       The first 'CoreBndr' is used to later construct the usage
       details, and is only kept here because of its magnificent
       convenience.
+
+For example, given the following [SpecRuleArg]s:
+
+  [ RuleUnspecArg (x :: Int)
+  , RuleSpecType (Type T1)
+  , RuleSpecDict (d1 :: Foo T1) (d1' :: Foo T1)
+  ]
+
+we will generate the following rewrite-rule body:
+
+  forall (x :: Int) (d1' :: Foo T1).
+     something x @T1 d1' = $ssomething x
+
 -}
+
+-- | See Note [Arguments for Specialised Call Rules]
 data SpecRuleArg
   = RuleSpecType  CoreExpr
   | RuleSpecDict  CoreBndr  -- original binder
@@ -739,6 +757,26 @@ splitTypeOnVarsAndArrows t
 -- relative to, construct a new type with those specialised parameters first.
 -- It's trivial to beta-reduce away the specialised parameters from the
 -- resulting type.
+--
+-- For example, consider the function 'f'
+--
+--    f :: Int -> forall a b c. (Foo a, Foo c) => Bar -> Qux
+--
+-- that we'd like to specialise with the [SpecArg]s
+--
+--    [ UnspecArg, SpecType T1, UnspecType, SpecType t3, SpecDict $dFooT1
+--    , SpecDict $dFooT3, UnspecArg]
+--
+-- which is to say, we'd like to specialise at (a ~ T1, c ~ T3).
+--
+-- The result of calling 'moveSpecArgsToFront' here is
+--
+--    forall a c. (Foo a, Foo c) => Int -> forall b. Bar -> Qux
+--
+-- which can now be beta-reduced via by application of T1 T3 (Foo T1) (Foo T3)
+-- in order to ultimately arrive at the desired, specialised type of '$sf':
+--
+--    $sf :: Int -> forall b. Bar -> Qux
 moveSpecArgsToFront :: Type -> [SpecArg] -> Type
 moveSpecArgsToFront ty args = ravelFun $ fmap snd (specs ++ unspecs) ++ [t_res]
   where
@@ -1524,7 +1562,6 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
 
 {- Note [Specialising Calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Suppose we have a function:
 
     f :: Int -> forall a b c. (Foo a, Foo c) => Bar -> Qux
@@ -1538,6 +1575,11 @@ This call is described as a 'CallInfo' whose 'ci_key' is
 
     [ UnspecArg, SpecType T1, UnspecType, SpecType T3, SpecDict dFooT1
     , SpecDict dFooT3, UnspecArg ]
+
+Why are 'a' and 'c' identified as 'SpecType', while 'b' is 'UnspecType'?
+Because we must specialise the function on type variables that appear
+free in its *dictionary* arguments; but not on type variables that do not
+appear in any dictionaries, i.e. are fully polymorphic.
 
 Because this call has dictionaries applied, we'd like to specialise
 the call on any type argument that appears free in those dictionaries.
