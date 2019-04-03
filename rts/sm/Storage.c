@@ -407,8 +407,10 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
 
     // Allocate the blackhole indirection closure
     bh = (StgInd *)allocate(cap, sizeofW(*bh));
-    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
+    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
+    // Ensure that above writes are visible before we introduce reference as CAF indirectee.
+    write_barrier();
 
     caf->indirectee = (StgClosure *)bh;
     write_barrier();
@@ -1081,6 +1083,8 @@ void
 dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 {
     Capability *cap = regTableToCapability(reg);
+    // No barrier required here as no other heap object fields are read. See
+    // note [Heap memory barriers] in SMP.h.
     if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
         p->header.info = &stg_MUT_VAR_DIRTY_info;
         recordClosureMutated(cap,p);
@@ -1090,6 +1094,8 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 void
 dirty_TVAR(Capability *cap, StgTVar *p)
 {
+    // No barrier required here as no other heap object fields are read. See
+    // note [Heap memory barriers] in SMP.h.
     if (p->header.info == &stg_TVAR_CLEAN_info) {
         p->header.info = &stg_TVAR_DIRTY_info;
         recordClosureMutated(cap,(StgClosure*)p);
