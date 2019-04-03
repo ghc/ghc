@@ -39,10 +39,10 @@
                  PROF_HDR_FIELDS(w_,ccs,p2)              \
                  p_ updatee
 
-
 #define updateWithIndirection(p1, p2, and_then) \
     W_ bd;                                                      \
                                                                 \
+    prim_write_barrier;                                         \
     OVERWRITING_CLOSURE(p1);                                    \
     StgInd_indirectee(p1) = p2;                                 \
     prim_write_barrier;                                         \
@@ -69,6 +69,7 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     ASSERT( (P_)p1 != (P_)p2 );
     /* not necessarily true: ASSERT( !closure_IND(p1) ); */
     /* occurs in RaiseAsync.c:raiseAsync() */
+    write_barrier();
     OVERWRITING_CLOSURE(p1);
     ((StgInd *)p1)->indirectee = p2;
     write_barrier();
