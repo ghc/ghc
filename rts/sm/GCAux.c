@@ -76,6 +76,7 @@ isAlive(StgClosure *p)
     }
 
     info = q->header.info;
+    load_load_barrier();
 
     if (IS_FORWARDING_PTR(info)) {
         // alive!
@@ -83,6 +84,7 @@ isAlive(StgClosure *p)
     }
 
     info = INFO_PTR_TO_STRUCT(info);
+    load_load_barrier();
 
     switch (info->type) {
 
@@ -121,8 +123,9 @@ revertCAFs( void )
          c = (StgIndStatic *)c->static_link)
     {
         c = (StgIndStatic *)UNTAG_STATIC_LIST_PTR(c);
-        SET_INFO((StgClosure *)c, c->saved_info);
         c->saved_info = NULL;
+        write_barrier();
+        SET_INFO((StgClosure *)c, c->saved_info);
         // could, but not necessary: c->static_link = NULL;
     }
     revertible_caf_list = (StgIndStatic*)END_OF_CAF_LIST;

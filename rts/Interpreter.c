@@ -249,10 +249,11 @@ StgClosure * newEmptyPAP (Capability *cap,
                           uint32_t arity)
 {
     StgPAP *pap = (StgPAP *)allocate(cap, sizeofW(StgPAP));
-    SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS);
     pap->arity = arity;
     pap->n_args = 0;
     pap->fun = tagged_obj;
+    write_barrier();
+    SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS);
     return (StgClosure *)pap;
 }
 
@@ -266,7 +267,6 @@ StgClosure * copyPAP  (Capability *cap, StgPAP *oldpap)
     uint32_t size = PAP_sizeW(oldpap->n_args);
     StgPAP *pap = (StgPAP *)allocate(cap, size);
     enterFunCCS(&cap->r, oldpap->header.prof.ccs);
-    SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS);
     pap->arity = oldpap->arity;
     pap->n_args = oldpap->n_args;
     pap->fun = oldpap->fun;
@@ -274,6 +274,8 @@ StgClosure * copyPAP  (Capability *cap, StgPAP *oldpap)
     for (i = 0; i < ((StgPAP *)pap)->n_args; i++) {
         pap->payload[i] = oldpap->payload[i];
     }
+    write_barrier();
+    SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS);
     return (StgClosure *)pap;
 }
 
@@ -481,8 +483,9 @@ eval_obj:
         {
             StgUpdateFrame *__frame;
             __frame = (StgUpdateFrame *)Sp;
-            SET_INFO((StgClosure *)__frame, (StgInfoTable *)&stg_upd_frame_info);
             __frame->updatee = (StgClosure *)(ap);
+            write_barrier();
+            SET_INFO((StgClosure *)__frame, (StgInfoTable *)&stg_upd_frame_info);
         }
 
         ENTER_CCS_THUNK(cap,ap);
@@ -799,7 +802,6 @@ do_apply:
                 // build a new PAP and return it.
                 StgPAP *new_pap;
                 new_pap = (StgPAP *)allocate(cap, PAP_sizeW(pap->n_args + m));
-                SET_HDR(new_pap,&stg_PAP_info,cap->r.rCCCS);
                 new_pap->arity = pap->arity - n;
                 new_pap->n_args = pap->n_args + m;
                 new_pap->fun = pap->fun;
@@ -809,6 +811,8 @@ do_apply:
                 for (i = 0; i < m; i++) {
                     new_pap->payload[pap->n_args + i] = (StgClosure *)SpW(i);
                 }
+                write_barrier();
+                SET_HDR(new_pap,&stg_PAP_info,cap->r.rCCCS);
                 tagged_obj = (StgClosure *)new_pap;
                 Sp_addW(m);
                 goto do_return;
@@ -844,13 +848,14 @@ do_apply:
                 StgPAP *pap;
                 uint32_t i;
                 pap = (StgPAP *)allocate(cap, PAP_sizeW(m));
-                SET_HDR(pap, &stg_PAP_info,cap->r.rCCCS);
                 pap->arity = arity - n;
                 pap->fun = obj;
                 pap->n_args = m;
                 for (i = 0; i < m; i++) {
                     pap->payload[i] = (StgClosure *)SpW(i);
                 }
+                write_barrier();
+                SET_HDR(pap, &stg_PAP_info,cap->r.rCCCS);
                 tagged_obj = (StgClosure *)pap;
                 Sp_addW(m);
                 goto do_return;
@@ -1081,7 +1086,6 @@ run_BCO:
                   // the BCO
                   size_words = BCO_BITMAP_SIZE(obj) + 2;
                   new_aps = (StgAP_STACK *) allocate(cap, AP_STACK_sizeW(size_words));
-                  SET_HDR(new_aps,&stg_AP_STACK_info,cap->r.rCCCS);
                   new_aps->size = size_words;
                   new_aps->fun = &stg_dummy_ret_closure;
 
@@ -1094,6 +1098,9 @@ run_BCO:
                   {
                      new_aps->payload[i] = (StgClosure *)SpW(i-2);
                   }
+
+                  write_barrier();
+                  SET_HDR(new_aps,&stg_AP_STACK_info,cap->r.rCCCS);
 
                   // Arrange the stack to call the breakpoint IO action, and
                   // continue execution of this BCO when the IO action returns.
@@ -1421,9 +1428,10 @@ run_BCO:
             StgAP* ap;
             int n_payload = BCO_NEXT;
             ap = (StgAP*)allocate(cap, AP_sizeW(n_payload));
-            SpW(-1) = (W_)ap;
             ap->n_args = n_payload;
+            write_barrier();
             SET_HDR(ap, &stg_AP_info, cap->r.rCCCS)
+            SpW(-1) = (W_)ap;
             Sp_subW(1);
             goto nextInsn;
         }
@@ -1432,9 +1440,10 @@ run_BCO:
             StgAP* ap;
             int n_payload = BCO_NEXT;
             ap = (StgAP*)allocate(cap, AP_sizeW(n_payload));
-            SpW(-1) = (W_)ap;
             ap->n_args = n_payload;
+            write_barrier();
             SET_HDR(ap, &stg_AP_NOUPD_info, cap->r.rCCCS)
+            SpW(-1) = (W_)ap;
             Sp_subW(1);
             goto nextInsn;
         }
@@ -1444,10 +1453,11 @@ run_BCO:
             int arity = BCO_NEXT;
             int n_payload = BCO_NEXT;
             pap = (StgPAP*)allocate(cap, PAP_sizeW(n_payload));
-            SpW(-1) = (W_)pap;
             pap->n_args = n_payload;
             pap->arity = arity;
+            write_barrier();
             SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS)
+            SpW(-1) = (W_)pap;
             Sp_subW(1);
             goto nextInsn;
         }
@@ -1518,16 +1528,18 @@ run_BCO:
             int o_itbl         = BCO_GET_LARGE_ARG;
             int n_words        = BCO_NEXT;
             StgInfoTable* itbl = INFO_PTR_TO_STRUCT((StgInfoTable *)BCO_LIT(o_itbl));
+            load_load_barrier();
             int request        = CONSTR_sizeW( itbl->layout.payload.ptrs,
                                                itbl->layout.payload.nptrs );
             StgClosure* con = (StgClosure*)allocate_NONUPD(cap,request);
             ASSERT( itbl->layout.payload.ptrs + itbl->layout.payload.nptrs > 0);
-            SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), cap->r.rCCCS);
             for (i = 0; i < n_words; i++) {
                 con->payload[i] = (StgClosure*)SpW(i);
             }
             Sp_addW(n_words);
             Sp_subW(1);
+            write_barrier();
+            SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), cap->r.rCCCS);
             SpW(0) = (W_)con;
             IF_DEBUG(interpreter,
                      debugBelch("\tBuilt ");

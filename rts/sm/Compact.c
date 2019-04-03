@@ -160,6 +160,7 @@ get_threaded_info( StgPtr p )
     StgWord q;
 
     q = (W_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
+    load_load_barrier();
 
 loop:
     switch (GET_CLOSURE_TAG((StgClosure *)q))
@@ -361,6 +362,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 
             fun_info = FUN_INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)
                            get_threaded_info((StgPtr)ret_fun->fun)));
+            load_load_barrier();
                  // *before* threading it!
             thread(&ret_fun->fun);
             p = thread_arg_block(fun_info, ret_fun->payload);
@@ -383,6 +385,7 @@ thread_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
 
     fun_info = FUN_INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)
                         get_threaded_info((StgPtr)fun)));
+    load_load_barrier();
     ASSERT(fun_info->i.type != PAP);
 
     p = (StgPtr)payload;
@@ -550,6 +553,8 @@ update_fwd_large( bdescr *bd )
 static /* STATIC_INLINE */ StgPtr
 thread_obj (const StgInfoTable *info, StgPtr p)
 {
+    load_load_barrier();
+
     switch (info->type) {
     case THUNK_0_1:
         return p + sizeofW(StgThunk) + 1;
@@ -823,6 +828,7 @@ update_fwd_compact( bdescr *blocks )
             // definitely have enough room.  Also see bug #1147.
             iptr = get_threaded_info(p);
             info = INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)iptr));
+            load_load_barrier();
 
             q = p;
 
