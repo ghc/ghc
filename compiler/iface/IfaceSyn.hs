@@ -1034,7 +1034,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- a compound field type is if it's preceded by a bang pattern.
     pprFieldArgTy (bang, ty) = ppr_arg_ty (bang_prec bang) bang ty
     -- If not using record syntax, a compound field type might need to be
-    -- parenthesize if one of the following holds:
+    -- parenthesized if one of the following holds:
     --
     -- 1. We're using Haskell98 syntax.
     -- 2. The field type is preceded with a bang pattern.
@@ -1046,18 +1046,23 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- If we're displaying the fields GADT-style, e.g.,
     --
     --   data Foo a where
-    --     MkFoo :: Maybe a -> Foo
+    --     MkFoo :: (Int -> Int) -> Maybe a -> Foo
     --
-    -- Then there is no inherent need to parenthesize compound fields like
-    -- `Maybe a` (bang patterns notwithstanding). If we're displaying the
-    -- fields Haskell98-style, e.g.,
+    -- Then we use `funPrec`, since that will ensure `Int -> Int` gets the
+    -- parentheses that it requires, but simple compound types like `Maybe a`
+    -- (which don't require parentheses in a function argument position) won't
+    -- get them, assuming that there are no bang patterns (see bang_prec).
     --
-    --   data Foo a = MkFoo (Maybe a)
+    -- If we're displaying the fields Haskell98-style, e.g.,
     --
-    -- Then we *must* parenthesize compound fields like (Maybe a).
+    --   data Foo a = MkFoo (Int -> Int) (Maybe a)
+    --
+    -- Then not only must we parenthesize `Int -> Int`, we must also
+    -- parenthesize compound fields like (Maybe a). Therefore, we pick
+    -- `appPrec`, which has higher precedence than `funPrec`.
     gadt_prec :: PprPrec
     gadt_prec
-      | gadt_style = topPrec
+      | gadt_style = funPrec
       | otherwise  = appPrec
 
     -- The presence of bang patterns or UNPACK annotations requires
