@@ -110,4 +110,4 @@ prepareTree dest = do
         , "ghc.mk"
         , "install-sh"
         , "packages"
-        , "settings.in" ]
+        ]
