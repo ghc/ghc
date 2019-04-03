@@ -8,6 +8,6 @@ be solved.
 Describe your proposed feature here.
 
 
-/label %"feature request"
-/label %"needs triage"
+/label ~"feature request"
+/label ~"needs triage"
 
