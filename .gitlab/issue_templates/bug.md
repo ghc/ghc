@@ -20,5 +20,5 @@ Optional:
 * System Architecture: 
 
 
-/label %bug
-/label %"needs triage"
+/label ~bug
+/label ~"needs triage"
