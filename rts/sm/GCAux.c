@@ -83,6 +83,7 @@ isAlive(StgClosure *p)
     }
 
     info = INFO_PTR_TO_STRUCT(info);
+    load_load_barrier();
 
     switch (info->type) {
 

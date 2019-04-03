@@ -53,6 +53,9 @@ import CLOSURE base_GHCziIOziException_cannotCompactPinned_closure;
 // data structure.  It takes the location to store the address of the
 // compacted object as an argument, so that it can be tail-recursive.
 //
+// N.B. No memory barrier (see Note [Heap memory barriers] in SMP.h) is needed
+// here since this is essentially an allocation of a new object which won't
+// be visible to other cores until after we return.
 stg_compactAddWorkerzh (
     P_ compact,  // The Compact# object
     P_ p,        // The object to compact
