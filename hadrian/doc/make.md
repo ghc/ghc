@@ -163,6 +163,17 @@ time you fire up a build. This is not possible with the Make build system.
   build _build/stage1/lib/platformConstants
   ```
 
+- Generate the `settings` file to be used for stage 1/2 GHC
+
+  ``` sh
+  # Make
+  make inplace/lib/settings
+
+  # Hadrian
+  build _build/stage0/lib/settings
+  build _build/stage1/lib/settings
+  ```
+
 - Build a static library for base with the stage 1 compiler
 
   ``` sh
