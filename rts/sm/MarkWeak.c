@@ -234,16 +234,17 @@ static bool tidyWeakList(generation *gen)
     last_w = &gen->old_weak_ptr_list;
     for (w = gen->old_weak_ptr_list; w != NULL; w = next_w) {
 
+        info = get_itbl((StgClosure *)w);
+
         /* There might be a DEAD_WEAK on the list if finalizeWeak# was
          * called on a live weak pointer object.  Just remove it.
          */
-        if (w->header.info == &stg_DEAD_WEAK_info) {
+        if (info == &stg_DEAD_WEAK_info) {
             next_w = w->link;
             *last_w = next_w;
             continue;
         }
 
-        info = get_itbl((StgClosure *)w);
         switch (info->type) {
 
         case WEAK:
