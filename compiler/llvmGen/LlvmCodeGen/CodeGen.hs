@@ -169,17 +169,25 @@ barrier = do
     let s = Fence False SyncSeqCst
     return (unitOL s, [])
 
+-- | Insert a 'barrier', unless the target platform is in the provided list of
+--   exceptions (where no code will be emitted instead).
+barrierUnless :: [Arch] -> LlvmM StmtData
+barrierUnless exs = do
+    platform <- getLlvmPlatform
+    if platformArch platform `elem` exs
+        then return (nilOL, [])
+        else barrier
+
 -- | Foreign Calls
 genCall :: ForeignTarget -> [CmmFormal] -> [CmmActual]
               -> LlvmM StmtData
 
--- Write barrier needs to be handled specially as it is implemented as an LLVM
--- intrinsic function.
+-- Barriers need to be handled specially as they are implemented as LLVM
+-- intrinsic functions.
+genCall (PrimTarget MO_ReadBarrier) _ _ =
+    barrierUnless [ArchX86, ArchX86_64, ArchSPARC]
 genCall (PrimTarget MO_WriteBarrier) _ _ = do
-    platform <- getLlvmPlatform
-    if platformArch platform `elem` [ArchX86, ArchX86_64, ArchSPARC]
-       then return (nilOL, [])
-       else barrier
+    barrierUnless [ArchX86, ArchX86_64, ArchSPARC]
 
 genCall (PrimTarget MO_Touch) _ _
  = return (nilOL, [])
@@ -824,6 +832,7 @@ cmmPrimOpFunctions mop = do
     -- We support MO_U_Mul2 through ordinary LLVM mul instruction, see the
     -- appropriate case of genCall.
     MO_U_Mul2 {}     -> unsupported
+    MO_ReadBarrier   -> unsupported
     MO_WriteBarrier  -> unsupported
     MO_Touch         -> unsupported
     MO_UF_Conv _     -> unsupported
