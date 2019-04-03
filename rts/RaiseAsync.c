@@ -870,6 +870,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
                 ap->payload[i] = (StgClosure *)*sp++;
             }
 
+            write_barrier();
             SET_HDR(ap,&stg_AP_STACK_info,
                     ((StgClosure *)frame)->header.prof.ccs /* ToDo */);
             TICK_ALLOC_UP_THK(WDS(words+1),0);
@@ -921,6 +922,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
                 ap->payload[i] = (StgClosure *)*sp++;
             }
 
+            write_barrier();
             SET_HDR(ap,&stg_AP_STACK_NOUPD_info,stack->header.prof.ccs);
             TICK_ALLOC_SE_THK(WDS(words+1),0);
 
@@ -959,6 +961,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
             //
             raise = (StgThunk *)allocate(cap,sizeofW(StgThunk)+1);
             TICK_ALLOC_SE_THK(WDS(1),0);
+            write_barrier();
             SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
             raise->payload[0] = exception;
 
@@ -1039,8 +1042,9 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 
                 atomically = (StgThunk*)allocate(cap,sizeofW(StgThunk)+1);
                 TICK_ALLOC_SE_THK(1,0);
-                SET_HDR(atomically,&stg_atomically_info,af->header.prof.ccs);
                 atomically->payload[0] = af->code;
+                write_barrier();
+                SET_HDR(atomically,&stg_atomically_info,af->header.prof.ccs);
 
                 // discard stack up to and including the ATOMICALLY_FRAME
                 frame += sizeofW(StgAtomicallyFrame);

@@ -29,6 +29,7 @@ StgTSO *getTopHandlerThread(void) {
     StgWeak *weak = (StgWeak*)deRefStablePtr(topHandlerPtr);
     RELEASE_LOCK(&m);
     const StgInfoTable *info = weak->header.info;
+    load_load_barrier();
     if (info == &stg_WEAK_info) {
         StgClosure *key = ((StgWeak*)weak)->key;
 

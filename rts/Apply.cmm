@@ -62,8 +62,11 @@ again:
     W_  info;
     P_ untaggedfun;
     W_ arity;
+    // We must obey the correct heap object observation pattern in
+    // note [Heap memory barriers] in SMP.h.
     untaggedfun = UNTAG(fun);
     info = %INFO_PTR(untaggedfun);
+    prim_read_barrier;
     switch [INVALID_OBJECT .. N_CLOSURE_TYPES]
         (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {
         case
@@ -104,7 +107,6 @@ again:
                 CCS_ALLOC(BYTES_TO_WDS(SIZEOF_StgPAP), CCS_OVERHEAD);
                 P_ pap;
                 pap = Hp - SIZEOF_StgPAP + WDS(1);
-                SET_HDR(pap, stg_PAP_info, CCCS);
                 StgPAP_arity(pap) = arity;
                 if (arity <= TAG_MASK) {
                   // TODO: Shouldn't this already be tagged? If not why did we
@@ -113,6 +115,8 @@ again:
                 }
                 StgPAP_fun(pap)   = fun;
                 StgPAP_n_args(pap) = 0;
+                prim_write_barrier;
+                SET_HDR(pap, stg_PAP_info, CCCS);
                 return (pap);
             }
         }
@@ -132,7 +136,6 @@ again:
                 pap = Hp - size + WDS(1);
                 // We'll lose the original PAP, so we should enter its CCS
                 ccall enterFunCCS(BaseReg "ptr", StgHeader_ccs(untaggedfun) "ptr");
-                SET_HDR(pap, stg_PAP_info, CCCS);
                 StgPAP_arity(pap) = StgPAP_arity(untaggedfun);
                 StgPAP_n_args(pap) = StgPAP_n_args(untaggedfun);
                 StgPAP_fun(pap)   = StgPAP_fun(fun);
@@ -140,6 +143,8 @@ again:
                 i = TO_W_(StgPAP_n_args(untaggedfun));
             loop:
                 if (i == 0) {
+                    prim_write_barrier;
+                    SET_HDR(pap, stg_PAP_info, CCCS);
                     return (pap);
                 }
                 i = i - 1;
@@ -282,6 +287,7 @@ for:
       info = %GET_FUN_INFO(UNTAG(R1));
       W_ type;
       type = TO_W_(StgFunInfoExtra_fun_type(info));
+      prim_read_barrier;
       if (type == ARG_GEN) {
           jump StgFunInfoExtra_slow_apply(info) [R1];
       }
@@ -360,6 +366,7 @@ for:
       info = %GET_FUN_INFO(UNTAG(R1));
       W_ type;
       type = TO_W_(StgFunInfoExtra_fun_type(info));
+      prim_read_barrier;
       if (type == ARG_GEN) {
           jump StgFunInfoExtra_slow_apply(info) [R1];
       }
@@ -424,12 +431,14 @@ for:
   TICK_ENT_VIA_NODE();
 
 #if defined(NO_ARG_REGS)
+  prim_read_barrier;
   jump %GET_ENTRY(UNTAG(R1)) [R1];
 #else
       W_ info;
       info = %GET_FUN_INFO(UNTAG(R1));
       W_ type;
       type = TO_W_(StgFunInfoExtra_fun_type(info));
+      prim_read_barrier;
       if (type == ARG_GEN) {
           jump StgFunInfoExtra_slow_apply(info) [R1];
       }

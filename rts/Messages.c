@@ -28,6 +28,7 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
 #if defined(DEBUG)
     {
         const StgInfoTable *i = msg->header.info;
+        load_load_barrier();
         if (i != &stg_MSG_THROWTO_info &&
             i != &stg_MSG_BLACKHOLE_info &&
             i != &stg_MSG_TRY_WAKEUP_info &&
@@ -70,6 +71,7 @@ executeMessage (Capability *cap, Message *m)
 loop:
     write_barrier(); // allow m->header to be modified by another thread
     i = m->header.info;
+    load_load_barrier();
     if (i == &stg_MSG_TRY_WAKEUP_info)
     {
         StgTSO *tso = ((MessageWakeup *)m)->tso;
@@ -173,6 +175,7 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
                   "blackhole %p", (W_)msg->tso->id, msg->bh);
 
     info = bh->header.info;
+    load_load_barrier();
 
     // If we got this message in our inbox, it might be that the
     // BLACKHOLE has already been updated, and GC has shorted out the
@@ -196,6 +199,7 @@ loop:
     // and turns this into an infinite loop.
     p = UNTAG_CLOSURE((StgClosure*)VOLATILE_LOAD(&((StgInd*)bh)->indirectee));
     info = p->header.info;
+    load_load_barrier();
 
     if (info == &stg_IND_info)
     {
@@ -226,7 +230,6 @@ loop:
         bq = (StgBlockingQueue*)allocate(cap, sizeofW(StgBlockingQueue));
 
         // initialise the BLOCKING_QUEUE object
-        SET_HDR(bq, &stg_BLOCKING_QUEUE_DIRTY_info, CCS_SYSTEM);
         bq->bh = bh;
         bq->queue = msg;
         bq->owner = owner;
@@ -238,6 +241,8 @@ loop:
         // a collision to update a BLACKHOLE and a BLOCKING_QUEUE
         // becomes orphaned (see updateThunk()).
         bq->link = owner->bq;
+        write_barrier();
+        SET_HDR(bq, &stg_BLOCKING_QUEUE_DIRTY_info, CCS_SYSTEM);
         owner->bq = bq;
         dirty_TSO(cap, owner); // we modified owner->bq
 
@@ -289,6 +294,7 @@ loop:
         recordClosureMutated(cap,(StgClosure*)msg);
 
         if (info == &stg_BLOCKING_QUEUE_CLEAN_info) {
+            write_barrier();
             bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
             recordClosureMutated(cap,(StgClosure*)bq);
         }
@@ -319,6 +325,7 @@ StgTSO * blackHoleOwner (StgClosure *bh)
     StgClosure *p;
 
     info = bh->header.info;
+    load_load_barrier();
 
     if (info != &stg_BLACKHOLE_info &&
         info != &stg_CAF_BLACKHOLE_info &&
@@ -334,6 +341,7 @@ loop:
     // and turns this into an infinite loop.
     p = UNTAG_CLOSURE((StgClosure*)VOLATILE_LOAD(&((StgInd*)bh)->indirectee));
     info = p->header.info;
+    load_load_barrier();
 
     if (info == &stg_IND_info) goto loop;
 
