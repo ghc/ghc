@@ -204,7 +204,7 @@ bindistRules = do
 bindistInstallFiles :: [FilePath]
 bindistInstallFiles =
     [ "config.sub", "config.guess", "install-sh", "mk" -/- "config.mk.in"
-    , "mk" -/- "install.mk.in", "mk" -/- "project.mk", "settings.in", "README"
+    , "mk" -/- "install.mk.in", "mk" -/- "project.mk", "README"
     , "INSTALL" ]
 
 -- | This auxiliary function gives us a top-level 'Filepath' that we can 'need'
