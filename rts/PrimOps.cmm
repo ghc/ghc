@@ -102,6 +102,7 @@ stg_newPinnedByteArrayzh ( W_ n )
        to BA_ALIGN bytes: */
     p = p + ((-p - SIZEOF_StgArrBytes) & BA_MASK);
 
+    /* No write barrier needed since this is a new allocation. */
     SET_HDR(p, stg_ARR_WORDS_info, CCCS);
     StgArrBytes_bytes(p) = n;
     return (p);
@@ -144,6 +145,7 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
        <alignment> is a power of 2, which is technically not guaranteed */
     p = p + ((-p - SIZEOF_StgArrBytes) & (alignment - 1));
 
+    /* No write barrier needed since this is a new allocation. */
     SET_HDR(p, stg_ARR_WORDS_info, CCCS);
     StgArrBytes_bytes(p) = n;
     return (p);
@@ -254,6 +256,7 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
     }
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(size), 0);
 
+    /* No write barrier needed since this is a new allocation. */
     SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
     StgMutArrPtrs_ptrs(arr) = n;
     StgMutArrPtrs_size(arr) = size;
@@ -405,6 +408,7 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
     }
     TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
 
+    /* No write barrier needed since this is a new allocation. */
     SET_HDR(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info, CCCS);
     StgSmallMutArrPtrs_ptrs(arr) = n;
 
@@ -522,6 +526,7 @@ stg_newMutVarzh ( gcptr init )
     ALLOC_PRIM_P (SIZEOF_StgMutVar, stg_newMutVarzh, init);
 
     mv = Hp - SIZEOF_StgMutVar + WDS(1);
+    /* No write barrier needed since this is a new allocation. */
     SET_HDR(mv,stg_MUT_VAR_DIRTY_info,CCCS);
     StgMutVar_var(mv) = init;
 
@@ -700,6 +705,7 @@ stg_mkWeakzh ( gcptr key,
     ALLOC_PRIM (SIZEOF_StgWeak)
 
     w = Hp - SIZEOF_StgWeak + WDS(1);
+    // No memory barrier needed as this is a new allocation.
     SET_HDR(w, stg_WEAK_info, CCCS);
 
     StgWeak_key(w)         = key;
@@ -815,6 +821,7 @@ stg_deRefWeakzh ( gcptr w )
     gcptr val;
 
     info = GET_INFO(w);
+    prim_read_barrier;
 
     if (info == stg_WHITEHOLE_info) {
         // w is locked by another thread. Now it's not immediately clear if w is
@@ -1385,11 +1392,13 @@ stg_readTVarzh (P_ tvar)
 
 stg_readTVarIOzh ( P_ tvar /* :: TVar a */ )
 {
-    W_ result;
+    W_ result, resultinfo;
 
 again:
     result = StgTVar_current_value(tvar);
-    if (%INFO_PTR(result) == stg_TREC_HEADER_info) {
+    resultinfo = %INFO_PTR(result);
+    prim_read_barrier;
+    if (resultinfo == stg_TREC_HEADER_info) {
         goto again;
     }
     return (result);
@@ -1458,6 +1467,7 @@ stg_newMVarzh ()
     ALLOC_PRIM_ (SIZEOF_StgMVar, stg_newMVarzh);
 
     mvar = Hp - SIZEOF_StgMVar + WDS(1);
+    // No memory barrier needed as this is a new allocation.
     SET_HDR(mvar,stg_MVAR_DIRTY_info,CCCS);
         // MVARs start dirty: generation 0 has no mutable list
     StgMVar_head(mvar)  = stg_END_TSO_QUEUE_closure;
@@ -1482,7 +1492,7 @@ stg_newMVarzh ()
 
 stg_takeMVarzh ( P_ mvar /* :: MVar a */ )
 {
-    W_ val, info, tso, q;
+    W_ val, info, tso, q, qinfo;
 
     LOCK_CLOSURE(mvar, info);
 
@@ -1504,9 +1514,12 @@ stg_takeMVarzh ( P_ mvar /* :: MVar a */ )
 
         q = Hp - SIZEOF_StgMVarTSOQueue + WDS(1);
 
-        SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
         StgMVarTSOQueue_link(q) = END_TSO_QUEUE;
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
+        SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
+        // Write barrier before we make the new MVAR_TSO_QUEUE
+        // visible to other cores.
+        prim_write_barrier;
 
         if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
             StgMVar_head(mvar) = q;
@@ -1536,8 +1549,10 @@ loop:
         unlockClosure(mvar, info);
         return (val);
     }
-    if (StgHeader_info(q) == stg_IND_info ||
-        StgHeader_info(q) == stg_MSG_NULL_info) {
+    qinfo = StgHeader_info(q);
+    prim_read_barrier;
+    if (qinfo == stg_IND_info ||
+        qinfo == stg_MSG_NULL_info) {
         q = StgInd_indirectee(q);
         goto loop;
     }
@@ -1575,7 +1590,7 @@ loop:
 
 stg_tryTakeMVarzh ( P_ mvar /* :: MVar a */ )
 {
-    W_ val, info, tso, q;
+    W_ val, info, tso, q, qinfo;
 
     LOCK_CLOSURE(mvar, info);
 
@@ -1602,8 +1617,11 @@ loop:
         return (1, val);
     }
 
-    if (StgHeader_info(q) == stg_IND_info ||
-        StgHeader_info(q) == stg_MSG_NULL_info) {
+    qinfo = StgHeader_info(q);
+    prim_read_barrier;
+
+    if (qinfo == stg_IND_info ||
+        qinfo == stg_MSG_NULL_info) {
         q = StgInd_indirectee(q);
         goto loop;
     }
@@ -1642,7 +1660,7 @@ loop:
 stg_putMVarzh ( P_ mvar, /* :: MVar a */
                 P_ val,  /* :: a */ )
 {
-    W_ info, tso, q;
+    W_ info, tso, q, qinfo;
 
     LOCK_CLOSURE(mvar, info);
 
@@ -1662,9 +1680,11 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
 
         q = Hp - SIZEOF_StgMVarTSOQueue + WDS(1);
 
-        SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
         StgMVarTSOQueue_link(q) = END_TSO_QUEUE;
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
+
+        SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
+        prim_write_barrier;
 
         if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
             StgMVar_head(mvar) = q;
@@ -1692,8 +1712,12 @@ loop:
         unlockClosure(mvar, stg_MVAR_DIRTY_info);
         return ();
     }
-    if (StgHeader_info(q) == stg_IND_info ||
-        StgHeader_info(q) == stg_MSG_NULL_info) {
+
+    qinfo = StgHeader_info(q);
+    prim_read_barrier;
+
+    if (qinfo == stg_IND_info ||
+        qinfo == stg_MSG_NULL_info) {
         q = StgInd_indirectee(q);
         goto loop;
     }
@@ -1750,7 +1774,7 @@ loop:
 stg_tryPutMVarzh ( P_ mvar, /* :: MVar a */
                    P_ val,  /* :: a */ )
 {
-    W_ info, tso, q;
+    W_ info, tso, q, qinfo;
 
     LOCK_CLOSURE(mvar, info);
 
@@ -1773,8 +1797,12 @@ loop:
         unlockClosure(mvar, stg_MVAR_DIRTY_info);
         return (1);
     }
-    if (StgHeader_info(q) == stg_IND_info ||
-        StgHeader_info(q) == stg_MSG_NULL_info) {
+
+    qinfo = StgHeader_info(q);
+    prim_read_barrier;
+
+    if (qinfo == stg_IND_info ||
+        qinfo == stg_MSG_NULL_info) {
         q = StgInd_indirectee(q);
         goto loop;
     }
@@ -1845,9 +1873,11 @@ stg_readMVarzh ( P_ mvar, /* :: MVar a */ )
 
         // readMVars are pushed to the front of the queue, so
         // they get handled immediately
-        SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
         StgMVarTSOQueue_link(q) = StgMVar_head(mvar);
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
+
+        SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
+        prim_write_barrier;
 
         StgTSO__link(CurrentTSO)       = q;
         StgTSO_block_info(CurrentTSO)  = mvar;
@@ -1913,6 +1943,10 @@ stg_makeStableNamezh ( P_ obj )
                                         BYTES_TO_WDS(SIZEOF_StgStableName));
         SET_HDR(sn_obj, stg_STABLE_NAME_info, CCCS);
         StgStableName_sn(sn_obj) = index;
+        // This will make the StableName# object visible to other threads;
+        // be sure that its completely visible to other cores.
+        // See Note [Heap memory barriers] in SMP.h.
+        prim_write_barrier;
         snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) = sn_obj;
     } else {
         sn_obj = snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry);
@@ -1954,6 +1988,7 @@ stg_newBCOzh ( P_ instrs,
     ALLOC_PRIM (bytes);
 
     bco = Hp - bytes + WDS(1);
+    // No memory barrier necessary as this is a new allocation.
     SET_HDR(bco, stg_BCO_info, CCS_MAIN);
 
     StgBCO_instrs(bco)     = instrs;
@@ -1990,6 +2025,7 @@ stg_mkApUpd0zh ( P_ bco )
     CCCS_ALLOC(SIZEOF_StgAP);
 
     ap = Hp - SIZEOF_StgAP + WDS(1);
+    // No memory barrier necessary as this is a new allocation.
     SET_HDR(ap, stg_AP_info, CCS_MAIN);
 
     StgAP_n_args(ap) = HALF_W_(0);
@@ -2002,6 +2038,7 @@ stg_unpackClosurezh ( P_ closure )
 {
     W_ info, ptrs, nptrs, p, ptrs_arr, dat_arr;
     info  = %GET_STD_INFO(UNTAG(closure));
+    prim_read_barrier;
 
     ptrs  = TO_W_(%INFO_PTRS(info));
     nptrs = TO_W_(%INFO_NPTRS(info));
@@ -2330,7 +2367,10 @@ stg_noDuplicatezh /* no arg list: explicit stack layout */
 
 stg_getApStackValzh ( P_ ap_stack, W_ offset )
 {
-   if (%INFO_PTR(UNTAG(ap_stack)) == stg_AP_STACK_info) {
+   W_ ap_stackinfo;
+   ap_stackinfo = %INFO_PTR(UNTAG(ap_stack));
+   prim_read_barrier;
+   if (ap_stackinfo == stg_AP_STACK_info) {
        return (1,StgAP_STACK_payload(ap_stack,offset));
    } else {
        return (0,ap_stack);

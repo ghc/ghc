@@ -632,6 +632,7 @@ emitBlackHoleCode node = do
 
   when eager_blackholing $ do
     emitStore (cmmOffsetW dflags node (fixedHdrSizeW dflags)) currentTSOExpr
+    -- See Note [Heap memory barriers] in SMP.h.
     emitPrimCall [] MO_WriteBarrier []
     emitStore node (CmmReg (CmmGlobal EagerBlackholeInfo))
 

@@ -870,6 +870,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
                 ap->payload[i] = (StgClosure *)*sp++;
             }
 
+            write_barrier(); // XXX: Necessary?
             SET_HDR(ap,&stg_AP_STACK_info,
                     ((StgClosure *)frame)->header.prof.ccs /* ToDo */);
             TICK_ALLOC_UP_THK(WDS(words+1),0);

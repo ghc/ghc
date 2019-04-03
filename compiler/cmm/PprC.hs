@@ -812,6 +812,7 @@ pprCallishMachOp_for_C mop
         MO_F32_ExpM1    -> text "expm1f"
         MO_F32_Sqrt     -> text "sqrtf"
         MO_F32_Fabs     -> text "fabsf"
+        MO_ReadBarrier  -> text "load_load_barrier"
         MO_WriteBarrier -> text "write_barrier"
         MO_Memcpy _     -> text "memcpy"
         MO_Memset _     -> text "memset"
