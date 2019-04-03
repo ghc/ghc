@@ -7,6 +7,7 @@ module Rules.Generate (
 import Base
 import Expression
 import Flavour
+import Hadrian.Oracles.TextFile (lookupValueOrError)
 import Oracles.Flag
 import Oracles.ModuleFiles
 import Oracles.Setting
@@ -161,7 +162,7 @@ copyRules = do
         prefix -/- "llvm-targets"      <~ return "."
         prefix -/- "llvm-passes"       <~ return "."
         prefix -/- "platformConstants" <~ (buildRoot <&> (-/- generatedDir))
-        prefix -/- "settings"          <~ return "."
+        prefix -/- "settings"          <~ (buildRoot <&> (-/- generatedDir))
         prefix -/- "template-hsc.h"    <~ return (pkgPath hsc2hs)
 
         prefix -/- "html//*"           <~ return "utils/haddock/haddock-api/resources"
@@ -177,6 +178,7 @@ generateRules = do
     priority 2.0 $ (root -/- generatedDir -/- "ghcautoconf.h") <~ generateGhcAutoconfH
     priority 2.0 $ (root -/- generatedDir -/- "ghcplatform.h") <~ generateGhcPlatformH
     priority 2.0 $ (root -/- generatedDir -/-  "ghcversion.h") <~ generateGhcVersionH
+    priority 2.0 $ (root -/- generatedDir -/-      "settings") <~ generateSettings
 
     -- TODO: simplify, get rid of fake rts context
     root -/- generatedDir ++ "//*" %> \file -> do
@@ -260,6 +262,55 @@ generateGhcPlatformH = do
         [ "#define UnregisterisedCompiler 1" | ghcUnreg ]
         ++
         [ "\n#endif /* __GHCPLATFORM_H__ */" ]
+
+generateSettings :: Expr String
+generateSettings = do
+    let flag' = flag >=> \case
+            True  -> pure "YES"
+            False -> pure "NO"
+    settings <- (traverse . traverse) expr $
+        [ ("GCC extra via C opts", lookupValueOrError configFile "gcc-extra-via-c-opts")
+        , ("C compiler command", settingsFileSetting SettingsFileSetting_CCompilerCommand)
+        , ("C compiler flags", settingsFileSetting SettingsFileSetting_CCompilerFlags)
+        , ("C compiler link flags", settingsFileSetting SettingsFileSetting_CCompilerLinkFlags)
+        , ("C compiler supports -no-pie", settingsFileSetting SettingsFileSetting_CCompilerSupportsNoPie)
+        , ("Haskell CPP command", settingsFileSetting SettingsFileSetting_HaskellCPPCommand)
+        , ("Haskell CPP flags", settingsFileSetting SettingsFileSetting_HaskellCPPFlags)
+        , ("ld command", settingsFileSetting SettingsFileSetting_LdCommand)
+        , ("ld flags", settingsFileSetting SettingsFileSetting_LdFlags)
+        , ("ld supports compact unwind", lookupValueOrError configFile "ld-has-no-compact-unwind")
+        , ("ld supports build-id", lookupValueOrError configFile "ld-has-build-id")
+        , ("ld supports filelist", lookupValueOrError configFile "ld-has-filelist")
+        , ("ld is GNU ld", lookupValueOrError configFile "ld-is-gnu-ld")
+        , ("ar command", settingsFileSetting SettingsFileSetting_ArCommand)
+        , ("ar flags", lookupValueOrError configFile "ar-args")
+        , ("ar supports at file", flag' ArSupportsAtFile)
+        , ("ranlib command", settingsFileSetting SettingsFileSetting_RanlibCommand)
+        , ("touch command", settingsFileSetting SettingsFileSetting_TouchCommand)
+        , ("dllwrap command", settingsFileSetting SettingsFileSetting_DllWrapCommand)
+        , ("windres command", settingsFileSetting SettingsFileSetting_WindresCommand)
+        , ("libtool command", settingsFileSetting SettingsFileSetting_LibtoolCommand)
+        , ("cross compiling", flag' CrossCompiling)
+        , ("target os", lookupValueOrError configFile "haskell-target-os")
+        , ("target arch", lookupValueOrError configFile "haskell-target-arch")
+        , ("target word size", lookupValueOrError configFile "target-word-size")
+        , ("target has GNU nonexec stack", lookupValueOrError configFile "haskell-have-gnu-nonexec-stack")
+        , ("target has .ident directive", lookupValueOrError configFile "haskell-have-ident-directive")
+        , ("target has subsections via symbols", lookupValueOrError configFile "haskell-have-subsections-via-symbols")
+        , ("target has RTS linker", lookupValueOrError configFile "haskell-have-rts-linker")
+        , ("Unregisterised", flag' GhcUnregisterised)
+        , ("LLVM llc command", settingsFileSetting SettingsFileSetting_LlcCommand)
+        , ("LLVM opt command", settingsFileSetting SettingsFileSetting_OptCommand)
+        , ("LLVM clang command", settingsFileSetting SettingsFileSetting_ClangCommand)
+        ]
+    let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
+    pure $ case settings of
+        [] -> "[]"
+        s : ss -> unlines $
+            ("[" ++ showTuple s)
+            : ((\s' -> "," ++ showTuple s') <$> ss)
+            ++ ["]"]
+
 
 -- | Generate @Config.hs@ files.
 generateConfigHs :: Expr String
