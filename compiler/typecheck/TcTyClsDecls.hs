@@ -1497,7 +1497,7 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
   = -- See Note [Type-checking default assoc decls]
     setSrcSpan loc $
     tcAddFamInstCtxt (text "default type instance") tc_name $
-    do { traceTc "tcDefaultAssocDecl" (ppr tc_name)
+    do { traceTc "tcDefaultAssocDecl 1" (ppr tc_name)
        ; let fam_tc_name = tyConName fam_tc
              fam_arity = length (tyConVisibleTyVars fam_tc)
 
@@ -1524,14 +1524,46 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
                                                     imp_vars exp_vars
                                                     hs_pats hs_rhs_ty
 
-         -- See Note [Type-checking default assoc decls]
-       ; traceTc "tcDefault" (vcat [ppr (tyConTyVars fam_tc), ppr qtvs, ppr pats])
-       ; case tcMatchTys pats (mkTyVarTys (tyConTyVars fam_tc)) of
-           Just subst -> return (Just (substTyUnchecked subst rhs_ty, loc) )
-           Nothing    -> failWithTc (defaultAssocKindErr fam_tc)
-           -- We check for well-formedness and validity later,
-           -- in checkValidClass
+       ; let fam_tvs = tyConTyVars fam_tc
+       ; traceTc "tcDefaultAssocDecl 2" (vcat
+           [ text "fam_tvs" <+> ppr fam_tvs
+           , text "qtvs"    <+> ppr qtvs
+           , text "pats"    <+> ppr pats
+           , text "rhs_ty"  <+> ppr rhs_ty
+           ])
+       ; pat_tvs <- traverse (extract_tv pats rhs_ty) pats
+       ; let subst = zipTvSubst pat_tvs (mkTyVarTys fam_tvs)
+       ; pure $ Just (substTyUnchecked subst rhs_ty, loc)
+           -- We also perform other checks for well-formedness and validity
+           -- later, in checkValidClass
      }
+  where
+    -- Checks that a pattern on the LHS of a default is a type
+    -- variable. If so, return the underlying type variable, and if
+    -- not, throw an error.
+    -- See Note [Type-checking default assoc decls]
+    extract_tv :: [Type] -- All default instance type patterns
+                         -- (only used for error message purposes)
+               -> Type   -- The default instance's right-hand side type
+                         -- (only used for error message purposes)
+               -> Type   -- The particular type pattern from which to extract
+                         -- its underlying type variable
+               -> TcM TyVar
+    extract_tv pats rhs_ty pat =
+      case getTyVar_maybe pat of
+        Just tv -> pure tv
+        Nothing ->
+          -- Per Note [Type-checking default assoc decls], we already
+          -- know by this point that if any arguments in the default
+          -- instance aren't type variables, then they must be
+          -- invisible kind arguments. Therefore, always display the
+          -- error message with -fprint-explicit-kinds enabled.
+          failWithTc $ pprWithExplicitKindsWhen True $
+          hang (text "Illegal argument" <+> quotes (ppr pat) <+> text "in:")
+             2 (vcat [ quotes (text "type" <+> ppr (mkTyConApp fam_tc pats)
+                       <+> equals <+> ppr rhs_ty)
+                     , text "The arguments to" <+> quotes (ppr fam_tc)
+                       <+> text "must all be type variables" ])
 tcDefaultAssocDecl _ [dL->L _ (XFamEqn _)] = panic "tcDefaultAssocDecl"
 tcDefaultAssocDecl _ [dL->L _ (FamEqn _ _ _ (XLHsQTyVars _) _ _)]
   = panic "tcDefaultAssocDecl"
@@ -1544,8 +1576,8 @@ tcDefaultAssocDecl _ [_]
 Consider this default declaration for an associated type
 
    class C a where
-      type F (a :: k) b :: *
-      type F x y = Proxy x -> y
+      type F (a :: k) b :: Type
+      type F (x :: j) y = Proxy x -> y
 
 Note that the class variable 'a' doesn't scope over the default assoc
 decl (rather oddly I think), and (less oddly) neither does the second
@@ -1555,17 +1587,26 @@ instance.
 
 However we store the default rhs (Proxy x -> y) in F's TyCon, using
 F's own type variables, so we need to convert it to (Proxy a -> b).
-We do this by calling tcMatchTys to match them up.  This also ensures
-that x's kind matches a's and similarly for y and b.  The error
-message isn't great, mind you.  (#11361 was caused by not doing a
-proper tcMatchTys here.)
+We do this by creating a substitution [j |-> k, x |-> a, b |-> y] and
+applying this substitution to the RHS.
 
-Recall also that the left-hand side of an associated type family
-default is always just variables -- no tycons here. Accordingly,
-the patterns used in the tcMatchTys won't actually be knot-tied,
-even though we're in the knot. This is too delicate for my taste,
-but it works.
+In order to create this substitution, we must first ensure that all of
+the arguments in the default instance consist of type variables. The parser
+already checks this to a certain degree (see RdrHsSyn.checkTyVars), but
+we must be wary of kind arguments being instantiated, which the parser cannot
+catch so easily. Consider this erroneous program (inspired by #11361):
 
+   class C a where
+      type F (a :: k) b :: Type
+      type F x        b = x
+
+If you squint, you'll notice that the kind of `x` is actually Type. However,
+we cannot substitute from [Type |-> k], so we reject this default.
+
+Since the LHS of an associated type family default is always just variables,
+it won't contain any tycons. Accordingly, the patterns used in the substitution
+won't actually be knot-tied, even though we're in the knot. This is too
+delicate for my taste, but it works.
 -}
 
 {- *********************************************************************
@@ -3848,11 +3889,6 @@ wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr max_args
   = text "Number of parameters must match family declaration; expected"
     <+> ppr max_args
-
-defaultAssocKindErr :: TyCon -> SDoc
-defaultAssocKindErr fam_tc
-  = text "Kind mis-match on LHS of default declaration for"
-    <+> quotes (ppr fam_tc)
 
 badRoleAnnot :: Name -> Role -> Role -> SDoc
 badRoleAnnot var annot inferred
