@@ -671,7 +671,12 @@ getSpecTypes :: [SpecArg] -> [Type]
 getSpecTypes = mapMaybe go
   where
     go (SpecType t) = Just t
-    go _                = Nothing
+    go _            = Nothing
+
+isSpecOrUnspecType :: SpecArg -> Bool
+isSpecOrUnspecType (SpecType _) = True
+isSpecOrUnspecType UnspecType = True
+isSpecOrUnspecType _ = False
 
 {- Note [Arguments for Specialised Call Rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1355,7 +1360,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
               -> SpecM SpecInfo
     spec_call spec_acc@(rules_acc, pairs_acc, uds_acc)
               (CI { ci_key = call_args })
-      = let call_ts = getSpecTypes call_args
+      = let call_ts = filter isSpecOrUnspecType call_args
             call_ds = getSpecDicts call_args
         in
 
@@ -2206,7 +2211,7 @@ mkCallUDs' env f args
              else UnspecArg
                 ) $ zip f_structure args
 
-    spec_tys = getSpecTypes ci_key
+    spec_tys = filter isSpecOrUnspecType ci_key
     dicts    = getSpecDicts ci_key
 
     want_calls_for f = isLocalId f || isJust (maybeUnfoldingTemplate (realIdUnfolding f))
