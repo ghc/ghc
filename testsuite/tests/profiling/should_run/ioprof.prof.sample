@@ -29,7 +29,6 @@ MAIN               MAIN                  <built-in>                 46          
      <*>           Main                  ioprof.hs:20:5-14          97          0    0.0    0.0     0.0   68.7
       >>=          Main                  ioprof.hs:(11,3)-(12,50)   98          1    0.0    0.0     0.0   68.7
        >>=.\       Main                  ioprof.hs:(11,27)-(12,50)  99          2    0.0    0.0     0.0   68.7
-        fmap       Main                  ioprof.hs:16:5-16         103          0    0.0    0.0     0.0    0.0
         foo        Main                  ioprof.hs:34:1-16         106          0    0.0    0.0     0.0   68.7
          errorM    Main                  ioprof.hs:23:1-28         107          0    0.0    0.0     0.0   68.7
           errorM.\ Main                  ioprof.hs:23:22-28        108          1    0.0   68.7     0.0   68.7

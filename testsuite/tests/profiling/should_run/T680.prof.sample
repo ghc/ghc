@@ -28,10 +28,6 @@ MAIN                 MAIN                  <built-in>            108          0 
      foo.bar         Main                  T680.hs:(5,3)-(9,38)  225          0    0.5    0.0     1.5    0.2
       foo.bar.\      Main                  T680.hs:(8,11)-(9,38) 226       4001    1.0    0.1     1.0    0.1
        foo.bar.\.k'' Main                  T680.hs:8:15-27       227       4000    0.0    0.0     0.0    0.0
-        foo.bar.k'   Main                  T680.hs:6:9-34        232          0    0.0    0.0     0.0    0.0
-         k.\         Main                  T680.hs:12:16         233          0    0.0    0.0     0.0    0.0
-      foo.bar.k'     Main                  T680.hs:6:9-34        230          0    0.0    0.0     0.0    0.0
-       k.\           Main                  T680.hs:12:16         231          0    0.0    0.0     0.0    0.0
  CAF                 GHC.Conc.Signal       <entire-module>       206          0    0.0    0.0     0.0    0.0
  CAF                 GHC.IO.Encoding       <entire-module>       194          0    0.0    0.0     0.0    0.0
  CAF                 GHC.IO.Encoding.Iconv <entire-module>       192          0    0.0    0.0     0.0    0.0
