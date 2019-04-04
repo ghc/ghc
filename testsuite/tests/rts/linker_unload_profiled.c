@@ -21,6 +21,7 @@ int main (int argc, char *argv[])
     testfun *f;
     int i, r;
     OStatus st;
+    char filename[50];
 
     RtsConfig conf = defaultRtsConfig;
     conf.rts_opts_enabled = RtsOptsAll;
@@ -69,6 +70,10 @@ int main (int argc, char *argv[])
             errorBelch("%d: object status != OBJECT_UNLOADED", i);
             exit(1);
         }
+
+        sprintf(filename, "linker_unload_profiled_%d.prof", i);
+        FILE *fp = fopen(filename, "w");
+        genCCSProfileReport(fp);
 
         performMajorGC();
 
