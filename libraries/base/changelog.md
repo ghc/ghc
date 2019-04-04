@@ -25,6 +25,9 @@
 
   * Add `HasResolution` instances for `Nat`s.
 
+  * Add `Functor`, `Applicative`, `Monad`, `Alternative`, `MonadPlus`,
+    `Generic` and `Generic1` instances to `Kleisli`
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
