@@ -88,6 +88,7 @@ fprintHeader( FILE *prof_file, uint32_t max_label_len, uint32_t max_module_len,
    -------------------------------------------------------------------------- */
 
 static CostCentre *sorted_cc_list;
+static CostCentre *last_cc_in_sorted_list;
 
 static void
 insertCCInSortedList( CostCentre *new_cc )
@@ -106,6 +107,7 @@ insertCCInSortedList( CostCentre *new_cc )
     }
     new_cc->link = NULL;
     *prev = new_cc;
+    last_cc_in_sorted_list = new_cc;
 }
 
 
@@ -116,12 +118,15 @@ reportPerCCCosts( FILE *prof_file, ProfilerTotals totals )
     uint32_t max_label_len, max_module_len, max_src_len;
 
     sorted_cc_list = NULL;
+    last_cc_in_sorted_list = NULL;
 
     max_label_len  = 11; // no shorter than the "COST CENTRE" header
     max_module_len = 6;  // no shorter than the "MODULE" header
     max_src_len    = 3;  // no shorter than the "SRC" header
 
-    for (cc = CC_LIST; cc != NULL; cc = next) {
+    cc = CC_LIST;
+    CC_LIST = NULL;
+    for (; cc != NULL; cc = next) {
         next = cc->link;
         if (cc->time_ticks > totals.total_prof_ticks/100
             || cc->mem_alloc > totals.total_alloc/100
@@ -131,6 +136,9 @@ reportPerCCCosts( FILE *prof_file, ProfilerTotals totals )
             max_label_len = stg_max(strlen_utf8(cc->label), max_label_len);
             max_module_len = stg_max(strlen_utf8(cc->module), max_module_len);
             max_src_len = stg_max(strlen_utf8(cc->srcloc), max_src_len);
+        } else {
+            cc->link = CC_LIST;
+            CC_LIST = cc;
         }
     }
 
@@ -167,6 +175,11 @@ reportPerCCCosts( FILE *prof_file, ProfilerTotals totals )
     }
 
     fprintf(prof_file,"\n\n");
+
+    if (last_cc_in_sorted_list != NULL) {
+        last_cc_in_sorted_list->link = CC_LIST;
+        CC_LIST = sorted_cc_list;
+    }
 }
 
 static uint32_t
@@ -193,10 +206,12 @@ findCCSMaxLens(CostCentreStack const *ccs, uint32_t indent, uint32_t *max_label_
 
     cc = ccs->cc;
 
-    *max_label_len = stg_max(*max_label_len, indent + strlen_utf8(cc->label));
-    *max_module_len = stg_max(*max_module_len, strlen_utf8(cc->module));
-    *max_src_len = stg_max(*max_src_len, strlen_utf8(cc->srcloc));
-    *max_id_len = stg_max(*max_id_len, numDigits(ccs->ccsID));
+    if (testCCSBitFlag(ccs, CCS_VISIBLE)) {
+        *max_label_len = stg_max(*max_label_len, indent + strlen_utf8(cc->label));
+        *max_module_len = stg_max(*max_module_len, strlen_utf8(cc->module));
+        *max_src_len = stg_max(*max_src_len, strlen_utf8(cc->srcloc));
+        *max_id_len = stg_max(*max_id_len, numDigits(ccs->ccsID));
+    }
 
     for (i = ccs->indexTable; i != 0; i = i->next) {
         if (!i->back_edge) {
@@ -219,7 +234,7 @@ logCCS(FILE *prof_file, CostCentreStack const *ccs, ProfilerTotals totals,
 
     /* Only print cost centres with non 0 data ! */
 
-    if (!ignoreCCS(ccs))
+    if (!ignoreCCS(ccs) && testCCSBitFlag(ccs, CCS_VISIBLE))
         /* force printing of *all* cost centres if -Pa */
     {
 
