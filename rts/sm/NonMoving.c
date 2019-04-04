@@ -67,6 +67,16 @@ void gcCAFs(void);
  *    stopAllCapabilitiesWith(SYNC_FLUSH_UPD_REM_SET). Capabilities are held
  *    the final mark has concluded.
  *
+ *
+ * Note [Live data accounting in nonmoving collector]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The nonmoving collector uses a very approximate heuristic for reporting live
+ * data. Specifically, it assumes that all segments are full. While we could
+ * maintain a (per-capability) running tally of live blocks which could get
+ * updated on allocation and sweep, this seems unnecessarily costly since it
+ * would require that sweep traverse the entire segment to count how many
+ * blocks are freed.
+ *
  */
 
 #if defined(THREADED_RTS)
@@ -89,6 +99,13 @@ static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t block_siz
 // Add a segment to the free list.
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
 {
+    bdescr *bd = Bdescr((StgPtr) seg);
+    // See Note [Live data accounting in nonmoving collector].
+    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+    oldest_gen->n_blocks -= bd->blocks;
+    oldest_gen->n_words  -= BLOCK_SIZE_W * bd->blocks;
+    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+
     if (nonmovingHeap.n_free > NONMOVING_MAX_FREE) {
         ACQUIRE_SM_LOCK;
         freeGroup(Bdescr((StgPtr) seg));
@@ -137,7 +154,7 @@ static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
         // generation and call `todo_block_full`
         ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
         bdescr *bd = allocAlignedGroupOnNode(node, NONMOVING_SEGMENT_BLOCKS);
-        // Approximate accounting
+        // See Note [Live data accounting in nonmoving collector].
         oldest_gen->n_blocks += bd->blocks;
         oldest_gen->n_words  += BLOCK_SIZE_W * bd->blocks;
         RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
