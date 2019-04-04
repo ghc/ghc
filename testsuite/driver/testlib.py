@@ -1131,9 +1131,9 @@ def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts, **kwa
     # no problems found, this test passed
     return passed()
 
-def compile_cmp_asm( name, way, extra_hc_opts ):
+def compile_cmp_asm( name, way, ext, extra_hc_opts ):
     print('Compile only, extra args = ', extra_hc_opts)
-    result = simple_build(name + '.cmm', way, '-keep-s-files -O ' + extra_hc_opts, 0, '', 0, 0)
+    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, 0, '', 0, 0)
 
     if badResult(result):
         return result
@@ -1148,6 +1148,24 @@ def compile_cmp_asm( name, way, extra_hc_opts ):
     if not compare_outputs(way, 'asm',
                            join_normalisers(normalise_errmsg, normalise_asm),
                            expected_asm_file, actual_asm_file):
+        return failBecause('asm mismatch')
+
+    # no problems found, this test passed
+    return passed()
+
+def compile_grep_asm( name, way, ext, is_substring, extra_hc_opts ):
+    print('Compile only, extra args = ', extra_hc_opts)
+    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, 0, '', 0, 0)
+
+    if badResult(result):
+        return result
+
+    expected_pat_file = find_expected_file(name, 'asm')
+    actual_asm_file = add_suffix(name, 's')
+
+    if not grep_output(join_normalisers(normalise_errmsg),
+                       expected_pat_file, actual_asm_file,
+                       is_substring):
         return failBecause('asm mismatch')
 
     # no problems found, this test passed
@@ -1734,6 +1752,43 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file, diff_file
             return True
         else:
             return False
+
+# Checks that each line from pattern_file is present in actual_file as
+# a substring or regex pattern depending on is_substring.
+def grep_output(normaliser, pattern_file, actual_file, is_substring=True):
+    expected_path = in_srcdir(pattern_file)
+    actual_path = in_testdir(actual_file)
+
+    expected_patterns = read_no_crs(expected_path).strip().split('\n')
+    actual_raw = read_no_crs(actual_path)
+    actual_str = normaliser(actual_raw)
+
+    success = True
+    failed_patterns = []
+
+    def regex_match(pat, actual):
+        return re.search(pat, actual) is not None
+
+    def substring_match(pat, actual):
+        return pat in actual
+
+    def is_match(pat, actual):
+        if is_substring:
+            return substring_match(pat, actual)
+        else:
+            return regex_match(pat, actual)
+
+    for pat in expected_patterns:
+        if not is_match(pat, actual_str):
+            success = False
+            failed_patterns.append(pat)
+
+    if not success:
+        print('Actual output does not contain the following patterns:')
+        for pat in failed_patterns:
+            print(pat)
+
+    return success
 
 # Note [Output comparison]
 #
