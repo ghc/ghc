@@ -211,9 +211,9 @@ initSysTools top_dir
            ghc_usage_msg_path  = installed "ghc-usage.txt"
            ghci_usage_msg_path = installed "ghci-usage.txt"
 
-             -- For all systems, unlit, split, mangle are GHC utilities
-             -- architecture-specific stuff is done when building Config.hs
-           unlit_path = libexec cGHC_UNLIT_PGM
+       -- For all systems, unlit, split, mangle are GHC utilities
+       -- architecture-specific stuff is done when building Config.hs
+       unlit_path <- getToolSetting "unlit command"
 
        windres_path <- getToolSetting "windres command"
        libtool_path <- getToolSetting "libtool command"
