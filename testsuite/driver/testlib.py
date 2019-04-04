@@ -1489,7 +1489,7 @@ def interpreter_run(name, way, extra_hc_opts, top_mod):
         print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
         dump_stdout(name)
         dump_stderr(name)
-        return failBecause('bad exit code')
+        return failBecause('bad exit code (%d)' % exit_code)
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
