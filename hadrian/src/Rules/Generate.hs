@@ -275,6 +275,7 @@ generateSettings = do
         , ("dllwrap command", settingsFileSetting SettingsFileSetting_DllWrapCommand)
         , ("windres command", settingsFileSetting SettingsFileSetting_WindresCommand)
         , ("libtool command", settingsFileSetting SettingsFileSetting_LibtoolCommand)
+        , ("unlit command", ("$topdir/bin/" <>) . takeFileName <$> builderPath Unlit)
         , ("cross compiling", flag' CrossCompiling)
         , ("target os", lookupValueOrError configFile "haskell-target-os")
         , ("target arch", lookupValueOrError configFile "haskell-target-arch")
@@ -320,7 +321,6 @@ generateConfigHs = do
     cGhcWithSMP                <- expr $ yesNo <$> ghcWithSMP
     cGhcEnableTablesNextToCode <- expr $ yesNo <$> ghcEnableTablesNextToCode
     cLeadingUnderscore         <- expr $ yesNo <$> flag LeadingUnderscore
-    cGHC_UNLIT_PGM             <- fmap takeFileName $ getBuilderPath Unlit
     cLibFFI                    <- expr useLibFFIForAdjustors
     rtsWays                    <- getRtsWays
     cGhcRtsWithLibdw           <- getFlag WithLibdw
@@ -378,8 +378,6 @@ generateConfigHs = do
         , "cGhcEnableTablesNextToCode = " ++ show cGhcEnableTablesNextToCode
         , "cLeadingUnderscore    :: String"
         , "cLeadingUnderscore    = " ++ show cLeadingUnderscore
-        , "cGHC_UNLIT_PGM        :: String"
-        , "cGHC_UNLIT_PGM        = " ++ show cGHC_UNLIT_PGM
         , "cLibFFI               :: Bool"
         , "cLibFFI               = " ++ show cLibFFI
         , "cGhcThreaded :: Bool"
