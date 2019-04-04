@@ -48,6 +48,7 @@ ghc-linters:
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
+    - git remote -v
     - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
     - "echo Merge base $base"
@@ -764,4 +765,3 @@ pages:
   artifacts:
     paths:
       - public
-
