@@ -136,6 +136,7 @@ linker_unload_profiled:
 	# -rtsopts causes a warning
 	"$(TEST_HC)" LinkerUnload.hs -package ghc $(filter-out -rtsopts, $(TEST_HC_OPTS)) -prof -fprof-auto linker_unload_profiled.c -o linker_unload_profiled -no-hs-main -optc-Werror
 	./linker_unload_profiled +RTS -p -RTS "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+	./linker_unload_profiled_compare.sh
 
 # -----------------------------------------------------------------------------
 # Testing failures in the RTS linker.  We should be able to repeatedly

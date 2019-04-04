@@ -1,0 +1,21 @@
+        Tue Apr  9 15:49 2019 Time and Allocation Profiling Report  (Final)
+
+           linker_unload_profiled +RTS -p -RTS /home/anfarmer/local/ghc/inplace/lib
+
+        total time  =        0.00 secs   (0 ticks @ 1000 us, 1 processor)
+        total alloc =         216 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE    SRC             %time %alloc
+
+f           Test      Test.hs:4:1-18    0.0   22.2
+caf         Test      Test.hs:8:1-13    0.0   44.4
+MAIN        MAIN      <built-in>        0.0   33.3
+
+
+                                                           individual      inherited
+COST CENTRE  MODULE    SRC             no.      entries  %time %alloc   %time %alloc
+
+MAIN         MAIN      <built-in>       715          0    0.0   33.3     0.0  100.0
+ f           Test      Test.hs:4:1-18  1936          1    0.0   22.2     0.0   22.2
+ CAF         Test      <entire-module> 1935          0    0.0    0.0     0.0   44.4
+  caf        Test      Test.hs:8:1-13  1937          1    0.0   44.4     0.0   44.4
