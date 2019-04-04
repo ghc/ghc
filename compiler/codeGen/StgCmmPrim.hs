@@ -2073,10 +2073,18 @@ doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
 -- character.
 doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                  -> FCode ()
-doSetByteArrayOp ba off len c
-    = do dflags <- getDynFlags
-         p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba (arrWordsHdrSize dflags)) off
-         emitMemsetCall p c len 1
+doSetByteArrayOp ba off len c = do
+    dflags <- getDynFlags
+    let maxAlign = wORD_SIZE dflags
+        align = minimum [maxAlign, possibleAlign]
+
+    p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba (arrWordsHdrSize dflags)) off
+
+    emitMemsetCall p c len align
+  where
+    possibleAlign = case off of
+      CmmLit (CmmInt intOff _) -> fromIntegral $ byteAlignment (fromIntegral intOff)
+      _ -> 1
 
 -- ----------------------------------------------------------------------------
 -- Allocating arrays

@@ -1843,22 +1843,32 @@ genCCall dflags is32Bit (PrimTarget (MO_Memcpy align)) _
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall dflags _ (PrimTarget (MO_Memset align)) _
+genCCall dflags is32Bit (PrimTarget (MO_Memset align)) _
          [dst,
           CmmLit (CmmInt c _),
           CmmLit (CmmInt n _)]
          _
-    | fromInteger insns <= maxInlineMemsetInsns dflags && align .&. 3 == 0 = do
+    | fromInteger insns <= maxInlineMemsetInsns dflags = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat format
-        return $ code_dst dst_r `appOL` go dst_r (fromInteger n)
+        if format == II64 && n >= 8 then do
+          code_imm8byte <- getAnyReg (CmmLit (CmmInt c8 W64))
+          imm8byte_r <- getNewRegNat II64
+          return $ code_dst dst_r `appOL`
+                   code_imm8byte imm8byte_r `appOL`
+                   go8 dst_r imm8byte_r (fromInteger n)
+        else
+          return $ code_dst dst_r `appOL`
+                   go4 dst_r (fromInteger n)
   where
-    (format, val) = case align .&. 3 of
-        2 -> (II16, c2)
-        0 -> (II32, c4)
-        _ -> (II8, c)
+    format = case byteAlignment (fromIntegral align) of
+        8  -> if is32Bit then II32 else II64
+        4  -> II32
+        2 -> II16
+        _ -> II8
     c2 = c `shiftL` 8 .|. c
     c4 = c2 `shiftL` 16 .|. c2
+    c8 = c4 `shiftL` 32 .|. c4
 
     -- The number of instructions we will generate (approx). We need 1
     -- instructions per move.
@@ -1868,25 +1878,45 @@ genCCall dflags _ (PrimTarget (MO_Memset align)) _
     sizeBytes :: Integer
     sizeBytes = fromIntegral (formatInBytes format)
 
-    go :: Reg -> Integer -> OrdList Instr
-    go dst i
-        -- TODO: Add movabs instruction and support 64-bit sets.
-        | i >= sizeBytes =  -- This might be smaller than the below sizes
-            unitOL (MOV format (OpImm (ImmInteger val)) (OpAddr dst_addr)) `appOL`
-            go dst (i - sizeBytes)
-        | i >= 4 =  -- Will never happen on 32-bit
-            unitOL (MOV II32 (OpImm (ImmInteger c4)) (OpAddr dst_addr)) `appOL`
-            go dst (i - 4)
-        | i >= 2 =
-            unitOL (MOV II16 (OpImm (ImmInteger c2)) (OpAddr dst_addr)) `appOL`
-            go dst (i - 2)
-        | i >= 1 =
-            unitOL (MOV II8 (OpImm (ImmInteger c)) (OpAddr dst_addr)) `appOL`
-            go dst (i - 1)
-        | otherwise = nilOL
+    -- Depending on size returns the widest MOV instruction and its
+    -- width.
+    gen4 :: AddrMode -> Integer -> (InstrBlock, Integer)
+    gen4 addr size
+        | size >= 4 =
+            (unitOL (MOV II32 (OpImm (ImmInteger c4)) (OpAddr addr)), 4)
+        | size >= 2 =
+            (unitOL (MOV II16 (OpImm (ImmInteger c2)) (OpAddr addr)), 2)
+        | size >= 1 =
+            (unitOL (MOV II8 (OpImm (ImmInteger c)) (OpAddr addr)), 1)
+        | otherwise = (nilOL, 0)
+
+    -- Generates a 64-bit wide MOV instruction from REG to MEM.
+    gen8 :: AddrMode -> Reg -> InstrBlock
+    gen8 addr reg8byte =
+      unitOL (MOV format (OpReg reg8byte) (OpAddr addr))
+
+    -- Unrolls memset when the widest MOV is <= 4 bytes.
+    go4 :: Reg -> Integer -> InstrBlock
+    go4 dst left =
+      if left <= 0 then nilOL
+      else curMov `appOL` go4 dst (left - curWidth)
       where
-        dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
-                   (ImmInteger (n - i))
+        possibleWidth = minimum [left, sizeBytes]
+        dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone (ImmInteger (n - left))
+        (curMov, curWidth) = gen4 dst_addr possibleWidth
+
+    -- Unrolls memset when the widest MOV is 8 bytes (thus another Reg
+    -- argument). Falls back to go4 when all 8 byte moves are
+    -- exhausted.
+    go8 :: Reg -> Reg -> Integer -> InstrBlock
+    go8 dst reg8byte left =
+      if possibleWidth >= 8 then
+        let curMov = gen8 dst_addr reg8byte
+        in  curMov `appOL` go8 dst reg8byte (left - 8)
+      else go4 dst left
+      where
+        possibleWidth = minimum [left, sizeBytes]
+        dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone (ImmInteger (n - left))
 
 genCCall _ _ (PrimTarget MO_WriteBarrier) _ _ _ = return nilOL
         -- write barrier compiles to no code on x86/x86-64;

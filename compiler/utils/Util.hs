@@ -87,6 +87,7 @@ module Util (
 
         -- * Integers
         exactLog2,
+        byteAlignment,
 
         -- * Floating point
         readRational,
@@ -1149,6 +1150,15 @@ exactLog2 x
     pow2 x | x == 1 = 0
            | otherwise = 1 + pow2 (x `shiftR` 1)
 
+-- x is aligned at N bytes means the remainder from x / N is zero.
+-- Currently, interested in N <= 8, but can be expanded to N <= 16 or
+-- N <= 32 if used within SSE or AVX context.
+byteAlignment :: Integer -> Integer
+byteAlignment x = case x .&. 7 of
+  0 -> 8
+  4 -> 4
+  2 -> 2
+  _ -> 1
 
 {-
 -- -----------------------------------------------------------------------------
