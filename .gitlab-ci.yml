@@ -387,6 +387,7 @@ validate-x86_64-linux-deb9-debug:
   stage: build
   variables:
     BUILD_FLAVOUR: validate
+    TEST_TYPE: slowtest
     TEST_ENV: "x86_64-linux-deb9-debug"
 
 validate-x86_64-linux-deb9-llvm:
