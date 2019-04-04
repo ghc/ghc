@@ -271,6 +271,9 @@ class Semigroup a => Monoid a where
         --
         -- __NOTE__: This method is redundant and has the default
         -- implementation @'mappend' = ('<>')@ since /base-4.11.0.0/.
+        -- Should it be implemented manually, since 'mappend' is a synonym for
+        -- ('<>'), it is expected that the two functions are defined the same
+        -- way.
         mappend :: a -> a -> a
         mappend = (<>)
         {-# INLINE mappend #-}
