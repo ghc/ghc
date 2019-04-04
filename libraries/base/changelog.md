@@ -5,6 +5,9 @@
 
   * Add a `TestEquality` instance for the `Compose` newtype.
 
+  * Add `Functor`, `Applicative`, `Monad`, `Alternative`, `MonadPlus`, and
+    `Generic` instances to `Kleisli`
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
