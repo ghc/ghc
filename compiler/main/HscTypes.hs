@@ -2799,9 +2799,16 @@ ms_imps ms =
 -- the ms_hs_date and imports can, of course, change
 
 msHsFilePath, msHiFilePath, msObjFilePath :: ModSummary -> FilePath
-msHsFilePath  ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
-msHiFilePath  ms = ml_hi_file  (ms_location ms)
-msObjFilePath ms = ml_obj_file (ms_location ms)
+msHsFilePath     ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
+msHiFilePath     ms = ml_hi_file  (ms_location ms)
+msObjFilePath    ms = ml_obj_file (ms_location ms)
+
+msDynObjFilePath :: ModSummary -> DynFlags -> FilePath
+msDynObjFilePath ms dflags = fileBase <.> dynObjectSuf dflags
+  where
+    objFile = msObjFilePath ms
+    objSuf = objectSuf dflags
+    fileBase = fromJust (stripExtension objSuf objFile)
 
 -- | Did this 'ModSummary' originate from a hs-boot file?
 isBootSummary :: ModSummary -> Bool
@@ -2826,16 +2833,20 @@ showModMsg dflags target recomp mod_summary = showSDoc dflags $
          [ text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' ')
          , char '('
          , text (op $ msHsFilePath mod_summary) <> char ','
-         , case target of
-              HscInterpreted | recomp -> text "interpreted"
-              HscNothing              -> text "nothing"
-              _                       -> text (op $ msObjFilePath mod_summary)
+         , text obj_file <> if_dyn (char ',')
+         , if_dyn (text dyn_file)
          , char ')'
          ]
   where
-    op      = normalise
-    mod     = moduleName (ms_mod mod_summary)
-    mod_str = showPpr dflags mod ++ hscSourceString (ms_hsc_src mod_summary)
+    op       = normalise
+    mod      = moduleName (ms_mod mod_summary)
+    mod_str  = showPpr dflags mod ++ hscSourceString (ms_hsc_src mod_summary)
+    if_dyn v = if gopt Opt_BuildDynamicToo dflags then v else text ""
+    dyn_file = op $ msDynObjFilePath mod_summary dflags
+    obj_file = case target of
+                HscInterpreted | recomp -> "interpreted"
+                HscNothing              -> "nothing"
+                _                       -> (op $ msObjFilePath mod_summary)
 
 {-
 ************************************************************************
