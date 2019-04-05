@@ -36,7 +36,7 @@ import PprBase
 
 import Hoopl.Collections
 import Hoopl.Label
-import BasicTypes       (Alignment)
+import BasicTypes       (Alignment, mkAlignment, alignmentBytes)
 import DynFlags
 import Cmm              hiding (topInfoTable)
 import BlockId
@@ -72,7 +72,7 @@ import Data.Bits
 
 pprProcAlignment :: SDoc
 pprProcAlignment = sdocWithDynFlags $ \dflags ->
-  (maybe empty pprAlign . cmmProcAlignment $ dflags)
+  (maybe empty (pprAlign . mkAlignment) (cmmProcAlignment dflags))
 
 pprNatCmmDecl :: NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
 pprNatCmmDecl (CmmData section dats) =
@@ -236,14 +236,15 @@ pprLabel lbl = pprGloblDecl lbl
             $$ pprTypeDecl lbl
             $$ (ppr lbl <> char ':')
 
-pprAlign :: Int -> SDoc
-pprAlign bytes
+pprAlign :: Alignment -> SDoc
+pprAlign alignment
         = sdocWithPlatform $ \platform ->
-          text ".align " <> int (alignment platform)
+          text ".align " <> int (alignmentOn platform)
   where
-        alignment platform = if platformOS platform == OSDarwin
-                             then log2 bytes
-                             else      bytes
+        bytes = alignmentBytes alignment
+        alignmentOn platform = if platformOS platform == OSDarwin
+                               then log2 bytes
+                               else      bytes
 
         log2 :: Int -> Int  -- cache the common ones
         log2 1 = 0
