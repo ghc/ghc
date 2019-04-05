@@ -1015,7 +1015,7 @@ can_eq_nc_forall ev eq_rel s1 s2
             -- Done: unify phi1 ~ phi2
             go [] subst bndrs2
               = ASSERT( null bndrs2 )
-                unify loc (eqRelRole eq_rel) phi1' (substTy subst phi2)
+                unify loc (eqRelRole eq_rel) phi1' (substTyUnchecked subst phi2)
 
             go _ _ _ = panic "cna_eq_nc_forall"  -- case (s:ss) []
 
