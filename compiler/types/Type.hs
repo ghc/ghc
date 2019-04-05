@@ -1044,7 +1044,7 @@ piResultTys ty orig_args@(arg:args)
     init_subst = mkEmptyTCvSubst $ mkInScopeSet (tyCoVarsOfTypes (ty:orig_args))
 
     go :: TCvSubst -> Type -> [Type] -> Type
-    go subst ty [] = substTy subst ty
+    go subst ty [] = substTyUnchecked subst ty
 
     go subst ty all_args@(arg:args)
       | Just ty' <- coreView ty

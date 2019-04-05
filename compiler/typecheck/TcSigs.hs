@@ -515,7 +515,7 @@ tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
                              , sig_inst_skols = tv_prs
                              , sig_inst_wcs   = wcs
                              , sig_inst_wcx   = wcx
-                             , sig_inst_theta = substTys subst theta
+                             , sig_inst_theta = substTysUnchecked subst theta
                              , sig_inst_tau   = substTyUnchecked  subst tau }
        ; traceTc "End partial sig }" (ppr inst_sig)
        ; return inst_sig }
