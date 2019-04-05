@@ -36,5 +36,8 @@ test(
     'cc017',
     normal,
     compile,
-    ['-optc=-DC -optcxx=-DCXX -optcxx=-std=c++11 -optcxx=-stdlib=libc++'],
+    [
+        '-optc=-DC -optcxx=-DCXX -optcxx=-std=c++11 -optcxx=-stdlib=libc++'
+        + (' -optcxx=-stdlib=libc++' if opsys('darwin') else '')
+    ],
 )
