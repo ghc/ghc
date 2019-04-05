@@ -7,5 +7,5 @@ test('heap_all',
      ],
      compile_and_run, [''])
 test('closure_size',
-     omit_ways(['ghci', 'hpc', 'prof']),
+     [omit_ways(['ghci', 'hpc', 'prof']), expect_broken_for(16544, ['dyn', 'optasm', 'threaded2'])],
      compile_and_run, [''])
