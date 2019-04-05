@@ -35,7 +35,7 @@ test('tcrun018', normal, compile_and_run, [''])
 test('tcrun019', normal, compile_and_run, [''])
 test('tcrun020', normal, compile_and_run, [''])
 test('tcrun021', normal, compile_and_run, ['-package containers'])
-test('tcrun022', omit_ways(['ghci']), compile_and_run, ['-O'])
+test('tcrun022', omit_ways(['hpc', 'ghci']), compile_and_run, ['-O'])
 test('tcrun023', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, ['-O'])
 test('tcrun024', normal, compile_and_run, ['-O'])
