@@ -380,6 +380,11 @@ These flags dump various phases of GHC's STG pipeline.
 
     Show the output of the intermediate STG-to-STG pass. (*lots* of output!)
 
+.. ghc-flag:: -ddump-stg-final
+    :shortdesc: Show output of last STG pass.
+    :type: dynamic
+
+    Show the output of the last STG pass before we generate Cmm.
 
 C-\\- representation
 ~~~~~~~~~~~~~~~~~~~~
