@@ -32,4 +32,9 @@ test('cc016', normal, compile, [''])
 test('T10460', normal, compile, [''])
 test('T11983', [omit_ways(['ghci'])], compile, ['T11983.c'])
 test('T14125', normal, compile, [''])
-test('cc017', normal, compile, ['-optc=-DC -optcxx=-DCXX -optcxx=-std=c++11'])
+test(
+    'cc017',
+    normal,
+    compile,
+    ['-optc=-DC -optcxx=-DCXX -optcxx=-std=c++11 -optcxx=-stdlib=libc++'],
+)
