@@ -41,6 +41,7 @@ module DynFlags (
         whenGeneratingDynamicToo, ifGeneratingDynamicToo,
         whenCannotGenerateDynamicToo,
         dynamicTooMkDynamicDynFlags,
+        dynamicOutputFile,
         DynFlags(..),
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
@@ -1823,6 +1824,12 @@ dynamicTooMkDynamicDynFlags dflags0
           dflags4 = gopt_unset dflags3 Opt_BuildDynamicToo
       in dflags4
 
+-- | Compute the path of the dynamic object corresponding to an object file.
+dynamicOutputFile :: DynFlags -> FilePath -> FilePath
+dynamicOutputFile dflags outputFile = dynOut outputFile
+  where
+    dynOut = flip addExtension (dynObjectSuf dflags) . dropExtension
+
 -----------------------------------------------------------------------------
 
 -- | Used by 'GHC.runGhc' to partially initialize a new 'DynFlags' value
@@ -2772,11 +2779,11 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   let chooseOutput
         | isJust (outputFile dflags3)          -- Only iff user specified -o ...
         , not (isJust (dynOutputFile dflags3)) -- but not -dyno
-        = return $ dflags3 { dynOutputFile = Just $ dynOut (fromJust $ outputFile dflags3) }
+        = return $ dflags3 { dynOutputFile = Just $ dynamicOutputFile dflags3 outFile }
         | otherwise
         = return dflags3
         where
-          dynOut = flip addExtension (dynObjectSuf dflags3) . dropExtension
+          outFile = fromJust $ outputFile dflags3
   dflags4 <- ifGeneratingDynamicToo dflags3 chooseOutput (return dflags3)
 
   let (dflags5, consistency_warnings) = makeDynFlagsConsistent dflags4
