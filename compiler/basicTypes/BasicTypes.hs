@@ -26,7 +26,7 @@ module BasicTypes(
 
         Arity, RepArity, JoinArity,
 
-        Alignment,
+        Alignment, mkAlignment, alignmentOf, alignmentBytes,
 
         PromotionFlag(..), isPromoted,
         FunctionOrData(..),
@@ -116,6 +116,7 @@ import Outputable
 import SrcLoc ( Located,unLoc )
 import Data.Data hiding (Fixity, Prefix, Infix)
 import Data.Function (on)
+import Data.Bits
 
 {-
 ************************************************************************
@@ -196,8 +197,39 @@ fIRST_TAG =  1
 ************************************************************************
 -}
 
-type Alignment = Int -- align to next N-byte boundary (N must be a power of 2).
+-- | A power-of-two alignment
+newtype Alignment = Alignment { alignmentBytes :: Int } deriving (Eq, Ord)
 
+-- Builds an alignment, throws on non power of 2 input. This is not
+-- ideal, but convenient for internal use and better then silently
+-- passing incorrect data.
+mkAlignment :: Int -> Alignment
+mkAlignment n
+  | n == 1 = Alignment 1
+  | n == 2 = Alignment 2
+  | n == 4 = Alignment 4
+  | n == 8 = Alignment 8
+  | n == 16 = Alignment 16
+  | n == 32 = Alignment 32
+  | n == 64 = Alignment 64
+  | n == 128 = Alignment 128
+  | n == 256 = Alignment 256
+  | n == 512 = Alignment 512
+  | otherwise = panic "mkAlignment: received either a non power of 2 argument or > 512"
+
+-- Calculates an alignment of a number. x is aligned at N bytes means
+-- the remainder from x / N is zero. Currently, interested in N <= 8,
+-- but can be expanded to N <= 16 or N <= 32 if used within SSE or AVX
+-- context.
+alignmentOf :: Int -> Alignment
+alignmentOf x = case x .&. 7 of
+  0 -> Alignment 8
+  4 -> Alignment 4
+  2 -> Alignment 2
+  _ -> Alignment 1
+
+instance Outputable Alignment where
+  ppr (Alignment m) = ppr m
 {-
 ************************************************************************
 *                                                                      *

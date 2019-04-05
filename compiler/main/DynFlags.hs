@@ -147,6 +147,7 @@ module DynFlags (
 #include "GHCConstantsHaskellExports.hs"
         bLOCK_SIZE_W,
         wORD_SIZE_IN_BITS,
+        wordAlignment,
         tAG_MASK,
         mAX_PTR_TAG,
         tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD,
@@ -205,7 +206,7 @@ import Maybes
 import MonadUtils
 import qualified Pretty
 import SrcLoc
-import BasicTypes       ( IntWithInf, treatZeroAsInf )
+import BasicTypes       ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
 import FastString
 import Fingerprint
 import Outputable
@@ -5660,6 +5661,9 @@ bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE dflags
 
 wORD_SIZE_IN_BITS :: DynFlags -> Int
 wORD_SIZE_IN_BITS dflags = wORD_SIZE dflags * 8
+
+wordAlignment :: DynFlags -> Alignment
+wordAlignment dflags = alignmentOf (wORD_SIZE dflags)
 
 tAG_MASK :: DynFlags -> Int
 tAG_MASK dflags = (1 `shiftL` tAG_BITS dflags) - 1

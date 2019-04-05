@@ -128,7 +128,7 @@ cmmTopCodeGen (CmmProc info lab live graph) = do
       Nothing -> return tops
 
 cmmTopCodeGen (CmmData sec dat) = do
-  return [CmmData sec (1, dat)]  -- no translation, we just use CmmStatic
+  return [CmmData sec (mkAlignment 1, dat)]  -- no translation, we just use CmmStatic
 
 
 basicBlockCodeGen
@@ -569,7 +569,7 @@ getRegister' _ _ (CmmLit lit@(CmmFloat f w)) =
       return (Any format code)
 
    | otherwise = do
-      Amode addr code <- memConstant (widthInBytes w) lit
+      Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
       loadFloatAmode True w addr code
 
   float_const_x87 = case w of
@@ -583,7 +583,7 @@ getRegister' _ _ (CmmLit lit@(CmmFloat f w)) =
         in  return (Any FF80 code)
 
     _otherwise -> do
-      Amode addr code <- memConstant (widthInBytes w) lit
+      Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
       loadFloatAmode False w addr code
 
 -- catch simple cases of zero- or sign-extended load
@@ -1247,7 +1247,7 @@ getNonClobberedOperand (CmmLit lit) = do
   if use_sse2 && isSuitableFloatingPointLit lit
     then do
       let CmmFloat _ w = lit
-      Amode addr code <- memConstant (widthInBytes w) lit
+      Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
       return (OpAddr addr, code)
      else do
 
@@ -1303,7 +1303,7 @@ getOperand (CmmLit lit) = do
   if (use_sse2 && isSuitableFloatingPointLit lit)
     then do
       let CmmFloat _ w = lit
-      Amode addr code <- memConstant (widthInBytes w) lit
+      Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
       return (OpAddr addr, code)
     else do
 
@@ -1351,7 +1351,7 @@ addAlignmentCheck align reg =
              , JXX_GBL NE $ ImmCLbl mkBadAlignmentLabel
              ]
 
-memConstant :: Int -> CmmLit -> NatM Amode
+memConstant :: Alignment -> CmmLit -> NatM Amode
 memConstant align lit = do
   lbl <- getNewLabelNat
   let rosection = Section ReadOnlyData lbl
@@ -1843,7 +1843,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Memcpy align)) _
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall dflags is32Bit (PrimTarget (MO_Memset align)) _
+genCCall dflags _ (PrimTarget (MO_Memset align)) _
          [dst,
           CmmLit (CmmInt c _),
           CmmLit (CmmInt n _)]
@@ -1861,11 +1861,9 @@ genCCall dflags is32Bit (PrimTarget (MO_Memset align)) _
           return $ code_dst dst_r `appOL`
                    go4 dst_r (fromInteger n)
   where
-    format = case byteAlignment (fromIntegral align) of
-        8  -> if is32Bit then II32 else II64
-        4  -> II32
-        2 -> II16
-        _ -> II8
+    maxAlignment = wordAlignment dflags -- only machine word wide MOVs are supported
+    effectiveAlignment = min (alignmentOf align) maxAlignment
+    format = intFormat . widthFromBytes $ alignmentBytes effectiveAlignment
     c2 = c `shiftL` 8 .|. c
     c4 = c2 `shiftL` 16 .|. c2
     c8 = c4 `shiftL` 32 .|. c4
@@ -2352,7 +2350,7 @@ genCCall _ is32Bit target dest_regs args bid = do
           let
             const | FF32 <- fmt = CmmInt 0x7fffffff W32
                   | otherwise   = CmmInt 0x7fffffffffffffff W64
-          Amode amode amode_code <- memConstant (widthInBytes w) const
+          Amode amode amode_code <- memConstant (mkAlignment $ widthInBytes w) const
           tmp <- getNewRegNat fmt
           let
             code dst = x_code dst `appOL` amode_code `appOL` toOL [
@@ -3081,7 +3079,7 @@ createJumpTable dflags ids section lbl
                           where blockLabel = blockLbl blockid
                   in map jumpTableEntryRel ids
             | otherwise = map (jumpTableEntry dflags) ids
-      in CmmData section (1, Statics lbl jumpTable)
+      in CmmData section (mkAlignment 1, Statics lbl jumpTable)
 
 extractUnwindPoints :: [Instr] -> [UnwindPoint]
 extractUnwindPoints instrs =
@@ -3448,7 +3446,7 @@ sse2NegCode w x = do
       x@FF80 -> wrongFmt x
       where
         wrongFmt x = panic $ "sse2NegCode: " ++ show x
-  Amode amode amode_code <- memConstant (widthInBytes w) const
+  Amode amode amode_code <- memConstant (mkAlignment $ widthInBytes w) const
   tmp <- getNewRegNat fmt
   let
     code dst = x_code dst `appOL` amode_code `appOL` toOL [

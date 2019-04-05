@@ -2075,16 +2075,15 @@ doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                  -> FCode ()
 doSetByteArrayOp ba off len c = do
     dflags <- getDynFlags
-    let maxAlign = wORD_SIZE dflags
-        align = minimum [maxAlign, possibleAlign]
+
+    let byteArrayAlignment = wordAlignment dflags -- known since BA is allocated on heap
+        offsetAlignment = case off of
+            CmmLit (CmmInt intOff _) -> alignmentOf (fromInteger intOff)
+            _ -> mkAlignment 1
+        align = min byteArrayAlignment offsetAlignment
 
     p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba (arrWordsHdrSize dflags)) off
-
     emitMemsetCall p c len align
-  where
-    possibleAlign = case off of
-      CmmLit (CmmInt intOff _) -> fromIntegral $ byteAlignment (fromIntegral intOff)
-      _ -> 1
 
 -- ----------------------------------------------------------------------------
 -- Allocating arrays
@@ -2355,7 +2354,7 @@ emitSetCards dst_start dst_cards_start n = do
     emitMemsetCall (cmmAddWord dflags dst_cards_start start_card)
         (mkIntExpr dflags 1)
         (cmmAddWord dflags (cmmSubWord dflags end_card start_card) (mkIntExpr dflags 1))
-        1 -- no alignment (1 byte)
+        (mkAlignment 1) -- no alignment (1 byte)
 
 -- Convert an element index to a card index
 cardCmm :: DynFlags -> CmmExpr -> CmmExpr
@@ -2481,11 +2480,11 @@ emitMemmoveCall dst src n align = do
 
 -- | Emit a call to @memset@.  The second argument must fit inside an
 -- unsigned char.
-emitMemsetCall :: CmmExpr -> CmmExpr -> CmmExpr -> Int -> FCode ()
+emitMemsetCall :: CmmExpr -> CmmExpr -> CmmExpr -> Alignment -> FCode ()
 emitMemsetCall dst c n align = do
     emitPrimCall
         [ {- no results -} ]
-        (MO_Memset align)
+        (MO_Memset (alignmentBytes align))
         [ dst, c, n ]
 
 emitMemcmpCall :: LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> Int -> FCode ()
