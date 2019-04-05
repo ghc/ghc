@@ -1426,7 +1426,6 @@ def simple_run(name, way, prog, extra_run_opts):
         return failBecause('bad stderr')
     if not (opts.ignore_stdout or stdout_ok(name, way)):
         return failBecause('bad stdout')
-
     check_hp = '-h' in my_rts_flags and opts.check_hp
     check_prof = '-p' in my_rts_flags
 
