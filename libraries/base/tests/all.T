@@ -202,7 +202,7 @@ test('T8089',
      compile_and_run, [''])
 test('hWaitForInput-accurate-socket', reqlib('unix'), compile_and_run, [''])
 test('T8684', expect_broken(8684), compile_and_run, [''])
-test('hWaitForInput-accurate-stdin', normal, compile_and_run, [''])
+test('hWaitForInput-accurate-stdin', [expect_broken_for(16535, ['threaded1', 'threaded2']), omit_ways(['ghci'])], compile_and_run, [''])
 test('hWaitForInput-accurate-pipe', reqlib('unix'), compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
