@@ -25,4 +25,4 @@ test('MissingMod', normal, multimod_compile, ['MissingMod', '-Wmissing-home-modu
 
 test('StarBinder', normal, compile, [''])
 
-test('Overflow', normal, compile, [''])
+test('Overflow', expect_broken_for(16543, ['hpc']), compile, [''])
