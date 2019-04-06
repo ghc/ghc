@@ -1008,16 +1008,16 @@ checkForExistence res mb_inst_tys = do
   toMaybe False _ = Nothing
 
   empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType (idType $ is_dfun res)))
-  (dfun_tvs, dfun_theta, cls, args) = instanceSig res
+  (dfun_tvs, _, _, _) = instanceSig res
 
 -- Find instances where the head unifies with the provided type
 findMatchingInstances :: Type -> TcM [(ClsInst, [DFunInstType])]
 findMatchingInstances ty = do
   ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
-  let allClasses = instEnvClss ie_global ++ instEnvClss ie_local
+  let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
 
   return . catMaybes $ map (\cls ->
-    let a@(res, _, _) = lookupInstEnv True ies cls [ty]
+    let (res, _, _) = lookupInstEnv True ies cls [ty]
     in case res of
           [(res, mb_inst_tys)] -> Just (res, mb_inst_tys)
           _ -> Nothing ) allClasses
@@ -1025,10 +1025,8 @@ findMatchingInstances ty = do
 -- Find all instances that match a provided type
 getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
 getInstancesForType ty = withSession $ \hsc_env -> do
-  dflags <- getDynFlags
   liftIO $ runInteractiveHsc hsc_env $ do
     ioMsgMaybe $ runTcInteractive hsc_env $ do
-
       matches <- findMatchingInstances ty
 
       fmap catMaybes . forM matches $ \(res, mb_inst_tys) -> do
@@ -1038,7 +1036,6 @@ getInstancesForType ty = withSession $ \hsc_env -> do
 -- Apply a substitution to an instance to instantiate all the variables within the instance
 substClassArgs ::  TCvSubst -> ClsInst -> ClsInst
 substClassArgs subst inst = let
-    clsTy = idType (is_dfun inst)
     tau   = mkClassPred cls (substTheta subst args)
     substitutedConstraints = substTheta subst dfun_theta
     unsatisfiedConstraints = filter constraintUnsolved substitutedConstraints
