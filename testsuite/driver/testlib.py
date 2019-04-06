@@ -257,14 +257,14 @@ def fragile( bug ):
 
     return helper
 
-def fragile_for( name, opts, bug, ways ):
+def fragile_for( bug, ways ):
     """
     Indicates that the test should be skipped due to fragility in the given
     test ways as documented in the given ticket.
     """
     def helper( name, opts, bug=bug, ways=ways ):
         record_broken(name, opts, bug)
-        opts.omit_ways = ways
+        opts.omit_ways += ways
 
     return helper
 
@@ -274,7 +274,7 @@ def omit_ways( ways ):
     return lambda name, opts, w=ways: _omit_ways( name, opts, w )
 
 def _omit_ways( name, opts, ways ):
-    opts.omit_ways = ways
+    opts.omit_ways += ways
 
 # -----
 
