@@ -206,6 +206,7 @@ for further change information.
     libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
     libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
     libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
     libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
     libraries/template-haskell/template-haskell.cabal:     Core library
     libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
