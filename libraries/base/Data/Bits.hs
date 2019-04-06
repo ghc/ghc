@@ -553,18 +553,18 @@ instance Bits Integer where
 instance Bits Natural where
    (.&.) = andNatural
    (.|.) = orNatural
-   xor = xorNatural
+   xor   = xorNatural
    complement _ = errorWithoutStackTrace
                     "Bits.complement: Natural complement undefined"
-   shift x i
-     | i >= 0    = shiftLNatural x i
-     | otherwise = shiftRNatural x (negate i)
-   testBit x i   = testBitNatural x i
-   zeroBits      = wordToNaturalBase 0##
-   clearBit x i  = x `xor` (bit i .&. x)
+   shift x i@(I# i#)
+     | i >= 0    = shiftLNatural x i#
+     | otherwise = let !(I# i'#) = negate i in shiftRNatural x i'#
+   testBit x (I# i#) = testBitNatural x i#
+   zeroBits          = wordToNaturalBase 0##
+   clearBit x i      = x `xor` (bit i .&. x)
 
    bit (I# i#) = bitNatural i#
-   popCount x  = popCountNatural x
+   popCount x  = I# (popCountNatural x)
 
    rotate x i = shift x i   -- since an Natural never wraps around
 
