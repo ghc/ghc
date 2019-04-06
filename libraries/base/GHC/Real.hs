@@ -458,12 +458,18 @@ instance  Integral Integer where
 instance Integral Natural where
     toInteger = naturalToInteger
 
+    {-# INLINE divMod #-}
     divMod = quotRemNatural
+    {-# INLINE div #-}
     div    = quotNatural
+    {-# INLINE mod #-}
     mod    = remNatural
 
+    {-# INLINE quotRem #-}
     quotRem = quotRemNatural
+    {-# INLINE quot #-}
     quot    = quotNatural
+    {-# INLINE rem #-}
     rem     = remNatural
 
 --------------------------------------------------------------

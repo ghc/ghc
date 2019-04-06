@@ -388,7 +388,19 @@ basicKnownKeyNames
         -- Natural
         naturalTyConName,
         naturalFromIntegerName, naturalToIntegerName,
+        negateNaturalName,
+        signumNaturalName,
+
+        divModNaturalName, quotRemNaturalName,
+        quotNaturalName, remNaturalName, divNaturalName, modNaturalName,
+        gcdNaturalName, lcmNaturalName,
+
+        andNaturalName, orNaturalName, xorNaturalName,
         plusNaturalName, minusNaturalName, timesNaturalName, mkNaturalName,
+
+        shiftLNaturalName, shiftRNaturalName, bitNaturalName,
+        testBitNaturalName,
+        popCountNaturalName,
         wordToNaturalName,
 
         -- Float/Double
@@ -1180,6 +1192,30 @@ minusNaturalName      = varQual gHC_NATURAL (fsLit "minusNatural")      minusNat
 timesNaturalName      = varQual gHC_NATURAL (fsLit "timesNatural")      timesNaturalIdKey
 mkNaturalName         = varQual gHC_NATURAL (fsLit "mkNatural")         mkNaturalIdKey
 wordToNaturalName     = varQual gHC_NATURAL (fsLit "wordToNatural#")    wordToNaturalIdKey
+
+negateNaturalName, signumNaturalName, divModNaturalName, quotRemNaturalName,
+  quotNaturalName, remNaturalName, divNaturalName, modNaturalName, gcdNaturalName,
+  lcmNaturalName, andNaturalName, orNaturalName, xorNaturalName, shiftLNaturalName,
+  shiftRNaturalName, bitNaturalName, testBitNaturalName, popCountNaturalName :: Name
+
+negateNaturalName   = varQual gHC_NATURAL (fsLit "negateNatural")   negateNaturalIdKey
+signumNaturalName   = varQual gHC_NATURAL (fsLit "signumNatural")   signumNaturalIdKey
+quotRemNaturalName  = varQual gHC_NATURAL (fsLit "quotRemNatural")  quotRemNaturalIdKey
+divModNaturalName   = varQual gHC_NATURAL (fsLit "divModNatural")   divModNaturalIdKey
+quotNaturalName     = varQual gHC_NATURAL (fsLit "quotNatural")     quotNaturalIdKey
+remNaturalName      = varQual gHC_NATURAL (fsLit "remNatural")      remNaturalIdKey
+divNaturalName      = varQual gHC_NATURAL (fsLit "divNatural")      divNaturalIdKey
+modNaturalName      = varQual gHC_NATURAL (fsLit "modNatural")      modNaturalIdKey
+gcdNaturalName      = varQual gHC_NATURAL (fsLit "gcdNatural")      gcdNaturalIdKey
+lcmNaturalName      = varQual gHC_NATURAL (fsLit "lcmNatural")      lcmNaturalIdKey
+andNaturalName      = varQual gHC_NATURAL (fsLit "andNatural")      andNaturalIdKey
+orNaturalName       = varQual gHC_NATURAL (fsLit "orNatural")       orNaturalIdKey
+xorNaturalName      = varQual gHC_NATURAL (fsLit "xorNatural")      xorNaturalIdKey
+shiftLNaturalName   = varQual gHC_NATURAL (fsLit "shiftLNatural")   shiftLNaturalIdKey
+shiftRNaturalName   = varQual gHC_NATURAL (fsLit "shiftRNatural")   shiftRNaturalIdKey
+bitNaturalName      = varQual gHC_NATURAL (fsLit "bitNatural")      bitNaturalIdKey
+testBitNaturalName  = varQual gHC_NATURAL (fsLit "testBitNatural")  testBitNaturalIdKey
+popCountNaturalName = varQual gHC_NATURAL (fsLit "popCountNatural") popCountNaturalIdKey
 
 -- GHC.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
@@ -2403,6 +2439,30 @@ timesNaturalIdKey       = mkPreludeMiscIdUnique 566
 mkNaturalIdKey          = mkPreludeMiscIdUnique 567
 naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
+
+negateNaturalIdKey, signumNaturalIdKey, divModNaturalIdKey, quotRemNaturalIdKey,
+  quotNaturalIdKey, remNaturalIdKey, divNaturalIdKey, modNaturalIdKey, gcdNaturalIdKey,
+  lcmNaturalIdKey, andNaturalIdKey, orNaturalIdKey, xorNaturalIdKey, shiftLNaturalIdKey,
+  shiftRNaturalIdKey, bitNaturalIdKey, testBitNaturalIdKey,
+  popCountNaturalIdKey :: Unique
+negateNaturalIdKey   = mkPreludeMiscIdUnique 570
+signumNaturalIdKey   = mkPreludeMiscIdUnique 571
+divModNaturalIdKey   = mkPreludeMiscIdUnique 572
+quotRemNaturalIdKey  = mkPreludeMiscIdUnique 573
+quotNaturalIdKey     = mkPreludeMiscIdUnique 574
+remNaturalIdKey      = mkPreludeMiscIdUnique 575
+divNaturalIdKey      = mkPreludeMiscIdUnique 576
+modNaturalIdKey      = mkPreludeMiscIdUnique 577
+gcdNaturalIdKey      = mkPreludeMiscIdUnique 578
+lcmNaturalIdKey      = mkPreludeMiscIdUnique 579
+andNaturalIdKey      = mkPreludeMiscIdUnique 580
+orNaturalIdKey       = mkPreludeMiscIdUnique 581
+xorNaturalIdKey      = mkPreludeMiscIdUnique 582
+shiftLNaturalIdKey   = mkPreludeMiscIdUnique 583
+shiftRNaturalIdKey   = mkPreludeMiscIdUnique 584
+bitNaturalIdKey      = mkPreludeMiscIdUnique 585
+testBitNaturalIdKey  = mkPreludeMiscIdUnique 586
+popCountNaturalIdKey = mkPreludeMiscIdUnique 587
 
 {-
 ************************************************************************
