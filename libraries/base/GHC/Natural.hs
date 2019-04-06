@@ -3,6 +3,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# OPTIONS_GHC -Wno-orphans -fno-worker-wrapper #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -259,38 +260,41 @@ bitNatural :: Int# -> Natural
 bitNatural i#
   | isTrue# (i# <# WORD_SIZE_IN_BITS#) = NatS# (1## `uncheckedShiftL#` i#)
   | True                               = NatJ# (bitBigNat i#)
--- {-# CONSTANT_FOLDED bitNatural #-}
+{-# CONSTANT_FOLDED bitNatural #-}
 
-testBitNatural :: Natural -> Int -> Bool
-testBitNatural (NatS# w) (I# i#)
+testBitNatural :: Natural -> Int# -> Bool
+testBitNatural (NatS# w) i#
   | isTrue# (i# <# WORD_SIZE_IN_BITS#) =
       isTrue# ((w `and#` (1## `uncheckedShiftL#` i#)) `neWord#` 0##)
   | True                               = False
-testBitNatural (NatJ# bn) (I# i#)      = testBitBigNat bn i#
--- {-# CONSTANT_FOLDED testBitNatural #-}
+testBitNatural (NatJ# bn) i#           = testBitBigNat bn i#
+{-# CONSTANT_FOLDED testBitNatural #-}
 
-popCountNatural :: Natural -> Int
-popCountNatural (NatS# w)  = I# (word2Int# (popCnt# w))
-popCountNatural (NatJ# bn) = I# (popCountBigNat bn)
--- {-# CONSTANT_FOLDED popCountNatural #-}
+popCountNatural :: Natural -> Int#
+-- @word2Int#@ will never underflow because for this pattern match,
+-- the maximum possible value it will return on an @n@-bit machine is
+-- @n@, well below @maxBound :: Int@ for any realistic use.
+popCountNatural (NatS# w)  = word2Int# (popCnt# w)
+popCountNatural (NatJ# bn) = popCountBigNat bn
+{-# CONSTANT_FOLDED popCountNatural #-}
 
-shiftLNatural :: Natural -> Int -> Natural
-shiftLNatural n           (I# 0#) = n
-shiftLNatural (NatS# 0##) _       = NatS# 0##
-shiftLNatural (NatS# 1##) (I# i#) = bitNatural i#
-shiftLNatural (NatS# w) (I# i#)
+shiftLNatural :: Natural -> Int# -> Natural
+shiftLNatural n           0# = n
+shiftLNatural (NatS# 0##) _  = NatS# 0##
+shiftLNatural (NatS# 1##) i# = bitNatural i#
+shiftLNatural (NatS# w) i#
     = bigNatToNatural (shiftLBigNat (wordToBigNat w) i#)
-shiftLNatural (NatJ# bn) (I# i#)
+shiftLNatural (NatJ# bn) i#
     = bigNatToNatural (shiftLBigNat bn i#)
--- {-# CONSTANT_FOLDED shiftLNatural #-}
+{-# CONSTANT_FOLDED shiftLNatural #-}
 
-shiftRNatural :: Natural -> Int -> Natural
-shiftRNatural n          (I# 0#) = n
-shiftRNatural (NatS# w)  (I# i#)
+shiftRNatural :: Natural -> Int# -> Natural
+shiftRNatural n         0# = n
+shiftRNatural (NatS# w) i#
       | isTrue# (i# >=# WORD_SIZE_IN_BITS#) = NatS# 0##
       | True = NatS# (w `uncheckedShiftRL#` i#)
-shiftRNatural (NatJ# bn) (I# i#) = bigNatToNatural (shiftRBigNat bn i#)
--- {-# CONSTANT_FOLDED shiftRNatural #-}
+shiftRNatural (NatJ# bn) i# = bigNatToNatural (shiftRBigNat bn i#)
+{-# CONSTANT_FOLDED shiftRNatural #-}
 
 ----------------------------------------------------------------------------
 
@@ -454,11 +458,11 @@ minusNaturalMaybe (Natural x) (Natural y)
 
 shiftLNatural :: Natural -> Int -> Natural
 shiftLNatural (Natural n) (I# i) = Natural (n `shiftLInteger` i)
--- {-# CONSTANT_FOLDED shiftLNatural #-}
+{-# CONSTANT_FOLDED shiftLNatural #-}
 
 shiftRNatural :: Natural -> Int -> Natural
 shiftRNatural (Natural n) (I# i) = Natural (n `shiftRInteger` i)
--- {-# CONSTANT_FOLDED shiftRNatural #-}
+{-# CONSTANT_FOLDED shiftRNatural #-}
 
 plusNatural :: Natural -> Natural -> Natural
 plusNatural (Natural x) (Natural y) = Natural (x `plusInteger` y)
@@ -486,8 +490,8 @@ andNatural :: Natural -> Natural -> Natural
 andNatural (Natural x) (Natural y) = Natural (x `andInteger` y)
 -- {-# CONSTANT_FOLDED andNatural #-}
 
-naturalToInt :: Natural -> Int
-naturalToInt (Natural i) = I# (integerToInt i)
+naturalToInt :: Natural -> Int#
+naturalToInt (Natural i) = integerToInt i
 
 naturalToWord :: Natural -> Word
 naturalToWord (Natural i) = W# (integerToWord i)
@@ -498,16 +502,16 @@ naturalToInteger (Natural i) = i
 
 testBitNatural :: Natural -> Int -> Bool
 testBitNatural (Natural n) (I# i) = testBitInteger n i
--- {-# CONSTANT_FOLDED testBitNatural #-}
+{-# CONSTANT_FOLDED testBitNatural #-}
 
-popCountNatural :: Natural -> Int
-popCountNatural (Natural n) = I# (popCountInteger n)
+popCountNatural :: Natural -> Int#
+popCountNatural (Natural n) = popCountInteger n
 
 bitNatural :: Int# -> Natural
 bitNatural i#
   | isTrue# (i# <# WORD_SIZE_IN_BITS#) = wordToNaturalBase (1## `uncheckedShiftL#` i#)
   | True                               = Natural (1 `shiftLInteger` i#)
--- {-# CONSTANT_FOLDED bitNatural #-}
+{-# CONSTANT_FOLDED bitNatural #-}
 
 quotNatural :: Natural -> Natural -> Natural
 quotNatural n@(Natural x) (Natural y)
@@ -611,7 +615,7 @@ mkNatural :: [Word]  -- ^ value expressed in 32 bit chunks, least
           -> Natural
 mkNatural [] = wordToNaturalBase 0##
 mkNatural (W# i : is') = wordToNaturalBase (i `and#` 0xffffffff##) `orNatural`
-                         shiftLNatural (mkNatural is') 32
+                         shiftLNatural (mkNatural is') 32#
 {-# CONSTANT_FOLDED mkNatural #-}
 
 -- | Convert 'Int' to 'Natural'.
