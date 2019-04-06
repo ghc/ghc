@@ -16,6 +16,7 @@ Contents:
    8.6.2-notes
    8.6.3-notes
    8.6.4-notes
+   8.6.5-notes
    ghci
    runghc
    usage
