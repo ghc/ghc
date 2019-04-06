@@ -65,6 +65,7 @@ import qualified Data.ByteString as BS
 import Data.Int
 import Data.Ratio
 import Data.Word
+import GHC.Natural ( Natural )
 
 {-
 Note [Constant folding]
@@ -956,6 +957,10 @@ trueValBool, falseValBool :: Expr CoreBndr
 trueValBool   = Var trueDataConId -- see Note [What's true and false]
 falseValBool  = Var falseDataConId
 
+mkBoolVal :: Bool -> Expr CoreBndr
+mkBoolVal True  = trueValBool
+mkBoolVal False = falseValBool
+
 ltVal, eqVal, gtVal :: Expr CoreBndr
 ltVal = Var ordLTDataConId
 eqVal = Var ordEQDataConId
@@ -1338,13 +1343,55 @@ builtinNaturalRules =
  ,rule_NaturalFromInteger "naturalFromInteger" naturalFromIntegerName
  ,rule_NaturalToInteger   "naturalToInteger"   naturalToIntegerName
  ,rule_WordToNatural      "wordToNatural"      wordToNaturalName
+
+ ,rule_binop              "andNatural"         andNaturalName          (.&.)
+ ,rule_binop              "orNatural"          orNaturalName           (.|.)
+ ,rule_binop              "xorNatural"         xorNaturalName          xor
+
+ ,rule_divop_one          "quotNatural"        quotNaturalName         quot
+ ,rule_divop_one          "remNatural"         remNaturalName          rem
+ ,rule_divop_one          "divNatural"         divNaturalName          div
+ ,rule_divop_one          "modNatural"         modNaturalName          mod
+ ,rule_divop_both         "quotRemNatural"     quotRemNaturalName      quotRem
+ ,rule_divop_both         "divModNatural"      divModNaturalName       divMod
+ ,rule_binop              "gcdNatural"         gcdNaturalName          gcd
+ ,rule_binop              "lcmNatural"         lcmNaturalName          lcm
+
+ ,rule_shift_op           "shiftLNatural"      shiftLNaturalName       shiftL
+ ,rule_shift_op           "shiftRNatural"      shiftRNaturalName       shiftR
+ ,rule_bitNatural         "bitNatural"         bitNaturalName
+ ,rule_testBit            "testBitNatural"     testBitNaturalName
+ ,rule_popCount           "popCountNatural"    popCountNaturalName
+ ,rule_unop               "signumNatural"      signumNaturalName       signum
+
  ]
-    where rule_binop str name op
+    where rule_bitNatural str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_Natural_bit }
+          rule_unop str name op
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_Natural_unop op }
+          rule_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Natural_binop op }
           rule_partial_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Natural_partial_binop op }
+          rule_divop_both str name op
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_Natural_divop_both op }
+          rule_divop_one str name op
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_Natural_divop_one op }
+          rule_shift_op str name op
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_Natural_shift_op op }
+          rule_testBit str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_Natural_testBit }
+          rule_popCount str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_Natural_popCount }
           rule_NaturalToInteger str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_NaturalToInteger }
@@ -1393,7 +1440,7 @@ match_eq_string _ id_unf _
   , unpk2 `hasKey` unpackCStringIdKey
   , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
   , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
-  = Just (if s1 == s2 then trueValBool else falseValBool)
+  = Just (mkBoolVal (s1 == s2))
 
 match_eq_string _ _ _ _ = Nothing
 
@@ -1646,6 +1693,68 @@ match_Integer_Int_encodeFloat mkLit _ id_unf _ [xl,yl]
   , Just (LitNumber LitNumInt y _)     <- exprIsLiteral_maybe id_unf yl
   = Just (mkLit $ encodeFloat x (fromInteger y))
 match_Integer_Int_encodeFloat _ _ _ _ _ = Nothing
+
+match_Natural_unop :: (Integer -> Integer) -> RuleFun
+match_Natural_unop unop _ id_unf _ [xl]
+  | Just (LitNumber LitNumNatural x i) <- exprIsLiteral_maybe id_unf xl
+  = Just (Lit (LitNumber LitNumNatural (unop x) i))
+match_Natural_unop _ _ _ _ _ = Nothing
+
+match_Natural_divop_both
+   :: (Integer -> Integer -> (Integer, Integer)) -> RuleFun
+match_Natural_divop_both divop _ id_unf _ [xl,yl]
+  | Just (LitNumber LitNumNatural x t) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumNatural y _) <- exprIsLiteral_maybe id_unf yl
+  , y /= 0
+  , (r,s) <- x `divop` y
+  = Just $ mkCoreUbxTup [t,t] [Lit (mkLitNatural r t), Lit (mkLitNatural s t)]
+match_Natural_divop_both _ _ _ _ _ = Nothing
+
+match_Natural_divop_one :: (Integer -> Integer -> Integer) -> RuleFun
+match_Natural_divop_one divop _ id_unf _ [xl,yl]
+  | Just (LitNumber LitNumNatural x i) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumNatural y _) <- exprIsLiteral_maybe id_unf yl
+  , y /= 0
+  = Just (Lit (mkLitNatural (x `divop` y) i))
+match_Natural_divop_one _ _ _ _ _ = Nothing
+
+match_Natural_shift_op :: (Integer -> Int -> Integer) -> RuleFun
+match_Natural_shift_op binop _ id_unf _ [xl,yl]
+  | Just (LitNumber LitNumNatural x i) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumInt y _)     <- exprIsLiteral_maybe id_unf yl
+  , y >= 0
+  , y <= 4   -- Restrict constant-folding of shifts on Integers, somewhat
+             -- arbitrary.  We can get huge shifts in inaccessible code
+             -- (Trac #15673)
+  = Just (Lit (mkLitNatural (x `binop` fromIntegral y) i))
+match_Natural_shift_op _ _ _ _ _ = Nothing
+
+match_Natural_bit :: RuleFun
+match_Natural_bit _ id_unf fn [xl]
+  | Just (LitNumber LitNumInt x _) <- exprIsLiteral_maybe id_unf xl
+  = case splitFunTy_maybe (idType fn) of
+    Just (_, naturalTy)
+      -> let y = toInteger (bit (fromInteger x) :: Natural)
+         in Just (Lit (LitNumber LitNumNatural y naturalTy))
+    _ -> panic "match_Natural_bit: Id has the wrong type"
+match_Natural_bit _ _ _ _ = Nothing
+
+match_Natural_popCount :: RuleFun
+match_Natural_popCount _ id_unf fn [xl]
+  | Just (LitNumber LitNumNatural x _) <- exprIsLiteral_maybe id_unf xl
+  = case splitFunTy_maybe (idType fn) of
+    Just (_, intTy)
+      -> let popCount' = toInteger (popCount (fromInteger x :: Natural))
+         in Just (Lit (LitNumber LitNumInt popCount' intTy))
+    _ -> panic "match_Natural_popCount: Id has the wrong type"
+match_Natural_popCount _ _ _ _ = Nothing
+
+match_Natural_testBit :: RuleFun
+match_Natural_testBit _ id_unf _ [xl,yl]
+  | Just (LitNumber LitNumNatural x _) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumInt y _) <- exprIsLiteral_maybe id_unf yl
+  = Just (mkBoolVal (testBit (fromInteger x :: Natural) (fromInteger y)))
+match_Natural_testBit _ _ _ _ = Nothing
 
 ---------------------------------------------------
 -- constant folding for Float/Double
