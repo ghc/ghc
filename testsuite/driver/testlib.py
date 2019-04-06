@@ -258,7 +258,7 @@ def fragile( bug ):
 
     return helper
 
-def fragile_for( name, opts, bug, ways ):
+def fragile_for( bug, ways ):
     """
     Indicates that the test should be skipped due to fragility in the given
     test ways as documented in the given ticket.
