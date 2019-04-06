@@ -49,7 +49,7 @@ default ()              -- Double isn't available yet,
 -- Note that it /isn't/ customarily expected that a type instance of both 'Num'
 -- and 'Ord' implement an ordered ring. Indeed, in @base@ only 'Integer' and
 -- 'Data.Ratio.Rational' do.
-class  Num a  where
+class Num a where
     {-# MINIMAL (+), (*), abs, signum, fromInteger, (negate | (-)) #-}
 
     (+), (-), (*)       :: a -> a -> a
@@ -86,7 +86,7 @@ subtract :: (Num a) => a -> a -> a
 subtract x y = y - x
 
 -- | @since 2.01
-instance  Num Int  where
+instance Num Int where
     I# x + I# y = I# (x +# y)
     I# x - I# y = I# (x -# y)
     negate (I# x) = I# (negateInt# x)
@@ -126,7 +126,7 @@ instance  Num Integer  where
 -- additive inverse. It is a semiring though.
 --
 -- @since 4.8.0.0
-instance  Num Natural  where
+instance Num Natural where
     (+) = plusNatural
     (-) = minusNatural
     (*) = timesNatural
