@@ -73,7 +73,7 @@ test('T2047', [ignore_stdout, extra_run_opts('+RTS -c -RTS')],
 # Blackhole-detection test.
 # Skip GHCi due to #2786
 test('T2783', [ omit_ways(['ghci']), exit_code(1)
-              , expect_broken_for(2783, ['threaded1'])
+              , fragile_for(2783, ['threaded1'])
               ], compile_and_run, [''])
 
 # Test the work-stealing deque implementation.  We run this test in
