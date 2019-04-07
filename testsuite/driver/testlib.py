@@ -275,6 +275,7 @@ def omit_ways( ways ):
     return lambda name, opts, w=ways: _omit_ways( name, opts, w )
 
 def _omit_ways( name, opts, ways ):
+    assert ways.__class__ is list
     opts.omit_ways += ways
 
 # -----
