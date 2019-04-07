@@ -55,6 +55,8 @@ ghc-linters:
     - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
     - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
     - .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
+    - egrep -q '\[[0-9]+\.[0-9]+\.[0-9]+\]' configure.ac ||
+        ( echo "error: configure.ac: GHC version number must have three components."; exit 1 )
   dependencies: []
   tags:
     - lint
