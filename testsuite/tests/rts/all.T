@@ -93,7 +93,7 @@ test('stack002', [extra_files(['stack001.hs']),
 
 # run this test with very small stack chunks to exercise the stack
 # overflow/underflow machinery.
-test('stack003', [ omit_ways('ghci'), # uses unboxed tuples
+test('stack003', [ omit_ways(['ghci']), # uses unboxed tuples
                    extra_run_opts('500000 +RTS -kc1k -kb100 -K96m -RTS') ],
                  compile_and_run, [''])
 
