@@ -39,7 +39,7 @@ test('drv-foldable-traversable1', normal, compile, [''])
 test('deriving-via-compile', normal, compile, [''])
 test('deriving-via-standalone', normal, compile, [''])
 test('T6031', [], multimod_compile, ['T6031', '-v0 -O'])
-# Adding -O on T6031 to expose Trac #11245 regardless of way
+# Adding -O on T6031 to expose #11245 regardless of way
 test('T1133', [], makefile_test, [])
 test('T7704', normal, compile, [''])
 test('T7710', normal, compile, [''])
@@ -115,3 +115,4 @@ test('T15290d', normal, compile, [''])
 test('T15398', normal, compile, [''])
 test('T15637', normal, compile, [''])
 test('T16179', normal, compile, [''])
+test('T16518', normal, compile, [''])

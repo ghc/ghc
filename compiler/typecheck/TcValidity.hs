@@ -157,7 +157,7 @@ in the forall case of check_type, but that had two bad consequences:
   * If we try to check for ambiguity of a nested forall like
     (forall a. Eq a => b), the implication constraint doesn't bind
     all the skolems, which results in "No skolem info" in error
-    messages (see Trac #10432).
+    messages (see #10432).
 
 To avoid this, we call checkAmbiguity once, at the top, in checkValidType.
 (I'm still a bit worried about unbound skolems when the type mentions
@@ -237,7 +237,7 @@ checkUserTypeError :: Type -> TcM ()
 -- Check to see if the type signature mentions "TypeError blah"
 -- anywhere in it, and fail if so.
 --
--- Very unsatisfactorily (Trac #11144) we need to tidy the type
+-- Very unsatisfactorily (#11144) we need to tidy the type
 -- because it may have come from an /inferred/ signature, not a
 -- user-supplied one.  This is really only a half-baked fix;
 -- the other errors in checkValidType don't do tidying, and so
@@ -269,7 +269,7 @@ In a few places we do not want to check a user-specified type for ambiguity
   It may be that when we /use/ T, we'll give an 'a' or 'b' that somehow
   cure the ambiguity.  So we defer the ambiguity check to the use site.
 
-  There is also an implementation reason (Trac #11608).  In the RHS of
+  There is also an implementation reason (#11608).  In the RHS of
   a type synonym we don't (currently) instantiate 'a' and 'b' with
   TcTyVars before calling checkValidType, so we get asertion failures
   from doing an ambiguity check on a type with TyVars in it.  Fixing this
@@ -417,7 +417,7 @@ Note [Higher rank types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Technically
             Int -> forall a. a->a
-is still a rank-1 type, but it's not Haskell 98 (Trac #5957).  So the
+is still a rank-1 type, but it's not Haskell 98 (#5957).  So the
 validity checker allow a forall after an arrow only if we allow it
 before -- that is, with Rank2Types or RankNTypes
 -}
@@ -549,7 +549,7 @@ exclusively `NoExpand` 100% of the time:
   If we expand `Bar Foo` immediately, we'll miss the fact that the `Foo` type
   synonyms is unsaturated.
 * If one never expands and only checks the arguments, then one can miss
-  erroneous programs like the one in Trac #16059:
+  erroneous programs like the one in #16059:
 
     type Foo b = Eq b => b
     f :: forall b (a :: Foo b). Int
@@ -927,7 +927,7 @@ checkConstraintsOK ve theta ty
   | allConstraintsAllowed (ve_ctxt ve) = return ()
   | otherwise
   = -- We are in a kind, where we allow only equality predicates
-    -- See Note [Constraints in kinds] in TyCoRep, and Trac #16263
+    -- See Note [Constraints in kinds] in TyCoRep, and #16263
     checkTcM (all isEqPred theta) $
     constraintTyErr (ve_tidy_env ve) ty
 
@@ -1015,7 +1015,7 @@ then when we saw
      (e :: (?x::Int) => t)
 it would be unclear how to discharge all the potential uses of the ?x
 in e.  For example, a constraint Foo [Int] might come out of e, and
-applying the instance decl would show up two uses of ?x.  Trac #8912.
+applying the instance decl would show up two uses of ?x.  #8912.
 -}
 
 checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
@@ -1055,7 +1055,7 @@ the context.
 
 But we record, in 'under_syn', whether we have looked under a synonym
 to avoid requiring language extensions at the use site.  Main example
-(Trac #9838):
+(#9838):
 
    {-# LANGUAGE ConstraintKinds #-}
    module A where
@@ -1093,7 +1093,7 @@ check_pred_help :: Bool    -- True <=> under a type synonym
                 -> PredType -> TcM ()
 check_pred_help under_syn env dflags ctxt pred
   | Just pred' <- tcView pred  -- Switch on under_syn when going under a
-                                 -- synonym (Trac #9838, yuk)
+                                 -- synonym (#9838, yuk)
   = check_pred_help True env dflags ctxt pred'
 
   | otherwise  -- A bit like classifyPredType, but not the same
@@ -1158,7 +1158,7 @@ check_irred_pred under_syn env dflags ctxt pred
   = do { -- If it looks like (x t1 t2), require ConstraintKinds
          --   see Note [ConstraintKinds in predicates]
          -- But (X t1 t2) is always ok because we just require ConstraintKinds
-         -- at the definition site (Trac #9838)
+         -- at the definition site (#9838)
         failIfTcM (not under_syn && not (xopt LangExt.ConstraintKinds dflags)
                                 && hasTyVarHead pred)
                   (predIrredErr env pred)
@@ -1179,7 +1179,7 @@ check_irred_pred under_syn env dflags ctxt pred
 {- Note [ConstraintKinds in predicates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't check for -XConstraintKinds under a type synonym, because that
-was done at the type synonym definition site; see Trac #9838
+was done at the type synonym definition site; see #9838
 e.g.   module A where
           type C a = (Eq a, Ix a)   -- Needs -XConstraintKinds
        module B where
@@ -1281,7 +1281,7 @@ Note [Instance and Given overlap].  As that Note discusses, for the
 most part the clever stuff in TcInteract means that we don't use a
 top-level instance if a local Given might fire, so there is no
 fragility. But if we /infer/ the type of a local let-binding, things
-can go wrong (Trac #11948 is an example, discussed in the Note).
+can go wrong (#11948 is an example, discussed in the Note).
 
 So this warning is switched on only if we have NoMonoLocalBinds; in
 that case the warning discourages users from writing simplifiable
@@ -1291,7 +1291,7 @@ The warning only fires if the constraint in the signature
 matches the top-level instances in only one way, and with no
 unifiers -- that is, under the same circumstances that
 TcInteract.matchInstEnv fires an interaction with the top
-level instances.  For example (Trac #13526), consider
+level instances.  For example (#13526), consider
 
   instance {-# OVERLAPPABLE #-} Eq (T a) where ...
   instance                   Eq (T Char) where ..
@@ -1325,7 +1325,7 @@ okIPCtxt SigmaCtxt              = True
 okIPCtxt (DataTyCtxt {})        = True
 okIPCtxt (PatSynCtxt {})        = True
 okIPCtxt (TySynCtxt {})         = True   -- e.g.   type Blah = ?x::Int
-                                         -- Trac #11466
+                                         -- #11466
 
 okIPCtxt (KindSigCtxt {})       = False
 okIPCtxt (ClassSCCtxt {})       = False
@@ -1420,7 +1420,7 @@ tyConArityErr :: TyCon -> [TcType] -> SDoc
 -- For type-constructor arity errors, be careful to report
 -- the number of /visible/ arguments required and supplied,
 -- ignoring the /invisible/ arguments, which the user does not see.
--- (e.g. Trac #10516)
+-- (e.g. #10516)
 tyConArityErr tc tks
   = arityErr (ppr (tyConFlavour tc)) (tyConName tc)
              tc_type_arity tc_type_args
@@ -1484,7 +1484,7 @@ entirely different meaning. Suppose in M.hsig we see
 
 That says that any module satisfying M.hsig must provide a KnownNat
 instance for T.  We absolultely need that instance when compiling a
-module that imports M.hsig: see Trac #15379 and
+module that imports M.hsig: see #15379 and
 Note [Fabricating Evidence for Literals in Backpack] in ClsInst.
 
 Hence, checkValidInstHead accepts a user-written instance declaration
@@ -1632,7 +1632,7 @@ tcInstHeadTyAppAllTyVars :: Type -> Bool
 tcInstHeadTyAppAllTyVars ty
   | Just (tc, tys) <- tcSplitTyConApp_maybe (dropCasts ty)
   = ok (filterOutInvisibleTypes tc tys)  -- avoid kinds
-  | LitTy _ <- ty = True  -- accept type literals (Trac #13833)
+  | LitTy _ <- ty = True  -- accept type literals (#13833)
   | otherwise
   = False
   where
@@ -1742,7 +1742,7 @@ It checks for three things
        newtype T (c :: * -> * -> *) a b = MkT (c a b)
        instance Category c => Category (T c) where ...
     since the first argument to Category is a non-visible *, which sizeTypes
-    would count as a constructor! See Trac #11833.
+    would count as a constructor! See #11833.
 
   * Also check for a bizarre corner case, when the derived instance decl
     would look like
@@ -1750,7 +1750,7 @@ It checks for three things
     Note that 'b' isn't a parameter of T.  This gives rise to all sorts of
     problems; in particular, it's hard to compare solutions for equality
     when finding the fixpoint, and that means the inferContext loop does
-    not converge.  See Trac #5287.
+    not converge.  See #5287.
 
 Note [Equality class instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1790,7 +1790,7 @@ validDerivPred tv_set pred
 {- Note [Instances and constraint synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Currently, we don't allow instances for constraint synonyms at all.
-Consider these (Trac #13267):
+Consider these (#13267):
   type C1 a = Show (a -> Bool)
   instance C1 Int where    -- I1
     show _ = "ur"
@@ -1901,13 +1901,13 @@ checkInstTermination theta head_pred
    check :: VarSet -> PredType -> TcM ()
    check foralld_tvs pred
      = case classifyPredType pred of
-         EqPred {}    -> return ()  -- See Trac #4200.
+         EqPred {}    -> return ()  -- See #4200.
          IrredPred {} -> check2 foralld_tvs pred (sizeType pred)
          ClassPred cls tys
            | isTerminatingClass cls
            -> return ()
 
-           | isCTupleClass cls  -- Look inside tuple predicates; Trac #8359
+           | isCTupleClass cls  -- Look inside tuple predicates; #8359
            -> check_preds foralld_tvs tys
 
            | otherwise          -- Other ClassPreds
@@ -1965,7 +1965,7 @@ Are these OK?
 No: the type family in the instance head might blow up to an
 arbitrarily large type, depending on how 'a' is instantiated.
 So we require UndecidableInstances if we have a type family
-in the instance head.  Trac #15172.
+in the instance head.  #15172.
 
 Note [Invisible arguments and termination]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1978,7 +1978,7 @@ in the instance head and constraints. Question: Do we look at
 
 I think both will ensure termination, provided we are consistent.
 Currently we are /not/ consistent, which is really a bug.  It's
-described in Trac #15177, which contains a number of examples.
+described in #15177, which contains a number of examples.
 The suspicious bits are the calls to filterOutInvisibleTypes.
 -}
 
@@ -2084,7 +2084,7 @@ checkValidTyFamEqn fam_tc qvs typats rhs
          --             type instance F Int#             = ...
          --             type instance F Int              = forall a. a->a
          --             type instance F Int              = Int#
-         -- See Trac #9357
+         -- See #9357
        ; checkValidMonoType rhs
 
          -- We have a decidable instance unless otherwise permitted
@@ -2177,7 +2177,7 @@ checkFamPatBinders fam_tc qtvs pats rhs
            2 (vcat [ text "but not" <+> what2 <+> text "the family instance"
                    , mk_extra tvs ])
 
-    -- mk_extra: Trac #7536: give a decent error message for
+    -- mk_extra: #7536: give a decent error message for
     --         type T a = Int
     --         type instance F (T a) = a
     mk_extra tvs = ppWhen (any (`elemVarSet` dodgy_tvs) tvs) $
@@ -2336,7 +2336,7 @@ so inside of GHC, the instance looks closer to this:
     type instance T @(Maybe a) = (Nothing :: Maybe a)
 
 Here, we can see that `a` really is bound by a LHS type pattern, so `a` is in
-fact not unbound. Contrast that with this example (Trac #13985)
+fact not unbound. Contrast that with this example (#13985)
 
     type instance T = Proxy (Nothing :: Maybe a)
 
@@ -2365,7 +2365,7 @@ obvious, one can also write the instance like so:
 Note [Matching in the consistent-instantation check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Matching the class-instance header to family-instance tyvars is
-tricker than it sounds.  Consider (Trac #13972)
+tricker than it sounds.  Consider (#13972)
     class C (a :: k) where
       type T k :: Type
     instance C Left where
@@ -2380,7 +2380,7 @@ from the class-instance header.
 We track the lexically-scoped type variables from the
 class-instance header in ai_tyvars.
 
-Here's another example (Trac #14045a)
+Here's another example (#14045a)
     class C (a :: k) where
       data S (a :: k)
     instance C (z :: Bool) where
@@ -2398,7 +2398,7 @@ somewhere deep inside the type
 
 Note [Checking consistent instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See Trac #11450 for background discussion on this check.
+See #11450 for background discussion on this check.
 
   class C a b where
     type T a x b
@@ -2420,7 +2420,7 @@ Note that
     instance C [p] Int
       type T [q] y Int = ...
   But from GHC 8.2 onwards, we don't.  It's much simpler this way.
-  See Trac #11450.
+  See #11450.
 
 * When the class variable isn't used on the RHS of the type instance,
   it's tempting to allow wildcards, thus
@@ -2467,7 +2467,7 @@ Note that
       CAux (Either x y) = x -> y
 
   We decided that this restriction wasn't buying us much, so we opted not
-  to pursue that design (see also GHC Trac #13398).
+  to pursue that design (see also GHC #13398).
 
 Implementation
   * Form the mini-envt from the class type variables a,b
@@ -2802,7 +2802,7 @@ sizeTyConAppArgs _tc tys = sizeTypes tys -- (filterOutInvisibleTypes tc tys)
 -- We are considering whether class constraints terminate.
 -- Equality constraints and constraints for the implicit
 -- parameter class always terminate so it is safe to say "size 0".
--- See Trac #4200.
+-- See #4200.
 sizePred :: PredType -> Int
 sizePred ty = goClass ty
   where

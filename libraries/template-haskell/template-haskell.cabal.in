@@ -9,7 +9,7 @@ license:        BSD3
 license-file:   LICENSE
 category:       Template Haskell
 maintainer:     libraries@haskell.org
-bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=Template%20Haskell
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       Support library for Template Haskell
 build-type:     Simple
 Cabal-Version:  >= 1.10
@@ -24,7 +24,7 @@ extra-source-files: changelog.md
 
 source-repository head
     type:     git
-    location: http://git.haskell.org/ghc.git
+    location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   libraries/template-haskell
 
 Library

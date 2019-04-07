@@ -8,7 +8,7 @@ license:        BSD3
 license-file:   LICENSE
 category:       GHC
 maintainer:     ghc-devs@haskell.org
-bug-reports:    https://ghc.haskell.org/trac/ghc/newticket
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       Shared functionality between GHC and the @template-haskell@
                 library
 description:    This library contains various bits shared between the @ghc@ and
@@ -23,7 +23,7 @@ extra-source-files: changelog.md
 
 source-repository head
     type:     git
-    location: http://git.haskell.org/ghc.git
+    location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   libraries/ghc-boot-th
 
 Library

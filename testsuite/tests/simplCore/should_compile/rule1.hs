@@ -1,5 +1,5 @@
 
--- This one triggers the bug reported in Trac #1092
+-- This one triggers the bug reported in #1092
 -- The problem is that the rule
 --      forall w. f (\v->w) = w
 -- erroneously matches the call

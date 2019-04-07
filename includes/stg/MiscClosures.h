@@ -8,12 +8,12 @@
  * our Cmm code generator doesn't know how to generate local symbols
  * for the RTS bits (it assumes all RTS symbols are external).
  *
- * See wiki:Commentary/Compiler/Backends/PprC#Prototypes
+ * See wiki:commentary/compiler/backends/ppr-c#prototypes
  *
  * Do not #include this file directly: #include "Rts.h" instead.
  *
  * To understand the structure of the RTS headers, see the wiki:
- *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/source-tree/includes
  *
  * --------------------------------------------------------------------------*/
 
@@ -470,6 +470,7 @@ RTS_FUN_DECL(stg_readTVarIOzh);
 RTS_FUN_DECL(stg_writeTVarzh);
 
 RTS_FUN_DECL(stg_unpackClosurezh);
+RTS_FUN_DECL(stg_closureSizzezh);
 RTS_FUN_DECL(stg_getApStackValzh);
 RTS_FUN_DECL(stg_getSparkzh);
 RTS_FUN_DECL(stg_numSparkszh);
@@ -486,7 +487,7 @@ RTS_FUN_DECL(stg_setThreadAllocationCounterzh);
 
 
 /* Other misc stuff */
-// See wiki:Commentary/Compiler/Backends/PprC#Prototypes
+// See wiki:commentary/compiler/backends/ppr-c#prototypes
 
 #if IN_STG_CODE && !IN_STGCRUN
 

@@ -164,6 +164,16 @@ compileHsObject rs objpath b@(BuildPath _root stage _path _o) hsobj =
         (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
         need (src:deps)
         needLibrary =<< contextDependencies ctx
+
+        -- The .dependencies files only lists shallow dependencies. ghc will
+        -- generally read more *.hi and *.hi-boot files (deep dependencies).
+        -- Allow such reads (see https://gitlab.haskell.org/ghc/ghc/wikis/Developing-Hadrian#cloud-shared-cache-build)
+        -- Note that this may allow too many *.hi and *.hi-boot files, but
+        -- calculating the exact set of deep dependencies is not feasible.
+        trackAllow [ "//*." ++ hisuf     way
+                   , "//*." ++ hibootsuf way
+                   ]
+
         buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
         -- Andrey: It appears that the previous refactoring has broken
         -- multiple-output build rules. Ideally, we should bring multiple-output

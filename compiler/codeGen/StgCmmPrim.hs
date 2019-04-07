@@ -619,6 +619,12 @@ emitPrimOp _      [res] BSwap32Op [w] = emitBSwapCall res w W32
 emitPrimOp _      [res] BSwap64Op [w] = emitBSwapCall res w W64
 emitPrimOp dflags [res] BSwapOp   [w] = emitBSwapCall res w (wordWidth dflags)
 
+emitPrimOp _      [res] BRev8Op  [w] = emitBRevCall res w W8
+emitPrimOp _      [res] BRev16Op [w] = emitBRevCall res w W16
+emitPrimOp _      [res] BRev32Op [w] = emitBRevCall res w W32
+emitPrimOp _      [res] BRev64Op [w] = emitBRevCall res w W64
+emitPrimOp dflags [res] BRevOp   [w] = emitBRevCall res w (wordWidth dflags)
+
 -- Population count
 emitPrimOp _      [res] PopCnt8Op  [w] = emitPopCntCall res w W8
 emitPrimOp _      [res] PopCnt16Op [w] = emitPopCntCall res w W16
@@ -2174,9 +2180,10 @@ emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
               -> CmmExpr        -- ^ offset in destination array
               -> WordOff        -- ^ number of elements to copy
               -> FCode ()
-emitCopyArray copy src0 src_off dst0 dst_off0 n = do
-    dflags <- getDynFlags
+emitCopyArray copy src0 src_off dst0 dst_off0 n =
     when (n /= 0) $ do
+        dflags <- getDynFlags
+
         -- Passed as arguments (be careful)
         src     <- assignTempE src0
         dst     <- assignTempE dst0
@@ -2236,23 +2243,24 @@ emitCopySmallArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
                    -> CmmExpr        -- ^ offset in destination array
                    -> WordOff        -- ^ number of elements to copy
                    -> FCode ()
-emitCopySmallArray copy src0 src_off dst0 dst_off n = do
-    dflags <- getDynFlags
+emitCopySmallArray copy src0 src_off dst0 dst_off n =
+    when (n /= 0) $ do
+        dflags <- getDynFlags
 
-    -- Passed as arguments (be careful)
-    src     <- assignTempE src0
-    dst     <- assignTempE dst0
+        -- Passed as arguments (be careful)
+        src     <- assignTempE src0
+        dst     <- assignTempE dst0
 
-    -- Set the dirty bit in the header.
-    emit (setInfo dst (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
+        -- Set the dirty bit in the header.
+        emit (setInfo dst (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
-    dst_p <- assignTempE $ cmmOffsetExprW dflags
-             (cmmOffsetB dflags dst (smallArrPtrsHdrSize dflags)) dst_off
-    src_p <- assignTempE $ cmmOffsetExprW dflags
-             (cmmOffsetB dflags src (smallArrPtrsHdrSize dflags)) src_off
-    let bytes = wordsToBytes dflags n
+        dst_p <- assignTempE $ cmmOffsetExprW dflags
+                 (cmmOffsetB dflags dst (smallArrPtrsHdrSize dflags)) dst_off
+        src_p <- assignTempE $ cmmOffsetExprW dflags
+                 (cmmOffsetB dflags src (smallArrPtrsHdrSize dflags)) src_off
+        let bytes = wordsToBytes dflags n
 
-    copy src dst dst_p src_p bytes
+        copy src dst dst_p src_p bytes
 
 -- | Takes an info table label, a register to return the newly
 -- allocated array in, a source array, an offset in the source array,
@@ -2507,6 +2515,13 @@ emitBSwapCall res x width = do
     emitPrimCall
         [ res ]
         (MO_BSwap width)
+        [ x ]
+
+emitBRevCall :: LocalReg -> CmmExpr -> Width -> FCode ()
+emitBRevCall res x width = do
+    emitPrimCall
+        [ res ]
+        (MO_BRev width)
         [ x ]
 
 emitPopCntCall :: LocalReg -> CmmExpr -> Width -> FCode ()

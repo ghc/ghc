@@ -37,9 +37,6 @@ module CoreMonad (
     liftIO, liftIOWithCount,
     liftIO1, liftIO2, liftIO3, liftIO4,
 
-    -- ** Global initialization
-    reinitializeGlobals,
-
     -- ** Dealing with annotations
     getAnnotations, getFirstAnnotations,
 
@@ -558,7 +555,7 @@ data CoreReader = CoreReader {
 
 -- Note: CoreWriter used to be defined with data, rather than newtype.  If it
 -- is defined that way again, the cw_simpl_count field, at least, must be
--- strict to avoid a space leak (Trac #7702).
+-- strict to avoid a space leak (#7702).
 newtype CoreWriter = CoreWriter {
         cw_simpl_count :: SimplCount
 }
@@ -589,7 +586,7 @@ instance Monad CoreM where
             let w = w1 `plusWriter` w2
             return $ seq w (y, s'', w)
             -- forcing w before building the tuple avoids a space leak
-            -- (Trac #7702)
+            -- (#7702)
 
 instance Applicative CoreM where
     pure x = CoreM $ \s -> nop s x
@@ -726,10 +723,6 @@ getPackageFamInstEnv = do
     hsc_env <- getHscEnv
     eps <- liftIO $ hscEPS hsc_env
     return $ eps_fam_inst_env eps
-
-{-# DEPRECATED reinitializeGlobals "It is not necessary to call reinitializeGlobals. Since GHC 8.2, this function is a no-op and will be removed in GHC 8.4" #-}
-reinitializeGlobals :: CoreM ()
-reinitializeGlobals = return ()
 
 {-
 ************************************************************************

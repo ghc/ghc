@@ -180,17 +180,17 @@ from other points in the document,
     See :ref:`options-platform` for details.
 
 
-To GHC Trac resources
-^^^^^^^^^^^^^^^^^^^^^
+To GHC resources
+^^^^^^^^^^^^^^^^
 
-There are special macros for conveniently linking to GHC Trac
+There are special macros for conveniently linking to GHC
 Wiki articles and tickets,
 
 .. code-block:: rest
 
-    See :ghc-wiki:`Commentary/Latedmd` for details on demand analysis.
+    See :ghc-wiki:`commentary/compiler/demand` for details on demand analysis.
 
-    See the :ghc-wiki:`coding style <Commentary/CodingStyle>` for guidelines.
+    See the :ghc-wiki:`coding style <commentary/coding-style>` for guidelines.
 
     See the :ghc-ticket:`123` for further discussion.
 
@@ -204,11 +204,11 @@ External links can be written in either of these ways,
 
 .. code-block:: rest
 
-    See the `GHC Wiki <http://ghc.haskell.org/wiki>`_ for details.
+    See the `GHC Wiki <https://gitlab.haskell.org/ghc/ghc/wikis>`_ for details.
 
     See the `GHC Wiki`_ for details.
 
-    .. _GHC Wiki: http://ghc.haskell.org/wiki
+    .. _GHC Wiki: https://gitlab.haskell.org/ghc/ghc/wikis
 
 
 To core library Haddock documentation
@@ -250,7 +250,7 @@ Index entries
 
 Index entries can be included anywhere in the document as a block element.
 They look like,
-    
+
 .. code-block:: rest
 
     Here is some discussion on the Strict Haskell extension.
@@ -374,7 +374,7 @@ must match the definition exactly, including the arguments. A quick way to find
 the exact names and special characters is,
 
 .. code-block:: sh
-    
+
     $ git grep -- "flag:: -o "
 
 which will generate the appropriate,

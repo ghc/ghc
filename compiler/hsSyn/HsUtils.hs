@@ -106,7 +106,7 @@ import TcEvidence
 import RdrName
 import Var
 import TyCoRep
-import Type   ( tyConArgFlags )
+import Type   ( appTyArgFlags, splitAppTys, tyConArgFlags )
 import TysWiredIn ( unitTy )
 import TcType
 import DataCon
@@ -456,7 +456,7 @@ nlNullaryConPat con = noLoc (ConPatIn (noLoc con) (PrefixCon []))
 
 nlWildConPat :: DataCon -> LPat GhcPs
 nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
-                         (PrefixCon (nOfThem (dataConSourceArity con)
+                         (PrefixCon (replicate (dataConSourceArity con)
                                              nlWildPat)))
 
 nlWildPat :: LPat GhcPs
@@ -611,7 +611,7 @@ mkHsSigEnv get_info sigs
    `extendNameEnvList` (mk_pairs gen_dm_sigs)
    -- The subtlety is this: in a class decl with a
    -- default-method signature as well as a method signature
-   -- we want the latter to win (Trac #12533)
+   -- we want the latter to win (#12533)
    --    class C x where
    --       op :: forall a . x a -> x a
    --       default op :: forall b . x b -> x b
@@ -665,7 +665,6 @@ typeToLHsType ty
                           , hst_xforall = noExt
                           , hst_body = go tau })
     go (TyVarTy tv)         = nlHsTyVar (getRdrName tv)
-    go (AppTy t1 t2)        = nlHsAppTy (go t1) (go t2)
     go (LitTy (NumTyLit n))
       = noLoc $ HsTyLit NoExt (HsNumTy NoSourceText n)
     go (LitTy (StrTyLit s))
@@ -674,26 +673,34 @@ typeToLHsType ty
       | tyConAppNeedsKindSig True tc (length args)
         -- We must produce an explicit kind signature here to make certain
         -- programs kind-check. See Note [Kind signatures in typeToLHsType].
-      = nlHsParTy $ noLoc $ HsKindSig NoExt lhs_ty (go (tcTypeKind ty))
-      | otherwise = lhs_ty
+      = nlHsParTy $ noLoc $ HsKindSig NoExt ty' (go (tcTypeKind ty))
+      | otherwise = ty'
        where
-        arg_flags :: [ArgFlag]
-        arg_flags = tyConArgFlags tc args
-
-        lhs_ty :: LHsType GhcPs
-        lhs_ty = foldl' (\f (arg, flag) ->
-                          let arg' = go arg in
-                          case flag of
-                            Inferred  -> f
-                            Specified -> f `nlHsAppKindTy` arg'
-                            Required  -> f `nlHsAppTy`     arg')
-                        (nlHsTyVar (getRdrName tc))
-                        (zip args arg_flags)
+        ty' :: LHsType GhcPs
+        ty' = go_app (nlHsTyVar (getRdrName tc)) args (tyConArgFlags tc args)
+    go ty@(AppTy {})        = go_app (go head) args (appTyArgFlags head args)
+      where
+        head :: Type
+        args :: [Type]
+        (head, args) = splitAppTys ty
     go (CastTy ty _)        = go ty
     go (CoercionTy co)      = pprPanic "toLHsSigWcType" (ppr co)
 
          -- Source-language types have _invisible_ kind arguments,
-         -- so we must remove them here (Trac #8563)
+         -- so we must remove them here (#8563)
+
+    go_app :: LHsType GhcPs -- The type being applied
+           -> [Type]        -- The argument types
+           -> [ArgFlag]     -- The argument types' visibilities
+           -> LHsType GhcPs
+    go_app head args arg_flags =
+      foldl' (\f (arg, flag) ->
+               let arg' = go arg in
+               case flag of
+                 Inferred  -> f
+                 Specified -> f `nlHsAppKindTy` arg'
+                 Required  -> f `nlHsAppTy`     arg')
+             head (zip args arg_flags)
 
     go_tv :: TyVar -> LHsTyVarBndr GhcPs
     go_tv tv = noLoc $ KindedTyVar noExt (noLoc (getRdrName tv))
@@ -703,7 +710,7 @@ typeToLHsType ty
 Note [Kind signatures in typeToLHsType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are types that typeToLHsType can produce which require explicit kind
-signatures in order to kind-check. Here is an example from Trac #14579:
+signatures in order to kind-check. Here is an example from #14579:
 
   -- type P :: forall {k} {t :: k}. Proxy t
   type P = 'Proxy
@@ -1302,7 +1309,7 @@ main name (the TyCon of a type declaration etc), we want to give it
 the @SrcSpan@ of the whole /declaration/, not just the name itself
 (which is how it appears in the syntax tree).  This SrcSpan (for the
 entire declaration) is used as the SrcSpan for the Name that is
-finally produced, and hence for error messages.  (See Trac #8607.)
+finally produced, and hence for error messages.  (See #8607.)
 
 Note [Binders in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

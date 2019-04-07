@@ -529,6 +529,7 @@ FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
 
 dnl ** Which ld to use
 dnl --------------------------------------------------------------
+AC_ARG_VAR(LD,[Use as the path to ld. See also --disable-ld-override.])
 FIND_LD([$target],[GccUseLdOpt])
 CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
 CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
@@ -558,14 +559,14 @@ if test "$TargetOS_CPP" = "darwin"
 then
     AC_MSG_CHECKING(whether nm program is broken)
     # Some versions of XCode ship a broken version of `nm`. Detect and work
-    # around this issue. See : https://ghc.haskell.org/trac/ghc/ticket/11744
+    # around this issue. See : https://gitlab.haskell.org/ghc/ghc/issues/11744
     nmver=$(${NM} --version | grep version | sed 's/ //g')
     case "$nmver" in
         LLVMversion7.3.0|LLVMversion7.3.1)
             AC_MSG_RESULT(yes)
             echo "The detected nm program is broken."
             echo
-            echo "See: https://ghc.haskell.org/trac/ghc/ticket/11744"
+            echo "See: https://gitlab.haskell.org/ghc/ghc/issues/11744"
             echo
             echo "Try re-running configure with:"
             echo
@@ -936,7 +937,7 @@ dnl ** check for math library
 dnl    Keep that check as early as possible.
 dnl    as we need to know whether we need libm
 dnl    for math functions or not
-dnl    (see http://ghc.haskell.org/trac/ghc/ticket/3730)
+dnl    (see https://gitlab.haskell.org/ghc/ghc/issues/3730)
 AC_CHECK_LIB(m, atan, HaveLibM=YES, HaveLibM=NO)
 if test $HaveLibM = YES
 then
@@ -1379,5 +1380,5 @@ To make changes to the default build configuration, copy the file
 mk/build.mk.sample to mk/build.mk, and edit the settings in there.
 
 For more information on how to configure your GHC build, see
-   http://ghc.haskell.org/trac/ghc/wiki/Building
+   https://gitlab.haskell.org/ghc/ghc/wikis/building
 "]

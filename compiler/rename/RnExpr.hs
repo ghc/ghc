@@ -826,7 +826,7 @@ rnStmt ctxt rnBody (L loc (LastStmt _ body noret _)) thing_inside
                             -- The 'return' in a LastStmt is used only
                             -- for MonadComp; and we don't want to report
                             -- "non in scope: return" in other cases
-                            -- Trac #15607
+                            -- #15607
 
         ; (thing,  fvs3) <- thing_inside []
         ; return (([(L loc (LastStmt noExt body' noret ret_op), fv_expr)]
@@ -1305,7 +1305,7 @@ Note [Segmenting mdo]
 ~~~~~~~~~~~~~~~~~~~~~
 NB. June 7 2012: We only glom segments that appear in an explicit mdo;
 and leave those found in "do rec"'s intact.  See
-http://ghc.haskell.org/trac/ghc/ticket/4148 for the discussion
+https://gitlab.haskell.org/ghc/ghc/issues/4148 for the discussion
 leading to this design choice.  Hence the test in segmentRecStmts.
 
 Note [Glomming segments]
@@ -2100,11 +2100,6 @@ badIpBinds what binds
 
 ---------
 
-lookupSyntaxMonadFailOpName :: Bool -> RnM (SyntaxExpr GhcRn, FreeVars)
-lookupSyntaxMonadFailOpName monadFailEnabled
-  | monadFailEnabled = lookupSyntaxName failMName
-  | otherwise        = lookupSyntaxName failMName_preMFP
-
 monadFailOp :: LPat GhcPs
             -> HsStmtContext Name
             -> RnM (SyntaxExpr GhcRn, FreeVars)
@@ -2146,14 +2141,14 @@ So, in this case, we synthesize the function
 -}
 getMonadFailOp :: RnM (SyntaxExpr GhcRn, FreeVars) -- Syntax expr fail op
 getMonadFailOp
- = do { xMonadFailEnabled <- fmap (xopt LangExt.MonadFailDesugaring) getDynFlags
-      ; xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
+ = do { xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
       ; xRebindableSyntax <- fmap (xopt LangExt.RebindableSyntax) getDynFlags
-      ; reallyGetMonadFailOp xRebindableSyntax xOverloadedStrings xMonadFailEnabled }
+      ; reallyGetMonadFailOp xRebindableSyntax xOverloadedStrings
+      }
   where
-    reallyGetMonadFailOp rebindableSyntax overloadedStrings monadFailEnabled
+    reallyGetMonadFailOp rebindableSyntax overloadedStrings
       | rebindableSyntax && overloadedStrings = do
-        (failExpr, failFvs) <- lookupSyntaxMonadFailOpName monadFailEnabled
+        (failExpr, failFvs) <- lookupSyntaxName failMName
         (fromStringExpr, fromStringFvs) <- lookupSyntaxName fromStringName
         let arg_lit = fsLit "arg"
             arg_name = mkSystemVarName (mkVarOccUnique arg_lit) arg_lit
@@ -2167,4 +2162,4 @@ getMonadFailOp
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
               mkSyntaxExpr failAfterFromStringExpr
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
-      | otherwise = lookupSyntaxMonadFailOpName monadFailEnabled
+      | otherwise = lookupSyntaxName failMName

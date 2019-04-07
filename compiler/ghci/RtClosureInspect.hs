@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, ScopedTypeVariables, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE BangPatterns, CPP, ScopedTypeVariables, MagicHash #-}
 
 -----------------------------------------------------------------------------
 --
@@ -765,7 +765,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                         then parens (text "already monomorphic: " <> ppr my_ty)
                         else Ppr.empty)
         Right dcname <- liftIO $ constrClosToName hsc_env clos
-        (_,mb_dc)    <- tryTc (tcLookupDataCon dcname)
+        (mb_dc, _)   <- tryTc (tcLookupDataCon dcname)
         case mb_dc of
           Nothing -> do -- This can happen for private constructors compiled -O0
                         -- where the .hi descriptor does not export them
@@ -981,7 +981,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
       ConstrClosure{ptrArgs=pArgs} -> do
         Right dcname <- liftIO $ constrClosToName hsc_env clos
         traceTR (text "Constr1" <+> ppr dcname)
-        (_,mb_dc) <- tryTc (tcLookupDataCon dcname)
+        (mb_dc, _) <- tryTc (tcLookupDataCon dcname)
         case mb_dc of
           Nothing-> do
             forM pArgs $ \x -> do
@@ -1056,7 +1056,7 @@ getDataConArgTys dc con_app_ty
 
 {- Note [Constructor arg types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider a GADT (cf Trac #7386)
+Consider a GADT (cf #7386)
    data family D a b
    data instance D [a] a where
      MkT :: a -> D [a] (Maybe a)

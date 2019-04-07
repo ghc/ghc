@@ -394,8 +394,8 @@ structured editors.
 The helper functions are defined at the bottom of this file.
 
 See
-  https://ghc.haskell.org/trac/ghc/wiki/ApiAnnotations and
-  https://ghc.haskell.org/trac/ghc/wiki/GhcAstAnnotations
+  https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations and
+  https://gitlab.haskell.org/ghc/ghc/wikis/ghc-ast-annotations
 for some background.
 
 If you modify the parser and want to ensure that the API annotations are processed
@@ -3269,7 +3269,7 @@ fbind   :: { LHsRecField GhcPs (LHsExpr GhcPs) }
         : qvar '=' texp {% runExpCmdP $3 >>= \ $3 ->
                            ams  (sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) $3 False)
                                 [mj AnnEqual $2] }
-                        -- RHS is a 'texp', allowing view patterns (Trac #6038)
+                        -- RHS is a 'texp', allowing view patterns (#6038)
                         -- and, incidentally, sections.  Eg
                         -- f (R { x = show -> s }) = ...
 
@@ -3960,7 +3960,7 @@ warnSpaceAfterBang span = do
 
 -- When two single quotes don't followed by tyvar or gtycon, we report the
 -- error as empty character literal, or TH quote that missing proper type
--- variable or constructor. See Trac #13450.
+-- variable or constructor. See #13450.
 reportEmptyDoubleQuotes :: SrcSpan -> P a
 reportEmptyDoubleQuotes span = do
     thQuotes <- getBit ThQuotesBit

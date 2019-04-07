@@ -17,7 +17,7 @@
    It needs to be FAST.
 
    See wiki commentary at
-     http://ghc.haskell.org/trac/ghc/wiki/Commentary/HeapAlloced
+     https://gitlab.haskell.org/ghc/ghc/wikis/commentary/heap-alloced
 
    Implementation of HEAP_ALLOCED
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

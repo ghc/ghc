@@ -62,6 +62,26 @@ typedef
         }
    SectionAlloc;
 
+/* Indicates a desired memory protection for pages within a segment. Defined as
+ * enum since it's more explicit and look nicer in a debugger.
+ *
+ * Can be used directly as a substitution for a combination of PROT_X flags on
+ * POSIX systems.
+ */
+typedef enum {
+#if RTS_LINKER_USE_MMAP
+    SEGMENT_PROT_RO  = PROT_READ,
+    SEGMENT_PROT_RX  = PROT_READ | PROT_EXEC,
+    SEGMENT_PROT_RWO = PROT_READ | PROT_WRITE,
+    SEGMENT_PROT_RWX = PROT_READ | PROT_WRITE | PROT_EXEC
+#else
+    SEGMENT_PROT_RO,
+    SEGMENT_PROT_RX,
+    SEGMENT_PROT_RWO,
+    SEGMENT_PROT_RWX
+#endif
+} SegmentProt;
+
 /*
  * Note [No typedefs for customizable types]
  * Some pointer-to-struct types are defined opaquely
@@ -102,6 +122,16 @@ typedef
       struct _ProddableBlock* next;
    }
    ProddableBlock;
+
+typedef struct _Segment {
+    void *start;                /* page aligned start address of a segment */
+    size_t size;                /* page rounded size of a segment */
+    SegmentProt prot;           /* mem protection to set after all symbols were
+                                 * resolved */
+
+    int *sections_idx;       /* an array of section indexes assigned to this segment */
+    int n_sections;
+} Segment;
 
 /*
  * We must keep track of the StablePtrs that are created for foreign
@@ -177,10 +207,12 @@ typedef struct _ObjectCode {
        after allocation, so that we can use realloc */
     int        misalignment;
 
-    /* The section-kind entries for this object module.  Linked
-       list. */
+    /* The section-kind entries for this object module. An array. */
     int n_sections;
     Section* sections;
+
+    int n_segments;
+    Segment *segments;
 
     /* Allow a chain of these things */
     struct _ObjectCode * next;
@@ -311,6 +343,9 @@ ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
                   bool mapped, char *archiveMemberName,
                   int misalignment
                   );
+
+void initSegment(Segment *s, void *start, size_t size, SegmentProt prot, int n_sections);
+void freeSegments(ObjectCode *oc);
 
 /* MAP_ANONYMOUS is MAP_ANON on some systems,
    e.g. OS X (before Sierra), OpenBSD etc */

@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 
--- Trac #8883
+-- #8883
 
 module T8883 where
 

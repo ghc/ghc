@@ -1,4 +1,4 @@
--- Test Trac #12146
+-- Test #12146
 
 module T12146 where
 

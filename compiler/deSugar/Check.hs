@@ -280,7 +280,7 @@ instance Monoid PartialResult where
 -- More details about the classification of clauses into useful, redundant
 -- and with inaccessible right hand side can be found here:
 --
---     https://ghc.haskell.org/trac/ghc/wiki/PatternMatchCheck
+--     https://gitlab.haskell.org/ghc/ghc/wikis/pattern-match-check
 --
 data PmResult =
   PmResult {
@@ -335,8 +335,8 @@ checkSingle' locn var p = do
   fam_insts <- liftD dsGetFamInstEnvs
   clause    <- liftD $ translatePat fam_insts p
   missing   <- mkInitialUncovered [var]
-  tracePm "checkSingle: missing" (vcat (map pprValVecDebug missing))
-                                 -- no guards
+  tracePm "checkSingle': missing" (vcat (map pprValVecDebug missing))
+                                  -- no guards
   PartialResult prov cs us ds <- runMany (pmcheckI clause []) missing
   let us' = UncoveredPatterns us
   return $ case (cs,ds) of
@@ -403,12 +403,12 @@ checkMatches' vars matches
               , [LMatch GhcTc (LHsExpr GhcTc)])
     go []     missing = return (mempty, [], missing, [])
     go (m:ms) missing = do
-      tracePm "checMatches': go" (ppr m $$ ppr missing)
+      tracePm "checkMatches': go" (ppr m $$ ppr missing)
       fam_insts          <- liftD dsGetFamInstEnvs
       (clause, guards)   <- liftD $ translateMatch fam_insts m
       r@(PartialResult prov cs missing' ds)
         <- runMany (pmcheckI clause guards) missing
-      tracePm "checMatches': go: res" (ppr r)
+      tracePm "checkMatches': go: res" (ppr r)
       (ms_prov, rs, final_u, is)  <- go ms missing'
       let final_prov = prov `mappend` ms_prov
       return $ case (cs, ds) of
@@ -421,7 +421,7 @@ checkMatches' vars matches
 
     hsLMatchToLPats :: LMatch id body -> Located [LPat id]
     hsLMatchToLPats (dL->L l (Match { m_pats = pats })) = cL l pats
-    hsLMatchToLPats _                                   = panic "checMatches'"
+    hsLMatchToLPats _                                   = panic "checkMatches'"
 
 -- | Check an empty case expression. Since there are no clauses to process, we
 --   only compute the uncovered set. See Note [Checking EmptyCase Expressions]
@@ -1030,7 +1030,7 @@ translatePat fam_insts pat = case pat of
     --
     --     - Otherwise, we treat the `ListPat` as ordinary view pattern.
     --
-    -- See Trac #14547, especially comment#9 and comment#10.
+    -- See #14547, especially comment#9 and comment#10.
     --
     -- Here we construct CanFailPmPat directly, rather can construct a view
     -- pattern and do further translation as an optimization, for the reason,
@@ -1100,7 +1100,7 @@ from translation in pattern matcher.
     `HsOverLit` inside `NPat` to HsIntPrim/HsWordPrim. If we do
     the same thing in `translatePat` as in `tidyNPat`, the exhaustiveness
     checker will fail to match the literals patterns correctly. See
-    Trac #14546.
+    #14546.
 
   In Note [Undecidable Equality for Overloaded Literals], we say: "treat
   overloaded literals that look different as different", but previously we
@@ -1121,7 +1121,7 @@ from translation in pattern matcher.
     in value position as PmOLit, but translate the 0 and 1 in pattern position
     as PmSLit. The inconsistency leads to the failure of eqPmLit to detect the
     equality and report warning of "Pattern match is redundant" on pattern 0,
-    as reported in Trac #14546. In this patch we remove the specialization of
+    as reported in #14546. In this patch we remove the specialization of
     OverLit patterns, and keep the overloaded number literal in pattern as it
     is to maintain the consistency. We know nothing about the `fromInteger`
     method (see Note [Undecidable Equality for Overloaded Literals]). Now we
@@ -1141,7 +1141,7 @@ from translation in pattern matcher.
     non-overloaded string values are translated to PmSLit. However the string
     patterns, both overloaded and non-overloaded, are translated to list of
     characters. The inconsistency leads to wrong warnings about redundant and
-    non-exhaustive pattern matching warnings, as reported in Trac #14546.
+    non-exhaustive pattern matching warnings, as reported in #14546.
 
     In order to catch the redundant pattern in following case:
 
@@ -1167,7 +1167,7 @@ from translation in pattern matcher.
 
   We must ensure that doing the same translation to literal values and patterns
   in `translatePat` and `hsExprToPmExpr`. The previous inconsistent work led to
-  Trac #14546.
+  #14546.
 -}
 
 -- | Translate a list of patterns (Note: each pattern is translated
@@ -2118,15 +2118,22 @@ pmcheckHd (p@(PmLit l)) ps guards
 -- no information is lost
 
 -- LitCon
-pmcheckHd (PmLit l) ps guards (va@(PmCon {})) (ValVec vva delta)
+pmcheckHd p@PmLit{} ps guards va@PmCon{} (ValVec vva delta)
   = do y <- liftD $ mkPmId (pmPatType va)
-       let tm_state = extendSubst y (PmExprLit l) (delta_tm_cs delta)
+       -- Analogous to the ConVar case, we have to case split the value
+       -- abstraction on possible literals. We do so by introducing a fresh
+       -- variable that is equated to the constructor. LitVar will then take
+       -- care of the case split by resorting to NLit.
+       let tm_state = extendSubst y (vaToPmExpr va) (delta_tm_cs delta)
            delta'   = delta { delta_tm_cs = tm_state }
-       pmcheckHdI (PmVar y) ps guards va (ValVec vva delta')
+       pmcheckHdI p ps guards (PmVar y) (ValVec vva delta')
 
 -- ConLit
-pmcheckHd (p@(PmCon {})) ps guards (PmLit l) (ValVec vva delta)
+pmcheckHd p@PmCon{} ps guards (PmLit l) (ValVec vva delta)
   = do y <- liftD $ mkPmId (pmPatType p)
+       -- This desugars to the ConVar case by introducing a fresh variable that
+       -- is equated to the literal via a constraint. ConVar will then properly
+       -- case split on all possible constructors.
        let tm_state = extendSubst y (PmExprLit l) (delta_tm_cs delta)
            delta'   = delta { delta_tm_cs = tm_state }
        pmcheckHdI p ps guards (PmVar y) (ValVec vva delta')
@@ -2332,7 +2339,7 @@ term constraints (respectively) as we go deeper.
 
 The type constraints we propagate inwards are collected by `collectEvVarsPats'
 in HsPat.hs. This handles bug #4139 ( see example
-  https://ghc.haskell.org/trac/ghc/attachment/ticket/4139/GADTbug.hs )
+  https://gitlab.haskell.org/ghc/ghc/snippets/672 )
 where this is needed.
 
 For term equalities we do less, we just generate equalities for HsCase. For
@@ -2511,7 +2518,7 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
 
 {- Note [Inaccessible warnings for record updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #12957)
+Consider (#12957)
   data T a where
     T1 :: { x :: Int } -> T Bool
     T2 :: { x :: Int } -> T a

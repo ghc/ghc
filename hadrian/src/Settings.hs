@@ -11,6 +11,7 @@ import Packages
 import UserSettings (userFlavours, userPackages, userDefaultFlavour)
 
 import {-# SOURCE #-} Settings.Default
+import Settings.Flavours.Benchmark
 import Settings.Flavours.Development
 import Settings.Flavours.Llvm
 import Settings.Flavours.Performance
@@ -18,6 +19,7 @@ import Settings.Flavours.Profiled
 import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
+import Settings.Flavours.GhcInGhci
 
 getArgs :: Args
 getArgs = expr flavour >>= args
@@ -35,10 +37,11 @@ stagePackages stage = do
 
 hadrianFlavours :: [Flavour]
 hadrianFlavours =
-    [ defaultFlavour, developmentFlavour Stage1, developmentFlavour Stage2
-    , performanceFlavour, profiledFlavour, quickFlavour, quickestFlavour
-    , quickCrossFlavour
-    , performanceLlvmFlavour, profiledLlvmFlavour, quickLlvmFlavour ]
+    [ benchmarkFlavour, defaultFlavour, developmentFlavour Stage1
+    , developmentFlavour Stage2, performanceFlavour, profiledFlavour
+    , quickFlavour, quickestFlavour, quickCrossFlavour, benchmarkLlvmFlavour
+    , performanceLlvmFlavour, profiledLlvmFlavour, quickLlvmFlavour
+    , ghcInGhciFlavour ]
 
 flavour :: Action Flavour
 flavour = do

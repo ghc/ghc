@@ -548,7 +548,7 @@ pprInstr (BCCFAR cond blockid prediction) = vcat [
             Just True  -> char '-'
             Just False -> char '+'
 
-pprInstr (JMP lbl)
+pprInstr (JMP lbl _)
   -- We never jump to ForeignLabels; if we ever do, c.f. handling for "BL"
   | isForeignLabel lbl = panic "PPC.Ppr.pprInstr: JMP to ForeignLabel"
   | otherwise =
@@ -565,7 +565,7 @@ pprInstr (MTCTR reg) = hcat [
         char '\t',
         pprReg reg
     ]
-pprInstr (BCTR _ _) = hcat [
+pprInstr (BCTR _ _ _) = hcat [
         char '\t',
         text "bctr"
     ]
@@ -754,12 +754,12 @@ pprInstr (SR II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
     -- Handle the case where we are asked to shift a 32 bit register by
     -- less than zero or more than 31 bits. We convert this into a clear
     -- of the destination register.
-    -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/5900
+    -- Fixes ticket https://gitlab.haskell.org/ghc/ghc/issues/5900
     pprInstr (XOR reg1 reg2 (RIReg reg2))
 
 pprInstr (SL II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
     -- As above for SR, but for left shifts.
-    -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/10870
+    -- Fixes ticket https://gitlab.haskell.org/ghc/ghc/issues/10870
     pprInstr (XOR reg1 reg2 (RIReg reg2))
 
 pprInstr (SRA II32 reg1 reg2 (RIImm (ImmInt i))) | i > 31 =

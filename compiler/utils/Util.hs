@@ -26,7 +26,7 @@ module Util (
 
         mapFst, mapSnd, chkAppend,
         mapAndUnzip, mapAndUnzip3, mapAccumL2,
-        nOfThem, filterOut, partitionWith,
+        filterOut, partitionWith,
 
         dropWhileEndLE, spanEnd, last2, lastMaybe,
 
@@ -457,9 +457,6 @@ mapAccumL2 f s1 s2 xs = (s1', s2', ys)
   where ((s1', s2'), ys) = mapAccumL (\(s1, s2) x -> case f s1 s2 x of
                                                        (s1', s2', y) -> ((s1', s2'), y))
                                      (s1, s2) xs
-
-nOfThem :: Int -> a -> [a]
-nOfThem n thing = replicate n thing
 
 -- | @atLength atLen atEnd ls n@ unravels list @ls@ to position @n@. Precisely:
 --
@@ -1314,7 +1311,8 @@ modificationTimeIfExists f = do
 -- also results in a skip.
 
 withAtomicRename :: (MonadIO m) => FilePath -> (FilePath -> m a) -> m a
-withAtomicRename targetFile f = do
+withAtomicRename targetFile f
+  | enableAtomicRename = do
   -- The temp file must be on the same file system (mount) as the target file
   -- to result in an atomic move on most platforms.
   -- The standard way to ensure that is to place it into the same directory.
@@ -1324,6 +1322,17 @@ withAtomicRename targetFile f = do
   res <- f temp
   liftIO $ renameFile temp targetFile
   return res
+
+  | otherwise = f targetFile
+  where
+    -- As described in #16450, enabling this causes spurious build failures due
+    -- to apparently missing files.
+    enableAtomicRename :: Bool
+#if defined(mingw32_BUILD_OS)
+    enableAtomicRename = False
+#else
+    enableAtomicRename = True
+#endif
 
 -- --------------------------------------------------------------
 -- split a string at the last character where 'pred' is True,

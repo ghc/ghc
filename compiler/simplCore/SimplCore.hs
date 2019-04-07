@@ -339,7 +339,7 @@ getCoreToDo dflags
         -- really really one-shot thunks. Only needed if the demand analyser
         -- has run at all. See Note [Final Demand Analyser run] in DmdAnal
         -- It is EXTREMELY IMPORTANT to run this pass, otherwise execution
-        -- can become /exponentially/ more expensive. See Trac #11731, #12996.
+        -- can become /exponentially/ more expensive. See #11731, #12996.
         runWhen (strictness || late_dmd_anal) CoreDoStrictness,
 
         maybe_rule_check (Phase 0)
@@ -943,18 +943,18 @@ shortOutIndirections binds
 
 makeIndEnv :: [CoreBind] -> IndEnv
 makeIndEnv binds
-  = foldr add_bind emptyVarEnv binds
+  = foldl' add_bind emptyVarEnv binds
   where
-    add_bind :: CoreBind -> IndEnv -> IndEnv
-    add_bind (NonRec exported_id rhs) env = add_pair (exported_id, rhs) env
-    add_bind (Rec pairs)              env = foldr add_pair env pairs
+    add_bind :: IndEnv -> CoreBind -> IndEnv
+    add_bind env (NonRec exported_id rhs) = add_pair env (exported_id, rhs)
+    add_bind env (Rec pairs)              = foldl' add_pair env pairs
 
-    add_pair :: (Id,CoreExpr) -> IndEnv -> IndEnv
-    add_pair (exported_id, exported) env
+    add_pair :: IndEnv -> (Id,CoreExpr) -> IndEnv
+    add_pair env (exported_id, exported)
         | (ticks, Var local_id) <- stripTicksTop tickishFloatable exported
         , shortMeOut env exported_id local_id
         = extendVarEnv env local_id (exported_id, ticks)
-    add_pair _ env = env
+    add_pair env _ = env
 
 -----------------
 shortMeOut :: IndEnv -> Id -> Id -> Bool

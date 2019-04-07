@@ -125,7 +125,7 @@ until later. 'allocateComments' in 'Lexer' is responsible for
 making sure we only attach comments that actually fit in the 'SrcSpan'.)
 
 The wiki page describing this feature is
-https://ghc.haskell.org/trac/ghc/wiki/ApiAnnotations
+https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 
 -}
 -- ---------------------------------------------------------------------
@@ -188,7 +188,7 @@ getAndRemoveAnnotationComments (anns,canns) span =
 -- @'DynFlags.DynFlags'@ before parsing.
 --
 -- The wiki page describing this feature is
--- https://ghc.haskell.org/trac/ghc/wiki/ApiAnnotations
+-- https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 --
 -- Note: in general the names of these are taken from the
 -- corresponding token, unless otherwise noted

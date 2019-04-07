@@ -305,7 +305,7 @@ Nor is it a good idea to dump them in the rhs, but outside the lambda
     f = case x of I# y -> \xy. body
 because now f's arity might get worse, which is Not Good. (And if
 there's an SCC around the RHS it might not get better again.
-See Trac #5342.)
+See #5342.)
 
 So, gruesomely, we split the floats into
  * the outer FloatLets, which can join the Rec, and

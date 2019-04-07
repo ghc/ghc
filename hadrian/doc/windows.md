@@ -6,7 +6,7 @@ We only assume that `git` and `stack` are installed (see
 
 ```
 # Get GHC sources; git core.autocrlf should be set to false (see Prerequisites section)
-git clone --recursive git://git.haskell.org/ghc.git
+git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
 cd ghc
 
 # Download and install the bootstrapping GHC and MSYS2
@@ -33,7 +33,7 @@ without optimisations. If you need an optimised GHC, drop the `--flavour=quickes
 flag from the build command line (this will slow down the build to about an hour).
 
 These are currently not the
-[official GHC building instructions](https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows),
+[official GHC building instructions](https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation/windows),
 but are much simpler and may also be more robust.
 
 The `stack build` and `stack exec hadrian` commands can be replaced by an

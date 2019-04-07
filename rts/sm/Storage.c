@@ -7,7 +7,7 @@
  * Documentation on the architecture of the Storage Manager can be
  * found in the online commentary:
  *
- *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage
+ *   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage
  *
  * ---------------------------------------------------------------------------*/
 
@@ -856,7 +856,7 @@ allocateMightFail (Capability *cap, W_ n)
     bdescr *bd;
     StgPtr p;
 
-    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+    if (RTS_UNLIKELY(n >= LARGE_OBJECT_THRESHOLD/sizeof(W_))) {
         // The largest number of words such that
         // the computation of req_blocks will not overflow.
         W_ max_words = (HS_WORD_MAX & ~(BLOCK_SIZE-1)) / sizeof(W_);
@@ -897,7 +897,7 @@ allocateMightFail (Capability *cap, W_ n)
 
     accountAllocation(cap, n);
     bd = cap->r.rCurrentAlloc;
-    if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
+    if (RTS_UNLIKELY(bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W)) {
 
         if (bd) finishedNurseryBlock(cap,bd);
 
@@ -1372,7 +1372,7 @@ extern void __clear_cache(void * begin, void * end);
 #elif defined(__GNUC__)
 /* __clear_cache is a libgcc function.
  * It existed before __builtin___clear_cache was introduced.
- * See Trac #8562.
+ * See #8562.
  */
 extern void __clear_cache(char * begin, char * end);
 #endif /* __GNUC__ */

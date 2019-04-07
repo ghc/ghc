@@ -155,7 +155,7 @@ unreachable. There are two situations that can cause this:
 
  * If a finalizer throws an exception, subsequent finalizers that had
    been queued to run after it do not get run. This behavior may change
-   in a future release. See issue <https://ghc.haskell.org/trac/ghc/ticket/13167 13167>
+   in a future release. See issue <https://gitlab.haskell.org/ghc/ghc/issues/13167 13167>
    on the issue tracker. Writing a finalizer that throws exceptions is
    discouraged.
 

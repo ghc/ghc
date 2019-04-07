@@ -1,3 +1,23 @@
+## 0.6.1 (edit as necessary)
+
+- Shipped with GHC 8.10.1
+
+- Added to `GHC.Prim`:
+
+        closureSize# :: a -> Int#
+
+- Added to `GHC.Prim`:
+
+        bitReverse# :: Word# -> Word#
+        bitReverse8# :: Word# -> Word#
+        bitReverse16# :: Word# -> Word#
+        bitReverse32# :: Word# -> Word#
+        bitReverse64# :: Word# -> Word#
+
+  `bitReverse#` is a primop that, for a `Word` of 8, 16, 32 or 64 bits,
+  reverses the order of its bits e.g. `0b110001` becomes `0b100011`.
+  These primitives use optimized machine instructions when available.
+
 ## 0.6.0
 
 - Shipped with GHC 8.8.1
@@ -6,7 +26,7 @@
 
         traceBinaryEvent# :: Addr# -> Int# -> State# s -> State# s
 
-## 0.5.3 (edit as necessary)
+## 0.5.3
 
 - Shipped with GHC 8.6.1
 

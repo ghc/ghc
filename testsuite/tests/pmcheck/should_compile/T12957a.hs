@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 
--- The original test case for Trac #12957
+-- The original test case for #12957
 
 module T12957a where
 

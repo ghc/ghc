@@ -3,7 +3,7 @@
 -- should_run to make sure linking succeeds
 -- (curried unboxed tuples with both boxed
 --  and unboxed components).
--- See Trac #1509; also Note [Primop wrappers] in Id.lhs
+-- See #1509; also Note [Primop wrappers] in Id.lhs
 
 import GHC.Exts
 

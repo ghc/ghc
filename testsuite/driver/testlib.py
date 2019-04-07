@@ -1402,7 +1402,7 @@ def simple_run(name, way, prog, extra_run_opts):
             print('Wrong exit code for ' + name + '(' + way + ')' + '(expected', opts.exit_code, ', actual', exit_code, ')')
             dump_stdout(name)
             dump_stderr(name)
-        return failBecause('bad exit code')
+        return failBecause('bad exit code (%d)' % exit_code)
 
     if not (opts.ignore_stderr or stderr_ok(name, way) or opts.combined_output):
         return failBecause('bad stderr')
@@ -1820,7 +1820,7 @@ def normalise_errmsg( str ):
     str = str.replace(bullet, '')
 
     # Windows only, this is a bug in hsc2hs but it is preventing
-    # stable output for the testsuite. See Trac #9775. For now we filter out this
+    # stable output for the testsuite. See #9775. For now we filter out this
     # warning message to get clean output.
     if config.msys:
         str = re.sub('Failed to remove file (.*); error= (.*)$', '', str)
@@ -2091,7 +2091,7 @@ if config.msys:
         # still locked then abort the current test by throwing an exception, this so it won't fail
         # with an even more cryptic error.
         #
-        # See Trac #13162
+        # See #13162
         exception = None
         while retries > 0 and os.path.exists(testdir):
             time.sleep((max_attempts-retries)*6)
@@ -2214,7 +2214,7 @@ def printUnexpectedTests(file, testInfoss):
 
 def printTestInfosSummary(file, testInfos):
     maxDirLen = max(len(tr.directory) for tr in testInfos)
-    for result in testInfos:
+    for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.way, r.directory)):
         directory = result.directory.ljust(maxDirLen)
         file.write('   {directory}  {r.testname} [{r.reason}] ({r.way})\n'.format(
             r = result,

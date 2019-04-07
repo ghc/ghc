@@ -375,7 +375,7 @@ Suppose we have this STG code:
    f = \[s : State# RealWorld] ->
        case s of _ -> blah
 This is very odd.  Why are we scrutinising a state token?  But it
-can arise with bizarre NOINLINE pragmas (Trac #9964)
+can arise with bizarre NOINLINE pragmas (#9964)
     crash :: IO ()
     crash = IO (\s -> let {-# NOINLINE s' #-}
                           s' = s
@@ -532,7 +532,7 @@ See Note [case on bool]
 
 It's odd, and it's flagrantly inconsistent with the rules described
 Note [Compiling case expressions].  However, after eliminating the
-tagToEnum# (Trac #13397) we will have:
+tagToEnum# (#13397) we will have:
    case (a>b) of ...
 Rather than make it behave quite differently, I am testing for a
 comparison operator here in in the general case as well.

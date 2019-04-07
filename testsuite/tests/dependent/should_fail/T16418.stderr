@@ -1,0 +1,7 @@
+
+T16418.hs:9:6: error:
+    • These kind and type variables: a k (b :: k)
+      are out of dependency order. Perhaps try this ordering:
+        k (a :: k) (b :: k)
+    • In the type signature:
+        f :: forall a k (b :: k). SameKind a b -> ()

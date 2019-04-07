@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Trac #2520: a bug in the specialiser when we tried to
+-- #2520: a bug in the specialiser when we tried to
 -- quantify over an Internal Name
 
 module Types where

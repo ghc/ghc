@@ -1,12 +1,12 @@
 cabal-version:  2.1
 name:           ghc-prim
-version:        0.5.3
+version:        0.6.1
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD-3-Clause
 license-file:   LICENSE
 category:       GHC
 maintainer:     libraries@haskell.org
-bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=libraries%20%28other%29&keywords=ghc-prim
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       GHC primitives
 build-type:     Custom
 description:
@@ -16,7 +16,7 @@ extra-source-files: changelog.md
 
 source-repository head
     type:     git
-    location: http://git.haskell.org/ghc.git
+    location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   libraries/ghc-prim
 
 custom-setup
@@ -69,6 +69,7 @@ Library
     c-sources:
         cbits/atomic.c
         cbits/bswap.c
+        cbits/bitrev.c
         cbits/clz.c
         cbits/ctz.c
         cbits/debug.c

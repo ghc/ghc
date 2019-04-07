@@ -840,7 +840,7 @@ used, and does a w/w split thus
 After some simplification, the (absentError "blah") thunk goes away.
 
 ------ Tricky wrinkle -------
-Trac #14285 had, roughly
+#14285 had, roughly
 
    data T a = MkT a !a
    {-# INLINABLE f #-}

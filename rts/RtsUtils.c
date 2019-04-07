@@ -97,13 +97,13 @@ stgReallocBytes (void *p, size_t n, char *msg)
 }
 
 void *
-stgCallocBytes (size_t n, size_t m, char *msg)
+stgCallocBytes (size_t count, size_t size, char *msg)
 {
     void *space;
 
-    if ((space = calloc(n, m)) == NULL) {
+    if ((space = calloc(count, size)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-      rtsConfig.mallocFailHook((W_) n*m, msg);
+      rtsConfig.mallocFailHook((W_) count*size, msg);
       stg_exit(EXIT_INTERNAL_ERROR);
     }
     return space;
@@ -306,7 +306,7 @@ void printRtsInfo(const RtsConfig rts_config) {
     mkRtsInfoPair("Word size",               TOSTRING(WORD_SIZE_IN_BITS));
     mkRtsInfoPair("Compiler unregisterised", GhcUnregisterised);
     mkRtsInfoPair("Tables next to code",     GhcEnableTablesNextToCode);
-    mkRtsInfoPair("Flag -with-rtsopts",      /* See Trac #15261 */
+    mkRtsInfoPair("Flag -with-rtsopts",      /* See #15261 */
         rts_config.rts_opts != NULL ? rts_config.rts_opts : "");
     printf(" ]\n");
 }

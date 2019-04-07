@@ -287,7 +287,7 @@ warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
 
 getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Name)
 -- ^ See if the expression is an 'Integral' literal.
--- Remember to look through automatically-added tick-boxes! (Trac #8384)
+-- Remember to look through automatically-added tick-boxes! (#8384)
 getLHsIntegralLit (dL->L _ (HsPar _ e))            = getLHsIntegralLit e
 getLHsIntegralLit (dL->L _ (HsTick _ _ e))         = getLHsIntegralLit e
 getLHsIntegralLit (dL->L _ (HsBinTick _ _ _ e))    = getLHsIntegralLit e
@@ -349,7 +349,7 @@ tidyNPat (OverLit (OverLitTc False ty) val _) mb_neg _eq outer_ty
         -- Once that is settled, look for cases where the type of the
         -- entire overloaded literal matches the type of the underlying literal,
         -- and in that case take the short cut
-        -- NB: Watch out for weird cases like Trac #3382
+        -- NB: Watch out for weird cases like #3382
         --        f :: Int -> Int
         --        f "blah" = 4
         --     which might be ok if we have 'instance IsString Int'
@@ -363,7 +363,7 @@ tidyNPat (OverLit (OverLitTc False ty) val _) mb_neg _eq outer_ty
      -- NB: do /not/ convert Float or Double literals to F# 3.8 or D# 5.3
      -- If we do convert to the constructor form, we'll generate a case
      -- expression on a Float# or Double# and that's not allowed in Core; see
-     -- Trac #9238 and Note [Rules for floating-point comparisons] in PrelRules
+     -- #9238 and Note [Rules for floating-point comparisons] in PrelRules
   where
     -- Sometimes (like in test case
     -- overloadedlists/should_run/overloadedlistsrun04), the SyntaxExprs include

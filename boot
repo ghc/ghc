@@ -50,11 +50,11 @@ def check_for_url_rewrites():
 
             Or start over, and clone the GHC repository from the haskell server:
 
-              git clone --recursive git://git.haskell.org/ghc.git
+              git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
 
             For more information, see:
-              * https://ghc.haskell.org/trac/ghc/wiki/Newcomers or
-              * https://ghc.haskell.org/trac/ghc/wiki/Building/GettingTheSources#CloningfromGitHub
+              * https://gitlab.haskell.org/ghc/ghc/wikis/newcomers or
+              * https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github
         """)
 
 def check_boot_packages():
@@ -186,7 +186,7 @@ def check_build_mk():
             than simply building it to use it.
 
             For information on creating a mk/build.mk file, please see:
-                http://ghc.haskell.org/trac/ghc/wiki/Building/Using#Buildconfiguration
+                https://gitlab.haskell.org/ghc/ghc/wikis/building/using#build-configuration
             """))
 
 check_for_url_rewrites()

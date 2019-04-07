@@ -40,7 +40,7 @@
 #
 # NOTE: The default e.g. ${docdir} above means that autoconf substitutes the
 # string "${docdir}", not the value of docdir! This is crucial for the GNU
-# coding standards. See Trac #1924.
+# coding standards. See #1924.
 
 define set_default
 # $1 = variable to set

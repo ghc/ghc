@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
+#      https://gitlab.haskell.org/ghc/ghc/wikis/building/architecture
+#      https://gitlab.haskell.org/ghc/ghc/wikis/building/modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -22,7 +22,7 @@ MAKEFLAGS += --no-builtin-rules
 # -----------------------------------------------------------------------------
 # Sanitize environment
 
-# See Trac #11530
+# See #11530
 export GREP_OPTIONS :=
 
 ifneq "$(filter maintainer-clean distclean clean clean_% help,$(MAKECMDGOALS))" ""

@@ -679,7 +679,7 @@ View patterns
 
 View patterns are enabled by the language extension :extension:`ViewPatterns`. More
 information and examples of view patterns can be found on the
-:ghc-wiki:`Wiki page <ViewPatterns>`.
+:ghc-wiki:`Wiki page <view-patterns>`.
 
 View patterns are somewhat like pattern guards that can be nested inside
 of other patterns. They are a convenient way of pattern-matching against
@@ -3787,7 +3787,7 @@ Haskell 98 allows the programmer to add a deriving clause to a data type
 declaration, to generate a standard instance declaration for specified class.
 GHC extends this mechanism along several axes:
 
-* The derivation mechanism can be used separtely from the data type
+* The derivation mechanism can be used separately from the data type
   declaration, using the `standalone deriving mechanism
   <#stand-alone-deriving>`__.
 
@@ -4459,7 +4459,7 @@ types containing a function type on the right-hand side.
 
 For a full specification of the algorithms used in :extension:`DeriveFunctor`,
 :extension:`DeriveFoldable`, and :extension:`DeriveTraversable`, see
-:ghc-wiki:`this wiki page <Commentary/Compiler/DeriveFunctor>`.
+:ghc-wiki:`this wiki page <commentary/compiler/derive-functor>`.
 
 .. _deriving-data:
 
@@ -5333,7 +5333,7 @@ Pattern synonyms
 
 Pattern synonyms are enabled by the language extension :extension:`PatternSynonyms`, which is
 required for defining them, but *not* for using them. More information and
-examples of pattern synonyms can be found on the :ghc-wiki:`Wiki page <PatternSynonyms>`.
+examples of pattern synonyms can be found on the :ghc-wiki:`Wiki page <pattern-synonyms>`.
 
 Pattern synonyms enable giving names to parametrized pattern schemes.
 They can also be thought of as abstract constructors that don't have a
@@ -5535,7 +5535,7 @@ following subsections.
 There are also lots more details in the `paper
 <https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/pattern-synonyms-Haskell16.pdf>`_.
 
-See the :ghc-wiki:`Wiki page <PatternSynonyms>` for more
+See the :ghc-wiki:`Wiki page <pattern-synonyms>` for more
 details.
 
 Syntax and scoping of pattern synonyms
@@ -5644,7 +5644,7 @@ incompatible with ``T``.
 A module which imports ``MyNum(..)`` from ``Example`` and then re-exports
 ``MyNum(..)`` will also export any pattern synonyms bundled with ``MyNum`` in
 ``Example``. A more complete specification can be found on the
-:ghc-wiki:`wiki. <PatternSynonyms/AssociatingSynonyms>`
+:ghc-wiki:`wiki. <pattern-synonyms/associating-synonyms>`
 
 
 .. _patsyn-typing:
@@ -5737,7 +5737,7 @@ Note also the following points
          pattern P x y v <- MkT True x y (v::a)
 
    Here the universal type variable `a` scopes over the definition of `P`,
-   but the existential `b` does not.  (c.f. discussion on Trac #14998.)
+   but the existential `b` does not.  (c.f. discussion on #14998.)
 
 -  For a bidirectional pattern synonym, a use of the pattern synonym as
    an expression has the type
@@ -7422,7 +7422,7 @@ But superclass constraints like these are sometimes useful, and the conservative
 check is annoying where no actual recursion is involved.
 
 Moreover genuninely-recursive superclasses are sometimes useful. Here's a real-life
-example (Trac #10318) ::
+example (#10318) ::
 
      class (Frac (Frac a) ~ Frac a,
             Fractional (Frac a),
@@ -10045,7 +10045,7 @@ Notes:
    instance (forall xx. c (Free c xx)) => Monad (Free c) where
        Free f >>= g = f g
 
-  See `Iceland Jack's summary <https://ghc.haskell.org/trac/ghc/ticket/14733#comment:6>`_.  The key point is that the bit to the right of the ``=>`` may be headed by a type *variable* (``c`` in this case), rather than a class.  It should not be one of the forall'd variables, though.
+  See `Iceland Jack's summary <https://gitlab.haskell.org/ghc/ghc/issues/14733#note_148352>`_.  The key point is that the bit to the right of the ``=>`` may be headed by a type *variable* (``c`` in this case), rather than a class.  It should not be one of the forall'd variables, though.
 
   (NB: this goes beyond what is described in `the paper <http://i.cs.hku.hk/~bruno//papers/hs2017.pdf>`_, but does not seem to introduce any new technical difficulties.)
 
@@ -10358,6 +10358,24 @@ function that can *never* be called, such as this one: ::
 
       f :: (Int ~ Bool) => a -> a
 
+Sometimes :extension:`AllowAmbiguousTypes` does not mix well with :extension:`RankNTypes`.
+For example: :: 
+      foo :: forall r. (forall i. (KnownNat i) => r) -> r
+      foo f = f @1
+
+      boo :: forall j. (KnownNat j) => Int
+      boo = ....
+          
+      h :: Int
+      h = foo boo
+
+This program will be rejected as ambiguous because GHC will not unify
+the type variables `j` and `i`.
+
+Unlike the previous examples, it is not currently possible
+to resolve the ambiguity manually by using :extension:`TypeApplications`.
+
+       
 .. note::
     *A historical note.* GHC used to impose some more restrictive and less
     principled conditions on type signatures. For type
@@ -10872,7 +10890,7 @@ We say that the type variables in ``f`` are *specified*, while those in
 a type variable in the source program, it is *specified*; if not, it is
 *inferred*.
 
-Thus rule applies in datatype declarations, too. For example, if we have
+This rule applies in datatype declarations, too. For example, if we have
 ``data Proxy a = Proxy`` (and :extension:`PolyKinds` is enabled), then
 ``a`` will be assigned kind ``k``, where ``k`` is a fresh kind variable.
 Because ``k`` was not written by the user, it will be unavailable for
@@ -11498,7 +11516,7 @@ Notice here that the ``Maybe`` type is parameterised by the
 should be considered highly experimental, and certainly un-supported*.
 You are welcome to try it, but please don't rely on it working
 consistently, or working the same in subsequent releases. See
-:ghc-wiki:`this wiki page <ImpredicativePolymorphism>` for more details.
+:ghc-wiki:`this wiki page <impredicative-polymorphism>` for more details.
 
 If you want impredicative polymorphism, the main workaround is to use a
 newtype wrapper. The ``id runST`` example can be written using this
@@ -12504,7 +12522,7 @@ that we're interested in is ``main`` it can be useful to be able to
 ignore the problems in ``a``.
 
 For more motivation and details please refer to the
-:ghc-wiki:`Wiki <DeferErrorsToRuntime>` page or the `original
+:ghc-wiki:`Wiki <defer-errors-to-runtime>` page or the `original
 paper <http://dreixel.net/research/pdf/epdtecp.pdf>`__.
 
 Enabling deferring of type errors
@@ -12600,7 +12618,7 @@ In a few cases, even equality constraints cannot be deferred.  Specifically:
 
   This type signature contains a kind error which cannot be deferred.
 
-- Type equalities under a forall cannot be deferred (c.f. Trac #14605).
+- Type equalities under a forall cannot be deferred (c.f. #14605).
 
 .. _template-haskell:
 

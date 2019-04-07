@@ -13,6 +13,12 @@ module GHC.Exts.Heap.Closures (
     , GenClosure(..)
     , PrimType(..)
     , allClosures
+#if __GLASGOW_HASKELL__ >= 809
+    -- The closureSize# primop is unsupported on earlier GHC releases but we
+    -- build ghc-heap as a boot library so it must be buildable. Drop this once
+    -- we are guaranteed to bootstsrap with GHC >= 8.9.
+    , closureSize
+#endif
 
     -- * Boxes
     , Box(..)
@@ -94,7 +100,7 @@ areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
 type Closure = GenClosure Box
 
 -- | This is the representation of a Haskell value on the heap. It reflects
--- <http://ghc.haskell.org/trac/ghc/browser/includes/rts/storage/Closures.h>
+-- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/storage/Closures.h>
 --
 -- The data type is parametrized by the type to store references in. Usually
 -- this is a 'Box' with the type synonym 'Closure'.
@@ -105,7 +111,7 @@ type Closure = GenClosure Box
 -- fields are the payload.
 --
 -- See
--- <https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/HeapObjects>
+-- <https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage/heap-objects>
 -- for more information.
 data GenClosure b
   = -- | A data constructor
@@ -321,3 +327,11 @@ allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (OtherClosure {..}) = hvalues
 allClosures _ = []
+
+#if __GLASGOW_HASKELL__ >= 809
+-- | Get the size of a closure in words.
+--
+-- @since 8.10.1
+closureSize :: Box -> Int
+closureSize (Box x) = I# (closureSize# x)
+#endif

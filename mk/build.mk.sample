@@ -34,7 +34,7 @@
 # Even faster build.  NOT RECOMMENDED: the libraries will be
 # completely unoptimised, so any code built with this compiler
 # (including stage2) will run very slowly, and many GHC tests
-# will fail with this profile (see Trac #12141):
+# will fail with this profile (see #12141):
 #BuildFlavour = quickest
 
 # Profile the stage2 compiler:
@@ -96,7 +96,7 @@ endif
 #GhcRtsHcOpts += -g3
 
 # Build the "extra" packages (see ./packages). This enables more tests. See:
-# https://ghc.haskell.org/trac/ghc/wiki/Building/RunningTests/Running#AdditionalPackages
+# https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests/running#additional-packages
 #BUILD_EXTRA_PKGS=YES
 
 # Uncomment the following to force `integer-gmp` to use the in-tree GMP 6.1.2

@@ -83,7 +83,7 @@ Hello,
 You are receiving this mail because you are the reporter, or on the CC
 list, for one or more GHC tickets that are automatically having their
 priority reduced due to our post-release ticket handling policy:
-    http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/BugTracker#Remilestoningticketsafterarelease
+    https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/bug-tracker#re-milestoning-tickets-after-a-release
 
 The list of tickets for which you are the reporter or on the CC list is
 given below. If any of these are causing problems for you, please let us
@@ -101,11 +101,11 @@ EOF
             my $title = $ticketsfor{$email}{$ticket}{"title"};
             print FH "\n";
             print FH "#$ticket $title:\n";
-            print FH "    http://ghc.haskell.org/trac/ghc/ticket/$ticket\n";
+            print FH "    https://gitlab.haskell.org/ghc/ghc/issues/$ticket\n";
         }
         print FH <<'EOF';
 
--- 
+--
 The GHC Team
 http://www.haskell.org/ghc/
 EOF

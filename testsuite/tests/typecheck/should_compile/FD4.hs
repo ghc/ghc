@@ -5,7 +5,7 @@
     FlexibleInstances,
     EmptyDataDecls #-}
 
--- Trac #1797
+-- #1797
 
 module ShouldCompile where
 

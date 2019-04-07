@@ -7,7 +7,7 @@ import Data.Proxy
 
 type family SomeFun (n :: Nat)
 
--- See the Trac ticket; whether this succeeds or fails is distinctly random
+-- See the ticket; whether this succeeds or fails is distinctly random
 
 -- upon creation, commit f861fc6ad8e5504a4fecfc9bb0945fe2d313687c, this failed
 

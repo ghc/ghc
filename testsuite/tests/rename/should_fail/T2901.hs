@@ -1,5 +1,5 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
--- Trac #2901
+-- #2901
 
 module T2901 where
 

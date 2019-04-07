@@ -30,7 +30,7 @@ main = do
     yield -- kick RTS IO manager
 
 {-
- Trac #10590 exposed a bug as:
+ #10590 exposed a bug as:
    T10590: internal error: removeThreadFromDeQueue: not found
     (GHC version 7.11.20150702 for x86_64_unknown_linux)
     Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug

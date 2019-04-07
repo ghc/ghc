@@ -5,7 +5,7 @@
 -- Primitive Operations and Types
 --
 -- For more information on PrimOps, see
---   http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps
+--   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/prim-ops
 --
 -----------------------------------------------------------------------
 
@@ -18,7 +18,7 @@
 -- Information on how PrimOps are implemented and the steps necessary to
 -- add a new one can be found in the Commentary:
 --
---  http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps
+--  https://gitlab.haskell.org/ghc/ghc/wikis/commentary/prim-ops
 --
 -- Note in particular that Haskell block-style comments are not recognized
 -- here, so stick to '--' (even for Notes spanning multiple lines).
@@ -654,6 +654,17 @@ primop   BSwap64Op   "byteSwap64#"   Monadic   WORD64 -> WORD64
     {Swap bytes in a 64 bits of a word.}
 primop   BSwapOp     "byteSwap#"     Monadic   Word# -> Word#
     {Swap bytes in a word.}
+
+primop   BRev8Op    "bitReverse8#"   Monadic   Word# -> Word#
+    {Reverse the order of the bits in a 8-bit word.}
+primop   BRev16Op   "bitReverse16#"   Monadic   Word# -> Word#
+    {Reverse the order of the bits in a 16-bit word.}
+primop   BRev32Op   "bitReverse32#"   Monadic   Word# -> Word#
+    {Reverse the order of the bits in a 32-bit word.}
+primop   BRev64Op   "bitReverse64#"   Monadic   WORD64 -> WORD64
+    {Reverse the order of the bits in a 64-bit word.}
+primop   BRevOp     "bitReverse#"     Monadic   Word# -> Word#
+    {Reverse the order of the bits in a word.}
 
 ------------------------------------------------------------------------
 section "Narrowings"
@@ -2584,7 +2595,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
 --     (# s2, a #) -> e
 -- with:
 --   retry# s1
--- where 'e' would be unreachable anyway.  See Trac #8091.
+-- where 'e' would be unreachable anyway.  See #8091.
 primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
    with
@@ -3079,7 +3090,7 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 -- conservative, but it prevented reallyUnsafePtrEquality# from floating out of
 -- places where its arguments were known to be forced. Unfortunately, GHC could
 -- sometimes lose track of whether those arguments were forced, leading to let/app
--- invariant failures (see Trac 13027 and the discussion in Trac 11444). Now that
+-- invariant failures (see #13027 and the discussion in #11444). Now that
 -- ok_for_speculation skips over lifted arguments, we need to explicitly prevent
 -- reallyUnsafePtrEquality# from floating out. Imagine if we had
 --
@@ -3205,6 +3216,13 @@ primop  UnpackClosureOp "unpackClosure#" GenPrimOp
      payload of the given closure into two new arrays, and returns a pointer to
      the first word of the closure's info table, a non-pointer array for the raw
      bytes of the closure, and a pointer array for the pointers in the payload. }
+   with
+   out_of_line = True
+
+primop  ClosureSizeOp "closureSize#" GenPrimOp
+   a -> Int#
+   { {\tt closureSize\# closure} returns the size of the given closure in
+     machine words. }
    with
    out_of_line = True
 

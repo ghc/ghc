@@ -4,7 +4,7 @@ tcfail182.hs:9:3: error:
                   with actual type ‘Maybe a0’
       NB: ‘Maybe’ is defined at tcfail182.hs:6:1-18
           ‘Prelude.Maybe’
-            is defined in ‘GHC.Maybe’ in package ‘base-4.12.0.0’
+            is defined in ‘GHC.Maybe’ in package ‘base-4.13.0.0’
     • In the pattern: Foo
       In an equation for ‘f’: f Foo = 3
     • Relevant bindings include

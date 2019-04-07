@@ -148,7 +148,7 @@ newMetaKindVar
        ; return (mkTyVarTy kv) }
 
 newMetaKindVars :: Int -> TcM [TcKind]
-newMetaKindVars n = mapM (\ _ -> newMetaKindVar) (nOfThem n ())
+newMetaKindVars n = replicateM n newMetaKindVar
 
 {-
 ************************************************************************
@@ -383,7 +383,7 @@ holes should
 By defining ExpType, separately from Type, we can achieve goals 1 and 2
 statically.
 
-See also [wiki:Typechecking]
+See also [wiki:typechecking]
 
 Note [TcLevel of ExpType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -683,7 +683,7 @@ influences the way it is tidied; see TypeRep.tidyTyVarBndr.
 Note [Unification variables need fresh Names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Whenever we allocate a unification variable (MetaTyVar) we give
-it a fresh name.   Trac #16221 is a very tricky case that illustrates
+it a fresh name.   #16221 is a very tricky case that illustrates
 why this is important:
 
    data SameKind :: k -> k -> *
@@ -944,7 +944,7 @@ newFlexiTyVarTy kind = do
     return (mkTyVarTy tc_tyvar)
 
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
-newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
+newFlexiTyVarTys n kind = replicateM n (newFlexiTyVarTy kind)
 
 newOpenTypeKind :: TcM TcKind
 newOpenTypeKind
@@ -996,14 +996,14 @@ new_meta_tv_x info subst tv
         ; return (subst1, new_tv) }
   where
     substd_kind = substTyUnchecked subst (tyVarKind tv)
-      -- NOTE: Trac #12549 is fixed so we could use
+      -- NOTE: #12549 is fixed so we could use
       -- substTy here, but the tc_infer_args problem
       -- is not yet fixed so leaving as unchecked for now.
       -- OLD NOTE:
       -- Unchecked because we call newMetaTyVarX from
       -- tcInstTyBinder, which is called from tcInferApps
       -- which does not yet take enough trouble to ensure
-      -- the in-scope set is right; e.g. Trac #12785 trips
+      -- the in-scope set is right; e.g. #12785 trips
       -- if we use substTy here
 
 newMetaTyVarTyAtLevel :: TcLevel -> TcKind -> TcM TcType
@@ -1084,7 +1084,7 @@ Note [CandidatesQTvs determinism and order]
   accumulating-parameter style for candidateQTyVarsOfType so that we
   add variables one at a time, left to right.  That means we tend to
   produce the variables in left-to-right order.  This is just to make
-  it bit more predicatable for the programmer.
+  it bit more predictable for the programmer.
 
 Note [Naughty quantification candidates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1255,7 +1255,7 @@ collect_cand_qtvs is_dep bound dvs ty
       = do { tv_kind <- zonkTcType (tyVarKind tv)
                  -- This zonk is annoying, but it is necessary, both to
                  -- ensure that the collected candidates have zonked kinds
-                 -- (Trac #15795) and to make the naughty check
+                 -- (#15795) and to make the naughty check
                  -- (which comes next) works correctly
            ; if intersectsVarSet bound (tyCoVarsOfType tv_kind)
 
@@ -1364,7 +1364,7 @@ non-dependent variables) and
 Step (2) is often unimportant, because the kind variable is often
 also free in the type.  Eg
      Typeable k (a::k)
-has free vars {k,a}.  But the type (see Trac #7916)
+has free vars {k,a}.  But the type (see #7916)
     (f::k->*) (a::k)
 has free vars {f,a}, but we must add 'k' as well! Hence step (2).
 
@@ -1496,7 +1496,7 @@ quantifiableTv :: TcLevel   -- Level of the context, outside the quantification
                -> TcTyVar
                -> Bool
 quantifiableTv outer_tclvl tcv
-  | isTcTyVar tcv  -- Might be a CoVar; change this when gather covars separtely
+  | isTcTyVar tcv  -- Might be a CoVar; change this when gather covars separately
   = tcTyVarLevel tcv > outer_tclvl
   | otherwise
   = False
@@ -1553,7 +1553,7 @@ defaultTyVar default_kind tv
   | isTyVarTyVar tv
     -- Do not default TyVarTvs. Doing so would violate the invariants
     -- on TyVarTvs; see Note [Signature skolems] in TcType.
-    -- Trac #13343 is an example; #14555 is another
+    -- #13343 is an example; #14555 is another
     -- See Note [Inferring kinds for type declarations] in TcTyClsDecls
   = return False
 
@@ -1848,7 +1848,7 @@ zonkImplication implic@(Implic { ic_skols  = skols
                                , ic_wanted = wanted
                                , ic_info   = info })
   = do { skols'  <- mapM zonkTyCoVarKind skols  -- Need to zonk their kinds!
-                                                -- as Trac #7230 showed
+                                                -- as #7230 showed
        ; given'  <- mapM zonkEvVar given
        ; info'   <- zonkSkolemInfo info
        ; wanted' <- zonkWCRec wanted
@@ -1892,7 +1892,7 @@ Why?, for example:
   simple wanted and plugin loop, looks for @CDictCan@s. If a plugin is in use,
   constraints are zonked before being passed to the plugin. This means if we
   don't preserve a canonical form, @expandSuperClasses@ fails to expand
-  superclasses. This is what happened in Trac #11525.
+  superclasses. This is what happened in #11525.
 
 - For CHoleCan, once we forget that it's a hole, we can never recover that info.
 
@@ -2200,7 +2200,7 @@ See Note [Levity polymorphism checking] in DsMonad
 -}
 
 -- | According to the rules around representation polymorphism
--- (see https://ghc.haskell.org/trac/ghc/wiki/NoSubKinds), no binder
+-- (see https://gitlab.haskell.org/ghc/ghc/wikis/no-sub-kinds), no binder
 -- can have a representation-polymorphic type. This check ensures
 -- that we respect this rule. It is a bit regrettable that this error
 -- occurs in zonking, after which we should have reported all errors.

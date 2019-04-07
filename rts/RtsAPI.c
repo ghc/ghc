@@ -464,7 +464,7 @@ void rts_evalIO (/* inout */ Capability **cap,
  * rts_evalStableIOMain() is suitable for calling main Haskell thread
  * stored in (StablePtr (IO a)) it calls rts_evalStableIO but wraps
  * function in GHC.TopHandler.runMainIO that installs top_handlers.
- * See Trac #12903.
+ * See #12903.
  */
 void rts_evalStableIOMain(/* inout */ Capability **cap,
                           /* in    */ HsStablePtr s,

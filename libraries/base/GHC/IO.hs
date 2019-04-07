@@ -440,7 +440,7 @@ evaluate a = IO $ \s -> seq# a s -- NB. see #2273, #5129
 {- $exceptions_and_strictness
 
 Laziness can interact with @catch@-like operations in non-obvious ways (see,
-e.g. GHC Trac #11555 and #13330). For instance, consider these subtly-different
+e.g. GHC #11555 and #13330). For instance, consider these subtly-different
 examples:
 
 > test1 = Control.Exception.catch (error "uh oh") (\(_ :: SomeException) -> putStrLn "it failed")

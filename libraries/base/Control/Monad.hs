@@ -19,7 +19,8 @@ module Control.Monad
     -- * Functor and monad classes
 
       Functor(fmap)
-    , Monad((>>=), (>>), return, fail)
+    , Monad((>>=), (>>), return)
+    , MonadFail(fail)
     , MonadPlus(mzero, mplus)
     -- * Functions
 
@@ -75,6 +76,7 @@ module Control.Monad
     , (<$!>)
     ) where
 
+import Control.Monad.Fail ( MonadFail(fail) )
 import Data.Foldable ( Foldable, sequence_, sequenceA_, msum, mapM_, foldlM, forM_ )
 import Data.Functor ( void, (<$>) )
 import Data.Traversable ( forM, mapM, traverse, sequence, sequenceA )
@@ -260,8 +262,8 @@ By contrast, the implementation below with a local loop makes it possible to
 inline the entire definition (as happens for foldr, for example) thereby
 specialising for the particular action.
 
-For further information, see this Trac comment, which includes side-by-side
-Core: https://ghc.haskell.org/trac/ghc/ticket/11795#comment:6
+For further information, see this issue comment, which includes side-by-side
+Core: https://gitlab.haskell.org/ghc/ghc/issues/11795#note_118976
 -}
 
 -- | @'replicateM' n act@ performs the action @n@ times,

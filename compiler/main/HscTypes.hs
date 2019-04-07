@@ -703,7 +703,7 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
                     Nothing -> pprTrace "WARNING in hptSomeThingsBelowUs" msg []
           msg = vcat [text "missing module" <+> ppr mod,
                       text "Probable cause: out-of-date interface files"]
-                        -- This really shouldn't happen, but see Trac #962
+                        -- This really shouldn't happen, but see #962
 
         -- And get its dfuns
     , thing <- things ]
@@ -1535,7 +1535,7 @@ e.g.    Prelude> data T = A | B
         Prelude> instance Eq T where ...
         Prelude> instance Eq T where ...   -- This one overrides
 
-It's exactly the same for type-family instances.  See Trac #7102
+It's exactly the same for type-family instances.  See #7102
 -}
 
 -- | Interactive context, recording information about the state of the
@@ -1658,7 +1658,7 @@ extendInteractiveContext :: InteractiveContext
 extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults fix_env
   = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
                             -- Always bump this; even instances should create
-                            -- a new mod_index (Trac #9426)
+                            -- a new mod_index (#9426)
           , ic_tythings   = new_tythings ++ old_tythings
           , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings
           , ic_instances  = ( new_cls_insts ++ old_cls_insts
@@ -1726,7 +1726,7 @@ icExtendGblRdrEnv env tythings
     -- are not implicit-ids, and must appear in the TypeEnv.  But they
     -- will also be brought into scope by the corresponding (ATyCon
     -- tc).  And we want the latter, because that has the correct
-    -- parent (Trac #10520)
+    -- parent (#10520)
     is_sub_bndr (AnId f) = case idDetails f of
                              RecSelId {}  -> True
                              ClassOpId {} -> True
@@ -2404,7 +2404,7 @@ noDependencies :: Dependencies
 noDependencies = Deps [] [] [] [] []
 
 -- | Records modules for which changes may force recompilation of this module
--- See wiki: http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
+-- See wiki: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance
 --
 -- This differs from Dependencies.  A module X may be in the dep_mods of this
 -- module (via an import chain) but if we don't use anything from X it won't

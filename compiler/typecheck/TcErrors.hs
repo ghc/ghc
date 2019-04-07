@@ -16,7 +16,7 @@ import GhcPrelude
 import TcRnTypes
 import TcRnMonad
 import TcMType
-import TcUnify( occCheckForErrors, OccCheckResult(..) )
+import TcUnify( occCheckForErrors, MetaTyVarUpdateResult(..) )
 import TcEnv( tcInitTidyEnv )
 import TcType
 import RnUnbound ( unknownNameSuggestions )
@@ -219,7 +219,7 @@ report_unsolved type_errors expr_holes
                                  -- See Note [Suppressing error messages]
                                  -- Suppress low-priority errors if there
                                  -- are insolule errors anywhere;
-                                 -- See Trac #15539 and c.f. setting ic_status
+                                 -- See #15539 and c.f. setting ic_status
                                  -- in TcSimplify.setImplicationStatus
                             , cec_warn_redundant = warn_redundant
                             , cec_binds    = binds_var }
@@ -381,7 +381,7 @@ ReportErrorSpec, as used in reportWanteds.
 
 But we need to take care: flags can turn errors into warnings, and we
 don't want those warnings to suppress subsequent errors (including
-suppressing the essential addTcEvBind for them: Trac #15152). So in
+suppressing the essential addTcEvBind for them: #15152). So in
 tryReporter we use askNoErrs to see if any error messages were
 /actually/ produced; if not, we don't switch on suppression.
 
@@ -424,7 +424,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
           -- type errors.  You could imagine using the /enclosing/
           -- bindings (in cec_binds), but that may not have enough stuff
           -- in scope for the bindings to be well typed.  So we just
-          -- switch off deferred type errors altogether.  See Trac #14605.
+          -- switch off deferred type errors altogether.  See #14605.
 
     ctxt' = ctxt1 { cec_tidy     = env1
                   , cec_encl     = implic' : cec_encl ctxt
@@ -433,7 +433,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
                         -- Suppress inessential errors if there
                         -- are insolubles anywhere in the
                         -- tree rooted here, or we've come across
-                        -- a suppress-worthy constraint higher up (Trac #11541)
+                        -- a suppress-worthy constraint higher up (#11541)
 
                   , cec_binds    = evb }
 
@@ -497,7 +497,7 @@ reportBadTelescope _ _ Nothing skols
 {- Note [Redundant constraints in instance decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For instance declarations, we don't report unused givens if
-they can give rise to improvement.  Example (Trac #10100):
+they can give rise to improvement.  Example (#10100):
     class Add a b ab | a b -> ab, a ab -> b
     instance Add Zero b b
     instance Add a b ab => Add (Succ a) b (Succ ab)
@@ -627,7 +627,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
           -- Reason: we don't report all given errors
           --         (see mkGivenErrorReporter), and we should only suppress
           --         subsequent errors if we actually report this one!
-          --         Trac #13446 is an example
+          --         #13446 is an example
 
     -- See Note [Given errors]
     has_gadt_match [] = False
@@ -816,7 +816,7 @@ reportGroup mk_err ctxt cts =
                             -- Add deferred bindings for all
                             -- Redundant if we are going to abort compilation,
                             -- but that's hard to know for sure, and if we don't
-                            -- abort, we need bindings for all (e.g. Trac #12156)
+                            -- abort, we need bindings for all (e.g. #12156)
   where
     isMonadFailInstanceMissing ct =
         case ctLocOrigin (ctLoc ct) of
@@ -829,11 +829,11 @@ maybeReportHoleError :: ReportErrCtxt -> Ct -> ErrMsg -> TcM ()
 maybeReportHoleError ctxt ct err
   -- When -XPartialTypeSignatures is on, warnings (instead of errors) are
   -- generated for holes in partial type signatures.
-  -- Unless -fwarn_partial_type_signatures is not on,
+  -- Unless -fwarn-partial-type-signatures is not on,
   -- in which case the messages are discarded.
   | isTypeHoleCt ct
   = -- For partial type signatures, generate warnings only, and do that
-    -- only if -fwarn_partial_type_signatures is on
+    -- only if -fwarn-partial-type-signatures is on
     case cec_type_holes ctxt of
        HoleError -> reportError err
        HoleWarn  -> reportWarning (Reason Opt_WarnPartialTypeSignatures) err
@@ -842,7 +842,7 @@ maybeReportHoleError ctxt ct err
   -- Always report an error for out-of-scope variables
   -- Unless -fdefer-out-of-scope-variables is on,
   -- in which case the messages are discarded.
-  -- See Trac #12170, #12406
+  -- See #12170, #12406
   | isOutOfScopeCt ct
   = -- If deferring, report a warning only if -Wout-of-scope-variables is on
     case cec_out_of_scope_holes ctxt of
@@ -1157,7 +1157,7 @@ mkHoleError _ _ ct@(CHoleCan { cc_hole = ExprHole (OutOfScope occ rdr_env0) })
 mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
   -- Explicit holes, like "_" or "_f"
   = do { (ctxt, binds_msg, ct) <- relevantBindings False ctxt ct
-               -- The 'False' means "don't filter the bindings"; see Trac #8191
+               -- The 'False' means "don't filter the bindings"; see #8191
 
        ; show_hole_constraints <- goptM Opt_ShowHoleConstraints
        ; let constraints_msg
@@ -1431,13 +1431,13 @@ Consider
 Here the second equation is unreachable. The original constraint
 (a~Int) from the signature gets rewritten by the pattern-match to
 (Bool~Int), so the danger is that we report the error as coming from
-the *signature* (Trac #7293).  So, for Given errors we replace the
+the *signature* (#7293).  So, for Given errors we replace the
 env (and hence src-loc) on its CtLoc with that from the immediately
 enclosing implication.
 
 Note [Error messages for untouchables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #9109)
+Consider (#9109)
   data G a where { GBool :: G Bool }
   foo x = case x of GBool -> True
 
@@ -1632,7 +1632,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
         , report
         ]
 
-  | OC_Occurs <- occ_check_expand
+  | MTVU_Occurs <- occ_check_expand
     -- We report an "occurs check" even for  a ~ F t a, where F is a type
     -- function; it's not insoluble (because in principle F could reduce)
     -- but we have certainly been unable to solve it
@@ -1657,10 +1657,10 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
        ; mkErrorMsgFromCt ctxt ct $
          mconcat [important main_msg, extra2, extra3, report] }
 
-  | OC_Bad <- occ_check_expand
+  | MTVU_Bad <- occ_check_expand
   = do { let msg = vcat [ text "Cannot instantiate unification variable"
                           <+> quotes (ppr tv1)
-                        , hang (text "with a" <+> what <+> text "involving foralls:") 2 (ppr ty2)
+                        , hang (text "with a" <+> what <+> text "involving polytypes:") 2 (ppr ty2)
                         , nest 2 (text "GHC doesn't yet support impredicative polymorphism") ]
        -- Unlike the other reports, this discards the old 'report_important'
        -- instead of augmenting it.  This is because the details are not likely
@@ -1745,7 +1745,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
 
   | otherwise
   = reportEqErr ctxt report ct oriented (mkTyVarTy tv1) ty2
-        -- This *can* happen (Trac #6123, and test T2627b)
+        -- This *can* happen (#6123, and test T2627b)
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
   where
@@ -2106,7 +2106,7 @@ mkExpectedActualMsg _ _ _ _ _ = panic "mkExpectedAcutalMsg"
 
 {- Note [Insoluble occurs check wins]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider [G] a ~ [a],  [W] a ~ [a] (Trac #13674).  The Given is insoluble
+Consider [G] a ~ [a],  [W] a ~ [a] (#13674).  The Given is insoluble
 so we don't use it for rewriting.  The Wanted is also insoluble, and
 we don't solve it from the Given.  It's very confusing to say
     Cannot solve a ~ [a] from given constraints a ~ [a]
@@ -2317,11 +2317,11 @@ untouchable type variable.  So suggestAddSig sees if the offending
 type variable is bound by an *inferred* signature, and suggests
 adding a declared signature instead.
 
-This initially came up in Trac #8968, concerning pattern synonyms.
+This initially came up in #8968, concerning pattern synonyms.
 
 Note [Disambiguating (X ~ X) errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See Trac #8278
+See #8278
 
 Note [Reporting occurs-check errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2577,15 +2577,15 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                             2 (sep [ text "bound by" <+> ppr skol_info
                                    , text "at" <+>
                                      ppr (tcl_loc (implicLclEnv implic)) ])
-        where ev_vars_matching = filter ev_var_matches (map evVarPred evvars)
-              ev_var_matches ty = case getClassPredTys_maybe ty of
-                 Just (clas', tys')
-                   | clas' == clas
-                   , Just _ <- tcMatchTys tys tys'
-                   -> True
-                   | otherwise
-                   -> any ev_var_matches (immSuperClasses clas' tys')
-                 Nothing -> False
+        where ev_vars_matching = [ pred
+                                 | ev_var <- evvars
+                                 , let pred = evVarPred ev_var
+                                 , any can_match (pred : transSuperClasses pred) ]
+              can_match pred
+                 = case getClassPredTys_maybe pred of
+                     Just (clas', tys') -> clas' == clas
+                                          && isJust (tcMatchTys tys tys')
+                     Nothing -> False
 
     -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)
@@ -2669,7 +2669,7 @@ something like
     No instance for (Num Int) arising from the literal ‘3’
     There are instances for similar types:
       instance Num GHC.Types.Int -- Defined in ‘GHC.Num’
-Discussion in Trac #9611.
+Discussion in #9611.
 
 Note [Highlighting ambiguous type variables]
 ~-------------------------------------------
@@ -2716,7 +2716,7 @@ the alleged "provided" constraints, Show a.
 
 So we suppress that Implication in discardProvCtxtGivens.  It's
 painfully ad-hoc but the truth is that adding it to the "required"
-constraints would work.  Suprressing it solves two problems.  First,
+constraints would work.  Suppressing it solves two problems.  First,
 we never tell the user that we could not deduce a "provided"
 constraint from the "required" context. Second, we never give a
 possible fix that suggests to add a "provided" constraint to the
@@ -2835,7 +2835,7 @@ the TcS monad, and we are in TcM here.
 
 Note [Kind arguments in error messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It can be terribly confusing to get an error message like (Trac #9171)
+It can be terribly confusing to get an error message like (#9171)
 
     Couldn't match expected type ‘GetParam Base (GetParam Base Int)’
                 with actual type ‘GetParam Base (GetParam Base Int)’
@@ -2939,10 +2939,10 @@ getSkolemInfo (implic:implics) tvs
 -- We must be careful to pass it a zonked type variable, too.
 --
 -- We always remove closed top-level bindings, though,
--- since they are never relevant (cf Trac #8233)
+-- since they are never relevant (cf #8233)
 
 relevantBindings :: Bool  -- True <=> filter by tyvar; False <=> no filtering
-                          -- See Trac #8191
+                          -- See #8191
                  -> ReportErrCtxt -> Ct
                  -> TcM (ReportErrCtxt, SDoc, Ct)
 -- Also returns the zonked and tidied CtOrigin of the constraint

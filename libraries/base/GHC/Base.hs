@@ -519,7 +519,7 @@ class  Functor f  where
 --
 --   * @'pure' = 'return'@
 --
---   * @('<*>') = 'ap'@
+--   * @m1 '<*>' m2 = m1 '>>=' (\x1 -> m2 '>>=' (\x2 -> 'return' (x1 x2)))@
 --
 --   * @('*>') = ('>>')@
 --
@@ -543,6 +543,9 @@ class Functor f => Applicative f where
     -- efficient than the default one. In particular, if 'fmap' is an
     -- expensive operation, it is likely better to use 'liftA2' than to
     -- 'fmap' over the structure and then use '<*>'.
+    --
+    -- This became a typeclass method in 4.10.0.0. Prior to that, it was
+    -- a function defined in terms of '<*>' and 'fmap'.
     liftA2 :: (a -> b -> c) -> f a -> f b -> f c
     liftA2 f x = (<*>) (fmap f x)
 
@@ -636,7 +639,7 @@ Instances of 'Monad' should satisfy the following:
 Furthermore, the 'Monad' and 'Applicative' operations should relate as follows:
 
 * @'pure' = 'return'@
-* @('<*>') = 'ap'@
+* @m1 '<*>' m2 = m1 '>>=' (\x1 -> m2 '>>=' (\x2 -> 'return' (x1 x2)))@
 
 The above laws imply:
 
@@ -663,17 +666,6 @@ class Applicative m => Monad m where
     -- | Inject a value into the monadic type.
     return      :: a -> m a
     return      = pure
-
-    -- | Fail with a message.  This operation is not part of the
-    -- mathematical definition of a monad, but is invoked on pattern-match
-    -- failure in a @do@ expression.
-    --
-    -- As part of the MonadFail proposal (MFP), this function is moved
-    -- to its own class 'Control.Monad.MonadFail' (see "Control.Monad.Fail" for
-    -- more details). The definition here will be removed in a future
-    -- release.
-    fail        :: String -> m a
-    fail s      = errorWithoutStackTrace s
 
 {- Note [Recursive bindings for Applicative/Monad]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -855,8 +847,6 @@ instance  Monad Maybe  where
 
     (>>) = (*>)
 
-    fail _              = Nothing
-
 -- -----------------------------------------------------------------------------
 -- The Alternative class definition
 
@@ -984,8 +974,6 @@ instance Monad []  where
     xs >>= f             = [y | x <- xs, y <- f x]
     {-# INLINE (>>) #-}
     (>>) = (*>)
-    {-# INLINE fail #-}
-    fail _              = []
 
 -- | @since 2.01
 instance Alternative [] where
@@ -1365,7 +1353,6 @@ instance  Monad IO  where
     {-# INLINE (>>=)  #-}
     (>>)      = (*>)
     (>>=)     = bindIO
-    fail s    = failIO s
 
 -- | @since 4.9.0.0
 instance Alternative IO where

@@ -1,5 +1,5 @@
 
--- Trac #958
+-- #958
 
 module ShoulFail where
 

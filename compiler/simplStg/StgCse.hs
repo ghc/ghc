@@ -78,7 +78,7 @@ Consider two unboxed sum terms:
 These two terms are not equal as they unarise to different unboxed
 tuples. However if we run StgCse before Unarise, it'll think the two
 terms (# 1 | #) are equal, and replace one of these with a binder to
-the other. That's bad -- Trac #15300.
+the other. That's bad -- #15300.
 
 Solution: do unarise first.
 
@@ -245,8 +245,8 @@ substBndr env old_id
     new_id = uniqAway (ce_in_scope env) old_id
     no_change = new_id == old_id
     env' = env { ce_in_scope = ce_in_scope env `extendInScopeSet` new_id }
-    new_env | no_change = env' { ce_subst = extendVarEnv (ce_subst env) old_id new_id }
-            | otherwise = env'
+    new_env | no_change = env'
+            | otherwise = env' { ce_subst = extendVarEnv (ce_subst env) old_id new_id }
 
 substBndrs :: CseEnv -> [InVar] -> (CseEnv, [OutVar])
 substBndrs env bndrs = mapAccumL substBndr env bndrs

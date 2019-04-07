@@ -797,7 +797,7 @@ static void procRtsOpts (int rts_argc0,
 
         } else {
             /* 0 is dash, 1 is first letter */
-            /* see Trac #9839 */
+            /* see #9839 */
             unchecked_arg_start = 1;
             switch(rts_argv[arg][1]) {
 
@@ -1566,12 +1566,12 @@ error = true;
                 break;  /* defensive programming */
 
             /* check the rest to be sure there is nothing afterwards.*/
-            /* see Trac #9839 */
+            /* see #9839 */
             check_rest:
                 {
                     /* start checking from the first unchecked position,
                      * not from index 2*/
-                    /* see Trac #9839 */
+                    /* see #9839 */
                     if (rts_argv[arg][unchecked_arg_start] != '\0') {
                       errorBelch("flag -%c given an argument"
                                  " when none was expected: %s",
@@ -1687,7 +1687,7 @@ static void normaliseRtsOpts (void)
 
         // If allocation area is larger that CPU cache
         // we can finish scanning quicker doing work-stealing
-        // scan. Trac #9221
+        // scan. #9221
         // 32M looks big enough not to fit into L2 cache
         // of popular modern CPUs.
         if (alloc_area_bytes >= 32 * 1024 * 1024) {

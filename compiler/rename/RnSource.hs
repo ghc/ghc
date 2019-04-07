@@ -43,7 +43,6 @@ import Module
 import HscTypes         ( Warnings(..), plusWarns )
 import PrelNames        ( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
-                        , monadFailClassName, failMName, failMName_preMFP
                         , semigroupClassName, sappendName
                         , monoidClassName, mappendName
                         )
@@ -127,7 +126,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
 
    -- (D1) Bring pattern synonyms into scope.
    --      Need to do this before (D2) because rnTopBindsLHS
-   --      looks up those pattern synonyms (Trac #9889)
+   --      looks up those pattern synonyms (#9889)
 
    extendPatSynEnv val_decls local_fix_env $ \pat_syn_bndrs -> do {
 
@@ -457,9 +456,6 @@ checkCanonicalInstances cls poly_ty mbinds = do
     whenWOptM Opt_WarnNonCanonicalMonadInstances
         checkCanonicalMonadInstances
 
-    whenWOptM Opt_WarnNonCanonicalMonadFailInstances
-        checkCanonicalMonadFailInstances
-
     whenWOptM Opt_WarnNonCanonicalMonoidInstances
         checkCanonicalMonoidInstances
 
@@ -506,45 +502,6 @@ checkCanonicalInstances cls poly_ty mbinds = do
                       -> addWarnNonCanonicalMethod2
                             Opt_WarnNonCanonicalMonadInstances "(>>)" "(*>)"
 
-                  _ -> return ()
-
-      | otherwise = return ()
-
-    -- | Warn about unsound/non-canonical 'Monad'/'MonadFail' instance
-    -- declarations. Specifically, the following conditions are verified:
-    --
-    -- In 'Monad' instances declarations:
-    --
-    --  * If 'fail' is overridden it must be canonical
-    --    (i.e. @fail = Control.Monad.Fail.fail@)
-    --
-    -- In 'MonadFail' instance declarations:
-    --
-    --  * Warn if 'fail' is defined backwards
-    --    (i.e. @fail = Control.Monad.fail@).
-    --
-    checkCanonicalMonadFailInstances
-      | cls == monadFailClassName  = do
-          forM_ (bagToList mbinds) $ \(dL->L loc mbind) -> setSrcSpan loc $ do
-              case mbind of
-                  FunBind { fun_id = (dL->L _ name)
-                          , fun_matches = mg }
-                      | name == failMName, isAliasMG mg == Just failMName_preMFP
-                      -> addWarnNonCanonicalMethod1
-                            Opt_WarnNonCanonicalMonadFailInstances "fail"
-                            "Control.Monad.fail"
-
-                  _ -> return ()
-
-      | cls == monadClassName  = do
-          forM_ (bagToList mbinds) $ \(dL->L loc mbind) -> setSrcSpan loc $ do
-              case mbind of
-                  FunBind { fun_id      = (dL->L _ name)
-                          , fun_matches = mg }
-                      | name == failMName_preMFP, isAliasMG mg /= Just failMName
-                      -> addWarnNonCanonicalMethod2
-                            Opt_WarnNonCanonicalMonadFailInstances "fail"
-                            "Control.Monad.Fail.fail"
                   _ -> return ()
 
       | otherwise = return ()
@@ -660,7 +617,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                -- we report an error and continue for as long as we can.
                -- Importantly, this error should be thrown before we reach the
                -- typechecker, lest we encounter different errors that are
-               -- hopelessly confusing (such as the one in Trac #16114).
+               -- hopelessly confusing (such as the one in #16114).
                addErrAt (getLoc (hsSigType inst_ty)) $
                  hang (text "Illegal class instance:" <+> quotes (ppr inst_ty))
                     2 (vcat [ text "Class instances must be of the form"
@@ -955,7 +912,7 @@ bound on the LHS.  For example, this is not ok
       type F a x :: *
    instance C (p,q) r where
       type F (p,q) x = (x, r)   -- BAD: mentions 'r'
-c.f. Trac #5515
+c.f. #5515
 
 Kind variables, on the other hand, are allowed to be implicitly or explicitly
 bound. As examples, this (#9574) is acceptable:
@@ -980,7 +937,7 @@ So for parity with type synonyms, we also allow:
 
 All this applies only for *instance* declarations.  In *class*
 declarations there is no RHS to worry about, and the class variables
-can all be in scope (Trac #5862):
+can all be in scope (#5862):
     class Category (x :: k -> k -> *) where
       type Ob x :: k -> Constraint
       id :: Ob x a => x a a
@@ -997,7 +954,7 @@ by a forall. For instance, the following is acceptable:
      type forall b. T (Maybe a) b = Either a b
 
 Even though `a` is not bound by the forall, this is still accepted because `a`
-was previously bound by the `instance C (Maybe a)` part. (see Trac #16116).
+was previously bound by the `instance C (Maybe a)` part. (see #16116).
 
 In each case, the function which detects improperly bound variables on the RHS
 is TcValidity.checkValidFamPats.
@@ -1225,7 +1182,7 @@ reasons:
   This has a kind error, but the error message is better if you
   check T first, (fixing its kind) and *then* S.  If you do kind
   inference together, you might get an error reported in S, which
-  is jolly confusing.  See Trac #4875
+  is jolly confusing.  See #4875
 
 
 * Increase kind polymorphism.  See TcTyClsDecls
@@ -1233,7 +1190,7 @@ reasons:
 
 Why do the instance declarations participate?  At least two reasons
 
-* Consider (Trac #11348)
+* Consider (#11348)
 
      type family F a
      type instance F Int = Bool
@@ -1246,7 +1203,7 @@ Why do the instance declarations participate?  At least two reasons
   know that unless we've looked at the type instance declaration for F
   before kind-checking Foo.
 
-* Another example is this (Trac #3990).
+* Another example is this (#3990).
 
      data family Complex a
      data instance Complex Double = CD {-# UNPACK #-} !Double
@@ -2064,7 +2021,7 @@ rnInjectivityAnn _ _ (dL->L srcSpan (InjectivityAnn injFrom injTo)) =
 {-
 Note [Stupid theta]
 ~~~~~~~~~~~~~~~~~~~
-Trac #3850 complains about a regression wrt 6.10 for
+#3850 complains about a regression wrt 6.10 for
      data Show a => T a
 There is no reason not to allow the stupid theta if there are no data
 constructors.  It's still stupid, but does no harm, and I don't want
@@ -2142,7 +2099,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- order of their appearance in the constructor type.
           -- That order governs the order the implicitly-quantified type
           -- variable, and hence the order needed for visible type application
-          -- See Trac #14808.
+          -- See #14808.
               free_tkvs = extractHsTvBndrs explicit_tkvs $
                           extractHsTysRdrTyVarsDups (theta ++ arg_tys ++ [res_ty])
 
@@ -2325,7 +2282,7 @@ add gp loc (SpliceD _ splice@(SpliceDecl _ _ flag)) ds
                      -- The compiler should suggest the above, and not using
                      -- TemplateHaskell since the former suggestion is more
                      -- relevant to the larger base of users.
-                     -- See Trac #12146 for discussion.
+                     -- See #12146 for discussion.
 
 -- Class declarations: pull out the fixity signatures to the top
 add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD _ d) ds

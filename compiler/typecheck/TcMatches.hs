@@ -42,9 +42,6 @@ import TcEvidence
 import Outputable
 import Util
 import SrcLoc
-import DynFlags
-import PrelNames (monadFailClassName)
-import qualified GHC.LanguageExtensions as LangExt
 
 -- Create chunkified tuple tybes for monad comprehensions
 import MkCore
@@ -823,7 +820,7 @@ tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax:
                 --       (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
                 -- This level of generality is needed for using do-notation
-                -- in full generality; see Trac #1537
+                -- in full generality; see #1537
 
           ((rhs', pat', new_res_ty, thing), bind_op')
             <- tcSyntaxOp DoOrigin bind_op [SynRho, SynFun SynAny SynRho] res_ty $
@@ -940,43 +937,8 @@ tcMonadFailOp orig pat fail_op res_ty
   = return noSyntaxExpr
 
   | otherwise
-  = do { -- Issue MonadFail warnings
-         rebindableSyntax <- xoptM LangExt.RebindableSyntax
-       ; desugarFlag      <- xoptM LangExt.MonadFailDesugaring
-       ; missingWarning   <- woptM Opt_WarnMissingMonadFailInstances
-       ; if | rebindableSyntax && desugarFlag && missingWarning
-              -> warnRebindableClash pat
-            | not desugarFlag && missingWarning
-              -> emitMonadFailConstraint pat res_ty
-            | otherwise
-              -> return ()
-
-        -- Get the fail op itself
-        ; snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
-                             (mkCheckExpType res_ty) $ \_ -> return ()) }
-
-emitMonadFailConstraint :: LPat GhcTcId -> TcType -> TcRn ()
-emitMonadFailConstraint pat res_ty
-  = do { -- We expect res_ty to be of form (monad_ty arg_ty)
-         (_co, (monad_ty, _arg_ty)) <- matchExpectedAppTy res_ty
-
-         -- Emit (MonadFail m), but ignore the evidence; it's
-         -- just there to generate a warning
-       ; monadFailClass <- tcLookupClass monadFailClassName
-       ; _ <- emitWanted (FailablePattern pat)
-                         (mkClassPred monadFailClass [monad_ty])
-       ; return () }
-
-warnRebindableClash :: LPat GhcTcId -> TcRn ()
-warnRebindableClash pattern = addWarnAt
-    (Reason Opt_WarnMissingMonadFailInstances)
-    (getLoc pattern)
-    (text "The failable pattern" <+> quotes (ppr pattern)
-     $$
-     nest 2 (text "is used together with -XRebindableSyntax."
-             <+> text "If this is intentional,"
-             $$
-             text "compile with -Wno-missing-monadfail-instances."))
+  = snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
+                             (mkCheckExpType res_ty) $ \_ -> return ())
 
 {-
 Note [Treat rebindable syntax first]
@@ -987,7 +949,7 @@ we want to typecheck 'bar' in the knowledge that it should be an IO thing,
 pushing info from the context into the RHS.  To do this, we check the
 rebindable syntax first, and push that information into (tcMonoExprNC rhs).
 Otherwise the error shows up when checking the rebindable syntax, and
-the expected/inferred stuff is back to front (see Trac #3613).
+the expected/inferred stuff is back to front (see #3613).
 
 Note [typechecking ApplicativeStmt]
 
@@ -1084,7 +1046,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An applicative-do is supposed to take place in parallel, so
 constraints bound in one arm can't possibly be available in another
-(Trac #13242).  Our current rule is this (more details and discussion
+(#13242).  Our current rule is this (more details and discussion
 on the ticket). Consider
 
    ...stmts...

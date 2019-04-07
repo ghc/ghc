@@ -549,7 +549,7 @@ case we'd prefer to generate the (more direct)
      (# fromInteger $dNum 3, fromInteger $dNum 4 #)
 
 A similar thing happens with representation-polymorphic defns
-(Trac #11405):
+(#11405):
 
   undef :: forall (r :: RuntimeRep) (a :: TYPE r). HasCallStack => a
   undef = error "undef"
@@ -798,7 +798,7 @@ instance (idR ~ GhcPass pr,OutputableBndrId idL, OutputableBndrId idR,
 
 pprTicks :: SDoc -> SDoc -> SDoc
 -- Print stuff about ticks only when -dppr-debug is on, to avoid
--- them appearing in error messages (from the desugarer); see Trac # 3263
+-- them appearing in error messages (from the desugarer); see # 3263
 -- Also print ticks in dumpStyle, so that -ddump-hpc actually does
 -- something useful.
 pprTicks pp_no_debug pp_when_debug

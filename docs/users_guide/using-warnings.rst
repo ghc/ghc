@@ -12,7 +12,7 @@ messages, otherwise known as warnings, can be generated during compilation.
 Some options control individual warnings and others control collections
 of warnings.
 To turn off an individual warning ``-W<wflag>``, use ``-Wno-<wflag>``.
-To reverse``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
+To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
 
 By default, you get a standard set of warnings which are
 generally likely to indicate bugs in your program. These are:

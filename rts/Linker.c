@@ -249,7 +249,7 @@ static void ghciRemoveSymbolTable(HashTable *table, const SymbolName* key,
 
  Some test have been written for weak symbols but have been disabled
  mostly because it's unsure how the weak symbols support should look.
- See Trac #11223
+ See #11223
  */
 int ghciInsertSymbolTable(
    pathchar* obj_name,
@@ -679,7 +679,7 @@ addDLL( pathchar *dll_name )
       return NULL;
    }
 
-   // GHC Trac ticket #2615
+   // GHC #2615
    // On some systems (e.g., Gentoo Linux) dynamic files (e.g. libc.so)
    // contain linker scripts rather than ELF-format object code. This
    // code handles the situation by recognizing the real object code
@@ -1195,6 +1195,7 @@ void freeObjectCode (ObjectCode *oc)
     }
 
     freeProddableBlocks(oc);
+    freeSegments(oc);
 
     /* Free symbol_extras.  On x86_64 Windows, symbol_extras are allocated
      * alongside the image, so we don't need to free. */
@@ -1279,6 +1280,8 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->symbols           = NULL;
    oc->n_sections        = 0;
    oc->sections          = NULL;
+   oc->n_segments        = 0;
+   oc->segments          = NULL;
    oc->proddables        = NULL;
    oc->stable_ptrs       = NULL;
 #if defined(NEED_SYMBOL_EXTRAS)
@@ -1419,6 +1422,9 @@ preloadObjectFile (pathchar *path)
 
 #endif /* RTS_LINKER_USE_MMAP */
 
+   IF_DEBUG(linker, debugBelch("loadObj: preloaded image at %p\n", (void *) image));
+
+   /* FIXME (AP): =mapped= parameter unconditionally set to true */
    oc = mkOc(path, image, fileSize, true, NULL, misalignment);
 
 #if defined(OBJFORMAT_MACHO)
@@ -1440,7 +1446,7 @@ preloadObjectFile (pathchar *path)
 static HsInt loadObj_ (pathchar *path)
 {
    ObjectCode* oc;
-   IF_DEBUG(linker, debugBelch("loadObj %" PATH_FMT "\n", path));
+   IF_DEBUG(linker, debugBelch("loadObj: %" PATH_FMT "\n", path));
 
    /* debugBelch("loadObj %s\n", path ); */
 
@@ -1610,6 +1616,8 @@ int ocTryLoad (ObjectCode* oc) {
     if (!r) { return r; }
 
     // run init/init_array/ctors/mod_init_func
+
+    IF_DEBUG(linker, debugBelch("ocTryLoad: ocRunInit start\n"));
 
     loading_obj = oc; // tells foreignExportStablePtr what to do
 #if defined(OBJFORMAT_ELF)
@@ -1814,8 +1822,8 @@ void freeProddableBlocks (ObjectCode *oc)
  */
 void
 addSection (Section *s, SectionKind kind, SectionAlloc alloc,
-            void* start, StgWord size, StgWord mapped_offset,
-            void* mapped_start, StgWord mapped_size)
+            void* start, StgWord size,
+            StgWord mapped_offset, void* mapped_start, StgWord mapped_size)
 {
    s->start        = start;     /* actual start of section in memory */
    s->size         = size;      /* actual size of section in memory */
@@ -1836,3 +1844,50 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
                        start, (void*)((StgWord)start + size),
                        size, kind ));
 }
+
+/* -----------------------------------------------------------------------------
+ * Segment management
+ */
+void
+initSegment (Segment *s, void *start, size_t size, SegmentProt prot, int n_sections)
+{
+    s->start = start;
+    s->size = size;
+    s->prot = prot;
+    s->sections_idx = (int *)stgCallocBytes(n_sections, sizeof(int),
+                                               "initSegment(segment)");
+    s->n_sections = n_sections;
+}
+
+void freeSegments (ObjectCode *oc)
+{
+    if (oc->segments != NULL) {
+        IF_DEBUG(linker, debugBelch("freeSegments: freeing %d segments\n", oc->n_segments));
+
+        for (int i = 0; i < oc->n_segments; i++) {
+            Segment *s = &oc->segments[i];
+
+            IF_DEBUG(linker, debugBelch("freeSegments: freeing segment %d at %p size %zu\n",
+                                        i, s->start, s->size));
+
+            stgFree(s->sections_idx);
+            s->sections_idx = NULL;
+
+            if (0 == s->size) {
+                IF_DEBUG(linker, debugBelch("freeSegment: skipping segment of 0 size\n"));
+                continue;
+            } else {
+#if RTS_LINKER_USE_MMAP
+                CHECKM(0 == munmap(s->start, s->size), "freeSegments: failed to unmap memory");
+#else
+                stgFree(s->start);
+#endif
+            }
+            s->start = NULL;
+        }
+
+        stgFree(oc->segments);
+        oc->segments = NULL;
+    }
+}
+

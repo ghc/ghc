@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies  #-}
 
--- Trac #3346
+-- #3346
 
 module Foo where
 

@@ -715,7 +715,7 @@ Associated types
 ~~~~~~~~~~~~~~~~
 For associated types everything above is determined by the
 associated-type declaration alone, ignoring the class header.
-Here is an example (Trac #15592)
+Here is an example (#15592)
   class C (a :: k) b where
     type F (x :: b a)
 
@@ -755,11 +755,11 @@ Design alternatives
 ~~~~~~~~~~~~~~~~~~~
 * For associated types we considered putting the class variables
   before the local variables, in a nod to the treatment for class
-  methods. But it got too compilicated; see Trac #15592, comment:21ff.
+  methods. But it got too compilicated; see #15592, comment:21ff.
 
 * We rigidly require the ordering above, even though we could be much more
   permissive. Relevant musings are at
-  https://ghc.haskell.org/trac/ghc/ticket/15743#comment:7
+  https://gitlab.haskell.org/ghc/ghc/issues/15743#note_161623
   The bottom line conclusion is that, if the user wants a different ordering,
   then can specify it themselves, and it is better to be predictable and dumb
   than clever and capricious.
@@ -850,13 +850,13 @@ There are some wrinkles
   TyVarTvs, and /not/ default them to Type. By definition a TyVarTv is
   not allowed to unify with a type; it must stand for a type
   variable. Hence the check in TcSimplify.defaultTyVarTcS, and
-  TcMType.defaultTyVar.  Here's another example (Trac #14555):
+  TcMType.defaultTyVar.  Here's another example (#14555):
      data Exp :: [TYPE rep] -> TYPE rep -> Type where
         Lam :: Exp (a:xs) b -> Exp xs (a -> b)
   We want to kind-generalise over the 'rep' variable.
-  Trac #14563 is another example.
+  #14563 is another example.
 
-* Duplicate type variables. Consider Trac #11203
+* Duplicate type variables. Consider #11203
     data SameKind :: k -> k -> *
     data Q (a :: k1) (b :: k2) c = MkQ (SameKind a b)
   Here we will unify k1 with k2, but this time doing so is an error,
@@ -884,7 +884,7 @@ There are some wrinkles
 
 Note [Tricky scoping in generaliseTcTyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider Trac #16342
+Consider #16342
   class C (a::ka) x where
     cop :: D a x => x -> Proxy a -> Proxy a
     cop _ x = x :: Proxy (a::ka)
@@ -1497,7 +1497,7 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
   = -- See Note [Type-checking default assoc decls]
     setSrcSpan loc $
     tcAddFamInstCtxt (text "default type instance") tc_name $
-    do { traceTc "tcDefaultAssocDecl" (ppr tc_name)
+    do { traceTc "tcDefaultAssocDecl 1" (ppr tc_name)
        ; let fam_tc_name = tyConName fam_tc
              fam_arity = length (tyConVisibleTyVars fam_tc)
 
@@ -1524,14 +1524,46 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
                                                     imp_vars exp_vars
                                                     hs_pats hs_rhs_ty
 
-         -- See Note [Type-checking default assoc decls]
-       ; traceTc "tcDefault" (vcat [ppr (tyConTyVars fam_tc), ppr qtvs, ppr pats])
-       ; case tcMatchTys pats (mkTyVarTys (tyConTyVars fam_tc)) of
-           Just subst -> return (Just (substTyUnchecked subst rhs_ty, loc) )
-           Nothing    -> failWithTc (defaultAssocKindErr fam_tc)
-           -- We check for well-formedness and validity later,
-           -- in checkValidClass
+       ; let fam_tvs = tyConTyVars fam_tc
+       ; traceTc "tcDefaultAssocDecl 2" (vcat
+           [ text "fam_tvs" <+> ppr fam_tvs
+           , text "qtvs"    <+> ppr qtvs
+           , text "pats"    <+> ppr pats
+           , text "rhs_ty"  <+> ppr rhs_ty
+           ])
+       ; pat_tvs <- traverse (extract_tv pats rhs_ty) pats
+       ; let subst = zipTvSubst pat_tvs (mkTyVarTys fam_tvs)
+       ; pure $ Just (substTyUnchecked subst rhs_ty, loc)
+           -- We also perform other checks for well-formedness and validity
+           -- later, in checkValidClass
      }
+  where
+    -- Checks that a pattern on the LHS of a default is a type
+    -- variable. If so, return the underlying type variable, and if
+    -- not, throw an error.
+    -- See Note [Type-checking default assoc decls]
+    extract_tv :: [Type] -- All default instance type patterns
+                         -- (only used for error message purposes)
+               -> Type   -- The default instance's right-hand side type
+                         -- (only used for error message purposes)
+               -> Type   -- The particular type pattern from which to extract
+                         -- its underlying type variable
+               -> TcM TyVar
+    extract_tv pats rhs_ty pat =
+      case getTyVar_maybe pat of
+        Just tv -> pure tv
+        Nothing ->
+          -- Per Note [Type-checking default assoc decls], we already
+          -- know by this point that if any arguments in the default
+          -- instance aren't type variables, then they must be
+          -- invisible kind arguments. Therefore, always display the
+          -- error message with -fprint-explicit-kinds enabled.
+          failWithTc $ pprWithExplicitKindsWhen True $
+          hang (text "Illegal argument" <+> quotes (ppr pat) <+> text "in:")
+             2 (vcat [ quotes (text "type" <+> ppr (mkTyConApp fam_tc pats)
+                       <+> equals <+> ppr rhs_ty)
+                     , text "The arguments to" <+> quotes (ppr fam_tc)
+                       <+> text "must all be type variables" ])
 tcDefaultAssocDecl _ [dL->L _ (XFamEqn _)] = panic "tcDefaultAssocDecl"
 tcDefaultAssocDecl _ [dL->L _ (FamEqn _ _ _ (XLHsQTyVars _) _ _)]
   = panic "tcDefaultAssocDecl"
@@ -1544,8 +1576,8 @@ tcDefaultAssocDecl _ [_]
 Consider this default declaration for an associated type
 
    class C a where
-      type F (a :: k) b :: *
-      type F x y = Proxy x -> y
+      type F (a :: k) b :: Type
+      type F (x :: j) y = Proxy x -> y
 
 Note that the class variable 'a' doesn't scope over the default assoc
 decl (rather oddly I think), and (less oddly) neither does the second
@@ -1555,17 +1587,26 @@ instance.
 
 However we store the default rhs (Proxy x -> y) in F's TyCon, using
 F's own type variables, so we need to convert it to (Proxy a -> b).
-We do this by calling tcMatchTys to match them up.  This also ensures
-that x's kind matches a's and similarly for y and b.  The error
-message isn't great, mind you.  (Trac #11361 was caused by not doing a
-proper tcMatchTys here.)
+We do this by creating a substitution [j |-> k, x |-> a, b |-> y] and
+applying this substitution to the RHS.
 
-Recall also that the left-hand side of an associated type family
-default is always just variables -- no tycons here. Accordingly,
-the patterns used in the tcMatchTys won't actually be knot-tied,
-even though we're in the knot. This is too delicate for my taste,
-but it works.
+In order to create this substitution, we must first ensure that all of
+the arguments in the default instance consist of type variables. The parser
+already checks this to a certain degree (see RdrHsSyn.checkTyVars), but
+we must be wary of kind arguments being instantiated, which the parser cannot
+catch so easily. Consider this erroneous program (inspired by #11361):
 
+   class C a where
+      type F (a :: k) b :: Type
+      type F x        b = x
+
+If you squint, you'll notice that the kind of `x` is actually Type. However,
+we cannot substitute from [Type |-> k], so we reject this default.
+
+Since the LHS of an associated type family default is always just variables,
+it won't contain any tycons. Accordingly, the patterns used in the substitution
+won't actually be knot-tied, even though we're in the knot. This is too
+delicate for my taste, but it works.
 -}
 
 {- *********************************************************************
@@ -1823,7 +1864,7 @@ kcTyFamInstEqn tc_fam_tc
          bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
          do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsType hs_rhs_ty res_kind }
-             -- Why "_Tv" here?  Consider (Trac #14066
+             -- Why "_Tv" here?  Consider (#14066
              --  type family Bar x y where
              --      Bar (x :: a) (y :: b) = Int
              --      Bar (x :: c) (y :: d) = Bool
@@ -2448,7 +2489,7 @@ checkValidDataCon needs), but the first three fields may be bogus if
 the return type isn't valid (the last equation for rejigConRes).
 
 This is better than an earlier solution which reduced the number of
-errors reported in one pass.  See Trac #7175, and #10836.
+errors reported in one pass.  See #7175, and #10836.
 -}
 
 -- Example
@@ -2721,7 +2762,7 @@ mkGADTVars tmpl_tvs dc_tvs subst
           _ -> choose (t_tv':univs) (mkEqSpec t_tv' r_ty : eqs)
                       (extendTvSubst t_sub t_tv (mkTyVarTy t_tv'))
                          -- We've updated the kind of t_tv,
-                         -- so add it to t_sub (Trac #14162)
+                         -- so add it to t_sub (#14162)
                       r_sub t_tvs
             where
               t_tv' = updateTyVarKind (substTy t_sub) t_tv
@@ -2838,11 +2879,11 @@ TyCon of the right kind, but with no interesting behaviour
 where Fun is a type family of arity 1.  The RHS is invalid, but we
 want to go on checking validity of subsequent type declarations.
 So we replace T with an abstract TyCon which will do no harm.
-See indexed-types/should_fail/BadSock and Trac #10896
+See indexed-types/should_fail/BadSock and #10896
 
 Some notes:
 
-* We must make fakes for promoted DataCons too. Consider (Trac #15215)
+* We must make fakes for promoted DataCons too. Consider (#15215)
       data T a = MkT ...
       data S a = ...T...MkT....
   If there is an error in the definition of 'T' we add a "fake type
@@ -3021,9 +3062,8 @@ checkValidDataCon dflags existential_ok tc con
               , ppr orig_res_ty <+> dcolon <+> ppr (tcTypeKind orig_res_ty)])
 
 
-        ; checkTc (isJust (tcMatchTy res_ty_tmpl
-                                     orig_res_ty))
-                  (badDataConTyCon con res_ty_tmpl orig_res_ty)
+        ; checkTc (isJust (tcMatchTy res_ty_tmpl orig_res_ty))
+                  (badDataConTyCon con res_ty_tmpl)
             -- Note that checkTc aborts if it finds an error. This is
             -- critical to avoid panicking when we call dataConUserType
             -- on an un-rejiggable datacon!
@@ -3162,7 +3202,7 @@ checkValidClass cls
 
         -- Check that the class is unary, unless multiparameter type classes
         -- are enabled; also recognize deprecated nullary type classes
-        -- extension (subsumed by multiparameter type classes, Trac #8993)
+        -- extension (subsumed by multiparameter type classes, #8993)
         ; checkTc (multi_param_type_classes || cls_arity == 1 ||
                     (nullary_type_classes && cls_arity == 0))
                   (classArityErr cls_arity cls)
@@ -3238,7 +3278,7 @@ checkValidClass cls
                         -- Check that the associated type mentions at least
                         -- one of the class type variables
                         -- The check is disabled for nullary type classes,
-                        -- since there is no possible ambiguity (Trac #10020)
+                        -- since there is no possible ambiguity (#10020)
 
              -- Check that any default declarations for associated types are valid
            ; whenIsJust m_dflt_rhs $ \ (rhs, loc) ->
@@ -3253,7 +3293,7 @@ checkValidClass cls
     -- E.g for   class C a where
     --             default op :: forall b. (a~b) => blah
     -- we do not want to do an ambiguity check on a type with
-    -- a free TyVar 'a' (Trac #11608).  See TcType
+    -- a free TyVar 'a' (#11608).  See TcType
     -- Note [TyVars and TcTyVars during type checking] in TcType
     -- Hence the mkDefaultMethodType to close the type.
     check_dm ctxt sel_id vanilla_cls_pred vanilla_tau
@@ -3346,7 +3386,7 @@ where the method type constrains only the class variable(s).  (The extension
 we should not reject
   class C a where
     op :: (?x::Int) => a -> a
-as pointed out in Trac #11793. So the test here rejects the program if
+as pointed out in #11793. So the test here rejects the program if
   * -XConstrainedClassMethods is off
   * the tyvars of the constraint are non-empty
   * all the tyvars are class tyvars, none are locally quantified
@@ -3363,13 +3403,13 @@ representative example:
     meth :: D a => ()
   class C a => D a
 
-This fixes Trac #9415, #9739
+This fixes #9415, #9739
 
 Note [Default method type signatures must align]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC enforces the invariant that a class method's default type signature
 must "align" with that of the method's non-default type signature, as per
-GHC Trac #12918. For instance, if you have:
+GHC #12918. For instance, if you have:
 
   class Foo a where
     bar :: forall b. Context => a -> b
@@ -3498,7 +3538,7 @@ signature for `each`, it would return (a -> f b) -> s -> f t like we desired.
 
 Note [Checking partial record field]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This check checks the partial record field selector, and warns (Trac #7169).
+This check checks the partial record field selector, and warns (#7169).
 
 For example:
 
@@ -3745,9 +3785,9 @@ noClassTyVarErr clas fam_tc
         , text "mentions none of the type or kind variables of the class" <+>
                 quotes (ppr clas <+> hsep (map ppr (classTyVars clas)))]
 
-badDataConTyCon :: DataCon -> Type -> Type -> SDoc
-badDataConTyCon data_con res_ty_tmpl actual_res_ty
-  | ASSERT( all isTyVar actual_ex_tvs )
+badDataConTyCon :: DataCon -> Type -> SDoc
+badDataConTyCon data_con res_ty_tmpl
+  | ASSERT( all isTyVar tvs )
     tcIsForAllTy actual_res_ty
   = nested_foralls_contexts_suggestion
   | isJust (tcSplitPredFunTy_maybe actual_res_ty)
@@ -3757,8 +3797,10 @@ badDataConTyCon data_con res_ty_tmpl actual_res_ty
                 text "returns type" <+> quotes (ppr actual_res_ty))
        2 (text "instead of an instance of its parent type" <+> quotes (ppr res_ty_tmpl))
   where
+    actual_res_ty = dataConOrigResTy data_con
+
     -- This suggestion is useful for suggesting how to correct code like what
-    -- was reported in Trac #12087:
+    -- was reported in #12087:
     --
     --   data F a where
     --     MkF :: Ord a => Eq a => a -> F a
@@ -3786,13 +3828,8 @@ badDataConTyCon data_con res_ty_tmpl actual_res_ty
     --    underneath the nested foralls and contexts.
     -- 3) Smash together the type variables and class predicates from 1) and
     --    2), and prepend them to the rho type from 2).
-    actual_ex_tvs = dataConExTyCoVars data_con
-    actual_theta  = dataConTheta data_con
-    (actual_res_tvs, actual_res_theta, actual_res_rho)
-      = tcSplitNestedSigmaTys actual_res_ty
-    suggested_ty = mkSpecForAllTys (actual_ex_tvs ++ actual_res_tvs) $
-                   mkPhiTy (actual_theta ++ actual_res_theta)
-                   actual_res_rho
+    (tvs, theta, rho) = tcSplitNestedSigmaTys (dataConUserType data_con)
+    suggested_ty = mkSpecSigmaTy tvs theta rho
 
 badGadtDecl :: Name -> SDoc
 badGadtDecl tc_name
@@ -3852,11 +3889,6 @@ wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr max_args
   = text "Number of parameters must match family declaration; expected"
     <+> ppr max_args
-
-defaultAssocKindErr :: TyCon -> SDoc
-defaultAssocKindErr fam_tc
-  = text "Kind mis-match on LHS of default declaration for"
-    <+> quotes (ppr fam_tc)
 
 badRoleAnnot :: Name -> Role -> Role -> SDoc
 badRoleAnnot var annot inferred

@@ -1686,7 +1686,7 @@ zonkEvBind env bind@(EvBind { eb_lhs = var, eb_rhs = term })
 
          -- Optimise the common case of Refl coercions
          -- See Note [Optimise coercion zonking]
-         -- This has a very big effect on some programs (eg Trac #5030)
+         -- This has a very big effect on some programs (eg #5030)
 
        ; term' <- case getEqPredTys_maybe (idType var') of
            Just (r, ty1, ty2) | ty1 `eqType` ty2
@@ -1708,7 +1708,7 @@ Rather, we can zonk the variable, and if its type is (ty ~ ty), we can just
 use Refl on the right, ignoring the actual coercion on the RHS.
 
 This can have a very big effect, because the constraint solver sometimes does go
-to a lot of effort to prove Refl!  (Eg when solving  10+3 = 10+3; cf Trac #5030)
+to a lot of effort to prove Refl!  (Eg when solving  10+3 = 10+3; cf #5030)
 
 
 ************************************************************************
@@ -1724,7 +1724,7 @@ Problem:
 
     In TcMType.zonkTcTyVar, we short-circuit (Indirect ty) to
     (Indirect zty), see Note [Sharing in zonking] in TcMType. But we
-    /can't/ do this when zonking a TcType to a Type (Trac #15552, esp
+    /can't/ do this when zonking a TcType to a Type (#15552, esp
     comment:3).  Suppose we have
 
        alpha -> alpha
@@ -1752,7 +1752,7 @@ Problem:
     the same as zonkTcTypeToType. (If we distinguished TcType from
     Type, this issue would have been a type error!)
 
-Solution: (see Trac #15552 for other variants)
+Solution: (see #15552 for other variants)
 
     One possible solution is simply not to do the short-circuiting.
     That has less sharing, but maybe sharing is rare. And indeed,

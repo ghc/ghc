@@ -45,7 +45,11 @@ instance NFData   CcMode
 -- * Compile a C source file.
 -- * Extract source dependencies by passing @-M@ command line argument.
 -- * Link object files & static libraries into an executable.
-data GhcMode = CompileHs | CompileCWithGhc | FindHsDependencies | LinkHs
+data GhcMode = CompileHs
+             | CompileCWithGhc
+             | FindHsDependencies
+             | LinkHs
+             | ToolArgs
     deriving (Eq, Generic, Show)
 
 instance Binary   GhcMode
@@ -178,8 +182,12 @@ instance H.Builder Builder where
             win <- windowsHost
             touchyPath <- programPath (vanillaContext Stage0 touchy)
             unlitPath  <- builderPath Unlit
-            ghcdeps <- ghcDeps stage
             ghcgens <- generatedGhcDependencies stage
+
+            -- GHC from the previous stage is used to build artifacts in the
+            -- current stage. Need the previous stage's GHC deps.
+            ghcdeps <- ghcDeps (pred stage)
+
             return $ [ unlitPath ]
                   ++ ghcdeps
                   ++ ghcgens
@@ -234,7 +242,7 @@ instance H.Builder Builder where
 
                 Ar Unpack _ -> cmd echo [Cwd output] [path] buildArgs
 
-                Autoreconf dir -> cmd echo [Cwd dir] [path] buildArgs
+                Autoreconf dir -> cmd echo [Cwd dir] ["sh", path] buildArgs
                 Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
                     -- otherwise Windows breaks. TODO: Figure out why.

@@ -8,7 +8,7 @@
 --
 -- Print Cmm as real C, for -fvia-C
 --
--- See wiki:Commentary/Compiler/Backends/PprC
+-- See wiki:commentary/compiler/backends/ppr-c
 --
 -- This is simpler than the old PprAbsC, because Cmm is "macro-expanded"
 -- relative to the old AbstractC, and many oddities/decorations have
@@ -179,7 +179,7 @@ pprAlignment words =
 --
 -- It's a reasonable assumption also known as natural alignment.
 -- Although some architectures have different alignment rules.
--- One of known exceptions is m68k (Trac #11395, comment:16) where:
+-- One of known exceptions is m68k (#11395, comment:16) where:
 --   __alignof__(StgWord) == 2, sizeof(StgWord) == 4
 --
 -- Thus we explicitly increase alignment by using
@@ -240,7 +240,7 @@ pprStmt stmt =
 
         cast_fn = parens (cCast (pprCFunType (char '*') cconv hresults hargs) fn)
 
-        -- See wiki:Commentary/Compiler/Backends/PprC#Prototypes
+        -- See wiki:commentary/compiler/backends/ppr-c#prototypes
         fnCall =
             case fn of
               CmmLit (CmmLabel lbl)
@@ -814,6 +814,7 @@ pprCallishMachOp_for_C mop
         MO_Memmove _    -> text "memmove"
         MO_Memcmp _     -> text "memcmp"
         (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
+        (MO_BRev w)     -> ptext (sLit $ bRevLabel w)
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
         (MO_Pext w)     -> ptext (sLit $ pextLabel w)
         (MO_Pdep w)     -> ptext (sLit $ pdepLabel w)

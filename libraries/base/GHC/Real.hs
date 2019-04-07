@@ -295,7 +295,7 @@ never reach the condition in `numericEnumFromTo`
 
     9007199254740990 + 1 + 1 + ... > 9007199254740991 + 1/2
 
-We would fall into infinite loop (as reported in Trac #15081).
+We would fall into infinite loop (as reported in #15081).
 
 To remedy the situation, we record the number of `1` that needed to be added
 to the start number, rather than increasing `1` at every time. This approach
@@ -313,7 +313,7 @@ The benchmark on T7954.hs shows that this approach leads to significant
 degeneration on performance (33% increase allocation and 300% increase on
 elapsed time).
 
-See Trac #15081 and Phab:D4650 for the related discussion about this problem.
+See #15081 and Phab:D4650 for the related discussion about this problem.
 -}
 
 --------------------------------------------------------------

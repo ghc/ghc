@@ -89,6 +89,7 @@ executable hadrian
                        , Settings.Builders.RunTest
                        , Settings.Builders.Xelatex
                        , Settings.Default
+                       , Settings.Flavours.Benchmark
                        , Settings.Flavours.Common
                        , Settings.Flavours.Development
                        , Settings.Flavours.Llvm
@@ -97,6 +98,7 @@ executable hadrian
                        , Settings.Flavours.Quick
                        , Settings.Flavours.QuickCross
                        , Settings.Flavours.Quickest
+                       , Settings.Flavours.GhcInGhci
                        , Settings.Packages
                        , Settings.Warnings
                        , Stage
@@ -117,7 +119,7 @@ executable hadrian
     other-extensions:    MultiParamTypeClasses
                        , TypeFamilies
     build-depends:       base                 >= 4.8     && < 5
-                       , Cabal                >= 2.5     && < 2.6
+                       , Cabal                >= 3.0     && < 3.1
                        , containers           >= 0.5     && < 0.7
                        , directory            >= 1.2     && < 1.4
                        , extra                >= 1.4.7
@@ -125,7 +127,7 @@ executable hadrian
                        , mtl                  == 2.2.*
                        , parsec               >= 3.1     && < 3.2
                        , QuickCheck           >= 2.6     && < 2.13
-                       , shake                >= 0.17.5
+                       , shake                >= 0.17.6
                        , transformers         >= 0.4     && < 0.6
                        , unordered-containers >= 0.2.1   && < 0.3
     build-tools:         alex  >= 3.1

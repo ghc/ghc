@@ -7,7 +7,7 @@
  * Do not #include this file directly: #include "Rts.h" instead.
  *
  * To understand the structure of the RTS headers, see the wiki:
- *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/source-tree/includes
  *
  * -------------------------------------------------------------------------- */
 
@@ -82,7 +82,7 @@ EXTERN_INLINE void busy_wait_nop(void);
  * Various kinds of memory barrier.
  *  write_barrier: prevents future stores occurring before prededing stores.
  *  store_load_barrier: prevents future loads occurring before preceding stores.
- *  load_load_barrier: prevents future loads occurring before earlier stores.
+ *  load_load_barrier: prevents future loads occurring before earlier loads.
  *
  * Reference for these: "The JSR-133 Cookbook for Compiler Writers"
  * http://gee.cs.oswego.edu/dl/jmm/cookbook.html

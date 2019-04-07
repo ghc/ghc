@@ -159,7 +159,7 @@ generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
               -- bndr_wanted constraints can include wildcard hole
               -- constraints, which we should not forget about.
               -- It may mention the skolem type variables bound by
-              -- the RULE.  c.f. Trac #10072
+              -- the RULE.  c.f. #10072
 
        ; tcExtendTyVarEnv tv_bndrs $
          tcExtendIdEnv    id_bndrs $
@@ -412,7 +412,7 @@ getRuleQuantCts :: WantedConstraints -> (Cts, WantedConstraints)
 --
 -- NB: we must look inside implications, because with
 --     -fdefer-type-errors we generate implications rather eagerly;
---     see TcUnify.implicationNeeded. Not doing so caused Trac #14732.
+--     see TcUnify.implicationNeeded. Not doing so caused #14732.
 --
 -- Unlike simplifyInfer, we don't leave the WantedConstraints unchanged,
 --   and attempt to solve them from the quantified constraints.  That

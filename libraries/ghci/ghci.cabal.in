@@ -7,7 +7,7 @@ license:        BSD3
 license-file:   LICENSE
 category:       GHC
 maintainer:     ghc-devs@haskell.org
-bug-reports:    https://ghc.haskell.org/trac/ghc/newticket
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       The library supporting GHC's interactive interpreter
 description:
             This library offers interfaces which mediate interactions between the
@@ -24,7 +24,7 @@ Flag ghci
 
 source-repository head
     type:     git
-    location: http://git.haskell.org/ghc.git
+    location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   libraries/ghci
 
 library

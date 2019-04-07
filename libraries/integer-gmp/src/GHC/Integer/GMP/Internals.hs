@@ -29,7 +29,7 @@
 -- if called with invalid arguments.
 --
 -- See also
--- <https://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/Integer GHC Commentary: Libraries/Integer>.
+-- <https://gitlab.haskell.org/ghc/ghc/wikis/commentary/libraries/integer GHC Commentary: Libraries/Integer>.
 
 module GHC.Integer.GMP.Internals
     ( -- * The 'Integer' type

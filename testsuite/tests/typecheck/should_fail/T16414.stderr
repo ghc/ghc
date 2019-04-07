@@ -1,0 +1,13 @@
+
+T16414.hs:14:6: error:
+    • Overlapping instances for AllZip2 f0 arising from a use of ‘f2’
+      Matching givens (or their superclasses):
+        AllZip2 I
+          bound by the type signature for:
+                     f1 :: forall x. (All x, AllZip2 I) => x -> ()
+          at T16414.hs:13:1-35
+      Matching instances:
+        instance AllZip2 f -- Defined at T16414.hs:11:10
+      (The choice depends on the instantiation of ‘f0’)
+    • In the expression: f2
+      In an equation for ‘f1’: f1 = f2

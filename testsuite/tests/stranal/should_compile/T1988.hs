@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -O2 #-}
 
--- Trac #1988: this one killed GHC 6.8.2
+-- #1988: this one killed GHC 6.8.2
 --              at least with -O2
 
 module ShouldCompile where

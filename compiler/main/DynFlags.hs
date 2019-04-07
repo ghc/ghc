@@ -322,9 +322,9 @@ import Foreign (Ptr) -- needed for 2nd stage
 --  * Adding the flag to the GHC Wiki
 --
 --    There is a change log tracking language extension additions and removals
---    on the GHC wiki:  https://ghc.haskell.org/trac/ghc/wiki/LanguagePragmaHistory
+--    on the GHC wiki:  https://gitlab.haskell.org/ghc/ghc/wikis/language-pragma-history
 --
---  See Trac #4437 and #8176.
+--  See #4437 and #8176.
 
 -- -----------------------------------------------------------------------------
 -- DynFlags
@@ -727,7 +727,7 @@ data WarnReason
 
 -- | Used to differentiate the scope an include needs to apply to.
 -- We have to split the include paths to avoid accidentally forcing recursive
--- includes since -I overrides the system search paths. See Trac #14312.
+-- includes since -I overrides the system search paths. See #14312.
 data IncludeSpecs
   = IncludeSpecs { includePathsQuote  :: [String]
                  , includePathsGlobal :: [String]
@@ -823,7 +823,7 @@ data WarningFlag =
    | Opt_WarnDeferredTypeErrors
    | Opt_WarnDeferredOutOfScopeVariables
    | Opt_WarnNonCanonicalMonadInstances   -- since 8.0
-   | Opt_WarnNonCanonicalMonadFailInstances -- since 8.0
+   | Opt_WarnNonCanonicalMonadFailInstances   -- since 8.0, removed 8.8
    | Opt_WarnNonCanonicalMonoidInstances  -- since 8.0
    | Opt_WarnMissingPatternSynonymSignatures -- since 8.0
    | Opt_WarnUnrecognisedWarningFlags     -- since 8.0
@@ -2245,7 +2245,6 @@ languageExtensions (Just Haskell98)
     = [LangExt.ImplicitPrelude,
        -- See Note [When is StarIsType enabled]
        LangExt.StarIsType,
-       LangExt.MonadFailDesugaring,
        LangExt.MonomorphismRestriction,
        LangExt.NPlusKPatterns,
        LangExt.DatatypeContexts,
@@ -2262,7 +2261,6 @@ languageExtensions (Just Haskell2010)
     = [LangExt.ImplicitPrelude,
        -- See Note [When is StarIsType enabled]
        LangExt.StarIsType,
-       LangExt.MonadFailDesugaring,
        LangExt.MonomorphismRestriction,
        LangExt.DatatypeContexts,
        LangExt.TraditionalRecordSyntax,
@@ -3005,7 +3003,7 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "pgmc"
       (hasArg (\f -> alterSettings (\s -> s { sPgm_c   = (f,[]),
                                               -- Don't pass -no-pie with -pgmc
-                                              -- (see Trac #15319)
+                                              -- (see #15319)
                                               sGccSupportsNoPie = False})))
   , make_ord_flag defFlag "pgms"
       (HasArg (\_ -> addWarn "Object splitting was removed in GHC 8.8"))
@@ -3753,7 +3751,7 @@ dynamic_flags_deps = [
                   "-XDeriveGeneric for generic programming support.") ]
 
 -- | This is where we handle unrecognised warning flags. We only issue a warning
--- if -Wunrecognised-warning-flags is set. See Trac #11429 for context.
+-- if -Wunrecognised-warning-flags is set. See #11429 for context.
 unrecognisedWarning :: String -> Flag (CmdLineP DynFlags)
 unrecognisedWarning prefix = defHiddenFlag prefix (Prefix action)
   where
@@ -4007,8 +4005,9 @@ wWarningFlagsDeps = [
   flagSpec "name-shadowing"              Opt_WarnNameShadowing,
   flagSpec "noncanonical-monad-instances"
                                          Opt_WarnNonCanonicalMonadInstances,
-  flagSpec "noncanonical-monadfail-instances"
-                                         Opt_WarnNonCanonicalMonadFailInstances,
+  depFlagSpec "noncanonical-monadfail-instances"
+                                         Opt_WarnNonCanonicalMonadInstances
+    "fail is no longer a method of Monad",
   flagSpec "noncanonical-monoid-instances"
                                          Opt_WarnNonCanonicalMonoidInstances,
   flagSpec "orphans"                     Opt_WarnOrphans,
@@ -4392,7 +4391,8 @@ xFlagsDeps = [
   flagSpec "LiberalTypeSynonyms"              LangExt.LiberalTypeSynonyms,
   flagSpec "MagicHash"                        LangExt.MagicHash,
   flagSpec "MonadComprehensions"              LangExt.MonadComprehensions,
-  flagSpec "MonadFailDesugaring"              LangExt.MonadFailDesugaring,
+  depFlagSpec "MonadFailDesugaring"           LangExt.MonadFailDesugaring
+    "MonadFailDesugaring is now the default behavior",
   flagSpec "MonoLocalBinds"                   LangExt.MonoLocalBinds,
   depFlagSpecCond "MonoPatBinds"              LangExt.MonoPatBinds
     id
@@ -4557,7 +4557,7 @@ impliedXFlags
     , (LangExt.ExistentialQuantification, turnOn, LangExt.ExplicitForAll)
     , (LangExt.FlexibleInstances,         turnOn, LangExt.TypeSynonymInstances)
     , (LangExt.FunctionalDependencies,    turnOn, LangExt.MultiParamTypeClasses)
-    , (LangExt.MultiParamTypeClasses,     turnOn, LangExt.ConstrainedClassMethods)  -- c.f. Trac #7854
+    , (LangExt.MultiParamTypeClasses,     turnOn, LangExt.ConstrainedClassMethods)  -- c.f. #7854
     , (LangExt.TypeFamilyDependencies,    turnOn, LangExt.TypeFamilies)
 
     , (LangExt.RebindableSyntax, turnOff, LangExt.ImplicitPrelude)      -- NB: turn off!
@@ -4675,7 +4675,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 
 {- Note [Eta-reduction in -O0]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Trac #11562 showed an example which tripped an ASSERT in CoreToStg; a
+#11562 showed an example which tripped an ASSERT in CoreToStg; a
 function was marked as MayHaveCafRefs when in fact it obviously
 didn't.  Reason was:
  * Eta reduction wasn't happening in the simplifier, but it was
@@ -5549,11 +5549,11 @@ picCCOpts dflags = pieOpts ++ picOpts
       -- otherwise things like stub.c files don't get compiled
       -- correctly.  They need to reference data in the Haskell
       -- objects, but can't without -fPIC.  See
-      -- http://ghc.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
+      -- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/position-independent-code
        | gopt Opt_PIC dflags || WayDyn `elem` ways dflags ->
           ["-fPIC", "-U__PIC__", "-D__PIC__"]
       -- gcc may be configured to have PIC on by default, let's be
-      -- explicit here, see Trac #15847
+      -- explicit here, see #15847
        | otherwise -> ["-fno-PIC"]
 
     pieOpts

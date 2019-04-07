@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Trac #289
+-- #289
 
 module ShouldCompile where
 

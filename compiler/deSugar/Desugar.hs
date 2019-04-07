@@ -533,7 +533,7 @@ by 'competesWith'
 
 Class methods have a built-in RULE to select the method from the dictionary,
 so you can't change the phase on this.  That makes id very dubious to
-match on class methods in RULE lhs's.   See Trac #10595.   I'm not happy
+match on class methods in RULE lhs's.   See #10595.   I'm not happy
 about this. For example in Control.Arrow we have
 
 {-# RULES "compose/arr"   forall f g .

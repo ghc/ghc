@@ -8,6 +8,7 @@ instance Ord a => Ord [a] -- Defined in ‘GHC.Classes’
 instance Semigroup [a] -- Defined in ‘GHC.Base’
 instance Show a => Show [a] -- Defined in ‘GHC.Show’
 instance Read a => Read [a] -- Defined in ‘GHC.Read’
+instance MonadFail [] -- Defined in ‘Control.Monad.Fail’
 instance Foldable [] -- Defined in ‘Data.Foldable’
 instance Traversable [] -- Defined in ‘Data.Traversable’
 data () = () 	-- Defined in ‘GHC.Tuple’

@@ -542,7 +542,7 @@ on its first argument -- it must be saturated for these to kick in
 
 Note [Do not expose strictness if sm_inline=False]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Trac #15163 showed a case in which we had
+#15163 showed a case in which we had
 
   {-# INLINE [1] zip #-}
   zip = undefined
@@ -708,7 +708,7 @@ float, exposing the value, if we inline.  That makes it different to
 exprIsHNF.
 
 Before 2009 we said it was interesting if the argument had *any* structure
-at all; i.e. (hasSomeUnfolding v).  But does too much inlining; see Trac #3016.
+at all; i.e. (hasSomeUnfolding v).  But does too much inlining; see #3016.
 
 But we don't regard (f x y) as interesting, unless f is unsaturated.
 If it's saturated and f hasn't inlined, then it's probably not going
@@ -822,12 +822,12 @@ When simplifying a rule LHS, refrain from /any/ inlining or applying
 of other RULES.
 
 Doing anything to the LHS is plain confusing, because it means that what the
-rule matches is not what the user wrote. c.f. Trac #10595, and #10528.
+rule matches is not what the user wrote. c.f. #10595, and #10528.
 Moreover, inlining (or applying rules) on rule LHSs risks introducing
-Ticks into the LHS, which makes matching trickier. Trac #10665, #10745.
+Ticks into the LHS, which makes matching trickier. #10665, #10745.
 
 Doing this to either side confounds tools like HERMIT, which seek to reason
-about and apply the RULES as originally written. See Trac #10829.
+about and apply the RULES as originally written. See #10829.
 
 Note [No eta expansion in stable unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -844,7 +844,7 @@ we do not want to eta-expand to
   --    = (/\a \(d:Ord a) (x:a) (eta:State#). bla eta) |> co
 
 because not specialisation of the overloading doesn't work properly
-(see Note [Specialisation shape] in Specialise), Trac #9509.
+(see Note [Specialisation shape] in Specialise), #9509.
 
 So we disable eta-expansion in stable unfoldings.
 
@@ -1109,7 +1109,7 @@ it might make fInt look big, and we'll lose the opportunity to inline f
 at each of fInt's call sites.  The INLINE pragma will only inline when
 the application is saturated for exactly this reason; and we don't
 want PreInlineUnconditionally to second-guess it.  A live example is
-Trac #3736.
+#3736.
     c.f. Note [Stable unfoldings and postInlineUnconditionally]
 
 NB: if the pragma is INLINEABLE, then we don't want to behave in
@@ -1516,7 +1516,7 @@ tryEtaExpandRhs mode bndr rhs
        ; return (count isId join_bndrs, exprIsBottom join_body, rhs) }
          -- Note [Do not eta-expand join points]
          -- But do return the correct arity and bottom-ness, because
-         -- these are used to set the bndr's IdInfo (Trac #15517)
+         -- these are used to set the bndr's IdInfo (#15517)
 
   | otherwise
   = do { (new_arity, is_bot, new_rhs) <- try_expand
@@ -1614,7 +1614,7 @@ Note [Do not eta-expand PAPs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to have old_arity = manifestArity rhs, which meant that we
 would eta-expand even PAPs.  But this gives no particular advantage,
-and can lead to a massive blow-up in code size, exhibited by Trac #9020.
+and can lead to a massive blow-up in code size, exhibited by #9020.
 Suppose we have a PAP
     foo :: IO ()
     foo = returnIO ()
@@ -1731,7 +1731,7 @@ new binding is abstracted.  Note that
          poly_t = /\ a b -> (e1, e2)
          poly_x = /\ a   -> fst (poly_t a *b*)
 
-  * We must do closeOverKinds.  Example (Trac #10934):
+  * We must do closeOverKinds.  Example (#10934):
        f = /\k (f:k->*) (a:k). let t = AccFailure @ (f a) in ...
     Here we want to float 't', but we must remember to abstract over
     'k' as well, even though it is not explicitly mentioned in the RHS,

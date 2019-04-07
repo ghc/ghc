@@ -242,7 +242,7 @@ Consider
          f (T { y=True, x=False }) = ...
 
 We must match the patterns IN THE ORDER GIVEN, thus for the first
-one we match y=True before x=False.  See Trac #246; or imagine
+one we match y=True before x=False.  See #246; or imagine
 matching against (T { y=False, x=undefined }): should fail without
 touching the undefined.
 

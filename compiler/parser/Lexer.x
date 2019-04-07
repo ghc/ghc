@@ -13,7 +13,7 @@
 -- References:
 -- [1] https://www.haskell.org/onlinereport/haskell2010/haskellch2.html
 -- [2] http://www.haskell.org/alex/
--- [3] https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/Parser
+-- [3] https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/parser
 --
 -----------------------------------------------------------------------------
 
@@ -1884,7 +1884,7 @@ lex_quasiquote start s = do
 
     -- NB: The string "|]" terminates the quasiquote,
     -- with absolutely no escaping. See the extensive
-    -- discussion on Trac #5348 for why there is no
+    -- discussion on #5348 for why there is no
     -- escape handling.
     Just ('|',i)
         | Just (']',i) <- alexGetChar' i

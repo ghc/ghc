@@ -1,5 +1,6 @@
 module Main (main) where
 
+import System.Directory (getCurrentDirectory)
 import Development.Shake
 import Hadrian.Expression
 import Hadrian.Utilities
@@ -30,14 +31,29 @@ main = do
         rebuild = [ (RebuildLater, buildRoot -/- "stage0//*")
                   | CommandLine.lookupFreeze1 argsMap ]
 
-        options :: ShakeOptions
+    cwd <- getCurrentDirectory
+    let options :: ShakeOptions
         options = shakeOptions
             { shakeChange   = ChangeModtimeAndDigest
             , shakeFiles    = buildRoot -/- Base.shakeFilesDir
             , shakeProgress = progressSimple
             , shakeRebuild  = rebuild
             , shakeTimings  = True
-            , shakeExtra    = extra }
+            , shakeExtra    = extra
+
+            -- Enable linting file accesses in the build dir and ghc root dir
+            -- (cwd) when using the `--lint-fsatrace` option.
+            , shakeLintInside = [ cwd, buildRoot ]
+            , shakeLintIgnore =
+                -- Ignore access to the package database caches.
+                -- They are managed externally by the ghc-pkg tool.
+                [ buildRoot -/- "//package.conf.d/package.cache"
+
+                -- Ignore access to autom4te.cache directories.
+                -- They are managed externally by auto tools.
+                , "//autom4te.cache//*"
+                ]
+            }
 
         rules :: Rules ()
         rules = do
@@ -50,6 +66,7 @@ main = do
             Rules.SourceDist.sourceDistRules
             Rules.Test.testRules
             Rules.topLevelTargets
+            Rules.toolArgsTarget
 
     shakeArgsWith options CommandLine.optDescrs $ \_ targets -> do
         Environment.setupEnvironment

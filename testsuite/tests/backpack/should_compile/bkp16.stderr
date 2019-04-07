@@ -2,7 +2,7 @@
   [1 of 1] Compiling Int[sig]         ( p/Int.hsig, nothing )
 [2 of 2] Processing q
   Instantiating q
-  [1 of 1] Including p[Int=base-4.12.0.0:GHC.Exts]
-    Instantiating p[Int=base-4.12.0.0:GHC.Exts]
-    [1 of 1] Including ghc-prim-0.5.3
+  [1 of 1] Including p[Int=base-4.13.0.0:GHC.Exts]
+    Instantiating p[Int=base-4.13.0.0:GHC.Exts]
+    [1 of 1] Including ghc-prim-0.6.1
     [1 of 1] Compiling Int[sig]         ( p/Int.hsig, bkp16.out/p/p-97PZnzqiJmd2hTwUNGdjod/Int.o )
