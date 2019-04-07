@@ -114,6 +114,12 @@ else
 RUNTEST_OPTS += -e config.have_profiling=False
 endif
 
+ifeq "$(HAVE_HADDOCK_COMPILED)" "YES"
+RUNTEST_OPTS += -e config.have_haddock_compiled=True
+else
+RUNTEST_OPTS += -e config.have_haddock_compiled=False
+endif
+
 ifeq "$(filter thr, $(GhcRTSWays))" "thr"
 RUNTEST_OPTS += -e ghc_with_threaded_rts=True
 else
