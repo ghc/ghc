@@ -175,19 +175,21 @@ numberToRational :: Number -> Rational
 numberToRational (MkOctal iPart) = val 8 iPart % 1
 numberToRational (MkDecimal iPart mFPart mExp)
  = let i = val 10 iPart
+       fracDExp = fracExp 10 10
    in case (mFPart, mExp) of
       (Nothing, Nothing)     -> i % 1
       (Nothing, Just exp)
        | exp >= 0            -> (i * (10 ^ exp)) % 1
        | otherwise           -> i % (10 ^ (- exp))
-      (Just fPart, Nothing)  -> fracExp 0   i fPart
-      (Just fPart, Just exp) -> fracExp exp i fPart
-      -- fracExp is a bit more efficient in calculating the Rational.
+      (Just fPart, Nothing)  -> fracDExp 0   i fPart
+      (Just fPart, Just exp) -> fracDExp exp i fPart
+      -- fracDExp is a bit more efficient in calculating the Rational.
       -- Instead of calculating the fractional part alone, then
       -- adding the integral part and finally multiplying with
-      -- 10 ^ exp if an exponent was given, do it all at once.
+      -- 10^exp if an exponent was given, do it all at once.
 numberToRational (MkHexadecimal iPart mFPart mExp)
  = let i = val 16 iPart
+       fracBExp = fracExp 2 16
    in case (mFPart, mExp) of
       (Nothing, Nothing)     -> i % 1
       (Nothing, Just exp)
@@ -195,10 +197,7 @@ numberToRational (MkHexadecimal iPart mFPart mExp)
        | otherwise           -> i % (2 ^ (- exp))
       (Just fPart, Nothing)  -> fracBExp 0   i fPart
       (Just fPart, Just exp) -> fracBExp exp i fPart
-      -- fracBExp is a bit more efficient in calculating the Rational.
-      -- Instead of calculating the fractional part alone, then
-      -- adding the integral part and finally multiplying with
-      -- 2 ^ exp if an exponent was given, do it all at once.
+      -- Same note as for fracDExp except this time for 2^exp
 
 -- -----------------------------------------------------------------------------
 -- Lexing
@@ -571,31 +570,27 @@ valInteger b0 ds0 = go b0 (length ds0) $ map fromIntegral ds0
     combine _ []  = []
     combine _ [_] = errorWithoutStackTrace "this should not happen"
 
--- Calculate a Rational from the exponent [of 10 to multiply with],
+-- Calculate a Rational from the exponent [of @expBase@ to multiply with],
 -- the integral part of the mantissa and the digits of the fractional
--- part. Leaving the calculation of the power of 10 until the end,
+-- part. Leaving the calculation of the power of @expBase@ until the end,
 -- when we know the effective exponent, saves multiplications.
 -- More importantly, this way we need at most one gcd instead of three.
---
--- frac was never used with anything but Integer and base 10, so
--- those are hardcoded now (trivial to change if necessary).
-fracExp :: Integer -> Integer -> Digits -> Rational
-fracExp exp mant []
-  | exp < 0     = mant % (10 ^ (-exp))
-  | otherwise   = fromInteger (mant * 10 ^ exp)
-fracExp exp mant (d:ds) = exp' `seq` mant' `seq` fracExp exp' mant' ds
+fracExp :: Integer -> Integer -> Integer -> Integer -> Digits -> Rational
+fracExp expBase mantBase exponent mantissa digits = go exponent mantissa digits
   where
-    exp'  = exp - 1
-    mant' = mant * 10 + fromIntegral d
-
-fracBExp :: Integer -> Integer -> Digits -> Rational
-fracBExp exp mant []
-  | exp < 0     = mant % (2 ^ (-exp))
-  | otherwise   = fromInteger (mant * 2 ^ exp)
-fracBExp exp mant (d:ds) = exp' `seq` mant' `seq` fracBExp exp' mant' ds
-  where
-    exp'  = exp - 4
-    mant' = mant * 16 + fromIntegral d
+    dlog base x = dlog' base 1
+      where dlog' acc res | acc == x  = res
+              | acc > x   = error ("No base " ++ show base
+                                   ++ " discrete log for " ++ show x ++ ".")
+                          | otherwise = dlog' (base * acc) (res + 1)
+    step = dlog expBase mantBase
+    go exp mant []
+      | exp < 0   = mant % (expBase ^ (-exp))
+      | otherwise = fromInteger (mant * expBase ^ exp)
+    go exp mant (d:ds) = exp' `seq` mant' `seq` go exp' mant' ds
+      where
+        exp'  = exp - step
+        mant' = mant * mantBase + fromIntegral d
 
 valDig :: (Eq a, Num a) => a -> Char -> Maybe Int
 valDig 8 c
