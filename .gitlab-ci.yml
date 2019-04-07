@@ -358,6 +358,7 @@ validate-x86_64-linux-deb9-debug:
 validate-x86_64-linux-deb9-llvm:
   extends: .build-x86_64-linux-deb9
   stage: full-build
+  allow_failure: true
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
@@ -365,6 +366,7 @@ validate-x86_64-linux-deb9-llvm:
 validate-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
   stage: full-build
+  allow_failure: true
   variables:
     INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
@@ -469,6 +471,7 @@ validate-x86_64-linux-fedora27:
 .build-windows-hadrian:
   extends: .build-windows
   stage: full-build
+  allow_failure: true
   variables:
     GHC_VERSION: "8.6.2"
   script:
