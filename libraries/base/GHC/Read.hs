@@ -575,7 +575,9 @@ convertInt _ = pfail
 convertFrac :: forall a . RealFloat a => L.Lexeme -> ReadPrec a
 convertFrac (L.Ident "NaN")      = return (0 / 0)
 convertFrac (L.Ident "Infinity") = return (1 / 0)
-convertFrac (L.Number n) = let resRange = floatRange (undefined :: a)
+convertFrac (L.Number n) = let mantDigs = floatDigits (undefined :: a)
+                               (minEx, maxEx) = floatRange (undefined :: a)
+                               resRange = (minEx - mantDigs, maxEx)
                            in case L.numberToRangedRational resRange n of
                               Nothing -> return (1 / 0)
                               Just rat -> return $ fromRational rat
