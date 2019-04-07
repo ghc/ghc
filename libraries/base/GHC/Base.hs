@@ -437,6 +437,32 @@ instance Monoid a => Applicative ((,) a) where
 instance Monoid a => Monad ((,) a) where
     (u, a) >>= k = case k a of (v, b) -> (u <> v, b)
 
+-- | @since 4.14.0.0
+instance Functor ((,,) a b) where
+    fmap f (a, b, c) = (a, b, f c)
+
+-- | @since 4.14.0.0
+instance (Monoid a, Monoid b) => Applicative ((,,) a b) where
+    pure x = (mempty, mempty, x)
+    (a, b, f) <*> (a', b', x) = (a <> a', b <> b', f x)
+
+-- | @since 4.14.0.0
+instance (Monoid a, Monoid b) => Monad ((,,) a b) where
+    (u, v, a) >>= k = case k a of (u', v', b) -> (u <> u', v <> v', b)
+
+-- | @since 4.14.0.0
+instance Functor ((,,,) a b c) where
+    fmap f (a, b, c, d) = (a, b, c, f d)
+
+-- | @since 4.14.0.0
+instance (Monoid a, Monoid b, Monoid c) => Applicative ((,,,) a b c) where
+    pure x = (mempty, mempty, mempty, x)
+    (a, b, c, f) <*> (a', b', c', x) = (a <> a', b <> b', c <> c', f x)
+
+-- | @since 4.14.0.0
+instance (Monoid a, Monoid b, Monoid c) => Monad ((,,,) a b c) where
+    (u, v, w, a) >>= k = case k a of (u', v', w', b) -> (u <> u', v <> v', w <> w', b)
+
 -- | @since 4.10.0.0
 instance Semigroup a => Semigroup (IO a) where
     (<>) = liftA2 (<>)
