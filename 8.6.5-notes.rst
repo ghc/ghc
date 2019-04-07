@@ -17,6 +17,9 @@ The highlights, since the 8.6.4 release, are:
 - A build system issue where use of GCC with ``-flto`` broke ``configure``
   was fixed (:ghc-ticket:`16440`)
 
+- An bug affecting Windows platforms wherein XMM register values could be
+  mangled when entering STG has been fixed (:ghc-ticket:`16514`)
+
 - Several packaging issues with the Windows binary distributions have been resolved.
   (:ghc-ticket:`16408`, :ghc-ticket:`16398`, :ghc-ticket:`16516`).
 
