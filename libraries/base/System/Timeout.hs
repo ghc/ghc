@@ -16,7 +16,7 @@
 --
 -------------------------------------------------------------------------------
 
-module System.Timeout ( timeout ) where
+module System.Timeout ( Timeout, timeout ) where
 
 #if !defined(mingw32_HOST_OS)
 import Control.Monad
@@ -35,7 +35,11 @@ import Data.Unique         (Unique, newUnique)
 -- interrupt the running IO computation when the timeout has
 -- expired.
 
-newtype Timeout = Timeout Unique deriving Eq -- ^ @since 4.0
+-- | An exception thrown to a thread by 'timeout' to interrupt a timed-out
+-- computation.
+--
+-- @since 4.0
+newtype Timeout = Timeout Unique deriving Eq
 
 -- | @since 4.0
 instance Show Timeout where
@@ -67,20 +71,25 @@ instance Exception Timeout where
 -- another thread.
 --
 -- A tricky implementation detail is the question of how to abort an @IO@
--- computation. This combinator relies on asynchronous exceptions internally.
--- The technique works very well for computations executing inside of the
--- Haskell runtime system, but it doesn't work at all for non-Haskell code.
--- Foreign function calls, for example, cannot be timed out with this
--- combinator simply because an arbitrary C function cannot receive
--- asynchronous exceptions. When @timeout@ is used to wrap an FFI call that
--- blocks, no timeout event can be delivered until the FFI call returns, which
--- pretty much negates the purpose of the combinator. In practice, however,
--- this limitation is less severe than it may sound. Standard I\/O functions
--- like 'System.IO.hGetBuf', 'System.IO.hPutBuf', Network.Socket.accept, or
--- 'System.IO.hWaitForInput' appear to be blocking, but they really don't
--- because the runtime system uses scheduling mechanisms like @select(2)@ to
--- perform asynchronous I\/O, so it is possible to interrupt standard socket
--- I\/O or file I\/O using this combinator.
+-- computation. This combinator relies on asynchronous exceptions internally
+-- (namely throwing the computation the 'Timeout' exception).  The technique
+-- works very well for computations executing inside of the Haskell runtime
+-- system, but it doesn't work at all for non-Haskell code.  Foreign function
+-- calls, for example, cannot be timed out with this combinator simply because
+-- an arbitrary C function cannot receive asynchronous exceptions. When
+-- @timeout@ is used to wrap an FFI call that blocks, no timeout event can be
+-- delivered until the FFI call returns, which pretty much negates the purpose
+-- of the combinator. In practice, however, this limitation is less severe than
+-- it may sound. Standard I\/O functions like 'System.IO.hGetBuf',
+-- 'System.IO.hPutBuf', Network.Socket.accept, or 'System.IO.hWaitForInput'
+-- appear to be blocking, but they really don't because the runtime system uses
+-- scheduling mechanisms like @select(2)@ to perform asynchronous I\/O, so it
+-- is possible to interrupt standard socket I\/O or file I\/O using this
+-- combinator.
+---
+-- Note that 'timeout' cancels the computation by throwing it the 'Timeout'
+-- exception. Consequently blanket exception handlers (e.g. catching
+-- 'SomeException') within the computation will break the timeout behavior.
 timeout :: Int -> IO a -> IO (Maybe a)
 timeout n f
     | n <  0    = fmap Just f
