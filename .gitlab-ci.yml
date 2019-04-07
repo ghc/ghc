@@ -59,6 +59,7 @@ ghc-linters:
     - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
     - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
     - .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
+    - .gitlab/linters/check-version-number.sh
   dependencies: []
   tags:
     - lint
