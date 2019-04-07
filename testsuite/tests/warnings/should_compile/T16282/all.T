@@ -1,0 +1,1 @@
+test('T16282', normal, compile, ['-O2 -Wall-missed-specialisations'])

@@ -778,8 +778,8 @@ we aren't using annotations heavily.
 ************************************************************************
 -}
 
-msg :: Severity -> SDoc -> CoreM ()
-msg sev doc
+msg :: Severity -> WarnReason -> SDoc -> CoreM ()
+msg sev reason doc
   = do { dflags <- getDynFlags
        ; loc    <- getSrcSpanM
        ; unqual <- getPrintUnqualified
@@ -791,7 +791,7 @@ msg sev doc
              err_sty  = mkErrStyle dflags unqual
              user_sty = mkUserStyle dflags unqual AllTheWay
              dump_sty = mkDumpStyle dflags unqual
-       ; liftIO $ putLogMsg dflags NoReason sev loc sty doc }
+       ; liftIO $ putLogMsg dflags reason sev loc sty doc }
 
 -- | Output a String message to the screen
 putMsgS :: String -> CoreM ()
@@ -799,7 +799,7 @@ putMsgS = putMsg . text
 
 -- | Output a message to the screen
 putMsg :: SDoc -> CoreM ()
-putMsg = msg SevInfo
+putMsg = msg SevInfo NoReason
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsgS :: String -> CoreM ()
@@ -807,9 +807,9 @@ errorMsgS = errorMsg . text
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()
-errorMsg = msg SevError
+errorMsg = msg SevError NoReason
 
-warnMsg :: SDoc -> CoreM ()
+warnMsg :: WarnReason -> SDoc -> CoreM ()
 warnMsg = msg SevWarning
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
@@ -818,7 +818,7 @@ fatalErrorMsgS = fatalErrorMsg . text
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsg :: SDoc -> CoreM ()
-fatalErrorMsg = msg SevFatal
+fatalErrorMsg = msg SevFatal NoReason
 
 -- | Output a string debugging message at verbosity level of @-v@ or higher
 debugTraceMsgS :: String -> CoreM ()
@@ -826,7 +826,7 @@ debugTraceMsgS = debugTraceMsg . text
 
 -- | Outputs a debugging message at verbosity level of @-v@ or higher
 debugTraceMsg :: SDoc -> CoreM ()
-debugTraceMsg = msg SevDump
+debugTraceMsg = msg SevDump NoReason
 
 -- | Show some labelled 'SDoc' if a particular flag is set or at a verbosity level of @-v -ddump-most@ or higher
 dumpIfSet_dyn :: DumpFlag -> String -> SDoc -> CoreM ()
