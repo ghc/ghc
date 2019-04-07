@@ -1472,18 +1472,21 @@ lookupBindGroupOcc ctxt what rdr_name
     lookup_top keep_me
       = do { env <- getGlobalRdrEnv
            ; let all_gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
+           ; let candidates_msg = candidates $ map gre_name $ globalRdrEnvElts env
            ; case filter (keep_me . gre_name) all_gres of
-               [] | null all_gres -> bale_out_with Outputable.empty
+               [] | null all_gres -> bale_out_with candidates_msg
                   | otherwise     -> bale_out_with local_msg
                (gre:_)            -> return (Right (gre_name gre)) }
 
     lookup_group bound_names  -- Look in the local envt (not top level)
       = do { mname <- lookupLocalOccRn_maybe rdr_name
+           ; env <- getLocalRdrEnv
+           ; let candidates_msg = candidates $ localRdrEnvElts env
            ; case mname of
                Just n
                  | n `elemNameSet` bound_names -> return (Right n)
                  | otherwise                   -> bale_out_with local_msg
-               Nothing                         -> bale_out_with Outputable.empty }
+               Nothing                         -> bale_out_with candidates_msg }
 
     bale_out_with msg
         = return (Left (sep [ text "The" <+> what
@@ -1493,6 +1496,19 @@ lookupBindGroupOcc ctxt what rdr_name
 
     local_msg = parens $ text "The"  <+> what <+> ptext (sLit "must be given where")
                            <+> quotes (ppr rdr_name) <+> text "is declared"
+
+    candidates names_in_scope
+      = case similar_names of
+          [] -> Outputable.empty
+          _  -> vcat $ map (\x -> text "Perhaps you meant" <+>
+                                  quotes (ppr x) <+>
+                                  parens (pprDefinedAt x))
+                           similar_names
+      where
+        similar_names
+          = fuzzyLookup (unpackFS $ occNameFS $ rdrNameOcc rdr_name)
+                        $ map (\x -> ((unpackFS $ occNameFS $ nameOccName x), x))
+                              names_in_scope
 
 
 ---------------
