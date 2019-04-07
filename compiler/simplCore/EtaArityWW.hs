@@ -84,7 +84,7 @@ etaArityWWBind' dflags fn_id rhs
         -- see [Note Inlining etaWW]
         work_prag       = InlinePragma
                         { inl_src       = SourceText "{-# INLINE"
-                        , inl_inline    = NoUserInline
+                        , inl_inline    = NoInline
                         , inl_sat       = Nothing
                         , inl_act       = work_act
                         , inl_rule      = FunLike }
