@@ -162,7 +162,6 @@ copyRules = do
         prefix -/- "llvm-targets"      <~ return "."
         prefix -/- "llvm-passes"       <~ return "."
         prefix -/- "platformConstants" <~ (buildRoot <&> (-/- generatedDir))
-        prefix -/- "settings"          <~ (buildRoot <&> (-/- generatedDir))
         prefix -/- "template-hsc.h"    <~ return (pkgPath hsc2hs)
 
         prefix -/- "html//*"           <~ return "utils/haddock/haddock-api/resources"
@@ -178,7 +177,10 @@ generateRules = do
     priority 2.0 $ (root -/- generatedDir -/- "ghcautoconf.h") <~ generateGhcAutoconfH
     priority 2.0 $ (root -/- generatedDir -/- "ghcplatform.h") <~ generateGhcPlatformH
     priority 2.0 $ (root -/- generatedDir -/-  "ghcversion.h") <~ generateGhcVersionH
-    priority 2.0 $ (root -/- generatedDir -/-      "settings") <~ generateSettings
+    forM_ [Stage0 ..] $ \stage -> do
+        let prefix = root -/- stageString stage -/- "lib"
+            go gen file = generate file (semiEmptyTarget stage) gen
+        priority 2.0 $ (prefix -/- "settings") %> go generateSettings
 
     -- TODO: simplify, get rid of fake rts context
     root -/- generatedDir ++ "//*" %> \file -> do
@@ -190,6 +192,10 @@ generateRules = do
 -- TODO: Use the Types, Luke! (drop partial function)
 -- We sometimes need to evaluate expressions that do not require knowing all
 -- information about the context. In this case, we don't want to know anything.
+semiEmptyTarget :: Stage -> Context
+semiEmptyTarget stage = vanillaContext stage
+  (error "Rules.Generate.emptyTarget: unknown package")
+
 emptyTarget :: Context
 emptyTarget = vanillaContext (error "Rules.Generate.emptyTarget: unknown stage")
                              (error "Rules.Generate.emptyTarget: unknown package")
