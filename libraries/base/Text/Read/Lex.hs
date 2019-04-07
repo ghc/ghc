@@ -44,7 +44,7 @@ import GHC.Show( Show(..) )
 import GHC.Unicode
   ( GeneralCategory(..), generalCategory, isSpace, isAlpha, isAlphaNum )
 import GHC.Real( Rational, (%), fromIntegral, Integral,
-                 toInteger, (^), quot, even )
+                 toInteger, (^), quot, quotRem, even )
 import GHC.List
 import GHC.Enum( minBound, maxBound )
 import Data.Maybe
@@ -130,7 +130,9 @@ fixedParts p base iPart fPart =
 numberToRangedRational :: (Int, Int) -> Number
                        -> Maybe Rational -- Nothing = Inf
 numberToRangedRational bounds n@(MkDecimal iPart mFPart (Just exp))
-  = exponentedToRangedRational bounds n iPart mFPart exp
+  = exponentedToRangedRational (shrink bounds) n iPart mFPart exp
+    where a `divUp` b | (q, r) <- a `quotRem` b = q + r
+          shrink (l, r) = (l `divUp` 3, r `divUp` 3)
 numberToRangedRational bounds n@(MkHexadecimal iPart mFPart (Just exp))
   -- TODO: I have no idea whether the +/- 3 padding makes
   --       sense for hexadecimal numbers too.
@@ -145,11 +147,12 @@ exponentedToRangedRational :: (Int, Int) -> Number
                            -> Digits -> Maybe Digits -> Integer
                            -> Maybe Rational
 exponentedToRangedRational (neg, pos) n iPart mFPart exp
-  -- if exp is out of integer bounds,
-  -- then the number is definitely out of range
-  | exp > fromIntegral (maxBound :: Int) ||
-    exp < fromIntegral (minBound :: Int)
+  -- if exp is over maxBound, then the number is definitely out of range
+  | exp > fromIntegral (maxBound :: Int)
   = Nothing
+  -- if exp is under minBound, the closest representation is always 0
+  | exp < fromIntegral (minBound :: Int)
+  = Just 0
   | otherwise
   = let mFirstDigit = case dropWhile (0 ==) iPart of
                       iPart'@(_ : _) -> Just (length iPart')
@@ -159,14 +162,16 @@ exponentedToRangedRational (neg, pos) n iPart mFPart exp
                                 case span (0 ==) fPart of
                                 (_, []) -> Nothing
                                 (zeroes, _) ->
-                                    Just (negate (length zeroes))
+                                    Just (negate (1 + length zeroes))
     in case mFirstDigit of
        Nothing -> Just 0
        Just firstDigit ->
            let firstDigit' = firstDigit + fromInteger exp
            in if firstDigit' > (pos + 3)
               then Nothing
-              else if firstDigit' < (neg - 3)
+              else if firstDigit' < (neg - 3) -- Padding hides the edge case
+                                              -- where the number is closer to
+                                              -- the smallest (de)norm than 0
               then Just 0
               else Just (numberToRational n)
 
