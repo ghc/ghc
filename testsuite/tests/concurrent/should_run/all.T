@@ -239,7 +239,7 @@ test('conc067', ignore_stdout, compile_and_run, [''])
 
 # omit threaded2, the behaviour of this test is non-deterministic with more
 # than one CPU.
-test('conc068', [ omit_ways('threaded2'), exit_code(1) ], compile_and_run, [''])
+test('conc068', [ omit_ways(['threaded2']), exit_code(1) ], compile_and_run, [''])
 
 test('setnumcapabilities001',
      [ only_ways(['threaded1','threaded2']),
