@@ -26,3 +26,5 @@ test('MissingMod', normal, multimod_compile, ['MissingMod', '-Wmissing-home-modu
 test('StarBinder', normal, compile, [''])
 
 test('Overflow', normal, compile, [''])
+
+test('T16551', normal, compile, ['Werror=missing-home-modules T16551A.hs T16551B.hs'])
