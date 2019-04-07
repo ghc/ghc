@@ -28,16 +28,11 @@
   * Add `Functor`, `Applicative`, `Monad`, `Alternative`, `MonadPlus`,
     `Generic` and `Generic1` instances to `Kleisli`
 
+  * Add `Functor`, `Applicative` and `Monad` instances to `(,,) a b`
+    and `(,,,) a b c`
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
-
-  * The final phase of the `MonadFail` proposal has been implemented:
-
-    * The `fail` method of `Monad` has been removed in favor of the method of
-      the same name in the `MonadFail` class.
-
-    * `MonadFail(fail)` is now re-exported from the `Prelude` and
-      `Control.Monad` modules.
 
   * Fix `Show` instance of `Data.Fixed`: Negative numbers are now parenthesized
     according to their surrounding context. I.e. `Data.Fixed.show` produces
@@ -56,8 +51,6 @@
   * The `shiftL` and `shiftR` methods in the `Bits` instances of `Int`, `IntN`,
     `Word`, and `WordN` now throw an overflow exception for negative shift
     values (instead of being undefined behaviour).
-
-  * `scanr` no longer crashes when passed a fusable, infinite list. (#16943)
 
 ## 4.12.0.0 *21 September 2018*
   * Bundled with GHC 8.6.1
