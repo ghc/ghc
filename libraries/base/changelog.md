@@ -5,6 +5,9 @@
 
   * Add a `TestEquality` instance for the `Compose` newtype.
 
+  * Add `Functor`, `Applicative` and `Monad` instances to `(,,) a b`
+    and `(,,,) a b c`
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
