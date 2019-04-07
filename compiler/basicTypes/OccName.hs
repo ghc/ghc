@@ -621,7 +621,7 @@ mkDataConWrapperOcc, mkWorkerOcc, mkEtaWorkerOcc,
 -- These derived variables have a prefix that no Haskell value could have
 mkDataConWrapperOcc = mk_simple_deriv varName  "$W"
 mkWorkerOcc         = mk_simple_deriv varName  "$w"
-mkEtaWorkerOcc      = mk_simple_deriv varName  "$etaW_"
+mkEtaWorkerOcc      = mk_simple_deriv varName  "$e"
 mkMatcherOcc        = mk_simple_deriv varName  "$m"
 mkBuilderOcc        = mk_simple_deriv varName  "$b"
 mkDefaultMethodOcc  = mk_simple_deriv varName  "$dm"

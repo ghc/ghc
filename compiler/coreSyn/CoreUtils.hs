@@ -2421,11 +2421,12 @@ tryEtaReduce bndrs body
     ok_fun (Cast fun _)        = ok_fun fun
     ok_fun (Tick _ expr)       = ok_fun expr
     ok_fun (Var fun_id)        = (ok_fun_id fun_id || all ok_lam bndrs)
-                               && (not (isFunTildeTy (idType fun_id)))
     ok_fun _fun                = False
 
     ---------------
     ok_fun_id fun = fun_arity fun >= incoming_arity
+                  && not (isFunTildeTy (idType fun))
+
 
     ---------------
     fun_arity fun             -- See Note [Arity care]

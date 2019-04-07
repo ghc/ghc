@@ -1,4 +1,4 @@
-module EtaArityWW (etaArityWW) where
+module EtaArityWW (etaArityWW, shallowEtaType, deepEtaType) where
 
 import GhcPrelude
 
@@ -12,12 +12,19 @@ import CoreUnfold
 import Id
 import IdInfo
 import TyCoRep
+import Type
 import UniqSupply
 import VarEnv
 import Outputable
 import MonadUtils
 
 import qualified Data.Map as F
+
+data WWInfo
+  = NoWW
+  | JustUnbox
+  | JustEtaArity
+  | BothUnboxAndEtaArity
 
 {-
 ************************************************************************
@@ -61,26 +68,31 @@ etaArityWWBind'
   -- the first component are recursive binds and the second are non-recursive
   -- binds (the wrappers are non-recursive)
 etaArityWWBind' dflags fn_id rhs
-  | arity >= 1              -- we only do etaArityWW on functions
-    && isId fn_id           -- only work on terms
-    && not (isJoinId fn_id) -- do not interfere with join points
-  = let fm = calledArityMap rhs
-        work_ty = exprArityType arity (idType fn_id) rhs fm
-        fn_info = idInfo fn_id
+  | arity >= 1                            -- * we only do etaArityWW on
+                                          --   functions
+    && isId fn_id                         -- * only work on terms
+    && not (isJoinId fn_id)               -- * do not interfere with join points
+    && not (isFunTildeTy (idType fn_id))  -- * do not worker/wrapper, things
+                                          --   that are already tildefuns
+  = let fm              = calledArityMap rhs
+        work_ty         = deepEtaType (idType fn_id)
+        fn_info         = idInfo fn_id
         fn_inl_prag     = inlinePragInfo fn_info
         fn_inline_spec  = inl_inline fn_inl_prag
         fn_act          = inl_act fn_inl_prag
         rule_match_info = inlinePragmaRuleMatchInfo fn_inl_prag
-        work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
-                                 , inl_inline = NoInline
-                                 , inl_sat    = Nothing
-                                 , inl_act    = work_act
-                                 , inl_rule   = FunLike }
-        work_act  = case fn_act of
-                      ActiveAfter {} -> fn_act
-                      NeverActive    -> ActiveAfter NoSourceText 0
-                      _              -> ActiveAfter NoSourceText 2
-        wrap_prag = alwaysInlinePragma
+        -- see [Note Inlining etaWW]
+        work_prag       = InlinePragma
+                        { inl_src       = SourceText "{-# INLINE"
+                        , inl_inline    = NoUserInline
+                        , inl_sat       = Nothing
+                        , inl_act       = work_act
+                        , inl_rule      = FunLike }
+        work_act        = case fn_act of
+                            ActiveAfter {} -> fn_act
+                            NeverActive    -> ActiveAfter NoSourceText 0
+                            _              -> ActiveAfter NoSourceText 2
+        wrap_prag       = alwaysInlinePragma
     in
     do { uniq <- getUniqueM
        ; let work_id = mkEtaWorkerId uniq fn_id work_ty
@@ -100,6 +112,17 @@ etaArityWWBind' dflags fn_id rhs
   = return [(fn_id,rhs)]
 
   where arity = manifestArity rhs
+
+{- [Note Inlining etaWW]
+
+  Inlining the worker will nullify this worker/wrapper transformation. However,
+  the opposite is not necessarily the best either.
+
+  If I try to never inline the worker, then there is one case in which we get
+  -83% allocations only one program. Most of the other programs show a minor
+  increase in allocations. Also minimax loops forever and bernoulli has a
+  linking error
+-}
 
 -- ^ Traverses the expression to do etaArityWWBind in let-expressions
 etaArityWWExpr :: DynFlags -> CoreExpr -> UniqSM CoreExpr
@@ -241,23 +264,37 @@ exprArityType :: Arity -> Type -> CoreExpr -> F.Map Id Arity -> Type
 exprArityType n (ForAllTy tv body_ty) (Lam _ expr) fm
   = ForAllTy tv (exprArityType n body_ty expr fm)
 exprArityType 0 (FunTy arg res) (Lam bndr expr) fm
-  = FunTy (flatEtaType (F.findWithDefault 0 bndr fm) arg)
+  = FunTy (nArgsEtaType (F.findWithDefault 0 bndr fm) arg)
           (exprArityType 0 res expr fm)
 exprArityType n (FunTy arg res) (Lam bndr expr) fm
-  = FunTildeTy (flatEtaType (F.findWithDefault 0 bndr fm) arg)
+  = FunTildeTy (nArgsEtaType (F.findWithDefault 0 bndr fm) arg)
                (exprArityType (n-1) res expr fm)
 exprArityType _ ty _ _ = ty
+
+nArgsEtaType :: Arity -> Type -> Type
+nArgsEtaType n (ForAllTy tv body_ty) = ForAllTy tv (nArgsEtaType n body_ty)
+nArgsEtaType 0 (FunTy arg res)       = FunTy arg (nArgsEtaType 0 res)
+nArgsEtaType n (FunTy arg res)       = FunTildeTy arg (nArgsEtaType (n-1) res)
+nArgsEtaType _ ty                    = ty
+
 
 -- ^ As described in Note [Extensionality and Higher-Order Functions],
 -- extentionalize returns the most extensional version of a type. This only
 -- effects function types
 
 -- TODO Coercions need an extensionalize function
-flatEtaType :: Arity -> Type -> Type
-flatEtaType n (ForAllTy tv body_ty) = ForAllTy tv (flatEtaType n body_ty)
-flatEtaType 0 (FunTy arg res) = FunTy arg (flatEtaType 0 res)
-flatEtaType n (FunTy arg res) = FunTildeTy arg (flatEtaType (n-1) res)
-flatEtaType _ ty = ty
+shallowEtaType :: Type -> Type
+shallowEtaType (ForAllTy tv body_ty) = ForAllTy tv (shallowEtaType body_ty)
+shallowEtaType (FunTy arg res)       = FunTy arg (shallowEtaType res)
+shallowEtaType (FunTy arg res)       = FunTildeTy arg (shallowEtaType res)
+shallowEtaType ty                    = ty
+
+deepEtaType :: Type -> Type
+deepEtaType (ForAllTy tv body_ty) = ForAllTy tv (deepEtaType body_ty)
+deepEtaType (FunTy arg res)       = FunTildeTy (deepEtaType arg) (deepEtaType res)
+deepEtaType (FunTildeTy arg res)  = FunTildeTy (deepEtaType arg) (deepEtaType res)
+deepEtaType ty                    = ty
+
 
 -- ^ Given an expression and it's name, generate a new expression with a
 -- tilde-lambda type. This is the exact same code, but we have encoded the arity
@@ -280,7 +317,6 @@ mkArityWrapperRhs
   -> CoreExpr
   -> Arity
   -> UniqSM CoreExpr
--- mkArityWrapperRhs _ work_id _ _ = return (Var work_id)
 mkArityWrapperRhs fm work_id expr arity = go fm expr arity work_id []
   where go fm (Lam b e) a w l
           | isId b = let expr = etaExpand (F.findWithDefault 0 b fm) (Var b) in
