@@ -9,7 +9,7 @@ GHC 8.6.5 is a bug-fix release, fixing a few regressions found in 8.6.4.
 Highlights
 ----------
 
-The highlights, since the 8.6.5 release, are:
+The highlights, since the 8.6.4 release, are:
 
 - Binary distributions once again ship with Haddock documentation including
   syntax highlighted source of core libraries (:ghc-ticket:`16445`)
