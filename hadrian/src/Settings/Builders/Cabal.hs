@@ -156,7 +156,13 @@ withBuilderArgs b = case b of
     GhcPkg _ stage -> do
       top   <- expr topDirectory
       pkgDb <- expr $ packageDbPath stage
+      targetArch <- getSetting TargetArch
+      targetOS  <- getSetting TargetOs
+      version <- getSetting ProjectVersion
       notStage0 ? arg ("--ghc-pkg-option=--global-package-db=" ++ top -/- pkgDb)
+      notStage0 ? arg ("--ghc-pkg-option=--global-package-db=" ++ top -/- pkgDb)
+      notStage0 ? arg "--default-user-package-db-subdir"
+      notStage0 ? arg (intercalate "-" [targetArch, targetOS, version])
     _          -> return [] -- no arguments
 
 -- | Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.

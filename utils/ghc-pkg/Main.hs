@@ -27,7 +27,7 @@
 
 module Main (main) where
 
-import Version ( version, targetOS, targetARCH )
+import Version ( version )
 import qualified GHC.PackageDb as GhcPkg
 import GHC.PackageDb (BinaryStringRep(..))
 import GHC.HandleEncoding
@@ -145,6 +145,7 @@ data Flag
   | FlagConfig FilePath
   | FlagGlobalConfig FilePath
   | FlagUserConfig FilePath
+  | FlagDefaultUserSubdir FilePath
   | FlagForce
   | FlagForceFiles
   | FlagMultiInstance
@@ -175,6 +176,8 @@ flags = [
         "never read the user package database",
   Option [] ["user-package-db"] (ReqArg FlagUserConfig "DIR")
         "location of the user package database (use instead of default)",
+  Option [] ["default-user-package-db-subdir"] (ReqArg FlagDefaultUserSubdir "DIR")
+        "subpath in ~/.ghc (or equivalent) where GHC looks by default for the user package db. Usually in the form <arch>-<os>-<version>.",
   Option [] ["no-user-package-conf"] (NoArg FlagNoUserDb)
         "never read the user package database (DEPRECATED)",
   Option [] ["force"] (NoArg FlagForce)
@@ -629,9 +632,11 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
       [] -> case e_appdir of
         Left _    -> return Nothing
         Right appdir -> do
-          let subdir = targetARCH ++ '-':targetOS ++ '-':Version.version
-              dir = appdir </> subdir
-          r <- lookForPackageDBIn dir
+          subdir <- case [ f | FlagDefaultUserSubdir f <- my_flags ] of
+            [] -> die "--default-user-package-db-subdir was not passed. Need to pass that, an explicit user package db location (--user-package-db DIR), or --no-user-package-db."
+            fs -> pure $ last fs
+          let dir = appdir </> subdir
+          r <- lookForPackageDBIn $ dir
           case r of
             Nothing -> return (Just (dir </> "package.conf.d", False))
             Just f  -> return (Just (f, True))
