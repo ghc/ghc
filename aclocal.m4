@@ -498,39 +498,102 @@ AC_DEFUN([FP_SETTINGS],
     if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"
     then
         mingw_bin_prefix=mingw/bin/
-	SettingsCCompilerCommand="\$$tooldir/${mingw_bin_prefix}gcc.exe"
-	SettingsHaskellCPPCommand="\$$tooldir/${mingw_bin_prefix}gcc.exe"
+        SettingsCCompilerCommand="tooldir/${mingw_bin_prefix}gcc.exe"
+        SettingsCCompilerCommandHadrian='$$'"${SettingsCCompilerCommand}"
+        SettingsCCompilerCommandMake='$$$$'"${SettingsCCompilerCommand}"
+
+        SettingsHaskellCPPCommand="tooldir/${mingw_bin_prefix}gcc.exe"
+        SettingsHaskellCPPCommandHadrian='$$$$'"${SettingsHaskellCPPCommand}"
+        SettingsHaskellCPPCommandMake='$$'"${SettingsHaskellCPPCommand}"
+
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
-	SettingsLdCommand="\$$tooldir/${mingw_bin_prefix}ld.exe"
-	SettingsArCommand="\$$tooldir/${mingw_bin_prefix}ar.exe"
-	SettingsRanlibCommand="\$$tooldir/${mingw_bin_prefix}ranlib.exe"
-	SettingsDllWrapCommand="\$$tooldir/${mingw_bin_prefix}dllwrap.exe"
-	SettingsWindresCommand="\$$tooldir/${mingw_bin_prefix}windres.exe"
-        SettingsTouchCommand='$$topdir/bin/touchy.exe'
+
+        SettingsLdCommand="tooldir/${mingw_bin_prefix}ld.exe"
+        SettingsLdCommandHadrian='$$'"${SettingsLdCommand}"
+        SettingsLdCommandMake='$$'"${SettingsLdCommand}"
+
+        SettingsArCommand="tooldir/${mingw_bin_prefix}ar.exe"
+        SettingsArCommandHadrian='$$'"${SettingsArCommand}"
+        SettingsArCommandMake='$$'"${SettingsArCommand}"
+
+        SettingsRanlibCommand="tooldir/${mingw_bin_prefix}ranlib.exe"
+        SettingsRanlibCommandHadrian='$$'"${SettingsRanlibCommand}"
+        SettingsRanlibCommandMake='$$$$'"${SettingsRanlibCommand}"
+
+        SettingsDllwrapCommand="tooldir/${mingw_bin_prefix}dllwrap.exe"
+        SettingsDllwrapCommandHadrian='$$'"${SettingsDllwrapCommand}"
+        SettingsDllwrapCommandMake='$$$$'"${SettingsDllwrapCommand}"
+
+        SettingsWindresCommand="tooldir/${mingw_bin_prefix}windres.exe"
+        SettingsWindresCommandHadrian='$$'"${SettingsWindresCommand}"
+        SettingsWindresCommandMake='$$$$'"${SettingsWindresCommand}"
+
+        SettingsTouchCommand='topdir/bin/touchy.exe'
+        SettingsTouchCommandHadrian='$$'"${SettingsTouchCommand}"
+        SettingsTouchCommandMake='$$$$'"${SettingsTouchCommand}"
     elif test "$EnableDistroToolchain" = "YES"
     then
         SettingsCCompilerCommand="$(basename $CC)"
+        SettingsCCompilerCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsCCompilerCommandMake="${SettingsCCompilerCommand}"
+
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+
         SettingsHaskellCPPCommand="$(basename $HaskellCPPCmd)"
+        SettingsHaskellCPPCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsHaskellCPPCommandMake="${SettingsCCompilerCommand}"
+
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
+
         SettingsLdCommand="$(basename $LdCmd)"
+        SettingsLdCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsLdCommandMake="${SettingsCCompilerCommand}"
+
         SettingsArCommand="$(basename $ArCmd)"
+        SettingsArCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsArCommandMake="${SettingsCCompilerCommand}"
+
         SettingsDllWrapCommand="$(basename $DllWrapCmd)"
+        SettingsDllWrapCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsDllWrapCommandMake="${SettingsCCompilerCommand}"
+
         SettingsWindresCommand="$(basename $WindresCmd)"
+        SettingsWindresCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsWindresCommandMake="${SettingsCCompilerCommand}"
+
         SettingsTouchCommand='$topdir/bin/touchy.exe'
+        SettingsTouchCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsTouchCommandMake="${SettingsCCompilerCommand}"
     else
         SettingsCCompilerCommand="$CC"
+        SettingsCCompilerCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsCCompilerCommandMake="${SettingsCCompilerCommand}"
+
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
+        SettingsHaskellCPPCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsHaskellCPPCommandMake="${SettingsCCompilerCommand}"
+
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
+
         SettingsLdCommand="$LdCmd"
+        SettingsCCompilerCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsCCompilerCommandMake="${SettingsCCompilerCommand}"
+
         SettingsArCommand="$ArCmd"
+        SettingsCCompilerCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsCCompilerCommandMake="${SettingsCCompilerCommand}"
+
         SettingsRanlibCommand="$RanlibCmd"
+        SettingsCCompilerCommandHadrian="${SettingsCCompilerCommand}"
+        SettingsCCompilerCommandMake="${SettingsCCompilerCommand}"
+
         if test -z "$DllWrapCmd"
         then
             SettingsDllWrapCommand="/bin/false"
         else
             SettingsDllWrapCommand="$DllWrapCmd"
         fi
+
         if test -z "$WindresCmd"
         then
             SettingsWindresCommand="/bin/false"

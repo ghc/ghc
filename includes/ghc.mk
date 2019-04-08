@@ -172,9 +172,6 @@ endif
 # These settings are read by GHC at runtime, so as to not cause spurious
 # rebuilds.
 
-# Need to $$ deplay variable expansion so some `$topdir` and `$tooldir` make it
-# as-is to the resulting file.
-
 includes_SETTINGS = includes/dist/build/settings
 
 $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.

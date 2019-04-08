@@ -506,10 +506,6 @@ HaskellHaveSubsectionsViaSymbols = @HaskellHaveSubsectionsViaSymbols@
 HaskellHaveRTSLinker = @HaskellHaveRTSLinker@
 Unregisterised = @Unregisterised@
 
-# Hack to deal with messed up `$topdir` and `$tooldir, because make needs more
-# escaping here than Hadrian so there's no one-size-fits-all amount.
-t := $$t
-
 SettingsCCompilerCommand = @SettingsCCompilerCommand@
 SettingsHaskellCPPCommand = @SettingsHaskellCPPCommand@
 SettingsHaskellCPPFlags = @SettingsHaskellCPPFlags@
@@ -527,8 +523,6 @@ SettingsTouchCommand = @SettingsTouchCommand@
 SettingsClangCommand = @SettingsClangCommand@
 SettingsLlcCommand = @SettingsLlcCommand@
 SettingsOptCommand = @SettingsOptCommand@
-
-undefined t
 
 #-----------------------------------------------------------------------------
 # C compiler
