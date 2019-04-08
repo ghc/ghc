@@ -12,8 +12,12 @@
 -- for details
 module Main(main) where
 
+-- We improperly include *HOST* macros for our target...
 #include "../../includes/ghcconfig.h"
+
+-- .. so that this header defines the right stuff.
 #include "../../includes/stg/HaskellMachRegs.h"
+
 #include "../../includes/rts/Constants.h"
 
 -- Needed for TAG_BITS

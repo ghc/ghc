@@ -1962,11 +1962,13 @@ doCpp dflags raw input_fn output_fn = do
     let cpp_prog args | raw       = SysTools.runCpp dflags args
                       | otherwise = SysTools.runCc Nothing dflags (SysTools.Option "-E" : args)
 
+    let targetArch = stringEncodeArch $ platformArch $ targetPlatform dflags
+        targetOS = stringEncodeOS $ platformOS $ targetPlatform dflags
     let target_defs =
           [ "-D" ++ HOST_OS     ++ "_BUILD_OS",
             "-D" ++ HOST_ARCH   ++ "_BUILD_ARCH",
-            "-D" ++ TARGET_OS   ++ "_HOST_OS",
-            "-D" ++ TARGET_ARCH ++ "_HOST_ARCH" ]
+            "-D" ++ targetOS    ++ "_HOST_OS",
+            "-D" ++ targetArch  ++ "_HOST_ARCH" ]
         -- remember, in code we *compile*, the HOST is the same our TARGET,
         -- and BUILD is the same as our HOST.
 

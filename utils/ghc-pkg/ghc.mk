@@ -17,10 +17,8 @@ utils/ghc-pkg/dist/build/Version.hs \
 utils/ghc-pkg/dist-install/build/Version.hs: mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	echo "module Version where"                    >> $@
-	echo "version, targetOS, targetARCH :: String" >> $@
+	echo "version :: String" >> $@
 	echo "version    = \"$(ProjectVersion)\""      >> $@
-	echo "targetOS   = \"$(TargetOS_CPP)\""        >> $@
-	echo "targetARCH = \"$(TargetArch_CPP)\""      >> $@
 
 utils/ghc-pkg_PACKAGE = ghc-pkg
 

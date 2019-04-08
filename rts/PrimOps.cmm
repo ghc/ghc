@@ -2440,7 +2440,7 @@ stg_traceEventzh ( W_ msg )
     // We should go through the macro HASKELLEVENT_USER_MSG_ENABLED from
     // RtsProbes.h, but that header file includes unistd.h, which doesn't
     // work in Cmm
-#if !defined(solaris2_TARGET_OS)
+#if !defined(solaris2_HOST_OS)
    (enabled) = ccall __dtrace_isenabled$HaskellEvent$user__msg$v1();
 #else
     // Solaris' DTrace can't handle the
@@ -2482,7 +2482,7 @@ stg_traceMarkerzh ( W_ msg )
 
     W_ enabled;
 
-#if !defined(solaris2_TARGET_OS)
+#if !defined(solaris2_HOST_OS)
     (enabled) = ccall __dtrace_isenabled$HaskellEvent$user__marker$v1();
 #else
     enabled = 1;

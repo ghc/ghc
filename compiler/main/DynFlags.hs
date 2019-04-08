@@ -1503,9 +1503,11 @@ versionedAppDir dflags = do
 -- constructing platform-version-dependent files that need to co-exist.
 --
 versionedFilePath :: DynFlags -> FilePath
-versionedFilePath dflags =     TARGET_ARCH
-                        ++ '-':TARGET_OS
-                        ++ '-':projectVersion dflags
+versionedFilePath dflags = intercalate "-"
+  [ stringEncodeArch $ platformArch $ targetPlatform dflags
+  , stringEncodeOS $ platformOS $ targetPlatform dflags
+  , projectVersion dflags
+  ]
   -- NB: This functionality is reimplemented in Cabal, so if you
   -- change it, be sure to update Cabal.
 
@@ -5503,7 +5505,7 @@ addIncludePath p =
 addFrameworkPath p =
   upd (\s -> s{frameworkPaths = frameworkPaths s ++ splitPathList p})
 
-#if !defined(mingw32_TARGET_OS)
+#if !defined(mingw32_HOST_OS)
 split_marker :: Char
 split_marker = ':'   -- not configurable (ToDo)
 #endif
@@ -5515,7 +5517,7 @@ splitPathList s = filter notNull (splitUp s)
                 -- cause confusion when they are translated into -I options
                 -- for passing to gcc.
   where
-#if !defined(mingw32_TARGET_OS)
+#if !defined(mingw32_HOST_OS)
     splitUp xs = split split_marker xs
 #else
      -- Windows: 'hybrid' support for DOS-style paths in directory lists.
