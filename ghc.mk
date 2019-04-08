@@ -974,7 +974,10 @@ install_packages: rts/dist/package.conf.install
 	                                  '$(ghclibdir)'              \
 	                                  '$(docdir)/html/libraries'  \
 	                                  '$(GhcLibWays)'))
-	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/dist/package.conf.install
+	"$(INSTALLED_GHC_PKG_REAL)" --force \
+		--default-user-package-db-subdir "$(TargetArch_CPP)-$(TargetOS_CPP)-$(ProjectVersion)" \
+		--global-package-db "$(INSTALLED_PACKAGE_CONF)" \
+		update rts/dist/package.conf.install
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(ghc-cabal_INPLACE)" register                    \
@@ -996,7 +999,10 @@ install_packages: rts/dist/package.conf.install
 
 # Finally, update package.cache to ensure it's newer than the registration
 # files. This avoids #13375.
-	"$(INSTALLED_GHC_PKG_REAL)" --global-package-db "$(INSTALLED_PACKAGE_CONF)" recache
+	"$(INSTALLED_GHC_PKG_REAL)" \
+		--default-user-package-db-subdir "$(TargetArch_CPP)-$(TargetOS_CPP)-$(ProjectVersion)" \
+		--global-package-db "$(INSTALLED_PACKAGE_CONF)" \
+		recache
 
 # -----------------------------------------------------------------------------
 # Binary distributions
