@@ -1,0 +1,10 @@
+instance GHC.Base.Alternative Maybe -- Defined in ‘GHC.Base’
+instance Applicative Maybe -- Defined in ‘GHC.Base’
+instance Functor Maybe -- Defined in ‘GHC.Base’
+instance Monad Maybe -- Defined in ‘GHC.Base’
+instance GHC.Base.MonadPlus Maybe -- Defined in ‘GHC.Base’
+
+instance Eq _ => Eq (Maybe _) -- Defined in ‘GHC.Maybe’
+instance Semigroup _ => Monoid (Maybe _) -- Defined in ‘GHC.Base’
+instance Ord _ => Ord (Maybe _) -- Defined in ‘GHC.Maybe’
+instance Semigroup _ => Semigroup (Maybe _) -- Defined in ‘GHC.Base’

@@ -78,7 +78,7 @@ import UniqSupply
 import MonadUtils
 import Module
 import PrelNames  ( toDynName, pretendNameIsInScope )
-import TysWiredIn ( isCTupleTyConName, anyTyCon )
+import TysWiredIn ( isCTupleTyConName )
 import Panic
 import Maybes
 import ErrUtils
@@ -950,11 +950,6 @@ typeKind  :: GhcMonad m => Bool -> String -> m (Type, Kind)
 typeKind normalise str = withSession $ \hsc_env -> do
    liftIO $ hscKcType hsc_env normalise str
 
-parseType :: GhcMonad m => String -> m Type
-parseType str = withSession $ \hsc_env -> do
-  (ty, _) <- liftIO $ hscKcType hsc_env False str
-  return ty
-
 -- ----------------------------------------------------------------------------
 -- Getting the class instances for a type
 
@@ -1060,8 +1055,6 @@ substClassArgs subst inst = let
   constraintUnsolved :: Type -> Bool
   constraintUnsolved cons = let
     freeVars = fvVarSet $ tyCoFVsOfType cons
-    (_, args) = splitAppTys cons
-
     in not (isEmptyVarSet freeVars)
 
 -----------------------------------------------------------------------------
