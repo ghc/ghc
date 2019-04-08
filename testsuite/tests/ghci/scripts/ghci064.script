@@ -1,0 +1,6 @@
+-- Test :instances
+:instances Maybe
+
+:set -XPartialTypeSignatures -wpartial-type-signatures
+
+:instances Maybe _
