@@ -32,32 +32,32 @@
 
 #define MACHREGS_NO_REGS 0
 
-#if defined(i386_TARGET_ARCH)
+#if defined(i386_HOST_ARCH)
 #define MACHREGS_i386     1
 #endif
 
-#if defined(x86_64_TARGET_ARCH)
+#if defined(x86_64_HOST_ARCH)
 #define MACHREGS_x86_64   1
 #endif
 
-#if defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH) \
-            || defined(powerpc64le_TARGET_ARCH) || defined(rs6000_TARGET_ARCH)
+#if defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
+            || defined(powerpc64le_HOST_ARCH) || defined(rs6000_HOST_ARCH)
 #define MACHREGS_powerpc  1
 #endif
 
-#if defined(sparc_TARGET_ARCH)
+#if defined(sparc_HOST_ARCH)
 #define MACHREGS_sparc    1
 #endif
 
-#if defined(arm_TARGET_ARCH)
+#if defined(arm_HOST_ARCH)
 #define MACHREGS_arm      1
 #endif
 
-#if defined(aarch64_TARGET_ARCH)
+#if defined(aarch64_HOST_ARCH)
 #define MACHREGS_aarch64  1
 #endif
 
-#if defined(darwin_TARGET_OS)
+#if defined(darwin_HOST_OS)
 #define MACHREGS_darwin   1
 #endif
 
