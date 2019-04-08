@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 
 -- | A description of the platform we're compiling for.
 --
@@ -16,6 +17,8 @@ module Platform (
         osMachOTarget,
         osSubsectionsViaSymbols,
         platformUsesFrameworks,
+        stringifyArch,
+        stringifyOS,
 )
 
 where
@@ -66,6 +69,29 @@ data Arch
         | ArchJavaScript
         deriving (Read, Show, Eq)
 
+stringifyArch :: Arch -> String
+stringifyArch = \case
+  ArchUnknown -> "unknown"
+  ArchX86 -> "i386"
+  ArchX86_64 -> "x86_64"
+  ArchPPC -> "powerpc"
+  ArchPPC_64 { ppc_64ABI = abi } -> case abi of
+    ELF_V1 -> "powerpc64"
+    ELF_V2 -> "powerpc64le"
+  ArchSPARC -> "sparc"
+  ArchSPARC64 -> "sparc64"
+  ArchARM { armISA = isa, armISAExt = _, armABI = _ } -> "arm" ++ vsuf
+    where
+      vsuf = case isa of
+        ARMv5 -> "v5"
+        ARMv6 -> "v6"
+        ARMv7 -> "v7"
+  ArchARM64 -> "aarch64"
+  ArchAlpha -> "alpha"
+  ArchMipseb -> "mipseb"
+  ArchMipsel -> "mipsel"
+  ArchJavaScript -> "js"
+
 isARM :: Arch -> Bool
 isARM (ArchARM {}) = True
 isARM ArchARM64    = True
@@ -89,6 +115,23 @@ data OS
         | OSAIX
         | OSHurd
         deriving (Read, Show, Eq)
+
+stringifyOS :: OS -> String
+stringifyOS = \case
+  OSUnknown -> "unknown"
+  OSLinux -> "linux"
+  OSDarwin -> "darwin"
+  OSSolaris2 -> "solaris2"
+  OSMinGW32 -> "mingw32"
+  OSFreeBSD -> "freebsd"
+  OSDragonFly -> "dragonfly"
+  OSOpenBSD -> "openbsd"
+  OSNetBSD -> "netbsd"
+  OSKFreeBSD -> "kfreebsdgnu"
+  OSHaiku -> "haiku"
+  OSQNXNTO -> "nto-qnx"
+  OSAIX -> "aix"
+  OSHurd -> "hurd"
 
 -- | ARM Instruction Set Architecture, Extensions and ABI
 --

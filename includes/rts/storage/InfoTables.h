@@ -27,7 +27,7 @@
    hackery can go away sometime.
    ------------------------------------------------------------------------- */
 
-#if defined(x86_64_TARGET_ARCH)
+#if defined(x86_64_HOST_ARCH)
 #define OFFSET_FIELD(n) StgHalfInt n; StgHalfWord __pad_##n
 #else
 #define OFFSET_FIELD(n) StgInt n
@@ -153,7 +153,7 @@ typedef union {
 } StgClosureInfo;
 
 
-#if defined(x86_64_TARGET_ARCH) && defined(TABLES_NEXT_TO_CODE)
+#if defined(x86_64_HOST_ARCH) && defined(TABLES_NEXT_TO_CODE)
 // On x86_64 we can fit a pointer offset in half a word, so put the SRT offset
 // in the info->srt field directly.
 //
@@ -338,7 +338,7 @@ typedef struct StgConInfoTable_ {
  * info must be a Stg[Ret|Thunk]InfoTable* (an info table that has a SRT)
  */
 #if defined(TABLES_NEXT_TO_CODE)
-#if defined(x86_64_TARGET_ARCH)
+#if defined(x86_64_HOST_ARCH)
 #define GET_SRT(info) \
   ((StgClosure*) (((StgWord) ((info)+1)) + (info)->i.srt))
 #else
@@ -365,7 +365,7 @@ typedef struct StgConInfoTable_ {
  * info must be a StgFunInfoTable*
  */
 #if defined(TABLES_NEXT_TO_CODE)
-#if defined(x86_64_TARGET_ARCH)
+#if defined(x86_64_HOST_ARCH)
 #define GET_FUN_SRT(info) \
   ((StgClosure*) (((StgWord) ((info)+1)) + (info)->i.srt))
 #else
