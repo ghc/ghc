@@ -156,7 +156,16 @@ withBuilderArgs b = case b of
     GhcPkg _ stage -> do
       top   <- expr topDirectory
       pkgDb <- expr $ packageDbPath stage
-      notStage0 ? arg ("--ghc-pkg-option=--global-package-db=" ++ top -/- pkgDb)
+      targetArch <- getSetting TargetArch
+      targetOS  <- getSetting TargetOs
+      version <- getSetting ProjectVersion
+      -- The wrapper scripts provide this for stage0, but the freshly
+      -- built tools are unwrapped for the later stages.
+      notStage0 ? mconcat
+        [ arg $ "--ghc-pkg-option=--global-package-db=" ++ top -/- pkgDb
+        , -- Additionally this flag is new in this version
+          arg $ "--ghc-pkg-option=--default-user-package-db-subdir" <> "=" <> intercalate "-" [targetArch, targetOS, version]
+        ]
     _          -> return [] -- no arguments
 
 -- | Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
