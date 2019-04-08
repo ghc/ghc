@@ -32,9 +32,11 @@ import FastString
 import Outputable
 import UniqSupply
 import SysTools ( figureLlvmVersion )
+import GHC.Platform
 import qualified Stream
 
 import Control.Monad ( when )
+import Data.List ( intercalate )
 import Data.Maybe ( fromMaybe, catMaybes )
 import System.IO
 
