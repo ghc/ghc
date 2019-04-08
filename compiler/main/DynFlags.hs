@@ -1479,9 +1479,11 @@ versionedAppDir dflags = do
 -- constructing platform-version-dependent files that need to co-exist.
 --
 versionedFilePath :: DynFlags -> FilePath
-versionedFilePath dflags =     TARGET_ARCH
-                        ++ '-':TARGET_OS
-                        ++ '-':projectVersion dflags
+versionedFilePath dflags = intercalate "-"
+  [ stringifyArch $ platformArch $ targetPlatform dflags
+  , stringifyOS $ platformOS $ targetPlatform dflags
+  , projectVersion dflags
+  ]
   -- NB: This functionality is reimplemented in Cabal, so if you
   -- change it, be sure to update Cabal.
 

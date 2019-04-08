@@ -413,11 +413,6 @@ generateGhcBootPlatformH = do
     hostArch       <- chooseSetting HostArch      TargetArch
     hostOs         <- chooseSetting HostOs        TargetOs
     hostVendor     <- chooseSetting HostVendor    TargetVendor
-    targetPlatform <- getSetting TargetPlatform
-    targetArch     <- getSetting TargetArch
-    llvmTarget     <- getSetting LlvmTarget
-    targetOs       <- getSetting TargetOs
-    targetVendor   <- getSetting TargetVendor
     return $ unlines
         [ "#ifndef __PLATFORM_H__"
         , "#define __PLATFORM_H__"
@@ -427,29 +422,21 @@ generateGhcBootPlatformH = do
         , ""
         , "#define " ++ cppify buildPlatform  ++ "_BUILD 1"
         , "#define " ++ cppify hostPlatform   ++ "_HOST 1"
-        , "#define " ++ cppify targetPlatform ++ "_TARGET 1"
         , ""
         , "#define " ++ buildArch  ++ "_BUILD_ARCH 1"
         , "#define " ++ hostArch   ++ "_HOST_ARCH 1"
-        , "#define " ++ targetArch ++ "_TARGET_ARCH 1"
         , "#define BUILD_ARCH "  ++ show buildArch
         , "#define HOST_ARCH "   ++ show hostArch
-        , "#define TARGET_ARCH " ++ show targetArch
-        , "#define LLVM_TARGET " ++ show llvmTarget
         , ""
         , "#define " ++ buildOs  ++ "_BUILD_OS 1"
         , "#define " ++ hostOs   ++ "_HOST_OS 1"
-        , "#define " ++ targetOs ++ "_TARGET_OS 1"
         , "#define BUILD_OS "  ++ show buildOs
         , "#define HOST_OS "   ++ show hostOs
-        , "#define TARGET_OS " ++ show targetOs
         , ""
         , "#define " ++ buildVendor  ++ "_BUILD_VENDOR 1"
         , "#define " ++ hostVendor   ++ "_HOST_VENDOR 1"
-        , "#define " ++ targetVendor ++ "_TARGET_VENDOR  1"
         , "#define BUILD_VENDOR "  ++ show buildVendor
         , "#define HOST_VENDOR "   ++ show hostVendor
-        , "#define TARGET_VENDOR " ++ show targetVendor
         , ""
         , "#endif /* __PLATFORM_H__ */" ]
 
@@ -489,11 +476,8 @@ generateVersionHs :: Expr String
 generateVersionHs = do
     trackGenerateHs
     projectVersion <- getSetting ProjectVersion
-    targetOs       <- getSetting TargetOs
-    targetArch     <- getSetting TargetArch
     return $ unlines
         [ "module Version where"
-        , "version, targetOS, targetARCH :: String"
+        , "version :: String"
         , "version    = " ++ show projectVersion
-        , "targetOS   = " ++ show targetOs
-        , "targetARCH = " ++ show targetArch ]
+        ]
