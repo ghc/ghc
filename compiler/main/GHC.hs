@@ -219,7 +219,7 @@ module GHC (
         Kind,
         PredType,
         ThetaType, pprForAll, pprThetaArrowTy,
-        parseType,
+        parseInstanceHead,
         getInstancesForType,
 
         -- ** Entities
