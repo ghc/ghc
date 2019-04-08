@@ -32,6 +32,7 @@ import FastString
 import Outputable
 import UniqSupply
 import SysTools ( figureLlvmVersion )
+import GHC.Platform
 import qualified Stream
 
 import Control.Monad ( when )
@@ -90,7 +91,7 @@ llvmCodeGen' cmm_stream
   where
     header :: SDoc
     header = sdocWithDynFlags $ \dflags ->
-      let target = LLVM_TARGET
+      let target = platformMisc_llvmTarget $ platformMisc dflags
           layout = case lookup target (llvmTargets dflags) of
             Just (LlvmTarget dl _ _) -> dl
             Nothing -> error $ "Failed to lookup the datalayout for " ++ target ++ "; available targets: " ++ show (map fst $ llvmTargets dflags)
