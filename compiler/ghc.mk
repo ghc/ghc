@@ -101,28 +101,21 @@ compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo                                                     >> $@
 	@echo "#define $(BuildPlatform_CPP)_BUILD 1"              >> $@
 	@echo "#define $(HostPlatform_CPP)_HOST 1"                >> $@
-	@echo "#define $(TargetPlatform_CPP)_TARGET 1"            >> $@
 	@echo                                                     >> $@
 	@echo "#define $(BuildArch_CPP)_BUILD_ARCH 1"             >> $@
 	@echo "#define $(HostArch_CPP)_HOST_ARCH 1"               >> $@
-	@echo "#define $(TargetArch_CPP)_TARGET_ARCH 1"           >> $@
 	@echo "#define BUILD_ARCH \"$(BuildArch_CPP)\""           >> $@
 	@echo "#define HOST_ARCH \"$(HostArch_CPP)\""             >> $@
-	@echo "#define TARGET_ARCH \"$(TargetArch_CPP)\""         >> $@
 	@echo                                                     >> $@
 	@echo "#define $(BuildOS_CPP)_BUILD_OS 1"                 >> $@
 	@echo "#define $(HostOS_CPP)_HOST_OS 1"                   >> $@
-	@echo "#define $(TargetOS_CPP)_TARGET_OS 1"               >> $@
 	@echo "#define BUILD_OS \"$(BuildOS_CPP)\""               >> $@
 	@echo "#define HOST_OS \"$(HostOS_CPP)\""                 >> $@
-	@echo "#define TARGET_OS \"$(TargetOS_CPP)\""             >> $@
 	@echo                                                     >> $@
 	@echo "#define $(BuildVendor_CPP)_BUILD_VENDOR 1"         >> $@
 	@echo "#define $(HostVendor_CPP)_HOST_VENDOR 1"           >> $@
-	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1"      >> $@
 	@echo "#define BUILD_VENDOR \"$(BuildVendor_CPP)\""       >> $@
 	@echo "#define HOST_VENDOR \"$(HostVendor_CPP)\""         >> $@
-	@echo "#define TARGET_VENDOR \"$(TargetVendor_CPP)\""     >> $@
 	@echo                                                     >> $@
 	@echo "#endif /* __PLATFORM_H__ */"                       >> $@
 	@echo "Done."
@@ -141,28 +134,21 @@ compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo                                                     >> $@
 	@echo "#define $(HostPlatform_CPP)_BUILD 1"               >> $@
 	@echo "#define $(TargetPlatform_CPP)_HOST 1"              >> $@
-	@echo "#define $(TargetPlatform_CPP)_TARGET 1"            >> $@
 	@echo                                                     >> $@
 	@echo "#define $(HostArch_CPP)_BUILD_ARCH 1"              >> $@
 	@echo "#define $(TargetArch_CPP)_HOST_ARCH 1"             >> $@
-	@echo "#define $(TargetArch_CPP)_TARGET_ARCH 1"           >> $@
 	@echo "#define BUILD_ARCH \"$(HostArch_CPP)\""            >> $@
 	@echo "#define HOST_ARCH \"$(TargetArch_CPP)\""           >> $@
-	@echo "#define TARGET_ARCH \"$(TargetArch_CPP)\""         >> $@
 	@echo                                                     >> $@
 	@echo "#define $(HostOS_CPP)_BUILD_OS 1"                  >> $@
 	@echo "#define $(TargetOS_CPP)_HOST_OS 1"                 >> $@
-	@echo "#define $(TargetOS_CPP)_TARGET_OS 1"               >> $@
 	@echo "#define BUILD_OS \"$(HostOS_CPP)\""                >> $@
 	@echo "#define HOST_OS \"$(TargetOS_CPP)\""               >> $@
-	@echo "#define TARGET_OS \"$(TargetOS_CPP)\""             >> $@
 	@echo                                                     >> $@
 	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR 1"          >> $@
 	@echo "#define $(TargetVendor_CPP)_HOST_VENDOR 1"         >> $@
-	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1"      >> $@
 	@echo "#define BUILD_VENDOR \"$(HostVendor_CPP)\""        >> $@
 	@echo "#define HOST_VENDOR \"$(TargetVendor_CPP)\""       >> $@
-	@echo "#define TARGET_VENDOR \"$(TargetVendor_CPP)\""     >> $@
 	@echo                                                     >> $@
 	@echo "#endif /* __PLATFORM_H__ */"                       >> $@
 	@echo "Done."
@@ -204,7 +190,7 @@ compiler_HC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 
 define preprocessCompilerFiles
 # $0 = stage
-compiler/stage$1/build/primops.txt: compiler/prelude/primops.txt.pp compiler/stage$1/$$(PLATFORM_H)
+compiler/stage$1/build/primops.txt: compiler/prelude/primops.txt.pp
 	$$(HS_CPP) -P $$(compiler_CPP_OPTS) -Icompiler/stage$1 -x c $$< | grep -v '^#pragma GCC' > $$@
 
 compiler/stage$1/build/primop-data-decl.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
