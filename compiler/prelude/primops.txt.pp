@@ -84,9 +84,6 @@ defaults
 
 #include "MachDeps.h"
 
--- We need platform defines (tests for mingw32 below).
-#include "ghc_boot_platform.h"
-
 section "The word size story."
         {Haskell98 specifies that signed integers (type {\tt Int})
          must contain at least 30 bits. GHC always implements {\tt
@@ -2797,7 +2794,8 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-#if defined(mingw32_TARGET_OS)
+-- TODO should be target; we need something better than CPP for these things
+#if defined(mingw32_HOST_OS)
 primop  AsyncReadOp "asyncRead#" GenPrimOp
    Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
    {Asynchronously read bytes from specified file descriptor.}
