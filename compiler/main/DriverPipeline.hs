@@ -867,7 +867,10 @@ llvmOptions dflags =
                                  , not (any (isInfixOf "-mcpu") (getOpts dflags opt_lc)) ]
     ++ [("", "-mattr=" ++ attrs) | not (null attrs) ]
 
-  where target = LLVM_TARGET
+  where target = intercalate "-"
+          [ stringEncodeArch $ platformArch $ targetPlatform dflags
+          , stringEncodeOS $ platformOS $ targetPlatform dflags
+          ]
         Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets dflags)
 
         -- Relocation models
