@@ -30,7 +30,7 @@ module GHC.Prim.Ext
     INT64
   , WORD64
   -- * Delay\/wait operations
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
   , asyncRead#
   , asyncWrite#
   , asyncDoProc#
@@ -66,7 +66,7 @@ type WORD64 =
 -- Delay/wait operations
 ------------------------------------------------------------------------
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 
 -- | Asynchronously read bytes from specified file descriptor.
 foreign import prim "stg_asyncReadzh" asyncRead#
