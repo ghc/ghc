@@ -17,6 +17,9 @@
 #endif
 #endif
 
+-- Fine if this comes from make/Hadrian or the pre-built base.
+#include <ghcplatform.h>
+
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004-2009.
@@ -633,14 +636,21 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
         Left _    -> return Nothing
         Right appdir -> do
           let settingsFile = top_dir </> "settings"
-          settingsStr <- readFile settingsFile
-          mySettings <- case maybeReadFuzzy settingsStr of
-            Just s -> pure $ Map.fromList s
-            Nothing -> die $ "Can't parse settings file " ++ show settingsFile
-          platform <- case getTargetPlatform settingsFile mySettings of
-            Right p -> pure p
-            Left e -> die e
-          let subdir = (stringifyArch $ platformArch platform) ++ '-':(stringifyOS $ platformOS platform) ++ '-':Version.version
+          exists_settings_file <- doesFileExist settingsFile
+          (arch, os) <- case exists_settings_file of
+            False -> do
+              warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
+              warn "cannot know target platform so guessing target == host (native compiler)."
+              pure (HOST_ARCH, HOST_OS)
+            True -> do
+              settingsStr <- readFile settingsFile
+              mySettings <- case maybeReadFuzzy settingsStr of
+                Just s -> pure $ Map.fromList s
+                Nothing -> die $ "Can't parse settings file " ++ show settingsFile
+              case getTargetPlatform settingsFile mySettings of
+                Right platform -> pure (stringifyArch $ platformArch platform, stringifyOS $ platformOS platform)
+                Left e -> die e
+          let subdir = arch ++ '-':os ++ '-':Version.version
               dir = appdir </> subdir
           r <- lookForPackageDBIn dir
           case r of
