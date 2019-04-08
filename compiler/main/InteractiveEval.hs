@@ -30,7 +30,7 @@ module InteractiveEval (
         exprType,
         typeKind,
         parseName,
-        parseType,
+        parseInstanceHead,
         getInstancesForType,
         getDocs,
         GetDocsFailure(..),
@@ -104,7 +104,9 @@ import GHC.Exts
 import Data.Array
 import Exception
 
-import TcRnDriver ( runTcInteractive )
+import TcRnDriver ( runTcInteractive, tcRnType )
+import TcHsSyn          ( ZonkFlexi (SkolemiseFlexi) )
+
 import TcEnv (tcGetInstEnvs)
 
 import Inst (instDFunType)
@@ -956,6 +958,14 @@ parseType str = withSession $ \hsc_env -> do
 -- ----------------------------------------------------------------------------
 -- Getting the class instances for a type
 
+parseInstanceHead :: GhcMonad m => String -> m Type
+parseInstanceHead str = withSession $ \hsc_env0 -> do
+  (ty, _) <- liftIO $ runInteractiveHsc hsc_env0 $ do
+    hsc_env <- getHscEnv
+    ty <- hscParseType str
+    ioMsgMaybe $ tcRnType hsc_env SkolemiseFlexi False ty
+
+  return ty
 
 -- Get all the constraints required of a dictionary binding
 getDictionaryBindings :: Var -> TcM (WantedConstraints, TcEvBinds)
@@ -1052,11 +1062,7 @@ substClassArgs subst inst = let
     freeVars = fvVarSet $ tyCoFVsOfType cons
     (_, args) = splitAppTys cons
 
-    in not (isEmptyVarSet freeVars) || any isAny args
-
-  isAny ty = case splitTyConApp_maybe ty of
-    Just (tycon, _) -> nonDetCmpTc tycon anyTyCon == EQ
-    Nothing -> False
+    in not (isEmptyVarSet freeVars)
 
 -----------------------------------------------------------------------------
 -- Compile an expression, run it, and deliver the result

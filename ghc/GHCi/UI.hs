@@ -1750,7 +1750,7 @@ instancesCmd "" =
   throwGhcException (CmdLineError "syntax: ':instances <type-you-want-instances-for>'")
 instancesCmd s = do
   handleSourceError GHC.printException $ do
-    ty <- GHC.parseType s
+    ty <- GHC.parseInstanceHead s
     res <- GHC.getInstancesForType ty
 
     printForUser $ vcat $ map ppr res
