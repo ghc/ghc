@@ -88,7 +88,7 @@ userArgs :: Args
 userArgs = builder Ghc ? package cabal ? arg "-O0"
 ```
 Builders such as `Ghc` are defined in `src/Builder.hs`, and all packages that
-are currently built as part of the GHC are defined in `src/GHC.hs`.
+are currently built as part of the GHC are defined in `src/Packages.hs`.
 
 You can combine several custom command line settings using `mconcat`:
 ```haskell
