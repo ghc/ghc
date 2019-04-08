@@ -4,6 +4,10 @@ variables:
   # Commit of ghc/ci-images repository from which to pull Docker images
   DOCKER_REV: cefaee3c742af193e0f7783f87edb0d35374515c
 
+  # Sequential version number capturing the versions of all tools fetched by
+  # .gitlab/win32-init.sh.
+  WINDOWS_TOOLCHAIN_VERSION: 1
+
 before_script:
   - python3 .gitlab/fix-submodules.py
   - git submodule sync --recursive
@@ -525,7 +529,7 @@ validate-x86_64-windows-hadrian:
   variables:
     MSYSTEM: MINGW64
   cache:
-    key: x86_64-windows-hadrian
+    key: "x86_64-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
 
 nightly-i386-windows-hadrian:
   extends: .build-windows-hadrian
@@ -535,7 +539,7 @@ nightly-i386-windows-hadrian:
     variables:
       - $NIGHTLY
   cache:
-    key: i386-windows-hadrian
+    key: "i386-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
 
 .build-windows-make:
   extends: .build-windows
@@ -571,7 +575,7 @@ validate-x86_64-windows:
     MSYSTEM: MINGW64
     CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
   cache:
-    key: x86_64-windows
+    key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
 # Normal Windows validate builds are profiled; that won't do for releases.
 release-x86_64-windows:
@@ -592,7 +596,7 @@ release-i386-windows:
     BUILD_FLAVOUR: "perf"
     CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
   cache:
-    key: i386-windows
+    key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
 nightly-i386-windows:
   extends: .build-windows-make
@@ -603,7 +607,7 @@ nightly-i386-windows:
     MSYSTEM: MINGW32
     CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
   cache:
-    key: i386-windows
+    key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
 ############################################################
 # Cleanup
