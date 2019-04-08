@@ -493,11 +493,8 @@ generateVersionHs :: Expr String
 generateVersionHs = do
     trackGenerateHs
     projectVersion <- getSetting ProjectVersion
-    targetOs       <- getSetting TargetOs
-    targetArch     <- getSetting TargetArch
     return $ unlines
         [ "module Version where"
-        , "version, targetOS, targetARCH :: String"
+        , "version :: String"
         , "version    = " ++ show projectVersion
-        , "targetOS   = " ++ show targetOs
-        , "targetARCH = " ++ show targetArch ]
+        ]
