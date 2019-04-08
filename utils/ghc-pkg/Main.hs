@@ -27,7 +27,7 @@
 
 module Main (main) where
 
-import Version ( version, targetOS, targetARCH )
+import Version ( version )
 import qualified GHC.PackageDb as GhcPkg
 import GHC.PackageDb (BinaryStringRep(..))
 import GHC.HandleEncoding
