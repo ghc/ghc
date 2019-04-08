@@ -307,6 +307,7 @@ generateSettings = do
         , ("target has subsections via symbols", expr $ lookupValueOrError configFile "haskell-have-subsections-via-symbols")
         , ("target has RTS linker", expr $ lookupValueOrError configFile "haskell-have-rts-linker")
         , ("Unregisterised", expr $ yesNo <$> flag GhcUnregisterised)
+        , ("LLVM target", getSetting LlvmTarget)
         , ("LLVM llc command", expr $ settingsFileSetting SettingsFileSetting_LlcCommand)
         , ("LLVM opt command", expr $ settingsFileSetting SettingsFileSetting_OptCommand)
         , ("LLVM clang command", expr $ settingsFileSetting SettingsFileSetting_ClangCommand)
@@ -413,7 +414,6 @@ generateGhcBootPlatformH = do
     hostVendor     <- chooseSetting HostVendor    TargetVendor
     targetPlatform <- getSetting TargetPlatform
     targetArch     <- getSetting TargetArch
-    llvmTarget     <- getSetting LlvmTarget
     targetOs       <- getSetting TargetOs
     targetVendor   <- getSetting TargetVendor
     return $ unlines
@@ -433,7 +433,6 @@ generateGhcBootPlatformH = do
         , "#define BUILD_ARCH "  ++ show buildArch
         , "#define HOST_ARCH "   ++ show hostArch
         , "#define TARGET_ARCH " ++ show targetArch
-        , "#define LLVM_TARGET " ++ show llvmTarget
         , ""
         , "#define " ++ buildOs  ++ "_BUILD_OS 1"
         , "#define " ++ hostOs   ++ "_HOST_OS 1"

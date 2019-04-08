@@ -236,6 +236,8 @@ initSysTools top_dir
              ld_prog  = cc_prog
              ld_args  = map Option (cc_args ++ words cc_link_args_str)
 
+       llvmTarget <- getSetting "LLVM target"
+
        -- We just assume on command line
        lc_prog <- getSetting "LLVM llc command"
        lo_prog <- getSetting "LLVM opt command"
@@ -336,6 +338,7 @@ initSysTools top_dir
            , platformMisc_ghcThreaded = ghcThreaded
            , platformMisc_ghcDebugged = ghcDebugged
            , platformMisc_ghcRtsWithLibdw = ghcRtsWithLibdw
+           , platformMisc_llvmTarget = llvmTarget
            }
 
          , sPlatformConstants = platformConstants

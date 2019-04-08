@@ -243,6 +243,7 @@ data PlatformMisc = PlatformMisc
   , platformMisc_ghcThreaded          :: Bool
   , platformMisc_ghcDebugged          :: Bool
   , platformMisc_ghcRtsWithLibdw      :: Bool
+  , platformMisc_llvmTarget           :: String
   }
 
 data IntegerLibrary

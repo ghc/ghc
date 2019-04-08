@@ -209,6 +209,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("target has subsections via symbols", "$(HaskellHaveSubsectionsViaSymbols)")' >> $@
 	@echo ',("target has RTS linker", "$(HaskellHaveRTSLinker)")' >> $@
 	@echo ',("Unregisterised", "$(Unregisterised)")' >> $@
+	@echo ',("LLVM target", "$(LLVMTarget_CPP)")' >> $@
 	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
 	@echo ',("LLVM clang command", "$(SettingsClangCommand)")' >> $@
