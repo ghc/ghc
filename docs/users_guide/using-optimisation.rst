@@ -88,6 +88,17 @@ So, for example, ``ghc -c Foo.hs``
     runtime or space *worse* if you're unlucky. They are normally turned
     on or off individually.
 
+.. ghc-flag:: -On
+    :shortdesc: Any -On where n > 2 is the same as -O2.
+    :type: dynamic
+    :reverse: -O0
+    :category: optimization-levels
+
+    .. index::
+       single: optimise; aggressively
+
+    Any -On where n > 2 is the same as -O2.
+
 We don't use a ``-O*`` flag for day-to-day work. We use ``-O`` to get
 respectable speed; e.g., when we want to measure something. When we want
 to go for broke, we tend to use ``-O2`` (and we go for lots of coffee
