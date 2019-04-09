@@ -12,7 +12,7 @@
 
 # RTS-like things
 /rts/                             @bgamari @simonmar @osa1 @Phyx @angerman
-/rts/linker/                      @angerman @Phyx
+/rts/linker/                      @angerman @Phyx @simonmar
 /includes/                        @bgamari @simonmar @osa1
 
 # The compiler
