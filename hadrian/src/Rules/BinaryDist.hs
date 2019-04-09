@@ -121,7 +121,13 @@ bindistRules = do
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
         need ["docs"]
-        copyDirectory (root -/- "docs") bindistFilesDir
+        -- TODO: we should only embed the docs that have been generated
+        -- depending on the current settings (flavours' "ghcDocs" field and
+        -- "--docs=.." command-line flag)
+        -- Currently we embed the "docs" directory if it exists but it may
+        -- contain outdated or even invalid data.
+        whenM (doesDirectoryExist (root -/- "docs")) $ do
+          copyDirectory (root -/- "docs") bindistFilesDir
         when windows $ do
           copyDirectory (root -/- "mingw") bindistFilesDir
           -- we use that opportunity to delete the .stamp file that we use
