@@ -115,7 +115,8 @@ bindistRules = do
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
         need ["docs"]
-        copyDirectory (root -/- "docs") bindistFilesDir
+        whenM (doesDirectoryExist (root -/- "docs")) $ do
+          copyDirectory (root -/- "docs") bindistFilesDir
         when windows $ do
           copyDirectory (root -/- "mingw") bindistFilesDir
           -- we use that opportunity to delete the .stamp file that we use
