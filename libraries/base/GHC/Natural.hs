@@ -500,8 +500,8 @@ naturalToInteger :: Natural -> Integer
 naturalToInteger (Natural i) = i
 {-# CONSTANT_FOLDED naturalToInteger #-}
 
-testBitNatural :: Natural -> Int -> Bool
-testBitNatural (Natural n) (I# i) = testBitInteger n i
+testBitNatural :: Natural -> Int# -> Bool
+testBitNatural (Natural n) i# = testBitInteger n i#
 {-# CONSTANT_FOLDED testBitNatural #-}
 
 popCountNatural :: Natural -> Int#
