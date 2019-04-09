@@ -1,6 +1,12 @@
 -- Test :instances
 :instances Maybe
 
-:set -XPartialTypeSignatures -fno-warnpartial-type-signatures
-
+:set -XPartialTypeSignatures -fno-warn-partial-type-signatures
+-- Test queries with holes
 :instances Maybe _
+
+:load ghci064
+
+-- Test that overlapping instances are all reported in the results
+:instances [_]
+:instances [T]
