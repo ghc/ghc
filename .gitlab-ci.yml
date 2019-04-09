@@ -85,7 +85,14 @@ lint-submods:
     refs:
       - master
       - /ghc-[0-9]+\.[0-9]+/
-      - wip/marge_bot_batch_merge_job
+
+lint-submods-marge:
+  extends: .lint-submods
+  only:
+    refs:
+      - merge_requests
+    variables:
+      - $CI_MERGE_REQUEST_LABELS =~ /.*wip/marge_bot_batch_merge_job.*/
 
 lint-submods-mr:
   extends: .lint-submods
