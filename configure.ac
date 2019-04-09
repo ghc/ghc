@@ -168,7 +168,7 @@ then
      $WithGhc is a development snapshot of GHC, version $GhcVersion.
      Bootstrapping using this version of GHC is not supported, and may not
      work.  Use --enable-bootstrap-with-devel-snapshot to try it anyway,
-     or --with-ghc to specify a different GHC to use.])
+     or 'GHC=' to specify a different GHC to use.])
     fi
 fi
 
