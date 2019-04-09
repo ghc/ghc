@@ -119,6 +119,7 @@ import TcSMonad (runTcS)
 
 import VarSet (isEmptyVarSet)
 import FV (fvVarSet)
+
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
 
@@ -1021,11 +1022,9 @@ findMatchingInstances ty = do
   ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
   let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
 
-  return . catMaybes $ map (\cls ->
-    let (res, _, _) = lookupInstEnv True ies cls [ty]
-    in case res of
-          [(res, mb_inst_tys)] -> Just (res, mb_inst_tys)
-          _ -> Nothing ) allClasses
+  return . concat $ map (\cls ->
+    let (matches, unifs, _) = lookupInstEnv True ies cls [ty]
+    in matches ++ map (\unif -> (unif, [])) unifs) allClasses
 
 -- Find all instances that match a provided type
 getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
