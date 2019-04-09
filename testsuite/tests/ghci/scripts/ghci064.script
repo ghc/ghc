@@ -1,6 +1,6 @@
 -- Test :instances
 :instances Maybe
 
-:set -XPartialTypeSignatures -wpartial-type-signatures
+:set -XPartialTypeSignatures -fno-warnpartial-type-signatures
 
 :instances Maybe _
