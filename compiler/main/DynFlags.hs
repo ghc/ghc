@@ -1020,6 +1020,7 @@ data DynFlags = DynFlags {
   --  For ghc -M
   depMakefile           :: FilePath,
   depIncludePkgDeps     :: Bool,
+  depIncludeCppDeps     :: Bool,
   depExcludeMods        :: [ModuleName],
   depSuffixes           :: [String],
 
@@ -1989,6 +1990,7 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         -- ghc -M values
         depMakefile       = "Makefile",
         depIncludePkgDeps = False,
+        depIncludeCppDeps = False,
         depExcludeMods    = [],
         depSuffixes       = [],
         -- end of ghc -M values
@@ -2661,6 +2663,9 @@ addOptP   f = alterSettings (\s -> s { sOpt_P   = f : sOpt_P s
 setDepMakefile :: FilePath -> DynFlags -> DynFlags
 setDepMakefile f d = d { depMakefile = f }
 
+setDepIncludeCppDeps :: Bool -> DynFlags -> DynFlags
+setDepIncludeCppDeps b d = d { depIncludeCppDeps = b }
+
 setDepIncludePkgDeps :: Bool -> DynFlags -> DynFlags
 setDepIncludePkgDeps b d = d { depIncludePkgDeps = b }
 
@@ -3077,6 +3082,8 @@ dynamic_flags_deps = [
         -------- ghc -M -----------------------------------------------------
   , make_ord_flag defGhcFlag "dep-suffix"              (hasArg addDepSuffix)
   , make_ord_flag defGhcFlag "dep-makefile"            (hasArg setDepMakefile)
+  , make_ord_flag defGhcFlag "include-cpp-deps"
+        (noArg (setDepIncludeCppDeps True))
   , make_ord_flag defGhcFlag "include-pkg-deps"
         (noArg (setDepIncludePkgDeps True))
   , make_ord_flag defGhcFlag "exclude-module"          (hasArg addDepExcludeMod)

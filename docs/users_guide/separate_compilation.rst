@@ -1425,6 +1425,20 @@ generation are:
     imported by the home package module. This option is normally only
     used by the various system libraries.
 
+.. ghc-flag:: -include-cpp-deps
+    :shortdesc: Include preprocessor dependencies
+    :type: dynamic
+    :category:
+
+    Output preprocessor dependencies. This only has an effect when the CPP
+    language extension is enabled. These dependencies are files included with
+    the ``#include`` preprocessor directive (as well as transitive includes) and
+    implicitly included files such as standard c preprocessor headers and a GHC
+    version header. One exception to this is that GHC generates a temporary
+    header file (during compilation) containing package version macros. As this
+    is only a temporary file that GHC will always generate, it is not output as
+    a dependency.
+
 .. _orphan-modules:
 
 Orphan modules and instance declarations
