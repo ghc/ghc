@@ -58,7 +58,7 @@ Executable ghc
         Build-depends:
             containers     >= 0.5 && < 0.7,
             deepseq        == 1.4.*,
-            ghc-prim       >= 0.5.0 && <= 0.6.1,
+            ghc-prim       >= 0.5.0 && < 0.7,
             ghci           == @ProjectVersionMunged@,
             haskeline      == 0.7.*,
             time           >= 1.8 && < 1.10,
