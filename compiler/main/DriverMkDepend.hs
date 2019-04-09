@@ -18,6 +18,7 @@ import GhcPrelude
 
 import qualified GHC
 import GhcMonad
+import HscMain          ( hscParse )
 import DynFlags
 import Util
 import HscTypes
@@ -85,7 +86,7 @@ doMkDependHS srcs = do
     -- Print out the dependencies if wanted
     liftIO $ debugTraceMsg dflags 2 (text "Module dependencies" $$ ppr sorted)
 
-    -- Prcess them one by one, dumping results into makefile
+    -- Process them one by one, dumping results into makefile
     -- and complaining about cycles
     hsc_env <- getSession
     root <- liftIO getCurrentDirectory
@@ -223,6 +224,16 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
                 -- Emit std dependency of the object(s) on the source file
                 -- Something like       A.o : A.hs
         ; writeDependency root hdl obj_files src_file
+
+                -- Emit a dependency for each CPP import
+        ; when (depIncludeCppDeps dflags) $ do
+          { -- CPP deps are descovered in the module parsing phase by parsing
+            -- comment lines left by the preprocessor.
+            parsedMod <- case ms_parsed_mod node of
+              Just pm -> return pm
+              Nothing -> hscParse hsc_env node
+          ; mapM_ (writeDependency root hdl obj_files) (hpm_src_files parsedMod)
+          }
 
                 -- Emit a dependency for each import
 
