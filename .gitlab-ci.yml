@@ -388,6 +388,7 @@ nightly-x86_64-linux-deb9-integer-simple:
 validate-x86_64-linux-deb9-unreg:
   extends: .build-x86_64-linux-deb9
   stage: full-build
+  allow_failure: true
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg"
