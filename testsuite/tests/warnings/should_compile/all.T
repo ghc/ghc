@@ -22,6 +22,7 @@ test('Werror01', normal, compile, [''])
 test('Werror02', normal, compile, [''])
 
 test('MissingMod', normal, multimod_compile, ['MissingMod', '-Wmissing-home-modules'])
+test('T16551', [extra_files(['T16551/'])], multimod_compile, ['T16551/A.hs T16551/B.hs', '-Wmissing-home-modules'])
 
 test('StarBinder', normal, compile, [''])
 

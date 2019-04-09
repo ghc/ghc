@@ -184,6 +184,10 @@ warnMissingHomeModules hsc_env mod_graph =
     is_my_target mod (TargetFile target_file _)
       | Just mod_file <- ml_hs_file (ms_location mod)
       = target_file == mod_file ||
+
+           --  Don't warn on B.hs-boot if B.hs is specified (#16551)
+           addBootSuffix target_file == mod_file ||
+
            --  We can get a file target even if a module name was
            --  originally specified in a command line because it can
            --  be converted in guessTarget (by appending .hs/.lhs).
