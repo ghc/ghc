@@ -146,7 +146,7 @@ readTestConfig config =
 
 readTestConfigFile :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestConfigFile filepath =
-    maybe (Left "Cannot parse test-speed") (Right . set) filepath
+    maybe (Left "Cannot parse test-config-file") (Right . set) filepath
   where
     set filepath flags =  flags { testArgs = (testArgs flags) { testConfigFile = filepath } }
 
