@@ -97,13 +97,24 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , arg ("-l" ++ libffiName')
             ]
 
+        -- This is the -rpath argument that is required for the bindist scenario
+        -- to work. Indeed, when you install a bindist, the actual executables
+        -- end up nested somewhere under $libdir, with the wrapper scripts
+        -- taking their place in $bindir, and 'rpath' therefore doesn't seem
+        -- to give us the right paths for such a case.
+        -- TODO: Could we get away with just one rpath...?
+        bindistRpath = "$ORIGIN" -/- ".." -/- ".." -/- originToLibsDir
+
     mconcat [ dynamic ? mconcat
                 [ arg "-dynamic"
                 -- TODO what about windows?
                 , isLibrary pkg ? pure [ "-shared", "-dynload", "deploy" ]
-                , hostSupportsRPaths ? arg ("-optl-Wl,-rpath," ++ rpath)
-                -- The darwin linker doesn't support/require the -zorigin option
-                , hostSupportsRPaths ? not darwin ? arg "-optl-Wl,-zorigin"
+                , hostSupportsRPaths ? mconcat
+                      [ arg ("-optl-Wl,-rpath," ++ rpath)
+                      , isProgram pkg ? arg ("-optl-Wl,-rpath," ++ bindistRpath)
+                      -- The darwin linker doesn't support/require the -zorigin option
+                      , not darwin ? arg "-optl-Wl,-zorigin"
+                      ]
                 ]
             , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
