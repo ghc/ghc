@@ -76,6 +76,7 @@ import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
 
 import qualified Data.IntMap as M
+import Control.DeepSeq (NFData (..))
 import qualified Data.IntSet as S
 import Data.Data
 import qualified Data.Semigroup as Semi
@@ -83,7 +84,7 @@ import Data.Functor.Classes (Eq1 (..))
 
 
 newtype UniqFM ele = UFM (M.IntMap ele)
-  deriving (Data, Eq, Functor)
+  deriving (Data, Eq, Functor, Typeable, NFData)
   -- We used to derive Traversable and Foldable, but they were nondeterministic
   -- and not obvious at the call site. You can use explicit nonDetEltsUFM
   -- and fold a list if needed.

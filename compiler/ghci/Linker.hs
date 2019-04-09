@@ -54,6 +54,7 @@ import FileCleanup
 
 -- Standard libraries
 import Control.Monad
+import Control.DeepSeq (force)
 
 import Data.Char (isSpace)
 import Data.IORef
@@ -1149,13 +1150,17 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
       keep_name (n,_) = isExternalName n &&
                         nameModule n `elemModuleSet` bcos_retained
 
-      itbl_env'     = filterNameEnv keep_name itbl_env
-      closure_env'  = filterNameEnv keep_name closure_env
+  -- On unload, if we don't strictly evaluate the environments, it may keep
+  -- pointers to BCOs alive. Ideally, this is not an issue, but due to a bug
+  -- where GHC incorrectly free unloaded object code. We may have crashes when
+  -- these BCOs still hold references into freed object code (see #16525)
+  itbl_env'     <- evaluate $ force $ filterNameEnv keep_name itbl_env
+  closure_env'  <- evaluate $ force $ filterNameEnv keep_name closure_env
 
-      !new_pls = pls { itbl_env = itbl_env',
-                       closure_env = closure_env',
-                       bcos_loaded = remaining_bcos_loaded,
-                       objs_loaded = remaining_objs_loaded }
+  let new_pls = pls { itbl_env = itbl_env',
+                      closure_env = closure_env',
+                      bcos_loaded = remaining_bcos_loaded,
+                      objs_loaded = remaining_objs_loaded }
 
   return new_pls
   where
