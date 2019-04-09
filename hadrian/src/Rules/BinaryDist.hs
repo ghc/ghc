@@ -101,6 +101,7 @@ bindistRules = do
         -- We 'need' all binaries and libraries
         targets <- mapM pkgTarget =<< stagePackages Stage1
         need targets
+        needIservBins
 
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
@@ -180,8 +181,9 @@ bindistRules = do
         moveFile (ghcRoot -/- "distrib" -/- "configure") configurePath
 
     -- Generate the Makefile that enables the "make install" part
-    root -/- "bindist" -/- "ghc-*" -/- "Makefile" %> \makefilePath ->
-        writeFile' makefilePath bindistMakefile
+    root -/- "bindist" -/- "ghc-*" -/- "Makefile" %> \makefilePath -> do
+        top <- topDirectory
+        copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
 
     root -/- "bindist" -/- "ghc-*" -/- "wrappers/*" %> \wrapperPath ->
         writeFile' wrapperPath $ wrapper (takeFileName wrapperPath)
@@ -215,153 +217,6 @@ pkgTarget :: Package -> Action FilePath
 pkgTarget pkg
     | isLibrary pkg = pkgConfFile (vanillaContext Stage1 pkg)
     | otherwise     = programPath =<< programContext Stage1 pkg
-
--- TODO: Augment this Makefile to match the various parameters that the current
--- bindist scripts support.
--- | A trivial Makefile that only takes @$prefix@ into account, and not e.g
--- @$datadir@ (for docs) and other variables, yet.
-bindistMakefile :: String
-bindistMakefile = unlines
-    [ "MAKEFLAGS += --no-builtin-rules"
-    , ".SUFFIXES:"
-    , ""
-    , "include mk/install.mk"
-    , "include mk/config.mk"
-    , ""
-    , ".PHONY: default"
-    , "default:"
-    , "\t@echo 'Run \"make install\" to install'"
-    , "\t@false"
-    , ""
-    , "#-----------------------------------------------------------------------"
-    , "# INSTALL RULES"
-    , ""
-    , "# Hacky function to check equality of two strings"
-    , "# TODO : find if a better function exists"
-    , "eq=$(and $(findstring $(1),$(2)),$(findstring $(2),$(1)))"
-    , ""
-    , "define installscript"
-    , "# $1 = package name"
-    , "# $2 = wrapper path"
-    , "# $3 = bindir"
-    , "# $4 = ghcbindir"
-    , "# $5 = Executable binary path"
-    , "# $6 = Library Directory"
-    , "# $7 = Docs Directory"
-    , "# $8 = Includes Directory"
-    , "# We are installing wrappers to programs by searching corresponding"
-    , "# wrappers. If wrapper is not found, we are attaching the common wrapper"
-    , "# to it. This implementation is a bit hacky and depends on consistency"
-    , "# of program names. For hadrian build this will work as programs have a"
-    , "# consistent naming procedure."
-    , "\trm -f '$2'"
-    , "\t$(CREATE_SCRIPT) '$2'"
-    , "\t@echo \"#!$(SHELL)\" >>  '$2'"
-    , "\t@echo \"exedir=\\\"$4\\\"\" >> '$2'"
-    , "\t@echo \"exeprog=\\\"$1\\\"\" >> '$2'"
-    , "\t@echo \"executablename=\\\"$5\\\"\" >> '$2'"
-    , "\t@echo \"bindir=\\\"$3\\\"\" >> '$2'"
-    , "\t@echo \"libdir=\\\"$6\\\"\" >> '$2'"
-    , "\t@echo \"docdir=\\\"$7\\\"\" >> '$2'"
-    , "\t@echo \"includedir=\\\"$8\\\"\" >> '$2'"
-    , "\t@echo \"\" >> '$2'"
-    , "\tcat wrappers/$1 >> '$2'"
-    , "\t$(EXECUTABLE_FILE) '$2' ;"
-    , "endef"
-    , ""
-    , "# Hacky function to patch up the 'haddock-interfaces' and 'haddock-html'"
-    , "# fields in the package .conf files"
-    , "define patchpackageconf"
-    , "# $1 = package name (ex: 'bytestring')"
-    , "# $2 = path to .conf file"
-    , "# $3 = Docs Directory"
-    , "\tcat '$2' | sed 's|haddock-interfaces.*|haddock-interfaces: $3/html/libraries/$1/$1.haddock|' \\"
-    , "\t         | sed 's|haddock-html.*|haddock-html: $3/html/libraries/$1|' \\"
-    , "\t       > '$2.copy'"
-    , "\tmv '$2.copy' '$2'"
-    , "endef"
-    , ""
-    , "# QUESTION : should we use shell commands?"
-    , ""
-    , ""
-    , ".PHONY: install"
-    , "install: install_lib install_bin install_includes"
-    , "install: install_docs install_wrappers install_ghci"
-    , "install: install_mingw update_package_db"
-    , ""
-    , "ActualBinsDir=${ghclibdir}/bin"
-    , "ActualLibsDir=${ghclibdir}/lib"
-    , "WrapperBinsDir=${bindir}"
-    , ""
-    , "# We need to install binaries relative to libraries."
-    , "BINARIES = $(wildcard ./bin/*)"
-    , "install_bin:"
-    , "\t@echo \"Copying binaries to $(ActualBinsDir)\""
-    , "\t$(INSTALL_DIR) \"$(ActualBinsDir)\""
-    , "\tfor i in $(BINARIES); do \\"
-    , "\t\tcp -R $$i \"$(ActualBinsDir)\"; \\"
-    , "\tdone"
-    , ""
-    , "install_ghci:"
-    , "\t@echo \"Installing ghci wrapper\""
-    , "\t@echo \"#!$(SHELL)\" >  '$(WrapperBinsDir)/ghci'"
-    , "\tcat wrappers/ghci-script >> '$(WrapperBinsDir)/ghci'"
-    , "\t$(EXECUTABLE_FILE) '$(WrapperBinsDir)/ghci'"
-    , ""
-    , "LIBRARIES = $(wildcard ./lib/*)"
-    , "install_lib:"
-    , "\t@echo \"Copying libraries to $(ActualLibsDir)\""
-    , "\t$(INSTALL_DIR) \"$(ActualLibsDir)\""
-    , "\tfor i in $(LIBRARIES); do \\"
-    , "\t\tcp -R $$i \"$(ActualLibsDir)/\"; \\"
-    , "\tdone"
-    , ""
-    , "INCLUDES = $(wildcard ./include/*)"
-    , "install_includes:"
-    , "\t@echo \"Copying libraries to $(includedir)\""
-    , "\t$(INSTALL_DIR) \"$(includedir)\""
-    , "\tfor i in $(INCLUDES); do \\"
-    , "\t\tcp -R $$i \"$(includedir)/\"; \\"
-    , "\tdone"
-    , ""
-    , "DOCS = $(wildcard ./docs/*)"
-    , "install_docs:"
-    , "\t@echo \"Copying libraries to $(docdir)\""
-    , "\t$(INSTALL_DIR) \"$(docdir)\""
-    , "\tfor i in $(DOCS); do \\"
-    , "\t\tcp -R $$i \"$(docdir)/\"; \\"
-    , "\tdone"
-    , ""
-    , "BINARY_NAMES=$(shell ls ./wrappers/)"
-    , "install_wrappers:"
-    , "\t@echo \"Installing Wrapper scripts\""
-    , "\t$(INSTALL_DIR) \"$(WrapperBinsDir)\""
-    , "\t$(foreach p, $(BINARY_NAMES),\\"
-    , "\t\t$(call installscript,$p,$(WrapperBinsDir)/$p," ++
-      "$(WrapperBinsDir),$(ActualBinsDir),$(ActualBinsDir)/$p," ++
-      "$(ActualLibsDir),$(docdir),$(includedir)))"
-    , "\trm -f '$(WrapperBinsDir)/ghci-script'" -- FIXME: we shouldn't generate it in the first place
-    , ""
-    , "PKG_CONFS = $(wildcard $(ActualLibsDir)/package.conf.d/*)"
-    , "update_package_db:"
-    , "\t@echo \"Updating the package DB\""
-    , "\t$(foreach p, $(PKG_CONFS),\\"
-    , "\t\t$(call patchpackageconf," ++
-      "$(shell echo $(notdir $p) | sed 's/-\\([0-9]*[0-9]\\.\\)*conf//g')," ++
-      "$p,$(docdir)))"
-    , "\t'$(WrapperBinsDir)/ghc-pkg' recache"
-    , ""
-    , "# The 'foreach' that copies the mingw directory will only trigger a copy"
-    , "# when the wildcard matches, therefore only on Windows."
-    , "MINGW = $(wildcard ./mingw)"
-    , "install_mingw:"
-    , "\t@echo \"Installing MingGW\""
-    , "\t$(INSTALL_DIR) \"$(prefix)/mingw\""
-    , "\t$(foreach d, $(MINGW),\\"
-    , "\t\tcp -R ./mingw \"$(prefix)\")"
-    , "# END INSTALL"
-    , "# ----------------------------------------------------------------------"
-    ]
 
 wrapper :: FilePath -> String
 wrapper "ghc"         = ghcWrapper
