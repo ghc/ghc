@@ -89,12 +89,18 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , arg ("-l" ++ libffiName')
             ]
 
+        rpath' | darwin = "@loader_path" -/- originToLibsDir
+               | otherwise = "$ORIGIN" -/- ".." -/- ".." -/- originToLibsDir
+
     mconcat [ dynamic ? mconcat
                 [ arg "-dynamic"
                 -- TODO what about windows?
                 , isLibrary pkg ? pure [ "-shared", "-dynload", "deploy" ]
-                , hostSupportsRPaths ? arg ("-optl-Wl,-rpath," ++ rpath)
-                , hostSupportsRPaths ? arg ("-optl-Wl,-rpath,$ORIGIN")
+                , hostSupportsRPaths ? pure
+                      [ ("-optl-Wl,-rpath," ++ rpath)
+                      , ("-optl-Wl,-rpath,$ORIGIN")
+                      , ("-optl-Wl,-rpath," ++ rpath')
+                      ]
                 ]
             , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
