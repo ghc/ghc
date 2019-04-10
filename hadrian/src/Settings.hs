@@ -60,10 +60,14 @@ programContext :: Stage -> Package -> Action Context
 programContext stage pkg = do
     profiled <- ghcProfiled <$> flavour
     dynGhcProgs <- dynamicGhcPrograms =<< flavour
-    return . Context stage pkg . wayFromUnits . concat $
-        [ [ Profiling  | pkg == ghc && profiled && stage > Stage0 ]
-        , [ Dynamic    | dynGhcProgs && stage > Stage0 ]
-        ]
+    return $ Context stage pkg (wayFor profiled dynGhcProgs)
+
+    where wayFor prof dyn
+            | prof && dyn                          =
+                error "programContext: profiling+dynamic not supported"
+            | pkg == ghc && prof && stage > Stage0 = profiling
+            | dyn && stage > Stage0                = dynamic
+            | otherwise                            = vanilla
 
 -- TODO: switch to Set Package as the order of packages should not matter?
 -- Otherwise we have to keep remembering to sort packages from time to time.
