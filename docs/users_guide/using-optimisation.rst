@@ -88,7 +88,7 @@ So, for example, ``ghc -c Foo.hs``
     runtime or space *worse* if you're unlucky. They are normally turned
     on or off individually.
 
-.. ghc-flag:: -On
+.. ghc-flag:: -O⟨n⟩
     :shortdesc: Any -On where n > 2 is the same as -O2.
     :type: dynamic
     :reverse: -O0
