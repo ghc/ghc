@@ -1045,11 +1045,11 @@ bitReverse64 (W64# w#) = W64# (bitReverse# w#)
 
 {-# RULES
 "fromIntegral/Natural->Word8"
-    fromIntegral = (fromIntegral :: Word -> Word8)  . naturalToWord
+    fromIntegral = \n -> (fromIntegral :: Word -> Word8) (W# (naturalToWord n))
 "fromIntegral/Natural->Word16"
-    fromIntegral = (fromIntegral :: Word -> Word16) . naturalToWord
+    fromIntegral = \n -> (fromIntegral :: Word -> Word16) (W# (naturalToWord n))
 "fromIntegral/Natural->Word32"
-    fromIntegral = (fromIntegral :: Word -> Word32) . naturalToWord
+    fromIntegral = \n -> (fromIntegral :: Word -> Word32) (W# (naturalToWord n))
   #-}
 
 {-# RULES
@@ -1065,7 +1065,7 @@ bitReverse64 (W64# w#) = W64# (bitReverse# w#)
 -- these RULES are valid for Word==Word64
 {-# RULES
 "fromIntegral/Natural->Word64"
-    fromIntegral = (fromIntegral :: Word -> Word64) . naturalToWord
+    fromIntegral = \n -> (fromIntegral :: Word -> Word64) (W# (naturalToWord n))
 "fromIntegral/Word64->Natural"
     fromIntegral = wordToNatural . (fromIntegral :: Word64 -> Word)
   #-}
