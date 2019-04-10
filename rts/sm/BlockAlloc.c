@@ -535,7 +535,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
 
     ASSERT(slop_low_blocks + slop_high_blocks + n == num_blocks);
 
-#ifdef DEBUG
+#if defined(DEBUG)
     checkFreeListSanity();
     W_ free_before = countFreeList();
 #endif
@@ -545,7 +545,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
         ASSERT(countBlocks(bd) == num_blocks - slop_low_blocks);
     }
 
-#ifdef DEBUG
+#if defined(DEBUG)
     ASSERT(countFreeList() == free_before + slop_low_blocks);
     checkFreeListSanity();
 #endif
@@ -553,7 +553,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
     // At this point the bd should be aligned, but we may have slop on the high side
     ASSERT((uintptr_t)bd->start % group_size == 0);
 
-#ifdef DEBUG
+#if defined(DEBUG)
     free_before = countFreeList();
 #endif
 
@@ -562,7 +562,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
         ASSERT(bd->blocks == n);
     }
 
-#ifdef DEBUG
+#if defined(DEBUG)
     ASSERT(countFreeList() == free_before + slop_high_blocks);
     checkFreeListSanity();
 #endif
