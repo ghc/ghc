@@ -71,6 +71,11 @@ runTestBuilderArgs = builder RunTest ? do
     debugged            <- read <$> getTestSetting TestGhcDebugged
     keepFiles           <- expr (testKeepFiles <$> userSetting defaultTestArgs)
 
+    accept <- expr (testAccept <$> userSetting defaultTestArgs)
+    (acceptPlatform, acceptOS) <- expr . liftIO $
+        (,) <$> (maybe False (=="YES") <$> lookupEnv "PLATFORM")
+            <*> (maybe False (=="YES") <$> lookupEnv "OS")
+
     windows     <- expr windowsHost
     darwin      <- expr osxHost
     threads     <- shakeThreads <$> expr getShakeOptions
@@ -95,6 +100,9 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "darwin=" ++ show darwin
             , arg "-e", arg $ "config.local=False"
             , arg "-e", arg $ "config.cleanup=" ++ show (not keepFiles)
+            , arg "-e", arg $ "config.accept=" ++ show accept
+            , arg "-e", arg $ "config.accept_platform=" ++ show acceptPlatform
+            , arg "-e", arg $ "config.accept_os=" ++ show acceptOS
             , arg "-e", arg $ "config.exeext=" ++ quote exe
             , arg "-e", arg $ "config.compiler_debugged=" ++ quote (yesNo debugged)
             , arg "-e", arg $ "ghc_debugged=" ++ quote (yesNo debugged)

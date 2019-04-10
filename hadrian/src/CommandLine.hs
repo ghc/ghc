@@ -56,7 +56,8 @@ data TestArgs = TestArgs
     , testSpeed      :: TestSpeed
     , testSummary    :: Maybe FilePath
     , testVerbosity  :: Maybe String
-    , testWays       :: [String] }
+    , testWays       :: [String]
+    , testAccept     :: Bool}
     deriving (Eq, Show)
 
 -- | Default value for `TestArgs`.
@@ -73,7 +74,8 @@ defaultTestArgs = TestArgs
     , testSpeed      = TestNormal
     , testSummary    = Nothing
     , testVerbosity  = Nothing
-    , testWays       = [] }
+    , testWays       = []
+    , testAccept     = False }
 
 readConfigure :: Either String (CommandLineArgs -> CommandLineArgs)
 readConfigure = Right $ \flags -> flags { configure = True }
@@ -123,6 +125,9 @@ readProgressInfo ms =
 
 readTestKeepFiles :: Either String (CommandLineArgs -> CommandLineArgs)
 readTestKeepFiles = Right $ \flags -> flags { testArgs = (testArgs flags) { testKeepFiles = True } }
+
+readTestAccept :: Either String (CommandLineArgs -> CommandLineArgs)
+readTestAccept = Right $ \flags -> flags { testArgs = (testArgs flags) { testAccept = True } }
 
 readTestCompiler :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestCompiler compiler = maybe (Left "Cannot parse compiler") (Right . set) compiler
@@ -245,7 +250,8 @@ optDescrs =
     , Option [] ["test-verbose"] (OptArg readTestVerbose "TEST_VERBOSE")
       "A verbosity value between 0 and 5. 0 is silent, 4 and higher activates extra output."
     , Option [] ["test-way"] (OptArg readTestWay "TEST_WAY")
-      "only run these ways" ]
+      "only run these ways"
+    , Option ['a'] ["test-accept"] (NoArg readTestAccept) "Accept new output of tests" ]
 
 -- | A type-indexed map containing Hadrian command line arguments to be passed
 -- to Shake via 'shakeExtra'.
