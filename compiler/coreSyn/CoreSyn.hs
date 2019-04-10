@@ -1264,7 +1264,7 @@ data CoreRule
         ru_nargs :: Int,        -- ^ Number of arguments that 'ru_try' consumes,
                                 -- if it fires, including type arguments
         ru_try   :: RuleFun
-                -- ^ This function does the rewrite.  It given too many
+                -- ^ This function does the rewrite.  If given too many
                 -- arguments, it simply discards them; the returned 'CoreExpr'
                 -- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args
     }
