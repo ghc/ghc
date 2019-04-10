@@ -15,6 +15,7 @@ module GHCi.UI.Monad (
         GHCiState(..), GhciMonad(..),
         GHCiOption(..), isOptionSet, setOption, unsetOption,
         Command(..), CommandResult(..), cmdSuccess,
+        LocalConfigBehaviour(..),
         PromptFunction,
         BreakLocation(..),
         TickArray,
@@ -79,6 +80,7 @@ data GHCiState = GHCiState
         prompt_cont    :: PromptFunction,
         editor         :: String,
         stop           :: String,
+        localConfig    :: LocalConfigBehaviour,
         options        :: [GHCiOption],
         line_number    :: !Int,         -- ^ input line
         break_ctr      :: !Int,
@@ -196,6 +198,15 @@ data GHCiOption
         | CollectInfo           -- collect and cache information about
                                 -- modules after load
         deriving Eq
+
+-- | Treatment of ./.ghci files.  For now we either load or
+-- ignore.  But later we could implement a "safe mode" where
+-- only safe operations are performed.
+--
+data LocalConfigBehaviour
+  = SourceLocalConfig
+  | IgnoreLocalConfig
+  deriving (Eq)
 
 data BreakLocation
    = BreakLocation
