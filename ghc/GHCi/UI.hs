@@ -102,7 +102,7 @@ import Data.Char
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
-                   partition, sort, sortBy )
+                   partition, sort, sortBy, (\\) )
 import qualified Data.Set as S
 import Data.Maybe
 import Data.Map (Map)
@@ -482,6 +482,7 @@ interactiveUI config srcs maybe_exprs = do
                    stop               = default_stop,
                    editor             = default_editor,
                    options            = [],
+                   localConfig        = SourceLocalConfig,
                    -- We initialize line number as 0, not 1, because we use
                    -- current line number while reporting errors which is
                    -- incremented after reading a line.
@@ -566,8 +567,6 @@ runGHCi paths maybe_exprs = do
   let
    ignore_dot_ghci = gopt Opt_IgnoreDotGhci dflags
 
-   current_dir = return (Just ".ghci")
-
    app_user_dir = liftIO $ withGhcAppData
                     (\dir -> return (Just (dir </> "ghci.conf")))
                     (return Nothing)
@@ -606,17 +605,44 @@ runGHCi paths maybe_exprs = do
 
   setGHCContextFromGHCiState
 
-  dot_cfgs <- if ignore_dot_ghci then return [] else do
-    dot_files <- catMaybes <$> sequence [ current_dir, app_user_dir, home_dir ]
-    liftIO $ filterM checkFileAndDirPerms dot_files
-  mdot_cfgs <- liftIO $ mapM canonicalizePath' dot_cfgs
+  processedCfgs <- if ignore_dot_ghci
+    then pure []
+    else do
+      userCfgs <- do
+        paths <- catMaybes <$> sequence [ app_user_dir, home_dir ]
+        checkedPaths <- liftIO $ filterM checkFileAndDirPerms paths
+        liftIO . fmap (nub . catMaybes) $ mapM canonicalizePath' checkedPaths
+
+      localCfg <- do
+        let path = ".ghci"
+        ok <- liftIO $ checkFileAndDirPerms path
+        if ok then liftIO $ canonicalizePath' path else pure Nothing
+
+      mapM_ sourceConfigFile userCfgs
+        -- Process the global and user .ghci
+        -- (but not $CWD/.ghci or CLI args, yet)
+
+      behaviour <- localConfig <$> getGHCiState
+
+      processedLocalCfg <- case localCfg of
+        Just path | path `notElem` userCfgs ->
+          -- don't read .ghci twice if CWD is $HOME
+          case behaviour of
+            SourceLocalConfig -> localCfg <$ sourceConfigFile path
+            IgnoreLocalConfig -> pure Nothing
+        _ -> pure Nothing
+
+      pure $ maybe id (:) processedLocalCfg userCfgs
 
   let arg_cfgs = reverse $ ghciScripts dflags
     -- -ghci-script are collected in reverse order
     -- We don't require that a script explicitly added by -ghci-script
     -- is owned by the current user. (#6017)
-  mapM_ sourceConfigFile $ nub $ (catMaybes mdot_cfgs) ++ arg_cfgs
-    -- nub, because we don't want to read .ghci twice if the CWD is $HOME.
+
+  mapM_ sourceConfigFile $ nub arg_cfgs \\ processedCfgs
+    -- Dedup, and remove any configs we already processed.
+    -- Importantly, if $PWD/.ghci was ignored due to configuration,
+    -- explicitly specifying it does cause it to be processed.
 
   -- Perform a :load for files given on the GHCi command line
   -- When in -e mode, if the load fails then we want to stop
