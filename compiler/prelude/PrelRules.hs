@@ -65,7 +65,7 @@ import qualified Data.ByteString as BS
 import Data.Int
 import Data.Ratio
 import Data.Word
-import GHC.Natural ( Natural )
+import GHC.Natural (Natural)
 
 {-
 Note [Constant folding]
@@ -1344,6 +1344,8 @@ builtinNaturalRules =
  ,rule_NaturalToInteger   "naturalToInteger"   naturalToIntegerName
  ,rule_WordToNatural      "wordToNatural"      wordToNaturalName
 
+ ,rule_convert            "naturalToWord"      naturalToWordName       mkWordLitWord
+
  ,rule_binop              "andNatural"         andNaturalName          (.&.)
  ,rule_binop              "orNatural"          orNaturalName           (.|.)
  ,rule_binop              "xorNatural"         xorNaturalName          xor
@@ -1365,7 +1367,10 @@ builtinNaturalRules =
  ,rule_unop               "signumNatural"      signumNaturalName       signum
 
  ]
-    where rule_bitNatural str name
+    where rule_convert str name convert
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_Natural_convert convert }
+          rule_bitNatural str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Natural_bit }
           rule_unop str name op
@@ -1597,6 +1602,14 @@ match_Integer_convert convert dflags id_unf _ [xl]
   = Just (convert dflags (fromInteger x))
 match_Integer_convert _ _ _ _ _ = Nothing
 
+match_Natural_convert :: Num a
+                      => (DynFlags -> a -> Expr CoreBndr)
+                      -> RuleFun
+match_Natural_convert convert dflags id_unf _ [xl]
+  | Just (LitNumber LitNumNatural x _) <- exprIsLiteral_maybe id_unf xl
+  = Just (convert dflags (fromInteger x))
+match_Natural_convert _ _ _ _ _ = Nothing
+
 match_Integer_unop :: (Integer -> Integer) -> RuleFun
 match_Integer_unop unop _ id_unf _ [xl]
   | Just (LitNumber LitNumInteger x i) <- exprIsLiteral_maybe id_unf xl
@@ -1663,7 +1676,7 @@ match_Integer_shift_op binop _ id_unf _ [xl,yl]
   , Just (LitNumber LitNumInt y _)     <- exprIsLiteral_maybe id_unf yl
   , y >= 0
   , y <= 4   -- Restrict constant-folding of shifts on Integers, somewhat
-             -- arbitrary.  We can get huge shifts in inaccessible code
+             -- arbitrarily.  We can get huge shifts in inaccessible code
              -- (#15673)
   = Just (Lit (mkLitInteger (x `binop` fromIntegral y) i))
 match_Integer_shift_op _ _ _ _ _ = Nothing
