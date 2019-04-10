@@ -1,3 +1,3 @@
 
-T14465.hs:26:13: warning: [-Woverflowed-literals (in -Wdefault)]
+T14465.hs:27:13: warning: [-Woverflowed-literals (in -Wdefault)]
     Literal -1 is negative but Natural only supports positive numbers

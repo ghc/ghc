@@ -62,7 +62,6 @@ module GHC.Natural
     , wordToNatural
     , intToNatural
     , naturalToWordMaybe
-    , wordToNatural#
     , wordToNaturalBase
       -- * Modular arithmetic
     , powModNatural
@@ -371,13 +370,15 @@ naturalToBigNat :: Natural -> BigNat
 naturalToBigNat (NatS# w#) = wordToBigNat w#
 naturalToBigNat (NatJ# bn) = bn
 
-naturalToWord :: Natural -> Word
-naturalToWord (NatS# w#) = W# w#
-naturalToWord (NatJ# bn) = W# (bigNatToWord bn)
+naturalToWord :: Natural -> Word#
+naturalToWord (NatS# w#) = w#
+naturalToWord (NatJ# bn) = bigNatToWord bn
+{-# CONSTANT_FOLDED naturalToWord #-}
 
-naturalToInt :: Natural -> Int
-naturalToInt (NatS# w#) = I# (word2Int# w#)
-naturalToInt (NatJ# bn) = I# (bigNatToInt bn)
+naturalToInt :: Natural -> Int#
+naturalToInt (NatS# w#) = word2Int# w#
+naturalToInt (NatJ# bn) = bigNatToInt bn
+{-# CONSTANT_FOLDED naturalToInt #-}
 
 ----------------------------------------------------------------------------
 
@@ -385,13 +386,13 @@ naturalToInt (NatJ# bn) = I# (bigNatToInt bn)
 --
 -- Built-in rule ensures that applications of this function to literal Word# are
 -- lifted into Natural literals.
-wordToNatural# :: Word# -> Natural
-wordToNatural# w# = NatS# w#
-{-# CONSTANT_FOLDED wordToNatural# #-}
+wordToNatural :: Word# -> Natural
+wordToNatural w# = NatS# w#
+{-# CONSTANT_FOLDED wordToNatural #-}
 
 -- | Convert a Word# into a Natural
 --
--- In base we can't use wordToNatural# as built-in rules transform some of them
+-- In base we can't use wordToNatural as built-in rules transform some of them
 -- into Natural literals. Use this function instead.
 wordToNaturalBase :: Word# -> Natural
 wordToNaturalBase w# = NatS# w#
@@ -423,13 +424,13 @@ isValidNatural (Natural i) = i >= wordToInteger 0##
 --
 -- Built-in rule ensures that applications of this function to literal 'Word#'
 -- are lifted into 'Natural' literals.
-wordToNatural# :: Word# -> Natural
-wordToNatural# w## = Natural (wordToInteger w##)
-{-# CONSTANT_FOLDED wordToNatural# #-}
+wordToNatural :: Word# -> Natural
+wordToNatural w## = Natural (wordToInteger w##)
+{-# CONSTANT_FOLDED wordToNatural #-}
 
 -- | Convert a 'Word#' into a Natural
 --
--- In base we can't use wordToNatural# as built-in rules transform some of them
+-- In base we can't use wordToNatural as built-in rules transform some of them
 -- into Natural literals. Use this function instead.
 wordToNaturalBase :: Word# -> Natural
 wordToNaturalBase w## = Natural (wordToInteger w##)
@@ -494,11 +495,13 @@ andNatural :: Natural -> Natural -> Natural
 andNatural (Natural x) (Natural y) = Natural (x `andInteger` y)
 {-# CONSTANT_FOLDED andNatural #-}
 
-naturalToInt :: Natural -> Int
-naturalToInt (Natural i) = I# (integerToInt i)
+naturalToInt :: Natural -> Int#
+naturalToInt (Natural i) = integerToInt i
+{-# CONSTANT_FOLDED naturalToInt #-}
 
-naturalToWord :: Natural -> Word
-naturalToWord (Natural i) = W# (integerToWord i)
+naturalToWord :: Natural -> Word#
+naturalToWord (Natural i) = integerToWord i
+{-# CONSTANT_FOLDED naturalToWord #-}
 
 naturalToInteger :: Natural -> Integer
 naturalToInteger (Natural i) = i
@@ -553,12 +556,6 @@ negateNatural (Natural x)
 {-# CONSTANT_FOLDED negateNatural #-}
 
 #endif
-
--- | Construct 'Natural' from 'Word' value.
---
--- @since 4.8.0.0
-wordToNatural :: Word -> Natural
-wordToNatural (W# w#) = wordToNatural# w#
 
 -- | Try downcasting 'Natural' to 'Word' value.
 -- Returns 'Nothing' if value doesn't fit in 'Word'.
@@ -623,9 +620,10 @@ mkNatural (W# i : is') = wordToNaturalBase (i `and#` 0xffffffff##) `orNatural`
                          shiftLNatural (mkNatural is') 32#
 {-# CONSTANT_FOLDED mkNatural #-}
 
--- | Convert 'Int' to 'Natural'.
--- Throws 'Control.Exception.Underflow' when passed a negative 'Int'.
-intToNatural :: Int -> Natural
-intToNatural (I# i#)
+-- | Convert 'Int#' to 'Natural'.
+-- Throws 'Control.Exception.Underflow' when passed a negative 'Int#'.
+intToNatural :: Int# -> Natural
+intToNatural i#
   | isTrue# (i# <# 0#) = underflowError
   | True               = wordToNaturalBase (int2Word# i#)
+{-# CONSTANT_FOLDED intToNatural #-}

@@ -3,7 +3,10 @@
 module Main (main) where
 
 import Data.Bits
-import GHC.Natural (Natural)
+import GHC.Int
+import GHC.Natural (Natural, intToNatural, naturalToInt, naturalToWord,
+                    wordToNatural)
+import GHC.Word
 
 main :: IO ()
 main = do
@@ -31,7 +34,10 @@ main = do
           p "testBitNaturalT"    testBitNaturalT
           p "testBitNaturalF"    testBitNaturalF
           p "timesNatural"       timesNatural
---           p "wordToNatural#"     wordToNatural
+          p "wordToNatural"      wordToNaturalLit
+          p "naturalToWord"      naturalToWordLit
+          p "intToNatural"       intToNaturalLit
+          p "naturalToInt"       naturalToIntLit
           p "xorNatural"         xorNatural
 
     where p :: Show a => String -> a -> IO ()
@@ -39,6 +45,9 @@ main = do
 
 andNatural :: Natural
 andNatural = 100052 .&. 140053
+
+xorNatural :: Natural
+xorNatural = 100071 `xor` 140072
 
 bitNatural :: Natural
 bitNatural = bit 4
@@ -109,8 +118,19 @@ testBitNaturalF = testBit (100069 :: Natural) 1
 timesNatural :: Natural
 timesNatural = 100070 * 6832
 
--- wordToNatural :: Natural
--- wordToNatural = wordToNatural# (100075 :: Word) + 100076
+-- Same story as the @Integer@ case: for the conversion functions, we can't
+-- just check that e.g. 100065 is in the resulting core, because it will be
+-- regardless of whether the rules fire or not. So we add something to the
+-- number being converted, and thus rely on the addition rule for the
+-- end-result type also firing.
+wordToNaturalLit :: Natural
+wordToNaturalLit = wordToNatural 100072## + 100073
 
-xorNatural :: Natural
-xorNatural = 100071 `xor` 140072
+naturalToWordLit :: Word
+naturalToWordLit = 100075 + W# (naturalToWord 100074)
+
+intToNaturalLit :: Natural
+intToNaturalLit = intToNatural 100076# + 100077
+
+naturalToIntLit :: Int
+naturalToIntLit = I# (naturalToInt 100078) + 100079

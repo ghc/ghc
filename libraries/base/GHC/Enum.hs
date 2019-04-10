@@ -924,7 +924,7 @@ instance Enum Natural where
     succ n = n `plusNatural`  wordToNaturalBase 1##
     pred n = n `minusNatural` wordToNaturalBase 1##
 
-    toEnum = intToNatural
+    toEnum (I# i#) = intToNatural i#
 
 #if defined(MIN_VERSION_integer_gmp)
     fromEnum (NatS# w)

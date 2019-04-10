@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeInType            #-}
 
@@ -15,7 +16,7 @@ plusOne n = n + 1
 
 -- a built-in rule should convert this unfolding into a Natural literal in Core
 ten :: Natural
-ten = wordToNatural 10
+ten = wordToNatural 10##
 
 -- test basic constant folding for Natural
 twoTimesTwo :: Natural
