@@ -351,13 +351,16 @@ defFullHelpText =
   "\n" ++
   "   :set <option> ...           set options\n" ++
   "   :seti <option> ...          set options for interactive evaluation only\n" ++
+  "   :set local-config { source | ignore }\n" ++
+  "                               set whether to source .ghci in current dir\n" ++
+  "                               (loading untrusted config is a security issue)\n" ++
   "   :set args <arg> ...         set the arguments returned by System.getArgs\n" ++
   "   :set prog <progname>        set the value returned by System.getProgName\n" ++
   "   :set prompt <prompt>        set the prompt used in GHCi\n" ++
   "   :set prompt-cont <prompt>   set the continuation prompt used in GHCi\n" ++
   "   :set prompt-function <expr> set the function to handle the prompt\n" ++
-  "   :set prompt-cont-function <expr>" ++
-                     "set the function to handle the continuation prompt\n" ++
+  "   :set prompt-cont-function <expr>\n" ++
+  "                               set the function to handle the continuation prompt\n" ++
   "   :set editor <cmd>           set the command used for :edit\n" ++
   "   :set stop [<n>] <cmd>       set the command to run when a breakpoint is hit\n" ++
   "   :unset <option> ...         unset options\n" ++
@@ -2689,6 +2692,8 @@ setCmd str
 
     Right ("editor",  rest) -> setEditor  $ dropWhile isSpace rest
     Right ("stop",    rest) -> setStop    $ dropWhile isSpace rest
+    Right ("local-config", rest) ->
+        setLocalConfigBehaviour $ dropWhile isSpace rest
     _ -> case toArgs str of
          Left err -> liftIO (hPutStrLn stderr err)
          Right wds -> setOptions wds
@@ -2754,6 +2759,7 @@ showDynFlags show_all dflags = do
 
 setArgs, setOptions :: GhciMonad m => [String] -> m ()
 setProg, setEditor, setStop :: GhciMonad m => String -> m ()
+setLocalConfigBehaviour :: GhciMonad m => String -> m ()
 
 setArgs args = do
   st <- getGHCiState
@@ -2766,6 +2772,14 @@ setProg prog = do
   setGHCiState st { progname = prog, evalWrapper = wrapper }
 
 setEditor cmd = modifyGHCiState (\st -> st { editor = cmd })
+
+setLocalConfigBehaviour s
+  | s == "source" =
+      modifyGHCiState (\st -> st { localConfig = SourceLocalConfig })
+  | s == "ignore" =
+      modifyGHCiState (\st -> st { localConfig = IgnoreLocalConfig })
+  | otherwise = throwGhcException
+      (CmdLineError "syntax:  :set local-config { source | ignore }")
 
 setStop str@(c:_) | isDigit c
   = do let (nm_str,rest) = break (not.isDigit) str
