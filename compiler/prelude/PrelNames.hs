@@ -1216,6 +1216,7 @@ shiftRNaturalName   = varQual gHC_NATURAL (fsLit "shiftRNatural")   shiftRNatura
 bitNaturalName      = varQual gHC_NATURAL (fsLit "bitNatural")      bitNaturalIdKey
 testBitNaturalName  = varQual gHC_NATURAL (fsLit "testBitNatural")  testBitNaturalIdKey
 popCountNaturalName = varQual gHC_NATURAL (fsLit "popCountNatural") popCountNaturalIdKey
+naturalToWordName   = varQual gHC_NATURAL (fsLit "naturalToWord")   naturalToWordIdKey
 
 -- GHC.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
@@ -2443,7 +2444,7 @@ wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
 negateNaturalIdKey, signumNaturalIdKey, divModNaturalIdKey, quotRemNaturalIdKey,
   quotNaturalIdKey, remNaturalIdKey, divNaturalIdKey, modNaturalIdKey, gcdNaturalIdKey,
   lcmNaturalIdKey, andNaturalIdKey, orNaturalIdKey, xorNaturalIdKey, shiftLNaturalIdKey,
-  shiftRNaturalIdKey, bitNaturalIdKey, testBitNaturalIdKey,
+  shiftRNaturalIdKey, bitNaturalIdKey, testBitNaturalIdKey, naturalToWordIdKey,
   popCountNaturalIdKey :: Unique
 negateNaturalIdKey   = mkPreludeMiscIdUnique 570
 signumNaturalIdKey   = mkPreludeMiscIdUnique 571
@@ -2463,6 +2464,7 @@ shiftRNaturalIdKey   = mkPreludeMiscIdUnique 584
 bitNaturalIdKey      = mkPreludeMiscIdUnique 585
 testBitNaturalIdKey  = mkPreludeMiscIdUnique 586
 popCountNaturalIdKey = mkPreludeMiscIdUnique 587
+naturalToWordIdKey   = mkPreludeMiscIdUnique 588
 
 {-
 ************************************************************************

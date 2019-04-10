@@ -3,7 +3,8 @@
 module Main (main) where
 
 import Data.Bits
-import GHC.Natural (Natural)
+import GHC.Natural (Natural, naturalToWord)
+import GHC.Word
 
 main :: IO ()
 main = do
@@ -32,6 +33,7 @@ main = do
           p "testBitNaturalF"    testBitNaturalF
           p "timesNatural"       timesNatural
 --           p "wordToNatural#"     wordToNatural
+          p "naturalToWord"      naturalToWordLit
           p "xorNatural"         xorNatural
 
     where p :: Show a => String -> a -> IO ()
@@ -111,6 +113,9 @@ timesNatural = 100070 * 6832
 
 -- wordToNatural :: Natural
 -- wordToNatural = wordToNatural# (100075 :: Word) + 100076
+
+naturalToWordLit :: Word
+naturalToWordLit = W# (naturalToWord 23)
 
 xorNatural :: Natural
 xorNatural = 100071 `xor` 140072
