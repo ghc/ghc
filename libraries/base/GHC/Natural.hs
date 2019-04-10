@@ -371,9 +371,10 @@ naturalToBigNat :: Natural -> BigNat
 naturalToBigNat (NatS# w#) = wordToBigNat w#
 naturalToBigNat (NatJ# bn) = bn
 
-naturalToWord :: Natural -> Word
-naturalToWord (NatS# w#) = W# w#
-naturalToWord (NatJ# bn) = W# (bigNatToWord bn)
+naturalToWord :: Natural -> Word#
+naturalToWord (NatS# w#) = w#
+naturalToWord (NatJ# bn) = bigNatToWord bn
+{-# CONSTANT_FOLDED naturalToWord #-}
 
 naturalToInt :: Natural -> Int
 naturalToInt (NatS# w#) = I# (word2Int# w#)
@@ -497,8 +498,9 @@ andNatural (Natural x) (Natural y) = Natural (x `andInteger` y)
 naturalToInt :: Natural -> Int
 naturalToInt (Natural i) = I# (integerToInt i)
 
-naturalToWord :: Natural -> Word
-naturalToWord (Natural i) = W# (integerToWord i)
+naturalToWord :: Natural -> Word#
+naturalToWord (Natural i) = integerToWord i
+{-# CONSTANT_FOLDED naturalToWord #-}
 
 naturalToInteger :: Natural -> Integer
 naturalToInteger (Natural i) = i

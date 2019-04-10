@@ -563,7 +563,7 @@ fromIntegral = fromInteger . toInteger
 {-# RULES
 "fromIntegral/Natural->Natural"  fromIntegral = id :: Natural -> Natural
 "fromIntegral/Natural->Integer"  fromIntegral = toInteger :: Natural->Integer
-"fromIntegral/Natural->Word"     fromIntegral = naturalToWord
+"fromIntegral/Natural->Word"     fromIntegral = \n -> W# (naturalToWord n)
   #-}
 
 {-# RULES

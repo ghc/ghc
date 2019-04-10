@@ -401,7 +401,7 @@ basicKnownKeyNames
         shiftLNaturalName, shiftRNaturalName, bitNaturalName,
         testBitNaturalName,
         popCountNaturalName,
-        wordToNaturalName,
+        wordToNaturalName, naturalToWordName,
 
         -- Float/Double
         rationalToFloatName,
@@ -1196,7 +1196,8 @@ wordToNaturalName     = varQual gHC_NATURAL (fsLit "wordToNatural#")    wordToNa
 negateNaturalName, signumNaturalName, divModNaturalName, quotRemNaturalName,
   quotNaturalName, remNaturalName, divNaturalName, modNaturalName, gcdNaturalName,
   lcmNaturalName, andNaturalName, orNaturalName, xorNaturalName, shiftLNaturalName,
-  shiftRNaturalName, bitNaturalName, testBitNaturalName, popCountNaturalName :: Name
+  shiftRNaturalName, bitNaturalName, testBitNaturalName, popCountNaturalName,
+  naturalToWordName :: Name
 
 negateNaturalName   = varQual gHC_NATURAL (fsLit "negateNatural")   negateNaturalIdKey
 signumNaturalName   = varQual gHC_NATURAL (fsLit "signumNatural")   signumNaturalIdKey
@@ -1216,6 +1217,7 @@ shiftRNaturalName   = varQual gHC_NATURAL (fsLit "shiftRNatural")   shiftRNatura
 bitNaturalName      = varQual gHC_NATURAL (fsLit "bitNatural")      bitNaturalIdKey
 testBitNaturalName  = varQual gHC_NATURAL (fsLit "testBitNatural")  testBitNaturalIdKey
 popCountNaturalName = varQual gHC_NATURAL (fsLit "popCountNatural") popCountNaturalIdKey
+naturalToWordName   = varQual gHC_NATURAL (fsLit "naturalToWord")   naturalToWordIdKey
 
 -- GHC.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
@@ -2443,7 +2445,7 @@ wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
 negateNaturalIdKey, signumNaturalIdKey, divModNaturalIdKey, quotRemNaturalIdKey,
   quotNaturalIdKey, remNaturalIdKey, divNaturalIdKey, modNaturalIdKey, gcdNaturalIdKey,
   lcmNaturalIdKey, andNaturalIdKey, orNaturalIdKey, xorNaturalIdKey, shiftLNaturalIdKey,
-  shiftRNaturalIdKey, bitNaturalIdKey, testBitNaturalIdKey,
+  shiftRNaturalIdKey, bitNaturalIdKey, testBitNaturalIdKey, naturalToWordIdKey,
   popCountNaturalIdKey :: Unique
 negateNaturalIdKey   = mkPreludeMiscIdUnique 570
 signumNaturalIdKey   = mkPreludeMiscIdUnique 571
@@ -2463,6 +2465,7 @@ shiftRNaturalIdKey   = mkPreludeMiscIdUnique 584
 bitNaturalIdKey      = mkPreludeMiscIdUnique 585
 testBitNaturalIdKey  = mkPreludeMiscIdUnique 586
 popCountNaturalIdKey = mkPreludeMiscIdUnique 587
+naturalToWordIdKey   = mkPreludeMiscIdUnique 588
 
 {-
 ************************************************************************
