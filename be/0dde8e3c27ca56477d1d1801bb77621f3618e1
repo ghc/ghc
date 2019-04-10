@@ -1285,3 +1285,133 @@ x86_64-linux-deb9	T8766	normal	bytes allocated	16827928
 x86_64-linux-deb9	T9848	normal	bytes allocated	51616
 x86_64-linux-deb9	T13191	normal	bytes allocated	185942592
 x86_64-linux-deb9	T3474	normal	max_bytes_used	44408
+
+x86_64-darwin	T3924	normal	bytes allocated	50616
+x86_64-darwin	T10858	normal	bytes allocated	228577040
+x86_64-darwin	hie002	normal	bytes allocated	22267623416
+x86_64-darwin	parsing001	normal	bytes allocated	551006208
+x86_64-darwin	T5030	normal	bytes allocated	750672896
+x86_64-darwin	T3064	normal	peak_megabytes_allocated	65
+x86_64-darwin	T3064	normal	bytes allocated	260017768
+x86_64-darwin	T4801	normal	bytes allocated	434434952
+x86_64-darwin	T5837	normal	bytes allocated	53951288
+x86_64-darwin	T6048	optasm	bytes allocated	100411824
+x86_64-darwin	T5631	normal	bytes allocated	1049606712
+x86_64-darwin	T5321FD	normal	bytes allocated	381667480
+x86_64-darwin	T1969	normal	peak_megabytes_allocated	72
+x86_64-darwin	T1969	normal	max_bytes_used	19487912
+x86_64-darwin	T1969	normal	bytes allocated	679976536
+x86_64-darwin	T783	normal	bytes allocated	507735536
+x86_64-darwin	T5321Fun	normal	bytes allocated	486459096
+x86_64-darwin	T9020	optasm	bytes allocated	376440608
+x86_64-darwin	T5642	normal	bytes allocated	770270704
+x86_64-darwin	T10547	normal	bytes allocated	38393752
+x86_64-darwin	T9961	normal	bytes allocated	499557368
+x86_64-darwin	T9675	optasm	max_bytes_used	20657552
+x86_64-darwin	T9675	optasm	peak_megabytes_allocated	77
+x86_64-darwin	T9675	optasm	bytes allocated	677626728
+x86_64-darwin	T12425	optasm	bytes allocated	143082416
+x86_64-darwin	T12234	optasm	bytes allocated	85744904
+x86_64-darwin	T12227	normal	bytes allocated	742477768
+x86_64-darwin	T9872d	normal	bytes allocated	608271328
+x86_64-darwin	T13035	normal	bytes allocated	126298728
+x86_64-darwin	T9233	normal	bytes allocated	1050368840
+x86_64-darwin	T12150	optasm	bytes allocated	77064144
+x86_64-darwin	T13056	optasm	bytes allocated	436320680
+x86_64-darwin	T3294	normal	max_bytes_used	35328656
+x86_64-darwin	T3294	normal	bytes allocated	1875485808
+x86_64-darwin	T13379	normal	bytes allocated	460799568
+x86_64-darwin	T12707	normal	bytes allocated	1205838560
+x86_64-darwin	Naperian	optasm	bytes allocated	56310216
+x86_64-darwin	T9872a	normal	bytes allocated	2642215840
+x86_64-darwin	T12545	normal	bytes allocated	3207919376
+x86_64-darwin	ManyAlternatives	normal	bytes allocated	1425418480
+x86_64-darwin	haddock.base	normal	bytes allocated	23340772120
+x86_64-darwin	haddock.Cabal	normal	bytes allocated	23677423408
+x86_64-darwin	haddock.compiler	normal	bytes allocated	61796918496
+x86_64-darwin	T9872c	normal	bytes allocated	2980702024
+x86_64-darwin	T9872b	normal	bytes allocated	3697784976
+x86_64-darwin	join002	optasm	bytes allocated	2000050712
+x86_64-darwin	T10370	optasm	max_bytes_used	30753576
+x86_64-darwin	T10370	optasm	peak_megabytes_allocated	109
+x86_64-darwin	join003	optasm	bytes allocated	2000050712
+x86_64-darwin	join004	optasm	bytes allocated	16050576
+x86_64-darwin	T15164	normal	bytes allocated	2000267592
+x86_64-darwin	T9630	normal	max_bytes_used	40685168
+x86_64-darwin	join007	optasm	bytes allocated	50896
+x86_64-darwin	T5835	normal	max_bytes_used	44408
+x86_64-darwin	T12791	normal	max_bytes_used	44408
+x86_64-darwin	T10359	normal	bytes allocated	450680
+x86_64-darwin	T14955	normal	bytes allocated	48050592
+x86_64-darwin	T4830	normal	bytes allocated	97936
+x86_64-darwin	T3586	normal	peak_megabytes_allocated	18
+x86_64-darwin	T3586	normal	bytes allocated	16102016
+x86_64-darwin	T876	normal	bytes allocated	57400
+x86_64-darwin	lazy-bs-alloc	normal	peak_megabytes_allocated	2
+x86_64-darwin	lazy-bs-alloc	normal	bytes allocated	428608
+x86_64-darwin	T3738	normal	peak_megabytes_allocated	2
+x86_64-darwin	T3738	normal	bytes allocated	50376
+x86_64-darwin	MethSharing	normal	peak_megabytes_allocated	2
+x86_64-darwin	MethSharing	normal	bytes allocated	480097920
+x86_64-darwin	ManyConstructors	normal	bytes allocated	4258409560
+x86_64-darwin	T5113	normal	bytes allocated	8058464
+x86_64-darwin	T4978	normal	bytes allocated	10136416
+x86_64-darwin	T14683	normal	bytes allocated	9988985600
+x86_64-darwin	T5205	normal	bytes allocated	54160
+x86_64-darwin	T5237	normal	bytes allocated	104280
+x86_64-darwin	T5536	normal	bytes allocated	890357080
+x86_64-darwin	Conversions	normal	bytes allocated	107512
+x86_64-darwin	T7257	normal	bytes allocated	1297292288
+x86_64-darwin	T7257	normal	peak_megabytes_allocated	228
+x86_64-darwin	T7436	normal	max_bytes_used	60272
+x86_64-darwin	T7797	normal	bytes allocated	480050408
+x86_64-darwin	T7954	normal	bytes allocated	1280050896
+x86_64-darwin	T4474a	normal	bytes allocated	4831889872
+x86_64-darwin	T4474c	normal	bytes allocated	4831889872
+x86_64-darwin	T4474b	normal	bytes allocated	4831889872
+x86_64-darwin	T5549	normal	bytes allocated	5793139976
+x86_64-darwin	T5949	normal	bytes allocated	200920
+x86_64-darwin	T4267	normal	bytes allocated	40904
+x86_64-darwin	T7619	normal	bytes allocated	40904
+x86_64-darwin	InlineByteArrayAlloc	normal	bytes allocated	1440040904
+x86_64-darwin	InlineArrayAlloc	normal	bytes allocated	1600040904
+x86_64-darwin	InlineCloneArrayAlloc	normal	bytes allocated	1600041064
+x86_64-darwin	T9203	normal	bytes allocated	45571392
+x86_64-darwin	T9339	normal	bytes allocated	50632
+x86_64-darwin	T8472	normal	bytes allocated	50640
+x86_64-darwin	T12996	normal	bytes allocated	78904
+x86_64-darwin	T13001	normal	bytes allocated	50520
+x86_64-darwin	T12990	normal	bytes allocated	20840920
+x86_64-darwin	T8763	normal	bytes allocated	40904
+x86_64-darwin	T13218	normal	bytes allocated	82005432
+x86_64-darwin	T13218	normal	max_bytes_used	332488
+x86_64-darwin	DeriveNull	normal	bytes allocated	112050712
+x86_64-darwin	T13623	normal	bytes allocated	50704
+x86_64-darwin	T14936	normal	bytes allocated	51072
+x86_64-darwin	T15226	normal	bytes allocated	40928
+x86_64-darwin	T15226a	normal	bytes allocated	40928
+x86_64-darwin	T15426	normal	bytes allocated	41168
+x86_64-darwin	T15263	normal	bytes allocated	1302032
+x86_64-darwin	T13719	normal	bytes allocated	4619218048
+x86_64-darwin	T2762	normal	peak_megabytes_allocated	2
+x86_64-darwin	T4334	normal	peak_megabytes_allocated	3
+x86_64-darwin	space_leak_001	normal	peak_megabytes_allocated	4
+x86_64-darwin	space_leak_001	normal	bytes allocated	11315396232
+x86_64-darwin	space_leak_001	normal	max_bytes_used	441848
+x86_64-darwin	T14052	ghci	bytes allocated	2257877696
+x86_64-darwin	T15578	normal	bytes allocated	800041224
+x86_64-darwin	T11303b	normal	bytes allocated	56117776
+x86_64-darwin	T11276	normal	bytes allocated	162853560
+x86_64-darwin	T11374	normal	bytes allocated	291585944
+x86_64-darwin	MultiLayerModules	normal	bytes allocated	5834887312
+x86_64-darwin	T7850	normal	peak_megabytes_allocated	5
+x86_64-darwin	T4029	ghci	peak_megabytes_allocated	71
+x86_64-darwin	T4029	ghci	max_bytes_used	20699568
+x86_64-darwin	T13701	normal	bytes allocated	2492522336
+x86_64-darwin	T11195	normal	bytes allocated	8201824632
+x86_64-darwin	T10678	normal	bytes allocated	64041352
+x86_64-darwin	T13536a	optasm	bytes allocated	86576
+x86_64-darwin	T8766	normal	bytes allocated	16827928
+x86_64-darwin	T9848	normal	bytes allocated	51616
+x86_64-darwin	T13191	normal	bytes allocated	185942592
+x86_64-darwin	T3474	normal	max_bytes_used	44408
