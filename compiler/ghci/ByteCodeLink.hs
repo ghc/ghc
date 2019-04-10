@@ -154,8 +154,8 @@ linkFail who what
                 , "the missing library using the -L/path/to/object/dir and -lmissinglibname"
                 , "flags, or simply by naming the relevant files on the GHCi command line."
                 , "Alternatively, this link failure might indicate a bug in GHCi."
-                , "If you suspect the latter, please send a bug report to:"
-                , "  glasgow-haskell-bugs@haskell.org"
+                , "If you suspect the latter, please report this as a GHC bug:"
+                , "  https://www.haskell.org/ghc/reportabug"
                 ])
 
 
