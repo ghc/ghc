@@ -399,9 +399,8 @@ basicKnownKeyNames
         plusNaturalName, minusNaturalName, timesNaturalName, mkNaturalName,
 
         shiftLNaturalName, shiftRNaturalName, bitNaturalName,
-        testBitNaturalName,
-        popCountNaturalName,
-        wordToNaturalName,
+        testBitNaturalName, popCountNaturalName,
+        naturalToWordName, wordToNaturalName, intToNaturalName, naturalToIntName,
 
         -- Float/Double
         rationalToFloatName,
@@ -1185,18 +1184,21 @@ naturalFromIntegerName :: Name
 naturalFromIntegerName = varQual gHC_NATURAL (fsLit "naturalFromInteger") naturalFromIntegerIdKey
 
 naturalToIntegerName, plusNaturalName, minusNaturalName, timesNaturalName,
-   mkNaturalName, wordToNaturalName :: Name
+   mkNaturalName, wordToNaturalName, intToNaturalName, naturalToIntName :: Name
 naturalToIntegerName  = varQual gHC_NATURAL (fsLit "naturalToInteger")  naturalToIntegerIdKey
 plusNaturalName       = varQual gHC_NATURAL (fsLit "plusNatural")       plusNaturalIdKey
 minusNaturalName      = varQual gHC_NATURAL (fsLit "minusNatural")      minusNaturalIdKey
 timesNaturalName      = varQual gHC_NATURAL (fsLit "timesNatural")      timesNaturalIdKey
 mkNaturalName         = varQual gHC_NATURAL (fsLit "mkNatural")         mkNaturalIdKey
-wordToNaturalName     = varQual gHC_NATURAL (fsLit "wordToNatural#")    wordToNaturalIdKey
+wordToNaturalName     = varQual gHC_NATURAL (fsLit "wordToNatural")    wordToNaturalIdKey
+intToNaturalName      = varQual gHC_NATURAL (fsLit "intToNatural")      intToNaturalIdKey
+naturalToIntName      = varQual gHC_NATURAL (fsLit "naturalToInt")      naturalToIntIdKey
 
 negateNaturalName, signumNaturalName, divModNaturalName, quotRemNaturalName,
   quotNaturalName, remNaturalName, divNaturalName, modNaturalName, gcdNaturalName,
   lcmNaturalName, andNaturalName, orNaturalName, xorNaturalName, shiftLNaturalName,
-  shiftRNaturalName, bitNaturalName, testBitNaturalName, popCountNaturalName :: Name
+  shiftRNaturalName, bitNaturalName, testBitNaturalName, popCountNaturalName,
+  naturalToWordName :: Name
 
 negateNaturalName   = varQual gHC_NATURAL (fsLit "negateNatural")   negateNaturalIdKey
 signumNaturalName   = varQual gHC_NATURAL (fsLit "signumNatural")   signumNaturalIdKey
@@ -1216,6 +1218,7 @@ shiftRNaturalName   = varQual gHC_NATURAL (fsLit "shiftRNatural")   shiftRNatura
 bitNaturalName      = varQual gHC_NATURAL (fsLit "bitNatural")      bitNaturalIdKey
 testBitNaturalName  = varQual gHC_NATURAL (fsLit "testBitNatural")  testBitNaturalIdKey
 popCountNaturalName = varQual gHC_NATURAL (fsLit "popCountNatural") popCountNaturalIdKey
+naturalToWordName   = varQual gHC_NATURAL (fsLit "naturalToWord")   naturalToWordIdKey
 
 -- GHC.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
@@ -2443,8 +2446,8 @@ wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
 negateNaturalIdKey, signumNaturalIdKey, divModNaturalIdKey, quotRemNaturalIdKey,
   quotNaturalIdKey, remNaturalIdKey, divNaturalIdKey, modNaturalIdKey, gcdNaturalIdKey,
   lcmNaturalIdKey, andNaturalIdKey, orNaturalIdKey, xorNaturalIdKey, shiftLNaturalIdKey,
-  shiftRNaturalIdKey, bitNaturalIdKey, testBitNaturalIdKey,
-  popCountNaturalIdKey :: Unique
+  shiftRNaturalIdKey, bitNaturalIdKey, testBitNaturalIdKey, naturalToWordIdKey,
+  intToNaturalIdKey, naturalToIntIdKey, popCountNaturalIdKey :: Unique
 negateNaturalIdKey   = mkPreludeMiscIdUnique 570
 signumNaturalIdKey   = mkPreludeMiscIdUnique 571
 divModNaturalIdKey   = mkPreludeMiscIdUnique 572
@@ -2463,6 +2466,9 @@ shiftRNaturalIdKey   = mkPreludeMiscIdUnique 584
 bitNaturalIdKey      = mkPreludeMiscIdUnique 585
 testBitNaturalIdKey  = mkPreludeMiscIdUnique 586
 popCountNaturalIdKey = mkPreludeMiscIdUnique 587
+naturalToWordIdKey   = mkPreludeMiscIdUnique 588
+intToNaturalIdKey    = mkPreludeMiscIdUnique 589
+naturalToIntIdKey    = mkPreludeMiscIdUnique 590
 
 {-
 ************************************************************************

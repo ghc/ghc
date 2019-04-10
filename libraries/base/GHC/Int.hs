@@ -1119,29 +1119,29 @@ instance Ix Int64 where
 
 {-# RULES
 "fromIntegral/Natural->Int8"
-    fromIntegral = (fromIntegral :: Int -> Int8)    . naturalToInt
+    fromIntegral = (fromIntegral :: Int -> Int8)    . (\n -> I# (naturalToInt n))
 "fromIntegral/Natural->Int16"
-    fromIntegral = (fromIntegral :: Int -> Int16)   . naturalToInt
+    fromIntegral = (fromIntegral :: Int -> Int16)   . (\n -> I# (naturalToInt n))
 "fromIntegral/Natural->Int32"
-    fromIntegral = (fromIntegral :: Int -> Int32)   . naturalToInt
+    fromIntegral = (fromIntegral :: Int -> Int32)   . (\n -> I# (naturalToInt n))
   #-}
 
 {-# RULES
 "fromIntegral/Int8->Natural"
-    fromIntegral = intToNatural  . (fromIntegral :: Int8  -> Int)
+    fromIntegral = (\(I# i#) -> intToNatural i#)  . (fromIntegral :: Int8  -> Int)
 "fromIntegral/Int16->Natural"
-    fromIntegral = intToNatural  . (fromIntegral :: Int16 -> Int)
+    fromIntegral = (\(I# i#) -> intToNatural i#)  . (fromIntegral :: Int16 -> Int)
 "fromIntegral/Int32->Natural"
-    fromIntegral = intToNatural  . (fromIntegral :: Int32 -> Int)
+    fromIntegral = (\(I# i#) -> intToNatural i#)  . (fromIntegral :: Int32 -> Int)
   #-}
 
 #if WORD_SIZE_IN_BITS == 64
 -- these RULES are valid for Word==Word64 & Int==Int64
 {-# RULES
 "fromIntegral/Natural->Int64"
-    fromIntegral = (fromIntegral :: Int -> Int64) . naturalToInt
+    fromIntegral = (fromIntegral :: Int -> Int64) . (\n -> I# (naturalToInt n))
 "fromIntegral/Int64->Natural"
-    fromIntegral = intToNatural . (fromIntegral :: Int64 -> Int)
+    fromIntegral = (\(I# i#) -> intToNatural i#) . (fromIntegral :: Int64 -> Int)
   #-}
 #endif
 
