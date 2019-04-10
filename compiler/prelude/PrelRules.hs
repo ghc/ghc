@@ -65,7 +65,7 @@ import qualified Data.ByteString as BS
 import Data.Int
 import Data.Ratio
 import Data.Word
-import GHC.Natural ( Natural )
+import GHC.Natural (Natural)
 
 {-
 Note [Constant folding]
@@ -695,7 +695,7 @@ Shift.$wgo = \ (w_sCS :: GHC.Prim.Int#) (w1_sCT :: [GHC.Types.Bool]) ->
 Note the massive shift on line "!!!!".  It can't happen, because we've checked
 that w < 64, but the optimiser didn't spot that. We DO NOT want to constant-fold this!
 Moreover, if the programmer writes (n `uncheckedShiftL` 9223372036854775807), we
-can't constant fold it, but if it gets to the assember we get
+can't constant fold it, but if it gets to the assembler we get
      Error: operand type mismatch for `shl'
 
 So the best thing to do is to rewrite the shift with a call to error,
@@ -1340,9 +1340,13 @@ builtinNaturalRules =
  [rule_binop              "plusNatural"        plusNaturalName         (+)
  ,rule_partial_binop      "minusNatural"       minusNaturalName        (\a b -> if a >= b then Just (a - b) else Nothing)
  ,rule_binop              "timesNatural"       timesNaturalName        (*)
+
  ,rule_NaturalFromInteger "naturalFromInteger" naturalFromIntegerName
  ,rule_NaturalToInteger   "naturalToInteger"   naturalToIntegerName
  ,rule_WordToNatural      "wordToNatural"      wordToNaturalName
+ ,rule_convert            "naturalToWord"      naturalToWordName       mkWordLitWord
+ ,rule_IntToNatural       "intToNatural"       intToNaturalName
+ ,rule_convert            "naturalToInt"       naturalToIntName        mkIntLitInt
 
  ,rule_binop              "andNatural"         andNaturalName          (.&.)
  ,rule_binop              "orNatural"          orNaturalName           (.|.)
@@ -1367,7 +1371,13 @@ builtinNaturalRules =
  ,rule_unop               "signumNatural"      signumNaturalName       signum
 
  ]
-    where rule_bitNatural str name
+    where rule_convert str name convert
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_Natural_convert convert }
+          rule_IntToNatural str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_IntToNatural }
+          rule_bitNatural str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Natural_bit }
           rule_unop str name op
@@ -1493,6 +1503,9 @@ match_magicDict _ = Nothing
 match_IntToInteger :: RuleFun
 match_IntToInteger = match_IntToInteger_unop id
 
+match_IntToNatural :: RuleFun
+match_IntToNatural = match_IntToNatural_unop id
+
 match_WordToInteger :: RuleFun
 match_WordToInteger _ id_unf id [xl]
   | Just (LitNumber LitNumWord x _) <- exprIsLiteral_maybe id_unf xl
@@ -1599,6 +1612,14 @@ match_Integer_convert convert dflags id_unf _ [xl]
   = Just (convert dflags (fromInteger x))
 match_Integer_convert _ _ _ _ _ = Nothing
 
+match_Natural_convert :: Num a
+                      => (DynFlags -> a -> Expr CoreBndr)
+                      -> RuleFun
+match_Natural_convert convert dflags id_unf _ [xl]
+  | Just (LitNumber LitNumNatural x _) <- exprIsLiteral_maybe id_unf xl
+  = Just (convert dflags (fromInteger x))
+match_Natural_convert _ _ _ _ _ = Nothing
+
 match_Integer_unop :: (Integer -> Integer) -> RuleFun
 match_Integer_unop unop _ id_unf _ [xl]
   | Just (LitNumber LitNumInteger x i) <- exprIsLiteral_maybe id_unf xl
@@ -1614,6 +1635,16 @@ match_IntToInteger_unop unop _ id_unf fn [xl]
     _ ->
         panic "match_IntToInteger_unop: Id has the wrong type"
 match_IntToInteger_unop _ _ _ _ _ = Nothing
+
+match_IntToNatural_unop :: (Integer -> Integer) -> RuleFun
+match_IntToNatural_unop unop _ id_unf fn [xl]
+  | Just (LitNumber LitNumInt x _) <- exprIsLiteral_maybe id_unf xl
+  = case splitFunTy_maybe (idType fn) of
+    Just (_, naturalTy) ->
+        Just (Lit (LitNumber LitNumNatural (unop x) naturalTy))
+    _ ->
+        panic "match_IntToNatural_unop: Id has the wrong type"
+match_IntToNatural_unop _ _ _ _ _ = Nothing
 
 match_Integer_binop :: (Integer -> Integer -> Integer) -> RuleFun
 match_Integer_binop binop _ id_unf _ [xl,yl]
@@ -1665,7 +1696,7 @@ match_Integer_shift_op binop _ id_unf _ [xl,yl]
   , Just (LitNumber LitNumInt y _)     <- exprIsLiteral_maybe id_unf yl
   , y >= 0
   , y <= 4   -- Restrict constant-folding of shifts on Integers, somewhat
-             -- arbitrary.  We can get huge shifts in inaccessible code
+             -- arbitrarily.  We can get huge shifts in inaccessible code
              -- (#15673)
   = Just (Lit (mkLitInteger (x `binop` fromIntegral y) i))
 match_Integer_shift_op _ _ _ _ _ = Nothing
