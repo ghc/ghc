@@ -331,6 +331,10 @@ instance Ord TyCon where
 -- 7. @min x y == if x <= y then x else y@ = 'True'
 -- 8. @max x y == if x >= y then x else y@ = 'True'
 --
+-- Note that (7.) and (8.) do /not/ require 'min' and 'max' to return either of
+-- their arguments. The result is merely required to /equal/ one of the
+-- arguments in terms of '(==)'.
+--
 -- Minimal complete definition: either 'compare' or '<='.
 -- Using 'compare' can be more efficient for complex types.
 --
