@@ -1411,12 +1411,11 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                 env1          = extendTvSubstList env spec_tv_binds
 
                 -- Take only need enough etas to bind each of the specialised arguments
-                necessary_etas   = reverse
-                                 . dropWhile (not . isSpecialized . snd)
-                                 . reverse
-                                 $ rhs_bndrs `zip` (call_args ++ repeat UnspecArg)
+                (extra_etas, necessary_etas)
+                     = spanEnd (not . isSpecialized . snd)
+                     $ rhs_bndrs `zip` (call_args ++ repeat UnspecArg)
                                    -- See Note [Repeating UnspecArgs]
-                body = mkLams (drop (length necessary_etas) rhs_bndrs) rhs_body
+                body = mkLams (fmap fst extra_etas) rhs_body
 
            -- For each binder, determine what capacity (if any) it should play in the rewrite rule.
            -- See Note [Arguments for Specialised Call Rules]
