@@ -22,5 +22,8 @@ signumNaturalZ: 0
 testBitNaturalT: True
 testBitNaturalF: False
 timesNatural: 683678240
-naturalToWord: 23
+wordToNatural: 200145
+naturalToWord: 200149
+intToNatural: 200153
+naturalToInt: 200157
 xorNatural: 239055
