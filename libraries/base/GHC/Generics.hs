@@ -1434,6 +1434,30 @@ deriving instance Generic ((,,,,,) a b c d e f)
 -- | @since 4.6.0.0
 deriving instance Generic ((,,,,,,) a b c d e f g)
 
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,,) a b c d e f g h)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,,,) a b c d e f g h i)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,,,,) a b c d e f g h i j)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,,,,,) a b c d e f g h i j k)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,,,,,,) a b c d e f g h i j k l)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,,,,,,,) a b c d e f g h i j k l m)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,,,,,,,,) a b c d e f g h i j k l m n)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o)
+
 -- | @since 4.12.0.0
 deriving instance Generic (Down a)
 
@@ -1470,6 +1494,30 @@ deriving instance Generic1 ((,,,,,) a b c d e)
 
 -- | @since 4.6.0.0
 deriving instance Generic1 ((,,,,,,) a b c d e f)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,,) a b c d e f g)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,,,) a b c d e f g h)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,,,,) a b c d e f g h i)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,,,,,) a b c d e f g h i j)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,,,,,,) a b c d e f g h i j k)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,,,,,,,) a b c d e f g h i j k l)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,,,,,,,,) a b c d e f g h i j k l m)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,,,,,,,,,) a b c d e f g h i j k l m n)
 
 -- | @since 4.12.0.0
 deriving instance Generic1 Down
