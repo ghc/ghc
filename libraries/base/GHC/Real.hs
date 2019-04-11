@@ -567,8 +567,8 @@ fromIntegral = fromInteger . toInteger
   #-}
 
 {-# RULES
-"fromIntegral/Word->Natural"     fromIntegral = wordToNatural
-"fromIntegral/Int->Natural"     fromIntegral = intToNatural
+"fromIntegral/Word->Natural"     fromIntegral = \(W# w#) -> wordToNatural w#
+"fromIntegral/Int->Natural"      fromIntegral = \(I# i#) -> intToNatural i#
   #-}
 
 -- | general coercion to fractional types
