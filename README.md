@@ -1,7 +1,7 @@
 The Glasgow Haskell Compiler
 ============================
 
-[![Build Status](https://api.travis-ci.org/ghc/ghc.svg?branch=master)](http://travis-ci.org/ghc/ghc)
+[![pipeline status](https://gitlab.haskell.org/ghc/ghc/badges/master/pipeline.svg?style=flat)](https://gitlab.haskell.org/ghc/ghc/commits/master)
 
 This is the source tree for [GHC][1], a compiler and interactive
 environment for the Haskell functional programming language.
