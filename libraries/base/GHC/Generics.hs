@@ -1434,6 +1434,42 @@ deriving instance Generic ((,,,,,) a b c d e f)
 -- | @since 4.6.0.0
 deriving instance Generic ((,,,,,,) a b c d e f g)
 
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18)
+
+-- | @since 4.14.0.0
+deriving instance Generic ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19)
+
 -- | @since 4.12.0.0
 deriving instance Generic (Down a)
 
@@ -1470,6 +1506,42 @@ deriving instance Generic1 ((,,,,,) a b c d e)
 
 -- | @since 4.6.0.0
 deriving instance Generic1 ((,,,,,,) a b c d e f)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17)
+
+-- | @since 4.14.0.0
+deriving instance Generic1 ((,,,,,,) x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18)
 
 -- | @since 4.12.0.0
 deriving instance Generic1 Down
