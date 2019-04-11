@@ -1133,7 +1133,14 @@ primop  ThawArrayOp "thawArray#" GenPrimOp
 
 primop CasArrayOp  "casArray#" GenPrimOp
    MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
-   {Unsafe, machine-level atomic compare and swap on an element within an Array.}
+   {Given an array, an offset in Int units, the expected old value, and
+    the new value, perform an atomic compare and swap i.e. write the new
+    value if the current value and the old value are the same pointer.
+    Returns 0 if the swap succeeds and 1 if it fails. Returns the value of
+    the element before the operation. Implies a full memory barrier. The
+    use of a pointer equality on a lifted value makes this function harder
+    to use correctly than {\tt casIntArray\#}.
+   }
    with
    out_of_line = True
    has_side_effects = True
