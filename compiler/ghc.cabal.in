@@ -203,6 +203,7 @@ Library
         DataCon
         PatSyn
         Demand
+        Cpr
         GHC.Cmm.DebugBlock
         Exception
         FieldLabel
