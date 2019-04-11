@@ -5,7 +5,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module CmmExpr
-    ( CmmExpr(..), cmmExprType, cmmExprWidth, maybeInvertCmmExpr
+    ( CmmExpr(..), cmmExprType, cmmExprWidth, cmmExprAlignment, maybeInvertCmmExpr
     , CmmReg(..), cmmRegType, cmmRegWidth
     , CmmLit(..), cmmLitType
     , LocalReg(..), localRegType
@@ -42,6 +42,8 @@ import Unique
 
 import Data.Set (Set)
 import qualified Data.Set as Set
+
+import BasicTypes (Alignment, mkAlignment, alignmentOf)
 
 -----------------------------------------------------------------------------
 --              CmmExpr
@@ -239,6 +241,13 @@ cmmLabelType dflags lbl
 cmmExprWidth :: DynFlags -> CmmExpr -> Width
 cmmExprWidth dflags e = typeWidth (cmmExprType dflags e)
 
+-- | Returns an alignment in bytes of a CmmExpr when it's a statically
+-- known integer constant, otherwise returns an alignment of 1 byte.
+-- The caller is responsible for using with a sensible CmmExpr
+-- argument.
+cmmExprAlignment :: CmmExpr -> Alignment
+cmmExprAlignment (CmmLit (CmmInt intOff _)) = alignmentOf (fromInteger intOff)
+cmmExprAlignment _                          = mkAlignment 1
 --------
 --- Negation for conditional branches
 

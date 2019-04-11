@@ -1767,12 +1767,11 @@ genCCall
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
--- Unroll memcpy calls if the source and destination pointers are at
--- least DWORD aligned and the number of bytes to copy isn't too
+-- Unroll memcpy calls if the number of bytes to copy isn't too
 -- large.  Otherwise, call C's memcpy.
-genCCall dflags is32Bit (PrimTarget (MO_Memcpy align)) _
+genCCall dflags _ (PrimTarget (MO_Memcpy align)) _
          [dst, src, CmmLit (CmmInt n _)] _
-    | fromInteger insns <= maxInlineMemcpyInsns dflags && align .&. 3 == 0 = do
+    | fromInteger insns <= maxInlineMemcpyInsns dflags = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat format
         code_src <- getAnyReg src
@@ -1785,7 +1784,9 @@ genCCall dflags is32Bit (PrimTarget (MO_Memcpy align)) _
     -- instructions per move.
     insns = 2 * ((n + sizeBytes - 1) `div` sizeBytes)
 
-    format = if align .&. 4 /= 0 then II32 else (archWordFormat is32Bit)
+    maxAlignment = wordAlignment dflags -- only machine word wide MOVs are supported
+    effectiveAlignment = min (alignmentOf align) maxAlignment
+    format = intFormat . widthFromBytes $ alignmentBytes effectiveAlignment
 
     -- The size of each move, in bytes.
     sizeBytes :: Integer
