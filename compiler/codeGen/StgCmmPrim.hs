@@ -2035,8 +2035,8 @@ doCopyByteArrayOp = emitCopyByteArray copy
   where
     -- Copy data (we assume the arrays aren't overlapping since
     -- they're of different types)
-    copy _src _dst dst_p src_p bytes =
-        emitMemcpyCall dst_p src_p bytes 1
+    copy _src _dst dst_p src_p bytes align =
+        emitMemcpyCall dst_p src_p bytes align
 
 -- | Takes a source 'MutableByteArray#', an offset in the source
 -- array, a destination 'MutableByteArray#', an offset into the
@@ -2050,22 +2050,26 @@ doCopyMutableByteArrayOp = emitCopyByteArray copy
     -- The only time the memory might overlap is when the two arrays
     -- we were provided are the same array!
     -- TODO: Optimize branch for common case of no aliasing.
-    copy src dst dst_p src_p bytes = do
+    copy src dst dst_p src_p bytes align = do
         dflags <- getDynFlags
         (moveCall, cpyCall) <- forkAltPair
-            (getCode $ emitMemmoveCall dst_p src_p bytes 1)
-            (getCode $ emitMemcpyCall  dst_p src_p bytes 1)
+            (getCode $ emitMemmoveCall dst_p src_p bytes align)
+            (getCode $ emitMemcpyCall  dst_p src_p bytes align)
         emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
 
 emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
-                      -> FCode ())
+                      -> Alignment -> FCode ())
                   -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> FCode ()
 emitCopyByteArray copy src src_off dst dst_off n = do
     dflags <- getDynFlags
+    let byteArrayAlignment = wordAlignment dflags
+        srcOffAlignment = cmmExprAlignment src_off
+        dstOffAlignment = cmmExprAlignment dst_off
+        align = minimum [byteArrayAlignment, srcOffAlignment, dstOffAlignment]
     dst_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags dst (arrWordsHdrSize dflags)) dst_off
     src_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags src (arrWordsHdrSize dflags)) src_off
-    copy src dst dst_p src_p n
+    copy src dst dst_p src_p n align
 
 -- | Takes a source 'ByteArray#', an offset in the source array, a
 -- destination 'Addr#', and the number of bytes to copy.  Copies the given
@@ -2075,7 +2079,7 @@ doCopyByteArrayToAddrOp src src_off dst_p bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     dflags <- getDynFlags
     src_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags src (arrWordsHdrSize dflags)) src_off
-    emitMemcpyCall dst_p src_p bytes 1
+    emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
 -- | Takes a source 'MutableByteArray#', an offset in the source array, a
 -- destination 'Addr#', and the number of bytes to copy.  Copies the given
@@ -2092,7 +2096,7 @@ doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     dflags <- getDynFlags
     dst_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags dst (arrWordsHdrSize dflags)) dst_off
-    emitMemcpyCall dst_p src_p bytes 1
+    emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
 
 -- ----------------------------------------------------------------------------
@@ -2107,9 +2111,7 @@ doSetByteArrayOp ba off len c = do
     dflags <- getDynFlags
 
     let byteArrayAlignment = wordAlignment dflags -- known since BA is allocated on heap
-        offsetAlignment = case off of
-            CmmLit (CmmInt intOff _) -> alignmentOf (fromInteger intOff)
-            _ -> mkAlignment 1
+        offsetAlignment = cmmExprAlignment off
         align = min byteArrayAlignment offsetAlignment
 
     p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba (arrWordsHdrSize dflags)) off
@@ -2180,7 +2182,7 @@ doCopyArrayOp = emitCopyArray copy
     copy _src _dst dst_p src_p bytes =
         do dflags <- getDynFlags
            emitMemcpyCall dst_p src_p (mkIntExpr dflags bytes)
-               (wORD_SIZE dflags)
+               (wordAlignment dflags)
 
 
 -- | Takes a source 'MutableArray#', an offset in the source array, a
@@ -2198,9 +2200,9 @@ doCopyMutableArrayOp = emitCopyArray copy
         dflags <- getDynFlags
         (moveCall, cpyCall) <- forkAltPair
             (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr dflags bytes)
-             (wORD_SIZE dflags))
+             (wordAlignment dflags))
             (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr dflags bytes)
-             (wORD_SIZE dflags))
+             (wordAlignment dflags))
         emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
 
 emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
@@ -2247,7 +2249,7 @@ doCopySmallArrayOp = emitCopySmallArray copy
     copy _src _dst dst_p src_p bytes =
         do dflags <- getDynFlags
            emitMemcpyCall dst_p src_p (mkIntExpr dflags bytes)
-               (wORD_SIZE dflags)
+               (wordAlignment dflags)
 
 
 doCopySmallMutableArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
@@ -2261,9 +2263,9 @@ doCopySmallMutableArrayOp = emitCopySmallArray copy
         dflags <- getDynFlags
         (moveCall, cpyCall) <- forkAltPair
             (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr dflags bytes)
-             (wORD_SIZE dflags))
+             (wordAlignment dflags))
             (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr dflags bytes)
-             (wORD_SIZE dflags))
+             (wordAlignment dflags))
         emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
 
 emitCopySmallArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
@@ -2328,7 +2330,7 @@ emitCloneArray info_p res_r src src_off n = do
               (mkIntExpr dflags (arrPtrsHdrSizeW dflags)) src_off)
 
     emitMemcpyCall dst_p src_p (mkIntExpr dflags (wordsToBytes dflags n))
-        (wORD_SIZE dflags)
+        (wordAlignment dflags)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 
@@ -2365,7 +2367,7 @@ emitCloneSmallArray info_p res_r src src_off n = do
               (mkIntExpr dflags (smallArrPtrsHdrSizeW dflags)) src_off)
 
     emitMemcpyCall dst_p src_p (mkIntExpr dflags (wordsToBytes dflags n))
-        (wORD_SIZE dflags)
+        (wordAlignment dflags)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 
@@ -2493,19 +2495,19 @@ doCasByteArray res mba idx idx_ty old new = do
 -- Helpers for emitting function calls
 
 -- | Emit a call to @memcpy@.
-emitMemcpyCall :: CmmExpr -> CmmExpr -> CmmExpr -> Int -> FCode ()
+emitMemcpyCall :: CmmExpr -> CmmExpr -> CmmExpr -> Alignment -> FCode ()
 emitMemcpyCall dst src n align = do
     emitPrimCall
         [ {-no results-} ]
-        (MO_Memcpy align)
+        (MO_Memcpy (alignmentBytes align))
         [ dst, src, n ]
 
 -- | Emit a call to @memmove@.
-emitMemmoveCall :: CmmExpr -> CmmExpr -> CmmExpr -> Int -> FCode ()
+emitMemmoveCall :: CmmExpr -> CmmExpr -> CmmExpr -> Alignment -> FCode ()
 emitMemmoveCall dst src n align = do
     emitPrimCall
         [ {- no results -} ]
-        (MO_Memmove align)
+        (MO_Memmove (alignmentBytes align))
         [ dst, src, n ]
 
 -- | Emit a call to @memset@.  The second argument must fit inside an
