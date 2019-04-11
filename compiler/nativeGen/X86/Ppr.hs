@@ -272,7 +272,7 @@ pprReg f r
       RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
       RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u
       RegVirtual (VirtualRegD  u)  -> text "%vD_"   <> pprUniqueAlways u
-      RegVirtual (VirtualRegSSE u) -> text "%vSSE_" <> pprUniqueAlways u
+
   where
     ppr32_reg_no :: Format -> Int -> SDoc
     ppr32_reg_no II8   = ppr32_reg_byte
@@ -364,17 +364,14 @@ pprReg f r
 
 ppr_reg_float :: Int -> PtrString
 ppr_reg_float i = case i of
-        16 -> sLit "%fake0";  17 -> sLit "%fake1"
-        18 -> sLit "%fake2";  19 -> sLit "%fake3"
-        20 -> sLit "%fake4";  21 -> sLit "%fake5"
-        24 -> sLit "%xmm0";   25 -> sLit "%xmm1"
-        26 -> sLit "%xmm2";   27 -> sLit "%xmm3"
-        28 -> sLit "%xmm4";   29 -> sLit "%xmm5"
-        30 -> sLit "%xmm6";   31 -> sLit "%xmm7"
-        32 -> sLit "%xmm8";   33 -> sLit "%xmm9"
-        34 -> sLit "%xmm10";  35 -> sLit "%xmm11"
-        36 -> sLit "%xmm12";  37 -> sLit "%xmm13"
-        38 -> sLit "%xmm14";  39 -> sLit "%xmm15"
+        16 -> sLit "%xmm0" ;   17 -> sLit "%xmm1"
+        18 -> sLit "%xmm2" ;   19 -> sLit "%xmm3"
+        20 -> sLit "%xmm4" ;   21 -> sLit "%xmm5"
+        22 -> sLit "%xmm6" ;   23 -> sLit "%xmm7"
+        24 -> sLit "%xmm8" ;   25 -> sLit "%xmm9"
+        26 -> sLit "%xmm10";   27 -> sLit "%xmm11"
+        28 -> sLit "%xmm12";   29 -> sLit "%xmm13"
+        30 -> sLit "%xmm14";   31 -> sLit "%xmm15"
         _  -> sLit "very naughty x86 register"
 
 pprFormat :: Format -> SDoc
@@ -386,7 +383,6 @@ pprFormat x
                 II64  -> sLit "q"
                 FF32  -> sLit "ss"      -- "scalar single-precision float" (SSE2)
                 FF64  -> sLit "sd"      -- "scalar double-precision float" (SSE2)
-                FF80  -> sLit "t"
                 )
 
 pprFormat_x87 :: Format -> SDoc
@@ -394,8 +390,8 @@ pprFormat_x87 x
   = ptext $ case x of
                 FF32  -> sLit "s"
                 FF64  -> sLit "l"
-                FF80  -> sLit "t"
                 _     -> panic "X86.Ppr.pprFormat_x87"
+
 
 pprCond :: Cond -> SDoc
 pprCond c
@@ -807,224 +803,12 @@ pprInstr (FETCHPC reg)
           ]
 
 
--- -----------------------------------------------------------------------------
--- i386 floating-point
-
--- Simulating a flat register set on the x86 FP stack is tricky.
--- you have to free %st(7) before pushing anything on the FP reg stack
--- so as to preclude the possibility of a FP stack overflow exception.
-pprInstr g@(GMOV src dst)
-   | src == dst
-   = empty
-   | otherwise
-   = pprG g (hcat [gtab, gpush src 0, gsemi, gpop dst 1])
-
--- GLD fmt addr dst ==> FLDsz addr ; FSTP (dst+1)
-pprInstr g@(GLD fmt addr dst)
- = pprG g (hcat [gtab, text "fld", pprFormat_x87 fmt, gsp,
-                 pprAddr addr, gsemi, gpop dst 1])
-
+-- the
 -- GST fmt src addr ==> FLD dst ; FSTPsz addr
-pprInstr g@(GST fmt src addr)
- | src == fake0 && fmt /= FF80 -- fstt instruction doesn't exist
- = pprG g (hcat [gtab,
-                 text "fst", pprFormat_x87 fmt, gsp, pprAddr addr])
- | otherwise
- = pprG g (hcat [gtab, gpush src 0, gsemi,
+pprInstr g@(X87Store fmt  addr)
+ = pprX87 g (hcat [gtab,
                  text "fstp", pprFormat_x87 fmt, gsp, pprAddr addr])
 
-pprInstr g@(GLDZ dst)
- = pprG g (hcat [gtab, text "fldz ; ", gpop dst 1])
-pprInstr g@(GLD1 dst)
- = pprG g (hcat [gtab, text "fld1 ; ", gpop dst 1])
-
-pprInstr (GFTOI src dst)
-   = pprInstr (GDTOI src dst)
-
-pprInstr g@(GDTOI src dst)
-   = pprG g (vcat [
-         hcat [gtab, text "subl $8, %esp ; fnstcw 4(%esp)"],
-         hcat [gtab, gpush src 0],
-         hcat [gtab, text "movzwl 4(%esp), ", reg,
-                     text " ; orl $0xC00, ", reg],
-         hcat [gtab, text "movl ", reg, text ", 0(%esp) ; fldcw 0(%esp)"],
-         hcat [gtab, text "fistpl 0(%esp)"],
-         hcat [gtab, text "fldcw 4(%esp) ; movl 0(%esp), ", reg],
-         hcat [gtab, text "addl $8, %esp"]
-     ])
-   where
-     reg = pprReg II32 dst
-
-pprInstr (GITOF src dst)
-   = pprInstr (GITOD src dst)
-
-pprInstr g@(GITOD src dst)
-   = pprG g (hcat [gtab, text "pushl ", pprReg II32 src,
-                   text " ; fildl (%esp) ; ",
-                   gpop dst 1, text " ; addl $4,%esp"])
-
-pprInstr g@(GDTOF src dst)
-  = pprG g (vcat [gtab <> gpush src 0,
-                  gtab <> text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ;",
-                  gtab <> gpop dst 1])
-
-{- Gruesome swamp follows.  If you're unfortunate enough to have ventured
-   this far into the jungle AND you give a Rat's Ass (tm) what's going
-   on, here's the deal.  Generate code to do a floating point comparison
-   of src1 and src2, of kind cond, and set the Zero flag if true.
-
-   The complications are to do with handling NaNs correctly.  We want the
-   property that if either argument is NaN, then the result of the
-   comparison is False ... except if we're comparing for inequality,
-   in which case the answer is True.
-
-   Here's how the general (non-inequality) case works.  As an
-   example, consider generating the an equality test:
-
-     pushl %eax         -- we need to mess with this
-     <get src1 to top of FPU stack>
-     fcomp <src2 location in FPU stack> and pop pushed src1
-                -- Result of comparison is in FPU Status Register bits
-                -- C3 C2 and C0
-     fstsw %ax  -- Move FPU Status Reg to %ax
-     sahf       -- move C3 C2 C0 from %ax to integer flag reg
-     -- now the serious magic begins
-     setpo %ah     -- %ah = if comparable(neither arg was NaN) then 1 else 0
-     sete  %al     -- %al = if arg1 == arg2 then 1 else 0
-     andb %ah,%al  -- %al &= %ah
-                   -- so %al == 1 iff (comparable && same); else it holds 0
-     decb %al      -- %al == 0, ZeroFlag=1  iff (comparable && same);
-                      else %al == 0xFF, ZeroFlag=0
-     -- the zero flag is now set as we desire.
-     popl %eax
-
-   The special case of inequality differs thusly:
-
-     setpe %ah     -- %ah = if incomparable(either arg was NaN) then 1 else 0
-     setne %al     -- %al = if arg1 /= arg2 then 1 else 0
-     orb %ah,%al   -- %al = if (incomparable || different) then 1 else 0
-     decb %al      -- if (incomparable || different) then (%al == 0, ZF=1)
-                                                     else (%al == 0xFF, ZF=0)
--}
-pprInstr g@(GCMP cond src1 src2)
-   | case cond of { NE -> True; _ -> False }
-   = pprG g (vcat [
-        hcat [gtab, text "pushl %eax ; ",gpush src1 0],
-        hcat [gtab, text "fcomp ", greg src2 1,
-                    text "; fstsw %ax ; sahf ;  setpe %ah"],
-        hcat [gtab, text "setne %al ;  ",
-              text "orb %ah,%al ;  decb %al ;  popl %eax"]
-    ])
-   | otherwise
-   = pprG g (vcat [
-        hcat [gtab, text "pushl %eax ; ",gpush src1 0],
-        hcat [gtab, text "fcomp ", greg src2 1,
-                    text "; fstsw %ax ; sahf ;  setpo %ah"],
-        hcat [gtab, text "set", pprCond (fix_FP_cond cond), text " %al ;  ",
-              text "andb %ah,%al ;  decb %al ;  popl %eax"]
-    ])
-    where
-        {- On the 486, the flags set by FP compare are the unsigned ones!
-           (This looks like a HACK to me.  WDP 96/03)
-        -}
-        fix_FP_cond :: Cond -> Cond
-        fix_FP_cond GE   = GEU
-        fix_FP_cond GTT  = GU
-        fix_FP_cond LTT  = LU
-        fix_FP_cond LE   = LEU
-        fix_FP_cond EQQ  = EQQ
-        fix_FP_cond NE   = NE
-        fix_FP_cond _    = panic "X86.Ppr.fix_FP_cond: no match"
-        -- there should be no others
-
-
-pprInstr g@(GABS _ src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fabs ; ", gpop dst 1])
-
-pprInstr g@(GNEG _ src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fchs ; ", gpop dst 1])
-
-pprInstr g@(GSQRT fmt src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fsqrt"] $$
-             hcat [gtab, gcoerceto fmt, gpop dst 1])
-
-pprInstr g@(GSIN fmt l1 l2 src dst)
-   = pprG g (pprTrigOp "fsin" False l1 l2 src dst fmt)
-
-pprInstr g@(GCOS fmt l1 l2 src dst)
-   = pprG g (pprTrigOp "fcos" False l1 l2 src dst fmt)
-
-pprInstr g@(GTAN fmt l1 l2 src dst)
-   = pprG g (pprTrigOp "fptan" True l1 l2 src dst fmt)
-
--- In the translations for GADD, GMUL, GSUB and GDIV,
--- the first two cases are mere optimisations.  The otherwise clause
--- generates correct code under all circumstances.
-
-pprInstr g@(GADD _ src1 src2 dst)
-   | src1 == dst
-   = pprG g (text "\t#GADD-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; faddp %st(0),", greg src1 1])
-   | src2 == dst
-   = pprG g (text "\t#GADD-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; faddp %st(0),", greg src2 1])
-   | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-                   text " ; fadd ", greg src2 1, text ",%st(0)",
-                   gsemi, gpop dst 1])
-
-
-pprInstr g@(GMUL _ src1 src2 dst)
-   | src1 == dst
-   = pprG g (text "\t#GMUL-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; fmulp %st(0),", greg src1 1])
-   | src2 == dst
-   = pprG g (text "\t#GMUL-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; fmulp %st(0),", greg src2 1])
-   | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-             text " ; fmul ", greg src2 1, text ",%st(0)",
-             gsemi, gpop dst 1])
-
-
-pprInstr g@(GSUB _ src1 src2 dst)
-   | src1 == dst
-   = pprG g (text "\t#GSUB-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; fsubrp %st(0),", greg src1 1])
-   | src2 == dst
-   = pprG g (text "\t#GSUB-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; fsubp %st(0),", greg src2 1])
-   | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-                   text " ; fsub ", greg src2 1, text ",%st(0)",
-                   gsemi, gpop dst 1])
-
-
-pprInstr g@(GDIV _ src1 src2 dst)
-   | src1 == dst
-   = pprG g (text "\t#GDIV-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; fdivrp %st(0),", greg src1 1])
-   | src2 == dst
-   = pprG g (text "\t#GDIV-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; fdivp %st(0),", greg src2 1])
-   | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-                   text " ; fdiv ", greg src2 1, text ",%st(0)",
-                   gsemi, gpop dst 1])
-
-
-pprInstr GFREE
-   = vcat [ text "\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)",
-            text "\tffree %st(4) ;ffree %st(5)"
-          ]
 
 -- Atomics
 
@@ -1038,70 +822,11 @@ pprInstr (CMPXCHG format src dst)
    = pprFormatOpOp (sLit "cmpxchg") format src dst
 
 
-pprTrigOp :: String -> Bool -> CLabel -> CLabel
-          -> Reg -> Reg -> Format -> SDoc
-pprTrigOp op -- fsin, fcos or fptan
-          isTan -- we need a couple of extra steps if we're doing tan
-          l1 l2 -- internal labels for us to use
-          src dst fmt
-    = -- We'll be needing %eax later on
-      hcat [gtab, text "pushl %eax;"] $$
-      -- tan is going to use an extra space on the FP stack
-      (if isTan then hcat [gtab, text "ffree %st(6)"] else empty) $$
-      -- First put the value in %st(0) and try to apply the op to it
-      hcat [gpush src 0, text ("; " ++ op)] $$
-      -- Now look to see if C2 was set (overflow, |value| >= 2^63)
-      hcat [gtab, text "fnstsw %ax"] $$
-      hcat [gtab, text "test   $0x400,%eax"] $$
-      -- If we were in bounds then jump to the end
-      hcat [gtab, text "je     " <> ppr l1] $$
-      -- Otherwise we need to shrink the value. Start by
-      -- loading pi, doubleing it (by adding it to itself),
-      -- and then swapping pi with the value, so the value we
-      -- want to apply op to is in %st(0) again
-      hcat [gtab, text "ffree %st(7); fldpi"] $$
-      hcat [gtab, text "fadd   %st(0),%st"] $$
-      hcat [gtab, text "fxch   %st(1)"] $$
-      -- Now we have a loop in which we make the value smaller,
-      -- see if it's small enough, and loop if not
-      (ppr l2 <> char ':') $$
-      hcat [gtab, text "fprem1"] $$
-      -- My Debian libc uses fstsw here for the tan code, but I can't
-      -- see any reason why it should need to be different for tan.
-      hcat [gtab, text "fnstsw %ax"] $$
-      hcat [gtab, text "test   $0x400,%eax"] $$
-      hcat [gtab, text "jne    " <> ppr l2] $$
-      hcat [gtab, text "fstp   %st(1)"] $$
-      hcat [gtab, text op] $$
-      (ppr l1 <> char ':') $$
-      -- Pop the 1.0 tan gave us
-      (if isTan then hcat [gtab, text "fstp %st(0)"] else empty) $$
-      -- Restore %eax
-      hcat [gtab, text "popl %eax;"] $$
-      -- And finally make the result the right size
-      hcat [gtab, gcoerceto fmt, gpop dst 1]
 
 --------------------------
+-- some left over
 
--- coerce %st(0) to the specified size
-gcoerceto :: Format -> SDoc
-gcoerceto FF64 = empty
-gcoerceto FF32 = empty --text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ; "
-gcoerceto _    = panic "X86.Ppr.gcoerceto: no match"
 
-gpush :: Reg -> RegNo -> SDoc
-gpush reg offset
-   = hcat [text "fld ", greg reg offset]
-
-gpop :: Reg -> RegNo -> SDoc
-gpop reg offset
-   = hcat [text "fstp ", greg reg offset]
-
-greg :: Reg -> RegNo -> SDoc
-greg reg offset = text "%st(" <> int (gregno reg - firstfake+offset) <> char ')'
-
-gsemi :: SDoc
-gsemi = text " ; "
 
 gtab :: SDoc
 gtab  = char '\t'
@@ -1109,45 +834,15 @@ gtab  = char '\t'
 gsp :: SDoc
 gsp   = char ' '
 
-gregno :: Reg -> RegNo
-gregno (RegReal (RealRegSingle i)) = i
-gregno _           = --pprPanic "gregno" (ppr other)
-                     999   -- bogus; only needed for debug printing
-
-pprG :: Instr -> SDoc -> SDoc
-pprG fake actual
-   = (char '#' <> pprGInstr fake) $$ actual
 
 
-pprGInstr :: Instr -> SDoc
-pprGInstr (GMOV src dst)   = pprFormatRegReg (sLit "gmov") FF64 src dst
-pprGInstr (GLD fmt src dst) = pprFormatAddrReg (sLit "gld") fmt src dst
-pprGInstr (GST fmt src dst) = pprFormatRegAddr (sLit "gst") fmt src dst
+pprX87 :: Instr -> SDoc -> SDoc
+pprX87 fake actual
+   = (char '#' <> pprX87Instr fake) $$ actual
 
-pprGInstr (GLDZ dst) = pprFormatReg (sLit "gldz") FF64 dst
-pprGInstr (GLD1 dst) = pprFormatReg (sLit "gld1") FF64 dst
-
-pprGInstr (GFTOI src dst) = pprFormatFormatRegReg (sLit "gftoi") FF32 II32 src dst
-pprGInstr (GDTOI src dst) = pprFormatFormatRegReg (sLit "gdtoi") FF64 II32 src dst
-
-pprGInstr (GITOF src dst) = pprFormatFormatRegReg (sLit "gitof") II32 FF32 src dst
-pprGInstr (GITOD src dst) = pprFormatFormatRegReg (sLit "gitod") II32 FF64 src dst
-pprGInstr (GDTOF src dst) = pprFormatFormatRegReg (sLit "gdtof") FF64 FF32 src dst
-
-pprGInstr (GCMP co src dst) = pprCondRegReg (sLit "gcmp_") FF64 co src dst
-pprGInstr (GABS fmt src dst) = pprFormatRegReg (sLit "gabs") fmt src dst
-pprGInstr (GNEG fmt src dst) = pprFormatRegReg (sLit "gneg") fmt src dst
-pprGInstr (GSQRT fmt src dst) = pprFormatRegReg (sLit "gsqrt") fmt src dst
-pprGInstr (GSIN fmt _ _ src dst) = pprFormatRegReg (sLit "gsin") fmt src dst
-pprGInstr (GCOS fmt _ _ src dst) = pprFormatRegReg (sLit "gcos") fmt src dst
-pprGInstr (GTAN fmt _ _ src dst) = pprFormatRegReg (sLit "gtan") fmt src dst
-
-pprGInstr (GADD fmt src1 src2 dst) = pprFormatRegRegReg (sLit "gadd") fmt src1 src2 dst
-pprGInstr (GSUB fmt src1 src2 dst) = pprFormatRegRegReg (sLit "gsub") fmt src1 src2 dst
-pprGInstr (GMUL fmt src1 src2 dst) = pprFormatRegRegReg (sLit "gmul") fmt src1 src2 dst
-pprGInstr (GDIV fmt src1 src2 dst) = pprFormatRegRegReg (sLit "gdiv") fmt src1 src2 dst
-
-pprGInstr _ = panic "X86.Ppr.pprGInstr: no match"
+pprX87Instr :: Instr -> SDoc
+pprX87Instr (X87Store fmt  dst) = pprFormatAddr (sLit "gst") fmt  dst
+pprX87Instr _ = panic "X86.Ppr.pprX87Instr: no match"
 
 pprDollImm :: Imm -> SDoc
 pprDollImm i = text "$" <> pprImm i
@@ -1215,23 +910,6 @@ pprOpOp name format op1 op2
     ]
 
 
-pprFormatReg :: PtrString -> Format -> Reg -> SDoc
-pprFormatReg name format reg1
-  = hcat [
-        pprMnemonic name format,
-        pprReg format reg1
-    ]
-
-
-pprFormatRegReg :: PtrString -> Format -> Reg -> Reg -> SDoc
-pprFormatRegReg name format reg1 reg2
-  = hcat [
-        pprMnemonic name format,
-        pprReg format reg1,
-        comma,
-        pprReg format reg2
-    ]
-
 
 pprRegReg :: PtrString -> Reg -> Reg -> SDoc
 pprRegReg name reg1 reg2
@@ -1266,31 +944,6 @@ pprCondOpReg name format cond op1 reg2
         pprReg format reg2
     ]
 
-pprCondRegReg :: PtrString -> Format -> Cond -> Reg -> Reg -> SDoc
-pprCondRegReg name format cond reg1 reg2
-  = hcat [
-        char '\t',
-        ptext name,
-        pprCond cond,
-        space,
-        pprReg format reg1,
-        comma,
-        pprReg format reg2
-    ]
-
-pprFormatFormatRegReg :: PtrString -> Format -> Format -> Reg -> Reg -> SDoc
-pprFormatFormatRegReg name format1 format2 reg1 reg2
-  = hcat [
-        char '\t',
-        ptext name,
-        pprFormat format1,
-        pprFormat format2,
-        space,
-        pprReg format1 reg1,
-        comma,
-        pprReg format2 reg2
-    ]
-
 pprFormatFormatOpReg :: PtrString -> Format -> Format -> Operand -> Reg -> SDoc
 pprFormatFormatOpReg name format1 format2 op1 reg2
   = hcat [
@@ -1298,17 +951,6 @@ pprFormatFormatOpReg name format1 format2 op1 reg2
         pprOperand format1 op1,
         comma,
         pprReg format2 reg2
-    ]
-
-pprFormatRegRegReg :: PtrString -> Format -> Reg -> Reg -> Reg -> SDoc
-pprFormatRegRegReg name format reg1 reg2 reg3
-  = hcat [
-        pprMnemonic name format,
-        pprReg format reg1,
-        comma,
-        pprReg format reg2,
-        comma,
-        pprReg format reg3
     ]
 
 pprFormatOpOpReg :: PtrString -> Format -> Operand -> Operand -> Reg -> SDoc
@@ -1322,25 +964,15 @@ pprFormatOpOpReg name format op1 op2 reg3
         pprReg format reg3
     ]
 
-pprFormatAddrReg :: PtrString -> Format -> AddrMode -> Reg -> SDoc
-pprFormatAddrReg name format op dst
-  = hcat [
-        pprMnemonic name format,
-        pprAddr op,
-        comma,
-        pprReg format dst
-    ]
 
 
-pprFormatRegAddr :: PtrString -> Format -> Reg -> AddrMode -> SDoc
-pprFormatRegAddr name format src op
+pprFormatAddr :: PtrString -> Format -> AddrMode -> SDoc
+pprFormatAddr name format  op
   = hcat [
         pprMnemonic name format,
-        pprReg format src,
         comma,
         pprAddr op
     ]
-
 
 pprShift :: PtrString -> Format -> Operand -> Operand -> SDoc
 pprShift name format src dest

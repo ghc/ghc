@@ -47,7 +47,6 @@ data Format
         | II64
         | FF32
         | FF64
-        | FF80
         deriving (Show, Eq)
 
 
@@ -70,7 +69,7 @@ floatFormat width
  = case width of
         W32     -> FF32
         W64     -> FF64
-        W80     -> FF80
+
         other   -> pprPanic "Format.floatFormat" (ppr other)
 
 
@@ -80,7 +79,6 @@ isFloatFormat format
  = case format of
         FF32    -> True
         FF64    -> True
-        FF80    -> True
         _       -> False
 
 
@@ -101,7 +99,7 @@ formatToWidth format
         II64            -> W64
         FF32            -> W32
         FF64            -> W64
-        FF80            -> W80
+
 
 formatInBytes :: Format -> Int
 formatInBytes = widthInBytes . formatToWidth

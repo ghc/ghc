@@ -384,7 +384,6 @@ sparc_mkSpillInstr dflags reg _ slot
                         RcInteger -> II32
                         RcFloat   -> FF32
                         RcDouble  -> FF64
-                        _         -> panic "sparc_mkSpillInstr"
 
     in ST fmt reg (fpRel (negate off_w))
 
@@ -405,7 +404,6 @@ sparc_mkLoadInstr dflags reg _ slot
                         RcInteger -> II32
                         RcFloat   -> FF32
                         RcDouble  -> FF64
-                        _         -> panic "sparc_mkLoadInstr"
 
         in LD fmt (fpRel (- off_w)) reg
 
@@ -454,7 +452,6 @@ sparc_mkRegRegMoveInstr platform src dst
                 RcInteger -> ADD  False False src (RIReg g0) dst
                 RcDouble  -> FMOV FF64 src dst
                 RcFloat   -> FMOV FF32 src dst
-                _         -> panic "sparc_mkRegRegMoveInstr"
 
         | otherwise
         = panic "SPARC.Instr.mkRegRegMoveInstr: classes of src and dest not the same"

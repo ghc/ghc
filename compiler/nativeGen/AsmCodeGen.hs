@@ -179,7 +179,7 @@ nativeCodeGen dflags this_mod modLoc h us cmms
 x86NcgImpl :: DynFlags -> NcgImpl (Alignment, CmmStatics)
                                   X86.Instr.Instr X86.Instr.JumpDest
 x86NcgImpl dflags
- = (x86_64NcgImpl dflags) { ncg_x86fp_kludge = map x86fp_kludge }
+ = (x86_64NcgImpl dflags)
 
 x86_64NcgImpl :: DynFlags -> NcgImpl (Alignment, CmmStatics)
                                   X86.Instr.Instr X86.Instr.JumpDest
@@ -194,7 +194,6 @@ x86_64NcgImpl dflags
        ,pprNatCmmDecl             = X86.Ppr.pprNatCmmDecl
        ,maxSpillSlots             = X86.Instr.maxSpillSlots dflags
        ,allocatableRegs           = X86.Regs.allocatableRegs platform
-       ,ncg_x86fp_kludge          = id
        ,ncgAllocMoreStack         = X86.Instr.allocMoreStack platform
        ,ncgExpandTop              = id
        ,ncgMakeFarBranches        = const id
@@ -215,7 +214,6 @@ ppcNcgImpl dflags
        ,pprNatCmmDecl             = PPC.Ppr.pprNatCmmDecl
        ,maxSpillSlots             = PPC.Instr.maxSpillSlots dflags
        ,allocatableRegs           = PPC.Regs.allocatableRegs platform
-       ,ncg_x86fp_kludge          = id
        ,ncgAllocMoreStack         = PPC.Instr.allocMoreStack platform
        ,ncgExpandTop              = id
        ,ncgMakeFarBranches        = PPC.Instr.makeFarBranches
@@ -236,7 +234,6 @@ sparcNcgImpl dflags
        ,pprNatCmmDecl             = SPARC.Ppr.pprNatCmmDecl
        ,maxSpillSlots             = SPARC.Instr.maxSpillSlots dflags
        ,allocatableRegs           = SPARC.Regs.allocatableRegs
-       ,ncg_x86fp_kludge          = id
        ,ncgAllocMoreStack         = noAllocMoreStack
        ,ncgExpandTop              = map SPARC.CodeGen.Expand.expandTop
        ,ncgMakeFarBranches        = const id
@@ -680,19 +677,10 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 foldl' (\m (from,to) -> addImmediateSuccessor from to m )
                        cfgWithFixupBlks stack_updt_blks
 
-        ---- x86fp_kludge.  This pass inserts ffree instructions to clear
-        ---- the FPU stack on x86.  The x86 ABI requires that the FPU stack
-        ---- is clear, and library functions can return odd results if it
-        ---- isn't.
-        ----
-        ---- NB. must happen before shortcutBranches, because that
-        ---- generates JXX_GBLs which we can't fix up in x86fp_kludge.
-        let kludged = {-# SCC "x86fp_kludge" #-} ncg_x86fp_kludge ncgImpl alloced
-
         ---- generate jump tables
         let tabled      =
                 {-# SCC "generateJumpTables" #-}
-                generateJumpTables ncgImpl kludged
+                generateJumpTables ncgImpl alloced
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_cfg_weights "CFG Update information"
@@ -786,12 +774,6 @@ checkLayout procsUnsequenced procsSequenced =
         getBlockIds (CmmData _ _) = setEmpty
         getBlockIds (CmmProc _ _ _ (ListGraph blocks)) =
                 setFromList $ map blockId blocks
-
-
-x86fp_kludge :: NatCmmDecl (Alignment, CmmStatics) X86.Instr.Instr -> NatCmmDecl (Alignment, CmmStatics) X86.Instr.Instr
-x86fp_kludge top@(CmmData _ _) = top
-x86fp_kludge (CmmProc info lbl live (ListGraph code)) =
-        CmmProc info lbl live (ListGraph $ X86.Instr.i386_insert_ffrees code)
 
 -- | Compute unwinding tables for the blocks of a procedure
 computeUnwinding :: Instruction instr

@@ -161,7 +161,7 @@ pprReg r
       RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
       RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u
       RegVirtual (VirtualRegD  u)  -> text "%vD_"   <> pprUniqueAlways u
-      RegVirtual (VirtualRegSSE u) -> text "%vSSE_" <> pprUniqueAlways u
+
   where
     ppr_reg_no :: Int -> SDoc
     ppr_reg_no i
@@ -179,8 +179,7 @@ pprFormat x
                 II32 -> sLit "w"
                 II64 -> sLit "d"
                 FF32 -> sLit "fs"
-                FF64 -> sLit "fd"
-                _    -> panic "PPC.Ppr.pprFormat: no match")
+                FF64 -> sLit "fd")
 
 
 pprCond :: Cond -> SDoc
@@ -365,7 +364,6 @@ pprInstr (LD fmt reg addr) = hcat [
             II64 -> sLit "d"
             FF32 -> sLit "fs"
             FF64 -> sLit "fd"
-            _         -> panic "PPC.Ppr.pprInstr: no match"
             ),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
@@ -405,7 +403,6 @@ pprInstr (LA fmt reg addr) = hcat [
             II64 -> sLit "d"
             FF32 -> sLit "fs"
             FF64 -> sLit "fd"
-            _         -> panic "PPC.Ppr.pprInstr: no match"
             ),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
