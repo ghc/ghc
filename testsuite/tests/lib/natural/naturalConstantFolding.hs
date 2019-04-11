@@ -32,7 +32,9 @@ main = do
           p "testBitNaturalT"    testBitNaturalT
           p "testBitNaturalF"    testBitNaturalF
           p "timesNatural"       timesNatural
---           p "wordToNatural#"     wordToNatural
+          p "wordToNatural"      wordToNatural
+          p "intToNatural"       intToNaturalLit
+          p "naturalToInt"       naturalToIntLit
           p "naturalToWord"      naturalToWordLit
           p "xorNatural"         xorNatural
 
@@ -111,11 +113,17 @@ testBitNaturalF = testBit (100069 :: Natural) 1
 timesNatural :: Natural
 timesNatural = 100070 * 6832
 
--- wordToNatural :: Natural
--- wordToNatural = wordToNatural# (100075 :: Word) + 100076
+wordToNatural :: Natural
+wordToNatural = wordToNatural (100075 :: Word) + 100076
 
 naturalToWordLit :: Word
 naturalToWordLit = W# (naturalToWord 23)
 
 xorNatural :: Natural
 xorNatural = 100071 `xor` 140072
+
+intToNaturalLit :: Natural
+intToNaturalLit = I# (intToNatural 12312)
+
+naturalToIntLit :: Int
+naturalToIntLit = naturalToInt 12313

@@ -401,7 +401,7 @@ basicKnownKeyNames
         shiftLNaturalName, shiftRNaturalName, bitNaturalName,
         testBitNaturalName,
         popCountNaturalName,
-        wordToNaturalName, naturalToWordName,
+        wordToNaturalName, intToNaturalName, naturalToIntName,
 
         -- Float/Double
         rationalToFloatName,
@@ -1185,13 +1185,15 @@ naturalFromIntegerName :: Name
 naturalFromIntegerName = varQual gHC_NATURAL (fsLit "naturalFromInteger") naturalFromIntegerIdKey
 
 naturalToIntegerName, plusNaturalName, minusNaturalName, timesNaturalName,
-   mkNaturalName, wordToNaturalName :: Name
+   mkNaturalName, wordToNaturalName, intToNaturalName, naturalToIntName :: Name
 naturalToIntegerName  = varQual gHC_NATURAL (fsLit "naturalToInteger")  naturalToIntegerIdKey
 plusNaturalName       = varQual gHC_NATURAL (fsLit "plusNatural")       plusNaturalIdKey
 minusNaturalName      = varQual gHC_NATURAL (fsLit "minusNatural")      minusNaturalIdKey
 timesNaturalName      = varQual gHC_NATURAL (fsLit "timesNatural")      timesNaturalIdKey
 mkNaturalName         = varQual gHC_NATURAL (fsLit "mkNatural")         mkNaturalIdKey
-wordToNaturalName     = varQual gHC_NATURAL (fsLit "wordToNatural#")    wordToNaturalIdKey
+wordToNaturalName     = varQual gHC_NATURAL (fsLit "wordToNatural")    wordToNaturalIdKey
+intToNaturalName      = varQual gHC_NATURAL (fsLit "intToNatural")      intToNaturalIdKey
+naturalToIntName      = varQual gHC_NATURAL (fsLit "naturalToInt")      naturalToIntIdKey
 
 negateNaturalName, signumNaturalName, divModNaturalName, quotRemNaturalName,
   quotNaturalName, remNaturalName, divNaturalName, modNaturalName, gcdNaturalName,
@@ -2466,6 +2468,8 @@ bitNaturalIdKey      = mkPreludeMiscIdUnique 585
 testBitNaturalIdKey  = mkPreludeMiscIdUnique 586
 popCountNaturalIdKey = mkPreludeMiscIdUnique 587
 naturalToWordIdKey   = mkPreludeMiscIdUnique 588
+intToNaturalIdKey    = mkPreludeMiscIdUnique 589
+naturalToIntIdKey    = mkPreludeMiscIdUnique 590
 
 {-
 ************************************************************************

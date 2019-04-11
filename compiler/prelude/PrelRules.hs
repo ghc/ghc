@@ -1340,11 +1340,13 @@ builtinNaturalRules =
  [rule_binop              "plusNatural"        plusNaturalName         (+)
  ,rule_partial_binop      "minusNatural"       minusNaturalName        (\a b -> if a >= b then Just (a - b) else Nothing)
  ,rule_binop              "timesNatural"       timesNaturalName        (*)
+
  ,rule_NaturalFromInteger "naturalFromInteger" naturalFromIntegerName
  ,rule_NaturalToInteger   "naturalToInteger"   naturalToIntegerName
  ,rule_WordToNatural      "wordToNatural"      wordToNaturalName
-
  ,rule_convert            "naturalToWord"      naturalToWordName       mkWordLitWord
+ ,rule_IntToNatural       "intToNatural"       intToNaturalName
+ ,rule_convert            "naturalToInt"       naturalToIntName        mkIntLitInt
 
  ,rule_binop              "andNatural"         andNaturalName          (.&.)
  ,rule_binop              "orNatural"          orNaturalName           (.|.)
@@ -1370,6 +1372,9 @@ builtinNaturalRules =
     where rule_convert str name convert
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Natural_convert convert }
+          rule_IntToNatural str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_IntToNatural }
           rule_bitNatural str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Natural_bit }
@@ -1495,6 +1500,9 @@ match_magicDict _ = Nothing
 
 match_IntToInteger :: RuleFun
 match_IntToInteger = match_IntToInteger_unop id
+
+match_IntToNatural :: RuleFun
+match_IntToNatural = match_IntToNatural_unop id
 
 match_WordToInteger :: RuleFun
 match_WordToInteger _ id_unf id [xl]
@@ -1625,6 +1633,16 @@ match_IntToInteger_unop unop _ id_unf fn [xl]
     _ ->
         panic "match_IntToInteger_unop: Id has the wrong type"
 match_IntToInteger_unop _ _ _ _ _ = Nothing
+
+match_IntToNatural_unop :: (Integer -> Integer) -> RuleFun
+match_IntToNatural_unop unop _ id_unf fn [xl]
+  | Just (LitNumber LitNumInt x _) <- exprIsLiteral_maybe id_unf xl
+  = case splitFunTy_maybe (idType fn) of
+    Just (_, naturalTy) ->
+        Just (Lit (LitNumber LitNumNatural (unop x) naturalTy))
+    _ ->
+        panic "match_IntToNatural_unop: Id has the wrong type"
+match_IntToNatural_unop _ _ _ _ _ = Nothing
 
 match_Integer_binop :: (Integer -> Integer -> Integer) -> RuleFun
 match_Integer_binop binop _ id_unf _ [xl,yl]

@@ -1128,11 +1128,11 @@ instance Ix Int64 where
 
 {-# RULES
 "fromIntegral/Int8->Natural"
-    fromIntegral = intToNatural  . (fromIntegral :: Int8  -> Int)
+    fromIntegral = (\(I# i#) -> intToNatural i#)  . (fromIntegral :: Int8  -> Int)
 "fromIntegral/Int16->Natural"
-    fromIntegral = intToNatural  . (fromIntegral :: Int16 -> Int)
+    fromIntegral = (\(I# i#) -> intToNatural i#)  . (fromIntegral :: Int16 -> Int)
 "fromIntegral/Int32->Natural"
-    fromIntegral = intToNatural  . (fromIntegral :: Int32 -> Int)
+    fromIntegral = (\(I# i#) -> intToNatural i#)  . (fromIntegral :: Int32 -> Int)
   #-}
 
 #if WORD_SIZE_IN_BITS == 64
@@ -1141,7 +1141,7 @@ instance Ix Int64 where
 "fromIntegral/Natural->Int64"
     fromIntegral = (fromIntegral :: Int -> Int64) . naturalToInt
 "fromIntegral/Int64->Natural"
-    fromIntegral = intToNatural . (fromIntegral :: Int64 -> Int)
+    fromIntegral = (\(I# i#) -> intToNatural i#) . (fromIntegral :: Int64 -> Int)
   #-}
 #endif
 
