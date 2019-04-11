@@ -1,7 +1,7 @@
 variables:
   GIT_SSL_NO_VERIFY: "1"
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 6d19c3adc1f5c28c82aed8c5b1ac40931ac60f3f
+  DOCKER_REV: cefaee3c742af193e0f7783f87edb0d35374515c
 
 before_script:
   - python3 .gitlab/fix-submodules.py
@@ -317,7 +317,49 @@ validate-x86_64-linux-deb9-unreg:
     CONFIGURE_ARGS: --enable-unregisterised
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   cache:
-    key: linux-x86_64-deb9
+    key: linux-x86_64-deb8
+  artifacts:
+    when: always
+    expire_in: 2 week
+
+#################################
+# x86_64-linux-centos7
+#################################
+
+release-x86_64-linux-centos7:
+  extends: .validate-linux
+  stage: full-build
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-centos7:$DOCKER_REV"
+  variables:
+    # The sphinx release shipped with Centos 7 fails to build out documentation
+    BUILD_SPHINX_HTML: "NO"
+    BUILD_SPHINX_PDF: "NO"
+    TEST_ENV: "x86_64-linux-centos7"
+    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-centos7-linux.tar.xz"
+  only:
+    - tags
+  cache:
+    key: linux-x86_64-centos7
+  artifacts:
+    when: always
+    expire_in: 2 week
+
+#################################
+# x86_64-linux-fedora27
+#################################
+
+validate-x86_64-linux-fedora27:
+  extends: .validate-linux
+  stage: full-build
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
+  variables:
+    TEST_ENV: "x86_64-linux-fedora27"
+    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-fedora27-linux.tar.xz"
+  cache:
+    key: linux-x86_64-fedora27
+  artifacts:
+    when: always
+    expire_in: 2 week
 
 ############################################################
 # Validation via Pipelines (Windows)
