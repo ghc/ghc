@@ -40,6 +40,31 @@ TEST="test1 test2" build test
 TEST="test1 test2" build test --only="test3 test4"
 ```
 
+## Accepting new output
+
+You can use the `-a` or `--test-accept` flag to "accept" the new
+output of your tests. This has the effect of updating the expected
+output of all the tests that fail due to mismatching output, so as to
+consider the new output the correct one.
+
+When the `PLATFORM` environment variable is set to `YES`, passing this flag has
+the effect of accepting the new output for the current platform.
+
+When the `OS` environment variable is set to `YES`, passing this flag has the
+effect of accepting the new output for all word sizes on the current OS.
+
+``` sh
+# accept new output for all tests
+build test -a
+
+# just run and accept new output for 'test123' and 'test456'
+build test -a --only="test123 test456"
+
+# accept new output for current platform and all word sizes for
+# the current OS, for all tests
+PLATFORM=YES OS=YES build test -a
+```
+
 ## Performance tests
 
 You can use the `--only-perf` and `--skip-perf` flags to

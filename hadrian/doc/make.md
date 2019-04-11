@@ -123,6 +123,8 @@ time you fire up a build. This is not possible with the Make build system.
   make test                             # (1)
   make test TEST=plugins01              # (2)
   make test TEST="plugins01 plugins02"  # (3)
+  make accept                           # (4)
+  PLATFORM=YES OS=YES make accept       # (5)
 
 
   # Hadrian
@@ -134,6 +136,12 @@ time you fire up a build. This is not possible with the Make build system.
   build test --only="plugins01 plugins02"    # equivalent to (3)
   TEST="plugins01 plugins02" build test      # equivalent to (3)
   TEST=plugins01 build test --only=plugins02 # equivalent to (3)
+
+  build test -a            # equivalent to (4)
+  build test --test-accept # equivalent to (4)
+
+  PLATFORM=YES OS=YES build test -a            # equivalent to (5)
+  PLATFORM=YES OS=YES build test --test-accept # equivalent to (5)
   ```
 
   As illustrated in the examples above, you can use the `TEST` environment
