@@ -67,7 +67,8 @@ parsePackageData pkg = do
         sorted  = sort [ C.unPackageName p | C.Dependency p _ _ <- allDeps ]
         deps    = nubOrd sorted \\ [name]
         depPkgs = catMaybes $ map findPackageByName deps
-    return $ PackageData name version (C.synopsis pd) (C.description pd) depPkgs gpd
+        exSrcs  = C.extraSrcFiles pd
+    return $ PackageData name version (C.synopsis pd) (C.description pd) depPkgs exSrcs gpd
   where
     -- Collect an overapproximation of dependencies by ignoring conditionals
     collectDeps :: Maybe (C.CondTree v [C.Dependency] a) -> [C.Dependency]
