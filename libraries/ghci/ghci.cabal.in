@@ -56,6 +56,8 @@ library
             GHCi.Signals
             GHCi.TH
 
+    include-dirs: @FFIIncludeDir@
+
     exposed-modules:
         GHCi.BreakArray
         GHCi.BinaryArray
