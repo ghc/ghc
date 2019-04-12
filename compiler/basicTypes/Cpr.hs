@@ -1,6 +1,6 @@
 module Cpr (
     CprType (..), topCprType, botCprType, prodCprType, sumCprType,
-    lubCprType, applyCprTy, abstractCprTy, removeCprTyArgs, trimCprTy
+    lubCprType, applyCprTy, abstractCprTy, ensureCprTyArity, trimCprTy
   ) where
 
 import GhcPrelude
@@ -51,9 +51,10 @@ abstractCprTy (CprType n res)
   | isTopCpr res = topCprType
   | otherwise    = CprType (n+1) res
 
-removeCprTyArgs :: CprType -> CprType
-removeCprTyArgs ty@(CprType 0 _) = ty
-removeCprTyArgs _                = topCprType
+ensureCprTyArity :: Arity -> CprType -> CprType
+ensureCprTyArity n ty@(CprType m _)
+  | n == m    = ty
+  | otherwise = topCprType
 
 trimCprTy :: Bool -> Bool -> CprType -> CprType
 trimCprTy trim_all trim_sums (CprType arty res) = CprType arty (trimCpr trim_all trim_sums res)

@@ -38,7 +38,7 @@ cprAnalTopBind :: AnalEnv
 cprAnalTopBind env (NonRec id rhs)
   = (extendAnalEnv env id' (get_idCprInfo id'), NonRec id' rhs')
   where
-    (id', rhs') = cprAnalRhsLetDown TopLevel env 0 id rhs
+    (id', rhs') = cprAnalBind TopLevel env 0 id rhs
 
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
@@ -89,7 +89,6 @@ cprAnal' env n (App fun arg)
     (_, arg')      = cprAnal env 0     arg
     res_ty         = applyCprTy fun_ty
 
--- this is an anonymous lambda, since @cprAnalRhsLetDown@ uses @collectBinders@
 cprAnal' env n (Lam var body)
   | isTyVar var
   , (body_ty, body') <- cprAnal env n body
@@ -118,7 +117,7 @@ cprAnal' env n (Case scrut case_bndr ty alts)
 cprAnal' env n (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
   where
-    (id', rhs')      = cprAnalRhsLetDown NotTopLevel env n id rhs
+    (id', rhs')      = cprAnalBind NotTopLevel env n id rhs
     env'             = extendAnalEnv env id' (get_idCprInfo id')
     (body_ty, body') = cprAnal env' n body
 
@@ -220,62 +219,40 @@ cprFix top_lvl env let_arty orig_pairs
         my_downRhs env (id,rhs)
           = (env', (id', rhs'))
           where
-            (id', rhs') = cprAnalRhsLetDown top_lvl env let_arty id rhs
+            (id', rhs') = cprAnalBind top_lvl env let_arty id rhs
             env'        = extendAnalEnv env id (get_idCprInfo id')
 
 
     zapIdCprInfo :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
     zapIdCprInfo pairs = [(setIdCprInfo id topCpr, rhs) | (id, rhs) <- pairs ]
 
--- Trivial RHS
--- See Note [Demand analysis for trivial right-hand sides] in DmdAnal.hs
-cprAnalTrivialRhs ::
-    AnalEnv -> Id -> CoreExpr -> Var ->
-    (Id, CoreExpr)
-cprAnalTrivialRhs env id rhs fn
-  = (set_idCprInfo id (cprTransform env fn), rhs)
 
--- Let bindings are processed in the following way (cf. LetDown from the paper
--- “Higher-Order Cardinality Analysis”):
---
---  * assuming manifest arity
---  * looking at the definition
---  * determining a CPR signature
-cprAnalRhsLetDown
+-- | Process the RHS of the binding for a sensible arity, add the CPR signature
+-- to the Id, and augment the environment with the signature as well.
+cprAnalBind
   :: TopLevelFlag
   -> AnalEnv
   -> Arity
   -> Id
   -> CoreExpr
   -> (Id, CoreExpr)
--- Process the RHS of the binding, add the strictness signature
--- to the Id, and augment the environment with the signature as well.
-cprAnalRhsLetDown top_lvl env let_arty id rhs
-  | Just fn <- unpackTrivial rhs   -- See Note [Demand analysis for trivial right-hand sides]
-  = cprAnalTrivialRhs env id rhs fn
-
-  | otherwise
-  = (id', mkLams bndrs body')
+cprAnalBind top_lvl env let_arty id rhs
+  = (id', rhs')
   where
-    (bndrs, body, body_arty)
-       = case isJoinId_maybe id of
-           Just join_arity  -- See Note [Demand analysis for join points]
-                   | (bndrs, body) <- collectNBinders join_arity rhs
-                   -> (bndrs, body, let_arty)
-
-           Nothing | (bndrs, body) <- collectBinders rhs
-                   -> (bndrs, body, 0)
-
-    env_body         = foldl' extendSigsWithLam env bndrs
-    (body_ty, body') = cprAnal env_body body_arty body
-    -- zap possible deep CPR info
-    body_ty'         = removeCprTyArgs body_ty
-    -- account for lambdas
-    n_val_lams       = length (filter isId bndrs)
-    rhs_ty           = iterate abstractCprTy body_ty' !! n_val_lams
+    rhs_arty
+      -- We don't WW join points (see Note [Don't CPR join points] in WorkWrap),
+      -- but still want to propagate CPR information.
+      | isJoinId id = idArity id + let_arty
+      | otherwise   = idArity id
+    (rhs_ty, rhs')  = cprAnal env rhs_arty rhs
+    -- ct_arty rhs_ty might be greater than rhs_arty, so we have to trim it
+    -- down. The same situation occurs in DmdAnal; see
+    -- Note [Understanding DmdType and StrictSig] in Demand
+    -- TODO: Is this really the case?
+    rhs_ty'         = ensureCprTyArity rhs_arty rhs_ty
     -- possibly trim thunk CPR info
-    sig_ty           = trimCprTy trim_all trim_sums rhs_ty
-    id'              = set_idCprInfo id sig_ty
+    sig_ty          = trimCprTy trim_all trim_sums rhs_ty'
+    id'             = set_idCprInfo id sig_ty
 
     -- See Note [CPR for thunks]
     -- See Note [CPR for sum types]
@@ -283,16 +260,6 @@ cprAnalRhsLetDown top_lvl env let_arty id rhs
     trim_sums = not (isTopLevel top_lvl)
     is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
     not_strict = not (isStrictDmd (idDemandInfo id))
-
-unpackTrivial :: CoreExpr -> Maybe Id
--- Returns (Just v) if the arg is really equal to v, modulo
--- casts, type applications etc
--- See Note [Demand analysis for trivial right-hand sides]
-unpackTrivial (Var v)                 = Just v
-unpackTrivial (Cast e _)              = unpackTrivial e
-unpackTrivial (Lam v e) | isTyVar v   = unpackTrivial e
-unpackTrivial (App e a) | isTypeArg a = unpackTrivial e
-unpackTrivial _                       = Nothing
 
 data AnalEnv
   = AE
