@@ -17,6 +17,7 @@ before_script:
 
 stages:
   - lint       # Source linting
+  - hello      # A quick smoke-test to weed out broken commits
   - build      # A quick smoke-test to weed out broken commits
   - full-build # Build all the things
   - cleanup    # See Note [Cleanup on Windows]
@@ -506,14 +507,14 @@ validate-x86_64-linux-fedora27:
 
 .build-windows-hadrian:
   extends: .build-windows
-  stage: full-build
+  stage: hello
   variables:
     GHC_VERSION: "8.6.2"
   script:
     - |
       python boot
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx binary-dist"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH CABFLAGS=-v2 hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx binary-dist"
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
     # FIXME: Testsuite disabled due to #16156.
     # - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
