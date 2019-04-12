@@ -61,10 +61,11 @@ Compiler
   :ghc-flag:`-Wredundant-record-wildcards`  which warn users when they have
   redundant or unused uses of a record wildcard match.
 
-- Calls to `memset` are now unrolled more aggressively and the
-  produced code is more efficient on `x86_64` with added support for
-  64-bit `MOV`s. In particular, `setByteArray#` calls that were not
-  optimized before, now will be. See :ghc-ticket:`16052`.
+- Calls to `memset` and `memcpy` are now unrolled more aggressively
+  and the produced code is more efficient on `x86_64` with added
+  support for 64-bit `MOV`s. In particular, `setByteArray#` and
+  `copyByteArray#` calls that were not optimized before, now will
+  be. See :ghc-ticket:`16052`.
 
 Runtime system
 ~~~~~~~~~~~~~~
