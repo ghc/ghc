@@ -6,6 +6,8 @@ import Hadrian.Oracles.TextFile
 import Base
 import Context
 import Expression
+import Hadrian.Haskell.Cabal.Type
+import Hadrian.Oracles.Cabal
 import Rules.Generate
 import Settings
 import Target
@@ -31,6 +33,14 @@ compilePackage rs = do
     -- the path and figure out the suitable way to produce that object file.
     objectFilesUnder root |%> \path -> do
         obj <- parsePath (parseBuildObject root) "<object file path parser>" path
+
+        -- All source files that lead to object files potentially
+        -- depend on the extra-source-files listed in the .cabal
+        -- file of the package, so regardless of the source file
+        -- we just 'need' them all before building the object file.
+        let pkg = Context.package (objectContext obj)
+        needPackageExtraSrcs pkg
+
         compileObject rs path obj
   where
     objectFilesUnder r = [ r -/- ("**/build/**/*" ++ pat)
@@ -39,6 +49,23 @@ compilePackage rs = do
     exts = [ "o", "hi", "o-boot", "hi-boot" ]
     patternsFor e = [ "." ++ e, ".*_" ++ e ]
     extensionPats = concatMap patternsFor exts
+
+    needPackageExtraSrcs pkg = do
+        extraSrcs <- map (pkgPath pkg -/-) . extraSourceFiles
+                 <$> readPackageData pkg
+        extraSrcs' <- concat <$> traverse expandWildcard extraSrcs
+        need extraSrcs'
+
+    expandWildcard filepat
+      -- there is a wildcard to expand
+      | takeBaseName filepat == "*" = liftIO $ do
+          getDirectoryFilesIO "." [filepat]
+
+      -- there's a * where I don't expect it...
+      | "*" `isInfixOf` filepat = error "expandWildcard: unexpected *"
+
+      -- no wildcard, this is an actual file
+      | otherwise                   = pure [ filepat ]
 
 -- * Object file paths types and parsers
 
