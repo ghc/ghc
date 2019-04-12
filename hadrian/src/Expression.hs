@@ -7,7 +7,7 @@ module Expression (
 
     -- ** Predicates
     (?), stage, stage0, stage1, stage2, notStage0, package, notPackage,
-    libraryPackage, builder, way, input, inputs, output, outputs,
+     packageOneOf, libraryPackage, builder, way, input, inputs, output, outputs,
 
     -- ** Evaluation
     interpret, interpretInContext,
@@ -43,6 +43,9 @@ stage s = (s ==) <$> getStage
 -- | Is a particular package being built?
 package :: Package -> Predicate
 package p = (p ==) <$> getPackage
+
+packageOneOf :: [Package] -> Predicate
+packageOneOf ps = (`elem` ps) <$> getPackage
 
 -- | This type class allows the user to construct both precise builder
 -- predicates, such as @builder (Ghc CompileHs Stage1)@, as well as predicates

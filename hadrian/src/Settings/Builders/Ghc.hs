@@ -3,6 +3,7 @@ module Settings.Builders.Ghc (ghcBuilderArgs, haddockGhcArgs) where
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 
+import Flavour
 import Packages
 import Settings.Builders.Common
 import Settings.Warnings
@@ -69,6 +70,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     useSystemFfi <- expr (flag UseSystemFfi)
     buildPath <- getBuildPath
     libffiName' <- libffiName
+    debugged <- ghcDebugged <$> expr flavour
 
     let
         dynamic = Dynamic `wayUnit` way
@@ -110,6 +112,9 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , pure [ "-L" ++ libDir | libDir <- libDirs ]
             , rtsFfiArg
             , darwin ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
+            , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
+              arg "-debug"
+
             ]
 
 findHsDependencies :: Args
