@@ -3101,15 +3101,14 @@ When it starts, unless the :ghc-flag:`-ignore-dot-ghci` flag is given, GHCi
 reads and executes commands from the following files, in this order, if
 they exist:
 
-1. :file:`./.ghci`
+1. :file:`{ghcappdata}/ghci.conf`, where ⟨ghcappdata⟩ depends on
+   your system, but is usually something like :file:`$HOME/.ghc` on
+   Unix or :file:`C:/Documents and Settings/user/Application
+   Data/ghc` on Windows.
 
-2. :file:`{appdata}/ghc/ghci.conf`, where ⟨appdata⟩ depends on your system,
-   but is usually something like
-   :file:`C:/Documents and Settings/user/Application Data`
+2. :file:`$HOME/.ghci`
 
-3. On Unix: :file:`$HOME/.ghc/ghci.conf`
-
-4. :file:`$HOME/.ghci`
+3. :file:`./.ghci`
 
 The :file:`ghci.conf` file is most useful for turning on favourite options
 (e.g. ``:set +s``), and defining useful macros.
@@ -3166,8 +3165,9 @@ read:
     :type: dynamic
     :category:
 
-    Read a specific file after the usual startup files. Maybe be
+    Read a specific file after the usual startup files.  May be
     specified repeatedly for multiple inputs.
+    :ghc-flag:`-ignore-dot-ghci` does not apply to these files.
 
 When defining GHCi macros, there is some important behavior you should
 be aware of when names may conflict with built-in commands, especially
