@@ -871,6 +871,12 @@ findModuleLinkable_maybe lis mod
         [li] -> Just li
         _    -> pprPanic "findModuleLinkable" (ppr mod)
 
+linkableInSet' :: Linkable -> ModuleEnv Linkable -> Bool
+linkableInSet' l objs_loaded =
+  case lookupModuleEnv objs_loaded (linkableModule l) of
+        Nothing -> False
+        Just m  -> linkableTime l == linkableTime m
+
 linkableInSet :: Linkable -> [Linkable] -> Bool
 linkableInSet l objs_loaded =
   case findModuleLinkable_maybe objs_loaded (linkableModule l) of
@@ -1128,12 +1134,17 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
 
   let (objs_to_keep, bcos_to_keep) = partition isObjectLinkable keep_linkables
 
-      discard keep l = not (linkableInSet l keep)
+      discard keep l = not (linkableInSet' l keep)
+
+      mkModuleEnvForLinkables linkables =
+        mkModuleEnv $ map (\lnk -> (linkableModule lnk, lnk)) linkables
+      objs_to_keep_env = mkModuleEnvForLinkables objs_to_keep
+      bcos_to_keep_env = mkModuleEnvForLinkables bcos_to_keep
 
       (objs_to_unload, remaining_objs_loaded) =
-         partition (discard objs_to_keep) objs_loaded
+         partition (discard objs_to_keep_env) objs_loaded
       (bcos_to_unload, remaining_bcos_loaded) =
-         partition (discard bcos_to_keep) bcos_loaded
+         partition (discard bcos_to_keep_env) bcos_loaded
 
   mapM_ unloadObjs objs_to_unload
   mapM_ unloadObjs bcos_to_unload
