@@ -5,10 +5,10 @@ module Packages (
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
     filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact,
     ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline,
-    hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi,
-    libiserv, mtl, parsec, pretty, primitive, process, rts, runGhc,
-    stm, templateHaskell, terminfo, text, time, timeout, touchy, transformers,
-    unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
+    hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
+    libffi, libiserv, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
+    runGhc, stm, templateHaskell, terminfo, text, time, timeout, touchy,
+    transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
 
     -- * Package information
     programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
@@ -78,6 +78,7 @@ hpcBin              = util "hpc-bin"         `setPath` "utils/hpc"
 integerGmp          = lib  "integer-gmp"
 integerSimple       = lib  "integer-simple"
 iserv               = util "iserv"
+iservProxy          = util "iserv-proxy"
 libffi              = top  "libffi"
 libiserv            = lib  "libiserv"
 mtl                 = lib  "mtl"
@@ -85,6 +86,7 @@ parsec              = lib  "parsec"
 pretty              = lib  "pretty"
 primitive           = lib  "primitive"
 process             = lib  "process"
+remoteIserv         = util "remote-iserv"
 rts                 = top  "rts"
 runGhc              = util "runghc"
 stm                 = lib  "stm"
