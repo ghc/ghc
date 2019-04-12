@@ -525,7 +525,7 @@ validate-x86_64-linux-fedora27:
     paths:
       - ghc.tar.xz
 
-validate-x86_64-windows-hadrian:
+.validate-x86_64-windows-hadrian:
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW64
