@@ -114,6 +114,21 @@ devel2WerrorFlavour :: Flavour
 devel2WerrorFlavour = werror (developmentFlavour Stage2)
 ```
 
+### Linking GHC against the debugged RTS
+
+What was previously achieved by having `GhcDebugged=YES` in `mk/build.mk` can
+be done by defining a custom flavour in the user settings file, one that
+sets the `ghcDebugged` field of `Flavour` to `True`, e.g:
+
+``` haskell
+quickDebug :: Flavour
+quickDebug = quickFlavour { name = "dbg", ghcDebugged = True }
+```
+
+Running `build --flavour=dbg` will build a `quick`-flavoured GHC and link
+GHC, iserv, iserv-proxy and remote-iserv against the debugged RTS, by passing
+`-debug` to the commands that link those executables.
+
 ## Packages
 
 Users can add and remove packages from particular build stages. As an example,
