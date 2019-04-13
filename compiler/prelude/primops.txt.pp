@@ -1308,7 +1308,7 @@ primop  ThawSmallArrayOp "thawSmallArray#" GenPrimOp
 primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
    SmallMutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
    {Unsafe, machine-level atomic compare and swap on an element within an array.
-    See the documentation of {casArray\#}.}
+    See the documentation of {\tt casArray\#}.}
    with
    out_of_line = True
    has_side_effects = True
