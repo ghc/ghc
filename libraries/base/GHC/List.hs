@@ -44,7 +44,7 @@ infix  4 `elem`, `notElem`
 -- List-manipulation functions
 --------------------------------------------------------------
 
--- | /O(1)/. Extract the first element of a list, which must be non-empty.
+-- | \(\mathcal{O}(1)\). Extract the first element of a list, which must be non-empty.
 head                    :: [a] -> a
 head (x:_)              =  x
 head []                 =  badHead
@@ -62,8 +62,8 @@ badHead = errorEmptyList "head"
                 head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
 
--- | /O(1)/. Decompose a list into its head and tail. If the list is empty,
--- returns 'Nothing'. If the list is non-empty, returns @'Just' (x, xs)@,
+-- | \(\mathcal{O}(1)\). Decompose a list into its head and tail. If the list is
+-- empty, returns 'Nothing'. If the list is non-empty, returns @'Just' (x, xs)@,
 -- where @x@ is the head of the list and @xs@ its tail.
 --
 -- @since 4.8.0.0
@@ -71,14 +71,14 @@ uncons                  :: [a] -> Maybe (a, [a])
 uncons []               = Nothing
 uncons (x:xs)           = Just (x, xs)
 
--- | /O(1)/. Extract the elements after the head of a list, which must be
--- non-empty.
+-- | \(\mathcal{O}(1)\). Extract the elements after the head of a list, which
+-- must be non-empty.
 tail                    :: [a] -> [a]
 tail (_:xs)             =  xs
 tail []                 =  errorEmptyList "tail"
 
--- | /O(n)/. Extract the last element of a list, which must be finite and
--- non-empty.
+-- | \(\mathcal{O}(n)\). Extract the last element of a list, which must be
+-- finite and non-empty.
 last                    :: [a] -> a
 #if defined(USE_REPORT_PRELUDE)
 last [x]                =  x
@@ -96,7 +96,7 @@ lastError :: a
 lastError = errorEmptyList "last"
 #endif
 
--- | /O(n)/. Return all the elements of a list except the last one.
+-- | \(\mathcal{O}(n)\). Return all the elements of a list except the last one.
 -- The list must be non-empty.
 init                    :: [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
@@ -111,14 +111,14 @@ init (x:xs)             =  init' x xs
         init' y (z:zs) = y : init' z zs
 #endif
 
--- | /O(1)/. Test whether a list is empty.
+-- | \(\mathcal{O}(1)\). Test whether a list is empty.
 null                    :: [a] -> Bool
 null []                 =  True
 null (_:_)              =  False
 
--- | /O(n)/. 'length' returns the length of a finite list as an 'Int'.
--- It is an instance of the more general 'Data.List.genericLength',
--- the result type of which may be any kind of number.
+-- | \(\mathcal{O}(n)\). 'length' returns the length of a finite list as an
+-- 'Int'. It is an instance of the more general 'Data.List.genericLength', the
+-- result type of which may be any kind of number.
 {-# NOINLINE [1] length #-}
 length                  :: [a] -> Int
 length xs               = lenAcc xs 0
@@ -142,8 +142,8 @@ lengthFB _ r = \ !a -> r (a + 1)
 idLength :: Int -> Int
 idLength = id
 
--- | /O(n)/. 'filter', applied to a predicate and a list, returns the list of
--- those elements that satisfy the predicate; i.e.,
+-- | \(\mathcal{O}(n)\). 'filter', applied to a predicate and a list, returns
+-- the list of those elements that satisfy the predicate; i.e.,
 --
 -- > filter p xs = [ x | x <- xs, p x]
 --
@@ -262,8 +262,8 @@ product                 :: (Num a) => [a] -> a
 {-# INLINE product #-}
 product                 =  foldl (*) 1
 
--- | /O(n)/. 'scanl' is similar to 'foldl', but returns a list of successive
--- reduced values from the left:
+-- | \(\mathcal{O}(n)\). 'scanl' is similar to 'foldl', but returns a list of
+-- successive reduced values from the left:
 --
 -- > scanl f z [x1, x2, ...] == [z, z `f` x1, (z `f` x1) `f` x2, ...]
 --
@@ -300,8 +300,8 @@ constScanl :: a -> b -> a
 constScanl = const
 
 
--- | /O(n)/. 'scanl1' is a variant of 'scanl' that has no starting value
--- argument:
+-- | \(\mathcal{O}(n)\). 'scanl1' is a variant of 'scanl' that has no starting
+-- value argument:
 --
 -- > scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
 
@@ -309,7 +309,7 @@ scanl1                  :: (a -> a -> a) -> [a] -> [a]
 scanl1 f (x:xs)         =  scanl f x xs
 scanl1 _ []             =  []
 
--- | /O(n)/. A strictly accumulating version of 'scanl'
+-- | \(\mathcal{O}(n)\). A strictly accumulating version of 'scanl'
 {-# NOINLINE [1] scanl' #-}
 scanl'           :: (b -> a -> b) -> b -> [a] -> [b]
 -- This peculiar form is needed to prevent scanl' from being rewritten
@@ -381,7 +381,7 @@ foldr1 f = go
         go []             =  errorEmptyList "foldr1"
 {-# INLINE [0] foldr1 #-}
 
--- | /O(n)/. 'scanr' is the right-to-left dual of 'scanl'.
+-- | \(\mathcal{O}(n)\). 'scanr' is the right-to-left dual of 'scanl'.
 -- Note that
 --
 -- > head (scanr f z xs) == foldr f z xs.
@@ -408,8 +408,8 @@ scanrFB f c = \x (r, est) -> (f x r, r `c` est)
                  scanr f q0 ls
  #-}
 
--- | /O(n)/. 'scanr1' is a variant of 'scanr' that has no starting value
--- argument.
+-- | \(\mathcal{O}(n)\). 'scanr1' is a variant of 'scanr' that has no starting
+-- value argument.
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
 scanr1 _ []             =  []
 scanr1 _ [x]            =  [x]
@@ -852,7 +852,8 @@ notElem x (y:ys)=  x /= y && notElem x ys
  #-}
 #endif
 
--- | /O(n)/. 'lookup' @key assocs@ looks up a key in an association list.
+-- | \(\mathcal{O}(n)\). 'lookup' @key assocs@ looks up a key in an association
+-- list.
 --
 -- >>> lookup 2 [(1, "first"), (2, "second"), (3, "third")]
 -- Just "second"
@@ -1012,8 +1013,8 @@ NB: Zips for larger tuples are in the List module.
 -}
 
 ----------------------------------------------
--- | /O(min(m,n))/. 'zip' takes two lists and returns a list of corresponding
--- pairs.
+-- | \(\mathcal{O}(min(m,n))\). 'zip' takes two lists and returns a list of
+-- corresponding pairs.
 --
 -- > zip [1, 2] ['a', 'b'] = [(1, 'a'), (2, 'b')]
 --
@@ -1070,10 +1071,10 @@ zip3FB cons = \a b c r -> (a,b,c) `cons` r
 -- function given as the first argument, instead of a tupling function.
 
 ----------------------------------------------
--- | /O(min(m,n))/. 'zipWith' generalises 'zip' by zipping with the function
--- given as the first argument, instead of a tupling function. For example,
--- @'zipWith' (+)@ is applied to two lists to produce the list of corresponding
--- sums:
+-- | \(\mathcal{O}(min(m,n))\). 'zipWith' generalises 'zip' by zipping with the
+-- function given as the first argument, instead of a tupling function. For
+-- example, @'zipWith' (+)@ is applied to two lists to produce the list of
+-- corresponding sums:
 --
 -- >>> zipWith (+) [1, 2, 3] [4, 5, 6]
 -- [5,7,9]

@@ -181,8 +181,8 @@ class Foldable t where
     -- use 'foldl'' instead of 'foldl'. The reason for this is that latter does
     -- not force the "inner" results (e.g. @z \`f\` x1@ in the above example)
     -- before applying them to the operator (e.g. to @(\`f\` x2)@). This results
-    -- in a thunk chain @O(n)@ elements long, which then must be evaluated from
-    -- the outside-in.
+    -- in a thunk chain \(\mathcal{O}(n)\) elements long, which then must be
+    -- evaluated from the outside-in.
     --
     -- For a general 'Foldable' structure this should be semantically identical
     -- to,
