@@ -636,28 +636,6 @@ cleanup-darwin:
 # Packaging
 ############################################################
 
-doc-tarball:
-  <<: *only-default
-  stage: packaging
-  tags:
-    - x86_64-linux
-  image: ghcci/x86_64-linux-deb9:0.2
-  dependencies:
-    - validate-x86_64-linux-deb9
-    - validate-x86_64-windows
-  artifacts:
-    paths:
-      - haddock.html.tar.xz
-      - libraries.html.tar.xz
-      - users_guide.html.tar.xz
-      - index.html
-      - "*.pdf"
-  script:
-    - rm -Rf docs
-    - bash -ex distrib/mkDocs/mkDocs ghc-x86_64-deb9-linux.tar.xz ghc-x86_64-mingw32.tar.xz
-    - ls -lh
-    - mv docs/*.tar.xz docs/index.html .
-
 source-tarball:
   stage: packaging
   tags:
@@ -715,23 +693,4 @@ nightly-hackage:
   only:
     variables:
       - $NIGHTLY
-
-pages:
-  stage: deploy
-  dependencies:
-    - doc-tarball
-  image: ghcci/x86_64-linux-deb9:0.2
-  tags:
-    - x86_64-linux
-  script:
-    - mkdir -p public/doc
-    - tar -xf haddock.html.tar.xz -C public/doc
-    - tar -xf libraries.html.tar.xz -C public/doc
-    - tar -xf users_guide.html.tar.xz -C public/doc
-    - cp -f index.html public/doc
-  only:
-    - master
-  artifacts:
-    paths:
-      - public
 
