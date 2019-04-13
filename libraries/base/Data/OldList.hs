@@ -241,9 +241,9 @@ infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/doc
 dropWhileEnd :: (a -> Bool) -> [a] -> [a]
 dropWhileEnd p = foldr (\x xs -> if p x && null xs then [] else x : xs) []
 
--- | /O(min(m,n))/. The 'stripPrefix' function drops the given prefix from a
--- list. It returns 'Nothing' if the list did not start with the prefix given,
--- or 'Just' the list after the prefix, if it does.
+-- | \(\mathcal{O}(min(m,n))\). The 'stripPrefix' function drops the given
+-- prefix from a list. It returns 'Nothing' if the list did not start with the
+-- prefix given, or 'Just' the list after the prefix, if it does.
 --
 -- >>> stripPrefix "foo" "foobar"
 -- Just "bar"
@@ -319,8 +319,8 @@ findIndices p ls = build $ \c n ->
   in foldr go (\_ -> n) ls 0#
 #endif  /* USE_REPORT_PRELUDE */
 
--- | /O(min(m,n))/. The 'isPrefixOf' function takes two lists and returns 'True'
--- iff the first list is a prefix of the second.
+-- | \(\mathcal{O}(min(m,n))\). The 'isPrefixOf' function takes two lists and
+-- returns 'True' iff the first list is a prefix of the second.
 --
 -- >>> "Hello" `isPrefixOf` "Hello World!"
 -- True
@@ -388,11 +388,10 @@ dropLengthMaybe (_:x') (_:y') = dropLengthMaybe x' y'
 isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
 isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 
--- | /O(n^2)/. The 'nub' function removes duplicate elements from a list.
--- In particular, it keeps only the first occurrence of each element.
--- (The name 'nub' means \`essence\'.)
--- It is a special case of 'nubBy', which allows the programmer to supply
--- their own equality test.
+-- | \(\mathcal{O}(n^2)\). The 'nub' function removes duplicate elements from a
+-- list. In particular, it keeps only the first occurrence of each element. (The
+-- name 'nub' means \`essence\'.) It is a special case of 'nubBy', which allows
+-- the programmer to supply their own equality test.
 --
 -- >>> nub [1,2,3,4,3,2,1,2,4,3,5]
 -- [1,2,3,4,5]
@@ -431,8 +430,8 @@ elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
 #endif
 
 
--- | /O(n)/. 'delete' @x@ removes the first occurrence of @x@ from its list
--- argument. For example,
+-- | \(\mathcal{O}(n)\). 'delete' @x@ removes the first occurrence of @x@ from
+-- its list argument. For example,
 --
 -- >>> delete 'a' "banana"
 -- "bnana"
@@ -442,8 +441,8 @@ elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
 delete                  :: (Eq a) => a -> [a] -> [a]
 delete                  =  deleteBy (==)
 
--- | /O(n)/. The 'deleteBy' function behaves like 'delete', but takes a
--- user-supplied equality predicate.
+-- | \(\mathcal{O}(n)\). The 'deleteBy' function behaves like 'delete', but
+-- takes a user-supplied equality predicate.
 --
 -- >>> deleteBy (<=) 4 [1..10]
 -- [1,2,3,5,6,7,8,9,10]
@@ -509,9 +508,9 @@ intersectBy _  [] _     =  []
 intersectBy _  _  []    =  []
 intersectBy eq xs ys    =  [x | x <- xs, any (eq x) ys]
 
--- | /O(n)/. The 'intersperse' function takes an element and a list and
--- \`intersperses\' that element between the elements of the list.
--- For example,
+-- | \(\mathcal{O}(n)\). The 'intersperse' function takes an element and a list
+-- and \`intersperses\' that element between the elements of the list. For
+-- example,
 --
 -- >>> intersperse ',' "abcde"
 -- "a,b,c,d,e"
@@ -618,18 +617,18 @@ mapAccumR f s (x:xs)    =  (s'', y:ys)
                            where (s'',y ) = f s' x
                                  (s', ys) = mapAccumR f s xs
 
--- | /O(n)/. The 'insert' function takes an element and a list and inserts the
--- element into the list at the first position where it is less than or equal to
--- the next element. In particular, if the list is sorted before the call, the
--- result will also be sorted. It is a special case of 'insertBy', which allows
--- the programmer to supply their own comparison function.
+-- | \(\mathcal{O}(n)\). The 'insert' function takes an element and a list and
+-- inserts the element into the list at the first position where it is less than
+-- or equal to the next element. In particular, if the list is sorted before the
+-- call, the result will also be sorted. It is a special case of 'insertBy',
+-- which allows the programmer to supply their own comparison function.
 --
 -- >>> insert 4 [1,2,3,5,6,7]
 -- [1,2,3,4,5,6,7]
 insert :: Ord a => a -> [a] -> [a]
 insert e ls = insertBy (compare) e ls
 
--- | /O(n)/. The non-overloaded version of 'insert'.
+-- | \(\mathcal{O}(n)\). The non-overloaded version of 'insert'.
 insertBy :: (a -> a -> Ordering) -> a -> [a] -> [a]
 insertBy _   x [] = [x]
 insertBy cmp x ys@(y:ys')
@@ -669,9 +668,10 @@ minimumBy cmp xs        =  foldl1 minBy xs
                                        GT -> y
                                        _  -> x
 
--- | /O(n)/. The 'genericLength' function is an overloaded version of 'length'.
--- In particular, instead of returning an 'Int', it returns any type which is an
--- instance of 'Num'. It is, however, less efficient than 'length'.
+-- | \(\mathcal{O}(n)\). The 'genericLength' function is an overloaded version
+-- of 'length'. In particular, instead of returning an 'Int', it returns any
+-- type which is an instance of 'Num'. It is, however, less efficient than
+-- 'length'.
 --
 -- >>> genericLength [1, 2, 3] :: Int
 -- 3
@@ -1029,8 +1029,8 @@ inits                   = map toListSB . scanl' snocSB emptySB
 -- if it fuses with a consumer, and it would generally lead to serious
 -- loss of sharing if allowed to fuse with a producer.
 
--- | /O(n)/. The 'tails' function returns all final segments of the argument,
--- longest first.  For example,
+-- | \(\mathcal{O}(n)\). The 'tails' function returns all final segments of the
+-- argument, longest first. For example,
 --
 -- >>> tails "abc"
 -- ["abc","bc","c",""]

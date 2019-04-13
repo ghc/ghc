@@ -31,7 +31,7 @@ import GHC.Real
 -- | This is a valid definition of 'stimes' for an idempotent 'Semigroup'.
 --
 -- When @x <> x = x@, this definition should be preferred, because it
--- works in /O(1)/ rather than /O(log n)/.
+-- works in \(\mathcal{O}(1)\) rather than \(\mathcal{O}(\log n)\).
 stimesIdempotent :: Integral b => b -> a -> a
 stimesIdempotent n x
   | n <= 0 = errorWithoutStackTrace "stimesIdempotent: positive multiplier expected"
@@ -40,7 +40,7 @@ stimesIdempotent n x
 -- | This is a valid definition of 'stimes' for an idempotent 'Monoid'.
 --
 -- When @mappend x x = x@, this definition should be preferred, because it
--- works in /O(1)/ rather than /O(log n)/
+-- works in \(\mathcal{O}(1)\) rather than \(\mathcal{O}(\log n)\)
 stimesIdempotentMonoid :: (Integral b, Monoid a) => b -> a -> a
 stimesIdempotentMonoid n x = case compare n 0 of
   LT -> errorWithoutStackTrace "stimesIdempotentMonoid: negative multiplier"

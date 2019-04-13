@@ -239,7 +239,7 @@ class Semigroup a where
         -- will do so.
         --
         -- By making this a member of the class, idempotent semigroups
-        -- and monoids can upgrade this to execute in /O(1)/ by
+        -- and monoids can upgrade this to execute in \(\mathcal{O}(1)\) by
         -- picking @stimes = 'Data.Semigroup.stimesIdempotent'@ or @stimes =
         -- 'stimesIdempotentMonoid'@ respectively.
         stimes :: Integral b => b -> a -> a
@@ -1083,8 +1083,8 @@ augment g xs = g (:) xs
 --              map
 ----------------------------------------------
 
--- | /O(n)/. 'map' @f xs@ is the list obtained by applying @f@ to each element
--- of @xs@, i.e.,
+-- | \(\mathcal{O}(n)\). 'map' @f xs@ is the list obtained by applying @f@ to
+-- each element of @xs@, i.e.,
 --
 -- > map f [x1, x2, ..., xn] == [f x1, f x2, ..., f xn]
 -- > map f [x1, x2, ...] == [f x1, f x2, ...]
