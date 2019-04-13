@@ -1499,11 +1499,13 @@ lookupBindGroupOcc ctxt what rdr_name
 
     candidates names_in_scope
       = case similar_names of
-          [] -> Outputable.empty
-          _  -> vcat $ map (\x -> text "Perhaps you meant" <+>
-                                  quotes (ppr x) <+>
-                                  parens (pprDefinedAt x))
-                           similar_names
+          []  -> Outputable.empty
+          [n] -> text "Perhaps you meant" <+>
+                 quotes (ppr n) <+>
+                 parens (pprDefinedAt n)
+          _   -> text "Perhaps you meant one of these:" <+>
+                 pprWithCommas (\x -> quotes (ppr x) <+> parens (pprDefinedAt x))
+                               similar_names
       where
         similar_names
           = fuzzyLookup (unpackFS $ occNameFS $ rdrNameOcc rdr_name)
