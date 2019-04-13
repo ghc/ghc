@@ -29,6 +29,7 @@ cat <<EOF >> mk/build.mk
 BuildFlavour=$BUILD_FLAVOUR
 ifneq "\$(BuildFlavour)" ""
 include mk/flavours/\$(BuildFlavour).mk
+GhcLibHcOpts+=-haddock
 endif
 EOF
 
