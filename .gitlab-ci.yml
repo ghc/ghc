@@ -130,6 +130,7 @@ validate-x86_64-darwin:
     - PATH="`pwd`/toolchain/bin:$PATH"
       # Disable sphinx PDF output as MacTeX apparently doesn't provide xelatex
     - echo "BUILD_SPHINX_PDF=NO" >> mk/build.mk
+    - echo "GhcLibHcOpts += -haddock" >> mk/build.mk
     - echo "libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp" >> mk/build.mk
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
@@ -153,13 +154,14 @@ validate-x86_64-darwin:
     - git submodule update --init --recursive
     - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+    - bash .circleci/prepare-system.sh
       # Build hyperlinked sources for documentation when building releases
     - |
       if [[ -n "$CI_COMMIT_TAG" ]]; then
+        echo "GhcLibHcOpts += -haddock" >> mk/build.mk
         echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
       fi
 
-    - bash .circleci/prepare-system.sh
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
   after_script:
@@ -383,6 +385,7 @@ validate-x86_64-linux-fedora27:
     - git submodule update --init --recursive
     - git checkout .gitmodules
     - bash .gitlab/win32-init.sh
+    - bash -c 'echo "GhcLibHcOpts += -haddock" >> mk/build.mk'
   after_script:
     - rd /s /q tmp
     - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
