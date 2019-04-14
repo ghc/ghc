@@ -1825,6 +1825,7 @@ resizeGenerations (void)
     }
 
 #if 0
+    debugBelch("n_words: %lu, live_estimate=%lu\n", oldest_gen->n_words, oldest_gen->live_estimate);
     debugBelch("live: %d, min_alloc: %d, size : %d, max = %d\n", live,
                min_alloc, size, max);
     debugBelch("resize_gen: n_blocks: %lu, n_large_block: %lu, n_compact_blocks: %lu\n",
