@@ -40,7 +40,7 @@ test('T12742', normal, compile, [''])
 #       (1) Use -fexternal-interpreter, or
 #       (2) Build the program twice: once with -dynamic, and then
 #           with -prof using -osuf to set a different object file suffix.
-test('T13910', omit_ways(['profasm']), compile, [''])
+test('T13910', [expect_broken_for(16537, ['optasm']), omit_ways(['profasm'])], compile, [''])
 test('T13938', [extra_files(['T13938a.hs'])], run_command,
      ['$MAKE -s --no-print-directory T13938'])
 test('T14556', normal, compile, [''])
