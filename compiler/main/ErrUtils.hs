@@ -81,6 +81,7 @@ import Data.IORef
 import Data.Maybe       ( fromMaybe )
 import Data.Ord
 import Data.Time
+import Debug.Trace
 import Control.Monad
 import Control.Monad.IO.Class
 import System.IO
@@ -608,9 +609,10 @@ fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg
 
 compilationProgressMsg :: DynFlags -> String -> IO ()
-compilationProgressMsg dflags msg
-  = ifVerbose dflags 1 $
-    logOutput dflags (defaultUserStyle dflags) (text msg)
+compilationProgressMsg dflags msg = do
+    traceEventIO $ "GHC progress: " ++ msg
+    ifVerbose dflags 1 $
+        logOutput dflags (defaultUserStyle dflags) (text msg)
 
 showPass :: DynFlags -> String -> IO ()
 showPass dflags what
