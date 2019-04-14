@@ -140,6 +140,16 @@ doCopy directory distDir
        strip myDestDir myPrefix myLibdir myDocdir withSharedLibs
        args
  = withCurrentDirectory directory $ do
+     print "-------------"
+     print directory
+     print distDir
+     print strip
+     print myDestDir
+     print myPrefix
+     print myLibdir
+     print myDocdir
+     print withSharedLibs
+     print "-------------"
      let copyArgs = ["copy", "--builddir", distDir]
                  ++ (if null myDestDir
                      then []
