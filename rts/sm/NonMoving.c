@@ -710,6 +710,20 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 
     // TODO: Remainder of things done by GarbageCollect (update stats)
 
+    // HACK
+    debugBelch("nonmoving: n_blocks: %lu, n_large_block: %lu, n_compact_blocks: %lu\n", 
+               oldest_gen->n_blocks, oldest_gen->n_large_blocks, oldest_gen->n_compact_blocks);
+    debugBelch("nonmoving: max_blocks: %lu -> %lu\n", oldest_gen->max_blocks, oldest_gen->n_blocks);
+    W_ live = oldest_gen->n_blocks +
+        oldest_gen->n_large_blocks +
+        oldest_gen->n_compact_blocks;
+    W_ size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
+                      RtsFlags.GcFlags.minOldGenSize);
+    size /= 2;
+    for (unsigned int g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        generations[g].max_blocks = size;
+    }
+
 #if defined(THREADED_RTS)
 finish:
     boundTaskExiting(task);
