@@ -65,6 +65,7 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntSet (IntSet)
 
 import qualified Data.IntMap.Strict as IM
+import qualified Data.Map as M
 import qualified Data.IntSet as IS
 import qualified Data.Set as S
 import Data.Tree
@@ -359,6 +360,11 @@ getEdgeInfo from to m
     = Just $! info
     | otherwise
     = Nothing
+
+getEdgeWeight :: CFG -> BlockId -> BlockId -> EdgeWeight
+getEdgeWeight cfg from to =
+    edgeWeight $ expectJust "Edgeweight for noexisting block" $
+                 getEdgeInfo from to cfg
 
 reverseEdges :: CFG -> CFG
 reverseEdges cfg = mapFoldlWithKey (\cfg from toMap -> go (addNode cfg from) from toMap) mapEmpty cfg
@@ -716,10 +722,16 @@ data LoopInfo = LoopInfo
   , liLoops :: [(Edge, LabelSet)] -- ^ (backEdge, loopBody), body includes header
   }
 
+instance Outputable LoopInfo where
+    ppr (LoopInfo _ _lvls loops) =
+        text "Loops:(backEdge, bodyNodes)" $$
+            (vcat $ map ppr loops)
+
 -- | Determine loop membership of blocks based on Dominator analysis.
---   This is slower but gives loop levels.
---   Only detects natural loops. Irreducible control flow is not
---   recognized even if it loops.
+--   This is slower but gives loop levels instead of just loop membership.
+--   However it only detects natural loops. Irreducible control flow is not
+--   recognized even if it loops. But that is rare enough that we don't have
+--   to care about that special case.
 loopInfo :: CFG -> BlockId -> LoopInfo
 loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
                               , liLevels = mapFromList loopCounts
@@ -830,9 +842,11 @@ revPostorderFrom cfg root =
 --   are reliably.
 --
 --   The algorithm is based on the Paper
---   "Static Branch Prediction and Program Profile Analysis"
+--   "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus
 --   The only big change is that we go over the nodes in the body of loops in
 --   reverse post order. Which is required for diamond control flow to work probably.
+--
+--   We also apply a few prediction heuristics (based on the same paper)
 
 mkGlobalWeights :: BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
 mkGlobalWeights root localCfg
@@ -842,6 +856,7 @@ mkGlobalWeights root localCfg
     -- undefined --propagate (mapSingleton root 1) (revOrder)
     (blockFreqs', edgeFreqs')
   where
+    -- Calculate fixpoints
     (blockFreqs, edgeFreqs) = calcFreqs nodeProbs backEdges' bodies' revOrder'
     blockFreqs' = mapFromList $ map (first fromVertex) (assocs blockFreqs) :: LabelMap Double
     edgeFreqs' = fmap fromVertexMap $ fromVertexMap edgeFreqs
@@ -850,12 +865,15 @@ mkGlobalWeights root localCfg
     fromVertexMap m = mapFromList . map (first fromVertex) $ IM.toList m
 
     revOrder = revPostorderFrom localCfg root :: [BlockId]
-    LoopInfo backedges _levels bodies = loopInfo localCfg root
+    loopinfo@(LoopInfo backedges _levels bodies) = loopInfo localCfg root
 
     revOrder' = map toVertex revOrder
     backEdges' = map (bimap toVertex toVertex) backedges
     bodies' = map calcBody bodies
-    nodeProbs = cfgEdgeProbabilities localCfg toVertex
+
+    estimatedCfg = staticBranchPrediction root loopinfo localCfg
+    -- Normalize the weights to probabilities and apply heuristics
+    nodeProbs = cfgEdgeProbabilities estimatedCfg toVertex
 
     -- By mapping vertices to numbers in reverse post order we can bring any subset into reverse post
     -- order simply by sorting.
@@ -871,6 +889,126 @@ mkGlobalWeights root localCfg
     -- Map from indicies starting at zero to blockIds
     fromVertex :: Int -> BlockId
     fromVertex vertex   = blockMapping ! vertex
+
+-- Also based on
+-- "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus
+-- TODO: This seems like something better done at the Cmm level as that would
+-- make it easier to implement more heuristics.
+
+-- | Update branch weights based on certain heuristics.
+staticBranchPrediction :: BlockId -> LoopInfo -> CFG -> CFG
+staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg =
+    -- pprTrace "staticEstimatesOn" (ppr (cfg)) $
+    setFoldl update cfg nodes
+  where
+    nodes = getCfgNodes cfg
+    -- updates = S.foldl' update nodes :: [(BlockId,Prob)]
+    backedges = S.fromList $ l_backEdges
+    -- Loops keyed by their back edge
+    loops = M.fromList $ l_loops :: M.Map Edge LabelSet
+    loopHeads = S.fromList $ map snd $ M.keys loops
+
+    update :: CFG -> BlockId -> CFG
+    update cfg node
+        -- No successors, nothing to do.
+        | null successors = cfg
+
+        -- Mix of backedges and others:
+        -- Always predict the backedges no matter what.
+        -- TODO: Don't overrule all predictions from earlier compiler
+        -- phases. Currently it simply overwrites these.
+        | not (null m) && length m < length successors
+        = let loopChance = repeat $ pred_LBH / (fromIntegral $ length m)
+                exitChance = repeat $ (1 - pred_LBH) / fromIntegral (length successors - length m)
+                updates = zip (map fst m) loopChance ++ zip (map fst not_m) exitChance
+            in --pprTrace "Backedges!!!" empty $
+            foldl' (\cfg (to,weight) -> setEdgeWeight cfg weight node to) cfg updates
+        -- For (regular) non-binary branches we keep the weights from the STG -> Cmm translation.
+        | length successors /= 2 = cfg
+        -- Only backedges - no need to adjust
+        | length m > 0
+        = cfg
+
+        -- A regular binary branch, we can plug addition predictors in here.
+        | [(s1,s1_info),(s2,s2_info)] <- successors
+        = -- Normalize weights to total of 1
+            let w1 = min (edgeWeight s1_info) (0.001)
+                w2 = min (edgeWeight s2_info) (0.001)
+                cfg'  = setEdgeWeight cfg  (w1/w1+w2) node s1
+                cfg'' = setEdgeWeight cfg' (w2/w1+w2) node s2
+
+                -- Figure out which heuristics apply to these successors
+                heuristics = map ($ (s1,s2))
+                            [lehPredicts, phPredicts, ohPredicts, ghPredicts, lhhPredicts, chPredicts
+                            , shPredicts, rhPredicts]
+                -- Apply result of a heuristic. Argument is the likelyhood
+                -- predicted for s1.
+                applyHeuristic :: CFG -> Maybe Prob -> CFG
+                applyHeuristic cfg Nothing = cfg
+                applyHeuristic cfg (Just (s1_pred :: Double)) =
+                        -- Old weights
+                    let s1_old = getEdgeWeight cfg node s1
+                        s2_old = getEdgeWeight cfg node s2
+                        -- Predictions from heuristic
+                        s1_prob = EdgeWeight s1_pred :: EdgeWeight
+                        s2_prob = 1.0 - s1_prob
+                        -- Update
+                        d = (s1_old * s1_prob) + (s2_old * s2_prob) :: EdgeWeight
+                        s1_prob' = s1_old * s1_prob / d
+                        s2_prob' = s2_old * s2_prob / d
+                        cfg_s1 = setEdgeWeight cfg    s1_prob' node s1
+                    in  -- pprTrace "Applying heuristic!" (ppr (node,s1,s2)) $
+                        setEdgeWeight cfg_s1 s2_prob' node s2
+
+            in
+            foldl' applyHeuristic cfg'' heuristics
+        | otherwise =
+            -- Giving the root here makes it easy to grep for it in case of error.
+            pprPanic "staticBranchPrediction: Impossible case in function with root " (ppr root)
+
+      where
+        -- Chance that loops are taken.
+        pred_LBH = 0.9
+        -- successors
+        successors = getSuccessorEdges cfg node
+        -- backedges
+        (m,not_m) = partition (\succ -> S.member (node, fst succ) backedges) successors
+
+        -- Heuristics return nothing if they don't say anything about this branch
+        -- or Just (prob_s1) where prob_s1 is the likelyhood for s1 to be the
+        -- taken branch.
+
+        -- Loop exit heuristic. We are unlikely to leave a loop unless it's to enter
+        -- another one.
+        pred_LEH = 0.8
+        lehPredicts :: (BlockId,BlockId) -> Maybe Prob
+        lehPredicts (s1,s2)
+          -- None of the successors is a loop header
+          | S.member s1 loopHeads || S.member s2 loopHeads
+          = Nothing
+          -- On of the branches exits the loop
+          | otherwise
+
+          = --pprTrace "lehPredict:" (ppr $ compare s1Level s2Level) $
+            case compare s1Level s2Level of
+                EQ -> Nothing
+                LT -> Just (1-pred_LEH) --s1 exits to a shallower loop level
+                GT -> Just (pred_LEH)
+            where
+                s1Level = mapLookup s1 loopLevels
+                s2Level = mapLookup s2 loopLevels
+
+        -- TODO: These are all the other heuristics from the paper.
+        -- Not all will apply, for now we just stub them out as Nothing.
+
+        -- Pointer heuristic - Pointers usually compare as unequal.
+        phPredicts = const Nothing
+        ohPredicts = const Nothing
+        ghPredicts = const Nothing
+        lhhPredicts = const Nothing
+        chPredicts = const Nothing
+        shPredicts = const Nothing
+        rhPredicts = const Nothing
 
 -- We normalize all edge weights as probabilities between 0 and 1.
 -- Ignoring rounding errors all outgoing edges sum up to 1.
@@ -902,6 +1040,9 @@ cfgEdgeProbabilities cfg toVertex
          = w/totalWeight
          | otherwise = panic "impossible"
 
+-- This is the fixpoint algorithm from
+--   "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus
+-- The adaption to Haskell is my own.
 calcFreqs :: IM.IntMap (IM.IntMap Prob) -> [(Int,Int)] -> [(Int, [Int])] -> [Int]
           -> (Array Int Double, IM.IntMap (IM.IntMap Prob))
 calcFreqs graph backEdges loops revPostOrder = runST $ do
