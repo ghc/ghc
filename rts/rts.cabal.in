@@ -137,6 +137,7 @@ library
                       rts/Libdw.h
                       rts/LibdwPool.h
                       rts/Linker.h
+                      rts/LongPause.h
                       rts/Main.h
                       rts/Messages.h
                       rts/OSThreads.h
@@ -392,6 +393,7 @@ library
                Libdw.c
                LibdwPool.c
                Linker.c
+               LongPause.c
                Messages.c
                OldARMAtomic.c
                PathUtils.c
