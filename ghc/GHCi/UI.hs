@@ -1618,8 +1618,11 @@ chooseEditFile =
 -- :def
 
 defineMacro :: GhciMonad m => Bool{-overwrite-} -> String -> m ()
-defineMacro _ (':':_) =
-  liftIO $ putStrLn "macro name cannot start with a colon"
+defineMacro _ (':':_) = liftIO $ putStrLn
+                          "macro name cannot start with a colon"
+defineMacro _ ('!':_) = liftIO $ putStrLn
+                          "macro name cannot start with an exclamation mark"
+                          -- little code duplication allows to grep error msg
 defineMacro overwrite s = do
   let (macro_name, definition) = break isSpace s
   macros <- ghci_macros <$> getGHCiState
@@ -1629,33 +1632,38 @@ defineMacro overwrite s = do
                 then liftIO $ putStrLn "no macros defined"
                 else liftIO $ putStr ("the following macros are defined:\n" ++
                                       unlines defined)
-        else do
-  if (not overwrite && macro_name `elem` defined)
-        then throwGhcException (CmdLineError
-                ("macro '" ++ macro_name ++ "' is already defined"))
-        else do
+  else do
+    isCommand <- isJust <$> lookupCommand' macro_name
+    let check_newname
+          | macro_name `elem` defined = throwGhcException (CmdLineError
+            ("macro '" ++ macro_name ++ "' is already defined. " ++ hint))
+          | isCommand = throwGhcException (CmdLineError
+            ("macro '" ++ macro_name ++ "' overwrites builtin command. " ++ hint))
+          | otherwise = return ()
+        hint = " Use ':def!' to overwrite."
 
-  -- compile the expression
-  handleSourceError GHC.printException $ do
-    step <- getGhciStepIO
-    expr <- GHC.parseExpr definition
-    -- > ghciStepIO . definition :: String -> IO String
-    let stringTy = nlHsTyVar stringTy_RDR
-        ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
-        body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
-                                   `mkHsApp` (nlHsPar expr)
-        tySig = mkLHsSigWcType (stringTy `nlHsFunTy` ioM)
-        new_expr = L (getLoc expr) $ ExprWithTySig noExt body tySig
-    hv <- GHC.compileParsedExprRemote new_expr
+    unless overwrite check_newname
+    -- compile the expression
+    handleSourceError GHC.printException $ do
+      step <- getGhciStepIO
+      expr <- GHC.parseExpr definition
+      -- > ghciStepIO . definition :: String -> IO String
+      let stringTy = nlHsTyVar stringTy_RDR
+          ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
+          body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
+                                     `mkHsApp` (nlHsPar expr)
+          tySig = mkLHsSigWcType (stringTy `nlHsFunTy` ioM)
+          new_expr = L (getLoc expr) $ ExprWithTySig noExt body tySig
+      hv <- GHC.compileParsedExprRemote new_expr
 
-    let newCmd = Command { cmdName = macro_name
-                         , cmdAction = lift . runMacro hv
-                         , cmdHidden = False
-                         , cmdCompletionFunc = noCompletion
-                         }
+      let newCmd = Command { cmdName = macro_name
+                           , cmdAction = lift . runMacro hv
+                           , cmdHidden = False
+                           , cmdCompletionFunc = noCompletion
+                           }
 
-    -- later defined macros have precedence
-    modifyGHCiState $ \s ->
+      -- later defined macros have precedence
+      modifyGHCiState $ \s ->
         let filtered = [ cmd | cmd <- macros, cmdName cmd /= macro_name ]
         in s { ghci_macros = newCmd : filtered }
 
