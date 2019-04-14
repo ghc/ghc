@@ -200,7 +200,9 @@ void  freeThreadLocalKey (ThreadLocalKey *key);
 void setThreadAffinity (uint32_t n, uint32_t m);
 void setThreadNode (uint32_t node);
 void releaseThreadNode (void);
+
 #endif // !CMINUSMINUS
+
 
 #if defined(THREADED_RTS)
 

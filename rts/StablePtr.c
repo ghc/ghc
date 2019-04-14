@@ -13,6 +13,7 @@
 #include "RtsAPI.h"
 
 #include "Hash.h"
+#include "LongPause.h"
 #include "RtsUtils.h"
 #include "Trace.h"
 #include "StablePtr.h"
@@ -125,7 +126,7 @@ void
 stablePtrLock(void)
 {
     initStablePtrTable();
-    ACQUIRE_LOCK(&stable_ptr_mutex);
+    ACQUIRE_LOCK_CHECKED(&stable_ptr_mutex, "stable_ptr_mutex");
 }
 
 void

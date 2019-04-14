@@ -13,6 +13,7 @@
 #include "RtsAPI.h"
 
 #include "Hash.h"
+#include "LongPause.h"
 #include "RtsUtils.h"
 #include "Trace.h"
 #include "StableName.h"
@@ -42,7 +43,7 @@ void
 stableNameLock(void)
 {
     initStableNameTable();
-    ACQUIRE_LOCK(&stable_name_mutex);
+    ACQUIRE_LOCK_CHECKED(&stable_name_mutex, "stable_name_mutex");
 }
 
 void

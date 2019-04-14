@@ -37,6 +37,7 @@
 #include "Schedule.h"
 #include "Sanity.h"
 #include "BlockAlloc.h"
+#include "LongPause.h"
 #include "ProfHeap.h"
 #include "Weak.h"
 #include "Prelude.h"
@@ -280,6 +281,9 @@ GarbageCollect (uint32_t collect_gen,
   }
 #endif
 
+  struct long_pause_ctx gc_pause;
+  LONG_PAUSE_START(&gc_pause);
+
   /* N.B. The nonmoving collector works a bit differently. See
    * Note [Static objects under the nonmoving collector].
    */
@@ -382,6 +386,9 @@ GarbageCollect (uint32_t collect_gen,
   // of markSomeCapabilities() because markSomeCapabilities() can only
   // call back into the GC via mark_root() (due to the gct register
   // variable).
+  trace(TRACE_gc, "scavenging mut_lists");
+  struct long_pause_ctx pause;
+  LONG_PAUSE_START(&pause);
   if (n_gc_threads == 1) {
       for (n = 0; n < n_capabilities; n++) {
 #if defined(THREADED_RTS)
@@ -400,8 +407,11 @@ GarbageCollect (uint32_t collect_gen,
           }
       }
   }
+  LONG_PAUSE_END(&pause, 20, "scav mut_lists");
+  trace(TRACE_gc, "done scavenging mut_lists");
 
   // follow roots from the CAF list (used by GHCi)
+  LONG_PAUSE_START(&pause);
   gct->evac_gen_no = 0;
   markCAFs(mark_root, gct);
 
@@ -415,7 +425,9 @@ GarbageCollect (uint32_t collect_gen,
   } else {
       markCapability(mark_root, gct, cap, true/*don't mark sparks*/);
   }
+  LONG_PAUSE_END(&pause, 50, "mark caps&sched");
 
+  LONG_PAUSE_START(&pause);
   markScheduler(mark_root, gct);
 
   // Mark the weak pointer list, and prepare to detect dead weak pointers.
@@ -427,6 +439,7 @@ GarbageCollect (uint32_t collect_gen,
 
   // Remember old stable name addresses.
   rememberOldStableNameAddresses ();
+  LONG_PAUSE_END(&pause, 50, "mark stables&weaks");
 
   /* -------------------------------------------------------------------------
    * Repeatedly scavenge all the areas we know about until there's no
@@ -436,6 +449,7 @@ GarbageCollect (uint32_t collect_gen,
   StgWeak *dead_weak_ptr_list = NULL;
   StgTSO *resurrected_threads = END_TSO_QUEUE;
 
+  LONG_PAUSE_START(&pause);
   for (;;)
   {
       scavenge_until_all_done();
@@ -455,6 +469,7 @@ GarbageCollect (uint32_t collect_gen,
   }
 
   shutdown_gc_threads(gct->thread_index, idle_cap);
+  LONG_PAUSE_END(&pause, 50, "scavenge loop");
 
   // Now see which stable names are still alive.
   gcStableNameTable();
@@ -764,12 +779,14 @@ GarbageCollect (uint32_t collect_gen,
       // so we need to mark those too.
       // Note that in sequential case these lists will be appended with more
       // weaks and threads found to be dead in mark.
+      LONG_PAUSE_START(&pause);
 #if !defined(THREADED_RTS)
       // In the non-threaded runtime this is the only time we push to the
       // upd_rem_set
       nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
 #endif
       nonmovingCollect(&dead_weak_ptr_list, &resurrected_threads);
+      LONG_PAUSE_END(&pause, 50, "nonmovingCollect");
       ACQUIRE_SM_LOCK;
   }
 
@@ -932,6 +949,8 @@ GarbageCollect (uint32_t collect_gen,
              N, n_gc_threads, par_max_copied, par_balanced_copied,
              gc_spin_spin, gc_spin_yield, mut_spin_spin, mut_spin_yield,
              any_work, no_work, scav_find_work);
+
+  LONG_PAUSE_END(&gc_pause, major_gc ? 10000 : 100, "overall gc");
 
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {

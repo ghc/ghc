@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Capability.h"
+#include "LongPause.h"
 
 #include "BeginPrivate.h"
 
@@ -34,7 +35,7 @@ extern Mutex sm_mutex;
 #endif
 
 #if defined(THREADED_RTS)
-#define ACQUIRE_SM_LOCK   ACQUIRE_LOCK(&sm_mutex);
+#define ACQUIRE_SM_LOCK   ACQUIRE_LOCK_CHECKED(&sm_mutex, "sm_lock");
 #define RELEASE_SM_LOCK   RELEASE_LOCK(&sm_mutex);
 #define ASSERT_SM_LOCK()  ASSERT_LOCK_HELD(&sm_mutex);
 #else
