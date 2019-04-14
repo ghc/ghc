@@ -1,4 +1,4 @@
-:def type (\e -> putStrLn ("called :type for "++show e++" (ignoring)") >> return "")
+:def! type (\e -> putStrLn ("called :type for "++show e++" (ignoring)") >> return "")
 :def
 :t ()
 :ty True

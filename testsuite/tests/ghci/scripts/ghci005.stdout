@@ -3,7 +3,7 @@ the following macros are defined:
 echo
 hello, world!
 hello, world!
-macro 'echo' is already defined
+macro 'echo' is already defined.  Use ':def!' to overwrite.
 HELLO, WORLD!
 hello, world!
 macro 'f' is not defined
