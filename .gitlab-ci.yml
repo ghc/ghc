@@ -450,6 +450,10 @@ validate-x86_64-linux-fedora27:
     # which will shorten the drive and give us length(cd)-2 lengths back from
     # the MAX_PATH limit.
     - |
+      subst W: /D > nul
+      subst X: /D > nul
+      subst Y: /D > nul
+      subst Z: /D > nul
       for /f "delims=" %%a in ('.gitlab\find-free-drive-letter.bat') do @set ndir=%%a
       subst %ndir%: /D > nul
       subst %ndir%: .
