@@ -350,7 +350,7 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
         } else {
             // allocate a fresh block.
             ACQUIRE_SM_LOCK;
-            bdescr *bd = allocGroup(1);
+            bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
             bd->link = q->blocks;
             q->blocks = bd;
             q->top = (MarkQueueBlock *) bd->start;
@@ -717,7 +717,7 @@ again:
 /* Must hold sm_mutex. */
 static void init_mark_queue_ (MarkQueue *queue)
 {
-    bdescr *bd = allocGroup(1);
+    bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
     queue->blocks = bd;
     queue->top = (MarkQueueBlock *) bd->start;
     queue->top->head = 0;
