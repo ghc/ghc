@@ -918,10 +918,10 @@ staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         -- TODO: Don't overrule all predictions from earlier compiler
         -- phases. Currently it simply overwrites these.
         | not (null m) && length m < length successors
-        = let loopChance = repeat $ pred_LBH / (fromIntegral $ length m)
+        = let   loopChance = repeat $ pred_LBH / (fromIntegral $ length m)
                 exitChance = repeat $ (1 - pred_LBH) / fromIntegral (length successors - length m)
                 updates = zip (map fst m) loopChance ++ zip (map fst not_m) exitChance
-            in --pprTrace "Backedges!!!" empty $
+            in  --pprTrace "Backedges!!!" empty $
             foldl' (\cfg (to,weight) -> setEdgeWeight cfg weight node to) cfg updates
         -- For (regular) non-binary branches we keep the weights from the STG -> Cmm translation.
         | length successors /= 2 = cfg
