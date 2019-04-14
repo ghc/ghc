@@ -2143,11 +2143,8 @@ doNewArrayOp res_r rep info payload n init = do
     emit $ mkAssign arr base
 
     -- Initialise all elements of the array
-    p <- assignTemp $ cmmOffsetB dflags (CmmReg arr) (hdrSize dflags rep)
-    let initialization =
-            [ mkStore (cmmOffsetW dflags (CmmReg (CmmLocal p)) off) init
-            | off <- [0.. n - 1]
-            ]
+    let mkOff off = cmmOffsetW dflags (CmmReg arr) (hdrSizeW dflags rep + off)
+        initialization = [ mkStore (mkOff off) init | off <- [0.. n - 1] ]
     emit (catAGraphs initialization)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
