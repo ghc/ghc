@@ -49,7 +49,7 @@ struct NonmovingSegment {
 
 // This is how we mark end of todo lists. Not NULL because todo_link == NULL
 // means segment is not in list.
-#define END_NONMOVING_TODO_LIST ((struct NonMovingSegment*)1)
+#define END_NONMOVING_TODO_LIST ((struct NonmovingSegment*)1)
 
 // A non-moving allocator for a particular block size
 struct NonmovingAllocator {
