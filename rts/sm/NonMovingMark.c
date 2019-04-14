@@ -1447,6 +1447,7 @@ nonmovingMark (MarkQueue *queue)
 {
     traceConcMarkBegin();
     debugTrace(DEBUG_nonmoving_gc, "Starting mark pass");
+    trace(1, "Starting mark pass");
     unsigned int count = 0;
     while (true) {
         count++;
@@ -1473,6 +1474,7 @@ nonmovingMark (MarkQueue *queue)
         case NULL_ENTRY:
             // Perhaps the update remembered set has more to mark...
             if (upd_rem_set_block_list) {
+                trace(1, "Starting taking updremset");
                 ACQUIRE_LOCK(&upd_rem_set_lock);
                 bdescr *old = queue->blocks;
                 queue->blocks = upd_rem_set_block_list;
@@ -1480,12 +1482,15 @@ nonmovingMark (MarkQueue *queue)
                 upd_rem_set_block_list = NULL;
                 RELEASE_LOCK(&upd_rem_set_lock);
 
+                trace(1, "Currently taking updremset");
                 ACQUIRE_SM_LOCK;
                 freeGroup(old);
                 RELEASE_SM_LOCK;
+                trace(1, "Finished taking updremset");
             } else {
                 // Nothing more to do
                 debugTrace(DEBUG_nonmoving_gc, "Finished mark pass: %d", count);
+                trace(1, "Finished mark pass");
                 traceConcMarkEnd(count);
                 return;
             }

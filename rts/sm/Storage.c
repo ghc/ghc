@@ -1394,6 +1394,9 @@ calcNeeded (bool force_major, memcount *blocks_needed)
                   + gen->n_large_blocks
                   + gen->n_compact_blocks;
 
+//        debugBelch("calcNeeded(%d): blocks: %lu, n_blocks: %lu, max_blocks: %lu\n",
+//                   g, blocks, gen->n_blocks, gen->max_blocks);
+
         // we need at least this much space
         needed += blocks;
 

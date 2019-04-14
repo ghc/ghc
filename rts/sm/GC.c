@@ -1762,9 +1762,13 @@ resize_generations (void)
             }
         }
 
-#if 0
-        debugBelch("live: %d, min_alloc: %d, size : %d, max = %d\n", live,
+#if 1
+        debugBelch("n_words: %lu, live_estimate=%lu\n", oldest_gen->n_words, oldest_gen->live_estimate);
+        debugBelch("live: %lu, min_alloc: %lu, size : %lu, max = %lu\n", live,
                    min_alloc, size, max);
+        debugBelch("resize_gen: n_blocks: %lu, n_large_block: %lu, n_compact_blocks: %lu\n", 
+                   oldest_gen->n_blocks, oldest_gen->n_large_blocks, oldest_gen->n_compact_blocks);
+        debugBelch("resize_gen: max_blocks: %lu -> %lu\n", oldest_gen->max_blocks, oldest_gen->n_blocks);
 #endif
 
         for (g = 0; g < gens; g++) {
