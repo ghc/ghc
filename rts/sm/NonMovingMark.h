@@ -93,8 +93,11 @@ typedef struct {
     MarkQueue queue;
 } UpdRemSet;
 
+// Number of blocks to allocate for a mark queue
+#define MARK_QUEUE_BLOCKS 16
+
 // The length of MarkQueueBlock.entries
-#define MARK_QUEUE_BLOCK_ENTRIES ((BLOCK_SIZE - sizeof(MarkQueueBlock)) / sizeof(MarkQueueEnt))
+#define MARK_QUEUE_BLOCK_ENTRIES ((MARK_QUEUE_BLOCKS * BLOCK_SIZE - sizeof(MarkQueueBlock)) / sizeof(MarkQueueEnt))
 
 extern bdescr *nonmoving_large_objects, *nonmoving_marked_large_objects;
 extern memcount n_nonmoving_large_blocks, n_nonmoving_marked_large_blocks;
