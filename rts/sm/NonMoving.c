@@ -46,10 +46,6 @@ Condition concurrent_coll_finished;
 Mutex concurrent_coll_finished_lock;
 #endif
 
-#if defined(DEBUG)
-void gcCAFs(void);
-#endif
-
 /* Note [Concurrent non-moving collection]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * Concurrency-control of non-moving garbage collection is a bit tricky. There
