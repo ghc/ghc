@@ -185,6 +185,7 @@ hadrian-ghc-in-ghci:
     - x86_64-linux
   script:
     - cabal update
+    - cd hadrian; cabal new-build --project-file=ci.project; cd ..
     - git clean -xdf && git submodule foreach git clean -xdf
     - bash .circleci/prepare-system.sh
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
