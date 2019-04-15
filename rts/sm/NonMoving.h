@@ -71,15 +71,21 @@ struct NonmovingAllocator {
 
 struct NonmovingHeap {
     struct NonmovingAllocator *allocators[NONMOVING_ALLOCA_CNT];
-    struct NonmovingSegment *free; // free segment list
+    // free segment list. This is a cache where we keep up to
+    // NONMOVING_MAX_FREE segments to avoid thrashing the block allocator.
+    // Note that segments in this list are still counted towards
+    // oldest_gen->n_blocks.
+    struct NonmovingSegment *free;
     // how many segments in free segment list? accessed atomically.
     unsigned int n_free;
 
     // records the current length of the nonmovingAllocator.current arrays
     unsigned int n_caps;
 
-    // The set of segments being swept in this GC. Filled during mark phase and
-    // consumed during sweep phase. NULL before mark and after sweep.
+    // The set of segments being swept in this GC. Segments are moved here from
+    // the filled list during preparation and moved back to either the filled,
+    // active, or free lists during sweep.  Should be NULL before mark and
+    // after sweep.
     struct NonmovingSegment *sweep_list;
 };
 
