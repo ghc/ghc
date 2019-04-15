@@ -94,6 +94,38 @@ static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t block_siz
     Bdescr((P_)seg)->u.scan = nonmovingSegmentGetBlock(seg, 0);
 }
 
+static unsigned int countSegmentListBlocks(struct NonmovingSegment *seg)
+{
+    unsigned int n = 0;
+    while (seg != NULL) {
+        n += Bdescr((StgPtr) seg)->blocks;
+        seg = seg->link;
+    }
+    return n;
+}
+
+static unsigned int countAllocatorBlocks(struct NonmovingAllocator *alloc)
+{
+    unsigned int n = 0;
+    n += countSegmentListBlocks(alloc->filled);
+    n += countSegmentListBlocks(alloc->active);
+    for (unsigned int cap = 0; cap < n_capabilities; cap++)
+        n += countSegmentListBlocks(alloc->current[cap]);
+    return n;
+}
+
+static unsigned int countHeapBlocks(struct NonmovingHeap *heap)
+{
+    unsigned int n = 0;
+    for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
+        n += countAllocatorBlocks(heap->allocators[i]);
+    }
+    n += countSegmentListBlocks(heap->free);
+    n += countSegmentListBlocks(heap->sweep_list);
+    return n;
+}
+
+
 // Add a segment to the free list.
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
 {
