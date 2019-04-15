@@ -46,7 +46,7 @@ import GhcPrelude
 
 import BlockId
 import Cmm ( RawCmmDecl, GenCmmDecl( .. ), CmmBlock, succ, g_entry
-           , CmmGraph )
+           , CmmGraph, GlobalReg ( HpLim, SpLim, BaseReg ), foldRegsUsed )
 import CmmNode
 import CmmUtils
 import CmmSwitch
@@ -144,9 +144,22 @@ instance Outputable CfgEdge where
 -- Cmm <-> asm transition.
 -- See also Note [Inverting Conditional Branches]
 data TransitionSource
-  = CmmSource (CmmNode O C)
+  = CmmSource { trans_cmmNode :: (CmmNode O C)
+              , trans_info :: BranchInfo }
   | AsmCodeGen
   deriving (Eq)
+
+data BranchInfo = NoInfo         -- ^ Unknown, but not heap or stack check.
+                | HeapStackCheck -- ^ Heap or stack check
+    deriving Eq
+
+instance Outputable BranchInfo where
+    ppr NoInfo = text "regular"
+    ppr HeapStackCheck = text "heap/stack"
+
+isHeapOrStackCheck :: TransitionSource -> Bool
+isHeapOrStackCheck (CmmSource { trans_info = HeapStackCheck}) = True
+isHeapOrStackCheck _ = False
 
 -- | Information about edges
 data EdgeInfo
@@ -578,13 +591,24 @@ getCfg weights graph =
     getBlockEdges block =
       case branch of
         CmmBranch dest -> [mkEdge dest uncondWeight]
-        CmmCondBranch _c t f l
+        CmmCondBranch cond t f l
           | l == Nothing ->
               [mkEdge f condBranchWeight,   mkEdge t condBranchWeight]
           | l == Just True ->
               [mkEdge f unlikelyCondWeight, mkEdge t likelyCondWeight]
           | l == Just False ->
               [mkEdge f likelyCondWeight,   mkEdge t unlikelyCondWeight]
+          where
+            mkEdgeInfo = -- pprTrace "Info" (ppr branchInfo <+> ppr cond)
+                         EdgeInfo (CmmSource branch branchInfo) . fromIntegral
+            mkEdge target weight = ((bid,target), mkEdgeInfo weight)
+            branchInfo =
+              foldRegsUsed
+                (panic "foldRegsDynFlags")
+                (\info r -> if r == SpLim || r == HpLim || r == BaseReg
+                    then HeapStackCheck else info)
+                NoInfo cond
+
         (CmmSwitch _e ids) ->
           let switchTargets = switchTargetsToList ids
               --Compiler performance hack - for very wide switches don't
@@ -602,7 +626,7 @@ getCfg weights graph =
             map (\x -> ((bid,x),mkEdgeInfo 0)) $ G.successors other
       where
         bid = G.entryLabel block
-        mkEdgeInfo = EdgeInfo (CmmSource branch) . fromIntegral
+        mkEdgeInfo = EdgeInfo (CmmSource branch NoInfo) . fromIntegral
         mkEdge target weight = ((bid,target), mkEdgeInfo weight)
         branch = lastNode block :: CmmNode O C
 
@@ -657,10 +681,6 @@ optimizeCFG weights (CmmProc info _lab _live graph) cfg =
           = weight - (fromIntegral $ D.infoTablePenalty weights)
           | otherwise = weight
 
-
-{- Note [Optimize for Fallthrough]
-
--}
     -- | If a block has two successors, favour the one with fewer
     -- predecessors. (As that one is more likely to become a fallthrough)
     favourFewerPreds :: CFG -> CFG
@@ -697,8 +717,8 @@ optimizeCFG weights (CmmProc info _lab _live graph) cfg =
         fallthroughTarget to (EdgeInfo source _weight)
           | mapMember to info = False
           | AsmCodeGen <- source = True
-          | CmmSource (CmmBranch {}) <- source = True
-          | CmmSource (CmmCondBranch {}) <- source = True
+          | CmmSource { trans_cmmNode = CmmBranch {} } <- source = True
+          | CmmSource { trans_cmmNode = CmmCondBranch {} } <- source = True
           | otherwise = False
 
 -- | Determine loop membership of blocks based on SCC analysis
@@ -894,13 +914,46 @@ mkGlobalWeights root localCfg
     fromVertex :: Int -> BlockId
     fromVertex vertex   = blockMapping ! vertex
 
--- Also based on
--- "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus
--- TODO: This seems like something better done at the Cmm level as that would
--- make it easier to implement more heuristics.
+-- Note [Static Branch Prediction]
+-- The work here has been based on the paper
+-- "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus.
+
+-- The primary differences are that if we branch on the result of a heap
+-- check we do not apply any of the heuristics.
+-- The reason is simple: They look like loops in the control flow graph
+-- but are usually never entered, and if at most once.
+
+-- Currently the implemented are an heuristic to predict that we do not exit
+-- loops (lehPredicts) and one to predict that backedges are more likely
+-- than any other edge.
+
+-- The back edge case is special as it superceeds any other heuristic if it
+-- applies.
+
+-- Do NOT rely solely on nofib results for benchmarking this. I recommend at least
+-- comparing megaparsec and container benchmarks. Nofib does not seeem to have
+-- many instances of "loopy" Cmm where these make a difference.
+
+-- TODO:
+-- * The paper containers more benchmarks which should be implemented.
+-- * If we turn the likelyhood on if/else branches into a probability
+--   instead of true/false we could implement this as a Cmm pass.
+--   + The complete Cmm code still exists and can be accessed by the heuristics
+--   + There is no chance of register allocation/codegen inserting branches/blocks
+--   + making the TransitionSource info wrong.
+--   + potential to use this information in CmmPasses.
+--   - Requires refactoring of all the code relying on the binary nature of likelyhood.
+--   - Requires refactoring `loopInfo` to work on both, Cmm Graphs and the backend CFG.
+
+-- | Combination of target node id and information about the branch
+--   we are looking at.
+type TargetNodeInfo = (BlockId, EdgeInfo)
+
 
 -- | Update branch weights based on certain heuristics.
+-- See Note [Static Branch Prediction]
 staticBranchPrediction :: BlockId -> LoopInfo -> CFG -> CFG
+-- staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg = cfg
 staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg =
     -- pprTrace "staticEstimatesOn" (ppr (cfg)) $
     setFoldl update cfg nodes
@@ -918,43 +971,50 @@ staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         | null successors = cfg
 
         -- Mix of backedges and others:
-        -- Always predict the backedges no matter what.
-        -- TODO: Don't overrule all predictions from earlier compiler
-        -- phases. Currently it simply overwrites these.
+        -- Always predict the backedges.
         | not (null m) && length m < length successors
+        -- Heap/Stack checks "loop", but only once.
+        -- So we simply exclude any case involving them.
+        , not $ any (isHeapOrStackCheck  . transitionSource . snd) successors
         = let   loopChance = repeat $ pred_LBH / (fromIntegral $ length m)
-                exitChance = repeat $ (1 - pred_LBH) / fromIntegral (length successors - length m)
+                exitChance = repeat $ (1 - pred_LBH) / fromIntegral (length not_m)
                 updates = zip (map fst m) loopChance ++ zip (map fst not_m) exitChance
-        in  --pprTrace "Backedges!!!" empty $
-            -- pprTrace "mix" (ppr (node,successors)) $
+        in  -- pprTrace "mix" (ppr (node,successors)) $
             foldl' (\cfg (to,weight) -> setEdgeWeight cfg weight node to) cfg updates
+
         -- For (regular) non-binary branches we keep the weights from the STG -> Cmm translation.
         | length successors /= 2 = cfg
         -- Only backedges - no need to adjust
+
         | length m > 0
         = cfg
 
         -- A regular binary branch, we can plug addition predictors in here.
         | [(s1,s1_info),(s2,s2_info)] <- successors
+        , not $ any (isHeapOrStackCheck  . transitionSource . snd) successors
         = -- Normalize weights to total of 1
-            let w1 = max (edgeWeight s1_info) (0.001)
-                w2 = max (edgeWeight s2_info) (0.001)
-                cfg'  = setEdgeWeight cfg  (w1/w1+w2) node s1
-                cfg'' = setEdgeWeight cfg' (w2/w1+w2) node s2
+            let w1 = max (edgeWeight s1_info) (0)
+                w2 = max (edgeWeight s2_info) (0)
+                -- Of both weights are <= 0 we set both to 0.5
+                normalizeWeight w = if w1 + w2 == 0 then 0.5 else w/(w1+w2)
+                cfg'  = setEdgeWeight cfg  (normalizeWeight w1) node s1
+                cfg'' = setEdgeWeight cfg' (normalizeWeight w2) node s2
 
                 -- Figure out which heuristics apply to these successors
-                heuristics = map ($ (s1,s2))
+                heuristics = map ($ ((s1,s1_info),(s2,s2_info)))
                             [lehPredicts, phPredicts, ohPredicts, ghPredicts, lhhPredicts, chPredicts
                             , shPredicts, rhPredicts]
                 -- Apply result of a heuristic. Argument is the likelyhood
                 -- predicted for s1.
                 applyHeuristic :: CFG -> Maybe Prob -> CFG
                 applyHeuristic cfg Nothing = cfg
-                applyHeuristic cfg (Just (s1_pred :: Double)) =
-                        -- Old weights
-                    let s1_old = getEdgeWeight cfg node s1
-                        s2_old = getEdgeWeight cfg node s2
-                        -- Predictions from heuristic
+                applyHeuristic cfg (Just (s1_pred :: Double))
+                  | s1_old == 0 || s2_old == 0 ||
+                    isHeapOrStackCheck (transitionSource s1_info) ||
+                    isHeapOrStackCheck (transitionSource s2_info)
+                  = cfg
+                  | otherwise =
+                    let -- Predictions from heuristic
                         s1_prob = EdgeWeight s1_pred :: EdgeWeight
                         s2_prob = 1.0 - s1_prob
                         -- Update
@@ -962,19 +1022,23 @@ staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg =
                         s1_prob' = s1_old * s1_prob / d
                         s2_prob' = s2_old * s2_prob / d
                         cfg_s1 = setEdgeWeight cfg    s1_prob' node s1
-                    in  -- pprTrace "Applying heuristic!" (ppr (node,s1,s2)) $
+                    in  -- pprTrace "Applying heuristic!" (ppr (node,s1,s2) $$ ppr (s1_prob', s2_prob')) $
                         setEdgeWeight cfg_s1 s2_prob' node s2
+                  where
+                    -- Old weights
+                    s1_old = getEdgeWeight cfg node s1
+                    s2_old = getEdgeWeight cfg node s2
 
             in
             -- pprTraceIt "RegularCfgResult" $
             foldl' applyHeuristic cfg'' heuristics
-        | otherwise =
-            -- Giving the root here makes it easy to grep for it in case of error.
-            pprPanic "staticBranchPrediction: Impossible case in function with root " (ppr root)
+
+        -- Branch on heap/stack check
+        | otherwise = cfg
 
       where
         -- Chance that loops are taken.
-        pred_LBH = 0.9
+        pred_LBH = 0.875
         -- successors
         successors = getSuccessorEdges cfg node
         -- backedges
@@ -986,9 +1050,9 @@ staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg =
 
         -- Loop exit heuristic. We are unlikely to leave a loop unless it's to enter
         -- another one.
-        pred_LEH = 0.8
-        lehPredicts :: (BlockId,BlockId) -> Maybe Prob
-        lehPredicts (s1,s2)
+        pred_LEH = 0.75
+        lehPredicts :: (TargetNodeInfo,TargetNodeInfo) -> Maybe Prob
+        lehPredicts ((s1,s1_info),(s2,s2_info))
           -- None of the successors is a loop header
           | S.member s1 loopHeads || S.member s2 loopHeads
           = Nothing
@@ -1008,12 +1072,12 @@ staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         -- Not all will apply, for now we just stub them out as Nothing.
 
         -- Pointer heuristic - Pointers usually compare as unequal.
-        -- phPredicts (s1,s2)
-        --     | CmmSource src1 <- getTransitionSource cfg node s1
-        --     , CmmCondBranch cond ltrue lfalse _likely <- src1
-        --     = Nothing
-        --     | otherwise = Nothing
-        phPredicts = const Nothing
+        phPredicts (s1,s2)
+            | CmmSource { trans_cmmNode = src1 } <- getTransitionSource node (fst s1) cfg
+            , CmmCondBranch cond ltrue lfalse _likely <- src1
+            = Nothing
+            | otherwise = Nothing
+        -- phPredicts = const Nothing
 
         ohPredicts = const Nothing
         ghPredicts = const Nothing
@@ -1042,12 +1106,14 @@ cfgEdgeProbabilities cfg toVertex
         -- Zeros could be okay if we would check if there is at least one non-zero edge
         -- but for simplicity/performance we just treat all edges <= zero as having a minimal chance of
         -- being taken to avoid tricky business with Inf values.
-        minWeight = 0.0001 :: Prob
+        minWeight = 0 :: Prob
         weightMap' = fmap (\w -> max (weightToDouble . edgeWeight $ w) minWeight) weightMap
         totalWeight = sum weightMap'
 
         normalWeight :: BlockId -> Prob
         normalWeight bid
+         | totalWeight == 0
+         = 1.0 / fromIntegral edgeCount
          | Just w <- mapLookup bid weightMap'
          = w/totalWeight
          | otherwise = panic "impossible"
@@ -1142,7 +1208,8 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
                                 setFreq block $! f + prob
                                 return 0)
                     -- traceM $ "cycleProb:" ++ show cycleProb
-                    let limit = 0.9999999999 -- Paper uses 1 - epsilon, but this works
+                    let limit = 1 - 1/512 -- Paper uses 1 - epsilon, but this works.
+                                          -- determines how large likelyhoods in loops can grow.
                     !cycleProb <- return $ min cycleProb limit -- <- return $ if cycleProb > limit then limit else cycleProb
                     -- traceM $ "cycleProb:" ++ show cycleProb
 

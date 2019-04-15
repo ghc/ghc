@@ -601,7 +601,7 @@ sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
           where
             relevantWeight :: CfgEdge -> Maybe CfgEdge
             relevantWeight edge@(CfgEdge from to edgeInfo)
-                | (EdgeInfo (CmmSource (CmmCall {})) _) <- edgeInfo
+                | (EdgeInfo CmmSource { trans_cmmNode = CmmCall {} } _) <- edgeInfo
                 -- Ignore edges across calls
                 = Nothing
                 | mapMember to info
@@ -648,7 +648,7 @@ sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
             deadEdge (CfgEdge from to _) = let e = (from,to) in Set.member e combined || Set.member e builtEdges
             relevantWeight :: CfgEdge -> EdgeWeight
             relevantWeight (CfgEdge _ _ edgeInfo)
-                | (EdgeInfo (CmmSource (CmmCall {})) _) <- edgeInfo
+                | EdgeInfo (CmmSource { trans_cmmNode = CmmCall {}}) _ <- edgeInfo
                 -- Penalize edges across calls
                 = weight/(64.0)
                 | otherwise
@@ -722,8 +722,10 @@ dropJumps info ((BasicBlock lbl ins):todo)
 sequenceTop
     :: (Instruction instr, Outputable instr)
     => DynFlags --Use new layout code
-    -> NcgImpl statics instr jumpDest -> CFG
-    -> NatCmmDecl statics instr -> NatCmmDecl statics instr
+    -> NcgImpl statics instr jumpDest
+    -> CFG
+    -> NatCmmDecl statics instr
+    -> NatCmmDecl statics instr
 
 sequenceTop _     _       _           top@(CmmData _ _) = top
 sequenceTop dflags ncgImpl edgeWeights
