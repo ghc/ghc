@@ -506,8 +506,10 @@ initEventLogging(const EventLogWriter *ev_writer)
     event_log_writer = ev_writer;
     initEventLogWriter();
 
-    if (sizeof(EventDesc) / sizeof(char*) != NUM_GHC_EVENT_TAGS) {
-        barf("EventDesc array has the wrong number of elements");
+    int num_descs = sizeof(EventDesc) / sizeof(char*);
+    if (num_descs != NUM_GHC_EVENT_TAGS) {
+        barf("EventDesc array has the wrong number of elements (%d, NUM_GHC_EVENT_TAGS=%d)",
+             num_descs, NUM_GHC_EVENT_TAGS);
     }
 
     /*
