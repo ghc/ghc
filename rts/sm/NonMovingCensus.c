@@ -90,6 +90,9 @@ nonmovingAllocatorCensus(struct NonmovingAllocator *alloc)
 
 void nonmovingPrintAllocatorCensus()
 {
+    if (!RtsFlags.GcFlags.useNonmoving)
+        return;
+
     for (int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
         struct NonmovingAllocCensus census =
             nonmovingAllocatorCensus(nonmovingHeap.allocators[i]);
@@ -108,4 +111,19 @@ void nonmovingPrintAllocatorCensus()
                    census.n_active_segs, census.n_filled_segs, census.n_live_blocks, census.n_live_words,
                    occupancy);
     }
+}
+
+void nonmovingTraceAllocatorCensus()
+{
+#if defined(TRACING)
+    if (!RtsFlags.GcFlags.useNonmoving && !TRACE_nonmoving_gc)
+        return;
+
+    for (int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
+        const struct NonmovingAllocCensus census =
+            nonmovingAllocatorCensus(nonmovingHeap.allocators[i]);
+        const uint32_t log_blk_size = i + NONMOVING_ALLOCA0;
+        traceNonmovingHeapCensus(log_blk_size, &census);
+    }
+#endif
 }

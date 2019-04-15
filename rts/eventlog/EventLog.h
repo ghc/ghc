@@ -160,6 +160,8 @@ void postHeapProfSampleCostCentre(StgWord8 profile_id,
 
 void postConcUpdRemSetFlush(Capability *cap);
 void postConcMarkEnd(StgWord32 marked_obj_count);
+void postNonmovingHeapCensus(int log_blk_size,
+                             const struct NonmovingAllocCensus *census);
 
 #else /* !TRACING */
 
