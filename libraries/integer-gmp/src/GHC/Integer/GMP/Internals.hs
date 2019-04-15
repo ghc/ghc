@@ -124,6 +124,7 @@ module GHC.Integer.GMP.Internals
     , eqBigNatWord#
     , eqBigNat
     , eqBigNat#
+    , neqBigNat#
     , gtBigNatWord#
 
       -- * Miscellaneous GMP-provided operations
