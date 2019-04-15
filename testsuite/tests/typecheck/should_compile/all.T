@@ -674,3 +674,10 @@ test('T16411', normal, compile, [''])
 test('T16609', normal, compile, [''])
 test('T505', normal, compile, [''])
 test('T12928', normal, compile, [''])
+# T12178
+#   All functions defined for this test have names beginning with 'test'.
+#   A pattern synonym used in a function testFoo was inlined iff there is no
+#   occurence of 'Pattern' between testFoo and the next empty line in the output
+#   of grep. This works because all pattern synonyms have 'Pattern' in their
+#   names, and every function definition ends with an empty line.
+test('T12178', [ grep_errmsg(r'(^test|Pattern|^$)') ], compile, ['-dsuppress-all -ddump-simpl'])

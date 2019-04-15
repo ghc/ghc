@@ -1002,7 +1002,20 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
 
 renameSig ctxt sig@(InlineSig _ v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
+        ; when (isDataOcc $ occ_v) $
+            -- If it looks like data constructor, but it's also present in the
+            -- context, it's probably a pattern synonym.
+            -- See Note [Pragmas for pattern synonyms] in TcPatSyn
+            unless (occ_v `elementOfUniqSet` (mapUniqSet nameOccName ctxt_ns)) $
+              addErr (text "INLINE and NOINLINE pragmas are not supported" <+>
+                      text "for data constructors")
         ; return (InlineSig noExt new_v s, emptyFVs) }
+  where
+    occ_v = occName $ unLoc v
+    ctxt_ns = case ctxt of
+                TopSigCtxt ns -> ns
+                HsBootCtxt ns -> ns
+                _ -> emptyNameSet
 
 renameSig ctxt (FixSig _ fsig)
   = do  { new_fsig <- rnSrcFixityDecl ctxt fsig
