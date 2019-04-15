@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "NonMoving.h"
+
 struct NonmovingAllocCensus {
     uint32_t n_active_segs;
     uint32_t n_filled_segs;
@@ -23,3 +25,4 @@ struct NonmovingAllocCensus
 nonmovingAllocatorCensus(struct NonmovingAllocator *alloc);
 
 void nonmovingPrintAllocatorCensus(void);
+void nonmovingTraceAllocatorCensus(void);
