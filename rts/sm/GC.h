@@ -37,13 +37,16 @@ extern StgPtr mark_sp;
 
 extern bool work_stealing;
 
-#if defined(DEBUG)
+#define MUTLIST_DEBUG
+#if defined(MUTLIST_DEBUG)
 extern uint32_t mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS,
     mutlist_TVAR,
     mutlist_TVAR_WATCH_QUEUE,
     mutlist_TREC_CHUNK,
     mutlist_TREC_HEADER;
+#endif
 
+#if defined(DEBUG)
 void gcCAFs(void);
 #endif
 

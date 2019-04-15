@@ -113,8 +113,9 @@ bool major_gc;
  */
 static W_ g0_pcnt_kept = 30; // percentage of g0 live at last minor GC
 
+#define MUTLIST_DEBUG
 /* Mut-list stats */
-#if defined(DEBUG)
+#if defined(MUTLIST_DEBUG)
 uint32_t mutlist_MUTVARS,
     mutlist_MUTARRS,
     mutlist_MVARS,
@@ -242,7 +243,7 @@ GarbageCollect (uint32_t collect_gen,
   // the table from occurring during GC.
   stablePtrLock();
 
-#if defined(DEBUG)
+#if defined(MUTLIST_DEBUG)
   mutlist_MUTVARS = 0;
   mutlist_MUTARRS = 0;
   mutlist_MVARS = 0;
@@ -566,13 +567,15 @@ GarbageCollect (uint32_t collect_gen,
         }
         copied +=  mut_list_size;
 
-        debugTrace(1,
-                   "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d others)",
-                   (unsigned long)(mut_list_size * sizeof(W_)),
-                   mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS,
-                   mutlist_TVAR, mutlist_TVAR_WATCH_QUEUE,
-                   mutlist_TREC_CHUNK, mutlist_TREC_HEADER,
-                   mutlist_OTHERS);
+#if defined(MUTLIST_DEBUG)
+        trace(1,
+              "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d others)",
+              (unsigned long)(mut_list_size * sizeof(W_)),
+              mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS,
+              mutlist_TVAR, mutlist_TVAR_WATCH_QUEUE,
+              mutlist_TREC_CHUNK, mutlist_TREC_HEADER,
+              mutlist_OTHERS);
+#endif
     }
 
     bdescr *next, *prev;
