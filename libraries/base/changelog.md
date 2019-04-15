@@ -5,6 +5,10 @@
 
   * Add a `TestEquality` instance for the `Compose` newtype.
 
+  * Allow compile-time constant folding of most instances of `Natural` literals.
+    Related to this, the `Eq` and `Ord` instances for this type are no longer
+    derived to let their methods constant-fold as well.
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 

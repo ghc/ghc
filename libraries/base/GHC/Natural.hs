@@ -45,6 +45,14 @@ module GHC.Natural
     , remNatural
     , gcdNatural
     , lcmNatural
+      -- * Equality and Ordering
+    , compareNatural
+    , neqNatural
+    , eqNatural
+    , leNatural
+    , ltNatural
+    , gtNatural
+    , geNatural
       -- * Bits
     , andNatural
     , orNatural
@@ -105,7 +113,7 @@ default ()
 -- Arithmetic underflow
 -------------------------------------------------------------------------------
 
--- We put them here because they are needed relatively early
+-- We put them here because they were needed relatively early
 -- in the libraries before the Exception type has been defined yet.
 
 {-# NOINLINE underflowError #-}
@@ -121,7 +129,7 @@ divZeroError = raise# divZeroException
 -------------------------------------------------------------------------------
 
 #if defined(MIN_VERSION_integer_gmp)
--- TODO: if saturated arithmetic is to used, replace 'underflowError' by '0'
+-- TODO: if saturated arithmetic is to be used, replace 'underflowError' by '0'
 
 -- | Type representing arbitrary-precision non-negative integers.
 --
@@ -141,12 +149,84 @@ data Natural = NatS#                 GmpLimb# -- ^ in @[0, maxBound::Word]@
                                               -- __Invariant__: 'NatJ#' is used
                                               -- /iff/ value doesn't fit in
                                               -- 'NatS#' constructor.
-                               -- NB: Order of constructors *must*
-                               -- coincide with 'Ord' relation
-             deriving ( Eq  -- ^ @since 4.8.0.0
-                      , Ord -- ^ @since 4.8.0.0
-                      )
+                                              -- NB: Order of constructors *must*
+                                              -- coincide with 'Ord' relation
 
+-- Note [Ord and Eq instances for Natural]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- In order to take advantage of constant folding, the @Ord/Eq@ instances for
+-- @Natural@ cannot be derived so that the @NOINLINE@ pragma can be applied to
+-- comparison operators when using the @Natural@ type, just as it is done for
+-- @Integer@. Deriving instances for these classes means it would not be
+-- possible to do this.
+--
+-- Note that in case there is no version of the `integer-gmp` library in use,
+-- @Natural@ falls back to wrapping an @Integer@ over a newtype and deriving
+-- @Eq/Ord@, at which point the folding rules for @Integer@ take over.
+-- Furthermore, the folding rules for these operators will remain, but will
+-- never be used as they won't match with anything in the AST.
+
+-- | @since 4.8.0.0
+instance Eq Natural where
+    (==)    = eqNatural
+    (/=)    = neqNatural
+
+-- | @since 4.8.0.0
+instance Ord Natural where
+    compare = compareNatural
+    (>)     = gtNatural
+    (>=)    = geNatural
+    (<)     = ltNatural
+    (<=)    = leNatural
+
+neqNatural, eqNatural, leNatural, ltNatural, gtNatural, geNatural
+  :: Natural -> Natural -> Bool
+eqNatural  x y = isTrue# (eqNatural#  x y)
+neqNatural x y = isTrue# (neqNatural# x y)
+leNatural  x y = isTrue# (leNatural#  x y)
+ltNatural  x y = isTrue# (ltNatural#  x y)
+gtNatural  x y = isTrue# (gtNatural#  x y)
+geNatural  x y = isTrue# (geNatural#  x y)
+
+eqNatural#, neqNatural#, leNatural#, ltNatural#, gtNatural#, geNatural#
+  :: Natural -> Natural -> Int#
+eqNatural# (NatS# x#) (NatS# y#) = eqWord# x# y#
+eqNatural# (NatJ# x) (NatJ# y)   = eqBigNat# x y
+eqNatural# _       _             = 0#
+{-# CONSTANT_FOLDED eqNatural# #-}
+
+neqNatural# (NatS# x#) (NatS# y#) = neWord# x# y#
+neqNatural# (NatJ# x) (NatJ# y)   = neqBigNat# x y
+neqNatural# _       _             = 1#
+{-# CONSTANT_FOLDED neqNatural# #-}
+
+gtNatural# (NatS# x#) (NatS# y#)           = gtWord# x# y#
+gtNatural# x y | compareNatural x y == GT  = 1#
+gtNatural# _ _                             = 0#
+{-# CONSTANT_FOLDED gtNatural# #-}
+
+leNatural# (NatS# x#) (NatS# y#)          = leWord# x# y#
+leNatural# x y | compareNatural x y /= GT = 1#
+leNatural# _ _                            = 0#
+{-# CONSTANT_FOLDED leNatural# #-}
+
+ltNatural# (NatS# x#) (NatS# y#)          = ltWord# x# y#
+ltNatural# x y | compareNatural x y == LT = 1#
+ltNatural# _ _                            = 0#
+{-# CONSTANT_FOLDED ltNatural# #-}
+
+geNatural# (NatS# x#) (NatS# y#)          = geWord# x# y#
+geNatural# x y | compareNatural x y /= LT = 1#
+geNatural# _ _                            = 0#
+{-# CONSTANT_FOLDED geNatural# #-}
+
+compareNatural :: Natural -> Natural -> Ordering
+compareNatural (NatS# x)  (NatS# y)  = compareWord#  x y
+compareNatural (NatJ# x)  (NatJ# y)  = compareBigNat x y
+compareNatural (NatS# _)  (NatJ# _)  = LT
+compareNatural (NatJ# _)  _          = GT
+{-# CONSTANT_FOLDED compareNatural #-}
 
 -- | Test whether all internal invariants are satisfied by 'Natural' value
 --
@@ -410,6 +490,17 @@ wordToNaturalBase w# = NatS# w#
 newtype Natural = Natural Integer -- ^ __Invariant__: non-negative 'Integer'
                   deriving (Eq,Ord)
 
+neqNatural, eqNatural, leNatural, ltNatural, gtNatural, geNatural
+  :: Natural -> Natural -> Bool
+eqNatural  (Natural x) (Natural y) = eqInteger x y
+neqNatural (Natural x) (Natural y) = neqInteger x y
+leNatural  (Natural x) (Natural y) = leInteger x y
+ltNatural  (Natural x) (Natural y) = ltInteger x y
+gtNatural  (Natural x) (Natural y) = gtInteger x y
+geNatural  (Natural x) (Natural y) = geInteger x y
+
+compareNatural :: Natural -> Natural -> Ordering
+compareNatural (Natural x) (Natural y) = compare x y
 
 -- | Test whether all internal invariants are satisfied by 'Natural' value
 --

@@ -39,10 +39,17 @@ main = do
           p "intToNatural"       intToNaturalLit
           p "naturalToInt"       naturalToIntLit
           p "xorNatural"         xorNatural
-
+          p "eqNatural"          eqNaturalLit
+          p "neqNatural"         neqNaturalLit
+          p "leNatural"          leNaturalLit
+          p "ltNatural"          ltNaturalLit
+          p "geNatural"          geNaturalLit
+          p "gtNatural"          gtNaturalLit
+          p "compareNatural"     compareNaturalLit
     where p :: Show a => String -> a -> IO ()
           p str x = putStrLn (str ++ ": " ++ show x)
 
+-- Bit arithmetic
 andNatural :: Natural
 andNatural = 100052 .&. 140053
 
@@ -52,50 +59,8 @@ xorNatural = 100071 `xor` 140072
 bitNatural :: Natural
 bitNatural = bit 4
 
-minusNatural :: Natural
-minusNatural = 100999 - 100010
-
-naturalFromInteger :: Natural
-naturalFromInteger = fromInteger 100054 + 100055
-
-naturalToInteger :: Integer
-naturalToInteger = toInteger (100056 :: Natural) + 100057
-
-negateNatural :: Natural
-negateNatural = negate 0
-
 orNatural :: Natural
 orNatural = 100058 .|. 140059
-
-plusNatural :: Natural
-plusNatural = 100060 + 100061
-
-popCountNatural :: Int
-popCountNatural = popCount (100095 :: Natural)
-
-quotRemNatural :: (Natural, Natural)
-quotRemNatural = 100063 `quotRem` 123
-
-divModNatural :: (Natural, Natural)
-divModNatural = 100060 `divMod` 456
-
-divNatural :: Natural
-divNatural = 100286 `div` 156
-
-modNatural :: Natural
-modNatural = 100086 `mod` 156
-
-quotNatural :: Natural
-quotNatural = 100062 `quot` 156
-
-remNatural :: Natural
-remNatural = 100064 `rem` 156
-
-gcdNatural :: Natural
-gcdNatural = 100048 `gcd` 150072
-
-lcmNatural :: Natural
-lcmNatural = 100050 `lcm` 100060
 
 shiftLNatural :: Natural
 shiftLNatural = 100065 `shiftL` 4
@@ -103,20 +68,68 @@ shiftLNatural = 100065 `shiftL` 4
 shiftRNatural :: Natural
 shiftRNatural = 100066 `shiftR` 4
 
-signumNaturalP :: Natural
-signumNaturalP = signum 100067
-
-signumNaturalZ :: Natural
-signumNaturalZ = signum 0
+popCountNatural :: Int
+popCountNatural = popCount (100095 :: Natural)
 
 testBitNaturalT :: Bool
 testBitNaturalT = testBit (100068 :: Natural) 2
 
 testBitNaturalF :: Bool
 testBitNaturalF = testBit (100069 :: Natural) 1
+-----------------------------------------------
+
+-- Arithmetic
+plusNatural :: Natural
+plusNatural = 100060 + 100061
 
 timesNatural :: Natural
 timesNatural = 100070 * 6832
+
+minusNatural :: Natural
+minusNatural = 100999 - 100010
+
+negateNatural :: Natural
+negateNatural = negate 0
+
+signumNaturalP :: Natural
+signumNaturalP = signum 100067
+
+signumNaturalZ :: Natural
+signumNaturalZ = signum 0
+------------------------
+
+-- Quotients and remainders
+quotRemNatural :: (Natural, Natural)
+quotRemNatural = 100063 `quotRem` 123
+
+divModNatural :: (Natural, Natural)
+divModNatural = 100060 `divMod` 456
+
+quotNatural :: Natural
+quotNatural = 100062 `quot` 156
+
+remNatural :: Natural
+remNatural = 100064 `rem` 156
+
+divNatural :: Natural
+divNatural = 100286 `div` 156
+
+modNatural :: Natural
+modNatural = 100086 `mod` 156
+
+gcdNatural :: Natural
+gcdNatural = 100048 `gcd` 150072
+
+lcmNatural :: Natural
+lcmNatural = 100050 `lcm` 100060
+--------------------------------
+
+-- Conversions
+naturalFromInteger :: Natural
+naturalFromInteger = fromInteger 100054 + 100055
+
+naturalToInteger :: Integer
+naturalToInteger = toInteger (100056 :: Natural) + 100057
 
 -- Same story as the @Integer@ case: for the conversion functions, we can't
 -- just check that e.g. 100065 is in the resulting core, because it will be
@@ -134,3 +147,22 @@ intToNaturalLit = intToNatural 100076# + 100077
 
 naturalToIntLit :: Int
 naturalToIntLit = I# (naturalToInt 100078) + 100079
+---------------------------------------------------
+
+-- Ordering and Equality
+eqNaturalLit, neqNaturalLit, leNaturalLit, ltNaturalLit, geNaturalLit,
+    gtNaturalLit :: Bool
+eqNaturalLit = (100080 :: Natural) == 100081
+
+neqNaturalLit = (100082 :: Natural) /= 100083
+
+leNaturalLit = (100084 :: Natural) <= 100085
+
+ltNaturalLit = (100086 :: Natural) < 100087
+
+geNaturalLit = (100088 :: Natural) >= 100089
+
+gtNaturalLit = (100090 :: Natural) > 100091
+
+compareNaturalLit :: Ordering
+compareNaturalLit = compare (100092 :: Natural) 100093
