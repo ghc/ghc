@@ -831,18 +831,31 @@ pprStgExpr (StgTick tickish expr)
     else sep [ ppr tickish, pprStgExpr expr ]
 
 
+-- Don't indent for a single case alternative.
+pprStgExpr (StgCase expr bndr alt_type [alt])
+  = sep [sep [text "case",
+           nest 4 (hsep [pprStgExpr expr,
+             whenPprDebug (dcolon <+> ppr alt_type)]),
+           text "of", pprBndr CaseBind bndr, char '{'],
+           pprStgAlt False alt,
+           char '}']
+
 pprStgExpr (StgCase expr bndr alt_type alts)
   = sep [sep [text "case",
            nest 4 (hsep [pprStgExpr expr,
              whenPprDebug (dcolon <+> ppr alt_type)]),
            text "of", pprBndr CaseBind bndr, char '{'],
-           nest 2 (vcat (map pprStgAlt alts)),
+           nest 2 (vcat (map (pprStgAlt True) alts)),
            char '}']
 
-pprStgAlt :: OutputablePass pass => GenStgAlt pass -> SDoc
-pprStgAlt (con, params, expr)
-  = hang (hsep [ppr con, sep (map (pprBndr CasePatBind) params), text "->"])
-         4 (ppr expr <> semi)
+
+pprStgAlt :: OutputablePass pass => Bool -> GenStgAlt pass -> SDoc
+pprStgAlt indent (con, params, expr)
+  | indent    = hang altPattern 4 (ppr expr <> semi)
+  | otherwise = sep [altPattern, ppr expr <> semi]
+    where
+      altPattern = (hsep [ppr con, sep (map (pprBndr CasePatBind) params), text "->"])
+
 
 pprStgOp :: StgOp -> SDoc
 pprStgOp (StgPrimOp  op)   = ppr op
