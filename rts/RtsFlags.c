@@ -218,6 +218,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.timestamp     = false;
     RtsFlags.TraceFlags.scheduler     = false;
     RtsFlags.TraceFlags.gc            = false;
+    RtsFlags.TraceFlags.nonmoving_gc  = false;
     RtsFlags.TraceFlags.sparks_sampled= false;
     RtsFlags.TraceFlags.sparks_full   = false;
     RtsFlags.TraceFlags.user          = false;
@@ -2101,6 +2102,10 @@ static void read_trace_flags(const char *arg)
             break;
         case 'g':
             RtsFlags.TraceFlags.gc        = enabled;
+            enabled = true;
+            break;
+        case 'n':
+            RtsFlags.TraceFlags.nonmoving_gc = enabled;
             enabled = true;
             break;
         case 'u':
