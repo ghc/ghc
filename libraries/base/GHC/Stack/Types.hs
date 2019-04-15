@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE ImplicitParams    #-}
 {-# LANGUAGE KindSignatures    #-}
 {-# LANGUAGE PolyKinds         #-}
@@ -48,6 +49,7 @@ import cycle,
 -}
 
 import GHC.Classes (Eq)
+import GHC.Generics (Generic)
 import GHC.Types (Char, Int)
 
 -- Make implicit dependency known to build system
@@ -216,4 +218,7 @@ data SrcLoc = SrcLoc
   , srcLocStartCol  :: Int
   , srcLocEndLine   :: Int
   , srcLocEndCol    :: Int
-  } deriving Eq -- ^ @since 4.9.0.0
+  } deriving
+    ( Eq -- ^ @since 4.9.0.0
+    , Generic -- ^ @since 4.14.0.0
+    )

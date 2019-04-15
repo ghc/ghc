@@ -5,6 +5,11 @@
 
   * Add a `TestEquality` instance for the `Compose` newtype.
 
+  * Add `Generic` instances to `Fingerprint`, `GiveGCStats`, `GCFlags`,
+    `ConcFlags`, `DebugFlags`, `CCFlags`, `DoHeapProfile`, `ProfFlags`,
+    `DoTrace`, `TraceFlags`, `TickyFlags`, `ParFlags`, `RTSFlags`, `RTSStats`,
+    `GCStats`, `ByteOrder`, `GeneralCategory`, `SrcLoc`
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
