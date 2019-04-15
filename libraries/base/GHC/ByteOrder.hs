@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -17,6 +18,8 @@
 
 module GHC.ByteOrder where
 
+import GHC.Generics (Generic)
+
 -- | Byte ordering.
 data ByteOrder
     = BigEndian    -- ^ most-significant-byte occurs in lowest address.
@@ -27,6 +30,7 @@ data ByteOrder
              , Enum    -- ^ @since 4.11.0.0
              , Read    -- ^ @since 4.11.0.0
              , Show    -- ^ @since 4.11.0.0
+             , Generic -- ^ @since 4.15.0.0
              )
 
 -- | The byte ordering of the target machine.

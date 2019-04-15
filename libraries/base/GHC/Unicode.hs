@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -34,6 +35,7 @@ import GHC.Base
 import GHC.Char        (chr)
 import GHC.Real
 import GHC.Enum ( Enum (..), Bounded (..) )
+import GHC.Generics (Generic)
 import GHC.Ix ( Ix (..) )
 import GHC.Num
 
@@ -135,6 +137,7 @@ data GeneralCategory
                  , Enum     -- ^ @since 2.01
                  , Bounded  -- ^ @since 2.01
                  , Ix       -- ^ @since 2.01
+                 , Generic  -- ^ @since 4.15.0.0
                  )
 
 -- | The Unicode general category of the character. This relies on the

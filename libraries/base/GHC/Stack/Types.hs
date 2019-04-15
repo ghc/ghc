@@ -48,6 +48,7 @@ import cycle,
 -}
 
 import GHC.Classes (Eq)
+import GHC.Generics (Generic)
 import GHC.Types (Char, Int)
 
 -- Make implicit dependency known to build system
@@ -216,4 +217,6 @@ data SrcLoc = SrcLoc
   , srcLocStartCol  :: Int
   , srcLocEndLine   :: Int
   , srcLocEndCol    :: Int
-  } deriving Eq -- ^ @since 4.9.0.0
+  } deriving
+    ( Eq -- ^ @since 4.9.0.0
+    )
