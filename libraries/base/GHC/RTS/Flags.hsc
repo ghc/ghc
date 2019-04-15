@@ -292,6 +292,8 @@ data TraceFlags = TraceFlags
     , timestamp      :: Bool -- ^ show timestamp in stderr output
     , traceScheduler :: Bool -- ^ trace scheduler events
     , traceGc        :: Bool -- ^ trace GC events
+    , traceNonmovingGc
+                     :: Bool -- ^ trace nonmoving GC heap census samples
     , sparksSampled  :: Bool -- ^ trace spark events by a sampled method
     , sparksFull     :: Bool -- ^ trace spark events 100% accurately
     , user           :: Bool -- ^ trace user events (emitted from Haskell code)
@@ -525,6 +527,8 @@ getTraceFlags = do
                    (#{peek TRACE_FLAGS, scheduler} ptr :: IO CBool))
              <*> (toBool <$>
                    (#{peek TRACE_FLAGS, gc} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek TRACE_FLAGS, nonmoving_gc} ptr :: IO CBool))
              <*> (toBool <$>
                    (#{peek TRACE_FLAGS, sparks_sampled} ptr :: IO CBool))
              <*> (toBool <$>
