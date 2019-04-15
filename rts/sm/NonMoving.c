@@ -208,6 +208,16 @@ static struct NonmovingSegment *pop_active_segment(struct NonmovingAllocator *al
     }
 }
 
+static uint64_t pushed_todos=0, allocations=0;
+
+void nonmovingEvent(void);
+void nonmovingEvent(void)
+{
+  debugTrace(1, "Nonmoving: pushed_todos=%ld, allocations=%ld", pushed_todos, allocations);
+  pushed_todos=0;
+  allocations=0;
+}
+
 /* sz is in words */
 void *nonmovingAllocate(Capability *cap, StgWord sz)
 {
@@ -225,12 +235,15 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
     void *ret = nonmovingSegmentGetBlock(current, current->next_free);
     ASSERT(GET_CLOSURE_TAG(ret) == 0); // check alignment
 
+    allocations++;
+
     // Add segment to the todo list unless it's already there
     // current->todo_link == NULL means not in todo list
     if (!current->todo_link) {
         gen_workspace *ws = &gct->gens[oldest_gen->no];
         current->todo_link = ws->todo_seg;
         ws->todo_seg = current;
+        pushed_todos++;
     }
 
     // Advance the current segment's next_free or allocate a new segment if full
@@ -708,15 +721,17 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     // TODO: Remainder of things done by GarbageCollect (update stats)
 
     // HACK
+#if 0
     debugBelch("nonmoving: n_blocks: %lu, n_large_block: %lu, n_compact_blocks: %lu\n", 
                oldest_gen->n_blocks, oldest_gen->n_large_blocks, oldest_gen->n_compact_blocks);
     debugBelch("nonmoving: max_blocks: %lu -> %lu\n", oldest_gen->max_blocks, oldest_gen->n_blocks);
+#endif
     W_ live = oldest_gen->n_blocks +
         oldest_gen->n_large_blocks +
         oldest_gen->n_compact_blocks;
     W_ size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
                       RtsFlags.GcFlags.minOldGenSize);
-    size /= 2;
+    //size /= 4;
     for (unsigned int g = 0; g < RtsFlags.GcFlags.generations; g++) {
         generations[g].max_blocks = size;
     }

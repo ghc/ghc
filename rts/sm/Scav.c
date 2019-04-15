@@ -865,8 +865,10 @@ scavenge_mark_stack(void)
 
     gct->evac_gen_no = oldest_gen->no;
     saved_eager_promotion = gct->eager_promotion;
+    int count=0;
 
     while ((p = pop_mark_stack())) {
+        count++;
 
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
         info = get_itbl((StgClosure *)p);
@@ -1212,6 +1214,8 @@ scavenge_mark_stack(void)
             }
         }
     } // while (p = pop_mark_stack())
+
+    debugTrace(1, "ScavMarkStack:%d", count);
 }
 
 /* -----------------------------------------------------------------------------
@@ -1715,6 +1719,8 @@ scavenge_static(void)
   /* keep going until we've scavenged all the objects on the linked
      list... */
 
+  int count = 0;
+
   while (1) {
 
     /* get the next static object from the list.  Remember, there might
@@ -1725,6 +1731,7 @@ scavenge_static(void)
     if (flagged_p == END_OF_STATIC_OBJECT_LIST) {
           break;
     }
+    count ++;
     p = UNTAG_STATIC_LIST_PTR(flagged_p);
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
@@ -1793,6 +1800,7 @@ scavenge_static(void)
 
     ASSERT(gct->failed_to_evac == false);
   }
+  debugTrace(1, "ScavStatic:%d", count);
 }
 
 /* -----------------------------------------------------------------------------
@@ -2050,6 +2058,8 @@ scavenge_find_work (void)
 
     did_anything = false;
 
+    int count = 0;
+
 loop:
     did_something = false;
     for (g = RtsFlags.GcFlags.generations-1; g >= 0; g--) {
@@ -2060,6 +2070,7 @@ loop:
             ASSERT(seg->todo_link);
             ws->todo_seg = seg->todo_link;
             seg->todo_link = NULL;
+            count++;
             scavengeNonmovingSegment(seg);
             did_something = true;
             break;
@@ -2113,6 +2124,7 @@ loop:
     }
 #endif
 
+    debugTrace(1, "ScavNon:%d", count);
     // only return when there is no more work to do
 
     return did_anything;

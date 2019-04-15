@@ -184,6 +184,8 @@ bdescr *mark_stack_top_bd; // topmost block in the mark stack
 bdescr *mark_stack_bd;     // current block in the mark stack
 StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 
+void nonmovingEvent(void);
+
 /* -----------------------------------------------------------------------------
    GarbageCollect: the main entry point to the garbage collector.
 
@@ -341,6 +343,7 @@ GarbageCollect (uint32_t collect_gen,
       mark_sp           = NULL;
   }
 
+  nonmovingEvent();
   /* -----------------------------------------------------------------------
    * follow all the roots that we know about:
    */
@@ -404,6 +407,20 @@ GarbageCollect (uint32_t collect_gen,
   // Remember old stable name addresses.
   rememberOldStableNameAddresses ();
 
+  debugTrace(1, "GC: MarkedRoots");
+  nonmovingEvent();
+  {
+  int count=0;
+  for (int g=RtsFlags.GcFlags.generations-1; g >= 0; g--) {
+    struct NonmovingSegment *seg  = gct->gens[g].todo_seg;
+    while (seg != END_NONMOVING_TODO_LIST) {
+      seg = seg->todo_link;
+      count++;
+    }
+  }
+  debugTrace(1, "GC:TodoSegs: %d", count)
+  }
+
   /* -------------------------------------------------------------------------
    * Repeatedly scavenge all the areas we know about until there's no
    * more scavenging to be done.
@@ -415,6 +432,8 @@ GarbageCollect (uint32_t collect_gen,
   for (;;)
   {
       scavenge_until_all_done();
+      debugTrace(1, "GC: Scav");
+      nonmovingEvent();
 
       // The other threads are now stopped.  We might recurse back to
       // here, but from now on this is the only thread.
@@ -429,6 +448,8 @@ GarbageCollect (uint32_t collect_gen,
       // If we get to here, there's really nothing left to do.
       break;
   }
+  debugTrace(1, "GC: DoneScav");
+  nonmovingEvent();
 
   shutdown_gc_threads(gct->thread_index, idle_cap);
 
@@ -545,7 +566,7 @@ GarbageCollect (uint32_t collect_gen,
         }
         copied +=  mut_list_size;
 
-        debugTrace(DEBUG_gc,
+        debugTrace(1,
                    "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d others)",
                    (unsigned long)(mut_list_size * sizeof(W_)),
                    mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS,
@@ -890,7 +911,7 @@ GarbageCollect (uint32_t collect_gen,
 
 #if defined(DEBUG)
   // check for memory leaks if DEBUG is on
-  memInventory(DEBUG_gc);
+  memInventory(1);
 #endif
 
   // ok, GC over: tell the stats department what happened.
@@ -1131,6 +1152,7 @@ loop:
 #else
     scavenge_loop();
 #endif
+    debugTrace(1, "ScavengeLoopDone");
 
     collect_gct_blocks();
 
@@ -1540,7 +1562,9 @@ collect_gct_blocks (void)
     uint32_t g;
     gen_workspace *ws;
     bdescr *bd, *prev;
+    int count=0;
 
+    debugTrace(1, "collectGctBlocks:start");
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         ws = &gct->gens[g];
 
@@ -1556,6 +1580,7 @@ collect_gct_blocks (void)
             prev = NULL;
             for (bd = ws->scavd_list; bd != NULL; bd = bd->link) {
                 prev = bd;
+                count ++;
             }
             if (prev != NULL) {
                 prev->link = ws->gen->blocks;
@@ -1571,6 +1596,7 @@ collect_gct_blocks (void)
             RELEASE_SPIN_LOCK(&ws->gen->sync);
         }
     }
+    //trace(1, "collectGctBlocks:%d", count);
 }
 
 /* -----------------------------------------------------------------------------
@@ -1762,7 +1788,7 @@ resize_generations (void)
             }
         }
 
-#if 1
+#if 0
         debugBelch("n_words: %lu, live_estimate=%lu\n", oldest_gen->n_words, oldest_gen->live_estimate);
         debugBelch("live: %lu, min_alloc: %lu, size : %lu, max = %lu\n", live,
                    min_alloc, size, max);
