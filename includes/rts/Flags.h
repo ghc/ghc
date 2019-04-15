@@ -169,6 +169,7 @@ typedef struct _TRACE_FLAGS {
     bool timestamp;      /* show timestamp in stderr output */
     bool scheduler;      /* trace scheduler events */
     bool gc;             /* trace GC events */
+    bool nonmoving_gc;   /* trace nonmoving GC events */
     bool sparks_sampled; /* trace spark events by a sampled method */
     bool sparks_full;    /* trace spark events 100% accurately */
     bool user;           /* trace user events (emitted from Haskell code) */
