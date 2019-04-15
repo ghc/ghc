@@ -1340,6 +1340,15 @@ builtinNaturalRules =
  [rule_binop              "plusNatural"        plusNaturalName         (+)
  ,rule_partial_binop      "minusNatural"       minusNaturalName        (\a b -> if a >= b then Just (a - b) else Nothing)
  ,rule_binop              "timesNatural"       timesNaturalName        (*)
+ -- See Note [Ord and Eq instances for Natural] for why the set of rules below
+ -- can now be used.
+ ,rule_binop_Prim         "eqNatural#"          eqNaturalPrimName      (==)
+ ,rule_binop_Prim         "neqNatural#"         neqNaturalPrimName     (/=)
+ ,rule_binop_Prim         "leNatural#"          leNaturalPrimName      (<=)
+ ,rule_binop_Prim         "gtNatural#"          gtNaturalPrimName      (>)
+ ,rule_binop_Prim         "ltNatural#"          ltNaturalPrimName      (<)
+ ,rule_binop_Prim         "geNatural#"          geNaturalPrimName      (>=)
+ ,rule_binop_Ordering     "compareNatural"      compareNaturalName     compare
 
  ,rule_NaturalFromInteger "naturalFromInteger" naturalFromIntegerName
  ,rule_NaturalToInteger   "naturalToInteger"   naturalToIntegerName
@@ -1386,6 +1395,12 @@ builtinNaturalRules =
           rule_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Natural_binop op }
+          rule_binop_Prim str name op
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_Natural_binop_Prim op }
+          rule_binop_Ordering str name op
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_Natural_binop_Ordering op }
           rule_partial_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Natural_partial_binop op }
@@ -1708,6 +1723,13 @@ match_Integer_binop_Prim binop dflags id_unf _ [xl, yl]
   = Just (if x `binop` y then trueValInt dflags else falseValInt dflags)
 match_Integer_binop_Prim _ _ _ _ _ = Nothing
 
+match_Natural_binop_Prim :: (Integer -> Integer -> Bool) -> RuleFun
+match_Natural_binop_Prim binop dflags id_unf _ [xl, yl]
+  | Just (LitNumber LitNumNatural x _) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumNatural y _) <- exprIsLiteral_maybe id_unf yl
+  = Just (if x `binop` y then trueValInt dflags else falseValInt dflags)
+match_Natural_binop_Prim _ _ _ _ _ = Nothing
+
 match_Integer_binop_Ordering :: (Integer -> Integer -> Ordering) -> RuleFun
 match_Integer_binop_Ordering binop _ id_unf _ [xl, yl]
   | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
@@ -1717,6 +1739,16 @@ match_Integer_binop_Ordering binop _ id_unf _ [xl, yl]
              EQ -> eqVal
              GT -> gtVal
 match_Integer_binop_Ordering _ _ _ _ _ = Nothing
+
+match_Natural_binop_Ordering :: (Integer -> Integer -> Ordering) -> RuleFun
+match_Natural_binop_Ordering binop _ id_unf _ [xl, yl]
+  | Just (LitNumber LitNumNatural x _) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumNatural y _) <- exprIsLiteral_maybe id_unf yl
+  = Just $ case x `binop` y of
+             LT -> ltVal
+             EQ -> eqVal
+             GT -> gtVal
+match_Natural_binop_Ordering _ _ _ _ _ = Nothing
 
 match_Integer_Int_encodeFloat :: RealFloat a
                               => (a -> Expr CoreBndr)
