@@ -52,6 +52,7 @@
 #include "CNF.h"
 #include "RtsFlags.h"
 #include "NonMoving.h"
+#include "NonMovingCensus.h"
 
 #if defined(PROFILING)
 #include "RetainerProfile.h"
@@ -345,6 +346,8 @@ GarbageCollect (uint32_t collect_gen,
   }
 
   nonmovingEvent();
+  nonmovingTraceAllocatorCensus();
+
   /* -----------------------------------------------------------------------
    * follow all the roots that we know about:
    */
