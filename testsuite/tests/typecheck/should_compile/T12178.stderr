@@ -1,0 +1,286 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 310, types: 579, coercions: 0, joins: 1/1}
+
+-- RHS size: {terms: 11, types: 23, coercions: 0, joins: 0/0}
+T12178.$bInlineablePattern [InlPrag=INLINE]
+  :: forall a. a -> [[[[a]]]]
+[GblId, Arity=1, Caf=NoCafRefs, Unf=OtherCon []]
+T12178.$bInlineablePattern
+  = \ (@ a) (a1 :: a) ->
+      GHC.Types.:
+        @ [[[a]]]
+        (GHC.Types.:
+           @ [[a]]
+           (GHC.Types.:
+              @ [a] (GHC.Types.: @ a a1 (GHC.Types.[] @ a)) (GHC.Types.[] @ [a]))
+           (GHC.Types.[] @ [[a]]))
+        (GHC.Types.[] @ [[[a]]])
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T12178.$bNonInlineablePattern [InlPrag=NOINLINE]
+  :: forall a b. a -> Either a b
+[GblId, Arity=1, Caf=NoCafRefs, Unf=OtherCon []]
+T12178.$bNonInlineablePattern = Data.Either.Left
+
+-- RHS size: {terms: 11, types: 23, coercions: 0, joins: 0/0}
+T12178.$bDefaultInliningPattern :: forall a. a -> [[[[a]]]]
+[GblId, Arity=1, Caf=NoCafRefs, Unf=OtherCon []]
+T12178.$bDefaultInliningPattern
+  = \ (@ a) (a1 :: a) ->
+      GHC.Types.:
+        @ [[[a]]]
+        (GHC.Types.:
+           @ [[a]]
+           (GHC.Types.:
+              @ [a] (GHC.Types.: @ a a1 (GHC.Types.[] @ a)) (GHC.Types.[] @ [a]))
+           (GHC.Types.[] @ [[a]]))
+        (GHC.Types.[] @ [[[a]]])
+
+-- RHS size: {terms: 17, types: 27, coercions: 0, joins: 0/0}
+testInBuilder :: forall a. Num a => a -> [[[[a]]]]
+[GblId, Arity=2, Caf=NoCafRefs, Unf=OtherCon []]
+testInBuilder
+  = \ (@ a) ($dNum :: Num a) (x :: a) ->
+      GHC.Types.:
+        @ [[[a]]]
+        (GHC.Types.:
+           @ [[a]]
+           (GHC.Types.:
+              @ [a]
+              (GHC.Types.:
+                 @ a (+ @ a $dNum x (fromInteger @ a $dNum 1)) (GHC.Types.[] @ a))
+              (GHC.Types.[] @ [a]))
+           (GHC.Types.[] @ [[a]]))
+        (GHC.Types.[] @ [[[a]]])
+
+-- RHS size: {terms: 56, types: 90, coercions: 0, joins: 0/0}
+T12178.$mInlineablePattern [InlPrag=INLINE]
+  :: forall (rep :: GHC.Types.RuntimeRep) (r :: TYPE rep) a.
+     [[[[a]]]] -> (a -> r) -> (GHC.Prim.Void# -> r) -> r
+[GblId, Arity=3, Caf=NoCafRefs, Unf=OtherCon []]
+T12178.$mInlineablePattern
+  = \ (@ (rep :: GHC.Types.RuntimeRep))
+      (@ (r :: TYPE rep))
+      (@ a)
+      (scrut :: [[[[a]]]])
+      (cont :: a -> r)
+      (fail :: GHC.Prim.Void# -> r) ->
+      case scrut of {
+        [] -> fail GHC.Prim.void#;
+        : ds ds1 ->
+          case ds of {
+            [] -> fail GHC.Prim.void#;
+            : ds2 ds3 ->
+              case ds2 of {
+                [] -> fail GHC.Prim.void#;
+                : ds4 ds5 ->
+                  case ds4 of {
+                    [] -> fail GHC.Prim.void#;
+                    : a1 ds6 ->
+                      case ds6 of {
+                        [] ->
+                          case ds5 of {
+                            [] ->
+                              case ds3 of {
+                                [] ->
+                                  case ds1 of {
+                                    [] -> cont a1;
+                                    : ipv ipv1 -> fail GHC.Prim.void#
+                                  };
+                                : ipv ipv1 -> fail GHC.Prim.void#
+                              };
+                            : ipv ipv1 -> fail GHC.Prim.void#
+                          };
+                        : ipv ipv1 -> fail GHC.Prim.void#
+                      }
+                  }
+              }
+          }
+      }
+
+-- RHS size: {terms: 60, types: 92, coercions: 0, joins: 1/1}
+testInMatcher :: forall p a. Num p => [[[[a]]]] -> p
+[GblId, Arity=2, Caf=NoCafRefs, Unf=OtherCon []]
+testInMatcher
+  = \ (@ p) (@ a) ($dNum :: Num p) (ds :: [[[[a]]]]) ->
+      join {
+        fail :: GHC.Prim.Void# -> p
+        [LclId[JoinId(1)], Arity=1, Unf=OtherCon []]
+        fail _ [Occ=Dead, OS=OneShot] = fromInteger @ p $dNum 2 } in
+      case ds of {
+        [] -> jump fail GHC.Prim.void#;
+        : ds1 ds2 ->
+          case ds1 of {
+            [] -> jump fail GHC.Prim.void#;
+            : ds3 ds4 ->
+              case ds3 of {
+                [] -> jump fail GHC.Prim.void#;
+                : ds5 ds6 ->
+                  case ds5 of {
+                    [] -> jump fail GHC.Prim.void#;
+                    : a1 ds7 ->
+                      case ds7 of {
+                        [] ->
+                          case ds6 of {
+                            [] ->
+                              case ds4 of {
+                                [] ->
+                                  case ds2 of {
+                                    [] -> fromInteger @ p $dNum 1;
+                                    : ipv ipv1 -> jump fail GHC.Prim.void#
+                                  };
+                                : ipv ipv1 -> jump fail GHC.Prim.void#
+                              };
+                            : ipv ipv1 -> jump fail GHC.Prim.void#
+                          };
+                        : ipv ipv1 -> jump fail GHC.Prim.void#
+                      }
+                  }
+              }
+          }
+      }
+
+-- RHS size: {terms: 11, types: 11, coercions: 0, joins: 0/0}
+testNonBuilder :: forall a b. Num a => a -> Either a b
+[GblId, Arity=2, Caf=NoCafRefs, Unf=OtherCon []]
+testNonBuilder
+  = \ (@ a) (@ b) ($dNum :: Num a) (x :: a) ->
+      T12178.$bNonInlineablePattern
+        @ a @ b (+ @ a $dNum x (fromInteger @ a $dNum 1))
+
+-- RHS size: {terms: 15, types: 19, coercions: 0, joins: 0/0}
+T12178.$mNonInlineablePattern [InlPrag=NOINLINE]
+  :: forall (rep :: GHC.Types.RuntimeRep) (r :: TYPE rep) a b.
+     Either a b -> (a -> r) -> (GHC.Prim.Void# -> r) -> r
+[GblId, Arity=3, Caf=NoCafRefs, Unf=OtherCon []]
+T12178.$mNonInlineablePattern
+  = \ (@ (rep :: GHC.Types.RuntimeRep))
+      (@ (r :: TYPE rep))
+      (@ a)
+      (@ b)
+      (scrut :: Either a b)
+      (cont :: a -> r)
+      (fail :: GHC.Prim.Void# -> r) ->
+      case scrut of {
+        Left a1 -> cont a1;
+        Right ipv -> fail GHC.Prim.void#
+      }
+
+-- RHS size: {terms: 15, types: 19, coercions: 0, joins: 0/0}
+testNonMatcher :: forall p a b. Num p => Either a b -> p
+[GblId, Arity=2, Caf=NoCafRefs, Unf=OtherCon []]
+testNonMatcher
+  = \ (@ p) (@ a) (@ b) ($dNum :: Num p) (ds :: Either a b) ->
+      T12178.$mNonInlineablePattern
+        @ 'GHC.Types.LiftedRep
+        @ p
+        @ a
+        @ b
+        ds
+        (\ _ [Occ=Dead] -> fromInteger @ p $dNum 1)
+        (\ _ [Occ=Dead] -> fromInteger @ p $dNum 2)
+
+-- RHS size: {terms: 17, types: 27, coercions: 0, joins: 0/0}
+testDefaultBuilder :: forall a. Num a => a -> [[[[a]]]]
+[GblId, Arity=2, Caf=NoCafRefs, Unf=OtherCon []]
+testDefaultBuilder
+  = \ (@ a) ($dNum :: Num a) (x :: a) ->
+      GHC.Types.:
+        @ [[[a]]]
+        (GHC.Types.:
+           @ [[a]]
+           (GHC.Types.:
+              @ [a]
+              (GHC.Types.:
+                 @ a (+ @ a $dNum x (fromInteger @ a $dNum 1)) (GHC.Types.[] @ a))
+              (GHC.Types.[] @ [a]))
+           (GHC.Types.[] @ [[a]]))
+        (GHC.Types.[] @ [[[a]]])
+
+-- RHS size: {terms: 56, types: 90, coercions: 0, joins: 0/0}
+T12178.$mDefaultInliningPattern
+  :: forall (rep :: GHC.Types.RuntimeRep) (r :: TYPE rep) a.
+     [[[[a]]]] -> (a -> r) -> (GHC.Prim.Void# -> r) -> r
+[GblId, Arity=3, Caf=NoCafRefs, Unf=OtherCon []]
+T12178.$mDefaultInliningPattern
+  = \ (@ (rep :: GHC.Types.RuntimeRep))
+      (@ (r :: TYPE rep))
+      (@ a)
+      (scrut :: [[[[a]]]])
+      (cont :: a -> r)
+      (fail :: GHC.Prim.Void# -> r) ->
+      case scrut of {
+        [] -> fail GHC.Prim.void#;
+        : ds ds1 ->
+          case ds of {
+            [] -> fail GHC.Prim.void#;
+            : ds2 ds3 ->
+              case ds2 of {
+                [] -> fail GHC.Prim.void#;
+                : ds4 ds5 ->
+                  case ds4 of {
+                    [] -> fail GHC.Prim.void#;
+                    : a1 ds6 ->
+                      case ds6 of {
+                        [] ->
+                          case ds5 of {
+                            [] ->
+                              case ds3 of {
+                                [] ->
+                                  case ds1 of {
+                                    [] -> cont a1;
+                                    : ipv ipv1 -> fail GHC.Prim.void#
+                                  };
+                                : ipv ipv1 -> fail GHC.Prim.void#
+                              };
+                            : ipv ipv1 -> fail GHC.Prim.void#
+                          };
+                        : ipv ipv1 -> fail GHC.Prim.void#
+                      }
+                  }
+              }
+          }
+      }
+
+-- RHS size: {terms: 14, types: 18, coercions: 0, joins: 0/0}
+testDefaultMatcher :: forall p a. Num p => [[[[a]]]] -> p
+[GblId, Arity=2, Caf=NoCafRefs, Unf=OtherCon []]
+testDefaultMatcher
+  = \ (@ p) (@ a) ($dNum :: Num p) (ds :: [[[[a]]]]) ->
+      T12178.$mDefaultInliningPattern
+        @ 'GHC.Types.LiftedRep
+        @ p
+        @ a
+        ds
+        (\ _ [Occ=Dead] -> fromInteger @ p $dNum 1)
+        (\ _ [Occ=Dead] -> fromInteger @ p $dNum 2)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule1 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+$trModule1 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule2 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+$trModule2 = GHC.Types.TrNameS $trModule1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule3 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+$trModule3 = "T12178"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule4 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+$trModule4 = GHC.Types.TrNameS $trModule3
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T12178.$trModule :: GHC.Types.Module
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+T12178.$trModule = GHC.Types.Module $trModule2 $trModule4
+
+
+
