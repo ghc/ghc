@@ -93,7 +93,7 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 236 -- shift/reduce conflicts
+%expect 237 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -213,6 +213,25 @@ Example of ambiguity:
 Shift parses as (per longest-parse rule):
     'x = ''a'
     'x = ''T'
+
+-------------------------------------------------------------------------------
+
+state 217 contains 1 shift/reduce conflicts.
+
+        sigdecl -> '{-# INLINE' . activation qvarcon '#-}'
+    *** activation ->
+        activation -> explicit_activation
+
+    Conflict: '['
+
+We don't know whether the '[' starts the activation, or is beginning of '[]'
+list constructor.
+
+Example ambiguity:
+    '{-# INLINE [0] Something #-}'
+
+We parse this as having [0] activation for inlining 'Something', rather than
+empty activation and inlining '[0] Something'.
 
 -------------------------------------------------------------------------------
 
@@ -1516,6 +1535,10 @@ pattern_synonym_sig :: { LSig GhcPs }
                    {% ams (sLL $1 $> $ PatSynSig noExtField (unLoc $2) (mkLHsSigType $4))
                           [mj AnnPattern $1, mu AnnDcolon $3] }
 
+qvarcon :: { Located RdrName }
+        : qvar                          { $1 }
+        | qcon                          { $1 }
+
 -----------------------------------------------------------------------------
 -- Nested declarations
 
@@ -2505,7 +2528,7 @@ sigdecl :: { LHsDecl GhcPs }
                     ([ mo $1 ] ++ dcolon ++ [mc $4]) }
 
         -- This rule is for both INLINE and INLINABLE pragmas
-        | '{-# INLINE' activation qvar '#-}'
+        | '{-# INLINE' activation qvarcon '#-}'
                 {% ams ((sLL $1 $> $ SigD noExtField (InlineSig noExtField $3
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
                                             (snd $2)))))

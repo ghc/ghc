@@ -75,3 +75,14 @@ T14934:
 	$(RM) -f T14934a.o T14934a.hi T14934.o T14934.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14934a.hs -O
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14934.hs  -O
+
+T12178:
+	$(RM) -f T12178.o T12178.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T12178.hs  -O -dsuppress-all -ddump-simpl | grep -e '^test' -e 'Pattern' -e '^$$'
+	# There are three types of lines of interest in this test:
+	# '^test' - Beginning of a function definition
+	# 'Pattern' - Non-inlined occurrence of a pattern synonym
+	# empty line - End of a function definition (among other possible meanings)
+	#
+	# Grepping for those allows to recognize which pattern synonym builders or
+	# matchers are called (as opposed to being inlined) in which functions
