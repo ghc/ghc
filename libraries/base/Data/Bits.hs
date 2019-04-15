@@ -558,7 +558,7 @@ instance Bits Natural where
                     "Bits.complement: Natural complement undefined"
    shift x i@(I# i#)
      | i >= 0    = shiftLNatural x i#
-     | otherwise = let !(I# i'#) = negate i in shiftRNatural x i'#
+     | otherwise = shiftRNatural x (negateInt# i#)
    testBit x (I# i#) = testBitNatural x i#
    zeroBits          = wordToNaturalBase 0##
    clearBit x i      = x `xor` (bit i .&. x)

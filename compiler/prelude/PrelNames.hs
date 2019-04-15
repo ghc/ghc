@@ -402,6 +402,9 @@ basicKnownKeyNames
         testBitNaturalName, popCountNaturalName,
         naturalToWordName, wordToNaturalName, intToNaturalName, naturalToIntName,
 
+        eqNaturalPrimName, neqNaturalPrimName, geNaturalPrimName, gtNaturalPrimName,
+        leNaturalPrimName, ltNaturalPrimName, compareNaturalName,
+
         -- Float/Double
         rationalToFloatName,
         rationalToDoubleName,
@@ -1219,6 +1222,16 @@ bitNaturalName      = varQual gHC_NATURAL (fsLit "bitNatural")      bitNaturalId
 testBitNaturalName  = varQual gHC_NATURAL (fsLit "testBitNatural")  testBitNaturalIdKey
 popCountNaturalName = varQual gHC_NATURAL (fsLit "popCountNatural") popCountNaturalIdKey
 naturalToWordName   = varQual gHC_NATURAL (fsLit "naturalToWord")   naturalToWordIdKey
+
+eqNaturalPrimName, neqNaturalPrimName, geNaturalPrimName, gtNaturalPrimName,
+    leNaturalPrimName, ltNaturalPrimName, compareNaturalName :: Name
+eqNaturalPrimName   = varQual gHC_NATURAL (fsLit "eqNatural#")      eqNaturalPrimIdKey
+neqNaturalPrimName  = varQual gHC_NATURAL (fsLit "neqNatural#")     neqNaturalPrimIdKey
+geNaturalPrimName   = varQual gHC_NATURAL (fsLit "geNatural#")      geNaturalPrimIdKey
+gtNaturalPrimName   = varQual gHC_NATURAL (fsLit "gtNatural#")      gtNaturalPrimIdKey
+leNaturalPrimName   = varQual gHC_NATURAL (fsLit "leNatural#")      leNaturalPrimIdKey
+ltNaturalPrimName   = varQual gHC_NATURAL (fsLit "ltNatural#")      ltNaturalPrimIdKey
+compareNaturalName  = varQual gHC_NATURAL (fsLit "compareNatural") compareNaturalPrimIdKey
 
 -- GHC.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
@@ -2469,6 +2482,16 @@ popCountNaturalIdKey = mkPreludeMiscIdUnique 587
 naturalToWordIdKey   = mkPreludeMiscIdUnique 588
 intToNaturalIdKey    = mkPreludeMiscIdUnique 589
 naturalToIntIdKey    = mkPreludeMiscIdUnique 590
+
+eqNaturalPrimIdKey, neqNaturalPrimIdKey, geNaturalPrimIdKey, gtNaturalPrimIdKey,
+    leNaturalPrimIdKey, ltNaturalPrimIdKey, compareNaturalPrimIdKey :: Unique
+eqNaturalPrimIdKey      = mkPreludeMiscIdUnique 591
+neqNaturalPrimIdKey     = mkPreludeMiscIdUnique 592
+geNaturalPrimIdKey      = mkPreludeMiscIdUnique 593
+gtNaturalPrimIdKey      = mkPreludeMiscIdUnique 594
+leNaturalPrimIdKey      = mkPreludeMiscIdUnique 595
+ltNaturalPrimIdKey      = mkPreludeMiscIdUnique 596
+compareNaturalPrimIdKey = mkPreludeMiscIdUnique 597
 
 {-
 ************************************************************************
