@@ -1,0 +1,192 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 310, types: 579, coercions: 0, joins: 1/1}
+
+-- RHS size: {terms: 11, types: 23, coercions: 0, joins: 0/0}
+$bInlineablePattern
+  = \ @ a_a1ik a1_arY -> : (: (: (: a1_arY []) []) []) []
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$bNonInlineablePattern = Left
+
+-- RHS size: {terms: 11, types: 23, coercions: 0, joins: 0/0}
+$bDefaultInliningPattern
+  = \ @ a_a1id a1_awV -> : (: (: (: a1_awV []) []) []) []
+
+-- RHS size: {terms: 17, types: 27, coercions: 0, joins: 0/0}
+testInBuilder
+  = \ @ a_a1hp $dNum_a1hA x_arZ ->
+      : (: (: (: (+ $dNum_a1hA x_arZ (fromInteger $dNum_a1hA 1)) []) [])
+           [])
+        []
+
+-- RHS size: {terms: 56, types: 90, coercions: 0, joins: 0/0}
+$mInlineablePattern
+  = \ @ rep_a1hd @ r_a1he @ a_a1ha scrut_a1hg cont_a1hh fail_a1hi ->
+      case scrut_a1hg of {
+        [] -> fail_a1hi void#;
+        : ds_d1jM ds1_d1jN ->
+          case ds_d1jM of {
+            [] -> fail_a1hi void#;
+            : ds2_d1jO ds3_d1jP ->
+              case ds2_d1jO of {
+                [] -> fail_a1hi void#;
+                : ds4_d1jQ ds5_d1jR ->
+                  case ds4_d1jQ of {
+                    [] -> fail_a1hi void#;
+                    : a1_arY ds6_d1jS ->
+                      case ds6_d1jS of {
+                        [] ->
+                          case ds5_d1jR of {
+                            [] ->
+                              case ds3_d1jP of {
+                                [] ->
+                                  case ds1_d1jN of {
+                                    [] -> cont_a1hh a1_arY;
+                                    : ipv_s1kj ipv1_s1kk -> fail_a1hi void#
+                                  };
+                                : ipv_s1kh ipv1_s1km -> fail_a1hi void#
+                              };
+                            : ipv_s1kf ipv1_s1ko -> fail_a1hi void#
+                          };
+                        : ipv_s1kd ipv1_s1kq -> fail_a1hi void#
+                      }
+                  }
+              }
+          }
+      }
+
+-- RHS size: {terms: 60, types: 92, coercions: 0, joins: 1/1}
+testInMatcher
+  = \ @ p_a1hN @ a_a1hQ $dNum_a1i2 ds_d1jW ->
+      join { fail_a1hi _ = fromInteger $dNum_a1i2 2 } in
+      case ds_d1jW of {
+        [] -> jump fail_a1hi void#;
+        : ds1_d1jM ds2_d1jN ->
+          case ds1_d1jM of {
+            [] -> jump fail_a1hi void#;
+            : ds3_d1jO ds4_d1jP ->
+              case ds3_d1jO of {
+                [] -> jump fail_a1hi void#;
+                : ds5_d1jQ ds6_d1jR ->
+                  case ds5_d1jQ of {
+                    [] -> jump fail_a1hi void#;
+                    : a1_arY ds7_d1jS ->
+                      case ds7_d1jS of {
+                        [] ->
+                          case ds6_d1jR of {
+                            [] ->
+                              case ds4_d1jP of {
+                                [] ->
+                                  case ds2_d1jN of {
+                                    [] -> fromInteger $dNum_a1i2 1;
+                                    : ipv_s1kH ipv1_s1kI -> jump fail_a1hi void#
+                                  };
+                                : ipv_s1kF ipv1_s1kK -> jump fail_a1hi void#
+                              };
+                            : ipv_s1kD ipv1_s1kM -> jump fail_a1hi void#
+                          };
+                        : ipv_s1kB ipv1_s1kO -> jump fail_a1hi void#
+                      }
+                  }
+              }
+          }
+      }
+
+-- RHS size: {terms: 11, types: 11, coercions: 0, joins: 0/0}
+testNonBuilder
+  = \ @ a_a1ga @ b_a1gb $dNum_a1gm x_awT ->
+      $bNonInlineablePattern
+        (+ $dNum_a1gm x_awT (fromInteger $dNum_a1gm 1))
+
+-- RHS size: {terms: 15, types: 19, coercions: 0, joins: 0/0}
+$mNonInlineablePattern
+  = \ @ rep_a1fY
+      @ r_a1fZ
+      @ a_a1fU
+      @ b_a1fV
+      scrut_a1g1
+      cont_a1g2
+      fail_a1g3 ->
+      case scrut_a1g1 of {
+        Left a1_awS -> cont_a1g2 a1_awS;
+        Right ipv_s1kZ -> fail_a1g3 void#
+      }
+
+-- RHS size: {terms: 15, types: 19, coercions: 0, joins: 0/0}
+testNonMatcher
+  = \ @ p_a1gB @ a_a1gE @ b_a1gF $dNum_a1gR ds_d1jE ->
+      $mNonInlineablePattern
+        ds_d1jE
+        (\ _ -> fromInteger $dNum_a1gR 1)
+        (\ _ -> fromInteger $dNum_a1gR 2)
+
+-- RHS size: {terms: 17, types: 27, coercions: 0, joins: 0/0}
+testDefaultBuilder
+  = \ @ a_axx $dNum_a1f4 x_awW ->
+      : (: (: (: (+ $dNum_a1f4 x_awW (fromInteger $dNum_a1f4 1)) []) [])
+           [])
+        []
+
+-- RHS size: {terms: 56, types: 90, coercions: 0, joins: 0/0}
+$mDefaultInliningPattern
+  = \ @ rep_axl @ r_axm @ a_axi scrut_axo cont_axp fail_axq ->
+      case scrut_axo of {
+        [] -> fail_axq void#;
+        : ds_d1jj ds1_d1jk ->
+          case ds_d1jj of {
+            [] -> fail_axq void#;
+            : ds2_d1jl ds3_d1jm ->
+              case ds2_d1jl of {
+                [] -> fail_axq void#;
+                : ds4_d1jn ds5_d1jo ->
+                  case ds4_d1jn of {
+                    [] -> fail_axq void#;
+                    : a1_awV ds6_d1jp ->
+                      case ds6_d1jp of {
+                        [] ->
+                          case ds5_d1jo of {
+                            [] ->
+                              case ds3_d1jm of {
+                                [] ->
+                                  case ds1_d1jk of {
+                                    [] -> cont_axp a1_awV;
+                                    : ipv_s1lg ipv1_s1lh -> fail_axq void#
+                                  };
+                                : ipv_s1le ipv1_s1lj -> fail_axq void#
+                              };
+                            : ipv_s1lc ipv1_s1ll -> fail_axq void#
+                          };
+                        : ipv_s1la ipv1_s1ln -> fail_axq void#
+                      }
+                  }
+              }
+          }
+      }
+
+-- RHS size: {terms: 14, types: 18, coercions: 0, joins: 0/0}
+testDefaultMatcher
+  = \ @ p_a1fh @ a_a1fk $dNum_a1fw ds_d1jt ->
+      $mDefaultInliningPattern
+        ds_d1jt
+        (\ _ -> fromInteger $dNum_a1fw 1)
+        (\ _ -> fromInteger $dNum_a1fw 2)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule1_r1jd = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule2_r1m1 = TrNameS $trModule1_r1jd
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule3_r1m2 = "T12178"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule4_r1m3 = TrNameS $trModule3_r1m2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$trModule = Module $trModule2_r1m1 $trModule4_r1m3
+
+
+

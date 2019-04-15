@@ -1,0 +1,7 @@
+
+T12178a.hs:14:1: error:
+    INLINE and NOINLINE pragmas are not supported for data constructors
+
+T12178a.hs:14:12: error:
+    The INLINE pragma for ‘MyConstructor’ lacks an accompanying binding
+      (The INLINE pragma must be given where ‘MyConstructor’ is declared)
