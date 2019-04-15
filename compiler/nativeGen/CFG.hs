@@ -366,6 +366,10 @@ getEdgeWeight cfg from to =
     edgeWeight $ expectJust "Edgeweight for noexisting block" $
                  getEdgeInfo from to cfg
 
+getTransitionSource :: BlockId -> BlockId -> CFG -> TransitionSource
+getTransitionSource from to cfg = transitionSource $ expectJust "Source info for noexisting block" $
+                        getEdgeInfo from to cfg
+
 reverseEdges :: CFG -> CFG
 reverseEdges cfg = mapFoldlWithKey (\cfg from toMap -> go (addNode cfg from) from toMap) mapEmpty cfg
   where
@@ -921,7 +925,8 @@ staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         = let   loopChance = repeat $ pred_LBH / (fromIntegral $ length m)
                 exitChance = repeat $ (1 - pred_LBH) / fromIntegral (length successors - length m)
                 updates = zip (map fst m) loopChance ++ zip (map fst not_m) exitChance
-            in  --pprTrace "Backedges!!!" empty $
+        in  --pprTrace "Backedges!!!" empty $
+            -- pprTrace "mix" (ppr (node,successors)) $
             foldl' (\cfg (to,weight) -> setEdgeWeight cfg weight node to) cfg updates
         -- For (regular) non-binary branches we keep the weights from the STG -> Cmm translation.
         | length successors /= 2 = cfg
@@ -932,8 +937,8 @@ staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         -- A regular binary branch, we can plug addition predictors in here.
         | [(s1,s1_info),(s2,s2_info)] <- successors
         = -- Normalize weights to total of 1
-            let w1 = min (edgeWeight s1_info) (0.001)
-                w2 = min (edgeWeight s2_info) (0.001)
+            let w1 = max (edgeWeight s1_info) (0.001)
+                w2 = max (edgeWeight s2_info) (0.001)
                 cfg'  = setEdgeWeight cfg  (w1/w1+w2) node s1
                 cfg'' = setEdgeWeight cfg' (w2/w1+w2) node s2
 
@@ -961,6 +966,7 @@ staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg =
                         setEdgeWeight cfg_s1 s2_prob' node s2
 
             in
+            -- pprTraceIt "RegularCfgResult" $
             foldl' applyHeuristic cfg'' heuristics
         | otherwise =
             -- Giving the root here makes it easy to grep for it in case of error.
@@ -1002,7 +1008,13 @@ staticBranchPrediction root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         -- Not all will apply, for now we just stub them out as Nothing.
 
         -- Pointer heuristic - Pointers usually compare as unequal.
+        -- phPredicts (s1,s2)
+        --     | CmmSource src1 <- getTransitionSource cfg node s1
+        --     , CmmCondBranch cond ltrue lfalse _likely <- src1
+        --     = Nothing
+        --     | otherwise = Nothing
         phPredicts = const Nothing
+
         ohPredicts = const Nothing
         ghPredicts = const Nothing
         lhhPredicts = const Nothing
