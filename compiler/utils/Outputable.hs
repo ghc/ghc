@@ -327,6 +327,10 @@ data SDocContext = SDC
 instance IsString SDoc where
   fromString = text
 
+-- The lazy programmer's friend.
+instance Outputable SDoc where
+  ppr = id
+
 initSDocContext :: DynFlags -> PprStyle -> SDocContext
 initSDocContext dflags sty = SDC
   { sdocStyle = sty
