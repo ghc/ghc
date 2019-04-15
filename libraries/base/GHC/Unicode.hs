@@ -135,6 +135,7 @@ data GeneralCategory
                  , Enum     -- ^ @since 2.01
                  , Bounded  -- ^ @since 2.01
                  , Ix       -- ^ @since 2.01
+                 , Generic  -- ^ @since 4.14.0.0
                  )
 
 -- | The Unicode general category of the character. This relies on the

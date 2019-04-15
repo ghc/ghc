@@ -216,4 +216,7 @@ data SrcLoc = SrcLoc
   , srcLocStartCol  :: Int
   , srcLocEndLine   :: Int
   , srcLocEndCol    :: Int
-  } deriving Eq -- ^ @since 4.9.0.0
+  } deriving
+    ( Eq -- ^ @since 4.9.0.0
+    , Generic -- ^ @since 4.14.0.0
+    )

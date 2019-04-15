@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -24,6 +25,7 @@ import Control.Monad
 import Data.Int
 import Data.Word
 import GHC.Base
+import GHC.Generics (Generic)
 import GHC.Read ( Read )
 import GHC.Show ( Show )
 import GHC.IO.Exception
@@ -107,6 +109,7 @@ data RTSStats = RTSStats {
   , gc :: GCDetails
   } deriving ( Read -- ^ @since 4.10.0.0
              , Show -- ^ @since 4.10.0.0
+             , Generic -- ^ @since 4.14.0.0
              )
 
 --
@@ -148,6 +151,7 @@ data GCDetails = GCDetails {
   , gcdetails_elapsed_ns :: RtsTime
   } deriving ( Read -- ^ @since 4.10.0.0
              , Show -- ^ @since 4.10.0.0
+             , Generic -- ^ @since 4.14.0.0
              )
 
 -- | Time values from the RTS, using a fixed resolution of nanoseconds.
