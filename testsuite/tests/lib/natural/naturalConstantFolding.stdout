@@ -27,3 +27,10 @@ naturalToWord: 200149
 intToNatural: 200153
 naturalToInt: 200157
 xorNatural: 239055
+eqNatural: False
+neqNatural: True
+leNatural: True
+ltNatural: True
+geNatural: False
+gtNatural: False
+compareNatural: LT
