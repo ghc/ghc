@@ -113,7 +113,8 @@ char *EventDesc[] = {
   [EVENT_CONC_SYNC_END]          = "End concurrent GC synchronisation",
   [EVENT_CONC_SWEEP_BEGIN]       = "Begin concurrent sweep",
   [EVENT_CONC_SWEEP_END]         = "End concurrent sweep",
-  [EVENT_CONC_UPD_REM_SET_FLUSH] = "Update remembered set flushed"
+  [EVENT_CONC_UPD_REM_SET_FLUSH] = "Update remembered set flushed",
+  [EVENT_NONMOVING_HEAP_CENSUS]  = "Nonmoving heap census"
 };
 
 // Event type.
@@ -463,6 +464,10 @@ init_event_types(void)
         case EVENT_CONC_UPD_REM_SET_FLUSH: // (cap)
             eventTypes[t].size =
                 sizeof(EventCapNo);
+            break;
+
+        case EVENT_NONMOVING_HEAP_CENSUS: // (cap, blk_size, active_segs, filled_segs, live_blks)
+            eventTypes[t].size = 13;
             break;
 
         default:
@@ -1174,6 +1179,18 @@ void postConcMarkEnd(StgWord32 marked_obj_count)
     ensureRoomForEvent(&eventBuf, EVENT_CONC_MARK_END);
     postEventHeader(&eventBuf, EVENT_CONC_MARK_END);
     postWord32(&eventBuf, marked_obj_count);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void postNonmovingHeapCensus(int log_blk_size,
+                             const struct NonmovingAllocCensus *census)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    postEventHeader(&eventBuf, EVENT_NONMOVING_HEAP_CENSUS);
+    postWord8(&eventBuf, log_blk_size);
+    postWord32(&eventBuf, census->n_active_segs);
+    postWord32(&eventBuf, census->n_filled_segs);
+    postWord32(&eventBuf, census->n_live_blocks);
     RELEASE_LOCK(&eventBufMutex);
 }
 
