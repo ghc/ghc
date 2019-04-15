@@ -1591,7 +1591,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
             p = (StgPtr)*q;
             ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 
-#if defined(DEBUG)
+#if defined(MUTLIST_DEBUG)
             const StgInfoTable *pinfo;
             switch (get_itbl((StgClosure *)p)->type) {
             case MUT_VAR_CLEAN:
