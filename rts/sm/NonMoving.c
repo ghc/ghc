@@ -295,7 +295,6 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
         if (new_current == NULL) {
             new_current = nonmovingAllocSegment(cap->node);
             nonmovingInitSegment(new_current, NONMOVING_ALLOCA0 + allocator_idx);
-            alloca->current[cap->no] = new_current;
         }
 
         // make it current
