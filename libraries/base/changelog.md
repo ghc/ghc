@@ -1,7 +1,11 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.15.0.0 *TBA*
-  * TODO
+
+  * Add `Generic` instances to `Fingerprint`, `GiveGCStats`, `GCFlags`,
+    `ConcFlags`, `DebugFlags`, `CCFlags`, `DoHeapProfile`, `ProfFlags`,
+    `DoTrace`, `TraceFlags`, `TickyFlags`, `ParFlags`, `RTSFlags`, `RTSStats`,
+    `GCStats`, `ByteOrder`, `GeneralCategory`, `SrcLoc`
 
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
