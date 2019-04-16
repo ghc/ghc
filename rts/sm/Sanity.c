@@ -1047,9 +1047,10 @@ memInventory (bool show)
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       live_blocks += gen_blocks[g];
   }
+  // N.B. nonmoving_blocks has already been counted in gen_blocks
   live_blocks += nursery_blocks +
                + retainer_blocks + arena_blocks + exec_blocks + gc_free_blocks
-               + upd_rem_set_blocks + nonmoving_blocks;
+               + upd_rem_set_blocks;
 
 #define MB(n) (((double)(n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
 
