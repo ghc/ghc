@@ -1136,9 +1136,11 @@ primop CasArrayOp  "casArray#" GenPrimOp
    {Given an array, an offset, the expected old value, and
     the new value, perform an atomic compare and swap (i.e. write the new
     value if the current value and the old value are the same pointer).
-    Returns 0 if the swap succeeds and 1 if it fails. Returns the value of
-    the element before the operation. Implies a full memory barrier. The
-    use of a pointer equality on a lifted value makes this function harder
+    Returns 0 if the swap succeeds and 1 if it fails. Additionally, returns
+    the element at the offset after the operation completes. This means that
+    on a success the new value is returned, and on a failure the actual old
+    value (not the expected one) is returned. Implies a full memory barrier.
+    The use of a pointer equality on a lifted value makes this function harder
     to use correctly than {\tt casIntArray\#}. All of the difficulties
     of using {\tt reallyUnsafePtrEquality\#} correctly apply to
     {\tt casArray\#} as well.
