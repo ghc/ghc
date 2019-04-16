@@ -91,6 +91,8 @@ struct NonmovingHeap {
 
 extern struct NonmovingHeap nonmovingHeap;
 
+extern uint64_t nonmoving_live_words;
+
 void nonmovingInit(void);
 void nonmovingExit(void);
 

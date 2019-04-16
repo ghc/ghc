@@ -1430,6 +1430,7 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
         struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
         nonmoving_block_idx block_idx = nonmovingGetBlockIdx((StgPtr) p);
         nonmovingSetMark(seg, block_idx);
+        nonmoving_live_words += nonmovingSegmentBlockSize(seg) / 8;
     }
 }
 
