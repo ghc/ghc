@@ -13,6 +13,8 @@
 
 #pragma once
 
+#include <stdio.h>
+
 /* -----------------------------------------------------------------------------
  * Data Structures
  * ---------------------------------------------------------------------------*/
@@ -54,9 +56,12 @@ typedef struct CostCentreStack_ {
     StgWord64  scc_count;       // Count of times this CCS is entered
                                 // align 8 (Note [struct alignment])
 
-    StgWord    selected;        // is this CCS shown in the heap
-                                // profile? (zero if excluded via -hc
-                                // -hm etc.)
+    StgWord    bitflags;        // bit 0 (lsb): is this CCS shown in the heap
+                                // profile? (zero if excluded via -hc -hm etc.)
+                                // bit 1: show this CCS in profile report?
+                                // (set while printing report)
+                                // bit 2: is this CCS referenced by a live heap
+                                // object? (only set during checkUnload)
 
     StgWord    time_ticks;      // number of time ticks accumulated by
                                 // this CCS
@@ -175,6 +180,17 @@ extern unsigned int RTS_VAR(era);
 CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
 void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
 CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
+void genCCSProfileReport (FILE *fp);
+bool specialCCS (CostCentreStack const *ccs);
+
+#define CCS_SELECTED 1
+#define CCS_VISIBLE 2
+#define CCS_REFERENCED 4
+// next flag would be 8
+
+void setCCSBitFlag(CostCentreStack *ccs, StgWord flag);
+bool testCCSBitFlag(CostCentreStack const *ccs, StgWord flag);
+void clearCCSBitFlag(CostCentreStack *ccs, StgWord flag);
 
 extern CostCentre * RTS_VAR(CC_LIST);               // registered CC list
 
@@ -202,7 +218,7 @@ extern CostCentre * RTS_VAR(CC_LIST);               // registered CC list
             .indexTable          = NULL,                 \
             .root                = NULL,                 \
             .depth               = 0,                    \
-            .selected            = 0,                    \
+            .bitflags            = 0,                    \
             .scc_count           = 0,                    \
             .time_ticks          = 0,                    \
             .mem_alloc           = 0,                    \

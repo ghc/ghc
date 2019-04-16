@@ -113,18 +113,16 @@ static  CostCentreStack * appendCCS       ( CostCentreStack *ccs1,
                                             CostCentreStack *ccs2 );
 static  CostCentreStack * actualPush_     ( CostCentreStack *ccs, CostCentre *cc,
                                             CostCentreStack *new_ccs );
-static  void              inheritCosts    ( CostCentreStack *ccs );
-static  ProfilerTotals    countTickss     ( CostCentreStack const *ccs );
+static  ProfilerTotals    aggregateCostData ( CostCentreStack *ccs );
 static  CostCentreStack * checkLoop       ( CostCentreStack *ccs,
                                             CostCentre *cc );
 static  void              sortCCSTree     ( CostCentreStack *ccs );
-static  CostCentreStack * pruneCCSTree    ( CostCentreStack *ccs );
+static  void              resetCCSData    ( CostCentreStack *ccs );
 static  CostCentreStack * actualPush      ( CostCentreStack *, CostCentre * );
 static  CostCentreStack * isInIndexTable  ( IndexTable *, CostCentre * );
 static  IndexTable *      addToIndexTable ( IndexTable *, CostCentreStack *,
                                             CostCentre *, bool );
 static  void              ccsSetSelected  ( CostCentreStack *ccs );
-static  void              aggregateCCCosts( CostCentreStack *ccs );
 static  void              registerCC      ( CostCentre *cc );
 static  void              registerCCS     ( CostCentreStack *ccs );
 
@@ -203,6 +201,11 @@ void initProfiling2 (void)
 {
     // make CCS_MAIN the parent of all the pre-defined CCSs.
     CostCentreStack *next;
+
+    // This function is called by the linker when initializing an object.
+    // Since it mutates the children of CCS_MAIN, we need to take the mutex.
+    ACQUIRE_LOCK(&ccs_mutex);
+
     for (CostCentreStack *ccs = CCS_LIST; ccs != NULL; ) {
         next = ccs->prevStack;
         ccs->prevStack = NULL;
@@ -211,6 +214,8 @@ void initProfiling2 (void)
         ccs = next;
     }
     CCS_LIST = NULL;
+
+    RELEASE_LOCK(&ccs_mutex);
 }
 
 void
@@ -283,7 +288,7 @@ initProfilingLogFile(void)
 
     if (RtsFlags.ProfFlags.doHeapProfile) {
         /* Initialise the log file name */
-        hp_filename = arenaAlloc(prof_arena, strlen(stem) + 6);
+        hp_filename = arenaAlloc(prof_arena, strlen(stem) + 4);
         sprintf(hp_filename, "%s.hp", stem);
 
         /* open the log file */
@@ -345,9 +350,14 @@ static void registerCCS(CostCentreStack *ccs)
 
 void registerCcList(CostCentre **cc_list)
 {
+    // This function is called by the linker when linking a new object.
+    // Since it mutates CC_LIST, which reportPerCCCosts also mutates, take
+    // the mutex.
+    ACQUIRE_LOCK(&ccs_mutex);
     for (CostCentre **i = cc_list; *i != NULL; i++) {
         registerCC(*i);
     }
+    RELEASE_LOCK(&ccs_mutex);
 }
 
 void registerCcsList(CostCentreStack **cc_list)
@@ -472,14 +482,14 @@ ccsSetSelected (CostCentreStack *ccs)
     if (RtsFlags.ProfFlags.modSelector) {
         if (! strMatchesSelector (ccs->cc->module,
                                   RtsFlags.ProfFlags.modSelector) ) {
-            ccs->selected = 0;
+            clearCCSBitFlag(ccs, CCS_SELECTED);
             return;
         }
     }
     if (RtsFlags.ProfFlags.ccSelector) {
         if (! strMatchesSelector (ccs->cc->label,
                                   RtsFlags.ProfFlags.ccSelector) ) {
-            ccs->selected = 0;
+            clearCCSBitFlag(ccs, CCS_SELECTED);
             return;
         }
     }
@@ -493,12 +503,12 @@ ccsSetSelected (CostCentreStack *ccs)
             }
         }
         if (c == NULL) {
-            ccs->selected = 0;
+            clearCCSBitFlag(ccs, CCS_SELECTED);
             return;
         }
     }
 
-    ccs->selected = 1;
+    setCCSBitFlag(ccs, CCS_SELECTED);
     return;
 }
 
@@ -569,7 +579,7 @@ pushCostCentre (CostCentreStack *ccs, CostCentre *cc)
                     // someone modified ccs->indexTable while
                     // we did not hold the lock, so we must
                     // check it again:
-                    temp_ccs = isInIndexTable(ixtable,cc);
+                    temp_ccs = isInIndexTable(ccs->indexTable, cc);
                     if (temp_ccs != EMPTY_STACK)
                     {
                         RELEASE_LOCK(&ccs_mutex);
@@ -638,6 +648,7 @@ actualPush_ (CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs)
     new_ccs->prevStack = ccs;
     new_ccs->root = ccs->root;
     new_ccs->depth = ccs->depth + 1;
+    new_ccs->bitflags = 0;
 
     new_ccs->indexTable = EMPTY_TABLE;
 
@@ -717,12 +728,18 @@ ignoreCC (CostCentre const *cc)
 bool
 ignoreCCS (CostCentreStack const *ccs)
 {
-    return RtsFlags.CcFlags.doCostCentres < COST_CENTRES_ALL &&
-        (   ccs == CCS_OVERHEAD
-         || ccs == CCS_DONT_CARE
-         || ccs == CCS_GC
-         || ccs == CCS_SYSTEM
-         || ccs == CCS_IDLE);
+    return RtsFlags.CcFlags.doCostCentres < COST_CENTRES_ALL && specialCCS(ccs);
+}
+
+bool
+specialCCS (CostCentreStack const *ccs)
+{
+    return
+        ccs == CCS_OVERHEAD
+        || ccs == CCS_DONT_CARE
+        || ccs == CCS_GC
+        || ccs == CCS_SYSTEM
+        || ccs == CCS_IDLE;
 }
 
 void
@@ -731,35 +748,71 @@ reportCCSProfiling( void )
     stopProfTimer();
     if (RtsFlags.CcFlags.doCostCentres == 0) return;
 
-    ProfilerTotals totals = countTickss(CCS_MAIN);
-    aggregateCCCosts(CCS_MAIN);
-    inheritCosts(CCS_MAIN);
-    CostCentreStack *stack = pruneCCSTree(CCS_MAIN);
-    sortCCSTree(stack);
+    genCCSProfileReport(prof_file);
+}
+
+void
+genCCSProfileReport(FILE *fp)
+{
+    // Writing the report involves reordering index tables in the CCS tree
+    // and nodes in the CC_LIST, so we take the mutex.
+    ACQUIRE_LOCK(&ccs_mutex);
+
+    ProfilerTotals totals = aggregateCostData(CCS_MAIN);
+    sortCCSTree(CCS_MAIN);
 
     if (RtsFlags.CcFlags.doCostCentres == COST_CENTRES_JSON) {
-        writeCCSReportJson(prof_file, stack, totals);
+        writeCCSReportJson(fp, CCS_MAIN, totals);
     } else {
-        writeCCSReport(prof_file, stack, totals);
+        writeCCSReport(fp, CCS_MAIN, totals);
     }
+
+    resetCCSData(CCS_MAIN);
+
+    RELEASE_LOCK(&ccs_mutex);
 }
 
 /* -----------------------------------------------------------------------------
- * Accumulating total allocatinos and tick count
+ * Accumulating total allocations and tick count
    -------------------------------------------------------------------------- */
 
-/* Helper */
 static void
-countTickss_(CostCentreStack const *ccs, ProfilerTotals *totals)
+aggregateCostData_( CostCentreStack *ccs, ProfilerTotals *totals )
 {
-    if (!ignoreCCS(ccs)) {
+    IndexTable *i;
+    bool showInReport =
+        (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL
+          /* force printing of *all* cost centres if -P -P */ )
+        || ccs->scc_count
+        || ccs->time_ticks
+        || ccs->mem_alloc;
+    bool ignored = ignoreCCS(ccs);
+
+    if (!ignored) {
         totals->total_alloc += ccs->mem_alloc;
         totals->total_prof_ticks += ccs->time_ticks;
+        ccs->inherited_alloc += ccs->mem_alloc;
+        ccs->inherited_ticks += ccs->time_ticks;
     }
-    for (IndexTable *i = ccs->indexTable; i != NULL; i = i->next) {
+
+    ccs->cc->mem_alloc += ccs->mem_alloc;
+    ccs->cc->time_ticks += ccs->time_ticks;
+
+    for (i = ccs->indexTable; i != NULL; i = i->next) {
         if (!i->back_edge) {
-            countTickss_(i->ccs, totals);
+            aggregateCostData_(i->ccs, totals);
+            if (!ignored) {
+              ccs->inherited_ticks += i->ccs->inherited_ticks;
+              ccs->inherited_alloc += i->ccs->inherited_alloc;
+            }
+            showInReport = showInReport || testCCSBitFlag(i->ccs, CCS_VISIBLE);
         }
+    }
+
+    if (showInReport) {
+        setCCSBitFlag(ccs, CCS_VISIBLE);
+    } else {
+        clearCCSBitFlag(ccs, CCS_VISIBLE);
     }
 }
 
@@ -767,82 +820,11 @@ countTickss_(CostCentreStack const *ccs, ProfilerTotals *totals)
  * total ticks/allocations.
  */
 static ProfilerTotals
-countTickss(CostCentreStack const *ccs)
+aggregateCostData(CostCentreStack *ccs)
 {
     ProfilerTotals totals = {0,0};
-    countTickss_(ccs, &totals);
+    aggregateCostData_(ccs, &totals);
     return totals;
-}
-
-/* Traverse the cost centre stack tree and inherit ticks & allocs.
- */
-static void
-inheritCosts(CostCentreStack *ccs)
-{
-    IndexTable *i;
-
-    if (ignoreCCS(ccs)) { return; }
-
-    ccs->inherited_ticks += ccs->time_ticks;
-    ccs->inherited_alloc += ccs->mem_alloc;
-
-    for (i = ccs->indexTable; i != NULL; i = i->next)
-        if (!i->back_edge) {
-            inheritCosts(i->ccs);
-            ccs->inherited_ticks += i->ccs->inherited_ticks;
-            ccs->inherited_alloc += i->ccs->inherited_alloc;
-        }
-
-    return;
-}
-
-static void
-aggregateCCCosts( CostCentreStack *ccs )
-{
-    IndexTable *i;
-
-    ccs->cc->mem_alloc += ccs->mem_alloc;
-    ccs->cc->time_ticks += ccs->time_ticks;
-
-    for (i = ccs->indexTable; i != 0; i = i->next) {
-        if (!i->back_edge) {
-            aggregateCCCosts(i->ccs);
-        }
-    }
-}
-
-//
-// Prune CCSs with zero entries, zero ticks or zero allocation from
-// the tree, unless COST_CENTRES_ALL is on.
-//
-static CostCentreStack *
-pruneCCSTree (CostCentreStack *ccs)
-{
-    CostCentreStack *ccs1;
-    IndexTable *i, **prev;
-
-    prev = &ccs->indexTable;
-    for (i = ccs->indexTable; i != 0; i = i->next) {
-        if (i->back_edge) { continue; }
-
-        ccs1 = pruneCCSTree(i->ccs);
-        if (ccs1 == NULL) {
-            *prev = i->next;
-        } else {
-            prev = &(i->next);
-        }
-    }
-
-    if ( (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL
-          /* force printing of *all* cost centres if -P -P */ )
-
-         || ( ccs->indexTable != 0 )
-         || ( ccs->scc_count || ccs->time_ticks || ccs->mem_alloc )
-        ) {
-        return ccs;
-    } else {
-        return NULL;
-    }
 }
 
 static IndexTable*
@@ -900,6 +882,26 @@ sortCCSTree(CostCentreStack *ccs)
     }
 
     ccs->indexTable = sortedList;
+}
+
+static void
+resetCCSData( CostCentreStack *ccs )
+{
+    IndexTable *i;
+
+    ccs->scc_count = 0;
+    ccs->time_ticks = 0;
+    ccs->cc->time_ticks = 0;
+    ccs->mem_alloc = 0;
+    ccs->cc->mem_alloc = 0;
+    ccs->inherited_ticks = 0;
+    ccs->inherited_alloc = 0;
+
+    for (i = ccs->indexTable; i != NULL; i = i->next) {
+        if (!i->back_edge) {
+            resetCCSData(i->ccs);
+        }
+    }
 }
 
 void
@@ -1007,6 +1009,23 @@ fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
         }
     }
 done:
+    return;
+}
+
+void setCCSBitFlag(CostCentreStack *ccs, StgWord flag)
+{
+    ccs->bitflags |= flag;
+    return;
+}
+
+bool testCCSBitFlag(CostCentreStack const *ccs, StgWord flag)
+{
+    return ccs->bitflags & flag;
+}
+
+void clearCCSBitFlag(CostCentreStack *ccs, StgWord flag)
+{
+    ccs->bitflags &= ~flag;
     return;
 }
 

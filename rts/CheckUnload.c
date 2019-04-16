@@ -214,6 +214,11 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
         p = bd->start;
         while (p < bd->free) {
             info = get_itbl((StgClosure *)p);
+#ifdef PROFILING
+            // mark CCS as referenced by the heap so it is not pruned while
+            // generating the profile snapshot
+            setCCSBitFlag(((StgClosure *)p)->header.prof.ccs, CCS_REFERENCED);
+#endif
             prim = false;
 
             switch (info->type) {
@@ -376,6 +381,85 @@ static void searchCostCentres (HashTable *addrs, CostCentreStack *ccs,
         }
     }
 }
+
+//
+// Prune the CCS tree.
+// Assumes CCS_REFERENCED bit has been set on all CCSs referenced by the heap.
+// Resulting CCS tree has CCS_REFERENCED bit cleared on all CCSs.
+//
+static CostCentreStack *
+gcCostCentreStacks (CostCentreStack *ccs)
+{
+    CostCentreStack *ccs1;
+    IndexTable *i, **prev;
+
+    prev = &ccs->indexTable;
+    for (i = ccs->indexTable; i != NULL; i = i->next) {
+        if (i->back_edge) { continue; }
+
+        ccs1 = gcCostCentreStacks(i->ccs);
+        if (ccs1 == NULL) {
+            *prev = i->next;
+        } else {
+            prev = &(i->next);
+        }
+    }
+
+    if (   testCCSBitFlag(ccs, CCS_REFERENCED)
+        || ( ccs->indexTable != NULL )
+        || specialCCS(ccs)
+        || ccs->scc_count
+        || ccs->time_ticks
+        || ccs->mem_alloc) {
+        clearCCSBitFlag(ccs, CCS_REFERENCED);
+        return ccs;
+    } else {
+        return NULL;
+    }
+}
+
+#if defined(PROFILING)
+static bool objectContains (ObjectCode *oc, const void *addr)
+{
+    int i;
+
+     if (oc != NULL) {
+        for (i = 0; i < oc->n_sections; i++) {
+            if (oc->sections[i].kind != SECTIONKIND_OTHER) {
+                if ((W_)addr >= (W_)oc->sections[i].start &&
+                    (W_)addr <  (W_)oc->sections[i].start
+                                + oc->sections[i].size) {
+                    return true;
+                }
+            }
+        }
+    }
+
+     return false;
+}
+#endif /* PROFILING */
+
+//
+// Remove all CostCentres which are statically allocated in the given object
+// from the global CC_LIST.
+//
+static void gcCostCentres(ObjectCode *oc)
+{
+    CostCentre *cc, *prev, *next;
+    prev = NULL;
+    for (cc = CC_LIST; cc != NULL; cc = next) {
+        next = cc->link;
+        if (objectContains(oc, cc)) {
+            if (prev == NULL) {
+                CC_LIST = cc->link;
+            } else {
+                prev->link = cc->link;
+            }
+        } else {
+          prev = cc;
+        }
+    }
+}
 #endif
 
 // Look through the unloadable objects, and any object that is still
@@ -393,6 +477,13 @@ static void pruneUnreferencedObjs (void)
           } else {
               prev->next = oc->next;
           }
+
+#if defined(PROFILING)
+          // The CCS tree isn't keeping this object alive, and it is unloaded,
+          // so we can prune the global CC_LIST of any CCs from this object.
+          gcCostCentres(oc);
+#endif /* PROFILING */
+
           IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
                                       oc->fileName));
           freeObjectCode(oc);
@@ -502,13 +593,14 @@ void checkUnload (StgClosure *static_objects)
 
 #if defined(PROFILING)
   /* Traverse the cost centre tree, calling checkAddress on each CCS/CC */
+  // searchHeapBlocks marked CCSs which are referenced by the heap, so we can
+  // garbage collect the CCS tree
+  gcCostCentreStacks(CCS_MAIN);
+
+  // The cost centre tree now only contains CCSs kept alive by the heap.
+  // Traverse it and mark the owning objects as referenced.
   searchCostCentres(addrs, CCS_MAIN, s_indices);
 
-  /* Also check each cost centre in the CC_LIST */
-  CostCentre *cc;
-  for (cc = CC_LIST; cc != NULL; cc = cc->link) {
-      checkAddress(addrs, cc, s_indices);
-  }
 #endif /* PROFILING */
 
   freeOCSectionIndices(s_indices);
