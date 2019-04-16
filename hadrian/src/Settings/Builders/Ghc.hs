@@ -1,4 +1,8 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Settings.Builders.Ghc (ghcBuilderArgs, haddockGhcArgs) where
+
+import Data.List.Extra (splitOn)
 
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
@@ -131,7 +135,16 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
 findHsDependencies :: Args
 findHsDependencies = builder (Ghc FindHsDependencies) ? do
     ways <- getLibraryWays
+    stage <- getStage
+    ghcVersion :: [Int] <- fmap read . splitOn "." <$> expr (ghcVersionStage stage)
     mconcat [ arg "-M"
+
+            -- "-include-cpp-deps" is a new ish feature so is version gated.
+            -- Without this feature some dependencies will be missing in stage0.
+            -- TODO Remove version gate when minimum supported Stage0 compiler
+            -- is >= 8.9.0.
+            , ghcVersion > [8,9,0] ? arg "-include-cpp-deps"
+
             , commonGhcArgs
             , arg "-include-pkg-deps"
             , arg "-dep-makefile", arg =<< getOutput
