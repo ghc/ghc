@@ -10,3 +10,7 @@
 -- Test that overlapping instances are all reported in the results
 :instances [_]
 :instances [T]
+
+-- Test that we can find instances for type families
+
+:instances F Int

@@ -954,12 +954,24 @@ typeKind normalise str = withSession $ \hsc_env -> do
 -- ----------------------------------------------------------------------------
 -- Getting the class instances for a type
 
+-- Find all instances that match a provided type
+getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
+getInstancesForType ty = withSession $ \hsc_env -> do
+  liftIO $ runInteractiveHsc hsc_env $ do
+    ioMsgMaybe $ runTcInteractive hsc_env $ do
+      matches <- findMatchingInstances ty
+
+      fmap catMaybes . forM matches $ \(res, mb_inst_tys) -> do
+          exists <- checkForExistence res mb_inst_tys
+          return $ fmap (\s -> substClassArgs s res) exists
+
+-- Parse a type string and turn any holes into skolems
 parseInstanceHead :: GhcMonad m => String -> m Type
 parseInstanceHead str = withSession $ \hsc_env0 -> do
   (ty, _) <- liftIO $ runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe $ tcRnType hsc_env SkolemiseFlexi False ty
+    ioMsgMaybe $ tcRnType hsc_env SkolemiseFlexi True ty
 
   return ty
 
@@ -1025,17 +1037,6 @@ findMatchingInstances ty = do
   return . concat $ map (\cls ->
     let (matches, unifs, _) = lookupInstEnv True ies cls [ty]
     in matches ++ map (\unif -> (unif, [])) unifs) allClasses
-
--- Find all instances that match a provided type
-getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
-getInstancesForType ty = withSession $ \hsc_env -> do
-  liftIO $ runInteractiveHsc hsc_env $ do
-    ioMsgMaybe $ runTcInteractive hsc_env $ do
-      matches <- findMatchingInstances ty
-
-      fmap catMaybes . forM matches $ \(res, mb_inst_tys) -> do
-          exists <- checkForExistence res mb_inst_tys
-          return $ fmap (\s -> substClassArgs s res) exists
 
 -- Apply a substitution to an instance to instantiate all the variables within the instance
 substClassArgs ::  TCvSubst -> ClsInst -> ClsInst

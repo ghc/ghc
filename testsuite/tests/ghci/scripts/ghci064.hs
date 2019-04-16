@@ -1,4 +1,6 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, TypeFamilies #-}
+import Data.Kind (Type)
+
 class MyShow a where
   myshow :: a -> String
 
@@ -12,3 +14,8 @@ instance MyShow T where
 
 instance MyShow [T] where
   myshow xs = "Used more specific instance"
+
+
+type family F a :: Type
+type instance F [a] = a -> F a
+type instance F Int = Bool
