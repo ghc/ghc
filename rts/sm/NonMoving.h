@@ -160,13 +160,29 @@ INLINE_HEADER unsigned int nonmovingSegmentBlockSize(struct NonmovingSegment *se
     return 1 << seg->block_size;
 }
 
+// How many blocks does a segment with the given block size have?
+INLINE_HEADER unsigned int nonmovingBlockCount(uint8_t log_block_size)
+{
+  unsigned int segment_data_size = NONMOVING_SEGMENT_SIZE - sizeof(struct NonmovingSegment);
+  segment_data_size -= segment_data_size % SIZEOF_VOID_P;
+  unsigned int blk_size = 1 << log_block_size;
+  // N.B. +1 accounts for the byte in the mark bitmap.
+  return segment_data_size / (blk_size + 1);
+}
+
 // How many blocks does the given segment contain? Also the size of the bitmap.
 INLINE_HEADER unsigned int nonmovingSegmentBlockCount(struct NonmovingSegment *seg)
 {
-  unsigned int sz = nonmovingSegmentBlockSize(seg);
-  unsigned int segment_data_size = NONMOVING_SEGMENT_SIZE - sizeof(struct NonmovingSegment);
-  segment_data_size -= segment_data_size % SIZEOF_VOID_P;
-  return segment_data_size / (sz + 1);
+  // We compute the overwhelmingly common size cases directly to avoid a very
+  // expensive integer division.
+  switch (seg->block_size) {
+    case 3:  return nonmovingBlockCount(3);
+    case 4:  return nonmovingBlockCount(4);
+    case 5:  return nonmovingBlockCount(5);
+    case 6:  return nonmovingBlockCount(6);
+    case 7:  return nonmovingBlockCount(7);
+    default: return nonmovingBlockCount(seg->block_size);
+  }
 }
 
 // Get a pointer to the given block index
