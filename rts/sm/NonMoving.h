@@ -190,9 +190,8 @@ INLINE_HEADER nonmoving_block_idx nonmovingGetBlockIdx(StgPtr p)
     ASSERT(HEAP_ALLOCED_GC(p) && (Bdescr(p)->flags & BF_NONMOVING));
     struct NonmovingSegment *seg = nonmovingGetSegment(p);
     ptrdiff_t blk0 = (ptrdiff_t)nonmovingSegmentGetBlock(seg, 0);
-    unsigned int blk_size = nonmovingSegmentBlockSize(seg);
     ptrdiff_t offset = (ptrdiff_t)p - blk0;
-    return (nonmoving_block_idx) (offset / blk_size);
+    return (nonmoving_block_idx) (offset >> seg->block_size);
 }
 
 // TODO: Eliminate this
