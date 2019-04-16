@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     }
     objpath = argv[1];
 
-#ifdef darwin_HOST_OS
+#if defined(darwin_HOST_OS)
     char symname[MAX_SYMNAME + 1];
     symname[0] = '_';
     strncpy(&symname[1], argv[2], MAX_SYMNAME);
