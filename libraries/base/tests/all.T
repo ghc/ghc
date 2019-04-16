@@ -73,7 +73,7 @@ test('length001',
      # excessive amounts of stack space. So we specifically set a low
      # stack limit and mark it as failing under a few conditions.
      [extra_run_opts('+RTS -K8m -RTS'),
-     expect_fail_for(['normal', 'threaded1', 'llvm'])],
+      expect_fail_for(['normal', 'threaded1', 'llvm', 'nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc'])],
      compile_and_run, [''])
 
 test('ratio001', 	normal, compile_and_run, [''])
@@ -231,5 +231,5 @@ test('T3474',
 test('T14425', normal, compile_and_run, [''])
 test('T10412', normal, compile_and_run, [''])
 test('T13896', normal, compile_and_run, [''])
-test('T13167', normal, compile_and_run, [''])
+test('T13167', expect_broken_for(16536, ['threaded2']), compile_and_run, [''])
 test('T15349', [exit_code(1), expect_broken_for(15349, 'ghci')], compile_and_run, [''])

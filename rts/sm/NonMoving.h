@@ -49,7 +49,7 @@ struct NonmovingSegment {
 
 // This is how we mark end of todo lists. Not NULL because todo_link == NULL
 // means segment is not in list.
-#define END_NONMOVING_TODO_LIST ((struct NonMovingSegment*)1)
+#define END_NONMOVING_TODO_LIST ((struct NonmovingSegment*)1)
 
 // A non-moving allocator for a particular block size
 struct NonmovingAllocator {
@@ -71,19 +71,27 @@ struct NonmovingAllocator {
 
 struct NonmovingHeap {
     struct NonmovingAllocator *allocators[NONMOVING_ALLOCA_CNT];
-    struct NonmovingSegment *free; // free segment list
+    // free segment list. This is a cache where we keep up to
+    // NONMOVING_MAX_FREE segments to avoid thrashing the block allocator.
+    // Note that segments in this list are still counted towards
+    // oldest_gen->n_blocks.
+    struct NonmovingSegment *free;
     // how many segments in free segment list? accessed atomically.
     unsigned int n_free;
 
     // records the current length of the nonmovingAllocator.current arrays
     unsigned int n_caps;
 
-    // The set of segments being swept in this GC. Filled during mark phase and
-    // consumed during sweep phase. NULL before mark and after sweep.
+    // The set of segments being swept in this GC. Segments are moved here from
+    // the filled list during preparation and moved back to either the filled,
+    // active, or free lists during sweep.  Should be NULL before mark and
+    // after sweep.
     struct NonmovingSegment *sweep_list;
 };
 
 extern struct NonmovingHeap nonmovingHeap;
+
+extern uint64_t nonmoving_live_words;
 
 void nonmovingInit(void);
 void nonmovingExit(void);
@@ -152,20 +160,36 @@ INLINE_HEADER unsigned int nonmovingSegmentBlockSize(struct NonmovingSegment *se
     return 1 << seg->block_size;
 }
 
+// How many blocks does a segment with the given block size have?
+INLINE_HEADER unsigned int nonmovingBlockCount(uint8_t log_block_size)
+{
+  unsigned int segment_data_size = NONMOVING_SEGMENT_SIZE - sizeof(struct NonmovingSegment);
+  segment_data_size -= segment_data_size % SIZEOF_VOID_P;
+  unsigned int blk_size = 1 << log_block_size;
+  // N.B. +1 accounts for the byte in the mark bitmap.
+  return segment_data_size / (blk_size + 1);
+}
+
 // How many blocks does the given segment contain? Also the size of the bitmap.
 INLINE_HEADER unsigned int nonmovingSegmentBlockCount(struct NonmovingSegment *seg)
 {
-  unsigned int sz = nonmovingSegmentBlockSize(seg);
-  unsigned int segment_data_size = NONMOVING_SEGMENT_SIZE - sizeof(struct NonmovingSegment);
-  segment_data_size -= segment_data_size % SIZEOF_VOID_P;
-  return segment_data_size / (sz + 1);
+  // We compute the overwhelmingly common size cases directly to avoid a very
+  // expensive integer division.
+  switch (seg->block_size) {
+    case 3:  return nonmovingBlockCount(3);
+    case 4:  return nonmovingBlockCount(4);
+    case 5:  return nonmovingBlockCount(5);
+    case 6:  return nonmovingBlockCount(6);
+    case 7:  return nonmovingBlockCount(7);
+    default: return nonmovingBlockCount(seg->block_size);
+  }
 }
 
 // Get a pointer to the given block index
 INLINE_HEADER void *nonmovingSegmentGetBlock(struct NonmovingSegment *seg, nonmoving_block_idx i)
 {
   // Block size in bytes
-  int blk_size = nonmovingSegmentBlockSize(seg);
+  unsigned int blk_size = nonmovingSegmentBlockSize(seg);
   // Bitmap size in bytes
   W_ bitmap_size = nonmovingSegmentBlockCount(seg) * sizeof(uint8_t);
   // Where the actual data starts (address of the first block).
@@ -190,9 +214,8 @@ INLINE_HEADER nonmoving_block_idx nonmovingGetBlockIdx(StgPtr p)
     ASSERT(HEAP_ALLOCED_GC(p) && (Bdescr(p)->flags & BF_NONMOVING));
     struct NonmovingSegment *seg = nonmovingGetSegment(p);
     ptrdiff_t blk0 = (ptrdiff_t)nonmovingSegmentGetBlock(seg, 0);
-    unsigned int blk_size = nonmovingSegmentBlockSize(seg);
     ptrdiff_t offset = (ptrdiff_t)p - blk0;
-    return (nonmoving_block_idx) (offset / blk_size);
+    return (nonmoving_block_idx) (offset >> seg->block_size);
 }
 
 // TODO: Eliminate this
@@ -233,7 +256,7 @@ INLINE_HEADER bool nonmovingClosureMarked(StgPtr p)
 // segment is in the set of segments that will be swept this collection cycle.
 INLINE_HEADER bool nonmovingSegmentBeingSwept(struct NonmovingSegment *seg)
 {
-    int n = nonmovingSegmentBlockCount(seg);
+    unsigned int n = nonmovingSegmentBlockCount(seg);
     return seg->next_free_snap >= n;
 }
 

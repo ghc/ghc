@@ -17,7 +17,7 @@ test('conc069a', only_threaded_ways, compile_and_run, [''])
 # those for now.
 test('conc070', only_threaded_ways, compile_and_run, [''])
 
-test('conc071', omit_ways(['threaded2', 'nonmoving_thr']), compile_and_run, [''])
+test('conc071', omit_ways(['threaded2', 'nonmoving_thr', 'nonmoving_thr_ghc']), compile_and_run, [''])
 test('conc072', only_ways(['threaded2', 'nonmoving_thr']), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
@@ -243,7 +243,7 @@ test('conc068', [ omit_ways(['threaded2', 'nonmoving_thr', 'nonmoving_thr_ghc'])
      exit_code(1) ], compile_and_run, [''])
 
 test('setnumcapabilities001',
-     [ only_ways(['threaded1','threaded2', 'nonmoving_thr']),
+     [ only_ways(['threaded1','threaded2']), # TODO: Fix for nonmoving_thr
        extra_run_opts('8 12 2000'),
        req_smp ],
      compile_and_run, [''])

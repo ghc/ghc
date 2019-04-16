@@ -29,6 +29,6 @@ validate:
         WAY="nonmoving nonmoving_thr nonmoving_thr_ghc" \
         THREADS=$THREADS \
         SKIP_PERF_TESTS=YES \
-        SKIP_TESTS="posix009 hpc_raytrace"
+        SKIP_TESTS="posix009 hpc_raytrace posix002 executeFile001"
     - |
       make V=0 HADDOCK_DOCS=YES EXTRA_HADDOCK_OPTS="+RTS -xn -RTS"

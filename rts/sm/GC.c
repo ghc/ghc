@@ -558,7 +558,7 @@ GarbageCollect (uint32_t collect_gen,
     gen = &generations[g];
 
     // for generations we collected...
-    if (g <= N) {
+    if (g <= N && !(RtsFlags.GcFlags.useNonmoving && gen == oldest_gen)) {
 
         /* free old memory and shift to-space into from-space for all
          * the collected generations (except the allocation area).  These

@@ -46,10 +46,6 @@ Condition concurrent_coll_finished;
 Mutex concurrent_coll_finished_lock;
 #endif
 
-#if defined(DEBUG)
-void gcCAFs(void);
-#endif
-
 /* Note [Concurrent non-moving collection]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * Concurrency-control of non-moving garbage collection is a bit tricky. There
@@ -67,7 +63,19 @@ void gcCAFs(void);
  *    stopAllCapabilitiesWith(SYNC_FLUSH_UPD_REM_SET). Capabilities are held
  *    the final mark has concluded.
  *
+ *
+ * Note [Live data accounting in nonmoving collector]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The nonmoving collector uses a very approximate heuristic for reporting live
+ * data. Specifically, it assumes that all segments are full. While we could
+ * maintain a (per-capability) running tally of live blocks which could get
+ * updated on allocation and sweep, this seems unnecessarily costly since it
+ * would require that sweep traverse the entire segment to count how many
+ * blocks are freed.
+ *
  */
+
+W_ nonmoving_live_words = 0;
 
 #if defined(THREADED_RTS)
 static void* nonmovingConcurrentMark(void *mark_queue);
@@ -89,8 +97,13 @@ static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t block_siz
 // Add a segment to the free list.
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
 {
+    bdescr *bd = Bdescr((StgPtr) seg);
+
+    // See Note [Live data accounting in nonmoving collector].
     if (nonmovingHeap.n_free > NONMOVING_MAX_FREE) {
         ACQUIRE_SM_LOCK;
+        oldest_gen->n_blocks -= bd->blocks;
+        oldest_gen->n_words  -= BLOCK_SIZE_W * bd->blocks;
         freeGroup(Bdescr((StgPtr) seg));
         RELEASE_SM_LOCK;
         return;
@@ -137,7 +150,7 @@ static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
         // generation and call `todo_block_full`
         ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
         bdescr *bd = allocAlignedGroupOnNode(node, NONMOVING_SEGMENT_BLOCKS);
-        // Approximate accounting
+        // See Note [Live data accounting in nonmoving collector].
         oldest_gen->n_blocks += bd->blocks;
         oldest_gen->n_words  += BLOCK_SIZE_W * bd->blocks;
         RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
@@ -385,6 +398,7 @@ static void nonmovingPrepareMark(void)
     oldest_gen->large_objects = NULL;
     oldest_gen->n_large_words = 0;
     oldest_gen->n_large_blocks = 0;
+    nonmoving_live_words = 0;
 
 #if defined(DEBUG)
     debug_caf_list_snapshot = debug_caf_list;
@@ -537,7 +551,6 @@ static void* nonmovingConcurrentMark(void *data)
     nonmovingMark_(mark_queue, &dead_weaks, &resurrected_threads);
     return NULL;
 }
-#endif
 
 // TODO: Not sure where to put this function.
 // Append w2 to the end of w1.
@@ -548,6 +561,7 @@ static void appendWeakList( StgWeak **w1, StgWeak *w2 )
     }
     *w1 = w2;
 }
+#endif
 
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads)
 {
@@ -692,6 +706,21 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 #endif
 
     // TODO: Remainder of things done by GarbageCollect (update stats)
+
+    // HACK
+    debugBelch("nonmoving: n_blocks: %lu, n_large_block: %lu, n_compact_blocks: %lu\n", 
+               oldest_gen->n_blocks, oldest_gen->n_large_blocks, oldest_gen->n_compact_blocks);
+    debugBelch("nonmoving: max_blocks: %lu -> %lu\n", oldest_gen->max_blocks, oldest_gen->n_blocks);
+    W_ live = oldest_gen->n_blocks +
+        oldest_gen->n_large_blocks +
+        oldest_gen->n_compact_blocks;
+    W_ size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
+                      RtsFlags.GcFlags.minOldGenSize);
+    size /= 2;
+    for (unsigned int g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        generations[g].max_blocks = size;
+    }
+    oldest_gen->n_words = nonmoving_live_words;
 
 #if defined(THREADED_RTS)
 finish:
