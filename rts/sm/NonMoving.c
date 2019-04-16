@@ -79,6 +79,8 @@ void gcCAFs(void);
  *
  */
 
+W_ nonmoving_live_words = 0;
+
 #if defined(THREADED_RTS)
 static void* nonmovingConcurrentMark(void *mark_queue);
 #endif
@@ -403,6 +405,7 @@ static void nonmovingPrepareMark(void)
     oldest_gen->large_objects = NULL;
     oldest_gen->n_large_words = 0;
     oldest_gen->n_large_blocks = 0;
+    nonmoving_live_words = 0;
 
 #if defined(DEBUG)
     debug_caf_list_snapshot = debug_caf_list;
@@ -724,6 +727,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     for (unsigned int g = 0; g < RtsFlags.GcFlags.generations; g++) {
         generations[g].max_blocks = size;
     }
+    oldest_gen->n_words = nonmoving_live_words;
 
 #if defined(THREADED_RTS)
 finish:
