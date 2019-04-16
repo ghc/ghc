@@ -643,12 +643,12 @@ withTiming getDFlags what force_result action
        if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
           then do liftIO $ logInfo dflags (defaultUserStyle dflags)
                          $ text "***" <+> what <> colon
-                  traceEventIO $ showSDocOneLine dflags $ text "GHC started:" <+> what
+                  liftIO $ traceEventIO $ showSDocOneLine dflags $ text "GHC:started:" <+> what
                   alloc0 <- liftIO getAllocationCounter
                   start <- liftIO getCPUTime
                   !r <- action
                   () <- pure $ force_result r
-                  traceEventIO $ showSDocOneLine dflags $ text "GHC done:" <+> what
+                  liftIO $ traceEventIO $ showSDocOneLine dflags $ text "GHC:finished:" <+> what
                   end <- liftIO getCPUTime
                   alloc1 <- liftIO getAllocationCounter
                   -- recall that allocation counter counts down
