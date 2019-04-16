@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#ifdef WEAK
+#if defined(WEAK)
 int power2(int x) __attribute__((weak));
 #endif
 int power2(int x)
