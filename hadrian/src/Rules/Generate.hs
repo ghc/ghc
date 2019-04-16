@@ -170,6 +170,10 @@ copyRules = do
 generateRules :: Rules ()
 generateRules = do
     root <- buildRootRules
+
+    (root -/- "ghc-stage1") <~ ghcWrapper Stage1
+    (root -/- "ghc-stage2") <~ ghcWrapper Stage2
+
     priority 2.0 $ (root -/- generatedDir -/- "ghcautoconf.h") <~ generateGhcAutoconfH
     priority 2.0 $ (root -/- generatedDir -/- "ghcplatform.h") <~ generateGhcPlatformH
     priority 2.0 $ (root -/- generatedDir -/-  "ghcversion.h") <~ generateGhcVersionH
@@ -189,6 +193,17 @@ emptyTarget = vanillaContext (error "Rules.Generate.emptyTarget: unknown stage")
                              (error "Rules.Generate.emptyTarget: unknown package")
 
 -- Generators
+
+-- | GHC wrapper scripts used for passing the path to the right package database
+-- when invoking in-tree GHC executables.
+ghcWrapper :: Stage -> Expr String
+ghcWrapper Stage0 = error "Stage0 GHC does not require a wrapper script to run."
+ghcWrapper stage  = do
+    dbPath  <- expr $ packageDbPath stage
+    ghcPath <- expr $ programPath (vanillaContext (pred stage) ghc)
+    return $ unwords $ map show $ [ ghcPath ]
+                               ++ [ "-package-db " ++ dbPath | stage == Stage1 ]
+                               ++ [ "$@" ]
 
 -- | Given a 'String' replace charaters '.' and '-' by underscores ('_') so that
 -- the resulting 'String' is a valid C preprocessor identifier.
