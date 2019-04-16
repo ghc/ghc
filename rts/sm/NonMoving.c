@@ -607,8 +607,22 @@ static void appendWeakList( StgWeak **w1, StgWeak *w2 )
 }
 #endif
 
+static void set_target_size(int mul)
+{
+    W_ live = (nonmoving_live_words + BLOCK_SIZE_W - 1) / BLOCK_SIZE_W +
+        oldest_gen->n_large_blocks +
+        oldest_gen->n_compact_blocks;
+    W_ size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
+                      RtsFlags.GcFlags.minOldGenSize);
+    size *= mul;
+    for (unsigned int g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        generations[g].max_blocks = size;
+    }
+}
+
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads)
 {
+    set_target_size(4);
     ACQUIRE_LOCK(&nonmoving_collection_mutex);
     debugTrace(DEBUG_nonmoving_gc, "Starting mark...");
 
@@ -757,16 +771,9 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
                oldest_gen->n_blocks, oldest_gen->n_large_blocks, oldest_gen->n_compact_blocks);
     debugBelch("nonmoving: max_blocks: %lu -> %lu\n", oldest_gen->max_blocks, oldest_gen->n_blocks);
 #endif
-    W_ live = oldest_gen->n_blocks +
-        oldest_gen->n_large_blocks +
-        oldest_gen->n_compact_blocks;
-    W_ size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
-                      RtsFlags.GcFlags.minOldGenSize);
-    //size /= 4;
-    for (unsigned int g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        generations[g].max_blocks = size;
-    }
     oldest_gen->n_words = nonmoving_live_words;
+    oldest_gen->n_old_blocks = 0;
+    set_target_size(1);
 
 #if defined(THREADED_RTS)
 finish:

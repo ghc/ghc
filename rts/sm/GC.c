@@ -1713,7 +1713,7 @@ resize_generations (void)
 {
     uint32_t g;
 
-    if (major_gc && RtsFlags.GcFlags.generations > 1) {
+    if (major_gc && RtsFlags.GcFlags.generations > 1 && ! RtsFlags.GcFlags.useNonmoving) {
         W_ live, size, min_alloc, words;
         const W_ max  = RtsFlags.GcFlags.maxHeapSize;
         const W_ gens = RtsFlags.GcFlags.generations;
