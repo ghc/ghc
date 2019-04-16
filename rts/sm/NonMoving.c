@@ -450,6 +450,19 @@ static void nonmovingPrepareMark(void)
 #endif
 }
 
+static void set_target_size(int mul)
+{
+    W_ live = (nonmoving_live_words + BLOCK_SIZE_W - 1) / BLOCK_SIZE_W +
+        oldest_gen->n_large_blocks +
+        oldest_gen->n_compact_blocks;
+    W_ size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
+                      RtsFlags.GcFlags.minOldGenSize);
+    size *= mul;
+    for (unsigned int g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        generations[g].max_blocks = size;
+    }
+}
+
 // Mark weak pointers in the non-moving heap. They'll either end up in
 // dead_weak_ptr_list or stay in weak_ptr_list. Either way they need to be kept
 // during sweep. See `MarkWeak.c:markWeakPtrList` for the moving heap variant
@@ -483,6 +496,7 @@ static void nonmovingMarkWeakPtrList(MarkQueue *mark_queue, StgWeak *dead_weak_p
 
 void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 {
+    set_target_size(4);
 #if defined(THREADED_RTS)
     // We can't start a new collection until the old one has finished
     // We also don't run in final GC
@@ -607,22 +621,8 @@ static void appendWeakList( StgWeak **w1, StgWeak *w2 )
 }
 #endif
 
-static void set_target_size(int mul)
-{
-    W_ live = (nonmoving_live_words + BLOCK_SIZE_W - 1) / BLOCK_SIZE_W +
-        oldest_gen->n_large_blocks +
-        oldest_gen->n_compact_blocks;
-    W_ size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
-                      RtsFlags.GcFlags.minOldGenSize);
-    size *= mul;
-    for (unsigned int g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        generations[g].max_blocks = size;
-    }
-}
-
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads)
 {
-    set_target_size(4);
     ACQUIRE_LOCK(&nonmoving_collection_mutex);
     debugTrace(DEBUG_nonmoving_gc, "Starting mark...");
 
