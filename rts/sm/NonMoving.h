@@ -165,7 +165,7 @@ INLINE_HEADER unsigned int nonmovingSegmentBlockCount(struct NonmovingSegment *s
 INLINE_HEADER void *nonmovingSegmentGetBlock(struct NonmovingSegment *seg, nonmoving_block_idx i)
 {
   // Block size in bytes
-  int blk_size = nonmovingSegmentBlockSize(seg);
+  unsigned int blk_size = nonmovingSegmentBlockSize(seg);
   // Bitmap size in bytes
   W_ bitmap_size = nonmovingSegmentBlockCount(seg) * sizeof(uint8_t);
   // Where the actual data starts (address of the first block).
@@ -233,7 +233,7 @@ INLINE_HEADER bool nonmovingClosureMarked(StgPtr p)
 // segment is in the set of segments that will be swept this collection cycle.
 INLINE_HEADER bool nonmovingSegmentBeingSwept(struct NonmovingSegment *seg)
 {
-    int n = nonmovingSegmentBlockCount(seg);
+    unsigned int n = nonmovingSegmentBlockCount(seg);
     return seg->next_free_snap >= n;
 }
 
