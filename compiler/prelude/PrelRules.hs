@@ -1223,6 +1223,24 @@ builtinRules
 -- there is no benefit to inlining these yet, despite this, GHC produces
 -- unfoldings for this regardless since the floated list entries look small.
 
+-- Note [Integer and Natural constant folding]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The constant folding rules for Natural were written to match those that
+-- @Integer@ has as the support of this feature by that type is quite complete.
+-- However, not every rule from @Integer@ will find meaningful translation to
+-- @Natural@.
+--
+-- For example, @negate :: Natural -> Natural@ doesn't need a rule,
+-- and neither does @complement :: Natural -> Natural@.
+--
+-- Other rules, like @rationalToFloat@, don't make sense to be in the list for
+-- @Natural@ - in this case, because @Rational@ uses @Integer@ under the hood.
+--
+-- As yet another example, @abs :: Natural -> Natural@ needs no rule since for
+-- this type, it is defined as @abs = id@, meaning no constant folding will be
+-- needed.
+
 builtinIntegerRules :: [CoreRule]
 builtinIntegerRules =
  [rule_IntToInteger   "smallInteger"        smallIntegerName,
@@ -1339,6 +1357,8 @@ builtinIntegerRules =
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Integer_popCount }
 
+-- See Note [Integer and Natural constant folding] for why some of the
+-- @builtinIntegerRules@ do not have counterparts in @builtinNaturalRules@.
 builtinNaturalRules :: [CoreRule]
 builtinNaturalRules =
  [rule_binop              "plusNatural"        plusNaturalName         (+)

@@ -425,7 +425,7 @@ instance Real Natural where
 -- of integer-gmp or integer-simple.
 
 -- | @since 2.0.1
-instance  Integral Integer where
+instance Integral Integer where
     toInteger n      = n
 
     {-# INLINE quot #-}
@@ -456,6 +456,10 @@ instance  Integral Integer where
 
 -- | @since 4.8.0.0
 instance Integral Natural where
+    -- See Note [Integer division constant folding] for why these @INLINE@s are
+    -- necessary. @toInteger@ also needs the pragma because there is a builtin
+    -- rules for @naturalToInteger@.
+    {-# INLINE toInteger #-}
     toInteger = naturalToInteger
 
     {-# INLINE divMod #-}
