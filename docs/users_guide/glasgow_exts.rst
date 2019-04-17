@@ -4531,7 +4531,8 @@ Deriving ``Lift`` instances
 The class ``Lift``, unlike other derivable classes, lives in
 ``template-haskell`` instead of ``base``. Having a data type be an instance of
 ``Lift`` permits its values to be promoted to Template Haskell expressions (of
-type ``ExpQ``), which can then be spliced into Haskell source code.
+type ``ExpQ`` and ``TExpQ a``), which can then be spliced into Haskell source
+code.
 
 Here is an example of how one can derive ``Lift``:
 
@@ -4546,17 +4547,11 @@ Here is an example of how one can derive ``Lift``:
 
     {-
     instance (Lift a) => Lift (Foo a) where
-        lift (Foo a)
-        = appE
-            (conE
-                (mkNameG_d "package-name" "Bar" "Foo"))
-            (lift a)
-        lift (u :^: v)
-        = infixApp
-            (lift u)
-            (conE
-                (mkNameG_d "package-name" "Bar" ":^:"))
-            (lift v)
+        lift (Foo a) = [| Foo a |]
+        lift ((:^:) u v) = [| (:^:) u v |]
+
+        liftTyped (Foo a) = [|| Foo a ||]
+        liftTyped ((:^:) u v) = [|| (:^:) u v ||]
     -}
 
     -----
@@ -4572,8 +4567,9 @@ Here is an example of how one can derive ``Lift``:
     fooExp :: Lift a => Foo a -> Q Exp
     fooExp f = [| f |]
 
-:extension:`DeriveLift` also works for certain unboxed types (``Addr#``, ``Char#``,
-``Double#``, ``Float#``, ``Int#``, and ``Word#``):
+Note that the ``Lift`` typeclass takes advantage of :ref:`runtime-rep` in order
+to support instances involving unboxed types. This means :extension:`DeriveLift`
+also works for these types:
 
 ::
 
@@ -4587,12 +4583,8 @@ Here is an example of how one can derive ``Lift``:
 
     {-
     instance Lift IntHash where
-        lift (IntHash i)
-        = appE
-            (conE
-                (mkNameG_d "package-name" "Unboxed" "IntHash"))
-            (litE
-                (intPrimL (toInteger (I# i))))
+        lift (IntHash i) = [| IntHash i |]
+        liftTyped (IntHash i) = [|| IntHash i ||]
     -}
 
 
