@@ -11,6 +11,7 @@
 #include "rts/EventLogFormat.h"
 #include "rts/EventLogWriter.h"
 #include "Capability.h"
+#include "sm/NonMovingCensus.h"
 
 #include "BeginPrivate.h"
 
