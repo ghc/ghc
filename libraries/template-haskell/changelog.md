@@ -11,6 +11,9 @@
   * Introduce support for `Bytes` literals (raw bytes embedded into the output
     binary)
 
+  * Make the `Lift` typeclass levity-polymorphic and add instances for unboxed
+    tuples, unboxed sums, `Int#`, `Word#`, `Addr#`, `Float#`, and `Double#`.
+
 ## 2.15.0.0 *TBA*
 
   * In `Language.Haskell.TH.Syntax`, `DataInstD`, `NewTypeInstD`, `TySynEqn`,

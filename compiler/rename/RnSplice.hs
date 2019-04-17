@@ -31,7 +31,7 @@ import Module
 import SrcLoc
 import RnTypes          ( rnLHsType )
 
-import Control.Monad    ( unless, when )
+import Control.Monad    ( when )
 
 import {-# SOURCE #-} RnExpr   ( rnLExpr )
 
@@ -60,8 +60,6 @@ import TcHsSyn
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
 
-import qualified GHC.LanguageExtensions as LangExt
-
 {-
 ************************************************************************
 *                                                                      *
@@ -73,15 +71,7 @@ import qualified GHC.LanguageExtensions as LangExt
 rnBracket :: HsExpr GhcPs -> HsBracket GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnBracket e br_body
   = addErrCtxt (quotationCtxtDoc br_body) $
-    do { -- Check that -XTemplateHaskellQuotes is enabled and available
-         thQuotesEnabled <- xoptM LangExt.TemplateHaskellQuotes
-       ; unless thQuotesEnabled $
-           failWith ( vcat
-                      [ text "Syntax error on" <+> ppr e
-                      , text ("Perhaps you intended to use TemplateHaskell"
-                              ++ " or TemplateHaskellQuotes") ] )
-
-         -- Check for nested brackets
+    do { -- Check for nested brackets
        ; cur_stage <- getStage
        ; case cur_stage of
            { Splice Typed   -> checkTc (isTypedBracket br_body)

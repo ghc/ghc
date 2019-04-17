@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP, DeriveDataTypeable,
              DeriveGeneric, FlexibleInstances, DefaultSignatures,
              RankNTypes, RoleAnnotations, ScopedTypeVariables,
+             MagicHash, KindSignatures, PolyKinds, TypeApplications, DataKinds,
+             GADTs, UnboxedTuples, UnboxedSums, TypeInType,
              Trustworthy #-}
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
@@ -32,13 +34,17 @@ import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad (liftM)
 import Control.Monad.IO.Class (MonadIO (..))
 import System.IO        ( hPutStrLn, stderr )
-import Data.Char        ( isAlpha, isAlphaNum, isUpper )
+import Data.Char        ( isAlpha, isAlphaNum, isUpper, ord )
 import Data.Int
 import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Void        ( Void, absurd )
 import Data.Word
 import Data.Ratio
+import GHC.CString      ( unpackCString# )
 import GHC.Generics     ( Generic )
+import GHC.Types        ( Int(..), Word(..), Char(..), Double(..), Float(..),
+                          TYPE, RuntimeRep(..) )
+import GHC.Prim         ( Int#, Word#, Char#, Double#, Float#, Addr# )
 import GHC.Lexeme       ( startsVarSym, startsVarId )
 import GHC.ForeignSrcLang.Type
 import Language.Haskell.TH.LanguageExtensions
@@ -201,7 +207,7 @@ instance Applicative Q where
 -----------------------------------------------------
 
 type role TExp nominal   -- See Note [Role of TExp]
-newtype TExp a = TExp
+newtype TExp (a :: TYPE (r :: RuntimeRep)) = TExp
   { unType :: Exp -- ^ Underlying untyped Template Haskell expression
   }
 -- ^ Represents an expression which has type @a@. Built on top of 'Exp', typed
@@ -240,7 +246,9 @@ newtype TExp a = TExp
 
 -- | Discard the type annotation and produce a plain Template Haskell
 -- expression
-unTypeQ :: Q (TExp a) -> Q Exp
+--
+-- Levity-polymorphic since /template-haskell-2.16.0.0/.
+unTypeQ :: forall (r :: RuntimeRep) (a :: TYPE r). Q (TExp a) -> Q Exp
 unTypeQ m = do { TExp e <- m
                ; return e }
 
@@ -248,7 +256,9 @@ unTypeQ m = do { TExp e <- m
 --
 -- This is unsafe because GHC cannot check for you that the expression
 -- really does have the type you claim it has.
-unsafeTExpCoerce :: Q Exp -> Q (TExp a)
+--
+-- Levity-polymorphic since /template-haskell-2.16.0.0/.
+unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r). Q Exp -> Q (TExp a)
 unsafeTExpCoerce m = do { e <- m
                         ; return (TExp e) }
 
@@ -651,17 +661,18 @@ sequenceQ = sequence
 
 -- | A 'Lift' instance can have any of its values turned into a Template
 -- Haskell expression. This is needed when a value used within a Template
--- Haskell quotation is bound outside the Oxford brackets (@[| ... |]@) but not
--- at the top level. As an example:
+-- Haskell quotation is bound outside the Oxford brackets (@[| ... |]@ or
+-- @[|| ... ||]@) but not at the top level. As an example:
 --
--- > add1 :: Int -> Q Exp
--- > add1 x = [| x + 1 |]
+-- > add1 :: Int -> Q (TExp Int)
+-- > add1 x = [|| x + 1 ||]
 --
 -- Template Haskell has no way of knowing what value @x@ will take on at
 -- splice-time, so it requires the type of @x@ to be an instance of 'Lift'.
 --
--- A 'Lift' instance must satisfy @$(lift x) ≡ x@ for all @x@, where @$(...)@
--- is a Template Haskell splice.
+-- A 'Lift' instance must satisfy @$(lift x) ≡ x@ and @$$(liftTyped x) ≡ x@
+-- for all @x@, where @$(...)@ and @$$(...)@ are Template Haskell splices.
+-- It is additionally expected that @'lift' x ≡ 'unTypeQ' ('liftTyped' x)@.
 --
 -- 'Lift' instances can be derived automatically by use of the @-XDeriveLift@
 -- GHC language extension:
@@ -673,10 +684,13 @@ sequenceQ = sequence
 -- >
 -- > data Bar a = Bar1 a (Bar a) | Bar2 String
 -- >   deriving Lift
-class Lift t where
+--
+-- Levity-polymorphic since /template-haskell-2.16.0.0/.
+class Lift (t :: TYPE r) where
   -- | Turn a value into a Template Haskell expression, suitable for use in
   -- a splice.
   lift :: t -> Q Exp
+  default lift :: (r ~ 'LiftedRep) => t -> Q Exp
   lift = unTypeQ . liftTyped
 
   -- | Turn a value into a Template Haskell typed expression, suitable for use
@@ -684,73 +698,127 @@ class Lift t where
   --
   -- @since 2.16.0.0
   liftTyped :: t -> Q (TExp t)
-  liftTyped = unsafeTExpCoerce . lift
-
-  {-# MINIMAL lift | liftTyped #-}
 
 
 -- If you add any instances here, consider updating test th/TH_Lift
 instance Lift Integer where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL x))
 
 instance Lift Int where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
+-- | @since 2.16.0.0
+instance Lift Int# where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x = return (LitE (IntPrimL (fromIntegral (I# x))))
+
 instance Lift Int8 where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Int16 where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Int32 where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Int64 where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
+-- | @since 2.16.0.0
+instance Lift Word# where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x = return (LitE (WordPrimL (fromIntegral (W# x))))
+
 instance Lift Word where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word8 where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word16 where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word32 where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word64 where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Natural where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Integral a => Lift (Ratio a) where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (RationalL (toRational x)))
 
 instance Lift Float where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (RationalL (toRational x)))
+
+-- | @since 2.16.0.0
+instance Lift Float# where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x = return (LitE (FloatPrimL (toRational (F# x))))
 
 instance Lift Double where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (RationalL (toRational x)))
 
+-- | @since 2.16.0.0
+instance Lift Double# where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x = return (LitE (DoublePrimL (toRational (D# x))))
+
 instance Lift Char where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift x = return (LitE (CharL x))
 
+-- | @since 2.16.0.0
+instance Lift Char# where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x = return (LitE (CharPrimL (C# x)))
+
 instance Lift Bool where
+  liftTyped x = unsafeTExpCoerce (lift x)
+
   lift True  = return (ConE trueName)
   lift False = return (ConE falseName)
 
+-- | Produces an 'Addr#' literal from the NUL-terminated C-string starting at
+-- the given memory address.
+--
+-- @since 2.16.0.0
+instance Lift Addr# where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x
+    = return (LitE (StringPrimL (map (fromIntegral . ord) (unpackCString# x))))
+
 instance Lift a => Lift (Maybe a) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+
   lift Nothing  = return (ConE nothingName)
   lift (Just x) = liftM (ConE justName `AppE`) (lift x)
 
 instance (Lift a, Lift b) => Lift (Either a b) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+
   lift (Left x)  = liftM (ConE leftName  `AppE`) (lift x)
   lift (Right y) = liftM (ConE rightName `AppE`) (lift y)
 
 instance Lift a => Lift [a] where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift xs = do { xs' <- mapM lift xs; return (ListE xs') }
 
 liftString :: String -> Q Exp
@@ -759,6 +827,8 @@ liftString s = return (LitE (StringL s))
 
 -- | @since 2.15.0.0
 instance Lift a => Lift (NonEmpty a) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+
   lift (x :| xs) = do
     x' <- lift x
     xs' <- lift xs
@@ -766,37 +836,165 @@ instance Lift a => Lift (NonEmpty a) where
 
 -- | @since 2.15.0.0
 instance Lift Void where
+  liftTyped = pure . absurd
   lift = pure . absurd
 
 instance Lift () where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift () = return (ConE (tupleDataName 0))
 
 instance (Lift a, Lift b) => Lift (a, b) where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b)
     = liftM TupE $ sequence [lift a, lift b]
 
 instance (Lift a, Lift b, Lift c) => Lift (a, b, c) where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c)
     = liftM TupE $ sequence [lift a, lift b, lift c]
 
 instance (Lift a, Lift b, Lift c, Lift d) => Lift (a, b, c, d) where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d)
     = liftM TupE $ sequence [lift a, lift b, lift c, lift d]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e)
       => Lift (a, b, c, d, e) where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d, e)
     = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
       => Lift (a, b, c, d, e, f) where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d, e, f)
     = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
       => Lift (a, b, c, d, e, f, g) where
+  liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d, e, f, g)
     = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f, lift g]
+
+-- | @since 2.16.0.0
+instance Lift (# #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift (# #) = return (ConE (unboxedTupleTypeName 0))
+
+-- | @since 2.16.0.0
+instance (Lift a) => Lift (# a #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift (# a #)
+    = liftM UnboxedTupE $ sequence [lift a]
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b) => Lift (# a, b #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift (# a, b #)
+    = liftM UnboxedTupE $ sequence [lift a, lift b]
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b, Lift c)
+      => Lift (# a, b, c #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift (# a, b, c #)
+    = liftM UnboxedTupE $ sequence [lift a, lift b, lift c]
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b, Lift c, Lift d)
+      => Lift (# a, b, c, d #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift (# a, b, c, d #)
+    = liftM UnboxedTupE $ sequence [lift a, lift b, lift c, lift d]
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b, Lift c, Lift d, Lift e)
+      => Lift (# a, b, c, d, e #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift (# a, b, c, d, e #)
+    = liftM UnboxedTupE $ sequence [lift a, lift b, lift c, lift d, lift e]
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
+      => Lift (# a, b, c, d, e, f #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift (# a, b, c, d, e, f #)
+    = liftM UnboxedTupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f]
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
+      => Lift (# a, b, c, d, e, f, g #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift (# a, b, c, d, e, f, g #)
+    = liftM UnboxedTupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f, lift g]
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b) => Lift (# a | b #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x
+    = case x of
+        (# y | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 2
+        (# | y #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 2
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b, Lift c)
+      => Lift (# a | b | c #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x
+    = case x of
+        (# y | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 3
+        (# | y | #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 3
+        (# | | y #) -> UnboxedSumE <$> lift y <*> pure 3 <*> pure 3
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b, Lift c, Lift d)
+      => Lift (# a | b | c | d #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x
+    = case x of
+        (# y | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 4
+        (# | y | | #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 4
+        (# | | y | #) -> UnboxedSumE <$> lift y <*> pure 3 <*> pure 4
+        (# | | | y #) -> UnboxedSumE <$> lift y <*> pure 4 <*> pure 4
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b, Lift c, Lift d, Lift e)
+      => Lift (# a | b | c | d | e #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x
+    = case x of
+        (# y | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 5
+        (# | y | | | #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 5
+        (# | | y | | #) -> UnboxedSumE <$> lift y <*> pure 3 <*> pure 5
+        (# | | | y | #) -> UnboxedSumE <$> lift y <*> pure 4 <*> pure 5
+        (# | | | | y #) -> UnboxedSumE <$> lift y <*> pure 5 <*> pure 5
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
+      => Lift (# a | b | c | d | e | f #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x
+    = case x of
+        (# y | | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 6
+        (# | y | | | | #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 6
+        (# | | y | | | #) -> UnboxedSumE <$> lift y <*> pure 3 <*> pure 6
+        (# | | | y | | #) -> UnboxedSumE <$> lift y <*> pure 4 <*> pure 6
+        (# | | | | y | #) -> UnboxedSumE <$> lift y <*> pure 5 <*> pure 6
+        (# | | | | | y #) -> UnboxedSumE <$> lift y <*> pure 6 <*> pure 6
+
+-- | @since 2.16.0.0
+instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
+      => Lift (# a | b | c | d | e | f | g #) where
+  liftTyped x = unsafeTExpCoerce (lift x)
+  lift x
+    = case x of
+        (# y | | | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 7
+        (# | y | | | | | #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 7
+        (# | | y | | | | #) -> UnboxedSumE <$> lift y <*> pure 3 <*> pure 7
+        (# | | | y | | | #) -> UnboxedSumE <$> lift y <*> pure 4 <*> pure 7
+        (# | | | | y | | #) -> UnboxedSumE <$> lift y <*> pure 5 <*> pure 7
+        (# | | | | | y | #) -> UnboxedSumE <$> lift y <*> pure 6 <*> pure 7
+        (# | | | | | | y #) -> UnboxedSumE <$> lift y <*> pure 7 <*> pure 7
 
 -- TH has a special form for literal strings,
 -- which we should take advantage of.
@@ -1619,8 +1817,8 @@ data Lit = CharL Char
          | WordPrimL Integer
          | FloatPrimL Rational
          | DoublePrimL Rational
-         | StringPrimL [Word8]  -- ^ A primitive C-style string, type Addr#
-         | BytesPrimL Bytes     -- ^ Some raw bytes, type Addr#:
+         | StringPrimL [Word8]  -- ^ A primitive C-style string, type 'Addr#'
+         | BytesPrimL Bytes     -- ^ Some raw bytes, type 'Addr#':
          | CharPrimL Char
     deriving( Show, Eq, Ord, Data, Generic )
 
