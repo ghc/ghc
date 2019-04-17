@@ -17,6 +17,7 @@ before_script:
 
 stages:
   - lint       # Source linting
+  - windows-problems # Temporary stage
   - build      # A quick smoke-test to weed out broken commits
   - full-build # Build all the things
   - cleanup    # See Note [Cleanup on Windows]
@@ -508,13 +509,12 @@ validate-x86_64-linux-fedora27:
     LANG: "en_US.UTF-8"
   cache:
     paths:
-      - cabal-cache
       - ghc-8.6.2
       - ghc-tarballs
 
 .build-windows-hadrian:
   extends: .build-windows
-  stage: full-build
+  stage: windows-problems
   variables:
     GHC_VERSION: "8.6.2"
   script:
@@ -532,7 +532,7 @@ validate-x86_64-linux-fedora27:
     paths:
       - ghc.tar.xz
 
-.validate-x86_64-windows-hadrian:
+validate-x86_64-windows-hadrian:
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW64
@@ -576,6 +576,9 @@ nightly-i386-windows-hadrian:
     paths:
       - ghc-*.tar.xz
       - junit.xml
+  cache:
+    paths:
+      - cabal-cache
 
 validate-x86_64-windows:
   extends: .build-windows-make
