@@ -1639,6 +1639,8 @@ doubleFromInteger (Jn# bn@(BN# bn#))
 {-# CONSTANT_FOLDED doubleFromInteger #-}
 
 -- TODO: Not sure if it's worth to write 'Float' optimized versions here
+-- See Note [Float/Double <-> Integer/Natural conversions] when these floating
+-- point conversion functions are changed.
 floatFromInteger :: Integer -> Float#
 floatFromInteger i = double2Float# (doubleFromInteger i)
 
