@@ -3,13 +3,16 @@
 ## 2.16.0.0 *TBA*
 
   * Introduce a `liftTyped` method to the `Lift` class and set the default
-    implementations of `lift`/`liftTyped` to be in terms of each other.
+    implementations of `lift` in terms of `liftTyped`.
 
   * Add a `ForallVisT` constructor to `Type` to represent visible, dependent
     quantification.
 
   * Introduce support for `Bytes` literals (raw bytes embedded into the output
     binary)
+
+  * Make the `Lift` typeclass levity-polymorphic and add instances for unboxed
+    tuples, unboxed sums, `Int#`, `Word#`, `Addr#`, `Float#`, and `Double#`.
 
 ## 2.15.0.0 *TBA*
 

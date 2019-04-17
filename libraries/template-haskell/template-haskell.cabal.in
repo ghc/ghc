@@ -57,6 +57,7 @@ Library
     build-depends:
         base        >= 4.11 && < 4.14,
         ghc-boot-th == @ProjectVersionMunged@,
+        ghc-prim,
         pretty      == 1.1.*
 
     ghc-options: -Wall

@@ -639,7 +639,8 @@ tcExpr (HsStatic fvs expr) res_ty
         ; emitStaticConstraints lie
 
         -- Wrap the static form with the 'fromStaticPtr' call.
-        ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName p_ty
+        ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName
+                                             [p_ty]
         ; let wrap = mkWpTyApps [expr_ty]
         ; loc <- getSrcSpanM
         ; return $ mkHsWrapCo co $ HsApp noExt
@@ -1040,7 +1041,7 @@ tcArithSeq witness seq@(From expr) res_ty
   = do { (wrap, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr' <- tcPolyExpr expr elt_ty
        ; enum_from <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromName elt_ty
+                              enumFromName [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from wit' (From expr') }
 
@@ -1049,7 +1050,7 @@ tcArithSeq witness seq@(FromThen expr1 expr2) res_ty
        ; expr1' <- tcPolyExpr expr1 elt_ty
        ; expr2' <- tcPolyExpr expr2 elt_ty
        ; enum_from_then <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromThenName elt_ty
+                              enumFromThenName [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from_then wit' (FromThen expr1' expr2') }
 
@@ -1058,7 +1059,7 @@ tcArithSeq witness seq@(FromTo expr1 expr2) res_ty
        ; expr1' <- tcPolyExpr expr1 elt_ty
        ; expr2' <- tcPolyExpr expr2 elt_ty
        ; enum_from_to <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromToName elt_ty
+                              enumFromToName [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from_to wit' (FromTo expr1' expr2') }
 
@@ -1068,7 +1069,7 @@ tcArithSeq witness seq@(FromThenTo expr1 expr2 expr3) res_ty
         ; expr2' <- tcPolyExpr expr2 elt_ty
         ; expr3' <- tcPolyExpr expr3 elt_ty
         ; eft <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromThenToName elt_ty
+                              enumFromThenToName [elt_ty]
         ; return $ mkHsWrap wrap $
           ArithSeq eft wit' (FromThenTo expr1' expr2' expr3') }
 
@@ -2041,7 +2042,8 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var))
                      setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE
                      newMethodFromName (OccurrenceOf id_name)
-                                       THNames.liftName id_ty
+                                       THNames.liftName
+                                       [getRuntimeRep id_ty, id_ty]
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var

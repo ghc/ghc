@@ -335,6 +335,8 @@ renameDeriv is_boot inst_infos bagBinds
     -- (See Note [Newtype-deriving instances] in TcGenDeriv)
     unsetXOptM LangExt.RebindableSyntax $
     -- See Note [Avoid RebindableSyntax when deriving]
+    setXOptM LangExt.TemplateHaskellQuotes $
+    -- DeriveLift makes uses of quotes
     do  {
         -- Bring the extra deriving stuff into scope
         -- before renaming the instances themselves
