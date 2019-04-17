@@ -41,6 +41,7 @@ main = do p "plusInteger"        plusInteger
           p "andInteger"        andInteger
           p "orInteger"         orInteger
           p "xorInteger"        xorInteger
+          p "popCountInteger"   popCountInteger
           p "complementInteger" complementInteger
           p "quotRemInteger"    quotRemInteger
           p "divModInteger"     divModInteger
@@ -153,6 +154,9 @@ orInteger = 100054 .|. 140055
 xorInteger :: Integer
 xorInteger = 100056 `xor` 140057
 
+popCountInteger :: Int
+popCountInteger = popCount (100084 :: Integer)
+
 complementInteger :: Integer
 complementInteger = complement 200058
 
@@ -216,4 +220,3 @@ int64ToInteger = toInteger (100081 :: Int64) + 100082
 
 decodeIntegerDouble :: (Integer, Int)
 decodeIntegerDouble = decodeFloat (100083 :: Double)
-
