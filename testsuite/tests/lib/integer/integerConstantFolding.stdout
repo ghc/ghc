@@ -33,6 +33,7 @@ lcmInteger: 1001100300
 andInteger: 532
 orInteger: 239575
 xorInteger: 239041
+popCountInteger: 9
 complementInteger: -200059
 quotRemInteger: (813,60)
 divModInteger: (219,196)

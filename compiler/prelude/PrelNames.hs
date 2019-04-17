@@ -383,7 +383,7 @@ basicKnownKeyNames
         gcdIntegerName, lcmIntegerName,
         andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
         shiftLIntegerName, shiftRIntegerName, bitIntegerName,
-        integerSDataConName,naturalSDataConName,
+        integerSDataConName,naturalSDataConName, popCountIntegerName,
 
         -- Natural
         naturalTyConName,
@@ -1132,7 +1132,7 @@ integerTyConName, mkIntegerName, integerSDataConName,
     decodeDoubleIntegerName,
     gcdIntegerName, lcmIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
-    shiftLIntegerName, shiftRIntegerName, bitIntegerName :: Name
+    shiftLIntegerName, shiftRIntegerName, bitIntegerName, popCountIntegerName :: Name
 integerTyConName      = tcQual gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
 integerSDataConName   = dcQual gHC_INTEGER_TYPE (fsLit "S#")                integerSDataConKey
 mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
@@ -1177,6 +1177,7 @@ complementIntegerName = varQual gHC_INTEGER_TYPE (fsLit "complementInteger") com
 shiftLIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "shiftLInteger")     shiftLIntegerIdKey
 shiftRIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "shiftRInteger")     shiftRIntegerIdKey
 bitIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "bitInteger")        bitIntegerIdKey
+popCountIntegerName   = varQual gHC_INTEGER_TYPE (fsLit "popCountInteger")   popCountIntegerIdKey
 
 -- GHC.Natural types
 naturalTyConName, naturalSDataConName :: Name
@@ -2193,7 +2194,7 @@ mkIntegerIdKey, smallIntegerIdKey, wordToIntegerIdKey,
     decodeDoubleIntegerIdKey,
     gcdIntegerIdKey, lcmIntegerIdKey,
     andIntegerIdKey, orIntegerIdKey, xorIntegerIdKey, complementIntegerIdKey,
-    shiftLIntegerIdKey, shiftRIntegerIdKey :: Unique
+    shiftLIntegerIdKey, shiftRIntegerIdKey, popCountIntegerIdKey :: Unique
 mkIntegerIdKey                = mkPreludeMiscIdUnique 60
 smallIntegerIdKey             = mkPreludeMiscIdUnique 61
 integerToWordIdKey            = mkPreludeMiscIdUnique 62
@@ -2235,6 +2236,9 @@ wordToIntegerIdKey            = mkPreludeMiscIdUnique 97
 word64ToIntegerIdKey          = mkPreludeMiscIdUnique 98
 int64ToIntegerIdKey           = mkPreludeMiscIdUnique 99
 decodeDoubleIntegerIdKey      = mkPreludeMiscIdUnique 100
+-- @popCountIntegerIdKey@ was a late addition, so its id key is much higher
+-- than it should be. Be careful when adding new keys.
+popCountIntegerIdKey          = mkPreludeMiscIdUnique 598
 
 rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101
@@ -2492,6 +2496,11 @@ gtNaturalPrimIdKey      = mkPreludeMiscIdUnique 594
 leNaturalPrimIdKey      = mkPreludeMiscIdUnique 595
 ltNaturalPrimIdKey      = mkPreludeMiscIdUnique 596
 compareNaturalPrimIdKey = mkPreludeMiscIdUnique 597
+-- The current highest id key is **not** that of @compareNaturalPrimIdKey,
+-- search for @popCountIntegerIdKey@ up above to see which id key the
+-- identifier you are adding will need.
+-- After doing so, please update this comment to reflect the fact that the
+-- 598th id key is not missing, but up above.
 
 {-
 ************************************************************************
