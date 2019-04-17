@@ -54,8 +54,6 @@ import FamInst
 import FamInstEnv
 import PrelNames
 import THNames
-import Module ( moduleName, moduleNameString
-              , moduleUnitId, unitIdString )
 import MkId ( coerceId )
 import PrimOp
 import SrcLoc
@@ -1559,68 +1557,36 @@ Example:
     ==>
 
     instance (Lift a) => Lift (Foo a) where
-        lift (Foo a)
-          = appE
-              (conE
-                (mkNameG_d "package-name" "ModuleName" "Foo"))
-              (lift a)
-        lift (u :^: v)
-          = infixApp
-              (lift u)
-              (conE
-                (mkNameG_d "package-name" "ModuleName" ":^:"))
-              (lift v)
+        lift (Foo a) = [| Foo a |]
+        lift ((:^:) u v) = [| (:^:) u v |]
 
-Note that (mkNameG_d "package-name" "ModuleName" "Foo") is equivalent to what
-'Foo would be when using the -XTemplateHaskell extension. To make sure that
--XDeriveLift can be used on stage-1 compilers, however, we explicitly invoke
-makeG_d.
+        liftTyped (Foo a) = [|| Foo a ||]
+        liftTyped ((:^:) u v) = [|| (:^:) u v ||]
 -}
 
+
 gen_Lift_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
-gen_Lift_binds loc tycon = (unitBag lift_bind, emptyBag)
+gen_Lift_binds loc tycon = (listToBag [lift_bind, liftTyped_bind], emptyBag)
   where
-    lift_bind = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
-                            (map pats_etc data_cons)
+    lift_bind      = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
+                                 (map (pats_etc mk_exp) data_cons)
+    liftTyped_bind = mkFunBindEC 1 loc liftTyped_RDR (nlHsApp pure_Expr)
+                                 (map (pats_etc mk_texp) data_cons)
+
+    mk_exp = ExpBr NoExt
+    mk_texp = TExpBr NoExt
     data_cons = tyConDataCons tycon
 
-    pats_etc data_con
+    pats_etc mk_bracket data_con
       = ([con_pat], lift_Expr)
        where
             con_pat      = nlConVarPat data_con_RDR as_needed
             data_con_RDR = getRdrName data_con
             con_arity    = dataConSourceArity data_con
             as_needed    = take con_arity as_RDRs
-            lifted_as    = zipWithEqual "mk_lift_app" mk_lift_app
-                             tys_needed as_needed
-            tycon_name   = tyConName tycon
-            is_infix     = dataConIsInfix data_con
-            tys_needed   = dataConOrigArgTys data_con
-
-            mk_lift_app ty a
-              | not (isUnliftedType ty) = nlHsApp (nlHsVar lift_RDR)
-                                                  (nlHsVar a)
-              | otherwise = nlHsApp (nlHsVar litE_RDR)
-                              (primLitOp (mkBoxExp (nlHsVar a)))
-              where (primLitOp, mkBoxExp) = primLitOps "Lift" ty
-
-            pkg_name = unitIdString . moduleUnitId
-                     . nameModule $ tycon_name
-            mod_name = moduleNameString . moduleName . nameModule $ tycon_name
-            con_name = occNameString . nameOccName . dataConName $ data_con
-
-            conE_Expr = nlHsApp (nlHsVar conE_RDR)
-                                (nlHsApps mkNameG_dRDR
-                                  (map (nlHsLit . mkHsString)
-                                    [pkg_name, mod_name, con_name]))
-
-            lift_Expr
-              | is_infix  = nlHsApps infixApp_RDR [a1, conE_Expr, a2]
-              | otherwise = foldl' mk_appE_app conE_Expr lifted_as
-            (a1:a2:_) = lifted_as
-
-mk_appE_app :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
-mk_appE_app a b = nlHsApps appE_RDR [a, b]
+            lift_Expr    = noLoc (HsBracket NoExt (mk_bracket br_body))
+            br_body      = nlHsApps (Exact (dataConName data_con))
+                                    (map nlHsVar as_needed)
 
 {-
 ************************************************************************
@@ -2133,17 +2099,6 @@ primOrdOps :: String    -- The class involved
            -> (RdrName, RdrName, RdrName, RdrName, RdrName)  -- (lt,le,eq,ge,gt)
 -- See Note [Deriving and unboxed types] in TcDerivInfer
 primOrdOps str ty = assoc_ty_id str ordOpTbl ty
-
-primLitOps :: String -- The class involved
-           -> Type   -- The type
-           -> ( LHsExpr GhcPs -> LHsExpr GhcPs -- Constructs a Q Exp value
-              , LHsExpr GhcPs -> LHsExpr GhcPs -- Constructs a boxed value
-              )
-primLitOps str ty = (assoc_ty_id str litConTbl ty, \v -> boxed v)
-  where
-    boxed v
-      | ty `eqType` addrPrimTy = nlHsVar unpackCString_RDR `nlHsApp` v
-      | otherwise = assoc_ty_id str boxConTbl ty v
 
 ordOpTbl :: [(Type, (RdrName, RdrName, RdrName, RdrName, RdrName))]
 ordOpTbl

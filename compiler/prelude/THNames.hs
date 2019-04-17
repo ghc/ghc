@@ -27,7 +27,7 @@ templateHaskellNames :: [Name]
 -- Should stay in sync with the import list of DsMeta
 
 templateHaskellNames = [
-    returnQName, bindQName, sequenceQName, newNameName, liftName,
+    returnQName, bindQName, sequenceQName, newNameName, liftName, liftTypedName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameLName,
     mkNameSName,
     liftStringName,
@@ -206,7 +206,7 @@ overlapTyConName       = thTc (fsLit "Overlap")        overlapTyConKey
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeQName,
-    unsafeTExpCoerceName :: Name
+    unsafeTExpCoerceName, liftTypedName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
@@ -222,6 +222,7 @@ mkNameSName    = thFun (fsLit "mkNameS")    mkNameSIdKey
 unTypeName     = thFun (fsLit "unType")     unTypeIdKey
 unTypeQName    = thFun (fsLit "unTypeQ")    unTypeQIdKey
 unsafeTExpCoerceName = thFun (fsLit "unsafeTExpCoerce") unsafeTExpCoerceIdKey
+liftTypedName = thFun (fsLit "liftTyped") liftTypedIdKey
 
 
 -------------------- TH.Lib -----------------------
@@ -726,7 +727,7 @@ incoherentDataConKey   = mkPreludeDataConUnique 212
 returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
     mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeQIdKey,
-    unsafeTExpCoerceIdKey :: Unique
+    unsafeTExpCoerceIdKey, liftTypedIdKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
@@ -741,6 +742,7 @@ mkNameSIdKey         = mkPreludeMiscIdUnique 210
 unTypeIdKey          = mkPreludeMiscIdUnique 211
 unTypeQIdKey         = mkPreludeMiscIdUnique 212
 unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 213
+liftTypedIdKey        = mkPreludeMiscIdUnique 214
 
 
 -- data Lit = ...
@@ -1078,8 +1080,9 @@ viaStrategyIdKey      = mkPreludeDataConUnique 497
 ************************************************************************
 -}
 
-lift_RDR, mkNameG_dRDR, mkNameG_vRDR :: RdrName
+lift_RDR, liftTyped_RDR, mkNameG_dRDR, mkNameG_vRDR :: RdrName
 lift_RDR     = nameRdrName liftName
+liftTyped_RDR = nameRdrName liftTypedName
 mkNameG_dRDR = nameRdrName mkNameG_dName
 mkNameG_vRDR = nameRdrName mkNameG_vName
 

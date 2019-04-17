@@ -13,13 +13,12 @@ Derived class instances:
   
   instance Language.Haskell.TH.Syntax.Lift T14682.Foo where
     Language.Haskell.TH.Syntax.lift (T14682.Foo a1 a2)
-      = Language.Haskell.TH.Lib.Internal.appE
-          (Language.Haskell.TH.Lib.Internal.appE
-             (Language.Haskell.TH.Lib.Internal.conE
-                (Language.Haskell.TH.Syntax.mkNameG_d "main" "T14682" "Foo"))
-             (Language.Haskell.TH.Syntax.lift a1))
-          (Language.Haskell.TH.Syntax.lift a2)
-  
+      = [| T14682.Foo a1 a2 |]
+        pending(rn) [<a2, Language.Haskell.TH.Syntax.lift a2>,
+                     <a1, Language.Haskell.TH.Syntax.lift a1>]
+    Language.Haskell.TH.Syntax.liftTyped (T14682.Foo a1 a2)
+      = [|| T14682.Foo a1 a2 ||]
+
   instance Data.Data.Data T14682.Foo where
     Data.Data.gfoldl k z (T14682.Foo a1 a2)
       = ((z T14682.Foo `k` a1) `k` a2)
@@ -94,13 +93,6 @@ GHC.Show.Show [T14682.Foo]
 ==================== Filling in method body ====================
 GHC.Show.Show [T14682.Foo]
   GHC.Show.showList = GHC.Show.$dmshowList @(T14682.Foo)
-
-
-
-==================== Filling in method body ====================
-Language.Haskell.TH.Syntax.Lift [T14682.Foo]
-  Language.Haskell.TH.Syntax.liftTyped = Language.Haskell.TH.Syntax.$dmliftTyped
-                                           @(T14682.Foo)
 
 
 

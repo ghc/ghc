@@ -177,13 +177,14 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
        ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var)) $
                                 tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
+       ; let rep = getRuntimeRep expr_ty
 
        ; meta_ty <- tcTExpTy expr_ty
        ; ps' <- readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
-                       (unLoc (mkHsApp (nlHsTyApp texpco [expr_ty])
+                       (unLoc (mkHsApp (nlHsTyApp texpco [rep, expr_ty])
                                       (noLoc (HsTcBracketOut noExt brack ps'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
@@ -230,7 +231,8 @@ tcTExpTy exp_ty
   = do { unless (isTauTy exp_ty) $ addErr (err_msg exp_ty)
        ; q    <- tcLookupTyCon qTyConName
        ; texp <- tcLookupTyCon tExpTyConName
-       ; return (mkTyConApp q [mkTyConApp texp [exp_ty]]) }
+       ; let rep = getRuntimeRep exp_ty
+       ; return (mkTyConApp q [mkTyConApp texp [rep, exp_ty]]) }
   where
     err_msg ty
       = vcat [ text "Illegal polytype:" <+> ppr ty
@@ -469,12 +471,13 @@ tcNestedSplice :: ThStage -> PendingStuff -> Name
     -- A splice inside brackets
 tcNestedSplice pop_stage (TcPending ps_var lie_var) splice_name expr res_ty
   = do { res_ty <- expTypeToType res_ty
+       ; let rep = getRuntimeRep res_ty
        ; meta_exp_ty <- tcTExpTy res_ty
        ; expr' <- setStage pop_stage $
                   setConstraintVar lie_var $
                   tcMonoExpr expr (mkCheckExpType meta_exp_ty)
        ; untypeq <- tcLookupId unTypeQName
-       ; let expr'' = mkHsApp (nlHsTyApp untypeq [res_ty]) expr'
+       ; let expr'' = mkHsApp (nlHsTyApp untypeq [rep, res_ty]) expr'
        ; ps <- readMutVar ps_var
        ; writeMutVar ps_var (PendingTcSplice splice_name expr'' : ps)
 

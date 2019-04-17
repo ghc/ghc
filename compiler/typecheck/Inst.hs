@@ -78,24 +78,30 @@ import Control.Monad( unless )
 ************************************************************************
 -}
 
-newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr GhcTcId)
--- Used when Name is the wired-in name for a wired-in class method,
+newMethodFromName
+  :: CtOrigin              -- ^ why do we need this?
+  -> Name                  -- ^ name of the method
+  -> [TcRhoType]           -- ^ types with which to instantiate the class
+  -> TcM (HsExpr GhcTcId)
+-- ^ Used when 'Name' is the wired-in name for a wired-in class method,
 -- so the caller knows its type for sure, which should be of form
---    forall a. C a => <blah>
--- newMethodFromName is supposed to instantiate just the outer
+--
+-- > forall a. C a => <blah>
+--
+-- 'newMethodFromName' is supposed to instantiate just the outer
 -- type variable and constraint
 
-newMethodFromName origin name inst_ty
+newMethodFromName origin name ty_args
   = do { id <- tcLookupId name
               -- Use tcLookupId not tcLookupGlobalId; the method is almost
               -- always a class op, but with -XRebindableSyntax GHC is
               -- meant to find whatever thing is in scope, and that may
               -- be an ordinary function.
 
-       ; let ty = piResultTy (idType id) inst_ty
+       ; let ty = piResultTys (idType id) ty_args
              (theta, _caller_knows_this) = tcSplitPhiTy ty
        ; wrap <- ASSERT( not (isForAllTy ty) && isSingleton theta )
-                 instCall origin [inst_ty] theta
+                 instCall origin ty_args theta
 
        ; return (mkHsWrap wrap (HsVar noExt (noLoc id))) }
 
@@ -607,7 +613,7 @@ tcSyntaxName :: CtOrigin
 
 tcSyntaxName orig ty (std_nm, HsVar _ (L _ user_nm))
   | std_nm == user_nm
-  = do rhs <- newMethodFromName orig std_nm ty
+  = do rhs <- newMethodFromName orig std_nm [ty]
        return (std_nm, rhs)
 
 tcSyntaxName orig ty (std_nm, user_nm_expr) = do

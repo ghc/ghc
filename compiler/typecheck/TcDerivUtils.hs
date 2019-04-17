@@ -738,8 +738,10 @@ cond_enumOrProduct cls = cond_isEnumeration `orCond`
                          (cond_isProduct `andCond` cond_args cls)
 
 cond_args :: Class -> Condition
--- For some classes (eg Eq, Ord) we allow unlifted arg types
--- by generating specialised code.  For others (eg Data) we don't.
+-- ^ For some classes (eg 'Eq', 'Ord') we allow unlifted arg types
+-- by generating specialised code.  For others (eg 'Data') we don't.
+-- For even others (eg 'Lift'), unlifted types aren't even a special
+-- consideration!
 cond_args cls _ _ rep_tc
   = case bad_args of
       []     -> IsValid
@@ -748,7 +750,7 @@ cond_args cls _ _ rep_tc
   where
     bad_args = [ arg_ty | con <- tyConDataCons rep_tc
                         , arg_ty <- dataConOrigArgTys con
-                        , isUnliftedType arg_ty
+                        , isLiftedType_maybe arg_ty /= Just True
                         , not (ok_ty arg_ty) ]
 
     cls_key = classKey cls
@@ -756,7 +758,7 @@ cond_args cls _ _ rep_tc
      | cls_key == eqClassKey   = check_in arg_ty ordOpTbl
      | cls_key == ordClassKey  = check_in arg_ty ordOpTbl
      | cls_key == showClassKey = check_in arg_ty boxConTbl
-     | cls_key == liftClassKey = check_in arg_ty litConTbl
+     | cls_key == liftClassKey = True     -- Lift is levity-polymorphic
      | otherwise               = False    -- Read, Ix etc
 
     check_in :: Type -> [(Type,a)] -> Bool
