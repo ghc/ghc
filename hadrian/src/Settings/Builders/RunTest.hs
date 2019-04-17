@@ -147,6 +147,7 @@ getTestArgs = do
     bindir          <- expr $ getBinaryDirectory (testCompiler args)
     compiler        <- expr $ getCompilerPath (testCompiler args)
     globalVerbosity <- shakeVerbosity <$> expr getShakeOptions
+    haveDocs        <- areDocsPresent
     let configFileArg= ["--config-file=" ++ (testConfigFile args)]
         testOnlyArg  =  map ("--only=" ++) (testOnly args ++ testEnvTargets)
         onlyPerfArg  = if testOnlyPerf args
@@ -169,7 +170,9 @@ getTestArgs = do
         wayArgs      = map ("--way=" ++) (testWays args)
         compilerArg  = ["--config", "compiler=" ++ show (compiler)]
         ghcPkgArg    = ["--config", "ghc_pkg=" ++ show (bindir -/- "ghc-pkg")]
-        haddockArg   = ["--config", "haddock=" ++ show (bindir -/- "haddock")]
+        haddockArg   = if haveDocs
+          then [ "--config", "haddock=" ++ show (bindir -/- "haddock") ]
+          else [ "--config", "haddock=" ]
         hp2psArg     = ["--config", "hp2ps=" ++ show (bindir -/- "hp2ps")]
         hpcArg       = ["--config", "hpc=" ++ show (bindir -/- "hpc")]
         inTreeArg    = [ "-e", "config.in_tree_compiler=" ++
@@ -180,6 +183,17 @@ getTestArgs = do
                       , junitArg, verbosityArg  ]
          ++ configArgs ++ wayArgs ++  compilerArg ++ ghcPkgArg
          ++ haddockArg ++ hp2psArg ++ hpcArg ++ inTreeArg
+
+  where areDocsPresent = expr $ do
+          root <- buildRoot
+          and <$> traverse doesFileExist (docFiles root)
+
+        docFiles root =
+          [ root -/- "docs" -/- "html" -/- "libraries" -/- p -/- (p ++ ".haddock")
+          -- list of packages from
+          -- utils/haddock/haddock-test/src/Test/Haddock/Config.hs
+          | p <- [ "array", "base", "ghc-prim", "process", "template-haskell" ]
+          ]
 
 -- | Set speed for test
 setTestSpeed :: TestSpeed -> String
