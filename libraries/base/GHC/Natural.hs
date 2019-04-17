@@ -103,10 +103,18 @@ default ()
 --   {-# NOINLINE plusNatural #-}
 --
 --
--- DONE: Note that some functions had commented CONSTANT_FOLDED annotations,
--- that's because the Integer counter-parts of these functions do actually have
--- a builtinRule in PrelRules, where the Natural functions did not. Issue
--- #15821 added builtin rules for those functions on Natural.
+-- DONE: Note that some functions had commented CONSTANT_FOLDED annotations
+-- because they did not have a built-in rule in PrelRules like their @Integer@
+-- counterparts did.
+-- #15821 added builtin rules for those functions on @Natural@ thereby enabling
+-- folding of @Natural@ literals, uncommenting all of the disabled annotations,
+-- and adding more.
+-- For more information on @Natural@ constant-folding, see the following notes:
+--
+-- * Note [Integer and Natural constant folding]
+-- * Note [Ord and Eq instances for Natural]
+-- * Note [Integer division constant folding]
+
 #define CONSTANT_FOLDED NOINLINE
 
 -------------------------------------------------------------------------------
