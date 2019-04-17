@@ -281,13 +281,20 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
     // Advance the current segment's next_free or allocate a new segment if full
     bool full = advance_next_free(current);
     if (full) {
-        // Current segment is full, link it to filled, take an active segment
-        // if one exists, otherwise allocate a new segment. Need to take the
+        // Current segment is full: update live data estimate link it to
+        // filled, take an active segment if one exists, otherwise allocate a
+        // new segment.
+
+        // Update live data estimate
+        unsigned int new_blocks =  nonmovingSegmentBlockCount(current) - current->next_free_snap;
+        atomic_inc(&oldest_gen->live_estimate, new_blocks * nonmovingSegmentBlockSize(current) / sizeof(W_));
+
+        // Need to take the
         // non-moving heap lock as allocators can be manipulated by scavenge
         // threads concurrently, and in the case where we need to allocate a
         // segment we'll need to modify the free segment list.
         nonmovingPushFilledSegment(current);
-
+        
         // first look for a new segment in the active list
         struct NonmovingSegment *new_current = pop_active_segment(alloca);
 
@@ -450,19 +457,6 @@ static void nonmovingPrepareMark(void)
 #endif
 }
 
-static void set_target_size(int mul)
-{
-    W_ live = (nonmoving_live_words + BLOCK_SIZE_W - 1) / BLOCK_SIZE_W +
-        oldest_gen->n_large_blocks +
-        oldest_gen->n_compact_blocks;
-    W_ size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
-                      RtsFlags.GcFlags.minOldGenSize);
-    size *= mul;
-    for (unsigned int g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        generations[g].max_blocks = size;
-    }
-}
-
 // Mark weak pointers in the non-moving heap. They'll either end up in
 // dead_weak_ptr_list or stay in weak_ptr_list. Either way they need to be kept
 // during sweep. See `MarkWeak.c:markWeakPtrList` for the moving heap variant
@@ -496,7 +490,7 @@ static void nonmovingMarkWeakPtrList(MarkQueue *mark_queue, StgWeak *dead_weak_p
 
 void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 {
-    set_target_size(4);
+    resizeGenerations();
 #if defined(THREADED_RTS)
     // We can't start a new collection until the old one has finished
     // We also don't run in final GC
@@ -765,15 +759,10 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 
     // TODO: Remainder of things done by GarbageCollect (update stats)
 
-    // HACK
-#if 0
-    debugBelch("nonmoving: n_blocks: %lu, n_large_block: %lu, n_compact_blocks: %lu\n", 
-               oldest_gen->n_blocks, oldest_gen->n_large_blocks, oldest_gen->n_compact_blocks);
-    debugBelch("nonmoving: max_blocks: %lu -> %lu\n", oldest_gen->max_blocks, oldest_gen->n_blocks);
-#endif
     oldest_gen->n_words = nonmoving_live_words;
+    oldest_gen->live_estimate = nonmoving_live_words;
     oldest_gen->n_old_blocks = 0;
-    set_target_size(1);
+    resizeGenerations();
 
 #if defined(THREADED_RTS)
 finish:

@@ -166,7 +166,6 @@ static void mark_root               (void *user, StgClosure **root);
 static void prepare_collected_gen   (generation *gen);
 static void prepare_uncollected_gen (generation *gen);
 static void init_gc_thread          (gc_thread *t);
-static void resize_generations      (void);
 static void resize_nursery          (void);
 static void start_gc_threads        (void);
 static void scavenge_until_all_done (void);
@@ -771,8 +770,12 @@ GarbageCollect (uint32_t collect_gen,
       ACQUIRE_SM_LOCK;
   }
 
-  // update the max size of older generations after a major GC
-  resize_generations();
+  // Update the max size of older generations after a major GC:
+  // We can't resize here in the case of the concurrent collector since we
+  // don't yet know how much live data we have. This will be instead done
+  // once we finish marking.
+  if (major_gc && RtsFlags.GcFlags.generations > 1 && ! RtsFlags.GcFlags.useNonmoving)
+      resizeGenerations();
 
   // Free the mark stack.
   if (mark_stack_top_bd != NULL) {
@@ -1708,12 +1711,11 @@ mark_root(void *user USED_IF_THREADS, StgClosure **root)
    percentage of the maximum heap size available to allocate into.
    ------------------------------------------------------------------------- */
 
-static void
-resize_generations (void)
+void
+resizeGenerations (void)
 {
     uint32_t g;
 
-    if (major_gc && RtsFlags.GcFlags.generations > 1 && ! RtsFlags.GcFlags.useNonmoving) {
         W_ live, size, min_alloc, words;
         const W_ max  = RtsFlags.GcFlags.maxHeapSize;
         const W_ gens = RtsFlags.GcFlags.generations;
@@ -1794,19 +1796,18 @@ resize_generations (void)
             }
         }
 
-#if 0
-        debugBelch("n_words: %lu, live_estimate=%lu\n", oldest_gen->n_words, oldest_gen->live_estimate);
-        debugBelch("live: %lu, min_alloc: %lu, size : %lu, max = %lu\n", live,
+#if 1
+        trace(1, "n_words: %lu, live_estimate=%lu\n", oldest_gen->n_words, oldest_gen->live_estimate);
+        trace(1, "live: %lu, min_alloc: %lu, size : %lu, max = %lu\n", live,
                    min_alloc, size, max);
-        debugBelch("resize_gen: n_blocks: %lu, n_large_block: %lu, n_compact_blocks: %lu\n", 
+        trace(1, "resize_gen: n_blocks: %lu, n_large_block: %lu, n_compact_blocks: %lu\n", 
                    oldest_gen->n_blocks, oldest_gen->n_large_blocks, oldest_gen->n_compact_blocks);
-        debugBelch("resize_gen: max_blocks: %lu -> %lu\n", oldest_gen->max_blocks, oldest_gen->n_blocks);
+        trace(1, "resize_gen: max_blocks: %lu -> %lu\n", oldest_gen->max_blocks, oldest_gen->n_blocks);
 #endif
 
         for (g = 0; g < gens; g++) {
             generations[g].max_blocks = size;
         }
-    }
 }
 
 /* -----------------------------------------------------------------------------

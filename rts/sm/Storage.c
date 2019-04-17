@@ -1390,12 +1390,13 @@ calcNeeded (bool force_major, memcount *blocks_needed)
     for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
         generation *gen = &generations[g];
 
-        W_ blocks = gen->n_blocks // or: gen->n_words / BLOCK_SIZE_W (?)
-                  + gen->n_large_blocks
-                  + gen->n_compact_blocks;
+        
+        W_ blocks = gen->live_estimate ? (gen->live_estimate / BLOCK_SIZE_W) : gen->n_blocks;
+        blocks += gen->n_large_blocks 
+                + gen->n_compact_blocks;
 
-//        debugBelch("calcNeeded(%d): blocks: %lu, n_blocks: %lu, max_blocks: %lu\n",
-//                   g, blocks, gen->n_blocks, gen->max_blocks);
+        trace(1, "calcNeeded(%d): blocks: %lu, n_blocks: %lu, max_blocks: %lu",
+                   g, blocks, gen->n_blocks, gen->max_blocks);
 
         // we need at least this much space
         needed += blocks;
@@ -1413,7 +1414,7 @@ calcNeeded (bool force_major, memcount *blocks_needed)
                 //  mark stack:
                 needed += gen->n_blocks / 100;
             }
-            if (gen->compact) {
+            if (gen->compact || (RtsFlags.GcFlags.useNonmoving && gen == oldest_gen)) {
                 continue; // no additional space needed for compaction
             } else {
                 needed += gen->n_blocks;
