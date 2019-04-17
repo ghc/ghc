@@ -38,6 +38,8 @@ main = do
           p "naturalToWord"      naturalToWordLit
           p "intToNatural"       intToNaturalLit
           p "naturalToInt"       naturalToIntLit
+          p "doubleFromNatural"  doubleFromNatural
+          p "floatFromNatural"   floatFromNatural
           p "xorNatural"         xorNatural
           p "eqNatural"          eqNaturalLit
           p "neqNatural"         neqNaturalLit
@@ -147,6 +149,13 @@ intToNaturalLit = intToNatural 100076# + 100077
 
 naturalToIntLit :: Int
 naturalToIntLit = I# (naturalToInt 100078) + 100079
+
+doubleFromNatural :: Double
+doubleFromNatural = 100095.0 + realToFrac (100094 :: Natural)
+
+floatFromNatural :: Float
+floatFromNatural = 100097.0 + realToFrac (100096 :: Natural)
+
 ---------------------------------------------------
 
 -- Ordering and Equality
