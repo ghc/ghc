@@ -116,7 +116,6 @@ import TcEvidence
 import Data.Bifunctor (second)
 
 import TcSMonad (runTcS)
-
 import VarSet (isEmptyVarSet)
 import FV (fvVarSet)
 
@@ -954,16 +953,55 @@ typeKind normalise str = withSession $ \hsc_env -> do
 -- ----------------------------------------------------------------------------
 -- Getting the class instances for a type
 
+{-
+  Note [Querying instances for a type]
+
+  Here is the implementation of GHC proposal 41.
+  (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0041-ghci-instances.rst)
+
+  The objective is to take a query string representing a (partial) type, and
+  report all the class instances available to that type.
+
+  The general outline of how we solve this is:
+
+  1. Parse the type, leaving skolems in the place of type-holes.
+  2. For every class, get a list of all instances that match with the query type.
+  3. For every matching instance, ask GHC for the context the instance dictionary needs.
+  4. Format and present the results, substituting our query into the instance
+     and simplifying the context.
+
+  For example, given the query "Maybe Int", we want to return:
+
+  instance Show (Maybe Int)
+  instance Read (Maybe Int)
+  instance Eq   (Maybe Int)
+  ....
+
+  [Holes in queries]
+
+  Often times we want to know what instances are available for a polymorphic type,
+  like `Maybe a`, and we'd like to return instances such as:
+
+  instance Show a => Show (Maybe a)
+  ....
+
+  These queries are expressed using type holes, so instead of `Maybe a` the user writes
+  `Maybe _`, we parse the type and during zonking, we skolemise it, replacing the holes
+  with (un-named) type variables.
+
+  When zonking the type holes we have two real choices: replace them with Any or replace
+  them with skolem typevars. Using skolem type variables ensures that the output is more
+  intuitive to end users, and there is no difference in the results between Any and skolems.
+
+-}
+
 -- Find all instances that match a provided type
 getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
 getInstancesForType ty = withSession $ \hsc_env -> do
   liftIO $ runInteractiveHsc hsc_env $ do
     ioMsgMaybe $ runTcInteractive hsc_env $ do
       matches <- findMatchingInstances ty
-
-      fmap catMaybes . forM matches $ \(res, mb_inst_tys) -> do
-          exists <- checkForExistence res mb_inst_tys
-          return $ fmap (\s -> substClassArgs s res) exists
+      fmap catMaybes . forM matches $ uncurry checkForExistence
 
 -- Parse a type string and turn any holes into skolems
 parseInstanceHead :: GhcMonad m => String -> m Type
@@ -976,54 +1014,68 @@ parseInstanceHead str = withSession $ \hsc_env0 -> do
   return ty
 
 -- Get all the constraints required of a dictionary binding
-getDictionaryBindings :: Var -> TcM (WantedConstraints, TcEvBinds)
+getDictionaryBindings :: DictId -> TcM WantedConstraints
 getDictionaryBindings dict_var = do
   loc <- getCtLocM (GivenOrigin UnkSkol) Nothing
-  let nonC = mkNonCanonical CtWanted
+  let nonC = mkNonCanonical CtDerived
           { ctev_pred = varType dict_var
-          , ctev_nosh = WDeriv
-          , ctev_dest = EvVarDest dict_var
           , ctev_loc = loc
           }
       wCs = mkSimpleWC [cc_ev nonC]
-  (res, evBinds) <- second evBindMapBinds <$> runTcS (solveWanteds wCs)
+  (res, _) <- second evBindMapBinds <$> runTcS (solveWanteds wCs)
 
-  return (res, EvBinds evBinds)
+  return res
 
 {-
-  Given a ClsInst that matches against a list of types, we check if the instance
-  really exists. To do this first, we create a binding for the dictionary and ask
-  GHC to tell us all the implied constraints.
+  When we've found an instance that a query matches against, we still need to
+  check that it is possible use. checkForExistence attempts to create an
+  instance dictionary and verifies that all the implied constraints are
+  satisfiable. The only implied constraints that are allowed are those that
+  mention at least one type-hole, meaning that they are blocked on unknowns.
+  If the instance is feasible, we return it with the query substituted into
+  the instance and all constraints simplified, for example given:
 
-  Afterwards, we look at all those constraints and check that they only mention the holes
-  that are in the query.
+  instance D a => C (MyType a b) where
 
-  If there's a residual constraint mentioning concrete types it means GHC couldn't find an instance
-  so there's no way we could ever successfully use this instance.
+  and the query `MyType a String`
+
+  we apply the substitution
+
+  { a -> a; b -> String}
+
+  so that we can display our result as
+
+  instance D a => C (MyType a String)
+
 -}
-checkForExistence :: ClsInst -> [DFunInstType] -> TcM (Maybe TCvSubst)
+
+checkForExistence :: ClsInst -> [DFunInstType] -> TcM (Maybe ClsInst)
 checkForExistence res mb_inst_tys = do
   (tys, thetas) <- instDFunType (is_dfun res) mb_inst_tys
 
-  constraints <- forM thetas $ \theta -> do
+  residuals <- forM thetas $ \theta -> do
     dictName <- newName (mkDictOcc (mkVarOcc "magic"))
     let dict_var = mkVanillaGlobal dictName theta
-
     getDictionaryBindings dict_var
 
-  let (residuals, _) = unzip constraints
-      -- select all the wanted constraints from the residual constraints generated by the binding
-      wantedRes = concat $ map (filter (isWanted . ctEvidence) . bagToList . wc_simple) residuals
-      tyArgs' = concat $ map (snd . tcSplitAppTys . ctPred) wantedRes
-
+  let all_residual_constraints = concatMap (bagToList . wc_simple) residuals
   let subst = foldl' (\a b -> uncurry (extendTvSubstAndInScope a) b) empty_subst (zip dfun_tvs tys)
-  -- Check that all residual constraints only mention type variables.
-  return $ toMaybe (all isTyVarTy tyArgs') subst
+
+  if all (isSatisfiablePred . ctPred) all_residual_constraints && all (null . wc_impl) residuals
+  then return . Just $ substClassArgs subst res
+  else return Nothing
 
   where
 
-  toMaybe True  a = Just a
-  toMaybe False _ = Nothing
+  -- Stricter version of isTyVarClassPred that requires all TyConApps to have at least
+  -- one argument or for the head to be a TyVar. The reason is that we want to ensure
+  -- that all residual constraints mention a type-hole somewhere in the constraint,
+  -- meaning that with the correct choice of a concrete type it could be possible for
+  -- the constraint to be discharged.
+  isSatisfiablePred :: PredType -> Bool
+  isSatisfiablePred ty = case getClassPredTys_maybe ty of
+      Just (_, tys@(_:_)) -> all isTyVarTy tys
+      _                   -> isTyVarTy ty
 
   empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType (idType $ is_dfun res)))
   (dfun_tvs, _, _, _) = instanceSig res
@@ -1034,18 +1086,20 @@ findMatchingInstances ty = do
   ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
   let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
 
-  return . concat $ map (\cls ->
-    let (matches, unifs, _) = lookupInstEnv True ies cls [ty]
-    in matches ++ map (\unif -> (unif, [])) unifs) allClasses
+  concat <$> mapM (\cls -> do
+    let (matches, _, _) = lookupInstEnv True ies cls [ty]
+    return matches) allClasses
 
--- Apply a substitution to an instance to instantiate all the variables within the instance
+{- Apply a substitution for the type variables of a class instance
+   and remove any fully instantiated constraints.
+-}
 substClassArgs ::  TCvSubst -> ClsInst -> ClsInst
 substClassArgs subst inst = let
     tau   = mkClassPred cls (substTheta subst args)
     substitutedConstraints = substTheta subst dfun_theta
     unsatisfiedConstraints = filter constraintUnsolved substitutedConstraints
 
-    phi   = mkPhiTy (unsatisfiedConstraints) tau
+    phi   = mkPhiTy unsatisfiedConstraints tau
     sigma = mkForAllTys (map (\v -> Bndr v Inferred) dfun_tvs) phi
 
   in inst { is_dfun = (is_dfun inst) { varType = sigma }}
