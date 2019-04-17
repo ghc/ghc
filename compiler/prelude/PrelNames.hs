@@ -403,7 +403,7 @@ basicKnownKeyNames
         naturalToWordName, wordToNaturalName, intToNaturalName, naturalToIntName,
 
         eqNaturalPrimName, neqNaturalPrimName, geNaturalPrimName, gtNaturalPrimName,
-        leNaturalPrimName, ltNaturalPrimName, compareNaturalName,
+        leNaturalPrimName, ltNaturalPrimName, compareNaturalName, doubleFromNaturalName,
 
         -- Float/Double
         rationalToFloatName,
@@ -1225,14 +1225,16 @@ popCountNaturalName = varQual gHC_NATURAL (fsLit "popCountNatural") popCountNatu
 naturalToWordName   = varQual gHC_NATURAL (fsLit "naturalToWord")   naturalToWordIdKey
 
 eqNaturalPrimName, neqNaturalPrimName, geNaturalPrimName, gtNaturalPrimName,
-    leNaturalPrimName, ltNaturalPrimName, compareNaturalName :: Name
-eqNaturalPrimName   = varQual gHC_NATURAL (fsLit "eqNatural#")      eqNaturalPrimIdKey
-neqNaturalPrimName  = varQual gHC_NATURAL (fsLit "neqNatural#")     neqNaturalPrimIdKey
-geNaturalPrimName   = varQual gHC_NATURAL (fsLit "geNatural#")      geNaturalPrimIdKey
-gtNaturalPrimName   = varQual gHC_NATURAL (fsLit "gtNatural#")      gtNaturalPrimIdKey
-leNaturalPrimName   = varQual gHC_NATURAL (fsLit "leNatural#")      leNaturalPrimIdKey
-ltNaturalPrimName   = varQual gHC_NATURAL (fsLit "ltNatural#")      ltNaturalPrimIdKey
-compareNaturalName  = varQual gHC_NATURAL (fsLit "compareNatural") compareNaturalPrimIdKey
+    leNaturalPrimName, ltNaturalPrimName, compareNaturalName,
+    doubleFromNaturalName :: Name
+eqNaturalPrimName     = varQual gHC_NATURAL (fsLit "eqNatural#")        eqNaturalPrimIdKey
+neqNaturalPrimName    = varQual gHC_NATURAL (fsLit "neqNatural#")       neqNaturalPrimIdKey
+geNaturalPrimName     = varQual gHC_NATURAL (fsLit "geNatural#")        geNaturalPrimIdKey
+gtNaturalPrimName     = varQual gHC_NATURAL (fsLit "gtNatural#")        gtNaturalPrimIdKey
+leNaturalPrimName     = varQual gHC_NATURAL (fsLit "leNatural#")        leNaturalPrimIdKey
+ltNaturalPrimName     = varQual gHC_NATURAL (fsLit "ltNatural#")        ltNaturalPrimIdKey
+compareNaturalName    = varQual gHC_NATURAL (fsLit "compareNatural")    compareNaturalPrimIdKey
+doubleFromNaturalName = varQual gHC_NATURAL (fsLit "doubleFromNatural") doubleFromNaturalIdKey
 
 -- GHC.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
@@ -2488,7 +2490,8 @@ intToNaturalIdKey    = mkPreludeMiscIdUnique 589
 naturalToIntIdKey    = mkPreludeMiscIdUnique 590
 
 eqNaturalPrimIdKey, neqNaturalPrimIdKey, geNaturalPrimIdKey, gtNaturalPrimIdKey,
-    leNaturalPrimIdKey, ltNaturalPrimIdKey, compareNaturalPrimIdKey :: Unique
+    leNaturalPrimIdKey, ltNaturalPrimIdKey, compareNaturalPrimIdKey,
+    doubleFromNaturalIdKey :: Unique
 eqNaturalPrimIdKey      = mkPreludeMiscIdUnique 591
 neqNaturalPrimIdKey     = mkPreludeMiscIdUnique 592
 geNaturalPrimIdKey      = mkPreludeMiscIdUnique 593
@@ -2496,11 +2499,10 @@ gtNaturalPrimIdKey      = mkPreludeMiscIdUnique 594
 leNaturalPrimIdKey      = mkPreludeMiscIdUnique 595
 ltNaturalPrimIdKey      = mkPreludeMiscIdUnique 596
 compareNaturalPrimIdKey = mkPreludeMiscIdUnique 597
--- The current highest id key is **not** that of @compareNaturalPrimIdKey,
--- search for @popCountIntegerIdKey@ up above to see which id key the
--- identifier you are adding will need.
--- After doing so, please update this comment to reflect the fact that the
--- 598th id key is not missing, but up above.
+-- The 598th id key is not missing, but up above. It belongs to
+-- @popCountIntegerIdKey@, added after its counterparts - hence the disparate
+-- numbering.
+doubleFromNaturalIdKey  = mkPreludeMiscIdUnique 599
 
 {-
 ************************************************************************
