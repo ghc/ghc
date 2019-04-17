@@ -26,7 +26,9 @@ import GHC.Base
 import GHC.Num
 import GHC.List
 import GHC.Enum
+import GHC.Natural (doubleFromNatural)
 import GHC.Show
+import GHC.Types
 import {-# SOURCE #-} GHC.Exception( divZeroException, overflowException
                                    , underflowException
                                    , ratioZeroDenomException )
@@ -579,6 +581,10 @@ fromIntegral = fromInteger . toInteger
 realToFrac :: (Real a, Fractional b) => a -> b
 {-# NOINLINE [1] realToFrac #-}
 realToFrac = fromRational . toRational
+
+{-# RULES
+"realToFrac/Natural->Double"     realToFrac = \n -> D# (doubleFromNatural n)
+  #-}
 
 --------------------------------------------------------------
 -- Overloaded numeric functions
