@@ -474,7 +474,9 @@ stg_copyArray_barrier ( W_ hdr_size, gcptr dst, W_ dst_off, W_ n)
     end = p + WDS(n);
 
 again:
-    ccall updateRemembSetPushClosure_(BaseReg "ptr", W_[p] "ptr");
+    IF_WRITE_BARRIER_ENABLED {
+        ccall updateRemembSetPushClosure_(BaseReg "ptr", W_[p] "ptr");
+    }
     p = p + WDS(1);
     if (p < end) {
         goto again;
@@ -488,7 +490,7 @@ stg_copySmallArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n)
     W_ dst_p, src_p, bytes;
 
     if (n > 0) {
-        if (nonmoving_write_barrier_enabled != 0 || 1) {
+        IF_WRITE_BARRIER_ENABLED {
             call stg_copyArray_barrier(SIZEOF_StgSmallMutArrPtrs,
                                       dst, dst_off, n);
         }
@@ -509,7 +511,7 @@ stg_copySmallMutableArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n
     W_ dst_p, src_p, bytes;
 
     if (n > 0) {
-        if (nonmoving_write_barrier_enabled != 0 || 1) {
+        IF_WRITE_BARRIER_ENABLED {
             call stg_copyArray_barrier(SIZEOF_StgSmallMutArrPtrs,
                                       dst, dst_off, n);
         }

@@ -712,7 +712,7 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
             barf("threadStackUnderflow: not enough space for return values");
         }
 
-        if (nonmoving_write_barrier_enabled) {
+        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled)) {
             // ensure that values that we copy into the new stack are marked
             // for the nonmoving collector. Note that these values won't
             // necessarily form a full closure so we need to handle them

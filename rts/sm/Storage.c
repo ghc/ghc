@@ -430,7 +430,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     // reference should be in SRTs
     ASSERT(orig_info_tbl->layout.payload.ptrs == 0);
     // Becuase the payload is empty we just push the SRT
-    if (nonmoving_write_barrier_enabled) {
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled)) {
         StgThunkInfoTable *thunk_info = itbl_to_thunk_itbl(orig_info_tbl);
         if (thunk_info->i.srt) {
             updateRemembSetPushClosure(cap, GET_SRT(thunk_info));
@@ -1140,7 +1140,7 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
     if (mvar->header.info == &stg_MUT_VAR_CLEAN_info) {
         mvar->header.info = &stg_MUT_VAR_DIRTY_info;
         recordClosureMutated(cap, (StgClosure *) mvar);
-        if (nonmoving_write_barrier_enabled != 0) {
+        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled != 0)) {
             updateRemembSetPushClosure_(reg, old);
         }
     }
@@ -1159,7 +1159,7 @@ dirty_TVAR(Capability *cap, StgTVar *p,
     if (p->header.info == &stg_TVAR_CLEAN_info) {
         p->header.info = &stg_TVAR_DIRTY_info;
         recordClosureMutated(cap,(StgClosure*)p);
-        if (nonmoving_write_barrier_enabled != 0) {
+        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled != 0)) {
             updateRemembSetPushClosure(cap, old);
         }
     }
@@ -1176,7 +1176,7 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
     if (tso->dirty == 0) {
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
-        if (nonmoving_write_barrier_enabled)
+        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
             updateRemembSetPushClosure(cap, (StgClosure *) tso->_link);
     }
     tso->_link = target;
@@ -1188,7 +1188,7 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
     if (tso->dirty == 0) {
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
-        if (nonmoving_write_barrier_enabled)
+        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
             updateRemembSetPushClosure(cap, (StgClosure *) tso->block_info.prev);
     }
     tso->block_info.prev = target;
@@ -1202,7 +1202,7 @@ dirty_TSO (Capability *cap, StgTSO *tso)
         recordClosureMutated(cap,(StgClosure*)tso);
     }
 
-    if (nonmoving_write_barrier_enabled)
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
         updateRemembSetPushTSO(cap, tso);
 }
 
@@ -1211,7 +1211,7 @@ dirty_STACK (Capability *cap, StgStack *stack)
 {
     // First push to upd_rem_set before we set stack->dirty since we
     // the nonmoving collector may already be marking the stack.
-    if (nonmoving_write_barrier_enabled)
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
         updateRemembSetPushStack(cap, stack);
 
     if (! (stack->dirty & STACK_DIRTY)) {
@@ -1236,7 +1236,7 @@ void
 update_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 {
     Capability *cap = regTableToCapability(reg);
-    if (nonmoving_write_barrier_enabled) {
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled)) {
         StgMVar *mvar = (StgMVar *) p;
         updateRemembSetPushClosure(cap, old_val);
         updateRemembSetPushClosure(cap, (StgClosure *) mvar->head);

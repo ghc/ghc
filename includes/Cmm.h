@@ -797,11 +797,6 @@
    Misc junk
    -------------------------------------------------------------------------- */
 
-#if !defined(THREADED_RTS)
-// This is also done in rts/NonMoving.h, but that isn't visible from C--
-#define nonmoving_write_barrier_enabled 0
-#endif
-
 #define NO_TREC                   stg_NO_TREC_closure
 #define END_TSO_QUEUE             stg_END_TSO_QUEUE_closure
 #define STM_AWOKEN                stg_STM_AWOKEN_closure
@@ -940,9 +935,19 @@
     return (dst);
 
 
+#if defined(THREADED_RTS)
+#define IF_WRITE_BARRIER_ENABLED                               \
+    if (W_[nonmoving_write_barrier_enabled] != 0) (likely: False)
+#else
+// A similar measure is also taken in rts/NonMoving.h, but that isn't visible from C--
+#define IF_WRITE_BARRIER_ENABLED                               \
+    if (0)
+#define nonmoving_write_barrier_enabled 0
+#endif
+
 // A useful helper for pushing a pointer to the update remembered set.
 // See Note [Update remembered set] in NonMovingMark.c.
-#define updateRemembSetPushPtr(p)                                \
-    if (nonmoving_write_barrier_enabled != 0) (likely: False) {  \
-      ccall updateRemembSetPushClosure_(BaseReg "ptr", p "ptr"); \
+#define updateRemembSetPushPtr(p)                                    \
+    IF_WRITE_BARRIER_ENABLED {                                       \
+      ccall updateRemembSetPushClosure_(BaseReg "ptr", p "ptr");     \
     }

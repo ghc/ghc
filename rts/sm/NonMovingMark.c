@@ -459,8 +459,6 @@ bool check_in_nonmoving_heap(StgClosure *p) {
  */
 void updateRemembSetPushThunk(Capability *cap, StgThunk *thunk)
 {
-    // TODO: Eliminate this conditional once it's folded into codegen
-    if (!nonmoving_write_barrier_enabled) return;
     const StgInfoTable *info;
     do {
         info = get_volatile_itbl((StgClosure *) thunk);
@@ -517,14 +515,11 @@ void updateRemembSetPushThunkEager(Capability *cap,
 
 void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *p)
 {
-    // TODO: Eliminate this conditional once it's folded into codegen
-    if (!nonmoving_write_barrier_enabled) return;
     updateRemembSetPushThunk(regTableToCapability(reg), p);
 }
 
 void updateRemembSetPushClosure(Capability *cap, StgClosure *p)
 {
-    if (!nonmoving_write_barrier_enabled) return;
     if (!check_in_nonmoving_heap(p)) return;
     MarkQueue *queue = &cap->upd_rem_set.queue;
     push_closure(queue, p, NULL);
@@ -578,8 +573,6 @@ STATIC_INLINE void finish_upd_rem_set_mark(StgClosure *p)
 
 void updateRemembSetPushTSO(Capability *cap, StgTSO *tso)
 {
-    // TODO: Eliminate this conditional once it's folded into codegen
-    if (!nonmoving_write_barrier_enabled) return;
     if (needs_upd_rem_set_mark((StgClosure *) tso)) {
         debugTrace(DEBUG_nonmoving_gc, "upd_rem_set: TSO %p", tso);
         mark_tso(&cap->upd_rem_set.queue, tso);

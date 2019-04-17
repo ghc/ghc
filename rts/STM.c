@@ -297,7 +297,7 @@ static StgClosure *lock_tvar(Capability *cap,
   } while (cas((void *)&(s -> current_value),
                (StgWord)result, (StgWord)trec) != (StgWord)result);
 
-  if (nonmoving_write_barrier_enabled && result) {
+  if (RTS_UNLIKELY(nonmoving_write_barrier_enabled && result)) {
       updateRemembSetPushClosure(cap, result);
   }
   return result;
@@ -323,7 +323,7 @@ static StgBool cond_lock_tvar(Capability *cap,
   TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
   w = cas((void *)&(s -> current_value), (StgWord)expected, (StgWord)trec);
   result = (StgClosure *)w;
-  if (nonmoving_write_barrier_enabled && result) {
+  if (RTS_UNLIKELY(nonmoving_write_barrier_enabled && result)) {
       updateRemembSetPushClosure(cap, expected);
   }
   TRACE("%p : %s", trec, result ? "success" : "failure");
