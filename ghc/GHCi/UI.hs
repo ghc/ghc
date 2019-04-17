@@ -1639,7 +1639,7 @@ defineMacro overwrite s = do
           | otherwise = return ()
         hint = " Use ':def!' to overwrite."
 
-    if not overwrite then check_newname else return ()
+    unless overwrite check_newname
     -- compile the expression
     handleSourceError GHC.printException $ do
       step <- getGhciStepIO
