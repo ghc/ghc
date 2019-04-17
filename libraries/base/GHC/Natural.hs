@@ -71,6 +71,7 @@ module GHC.Natural
     , intToNatural
     , naturalToWordMaybe
     , wordToNaturalBase
+    , doubleFromNatural
       -- * Modular arithmetic
     , powModNatural
     ) where
@@ -758,3 +759,21 @@ intToNatural i#
   | isTrue# (i# <# 0#) = underflowError
   | True               = wordToNaturalBase (int2Word# i#)
 {-# CONSTANT_FOLDED intToNatural #-}
+
+----------------------------------------------------------------------------
+-- Conversions to/from floating point (similar to those for @Integer@)
+
+doubleFromNatural :: Natural -> Double#
+#if defined(MIN_VERSION_integer_gmp)
+doubleFromNatural (NatS# m#) = word2Double# m#
+doubleFromNatural (NatJ# bn@(BN# bn#))
+    = c_mpn_get_d bn# (sizeofBigNat# bn) 0#
+
+-- double integer_gmp_mpn_get_d (const mp_limb_t sp[], const mp_size_t sn)
+foreign import ccall unsafe "integer_gmp_mpn_get_d"
+  c_mpn_get_d :: ByteArray# -> GmpSize# -> Int# -> Double#
+
+#else
+doubleFromNatural (Natural i) = doubleFromInteger i
+#endif
+{-# CONSTANT_FOLDED doubleFromNatural #-}

@@ -1380,6 +1380,7 @@ builtinNaturalRules =
  ,rule_convert            "naturalToWord"      naturalToWordName       mkWordLitWord
  ,rule_IntToNatural       "intToNatural"       intToNaturalName
  ,rule_convert            "naturalToInt"       naturalToIntName        mkIntLitInt
+ ,rule_convert            "doubleFromNatural"  doubleFromNaturalName   (\_ -> mkDoubleLitDouble)
 
  ,rule_binop              "andNatural"         andNaturalName          (.&.)
  ,rule_binop              "orNatural"          orNaturalName           (.|.)
