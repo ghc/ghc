@@ -102,6 +102,10 @@ testRules = do
         pythonPath      <- builderPath Python
         need [ root -/- checkPprProgPath, root -/- checkApiAnnotationsProgPath ]
 
+        -- A few Haddock tests use .haddock files, so we need to generate
+        -- haddock documentation for our packages before running the testsuite.
+        need [ "docs" ]
+
         -- Set environment variables for test's Makefile.
         -- TODO: Ideally we would define all those env vars in 'env', so that
         --       Shake can keep track of them, but it is not as easy as it seems
