@@ -21,6 +21,7 @@ integerConstantFolding:
 	$(call CHECK,\<532\>,andInteger)
 	$(call CHECK,\<239575\>,orInteger)
 	$(call CHECK,\<239041\>,xorInteger)
+	$(call CHECK,\<9\>,popCountInteger)
 	$(call CHECK,-200059\>,complementInteger)
 	$(call CHECK,\<813\>,quotRemInteger)
 	$(call CHECK,\<60\>,quotRemInteger)
