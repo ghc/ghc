@@ -45,5 +45,6 @@ naturalConstantFolding:
 	$(call CHECK,\<200149\>,naturalToWord)
 	$(call CHECK,\<200153\>,intToNatural)
 	$(call CHECK,\<200157\>,naturalToInt)
+	$(call CHECK,\<200189.0\>,doubleFromNatural)
 	# Ordering and Equality
 	./naturalConstantFolding

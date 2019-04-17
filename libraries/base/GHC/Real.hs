@@ -580,6 +580,10 @@ realToFrac :: (Real a, Fractional b) => a -> b
 {-# NOINLINE [1] realToFrac #-}
 realToFrac = fromRational . toRational
 
+{-# RULES
+"realToFrac/Natural->Double"     realToFrac = \n -> D# (doubleFromNatural n)
+  #-}
+
 --------------------------------------------------------------
 -- Overloaded numeric functions
 --------------------------------------------------------------
