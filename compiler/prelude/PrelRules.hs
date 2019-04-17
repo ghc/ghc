@@ -1265,9 +1265,11 @@ builtinIntegerRules =
   rule_binop_Prim     "geInteger#"          geIntegerPrimName       (>=),
   rule_binop_Ordering "compareInteger"      compareIntegerName      compare,
   rule_encodeFloat    "encodeFloatInteger"  encodeFloatIntegerName  mkFloatLitFloat,
-  rule_convert        "floatFromInteger"    floatFromIntegerName    (\_ -> mkFloatLitFloat),
   rule_encodeFloat    "encodeDoubleInteger" encodeDoubleIntegerName mkDoubleLitDouble,
   rule_decodeDouble   "decodeDoubleInteger" decodeDoubleIntegerName,
+  -- See Note [Float/Double <-> Integer/Natural conversions] if the two rules
+  -- below change for either @Integer@ or @Natural@change.
+  rule_convert        "floatFromInteger"    floatFromIntegerName    (\_ -> mkFloatLitFloat),
   rule_convert        "doubleFromInteger"   doubleFromIntegerName   (\_ -> mkDoubleLitDouble),
   rule_rationalTo     "rationalToFloat"     rationalToFloatName     mkFloatExpr,
   rule_rationalTo     "rationalToDouble"    rationalToDoubleName    mkDoubleExpr,
@@ -1380,6 +1382,10 @@ builtinNaturalRules =
  ,rule_convert            "naturalToWord"      naturalToWordName       mkWordLitWord
  ,rule_IntToNatural       "intToNatural"       intToNaturalName
  ,rule_convert            "naturalToInt"       naturalToIntName        mkIntLitInt
+ -- See Note [Float/Double <-> Integer/Natural conversions] if the two rules
+ -- below change for either @Integer@ or @Natural@change.
+ ,rule_convert            "doubleFromNatural"  doubleFromNaturalName   (\_ -> mkDoubleLitDouble)
+ ,rule_convert            "floatFromNatural"   floatFromNaturalName    (\_ -> mkFloatLitFloat)
 
  ,rule_binop              "andNatural"         andNaturalName          (.&.)
  ,rule_binop              "orNatural"          orNaturalName           (.|.)
