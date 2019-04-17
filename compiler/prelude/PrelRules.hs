@@ -1262,6 +1262,7 @@ builtinIntegerRules =
   rule_shift_op       "shiftLInteger"       shiftLIntegerName       shiftL,
   rule_shift_op       "shiftRInteger"       shiftRIntegerName       shiftR,
   rule_bitInteger     "bitInteger"          bitIntegerName,
+  rule_popCount       "popCountInteger"     popCountIntegerName
   -- See Note [Integer division constant folding] in libraries/base/GHC/Real.hs
   rule_divop_one      "quotInteger"         quotIntegerName         quot,
   rule_divop_one      "remInteger"          remIntegerName          rem,
@@ -1334,6 +1335,9 @@ builtinIntegerRules =
           rule_rationalTo str name mkLit
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_rationalTo mkLit }
+          rule_popCount str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_Integer_popCount }
 
 builtinNaturalRules :: [CoreRule]
 builtinNaturalRules =
@@ -1803,6 +1807,15 @@ match_Natural_bit _ id_unf fn [xl]
          in Just (Lit (LitNumber LitNumNatural y naturalTy))
     _ -> panic "match_Natural_bit: Id has the wrong type"
 match_Natural_bit _ _ _ _ = Nothing
+
+match_Integer_popCount :: RuleFun
+match_Integer_popCount _ id_unf fn [xl]
+  | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
+  = case splitFunTy_maybe (idType fn) of
+    Just (_, intTy)
+      -> Just (Lit (LitNumber LitNumInt (popCount x) intTy))
+    _ -> panic "match_Integer_popCount: Id has the wrong type"
+match_Integer_popCount _ _ _ _ = Nothing
 
 match_Natural_popCount :: RuleFun
 match_Natural_popCount _ id_unf fn [xl]
