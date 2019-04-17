@@ -75,6 +75,9 @@ data SpanInfo = SpanInfo
       -- locality, definition location, etc.
     }
 
+instance Outputable SpanInfo where
+  ppr (SpanInfo s t i) = ppr s <+> ppr t <+> ppr i
+
 -- | Test whether second span is contained in (or equal to) first span.
 -- This is basically 'containsSpan' for 'SpanInfo'
 containsSpanInfo :: SpanInfo -> SpanInfo -> Bool

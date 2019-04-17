@@ -1,0 +1,3 @@
+:set +c
+:l T16569.hs
+::type-at T16569.hs 4 8 4 59
