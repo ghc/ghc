@@ -26,6 +26,8 @@ wordToNatural: 200145
 naturalToWord: 200149
 intToNatural: 200153
 naturalToInt: 200157
+doubleFromNatural: 200189.0
+floatFromNatural: 200193.0
 xorNatural: 239055
 eqNatural: False
 neqNatural: True
