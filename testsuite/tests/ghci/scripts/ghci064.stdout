@@ -18,7 +18,6 @@ instance Show _ => Show [_] -- Defined in ‘GHC.Show’
 instance Read _ => Read [_] -- Defined in ‘GHC.Read’
 instance [safe] MyShow _ => MyShow [_]
   -- Defined at ghci064.hs:7:10
-instance [safe] MyShow [T] -- Defined at ghci064.hs:15:10
 instance Monoid [T] -- Defined in ‘GHC.Base’
 instance Semigroup [T] -- Defined in ‘GHC.Base’
 instance [safe] MyShow [T] -- Defined at ghci064.hs:7:10
@@ -32,3 +31,5 @@ instance Bounded Bool -- Defined in ‘GHC.Enum’
 instance Data.Bits.Bits Bool -- Defined in ‘Data.Bits’
 instance Data.Bits.FiniteBits Bool -- Defined in ‘Data.Bits’
 instance GHC.Arr.Ix Bool -- Defined in ‘GHC.Arr’
+instance Functor ((,) Int) -- Defined in ‘GHC.Base’
+instance Foldable ((,) Int) -- Defined in ‘Data.Foldable’
