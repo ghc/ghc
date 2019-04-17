@@ -2146,7 +2146,9 @@ parseSpanArg s = do
 
     let fs    = mkFastString fp
         span' = mkRealSrcSpan (mkRealSrcLoc fs sl sc)
-                              (mkRealSrcLoc fs el ec)
+                              -- End column of RealSrcSpan is the column
+                              -- after the end of the span.
+                              (mkRealSrcLoc fs el (ec + 1))
 
     return (span',trailer)
   where
@@ -2192,7 +2194,9 @@ showRealSrcSpan spn = concat [ fp, ":(", show sl, ",", show sc
     sl = srcSpanStartLine spn
     sc = srcSpanStartCol  spn
     el = srcSpanEndLine   spn
-    ec = srcSpanEndCol    spn
+    -- The end column is the column after the end of the span see the
+    -- RealSrcSpan module
+    ec = let ec' = srcSpanEndCol    spn in if ec' == 0 then 0 else ec' - 1
 
 -----------------------------------------------------------------------------
 -- | @:kind@ command
