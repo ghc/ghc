@@ -267,7 +267,10 @@ GarbageCollect (uint32_t collect_gen,
   N = collect_gen;
   major_gc = (N == RtsFlags.GcFlags.generations-1);
 
-  if (major_gc) {
+  /* N.B. The nonmoving collector works a bit differently. See
+   * Note [Static objects under the nonmoving collector].
+   */
+  if (major_gc && !RtsFlags.GcFlags.useNonmoving) {
       prev_static_flag = static_flag;
       static_flag =
           static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
@@ -743,6 +746,11 @@ GarbageCollect (uint32_t collect_gen,
       // so we need to mark those too.
       // Note that in sequential case these lists will be appended with more
       // weaks and threads found to be dead in mark.
+#if !defined(THREADED_RTS)
+      // In the non-threaded runtime this is the only time we push to the
+      // upd_rem_set
+      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
+#endif
       nonmovingCollect(&dead_weak_ptr_list, &resurrected_threads);
       ACQUIRE_SM_LOCK;
   }
