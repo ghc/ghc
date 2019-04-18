@@ -68,6 +68,27 @@ Mutex concurrent_coll_finished_lock;
  *    stopAllCapabilitiesWith(SYNC_FLUSH_UPD_REM_SET). Capabilities are held
  *    the final mark has concluded.
  *
+ * Note that possibility of concurrent minor and non-moving collections
+ * requires that we handle static objects a bit specially. See
+ * Note [Static objects under the nonmoving collector] in Storage.c
+ * for details.
+ *
+ *
+ * Note [Aging under the non-moving collector]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * The initial design of the non-moving collector mandated that all live data
+ * be evacuated to the non-moving heap prior to a major collection. This
+ * simplified certain bits of implementation and eased reasoning. However, it
+ * was (unsurprisingly) also found to result in significant amounts of
+ * unnecessary copying.
+ *
+ * Consequently, we now allow aging. We do this by teaching the moving
+ * collector to "evacuate" objects it encounters in the non-moving heap by
+ * adding them to the mark queue. Specifically, since each gc_thread holds a
+ * capability we push to the capability's update remembered set (implemented
+ * by markQueuePushClosureGC)
+ *
  *
  * Note [Live data accounting in nonmoving collector]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -150,6 +171,8 @@ static struct NonmovingSegment *nonmovingPopFreeSegment(void)
  * Request a fresh segment from the free segment list or allocate one of the
  * given node.
  *
+ * Caller must hold SM_MUTEX (although we take the gc_alloc_block_sync spinlock
+ * under the assumption that we are in a GC context).
  */
 static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
 {
@@ -221,7 +244,7 @@ static struct NonmovingSegment *pop_active_segment(struct NonmovingAllocator *al
     }
 }
 
-/* sz is in words */
+/* Allocate a block in the nonmoving heap. Caller must hold SM_MUTEX. sz is in words */
 GNUC_ATTR_HOT
 void *nonmovingAllocate(Capability *cap, StgWord sz)
 {
@@ -238,14 +261,6 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
     ASSERT(current); // current is never NULL
     void *ret = nonmovingSegmentGetBlock(current, current->next_free);
     ASSERT(GET_CLOSURE_TAG(ret) == 0); // check alignment
-
-    // Add segment to the todo list unless it's already there
-    // current->todo_link == NULL means not in todo list
-    if (!current->todo_link) {
-        gen_workspace *ws = &gct->gens[oldest_gen->no];
-        current->todo_link = ws->todo_seg;
-        ws->todo_seg = current;
-    }
 
     // Advance the current segment's next_free or allocate a new segment if full
     bool full = advance_next_free(current);
@@ -382,6 +397,11 @@ static void nonmovingClearAllBitmaps(void)
 /* Prepare the heap bitmaps and snapshot metadata for a mark */
 static void nonmovingPrepareMark(void)
 {
+    // See Note [Static objects under the nonmoving collector].
+    prev_static_flag = static_flag;
+    static_flag =
+        static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
+
     nonmovingClearAllBitmaps();
     nonmovingBumpEpoch();
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
@@ -665,7 +685,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 
 #if defined(DEBUG)
     // Zap CAFs that we will sweep
-    nonmovingGcCafs(mark_queue);
+    nonmovingGcCafs();
 #endif
 
     ASSERT(mark_queue->top->head == 0);

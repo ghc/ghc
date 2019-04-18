@@ -82,10 +82,6 @@ typedef struct MarkQueue_ {
 
     // Is this a mark queue or a capability-local update remembered set?
     bool is_upd_rem_set;
-
-    // Marked objects outside of nonmoving heap, namely large and static
-    // objects.
-    HashTable *marked_objects;
 } MarkQueue;
 
 /* While it shares its representation with MarkQueue, UpdRemSet differs in
@@ -143,8 +139,10 @@ void nonmovingResurrectThreads(struct MarkQueue_ *queue, StgTSO **resurrected_th
 bool nonmovingIsAlive(StgClosure *p);
 void nonmovingMarkDeadWeak(struct MarkQueue_ *queue, StgWeak *w);
 void nonmovingMarkLiveWeak(struct MarkQueue_ *queue, StgWeak *w);
+void nonmovingAddUpdRemSetBlocks(struct MarkQueue_ *rset);
 
 void markQueuePush(MarkQueue *q, const MarkQueueEnt *ent);
+void markQueuePushClosureGC(MarkQueue *q, StgClosure *p);
 void markQueuePushClosure(MarkQueue *q,
                              StgClosure *p,
                              StgClosure **origin);
