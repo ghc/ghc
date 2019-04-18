@@ -50,7 +50,6 @@ module   RdrHsSyn (
 
         -- Bunch of functions in the parser monad for
         -- checking and constructing values
-        checkBlockArguments,
         checkPrecP,           -- Int -> P Int
         checkContext,         -- HsType -> P HsContext
         checkPattern,         -- HsExp -> P HsPat
@@ -61,7 +60,6 @@ module   RdrHsSyn (
         checkMonadComp,       -- P (HsStmtContext RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
-        checkDoAndIfThenElse,
         LRuleTyTmVar, RuleTyTmVar(..),
         mkRuleBndrs, mkRuleTyVarBndrs,
         checkRuleTyVarBndrNames,
@@ -94,14 +92,6 @@ module   RdrHsSyn (
         ExpCmdI(..),
         ecFromExp,
         ecFromCmd,
-        ecHsLam,
-        ecHsLet,
-        ecOpApp,
-        ecHsCase,
-        ecHsApp,
-        ecHsIf,
-        ecHsDo,
-        ecHsPar,
 
     ) where
 
@@ -1004,8 +994,9 @@ checkTyClHdr is_cls ty
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
-checkBlockArguments :: forall b. ExpCmdI b => Located (b GhcPs) -> PV ()
-checkBlockArguments = case expCmdG @b of { ExpG -> checkExpr; CmdG -> checkCmd }
+checkExpBlockArguments :: LHsExpr GhcPs -> P ()
+checkCmdBlockArguments :: LHsCmd GhcPs -> P ()
+(checkExpBlockArguments, checkCmdBlockArguments) = (checkExpr, checkCmd)
   where
     checkExpr :: LHsExpr GhcPs -> P ()
     checkExpr expr = case unLoc expr of
@@ -1314,19 +1305,6 @@ checkValSigLhs lhs@(dL->L l _)
     foreign_RDR = mkUnqual varName (fsLit "foreign")
     default_RDR = mkUnqual varName (fsLit "default")
     pattern_RDR = mkUnqual varName (fsLit "pattern")
-
-checkDoAndIfThenElse
-  :: forall b. ExpCmdI b =>
-     LHsExpr GhcPs
-  -> Bool
-  -> Located (b GhcPs)
-  -> Bool
-  -> Located (b GhcPs)
-  -> P ()
-checkDoAndIfThenElse =
-  case expCmdG @b of
-    ExpG -> checkDoAndIfThenElse'
-    CmdG -> checkDoAndIfThenElse'
 
 checkDoAndIfThenElse'
   :: (HasSrcSpan a, Outputable a, Outputable b, HasSrcSpan c, Outputable c)
@@ -1924,73 +1902,78 @@ checkMonadComp = do
 newtype ExpCmdP =
   ExpCmdP { runExpCmdP :: forall b. ExpCmdI b => PV (Located (b GhcPs)) }
 
--- See Note [Ambiguous syntactic categories]
-data ExpCmdG b where
-  ExpG :: ExpCmdG HsExpr
-  CmdG :: ExpCmdG HsCmd
-
--- See Note [Ambiguous syntactic categories]
-class    ExpCmdI b      where expCmdG :: ExpCmdG b
-instance ExpCmdI HsExpr where expCmdG = ExpG
-instance ExpCmdI HsCmd  where expCmdG = CmdG
+ecFromExp :: LHsExpr GhcPs -> ExpCmdP
+ecFromExp a = ExpCmdP (ecFromExp' a)
 
 ecFromCmd :: LHsCmd GhcPs -> ExpCmdP
-ecFromCmd c@(getLoc -> l) = ExpCmdP onB
-  where
-    onB :: forall b. ExpCmdI b => PV (Located (b GhcPs))
-    onB = case expCmdG @b of { ExpG -> onExp; CmdG -> return c }
-    onExp :: P (LHsExpr GhcPs)
-    onExp = do
-      addError l $ vcat
-        [ text "Arrow command found where an expression was expected:",
-          nest 2 (ppr c) ]
-      return (cL l hsHoleExpr)
+ecFromCmd a = ExpCmdP (ecFromCmd' a)
 
-ecFromExp :: LHsExpr GhcPs -> ExpCmdP
-ecFromExp e@(getLoc -> l) = ExpCmdP onB
-  where
-    onB :: forall b. ExpCmdI b => PV (Located (b GhcPs))
-    onB = case expCmdG @b of { ExpG -> return e; CmdG -> onCmd }
-    onCmd :: P (LHsCmd GhcPs)
-    onCmd =
-      addFatalError l $
-        text "Parse error in command:" <+> ppr e
+-- See Note [Ambiguous syntactic categories]
+class ExpCmdI b where
+  -- | Return a command without ambiguity, or fail in a non-command context.
+  ecFromCmd' :: LHsCmd GhcPs -> PV (Located (b GhcPs))
+  -- | Return an expression without ambiguity, or fail in a non-expression context.
+  ecFromExp' :: LHsExpr GhcPs -> PV (Located (b GhcPs))
+  -- | Disambiguate "\... -> ..." (lambda)
+  ecHsLam :: MatchGroup GhcPs (Located (b GhcPs)) -> b GhcPs
+  -- | Disambiguate "let ... in ..."
+  ecHsLet :: LHsLocalBinds GhcPs -> Located (b GhcPs) -> b GhcPs
+  -- | Disambiguate "f # x" (infix operator)
+  ecOpApp :: Located (b GhcPs) -> LHsExpr GhcPs -> Located (b GhcPs) -> b GhcPs
+  -- | Disambiguate "case ... of ..."
+  ecHsCase :: LHsExpr GhcPs -> MatchGroup GhcPs (Located (b GhcPs)) -> b GhcPs
+  -- | Disambiguate "f x" (function application)
+  ecHsApp :: Located (b GhcPs) -> LHsExpr GhcPs -> b GhcPs
+  -- | Disambiguate "if ... then ... else ..."
+  ecHsIf :: LHsExpr GhcPs -> Located (b GhcPs) -> Located (b GhcPs) -> b GhcPs
+  -- | Disambiguate "do { ... }" (do notation)
+  ecHsDo :: Located [LStmt GhcPs (Located (b GhcPs))] -> b GhcPs
+  -- | Disambiguate "( ... )" (parentheses)
+  ecHsPar :: Located (b GhcPs) -> b GhcPs
+  -- | Check if the argument requires -XBlockArguments.
+  checkBlockArguments :: Located (b GhcPs) -> PV ()
+  -- | Check if -XDoAndIfThenElse is enabled.
+  checkDoAndIfThenElse :: LHsExpr GhcPs -> Bool -> Located (b GhcPs)
+                                        -> Bool -> Located (b GhcPs) -> P ()
+
+instance ExpCmdI HsCmd where
+  ecFromCmd' = return
+  ecFromExp' (dL-> L l e) =
+    addFatalError l $
+      text "Parse error in command:" <+> ppr e
+  ecHsLam = HsCmdLam noExt
+  ecHsLet = HsCmdLet noExt
+  ecOpApp c1 op c2 =
+      let cmdArg c = cL (getLoc c) $ HsCmdTop noExt c in
+      HsCmdArrForm noExt op Infix Nothing [cmdArg c1, cmdArg c2]
+  ecHsCase = HsCmdCase noExt
+  ecHsApp = HsCmdApp noExt
+  ecHsIf = mkHsCmdIf
+  ecHsDo = HsCmdDo noExt
+  ecHsPar = HsCmdPar noExt
+  checkBlockArguments = checkCmdBlockArguments
+  checkDoAndIfThenElse = checkDoAndIfThenElse'
+
+instance ExpCmdI HsExpr where
+  ecFromCmd' (dL -> L l c) = do
+    addError l $ vcat
+      [ text "Arrow command found where an expression was expected:",
+        nest 2 (ppr c) ]
+    return (cL l hsHoleExpr)
+  ecFromExp' = return
+  ecHsLam = HsLam noExt
+  ecHsLet = HsLet noExt
+  ecOpApp = OpApp noExt
+  ecHsCase = HsCase noExt
+  ecHsApp = HsApp noExt
+  ecHsIf = mkHsIf
+  ecHsDo = HsDo noExt DoExpr
+  ecHsPar = HsPar noExt
+  checkBlockArguments = checkExpBlockArguments
+  checkDoAndIfThenElse = checkDoAndIfThenElse'
 
 hsHoleExpr :: HsExpr (GhcPass id)
 hsHoleExpr = HsUnboundVar noExt (TrueExprHole (mkVarOcc "_"))
-
-ecHsLam :: forall b. ExpCmdI b => MatchGroup GhcPs (Located (b GhcPs)) -> b GhcPs
-ecHsLam = case expCmdG @b of { ExpG -> HsLam noExt; CmdG -> HsCmdLam noExt }
-
-ecHsLet :: forall b. ExpCmdI b => LHsLocalBinds GhcPs -> Located (b GhcPs) -> b GhcPs
-ecHsLet = case expCmdG @b of { ExpG -> HsLet noExt; CmdG -> HsCmdLet noExt }
-
-ecOpApp :: forall b. ExpCmdI b => Located (b GhcPs) -> LHsExpr GhcPs
-        -> Located (b GhcPs) -> b GhcPs
-ecOpApp = case expCmdG @b of { ExpG -> OpApp noExt; CmdG -> cmdOpApp }
-  where
-    cmdOpApp c1 op c2 =
-      let cmdArg c = cL (getLoc c) $ HsCmdTop noExt c in
-      HsCmdArrForm noExt op Infix Nothing [cmdArg c1, cmdArg c2]
-
-ecHsCase :: forall b. ExpCmdI b =>
-  LHsExpr GhcPs -> MatchGroup GhcPs (Located (b GhcPs)) -> b GhcPs
-ecHsCase = case expCmdG @b of { ExpG -> HsCase noExt; CmdG -> HsCmdCase noExt }
-
-ecHsApp :: forall b. ExpCmdI b =>
-  Located (b GhcPs) -> LHsExpr GhcPs -> b GhcPs
-ecHsApp = case expCmdG @b of { ExpG -> HsApp noExt; CmdG -> HsCmdApp noExt }
-
-ecHsIf :: forall b. ExpCmdI b =>
-   LHsExpr GhcPs -> Located (b GhcPs) -> Located (b GhcPs) -> b GhcPs
-ecHsIf = case expCmdG @b of { ExpG -> mkHsIf; CmdG -> mkHsCmdIf }
-
-ecHsDo :: forall b. ExpCmdI b =>
-  Located [LStmt GhcPs (Located (b GhcPs))] -> b GhcPs
-ecHsDo = case expCmdG @b of { ExpG -> HsDo noExt DoExpr; CmdG -> HsCmdDo noExt }
-
-ecHsPar :: forall b. ExpCmdI b => Located (b GhcPs) -> b GhcPs
-ecHsPar = case expCmdG @b of { ExpG -> HsPar noExt; CmdG -> HsCmdPar noExt }
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2043,19 +2026,12 @@ we decided against, see Note [Resolving parsing ambiguities: non-taken alternati
 
 The solution that keeps basic definitions (such as HsExpr) clean, keeps the
 concerns local to the parser, and does not require duplication of hsSyn types,
-or an extra pass over the entire AST, is to parse into a function from a GADT
-to a parser-validator:
+or an extra pass over the entire AST, is to parse into an overloaded
+parser-validator (a so-called tagless final encoding):
 
-    data ExpCmdG b where
-      ExpG :: ExpCmdG HsExpr
-      CmdG :: ExpCmdG HsCmd
-
-    type ExpCmd = forall b. ExpCmdG b -> PV (Located (b GhcPs))
-
-    checkExp :: ExpCmd -> PV (LHsExpr GhcPs)
-    checkCmd :: ExpCmd -> PV (LHsCmd GhcPs)
-    checkExp f = f ExpG  -- interpret as an expression
-    checkCmd f = f CmdG  -- interpret as a command
+    class ExpCmdI b where ...
+    instance ExpCmdI HsCmd where ...
+    instance ExpCmdI HsExp where ...
 
 Consider the 'alts' production used to parse case-of alternatives:
 
@@ -2064,30 +2040,6 @@ Consider the 'alts' production used to parse case-of alternatives:
     | ';' alts  { sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2)),snd $ unLoc $2) }
 
 We abstract over LHsExpr, and it becomes:
-
-  alts :: { forall b. ExpCmdG b -> PV (Located ([AddAnn],[LMatch GhcPs (Located (b GhcPs))])) }
-    : alts1
-        { \tag -> $1 tag >>= \ $1 ->
-                  return $ sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
-    | ';' alts
-        { \tag -> $2 tag >>= \ $2 ->
-                  return $ sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2)),snd $ unLoc $2) }
-
-Note that 'ExpCmdG' is a singleton type, the value is completely
-determined by the type:
-
-  when (b~HsExpr),  tag = ExpG
-  when (b~HsCmd),   tag = CmdG
-
-This is a clear indication that we can use a class to pass this value behind
-the scenes:
-
-  class    ExpCmdI b      where expCmdG :: ExpCmdG b
-  instance ExpCmdI HsExpr where expCmdG = ExpG
-  instance ExpCmdI HsCmd  where expCmdG = CmdG
-
-And now the 'alts' production is simplified, as we no longer need to
-thread 'tag' explicitly:
 
   alts :: { forall b. ExpCmdI b => PV (Located ([AddAnn],[LMatch GhcPs (Located (b GhcPs))])) }
     : alts1     { $1 >>= \ $1 ->
@@ -2330,6 +2282,63 @@ each reduction rule:
 
 And the same goes for other productions: 'altslist', 'alts1', 'alt', 'alt_rhs',
 'ralt', 'gdpats', 'gdpat', 'exp', ... and so on. That is a lot of code!
+
+Alternative VIII, a function from a GADT
+----------------------------------------
+We could avoid code duplication of the Alternative VII by representing the product
+as a function from a GADT:
+
+    data ExpCmdG b where
+      ExpG :: ExpCmdG HsExpr
+      CmdG :: ExpCmdG HsCmd
+
+    type ExpCmd = forall b. ExpCmdG b -> PV (Located (b GhcPs))
+
+    checkExp :: ExpCmd -> PV (LHsExpr GhcPs)
+    checkCmd :: ExpCmd -> PV (LHsCmd GhcPs)
+    checkExp f = f ExpG  -- interpret as an expression
+    checkCmd f = f CmdG  -- interpret as a command
+
+Consider the 'alts' production used to parse case-of alternatives:
+
+  alts :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
+    : alts1     { sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
+    | ';' alts  { sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2)),snd $ unLoc $2) }
+
+We abstract over LHsExpr, and it becomes:
+
+  alts :: { forall b. ExpCmdG b -> PV (Located ([AddAnn],[LMatch GhcPs (Located (b GhcPs))])) }
+    : alts1
+        { \tag -> $1 tag >>= \ $1 ->
+                  return $ sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
+    | ';' alts
+        { \tag -> $2 tag >>= \ $2 ->
+                  return $ sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2)),snd $ unLoc $2) }
+
+Note that 'ExpCmdG' is a singleton type, the value is completely
+determined by the type:
+
+  when (b~HsExpr),  tag = ExpG
+  when (b~HsCmd),   tag = CmdG
+
+This is a clear indication that we can use a class to pass this value behind
+the scenes:
+
+  class    ExpCmdI b      where expCmdG :: ExpCmdG b
+  instance ExpCmdI HsExpr where expCmdG = ExpG
+  instance ExpCmdI HsCmd  where expCmdG = CmdG
+
+And now the 'alts' production is simplified, as we no longer need to
+thread 'tag' explicitly:
+
+  alts :: { forall b. ExpCmdI b => PV (Located ([AddAnn],[LMatch GhcPs (Located (b GhcPs))])) }
+    : alts1     { $1 >>= \ $1 ->
+                  return $ sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
+    | ';' alts  { $2 >>= \ $2 ->
+                  return $ sLL $1 $> ((mj AnnSemi $1:(fst $ unLoc $2)),snd $ unLoc $2) }
+
+This encoding works well enough for two cases (Exp vs Cmd), but it does not scale well to
+more cases (Exp vs Cmd vs Pat), as we would need multiple GADTs for all possible ambiguities.
 
 -}
 
