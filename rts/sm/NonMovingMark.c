@@ -205,7 +205,7 @@ static void init_mark_queue_(MarkQueue *queue);
  * Really the argument type should be UpdRemSet* but this would be rather
  * inconvenient without polymorphism.
  */
-static void nonmovingAddUpdRemSetBlocks(MarkQueue *rset)
+void nonmovingAddUpdRemSetBlocks(MarkQueue *rset)
 {
     if (markQueueIsEmpty(rset)) return;
 
@@ -371,6 +371,38 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
     }
 
     q->top->entries[q->top->head] = *ent;
+    q->top->head++;
+}
+
+/* A variant of push to be used by the minor GC when it encounters a reference
+ * to an object in the non-moving heap. In contrast to the other push
+ * operations this uses the gc_alloc_block_sync spinlock instead of the
+ * SM_LOCK to allocate new blocks in the event that the mark queue is full.
+ */
+void
+markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
+{
+    // Are we at the end of the block?
+    if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {
+        // Yes, this block is full.
+        // allocate a fresh block.
+        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+        bdescr *bd = allocGroup(1);
+        bd->link = q->blocks;
+        q->blocks = bd;
+        q->top = (MarkQueueBlock *) bd->start;
+        q->top->head = 0;
+        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    }
+
+    MarkQueueEnt ent = {
+        .type = MARK_CLOSURE,
+        .mark_closure = {
+            .p = UNTAG_CLOSURE(p),
+            .origin = NULL,
+        }
+    };
+    q->top->entries[q->top->head] = ent;
     q->top->head++;
 }
 
@@ -715,7 +747,6 @@ static void init_mark_queue_ (MarkQueue *queue)
 void initMarkQueue (MarkQueue *queue)
 {
     init_mark_queue_(queue);
-    queue->marked_objects = allocHashTable();
     queue->is_upd_rem_set = false;
 }
 
@@ -723,8 +754,6 @@ void initMarkQueue (MarkQueue *queue)
 void init_upd_rem_set (UpdRemSet *rset)
 {
     init_mark_queue_(&rset->queue);
-    // Update remembered sets don't have to worry about static objects
-    rset->queue.marked_objects = NULL;
     rset->queue.is_upd_rem_set = true;
 }
 
@@ -739,7 +768,6 @@ void reset_upd_rem_set (UpdRemSet *rset)
 void freeMarkQueue (MarkQueue *queue)
 {
     freeChain_lock(queue->blocks);
-    freeHashTable(queue->marked_objects, NULL);
 }
 
 #if defined(THREADED_RTS) && defined(DEBUG)
@@ -986,12 +1014,32 @@ mark_stack (MarkQueue *queue, StgStack *stack)
     mark_stack_(queue, stack->sp, stack->stack + stack->stack_size);
 }
 
+/* See Note [Static objects under the nonmoving collector].
+ *
+ * Returns true if the object needs to be marked.
+ */
+static bool
+bump_static_flag(StgClosure **link_field, StgClosure *q STG_UNUSED)
+{
+    while (1) {
+        StgWord link = (StgWord) *link_field;
+        StgWord new = (link & ~STATIC_BITS) | static_flag;
+        if ((link & STATIC_BITS) == static_flag)
+            return false;
+        else if (cas((StgVolatilePtr) link_field, link, new) == link) {
+            return true;
+        }
+    }
+}
+
 static GNUC_ATTR_HOT void
 mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
 {
     (void)origin; // TODO: should be used for selector/thunk optimisations
 
  try_again:
+    ;
+    bdescr *bd = NULL;
     p = UNTAG_CLOSURE(p);
 
 #   define PUSH_FIELD(obj, field)                                \
@@ -1009,45 +1057,46 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
             return;
         }
 
-        if (lookupHashTable(queue->marked_objects, (W_)p)) {
-            // already marked
-            return;
-        }
-
-        insertHashTable(queue->marked_objects, (W_)p, (P_)1);
-
         switch (type) {
 
         case THUNK_STATIC:
             if (info->srt != 0) {
-                markQueuePushThunkSrt(queue, info); // TODO this function repeats the check above
+                if (bump_static_flag(THUNK_STATIC_LINK((StgClosure *)p), p)) {
+                    markQueuePushThunkSrt(queue, info); // TODO this function repeats the check above
+                }
             }
             return;
 
         case FUN_STATIC:
             if (info->srt != 0 || info->layout.payload.ptrs != 0) {
-                markQueuePushFunSrt(queue, info); // TODO this function repeats the check above
+                if (bump_static_flag(STATIC_LINK(info, (StgClosure *)p), p)) {
+                    markQueuePushFunSrt(queue, info); // TODO this function repeats the check above
 
-                // a FUN_STATIC can also be an SRT, so it may have pointer
-                // fields.  See Note [SRTs] in CmmBuildInfoTables, specifically
-                // the [FUN] optimisation.
-                // TODO (osa) I don't understand this comment
-                for (StgHalfWord i = 0; i < info->layout.payload.ptrs; ++i) {
-                    PUSH_FIELD(p, payload[i]);
+                    // a FUN_STATIC can also be an SRT, so it may have pointer
+                    // fields.  See Note [SRTs] in CmmBuildInfoTables, specifically
+                    // the [FUN] optimisation.
+                    // TODO (osa) I don't understand this comment
+                    for (StgHalfWord i = 0; i < info->layout.payload.ptrs; ++i) {
+                        PUSH_FIELD(p, payload[i]);
+                    }
                 }
             }
             return;
 
         case IND_STATIC:
-            PUSH_FIELD((StgInd *) p, indirectee);
+            if (bump_static_flag(IND_STATIC_LINK((StgClosure *)p), p)) {
+                PUSH_FIELD((StgInd *) p, indirectee);
+            }
             return;
 
         case CONSTR:
         case CONSTR_1_0:
         case CONSTR_2_0:
         case CONSTR_1_1:
-            for (StgHalfWord i = 0; i < info->layout.payload.ptrs; ++i) {
-                PUSH_FIELD(p, payload[i]);
+            if (bump_static_flag(STATIC_LINK(info, (StgClosure *)p), p)) {
+                for (StgHalfWord i = 0; i < info->layout.payload.ptrs; ++i) {
+                    PUSH_FIELD(p, payload[i]);
+                }
             }
             return;
 
@@ -1061,19 +1110,17 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
         }
     }
 
-    bdescr *bd = Bdescr((StgPtr) p);
+    bd = Bdescr((StgPtr) p);
 
     if (bd->gen != oldest_gen) {
-        // Here we have an object living outside of the non-moving heap. Since
-        // we moved everything to the non-moving heap before starting the major
-        // collection, we know that we don't need to trace it: it was allocated
-        // after we took our snapshot.
-#if !defined(THREADED_RTS)
-        // This should never happen in the non-concurrent case
-        barf("Closure outside of non-moving heap: %p", p);
-#else
+        // Here we have an object living outside of the non-moving heap. While
+        // we likely evacuated nearly everything to the nonmoving heap during
+        // preparation there are nevertheless a few ways in which we might trace
+        // a reference into younger generations:
+        //
+        //  * a mutable object might have been updated
+        //  * we might have aged an object
         return;
-#endif
     }
 
     ASSERTM(LOOKS_LIKE_CLOSURE_PTR(p), "invalid closure, info=%p", p->header.info);
