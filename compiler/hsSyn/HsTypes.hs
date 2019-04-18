@@ -105,14 +105,22 @@ import Data.Data hiding ( Fixity, Prefix, Infix )
 type LBangType pass = Located (BangType pass)
 
 -- | Bang Type
+--
+-- In the parser, strictness and packedness annotations bind more tightly
+-- than docstrings. This means that when consuming a 'BangType' (and looking
+-- for 'HsBangTy') we must be ready to peer behind a potential layer of
+-- 'HsDocTy'. See #15206 for motivation and 'getBangType' for an example.
 type BangType pass  = HsType pass       -- Bangs are in the HsType data type
 
 getBangType :: LHsType a -> LHsType a
-getBangType (L _ (HsBangTy _ _ ty)) = ty
-getBangType ty                      = ty
+getBangType                 (L _ (HsBangTy _ _ lty))       = lty
+getBangType (L _ (HsDocTy x (L _ (HsBangTy _ _ lty)) lds)) =
+  addCLoc lty lds (HsDocTy x lty lds)
+getBangType lty                                            = lty
 
 getBangStrictness :: LHsType a -> HsSrcBang
-getBangStrictness (L _ (HsBangTy _ s _)) = s
+getBangStrictness                 (L _ (HsBangTy _ s _))     = s
+getBangStrictness (L _ (HsDocTy _ (L _ (HsBangTy _ s _)) _)) = s
 getBangStrictness _ = (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 
 {-
