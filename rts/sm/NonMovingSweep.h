@@ -28,5 +28,5 @@ void nonmovingPrepareSweep(void);
 
 #if defined(DEBUG)
 // The non-moving equivalent of the moving collector's gcCAFs.
-void nonmovingGcCafs(struct MarkQueue_ *queue);
+void nonmovingGcCafs(void);
 #endif
