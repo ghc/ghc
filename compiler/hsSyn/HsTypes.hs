@@ -108,11 +108,13 @@ type LBangType pass = Located (BangType pass)
 type BangType pass  = HsType pass       -- Bangs are in the HsType data type
 
 getBangType :: LHsType a -> LHsType a
-getBangType (L _ (HsBangTy _ _ ty)) = ty
-getBangType ty                      = ty
+getBangType (L _ (HsDocTy _ (L _ (HsBangTy _ _ ty)) _)) = ty
+getBangType                 (L _ (HsBangTy _ _ ty))     = ty
+getBangType ty                                          = ty
 
 getBangStrictness :: LHsType a -> HsSrcBang
-getBangStrictness (L _ (HsBangTy _ s _)) = s
+getBangStrictness (L _ (HsDocTy _ (L _ (HsBangTy _ s _)) _)) = s
+getBangStrictness                 (L _ (HsBangTy _ s _))     = s
 getBangStrictness _ = (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 
 {-
