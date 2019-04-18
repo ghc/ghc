@@ -102,7 +102,7 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
 
 #if defined(DEBUG)
 
-void nonmovingGcCafs(struct MarkQueue_ *queue)
+void nonmovingGcCafs()
 {
     uint32_t i = 0;
     StgIndStatic *next;
@@ -116,7 +116,8 @@ void nonmovingGcCafs(struct MarkQueue_ *queue)
         const StgInfoTable *info = get_itbl((StgClosure*)caf);
         ASSERT(info->type == IND_STATIC);
 
-        if (lookupHashTable(queue->marked_objects, (StgWord) caf) == NULL) {
+        StgWord flag = ((StgWord) caf->static_link) & STATIC_BITS;
+        if (flag != 0 && flag != static_flag) {
             debugTrace(DEBUG_gccafs, "CAF gc'd at 0x%p", caf);
             SET_INFO((StgClosure*)caf, &stg_GCD_CAF_info); // stub it
         } else {
