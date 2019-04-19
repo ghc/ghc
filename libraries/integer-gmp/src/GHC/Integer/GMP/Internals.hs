@@ -77,6 +77,11 @@ module GHC.Integer.GMP.Internals
     , bigNatToWord
     , indexBigNat#
 
+#if (WORD_SIZE_IN_BITS == 32) && (GMP_LIMB_BITS == 32)
+    , word64ToBigNat
+    , bigNatToWord64
+#endif
+
       -- ** 'BigNat' arithmetic operations
     , plusBigNat
     , plusBigNatWord
