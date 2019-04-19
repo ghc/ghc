@@ -414,6 +414,8 @@ validate-i386-windows:
     GHC_VERSION: "8.6.2"
     LANG: "en_US.UTF-8"
     MSYSTEM: MINGW32
+    # Due to #15934
+    BUILD_PROF_LIBS: "NO"
   script:
     - |
       python boot
