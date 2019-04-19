@@ -249,6 +249,7 @@ integerToWord64 (Jn# bn)
     = int64ToWord64# (negateInt64# (word64ToInt64# (bigNatToWord64 bn)))
 {-# CONSTANT_FOLDED integerToWord64 #-}
 
+-- This module will fail to compile if `GMP_LIMB_BITS != 32`.
 #if GMP_LIMB_BITS == 32
 word64ToBigNat :: Word64# -> BigNat
 word64ToBigNat w64 = wordToBigNat2 wh# wl#
