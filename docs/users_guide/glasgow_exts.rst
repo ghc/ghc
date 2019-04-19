@@ -9624,7 +9624,17 @@ when printing, and printing ``TYPE 'LiftedRep`` as ``Type`` (or ``*`` when
 :extension:`StarIsType` is on).
 
 Should you wish to see levity polymorphism in your types, enable
-the flag :ghc-flag:`-fprint-explicit-runtime-reps`.
+the flag :ghc-flag:`-fprint-explicit-runtime-reps`. For example,
+
+    .. code-block:: none
+
+        ghci> :t ($)
+        ($) :: (a -> b) -> a -> b
+        ghci> :set -fprint-explicit-runtime-reps
+        ghci> :t ($)
+        ($)
+          :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPE r).
+             (a -> b) -> a -> b
 
 .. _type-level-literals:
 
@@ -10351,13 +10361,13 @@ function that can *never* be called, such as this one: ::
       f :: (Int ~ Bool) => a -> a
 
 Sometimes :extension:`AllowAmbiguousTypes` does not mix well with :extension:`RankNTypes`.
-For example: :: 
+For example: ::
       foo :: forall r. (forall i. (KnownNat i) => r) -> r
       foo f = f @1
 
       boo :: forall j. (KnownNat j) => Int
       boo = ....
-          
+
       h :: Int
       h = foo boo
 
@@ -10367,7 +10377,7 @@ the type variables `j` and `i`.
 Unlike the previous examples, it is not currently possible
 to resolve the ambiguity manually by using :extension:`TypeApplications`.
 
-       
+
 .. note::
     *A historical note.* GHC used to impose some more restrictive and less
     principled conditions on type signatures. For type
