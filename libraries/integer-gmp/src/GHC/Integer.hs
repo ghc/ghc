@@ -25,12 +25,12 @@ module GHC.Integer (
 
     -- * Construct 'Integer's
     mkInteger, smallInteger, wordToInteger,
-#if WORD_SIZE_IN_BITS < 64
+#if WORD_SIZE_IN_BITS == 32
     word64ToInteger, int64ToInteger,
 #endif
     -- * Conversion to other integral types
     integerToWord, integerToInt,
-#if WORD_SIZE_IN_BITS < 64
+#if WORD_SIZE_IN_BITS == 32
     integerToWord64, integerToInt64,
 #endif
 

@@ -212,6 +212,8 @@ wordToInteger = toInteger (100075 :: Word) + 100076
 intToInteger :: Integer
 intToInteger = toInteger (100077 :: Int) + 100078
 
+-- See Note [Constant folding of @Natural@/@Integer@->@Int64@/@Word64@ conversions on 32-bit architectures]
+-- for the reason why there are no @integerToInt64@/@integerToWord64@ tests here.
 word64ToInteger :: Integer
 word64ToInteger = toInteger (100079 :: Word64) + 100080
 
