@@ -1105,7 +1105,7 @@ patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
 patGroup _ (NPat _ (dL->L _ (OverLit {ol_val=oval})) mb_neg _) =
   case (oval, isJust mb_neg) of
-   (HsIntegral   i, b) -> PgN (integralFractionalLit b (fromInteger (il_value i)))
+   (HsIntegral   i, b) -> PgN (integralFractionalLit b (il_value i))
    (HsFractional f, _) -> PgN f
    (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
                           PgOverS s

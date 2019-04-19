@@ -1429,7 +1429,7 @@ tok_frac :: Int -> (String -> Token) -> Action
 tok_frac drop f span buf len = do
   numericUnderscores <- getBit NumericUnderscoresBit  -- #14473
   let src = lexemeToString buf (len-drop)
-  when ((not numericUnderscores) && ('_' `elem` src)) $ do
+  when (not numericUnderscores && ('_' `elem` src)) $ do
     pState <- getPState
     addError (RealSrcSpan (last_loc pState)) $ text
              "Use NumericUnderscores to allow underscores in floating literals"

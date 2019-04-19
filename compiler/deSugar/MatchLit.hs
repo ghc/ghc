@@ -100,15 +100,13 @@ dsLit l = do
     XLit nec         -> noExtCon nec
 
 dsFractionalLitToRational :: FractionalLit -> DsM CoreExpr
-dsFractionalLitToRational fl =
-  case fl of
-    FL { fl_signi = fl_signi, fl_exp = fl_exp, fl_exp_base = feb } -> do
-      let mkRationalName = case feb of
+dsFractionalLitToRational FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = base } = do
+      let mkRationalName = case base of
                              Base2 -> mkRationalBase2Name
                              Base10 -> mkRationalBase10Name
       mkRational <- dsLookupGlobalId mkRationalName
-      litR <- dsRational fl_signi
-      litE <- mkIntegerExpr fl_exp
+      litR <- dsRational signi
+      litE <- mkIntegerExpr exp
       return (mkCoreApps (Var mkRational) [litR, litE])
 
 dsRational :: Rational -> DsM CoreExpr

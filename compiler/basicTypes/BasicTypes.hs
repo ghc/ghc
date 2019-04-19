@@ -99,7 +99,7 @@ module BasicTypes(
         SuccessFlag(..), succeeded, failed, successIf,
 
         IntegralLit(..), FractionalLit(..), FractionalExponentBase(..),
-        negateIntegralLit, negateFractionalLit, fractionalLitNeg,
+        negateIntegralLit, negateFractionalLit,
         mkIntegralLit, mkTHFractionalLit, rationalFromFractionalLit,
         integralFractionalLit, mkSourceFractionalLit,
 
@@ -1529,11 +1529,8 @@ data FractionalLit
   deriving (Data, Show)
   -- The Show instance is required for the derived Lexer.x:Token instance when DEBUG is on
 
-fractionalLitNeg :: FractionalLit -> Bool
-fractionalLitNeg fl = fl_neg fl
-
 data FractionalExponentBase
-  = Base2
+  = Base2 -- Used in hex fractional literals
   | Base10
   deriving (Eq, Ord, Data, Show)
 
@@ -1612,7 +1609,9 @@ instance Ord FractionalLit where
   compare = compareFractionalLit
 
 instance Outputable FractionalLit where
-  ppr (fl@(FL {})) = pprWithSourceText (fl_text fl) (rational $ mkRationalWithExponentBase (fl_signi fl) (fl_exp fl) (fl_exp_base fl))
+  ppr (fl@(FL {})) =
+    pprWithSourceText (fl_text fl) $
+      rational $ mkRationalWithExponentBase (fl_signi fl) (fl_exp fl) (fl_exp_base fl)
 
 {-
 ************************************************************************
