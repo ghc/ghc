@@ -1136,13 +1136,26 @@ instance Ix Int64 where
   #-}
 
 #if WORD_SIZE_IN_BITS == 64
--- these RULES are valid for Word==Word64 & Int==Int64
+
+-- These RULES are valid for Int==Int64
 {-# RULES
 "fromIntegral/Natural->Int64"
     fromIntegral = (fromIntegral :: Int -> Int64) . (\n -> I# (naturalToInt n))
 "fromIntegral/Int64->Natural"
     fromIntegral = (\(I# i#) -> intToNatural i#) . (fromIntegral :: Int64 -> Int)
   #-}
+
+#elif WORD_SIZE_IN_BITS == 32
+
+{-# RULES
+"fromIntegral/Natural->Int64"
+    fromIntegral = \n -> I64# (naturalToInt64 n)
+"fromIntegral/Int64->Natural"
+    fromIntegral = \(I64# i#) -> int64ToNatural i#
+  #-}
+
+#else
+#error Unhandled value for WORD_SIZE_IN_BITS
 #endif
 
 

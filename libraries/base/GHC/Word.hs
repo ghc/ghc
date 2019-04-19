@@ -1062,11 +1062,24 @@ bitReverse64 (W64# w#) = W64# (bitReverse# w#)
   #-}
 
 #if WORD_SIZE_IN_BITS == 64
--- these RULES are valid for Word==Word64
+
+-- These RULES are valid for Word==Word64
 {-# RULES
 "fromIntegral/Natural->Word64"
-    fromIntegral = \n -> (fromIntegral :: Word -> Word64) (W# (naturalToWord n))
+    fromIntegral = fromIntegral :: Word -> Word64) . (\n -> W# (naturalToWord n)
 "fromIntegral/Word64->Natural"
     fromIntegral = (\(W# w#) -> wordToNatural w#) . (fromIntegral :: Word64 -> Word)
   #-}
+
+#elif WORD_SIZE_IN_BITS == 32
+
+{-# RULES
+"fromIntegral/Natural->Word64"
+    fromIntegral = \n -> W64# (naturalToWord64 n)
+"fromIntegral/Word64->Natural"
+    fromIntegral = \(W64# w#) -> word64ToNatural w#
+  #-}
+
+#else
+#error Unhandled value for WORD_SIZE_IN_BITS
 #endif
