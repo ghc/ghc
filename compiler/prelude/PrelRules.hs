@@ -1249,8 +1249,11 @@ builtinIntegerRules =
   rule_Word64ToInteger "word64ToInteger"    word64ToIntegerName,
   rule_convert        "integerToWord"       integerToWordName       mkWordLitWord,
   rule_convert        "integerToInt"        integerToIntName        mkIntLitInt,
+  -- See Note [Constant folding of @Natural@/@Integer@->@Int64@/@Word64@ conversions on 32-bit architectures]
+  -- for some information on the firing of the two rules below in 32-bit architectures.
   rule_convert        "integerToWord64"     integerToWord64Name     (\_ -> mkWord64LitWord64),
   rule_convert        "integerToInt64"      integerToInt64Name      (\_ -> mkInt64LitInt64),
+
   rule_binop          "plusInteger"         plusIntegerName         (+),
   rule_binop          "minusInteger"        minusIntegerName        (-),
   rule_binop          "timesInteger"        timesIntegerName        (*),
@@ -1382,6 +1385,13 @@ builtinNaturalRules =
  ,rule_convert            "naturalToWord"      naturalToWordName       mkWordLitWord
  ,rule_IntToNatural       "intToNatural"       intToNaturalName
  ,rule_convert            "naturalToInt"       naturalToIntName        mkIntLitInt
+ ,rule_Int64ToNatural     "int64ToNatural"     int64ToNaturalName
+ ,rule_Word64ToNatural    "word64ToNatural"    word64ToNaturalName
+ -- See Note [Constant folding of @Natural@/@Integer@->@Int64@/@Word64@ conversions on 32-bit architectures]
+ -- for some information on the firing of the two rules below in 32-bit architectures.
+ ,rule_convert            "naturalToWord64"    naturalToWord64Name     (\_ -> mkWord64LitWord64)
+ ,rule_convert            "naturalToInt64"     naturalToInt64Name      (\_ -> mkInt64LitInt64)
+
  -- See Note [Float/Double <-> Integer/Natural conversions] if the two rules
  -- below change for either @Integer@ or @Natural@change.
  ,rule_convert            "doubleFromNatural"  doubleFromNaturalName   (\_ -> mkDoubleLitDouble)
@@ -1458,6 +1468,12 @@ builtinNaturalRules =
           rule_WordToNatural str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_WordToNatural }
+          rule_Int64ToNatural str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_Int64ToNatural }
+          rule_Word64ToNatural str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_Word64ToNatural }
 
 ---------------------------------------------------
 -- The rule is this:
@@ -1571,6 +1587,16 @@ match_Int64ToInteger _ id_unf id [xl]
         panic "match_Int64ToInteger: Id has the wrong type"
 match_Int64ToInteger _ _ _ _ = Nothing
 
+match_Int64ToNatural :: RuleFun
+match_Int64ToNatural _ id_unf id [xl]
+  | Just (LitNumber LitNumInt64 x _) <- exprIsLiteral_maybe id_unf xl
+  = case splitFunTy_maybe (idType id) of
+    Just (_, naturalTy) ->
+        Just (Lit (mkLitNatural x naturalTy))
+    _ ->
+        panic "match_Int64ToNatural: Id has the wrong type"
+match_Int64ToNatural _ _ _ _ = Nothing
+
 match_Word64ToInteger :: RuleFun
 match_Word64ToInteger _ id_unf id [xl]
   | Just (LitNumber LitNumWord64 x _) <- exprIsLiteral_maybe id_unf xl
@@ -1580,6 +1606,16 @@ match_Word64ToInteger _ id_unf id [xl]
     _ ->
         panic "match_Word64ToInteger: Id has the wrong type"
 match_Word64ToInteger _ _ _ _ = Nothing
+
+match_Word64ToNatural :: RuleFun
+match_Word64ToNatural _ id_unf id [xl]
+  | Just (LitNumber LitNumWord64 x _) <- exprIsLiteral_maybe id_unf xl
+  = case splitFunTy_maybe (idType id) of
+    Just (_, naturalTy) ->
+        Just (Lit (mkLitNatural x naturalTy))
+    _ ->
+        panic "match_Word64ToNatural: Id has the wrong type"
+match_Word64ToNatural _ _ _ _ = Nothing
 
 match_NaturalToInteger :: RuleFun
 match_NaturalToInteger _ id_unf id [xl]
