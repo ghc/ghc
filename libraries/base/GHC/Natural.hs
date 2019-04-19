@@ -74,6 +74,12 @@ module GHC.Natural
     , wordToNaturalBase
     , doubleFromNatural
     , floatFromNatural
+#if WORD_SIZE_IN_BITS < 64
+    , int64ToNatural
+    , word64ToNatural
+    , naturalToInt64
+    , naturalToWord64
+#endif
       -- * Modular arithmetic
     , powModNatural
     ) where
@@ -89,6 +95,9 @@ import {-# SOURCE #-} GHC.Exception.Type (underflowException, divZeroException)
 import GHC.Integer.GMP.Internals
 #else
 import GHC.Integer
+#endif
+#if WORD_SIZE_IN_BITS < 64
+import GHC.IntWord64
 #endif
 
 default ()
@@ -790,3 +799,56 @@ doubleFromNatural (Natural i) = doubleFromInteger i
 floatFromNatural :: Natural -> Float#
 floatFromNatural n = double2Float# (doubleFromNatural n)
 {-# CONSTANT_FOLDED floatFromNatural #-}
+
+----------------------------------------------------------------------------
+-- Int64/Word64 specific primitives
+
+#if WORD_SIZE_IN_BITS < 64
+int64ToNatural :: Int64# -> Natural
+word64ToNatural :: Word64# -> Natural
+naturalToInt64 :: Natural -> Int64#
+naturalToWord64 :: Natural -> Word64#
+
+#if defined(MIN_VERSION_integer_gmp)
+int64ToNatural i
+  | isTrue# ((int64ToWord64# i) `leWord64#` wordToWord64# 0xFFFFFFFF##)
+  , isTrue# (i `geInt64#` intToInt64# 0#)
+    = NatS# (int2Word# (int64ToInt# i))
+  | isTrue# ((int64ToWord64# i) `gtWord64#` wordToWord64# 0xFFFFFFFF##)
+    = NatJ# (word64ToBigNat (int64ToWord64# i))
+  | True
+    = underflowError
+{-# CONSTANT_FOLDED int64ToNatural #-}
+
+word64ToNatural w
+  | isTrue# (w `leWord64#` wordToWord64# 0xFFFFFFFF##)
+    = NatS# (word64ToWord# w)
+  | True
+    = NatJ# (word64ToBigNat w)
+{-# CONSTANT_FOLDED word64ToNatural #-}
+
+-- This call to `word64ToInt64` won't overflow if @w#@ has 32 bits or less.
+naturalToInt64 (NatS# w#)  = word64ToInt64# (wordToWord64# w#)
+naturalToInt64 (NatJ# bn) = word64ToInt64# (bigNatToWord64 bn)
+{-# CONSTANT_FOLDED naturalToInt64 #-}
+
+naturalToWord64 (NatS# w#)  = wordToWord64# w#
+naturalToWord64 (NatJ# bn) = bigNatToWord64 bn
+{-# CONSTANT_FOLDED naturalToWord64 #-}
+#endif
+
+int64ToNatural i = Natural (int64ToInteger i)
+{-# CONSTANT_FOLDED int64ToNatural #-}
+
+word64ToNatural w = Natural (word64ToNatural w)
+{-# CONSTANT_FOLDED word64ToNatural #-}
+
+naturalToInt64 (Natural i) = integerToInt64 i
+{-# CONSTANT_FOLDED naturalToInt64 #-}
+
+naturalToWord64 (Natural i) = integerToWord64 i
+{-# CONSTANT_FOLDED naturalToWord64 #-}
+#endif
+
+-- End of Int64/Word64 specific primitives
+----------------------------------------------------------------------------
