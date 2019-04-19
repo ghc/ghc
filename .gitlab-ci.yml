@@ -626,6 +626,8 @@ release-i386-windows:
     MSYSTEM: MINGW32
     BUILD_FLAVOUR: "perf"
     CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
+    # Due to #15934
+    BUILD_PROF_LIBS: "NO"
   cache:
     key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
@@ -637,6 +639,8 @@ nightly-i386-windows:
   variables:
     MSYSTEM: MINGW32
     CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
+    # Due to #15934
+    BUILD_PROF_LIBS: "NO"
   cache:
     key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
