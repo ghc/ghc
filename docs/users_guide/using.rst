@@ -810,27 +810,6 @@ messages and in GHCi:
     exposed to the programmer, but it is nevertheless displayed when
     :ghc-flag:`-fprint-explicit-kinds` is enabled.
 
-.. ghc-flag:: -fprint-explicit-runtime-reps
-    :shortdesc: Print ``RuntimeRep`` variables in types which are
-        runtime-representation polymorphic.
-    :type: dynamic
-    :reverse: -fno-print-explicit-runtime-reps
-    :category: verbosity
-
-    When :ghc-flag:`-fprint-explicit-runtime-reps` is enabled, GHC prints
-    ``RuntimeRep`` type variables for levity-polymorphic types.
-    Otherwise GHC will default these to ``LiftedRep``. For example,
-
-    .. code-block:: none
-
-        ghci> :t ($)
-        ($) :: (a -> b) -> a -> b
-        ghci> :set -fprint-explicit-runtime-reps
-        ghci> :t ($)
-        ($)
-          :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPE r).
-             (a -> b) -> a -> b
-
 .. ghc-flag:: -fprint-explicit-coercions
     :shortdesc: Print coercions in types
     :type: dynamic
@@ -1131,4 +1110,3 @@ Some flags only make sense for a particular use case.
     included. This option can be used to specify the path to the
     ``ghcversions.h`` file to be included. This is primarily intended to be
     used by GHC's build system.
-
