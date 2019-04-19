@@ -36,3 +36,7 @@ ltNatural: True
 geNatural: False
 gtNatural: False
 compareNatural: LT
+naturalToInt64: 200003
+int64ToNatural: 200007
+naturalToWord64: 200011
+word64ToNatural: 200015

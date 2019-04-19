@@ -403,8 +403,10 @@ basicKnownKeyNames
         naturalToWordName, wordToNaturalName, intToNaturalName, naturalToIntName,
 
         eqNaturalPrimName, neqNaturalPrimName, geNaturalPrimName, gtNaturalPrimName,
-        leNaturalPrimName, ltNaturalPrimName, compareNaturalName, doubleFromNaturalName,
-        floatFromNaturalName,
+        leNaturalPrimName, ltNaturalPrimName, compareNaturalName,
+        
+        doubleFromNaturalName, floatFromNaturalName, naturalToInt64Name,
+        int64ToNaturalName, naturalToWord64Name, word64ToNaturalName,
 
         -- Float/Double
         rationalToFloatName,
@@ -1203,7 +1205,8 @@ negateNaturalName, signumNaturalName, divModNaturalName, quotRemNaturalName,
   quotNaturalName, remNaturalName, divNaturalName, modNaturalName, gcdNaturalName,
   lcmNaturalName, andNaturalName, orNaturalName, xorNaturalName, shiftLNaturalName,
   shiftRNaturalName, bitNaturalName, testBitNaturalName, popCountNaturalName,
-  naturalToWordName :: Name
+  naturalToWordName, naturalToInt64Name, naturalToWord64Name, int64ToNaturalName,
+  word64ToNaturalName :: Name
 
 negateNaturalName   = varQual gHC_NATURAL (fsLit "negateNatural")   negateNaturalIdKey
 signumNaturalName   = varQual gHC_NATURAL (fsLit "signumNatural")   signumNaturalIdKey
@@ -1224,6 +1227,10 @@ bitNaturalName      = varQual gHC_NATURAL (fsLit "bitNatural")      bitNaturalId
 testBitNaturalName  = varQual gHC_NATURAL (fsLit "testBitNatural")  testBitNaturalIdKey
 popCountNaturalName = varQual gHC_NATURAL (fsLit "popCountNatural") popCountNaturalIdKey
 naturalToWordName   = varQual gHC_NATURAL (fsLit "naturalToWord")   naturalToWordIdKey
+naturalToInt64Name  = varQual gHC_NATURAL (fsLit "naturalToInt64")  naturalToInt64IdKey
+naturalToWord64Name = varQual gHC_NATURAL (fsLit "naturalToWord64") naturalToWord64IdKey
+int64ToNaturalName  = varQual gHC_NATURAL (fsLit "int64ToNatural")  int64ToNaturalIdKey
+word64ToNaturalName = varQual gHC_NATURAL (fsLit "word64ToNatural") word64ToNaturalIdKey
 
 eqNaturalPrimName, neqNaturalPrimName, geNaturalPrimName, gtNaturalPrimName,
     leNaturalPrimName, ltNaturalPrimName, compareNaturalName,
@@ -2506,6 +2513,10 @@ compareNaturalPrimIdKey = mkPreludeMiscIdUnique 597
 -- numbering.
 doubleFromNaturalIdKey  = mkPreludeMiscIdUnique 599
 floatFromNaturalIdKey   = mkPreludeMiscIdUnique 600
+int64ToNaturalIdKey     = mkPreludeMiscIdUnique 601
+naturalToInt64IdKey     = mkPreludeMiscIdUnique 602
+word64ToNaturalIdKey    = mkPreludeMiscIdUnique 603
+naturalToWord64IdKey    = mkPreludeMiscIdUnique 604
 
 {-
 ************************************************************************
