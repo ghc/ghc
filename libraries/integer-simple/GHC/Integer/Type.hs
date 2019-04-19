@@ -103,7 +103,7 @@ integerToWord64 :: Integer -> Word64#
 integerToWord64 i = int64ToWord64# (integerToInt64 i)
 
 {-# NOINLINE word64ToInteger #-}
-word64ToInteger:: Word64# -> Integer
+word64ToInteger :: Word64# -> Integer
 word64ToInteger w = if isTrue# (w `eqWord64#` wordToWord64# 0##)
                     then Naught
                     else Positive (word64ToPositive w)
