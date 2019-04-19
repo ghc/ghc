@@ -1,12 +1,9 @@
-{-# LANGUAGE MagicHash #-}
-
 module Main (main) where
 
 import Data.Bits
 import GHC.Int
-import GHC.Natural (Natural, intToNatural, naturalToInt, naturalToWord,
-                    wordToNatural)
 import GHC.Word
+import Numeric.Natural (Natural)
 
 main :: IO ()
 main = do
@@ -34,22 +31,27 @@ main = do
           p "testBitNaturalT"    testBitNaturalT
           p "testBitNaturalF"    testBitNaturalF
           p "timesNatural"       timesNatural
-          p "wordToNatural"      wordToNaturalLit
-          p "naturalToWord"      naturalToWordLit
-          p "intToNatural"       intToNaturalLit
-          p "naturalToInt"       naturalToIntLit
+          p "wordToNatural"      wordToNatural
+          p "naturalToWord"      naturalToWord
+          p "intToNatural"       intToNatural
+          p "naturalToInt"       naturalToInt
           p "doubleFromNatural"  doubleFromNatural
           p "floatFromNatural"   floatFromNatural
           p "xorNatural"         xorNatural
-          p "eqNatural"          eqNaturalLit
-          p "neqNatural"         neqNaturalLit
-          p "leNatural"          leNaturalLit
-          p "ltNatural"          ltNaturalLit
-          p "geNatural"          geNaturalLit
-          p "gtNatural"          gtNaturalLit
-          p "compareNatural"     compareNaturalLit
-    where p :: Show a => String -> a -> IO ()
-          p str x = putStrLn (str ++ ": " ++ show x)
+          p "eqNatural"          eqNatural
+          p "neqNatural"         neqNatural
+          p "leNatural"          leNatural
+          p "ltNatural"          ltNatural
+          p "geNatural"          geNatural
+          p "gtNatural"          gtNatural
+          p "compareNatural"     compareNatural
+          p "naturalToInt64"     naturalToInt64
+          p "int64ToNatural"     int64ToNatural
+          p "naturalToWord64"    naturalToWord64
+          p "word64ToNatural"    word64ToNatural
+
+  where p :: Show a => String -> a -> IO ()
+        p str x = putStrLn (str ++ ": " ++ show x)
 
 -- Bit arithmetic
 andNatural :: Natural
@@ -138,17 +140,17 @@ naturalToInteger = toInteger (100056 :: Natural) + 100057
 -- regardless of whether the rules fire or not. So we add something to the
 -- number being converted, and thus rely on the addition rule for the
 -- end-result type also firing.
-wordToNaturalLit :: Natural
-wordToNaturalLit = wordToNatural 100072## + 100073
+wordToNatural :: Natural
+wordToNatural = fromIntegral (100072 :: Word) + 100073
 
-naturalToWordLit :: Word
-naturalToWordLit = 100075 + W# (naturalToWord 100074)
+naturalToWord :: Word
+naturalToWord = 100075 + fromIntegral (100074 :: Natural)
 
-intToNaturalLit :: Natural
-intToNaturalLit = intToNatural 100076# + 100077
+intToNatural :: Natural
+intToNatural = fromIntegral (100076 :: Int) + 100077
 
-naturalToIntLit :: Int
-naturalToIntLit = I# (naturalToInt 100078) + 100079
+naturalToInt :: Int
+naturalToInt = fromIntegral (100078 :: Natural) + 100079
 
 doubleFromNatural :: Double
 doubleFromNatural = 100095.0 + realToFrac (100094 :: Natural)
@@ -156,22 +158,33 @@ doubleFromNatural = 100095.0 + realToFrac (100094 :: Natural)
 floatFromNatural :: Float
 floatFromNatural = 100097.0 + realToFrac (100096 :: Natural)
 
+naturalToInt64 :: Int64
+naturalToInt64 = fromIntegral (100001 :: Natural) + 100002
+
+int64ToNatural :: Natural
+int64ToNatural = fromIntegral (100003 :: Int64) + 100004
+
+naturalToWord64 :: Word64
+naturalToWord64 = fromIntegral (100005 :: Natural) + 100006
+
+word64ToNatural :: Natural
+word64ToNatural = fromIntegral (100007 :: Word64) + 100008
+
 ---------------------------------------------------
 
 -- Ordering and Equality
-eqNaturalLit, neqNaturalLit, leNaturalLit, ltNaturalLit, geNaturalLit,
-    gtNaturalLit :: Bool
-eqNaturalLit = (100080 :: Natural) == 100081
+eqNatural, neqNatural, leNatural, ltNatural, geNatural, gtNatural :: Bool
+eqNatural = (100080 :: Natural) == 100081
 
-neqNaturalLit = (100082 :: Natural) /= 100083
+neqNatural = (100082 :: Natural) /= 100083
 
-leNaturalLit = (100084 :: Natural) <= 100085
+leNatural = (100084 :: Natural) <= 100085
 
-ltNaturalLit = (100086 :: Natural) < 100087
+ltNatural = (100086 :: Natural) < 100087
 
-geNaturalLit = (100088 :: Natural) >= 100089
+geNatural = (100088 :: Natural) >= 100089
 
-gtNaturalLit = (100090 :: Natural) > 100091
+gtNatural = (100090 :: Natural) > 100091
 
-compareNaturalLit :: Ordering
-compareNaturalLit = compare (100092 :: Natural) 100093
+compareNatural :: Ordering
+compareNatural = compare (100092 :: Natural) 100093
