@@ -153,7 +153,7 @@ doCopy directory distDir
      defaultMainWithHooksArgs copyHooks copyArgs
     where
       modHook relocatableBuild f pd lbi us flags
-       = do let verbosity = deafening
+       = do let verbosity = normal
                 idts = updateInstallDirTemplates relocatableBuild
                                                  myPrefix myLibdir myDocdir
                                                  (installDirTemplates lbi)
