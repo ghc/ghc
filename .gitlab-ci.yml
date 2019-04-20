@@ -688,6 +688,9 @@ doc-tarball:
   dependencies:
     - validate-x86_64-linux-deb9
     - validate-x86_64-windows
+  variables:
+    LINUX_BINDIST: "ghc-x86_64-deb9-linux.tar.xz"
+    WINDOWS_BINDIST: "ghc-x86_64-mingw32.tar.xz"
   artifacts:
     paths:
       - haddock.html.tar.xz
@@ -696,8 +699,17 @@ doc-tarball:
       - index.html
       - "*.pdf"
   script:
+    - |
+      if [ ! -f "$LINUX_BINDIST" ]; then
+        echo "Error: $LINUX_BINDIST does not exist. Did the Debian 9 job fail?"
+        exit 1
+      fi
+      if [ ! -f "$WINDOWS_BINDIST" ]; then
+        echo "Error: $WINDOWS_BINDIST does not exist. Did the 64-bit Windows job fail?"
+        exit 1
+      fi
     - rm -Rf docs
-    - bash -ex distrib/mkDocs/mkDocs ghc-x86_64-deb9-linux.tar.xz ghc-x86_64-mingw32.tar.xz
+    - bash -ex distrib/mkDocs/mkDocs $LINUX_BINDIST $WINDOWS_BINDIST
     - ls -lh
     - mv docs/*.tar.xz docs/index.html .
 
