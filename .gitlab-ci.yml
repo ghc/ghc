@@ -276,8 +276,8 @@ validate-x86_64-linux-deb8:
   cache:
     key: linux-x86_64-deb8
   variables:
-      # Disable sphinx PDF output as our Debian image doesn't have the requisite packages
-    - BUILD_SPHINX_PDF: "NO"
+    # Disable sphinx PDF output as our Debian image doesn't have the requisite packages
+    BUILD_SPHINX_PDF: "NO"
   artifacts:
     when: always
     expire_in: 2 week
