@@ -625,7 +625,7 @@ cleanup-windows:
     - for /d %%p in (%BUILD_DIR%\*) do rd /Q /S "%%p"
     # Now clean up drive letter mappings
     - popd
-    - subst %ndir%: /D
+    - subst "%ndir%:" /D
     - exit /b 0
 
 # See Note [Cleanup after shell executor]
