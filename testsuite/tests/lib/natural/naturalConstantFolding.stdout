@@ -1,3 +1,1941 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 1,479, types: 1,492, coercions: 93, joins: 0/4}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Main.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+Main.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Main.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+Main.$trModule3 = GHC.Types.TrNameS Main.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Main.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+Main.$trModule2 = "Main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Main.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+Main.$trModule1 = GHC.Types.TrNameS Main.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Main.$trModule :: GHC.Types.Module
+[GblId,
+ Caf=NoCafRefs,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+Main.$trModule = GHC.Types.Module Main.$trModule3 Main.$trModule1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl_r6cl :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl_r6cl = "word64ToNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl1_r6cm :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl1_r6cm = ": "#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl2_r6cn :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl2_r6cn = 200015
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl3_r6co :: [Char]
+[GblId]
+lvl3_r6co
+  = case lvl2_r6cn of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl4_r6cp :: [Char]
+[GblId]
+lvl4_r6cp = GHC.CString.unpackAppendCString# lvl1_r6cm lvl3_r6co
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl5_r6cq :: [Char]
+[GblId]
+lvl5_r6cq = GHC.CString.unpackAppendCString# lvl_r6cl lvl4_r6cp
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl6_r6cr :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl6_r6cr = "naturalToWord64"#
+
+-- RHS size: {terms: 7, types: 10, coercions: 0, joins: 0/0}
+lvl7_r6cs :: [Char]
+[GblId]
+lvl7_r6cs
+  = case GHC.Word.$w$cshow 200011## of { (# ww3_a4HY, ww4_a4HZ #) ->
+    GHC.Types.: @ Char ww3_a4HY ww4_a4HZ
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl8_r6ct :: [Char]
+[GblId]
+lvl8_r6ct = GHC.CString.unpackAppendCString# lvl1_r6cm lvl7_r6cs
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl9_r6cu :: [Char]
+[GblId]
+lvl9_r6cu = GHC.CString.unpackAppendCString# lvl6_r6cr lvl8_r6ct
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl10_r6cv :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl10_r6cv = "int64ToNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl11_r6cw :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl11_r6cw = 200007
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl12_r6cx :: [Char]
+[GblId]
+lvl12_r6cx
+  = case lvl11_r6cw of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl13_r6cy :: [Char]
+[GblId]
+lvl13_r6cy = GHC.CString.unpackAppendCString# lvl1_r6cm lvl12_r6cx
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl14_r6cz :: [Char]
+[GblId]
+lvl14_r6cz = GHC.CString.unpackAppendCString# lvl10_r6cv lvl13_r6cy
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl15_r6cA :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl15_r6cA = "naturalToInt64"#
+
+-- RHS size: {terms: 9, types: 11, coercions: 0, joins: 0/0}
+lvl16_r6cB :: [Char]
+[GblId]
+lvl16_r6cB
+  = case GHC.Show.$wshowSignedInt 0# 200003# (GHC.Types.[] @ Char) of
+    { (# ww5_a4GU, ww6_a4GV #) ->
+    GHC.Types.: @ Char ww5_a4GU ww6_a4GV
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl17_r6cC :: [Char]
+[GblId]
+lvl17_r6cC = GHC.CString.unpackAppendCString# lvl1_r6cm lvl16_r6cB
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl18_r6cD :: [Char]
+[GblId]
+lvl18_r6cD = GHC.CString.unpackAppendCString# lvl15_r6cA lvl17_r6cC
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl19_r6cE :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl19_r6cE = "compareNatural"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl20_r6cF :: [Char]
+[GblId]
+lvl20_r6cF
+  = GHC.CString.unpackAppendCString#
+      lvl1_r6cm GHC.Show.$fShowOrdering5
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl21_r6cG :: [Char]
+[GblId]
+lvl21_r6cG = GHC.CString.unpackAppendCString# lvl19_r6cE lvl20_r6cF
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl22_r6cH :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl22_r6cH = "gtNatural"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl23_r6cI :: [Char]
+[GblId]
+lvl23_r6cI
+  = GHC.CString.unpackAppendCString# lvl1_r6cm GHC.Show.$fShowBool4
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl24_r6cJ :: [Char]
+[GblId]
+lvl24_r6cJ = GHC.CString.unpackAppendCString# lvl22_r6cH lvl23_r6cI
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl25_r6cK :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl25_r6cK = "geNatural"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl26_r6cL :: [Char]
+[GblId]
+lvl26_r6cL = GHC.CString.unpackAppendCString# lvl25_r6cK lvl23_r6cI
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl27_r6cM :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl27_r6cM = "ltNatural"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl28_r6cN :: [Char]
+[GblId]
+lvl28_r6cN
+  = GHC.CString.unpackAppendCString# lvl1_r6cm GHC.Show.$fShowBool2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl29_r6cO :: [Char]
+[GblId]
+lvl29_r6cO = GHC.CString.unpackAppendCString# lvl27_r6cM lvl28_r6cN
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl30_r6cP :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl30_r6cP = "leNatural"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl31_r6cQ :: [Char]
+[GblId]
+lvl31_r6cQ = GHC.CString.unpackAppendCString# lvl30_r6cP lvl28_r6cN
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl32_r6cR :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl32_r6cR = "neqNatural"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl33_r6cS :: [Char]
+[GblId]
+lvl33_r6cS = GHC.CString.unpackAppendCString# lvl32_r6cR lvl28_r6cN
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl34_r6cT :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl34_r6cT = "eqNatural"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl35_r6cU :: [Char]
+[GblId]
+lvl35_r6cU = GHC.CString.unpackAppendCString# lvl34_r6cT lvl23_r6cI
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl36_r6cV :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl36_r6cV = "xorNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl37_r6cW :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl37_r6cW = 239055
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl38_r6cX :: [Char]
+[GblId]
+lvl38_r6cX
+  = case lvl37_r6cW of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl39_r6cY :: [Char]
+[GblId]
+lvl39_r6cY = GHC.CString.unpackAppendCString# lvl1_r6cm lvl38_r6cX
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl40_r6cZ :: [Char]
+[GblId]
+lvl40_r6cZ = GHC.CString.unpackAppendCString# lvl36_r6cV lvl39_r6cY
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl41_r6d0 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl41_r6d0 = "floatFromNatural"#
+
+-- RHS size: {terms: 4, types: 0, coercions: 0, joins: 0/0}
+lvl42_r6d1 :: ShowS
+[GblId]
+lvl42_r6d1
+  = GHC.Float.$w$sshowSignedFloat1
+      GHC.Float.$fShowFloat2 GHC.Float.$fRealFracFloat3 200193.0#
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+lvl43_r6d2 :: String
+[GblId]
+lvl43_r6d2 = lvl42_r6d1 (GHC.Types.[] @ Char)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl44_r6d3 :: [Char]
+[GblId]
+lvl44_r6d3 = GHC.CString.unpackAppendCString# lvl1_r6cm lvl43_r6d2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl45_r6d4 :: [Char]
+[GblId]
+lvl45_r6d4 = GHC.CString.unpackAppendCString# lvl41_r6d0 lvl44_r6d3
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl46_r6d5 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl46_r6d5 = "doubleFromNatural"#
+
+-- RHS size: {terms: 4, types: 0, coercions: 0, joins: 0/0}
+lvl47_r6d6 :: ShowS
+[GblId]
+lvl47_r6d6
+  = GHC.Float.$w$sshowSignedFloat
+      GHC.Float.$fShowDouble2 GHC.Float.$fRealFracFloat3 200189.0##
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+lvl48_r6d7 :: String
+[GblId]
+lvl48_r6d7 = lvl47_r6d6 (GHC.Types.[] @ Char)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl49_r6d8 :: [Char]
+[GblId]
+lvl49_r6d8 = GHC.CString.unpackAppendCString# lvl1_r6cm lvl48_r6d7
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl50_r6d9 :: [Char]
+[GblId]
+lvl50_r6d9 = GHC.CString.unpackAppendCString# lvl46_r6d5 lvl49_r6d8
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl51_r6da :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl51_r6da = "naturalToInt"#
+
+-- RHS size: {terms: 9, types: 11, coercions: 0, joins: 0/0}
+lvl52_r6db :: [Char]
+[GblId]
+lvl52_r6db
+  = case GHC.Show.$wshowSignedInt 0# 200157# (GHC.Types.[] @ Char) of
+    { (# ww5_a4uO, ww6_a4uP #) ->
+    GHC.Types.: @ Char ww5_a4uO ww6_a4uP
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl53_r6dc :: [Char]
+[GblId]
+lvl53_r6dc = GHC.CString.unpackAppendCString# lvl1_r6cm lvl52_r6db
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl54_r6dd :: [Char]
+[GblId]
+lvl54_r6dd = GHC.CString.unpackAppendCString# lvl51_r6da lvl53_r6dc
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl55_r6de :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl55_r6de = "intToNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl56_r6df :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl56_r6df = 200153
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl57_r6dg :: [Char]
+[GblId]
+lvl57_r6dg
+  = case lvl56_r6df of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl58_r6dh :: [Char]
+[GblId]
+lvl58_r6dh = GHC.CString.unpackAppendCString# lvl1_r6cm lvl57_r6dg
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl59_r6di :: [Char]
+[GblId]
+lvl59_r6di = GHC.CString.unpackAppendCString# lvl55_r6de lvl58_r6dh
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl60_r6dj :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl60_r6dj = "naturalToWord"#
+
+-- RHS size: {terms: 8, types: 11, coercions: 0, joins: 0/0}
+lvl61_r6dk :: [Char]
+[GblId]
+lvl61_r6dk
+  = case GHC.Show.$wshowWord 200149## (GHC.Types.[] @ Char) of
+    { (# ww1_a4DA, ww2_a4DB #) ->
+    GHC.Types.: @ Char ww1_a4DA ww2_a4DB
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl62_r6dl :: [Char]
+[GblId]
+lvl62_r6dl = GHC.CString.unpackAppendCString# lvl1_r6cm lvl61_r6dk
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl63_r6dm :: [Char]
+[GblId]
+lvl63_r6dm = GHC.CString.unpackAppendCString# lvl60_r6dj lvl62_r6dl
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl64_r6dn :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl64_r6dn = "wordToNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl65_r6do :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl65_r6do = 200145
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl66_r6dp :: [Char]
+[GblId]
+lvl66_r6dp
+  = case lvl65_r6do of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl67_r6dq :: [Char]
+[GblId]
+lvl67_r6dq = GHC.CString.unpackAppendCString# lvl1_r6cm lvl66_r6dp
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl68_r6dr :: [Char]
+[GblId]
+lvl68_r6dr = GHC.CString.unpackAppendCString# lvl64_r6dn lvl67_r6dq
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl69_r6ds :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl69_r6ds = "timesNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl70_r6dt :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl70_r6dt = 683678240
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl71_r6du :: [Char]
+[GblId]
+lvl71_r6du
+  = case lvl70_r6dt of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl72_r6dv :: [Char]
+[GblId]
+lvl72_r6dv = GHC.CString.unpackAppendCString# lvl1_r6cm lvl71_r6du
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl73_r6dw :: [Char]
+[GblId]
+lvl73_r6dw = GHC.CString.unpackAppendCString# lvl69_r6ds lvl72_r6dv
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl74_r6dx :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl74_r6dx = "testBitNaturalF"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl75_r6dy :: [Char]
+[GblId]
+lvl75_r6dy = GHC.CString.unpackAppendCString# lvl74_r6dx lvl23_r6cI
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl76_r6dz :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl76_r6dz = "testBitNaturalT"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl77_r6dA :: [Char]
+[GblId]
+lvl77_r6dA = GHC.CString.unpackAppendCString# lvl76_r6dz lvl28_r6cN
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl78_r6dB :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl78_r6dB = "signumNaturalZ"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl79_r6dC :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl79_r6dC = 0
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl80_r6dD :: [Char]
+[GblId]
+lvl80_r6dD
+  = case lvl79_r6dC of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl81_r6dE :: [Char]
+[GblId]
+lvl81_r6dE = GHC.CString.unpackAppendCString# lvl1_r6cm lvl80_r6dD
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl82_r6dF :: [Char]
+[GblId]
+lvl82_r6dF = GHC.CString.unpackAppendCString# lvl78_r6dB lvl81_r6dE
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl83_r6dG :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl83_r6dG = "signumNaturalP"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl84_r6dH :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl84_r6dH = 1
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl85_r6dI :: [Char]
+[GblId]
+lvl85_r6dI
+  = case lvl84_r6dH of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl86_r6dJ :: [Char]
+[GblId]
+lvl86_r6dJ = GHC.CString.unpackAppendCString# lvl1_r6cm lvl85_r6dI
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl87_r6dK :: [Char]
+[GblId]
+lvl87_r6dK = GHC.CString.unpackAppendCString# lvl83_r6dG lvl86_r6dJ
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl88_r6dL :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl88_r6dL = "shiftRNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl89_r6dM :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl89_r6dM = 6254
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl90_r6dN :: [Char]
+[GblId]
+lvl90_r6dN
+  = case lvl89_r6dM of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl91_r6dO :: [Char]
+[GblId]
+lvl91_r6dO = GHC.CString.unpackAppendCString# lvl1_r6cm lvl90_r6dN
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl92_r6dP :: [Char]
+[GblId]
+lvl92_r6dP = GHC.CString.unpackAppendCString# lvl88_r6dL lvl91_r6dO
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl93_r6dQ :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl93_r6dQ = "shiftLNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl94_r6dR :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl94_r6dR = 1601040
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl95_r6dS :: [Char]
+[GblId]
+lvl95_r6dS
+  = case lvl94_r6dR of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl96_r6dT :: [Char]
+[GblId]
+lvl96_r6dT = GHC.CString.unpackAppendCString# lvl1_r6cm lvl95_r6dS
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl97_r6dU :: [Char]
+[GblId]
+lvl97_r6dU = GHC.CString.unpackAppendCString# lvl93_r6dQ lvl96_r6dT
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl98_r6dV :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl98_r6dV = "lcmNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl99_r6dW :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl99_r6dW = 1001100300
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl100_r6dX :: [Char]
+[GblId]
+lvl100_r6dX
+  = case lvl99_r6dW of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl101_r6dY :: [Char]
+[GblId]
+lvl101_r6dY
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl100_r6dX
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl102_r6dZ :: [Char]
+[GblId]
+lvl102_r6dZ
+  = GHC.CString.unpackAppendCString# lvl98_r6dV lvl101_r6dY
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl103_r6e0 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl103_r6e0 = "gcdNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl104_r6e1 :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl104_r6e1 = 50024
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl105_r6e2 :: [Char]
+[GblId]
+lvl105_r6e2
+  = case lvl104_r6e1 of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl106_r6e3 :: [Char]
+[GblId]
+lvl106_r6e3
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl105_r6e2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl107_r6e4 :: [Char]
+[GblId]
+lvl107_r6e4
+  = GHC.CString.unpackAppendCString# lvl103_r6e0 lvl106_r6e3
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl108_r6e5 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl108_r6e5 = "remNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl109_r6e6 :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl109_r6e6 = 68
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl110_r6e7 :: [Char]
+[GblId]
+lvl110_r6e7
+  = case lvl109_r6e6 of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl111_r6e8 :: [Char]
+[GblId]
+lvl111_r6e8
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl110_r6e7
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl112_r6e9 :: [Char]
+[GblId]
+lvl112_r6e9
+  = GHC.CString.unpackAppendCString# lvl108_r6e5 lvl111_r6e8
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl113_r6ea :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl113_r6ea = "quotRemNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl114_r6eb :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl114_r6eb = 813
+
+-- RHS size: {terms: 21, types: 16, coercions: 0, joins: 0/1}
+lvl115_r6ec :: ShowS
+[GblId]
+lvl115_r6ec
+  = case lvl114_r6eb of wild_a5Jv {
+      GHC.Natural.NatS# w#_a5JG ->
+        \ (eta_a5JF :: String) -> GHC.Show.showWord w#_a5JG eta_a5JF;
+      GHC.Natural.NatJ# ipv_a5JL ->
+        let {
+          w_a5JK :: Integer
+          [LclId]
+          w_a5JK = GHC.Natural.naturalToInteger wild_a5Jv } in
+        \ (w1_a5JN :: String) ->
+          case GHC.Show.$w$cshowsPrec4 0# w_a5JK w1_a5JN of
+          { (# ww3_a5JU, ww4_a5JV #) ->
+          GHC.Types.: @ Char ww3_a5JU ww4_a5JV
+          }
+    }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl116_r6ed :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl116_r6ed = 64
+
+-- RHS size: {terms: 21, types: 16, coercions: 0, joins: 0/1}
+lvl117_r6ee :: ShowS
+[GblId]
+lvl117_r6ee
+  = case lvl116_r6ed of wild_a5Jv {
+      GHC.Natural.NatS# w#_a5JG ->
+        \ (eta_a5JF :: String) -> GHC.Show.showWord w#_a5JG eta_a5JF;
+      GHC.Natural.NatJ# ipv_a5JL ->
+        let {
+          w_a5JK :: Integer
+          [LclId]
+          w_a5JK = GHC.Natural.naturalToInteger wild_a5Jv } in
+        \ (w1_a5JN :: String) ->
+          case GHC.Show.$w$cshowsPrec4 0# w_a5JK w1_a5JN of
+          { (# ww3_a5JU, ww4_a5JV #) ->
+          GHC.Types.: @ Char ww3_a5JU ww4_a5JV
+          }
+    }
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+lvl118_r6ef :: [ShowS]
+[GblId, Str=m2, Unf=OtherCon []]
+lvl118_r6ef
+  = GHC.Types.: @ ShowS lvl117_r6ee (GHC.Types.[] @ ShowS)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+lvl119_r6eg :: [ShowS]
+[GblId, Str=m2, Unf=OtherCon []]
+lvl119_r6eg = GHC.Types.: @ ShowS lvl115_r6ec lvl118_r6ef
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+lvl120_r6eh :: [Char]
+[GblId, Caf=NoCafRefs, Str=m2, Unf=OtherCon []]
+lvl120_r6eh
+  = GHC.Types.: @ Char GHC.Show.$fShow(,)2 (GHC.Types.[] @ Char)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl121_r6ei :: String
+[GblId]
+lvl121_r6ei = GHC.Show.$fShow(,)_go1 lvl119_r6eg lvl120_r6eh
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+lvl122_r6ej :: [Char]
+[GblId, Str=m2, Unf=OtherCon []]
+lvl122_r6ej = GHC.Types.: @ Char GHC.Show.$fShow(,)4 lvl121_r6ei
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl123_r6ek :: [Char]
+[GblId]
+lvl123_r6ek
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl122_r6ej
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl124_r6el :: [Char]
+[GblId]
+lvl124_r6el
+  = GHC.CString.unpackAppendCString# lvl113_r6ea lvl123_r6ek
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl125_r6em :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl125_r6em = "quotNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl126_r6en :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl126_r6en = 641
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl127_r6eo :: [Char]
+[GblId]
+lvl127_r6eo
+  = case lvl126_r6en of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl128_r6ep :: [Char]
+[GblId]
+lvl128_r6ep
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl127_r6eo
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl129_r6eq :: [Char]
+[GblId]
+lvl129_r6eq
+  = GHC.CString.unpackAppendCString# lvl125_r6em lvl128_r6ep
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl130_r6er :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl130_r6er = "modNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl131_r6es :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl131_r6es = 90
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl132_r6et :: [Char]
+[GblId]
+lvl132_r6et
+  = case lvl131_r6es of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl133_r6eu :: [Char]
+[GblId]
+lvl133_r6eu
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl132_r6et
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl134_r6ev :: [Char]
+[GblId]
+lvl134_r6ev
+  = GHC.CString.unpackAppendCString# lvl130_r6er lvl133_r6eu
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl135_r6ew :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl135_r6ew = "divNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl136_r6ex :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl136_r6ex = 642
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl137_r6ey :: [Char]
+[GblId]
+lvl137_r6ey
+  = case lvl136_r6ex of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl138_r6ez :: [Char]
+[GblId]
+lvl138_r6ez
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl137_r6ey
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl139_r6eA :: [Char]
+[GblId]
+lvl139_r6eA
+  = GHC.CString.unpackAppendCString# lvl135_r6ew lvl138_r6ez
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl140_r6eB :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl140_r6eB = "divModNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl141_r6eC :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl141_r6eC = 219
+
+-- RHS size: {terms: 21, types: 16, coercions: 0, joins: 0/1}
+lvl142_r6eD :: ShowS
+[GblId]
+lvl142_r6eD
+  = case lvl141_r6eC of wild_a5Jv {
+      GHC.Natural.NatS# w#_a5JG ->
+        \ (eta_a5JF :: String) -> GHC.Show.showWord w#_a5JG eta_a5JF;
+      GHC.Natural.NatJ# ipv_a5JL ->
+        let {
+          w_a5JK :: Integer
+          [LclId]
+          w_a5JK = GHC.Natural.naturalToInteger wild_a5Jv } in
+        \ (w1_a5JN :: String) ->
+          case GHC.Show.$w$cshowsPrec4 0# w_a5JK w1_a5JN of
+          { (# ww3_a5JU, ww4_a5JV #) ->
+          GHC.Types.: @ Char ww3_a5JU ww4_a5JV
+          }
+    }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl143_r6eE :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl143_r6eE = 196
+
+-- RHS size: {terms: 21, types: 16, coercions: 0, joins: 0/1}
+lvl144_r6eF :: ShowS
+[GblId]
+lvl144_r6eF
+  = case lvl143_r6eE of wild_a5Jv {
+      GHC.Natural.NatS# w#_a5JG ->
+        \ (eta_a5JF :: String) -> GHC.Show.showWord w#_a5JG eta_a5JF;
+      GHC.Natural.NatJ# ipv_a5JL ->
+        let {
+          w_a5JK :: Integer
+          [LclId]
+          w_a5JK = GHC.Natural.naturalToInteger wild_a5Jv } in
+        \ (w1_a5JN :: String) ->
+          case GHC.Show.$w$cshowsPrec4 0# w_a5JK w1_a5JN of
+          { (# ww3_a5JU, ww4_a5JV #) ->
+          GHC.Types.: @ Char ww3_a5JU ww4_a5JV
+          }
+    }
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+lvl145_r6eG :: [ShowS]
+[GblId, Str=m2, Unf=OtherCon []]
+lvl145_r6eG
+  = GHC.Types.: @ ShowS lvl144_r6eF (GHC.Types.[] @ ShowS)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+lvl146_r6eH :: [ShowS]
+[GblId, Str=m2, Unf=OtherCon []]
+lvl146_r6eH = GHC.Types.: @ ShowS lvl142_r6eD lvl145_r6eG
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl147_r6eI :: String
+[GblId]
+lvl147_r6eI = GHC.Show.$fShow(,)_go1 lvl146_r6eH lvl120_r6eh
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+lvl148_r6eJ :: [Char]
+[GblId, Str=m2, Unf=OtherCon []]
+lvl148_r6eJ = GHC.Types.: @ Char GHC.Show.$fShow(,)4 lvl147_r6eI
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl149_r6eK :: [Char]
+[GblId]
+lvl149_r6eK
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl148_r6eJ
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl150_r6eL :: [Char]
+[GblId]
+lvl150_r6eL
+  = GHC.CString.unpackAppendCString# lvl140_r6eB lvl149_r6eK
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl151_r6eM :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl151_r6eM = "popCountNatural"#
+
+-- RHS size: {terms: 9, types: 11, coercions: 0, joins: 0/0}
+lvl152_r6eN :: [Char]
+[GblId]
+lvl152_r6eN
+  = case GHC.Show.$wshowSignedInt 0# 12# (GHC.Types.[] @ Char) of
+    { (# ww5_a4uO, ww6_a4uP #) ->
+    GHC.Types.: @ Char ww5_a4uO ww6_a4uP
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl153_r6eO :: [Char]
+[GblId]
+lvl153_r6eO
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl152_r6eN
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl154_r6eP :: [Char]
+[GblId]
+lvl154_r6eP
+  = GHC.CString.unpackAppendCString# lvl151_r6eM lvl153_r6eO
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl155_r6eQ :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl155_r6eQ = "plusNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl156_r6eR :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl156_r6eR = 200121
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl157_r6eS :: [Char]
+[GblId]
+lvl157_r6eS
+  = case lvl156_r6eR of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl158_r6eT :: [Char]
+[GblId]
+lvl158_r6eT
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl157_r6eS
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl159_r6eU :: [Char]
+[GblId]
+lvl159_r6eU
+  = GHC.CString.unpackAppendCString# lvl155_r6eQ lvl158_r6eT
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl160_r6eV :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl160_r6eV = "orNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl161_r6eW :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl161_r6eW = 239579
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl162_r6eX :: [Char]
+[GblId]
+lvl162_r6eX
+  = case lvl161_r6eW of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl163_r6eY :: [Char]
+[GblId]
+lvl163_r6eY
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl162_r6eX
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl164_r6eZ :: [Char]
+[GblId]
+lvl164_r6eZ
+  = GHC.CString.unpackAppendCString# lvl160_r6eV lvl163_r6eY
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl165_r6f0 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl165_r6f0 = "negateNatural"#
+
+-- RHS size: {terms: 8, types: 10, coercions: 0, joins: 0/0}
+lvl166_r6f1 :: [Char]
+[GblId]
+lvl166_r6f1
+  = case GHC.Show.$w$cshow (GHC.Natural.negateNatural lvl79_r6dC) of
+    { (# ww1_a4tA, ww2_a4tB #) ->
+    GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl167_r6f2 :: [Char]
+[GblId]
+lvl167_r6f2
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl166_r6f1
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl168_r6f3 :: [Char]
+[GblId]
+lvl168_r6f3
+  = GHC.CString.unpackAppendCString# lvl165_r6f0 lvl167_r6f2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl169_r6f4 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl169_r6f4 = "naturalToInteger"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl170_r6f5 :: Integer
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl170_r6f5 = 200113
+
+-- RHS size: {terms: 9, types: 11, coercions: 0, joins: 0/0}
+lvl171_r6f6 :: [Char]
+[GblId]
+lvl171_r6f6
+  = case GHC.Show.$w$cshowsPrec4 0# lvl170_r6f5 (GHC.Types.[] @ Char)
+    of
+    { (# ww3_a4ul, ww4_a4um #) ->
+    GHC.Types.: @ Char ww3_a4ul ww4_a4um
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl172_r6f7 :: [Char]
+[GblId]
+lvl172_r6f7
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl171_r6f6
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl173_r6f8 :: [Char]
+[GblId]
+lvl173_r6f8
+  = GHC.CString.unpackAppendCString# lvl169_r6f4 lvl172_r6f7
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl174_r6f9 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl174_r6f9 = "naturalFromInteger"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl175_r6fa :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl175_r6fa = 200109
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl176_r6fb :: [Char]
+[GblId]
+lvl176_r6fb
+  = case lvl175_r6fa of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl177_r6fc :: [Char]
+[GblId]
+lvl177_r6fc
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl176_r6fb
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl178_r6fd :: [Char]
+[GblId]
+lvl178_r6fd
+  = GHC.CString.unpackAppendCString# lvl174_r6f9 lvl177_r6fc
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl179_r6fe :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl179_r6fe = "minusNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl180_r6ff :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl180_r6ff = 989
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl181_r6fg :: [Char]
+[GblId]
+lvl181_r6fg
+  = case lvl180_r6ff of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl182_r6fh :: [Char]
+[GblId]
+lvl182_r6fh
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl181_r6fg
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl183_r6fi :: [Char]
+[GblId]
+lvl183_r6fi
+  = GHC.CString.unpackAppendCString# lvl179_r6fe lvl182_r6fh
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl184_r6fj :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl184_r6fj = "bitNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl185_r6fk :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl185_r6fk = 16
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl186_r6fl :: [Char]
+[GblId]
+lvl186_r6fl
+  = case lvl185_r6fk of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl187_r6fm :: [Char]
+[GblId]
+lvl187_r6fm
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl186_r6fl
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl188_r6fn :: [Char]
+[GblId]
+lvl188_r6fn
+  = GHC.CString.unpackAppendCString# lvl184_r6fj lvl187_r6fm
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl189_r6fo :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl189_r6fo = "andNatural"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl190_r6fp :: Natural
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl190_r6fp = 532
+
+-- RHS size: {terms: 22, types: 25, coercions: 0, joins: 0/0}
+lvl191_r6fq :: [Char]
+[GblId]
+lvl191_r6fq
+  = case lvl190_r6fp of wild_a5K2 {
+      GHC.Natural.NatS# w#_a5K4 ->
+        case GHC.Show.$wshowWord w#_a5K4 (GHC.Types.[] @ Char) of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        };
+      GHC.Natural.NatJ# ipv_a5K7 ->
+        case GHC.Show.$w$cshowsPrec4
+               0# (GHC.Natural.naturalToInteger wild_a5K2) (GHC.Types.[] @ Char)
+        of
+        { (# ww1_a4tA, ww2_a4tB #) ->
+        GHC.Types.: @ Char ww1_a4tA ww2_a4tB
+        }
+    }
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl192_r6fr :: [Char]
+[GblId]
+lvl192_r6fr
+  = GHC.CString.unpackAppendCString# lvl1_r6cm lvl191_r6fq
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl193_r6fs :: [Char]
+[GblId]
+lvl193_r6fs
+  = GHC.CString.unpackAppendCString# lvl189_r6fo lvl192_r6fr
+
+-- RHS size: {terms: 293, types: 453, coercions: 84, joins: 0/0}
+Main.main1
+  :: GHC.Prim.State# GHC.Prim.RealWorld
+     -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
+[GblId, Arity=1, Str=<L,U>, Unf=OtherCon []]
+Main.main1
+  = \ (s_a4tq :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl193_r6fs GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             s_a4tq
+      of
+      { (# ipv_a4tt, ipv1_a4tu #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl188_r6fn GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv_a4tt
+      of
+      { (# ipv2_X4tO, ipv3_X4tQ #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl183_r6fi GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv2_X4tO
+      of
+      { (# ipv4_X4tT, ipv5_X4tV #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl178_r6fd GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv4_X4tT
+      of
+      { (# ipv6_X4tY, ipv7_X4u0 #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl173_r6f8 GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv6_X4tY
+      of
+      { (# ipv8_X4u3, ipv9_X4u5 #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl168_r6f3 GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv8_X4u3
+      of
+      { (# ipv10_X4u8, ipv11_X4ua #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl164_r6eZ GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv10_X4u8
+      of
+      { (# ipv12_X4ud, ipv13_X4uf #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl159_r6eU GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv12_X4ud
+      of
+      { (# ipv14_X4ui, ipv15_X4uk #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl154_r6eP GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv14_X4ui
+      of
+      { (# ipv16_X4un, ipv17_X4up #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl150_r6eL GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv16_X4un
+      of
+      { (# ipv18_X4us, ipv19_X4uu #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl139_r6eA GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv18_X4us
+      of
+      { (# ipv20_X4ux, ipv21_X4uz #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl134_r6ev GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv20_X4ux
+      of
+      { (# ipv22_X4uC, ipv23_X4uE #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl129_r6eq GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv22_X4uC
+      of
+      { (# ipv24_X4uH, ipv25_X4uJ #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl124_r6el GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv24_X4uH
+      of
+      { (# ipv26_X4uM, ipv27_X4uO #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl112_r6e9 GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv26_X4uM
+      of
+      { (# ipv28_X4uR, ipv29_X4uT #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl107_r6e4 GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv28_X4uR
+      of
+      { (# ipv30_X4uW, ipv31_X4uY #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl102_r6dZ GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv30_X4uW
+      of
+      { (# ipv32_X4v1, ipv33_X4v3 #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl97_r6dU GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv32_X4v1
+      of
+      { (# ipv34_X4v6, ipv35_X4v8 #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl92_r6dP GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv34_X4v6
+      of
+      { (# ipv36_X4vb, ipv37_X4vd #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl87_r6dK GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv36_X4vb
+      of
+      { (# ipv38_X4vg, ipv39_X4vi #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl82_r6dF GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv38_X4vg
+      of
+      { (# ipv40_X4vl, ipv41_X4vn #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl77_r6dA GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv40_X4vl
+      of
+      { (# ipv42_X4vq, ipv43_X4vs #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl75_r6dy GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv42_X4vq
+      of
+      { (# ipv44_X4vv, ipv45_X4vx #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl73_r6dw GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv44_X4vv
+      of
+      { (# ipv46_X4vA, ipv47_X4vC #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl68_r6dr GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv46_X4vA
+      of
+      { (# ipv48_X4vF, ipv49_X4vH #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl63_r6dm GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv48_X4vF
+      of
+      { (# ipv50_X4vK, ipv51_X4vM #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl59_r6di GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv50_X4vK
+      of
+      { (# ipv52_X4vP, ipv53_X4vR #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl54_r6dd GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv52_X4vP
+      of
+      { (# ipv54_X4vU, ipv55_X4vW #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl50_r6d9 GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv54_X4vU
+      of
+      { (# ipv56_X4vZ, ipv57_X4w1 #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl45_r6d4 GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv56_X4vZ
+      of
+      { (# ipv58_X4w4, ipv59_X4w6 #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl40_r6cZ GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv58_X4w4
+      of
+      { (# ipv60_X4w9, ipv61_X4wb #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl35_r6cU GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv60_X4w9
+      of
+      { (# ipv62_X4we, ipv63_X4wg #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl33_r6cS GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv62_X4we
+      of
+      { (# ipv64_X4wj, ipv65_X4wl #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl31_r6cQ GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv64_X4wj
+      of
+      { (# ipv66_X4wo, ipv67_X4wq #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl29_r6cO GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv66_X4wo
+      of
+      { (# ipv68_X4wt, ipv69_X4wv #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl26_r6cL GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv68_X4wt
+      of
+      { (# ipv70_X4wy, ipv71_X4wA #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl24_r6cJ GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv70_X4wy
+      of
+      { (# ipv72_X4wD, ipv73_X4wF #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl21_r6cG GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv72_X4wD
+      of
+      { (# ipv74_X4wI, ipv75_X4wK #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl18_r6cD GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv74_X4wI
+      of
+      { (# ipv76_X4wN, ipv77_X4wP #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl14_r6cz GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv76_X4wN
+      of
+      { (# ipv78_X4wS, ipv79_X4wU #) ->
+      case ((GHC.IO.Handle.Text.hPutStr'
+               GHC.IO.Handle.FD.stdout lvl9_r6cu GHC.Types.True)
+            `cast` (GHC.Types.N:IO[0] <()>_R
+                    :: IO ()
+                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+             ipv78_X4wS
+      of
+      { (# ipv80_X4wX, ipv81_X4wZ #) ->
+      ((GHC.IO.Handle.Text.hPutStr'
+          GHC.IO.Handle.FD.stdout lvl5_r6cq GHC.Types.True)
+       `cast` (GHC.Types.N:IO[0] <()>_R
+               :: IO ()
+                  ~R# (GHC.Prim.State# GHC.Prim.RealWorld
+                       -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))))
+        ipv80_X4wX
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 3, joins: 0/0}
+main :: IO ()
+[GblId,
+ Arity=1,
+ Str=<L,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)
+         Tmpl= Main.main1
+               `cast` (Sym (GHC.Types.N:IO[0] <()>_R)
+                       :: (GHC.Prim.State# GHC.Prim.RealWorld
+                           -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))
+                          ~R# IO ())}]
+main
+  = Main.main1
+    `cast` (Sym (GHC.Types.N:IO[0] <()>_R)
+            :: (GHC.Prim.State# GHC.Prim.RealWorld
+                -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))
+               ~R# IO ())
+
+-- RHS size: {terms: 2, types: 1, coercions: 3, joins: 0/0}
+Main.main2
+  :: GHC.Prim.State# GHC.Prim.RealWorld
+     -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
+[GblId,
+ Arity=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 60}]
+Main.main2
+  = GHC.TopHandler.runMainIO1
+      @ ()
+      (Main.main1
+       `cast` (Sym (GHC.Types.N:IO[0] <()>_R)
+               :: (GHC.Prim.State# GHC.Prim.RealWorld
+                   -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))
+                  ~R# IO ()))
+
+-- RHS size: {terms: 1, types: 0, coercions: 3, joins: 0/0}
+:Main.main :: IO ()
+[GblId,
+ Arity=1,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)
+         Tmpl= Main.main2
+               `cast` (Sym (GHC.Types.N:IO[0] <()>_R)
+                       :: (GHC.Prim.State# GHC.Prim.RealWorld
+                           -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))
+                          ~R# IO ())}]
+:Main.main
+  = Main.main2
+    `cast` (Sym (GHC.Types.N:IO[0] <()>_R)
+            :: (GHC.Prim.State# GHC.Prim.RealWorld
+                -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))
+               ~R# IO ())
+
+
+
 andNatural: 532
 bitNatural: 16
 minusNatural: 989
