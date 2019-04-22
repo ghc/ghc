@@ -12,6 +12,7 @@ CHECK2 = grep -q -- '$1' naturalConstantFolding.simpl || \
 .PHONY: naturalConstantFolding
 naturalConstantFolding:
 	'$(TEST_HC)' -Wall -v0 -O --make naturalConstantFolding -fforce-recomp -ddump-simpl > naturalConstantFolding.simpl
+	cat naturalConstantFolding.simpl
 # All the 100nnn values should be constant-folded away
 	! grep -q '\<100[0-9][0-9][0-9]\>' naturalConstantFolding.simpl || { echo "Unfolded values found"; grep '\<100[0-9][0-9][0-9]\>' naturalConstantFolding.simpl; }
 	# Bit arithmetic

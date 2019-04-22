@@ -8,6 +8,7 @@ CHECK = grep -q -- '$1' integerConstantFolding.simpl || \
 .PHONY: integerConstantFolding
 integerConstantFolding:
 	'$(TEST_HC)' -Wall -v0 -O --make integerConstantFolding -fforce-recomp -ddump-simpl > integerConstantFolding.simpl
+	cat integerConstantFolding.simpl
 # All the 100nnn values should be constant-folded away
 	! grep -q '\<100[0-9][0-9][0-9]\>' integerConstantFolding.simpl || { echo "Unfolded values found"; grep '\<100[0-9][0-9][0-9]\>' integerConstantFolding.simpl; }
 	$(call CHECK,\<200007\>,plusInteger)
@@ -37,6 +38,8 @@ integerConstantFolding:
 	$(call CHECK,\<200135.0\>,floatFromInteger)
 	$(call CHECK,\<400276.0\>,encodeIntegerDouble)
 	$(call CHECK,\<400280.0\>,encodeIntegerFloat)
+	$(call CHECK,\<200169\>,integerToInt64)
+	$(call CHECK,\<200173\>,integerToWord64)
 	./integerConstantFolding
 
 .PHONY: fromToInteger
