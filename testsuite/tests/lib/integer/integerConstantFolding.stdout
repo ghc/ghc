@@ -54,3 +54,5 @@ wordToInteger: 200151
 intToInteger: 200155
 word64ToInteger: 200159
 int64ToInteger: 200163
+integerToInt64: 200169
+integerToWord64: 200173

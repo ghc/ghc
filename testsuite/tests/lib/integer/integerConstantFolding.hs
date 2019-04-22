@@ -62,6 +62,8 @@ main = do p "plusInteger"        plusInteger
           p "intToInteger"        intToInteger
           p "word64ToInteger"     word64ToInteger
           p "int64ToInteger"      int64ToInteger
+          p "integerToInt64"      integerToInt64
+          p "integerToWord64"     integerToWord64
 
     where p :: Show a => String -> a -> IO ()
           p str x = putStrLn (str ++ ": " ++ show x)
@@ -220,3 +222,9 @@ int64ToInteger = toInteger (100081 :: Int64) + 100082
 
 decodeIntegerDouble :: (Integer, Int)
 decodeIntegerDouble = decodeFloat (100083 :: Double)
+
+integerToInt64 :: Int64
+integerToInt64 = 100085 + fromInteger 100084
+
+integerToWord64 :: Word64
+integerToWord64 = 100087 + fromInteger 100086
