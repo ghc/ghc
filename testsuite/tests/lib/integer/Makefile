@@ -37,6 +37,8 @@ integerConstantFolding:
 	$(call CHECK,\<200135.0\>,floatFromInteger)
 	$(call CHECK,\<400276.0\>,encodeIntegerDouble)
 	$(call CHECK,\<400280.0\>,encodeIntegerFloat)
+	$(call CHECK,\<200169\>,integerToInt64)
+	$(call CHECK,\<200173\>,integerToWord64)
 	./integerConstantFolding
 
 .PHONY: fromToInteger
