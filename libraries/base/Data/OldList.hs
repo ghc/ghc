@@ -241,7 +241,7 @@ infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/doc
 dropWhileEnd :: (a -> Bool) -> [a] -> [a]
 dropWhileEnd p = foldr (\x xs -> if p x && null xs then [] else x : xs) []
 
--- | \(\mathcal{O}(min(m,n))\). The 'stripPrefix' function drops the given
+-- | \(\mathcal{O}(\min(m,n))\). The 'stripPrefix' function drops the given
 -- prefix from a list. It returns 'Nothing' if the list did not start with the
 -- prefix given, or 'Just' the list after the prefix, if it does.
 --
@@ -319,7 +319,7 @@ findIndices p ls = build $ \c n ->
   in foldr go (\_ -> n) ls 0#
 #endif  /* USE_REPORT_PRELUDE */
 
--- | \(\mathcal{O}(min(m,n))\). The 'isPrefixOf' function takes two lists and
+-- | \(\mathcal{O}(\min(m,n))\). The 'isPrefixOf' function takes two lists and
 -- returns 'True' iff the first list is a prefix of the second.
 --
 -- >>> "Hello" `isPrefixOf` "Hello World!"
