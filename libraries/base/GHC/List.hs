@@ -1013,7 +1013,7 @@ NB: Zips for larger tuples are in the List module.
 -}
 
 ----------------------------------------------
--- | \(\mathcal{O}(min(m,n))\). 'zip' takes two lists and returns a list of
+-- | \(\mathcal{O}(\min(m,n))\). 'zip' takes two lists and returns a list of
 -- corresponding pairs.
 --
 -- > zip [1, 2] ['a', 'b'] = [(1, 'a'), (2, 'b')]
@@ -1071,7 +1071,7 @@ zip3FB cons = \a b c r -> (a,b,c) `cons` r
 -- function given as the first argument, instead of a tupling function.
 
 ----------------------------------------------
--- | \(\mathcal{O}(min(m,n))\). 'zipWith' generalises 'zip' by zipping with the
+-- | \(\mathcal{O}(\min(m,n))\). 'zipWith' generalises 'zip' by zipping with the
 -- function given as the first argument, instead of a tupling function. For
 -- example, @'zipWith' (+)@ is applied to two lists to produce the list of
 -- corresponding sums:
