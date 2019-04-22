@@ -244,6 +244,7 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
     TICK_ENT_DYN_IND(); /* tick */
     node = UNTAG(StgInd_indirectee(node));
     TICK_ENT_VIA_NODE();
+    W_[ben_IND] = W_[ben_IND] + 1;
     jump %GET_ENTRY(node) (node);
 }
 #else
@@ -252,6 +253,7 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
     TICK_ENT_DYN_IND(); /* tick */
     R1 = UNTAG(StgInd_indirectee(R1));
     TICK_ENT_VIA_NODE();
+    W_[ben_IND] = W_[ben_IND] + 1;
     jump %GET_ENTRY(R1) [R1];
 }
 #endif
@@ -262,6 +264,7 @@ INFO_TABLE(stg_IND_direct,1,0,IND,"IND","IND")
     TICK_ENT_DYN_IND(); /* tick */
     node = StgInd_indirectee(node);
     TICK_ENT_VIA_NODE();
+    W_[ben_IND] = W_[ben_IND] + 1;
     jump %ENTRY_CODE(Sp(0)) (node);
 }
 
@@ -290,6 +293,7 @@ INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     P_ p, bq, msg;
 
     TICK_ENT_DYN_IND(); /* tick */
+    W_[ben_IND] = W_[ben_IND] + 1;
 
 retry:
     prim_read_barrier;
