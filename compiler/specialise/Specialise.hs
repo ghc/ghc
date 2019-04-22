@@ -5,7 +5,6 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 module Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
@@ -20,6 +19,7 @@ import Coercion( Coercion )
 import CoreMonad
 import qualified CoreSubst
 import CoreUnfold
+import CoreUtils
 import Var              ( isLocalVar )
 import VarSet
 import VarEnv
@@ -45,10 +45,7 @@ import UniqDFM
 
 import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
-import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
-import Data.List (partition)
-import Data.Traversable
 
 {-
 ************************************************************************
@@ -655,12 +652,6 @@ instance Outputable SpecArg where
   ppr (SpecDict d) = text "SpecDict" <+> ppr d
   ppr UnspecArg    = text "UnspecArg"
 
-isSpecialized :: SpecArg -> Bool
-isSpecialized (SpecType _) = True
-isSpecialized (SpecDict _) = True
-isSpecialized UnspecType   = False
-isSpecialized UnspecArg    = False
-
 getSpecDicts :: [SpecArg] -> [DictExpr]
 getSpecDicts = mapMaybe go
   where
@@ -678,61 +669,121 @@ isSpecOrUnspecType (SpecType _) = True
 isSpecOrUnspecType UnspecType = True
 isSpecOrUnspecType _ = False
 
-{- Note [Arguments for Specialised Call Rules]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When constructing a SPEC rule, we must differentiate between
-(1) unspecialised arguments, (2) specialised types, and (3)
-specialised dicts. These three cases correspond to the constructors
-of 'SpecRuleArg'.
+specHeader
+     :: SpecEnv
+     -> [CoreBndr]  -- The binders from the original function 'f'
+     -> [SpecArg]   -- From the CallInfo; padded out with [UnspecArgs]
+     -> SpecM ( [CoreBndr]   -- Binders for $sf
+              , SpecEnv      -- Substitution to apply to the body of 'f'
+              , [CoreBndr]   -- Binders for the RULE
+              , [CoreArg]    -- Args for the LHS of the rule
+              , [DictBind]   -- Auxiliary dictionary bindings
+              , [CoreExpr]   -- Specialised arguments
+              , Int          -- Arity decrease
+              )
+specHeader env [] _ = pure ([], env, [], [], [], [], 0)
 
-  (1) Unspecialised arguments require a binder, and must occur on
-      both the left and righthand sides of the rule. Corresponding
-      constructor: 'RuleUnspecArg'.
+-- If we have an unspecialised (value) argument, just
+-- copy it from the LHS to the RHS of the SPEC rule. For
+-- example, the '[SpecRuleArg]'
+--
+--   [RuleUnspecArg (foo :: Int)]
+--
+-- would correspond to
+--
+--   RULE "SPEC f"
+--     forall (foo :: Int).
+--       f foo = $sf foo
+specHeader env (bndr : bndrs) (UnspecArg : args)
+  = do { let (env', bndr') = substBndr env bndr
+       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease) <- specHeader env' bndrs args
+       ; pure ( bndr' : bs'
+              , env''
+              , bndr' : rule_bs
+              , varToCoreExpr bndr' : rule_es
+              , dx
+              , varToCoreExpr bndr' : spec_args
+              , arity_decrease
+              )
+       }
 
-  (2) Specialised types appear only on the lefthand side, and do not
-      require a binder. Corresponding constructor: 'RuleSpecType'.
+-- If we are specialising a type 't', we only need to
+-- bind it on the LHS of the rule.
+--
+--   [RuleSpecType Int]
+--
+--       -->
+--
+--   RULE "SPEC f @Int"
+--     f @Int = $sf
+specHeader env (bndr : bndrs) (SpecType t : args)
+  = do { (bs', env', rule_bs, rule_es, dx, spec_args, arity_decrease) <- specHeader env bndrs args
+       ; pure ( bs'
+              , env'
+              , rule_bs
+              , Type t : rule_es
+              , dx
+              , Type t : spec_args
+              , arity_decrease
+              )
+       }
 
-  (3) Specialised dicts appear only on the lefthand side, and _do_
-      require a binder.  See Note [Specialising Calls] for why.
-      Corresponding constructor: 'RuleSpecDict'.
+-- If we have an unspecialised type, it might have a type
+-- variable that itself should be specialised. Thus we
+-- must first substitute any specialised types through
+-- its binder. Consider the function
+--
+--   f :: forall m t. Monad m => t m ()
+--
+-- where we'd like to specialise (m ~ Maybe), but keep
+-- 't' unspecialised. The resuling specialising should
+-- have type
+--
+--   $sf :: forall t. t Maybe ()
+--
+-- which is to say that we've constructed
+--
+--   SUBST[m -> Maybe] ($sf :: forall t. t m ())
+specHeader env (bndr : bndrs) (UnspecType : args)
+  = do { let (env', bndr') = substBndr env bndr
+       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease) <- specHeader env' bndrs args
+       ; pure ( bndr' : bs'
+              , env''
+              , bndr' : rule_bs
+              , varToCoreExpr bndr' : rule_es
+              , dx
+              , varToCoreExpr bndr' : spec_args
+              , arity_decrease
+              )
+       }
 
-      *The binder to be used in the rule is the second 'CoreBndr'
-      in 'RuleSpecDict'.*
+-- Otherwise we want to specialise a dictionary 'd1',
+-- which requires constructing a new wildcard binder
+-- 'd1'' to match the dict.
+--
+--   [RuleSpecDict (d1 :: Enum Int) (d1' :: Enum Int)]
+--
+--       -->
+--
+--   RULE "SPEC f"
+--     forall (d1' :: Enum Int).
+--       f d1' = $sf
+specHeader env (bndr : bndrs) (SpecDict d : args)
+  = do { inst_dict_id <- newDictBndr env bndr
+       ; let (rhs_env2, dx_binds, spec_dict_args')
+                = bindAuxiliaryDicts env [bndr] [d] [inst_dict_id]
+       ; (bs', env', rule_bs, rule_es, dx, spec_args, arity_decrease) <- specHeader rhs_env2 bndrs args
+       ; pure ( bs'
+              , env'
+              , exprFreeIdsList (varToCoreExpr inst_dict_id) ++ rule_bs
+              , varToCoreExpr inst_dict_id : rule_es
+              , dx_binds ++ dx
+              , spec_dict_args' ++ spec_args
+              , arity_decrease + 1
+              )
+       }
 
-      The first 'CoreBndr' is used to later construct the usage
-      details, and is only kept here because of its magnificent
-      convenience.
 
-For example, given the following [SpecRuleArg]s:
-
-  [ RuleUnspecArg (x :: Int)
-  , RuleSpecType (Type T1)
-  , RuleSpecDict (d1 :: Foo T1) (d1' :: Foo T1)
-  ]
-
-we will generate the following rewrite-rule body:
-
-  forall (x :: Int) (d1' :: Foo T1).
-     something x @T1 d1' = $ssomething x
-
--}
-
--- | See Note [Arguments for Specialised Call Rules]
-data SpecRuleArg
-  = RuleSpecType  CoreExpr
-  | RuleSpecDict  CoreBndr  -- original binder
-                  CoreBndr  -- newly instantiated binder
-  | RuleUnspecArg CoreBndr
-
-instance Outputable SpecRuleArg where
-  ppr (RuleSpecType e)   = text "RuleSpecType" <+> ppr e
-  ppr (RuleSpecDict a b) = text "RuleSpecDict" <+> ppr a <+> ppr b
-  ppr (RuleUnspecArg e)  = text "RuleUnspecArg"  <+> ppr e
-
-isOnlyOnLeftSide :: SpecRuleArg -> Bool
-isOnlyOnLeftSide (RuleUnspecArg _)  = False
-isOnlyOnLeftSide (RuleSpecType _)   = True
-isOnlyOnLeftSide (RuleSpecDict _ _) = True
 
 -- | Given a type, split it along its introdution of type variables, and along
 -- its arrows.
@@ -752,46 +803,6 @@ splitTypeOnVarsAndArrows t
   | (args@(_:_), t') <- splitFunTys t      =
         fmap Right args ++ splitTypeOnVarsAndArrows t'
   | otherwise = [Right t]
-
--- | Given a type and a list of the arguments it wants to be specialised
--- relative to, construct a new type with those specialised parameters first.
--- It's trivial to beta-reduce away the specialised parameters from the
--- resulting type.
---
--- For example, consider the function 'f'
---
---    f :: Int -> forall a b c. (Foo a, Foo c) => Bar -> Qux
---
--- that we'd like to specialise with the [SpecArg]s
---
---    [ UnspecArg, SpecType T1, UnspecType, SpecType t3, SpecDict $dFooT1
---    , SpecDict $dFooT3, UnspecArg]
---
--- which is to say, we'd like to specialise at (a ~ T1, c ~ T3).
---
--- The result of calling 'moveSpecArgsToFront' here is
---
---    forall a c. (Foo a, Foo c) => Int -> forall b. Bar -> Qux
---
--- which can now be beta-reduced via by application of T1 T3 (Foo T1) (Foo T3)
--- in order to ultimately arrive at the desired, specialised type of '$sf':
---
---    $sf :: Int -> forall b. Bar -> Qux
-moveSpecArgsToFront :: Type -> [SpecArg] -> Type
-moveSpecArgsToFront ty args = ravelFun $ fmap snd (specs ++ unspecs) ++ [t_res]
-  where
-    unraveled            = splitTypeOnVarsAndArrows ty
-    Just (t_args, t_res) = snocView unraveled
-    (specs, unspecs)     = partition (isSpecialized . fst)
-                         $ zip (args ++ repeat UnspecArg) t_args
-                           -- See Note [Repeating UnspecArgs]
-
-    ravelFun :: [Either TyVar Type] -> Type
-    ravelFun []             = pprPanic "ravelFun" $ empty
-    ravelFun [Right t]      = t
-    ravelFun [Left tv]      = pprPanic "ravelFun" $ ppr tv
-    ravelFun (Left tv : ts) = mkForAllTy tv Specified $ ravelFun ts
-    ravelFun (Right t : ts) = mkVisFunTy t $ ravelFun ts
 
 -- | Specialise a set of calls to imported bindings
 specImports :: DynFlags
@@ -1380,18 +1391,6 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
          -- NB: we look both in the new_rules (generated by this invocation
          --     of specCalls), and in existing_rules (passed in to specCalls)
 
-    mk_spec_args :: [SpecRuleArg] -> [CoreExpr] -> [CoreExpr]
-    mk_spec_args [] args
-      = ASSERT( null args ) []
-    mk_spec_args (RuleSpecDict _ _ : rule_args) (arg : args)
-      = arg : mk_spec_args rule_args args
-    mk_spec_args rule_args@(RuleSpecDict _ _ : _) [] =
-      pprPanic "mk_spec_args" $ ppr rule_args
-    mk_spec_args (RuleSpecType ty : rule_args) args
-      = ty : mk_spec_args rule_args args
-    mk_spec_args (RuleUnspecArg ty : rule_args) args
-      = varToCoreExpr ty : mk_spec_args rule_args args
-
     ----------------------------------------------------------
         -- Specialise to one particular call pattern
     spec_call :: SpecInfo                         -- Accumulating parameter
@@ -1410,102 +1409,8 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                 spec_tv_binds = [(tv,ty) | (tv, SpecType ty) <- rhs_bndrs `zip` call_args]
                 env1          = extendTvSubstList env spec_tv_binds
 
-                -- Take only need enough etas to bind each of the specialised arguments
-                (extra_etas, necessary_etas)
-                     = spanEnd (not . isSpecialized . snd)
-                     $ rhs_bndrs `zip` (call_args ++ repeat UnspecArg)
-                                   -- See Note [Repeating UnspecArgs]
-                body = mkLams (fmap fst extra_etas) rhs_body
-
-           -- For each binder, determine what capacity (if any) it should play in the rewrite rule.
-           -- See Note [Arguments for Specialised Call Rules]
-           ; (spec_rule_args, rhs_env)
-               <- flip runStateT env1
-                          $ for necessary_etas $ \(bndr, arg) ->
-                    case arg of
-                      -- If we have an unspecialised (value) argument, just
-                      -- copy it from the LHS to the RHS of the SPEC rule. For
-                      -- example, the '[SpecRuleArg]'
-                      --
-                      --   [RuleUnspecArg (foo :: Int)]
-                      --
-                      -- would correspond to
-                      --
-                      --   RULE "SPEC f"
-                      --     forall (foo :: Int).
-                      --       f foo = $sf foo
-                      UnspecArg  -> pure $ RuleUnspecArg bndr
-
-                      -- If we are specialising a type 't', we only need to
-                      -- bind it on the LHS of the rule.
-                      --
-                      --   [RuleSpecType Int]
-                      --
-                      --       -->
-                      --
-                      --   RULE "SPEC f @Int"
-                      --     f @Int = $sf
-                      SpecType t -> pure $ RuleSpecType $ Type t
-
-                      -- If we have an unspecialised type, it might have a type
-                      -- variable that itself should be specialised. Thus we
-                      -- must first substitute any specialised types through
-                      -- its binder. Consider the function
-                      --
-                      --   f :: forall m t. Monad m => t m ()
-                      --
-                      -- where we'd like to specialise (m ~ Maybe), but keep
-                      -- 't' unspecialised. The resuling specialising should
-                      -- have type
-                      --
-                      --   $sf :: forall t. t Maybe ()
-                      --
-                      -- which is to say that we've constructed
-                      --
-                      --   SUBST[m -> Maybe] ($sf :: forall t. t m ())
-                      UnspecType -> do
-                        env <- get
-                        let (env', bndr') = substBndr env bndr
-                        put env'
-                        pure $ RuleUnspecArg bndr'
-
-                      -- Otherwise we want to specialise a dictionary 'd1',
-                      -- which requires constructing a new wildcard binder
-                      -- 'd1'' to match the dict.
-                      --
-                      --   [RuleSpecDict (d1 :: Enum Int) (d1' :: Enum Int)]
-                      --
-                      --       -->
-                      --
-                      --   RULE "SPEC f"
-                      --     forall (d1' :: Enum Int).
-                      --       f d1' = $sf
-                      SpecDict _ -> do
-                        env <- get
-                        -- Clone rhs_dicts, including instantiating their types
-                        inst_dict_id <- lift $ newDictBndr env bndr
-                        pure $ RuleSpecDict bndr inst_dict_id
-
-           ; let unspec_bndrs =
-                  [ bndr | RuleUnspecArg bndr <- spec_rule_args ]
-                 (rhs_dict_ids, inst_dict_ids) = unzip
-                  [ (bndr, inst_bndr) | RuleSpecDict bndr inst_bndr <- spec_rule_args ]
-
-                 (rhs_env2, dx_binds, spec_dict_args)
-                            = bindAuxiliaryDicts rhs_env rhs_dict_ids call_ds inst_dict_ids
-
-                 rule_bndrs = flip concatMap spec_rule_args $ \case
-                   RuleSpecType _   -> []
-                   RuleSpecDict _ x -> exprFreeIdsList $ varToCoreExpr x
-                   RuleUnspecArg x  -> [x]
-
-                 rule_args = flip map spec_rule_args $ \case
-                   RuleSpecType x   -> x
-                   RuleSpecDict _ x -> varToCoreExpr x
-                   RuleUnspecArg x  -> varToCoreExpr x
-
-                 shuffled_ty = moveSpecArgsToFront fn_type call_args
-
+           ; (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, arity_decrease)
+               <- specHeader env1 rhs_bndrs $ call_args ++ repeat UnspecArg
            ; dflags <- getDynFlags
            ; if already_covered dflags rules_acc rule_args
              then return spec_acc
@@ -1515,14 +1420,12 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   do
            {    -- Figure out the type of the specialised function
                 -- See Note [Specialising Calls]
-             let body_ty = applyTypeToArgs rhs shuffled_ty
-                         . fmap fst
-                         . filter (isOnlyOnLeftSide . snd)
-                         $ rule_args `zip` spec_rule_args
+             let body = mkLams unspec_bndrs rhs_body
+                 body_ty = substTy rhs_env2 $ exprType body
                  (lam_extra_args, app_args)     -- Add a dummy argument if body_ty is unlifted
                    | isUnliftedType body_ty     -- C.f. WwLib.mkWorkerArgs
                    , not (isJoinId fn)
-                   = ([voidArgId], unspec_bndrs ++ [voidPrimId])
+                   = ([voidArgId], voidPrimId : unspec_bndrs)
                    | otherwise = ([], unspec_bndrs)
                  spec_id_ty = mkLamTypes lam_extra_args body_ty
                  join_arity_change = length app_args - length rule_args
@@ -1531,8 +1434,8 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                  | otherwise
                                  = Nothing
 
+           ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams lam_extra_args body)
            ; spec_f <- newSpecIdSM fn spec_id_ty spec_join_arity
-           ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams (unspec_bndrs ++ lam_extra_args) body)
            ; this_mod <- getModule
            ; let
                 -- The rule to put in the function's specialisation is:
@@ -1588,8 +1491,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   = (inl_prag, specUnfolding dflags unspec_bndrs spec_app
                                              arity_decrease fn_unf)
 
-                arity_decrease = length spec_dict_args
-                spec_app e = e `mkApps` mk_spec_args spec_rule_args spec_dict_args
+                spec_app e = e `mkApps` spec_args
 
                 --------------------------------------
                 -- Adding arity information just propagates it a bit faster
@@ -1601,9 +1503,10 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                         `setIdUnfolding`  spec_unf
                                         `asJoinId_maybe`  spec_join_arity
 
-                _rule_trace_doc = vcat [ ppr spec_f, ppr fn_type, ppr shuffled_ty
+                _rule_trace_doc = vcat [ ppr spec_f, ppr fn_type, ppr spec_id_ty
                                        , ppr rhs_bndrs, ppr spec_tv_binds, ppr call_args
-                                       , ppr spec_rule ]
+                                       , ppr spec_rule, ppr body
+                                       ]
 
            ; -- pprTrace "spec_call: rule" _rule_trace_doc
              return ( spec_rule                  : rules_acc
