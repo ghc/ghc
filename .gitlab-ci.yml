@@ -450,12 +450,7 @@ validate-x86_64-linux-fedora27:
     # which will shorten the drive and give us length(cd)-2 lengths back from
     # the MAX_PATH limit.
     - |
-      subst W: /D > nul
-      subst X: /D > nul
-      subst Y: /D > nul
-      subst Z: /D > nul
       for /f "delims=" %%a in ('.gitlab\find-free-drive-letter.bat') do @set ndir=%%a
-      subst %ndir%: /D > nul
       subst %ndir%: .
       pushd %ndir%:
 
@@ -477,11 +472,6 @@ validate-x86_64-linux-fedora27:
     - rd /s /q tmp
     - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
     - bash -c 'make clean || true'
-
-    # Now clean up after the build
-    - |
-      popd
-      subst %ndir%: /D > nul
   dependencies: []
   variables:
     FORCE_SYMLINKS: 1
@@ -633,6 +623,9 @@ cleanup-windows:
     # See https://stackoverflow.com/questions/1965787
     - del %BUILD_DIR%\* /F /Q
     - for /d %%p in (%BUILD_DIR%\*) do rd /Q /S "%%p"
+    # Now clean up drive letter mappings
+    - popd
+    - subst %ndir%: /D
     - exit /b 0
 
 # See Note [Cleanup after shell executor]
