@@ -281,7 +281,7 @@ GarbageCollect (uint32_t collect_gen,
       // lose locality by moving cached data into another CPU's cache
       // (this effect can be quite significant).
       //
-      // We could have a more complex way to deterimine whether to do
+      // We could have a more complex way to determine whether to do
       // work stealing or not, e.g. it might be a good idea to do it
       // if the heap is big.  For now, we just turn it on or off with
       // a flag.

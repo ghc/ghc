@@ -184,8 +184,8 @@ STATIC_LINK(const StgInfoTable *info, StgClosure *p)
     case IND_STATIC:
         return IND_STATIC_LINK(p);
     default:
-        return &(p)->payload[info->layout.payload.ptrs +
-                             info->layout.payload.nptrs];
+        return &p->payload[info->layout.payload.ptrs +
+                           info->layout.payload.nptrs];
     }
 }
 
