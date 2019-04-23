@@ -1,0 +1,2 @@
+
+cmdFail005.hs:4:15: error: Parse error in command: x@(_ -< _)
