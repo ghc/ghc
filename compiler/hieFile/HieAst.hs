@@ -870,18 +870,6 @@ instance ( a ~ GhcPass p
       HsSpliceE _ x ->
         [ toHie $ L mspan x
         ]
-      EWildPat _ -> []
-      EAsPat _ a b ->
-        [ toHie $ C Use a
-        , toHie b
-        ]
-      EViewPat _ a b ->
-        [ toHie a
-        , toHie b
-        ]
-      ELazyPat _ a ->
-        [ toHie a
-        ]
       XExpr _ -> []
 
 instance ( a ~ GhcPass p

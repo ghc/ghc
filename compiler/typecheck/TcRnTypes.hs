@@ -3662,10 +3662,6 @@ exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsTick _ _ e)           = lexprCtOrigin e
 exprCtOrigin (HsBinTick _ _ _ e)      = lexprCtOrigin e
 exprCtOrigin (HsTickPragma _ _ _ _ e) = lexprCtOrigin e
-exprCtOrigin (EWildPat {})      = panic "exprCtOrigin EWildPat"
-exprCtOrigin (EAsPat {})        = panic "exprCtOrigin EAsPat"
-exprCtOrigin (EViewPat {})      = panic "exprCtOrigin EViewPat"
-exprCtOrigin (ELazyPat {})      = panic "exprCtOrigin ELazyPat"
 exprCtOrigin (HsWrap {})        = panic "exprCtOrigin HsWrap"
 exprCtOrigin (XExpr {})         = panic "exprCtOrigin XExpr"
 
