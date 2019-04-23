@@ -401,14 +401,11 @@ generate directory distdir config_args
           otherMods = map display (otherModules bi)
           buildDir' = map (\c -> if c=='\\' then '/' else c) $ buildDir lbi
 
-      let pid = case Map.lookup "Target platform" (compilerProperties . compiler $ lbi) of
-                  Just target -> target ++ "-" ++ localCompatPackageKey lbi
-                  Nothing -> localCompatPackageKey lbi
 
 
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 -- TODO: move inside withLibLBI
-                variablePrefix ++ "_COMPONENT_ID = " ++ pid,
+                variablePrefix ++ "_COMPONENT_ID = " ++ localCompatPackageKey lbi,
                 variablePrefix ++ "_LIBRARY_NAME = " ++ localCompatPackageKey lbi,
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
