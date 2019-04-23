@@ -1503,14 +1503,15 @@ lookupBindGroupOcc ctxt what rdr_name
           [n] -> text "Perhaps you meant" <+>
                  quotes (ppr n) <+>
                  parens (pprDefinedAt n)
-          _   -> text "Perhaps you meant one of these:" <+>
-                 pprWithCommas (\x -> quotes (ppr x) <+> parens (pprDefinedAt x))
-                               similar_names
+          _   -> sep [ text "Perhaps you meant one of these:"
+                     , nest 2 (pprWithCommas pp_item similar_names) ]
       where
         similar_names
           = fuzzyLookup (unpackFS $ occNameFS $ rdrNameOcc rdr_name)
                         $ map (\x -> ((unpackFS $ occNameFS $ nameOccName x), x))
                               names_in_scope
+
+        pp_item x = quotes (ppr x) <+> parens (pprDefinedAt x)
 
 
 ---------------
