@@ -669,6 +669,11 @@ isSpecOrUnspecType (SpecType _) = True
 isSpecOrUnspecType UnspecType = True
 isSpecOrUnspecType _ = False
 
+isUnspecArg :: SpecArg -> Bool
+isUnspecArg UnspecArg = True
+isUnspecArg UnspecType = True
+isUnspecArg _ = False
+
 specHeader
      :: SpecEnv
      -> [CoreBndr]  -- The binders from the original function 'f'
@@ -716,7 +721,7 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
 --
 --   RULE "SPEC f @Int"
 --     f @Int = $sf
-specHeader env (bndr : bndrs) (SpecType t : args)
+specHeader env (_ : bndrs) (SpecType t : args)
   = do { (bs', env', rule_bs, rule_es, dx, spec_args, arity_decrease) <- specHeader env bndrs args
        ; pure ( bs'
               , env'
@@ -1409,6 +1414,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                 spec_tv_binds = [(tv,ty) | (tv, SpecType ty) <- rhs_bndrs `zip` call_args]
                 env1          = extendTvSubstList env spec_tv_binds
 
+           -- TODO(sandy): only spec on necessary etas
            ; (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, arity_decrease)
                <- specHeader env1 rhs_bndrs $ call_args ++ repeat UnspecArg
            ; dflags <- getDynFlags
@@ -1420,7 +1426,9 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   do
            {    -- Figure out the type of the specialised function
                 -- See Note [Specialising Calls]
-             let body = mkLams unspec_bndrs rhs_body
+             let num_trailing_unnecessary_etas
+                     = numUnspecialisedTrailingEtas rhs_bndrs $ call_args ++ repeat UnspecArg
+                 body = mkLams unspec_bndrs rhs_body
                  body_ty = substTy rhs_env2 $ exprType body
                  (lam_extra_args, app_args)     -- Add a dummy argument if body_ty is unlifted
                    | isUnliftedType body_ty     -- C.f. WwLib.mkWorkerArgs
@@ -1462,9 +1470,11 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                   rule_name
                                   inl_act       -- Note [Auto-specialisation and RULES]
                                   (idName fn)
-                                  rule_bndrs
-                                  rule_args
-                                  (mkVarApps (Var spec_f) app_args)
+                                  -- TODO(sandy): only enough bndrs for the
+                                  -- necessary etas
+                                  (dropTail num_trailing_unnecessary_etas rule_bndrs)
+                                  (dropTail num_trailing_unnecessary_etas rule_args)
+                                  (mkVarApps (Var spec_f) $ dropTail num_trailing_unnecessary_etas app_args)
 
                 spec_rule
                   = case isJoinId_maybe fn of
@@ -1505,14 +1515,24 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
 
                 _rule_trace_doc = vcat [ ppr spec_f, ppr fn_type, ppr spec_id_ty
                                        , ppr rhs_bndrs, ppr spec_tv_binds, ppr call_args
-                                       , ppr spec_rule, ppr body
+                                       , ppr spec_rule, ppr num_trailing_unnecessary_etas
                                        ]
 
-           ; -- pprTrace "spec_call: rule" _rule_trace_doc
+           ; pprTrace "spec_call: rule" _rule_trace_doc
              return ( spec_rule                  : rules_acc
                     , (spec_f_w_arity, spec_rhs) : pairs_acc
                     , spec_uds           `plusUDs` uds_acc
                     ) } }
+
+
+numUnspecialisedTrailingEtas :: [CoreBndr] -> [SpecArg] -> Int
+numUnspecialisedTrailingEtas bndrs args
+    = length
+    . takeWhile (isUnspecArg . snd)
+    . reverse
+    . zip bndrs
+    $ args ++ repeat UnspecArg
+
 
 {- Note [Specialising Calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
