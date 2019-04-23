@@ -113,7 +113,7 @@ lint-release-changelogs:
   extends: .lint-changelogs
   only:
     refs:
-      - /ghc-[0-9]+\.[0-9]+\.[0-9]+-.*/
+      - /ghc-[0-9]+\.[0-9]+\.[0-9]+-.*-release/
 
 
 ############################################################
