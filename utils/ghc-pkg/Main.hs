@@ -1918,7 +1918,7 @@ checkUnitId ipi db_stack update = do
   when (null (display uid)) $ verror CannotForce "missing id field"
   when (display uid /= compatPackageKey ipi) $
     verror CannotForce $ "installed package info from too old version of Cabal "
-                      ++ "(key field does not match id field)"
+                      ++ "(key field `" ++ compatPackageKey ipi ++ "' does not match id field `" ++ display uid ++ "')"
   let dups = [ p | p <- allPackagesInStack db_stack,
                    installedUnitId p == uid ]
   when (not update && not (null dups)) $
