@@ -1,0 +1,3 @@
+
+patFail004.hs:3:4: error:
+    (if ... then ... else ...)-syntax in pattern

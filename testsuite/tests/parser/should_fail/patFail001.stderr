@@ -1,0 +1,4 @@
+
+patFail001.hs:3:4: error:
+    Lambda-syntax in pattern.
+    Pattern matching on functions is not possible.

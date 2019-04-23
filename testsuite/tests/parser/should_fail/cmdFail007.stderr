@@ -1,0 +1,4 @@
+
+cmdFail007.hs:5:7: error:
+    Parse error in command:
+      (_ -< _) {a = _ -< _, b = _ -< _, c = _ -< _}
