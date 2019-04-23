@@ -752,10 +752,6 @@ ds_expr _ (HsTickPragma _ _ _ _ expr) = do
 
 -- HsSyn constructs that just shouldn't be here:
 ds_expr _ (HsBracket     {})  = panic "dsExpr:HsBracket"
-ds_expr _ (EWildPat      {})  = panic "dsExpr:EWildPat"
-ds_expr _ (EAsPat        {})  = panic "dsExpr:EAsPat"
-ds_expr _ (EViewPat      {})  = panic "dsExpr:EViewPat"
-ds_expr _ (ELazyPat      {})  = panic "dsExpr:ELazyPat"
 ds_expr _ (HsDo          {})  = panic "dsExpr:HsDo"
 ds_expr _ (HsRecFld      {})  = panic "dsExpr:HsRecFld"
 ds_expr _ (XExpr         {})  = panic "dsExpr: XExpr"
