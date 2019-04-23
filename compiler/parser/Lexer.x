@@ -58,7 +58,6 @@ module Lexer (
    activeContext, nextIsEOF,
    getLexState, popLexState, pushLexState,
    ExtBits(..),
-   addWarning,
    lexTokenStream,
    AddAnn,mkParensApiAnn,
    commentToAnnotation
@@ -2493,6 +2492,9 @@ class Monad m => MonadP m where
   --   more than one parse error per file.
   --
   addError :: SrcSpan -> SDoc -> m ()
+  -- | Add a warning to the accumulator.
+  --   Use 'getMessages' to get the accumulated warnings.
+  addWarning :: WarningFlag -> SrcSpan -> SDoc -> m ()
   -- | Add a fatal error. This will be the last error reported by the parser, and
   --   the parser will not produce any result, ending in a 'PFailed' state.
   addFatalError :: SrcSpan -> SDoc -> m a
@@ -2515,6 +2517,16 @@ instance MonadP P where
                      es' = es `snocBag` errormsg
                  in (ws, es')
          in POk s{messages=m'} ()
+  addWarning option srcspan warning
+   = P $ \s@PState{messages=m, options=o} ->
+         let
+             m' d =
+                 let (ws, es) = m d
+                     warning' = makeIntoWarning (Reason option) $
+                        mkWarnMsg d srcspan alwaysQualify warning
+                     ws' = if warnopt option o then ws `snocBag` warning' else ws
+                 in (ws', es)
+         in POk s{messages=m'} ()
   addFatalError span msg =
     addError span msg >> P PFailed
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
@@ -2523,20 +2535,6 @@ instance MonadP P where
   addAnnotation l a v = do
     addAnnotationOnly l a v
     allocateComments l
-
--- | Add a warning to the accumulator.
---   Use 'getMessages' to get the accumulated warnings.
-addWarning :: WarningFlag -> SrcSpan -> SDoc -> P ()
-addWarning option srcspan warning
- = P $ \s@PState{messages=m, options=o} ->
-       let
-           m' d =
-               let (ws, es) = m d
-                   warning' = makeIntoWarning (Reason option) $
-                      mkWarnMsg d srcspan alwaysQualify warning
-                   ws' = if warnopt option o then ws `snocBag` warning' else ws
-               in (ws', es)
-       in POk s{messages=m'} ()
 
 addTabWarning :: RealSrcSpan -> P ()
 addTabWarning srcspan

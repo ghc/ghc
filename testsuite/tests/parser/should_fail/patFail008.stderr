@@ -1,0 +1,2 @@
+
+patFail008.hs:4:4: error: Command syntax in pattern: a -< b
