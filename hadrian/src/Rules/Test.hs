@@ -107,6 +107,9 @@ testRules = do
         --       Shake can keep track of them, but it is not as easy as it seems
         --       to get that to work.
         liftIO $ do
+            -- Many of those env vars are used by Makefiles in the
+            -- test infrastructure, or from tests or their
+            -- Makefiles.
             setEnv "MAKE" makePath
             setEnv "PYTHON" pythonPath
             setEnv "TEST_HC" ghcPath
@@ -115,6 +118,11 @@ testRules = do
             setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
             setEnv "CHECK_API_ANNOTATIONS"
                    (top -/- root -/- checkApiAnnotationsProgPath)
+
+            -- This lets us bypass the need to generate a config
+            -- through Make, which happens in testsuite/mk/boilerplate.mk
+            -- which is in turn included by all test 'Makefile's.
+            setEnv "ghc-config-mk" (top -/- root -/- ghcConfigPath)
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
