@@ -1504,9 +1504,7 @@ lookupBindGroupOcc ctxt what rdr_name
     candidates names_in_scope
       = case similar_names of
           []  -> Outputable.empty
-          [n] -> text "Perhaps you meant" <+>
-                 quotes (ppr n) <+>
-                 parens (pprDefinedAt n)
+          [n] -> text "Perhaps you meant" <+> pp_item n
           _   -> sep [ text "Perhaps you meant one of these:"
                      , nest 2 (pprWithCommas pp_item similar_names) ]
       where
