@@ -1,5 +1,19 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase #-}
 
+-- | Defines a simple exception type and utilities to throw it. The
+-- 'PlainGhcException' type is a subset of the 'Panic.GhcException'
+-- type.  It omits the exception constructors that involve
+-- pretty-printing via 'Outputable.SDoc'.
+--
+-- There are two reasons for this:
+--
+-- 1. To avoid import cycles / use of boot files. "Outputable" has
+-- many transitive dependencies. To throw exceptions from these
+-- modules, the functions here can be used without introducing import
+-- cycles.
+--
+-- 2. To reduce the number of modules that need to be compiled to
+-- object code when loading GHC into GHCi. See #13101
 module PlainPanic
   ( PlainGhcException(..)
   , showPlainGhcException
@@ -20,6 +34,15 @@ import GhcPrelude
 import System.Environment
 import System.IO.Unsafe
 
+-- | This type is very similar to 'Panic.GhcException', but it omits
+-- the constructors that involve pretty-printing via
+-- 'Outputable.SDoc'.  Due to the implementation of 'fromException'
+-- for 'Panic.GhcException', this type can be caught as a
+-- 'Panic.GhcException'.
+--
+-- Note that this should only be used for throwing exceptions, not for
+-- catching, as 'Panic.GhcException' will not be converted to this
+-- type when catching.
 data PlainGhcException
   -- | Some other fatal signal (SIGHUP,SIGTERM)
   = PlainSignal Int
