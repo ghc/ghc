@@ -4,6 +4,7 @@ module M where
 -- Both in global scope
 simpleFuntcion :: Int -> Bool
 simpleFunction i = i > 5
+simpleFunction2 i = i < 5
 
 -- Both in local scope
 f x = anotherFunction x
