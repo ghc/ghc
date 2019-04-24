@@ -747,6 +747,7 @@ source-tarball:
   tags:
     - x86_64-linux
   image: ghcci/x86_64-linux-deb9:0.2
+  dependencies: []
   only:
     - tags
   artifacts:
