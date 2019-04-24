@@ -406,6 +406,8 @@ release-x86_64-linux-deb8:
   variables:
     TEST_ENV: "x86_64-linux-deb8"
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-deb8-linux.tar.xz"
+    # Disable sphinx PDF output as our Debian image doesn't have the requisite packages
+    BUILD_SPHINX_PDF: "NO"
   only:
     - tags
   cache:
