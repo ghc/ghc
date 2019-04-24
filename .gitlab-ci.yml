@@ -671,7 +671,8 @@ source-tarball:
   stage: packaging
   tags:
     - x86_64-linux
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  dependencies: []
   only:
     - tags
   artifacts:
@@ -700,7 +701,7 @@ source-tarball:
 .hackage:
   <<: *only-default
   stage: hackage
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   tags:
     - x86_64-linux
   dependencies: []
