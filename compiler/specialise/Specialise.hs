@@ -721,10 +721,11 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
 --
 --   RULE "SPEC f @Int"
 --     f @Int = $sf
-specHeader env (_ : bndrs) (SpecType t : args)
-  = do { (bs', env', rule_bs, rule_es, dx, spec_args, arity_decrease) <- specHeader env bndrs args
+specHeader env (bndr : bndrs) (SpecType t : args)
+  = do { let env' = extendTvSubstList env [(bndr, t)]
+       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease) <- specHeader env' bndrs args
        ; pure ( bs'
-              , env'
+              , env''
               , rule_bs
               , Type t : rule_es
               , dx
@@ -1413,12 +1414,8 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
         ASSERT( call_ts `lengthIs` n_tyvars  && call_ds `lengthIs` n_dicts )
 
         -- See Note [Specialising Calls]
-        do { let
-                spec_tv_binds = [(tv,ty) | (tv, SpecType ty) <- rhs_bndrs `zip` call_args]
-                env1          = extendTvSubstList env spec_tv_binds
-
-           ; (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, arity_decrease)
-               <- specHeader env1 rhs_bndrs
+        do { (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, arity_decrease)
+               <- specHeader env rhs_bndrs
                 $ call_args ++ repeat UnspecArg   -- See note [Repeating UnspecArgs]
            ; dflags <- getDynFlags
            ; if already_covered dflags rules_acc rule_args
@@ -1439,7 +1436,6 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                    , not (isJoinId fn)
                    = ([voidArgId], voidPrimId : unspec_bndrs)
                    | otherwise = ([], unspec_bndrs)
-                 spec_id_ty = mkLamTypes lam_extra_args body_ty
                  join_arity_change = length app_args - length rule_args
                  spec_join_arity | Just orig_join_arity <- isJoinId_maybe fn
                                  = Just (orig_join_arity + join_arity_change)
@@ -1447,6 +1443,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                  = Nothing
 
            ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams lam_extra_args body)
+           ; let spec_id_ty = exprType spec_rhs
            ; spec_f <- newSpecIdSM fn spec_id_ty spec_join_arity
            ; this_mod <- getModule
            ; let
@@ -1516,7 +1513,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                         `asJoinId_maybe`  spec_join_arity
 
                 _rule_trace_doc = vcat [ ppr spec_f, ppr fn_type, ppr spec_id_ty
-                                       , ppr rhs_bndrs, ppr spec_tv_binds, ppr call_args
+                                       , ppr rhs_bndrs, ppr call_args
                                        , ppr spec_rule
                                        ]
 
