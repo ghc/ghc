@@ -1497,6 +1497,8 @@ lookupBindGroupOcc ctxt what rdr_name
     local_msg = parens $ text "The"  <+> what <+> ptext (sLit "must be given where")
                            <+> quotes (ppr rdr_name) <+> text "is declared"
 
+    -- Identify all similar names and produce a message listing them
+    candidates :: [Name] -> MsgDoc
     candidates names_in_scope
       = case similar_names of
           []  -> Outputable.empty
