@@ -1429,7 +1429,8 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   do
            {    -- Figure out the type of the specialised function
              let unnecessary_etas
-                     = numUnspecialisedTrailingEtas rhs_bndrs
+                     = countEndWhile (isUnspecArg . snd)
+                     . zip rhs_bndrs
                      $ call_args ++ repeat UnspecArg  -- See note [Repeating UnspecArgs]
                  body = mkLams unspec_bndrs rhs_body
                  body_ty = substTy rhs_env2 $ exprType body
@@ -1524,15 +1525,6 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                     , (spec_f_w_arity, spec_rhs) : pairs_acc
                     , spec_uds           `plusUDs` uds_acc
                     ) } }
-
-
-numUnspecialisedTrailingEtas :: [CoreBndr] -> [SpecArg] -> Int
-numUnspecialisedTrailingEtas bndrs args
-    = length
-    . takeWhile (isUnspecArg . snd)
-    . reverse
-    $ zip bndrs args
-
 
 {- Note [Specialising Calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
