@@ -751,7 +751,8 @@ specHeader env (_ : bndrs) (SpecType t : args)
 --   SUBST[m -> Maybe] ($sf :: forall t. t m ())
 specHeader env (bndr : bndrs) (UnspecType : args)
   = do { let (env', bndr') = substBndr env bndr
-       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease) <- specHeader env' bndrs args
+       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease)
+            <- specHeader env' bndrs args
        ; pure ( bndr' : bs'
               , env''
               , bndr' : rule_bs
@@ -777,9 +778,11 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
   = do { inst_dict_id <- newDictBndr env bndr
        ; let (rhs_env2, dx_binds, spec_dict_args')
                 = bindAuxiliaryDicts env [bndr] [d] [inst_dict_id]
-       ; (bs', env', rule_bs, rule_es, dx, spec_args, arity_decrease) <- specHeader rhs_env2 bndrs args
+       ; (bs', env', rule_bs, rule_es, dx, spec_args, arity_decrease)
+             <- specHeader rhs_env2 bndrs args
        ; pure ( bs'
               , env'
+              -- See Note [Evidence foralls]
               , exprFreeIdsList (varToCoreExpr inst_dict_id) ++ rule_bs
               , varToCoreExpr inst_dict_id : rule_es
               , dx_binds ++ dx
@@ -1414,9 +1417,9 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                 spec_tv_binds = [(tv,ty) | (tv, SpecType ty) <- rhs_bndrs `zip` call_args]
                 env1          = extendTvSubstList env spec_tv_binds
 
-           -- TODO(sandy): only spec on necessary etas
            ; (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, arity_decrease)
-               <- specHeader env1 rhs_bndrs $ call_args ++ repeat UnspecArg
+               <- specHeader env1 rhs_bndrs
+                $ call_args ++ repeat UnspecArg   -- See note [Repeating UnspecArgs]
            ; dflags <- getDynFlags
            ; if already_covered dflags rules_acc rule_args
              then return spec_acc
@@ -1425,9 +1428,9 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   --                           , ppr dx_binds ]) $
                   do
            {    -- Figure out the type of the specialised function
-                -- See Note [Specialising Calls]
-             let num_trailing_unnecessary_etas
-                     = numUnspecialisedTrailingEtas rhs_bndrs $ call_args ++ repeat UnspecArg
+             let unnecessary_etas
+                     = numUnspecialisedTrailingEtas rhs_bndrs
+                     $ call_args ++ repeat UnspecArg  -- See note [Repeating UnspecArgs]
                  body = mkLams unspec_bndrs rhs_body
                  body_ty = substTy rhs_env2 $ exprType body
                  (lam_extra_args, app_args)     -- Add a dummy argument if body_ty is unlifted
@@ -1470,11 +1473,9 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                   rule_name
                                   inl_act       -- Note [Auto-specialisation and RULES]
                                   (idName fn)
-                                  -- TODO(sandy): only enough bndrs for the
-                                  -- necessary etas
-                                  (dropTail num_trailing_unnecessary_etas rule_bndrs)
-                                  (dropTail num_trailing_unnecessary_etas rule_args)
-                                  (mkVarApps (Var spec_f) $ dropTail num_trailing_unnecessary_etas app_args)
+                                  (dropTail unnecessary_etas rule_bndrs)
+                                  (dropTail unnecessary_etas rule_args)
+                                  (mkVarApps (Var spec_f) $ dropTail unnecessary_etas app_args)
 
                 spec_rule
                   = case isJoinId_maybe fn of
@@ -1515,7 +1516,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
 
                 _rule_trace_doc = vcat [ ppr spec_f, ppr fn_type, ppr spec_id_ty
                                        , ppr rhs_bndrs, ppr spec_tv_binds, ppr call_args
-                                       , ppr spec_rule, ppr num_trailing_unnecessary_etas
+                                       , ppr spec_rule
                                        ]
 
            ; -- pprTrace "spec_call: rule" _rule_trace_doc
@@ -1530,8 +1531,7 @@ numUnspecialisedTrailingEtas bndrs args
     = length
     . takeWhile (isUnspecArg . snd)
     . reverse
-    . zip bndrs
-    $ args ++ repeat UnspecArg
+    $ zip bndrs args
 
 
 {- Note [Specialising Calls]
@@ -1568,17 +1568,7 @@ Note that the substitution is applied to the whole thing.  This is
 convenient, but just slightly fragile.  Notably:
   * There had better be no name clashes in a/b/c
 
-In order to construct the type of '$sf', we must first reorder its
-parameters so that the to-be-specialised ones come first:
-
-    forall a c. (Foo a, Foo c) => Int -> forall b. Bar -> Qux
-
-Then by applying '@T1' '@T3' 'Foo T1' 'Foo T3' to this reodering, we
-get the desired type:
-
-    Int -> forall b. Bar -> Qux
-
-Next we must construct a rewrite rule:
+We must construct a rewrite rule:
 
     RULE "SPEC f @T1 _ @T3"
       forall (x :: Int) (@b :: Type) (d1' :: Foo T1) (d2' :: Foo T3).
