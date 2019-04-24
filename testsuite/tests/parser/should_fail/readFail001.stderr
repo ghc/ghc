@@ -1,8 +1,6 @@
 
 readFail001.hs:25:11: error:
     The fixity signature for ‘+#’ lacks an accompanying binding
-      Perhaps you meant one of these:
-        ‘+’ (Defined in ‘GHC.Num’), ‘++’ (Defined in ‘GHC.Base’)
 
 readFail001.hs:38:32: error:
     Not in scope: type constructor or class ‘Leaf’

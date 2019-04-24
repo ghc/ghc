@@ -2,13 +2,15 @@
 T16504.hs:5:1: error:
     The type signature for ‘simpleFuntcion’
       lacks an accompanying binding
-      Perhaps you meant ‘simpleFunction’ (Defined at T16504.hs:6:1)
+      Perhaps you meant one of these:
+        ‘simpleFunction’ (Defined at T16504.hs:6:1),
+        ‘simpleFunction2’ (Defined at T16504.hs:7:1)
 
-T16504.hs:10:9: error:
+T16504.hs:11:9: error:
     The type signature for ‘anotherFunction’
       lacks an accompanying binding
-      Perhaps you meant ‘anotherFuntcion’ (Defined at T16504.hs:11:9)
+      Perhaps you meant ‘anotherFuntcion’ (Defined at T16504.hs:12:9)
 
-T16504.hs:14:1: error:
+T16504.hs:15:1: error:
     The type signature for ‘nonexistentFuntcion’
       lacks an accompanying binding

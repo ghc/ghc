@@ -1374,7 +1374,7 @@ However, consider this case:
         f :: Int -> Int
         g x = x
 We don't want to say 'f' is out of scope; instead, we want to
-return the imported 'f', so that later on the reanamer will
+return the imported 'f', so that later on the renamer will
 correctly report "misplaced type sig".
 
 Note [Signatures for top level things]
@@ -1472,7 +1472,9 @@ lookupBindGroupOcc ctxt what rdr_name
     lookup_top keep_me
       = do { env <- getGlobalRdrEnv
            ; let all_gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
-           ; let candidates_msg = candidates $ map gre_name $ globalRdrEnvElts env
+           ; let candidates_msg = candidates $ map gre_name
+                                             $ filter isLocalGRE
+                                             $ globalRdrEnvElts env
            ; case filter (keep_me . gre_name) all_gres of
                [] | null all_gres -> bale_out_with candidates_msg
                   | otherwise     -> bale_out_with local_msg
