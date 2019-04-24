@@ -423,6 +423,8 @@ release-x86_64-linux-centos7:
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-centos7:$DOCKER_REV"
   variables:
+    # For the testsuite
+    LANG: "en_US.UTF-8"
     # The sphinx release shipped with Centos 7 fails to build out documentation
     BUILD_SPHINX_HTML: "NO"
     BUILD_SPHINX_PDF: "NO"
