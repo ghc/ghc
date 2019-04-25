@@ -318,7 +318,12 @@ Compiler options for profiling
     put in your source will spring to life.
 
     Without a :ghc-flag:`-prof` option, your ``SCC``\ s are ignored; so you can
-    compile ``SCC``-laden code without changing it.
+    compile :pragma:`SCC`-laden code without changing it.
+
+.. warning::
+
+   Due to platform limitations, GHC may fail to produce profiled
+   object files on 32-bit Windows (see :ghc-ticket:`15934`).
 
 There are a few other profiling-related compilation options. Use them
 *in addition to* :ghc-flag:`-prof`. These do not have to be used consistently
