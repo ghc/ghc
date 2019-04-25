@@ -38,12 +38,12 @@ cprAnalTopBind :: AnalEnv
 cprAnalTopBind env (NonRec id rhs)
   = (extendAnalEnv env id' (get_idCprInfo id'), NonRec id' rhs')
   where
-    (id', rhs') = cprAnalBind TopLevel env 0 id rhs
+    (id', rhs') = cprAnalBind TopLevel env id rhs
 
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
   where
-    (env', pairs') = cprFix TopLevel env 0 pairs
+    (env', pairs') = cprFix TopLevel env pairs
 
 --
 -- * Analysing expressions
@@ -52,98 +52,91 @@ cprAnalTopBind env (Rec pairs)
 -- Main CPR Analysis machinery
 cprAnal, cprAnal'
   :: AnalEnv
-  -> Arity               -- ^ number of arguments the expression is applied to
   -> CoreExpr            -- ^ expression to be denoted by a 'CprType'
   -> (CprType, CoreExpr) -- ^ the updated expression and its 'CprType'
 
-cprAnal env n e = -- pprTrace "cprAnal" (ppr n <+> ppr e) $
-                  cprAnal' env n e
+cprAnal env e = -- pprTrace "cprAnal" (ppr n <+> ppr e) $
+                  cprAnal' env e
 
-cprAnal' _ _ (Lit lit)     = (topCprType, Lit lit)
-cprAnal' _ _ (Type ty)     = (topCprType, Type ty)      -- Doesn't happen, in fact
-cprAnal' _ _ (Coercion co) = (topCprType, Coercion co)
+cprAnal' _ (Lit lit)     = (topCprType, Lit lit)
+cprAnal' _ (Type ty)     = (topCprType, Type ty)      -- Doesn't happen, in fact
+cprAnal' _ (Coercion co) = (topCprType, Coercion co)
 
-cprAnal' env _ (Var var)   = (cprTransform env var, Var var)
+cprAnal' env (Var var)   = (cprTransform env var, Var var)
 
-cprAnal' env n (Cast e co)
+cprAnal' env (Cast e co)
   = (cpr_ty, Cast e' co)
   where
-    (cpr_ty, e') = cprAnal env n e
+    (cpr_ty, e') = cprAnal env e
 
-cprAnal' env n (Tick t e)
+cprAnal' env (Tick t e)
   = (cpr_ty, Tick t e')
   where
-    (cpr_ty, e') = cprAnal env n e
+    (cpr_ty, e') = cprAnal env e
 
-cprAnal' env n (App fun (Type ty))
+cprAnal' env (App fun (Type ty))
   = (fun_ty, App fun' (Type ty))
   where
-    (fun_ty, fun') = cprAnal env n fun
+    (fun_ty, fun') = cprAnal env fun
 
-cprAnal' env n (App fun arg)
+cprAnal' env (App fun arg)
   = (res_ty, App fun' arg')
   where
-    (fun_ty, fun') = cprAnal env (n+1) fun
+    (fun_ty, fun') = cprAnal env fun
     -- In contrast to DmdAnal, there is no useful (non-nested) CPR info to be
     -- had by looking into the CprType of arg.
-    (_, arg')      = cprAnal env 0     arg
+    (_, arg')      = cprAnal env arg
     res_ty         = applyCprTy fun_ty
 
-cprAnal' env n (Lam var body)
+cprAnal' env (Lam var body)
   | isTyVar var
-  , (body_ty, body') <- cprAnal env n body
+  , (body_ty, body') <- cprAnal env body
   = (body_ty, Lam var body')
   | otherwise
-  = (lam_ty', Lam var body')
+  = (lam_ty, Lam var body')
   where
-    body_n           = max 0 (n-1)
     env'             = extendSigsWithLam env var
-    (body_ty, body') = cprAnal env' body_n body
+    (body_ty, body') = cprAnal env' body
     lam_ty           = abstractCprTy body_ty
-    is_unsat         = n == 0
-    lam_ty'
-      | is_unsat = topCprType
-      | otherwise = lam_ty
 
-cprAnal' env n (Case scrut case_bndr ty alts)
+cprAnal' env (Case scrut case_bndr ty alts)
   = (res_ty, Case scrut' case_bndr ty alts')
   where
-    (_, scrut')      = cprAnal env 0 scrut
+    (_, scrut')      = cprAnal env scrut
     -- Regardless whether scrut had the CPR property or not, the case binder
     -- certainly has it. See 'extendEnvForDataAlt'.
-    (alt_tys, alts') = mapAndUnzip (cprAnalAlt env scrut case_bndr n) alts
+    (alt_tys, alts') = mapAndUnzip (cprAnalAlt env scrut case_bndr) alts
     res_ty           = foldl' lubCprType botCprType alt_tys
 
-cprAnal' env n (Let (NonRec id rhs) body)
+cprAnal' env (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
   where
-    (id', rhs')      = cprAnalBind NotTopLevel env n id rhs
+    (id', rhs')      = cprAnalBind NotTopLevel env id rhs
     env'             = extendAnalEnv env id' (get_idCprInfo id')
-    (body_ty, body') = cprAnal env' n body
+    (body_ty, body') = cprAnal env' body
 
-cprAnal' env n (Let (Rec pairs) body)
-  = body_ty `seq` (body_ty,  Let (Rec pairs') body')
+cprAnal' env (Let (Rec pairs) body)
+  = body_ty `seq` (body_ty, Let (Rec pairs') body')
   where
-    (env', pairs')   = cprFix NotTopLevel env n pairs
-    (body_ty, body') = cprAnal env' n body
+    (env', pairs')   = cprFix NotTopLevel env pairs
+    (body_ty, body') = cprAnal env' body
 
 cprAnalAlt
   :: AnalEnv
   -> CoreExpr -- ^ scrutinee
   -> Id       -- ^ case binder
-  -> Arity    -- ^ incoming arity
   -> Alt Var  -- ^ current alternative
   -> (CprType, Alt Var)
-cprAnalAlt env scrut case_bndr n (con@(DataAlt dc),bndrs,rhs)
+cprAnalAlt env scrut case_bndr (con@(DataAlt dc),bndrs,rhs)
   -- See 'extendEnvForDataAlt' and Note [CPR in a DataAlt case alternative]
   = (rhs_ty, (con, bndrs, rhs'))
   where
     env_alt        = extendEnvForDataAlt env scrut case_bndr dc bndrs
-    (rhs_ty, rhs') = cprAnal env_alt n rhs
-cprAnalAlt env _ _ n (con,bndrs,rhs)
+    (rhs_ty, rhs') = cprAnal env_alt rhs
+cprAnalAlt env _ _ (con,bndrs,rhs)
   = (rhs_ty, (con, bndrs, rhs'))
   where
-    (rhs_ty, rhs') = cprAnal env n rhs
+    (rhs_ty, rhs') = cprAnal env rhs
 
 --
 -- * CPR transformer
@@ -171,11 +164,10 @@ cprTransform env id
 -- Recursive bindings
 cprFix :: TopLevelFlag
        -> AnalEnv                            -- Does not include bindings for this binding
-       -> Arity
        -> [(Id,CoreExpr)]
        -> (AnalEnv, [(Id,CoreExpr)]) -- Binders annotated with stricness info
 
-cprFix top_lvl env let_arty orig_pairs
+cprFix top_lvl env orig_pairs
   = loop 1 initial_pairs
   where
     -- See Note [Initialising strictness] in DmdAnal.hs
@@ -219,7 +211,7 @@ cprFix top_lvl env let_arty orig_pairs
         my_downRhs env (id,rhs)
           = (env', (id', rhs'))
           where
-            (id', rhs') = cprAnalBind top_lvl env let_arty id rhs
+            (id', rhs') = cprAnalBind top_lvl env id rhs
             env'        = extendAnalEnv env id (get_idCprInfo id')
 
 
@@ -232,24 +224,28 @@ cprFix top_lvl env let_arty orig_pairs
 cprAnalBind
   :: TopLevelFlag
   -> AnalEnv
-  -> Arity
   -> Id
   -> CoreExpr
   -> (Id, CoreExpr)
-cprAnalBind top_lvl env let_arty id rhs
+cprAnalBind top_lvl env id rhs
   = (id', rhs')
   where
-    rhs_arty
-      -- We don't WW join points (see Note [Don't CPR join points] in WorkWrap),
-      -- but still want to propagate CPR information.
-      | isJoinId id = idArity id + let_arty
-      | otherwise   = idArity id
-    (rhs_ty, rhs')  = cprAnal env rhs_arty rhs
+    (rhs_ty, rhs')  = cprAnal env rhs
     -- ct_arty rhs_ty might be greater than rhs_arty, so we have to trim it
     -- down. The same situation occurs in DmdAnal; see
     -- Note [Understanding DmdType and StrictSig] in Demand
-    -- TODO: Is this really the case?
-    rhs_ty'         = ensureCprTyArity rhs_arty rhs_ty
+    -- TODO: Is this really the case? Well, we identify Tops of different
+    --       arities with topCprTy, which has arity 0. So, rhs_arty may in fact
+    --       be *greater* than ct_arty.
+    rhs_ty'
+      | isJoinId id
+      -- We don't WW join points (see Note [Don't CPR join points] in WorkWrap),
+      -- but still want to propagate CPR information.
+      -- TODO: Do we? Yes, we do. But we may just ignore trimming CPR for join
+      -- points... Or at least try doing so. Let's see what happens.
+      = rhs_ty
+      | otherwise
+      = ensureCprTyArity (idArity id) rhs_ty
     -- possibly trim thunk CPR info
     sig_ty          = trimCprTy trim_all trim_sums rhs_ty'
     id'             = set_idCprInfo id sig_ty

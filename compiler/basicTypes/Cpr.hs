@@ -18,11 +18,15 @@ data CprType
                           --   'ct_arty' arguments
   }
 
+instance Eq CprType where
+  a == b =  ct_cpr a == ct_cpr b
+         && (_ct_arty a == _ct_arty b || ct_cpr a == topCpr)
+
 topCprType :: CprType
 topCprType = CprType 0 topCpr
 
 botCprType :: CprType
-botCprType = CprType 0 botCpr -- TODO: Figure out if arity 0 does what we want
+botCprType = CprType 0 botCpr -- TODO: Figure out if arity 0 does what we want... Yes it does: arity zero means we may unleash it under any number of incoming arguments
 
 prodCprType :: Arity -> CprType
 prodCprType _con_arty = CprType 0 prodCpr
