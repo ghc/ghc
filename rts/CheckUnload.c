@@ -404,6 +404,7 @@ void checkUnload (StgClosure *static_objects)
       p = UNTAG_STATIC_LIST_PTR(p);
       checkAddress(addrs, p, s_indices);
       info = get_itbl(p);
+      checkAddress(addrs, info, s_indices);
       link = *STATIC_LINK(info, p);
   }
 
