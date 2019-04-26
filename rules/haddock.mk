@@ -76,7 +76,7 @@ endif
 		$$($1_$2_HS_SRCS) \
 		$$($1_$2_EXTRA_HADDOCK_SRCS) \
 		$$(EXTRA_HADDOCK_OPTS) \
-		+RTS -t"$1/$2/haddock.t" --machine-readable
+		+RTS -t"$$(TOP)/testsuite/tests/perf/haddock/$$($1_PACKAGE).t" --machine-readable
 
 # --no-tmp-comp-dir above is important: it saves a few minutes in a
 # validate.  This flag lets Haddock use the pre-compiled object files
