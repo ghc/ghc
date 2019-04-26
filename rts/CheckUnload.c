@@ -38,7 +38,8 @@
 // object as referenced so that it won't get unloaded in this round.
 //
 
-//
+// Note [Speeding up checkUnload]
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // In certain circumstances, there may be a lot of unloaded ObjectCode structs
 // chained in `unloaded_objects` (such as when users `:load` a module in a very
 // big repo in GHCi). To speed up checking whether an address lies within any of
