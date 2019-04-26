@@ -144,16 +144,19 @@ lint-release-changelogs:
     - ./boot
     - ./configure $CONFIGURE_ARGS
     - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
-    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx test
+    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
   cache:
     key: hadrian
     paths:
       - cabal-cache
   artifacts:
-    when: always
+    reports:
+      junit: junit.xml
+    expire_in: 2 week
     paths:
       - ghc.tar.xz
+      - junit.xml
 
 validate-x86_64-linux-deb8-hadrian:
   extends: .validate-hadrian
