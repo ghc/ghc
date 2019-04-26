@@ -85,7 +85,10 @@ runTestBuilderArgs = builder RunTest ? do
     wordsize    <- getTestSetting TestWORDSIZE
     top         <- expr $ topDirectory
     ghcFlags    <- expr runTestGhcFlags
-    timeoutProg <- expr buildRoot <&> (-/- timeoutPath)
+    root        <- expr buildRoot
+
+    let timeoutProg = root -/- timeoutPath
+        statsFilesDir = top -/- root
 
     -- See #16087
     let ghcBuiltByLlvm = False -- TODO: Implement this check
@@ -132,6 +135,7 @@ runTestBuilderArgs = builder RunTest ? do
 
             , arg "--config", arg $ "gs=gs"                           -- Use the default value as in test.mk
             , arg "--config", arg $ "timeout_prog=" ++ show (top -/- timeoutProg)
+            , arg "--config", arg $ "stats_files_dir=" ++ statsFilesDir
             , arg $ "--threads=" ++ show threads
             , getTestArgs -- User-provided arguments from command line.
             ]
