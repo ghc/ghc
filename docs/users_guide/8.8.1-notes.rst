@@ -149,8 +149,9 @@ Template Haskell
 ~~~~~~~~~~~~~~~~~~~~
 
 - GHC now exposes a new primop, ``traceBinaryEvent#``. This primop writes
-  eventlog events similar to ``traceBinaryEvent#`` but allows the user to pass
-  the event payload as a binary blob instead of a ``String``.
+  eventlog events similar to ``traceEvent#`` but allows the user to pass
+  the event payload as a binary blob instead of a zero-terminated
+  ``ByteString``.
 
 - The ``StableName#`` type parameter now has a phantom role instead of
   a representational one. There is really no reason to care about the
