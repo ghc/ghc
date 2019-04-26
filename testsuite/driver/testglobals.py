@@ -136,6 +136,11 @@ class TestConfig:
         # The test environment.
         self.test_env = 'local'
 
+        # Where to look up runtime stats produced by haddock, needed for
+        # the haddock perf tests in testsuite/tests/perf/haddock/.
+        # See Note [Haddock runtime stats files] at the bottom of this file.
+        self.stats_files_dir = '/please_set_stats_files_dir'
+
 global config
 config = TestConfig()
 
