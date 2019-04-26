@@ -3,25 +3,22 @@
 # detect outliers, as described in Note [residency]. See #9556.
 
 test('haddock.base',
-     [extra_files(['../../../../libraries/base/dist-install/haddock.t']),
-      unless(in_tree_compiler(), skip), req_haddock
+     [unless(in_tree_compiler(), skip), req_haddock
      ,collect_stats('bytes allocated',5)
       ],
-     stats,
-     ['haddock.t'])
+     haddock_stats,
+     ['base.t'])
 
 test('haddock.Cabal',
-     [extra_files(['../../../../libraries/Cabal/Cabal/dist-install/haddock.t']),
-      unless(in_tree_compiler(), skip), req_haddock
+     [unless(in_tree_compiler(), skip), req_haddock
      ,collect_stats('bytes allocated',5)
       ],
-     stats,
-     ['haddock.t'])
+     haddock_stats,
+     ['Cabal.t'])
 
 test('haddock.compiler',
-     [extra_files(['../../../../compiler/stage2/haddock.t']),
-      unless(in_tree_compiler(), skip), req_haddock
+     [unless(in_tree_compiler(), skip), req_haddock
      ,collect_stats('bytes allocated',10)
       ],
-     stats,
-     ['haddock.t'])
+     haddock_stats,
+     ['ghc.t'])
