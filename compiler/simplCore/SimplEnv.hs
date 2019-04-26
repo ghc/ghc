@@ -667,7 +667,9 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
 
         -- Get the most up-to-date thing from the in-scope set
         -- Even though it isn't in the substitution, it may be in
-        -- the in-scope set with better IdInfo
+        -- the in-scope set with better IdInfo.
+        --
+        -- See also Note [In-scope set as a substitution] in Simplify.
 
 refineFromInScope :: InScopeSet -> Var -> Var
 refineFromInScope in_scope v

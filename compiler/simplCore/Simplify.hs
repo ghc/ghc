@@ -118,6 +118,30 @@ lambdas together.  And in general that's a good thing to do.  Perhaps
 we should eta expand wherever we find a (value) lambda?  Then the eta
 expansion at a let RHS can concentrate solely on the PAP case.
 
+Note [In-scope set as a substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As noted in the definition of InScopeSet (in VarEnv), in-scope sets can act as
+substitutions. Specifically, they act as a substitution from variable to
+variables /with the same unique/.
+
+Why do we need this? Well, during the course of the simplifier, we may want to
+adjust inessential properties of a variable. For instance, when performing a
+beta-reduction, we change
+
+    (\x. e) u ==> let x = u in e
+
+We typically want to add an unfolding to `x` so that it inlines to (the
+simplification of) `u`.
+
+We do that by adding the unfolding to the binder `x`, which is added to the
+in-scope set. When simplifying occurrences of `x`, they are replaced by their
+“updated” version from the in-scope set, hence inherit the unfolding.
+
+It's quite convenient. This way we don't need to manipulate the substitution all
+the time: every update to a binder is automatically reflected to its bound
+occurrences.
+
 ************************************************************************
 *                                                                      *
 \subsection{Bindings}
@@ -659,6 +683,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
                                            final_rhs (idType new_bndr) old_unf
 
       ; let final_bndr = addLetBndrInfo new_bndr new_arity is_bot new_unfolding
+        -- See Note [In-scope set as a substitution]
 
       ; if postInlineUnconditionally env top_lvl final_bndr occ_info final_rhs
 
