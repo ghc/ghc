@@ -67,7 +67,6 @@ def isStatsTest():
     opts = getTestOpts()
     return opts.is_stats_test
 
-
 # This can be called at the top of a file of tests, to set default test options
 # for the following tests.
 def setTestOpts( f ):
@@ -1205,7 +1204,11 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
 
 def stats( name, way, stats_file ):
     opts = getTestOpts()
-    return check_stats(name, way, stats_file, opts.stats_range_fields)
+    return check_stats(name, way, stats_file, opts.stats_range_fields, False)
+
+def haddock_stats ( name, way, stats_file ):
+    opts = getTestOpts()
+    return check_stats(name, way, stats_file, opts.stats_range_fields, True)
 
 def metric_dict(name, way, metric, value):
     return Perf.PerfStat(
@@ -1223,12 +1226,13 @@ def metric_dict(name, way, metric, value):
 # range_fields: see TestOptions.stats_range_fields
 # Returns a pass/fail object. Passes if the stats are withing the expected value ranges.
 # This prints the results for the user.
-def check_stats(name, way, stats_file, range_fields):
+def check_stats(name, way, stats_file, range_fields, isHaddockStatsTest):
     head_commit = Perf.commit_hash('HEAD') if Perf.inside_git_repo() else None
     result = passed()
+    stats_file_path = in_statsdir(stats_file) if isHaddockStatsTest else in_testdir(stats_file)
     if range_fields:
         try:
-            f = open(in_testdir(stats_file))
+            f = open(stats_file_path)
         except IOError as e:
             return failBecause(str(e))
         stats_file_contents = f.read()
@@ -1351,7 +1355,7 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
     # ToDo: if the sub-shell was killed by ^C, then exit
 
     if isCompilerStatsTest():
-        statsResult = check_stats(name, way, stats_file, opts.stats_range_fields)
+        statsResult = check_stats(name, way, stats_file, opts.stats_range_fields, False)
         if badResult(statsResult):
             return statsResult
 
@@ -1436,7 +1440,7 @@ def simple_run(name, way, prog, extra_run_opts):
     if check_prof and not check_prof_ok(name, way):
         return failBecause('bad profile')
 
-    return check_stats(name, way, stats_file, opts.stats_range_fields)
+    return check_stats(name, way, stats_file, opts.stats_range_fields, False)
 
 def rts_flags(way):
     args = config.way_rts_flags.get(way, [])
@@ -2096,6 +2100,9 @@ def in_testdir(name, suffix=''):
 
 def in_srcdir(name, suffix=''):
     return os.path.join(getTestOpts().srcdir, add_suffix(name, suffix))
+
+def in_statsdir(name, suffix=''):
+    return os.path.join(config.stats_files_dir, add_suffix(name, suffix))
 
 # Finding the sample output.  The filename is of the form
 #
