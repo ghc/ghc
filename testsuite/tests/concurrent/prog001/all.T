@@ -14,5 +14,6 @@
 
 test('concprog001', [extra_files(['Arithmetic.hs', 'Converter.hs', 'Mult.hs', 'Stream.hs', 'Thread.hs', 'Trit.hs', 'Utilities.hs']),
                      when(fast(), skip), only_ways(['threaded2']),
+                     skip, #fragile(16604),
                      run_timeout_multiplier(2)],
      multimod_compile_and_run, ['Mult', ''])
