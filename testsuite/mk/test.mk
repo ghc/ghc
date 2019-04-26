@@ -278,6 +278,8 @@ RUNTEST_OPTS +=  \
 	--config 'gs=$(call quote_path,$(GS))' \
 	--config 'timeout_prog=$(call quote_path,$(TIMEOUT_PROGRAM))'
 
+RUNTEST_OPTS += --config 'stats_files_dir=$(TOP)/tests/perf/haddock'
+
 RUNTEST_OPTS += -e "config.stage=$(GhcStage)"
 
 ifneq "$(METRICS_FILE)" ""
