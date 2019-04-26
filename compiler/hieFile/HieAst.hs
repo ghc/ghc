@@ -479,7 +479,9 @@ instance HasType (LHsExpr GhcTc) where
 
     in
     case tyOpt of
-      _ | skipDesugaring e' -> fallback
+      Just t -> makeTypeNode e' spn t
+      Nothing
+        | skipDesugaring e' -> fallback
         | otherwise -> do
             hs_env <- Hsc $ \e w -> return (e,w)
             (_,mbe) <- liftIO $ deSugarExpr hs_env e
