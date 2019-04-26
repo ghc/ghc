@@ -8,7 +8,8 @@ module Context (
     -- * Paths
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
     pkgHaddockFile, pkgLibraryFile, pkgGhciLibraryFile, pkgConfFile, objectPath,
-    contextPath, getContextPath, libPath, distDir
+    contextPath, getContextPath, libPath, distDir,
+    haddockStatsFilesDir
     ) where
 
 import Base
