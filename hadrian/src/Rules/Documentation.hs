@@ -22,6 +22,7 @@ import Target
 import Utilities
 
 import Data.List (union)
+import System.Directory (createDirectoryIfMissing)
 import qualified Data.Set    as Set
 import qualified Text.Parsec as Parsec
 
@@ -202,6 +203,7 @@ buildPackageDocumentation = do
         -- TODO: Pass the correct way from Rules via Context.
         dynamicPrograms <- dynamicGhcPrograms =<< flavour
         let haddockWay = if dynamicPrograms then dynamic else vanilla
+        liftIO . createDirectoryIfMissing True =<< haddockStatsFilesDir
         build $ target (context {way = haddockWay}) (Haddock BuildPackage) srcs [file]
 
 data PkgDocTarget = DotHaddock PackageName | HaddockPrologue PackageName
