@@ -758,6 +758,11 @@ negateNatural (Natural x)
 -- on a numeric literal with a GHC that targets 32-bit systems will **not**
 -- result in that literal constant folding during compile time as it does
 -- when using a GHC that targets 64-bit systems.
+--
+-- Adding 32-bit support for this feature is arguably not important, so any
+-- test to this feature - constant folding of conversions of naturals and
+-- integers to 64-bit ints/words - **should be** allowed to fail on 32-bit
+-- architectures.
 
 int64ToNatural :: Int64# -> Natural
 int64ToNatural i = Natural (int64ToInteger i)
