@@ -51,3 +51,15 @@ naturalConstantFolding:
 	$(call CHECK,\<200015\>,word64ToNatural)
 	# Ordering and Equality
 	./naturalConstantFolding
+
+LOOKUP = grep -q -- '$1' naturalToIntWord64ConstantFolding.simpl || \
+        echo "$2 didn't constant fold"
+
+.PHONY: naturalToIntWord64ConstantFolding
+naturalToIntWord64ConstantFolding:
+	'$(TEST_HC)' -Wall -v0 -O --make naturalToIntWord64ConstantFolding -fforce-recomp -ddump-simpl > naturalToIntWord64ConstantFolding.simpl
+# All the 100nnn values should be constant-folded away. Similar check to above.
+	! grep -q '\<100[0-9][0-9][0-9]\>' naturalToIntWord64ConstantFolding.simpl || { echo "Unfolded values found"; grep '\<100[0-9][0-9][0-9]\>' naturalToIntWord64ConstantFolding.simpl; }
+	$(call LOOKUP,\<200003\>,naturalToInt64)
+	$(call LOOKUP,\<200007\>,naturalToWord64)
+	./naturalToIntWord64ConstantFolding

@@ -39,6 +39,18 @@ integerConstantFolding:
 	$(call CHECK,\<400280.0\>,encodeIntegerFloat)
 	./integerConstantFolding
 
+LOOKUP = grep -q -- '$1' integerToIntWord64ConstantFolding.simpl || \
+        echo "$2 didn't constant fold"
+
+.PHONY: integerToIntWord64ConstantFolding
+integerToIntWord64ConstantFolding:
+	'$(TEST_HC)' -Wall -v0 -O --make integerToIntWord64ConstantFolding -fforce-recomp -ddump-simpl > integerToIntWord64ConstantFolding.simpl
+# All the 100nnn values should be constant-folded away. Similar check to above.
+	! grep -q '\<100[0-9][0-9][0-9]\>' integerToIntWord64ConstantFolding.simpl || { echo "Unfolded values found"; grep '\<100[0-9][0-9][0-9]\>' integerToIntWord64ConstantFolding.simpl; }
+	$(call LOOKUP,\<200003\>,integerToInt64)
+	$(call LOOKUP,\<200007\>,integerToWord64)
+	./integerToIntWord64ConstantFolding
+
 .PHONY: fromToInteger
 fromToInteger:
 	'$(TEST_HC)' -Wall -v0 -O -c fromToInteger.hs -fforce-recomp -ddump-simpl > fromToInteger.simpl
