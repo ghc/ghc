@@ -42,7 +42,7 @@
 // In certain circumstances, there may be a lot of unloaded ObjectCode structs
 // chained in `unloaded_objects` (such as when users `:load` a module in a very
 // big repo in GHCi). To speed up checking whether an address lies within any of
-// these objects, we populate the addresses of the their mapped sections in
+// these objects, we populate the addresses of their mapped sections in
 // an array sorted by their `start` address and do binary search for our address
 // on that array. Note that this works because the sections are mapped to mutual
 // exclusive memory regions, so we can simply find the largest lower bound among
