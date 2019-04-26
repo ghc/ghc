@@ -67,6 +67,9 @@ def isStatsTest():
     opts = getTestOpts()
     return opts.is_stats_test
 
+def isHaddockStatsTest():
+    opts = getTestOpts()
+    return opts.is_haddock_stats_test
 
 # This can be called at the top of a file of tests, to set default test options
 # for the following tests.
@@ -387,6 +390,9 @@ def collect_stats(metric='all', deviation=20):
 
 def testing_metrics():
     return ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used']
+
+def haddock_stats_test(name, opts):
+    opts.is_haddock_stats_test = True
 
 # This is an internal function that is used only in the implementation.
 # 'is_compiler_stats_test' is somewhat of an unfortunate name.
@@ -1226,9 +1232,10 @@ def metric_dict(name, way, metric, value):
 def check_stats(name, way, stats_file, range_fields):
     head_commit = Perf.commit_hash('HEAD') if Perf.inside_git_repo() else None
     result = passed()
+    stats_file_path = in_statsdir(stats_file) if isHaddockStatsTest() else in_testdir(stats_file)
     if range_fields:
         try:
-            f = open(in_testdir(stats_file))
+            f = open(stats_file_path)
         except IOError as e:
             return failBecause(str(e))
         stats_file_contents = f.read()
@@ -2096,6 +2103,9 @@ def in_testdir(name, suffix=''):
 
 def in_srcdir(name, suffix=''):
     return os.path.join(getTestOpts().srcdir, add_suffix(name, suffix))
+
+def in_statsdir(name, suffix=''):
+    return os.path.join(config.stats_files_dir, add_suffix(name, suffix))
 
 # Finding the sample output.  The filename is of the form
 #
