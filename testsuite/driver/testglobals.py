@@ -136,6 +136,8 @@ class TestConfig:
         # The test environment.
         self.test_env = 'local'
 
+        self.stats_files_dir = '/please_set_stats_files_dir'
+
 global config
 config = TestConfig()
 

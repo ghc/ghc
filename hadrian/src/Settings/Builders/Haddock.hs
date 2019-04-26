@@ -35,7 +35,6 @@ haddockBuilderArgs = mconcat
         output   <- getOutput
         pkg      <- getPackage
         root     <- getBuildRoot
-        path     <- getBuildPath
         context  <- getContext
         version  <- expr $ pkgVersion  pkg
         synopsis <- expr $ pkgSynopsis pkg
@@ -66,6 +65,6 @@ haddockBuilderArgs = mconcat
             , pure [ "--optghc=" ++ opt | opt <- ghcOpts, not ("--package-db" `isInfixOf` opt) ]
             , getInputs
             , arg "+RTS"
-            , arg $ "-t" ++ path -/- "haddock.t"
+            , arg $ "-t" ++ (root -/- pkgName pkg ++ ".t")
             , arg "--machine-readable"
             , arg "-RTS" ] ]

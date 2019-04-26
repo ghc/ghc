@@ -1228,7 +1228,7 @@ def check_stats(name, way, stats_file, range_fields):
     result = passed()
     if range_fields:
         try:
-            f = open(in_testdir(stats_file))
+            f = open(in_statsdir(stats_file))
         except IOError as e:
             return failBecause(str(e))
         stats_file_contents = f.read()
@@ -2096,6 +2096,11 @@ def in_testdir(name, suffix=''):
 
 def in_srcdir(name, suffix=''):
     return os.path.join(getTestOpts().srcdir, add_suffix(name, suffix))
+
+def in_statsdir(name, suffix=''):
+    res = os.path.join(config.stats_files_dir, add_suffix(name, suffix))
+    print(f'in_statsdir called: name={name}, suffix={suffix}, res={res}')
+    return res
 
 # Finding the sample output.  The filename is of the form
 #
