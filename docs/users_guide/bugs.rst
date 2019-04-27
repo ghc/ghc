@@ -435,7 +435,7 @@ undefined or implementation specific in Haskell 98.
     architecture; in other words it holds 32 bits on a 32-bit machine,
     and 64-bits on a 64-bit machine.
 
-    Arithmetic on ``Int`` is unchecked for overflowoverflow\ ``Int``, so
+    Arithmetic on ``Int`` is unchecked for overflow\ ``Int``, so
     all operations on ``Int`` happen modulo 2\ :sup:`⟨n⟩` where ⟨n⟩ is
     the size in bits of the ``Int`` type.
 

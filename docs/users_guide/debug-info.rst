@@ -145,7 +145,7 @@ this point in the program,
     other language-agnostic debugging tools, GHC is forced to heuristically
     choose one location from among this set.
 
-    For this reason we should be cautious when interpretting the source locations
+    For this reason we should be cautious when interpreting the source locations
     provided by GDB. While these locations will usually be in some sense
     "correct", they aren't always useful. This is why profiling tools targetting
     Haskell should supplement the standard source location information with

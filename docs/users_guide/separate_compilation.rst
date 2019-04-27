@@ -586,7 +586,7 @@ The GHC API exposes functions for reading and writing these files.
     :type: dynamic
     :category: extended-interface-files
 
-    Writes out extended interface files alongisde regular enterface files.
+    Writes out extended interface files alongside regular interface files.
     Just like regular interface files, GHC has a recompilation check to detect
     out of date or missing extended interface files.
 
