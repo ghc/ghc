@@ -628,6 +628,9 @@ wanteds os = concat
           -- header sizes)
           ,constantWord Haskell "MIN_PAYLOAD_SIZE" "MIN_PAYLOAD_SIZE"
 
+           -- whether to use inline SRT offsets (see Note [SRTs])
+          ,constantBool Haskell "USE_INLINE_SRT_FIELD" "defined(USE_INLINE_SRT_FIELD)"
+
           ,constantInt  Haskell "MIN_INTLIKE" "MIN_INTLIKE"
           ,constantWord Haskell "MAX_INTLIKE" "MAX_INTLIKE"
 
