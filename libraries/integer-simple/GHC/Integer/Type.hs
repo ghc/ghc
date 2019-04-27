@@ -72,50 +72,54 @@ errorInteger = Positive errorPositive
 errorPositive :: Positive
 errorPositive = Some 47## None -- Random number
 
-{-# NOINLINE smallInteger #-}
+-- See Note [CONSTANT_FOLDED pragma] for information on this #define below.
+
+#define CONSTANT_FOLDED NOINLINE [0]
+
+{-# CONSTANT_FOLDED smallInteger #-}
 smallInteger :: Int# -> Integer
 smallInteger i = if isTrue# (i >=# 0#) then wordToInteger (int2Word# i)
                  else -- XXX is this right for -minBound?
                       negateInteger (wordToInteger (int2Word# (negateInt# i)))
 
-{-# NOINLINE wordToInteger #-}
+{-# CONSTANT_FOLDED wordToInteger #-}
 wordToInteger :: Word# -> Integer
 wordToInteger w = if isTrue# (w `eqWord#` 0##)
                   then Naught
                   else Positive (Some w None)
 
-{-# NOINLINE integerToWord #-}
+{-# CONSTANT_FOLDED integerToWord #-}
 integerToWord :: Integer -> Word#
 integerToWord (Positive (Some w _)) = w
 integerToWord (Negative (Some w _)) = 0## `minusWord#` w
 -- Must be Naught by the invariant:
 integerToWord _ = 0##
 
-{-# NOINLINE integerToInt #-}
+{-# CONSTANT_FOLDED integerToInt #-}
 integerToInt :: Integer -> Int#
 integerToInt i = word2Int# (integerToWord i)
 
 #if WORD_SIZE_IN_BITS == 64
 -- Nothing
 #elif WORD_SIZE_IN_BITS == 32
-{-# NOINLINE integerToWord64 #-}
+{-# CONSTANT_FOLDED integerToWord64 #-}
 integerToWord64 :: Integer -> Word64#
 integerToWord64 i = int64ToWord64# (integerToInt64 i)
 
-{-# NOINLINE word64ToInteger #-}
+{-# CONSTANT_FOLDED word64ToInteger #-}
 word64ToInteger :: Word64# -> Integer
 word64ToInteger w = if isTrue# (w `eqWord64#` wordToWord64# 0##)
                     then Naught
                     else Positive (word64ToPositive w)
 
-{-# NOINLINE integerToInt64 #-}
+{-# CONSTANT_FOLDED integerToInt64 #-}
 integerToInt64 :: Integer -> Int64#
 integerToInt64 Naught = intToInt64# 0#
 integerToInt64 (Positive p) = word64ToInt64# (positiveToWord64 p)
 integerToInt64 (Negative p)
     = negateInt64# (word64ToInt64# (positiveToWord64 p))
 
-{-# NOINLINE int64ToInteger #-}
+{-# CONSTANT_FOLDED int64ToInteger #-}
 int64ToInteger :: Int64# -> Integer
 int64ToInteger i
  = if isTrue# (i `eqInt64#` intToInt64# 0#)
@@ -136,7 +140,7 @@ negativeOneInteger = Negative onePositive
 twoToTheThirtytwoInteger :: Integer
 twoToTheThirtytwoInteger = Positive twoToTheThirtytwoPositive
 
-{-# NOINLINE encodeDoubleInteger #-}
+{-# CONSTANT_FOLDED encodeDoubleInteger #-}
 encodeDoubleInteger :: Integer -> Int# -> Double#
 encodeDoubleInteger (Positive ds0) e0 = f 0.0## ds0 e0
     where f !acc None        (!_) = acc
@@ -152,7 +156,7 @@ encodeDoubleInteger Naught _ = 0.0##
 foreign import ccall unsafe "__word_encodeDouble"
         encodeDouble# :: Word# -> Int# -> Double#
 
-{-# NOINLINE encodeFloatInteger #-}
+{-# CONSTANT_FOLDED encodeFloatInteger #-}
 encodeFloatInteger :: Integer -> Int# -> Float#
 encodeFloatInteger (Positive ds0) e0 = f 0.0# ds0 e0
     where f !acc None        (!_) = acc
@@ -168,7 +172,7 @@ encodeFloatInteger Naught _ = 0.0#
 foreign import ccall unsafe "__word_encodeFloat"
     encodeFloat# :: Word# -> Int# -> Float#
 
-{-# NOINLINE decodeFloatInteger #-}
+{-# CONSTANT_FOLDED decodeFloatInteger #-}
 decodeFloatInteger :: Float# -> (# Integer, Int# #)
 decodeFloatInteger f = case decodeFloat_Int# f of
                        (# mant, exp #) -> (# smallInteger mant, exp #)
@@ -176,7 +180,7 @@ decodeFloatInteger f = case decodeFloat_Int# f of
 -- XXX This could be optimised better, by either (word-size dependent)
 -- using single 64bit value for the mantissa, or doing the multiplication
 -- by just building the Digits directly
-{-# NOINLINE decodeDoubleInteger #-}
+{-# CONSTANT_FOLDED decodeDoubleInteger #-}
 decodeDoubleInteger :: Double# -> (# Integer, Int# #)
 decodeDoubleInteger d
  = case decodeDouble_2Int# d of
@@ -186,19 +190,19 @@ decodeDoubleInteger d
              `plusInteger` wordToInteger mantLow),
           exp #)
 
-{-# NOINLINE doubleFromInteger #-}
+{-# CONSTANT_FOLDED doubleFromInteger #-}
 doubleFromInteger :: Integer -> Double#
 doubleFromInteger Naught = 0.0##
 doubleFromInteger (Positive p) = doubleFromPositive p
 doubleFromInteger (Negative p) = negateDouble# (doubleFromPositive p)
 
-{-# NOINLINE floatFromInteger #-}
+{-# CONSTANT_FOLDED floatFromInteger #-}
 floatFromInteger :: Integer -> Float#
 floatFromInteger Naught = 0.0#
 floatFromInteger (Positive p) = floatFromPositive p
 floatFromInteger (Negative p) = negateFloat# (floatFromPositive p)
 
-{-# NOINLINE andInteger #-}
+{-# CONSTANT_FOLDED andInteger #-}
 andInteger :: Integer -> Integer -> Integer
 Naught     `andInteger` (!_)       = Naught
 (!_)       `andInteger` Naught     = Naught
@@ -242,7 +246,7 @@ Negative x `andInteger` Negative y = let x' = x `minusPositive` onePositive
                                          z' = succPositive z
                                      in digitsToNegativeInteger z'
 
-{-# NOINLINE orInteger #-}
+{-# CONSTANT_FOLDED orInteger #-}
 orInteger :: Integer -> Integer -> Integer
 Naught     `orInteger` (!i)       = i
 (!i)       `orInteger` Naught     = i
@@ -273,7 +277,7 @@ Negative x `orInteger` Negative y = let x' = x `minusPositive` onePositive
                                         z' = succPositive z
                                     in digitsToNegativeInteger z'
 
-{-# NOINLINE xorInteger #-}
+{-# CONSTANT_FOLDED xorInteger #-}
 xorInteger :: Integer -> Integer -> Integer
 Naught     `xorInteger` (!i)       = i
 (!i)       `xorInteger` Naught     = i
@@ -302,24 +306,24 @@ Negative x `xorInteger` Negative y = let x' = x `minusPositive` onePositive
                                          z = x' `xorDigits` y'
                                      in digitsToInteger z
 
-{-# NOINLINE complementInteger #-}
+{-# CONSTANT_FOLDED complementInteger #-}
 complementInteger :: Integer -> Integer
 complementInteger x = negativeOneInteger `minusInteger` x
 
-{-# NOINLINE shiftLInteger #-}
+{-# CONSTANT_FOLDED shiftLInteger #-}
 shiftLInteger :: Integer -> Int# -> Integer
 shiftLInteger (Positive p) i = Positive (shiftLPositive p i)
 shiftLInteger (Negative n) i = Negative (shiftLPositive n i)
 shiftLInteger Naught       _ = Naught
 
-{-# NOINLINE shiftRInteger #-}
+{-# CONSTANT_FOLDED shiftRInteger #-}
 shiftRInteger :: Integer -> Int# -> Integer
 shiftRInteger (Positive p)   i = shiftRPositive p i
 shiftRInteger j@(Negative _) i
     = complementInteger (shiftRInteger (complementInteger j) i)
 shiftRInteger Naught         _ = Naught
 
-{-# NOINLINE popCountInteger #-}
+{-# CONSTANT_FOLDED popCountInteger #-}
 popCountInteger :: Integer -> Int#
 popCountInteger (Positive p) = popCountPositive p
 popCountInteger Naught       = 0#
@@ -332,7 +336,7 @@ popCountPositive p = word2Int# (go 0## p)
   go acc# None = acc#
   go acc# (Some d ds) = go (popCnt# d `plusWord#` acc#) ds
 
-{-# NOINLINE bitInteger #-}
+{-# CONSTANT_FOLDED bitInteger #-}
 -- | 'Integer' for which only /n/-th bit is set. Undefined behaviour
 -- for negative /n/ values.
 bitInteger :: Int# -> Integer
@@ -347,7 +351,7 @@ bitPositive i#
       then Some 0## (bitPositive (i# -# WORD_SIZE_IN_BITS#))
       else Some (uncheckedShiftL# 1## i#) None
 
-{-# NOINLINE testBitInteger #-}
+{-# CONSTANT_FOLDED testBitInteger #-}
 testBitInteger :: Integer -> Int# -> Bool
 testBitInteger (!_) i# | isTrue# (i# <# 0#) = False
 testBitInteger Naught       _  = False
@@ -397,14 +401,14 @@ flipBitsDigits :: Digits -> Digits
 flipBitsDigits None = None
 flipBitsDigits (Some w ws) = Some (not# w) (flipBitsDigits ws)
 
-{-# NOINLINE negateInteger #-}
+{-# CONSTANT_FOLDED negateInteger #-}
 negateInteger :: Integer -> Integer
 negateInteger (Positive p) = Negative p
 negateInteger (Negative p) = Positive p
 negateInteger Naught       = Naught
 
 -- Note [Avoid patError]
-{-# NOINLINE plusInteger #-}
+{-# CONSTANT_FOLDED plusInteger #-}
 plusInteger :: Integer -> Integer -> Integer
 Positive p1    `plusInteger` Positive p2 = Positive (p1 `plusPositive` p2)
 Negative p1    `plusInteger` Negative p2 = Negative (p1 `plusPositive` p2)
@@ -421,11 +425,11 @@ Naught         `plusInteger` i@(Negative _) = i
 i@(Positive _) `plusInteger` Naught         = i
 i@(Negative _) `plusInteger` Naught         = i
 
-{-# NOINLINE minusInteger #-}
+{-# CONSTANT_FOLDED minusInteger #-}
 minusInteger :: Integer -> Integer -> Integer
 i1 `minusInteger` i2 = i1 `plusInteger` negateInteger i2
 
-{-# NOINLINE timesInteger #-}
+{-# CONSTANT_FOLDED timesInteger #-}
 timesInteger :: Integer -> Integer -> Integer
 Positive p1 `timesInteger` Positive p2 = Positive (p1 `timesPositive` p2)
 Negative p1 `timesInteger` Negative p2 = Positive (p1 `timesPositive` p2)
@@ -433,7 +437,7 @@ Positive p1 `timesInteger` Negative p2 = Negative (p1 `timesPositive` p2)
 Negative p1 `timesInteger` Positive p2 = Negative (p1 `timesPositive` p2)
 (!_)        `timesInteger` (!_)        = Naught
 
-{-# NOINLINE divModInteger #-}
+{-# CONSTANT_FOLDED divModInteger #-}
 divModInteger :: Integer -> Integer -> (# Integer, Integer #)
 n `divModInteger` d =
     case n `quotRemInteger` d of
@@ -443,17 +447,17 @@ n `divModInteger` d =
             then (# q `minusInteger` oneInteger, r `plusInteger` d #)
             else (# q, r #)
 
-{-# NOINLINE divInteger #-}
+{-# CONSTANT_FOLDED divInteger #-}
 divInteger :: Integer -> Integer -> Integer
 n `divInteger` d = quotient
     where (# quotient, _ #) = n `divModInteger` d
 
-{-# NOINLINE modInteger #-}
+{-# CONSTANT_FOLDED modInteger #-}
 modInteger :: Integer -> Integer -> Integer
 n `modInteger` d = modulus
     where (# _, modulus #) = n `divModInteger` d
 
-{-# NOINLINE quotRemInteger #-}
+{-# CONSTANT_FOLDED quotRemInteger #-}
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
 Naught      `quotRemInteger` (!_)        = (# Naught, Naught #)
 (!_)        `quotRemInteger` Naught
@@ -471,17 +475,17 @@ Negative p1 `quotRemInteger` Negative p2 = case p1 `quotRemPositive` p2 of
                                            (# q, r #) ->
                                                (# q, negateInteger r #)
 
-{-# NOINLINE quotInteger #-}
+{-# CONSTANT_FOLDED quotInteger #-}
 quotInteger :: Integer -> Integer -> Integer
 x `quotInteger` y = case x `quotRemInteger` y of
                     (# q, _ #) -> q
 
-{-# NOINLINE remInteger #-}
+{-# CONSTANT_FOLDED remInteger #-}
 remInteger :: Integer -> Integer -> Integer
 x `remInteger` y = case x `quotRemInteger` y of
                    (# _, r #) -> r
 
-{-# NOINLINE gcdInteger #-}
+{-# CONSTANT_FOLDED gcdInteger #-}
 gcdInteger :: Integer -> Integer -> Integer
 gcdInteger (Positive a) (Positive b) = Positive (gcdPositive a b)
 gcdInteger (Positive a) (Negative b) = Positive (gcdPositive a b)
@@ -497,7 +501,7 @@ gcdPositive p1 p2 = case p1 `quotRemPositive` p2 of
                         (# _, Negative _ #) -> errorPositive -- XXX Can't happen
 
 
-{-# NOINLINE lcmInteger #-}
+{-# CONSTANT_FOLDED lcmInteger #-}
 lcmInteger :: Integer -> Integer -> Integer
 lcmInteger (Positive a) (Positive b) = Positive (lcmPositive a b)
 lcmInteger (Positive a) (Negative b) = Positive (lcmPositive a b)
@@ -512,7 +516,7 @@ lcmPositive p1 p2 = case p1 `quotRemPositive` (p1 `gcdPositive` p2) of
                         (# _,          _ #) -> errorPositive -- XXX Can't happen
 
 
-{-# NOINLINE compareInteger #-}
+{-# CONSTANT_FOLDED compareInteger #-}
 compareInteger :: Integer -> Integer -> Ordering
 Positive x `compareInteger` Positive y = x `comparePositive` y
 Positive _ `compareInteger` (!_)       = GT
@@ -521,13 +525,13 @@ Naught     `compareInteger` Negative _ = GT
 Negative x `compareInteger` Negative y = y `comparePositive` x
 (!_)       `compareInteger` (!_)       = LT
 
-{-# NOINLINE eqInteger# #-}
+{-# CONSTANT_FOLDED eqInteger# #-}
 eqInteger# :: Integer -> Integer -> Int#
 x `eqInteger#` y = case x `compareInteger` y of
                         EQ -> 1#
                         _  -> 0#
 
-{-# NOINLINE neqInteger# #-}
+{-# CONSTANT_FOLDED neqInteger# #-}
 neqInteger# :: Integer -> Integer -> Int#
 x `neqInteger#` y = case x `compareInteger` y of
                          EQ -> 0#
@@ -543,25 +547,25 @@ instance  Eq Integer  where
     (==) = eqInteger
     (/=) = neqInteger
 
-{-# NOINLINE ltInteger# #-}
+{-# CONSTANT_FOLDED ltInteger# #-}
 ltInteger# :: Integer -> Integer -> Int#
 x `ltInteger#` y = case x `compareInteger` y of
                         LT -> 1#
                         _  -> 0#
 
-{-# NOINLINE gtInteger# #-}
+{-# CONSTANT_FOLDED gtInteger# #-}
 gtInteger# :: Integer -> Integer -> Int#
 x `gtInteger#` y = case x `compareInteger` y of
                         GT -> 1#
                         _  -> 0#
 
-{-# NOINLINE leInteger# #-}
+{-# CONSTANT_FOLDED leInteger# #-}
 leInteger# :: Integer -> Integer -> Int#
 x `leInteger#` y = case x `compareInteger` y of
                         GT -> 0#
                         _  -> 1#
 
-{-# NOINLINE geInteger# #-}
+{-# CONSTANT_FOLDED geInteger# #-}
 geInteger# :: Integer -> Integer -> Int#
 x `geInteger#` y = case x `compareInteger` y of
                         LT -> 0#
@@ -584,18 +588,18 @@ instance Ord Integer where
     (>=) = geInteger
     compare = compareInteger
 
-{-# NOINLINE absInteger #-}
+{-# CONSTANT_FOLDED absInteger #-}
 absInteger :: Integer -> Integer
 absInteger (Negative x) = Positive x
 absInteger x = x
 
-{-# NOINLINE signumInteger #-}
+{-# CONSTANT_FOLDED signumInteger #-}
 signumInteger :: Integer -> Integer
 signumInteger (Negative _) = negativeOneInteger
 signumInteger Naught       = Naught
 signumInteger (Positive _) = oneInteger
 
-{-# NOINLINE hashInteger #-}
+{-# CONSTANT_FOLDED hashInteger #-}
 hashInteger :: Integer -> Int#
 hashInteger = integerToInt
 
