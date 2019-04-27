@@ -10,6 +10,7 @@
 #include "RtsUtils.h"
 #include "Capability.h"
 #include "Printer.h"
+#include "Sanity.h"
 #include "Storage.h"
 // We call evacuate, which expects the thread-local gc_thread to be valid;
 // This is sometimes declared as a register variable therefore it is necessary

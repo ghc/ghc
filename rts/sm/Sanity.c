@@ -87,7 +87,10 @@ checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap, uint32_t size )
 static void
 checkClosureShallow( const StgClosure* p )
 {
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(UNTAG_CONST_CLOSURE(p)));
+    const StgClosure *q;
+
+    q = UNTAG_CONST_CLOSURE(p);
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
 }
 
 // check an individual stack object
@@ -467,7 +470,13 @@ checkClosure( const StgClosure* p )
 void checkHeapChain (bdescr *bd)
 {
     for (; bd != NULL; bd = bd->link) {
-        if(!(bd->flags & BF_SWEPT)) {
+        if (false && bd->flags & BF_NONMOVING) {
+            struct NonmovingSegment *seg = (struct NonmovingSegment *) bd->start;
+            for (nonmoving_block_idx i=0; i < nonmovingSegmentBlockCount(seg); i++) {
+                if (nonmovingGetMark(seg, i) == nonmovingMarkEpoch) 
+                    checkClosure((StgClosure *) nonmovingSegmentGetBlock(seg, i));
+            }
+        } else if(!(bd->flags & BF_SWEPT)) {
             StgPtr p = bd->start;
             while (p < bd->free) {
                 uint32_t size = checkClosure((StgClosure *)p);
