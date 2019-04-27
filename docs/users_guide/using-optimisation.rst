@@ -316,7 +316,7 @@ by saying ``-fno-wombat``.
 
     Enables the common-sub-expression elimination optimisation on the STG
     intermediate language, where it is able to common up some subexpressions
-    that differ in their types, but not their represetation.
+    that differ in their types, but not their representation.
 
 .. ghc-flag:: -fdicts-cheap
     :shortdesc: Make dictionary-valued expressions seem cheap to the optimiser.
