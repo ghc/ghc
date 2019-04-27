@@ -214,7 +214,7 @@ External links can be written in either of these ways,
 To core library Haddock documentation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-It is often useful to be able to refer to the Haddock documention of the
+It is often useful to be able to refer to the Haddock documentation of the
 libraries shipped with GHC. The users guide's build system provides
 commands for referring to documentation for the following core GHC packages,
 

@@ -215,7 +215,7 @@ all these warnings can still be controlled with ``-f(no-)warn-*`` instead
 of ``-W(no-)*``.
 
 .. ghc-flag:: -Wunrecognised-warning-flags
-    :shortdesc: throw a warning when an unreconised ``-W...`` flag is
+    :shortdesc: throw a warning when an unrecognised ``-W...`` flag is
         encountered on the command line.
     :type: dynamic
     :reverse: -Wno-unrecognised-warning-flags

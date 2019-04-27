@@ -2212,7 +2212,7 @@ commonly used commands.
 
        This output shows that, in the context of the current session (ie
        in the scope of ``Prelude``), the first group of items from
-       ``Data.Maybe`` are not in scope (althought they are available in
+       ``Data.Maybe`` are not in scope (although they are available in
        fully qualified form in the GHCi session - see
        :ref:`ghci-scope`), whereas the second group of items are in
        scope (via ``Prelude``) and are therefore available either
