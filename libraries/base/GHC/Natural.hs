@@ -104,18 +104,7 @@ import GHC.IntWord64
 
 default ()
 
--- Most high-level operations need to be marked `NOINLINE` as
--- otherwise GHC doesn't recognize them and fails to apply constant
--- folding to `Natural`-typed expression.
---
--- To this end, the CPP hack below allows to write the pseudo-pragma
---
---   {-# CONSTANT_FOLDED plusNatural #-}
---
--- which is simply expanded into a
---
---   {-# NOINLINE plusNatural #-}
---
+-- See Note [CONSTANT_FOLDED pragma] for information on this #define below.
 --
 -- DONE: Note that some functions had commented CONSTANT_FOLDED annotations
 -- because they did not have a built-in rule in PrelRules like their @Integer@
