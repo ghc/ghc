@@ -43,18 +43,31 @@ import GHC.IntWord64
 
 default ()
 
--- Most high-level operations need to be marked `NOINLINE` as
--- otherwise GHC doesn't recognize them and fails to apply constant
--- folding to `Integer`-typed expression.
+-- Note [CONSTANT_FOLDED pragma]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Most high-level operations need to be marked `NOINLINE` as otherwise GHC
+-- may inline them before the rewrite rules have had a chance to fire and
+-- thereby fail to apply constant folding to e.g. `Integer` or `Natural`-typed
+-- expressions.
+--
+-- Using `NOINLINE` informs the compiler not to inline these operations in any
+-- of the GHC simplifier's phases so as to give RULES ample chances to
+-- activate.
+--
+-- All of the above also applies to `Natural`, and even `Integer` from
+-- `integer-simple` should `integer-gmp` not be available.
 --
 -- To this end, the CPP hack below allows to write the pseudo-pragma
 --
 --   {-# CONSTANT_FOLDED plusInteger #-}
 --
--- which is simply expaned into a
+-- which is simply expanded into a
 --
 --   {-# NOINLINE plusInteger #-}
 --
+-- This is more informative, and also helps discoverability of this comment.
+
 #define CONSTANT_FOLDED NOINLINE
 
 ----------------------------------------------------------------------------
