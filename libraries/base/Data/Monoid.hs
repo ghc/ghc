@@ -121,6 +121,11 @@ import Data.Semigroup.Internal
 --      Just (combine key value oldValue))
 -- @
 
+{-# DEPRECATED First
+    [ "Will be removed in GHC 8.10."
+    , "Use @'Maybe ('Data.Semigroup.First' a)@ from \"Data.Semigroup\" instead."
+    ]
+#-}
 
 -- | Maybe monoid returning the leftmost non-Nothing value.
 --
@@ -135,10 +140,7 @@ import Data.Semigroup.Internal
 -- > Data.Monoid.First x === Maybe (Data.Semigroup.First x)
 --
 -- In addition to being equivalent in the structural sense, the two
--- also have 'Monoid' instances that behave the same. This type will
--- be marked deprecated in GHC 8.8, and removed in GHC 8.10.
--- Users are advised to use the variant from "Data.Semigroup" and wrap
--- it in 'Maybe'.
+-- also have 'Monoid' instances that behave the same.
 newtype First a = First { getFirst :: Maybe a }
         deriving ( Eq          -- ^ @since 2.01
                  , Ord         -- ^ @since 2.01
@@ -161,6 +163,12 @@ instance Semigroup (First a) where
 instance Monoid (First a) where
         mempty = First Nothing
 
+{-# DEPRECATED Last
+    [ "Will be removed in GHC 8.10."
+    , "Use @'Maybe ('Data.Semigroup.Last' a)@ from \"Data.Semigroup\" instead."
+    ]
+#-}
+
 -- | Maybe monoid returning the rightmost non-Nothing value.
 --
 -- @'Last' a@ is isomorphic to @'Dual' ('First' a)@, and thus to
@@ -174,10 +182,7 @@ instance Monoid (First a) where
 -- > Data.Monoid.Last x === Maybe (Data.Semigroup.Last x)
 --
 -- In addition to being equivalent in the structural sense, the two
--- also have 'Monoid' instances that behave the same. This type will
--- be marked deprecated in GHC 8.8, and removed in GHC 8.10.
--- Users are advised to use the variant from "Data.Semigroup" and wrap
--- it in 'Maybe'.
+-- also have 'Monoid' instances that behave the same.
 newtype Last a = Last { getLast :: Maybe a }
         deriving ( Eq          -- ^ @since 2.01
                  , Ord         -- ^ @since 2.01
