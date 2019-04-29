@@ -314,6 +314,22 @@ This gets us more polymorphism than we would otherwise get, similar
 (but implemented strangely differently from) the treatment of type
 signatures in value declarations.
 
+However, we only want to do so when we have PolyKinds.
+When we are in Haskell98, we don't skip those decls, because we have defaulting
+(#16609). Skipping won't bring us more polymorphism when we have defaulting.
+Consider
+
+  data T1 a = MkT1 T2        -- No CUSK
+  data T2 = MkT2 (T1 Maybe)  -- Has CUSK
+
+If we skip the rhs of T2 during kind-checking, the kind of a remains unsolved.
+With PolyKinds, we do generalization to get T1 :: forall a. a -> *. And the
+program type-checks.
+But in Haskell 98, we do defaulting to get T1 :: * -> *, which then leads to a
+type error when type-checking (T1 Maybe).
+
+Summary: we only do skipping when we have PolyKinds on.
+
 Open type families
 ~~~~~~~~~~~~~~~~~~
 This treatment of type synonyms only applies to Haskell 98-style synonyms.
@@ -512,8 +528,12 @@ kcTyClGroup decls
                     -- NB: the environment extension overrides the tycon
                     --     promotion-errors bindings
                     --     See Note [Type environment evolution]
+                  ; poly_kinds  <- xoptM LangExt.PolyKinds
                   ; tcExtendKindEnvWithTyCons mono_tcs $
-                    mapM_ kcLTyClDecl no_cusk_decls
+                    if poly_kinds
+                    -- See Note [Skip decls with CUSKs in kcLTyClDecl]
+                    then mapM_ kcLTyClDecl no_cusk_decls
+                    else mapM_ kcLTyClDecl decls
 
                   ; return mono_tcs }
 
