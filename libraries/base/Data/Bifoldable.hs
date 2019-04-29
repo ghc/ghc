@@ -429,5 +429,5 @@ binotElem x =  not . bielem x
 --
 -- @since 4.10.0.0
 bifind :: Bifoldable t => (a -> Bool) -> t a a -> Maybe a
-bifind p = getFirst . bifoldMap finder finder
-  where finder x = First (if p x then Just x else Nothing)
+bifind p = getAlt . bifoldMap finder finder
+  where finder x = Alt (if p x then Just x else Nothing)

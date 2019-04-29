@@ -1,5 +1,6 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -Wno-deprecations #-} -- For the First and Last instances
 
 -----------------------------------------------------------------------------
 -- |
