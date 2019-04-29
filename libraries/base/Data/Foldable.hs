@@ -5,6 +5,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -Wno-deprecations #-} -- For the First and Last instances
 
 -----------------------------------------------------------------------------
 -- |
@@ -687,7 +688,7 @@ notElem x = not . elem x
 -- the leftmost element of the structure matching the predicate, or
 -- 'Nothing' if there is no such element.
 find :: Foldable t => (a -> Bool) -> t a -> Maybe a
-find p = getFirst . foldMap (\ x -> First (if p x then Just x else Nothing))
+find p = getAlt . foldMap (\ x -> Alt (if p x then Just x else Nothing))
 
 {-
 Note [List fusion and continuations in 'c']
