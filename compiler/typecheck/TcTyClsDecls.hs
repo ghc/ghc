@@ -530,10 +530,8 @@ kcTyClGroup decls
                     --     See Note [Type environment evolution]
                   ; poly_kinds  <- xoptM LangExt.PolyKinds
                   ; tcExtendKindEnvWithTyCons mono_tcs $
-                    if poly_kinds
+                    mapM_ kcLTyClDecl (if poly_kinds then no_cusk_decls else decls)
                     -- See Note [Skip decls with CUSKs in kcLTyClDecl]
-                    then mapM_ kcLTyClDecl no_cusk_decls
-                    else mapM_ kcLTyClDecl decls
 
                   ; return mono_tcs }
 
