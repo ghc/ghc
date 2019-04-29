@@ -484,6 +484,8 @@ mtimesDefault n x
   | n == 0    = mempty
   | otherwise = unwrapMonoid (stimes n (WrapMonoid x))
 
+{-# DEPRECATED Option, option "Will be removed in GHC 8.10; use 'Maybe' instead." #-}
+
 -- | 'Option' is effectively 'Maybe' with a better instance of
 -- 'Monoid', built off of an underlying 'Semigroup' instead of an
 -- underlying 'Monoid'.
@@ -493,8 +495,7 @@ mtimesDefault n x
 --
 -- In GHC 8.4 and higher, the 'Monoid' instance for 'Maybe' has been
 -- corrected to lift a 'Semigroup' instance instead of a 'Monoid'
--- instance. Consequently, this type is no longer useful. It will be
--- marked deprecated in GHC 8.8 and removed in GHC 8.10.
+-- instance. Consequently, this type is no longer useful.
 newtype Option a = Option { getOption :: Maybe a }
   deriving ( Eq       -- ^ @since 4.9.0.0
            , Ord      -- ^ @since 4.9.0.0
