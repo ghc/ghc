@@ -3996,10 +3996,10 @@ in ApiAnnotation.hs
 -- |Construct an AddAnn from the annotation keyword and the location
 -- of the keyword itself
 mj :: HasSrcSpan e => AnnKeywordId -> e -> AddAnn
-mj a l s = addAnnotation s a (gl l)
+mj a l = AddAnn a (gl l)
 
 mjL :: AnnKeywordId -> SrcSpan -> AddAnn
-mjL a l s = addAnnotation s a l
+mjL = AddAnn
 
 
 
@@ -4007,7 +4007,7 @@ mjL a l s = addAnnotation s a l
 -- the token has a unicode equivalent and this has been used, provide the
 -- unicode variant of the annotation.
 mu :: AnnKeywordId -> Located Token -> AddAnn
-mu a lt@(dL->L l t) = (\s -> addAnnotation s (toUnicodeAnn a lt) l)
+mu a lt@(dL->L l t) = AddAnn (toUnicodeAnn a lt) l
 
 -- | If the 'Token' is using its unicode variant return the unicode variant of
 --   the annotation

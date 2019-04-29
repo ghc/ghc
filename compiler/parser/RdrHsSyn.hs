@@ -266,7 +266,7 @@ mkDataFamInst :: SrcSpan
 mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
               ksig data_cons maybe_deriv
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
-       ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
+       ; addAnnsAt loc ann -- Add any API Annotations to the top SrcSpan
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (cL loc (DataFamInstD noExtField (DataFamInstDecl (mkHsImplicitBndrs
                   (FamEqn { feqn_ext    = noExtField
@@ -1374,12 +1374,12 @@ pStrictMark ((dL->L l1 x1) : (dL->L l2 x2) : xs)
   | Just (strAnnId, str) <- tyElStrictness x1
   , TyElUnpackedness (unpkAnns, prag, unpk) <- x2
   = Just ( cL (combineSrcSpans l1 l2) (HsSrcBang prag unpk str)
-         , unpkAnns ++ [\s -> addAnnotation s strAnnId l1]
+         , unpkAnns ++ [AddAnn strAnnId l1]
          , xs )
 pStrictMark ((dL->L l x1) : xs)
   | Just (strAnnId, str) <- tyElStrictness x1
   = Just ( cL l (HsSrcBang NoSourceText NoSrcUnpack str)
-         , [\s -> addAnnotation s strAnnId l]
+         , [AddAnn strAnnId l]
          , xs )
 pStrictMark ((dL->L l x1) : xs)
   | TyElUnpackedness (anns, prag, unpk) <- x1
@@ -3025,8 +3025,6 @@ instance MonadP PV where
     PV $ ReaderT $ \ctxMsg -> addFatalError srcspan (msg $$ ctxMsg)
   getBit ext =
     PV $ ReaderT $ \_ -> getBit ext
-  addAnnsAt loc anns =
-    PV $ ReaderT $ \_ -> addAnnsAt loc anns
   addAnnotation l a v =
     PV $ ReaderT $ \_ -> addAnnotation l a v
 
