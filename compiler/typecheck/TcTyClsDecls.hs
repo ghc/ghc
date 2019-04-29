@@ -288,7 +288,7 @@ we can get away with this is because we have more systematic TYPE r
 inference, which means that we can do unification between kinds that
 aren't lifted (this historically was not true.)
 
-The downside of not directly reading off the kinds off the RHS of
+The downside of not directly reading off the kinds of the RHS of
 type synonyms in topological order is that we don't transparently
 support making synonyms of types with higher-rank kinds.  But
 you can always specify a CUSK directly to make this work out.
@@ -313,6 +313,23 @@ a CUSK.  Here we skip the RHS of T, so we eventually get
 This gets us more polymorphism than we would otherwise get, similar
 (but implemented strangely differently from) the treatment of type
 signatures in value declarations.
+
+However, we only want to do so when we have PolyKinds.
+When we have NoPolyKinds, we don't skip those decls, because we have defaulting
+(#16609). Skipping won't bring us more polymorphism when we have defaulting.
+Consider
+
+  data T1 a = MkT1 T2        -- No CUSK
+  data T2 = MkT2 (T1 Maybe)  -- Has CUSK
+
+If we skip the rhs of T2 during kind-checking, the kind of a remains unsolved.
+With PolyKinds, we do generalization to get T1 :: forall a. a -> *. And the
+program type-checks.
+But with NoPolyKinds, we do defaulting to get T1 :: * -> *. Defaulting happens
+in quantifyTyVars, which is called from generaliseTcTyCon. Then type-checking
+(T1 Maybe) will throw a type error.
+
+Summary: with PolyKinds, we must skip; with NoPolyKinds, we must /not/ skip.
 
 Open type families
 ~~~~~~~~~~~~~~~~~~
@@ -405,9 +422,9 @@ We do the following steps:
             B   :-> TyConPE
             MkB :-> DataConPE
 
-  2. kcTyCLGruup
+  2. kcTyCLGroup
       - Do getInitialKinds, which will signal a promotion
-        error if B is used in any of the kinds needed to initialse
+        error if B is used in any of the kinds needed to initialise
         B's kind (e.g. (a :: Type)) here
 
       - Extend the type env with these initial kinds (monomorphic for
@@ -512,8 +529,10 @@ kcTyClGroup decls
                     -- NB: the environment extension overrides the tycon
                     --     promotion-errors bindings
                     --     See Note [Type environment evolution]
+                  ; poly_kinds  <- xoptM LangExt.PolyKinds
                   ; tcExtendKindEnvWithTyCons mono_tcs $
-                    mapM_ kcLTyClDecl no_cusk_decls
+                    mapM_ kcLTyClDecl (if poly_kinds then no_cusk_decls else decls)
+                    -- See Note [Skip decls with CUSKs in kcLTyClDecl]
 
                   ; return mono_tcs }
 
@@ -810,8 +829,8 @@ We do kind inference as follows:
       Note [Unification variables need fresh Names]
 
   Assign initial monomorophic kinds to S, T
-          S :: kk1 -> * -> kk2 -> *
-          T :: kk3 -> * -> kk4 -> *
+          T :: kk1 -> * -> kk2 -> *
+          S :: kk3 -> * -> kk4 -> *
 
 * Step 2: kcTyClDecl. Extend the environment with a TcTyCon for S and
   T, with these monomophic kinds.  Now kind-check the declarations,
@@ -900,7 +919,7 @@ But when typechecking the default declarations for 'cop' and 'dop' in
 tcDlassDecl2 we need {a, ka} and {b, kb} respectively to be in scope.
 But at that point all we have is the utterly-final Class itself.
 
-Conclusion: the classTyVars of a class must have the same Mame as
+Conclusion: the classTyVars of a class must have the same Name as
 that originally assigned by the user.  In our example, C must have
 classTyVars {a, ka, x} while D has classTyVars {a, kb, y}.  Despite
 the fact that kka and kkb got unified!
