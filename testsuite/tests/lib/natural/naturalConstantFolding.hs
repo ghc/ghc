@@ -71,7 +71,7 @@ shiftRNatural :: Natural
 shiftRNatural = 100066 `shiftR` 4
 
 popCountNatural :: Int
-popCountNatural = popCount (100095 :: Natural)
+popCountNatural = popCount (100098 :: Natural)
 
 testBitNaturalT :: Bool
 testBitNaturalT = testBit (100068 :: Natural) 2
