@@ -10,33 +10,49 @@ integerConstantFolding:
 	'$(TEST_HC)' -Wall -v0 -O --make integerConstantFolding -fforce-recomp -ddump-simpl > integerConstantFolding.simpl
 # All the 100nnn values should be constant-folded away
 	! grep -q '\<100[0-9][0-9][0-9]\>' integerConstantFolding.simpl || { echo "Unfolded values found"; grep '\<100[0-9][0-9][0-9]\>' integerConstantFolding.simpl; }
+	# Bit arithmetic
+	$(call CHECK,\<532\>,andInteger)
+	$(call CHECK,\<239575\>,orInteger)
+	$(call CHECK,\<239041\>,xorInteger)
+	$(call CHECK,\<9\>,popCountInteger)
+	$(call CHECK,-200059\>,complementInteger)
+	$(call CHECK,\<1600976\>,shiftLInteger)
+	$(call CHECK,\<6253\>,shiftRInteger)
+	# Arithmetic
 	$(call CHECK,\<200007\>,plusInteger)
 	$(call CHECK,\<683234160\>,timesInteger)
 	$(call CHECK,-991\>,minusIntegerN)
 	$(call CHECK,\<989\>,minusIntegerP)
 	$(call CHECK,-200011\>,negateInteger)
 	$(call CHECK,\<200019\>,absInteger)
+	$(call CHECK,\<1\>,signumIntegerP)
+	$(call CHECK,\<0\>,signumIntegerZ)
+	# It seems searching for '\<\-1\>' does not work properly. As such, we only
+	# search for '-1' without caring for word boundaries. Library version
+	# numbers may be included.
+	$(call CHECK,\-1,signumIntegerN)
+	# Quotients and remainders
 	$(call CHECK,\<50024\>,gcdInteger)
 	$(call CHECK,\<1001100300\>,lcmInteger)
-	$(call CHECK,\<532\>,andInteger)
-	$(call CHECK,\<239575\>,orInteger)
-	$(call CHECK,\<239041\>,xorInteger)
-	$(call CHECK,\<9\>,popCountInteger)
-	$(call CHECK,-200059\>,complementInteger)
 	$(call CHECK,\<813\>,quotRemInteger)
 	$(call CHECK,\<60\>,quotRemInteger)
 	$(call CHECK,\<219\>,divModInteger)
 	$(call CHECK,\<196\>,divModInteger)
-	$(call CHECK,\<1600976\>,shiftLInteger)
-	$(call CHECK,\<6253\>,shiftRInteger)
 	$(call CHECK,\<641\>,quotInteger)
 	$(call CHECK,\<68\>,remInteger)
 	$(call CHECK,\<642\>,divInteger)
 	$(call CHECK,\<90\>,modInteger)
+	# Conversions
 	$(call CHECK,\<200131.0\>,doubleFromInteger)
 	$(call CHECK,\<200135.0\>,floatFromInteger)
 	$(call CHECK,\<400276.0\>,encodeIntegerDouble)
 	$(call CHECK,\<400280.0\>,encodeIntegerFloat)
+	$(call CHECK,\<200143\>,integerToWord)
+	$(call CHECK,\<200147\>,integerToInt)
+	$(call CHECK,\<200151\>,wordToInteger)
+	$(call CHECK,\<200155\>,intToInteger)
+	$(call CHECK,\<200159\>,word64ToInteger)
+	$(call CHECK,\<200163\>,int64ToInteger)
 	./integerConstantFolding
 
 LOOKUP = grep -q -- '$1' integerToIntWord64ConstantFolding.simpl || \

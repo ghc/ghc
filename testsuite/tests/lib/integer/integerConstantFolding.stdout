@@ -13,6 +13,8 @@ absIntegerN: 200019
 signumIntegerP: 1
 signumIntegerZ: 0
 signumIntegerN: -1
+testBitIntegerT: True
+testBitIntegerF: False
 leIntegerL: True
 leIntegerE: True
 leIntegerG: False

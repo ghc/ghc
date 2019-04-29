@@ -21,7 +21,7 @@ naturalConstantFolding:
 	$(call CHECK,\<239579\>,orNatural)
 	$(call CHECK,\<1601040\>,shiftLNatural)
 	$(call CHECK,\<6254\>,shiftRNatural)
-	$(call CHECK,\<12\>,popCountNatural)
+	$(call CHECK,\<6\>,popCountNatural)
 	# Arithmetic
 	$(call CHECK,\<200121\>,plusNatural)
 	$(call CHECK,\<683678240\>,timesNatural)
