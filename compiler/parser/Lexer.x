@@ -59,7 +59,8 @@ module Lexer (
    getLexState, popLexState, pushLexState,
    ExtBits(..),
    lexTokenStream,
-   AddAnn,mkParensApiAnn,
+   AddAnn(..),mkParensApiAnn,
+   addAnnsAt,
    commentToAnnotation
   ) where
 
@@ -2503,7 +2504,6 @@ class Monad m => MonadP m where
   -- | Check if a given flag is currently set in the bitmap.
   getBit :: ExtBits -> m Bool
   -- | Given a location and a list of AddAnn, apply them all to the location.
-  addAnnsAt :: SrcSpan -> [AddAnn] -> m ()
   addAnnotation :: SrcSpan          -- SrcSpan of enclosing AST construct
                 -> AnnKeywordId     -- The first two parameters are the key
                 -> SrcSpan          -- The location of the keyword itself
@@ -2533,10 +2533,12 @@ instance MonadP P where
     addError span msg >> P PFailed
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
                          in b `seq` POk s b
-  addAnnsAt loc anns = mapM_ (\a -> a loc) anns
   addAnnotation l a v = do
     addAnnotationOnly l a v
     allocateComments l
+
+addAnnsAt :: MonadP m => SrcSpan -> [AddAnn] -> m ()
+addAnnsAt l = mapM_ (\(AddAnn a v) -> addAnnotation l a v)
 
 addTabWarning :: RealSrcSpan -> P ()
 addTabWarning srcspan
@@ -3061,7 +3063,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 --
 --   The usual way an 'AddAnn' is created is using the 'mj' ("make jump")
 --   function, and then it can be discharged using the 'ams' function.
-type AddAnn = SrcSpan -> P ()
+data AddAnn = AddAnn AnnKeywordId SrcSpan
 
 addAnnotationOnly :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
 addAnnotationOnly l a v = P $ \s -> POk s {
@@ -3073,9 +3075,8 @@ addAnnotationOnly l a v = P $ \s -> POk s {
 -- and end of the span
 mkParensApiAnn :: SrcSpan -> [AddAnn]
 mkParensApiAnn (UnhelpfulSpan _)  = []
-mkParensApiAnn s@(RealSrcSpan ss) = [mj AnnOpenP lo,mj AnnCloseP lc]
+mkParensApiAnn s@(RealSrcSpan ss) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
   where
-    mj a l = (\s -> addAnnotation s a l)
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
     sc = srcSpanStartCol ss
