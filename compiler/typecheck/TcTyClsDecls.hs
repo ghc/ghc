@@ -288,7 +288,7 @@ we can get away with this is because we have more systematic TYPE r
 inference, which means that we can do unification between kinds that
 aren't lifted (this historically was not true.)
 
-The downside of not directly reading off the kinds off the RHS of
+The downside of not directly reading off the kinds of the RHS of
 type synonyms in topological order is that we don't transparently
 support making synonyms of types with higher-rank kinds.  But
 you can always specify a CUSK directly to make this work out.
@@ -421,9 +421,9 @@ We do the following steps:
             B   :-> TyConPE
             MkB :-> DataConPE
 
-  2. kcTyCLGruup
+  2. kcTyCLGroup
       - Do getInitialKinds, which will signal a promotion
-        error if B is used in any of the kinds needed to initialse
+        error if B is used in any of the kinds needed to initialise
         B's kind (e.g. (a :: Type)) here
 
       - Extend the type env with these initial kinds (monomorphic for
@@ -830,8 +830,8 @@ We do kind inference as follows:
       Note [Unification variables need fresh Names]
 
   Assign initial monomorophic kinds to S, T
-          S :: kk1 -> * -> kk2 -> *
-          T :: kk3 -> * -> kk4 -> *
+          T :: kk1 -> * -> kk2 -> *
+          S :: kk3 -> * -> kk4 -> *
 
 * Step 2: kcTyClDecl. Extend the environment with a TcTyCon for S and
   T, with these monomophic kinds.  Now kind-check the declarations,
@@ -920,7 +920,7 @@ But when typechecking the default declarations for 'cop' and 'dop' in
 tcDlassDecl2 we need {a, ka} and {b, kb} respectively to be in scope.
 But at that point all we have is the utterly-final Class itself.
 
-Conclusion: the classTyVars of a class must have the same Mame as
+Conclusion: the classTyVars of a class must have the same Name as
 that originally assigned by the user.  In our example, C must have
 classTyVars {a, ka, x} while D has classTyVars {a, kb, y}.  Despite
 the fact that kka and kkb got unified!
