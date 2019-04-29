@@ -112,7 +112,7 @@ instance Num Word where
     fromInteger i          = W# (integerToWord i)
 
 -- | @since 2.01
-instance  Num Integer  where
+instance Num Integer where
     (+) = plusInteger
     (-) = minusInteger
     (*) = timesInteger

@@ -21,6 +21,8 @@ main = do p "plusInteger"        plusInteger
           p "signumIntegerP"    signumIntegerP
           p "signumIntegerZ"    signumIntegerZ
           p "signumIntegerN"    signumIntegerN
+          p "testBitIntegerT"   testBitIntegerT
+          p "testBitIntegerF"   testBitIntegerF
           p "leIntegerL"        leIntegerL
           p "leIntegerE"        leIntegerE
           p "leIntegerG"        leIntegerG
@@ -66,6 +68,36 @@ main = do p "plusInteger"        plusInteger
     where p :: Show a => String -> a -> IO ()
           p str x = putStrLn (str ++ ": " ++ show x)
 
+-- | Bit arithmetic
+andInteger :: Integer
+andInteger = 100052 .&. 140053
+
+orInteger :: Integer
+orInteger = 100054 .|. 140055
+
+xorInteger :: Integer
+xorInteger = 100056 `xor` 140057
+
+popCountInteger :: Int
+popCountInteger = popCount (100084 :: Integer)
+
+complementInteger :: Integer
+complementInteger = complement 200058
+
+shiftLInteger :: Integer
+shiftLInteger = 100061 `shiftL` 4
+
+shiftRInteger :: Integer
+shiftRInteger = 100062 `shiftR` 4
+
+testBitIntegerT :: Bool
+testBitIntegerT = testBit (100068 :: Integer) 2
+
+testBitIntegerF :: Bool
+testBitIntegerF = testBit (100069 :: Integer) 1
+-----------------------------------------------
+
+-- Arithmetic
 plusInteger :: Integer
 plusInteger = 100003 + 100004
 
@@ -80,16 +112,6 @@ minusIntegerP = 100999 - 100010
 negateInteger :: Integer
 negateInteger = negate 200011
 
-eqIntegerE :: Bool
-eqIntegerE = (100012 :: Integer) == 100012
-eqIntegerN :: Bool
-eqIntegerN = (100013 :: Integer) == 100014
-
-neqIntegerE :: Bool
-neqIntegerE = (100015 :: Integer) /= 100015
-neqIntegerN :: Bool
-neqIntegerN = (100016 :: Integer) /= 100017
-
 absIntegerP :: Integer
 absIntegerP = abs 200018
 absIntegerZ :: Integer
@@ -103,6 +125,18 @@ signumIntegerZ :: Integer
 signumIntegerZ = signum 0
 signumIntegerN :: Integer
 signumIntegerN = signum (-100021)
+---------------------------------
+
+-- Ordering and Equality
+eqIntegerE :: Bool
+eqIntegerE = (100012 :: Integer) == 100012
+eqIntegerN :: Bool
+eqIntegerN = (100013 :: Integer) == 100014
+
+neqIntegerE :: Bool
+neqIntegerE = (100015 :: Integer) /= 100015
+neqIntegerN :: Bool
+neqIntegerN = (100016 :: Integer) /= 100017
 
 leIntegerL :: Bool
 leIntegerL = (100022 :: Integer) <= 100023
@@ -138,39 +172,20 @@ compareIntegerE :: Ordering
 compareIntegerE = (100044 :: Integer) `compare` 100044
 compareIntegerG :: Ordering
 compareIntegerG = (100046 :: Integer) `compare` 100045
+------------------------------------------------------
 
+-- Quotients and remainders
 gcdInteger :: Integer
 gcdInteger = 100048 `gcd` 150072
 
 lcmInteger :: Integer
 lcmInteger = 100050 `lcm` 100060
 
-andInteger :: Integer
-andInteger = 100052 .&. 140053
-
-orInteger :: Integer
-orInteger = 100054 .|. 140055
-
-xorInteger :: Integer
-xorInteger = 100056 `xor` 140057
-
-popCountInteger :: Int
-popCountInteger = popCount (100084 :: Integer)
-
-complementInteger :: Integer
-complementInteger = complement 200058
-
 quotRemInteger :: (Integer, Integer)
 quotRemInteger = 100059 `quotRem` 123
 
 divModInteger :: (Integer, Integer)
 divModInteger = 100060 `divMod` 456
-
-shiftLInteger :: Integer
-shiftLInteger = 100061 `shiftL` 4
-
-shiftRInteger :: Integer
-shiftRInteger = 100062 `shiftR` 4
 
 quotInteger :: Integer
 quotInteger = 100063 `quot` 156
@@ -183,6 +198,8 @@ divInteger = 100286 `div` 156
 
 modInteger :: Integer
 modInteger = 100086 `mod` 156
+
+-- Conversions
 
 -- For the conversion functions, we can't just check that e.g. 100065
 -- is in the resulting core, because it will be regardless of whether
@@ -222,3 +239,4 @@ int64ToInteger = toInteger (100081 :: Int64) + 100082
 
 decodeIntegerDouble :: (Integer, Int)
 decodeIntegerDouble = decodeFloat (100083 :: Double)
+----------------------------------------------------

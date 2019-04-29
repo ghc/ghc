@@ -1286,6 +1286,7 @@ builtinIntegerRules =
   rule_shift_op       "shiftRInteger"       shiftRIntegerName       shiftR,
   rule_bitInteger     "bitInteger"          bitIntegerName,
   rule_popCount       "popCountInteger"     popCountIntegerName,
+  rule_testBit        "testBitInteger"      testBitIntegerName,
   -- See Note [Integer division constant folding] in libraries/base/GHC/Real.hs
   rule_divop_one      "quotInteger"         quotIntegerName         quot,
   rule_divop_one      "remInteger"          remIntegerName          rem,
@@ -1361,6 +1362,9 @@ builtinIntegerRules =
           rule_popCount str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Integer_popCount }
+          rule_testBit str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_Integer_testBit }
 
 -- See Note [Integer and Natural constant folding] for why some of the
 -- @builtinIntegerRules@ do not have counterparts in @builtinNaturalRules@.
@@ -1896,6 +1900,13 @@ match_Natural_testBit _ id_unf _ [xl,yl]
   , Just (LitNumber LitNumInt y _) <- exprIsLiteral_maybe id_unf yl
   = Just (mkBoolVal (testBit (fromInteger x :: Natural) (fromInteger y)))
 match_Natural_testBit _ _ _ _ = Nothing
+
+match_Integer_testBit :: RuleFun
+match_Integer_testBit _ id_unf _ [xl,yl]
+  | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumInt y _) <- exprIsLiteral_maybe id_unf yl
+  = Just (mkBoolVal (testBit x (fromInteger y)))
+match_Integer_testBit _ _ _ _ = Nothing
 
 ---------------------------------------------------
 -- constant folding for Float/Double

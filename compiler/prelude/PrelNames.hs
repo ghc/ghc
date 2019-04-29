@@ -384,6 +384,7 @@ basicKnownKeyNames
         andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
         shiftLIntegerName, shiftRIntegerName, bitIntegerName,
         integerSDataConName,naturalSDataConName, popCountIntegerName,
+        testBitIntegerName,
 
         -- Natural
         naturalTyConName,
@@ -1135,7 +1136,8 @@ integerTyConName, mkIntegerName, integerSDataConName,
     decodeDoubleIntegerName,
     gcdIntegerName, lcmIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
-    shiftLIntegerName, shiftRIntegerName, bitIntegerName, popCountIntegerName :: Name
+    shiftLIntegerName, shiftRIntegerName, bitIntegerName, popCountIntegerName,
+    testBitIntegerName :: Name
 integerTyConName      = tcQual gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
 integerSDataConName   = dcQual gHC_INTEGER_TYPE (fsLit "S#")                integerSDataConKey
 mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
@@ -1181,6 +1183,7 @@ shiftLIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "shiftLInteger")     shi
 shiftRIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "shiftRInteger")     shiftRIntegerIdKey
 bitIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "bitInteger")        bitIntegerIdKey
 popCountIntegerName   = varQual gHC_INTEGER_TYPE (fsLit "popCountInteger")   popCountIntegerIdKey
+testBitIntegerName    = varQual gHC_INTEGER_TYPE (fsLit "testBitInteger")    testBitIntegerIdKey
 
 -- GHC.Natural types
 naturalTyConName, naturalSDataConName :: Name
@@ -2205,7 +2208,8 @@ mkIntegerIdKey, smallIntegerIdKey, wordToIntegerIdKey,
     decodeDoubleIntegerIdKey,
     gcdIntegerIdKey, lcmIntegerIdKey,
     andIntegerIdKey, orIntegerIdKey, xorIntegerIdKey, complementIntegerIdKey,
-    shiftLIntegerIdKey, shiftRIntegerIdKey, popCountIntegerIdKey :: Unique
+    shiftLIntegerIdKey, shiftRIntegerIdKey, popCountIntegerIdKey,
+    testBitIntegerIdKey :: Unique
 mkIntegerIdKey                = mkPreludeMiscIdUnique 60
 smallIntegerIdKey             = mkPreludeMiscIdUnique 61
 integerToWordIdKey            = mkPreludeMiscIdUnique 62
@@ -2247,9 +2251,11 @@ wordToIntegerIdKey            = mkPreludeMiscIdUnique 97
 word64ToIntegerIdKey          = mkPreludeMiscIdUnique 98
 int64ToIntegerIdKey           = mkPreludeMiscIdUnique 99
 decodeDoubleIntegerIdKey      = mkPreludeMiscIdUnique 100
--- @popCountIntegerIdKey@ was a late addition, so its id key is much higher
--- than it should be. Be careful when adding new keys.
+-- @popCountIntegerIdKey@ and @testBitIntegerIdKey@ were late additions, so
+-- their id keys are much higher than they should be. Be careful when adding
+-- new keys.
 popCountIntegerIdKey          = mkPreludeMiscIdUnique 598
+testBitIntegerIdKey           = mkPreludeMiscIdUnique 605
 
 rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101
@@ -2509,9 +2515,9 @@ gtNaturalPrimIdKey      = mkPreludeMiscIdUnique 594
 leNaturalPrimIdKey      = mkPreludeMiscIdUnique 595
 ltNaturalPrimIdKey      = mkPreludeMiscIdUnique 596
 compareNaturalPrimIdKey = mkPreludeMiscIdUnique 597
--- The 598th id key is not missing, but up above. It belongs to
--- @popCountIntegerIdKey@, added after its counterparts - hence the disparate
--- numbering.
+-- The 598th and 605th id keys are not missing, but up above. They belong to
+-- @popCountIntegerIdKey@ and @testBitIntegerIdKey@, added long after their
+-- counterparts - hence the disparate numbering.
 doubleFromNaturalIdKey  = mkPreludeMiscIdUnique 599
 floatFromNaturalIdKey   = mkPreludeMiscIdUnique 600
 int64ToNaturalIdKey     = mkPreludeMiscIdUnique 601
