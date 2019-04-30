@@ -35,6 +35,40 @@ parseBuildPath root afterBuild = do
     a <- afterBuild
     return (BuildPath root stage pkgpath a)
 
+-- | A path of the form
+--
+-- > <build root>/stage<N>/lib/<arch>-<os>-ghc-<ghc version>/<something>
+--
+-- where @something@ describes a library or object file or ... to be registerd
+-- for the given package. These are files registered into a ghc-pkg database.
+--
+-- @a@, which represents that @something@, is instantiated with library-related
+-- data types in @Rules.Library@ and with object/interface files related types
+-- in @Rules.Compile@.
+data GhcPkgPath a
+    = GhcPkgPath
+        FilePath -- ^ > <build root>/
+        Stage    -- ^ > stage<N>/
+        FilePath -- ^ > lib/<arch>-<os>-ghc-<ghc version>/
+        a        -- ^ > whatever comes after
+        deriving (Eq, Show)
+
+-- | Parse a registered ghc-pkg path under the given build root.
+parseGhcPkgPath
+    :: FilePath -- ^ build root
+    -> Parsec.Parsec String () a -- ^ what to parse after @build/@
+    -> Parsec.Parsec String () (GhcPkgPath a)
+parseGhcPkgPath root after = do
+    _ <- Parsec.string root *> Parsec.optional (Parsec.char '/')
+    stage <- parseStage
+    _ <- Parsec.char '/'
+    regPath <- Parsec.string "lib/"
+            <> Parsec.manyTill Parsec.anyChar (Parsec.try $ Parsec.string "/")
+    a <- after
+    return (GhcPkgPath root stage regPath a)
+
+
+
 -- To be kept in sync with Stage.hs's stageString function
 -- | Parse @"stageX"@ into a 'Stage'.
 parseStage :: Parsec.Parsec String () Stage
