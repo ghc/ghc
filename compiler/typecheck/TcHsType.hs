@@ -2368,13 +2368,13 @@ etaExpandAlgTyCon tc_bndrs kind
       = case splitPiTy_maybe kind of
           Nothing -> (reverse acc, substTy subst kind)
 
-          Just (Anon _ arg, kind')
+          Just (Anon af arg, kind')
             -> go loc occs' uniqs' subst' (tcb : acc) kind'
             where
               arg'   = substTy subst arg
               tv     = mkTyVar (mkInternalName uniq occ loc) arg'
               subst' = extendTCvInScope subst tv
-              tcb    = Bndr tv (AnonTCB VisArg)
+              tcb    = Bndr tv (AnonTCB af)
               (uniq:uniqs') = uniqs
               (occ:occs')   = occs
 

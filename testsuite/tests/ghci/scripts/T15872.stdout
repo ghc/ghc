@@ -1,0 +1,16 @@
+MkFun :: (a -> b) -> Fun a b
+Fun :: (a ~ 'OP) => * -> * -> *
+data Fun b c where
+  MkFun :: (b -> c) -> Fun b c
+  	-- Defined at T15872.hs:11:1
+MkFun
+  :: (a -> b) -> Fun @'OP @{'GHC.Types.Eq# @WHICH @'OP @'OP <>} a b
+Fun :: ((a :: WHICH) ~ ('OP :: WHICH)) => * -> * -> *
+type role Fun nominal nominal representational representational
+data Fun @(a :: WHICH)
+         @{a1 :: (a :: WHICH) ~ ('OP :: WHICH)}
+         b
+         c where
+  MkFun :: (b -> c)
+           -> Fun @'OP @{'GHC.Types.Eq# @WHICH @'OP @'OP <>} b c
+  	-- Defined at T15872.hs:11:1

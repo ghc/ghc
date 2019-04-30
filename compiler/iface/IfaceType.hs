@@ -719,8 +719,9 @@ pprIfaceTyConBinders = sep . map go
       -- See Note [Pretty-printing invisible arguments]
       case vis of
         AnonTCB  VisArg    -> ppr_bndr True
-        AnonTCB  InvisArg  -> ppr_bndr True  -- Rare; just promoted GADT data constructors
-                                             -- Should we print them differently?
+        AnonTCB  InvisArg  -> char '@' <> braces (ppr_bndr False)
+          -- The above case is rare. (See Note [AnonTCB InvisArg] in TyCon.)
+          -- Should we print these differently?
         NamedTCB Required  -> ppr_bndr True
         NamedTCB Specified -> char '@' <> ppr_bndr True
         NamedTCB Inferred  -> char '@' <> braces (ppr_bndr False)

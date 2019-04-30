@@ -487,14 +487,22 @@ tyConVisibleTyVars tc
   = [ tv | Bndr tv vis <- tyConBinders tc
          , isVisibleTcbVis vis ]
 
-{- Note [AnonTCB InivsArg]
+{- Note [AnonTCB InvisArg]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's pretty rare to have an (AnonTCB InvisArg) binder.  The
-only way it can occur is in a PromotedDataCon whose
-kind has an equality constraint:
-  'MkT :: forall a b. (a~b) => blah
-See Note [Constraints in kinds] in TyCoRep, and
-Note [Promoted data constructors] in this module.
+only way it can occur is through equality constraints in kinds. These
+can arise in one of two ways:
+
+* In a PromotedDataCon whose kind has an equality constraint:
+
+    'MkT :: forall a b. (a~b) => blah
+
+  See Note [Constraints in kinds] in TyCoRep, and
+  Note [Promoted data constructors] in this module.
+* In a data type whose kind has an equality constraint, as in the
+  following example from #12102:
+
+    data T :: forall a. (IsTypeLit a ~ 'True) => a -> Type
 
 When mapping an (AnonTCB InvisArg) to an ArgFlag, in
 tyConBndrVisArgFlag, we use "Inferred" to mean "the user cannot
