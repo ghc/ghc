@@ -1257,19 +1257,20 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
   = do  { (env1, new_mb_join)   <- zonk_join env mb_join
         ; (env2, new_args)      <- zonk_args env1 args
         ; new_body_ty           <- zonkTcTypeToTypeX env2 body_ty
-        ; return (env2, ApplicativeStmt new_body_ty new_args new_mb_join) }
+        ; return ( env2
+                 , ApplicativeStmt new_body_ty new_args new_mb_join) }
   where
     zonk_join env Nothing  = return (env, Nothing)
     zonk_join env (Just j) = second Just <$> zonkSyntaxExpr env j
 
-    get_pat (_, ApplicativeArgOne _ pat _ _) = pat
-    get_pat (_, ApplicativeArgMany _ _ _ pat) = pat
+    get_pat (_, ApplicativeArgOne _ pat _ _ _) = pat
+    get_pat (_, ApplicativeArgMany _ _ _ pat _) = pat
     get_pat (_, XApplicativeArg _) = panic "zonkStmt"
 
-    replace_pat pat (op, ApplicativeArgOne x _ a isBody)
-      = (op, ApplicativeArgOne x pat a isBody)
-    replace_pat pat (op, ApplicativeArgMany x a b _)
-      = (op, ApplicativeArgMany x a b pat)
+    replace_pat pat (op, ApplicativeArgOne x _ a isBody fail_op)
+      = (op, ApplicativeArgOne x pat a isBody fail_op)
+    replace_pat pat (op, ApplicativeArgMany x a b _ fail_op)
+      = (op, ApplicativeArgMany x a b pat fail_op)
     replace_pat _ (_, XApplicativeArg _) = panic "zonkStmt"
 
     zonk_args env args
@@ -1287,13 +1288,15 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
            ; return (env2, (new_op, new_arg) : new_args) }
     zonk_args_rev env [] = return (env, [])
 
-    zonk_arg env (ApplicativeArgOne x pat expr isBody)
+    zonk_arg env (ApplicativeArgOne x pat expr isBody fail_op)
       = do { new_expr <- zonkLExpr env expr
-           ; return (ApplicativeArgOne x pat new_expr isBody) }
-    zonk_arg env (ApplicativeArgMany x stmts ret pat)
+           ; (_, new_fail) <- zonkSyntaxExpr env fail_op
+           ; return (ApplicativeArgOne x pat new_expr isBody new_fail) }
+    zonk_arg env (ApplicativeArgMany x stmts ret pat fail_op)
       = do { (env1, new_stmts) <- zonkStmts env zonkLExpr stmts
            ; new_ret           <- zonkExpr env1 ret
-           ; return (ApplicativeArgMany x new_stmts new_ret pat) }
+           ; (_, new_fail) <- zonkSyntaxExpr env1 fail_op
+           ; return (ApplicativeArgMany x new_stmts new_ret pat new_fail) }
     zonk_arg _ (XApplicativeArg _) = panic "zonkStmt.XApplicativeArg"
 
 zonkStmt _ _ (XStmtLR _) = panic "zonkStmt"

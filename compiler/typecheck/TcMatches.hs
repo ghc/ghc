@@ -992,7 +992,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
 
       -- Typecheck each ApplicativeArg separately
       -- See Note [ApplicativeDo and constraints]
-      ; args' <- mapM goArg (zip3 args pat_tys exp_tys)
+      ; args' <- mapM (goArg body_ty) (zip3 args pat_tys exp_tys)
 
       -- Bring into scope all the things bound by the args,
       -- and typecheck the thing_inside
@@ -1012,35 +1012,39 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
            ; ops' <- goOps t_i ops
            ; return (op' : ops') }
 
-    goArg :: (ApplicativeArg GhcRn, Type, Type)
+    goArg :: Type -> (ApplicativeArg GhcRn, Type, Type)
           -> TcM (ApplicativeArg GhcTcId)
 
-    goArg (ApplicativeArgOne x pat rhs isBody, pat_ty, exp_ty)
+    goArg body_ty (ApplicativeArgOne x pat rhs isBody fail_op, pat_ty, exp_ty)
       = setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
         addErrCtxt (pprStmtInCtxt ctxt (mkBindStmt pat rhs))   $
         do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty)
            ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
                           return ()
-           ; return (ApplicativeArgOne x pat' rhs' isBody) }
+           ; fail_op' <- tcMonadFailOp (DoPatOrigin pat) pat' fail_op body_ty
 
-    goArg (ApplicativeArgMany x stmts ret pat, pat_ty, exp_ty)
-      = do { (stmts', (ret',pat')) <-
+           ; return (ApplicativeArgOne x pat' rhs' isBody fail_op') }
+
+    goArg body_ty (ApplicativeArgMany x stmts ret pat fail_op, pat_ty, exp_ty)
+      = do { (stmts', (ret',pat', fail_op')) <-
                 tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty) $
                 \res_ty  -> do
                   { L _ ret' <- tcMonoExprNC (noLoc ret) res_ty
                   ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
                                  return ()
-                  ; return (ret', pat')
+                  ; monad_ty_var <- newFlexiTyVarTy (liftedTypeKind `mkVisFunTy` liftedTypeKind)
+                  ; let monad_type = mkAppTy monad_ty_var body_ty
+                  ; fail_op' <- tcMonadFailOp (DoPatOrigin pat) pat' fail_op monad_type
+                  ; return (ret', pat', fail_op')
                   }
-           ; return (ApplicativeArgMany x stmts' ret' pat') }
+           ; return (ApplicativeArgMany x stmts' ret' pat' fail_op') }
 
-    goArg (XApplicativeArg _, _, _) = panic "tcApplicativeStmts"
+    goArg _ (XApplicativeArg _, _, _) = panic "tcApplicativeStmts"
 
     get_arg_bndrs :: ApplicativeArg GhcTcId -> [Id]
-    get_arg_bndrs (ApplicativeArgOne _ pat _ _)  = collectPatBinders pat
-    get_arg_bndrs (ApplicativeArgMany _ _ _ pat) = collectPatBinders pat
-    get_arg_bndrs (XApplicativeArg _)            = panic "tcApplicativeStmts"
-
+    get_arg_bndrs (ApplicativeArgOne _ pat _ _ _)  = collectPatBinders pat
+    get_arg_bndrs (ApplicativeArgMany _ _ _ pat _) = collectPatBinders pat
+    get_arg_bndrs (XApplicativeArg _)              = panic "tcApplicativeStmts"
 
 {- Note [ApplicativeDo and constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

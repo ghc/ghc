@@ -1519,6 +1519,16 @@ dsDo {(arg_1 | ... | arg_n); stmts} expr =
 -- 'pureName' due to @RebindableSyntax@.
 data MonadNames = MonadNames { return_name, pure_name :: Name }
 
+instance Outputable MonadNames where
+  ppr (MonadNames {return_name=return_name,pure_name=pure_name}) =
+    hcat
+    [text "MonadNames { return_name = "
+    ,ppr return_name
+    ,text ", pure_name = "
+    ,ppr pure_name
+    ,text "}"
+    ]
+
 -- | rearrange a list of statements using ApplicativeDoStmt.  See
 -- Note [ApplicativeDo].
 rearrangeForApplicativeDo
@@ -1661,16 +1671,16 @@ stmtTreeToStmts
 -- In the spec, but we do it here rather than in the desugarer,
 -- because we need the typechecker to typecheck the <$> form rather than
 -- the bind form, which would give rise to a Monad constraint.
-stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt _ pat rhs _ _), _))
+stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt _ pat rhs _ fail_op), _))
                 tail _tail_fvs
   | not (isStrictPattern pat), (False,tail') <- needJoin monad_names tail
   -- See Note [ApplicativeDo and strict patterns]
-  = mkApplicativeStmt ctxt [ApplicativeArgOne noExt pat rhs False] False tail'
-stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ _),_))
+  = mkApplicativeStmt ctxt [ApplicativeArgOne noExt pat rhs False fail_op] False tail'
+stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ fail_op),_))
                 tail _tail_fvs
   | (False,tail') <- needJoin monad_names tail
   = mkApplicativeStmt ctxt
-      [ApplicativeArgOne noExt nlWildPatName rhs True] False tail'
+      [ApplicativeArgOne noExt nlWildPatName rhs True fail_op] False tail'
 
 stmtTreeToStmts _monad_names _ctxt (StmtTreeOne (s,_)) tail _tail_fvs =
   return (s : tail, emptyNameSet)
@@ -1684,14 +1694,29 @@ stmtTreeToStmts monad_names ctxt (StmtTreeBind before after) tail tail_fvs = do
 stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
    pairs <- mapM (stmtTreeArg ctxt tail_fvs) trees
    let (stmts', fvss) = unzip pairs
-   let (need_join, tail') = needJoin monad_names tail
+   let (need_join, tail') =
+         if any hasStrictPattern trees
+         then (True, tail)
+         else needJoin monad_names tail
+{-
+   dflags <- getDynFlags
+
+   liftIO $ printSDoc PageMode dflags stdout (defaultDumpStyle dflags)
+     (vcat [text "Rn.StmtTreeApplicative"
+           ,ppr trees
+           ,ppr tail
+           ,ppr monad_names
+           ,text ""
+           ])
+-}
+
    (stmts, fvs) <- mkApplicativeStmt ctxt stmts' need_join tail'
    return (stmts, unionNameSets (fvs:fvss))
  where
-   stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BindStmt _ pat exp _ _), _))
-     = return (ApplicativeArgOne noExt pat exp False, emptyFVs)
-   stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BodyStmt _ exp _ _), _)) =
-     return (ApplicativeArgOne noExt nlWildPatName exp True, emptyFVs)
+   stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BindStmt _ pat exp _ fail_op), _))
+     = return (ApplicativeArgOne noExt pat exp False fail_op, emptyFVs)
+   stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BodyStmt _ exp _ fail_op), _)) =
+     return (ApplicativeArgOne noExt nlWildPatName exp True fail_op, emptyFVs)
    stmtTreeArg ctxt tail_fvs tree = do
      let stmts = flattenStmtTree tree
          pvarset = mkNameSet (concatMap (collectStmtBinders.unLoc.fst) stmts)
@@ -1707,8 +1732,9 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
            | otherwise -> do
              (ret,fvs) <- lookupStmtNamePoly ctxt returnMName
              return (HsApp noExt (noLoc ret) tup, fvs)
-     return ( ApplicativeArgMany noExt stmts' mb_ret pat
-            , fvs1 `plusFV` fvs2)
+     (fail_op, fvs3) <- getMonadFailOp
+     return ( ApplicativeArgMany noExt stmts' mb_ret pat fail_op
+            , fvs1 `plusFV` fvs2 `plusFV` fvs3)
 
 
 -- | Divide a sequence of statements into segments, where no segment
@@ -1810,6 +1836,13 @@ isStrictPattern lpat =
     NPlusKPat{}     -> True
     SplicePat{}     -> True
     _otherwise -> panic "isStrictPattern"
+
+hasStrictPattern :: ExprStmtTree -> Bool
+hasStrictPattern (StmtTreeOne (L _ (BindStmt _ pat _ _ _), _)) = isStrictPattern pat
+hasStrictPattern (StmtTreeOne _) = False
+hasStrictPattern (StmtTreeBind a b) = hasStrictPattern a || hasStrictPattern b
+hasStrictPattern (StmtTreeApplicative trees) = any hasStrictPattern trees
+
 
 isLetStmt :: LStmt a b -> Bool
 isLetStmt (L _ LetStmt{}) = True

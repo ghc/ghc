@@ -768,16 +768,18 @@ addTickApplicativeArg
 addTickApplicativeArg isGuard (op, arg) =
   liftM2 (,) (addTickSyntaxExpr hpcSrcSpan op) (addTickArg arg)
  where
-  addTickArg (ApplicativeArgOne x pat expr isBody) =
+  addTickArg (ApplicativeArgOne x pat expr isBody fail) =
     (ApplicativeArgOne x)
       <$> addTickLPat pat
       <*> addTickLHsExpr expr
       <*> pure isBody
-  addTickArg (ApplicativeArgMany x stmts ret pat) =
+      <*> addTickSyntaxExpr hpcSrcSpan fail
+  addTickArg (ApplicativeArgMany x stmts ret pat fail) =
     (ApplicativeArgMany x)
       <$> addTickLStmts isGuard stmts
       <*> (unLoc <$> addTickLHsExpr (cL hpcSrcSpan ret))
       <*> addTickLPat pat
+      <*> addTickSyntaxExpr hpcSrcSpan fail
   addTickArg (XApplicativeArg _) = panic "addTickApplicativeArg"
 
 addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ParStmtBlock GhcTc GhcTc
