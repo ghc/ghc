@@ -315,7 +315,7 @@ This gets us more polymorphism than we would otherwise get, similar
 signatures in value declarations.
 
 However, we only want to do so when we have PolyKinds.
-When we are in Haskell98, we don't skip those decls, because we have defaulting
+When we have NoPolyKinds, we don't skip those decls, because we have defaulting
 (#16609). Skipping won't bring us more polymorphism when we have defaulting.
 Consider
 
@@ -325,10 +325,11 @@ Consider
 If we skip the rhs of T2 during kind-checking, the kind of a remains unsolved.
 With PolyKinds, we do generalization to get T1 :: forall a. a -> *. And the
 program type-checks.
-But in Haskell 98, we do defaulting to get T1 :: * -> *, which then leads to a
-type error when type-checking (T1 Maybe).
+But with NoPolyKinds, we do defaulting to get T1 :: * -> *. Defaulting happens
+in quantifyTyVars, which is called from generaliseTcTyCon. Then type-checking
+(T1 Maybe) will throw a type error.
 
-Summary: we only do skipping when we have PolyKinds on.
+Summary: with PolyKinds, we must skip; with NoPolyKinds, we must /not/ skip.
 
 Open type families
 ~~~~~~~~~~~~~~~~~~
