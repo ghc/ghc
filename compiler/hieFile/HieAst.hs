@@ -1177,7 +1177,7 @@ instance ( a ~ GhcPass p
          , Data (StmtLR a a (Located (HsExpr a)))
          , Data (HsLocalBinds a)
          ) => ToHie (RScoped (ApplicativeArg (GhcPass p))) where
-  toHie (RS sc (ApplicativeArgOne _ pat expr _)) = concatM
+  toHie (RS sc (ApplicativeArgOne _ pat expr _ _)) = concatM
     [ toHie $ PS Nothing sc NoScope pat
     , toHie expr
     ]
