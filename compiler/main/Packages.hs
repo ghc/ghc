@@ -94,8 +94,8 @@ import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
 import Data.List as List
 import Data.Map (Map)
+import Data.Semigroup (First(..))
 import Data.Set (Set)
-import Data.Monoid (First(..))
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
@@ -264,7 +264,7 @@ data UnitVisibility = UnitVisibility
     , uv_renamings :: [(ModuleName, ModuleName)]
       -- ^ Any custom renamings that should bring extra 'ModuleName's into
       -- scope.
-    , uv_package_name :: First FastString
+    , uv_package_name :: Maybe (First FastString)
       -- ^ The package name is associated with the 'UnitId'.  This is used
       -- to implement legacy behavior where @-package foo-0.1@ implicitly
       -- hides any packages named @foo@
@@ -281,10 +281,10 @@ instance Outputable UnitVisibility where
     ppr (UnitVisibility {
         uv_expose_all = b,
         uv_renamings = rns,
-        uv_package_name = First mb_pn,
+        uv_package_name = mb_fst_pn,
         uv_requirements = reqs,
         uv_explicit = explicit
-    }) = ppr (b, rns, mb_pn, reqs, explicit)
+    }) = ppr (b, rns, getFirst <$> mb_fst_pn, reqs, explicit)
 
 instance Semigroup UnitVisibility where
     uv1 <> uv2
@@ -300,7 +300,7 @@ instance Monoid UnitVisibility where
     mempty = UnitVisibility
              { uv_expose_all = False
              , uv_renamings = []
-             , uv_package_name = First Nothing
+             , uv_package_name = Nothing
              , uv_requirements = Map.empty
              , uv_explicit = False
              }
@@ -771,7 +771,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
            uv = UnitVisibility
                 { uv_expose_all = b
                 , uv_renamings = rns
-                , uv_package_name = First (Just n)
+                , uv_package_name = Just (First n)
                 , uv_requirements = reqs
                 , uv_explicit = True
                 }
@@ -801,7 +801,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
                       | (_:_) <- rns = vm
                       | otherwise = Map.filterWithKey
                             (\k uv -> k == packageConfigId p
-                                   || First (Just n) /= uv_package_name uv) vm
+                                   || Just (First n) /= uv_package_name uv) vm
          _ -> panic "applyPackageFlag"
 
     HidePackage str ->
@@ -1477,7 +1477,7 @@ mkPackageState dflags dbs preload0 = do
                                                UnitVisibility {
                                                  uv_expose_all = True,
                                                  uv_renamings = [],
-                                                 uv_package_name = First (Just (fsPackageName p)),
+                                                 uv_package_name = Just (First (fsPackageName p)),
                                                  uv_requirements = Map.empty,
                                                  uv_explicit = False
                                                }
