@@ -1,0 +1,10 @@
+:l T15872
+
+:t MkFun
+:k Fun
+:i Fun
+
+:set -fprint-explicit-kinds
+:t MkFun
+:k Fun
+:i Fun
