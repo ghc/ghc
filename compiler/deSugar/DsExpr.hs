@@ -37,7 +37,6 @@ import GHC.Hs
 import TcType
 import TcEvidence
 import TcRnMonad
-import TcHsSyn
 import Type
 import CoreSyn
 import CoreUtils
@@ -924,25 +923,26 @@ dsDo stmts
              let
                (pats, rhss) = unzip (map (do_arg . snd) args)
 
-               do_arg (ApplicativeArgOne _ pat expr _) =
-                 (pat, dsLExpr expr)
+               do_arg (ApplicativeArgOne _ pat expr _ fail_op) =
+                 ((pat, fail_op), dsLExpr expr)
                do_arg (ApplicativeArgMany _ stmts ret pat) =
-                 (pat, dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
+                 ((pat, noSyntaxExpr), dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
                do_arg (XApplicativeArg nec) = noExtCon nec
-
-               arg_tys = map hsPatType pats
 
            ; rhss' <- sequence rhss
 
-           ; let body' = noLoc $ HsDo body_ty DoExpr (noLoc stmts)
+           ; body' <- dsLExpr $ noLoc $ HsDo body_ty DoExpr (noLoc stmts)
 
-           ; let fun = cL noSrcSpan $ HsLam noExtField $
-                   MG { mg_alts = noLoc [mkSimpleMatch LambdaExpr pats
-                                                       body']
-                      , mg_ext = MatchGroupTc arg_tys body_ty
-                      , mg_origin = Generated }
+           ; let match_args (pat, fail_op) (vs,body)
+                   = do { var   <- selectSimpleMatchVarL pat
+                        ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
+                                   body_ty (cantFailMatchResult body)
+                        ; match_code <- handle_failure pat match fail_op
+                        ; return (var:vs, match_code)
+                        }
 
-           ; fun' <- dsLExpr fun
+           ; (vars, body) <- foldrM match_args ([],body') pats
+           ; let fun' = mkLams vars body
            ; let mk_ap_call l (op,r) = dsSyntaxExpr op [l,r]
            ; expr <- foldlM mk_ap_call fun' (zip (map fst args) rhss')
            ; case mb_join of
