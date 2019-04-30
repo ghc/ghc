@@ -7,10 +7,10 @@ import Settings.Builders.Common
 -- | Dynamic RTS library files need symlinks without the dummy version number.
 -- This is for backwards compatibility (the old make build system omitted the
 -- dummy version number).
--- This rule has priority 2 to override the general rule for generating share
+-- This rule has priority 3 to override the general rule for generating shared
 -- library files (see Rules.Library.libraryRules).
 rtsRules :: Rules ()
-rtsRules = priority 2 $ do
+rtsRules = priority 3 $ do
     root <- buildRootRules
     [ root -/- "//libHSrts_*-ghc*.so",
       root -/- "//libHSrts_*-ghc*.dylib",

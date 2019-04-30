@@ -7,8 +7,8 @@ module Context (
 
     -- * Paths
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
-    pkgHaddockFile, pkgLibraryFile, pkgGhciLibraryFile, pkgConfFile, objectPath,
-    contextPath, getContextPath, libPath, distDir
+    pkgHaddockFile, pkgRegisteredLibraryFile, pkgLibraryFile, pkgGhciLibraryFile,
+    pkgConfFile, objectPath, contextPath, getContextPath, libPath, distDir
     ) where
 
 import Base
@@ -59,11 +59,16 @@ distDir st = do
     hostArch       <- cabalArchString <$> setting BuildArch
     return $ hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
 
+pkgFileName :: Package -> String -> String -> Action FilePath
+pkgFileName package prefix suffix = do
+    pid  <- pkgIdentifier package
+    return $ prefix ++ pid ++ suffix
+
 pkgFile :: Context -> String -> String -> Action FilePath
 pkgFile context@Context {..} prefix suffix = do
     path <- buildPath context
-    pid  <- pkgIdentifier package
-    return $ path -/- prefix ++ pid ++ suffix
+    fileName <- pkgFileName package prefix suffix
+    return $ path -/- fileName
 
 -- | Path to inplace package configuration file of a given 'Context'.
 pkgInplaceConfig :: Context -> Action FilePath
@@ -80,6 +85,20 @@ pkgHaddockFile Context {..} = do
     root <- buildRoot
     let name = pkgName package
     return $ root -/- "docs/html/libraries" -/- name -/- name <.> "haddock"
+
+-- | Path to the registered ghc-pkg library file of a given 'Context', e.g.:
+-- @_build/stage1/lib/x86_64-linux-ghc-8.9.0/libHSarray-0.5.1.0-ghc8.9.0.so@
+-- @_build/stage1/lib/x86_64-linux-ghc-8.9.0/array-0.5.1.0/libHSarray-0.5.4.0.a@
+pkgRegisteredLibraryFile :: Context -> Action FilePath
+pkgRegisteredLibraryFile context@Context {..} = do
+    libDir    <- libPath context
+    pkgId     <- pkgIdentifier package
+    extension <- libsuf stage way
+    fileName  <- pkgFileName package "libHS" extension
+    distDir   <- distDir stage
+    return $ if Dynamic `wayUnit` way
+        then libDir -/- distDir -/- fileName
+        else libDir -/- distDir -/- pkgId -/- fileName
 
 -- | Path to the library file of a given 'Context', e.g.:
 -- @_build/stage1/libraries/array/build/libHSarray-0.5.1.0.a@.
