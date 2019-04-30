@@ -31,6 +31,7 @@ import TcUnify
 import TcHsType
 import TcMType
 import Type     ( getClassPredTys_maybe, piResultTys )
+import Multiplicity
 import TcType
 import TcRnMonad
 import DriverPhases (HscSource(..))
@@ -198,7 +199,7 @@ tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 
         ; let tc_item = tcDefMeth clas clas_tyvars this_dict
                                   default_binds sig_fn prag_fn
-        ; dm_binds <- tcExtendTyVarEnv clas_tyvars $
+        ; dm_binds <- tcExtendTyVarEnv (map unrestricted clas_tyvars) $
                       mapM tc_item op_items
 
         ; return (unionManyBags dm_binds) }
@@ -274,7 +275,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
              ctxt = FunSigCtxt sel_name warn_redundant
 
-       ; let local_dm_id = mkLocalId local_dm_name local_dm_ty
+       ; let local_dm_id = mkLocalId local_dm_name (Regular Omega) local_dm_ty
              local_dm_sig = CompleteSig { sig_bndr = local_dm_id
                                         , sig_ctxt  = ctxt
                                         , sig_loc   = getLoc (hsSigType hs_ty) }

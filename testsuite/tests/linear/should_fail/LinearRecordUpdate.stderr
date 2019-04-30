@@ -1,0 +1,4 @@
+
+LinearRecordUpdate.hs:8:12: error:
+    • Couldn't match expected multiplicity ‘'One’ of variable ‘r’ with actual multiplicity ‘'Omega’
+    • In an equation for ‘shouldFail’: shouldFail r = r {y = False}

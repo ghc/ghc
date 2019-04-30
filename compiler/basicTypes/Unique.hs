@@ -64,7 +64,7 @@ module Unique (
         -- *** From TyCon name uniques
         tyConRepNameUnique,
         -- *** From DataCon name uniques
-        dataConWorkerUnique, dataConTyRepNameUnique
+        dataConWorkerUnique, dataConTyRepNameUnique, dataConWrapperUnique
     ) where
 
 #include "HsVersions.h"
@@ -395,14 +395,16 @@ tyConRepNameUnique  u = incrUnique u
 --    * u: the DataCon itself
 --    * u+1: its worker Id
 --    * u+2: the TyConRepName of the promoted TyCon
+--    * u+3: its wrapper Id
 -- Prelude data constructors are too simple to need wrappers.
 
-mkPreludeDataConUnique i              = mkUnique '6' (3*i)    -- Must be alphabetic
+mkPreludeDataConUnique i              = mkUnique '6' (4*i)    -- Must be alphabetic
 
 --------------------------------------------------
-dataConTyRepNameUnique, dataConWorkerUnique :: Unique -> Unique
+dataConTyRepNameUnique, dataConWorkerUnique, dataConWrapperUnique :: Unique -> Unique
 dataConWorkerUnique  u = incrUnique u
 dataConTyRepNameUnique u = stepUnique u 2
+dataConWrapperUnique u = stepUnique u 3
 
 --------------------------------------------------
 mkPrimOpIdUnique op         = mkUnique '9' op

@@ -3,8 +3,8 @@
 module Type where
 
 import GhcPrelude
-import TyCon
-import Var ( TyCoVar )
+import {-# SOURCE #-} TyCon
+import {-# SOURCE #-} Var ( TyCoVar )
 import {-# SOURCE #-} TyCoRep( Type, Coercion )
 import Util
 
@@ -24,3 +24,4 @@ tyCoVarsOfTypesWellScoped :: [Type] -> [TyCoVar]
 tyCoVarsOfTypeWellScoped :: Type -> [TyCoVar]
 scopedSort :: [TyCoVar] -> [TyCoVar]
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
+mkTyConApp :: TyCon -> [Type] -> Type

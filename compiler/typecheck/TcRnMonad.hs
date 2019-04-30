@@ -153,6 +153,8 @@ import HscTypes
 import Module
 import RdrName
 import Name
+import UsageEnv
+import Multiplicity
 import Type
 
 import TcType
@@ -333,6 +335,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
  = do { tvs_var      <- newIORef emptyVarSet
       ; lie_var      <- newIORef emptyWC
       ; errs_var     <- newIORef (emptyBag, emptyBag)
+      ; usage_var    <- newIORef zeroUE
       ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
                 tcl_loc        = loc,     -- Should be over-ridden very soon!
@@ -342,6 +345,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_th_bndrs   = emptyNameEnv,
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
+                tcl_usage      = usage_var,
                 tcl_bndrs      = [],
                 tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
@@ -639,15 +643,16 @@ newSysName occ
   = do { uniq <- newUnique
        ; return (mkSystemName uniq occ) }
 
-newSysLocalId :: FastString -> TcType -> TcRnIf gbl lcl TcId
-newSysLocalId fs ty
+newSysLocalId :: FastString -> Mult -> TcType -> TcRnIf gbl lcl TcId
+newSysLocalId fs w ty
   = do  { u <- newUnique
-        ; return (mkSysLocalOrCoVar fs u ty) }
+        ; return (mkSysLocalOrCoVar fs u (Regular w) ty) }
 
-newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
+newSysLocalIds :: FastString -> [Scaled TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do  { us <- newUniqueSupply
-        ; return (zipWith (mkSysLocalOrCoVar fs) (uniqsFromSupply us) tys) }
+        ; let mkId' n (Scaled w t) = mkSysLocalOrCoVar fs n (Regular w) t
+        ; return (zipWith mkId' (uniqsFromSupply us) tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where
         getUniqueM = newUnique

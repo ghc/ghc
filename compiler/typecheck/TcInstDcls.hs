@@ -29,6 +29,7 @@ import TcValidity
 import TcHsSyn
 import TcMType
 import TcType
+import Multiplicity
 import BuildTyCl
 import Inst
 import ClsInst( AssocInstInfo(..), isNotAssociated )
@@ -488,7 +489,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
 
         -- Next, process any associated types.
         ; (datafam_stuff, tyfam_insts)
-             <- tcExtendNameTyVarEnv tv_skol_prs $
+             <- tcExtendNameTyVarEnv [(n, unrestricted t) | (n, t) <- tv_skol_prs] $
                 do  { let mini_env   = mkVarEnv (classTyVars clas `zip` substTys subst inst_tys)
                           mini_subst = mkTvSubst (mkInScopeSet (mkVarSet skol_tvs)) mini_env
                           mb_info    = InClsInst { ai_class = clas
@@ -702,7 +703,7 @@ tcDataFamInstDecl mb_clsinfo
               , text "eta_tcbs" <+> ppr eta_tcbs ]
 
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { data_cons <- tcExtendTyVarEnv qtvs $
+           do { data_cons <- tcExtendTyVarEnv (map unrestricted qtvs) $
                              -- For H98 decls, the tyvars scope
                              -- over the data constructors
                              tcConDecls rec_rep_tc ty_binders orig_res_ty hs_cons
@@ -1109,10 +1110,10 @@ addDFunPrags dfun_id sc_meth_ids
            `setInlinePragma` dfunInlinePragma
  where
    con_app    = mkLams dfun_bndrs $
-                mkApps (Var (dataConWrapId dict_con)) dict_args
+                mkApps (Var (dataConWorkId dict_con)) dict_args
                  -- mkApps is OK because of the checkForLevPoly call in checkValidClass
                  -- See Note [Levity polymorphism checking] in DsMonad
-   dict_args  = map Type inst_tys ++
+   dict_args  = map Type (inst_tys) ++
                 [mkVarApps (Var id) dfun_bndrs | id <- sc_meth_ids]
 
    (dfun_tvs, dfun_theta, clas, inst_tys) = tcSplitDFunTy (idType dfun_id)
@@ -1221,7 +1222,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
            ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id sc_ev_tm
            ; let sc_top_ty = mkInvForAllTys tyvars $
                              mkPhiTy (map idType dfun_evs) sc_pred
-                 sc_top_id = mkLocalId sc_top_name sc_top_ty
+                 sc_top_id = mkLocalId sc_top_name (Regular Omega) sc_top_ty
                  export = ABE { abe_ext  = noExt
                               , abe_wrap = idHsWrapper
                               , abe_poly = sc_top_id
@@ -1467,7 +1468,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                                 , ib_pragmas    = sigs
                                 , ib_extensions = exts
                                 , ib_derived    = is_derived })
-  = tcExtendNameTyVarEnv (lexical_tvs `zip` tyvars) $
+  = tcExtendNameTyVarEnv (lexical_tvs `zip` (map unrestricted tyvars)) $
        -- The lexical_tvs scope over the 'where' part
     do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
        ; checkMinimalDefinition
@@ -1696,7 +1697,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                    ; return (sig_ty, hs_wrap) }
 
        ; inner_meth_name <- newName (nameOccName sel_name)
-       ; let inner_meth_id  = mkLocalId inner_meth_name sig_ty
+       ; let inner_meth_id  = mkLocalId inner_meth_name (Regular Omega) sig_ty
              inner_meth_sig = CompleteSig { sig_bndr = inner_meth_id
                                           , sig_ctxt = ctxt
                                           , sig_loc  = getLoc (hsSigType hs_sig_ty) }
@@ -1747,8 +1748,8 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
         ; local_meth_name <- newName sel_occ
                   -- Base the local_meth_name on the selector name, because
                   -- type errors from tcMethodBody come from here
-        ; let poly_meth_id  = mkLocalId poly_meth_name  poly_meth_ty
-              local_meth_id = mkLocalId local_meth_name local_meth_ty
+        ; let poly_meth_id  = mkLocalId poly_meth_name  (Regular Omega) poly_meth_ty
+              local_meth_id = mkLocalId local_meth_name (Regular Omega) local_meth_ty
 
         ; return (poly_meth_id, local_meth_id) }
   where

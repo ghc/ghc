@@ -43,6 +43,7 @@ import Avail
 import Unify( tcUnifyTy )
 import Class
 import Type
+import Multiplicity
 import ErrUtils
 import DataCon
 import Maybes
@@ -766,7 +767,7 @@ deriveTyData tvs tc tc_args mb_deriv_strat deriv_pred
   = setSrcSpan (getLoc (hsSigType deriv_pred)) $
     -- Use loc of the 'deriving' item
     do  { (mb_deriv_strat', deriv_tvs, (cls, cls_tys, cls_arg_kinds))
-                <- tcExtendTyVarEnv tvs $
+                <- tcExtendTyVarEnv (map unrestricted tvs) $
                 -- Deriving preds may (now) mention
                 -- the type variables for the type constructor, hence tcExtendTyVarenv
                 -- The "deriv_pred" is a LHsType to take account of the fact that for

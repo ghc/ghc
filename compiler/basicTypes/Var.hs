@@ -42,11 +42,14 @@ module Var (
         OutVar, OutCoVar, OutId, OutTyVar,
 
         -- ** Taking 'Var's apart
-        varName, varUnique, varType,
+        VarMult(..),
+        varName, varUnique, varType, varWeight, varWeightMaybe, varWeightDef,
+        varMult, varMultMaybe, varMult',
 
         -- ** Modifying 'Var's
-        setVarName, setVarUnique, setVarType, updateVarType,
-        updateVarTypeM,
+        setVarName, setVarUnique, setVarType,
+        scaleVarBy, setVarMult,
+        updateVarTypeAndMult, updateVarTypeAndMultM,
 
         -- ** Constructing, taking apart, modifying 'Id's
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
@@ -58,7 +61,7 @@ module Var (
         isId, isTyVar, isTcTyVar,
         isLocalVar, isLocalId, isCoVar, isNonCoVarId, isTyCoVar,
         isGlobalId, isExportedId,
-        mustHaveLocalBinding,
+        mustHaveLocalBinding, isUnrestrictedVar, isAliasLikeVar,
 
         -- * ArgFlags
         ArgFlag(..), isVisibleArgFlag, isInvisibleArgFlag, sameVis,
@@ -93,6 +96,7 @@ import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind )
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )
+import Multiplicity
 
 import Name hiding (varName)
 import Unique ( Uniquable, Unique, getKey, getUnique
@@ -103,6 +107,7 @@ import DynFlags
 import Outputable
 
 import Data.Data
+import Data.Maybe
 
 {-
 ************************************************************************
@@ -244,6 +249,7 @@ data Var
         varName    :: !Name,
         realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
+        varMult    :: VarMult,
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
@@ -256,6 +262,16 @@ data IdScope    -- See Note [GlobalId/LocalId]
 data ExportFlag   -- See Note [ExportFlag on binders]
   = NotExported   -- ^ Not exported: may be discarded as dead code.
   | Exported      -- ^ Exported: kept alive
+
+data VarMult
+  = Regular Mult
+  -- ^ a normal variable, carrying a multiplicity like in the Linear Haskell
+  -- paper
+  | Alias
+  -- ^ a variable typed as a alias for the multiplicity of other variables, this
+  -- lets the variable be used differently depending on the branch. Tremendously
+  -- useful for join points. But also used for regular lets because of inlining,
+  -- float out, and common subexpression elimination.
 
 {- Note [ExportFlag on binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -300,10 +316,16 @@ instance Outputable Var where
   ppr var = sdocWithDynFlags $ \dflags ->
             getPprStyle $ \ppr_style ->
             if |  debugStyle ppr_style && (not (gopt Opt_SuppressVarKinds dflags))
-                 -> parens (ppr (varName var) <+> ppr_debug var ppr_style <+>
+                 -> parens (ppr (varName var) <+> ppr (varMultMaybe var)
+                                              <+> ppr_debug var ppr_style <+>
                           dcolon <+> pprKind (tyVarKind var))
-               |  otherwise
+
+               |  codeStyle ppr_style
                  -> ppr (varName var) <> ppr_debug var ppr_style
+               |  otherwise
+                 -> ppr (varName var)  -- <> maybe empty (brackets . ppr) (varMultMaybe var)
+                                        -- Types don't have multiplicites
+                                      <> ppr_debug var ppr_style
 
 ppr_debug :: Var -> PprStyle -> SDoc
 ppr_debug (TyVar {}) sty
@@ -367,12 +389,75 @@ setVarName var new_name
 setVarType :: Id -> Type -> Id
 setVarType id ty = id { varType = ty }
 
-updateVarType :: (Type -> Type) -> Id -> Id
-updateVarType f id = id { varType = f (varType id) }
+updateVarTypeAndMult :: (Type -> Type) -> Id -> Id
+updateVarTypeAndMult f id = let id' = id { varType = f (varType id) }
+                            in case varMultMaybe id' of
+                                      Just (Regular w) -> setVarMult id' (Regular (f w))
+                                      _ -> id'
 
-updateVarTypeM :: Monad m => (Type -> m Type) -> Id -> m Id
-updateVarTypeM f id = do { ty' <- f (varType id)
-                         ; return (id { varType = ty' }) }
+updateVarTypeAndMultM :: Monad m => (Type -> m Type) -> Id -> m Id
+updateVarTypeAndMultM f id = do { ty' <- f (varType id)
+                                ; let id' = setVarType id ty'
+                                ; case varMultMaybe id of
+                                    Just (Regular w) -> do w' <- f w
+                                                           return $ setVarMult id' (Regular w')
+                                    _ -> return id'
+                                }
+
+varMultMaybe :: Id -> Maybe VarMult
+varMultMaybe (Id { varMult = mult }) = Just mult
+varMultMaybe _ = Nothing
+
+varMult' :: Id -> Mult
+varMult' v =
+  case varMultMaybe v of
+    Just (Regular w) -> w
+    _ -> pprPanic "varMult'" (text "Irregular multiplicity" <+> ppr v)
+
+varWeightMaybe :: Id -> Maybe Mult
+varWeightMaybe v =
+  case varMultMaybe v of
+    Just (Regular w) -> Just w
+    Just Alias -> Just Omega
+  -- It may be preferable to fail returning a multiplicity in the 'Alias' case,
+  -- varWeight probably isn't called on alias-like variables. Until it poses a
+  -- problem, however, let's just pretend that these are secretly unrestricted
+  -- binders.
+    Nothing -> Nothing
+
+varWeightDef :: Id -> Mult
+varWeightDef = fromMaybe Omega . varWeightMaybe
+
+-- Assumes that `id` is a term variable (`Id`)
+varWeight :: Id -> Mult
+varWeight id = case varWeightMaybe id of
+  Just x -> x
+  Nothing -> pprPanic "varWeight" (text "Attempted to retrieve the multiplicity of a non-Id variable" <+> ppr id)
+
+scaleVarBy :: Id -> Mult -> Id
+scaleVarBy id@(Id { varMult = Regular w }) r =
+  id { varMult = Regular (r `mkMultMul` w) }
+  -- Note that alias-like variables are preserved by scaling. Consider the
+  -- transformation `let x_π = let y_ue = u in v in e ==> let y_ue = u in let
+  -- x_π = v in e` if `y` were regular it would need to be scaled (by a factor
+  -- of π) for typing to be preserved; in contrast, since `ue` is the computed
+  -- usage environment of `u`, it is scaled implicitly by the fact that the
+  -- call-sites of `y` are in `v`, hence scaled by the typing rule of `let
+  -- x_π`. The difference, can be summed up to the fact that a regular let
+  -- introduces a multiplicity constraint, while an alias-like let doesn't.
+scaleVarBy id _ = id
+
+setVarMult :: Id -> VarMult -> Id
+setVarMult id r | isId id = id { varMult = r }
+setVarMult id _ = id
+
+isUnrestrictedVar :: Id -> Bool
+isUnrestrictedVar Id { varMult = Regular Omega } = True
+isUnrestrictedVar _ = False
+
+isAliasLikeVar :: Id -> Bool
+isAliasLikeVar Id { varMult = Alias } = True
+isAliasLikeVar _ = False
 
 {- *********************************************************************
 *                                                                      *
@@ -424,6 +509,10 @@ instance Binary ArgFlag where
       0 -> return Required
       1 -> return Specified
       _ -> return Inferred
+
+instance Outputable VarMult where
+  ppr (Regular w) = ppr w
+  ppr Alias = text"alias"
 
 -- | The non-dependent version of 'ArgFlag'.
 
@@ -645,25 +734,29 @@ idDetails other                         = pprPanic "idDetails" (ppr other)
 -- Ids, because Id.hs uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
-  = mk_id name ty GlobalId details info
+  = mk_id name (Regular Omega) ty GlobalId details info
+  -- There is no support for linear global variables yet. They would require
+  -- being checked at link-time, which can be useful, but is not a priority.
 
-mkLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
-mkLocalVar details name ty info
-  = mk_id name ty (LocalId NotExported) details  info
+mkLocalVar :: IdDetails -> Name -> VarMult -> Type -> IdInfo -> Id
+mkLocalVar details name w ty info
+  = mk_id name w ty (LocalId NotExported) details  info
 
 mkCoVar :: Name -> Type -> CoVar
 -- Coercion variables have no IdInfo
-mkCoVar name ty = mk_id name ty (LocalId NotExported) coVarDetails vanillaIdInfo
+mkCoVar name ty = mk_id name (Regular Omega) ty (LocalId NotExported) coVarDetails vanillaIdInfo
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
-  = mk_id name ty (LocalId Exported) details info
+  = mk_id name (Regular Omega) ty (LocalId Exported) details info
+  -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
-mk_id :: Name -> Type -> IdScope -> IdDetails -> IdInfo -> Id
-mk_id name ty scope details info
+mk_id :: Name -> VarMult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
+mk_id name w ty scope details info
   = Id { varName    = name,
          realUnique = getKey (nameUnique name),
+         varMult    = w,
          varType    = ty,
          idScope    = scope,
          id_details = details,

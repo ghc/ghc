@@ -674,7 +674,7 @@ addTickGRHSs _ _ (XGRHSs _) = panic "addTickGRHSs"
 addTickGRHS :: Bool -> Bool -> GRHS GhcTc (LHsExpr GhcTc)
             -> TM (GRHS GhcTc (LHsExpr GhcTc))
 addTickGRHS isOneOfMany isLambda (GRHS x stmts expr) = do
-  (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox) stmts
+  (stmts',expr') <- addTickLStmts' (Just $ BinBox GuardBinBox) stmts
                         (addTickGRHSBody isOneOfMany isLambda expr)
   return $ GRHS x stmts' expr'
 addTickGRHS _ _ (XGRHS _) = panic "addTickGRHS"
@@ -769,12 +769,12 @@ addTickApplicativeArg isGuard (op, arg) =
   liftM2 (,) (addTickSyntaxExpr hpcSrcSpan op) (addTickArg arg)
  where
   addTickArg (ApplicativeArgOne x pat expr isBody) =
-    (ApplicativeArgOne x)
+    ApplicativeArgOne x
       <$> addTickLPat pat
       <*> addTickLHsExpr expr
       <*> pure isBody
   addTickArg (ApplicativeArgMany x stmts ret pat) =
-    (ApplicativeArgMany x)
+    ApplicativeArgMany x
       <$> addTickLStmts isGuard stmts
       <*> (unLoc <$> addTickLHsExpr (cL hpcSrcSpan ret))
       <*> addTickLPat pat
@@ -929,7 +929,7 @@ addTickCmdGRHS :: GRHS GhcTc (LHsCmd GhcTc) -> TM (GRHS GhcTc (LHsCmd GhcTc))
 -- The *guards* are *not* Cmds, although the body is
 -- C.f. addTickGRHS for the BinBox stuff
 addTickCmdGRHS (GRHS x stmts cmd)
-  = do { (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox)
+  = do { (stmts',expr') <- addTickLStmts' (Just $ BinBox GuardBinBox)
                                    stmts (addTickLHsCmd cmd)
        ; return $ GRHS x stmts' expr' }
 addTickCmdGRHS (XGRHS _) = panic "addTickCmdGRHS"
