@@ -63,10 +63,8 @@ Now, hack on your copy and rebuild (with `make`) as necessary.
 
 Then start by making your commits however you want. When you're done, you can submit
  a pull request on Github for small changes. For larger changes the patch needs to be
- submitted to [Phabricator](https://phabricator.haskell.org/) for code review.
- The GHC Wiki has a good summary for the [overall process](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs)
- as well as a guide on
- [how to use Phabricator/arcanist](https://gitlab.haskell.org/ghc/ghc/wikis/phabricator).
+ submitted to [GitLab](https://gitlab.haskell.org/ghc/ghc/merge_requests) for code review.
+ The GHC Wiki has a good summary for the [overall process](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs).
 
 
 Useful links:
@@ -75,22 +73,22 @@ Useful links:
 An overview of things like using git, the release process, filing bugs
 and more can be located here:
 
-<https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions>
+<https://gitlab.haskell.org/ghc/ghc/wikis/contributing>
 
 You can find our coding conventions for the compiler and RTS here:
 
 <https://gitlab.haskell.org/ghc/ghc/wikis/commentary/coding-style>
 <https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/conventions>
 
-A high level overview of the bug tracker:
-
-<https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/bug-tracker>
-
 If you're going to contribute regularly, **learning how to use the
 build system is important** and will save you lots of time. You should
 read over this page carefully:
 
 <https://gitlab.haskell.org/ghc/ghc/wikis/building/using>
+
+If you want to watch issues and code review activities, the following page is a good start:
+
+<https://gitlab.haskell.org/ghc/ghc/activity>
 
 How to communicate with us
 ==========================
@@ -126,10 +124,6 @@ undoubtedly also interested in the other mailing lists:
 
  * [glasgow-haskell-users](http://www.haskell.org/mailman/listinfo/glasgow-haskell-users)
    is where developers/users meet.
- * [ghc-tickets](http://www.haskell.org/mailman/listinfo/ghc-tickets)
-   for email from Trac.
- * [ghc-builds](http://www.haskell.org/mailman/listinfo/ghc-builds)
-   for nightly build emails.
  * [ghc-commits](http://www.haskell.org/mailman/listinfo/ghc-commits)
    for commit messages when someone pushes to the repository.
 
