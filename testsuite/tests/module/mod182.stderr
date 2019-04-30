@@ -1,0 +1,3 @@
+mod182.hs:5:16: error:
+    Found ‘qualified’ in postpositive position.
+    To allow this, enable language extension 'ImportQualifiedPost'
