@@ -309,8 +309,14 @@ toIfaceAppArgsX fr kind ty_args
         t'  = toIfaceTypeX fr t
         ts' = go (extendTCvSubst env tv t) res ts
 
-    go env (FunTy { ft_res = res }) (t:ts) -- No type-class args in tycon apps
-      = IA_Arg (toIfaceTypeX fr t) Required (go env res ts)
+    go env (FunTy { ft_af = af, ft_res = res }) (t:ts)
+      = IA_Arg (toIfaceTypeX fr t) argf (go env res ts)
+      where
+        argf = case af of
+                 VisArg   -> Required
+                 InvisArg -> Inferred
+                   -- It's rare for a kind to have a constraint argument, but
+                   -- it can happen. See Note [AnonTCB InvisArg] in TyCon.
 
     go env ty ts@(t1:ts1)
       | not (isEmptyTCvSubst env)
