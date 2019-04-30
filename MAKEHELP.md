@@ -3,9 +3,9 @@ Quick `make` guide for GHC
 
 For a "Getting Started" guide, see:
 
-  https://gitlab.haskell.org/ghc/ghc/wikis/building/quick-start
-  https://gitlab.haskell.org/ghc/ghc/wikis/building/using
-  https://gitlab.haskell.org/ghc/ghc/wikis/building/standard-targets
+  - https://gitlab.haskell.org/ghc/ghc/wikis/building/quick-start
+  - https://gitlab.haskell.org/ghc/ghc/wikis/building/using
+  - https://gitlab.haskell.org/ghc/ghc/wikis/building/standard-targets
 
 Common commands:
 
@@ -21,18 +21,18 @@ Common commands:
 
     Builds everything in the given directory.
 
-  - cd <dir>; make help
+  - `cd <dir>; make help`
 
     Shows the targets available in <dir>
 
-  - make install
-  - make install-strip
+  - `make install`
+  - `make install-strip`
 
     Installs GHC, libraries and tools under $(prefix). The install-strip
     variant strips executable files while installing them.
 
-  - make sdist
-  - make binary-dist
+  - `make sdist`
+  - `make binary-dist`
 
     Builds a source or binary distribution respectively
 
@@ -42,9 +42,9 @@ Common commands:
     Show the value of make variable <var>. The show! variant works right after
     ./configure (it skips reading package-data.mk files).
 
-  - make clean
-  - make distclean
-  - make maintainer-clean
+  - `make clean`
+  - `make distclean`
+  - `make maintainer-clean`
 
     Various levels of cleaning: "clean" restores the tree to the
     state after "./configure", "distclean" restores to the state
@@ -87,3 +87,10 @@ Using `make` in subdirectories
 
     Bring a particular file up to date, e.g. make dist/build/Module.o
     The name <file> is relative to the current directory
+
+Useful links:
+=============
+
+See also "new Hadrian build system":
+
+  - https://gitlab.haskell.org/ghc/ghc/wikis/building/hadrian
