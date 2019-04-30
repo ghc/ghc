@@ -10351,13 +10351,13 @@ function that can *never* be called, such as this one: ::
       f :: (Int ~ Bool) => a -> a
 
 Sometimes :extension:`AllowAmbiguousTypes` does not mix well with :extension:`RankNTypes`.
-For example: :: 
+For example: ::
       foo :: forall r. (forall i. (KnownNat i) => r) -> r
       foo f = f @1
 
       boo :: forall j. (KnownNat j) => Int
       boo = ....
-          
+
       h :: Int
       h = foo boo
 
@@ -10367,7 +10367,7 @@ the type variables `j` and `i`.
 Unlike the previous examples, it is not currently possible
 to resolve the ambiguity manually by using :extension:`TypeApplications`.
 
-       
+
 .. note::
     *A historical note.* GHC used to impose some more restrictive and less
     principled conditions on type signatures. For type
@@ -16524,3 +16524,30 @@ compilation with ``-prof``. On the other hand, as the ``CallStack`` is
 built up explicitly via the ``HasCallStack`` constraints, it will
 generally not contain as much information as the simulated call-stacks
 maintained by the RTS.
+
+.. _importqualifiedpost:
+
+ImportQualifiedPost
+===================
+
+``ImportQualifiedPost`` allows the syntax ``import M qualified``.
+
+To import a qualified module usually you must specify ``qualified`` in prepositive position : ``import qualified M``. This often leads to a "hanging indent" (which is automatically inserted by some autoformatters and common in many code bases. For example:
+
+.. code-block::  none
+
+ import qualified A
+ import           B
+ import           C
+
+The ``ImportQualifiedPost`` extension allows ``qualified`` to appear in postpositive position : ``import M qualified``. With this extension enabled, one can write:
+
+.. code-block:: none
+
+   import A qualified
+   import B
+   import C
+
+It is a fatal error if ``qualified`` appears in both pre and postpositive positions.
+
+The warning ``-Wprepositive-qualified-syntax`` (off by default) reports on any occurrences of imports annotated ``qualified`` using prepositive syntax.
