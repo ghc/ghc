@@ -769,11 +769,12 @@ addTickApplicativeArg
 addTickApplicativeArg isGuard (op, arg) =
   liftM2 (,) (addTickSyntaxExpr hpcSrcSpan op) (addTickArg arg)
  where
-  addTickArg (ApplicativeArgOne x pat expr isBody) =
+  addTickArg (ApplicativeArgOne x pat expr isBody fail) =
     (ApplicativeArgOne x)
       <$> addTickLPat pat
       <*> addTickLHsExpr expr
       <*> pure isBody
+      <*> addTickSyntaxExpr hpcSrcSpan fail
   addTickArg (ApplicativeArgMany x stmts ret pat) =
     (ApplicativeArgMany x)
       <$> addTickLStmts isGuard stmts
