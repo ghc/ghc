@@ -9395,7 +9395,8 @@ Here is an example of a constrained kind: ::
 The declarations above are accepted. However, if we add ``MkOther :: T Int``,
 we get an error that the equality constraint is not satisfied; ``Int`` is
 not a type literal. Note that explicitly quantifying with ``forall a`` is
-not necessary here.
+necessary in order for ``T`` to typecheck
+(see :ref:`complete-kind-signatures`).
 
 The kind ``Type``
 -----------------

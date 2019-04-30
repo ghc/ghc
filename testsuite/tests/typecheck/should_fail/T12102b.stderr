@@ -1,0 +1,7 @@
+
+T12102b.hs:21:25: error:
+    • Couldn't match expected kind ‘'True’
+                  with actual kind ‘IsTypeLit a0’
+      The type variable ‘a0’ is ambiguous
+    • In the first argument of ‘Show’, namely ‘(T a)’
+      In the stand-alone deriving instance for ‘Show (T a)’
