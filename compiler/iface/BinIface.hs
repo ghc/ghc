@@ -92,11 +92,12 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
                                     (defaultDumpStyle dflags)
                                     sd
                       QuietBinIFaceReading -> \_ -> return ()
-        wantedGot :: Outputable a => String -> a -> a -> IO ()
-        wantedGot what wanted got =
+
+        wantedGot :: String -> a -> a -> (a -> SDoc) -> IO ()
+        wantedGot what wanted got ppr' =
             printer (text what <> text ": " <>
-                     vcat [text "Wanted " <> ppr wanted <> text ",",
-                           text "got    " <> ppr got])
+                     vcat [text "Wanted " <> ppr' wanted <> text ",",
+                           text "got    " <> ppr' got])
 
         errorOnMismatch :: (Eq a, Show a) => String -> a -> a -> IO ()
         errorOnMismatch what wanted got =
@@ -111,7 +112,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     -- (This magic number does not change when we change
     --  GHC interface file format)
     magic <- get bh
-    wantedGot "Magic" (binaryInterfaceMagic dflags) magic
+    wantedGot "Magic" (binaryInterfaceMagic dflags) magic ppr
     errorOnMismatch "magic number mismatch: old/corrupt interface file?"
         (binaryInterfaceMagic dflags) magic
 
@@ -129,12 +130,12 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     -- Check the interface file version and ways.
     check_ver  <- get bh
     let our_ver = show hiVersion
-    wantedGot "Version" our_ver check_ver
+    wantedGot "Version" our_ver check_ver text
     errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
     check_way <- get bh
     let way_descr = getWayDescr dflags
-    wantedGot "Way" way_descr check_way
+    wantedGot "Way" way_descr check_way ppr
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file ways" way_descr check_way
     getWithUserData ncu bh
