@@ -18,20 +18,20 @@ There are two ways to get a source tree:
 
  1. *Download source tarballs*
 
-  Download the GHC source distribution:
+    Download the GHC source distribution:
 
-        ghc-<version>-src.tar.bz2
+        ghc-<version>-src.tar.xz
 
-  which contains GHC itself and the "boot" libraries.
+    which contains GHC itself and the "boot" libraries.
 
  2. *Check out the source code from git*
 
         $ git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
 
-  Note: cloning GHC from Github requires a special setup. See [Getting a GHC
-  repository from Github][7].
+    Note: cloning GHC from Github requires a special setup. See [Getting a GHC
+    repository from Github][7].
 
-  *See the GHC team's working conventions regarding [how to contribute a patch to GHC](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs).* First time contributors are encouraged to get started by just sending a Pull Request.
+  *See the GHC team's working conventions regarding [how to contribute a patch to GHC](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs).* First time contributors are encouraged to get started by just sending a Merge Request.
 
 
 Building & Installing
