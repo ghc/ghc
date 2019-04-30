@@ -12,6 +12,7 @@ TcMatches: Typecheck some @Matches@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
                    TcMatchCtxt(..), TcStmtChecker, TcExprStmtChecker, TcCmdStmtChecker,
@@ -991,7 +992,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
 
       -- Typecheck each ApplicativeArg separately
       -- See Note [ApplicativeDo and constraints]
-      ; args' <- mapM goArg (zip3 args pat_tys exp_tys)
+      ; args' <- mapM (goArg body_ty) (zip3 args pat_tys exp_tys)
 
       -- Bring into scope all the things bound by the args,
       -- and typecheck the thing_inside
@@ -1011,18 +1012,30 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
            ; ops' <- goOps t_i ops
            ; return (op' : ops') }
 
-    goArg :: (ApplicativeArg GhcRn, Type, Type)
+    goArg :: Type -> (ApplicativeArg GhcRn, Type, Type)
           -> TcM (ApplicativeArg GhcTcId)
 
-    goArg (ApplicativeArgOne x pat rhs isBody, pat_ty, exp_ty)
+    goArg body_ty (ApplicativeArgOne
+                    { app_arg_pattern = pat
+                    , arg_expr        = rhs
+                    , fail_operator   = fail_op
+                    , ..
+                    }, pat_ty, exp_ty)
       = setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
         addErrCtxt (pprStmtInCtxt ctxt (mkBindStmt pat rhs))   $
         do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty)
            ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
                           return ()
-           ; return (ApplicativeArgOne x pat' rhs' isBody) }
+           ; fail_op' <- tcMonadFailOp (DoPatOrigin pat) pat' fail_op body_ty
 
-    goArg (ApplicativeArgMany x stmts ret pat, pat_ty, exp_ty)
+           ; return (ApplicativeArgOne
+                      { app_arg_pattern = pat'
+                      , arg_expr        = rhs'
+                      , fail_operator   = fail_op'
+                      , .. }
+                    ) }
+
+    goArg _body_ty (ApplicativeArgMany x stmts ret pat, pat_ty, exp_ty)
       = do { (stmts', (ret',pat')) <-
                 tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty) $
                 \res_ty  -> do
@@ -1033,13 +1046,12 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                   }
            ; return (ApplicativeArgMany x stmts' ret' pat') }
 
-    goArg (XApplicativeArg nec, _, _) = noExtCon nec
+    goArg _body_ty (XApplicativeArg nec, _, _) = noExtCon nec
 
     get_arg_bndrs :: ApplicativeArg GhcTcId -> [Id]
-    get_arg_bndrs (ApplicativeArgOne _ pat _ _)  = collectPatBinders pat
-    get_arg_bndrs (ApplicativeArgMany _ _ _ pat) = collectPatBinders pat
+    get_arg_bndrs (ApplicativeArgOne { app_arg_pattern = pat }) = collectPatBinders pat
+    get_arg_bndrs (ApplicativeArgMany { bv_pattern =  pat }) = collectPatBinders pat
     get_arg_bndrs (XApplicativeArg nec)          = noExtCon nec
-
 
 {- Note [ApplicativeDo and constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

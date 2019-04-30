@@ -1040,8 +1040,8 @@ collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmt
 collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
 collectStmtBinders (ApplicativeStmt _ args _) = concatMap collectArgBinders args
  where
-  collectArgBinders (_, ApplicativeArgOne _ pat _ _) = collectPatBinders pat
-  collectArgBinders (_, ApplicativeArgMany _ _ _ pat) = collectPatBinders pat
+  collectArgBinders (_, ApplicativeArgOne { app_arg_pattern = pat }) = collectPatBinders pat
+  collectArgBinders (_, ApplicativeArgMany { bv_pattern = pat }) = collectPatBinders pat
   collectArgBinders _ = []
 collectStmtBinders (XStmtLR nec) = noExtCon nec
 
@@ -1344,8 +1344,8 @@ lStmtsImplicits = hs_lstmts
             -> [(SrcSpan, [Name])]
     hs_stmt (BindStmt _ pat _ _ _) = lPatImplicits pat
     hs_stmt (ApplicativeStmt _ args _) = concatMap do_arg args
-      where do_arg (_, ApplicativeArgOne _ pat _ _) = lPatImplicits pat
-            do_arg (_, ApplicativeArgMany _ stmts _ _) = hs_lstmts stmts
+      where do_arg (_, ApplicativeArgOne { app_arg_pattern = pat }) = lPatImplicits pat
+            do_arg (_, ApplicativeArgMany { app_stmts = stmts }) = hs_lstmts stmts
             do_arg (_, XApplicativeArg nec) = noExtCon nec
     hs_stmt (LetStmt _ binds)     = hs_local_binds (unLoc binds)
     hs_stmt (BodyStmt {})         = []

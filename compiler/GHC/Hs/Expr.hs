@@ -1906,18 +1906,27 @@ type instance XXParStmtBlock (GhcPass pL) (GhcPass pR) = NoExtCon
 -- | Applicative Argument
 data ApplicativeArg idL
   = ApplicativeArgOne      -- A single statement (BindStmt or BodyStmt)
-      (XApplicativeArgOne idL)
-      (LPat idL)           -- WildPat if it was a BodyStmt (see below)
-      (LHsExpr idL)
-      Bool                 -- True <=> was a BodyStmt
-                           -- False <=> was a BindStmt
-                           -- See Note [Applicative BodyStmt]
-
+    { xarg_app_arg_one  :: (XApplicativeArgOne idL)
+    , app_arg_pattern   :: (LPat idL) -- WildPat if it was a BodyStmt (see below)
+    , arg_expr          :: (LHsExpr idL)
+    , is_body_stmt      :: Bool -- True <=> was a BodyStmt
+                              -- False <=> was a BindStmt
+                              -- See Note [Applicative BodyStmt]
+    , fail_operator     :: (SyntaxExpr idL) -- The fail operator
+                         -- The fail operator is needed if this is a BindStmt
+                         -- where the pattern can fail. E.g.:
+                         -- (Just a) <- stmt
+                         -- The fail operator will be invoked if the pattern
+                         -- match fails.
+                         -- The fail operator is noSyntaxExpr
+                         -- if the pattern match can't fail
+    }
   | ApplicativeArgMany     -- do { stmts; return vars }
-      (XApplicativeArgMany idL)
-      [ExprLStmt idL]      -- stmts
-      (HsExpr idL)         -- return (v1,..,vn), or just (v1,..,vn)
-      (LPat idL)           -- (v1,...,vn)
+    { xarg_app_arg_many :: (XApplicativeArgMany idL)
+    , app_stmts         :: [ExprLStmt idL] -- stmts
+    , final_expr        :: (HsExpr idL)    -- return (v1,..,vn), or just (v1,..,vn)
+    , bv_pattern        :: (LPat idL)      -- (v1,...,vn)
+    }
   | XApplicativeArg (XXApplicativeArg idL)
 
 type instance XApplicativeArgOne  (GhcPass _) = NoExtField
@@ -2144,7 +2153,7 @@ pprStmt (ApplicativeStmt _ args mb_join)
    flattenStmt stmt = [ppr stmt]
 
    flattenArg :: forall a . (a, ApplicativeArg (GhcPass idL)) -> [SDoc]
-   flattenArg (_, ApplicativeArgOne _ pat expr isBody)
+   flattenArg (_, ApplicativeArgOne _ pat expr isBody _)
      | isBody =  -- See Note [Applicative BodyStmt]
      [ppr (BodyStmt (panic "pprStmt") expr noSyntaxExpr noSyntaxExpr
              :: ExprStmt (GhcPass idL))]
@@ -2164,7 +2173,7 @@ pprStmt (ApplicativeStmt _ args mb_join)
           else text "join" <+> parens ap_expr
 
    pp_arg :: (a, ApplicativeArg (GhcPass idL)) -> SDoc
-   pp_arg (_, ApplicativeArgOne _ pat expr isBody)
+   pp_arg (_, ApplicativeArgOne _ pat expr isBody _)
      | isBody =  -- See Note [Applicative BodyStmt]
      ppr (BodyStmt (panic "pprStmt") expr noSyntaxExpr noSyntaxExpr
             :: ExprStmt (GhcPass idL))
