@@ -27,6 +27,7 @@ import qualified Data.Set as S
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Array as A
 import Data.Data                  ( typeOf, typeRepTyCon, Data(toConstr) )
+import Data.Foldable              ( asum )
 import Data.Maybe                 ( maybeToList )
 import Data.Monoid
 import Data.Traversable           ( for )
@@ -215,12 +216,11 @@ getNameBindingInClass
   -> Maybe Span
 getNameBindingInClass n sp asts = do
   ast <- M.lookup (srcSpanFile sp) asts
-  getFirst $ foldMap First $ do
+  asum $ do
     child <- flattenAst ast
     dets <- maybeToList
       $ M.lookup (Right n) $ nodeIdentifiers $ nodeInfo child
-    let binding = foldMap (First . getBindSiteFromContext) (identInfo dets)
-    return (getFirst binding)
+    return $ asum $ map getBindSiteFromContext $ S.toList $ identInfo dets
 
 getNameScopeAndBinding
   :: Name
@@ -230,13 +230,13 @@ getNameScopeAndBinding n asts = case nameSrcSpan n of
   RealSrcSpan sp -> do -- @Maybe
     ast <- M.lookup (srcSpanFile sp) asts
     defNode <- selectLargestContainedBy sp ast
-    getFirst $ foldMap First $ do -- @[]
+    asum $ do -- @[]
       node <- flattenAst defNode
       dets <- maybeToList
         $ M.lookup (Right n) $ nodeIdentifiers $ nodeInfo node
       scopes <- maybeToList $ foldMap getScopeFromContext (identInfo dets)
-      let binding = foldMap (First . getBindSiteFromContext) (identInfo dets)
-      return $ Just (scopes, getFirst binding)
+      let binding = asum $ map getBindSiteFromContext $ S.toList $ identInfo dets
+      return $ Just (scopes, binding)
   _ -> Nothing
 
 getScopeFromContext :: ContextInfo -> Maybe [Scope]
@@ -263,10 +263,10 @@ smallestContainingSatisfying
   -> HieAST a
   -> Maybe (HieAST a)
 smallestContainingSatisfying sp cond node
-  | nodeSpan node `containsSpan` sp = getFirst $ mconcat
-      [ foldMap (First . smallestContainingSatisfying sp cond) $
+  | nodeSpan node `containsSpan` sp = asum
+      [ asum $ map (smallestContainingSatisfying sp cond) $
           nodeChildren node
-      , First $ if cond node then Just node else Nothing
+      , if cond node then Just node else Nothing
       ]
   | sp `containsSpan` nodeSpan node = Nothing
   | otherwise = Nothing
@@ -275,15 +275,14 @@ selectLargestContainedBy :: Span -> HieAST a -> Maybe (HieAST a)
 selectLargestContainedBy sp node
   | sp `containsSpan` nodeSpan node = Just node
   | nodeSpan node `containsSpan` sp =
-      getFirst $ foldMap (First . selectLargestContainedBy sp) $
-        nodeChildren node
+      asum $ map (selectLargestContainedBy sp) $ nodeChildren node
   | otherwise = Nothing
 
 selectSmallestContaining :: Span -> HieAST a -> Maybe (HieAST a)
 selectSmallestContaining sp node
-  | nodeSpan node `containsSpan` sp = getFirst $ mconcat
-      [ foldMap (First . selectSmallestContaining sp) $ nodeChildren node
-      , First (Just node)
+  | nodeSpan node `containsSpan` sp = asum
+      [ asum $ map (selectSmallestContaining sp) $ nodeChildren node
+      , Just node
       ]
   | sp `containsSpan` nodeSpan node = Nothing
   | otherwise = Nothing
