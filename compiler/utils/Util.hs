@@ -30,7 +30,7 @@ module Util (
 
         dropWhileEndLE, spanEnd, last2, lastMaybe,
 
-        foldl1', foldl2, count, countWhile, countEndWhile, all2,
+        foldl1', foldl2, count, countWhile, all2,
 
         lengthExceeds, lengthIs, lengthIsNot,
         lengthAtLeast, lengthAtMost, lengthLessThan,
@@ -709,10 +709,6 @@ countWhile :: (a -> Bool) -> [a] -> Int
 countWhile p = go 0
   where go !n (x:xs) | p x = go (n+1) xs
         go !n _            = n
-
--- | Length of a /final suffix/ of the list satisfying @p@.
-countEndWhile :: (a -> Bool) -> [a] -> Int
-countEndWhile p = foldl' (\acc x -> if p x then acc + 1 else 0) 0
 
 {-
 @splitAt@, @take@, and @drop@ but with length of another

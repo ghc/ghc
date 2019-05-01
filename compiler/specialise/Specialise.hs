@@ -675,56 +675,48 @@ isValueArg UnspecArg = True
 isValueArg (SpecDict _) = True
 isValueArg _ = False
 
+-- | Given binders from an original function 'f', and the 'SpecArg's
+-- corresponding to its usage, compute everything necessary to build
+-- a specialisation.
+--
+-- We will use a running example. Consider the function
+--
+--    foo :: forall a b. Eq a => Int -> blah
+--    foo @a @b dEqA int = blah
+--
+-- which is called with the 'CallInfo'
+--
+--    [SpecType T1, UnspecType, SpecDict dEqT1, UnspecArg]
+--
+-- We'd eventually like to build the RULE
+--
+--    RULE "SPEC foo @T1 _"
+--      forall @a @b (dEqA' :: Eq a).
+--        foo @T1 @b dEqA' = $sfoo @b
+--
+-- and the specialisation '$sfoo'
+--
+--    $sfoo :: forall b. Int -> blah
+--    $sfoo @b = \int -> SUBST[a->T1, dEqA->dEqA'] blah
+--
+-- The cases for 'specHeader' below are presented in the same order as this
+-- running example.
 specHeader
      :: SpecEnv
      -> [CoreBndr]  -- The binders from the original function 'f'
-     -> [SpecArg]   -- From the CallInfo; padded out with [UnspecArgs]
+     -> [SpecArg]   -- From the CallInfo
      -> SpecM ( [CoreBndr]   -- Binders for $sf
               , SpecEnv      -- Substitution to apply to the body of 'f'
               , [CoreBndr]   -- Binders for the RULE
               , [CoreArg]    -- Args for the LHS of the rule
               , [DictBind]   -- Auxiliary dictionary bindings
-              , [CoreExpr]   -- Specialised arguments
+              , [CoreExpr]   -- Specialised arguments for unfolding
               , [CoreBndr]   -- All the remaining unspecialised args from the original function 'f'
               )
-specHeader env bndrs [] = pure ([], env, [], [], [], [], bndrs)
-specHeader env [] args =
-  ASSERT (all isUnspecArg args) pure ([], env, [], [], [], [], [])
 
--- If we have an unspecialised (value) argument, just
--- copy it from the LHS to the RHS of the SPEC rule. For
--- example, the '[SpecRuleArg]'
---
---   [RuleUnspecArg (foo :: Int)]
---
--- would correspond to
---
---   RULE "SPEC f"
---     forall (foo :: Int).
---       f foo = $sf foo
-specHeader env (bndr : bndrs) (UnspecArg : args)
-  = do { let (env', bndr') = substBndr env bndr
-       ; (bs', env'', rule_bs, rule_es, dx, spec_args, unused_bndrs)
-             <- specHeader env' bndrs args
-       ; pure ( bndr' : bs'
-              , env''
-              , bndr' : rule_bs
-              , varToCoreExpr bndr' : rule_es
-              , dx
-              , varToCoreExpr bndr' : spec_args
-              , unused_bndrs
-              )
-       }
-
--- If we are specialising a type 't', we only need to
--- bind it on the LHS of the rule.
---
---   [RuleSpecType Int]
---
---       -->
---
---   RULE "SPEC f @Int"
---     f @Int = $sf
+-- We want to specialise on type 'T1', and so we must construct a substitution
+-- 'a->T1', as well as a LHS argument for the resulting RULE and unfolding
+-- details.
 specHeader env (bndr : bndrs) (SpecType t : args)
   = do { let env' = extendTvSubstList env [(bndr, t)]
        ; (bs', env'', rule_bs, rule_es, dx, spec_args, unused_bndrs)
@@ -739,22 +731,10 @@ specHeader env (bndr : bndrs) (SpecType t : args)
               )
        }
 
--- If we have an unspecialised type, it might have a type
--- variable that itself should be specialised. Thus we
--- must first substitute any specialised types through
--- its binder. Consider the function
---
---   f :: forall m t. Monad m => t m ()
---
--- where we'd like to specialise (m ~ Maybe), but keep
--- 't' unspecialised. The resuling specialising should
--- have type
---
---   $sf :: forall t. t Maybe ()
---
--- which is to say that we've constructed
---
---   SUBST[m -> Maybe] ($sf :: forall t. t m ())
+-- Next we have a type that we don't want to specialise. We need to perform
+-- a substitution on it (in case the type refers to 'a'). Additionally, we need
+-- to produce a binder, LHS argument and RHS argument for the resulting rule,
+-- /and/ a binder for the specialised body.
 specHeader env (bndr : bndrs) (UnspecType : args)
   = do { let (env', bndr') = substBndr env bndr
        ; (bs', env'', rule_bs, rule_es, dx, spec_args, unused_bndrs)
@@ -769,17 +749,9 @@ specHeader env (bndr : bndrs) (UnspecType : args)
               )
        }
 
--- Otherwise we want to specialise a dictionary 'd1',
--- which requires constructing a new wildcard binder
--- 'd1'' to match the dict.
---
---   [RuleSpecDict (d1 :: Enum Int) (d1' :: Enum Int)]
---
---       -->
---
---   RULE "SPEC f"
---     forall (d1' :: Enum Int).
---       f d1' = $sf
+-- Next we want to specialise the 'Eq a' dict away. We need to construct
+-- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
+-- the nitty-gritty), as a LHS rule and unfolding details.
 specHeader env (bndr : bndrs) (SpecDict d : args)
   = do { inst_dict_id <- newDictBndr env bndr
        ; let (rhs_env2, dx_binds, spec_dict_args')
@@ -796,6 +768,35 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
               , unused_bndrs
               )
        }
+
+-- Finally, we have the unspecialised argument 'int'. We need to produce
+-- a binder, LHS and RHS argument for the RULE, and a binder for the
+-- specialised body.
+--
+-- NB: Calls to 'specHeader' will trim off any trailing 'UnspecArg's, which is
+-- why 'int' doesn't appear in our RULE above. But we have no guarantee that
+-- there aren't 'UnspecArg's which come /before/ all of the dictionaries, so
+-- this case must be here.
+specHeader env (bndr : bndrs) (UnspecArg : args)
+  = do { let (env', bndr') = substBndr env bndr
+       ; (bs', env'', rule_bs, rule_es, dx, spec_args, unused_bndrs)
+             <- specHeader env' bndrs args
+       ; pure ( bndr' : bs'
+              , env''
+              , bndr' : rule_bs
+              , varToCoreExpr bndr' : rule_es
+              , dx
+              , varToCoreExpr bndr' : spec_args
+              , unused_bndrs
+              )
+       }
+
+-- Return all remaining binders from the original function. These have the
+-- invariant that they should all correspond to unspecialised arguments, so
+-- it's safe to stop processing at this point.
+specHeader env bndrs [] = pure ([], env, [], [], [], [], bndrs)
+specHeader env [] args =
+  ASSERT (all isUnspecArg args) pure ([], env, [], [], [], [], [])
 
 
 -- | Specialise a set of calls to imported bindings
@@ -1331,19 +1332,7 @@ type SpecInfo = ( [CoreRule]       -- Specialisation rules
 
 specCalls mb_mod env existing_rules calls_for_me fn rhs
         -- The first case is the interesting one
-  |  callSpecArity pis <= fn_arity
--- TODO(sandy): this might just be for sharing purposes!
--- TODO(sandy): write a note
--- f :: forall a. Eq a => blah
--- f = if expensive then f1 else f2
--- $sfInt = (if expenseive then f1 else f2) Int dEqInt
--- RULE f Int _ = $sfIntf = /\a \d.a. blah
---
--- don't want to specialise if it loses sharing
--- can check arity with idArity
--- types don't count towards arity, dicts do
---
--- arity must be > than the number of etas to bind all the spec args
+  |  callSpecArity pis <= fn_arity      -- See Note [Specialisation Must Preserve Sharing]
   && notNull calls_for_me               -- And there are some calls to specialise
   && not (isNeverActive (idInlineActivation fn))
         -- Don't specialise NOINLINE things
@@ -1404,7 +1393,6 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
       = ASSERT(call_arity <= fn_arity)
 
         -- See Note [Specialising Calls]
-        -- TODO(sandy): assuming there's enough rhs_bndrs to get all the spec args
         do { (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, unused_bndrs)
                <- specHeader env rhs_bndrs $ dropWhileEndLE isUnspecArg call_args
            ; dflags <- getDynFlags
@@ -1420,7 +1408,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                  (lam_extra_args, app_args)     -- Add a dummy argument if body_ty is unlifted
                    | isUnliftedType body_ty     -- C.f. WwLib.mkWorkerArgs
                    , not (isJoinId fn)
-                   = ([voidArgId], unspec_bndrs ++ [voidPrimId])
+                   = ([voidArgId], unspec_bndrs ++ [voidPrimId])  -- See Note [Specialisations Must Be Lifted]
                    | otherwise = ([], unspec_bndrs)
                  join_arity_change = length app_args - length rule_args
                  spec_join_arity | Just orig_join_arity <- isJoinId_maybe fn
@@ -1507,8 +1495,51 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                     , spec_uds           `plusUDs` uds_acc
                     ) } }
 
-{- Note [Specialising Calls]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Specialisation Must Preserve Sharing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a function:
+
+    f :: forall a. Eq a => a -> blah
+    f =
+      if expensive
+         then f1
+         else f2
+
+As written, all calls to 'f' will share 'expensive'. But if we specialise 'f'
+at 'Int', eg:
+
+    $sfInt = (if expenseive then f1 else f2) @Int dEqInt
+    RULE f Int _ = $sfIntf = /\a \d a. blah
+
+We've now lost sharing between 'f' and '$sfInt' for 'expensive'. Yikes!
+
+To avoid this, we only generate specialisations for functions whose arity is >=
+the number of arguments necessary to bind in order to everything we want to
+specialise. This ensures our specialised functions don't do any work before
+receiving all of their dicts, and thus avoids the 'f' case above.
+
+Note [Specialisations Must Be Lifted]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a function 'f':
+
+    f = forall a. Eq a => Array# a
+
+used like
+
+    case x of
+      True -> ...f @Int dEqInt...
+      False -> 0
+
+Naively, we might generate an (expensive) specialisation
+
+    $sfInt :: Array# Int
+
+even in the case that @x = False@! Instead, we add a dummy 'Void#' argument to
+the specialisation '$sfInt' ($sfInt :: Void# -> Array# Int) in order to
+preserve laziness.
+
+Note [Specialising Calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have a function:
 
     f :: Int -> forall a b c. (Foo a, Foo c) => Bar -> Qux
