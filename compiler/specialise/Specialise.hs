@@ -685,11 +685,11 @@ specHeader
               , [CoreArg]    -- Args for the LHS of the rule
               , [DictBind]   -- Auxiliary dictionary bindings
               , [CoreExpr]   -- Specialised arguments
-              , Int          -- Arity decrease
-              , [CoreBndr]   -- all the remaining unspecialised args from the original function f
+              , [CoreBndr]   -- All the remaining unspecialised args from the original function 'f'
               )
-specHeader env bndrs [] = pure ([], env, [], [], [], [], 0, bndrs)
-specHeader env [] args = ASSERT (all isUnspecArg args) pure ([], env, [], [], [], [], 0, [])
+specHeader env bndrs [] = pure ([], env, [], [], [], [], bndrs)
+specHeader env [] args =
+  ASSERT (all isUnspecArg args) pure ([], env, [], [], [], [], [])
 
 -- If we have an unspecialised (value) argument, just
 -- copy it from the LHS to the RHS of the SPEC rule. For
@@ -704,7 +704,7 @@ specHeader env [] args = ASSERT (all isUnspecArg args) pure ([], env, [], [], []
 --       f foo = $sf foo
 specHeader env (bndr : bndrs) (UnspecArg : args)
   = do { let (env', bndr') = substBndr env bndr
-       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease, unused_bndrs)
+       ; (bs', env'', rule_bs, rule_es, dx, spec_args, unused_bndrs)
              <- specHeader env' bndrs args
        ; pure ( bndr' : bs'
               , env''
@@ -712,7 +712,6 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
               , varToCoreExpr bndr' : rule_es
               , dx
               , varToCoreExpr bndr' : spec_args
-              , arity_decrease
               , unused_bndrs
               )
        }
@@ -728,7 +727,7 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
 --     f @Int = $sf
 specHeader env (bndr : bndrs) (SpecType t : args)
   = do { let env' = extendTvSubstList env [(bndr, t)]
-       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease, unused_bndrs)
+       ; (bs', env'', rule_bs, rule_es, dx, spec_args, unused_bndrs)
             <- specHeader env' bndrs args
        ; pure ( bs'
               , env''
@@ -736,7 +735,6 @@ specHeader env (bndr : bndrs) (SpecType t : args)
               , Type t : rule_es
               , dx
               , Type t : spec_args
-              , arity_decrease
               , unused_bndrs
               )
        }
@@ -759,7 +757,7 @@ specHeader env (bndr : bndrs) (SpecType t : args)
 --   SUBST[m -> Maybe] ($sf :: forall t. t m ())
 specHeader env (bndr : bndrs) (UnspecType : args)
   = do { let (env', bndr') = substBndr env bndr
-       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease, unused_bndrs)
+       ; (bs', env'', rule_bs, rule_es, dx, spec_args, unused_bndrs)
             <- specHeader env' bndrs args
        ; pure ( bndr' : bs'
               , env''
@@ -767,7 +765,6 @@ specHeader env (bndr : bndrs) (UnspecType : args)
               , varToCoreExpr bndr' : rule_es
               , dx
               , varToCoreExpr bndr' : spec_args
-              , arity_decrease
               , unused_bndrs
               )
        }
@@ -787,7 +784,7 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
   = do { inst_dict_id <- newDictBndr env bndr
        ; let (rhs_env2, dx_binds, spec_dict_args')
                 = bindAuxiliaryDicts env [bndr] [d] [inst_dict_id]
-       ; (bs', env', rule_bs, rule_es, dx, spec_args, arity_decrease, unused_bndrs)
+       ; (bs', env', rule_bs, rule_es, dx, spec_args, unused_bndrs)
              <- specHeader rhs_env2 bndrs args
        ; pure ( bs'
               , env'
@@ -796,7 +793,6 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
               , varToCoreExpr inst_dict_id : rule_es
               , dx_binds ++ dx
               , spec_dict_args' ++ spec_args
-              , arity_decrease + 1
               , unused_bndrs
               )
        }
@@ -1409,7 +1405,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
 
         -- See Note [Specialising Calls]
         -- TODO(sandy): assuming there's enough rhs_bndrs to get all the spec args
-        do { (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, arity_decrease, unused_bndrs)
+        do { (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, unused_bndrs)
                <- specHeader env rhs_bndrs $ dropWhileEndLE isUnspecArg call_args
            ; dflags <- getDynFlags
            ; if already_covered dflags rules_acc rule_args
@@ -1486,8 +1482,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   = (inl_prag { inl_inline = NoUserInline }, noUnfolding)
 
                   | otherwise
-                  = (inl_prag, specUnfolding dflags unspec_bndrs spec_app
-                                             arity_decrease fn_unf)
+                  = (inl_prag, specUnfolding dflags unspec_bndrs spec_app n_dicts fn_unf)
 
                 spec_app e = e `mkApps` spec_args
 
@@ -2133,7 +2128,7 @@ callSpecArity :: [TyCoBinder] -> Int
 callSpecArity = length . filter (not . isNamedBinder) . dropWhileEndLE isVisibleBinder
 
 getTheta :: [TyCoBinder] -> [PredType]
-getTheta = fmap tyBinderType . filter isInvisibleBinder
+getTheta = fmap tyBinderType . filter isInvisibleBinder . filter (not . isNamedBinder)
 
 
 ------------------------------------------------------------
