@@ -159,14 +159,19 @@
 #define BYTES_TO_WDS(n) ((n) / SIZEOF_W)
 #define ROUNDUP_BYTES_TO_WDS(n) (((n) + SIZEOF_W - 1) / SIZEOF_W)
 
-/* TO_W_(n) converts n to W_ type from a smaller type */
+/*
+ * TO_W_(n) and TO_ZXW_(n) convert n to W_ type from a smaller type,
+ * with and without sign extension respectively
+ */
 #if SIZEOF_W == 4
 #define TO_I64(x) %sx64(x)
 #define TO_W_(x) %sx32(x)
+#define TO_ZXW_(x) %zx32(x)
 #define HALF_W_(x) %lobits16(x)
 #elif SIZEOF_W == 8
 #define TO_I64(x) (x)
 #define TO_W_(x) %sx64(x)
+#define TO_ZXW_(x) %zx64(x)
 #define HALF_W_(x) %lobits32(x)
 #endif
 

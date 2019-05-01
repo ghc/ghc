@@ -61,7 +61,8 @@ stg_floatToWord32zh(F_ f)
 
     reserve 1 = ptr {
         F_[ptr] = f;
-        w = TO_W_(I32[ptr]);
+        // Fix #16617: use zero-extending (TO_ZXW_) here
+        w = TO_ZXW_(I32[ptr]);
     }
 
     return (w);
