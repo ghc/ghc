@@ -5,7 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
+{-# LANGUAGE ViewPatterns #-}
 module Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
@@ -41,12 +41,12 @@ import DynFlags
 import Util
 import Outputable
 import FastString
+import State
 import UniqDFM
 import TyCoRep (TyCoBinder (..))
 
 import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
-import Control.Monad.Trans.State.Strict
 
 {-
 ************************************************************************
@@ -666,14 +666,14 @@ getSpecTypes = mapMaybe go
     go _            = Nothing
 
 isUnspecArg :: SpecArg -> Bool
-isUnspecArg UnspecArg = True
+isUnspecArg UnspecArg  = True
 isUnspecArg UnspecType = True
-isUnspecArg _ = False
+isUnspecArg _          = False
 
 isValueArg :: SpecArg -> Bool
-isValueArg UnspecArg = True
+isValueArg UnspecArg    = True
 isValueArg (SpecDict _) = True
-isValueArg _ = False
+isValueArg _            = False
 
 -- | Given binders from an original function 'f', and the 'SpecArg's
 -- corresponding to its usage, compute everything necessary to build
@@ -1371,7 +1371,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
 
     (rhs_bndrs, rhs_body)      = collectBindersPushingCo rhs
                                  -- See Note [Account for casts in binding]
-    rhs_tyvars   = filter isTyVar rhs_bndrs
+    rhs_tyvars = filter isTyVar rhs_bndrs
 
     in_scope = CoreSubst.substInScope (se_subst env)
 
@@ -1405,16 +1405,17 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
            {    -- Figure out the type of the specialised function
              let body = mkLams (unspec_bndrs ++ unused_bndrs) rhs_body
                  body_ty = substTy rhs_env2 $ exprType body
-                 (lam_extra_args, app_args)     -- Add a dummy argument if body_ty is unlifted
+                 (lam_extra_args, app_args)     -- See Note [Specialisations Must Be Lifted]
                    | isUnliftedType body_ty     -- C.f. WwLib.mkWorkerArgs
                    , not (isJoinId fn)
-                   = ([voidArgId], unspec_bndrs ++ [voidPrimId])  -- See Note [Specialisations Must Be Lifted]
+                   = ([voidArgId], unspec_bndrs ++ [voidPrimId])
                    | otherwise = ([], unspec_bndrs)
                  join_arity_change = length app_args - length rule_args
                  spec_join_arity | Just orig_join_arity <- isJoinId_maybe fn
                                  = Just (orig_join_arity + join_arity_change)
                                  | otherwise
                                  = Nothing
+
            ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams lam_extra_args body)
            ; let spec_id_ty = exprType spec_rhs
            ; spec_f <- newSpecIdSM fn spec_id_ty spec_join_arity
@@ -2216,19 +2217,18 @@ mkCallUDs' env f args
     ci_key :: [SpecArg]
     ci_key = fmap (\(t, a) ->
       case t of
-        Named tyBndr ->
-          let tyVar = binderVar tyBndr
-           in if tyVar `elemVarSet` constrained_tyvars
-                 then
-                   case a of
-                     Type ty -> SpecType ty
-                     _ -> pprPanic "ci_key" $ ppr a
-                  else UnspecType
+        Named (binderVar -> tyVar)
+          |  tyVar `elemVarSet` constrained_tyvars
+          -> case a of
+              Type ty -> SpecType ty
+              _ -> pprPanic "ci_key" $ ppr a
+          |  otherwise
+          -> UnspecType
         Anon InvisArg _ -> SpecDict a
         Anon VisArg _ -> UnspecArg
                 ) $ zip pis args
 
-    dicts    = getSpecDicts ci_key
+    dicts = getSpecDicts ci_key
 
     want_calls_for f = isLocalId f || isJust (maybeUnfoldingTemplate (realIdUnfolding f))
          -- For imported things, we gather call instances if
