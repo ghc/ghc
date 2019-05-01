@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
 module Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
@@ -41,6 +42,7 @@ import Util
 import Outputable
 import FastString
 import UniqDFM
+import TyCoRep (TyCoBinder (..))
 
 import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
@@ -663,15 +665,15 @@ getSpecTypes = mapMaybe go
     go (SpecType t) = Just t
     go _            = Nothing
 
-isSpecOrUnspecType :: SpecArg -> Bool
-isSpecOrUnspecType (SpecType _) = True
-isSpecOrUnspecType UnspecType = True
-isSpecOrUnspecType _ = False
-
 isUnspecArg :: SpecArg -> Bool
 isUnspecArg UnspecArg = True
 isUnspecArg UnspecType = True
 isUnspecArg _ = False
+
+isValueArg :: SpecArg -> Bool
+isValueArg UnspecArg = True
+isValueArg (SpecDict _) = True
+isValueArg _ = False
 
 specHeader
      :: SpecEnv
@@ -684,6 +686,7 @@ specHeader
               , [DictBind]   -- Auxiliary dictionary bindings
               , [CoreExpr]   -- Specialised arguments
               , Int          -- Arity decrease
+              -- , [CoreBndr]   -- all the remaining unspecialised args from the original function f
               )
 specHeader env [] _ = pure ([], env, [], [], [], [], 0)
 specHeader _ bndrs [] = pprPanic "specHeader" $ ppr bndrs
@@ -792,26 +795,6 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
               )
        }
 
-
-
--- | Given a type, split it along its introdution of type variables, and along
--- its arrows.
---
--- For example, given the type
---     forall a. Int -> forall b. a -> x
--- return
---     [Left a, Right Int, Left b, Right a, Right x]
---
--- This function is used to determine which arguments are to be
--- specialised on (see 'mkCallUDs') and for building the reordered
--- to-be-speialised type (see Note [Specialising Calls]).
-splitTypeOnVarsAndArrows :: Type -> [Either TyVar Type]
-splitTypeOnVarsAndArrows t
-  | (fvs@(_:_),  t') <- tcSplitForAllTys t =
-        fmap Left fvs   ++ splitTypeOnVarsAndArrows t'
-  | (args@(_:_), t') <- splitFunTys t      =
-        fmap Right args ++ splitTypeOnVarsAndArrows t'
-  | otherwise = [Right t]
 
 -- | Specialise a set of calls to imported bindings
 specImports :: DynFlags
@@ -1346,8 +1329,19 @@ type SpecInfo = ( [CoreRule]       -- Specialisation rules
 
 specCalls mb_mod env existing_rules calls_for_me fn rhs
         -- The first case is the interesting one
-  |  rhs_tyvars `lengthIs`      n_tyvars -- Rhs of fn's defn has right number of big lambdas
-  && rhs_dict_ids `lengthAtLeast` n_dicts -- and enough dict args
+  |  callSpecArity pis <= fn_arity
+-- TODO(sandy): this might just be for sharing purposes!
+-- TODO(sandy): write a note
+-- f :: forall a. Eq a => blah
+-- f = if expensive then f1 else f2
+-- $sfInt = (if expenseive then f1 else f2) Int dEqInt
+-- RULE f Int _ = $sfIntf = /\a \d.a. blah
+--
+-- don't want to specialise if it loses sharing
+-- can check arity with idArity
+-- types don't count towards arity, dicts do
+--
+-- arity must be > than the number of etas to bind all the spec args
   && notNull calls_for_me               -- And there are some calls to specialise
   && not (isNeverActive (idInlineActivation fn))
         -- Don't specialise NOINLINE things
@@ -1368,15 +1362,14 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
     -- pprTrace "specDefn: none" (ppr fn <+> ppr calls_for_me) $
     return ([], [], emptyUDs)
   where
-    _trace_doc = sep [ ppr rhs_tyvars, ppr n_tyvars
-                     , ppr rhs_bndrs, ppr n_dicts
+    _trace_doc = sep [ ppr rhs_tyvars, ppr rhs_bndrs
                      , ppr (idInlineActivation fn) ]
 
     fn_type                 = idType fn
     fn_arity                = idArity fn
     fn_unf                  = realIdUnfolding fn  -- Ignore loop-breaker-ness here
-    (tyvars, theta, _)      = tcSplitNestedSigmaTys fn_type
-    n_tyvars                = length tyvars
+    pis                     = fst $ splitPiTys fn_type
+    theta                   = getTheta pis
     n_dicts                 = length theta
     inl_prag                = idInlinePragma fn
     inl_act                 = inlinePragmaActivation inl_prag
@@ -1388,7 +1381,6 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
     (rhs_bndrs, rhs_body)      = collectBindersPushingCo rhs
                                  -- See Note [Account for casts in binding]
     rhs_tyvars   = filter isTyVar rhs_bndrs
-    rhs_dict_ids = filter (isPredTy . idType) rhs_bndrs
 
     in_scope = CoreSubst.substInScope (se_subst env)
 
@@ -1406,14 +1398,11 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
               -> CallInfo                         -- Call instance
               -> SpecM SpecInfo
     spec_call spec_acc@(rules_acc, pairs_acc, uds_acc)
-              (CI { ci_key = call_args })
-      = let call_ts = filter isSpecOrUnspecType call_args
-            call_ds = getSpecDicts call_args
-        in
-
-        ASSERT( call_ts `lengthIs` n_tyvars  && call_ds `lengthIs` n_dicts )
+              (CI { ci_key = call_args, ci_arity = call_arity })
+      = ASSERT(call_arity <= fn_arity)
 
         -- See Note [Specialising Calls]
+        -- TODO(sandy): assuming there's enough rhs_bndrs to get all the spec args
         do { (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, arity_decrease)
                <- specHeader env rhs_bndrs
                 $ call_args ++ repeat UnspecArg   -- See note [Repeating UnspecArgs]
@@ -2118,6 +2107,8 @@ data CallInfoSet = CIS Id (Bag CallInfo)
 
 data CallInfo
   = CI { ci_key  :: [SpecArg]   -- All arguments
+       , ci_arity :: Int        -- The number of variables necessary to bind
+                                -- all of the specialised arguments
        , ci_fvs  :: VarSet      -- Free vars of the ci_key
                                 -- call (including tyvars)
                                 -- [*not* include the main id itself, of course]
@@ -2163,12 +2154,23 @@ callInfoFVs :: CallInfoSet -> VarSet
 callInfoFVs (CIS _ call_info) =
   foldrBag (\(CI { ci_fvs = fv }) vs -> unionVarSet fv vs) emptyVarSet call_info
 
+computeArity :: [SpecArg] -> Int
+computeArity = length . filter isValueArg . dropWhileEndLE isUnspecArg
+
+callSpecArity :: [TyCoBinder] -> Int
+callSpecArity = length . filter (not . isNamedBinder) . dropWhileEndLE isVisibleBinder
+
+getTheta :: [TyCoBinder] -> [PredType]
+getTheta = fmap tyBinderType . filter isInvisibleBinder
+
+
 ------------------------------------------------------------
 singleCall :: Id -> [SpecArg] -> UsageDetails
 singleCall id args
   = MkUD {ud_binds = emptyBag,
           ud_calls = unitDVarEnv id $ CIS id $
                      unitBag (CI { ci_key  = args -- used to be tys
+                                 , ci_arity = computeArity args
                                  , ci_fvs  = call_fvs }) }
   where
     tys      = getSpecTypes args
@@ -2198,8 +2200,7 @@ mkCallUDs' env f args
   = emptyUDs
 
   |  not (all type_determines_value theta)
-  || not (spec_tys `lengthIs` n_tyvars)
-  || not ( dicts   `lengthIs` n_dicts)
+  || not (computeArity ci_key <= idArity f)
   || not (any (interestingDict env) dicts)    -- Note [Interesting dictionary arguments]
   -- See also Note [Specialisations already covered]
   = -- pprTrace "mkCallUDs: discarding" _trace_doc
@@ -2209,31 +2210,27 @@ mkCallUDs' env f args
   = -- pprTrace "mkCallUDs: keeping" _trace_doc
     singleCall f ci_key
   where
-    _trace_doc = vcat [ppr f, ppr args, ppr n_tyvars, ppr n_dicts
-                      , ppr (map (interestingDict env) dicts)]
-    (tyvars, theta, _)      = tcSplitNestedSigmaTys (idType f)
+    _trace_doc = vcat [ppr f, ppr args, ppr (map (interestingDict env) dicts)]
+    -- TODO(sandy): splitpitys
+    pis = fst $ splitPiTys $ idType f
+    theta = getTheta pis
     constrained_tyvars      = tyCoVarsOfTypes theta
-    n_tyvars                = length tyvars
-    n_dicts                 = length theta
-    f_structure             = splitTypeOnVarsAndArrows (idType f)
 
     ci_key :: [SpecArg]
     ci_key = fmap (\(t, a) ->
       case t of
-        Left tyVar ->
-          if tyVar `elemVarSet` constrained_tyvars
-             then
-              case a of
-                Type ty -> SpecType ty
-                _ -> pprPanic "ci_key" $ ppr a
-             else UnspecType
-        Right ty ->
-          if isPredTy ty
-             then SpecDict a
-             else UnspecArg
-                ) $ zip f_structure args
+        Named tyBndr ->
+          let tyVar = binderVar tyBndr
+           in if tyVar `elemVarSet` constrained_tyvars
+                 then
+                   case a of
+                     Type ty -> SpecType ty
+                     _ -> pprPanic "ci_key" $ ppr a
+                  else UnspecType
+        Anon InvisArg _ -> SpecDict a
+        Anon VisArg _ -> UnspecArg
+                ) $ zip pis args
 
-    spec_tys = filter isSpecOrUnspecType ci_key
     dicts    = getSpecDicts ci_key
 
     want_calls_for f = isLocalId f || isJust (maybeUnfoldingTemplate (realIdUnfolding f))
