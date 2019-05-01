@@ -657,11 +657,8 @@ static void init_RTSSummaryStats(RTSSummaryStats* sum)
 
 static void free_RTSSummaryStats(RTSSummaryStats * sum)
 {
-    if (!sum) { return; }
-    if (!sum->gc_summary_stats) {
-        stgFree(sum->gc_summary_stats);
-        sum->gc_summary_stats = NULL;
-    }
+    stgFree(sum->gc_summary_stats);
+    sum->gc_summary_stats = NULL;
 }
 
 static void report_summary(const RTSSummaryStats* sum)
@@ -1257,10 +1254,11 @@ stat_exit (void)
             }
         }
 
-        free_RTSSummaryStats(&sum);
         statsFlush();
         statsClose();
     }
+
+    free_RTSSummaryStats(&sum);
 
     if (GC_coll_cpu) {
       stgFree(GC_coll_cpu);
