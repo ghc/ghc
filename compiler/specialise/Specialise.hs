@@ -2200,6 +2200,7 @@ mkCallUDs' env f args
 
   |  not (all type_determines_value theta)
   || not (computeArity ci_key <= idArity f)
+  || not (length dicts == length theta)
   || not (any (interestingDict env) dicts)    -- Note [Interesting dictionary arguments]
   -- See also Note [Specialisations already covered]
   = -- pprTrace "mkCallUDs: discarding" _trace_doc
