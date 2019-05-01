@@ -686,10 +686,10 @@ specHeader
               , [DictBind]   -- Auxiliary dictionary bindings
               , [CoreExpr]   -- Specialised arguments
               , Int          -- Arity decrease
-              -- , [CoreBndr]   -- all the remaining unspecialised args from the original function f
+              , [CoreBndr]   -- all the remaining unspecialised args from the original function f
               )
-specHeader env [] _ = pure ([], env, [], [], [], [], 0)
-specHeader _ bndrs [] = pprPanic "specHeader" $ ppr bndrs
+specHeader env bndrs [] = pure ([], env, [], [], [], [], 0, bndrs)
+specHeader env [] args = ASSERT (all isUnspecArg args) pure ([], env, [], [], [], [], 0, [])
 
 -- If we have an unspecialised (value) argument, just
 -- copy it from the LHS to the RHS of the SPEC rule. For
@@ -704,7 +704,8 @@ specHeader _ bndrs [] = pprPanic "specHeader" $ ppr bndrs
 --       f foo = $sf foo
 specHeader env (bndr : bndrs) (UnspecArg : args)
   = do { let (env', bndr') = substBndr env bndr
-       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease) <- specHeader env' bndrs args
+       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease, unused_bndrs)
+             <- specHeader env' bndrs args
        ; pure ( bndr' : bs'
               , env''
               , bndr' : rule_bs
@@ -712,6 +713,7 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
               , dx
               , varToCoreExpr bndr' : spec_args
               , arity_decrease
+              , unused_bndrs
               )
        }
 
@@ -726,7 +728,8 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
 --     f @Int = $sf
 specHeader env (bndr : bndrs) (SpecType t : args)
   = do { let env' = extendTvSubstList env [(bndr, t)]
-       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease) <- specHeader env' bndrs args
+       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease, unused_bndrs)
+            <- specHeader env' bndrs args
        ; pure ( bs'
               , env''
               , rule_bs
@@ -734,6 +737,7 @@ specHeader env (bndr : bndrs) (SpecType t : args)
               , dx
               , Type t : spec_args
               , arity_decrease
+              , unused_bndrs
               )
        }
 
@@ -755,7 +759,7 @@ specHeader env (bndr : bndrs) (SpecType t : args)
 --   SUBST[m -> Maybe] ($sf :: forall t. t m ())
 specHeader env (bndr : bndrs) (UnspecType : args)
   = do { let (env', bndr') = substBndr env bndr
-       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease)
+       ; (bs', env'', rule_bs, rule_es, dx, spec_args, arity_decrease, unused_bndrs)
             <- specHeader env' bndrs args
        ; pure ( bndr' : bs'
               , env''
@@ -764,6 +768,7 @@ specHeader env (bndr : bndrs) (UnspecType : args)
               , dx
               , varToCoreExpr bndr' : spec_args
               , arity_decrease
+              , unused_bndrs
               )
        }
 
@@ -782,7 +787,7 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
   = do { inst_dict_id <- newDictBndr env bndr
        ; let (rhs_env2, dx_binds, spec_dict_args')
                 = bindAuxiliaryDicts env [bndr] [d] [inst_dict_id]
-       ; (bs', env', rule_bs, rule_es, dx, spec_args, arity_decrease)
+       ; (bs', env', rule_bs, rule_es, dx, spec_args, arity_decrease, unused_bndrs)
              <- specHeader rhs_env2 bndrs args
        ; pure ( bs'
               , env'
@@ -792,6 +797,7 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
               , dx_binds ++ dx
               , spec_dict_args' ++ spec_args
               , arity_decrease + 1
+              , unused_bndrs
               )
        }
 
@@ -1403,9 +1409,8 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
 
         -- See Note [Specialising Calls]
         -- TODO(sandy): assuming there's enough rhs_bndrs to get all the spec args
-        do { (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, arity_decrease)
-               <- specHeader env rhs_bndrs
-                $ call_args ++ repeat UnspecArg   -- See note [Repeating UnspecArgs]
+        do { (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, arity_decrease, unused_bndrs)
+               <- specHeader env rhs_bndrs $ dropWhileEndLE isUnspecArg call_args
            ; dflags <- getDynFlags
            ; if already_covered dflags rules_acc rule_args
              then return spec_acc
@@ -1414,23 +1419,18 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   --                           , ppr dx_binds ]) $
                   do
            {    -- Figure out the type of the specialised function
-             let unnecessary_etas
-                     = countEndWhile (isUnspecArg . snd)
-                     . zip rhs_bndrs
-                     $ call_args ++ repeat UnspecArg  -- See note [Repeating UnspecArgs]
-                 body = mkLams unspec_bndrs rhs_body
+             let body = mkLams (unspec_bndrs ++ unused_bndrs) rhs_body
                  body_ty = substTy rhs_env2 $ exprType body
                  (lam_extra_args, app_args)     -- Add a dummy argument if body_ty is unlifted
                    | isUnliftedType body_ty     -- C.f. WwLib.mkWorkerArgs
                    , not (isJoinId fn)
-                   = ([voidArgId], voidPrimId : unspec_bndrs)
+                   = ([voidArgId], unspec_bndrs ++ [voidPrimId])
                    | otherwise = ([], unspec_bndrs)
                  join_arity_change = length app_args - length rule_args
                  spec_join_arity | Just orig_join_arity <- isJoinId_maybe fn
                                  = Just (orig_join_arity + join_arity_change)
                                  | otherwise
                                  = Nothing
-
            ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams lam_extra_args body)
            ; let spec_id_ty = exprType spec_rhs
            ; spec_f <- newSpecIdSM fn spec_id_ty spec_join_arity
@@ -1460,9 +1460,9 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                   rule_name
                                   inl_act       -- Note [Auto-specialisation and RULES]
                                   (idName fn)
-                                  (dropTail unnecessary_etas rule_bndrs)
-                                  (dropTail unnecessary_etas rule_args)
-                                  (mkVarApps (Var spec_f) $ dropTail unnecessary_etas app_args)
+                                  rule_bndrs
+                                  rule_args
+                                  (mkVarApps (Var spec_f) app_args)
 
                 spec_rule
                   = case isJoinId_maybe fn of
@@ -1562,34 +1562,6 @@ Finally, we must also construct the usage-details
 
 where d1', d2' are cloned versions of d1,d2, with the type substitution
 applied.  These auxiliary bindings just avoid duplication of dx1, dx2.
-
-Note [Repeating UnspecArgs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider a function
-
-  f :: forall a. Enum a => a -> Int -> Bool
-  f @a $dEnum a n = ...
-
-which is unsaturated at its usage site
-
-  fmap (f @Bool True) [0..]
-
-This call corresponds to a 'CallInfo' whose 'ci_key' is also unsaturated with
-respect to 'f':
-
-  [SpecType Bool, SpecDict $dEnumBool]
-
-The specialisation machinery works by zipping the binders of 'f' against the
-'ci_key' of its use. It uses the the 'ci_key' to determine the structure of the
-SPEC rule, but it uses the binders of 'f' to copy unspecialised arguments.
-
-In this case, however, because the 'ci_key' is unsaturated, zipping it against
-the binders of 'f' will cut off any unsaturated arguments. As a result, the
-specialisation '$sf' would have the wrong arity and would refer to nonexistant
-binders.
-
-The solution? Simply saturate the 'ci_key' by filling in its remaining
-arguments with 'UnspecArg's.
 
 Note [Account for casts in binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2211,10 +2183,9 @@ mkCallUDs' env f args
     singleCall f ci_key
   where
     _trace_doc = vcat [ppr f, ppr args, ppr (map (interestingDict env) dicts)]
-    -- TODO(sandy): splitpitys
-    pis = fst $ splitPiTys $ idType f
-    theta = getTheta pis
-    constrained_tyvars      = tyCoVarsOfTypes theta
+    pis                = fst $ splitPiTys $ idType f
+    theta              = getTheta pis
+    constrained_tyvars = tyCoVarsOfTypes theta
 
     ci_key :: [SpecArg]
     ci_key = fmap (\(t, a) ->
