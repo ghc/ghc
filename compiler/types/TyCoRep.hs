@@ -215,7 +215,7 @@ data Type
         Type            -- ^ A Π type.
 
   | FunTy      -- ^ t1 -> t2   Very common, so an important special case
-                -- See Note [Function types]
+               -- See Note [Function types]
      { ft_af  :: AnonArgFlag  -- Is this (->) or (=>)?
      , ft_arg :: Type           -- Argument type
      , ft_res :: Type }         -- Result type
@@ -1036,6 +1036,7 @@ isRuntimeRepTy _ = False
 -- | Is a tyvar of type 'RuntimeRep'?
 isRuntimeRepVar :: TyVar -> Bool
 isRuntimeRepVar = isRuntimeRepTy . tyVarKind
+
 
 {-
 %************************************************************************

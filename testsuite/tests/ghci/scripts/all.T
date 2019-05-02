@@ -11,7 +11,7 @@ test('ghci001', combined_output, ghci_script, ['ghci001.script'])
 test('ghci002', combined_output, ghci_script, ['ghci002.script'])
 test('ghci003', combined_output, ghci_script, ['ghci003.script'])
 test('ghci004', [ combined_output,
-		  when(arch('powerpc64') or arch('powerpc64le'),
+                  when(arch('powerpc64') or arch('powerpc64le'),
                        expect_broken_for(11259,['ghci-ext'])),
                   unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
                 ghci_script, ['ghci004.script'])
@@ -104,7 +104,7 @@ test('ghci060', normal, ghci_script, ['ghci060.script'])
 test('ghci061', normal, ghci_script, ['ghci061.script'])
 test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
                  when(config.have_ext_interp, extra_ways(['ghci-ext']))],
-		ghci_script, ['ghci062.script'])
+                ghci_script, ['ghci062.script'])
 test('ghci063', normal, ghci_script, ['ghci063.script'])
 test('ghci064', normal, ghci_script, ['ghci064.script'])
 test('T2452', [extra_hc_opts("-fno-implicit-import-qualified")],
@@ -304,3 +304,4 @@ test('T16575', normal, ghci_script, ['T16575.script'])
 test('T16509', normal, ghci_script, ['T16509.script'])
 test('T16804', extra_files(['T16804a.hs', 'T16804b.hs']), ghci_script, ['T16804.script'])
 test('T15546', normal, ghci_script, ['T15546.script'])
+test('T16320', normal, ghci_script, ['T16320.script'])

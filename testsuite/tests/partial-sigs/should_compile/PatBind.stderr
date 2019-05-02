@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  foo :: forall a. a -> a
+  foo :: forall {a}. a -> a
 Dependent modules: []
 Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
                      integer-gmp-1.0.2.0]

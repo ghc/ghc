@@ -1,4 +1,3 @@
-
 # We only want to run these tests with GHCi
 def just_ghci( name, opts ):
   opts.only_ways = ['ghci']

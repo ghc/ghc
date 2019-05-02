@@ -597,7 +597,7 @@ pprAxBranch pp_tc idx (IfaceAxBranch { ifaxbTyVars = tvs
   where
     -- See Note [Printing foralls in type family instances] in IfaceType
     ppr_binders = maybe_index <+>
-      pprUserIfaceForAll (map (mkIfaceForAllTvBndr Specified) tvs)
+      pprUserIfaceForAll Nothing (map (mkIfaceForAllTvBndr Specified) tvs)
     pp_lhs = hang pp_tc 2 (pprParendIfaceAppArgs pat_tys)
 
     -- See Note [Displaying axiom incompatibilities]
@@ -648,6 +648,11 @@ data ShowSub
   = ShowSub
       { ss_how_much :: ShowHowMuch
       , ss_forall :: ShowForAllFlag }
+
+instance Outputable ShowSub where
+  ppr ss = text "ShowSub" <+>
+             (braces $ text "ss_how_much:" <> (ppr (ss_how_much ss)) <+>
+                       text "ss_forall:" <> (ppr (ss_forall ss)))
 
 -- See Note [Printing IfaceDecl binders]
 -- The alternative pretty printer referred to in the note.
@@ -732,7 +737,7 @@ pprClassRoles ss clas binders roles =
 
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
---     See Note [Pretty-printing TyThings] in PprTyThing
+--     See Note [Pretty printing via IfaceSyn] in PprTyThing
 pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                              ifCtxt = context, ifResKind = kind,
                              ifRoles = roles, ifCons = condecls,
@@ -751,7 +756,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     is_data_instance = isIfaceDataInstance parent
     -- See Note [Printing foralls in type family instances] in IfaceType
     pp_data_inst_forall :: SDoc
-    pp_data_inst_forall = pprUserIfaceForAll forall_bndrs
+    pp_data_inst_forall = pprUserIfaceForAll Nothing forall_bndrs
 
     forall_bndrs :: [IfaceForAllBndr]
     forall_bndrs = [Bndr (binderVar tc_bndr) Specified | tc_bndr <- binders]
@@ -916,8 +921,9 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                              , pprIfaceContextArr prov_ctxt
                              , pprIfaceType $ foldr (IfaceFunTy VisArg) pat_ty arg_tys ])
       where
-        univ_msg = pprUserIfaceForAll univ_bndrs
-        ex_msg   = pprUserIfaceForAll ex_bndrs
+        -- TODO: both of these should be Just's
+        univ_msg = pprUserIfaceForAll Nothing univ_bndrs
+        ex_msg   = pprUserIfaceForAll Nothing ex_bndrs
 
         insert_empty_ctxt = null req_ctxt
             && not (null prov_ctxt && isEmpty dflags ex_msg)

@@ -1,4 +1,3 @@
-
 ==================== Tidy Core ====================
 Result size of Tidy Core
   = {terms: 71, types: 44, coercions: 0, joins: 0/0}
@@ -6,7 +5,7 @@ Result size of Tidy Core
 Rec {
 -- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
-  :: forall a. GHC.Prim.Void# -> a
+  :: forall {a}. GHC.Prim.Void# -> a
 [GblId, Arity=1, Caf=NoCafRefs, Str=<B,A>b, Unf=OtherCon []]
 T13143.$wf = \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#
 end Rec }
@@ -113,6 +112,3 @@ g = \ (w :: Bool) (w1 :: Bool) (w2 :: Int) ->
       case w2 of { GHC.Types.I# ww1 ->
       case T13143.$wg w w1 ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
       }
-
-
-

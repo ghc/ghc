@@ -1,4 +1,3 @@
-
 ==================== Tidy Core ====================
 Result size of Tidy Core
   = {terms: 114, types: 53, coercions: 0, joins: 0/0}
@@ -40,7 +39,7 @@ T7360.fun4 :: Int
 T7360.fun4 = GHC.Types.I# 0#
 
 -- RHS size: {terms: 16, types: 13, coercions: 0, joins: 0/0}
-fun2 :: forall a. [a] -> ((), Int)
+fun2 :: forall {a}. [a] -> ((), Int)
 [GblId,
  Arity=1,
  Str=<L,1*U>m,
@@ -261,6 +260,3 @@ T7360.$tc'Foo3
       T7360.$tc'Foo10
       0#
       T7360.$tc'Foo9
-
-
-

@@ -165,7 +165,7 @@ pprTyThingInContextLoc tyThing
 -- | Pretty-prints a 'TyThing'.
 pprTyThing :: ShowSub -> TyThing -> SDoc
 -- We pretty-print 'TyThing' via 'IfaceDecl'
--- See Note [Pretty-printing TyThings]
+-- See Note [Pretty printing via IfaceSyn]
 pprTyThing ss ty_thing
   = pprIfaceDecl ss' (tyThingToIfaceDecl ty_thing)
   where

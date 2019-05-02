@@ -157,7 +157,7 @@ pprForAll tvs = pprIfaceForAll (map toIfaceForAllBndr tvs)
 
 -- | Print a user-level forall; see Note [When to print foralls] in this module.
 pprUserForAll :: [TyCoVarBinder] -> SDoc
-pprUserForAll = pprUserIfaceForAll . map toIfaceForAllBndr
+pprUserForAll = pprUserIfaceForAll Nothing . map toIfaceForAllBndr
 
 pprTCvBndrs :: [TyCoVarBinder] -> SDoc
 pprTCvBndrs tvs = sep (map pprTCvBndr tvs)
@@ -305,4 +305,3 @@ pprWithExplicitKindsWhen b
   = updSDocDynFlags $ \dflags ->
       if b then gopt_set dflags Opt_PrintExplicitKinds
            else dflags
-

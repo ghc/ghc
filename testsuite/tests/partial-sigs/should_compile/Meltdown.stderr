@@ -1,7 +1,7 @@
 TYPE SIGNATURES
   isMeltdown :: forall param1 param2. NukeMonad param1 param2 Bool
   unlessMeltdown ::
-    forall param1 param2.
+    forall {param1} {param2}.
     NukeMonad param1 param2 () -> NukeMonad param1 param2 ()
 TYPE CONSTRUCTORS
   data type NukeMonad{3} :: * -> * -> * -> *

@@ -1,10 +1,9 @@
-
 T7438.hs:6:14: error:
     • Couldn't match expected type ‘p1’ with actual type ‘p’
         ‘p’ is untouchable
           inside the constraints: b ~ a
           bound by a pattern with constructor:
-                     Nil :: forall k (a :: k). Thrist a a,
+                     Nil :: forall {k} (a :: k). Thrist a a,
                    in an equation for ‘go’
           at T7438.hs:6:4-6
       ‘p’ is a rigid type variable bound by

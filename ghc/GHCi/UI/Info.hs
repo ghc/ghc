@@ -220,7 +220,7 @@ findType infos span0 string = do
              MaybeT $ pure $ M.lookup name infos
 
     case resolveType (modinfoSpans info) (spanInfoFromRealSrcSpan' span0) of
-        Nothing -> (,) info <$> lift (exprType TM_Inst string)
+        Nothing -> (,) info <$> lift (exprType GHC.TM_InstInferred string)
         Just ty -> return (info, ty)
   where
     -- | Try to resolve the type display from the given span.

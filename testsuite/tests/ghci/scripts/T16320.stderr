@@ -1,0 +1,2 @@
+<interactive>:1:1:
+    Couldn't match type ‘Bool’ with ‘Int’ arising from a use of ‘foo’

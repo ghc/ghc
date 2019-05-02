@@ -1,3 +1,4 @@
 deferEither @(_ ~ _)
-  :: (Typeable _1, Typeable _2) =>
+  :: forall {_1} {_2} (proxy :: Constraint -> *) r.
+     (Typeable _1, Typeable _2) =>
      proxy (_1 ~ _2) -> ((_1 ~ _2) => r) -> Either String r

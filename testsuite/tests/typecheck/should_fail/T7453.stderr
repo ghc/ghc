@@ -1,4 +1,3 @@
-
 T7453.hs:10:30: error:
     • Couldn't match expected type ‘t’ with actual type ‘p’
       ‘t’ is a rigid type variable bound by
@@ -58,7 +57,7 @@ T7453.hs:21:15: error:
                   where
                       aux = const v
     • Relevant bindings include
-        aux :: forall b. b -> p (bound at T7453.hs:22:21)
+        aux :: forall {b}. b -> p (bound at T7453.hs:22:21)
         z :: t1 (bound at T7453.hs:21:11)
         v :: p (bound at T7453.hs:19:7)
         cast3 :: p -> t (bound at T7453.hs:19:1)

@@ -73,7 +73,7 @@ import Control.Monad( unless )
 {-
 ************************************************************************
 *                                                                      *
-                Creating and emittind constraints
+                Creating and emitting constraints
 *                                                                      *
 ************************************************************************
 -}

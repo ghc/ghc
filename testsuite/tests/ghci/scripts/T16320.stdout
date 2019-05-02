@@ -1,0 +1,28 @@
+Inferred variables are always printed with braces
+-XPolyKinds -XTypeApplications -XRankNTypes
+meth :: forall {k} (a :: k) b a1. C a b => a1 -> b
+typeRep :: forall {k} (a :: k). Typeable a => TypeRep a
+baz :: forall k (a :: k). Proxy a -> Proxy a
+-XNoPolyKinds
+Only inferred variables are instantiated
+foo :: (a ~ Int) => a -> a
+foo @Int :: Int -> Int
+bar :: (a ~ Int) => a -> b -> a
+bar @Int :: (Int ~ Int) => Int -> b -> Int
+bar @Int @Bool :: Int -> Bool -> Int
+-fprint-explicit-foralls
+bar @Int :: forall b. (Int ~ Int) => Int -> b -> Int
+bar @Int @Bool :: Int -> Bool -> Int
+map :: forall a b. (a -> b) -> [a] -> [b]
+-fno-print-explicit-foralls
+Tests to check the predicate that supresses foralls
+Foo :: forall k -> k -> *
+f7 :: (forall a. a) -> forall a. a
+f4 :: forall a. (forall b. b -> b) -> a -> a
+return :: Monad m => a -> m a
+meth :: C a b => a1 -> b
+f6 :: forall a. Int -> Show a => String
+-fprint-explicit-runtime-reps
+($)
+  :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPE r).
+     (a -> b) -> a -> b

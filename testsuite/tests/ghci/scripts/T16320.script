@@ -1,0 +1,81 @@
+-- See the proposal[1] for details about these tests.
+--
+-- [1]: https://github.com/ghc-proposals/ghc-proposals/blob/7790b73fa685f42773b895a11845a40916839a27/proposals/0048-printing-foralls.rst
+
+
+-- Inferred variables are always printed with braces
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+putStrLn "Inferred variables are always printed with braces"
+:set -XPolyKinds -XTypeApplications -XRankNTypes
+putStrLn "-XPolyKinds -XTypeApplications -XRankNTypes"
+:load T16320.hs
+:type meth
+import Type.Reflection
+:t typeRep
+
+-- k and (a::k) are NOT printed in braces.
+let baz :: forall k (a::k). Proxy a -> Proxy a ; baz = undefined
+:type baz
+
+-- Load again with -XNoPolyKinds for rest of the tests.
+putStrLn "-XNoPolyKinds"
+:set -XNoPolyKinds
+:load T16320.hs
+
+-- Only inferred variables are instantiated
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+putStrLn "Only inferred variables are instantiated"
+:type foo
+:type foo @Int
+-- This is a type error.
+:type foo @Bool
+:type bar
+:type bar @Int
+:type bar @Int @Bool
+
+putStrLn "-fprint-explicit-foralls"
+:set -fprint-explicit-foralls
+:type bar @Int
+:type bar @Int @Bool
+:type map
+putStrLn "-fno-print-explicit-foralls"
+:set -fno-print-explicit-foralls
+
+
+-- Tests to check the predicate that supresses foralls
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+putStrLn "Tests to check the predicate that supresses foralls"
+
+-- See (3) in #16320. Also see #14238.
+:kind Foo
+:t f7
+
+-- Print all foralls, if some of them are not at the top.
+-- See (4) in #16320.
+:type f4
+
+-- If the nested foralls are mixed with class constraints, but don't
+-- appear under a (->), don't print them.
+-- See (4) in #16320.
+:type return
+
+-- See (5) in #16320. Well, GHC already takes care of renaming the ambiguous
+-- 'a' to 'a1' if we use :type. The issue that SPJ mentioned in
+-- https://gitlab.haskell.org//ghc/ghc/issues/11786#note_168643
+-- 'ghci025' is caused by :browse!. It uses 'pprTyThing' which in turn
+-- makes a 'IfaceSyn' and pretty prints that. There's an assumption that
+-- "IfaceDecls are already 'tidy', so it's straightforward to print them.",
+-- but I think that they are not 'tidy' via the `:browse!` codepath.
+:type meth
+
+-- GHC will print a top-level forall for this type, because the constraint
+-- (Show a) appears under an arrow. See (4) in #16320.
+:type f6
+
+putStrLn "-fprint-explicit-runtime-reps"
+:set -fprint-explicit-runtime-reps
+:type ($)
+
+-- [1]: https://github.com/ghc-proposals/ghc-proposals/blob/7790b73fa685f42773b895a11845a40916839a27/proposals/0048-printing-foralls.rst

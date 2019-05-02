@@ -14,7 +14,7 @@ module ListSetOps (
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
 
         -- Duplicate handling
-        hasNoDups, removeDups, findDupsEq, insertNoDup,
+        hasNoDups, hasDups, removeDups, findDupsEq, insertNoDup,
         equivClasses,
 
         -- Indexing
@@ -136,8 +136,10 @@ assocMaybe alist key
 ************************************************************************
 -}
 
-hasNoDups :: (Eq a) => [a] -> Bool
+hasDups :: (Eq a) => [a] -> Bool
+hasDups = not . hasNoDups
 
+hasNoDups :: (Eq a) => [a] -> Bool
 hasNoDups xs = f [] xs
   where
     f _           []     = True

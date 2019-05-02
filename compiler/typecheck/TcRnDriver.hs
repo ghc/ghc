@@ -54,7 +54,7 @@ import IfaceEnv( externaliseName )
 import TcHsType
 import TcValidity( checkValidType )
 import TcMatches
-import Inst( deeplyInstantiate )
+import Inst( deeplyInstantiate, topInstantiateInferred )
 import TcUnify( checkConstraints )
 import RnTypes
 import RnExpr
@@ -2344,9 +2344,11 @@ isGHCiMonad hsc_env ty
             Nothing -> failWithTc $ text ("Can't find type:" ++ ty)
 
 -- | How should we infer a type? See Note [TcRnExprMode]
-data TcRnExprMode = TM_Inst    -- ^ Instantiate the type fully (:type)
-                  | TM_NoInst  -- ^ Do not instantiate the type (:type +v)
-                  | TM_Default -- ^ Default the type eagerly (:type +d)
+data TcRnExprMode = TM_Inst         -- ^ Instantiate the type fully
+                  | TM_NoInst       -- ^ Do not instantiate the type (:type +v)
+                  | TM_Default      -- ^ Default the type eagerly (:type +d)
+                  | TM_InstInferred -- ^ Only instantiate inferred type
+                                    --   variables (:type)
 
 -- | tcRnExpr just finds the type of an expression
 tcRnExpr :: HscEnv
@@ -2369,9 +2371,11 @@ tcRnExpr hsc_env mode rdr_expr
           <- captureTopConstraints $
              pushTcLevelM          $
              do { (_tc_expr, expr_ty) <- tcInferSigma rn_expr
-                ; if inst
-                  then snd <$> deeplyInstantiate orig expr_ty
-                  else return expr_ty } ;
+                ; case mode of
+                    TM_NoInst       -> return expr_ty
+                    TM_InstInferred -> snd <$> topInstantiateInferred orig expr_ty
+                    _               -> snd <$> deeplyInstantiate orig expr_ty
+                } ;
 
     -- Generalise
     (qtvs, dicts, _, residual, _)
@@ -2398,10 +2402,11 @@ tcRnExpr hsc_env mode rdr_expr
     }
   where
     -- See Note [TcRnExprMode]
-    (inst, infer_mode, perhaps_disable_default_warnings) = case mode of
-      TM_Inst    -> (True,  NoRestrictions, id)
-      TM_NoInst  -> (False, NoRestrictions, id)
-      TM_Default -> (True,  EagerDefaulting, unsetWOptM Opt_WarnTypeDefaults)
+    (infer_mode, perhaps_disable_default_warnings) = case mode of
+      TM_Inst         -> (NoRestrictions, id)
+      TM_NoInst       -> (NoRestrictions, id)
+      TM_InstInferred -> (NoRestrictions, id)
+      TM_Default      -> (EagerDefaulting, unsetWOptM Opt_WarnTypeDefaults)
 
 --------------------------
 tcRnImportDecls :: HscEnv
@@ -2472,19 +2477,23 @@ considers this example, with -fprint-explicit-foralls enabled:
   foo :: forall a f b. (Show a, Num b, Foldable f) => a -> f b -> String
   :type{,-spec,-def} foo @Int
 
-:type / TM_Inst
+
+- TM_Inst (exposed via GHC API)
 
   In this mode, we report the type that would be inferred if a variable
   were assigned to expression e, without applying the monomorphism restriction.
   This means we deeply instantiate the type and then regeneralize, as discussed
   in #11376.
 
-  > :type foo @Int
+  > :set +c -XTypeApplications
+  > :load Foo.hs
+  > :type-at <module> <line> <col> <end-line> <end-col> foo @Int
   forall {b} {f :: * -> *}. (Foldable f, Num b) => Int -> f b -> String
 
   Note that the variables and constraints are reordered here, because this
   is possible during regeneralization. Also note that the variables are
   reported as Inferred instead of Specified.
+
 
 :type +v / TM_NoInst
 
@@ -2493,10 +2502,35 @@ considers this example, with -fprint-explicit-foralls enabled:
   solved.
 
   > :type +v foo @Int
-  forall f b. (Show Int, Num b, Foldable f) => Int -> f b -> String
+  (Show Int, Num b, Foldable f) => Int -> f b -> String
 
   Note that Show Int is still reported, because the solver never got a chance
   to see it.
+
+  As noted in #16320, this will be deprecated soon!
+
+
+:type / TM_InstInferred
+
+  This mode only instantiates all inferred type variables or dictionaries,
+  but not specified or required ones. This also means that it will try to
+  solve any class constraints in the type of an expression passed to :type,
+  as long as there are no intervening visible or specified arguments.
+  Consider this example:
+
+  > bar :: forall a b. (a ~ Int) => a -> b -> a; bar = undefined
+  > :type bar @Int
+  (Int ~ Int) => Int -> b -> Int
+
+  It still reports Int ~ Int in the type of because there is an intervening
+  specified variable, b.
+
+  > :type foo @Int
+  (Show Int, Num b, Foldable f) => Int -> f b -> String
+
+  Show Int is reported for the same reason it's reported in :type +v.
+  See GHC proposal #48 and GitLab #16320 for more details.
+
 
 :type +d / TM_Default
 

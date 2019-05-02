@@ -72,6 +72,7 @@ import Outputable
 import FastString
 import FastStringEnv
 import Util
+import ListSetOps ( hasDups )
 
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
@@ -448,6 +449,39 @@ ifTypeIsVarFree ty = go ty
 
     go_args IA_Nil = True
     go_args (IA_Arg arg _ args) = go arg && go_args args
+
+
+-- | Are all foralls at the top? Exception: foralls are allowed to be mixed
+-- with class constraints, but no foralls can appear under a proper ->.
+areForAllsAtTop :: IfaceType -> Bool
+-- Used to decide if forall's should be suppressed when printing a type
+-- in 'pprUserIfaceForAll'. See (4) in #16320.
+areForAllsAtTop = go False
+  where
+    go under_arrow ty =
+      case ty of
+        IfaceFreeTyVar{} -> True
+        IfaceTyVar{}     -> True
+        IfaceLitTy{}     -> True
+        IfaceAppTy a bs  ->
+          go under_arrow a && go_IfaceAppArgs under_arrow bs
+        IfaceFunTy af arg res
+          | af == VisArg -> go True arg && go True res
+          -- If '=>' is not at the top, for example in (a -> Show b => b),
+          -- 'areForAllsAtTop' returns False, and causes foralls to be
+          -- printed for such types.
+          | otherwise    -> not under_arrow &&
+                            go under_arrow arg && go under_arrow res
+        IfaceForAllTy _ ty1    -> not under_arrow && go under_arrow ty1
+        IfaceTyConApp _tc args -> go_IfaceAppArgs under_arrow args
+        IfaceCastTy ty1 _co    -> go under_arrow ty1
+        IfaceCoercionTy _co    -> True
+        IfaceTupleTy _ _ args  -> go_IfaceAppArgs under_arrow args
+
+    go_IfaceAppArgs _ IA_Nil = True
+    go_IfaceAppArgs under_arrow (IA_Arg ty1 _af rst) =
+      go under_arrow ty1 && go_IfaceAppArgs under_arrow rst
+
 
 {- Note [Substitution on IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -991,23 +1025,25 @@ ppr_app_arg ctx_prec (t, argf) =
 -------------------
 pprIfaceForAllPart :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
 pprIfaceForAllPart tvs ctxt sdoc
-  = ppr_iface_forall_part ShowForAllWhen tvs ctxt sdoc
+  = ppr_iface_forall_part ShowForAllWhen tvs ctxt Nothing sdoc
 
 -- | Like 'pprIfaceForAllPart', but always uses an explicit @forall@.
 pprIfaceForAllPartMust :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
 pprIfaceForAllPartMust tvs ctxt sdoc
-  = ppr_iface_forall_part ShowForAllMust tvs ctxt sdoc
+  = ppr_iface_forall_part ShowForAllMust tvs ctxt Nothing sdoc
 
 pprIfaceForAllCoPart :: [(IfLclName, IfaceCoercion)] -> SDoc -> SDoc
 pprIfaceForAllCoPart tvs sdoc
   = sep [ pprIfaceForAllCo tvs, sdoc ]
 
 ppr_iface_forall_part :: ShowForAllFlag
-                      -> [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
-ppr_iface_forall_part show_forall tvs ctxt sdoc
+                      -> [IfaceForAllBndr] -> [IfacePredType]
+                      -> Maybe IfaceType
+                      -> SDoc -> SDoc
+ppr_iface_forall_part show_forall tvs ctxt mb_ty sdoc
   = sep [ case show_forall of
             ShowForAllMust -> pprIfaceForAll tvs
-            ShowForAllWhen -> pprUserIfaceForAll tvs
+            ShowForAllWhen -> pprUserIfaceForAll mb_ty tvs
         , pprIfaceContextArr ctxt
         , sdoc]
 
@@ -1029,8 +1065,8 @@ pprIfaceForAll bndrs@(Bndr _ vis : _)
 -- Returns both the list of not-yet-rendered binders and the doc.
 -- No anonymous binders here!
 ppr_itv_bndrs :: [IfaceForAllBndr]
-             -> ArgFlag  -- ^ visibility of the first binder in the list
-             -> ([IfaceForAllBndr], [SDoc])
+              -> ArgFlag  -- ^ visibility of the first binder in the list
+              -> ([IfaceForAllBndr], [SDoc])
 ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ vis) : bndrs) vis1
   | vis `sameVis` vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs vis1 in
                          (bndrs', pprIfaceForAllBndr bndr : doc)
@@ -1046,10 +1082,7 @@ pprIfaceForAllCoBndrs bndrs = hsep $ map pprIfaceForAllCoBndr bndrs
 
 pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
 pprIfaceForAllBndr (Bndr (IfaceTvBndr tv) Inferred)
-  = sdocWithDynFlags $ \dflags ->
-                          if gopt Opt_PrintExplicitForalls dflags
-                          then braces $ pprIfaceTvBndr False tv
-                          else pprIfaceTvBndr True tv
+  = braces $ pprIfaceTvBndr False tv
 pprIfaceForAllBndr (Bndr (IfaceTvBndr tv) _)  = pprIfaceTvBndr True tv
 pprIfaceForAllBndr (Bndr (IfaceIdBndr idv) _) = pprIfaceIdBndr idv
 
@@ -1064,28 +1097,48 @@ pprIfaceForAllCoBndr (tv, kind_co)
 -- or when compiling with -fprint-explicit-foralls.
 data ShowForAllFlag = ShowForAllMust | ShowForAllWhen
 
+instance Outputable ShowForAllFlag where
+  ppr ShowForAllMust = text "ShowForAllMust"
+  ppr ShowForAllWhen = text "ShowForAllWhen"
+
 pprIfaceSigmaType :: ShowForAllFlag -> IfaceType -> SDoc
 pprIfaceSigmaType show_forall ty
   = eliminateRuntimeRep ppr_fn ty
   where
     ppr_fn iface_ty =
       let (tvs, theta, tau) = splitIfaceSigmaTy iface_ty
-       in ppr_iface_forall_part show_forall tvs theta (ppr tau)
+       in ppr_iface_forall_part show_forall tvs theta (Just ty) (ppr tau)
 
-pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
-pprUserIfaceForAll tvs
+
+-- Render the "forall ... ." or "forall ... ->" bit of a type if appropriate.
+-- See Note [When to print foralls]. It accepts a 'Maybe IfaceType' because
+-- it needs the full type, not just type variables, to check criteria (4) in
+-- the note. It's a 'Maybe' because at some call-sites of 'pprUserIfaceForAll'
+-- the type is not easily available.
+-- TODO: check if the types are _really_ not available, and whether it's then
+-- OK to ignore criteria (4).
+pprUserIfaceForAll :: Maybe IfaceType -> [IfaceForAllBndr] -> SDoc
+pprUserIfaceForAll mb_ty tvs
    = sdocWithDynFlags $ \dflags ->
-     -- See Note [When to print foralls] in this module.
-     ppWhen (any tv_has_kind_var tvs
-             || any tv_is_required tvs
-             || gopt Opt_PrintExplicitForalls dflags) $
-     pprIfaceForAll tvs
+       ppWhen (print_foralls dflags) (pprIfaceForAll tvs)
    where
      tv_has_kind_var (Bndr (IfaceTvBndr (_,kind)) _)
        = not (ifTypeIsVarFree kind)
      tv_has_kind_var _ = False
 
      tv_is_required = isVisibleArgFlag . binderArgFlag
+
+     tv_names = map ifaceBndrName (binderVars tvs)
+
+     print_foralls dflags =
+       gopt Opt_PrintExplicitForalls dflags
+       || any tv_has_kind_var tvs
+       || any tv_is_required tvs
+       || (case mb_ty of
+             Nothing -> False
+             Just ty -> not (areForAllsAtTop ty))
+       || hasDups tv_names
+
 
 {-
 Note [When to print foralls]
@@ -1118,7 +1171,13 @@ criteria are met:
    See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility]
    in TyCoRep.
 
+4. The foralls are not all at the top. Exception: foralls are allowed to be
+   mixed with class constraints, but no foralls can appear under a proper ->.
+
+5. Two quantified type variables are spelled the same.
+
 N.B. Until now (Aug 2018) we didn't check anything for coercion variables.
+
 
 Note [Printing foralls in type family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

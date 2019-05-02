@@ -1,6 +1,8 @@
 lookup :: Eq a => a -> [(a, b)] -> Maybe b
-hr :: (forall a. a -> a) -> a :: (forall a1. a1 -> a1) -> a
+hr :: (forall a. a -> a) -> a
+  :: forall a. (forall a1. a1 -> a1) -> a
 lookup ∷ Eq a ⇒ a → [(a, b)] → Maybe b
-hr :: (forall a. a -> a) -> a ∷ (∀ a1. a1 → a1) → a
+hr :: (forall a. a -> a) -> a ∷ ∀ a. (∀ a1. a1 → a1) → a
 lookup :: Eq a => a -> [(a, b)] -> Maybe b
-hr :: (forall a. a -> a) -> a :: (forall a1. a1 -> a1) -> a
+hr :: (forall a. a -> a) -> a
+  :: forall a. (forall a1. a1 -> a1) -> a

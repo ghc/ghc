@@ -2894,6 +2894,8 @@ commonly used commands.
 
 .. ghci-cmd:: :type; ⟨expression⟩
 
+    TODO: update...
+
     Infers and prints the type of ⟨expression⟩, including explicit
     forall quantifiers for polymorphic types.
     The type reported is the type that would be inferred
@@ -2902,10 +2904,12 @@ commonly used commands.
 
     .. code-block:: none
 
-	*X> :type length
-	length :: Foldable t => t a -> Int
+        *X> :type length
+        length :: Foldable t => t a -> Int
 
 .. ghci-cmd:: :type +v; ⟨expression⟩
+
+    TODO: warn that it'll be deprecated soon...
 
     Infers and prints the type of ⟨expression⟩, but without fiddling
     with type variables or class constraints. This is useful when you
@@ -2917,9 +2921,9 @@ commonly used commands.
 
     .. code-block:: none
 
-	*X> :set -fprint-explicit-foralls
-	*X> :type +v length
-	length :: forall (t :: * -> *). Foldable t => forall a. t a -> Int
+        *X> :set -fprint-explicit-foralls
+        *X> :type +v length
+        length :: forall (t :: * -> *). Foldable t => forall a. t a -> Int
 
 .. ghci-cmd:: :type +d; ⟨expression⟩
 
@@ -2934,8 +2938,8 @@ commonly used commands.
 
     .. code-block:: none
 
-	*X> :type +d length
-	length :: [a] -> Int
+        *X> :type +d length
+        length :: [a] -> Int
 
 .. ghci-cmd:: :type-at; ⟨path⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]
 

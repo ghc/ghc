@@ -18,7 +18,7 @@ import System.Environment( getArgs )
 import qualified Data.Map as Map
 import Data.Dynamic ( fromDynamic,Dynamic )
 
-main::IO()
+main :: IO()
 main = do
         [libdir] <- getArgs
         testOneFile libdir "AnnotationLet"
