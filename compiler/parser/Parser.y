@@ -1064,7 +1064,7 @@ topdecl :: { LHsDecl GhcPs }
         -- The $(..) form is one possible form of infixexp
         -- but we treat an arbitrary expression just as if
         -- it had a $(..) wrapped around it
-        | infixexp_top                          {% runECP_P $1 >>= \ $1 ->
+        | infixexp                              {% runECP_P $1 >>= \ $1 ->
                                                    return $ sLL $1 $> $ mkSpliceDecl $1 }
 
 -- Type classes
@@ -2411,7 +2411,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                         _ <- amsL l (ann ++ fst (unLoc $3) ++ [mj AnnBang $1]) ;
                                         return $! (sL l $ ValD noExt r) } }
 
-        | infixexp_top opt_sig rhs  {% runECP_P $1 >>= \ $1 ->
+        | infixexp     opt_sig rhs  {% runECP_P $1 >>= \ $1 ->
                                        do { (ann,r) <- checkValDef NoSrcStrict $1 (snd $2) $3;
                                         let { l = comb2 $1 $> };
                                         -- Depending upon what the pattern looks like we might get either
@@ -2457,7 +2457,7 @@ gdrh :: { LGRHS GhcPs (LHsExpr GhcPs) }
 sigdecl :: { LHsDecl GhcPs }
         :
         -- See Note [Declaration/signature overlap] for why we need infixexp here
-          infixexp_top '::' sigtypedoc
+          infixexp     '::' sigtypedoc
                         {% do { $1 <- runECP_P $1
                               ; v <- checkValSigLhs $1
                               ; _ <- amsL (comb2 $1 $>) [mu AnnDcolon $2]
@@ -2581,56 +2581,53 @@ exp   :: { ECP }
                                                       HsHigherOrderApp False)
                                        [mu AnnRarrowtail $2] }
         | infixexp              { $1 }
+        | exp_ann exp           {% runECP_P $2 >>= \ $2 -> fmap ecpFromExp $ $1 $2 }
 
 infixexp :: { ECP }
-        : exp10 { $1 }
-        | infixexp qop exp10  {  ECP $
-                                 superInfixOp $
-                                 $2 >>= \ $2 ->
-                                 runECP_PV $1 >>= \ $1 ->
-                                 runECP_PV $3 >>= \ $3 ->
-                                 amms (mkHsOpAppPV (comb2 $1 $>) $1 $2 $3)
-                                     [mj AnnVal $2] }
-                 -- AnnVal annotation for NPlusKPat, which discards the operator
+        : infixexp_inner         { $1 }
+        | infixexp_inner qop exp_ann exp10
+                                 {% runPV $2 >>= \ $2 ->
+                                    runECP_P $1 >>= \ $1 ->
+                                    runECP_P $4 >>= \ $4 ->
+                                    $3 $4 >>= \last ->
+                                    fmap ecpFromExp $
+                                    ams (sLL $1 last $ OpApp noExt $1 $2 last)
+                                         [mj AnnVal $2] }
+             -- AnnVal annotation for NPlusKPat, which discards the operator
 
-infixexp_top :: { ECP }
-            : exp10_top               { $1 }
-            | infixexp_top qop exp10_top
-                                      { ECP $
-                                         superInfixOp $
-                                         $2 >>= \ $2 ->
-                                         runECP_PV $1 >>= \ $1 ->
-                                         runECP_PV $3 >>= \ $3 ->
-                                         amms (mkHsOpAppPV (comb2 $1 $>) $1 $2 $3)
-                                              [mj AnnVal $2] }
+infixexp_inner :: { ECP }
+        : exp10                   { $1 }
+        | infixexp_inner qop exp10
+                                  { ECP $
+                                     superInfixOp $
+                                     $2 >>= \ $2 ->
+                                     runECP_PV $1 >>= \ $1 ->
+                                     runECP_PV $3 >>= \ $3 ->
+                                     amms (mkHsOpAppPV (comb2 $1 $>) $1 $2 $3)
+                                          [mj AnnVal $2] }
+             -- AnnVal annotation for NPlusKPat, which discards the operator
 
-exp10_top :: { ECP }
+exp_ann :: { LHsExpr GhcPs -> P (LHsExpr GhcPs) }
+  : scc_annot { \exp ->
+      ams (sLL $1 exp $ HsSCC noExt (snd $ fst $ unLoc $1) (snd $ unLoc $1) exp)
+          (fst $ fst $ unLoc $1) }
+  | hpc_annot { \exp ->
+      ams (sLL $1 exp $ HsTickPragma noExt (snd $ fst $ fst $ unLoc $1)
+                                           (snd $ fst $ unLoc $1) (snd $ unLoc $1) exp)
+          (fst $ fst $ fst $ unLoc $1) }
+
+  | '{-# CORE' STRING '#-}' { \exp ->
+      ams (sLL $1 exp $ HsCoreAnn noExt (getCORE_PRAGs $1) (getStringLiteral $2) exp)
+          [mo $1,mj AnnVal $2
+          ,mc $3] }
+       -- hdaume: core annotation
+
+exp10 :: { ECP }
         : '-' fexp                      { ECP $
                                            runECP_PV $2 >>= \ $2 ->
                                            amms (mkHsNegAppPV (comb2 $1 $>) $2)
                                                [mj AnnMinus $1] }
-
-
-        | hpc_annot exp        {% runECP_P $2 >>= \ $2 ->
-                                  fmap ecpFromExp $
-                                  ams (sLL $1 $> $ HsTickPragma noExt (snd $ fst $ fst $ unLoc $1)
-                                                                (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
-                                      (fst $ fst $ fst $ unLoc $1) }
-
-        | '{-# CORE' STRING '#-}' exp  {% runECP_P $4 >>= \ $4 ->
-                                          fmap ecpFromExp $
-                                          ams (sLL $1 $> $ HsCoreAnn noExt (getCORE_PRAGs $1) (getStringLiteral $2) $4)
-                                              [mo $1,mj AnnVal $2
-                                              ,mc $3] }
-                                          -- hdaume: core annotation
         | fexp                         { $1 }
-
-exp10 :: { ECP }
-        : exp10_top            { $1 }
-        | scc_annot exp        {% runECP_P $2 >>= \ $2 ->
-                                  fmap ecpFromExp $
-                                  ams (sLL $1 $> $ HsSCC noExt (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
-                                      (fst $ fst $ unLoc $1) }
 
 optSemi :: { ([Located Token],Bool) }
         : ';'         { ([$1],True) }
@@ -2900,7 +2897,7 @@ texp :: { ECP }
         -- Then when converting expr to pattern we unravel it again
         -- Meanwhile, the renamer checks that real sections appear
         -- inside parens.
-        | infixexp qop       {% runECP_P $1 >>= \ $1 ->
+        | infixexp_inner qop {% runECP_P $1 >>= \ $1 ->
                                 runPV $2 >>= \ $2 ->
                                 return $ ecpFromExp $
                                 sLL $1 $> $ SectionL noExt $1 $2 }
