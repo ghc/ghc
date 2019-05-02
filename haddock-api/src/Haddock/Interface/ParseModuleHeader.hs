@@ -86,6 +86,13 @@ parseModuleHeader dflags pkgName str0 =
 -- the value will be "this is a .. description" and the rest will begin
 -- at "The module comment".
 
+-- | 'C' is a 'Char' carrying its column.
+--
+-- This let us make an indentation-aware parser, as we know current indentation.
+-- by looking at the next character in the stream ('curInd').
+--
+-- Thus we can munch all spaces but only not-spaces which are indented.
+--
 data C = C {-# UNPACK #-} !Int Char
 
 newtype P a = P { unP :: [C] -> Maybe ([C], a) }
