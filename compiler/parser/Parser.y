@@ -2601,14 +2601,8 @@ infixexp_top :: { ECP }
                                          $2 >>= \ $2 ->
                                          runECP_PV $1 >>= \ $1 ->
                                          runECP_PV $3 >>= \ $3 ->
-                                         do { when (srcSpanEnd (getLoc $2)
-                                                == srcSpanStart (getLoc $3)
-                                                && checkIfBang (unLoc $2)) $
-                                                warnSpaceAfterBang (comb2 $2 $3);
-                                              amms (mkHsOpAppPV (comb2 $1 $>) $1 $2 $3)
-                                                   [mj AnnVal $2]
-                                            }
-                                      }
+                                         amms (mkHsOpAppPV (comb2 $1 $>) $1 $2 $3)
+                                              [mj AnnVal $2] }
 
 exp10_top :: { ECP }
         : '-' fexp                      { ECP $
@@ -3962,17 +3956,6 @@ hintExplicitForall tok = do
       ]
   where
     forallSymDoc = text (forallSym (isUnicode tok))
-
--- | Warn about missing space after bang
-warnSpaceAfterBang :: SrcSpan -> PV ()
-warnSpaceAfterBang span = do
-    bang_on <- getBit BangPatBit
-    unless bang_on $
-      addWarning Opt_WarnSpaceAfterBang span msg
-    where
-      msg = text "Did you forget to enable BangPatterns?" $$
-            text "If you mean to bind (!) then perhaps you want" $$
-            text "to add a space after the bang for clarity."
 
 -- When two single quotes don't followed by tyvar or gtycon, we report the
 -- error as empty character literal, or TH quote that missing proper type

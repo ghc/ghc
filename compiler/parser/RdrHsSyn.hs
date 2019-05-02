@@ -1847,20 +1847,16 @@ ecpFromCmd a = ECP (ecpFromCmd' a)
 -- | Disambiguate infix operators.
 -- See Note [Ambiguous syntactic categories]
 class DisambInfixOp b where
-  checkIfBang :: b -> Bool
   mkHsVarOpPV :: Located RdrName -> PV (Located b)
   mkHsConOpPV :: Located RdrName -> PV (Located b)
   mkHsInfixHolePV :: SrcSpan -> PV (Located b)
 
 instance p ~ GhcPs => DisambInfixOp (HsExpr p) where
-  checkIfBang (HsVar _ (unLoc -> op)) = isBangRdr op
-  checkIfBang _ = False
   mkHsVarOpPV v = return $ cL (getLoc v) (HsVar noExt v)
   mkHsConOpPV v = return $ cL (getLoc v) (HsVar noExt v)
   mkHsInfixHolePV l = return $ cL l hsHoleExpr
 
 instance DisambInfixOp RdrName where
-  checkIfBang = isBangRdr
   mkHsConOpPV (dL->L l v) = return $ cL l v
   mkHsVarOpPV (dL->L l v) = return $ cL l v
   mkHsInfixHolePV l =
@@ -2132,7 +2128,9 @@ instance p ~ GhcPs => DisambECP (PatBuilder p) where
   mkHsLetPV l _ _ = addFatalError l $ text "(let ... in ...)-syntax in pattern"
   type InfixOp (PatBuilder p) = RdrName
   superInfixOp m = m
-  mkHsOpAppPV l p1 op p2 = return $ cL l $ PatBuilderOpApp p1 op p2
+  mkHsOpAppPV l p1 op p2 = do
+    warnSpaceAfterBang op (getLoc p2)
+    return $ cL l $ PatBuilderOpApp p1 op p2
   mkHsCasePV l _ _ = addFatalError l $ text "(case ... of ...)-syntax in pattern"
   type FunArg (PatBuilder p) = PatBuilder p
   superFunArg m = m
@@ -2192,6 +2190,19 @@ mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields fs dd)
        return (PatBuilderPat (ConPatIn c (RecCon (HsRecFields fs dd))))
 mkPatRec p _ =
   addFatalError (getLoc p) $ text "Not a record constructor:" <+> ppr p
+
+-- | Warn about missing space after bang
+warnSpaceAfterBang :: Located RdrName -> SrcSpan -> PV ()
+warnSpaceAfterBang (dL->L opLoc op) argLoc = do
+    bang_on <- getBit BangPatBit
+    when (not bang_on && noSpace && isBangRdr op) $
+      addWarning Opt_WarnSpaceAfterBang span msg
+    where
+      span = combineSrcSpans opLoc argLoc
+      noSpace = srcSpanEnd opLoc == srcSpanStart argLoc
+      msg = text "Did you forget to enable BangPatterns?" $$
+            text "If you mean to bind (!) then perhaps you want" $$
+            text "to add a space after the bang for clarity."
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
