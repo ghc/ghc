@@ -210,7 +210,7 @@ again:
    -------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_PAP,/*special layout*/0,0,PAP,"PAP","PAP")
-{  ccall barf("PAP object entered!") never returns; }
+{  ccall barf("PAP object (%p) entered!", R1) never returns; }
 
 stg_PAP_apply /* no args => explicit stack */
 {
