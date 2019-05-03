@@ -41,6 +41,16 @@ exConstrClosure = ConstrClosure
     , name = "Just"
     }
 
+exConstrNoCafClosure :: Closure
+exConstrNoCafClosure = ConstrClosure
+    { info = exItbl{tipe=CONSTR_NOCAF, ptrs=0, nptrs=3}
+    , ptrArgs = []
+    , dataArgs = [0,1,2]
+    , pkg = "main"
+    , modl = "Main"
+    , name = "ConstrNoCaf"
+    }
+
 exFunClosure :: Closure
 exFunClosure = FunClosure
     { info = exItbl{tipe=FUN_0_1, ptrs=0, nptrs=1}
@@ -189,6 +199,12 @@ data MBA = MBA (MutableByteArray# RealWorld)
 data B = B BCO#
 data APC a = APC a
 
+data ConstrNoCaf = ConstrNoCaf Int# Int# Int#
+
+staticClosure :: ConstrNoCaf
+staticClosure = ConstrNoCaf 0# 1# 2#
+{-# NOINLINE staticClosure #-}
+
 main :: IO ()
 main = do
 
@@ -223,6 +239,13 @@ main = do
     let !con = Just 1
     getClosureData con >>=
         assertClosuresEq exConstrClosure
+
+    evaluate staticClosure
+    performGC
+
+    -- Static Constructor
+    getClosureData staticClosure >>=
+        assertClosuresEq exConstrNoCafClosure
 
     -- Function
     let !fun = \x -> x + 1
