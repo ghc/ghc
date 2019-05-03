@@ -795,8 +795,9 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
 -- invariant that they should all correspond to unspecialised arguments, so
 -- it's safe to stop processing at this point.
 specHeader env bndrs [] = pure ([], env, [], [], [], [], bndrs)
-specHeader env [] args =
-  ASSERT (all isUnspecArg args) pure ([], env, [], [], [], [], [])
+specHeader env [] _ =
+  -- ASSERT (all isUnspecArg args)
+  pure ([], env, [], [], [], [], [])
 
 
 -- | Specialise a set of calls to imported bindings
