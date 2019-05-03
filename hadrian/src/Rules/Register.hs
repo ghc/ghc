@@ -12,6 +12,7 @@ import Rules.Rts
 import Settings
 import Target
 import Utilities
+import Rules.Library
 
 import Distribution.Version (Version)
 import qualified Distribution.Parsec as Cabal
@@ -109,8 +110,7 @@ buildConf _ context@Context {..} conf = do
         need [ path -/- "DerivedConstants.h"
              , path -/- "ghcautoconf.h"
              , path -/- "ghcplatform.h"
-             , path -/- "ghcversion.h"
-             , path -/- "ffi.h" ]
+             , path -/- "ghcversion.h" ]
 
     when (package == integerGmp) $ need [path -/- gmpLibraryH]
 
