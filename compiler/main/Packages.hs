@@ -559,13 +559,15 @@ readPackageConfig dflags conf_file = do
                       "can't find a package database at " ++ conf_file
 
   let
+      -- Fix #16360: remove trailing slash from conf_file before calculting pkgroot
+      conf_file' = dropTrailingPathSeparator conf_file
       top_dir = topDir dflags
-      pkgroot = takeDirectory conf_file
+      pkgroot = takeDirectory conf_file'
       pkg_configs1 = map (mungePackageConfig top_dir pkgroot)
                          proto_pkg_configs
       pkg_configs2 = setBatchPackageFlags dflags pkg_configs1
   --
-  return (conf_file, pkg_configs2)
+  return (conf_file', pkg_configs2)
   where
     readDirStylePackageConfig conf_dir = do
       let filename = conf_dir </> "package.cache"
