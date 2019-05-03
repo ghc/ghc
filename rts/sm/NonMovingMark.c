@@ -401,7 +401,6 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
     }
 
     MarkQueueEnt ent = {
-        .type = MARK_CLOSURE,
         .mark_closure = {
             .p = UNTAG_CLOSURE(p),
             .origin = NULL,
@@ -430,8 +429,12 @@ void push_closure (MarkQueue *q,
     // }
 #endif
 
+    // This must be true as origin points to a pointer and therefore must be
+    // word-aligned. However, we check this as otherwise we would confuse this
+    // with a mark_array entry
+    ASSERT(((uintptr_t) origin & 0x3) == 0);
+
     MarkQueueEnt ent = {
-        .type = MARK_CLOSURE,
         .mark_closure = {
             .p = UNTAG_CLOSURE(p),
             .origin = origin,
@@ -450,10 +453,9 @@ void push_array (MarkQueue *q,
         return;
 
     MarkQueueEnt ent = {
-        .type = MARK_ARRAY,
         .mark_array = {
             .array = array,
-            .start_index = start_index
+            .start_index = (start_index << 16) | 0x3,
         }
     };
     push(q, &ent);
@@ -716,7 +718,7 @@ again:
         // Is this the first block of the queue?
         if (q->blocks->link == NULL) {
             // Yes, therefore queue is empty...
-            MarkQueueEnt none = { .type = NULL_ENTRY };
+            MarkQueueEnt none = { .null_entry = { .p = NULL } };
             return none;
         } else {
             // No, unwind to the previous block and try popping again...
@@ -1492,13 +1494,13 @@ nonmovingMark (MarkQueue *queue)
         count++;
         MarkQueueEnt ent = markQueuePop(queue);
 
-        switch (ent.type) {
+        switch (nonmovingMarkQueueEntryType(&ent)) {
         case MARK_CLOSURE:
             mark_closure(queue, ent.mark_closure.p, ent.mark_closure.origin);
             break;
         case MARK_ARRAY: {
             const StgMutArrPtrs *arr = ent.mark_array.array;
-            StgWord start = ent.mark_array.start_index;
+            StgWord start = ent.mark_array.start_index >> 16;
             StgWord end = start + MARK_ARRAY_CHUNK_LENGTH;
             if (end < arr->ptrs) {
                 markQueuePushArray(queue, ent.mark_array.array, end);
@@ -1743,13 +1745,17 @@ void nonmovingResurrectThreads (struct MarkQueue_ *queue, StgTSO **resurrected_t
 
 void printMarkQueueEntry (MarkQueueEnt *ent)
 {
-    if (ent->type == MARK_CLOSURE) {
+    switch(nonmovingMarkQueueEntryType(ent)) {
+      case MARK_CLOSURE:
         debugBelch("Closure: ");
         printClosure(ent->mark_closure.p);
-    } else if (ent->type == MARK_ARRAY) {
+        break;
+      case MARK_ARRAY:
         debugBelch("Array\n");
-    } else {
+        break;
+      case NULL_ENTRY:
         debugBelch("End of mark\n");
+        break;
     }
 }
 
