@@ -473,7 +473,10 @@ trimThing :: TyThing -> TyThing
 -- Trim off inessentials, for boot files and no -O
 trimThing (AnId id)
    | not (isImplicitId id)
-   = AnId (id `setIdInfo` vanillaIdInfo)
+   = AnId (id `setIdInfo` vanillaIdInfo
+              -- CafInfo is essential for the iface files as they're part of the
+              -- ABI. See #16608.
+              `setIdCafInfo` idCafInfo id)
 
 trimThing other_thing
   = other_thing
