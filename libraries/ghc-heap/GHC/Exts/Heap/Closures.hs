@@ -221,6 +221,15 @@ data GenClosure b
         -- Card table ignored
         }
 
+    -- | A @SmallMutableArray#@
+    --
+    -- @since 8.10.1
+  | SmallMutArrClosure
+        { info       :: !StgInfoTable
+        , mccPtrs    :: !Word           -- ^ Number of pointers
+        , mccPayload :: ![b]            -- ^ Array payload
+        }
+
     -- | An @MVar#@, with a queue of thread state objects blocking on them
   | MVarClosure
         { info       :: !StgInfoTable
@@ -321,6 +330,7 @@ allClosures (APStackClosure {..}) = fun:payload
 allClosures (BCOClosure {..}) = [instrs,literals,bcoptrs]
 allClosures (ArrWordsClosure {}) = []
 allClosures (MutArrClosure {..}) = mccPayload
+allClosures (SmallMutArrClosure {..}) = mccPayload
 allClosures (MutVarClosure {..}) = [var]
 allClosures (MVarClosure {..}) = [queueHead,queueTail,value]
 allClosures (FunClosure {..}) = ptrArgs

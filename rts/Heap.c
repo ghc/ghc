@@ -110,6 +110,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
         case CONSTR_1_1:
         case CONSTR_0_2:
         case CONSTR:
+        case CONSTR_NOCAF:
 
 
         case PRIM:
@@ -192,6 +193,16 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
                 ptrs[nptrs++] = ((StgMutArrPtrs *)closure)->payload[i];
             }
             break;
+
+        case SMALL_MUT_ARR_PTRS_CLEAN:
+        case SMALL_MUT_ARR_PTRS_DIRTY:
+        case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+        case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+            for (i = 0; i < ((StgSmallMutArrPtrs *)closure)->ptrs; ++i) {
+                ptrs[nptrs++] = ((StgSmallMutArrPtrs *)closure)->payload[i];
+            }
+            break;
+
         case MUT_VAR_CLEAN:
         case MUT_VAR_DIRTY:
             ptrs[nptrs++] = ((StgMutVar *)closure)->var;
