@@ -1182,6 +1182,8 @@ heapCensusChain( Census *census, bdescr *bd )
     }
 }
 
+// Time is process CPU time of beginning of current GC and is used as
+// the mutator CPU time reported as the census timestamp.
 void heapCensus (Time t)
 {
   uint32_t g, n;
@@ -1189,7 +1191,7 @@ void heapCensus (Time t)
   gen_workspace *ws;
 
   census = &censuses[era];
-  census->time  = mut_user_time_until(t);
+  census->time  = TimeToSecondsDbl(t);
   census->rtime = TimeToNS(stat_getElapsedTime());
 
 
