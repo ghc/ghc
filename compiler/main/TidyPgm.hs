@@ -472,6 +472,7 @@ tidyTypeEnv omit_prags type_env
 --------------------------
 trimThing :: TyThing -> TyThing
 -- Trim off inessentials, for boot files and no -O
+
 trimThing (AnId id)
    | not (isImplicitId id)
    = AnId (id `setIdInfo` vanillaIdInfo)
