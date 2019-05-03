@@ -16,7 +16,7 @@ module Hadrian.Utilities (
     BuildRoot (..), buildRoot, buildRootRules, isGeneratedSource,
 
     -- * File system operations
-    copyFile, copyFileUntracked, createFileLinkUntracked, fixFile,
+    copyFile, copyFileUntracked, createFileLink, createFileLinkUntracked, fixFile,
     makeExecutable, moveFile, removeFile, createDirectory, copyDirectory,
     moveDirectory, removeDirectory,
 
@@ -289,13 +289,24 @@ infixl 1 <&>
 isGeneratedSource :: FilePath -> Action Bool
 isGeneratedSource file = buildRoot <&> (`isPrefixOf` file)
 
--- | Link a file tracking the source. Create the target directory if missing.
+-- | Link a file (without tracking the link target). Create the target directory
+-- if missing.
 createFileLinkUntracked :: FilePath -> FilePath -> Action ()
 createFileLinkUntracked linkTarget link = do
-    let dir = takeDirectory linkTarget
+    let dir = takeDirectory link
     liftIO $ IO.createDirectoryIfMissing True dir
     putProgressInfo =<< renderCreateFileLink linkTarget link
     quietly . liftIO $ IO.createFileLink linkTarget link
+
+-- | Link a file tracking the link target. Create the target directory if
+-- missing.
+createFileLink :: FilePath -> FilePath -> Action ()
+createFileLink linkTarget link = do
+    let source = if isAbsolute linkTarget
+                    then linkTarget
+                    else takeDirectory link -/- linkTarget
+    need [source]
+    createFileLinkUntracked linkTarget link
 
 -- | Copy a file tracking the source. Create the target directory if missing.
 copyFile :: FilePath -> FilePath -> Action ()
