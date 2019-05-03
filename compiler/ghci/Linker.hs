@@ -13,7 +13,7 @@
 module Linker ( getHValue, showLinkerState,
                 linkExpr, linkDecls, unload, withExtendedLinkEnv,
                 extendLinkEnv, deleteFromLinkEnv,
-                extendLoadedPkgs,
+--                extendLoadedPkgs,
                 linkPackages,initDynLinker,linkModule,
                 linkCmdLineLibs
         ) where
@@ -94,27 +94,46 @@ The PersistentLinkerState maps Names to actual closures (for
 interpreted code only), for use during linking.
 -}
 #if STAGE < 2
-GLOBAL_VAR_M(v_PersistentLinkerState, newMVar (panic "Dynamic linker not initialised"), MVar PersistentLinkerState)
-GLOBAL_VAR(v_InitLinkerDone, False, Bool) -- Set True when dynamic linker is initialised
+GLOBAL_VAR_M( v_PersistentLinkerState
+            , newMVar (Nothing, Nothing)
+            , MVar (PersistentLinkerStates))
 #else
 SHARED_GLOBAL_VAR_M( v_PersistentLinkerState
                    , getOrSetLibHSghcPersistentLinkerState
                    , "getOrSetLibHSghcPersistentLinkerState"
-                   , newMVar (panic "Dynamic linker not initialised")
-                   , MVar PersistentLinkerState)
--- Set True when dynamic linker is initialised
-SHARED_GLOBAL_VAR( v_InitLinkerDone
-                 , getOrSetLibHSghcInitLinkerDone
-                 , "getOrSetLibHSghcInitLinkerDone"
-                 , False
-                 , Bool)
+                   , newMVar (Nothing, Nothing)
+                   , MVar (PersistentLinkerStates))
 #endif
 
-modifyPLS_ :: (PersistentLinkerState -> IO PersistentLinkerState) -> IO ()
-modifyPLS_ f = readIORef v_PersistentLinkerState >>= flip modifyMVar_ f
+uninitialised :: a
+uninitialised = panic "Dynamic linker not initialised"
 
-modifyPLS :: (PersistentLinkerState -> IO (PersistentLinkerState, a)) -> IO a
-modifyPLS f = readIORef v_PersistentLinkerState >>= flip modifyMVar f
+modifyPLS_ :: HscEnv -> (PersistentLinkerState -> IO PersistentLinkerState) -> IO ()
+modifyPLS_ hsc_env f = readIORef v_PersistentLinkerState
+  >>= flip modifyMVar_ (liftPLS (fmap pure . f . fromMaybe uninitialised))
+  where liftPLS f (x,y)
+          | gopt Opt_ExternalInterpreter (hsc_dflags hsc_env) = liftM (\y' -> (x, y')) (f y)
+          | otherwise = liftM (\x' -> (x', y)) (f x)
+
+modifyPLS :: HscEnv -> (PersistentLinkerState -> IO (PersistentLinkerState, a)) -> IO a
+modifyPLS hsc_env f = readIORef v_PersistentLinkerState
+  >>= flip modifyMVar (liftPLS (fmapFst pure . f . fromMaybe uninitialised))
+  where fmapFst f = fmap (\(x, y) -> (f x, y))
+        liftPLS f (x,y)
+          | gopt Opt_ExternalInterpreter (hsc_dflags hsc_env) = liftM (\(y',z) -> ((x, y'), z)) (f y)
+          | otherwise = liftM (\(x', z) -> ((x', y), z)) (f x)
+
+readPLS :: IO PersistentLinkerStates
+readPLS = readIORef v_PersistentLinkerState
+  >>= readMVar
+
+modifyMbPLS_
+  :: HscEnv -> (Maybe PersistentLinkerState -> IO (Maybe PersistentLinkerState)) -> IO ()
+modifyMbPLS_ hsc_env f = readIORef v_PersistentLinkerState >>= flip modifyMVar_ (liftPLS f)
+  where liftPLS f (x,y)
+          | gopt Opt_ExternalInterpreter (hsc_dflags hsc_env) = liftM (\y' -> (x, y')) (f y)
+          | otherwise = liftM (\x' -> (x', y)) (f x)
+
 
 data PersistentLinkerState
    = PersistentLinkerState {
@@ -144,39 +163,42 @@ data PersistentLinkerState
         -- libraries so we can link them (see #10322)
         temp_sos :: ![(FilePath, String)] }
 
+type PersistentLinkerStates
+  =  (Maybe PersistentLinkerState, Maybe PersistentLinkerState) -- (Local, Remote)
+
 
 emptyPLS :: DynFlags -> PersistentLinkerState
-emptyPLS _ = PersistentLinkerState {
-                        closure_env = emptyNameEnv,
-                        itbl_env    = emptyNameEnv,
-                        pkgs_loaded = init_pkgs,
-                        bcos_loaded = [],
-                        objs_loaded = [],
-                        temp_sos = [] }
-
+emptyPLS _ = linker_state
   -- Packages that don't need loading, because the compiler
   -- shares them with the interpreted program.
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
   where init_pkgs = map toInstalledUnitId [rtsUnitId]
+        linker_state = PersistentLinkerState
+          { closure_env = emptyNameEnv
+          , itbl_env    = emptyNameEnv
+          , pkgs_loaded = init_pkgs
+          , bcos_loaded = []
+          , objs_loaded = []
+          , temp_sos = []
+          }
 
+-- extendLoadedPkgs :: [InstalledUnitId] -> IO ()
+-- extendLoadedPkgs pkgs =
+--   modifyPLS_ $ \s ->
+--       return s{ pkgs_loaded = pkgs ++ pkgs_loaded s }
 
-extendLoadedPkgs :: [InstalledUnitId] -> IO ()
-extendLoadedPkgs pkgs =
-  modifyPLS_ $ \s ->
-      return s{ pkgs_loaded = pkgs ++ pkgs_loaded s }
+extendLinkEnv :: HscEnv -> [(Name,ForeignHValue)] -> IO ()
+extendLinkEnv hsc_env new_bindings =
+  modifyPLS_ hsc_env $ \pls@PersistentLinkerState{..} -> do
+    let new_ce = extendClosureEnv closure_env new_bindings
+    return $! pls{ closure_env = new_ce }
+    -- strictness is important for not retaining old copies of the pls
 
-extendLinkEnv :: [(Name,ForeignHValue)] -> IO ()
-extendLinkEnv new_bindings =
-  modifyPLS_ $ \pls -> do
-    let ce = closure_env pls
-    let new_ce = extendClosureEnv ce new_bindings
-    return pls{ closure_env = new_ce }
-
-deleteFromLinkEnv :: [Name] -> IO ()
-deleteFromLinkEnv to_remove =
-  modifyPLS_ $ \pls -> do
+deleteFromLinkEnv :: HscEnv -> [Name] -> IO ()
+deleteFromLinkEnv hsc_env to_remove =
+  modifyPLS_ hsc_env $ \pls -> do
     let ce = closure_env pls
     let new_ce = delListFromNameEnv ce to_remove
     return pls{ closure_env = new_ce }
@@ -189,7 +211,7 @@ deleteFromLinkEnv to_remove =
 getHValue :: HscEnv -> Name -> IO ForeignHValue
 getHValue hsc_env name = do
   initDynLinker hsc_env
-  pls <- modifyPLS $ \pls -> do
+  pls <- modifyPLS hsc_env $ \pls -> do
            if (isExternalName name) then do
              (pls', ok) <- linkDependencies hsc_env pls noSrcSpan
                               [nameModule name]
@@ -233,9 +255,10 @@ linkDependencies hsc_env pls span needed_mods = do
 -- | Temporarily extend the linker state.
 
 withExtendedLinkEnv :: (ExceptionMonad m) =>
+                       HscEnv ->
                        [(Name,ForeignHValue)] -> m a -> m a
-withExtendedLinkEnv new_env action
-    = gbracket (liftIO $ extendLinkEnv new_env)
+withExtendedLinkEnv hsc_env new_env action
+    = gbracket (liftIO $ extendLinkEnv hsc_env new_env)
                (\_ -> reset_old_env)
                (\_ -> action)
     where
@@ -245,7 +268,7 @@ withExtendedLinkEnv new_env action
         -- package), so the reset action only removes the names we
         -- added earlier.
           reset_old_env = liftIO $ do
-            modifyPLS_ $ \pls ->
+            modifyPLS_ hsc_env $ \pls ->
                 let cur = closure_env pls
                     new = delListFromNameEnv cur (map fst new_env)
                 in return pls{ closure_env = new }
@@ -254,13 +277,18 @@ withExtendedLinkEnv new_env action
 -- | Display the persistent linker state.
 showLinkerState :: DynFlags -> IO ()
 showLinkerState dflags
-  = do pls <- readIORef v_PersistentLinkerState >>= readMVar
+  = do (ls_local, ls_remote) <- readPLS
        putLogMsg dflags NoReason SevDump noSrcSpan
           (defaultDumpStyle dflags)
-                 (vcat [text "----- Linker state -----",
-                        text "Pkgs:" <+> ppr (pkgs_loaded pls),
-                        text "Objs:" <+> ppr (objs_loaded pls),
-                        text "BCOs:" <+> ppr (bcos_loaded pls)])
+                 (vcat [text "----- Linker state (local) -----",
+                        text "Pkgs:" <+> ppr (fromMaybe [] $ pkgs_loaded <$> ls_local),
+                        text "Objs:" <+> ppr (fromMaybe [] $ objs_loaded <$> ls_local),
+                        text "BCOs:" <+> ppr (fromMaybe [] $ bcos_loaded <$> ls_local),
+                        text "----- Linker state (remote) -----",
+                        text "Pkgs:" <+> ppr (fromMaybe [] $ pkgs_loaded <$> ls_remote),
+                        text "Objs:" <+> ppr (fromMaybe [] $ objs_loaded <$> ls_remote),
+                        text "BCOs:" <+> ppr (fromMaybe [] $ bcos_loaded <$> ls_remote)
+                       ])
 
 
 {- **********************************************************************
@@ -289,11 +317,10 @@ showLinkerState dflags
 --
 initDynLinker :: HscEnv -> IO ()
 initDynLinker hsc_env =
-  modifyPLS_ $ \pls0 -> do
-    done <- readIORef v_InitLinkerDone
-    if done then return pls0
-            else do writeIORef v_InitLinkerDone True
-                    reallyInitDynLinker hsc_env
+  modifyMbPLS_ hsc_env $ \pls -> do
+    case pls of
+      Just  _ -> return pls
+      Nothing -> Just <$> reallyInitDynLinker hsc_env
 
 reallyInitDynLinker :: HscEnv -> IO PersistentLinkerState
 reallyInitDynLinker hsc_env = do
@@ -314,7 +341,7 @@ reallyInitDynLinker hsc_env = do
 linkCmdLineLibs :: HscEnv -> IO ()
 linkCmdLineLibs hsc_env = do
   initDynLinker hsc_env
-  modifyPLS_ $ \pls -> do
+  modifyPLS_ hsc_env $ \pls -> do
     linkCmdLineLibs' hsc_env pls
 
 linkCmdLineLibs' :: HscEnv -> PersistentLinkerState -> IO PersistentLinkerState
@@ -539,7 +566,7 @@ linkExpr hsc_env span root_ul_bco
    ; initDynLinker hsc_env
 
      -- Take lock for the actual work.
-   ; modifyPLS $ \pls0 -> do {
+   ; modifyPLS hsc_env $ \pls0 -> do {
 
      -- Link the packages and modules required
    ; (pls, ok) <- linkDependencies hsc_env pls0 span needed_mods
@@ -769,7 +796,7 @@ linkDecls hsc_env span cbc@CompiledByteCode{..} = do
     initDynLinker hsc_env
 
     -- Take lock for the actual work.
-    modifyPLS $ \pls0 -> do
+    modifyPLS hsc_env $ \pls0 -> do
 
     -- Link the packages and modules required
     (pls, ok) <- linkDependencies hsc_env pls0 span needed_mods
@@ -809,11 +836,13 @@ linkDecls hsc_env span cbc@CompiledByteCode{..} = do
 
 linkModule :: HscEnv -> Module -> IO ()
 linkModule hsc_env mod = do
+  putStrLn "[linkModule] linking mod..."
   initDynLinker hsc_env
-  modifyPLS_ $ \pls -> do
+  modifyPLS_ hsc_env $ \pls -> do
     (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [mod]
     if (failed ok) then throwGhcExceptionIO (ProgramError "could not link module")
       else return pls'
+  putStrLn "[linkModule] done."
 
 {- **********************************************************************
 
@@ -1075,7 +1104,7 @@ unload hsc_env linkables
         initDynLinker hsc_env
 
         new_pls
-            <- modifyPLS $ \pls -> do
+            <- modifyPLS hsc_env $ \pls -> do
                  pls1 <- unload_wkr hsc_env linkables pls
                  return (pls1, pls1)
 
@@ -1213,7 +1242,7 @@ linkPackages hsc_env new_pkgs = do
   -- It's probably not safe to try to load packages concurrently, so we take
   -- a lock.
   initDynLinker hsc_env
-  modifyPLS_ $ \pls -> do
+  modifyPLS_ hsc_env $ \pls -> do
     linkPackages' hsc_env new_pkgs pls
 
 linkPackages' :: HscEnv -> [LinkerUnitId] -> PersistentLinkerState

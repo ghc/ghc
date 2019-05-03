@@ -988,6 +988,13 @@ dnl ################################################################
 dnl Check for libraries
 dnl ################################################################
 
+# integer lib
+AC_ARG_WITH([integer-library],[AC_HELP_STRING([--with-integer-library],[Integer library to use [default=gmp]])])
+AS_IF([test "x$with_integer_library" = "x"],
+      [SettingsIntegerLibrary="gmp"],
+      [SettingsIntegerLibrary="$with_integer_library"])
+AC_SUBST(SettingsIntegerLibrary)
+
 # system libffi
 
 AC_ARG_WITH([system-libffi],

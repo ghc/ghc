@@ -664,7 +664,7 @@ newtype InstalledUnitId =
       -- | The full hashed unit identifier, including the component id
       -- and the hash.
       installedUnitIdFS :: FastString
-    }
+    } deriving Show
 
 instance Binary InstalledUnitId where
   put_ bh (InstalledUnitId fs) = put_ bh fs

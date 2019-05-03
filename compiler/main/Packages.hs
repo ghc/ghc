@@ -82,7 +82,7 @@ import Maybes
 
 import System.Environment ( getEnv )
 import FastString
-import ErrUtils         ( debugTraceMsg, MsgDoc, printInfoForUser )
+import ErrUtils         ( debugTraceMsg, MsgDoc, printInfoForUser, dumpIfSet )
 import Exception
 
 import System.Directory
@@ -101,6 +101,8 @@ import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
 import qualified Data.Set as Set
 import Data.Version
+
+import Debug.Trace (traceShowId)
 
 -- ---------------------------------------------------------------------------
 -- The Package state
@@ -467,6 +469,7 @@ listPackageConfigMap dflags = eltsUDFM pkg_map
 -- link in.
 initPackages :: DynFlags -> IO (DynFlags, [PreloadUnitId])
 initPackages dflags0 = do
+  putStrLn "[initPackages]"
   dflags <- interpretPackageEnv dflags0
   pkg_db <-
     case pkgDatabase dflags of
@@ -475,10 +478,25 @@ initPackages dflags0 = do
                                     -> (p, setBatchPackageFlags dflags pkgs)) db
   (pkg_state, preload, insts)
         <- mkPackageState dflags pkg_db []
+
+  dumpPkgState dflags pkg_state
+
+  putStrLn "[/initPackages]"
   return (dflags{ pkgDatabase = Just pkg_db,
                   pkgState = pkg_state,
                   thisUnitIdInsts_ = insts },
           preload)
+
+dumpPkgState :: DynFlags -> PackageState -> IO ()
+dumpPkgState dflags pkgState =
+  let pkgs = map snd . udfmToList . unPackageConfigMap . pkgIdMap $ pkgState
+  in dumpIfSet dflags True "Package State" $ vcat (map pprPkg pkgs)
+
+  where
+    pprPkg :: PackageConfig -> SDoc
+    pprPkg pkg = ppr (packageName pkg) <+> ppr (unitId pkg)
+                 $+$ nest 2 (fsep (map ppr (depends pkg)))
+
 
 -- -----------------------------------------------------------------------------
 -- Reading the package database(s)
@@ -524,8 +542,12 @@ getPackageConfRefs dflags = do
   isNotGlobal GlobalPkgConf = False
   isNotGlobal _ = True
 
-resolvePackageConfig :: DynFlags -> PkgConfRef -> IO (Maybe FilePath)
-resolvePackageConfig dflags GlobalPkgConf = return $ Just (systemPackageConfig dflags)
+targetPrefix, hostPrefix :: DynFlags -> String
+targetPrefix dflags = ""
+hostPrefix dflags = "x86_64-apple-darwin"
+
+resolvePackageConfig :: DynFlags -> PkgConfRef -> IO (Maybe (String, FilePath))
+resolvePackageConfig dflags GlobalPkgConf = return $ Just (targetPrefix dflags, systemPackageConfig dflags)
 -- NB: This logic is reimplemented in Cabal, so if you change it,
 -- make sure you update Cabal.  (Or, better yet, dump it in the
 -- compiler info so Cabal can use the info.)
@@ -533,11 +555,12 @@ resolvePackageConfig dflags UserPkgConf = runMaybeT $ do
   dir <- versionedAppDir dflags
   let pkgconf = dir </> "package.conf.d"
   exist <- tryMaybeT $ doesDirectoryExist pkgconf
-  if exist then return pkgconf else mzero
-resolvePackageConfig _ (PkgConfFile name) = return $ Just name
+  if exist then return (targetPrefix dflags, pkgconf) else mzero
+resolvePackageConfig dflags (PkgConfFile name) = return $ Just (targetPrefix dflags, name)
+resolvePackageConfig dflags (HostPkgConfFile name) = return $ Just (hostPrefix dflags, name)
 
-readPackageConfig :: DynFlags -> FilePath -> IO (FilePath, [PackageConfig])
-readPackageConfig dflags conf_file = do
+readPackageConfig :: DynFlags -> (String, FilePath) -> IO (FilePath, [PackageConfig])
+readPackageConfig dflags (prefix, conf_file) = do
   isdir <- doesDirectoryExist conf_file
 
   proto_pkg_configs <-
@@ -563,7 +586,8 @@ readPackageConfig dflags conf_file = do
       pkgroot = takeDirectory conf_file
       pkg_configs1 = map (mungePackageConfig top_dir pkgroot)
                          proto_pkg_configs
-      pkg_configs2 = setBatchPackageFlags dflags pkg_configs1
+      pkg_configs2 = setPackagePrefix dflags prefix
+                   $ setBatchPackageFlags dflags pkg_configs1
   --
   return (conf_file, pkg_configs2)
   where
@@ -616,6 +640,17 @@ readPackageConfig dflags conf_file = do
                      liftM Just (readDirStylePackageConfig conf_dir)
              else return (Just []) -- ghc-pkg will create it when it's updated
         else return Nothing
+
+setPackagePrefix :: DynFlags -> String -> [PackageConfig] -> [PackageConfig]
+setPackagePrefix dflags "" pkgs = pkgs
+setPackagePrefix dflags prefix pkgs = map go pkgs
+  where go pkg = pkg
+          { unitId = addPrefix (unitId pkg)
+          , packageName = y (packageName pkg)
+          , depends = map addPrefix (depends pkg)
+          }
+        addPrefix = stringToInstalledUnitId . ((prefix ++ "-") ++) . installedUnitIdString
+        y (PackageName fs) = PackageName $ (fsLit (prefix ++ "-")) Semigroup.<> fs
 
 setBatchPackageFlags :: DynFlags -> [PackageConfig] -> [PackageConfig]
 setBatchPackageFlags dflags pkgs = maybeDistrustAll pkgs
@@ -976,12 +1011,16 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
   -- their canonical names (eg. base-1.0 ==> base), as described
   -- in Note [Wired-in packages] in Module
   let
+        targetPrefix = case targetPlatformString dflags of
+          "" -> ""
+          pfx -> pfx ++ "-"
+
         matches :: PackageConfig -> WiredInUnitId -> Bool
         pc `matches` pid
             -- See Note [The integer library] in PrelNames
             | pid == unitIdString integerUnitId
             = packageNameString pc `elem` ["integer-gmp", "integer-simple"]
-        pc `matches` pid = packageNameString pc == pid
+        pc `matches` pid = packageNameString pc == traceShowId (targetPrefix ++ pid)
 
         -- find which package corresponds to each wired-in package
         -- delete any other packages with the same name
@@ -1993,7 +2032,9 @@ getPreloadPackagesAnd dflags pkgids0 =
       preload = preloadPackages state
       pairs = zip pkgids (repeat Nothing)
   in do
+  putStrLn $ "[getPreloadPackagesAnd] pkgids0 = " ++ show pkgids0
   all_pkgs <- throwErr dflags (foldM (add_package dflags pkg_map) preload pairs)
+  putStrLn $ "[getPreloadPacakgesAnd] all_pkgs = " ++ show all_pkgs
   return (map (getInstalledPackageDetails dflags) all_pkgs)
 
 -- Takes a list of packages, and returns the list with dependencies included,

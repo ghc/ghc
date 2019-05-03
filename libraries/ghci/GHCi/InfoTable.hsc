@@ -3,6 +3,7 @@
 -- Get definitions for the structs, constants & config etc.
 #include "Rts.h"
 
+#define GHCI
 -- |
 -- Run-time info table support.  This module provides support for
 -- creating and reading info tables /in the running program/.

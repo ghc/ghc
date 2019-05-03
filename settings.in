@@ -31,6 +31,6 @@
  ("Unregisterised", "@Unregisterised@"),
  ("LLVM llc command", "@SettingsLlcCommand@"),
  ("LLVM opt command", "@SettingsOptCommand@"),
- ("LLVM clang command", "@SettingsClangCommand@")
+ ("LLVM clang command", "@SettingsClangCommand@"),
+ ("integer library", "@SettingsIntegerLibrary@")
  ]
-

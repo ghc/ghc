@@ -15,7 +15,7 @@
 --   0 otherwise
 --
 -------------------------------------------------------------------------------
-
+#define GHCI
 module GHCi.BreakArray
     (
       BreakArray

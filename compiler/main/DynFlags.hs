@@ -84,6 +84,7 @@ module DynFlags (
 
         -- ** System tool settings and locations
         Settings(..),
+        integerLibrary, targetPlatformString,
         targetPlatform, programName, projectVersion,
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
         versionedAppDir,
@@ -1229,6 +1230,12 @@ data Settings = Settings {
   sPlatformConstants     :: PlatformConstants
  }
 
+-- | IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
+-- by GHC-API users. See Note [The integer library] in PrelNames
+integerLibrary :: DynFlags -> IntegerLibrary
+integerLibrary = platformIntegerLibrary . targetPlatform
+targetPlatformString :: DynFlags -> String
+targetPlatformString = platformString . targetPlatform
 targetPlatform :: DynFlags -> Platform
 targetPlatform dflags = sTargetPlatform (settings dflags)
 programName :: DynFlags -> String
@@ -3588,6 +3595,8 @@ package_flags_deps = [
         ------- Packages ----------------------------------------------------
     make_ord_flag defFlag "package-db"
       (HasArg (addPkgConfRef . PkgConfFile))
+  , make_ord_flag defFlag "host-package-db"
+      (HasArg (addPkgConfRef . HostPkgConfFile))
   , make_ord_flag defFlag "clear-package-db"      (NoArg clearPkgConf)
   , make_ord_flag defFlag "no-global-package-db"  (NoArg removeGlobalPkgConf)
   , make_ord_flag defFlag "no-user-package-db"    (NoArg removeUserPkgConf)
@@ -4881,6 +4890,7 @@ data PkgConfRef
   = GlobalPkgConf
   | UserPkgConf
   | PkgConfFile FilePath
+  | HostPkgConfFile FilePath -- ^ a package config file that specifies packages compiled for the same host as the compiler.
   deriving Eq
 
 addPkgConfRef :: PkgConfRef -> DynP ()
@@ -5077,6 +5087,10 @@ interpretPackageEnv dflags = do
       where
         parseEntry str = case words str of
           ("package-db": _)     -> addPkgConfRef (PkgConfFile (envdir </> db))
+            -- relative package dbs are interpreted relative to the env file
+            where envdir = takeDirectory envfile
+                  db     = drop 11 str
+          ("host-package-db": _) -> addPkgConfRef (HostPkgConfFile (envdir </> db))
             -- relative package dbs are interpreted relative to the env file
             where envdir = takeDirectory envfile
                   db     = drop 11 str

@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, MagicHash #-}
-
+#define GHCI 1
 -- | Dynamically lookup up values from modules and loading them.
 module DynamicLoading (
         initializePlugins,
@@ -27,6 +27,7 @@ module DynamicLoading (
 import GhcPrelude
 import HscTypes         ( HscEnv )
 import DynFlags
+import Platform
 
 #if defined(GHCI)
 import Linker           ( linkModule, getHValue )
@@ -47,9 +48,9 @@ import HscTypes
 import GHCi.RemoteTypes ( HValue )
 import Type             ( Type, eqType, mkTyConTy, pprTyThingCategory )
 import TyCon            ( TyCon )
-import Name             ( Name, nameModule_maybe )
+import Name             ( Name, nameModule_maybe, nameStableString )
 import Id               ( idType )
-import Module           ( Module, ModuleName )
+import Module           ( Module, ModuleName, moduleNameString )
 import Panic
 import FastString
 import ErrUtils
@@ -97,10 +98,14 @@ initializePlugins hsc_env df
 
 loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env
-  = do { unless (null to_load) $
-           checkExternalInterpreter hsc_env
+  = do
+  putStrLn "[loadPlugins] loading plugins..."
+  ret <- do { -- unless (null to_load) $
+         --   checkExternalInterpreter hsc_env
        ; plugins <- mapM loadPlugin to_load
        ; return $ zipWith attachOptions to_load plugins }
+  putStrLn "[loadPlugins] done."
+  return ret
   where
     dflags  = hsc_dflags hsc_env
     to_load = pluginModNames dflags
@@ -129,7 +134,9 @@ checkExternalInterpreter hsc_env =
 
 loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface)
 loadPlugin' occ_name plugin_name hsc_env mod_name
-  = do { let plugin_rdr_name = mkRdrQual mod_name occ_name
+  = do
+    ret <- do { putStrLn $ "[loadPlugin'] loading `" ++ nameStableString plugin_name ++ "' from `" ++ moduleNameString mod_name ++ "' ... "
+       ; let plugin_rdr_name = mkRdrQual mod_name occ_name
              dflags = hsc_dflags hsc_env
        ; mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name
                         plugin_rdr_name
@@ -150,6 +157,8 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           , text "did not have the type"
                           , ppr pluginTyConName, text "as required"])
             Just plugin -> return (plugin, mod_iface) } } }
+    putStrLn "[loadPlugin'] done. "
+    return ret
 
 
 -- | Force the interfaces for the given modules to be loaded. The 'SDoc' parameter is used
@@ -207,10 +216,11 @@ getValueSafely hsc_env val_name expected_type = do
 
 getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
 getHValueSafely hsc_env val_name expected_type = do
+    putStrLn "[getHValueSafely]: loading ..."
     forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of getHValueSafely") val_name
     -- Now look up the names for the value and type constructor in the type environment
     mb_val_thing <- lookupTypeHscEnv hsc_env val_name
-    case mb_val_thing of
+    ret <- case mb_val_thing of
         Nothing -> throwCmdLineErrorS dflags $ missingTyThingError val_name
         Just (AnId id) -> do
             -- Check the value type in the interface against the type recovered from the type constructor
@@ -219,15 +229,40 @@ getHValueSafely hsc_env val_name expected_type = do
              then do
                 -- Link in the module that contains the value, if it has such a module
                 case nameModule_maybe val_name of
-                    Just mod -> do linkModule hsc_env mod
+                    Just mod -> do linkModule local_hsc_env mod
                                    return ()
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
-                hval <- getHValue hsc_env val_name >>= wormhole dflags
+                hval <- getHValue local_hsc_env val_name >>= wormhole local_dflags
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing
+    putStrLn "[getHValueSafely]: done."
+    return ret
    where dflags = hsc_dflags hsc_env
+         -- unset Opt_ExternalInterpreter. This will ensure that
+         -- local_hsc_env and local_dflags go through the local linker.
+         -- if no -fexternal-interpreter is provided, this will be a no-op.
+         -- if however -fexteranl-interpreter is provided, we maintain two
+         -- linker states. The remote (iserv) one and the local one.
+         local_hsc_env = hsc_env
+           { hsc_dflags = (gopt_unset (hsc_dflags hsc_env) Opt_ExternalInterpreter)
+             { settings = (settings (hsc_dflags hsc_env))
+               { sTargetPlatform = Platform
+                 { platformArch = ArchX86_64
+                 , platformOS = OSDarwin
+                 , platformWordSize = 8
+                 , platformUnregisterised = False
+                 , platformHasGnuNonexecStack = error "platformGnuNonexecStack undefined"
+                 , platformHasIdentDirective = error "platformHasIdentDirective undefined"
+                 , platformHasSubsectionsViaSymbols = True
+                 , platformIsCrossCompiling = True
+                 , platformString = "x86_64-apple-darwin"
+                 }
+               }
+             }
+           }
+         local_dflags = hsc_dflags local_hsc_env
 
 -- | Coerce a value as usual, but:
 --

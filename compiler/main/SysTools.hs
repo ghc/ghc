@@ -8,7 +8,7 @@
 -----------------------------------------------------------------------------
 -}
 
-{-# LANGUAGE CPP, MultiWayIf, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, MultiWayIf, ScopedTypeVariables, LambdaCase #-}
 
 module SysTools (
         -- * Initialisation
@@ -266,8 +266,13 @@ initSysTools mbMinusB
        lcc_prog <- getSetting "LLVM clang command"
 
        let iserv_prog = libexec "ghc-iserv"
+       integer_library <- getSetting "integer library" >>= \case
+         "gmp" -> pure IntegerGMP
+         "simple" -> pure IntegerSimple
+         x -> error $ "Unknown integer-library: " ++ x
 
        let platform = Platform {
+                          platformIntegerLibrary = integer_library,
                           platformArch = targetArch,
                           platformOS   = targetOS,
                           platformWordSize = targetWordSize,
@@ -275,7 +280,8 @@ initSysTools mbMinusB
                           platformHasGnuNonexecStack = targetHasGnuNonexecStack,
                           platformHasIdentDirective = targetHasIdentDirective,
                           platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols,
-                          platformIsCrossCompiling = crossCompiling
+                          platformIsCrossCompiling = crossCompiling,
+                          platformString = ""
                       }
 
        return $ Settings {
