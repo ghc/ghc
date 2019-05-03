@@ -240,9 +240,6 @@ main = do
     getClosureData con >>=
         assertClosuresEq exConstrClosure
 
-    evaluate staticClosure
-    performGC
-
     -- Static Constructor
     getClosureData staticClosure >>=
         assertClosuresEq exConstrNoCafClosure
