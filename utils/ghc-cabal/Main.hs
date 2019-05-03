@@ -406,7 +406,7 @@ generate directory distdir config_args
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 -- TODO: move inside withLibLBI
                 variablePrefix ++ "_COMPONENT_ID = " ++ localCompatPackageKey lbi,
-                variablePrefix ++ "_LIBRARY_NAME = " ++ localCompatPackageKey lbi,
+                variablePrefix ++ "_LIBRARY_NAME = " ++ display (packageId pd),
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
                 variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ synopsis pd),
