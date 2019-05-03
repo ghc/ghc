@@ -26,7 +26,6 @@ import qualified Rules.SimpleTargets
 import Settings
 import Target
 import UserSettings
-import Utilities
 
 
 -- | @tool-args@ is used by tooling in order to get the arguments necessary
@@ -120,7 +119,7 @@ packageTargets includeGhciLib stage pkg = do
             let pkgWays = if pkg == rts then getRtsWays else getLibraryWays
             ways  <- interpretInContext context pkgWays
             libs  <- mapM (pkgLibraryFile . Context stage pkg) ways
-            more  <- libraryTargets includeGhciLib context
+            more  <- Rules.Library.libraryTargets includeGhciLib context
             setupConfig <- pkgSetupConfigFile context
             return $ [setupConfig] ++ libs ++ more
         else do -- The only target of a program package is the executable.

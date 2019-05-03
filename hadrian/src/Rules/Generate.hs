@@ -54,7 +54,7 @@ compilerDependencies = do
     rtsPath <- expr (rtsBuildPath stage)
     mconcat [ return ((root -/-) <$> derivedConstantsDependencies)
             , notStage0 ? isGmp ? return [gmpPath -/- gmpLibraryH]
-            , notStage0 ? return ((rtsPath -/-) <$> libffiDependencies)
+            , notStage0 ? return ((rtsPath -/-) <$> libffiHeaderFiles)
             , return $ fmap (ghcPath -/-)
                   [ "primop-can-fail.hs-incl"
                   , "primop-code-size.hs-incl"
@@ -80,7 +80,7 @@ generatedDependencies = do
     includes <- expr includesDependencies
     mconcat [ package compiler ? compilerDependencies
             , package ghcPrim  ? ghcPrimDependencies
-            , package rts      ? return (fmap (rtsPath -/-) libffiDependencies
+            , package rts      ? return (fmap (rtsPath -/-) libffiHeaderFiles
                 ++ includes
                 ++ fmap (root -/-) derivedConstantsDependencies)
             , stage0 ? return includes ]
