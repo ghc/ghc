@@ -2116,6 +2116,7 @@ Writing qualified in postpositive position
 
 .. extension:: ImportQualifiedPost
     :shortdesc: ``ImportQualifiedPost`` allows the syntax ``import M qualified``
+
     :since: 8.10.1
 
     ``ImportQualifiedPost`` allows the syntax ``import M qualified``, that is, to annotate a module as qualified by writing ``qualified`` after the module name.
