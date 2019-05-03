@@ -2628,15 +2628,15 @@ warnPrepositiveQualifiedModule span =
        $$ text "Suggested fix: place " <+> quotes (text "qualified")
            <+> text "after the module name instead."
 
-failOpNotEnabledImportQualifiedPost :: SrcSpan -> P a
-failOpNotEnabledImportQualifiedPost loc = addFatalError loc msg
+failOpNotEnabledImportQualifiedPost :: SrcSpan -> P ()
+failOpNotEnabledImportQualifiedPost loc = addError loc msg
   where
     msg = text "Found" <+> quotes (text "qualified")
           <+> text "in postpositive position. "
       $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
 
-failOpImportQualifiedTwice :: SrcSpan -> P a
-failOpImportQualifiedTwice loc = addFatalError loc msg
+failOpImportQualifiedTwice :: SrcSpan -> P ()
+failOpImportQualifiedTwice loc = addError loc msg
   where
     msg = text "Multiple occurences of 'qualified'"
 

@@ -2137,7 +2137,7 @@ The ``ImportQualifiedPost`` extension allows ``qualified`` to appear in postposi
    import B
    import C
 
-It is a fatal error if ``qualified`` appears in both pre and postpositive positions.
+It is an error if ``qualified`` appears in both pre and postpositive positions.
 
 The warning ``-Wprepositive-qualified-syntax`` (off by default) reports on any occurrences of imports annotated ``qualified`` using prepositive syntax.
 
