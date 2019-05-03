@@ -31,6 +31,6 @@ instance (Bounded a, Bounded b) => Bounded (a, b)
 data (#,#) (a :: TYPE k0) (b :: TYPE k1) = (#,#) a b
   	-- Defined in ‘GHC.Prim’
 (,) :: a -> b -> (a, b)
-(#,#) :: a -> b -> (# a, b #)
+(#,#) :: a ->. b ->. (# a, b #)
 (  ,  ) :: a -> b -> (a, b)
-(#  ,  #) :: a -> b -> (# a, b #)
+(#  ,  #) :: a ->. b ->. (# a, b #)

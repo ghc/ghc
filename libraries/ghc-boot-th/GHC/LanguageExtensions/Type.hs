@@ -71,6 +71,7 @@ data Extension
    | DataKinds                -- Datatype promotion
    | InstanceSigs
    | ApplicativeDo
+   | LinearTypes
 
    | StandaloneDeriving
    | DeriveDataTypeable

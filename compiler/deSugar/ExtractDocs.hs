@@ -199,8 +199,8 @@ subordinates instMap decl = case decl of
 -- | Extract constructor argument docs from inside constructor decls.
 conArgDocs :: ConDecl GhcRn -> Map Int (HsDocString)
 conArgDocs con = case getConArgs con of
-                   PrefixCon args -> go 0 (map unLoc args ++ ret)
-                   InfixCon arg1 arg2 -> go 0 ([unLoc arg1, unLoc arg2] ++ ret)
+                   PrefixCon args -> go 0 (map (unLoc . hsThing) args ++ ret)
+                   InfixCon arg1 arg2 -> go 0 ([unLoc (hsThing arg1), unLoc (hsThing arg2)] ++ ret)
                    RecCon _ -> go 1 ret
   where
     go n (HsDocTy _ _ (dL->L _ ds) : tys) = M.insert n ds $ go (n+1) tys
@@ -253,10 +253,10 @@ typeDocs = go 0
   where
     go n (HsForAllTy { hst_body = ty }) = go n (unLoc ty)
     go n (HsQualTy   { hst_body = ty }) = go n (unLoc ty)
-    go n (HsFunTy _ (dL->L _
+    go n (HsFunTy _ _ (dL->L _
                       (HsDocTy _ _ (dL->L _ x))) (dL->L _ ty)) =
        M.insert n x $ go (n+1) ty
-    go n (HsFunTy _ _ ty) = go (n+1) (unLoc ty)
+    go n (HsFunTy _ _ _ ty) = go (n+1) (unLoc ty)
     go n (HsDocTy _ _ (dL->L _ doc)) = M.singleton n doc
     go _ _ = M.empty
 

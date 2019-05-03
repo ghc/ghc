@@ -39,6 +39,7 @@ import Inst( topInstantiate )
 import TcEnv( tcLookupId )
 import TcEvidence( HsWrapper, (<.>) )
 import Type( mkTyVarBinders )
+import Multiplicity
 
 import DynFlags
 import Var      ( TyVar, tyVarKind )
@@ -53,6 +54,7 @@ import Outputable
 import SrcLoc
 import Util( singleton )
 import Maybes( orElse )
+import Data.Functor.Compose
 import Data.Maybe( mapMaybe )
 import Control.Monad( unless )
 
@@ -224,7 +226,12 @@ tcUserTypeSig loc hs_sig_ty mb_name
   = do { sigma_ty <- tcHsSigWcType ctxt_F hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $
-         CompleteSig { sig_bndr  = mkLocalId name sigma_ty
+         CompleteSig { sig_bndr  = mkLocalId name Omega sigma_ty
+                                   -- We use `Omega' as the multiplicity here,
+                                   -- as if this identifier corresponds to
+                                   -- anything, it is a top-level
+                                   -- definition. Which are all unrestricted in
+                                   -- the current implementation.
                      , sig_ctxt  = ctxt_T
                      , sig_loc   = loc } }
                        -- Location of the <type> in   f :: <type>
@@ -268,7 +275,7 @@ no_anon_wc lty = go lty
       HsWildCardTy _                 -> False
       HsAppTy _ ty1 ty2              -> go ty1 && go ty2
       HsAppKindTy _ ty ki            -> go ty && go ki
-      HsFunTy _ ty1 ty2              -> go ty1 && go ty2
+      HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go (arrowToHsType w)
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
       HsSumTy _ tys                  -> gos tys
@@ -437,7 +444,7 @@ tcPatSynSig name sig_ty
        -- arguments become the types of binders. We thus cannot allow
        -- levity polymorphism here
        ; let (arg_tys, _) = tcSplitFunTys body_ty'
-       ; mapM_ (checkForLevPoly empty) arg_tys
+       ; mapM_ (checkForLevPoly empty) (Compose arg_tys)
 
        ; traceTc "tcTySig }" $
          vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs'

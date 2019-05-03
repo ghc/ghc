@@ -676,6 +676,8 @@ data Token
   | ITvbar
   | ITlarrow            IsUnicodeSyntax
   | ITrarrow            IsUnicodeSyntax
+  | ITlolly             IsUnicodeSyntax
+  | ITlolly2
   | ITat
   | ITtilde
   | ITdarrow            IsUnicodeSyntax
@@ -906,6 +908,10 @@ reservedSymsFM = listToUFM $
        ,("∀",   ITforall UnicodeSyntax,     UnicodeSyntax, 0 )
        ,("→",   ITrarrow UnicodeSyntax,     UnicodeSyntax, 0 )
        ,("←",   ITlarrow UnicodeSyntax,     UnicodeSyntax, 0 )
+
+       ,("-->.", ITlolly2, NormalSyntax, 0)
+       ,("->.", ITlolly NormalSyntax, NormalSyntax, 0)
+       ,("⊸",   ITlolly UnicodeSyntax, UnicodeSyntax, 0)
 
        ,("⤙",   ITlarrowtail UnicodeSyntax, UnicodeSyntax, xbit ArrowsBit)
        ,("⤚",   ITrarrowtail UnicodeSyntax, UnicodeSyntax, xbit ArrowsBit)
@@ -2330,6 +2336,7 @@ data ExtBits
   | DoAndIfThenElseBit
   | MultiWayIfBit
   | GadtSyntaxBit
+  | LinearTypesBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2416,6 +2423,7 @@ mkParserFlags' warningFlags extensionFlags thisPackage
       .|. DoAndIfThenElseBit          `xoptBit` LangExt.DoAndIfThenElse
       .|. MultiWayIfBit               `xoptBit` LangExt.MultiWayIf
       .|. GadtSyntaxBit               `xoptBit` LangExt.GADTSyntax
+      .|. LinearTypesBit              `xoptBit` LangExt.LinearTypes
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream

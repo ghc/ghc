@@ -54,7 +54,9 @@ import Pair
 import Util
 import ErrUtils
 import Module          ( moduleName, pprModuleName )
+import Multiplicity
 import PrimOp          ( PrimOp (SeqOp) )
+import TyCoRep         ( TyCoBinder(..) )
 
 
 {-
@@ -316,8 +318,43 @@ simplJoinBind :: SimplEnv
 simplJoinBind env cont old_bndr new_bndr rhs rhs_se
   = do  { let rhs_env = rhs_se `setInScopeFromE` env
         ; rhs' <- simplJoinRhs rhs_env old_bndr rhs cont
-        ; completeBind env NotTopLevel (Just cont) old_bndr new_bndr rhs' }
+        ; let mult = contHoleScaling cont
+              Just arity = isJoinIdDetails_maybe (idDetails new_bndr)
+              new_type = scaleJoinPointType mult arity (varType new_bndr)
+              new_bndr' = setIdType new_bndr new_type
+        ; completeBind env NotTopLevel (Just cont) old_bndr new_bndr' rhs' }
 
+{-
+Note [Scaling join point arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a join point which is linear in its variable, in some context E:
+
+E[join j :: a ->. a
+       j x = x
+  in case v of
+       A -> j 'x'
+       B -> <blah>]
+
+The simplifier changes to:
+
+join j :: a ->. a
+     j x = E[x]
+in case v of
+     A -> j 'x'
+     B -> E[<blah>]
+
+If E uses its argument in a nonlinear way (e.g. a case['Omega]), then
+this is wrong: the join point has to change its type to a -> a.
+Otherwise, we'd get a linearity error.
+
+See also Note [Return type for join points] and Note [Join points and case-of-case].
+-}
+scaleJoinPointType :: Mult -> Int -> Type -> Type
+scaleJoinPointType mult arity ty | arity == 0 = ty
+                                 | otherwise  = case splitPiTy ty of
+  (binder, ty') -> mkPiTy (scaleBinder binder) (scaleJoinPointType mult (arity-1) ty')
+  where scaleBinder   (Anon af t) = Anon af (scaleScaled mult t)
+        scaleBinder b@(Named _)   = b
 --------------------------
 simplNonRecX :: SimplEnv
              -> InId            -- Old binder; not a JoinId
@@ -510,9 +547,9 @@ These strange casts can happen as a result of case-of-case
 -}
 
 makeTrivialArg :: SimplMode -> ArgSpec -> SimplM (LetFloats, ArgSpec)
-makeTrivialArg mode (ValArg e)
+makeTrivialArg mode (ValArg w e)
   = do { (floats, e') <- makeTrivial mode NotTopLevel (fsLit "arg") e
-       ; return (floats, ValArg e') }
+       ; return (floats, ValArg w e') }
 makeTrivialArg _ arg
   = return (emptyLetFloats, arg)  -- CastBy, TyArg
 
@@ -545,7 +582,7 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
           else do
         { uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var  = mkLocalIdOrCoVarWithInfo name expr_ty info
+              var  = mkLocalIdOrCoVarWithInfo name Omega expr_ty info
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditinoally part
@@ -855,8 +892,8 @@ simplExprF env e cont
 simplExprF1 :: SimplEnv -> InExpr -> SimplCont
             -> SimplM (SimplFloats, OutExpr)
 
-simplExprF1 _ (Type ty) _
-  = pprPanic "simplExprF: type" (ppr ty)
+simplExprF1 _ (Type ty) cont
+  = pprPanic "simplExprF: type" (ppr ty <+> text"cont: " <+> ppr cont)
     -- simplExprF does only with term-valued expressions
     -- The (Type ty) case is handled separately by simplExpr
     -- and by the other callers of simplExprF
@@ -883,9 +920,13 @@ simplExprF1 env (App fun arg) cont
                       ApplyToTy { sc_arg_ty  = arg'
                                 , sc_hole_ty = hole'
                                 , sc_cont    = cont } }
-      _       -> simplExprF env fun $
+      _       ->
+        let fun_ty = exprType fun
+            (Scaled m _, _) = splitFunTy fun_ty
+        in
+                simplExprF env fun $
                  ApplyToVal { sc_arg = arg, sc_env = env
-                            , sc_dup = NoDup, sc_cont = cont }
+                            , sc_dup = NoDup, sc_cont = cont, sc_mult = m }
 
 simplExprF1 env expr@(Lam {}) cont
   = {-#SCC "simplExprF1-Lam" #-}
@@ -991,7 +1032,8 @@ simplJoinRhs :: SimplEnv -> InId -> InExpr -> SimplCont
 simplJoinRhs env bndr expr cont
   | Just arity <- isJoinId_maybe bndr
   =  do { let (join_bndrs, join_body) = collectNBinders arity expr
-        ; (env', join_bndrs') <- simplLamBndrs env join_bndrs
+              mult = contHoleScaling cont
+        ; (env', join_bndrs') <- simplLamBndrs env (map (flip scaleIdBy mult) join_bndrs)
         ; join_body' <- simplExprC env' join_body cont
         ; return $ mkLams join_bndrs' join_body' }
 
@@ -1189,8 +1231,8 @@ rebuild env expr cont
       Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont }
         -> rebuildCase (se `setInScopeFromE` env) expr bndr alts cont
 
-      StrictArg { sc_fun = fun, sc_cont = cont }
-        -> rebuildCall env (fun `addValArgTo` expr) cont
+      StrictArg { sc_fun = fun, sc_cont = cont, sc_mult = m }
+        -> rebuildCall env (fun `addValArgTo` (m, expr)) cont
       StrictBind { sc_bndr = b, sc_bndrs = bs, sc_body = body
                  , sc_env = se, sc_cont = cont }
         -> do { (floats1, env') <- simplNonRecX (se `setInScopeFromE` env) b expr
@@ -1274,7 +1316,7 @@ simplCast env body co0 cont0
                ; return (cont { sc_arg_ty = arg_ty', sc_cont = tail' }) }
 
         addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                      , sc_dup = dup, sc_cont = tail })
+                                      , sc_dup = dup, sc_cont = tail, sc_mult = m })
           | Just (co1, m_co2) <- pushCoValArg co
           , Pair _ new_ty <- coercionKind co1
           , not (isTypeLevPoly new_ty)  -- Without this check, we get a lev-poly arg
@@ -1296,7 +1338,8 @@ simplCast env body co0 cont0
                ; return (ApplyToVal { sc_arg  = mkCast arg' co1
                                     , sc_env  = arg_se'
                                     , sc_dup  = dup'
-                                    , sc_cont = tail' }) } }
+                                    , sc_cont = tail'
+                                    , sc_mult = m }) } }
 
         addCoerce co cont
           | isReflexiveCo co = return cont  -- Having this at the end makes a huge
@@ -1823,16 +1866,16 @@ rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
 rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
                               , ai_strs = str:strs, ai_discs = disc:discs })
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
-                        , sc_dup = dup_flag, sc_cont = cont })
+                        , sc_dup = dup_flag, sc_cont = cont, sc_mult = m })
   | isSimplified dup_flag     -- See Note [Avoid redundant simplification]
-  = rebuildCall env (addValArgTo info' arg) cont
+  = rebuildCall env (addValArgTo info' (m, arg)) cont
 
   | str         -- Strict argument
   , sm_case_case (getMode env)
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setInScopeFromE` env) arg
                (StrictArg { sc_fun = info', sc_cci = cci_strict
-                          , sc_dup = Simplified, sc_cont = cont })
+                          , sc_dup = Simplified, sc_cont = cont, sc_mult = m })
                 -- Note [Shadowing]
 
   | otherwise                           -- Lazy argument
@@ -1842,7 +1885,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
         -- floating a demanded let.
   = do  { arg' <- simplExprC (arg_se `setInScopeFromE` env) arg
                              (mkLazyArgStop arg_ty cci_lazy)
-        ; rebuildCall env (addValArgTo info' arg') cont }
+        ; rebuildCall env (addValArgTo info' (m, arg')) cont }
   where
     info'  = info { ai_strs = strs, ai_discs = discs }
     arg_ty = funArgTy fun_ty
@@ -2052,9 +2095,23 @@ trySeqRules in_env scrut rhs cont
                         , as_hole_ty = seq_id_ty }
                 , TyArg { as_arg_ty  = rhs_ty
                        , as_hole_ty  = piResultTy seq_id_ty scrut_ty }
-                , ValArg no_cast_scrut]
+                , ValArg Omega no_cast_scrut]
+                -- The multiplicity of the scrutiny above is ω because the type
+                -- of seq requires that its first argument is unrestricted. The
+                -- typing rule of case also guarantees it though. In a more
+                -- general world, where the first argument of seq would have
+                -- affine multiplicity, then we could use the multiplicity of
+                -- the case (held in the case binder) instead.
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
-                           , sc_env = in_env, sc_cont = cont }
+                           , sc_env = in_env, sc_cont = cont, sc_mult = Omega}
+                           -- The multiplicity in sc_mult above is the
+                           -- multiplicity of the second argument of seq. Since
+                           -- seq's type, as it stands, imposes that its second
+                           -- argument be unrestricted, so is
+                           -- sc_mult. However, a more precise typing rule,
+                           -- for seq, would be to have it be linear. In which
+                           -- case, sc_mult should be 1.
+
     -- Lazily evaluated, so we don't do most of this
 
     drop_casts (Cast e _) = drop_casts e
@@ -2407,13 +2464,14 @@ rebuildCase env scrut case_bndr alts cont
         -- as well as when it's an explicit constructor application
   , let env0 = setInScopeSet env in_scope'
   = do  { tick (KnownBranch case_bndr)
+        ; let scaled_wfloats = map scale_float wfloats
         ; case findAlt (DataAlt con) alts of
             Nothing  -> missingAlt env0 case_bndr alts cont
             Just (DEFAULT, bs, rhs) -> let con_app = Var (dataConWorkId con)
                                                  `mkTyApps` ty_args
                                                  `mkApps`   other_args
-                                       in simple_rhs env0 wfloats con_app bs rhs
-            Just (_, bs, rhs)       -> knownCon env0 scrut wfloats con ty_args other_args
+                                       in simple_rhs env0 scaled_wfloats con_app bs rhs
+            Just (_, bs, rhs)       -> knownCon env0 scrut scaled_wfloats con ty_args other_args
                                                 case_bndr bs rhs cont
         }
   where
@@ -2430,6 +2488,17 @@ rebuildCase env scrut case_bndr alts cont
                    ( emptyFloats env,
                      MkCore.wrapFloats wfloats $
                      wrapFloats (floats1 `addFloats` floats2) expr' )}
+
+    -- This scales case floats by the multiplicity of the continuation hole (see
+    -- Note [Scaling in case-of-case]).  Let floats are _not_ scaled, because
+    -- they are aliases anyway.
+    scale_float (MkCore.FloatCase scrut case_bndr con vars) =
+      let
+        holeScaling = contHoleScaling cont
+        scale_id id = scaleIdBy id holeScaling
+      in
+      MkCore.FloatCase scrut (scale_id case_bndr) con (map scale_id vars)
+    scale_float f = f
 
 
 --------------------------------------------------
@@ -2512,8 +2581,11 @@ reallyRebuildCase env scrut case_bndr alts cont
   | otherwise
   = do { (floats, cont') <- mkDupableCaseCont env alts cont
        ; case_expr <- simplAlts (env `setInScopeFromF` floats)
-                                scrut case_bndr alts cont'
+                                scrut (scaleIdBy case_bndr holeScaling) (scaleAltsBy holeScaling alts) cont'
        ; return (floats, case_expr) }
+  where
+    holeScaling = contHoleScaling cont
+    -- Note [Scaling in case-of-case]
 
 {-
 simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
@@ -2592,6 +2664,39 @@ taking advantage of the `seq`.
 At one point I did transformation in LiberateCase, but it's more
 robust here.  (Otherwise, there's a danger that we'll simply drop the
 'seq' altogether, before LiberateCase gets to see it.)
+
+Note [Scaling in case-of-case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When two cases commute, if done naively, the multiplicities will be wrong:
+
+  case (case u of w[1] { (x[1], y[1]) } -> f x y) of w'[Omega]
+  { (z[Omega], t[Omega]) -> z
+  }
+
+The multiplicities here, are correct, but if I perform a case of case:
+
+  case u of w[1]
+  { (x[1], y[1]) -> case f x y of w'[Omega] of { (z[Omega], t[Omega]) -> z }
+  }
+
+This is wrong! Using `f x y` inside a `case … of w'[Omega]` means that `x` and
+`y` must have multiplicities `Omega` not `1`! The correct solution is to make
+all the `1`-s be `Omega`-s instead:
+
+  case u of w[Omega]
+  { (x[Omega], y[Omega]) -> case f x y of w'[Omega] of { (z[Omega], t[Omega]) -> z }
+  }
+
+In general, when commuting two cases, the rule has to be:
+
+  case (case … of x[p] {…}) of y[q] { … }
+  ===> case … of x[p*q] { … case … of y[q] { … } }
+
+This is materialised, in the simplifier, by the fact that every time we simplify
+case alternatives with a continuation (the surrounded case (or more!)), we must
+scale the entire case we are simplifying, by a scaling factor which can be
+computed in the continuation (with function `contHoleScaling`).
 -}
 
 simplAlts :: SimplEnv
@@ -2634,7 +2739,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
   | Just (co, ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
-  = do { case_bndr2 <- newId (fsLit "nt") ty2
+  = do { case_bndr2 <- newId (fsLit "nt") Omega ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) Nothing
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
@@ -3044,7 +3149,7 @@ mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
                              , sc_dup  = OkToDup
                              , sc_cont = mkBoringStop res_ty } ) }
 
-mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont })
+mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont, sc_mult = m })
         -- See Note [Duplicating StrictArg]
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
   = do { (floats1, cont') <- mkDupableCont env cont
@@ -3054,7 +3159,9 @@ mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont })
                 , StrictArg { sc_fun = info { ai_args = args' }
                             , sc_cci = cci
                             , sc_cont = cont'
-                            , sc_dup = OkToDup} ) }
+                            , sc_dup = OkToDup
+                            , sc_mult = m } ) }
+
 
 mkDupableCont env (ApplyToTy { sc_cont = cont
                              , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty })
@@ -3063,7 +3170,7 @@ mkDupableCont env (ApplyToTy { sc_cont = cont
                                     , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty }) }
 
 mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
-                              , sc_env = se, sc_cont = cont })
+                              , sc_env = se, sc_cont = cont , sc_mult = mult })
   =     -- e.g.         [...hole...] (...arg...)
         --      ==>
         --              let a = ...arg...
@@ -3081,7 +3188,7 @@ mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
                                          -- arg'' in its in-scope set, even if makeTrivial
                                          -- has turned arg'' into a fresh variable
                                          -- See Note [StaticEnv invariant] in SimplUtils
-                              , sc_dup = OkToDup, sc_cont = cont' }) }
+                              , sc_dup = OkToDup, sc_cont = cont', sc_mult = mult }) }
 
 mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                           , sc_env = se, sc_cont = cont })
@@ -3097,8 +3204,10 @@ mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                 -- And this is important: see Note [Fusing case continuations]
 
         ; let alt_env = se `setInScopeFromF` floats
-        ; (alt_env', case_bndr') <- simplBinder alt_env case_bndr
-        ; alts' <- mapM (simplAlt alt_env' Nothing [] case_bndr' alt_cont) alts
+        ; let cont_scaling = contHoleScaling cont
+          -- See Note [Scaling in case-of-case]
+        ; (alt_env', case_bndr') <- simplBinder alt_env (scaleIdBy case_bndr cont_scaling)
+        ; alts' <- mapM (simplAlt alt_env' Nothing [] case_bndr' alt_cont) (scaleAltsBy cont_scaling alts)
         -- Safe to say that there are no handled-cons for the DEFAULT case
                 -- NB: simplBinder does not zap deadness occ-info, so
                 -- a dead case_bndr' will still advertise its deadness

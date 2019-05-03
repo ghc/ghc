@@ -110,7 +110,7 @@ import BasicTypes
 import TcEvidence       ( idHsWrapper )
 import Lexer
 import Lexeme           ( isLexCon )
-import Type             ( TyThing(..), funTyCon )
+import Type             ( TyThing(..), unrestrictedFunTyCon )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, eqTyCon_RDR,
@@ -697,7 +697,7 @@ mkGadtDecl names ty
     (args, res_ty) = split_tau tau
 
     -- See Note [GADT abstract syntax] in HsDecls
-    split_tau (dL->L _ (HsFunTy _ (dL->L loc (HsRecTy _ rf)) res_ty))
+    split_tau (dL->L _ (HsFunTy _ _w (dL->L loc (HsRecTy _ rf)) res_ty))
       = (RecCon (cL loc rf), res_ty)
     split_tau tau
       = (PrefixCon [], tau)
@@ -705,7 +705,6 @@ mkGadtDecl names ty
     peel_parens (dL->L l (HsParTy _ ty)) ann = peel_parens ty
                                                        (ann++mkParensApiAnn l)
     peel_parens ty                   ann = (ty, ann)
-
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.
@@ -1790,7 +1789,7 @@ mergeDataCon all_xs =
     goFirst [dL->L l (TyElOpd (HsTupleTy _ HsBoxedOrConstraintTuple ts))]
       = return ( pure ()
                , ( cL l (getRdrName (tupleDataCon Boxed (length ts)))
-                 , PrefixCon ts
+                 , PrefixCon (map hsLinear ts)
                  , mTrailingDoc ) )
     goFirst ((dL->L l (TyElOpd t)):xs)
       | (_, t', addAnns, xs') <- pBangTy (cL l t) xs
@@ -1802,7 +1801,7 @@ mergeDataCon all_xs =
 
     go addAnns mLastDoc ts [ dL->L l (TyElOpd (HsTyVar _ _ (dL->L _ tc))) ]
       = do { data_con <- tyConToDataCon l tc
-           ; return (addAnns, (data_con, PrefixCon ts, mkConDoc mLastDoc)) }
+           ; return (addAnns, (data_con, PrefixCon (map hsLinear ts), mkConDoc mLastDoc)) }
     go addAnns mLastDoc ts ((dL->L l (TyElDocPrev doc)):xs) =
       go addAnns (mLastDoc `mplus` Just (cL l doc)) ts xs
     go addAnns mLastDoc ts ((dL->L l (TyElOpd t)):xs)
@@ -1837,7 +1836,7 @@ mergeDataCon all_xs =
          ; let rhs = mkLHsDocTyMaybe rhs_t trailingFieldDoc
                lhs = mkLHsDocTyMaybe lhs_t mLhsDoc
                addAnns = lhs_addAnns >> rhs_addAnns
-         ; return (addAnns, (op, InfixCon lhs rhs, mkConDoc mOpDoc)) }
+         ; return (addAnns, (op, InfixCon (hsLinear lhs) (hsLinear rhs), mkConDoc mOpDoc)) }
       where
         malformedErr =
           ( foldr combineSrcSpans noSrcSpan (map getLoc all_xs')
@@ -2336,7 +2335,7 @@ checkPrecP (dL->L l (_,i)) (dL->L _ ol)
  | otherwise = addFatalError l (text ("Precedence out of range: " ++ show i))
   where
     specialOp op = unLoc op `elem` [ eqTyCon_RDR
-                                   , getRdrName funTyCon ]
+                                   , getRdrName unrestrictedFunTyCon ]
 
 mkRecConstrOrUpdate
         :: LHsExpr GhcPs
