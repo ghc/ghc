@@ -10,6 +10,7 @@ import Rules.Generate
 import Settings
 import Target
 import Utilities
+import Rules.Library
 
 import qualified Text.Parsec as Parsec
 

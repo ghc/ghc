@@ -2,7 +2,7 @@ module Utilities (
     build, buildWithResources, buildWithCmdOptions,
     askWithResources,
     runBuilder, runBuilderWith,
-    needLibrary, contextDependencies, stage1Dependencies, libraryTargets,
+    contextDependencies, stage1Dependencies,
     topsortPackages, cabalDependencies
     ) where
 
@@ -54,21 +54,6 @@ cabalDependencies ctx = interpretInContext ctx $ getContextData depIds
 stage1Dependencies :: Package -> Action [Package]
 stage1Dependencies =
     fmap (map Context.package) . contextDependencies . vanillaContext Stage1
-
--- | Given a library 'Package' this action computes all of its targets. See
--- 'packageTargets' for the explanation of the @includeGhciLib@ parameter.
-libraryTargets :: Bool -> Context -> Action [FilePath]
-libraryTargets includeGhciLib context@Context {..} = do
-    libFile  <- pkgLibraryFile     context
-    ghciLib  <- pkgGhciLibraryFile context
-    ghci     <- if includeGhciLib && not (wayUnit Dynamic way)
-                then interpretInContext context $ getContextData buildGhciLib
-                else return False
-    return $ [ libFile ] ++ [ ghciLib | ghci ]
-
--- | Coarse-grain 'need': make sure all given libraries are fully built.
-needLibrary :: [Context] -> Action ()
-needLibrary cs = need =<< concatMapM (libraryTargets True) cs
 
 -- HACK (izgzhen), see https://github.com/snowleopard/hadrian/issues/344.
 -- | Topological sort of packages according to their dependencies.

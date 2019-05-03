@@ -14,6 +14,7 @@ import Settings
 import Settings.Default
 import Target
 import Utilities
+import Rules.Library
 
 -- | TODO: Drop code duplication
 buildProgramRules :: [(Resource, Int)] -> Rules ()
