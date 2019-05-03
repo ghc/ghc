@@ -1387,7 +1387,7 @@ foreign import prim "stg_word64ToDoublezh"
 #endif
 
 
--- | @'castFloatToWord32' f@ does a bit-for-bit copy from a floating-point value
+-- | @'castFloatToWord64' f@ does a bit-for-bit copy from a floating-point value
 -- to an integral value.
 --
 -- @since 4.10.0.0
