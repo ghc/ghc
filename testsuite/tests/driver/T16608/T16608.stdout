@@ -1,0 +1,6 @@
+[1 of 2] Compiling MyInteger        ( MyInteger.hs, MyInteger.o )
+[2 of 2] Compiling Main             ( T16608.hs, T16608.o )
+Linking T16608 ...
+[1 of 2] Compiling MyInteger        ( MyInteger.hs, MyInteger.o )
+[2 of 2] Compiling Main             ( T16608.hs, T16608.o ) [MyInteger changed]
+Linking T16608 ...
