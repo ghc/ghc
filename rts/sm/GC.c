@@ -901,9 +901,11 @@ GarbageCollect (uint32_t collect_gen,
 #endif
 
   // ok, GC over: tell the stats department what happened.
+  stat_endGCWorker(cap, gct);
   stat_endGC(cap, gct, live_words, copied,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */,
-             N, n_gc_threads, par_max_copied, par_balanced_copied,
+             N, n_gc_threads, gc_threads,
+             par_max_copied, par_balanced_copied,
              gc_spin_spin, gc_spin_yield, mut_spin_spin, mut_spin_yield,
              any_work, no_work, scav_find_work);
 
@@ -1181,6 +1183,7 @@ gcWorkerThread (Capability *cap)
 
     SET_GCT(gc_threads[cap->no]);
     gct->id = osThreadId();
+    stat_startGCWorker (cap, gct);
 
     // Wait until we're told to wake up
     RELEASE_SPIN_LOCK(&gct->mut_spin);
@@ -1222,6 +1225,7 @@ gcWorkerThread (Capability *cap)
     ACQUIRE_SPIN_LOCK(&gct->mut_spin);
     debugTrace(DEBUG_gc, "GC thread %d on my way...", gct->thread_index);
 
+    stat_endGCWorker (cap, gct);
     SET_GCT(saved_gct);
 }
 
