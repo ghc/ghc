@@ -110,6 +110,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
         case CONSTR_1_1:
         case CONSTR_0_2:
         case CONSTR:
+        case CONSTR_NOCAF:
 
 
         case PRIM:
@@ -204,7 +205,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
             break;
 
         default:
-            fprintf(stderr,"closurePtrs: Cannot handle type %s yet\n",
+            fprintf(stderr,"heap_view_closurePtrs: Cannot handle type %s yet\n",
                            closure_type_names[info->type]);
             break;
     }
