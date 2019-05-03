@@ -185,9 +185,11 @@ typedef struct gc_thread_ {
     W_ no_work;
     W_ scav_find_work;
 
-    Time gc_start_cpu;   // process CPU time
-    Time gc_sync_start_elapsed;  // start of GC sync
-    Time gc_start_elapsed;  // process elapsed time
+    Time gc_start_cpu;             // thread CPU time
+    Time gc_end_cpu;               // thread CPU time
+    Time gc_sync_start_elapsed;    // start of GC sync
+    Time gc_start_elapsed;         // thread elapsed time
+    Time gc_end_elapsed;
     W_ gc_start_faults;
 
     // -------------------
