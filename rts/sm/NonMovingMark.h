@@ -43,9 +43,16 @@ enum EntryType {
  */
 
 typedef struct {
-    enum EntryType type;
-    // All pointers should be untagged
+    // Which kind of mark queue entry we have is determined by the low bits of
+    // the second word: they must be zero in the case of a mark_closure entry
+    // (since the second word of a mark_closure entry points to a pointer and
+    // pointers must be word-aligned).  In the case of a mark_array we set them
+    // to 0x3 (the value of start_index is shifted to the left to accomodate
+    // this). null_entry where p==NULL is used to indicate the end of the queue.
     union {
+        struct {
+            void *p;              // must be NULL
+        } null_entry;
         struct {
             StgClosure *p;        // the object to be marked
             StgClosure **origin;  // field where this reference was found.
@@ -53,10 +60,22 @@ typedef struct {
         } mark_closure;
         struct {
             const StgMutArrPtrs *array;
-            StgWord start_index;
+            StgWord start_index;  // start index is shifted to the left by 16 bits
         } mark_array;
     };
 } MarkQueueEnt;
+
+INLINE_HEADER enum EntryType nonmovingMarkQueueEntryType(MarkQueueEnt *ent)
+{
+    if (ent->null_entry.p == NULL) {
+        return NULL_ENTRY;
+    } else if (((uintptr_t) ent->mark_closure.origin & TAG_BITS) == 0) {
+        return MARK_CLOSURE;
+    } else {
+        ASSERT((ent->mark_array.start_index & TAG_BITS) == 0x3);
+        return MARK_ARRAY;
+    }
+}
 
 typedef struct {
     // index of first *unused* queue entry
