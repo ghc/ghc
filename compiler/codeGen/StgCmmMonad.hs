@@ -16,7 +16,7 @@ module StgCmmMonad (
 
         emitLabel,
 
-        emit, emitDecl, emitProc,
+        emit, emitDecl,
         emitProcWithConvention, emitProcWithStackFrame,
         emitOutOfLine, emitAssign, emitStore,
         emitComment, emitTick, emitUnwind,
@@ -738,14 +738,14 @@ emitProcWithStackFrame
 
 emitProcWithStackFrame _conv mb_info lbl _stk_args [] blocks False
   = do  { dflags <- getDynFlags
-        ; emitProc_ mb_info lbl [] blocks (widthInBytes (wordWidth dflags)) False
+        ; emitProc mb_info lbl [] blocks (widthInBytes (wordWidth dflags)) False
         }
 emitProcWithStackFrame conv mb_info lbl stk_args args (graph, tscope) True
         -- do layout
   = do  { dflags <- getDynFlags
         ; let (offset, live, entry) = mkCallEntry dflags conv args stk_args
               graph' = entry MkGraph.<*> graph
-        ; emitProc_ mb_info lbl live (graph', tscope) offset True
+        ; emitProc mb_info lbl live (graph', tscope) offset True
         }
 emitProcWithStackFrame _ _ _ _ _ _ _ = panic "emitProcWithStackFrame"
 
@@ -757,16 +757,12 @@ emitProcWithConvention conv mb_info lbl args blocks
   = emitProcWithStackFrame conv mb_info lbl [] args blocks True
 
 emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraphScoped
-         -> Int -> FCode ()
-emitProc  mb_info lbl live blocks offset
- = emitProc_ mb_info lbl live blocks offset True
-
-emitProc_ :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraphScoped
-          -> Int -> Bool -> FCode ()
-emitProc_ mb_info lbl live blocks offset do_layout
+         -> Int -> Bool -> FCode ()
+emitProc mb_info lbl live blocks offset do_layout
   = do  { dflags <- getDynFlags
         ; l <- newBlockId
         ; let
+              blks :: CmmGraph
               blks = labelAGraph l blocks
 
               infos | Just info <- mb_info = mapSingleton (g_entry blks) info
