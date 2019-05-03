@@ -20,6 +20,7 @@
 #include "Printer.h"
 #include "Schedule.h"
 #include "Weak.h"
+#include "Stats.h"
 #include "STM.h"
 #include "MarkWeak.h"
 #include "sm/Storage.h"
@@ -254,6 +255,7 @@ void nonmovingBeginFlush(Task *task)
     debugTrace(DEBUG_nonmoving_gc, "Starting update remembered set flush...");
     traceConcSyncBegin();
     upd_rem_set_flush_count = 0;
+    stat_startNonmovingGcSync();
     stopAllCapabilitiesWith(NULL, task, SYNC_FLUSH_UPD_REM_SET);
 
     // XXX: We may have been given a capability via releaseCapability (i.e. a
@@ -345,6 +347,7 @@ void nonmovingFinishFlush(Task *task)
 
     debugTrace(DEBUG_nonmoving_gc, "Finished update remembered set flush...");
     traceConcSyncEnd();
+    stat_endNonmovingGcSync();
     releaseAllCapabilities(n_capabilities, NULL, task);
 }
 #endif
