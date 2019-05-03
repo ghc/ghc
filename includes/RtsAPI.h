@@ -151,6 +151,23 @@ typedef struct GCDetails_ {
   Time cpu_ns;
     // The time elapsed during GC itself
   Time elapsed_ns;
+
+    //
+    // Concurrent garbage collector
+    //
+
+    // The CPU time used during the post-mark pause phase of the concurrent
+    // nonmoving GC.
+  Time nonmoving_gc_sync_cpu_ns;
+    // The time elapsed during the post-mark pause phase of the concurrent
+    // nonmoving GC.
+  Time nonmoving_gc_sync_elapsed_ns;
+    // The CPU time used during the post-mark pause phase of the concurrent
+    // nonmoving GC.
+  Time nonmoving_gc_cpu_ns;
+    // The time elapsed during the post-mark pause phase of the concurrent
+    // nonmoving GC.
+  Time nonmoving_gc_elapsed_ns;
 } GCDetails;
 
 //
@@ -241,6 +258,28 @@ typedef struct _RTSStats {
     // The number of times a GC thread has iterated it's outer loop across all
     // parallel GCs
   uint64_t scav_find_work;
+
+  // ----------------------------------
+  // Concurrent garbage collector
+
+    // The CPU time used during the post-mark pause phase of the concurrent
+    // nonmoving GC.
+  Time nonmoving_gc_sync_cpu_ns;
+    // The time elapsed during the post-mark pause phase of the concurrent
+    // nonmoving GC.
+  Time nonmoving_gc_sync_elapsed_ns;
+    // The maximum time elapsed during the post-mark pause phase of the
+    // concurrent nonmoving GC.
+  Time nonmoving_gc_sync_max_elapsed_ns;
+    // The CPU time used during the post-mark pause phase of the concurrent
+    // nonmoving GC.
+  Time nonmoving_gc_cpu_ns;
+    // The time elapsed during the post-mark pause phase of the concurrent
+    // nonmoving GC.
+  Time nonmoving_gc_elapsed_ns;
+    // The maximum time elapsed during the post-mark pause phase of the
+    // concurrent nonmoving GC.
+  Time nonmoving_gc_max_elapsed_ns;
 } RTSStats;
 
 void getRTSStats (RTSStats *s);
