@@ -19,7 +19,7 @@ module PatSyn (
         patSynInstArgTys, patSynInstResTy, patSynFieldLabels,
         patSynFieldType,
 
-        tidyPatSynIds, pprPatSynType
+        updatePatSynIds, pprPatSynType
     ) where
 
 #include "HsVersions.h"
@@ -417,8 +417,8 @@ patSynMatcher = psMatcher
 patSynBuilder :: PatSyn -> Maybe (Id, Bool)
 patSynBuilder = psBuilder
 
-tidyPatSynIds :: (Id -> Id) -> PatSyn -> PatSyn
-tidyPatSynIds tidy_fn ps@(MkPatSyn { psMatcher = matcher, psBuilder = builder })
+updatePatSynIds :: (Id -> Id) -> PatSyn -> PatSyn
+updatePatSynIds tidy_fn ps@(MkPatSyn { psMatcher = matcher, psBuilder = builder })
   = ps { psMatcher = tidy_pr matcher, psBuilder = fmap tidy_pr builder }
   where
     tidy_pr (id, dummy) = (tidy_fn id, dummy)
