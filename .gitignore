@@ -123,6 +123,7 @@ _darcs/
 /settings
 /ghc.spec
 /ghc/ghc-bin.cabal
+/includes/dist/
 /includes/ghcautoconf.h
 /includes/ghcplatform.h
 /includes/ghcversion.h
