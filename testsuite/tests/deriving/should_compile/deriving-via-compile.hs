@@ -171,8 +171,8 @@ deriving via (X2 IO) instance C IO
 newtype P0 a = P0 a             deriving Show via a
 newtype P1 a = P1 [a]           deriving Show via [a]
 newtype P2 a = P2 (a, a)        deriving Show via (a, a)
-newtype P3 a = P3 (Maybe a)     deriving Show via (First a)
-newtype P4 a = P4 (Maybe a)     deriving Show via (First $ a)
+newtype P3 a = P3 (Maybe a)     deriving Show via (Alt Maybe a)
+newtype P4 a = P4 (Maybe a)     deriving Show via (Alt Maybe $ a)
 newtype P5 a = P5 a             deriving Show via (Identity $ a)
 newtype P6 a = P6 [a]           deriving Show via ([] $ a)
 newtype P7 a = P7 (a, a)        deriving Show via (Identity $ (a, a))

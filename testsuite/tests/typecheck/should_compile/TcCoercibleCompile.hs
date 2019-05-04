@@ -3,7 +3,7 @@
 
 import Data.Coerce
 import Data.Proxy
-import Data.Monoid (First(First)) -- check whether the implicit use of First is noted
+import Data.Monoid (Alt(Alt)) -- check whether the implicit use of First is noted
 
 -- see https://ghc.haskell.org/trac/ghc/wiki/Design/NewCoercibleSolver/V2
 
@@ -44,7 +44,7 @@ foo7 = coerce
 foo8 :: (Coercible a b, Coercible b c) => Proxy b -> a -> c
 foo8 _ = coerce
 
-main = print (coerce $ Just (1::Int)  :: First Int)
+main = print (coerce $ Just (1::Int)  :: Alt Maybe Int)
 
 
 
