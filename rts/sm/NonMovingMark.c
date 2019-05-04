@@ -410,11 +410,8 @@ void push_closure (MarkQueue *q,
                    StgClosure *p,
                    StgClosure **origin)
 {
-    // TODO: Push this into callers where they already have the Bdescr
-    if (HEAP_ALLOCED_GC(p) && (Bdescr((StgPtr) p)->gen != oldest_gen))
-        return;
-
 #if defined(DEBUG)
+    ASSERT(!HEAP_ALLOCED_GC(p) || (Bdescr((StgPtr) p)->gen == oldest_gen));
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     // Commenting out: too slow
     // if (RtsFlags.DebugFlags.sanity) {
@@ -527,15 +524,11 @@ void updateRemembSetPushThunkEager(Capability *cap,
         MarkQueue *queue = &cap->upd_rem_set.queue;
         push_thunk_srt(queue, &info->i);
 
-        // Don't record the origin of objects living outside of the nonmoving
-        // heap; we can't perform the selector optimisation on them anyways.
-        bool record_origin = check_in_nonmoving_heap((StgClosure*)thunk);
-
         for (StgWord i = 0; i < info->i.layout.payload.ptrs; i++) {
             if (check_in_nonmoving_heap(thunk->payload[i])) {
-                push_closure(queue,
-                             thunk->payload[i],
-                             record_origin ? &thunk->payload[i] : NULL);
+                // Don't bother to push origin; it makes the barrier needlessly
+                // expensive with little benefit.
+                push_closure(queue, thunk->payload[i], NULL);
             }
         }
         break;
@@ -544,7 +537,9 @@ void updateRemembSetPushThunkEager(Capability *cap,
     {
         MarkQueue *queue = &cap->upd_rem_set.queue;
         StgAP *ap = (StgAP *) thunk;
-        push_closure(queue, ap->fun, &ap->fun);
+        if (check_in_nonmoving_heap(ap->fun)) {
+            push_closure(queue, ap->fun, NULL);
+        }
         mark_PAP_payload(queue, ap->fun, ap->payload, ap->n_args);
         break;
     }
@@ -565,9 +560,10 @@ void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *p)
 
 inline void updateRemembSetPushClosure(Capability *cap, StgClosure *p)
 {
-    if (!check_in_nonmoving_heap(p)) return;
-    MarkQueue *queue = &cap->upd_rem_set.queue;
-    push_closure(queue, p, NULL);
+    if (check_in_nonmoving_heap(p)) {
+        MarkQueue *queue = &cap->upd_rem_set.queue;
+        push_closure(queue, p, NULL);
+    }
 }
 
 void updateRemembSetPushClosure_(StgRegTable *reg, StgClosure *p)
@@ -664,7 +660,10 @@ void markQueuePushClosure (MarkQueue *q,
                            StgClosure *p,
                            StgClosure **origin)
 {
-    push_closure(q, p, origin);
+    // TODO: Push this into callers where they already have the Bdescr
+    if (check_in_nonmoving_heap(p)) {
+        push_closure(q, p, origin);
+    }
 }
 
 /* TODO: Do we really never want to specify the origin here? */
