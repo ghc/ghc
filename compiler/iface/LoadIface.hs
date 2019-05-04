@@ -79,6 +79,7 @@ import RnModIface
 import UniqDSet
 import Plugins
 
+import Control.Applicative ((<|>))
 import Control.Monad
 import Control.Exception
 import Data.IORef
@@ -674,7 +675,7 @@ moduleFreeHolesPrecise doc_str mod
                  text "to compute precise free module holes")
         (eps, hpt) <- getEpsAndHpt
         dflags <- getDynFlags
-        case tryEpsAndHpt dflags eps hpt `firstJust` tryDepsCache eps imod insts of
+        case tryEpsAndHpt dflags eps hpt <|> tryDepsCache eps imod insts of
             Just r -> return (Succeeded r)
             Nothing -> readAndCache imod insts
     (_, Nothing) -> return (Succeeded emptyUniqDSet)

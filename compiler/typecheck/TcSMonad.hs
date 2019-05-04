@@ -2269,8 +2269,8 @@ lookupFlatCache :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType, CtFlavour)
 lookupFlatCache fam_tc tys
   = do { IS { inert_flat_cache = flat_cache
             , inert_cans = IC { inert_funeqs = inert_funeqs } } <- getTcSInerts
-       ; return (firstJusts [lookup_inerts inert_funeqs,
-                             lookup_flats flat_cache]) }
+       ; return (firstJust [lookup_inerts inert_funeqs,
+                            lookup_flats flat_cache]) }
   where
     lookup_inerts inert_funeqs
       | Just (CFunEqCan { cc_ev = ctev, cc_fsk = fsk, cc_tyargs = xis })
