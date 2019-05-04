@@ -320,7 +320,7 @@ instance Bifoldable Arg where
 instance Bitraversable Arg where
   bitraverse f g (Arg a b) = Arg <$> f a <*> g b
 
--- | Use @'Option' ('First' a)@ to get the behavior of
+-- | Use @'Maybe' ('First' a)@ to get the behavior of
 -- 'Data.Monoid.First' from "Data.Monoid".
 newtype First a = First { getFirst :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
@@ -378,7 +378,7 @@ instance Monad First where
 instance MonadFix First where
   mfix f = fix (f . getFirst)
 
--- | Use @'Option' ('Last' a)@ to get the behavior of
+-- | Use @'Maybe' ('Last' a)@ to get the behavior of
 -- 'Data.Monoid.Last' from "Data.Monoid"
 newtype Last a = Last { getLast :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
