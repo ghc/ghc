@@ -3,6 +3,14 @@
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
+  * The final phase of the `MonadFail` proposal has been implemented:
+
+    * The `fail` method of `Monad` has been removed in favor of the method of
+      the same name in the `MonadFail` class.
+
+    * `MonadFail(fail)` is now re-exported from the `Prelude` and
+      `Control.Monad` modules.
+
   * Fix `Show` instance of `Data.Fixed`: Negative numbers are now parenthesized
     according to their surrounding context. I.e. `Data.Fixed.show` produces
     syntactically correct Haskell for expressions like `Just (-1 :: Fixed E2)`.
