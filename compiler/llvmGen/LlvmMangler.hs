@@ -17,6 +17,7 @@ import DynFlags ( DynFlags, targetPlatform )
 import Platform ( platformArch, Arch(..) )
 import ErrUtils ( withTiming )
 import Outputable ( text )
+import Maybes ( firstJust )
 
 import Control.Exception
 import qualified Data.ByteString.Char8 as B
@@ -64,11 +65,6 @@ rewriteLine dflags rewrites l
     isSubsectionsViaSymbols = B.isPrefixOf (B.pack ".subsections_via_symbols")
 
     (symbol, rest) = splitLine l
-
-    firstJust :: [Maybe a] -> Maybe a
-    firstJust (Just x:_) = Just x
-    firstJust []         = Nothing
-    firstJust (_:rest)   = firstJust rest
 
 -- | This rewrites @.type@ annotations of function symbols to @%object@.
 -- This is done as the linker can relocate @%functions@ through the

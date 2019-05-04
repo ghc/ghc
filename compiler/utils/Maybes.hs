@@ -15,7 +15,7 @@ module Maybes (
         failME, isSuccess,
 
         orElse,
-        firstJust, firstJusts,
+        firstJust,
         whenIsJust,
         expectJust,
         rightToMaybe,
@@ -29,6 +29,7 @@ import GhcPrelude
 import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Exception (catch, SomeException(..))
+import Data.Foldable
 import Data.Maybe
 import Util (HasCallStack)
 
@@ -42,13 +43,10 @@ infixr 4 `orElse`
 ************************************************************************
 -}
 
-firstJust :: Maybe a -> Maybe a -> Maybe a
-firstJust a b = firstJusts [a, b]
-
 -- | Takes a list of @Maybes@ and returns the first @Just@ if there is one, or
 -- @Nothing@ otherwise.
-firstJusts :: [Maybe a] -> Maybe a
-firstJusts = msum
+firstJust :: [Maybe a] -> Maybe a
+firstJust = asum
 
 expectJust :: HasCallStack => String -> Maybe a -> a
 {-# INLINE expectJust #-}
