@@ -4,4 +4,4 @@ import T13585a
 import Data.Monoid
 
 extractZonedTime :: Maybe ()
-extractZonedTime = ala First foldMap [Nothing]
+extractZonedTime = ala Alt foldMap [Nothing]

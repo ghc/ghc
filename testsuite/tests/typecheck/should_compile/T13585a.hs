@@ -2,7 +2,7 @@
 
 module T13585a where
 
-import Data.Monoid (First(..))
+import Data.Monoid (Alt(..))
 import Data.Functor.Identity
 import Data.Kind (Type)
 
@@ -49,10 +49,10 @@ class    (Rewrapped s t, Rewrapped t s) => Rewrapping s t
 instance (Rewrapped s t, Rewrapped t s) => Rewrapping s t
 
 
-instance (t ~ First b) => Rewrapped (First a) t
-instance Wrapped (First a) where
-    type Unwrapped (First a) = Maybe a
-    _Wrapped' = iso getFirst First
+instance (t ~ Alt Maybe b) => Rewrapped (Alt Maybe a) t
+instance Wrapped (Alt Maybe a) where
+    type Unwrapped (Alt Maybe a) = Maybe a
+    _Wrapped' = iso getAlt Alt
     {-# INLINE _Wrapped' #-}
 
 class Wrapped s => Rewrapped (s :: Type) (t :: Type)
