@@ -21,6 +21,19 @@
     `Word`, and `WordN` now throw an overflow exception for negative shift
     values (instead of being undefined behaviour).
 
+  * `Data.Monoid.First` and `Data.Monoid.Last` are deprecated and scheduled to
+    be removed in v4.14.
+
+    Users should switch to `Maybe (Data.Semigroup.First a)` or
+    `Maybe (Data.Semigroup.Last a)`. Users of `Data.Monoid.First` may
+    also switch to `Data.Monoid.Alt Maybe`.
+
+  * `Data.Semigroup.Option` is deprecated and scheduled to be removed in v4.14.
+
+    Users should simply remove this wrapper around `Maybe`: `Maybe` has adopted
+    `Option`'s `Monoid` instance in v4.11.
+
+
 ## 4.12.0.0 *21 September 2018*
   * Bundled with GHC 8.6.1
 
