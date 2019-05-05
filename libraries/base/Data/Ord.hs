@@ -46,15 +46,31 @@ comparing p x y = compare (p x) (p y)
 -- as in: @then sortWith by 'Down' x@
 --
 -- @since 4.6.0.0
-newtype Down a = Down a
+newtype Down a = Down
+    { getDown :: a -- ^ @since 4.14.0.0
+    }
     deriving
       ( Eq        -- ^ @since 4.6.0.0
-      , Show      -- ^ @since 4.7.0.0
-      , Read      -- ^ @since 4.7.0.0
       , Num       -- ^ @since 4.11.0.0
       , Semigroup -- ^ @since 4.11.0.0
       , Monoid    -- ^ @since 4.11.0.0
       )
+
+-- | This instance would be equivalent to the derived instances of the
+-- 'Down' newtype if the 'getDown' field were removed
+--
+-- @since 4.7.0.0
+instance (Read a) => Read (Down a) where
+    readsPrec d = readParen (d > 10) $ \ r ->
+        [(Down x,t) | ("Down",s) <- lex r, (x,t) <- readsPrec 11 s]
+
+-- | This instance would be equivalent to the derived instances of the
+-- 'Down' newtype if the 'getDown' field were removed
+--
+-- @since 4.7.0.0
+instance (Show a) => Show (Down a) where
+    showsPrec d (Down x) = showParen (d > 10) $
+        showString "Down " . showsPrec 11 x
 
 -- | @since 4.6.0.0
 instance Ord a => Ord (Down a) where

@@ -5,6 +5,8 @@
 
   * Add a `TestEquality` instance for the `Compose` newtype.
 
+  * `Data.Ord.Down` now has a field name, `getDown`
+
   * Fix the `integer-gmp` variant of `isValidNatural`: Previously it would fail
     to detect values `<= maxBound::Word` that were incorrectly encoded using
     the `NatJ#` constructor.
