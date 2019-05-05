@@ -3,7 +3,7 @@
 
 import Data.Coerce
 import Data.Proxy
-import Data.Monoid (Alt(Alt)) -- check whether the implicit use of First is noted
+import Data.Monoid (Alt(Alt)) -- check whether the implicit use of Alt is noted
 
 -- see https://ghc.haskell.org/trac/ghc/wiki/Design/NewCoercibleSolver/V2
 
