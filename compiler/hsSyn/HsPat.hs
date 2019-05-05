@@ -622,8 +622,12 @@ mkPrefixConPat dc pats tys
                       , pat_dicts = []
                       , pat_binds = emptyTcEvBinds
                       , pat_args = PrefixCon pats
-                      , pat_arg_tys = tys
+                      , pat_arg_tys = tys'
                       , pat_wrap = idHsWrapper }
+  where tys' = if isUnboxedTupleCon dc || isUnboxedSumCon dc
+               -- See Note [Unboxed tuple RuntimeRep vars]
+               then map getRuntimeRep tys ++ tys
+               else tys
 
 mkNilPat :: Type -> OutPat (GhcPass p)
 mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
