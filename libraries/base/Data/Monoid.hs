@@ -123,7 +123,7 @@ import Data.Semigroup.Internal
 
 {-# DEPRECATED First
     [ "Will be removed in GHC 8.10."
-    , "Use @'Maybe ('Data.Semigroup.First' a)@ from \"Data.Semigroup\" instead."
+    , "Use @'Maybe' ('Data.Semigroup.First' a)@ from \"Data.Semigroup\" instead."
     ]
 #-}
 
@@ -165,7 +165,7 @@ instance Monoid (First a) where
 
 {-# DEPRECATED Last
     [ "Will be removed in GHC 8.10."
-    , "Use @'Maybe ('Data.Semigroup.Last' a)@ from \"Data.Semigroup\" instead."
+    , "Use @'Maybe' ('Data.Semigroup.Last' a)@ from \"Data.Semigroup\" instead."
     ]
 #-}
 
