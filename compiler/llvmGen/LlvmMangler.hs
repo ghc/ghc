@@ -58,7 +58,7 @@ rewriteLine dflags rewrites l
   | isSubsectionsViaSymbols l =
     (B.pack "## no .subsection_via_symbols for ghc. We need our info tables!")
   | otherwise =
-    case firstJust $ map (\rewrite -> rewrite dflags rest) rewrites of
+    case firstJust (\rewrite -> rewrite dflags rest) rewrites of
       Nothing        -> l
       Just rewritten -> B.concat $ [symbol, B.pack "\t", rewritten]
   where
