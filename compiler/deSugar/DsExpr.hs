@@ -957,10 +957,13 @@ dsDo stmts
                         , recS_ret_ty = body_ty} }) stmts
       = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
-        new_bind_stmt = cL loc $ BindStmt bind_ty (mkBigLHsPatTupId later_pats)
+        new_bind_stmt = cL loc $ BindStmt bind_ty bind_pat
                                          mfix_app bind_op
                                          noSyntaxExpr  -- Tuple cannot fail
-
+        -- If XStrict is enabled then this match is made strict, with the
+        -- programmer having no way of making it lazy. Make it an irrefutable
+        -- match here
+        bind_pat     = LazyPat noExt $ LazyPat noExt $ mkBigLHsPatTupId later_pats
         tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
         tup_ty       = mkBigCoreTupTy (map idType tup_ids) -- Deals with singleton case
         rec_tup_pats = map nlVarPat tup_ids
