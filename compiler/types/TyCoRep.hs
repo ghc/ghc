@@ -2499,39 +2499,29 @@ unionTCvSubst (TCvSubst in_scope1 tenv1 cenv1) (TCvSubst in_scope2 tenv2 cenv2)
 
 -- | Generates the in-scope set for the 'TCvSubst' from the types in the incoming
 -- environment. No CoVars, please!
-zipTvSubst :: [TyVar] -> [Type] -> TCvSubst
+zipTvSubst :: HasDebugCallStack => [TyVar] -> [Type] -> TCvSubst
 zipTvSubst tvs tys
-  | debugIsOn
-  , not (all isTyVar tvs) || neLength tvs tys
-  = pprTrace "zipTvSubst" (ppr tvs $$ ppr tys) emptyTCvSubst
-  | otherwise
   = mkTvSubst (mkInScopeSet (tyCoVarsOfTypes tys)) tenv
   where
     tenv = zipTyEnv tvs tys
 
 -- | Generates the in-scope set for the 'TCvSubst' from the types in the incoming
 -- environment.  No TyVars, please!
-zipCvSubst :: [CoVar] -> [Coercion] -> TCvSubst
+zipCvSubst :: HasDebugCallStack => [CoVar] -> [Coercion] -> TCvSubst
 zipCvSubst cvs cos
-  | debugIsOn
-  , not (all isCoVar cvs) || neLength cvs cos
-  = pprTrace "zipCvSubst" (ppr cvs $$ ppr cos) emptyTCvSubst
-  | otherwise
   = TCvSubst (mkInScopeSet (tyCoVarsOfCos cos)) emptyTvSubstEnv cenv
   where
     cenv = zipCoEnv cvs cos
 
-zipTCvSubst :: [TyCoVar] -> [Type] -> TCvSubst
+zipTCvSubst :: HasDebugCallStack => [TyCoVar] -> [Type] -> TCvSubst
 zipTCvSubst tcvs tys
-  | debugIsOn
-  , neLength tcvs tys
-  = pprTrace "zipTCvSubst" (ppr tcvs $$ ppr tys) emptyTCvSubst
-  | otherwise
   = zip_tcvsubst tcvs tys (mkEmptyTCvSubst $ mkInScopeSet (tyCoVarsOfTypes tys))
   where zip_tcvsubst :: [TyCoVar] -> [Type] -> TCvSubst -> TCvSubst
         zip_tcvsubst (tv:tvs) (ty:tys) subst
           = zip_tcvsubst tvs tys (extendTCvSubst subst tv ty)
-        zip_tcvsubst _ _ subst = subst -- empty case
+        zip_tcvsubst [] [] subst = subst -- empty case
+        zip_tcvsubst _  _  _     = pprPanic "zipTCvSubst: length mismatch"
+                                            (ppr tcvs <+> ppr tys)
 
 -- | Generates the in-scope set for the 'TCvSubst' from the types in the
 -- incoming environment. No CoVars, please!
@@ -2545,8 +2535,12 @@ mkTvSubstPrs prs =
           and [ isTyVar tv && not (isCoercionTy ty)
               | (tv, ty) <- prs ]
 
-zipTyEnv :: [TyVar] -> [Type] -> TvSubstEnv
+zipTyEnv :: HasDebugCallStack => [TyVar] -> [Type] -> TvSubstEnv
 zipTyEnv tyvars tys
+  | debugIsOn
+  , not (all isTyVar tyvars)
+  = pprPanic "zipTyEnv" (ppr tyvars <+> ppr tys)
+  | otherwise
   = ASSERT( all (not . isCoercionTy) tys )
     mkVarEnv (zipEqual "zipTyEnv" tyvars tys)
         -- There used to be a special case for when
@@ -2562,8 +2556,13 @@ zipTyEnv tyvars tys
         --
         -- Simplest fix is to nuke the "optimisation"
 
-zipCoEnv :: [CoVar] -> [Coercion] -> CvSubstEnv
-zipCoEnv cvs cos = mkVarEnv (zipEqual "zipCoEnv" cvs cos)
+zipCoEnv :: HasDebugCallStack => [CoVar] -> [Coercion] -> CvSubstEnv
+zipCoEnv cvs cos
+  | debugIsOn
+  , not (all isCoVar cvs)
+  = pprPanic "zipCoEnv" (ppr cvs <+> ppr cos)
+  | otherwise
+  = mkVarEnv (zipEqual "zipCoEnv" cvs cos)
 
 instance Outputable TCvSubst where
   ppr (TCvSubst ins tenv cenv)
