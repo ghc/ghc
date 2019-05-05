@@ -302,8 +302,7 @@ checkClassCycles cls
     --     with more error message generation clobber
     -- Make sure the two stay in sync.
     go :: NameSet -> Class -> [Type] -> Maybe (Bool, SDoc)
-    go so_far cls tys = firstJust $
-                        map (go_pred so_far) $
+    go so_far cls tys = firstJust (go_pred so_far) $
                         immSuperClasses cls tys
 
     go_pred :: NameSet -> PredType -> Maybe (Bool, SDoc)

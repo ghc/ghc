@@ -11,7 +11,7 @@ import DynFlags                   ( DynFlags )
 import FastString                 ( FastString, mkFastString )
 import IfaceType
 import Name hiding (varName)
-import Maybes                     ( firstJust, fromMaybe, maybeToList )
+import Maybes                     ( firstJust, fromMaybe, listToMaybe, maybeToList )
 import Outputable                 ( renderWithStyle, ppr, defaultUserStyle )
 import SrcLoc
 import ToIface
@@ -216,11 +216,11 @@ getNameBindingInClass
   -> Maybe Span
 getNameBindingInClass n sp asts = do
   ast <- M.lookup (srcSpanFile sp) asts
-  firstJust $ do
+  firstJust getBindSiteFromContext $ do
     child <- flattenAst ast
     dets <- maybeToList
       $ M.lookup (Right n) $ nodeIdentifiers $ nodeInfo child
-    map getBindSiteFromContext $ S.toList $ identInfo dets
+    S.toList $ identInfo dets
 
 getNameScopeAndBinding
   :: Name
@@ -230,13 +230,13 @@ getNameScopeAndBinding n asts = case nameSrcSpan n of
   RealSrcSpan sp -> do -- @Maybe
     ast <- M.lookup (srcSpanFile sp) asts
     defNode <- selectLargestContainedBy sp ast
-    firstJust $ do -- @[]
+    listToMaybe $ do -- @[]
       node <- flattenAst defNode
       dets <- maybeToList
         $ M.lookup (Right n) $ nodeIdentifiers $ nodeInfo node
       scopes <- maybeToList $ foldMap getScopeFromContext (identInfo dets)
-      let binding = firstJust $ map getBindSiteFromContext $ S.toList $ identInfo dets
-      return $ Just (scopes, binding)
+      let binding = firstJust getBindSiteFromContext $ identInfo dets
+      return (scopes, binding)
   _ -> Nothing
 
 getScopeFromContext :: ContextInfo -> Maybe [Scope]
@@ -264,7 +264,7 @@ smallestContainingSatisfying
   -> Maybe (HieAST a)
 smallestContainingSatisfying sp cond node
   | nodeSpan node `containsSpan` sp =
-      firstJust (map (smallestContainingSatisfying sp cond) (nodeChildren node))
+      firstJust (smallestContainingSatisfying sp cond) (nodeChildren node)
       <|> if cond node then Just node else Nothing
   | sp `containsSpan` nodeSpan node = Nothing
   | otherwise = Nothing
@@ -273,13 +273,13 @@ selectLargestContainedBy :: Span -> HieAST a -> Maybe (HieAST a)
 selectLargestContainedBy sp node
   | sp `containsSpan` nodeSpan node = Just node
   | nodeSpan node `containsSpan` sp =
-      firstJust $ map (selectLargestContainedBy sp) $ nodeChildren node
+      firstJust (selectLargestContainedBy sp) (nodeChildren node)
   | otherwise = Nothing
 
 selectSmallestContaining :: Span -> HieAST a -> Maybe (HieAST a)
 selectSmallestContaining sp node
   | nodeSpan node `containsSpan` sp = Just $ fromMaybe node $
-      firstJust $ map (selectSmallestContaining sp) $ nodeChildren node
+      firstJust (selectSmallestContaining sp) (nodeChildren node)
   | sp `containsSpan` nodeSpan node = Nothing
   | otherwise = Nothing
 

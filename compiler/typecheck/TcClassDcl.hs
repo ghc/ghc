@@ -380,7 +380,7 @@ findMethodBind sel_name binds prag_fn
 
 ---------------------------
 findMinimalDef :: [LSig GhcRn] -> Maybe ClassMinimalDef
-findMinimalDef = firstJust . map toMinimalDef
+findMinimalDef = firstJust toMinimalDef
   where
     toMinimalDef :: LSig GhcRn -> Maybe ClassMinimalDef
     toMinimalDef (L _ (MinimalSig _ _ (L _ bf))) = Just (fmap unLoc bf)

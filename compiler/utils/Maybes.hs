@@ -26,10 +26,10 @@ module Maybes (
 
 import GhcPrelude
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Exception (catch, SomeException(..))
-import Data.Foldable
 import Data.Maybe
 import Util (HasCallStack)
 
@@ -45,8 +45,8 @@ infixr 4 `orElse`
 
 -- | Takes a list of @Maybes@ and returns the first @Just@ if there is one, or
 -- @Nothing@ otherwise.
-firstJust :: [Maybe a] -> Maybe a
-firstJust = asum
+firstJust :: Foldable f => (a -> Maybe b) -> f a -> Maybe b
+firstJust f = foldr (\x acc -> f x <|> acc) Nothing
 
 expectJust :: HasCallStack => String -> Maybe a -> a
 {-# INLINE expectJust #-}
