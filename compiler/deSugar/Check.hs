@@ -43,6 +43,7 @@ import FastString
 import DataCon
 import PatSyn
 import HscTypes (CompleteMatch(..))
+import BasicTypes (Boxity(..))
 
 import DsMonad
 import TcSimplify    (tcCheckSatisfiability)
@@ -1078,12 +1079,17 @@ translatePat fam_insts pat = case pat of
   TuplePat tys ps boxity -> do
     tidy_ps <- translatePatVec fam_insts (map unLoc ps)
     let tuple_con = RealDataCon (tupleDataCon boxity (length ps))
-    return [vanillaConPattern tuple_con tys (concat tidy_ps)]
+        tys' = case boxity of
+                 Boxed -> tys
+                 -- See Note [Unboxed tuple RuntimeRep vars]
+                 Unboxed -> map getRuntimeRep tys ++ tys
+    return [vanillaConPattern tuple_con tys' (concat tidy_ps)]
 
   SumPat ty p alt arity -> do
     tidy_p <- translatePat fam_insts (unLoc p)
     let sum_con = RealDataCon (sumDataCon alt arity)
-    return [vanillaConPattern sum_con ty tidy_p]
+    -- See Note [Unboxed tuple RuntimeRep vars]
+    return [vanillaConPattern sum_con (map getRuntimeRep ty ++ ty) tidy_p]
 
   -- --------------------------------------------------------------------------
   -- Not supposed to happen
