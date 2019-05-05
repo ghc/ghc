@@ -341,6 +341,8 @@ isUserSig _             = False
 
 -- | Take a field of declarations from a data structure and create HsDecls
 -- using the given constructor
-mkDecls :: (a -> [Located b]) -> (b -> c) -> a -> [Located c]
-mkDecls field con struct = [ cL loc (con decl)
-                           | (dL->L loc decl) <- field struct ]
+mkDecls :: (struct -> [Located decl])
+        -> (decl -> hsDecl)
+        -> struct
+        -> [Located hsDecl]
+mkDecls field con = map (mapLoc con) . field
