@@ -279,11 +279,11 @@ ungroup group_ =
   mkDecls (valbinds . hs_valds)  (ValD noExt)   group_
   where
     typesigs (XValBindsLR (NValBinds _ sigs)) = filter (isUserSig . unLoc) sigs
-    typesigs _ = error "expected ValBindsOut"
+    typesigs ValBinds{} = error "expected XValBindsLR"
 
     valbinds (XValBindsLR (NValBinds binds _)) =
       concatMap bagToList . snd . unzip $ binds
-    valbinds _ = error "expected ValBindsOut"
+    valbinds ValBinds{} = error "expected XValBindsLR"
 
 -- | Sort by source location
 sortByLoc :: [Located a] -> [Located a]
