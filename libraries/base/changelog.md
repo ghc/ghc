@@ -5,6 +5,8 @@
 
   * Add a `TestEquality` instance for the `Compose` newtype.
 
+  * `Data.Ord.Down` now has a field name, `getDown`
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
