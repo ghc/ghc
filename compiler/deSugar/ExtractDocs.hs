@@ -253,14 +253,13 @@ nubByName f ns = go emptyNameSet ns
 typeDocs :: HsType GhcRn -> Map Int (HsDocString)
 typeDocs = go 0
   where
-    go n (HsForAllTy { hst_body = ty }) = go n (unLoc ty)
-    go n (HsQualTy   { hst_body = ty }) = go n (unLoc ty)
-    go n (HsFunTy _ (dL->L _
-                      (HsDocTy _ _ (dL->L _ x))) (dL->L _ ty)) =
-       M.insert n x $ go (n+1) ty
-    go n (HsFunTy _ _ ty) = go (n+1) (unLoc ty)
-    go n (HsDocTy _ _ (dL->L _ doc)) = M.singleton n doc
-    go _ _ = M.empty
+    go n = \case
+      HsForAllTy { hst_body = ty }           -> go n (unLoc ty)
+      HsQualTy   { hst_body = ty }           -> go n (unLoc ty)
+      HsFunTy _ (dL->L _ (HsDocTy _ _ x)) ty -> M.insert n (unLoc x) $ go (n+1) (unLoc ty)
+      HsFunTy _ _ ty                         -> go (n+1) (unLoc ty)
+      HsDocTy _ _ doc                        -> M.singleton n (unLoc doc)
+      _                                      -> M.empty
 
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.
