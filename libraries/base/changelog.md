@@ -7,6 +7,10 @@
 
   * `Data.Ord.Down` now has a field name, `getDown`
 
+  * Add `Bits`, `Bounded`, `Enum`, `FiniteBits`, `Floating`, `Fractional`,
+    `Integral`, `Ix`, `Real`, `RealFrac`, `RealFloat` and `Storable` instances
+    to `Data.Ord.Down`
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
