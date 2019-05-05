@@ -320,8 +320,10 @@ instance Bifoldable Arg where
 instance Bitraversable Arg where
   bitraverse f g (Arg a b) = Arg <$> f a <*> g b
 
--- | Use @'Maybe' ('First' a)@ to get the behavior of
--- 'Data.Monoid.First' from "Data.Monoid".
+-- | A 'Semigroup' preferring the first operand.
+--
+-- >>> First 1 <> First 2
+-- First {getFirst = 1}
 newtype First a = First { getFirst :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0
@@ -378,8 +380,10 @@ instance Monad First where
 instance MonadFix First where
   mfix f = fix (f . getFirst)
 
--- | Use @'Maybe' ('Last' a)@ to get the behavior of
--- 'Data.Monoid.Last' from "Data.Monoid"
+-- | A 'Semigroup' preferring the last operand.
+--
+-- >>> Last 1 <> Last 2
+-- Last {getLast = 2}
 newtype Last a = Last { getLast :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0
