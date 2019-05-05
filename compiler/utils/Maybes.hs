@@ -43,8 +43,10 @@ infixr 4 `orElse`
 ************************************************************************
 -}
 
--- | Takes a list of @Maybes@ and returns the first @Just@ if there is one, or
--- @Nothing@ otherwise.
+-- | @'firstJust' fn as@ returns the first @fn a@ that is a 'Just'.
+--
+-- >>> firstJust id [Nothing, Just 1, Just 2]
+-- Just 1
 firstJust :: Foldable f => (a -> Maybe b) -> f a -> Maybe b
 firstJust f = foldr (\x acc -> f x <|> acc) Nothing
 
