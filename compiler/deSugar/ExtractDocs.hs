@@ -16,7 +16,6 @@ import HsTypes
 import HsUtils
 import Name
 import NameSet
-import Panic (panic)
 import SrcLoc
 import TcRnTypes
 
@@ -300,8 +299,7 @@ collectDocs = go [] Nothing
     go docs mprev decls = case (decls, mprev) of
       ((LL _ (DocD _ (DocCommentNext s))) : ds, Nothing)   -> go (s:docs) Nothing ds
       ((LL _ (DocD _ (DocCommentNext s))) : ds, Just prev) -> finished prev docs $ go [s] Nothing ds
-      ((LL _ (DocD _ (DocCommentPrev s))) : _ , Nothing)   -> panic $ "collectDocs: -- ^ " ++ show s
-      ((LL _ (DocD _ (DocCommentPrev s))) : ds, Just prev) -> go (s:docs) (Just prev) ds
+      ((LL _ (DocD _ (DocCommentPrev s))) : ds, mprev)     -> go (s:docs) mprev ds
       (d                                  : ds, Nothing)   -> go docs (Just d) ds
       (d                                  : ds, Just prev) -> finished prev docs $ go [] (Just d) ds
       ([]                                     , Nothing)   -> []
