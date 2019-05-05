@@ -20,6 +20,7 @@ import SrcLoc
 import TcRnTypes
 
 import Control.Applicative
+import Data.Bifunctor (first)
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -324,13 +325,12 @@ filterDecls = filter (isHandled . unLoc . fst)
 
 -- | Go through all class declarations and filter their sub-declarations
 filterClasses :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
-filterClasses decls = [ if isClassD d then (cL loc (filterClass d), doc) else x
-                      | x@(dL->L loc d, doc) <- decls ]
+filterClasses = map (first (mapLoc filterClass))
   where
-    filterClass (TyClD x c) =
+    filterClass (TyClD x c@(ClassDecl {})) =
       TyClD x $ c { tcdSigs =
         filter (liftA2 (||) (isUserSig . unLoc) isMinimalLSig) (tcdSigs c) }
-    filterClass _ = error "expected TyClD"
+    filterClass d = d
 
 -- | Was this signature given by the user?
 isUserSig :: Sig name -> Bool
@@ -338,10 +338,6 @@ isUserSig TypeSig {}    = True
 isUserSig ClassOpSig {} = True
 isUserSig PatSynSig {}  = True
 isUserSig _             = False
-
-isClassD :: HsDecl a -> Bool
-isClassD (TyClD _ d) = isClassDecl d
-isClassD _ = False
 
 -- | Take a field of declarations from a data structure and create HsDecls
 -- using the given constructor
