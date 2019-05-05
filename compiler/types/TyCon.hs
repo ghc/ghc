@@ -359,13 +359,27 @@ Note [Unboxed tuple RuntimeRep vars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The contents of an unboxed tuple may have any representation. Accordingly,
 the kind of the unboxed tuple constructor is runtime-representation
-polymorphic. For example,
+polymorphic.
 
-   (#,#) :: forall (q :: RuntimeRep) (r :: RuntimeRep). TYPE q -> TYPE r -> #
+Type constructor (2 kind arguments)
+   (#,#) :: forall (q :: RuntimeRep) (r :: RuntimeRep).
+                   TYPE q -> TYPE r -> TYPE (TupleRep [q, r])
+Data constructor (4 type arguments)
+   (#,#) :: forall (q :: RuntimeRep) (r :: RuntimeRep)
+                   (a :: TYPE q) (b :: TYPE r). a -> b -> (# a, b #)
 
-These extra tyvars (v and w) cause some delicate processing around tuples,
-where we used to be able to assume that the tycon arity and the
-datacon arity were the same.
+These extra tyvars (q and r) cause some delicate processing around tuples,
+where we need to manually insert RuntimeRep arguments.
+The same situation happens with unboxed sums: each alternative
+has its own RuntimeRep.
+For boxed tuples, there is no levity polymorphism, and therefore
+we add RuntimeReps only for the unboxed version.
+
+Type constructor (no kind arguments)
+   (,) :: Type -> Type -> Type
+Data constructor (2 type arguments)
+   (,) :: forall a b. a -> b -> (a, b)
+
 
 Note [Injective type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
