@@ -204,9 +204,10 @@ conArgDocs con = case getConArgs con of
                    InfixCon arg1 arg2 -> go 0 ([unLoc arg1, unLoc arg2] ++ ret)
                    RecCon _ -> go 1 ret
   where
-    go n (HsDocTy _ _ (dL->L _ ds) : tys) = M.insert n ds $ go (n+1) tys
-    go n (_ : tys) = go (n+1) tys
-    go _ [] = M.empty
+    go n = M.fromList . catMaybes . zipWith f [n..]
+      where
+        f n (HsDocTy _ _ lds) = Just (n, unLoc lds)
+        f _ _ = Nothing
 
     ret = case con of
             ConDeclGADT { con_res_ty = res_ty } -> [ unLoc res_ty ]
