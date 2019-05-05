@@ -294,17 +294,16 @@ sortByLoc = sortOn getLoc
 -- A declaration may have multiple doc strings attached to it.
 collectDocs :: [LHsDecl pass] -> [(LHsDecl pass, [HsDocString])]
 -- ^ This is an example.
-collectDocs = go Nothing []
+collectDocs = go [] Nothing
   where
-    go Nothing _ [] = []
-    go (Just prev) docs [] = finished prev docs []
-    go prev docs ((dL->L _ (DocD _ (DocCommentNext str))) : ds)
-      | Nothing <- prev = go Nothing (str:docs) ds
-      | Just decl <- prev = finished decl docs (go Nothing [str] ds)
-    go prev docs ((dL->L _ (DocD _ (DocCommentPrev str))) : ds) =
-      go prev (str:docs) ds
-    go Nothing docs (d:ds) = go (Just d) docs ds
-    go (Just prev) docs (d:ds) = finished prev docs (go (Just d) [] ds)
+    go docs mprev decls = case (decls, mprev) of
+      ((LL _ (DocD _ (DocCommentNext s))) : ds, Nothing)   -> go (s:docs) Nothing ds
+      ((LL _ (DocD _ (DocCommentNext s))) : ds, Just prev) -> finished prev docs $ go [s] Nothing ds
+      ((LL _ (DocD _ (DocCommentPrev s))) : ds, mprev)     -> go (s:docs) mprev ds
+      (d                                  : ds, Nothing)   -> go docs (Just d) ds
+      (d                                  : ds, Just prev) -> finished prev docs $ go [] (Just d) ds
+      ([]                                     , Nothing)   -> []
+      ([]                                     , Just prev) -> finished prev docs []
 
     finished decl docs rest = (decl, reverse docs) : rest
 
