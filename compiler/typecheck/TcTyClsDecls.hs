@@ -73,7 +73,9 @@ import BasicTypes
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Data.Foldable
 import Data.List
+import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
 
@@ -1544,13 +1546,15 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
                                                     hs_pats hs_rhs_ty
 
        ; let fam_tvs = tyConTyVars fam_tc
+             ppr_eqn = ppr_default_eqn pats rhs_ty
        ; traceTc "tcDefaultAssocDecl 2" (vcat
            [ text "fam_tvs" <+> ppr fam_tvs
            , text "qtvs"    <+> ppr qtvs
            , text "pats"    <+> ppr pats
            , text "rhs_ty"  <+> ppr rhs_ty
            ])
-       ; pat_tvs <- traverse (extract_tv pats rhs_ty) pats
+       ; pat_tvs <- traverse (extract_tv ppr_eqn) pats
+       ; check_all_distinct_tvs ppr_eqn pat_tvs
        ; let subst = zipTvSubst pat_tvs (mkTyVarTys fam_tvs)
        ; pure $ Just (substTyUnchecked subst rhs_ty, loc)
            -- We also perform other checks for well-formedness and validity
@@ -1561,14 +1565,12 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
     -- variable. If so, return the underlying type variable, and if
     -- not, throw an error.
     -- See Note [Type-checking default assoc decls]
-    extract_tv :: [Type] -- All default instance type patterns
-                         -- (only used for error message purposes)
-               -> Type   -- The default instance's right-hand side type
+    extract_tv :: SDoc   -- The pretty-printed default equation
                          -- (only used for error message purposes)
                -> Type   -- The particular type pattern from which to extract
                          -- its underlying type variable
                -> TcM TyVar
-    extract_tv pats rhs_ty pat =
+    extract_tv ppr_eqn pat =
       case getTyVar_maybe pat of
         Just tv -> pure tv
         Nothing ->
@@ -1579,10 +1581,39 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
           -- error message with -fprint-explicit-kinds enabled.
           failWithTc $ pprWithExplicitKindsWhen True $
           hang (text "Illegal argument" <+> quotes (ppr pat) <+> text "in:")
-             2 (vcat [ quotes (text "type" <+> ppr (mkTyConApp fam_tc pats)
-                       <+> equals <+> ppr rhs_ty)
-                     , text "The arguments to" <+> quotes (ppr fam_tc)
-                       <+> text "must all be type variables" ])
+             2 (vcat [ppr_eqn, suggestion])
+
+
+    -- Checks that no type variables in an associated default declaration are
+    -- duplicated. If that is the case, throw an error.
+    -- See Note [Type-checking default assoc decls]
+    check_all_distinct_tvs :: SDoc    -- The pretty-printed default equation
+                                      -- (only used for error message purposes)
+                           -> [TyVar] -- The type variable arguments in the
+                                      -- associated default declaration
+                           -> TcM ()
+    check_all_distinct_tvs ppr_eqn tvs =
+      let dups = findDupsEq (==) tvs in
+      traverse_
+        (\d -> -- Per Note [Type-checking default assoc decls], we already
+               -- know by this point that if any arguments in the default
+               -- instance are duplicates, then they must be
+               -- invisible kind arguments. Therefore, always display the
+               -- error message with -fprint-explicit-kinds enabled.
+               failWithTc $ pprWithExplicitKindsWhen True $
+               hang (text "Illegal duplicate variable"
+                       <+> quotes (ppr (NE.head d)) <+> text "in:")
+                  2 (vcat [ppr_eqn, suggestion]))
+        dups
+
+    ppr_default_eqn :: [Type] -> Type -> SDoc
+    ppr_default_eqn pats rhs_ty =
+      quotes (text "type" <+> ppr (mkTyConApp fam_tc pats)
+                <+> equals <+> ppr rhs_ty)
+
+    suggestion :: SDoc
+    suggestion = text "The arguments to" <+> quotes (ppr fam_tc)
+             <+> text "must all be distinct type variables"
 tcDefaultAssocDecl _ [dL->L _ (XFamEqn _)] = panic "tcDefaultAssocDecl"
 tcDefaultAssocDecl _ [dL->L _ (FamEqn _ _ _ (XLHsQTyVars _) _ _)]
   = panic "tcDefaultAssocDecl"
@@ -1610,10 +1641,15 @@ We do this by creating a substitution [j |-> k, x |-> a, b |-> y] and
 applying this substitution to the RHS.
 
 In order to create this substitution, we must first ensure that all of
-the arguments in the default instance consist of type variables. The parser
-already checks this to a certain degree (see RdrHsSyn.checkTyVars), but
-we must be wary of kind arguments being instantiated, which the parser cannot
-catch so easily. Consider this erroneous program (inspired by #11361):
+the arguments in the default instance consist of distinct type variables.
+This property has already been checked to some degree earlier in the compiler:
+RdrHsSyn.checkTyVars ensures that all visible type arguments are type
+variables, and RnTypes.bindLHsTyVarBndrs ensures that no visible type arguments
+are duplicated. But these only check /visible/ arguments, however, so we still
+must check the invisible kind arguments to see if these invariants are upheld.
+
+First, we must check that all arguments are type variables. As a motivating
+example, consider this erroneous program (inspired by #11361):
 
    class C a where
       type F (a :: k) b :: Type
@@ -1621,6 +1657,19 @@ catch so easily. Consider this erroneous program (inspired by #11361):
 
 If you squint, you'll notice that the kind of `x` is actually Type. However,
 we cannot substitute from [Type |-> k], so we reject this default.
+
+Next, we must check that all arguments are distinct. Here is another offending
+example, this time taken from #13971:
+
+   class C2 (a :: j) where
+      type F2 (a :: j) (b :: k)
+      type F2 (x :: z) (y :: z) = z
+
+All of the arguments in the default equation for `F2` are type variables, so
+that passes the first check. However, if we were to build this substitution,
+then both `j` and `k` map to `z`! In terms of visible kind application, it's as
+if we had written `type F2 @z @z x y = z`, which makes it clear that we have
+duplicated a use of `z`. Therefore, `F2`'s default is also rejected.
 
 Since the LHS of an associated type family default is always just variables,
 it won't contain any tycons. Accordingly, the patterns used in the substitution
