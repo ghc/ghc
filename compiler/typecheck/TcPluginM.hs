@@ -3,7 +3,7 @@
 -- access select functions of the 'TcM', principally those to do with
 -- reading parts of the state.
 module TcPluginM (
-#if defined(GHCI)
+#if defined(HAVE_INTERPRETER)
         -- * Basic TcPluginM functionality
         TcPluginM,
         tcPluginIO,
@@ -52,7 +52,7 @@ module TcPluginM (
 #endif
     ) where
 
-#if defined(GHCI)
+#if defined(HAVE_INTERPRETER)
 import GhcPrelude
 
 import qualified TcRnMonad as TcM
