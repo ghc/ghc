@@ -1109,21 +1109,36 @@ hscCheckSafe' m l = do
                 let trust = getSafeMode $ mi_trust iface'
                     trust_own_pkg = mi_trust_pkg iface'
                     -- check module is trusted
-                    safeM = trust `elem` [Sf_Safe, Sf_Trustworthy]
+                    safeM = trust `elem` [Sf_Safe, Sf_SafeInferred, Sf_Trustworthy]
                     -- check package is trusted
                     safeP = packageTrusted dflags trust trust_own_pkg m
                     -- pkg trust reqs
                     pkgRs = S.fromList . map fst $ filter snd $ dep_pkgs $ mi_deps iface'
+                    -- warn if Safe module imports Safe-Inferred module.
+                    warns = if wopt Opt_WarnInferredSafeImports dflags
+                                && safeLanguageOn dflags
+                                && trust == Sf_SafeInferred
+                                then inferredImportWarn
+                                else emptyBag
                     -- General errors we throw but Safe errors we log
                     errs = case (safeM, safeP) of
                         (True, True ) -> emptyBag
                         (True, False) -> pkgTrustErr
                         (False, _   ) -> modTrustErr
                 in do
+                    logWarnings warns
                     logWarnings errs
                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
+                    inferredImportWarn = unitBag
+                        $ makeIntoWarning (Reason Opt_WarnInferredSafeImports)
+                        $ mkErrMsg dflags l (pkgQual dflags)
+                        $ sep
+                            [ text "Importing Safe-Inferred module "
+                                <> ppr (moduleName m)
+                                <> text " from explicitly Safe module"
+                            ]
                     pkgTrustErr = unitBag $ mkErrMsg dflags l (pkgQual dflags) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
@@ -1146,6 +1161,7 @@ hscCheckSafe' m l = do
     packageTrusted dflags _ _ _
         | not (packageTrustOn dflags) = True
     packageTrusted _ Sf_Safe  False _ = True
+    packageTrusted _ Sf_SafeInferred False _ = True
     packageTrusted dflags _ _ m
         | isHomePkg dflags m = True
         | otherwise = trusted $ getPackageDetails dflags (moduleUnitId m)
