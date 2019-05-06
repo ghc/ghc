@@ -34,7 +34,7 @@ test('ghci010', skip, ghci_script, ['ghci010.script'])
 test('ghci011', normal, ghci_script, ['ghci011.script'])
 test('ghci012', normal, ghci_script, ['ghci012.script'])
 test('ghci013', normal, ghci_script, ['ghci013.script'])
-test('ghci014', reqlib('QuickCheck'), ghci_script, ['ghci014.script'])
+test('ghci014', normal, ghci_script, ['ghci014.script'])
 
 # Ignore stderr from ghci015, the output is non-deterministic
 # (has occasional "thread blocked indefinitely" exceptions), and this
