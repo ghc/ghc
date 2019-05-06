@@ -857,6 +857,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-inferred-safe-imports
     :category:
 
+    :since: 8.10.1
+
     .. index::
        single: safe haskell imports, warning
 
