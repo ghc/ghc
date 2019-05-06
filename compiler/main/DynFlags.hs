@@ -843,6 +843,7 @@ data WarningFlag =
    | Opt_WarnImplicitKindVars             -- Since 8.6
    | Opt_WarnSpaceAfterBang
    | Opt_WarnMissingDerivingStrategies    -- Since 8.8
+   | Opt_WarnInferredSafeImports          -- Since 8.10
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -853,11 +854,12 @@ instance Outputable Language where
 
 -- | The various Safe Haskell modes
 data SafeHaskellMode
-   = Sf_None
-   | Sf_Unsafe
-   | Sf_Trustworthy
-   | Sf_Safe
-   | Sf_Ignore
+   = Sf_None          -- ^ inferred unsafe
+   | Sf_Unsafe        -- ^ set and checked
+   | Sf_Trustworthy   -- ^ set and checked
+   | Sf_Safe          -- ^ set and checked
+   | Sf_SafeInferred  -- ^ inferred as safe
+   | Sf_Ignore        -- ^ @-fno-safe-haskell@ state
    deriving (Eq)
 
 instance Show SafeHaskellMode where
@@ -865,6 +867,7 @@ instance Show SafeHaskellMode where
     show Sf_Unsafe       = "Unsafe"
     show Sf_Trustworthy  = "Trustworthy"
     show Sf_Safe         = "Safe"
+    show Sf_SafeInferred = "Safe-Inferred"
     show Sf_Ignore       = "Ignore"
 
 instance Outputable SafeHaskellMode where
@@ -3719,6 +3722,8 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fno-safe-infer"   (noArg (\d ->
                                                     d { safeInfer = False }))
   , make_ord_flag defFlag "fno-safe-haskell" (NoArg (setSafeHaskell Sf_Ignore))
+
+        ------ position independent flags  ----------------------------------
   , make_ord_flag defGhcFlag "fPIC"          (NoArg (setGeneralFlag Opt_PIC))
   , make_ord_flag defGhcFlag "fno-PIC"       (NoArg (unSetGeneralFlag Opt_PIC))
   , make_ord_flag defGhcFlag "fPIE"          (NoArg (setGeneralFlag Opt_PIC))
@@ -4037,6 +4042,7 @@ wWarningFlagsDeps = [
   flagSpec "all-missed-specializations"  Opt_WarnAllMissedSpecs,
   flagSpec' "safe"                       Opt_WarnSafe setWarnSafe,
   flagSpec "trustworthy-safe"            Opt_WarnTrustworthySafe,
+  flagSpec "inferred-safe-imports"       Opt_WarnInferredSafeImports,
   flagSpec "tabs"                        Opt_WarnTabs,
   flagSpec "type-defaults"               Opt_WarnTypeDefaults,
   flagSpec "typed-holes"                 Opt_WarnTypedHoles,

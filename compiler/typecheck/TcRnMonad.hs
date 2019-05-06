@@ -1837,7 +1837,7 @@ finalSafeMode :: DynFlags -> TcGblEnv -> IO SafeHaskellMode
 finalSafeMode dflags tcg_env = do
     safeInf <- fst <$> readIORef (tcg_safeInfer tcg_env)
     return $ case safeHaskell dflags of
-        Sf_None | safeInferOn dflags && safeInf -> Sf_Safe
+        Sf_None | safeInferOn dflags && safeInf -> Sf_SafeInferred
                 | otherwise                     -> Sf_None
         s -> s
 
