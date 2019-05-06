@@ -188,7 +188,7 @@ the flags are off.
 -}
 
 ghciSupported :: Bool
-#if defined(GHCI)
+#if defined(HAVE_INTERNAL_INTERPRETER)
 ghciSupported = True
 #else
 ghciSupported = False
