@@ -1,0 +1,11 @@
+
+LinearViewPattern.hs:11:4: error:
+    • Nontrivial multiplicity equalities are currently not supported
+    • In the pattern: not -> True
+      In an equation for ‘f’: f (not -> True) = True
+
+LinearViewPattern.hs:11:4: error:
+    • Couldn't match type ‘'Omega’ with ‘'One’
+        arising from a non-linear pattern
+    • In the pattern: not -> True
+      In an equation for ‘f’: f (not -> True) = True

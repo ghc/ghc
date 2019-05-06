@@ -1,0 +1,9 @@
+
+LinearAsPat.hs:6:12: error:
+    • Nontrivial multiplicity equalities are currently not supported
+    • In an equation for ‘shouldFail’: shouldFail x@True = x
+
+LinearAsPat.hs:6:12: error:
+    • Couldn't match type ‘'Omega’ with ‘'One’
+        arising from a non-linear pattern
+    • In an equation for ‘shouldFail’: shouldFail x@True = x

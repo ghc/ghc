@@ -42,6 +42,7 @@ import ClsInst( AssocInstInfo(..) )
 import TcMType
 import TysWiredIn ( unitTy, makeRecoveryTyCon )
 import TcType
+import Multiplicity
 import RnEnv( lookupConstructorFields )
 import FamInst
 import FamInstEnv
@@ -73,6 +74,7 @@ import BasicTypes
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Data.Functor.Compose ( Compose(..) )
 import Data.List
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
@@ -640,7 +642,7 @@ generaliseTcTyCon tc
 
        -- Step 7: Make the result TcTyCon
              tycon = mkTcTyCon tc_name final_tcbs tc_res_kind
-                            (mkTyVarNamePairs final_spec_req_tvs)
+                            [(tyVarName v, v) | v <- final_spec_req_tvs]
                             True {- it's generalised now -}
                             (tyConFlavour tc)
 
@@ -956,7 +958,7 @@ mkPromotionErrorEnv :: [LTyClDecl GhcRn] -> TcTypeEnv
 -- Maps each tycon/datacon to a suitable promotion error
 --    tc :-> APromotionErr TyConPE
 --    dc :-> APromotionErr RecDataConPE
---    See Note [Recursion and promoting data constructors]
+--    See Note [ARecDataCon: Recursion and promoting data constructors]
 
 mkPromotionErrorEnv decls
   = foldr (plusNameEnv . mk_prom_err_env . unLoc)
@@ -1015,7 +1017,7 @@ getInitialKind cusk
                   return constraintKind
        ; let parent_tv_prs = tcTyConScopedTyVars tycon
             -- See Note [Don't process associated types in kcLHsQTyVars]
-       ; inner_tcs <- tcExtendNameTyVarEnv parent_tv_prs $
+       ; inner_tcs <- tcExtendNameTyVarEnv (map (\(x,y) -> (x, unrestricted y)) parent_tv_prs) $
                       getFamDeclInitialKinds cusk (Just tycon) ats
        ; return (tycon : inner_tcs) }
 
@@ -1164,7 +1166,7 @@ kcConDecl (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
     bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
        ; traceTc "kcConDecl {" (ppr name $$ ppr args)
-       ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)
+       ; mapM_ (tcHsOpenType . getBangType) (map hsThing (hsConDeclArgTys args))
        ; traceTc "kcConDecl }" (ppr name)
        }
               -- We don't need to check the telescope here, because that's
@@ -1188,7 +1190,7 @@ kcConDecl (ConDeclGADT { con_names = names
     bindExplicitTKBndrs_Tv explicit_tkv_nms $
         -- Why "_Tv"?  See Note [Kind-checking for GADTs]
     do { _ <- tcHsMbContext cxt
-       ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)
+       ; mapM_ (tcHsOpenType . getBangType . hsThing) (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty
        ; return () }
 kcConDecl (XConDecl _) = panic "kcConDecl"
@@ -2302,7 +2304,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
              -- Zonk to Types
        ; (ze, qkvs)      <- zonkTyBndrs kvs
        ; (ze, user_qtvs) <- zonkTyBndrsX ze exp_tvs
-       ; arg_tys         <- zonkTcTypesToTypesX ze arg_tys
+       ; Compose arg_tys <- zonkTcTypesToTypesX ze (Compose arg_tys)
        ; ctxt            <- zonkTcTypesToTypesX ze ctxt
 
        ; fam_envs <- tcGetFamInstEnvs
@@ -2371,7 +2373,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
              -- Zonk to Types
        ; (ze, tkvs)     <- zonkTyBndrs tkvs
        ; (ze, user_tvs) <- zonkTyBndrsX ze user_tvs
-       ; arg_tys <- zonkTcTypesToTypesX ze arg_tys
+       ; Compose arg_tys <- zonkTcTypesToTypesX ze (Compose arg_tys)
        ; ctxt    <- zonkTcTypesToTypesX ze ctxt
        ; res_ty  <- zonkTcTypeToTypeX   ze res_ty
 
@@ -2389,7 +2391,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
              all_user_bndrs = tkv_bndrs ++ user_tv_bndrs
 
              ctxt'      = substTys arg_subst ctxt
-             arg_tys'   = substTys arg_subst arg_tys
+             arg_tys'   = getCompose $ substTys arg_subst (Compose arg_tys)
              res_ty'    = substTy  arg_subst res_ty
 
 
@@ -2419,7 +2421,7 @@ tcConDecl _ _ _ _ (ConDeclGADT _ _ _ (XLHsQTyVars _) _ _ _ _)
 tcConDecl _ _ _ _ (XConDecl _) = panic "tcConDecl"
 
 tcConIsInfixH98 :: Name
-             -> HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn])
+             -> HsConDetails a b
              -> TcM Bool
 tcConIsInfixH98 _   details
   = case details of
@@ -2427,7 +2429,7 @@ tcConIsInfixH98 _   details
            _            -> return False
 
 tcConIsInfixGADT :: Name
-             -> HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn])
+             -> HsConDetails (HsScaled GhcRn (LHsType GhcRn)) r
              -> TcM Bool
 tcConIsInfixGADT con details
   = case details of
@@ -2435,13 +2437,13 @@ tcConIsInfixGADT con details
            RecCon {}    -> return False
            PrefixCon arg_tys           -- See Note [Infix GADT constructors]
                | isSymOcc (getOccName con)
-               , [_ty1,_ty2] <- arg_tys
+               , [_ty1,_ty2] <- map hsThing arg_tys
                   -> do { fix_env <- getFixityEnv
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
 
 tcConArgs :: HsConDeclDetails GhcRn
-          -> TcM [(TcType, HsSrcBang)]
+          -> TcM [(Scaled TcType, HsSrcBang)]
 tcConArgs (PrefixCon btys)
   = mapM tcConArg btys
 tcConArgs (InfixCon bty1 bty2)
@@ -2452,22 +2454,23 @@ tcConArgs (RecCon fields)
   = mapM tcConArg btys
   where
     -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(dL->L _ f) -> (cd_fld_names f,cd_fld_type f))
+    combined = map (\(dL->L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f)))
                    (unLoc fields)
     explode (ns,ty) = zip ns (repeat ty)
     exploded = concatMap explode combined
     (_,btys) = unzip exploded
 
 
-tcConArg :: LHsType GhcRn -> TcM (TcType, HsSrcBang)
-tcConArg bty
+tcConArg :: HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
+tcConArg (HsScaled w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcHsOpenType (getBangType bty)
+        ; w' <- tcMult w
              -- Newtypes can't have unboxed types, but we check
              -- that in checkValidDataCon; this tcConArg stuff
              -- doesn't happen for GADT-style declarations
         ; traceTc "tcConArg 2" (ppr bty)
-        ; return (arg_ty, getBangStrictness bty) }
+        ; return (Scaled w' arg_ty, getBangStrictness bty) }
 
 {-
 Note [Infix GADT constructors]
@@ -3097,7 +3100,7 @@ checkValidDataCon dflags existential_ok tc con
           -- Check all argument types for validity
         ; checkValidType ctxt (dataConUserType con)
         ; mapM_ (checkForLevPoly empty)
-                (dataConOrigArgTys con)
+                (map scaledThing $ dataConOrigArgTys con)
 
           -- Extra checks for newtype data constructors
         ; when (isNewTyCon tc) (checkNewDataCon con)
@@ -3180,8 +3183,11 @@ checkNewDataCon con
   = do  { checkTc (isSingleton arg_tys) (newtypeFieldErr con (length arg_tys))
               -- One argument
 
-        ; checkTc (not (isUnliftedType arg_ty1)) $
+        ; checkTc (not (isUnliftedType (scaledThing arg_ty1))) $
           text "A newtype cannot have an unlifted argument type"
+
+        ; checkTc (ok_mult (scaledMult arg_ty1)) $
+          text "A newtype constructor must be linear"
 
         ; check_con (null eq_spec) $
           text "A newtype constructor must have a return type of form T a1 ... an"
@@ -3209,6 +3215,9 @@ checkNewDataCon con
     ok_bang (HsSrcBang _ _ SrcStrict) = False
     ok_bang (HsSrcBang _ _ SrcLazy)   = False
     ok_bang _                         = True
+
+    ok_mult One = True
+    ok_mult _   = False
 
 -------------------------------
 checkValidClass :: Class -> TcM ()
@@ -3649,7 +3658,7 @@ checkValidRoles tc
     check_dc_roles datacon
       = do { traceTc "check_dc_roles" (ppr datacon <+> ppr (tyConRoles tc))
            ; mapM_ (check_ty_roles role_env Representational) $
-                    eqSpecPreds eq_spec ++ theta ++ arg_tys }
+                    eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys) }
                     -- See Note [Role-checking data constructor arguments] in TcTyDecls
       where
         (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
@@ -3686,8 +3695,9 @@ checkValidRoles tc
       =  check_ty_roles env role    ty1
       >> check_ty_roles env Nominal ty2
 
-    check_ty_roles env role (FunTy _ ty1 ty2)
-      =  check_ty_roles env role ty1
+    check_ty_roles env role (FunTy _ w ty1 ty2)
+      =  check_ty_roles env role w
+      >> check_ty_roles env role ty1
       >> check_ty_roles env role ty2
 
     check_ty_roles env role (ForAllTy (Bndr tv _) ty)

@@ -31,6 +31,7 @@ import Name
 import Outputable
 import Unique
 import Util
+import Multiplicity
 import BasicTypes
 import Var
 import FieldLabel
@@ -405,11 +406,11 @@ patSynExTyVars ps = binderVars (psExTyVars ps)
 patSynExTyVarBinders :: PatSyn -> [TyVarBinder]
 patSynExTyVarBinders = psExTyVars
 
-patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
+patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Scaled Type], Type)
 patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
                     , psProvTheta = prov, psReqTheta = req
                     , psArgs = arg_tys, psResultTy = res_ty })
-  = (binderVars univ_tvs, req, binderVars ex_tvs, prov, arg_tys, res_ty)
+  = (binderVars univ_tvs, req, binderVars ex_tvs, prov, map unrestricted arg_tys, res_ty)
 
 patSynMatcher :: PatSyn -> (Id,Bool)
 patSynMatcher = psMatcher
@@ -464,6 +465,6 @@ pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
         , pprType sigma_ty ]
   where
     sigma_ty = mkForAllTys ex_tvs  $
-               mkInvisFunTys prov_theta $
-               mkVisFunTys orig_args orig_res_ty
+               mkInvisFunTysOm prov_theta $
+               mkVisFunTysOm orig_args orig_res_ty
     insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)

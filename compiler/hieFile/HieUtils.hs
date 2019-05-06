@@ -10,6 +10,7 @@ import CoreMap
 import DynFlags                   ( DynFlags )
 import FastString                 ( FastString, mkFastString )
 import IfaceType
+import Multiplicity
 import Name hiding (varName)
 import Outputable                 ( renderWithStyle, ppr, defaultUserStyle )
 import SrcLoc
@@ -81,8 +82,8 @@ hieTypeToIface = foldType go
     go (HLitTy l) = IfaceLitTy l
     go (HForAllTy ((n,k),af) t) = let b = (occNameFS $ getOccName n, k)
                                   in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
-    go (HFunTy a b)     = IfaceFunTy VisArg   a    b
-    go (HQualTy pred b) = IfaceFunTy InvisArg pred b
+    go (HFunTy w a b)   = IfaceFunTy VisArg   w        a    b
+    go (HQualTy pred b) = IfaceFunTy InvisArg omega_ty pred b
     go (HCastTy a) = a
     go HCoercionTy = IfaceTyVar "<coercion type>"
     go (HTyConApp a xs) = IfaceTyConApp a (hieToIfaceArgs xs)
@@ -158,12 +159,13 @@ getTypeIndex t
       k <- getTypeIndex (varType v)
       i <- getTypeIndex t
       return $ HForAllTy ((varName v,k),a) i
-    go (FunTy { ft_af = af, ft_arg = a, ft_res = b }) = do
+    go (FunTy { ft_af = af, ft_mult = w, ft_arg = a, ft_res = b }) = do
       ai <- getTypeIndex a
       bi <- getTypeIndex b
+      wi <- getTypeIndex w
       return $ case af of
-                 InvisArg -> HQualTy ai bi
-                 VisArg   -> HFunTy ai bi
+                 InvisArg -> case w of Omega -> HQualTy ai bi; _ -> error "Unexpected non-linear predicate"
+                 VisArg   -> HFunTy wi ai bi
     go (LitTy a) = return $ HLitTy $ toIfaceTyLit a
     go (CastTy t _) = do
       i <- getTypeIndex t

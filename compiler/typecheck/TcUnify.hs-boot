@@ -2,10 +2,10 @@ module TcUnify where
 
 import GhcPrelude
 import TcType      ( TcTauType )
-import TcRnTypes   ( TcM )
+import TcRnTypes   ( TcM, CtOrigin )
 import TcEvidence  ( TcCoercion )
 import HsExpr      ( HsExpr )
-import HsTypes     ( HsType )
+import HsTypes     ( HsType, Mult )
 import HsExtension ( GhcRn )
 
 -- This boot file exists only to tie the knot between
@@ -13,3 +13,5 @@ import HsExtension ( GhcRn )
 
 unifyType :: Maybe (HsExpr GhcRn) -> TcTauType -> TcTauType -> TcM TcCoercion
 unifyKind :: Maybe (HsType GhcRn) -> TcTauType -> TcTauType -> TcM TcCoercion
+
+tcSubMult :: CtOrigin -> Mult -> Mult -> TcM ()

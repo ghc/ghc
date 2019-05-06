@@ -2,6 +2,7 @@
 :set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l Test
 let t = O (map Just [[1 :: Int,1],[2,2]])
+seq t ()
 :p t
 -- should have bound _t1 now
 :show bindings
