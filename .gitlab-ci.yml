@@ -19,7 +19,7 @@ stages:
   - lint       # Source linting
   - build      # A quick smoke-test to weed out broken commits
   - full-build # Build all the things
-  - cleanup    # See Note [Cleanup on Windows]
+  - cleanup    # See Note [Cleanup after the shell executor]
   - packaging  # Source distribution, etc.
   - hackage    # head.hackage testing
   - deploy     # push documentation
@@ -673,34 +673,17 @@ nightly-i386-windows:
 #
 # As noted in [1], gitlab-runner's shell executor doesn't clean up its working
 # directory after builds. Unfortunately, we are forced to use the shell executor
-# on Windows. To avoid running out of disk space we add a stage at the end of
-# the build to remove the \GitLabRunner\builds directory. Since we only run a
-# single build at a time on Windows this should be safe.
+# on Darwin. To avoid running out of disk space we add a stage at the end of
+# the build to remove the /.../GitLabRunner/builds directory. Since we only run a
+# single build at a time on Darwin this should be safe.
+#
+# We used to have a similar cleanup job on Windows as well however it ended up
+# being quite fragile as we have multiple Windows builders yet there is no
+# guarantee that the cleanup job is run on the same machine as the build itself
+# was run. Consequently we were forced to instead handle cleanup with a separate
+# cleanup cron job on Windows.
 #
 # [1] https://gitlab.com/gitlab-org/gitlab-runner/issues/3856
-
-# See Note [Cleanup after shell executor]
-cleanup-windows:
-  <<: *only-default
-  stage: cleanup
-  tags:
-    - x86_64-windows
-  when: always
-  dependencies: []
-  before_script:
-    - echo "Time to clean up"
-  script:
-    - echo "Let's go"
-  after_script:
-    - set "BUILD_DIR=%CI_PROJECT_DIR%"
-    - set "BUILD_DIR=%BUILD_DIR:/=\%"
-    - echo "Cleaning %BUILD_DIR%"
-    - cd \GitLabRunner
-    # This is way more complicated than it should be:
-    # See https://stackoverflow.com/questions/1965787
-    - del %BUILD_DIR%\* /F /Q
-    - for /d %%p in (%BUILD_DIR%\*) do rd /Q /S "%%p"
-    - exit /b 0
 
 # See Note [Cleanup after shell executor]
 cleanup-darwin:
