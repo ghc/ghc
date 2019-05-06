@@ -320,8 +320,8 @@ import qualified EnumSet
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
 
-#if defined(GHCI)
-import Foreign (Ptr) -- needed for 2nd stage
+#if defined(HAVE_INTERPRETER)
+import Foreign (Ptr)
 #endif
 
 -- Note [Updating flag description in the User's Guide]
@@ -4342,7 +4342,7 @@ supportedExtensions :: [String]
 supportedExtensions = concatMap toFlagSpecNamePair xFlags
   where
     toFlagSpecNamePair flg
-#if !defined(GHCI)
+#if !defined(HAVE_INTERPRETER)
       -- IMPORTANT! Make sure that `ghc --supported-extensions` omits
       -- "TemplateHaskell"/"QuasiQuotes" when it's known not to work out of the
       -- box. See also GHC #11102 and #16331 for more details about
