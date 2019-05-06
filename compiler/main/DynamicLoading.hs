@@ -3,7 +3,7 @@
 -- | Dynamically lookup up values from modules and loading them.
 module DynamicLoading (
         initializePlugins,
-#if defined(GHCI)
+#if defined(HAVE_INTERPRETER)
         -- * Loading plugins
         loadFrontendPlugin,
 
@@ -27,7 +27,7 @@ module DynamicLoading (
 import GhcPrelude
 import DynFlags
 
-#if defined(GHCI)
+#if defined(HAVE_INTERPRETER)
 import Linker           ( linkModule, getHValue )
 import GHCi             ( wormhole )
 import SrcLoc           ( noSrcSpan )
@@ -76,7 +76,7 @@ import Control.Monad    ( unless )
 -- actual compilation starts. Idempotent operation. Should be re-called if
 -- pluginModNames or pluginModNameOpts changes.
 initializePlugins :: HscEnv -> DynFlags -> IO DynFlags
-#if !defined(GHCI)
+#if !defined(HAVE_INTERPRETER)
 initializePlugins _ df
   = do let pluginMods = pluginModNames df
        unless (null pluginMods) (pluginError pluginMods)
@@ -96,7 +96,7 @@ initializePlugins hsc_env df
 #endif
 
 
-#if defined(GHCI)
+#if defined(HAVE_INTERPRETER)
 
 loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env

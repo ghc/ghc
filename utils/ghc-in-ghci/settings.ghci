@@ -30,7 +30,7 @@
 :set -Iincludes/dist-derivedconstants/header
 :set -package=ghc-boot-th
 :set -DSTAGE=2
-:set -DGHCI
+:set -DHAVE_INTERNAL_INTERPRETER
 :set -DGHC_LOADED_INTO_GHCI
 :set -XNoImplicitPrelude
 
