@@ -1835,13 +1835,13 @@ finalSafeMode :: DynFlags -> TcGblEnv -> IO SafeHaskellMode
 finalSafeMode dflags tcg_env = do
     safeInf <- fst <$> readIORef (tcg_safeInfer tcg_env)
     return $ case safeHaskell dflags of
-        Sf_None | safeInferOn dflags && safeInf -> Sf_Safe
+        Sf_None | safeInferOn dflags && safeInf -> Sf_SafeInferred
                 | otherwise                     -> Sf_None
         s -> s
 
 -- | Switch instances to safe instances if we're in Safe mode.
 fixSafeInstances :: SafeHaskellMode -> [ClsInst] -> [ClsInst]
-fixSafeInstances sfMode | sfMode /= Sf_Safe = id
+fixSafeInstances sfMode | sfMode /= Sf_Safe && sfMode /= Sf_SafeInferred = id
 fixSafeInstances _ = map fixSafe
   where fixSafe inst = let new_flag = (is_flag inst) { isSafeOverlap = True }
                        in inst { is_flag = new_flag }

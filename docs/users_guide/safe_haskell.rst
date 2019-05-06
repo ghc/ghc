@@ -740,7 +740,7 @@ And one general flag:
     requiring the package that ``M`` resides in be considered trusted, for ``M``
     to be considered trusted.
 
-And three warning flags:
+And four warning flags:
 
 .. ghc-flag:: -Wunsafe
     :shortdesc: warn if the module being compiled is regarded to be unsafe.
@@ -776,6 +776,39 @@ And three warning flags:
     -XTrustworthy but it could instead be marked as
     -XSafe , a more informative bound. Can be used to detect once a Safe Haskell
     bound can be improved as dependencies are updated.
+
+.. ghc-flag:: -Winferred-safe-imports
+    :shortdesc: warn when an explicitly Safe Haskell module imports a Safe-Inferred one
+    :type: dynamic
+    :reverse: -Wno-inferred-safe-imports
+    :category:
+
+    :since: 8.10.1
+
+    .. index::
+       single: safe haskell imports, warning
+
+    The module ``A`` below is annotated to be explictly ``Safe``, but it imports
+    ``Safe-Inferred`` module.
+
+        {-# LANGUAGE Safe #-}
+        module A where
+
+        import B (double)
+
+        quad :: Int -> Int
+        quad = double . double
+
+    
+        module B where
+
+        double :: Int -> Int
+        double n = n + n
+
+    The inferred status is volatile: if an unsafe import is added to the module
+    ``B``, it will cause compilation error of ``A``.  When
+    :ghc-flag:`-Winferred-safe-imports` is enabled, the compiler will emit a
+    warning about this.
 
 .. _safe-compilation:
 
