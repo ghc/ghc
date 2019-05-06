@@ -955,17 +955,47 @@ importdecls_semi
         | {- empty -}           { [] }
 
 importdecl :: { LImportDecl GhcPs }
-        : 'import' maybe_src maybe_safe optqualified maybe_pkg modid maybeas maybeimpspec
-                {% ams (cL (comb4 $1 $6 (snd $7) $8) $
-                  ImportDecl { ideclExt = noExt
-                             , ideclSourceSrc = snd $ fst $2
-                             , ideclName = $6, ideclPkgQual = snd $5
-                             , ideclSource = snd $2, ideclSafe = snd $3
-                             , ideclQualified = snd $4, ideclImplicit = False
-                             , ideclAs = unLoc (snd $7)
-                             , ideclHiding = unLoc $8 })
-                   ((mj AnnImport $1 : (fst $ fst $2) ++ fst $3 ++ fst $4
-                                    ++ fst $5 ++ fst $7)) }
+        : 'import' maybe_src maybe_safe optqualified maybe_pkg modid optqualified maybeas maybeimpspec
+                {% do
+                  {
+                  -- Take into account the 'ImportQualifiedPost'
+                  -- extension.
+                     let preposQualMod = snd (unLoc $4)
+                         postposQualMod = snd (unLoc $7)
+                         qualModAddAnn =
+                           if preposQualMod then fst (unLoc $4)
+                           else if postposQualMod then fst (unLoc $7) else []
+                  ; importQualifiedPostEnabled <- getBit ImportQualifiedPostBit
+                  -- Error if 'qualified' found in postpostive
+                  -- position and 'ImportQualifiedPost' is not in
+                  -- effect.
+                  ; if (not importQualifiedPostEnabled) && postposQualMod
+                      then failOpNotEnabledImportQualifiedPost (getLoc $7)
+                      else return ()
+                  -- Error if 'qualified' occurs in both pre and
+                  -- postpositive positions.
+                  ;  if preposQualMod && postposQualMod
+                       then failOpImportQualifiedTwice (getLoc $7)
+                       else return ()
+                  -- Warn if 'qualified' found in prepositive
+                  -- position and 'Opt_WarnPrepositiveQualifiedModule'
+                  -- is enabled.
+                  ;  if preposQualMod
+                       then warnPrepositiveQualifiedModule (getLoc $4)
+                       else return ()
+                  ;  ams (cL (comb4 $1 $6 (snd $8) $9) $
+                      ImportDecl { ideclExt = noExt
+                                  , ideclSourceSrc = snd $ fst $2
+                                  , ideclName = $6, ideclPkgQual = snd $5
+                                  , ideclSource = snd $2, ideclSafe = snd $3
+                                  , ideclQualified = preposQualMod || postposQualMod
+                                  , ideclImplicit = False
+                                  , ideclAs = unLoc (snd $8)
+                                  , ideclHiding = unLoc $9 })
+                         ((mj AnnImport $1 : (fst $ fst $2) ++ fst $3 ++ qualModAddAnn
+                                          ++ fst $5 ++ fst $8))
+                  }
+                }
 
 maybe_src :: { (([AddAnn],SourceText),IsBootInterface) }
         : '{-# SOURCE' '#-}'        { (([mo $1,mc $2],getSOURCE_PRAGs $1)
@@ -986,9 +1016,9 @@ maybe_pkg :: { ([AddAnn],Maybe StringLiteral) }
                         ; return ([mj AnnPackageName $1], Just (StringLiteral (getSTRINGs $1) pkgFS)) } }
         | {- empty -}                           { ([],Nothing) }
 
-optqualified :: { ([AddAnn],Bool) }
-        : 'qualified'                           { ([mj AnnQualified $1],True)  }
-        | {- empty -}                           { ([],False) }
+optqualified :: { Located ([AddAnn],Bool) }
+        : 'qualified'                           { sL1 $1 ([mj AnnQualified $1],True)  }
+        | {- empty -}                           { sL0 ([],False) }
 
 maybeas :: { ([AddAnn],Located (Maybe (Located ModuleName))) }
         : 'as' modid                           { ([mj AnnAs $1]

@@ -843,6 +843,7 @@ data WarningFlag =
    | Opt_WarnImplicitKindVars             -- Since 8.6
    | Opt_WarnSpaceAfterBang
    | Opt_WarnMissingDerivingStrategies    -- Since 8.8
+   | Opt_WarnPrepositiveQualifiedModule   -- Since TBD
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -4070,7 +4071,10 @@ wWarningFlagsDeps = [
   flagSpec "star-binder"                 Opt_WarnStarBinder,
   flagSpec "star-is-type"                Opt_WarnStarIsType,
   flagSpec "missing-space-after-bang"    Opt_WarnSpaceAfterBang,
-  flagSpec "partial-fields"              Opt_WarnPartialFields ]
+  flagSpec "partial-fields"              Opt_WarnPartialFields,
+  flagSpec "prepositive-qualified-module"
+                                         Opt_WarnPrepositiveQualifiedModule
+ ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
 negatableFlagsDeps :: [(Deprecation, FlagSpec GeneralFlag)]
@@ -4396,6 +4400,7 @@ xFlagsDeps = [
                                               setGenDeriving,
   flagSpec "ImplicitParams"                   LangExt.ImplicitParams,
   flagSpec "ImplicitPrelude"                  LangExt.ImplicitPrelude,
+  flagSpec "ImportQualifiedPost"              LangExt.ImportQualifiedPost,
   flagSpec "ImpredicativeTypes"               LangExt.ImpredicativeTypes,
   flagSpec' "IncoherentInstances"             LangExt.IncoherentInstances
                                               setIncoherentInsts,
