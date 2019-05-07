@@ -70,13 +70,77 @@ GHC extensions to the FFI Chapter
 The FFI features that are described in this section are specific to GHC.
 Your code will not be portable to other compilers if you use them.
 
-Unboxed types
-~~~~~~~~~~~~~
+Unlifted FFI Types
+~~~~~~~~~~~~~~~~~~
 
-The following unboxed types may be used as basic foreign types (see FFI
-Chapter, Section 8.6): ``Int#``, ``Word#``, ``Char#``, ``Float#``,
-``Double#``, ``Addr#``, ``StablePtr# a``, ``MutableByteArray#``,
-``ForeignObj#``, and ``ByteArray#``.
+.. extension:: InterruptibleFFI
+    :shortdesc: Enable unlifted FFI types
+
+    :since: 6.X.X
+
+The following unlifted unboxed types may be used as basic foreign
+types (see FFI Chapter, Section 8.6) for both ``safe`` and
+``unsafe`` foreign calls: ``Int#``, ``Word#``, ``Char#``, ``Float#``,
+``Double#``, ``Addr#``, and ``StablePtr# a``. The following unlifted
+boxed types may be used as arguments to (not results of) ``unsafe``
+foreign calls: ``Array#``, ``ArrayArray#``, ``ByteArray#``, and
+``MutableByteArray#``. Additionally, ``ByteArray#`` and
+``MutableByteArray#`` can be passed to ``safe`` foreign calls
+if object is pinned. (Such can be ascertained by judicious use of
+``isByteArrayPinned#``, ``isMutableByteArrayPinned#``, or
+``newPinnedByteArray#``.) An unpinned argument to an ``safe``
+foreign call results in undefined behavior.
+
+When passing ``ByteArray#`` or ``MutableByteArray#`` as an argument to
+a foreign call, foreign function sees a pointers that refers to the
+payload of the array, not to the ``StgArrBytes`` heap object containing
+it. This means that the foreign function does not need any knowledge of
+the RTS data types. The following example (note that in practice, users
+should prefer ``readWord8Array#`` to the FFI for something this simple),
+sums the first three bytes in a ``MutableByteArray##``::
+
+    // C source
+    uint8_t add_triplet(uint8_t* arr) {
+      return (arr[0] + arr[1] + arr[2]);
+    }
+
+    -- Haskell source
+    foreign import ccall unsafe "add_triplet"
+      addTriplet :: MutableByteArray# RealWorld -> IO Word8
+
+When passing unlifted boxed types other than ``ByteArray#`` and
+``MutableByteArray#`` as arguments to foreign calls, the foreign
+function sees a pointer to a heap object. In the case of ``ArrayArray#``,
+this heap object is ``StgMutArrPtrs``. The foreign function must have
+knowledge of the RTS data types to perform any meaningful work. The
+following example (again, this is not something that the FFI is actually
+needed for) sums the first element of each ``ByteArray#`` (interpreting
+the bytes as an array of ``CInt``) element of an ``ArrayArray##``::
+    
+    // C source, must include the RTS
+    #include "Rts.h"
+    int sum_first (StgMutArrPtrs *arr) {
+      StgClosure **bufsTmp = arr->payload;
+      StgArrBytes **bufs = (StgArrBytes**)bufsTmp;
+      int res = 0;
+      for(StgWord ix = 0;ix < arr->ptrs;ix++) {
+        res = res + ((int*)(bufs[ix]->payload))[0];
+      }
+      return res;
+    }
+
+    -- Haskell source, all elements in the array must be
+    -- either ByteArray# or MutableByteArray#. This is not
+    -- enforced by the type system in this example.
+    foreign import ccall unsafe "sum_first"
+      sumFirst :: ArrayArray# -> IO CInt
+
+Although GHC allows the user to pass all unlifted boxed types to
+foreign functions, many of them are not amenable to useful work.
+Although ``Array#`` is unlifted, the elements in its payload are
+lifted, and a foreign function cannot force thunks. Consequently,
+a foreign function could not inspect the elements of an ``Array#``
+other than for operations like a pointer equality check.
 
 .. _ffi-newtype-io:
 
