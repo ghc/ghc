@@ -1,0 +1,6 @@
+
+T16632.hs:5:22: warning: [-Wunused-type-patterns]
+    Defined but not used on the right hand side: type variable ‘b’
+  |
+5 | type instance F Char b Int = ()
+  |                      ^
