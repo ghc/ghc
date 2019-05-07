@@ -740,7 +740,7 @@ And one general flag:
     requiring the package that ``M`` resides in be considered trusted, for ``M``
     to be considered trusted.
 
-And four warning flags:
+And five warning flags:
 
 .. ghc-flag:: -Wunsafe
     :shortdesc: warn if the module being compiled is regarded to be unsafe.
@@ -809,6 +809,22 @@ And four warning flags:
     ``B``, it will cause compilation error of ``A``.  When
     :ghc-flag:`-Winferred-safe-imports` is enabled, the compiler will emit a
     warning about this.
+    This option is off by default.
+
+.. ghc-flag:: -Wmissing-safe-haskell-mode
+    :shortdesc: warn when the Safe Haskell mode is not explicitly specified.
+    :type: dynamic
+    :reverse: -Wno-missing-safe-haskell-mode
+    :category:
+
+    :since: 8.10.1
+
+    .. index::
+       single: safe haskell mode, missing
+
+    The compiler will warn when none of  :extension:`Safe`,
+    :extension:`Trustworthy` or :extension:`Unsafe` is specified.
+    This option is off by default.
 
 .. _safe-compilation:
 
