@@ -78,6 +78,65 @@ data SomeNat    = forall n. KnownNat n    => SomeNat    (Proxy n)
 -- @since 4.10.0.0
 someNatVal :: Natural -> SomeNat
 someNatVal n = withSNat SomeNat (SNat n) Proxy
+{-# NOINLINE someNatVal #-} -- See Note [NOINLINE someNatVal]
+
+{- Note [NOINLINE someNatVal]
+
+`someNatVal` converts a natural number to an existentially quantified
+dictionary for `KnowNat` (aka `SomeNat`).  The existential quantification
+is very important, as it captures the fact that we don't know the type
+statically, although we do know that it exists.   Because this type is
+fully opaque, we should never be able to prove that it matches anything else.
+This is why coherence should still hold:  we can manufacture a `KnownNat k`
+dictionary, but it can never be confused with a `KnownNat 33` dictionary,
+because we should never be able to prove that `k ~ 33`.
+
+But how to implement `someNatVal`?  We can't quite implement it "honestly"
+because `SomeNat` needs to "hide" the type of the newly created dictionary,
+but we don't know what the actual type is!  If `someNatVal` was built into
+the language, then we could manufacture a new skolem constant,
+which should behave correctly.
+
+Since extra language constructors have additional maintenance costs,
+we use a trick to implement `someNatVal` in the library.  The idea is that
+instead of generating a "fresh" type for each use of `someNatVal`, we simply
+use GHC's placeholder type `Any` (of kind `Nat`). So, the elaborated
+version of the code is:
+
+  someNatVal n = withSNat @T (SomeNat @T) (SNat @T n) (Proxy @T)
+    where type T = Any Nat
+
+After inlining and simplification, this ends up looking something like this:
+
+  someNatVal n = SomeNat @T (KnownNat @T (SNat @T n)) (Proxy @T)
+    where type T = Any Nat
+
+`KnownNat` is the constructor for dictionaries for the class `KnownNat`.
+See Note [magicDictId magic] in "basicType/MkId.hs" for details on how
+we actually construct the dictionry.
+
+Note that using `Any Nat` is not really correct, as multilple calls to
+`someNatVal` would violate coherence:
+
+  type T = Any Nat
+
+  x = SomeNat @T (KnownNat @T (SNat @T 1)) (Proxy @T)
+  y = SomeNat @T (KnownNat @T (SNat @T 2)) (Proxy @T)
+
+Note that now the code has two dictionaries with the same type, `KnownNat Any`,
+but they have different implementations, namely `SNat 1` and `SNat 2`.  This
+is not good, as GHC assumes coherence, and it is free to interchange
+dictionaries of the same type, but in this case this would produce an incorrect
+result.   See #16586 for examples of this happening.
+
+We can avoid this problem by making the definition of `someNatVal` opaque
+and we do this by using a `NOINLINE` pragma.  This restores coherence, because
+GHC can only inspect the result of `someNatVal` by pattern matching on the
+existential, which would generate a new type.  This restores correctness,
+at the cost of having a little more allocation for the `SomeNat` constructors.
+-}
+
+
 
 -- | @since 4.7.0.0
 instance Eq SomeNat where
