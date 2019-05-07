@@ -955,8 +955,8 @@ checkTyClHdr is_cls ty
            ; let name = mkOccName tcClsName (starSym isUni)
            ; return (cL l (Unqual name), acc, fix, (ann ++ mkParensApiAnn lp)) }
 
-    go l (HsTyVar _ _ (dL->L _ tc)) acc ann fix
-      | isRdrTc tc               = return (cL l tc, acc, fix, ann)
+    go _ (HsTyVar _ _ ltc@(dL->L _ tc)) acc ann fix
+      | isRdrTc tc               = return (ltc, acc, fix, ann)
     go _ (HsOpTy _ t1 ltc@(dL->L _ tc) t2) acc ann _fix
       | isRdrTc tc               = return (ltc, HsValArg t1:HsValArg t2:acc, Infix, ann)
     go l (HsParTy _ ty)    acc ann fix = goL ty acc (ann ++mkParensApiAnn l) fix
