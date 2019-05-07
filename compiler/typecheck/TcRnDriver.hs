@@ -1567,7 +1567,7 @@ tcPreludeClashWarn warnFlag name = do
 
         -- Unqualified import?
         isUnqualified :: ImportDecl GhcRn -> Bool
-        isUnqualified = not . ideclQualified
+        isUnqualified = not . isImportDeclQualified . ideclQualified
 
         -- List of explicitly imported (or hidden) Names from a single import.
         --   Nothing -> No explicit imports
