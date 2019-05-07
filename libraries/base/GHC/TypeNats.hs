@@ -78,6 +78,43 @@ data SomeNat    = forall n. KnownNat n    => SomeNat    (Proxy n)
 -- @since 4.10.0.0
 someNatVal :: Natural -> SomeNat
 someNatVal n = withSNat SomeNat (SNat n) Proxy
+{-# NOINLINE someNatVal #-} -- See Note [NOINLINE someNatVal]
+
+{- Note [NOINLINE someNatVal]
+
+`someNatVal` converts a natural number to an existentially quantified
+dictionary for `KnowNat` (aka `SomeNat`).  The existential quantification
+is very important, as it captures the fact that we don't know the type
+statically, although we do know that it exists.   Because this type is
+fully opaque, we should never be able to prove that it matches anything else.
+This is why coherence should still hold:  we can manufacture a `KnownNat k`
+dictionary, but it can never be confused with a `KnownNat 33` dictionary,
+because we should never be able to prove that `k ~ 33`.
+
+But how to implement `someNatVal`?  We can't quite implement it "honestly"
+because `SomeNat` needs to a "hide" the type of the newly created dictionary,
+but we don't know what the actual type is!  If `someNatVal` was built into
+the language, then we could manufacture a new skolem constant,
+which should behave correctly.
+
+Since extra language constructors have additional maintenance costs,
+we can implement `someNatVal` with a little bit of cheating:
+we use `Any` for the unknown type, which should be OK, as once the type is
+"hidden" in the existential is can never be accessed again.  This is cheating,
+however, because different uses of `someNatVal` should really
+use a different instance of `Any`, not the same one!
+
+To ensure that the wrong type hidden by `SomeNat` is not visible by the
+rest of the compiler, we annotate `someNatVal` with `NOINLINE`. In this
+way, the only way to access the dictionary inside `SomeNat` would be by
+pattern matching with the `SomeNat` constructor, which would expose the
+dictionary with a skolem constant, which is the intended behavior.
+
+See #16586 for a concrete example of where inlining `someNatVal`
+leads to incorrect behavior when we optimize aggressively.
+-}
+
+
 
 -- | @since 4.7.0.0
 instance Eq SomeNat where
