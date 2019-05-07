@@ -61,3 +61,4 @@ test('T15633b',
      ghci_script, ['T15633b.script'])
 
 test('T16096', just_ghci, ghci_script, ['T16096.script'])
+test('T507', just_ghci, ghci_script, ['T507.script'])
