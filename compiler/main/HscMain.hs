@@ -498,6 +498,14 @@ tcRnModule' sum save_rn_syntax mod = do
     hsc_env <- getHscEnv
     dflags   <- getDynFlags
 
+    -- -Wmissing-safe-haskell-mode
+    when (not (safeHaskellModeEnabled dflags)
+          && wopt Opt_WarnMissingSafeHaskellMode dflags) $
+        logWarnings $ unitBag $
+        makeIntoWarning (Reason Opt_WarnMissingSafeHaskellMode) $
+        mkPlainWarnMsg dflags (getLoc (hpm_module mod)) $
+        warnMissingSafeHaskellMode
+
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
                ioMsgMaybe $
                    tcRnModule hsc_env sum
@@ -544,6 +552,8 @@ tcRnModule' sum save_rn_syntax mod = do
     errSafe t = quotes (pprMod t) <+> text "has been inferred as safe!"
     errTwthySafe t = quotes (pprMod t)
       <+> text "is marked as Trustworthy but has been inferred as safe!"
+    warnMissingSafeHaskellMode = ppr (moduleName (ms_mod sum))
+      <+> text "is missing Safe Haskell mode"
 
 -- | Convert a typechecked module to Core
 hscDesugar :: HscEnv -> ModSummary -> TcGblEnv -> IO ModGuts
