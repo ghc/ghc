@@ -131,7 +131,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
                                 ideclPkgQual   = Nothing,
                                 ideclSource    = False,
                                 ideclSafe      = False,  -- Not a safe import
-                                ideclQualified = False,
+                                ideclQualified = NotQualified,
                                 ideclImplicit  = True,   -- Implicit!
                                 ideclAs        = Nothing,
                                 ideclHiding    = Nothing  }

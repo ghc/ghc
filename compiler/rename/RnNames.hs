@@ -267,13 +267,15 @@ rnImportDecl this_mod
                                      , ideclName = loc_imp_mod_name
                                      , ideclPkgQual = mb_pkg
                                      , ideclSource = want_boot, ideclSafe = mod_safe
-                                     , ideclQualified = qual_only, ideclImplicit = implicit
+                                     , ideclQualified = qual_style, ideclImplicit = implicit
                                      , ideclAs = as_mod, ideclHiding = imp_details }))
   = setSrcSpan loc $ do
 
     when (isJust mb_pkg) $ do
         pkg_imports <- xoptM LangExt.PackageImports
         when (not pkg_imports) $ addErr packageImportErr
+
+    let qual_only = isImportDeclQualified qual_style
 
     -- If there's an error in loadInterface, (e.g. interface
     -- file not found) we get lots of spurious errors from 'filterImports'
@@ -1470,8 +1472,8 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
                , text "from module" <+> quotes pp_mod <+> is_redundant]
     pp_herald  = text "The" <+> pp_qual <+> text "import of"
     pp_qual
-      | ideclQualified decl = text "qualified"
-      | otherwise           = Outputable.empty
+      | isImportDeclQualified (ideclQualified decl)= text "qualified"
+      | otherwise                                  = Outputable.empty
     pp_mod       = ppr (unLoc (ideclName decl))
     is_redundant = text "is redundant"
 

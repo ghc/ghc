@@ -29,6 +29,7 @@ import SrcLoc
 import HsExtension
 
 import Data.Data
+import Data.Maybe
 
 {-
 ************************************************************************
@@ -48,6 +49,29 @@ type LImportDecl pass = Located (ImportDecl pass)
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
+-- | If/how an import is 'qualified'.
+data ImportDeclQualifiedStyle
+  = QualifiedPre  -- ^ 'qualified' appears in prepositive position.
+  | QualifiedPost -- ^ 'qualified' appears in postpositive position.
+  | NotQualified  -- ^ Not qualified.
+  deriving (Eq, Data)
+
+-- | Given two possible located 'qualified' tokens, compute a style
+-- (in a conforming Haskell program only one of the two can be not
+-- 'Nothing'). This is called from 'Parser.y'.
+importDeclQualifiedStyle :: Maybe (Located a)
+                         -> Maybe (Located a)
+                         -> ImportDeclQualifiedStyle
+importDeclQualifiedStyle mPre mPost =
+  if isJust mPre then QualifiedPre
+  else if isJust mPost then QualifiedPost else NotQualified
+
+-- | Convenience function to answer the question if an import decl. is
+-- qualified.
+isImportDeclQualified :: ImportDeclQualifiedStyle -> Bool
+isImportDeclQualified NotQualified = False
+isImportDeclQualified _ = True
+
 -- | Import Declaration
 --
 -- A single Haskell @import@ declaration.
@@ -60,7 +84,7 @@ data ImportDecl pass
       ideclPkgQual   :: Maybe StringLiteral,  -- ^ Package qualifier.
       ideclSource    :: Bool,          -- ^ True <=> {-\# SOURCE \#-} import
       ideclSafe      :: Bool,          -- ^ True => safe import
-      ideclQualified :: Bool,          -- ^ True => qualified
+      ideclQualified :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
       ideclAs        :: Maybe (Located ModuleName),  -- ^ as Module
       ideclHiding    :: Maybe (Bool, Located [LIE pass])
@@ -96,7 +120,7 @@ simpleImportDecl mn = ImportDecl {
       ideclSource    = False,
       ideclSafe      = False,
       ideclImplicit  = False,
-      ideclQualified = False,
+      ideclQualified = NotQualified,
       ideclAs        = Nothing,
       ideclHiding    = Nothing
     }
@@ -109,7 +133,7 @@ instance (p ~ GhcPass pass,OutputableBndrId p)
                     , ideclQualified = qual, ideclImplicit = implicit
                     , ideclAs = as, ideclHiding = spec })
       = hang (hsep [text "import", ppr_imp from, pp_implicit implicit, pp_safe safe,
-                    pp_qual qual, pp_pkg pkg, ppr mod', pp_as as])
+                    pp_qual qual False, pp_pkg pkg, ppr mod', pp_qual qual True, pp_as as])
              4 (pp_spec spec)
       where
         pp_implicit False = empty
@@ -119,8 +143,11 @@ instance (p ~ GhcPass pass,OutputableBndrId p)
         pp_pkg (Just (StringLiteral st p))
           = pprWithSourceText st (doubleQuotes (ftext p))
 
-        pp_qual False   = empty
-        pp_qual True    = text "qualified"
+        pp_qual QualifiedPre False = text "qualified" -- Prepositive qualifier/prepositive position.
+        pp_qual QualifiedPost True = text "qualified" -- Postpositive qualifier/postpositive position.
+        pp_qual QualifiedPre True = empty -- Prepositive qualifier/postpositive position.
+        pp_qual QualifiedPost False = empty -- Postpositive qualifier/prepositive position.
+        pp_qual NotQualified _ = empty
 
         pp_safe False   = empty
         pp_safe True    = text "safe"
