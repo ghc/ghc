@@ -126,9 +126,10 @@ ppSourceStats short (dL->L _ (HsModule _ exports imports ldecls _ _))
     import_info _ = panic " import_info: Impossible Match"
                              -- due to #15884
 
-    safe_info = qual_info
-    qual_info False  = 0
-    qual_info True   = 1
+    safe_info False = 0
+    safe_info True = 1
+    qual_info NotQualified = 0
+    qual_info _  = 1
     as_info Nothing  = 0
     as_info (Just _) = 1
     spec_info Nothing           = (0,0,0,0,1,0,0)

@@ -263,6 +263,12 @@ test('mod179', [extra_files(['Mod179_A.hs'])], multimod_compile, ['mod179', '-v0
 
 test('mod180', [extra_files(['Mod180_A.hs', 'Mod180_B.hs'])], multimod_compile_fail, ['mod180', '-v0'])
 
+# Tests for 'ImportQualifiedPost'
+test('mod181', normal, compile, [''])
+test('mod182', normal, compile_fail, [''])
+test('mod183', normal, compile_fail, [''])
+test('mod184', normal, compile, ['-Wprepositive-qualified-module'])
+
 test('T1148', normal, compile, [''])
 test('T1074', normal, compile, [''])
 test('T1074a', normal, compile, [''])

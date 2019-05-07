@@ -2329,6 +2329,7 @@ data ExtBits
   | DoAndIfThenElseBit
   | MultiWayIfBit
   | GadtSyntaxBit
+  | ImportQualifiedPostBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2415,6 +2416,7 @@ mkParserFlags' warningFlags extensionFlags thisPackage
       .|. DoAndIfThenElseBit          `xoptBit` LangExt.DoAndIfThenElse
       .|. MultiWayIfBit               `xoptBit` LangExt.MultiWayIf
       .|. GadtSyntaxBit               `xoptBit` LangExt.GADTSyntax
+      .|. ImportQualifiedPostBit      `xoptBit` LangExt.ImportQualifiedPost
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream

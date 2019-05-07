@@ -49,6 +49,7 @@ module   RdrHsSyn (
 
         -- Bunch of functions in the parser monad for
         -- checking and constructing values
+        checkImportDecl,
         checkExpBlockArguments,
         checkPrecP,           -- Int -> P Int
         checkContext,         -- HsType -> P HsContext
@@ -81,7 +82,10 @@ module   RdrHsSyn (
 
         -- Warnings and errors
         warnStarIsType,
+        warnPrepositiveQualifiedModule,
         failOpFewArgs,
+        failOpNotEnabledImportQualifiedPost,
+        failOpImportQualifiedTwice,
 
         SumOrTuple (..),
 
@@ -1050,6 +1054,31 @@ checkNoDocs msg ty = go ty
                                   [ text "Unexpected haddock", quotes (ppr ds)
                                   , text "on", msg, quotes (ppr t) ]
     go _ = pure ()
+
+checkImportDecl :: Maybe (Located Token)
+                -> Maybe (Located Token)
+                -> P ()
+checkImportDecl mPre mPost = do
+  let whenJust mg f = maybe (pure ()) f mg
+
+  importQualifiedPostEnabled <- getBit ImportQualifiedPostBit
+
+  -- Error if 'qualified' found in postpostive position and
+  -- 'ImportQualifiedPost' is not in effect.
+  whenJust mPost $ \post ->
+    when (not importQualifiedPostEnabled) $
+      failOpNotEnabledImportQualifiedPost (getLoc post)
+
+  -- Error if 'qualified' occurs in both pre and postpositive
+  -- positions.
+  whenJust mPost $ \post ->
+    when (isJust mPre) $
+      failOpImportQualifiedTwice (getLoc post)
+
+  -- Warn if 'qualified' found in prepositive position and
+  -- 'Opt_WarnPrepositiveQualifiedModule' is enabled.
+  whenJust mPre $ \pre ->
+    warnPrepositiveQualifiedModule (getLoc pre)
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.
@@ -2944,6 +2973,27 @@ isImpExpQcWildcard _                = False
 
 -----------------------------------------------------------------------------
 -- Warnings and failures
+
+warnPrepositiveQualifiedModule :: SrcSpan -> P ()
+warnPrepositiveQualifiedModule span =
+  addWarning Opt_WarnPrepositiveQualifiedModule span msg
+  where
+    msg = text "Found" <+> quotes (text "qualified")
+           <+> text "in prepositive position"
+       $$ text "Suggested fix: place " <+> quotes (text "qualified")
+           <+> text "after the module name instead."
+
+failOpNotEnabledImportQualifiedPost :: SrcSpan -> P ()
+failOpNotEnabledImportQualifiedPost loc = addError loc msg
+  where
+    msg = text "Found" <+> quotes (text "qualified")
+          <+> text "in postpositive position. "
+      $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
+
+failOpImportQualifiedTwice :: SrcSpan -> P ()
+failOpImportQualifiedTwice loc = addError loc msg
+  where
+    msg = text "Multiple occurences of 'qualified'"
 
 warnStarIsType :: SrcSpan -> P ()
 warnStarIsType span = addWarning Opt_WarnStarIsType span msg
