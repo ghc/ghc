@@ -1,0 +1,10 @@
+
+T14548.hs:8:27: error: Not in scope: type variable ‘k’
+
+T14548.hs:9:13: error: Not in scope: type variable ‘k’
+
+T14548.hs:12:19: error: Not in scope: type variable ‘k’
+
+T14548.hs:12:34: error: Not in scope: type variable ‘k’
+
+T14548.hs:13:13: error: Not in scope: type variable ‘k’
