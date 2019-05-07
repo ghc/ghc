@@ -694,6 +694,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/ffi/should_run/Capi_Ctype_002
 /tests/ffi/should_run/Capi_Ctype_A_001.hs
 /tests/ffi/should_run/Capi_Ctype_A_002.hs
+/tests/ffi/should_run/T493
 /tests/ffi/should_run/T1288
 /tests/ffi/should_run/T1679
 /tests/ffi/should_run/T2276
