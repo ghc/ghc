@@ -73,7 +73,7 @@ Your code will not be portable to other compilers if you use them.
 Unlifted FFI Types
 ~~~~~~~~~~~~~~~~~~
 
-.. extension:: InterruptibleFFI
+.. extension:: UnliftedFFITypes
     :shortdesc: Enable unlifted FFI types
 
     :since: 6.X.X
