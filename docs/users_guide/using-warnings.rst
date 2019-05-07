@@ -851,39 +851,6 @@ of ``-W(no-)*``.
     This option isn't enabled by default because it can be very noisy,
     and it often doesn't indicate a bug in the program.
 
-.. ghc-flag:: -Winferred-safe-imports
-     :shortdesc: warn when an explicitly Safe Haskell module imports Safe-Inferred one
-    :type: dynamic
-    :reverse: -Wno-inferred-safe-imports
-    :category:
-
-    :since: 8.10.1
-
-    .. index::
-       single: safe haskell imports, warning
-
-    The module ``A`` below is annotated to be explictly ``Safe``, but it imports
-    ``Safe-Inferred`` module.
-
-        {-# LANGUAGE Safe #-}
-        module A where
-
-        import B (double)
-
-        quad :: Int -> Int
-        quad = double . double
-
-    
-        module B where
-
-        double :: Int -> Int
-        double n = n + n
-
-    The inferred status is volatile: if an unsafe import is added to the module
-    ``B``, it will cause compilation error of ``A``.  When
-    :ghc-flag:`-Winferred-safe-imports` is enabled, the compiler will emit a
-    warning about this.
-
 .. ghc-flag:: -Wmissing-deriving-strategies
     :shortdesc: warn when a deriving clause is missing a deriving strategy
     :type: dynamic

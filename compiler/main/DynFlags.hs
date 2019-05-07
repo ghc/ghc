@@ -844,6 +844,7 @@ data WarningFlag =
    | Opt_WarnSpaceAfterBang
    | Opt_WarnMissingDerivingStrategies    -- Since 8.8
    | Opt_WarnInferredSafeImports          -- Since 8.10
+   | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -4043,6 +4044,7 @@ wWarningFlagsDeps = [
   flagSpec' "safe"                       Opt_WarnSafe setWarnSafe,
   flagSpec "trustworthy-safe"            Opt_WarnTrustworthySafe,
   flagSpec "inferred-safe-imports"       Opt_WarnInferredSafeImports,
+  flagSpec "missing-safe-haskell-mode"   Opt_WarnMissingSafeHaskellMode,
   flagSpec "tabs"                        Opt_WarnTabs,
   flagSpec "type-defaults"               Opt_WarnTypeDefaults,
   flagSpec "typed-holes"                 Opt_WarnTypedHoles,
