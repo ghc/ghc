@@ -653,3 +653,135 @@ x86_64-linux-deb9	T8766	normal	bytes allocated	16827928
 x86_64-linux-deb9	T9848	normal	bytes allocated	51616
 x86_64-linux-deb9	T13191	normal	bytes allocated	185942592
 x86_64-linux-deb9	T3474	normal	max_bytes_used	44408
+
+x86_64-linux-fedora27	T3924	normal	bytes allocated	50616
+x86_64-linux-fedora27	T10858	normal	bytes allocated	226647272
+x86_64-linux-fedora27	hie002	normal	bytes allocated	22258011024
+x86_64-linux-fedora27	T3064	normal	peak_megabytes_allocated	65
+x86_64-linux-fedora27	T3064	normal	bytes allocated	255698072
+x86_64-linux-fedora27	T4801	normal	bytes allocated	391561688
+x86_64-linux-fedora27	T1969	normal	peak_megabytes_allocated	71
+x86_64-linux-fedora27	T1969	normal	max_bytes_used	19149000
+x86_64-linux-fedora27	T1969	normal	bytes allocated	672953312
+x86_64-linux-fedora27	T5030	normal	bytes allocated	746336464
+x86_64-linux-fedora27	parsing001	normal	bytes allocated	538759088
+x86_64-linux-fedora27	T5631	normal	bytes allocated	1041330320
+x86_64-linux-fedora27	T783	normal	bytes allocated	478373248
+x86_64-linux-fedora27	T5321Fun	normal	bytes allocated	467436120
+x86_64-linux-fedora27	T5837	normal	bytes allocated	52507744
+x86_64-linux-fedora27	T5321FD	normal	bytes allocated	362874616
+x86_64-linux-fedora27	T6048	optasm	bytes allocated	98592064
+x86_64-linux-fedora27	T3294	normal	max_bytes_used	35095448
+x86_64-linux-fedora27	T3294	normal	bytes allocated	1839446128
+x86_64-linux-fedora27	T9020	optasm	bytes allocated	374991776
+x86_64-linux-fedora27	T5642	normal	bytes allocated	766836544
+x86_64-linux-fedora27	T9675	optasm	max_bytes_used	19547240
+x86_64-linux-fedora27	T9675	optasm	peak_megabytes_allocated	73
+x86_64-linux-fedora27	T9675	optasm	bytes allocated	675708080
+x86_64-linux-fedora27	T9872d	normal	bytes allocated	606859152
+x86_64-linux-fedora27	T9961	normal	bytes allocated	498940952
+x86_64-linux-fedora27	T9872a	normal	bytes allocated	2651035136
+x86_64-linux-fedora27	T9233	normal	bytes allocated	1048176328
+x86_64-linux-fedora27	T9872c	normal	bytes allocated	2982642232
+x86_64-linux-fedora27	T10547	normal	bytes allocated	37380040
+x86_64-linux-fedora27	T12425	optasm	bytes allocated	141263936
+x86_64-linux-fedora27	T12234	optasm	bytes allocated	84261760
+x86_64-linux-fedora27	T12227	normal	bytes allocated	741476168
+x86_64-linux-fedora27	T13035	normal	bytes allocated	124348688
+x86_64-linux-fedora27	T13056	optasm	bytes allocated	432069608
+x86_64-linux-fedora27	T9872b	normal	bytes allocated	3689419272
+x86_64-linux-fedora27	T12150	optasm	bytes allocated	75716888
+x86_64-linux-fedora27	T12707	normal	bytes allocated	1157848736
+x86_64-linux-fedora27	T12545	normal	bytes allocated	3196400864
+x86_64-linux-fedora27	T13379	normal	bytes allocated	421629784
+x86_64-linux-fedora27	T10370	optasm	max_bytes_used	33116872
+x86_64-linux-fedora27	T10370	optasm	peak_megabytes_allocated	114
+x86_64-linux-fedora27	ManyAlternatives	normal	bytes allocated	1415466120
+x86_64-linux-fedora27	ManyConstructors	normal	bytes allocated	4281067240
+x86_64-linux-fedora27	T14697	normal	bytes allocated	349203016
+x86_64-linux-fedora27	T13719	normal	bytes allocated	4590907368
+x86_64-linux-fedora27	Naperian	optasm	bytes allocated	55278952
+x86_64-linux-fedora27	T9630	normal	max_bytes_used	40787744
+x86_64-linux-fedora27	MultiLayerModules	normal	bytes allocated	5792905024
+x86_64-linux-fedora27	WWRec	normal	bytes allocated	879004904
+x86_64-linux-fedora27	T14683	normal	bytes allocated	9957481648
+x86_64-linux-fedora27	haddock.base	normal	bytes allocated	23958216704
+x86_64-linux-fedora27	haddock.Cabal	normal	bytes allocated	23823832104
+x86_64-linux-fedora27	haddock.compiler	normal	bytes allocated	62341965272
+x86_64-linux-fedora27	T13701	normal	bytes allocated	2429081352
+x86_64-linux-fedora27	T15164	normal	bytes allocated	2022840272
+x86_64-linux-fedora27	join004	optasm	bytes allocated	16050576
+x86_64-linux-fedora27	join002	optasm	bytes allocated	2000050712
+x86_64-linux-fedora27	join003	optasm	bytes allocated	2000050712
+x86_64-linux-fedora27	join007	optasm	bytes allocated	50896
+x86_64-linux-fedora27	T5835	normal	max_bytes_used	44408
+x86_64-linux-fedora27	T12791	normal	max_bytes_used	44408
+x86_64-linux-fedora27	T10359	normal	bytes allocated	450680
+x86_64-linux-fedora27	T14955	normal	bytes allocated	48050592
+x86_64-linux-fedora27	T4830	normal	bytes allocated	97936
+x86_64-linux-fedora27	T3586	normal	peak_megabytes_allocated	18
+x86_64-linux-fedora27	T3586	normal	bytes allocated	16102016
+x86_64-linux-fedora27	lazy-bs-alloc	normal	peak_megabytes_allocated	2
+x86_64-linux-fedora27	lazy-bs-alloc	normal	bytes allocated	428688
+x86_64-linux-fedora27	T876	normal	bytes allocated	57400
+x86_64-linux-fedora27	T3738	normal	peak_megabytes_allocated	2
+x86_64-linux-fedora27	T3738	normal	bytes allocated	50376
+x86_64-linux-fedora27	MethSharing	normal	peak_megabytes_allocated	2
+x86_64-linux-fedora27	MethSharing	normal	bytes allocated	480097920
+x86_64-linux-fedora27	T5113	normal	bytes allocated	8058464
+x86_64-linux-fedora27	T4978	normal	bytes allocated	10136416
+x86_64-linux-fedora27	T5205	normal	bytes allocated	54224
+x86_64-linux-fedora27	T4474a	normal	bytes allocated	4831889872
+x86_64-linux-fedora27	T4474b	normal	bytes allocated	4831889872
+x86_64-linux-fedora27	T5549	normal	bytes allocated	5793139976
+x86_64-linux-fedora27	T5237	normal	bytes allocated	104280
+x86_64-linux-fedora27	T4474c	normal	bytes allocated	4831889872
+x86_64-linux-fedora27	T5536	normal	bytes allocated	890357192
+x86_64-linux-fedora27	Conversions	normal	bytes allocated	107512
+x86_64-linux-fedora27	T7257	normal	bytes allocated	1297292304
+x86_64-linux-fedora27	T7257	normal	peak_megabytes_allocated	228
+x86_64-linux-fedora27	T7436	normal	max_bytes_used	60272
+x86_64-linux-fedora27	T7797	normal	bytes allocated	480050408
+x86_64-linux-fedora27	T7954	normal	bytes allocated	1280050896
+x86_64-linux-fedora27	T5949	normal	bytes allocated	200920
+x86_64-linux-fedora27	T4267	normal	bytes allocated	40904
+x86_64-linux-fedora27	T7619	normal	bytes allocated	40904
+x86_64-linux-fedora27	InlineArrayAlloc	normal	bytes allocated	1600040904
+x86_64-linux-fedora27	InlineByteArrayAlloc	normal	bytes allocated	1440040904
+x86_64-linux-fedora27	InlineCloneArrayAlloc	normal	bytes allocated	1600041064
+x86_64-linux-fedora27	T9339	normal	bytes allocated	50632
+x86_64-linux-fedora27	T9203	normal	bytes allocated	46371696
+x86_64-linux-fedora27	T8472	normal	bytes allocated	50640
+x86_64-linux-fedora27	T13001	normal	bytes allocated	50520
+x86_64-linux-fedora27	T12996	normal	bytes allocated	78904
+x86_64-linux-fedora27	T8763	normal	bytes allocated	40904
+x86_64-linux-fedora27	T12990	normal	bytes allocated	20840920
+x86_64-linux-fedora27	T13218	normal	bytes allocated	82005432
+x86_64-linux-fedora27	T13218	normal	max_bytes_used	332488
+x86_64-linux-fedora27	DeriveNull	normal	bytes allocated	112050712
+x86_64-linux-fedora27	T13623	normal	bytes allocated	50704
+x86_64-linux-fedora27	T14936	normal	bytes allocated	51072
+x86_64-linux-fedora27	T15226	normal	bytes allocated	40928
+x86_64-linux-fedora27	T15226a	normal	bytes allocated	40928
+x86_64-linux-fedora27	T15263	normal	bytes allocated	1302032
+x86_64-linux-fedora27	T15426	normal	bytes allocated	41168
+x86_64-linux-fedora27	T14052	ghci	bytes allocated	2256182792
+x86_64-linux-fedora27	T4334	normal	peak_megabytes_allocated	3
+x86_64-linux-fedora27	space_leak_001	normal	peak_megabytes_allocated	4
+x86_64-linux-fedora27	space_leak_001	normal	bytes allocated	11315396232
+x86_64-linux-fedora27	space_leak_001	normal	max_bytes_used	441848
+x86_64-linux-fedora27	T2762	normal	peak_megabytes_allocated	2
+x86_64-linux-fedora27	T15578	normal	bytes allocated	800041224
+x86_64-linux-fedora27	T7850	normal	peak_megabytes_allocated	5
+x86_64-linux-fedora27	T4029	ghci	peak_megabytes_allocated	67
+x86_64-linux-fedora27	T4029	ghci	max_bytes_used	19527728
+x86_64-linux-fedora27	T11303b	normal	bytes allocated	54570104
+x86_64-linux-fedora27	T11276	normal	bytes allocated	159794272
+x86_64-linux-fedora27	T11374	normal	bytes allocated	284013784
+x86_64-linux-fedora27	T11195	normal	bytes allocated	8245024304
+x86_64-linux-fedora27	T10678	normal	bytes allocated	64041352
+x86_64-linux-fedora27	T13536a	optasm	bytes allocated	86576
+x86_64-linux-fedora27	T8766	normal	bytes allocated	16827928
+x86_64-linux-fedora27	T9848	normal	bytes allocated	51616
+x86_64-linux-fedora27	T13191	normal	bytes allocated	185942592
+x86_64-linux-fedora27	T3474	normal	max_bytes_used	44408
