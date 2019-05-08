@@ -1302,9 +1302,9 @@ CLEAN_FILES += compiler/ghc.cabal.old
 # as they may still be in old GHC trees:
 CLEAN_FILES += includes/GHCConstants.h
 CLEAN_FILES += includes/DerivedConstants.h
-CLEAN_FILES += includes/ghcautoconf.h
-CLEAN_FILES += includes/ghcplatform.h
-CLEAN_FILES += includes/ghcversion.h
+$(foreach n,0 1 2, \
+    $(foreach h,$(includes_$n_H_CONFIG) $(includes_$n_H_PLATFORM) $(includes_$n_H_VERSION), \
+        $(eval CLEAN_FILES += $h)))
 CLEAN_FILES += $(includes_SETTINGS)
 CLEAN_FILES += utils/ghc-pkg/Version.hs
 CLEAN_FILES += compiler/prelude/primops.txt
@@ -1440,7 +1440,6 @@ maintainer-clean : distclean
 
 .PHONY: bootstrapping-files
 # See https://gitlab.haskell.org/ghc/ghc/wikis/building/porting
-bootstrapping-files: $(includes_H_CONFIG)
 bootstrapping-files: $(includes_DERIVEDCONSTANTS)
 bootstrapping-files: $(includes_GHCCONSTANTS)
 bootstrapping-files: $(libffi_HEADERS)
