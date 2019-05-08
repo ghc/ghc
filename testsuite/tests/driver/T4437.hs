@@ -41,6 +41,7 @@ expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRuleTransitional",
                              "EmptyDataDeriving",
                              "GeneralisedNewtypeDeriving",
+                             "CUSKs",
                              "ImportQualifiedPost"]
 
 expectedCabalOnlyExtensions :: [String]
