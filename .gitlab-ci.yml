@@ -218,6 +218,8 @@ hadrian-ghc-in-ghci:
       THREADS=`mk/detect-cpu-count.sh`
       make V=0 -j$THREADS WERROR=-Werror
     - |
+      make bindisttest
+    - |
       make binary-dist TAR_COMP_OPTS="-1"
     - |
       # Prepare to push git notes.
@@ -650,6 +652,7 @@ nightly-i386-windows-hadrian:
     - bash -c "echo include mk/flavours/${BUILD_FLAVOUR}.mk > mk/build.mk"
     - bash -c "echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make bindisttest"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist TAR_COMP_OPTS=-1"
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   tags:
