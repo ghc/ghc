@@ -28,13 +28,14 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
 
 includeCcArgs :: Args
 includeCcArgs = do
-    root <- getBuildRoot
+    stage <- getStage
+    libPath <- expr $ stageLibPath stage
     mconcat [ cArgs
             , cWarnings
             , getSettingList $ ConfCcArgs Stage1
             , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
             , arg "-Irts"
             , arg "-Iincludes"
-            , arg $ "-I" ++ root -/- generatedDir
+            , arg $ "-I" ++ libPath
             , notM ghcWithSMP ? arg "-DNOSMP"
             , arg "-fcommon" ]
