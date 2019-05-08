@@ -22,16 +22,16 @@ import UserSettings
 cIncludeArgs :: Args
 cIncludeArgs = do
     pkg     <- getPackage
-    root    <- getBuildRoot
     path    <- getBuildPath
     incDirs <- getContextData includeDirs
     depDirs <- getContextData depIncludeDirs
+    stage <- getStage
     iconvIncludeDir <- getSetting IconvIncludeDir
     gmpIncludeDir   <- getSetting GmpIncludeDir
     ffiIncludeDir   <- getSetting FfiIncludeDir
+    libPath <- expr $ stageLibPath stage
     mconcat [ notStage0 ||^ package compiler ? arg "-Iincludes"
-            , arg $ "-I" ++ root -/- generatedDir
-            , arg $ "-I" ++ path
+            , arg $ "-I" ++ libPath
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]
             , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
             -- Add @incDirs@ in the build directory, since some files generated
