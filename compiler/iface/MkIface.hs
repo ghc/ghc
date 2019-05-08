@@ -115,6 +115,7 @@ import Control.Monad
 import Data.Function
 import Data.List
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.Ord
 import Data.IORef
 import System.Directory
@@ -1177,8 +1178,8 @@ recompileRequired _ = True
 -- is equivalent to the current source file the user asked us to compile.
 -- If the same, we can avoid recompilation. We return a tuple where the
 -- first element is a bool saying if we should recompile the object file
--- and the second is maybe the interface file, where Nothng means to
--- rebuild the interface file not use the exisitng one.
+-- and the second is maybe the interface file, where Nothing means to
+-- rebuild the interface file and not use the existing one.
 checkOldIface
   :: HscEnv
   -> ModSummary
@@ -1486,11 +1487,30 @@ checkMergedSignatures mod_summary iface = do
 --   - a new home module has been added that shadows a package module
 -- See bug #1372.
 --
+-- In addition, we also check if the union of dependencies of the imported
+-- modules has any difference to the previous set of dependencies. We would need
+-- to recompile in that case also since the `mi_deps` field of ModIface needs
+-- to be updated to match that information. This is one of the invariants
+-- of interface files (see https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance#interface-file-invariants).
+-- See bug #16511.
+--
 -- Returns (RecompBecause <textual reason>) if recompilation is required.
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
- = checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
-  where
+ = do
+   checkList $
+     [ checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
+     , do
+         (recomp, mnames_seen) <- runUntilRecompRequired $ map
+           checkForNewHomeDependency
+           (ms_home_imps summary)
+         case recomp of
+           UpToDate -> do
+             let
+               seen_home_deps = Set.unions $ map Set.fromList mnames_seen
+             checkIfAllOldHomeDependenciesAreSeen seen_home_deps
+           _ -> return recomp]
+ where
    prev_dep_mods = dep_mods (mi_deps iface)
    prev_dep_plgn = dep_plgins (mi_deps iface)
    prev_dep_pkgs = dep_pkgs (mi_deps iface)
@@ -1522,12 +1542,74 @@ checkDependencies hsc_env summary iface
            where pkg = moduleUnitId mod
         _otherwise  -> return (RecompBecause reason)
 
+   old_deps = Set.fromList $ map fst $ filter (not . snd) prev_dep_mods
+   isOldHomeDeps = flip Set.member old_deps
+   checkForNewHomeDependency (L _ mname) = do
+     let
+       mod = mkModule this_pkg mname
+       str_mname = moduleNameString mname
+       reason = str_mname ++ " changed"
+     -- We only want to look at home modules to check if any new home dependency
+     -- pops in and thus here, skip modules that are not home. Checking
+     -- membership in old home dependencies suffice because the `dep_missing`
+     -- check already verified that all imported home modules are present there.
+     if not (isOldHomeDeps mname)
+       then return (UpToDate, [])
+       else do
+         mb_result <- getFromModIface "need mi_deps for" mod $ \imported_iface -> do
+           let mnames = mname:(map fst $ filter (not . snd) $
+                 dep_mods $ mi_deps imported_iface)
+           case find (not . isOldHomeDeps) mnames of
+             Nothing -> return (UpToDate, mnames)
+             Just new_dep_mname -> do
+               traceHiDiffs $
+                 text "imported home module " <> quotes (ppr mod) <>
+                 text " has a new dependency " <> quotes (ppr new_dep_mname)
+               return (RecompBecause reason, [])
+         return $ fromMaybe (MustCompile, []) mb_result
+
+   -- Performs all recompilation checks in the list until a check that yields
+   -- recompile required is encountered. Returns the list of the results of
+   -- all UpToDate checks.
+   runUntilRecompRequired []             = return (UpToDate, [])
+   runUntilRecompRequired (check:checks) = do
+     (recompile, value) <- check
+     if recompileRequired recompile
+       then return (recompile, [])
+       else do
+         (recomp, values) <- runUntilRecompRequired checks
+         return (recomp, value:values)
+
+   checkIfAllOldHomeDependenciesAreSeen seen_deps = do
+     let unseen_old_deps = Set.difference
+          old_deps
+          seen_deps
+     if not (null unseen_old_deps)
+       then do
+         let missing_dep = Set.elemAt 0 unseen_old_deps
+         traceHiDiffs $
+           text "missing old home dependency " <> quotes (ppr missing_dep)
+         return $ RecompBecause "missing old dependency"
+       else return UpToDate
+
 needInterface :: Module -> (ModIface -> IfG RecompileRequired)
-              -> IfG RecompileRequired
+             -> IfG RecompileRequired
 needInterface mod continue
+  = do
+      mb_recomp <- getFromModIface
+        "need version info for"
+        mod
+        continue
+      case mb_recomp of
+        Nothing -> return MustCompile
+        Just recomp -> return recomp
+
+getFromModIface :: String -> Module -> (ModIface -> IfG a)
+              -> IfG (Maybe a)
+getFromModIface doc_msg mod getter
   = do  -- Load the imported interface if possible
-    let doc_str = sep [text "need version info for", ppr mod]
-    traceHiDiffs (text "Checking usages for module" <+> ppr mod)
+    let doc_str = sep [text doc_msg, ppr mod]
+    traceHiDiffs (text "Checking innterface for module" <+> ppr mod)
 
     mb_iface <- loadInterface doc_str mod ImportBySystem
         -- Load the interface, but don't complain on failure;
@@ -1537,12 +1619,12 @@ needInterface mod continue
       Failed _ -> do
         traceHiDiffs (sep [text "Couldn't load interface for module",
                            ppr mod])
-        return MustCompile
+        return Nothing
                   -- Couldn't find or parse a module mentioned in the
                   -- old interface file.  Don't complain: it might
                   -- just be that the current module doesn't need that
                   -- import and it's been deleted
-      Succeeded iface -> continue iface
+      Succeeded iface -> Just <$> getter iface
 
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
