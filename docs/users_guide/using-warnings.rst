@@ -1545,9 +1545,10 @@ of ``-W(no-)*``.
     :shortdesc: Warn about record wildcard matches when none of the bound variables
       are used.
     :type: dynamic
-    :since: 8.10.1
     :reverse: -Wno-unused-record-wildcards
     :category:
+
+    :since: 8.10.1
 
     .. index::
        single: unused, warning, record wildcards
@@ -1566,9 +1567,10 @@ of ``-W(no-)*``.
 .. ghc-flag:: -Wredundant-record-wildcards
     :shortdesc: Warn about record wildcard matches when the wildcard binds no patterns.
     :type: dynamic
-    :since: 8.10.1
     :reverse: -Wno-redundant-record-wildcards
     :category:
+
+    :since: 8.10.1
 
     .. index::
        single: unused, warning, record wildcards
