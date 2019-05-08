@@ -147,7 +147,10 @@ def parse_ghci_cmd(env, sig, signode):
     return name
 
 def parse_pragma(env, sig, signode):
-    idx = sig.split(' ')[0]
+    parts = sig.split(' ')
+    idx = parts[0]
+    if idx == "SPECIALIZE" and parts[1].isalpha():
+        idx += "-" + parts[1]
     name = '{-# ' + sig + ' #-}'
     signode += addnodes.desc_name(name, name)
     return idx
