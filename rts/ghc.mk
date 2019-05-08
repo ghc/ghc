@@ -613,7 +613,7 @@ endif
 
 $(eval $(call manual-package-config,rts))
 
-rts/package.conf.inplace : $(includes_H_CONFIG) $(includes_H_PLATFORM)
+rts/package.conf.inplace : $(includes_stage2_H_CONFIG) $(includes_stage2_H_PLATFORM)
 
 # -----------------------------------------------------------------------------
 # installing
