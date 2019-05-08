@@ -84,9 +84,6 @@ defaults
 
 #include "MachDeps.h"
 
--- We need platform defines (tests for mingw32 below).
-#include "ghc_boot_platform.h"
-
 section "The word size story."
         {Haskell98 specifies that signed integers (type {\tt Int})
          must contain at least 30 bits. GHC always implements {\tt
