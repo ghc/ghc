@@ -136,6 +136,9 @@ class TestConfig:
         # The test environment.
         self.test_env = 'local'
 
+        # terminal supports colors
+        self.supports_colors = False
+
 global config
 config = TestConfig()
 

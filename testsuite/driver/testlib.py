@@ -891,11 +891,17 @@ def do_test(name, way, func, args, files):
 
     full_name = name + '(' + way + ')'
 
-    if_verbose(2, "=====> {0} {1} of {2} {3}".format(
-        full_name, t.total_tests, len(allTestNames),
+    progress_args = [ full_name, t.total_tests, len(allTestNames),
         [len(t.unexpected_passes),
          len(t.unexpected_failures),
-         len(t.framework_failures)]))
+         len(t.framework_failures)]]
+    if_verbose(2, "=====> {0} {1} of {2} {3}".format(*progress_args))
+
+    # Update terminal title
+    # useful progress indicator even when make test VERBOSE=1
+    if config.supports_colors:
+        print("\033]0;{0} {1} of {2} {3}\007".format(*progress_args), end="")
+        sys.stdout.flush()
 
     # Clean up prior to the test, so that we can't spuriously conclude
     # that it passed on the basis of old run outputs.
