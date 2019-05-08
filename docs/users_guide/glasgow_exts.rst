@@ -10363,6 +10363,7 @@ function that can *never* be called, such as this one: ::
 
 Sometimes :extension:`AllowAmbiguousTypes` does not mix well with :extension:`RankNTypes`.
 For example: ::
+
       foo :: forall r. (forall i. (KnownNat i) => r) -> r
       foo f = f @1
 
