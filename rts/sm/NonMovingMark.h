@@ -16,6 +16,9 @@
 
 #include "Hash.h"
 
+// Enable mark tracing
+//#define MARK_DUMP
+
 enum EntryType {
     NULL_ENTRY = 0,
     MARK_CLOSURE,
@@ -42,6 +45,13 @@ enum EntryType {
  *
  */
 
+enum MarkQueueEntSource {
+    MARK_QUEUE_ROOT,
+    MARK_QUEUE_EVACD,
+    MARK_QUEUE_UPD_REM_SET,
+    MARK_QUEUE_OTHER
+};
+
 typedef struct {
     // Which kind of mark queue entry we have is determined by the low bits of
     // the second word: they must be zero in the case of a mark_closure entry
@@ -63,6 +73,9 @@ typedef struct {
             StgWord start_index;  // start index is shifted to the left by 16 bits
         } mark_array;
     };
+#if defined(MARK_DUMP)
+    enum MarkQueueEntSource source;
+#endif
 } MarkQueueEnt;
 
 INLINE_HEADER enum EntryType nonmovingMarkQueueEntryType(MarkQueueEnt *ent)
