@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-#include "ghcconfig.h"
+#include <ghcplatform.h>
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 2004
