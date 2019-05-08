@@ -14,9 +14,17 @@
 # Header files built from the configure script's findings
 #
 # XXX: these should go in includes/dist/build?
-includes_H_CONFIG   = includes/ghcautoconf.h
-includes_H_PLATFORM = includes/ghcplatform.h
-includes_H_VERSION  = includes/ghcversion.h
+includes_stage0_H_CONFIG   = includes/stage0/ghcautoconf.h
+includes_stage1_H_CONFIG   = includes/stage1/ghcautoconf.h
+includes_stage2_H_CONFIG   = includes/stage2/ghcautoconf.h
+
+includes_stage0_H_PLATFORM = includes/stage0/ghcplatform.h
+includes_stage1_H_PLATFORM = includes/stage1/ghcplatform.h
+includes_stage2_H_PLATFORM = includes/stage2/ghcplatform.h
+
+includes_stage0_H_VERSION  = includes/stage0/ghcversion.h
+includes_stage1_H_VERSION  = includes/stage1/ghcversion.h
+includes_stage2_H_VERSION  = includes/stage2/ghcversion.h
 
 #
 # All header files are in includes/{one of these subdirectories}
@@ -54,8 +62,7 @@ ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
 includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT
 endif
 
-
-$(includes_H_VERSION) : mk/project.mk | $$(dir $$@)/.
+$(includes_$1_H_VERSION) : mk/project.mk | $$(dir $$@)/.
 	@echo "Creating $@..."
 	@echo "#ifndef __GHCVERSION_H__"  > $@
 	@echo "#define __GHCVERSION_H__" >> $@
