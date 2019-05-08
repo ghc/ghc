@@ -161,7 +161,8 @@ commonGhcArgs :: Args
 commonGhcArgs = do
     way  <- getWay
     path <- getBuildPath
-    ghcVersion <- expr ghcVersionH
+    stage <- getStage
+    ghcVersion <- expr $ ghcVersionH stage
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
             , arg "-hcsuf", arg $ hcsuf way
@@ -208,10 +209,11 @@ includeGhcArgs :: Args
 includeGhcArgs = do
     pkg     <- getPackage
     path    <- getBuildPath
-    root    <- getBuildRoot
     context <- getContext
     srcDirs <- getContextData srcDirs
     autogen <- expr $ autogenPath context
+    stage <- getStage
+    libPath <- expr $ stageLibPath stage
     let cabalMacros = autogen -/- "cabal_macros.h"
     expr $ need [cabalMacros]
     mconcat [ arg "-i"
@@ -219,6 +221,6 @@ includeGhcArgs = do
             , arg $ "-i" ++ autogen
             , pure [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , cIncludeArgs
-            , arg $      "-I" ++ root -/- generatedDir
-            , arg $ "-optc-I" ++ root -/- generatedDir
+            , arg $      "-I" ++ libPath
+            , arg $ "-optc-I" ++ libPath
             , pure ["-optP-include", "-optP" ++ cabalMacros] ]
