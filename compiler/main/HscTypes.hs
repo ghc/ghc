@@ -33,7 +33,8 @@ module HscTypes (
         ForeignSrcLang(..),
         phaseForeignLanguage,
 
-        ModSummary(..), ms_imps, ms_installed_mod, ms_mod_name, showModMsg, isBootSummary,
+        ModSummary(..), ms_imps, ms_installed_mod, ms_mod_name, ms_home_imps,
+        home_imps, ms_home_allimps, ms_home_srcimps, showModMsg, isBootSummary,
         msHsFilePath, msHiFilePath, msObjFilePath,
         SourceModified(..), isTemplateHaskellOrQQNonBoot,
 
@@ -2799,6 +2800,28 @@ ms_imps ms =
   map mk_additional_import (dynFlagDependencies (ms_hspp_opts ms))
   where
     mk_additional_import mod_nm = (Nothing, noLoc mod_nm)
+
+home_imps :: [(Maybe FastString, Located ModuleName)] -> [Located ModuleName]
+home_imps imps = [ lmodname |  (mb_pkg, lmodname) <- imps,
+                                  isLocal mb_pkg ]
+  where isLocal Nothing = True
+        isLocal (Just pkg) | pkg == fsLit "this" = True -- "this" is special
+        isLocal _ = False
+
+ms_home_allimps :: ModSummary -> [ModuleName]
+ms_home_allimps ms = map unLoc (ms_home_srcimps ms ++ ms_home_imps ms)
+
+-- | Like 'ms_home_imps', but for SOURCE imports.
+ms_home_srcimps :: ModSummary -> [Located ModuleName]
+ms_home_srcimps = home_imps . ms_srcimps
+
+-- | All of the (possibly) home module imports from a
+-- 'ModSummary'; that is to say, each of these module names
+-- could be a home import if an appropriately named file
+-- existed.  (This is in contrast to package qualified
+-- imports, which are guaranteed not to be home imports.)
+ms_home_imps :: ModSummary -> [Located ModuleName]
+ms_home_imps = home_imps . ms_imps
 
 -- The ModLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been
