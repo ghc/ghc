@@ -92,7 +92,7 @@ dictionary, but it can never be confused with a `KnownNat 33` dictionary,
 because we should never be able to prove that `k ~ 33`.
 
 But how to implement `someNatVal`?  We can't quite implement it "honestly"
-because `SomeNat` needs to a "hide" the type of the newly created dictionary,
+because `SomeNat` needs to "hide" the type of the newly created dictionary,
 but we don't know what the actual type is!  If `someNatVal` was built into
 the language, then we could manufacture a new skolem constant,
 which should behave correctly.
@@ -100,18 +100,21 @@ which should behave correctly.
 Since extra language constructors have additional maintenance costs,
 we can implement `someNatVal` with a little bit of cheating:
 we use `Any` for the unknown type, which should be OK, as once the type is
-"hidden" in the existential is can never be accessed again.  This is cheating,
+"hidden" in the existential, it can never be accessed again.  This is cheating,
 however, because different uses of `someNatVal` should really
 use a different instance of `Any`, not the same one!
 
 To ensure that the wrong type hidden by `SomeNat` is not visible by the
 rest of the compiler, we annotate `someNatVal` with `NOINLINE`. In this
 way, the only way to access the dictionary inside `SomeNat` would be by
-pattern matching with the `SomeNat` constructor, which would expose the
+pattern matching with the `SomeNat` constructor. This exposes the
 dictionary with a skolem constant, which is the intended behavior.
 
 See #16586 for a concrete example of where inlining `someNatVal`
 leads to incorrect behavior when we optimize aggressively.
+
+The same issue occurs with `someSymbolVal`, so we also annotate it
+with `NOINLINE`.
 -}
 
 
