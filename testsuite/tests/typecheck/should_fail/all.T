@@ -241,6 +241,7 @@ test('tcfail217', normal, compile_fail, [''])
 test('tcfail218', normal, compile_fail, [''])
 test('tcfail223', normal, compile_fail, [''])
 test('tcfail224', normal, compile_fail, [''])
+test('tcfail225', normal, compile_fail, [''])
 
 test('SilentParametersOverlapping', normal, compile, [''])
 test('FailDueToGivenOverlapping', normal, compile_fail, [''])

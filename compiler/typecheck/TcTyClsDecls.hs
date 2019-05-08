@@ -510,8 +510,9 @@ kcTyClGroup decls
           --    3. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
+        ; cusks <- xoptM LangExt.CUSKs
         ; let (cusk_decls, no_cusk_decls)
-                 = partition (hsDeclHasCusk . unLoc) decls
+                 = partition (\d -> cusks && hsDeclHasCusk (unLoc d)) decls
 
         ; poly_cusk_tcs <- getInitialKinds True cusk_decls
 

@@ -8980,6 +8980,9 @@ do so.
 Complete user-supplied kind signatures and polymorphic recursion
 ----------------------------------------------------------------
 
+.. extension:: CUSKs
+    :shortdesc: Enable detection of complete user-supplied kind signatures.
+
 Just as in type inference, kind inference for recursive types can only
 use *monomorphic* recursion. Consider this (contrived) example: ::
 
