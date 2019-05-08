@@ -12,14 +12,10 @@ you will screw up the layout where they are used in case expressions!
 /* Useful in the headers that we share with the RTS */
 #define COMPILING_GHC 1
 
-/* Pull in all the platform defines for this build (foo_TARGET_ARCH etc.) */
-#include "ghc_boot_platform.h"
-
-/* Pull in the autoconf defines (HAVE_FOO), but don't include
- * ghcconfig.h, because that will include ghcplatform.h which has the
- * wrong platform settings for the compiler (it has the platform
- * settings for the target plat instead). */
-#include "ghcautoconf.h"
+/* Pull in the autoconf defines (HAVE_FOO), and all the platform defines
+ * for this build (foo_TARGET_ARCH etc.)
+ */
+#include "ghcconfig.h"
 
 #define GLOBAL_VAR(name,value,ty)  \
 {-# NOINLINE name #-};             \
