@@ -10,6 +10,8 @@
 #
 # -----------------------------------------------------------------------------
 
+utils/hp2ps_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
+
 # stage0
 utils/hp2ps_dist_C_SRCS          = AreaBelow.c Curves.c Error.c Main.c \
                                    Reorder.c TopTwenty.c AuxFile.c Deviation.c \
@@ -21,8 +23,7 @@ utils/hp2ps_dist_PROGNAME        = hp2ps
 utils/hp2ps_dist_INSTALL_INPLACE = YES
 utils/hp2ps_dist_SHELL_WRAPPER              = YES
 utils/hp2ps_dist_INSTALL_SHELL_WRAPPER_NAME = hp2ps
-
-utils/hp2ps_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
+utils/hp2ps_dist_CC_OPTS += -I,$(BUILD_0_INCLUDE_DIR)
 
 # stage 1
 utils/hp2ps_dist-install_C_SRCS = $(utils/hp2ps_dist_C_SRCS)
@@ -31,6 +32,7 @@ utils/hp2ps_dist-install_PROGNAME        = $(utils/hp2ps_dist_PROGNAME)
 utils/hp2ps_dist-install_INSTALL_INPLACE = NO
 utils/hp2ps_dist-install_SHELL_WRAPPER              = YES
 utils/hp2ps_dist-install_INSTALL_SHELL_WRAPPER_NAME = $(utils/hp2ps_dist_INSTALL_SHELL_WRAPPER_NAME)
+utils/hp2ps_dist-install_CC_OPTS += -I,$(BUILD_1_INCLUDE_DIR)
 
 ifeq "$(Stage1Only)" "YES"
 utils/hp2ps_dist_INSTALL         = YES
