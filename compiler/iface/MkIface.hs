@@ -115,6 +115,7 @@ import Control.Monad
 import Data.Function
 import Data.List
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.Ord
 import Data.IORef
 import System.Directory
@@ -1486,10 +1487,56 @@ checkMergedSignatures mod_summary iface = do
 --   - a new home module has been added that shadows a package module
 -- See bug #1372.
 --
+-- In addition, we also checks if the union of dependencies of the imported
+-- modules has any difference to the existing set of dependencies. We would need
+-- to recompile in that case also since the `mi_deps` field of ModIface needs
+-- to be updated to match that information. See bug #16511.
+
+--
 -- Returns (RecompBecause <textual reason>) if recompilation is required.
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
- = checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
+ = anyRecomp [
+   checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
+   , do
+     let
+       old_deps = Set.fromList $ map fst $ filter (not . snd) prev_dep_mods
+       this_package = thisPackage $ hsc_dflags hsc_env
+       notInOldDeps = not . (flip Set.member old_deps)
+     unseen_old_deps <- liftIO $ newIORef old_deps
+     anyRecomp $
+       (flip map (ms_home_imps summary) $ \(L _ mname) -> do
+         let
+           mod = mkModule this_package mname
+           str_mname = moduleNameString mname
+           reason = str_mname ++ " changed"
+         if notInOldDeps mname then
+           -- After the first check, we know that all imported home modules are
+           -- present in `prev_dep_mods`. Hence, if the current module is not in
+           -- that set, we know that it is not a home module.
+           return UpToDate
+         else
+          needInterface mod $ \imported_iface -> do
+            let mnames = mname:(map fst $ filter (not . snd) $
+                  dep_mods $ mi_deps imported_iface)
+            liftIO $ modifyIORef' unseen_old_deps $ \cur_unseen_old_deps ->
+              foldl' (flip Set.delete) cur_unseen_old_deps mnames
+            case listToMaybe (filter notInOldDeps mnames) of
+              Nothing -> return UpToDate
+              Just new_dep_mname -> do
+                traceHiDiffs $
+                  text "imported home module " <> quotes (ppr mod) <>
+                  text " has a new dependency " <> quotes (ppr new_dep_mname)
+                return $ RecompBecause reason)
+       ++ [(do
+        cur_unseen_old_deps <- liftIO $ readIORef unseen_old_deps
+        if not (null cur_unseen_old_deps)
+          then do
+            let missing_dep = Set.elemAt 0 cur_unseen_old_deps
+            traceHiDiffs $
+              text "missing old home dependency " <> quotes (ppr missing_dep)
+            return $ RecompBecause "missing old depedency"
+          else return UpToDate)]]
   where
    prev_dep_mods = dep_mods (mi_deps iface)
    prev_dep_plgn = dep_plgins (mi_deps iface)
@@ -1543,6 +1590,14 @@ needInterface mod continue
                   -- just be that the current module doesn't need that
                   -- import and it's been deleted
       Succeeded iface -> continue iface
+
+anyRecomp :: [IfG RecompileRequired] -> IfG RecompileRequired
+anyRecomp [] = return UpToDate
+anyRecomp (x:xs) = do
+  recomp_reqd <- x
+  case recomp_reqd of
+    UpToDate -> anyRecomp xs
+    _ -> return recomp_reqd
 
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
