@@ -1,8 +1,10 @@
 module Rules.Generate (
     isGeneratedCmmFile, compilerDependencies, generatePackageCode,
-    generateRules, copyRules, generatedDependencies, generatedGhcDependencies,
+    generateRules, copyRules, generatedDependencies,
     ghcPrimDependencies
     ) where
+
+import Data.Foldable (for_)
 
 import Base
 import qualified Context
@@ -16,6 +18,7 @@ import Packages
 import Rules.Gmp
 import Rules.Libffi
 import Settings
+import Settings.Builders.DeriveConstants (deriveConstantsPairs)
 import Target
 import Utilities
 
@@ -38,8 +41,8 @@ ghcPrimDependencies = do
     path  <- expr $ buildPath (vanillaContext stage ghcPrim)
     return [path -/- "GHC/Prim.hs", path -/- "GHC/PrimopWrappers.hs"]
 
-derivedConstantsDependencies :: [FilePath]
-derivedConstantsDependencies = fmap (generatedDir -/-)
+derivedConstantsFiles :: [FilePath]
+derivedConstantsFiles =
     [ "DerivedConstants.h"
     , "GHCConstantsHaskellExports.hs"
     , "GHCConstantsHaskellType.hs"
@@ -47,13 +50,13 @@ derivedConstantsDependencies = fmap (generatedDir -/-)
 
 compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
-    root    <- getBuildRoot
     stage   <- getStage
     isGmp   <- (== integerGmp) <$> getIntegerPackage
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
     gmpPath <- expr gmpBuildPath
     rtsPath <- expr (rtsBuildPath stage)
-    mconcat [ return ((root -/-) <$> derivedConstantsDependencies)
+    libDir <- expr $ stageLibPath stage
+    mconcat [ return $ (libDir -/-) <$> derivedConstantsFiles
             , notStage0 ? isGmp ? return [gmpPath -/- gmpLibraryH]
             , notStage0 ? return ((rtsPath -/-) <$> libffiHeaderFiles)
             , return $ fmap (ghcPath -/-)
@@ -75,15 +78,15 @@ compilerDependencies = do
 
 generatedDependencies :: Expr [FilePath]
 generatedDependencies = do
-    root     <- getBuildRoot
     stage    <- getStage
     rtsPath  <- expr (rtsBuildPath stage)
-    includes <- expr includesDependencies
+    includes <- expr $ includesDependencies stage
+    libDir <- expr $ stageLibPath stage
     mconcat [ package compiler ? compilerDependencies
             , package ghcPrim  ? ghcPrimDependencies
             , package rts      ? return (fmap (rtsPath -/-) libffiHeaderFiles
                 ++ includes
-                ++ fmap (root -/-) derivedConstantsDependencies)
+                ++ ((libDir -/-) <$> derivedConstantsFiles))
             , stage0 ? return includes ]
 
 generate :: FilePath -> Context -> Expr String -> Action ()
@@ -121,21 +124,18 @@ generatePackageCode context@(Context stage pkg _) = do
 
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
-            includes <- includesDependencies
+            includes <- includesDependencies stage
             need $ [primopsSource] ++ includes
             build $ target context HsCpp [primopsSource] [file]
-
-        root -/- stageString stage -/- "**" -/- "ghc_boot_platform.h" %>
-            go generateGhcBootPlatformH
 
     when (pkg == rts) $ do
         root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file ->
             build $ target context GenApply [] [file]
         -- TODO: This should be fixed properly, e.g. generated here on demand.
-        (root -/- "**" -/- dir -/- "DerivedConstants.h") <~ (buildRoot <&> (-/- generatedDir))
-        (root -/- "**" -/- dir -/- "ghcautoconf.h") <~ (buildRoot <&> (-/- generatedDir))
-        (root -/- "**" -/- dir -/- "ghcplatform.h") <~ (buildRoot <&> (-/- generatedDir))
-        (root -/- "**" -/- dir -/- "ghcversion.h") <~ (buildRoot <&> (-/- generatedDir))
+        (root -/- "**" -/- dir -/- "DerivedConstants.h") <~ stageLibPath stage
+        (root -/- "**" -/- dir -/- "ghcautoconf.h") <~ stageLibPath stage
+        (root -/- "**" -/- dir -/- "ghcplatform.h") <~ stageLibPath stage
+        (root -/- "**" -/- dir -/- "ghcversion.h") <~ stageLibPath stage
  where
     pattern <~ mdir = pattern %> \file -> do
         dir <- mdir
@@ -162,7 +162,6 @@ copyRules = do
         prefix -/- "ghci-usage.txt"    <~ return "driver"
         prefix -/- "llvm-targets"      <~ return "."
         prefix -/- "llvm-passes"       <~ return "."
-        prefix -/- "platformConstants" <~ (buildRoot <&> (-/- generatedDir))
         prefix -/- "template-hsc.h"    <~ return (pkgPath hsc2hs)
 
         prefix -/- "html/**"           <~ return "utils/haddock/haddock-api/resources"
@@ -175,20 +174,19 @@ generateRules = do
     (root -/- "ghc-stage1") <~+ ghcWrapper Stage1
     (root -/- "ghc-stage2") <~+ ghcWrapper Stage2
 
-    priority 2.0 $ (root -/- generatedDir -/- "ghcautoconf.h") <~ generateGhcAutoconfH
-    priority 2.0 $ (root -/- generatedDir -/- "ghcplatform.h") <~ generateGhcPlatformH
-    priority 2.0 $ (root -/- generatedDir -/-  "ghcversion.h") <~ generateGhcVersionH
     forM_ [Stage0 ..] $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
             go gen file = generate file (semiEmptyTarget stage) gen
-        priority 2.0 $ (prefix -/- "settings") %> go generateSettings
-
-    -- TODO: simplify, get rid of fake rts context
-    root -/- generatedDir -/- "**" %> \file -> do
-        withTempDir $ \dir -> build $
-            target (rtsContext Stage1) DeriveConstants [] [file, dir]
+        (prefix -/- "ghcplatform.h") %> go generateGhcPlatformH
+        (prefix -/- "settings") %> go generateSettings
+        (prefix -/- "ghcautoconf.h") %> go generateGhcAutoconfH
+        (prefix -/- "ghcversion.h") %> go generateGhcVersionH
+        -- TODO: simplify, get rid of fake rts context
+        for_ (fst <$> deriveConstantsPairs) $ \constantsFile ->
+            prefix -/- constantsFile %> \file -> do
+                withTempDir $ \dir -> build $
+                    target (rtsContext stage) DeriveConstants [] [file, dir]
   where
-    file <~  gen = file %> \out -> generate out emptyTarget gen
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
 
 -- TODO: Use the Types, Luke! (drop partial function)
@@ -225,39 +223,44 @@ cppify = replaceEq '-' '_' . replaceEq '.' '_'
 generateGhcPlatformH :: Expr String
 generateGhcPlatformH = do
     trackGenerateHs
-    hostPlatform   <- getSetting HostPlatform
-    hostArch       <- getSetting HostArch
-    hostOs         <- getSetting HostOs
-    hostVendor     <- getSetting HostVendor
-    targetPlatform <- getSetting TargetPlatform
-    targetArch     <- getSetting TargetArch
-    targetOs       <- getSetting TargetOs
-    targetVendor   <- getSetting TargetVendor
+    stage    <- getStage
+    let chooseSetting x y = getSetting $ if stage == Stage0 then x else y
+    buildPlatform  <- chooseSetting BuildPlatform HostPlatform
+    buildArch      <- chooseSetting BuildArch     HostArch
+    buildOs        <- chooseSetting BuildOs       HostOs
+    buildVendor    <- chooseSetting BuildVendor   HostVendor
+    hostPlatform   <- chooseSetting HostPlatform  TargetPlatform
+    hostArch       <- chooseSetting HostArch      TargetArch
+    hostOs         <- chooseSetting HostOs        TargetOs
+    hostVendor     <- chooseSetting HostVendor    TargetVendor
     ghcUnreg       <- getFlag    GhcUnregisterised
     return . unlines $
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
         , ""
-        , "#define BuildPlatform_TYPE  " ++ cppify hostPlatform
-        , "#define HostPlatform_TYPE   " ++ cppify targetPlatform
+        , "#define BuildPlatform_NAME  " ++ show buildPlatform
+        , "#define HostPlatform_NAME   " ++ show hostPlatform
         , ""
-        , "#define " ++ cppify hostPlatform   ++ "_BUILD 1"
-        , "#define " ++ cppify targetPlatform ++ "_HOST 1"
+        , "#define BuildPlatform_TYPE  " ++ cppify buildPlatform
+        , "#define HostPlatform_TYPE   " ++ cppify hostPlatform
         , ""
-        , "#define " ++ hostArch   ++ "_BUILD_ARCH 1"
-        , "#define " ++ targetArch ++ "_HOST_ARCH 1"
-        , "#define BUILD_ARCH " ++ show hostArch
-        , "#define HOST_ARCH "  ++ show targetArch
+        , "#define " ++ cppify buildPlatform   ++ "_BUILD 1"
+        , "#define " ++ cppify hostPlatform ++ "_HOST 1"
         , ""
-        , "#define " ++ hostOs   ++ "_BUILD_OS 1"
-        , "#define " ++ targetOs ++ "_HOST_OS 1"
-        , "#define BUILD_OS " ++ show hostOs
-        , "#define HOST_OS "  ++ show targetOs
+        , "#define " ++ buildArch   ++ "_BUILD_ARCH 1"
+        , "#define " ++ hostArch ++ "_HOST_ARCH 1"
+        , "#define BUILD_ARCH " ++ show buildArch
+        , "#define HOST_ARCH "  ++ show hostArch
         , ""
-        , "#define " ++ hostVendor   ++ "_BUILD_VENDOR 1"
-        , "#define " ++ targetVendor ++ "_HOST_VENDOR 1"
-        , "#define BUILD_VENDOR " ++ show hostVendor
-        , "#define HOST_VENDOR "  ++ show targetVendor
+        , "#define " ++ buildOs   ++ "_BUILD_OS 1"
+        , "#define " ++ hostOs ++ "_HOST_OS 1"
+        , "#define BUILD_OS " ++ show buildOs
+        , "#define HOST_OS "  ++ show hostOs
+        , ""
+        , "#define " ++ buildVendor   ++ "_BUILD_VENDOR 1"
+        , "#define " ++ hostVendor ++ "_HOST_VENDOR 1"
+        , "#define BUILD_VENDOR " ++ show buildVendor
+        , "#define HOST_VENDOR "  ++ show hostVendor
         , ""
         ]
         ++
@@ -351,7 +354,7 @@ generateConfigHs = do
         , ""
         , "import GHC.Version"
         , ""
-        , "#include \"ghc_boot_platform.h\""
+        , "#include \"ghcplatform.h\""
         , ""
         , "cBuildPlatformString :: String"
         , "cBuildPlatformString = BuildPlatform_NAME"
@@ -394,47 +397,6 @@ generateGhcAutoconfH = do
         | "#define PACKAGE_" `isPrefixOf` s
             = "/* #undef " ++ takeWhile (/=' ') (drop 8 s) ++ " */"
         | otherwise = s
-
--- | Generate @ghc_boot_platform.h@ headers.
-generateGhcBootPlatformH :: Expr String
-generateGhcBootPlatformH = do
-    trackGenerateHs
-    stage <- getStage
-    let chooseSetting x y = getSetting $ if stage == Stage0 then x else y
-    buildPlatform  <- chooseSetting BuildPlatform HostPlatform
-    buildArch      <- chooseSetting BuildArch     HostArch
-    buildOs        <- chooseSetting BuildOs       HostOs
-    buildVendor    <- chooseSetting BuildVendor   HostVendor
-    hostPlatform   <- chooseSetting HostPlatform  TargetPlatform
-    hostArch       <- chooseSetting HostArch      TargetArch
-    hostOs         <- chooseSetting HostOs        TargetOs
-    hostVendor     <- chooseSetting HostVendor    TargetVendor
-    return $ unlines
-        [ "#if !defined(__PLATFORM_H__)"
-        , "#define __PLATFORM_H__"
-        , ""
-        , "#define BuildPlatform_NAME  " ++ show buildPlatform
-        , "#define HostPlatform_NAME   " ++ show hostPlatform
-        , ""
-        , "#define " ++ cppify buildPlatform  ++ "_BUILD 1"
-        , "#define " ++ cppify hostPlatform   ++ "_HOST 1"
-        , ""
-        , "#define " ++ buildArch  ++ "_BUILD_ARCH 1"
-        , "#define " ++ hostArch   ++ "_HOST_ARCH 1"
-        , "#define BUILD_ARCH "  ++ show buildArch
-        , "#define HOST_ARCH "   ++ show hostArch
-        , ""
-        , "#define " ++ buildOs  ++ "_BUILD_OS 1"
-        , "#define " ++ hostOs   ++ "_HOST_OS 1"
-        , "#define BUILD_OS "  ++ show buildOs
-        , "#define HOST_OS "   ++ show hostOs
-        , ""
-        , "#define " ++ buildVendor  ++ "_BUILD_VENDOR 1"
-        , "#define " ++ hostVendor   ++ "_HOST_VENDOR 1"
-        , "#define BUILD_VENDOR "  ++ show buildVendor
-        , "#define HOST_VENDOR "   ++ show hostVendor
-        , ""
-        , "#endif /* __PLATFORM_H__ */" ]
 
 -- | Generate @ghcversion.h@ header.
 generateGhcVersionH :: Expr String
