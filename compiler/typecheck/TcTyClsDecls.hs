@@ -510,8 +510,9 @@ kcTyClGroup decls
           --    3. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
+        ; cusks_enabled <- xoptM LangExt.CUSKs
         ; let (cusk_decls, no_cusk_decls)
-                 = partition (hsDeclHasCusk . unLoc) decls
+                 = partition (hsDeclHasCusk cusks_enabled . unLoc) decls
 
         ; poly_cusk_tcs <- getInitialKinds True cusk_decls
 
@@ -1040,17 +1041,25 @@ getInitialKind cusk (FamDecl { tcdFam = decl })
 getInitialKind cusk (SynDecl { tcdLName = dL->L _ name
                              , tcdTyVars = ktvs
                              , tcdRhs = rhs })
-  = do  { tycon <- kcLHsQTyVars name TypeSynonymFlavour cusk ktvs $
-                   case kind_annotation rhs of
+  = do  { cusks_enabled <- xoptM LangExt.CUSKs
+        ; tycon <- kcLHsQTyVars name TypeSynonymFlavour cusk ktvs $
+                   case kind_annotation cusks_enabled rhs of
                      Just ksig -> tcLHsKindSig (TySynKindCtxt name) ksig
-                     Nothing   -> newMetaKindVar
+                     Nothing -> newMetaKindVar
         ; return [tycon] }
   where
     -- Keep this synchronized with 'hsDeclHasCusk'.
-    kind_annotation (dL->L _ ty) = case ty of
-        HsParTy _ lty     -> kind_annotation lty
-        HsKindSig _ _ k   -> Just k
-        _                 -> Nothing
+    kind_annotation
+      :: Bool           --  cusks_enabled?
+      -> LHsType GhcRn  --  rhs
+      -> Maybe (LHsKind GhcRn)
+    kind_annotation False = const Nothing
+    kind_annotation True = go
+      where
+        go (dL->L _ ty) = case ty of
+          HsParTy _ lty     -> go lty
+          HsKindSig _ _ k   -> Just k
+          _                 -> Nothing
 
 getInitialKind _ (DataDecl _ _ _ _ (XHsDataDefn _)) = panic "getInitialKind"
 getInitialKind _ (XTyClDecl _) = panic "getInitialKind"
@@ -1074,18 +1083,20 @@ getFamDeclInitialKind parent_cusk mb_parent_tycon
                      , fdTyVars    = ktvs
                      , fdResultSig = (dL->L _ resultSig)
                      , fdInfo      = info })
-  = kcLHsQTyVars name flav fam_cusk ktvs $
-    case resultSig of
-      KindSig _ ki                              -> tcLHsKindSig ctxt ki
-      TyVarSig _ (dL->L _ (KindedTyVar _ _ ki)) -> tcLHsKindSig ctxt ki
-      _ -- open type families have * return kind by default
-        | tcFlavourIsOpen flav              -> return liftedTypeKind
-               -- closed type families have their return kind inferred
-               -- by default
-        | otherwise                         -> newMetaKindVar
+  = do { cusks_enabled <- xoptM LangExt.CUSKs
+       ; kcLHsQTyVars name flav (fam_cusk cusks_enabled) ktvs $
+         case resultSig of
+           KindSig _ ki                              -> tcLHsKindSig ctxt ki
+           TyVarSig _ (dL->L _ (KindedTyVar _ _ ki)) -> tcLHsKindSig ctxt ki
+           _ -- open type families have * return kind by default
+             | tcFlavourIsOpen flav              -> return liftedTypeKind
+                    -- closed type families have their return kind inferred
+                    -- by default
+             | otherwise                         -> newMetaKindVar
+       }
   where
     assoc_with_no_cusk = isJust mb_parent_tycon && not parent_cusk
-    fam_cusk = famDeclHasCusk assoc_with_no_cusk decl
+    fam_cusk cusks_enabled = famDeclHasCusk cusks_enabled assoc_with_no_cusk decl
     flav = case info of
       DataFamily         -> DataFamilyFlavour mb_parent_tycon
       OpenTypeFamily     -> OpenTypeFamilyFlavour mb_parent_tycon

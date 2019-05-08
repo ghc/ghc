@@ -9012,6 +9012,11 @@ do so.
 Complete user-supplied kind signatures and polymorphic recursion
 ----------------------------------------------------------------
 
+.. extension:: CUSKs
+    :shortdesc: Enable detection of complete user-supplied kind signatures.
+
+    :since: 8.10.1
+
 Just as in type inference, kind inference for recursive types can only
 use *monomorphic* recursion. Consider this (contrived) example: ::
 
@@ -9109,6 +9114,13 @@ example, consider ::
 
 According to the rules above ``X`` has a CUSK. Yet, the kind of ``k`` is undetermined.
 It is thus quantified over, giving ``X`` the kind ``forall k1 (k :: k1). Proxy k -> Type``.
+
+The detection of CUSKs is enabled by the :extension:`CUSKs` flag, which is
+switched on by default. When :extension:`CUSKs` is switched off, there is
+currently no way to enable polymorphic recursion in types. In the future, the
+notion of a CUSK will be replaced by top-level kind signatures
+(`GHC Proposal #36 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0036-kind-signatures.rst>`__),
+then, after a transition period, this extension will be turned off by default, and eventually removed.
 
 Kind inference in closed type families
 --------------------------------------
