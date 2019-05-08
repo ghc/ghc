@@ -563,8 +563,9 @@ rnHsTyKi env t@(HsKindSig _ ty k)
   = do { checkPolyKinds env t
        ; kind_sigs_ok <- xoptM LangExt.KindSignatures
        ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) ty)
-       ; (ty', fvs1) <- rnLHsTyKi env ty
        ; (k', fvs2)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
+       ; (ty', fvs1) <- bindSigTyVarsFV (hsScopedKvs k') $
+                        rnLHsTyKi env ty
        ; return (HsKindSig noExt ty' k', fvs1 `plusFV` fvs2) }
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
@@ -645,6 +646,10 @@ rnHsTyKi env ty@(HsExplicitTupleTy _ tys)
 rnHsTyKi env (HsWildCardTy _)
   = do { checkAnonWildCard env
        ; return (HsWildCardTy noExt, emptyFVs) }
+
+hsScopedKvs :: LHsType GhcRn -> [Name]
+hsScopedKvs (L _ (HsForAllTy { hst_bndrs = tvs })) = hsLTyVarNames tvs
+hsScopedKvs _ = []
 
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name

@@ -587,7 +587,8 @@ tc_infer_hs_type mode (HsKindSig _ ty sig)
                  -- things like instantiate its foralls, so it needs
                  -- to be fully determined (#14904)
        ; traceTc "tc_infer_hs_type:sig" (ppr ty $$ ppr sig')
-       ; ty' <- tc_lhs_type mode ty sig'
+       ; ty' <- tcExtendTyVarEnv (fst (tcSplitForAllTys sig')) $
+                tc_lhs_type mode ty sig'
        ; return (ty', sig') }
 
 -- HsSpliced is an annotation produced by 'RnSplice.rnSpliceType' to communicate

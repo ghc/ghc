@@ -1,0 +1,6 @@
+
+T16635b.hs:14:11: error:
+    • Expected kind ‘forall a. a -> Maybe a’,
+        but ‘Just @a’ has kind ‘a -> Maybe a’
+    • In the type ‘(Just @a :: forall a. a -> Maybe a) U’
+      In the type declaration for ‘F’
