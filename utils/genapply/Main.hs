@@ -12,10 +12,13 @@
 -- for details
 module Main(main) where
 
+-- Note [Genapply target as host for RTS macros]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- We improperly include *HOST* macros for our target...
 #include "../../includes/ghcconfig.h"
 
--- .. so that this header defines the right stuff.
+-- ...so that this header defines the right stuff.  It is the RTS's host, but
+-- our target, as we are generating code that uses that RTS.
 #include "../../includes/stg/MachRegsForHost.h"
 
 #include "../../includes/rts/Constants.h"
