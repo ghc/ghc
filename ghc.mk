@@ -1437,7 +1437,6 @@ maintainer-clean : distclean
 
 .PHONY: bootstrapping-files
 # See https://gitlab.haskell.org/ghc/ghc/wikis/building/porting
-bootstrapping-files: $(includes_H_CONFIG)
 bootstrapping-files: $(includes_DERIVEDCONSTANTS)
 bootstrapping-files: $(includes_GHCCONSTANTS)
 bootstrapping-files: $(libffi_HEADERS)
