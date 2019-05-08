@@ -679,11 +679,15 @@ countTyClDecls decls
 
 -- | Does this declaration have a complete, user-supplied kind signature?
 -- See Note [CUSKs: complete user-supplied kind signatures]
-hsDeclHasCusk :: TyClDecl GhcRn -> Bool
-hsDeclHasCusk (FamDecl { tcdFam = fam_decl })
-  = famDeclHasCusk False fam_decl
+hsDeclHasCusk
+  :: Bool  -- True <=> CUSKs are enabled
+  -> TyClDecl GhcRn
+  -> Bool
+hsDeclHasCusk False _ = False
+hsDeclHasCusk cusks (FamDecl { tcdFam = fam_decl })
+  = famDeclHasCusk cusks False fam_decl
     -- False: this is not: an associated type of a class with no cusk
-hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
+hsDeclHasCusk True (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
   -- NB: Keep this synchronized with 'getInitialKind'
   = hsTvbAllKinded tyvars && rhs_annotated rhs
   where
@@ -691,9 +695,9 @@ hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
       HsParTy _ lty  -> rhs_annotated lty
       HsKindSig {}   -> True
       _              -> False
-hsDeclHasCusk (DataDecl { tcdDExt = DataDeclRn { tcdDataCusk = cusk }}) = cusk
-hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
-hsDeclHasCusk (XTyClDecl _) = panic "hsDeclHasCusk"
+hsDeclHasCusk True (DataDecl { tcdDExt = DataDeclRn { tcdDataCusk = cusk }}) = cusk
+hsDeclHasCusk True (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
+hsDeclHasCusk _ (XTyClDecl _) = panic "hsDeclHasCusk"
 
 -- Pretty-printing TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -786,6 +790,9 @@ kind signature (CUSK). This is because we can safely generalise a CUSKed
 declaration before checking all of the others, supporting polymorphic recursion.
 See https://gitlab.haskell.org/ghc/ghc/wikis/ghc-kinds/kind-inference#proposed-new-strategy
 and #9200 for lots of discussion of how we got here.
+
+The detection of CUSKs is enabled by the -XCUSKs extension, switched on by default.
+Under -XNoCUSKs, all declarations are treated as if they have no CUSK.
 
 PRINCIPLE:
   a type declaration has a CUSK iff we could produce a separate kind signature
@@ -1080,11 +1087,13 @@ data FamilyInfo pass
 
 -- | Does this family declaration have a complete, user-supplied kind signature?
 -- See Note [CUSKs: complete user-supplied kind signatures]
-famDeclHasCusk :: Bool -- ^ True <=> this is an associated type family,
+famDeclHasCusk :: Bool -- ^ True <=> CUSKs are enabled
+               -> Bool -- ^ True <=> this is an associated type family,
                        --            and the parent class has /no/ CUSK
                -> FamilyDecl pass
                -> Bool
-famDeclHasCusk assoc_with_no_cusk
+famDeclHasCusk False _ _ = False
+famDeclHasCusk True assoc_with_no_cusk
                (FamilyDecl { fdInfo      = fam_info
                            , fdTyVars    = tyvars
                            , fdResultSig = L _ resultSig })
@@ -1095,7 +1104,7 @@ famDeclHasCusk assoc_with_no_cusk
             -- Un-associated open type/data families have CUSKs
             -- Associated type families have CUSKs iff the parent class does
 
-famDeclHasCusk _ (XFamilyDecl {}) = panic "famDeclHasCusk"
+famDeclHasCusk _ _ (XFamilyDecl {}) = panic "famDeclHasCusk"
 
 -- | Does this family declaration have user-supplied return kind signature?
 hasReturnKindSignature :: FamilyResultSig a -> Bool

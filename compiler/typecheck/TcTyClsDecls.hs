@@ -510,8 +510,9 @@ kcTyClGroup decls
           --    3. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
+        ; cusks <- xoptM LangExt.CUSKs
         ; let (cusk_decls, no_cusk_decls)
-                 = partition (hsDeclHasCusk . unLoc) decls
+                 = partition (hsDeclHasCusk cusks . unLoc) decls
 
         ; poly_cusk_tcs <- getInitialKinds True cusk_decls
 
@@ -1040,10 +1041,11 @@ getInitialKind cusk (FamDecl { tcdFam = decl })
 getInitialKind cusk (SynDecl { tcdLName = dL->L _ name
                              , tcdTyVars = ktvs
                              , tcdRhs = rhs })
-  = do  { tycon <- kcLHsQTyVars name TypeSynonymFlavour cusk ktvs $
+  = do  { cusks <- xoptM LangExt.CUSKs
+        ; tycon <- kcLHsQTyVars name TypeSynonymFlavour cusk ktvs $
                    case kind_annotation rhs of
-                     Just ksig -> tcLHsKindSig (TySynKindCtxt name) ksig
-                     Nothing   -> newMetaKindVar
+                     Just ksig | cusks -> tcLHsKindSig (TySynKindCtxt name) ksig
+                     _ -> newMetaKindVar
         ; return [tycon] }
   where
     -- Keep this synchronized with 'hsDeclHasCusk'.
@@ -1074,7 +1076,8 @@ getFamDeclInitialKind parent_cusk mb_parent_tycon
                      , fdTyVars    = ktvs
                      , fdResultSig = (dL->L _ resultSig)
                      , fdInfo      = info })
-  = kcLHsQTyVars name flav fam_cusk ktvs $
+  = xoptM LangExt.CUSKs >>= \cusks ->
+    kcLHsQTyVars name flav (fam_cusk cusks) ktvs $
     case resultSig of
       KindSig _ ki                              -> tcLHsKindSig ctxt ki
       TyVarSig _ (dL->L _ (KindedTyVar _ _ ki)) -> tcLHsKindSig ctxt ki
@@ -1085,7 +1088,7 @@ getFamDeclInitialKind parent_cusk mb_parent_tycon
         | otherwise                         -> newMetaKindVar
   where
     assoc_with_no_cusk = isJust mb_parent_tycon && not parent_cusk
-    fam_cusk = famDeclHasCusk assoc_with_no_cusk decl
+    fam_cusk cusks = famDeclHasCusk cusks assoc_with_no_cusk decl
     flav = case info of
       DataFamily         -> DataFamilyFlavour mb_parent_tycon
       OpenTypeFamily     -> OpenTypeFamilyFlavour mb_parent_tycon
