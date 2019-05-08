@@ -176,12 +176,12 @@ instance H.Builder Builder where
         Autoreconf dir -> return [dir -/- "configure.ac"]
         Configure  dir -> return [dir -/- "configure"]
 
-        Ghc _ Stage0 -> generatedGhcDependencies Stage0
+        Ghc _ Stage0 -> includesDependencies Stage0
         Ghc _ stage -> do
             root <- buildRoot
             touchyPath <- programPath (vanillaContext Stage0 touchy)
             unlitPath  <- builderPath Unlit
-            ghcgens <- generatedGhcDependencies stage
+            ghcgens <- includesDependencies stage
 
             -- GHC from the previous stage is used to build artifacts in the
             -- current stage. Need the previous stage's GHC deps.

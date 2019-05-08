@@ -67,7 +67,7 @@ extra-libraries:
 #if defined(INSTALLING)
 include-dirs:           INCLUDE_DIR FFI_INCLUDE_DIR
 #else /* !INSTALLING */
-include-dirs:           TOP"/rts/dist/build" TOP"/includes" TOP"/includes/dist-derivedconstants/header" FFI_INCLUDE_DIR
+include-dirs:           TOP"/rts/dist/build" TOP"/includes" TOP"/includes/dist-derivedconstants/header" FFI_INCLUDE_DIR TOP"/includes/dist-install/build"
 #endif
 
 includes:               Stg.h

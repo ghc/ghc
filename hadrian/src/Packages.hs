@@ -13,7 +13,7 @@ module Packages (
     -- * Package information
     programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
     rtsContext, rtsBuildPath, libffiBuildPath, libffiLibraryName,
-    generatedGhcDependencies, ensureConfigured
+    ensureConfigured
     ) where
 
 import Hadrian.Package
@@ -216,12 +216,3 @@ libffiLibraryName = do
         (True , False) -> "ffi"
         (False, False) -> "Cffi"
         (_    , True ) -> "Cffi-6"
-
--- | Generated header files required by GHC in runtime.
-generatedGhcDependencies :: Stage -> Action [FilePath]
-generatedGhcDependencies stage = do
-    let context = vanillaContext stage compiler
-    bh <- buildPath   context <&> (-/- "ghc_boot_platform.h")
-    ch <- contextPath context <&> (-/- "ghc_boot_platform.h")
-    is <- includesDependencies
-    return $ is ++ [bh, ch]

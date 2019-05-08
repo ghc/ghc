@@ -13,10 +13,21 @@
 #
 # Header files built from the configure script's findings
 #
-# XXX: these should go in includes/dist/build?
-includes_H_CONFIG   = includes/ghcautoconf.h
-includes_H_PLATFORM = includes/ghcplatform.h
-includes_H_VERSION  = includes/ghcversion.h
+includes_0_H_CONFIG   = includes/dist/build/ghcautoconf.h
+includes_1_H_CONFIG   = includes/dist-install/build/ghcautoconf.h
+includes_2_H_CONFIG   = $(includes_1_H_CONFIG)
+
+includes_0_H_PLATFORM = includes/dist/build/ghcplatform.h
+includes_1_H_PLATFORM = includes/dist-install/build/ghcplatform.h
+includes_2_H_PLATFORM = $(includes_1_H_PLATFORM)
+
+includes_0_H_VERSION  = includes/dist/build/ghcversion.h
+includes_1_H_VERSION  = includes/dist-install/build/ghcversion.h
+includes_2_H_VERSION  = $(includes_1_H_VERSION)
+
+BUILD_0_INCLUDE_DIR = includes/dist/build
+BUILD_1_INCLUDE_DIR = includes/dist-install/build
+BUILD_2_INCLUDE_DIR = $(BUILD_1_INCLUDE_DIR)
 
 #
 # All header files are in includes/{one of these subdirectories}
@@ -44,6 +55,7 @@ includes_CC_OPTS += -DUSE_MINIINTERPRETER
 endif
 
 includes_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
+includes_CC_OPTS += -I$(BUILD_1_INCLUDE_DIR)
 includes_CC_OPTS += -Irts
 
 ifneq "$(GhcWithSMP)" "YES"
@@ -54,109 +66,163 @@ ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
 includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT
 endif
 
-
-$(includes_H_VERSION) : mk/project.mk | $$(dir $$@)/.
-	@echo "Creating $@..."
-	@echo "#if !defined(__GHCVERSION_H__)"  > $@
-	@echo "#define __GHCVERSION_H__" >> $@
-	@echo >> $@
-	@echo "#define __GLASGOW_HASKELL__ $(ProjectVersionInt)" >> $@
-	@echo >> $@
-	@if [ -n "$(ProjectPatchLevel1)" ]; then \
-	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ $(ProjectPatchLevel1)" >> $@; \
+define includesHeaderVersion
+# $1 = stage
+$$(includes_$1_H_VERSION) : mk/project.mk | $$$$(dir $$$$@)/.
+	$$(call removeFiles,$$@)
+	@echo "Creating $$@..."
+	@echo "#if !defined(__GHCVERSION_H__)"  > $$@
+	@echo "#define __GHCVERSION_H__" >> $$@
+	@echo >> $$@
+	@echo "#define __GLASGOW_HASKELL__ $$(ProjectVersionInt)" >> $$@
+	@echo >> $$@
+	@if [ -n "$$(ProjectPatchLevel1)" ]; then \
+	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ $$(ProjectPatchLevel1)" >> $$@; \
 	fi
-	@if [ -n "$(ProjectPatchLevel2)" ]; then \
-	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL2__ $(ProjectPatchLevel2)" >> $@; \
+	@if [ -n "$$(ProjectPatchLevel2)" ]; then \
+	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL2__ $$(ProjectPatchLevel2)" >> $$@; \
 	fi
-	@echo >> $@
-	@echo '#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (\'      >> $@
-	@echo '   ((ma)*100+(mi)) <  __GLASGOW_HASKELL__ || \'             >> $@
-	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'             >> $@
-	@echo '          && (pl1) <  __GLASGOW_HASKELL_PATCHLEVEL1__ || \' >> $@
-	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'             >> $@
-	@echo '          && (pl1) == __GLASGOW_HASKELL_PATCHLEVEL1__ \'    >> $@
-	@echo '          && (pl2) <= __GLASGOW_HASKELL_PATCHLEVEL2__ )'    >> $@
-	@echo >> $@
-	@echo "#endif /* __GHCVERSION_H__ */"          >> $@
+	@echo >> $$@
+	@echo '#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (\'      >> $$@
+	@echo '   ((ma)*100+(mi)) <  __GLASGOW_HASKELL__ || \'             >> $$@
+	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'             >> $$@
+	@echo '          && (pl1) <  __GLASGOW_HASKELL_PATCHLEVEL1__ || \' >> $$@
+	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'             >> $$@
+	@echo '          && (pl1) == __GLASGOW_HASKELL_PATCHLEVEL1__ \'    >> $$@
+	@echo '          && (pl2) <= __GLASGOW_HASKELL_PATCHLEVEL2__ )'    >> $$@
+	@echo >> $$@
+	@echo "#endif /* __GHCVERSION_H__ */"          >> $$@
 	@echo "Done."
+
+endef
+
+$(eval $(call includesHeaderVersion,0))
+$(eval $(call includesHeaderVersion,1))
 
 ifneq "$(BINDIST)" "YES"
 
-ifeq "$(PORTING_HOST)" "YES"
-
-$(includes_H_CONFIG) :
-	@echo "*** Cross-compiling: please copy $(includes_H_CONFIG) from the target system"
-	@exit 1
-
-else
-
-$(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$(dir $$@)/.
-	@echo "Creating $@..."
-	@echo "#if !defined(__GHCAUTOCONF_H__)"  >$@
-	@echo "#define __GHCAUTOCONF_H__" >>$@
+define includesHeaderConfig
+# $1 = stage
+$$(includes_$1_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$$$(dir $$$$@)/.
+	$$(call removeFiles,$$@)
+	@echo "Creating $$@..."
+	@echo "#if !defined(__GHCAUTOCONF_H__)"  > $$@
+	@echo "#define __GHCAUTOCONF_H__" >> $$@
 #
 #	Copy the contents of mk/config.h, turning '#define PACKAGE_FOO
 #	"blah"' into '/* #undef PACKAGE_FOO */' to avoid clashes.
 #
-	@sed 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$,\1/* #undef \2 */,' mk/config.h >> $@
+	@sed 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$$$,\1/* #undef \2 */,' mk/config.h >> $$@
 #
 #	Tack on some extra config information from the build system
 #
-ifeq "$(TablesNextToCode)" "YES"
-	@echo >> $@
-	@echo "#define TABLES_NEXT_TO_CODE 1" >> $@
+ifeq "$$(TablesNextToCode)" "YES"
+	@echo >> $$@
+	@echo "#define TABLES_NEXT_TO_CODE 1" >> $$@
 endif
 #
-ifeq "$(CC_LLVM_BACKEND)" "1"
-	@echo >> $@
-	@echo "#define llvm_CC_FLAVOR 1" >> $@
+ifeq "$$(CC_LLVM_BACKEND)" "1"
+	@echo >> $$@
+	@echo "#define llvm_CC_FLAVOR 1" >> $$@
 endif
 #
-ifeq "$(CC_CLANG_BACKEND)" "1"
-	@echo >> $@
-	@echo "#define clang_CC_FLAVOR 1" >> $@
+ifeq "$$(CC_CLANG_BACKEND)" "1"
+	@echo >> $$@
+	@echo "#define clang_CC_FLAVOR 1" >> $$@
 endif
 #
-	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $@
+	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $$@
 	@echo "Done."
 
-endif
+endef
 
-$(includes_H_PLATFORM) : includes/Makefile | $$(dir $$@)/.
-	$(call removeFiles,$@)
-	@echo "Creating $@..."
-	@echo "#if !defined(__GHCPLATFORM_H__)"  >$@
-	@echo "#define __GHCPLATFORM_H__" >>$@
-	@echo >> $@
-	@echo "#define BuildPlatform_TYPE  $(HostPlatform_CPP)" >> $@
-	@echo "#define HostPlatform_TYPE   $(TargetPlatform_CPP)" >> $@
-	@echo >> $@
-	@echo "#define $(HostPlatform_CPP)_BUILD  1" >> $@
-	@echo "#define $(TargetPlatform_CPP)_HOST  1" >> $@
-	@echo >> $@
-	@echo "#define $(HostArch_CPP)_BUILD_ARCH  1" >> $@
-	@echo "#define $(TargetArch_CPP)_HOST_ARCH  1" >> $@
-	@echo "#define BUILD_ARCH  \"$(HostArch_CPP)\"" >> $@
-	@echo "#define HOST_ARCH  \"$(TargetArch_CPP)\"" >> $@
-	@echo >> $@
-	@echo "#define $(HostOS_CPP)_BUILD_OS  1" >> $@
-	@echo "#define $(TargetOS_CPP)_HOST_OS  1" >> $@
-	@echo "#define BUILD_OS  \"$(HostOS_CPP)\"" >> $@
-	@echo "#define HOST_OS  \"$(TargetOS_CPP)\"" >> $@
-	@echo >> $@
-	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR  1" >> $@
-	@echo "#define $(TargetVendor_CPP)_HOST_VENDOR  1" >> $@
-	@echo "#define BUILD_VENDOR  \"$(HostVendor_CPP)\"" >> $@
-	@echo "#define HOST_VENDOR  \"$(TargetVendor_CPP)\"" >> $@
-	@echo >> $@
-ifeq "$(GhcUnregisterised)" "YES"
-	@echo "#define UnregisterisedCompiler 1" >> $@
+$(eval $(call includesHeaderConfig,0))
+$(eval $(call includesHeaderConfig,1))
+
+BUILDPLATFORM_0 = $(BUILDPLATFORM)
+BUILDPLATFORM_1 = $(HOSTPLATFORM)
+BUILDPLATFORM_2 = $(TARGETPLATFORM)
+
+HOSTPLATFORM_0 = $(HOSTPLATFORM)
+HOSTPLATFORM_1 = $(TARGETPLATFORM)
+HOSTPLATFORM_2 = $(TARGETPLATFORM)
+
+BuildPlatform_0_CPP = $(BuildPlatform_CPP)
+BuildPlatform_1_CPP = $(HostPlatform_CPP)
+BuildPlatform_2_CPP = $(TargetPlatform_CPP)
+
+HostPlatform_0_CPP = $(HostPlatform_CPP)
+HostPlatform_1_CPP = $(TargetPlatform_CPP)
+HostPlatform_2_CPP = $(TargetPlatform_CPP)
+
+BuildArch_0_CPP = $(BuildArch_CPP)
+BuildArch_1_CPP = $(HostArch_CPP)
+BuildArch_2_CPP = $(TargetArch_CPP)
+
+HostArch_0_CPP = $(HostArch_CPP)
+HostArch_1_CPP = $(TargetArch_CPP)
+HostArch_2_CPP = $(TargetArch_CPP)
+
+BuildOS_0_CPP = $(BuildOS_CPP)
+BuildOS_1_CPP = $(HostOS_CPP)
+BuildOS_2_CPP = $(TargetOS_CPP)
+
+HostOS_0_CPP = $(HostOS_CPP)
+HostOS_1_CPP = $(TargetOS_CPP)
+HostOS_2_CPP = $(TargetOS_CPP)
+
+BuildVendor_0_CPP = $(BuildVendor_CPP)
+BuildVendor_1_CPP = $(HostVendor_CPP)
+BuildVendor_2_CPP = $(TargetVendor_CPP)
+
+HostVendor_0_CPP = $(HostVendor_CPP)
+HostVendor_1_CPP = $(TargetVendor_CPP)
+HostVendor_2_CPP = $(TargetVendor_CPP)
+
+define includesHeaderPlatform
+# $1 = stage
+$$(includes_$1_H_PLATFORM) : includes/ghc.mk includes/Makefile | $$$$(dir $$$$@)/.
+	$$(call removeFiles,$$@)
+	@echo "Creating $$@..."
+	@echo "#if !defined(__GHCPLATFORM_H__)"  > $$@
+	@echo "#define __GHCPLATFORM_H__" >> $$@
+	@echo >> $$@
+	@echo "#define BuildPlatform_NAME  \"$(BUILDPLATFORM_$1)\"" >> $$@
+	@echo "#define HostPlatform_NAME   \"$(HOSTPLATFORM_$1)\"" >> $$@
+	@echo >> $$@
+	@echo "#define BuildPlatform_TYPE  $(BuildPlatform_$1_CPP)" >> $$@
+	@echo "#define HostPlatform_TYPE   $(HostPlatform_$1_CPP)" >> $$@
+	@echo >> $$@
+	@echo "#define $(BuildPlatform_$1_CPP)_BUILD  1" >> $$@
+	@echo "#define $(HostPlatform_$1_CPP)_HOST  1" >> $$@
+	@echo >> $$@
+	@echo "#define $(BuildArch_$1_CPP)_BUILD_ARCH  1" >> $$@
+	@echo "#define $(HostArch_$1_CPP)_HOST_ARCH  1" >> $$@
+	@echo "#define BUILD_ARCH  \"$(BuildArch_$1_CPP)\"" >> $$@
+	@echo "#define HOST_ARCH  \"$(HostArch_$1_CPP)\"" >> $$@
+	@echo >> $$@
+	@echo "#define $(BuildOS_$1_CPP)_BUILD_OS  1" >> $$@
+	@echo "#define $(HostOS_$1_CPP)_HOST_OS  1" >> $$@
+	@echo "#define BUILD_OS  \"$(BuildOS_$1_CPP)\"" >> $$@
+	@echo "#define HOST_OS  \"$(HostOS_$1_CPP)\"" >> $$@
+	@echo >> $$@
+	@echo "#define $(BuildVendor_$1_CPP)_BUILD_VENDOR  1" >> $$@
+	@echo "#define $(HostVendor_$1_CPP)_HOST_VENDOR  1" >> $$@
+	@echo "#define BUILD_VENDOR  \"$(BuildVendor_$1_CPP)\"" >> $$@
+	@echo "#define HOST_VENDOR  \"$(HostVendor_$1_CPP)\"" >> $$@
+	@echo >> $$@
+ifeq "$$(GhcUnregisterised)" "YES"
+	@echo "#define UnregisterisedCompiler 1" >> $$@
 endif
-	@echo >> $@
-	@echo "#endif /* __GHCPLATFORM_H__ */"          >> $@
+	@echo >> $$@
+	@echo "#endif /* __GHCPLATFORM_H__ */" >> $$@
 	@echo "Done."
+endef
 
 endif
+
+$(eval $(call includesHeaderPlatform,0))
+$(eval $(call includesHeaderPlatform,1))
 
 # -----------------------------------------------------------------------------
 # Settings
@@ -244,10 +310,10 @@ endif
 DERIVE_CONSTANTS_FLAGS += --target-os "$(TargetOS_CPP)"
 
 ifneq "$(BINDIST)" "YES"
-$(includes_DERIVEDCONSTANTS):           $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_VERSION) $$(includes_H_FILES) $$(rts_H_FILES)
-$(includes_GHCCONSTANTS_HASKELL_VALUE): $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_VERSION) $$(includes_H_FILES) $$(rts_H_FILES)
+$(includes_DERIVEDCONSTANTS):           $$(includes_H_FILES) $$(rts_H_FILES)
+$(includes_GHCCONSTANTS_HASKELL_VALUE): $$(includes_H_FILES) $$(rts_H_FILES)
 
-$(includes_DERIVEDCONSTANTS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
+$(includes_DERIVEDCONSTANTS): $(deriveConstants_INPLACE) $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) | $$(dir $$@)/.
 	$< --gen-header -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
 $(includes_GHCCONSTANTS_HASKELL_TYPE): $(deriveConstants_INPLACE) | $$(dir $$@)/.
@@ -267,10 +333,12 @@ endif
 # Install all header files
 
 $(eval $(call clean-target,includes,,\
-  $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_H_VERSION)))
+  $(includes_0_H_CONFIG) $(includes_0_H_PLATFORM) $(includes_0_H_VERSION) \
+  $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION)))
 
 $(eval $(call all-target,includes,\
-  $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_H_VERSION) \
+  $(includes_0_H_CONFIG) $(includes_0_H_PLATFORM) $(includes_0_H_VERSION) \
+  $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION) \
   $(includes_GHCCONSTANTS_HASKELL_TYPE) \
   $(includes_GHCCONSTANTS_HASKELL_VALUE) \
   $(includes_GHCCONSTANTS_HASKELL_WRAPPERS) \
@@ -280,11 +348,14 @@ $(eval $(call all-target,includes,\
 install: install_includes
 
 .PHONY: install_includes
-install_includes :
+install_includes : $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION)
 	$(INSTALL_DIR) "$(DESTDIR)$(ghcheaderdir)"
 	$(foreach d,$(includes_H_SUBDIRS), \
 	    $(INSTALL_DIR) "$(DESTDIR)$(ghcheaderdir)/$d" && \
 	    $(INSTALL_HEADER) $(INSTALL_OPTS) includes/$d/*.h "$(DESTDIR)$(ghcheaderdir)/$d/" && \
 	) true
-	$(INSTALL_HEADER) $(INSTALL_OPTS) $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_H_VERSION) $(includes_DERIVEDCONSTANTS) "$(DESTDIR)$(ghcheaderdir)/"
+	$(INSTALL_HEADER) $(INSTALL_OPTS) \
+		$(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION) \
+		$(includes_DERIVEDCONSTANTS) \
+		"$(DESTDIR)$(ghcheaderdir)/"
 

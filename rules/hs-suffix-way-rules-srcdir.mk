@@ -12,7 +12,7 @@
 
 
 define hs-suffix-way-rules-srcdir
-# args: $1 = dir,  $2 = distdir, $3 = way, $4 = srcdir
+# args: $1 = dir,  $2 = distdir, $3 = way, $4 = srcdir, $5 = stage
 
 ifneq "$$(BINDIST)" "YES"
 
@@ -35,11 +35,21 @@ $1/$2/build/%.$$($3_hcsuf) : $1/$4/%.lhs $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) 
 # XXX: for some reason these get used in preference to the direct
 # .hs->.o rule, I don't know why --SDM
 
-$1/$2/build/%.$$($3_osuf) : $1/$4/%.hc includes/ghcautoconf.h includes/ghcplatform.h | $$$$(dir $$$$@)/.
-	$$(call cmd,$1_$2_CC) $$($1_$2_$3_ALL_CC_OPTS) $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) -x c -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
+$1/$2/build/%.$$($3_osuf) : $1/$4/%.hc $$(includes_$5_H_CONFIG) $$(includes_$5_H_PLATFORM) | $$$$(dir $$$$@)/.
+	$$(call cmd,$1_$2_CC) \
+		$$($1_$2_$3_ALL_CC_OPTS) \
+		$$(addprefix -I,$$(GHC_INCLUDE_DIRS)) \
+		-I$$(BUILD_$5_INCLUDE_DIR) \
+		-x c -c $$< -o $$@ \
+		$$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
 
-$1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hc includes/ghcautoconf.h includes/ghcplatform.h
-	$$(call cmd,$1_$2_CC) $$($1_$2_$3_ALL_CC_OPTS) $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) -x c -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
+$1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hc $$(includes_$5_H_CONFIG) $$(includes_$5_H_PLATFORM)
+	$$(call cmd,$1_$2_CC) \
+		$$($1_$2_$3_ALL_CC_OPTS) \
+		$$(addprefix -I,$$(GHC_INCLUDE_DIRS)) \
+		-I$$(BUILD_$5_INCLUDE_DIR) \
+		-x c -c $$< -o $$@ \
+		$$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
 
 # $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.$$($3_hcsuf)
 # 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
