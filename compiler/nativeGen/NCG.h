@@ -8,4 +8,4 @@
 
 #pragma once
 
-#include "ghc_boot_platform.h"
+#include "ghcplatform.h"
