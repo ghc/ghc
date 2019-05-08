@@ -29,20 +29,23 @@ compiler_stage1_C_FILES_NODEPS = compiler/parser/cutils.c
 # we just skip the check.
 compiler_NO_CHECK = YES
 
-ifneq "$(BINDIST)" "YES"
-compiler/stage1/package-data.mk : compiler/stage1/build/Config.hs
-compiler/stage2/package-data.mk : compiler/stage2/build/Config.hs
-compiler/stage3/package-data.mk : compiler/stage3/build/Config.hs
+dec1 = 0
+dec2 = 1
+dec3 = 2
 
-compiler/stage1/build/PlatformConstants.o: $(includes_GHCCONSTANTS_HASKELL_TYPE)
-compiler/stage2/build/PlatformConstants.o: $(includes_GHCCONSTANTS_HASKELL_TYPE)
-compiler/stage3/build/PlatformConstants.o: $(includes_GHCCONSTANTS_HASKELL_TYPE)
-compiler/stage1/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)
-compiler/stage2/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)
-compiler/stage3/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)
-compiler/stage1/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
-compiler/stage2/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
-compiler/stage3/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
+ifneq "$(BINDIST)" "YES"
+
+$(foreach n,1 2 3, \
+    $(eval compiler/stage$n/package-data.mk : $(includes_$(dec$n)_H_PLATFORM)) \
+    $(eval compiler/stage$n/package-data.mk : $(includes_$(dec$n)_H_CONFIG)) \
+  )
+
+$(foreach n,1 2 3, \
+    $(eval compiler/stage$n/package-data.mk : compiler/stage$n/build/Config.hs) \
+    $(eval compiler/stage$n/build/PlatformConstants.o : $(includes_GHCCONSTANTS_HASKELL_TYPE)) \
+    $(eval compiler/stage$n/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)) \
+    $(eval compiler/stage$n/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)) \
+  )
 endif
 
 compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
@@ -62,7 +65,7 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo                                                               >> $@
 	@echo 'import GHC.Version'                                          >> $@
 	@echo                                                               >> $@
-	@echo '#include "ghc_boot_platform.h"'                              >> $@
+	@echo '#include "ghcplatform.h"'                                    >> $@
 	@echo                                                               >> $@
 	@echo 'cBuildPlatformString :: String'                              >> $@
 	@echo 'cBuildPlatformString = BuildPlatform_NAME'                   >> $@
@@ -79,82 +82,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cStage                :: String'                             >> $@
 	@echo 'cStage                = show (STAGE :: Int)'                 >> $@
 	@echo done.
-
-# -----------------------------------------------------------------------------
-# Create platform includes
-
-# Here we generate a little header file containing CPP symbols that GHC
-# uses to determine which platform it is building on/for.  The platforms
-# can differ between stage1 and stage2 if we're cross-compiling, so we
-# need one of these header files per stage.
-
-PLATFORM_H = ghc_boot_platform.h
-
-compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
-	$(call removeFiles,$@)
-	@echo "Creating $@..."
-	@echo "#if !defined(__PLATFORM_H__)"                     >> $@
-	@echo "#define __PLATFORM_H__"                           >> $@
-	@echo                                                    >> $@
-	@echo "#define BuildPlatform_NAME  \"$(BUILDPLATFORM)\""  >> $@
-	@echo "#define HostPlatform_NAME   \"$(HOSTPLATFORM)\""   >> $@
-	@echo                                                     >> $@
-	@echo "#define $(BuildPlatform_CPP)_BUILD 1"              >> $@
-	@echo "#define $(HostPlatform_CPP)_HOST 1"                >> $@
-	@echo                                                     >> $@
-	@echo "#define $(BuildArch_CPP)_BUILD_ARCH 1"             >> $@
-	@echo "#define $(HostArch_CPP)_HOST_ARCH 1"               >> $@
-	@echo "#define BUILD_ARCH \"$(BuildArch_CPP)\""           >> $@
-	@echo "#define HOST_ARCH \"$(HostArch_CPP)\""             >> $@
-	@echo                                                     >> $@
-	@echo "#define $(BuildOS_CPP)_BUILD_OS 1"                 >> $@
-	@echo "#define $(HostOS_CPP)_HOST_OS 1"                   >> $@
-	@echo "#define BUILD_OS \"$(BuildOS_CPP)\""               >> $@
-	@echo "#define HOST_OS \"$(HostOS_CPP)\""                 >> $@
-	@echo                                                     >> $@
-	@echo "#define $(BuildVendor_CPP)_BUILD_VENDOR 1"         >> $@
-	@echo "#define $(HostVendor_CPP)_HOST_VENDOR 1"           >> $@
-	@echo "#define BUILD_VENDOR \"$(BuildVendor_CPP)\""       >> $@
-	@echo "#define HOST_VENDOR \"$(HostVendor_CPP)\""         >> $@
-	@echo                                                     >> $@
-	@echo "#endif /* __PLATFORM_H__ */"                       >> $@
-	@echo "Done."
-
-# For stage2 and above, the BUILD platform is the HOST of stage1, and
-# the HOST platform is the TARGET of stage1.  The TARGET remains the same
-# (stage1 is the cross-compiler, not stage2).
-compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
-	$(call removeFiles,$@)
-	@echo "Creating $@..."
-	@echo "#if !defined(__PLATFORM_H__)"                      >> $@
-	@echo "#define __PLATFORM_H__"                            >> $@
-	@echo                                                     >> $@
-	@echo "#define BuildPlatform_NAME  \"$(HOSTPLATFORM)\""   >> $@
-	@echo "#define HostPlatform_NAME   \"$(TARGETPLATFORM)\"" >> $@
-	@echo                                                     >> $@
-	@echo "#define $(HostPlatform_CPP)_BUILD 1"               >> $@
-	@echo "#define $(TargetPlatform_CPP)_HOST 1"              >> $@
-	@echo                                                     >> $@
-	@echo "#define $(HostArch_CPP)_BUILD_ARCH 1"              >> $@
-	@echo "#define $(TargetArch_CPP)_HOST_ARCH 1"             >> $@
-	@echo "#define BUILD_ARCH \"$(HostArch_CPP)\""            >> $@
-	@echo "#define HOST_ARCH \"$(TargetArch_CPP)\""           >> $@
-	@echo                                                     >> $@
-	@echo "#define $(HostOS_CPP)_BUILD_OS 1"                  >> $@
-	@echo "#define $(TargetOS_CPP)_HOST_OS 1"                 >> $@
-	@echo "#define BUILD_OS \"$(HostOS_CPP)\""                >> $@
-	@echo "#define HOST_OS \"$(TargetOS_CPP)\""               >> $@
-	@echo                                                     >> $@
-	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR 1"          >> $@
-	@echo "#define $(TargetVendor_CPP)_HOST_VENDOR 1"         >> $@
-	@echo "#define BUILD_VENDOR \"$(HostVendor_CPP)\""        >> $@
-	@echo "#define HOST_VENDOR \"$(TargetVendor_CPP)\""       >> $@
-	@echo                                                     >> $@
-	@echo "#endif /* __PLATFORM_H__ */"                       >> $@
-	@echo "Done."
-
-compiler/stage3/$(PLATFORM_H) : compiler/stage2/$(PLATFORM_H)
-	"$(CP)" $< $@
 
 # ----------------------------------------------------------------------------
 #		Generate supporting stuff for prelude/PrimOp.hs
@@ -180,18 +107,16 @@ PRIMOP_BITS_STAGE1 = $(addprefix compiler/stage1/build/,$(PRIMOP_BITS_NAMES))
 PRIMOP_BITS_STAGE2 = $(addprefix compiler/stage2/build/,$(PRIMOP_BITS_NAMES))
 PRIMOP_BITS_STAGE3 = $(addprefix compiler/stage3/build/,$(PRIMOP_BITS_NAMES))
 
-compiler_CPP_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
-compiler_CPP_OPTS += ${GhcCppOpts}
-
-# We add these paths to the Haskell compiler's #include search path list since
-# we must avoid #including files by paths relative to the source file as Hadrian
-# moves the build artifacts out of the source tree. See #8040.
-compiler_HC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
-
 define preprocessCompilerFiles
-# $0 = stage
-compiler/stage$1/build/primops.txt: compiler/prelude/primops.txt.pp
-	$$(HS_CPP) -P $$(compiler_CPP_OPTS) -Icompiler/stage$1 -x c $$< | grep -v '^#pragma GCC' > $$@
+# $1 = compiler stage (build system stage + 1)
+compiler/stage$1/build/primops.txt: \
+		compiler/prelude/primops.txt.pp \
+		$(includes_$(dec$1)_H_CONFIG) \
+		$(includes_$(dec$1)_H_PLATFORM)
+	$$(HS_CPP) -P $$(compiler_CPP_OPTS) \
+		-Icompiler/stage$1 \
+		-I$(BUILD_$(dec$1)_INCLUDE_DIR) \
+		-x c $$< | grep -v '^#pragma GCC' > $$@
 
 compiler/stage$1/build/primop-data-decl.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --data-decl          < $$< > $$@
@@ -389,6 +314,17 @@ compiler_stage2_CONFIGURE_OPTS += --disable-library-for-ghci
 compiler_stage3_CONFIGURE_OPTS += --disable-library-for-ghci
 
 # after build-package, because that sets compiler_stage1_HC_OPTS:
+
+compiler_CPP_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
+$(foreach n,1 2 3,$(eval compiler_stage$n_CPP_OPTS += -I$(BUILD_$(dec$n)_INCLUDE_DIR)))
+compiler_CPP_OPTS += ${GhcCppOpts}
+
+# We add these paths to the Haskell compiler's #include search path list since
+# we must avoid #including files by paths relative to the source file as Hadrian
+# moves the build artifacts out of the source tree. See #8040.
+compiler_HC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
+$(foreach n,1 2 3,$(eval compiler_stage$n_HC_OPTS += -I$(BUILD_$(dec$n)_INCLUDE_DIR)))
+
 ifeq "$(V)" "0"
 compiler_stage1_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage1HcOpts)
 compiler_stage2_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage2HcOpts)
@@ -401,12 +337,10 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 
-$(compiler_stage1_depfile_haskell) : compiler/stage1/$(PLATFORM_H)
-$(compiler_stage2_depfile_haskell) : compiler/stage2/$(PLATFORM_H)
-$(compiler_stage3_depfile_haskell) : compiler/stage3/$(PLATFORM_H)
+$(compiler_stage1_depfile_haskell) : $(includes_0_H_CONFIG) $(includes_0_H_PLATFORM)
+$(compiler_stage2_depfile_haskell) : $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM)
+$(compiler_stage3_depfile_haskell) : $(includes_2_H_CONFIG) $(includes_2_H_PLATFORM)
 
-COMPILER_INCLUDES_DEPS += $(includes_H_CONFIG)
-COMPILER_INCLUDES_DEPS += $(includes_H_PLATFORM)
 COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)
 COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_TYPE)
 COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
