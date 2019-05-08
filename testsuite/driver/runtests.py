@@ -189,6 +189,23 @@ else:
                 print('WARNING: No UTF8 locale found.')
                 print('You may get some spurious test failures.')
 
+# https://stackoverflow.com/a/22254892/1308058
+def supports_colors():
+    """
+    Returns True if the running system's terminal supports color, and False
+    otherwise.
+    """
+    plat = sys.platform
+    supported_platform = plat != 'Pocket PC' and (plat != 'win32' or
+                                                  'ANSICON' in os.environ)
+    # isatty is not always implemented, #6223.
+    is_a_tty = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
+    if not supported_platform or not is_a_tty:
+        return False
+    return True
+
+config.supports_colors = supports_colors()
+
 # This has to come after arg parsing as the args can change the compiler
 get_compiler_info()
 
@@ -412,7 +429,7 @@ else:
         print(Perf.allow_changes_string(t.metrics))
         print('-' * 25)
 
-    summary(t, sys.stdout, config.no_print_summary, True)
+    summary(t, sys.stdout, config.no_print_summary, config.supports_colors)
 
     # Write perf stats if any exist or if a metrics file is specified.
     stats = [stat for (_, stat) in t.metrics]
