@@ -140,4 +140,5 @@ data Extension
    | QuantifiedConstraints
    | StarIsType
    | ImportQualifiedPost
+   | CUSKs
    deriving (Eq, Enum, Show, Generic, Bounded)
