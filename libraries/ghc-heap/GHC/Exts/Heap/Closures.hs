@@ -222,6 +222,8 @@ data GenClosure b
         }
 
     -- | A @SmallMutableArray#@
+    --
+    -- @since 8.10.1
   | SmallMutArrClosure
         { info       :: !StgInfoTable
         , mccPtrs    :: !Word           -- ^ Number of pointers
