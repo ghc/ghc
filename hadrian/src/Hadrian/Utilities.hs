@@ -53,6 +53,7 @@ import qualified Data.HashMap.Strict    as Map
 import qualified System.Directory.Extra as IO
 import qualified System.Info.Extra      as IO
 import qualified System.IO              as IO
+import qualified System.IO.Error        as IO
 
 -- | Extract a value from a singleton list, or terminate with an error message
 -- if the list does not contain exactly one value.
@@ -293,6 +294,25 @@ isGeneratedSource file = buildRoot <&> (`isPrefixOf` file)
 -- if missing.
 createFileLinkUntracked :: FilePath -> FilePath -> Action ()
 createFileLinkUntracked linkTarget link = do
+    -- Remove existing file or symlink.
+    -- If a directory, we let createFileLink throw an exception.
+    liftIO $ do
+        isFileOrFileLink <- IO.doesFileExist link
+        if isFileOrFileLink
+        then IO.removeFile link
+        -- link may still be a broken symlink or symlink to a directory.
+        -- TODO At the moment there is no convenient way to avoid exception
+        -- handling (see https://github.com/haskell/directory/issues/94).
+        else do
+            isSymLink  <- IO.pathIsSymbolicLink link
+                -- If file doesn't exist, it is not a symlink.
+                `IO.catch`  (\ (e :: IO.IOException)
+                    -> if IO.isDoesNotExistError e
+                        then return False
+                        else IO.throw e)
+            when isSymLink (IO.removeFile link)
+
+    -- Create the symlink.
     let dir = takeDirectory link
     liftIO $ IO.createDirectoryIfMissing True dir
     putProgressInfo =<< renderCreateFileLink linkTarget link
