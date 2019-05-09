@@ -734,6 +734,11 @@ GarbageCollect (uint32_t collect_gen,
   // N.B. This can only happen after we've moved
   // oldest_gen->scavenged_large_objects back to oldest_gen->large_objects.
   ASSERT(oldest_gen->scavenged_large_objects == NULL);
+  if (RtsFlags.GcFlags.useNonmoving) {
+      RELEASE_SM_LOCK;
+      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
+      ACQUIRE_SM_LOCK;
+  }
   if (RtsFlags.GcFlags.useNonmoving && major_gc) {
       // All threads in non-moving heap should be found to be alive, becuase
       // threads in the non-moving generation's list should live in the
