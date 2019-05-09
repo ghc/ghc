@@ -858,8 +858,7 @@ HAPPY_VERSION		= @HappyVersion@
 #
 # Options to pass to Happy when we're going to compile the output with GHC
 #
-# TODO (int-index): restore the -c option when happy/pull/134 is merged.
-SRC_HAPPY_OPTS		= -ag --strict
+SRC_HAPPY_OPTS		= -agc --strict
 
 #
 # Alex
