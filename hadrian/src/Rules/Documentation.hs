@@ -138,6 +138,9 @@ buildSphinxHtml path = do
     root <- buildRootRules
     root -/- htmlRoot -/- path -/- "index.html" %> \file -> do
         let dest = takeDirectory file
+            rstFilesDir = pathPath path
+        rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
+        need (map (rstFilesDir -/-) rstFiles)
         build $ target docContext (Sphinx Html) [pathPath path] [dest]
 
 ------------------------------------ Haddock -----------------------------------
@@ -242,6 +245,9 @@ buildSphinxPdf path = do
     root <- buildRootRules
     root -/- pdfRoot -/- path <.> "pdf" %> \file -> do
         withTempDir $ \dir -> do
+            let rstFilesDir = pathPath path
+            rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
+            need (map (rstFilesDir -/-) rstFiles)
             build $ target docContext (Sphinx Latex) [pathPath path] [dir]
             build $ target docContext Xelatex [path <.> "tex"] [dir]
             copyFileUntracked (dir -/- path <.> "pdf") file
