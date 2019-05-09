@@ -131,6 +131,49 @@ StgIndStatic *debug_caf_list_snapshot = (StgIndStatic*)END_OF_CAF_LIST;
  * The mark phase is responsible for freeing update remembered set block
  * allocations.
  *
+ * Note that we eagerly flush update remembered sets during minor GCs as
+ * described in Note [Eager update remembered set flushing].
+ *
+ *
+ * Note [Eager update remembered set flushing]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * We eagerly flush update remembered sets during minor GCs to avoid scenarios
+ * like the following which could result in long sync pauses:
+ *
+ *  1. We start a major GC, all thread stacks are added to the mark queue.
+ *  2. The concurrent mark thread starts.
+ *  3. The mutator is allowed to resume. One mutator thread T is scheduled and marks its
+ *     stack to its local update remembered set.
+ *  4. The mark thread eventually encounters the mutator thread's stack but
+ *     sees that it has already been marked; skips it.
+ *  5. Thread T continues running but does not push enough to its update
+ *     remembered set to require a flush.
+ *  6. Eventually the mark thread finished marking and requests a final sync.
+ *  7. The thread T flushes its update remembered set.
+ *  8. We find that a large fraction of the heap (namely the subset that is
+ *     only reachable from the thread T's stack) needs to be marked, incurring
+ *     a large sync pause
+ *
+ * We avoid this by periodically (during minor GC) forcing a flush of the
+ * update remembered set.
+ *
+ * A better (but more complex) approach that would be worthwhile trying in the
+ * future would be to rather do the following:
+ *
+ *  1. Concurrent mark phase is on-going
+ *  2. Mark thread runs out of things to mark
+ *  3. Mark thread sends a signal to capabilities requesting that they send
+ *     their update remembered sets without suspending their execution
+ *  4. The mark thread marks everything it was sent; runs out of things to mark
+ *  5. Mark thread initiates a sync
+ *  6. Capabilities send their final update remembered sets and suspend execution
+ *  7. Mark thread marks everything is was sent
+ *  8. Mark thead allows capabilities to resume.
+ *
+ * However, this is obviously a fair amount of complexity and so far the
+ * periodic eager flushing approach has been sufficient.
+ *
  *
  * Note [Concurrent read barrier on deRefWeak#]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
