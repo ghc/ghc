@@ -15,6 +15,7 @@
 #include "Rts.h"
 
 #include "Evac.h"
+#include "TraceDump.h"
 #include "Storage.h"
 #include "GC.h"
 #include "GCThread.h"
@@ -588,6 +589,7 @@ loop:
   /* The tag and the pointer are split, to be merged after evacing */
   tag = GET_CLOSURE_TAG(q);
   q = UNTAG_CLOSURE(q);
+  trace_dump_edge(q);
 
   ASSERTM(LOOKS_LIKE_CLOSURE_PTR(q), "invalid closure, info=%p", q->header.info);
 
@@ -978,6 +980,7 @@ evacuate_BLACKHOLE(StgClosure **p)
     StgClosure *q;
     const StgInfoTable *info;
     q = *p;
+    trace_dump_edge(q);
 
     // closure is required to be a heap-allocated BLACKHOLE
     ASSERT(HEAP_ALLOCED_GC(q));

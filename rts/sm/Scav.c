@@ -45,6 +45,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
+#include "TraceDump.h"
 #include "Storage.h"
 #include "GC.h"
 #include "GCThread.h"
@@ -102,6 +103,7 @@ scavengeTSO (StgTSO *tso)
     bool saved_eager;
 
     debugTrace(DEBUG_gc,"scavenging thread %d",(int)tso->id);
+    trace_dump_set_source_closure((StgClosure *) tso);
 
     // update the pointer from the InCall.
     if (tso->bound != NULL) {
@@ -450,6 +452,7 @@ scavenge_block (bdescr *bd)
     ASSERT(gct->thunk_selector_depth == 0);
 
     q = p;
+    trace_dump_set_source_closure((StgClosure *) p);
     switch (info->type) {
 
     case MVAR_CLEAN:
@@ -1236,6 +1239,7 @@ scavenge_one(StgPtr p)
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl((StgClosure *)p);
+    trace_dump_set_source_closure((StgClosure *)p);
 
     switch (info->type) {
 
@@ -1586,6 +1590,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
     uint32_t gen_no = gen->no;
     gct->evac_gen_no = gen_no;
 
+    trace_dump_set_source("mut_list");
     for (; bd != NULL; bd = bd->link) {
         for (q = bd->start; q < bd->free; q++) {
             p = (StgPtr)*q;
@@ -1734,6 +1739,7 @@ scavenge_static(void)
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl(p);
+    trace_dump_set_source_closure((StgClosure *) p);
     // make sure the info pointer is into text space
 
     /* Take this object *off* the static_objects list,
@@ -1824,6 +1830,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
   StgWord bitmap;
   StgWord size;
 
+  trace_dump_set_source("STACK");
   /*
    * Each time around this loop, we are looking at a chunk of stack
    * that starts with an activation record.
@@ -2013,6 +2020,7 @@ scavenge_large (gen_workspace *ws)
         }
         RELEASE_SPIN_LOCK(&ws->gen->sync);
 
+        trace_dump_set_source_closure((StgClosure *) p);
         if (scavenge_one(p)) {
             if (ws->gen->no > 0) {
                 recordMutableGen_GC((StgClosure *)p, ws->gen->no);
