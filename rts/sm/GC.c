@@ -730,6 +730,14 @@ GarbageCollect (uint32_t collect_gen,
     }
   } // for all generations
 
+  // Flush the update remembered set. See Note [Eager update remembered set
+  // flushing] in NonMovingMark.c
+  if (RtsFlags.GcFlags.useNonmoving) {
+      RELEASE_SM_LOCK;
+      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
+      ACQUIRE_SM_LOCK;
+  }
+
   // Mark and sweep the oldest generation.
   // N.B. This can only happen after we've moved
   // oldest_gen->scavenged_large_objects back to oldest_gen->large_objects.
