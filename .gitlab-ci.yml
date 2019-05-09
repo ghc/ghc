@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: cefaee3c742af193e0f7783f87edb0d35374515c
+  DOCKER_REV: ac65f31dcffb09cd7ca7aaa70f447fcbb19f427f
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/win32-init.sh.
@@ -176,7 +176,7 @@ validate-x86_64-linux-deb8-hadrian:
 hadrian-ghc-in-ghci:
   <<: *only-default
   stage: build
-  image: ghcci/x86_64-linux-deb8:0.1
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
