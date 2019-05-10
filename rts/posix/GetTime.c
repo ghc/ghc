@@ -44,11 +44,53 @@ void initializeTimer()
 #endif
 }
 
+#if defined(HAVE_CLOCK_GETTIME)
+static Time getClockTime(clockid_t clock)
+{
+    struct timespec ts;
+    int res = clock_gettime(clock, &ts);
+    if (res == 0) {
+        return SecondsToTime(ts.tv_sec) + NSToTime(ts.tv_nsec);
+    } else {
+        sysErrorBelch("clock_gettime");
+        stg_exit(EXIT_FAILURE);
+    }
+}
+#endif
+
+
+Time getThreadCPUTime(OSThreadId t)
+{
+#if defined(HAVE_PTHREAD_GET_CPUCLOCKID) && defined(HAVE_CLOCK_GETTIME)
+    clockid_t clockid;
+    if (pthread_getcpuclockid(t, &clockid) != 0) {
+        sysErrorBelch("pthread_getcpuclockid");
+        stg_exit(EXIT_FAILURE);
+    }
+    return getClockTime(clockid);
+#else
+    (void) t;
+    abort(); // TODO
+#endif
+}
+
+Time getMyThreadCPUTime(void)
+{
+#if defined(HAVE_CLOCK_GETTIME)          &&  \
+       defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
+       defined(HAVE_SYSCONF)
+    return getClockTime(CLOCK_THREAD_CPUTIME_ID);
+#else
+    // TODO: How to fallback here?
+    return getProcessCPUTime();
+#endif
+}
+
 Time getProcessCPUTime(void)
 {
 #if !defined(BE_CONSERVATIVE)            &&  \
        defined(HAVE_CLOCK_GETTIME)       &&  \
-       defined(_SC_CPUTIME)             &&  \
+       defined(_SC_CPUTIME)              &&  \
        defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
        defined(HAVE_SYSCONF)
     static int checked_sysconf = 0;
@@ -59,15 +101,7 @@ Time getProcessCPUTime(void)
         checked_sysconf = 1;
     }
     if (sysconf_result != -1) {
-        struct timespec ts;
-        int res;
-        res = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
-        if (res == 0) {
-            return SecondsToTime(ts.tv_sec) + NSToTime(ts.tv_nsec);
-        } else {
-            sysErrorBelch("clock_gettime");
-            stg_exit(EXIT_FAILURE);
-        }
+        return getClockTime(CLOCK_PROCESS_CPUTIME_ID);
     }
 #endif
 
@@ -82,16 +116,7 @@ Time getProcessCPUTime(void)
 StgWord64 getMonotonicNSec(void)
 {
 #if defined(HAVE_CLOCK_GETTIME)
-    struct timespec ts;
-    int res;
-
-    res = clock_gettime(CLOCK_ID, &ts);
-    if (res != 0) {
-        sysErrorBelch("clock_gettime");
-        stg_exit(EXIT_FAILURE);
-    }
-    return (StgWord64)ts.tv_sec * 1000000000 +
-           (StgWord64)ts.tv_nsec;
+    return getClockTime(CLOCK_ID);
 
 #elif defined(darwin_HOST_OS)
 
