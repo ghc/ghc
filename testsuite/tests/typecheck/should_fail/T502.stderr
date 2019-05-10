@@ -1,0 +1,12 @@
+
+T502.hs:8:11: error:
+    • Couldn't match expected type ‘(a0, Int)’
+                  with actual type ‘(# Int, Int #)’
+    • In the first argument of ‘snd’, namely ‘foo’
+      In the expression: snd foo
+      In an equation for ‘bar’:
+          bar
+            = snd foo
+            where
+                foo :: (# Int, Int #)
+                foo = undefined
