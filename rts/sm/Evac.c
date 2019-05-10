@@ -134,21 +134,36 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
    The evacuate() code
    -------------------------------------------------------------------------- */
 
+/* Manually unroll copy for small closures */
+STATIC_INLINE GNUC_ATTR_HOT void
+copy_words(StgWord *from, StgWord *to, uint32_t n)
+{
+    switch (n) {
+      case 7: to[6] = from[6]; FALLTHROUGH;
+      case 6: to[5] = from[5]; FALLTHROUGH;
+      case 5: to[4] = from[4]; FALLTHROUGH;
+      case 4: to[3] = from[3]; FALLTHROUGH;
+      case 3: to[2] = from[2]; FALLTHROUGH;
+      case 2: to[1] = from[1]; FALLTHROUGH;
+      case 1: to[0] = from[0]; FALLTHROUGH;
+      case 0: break;
+      default:
+        memcpy(to, from, count * sizeof(StgWord));
+    }
+}
+
 /* size is in words */
 STATIC_INLINE GNUC_ATTR_HOT void
 copy_tag(StgClosure **p, const StgInfoTable *info,
          StgClosure *src, uint32_t size, uint32_t gen_no, StgWord tag)
 {
     StgPtr to, from;
-    uint32_t i;
 
     to = alloc_for_copy(size,gen_no);
 
     from = (StgPtr)src;
     to[0] = (W_)info;
-    for (i = 1; i < size; i++) { // unroll for small i
-        to[i] = from[i];
-    }
+    copy_words(&from[1], &to[1], size-1)
 
 //  if (to+size+2 < bd->start + BLOCK_SIZE_W) {
 //      __builtin_prefetch(to + size + 2, 1);
@@ -201,9 +216,7 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
 
     from = (StgPtr)src;
     to[0] = (W_)info;
-    for (i = 1; i < size; i++) { // unroll for small i
-        to[i] = from[i];
-    }
+    copy_words(&from[1], &to[1], size-1);
 
     // if somebody else reads the forwarding pointer, we better make
     // sure there's a closure at the end of it.
@@ -258,9 +271,7 @@ spin:
 
     from = (StgPtr)src;
     to[0] = info;
-    for (i = 1; i < size_to_copy; i++) { // unroll for small i
-        to[i] = from[i];
-    }
+    copy_words(&from[1], &to[1], size_to_copy-1);
 
     write_barrier();
     *p = (StgClosure *)to;
