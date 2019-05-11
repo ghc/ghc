@@ -129,9 +129,11 @@ import Foreign.Marshal.Alloc (alloca)
 #if defined(i386_HOST_ARCH)
 # define WINDOWS_CCONV stdcall
 # define ARCH "x86"
+# define PREFIX(S) "_"##S
 #elif defined(x86_64_HOST_ARCH)
 # define WINDOWS_CCONV ccall
 # define ARCH "x86_64"
+# define PREFIX(S) S
 #else
 # error Unknown mingw32 arch
 #endif
@@ -221,8 +223,10 @@ process_dll_link _dir _distdir _way extra_flags extra_libs objs_files output
 
        putStrLn $ "Number of symbols in object files for " ++ output ++ ": " ++ show num_sym
 
-       _ <- withFile exports WriteMode $ \hExports ->
+       _ <- withFile exports WriteMode $ \hExports -> do
              mapM_ (hPutStrLn hExports . unlines . map snd . objItems) objs
+             -- Ensure we always keep DllMain
+             hPutStrLn hExports PREFIX("DllMain")
 
 #if defined(GEN_SXS)
        -- Side-by-Side assembly generation flags for GHC. Pass these along so the DLLs
@@ -253,6 +257,7 @@ process_dll_link _dir _distdir _way extra_flags extra_libs objs_files output
                                        ,sxs_opts
                                        ,["-fno-shared-implib"
                                         ,"-optl-Wl,--retain-symbols-file=" ++ exports
+                                        ,"-optl-Wl,-u," ++ PREFIX("DllMain")
                                         ,"-o"
                                         ,output
                                         ]
@@ -318,6 +323,7 @@ process_dll_link _dir _distdir _way extra_flags extra_libs objs_files output
                                            , sxs_opts
                                            , [ "-fno-shared-implib"
                                              , "-optl-Wl,--retain-symbols-file=" ++ lst
+                                             , "-optl-Wl,-u," ++ PREFIX("DllMain")
                                              , "-o"
                                              , dll
                                              ]
@@ -472,8 +478,8 @@ build_import_lib base dll_name defFile objs
        let (globals, functions) = splitObjs objs
 
        -- This split is important because for DATA entries the compiler should not generate
-       -- a trampoline since CONTS DATA is directly referenced and not executed. This is not very
-       -- important for mingw-w64 which would generate both the trampoline and direct referecne
+       -- a trampoline since CONST DATA is directly referenced and not executed. This is not very
+       -- important for mingw-w64 which would generate both the trampoline and direct reference
        -- by default, but for dlltool is it and even for mingw-w64 we can trim the output.
        _ <- withFile defFile WriteMode $ \hDef -> do
               hPutStrLn hDef $ unlines $ ["LIBRARY " ++ show dll_name
@@ -481,6 +487,10 @@ build_import_lib base dll_name defFile objs
                                          ]
               mapM_ (\v -> hPutStrLn hDef $ "    " ++ show v ++ " DATA") globals
               mapM_ (\v -> hPutStrLn hDef $ "    " ++ show v           ) functions
+              -- We always need to expose DllMain, however it may not be in the
+              -- in the input object files, in which case we'll use the default
+              -- one from mingw-w64's crtdll.
+              hPutStrLn hDef $ "    " ++ show PREFIX("DllMain")
 
        let dll_import = base <.> "dll.a"
        _ <- execLibTool defFile dll_import
