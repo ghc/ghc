@@ -17,38 +17,6 @@
 #include "Trace.h"
 #include "StableName.h"
 
-static struct NonmovingSegment *pop_all_filled_segments(struct NonmovingAllocator *alloc)
-{
-    while (true) {
-        struct NonmovingSegment *head = alloc->filled;
-        if (cas((StgVolatilePtr) &alloc->filled, (StgWord) head, (StgWord) NULL) == (StgWord) head)
-            return head;
-    }
-}
-
-void nonmovingPrepareSweep()
-{
-    ASSERT(nonmovingHeap.sweep_list == NULL);
-
-    // Move blocks in the allocators' filled lists into sweep_list
-    for (unsigned int alloc_idx = 0; alloc_idx < NONMOVING_ALLOCA_CNT; alloc_idx++)
-    {
-        struct NonmovingAllocator *alloc = nonmovingHeap.allocators[alloc_idx];
-        struct NonmovingSegment *filled = pop_all_filled_segments(alloc);
-
-        // Link filled to sweep_list
-        if (filled) {
-            struct NonmovingSegment *filled_head = filled;
-            // Find end of filled list
-            while (filled->link) {
-                filled = filled->link;
-            }
-            filled->link = nonmovingHeap.sweep_list;
-            nonmovingHeap.sweep_list = filled_head;
-        }
-    }
-}
-
 // On which list should a particular segment be placed?
 enum SweepResult {
     SEGMENT_FREE,     // segment is empty: place on free list
