@@ -6,6 +6,8 @@
 {-# language UnliftedFFITypes #-}
 {-# language UnliftedNewtypes #-}
 
+{-# OPTIONS_GHC -O2 #-}
+
 import Data.Kind (Type)
 import Data.Word
 import GHC.Exts
