@@ -1128,7 +1128,9 @@ kcConDecl new_or_data res_kind (ConDeclH98
        ; arg_tc_tys <- mapM (tcHsOpenType . getBangType) arg_tys
        ; traceTc "kcConDecl }" (ppr name)
          -- See Note [Deciding the kind of a newtype]
-       ; when (new_or_data == NewType) $
+         -- and also Note [Unify newtype kind regression]
+       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
+       ; when (unlifted_newtypes && new_or_data == NewType) $
            unifyNewtypeKind arg_tc_tys res_kind
          -- We don't need to check the telescope here, because that's
          -- done in tcConDecl
@@ -1154,7 +1156,9 @@ kcConDecl new_or_data res_kind (ConDeclGADT
     do { _ <- tcHsMbContext cxt
        ; arg_tc_tys <- mapM (tcHsOpenType . getBangType) (hsConDeclArgTys args)
          -- See Note [Deciding the kind of a newtype]
-       ; when (new_or_data == NewType) $
+         -- and also Note [Unify newtype kind regression]
+       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
+       ; when (unlifted_newtypes && new_or_data == NewType) $
            unifyNewtypeKind arg_tc_tys res_kind
        ; _ <- tcHsOpenType res_ty
        ; return () }
@@ -1204,6 +1208,18 @@ newtype `Foo` have matching kinds happens over in tcConDecl.
 See Note [Kind-checking the field in a newtype] for a discussion of
 this and see Note [Implementation of UnliftedNewtypes] for how all
 the pieces fit together.
+
+Note [Unify newtype kind regression]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In unusual cases involving typechecking more esoteric newtypes,
+unifyNewtypeKind can regress typechecking. That is, it can reject
+a newtype data constructor that should have been accepted.
+See T15801.hs for an example of something that fails when
+UnliftedNewtypes is enabled. Consequently, we guard calls to
+unifyNewtypeKind behind the UnliftedNewtypes flag since the check
+is only ever neccessary when this extension is enabled.
+This means that the type checker still rejects some well-typed programs
+but that it only affects users who enable UnliftedNewtypes.
 
 Note [Kind-checking for GADTs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2453,6 +2469,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl new_or_data
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let ((dL->L _ name) : _) = names
 
+       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
        ; (imp_tvs, (exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts, mco)))
            <- pushTcLevelM_    $  -- We are going to generalise
               solveEqualities  $  -- We won't get another crack, and we don't
@@ -2461,7 +2478,6 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl new_or_data
               bindExplicitTKBndrs_Skol explicit_tkv_nms $
               do { ctxt <- tcHsMbContext cxt
                  ; btys <- tcConArgs hs_args
-                 ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
                  ; let (arg_tys, stricts) = unzip btys
                    -- See Note [Kind-checking the field type]
                  ; (res_ty, mco) <-
@@ -3254,9 +3270,10 @@ checkValidDataCon dflags existential_ok tc con
         ; checkValidType ctxt (dataConUserType con)
 
           -- If we are dealing with a newtype, we allow levity polymorphism
-          -- if UnliftedNewtypes is enabled.
-        ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-        ; unless (unlifted_newtypes && isNewTyCon tc)
+          -- regardless of whether or not UnliftedNewtypes is enabled. A
+          -- later check in checkNewDataCon handles this, producing a
+          -- better error message than checkForLevPoly would.
+        ; unless (isNewTyCon tc)
             (mapM_ (checkForLevPoly empty) (dataConOrigArgTys con))
 
           -- Extra checks for newtype data constructors
