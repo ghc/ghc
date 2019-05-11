@@ -303,8 +303,10 @@ static inline unsigned long log2_ceil(unsigned long x)
 // Advance a segment's next_free pointer. Returns true if segment if full.
 static bool advance_next_free(struct NonmovingSegment *seg)
 {
-    uint8_t *bitmap = seg->bitmap;
-    unsigned int blk_count = nonmovingSegmentBlockCount(seg);
+    const uint8_t *bitmap = seg->bitmap;
+    const unsigned int blk_count = nonmovingSegmentBlockCount(seg);
+#if defined(NAIVE_ADVANCE_FREE)
+    // reference implementation
     for (unsigned int i = seg->next_free+1; i < blk_count; i++) {
         if (!bitmap[i]) {
             seg->next_free = i;
@@ -313,6 +315,16 @@ static bool advance_next_free(struct NonmovingSegment *seg)
     }
     seg->next_free = blk_count;
     return true;
+#else
+    const uint8_t *c = memchr(&bitmap[seg->next_free+1], 0, blk_count - seg->next_free - 1);
+    if (c == NULL) {
+        seg->next_free = blk_count;
+        return true;
+    } else {
+        seg->next_free = c - bitmap;
+        return false;
+    }
+#endif
 }
 
 static struct NonmovingSegment *pop_active_segment(struct NonmovingAllocator *alloca)
