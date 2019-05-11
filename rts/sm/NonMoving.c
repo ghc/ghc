@@ -474,6 +474,8 @@ static void nonmovingClearBitmap(struct NonmovingSegment *seg)
 static void nonmovingClearSegmentBitmaps(struct NonmovingSegment *seg)
 {
     while (seg) {
+        prefetchForRead(seg->link);
+        prefetchForWrite(seg->link->bitmap);
         nonmovingClearBitmap(seg);
         seg = seg->link;
     }
