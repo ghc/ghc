@@ -465,33 +465,10 @@ void nonmovingAddCapabilities(uint32_t new_n_caps)
     nonmovingHeap.n_caps = new_n_caps;
 }
 
-static void nonmovingClearBitmap(struct NonmovingSegment *seg)
+static inline void nonmovingClearBitmap(struct NonmovingSegment *seg)
 {
     unsigned int n = nonmovingSegmentBlockCount(seg);
     memset(seg->bitmap, 0, n);
-}
-
-static void nonmovingClearSegmentBitmaps(struct NonmovingSegment *seg)
-{
-    while (seg) {
-        prefetchForRead(seg->link);
-        prefetchForWrite(seg->link->bitmap);
-        nonmovingClearBitmap(seg);
-        seg = seg->link;
-    }
-}
-
-static void nonmovingClearAllBitmaps(void)
-{
-    for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
-        struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
-        nonmovingClearSegmentBitmaps(alloca->filled);
-    }
-
-    // Clear large object bits
-    for (bdescr *bd = nonmoving_large_objects; bd; bd = bd->link) {
-        bd->flags &= ~BF_MARKED;
-    }
 }
 
 /* Prepare the heap bitmaps and snapshot metadata for a mark */
@@ -502,7 +479,6 @@ static void nonmovingPrepareMark(void)
     static_flag =
         static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
 
-    nonmovingClearAllBitmaps();
     nonmovingBumpEpoch();
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
         struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
@@ -516,6 +492,9 @@ static void nonmovingPrepareMark(void)
         // Update filled segments' snapshot pointers
         struct NonmovingSegment *seg = alloca->filled;
         while (seg) {
+            prefetchForRead(seg->link);
+            prefetchForWrite(seg->link->bitmap);
+            nonmovingClearBitmap(seg);
             seg->next_free_snap = seg->next_free;
             seg = seg->link;
         }
@@ -537,6 +516,12 @@ static void nonmovingPrepareMark(void)
     oldest_gen->n_large_words = 0;
     oldest_gen->n_large_blocks = 0;
     nonmoving_live_words = 0;
+
+    // Clear large object bits
+    for (bdescr *bd = nonmoving_large_objects; bd; bd = bd->link) {
+        bd->flags &= ~BF_MARKED;
+    }
+
 
 #if defined(DEBUG)
     debug_caf_list_snapshot = debug_caf_list;
