@@ -479,6 +479,9 @@ static void nonmovingPrepareMark(void)
     static_flag =
         static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
 
+    // Should have been cleared by the last sweep
+    ASSERT(nonmovingHeap.sweep_list == NULL);
+
     nonmovingBumpEpoch();
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
         struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
@@ -489,14 +492,28 @@ static void nonmovingPrepareMark(void)
             seg->next_free_snap = seg->next_free;
         }
 
-        // Update filled segments' snapshot pointers
-        struct NonmovingSegment *seg = alloca->filled;
-        while (seg) {
-            prefetchForRead(seg->link);
-            prefetchForWrite(seg->link->bitmap);
-            nonmovingClearBitmap(seg);
-            seg->next_free_snap = seg->next_free;
-            seg = seg->link;
+        // Update filled segments' snapshot pointers and move to sweep_list
+        uint32_t n_filled = 0;
+        struct NonmovingSegment *const filled = alloca->filled;
+        alloca->filled = NULL;
+        if (filled) {
+            struct NonmovingSegment *seg = filled;
+            while (true) {
+                n_filled++;
+                prefetchForRead(seg->link);
+                // Clear bitmap
+                prefetchForWrite(seg->link->bitmap);
+                nonmovingClearBitmap(seg);
+                // Set snapshot
+                seg->next_free_snap = seg->next_free;
+                if (seg->link)
+                    seg = seg->link;
+                else
+                    break;
+            }
+            // add filled segments to sweep_list
+            seg->link = nonmovingHeap.sweep_list;
+            nonmovingHeap.sweep_list = filled;
         }
 
         // N.B. It's not necessary to update snapshot pointers of active segments;
@@ -573,7 +590,6 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     resizeGenerations();
 
     nonmovingPrepareMark();
-    nonmovingPrepareSweep();
 
     // N.B. These should have been cleared at the end of the last sweep.
     ASSERT(nonmoving_marked_large_objects == NULL);
