@@ -1,0 +1,5 @@
+T15883e.hs:16:1:
+     Can't make a derived instance of
+        ‘Data (Foo 'LiftedRep)’ with the stock strategy:
+        Don't know how to derive ‘Data’ for type ‘forall a. a’
+     In the stand-alone deriving instance for ‘Data (Foo LiftedRep)’
