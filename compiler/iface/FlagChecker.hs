@@ -20,6 +20,7 @@ import Fingerprint
 import BinFingerprint
 -- import Outputable
 
+import Collections
 import qualified EnumSet
 import System.FilePath (normalise)
 
@@ -43,7 +44,7 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
 
         -- *all* the extension flags and the language
         lang = (fmap fromEnum language,
-                map fromEnum $ EnumSet.toList extensionFlags)
+                map fromEnum $ setElems extensionFlags)
 
         -- -I, -D and -U flags affect CPP
         cpp = ( map normalise $ flattenIncludes includePaths
@@ -77,8 +78,8 @@ fingerprintOptFlags DynFlags{..} nameio =
         -- We used to fingerprint the optimisation level, but as Joachim
         -- Breitner pointed out in comment 9 on that ticket, it's better
         -- to ignore that and just look at the individual optimisation flags.
-        opt_flags = map fromEnum $ filter (`EnumSet.member` optimisationFlags)
-                                          (EnumSet.toList generalFlags)
+        opt_flags = map fromEnum $ filter (`setMember` optimisationFlags)
+                                          (setElems generalFlags)
 
       in computeFingerprint nameio opt_flags
 

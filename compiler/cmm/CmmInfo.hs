@@ -43,7 +43,7 @@ import SMRep
 import Bitmap
 import Stream (Stream)
 import qualified Stream
-import Hoopl.Collections
+import Collections
 
 import Platform
 import Maybes

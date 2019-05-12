@@ -75,7 +75,7 @@ import Data.Maybe
 import Data.Word
 
 import EnumSet (EnumSet)
-import qualified EnumSet
+import Collections
 
 -- ghc-boot
 import qualified GHC.LanguageExtensions as LangExt
@@ -1944,7 +1944,7 @@ data ParseResult a
 
 -- | Test whether a 'WarningFlag' is set
 warnopt :: WarningFlag -> ParserFlags -> Bool
-warnopt f options = f `EnumSet.member` pWarningFlags options
+warnopt f options = f `setMember` pWarningFlags options
 
 -- | The subset of the 'DynFlags' used by the parser.
 -- See 'mkParserFlags' or 'mkParserFlags'' for ways to construct this.
@@ -2422,7 +2422,7 @@ mkParserFlags' warningFlags extensionFlags thisPackage
       .|. RawTokenStreamBit `setBitIf` rawTokStream
       .|. UsePosPragsBit    `setBitIf` usePosPrags
 
-    xoptBit bit ext = bit `setBitIf` EnumSet.member ext extensionFlags
+    xoptBit bit ext = bit `setBitIf` setMember ext extensionFlags
 
     setBitIf :: ExtBits -> Bool -> ExtsBitmap
     b `setBitIf` cond | cond      = xbit b

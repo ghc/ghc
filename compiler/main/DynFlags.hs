@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -------------------------------------------------------------------------------
 --
@@ -248,7 +249,7 @@ import Text.ParserCombinators.ReadP hiding (char)
 import Text.ParserCombinators.ReadP as R
 
 import EnumSet (EnumSet)
-import qualified EnumSet
+import Collections
 
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
@@ -667,7 +668,7 @@ data GeneralFlag
 -- to allow users to ignore the optimisation level even though that
 -- means ignoring some change.
 optimisationFlags :: EnumSet GeneralFlag
-optimisationFlags = EnumSet.fromList
+optimisationFlags = setFromList
    [ Opt_CallArity
    , Opt_Strictness
    , Opt_LateDmdAnal
@@ -1650,7 +1651,7 @@ shouldUseColor dflags = overrideWith (canUseColor dflags) (useColor dflags)
 
 shouldUseHexWordLiterals :: DynFlags -> Bool
 shouldUseHexWordLiterals dflags =
-  Opt_HexWordLiterals `EnumSet.member` generalFlags dflags
+  Opt_HexWordLiterals `setMember` generalFlags dflags
 
 -- | Are we building with @-fPIE@ or @-fPIC@ enabled?
 positionIndependent :: DynFlags -> Bool
@@ -2000,10 +2001,10 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         generatedDumps = panic "defaultDynFlags: No generatedDumps",
         ghcVersionFile = Nothing,
         haddockOptions = Nothing,
-        dumpFlags = EnumSet.empty,
-        generalFlags = EnumSet.fromList (defaultFlags mySettings),
-        warningFlags = EnumSet.fromList standardWarnings,
-        fatalWarningFlags = EnumSet.empty,
+        dumpFlags = setEmpty,
+        generalFlags = setFromList (defaultFlags mySettings),
+        warningFlags = setFromList standardWarnings,
+        fatalWarningFlags = setEmpty,
         ghciScripts = [],
         language = Nothing,
         safeHaskell = Sf_None,
@@ -2239,9 +2240,9 @@ instance Outputable a => Outputable (OnOff a) where
 -- process them in the right order
 flattenExtensionFlags :: Maybe Language -> [OnOff LangExt.Extension] -> EnumSet LangExt.Extension
 flattenExtensionFlags ml = foldr f defaultExtensionFlags
-    where f (On f)  flags = EnumSet.insert f flags
-          f (Off f) flags = EnumSet.delete f flags
-          defaultExtensionFlags = EnumSet.fromList (languageExtensions ml)
+    where f (On f)  flags = setInsert f flags
+          f (Off f) flags = setDelete f flags
+          defaultExtensionFlags = setFromList (languageExtensions ml)
 
 languageExtensions :: Maybe Language -> [LangExt.Extension]
 
@@ -2300,7 +2301,7 @@ hasNoOptCoercion = gopt Opt_G_NoOptCoercion
 
 -- | Test whether a 'DumpFlag' is set
 dopt :: DumpFlag -> DynFlags -> Bool
-dopt f dflags = (f `EnumSet.member` dumpFlags dflags)
+dopt f dflags = (f `setMember` dumpFlags dflags)
              || (verbosity dflags >= 4 && enableIfVerbose f)
     where enableIfVerbose Opt_D_dump_tc_trace               = False
           enableIfVerbose Opt_D_dump_rn_trace               = False
@@ -2334,53 +2335,53 @@ dopt f dflags = (f `EnumSet.member` dumpFlags dflags)
 
 -- | Set a 'DumpFlag'
 dopt_set :: DynFlags -> DumpFlag -> DynFlags
-dopt_set dfs f = dfs{ dumpFlags = EnumSet.insert f (dumpFlags dfs) }
+dopt_set dfs f = dfs{ dumpFlags = setInsert f (dumpFlags dfs) }
 
 -- | Unset a 'DumpFlag'
 dopt_unset :: DynFlags -> DumpFlag -> DynFlags
-dopt_unset dfs f = dfs{ dumpFlags = EnumSet.delete f (dumpFlags dfs) }
+dopt_unset dfs f = dfs{ dumpFlags = setDelete f (dumpFlags dfs) }
 
 -- | Test whether a 'GeneralFlag' is set
 gopt :: GeneralFlag -> DynFlags -> Bool
-gopt f dflags  = f `EnumSet.member` generalFlags dflags
+gopt f dflags  = f `setMember` generalFlags dflags
 
 -- | Set a 'GeneralFlag'
 gopt_set :: DynFlags -> GeneralFlag -> DynFlags
-gopt_set dfs f = dfs{ generalFlags = EnumSet.insert f (generalFlags dfs) }
+gopt_set dfs f = dfs{ generalFlags = setInsert f (generalFlags dfs) }
 
 -- | Unset a 'GeneralFlag'
 gopt_unset :: DynFlags -> GeneralFlag -> DynFlags
-gopt_unset dfs f = dfs{ generalFlags = EnumSet.delete f (generalFlags dfs) }
+gopt_unset dfs f = dfs{ generalFlags = setDelete f (generalFlags dfs) }
 
 -- | Test whether a 'WarningFlag' is set
 wopt :: WarningFlag -> DynFlags -> Bool
-wopt f dflags  = f `EnumSet.member` warningFlags dflags
+wopt f dflags  = f `setMember` warningFlags dflags
 
 -- | Set a 'WarningFlag'
 wopt_set :: DynFlags -> WarningFlag -> DynFlags
-wopt_set dfs f = dfs{ warningFlags = EnumSet.insert f (warningFlags dfs) }
+wopt_set dfs f = dfs{ warningFlags = setInsert f (warningFlags dfs) }
 
 -- | Unset a 'WarningFlag'
 wopt_unset :: DynFlags -> WarningFlag -> DynFlags
-wopt_unset dfs f = dfs{ warningFlags = EnumSet.delete f (warningFlags dfs) }
+wopt_unset dfs f = dfs{ warningFlags = setDelete f (warningFlags dfs) }
 
 -- | Test whether a 'WarningFlag' is set as fatal
 wopt_fatal :: WarningFlag -> DynFlags -> Bool
-wopt_fatal f dflags = f `EnumSet.member` fatalWarningFlags dflags
+wopt_fatal f dflags = f `setMember` fatalWarningFlags dflags
 
 -- | Mark a 'WarningFlag' as fatal (do not set the flag)
 wopt_set_fatal :: DynFlags -> WarningFlag -> DynFlags
 wopt_set_fatal dfs f
-    = dfs { fatalWarningFlags = EnumSet.insert f (fatalWarningFlags dfs) }
+    = dfs { fatalWarningFlags = setInsert f (fatalWarningFlags dfs) }
 
 -- | Mark a 'WarningFlag' as not fatal
 wopt_unset_fatal :: DynFlags -> WarningFlag -> DynFlags
 wopt_unset_fatal dfs f
-    = dfs { fatalWarningFlags = EnumSet.delete f (fatalWarningFlags dfs) }
+    = dfs { fatalWarningFlags = setDelete f (fatalWarningFlags dfs) }
 
 -- | Test whether a 'LangExt.Extension' is set
 xopt :: LangExt.Extension -> DynFlags -> Bool
-xopt f dflags = f `EnumSet.member` extensionFlags dflags
+xopt f dflags = f `setMember` extensionFlags dflags
 
 -- | Set a 'LangExt.Extension'
 xopt_set :: DynFlags -> LangExt.Extension -> DynFlags
@@ -3493,10 +3494,10 @@ dynamic_flags_deps = [
                           -- Opt_WarnIsError is still needed to pass -Werror
                           -- to CPP; see runCpp in SysTools
   , make_dep_flag defFlag "Wnot"    (NoArg (upd (\d ->
-                                              d {warningFlags = EnumSet.empty})))
+                                              d {warningFlags = setEmpty})))
                                              "Use -w or -Wno-everything instead"
   , make_ord_flag defFlag "w"       (NoArg (upd (\d ->
-                                              d {warningFlags = EnumSet.empty})))
+                                              d {warningFlags = setEmpty})))
 
      -- New-style uniform warning sets
      --
@@ -3504,7 +3505,7 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "Weverything"    (NoArg (mapM_
                                            setWarningFlag minusWeverythingOpts))
   , make_ord_flag defFlag "Wno-everything"
-                           (NoArg (upd (\d -> d {warningFlags = EnumSet.empty})))
+                           (NoArg (upd (\d -> d {warningFlags = setEmpty})))
 
   , make_ord_flag defFlag "Wall"           (NoArg (mapM_
                                                   setWarningFlag minusWallOpts))

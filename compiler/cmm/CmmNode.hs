@@ -39,7 +39,7 @@ import qualified Unique as U
 
 import Hoopl.Block
 import Hoopl.Graph
-import Hoopl.Collections
+import Collections
 import Hoopl.Label
 import Data.Maybe
 import Data.List (tails,sortBy)

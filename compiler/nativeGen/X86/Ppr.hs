@@ -34,7 +34,7 @@ import Reg
 import PprBase
 
 
-import Hoopl.Collections
+import Collections
 import Hoopl.Label
 import BasicTypes       (Alignment, mkAlignment, alignmentBytes)
 import DynFlags

@@ -22,7 +22,7 @@ import CmmUtils
 import CmmSwitch
 import Hoopl.Block
 import Hoopl.Graph
-import Hoopl.Collections
+import Collections
 
 import DynFlags
 import FastString

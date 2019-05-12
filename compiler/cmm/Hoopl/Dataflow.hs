@@ -46,7 +46,7 @@ import qualified Data.IntSet as IntSet
 
 import Hoopl.Block
 import Hoopl.Graph
-import Hoopl.Collections
+import Collections
 import Hoopl.Label
 
 type family   Fact x f :: *
