@@ -43,7 +43,7 @@ import PprCmm()
 import BlockId
 import CLabel
 import Hoopl.Label
-import Hoopl.Collections
+import Collections
 
 import Unique           ( pprUniqueAlways )
 import Outputable

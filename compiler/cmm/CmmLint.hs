@@ -13,7 +13,7 @@ module CmmLint (
 import GhcPrelude
 
 import Hoopl.Block
-import Hoopl.Collections
+import Collections
 import Hoopl.Graph
 import Hoopl.Label
 import Cmm

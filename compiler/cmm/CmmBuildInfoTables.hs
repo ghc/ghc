@@ -13,7 +13,7 @@ import BlockId
 import Hoopl.Block
 import Hoopl.Graph
 import Hoopl.Label
-import Hoopl.Collections
+import Collections
 import Hoopl.Dataflow
 import Module
 import Platform

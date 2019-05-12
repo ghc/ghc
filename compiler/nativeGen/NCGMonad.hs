@@ -48,7 +48,7 @@ import Format
 import TargetReg
 
 import BlockId
-import Hoopl.Collections
+import Collections
 import Hoopl.Label
 import CLabel           ( CLabel )
 import Debug

@@ -29,7 +29,7 @@ import System.FilePath
 import System.Directory ( getCurrentDirectory )
 
 import qualified Hoopl.Label as H
-import qualified Hoopl.Collections as H
+import qualified Collections as H
 
 -- | Generate DWARF/debug information
 dwarfGen :: DynFlags -> ModLocation -> UniqSupply -> [DebugBlock]

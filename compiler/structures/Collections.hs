@@ -1,15 +1,16 @@
+-- | Defines common interfaces for maps and sets similar to the ones provided by containers.
+
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Hoopl.Collections
-    ( IsSet(..)
+module Collections
+    ( IsSet(..), IsDetSet(..), IsNonDetSet(..)
     , setInsertList, setDeleteList, setUnions
     , IsMap(..)
     , mapInsertList, mapDeleteList, mapUnions
-    , UniqueMap, UniqueSet
     ) where
 
 import GhcPrelude
@@ -37,11 +38,22 @@ class IsSet set where
   setIsSubsetOf :: set -> set -> Bool
   setFilter :: (ElemOf set -> Bool) -> set -> set
 
+  setFromList :: [ElemOf set] -> set
+
+-- | Deterministic oder of elements for folds/elems.
+--   See Note [Deterministic UniqFM]
+class (IsSet set) => IsDetSet set where
   setFoldl :: (b -> ElemOf set -> b) -> b -> set -> b
   setFoldr :: (ElemOf set -> b -> b) -> b -> set -> b
 
   setElems :: set -> [ElemOf set]
-  setFromList :: [ElemOf set] -> set
+
+class (IsSet set) => IsNonDetSet set where
+  setNonDetFoldl :: (b -> ElemOf set -> b) -> b -> set -> b
+  setNonDetFoldr :: (ElemOf set -> b -> b) -> b -> set -> b
+
+  setNonDetElems :: set -> [ElemOf set]
+
 
 -- Helper functions for IsSet class
 setInsertList :: IsSet set => [ElemOf set] -> set -> set
@@ -109,69 +121,74 @@ mapUnions maps = foldl1' mapUnion maps
 -- Basic instances
 -----------------------------------------------------------------------------
 
-newtype UniqueSet = US S.IntSet deriving (Eq, Ord, Show, Semigroup, Monoid)
+instance IsSet S.IntSet where
+  type ElemOf S.IntSet = Int
 
-instance IsSet UniqueSet where
-  type ElemOf UniqueSet = Int
+  setNull s = S.null s
+  setSize s = S.size s
+  setMember k s = S.member k s
 
-  setNull (US s) = S.null s
-  setSize (US s) = S.size s
-  setMember k (US s) = S.member k s
+  setEmpty = S.empty
+  setSingleton k = S.singleton k
+  setFromList ks = S.fromList ks
 
-  setEmpty = US S.empty
-  setSingleton k = US (S.singleton k)
-  setInsert k (US s) = US (S.insert k s)
-  setDelete k (US s) = US (S.delete k s)
+  setInsert k s = S.insert k s
+  setDelete k s = S.delete k s
 
-  setUnion (US x) (US y) = US (S.union x y)
-  setDifference (US x) (US y) = US (S.difference x y)
-  setIntersection (US x) (US y) = US (S.intersection x y)
-  setIsSubsetOf (US x) (US y) = S.isSubsetOf x y
-  setFilter f (US s) = US (S.filter f s)
+  setUnion x y = S.union x y
+  setDifference x y = S.difference x y
+  setIntersection x y = S.intersection x y
+  setIsSubsetOf x y = S.isSubsetOf x y
+  setFilter f s = S.filter f s
 
-  setFoldl k z (US s) = S.foldl' k z s
-  setFoldr k z (US s) = S.foldr k z s
+instance IsDetSet S.IntSet where
+  -- | Strict left fold
+  setFoldl k z s = S.foldl' k z s
+  setFoldr k z s = S.foldr k z s
 
-  setElems (US s) = S.elems s
-  setFromList ks = US (S.fromList ks)
+  setElems s = S.elems s
 
-newtype UniqueMap v = UM (M.IntMap v)
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+instance IsNonDetSet S.IntSet where
+  setNonDetFoldl k z s = S.foldl' k z s
+  setNonDetFoldr k z s = S.foldr k z s
 
-instance IsMap UniqueMap where
-  type KeyOf UniqueMap = Int
+  setNonDetElems s = S.elems s
 
-  mapNull (UM m) = M.null m
-  mapSize (UM m) = M.size m
-  mapMember k (UM m) = M.member k m
-  mapLookup k (UM m) = M.lookup k m
-  mapFindWithDefault def k (UM m) = M.findWithDefault def k m
+instance IsMap M.IntMap where
+  type KeyOf M.IntMap = Int
 
-  mapEmpty = UM M.empty
-  mapSingleton k v = UM (M.singleton k v)
-  mapInsert k v (UM m) = UM (M.insert k v m)
-  mapInsertWith f k v (UM m) = UM (M.insertWith f k v m)
-  mapDelete k (UM m) = UM (M.delete k m)
-  mapAlter f k (UM m) = UM (M.alter f k m)
-  mapAdjust f k (UM m) = UM (M.adjust f k m)
+  mapNull m = M.null m
+  mapSize m = M.size m
+  mapMember k m = M.member k m
+  mapLookup k m = M.lookup k m
+  mapFindWithDefault def k m = M.findWithDefault def k m
 
-  mapUnion (UM x) (UM y) = UM (M.union x y)
-  mapUnionWithKey f (UM x) (UM y) = UM (M.unionWithKey f x y)
-  mapDifference (UM x) (UM y) = UM (M.difference x y)
-  mapIntersection (UM x) (UM y) = UM (M.intersection x y)
-  mapIsSubmapOf (UM x) (UM y) = M.isSubmapOf x y
+  mapEmpty = M.empty
+  mapSingleton k v = M.singleton k v
+  mapInsert k v m = M.insert k v m
+  mapInsertWith f k v m = M.insertWith f k v m
+  mapDelete k m = M.delete k m
+  mapAlter f k m = M.alter f k m
+  mapAdjust f k m = M.adjust f k m
 
-  mapMap f (UM m) = UM (M.map f m)
-  mapMapWithKey f (UM m) = UM (M.mapWithKey f m)
-  mapFoldl k z (UM m) = M.foldl' k z m
-  mapFoldr k z (UM m) = M.foldr k z m
-  mapFoldlWithKey k z (UM m) = M.foldlWithKey' k z m
-  mapFoldMapWithKey f (UM m) = M.foldMapWithKey f m
-  mapFilter f (UM m) = UM (M.filter f m)
-  mapFilterWithKey f (UM m) = UM (M.filterWithKey f m)
+  mapUnion x y = M.union x y
+  mapUnionWithKey f x y = M.unionWithKey f x y
+  mapDifference x y = M.difference x y
+  mapIntersection x y = M.intersection x y
+  mapIsSubmapOf x y = M.isSubmapOf x y
 
-  mapElems (UM m) = M.elems m
-  mapKeys (UM m) = M.keys m
-  mapToList (UM m) = M.toList m
-  mapFromList assocs = UM (M.fromList assocs)
-  mapFromListWith f assocs = UM (M.fromListWith f assocs)
+  mapMap f m = M.map f m
+  mapMapWithKey f m = M.mapWithKey f m
+  -- | Strict left fold.
+  mapFoldl k z m = M.foldl' k z m
+  mapFoldr k z m = M.foldr k z m
+  mapFoldlWithKey k z m = M.foldlWithKey' k z m
+  mapFoldMapWithKey f m = M.foldMapWithKey f m
+  mapFilter f m = M.filter f m
+  mapFilterWithKey f m = M.filterWithKey f m
+
+  mapElems m = M.elems m
+  mapKeys m = M.keys m
+  mapToList m = M.toList m
+  mapFromList assocs = M.fromList assocs
+  mapFromListWith f assocs = M.fromListWith f assocs
