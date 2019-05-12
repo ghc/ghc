@@ -1,0 +1,5 @@
+UnliftedNewtypesInstanceFail.hs:13:3:
+     Expected kind ‘TYPE 'WordRep’,
+        but ‘Bar Bool’ has kind ‘TYPE 'IntRep’
+     In the newtype instance declaration for ‘Bar’
+      In the instance declaration for ‘Foo Bool’

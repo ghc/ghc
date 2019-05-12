@@ -30,6 +30,7 @@ module TcEvidence (
 
   -- TcCoercion
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
+  TcMCoercion,
   Role(..), LeftOrRight(..), pickLR,
   mkTcReflCo, mkTcNomReflCo, mkTcRepReflCo,
   mkTcTyConAppCo, mkTcAppCo, mkTcFunCo,
@@ -42,7 +43,7 @@ module TcEvidence (
   mkTcKindCo,
   tcCoercionKind, coVarsOfTcCo,
   mkTcCoVarCo,
-  isTcReflCo, isTcReflexiveCo,
+  isTcReflCo, isTcReflexiveCo, isTcGReflMCo, tcCoToMCo,
   tcCoercionRole,
   unwrapIP, wrapIP
   ) where
@@ -98,6 +99,7 @@ type TcCoercion  = Coercion
 type TcCoercionN = CoercionN    -- A Nominal          coercion ~N
 type TcCoercionR = CoercionR    -- A Representational coercion ~R
 type TcCoercionP = CoercionP    -- a phantom coercion
+type TcMCoercion = MCoercion
 
 mkTcReflCo             :: Role -> TcType -> TcCoercion
 mkTcSymCo              :: TcCoercion -> TcCoercion
@@ -133,6 +135,7 @@ tcCoercionKind         :: TcCoercion -> Pair TcType
 tcCoercionRole         :: TcCoercion -> Role
 coVarsOfTcCo           :: TcCoercion -> TcTyCoVarSet
 isTcReflCo             :: TcCoercion -> Bool
+isTcGReflMCo           :: TcMCoercion -> Bool
 
 -- | This version does a slow check, calculating the related types and seeing
 -- if they are equal.
@@ -168,7 +171,11 @@ tcCoercionKind         = coercionKind
 tcCoercionRole         = coercionRole
 coVarsOfTcCo           = coVarsOfCo
 isTcReflCo             = isReflCo
+isTcGReflMCo           = isGReflMCo
 isTcReflexiveCo        = isReflexiveCo
+
+tcCoToMCo :: TcCoercion -> TcMCoercion
+tcCoToMCo = coToMCo
 
 {-
 %************************************************************************

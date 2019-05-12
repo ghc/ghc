@@ -30,9 +30,7 @@ import GhcPrelude
 
 import Bag
 import Class         ( Class, classKey, classTyCon )
-import DynFlags      ( WarningFlag ( Opt_WarnMonomorphism )
-                     , WarnReason ( Reason )
-                     , DynFlags( solverIterations ) )
+import DynFlags
 import HsExpr        ( UnboundVar(..) )
 import Id            ( idType, mkLocalId )
 import Inst
@@ -229,12 +227,16 @@ simpl_top :: WantedConstraints -> TcS WantedConstraints
 simpl_top wanteds
   = do { wc_first_go <- nestTcS (solveWantedsAndDrop wanteds)
                             -- This is where the main work happens
-       ; try_tyvar_defaulting wc_first_go }
+       ; dflags <- getDynFlags
+       ; try_tyvar_defaulting dflags wc_first_go }
   where
-    try_tyvar_defaulting :: WantedConstraints -> TcS WantedConstraints
-    try_tyvar_defaulting wc
+    try_tyvar_defaulting :: DynFlags -> WantedConstraints -> TcS WantedConstraints
+    try_tyvar_defaulting dflags wc
       | isEmptyWC wc
       = return wc
+      | insolubleWC wc
+      , gopt Opt_PrintExplicitRuntimeReps dflags -- See Note [Defaulting insolubles]
+      = try_class_defaulting wc
       | otherwise
       = do { free_tvs <- TcS.zonkTyCoVarsAndFVList (tyCoVarsOfWCList wc)
            ; let meta_tvs = filter (isTyVar <&&> isMetaTyVar) free_tvs
@@ -252,7 +254,7 @@ simpl_top wanteds
 
     try_class_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_class_defaulting wc
-      | isEmptyWC wc
+      | isEmptyWC wc || insolubleWC wc -- See Note [Defaulting insolubles]
       = return wc
       | otherwise  -- See Note [When to do type-class defaulting]
       = do { something_happened <- applyDefaultingRules wc
@@ -518,6 +520,50 @@ solveWantedsAndDrop, not simpl_top, so that we do no defaulting.
 This is ambiguous of course, but we don't want to default the
 (Num alpha) constraint to (Num Int)!  Doing so gives a defaulting
 warning, but no error.
+
+Note [Defaulting insolubles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a set of wanteds is insoluble, we have no hope of accepting the
+program. Yet we do not stop constraint solving, etc., because we may
+simplify the wanteds to produce better error messages. So, once
+we have an insoluble constraint, everything we do is just about producing
+helpful error messages.
+
+Should we default in this case or not? Let's look at an example (tcfail004):
+
+  (f,g) = (1,2,3)
+
+With defaulting, we get a conflict between (a0,b0) and (Integer,Integer,Integer).
+Without defaulting, we get a conflict between (a0,b0) and (a1,b1,c1). I (Richard)
+find the latter more helpful. Several other test cases (e.g. tcfail005) suggest
+similarly. So: we should not do class defaulting with insolubles.
+
+On the other hand, RuntimeRep-defaulting is different. Witness tcfail078:
+
+  f :: Integer i => i
+  f =               0
+
+Without RuntimeRep-defaulting, we GHC suggests that Integer should have kind
+TYPE r0 -> Constraint and then complains that r0 is actually untouchable
+(presumably, because it can't be sure if `Integer i` entails an equality).
+If we default, we are told of a clash between (* -> Constraint) and Constraint.
+The latter seems far better, suggesting we *should* do RuntimeRep-defaulting
+even on insolubles.
+
+But, evidently, not always. Witness UnliftedNewtypesInfinite:
+
+  newtype Foo = FooC (# Int#, Foo #)
+
+This should fail with an occurs-check error on the kind of Foo (with -XUnliftedNewtypes).
+If we default RuntimeRep-vars, we get
+
+  Expecting a lifted type, but ‘(# Int#, Foo #)’ is unlifted
+
+which is just plain wrong.
+
+Conclusion: we should do RuntimeRep-defaulting on insolubles only when the user does not
+want to hear about RuntimeRep stuff -- that is, when -fprint-explicit-runtime-reps
+is not set.
 -}
 
 ------------------

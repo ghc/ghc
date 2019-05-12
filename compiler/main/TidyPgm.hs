@@ -566,7 +566,9 @@ See Note [Data constructor workers] in CorePrep.
 -}
 
 getTyConImplicitBinds :: TyCon -> [CoreBind]
-getTyConImplicitBinds tc = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
+getTyConImplicitBinds tc
+  | isNewTyCon tc = []  -- See Note [Compulsory newtype unfolding] in MkId
+  | otherwise     = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
 
 getClassImplicitBinds :: Class -> [CoreBind]
 getClassImplicitBinds cls

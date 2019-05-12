@@ -1,7 +1,7 @@
 
 tc211.hs:20:8: error:
     • Couldn't match expected type ‘forall a. a -> a’
-                  with actual type ‘a3 -> a3’
+                  with actual type ‘a9 -> a9’
     • In the expression:
           (:) ::
             (forall a. a -> a) -> [forall a. a -> a] -> [forall a. a -> a]
@@ -32,7 +32,7 @@ tc211.hs:25:20: error:
 
 tc211.hs:62:18: error:
     • Couldn't match expected type ‘forall a. a -> a’
-                  with actual type ‘a2 -> a2’
+                  with actual type ‘a6 -> a6’
     • In the expression:
           Cons ::
             (forall a. a -> a)
@@ -70,10 +70,10 @@ tc211.hs:68:8: error:
                 (\ x -> x) Nil
 
 tc211.hs:76:9: error:
-    • Couldn't match type ‘forall a5. a5 -> a5’ with ‘a4 -> a4’
+    • Couldn't match type ‘forall a11. a11 -> a11’ with ‘a10 -> a10’
       Expected type: List (forall a. a -> a)
-                     -> (forall a. a -> a) -> a4 -> a4
-        Actual type: List (a4 -> a4) -> (a4 -> a4) -> a4 -> a4
+                     -> (forall a. a -> a) -> a10 -> a10
+        Actual type: List (a10 -> a10) -> (a10 -> a10) -> a10 -> a10
     • In the expression:
           foo2 ::
             List (forall a. a -> a) -> (forall a. a -> a) -> (forall a. a -> a)

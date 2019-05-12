@@ -178,6 +178,10 @@ There are some restrictions on the use of primitive types:
 
          newtype A = MkA Int#
 
+   However, this restriction can be relaxed by enabling
+   :extension:`-XUnliftedNewtypes`.  The `section on unlifted newtypes
+   <#unlifted-newtypes>`__ details the behavior of such types.
+
 -  You cannot bind a variable with an unboxed type in a *top-level*
    binding.
 
@@ -358,6 +362,77 @@ layout for a sum type works like this:
   In the degenerate case where all the alternatives have zero width, such
   as the ``Bool``-like ``(# (# #) | (# #) #)``, the unboxed sum layout only
   has an ``Int32`` tag field (i.e., the whole thing is represented by an integer).
+
+.. _unlifted-newtypes:
+
+Unlifted Newtypes
+-----------------
+
+.. extension:: UnliftedNewtypes
+    :shortdesc: Enable unlifted newtypes.
+
+    :since: 8.10.1
+
+    Enable the use of newtypes over types with non-lifted runtime representations.
+
+``-XUnliftedNewtypes`` relaxes the restrictions around what types can appear inside
+of a `newtype`. For example, the type ::
+
+    newtype A = MkA Int#
+
+is accepted when this extension is enabled. This creates a type
+``A :: TYPE 'IntRep`` and a data constructor ``MkA :: Int# -> A``.
+Although the kind of ``A`` is inferred by GHC, there is nothing visually
+distictive about this type that indicated that is it not of kind ``Type``
+like newtypes typically are. `GADTSyntax <#gadt-style>`__ can be used to
+provide a kind signature for additional clarity ::
+
+    newtype A :: TYPE 'IntRep where
+      MkA :: Int# -> A
+
+The ``Coercible`` machinery works with unlifted newtypes just like it does with
+lifted types. In either of the equivalent formulations of ``A`` given above,
+users would additionally have access to a coercion between ``A`` and ``Int#``.
+
+As a consequence of the
+`levity-polymorphic binder restriction <#levity-polymorphic-restrictions>`__,
+levity-polymorphic fields are disallowed in data constructors
+of data types declared using ``data``. However, since ``newtype`` data
+constructor application is implemented as a coercion instead of as function
+application, this restriction does not apply to the field inside a ``newtype``
+data constructor. Thus, the type checker accepts ::
+
+    newtype Identity# :: forall (r :: RuntimeRep). TYPE r -> TYPE r where
+      MkIdentity# :: forall (r :: RuntimeRep) (a :: TYPE r). a -> Identity# a
+
+And with `UnboxedSums <#unboxed-sums>`__ enabled ::
+
+    newtype Maybe# :: forall (r :: RuntimeRep). TYPE r -> TYPE (SumRep '[r, TupleRep '[]]) where
+      MkMaybe# :: forall (r :: RuntimeRep) (a :: TYPE r). (# a | (# #) #) -> Maybe# a
+
+This extension also relaxes some of the restrictions around data families.
+It must be enabled in modules where either of the following occur:
+
+- A data family is declared with a kind other than ``Type``. Both ``Foo``
+  and ``Bar``, defined below, fall into this category:
+  ::
+     class Foo a where
+       data FooKey a :: TYPE 'IntRep
+     class Bar (r :: RuntimeRep) where
+       data BarType r :: TYPE r
+
+- A ``newtype instance`` is written with a kind other than ``Type``. The
+  following instances of ``Foo`` and ``Bar`` as defined above fall into
+  this category.
+  ::
+     instance Foo Bool where
+       newtype FooKey Bool = FooKeyBoolC Int#
+     instance Bar 'WordRep where
+       newtype BarType 'WordRep = BarTypeWordRepC Word#
+
+This extension impacts the determination of whether or not a newtype has
+a Complete User-Specified Kind Signature (CUSK). The exact impact is specified
+`the section on CUSKs <#complete-kind-signatures>`__.
 
 .. _syntax-extns:
 
@@ -9097,6 +9172,20 @@ signature" for a type constructor? These are the forms:
      data T2 :: forall k. k -> Type  -- CUSK: `k` is bound explicitly
      data T3 :: forall (k :: Type). k -> Type   -- still a CUSK
 
+-  For a newtype, the rules are the same as they are for a data type
+   unless `UnliftedNewtypes <#unboxed-newtypes>`__ is enabled.
+   With `UnliftedNewtypes <#unboxed-newtypes>`__, the type constructor
+   only has a CUSK if a kind signature is present. As with a datatype
+   with a top-level ``::``, all kind variables must introduced after
+   the ``::`` must be explicitly quantified ::
+
+       {-# LANGUAGE UnliftedNewtypes #-}
+       newtype N1 where                 -- No; missing kind signature
+       newtype N2 :: TYPE 'IntRep where -- Yes; kind signature present
+       newtype N3 (a :: Type) where     -- No; missing kind signature
+       newtype N4 :: k -> Type where    -- No; `k` is not explicitly quantified
+       newtype N5 :: forall (k :: Type). k -> Type where -- Yes; good signature
+
 -  For a class, every type variable must be annotated with a kind.
 
 -  For a type synonym, every type variable and the result type must all
@@ -9616,6 +9705,8 @@ and ``Bool :: TYPE 'LiftedRep``. Anything with a type of the form
 thus say that ``->`` has type
 ``TYPE r1 -> TYPE r2 -> TYPE 'LiftedRep``. The result is always lifted
 because all functions are lifted in GHC.
+
+.. _levity-polymorphic-restrictions:
 
 No levity-polymorphic variables or arguments
 --------------------------------------------
