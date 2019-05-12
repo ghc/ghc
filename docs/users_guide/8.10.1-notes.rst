@@ -54,6 +54,35 @@ Language
   See the `section on explicit kind quantification
   <#explicit-kind-quantification>`__ for more details.
 
+- Type variables in associated type family default declarations can now be
+  explicitly bound with a ``forall`` when :extension:`ExplicitForAll` is
+  enabled, as in the following example: ::
+
+    class C a where
+      type T a b
+      type forall a b. T a b = Either a b
+
+  This has a couple of knock-on consequences:
+
+  - Wildcard patterns are now permitted on the left-hand sides of default
+    declarations, whereas they were rejected by previous versions of GHC.
+
+  - It used to be the case that default declarations supported occurrences of
+    left-hand side arguments with higher-rank kinds, such as in the following
+    example: ::
+
+      class C a where
+        type T a (f :: forall k. k -> Type)
+        type T a (f :: forall k. k -> Type) = f Int
+
+    This will no longer work unless ``f`` is explicitly quantified with a
+    ``forall``, like so: ::
+
+      class C a where
+        type T a (f :: forall k. k -> Type)
+        type forall a (f :: forall k. k -> Type).
+             T a f = f Int
+
 Compiler
 ~~~~~~~~
 
