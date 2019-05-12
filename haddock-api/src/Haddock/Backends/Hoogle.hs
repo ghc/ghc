@@ -18,7 +18,7 @@ module Haddock.Backends.Hoogle (
   ) where
 
 import BasicTypes ( OverlapFlag(..), OverlapMode(..), SourceText(..)
-                  , PromotionFlag(..) )
+                  , PromotionFlag(..), TopLevelFlag(..) )
 import InstEnv (ClsInst(..))
 import Documentation.Haddock.Markup
 import Haddock.GhcUtils
@@ -174,7 +174,7 @@ ppClass dflags decl subdocs =
             | null $ tcdATs decl = ""
             | otherwise = (" " ++) . showSDocUnqual dflags . whereWrapper $ concat
                 [ map pprTyFam (tcdATs decl)
-                , map (ppr . tyFamEqnToSyn . unLoc) (tcdATDefs decl)
+                , map (pprTyFamInstDecl NotTopLevel . unLoc) (tcdATDefs decl)
                 ]
 
         pprTyFam :: LFamilyDecl GhcRn -> SDoc
@@ -186,15 +186,6 @@ ppClass dflags decl subdocs =
             , nest 4 . vcat . map (Outputable.<> semi) $ elems
             , rbrace
             ]
-
-        tyFamEqnToSyn :: TyFamDefltEqn GhcRn -> TyClDecl GhcRn
-        tyFamEqnToSyn tfe = SynDecl
-            { tcdLName  = feqn_tycon tfe
-            , tcdTyVars = feqn_pats tfe
-            , tcdFixity = feqn_fixity tfe
-            , tcdRhs    = feqn_rhs tfe
-            , tcdSExt   = emptyNameSet
-            }
 
 ppFam :: DynFlags -> FamilyDecl GhcRn -> [String]
 ppFam dflags decl@(FamilyDecl { fdInfo = info })

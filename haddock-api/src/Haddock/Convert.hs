@@ -85,19 +85,21 @@ tyThingToLHsDecl prr t = case t of
            extractFamilyDecl _           =
              Left "tyThingToLHsDecl: impossible associated tycon"
 
-           extractFamDefDecl :: FamilyDecl GhcRn -> Type -> TyFamDefltEqn GhcRn
-           extractFamDefDecl fd rhs = FamEqn
+           extractFamDefDecl :: FamilyDecl GhcRn -> Type -> TyFamDefltDecl GhcRn
+           extractFamDefDecl fd rhs =
+             TyFamInstDecl $ HsIB { hsib_ext = hsq_ext (fdTyVars fd)
+                                  , hsib_body = FamEqn
              { feqn_ext = noExt
              , feqn_tycon = fdLName fd
-             , feqn_bndrs  = Nothing
-                 -- TODO: this must change eventually
-             , feqn_pats = fdTyVars fd
+             , feqn_bndrs = Nothing
+             , feqn_pats = map (HsValArg . hsLTyVarBndrToType) $
+                           hsq_explicit $ fdTyVars fd
              , feqn_fixity = fdFixity fd
-             , feqn_rhs = synifyType WithinType [] rhs }
+             , feqn_rhs = synifyType WithinType [] rhs }}
 
            extractAtItem
              :: ClassATItem
-             -> Either ErrMsg (LFamilyDecl GhcRn, Maybe (LTyFamDefltEqn GhcRn))
+             -> Either ErrMsg (LFamilyDecl GhcRn, Maybe (LTyFamDefltDecl GhcRn))
            extractAtItem (ATI at_tc def) = do
              tyDecl <- synifyTyCon prr Nothing at_tc
              famDecl <- extractFamilyDecl tyDecl

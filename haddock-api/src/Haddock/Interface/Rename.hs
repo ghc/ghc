@@ -400,7 +400,7 @@ renameTyClD d = case d of
     lfundeps' <- mapM renameLFunDep lfundeps
     lsigs'    <- mapM renameLSig lsigs
     ats'      <- mapM (renameLThing renameFamilyDecl) ats
-    at_defs'  <- mapM renameLTyFamDefltEqn at_defs
+    at_defs'  <- mapM (mapM renameTyFamDefltD) at_defs
     -- we don't need the default methods or the already collected doc entities
     return (ClassDecl { tcdCtxt = lcontext', tcdLName = lname', tcdTyVars = ltyvars'
                       , tcdFixity = fixity
@@ -606,8 +606,8 @@ renameTyFamInstEqn eqn
   = renameImplicit rename_ty_fam_eqn eqn
   where
     rename_ty_fam_eqn
-      :: FamEqn GhcRn (HsTyPats GhcRn) (LHsType GhcRn)
-      -> RnM (FamEqn DocNameI (HsTyPats DocNameI) (LHsType DocNameI))
+      :: FamEqn GhcRn (LHsType GhcRn)
+      -> RnM (FamEqn DocNameI (LHsType DocNameI))
     rename_ty_fam_eqn (FamEqn { feqn_tycon = tc, feqn_bndrs = bndrs
                               , feqn_pats = pats, feqn_fixity = fixity
                               , feqn_rhs = rhs })
@@ -623,19 +623,8 @@ renameTyFamInstEqn eqn
                             , feqn_rhs    = rhs' }) }
     rename_ty_fam_eqn (XFamEqn _) = panic "haddock:renameTyFamInstEqn"
 
-renameLTyFamDefltEqn :: LTyFamDefltEqn GhcRn -> RnM (LTyFamDefltEqn DocNameI)
-renameLTyFamDefltEqn (L loc (FamEqn { feqn_tycon = tc, feqn_pats = tvs
-                                    , feqn_fixity = fixity, feqn_rhs = rhs }))
-  = do { tc'  <- renameL tc
-       ; tvs' <- renameLHsQTyVars tvs
-       ; rhs' <- renameLType rhs
-       ; return (L loc (FamEqn { feqn_ext    = noExt
-                               , feqn_tycon  = tc'
-                               , feqn_bndrs  = Nothing  -- this is always Nothing
-                               , feqn_pats   = tvs'
-                               , feqn_fixity = fixity
-                               , feqn_rhs    = rhs' })) }
-renameLTyFamDefltEqn (L _ (XFamEqn _)) = panic "haddock:renameLTyFamDefltEqn"
+renameTyFamDefltD :: TyFamDefltDecl GhcRn -> RnM (TyFamDefltDecl DocNameI)
+renameTyFamDefltD = renameTyFamInstD
 
 renameDataFamInstD :: DataFamInstDecl GhcRn -> RnM (DataFamInstDecl DocNameI)
 renameDataFamInstD (DataFamInstDecl { dfid_eqn = eqn })
@@ -643,8 +632,8 @@ renameDataFamInstD (DataFamInstDecl { dfid_eqn = eqn })
        ; return (DataFamInstDecl { dfid_eqn = eqn' }) }
   where
     rename_data_fam_eqn
-      :: FamEqn GhcRn (HsTyPats GhcRn) (HsDataDefn GhcRn)
-      -> RnM (FamEqn DocNameI (HsTyPats DocNameI) (HsDataDefn DocNameI))
+      :: FamEqn GhcRn (HsDataDefn GhcRn)
+      -> RnM (FamEqn DocNameI (HsDataDefn DocNameI))
     rename_data_fam_eqn (FamEqn { feqn_tycon = tc, feqn_bndrs = bndrs
                                 , feqn_pats = pats, feqn_fixity = fixity
                                 , feqn_rhs = defn })

@@ -721,7 +721,7 @@ type instance XNoSig      DocNameI = NoExt
 type instance XCKindSig   DocNameI = NoExt
 type instance XTyVarSig   DocNameI = NoExt
 
-type instance XCFamEqn       DocNameI _ _ = NoExt
+type instance XCFamEqn       DocNameI _ = NoExt
 
 type instance XCClsInstDecl DocNameI = NoExt
 type instance XCDerivDecl   DocNameI = NoExt
