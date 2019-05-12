@@ -748,7 +748,7 @@ cond_args cls _ _ rep_tc
   where
     bad_args = [ arg_ty | con <- tyConDataCons rep_tc
                         , arg_ty <- dataConOrigArgTys con
-                        , isUnliftedType arg_ty
+                        , isLiftedType_maybe arg_ty /= Just True
                         , not (ok_ty arg_ty) ]
 
     cls_key = classKey cls

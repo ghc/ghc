@@ -472,8 +472,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                                   , cid_datafam_insts = adts }))
   = setSrcSpan loc                      $
     addErrCtxt (instDeclCtxt1 hs_ty)  $
-    do  { traceTc "tcLocalInstDecl" (ppr hs_ty)
-        ; dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
+    do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
         ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
              -- NB: tcHsClsInstType does checkValidInstance
 
@@ -660,10 +659,10 @@ tcDataFamInstDecl mb_clsinfo
        ; gadt_syntax <- dataDeclChecks fam_name new_or_data hs_ctxt hs_cons
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
           -- See [Arity of data families] in FamInstEnv
-
        ; (qtvs, pats, res_kind, stupid_theta)
              <- tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs
                                 fixity hs_ctxt hs_pats m_ksig hs_cons
+                                new_or_data
 
        -- Eta-reduce the axiom if possible
        -- Quite tricky: see Note [Eta-reduction for data families]
@@ -679,13 +678,26 @@ tcDataFamInstDecl mb_clsinfo
                  -- first, so there is no reason to suppose that the eta_tvs
                  -- (obtained from the pats) are at the end (Trac #11148)
 
-       -- Eta-expand the representation tycon until it has reult kind *
+       -- Eta-expand the representation tycon until it has result
+       -- kind `TYPE r`, for some `r`. If UnliftedNewtypes is not enabled, we
+       -- go one step further and ensure that it has kind `TYPE 'LiftedRep`.
+       --
        -- See also Note [Arity of data families] in FamInstEnv
        -- NB: we can do this after eta-reducing the axiom, because if
        --     we did it before the "extra" tvs from etaExpandAlgTyCon
        --     would always be eta-reduced
        ; (extra_tcbs, final_res_kind) <- etaExpandAlgTyCon full_tcbs res_kind
-       ; checkTc (tcIsLiftedTypeKind final_res_kind) (badKindSig True res_kind)
+       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
+       ; let allowUnlifted = unlifted_newtypes && new_or_data == NewType
+         -- With UnliftedNewtypes, we allow kinds other than Type, but they
+         -- must still be of the form `TYPE r` since we don't want to accept
+         -- Constraint or Nat. See Note [Implementation of UnliftedNewtypes].
+       ; checkTc
+           (if allowUnlifted
+              then tcIsRuntimeTypeKind final_res_kind
+              else tcIsLiftedTypeKind final_res_kind
+           )
+           (badKindSig True res_kind)
        ; let extra_pats  = map (mkTyVarTy . binderVar) extra_tcbs
              all_pats    = pats `chkAppend` extra_pats
              orig_res_ty = mkTyConApp fam_tc all_pats
@@ -703,9 +715,10 @@ tcDataFamInstDecl mb_clsinfo
 
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
            do { data_cons <- tcExtendTyVarEnv qtvs $
-                             -- For H98 decls, the tyvars scope
-                             -- over the data constructors
-                             tcConDecls rec_rep_tc ty_binders orig_res_ty hs_cons
+                  -- For H98 decls, the tyvars scope
+                  -- over the data constructors
+                  tcConDecls rec_rep_tc new_or_data ty_binders
+                             orig_res_ty hs_cons
 
               ; rep_tc_name <- newFamInstTyConName lfam_name pats
               ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
@@ -782,11 +795,13 @@ tcDataFamInstDecl _ _ = panic "tcDataFamInstDecl"
 tcDataFamHeader :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr GhcRn]
                 -> LexicalFixity -> LHsContext GhcRn
                 -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
+                -> NewOrData
                 -> TcM ([TyVar], [Type], Kind, ThetaType)
 -- The "header" is the part other than the data constructors themselves
 -- e.g.  data instance D [a] :: * -> * where ...
 -- Here the "header" is the bit before the "where"
-tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksig hs_cons
+tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt
+                hs_pats m_ksig hs_cons new_or_data
   = do { (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, res_kind)))
             <- pushTcLevelM_                                $
                solveEqualities                              $
@@ -797,14 +812,14 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
                     -- Ensure that the instance is consistent with its
                     -- parent class
                   ; addConsistencyConstraints mb_clsinfo lhs_ty
-                  ; mapM_ (wrapLocM_ kcConDecl) hs_cons
                   ; res_kind <- tc_kind_sig m_ksig
+                  ; mapM_ (wrapLocM_ (kcConDecl new_or_data res_kind)) hs_cons
                   ; lhs_ty <- checkExpectedKind YesSaturation pp_lhs lhs_ty lhs_kind res_kind
                   ; return (stupid_theta, lhs_ty, res_kind) }
 
        -- See TcTyClsDecls Note [Generalising in tcFamTyPatsGuts]
        -- This code (and the stuff immediately above) is very similar
-       -- to that in tcFamTyInstEqnGuts.  Maybe we should abstract the
+       -- to that in tcTyFamInstEqnGuts.  Maybe we should abstract the
        -- common code; but for the moment I concluded that it's
        -- clearer to duplicate it.  Still, if you fix a bug here,
        -- check there too!
@@ -819,7 +834,19 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
        ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
 
        -- Check that type patterns match the class instance head
-       ; let pats = unravelFamInstPats lhs_ty
+       -- The call to splitTyConApp_maybe here is just an inlining of
+       -- the body of unravelFamInstPats. However, the panic has been
+       -- replaced by an error message since we are not certain that
+       -- that we have a TyConApp.
+       -- See Note [Difficult Newtype Kinds]
+       ; pats <- case splitTyConApp_maybe lhs_ty of
+           Just (_, pats) -> pure pats
+           Nothing -> failWithTc $ vcat
+             [ text "Kind unification on the result kind a newtype is not yet"
+             , text "sophisticated enough to handle non-reflexive coercions"
+             , text "between a data family kind and a newtype field kind."
+             , text "Please open a bug report."
+             ]
        ; return (qtvs, pats, res_kind, stupid_theta) }
   where
     fam_name  = tyConName fam_tc
@@ -827,9 +854,15 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
     pp_lhs    = pprHsFamInstLHS fam_name mb_bndrs hs_pats fixity hs_ctxt
     exp_bndrs = mb_bndrs `orElse` []
 
-    -- See Note [Result kind signature for a data family instance]
+    -- See Note [Result kind signature for a data family instance].
+    -- Additionally, see Note [Implementation of UnliftedNewtypes].
     tc_kind_sig Nothing
-      = return liftedTypeKind
+      = do { unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
+             -- See Note [Unlifted newtype instance without kind signature]
+           ; if unlifted_newtypes && new_or_data == NewType
+               then newOpenTypeKind
+               else pure liftedTypeKind
+           }
     tc_kind_sig (Just hs_kind)
       = do { sig_kind <- tcLHsKindSig data_ctxt hs_kind
            ; let (tvs, inner_kind) = tcSplitForAllTys sig_kind
@@ -846,6 +879,48 @@ But here, we're at the top-level of an instance declaration, so
 we actually have a place to put the regeneralised variables.
 Thus: skolemise away. cf. Inst.deeplySkolemise and TcUnify.tcSkolemise
 Examples in indexed-types/should_compile/T12369
+
+Note [Unlifted newtype instance without kind signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Although tc_kind_sig cannot actually do any typechecking on a data instance
+without a kind signature, it does still have to pick out a result kind
+for the data instance. Without UnliftedNewtypes, this must always be the
+kind of lifted types. However, with UnliftedNewtypes, we instead conjure up
+a fresh metavariable. Consider the following:
+
+  data Bar (a :: RuntimeRep) :: TYPE a
+  newtype instance Bar 'IntRep = BarIntC Int#
+  newtype instance Bar 'WordRep :: TYPE 'WordRep where
+    BarWordC :: Word# -> Bar 'WordRep
+
+The data instance corresponding to IntRep does not specify a kind signature,
+so tc_kind_sig just returns `TYPE r0` (where `r0` is a fresh metavariable).
+The data instance corresponding to WordRep does have a kind signature, so
+we use that kind signature. See Note [Implementation of UnliftedNewtypes].
+
+Note [Difficult Newtype Kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following declarations:
+
+  data family DF a :: K1
+  newtype instance DF Int :: K2 where
+    Mk :: (Ty :: K3) -> DF Int
+
+When we kind-check a newtype instance when UnliftedNewtypes is enabled, we must
+unify K2 and K3. Additionally, we must unify K1 (which may refer to `a`,
+instantiated to `Int` in the instance above) with K3. For simplicity, we
+currently require both of these to result in reflexive coercions. This allows
+us to throw away the coercions. For example, we currently reject this:
+
+  data Color = Red | Blue
+  type family Interpret (x :: Color) :: RuntimeRep where
+    Interpret 'Red = 'IntRep
+    Interpret 'Blue = 'WordRep
+  data family Foo (x :: Color) :: TYPE (Interpret x)
+  newtype instance Foo 'Red = FooRedC Int#
+
+It should be possible to accept such constructions if anyone wants to figure
+out how to do this. See Note [Implementation of UnliftedNewtypes].
 
 Note [Eta-reduction for data families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
