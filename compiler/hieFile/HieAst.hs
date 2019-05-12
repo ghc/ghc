@@ -333,7 +333,7 @@ instance HasLoc a => HasLoc [a] where
   loc [] = noSrcSpan
   loc xs = foldl1' combineSrcSpans $ map loc xs
 
-instance (HasLoc a, HasLoc b) => HasLoc (FamEqn s a b) where
+instance HasLoc a => HasLoc (FamEqn s a) where
   loc (FamEqn _ a Nothing b _ c) = foldl1' combineSrcSpans [loc a, loc b, loc c]
   loc (FamEqn _ a (Just tvs) b _ c) = foldl1' combineSrcSpans
                                               [loc a, loc tvs, loc b, loc c]
@@ -1149,18 +1149,12 @@ instance ToHie (LTyClDecl GhcRn) where
         , toHie $ fmap (BC InstanceBind ModuleScope) meths
         , toHie typs
         , concatMapM (pure . locOnly . getLoc) deftyps
-        , toHie $ map (go . unLoc) deftyps
+        , toHie deftyps
         ]
         where
           context_scope = mkLScope context
           rhs_scope = foldl1' combineScopes $ map mkScope
             [ loc deps, loc sigs, loc (bagToList meths), loc typs, loc deftyps]
-
-          go :: TyFamDefltEqn GhcRn
-             -> FamEqn GhcRn (TScoped (LHsQTyVars GhcRn)) (LHsType GhcRn)
-          go (FamEqn a var bndrs pat b rhs) =
-             FamEqn a var bndrs (TS (ResolvedScopes [mkLScope rhs]) pat) b rhs
-          go (XFamEqn NoExt) = XFamEqn NoExt
       XTyClDecl _ -> []
 
 instance ToHie (LFamilyDecl GhcRn) where
@@ -1206,15 +1200,12 @@ instance ToHie (Located (FunDep (Located Name))) where
     , toHie $ map (C Use) rhs
     ]
 
-instance (ToHie pats, ToHie rhs, HasLoc pats, HasLoc rhs)
-    => ToHie (TScoped (FamEqn GhcRn pats rhs)) where
+instance (ToHie rhs, HasLoc rhs)
+    => ToHie (TScoped (FamEqn GhcRn rhs)) where
   toHie (TS _ f) = toHie f
 
-instance ( ToHie pats
-         , ToHie rhs
-         , HasLoc pats
-         , HasLoc rhs
-         ) => ToHie (FamEqn GhcRn pats rhs) where
+instance (ToHie rhs, HasLoc rhs)
+    => ToHie (FamEqn GhcRn rhs) where
   toHie fe@(FamEqn _ var tybndrs pats _ rhs) = concatM $
     [ toHie $ C (Decl InstDec $ getRealSpan $ loc fe) var
     , toHie $ fmap (tvScopes (ResolvedScopes []) scope) tybndrs

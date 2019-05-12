@@ -1,6 +1,7 @@
 
-AssocTyDef02.hs:6:14:
-    Unexpected type ‘[b]’
-    In the default declaration for ‘Typ’
-    A default declaration should have form
-      default Typ a = ...
+AssocTyDef02.hs:6:5: error:
+    • Illegal argument ‘[b]’ in:
+        ‘type Typ [b] = Int’
+        The arguments to ‘Typ’ must all be distinct type variables
+    • In the default type instance declaration for ‘Typ’
+      In the class declaration for ‘Cls’
