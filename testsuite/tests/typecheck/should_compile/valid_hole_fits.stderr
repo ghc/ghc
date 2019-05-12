@@ -68,7 +68,8 @@ valid_hole_fits.hs:24:9: warning: [-Wtyped-holes (in -Wdefault)]
            (and originally defined at ValidHoleFits.hs:4:12-22))
 
 valid_hole_fits.hs:27:5: warning: [-Wtyped-holes (in -Wdefault)]
-    • Found hole: _ :: Integer -> Maybe Integer
+    • Found hole: _ :: t0 -> Maybe Integer
+      Where: ‘t0’ is an ambiguous type variable
     • In the expression: _
       In the expression: _ 2
       In an equation for ‘k’: k = _ 2

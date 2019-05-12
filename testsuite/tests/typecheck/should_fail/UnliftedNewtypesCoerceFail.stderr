@@ -1,0 +1,5 @@
+UnliftedNewtypesCoerceFail.hs:15:8:
+    Cannot use function with levity-polymorphic arguments:
+      coerce :: x -> y
+    Levity-polymorphic arguments: x :: TYPE rep
+

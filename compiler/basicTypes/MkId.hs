@@ -29,6 +29,7 @@ module MkId (
         nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, magicDictId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
+        coerceName,
 
         -- Re-export error Ids
         module PrelRules
@@ -71,6 +72,7 @@ import DynFlags
 import Outputable
 import FastString
 import ListSetOps
+import Var (VarBndr(Bndr))
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Maybe       ( maybeToList )
@@ -338,6 +340,32 @@ effect whether a wrapper is present or not:
     We'd like 'map Age' to match the LHS. For this to happen, Age
     must be unfolded, otherwise we'll be stuck. This is tested in T16208.
 
+It also allows for the posssibility of levity polymorphic newtypes
+with wrappers (with -XUnliftedNewtypes):
+
+  newtype N (a :: TYPE r) = MkN a
+
+With -XUnliftedNewtypes, this is allowed -- even though MkN is levity-
+polymorphic. It's OK because MkN evaporates in the compiled code, becoming
+just a cast. That is, it has a compulsory unfolding. As long as its
+argument is not levity-polymorphic (which it can't be, according to
+Note [Levity polymorphism invariants] in CoreSyn), and it's saturated,
+no levity-polymorphic code ends up in the code generator. The saturation
+condition is effectively checked by Note [Detecting forced eta expansion]
+in DsExpr.
+
+However, if we make a *wrapper* for a newtype, we get into trouble.
+The saturation condition is no longer checked (because hasNoBinding
+returns False) and indeed we generate a forbidden levity-polymorphic
+binding.
+
+The solution is simple, though: just make the newtype wrappers
+as ephemeral as the newtype workers. In other words, give the wrappers
+compulsory unfoldings and no bindings. The compulsory unfolding is given
+in wrap_unf in mkDataConRep, and the lack of a binding happens in
+TidyPgm.getTyConImplicitBinds, where we say that a newtype has no implicit
+bindings.
+
 ************************************************************************
 *                                                                      *
 \subsection{Dictionary selectors}
@@ -595,6 +623,7 @@ But if we inline the wrapper, we get
    map (\a. case i of I# i# a -> Foo i# a) (f a)
 
 and now case-of-known-constructor eliminates the redundant allocation.
+
 -}
 
 mkDataConRep :: DynFlags
@@ -624,7 +653,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                              -- We need to get the CAF info right here because TidyPgm
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
-                         `setNeverLevPoly`      wrap_ty
+                         `setLevityInfoWithType` wrap_ty
 
              wrap_sig = mkClosedStrictSig wrap_arg_dmds (dataConCPR data_con)
 
@@ -1423,19 +1452,23 @@ coerceId = pcMiscPrelId coerceName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-                       `setNeverLevPoly`   ty
-    eqRTy     = mkTyConApp coercibleTyCon [ liftedTypeKind
-                                          , alphaTy, betaTy ]
-    eqRPrimTy = mkTyConApp eqReprPrimTyCon [ liftedTypeKind
-                                           , liftedTypeKind
-                                           , alphaTy, betaTy ]
-    ty        = mkSpecForAllTys [alphaTyVar, betaTyVar] $
-                mkInvisFunTy eqRTy                      $
-                mkVisFunTy alphaTy betaTy
+    eqRTy     = mkTyConApp coercibleTyCon [ tYPE r , a, b ]
+    eqRPrimTy = mkTyConApp eqReprPrimTyCon [ tYPE r, tYPE r, a, b ]
+    ty        = mkForAllTys [ Bndr rv Inferred
+                            , Bndr av Specified
+                            , Bndr bv Specified
+                            ] $
+                mkInvisFunTy eqRTy $
+                mkVisFunTy a b
 
-    [eqR,x,eq] = mkTemplateLocals [eqRTy, alphaTy, eqRPrimTy]
-    rhs = mkLams [alphaTyVar, betaTyVar, eqR, x] $
-          mkWildCase (Var eqR) eqRTy betaTy $
+    bndrs@[rv,av,bv] = mkTemplateKiTyVar runtimeRepTy
+                        (\r -> [tYPE r, tYPE r])
+
+    [r, a, b] = mkTyVarTys bndrs
+
+    [eqR,x,eq] = mkTemplateLocals [eqRTy, a, eqRPrimTy]
+    rhs = mkLams (bndrs ++ [eqR, x]) $
+          mkWildCase (Var eqR) eqRTy b $
           [(DataAlt coercibleDataCon, [eq], Cast (Var x) (mkCoVarCo eq))]
 
 {-

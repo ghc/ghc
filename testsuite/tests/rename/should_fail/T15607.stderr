@@ -1,5 +1,5 @@
 
 T15607.hs:6:10: error:
-    • Variable not in scope: pure :: Integer -> t
+    • Variable not in scope: pure :: t0 -> t
     • Perhaps you want to remove ‘pure’ from the explicit hiding list
       in the import of ‘Prelude’ (T15607.hs:4:1-36).
