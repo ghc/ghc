@@ -1,0 +1,4 @@
+UnliftedNewtypesMismatchedKind.hs:12:3:
+     Expecting a lifted type, but ‘Int#’ is unlifted
+     In the definition of data constructor ‘MkT’
+      In the newtype declaration for ‘T’

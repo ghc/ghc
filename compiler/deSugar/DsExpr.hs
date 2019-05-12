@@ -1162,7 +1162,11 @@ badUseOfLevPolyPrimop id ty
 
 levPolyPrimopErr :: Id -> Type -> [Type] -> DsM ()
 levPolyPrimopErr primop ty bad_tys
-  = errDs $ vcat [ hang (text "Cannot use primitive with levity-polymorphic arguments:")
-                      2 (ppr primop <+> dcolon <+> pprWithTYPE ty)
-                 , hang (text "Levity-polymorphic arguments:")
-                      2 (vcat (map (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t)) bad_tys)) ]
+  = errDs $ vcat
+    [ hang (text "Cannot use function with levity-polymorphic arguments:")
+         2 (ppr primop <+> dcolon <+> pprWithTYPE ty)
+    , hang (text "Levity-polymorphic arguments:")
+         2 $ vcat $ map
+           (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t))
+           bad_tys
+    ]
