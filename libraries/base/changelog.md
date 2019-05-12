@@ -9,6 +9,12 @@
     to detect values `<= maxBound::Word` that were incorrectly encoded using
     the `NatJ#` constructor.
 
+  * The type of `coerce` has been generalized. It is now runtime-representation
+    polymorphic:
+    `forall {r :: RuntimeRep} (a :: TYPE r) (b :: TYPE r). Coercible a b => a -> b`.
+    The type argument `r` is marked as `Inferred` to prevent it from
+    interfering with visible type application.
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 

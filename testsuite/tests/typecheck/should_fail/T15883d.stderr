@@ -1,0 +1,5 @@
+T15883d.hs:14:1:
+     Can't make a derived instance of
+        ‘Show (Foo 'LiftedRep)’ with the stock strategy:
+        Don't know how to derive ‘Show’ for type ‘forall a. a’
+     In the stand-alone deriving instance for ‘Show (Foo LiftedRep)’
