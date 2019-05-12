@@ -243,27 +243,20 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
 cvtDec (ClassD ctxt cl tvs fds decs)
   = do  { (cxt', tc', tvs') <- cvt_tycl_hdr ctxt cl tvs
         ; fds'  <- mapM cvt_fundep fds
-        ; (binds', sigs', fams', ats', adts') <- cvt_ci_decs (text "a class declaration") decs
+        ; (binds', sigs', fams', at_defs', adts') <- cvt_ci_decs (text "a class declaration") decs
         ; unless (null adts')
             (failWith $ (text "Default data instance declarations"
                      <+> text "are not allowed:")
                    $$ (Outputable.ppr adts'))
-        ; at_defs <- mapM cvt_at_def ats'
         ; returnJustL $ TyClD noExt $
           ClassDecl { tcdCExt = noExt
                     , tcdCtxt = cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFixity = Prefix
                     , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'
                     , tcdMeths = binds'
-                    , tcdATs = fams', tcdATDefs = at_defs, tcdDocs = [] }
+                    , tcdATs = fams', tcdATDefs = at_defs', tcdDocs = [] }
                               -- no docs in TH ^^
         }
-  where
-    cvt_at_def :: LTyFamInstDecl GhcPs -> CvtM (LTyFamDefltEqn GhcPs)
-    -- Very similar to what happens in RdrHsSyn.mkClassDecl
-    cvt_at_def decl = case RdrHsSyn.mkATDefault decl of
-                        Right (def, _) -> return def
-                        Left (_, msg) -> failWith msg
 
 cvtDec (InstanceD o ctxt ty decs)
   = do  { let doc = text "an instance declaration"

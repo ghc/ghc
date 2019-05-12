@@ -424,11 +424,11 @@ patchCCallTarget unitId callTarget =
 
 rnSrcInstDecl :: InstDecl GhcPs -> RnM (InstDecl GhcRn, FreeVars)
 rnSrcInstDecl (TyFamInstD { tfid_inst = tfi })
-  = do { (tfi', fvs) <- rnTyFamInstDecl Nothing tfi
+  = do { (tfi', fvs) <- rnTyFamInstDecl NonAssocTyFamEqn tfi
        ; return (TyFamInstD { tfid_ext = noExt, tfid_inst = tfi' }, fvs) }
 
 rnSrcInstDecl (DataFamInstD { dfid_inst = dfi })
-  = do { (dfi', fvs) <- rnDataFamInstDecl Nothing dfi
+  = do { (dfi', fvs) <- rnDataFamInstDecl NonAssocTyFamEqn dfi
        ; return (DataFamInstD { dfid_ext = noExt, dfid_inst = dfi' }, fvs) }
 
 rnSrcInstDecl (ClsInstD { cid_inst = cid })
@@ -666,21 +666,22 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
 rnClsInstDecl (XClsInstDecl _) = panic "rnClsInstDecl"
 
 rnFamInstEqn :: HsDocContext
-             -> Maybe (Name, [Name]) -- Nothing => not associated
-                                     -- Just (cls,tvs) => associated,
-                                     --   and gives class and tyvars of the
-                                     --   parent instance decl
+             -> AssocTyFamInfo
              -> [Located RdrName]    -- Kind variables from the equation's RHS
              -> FamInstEqn GhcPs rhs
              -> (HsDocContext -> rhs -> RnM (rhs', FreeVars))
              -> RnM (FamInstEqn GhcRn rhs', FreeVars)
-rnFamInstEqn doc mb_cls rhs_kvars
+rnFamInstEqn doc atfi rhs_kvars
     (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
                                , feqn_bndrs  = mb_bndrs
                                , feqn_pats   = pats
                                , feqn_fixity = fixity
                                , feqn_rhs    = payload }}) rn_payload
-  = do { tycon'   <- lookupFamInstName (fmap fst mb_cls) tycon
+  = do { let mb_cls = case atfi of
+                        NonAssocTyFamEqn     -> Nothing
+                        AssocTyFamDeflt cls  -> Just cls
+                        AssocTyFamInst cls _ -> Just cls
+       ; tycon'   <- lookupFamInstName mb_cls tycon
        ; let pat_kity_vars_with_dups = extractHsTyArgRdrKiTyVarsDup pats
              -- Use the "...Dups" form because it's needed
              -- below to report unsed binder on the LHS
@@ -730,9 +731,10 @@ rnFamInstEqn doc mb_cls rhs_kvars
                           --     Note [Unused type variables in family instances]
                     ; let nms_used = extendNameSetList rhs_fvs $
                                         inst_tvs ++ nms_dups
-                          inst_tvs = case mb_cls of
-                                       Nothing            -> []
-                                       Just (_, inst_tvs) -> inst_tvs
+                          inst_tvs = case atfi of
+                                       NonAssocTyFamEqn          -> []
+                                       AssocTyFamDeflt _         -> []
+                                       AssocTyFamInst _ inst_tvs -> inst_tvs
                           all_nms = all_imp_var_names ++ hsLTyVarNames bndrs'
                     ; warnUnusedTypePatterns all_nms nms_used
 
@@ -753,14 +755,26 @@ rnFamInstEqn doc mb_cls rhs_kvars
 rnFamInstEqn _ _ _ (HsIB _ (XFamEqn _)) _ = panic "rnFamInstEqn"
 rnFamInstEqn _ _ _ (XHsImplicitBndrs _) _ = panic "rnFamInstEqn"
 
-rnTyFamInstDecl :: Maybe (Name, [Name]) -- Just (cls,tvs) => associated,
-                                        --   and gives class and tyvars of
-                                        --   the parent instance decl
+rnTyFamInstDecl :: AssocTyFamInfo
                 -> TyFamInstDecl GhcPs
                 -> RnM (TyFamInstDecl GhcRn, FreeVars)
-rnTyFamInstDecl mb_cls (TyFamInstDecl { tfid_eqn = eqn })
-  = do { (eqn', fvs) <- rnTyFamInstEqn mb_cls NotClosedTyFam eqn
+rnTyFamInstDecl atfi (TyFamInstDecl { tfid_eqn = eqn })
+  = do { (eqn', fvs) <- rnTyFamInstEqn atfi NotClosedTyFam eqn
        ; return (TyFamInstDecl { tfid_eqn = eqn' }, fvs) }
+
+-- | Tracks whether we are renaming:
+--
+-- 1. A type family equation that is not associated
+--    with a parent type class ('NonAssocTyFamEqn')
+--
+-- 2. An associated type family default delcaration ('AssocTyFamDeflt')
+--
+-- 3. An associated type family instance declaration ('AssocTyFamInst')
+data AssocTyFamInfo
+  = NonAssocTyFamEqn
+  | AssocTyFamDeflt Name   -- Name of the parent class
+  | AssocTyFamInst  Name   -- Name of the parent class
+                    [Name] -- Names of the tyvars of the parent instance decl
 
 -- | Tracks whether we are renaming an equation in a closed type family
 -- equation ('ClosedTyFam') or not ('NotClosedTyFam').
@@ -769,17 +783,17 @@ data ClosedTyFamInfo
   | ClosedTyFam (Located RdrName) Name
                 -- The names (RdrName and Name) of the closed type family
 
-rnTyFamInstEqn :: Maybe (Name, [Name])
+rnTyFamInstEqn :: AssocTyFamInfo
                -> ClosedTyFamInfo
                -> TyFamInstEqn GhcPs
                -> RnM (TyFamInstEqn GhcRn, FreeVars)
-rnTyFamInstEqn mb_cls ctf_info
+rnTyFamInstEqn atfi ctf_info
     eqn@(HsIB { hsib_body = FamEqn { feqn_tycon = tycon
                                    , feqn_rhs   = rhs }})
   = do { let rhs_kvs = extractHsTyRdrTyVarsKindVars rhs
        ; (eqn'@(HsIB { hsib_body =
                        FamEqn { feqn_tycon = dL -> L _ tycon' }}), fvs)
-           <- rnFamInstEqn (TySynCtx tycon) mb_cls rhs_kvs eqn rnTySyn
+           <- rnFamInstEqn (TySynCtx tycon) atfi rhs_kvs eqn rnTySyn
        ; case ctf_info of
            NotClosedTyFam -> pure ()
            ClosedTyFam fam_rdr_name fam_name ->
@@ -790,38 +804,20 @@ rnTyFamInstEqn mb_cls ctf_info
 rnTyFamInstEqn _ _ (HsIB _ (XFamEqn _)) = panic "rnTyFamInstEqn"
 rnTyFamInstEqn _ _ (XHsImplicitBndrs _) = panic "rnTyFamInstEqn"
 
-rnTyFamDefltEqn :: Name
-                -> TyFamDefltEqn GhcPs
-                -> RnM (TyFamDefltEqn GhcRn, FreeVars)
-rnTyFamDefltEqn cls (FamEqn { feqn_tycon  = tycon
-                            , feqn_bndrs  = bndrs
-                            , feqn_pats   = tyvars
-                            , feqn_fixity = fixity
-                            , feqn_rhs    = rhs })
-  = do { let kvs = extractHsTyRdrTyVarsKindVars rhs
-       ; bindHsQTyVars ctx Nothing (Just cls) kvs tyvars $ \ tyvars' _ ->
-    do { tycon'      <- lookupFamInstName (Just cls) tycon
-       ; (rhs', fvs) <- rnLHsType ctx rhs
-       ; return (FamEqn { feqn_ext    = noExt
-                        , feqn_tycon  = tycon'
-                        , feqn_bndrs  = ASSERT( isNothing bndrs )
-                                        Nothing
-                        , feqn_pats   = tyvars'
-                        , feqn_fixity = fixity
-                        , feqn_rhs    = rhs' }, fvs) } }
-  where
-    ctx = TyFamilyCtx tycon
-rnTyFamDefltEqn _ (XFamEqn _) = panic "rnTyFamDefltEqn"
+rnTyFamDefltDecl :: Name
+                 -> TyFamDefltDecl GhcPs
+                 -> RnM (TyFamDefltDecl GhcRn, FreeVars)
+rnTyFamDefltDecl cls = rnTyFamInstDecl (AssocTyFamDeflt cls)
 
-rnDataFamInstDecl :: Maybe (Name, [Name])
+rnDataFamInstDecl :: AssocTyFamInfo
                   -> DataFamInstDecl GhcPs
                   -> RnM (DataFamInstDecl GhcRn, FreeVars)
-rnDataFamInstDecl mb_cls (DataFamInstDecl { dfid_eqn = eqn@(HsIB { hsib_body =
-                           FamEqn { feqn_tycon = tycon
-                                  , feqn_rhs   = rhs }})})
+rnDataFamInstDecl atfi (DataFamInstDecl { dfid_eqn = eqn@(HsIB { hsib_body =
+                         FamEqn { feqn_tycon = tycon
+                                , feqn_rhs   = rhs }})})
   = do { let rhs_kvs = extractDataDefnKindVars rhs
        ; (eqn', fvs) <-
-           rnFamInstEqn (TyDataCtx tycon) mb_cls rhs_kvs eqn rnDataDefn
+           rnFamInstEqn (TyDataCtx tycon) atfi rhs_kvs eqn rnDataDefn
        ; return (DataFamInstDecl { dfid_eqn = eqn' }, fvs) }
 rnDataFamInstDecl _ (DataFamInstDecl (HsIB _ (XFamEqn _)))
   = panic "rnDataFamInstDecl"
@@ -837,8 +833,8 @@ rnATDecls :: Name      -- Class
 rnATDecls cls at_decls
   = rnList (rnFamDecl (Just cls)) at_decls
 
-rnATInstDecls :: (Maybe (Name, [Name]) -> -- The function that renames
-                  decl GhcPs ->            -- an instance. rnTyFamInstDecl
+rnATInstDecls :: (AssocTyFamInfo ->           -- The function that renames
+                  decl GhcPs ->               -- an instance. rnTyFamInstDecl
                   RnM (decl GhcRn, FreeVars)) -- or rnDataFamInstDecl
               -> Name      -- Class
               -> [Name]
@@ -850,7 +846,7 @@ rnATInstDecls :: (Maybe (Name, [Name]) -> -- The function that renames
 -- NB: We allow duplicate associated-type decls;
 --     See Note [Associated type instances] in TcInstDcls
 rnATInstDecls rnFun cls tv_ns at_insts
-  = rnList (rnFun (Just (cls, tv_ns))) at_insts
+  = rnList (rnFun (AssocTyFamInst cls tv_ns)) at_insts
     -- See Note [Renaming associated types]
 
 {- Note [Wildcards in family instances]
@@ -1585,7 +1581,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                          fv_ats
              ; return ((tyvars', context', fds', ats'), fvs) }
 
-        ; (at_defs', fv_at_defs) <- rnList (rnTyFamDefltEqn cls') at_defs
+        ; (at_defs', fv_at_defs) <- rnList (rnTyFamDefltDecl cls') at_defs
 
         -- No need to check for duplicate associated type decls
         -- since that is done by RnNames.extendGlobalRdrEnvRn
@@ -1884,7 +1880,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
              -> FamilyInfo GhcPs -> RnM (FamilyInfo GhcRn, FreeVars)
      rn_info (dL->L _ fam_name) (ClosedTypeFamily (Just eqns))
        = do { (eqns', fvs)
-                <- rnList (rnTyFamInstEqn Nothing (ClosedTyFam tycon fam_name))
+                <- rnList (rnTyFamInstEqn NonAssocTyFamEqn (ClosedTyFam tycon fam_name))
                                           -- no class context
                           eqns
             ; return (ClosedTypeFamily (Just eqns'), fvs) }

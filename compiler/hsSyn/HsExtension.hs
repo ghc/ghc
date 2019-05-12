@@ -355,12 +355,12 @@ type ForallXConDecl (c :: * -> Constraint) (x :: *) =
 
 -- -------------------------------------
 -- FamEqn type families
-type family XCFamEqn      x p r
-type family XXFamEqn      x p r
+type family XCFamEqn      x r
+type family XXFamEqn      x r
 
-type ForallXFamEqn (c :: * -> Constraint) (x :: *) (p :: *) (r :: *) =
-       ( c (XCFamEqn       x p r)
-       , c (XXFamEqn       x p r)
+type ForallXFamEqn (c :: * -> Constraint) (x :: *) (r :: *) =
+       ( c (XCFamEqn       x r)
+       , c (XXFamEqn       x r)
        )
 
 -- -------------------------------------
