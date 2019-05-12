@@ -253,6 +253,20 @@ static struct NonmovingSegment *nonmovingPopFreeSegment(void)
     }
 }
 
+unsigned int nonmovingBlockCountFromSize(uint8_t log_block_size)
+{
+  // We compute the overwhelmingly common size cases directly to avoid a very
+  // expensive integer division.
+  switch (log_block_size) {
+    case 3:  return nonmovingBlockCount(3);
+    case 4:  return nonmovingBlockCount(4);
+    case 5:  return nonmovingBlockCount(5);
+    case 6:  return nonmovingBlockCount(6);
+    case 7:  return nonmovingBlockCount(7);
+    default: return nonmovingBlockCount(log_block_size);
+  }
+}
+
 /*
  * Request a fresh segment from the free segment list or allocate one of the
  * given node.
@@ -301,10 +315,10 @@ static inline unsigned long log2_ceil(unsigned long x)
 }
 
 // Advance a segment's next_free pointer. Returns true if segment if full.
-static bool advance_next_free(struct NonmovingSegment *seg)
+static bool advance_next_free(struct NonmovingSegment *seg, const unsigned int blk_count)
 {
     const uint8_t *bitmap = seg->bitmap;
-    const unsigned int blk_count = nonmovingSegmentBlockCount(seg);
+    ASSERT(blk_count == nonmovingSegmentBlockCount(seg));
 #if defined(NAIVE_ADVANCE_FREE)
     // reference implementation
     for (unsigned int i = seg->next_free+1; i < blk_count; i++) {
@@ -346,22 +360,23 @@ static struct NonmovingSegment *pop_active_segment(struct NonmovingAllocator *al
 GNUC_ATTR_HOT
 void *nonmovingAllocate(Capability *cap, StgWord sz)
 {
-    unsigned int allocator_idx = log2_ceil(sz * sizeof(StgWord)) - NONMOVING_ALLOCA0;
+    unsigned int log_block_size = log2_ceil(sz * sizeof(StgWord));
+    unsigned int block_count = nonmovingBlockCountFromSize(log_block_size);
 
     // The max we ever allocate is 3276 bytes (anything larger is a large
     // object and not moved) which is covered by allocator 9.
-    ASSERT(allocator_idx < NONMOVING_ALLOCA_CNT);
+    ASSERT(log_block_size < NONMOVING_ALLOCA0 + NONMOVING_ALLOCA_CNT);
 
-    struct NonmovingAllocator *alloca = nonmovingHeap.allocators[allocator_idx];
+    struct NonmovingAllocator *alloca = nonmovingHeap.allocators[log_block_size - NONMOVING_ALLOCA0];
 
     // Allocate into current segment
     struct NonmovingSegment *current = alloca->current[cap->no];
     ASSERT(current); // current is never NULL
-    void *ret = nonmovingSegmentGetBlock(current, current->next_free);
+    void *ret = nonmovingSegmentGetBlock_(current, log_block_size, current->next_free);
     ASSERT(GET_CLOSURE_TAG(ret) == 0); // check alignment
 
     // Advance the current segment's next_free or allocate a new segment if full
-    bool full = advance_next_free(current);
+    bool full = advance_next_free(current, block_count);
     if (full) {
         // Current segment is full: update live data estimate link it to
         // filled, take an active segment if one exists, otherwise allocate a
@@ -369,8 +384,9 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
 
         // Update live data estimate.
         // See Note [Live data accounting in nonmoving collector].
-        unsigned int new_blocks =  nonmovingSegmentBlockCount(current) - current->next_free_snap;
-        atomic_inc(&oldest_gen->live_estimate, new_blocks * nonmovingSegmentBlockSize(current) / sizeof(W_));
+        unsigned int new_blocks = block_count - current->next_free_snap;
+        unsigned int block_size = 1 << log_block_size;
+        atomic_inc(&oldest_gen->live_estimate, new_blocks * block_size / sizeof(W_));
 
         // push the current segment to the filled list
         nonmovingPushFilledSegment(current);
@@ -381,7 +397,7 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
         // there are no active segments, allocate new segment
         if (new_current == NULL) {
             new_current = nonmovingAllocSegment(cap->node);
-            nonmovingInitSegment(new_current, NONMOVING_ALLOCA0 + allocator_idx);
+            nonmovingInitSegment(new_current, log_block_size);
         }
 
         // make it current
