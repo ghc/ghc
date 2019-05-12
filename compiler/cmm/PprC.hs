@@ -34,7 +34,7 @@ import ForeignCall
 import Cmm hiding (pprBBlock)
 import PprCmm ()
 import Hoopl.Block
-import Hoopl.Collections
+import Collections
 import Hoopl.Graph
 import CmmUtils
 import CmmSwitch

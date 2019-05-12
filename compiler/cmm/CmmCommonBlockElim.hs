@@ -18,7 +18,7 @@ import CmmContFlowOpt
 import Hoopl.Block
 import Hoopl.Graph
 import Hoopl.Label
-import Hoopl.Collections
+import Collections
 import Data.Bits
 import Data.Maybe (mapMaybe)
 import qualified Data.List as List

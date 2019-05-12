@@ -35,7 +35,7 @@ import Reg
 
 import CodeGen.Platform
 import BlockId
-import Hoopl.Collections
+import Collections
 import Hoopl.Label
 import DynFlags
 import Cmm

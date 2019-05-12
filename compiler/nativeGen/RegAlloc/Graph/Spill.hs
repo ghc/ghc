@@ -14,7 +14,7 @@ import Instruction
 import Reg
 import Cmm hiding (RegSet)
 import BlockId
-import Hoopl.Collections
+import Collections
 
 import MonadUtils
 import State

@@ -38,7 +38,7 @@ import SrcLoc
 import Util            ( seqList )
 
 import Hoopl.Block
-import Hoopl.Collections
+import Collections
 import Hoopl.Graph
 import Hoopl.Label
 

@@ -18,10 +18,13 @@ import GhcPrelude
 import Outputable
 
 -- TODO: This should really just use GHC's Unique and Uniq{Set,FM}
-import Hoopl.Collections
+import Collections
 
 import Unique (Uniquable(..))
 import TrieMap
+
+import qualified Data.IntSet as S
+import qualified Data.IntMap as M
 
 
 -----------------------------------------------------------------------------
@@ -46,7 +49,7 @@ instance Outputable Label where
 -----------------------------------------------------------------------------
 -- LabelSet
 
-newtype LabelSet = LS UniqueSet deriving (Eq, Ord, Show, Monoid, Semigroup)
+newtype LabelSet = LS S.IntSet deriving (Eq, Ord, Show, Monoid, Semigroup)
 
 instance IsSet LabelSet where
   type ElemOf LabelSet = Label
@@ -65,16 +68,20 @@ instance IsSet LabelSet where
   setIntersection (LS x) (LS y) = LS (setIntersection x y)
   setIsSubsetOf (LS x) (LS y) = setIsSubsetOf x y
   setFilter f (LS s) = LS (setFilter (f . mkHooplLabel) s)
-  setFoldl k z (LS s) = setFoldl (\a v -> k a (mkHooplLabel v)) z s
-  setFoldr k z (LS s) = setFoldr (\v a -> k (mkHooplLabel v) a) z s
 
-  setElems (LS s) = map mkHooplLabel (setElems s)
   setFromList ks = LS (setFromList (map lblToUnique ks))
+
+instance IsNonDetSet LabelSet where
+  setNonDetElems (LS s) = map mkHooplLabel (setElems s)
+
+  setNonDetFoldl k z (LS s) = setFoldl (\a v -> k a (mkHooplLabel v)) z s
+  setNonDetFoldr k z (LS s) = setFoldr (\v a -> k (mkHooplLabel v) a) z s
+
 
 -----------------------------------------------------------------------------
 -- LabelMap
 
-newtype LabelMap v = LM (UniqueMap v)
+newtype LabelMap v = LM (M.IntMap v)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 instance IsMap LabelMap where
@@ -120,7 +127,7 @@ instance IsMap LabelMap where
 -- Instances
 
 instance Outputable LabelSet where
-  ppr = ppr . setElems
+  ppr = ppr . setNonDetElems
 
 instance Outputable a => Outputable (LabelMap a) where
   ppr = ppr . mapToList

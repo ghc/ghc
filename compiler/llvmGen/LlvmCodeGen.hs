@@ -22,7 +22,7 @@ import CgUtils ( fixStgRegisters )
 import Cmm
 import CmmUtils
 import Hoopl.Block
-import Hoopl.Collections
+import Collections
 import PprCmm
 
 import BufWrite

@@ -65,7 +65,7 @@ import CmmUtils
 import CmmSwitch
 import Cmm
 import Hoopl.Block
-import Hoopl.Collections
+import Collections
 import Hoopl.Graph
 import Hoopl.Label
 import CLabel

@@ -24,7 +24,7 @@ import Util
 
 import Hoopl.Label
 import Hoopl.Block
-import Hoopl.Collections
+import Collections
 
 -- | A (possibly empty) collection of closed/closed blocks
 type Body n = LabelMap (Block n C C)

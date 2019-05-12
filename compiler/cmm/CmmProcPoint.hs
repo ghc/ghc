@@ -26,7 +26,7 @@ import Outputable
 import Platform
 import UniqSupply
 import Hoopl.Block
-import Hoopl.Collections
+import Collections
 import Hoopl.Dataflow
 import Hoopl.Graph
 import Hoopl.Label
@@ -126,7 +126,7 @@ instance Outputable Status where
   ppr (ReachedBy ps)
       | setNull ps = text "<not-reached>"
       | otherwise = text "reached by" <+>
-                    (hsep $ punctuate comma $ map ppr $ setElems ps)
+                    (hsep $ punctuate comma $ map ppr $ setNonDetElems ps)
   ppr ProcPoint = text "<procpt>"
 
 --------------------------------------------------
@@ -143,7 +143,7 @@ procPointAnalysis procPoints cmmGraph@(CmmGraph {g_graph = graph}) =
         mkFactBase
             procPointLattice
             [ (id, ProcPoint)
-            | id <- setElems procPoints
+            | id <- setNonDetElems procPoints
             -- See Note [Non-existing proc-points]
             , id `setMember` labelsInGraph
             ]
@@ -250,7 +250,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
            case mapLookup bid procMap of
              Just ProcPoint -> add graphEnv bid bid b
              Just (ReachedBy set) ->
-               case setElems set of
+               case setNonDetElems set of
                  []   -> graphEnv
                  [id] -> add graphEnv id bid b
                  _    -> panic "Each block should be reachable from only one ProcPoint"
@@ -281,7 +281,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
 
          procLabels :: LabelMap (CLabel, Maybe CLabel)
          procLabels = foldl' add_label mapEmpty
-                             (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
+                             (filter (flip mapMember (toBlockMap g)) (setNonDetElems procPoints))
 
      -- In each new graph, add blocks jumping off to the new procedures,
      -- and replace branches to procpoints with branches to the jump-off blocks
@@ -418,7 +418,7 @@ attachContInfoTables call_proc_points (CmmProc top_info top_l live g)
  where
    info_tbls' = mapUnion (info_tbls top_info) $
                 mapFromList [ (l, mkEmptyContInfoTable (infoTblLbl l))
-                            | l <- setElems call_proc_points
+                            | l <- setNonDetElems call_proc_points
                             , l /= g_entry g ]
 attachContInfoTables _ other_decl
  = other_decl

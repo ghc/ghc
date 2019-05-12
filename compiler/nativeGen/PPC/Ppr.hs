@@ -22,7 +22,7 @@ import RegClass
 import TargetReg
 
 import Cmm hiding (topInfoTable)
-import Hoopl.Collections
+import Collections
 import Hoopl.Label
 
 import BlockId

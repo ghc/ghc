@@ -180,6 +180,7 @@ Library
         specialise
         stgSyn
         stranal
+        structures
         typecheck
         types
         utils
@@ -570,7 +571,7 @@ Library
         UniqSet
         Util
         Hoopl.Block
-        Hoopl.Collections
+        Collections
         Hoopl.Dataflow
         Hoopl.Graph
         Hoopl.Label

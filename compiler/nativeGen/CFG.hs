@@ -43,7 +43,7 @@ import Cmm ( RawCmmDecl, GenCmmDecl( .. ), CmmBlock, succ, g_entry
 import CmmNode
 import CmmUtils
 import CmmSwitch
-import Hoopl.Collections
+import Collections
 import Hoopl.Label
 import Hoopl.Block
 import qualified Hoopl.Graph as G
@@ -623,7 +623,7 @@ optimizeCFG weights (CmmProc info _lab _live graph) cfg =
                   (adjustEdgeWeight cfg  (+mod1) node s1)
               | otherwise
               = cfg
-        in setFoldl update cfg nodes
+        in setNonDetFoldl update cfg nodes
       where
         fallthroughTarget :: BlockId -> EdgeInfo -> Bool
         fallthroughTarget to (EdgeInfo source _weight)
@@ -642,7 +642,7 @@ loopMembers cfg =
   where
     mkNode :: BlockId -> Node BlockId BlockId
     mkNode bid = DigraphNode bid bid (getSuccessors cfg bid)
-    nodes = map mkNode (setElems $ getCfgNodes cfg)
+    nodes = map mkNode (setNonDetElems $ getCfgNodes cfg)
 
     sccs = stronglyConnCompFromEdgedVerticesOrd nodes
 

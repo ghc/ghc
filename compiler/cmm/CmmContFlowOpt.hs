@@ -12,7 +12,7 @@ where
 import GhcPrelude hiding (succ, unzip, zip)
 
 import Hoopl.Block
-import Hoopl.Collections
+import Collections
 import Hoopl.Graph
 import Hoopl.Label
 import BlockId

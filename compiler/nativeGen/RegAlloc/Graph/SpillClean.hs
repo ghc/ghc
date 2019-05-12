@@ -42,7 +42,7 @@ import Unique
 import State
 import Outputable
 import Platform
-import Hoopl.Collections
+import Collections
 
 import Data.List
 import Data.Maybe
