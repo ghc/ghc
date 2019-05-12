@@ -120,7 +120,7 @@ import Instruction
 import Reg
 
 import BlockId
-import Hoopl.Collections
+import Collections
 import Cmm hiding (RegSet)
 
 import Digraph

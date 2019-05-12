@@ -19,7 +19,7 @@ import GhcPrelude
 import Reg
 
 import BlockId
-import Hoopl.Collections
+import Collections
 import Hoopl.Label
 import DynFlags
 import Cmm hiding (topInfoTable)

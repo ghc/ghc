@@ -42,7 +42,7 @@ import Instruction
 
 import BlockId
 import CFG
-import Hoopl.Collections
+import Collections
 import Hoopl.Label
 import Cmm hiding (RegSet, emptyRegSet)
 import PprCmm()

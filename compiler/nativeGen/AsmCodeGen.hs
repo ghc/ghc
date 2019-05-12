@@ -70,7 +70,7 @@ import BlockId
 import CgUtils          ( fixStgRegisters )
 import Cmm
 import CmmUtils
-import Hoopl.Collections
+import Collections
 import Hoopl.Label
 import Hoopl.Block
 import CmmOpt           ( cmmMachOpFold )

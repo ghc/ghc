@@ -20,7 +20,7 @@ import CFG
 
 import BlockId
 import Cmm
-import Hoopl.Collections
+import Collections
 import Hoopl.Label
 import Hoopl.Block
 

@@ -63,7 +63,7 @@ import GhcPrelude hiding( sequence, succ )
 import Cmm
 import StgCmmClosure
 import DynFlags
-import Hoopl.Collections
+import Collections
 import MkGraph
 import BlockId
 import CLabel

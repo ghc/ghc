@@ -19,7 +19,7 @@ import Instruction
 import Reg
 
 import BlockId
-import Hoopl.Collections
+import Collections
 import Digraph
 import DynFlags
 import Outputable

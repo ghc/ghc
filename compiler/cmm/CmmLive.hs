@@ -19,7 +19,7 @@ import BlockId
 import Cmm
 import PprCmmExpr ()
 import Hoopl.Block
-import Hoopl.Collections
+import Collections
 import Hoopl.Dataflow
 import Hoopl.Label
 

@@ -84,7 +84,7 @@ import Data.Bits
 import Hoopl.Graph
 import Hoopl.Label
 import Hoopl.Block
-import Hoopl.Collections
+import Collections
 
 ---------------------------------------------------
 --

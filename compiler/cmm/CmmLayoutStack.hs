@@ -20,7 +20,7 @@ import CmmLive
 import CmmProcPoint
 import SMRep
 import Hoopl.Block
-import Hoopl.Collections
+import Collections
 import Hoopl.Dataflow
 import Hoopl.Graph
 import Hoopl.Label

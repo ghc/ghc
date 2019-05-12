@@ -22,7 +22,7 @@ import Reg
 
 import GraphBase
 
-import Hoopl.Collections (mapLookup)
+import Collections (mapLookup)
 import Cmm
 import UniqFM
 import UniqSet

@@ -111,6 +111,7 @@ import DynFlags
 import Panic
 import Lexeme
 import qualified EnumSet
+import Collections
 import Plugins
 import Bag
 
@@ -1042,7 +1043,7 @@ instance TH.Quasi TcM where
   qIsExtEnabled = xoptM
 
   qExtsEnabled =
-    EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
+    setElems . extensionFlags . hsc_dflags <$> getTopEnv
 
 -- | Adds a mod finalizer reference to the local environment.
 addModFinalizerRef :: ForeignRef (TH.Q ()) -> TcM ()

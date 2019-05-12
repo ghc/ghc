@@ -11,7 +11,7 @@ import CmmLive
 import CmmUtils
 import Hoopl.Block
 import Hoopl.Label
-import Hoopl.Collections
+import Collections
 import Hoopl.Graph
 import CodeGen.Platform
 import Platform (isARM, platformArch)

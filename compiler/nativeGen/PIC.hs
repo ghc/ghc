@@ -60,7 +60,7 @@ import Reg
 import NCGMonad
 
 
-import Hoopl.Collections
+import Collections
 import Cmm
 import CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
                           mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),
