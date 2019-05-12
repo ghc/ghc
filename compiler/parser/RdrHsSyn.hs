@@ -45,7 +45,6 @@ module   RdrHsSyn (
         mkExtName,    -- RdrName -> CLabelString
         mkGadtDecl,   -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
         mkConDeclH98,
-        mkATDefault,
 
         -- Bunch of functions in the parser monad for
         -- checking and constructing values
@@ -173,14 +172,12 @@ mkClassDecl :: SrcSpan
             -> P (LTyClDecl GhcPs)
 
 mkClassDecl loc (dL->L _ (mcxt, tycl_hdr)) fds where_cls
-  = do { (binds, sigs, ats, at_insts, _, docs) <- cvBindsAndSigs where_cls
+  = do { (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs where_cls
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams, fixity, ann) <- checkTyClHdr True tycl_hdr
        ; addAnnsAt loc ann -- Add any API Annotations to the top SrcSpan
-       ; (tyvars,annst) <- checkTyVarsP (text "class") whereDots cls tparams
+       ; (tyvars,annst) <- checkTyVars (text "class") whereDots cls tparams
        ; addAnnsAt loc annst -- Add any API Annotations to the top SrcSpan
-       ; (at_defs, annsi) <- mapAndUnzipM (eitherToP . mkATDefault) at_insts
-       ; sequence_ annsi
        ; return (cL loc (ClassDecl { tcdCExt = noExt, tcdCtxt = cxt
                                    , tcdLName = cls, tcdTyVars = tyvars
                                    , tcdFixity = fixity
@@ -189,34 +186,6 @@ mkClassDecl loc (dL->L _ (mcxt, tycl_hdr)) fds where_cls
                                    , tcdMeths = binds
                                    , tcdATs = ats, tcdATDefs = at_defs
                                    , tcdDocs  = docs })) }
-
-mkATDefault :: LTyFamInstDecl GhcPs
-            -> Either (SrcSpan, SDoc) (LTyFamDefltEqn GhcPs, P ())
--- ^ Take a type-family instance declaration and turn it into
--- a type-family default equation for a class declaration.
--- We parse things as the former and use this function to convert to the latter
---
--- We use the Either monad because this also called from "Convert".
---
--- The @P ()@ we return corresponds represents an action which will add
--- some necessary paren annotations to the parsing context. Naturally, this
--- is not something that the "Convert" use cares about.
-mkATDefault (dL->L loc (TyFamInstDecl { tfid_eqn = HsIB { hsib_body = e }}))
-      | FamEqn { feqn_tycon = tc, feqn_bndrs = bndrs, feqn_pats = pats
-               , feqn_fixity = fixity, feqn_rhs = rhs } <- e
-      = do { (tvs, anns) <- checkTyVars (text "default") equalsDots tc pats
-           ; let f = cL loc (FamEqn { feqn_ext    = noExt
-                                    , feqn_tycon  = tc
-                                    , feqn_bndrs  = ASSERT( isNothing bndrs )
-                                                    Nothing
-                                    , feqn_pats   = tvs
-                                    , feqn_fixity = fixity
-                                    , feqn_rhs    = rhs })
-           ; pure (f, addAnnsAt loc anns) }
-mkATDefault (dL->L _ (TyFamInstDecl (HsIB _ (XFamEqn _)))) = panic "mkATDefault"
-mkATDefault (dL->L _ (TyFamInstDecl (XHsImplicitBndrs _))) = panic "mkATDefault"
-mkATDefault _ = panic "mkATDefault: Impossible Match"
-                                -- due to #15884
 
 mkTyData :: SrcSpan
          -> NewOrData
@@ -230,7 +199,7 @@ mkTyData loc new_or_data cType (dL->L _ (mcxt, tycl_hdr))
          ksig data_cons maybe_deriv
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; addAnnsAt loc ann -- Add any API Annotations to the top SrcSpan
-       ; (tyvars, anns) <- checkTyVarsP (ppr new_or_data) equalsDots tc tparams
+       ; (tyvars, anns) <- checkTyVars (ppr new_or_data) equalsDots tc tparams
        ; addAnnsAt loc anns -- Add any API Annotations to the top SrcSpan
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (cL loc (DataDecl { tcdDExt = noExt,
@@ -263,7 +232,7 @@ mkTySynonym :: SrcSpan
 mkTySynonym loc lhs rhs
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; addAnnsAt loc ann -- Add any API Annotations to the top SrcSpan
-       ; (tyvars, anns) <- checkTyVarsP (text "type") equalsDots tc tparams
+       ; (tyvars, anns) <- checkTyVars (text "type") equalsDots tc tparams
        ; addAnnsAt loc anns -- Add any API Annotations to the top SrcSpan
        ; return (cL loc (SynDecl { tcdSExt = noExt
                                  , tcdLName = tc, tcdTyVars = tyvars
@@ -322,7 +291,7 @@ mkFamDecl :: SrcSpan
 mkFamDecl loc info lhs ksig injAnn
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; addAnnsAt loc ann -- Add any API Annotations to the top SrcSpan
-       ; (tyvars, anns) <- checkTyVarsP (ppr info) equals_or_where tc tparams
+       ; (tyvars, anns) <- checkTyVars (ppr info) equals_or_where tc tparams
        ; addAnnsAt loc anns -- Add any API Annotations to the top SrcSpan
        ; return (cL loc (FamDecl noExt (FamilyDecl
                                            { fdExt       = noExt
@@ -804,56 +773,47 @@ to make setRdrNameSpace partial, so we just make an Unqual name instead. It
 really doesn't matter!
 -}
 
-checkTyVarsP :: SDoc -> SDoc -> Located RdrName -> [LHsTypeArg GhcPs]
-             -> P (LHsQTyVars GhcPs, [AddAnn])
--- Same as checkTyVars, but in the P monad
-checkTyVarsP pp_what equals_or_where tc tparms
-  = do { let checkedTvs = checkTyVars pp_what equals_or_where tc tparms
-       ; eitherToP checkedTvs }
-
 eitherToP :: Either (SrcSpan, SDoc) a -> P a
 -- Adapts the Either monad to the P monad
 eitherToP (Left (loc, doc)) = addFatalError loc doc
 eitherToP (Right thing)     = return thing
 
 checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsTypeArg GhcPs]
-            -> Either (SrcSpan, SDoc)
-                      ( LHsQTyVars GhcPs  -- the synthesized type variables
-                      , [AddAnn] )        -- action which adds annotations
+            -> P ( LHsQTyVars GhcPs  -- the synthesized type variables
+                 , [AddAnn] )        -- action which adds annotations
 -- ^ Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).
--- We use the Either monad because it's also called (via 'mkATDefault') from
--- "Convert".
 checkTyVars pp_what equals_or_where tc tparms
   = do { (tvs, anns) <- fmap unzip $ mapM check tparms
        ; return (mkHsQTvs tvs, concat anns) }
   where
     check (HsTypeArg _ ki@(L loc _))
-                              = Left (loc,
+                              = addFatalError loc $
                                       vcat [ text "Unexpected type application" <+>
                                             text "@" <> ppr ki
                                           , text "In the" <+> pp_what <+>
-                                            ptext (sLit "declaration for") <+> quotes (ppr tc)])
+                                            ptext (sLit "declaration for") <+> quotes (ppr tc)]
     check (HsValArg ty) = chkParens [] ty
-    check (HsArgPar sp) = Left (sp, vcat [text "Malformed" <+> pp_what
-                           <+> text "declaration for" <+> quotes (ppr tc)])
+    check (HsArgPar sp) = addFatalError sp $
+                          vcat [text "Malformed" <+> pp_what
+                            <+> text "declaration for" <+> quotes (ppr tc)]
         -- Keep around an action for adjusting the annotations of extra parens
     chkParens :: [AddAnn] -> LHsType GhcPs
-              -> Either (SrcSpan, SDoc) (LHsTyVarBndr GhcPs, [AddAnn])
+              -> P (LHsTyVarBndr GhcPs, [AddAnn])
     chkParens acc (dL->L l (HsParTy _ ty)) = chkParens (mkParensApiAnn l
                                                         ++ acc) ty
-    chkParens acc ty = case chk ty of
-      Left err -> Left err
-      Right tv -> Right (tv, reverse acc)
+    chkParens acc ty = do
+      tv <- chk ty
+      return (tv, reverse acc)
 
         -- Check that the name space is correct!
-    chk :: LHsType GhcPs -> Either (SrcSpan, SDoc) (LHsTyVarBndr GhcPs)
+    chk :: LHsType GhcPs -> P (LHsTyVarBndr GhcPs)
     chk (dL->L l (HsKindSig _ (dL->L lv (HsTyVar _ _ (dL->L _ tv))) k))
         | isRdrTyVar tv    = return (cL l (KindedTyVar noExt (cL lv tv) k))
     chk (dL->L l (HsTyVar _ _ (dL->L ltv tv)))
         | isRdrTyVar tv    = return (cL l (UserTyVar noExt (cL ltv tv)))
     chk t@(dL->L loc _)
-        = Left (loc,
+        = addFatalError loc $
                 vcat [ text "Unexpected type" <+> quotes (ppr t)
                      , text "In the" <+> pp_what
                        <+> ptext (sLit "declaration for") <+> quotes tc'
@@ -863,7 +823,7 @@ checkTyVars pp_what equals_or_where tc tparms
                        (pp_what
                         <+> tc'
                         <+> hsep (map text (takeList tparms allNameStrings))
-                        <+> equals_or_where) ] ])
+                        <+> equals_or_where) ] ]
 
     -- Avoid printing a constraint tuple in the error message. Print
     -- a plain old tuple instead (since that's what the user probably

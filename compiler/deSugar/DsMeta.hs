@@ -328,7 +328,7 @@ repTyClD (dL->L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
               ; (ss, sigs_binds) <- rep_sigs_binds sigs meth_binds
               ; fds1   <- repLFunDeps fds
               ; ats1   <- repFamilyDecls ats
-              ; atds1  <- repAssocTyFamDefaults atds
+              ; atds1  <- mapM (repAssocTyFamDefaultD . unLoc) atds
               ; decls1 <- coreList decQTyConName (ats1 ++ atds1 ++ sigs_binds)
               ; decls2 <- repClass cxt1 cls1 bndrs fds1 decls1
               ; wrapGenSyms ss decls2 }
@@ -454,35 +454,8 @@ repInjectivityAnn (Just (dL->L _ (InjectivityAnn lhs rhs))) =
 repFamilyDecls :: [LFamilyDecl GhcRn] -> DsM [Core TH.DecQ]
 repFamilyDecls fds = liftM de_loc (mapM repFamilyDecl fds)
 
-repAssocTyFamDefaults :: [LTyFamDefltEqn GhcRn] -> DsM [Core TH.DecQ]
-repAssocTyFamDefaults = mapM rep_deflt
-  where
-     -- very like repTyFamEqn, but different in the details
-    rep_deflt :: LTyFamDefltEqn GhcRn -> DsM (Core TH.DecQ)
-    rep_deflt (dL->L _ (FamEqn { feqn_tycon = tc
-                               , feqn_bndrs = bndrs
-                               , feqn_pats  = tys
-                               , feqn_fixity = fixity
-                               , feqn_rhs   = rhs }))
-      = addTyClTyVarBinds tys $ \ _ ->
-        do { tc1  <- lookupLOcc tc
-           ; no_bndrs <- ASSERT( isNothing bndrs )
-                         coreNothingList tyVarBndrQTyConName
-           ; tys1 <- repLTys (hsLTyVarBndrsToTypes tys)
-           ; lhs <- case fixity of
-                      Prefix -> do { head_ty <- repNamedTyCon tc1
-                                   ; repTapps head_ty tys1 }
-                      Infix -> do { (t1:t2:args) <- checkTys tys1
-                                  ; head_ty <- repTInfix t1 tc1 t2
-                                  ; repTapps head_ty args }
-           ; rhs1 <- repLTy rhs
-           ; eqn1 <- repTySynEqn no_bndrs lhs rhs1
-           ; repTySynInst eqn1 }
-    rep_deflt _ = panic "repAssocTyFamDefaults"
-
-    checkTys :: [Core TH.TypeQ] -> DsM [Core TH.TypeQ]
-    checkTys tys@(_:_:_) = return tys
-    checkTys _ = panic "repAssocTyFamDefaults:checkTys"
+repAssocTyFamDefaultD :: TyFamDefltDecl GhcRn -> DsM (Core TH.DecQ)
+repAssocTyFamDefaultD = repTyFamInstD
 
 -------------------------
 -- represent fundeps
