@@ -59,6 +59,7 @@ module Type (
         getRuntimeRep_maybe, kindRep_maybe, kindRep,
 
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
+        discardCast,
 
         userTypeError_maybe, pprUserTypeErrorTy,
 
@@ -137,6 +138,7 @@ module Type (
         -- ** Finding the kind of a type
         typeKind, tcTypeKind, isTypeLevPoly, resultIsLevPoly,
         tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
+        tcIsRuntimeTypeKind,
 
         -- ** Common Kind
         liftedTypeKind,
@@ -1277,6 +1279,21 @@ tyConBindersTyCoBinders = map to_tyb
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
     to_tyb (Bndr tv (AnonTCB af))   = Anon af (varType tv)
 
+-- | Drop the cast on a type, if any. If there is no
+-- cast, just return the original type. This is rarely what
+-- you want. The CastTy data constructor (in TyCoRep) has the
+-- invariant that another CastTy is not inside. See the
+-- data constructor for a full description of this invariant.
+-- Since CastTy cannot be nested, the result of discardCast
+-- cannot be a CastTy.
+discardCast :: Type -> Type
+discardCast (CastTy ty _) = ASSERT(not (isCastTy ty)) ty
+  where
+  isCastTy CastTy{} = True
+  isCastTy _        = False
+discardCast ty            = ty
+
+
 {-
 --------------------------------------------------------------------
                             CoercionTy
@@ -1824,6 +1841,17 @@ tcIsLiftedTypeKind ty
   | Just (tc, [arg]) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
   , tc `hasKey` tYPETyConKey
   = isLiftedRuntimeRep arg
+  | otherwise
+  = False
+
+-- | Is this kind equivalent to @TYPE r@ (for some unknown r)?
+--
+-- This considers 'Constraint' to be distinct from @*@.
+tcIsRuntimeTypeKind :: Kind -> Bool
+tcIsRuntimeTypeKind ty
+  | Just (tc, _) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
+  , tc `hasKey` tYPETyConKey
+  = True
   | otherwise
   = False
 

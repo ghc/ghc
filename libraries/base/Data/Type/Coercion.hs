@@ -8,6 +8,7 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE PolyKinds           #-}
 {-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE MagicHash           #-}
 
 -----------------------------------------------------------------------------
 -- |

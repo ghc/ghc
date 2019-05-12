@@ -619,6 +619,9 @@ typeToStgFArgType typ
   | tycon == mutableByteArrayPrimTyCon = StgByteArrayType
   | otherwise = StgPlainType
   where
-  -- should be a tycon app, since this is a foreign call
+  -- Should be a tycon app, since this is a foreign call. We look
+  -- through newtypes so the offset does not change if a user replaces
+  -- a type in a foreign function signature with a representationally
+  -- equivalent newtype.
   tycon = tyConAppTyCon (unwrapType typ)
 

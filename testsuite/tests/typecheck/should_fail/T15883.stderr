@@ -1,0 +1,5 @@
+T15883.hs:9:19:
+     A newtype cannot have an unlifted argument type
+      Perhaps you intended to use UnliftedNewtypes
+      In the definition of data constructor ‘MkFoo’
+      In the newtype declaration for ‘Foo’

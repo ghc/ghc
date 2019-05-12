@@ -10,6 +10,8 @@ following sections.
 Highlights
 ----------
 
+- The `UnliftedNewtypes` extension.
+
 Full details
 ------------
 
@@ -83,6 +85,11 @@ Language
         type forall a (f :: forall k. k -> Type).
              T a f = f Int
 
+- A new extension :extension:`UnliftedNewtypes` that relaxes restrictions
+  around what kinds of types can appear inside of the data constructor
+  for a `newtype`. This was proposed in
+  `GHC proposal #13 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`__.
+             
 Compiler
 ~~~~~~~~
 

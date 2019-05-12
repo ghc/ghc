@@ -62,7 +62,7 @@ module Coercion (
         pickLR,
 
         isGReflCo, isReflCo, isReflCo_maybe, isGReflCo_maybe, isReflexiveCo, isReflexiveCo_maybe,
-        isReflCoVar_maybe,
+        isReflCoVar_maybe, isGReflMCo, coToMCo,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -591,6 +591,11 @@ isReflexiveCo_maybe co
   | otherwise
   = Nothing
   where (Pair ty1 ty2, r) = coercionKindRole co
+
+coToMCo :: Coercion -> MCoercion
+coToMCo c = if isReflCo c
+  then MRefl
+  else MCo c
 
 {-
 %************************************************************************

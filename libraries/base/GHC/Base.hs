@@ -1156,7 +1156,6 @@ The rules for map work like this.
 
 {-# RULES "map/coerce" [1] map coerce = coerce #-}
 
-
 ----------------------------------------------
 --              append
 ----------------------------------------------

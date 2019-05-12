@@ -1,0 +1,5 @@
+T15883c.hs:14:1:                 
+     Can't make a derived instance of
+        ‘Ord (Foo 'LiftedRep)’ with the stock strategy:
+        Don't know how to derive ‘Ord’ for type ‘forall a. a’
+     In the stand-alone deriving instance for ‘Ord (Foo LiftedRep)’

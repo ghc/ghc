@@ -6,5 +6,5 @@
         foreign import ccall safe "sin" c_sin :: Double -> Double
 
 <interactive>:12:1: error:
-    • Variable not in scope: c_sin :: Integer -> t
+    • Variable not in scope: c_sin :: t0 -> t
     • Perhaps you meant ‘c_sin'’ (line 7)

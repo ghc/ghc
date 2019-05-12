@@ -17,7 +17,7 @@ import GhcPrelude
 import BasicTypes ( Boxity(..), neverInlinePragma, SourceText(..) )
 import TcBinds( addTypecheckedBinds )
 import IfaceEnv( newGlobalBinder )
-import TyCoRep( Type(..), TyLit(..) )
+import TyCoRep( Type(..), TyLit(..), isLiftedTypeKind )
 import TcEnv
 import TcEvidence ( mkWpTyApps )
 import TcRnMonad
@@ -426,12 +426,14 @@ tyConIsTypeable tc =
 -- polytypes and types containing casts (which may be, for instance, a type
 -- family).
 typeIsTypeable :: Type -> Bool
--- We handle types of the form (TYPE rep) specifically to avoid
--- looping on (tyConIsTypeable RuntimeRep)
+-- We handle types of the form (TYPE LiftedRep) specifically to avoid
+-- looping on (tyConIsTypeable RuntimeRep). We used to consider (TYPE rr)
+-- to be typeable without inspecting rr, but this exhibits bad behavior
+-- when rr is a type family.
 typeIsTypeable ty
   | Just ty' <- coreView ty         = typeIsTypeable ty'
 typeIsTypeable ty
-  | isJust (kindRep_maybe ty)       = True
+  | isLiftedTypeKind ty             = True
 typeIsTypeable (TyVarTy _)          = True
 typeIsTypeable (AppTy a b)          = typeIsTypeable a && typeIsTypeable b
 typeIsTypeable (FunTy _ a b)        = typeIsTypeable a && typeIsTypeable b

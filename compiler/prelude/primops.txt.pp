@@ -3439,6 +3439,11 @@ pseudoop   "coerce"
      the newtype's concrete type to the abstract type. But it also works in
      more complicated settings, e.g. converting a list of newtypes to a list of
      concrete types.
+
+     This function is runtime-representation polymorphic, but the
+     {\tt RuntimeRep} type argument is marked as {\tt Inferred}, meaning
+     that it is not available for visible type application. This means
+     the typechecker will accept {\tt coerce @Int @Age 42}.
    }
 
 ------------------------------------------------------------------------

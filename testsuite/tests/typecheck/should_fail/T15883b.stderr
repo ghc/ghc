@@ -1,0 +1,5 @@
+T15883b.hs:14:1:
+     Can't make a derived instance of
+        ‘Eq (Foo 'LiftedRep)’ with the stock strategy:
+        Don't know how to derive ‘Eq’ for type ‘forall a. a’
+     In the stand-alone deriving instance for ‘Eq (Foo LiftedRep)’

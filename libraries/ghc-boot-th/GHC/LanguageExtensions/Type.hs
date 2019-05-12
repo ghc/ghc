@@ -49,6 +49,7 @@ data Extension
    | AllowAmbiguousTypes
    | UnboxedTuples
    | UnboxedSums
+   | UnliftedNewtypes
    | BangPatterns
    | TypeFamilies
    | TypeFamilyDependencies
