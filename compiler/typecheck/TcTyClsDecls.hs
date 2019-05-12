@@ -74,6 +74,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Foldable
+import Data.Function ( on )
 import Data.List
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -1412,7 +1413,7 @@ tcTyClDecl1 _ _ (XTyClDecl _) = panic "tcTyClDecl1"
 
 tcClassDecl1 :: RolesInfo -> Name -> LHsContext GhcRn
              -> LHsBinds GhcRn -> [LHsFunDep GhcRn] -> [LSig GhcRn]
-             -> [LFamilyDecl GhcRn] -> [LTyFamDefltEqn GhcRn]
+             -> [LFamilyDecl GhcRn] -> [LTyFamDefltDecl GhcRn]
              -> TcM Class
 tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
   = fixM $ \ clas ->
@@ -1478,10 +1479,10 @@ Note that we can get default definitions only for type families, not data
 families.
 -}
 
-tcClassATs :: Name                   -- The class name (not knot-tied)
-           -> Class                  -- The class parent of this associated type
-           -> [LFamilyDecl GhcRn]    -- Associated types.
-           -> [LTyFamDefltEqn GhcRn] -- Associated type defaults.
+tcClassATs :: Name                    -- The class name (not knot-tied)
+           -> Class                   -- The class parent of this associated type
+           -> [LFamilyDecl GhcRn]     -- Associated types.
+           -> [LTyFamDefltDecl GhcRn] -- Associated type defaults.
            -> TcM [ClassATItem]
 tcClassATs class_name cls ats at_defs
   = do {  -- Complain about associated type defaults for non associated-types
@@ -1490,15 +1491,15 @@ tcClassATs class_name cls ats at_defs
                    , not (n `elemNameSet` at_names) ]
        ; mapM tc_at ats }
   where
-    at_def_tycon :: LTyFamDefltEqn GhcRn -> Name
-    at_def_tycon (dL->L _ eqn) = unLoc (feqn_tycon eqn)
+    at_def_tycon :: LTyFamDefltDecl GhcRn -> Name
+    at_def_tycon (dL->L _ eqn) = tyFamInstDeclName eqn
 
     at_fam_name :: LFamilyDecl GhcRn -> Name
     at_fam_name (dL->L _ decl) = unLoc (fdLName decl)
 
     at_names = mkNameSet (map at_fam_name ats)
 
-    at_defs_map :: NameEnv [LTyFamDefltEqn GhcRn]
+    at_defs_map :: NameEnv [LTyFamDefltDecl GhcRn]
     -- Maps an AT in 'ats' to a list of all its default defs in 'at_defs'
     at_defs_map = foldr (\at_def nenv -> extendNameEnv_C (++) nenv
                                           (at_def_tycon at_def) [at_def])
@@ -1511,61 +1512,61 @@ tcClassATs class_name cls ats at_defs
                   ; return (ATI fam_tc atd) }
 
 -------------------------
-tcDefaultAssocDecl :: TyCon                    -- ^ Family TyCon (not knot-tied)
-                   -> [LTyFamDefltEqn GhcRn]        -- ^ Defaults
-                   -> TcM (Maybe (KnotTied Type, SrcSpan))   -- ^ Type checked RHS
+tcDefaultAssocDecl ::
+     TyCon                                -- ^ Family TyCon (not knot-tied)
+  -> [LTyFamDefltDecl GhcRn]              -- ^ Defaults
+  -> TcM (Maybe (KnotTied Type, SrcSpan)) -- ^ Type checked RHS
 tcDefaultAssocDecl _ []
   = return Nothing  -- No default declaration
 
 tcDefaultAssocDecl _ (d1:_:_)
   = failWithTc (text "More than one default declaration for"
-                <+> ppr (feqn_tycon (unLoc d1)))
+                <+> ppr (tyFamInstDeclName (unLoc d1)))
 
-tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
-                                             , feqn_pats = hs_tvs
-                                             , feqn_rhs = hs_rhs_ty })]
-  | HsQTvs { hsq_ext = imp_vars
-           , hsq_explicit = exp_vars } <- hs_tvs
+tcDefaultAssocDecl fam_tc
+  [dL->L loc (TyFamInstDecl { tfid_eqn =
+         HsIB { hsib_ext  = imp_vars
+              , hsib_body = FamEqn { feqn_tycon = L _ tc_name
+                                   , feqn_bndrs = mb_expl_bndrs
+                                   , feqn_pats  = hs_pats
+                                   , feqn_rhs   = hs_rhs_ty }}})]
   = -- See Note [Type-checking default assoc decls]
     setSrcSpan loc $
     tcAddFamInstCtxt (text "default type instance") tc_name $
     do { traceTc "tcDefaultAssocDecl 1" (ppr tc_name)
        ; let fam_tc_name = tyConName fam_tc
-             fam_arity = length (tyConVisibleTyVars fam_tc)
+             vis_arity = length (tyConVisibleTyVars fam_tc)
+             vis_pats  = numVisibleArgs hs_pats
 
        -- Kind of family check
        ; ASSERT( fam_tc_name == tc_name )
          checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
        -- Arity check
-       ; checkTc (exp_vars `lengthIs` fam_arity)
-                 (wrongNumberOfParmsErr fam_arity)
+       ; checkTc (vis_pats == vis_arity)
+                 (wrongNumberOfParmsErr vis_arity)
 
        -- Typecheck RHS
-       ; let hs_pats = map (HsValArg . hsLTyVarBndrToType) exp_vars
-
-          -- NB: Use tcFamTyPats, not bindTyClTyVars. The latter expects to get
-          -- the LHsQTyVars used for declaring a tycon, but the names here
-          -- are different.
-
-          -- You might think we should pass in some AssocInstInfo, as we're looking
-          -- at an associated type. But this would be wrong, because an associated
-          -- type default LHS can mention *different* type variables than the
-          -- enclosing class. So it's treated more as a freestanding beast.
+       --
+       -- You might think we should pass in some AssocInstInfo, as we're looking
+       -- at an associated type. But this would be wrong, because an associated
+       -- type default LHS can mention *different* type variables than the
+       -- enclosing class. So it's treated more as a freestanding beast.
        ; (qtvs, pats, rhs_ty) <- tcTyFamInstEqnGuts fam_tc NotAssociated
-                                                    imp_vars exp_vars
+                                                    imp_vars (mb_expl_bndrs `orElse` [])
                                                     hs_pats hs_rhs_ty
 
-       ; let fam_tvs = tyConTyVars fam_tc
-             ppr_eqn = ppr_default_eqn pats rhs_ty
+       ; let fam_tvs  = tyConTyVars fam_tc
+             ppr_eqn  = ppr_default_eqn pats rhs_ty
+             pats_vis = tyConArgFlags fam_tc pats
        ; traceTc "tcDefaultAssocDecl 2" (vcat
            [ text "fam_tvs" <+> ppr fam_tvs
            , text "qtvs"    <+> ppr qtvs
            , text "pats"    <+> ppr pats
            , text "rhs_ty"  <+> ppr rhs_ty
            ])
-       ; pat_tvs <- traverse (extract_tv ppr_eqn) pats
-       ; check_all_distinct_tvs ppr_eqn pat_tvs
+       ; pat_tvs <- zipWithM (extract_tv ppr_eqn) pats pats_vis
+       ; check_all_distinct_tvs ppr_eqn $ zip pat_tvs pats_vis
        ; let subst = zipTvSubst pat_tvs (mkTyVarTys fam_tvs)
        ; pure $ Just (substTyUnchecked subst rhs_ty, loc)
            -- We also perform other checks for well-formedness and validity
@@ -1576,21 +1577,18 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
     -- variable. If so, return the underlying type variable, and if
     -- not, throw an error.
     -- See Note [Type-checking default assoc decls]
-    extract_tv :: SDoc   -- The pretty-printed default equation
-                         -- (only used for error message purposes)
-               -> Type   -- The particular type pattern from which to extract
-                         -- its underlying type variable
+    extract_tv :: SDoc    -- The pretty-printed default equation
+                          -- (only used for error message purposes)
+               -> Type    -- The particular type pattern from which to extract
+                          -- its underlying type variable
+               -> ArgFlag -- The visibility of the type pattern
+                          -- (only used for error message purposes)
                -> TcM TyVar
-    extract_tv ppr_eqn pat =
+    extract_tv ppr_eqn pat pat_vis =
       case getTyVar_maybe pat of
         Just tv -> pure tv
-        Nothing ->
-          -- Per Note [Type-checking default assoc decls], we already
-          -- know by this point that if any arguments in the default
-          -- instance aren't type variables, then they must be
-          -- invisible kind arguments. Therefore, always display the
-          -- error message with -fprint-explicit-kinds enabled.
-          failWithTc $ pprWithExplicitKindsWhen True $
+        Nothing -> failWithTc $
+          pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
           hang (text "Illegal argument" <+> quotes (ppr pat) <+> text "in:")
              2 (vcat [ppr_eqn, suggestion])
 
@@ -1598,22 +1596,21 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
     -- Checks that no type variables in an associated default declaration are
     -- duplicated. If that is the case, throw an error.
     -- See Note [Type-checking default assoc decls]
-    check_all_distinct_tvs :: SDoc    -- The pretty-printed default equation
-                                      -- (only used for error message purposes)
-                           -> [TyVar] -- The type variable arguments in the
-                                      -- associated default declaration
-                           -> TcM ()
-    check_all_distinct_tvs ppr_eqn tvs =
-      let dups = findDupsEq (==) tvs in
+    check_all_distinct_tvs ::
+         SDoc               -- The pretty-printed default equation (only used
+                            -- for error message purposes)
+      -> [(TyVar, ArgFlag)] -- The type variable arguments in the associated
+                            -- default declaration, along with their respective
+                            -- visibilities (the latter are only used for error
+                            -- message purposes)
+      -> TcM ()
+    check_all_distinct_tvs ppr_eqn pat_tvs_vis =
+      let dups = findDupsEq ((==) `on` fst) pat_tvs_vis in
       traverse_
-        (\d -> -- Per Note [Type-checking default assoc decls], we already
-               -- know by this point that if any arguments in the default
-               -- instance are duplicates, then they must be
-               -- invisible kind arguments. Therefore, always display the
-               -- error message with -fprint-explicit-kinds enabled.
-               failWithTc $ pprWithExplicitKindsWhen True $
+        (\d -> let (pat_tv, pat_vis) = NE.head d in failWithTc $
+               pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
                hang (text "Illegal duplicate variable"
-                       <+> quotes (ppr (NE.head d)) <+> text "in:")
+                       <+> quotes (ppr pat_tv) <+> text "in:")
                   2 (vcat [ppr_eqn, suggestion]))
         dups
 
@@ -1625,9 +1622,6 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
     suggestion :: SDoc
     suggestion = text "The arguments to" <+> quotes (ppr fam_tc)
              <+> text "must all be distinct type variables"
-tcDefaultAssocDecl _ [dL->L _ (XFamEqn _)] = panic "tcDefaultAssocDecl"
-tcDefaultAssocDecl _ [dL->L _ (FamEqn _ _ _ (XLHsQTyVars _) _ _)]
-  = panic "tcDefaultAssocDecl"
 tcDefaultAssocDecl _ [_]
   = panic "tcDefaultAssocDecl: Impossible Match" -- due to #15884
 
@@ -1653,11 +1647,10 @@ applying this substitution to the RHS.
 
 In order to create this substitution, we must first ensure that all of
 the arguments in the default instance consist of distinct type variables.
-This property has already been checked to some degree earlier in the compiler:
-RdrHsSyn.checkTyVars ensures that all visible type arguments are type
-variables, and RnTypes.bindLHsTyVarBndrs ensures that no visible type arguments
-are duplicated. But these only check /visible/ arguments, however, so we still
-must check the invisible kind arguments to see if these invariants are upheld.
+One might think that this is a simple task that could be implemented earlier
+in the compiler, perhaps in the parser or the renamer. However, there are some
+tricky corner cases that really do require the full power of typechecking to
+weed out, as the examples below should illustrate.
 
 First, we must check that all arguments are type variables. As a motivating
 example, consider this erroneous program (inspired by #11361):
@@ -1674,13 +1667,15 @@ example, this time taken from #13971:
 
    class C2 (a :: j) where
       type F2 (a :: j) (b :: k)
-      type F2 (x :: z) (y :: z) = z
+      type F2 (x :: z) y = SameKind x y
+   data SameKind :: k -> k -> Type
 
 All of the arguments in the default equation for `F2` are type variables, so
 that passes the first check. However, if we were to build this substitution,
 then both `j` and `k` map to `z`! In terms of visible kind application, it's as
-if we had written `type F2 @z @z x y = z`, which makes it clear that we have
-duplicated a use of `z`. Therefore, `F2`'s default is also rejected.
+if we had written `type F2 @z @z x y = SameKind @z x y`, which makes it clear
+that we have duplicated a use of `z` on the LHS. Therefore, `F2`'s default is
+also rejected.
 
 Since the LHS of an associated type family default is always just variables,
 it won't contain any tycons. Accordingly, the patterns used in the substitution

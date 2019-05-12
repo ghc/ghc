@@ -8166,14 +8166,15 @@ Note the following points:
 -  A default declaration is not permitted for an associated *data* type.
 
 -  The default declaration must mention only type *variables* on the
-   left hand side, and the right hand side must mention only type
+   left hand side, and type variables may not be repeated on the left-hand
+   side. The right hand side must mention only type
    variables that are explicitly bound on the left hand side. This restriction
    is relaxed for *kind* variables, however, as the right hand side is allowed
    to mention kind variables that are implicitly bound on the left hand side.
 
-   Because of this, unlike :ref:`assoc-inst`, explicit binding of type/kind
-   variables in default declarations is not permitted by
-   :extension:`ExplicitForAll`.
+   Like with :ref:`assoc-inst`, it is possible to explicitly bind type and kind
+   variables in default declarations with a ``forall`` by using the
+   :extension:`ExplicitForAll` language extension.
 
 -  Unlike the associated type family declaration itself, the type variables of
    the default instance are independent of those of the parent class.
@@ -8192,25 +8193,50 @@ Here are some examples:
         type instance F2 c d = c->d  -- OK; you don't have to use 'a' in the type instance
 
         type F3 a
-        type F3 [b] = b              -- BAD; only type variables allowed on the LHS
+        type F3 [b] = b              -- BAD; only type variables allowed on the
+                                             LHS, and the argument to F3 is
+                                             instantiated to [b], which is not
+                                             a bare type variable
 
-        type F4 a
-        type F4 b = a                -- BAD; 'a' is not in scope  in the RHS
+        type F4 x y
+        type F4 x x = x              -- BAD; the type variable x is repeated on
+                                             the LHS
 
-        type F5 a :: [k]
-        type F5 a = ('[] :: [x])     -- OK; the kind variable x is implicitly
+        type F5 a
+        type F5 b = a                -- BAD; 'a' is not in scope  in the RHS
+
+        type F6 a :: [k]
+        type F6 a = ('[] :: [x])     -- OK; the kind variable x is implicitly
                                             bound by an invisible kind pattern
                                             on the LHS
 
-        type F6 a
-        type F6 a =
+        type F7 a
+        type F7 a =
           Proxy ('[] :: [x])         -- BAD; the kind variable x is not bound,
                                              even by an invisible kind pattern
 
-        type F7 (x :: a) :: [a]
-        type F7 x = ('[] :: [a])     -- OK; the kind variable a is implicitly
+        type F8 (x :: a) :: [a]
+        type F8 x = ('[] :: [a])     -- OK; the kind variable a is implicitly
                                             bound by the kind signature of the
                                             LHS type pattern
+
+        type F9 (a :: k)
+        type F9 a = Maybe a          -- BAD; the kind variable k is
+                                             instantiated to Type, which is not
+                                             a bare kind variable
+
+        type F10 (a :: j) (b :: k)
+        type F10 (a :: z) (b :: z)
+          = Proxy a                  -- BAD; the kind variable z is repeated,
+                                     -- as both j and k are instantiated to z
+
+        type F11 a b
+        type forall a b. F11 a b = a -- OK; LHS type variables can be
+                                        explicitly bound with 'forall'
+
+        type F12 (a :: k)
+        type F12 @k a = Proxy a      -- OK; visible kind application syntax is
+                                            permitted in default declarations
 
 .. _scoping-class-params:
 
