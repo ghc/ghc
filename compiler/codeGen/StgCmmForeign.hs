@@ -494,7 +494,7 @@ closureField dflags off = off + fixedHdrSize dflags
 
 -- -----------------------------------------------------------------------------
 -- For certain types passed to foreign calls, we adjust the actual
--- value passed to the call.  For ByteArray#/Array# we pass the
+-- value passed to the call.  For ByteArray#/Array#/SmallArray# we pass the
 -- address of the actual array, not the address of the heap object.
 
 getFCallArgs :: [StgArg] -> FCode [(CmmExpr, ForeignHint)]
@@ -517,6 +517,10 @@ getFCallArgs args
               arg_reps = typePrimRep arg_ty
               hint     = typeForeignHint arg_ty
 
+-- Use the type of the argument to determine how much to offset the
+-- pointer. If unsafeCoerce# is used incorrectly, it has a nasty
+-- interaction with this. See the docs for unsafeCoerce# and
+-- issue 16650.
 add_shim :: DynFlags -> Type -> CmmExpr -> CmmExpr
 add_shim dflags arg_ty expr
   | tycon == arrayPrimTyCon || tycon == mutableArrayPrimTyCon

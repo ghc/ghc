@@ -3313,9 +3313,11 @@ pseudoop   "unsafeCoerce#"
         The following uses of {\tt unsafeCoerce\#} are supposed to work (i.e. not lead to
         spurious compile-time or run-time crashes):
 
-         * Casting any lifted type to {\tt Any}
+         * Casting any lifted boxed type or unlifted boxed type to {\tt Any}.
+           This includes types like {\tt Int} and {\tt ByteArray\#} but not
+           {\tt Int\#}.
 
-         * Casting {\tt Any} back to the real type
+         * Casting {\tt Any} back to the real type.
 
          * Casting an unboxed type to another unboxed type of the same size.
            (Casting between floating-point and integral types does not work.
@@ -3327,6 +3329,17 @@ pseudoop   "unsafeCoerce#"
            known to be empty.  Also, a {\tt newtype} of a type {\tt T} has the same representation
            at runtime as {\tt T}.
 
+         * Casting an unlifted boxed type to or from its mutable variant.
+           The following pairs are supported: {\tt Array\#} and
+           {\tt MutableArray\#}, {\tt ByteArray\#} and
+           {\tt MutableByteArray\#}, {\tt SmallArray\#} and
+           {\tt SmallMutableArray\#}, {\tt ArrayArray\#} and
+           {\tt MutableArrayArray\#}. It is not generally safe to do this
+           since it makes it possible to mutate an immutable array or to
+           perform a read operation that is not sequenced correctly. The
+           caller of {\tt unsafeCoerce\#} assumes responsibility for avoiding
+           these.
+
         Other uses of {\tt unsafeCoerce\#} are undefined.  In particular, you should not use
         {\tt unsafeCoerce\#} to cast a T to an algebraic data type D, unless T is also
         an algebraic data type.  For example, do not cast {\tt Int->Int} to {\tt Bool}, even if
@@ -3335,6 +3348,15 @@ pseudoop   "unsafeCoerce#"
         can be entered but function closures cannot).  If you want a safe type to cast things
         to, use {\tt Any}, which is not an algebraic data type.
 
+        Do not use {\tt unsafeCoerce\#} to cast from an unlifted boxed type
+        to any other type unless that type is either its mutable/immutable
+        variant or {\tt Any}. It may appear that a roundtrip cast to and from
+        any type of kind {\tt TYPE 'UnliftedRep} is sound. However, it is not.
+        In particular, with {\tt UnliftedFFITypes}, the FFI accepts unlifted
+        array-like types as arguments, applying an offset so that the foreign
+        function receives a pointer to the payload. To calculate this offset,
+        it uses the argument's type. However, {\tt unsafeCoerce\#} can thwart
+        this analysis. See issue 16650 for an example of how this can happen.
         }
    with can_fail = True
 

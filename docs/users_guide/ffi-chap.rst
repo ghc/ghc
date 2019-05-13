@@ -115,8 +115,10 @@ e.g.: ::
 This is used to import functions written in Cmm code that follow an
 internal GHC calling convention. The arguments and results must be
 unboxed types, except that an argument may be of type ``Any`` (by way of
-``unsafeCoerce#``) and the result type is allowed to be an unboxed tuple
+`unsafeCoerce#`_) and the result type is allowed to be an unboxed tuple
 or the type ``Any``.
+
+.. _unsafeCoerce#: http://hackage.haskell.org/package/ghc-prim-0.5.3/docs/GHC-Prim.html#v:unsafeCoerce-35-
 
 This feature is not intended for use outside of the core libraries that
 come with GHC. For more details see the
