@@ -937,7 +937,7 @@ for example).
     :type: dynamic
     :category: linking
 
-    :default: all
+    :default: some
 
     This option affects the processing of RTS control options given
     either on the command line or via the :envvar:`GHCRTS` environment
