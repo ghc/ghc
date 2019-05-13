@@ -45,7 +45,7 @@ infixl 1 &
 -- 120
 --
 -- Instead of making a recursive call, we introduce a dummy parameter @rec@;
--- when used within 'fix', this parameter then refers to 'fix' argument, hence
+-- when used within 'fix', this parameter then refers to 'fix'’s argument, hence
 -- the recursion is reintroduced.
 fix :: (a -> a) -> a
 fix f = let x = f x in x
