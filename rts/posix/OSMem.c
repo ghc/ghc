@@ -550,8 +550,8 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
      * explicitly cast to avoid sign compare error */
     if (!getrlimit(RLIMIT_AS, &limit)
         && limit.rlim_cur > 0
-        && *len > (unsigned) limit.rlim_cur) {
-        *len = (unsigned) limit.rlim_cur;
+        && *len > (W_) limit.rlim_cur) {
+        *len = (W_) limit.rlim_cur;
     }
 #endif
 
