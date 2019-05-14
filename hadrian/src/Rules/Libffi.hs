@@ -24,6 +24,7 @@ askLibffilDynLibs stage = askOracle (LibffiDynLibs stage)
 
 -- | The path to the dynamic library manifest file. The file contains all file
 -- paths to libffi dynamic library file paths.
+-- The path is calculated but not `need`ed.
 dynLibManifest' :: Monad m => m FilePath -> Stage -> m FilePath
 dynLibManifest' getRoot stage = do
     root <- getRoot
@@ -103,6 +104,24 @@ configureEnvironment stage = do
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
              , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
 
+-- Need the libffi archive and `trackAllow` all files in the build directory.
+-- As all libffi build files are derived from this archive, we can safely
+-- `trackAllow` the libffi build dir. I.e the archive file can be seen as a
+-- shallow dependency of the libffi build. This is much simpler than working out
+-- the dependencies of each rule (within the build dir).
+-- This means changing the archive file forces a clean build of libffi. This
+-- seems like a performance issue, but is justified as building libffi is fast
+-- and the archive file is rarely changed.
+needLibfffiArchive :: FilePath -> Action FilePath
+needLibfffiArchive buildPath = do
+    top <- topDirectory
+    tarball <- unifyPath
+                . fromSingleton "Exactly one LibFFI tarball is expected"
+                <$> getDirectoryFiles top ["libffi-tarballs/libffi*.tar.gz"]
+    need [top -/- tarball]
+    trackAllow [buildPath -/- "//*"]
+    return tarball
+
 libffiRules :: Rules ()
 libffiRules = do
   _ <- addOracleCache $ \ (LibffiDynLibs stage)
@@ -119,6 +138,7 @@ libffiRules = do
                            , dynLibMan
                            ]
     priority 2 $ topLevelTargets &%> \_ -> do
+        _ <- needLibfffiArchive libffiPath
         context <- libffiContext stage
 
         -- Note this build needs the Makefile, triggering the rules bellow.
@@ -149,11 +169,7 @@ libffiRules = do
         -- Extract libffi tar file
         context <- libffiContext stage
         removeDirectory libffiPath
-        top <- topDirectory
-        tarball <- unifyPath . fromSingleton "Exactly one LibFFI tarball is expected"
-               <$> getDirectoryFiles top ["libffi-tarballs/libffi*.tar.gz"]
-
-        need [top -/- tarball]
+        tarball <- needLibfffiArchive libffiPath
         -- Go from 'libffi-3.99999+git20171002+77e130c.tar.gz' to 'libffi-3.99999'
         let libname = takeWhile (/= '+') $ takeFileName tarball
 
@@ -166,12 +182,14 @@ libffiRules = do
             -- And finally:
             removeFiles (path) [libname <//> "*"]
 
+        top <- topDirectory
         fixFile mkIn (fixLibffiMakefile top)
 
         files <- liftIO $ getDirectoryFilesIO "." [libffiPath <//> "*"]
         produces files
 
     fmap (libffiPath -/-) ["Makefile", "config.guess", "config.sub"] &%> \[mk, _, _] -> do
+        _ <- needLibfffiArchive libffiPath
         context <- libffiContext stage
 
         -- This need rule extracts the libffi tar file to libffiPath.
