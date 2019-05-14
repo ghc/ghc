@@ -1,12 +1,14 @@
 
 ==================== Parser ====================
 module T11768 where
+class C a b
 data Foo
   = Foo
   deriving Eq " Documenting a single type"
 data Bar
   = Bar
   deriving (Eq " Documenting one of multiple types", Ord)
+  deriving anyclass (forall a. C a " Documenting forall type ")
 <document comment>
 deriving instance Read Bar
 

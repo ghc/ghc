@@ -191,10 +191,21 @@ subordinates instMap decl = case decl of
                   , (dL->L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
                   , (dL->L _ n) <- ns ]
         derivs  = [ (instName, [unLoc doc], M.empty)
-                  | HsIB { hsib_body = (dL->L l (HsDocTy _ _ doc)) }
-                      <- concatMap (unLoc . deriv_clause_tys . unLoc) $
-                           unLoc $ dd_derivs dd
+                  | (l, doc) <- mapMaybe (extract_deriv_ty . hsib_body) $
+                                concatMap (unLoc . deriv_clause_tys . unLoc) $
+                                unLoc $ dd_derivs dd
                   , Just instName <- [M.lookup l instMap] ]
+
+        extract_deriv_ty :: LHsType GhcRn -> Maybe (SrcSpan, LHsDocString)
+        extract_deriv_ty ty =
+          case dL ty of
+            -- deriving (forall a. C a {- ^ Doc comment -})
+            L l (HsForAllTy{ hst_fvf = ForallInvis
+                           , hst_body = dL->L _ (HsDocTy _ _ doc) })
+                                  -> Just (l, doc)
+            -- deriving (C a {- ^ Doc comment -})
+            L l (HsDocTy _ _ doc) -> Just (l, doc)
+            _                     -> Nothing
 
 -- | Extract constructor argument docs from inside constructor decls.
 conArgDocs :: ConDecl GhcRn -> Map Int (HsDocString)
