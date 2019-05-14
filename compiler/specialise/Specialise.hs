@@ -705,13 +705,18 @@ specHeader
      :: SpecEnv
      -> [CoreBndr]  -- The binders from the original function 'f'
      -> [SpecArg]   -- From the CallInfo
-     -> SpecM ( [CoreBndr]   -- Binders for $sf
-              , SpecEnv      -- Substitution to apply to the body of 'f'
+     -> SpecM ( -- Returned arguments
+                SpecEnv      -- Substitution to apply to the body of 'f'
+              , [CoreBndr]   -- All the remaining unspecialised args from the original function 'f'
+
+                -- RULE helpers
               , [CoreBndr]   -- Binders for the RULE
               , [CoreArg]    -- Args for the LHS of the rule
+
+                -- Specialised function helpers
+              , [CoreBndr]   -- Binders for $sf
               , [DictBind]   -- Auxiliary dictionary bindings
               , [CoreExpr]   -- Specialised arguments for unfolding
-              , [CoreBndr]   -- All the remaining unspecialised args from the original function 'f'
               )
 
 -- We want to specialise on type 'T1', and so we must construct a substitution
@@ -719,15 +724,15 @@ specHeader
 -- details.
 specHeader env (bndr : bndrs) (SpecType t : args)
   = do { let env' = extendTvSubstList env [(bndr, t)]
-       ; (bs', env'', rule_bs, rule_es, dx, spec_args, unused_bndrs)
+       ; (env'', unused_bndrs, rule_bs, rule_es, bs', dx, spec_args)
             <- specHeader env' bndrs args
-       ; pure ( bs'
-              , env''
+       ; pure ( env''
+              , unused_bndrs
               , rule_bs
               , Type t : rule_es
+              , bs'
               , dx
               , Type t : spec_args
-              , unused_bndrs
               )
        }
 
@@ -737,15 +742,15 @@ specHeader env (bndr : bndrs) (SpecType t : args)
 -- /and/ a binder for the specialised body.
 specHeader env (bndr : bndrs) (UnspecType : args)
   = do { let (env', bndr') = substBndr env bndr
-       ; (bs', env'', rule_bs, rule_es, dx, spec_args, unused_bndrs)
+       ; (env'', unused_bndrs, rule_bs, rule_es, bs', dx, spec_args)
             <- specHeader env' bndrs args
-       ; pure ( bndr' : bs'
-              , env''
+       ; pure ( env''
+              , unused_bndrs
               , bndr' : rule_bs
               , varToCoreExpr bndr' : rule_es
+              , bndr' : bs'
               , dx
               , varToCoreExpr bndr' : spec_args
-              , unused_bndrs
               )
        }
 
@@ -756,16 +761,16 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
   = do { inst_dict_id <- newDictBndr env bndr
        ; let (rhs_env2, dx_binds, spec_dict_args')
                 = bindAuxiliaryDicts env [bndr] [d] [inst_dict_id]
-       ; (bs', env', rule_bs, rule_es, dx, spec_args, unused_bndrs)
+       ; (env', unused_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader rhs_env2 bndrs args
-       ; pure ( bs'
-              , env'
+       ; pure ( env'
+              , unused_bndrs
               -- See Note [Evidence foralls]
               , exprFreeIdsList (varToCoreExpr inst_dict_id) ++ rule_bs
               , varToCoreExpr inst_dict_id : rule_es
+              , bs'
               , dx_binds ++ dx
               , spec_dict_args' ++ spec_args
-              , unused_bndrs
               )
        }
 
@@ -779,25 +784,25 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
 -- this case must be here.
 specHeader env (bndr : bndrs) (UnspecArg : args)
   = do { let (env', bndr') = substBndr env bndr
-       ; (bs', env'', rule_bs, rule_es, dx, spec_args, unused_bndrs)
+       ; (env'', unused_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader env' bndrs args
-       ; pure ( bndr' : bs'
-              , env''
+       ; pure ( env''
+              , unused_bndrs
               , bndr' : rule_bs
               , varToCoreExpr bndr' : rule_es
+              , bndr' : bs'
               , dx
               , varToCoreExpr bndr' : spec_args
-              , unused_bndrs
               )
        }
 
 -- Return all remaining binders from the original function. These have the
 -- invariant that they should all correspond to unspecialised arguments, so
 -- it's safe to stop processing at this point.
-specHeader env bndrs [] = pure ([], env, [], [], [], [], bndrs)
+specHeader env bndrs [] = pure (env, bndrs, [], [], [], [], [])
 specHeader env [] _ =
   -- ASSERT (all isUnspecArg args)
-  pure ([], env, [], [], [], [], [])
+  pure (env, [], [], [], [], [], [])
 
 
 -- | Specialise a set of calls to imported bindings
@@ -1394,8 +1399,9 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
       = ASSERT(call_arity <= fn_arity)
 
         -- See Note [Specialising Calls]
-        do { (unspec_bndrs, rhs_env2, rule_bndrs, rule_args, dx_binds, spec_args, unused_bndrs)
+        do { (rhs_env2, unused_bndrs, rule_bndrs, rule_args, unspec_bndrs, dx_binds, spec_args)
                <- specHeader env rhs_bndrs $ dropWhileEndLE isUnspecArg call_args
+           ; let rhs_body' = mkLams unused_bndrs rhs_body
            ; dflags <- getDynFlags
            ; if already_covered dflags rules_acc rule_args
              then return spec_acc
@@ -1404,7 +1410,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   --                           , ppr dx_binds ]) $
                   do
            {    -- Figure out the type of the specialised function
-             let body = mkLams (unspec_bndrs ++ unused_bndrs) rhs_body
+             let body = mkLams unspec_bndrs rhs_body'
                  body_ty = substTy rhs_env2 $ exprType body
                  (lam_extra_args, app_args)     -- See Note [Specialisations Must Be Lifted]
                    | isUnliftedType body_ty     -- C.f. WwLib.mkWorkerArgs
