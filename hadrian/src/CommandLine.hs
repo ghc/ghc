@@ -53,6 +53,7 @@ data TestArgs = TestArgs
     , testOnly       :: [String]
     , testOnlyPerf   :: Bool
     , testSkipPerf   :: Bool
+    , testRootDirs   :: [FilePath]
     , testSpeed      :: TestSpeed
     , testSummary    :: Maybe FilePath
     , testVerbosity  :: Maybe String
@@ -71,6 +72,7 @@ defaultTestArgs = TestArgs
     , testOnly       = []
     , testOnlyPerf   = False
     , testSkipPerf   = False
+    , testRootDirs   = []
     , testSpeed      = TestNormal
     , testSummary    = Nothing
     , testVerbosity  = Nothing
@@ -153,15 +155,23 @@ readTestJUnit filepath = Right $ \flags -> flags { testArgs = (testArgs flags) {
 
 readTestOnly :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestOnly tests = Right $ \flags ->
-  flags { testArgs = (testArgs flags) { testOnly = tests' } }
+  flags { testArgs = (testArgs flags) { testOnly = tests'' flags } }
 
   where tests' = maybe [] words tests
+        tests'' flags = testOnly (testArgs flags) ++ tests'
 
 readTestOnlyPerf :: Either String (CommandLineArgs -> CommandLineArgs)
 readTestOnlyPerf = Right $ \flags -> flags { testArgs = (testArgs flags) { testOnlyPerf = True } }
 
 readTestSkipPerf :: Either String (CommandLineArgs -> CommandLineArgs)
 readTestSkipPerf = Right $ \flags -> flags { testArgs = (testArgs flags) { testSkipPerf = True } }
+
+readTestRootDirs :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readTestRootDirs rootdirs = Right $ \flags ->
+  flags { testArgs = (testArgs flags) { testRootDirs = rootdirs'' flags } }
+
+  where rootdirs' = maybe [] (splitOn ":") rootdirs
+        rootdirs'' flags = testRootDirs (testArgs flags) ++ rootdirs'
 
 readTestSpeed :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestSpeed ms =
@@ -243,6 +253,8 @@ optDescrs =
       "Only run performance tests."
     , Option [] ["skip-perf"] (NoArg readTestSkipPerf)
       "Skip performance tests."
+    , Option [] ["test-root-dirs"] (OptArg readTestRootDirs "DIR1:[DIR2:...:DIRn]")
+      "Test root directories to look at (all by default)."
     , Option [] ["test-speed"] (OptArg readTestSpeed "SPEED")
       "fast, slow or normal. Normal by default"
     , Option [] ["summary"] (OptArg readTestSummary "TEST_SUMMARY")
