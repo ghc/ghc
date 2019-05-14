@@ -107,6 +107,12 @@ Compiler
   only convenient workaround was to enable `-fobject-code` for all
   modules.
 
+GHCi
+~~~~
+
+- Add new debugger commands :ghci-cmd:`:disable` and :ghci-cmd:`:enable` to
+  disable and re-enable breakpoints.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
