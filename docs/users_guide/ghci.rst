@@ -1556,17 +1556,32 @@ breakpoint on a let expression, but there will always be a breakpoint on
 its body, because we are usually interested in inspecting the values of
 the variables bound by the let.
 
-Listing and deleting breakpoints
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Managing breakpoints
+^^^^^^^^^^^^^^^^^^^^
 
-The list of breakpoints currently enabled can be displayed using
+The list of breakpoints currently defined can be displayed using
 :ghci-cmd:`:show breaks`:
 
 .. code-block:: none
 
     *Main> :show breaks
-    [0] Main qsort.hs:1:11-12
-    [1] Main qsort.hs:2:15-46
+    [0] Main qsort.hs:1:11-12 enabled
+    [1] Main qsort.hs:2:15-46 enabled
+
+To disable one or several defined breakpoint, use the :ghci-cmd:`:disable` command with
+one or several blank separated numbers
+given in the output from :ghci-cmd:`:show breaks`:.
+To disable all breakpoints at once, use ``:disable *``.
+
+.. code-block:: none
+
+    *Main> :disable 0
+    *Main> :show breaks
+    [0] Main qsort.hs:1:11-12 disabled
+    [1] Main qsort.hs:2:15-46 enabled
+
+Disabled breakpoints can be (re-)enabled with the :ghci-cmd:`:enable` command.
+The parameters of the :ghci-cmd:`:disable` and :ghci-cmd:`:enable` commands are identical.
 
 To delete a breakpoint, use the :ghci-cmd:`:delete` command with the number
 given in the output from :ghci-cmd:`:show breaks`:
@@ -1575,7 +1590,7 @@ given in the output from :ghci-cmd:`:show breaks`:
 
     *Main> :delete 0
     *Main> :show breaks
-    [1] Main qsort.hs:2:15-46
+    [1] Main qsort.hs:2:15-46 disabled
 
 To delete all breakpoints at once, use ``:delete *``.
 
@@ -2377,6 +2392,12 @@ commonly used commands.
     see the number of each breakpoint). The ``*`` form deletes all the
     breakpoints.
 
+.. ghci-cmd:: :disable; * | ⟨num⟩ ...
+
+    Disable one or more breakpoints by number (use :ghci-cmd:`:show breaks` to
+    see the number and state of each breakpoint). The ``*`` form disables all the
+    breakpoints.
+
 .. ghci-cmd:: :doc; ⟨name⟩
 
     (Experimental: This command will likely change significantly in GHC 8.8.)
@@ -2393,6 +2414,12 @@ commonly used commands.
     error. The editor to invoke is taken from the :envvar:`EDITOR` environment
     variable, or a default editor on your system if :envvar:`EDITOR` is not
     set. You can change the editor using :ghci-cmd:`:set editor`.
+
+.. ghci-cmd:: :enable; * | ⟨num⟩ ...
+
+    Enable one or more disabled breakpoints by number (use :ghci-cmd:`:show breaks` to
+    see the number and state of each breakpoint). The ``*`` form enables all the
+    disabled breakpoints.
 
 .. ghci-cmd:: :etags
 
@@ -2764,8 +2791,10 @@ commonly used commands.
     If a number is given before the command, then the commands are run
     when the specified breakpoint (only) is hit. This can be quite
     useful: for example, ``:set stop 1 :continue`` effectively disables
-    breakpoint 1, by running :ghci-cmd:`:continue` whenever it is hit (although
-    GHCi will still emit a message to say the breakpoint was hit). What's more,
+    breakpoint 1, by running :ghci-cmd:`:continue` whenever it is hit
+    In this case GHCi will still emit a message to say the breakpoint was hit.
+    If you don't want such a message, you can use the :ghci-cmd:`:disable`
+    command. What's more,
     with cunning use of :ghci-cmd:`:def` and :ghci-cmd:`:cmd` you can use
     :ghci-cmd:`:set stop` to implement conditional breakpoints:
 

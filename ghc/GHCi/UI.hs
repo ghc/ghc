@@ -108,6 +108,7 @@ import qualified Data.Set as S
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as M
+import qualified Data.IntMap.Strict as IntMap
 import Data.Time.LocalTime ( getZonedTime )
 import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
@@ -187,8 +188,10 @@ ghciCommands = map mkCmd [
   ("def",       keepGoing (defineMacro False),  completeExpression),
   ("def!",      keepGoing (defineMacro True),   completeExpression),
   ("delete",    keepGoing deleteCmd,            noCompletion),
+  ("disable",   keepGoing disableCmd,           noCompletion),
   ("doc",       keepGoing' docCmd,              completeIdentifier),
   ("edit",      keepGoing' editFile,            completeFilename),
+  ("enable",    keepGoing enableCmd,            noCompletion),
   ("etags",     keepGoing createETagsFileCmd,   completeFilename),
   ("force",     keepGoing forceCmd,             completeExpression),
   ("forward",   keepGoing forwardCmd,           noCompletion),
@@ -331,8 +334,12 @@ defFullHelpText =
   "   :break [<mod>] <l> [<col>]  set a breakpoint at the specified location\n" ++
   "   :break <name>               set a breakpoint on the specified function\n" ++
   "   :continue                   resume after a breakpoint\n" ++
-  "   :delete <number>            delete the specified breakpoint\n" ++
+  "   :delete <number> ...        delete the specified breakpoints\n" ++
   "   :delete *                   delete all breakpoints\n" ++
+  "   :disable <number> ...       disable the specified breakpoints\n" ++
+  "   :disable *                  disable all breakpoints\n" ++
+  "   :enable <number> ...        enable the specified breakpoints\n" ++
+  "   :enable *                   enable all breakpoints\n" ++
   "   :force <expr>               print <expr>, forcing unevaluated parts\n" ++
   "   :forward [<n>]              go forward in the history N step s(after :back)\n" ++
   "   :history [<n>]              after :trace, show the execution history\n" ++
@@ -493,7 +500,7 @@ interactiveUI config srcs maybe_exprs = do
                    -- incremented after reading a line.
                    line_number        = 0,
                    break_ctr          = 0,
-                   breaks             = [],
+                   breaks             = IntMap.empty,
                    tickarrays         = emptyModuleEnv,
                    ghci_commands      = availableCommands config,
                    ghci_macros        = [],
@@ -1300,7 +1307,7 @@ toBreakIdAndLocation (Just inf) = do
   let md = GHC.breakInfo_module inf
       nm = GHC.breakInfo_number inf
   st <- getGHCiState
-  return $ listToMaybe [ id_loc | id_loc@(_,loc) <- breaks st,
+  return $ listToMaybe [ id_loc | id_loc@(_,loc) <- IntMap.assocs (breaks st),
                                   breakModule loc == md,
                                   breakTick loc == nm ]
 
@@ -2813,14 +2820,14 @@ setStop str@(c:_) | isDigit c
            nm = read nm_str
        st <- getGHCiState
        let old_breaks = breaks st
-       if all ((/= nm) . fst) old_breaks
-              then printForUser (text "Breakpoint" <+> ppr nm <+>
-                                 text "does not exist")
-              else do
-       let new_breaks = map fn old_breaks
-           fn (i,loc) | i == nm   = (i,loc { onBreakCmd = dropWhile isSpace rest })
-                      | otherwise = (i,loc)
-       setGHCiState st{ breaks = new_breaks }
+       case IntMap.lookup nm old_breaks of
+         Nothing ->  printForUser (text "Breakpoint" <+> ppr nm <+>
+                                   text "does not exist")
+         Just loc -> do
+            let new_breaks = IntMap.insert nm
+                                loc { onBreakCmd = dropWhile isSpace rest }
+                                old_breaks
+            setGHCiState st{ breaks = new_breaks }
 setStop cmd = modifyGHCiState (\st -> st { stop = cmd })
 
 setPrompt :: GhciMonad m => PromptFunction -> m ()
@@ -3521,6 +3528,56 @@ deleteCmd argLine = withSandboxOnly ":delete" $ do
          | all isDigit str = deleteBreak (read str)
          | otherwise = return ()
 
+enableCmd :: GhciMonad m => String -> m ()
+enableCmd argLine = withSandboxOnly ":enable" $ do
+    enaDisaSwitch True $ words argLine
+
+disableCmd :: GhciMonad m => String -> m ()
+disableCmd argLine = withSandboxOnly ":disable" $ do
+    enaDisaSwitch False $ words argLine
+
+enaDisaSwitch :: GhciMonad m => Bool -> [String] -> m ()
+enaDisaSwitch enaDisa [] =
+    printForUser (text "The" <+> text strCmd <+>
+                  text "command requires at least one argument.")
+  where
+    strCmd = if enaDisa then ":enable" else ":disable"
+enaDisaSwitch enaDisa ("*" : _) = enaDisaAllBreaks enaDisa
+enaDisaSwitch enaDisa idents = do
+    mapM_ (enaDisaOneBreak enaDisa) idents
+  where
+    enaDisaOneBreak :: GhciMonad m => Bool -> String -> m ()
+    enaDisaOneBreak enaDisa strId = do
+      sdoc_loc <- getBreakLoc enaDisa strId
+      case sdoc_loc of
+        Left sdoc -> printForUser sdoc
+        Right loc -> enaDisaAssoc enaDisa (read strId, loc)
+
+getBreakLoc :: GhciMonad m => Bool -> String -> m (Either SDoc BreakLocation)
+getBreakLoc enaDisa strId = do
+    st <- getGHCiState
+    case readMaybe strId >>= flip IntMap.lookup (breaks st) of
+      Nothing -> return $ Left (text "Breakpoint" <+> text strId <+>
+                                text "not found")
+      Just loc ->
+        if breakEnabled loc == enaDisa
+           then return $ Left
+               (text "Breakpoint" <+> text strId <+>
+                text "already in desired state")
+           else return $ Right loc
+
+enaDisaAssoc :: GhciMonad m => Bool -> (Int, BreakLocation) -> m ()
+enaDisaAssoc enaDisa (intId, loc) = do
+    st <- getGHCiState
+    newLoc <- turnBreakOnOff enaDisa loc
+    let new_breaks = IntMap.insert intId newLoc (breaks st)
+    setGHCiState $ st { breaks = new_breaks }
+
+enaDisaAllBreaks :: GhciMonad m => Bool -> m()
+enaDisaAllBreaks enaDisa = do
+    st <- getGHCiState
+    mapM_ (enaDisaAssoc enaDisa) $ IntMap.assocs $ breaks st
+
 historyCmd :: GHC.GhcMonad m => String -> m ()
 historyCmd arg
   | null arg        = history 20
@@ -3648,6 +3705,7 @@ findBreakAndSet md lookupTickTree = do
                        , breakLoc = RealSrcSpan pan
                        , breakTick = tick
                        , onBreakCmd = ""
+                       , breakEnabled = True
                        }
          printForUser $
             text "Breakpoint " <> ppr nm <>
@@ -3913,26 +3971,29 @@ mkTickArray ticks
 discardActiveBreakPoints :: GhciMonad m => m ()
 discardActiveBreakPoints = do
    st <- getGHCiState
-   mapM_ (turnOffBreak.snd) (breaks st)
-   setGHCiState $ st { breaks = [] }
+   mapM_ (turnBreakOnOff False) $ breaks st
+   setGHCiState $ st { breaks = IntMap.empty }
 
 deleteBreak :: GhciMonad m => Int -> m ()
 deleteBreak identity = do
    st <- getGHCiState
-   let oldLocations    = breaks st
-       (this,rest)     = partition (\loc -> fst loc == identity) oldLocations
-   if null this
-      then printForUser (text "Breakpoint" <+> ppr identity <+>
-                         text "does not exist")
-      else do
-           mapM_ (turnOffBreak.snd) this
+   let oldLocations = breaks st
+   case IntMap.lookup identity oldLocations of
+       Nothing -> printForUser (text "Breakpoint" <+> ppr identity <+>
+                                text "does not exist")
+       Just loc -> do
+           _ <- (turnBreakOnOff False) loc
+           let rest = IntMap.delete identity oldLocations
            setGHCiState $ st { breaks = rest }
 
-turnOffBreak :: GHC.GhcMonad m => BreakLocation -> m ()
-turnOffBreak loc = do
-  (arr, _) <- getModBreak (breakModule loc)
-  hsc_env <- GHC.getSession
-  liftIO $ enableBreakpoint hsc_env arr (breakTick loc) False
+turnBreakOnOff :: GHC.GhcMonad m => Bool -> BreakLocation -> m BreakLocation
+turnBreakOnOff onOff loc
+  | onOff == breakEnabled loc = return loc
+  | otherwise = do
+      (arr, _) <- getModBreak (breakModule loc)
+      hsc_env <- GHC.getSession
+      liftIO $ enableBreakpoint hsc_env arr (breakTick loc) onOff
+      return loc { breakEnabled = onOff }
 
 getModBreak :: GHC.GhcMonad m
             => Module -> m (ForeignRef BreakArray, Array Int SrcSpan)
