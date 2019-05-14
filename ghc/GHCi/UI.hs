@@ -186,8 +186,10 @@ ghciCommands = map mkCmd [
   ("def",       keepGoing (defineMacro False),  completeExpression),
   ("def!",      keepGoing (defineMacro True),   completeExpression),
   ("delete",    keepGoing deleteCmd,            noCompletion),
+  ("disable",   keepGoing disableCmd,           noCompletion),
   ("doc",       keepGoing' docCmd,              completeIdentifier),
   ("edit",      keepGoing' editFile,            completeFilename),
+  ("enable",    keepGoing enableCmd,            noCompletion),
   ("etags",     keepGoing createETagsFileCmd,   completeFilename),
   ("force",     keepGoing forceCmd,             completeExpression),
   ("forward",   keepGoing forwardCmd,           noCompletion),
@@ -329,8 +331,12 @@ defFullHelpText =
   "   :break [<mod>] <l> [<col>]  set a breakpoint at the specified location\n" ++
   "   :break <name>               set a breakpoint on the specified function\n" ++
   "   :continue                   resume after a breakpoint\n" ++
-  "   :delete <number>            delete the specified breakpoint\n" ++
+  "   :delete <number> ...        delete the specified breakpoints\n" ++
   "   :delete *                   delete all breakpoints\n" ++
+  "   :disable <number> ...       disable the specified breakpoints\n" ++
+  "   :disable *                  disable all breakpoints\n" ++
+  "   :enable <number> ...        enable the specified breakpoints\n" ++
+  "   :enable *                   enable all breakpoints\n" ++
   "   :force <expr>               print <expr>, forcing unevaluated parts\n" ++
   "   :forward [<n>]              go forward in the history N step s(after :back)\n" ++
   "   :history [<n>]              after :trace, show the execution history\n" ++
@@ -3505,6 +3511,66 @@ deleteCmd argLine = withSandboxOnly ":delete" $ do
          | all isDigit str = deleteBreak (read str)
          | otherwise = return ()
 
+enableCmd :: GhciMonad m => String -> m ()
+enableCmd argLine = withSandboxOnly ":enable" $ do
+    enableSwitch $ words argLine
+  where
+    enableSwitch :: GhciMonad m => [String] -> m ()
+    enableSwitch [] =
+      liftIO $ putStrLn "The enable command requires at least one argument."
+    enableSwitch ("*" : _) = enaDisaAllBreaks True
+    enableSwitch idents = mapM_ (checkAndEnaDisaBreak True) idents
+
+disableCmd :: GhciMonad m => String -> m ()
+disableCmd argLine = withSandboxOnly ":enable" $ do
+    disableSwitch $ words argLine
+  where
+    disableSwitch :: GhciMonad m => [String] -> m ()
+    disableSwitch [] =
+      liftIO $ putStrLn "The disable command requires at least one argument."
+    disableSwitch ("*" : _) = enaDisaAllBreaks False
+    disableSwitch idents = mapM_ (checkAndEnaDisaBreak False) idents
+
+checkAndEnaDisaBreak :: GhciMonad m => Bool -> String -> m ()
+checkAndEnaDisaBreak enaDisa ident = do
+    ok <- checkBreakState enaDisa ident
+    when ok $ enaDisaBreak enaDisa $ read ident
+
+checkBreakState :: GhciMonad m => Bool -> String -> m (Bool)
+checkBreakState enaDisa strId = do
+    st <- getGHCiState
+    let bres = filter (\bre -> strId == (show . fst) bre) $ breaks st
+    if null bres
+      then do
+          liftIO $ putStrLn ("Breakpoint " ++ strId ++ " not found")
+          return False
+      else
+        if breakEnabled ((snd . head) bres) == enaDisa
+          then do
+            liftIO $ putStrLn ("Breakpoint " ++ strId ++
+                  " already in desired state")
+            return False
+          else return True
+
+enaDisaBreak :: GhciMonad m => Bool -> Int -> m ()
+enaDisaBreak enaDisa identity = do
+    let condRepl :: GhciMonad m => (Int, BreakLocation) -> m (Int, BreakLocation)
+        condRepl bre@(ident, bri) =
+          if ident == identity
+            then do
+              turnBreakOnOff enaDisa bri
+              return (ident, bri {breakEnabled = enaDisa})
+            else return bre
+    st <- getGHCiState
+    newBreaks <- mapM condRepl $ breaks st
+    setGHCiState $ st { breaks = newBreaks }
+
+enaDisaAllBreaks :: GhciMonad m => Bool -> m()
+enaDisaAllBreaks enaDisa = do
+    st <- getGHCiState
+    let ids = map fst $ breaks st
+    mapM_ (enaDisaBreak enaDisa) ids
+
 historyCmd :: GHC.GhcMonad m => String -> m ()
 historyCmd arg
   | null arg        = history 20
@@ -3554,7 +3620,7 @@ forwardCmd :: GhciMonad m => String -> m ()
 forwardCmd arg
   | null arg        = forward 1
   | all isDigit arg = forward (read arg)
-  | otherwise       = liftIO $ putStrLn "Syntax:  :back [num]"
+  | otherwise       = liftIO $ putStrLn "Syntax:  :forward [num]"
   where
   forward num = withSandboxOnly ":forward" $ do
       (names, ix, pan, _) <- GHC.forward num
@@ -3632,6 +3698,7 @@ findBreakAndSet md lookupTickTree = do
                        , breakLoc = RealSrcSpan pan
                        , breakTick = tick
                        , onBreakCmd = ""
+                       , breakEnabled = True
                        }
          printForUser $
             text "Breakpoint " <> ppr nm <>
@@ -3897,7 +3964,7 @@ mkTickArray ticks
 discardActiveBreakPoints :: GhciMonad m => m ()
 discardActiveBreakPoints = do
    st <- getGHCiState
-   mapM_ (turnOffBreak.snd) (breaks st)
+   mapM_ (turnBreakOnOff False . snd) (breaks st)
    setGHCiState $ st { breaks = [] }
 
 deleteBreak :: GhciMonad m => Int -> m ()
@@ -3909,14 +3976,14 @@ deleteBreak identity = do
       then printForUser (text "Breakpoint" <+> ppr identity <+>
                          text "does not exist")
       else do
-           mapM_ (turnOffBreak.snd) this
+           mapM_ (turnBreakOnOff False . snd) this
            setGHCiState $ st { breaks = rest }
 
-turnOffBreak :: GHC.GhcMonad m => BreakLocation -> m ()
-turnOffBreak loc = do
+turnBreakOnOff :: GHC.GhcMonad m => Bool -> BreakLocation -> m ()
+turnBreakOnOff onOff loc = do
   (arr, _) <- getModBreak (breakModule loc)
   hsc_env <- GHC.getSession
-  liftIO $ enableBreakpoint hsc_env arr (breakTick loc) False
+  liftIO $ enableBreakpoint hsc_env arr (breakTick loc) onOff
 
 getModBreak :: GHC.GhcMonad m
             => Module -> m (ForeignRef BreakArray, Array Int SrcSpan)

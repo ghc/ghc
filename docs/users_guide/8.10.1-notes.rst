@@ -67,6 +67,12 @@ Compiler
   `copyByteArray#` calls that were not optimized before, now will
   be. See :ghc-ticket:`16052`.
 
+GHCi
+~~~~
+
+- Add new debugger commands :ghci-cmd:`:disable` and :ghci-cmd:`:enable` to
+  disable and re-enable breakpoints.
+
 Runtime system
 ~~~~~~~~~~~~~~
 

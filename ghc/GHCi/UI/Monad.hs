@@ -213,6 +213,7 @@ data BreakLocation
    { breakModule :: !GHC.Module
    , breakLoc    :: !SrcSpan
    , breakTick   :: {-# UNPACK #-} !Int
+   , breakEnabled:: !Bool
    , onBreakCmd  :: String
    }
 
@@ -225,10 +226,13 @@ prettyLocations []   = text "No active breakpoints."
 prettyLocations locs = vcat $ map (\(i, loc) -> brackets (int i) <+> ppr loc) $ reverse $ locs
 
 instance Outputable BreakLocation where
-   ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+>
+   ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+> pprEnaDisa <+>
                 if null (onBreakCmd loc)
                    then Outputable.empty
                    else doubleQuotes (text (onBreakCmd loc))
+      where pprEnaDisa = case breakEnabled loc of
+                True  -> text "enabled"
+                False -> text "disabled"
 
 recordBreak
   :: GhciMonad m => BreakLocation -> m (Bool{- was already present -}, Int)
