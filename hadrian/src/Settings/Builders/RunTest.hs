@@ -86,7 +86,10 @@ runTestBuilderArgs = builder RunTest ? do
     top         <- expr $ topDirectory
     ghcFlags    <- expr runTestGhcFlags
     timeoutProg <- expr buildRoot <&> (-/- timeoutPath)
-
+    cmdrootdirs <- expr (testRootDirs <$> userSetting defaultTestArgs)
+    let defaultRootdirs = ("testsuite" -/- "tests") : libTests
+        rootdirs | null cmdrootdirs = defaultRootdirs
+                 | otherwise        = cmdrootdirs
     -- See #16087
     let ghcBuiltByLlvm = False -- TODO: Implement this check
 
@@ -94,8 +97,7 @@ runTestBuilderArgs = builder RunTest ? do
 
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
     mconcat [ arg $ "testsuite/driver/runtests.py"
-            , arg $ "--rootdir=" ++ ("testsuite" -/- "tests")
-            , pure ["--rootdir=" ++ test | test <- libTests]
+            , pure [ "--rootdir=" ++ testdir | testdir <- rootdirs ]
             , arg "-e", arg $ "windows=" ++ show windows
             , arg "-e", arg $ "darwin=" ++ show darwin
             , arg "-e", arg $ "config.local=False"
