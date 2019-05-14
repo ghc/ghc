@@ -66,6 +66,7 @@ import qualified System.Console.Haskeline as Haskeline
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import Data.Map.Strict (Map)
+import qualified Data.IntMap.Strict as IntMap
 import qualified GHC.LanguageExtensions as LangExt
 
 -----------------------------------------------------------------------------
@@ -84,7 +85,7 @@ data GHCiState = GHCiState
         options        :: [GHCiOption],
         line_number    :: !Int,         -- ^ input line
         break_ctr      :: !Int,
-        breaks         :: ![(Int, BreakLocation)],
+        breaks         :: !(IntMap.IntMap BreakLocation),
         tickarrays     :: ModuleEnv TickArray,
             -- ^ 'tickarrays' caches the 'TickArray' for loaded modules,
             -- so that we don't rebuild it each time the user sets
@@ -213,6 +214,7 @@ data BreakLocation
    { breakModule :: !GHC.Module
    , breakLoc    :: !SrcSpan
    , breakTick   :: {-# UNPACK #-} !Int
+   , breakEnabled:: !Bool
    , onBreakCmd  :: String
    }
 
@@ -220,21 +222,27 @@ instance Eq BreakLocation where
   loc1 == loc2 = breakModule loc1 == breakModule loc2 &&
                  breakTick loc1   == breakTick loc2
 
-prettyLocations :: [(Int, BreakLocation)] -> SDoc
-prettyLocations []   = text "No active breakpoints."
-prettyLocations locs = vcat $ map (\(i, loc) -> brackets (int i) <+> ppr loc) $ reverse $ locs
+prettyLocations :: IntMap.IntMap BreakLocation -> SDoc
+prettyLocations  locs =
+    case  IntMap.null locs of
+      True  -> text "No active breakpoints."
+      False -> vcat $ map (\(i, loc) -> brackets (int i) <+> ppr loc) $ IntMap.toAscList locs
 
 instance Outputable BreakLocation where
-   ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+>
+   ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+> pprEnaDisa <+>
                 if null (onBreakCmd loc)
                    then Outputable.empty
                    else doubleQuotes (text (onBreakCmd loc))
+      where pprEnaDisa = case breakEnabled loc of
+                True  -> text "enabled"
+                False -> text "disabled"
 
 recordBreak
   :: GhciMonad m => BreakLocation -> m (Bool{- was already present -}, Int)
 recordBreak brkLoc = do
    st <- getGHCiState
-   let oldActiveBreaks = breaks st
+   let oldmap = breaks st
+       oldActiveBreaks = IntMap.assocs oldmap
    -- don't store the same break point twice
    case [ nm | (nm, loc) <- oldActiveBreaks, loc == brkLoc ] of
      (nm:_) -> return (True, nm)
@@ -242,7 +250,7 @@ recordBreak brkLoc = do
       let oldCounter = break_ctr st
           newCounter = oldCounter + 1
       setGHCiState $ st { break_ctr = newCounter,
-                          breaks = (oldCounter, brkLoc) : oldActiveBreaks
+                          breaks = IntMap.insert oldCounter brkLoc oldmap
                         }
       return (False, oldCounter)
 
