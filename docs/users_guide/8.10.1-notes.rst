@@ -96,7 +96,7 @@ Compiler
   `copyByteArray#` calls that were not optimized before, now will
   be. See :ghc-ticket:`16052`.
 - GHC's runtime linker no longer uses global state. This allows programs
-  that use the GHC API to safely use multiple GHC sessions in a single 
+  that use the GHC API to safely use multiple GHC sessions in a single
   process, as long as there are no native dependencies that rely on
   global state.
 
@@ -111,6 +111,9 @@ GHCi
 ~~~~
 
 - Added a command `:instances` to show the class instances available for a type.
+
+- Added new debugger commands :ghci-cmd:`:disable` and :ghci-cmd:`:enable` to
+  disable and re-enable breakpoints.
 
 Runtime system
 ~~~~~~~~~~~~~~
