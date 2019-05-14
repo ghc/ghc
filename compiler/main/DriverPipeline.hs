@@ -29,6 +29,7 @@ module DriverPipeline (
    hscPostBackendPhase, getLocation, setModLocation, setDynFlags,
    runPhase, exeFileName,
    maybeCreateManifest,
+   doCpp,
    linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode
   ) where
 
