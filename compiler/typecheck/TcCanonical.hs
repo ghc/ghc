@@ -2079,13 +2079,6 @@ What do we do when we have an equality
 
 where k1 and k2 differ? This Note explores this treacherous area.
 
-First off, the question above is slightly the wrong question. Flattening
-a tyvar will flatten its kind (Note [Flattening] in TcFlatten); flattening
-the kind might introduce a cast. So we might have a casted tyvar on the
-left. We thus revise our test case to
-
-  (tv |> co :: k1) ~ (rhs :: k2)
-
 We must proceed differently here depending on whether we have a Wanted
 or a Given. Consider this:
 
@@ -2109,35 +2102,32 @@ The reason for this odd behavior is much the same as
 Note [Wanteds do not rewrite Wanteds] in TcRnTypes: note that the
 new `co` is a Wanted.
 
-   The solution is then not to use `co` to "rewrite" -- that is, cast
-   -- `w`, but instead to keep `w` heterogeneous and
-   irreducible. Given that we're not using `co`, there is no reason to
-   collect evidence for it, so `co` is born a Derived, with a CtOrigin
-   of KindEqOrigin.
+The solution is then not to use `co` to "rewrite" -- that is, cast -- `w`, but
+instead to keep `w` heterogeneous and irreducible. Given that we're not using
+`co`, there is no reason to collect evidence for it, so `co` is born a
+Derived, with a CtOrigin of KindEqOrigin. When the Derived is solved (by
+unification), the original wanted (`w`) will get kicked out. We thus get
 
-When the Derived is solved (by unification), the original wanted (`w`)
-will get kicked out.
+[D] _ :: k ~ Type
+[W] w :: (alpha :: k) ~ (Int :: Type)
 
-Note that, if we had [G] co1 :: k ~ Type available, then none of this code would
-trigger, because flattening would have rewritten k to Type. That is,
-`w` would look like [W] (alpha |> co1 :: Type) ~ (Int :: Type), and the tyvar
-case will trigger, correctly rewriting alpha to (Int |> sym co1).
+Note that the Wanted is unchanged and will be irreducible. This all happens
+in canEqTyVarHetero.
+
+Note that, if we had [G] co1 :: k ~ Type available, then we never get
+to canEqTyVarHetero: canEqTyVar tries flattening the kinds first. If
+we have [G] co1 :: k ~ Type, then flattening the kind of alpha would
+rewrite k to Type, and we would end up in canEqTyVarHomo.
 
 Successive canonicalizations of the same Wanted may produce
 duplicate Deriveds. Similar duplications can happen with fundeps, and there
 seems to be no easy way to avoid. I expect this case to be rare.
 
-For Givens, this problem doesn't bite, so a heterogeneous Given gives
+For Givens, this problem (the Wanteds-rewriting-Wanteds action of
+a kind coercion) doesn't bite, so a heterogeneous Given gives
 rise to a Given kind equality. No Deriveds here. We thus homogenise
-the Given (see the "homo_co" in the Given case in canEqTyVar) and
+the Given (see the "homo_co" in the Given case in canEqTyVarHetero) and
 carry on with a homogeneous equality constraint.
-
-Separately, I (Richard E) spent some time pondering what to do in the case
-that we have [W] (tv |> co1 :: k1) ~ (tv |> co2 :: k2) where k1 and k2
-differ. Note that the tv is the same. (This case is handled as the first
-case in canEqTyVarHomo.) At one point, I thought we could solve this limited
-form of heterogeneous Wanted, but I then reconsidered and now treat this case
-just like any other heterogeneous Wanted.
 
 Note [Type synonyms and canonicalization]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
