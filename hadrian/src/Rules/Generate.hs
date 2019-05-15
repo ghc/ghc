@@ -293,7 +293,7 @@ generateSettings = do
         , ("dllwrap command", expr $ settingsFileSetting SettingsFileSetting_DllWrapCommand)
         , ("windres command", expr $ settingsFileSetting SettingsFileSetting_WindresCommand)
         , ("libtool command", expr $ settingsFileSetting SettingsFileSetting_LibtoolCommand)
-        , ("unlit command", ("$topdir/bin/" <>) <$> getBuilderPath Unlit)
+        , ("unlit command", ("$topdir/bin/" <>) . takeFileName <$> getBuilderPath Unlit)
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
         , ("target platform string", getSetting TargetPlatform)
         , ("target os", expr $ lookupValueOrError configFile "haskell-target-os")
