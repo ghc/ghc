@@ -84,6 +84,9 @@ typedef struct {
     MarkQueueEnt entries[];
 } MarkQueueBlock;
 
+// How far ahead in mark queue to prefetch?
+#define MARK_PREFETCH_QUEUE_DEPTH 5
+
 /* The mark queue is not capable of concurrent read or write.
  *
  * invariants:
@@ -101,6 +104,13 @@ typedef struct MarkQueue_ {
 
     // Is this a mark queue or a capability-local update remembered set?
     bool is_upd_rem_set;
+
+#if MARK_PREFETCH_QUEUE_DEPTH > 0
+    // A ring-buffer of entries which we will mark next
+    MarkQueueEnt prefetch_queue[MARK_PREFETCH_QUEUE_DEPTH];
+    // The first free slot in prefetch_queue.
+    uint8_t prefetch_head;
+#endif
 } MarkQueue;
 
 /* While it shares its representation with MarkQueue, UpdRemSet differs in
