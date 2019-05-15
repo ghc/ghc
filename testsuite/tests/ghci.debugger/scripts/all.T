@@ -100,6 +100,8 @@ test('hist001', [extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
 test('hist002', [extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
      ghci_script, ['hist002.script'])
 
+test('T1620', extra_files(['T1620/', 'T1620/T1620.hs']),
+              ghci_script, ['T1620.script'])
 test('T2740', normal, ghci_script, ['T2740.script'])
 
 test('getargs', extra_files(['../getargs.hs']), ghci_script, ['getargs.script'])
@@ -110,3 +112,4 @@ test('T13825-debugger', when(arch('powerpc64'), expect_broken(14455)),
       ghci_script, ['T13825-debugger.script'])
 
 test('break029', extra_files(['break029.hs']), ghci_script, ['break029.script'])
+

@@ -1535,6 +1535,8 @@ changeDirectory dir = do
   graph <- GHC.getModuleGraph
   when (not (null $ GHC.mgModSummaries graph)) $
         liftIO $ putStrLn "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed."
+  -- delete all eventually defined breakpoints before unloading modules (#1620)
+  deleteCmd "*"
   GHC.setTargets []
   _ <- GHC.load LoadAllTargets
   setContextAfterLoad False []
