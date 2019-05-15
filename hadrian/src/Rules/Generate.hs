@@ -5,6 +5,7 @@ module Rules.Generate (
     ) where
 
 import Base
+import qualified Context
 import Expression
 import Flavour
 import Hadrian.Oracles.TextFile (lookupValueOrError)
@@ -271,6 +272,7 @@ generateGhcPlatformH = do
 
 generateSettings :: Expr String
 generateSettings = do
+    ctx <- getContext
     settings <- traverse sequence $
         [ ("GCC extra via C opts", expr $ lookupValueOrError configFile "gcc-extra-via-c-opts")
         , ("C compiler command", expr $ settingsFileSetting SettingsFileSetting_CCompilerCommand)
@@ -293,7 +295,7 @@ generateSettings = do
         , ("dllwrap command", expr $ settingsFileSetting SettingsFileSetting_DllWrapCommand)
         , ("windres command", expr $ settingsFileSetting SettingsFileSetting_WindresCommand)
         , ("libtool command", expr $ settingsFileSetting SettingsFileSetting_LibtoolCommand)
-        , ("unlit command", ("$topdir/bin/" <>) <$> getBuilderPath Unlit)
+        , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
         , ("target platform string", getSetting TargetPlatform)
         , ("target os", expr $ lookupValueOrError configFile "haskell-target-os")
