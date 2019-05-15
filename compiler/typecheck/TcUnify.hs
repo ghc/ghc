@@ -14,7 +14,7 @@ module TcUnify (
   tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS,
   tcSubTypeDS_NC_O, tcSubTypeET,
   checkConstraints, checkTvConstraints,
-  buildImplicationFor, emitResidualTvConstraint,
+  buildImplicationFor, mkResidualTvWC, emitResidualTvConstraint,
 
   -- Various unifications
   unifyType, unifyKind,
@@ -1171,11 +1171,12 @@ checkTvConstraints skol_info m_telescope thing_inside
 
        ; return (skol_tvs, result) }
 
-emitResidualTvConstraint :: SkolemInfo -> Maybe SDoc -> [TcTyVar]
-                         -> TcLevel -> WantedConstraints -> TcM ()
-emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
+mkResidualTvWC :: SkolemInfo -> Maybe SDoc -> [TcTyVar]
+                       -> TcLevel -> WantedConstraints
+                       -> TcM WantedConstraints
+mkResidualTvWC skol_info m_telescope skol_tvs tclvl wanted
   | isEmptyWC wanted
-  = return ()
+  = return wanted
   | otherwise
   = do { ev_binds <- newNoTcEvBinds
        ; implic   <- newImplication
@@ -1185,7 +1186,9 @@ emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
              -- we should mark the outer one similarly,
              -- so that insolubleWC works on the outer one
 
-       ; emitImplication $
+       ; return $
+         mkImplicWC $
+         unitBag $
          implic { ic_status    = status
                 , ic_tclvl     = tclvl
                 , ic_skols     = skol_tvs
@@ -1194,6 +1197,15 @@ emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
                 , ic_wanted    = wanted
                 , ic_binds     = ev_binds
                 , ic_info      = skol_info } }
+
+emitResidualTvConstraint :: SkolemInfo -> Maybe SDoc -> [TcTyVar]
+                         -> TcLevel -> WantedConstraints -> TcM ()
+emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
+  | isEmptyWC wanted
+  = return ()
+  | otherwise
+  = do { resid_wc <- mkResidualTvWC skol_info m_telescope skol_tvs tclvl wanted
+       ; emitConstraints resid_wc }
 
 implicationNeeded :: SkolemInfo -> [TcTyVar] -> [EvVar] -> TcM Bool
 -- See Note [When to build an implication]

@@ -834,14 +834,14 @@ writeMetaTyVar tyvar ty
 
 -- Everything from here on only happens if DEBUG is on
   | not (isTcTyVar tyvar)
-  = WARN( True, text "Writing to non-tc tyvar" <+> ppr tyvar )
+  = ASSERT2( False, text "Writing to non-tc tyvar" <+> ppr tyvar )
     return ()
 
   | MetaTv { mtv_ref = ref } <- tcTyVarDetails tyvar
   = writeMetaTyVarRef tyvar ref ty
 
   | otherwise
-  = WARN( True, text "Writing to non-meta tyvar" <+> ppr tyvar )
+  = ASSERT2( False, text "Writing to non-meta tyvar" <+> ppr tyvar )
     return ()
 
 --------------------
@@ -1094,14 +1094,14 @@ we are trying to generalise this type:
   forall arg. ... (alpha[tau]:arg) ...
 
 We have a metavariable alpha whose kind mentions a skolem variable
-boudn inside the very type we are generalising.
+bound inside the very type we are generalising.
 This can arise while type-checking a user-written type signature
 (see the test case for the full code).
 
 We cannot generalise over alpha!  That would produce a type like
   forall {a :: arg}. forall arg. ...blah...
 The fact that alpha's kind mentions arg renders it completely
-ineligible for generaliation.
+ineligible for generalisation.
 
 However, we are not going to learn any new constraints on alpha,
 because its kind isn't even in scope in the outer context.  So alpha
@@ -1175,25 +1175,29 @@ candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
 -- in both sets, if it's used in both a type and a kind.
 -- See Note [CandidatesQTvs determinism and order]
 -- See Note [Dependent type variables]
-candidateQTyVarsOfType :: TcType       -- not necessarily zonked
+candidateQTyVarsOfType :: TcTyVarSet   -- in-scope variables (not candidates)
+                       -> TcType       -- not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfType ty = collect_cand_qtvs False emptyVarSet mempty ty
+candidateQTyVarsOfType gbls ty = collect_cand_qtvs False gbls emptyVarSet mempty ty
 
 -- | Like 'splitDepVarsOfType', but over a list of types
-candidateQTyVarsOfTypes :: [Type] -> TcM CandidatesQTvs
-candidateQTyVarsOfTypes tys = foldlM (collect_cand_qtvs False emptyVarSet) mempty tys
+candidateQTyVarsOfTypes :: TcTyVarSet  -- in-scope variables (not candidates)
+                        -> [Type] -> TcM CandidatesQTvs
+candidateQTyVarsOfTypes gbls tys = foldlM (collect_cand_qtvs False gbls emptyVarSet) mempty tys
 
 -- | Like 'candidateQTyVarsOfType', but consider every free variable
 -- to be dependent. This is appropriate when generalizing a *kind*,
 -- instead of a type. (That way, -XNoPolyKinds will default the variables
 -- to Type.)
-candidateQTyVarsOfKind :: TcKind       -- Not necessarily zonked
+candidateQTyVarsOfKind :: TcTyVarSet   -- in-scope variables (not candidates)
+                       -> TcKind       -- Not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfKind ty = collect_cand_qtvs True emptyVarSet mempty ty
+candidateQTyVarsOfKind gbls ty = collect_cand_qtvs True gbls emptyVarSet mempty ty
 
-candidateQTyVarsOfKinds :: [TcKind]    -- Not necessarily zonked
-                       -> TcM CandidatesQTvs
-candidateQTyVarsOfKinds tys = foldM (collect_cand_qtvs True emptyVarSet) mempty tys
+candidateQTyVarsOfKinds :: TcTyVarSet  -- in-scope variables (not candidates)
+                        -> [TcKind]    -- Not necessarily zonked
+                        -> TcM CandidatesQTvs
+candidateQTyVarsOfKinds gbls tys = foldM (collect_cand_qtvs True gbls emptyVarSet) mempty tys
 
 delCandidates :: CandidatesQTvs -> [Var] -> CandidatesQTvs
 delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
@@ -1203,7 +1207,8 @@ delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
 
 collect_cand_qtvs
   :: Bool            -- True <=> consider every fv in Type to be dependent
-  -> VarSet          -- Bound variables (both locally bound and globally bound)
+  -> TyCoVarSet      -- Globally bound tyvars
+  -> TyVarSet        -- Locally bound tyvars
   -> CandidatesQTvs  -- Accumulating parameter
   -> Type            -- Not necessarily zonked
   -> TcM CandidatesQTvs
@@ -1219,10 +1224,10 @@ collect_cand_qtvs
 --     so that subsequent dependency analysis (to build a well
 --     scoped telescope) works correctly
 
-collect_cand_qtvs is_dep bound dvs ty
+collect_cand_qtvs is_dep gbls locals dvs ty
   = go dvs ty
   where
-    is_bound tv = tv `elemVarSet` bound
+    is_bound tv = tv `elemVarSet` gbls || tv `elemVarSet` locals
 
     -----------------
     go :: CandidatesQTvs -> TcType -> TcM CandidatesQTvs
@@ -1232,8 +1237,8 @@ collect_cand_qtvs is_dep bound dvs ty
     go dv (FunTy _ arg res) = foldlM go dv [arg, res]
     go dv (LitTy {})        = return dv
     go dv (CastTy ty co)    = do dv1 <- go dv ty
-                                 collect_cand_qtvs_co bound dv1 co
-    go dv (CoercionTy co)   = collect_cand_qtvs_co bound dv co
+                                 collect_cand_qtvs_co gbls locals dv1 co
+    go dv (CoercionTy co)   = collect_cand_qtvs_co gbls locals dv co
 
     go dv (TyVarTy tv)
       | is_bound tv = return dv
@@ -1243,8 +1248,8 @@ collect_cand_qtvs is_dep bound dvs ty
                              Nothing     -> go_tv dv tv }
 
     go dv (ForAllTy (Bndr tv _) ty)
-      = do { dv1 <- collect_cand_qtvs True bound dv (tyVarKind tv)
-           ; collect_cand_qtvs is_dep (bound `extendVarSet` tv) dv1 ty }
+      = do { dv1 <- collect_cand_qtvs True gbls locals dv (tyVarKind tv)
+           ; collect_cand_qtvs is_dep gbls (locals `extendVarSet` tv) dv1 ty }
 
     -----------------
     go_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
@@ -1257,26 +1262,27 @@ collect_cand_qtvs is_dep bound dvs ty
                  -- ensure that the collected candidates have zonked kinds
                  -- (#15795) and to make the naughty check
                  -- (which comes next) works correctly
-           ; if intersectsVarSet bound (tyCoVarsOfType tv_kind)
+           ; if intersectsVarSet locals (tyCoVarsOfType tv_kind)
 
              then -- See Note [Naughty quantification candidates]
                   do { traceTc "Zapping naughty quantifier" (pprTyVar tv)
                      ; writeMetaTyVar tv (anyTypeOfKind tv_kind)
-                     ; collect_cand_qtvs True bound dv tv_kind }
+                     ; collect_cand_qtvs True gbls locals dv tv_kind }
 
              else do { let tv' = tv `setTyVarKind` tv_kind
                            dv' | is_dep    = dv { dv_kvs = kvs `extendDVarSet` tv' }
                                | otherwise = dv { dv_tvs = tvs `extendDVarSet` tv' }
                                -- See Note [Order of accumulation]
-                     ; collect_cand_qtvs True emptyVarSet dv' tv_kind } }
+                     ; collect_cand_qtvs True gbls locals dv' tv_kind } }
 
-collect_cand_qtvs_co :: VarSet -- bound variables
+collect_cand_qtvs_co :: TyCoVarSet -- Globals
+                     -> TyVarSet   -- Locals
                      -> CandidatesQTvs -> Coercion
                      -> TcM CandidatesQTvs
-collect_cand_qtvs_co bound = go_co
+collect_cand_qtvs_co gbls locals = go_co
   where
-    go_co dv (Refl ty)             = collect_cand_qtvs True bound dv ty
-    go_co dv (GRefl _ ty mco)      = do dv1 <- collect_cand_qtvs True bound dv ty
+    go_co dv (Refl ty)             = collect_cand_qtvs True gbls locals dv ty
+    go_co dv (GRefl _ ty mco)      = do dv1 <- collect_cand_qtvs True gbls locals dv ty
                                         go_mco dv1 mco
     go_co dv (TyConAppCo _ _ cos)  = foldlM go_co dv cos
     go_co dv (AppCo co1 co2)       = foldlM go_co dv [co1, co2]
@@ -1284,8 +1290,8 @@ collect_cand_qtvs_co bound = go_co
     go_co dv (AxiomInstCo _ _ cos) = foldlM go_co dv cos
     go_co dv (AxiomRuleCo _ cos)   = foldlM go_co dv cos
     go_co dv (UnivCo prov _ t1 t2) = do dv1 <- go_prov dv prov
-                                        dv2 <- collect_cand_qtvs True bound dv1 t1
-                                        collect_cand_qtvs True bound dv2 t2
+                                        dv2 <- collect_cand_qtvs True gbls locals dv1 t1
+                                        collect_cand_qtvs True gbls locals dv2 t2
     go_co dv (SymCo co)            = go_co dv co
     go_co dv (TransCo co1 co2)     = foldlM go_co dv [co1, co2]
     go_co dv (NthCo _ _ co)        = go_co dv co
@@ -1303,7 +1309,7 @@ collect_cand_qtvs_co bound = go_co
 
     go_co dv (ForAllCo tcv kind_co co)
       = do { dv1 <- go_co dv kind_co
-           ; collect_cand_qtvs_co (bound `extendVarSet` tcv) dv1 co }
+           ; collect_cand_qtvs_co gbls (locals `extendVarSet` tcv) dv1 co }
 
     go_mco dv MRefl    = return dv
     go_mco dv (MCo co) = go_co dv co
@@ -1317,11 +1323,11 @@ collect_cand_qtvs_co bound = go_co
     go_cv dv@(DV { dv_cvs = cvs }) cv
       | is_bound cv         = return dv
       | cv `elemVarSet` cvs = return dv
-      | otherwise           = collect_cand_qtvs True emptyVarSet
+      | otherwise           = collect_cand_qtvs True gbls emptyVarSet
                                     (dv { dv_cvs = cvs `extendVarSet` cv })
                                     (idType cv)
 
-    is_bound tv = tv `elemVarSet` bound
+    is_bound tv = tv `elemVarSet` gbls || tv `elemVarSet` locals
 
 {- Note [Order of accumulation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
