@@ -1,0 +1,9 @@
+Breakpoint 0 activated at T1620.hs:2:16-47
+Warning: changing directory causes all loaded modules to be unloaded,
+because the search path has changed.
+No modules are loaded with debugging support.
+No active breakpoints.
+[1,3,4,7,10]
+Breakpoint 1 activated at T1620.hs:2:16-47
+No active breakpoints.
+[1,3,4,7,10]
