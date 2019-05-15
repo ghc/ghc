@@ -1,0 +1,8 @@
+:cd T1620
+:l T1620.hs
+:break 2
+:cd ..
+:cd T1620
+:l T1620.hs
+:main
+:l T1620.hs
