@@ -834,14 +834,14 @@ writeMetaTyVar tyvar ty
 
 -- Everything from here on only happens if DEBUG is on
   | not (isTcTyVar tyvar)
-  = WARN( True, text "Writing to non-tc tyvar" <+> ppr tyvar )
+  = ASSERT2( False, text "Writing to non-tc tyvar" <+> ppr tyvar )
     return ()
 
   | MetaTv { mtv_ref = ref } <- tcTyVarDetails tyvar
   = writeMetaTyVarRef tyvar ref ty
 
   | otherwise
-  = WARN( True, text "Writing to non-meta tyvar" <+> ppr tyvar )
+  = ASSERT2( False, text "Writing to non-meta tyvar" <+> ppr tyvar )
     return ()
 
 --------------------
@@ -1094,14 +1094,14 @@ we are trying to generalise this type:
   forall arg. ... (alpha[tau]:arg) ...
 
 We have a metavariable alpha whose kind mentions a skolem variable
-boudn inside the very type we are generalising.
+bound inside the very type we are generalising.
 This can arise while type-checking a user-written type signature
 (see the test case for the full code).
 
 We cannot generalise over alpha!  That would produce a type like
   forall {a :: arg}. forall arg. ...blah...
 The fact that alpha's kind mentions arg renders it completely
-ineligible for generaliation.
+ineligible for generalisation.
 
 However, we are not going to learn any new constraints on alpha,
 because its kind isn't even in scope in the outer context.  So alpha
@@ -1175,25 +1175,29 @@ candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
 -- in both sets, if it's used in both a type and a kind.
 -- See Note [CandidatesQTvs determinism and order]
 -- See Note [Dependent type variables]
-candidateQTyVarsOfType :: TcType       -- not necessarily zonked
+candidateQTyVarsOfType :: TcTyVarSet   -- in-scope variables (not candidates)
+                       -> TcType       -- not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfType ty = collect_cand_qtvs False emptyVarSet mempty ty
+candidateQTyVarsOfType gbls ty = collect_cand_qtvs False gbls mempty ty
 
 -- | Like 'splitDepVarsOfType', but over a list of types
-candidateQTyVarsOfTypes :: [Type] -> TcM CandidatesQTvs
-candidateQTyVarsOfTypes tys = foldlM (collect_cand_qtvs False emptyVarSet) mempty tys
+candidateQTyVarsOfTypes :: TcTyVarSet  -- in-scope variables (not candidates)
+                        -> [Type] -> TcM CandidatesQTvs
+candidateQTyVarsOfTypes gbls tys = foldlM (collect_cand_qtvs False gbls) mempty tys
 
 -- | Like 'candidateQTyVarsOfType', but consider every free variable
 -- to be dependent. This is appropriate when generalizing a *kind*,
 -- instead of a type. (That way, -XNoPolyKinds will default the variables
 -- to Type.)
-candidateQTyVarsOfKind :: TcKind       -- Not necessarily zonked
+candidateQTyVarsOfKind :: TcTyVarSet   -- in-scope variables (not candidates)
+                       -> TcKind       -- Not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfKind ty = collect_cand_qtvs True emptyVarSet mempty ty
+candidateQTyVarsOfKind gbls ty = collect_cand_qtvs True gbls mempty ty
 
-candidateQTyVarsOfKinds :: [TcKind]    -- Not necessarily zonked
-                       -> TcM CandidatesQTvs
-candidateQTyVarsOfKinds tys = foldM (collect_cand_qtvs True emptyVarSet) mempty tys
+candidateQTyVarsOfKinds :: TcTyVarSet  -- in-scope variables (not candidates)
+                        -> [TcKind]    -- Not necessarily zonked
+                        -> TcM CandidatesQTvs
+candidateQTyVarsOfKinds gbls tys = foldM (collect_cand_qtvs True gbls) mempty tys
 
 delCandidates :: CandidatesQTvs -> [Var] -> CandidatesQTvs
 delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
@@ -1203,7 +1207,7 @@ delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
 
 collect_cand_qtvs
   :: Bool            -- True <=> consider every fv in Type to be dependent
-  -> VarSet          -- Bound variables (both locally bound and globally bound)
+  -> VarSet          -- Bound variables (globals and locals)
   -> CandidatesQTvs  -- Accumulating parameter
   -> Type            -- Not necessarily zonked
   -> TcM CandidatesQTvs
@@ -1268,9 +1272,9 @@ collect_cand_qtvs is_dep bound dvs ty
                            dv' | is_dep    = dv { dv_kvs = kvs `extendDVarSet` tv' }
                                | otherwise = dv { dv_tvs = tvs `extendDVarSet` tv' }
                                -- See Note [Order of accumulation]
-                     ; collect_cand_qtvs True emptyVarSet dv' tv_kind } }
+                     ; collect_cand_qtvs True bound dv' tv_kind } }
 
-collect_cand_qtvs_co :: VarSet -- bound variables
+collect_cand_qtvs_co :: VarSet -- bound variables (global & local)
                      -> CandidatesQTvs -> Coercion
                      -> TcM CandidatesQTvs
 collect_cand_qtvs_co bound = go_co
