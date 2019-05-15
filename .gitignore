@@ -222,4 +222,10 @@ GIT_COMMIT_ID
 ghc.nix/
 
 
+# -----------------------------------------------------------------------------
+# Use case: list all relevant tests in this file and run
+#   hadrian/build.sh -j --flavour=Quick --freeze1 test --only="$(cat tests)"
+/tests
+
+
 .gdb_history
