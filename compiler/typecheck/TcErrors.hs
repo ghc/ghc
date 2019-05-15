@@ -160,7 +160,7 @@ reportUnsolved wanted
 -- have any convenient place to put them.
 -- See Note [Deferring coercion errors to runtime]
 -- Used by solveEqualities for kind equalities
---      (see Note [Fail fast on kind errors] in TcSimplify]
+--      (see Note [Fail fast on kind errors] in TcSimplify)
 -- and for simplifyDefault.
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted

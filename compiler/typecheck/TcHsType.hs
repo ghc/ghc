@@ -11,7 +11,7 @@
 
 module TcHsType (
         -- Type signatures
-        kcHsSigType, tcClassSigType,
+        kcClassSigType, tcClassSigType,
         tcHsSigType, tcHsSigWcType,
         tcHsPartialSigType,
         funsSigCtxt, addSigCtxt, pprSigCtxt,
@@ -187,15 +187,19 @@ tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 -- already checked this, so we can simply ignore it.
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
-kcHsSigType :: [Located Name] -> LHsSigType GhcRn -> TcM ()
-kcHsSigType names (HsIB { hsib_body = hs_ty
-                                  , hsib_ext = sig_vars })
-  = discardResult                        $
-    addSigCtxt (funsSigCtxt names) hs_ty $
-    bindImplicitTKBndrs_Skol sig_vars    $
-    tc_lhs_type typeLevelMode hs_ty liftedTypeKind
-
-kcHsSigType _ (XHsImplicitBndrs _) = panic "kcHsSigType"
+kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
+kcClassSigType skol_info names sig_ty
+  = discardResult $
+    tcClassSigType skol_info names sig_ty
+  -- tcClassSigType does a fair amount of extra work that we don't need,
+  -- such as ordering quantified variables. But we absolutely do need
+  -- to push the level when checking method types and solve local equalities,
+  -- and so it seems easier just to call tcClassSigType than selectively
+  -- extract the lines of code from tc_hs_sig_type that we really need.
+  -- If we don't push the level, we get #16517, where GHC accepts
+  --   class C a where
+  --     meth :: forall k. Proxy (a :: k) -> ()
+  -- Note that k is local to meth -- this is hogwash.
 
 tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
@@ -245,13 +249,16 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
        ; spec_tkvs <- zonkAndScopedSort spec_tkvs
        ; let ty1 = mkSpecForAllTys spec_tkvs ty
        ; kvs <- kindGeneralizeLocal wanted ty1
-       ; emitResidualTvConstraint skol_info Nothing (kvs ++ spec_tkvs)
-                                  tc_lvl wanted
+       ; resid_wc <- mkResidualTvWC skol_info Nothing (kvs ++ spec_tkvs)
+                                    tc_lvl wanted
 
        -- See Note [Fail fast if there are insoluble kind equalities]
        --     in TcSimplify
-       ; when (insolubleWC wanted) failM
+       ; when (insolubleWC resid_wc) $
+         do { _ <- simplifyTop resid_wc
+            ; failM }
 
+       ; emitConstraints resid_wc
        ; return (mkInvForAllTys kvs ty1) }
 
 tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type"
@@ -1797,7 +1804,7 @@ kcLHsQTyVars_Cusk name flav
        ; let spec_req_tkvs = scoped_kvs ++ tc_tvs
              all_kinds     = res_kind : map tyVarKind spec_req_tkvs
 
-       ; candidates <- candidateQTyVarsOfKinds all_kinds
+       ; candidates <- candidateQTyVarsOfKinds emptyVarSet all_kinds
              -- 'candidates' are all the variables that we are going to
              -- skolemise and then quantify over.  We do not include spec_req_tvs
              -- because they are /already/ skolems
@@ -2235,8 +2242,8 @@ kindGeneralize :: TcType -> TcM [KindVar]
 kindGeneralize kind_or_type
   = do { kt <- zonkTcType kind_or_type
        ; traceTc "kindGeneralise1" (ppr kt)
-       ; dvs <- candidateQTyVarsOfKind kind_or_type
        ; gbl_tvs <- tcGetGlobalTyCoVars -- Already zonked
+       ; dvs <- candidateQTyVarsOfKind gbl_tvs kind_or_type
        ; traceTc "kindGeneralize" (vcat [ ppr kind_or_type
                                         , ppr dvs ])
        ; quantifyTyVars gbl_tvs dvs }
@@ -2261,7 +2268,7 @@ kindGeneralizeLocal wanted kind_or_type
          -- use the "Kind" variant here, as any types we see
          -- here will already have all type variables quantified;
          -- thus, every free variable is really a kv, never a tv.
-       ; dvs <- candidateQTyVarsOfKind kind_or_type
+       ; dvs <- candidateQTyVarsOfKind mono_tvs kind_or_type
 
        ; traceTc "kindGeneralizeLocal" $
          vcat [ text "Wanted:" <+> ppr wanted

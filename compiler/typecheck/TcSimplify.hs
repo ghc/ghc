@@ -166,12 +166,14 @@ simplifyTop wanteds
 solveLocalEqualities :: String -> TcM a -> TcM a
 solveLocalEqualities callsite thing_inside
   = do { (wanted, res) <- solveLocalEqualitiesX callsite thing_inside
-       ; emitConstraints wanted
 
        -- See Note [Fail fast if there are insoluble kind equalities]
-       ; if insolubleWC wanted
-         then failM
-         else return res }
+       ; when (insolubleWC wanted) $
+         do { _ <- simplifyTop wanted
+            ; failM }
+
+       ; emitConstraints wanted
+       ; return res }
 
 {- Note [Fail fast if there are insoluble kind equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -181,9 +183,48 @@ type, with a cascade of follow-up errors.
 
 For example polykinds/T12593, T15577, and many others.
 
-Take care to ensure that you emit the insoluble constraints before
-failing, because they are what will ulimately lead to the error
-messsage!
+However, we must be careful to report errors before failing. Otherwise,
+we might end up in tryCaptureConstraints, where we filter out anything
+that isn't insoluble. If we're left only with Derived insolubles, then
+we get no error at all.
+
+Here is the test case (triggering the link to this Note in tc_hs_sig_type):
+
+  class Foo f where
+    x :: f a -> f
+
+We get
+
+  f :: kappa1[1]
+  a :: kappa2[2]
+  rho1[2] :: RuntimeRep
+  rho2[2] :: RuntimeRep
+
+  [WD] kappa1[1] ~ (kappa2[2] -> TYPE rho1[2])
+  [WD] kappa1[1] ~ TYPE rho2[2]
+
+When we're solving in the type signature for `x`, we're at TcLevel 2. So
+kappa1 is untouchable. There is no way to make progress on these constraints
+without wanteds rewriting wanteds. But, lo, deriveds *can* rewrite deriveds.
+Thus, a little while later, we get
+
+  [W] kappa1[1] ~ (kappa2[2] -> TYPE rho1[2])
+  [W] kappa1[1] ~ TYPE rho2[2]
+  [D] TYPE rho2[2] ~ (kappa2[2] -> TYPE rho1[2])
+
+That D is insoluble, tripping the `insolubleWC` check.
+
+Previously, we emitted these constraints and called failM. But tryCaptureConstraints
+will *discard* the two Wanteds, according to Note [Constraints and errors] in TcRnMonad.
+We still have the insoluble D. If tryCaptureConstraints was called by
+captureTopConstraints, then we end up calling simplifyTop -- which discards the D!
+We're left with nothing, and GHC just exits, with no error reported.
+
+The solution is to make sure the errors are out there before failing.
+Calling simplifyTop does this nicely. Why not just call reportUnsolved?
+Because we want the defaulting behavior of simplifyTop. Otherwise, for example,
+typecheck/should_fail/T14232 reports something about (TYPE t0) instead of
+* in its error message.
 -}
 
 solveLocalEqualitiesX :: String -> TcM a -> TcM (WantedConstraints, a)
@@ -717,7 +758,8 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                                    , pred <- sig_inst_theta sig ]
 
        ; gbl_tvs <- tcGetGlobalTyCoVars
-       ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
+       ; dep_vars <- candidateQTyVarsOfTypes gbl_tvs
+                       (psig_tv_tys ++ psig_theta ++ map snd name_taus)
        ; qtkvs <- quantifyTyVars gbl_tvs dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, emptyWC, False) }
@@ -1127,7 +1169,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 
        -- Default any kind/levity vars
        ; DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
-                <- candidateQTyVarsOfTypes candidates
+                <- candidateQTyVarsOfTypes mono_tvs candidates
                 -- any covars should already be handled by
                 -- the logic in decideMonoTyVars, which looks at
                 -- the constraints generated
@@ -1197,7 +1239,7 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
        -- Keep the psig_tys first, so that candidateQTyVarsOfTypes produces
        -- them in that order, so that the final qtvs quantifies in the same
        -- order as the partial signatures do (#13524)
-       ; dv@DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs} <- candidateQTyVarsOfTypes $
+       ; dv@DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs} <- candidateQTyVarsOfTypes mono_tvs $
                                                          psig_tys ++ candidates ++ tau_tys
        ; let pick     = (`dVarSetIntersectVarSet` grown_tcvs)
              dvs_plus = dv { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
