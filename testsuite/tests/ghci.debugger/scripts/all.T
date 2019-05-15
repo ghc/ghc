@@ -100,6 +100,8 @@ test('hist001', [extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
 test('hist002', [extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
      ghci_script, ['hist002.script'])
 
+test('T1620', extra_files(['T1620/', 'T1620/T1620.hs']),
+              ghci_script, ['T1620.script'])
 test('T2740', normal, ghci_script, ['T2740.script'])
 
 test('getargs', extra_files(['../getargs.hs']), ghci_script, ['getargs.script'])
