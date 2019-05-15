@@ -706,7 +706,7 @@ void markQueuePushArray (MarkQueue *q,
  *********************************************************/
 
 // Returns invalid MarkQueueEnt if queue is empty.
-static MarkQueueEnt markQueuePop (MarkQueue *q)
+static MarkQueueEnt markQueuePop_ (MarkQueue *q)
 {
     MarkQueueBlock *top;
 
@@ -737,6 +737,46 @@ again:
     return ent;
 }
 
+static MarkQueueEnt markQueuePop (MarkQueue *q)
+{
+#if MARK_PREFETCH_QUEUE_DEPTH == 0
+    return markQueuePop_(q);
+#else
+    unsigned int i = q->prefetch_head;
+    while (nonmovingMarkQueueEntryType(&q->prefetch_queue[i]) == NULL_ENTRY) {
+        MarkQueueEnt new = markQueuePop_(q);
+        if (nonmovingMarkQueueEntryType(&new) == NULL_ENTRY) {
+            // Mark queue is empty; look for any valid entries in the prefetch
+            // queue
+            for (unsigned int j = (i+1) % MARK_PREFETCH_QUEUE_DEPTH;
+                 j != i;
+                 j = (j+1) % MARK_PREFETCH_QUEUE_DEPTH)
+            {
+                if (nonmovingMarkQueueEntryType(&q->prefetch_queue[j]) != NULL_ENTRY) {
+                    i = j;
+                    goto done;
+                }
+            }
+            return new;
+        }
+
+        // The entry may not be a MARK_CLOSURE but it doesn't matter, our
+        // MarkQueueEnt encoding always places the pointer to the object to be
+        // marked first.
+        prefetchForRead(&new.mark_closure.p->header.info);
+        q->prefetch_queue[i] = new;
+        i = (i + 1) % MARK_PREFETCH_QUEUE_DEPTH;
+    }
+
+  done:
+    ;
+    MarkQueueEnt ret = q->prefetch_queue[i];
+    q->prefetch_queue[i].null_entry.p = NULL;
+    q->prefetch_head = i;
+    return ret;
+#endif
+}
+
 /*********************************************************
  * Creating and destroying MarkQueues and UpdRemSets
  *********************************************************/
@@ -748,6 +788,10 @@ static void init_mark_queue_ (MarkQueue *queue)
     queue->blocks = bd;
     queue->top = (MarkQueueBlock *) bd->start;
     queue->top->head = 0;
+#if MARK_PREFETCH_QUEUE_DEPTH > 0
+    memset(&queue->prefetch_queue, 0, sizeof(queue->prefetch_queue));
+    queue->prefetch_head = 0;
+#endif
 }
 
 /* Must hold sm_mutex. */
