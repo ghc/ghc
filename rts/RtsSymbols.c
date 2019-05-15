@@ -934,6 +934,7 @@
       SymI_HasProto(load_load_barrier)                                  \
       SymI_HasProto(cas)                                                \
       SymI_HasProto(_assertFail)                                        \
+      SymI_HasProto(keepCAFs)                                           \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
