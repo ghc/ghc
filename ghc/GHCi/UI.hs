@@ -1543,8 +1543,8 @@ changeDirectory dir = do
   graph <- GHC.getModuleGraph
   when (not (null $ GHC.mgModSummaries graph)) $
         liftIO $ putStrLn "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed."
-  GHC.setTargets []
-  _ <- GHC.load LoadAllTargets
+  -- delete targets and all eventually defined breakpoints (#1620)
+  clearAllTargets
   setContextAfterLoad False []
   GHC.workingDirectoryChanged
   dir' <- expandPath dir
@@ -1852,9 +1852,7 @@ loadModule' files = do
 
   -- unload first
   _ <- GHC.abandonAll
-  discardActiveBreakPoints
-  GHC.setTargets []
-  _ <- GHC.load LoadAllTargets
+  clearAllTargets
 
   GHC.setTargets targets
   success <- doLoadAndCollectInfo False LoadAllTargets
@@ -2916,8 +2914,8 @@ newDynFlags interactive_only minus_opts = do
           when (verbosity dflags2 > 0) $
             liftIO . putStrLn $
               "package flags have changed, resetting and loading new packages..."
-          GHC.setTargets []
-          _ <- GHC.load LoadAllTargets
+          -- delete targets and all eventually defined breakpoints. (#1620)
+          clearAllTargets
           liftIO $ linkPackages hsc_env new_pkgs
           -- package flags changed, we can't re-use any of the old context
           setContextAfterLoad False []
@@ -4128,3 +4126,9 @@ wantNameFromInterpretedModule noCanDo str and_then =
                then noCanDo n $ text "module " <> ppr modl <>
                                 text " is not interpreted"
                else and_then n
+
+clearAllTargets :: GhciMonad m => m ()
+clearAllTargets = discardActiveBreakPoints
+                >> GHC.setTargets []
+                >> GHC.load LoadAllTargets
+                >> pure ()

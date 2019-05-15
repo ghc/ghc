@@ -1,0 +1,18 @@
+-- Test 1: No hanging breakpoints after :cd
+:cd T1620
+:l T1620.hs
+:break 2
+:cd ..
+:break 2
+:show breaks
+:cd T1620
+:l T1620.hs
+:main
+:l T1620.hs
+-- Test 2: Non hanging breakpoints after :set <some-package-flag>
+:break 2
+:set -no-user-package-db
+:show breaks
+:l T1620.hs
+:main
+:l T1620.hs
