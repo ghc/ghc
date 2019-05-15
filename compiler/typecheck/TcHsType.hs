@@ -205,10 +205,15 @@ tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType skol_info names sig_ty
   = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
-    tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
+    snd <$> tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
        -- Do not zonk-to-Type, nor perform a validity check
        -- We are in a knot with the class and associated types
        -- Zonking and validity checking is done by tcClassDecl
+       -- No need to fail here if the type has an error:
+       --   If we're in the kind-checking phase, the solveEqualities
+       --     in kcTyClGroup catches the error
+       --   If we're in the type-checking phase, the solveEqualities
+       --     in tcClassDecl1 gets it
 
 tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- Does validity checking
@@ -218,9 +223,12 @@ tcHsSigType ctxt sig_ty
     do { traceTc "tcHsSigType {" (ppr sig_ty)
 
           -- Generalise here: see Note [Kind generalisation]
-       ; ty <- tc_hs_sig_type skol_info sig_ty
-                                      (expectedKindInCtxt ctxt)
+       ; (insol, ty) <- tc_hs_sig_type skol_info sig_ty
+                                       (expectedKindInCtxt ctxt)
        ; ty <- zonkTcType ty
+
+       ; when insol failM
+       -- See Note [Fail fast if there are insoluble kind equalities] in TcSimplify
 
        ; checkValidType ctxt ty
        ; traceTc "end tcHsSigType }" (ppr ty)
@@ -229,12 +237,14 @@ tcHsSigType ctxt sig_ty
     skol_info = SigTypeSkol ctxt
 
 tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
-               -> ContextKind -> TcM Type
+               -> ContextKind -> TcM (Bool, TcType)
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
 --   and then kind-generalizes.
 -- This will never emit constraints, as it uses solveEqualities interally.
 -- No validity checking or zonking
+-- Returns also a Bool indicating whether the type induced an insoluble constraint;
+-- True <=> constraint is insoluble
 tc_hs_sig_type skol_info hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { (tc_lvl, (wanted, (spec_tkvs, ty)))
@@ -249,17 +259,10 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
        ; spec_tkvs <- zonkAndScopedSort spec_tkvs
        ; let ty1 = mkSpecForAllTys spec_tkvs ty
        ; kvs <- kindGeneralizeLocal wanted ty1
-       ; resid_wc <- mkResidualTvWC skol_info Nothing (kvs ++ spec_tkvs)
-                                    tc_lvl wanted
+       ; emitResidualTvConstraint skol_info Nothing (kvs ++ spec_tkvs)
+                                  tc_lvl wanted
 
-       -- See Note [Fail fast if there are insoluble kind equalities]
-       --     in TcSimplify
-       ; when (insolubleWC resid_wc) $
-         do { _ <- simplifyTop resid_wc
-            ; failM }
-
-       ; emitConstraints resid_wc
-       ; return (mkInvForAllTys kvs ty1) }
+       ; return (insolubleWC wanted, mkInvForAllTys kvs ty1) }
 
 tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type"
 
