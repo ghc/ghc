@@ -166,13 +166,12 @@ simplifyTop wanteds
 solveLocalEqualities :: String -> TcM a -> TcM a
 solveLocalEqualities callsite thing_inside
   = do { (wanted, res) <- solveLocalEqualitiesX callsite thing_inside
+       ; emitConstraints wanted
 
        -- See Note [Fail fast if there are insoluble kind equalities]
        ; when (insolubleWC wanted) $
-         do { _ <- simplifyTop wanted
-            ; failM }
+           failM
 
-       ; emitConstraints wanted
        ; return res }
 
 {- Note [Fail fast if there are insoluble kind equalities]
@@ -183,48 +182,9 @@ type, with a cascade of follow-up errors.
 
 For example polykinds/T12593, T15577, and many others.
 
-However, we must be careful to report errors before failing. Otherwise,
-we might end up in tryCaptureConstraints, where we filter out anything
-that isn't insoluble. If we're left only with Derived insolubles, then
-we get no error at all.
-
-Here is the test case (triggering the link to this Note in tc_hs_sig_type):
-
-  class Foo f where
-    x :: f a -> f
-
-We get
-
-  f :: kappa1[1]
-  a :: kappa2[2]
-  rho1[2] :: RuntimeRep
-  rho2[2] :: RuntimeRep
-
-  [WD] kappa1[1] ~ (kappa2[2] -> TYPE rho1[2])
-  [WD] kappa1[1] ~ TYPE rho2[2]
-
-When we're solving in the type signature for `x`, we're at TcLevel 2. So
-kappa1 is untouchable. There is no way to make progress on these constraints
-without wanteds rewriting wanteds. But, lo, deriveds *can* rewrite deriveds.
-Thus, a little while later, we get
-
-  [W] kappa1[1] ~ (kappa2[2] -> TYPE rho1[2])
-  [W] kappa1[1] ~ TYPE rho2[2]
-  [D] TYPE rho2[2] ~ (kappa2[2] -> TYPE rho1[2])
-
-That D is insoluble, tripping the `insolubleWC` check.
-
-Previously, we emitted these constraints and called failM. But tryCaptureConstraints
-will *discard* the two Wanteds, according to Note [Constraints and errors] in TcRnMonad.
-We still have the insoluble D. If tryCaptureConstraints was called by
-captureTopConstraints, then we end up calling simplifyTop -- which discards the D!
-We're left with nothing, and GHC just exits, with no error reported.
-
-The solution is to make sure the errors are out there before failing.
-Calling simplifyTop does this nicely. Why not just call reportUnsolved?
-Because we want the defaulting behavior of simplifyTop. Otherwise, for example,
-typecheck/should_fail/T14232 reports something about (TYPE t0) instead of
-* in its error message.
+Take care to ensure that you emit the insoluble constraints before
+failing, because they are what will ulimately lead to the error
+messsage!
 -}
 
 solveLocalEqualitiesX :: String -> TcM a -> TcM (WantedConstraints, a)
