@@ -9,8 +9,8 @@ int rtsOpts;
 
 #include <stdarg.h>
 #include <stdio.h>
-#include <Windows.h>
-#include <Shlwapi.h>
+#include <windows.h>
+#include <shlwapi.h>
 
 #include "Rts.h"
 
