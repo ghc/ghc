@@ -566,7 +566,7 @@ generaliseTcTyCon tc
              -- Running example in Note [Inferring kinds for type declarations]
              --    spec_req_prs = [ ("k1",kk1), ("a", (aa::kk1))
              --                   , ("k2",kk2), ("x", (xx::kk2))]
-             -- where "k1" dnotes the Name k1, and kk1, aa, etc are MetaTyVarss,
+             -- where "k1" dnotes the Name k1, and kk1, aa, etc are MetaTyVars,
              -- specifically TyVarTvs
 
        -- Step 0: zonk and skolemise the Specified and Required binders
@@ -585,7 +585,7 @@ generaliseTcTyCon tc
 
        -- Step 2a: find all the Inferred variables we want to quantify over
        -- NB: candidateQTyVarsOfKinds zonks as it goes
-       ; dvs1 <- candidateQTyVarsOfKinds $
+       ; dvs1 <- candidateQTyVarsOfKinds emptyVarSet $
                 (tc_res_kind : map tyVarKind spec_req_tvs)
        ; let dvs2 = dvs1 `delCandidates` spec_req_tvs
 
@@ -1141,8 +1141,10 @@ kcTyClDecl (ClassDecl { tcdLName = (dL->L _ name)
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM_ kc_sig) sigs }
   where
-    kc_sig (ClassOpSig _ _ nms op_ty) = kcHsSigType nms op_ty
+    kc_sig (ClassOpSig _ _ nms op_ty) = kcClassSigType skol_info nms op_ty
     kc_sig _                          = return ()
+
+    skol_info = TyConSkol ClassFlavour name
 
 kcTyClDecl (FamDecl _ (FamilyDecl { fdLName  = (dL->L _ fam_tc_name)
                                   , fdInfo   = fd_info }))
@@ -2033,7 +2035,7 @@ So, the simple thing is
    - quantify over them
 
 Hence the sligtly mysterious call:
-    candidateQTyVarsOfTypes (pats ++ mkTyVarTys scoped_tvs)
+    candidateQTyVarsOfTypes emptyVarSet (pats ++ mkTyVarTys scoped_tvs)
 
 Simple, neat, but a little non-obvious!
 -}
@@ -2072,7 +2074,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        -- clearer to duplicate it.  Still, if you fix a bug here,
        -- check there too!
        ; let scoped_tvs = imp_tvs ++ exp_tvs
-       ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
+       ; dvs  <- candidateQTyVarsOfTypes emptyVarSet (lhs_ty : mkTyVarTys scoped_tvs)
        ; qtvs <- quantifyTyVars emptyVarSet dvs
 
        ; (ze, qtvs) <- zonkTyBndrs qtvs

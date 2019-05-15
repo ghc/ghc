@@ -112,7 +112,7 @@ tcRule (HsRule { rd_ext  = ext
        ; let tpl_ids = lhs_evs ++ id_bndrs
        ; gbls  <- tcGetGlobalTyCoVars -- Even though top level, there might be top-level
                                       -- monomorphic bindings from the MR; test tc111
-       ; forall_tkvs <- candidateQTyVarsOfTypes $
+       ; forall_tkvs <- candidateQTyVarsOfTypes gbls $
                         map (mkSpecForAllTys tv_bndrs) $  -- don't quantify over lexical tyvars
                         rule_ty : map idType tpl_ids
        ; qtkvs <- quantifyTyVars gbls forall_tkvs

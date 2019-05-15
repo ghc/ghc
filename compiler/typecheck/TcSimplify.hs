@@ -717,7 +717,8 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                                    , pred <- sig_inst_theta sig ]
 
        ; gbl_tvs <- tcGetGlobalTyCoVars
-       ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
+       ; dep_vars <- candidateQTyVarsOfTypes gbl_tvs
+                       (psig_tv_tys ++ psig_theta ++ map snd name_taus)
        ; qtkvs <- quantifyTyVars gbl_tvs dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, emptyWC, False) }
@@ -1127,7 +1128,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 
        -- Default any kind/levity vars
        ; DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
-                <- candidateQTyVarsOfTypes candidates
+                <- candidateQTyVarsOfTypes mono_tvs candidates
                 -- any covars should already be handled by
                 -- the logic in decideMonoTyVars, which looks at
                 -- the constraints generated
@@ -1197,7 +1198,7 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
        -- Keep the psig_tys first, so that candidateQTyVarsOfTypes produces
        -- them in that order, so that the final qtvs quantifies in the same
        -- order as the partial signatures do (#13524)
-       ; dv@DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs} <- candidateQTyVarsOfTypes $
+       ; dv@DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs} <- candidateQTyVarsOfTypes mono_tvs $
                                                          psig_tys ++ candidates ++ tau_tys
        ; let pick     = (`dVarSetIntersectVarSet` grown_tcvs)
              dvs_plus = dv { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
