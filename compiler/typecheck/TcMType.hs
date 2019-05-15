@@ -1223,6 +1223,18 @@ collect_cand_qtvs
 --   * Returns fully-zonked CandidateQTvs, including their kinds
 --     so that subsequent dependency analysis (to build a well
 --     scoped telescope) works correctly
+--
+--   * Passes around the global tyvars so that we don't accidentally
+--     zap one as a "maughty" variable. For example, in this code:
+--
+--      class C f where
+--        m :: forall a p. f (p :: Proxy a)
+--
+--     a previous version of this code thought f was naughty in the type
+--     of m (given that `a` is locally scoped). This *should* be rejected,
+--     given that f's kind must be `f :: Proxy a -> Type` and `a` is bound
+--     by the local forall, but it should still pass through this function
+--     unaffected. This is #16517.
 
 collect_cand_qtvs is_dep gbls locals dvs ty
   = go dvs ty
