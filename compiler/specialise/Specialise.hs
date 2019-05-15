@@ -682,7 +682,7 @@ isValueArg _            = False
 -- We will use a running example. Consider the function
 --
 --    foo :: forall a b. Eq a => Int -> blah
---    foo @a @b dEqA int = blah
+--    foo @a @b dEqA i = blah
 --
 -- which is called with the 'CallInfo'
 --
@@ -697,10 +697,24 @@ isValueArg _            = False
 -- and the specialisation '$sfoo'
 --
 --    $sfoo :: forall b. Int -> blah
---    $sfoo @b = \int -> SUBST[a->T1, dEqA->dEqA'] blah
+--    $sfoo @b = \i -> SUBST[a->T1, dEqA->dEqA'] blah
 --
 -- The cases for 'specHeader' below are presented in the same order as this
--- running example.
+-- running example. The result of 'specHeader' for this example is as follows:
+--
+--    ( -- Returned arguments
+--      env + [a -> T1, deqA -> dEqA']
+--    , []
+--
+--      -- RULE helpers
+--    , [b, dx', i]
+--    , [T1, b, dx', i]
+--
+--      -- Specialised function helpers
+--    , [b, i]
+--    , [dx]
+--    , [T1, b, dx_spec, i]
+--    )
 specHeader
      :: SpecEnv
      -> [CoreBndr]  -- The binders from the original function 'f'
@@ -774,12 +788,12 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
               )
        }
 
--- Finally, we have the unspecialised argument 'int'. We need to produce
+-- Finally, we have the unspecialised argument 'i'. We need to produce
 -- a binder, LHS and RHS argument for the RULE, and a binder for the
 -- specialised body.
 --
 -- NB: Calls to 'specHeader' will trim off any trailing 'UnspecArg's, which is
--- why 'int' doesn't appear in our RULE above. But we have no guarantee that
+-- why 'i' doesn't appear in our RULE above. But we have no guarantee that
 -- there aren't 'UnspecArg's which come /before/ all of the dictionaries, so
 -- this case must be here.
 specHeader env (bndr : bndrs) (UnspecArg : args)
