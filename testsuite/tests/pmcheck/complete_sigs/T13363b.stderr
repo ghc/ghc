@@ -1,0 +1,7 @@
+
+testsuite/tests/pmcheck/complete_sigs/T13363b.hs:16:1: warning: [-Woverlapping-patterns]
+    Pattern match is redundant
+    In an equation for `f': f _ = ...
+   |
+16 | f _  = error "impossible"
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
