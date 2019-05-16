@@ -8,7 +8,7 @@ import Data.List
 
 -- info for all primops; the totality of the info in primops.txt(.pp)
 data Info
-   = Info [Option] [Entry]   -- defaults, primops
+   = Info [Option] [EntryOrMacroDef]   -- defaults, primops
      deriving Show
 
 -- info for one primop
@@ -18,7 +18,7 @@ data Entry
                    ty    :: Ty,          -- type
                    cat   :: Category,    -- category
                    desc  :: String,      -- description
-                   opts  :: [Option] }   -- default overrides
+                   opts  :: [Option] } -- default overrides
     | PrimVecOpSpec { cons    :: String,    -- PrimOp name
                       name    :: String,    -- name in prog text
                       prefix  :: String,    -- prefix for generated names
@@ -31,19 +31,72 @@ data Entry
     | PseudoOpSpec { name  :: String,      -- name in prog text
                      ty    :: Ty,          -- type
                      desc  :: String,      -- description
-                     opts  :: [Option] }   -- default overrides
-    | PrimTypeSpec { ty    :: Ty,      -- name in prog text
+                     opts  :: [Option] } -- default overrides
+    | PrimTypeSpec { ty    :: Ty,          -- name in prog text
                      desc  :: String,      -- description
-                     opts  :: [Option] }   -- default overrides
-    | PrimVecTypeSpec { ty    :: Ty,      -- name in prog text
+                     opts  :: [Option] } -- default overrides
+    | PrimVecTypeSpec { ty    :: Ty,       -- name in prog text
                         prefix  :: String,    -- prefix for generated names
                         veclen  :: Int,       -- vector length
                         elemrep :: String,    -- vector ElemRep
                         desc  :: String,      -- description
-                        opts  :: [Option] }   -- default overrides
+                        opts  :: [Option] } -- default overrides
     | Section { title :: String,         -- section title
                 desc  :: String }        -- description
-    deriving Show
+    deriving (Eq, Ord, Show)
+
+data EntryOrMacroDef
+    = Entry Entry
+    | MacroDef MacroDef
+    deriving (Eq, Ord, Show)
+
+type MacroVar = String
+
+data MacroDef
+    -- | let-bind a macro variable for a type
+    = MacroDef_Macro
+      { macroDef_macro_name :: MacroVar
+      , macroDef_macro_body :: MacroExpr
+      }
+    -- | Enties that are only conditionally available
+    | MacroDef_Guarded
+      { macroDef_guarded_condition :: MacroExpr
+      ,  -- | not 'EntryOrMacroDef', don't need or want nested conditional sections
+        macroDef_guarded_entities :: [Entry]
+      }
+  deriving (Eq, Ord, Show)
+
+-- N.B Needs to lower to CPP
+data MacroBinOp
+    = MacroBinOp_LT
+    | MacroBinOp_GT
+    | MacroBinOp_EQ
+    | MacroBinOp_NEQ
+    | MacroBinOp_LE
+    | MacroBinOp_GE
+
+    | MacroBinOp_And
+    | MacroBinOp_Or
+    deriving (Eq, Ord, Show)
+
+-- N.B Needs to lower to CPP
+data MacroExpr
+    = MacroExpr_OS
+    | MacroExpr_WordSize
+    | MacroExpr_StringLit String
+    | MacroExpr_NumberLit Int
+    | MacroExpr_BinOp
+      { macroCondition_binOp_op :: MacroBinOp
+      , macroCondition_binOp_left_operand :: MacroExpr
+      , macroCondition_binOp_right_operand :: MacroExpr
+      }
+    | MacroExpr_If
+      { tyMacroExpr_if_cond :: MacroExpr
+      , tyMacroExpr_if_then :: MacroExpr
+      , tyMacroExpr_if_else :: MacroExpr
+      }
+    | MacroExpr_Unquote Ty
+    deriving (Eq, Ord, Show)
 
 is_primop :: Entry -> Bool
 is_primop (PrimOpSpec _ _ _ _ _ _) = True
@@ -61,22 +114,23 @@ data Option
    | OptionInteger String Int     -- name = <int>
    | OptionVector [(String,String,Int)]  -- name = [(,...),...]
    | OptionFixity (Maybe Fixity)  -- fixity = infix{,l,r} <int> | Nothing
-     deriving Show
+   deriving (Eq, Ord, Show)
 
 -- categorises primops
 data Category
    = Dyadic | Monadic | Compare | GenPrimOp
-     deriving Show
+   deriving (Eq, Ord, Show)
 
 -- types
 data Ty
    = TyF    Ty Ty
-   | TyC    Ty Ty -- We only allow one constraint, keeps the grammar simpler
+   -- | We only allow one constraint, keeps the grammar simpler
+   | TyC    Ty Ty
    | TyApp  TyCon [Ty]
    | TyVar  TyVar
-   | TyUTup [Ty]   -- unboxed tuples; just a TyCon really, 
-                   -- but convenient like this
-   deriving (Eq,Show)
+   -- | unboxed tuples; just a TyCon really, but convenient like this
+   | TyUTup [Ty] 
+   deriving (Eq, Ord, Show)
 
 type TyVar = String
 
@@ -85,6 +139,7 @@ data TyCon = TyCon String
            | VECTOR
            | VECTUPLE
            | VecTyCon String String
+           | MacroUse MacroVar
   deriving (Eq, Ord)
 
 instance Show TyCon where
@@ -94,19 +149,21 @@ instance Show TyCon where
     show VECTUPLE        = "VECTUPLE"
     show (VecTyCon tc _) = tc
 
+    show (MacroUse m)    = "$" ++ m
+
 -- Follow definitions of Fixity and FixityDirection in GHC
 
 -- The SourceText exists so that it matches the SourceText field in
 -- BasicTypes.Fixity
 data Fixity = Fixity SourceText Int FixityDirection
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data FixityDirection = InfixN | InfixL | InfixR
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data SourceText = SourceText String
                 | NoSourceText
-                deriving (Eq,Show)
+  deriving (Eq, Ord, Show)
 
 ------------------------------------------------------------------
 -- Sanity checking -----------------------------------------------
@@ -115,9 +172,9 @@ data SourceText = SourceText String
 {- Do some simple sanity checks:
     * all the default field names are unique
     * for each PrimOpSpec, all override field names are unique
-    * for each PrimOpSpec, all overriden field names   
+    * for each PrimOpSpec, all overriden field names
           have a corresponding default value
-    * that primop types correspond in certain ways to the 
+    * that primop types correspond in certain ways to the
       Category: eg if Comparison, the type must be of the form
          T -> T -> Bool.
    Dies with "error" if there's a problem, else returns ().
@@ -129,8 +186,8 @@ myseqAll []      x = x
 sanityTop :: Info -> ()
 sanityTop (Info defs entries)
    = let opt_names = map get_attrib_name defs
-         primops = filter is_primop entries
-     in  
+         primops = [ e | Entry e <- entries, is_primop e ] -- TODO
+     in
      if   length opt_names /= length (nub opt_names)
      then error ("non-unique default attribute names: " ++ show opt_names ++ "\n")
      else myseqAll (map (sanityPrimOp opt_names) primops) ()
@@ -153,9 +210,15 @@ sanityPrimOp def_names p
          else ()
 
 sane_ty :: Category -> Ty -> Bool
-sane_ty Compare (TyF t1 (TyF t2 td)) 
-   | t1 == t2 && td == TyApp (TyCon "Int#") []  = True
-sane_ty Monadic (TyF t1 td) 
+sane_ty Compare (TyF t1 (TyF t2 td))
+   | t1 == t2
+   , TyApp td' [] <- td
+   , case td' of
+       TyCon "Int#" -> True
+       MacroUse _ -> True -- only macro we define is Ints
+       _ -> False
+   = True
+sane_ty Monadic (TyF t1 td)
    | t1 == td  = True
 sane_ty Dyadic (TyF t1 (TyF t2 td))
    | t1 == td && t2 == td  = True
@@ -174,7 +237,7 @@ get_attrib_name (OptionFixity _) = "fixity"
 
 lookup_attrib :: String -> [Option] -> Maybe Option
 lookup_attrib _ [] = Nothing
-lookup_attrib nm (a:as) 
+lookup_attrib nm (a:as)
     = if get_attrib_name a == nm then Just a else lookup_attrib nm as
 
 is_vector :: Entry -> Bool

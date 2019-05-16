@@ -82,11 +82,6 @@ defaults
 -- description fields should be legal latex. Descriptions can contain
 -- matched pairs of embedded curly brackets.
 
-#include "MachDeps.h"
-
--- We need platform defines (tests for mingw32 below).
-#include "ghc_boot_platform.h"
-
 section "The word size story."
         {Haskell98 specifies that signed integers (type {\tt Int})
          must contain at least 30 bits. GHC always implements {\tt
@@ -147,16 +142,18 @@ section "The word size story."
 
 -- Define synonyms for indexing ops.
 
-#define INT32 Int#
-#define WORD32 Word#
+$let INT32 = [| Int# |]
+$let WORD32 = [| Word# |]
 
-#if WORD_SIZE_IN_BITS < 64
-#define INT64 Int64#
-#define WORD64 Word64#
-#else
-#define INT64 Int#
-#define WORD64 Word#
-#endif
+$let INT64 =
+  if (WORD_SIZE_IN_BITS < 64)
+  then [| Int64# |]
+  else [| Int# |]
+
+$let WORD64 =
+  if (WORD_SIZE_IN_BITS < 64)
+  then [| Word64# |]
+  else [| Word# |]
 
 -- This type won't be exported directly (since there is no concrete
 -- syntax for this sort of export) so we'll have to manually patch
@@ -679,26 +676,25 @@ primop   Narrow16WordOp    "narrow16Word#"    Monadic   Word# -> Word#
 primop   Narrow32WordOp    "narrow32Word#"    Monadic   Word# -> Word#
 
 
-#if WORD_SIZE_IN_BITS < 64
-------------------------------------------------------------------------
-section "Int64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
+$guarded (WORD_SIZE_IN_BITS < 64)
+  ------------------------------------------------------------------------
+  section "Int64#"
+          {Operations on 64-bit unsigned words. This type is only used
+           if plain {\tt Int\#} has less than 64 bits. In any case, the operations
+           are not primops; they are implemented (if needed) as ccalls instead.}
+  ------------------------------------------------------------------------
 
-primtype Int64#
+  primtype Int64#
 
-------------------------------------------------------------------------
-section "Word64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
+  ------------------------------------------------------------------------
+  section "Word64#"
+          {Operations on 64-bit unsigned words. This type is only used
+           if plain {\tt Word\#} has less than 64 bits. In any case, the operations
+           are not primops; they are implemented (if needed) as ccalls instead.}
+  ------------------------------------------------------------------------
 
-primtype Word64#
-
-#endif
+  primtype Word64#
+$endGuarded
 
 ------------------------------------------------------------------------
 section "Double#"
@@ -2153,16 +2149,17 @@ primop   AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
 primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
          {Return the remainder when the {\tt Addr\#} arg, treated like an {\tt Int\#},
           is divided by the {\tt Int\#} arg.}
-#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
-primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
-        {Coerce directly from address to int.}
-   with code_size = 0
-        deprecated_msg = { This operation is strongly deprecated. }
-primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
-        {Coerce directly from int to address.}
-   with code_size = 0
-        deprecated_msg = { This operation is strongly deprecated. }
-#endif
+
+$guarded ((WORD_SIZE_IN_BITS == 32) || (WORD_SIZE_IN_BITS == 64))
+  primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
+          {Coerce directly from address to int.}
+     with code_size = 0
+          deprecated_msg = { This operation is strongly deprecated. }
+  primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
+          {Coerce directly from int to address.}
+     with code_size = 0
+          deprecated_msg = { This operation is strongly deprecated. }
+$endGuarded
 
 primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Int#
 primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Int#
@@ -2777,29 +2774,28 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-#if defined(mingw32_TARGET_OS)
-primop  AsyncReadOp "asyncRead#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously read bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
+$guarded (OS == "mingw32")
+  primop  AsyncReadOp "asyncRead#" GenPrimOp
+     Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+     {Asynchronously read bytes from specified file descriptor.}
+     with
+     has_side_effects = True
+     out_of_line      = True
 
-primop  AsyncWriteOp "asyncWrite#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously write bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
+  primop  AsyncWriteOp "asyncWrite#" GenPrimOp
+     Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+     {Asynchronously write bytes from specified file descriptor.}
+     with
+     has_side_effects = True
+     out_of_line      = True
 
-primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
-   Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously perform procedure (first arg), passing it 2nd arg.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-#endif
+  primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
+     Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+     {Asynchronously perform procedure (first arg), passing it 2nd arg.}
+     with
+     has_side_effects = True
+     out_of_line      = True
+$endGuarded
 
 ------------------------------------------------------------------------
 section "Concurrency primitives"
