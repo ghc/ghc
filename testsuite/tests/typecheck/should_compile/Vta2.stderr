@@ -1,0 +1,4 @@
+
+Vta2.hs:14:17: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: False -> ...

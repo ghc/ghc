@@ -1,0 +1,9 @@
+
+T14546d.hs:3:10: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘+’, ‘*’, ‘abs’, ‘signum’, and (either ‘negate’ or ‘-’)
+    • In the instance declaration for ‘Num D’
+
+T14546d.hs:7:5: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: 3

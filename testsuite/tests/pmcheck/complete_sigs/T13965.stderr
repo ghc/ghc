@@ -1,0 +1,4 @@
+
+T13965.hs:19:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘catchAll’: catchAll F = ...

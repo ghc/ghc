@@ -690,7 +690,13 @@ Call @match@ with all of this information!
 
 matchWrapper
   :: HsMatchContext Name               -- ^ For shadowing warning messages
-  -> Maybe (LHsExpr GhcTc)             -- ^ Scrutinee, if we check a case expr
+  -> Maybe (LHsExpr GhcTc)             -- ^ Scrutinee. (Just scrut) for a case expr
+                                       --      case scrut of { p1 -> e1 ... }
+                                       --   (and in this case the MatchGroup will
+                                       --    have all singleton patterns)
+                                       --   Nothing for a function definition
+                                       --      f p1 q1 = ...  -- No "scrutinee"
+                                       --      f p2 q2 = ...  -- in this case
   -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
   -> DsM ([Id], CoreExpr)              -- ^ Results (usually passed to 'match')
 
@@ -730,25 +736,30 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
 
         ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
 
-        -- pattern match check warnings
-        ; unless (isGenerated origin) $
-          when (isAnyPmCheckEnabled dflags (DsMatchContext ctxt locn)) $
-          addTmCsDs (genCaseTmCs1 mb_scr new_vars) $
-              -- See Note [Type and Term Equality Propagation]
-          checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
+        -- Pattern match check warnings for /this match-group/
+        ; when (isMatchContextPmChecked dflags origin ctxt) $
+            addScrutTmCs mb_scr new_vars $
+            -- See Note [Type and Term Equality Propagation]
+            checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
         ; return (new_vars, result_expr) }
   where
+    -- Called once per equation in the match, or alternative in the case
     mk_eqn_info vars (dL->L _ (Match { m_pats = pats, m_grhss = grhss }))
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
                  dicts = collectEvVarsPats upats
-           ; tm_cs <- genCaseTmCs2 mb_scr upats vars
-           ; match_result <- addDictsDs dicts $ -- See Note [Type and Term Equality Propagation]
-                             addTmCsDs tm_cs  $ -- See Note [Type and Term Equality Propagation]
-                             dsGRHSs ctxt grhss rhs_ty
+
+           ; match_result <-
+              -- Extend the environment with knowledge about
+              -- the matches before desguaring the RHS
+              -- See Note [Type and Term Equality Propagation]
+              applyWhen (needToRunPmCheck dflags origin)
+                        (addTyCsDs dicts . addScrutTmCs mb_scr vars . addPatTmCs upats vars)
+                        (dsGRHSs ctxt grhss rhs_ty)
+
            ; return (EqnInfo { eqn_pats = upats
                              , eqn_orig = FromSource
                              , eqn_rhs = match_result }) }

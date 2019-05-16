@@ -1,3 +1,4 @@
+
 EmptyCase005.hs:24:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative: Patterns not matched: (Void3 _)

@@ -7,3 +7,7 @@ case (# 'b', GHC.Types.False #) of
 TH_repUnboxedTuples.hs:18:13: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In a case alternative: (# 'a', True #) -> ...
+
+TH_repUnboxedTuples.hs:18:13: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: (# _, _ #) -> ...
