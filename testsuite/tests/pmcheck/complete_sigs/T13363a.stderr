@@ -1,0 +1,7 @@
+
+testsuite/tests/pmcheck/complete_sigs/T13363a.hs:15:1: warning: [-Woverlapping-patterns]
+    Pattern match is redundant
+    In an equation for `catchAll': catchAll _ = ...
+   |
+14 | catchAll _               = error "impossible"
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
