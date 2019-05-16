@@ -297,10 +297,19 @@ def baseline_commit_log(commit):
     global _baseline_depth_commit_log
     commit = commit_hash(commit)
     if not commit in _baseline_depth_commit_log:
-        _baseline_depth_commit_log[commit] = \
-            subprocess.check_output(['git', 'log', '--format=%H', \
-                             '-n' + str(BaselineSearchDepth)]) \
-                .decode().split('\n')
+        n = BaselineSearchDepth
+        output = subprocess.check_output(['git', 'log', '--format=%H', '-n' + str(n), commit]).decode()
+        hashes = list(filter(is_commit_hash, output.split('\n')))
+
+        # We only got 10 results (expecting 75) in a CI pipeline (issue #16662).
+        # It's unclear from the logs what went wrong. Since no exception was
+        # thrown, we can assume the `git log` call above succeeded. The best we
+        # can do for now is improve logging.
+        actualN = len(hashes)
+        if actualN != n:
+            print("Expected " + str(n) + " hashes, but git gave " + str(actualN) + ":\n" + output)
+        _baseline_depth_commit_log[commit] = hashes
+
     return _baseline_depth_commit_log[commit]
 
 # Cache of baseline values. This is a dict of dicts indexed on:
@@ -397,7 +406,9 @@ def baseline_metric(commit, name, test_env, metric, way):
     # Searches through previous commits trying local then ci for each commit in.
     def search(useCiNamespace, depth):
         # Stop if reached the max search depth.
-        if depth >= BaselineSearchDepth:
+        # We use len(commit_hashes) instead of BaselineSearchDepth incase
+        # baseline_commit_log() returned fewer than BaselineSearchDepth hashes.
+        if depth >= len(commit_hashes):
             return None
 
         # Check for a metric on this commit.
