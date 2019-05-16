@@ -1,20 +1,5 @@
 module PmExprVars where
 
--- | Demonstrates why we can't lower constructors as flexible meta variables.
--- If we did, we'd get a warning that cases 1 and 2 were redundant, implying
--- cases 0 and 3 are not. Arguably this might be better than not warning at
--- all, but it's very surprising having to supply the third case but not the
--- first two cases. And it's probably buggy somwhere else. Delete this when we
--- detect that all but the last case is redundant.
-consAreRigid :: Int
-consAreRigid = case False of
-  False -> case False of
-    False -> 0
-    True -> 1
-  True -> case False of
-    False -> 2
-    True -> 3
-
 data D a = A | B
 
 class C a where

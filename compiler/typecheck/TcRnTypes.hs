@@ -167,7 +167,7 @@ import TcType
 import Annotations
 import InstEnv
 import FamInstEnv
-import PmExpr
+import {-# SOURCE #-} PmOracle (Delta)
 import IOEnv
 import RdrName
 import Name
@@ -390,10 +390,9 @@ data DsLclEnv = DsLclEnv {
         dsl_loc     :: RealSrcSpan,      -- To put in pattern-matching error msgs
 
         -- See Note [Note [Type and Term Equality Propagation] in Check.hs
-        -- These two fields are augmented as we walk inwards,
-        -- through each patttern match in turn
-        dsl_dicts   :: Bag EvVar,     -- Constraints from GADT pattern-matching
-        dsl_tm_cs   :: Bag TmVarCt,      -- Constraints form term-level pattern matching
+        -- The oracle state Delta is augmented as we walk inwards,
+        -- through each pattern match in turn
+        dsl_delta   :: Delta,
 
         dsl_pm_iter :: IORef Int  -- Number of iterations for pmcheck so far
                                   -- We fail if this gets too big

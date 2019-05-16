@@ -13,7 +13,7 @@ test('unboxed-wrapper', normal, compile_and_run, [''])
 test('records-run', normal, compile_and_run, [''])
 test('ghci', just_ghci, ghci_script, ['ghci.script'])
 test('T11985', just_ghci, ghci_script, ['T11985.script'])
-test('T11224', normal, compile_and_run, [''])
+test('T11224', normal, compile_and_run, ['-Wincomplete-patterns -Woverlapping-patterns'])
 # we omit profasm/profthreaded because it doesn't bring much to the table but
 # introduces its share of complexity, as the test as it is fails with
 # profasm:
