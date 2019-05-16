@@ -764,6 +764,7 @@ static MarkQueueEnt markQueuePop (MarkQueue *q)
         // MarkQueueEnt encoding always places the pointer to the object to be
         // marked first.
         prefetchForRead(&new.mark_closure.p->header.info);
+        prefetchForRead(&nonmovingGetSegment_unchecked((StgPtr) new.mark_closure.p)->block_size);
         q->prefetch_queue[i] = new;
         i = (i + 1) % MARK_PREFETCH_QUEUE_DEPTH;
     }
