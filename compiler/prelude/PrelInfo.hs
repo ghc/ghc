@@ -71,6 +71,7 @@ import TyCon
 import UniqFM
 import Util
 import TcTypeNats ( typeNatTyCons )
+import Platform
 
 import Control.Applicative ((<|>))
 import Data.List        ( intercalate )
@@ -108,8 +109,8 @@ Note [About wired-in things]
 -- | This list is used to ensure that when you say "Prelude.map" in your source
 -- code, or in an interface file, you get a Name with the correct known key (See
 -- Note [Known-key names] in PrelNames)
-knownKeyNames :: [Name]
-knownKeyNames
+knownKeyNames :: Platform -> [Name]
+knownKeyNames platform
   | debugIsOn
   , Just badNamesStr <- knownKeyNamesOkay all_names
   = panic ("badAllKnownKeyNames:\n" ++ badNamesStr)
@@ -130,7 +131,7 @@ knownKeyNames
              , concatMap wired_tycon_kk_names typeNatTyCons
 
              , map idName wiredInIds
-             , map (idName . primOpId) allThePrimOps
+             , map (idName . primOpId platform) $ allThePrimOps platform
              , basicKnownKeyNames
              , templateHaskellNames
              ]
@@ -188,17 +189,17 @@ knownKeyNamesOkay all_names
 
 -- | Given a 'Unique' lookup its associated 'Name' if it corresponds to a
 -- known-key thing.
-lookupKnownKeyName :: Unique -> Maybe Name
-lookupKnownKeyName u =
-    knownUniqueName u <|> lookupUFM knownKeysMap u
+lookupKnownKeyName :: Platform -> Unique -> Maybe Name
+lookupKnownKeyName platform u =
+    knownUniqueName u <|> lookupUFM (knownKeysMap platform) u
 
 -- | Is a 'Name' known-key?
-isKnownKeyName :: Name -> Bool
-isKnownKeyName n =
-    isJust (knownUniqueName $ nameUnique n) || elemUFM n knownKeysMap
+isKnownKeyName :: Platform -> Name -> Bool
+isKnownKeyName platform n =
+    isJust (knownUniqueName $ nameUnique n) || elemUFM n (knownKeysMap platform)
 
-knownKeysMap :: UniqFM Name
-knownKeysMap = listToUFM [ (nameUnique n, n) | n <- knownKeyNames ]
+knownKeysMap :: Platform -> UniqFM Name
+knownKeysMap platform = listToUFM [ (nameUnique n, n) | n <- knownKeyNames platform ]
 
 -- | Given a 'Unique' lookup any associated arbitrary SDoc's to be displayed by
 -- GHCi's ':info' command.
@@ -228,13 +229,14 @@ sense of them in interface pragmas. It's cool, though they all have
 ************************************************************************
 -}
 
-primOpIds :: Array Int Id
+primOpIds :: Platform -> Array Int Id
 -- A cache of the PrimOp Ids, indexed by PrimOp tag
-primOpIds = array (1,maxPrimOpTag) [ (primOpTag op, mkPrimOpId op)
-                                   | op <- allThePrimOps ]
+primOpIds platform = array (1, maxPrimOpTag)
+    [ (primOpTag op, mkPrimOpId platform op)
+    | op <- allThePrimOps platform ]
 
-primOpId :: PrimOp -> Id
-primOpId op = primOpIds ! primOpTag op
+primOpId :: Platform -> PrimOp -> Id
+primOpId platform op = primOpIds platform ! primOpTag op
 
 {-
 ************************************************************************
@@ -247,10 +249,10 @@ GHC.Prim "exports" all the primops and primitive types, some
 wired-in Ids.
 -}
 
-ghcPrimExports :: [IfaceExport]
-ghcPrimExports
+ghcPrimExports :: Platform -> [IfaceExport]
+ghcPrimExports platform
  = map (avail . idName) ghcPrimIds ++
-   map (avail . idName . primOpId) allThePrimOps ++
+   map (avail . idName . primOpId platform) (allThePrimOps platform) ++
    [ AvailTC n [n] []
    | tc <- funTyCon : exposedPrimTyCons, let n = tyConName tc  ]
 
