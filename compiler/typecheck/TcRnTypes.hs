@@ -167,7 +167,7 @@ import TcType
 import Annotations
 import InstEnv
 import FamInstEnv
-import PmExpr
+import {-# SOURCE #-} PmExpr (TmVarCt)
 import IOEnv
 import RdrName
 import Name
