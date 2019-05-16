@@ -9,14 +9,15 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module PmExpr (
-        PmExpr(..), PmLit(..), PmAltCon(..), TmEq,
-        eqPmLit, isNotPmExprOther, lhsExprToPmExpr, hsExprToPmExpr
+        PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..), isNotPmExprOther,
+        lhsExprToPmExpr, hsExprToPmExpr, mkPmExprLit, pmExprAsList
     ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
+import Util
 import BasicTypes (SourceText)
 import FastString (FastString, unpackFS)
 import HsSyn
@@ -53,34 +54,29 @@ refer to variables that are otherwise substituted away.
 
 -- | Lifted expressions for pattern match checking.
 data PmExpr = PmExprVar   Name
-            | PmExprCon   ConLike [PmExpr]
-            | PmExprLit   PmLit
+            | PmExprCon   PmAltCon [PmExpr]
             | PmExprOther (HsExpr GhcTc)  -- Note [PmExprOther in PmExpr]
 
-
-mkPmExprData :: DataCon -> [PmExpr] -> PmExpr
-mkPmExprData dc args = PmExprCon (RealDataCon dc) args
-
 -- | Literals (simple and overloaded ones) for pattern match checking.
+--
+-- See Note [Undecidable Equality for Overloaded Literals]
 data PmLit = PmSLit (HsLit GhcTc)                               -- simple
            | PmOLit Bool {- is it negated? -} (HsOverLit GhcTc) -- overloaded
+           deriving Eq
 
--- | Equality between literals for pattern match checking.
-eqPmLit :: PmLit -> PmLit -> Bool
-eqPmLit (PmSLit    l1) (PmSLit    l2) = l1 == l2
-eqPmLit (PmOLit b1 l1) (PmOLit b2 l2) = b1 == b2 && l1 == l2
-  -- See Note [Undecidable Equality for Overloaded Literals]
-eqPmLit _              _              = False
-
--- | Represents a match against a literal. We mostly use it to to encode shapes
--- for a variable that immediately lead to a refutation.
+-- | Represents a match against a 'ConLike' or literal. We mostly use it to
+-- to encode shapes for a variable that immediately lead to a refutation.
 --
 -- See Note [Refutable shapes] in TmOracle. Really similar to 'CoreSyn.AltCon'.
-newtype PmAltCon = PmAltLit PmLit
-  deriving Outputable
+data PmAltCon = PmAltConLike ConLike
+              | PmAltLit     PmLit
+              deriving Eq
 
-instance Eq PmAltCon where
-  PmAltLit l1 == PmAltLit l2 = eqPmLit l1 l2
+mkPmExprData :: DataCon -> [PmExpr] -> PmExpr
+mkPmExprData dc args = PmExprCon (PmAltConLike (RealDataCon dc)) args
+
+mkPmExprLit :: PmLit -> PmExpr
+mkPmExprLit l = PmExprCon (PmAltLit l) []
 
 {- Note [Undecidable Equality for Overloaded Literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -148,8 +144,11 @@ impact of this is the following:
        appearance of the warnings and is, in practice safe.
 -}
 
--- | Term equalities
-type TmEq  = (Id, PmExpr)
+-- | A term constraint. @TVC x e@ encodes that @x@ is equal to @e@.
+data TmVarCt = TVC !Id !PmExpr
+
+instance Outputable TmVarCt where
+  ppr (TVC x e) = ppr x <+> char '~' <+> ppr e
 
 -- ----------------------------------------------------------------------------
 -- ** Predicates on PmExpr
@@ -189,17 +188,17 @@ hsExprToPmExpr (HsVar        _ x) = PmExprVar (idName (unLoc x))
 hsExprToPmExpr (HsOverLit _ olit)
   | OverLit (OverLitTc False ty) (HsIsString src s) _ <- olit, isStringTy ty
   = stringExprToList src s
-  | otherwise = PmExprLit (PmOLit False olit)
+  | otherwise = PmExprCon (PmAltLit (PmOLit False olit)) []
 hsExprToPmExpr (HsLit     _ lit)
   | HsString src s <- lit
   = stringExprToList src s
-  | otherwise = PmExprLit (PmSLit lit)
+  | otherwise = PmExprCon (PmAltLit (PmSLit lit)) []
 
 hsExprToPmExpr e@(NegApp _ (dL->L _ neg_expr) _)
-  | PmExprLit (PmOLit False olit) <- hsExprToPmExpr neg_expr
+  | PmExprCon (PmAltLit (PmOLit False olit)) _ <- hsExprToPmExpr neg_expr
     -- NB: DON'T simply @(NegApp (NegApp olit))@ as @x@. when extension
     -- @RebindableSyntax@ enabled, (-(-x)) may not equals to x.
-  = PmExprLit (PmOLit True olit)
+  = PmExprCon (PmAltLit (PmOLit False olit)) []
   | otherwise = PmExprOther e
 
 hsExprToPmExpr (HsPar _ (dL->L _ e)) = hsExprToPmExpr e
@@ -246,7 +245,22 @@ stringExprToList src s = foldr cons nil (map charToPmExpr (unpackFS s))
   where
     cons x xs      = mkPmExprData consDataCon [x,xs]
     nil            = mkPmExprData nilDataCon  []
-    charToPmExpr c = PmExprLit (PmSLit (HsChar src c))
+    charToPmExpr c = PmExprCon (PmAltLit (PmSLit (HsChar src c))) []
+
+-- | Return @Just@ a 'DataCon' application or @Nothing@, otherwise.
+pmExprToDataConApp :: PmExpr -> Maybe (DataCon, [PmExpr])
+pmExprToDataConApp (PmExprCon (PmAltConLike (RealDataCon c)) es) = Just (c, es)
+pmExprToDataConApp _                                             = Nothing
+
+-- | Extract a list of 'PmExpr's out of a sequence of cons cells.
+pmExprAsList :: PmExpr -> Maybe [PmExpr]
+pmExprAsList (pmExprToDataConApp -> Just (c, es))
+  | c == nilDataCon
+  = ASSERT( null es ) Just []
+  | c == consDataCon
+  = ASSERT( length es == 2 ) (es !! 0 :) <$> pmExprAsList (es !! 1)
+pmExprAsList _
+  = Nothing
 
 {-
 %************************************************************************
@@ -260,18 +274,18 @@ instance Outputable PmLit where
   ppr (PmSLit     l) = pmPprHsLit l
   ppr (PmOLit neg l) = (if neg then char '-' else empty) <> ppr l
 
+instance Outputable PmAltCon where
+  ppr (PmAltConLike cl) = ppr cl
+  ppr (PmAltLit l)      = ppr l
+
 instance Outputable PmExpr where
   ppr = go (0 :: Int)
     where
-      go _    (PmExprLit l)       = ppr l
       go _    (PmExprVar v)       = ppr v
       go _    (PmExprOther e)     = angleBrackets (ppr e)
-      go _    (PmExprCon (RealDataCon dc) args)
-        | isTupleDataCon dc = parens $ comma_sep $ map ppr args
-        | dc == consDataCon = brackets $ comma_sep $ map ppr (list_cells args)
-        where
-          comma_sep = fsep . punctuate comma
-          list_cells (hd:tl) = hd : list_cells tl
-          list_cells _       = []
+      go _    (pmExprAsList -> Just list)
+        = brackets $ fsep $ punctuate comma $ map ppr list
+      go _    (pmExprToDataConApp -> Just (dc, args))
+        | isTupleDataCon dc = parens $ fsep $ punctuate comma $ map ppr args
       go prec (PmExprCon cl args)
-        = cparen (null args || prec > 0) (hcat (ppr cl:map (go 1) args))
+        = cparen (notNull args && prec > 0) (hsep (ppr cl:map (go 1) args))
