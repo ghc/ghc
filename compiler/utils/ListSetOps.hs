@@ -14,7 +14,7 @@ module ListSetOps (
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
 
         -- Duplicate handling
-        hasNoDups, removeDups, findDupsEq, insertNoDup,
+        hasNoDups, removeDups, findDupsEq,
         equivClasses,
 
         -- Indexing
@@ -178,10 +178,3 @@ findDupsEq _  [] = []
 findDupsEq eq (x:xs) | null eq_xs  = findDupsEq eq xs
                      | otherwise   = (x :| eq_xs) : findDupsEq eq neq_xs
     where (eq_xs, neq_xs) = partition (eq x) xs
-
--- | \( O(n) \). @'insertNoDup' x xs@ treats @xs@ as a set, inserting @x@ only
--- when an equal element couldn't be found in @xs@.
-insertNoDup :: (Eq a) => a -> [a] -> [a]
-insertNoDup x set
-  | elem x set = set
-  | otherwise  = x:set
