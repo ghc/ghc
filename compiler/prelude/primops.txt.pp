@@ -147,8 +147,8 @@ section "The word size story."
 
 -- Define synonyms for indexing ops.
 
-#define INT32 Int#
-#define WORD32 Word#
+$INT32 = Int#
+$WORD32 = Word#
 
 #if WORD_SIZE_IN_BITS < 64
 #define INT64 Int64#
