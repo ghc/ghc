@@ -336,7 +336,7 @@ Library
         PprCore
         PmExpr
         PmPpr
-        TmOracle
+        PmOracle
         Check
         Coverage
         Desugar
@@ -572,7 +572,6 @@ Library
         IOEnv
         Json
         ListSetOps
-        ListT
         Maybes
         MonadUtils
         OrdList
