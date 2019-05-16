@@ -1,0 +1,4 @@
+
+completesig01.hs:20:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘b’: b C = ...

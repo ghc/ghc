@@ -3,6 +3,4 @@
 T8101b.hs:7:9: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns not matched:
-            B
-            C
+        Patterns not matched: p where p is not one of {A}
