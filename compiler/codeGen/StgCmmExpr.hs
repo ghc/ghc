@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -36,6 +37,7 @@ import Cmm
 import CmmInfo
 import CoreSyn
 import DataCon
+import DynFlags (targetPlatform)
 import ForeignCall
 import Id
 import PrimOp
@@ -501,8 +503,13 @@ cgCase scrut bndr alt_type alts
        ; up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
              alt_regs  = map (idToReg dflags) ret_bndrs
+             platform = targetPlatform dflags
+             is_cmp_op = \case
+                 (StgOpApp (StgPrimOp op) _ _) -> isComparisonPrimOp platform op
+                 _ -> False
+
        ; simple_scrut <- isSimpleScrut scrut alt_type
-       ; let do_gc  | is_cmp_op scrut  = False  -- See Note [GC for conditionals]
+       ; let do_gc  | is_cmp_op scrut  = False -- See Note [GC for conditionals]
                     | not simple_scrut = True
                     | isSingleton alts = False
                     | up_hp_usg > 0    = False
@@ -519,8 +526,6 @@ cgCase scrut bndr alt_type alts
        ; cgAlts (gc_plan,ret_kind) (NonVoid bndr) alt_type alts
        }
   where
-    is_cmp_op (StgOpApp (StgPrimOp op) _ _) = isComparisonPrimOp op
-    is_cmp_op _                             = False
 
 {- Note [GC for conditionals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -62,8 +62,8 @@
 -- 3-tuple in the list of 3-tuples. That is, the vector attribute allows us to
 -- define a family of types or primops. Vector support also adds three new
 -- keywords: VECTOR, SCALAR, and VECTUPLE. These keywords are expanded to types
--- derived from the 3-tuple. For the 3-tuple <Int64,INT64,2>, VECTOR expands to
--- Int64X2#, SCALAR expands to INT64, and VECTUPLE expands to (# INT64, INT64
+-- derived from the 3-tuple. For the 3-tuple <Int64,$INT64,2>, VECTOR expands to
+-- Int64X2#, SCALAR expands to $INT64, and VECTUPLE expands to (# $INT64, $INT64
 -- #).
 
 defaults
@@ -81,11 +81,6 @@ defaults
 -- Currently, documentation is produced using latex, so contents of
 -- description fields should be legal latex. Descriptions can contain
 -- matched pairs of embedded curly brackets.
-
-#include "MachDeps.h"
-
--- We need platform defines (tests for mingw32 below).
-#include "ghc_boot_platform.h"
 
 section "The word size story."
         {Haskell98 specifies that signed integers (type {\tt Int})
@@ -147,16 +142,18 @@ section "The word size story."
 
 -- Define synonyms for indexing ops.
 
-#define INT32 Int#
-#define WORD32 Word#
+$let INT32 = [| Int# |]
+$let WORD32 = [| Word# |]
 
-#if WORD_SIZE_IN_BITS < 64
-#define INT64 Int64#
-#define WORD64 Word64#
-#else
-#define INT64 Int#
-#define WORD64 Word#
-#endif
+$let INT64 =
+  if (WORD_SIZE_IN_BITS < 64)
+  then [| Int64# |]
+  else [| Int# |]
+
+$let WORD64 =
+  if (WORD_SIZE_IN_BITS < 64)
+  then [| Word64# |]
+  else [| Word# |]
 
 -- This type won't be exported directly (since there is no concrete
 -- syntax for this sort of export) so we'll have to manually patch
@@ -597,7 +594,7 @@ primop   PopCnt16Op   "popCnt16#"   Monadic   Word# -> Word#
     {Count the number of set bits in the lower 16 bits of a word.}
 primop   PopCnt32Op   "popCnt32#"   Monadic   Word# -> Word#
     {Count the number of set bits in the lower 32 bits of a word.}
-primop   PopCnt64Op   "popCnt64#"   GenPrimOp   WORD64 -> Word#
+primop   PopCnt64Op   "popCnt64#"   GenPrimOp   $WORD64 -> Word#
     {Count the number of set bits in a 64-bit word.}
 primop   PopCntOp   "popCnt#"   Monadic   Word# -> Word#
     {Count the number of set bits in a word.}
@@ -608,7 +605,7 @@ primop   Pdep16Op   "pdep16#"   Dyadic   Word# -> Word# -> Word#
     {Deposit bits to lower 16 bits of a word at locations specified by a mask.}
 primop   Pdep32Op   "pdep32#"   Dyadic   Word# -> Word# -> Word#
     {Deposit bits to lower 32 bits of a word at locations specified by a mask.}
-primop   Pdep64Op   "pdep64#"   GenPrimOp   WORD64 -> WORD64 -> WORD64
+primop   Pdep64Op   "pdep64#"   GenPrimOp   $WORD64 -> $WORD64 -> $WORD64
     {Deposit bits to a word at locations specified by a mask.}
 primop   PdepOp   "pdep#"   Dyadic   Word# -> Word# -> Word#
     {Deposit bits to a word at locations specified by a mask.}
@@ -619,7 +616,7 @@ primop   Pext16Op   "pext16#"   Dyadic   Word# -> Word# -> Word#
     {Extract bits from lower 16 bits of a word at locations specified by a mask.}
 primop   Pext32Op   "pext32#"   Dyadic   Word# -> Word# -> Word#
     {Extract bits from lower 32 bits of a word at locations specified by a mask.}
-primop   Pext64Op   "pext64#"   GenPrimOp   WORD64 -> WORD64 -> WORD64
+primop   Pext64Op   "pext64#"   GenPrimOp   $WORD64 -> $WORD64 -> $WORD64
     {Extract bits from a word at locations specified by a mask.}
 primop   PextOp   "pext#"   Dyadic   Word# -> Word# -> Word#
     {Extract bits from a word at locations specified by a mask.}
@@ -630,7 +627,7 @@ primop   Clz16Op   "clz16#" Monadic   Word# -> Word#
     {Count leading zeros in the lower 16 bits of a word.}
 primop   Clz32Op   "clz32#" Monadic   Word# -> Word#
     {Count leading zeros in the lower 32 bits of a word.}
-primop   Clz64Op   "clz64#" GenPrimOp WORD64 -> Word#
+primop   Clz64Op   "clz64#" GenPrimOp $WORD64 -> Word#
     {Count leading zeros in a 64-bit word.}
 primop   ClzOp     "clz#"   Monadic   Word# -> Word#
     {Count leading zeros in a word.}
@@ -641,7 +638,7 @@ primop   Ctz16Op   "ctz16#" Monadic   Word# -> Word#
     {Count trailing zeros in the lower 16 bits of a word.}
 primop   Ctz32Op   "ctz32#" Monadic   Word# -> Word#
     {Count trailing zeros in the lower 32 bits of a word.}
-primop   Ctz64Op   "ctz64#" GenPrimOp WORD64 -> Word#
+primop   Ctz64Op   "ctz64#" GenPrimOp $WORD64 -> Word#
     {Count trailing zeros in a 64-bit word.}
 primop   CtzOp     "ctz#"   Monadic   Word# -> Word#
     {Count trailing zeros in a word.}
@@ -650,7 +647,7 @@ primop   BSwap16Op   "byteSwap16#"   Monadic   Word# -> Word#
     {Swap bytes in the lower 16 bits of a word. The higher bytes are undefined. }
 primop   BSwap32Op   "byteSwap32#"   Monadic   Word# -> Word#
     {Swap bytes in the lower 32 bits of a word. The higher bytes are undefined. }
-primop   BSwap64Op   "byteSwap64#"   Monadic   WORD64 -> WORD64
+primop   BSwap64Op   "byteSwap64#"   Monadic   $WORD64 -> $WORD64
     {Swap bytes in a 64 bits of a word.}
 primop   BSwapOp     "byteSwap#"     Monadic   Word# -> Word#
     {Swap bytes in a word.}
@@ -661,7 +658,7 @@ primop   BRev16Op   "bitReverse16#"   Monadic   Word# -> Word#
     {Reverse the order of the bits in a 16-bit word.}
 primop   BRev32Op   "bitReverse32#"   Monadic   Word# -> Word#
     {Reverse the order of the bits in a 32-bit word.}
-primop   BRev64Op   "bitReverse64#"   Monadic   WORD64 -> WORD64
+primop   BRev64Op   "bitReverse64#"   Monadic   $WORD64 -> $WORD64
     {Reverse the order of the bits in a 64-bit word.}
 primop   BRevOp     "bitReverse#"     Monadic   Word# -> Word#
     {Reverse the order of the bits in a word.}
@@ -679,26 +676,25 @@ primop   Narrow16WordOp    "narrow16Word#"    Monadic   Word# -> Word#
 primop   Narrow32WordOp    "narrow32Word#"    Monadic   Word# -> Word#
 
 
-#if WORD_SIZE_IN_BITS < 64
-------------------------------------------------------------------------
-section "Int64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
+$guarded (WORD_SIZE_IN_BITS < 64)
+  ------------------------------------------------------------------------
+  section "Int64#"
+          {Operations on 64-bit unsigned words. This type is only used
+           if plain {\tt Int\#} has less than 64 bits. In any case, the operations
+           are not primops; they are implemented (if needed) as ccalls instead.}
+  ------------------------------------------------------------------------
 
-primtype Int64#
+  primtype Int64#
 
-------------------------------------------------------------------------
-section "Word64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
+  ------------------------------------------------------------------------
+  section "Word64#"
+          {Operations on 64-bit unsigned words. This type is only used
+           if plain {\tt Word\#} has less than 64 bits. In any case, the operations
+           are not primops; they are implemented (if needed) as ccalls instead.}
+  ------------------------------------------------------------------------
 
-primtype Word64#
-
-#endif
+  primtype Word64#
+$endGuarded
 
 ------------------------------------------------------------------------
 section "Double#"
@@ -851,7 +847,7 @@ primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp
    with out_of_line = True
 
 primop   DoubleDecode_Int64Op   "decodeDouble_Int64#" GenPrimOp
-   Double# -> (# INT64, Int# #)
+   Double# -> (# $INT64, Int# #)
    {Decode {\tt Double\#} into mantissa and base-2 exponent.}
    with out_of_line = True
 
@@ -1461,12 +1457,12 @@ primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
-   ByteArray# -> Int# -> INT32
+   ByteArray# -> Int# -> $INT32
    {Read 32-bit integer; offset in 32-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
-   ByteArray# -> Int# -> INT64
+   ByteArray# -> Int# -> $INT64
    {Read 64-bit integer; offset in 64-bit words.}
    with can_fail = True
 
@@ -1481,12 +1477,12 @@ primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
-   ByteArray# -> Int# -> WORD32
+   ByteArray# -> Int# -> $WORD32
    {Read 32-bit word; offset in 32-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
-   ByteArray# -> Int# -> WORD64
+   ByteArray# -> Int# -> $WORD64
    {Read 64-bit word; offset in 64-bit words.}
    with can_fail = True
 
@@ -1526,12 +1522,12 @@ primop IndexByteArrayOp_Word8AsInt16 "indexWord8ArrayAsInt16#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsInt32 "indexWord8ArrayAsInt32#" GenPrimOp
-   ByteArray# -> Int# -> INT32
+   ByteArray# -> Int# -> $INT32
    {Read 32-bit int; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsInt64 "indexWord8ArrayAsInt64#" GenPrimOp
-   ByteArray# -> Int# -> INT64
+   ByteArray# -> Int# -> $INT64
    {Read 64-bit int; offset in bytes.}
    with can_fail = True
 
@@ -1546,12 +1542,12 @@ primop IndexByteArrayOp_Word8AsWord16 "indexWord8ArrayAsWord16#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsWord32 "indexWord8ArrayAsWord32#" GenPrimOp
-   ByteArray# -> Int# -> WORD32
+   ByteArray# -> Int# -> $WORD32
    {Read 32-bit word; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsWord64 "indexWord8ArrayAsWord64#" GenPrimOp
-   ByteArray# -> Int# -> WORD64
+   ByteArray# -> Int# -> $WORD64
    {Read 64-bit word; offset in bytes.}
    with can_fail = True
 
@@ -1615,12 +1611,12 @@ primop  ReadByteArrayOp_Int16 "readInt16Array#" GenPrimOp
         can_fail = True
 
 primop  ReadByteArrayOp_Int32 "readInt32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, $INT32 #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Int64 "readInt64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, $INT64 #)
    with has_side_effects = True
         can_fail = True
 
@@ -1635,12 +1631,12 @@ primop  ReadByteArrayOp_Word16 "readWord16Array#" GenPrimOp
         can_fail = True
 
 primop  ReadByteArrayOp_Word32 "readWord32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, $WORD32 #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word64 "readWord64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, $WORD64 #)
    with has_side_effects = True
         can_fail = True
 
@@ -1680,12 +1676,12 @@ primop  ReadByteArrayOp_Word8AsInt16 "readWord8ArrayAsInt16#" GenPrimOp
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsInt32 "readWord8ArrayAsInt32#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, $INT32 #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsInt64 "readWord8ArrayAsInt64#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, $INT64 #)
    with has_side_effects = True
         can_fail = True
 
@@ -1700,12 +1696,12 @@ primop  ReadByteArrayOp_Word8AsWord16 "readWord8ArrayAsWord16#" GenPrimOp
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsWord32 "readWord8ArrayAsWord32#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, $WORD32 #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsWord64 "readWord8ArrayAsWord64#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, $WORD64 #)
    with has_side_effects = True
         can_fail = True
 
@@ -1767,12 +1763,12 @@ primop  WriteByteArrayOp_Int16 "writeInt16Array#" GenPrimOp
         can_fail = True
 
 primop  WriteByteArrayOp_Int32 "writeInt32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT32 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> $INT32 -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Int64 "writeInt64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT64 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> $INT64 -> State# s -> State# s
    with can_fail = True
         has_side_effects = True
 
@@ -1787,12 +1783,12 @@ primop  WriteByteArrayOp_Word16 "writeWord16Array#" GenPrimOp
         can_fail = True
 
 primop  WriteByteArrayOp_Word32 "writeWord32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD32 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> $WORD32 -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> $WORD64 -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
@@ -1832,12 +1828,12 @@ primop  WriteByteArrayOp_Word8AsInt16 "writeWord8ArrayAsInt16#" GenPrimOp
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsInt32 "writeWord8ArrayAsInt32#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT32 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> $INT32 -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsInt64 "writeWord8ArrayAsInt64#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT64 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> $INT64 -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
@@ -1852,12 +1848,12 @@ primop  WriteByteArrayOp_Word8AsWord16 "writeWord8ArrayAsWord16#" GenPrimOp
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsWord32 "writeWord8ArrayAsWord32#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD32 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> $WORD32 -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsWord64 "writeWord8ArrayAsWord64#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> $WORD64 -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
@@ -2153,16 +2149,17 @@ primop   AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
 primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
          {Return the remainder when the {\tt Addr\#} arg, treated like an {\tt Int\#},
           is divided by the {\tt Int\#} arg.}
-#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
-primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
-        {Coerce directly from address to int.}
-   with code_size = 0
-        deprecated_msg = { This operation is strongly deprecated. }
-primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
-        {Coerce directly from int to address.}
-   with code_size = 0
-        deprecated_msg = { This operation is strongly deprecated. }
-#endif
+
+$guarded ((WORD_SIZE_IN_BITS == 32) || (WORD_SIZE_IN_BITS == 64))
+  primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
+          {Coerce directly from address to int.}
+     with code_size = 0
+          deprecated_msg = { This operation is strongly deprecated. }
+  primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
+          {Coerce directly from int to address.}
+     with code_size = 0
+          deprecated_msg = { This operation is strongly deprecated. }
+$endGuarded
 
 primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Int#
 primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Int#
@@ -2214,11 +2211,11 @@ primop IndexOffAddrOp_Int16 "indexInt16OffAddr#" GenPrimOp
    with can_fail = True
 
 primop IndexOffAddrOp_Int32 "indexInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT32
+   Addr# -> Int# -> $INT32
    with can_fail = True
 
 primop IndexOffAddrOp_Int64 "indexInt64OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT64
+   Addr# -> Int# -> $INT64
    with can_fail = True
 
 primop IndexOffAddrOp_Word8 "indexWord8OffAddr#" GenPrimOp
@@ -2230,11 +2227,11 @@ primop IndexOffAddrOp_Word16 "indexWord16OffAddr#" GenPrimOp
    with can_fail = True
 
 primop IndexOffAddrOp_Word32 "indexWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD32
+   Addr# -> Int# -> $WORD32
    with can_fail = True
 
 primop IndexOffAddrOp_Word64 "indexWord64OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD64
+   Addr# -> Int# -> $WORD64
    with can_fail = True
 
 primop ReadOffAddrOp_Char "readCharOffAddr#" GenPrimOp
@@ -2290,12 +2287,12 @@ primop ReadOffAddrOp_Int16 "readInt16OffAddr#" GenPrimOp
         can_fail         = True
 
 primop ReadOffAddrOp_Int32 "readInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, INT32 #)
+   Addr# -> Int# -> State# s -> (# State# s, $INT32 #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Int64 "readInt64OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, INT64 #)
+   Addr# -> Int# -> State# s -> (# State# s, $INT64 #)
    with has_side_effects = True
         can_fail         = True
 
@@ -2310,12 +2307,12 @@ primop ReadOffAddrOp_Word16 "readWord16OffAddr#" GenPrimOp
         can_fail         = True
 
 primop ReadOffAddrOp_Word32 "readWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, WORD32 #)
+   Addr# -> Int# -> State# s -> (# State# s, $WORD32 #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Word64 "readWord64OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, WORD64 #)
+   Addr# -> Int# -> State# s -> (# State# s, $WORD64 #)
    with has_side_effects = True
         can_fail         = True
 
@@ -2370,12 +2367,12 @@ primop  WriteOffAddrOp_Int16 "writeInt16OffAddr#" GenPrimOp
         can_fail         = True
 
 primop  WriteOffAddrOp_Int32 "writeInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT32 -> State# s -> State# s
+   Addr# -> Int# -> $INT32 -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Int64 "writeInt64OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT64 -> State# s -> State# s
+   Addr# -> Int# -> $INT64 -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
@@ -2390,12 +2387,12 @@ primop  WriteOffAddrOp_Word16 "writeWord16OffAddr#" GenPrimOp
         can_fail         = True
 
 primop  WriteOffAddrOp_Word32 "writeWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD32 -> State# s -> State# s
+   Addr# -> Int# -> $WORD32 -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD64 -> State# s -> State# s
+   Addr# -> Int# -> $WORD64 -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
@@ -2777,29 +2774,28 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-#if defined(mingw32_TARGET_OS)
-primop  AsyncReadOp "asyncRead#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously read bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
+$guarded (OS == "mingw32")
+  primop  AsyncReadOp "asyncRead#" GenPrimOp
+     Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+     {Asynchronously read bytes from specified file descriptor.}
+     with
+     has_side_effects = True
+     out_of_line      = True
 
-primop  AsyncWriteOp "asyncWrite#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously write bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
+  primop  AsyncWriteOp "asyncWrite#" GenPrimOp
+     Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+     {Asynchronously write bytes from specified file descriptor.}
+     with
+     has_side_effects = True
+     out_of_line      = True
 
-primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
-   Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously perform procedure (first arg), passing it 2nd arg.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-#endif
+  primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
+     Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+     {Asynchronously perform procedure (first arg), passing it 2nd arg.}
+     with
+     has_side_effects = True
+     out_of_line      = True
+$endGuarded
 
 ------------------------------------------------------------------------
 section "Concurrency primitives"
@@ -3377,14 +3373,14 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
    out_of_line      = True
 
 primop  GetThreadAllocationCounter "getThreadAllocationCounter#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, INT64 #)
+   State# RealWorld -> (# State# RealWorld, $INT64 #)
    { Retrieves the allocation counter for the current thread. }
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
-   INT64 -> State# RealWorld -> State# RealWorld
+   $INT64 -> State# RealWorld -> State# RealWorld
    { Sets the allocation counter for the current thread to the given value. }
    with
    has_side_effects = True
@@ -3410,20 +3406,20 @@ section "SIMD Vectors"
 ------------------------------------------------------------------------
 
 #define ALL_VECTOR_TYPES \
-  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
-  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
-  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
-  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,WORD32,4>,<Word64,WORD64,2> \
-  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,WORD32,8>,<Word64,WORD64,4> \
-  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,WORD32,16>,<Word64,WORD64,8> \
+  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,$INT32,4>,<Int64,$INT64,2> \
+  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,$INT32,8>,<Int64,$INT64,4> \
+  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,$INT32,16>,<Int64,$INT64,8> \
+  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,$WORD32,4>,<Word64,$WORD64,2> \
+  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,$WORD32,8>,<Word64,$WORD64,4> \
+  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,$WORD32,16>,<Word64,$WORD64,8> \
   ,<Float,Float#,4>,<Double,Double#,2> \
   ,<Float,Float#,8>,<Double,Double#,4> \
   ,<Float,Float#,16>,<Double,Double#,8>]
 
 #define SIGNED_VECTOR_TYPES \
-  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
-  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
-  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
+  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,$INT32,4>,<Int64,$INT64,2> \
+  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,$INT32,8>,<Int64,$INT64,4> \
+  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,$INT32,16>,<Int64,$INT64,8> \
   ,<Float,Float#,4>,<Double,Double#,2> \
   ,<Float,Float#,8>,<Double,Double#,4> \
   ,<Float,Float#,16>,<Double,Double#,8>]
@@ -3434,12 +3430,12 @@ section "SIMD Vectors"
   ,<Float,Float#,16>,<Double,Double#,8>]
 
 #define INT_VECTOR_TYPES \
-  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
-  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
-  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
-  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,WORD32,4>,<Word64,WORD64,2> \
-  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,WORD32,8>,<Word64,WORD64,4> \
-  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,WORD32,16>,<Word64,WORD64,8>]
+  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,$INT32,4>,<Int64,$INT64,2> \
+  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,$INT32,8>,<Int64,$INT64,4> \
+  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,$INT32,16>,<Int64,$INT64,8> \
+  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,$WORD32,4>,<Word64,$WORD64,2> \
+  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,$WORD32,8>,<Word64,$WORD64,4> \
+  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,$WORD32,16>,<Word64,$WORD64,8>]
 
 primtype VECTOR
    with llvm_only = True
