@@ -72,15 +72,21 @@ eqPmLit (PmOLit b1 l1) (PmOLit b2 l2) = b1 == b2 && l1 == l2
   -- See Note [Undecidable Equality for Overloaded Literals]
 eqPmLit _              _              = False
 
--- | Represents a match against a literal. We mostly use it to to encode shapes
--- for a variable that immediately lead to a refutation.
+-- | Represents a match against a 'ConLike' or literal. We mostly use it to
+-- to encode shapes for a variable that immediately lead to a refutation.
 --
 -- See Note [Refutable shapes] in TmOracle. Really similar to 'CoreSyn.AltCon'.
-newtype PmAltCon = PmAltLit PmLit
-  deriving Outputable
+data PmAltCon = PmAltConLike ConLike
+              | PmAltLit     PmLit
 
 instance Eq PmAltCon where
-  PmAltLit l1 == PmAltLit l2 = eqPmLit l1 l2
+  PmAltConLike cl1 == PmAltConLike cl2 = cl1 == cl2
+  PmAltLit l1      == PmAltLit l2      = eqPmLit l1 l2
+  _                == _                = False
+
+instance Outputable PmAltCon where
+  ppr (PmAltConLike cl) = ppr cl
+  ppr (PmAltLit l)      = ppr l
 
 {- Note [Undecidable Equality for Overloaded Literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

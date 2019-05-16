@@ -33,6 +33,9 @@ import PmExpr
 import Util
 import Id
 import Name
+import NameEnv
+import UniqFM
+import UniqDFM
 import Type
 import HsLit
 import TcHsSyn
@@ -43,6 +46,7 @@ import Outputable
 import NameEnv
 import UniqFM
 import UniqDFM
+import Data.Bifunctor (second)
 
 {-
 %************************************************************************
@@ -58,12 +62,14 @@ type PmVarEnv = NameEnv PmExpr
 -- | An environment assigning shapes to variables that immediately lead to a
 -- refutation. So, if this maps @x :-> [Just]@, then trying to solve a
 -- 'TmEq' like @x ~ Just False@ immediately leads to a contradiction.
+-- Additionally, this stores the 'Type' from which to draw 'ConLike's from.
+--
 -- Determinism is important since we use this for warning messages in
 -- 'PmPpr.pprUncovered'. We don't do the same for 'PmVarEnv', so that is a plain
 -- 'NameEnv'.
 --
 -- See also Note [Refutable shapes] in TmOracle.
-type PmRefutEnv = DNameEnv [PmAltCon]
+type PmRefutEnv = DNameEnv (Type, [PmAltCon])
 
 -- | The state of the term oracle. Tracks all term-level facts of the form "x is
 -- @True@" ('tm_pos') and "x is not @5@" ('tm_neg').
@@ -80,10 +86,16 @@ data TmState = TmS
   -- update the solution for @x@ in a union-find-like fashion.
   , tm_neg     :: !PmRefutEnv
   -- ^ Maps each variable @x@ to a list of 'PmAltCon's that @x@ definitely
-  -- cannot match. Example, @x :-> [3, 4]@ means that @x@ cannot match a literal
-  -- 3 or 4. Should we later solve @x@ to a variable @y@
-  -- ('extendSubstAndSolve'), we merge the refutable shapes of @x@ into those of
-  -- @y@. See also Note [The Pos/Neg invariant].
+  -- cannot match. Example, assuming
+  --
+  -- @
+  --     data T = Leaf Int | Branch T T | Node Int T
+  -- @
+  --
+  -- then @x :-> [Leaf, Node]@ means that @x@ cannot match a @Leaf@ or @Node@,
+  -- and hence can only match @Branch@. Should we later solve @x@ to a variable
+  -- @y@ ('extendSubstAndSolve'), we merge the refutable shapes of @x@ into
+  -- those of @y@. See also Note [The Pos/Neg invariant].
   }
 
 {- Note [The Pos/Neg invariant]
@@ -144,8 +156,10 @@ canDiverge x TmS{ tm_pos = pos, tm_neg = neg }
 -- | Check whether the equality @x ~ e@ leads to a refutation. Make sure that
 -- @x@ and @e@ are completely substituted before!
 isRefutable :: Name -> PmExpr -> PmRefutEnv -> Bool
-isRefutable x e env
-  = fromMaybe False $ elem <$> exprToAlt e <*> lookupDNameEnv env x
+isRefutable x e env = fromMaybe False $ do
+  alt <- exprToAlt e
+  (_, nalts) <- lookupDNameEnv env x
+  pure (elem alt nalts)
 
 -- | Solve an equality (top-level).
 solveOneEq :: TmState -> TmEq -> Maybe TmState
@@ -168,20 +182,14 @@ addSolveRefutableAltCon original@TmS{ tm_pos = pos, tm_neg = neg } x nalt
   where                                --     refutation redundant
     (y, e) = varDeepLookup pos (idName x)
     extended = original { tm_neg = neg' }
-    neg' = alterDNameEnv (delNulls (insertNoDup nalt)) neg y
-
--- | When updating 'tm_neg', we want to delete any 'null' entries. This adapter
--- intends to provide a suitable interface for 'alterDNameEnv'.
-delNulls :: ([a] -> [a]) -> Maybe [a] -> Maybe [a]
-delNulls f mb_entry
-  | ret@(_:_) <- f (fromMaybe [] mb_entry) = Just ret
-  | otherwise                              = Nothing
+    neg' = alterDNameEnv alter_f neg y
+    alter_f = Just . second (insertNoDup nalt) . fromMaybe (idType x, [])
 
 -- | Return all 'PmAltCon' shapes that are impossible for 'Id' to take, i.e.
 -- would immediately lead to a refutation by the term oracle.
-lookupRefutableAltCons :: Id -> TmState -> [PmAltCon]
+lookupRefutableAltCons :: Id -> TmState -> (Type, [PmAltCon])
 lookupRefutableAltCons x TmS { tm_neg = neg }
-  = fromMaybe [] (lookupDNameEnv neg (idName x))
+  = fromMaybe (idType x, []) (lookupDNameEnv neg (idName x))
 
 -- | Is the given variable /rigid/ (i.e., we have a solution for it) or
 -- /flexible/ (i.e., no solution)? Returns the solution if /rigid/. A
@@ -252,10 +260,12 @@ extendSubstAndSolve x e _tms@TmS{ tm_pos = pos, tm_neg = neg }
     (y, e')              = varDeepLookup new_pos x
     -- Be careful to uphold Note [The Pos/Neg invariant] by adjusting 'tm_neg'
     neg' | x == y        = neg
-         | otherwise     = case lookupDNameEnv neg x of
-                             Nothing -> neg
-                             Just nalts ->
-                               alterDNameEnv (delNulls (unionLists nalts)) neg y
+         | otherwise
+         = case lookupDNameEnv neg x of
+             Nothing -> neg
+             Just (ty, nalts) -> alterDNameEnv alter_f neg y
+               where
+                 alter_f = Just . second (unionLists nalts) . fromMaybe (ty, [])
     new_neg              = delFromDNameEnv neg' x
     _assert_is_not_cyclic = case e of
       PmExprVar z -> fst (varDeepLookup pos z) /= x
@@ -340,9 +350,17 @@ second clause and report the clause as redundant. After the third clause, the
 set of such *refutable* literals is again extended to `[0, 1]`.
 
 In general, we want to store a set of refutable shapes (`PmAltCon`) for each
-variable. That's the purpose of the `PmRefutEnv`. `addSolveRefutableAltCon` will
-add such a refutable mapping to the `PmRefutEnv` in the term oracles state and
-check if causes any immediate contradiction. Whenever we record a solution in
-the substitution via `extendSubstAndSolve`, the refutable environment is checked
-for any matching refutable `PmAltCon`.
+variable. That's the purpose of the `PmRefutEnv`. This extends to
+`ConLike`s, where all value arguments are universally quantified implicitly.
+So, if the `PmRefutEnv` contains an entry for `x` with `Just [Bool]`, then this
+corresponds to the fact that `forall y. x ≁ Just @Bool y`.
+
+`addSolveRefutableAltCon` will add such a refutable mapping to the `PmRefutEnv`
+in the term oracles state and check if it causes any immediate contradiction.
+Whenever we record a solution in the substitution via `extendSubstAndSolve`, the
+refutable environment is checked for any matching refutable `PmAltCon`.
+
+Note that `PmAltConLike` carries a list of type arguments. This purely for the
+purpose of being able to reconstruct all other constructors of the matching
+group the `ConLike` is part of through calling `allCompleteMatches` in Check.
 -}

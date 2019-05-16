@@ -35,6 +35,9 @@ import TmOracle
 --     where p is not one of {3, 4}
 --           q is not one of {0, 5}
 -- @
+--
+-- When the set of refutable shapes contains more than 3 elements, the
+-- additional elements are indicated by "...".
 pprUncovered :: ([PmExpr], PmRefutEnv) -> SDoc
 pprUncovered (expr_vec, refuts)
   | null cs   = fsep vec -- there are no literal constraints
@@ -45,12 +48,17 @@ pprUncovered (expr_vec, refuts)
     (vec,cs) = runPmPpr sdoc_vec (prettifyRefuts refuts)
 
 -- | Output refutable shapes of a variable in the form of @var is not one of {2,
--- Nothing, 3}@.
+-- Nothing, 3}@. Will never print more than 3 refutable shapes, the tail is
+-- indicated by an ellipsis.
 pprRefutableShapes :: (SDoc,[PmAltCon]) -> SDoc
 pprRefutableShapes (var, alts)
-  = var <+> text "is not one of" <+> braces (pprWithCommas ppr_alt alts)
+  = var <+> text "is not one of" <+> format_alts alts
   where
-    ppr_alt (PmAltLit lit)      = ppr lit
+    format_alts = braces . fsep . punctuate comma . shorten . map ppr_alt
+    shorten (a:b:c:_:_)       = a:b:c:[text "..."]
+    shorten xs                = xs
+    ppr_alt (PmAltConLike cl) = ppr cl
+    ppr_alt (PmAltLit lit)    = ppr lit
 
 {- 1. Literals
 ~~~~~~~~~~~~~~
@@ -86,7 +94,7 @@ type PrettyPmRefutEnv = DNameEnv (SDoc, [PmAltCon])
 prettifyRefuts :: PmRefutEnv -> PrettyPmRefutEnv
 prettifyRefuts = listToUDFM . zipWith rename nameList . udfmToList
   where
-    rename new (old, lits) = (old, (new, lits))
+    rename new (old, (_ty, lits)) = (old, (new, lits))
     -- Try nice names p,q,r,s,t before using the (ugly) t_i
     nameList :: [SDoc]
     nameList = map text ["p","q","r","s","t"] ++
