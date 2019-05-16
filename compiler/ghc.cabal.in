@@ -570,7 +570,6 @@ Library
         IOEnv
         Json
         ListSetOps
-        ListT
         Maybes
         MonadUtils
         OrdList
