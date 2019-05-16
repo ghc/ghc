@@ -1021,7 +1021,7 @@ tagToEnumRule = do
 
 ------------------------------
 dataToTagRule :: RuleM CoreExpr
--- See Note [dataToTag#] in primops.txt.pp
+-- See Note [dataToTag#] in primops.txt
 dataToTagRule = a `mplus` b
   where
     -- dataToTag (tagToEnum x)   ==>   x
