@@ -3,8 +3,12 @@
 CABAL=cabal
 CABFLAGS="--disable-documentation --disable-profiling --disable-library-profiling $CABFLAGS"
 
+THIS_SCRIPT=$0
+TOP=$(readlink -f $THIS_SCRIPT | xargs -exec dirname | xargs -exec dirname)
+CALLED_FROM_DIR=$PWD
+
 # It is currently more robust to pass Cabal an absolute path to the project file.
-PROJ="$PWD/hadrian/cabal.project"
+PROJ="$TOP/hadrian/cabal.project"
 
 set -euo pipefail
 
@@ -26,7 +30,8 @@ then
     "$CABAL" --project-file="$PROJ" new-build $CABFLAGS -j exe:hadrian
     # use new-exec instead of new-run to make sure that the build-tools (alex & happy) are in PATH
     "$CABAL" --project-file="$PROJ" new-exec  $CABFLAGS    hadrian -- \
-        --directory "$PWD" \
+             --directory="$TOP" \
+	     --target-dir="$CALLED_FROM_DIR" \
         "$@"
 else
     echo "Cabal version is too old; you need at least cabal-install 2.2"
