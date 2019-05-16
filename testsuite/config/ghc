@@ -25,7 +25,8 @@ config.other_ways         = ['prof', 'normal_h',
                              'debug',
                              'ghci-ext', 'ghci-ext-prof',
                              'ext-interp',
-                             'nonmoving', 'nonmoving_thr',
+                             'nonmoving',
+                             'nonmoving_thr',
                              'nonmoving_thr_ghc']
 
 if ghc_with_native_codegen:
