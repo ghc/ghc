@@ -77,6 +77,7 @@ import Hooks
 import FieldLabel
 import RnModIface
 import UniqDSet
+import Platform
 import Plugins
 
 import Control.Monad
@@ -896,7 +897,8 @@ findAndReadIface :: SDoc
         -- It *doesn't* add an error to the monad, because
         -- sometimes it's ok to fail... see notes with loadInterface
 findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
-  = do traceIf (sep [hsep [text "Reading",
+  = do dflags <- getDynFlags
+       traceIf (sep [hsep [text "Reading",
                            if hi_boot_file
                              then text "[boot]"
                              else Outputable.empty,
@@ -904,15 +906,15 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                            ppr mod <> semi],
                      nest 4 (text "reason:" <+> doc_str)])
 
+       let platform = targetPlatform dflags
        -- Check for GHC.Prim, and return its static interface
        -- TODO: make this check a function
        if mod `installedModuleEq` gHC_PRIM
            then do
-               iface <- getHooked ghcPrimIfaceHook ghcPrimIface
+               iface <- getHooked ghcPrimIfaceHook $ ghcPrimIface platform
                return (Succeeded (iface,
                                    "<built in interface for GHC.Prim>"))
            else do
-               dflags <- getDynFlags
                -- Look for the file
                hsc_env <- getTopEnv
                mb_found <- liftIO (findExactModule hsc_env mod)
@@ -1025,7 +1027,9 @@ initExternalPackageState
       eps_ann_env          = emptyAnnEnv,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
                            , n_insts_in = 0, n_insts_out = 0
-                           , n_rules_in = length builtinRules, n_rules_out = 0 }
+                           , n_rules_in = length builtinRules
+                           , n_rules_out = 0
+                           }
     }
 
 {-
@@ -1036,10 +1040,10 @@ initExternalPackageState
 *********************************************************
 -}
 
-ghcPrimIface :: ModIface
-ghcPrimIface
+ghcPrimIface :: Platform -> ModIface
+ghcPrimIface platform
   = (emptyModIface gHC_PRIM) {
-        mi_exports  = ghcPrimExports,
+        mi_exports  = ghcPrimExports platform,
         mi_decls    = [],
         mi_fixities = fixities,
         mi_fix_fn  = mkIfaceFixCache fixities
@@ -1049,8 +1053,8 @@ ghcPrimIface
     -- those in primops.txt.pp (from which Haddock docs are generated).
     fixities = (getOccName seqId, Fixity NoSourceText 0 InfixR)
              : (occName funTyConName, funTyFixity)  -- trac #10145
-             : mapMaybe mkFixity allThePrimOps
-    mkFixity op = (,) (primOpOcc op) <$> primOpFixity op
+             : mapMaybe mkFixity (allThePrimOps platform)
+    mkFixity op = (,) (primOpOcc platform op) <$> primOpFixity op
 
 {-
 *********************************************************

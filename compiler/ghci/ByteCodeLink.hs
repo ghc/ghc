@@ -25,11 +25,13 @@ import GHCi.ResolvedBCO
 import GHCi.BreakArray
 import SizedSeq
 
+import DynFlags (targetPlatform)
 import GHCi
 import ByteCodeTypes
 import HscTypes
 import Name
 import NameEnv
+import Platform
 import PrimOp
 import Module
 import FastString
@@ -114,7 +116,10 @@ lookupIE hsc_env ie con_nm =
 
 lookupPrimOp :: HscEnv -> PrimOp -> IO (RemotePtr ())
 lookupPrimOp hsc_env primop = do
-  let sym_to_find = primopToCLabel primop "closure"
+  let sym_to_find = primopToCLabel
+        (targetPlatform $ hsc_dflags hsc_env)
+        primop
+        "closure"
   m <- lookupSymbol hsc_env (mkFastString sym_to_find)
   case m of
     Just p -> return (toRemotePtr p)
@@ -176,9 +181,12 @@ nameToCLabel n suffix = mkFastString label
         ]
 
 
-primopToCLabel :: PrimOp -> String -> String
-primopToCLabel primop suffix = concat
+primopToCLabel :: Platform -> PrimOp -> String -> String
+primopToCLabel platform primop suffix = concat
     [ "ghczmprim_GHCziPrimopWrappers_"
-    , zString (zEncodeFS (occNameFS (primOpOcc primop)))
+    -- TODO don't be unsafe like this. Thread 'DynFlags' or something instead.
+    , zString $ zEncodeFS $ occNameFS $ primOpOcc
+        platform
+        primop
     , '_':suffix
     ]

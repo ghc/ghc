@@ -138,14 +138,14 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     wantedGot "Way" way_descr check_way ppr
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file ways" way_descr check_way
-    getWithUserData ncu bh
+    getWithUserData (targetPlatform dflags) ncu bh
 
 
 -- | This performs a get action after reading the dictionary and symbol
 -- table. It is necessary to run this before trying to deserialise any
 -- Names or FastStrings.
-getWithUserData :: Binary a => NameCacheUpdater -> BinHandle -> IO a
-getWithUserData ncu bh = do
+getWithUserData :: Binary a => Platform -> NameCacheUpdater -> BinHandle -> IO a
+getWithUserData platform ncu bh = do
     -- Read the dictionary
     -- The next word in the file is a pointer to where the dictionary is
     -- (probably at the end of the file)
@@ -166,8 +166,9 @@ getWithUserData ncu bh = do
         seekBin bh data_p             -- Back to where we were before
 
         -- It is only now that we know how to get a Name
-        return $ setUserData bh $ newReadState (getSymtabName ncu dict symtab)
-                                               (getDictFastString dict)
+        return $ setUserData bh $ newReadState
+            (getSymtabName platform ncu dict symtab)
+            (getDictFastString dict)
 
     -- Read the interface file
     get bh
@@ -191,7 +192,8 @@ writeBinIface dflags hi_path mod_iface = do
     put_  bh way_descr
 
 
-    putWithUserData (debugTraceMsg dflags 3) bh mod_iface
+    putWithUserData
+        (targetPlatform dflags) (debugTraceMsg dflags 3) bh mod_iface
     -- And send the result to the file
     writeBinMem bh hi_path
 
@@ -199,8 +201,8 @@ writeBinIface dflags hi_path mod_iface = do
 -- is necessary if you want to serialise Names or FastStrings.
 -- It also writes a symbol table and the dictionary.
 -- This segment should be read using `getWithUserData`.
-putWithUserData :: Binary a => (SDoc -> IO ()) -> BinHandle -> a -> IO ()
-putWithUserData log_action bh payload = do
+putWithUserData :: Binary a => Platform -> (SDoc -> IO ()) -> BinHandle -> a -> IO ()
+putWithUserData platform log_action bh payload = do
     -- Remember where the dictionary pointer will go
     dict_p_p <- tellBin bh
     -- Placeholder for ptr to dictionary
@@ -224,8 +226,8 @@ putWithUserData log_action bh payload = do
                        bin_dict_map  = dict_map_ref }
 
     -- Put the main thing,
-    bh <- return $ setUserData bh $ newWriteState (putName bin_dict bin_symtab)
-                                                  (putName bin_dict bin_symtab)
+    bh <- return $ setUserData bh $ newWriteState (putName platform bin_dict bin_symtab)
+                                                  (putName platform bin_dict bin_symtab)
                                                   (putFastString bin_dict)
     put_ bh payload
 
@@ -337,12 +339,12 @@ serialiseName bh name _ = do
 
 
 -- See Note [Symbol table representation of names]
-putName :: BinDictionary -> BinSymbolTable -> BinHandle -> Name -> IO ()
-putName _dict BinSymbolTable{
+putName :: Platform -> BinDictionary -> BinSymbolTable -> BinHandle -> Name -> IO ()
+putName platform _dict BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }
         bh name
-  | isKnownKeyName name
+  | isKnownKeyName platform name
   , let (c, u) = unpkUnique (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
   = -- ASSERT(u < 2^(22 :: Int))
     put_ bh (0x80000000
@@ -362,10 +364,11 @@ putName _dict BinSymbolTable{
             put_ bh (fromIntegral off :: Word32)
 
 -- See Note [Symbol table representation of names]
-getSymtabName :: NameCacheUpdater
+getSymtabName :: Platform
+              -> NameCacheUpdater
               -> Dictionary -> SymbolTable
               -> BinHandle -> IO Name
-getSymtabName _ncu _dict symtab bh = do
+getSymtabName platform _ncu _dict symtab bh = do
     i :: Word32 <- get bh
     case i .&. 0xC0000000 of
       0x00000000 -> return $! symtab ! fromIntegral i
@@ -376,7 +379,7 @@ getSymtabName _ncu _dict symtab bh = do
           ix  = fromIntegral i .&. 0x003FFFFF
           u   = mkUnique tag ix
         in
-          return $! case lookupKnownKeyName u of
+          return $! case lookupKnownKeyName platform u of
                       Nothing -> pprPanic "getSymtabName:unknown known-key unique"
                                           (ppr i $$ ppr (unpkUnique u))
                       Just n  -> n
