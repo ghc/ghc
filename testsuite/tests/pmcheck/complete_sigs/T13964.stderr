@@ -1,0 +1,5 @@
+
+T13964.hs:18:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘catchAll’:
+        Patterns not matched: p where p is not one of {F}
