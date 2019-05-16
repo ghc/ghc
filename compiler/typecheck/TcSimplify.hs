@@ -688,6 +688,8 @@ constraints or to decide if a particular set of constraints is satisfiable,
 the purpose of tcNormalise is to take a type, plus some local constraints, and
 normalise the type as much as possible with respect to those constraints.
 
+It does *not* reduce type or data family applications or look through newtypes.
+
 Why is this useful? As one example, when coverage-checking an EmptyCase
 expression, it's possible that the type of the scrutinee will only reduce
 if some local equalities are solved for. See "Wrinkle: Local equalities"

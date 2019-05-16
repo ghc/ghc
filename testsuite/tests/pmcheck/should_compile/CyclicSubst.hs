@@ -1,5 +1,5 @@
 -- | The following match demonstrates why we need to detect cyclic solutions
--- when extending 'TmOracle.tm_pos'.
+-- when extending 'PmOracle.tm_pos'.
 --
 -- TLDR; solving @x :-> y@ where @x@ is the representative of @y@'s equivalence
 -- class can easily lead to a cycle in the substitution.

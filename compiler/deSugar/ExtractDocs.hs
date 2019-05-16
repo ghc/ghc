@@ -289,7 +289,7 @@ ungroup group_ =
   mkDecls (typesigs . hs_valds)  (SigD noExtField)   group_ ++
   mkDecls (valbinds . hs_valds)  (ValD noExtField)   group_
   where
-    typesigs (XValBindsLR (NValBinds _ sigs)) = filter (isUserSig . unLoc) sigs
+    typesigs (XValBindsLR (NValBinds _ sig)) = filter (isUserSig . unLoc) sig
     typesigs ValBinds{} = error "expected XValBindsLR"
 
     valbinds (XValBindsLR (NValBinds binds _)) =
