@@ -404,3 +404,5 @@ test('T16190',
       collect_stats(),
       multimod_compile,
       ['T16190.hs', '-v0'])
+
+test('T16473', normal, makefile_test, ['T16473'])
