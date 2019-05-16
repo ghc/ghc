@@ -1458,7 +1458,11 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     }
 
     case THUNK_SELECTOR:
-        nonmoving_eval_thunk_selector(queue, (StgSelector*)p, origin);
+        if (RtsFlags.GcFlags.nonmovingSelectorOpt) {
+            nonmoving_eval_thunk_selector(queue, (StgSelector*)p, origin);
+        } else {
+            PUSH_FIELD((StgSelector *) p, selectee);
+        }
         break;
 
     case AP_STACK: {
