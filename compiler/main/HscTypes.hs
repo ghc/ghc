@@ -11,7 +11,7 @@
 -- | Types for the per-module compiler
 module HscTypes (
         -- * compilation state
-        HscEnv(..), hscEPS, hsc_HPT, hsc_dflags, set_hsc_dflags, modify_hsc_dflags,
+        HscEnv(..), hscEPS, hsc_HPT, hsc_dflags, set_hsc_dflags, set_hsc_HPT, modify_hsc_dflags,
         UnitEnv(..), modify_hsc_HPT,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,

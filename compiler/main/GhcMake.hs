@@ -1746,7 +1746,7 @@ typecheckLoop dflags hsc_env mods = do
                         (zip mods [ hmi{ hm_details = details }
                                   | (hmi,details) <- zip hmis mds ])
       return new_hpt
-  return set_hsc_HPT hsc_env new_hpt
+  return $ set_hsc_HPT hsc_env new_hpt
   where
     old_hpt = hsc_HPT hsc_env
     hmis    = map (expectJust "typecheckLoop" . lookupHpt old_hpt) mods
@@ -1971,9 +1971,9 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                                        obj_allowed maybe_buf
                     else return $ Left $ mkPlainErrMsg dflags noSrcSpan $
                            text "can't find file:" <+> text file
-        getRootSummary (Target (TargetModule modl) package obj_allowed maybe_buf)
+        getRootSummary (Target (TargetModule modl) _package obj_allowed maybe_buf)
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
-                                           (L rootLoc modl) package obj_allowed
+                                           (L rootLoc modl) obj_allowed
                                            maybe_buf excl_mods
                 case maybe_summary of
                    Nothing -> return $ Left $ moduleNotFoundErr dflags modl
@@ -1994,7 +1994,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
              dup_roots :: [[ModSummary]]        -- Each at least of length 2
              dup_roots = filterOut isSingleton $ map rights $ nodeMapElts root_map
 
-        loop :: [(Located ModuleName, UnitId, IsBoot)]
+        loop :: [(Located ModuleName, IsBoot)]
                         -- Work list: process these modules
              -> NodeMap [Either ErrMsg ModSummary]
                         -- Visited set; the range is a list because
@@ -2003,7 +2003,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
              -> IO (NodeMap [Either ErrMsg ModSummary])
                         -- The result is the completed NodeMap
         loop [] done = return done
-        loop ((wanted_mod, package, is_boot) : ss) done
+        loop ((wanted_mod, is_boot) : ss) done
           | Just summs <- Map.lookup key done
           = if isSingleton summs then
                 loop ss done
@@ -2011,7 +2011,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 do { multiRootsErr dflags (rights summs); return Map.empty }
           | otherwise
           = do mb_s <- summariseModule hsc_env old_summary_map
-                                       is_boot wanted_mod package True
+                                       is_boot wanted_mod True
                                        Nothing excl_mods
                case mb_s of
                    Nothing -> loop ss done
@@ -2264,14 +2264,13 @@ summariseModule
           -> NodeMap ModSummary -- Map of old summaries
           -> IsBoot             -- IsBoot <=> a {-# SOURCE #-} import
           -> Located ModuleName -- Imported module to be summarised
-          -> UnitId
           -> Bool               -- object code allowed?
           -> Maybe (StringBuffer, UTCTime)
           -> [ModuleName]               -- Modules to exclude
           -> IO (Maybe (Either ErrMsg ModSummary))      -- Its new summary
 
 summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
-                package obj_allowed maybe_buf excl_mods
+                obj_allowed maybe_buf excl_mods
   | wanted_mod `elem` excl_mods
   = return Nothing
 
@@ -2487,7 +2486,7 @@ withDeferredDiagnostics f = do
             sequence_ $ reverse actions
 
         setLogAction action = modifySession $ \hsc_env ->
-          modify_hsc_dflags hs_env $ \dflags -> dflags { log_action = action }
+          modify_hsc_dflags hsc_env $ \dflags -> dflags { log_action = action }
 
     gbracket
       (setLogAction deferDiagnostics)
