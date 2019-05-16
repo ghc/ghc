@@ -7,8 +7,10 @@ import qualified Hadrian.Oracles.DirectoryContents
 import qualified Hadrian.Oracles.Path
 import qualified Hadrian.Oracles.TextFile
 
+import qualified CommandLine
 import Expression
 import qualified Oracles.ModuleFiles
+import qualified Oracles.Setting
 import Packages
 import qualified Rules.BinaryDist
 import qualified Rules.Compile
@@ -23,6 +25,7 @@ import qualified Rules.Program
 import qualified Rules.Register
 import qualified Rules.Rts
 import qualified Rules.SimpleTargets
+import qualified Rules.TargetDirs
 import Settings
 import Target
 import UserSettings
@@ -62,10 +65,34 @@ toolArgsTarget = do
 allStages :: [Stage]
 allStages = [minBound .. maxBound]
 
--- | This rule calls 'need' on all top-level build targets that Hadrian builds
--- by default, respecting the 'finalStage' flag.
 topLevelTargets :: Rules ()
 topLevelTargets = action $ do
+  mdir <- CommandLine.cmdTargetDir
+  top <- Oracles.Setting.topDirectory
+  case mdir of
+    -- No --target-dir=... specified, we just go for a complete
+    -- GHC build.
+    Nothing -> defaultTopLevelTargets
+    Just dir
+      -- --target-dir equal to $TOP, complete GHC build again.
+      | splitDirectories top == splitDirectories dir ->
+        defaultTopLevelTargets
+      -- Non-trivial --target-dir, we try to guess a proper target
+      -- from it.
+      | otherwise -> targetDirTargets dir
+
+targetDirTargets :: FilePath -> Action ()
+targetDirTargets dir = do
+  trie <- liftIO Rules.TargetDirs.targetsTrie
+  Rules.TargetDirs.getDirAction dir trie >>= \ma -> case ma of
+    Nothing  -> error $
+      "--target-dir=" ++ dir ++ ": doesn't belong to a package or test"
+    Just act -> Rules.TargetDirs.performDirAction act
+
+-- | This rule calls 'need' on all top-level build targets that Hadrian builds
+-- by default, respecting the 'finalStage' flag.
+defaultTopLevelTargets :: Action ()
+defaultTopLevelTargets = do
     verbosity <- getVerbosity
     forM_ [ Stage1 ..] $ \stage -> do
       when (verbosity >= Loud) $ do

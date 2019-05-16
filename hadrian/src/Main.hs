@@ -22,6 +22,7 @@ main = do
     -- Provide access to command line arguments and some user settings through
     -- Shake's type-indexed map 'shakeExtra'.
     argsMap <- CommandLine.cmdLineArgsMap
+    cwd     <- getCurrentDirectory
     let extra = insertExtra UserSettings.buildProgressColour
               $ insertExtra UserSettings.successColour
               $ insertExtra (VerboseCommand UserSettings.verboseCommand) argsMap
@@ -31,7 +32,6 @@ main = do
         rebuild = [ (RebuildLater, buildRoot -/- "stage0//*")
                   | CommandLine.lookupFreeze1 argsMap ]
 
-    cwd <- getCurrentDirectory
     let options :: ShakeOptions
         options = shakeOptions
             { shakeChange   = ChangeModtimeAndDigest
