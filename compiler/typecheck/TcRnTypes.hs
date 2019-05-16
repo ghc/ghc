@@ -391,7 +391,7 @@ data DsLclEnv = DsLclEnv {
         -- These two fields are augmented as we walk inwards,
         -- through each patttern match in turn
         dsl_dicts   :: Bag EvVar,     -- Constraints from GADT pattern-matching
-        dsl_tm_cs   :: Bag TmEq,      -- Constraints form term-level pattern matching
+        dsl_tm_cs   :: Bag TmVarCt,      -- Constraints form term-level pattern matching
 
         dsl_pm_iter :: IORef Int  -- Number of iterations for pmcheck so far
                                   -- We fail if this gets too big
