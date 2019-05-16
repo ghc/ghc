@@ -5,20 +5,16 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 {-# LANGUAGE CPP, MultiWayIf #-}
 
 -- | The term equality oracle. The main export of the module are the functions
--- 'tmOracle', 'solveOneEq' and 'addSolveRefutableAltCon'.
+-- 'tmOracle', 'solveOneEq' and 'tryAddRefutableAltCon'.
 --
 -- If you are looking for an oracle that can solve type-level constraints, look
 -- at 'TcSimplify.tcCheckSatisfiability'.
 module TmOracle (
 
-        -- re-exported from PmExpr
-        PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..), TmVarCtEnv,
-        PmRefutEnv, eqPmLit, isNotPmExprOther, lhsExprToPmExpr, hsExprToPmExpr,
-
         -- the term oracle
-        tmOracle, TmState, initialTmState, wrapUpTmState, solveOneEq,
-        extendSubst, canDiverge, isRigid,
-        addSolveRefutableAltCon, lookupRefutableAltCons,
+        tmOracle, TmVarCtEnv, PmRefutEnv, TmState, initialTmState,
+        wrapUpTmState, solveOneEq, extendSubst, canDiverge, isRigid,
+        tryAddRefutableAltCon, lookupRefutableAltCons,
 
         -- misc.
         exprDeepLookup, pmLitType
@@ -33,16 +29,16 @@ import PmExpr
 import Util
 import Id
 import Name
+import NameEnv
+import UniqFM
+import UniqDFM
 import Type
 import HsLit
 import TcHsSyn
 import MonadUtils
-import ListSetOps (insertNoDup, unionLists)
+import ListSetOps (unionLists)
 import Maybes
 import Outputable
-import NameEnv
-import UniqFM
-import UniqDFM
 
 {-
 %************************************************************************
@@ -58,14 +54,16 @@ import UniqDFM
 type TmVarCtEnv = NameEnv PmExpr
 
 -- | An environment assigning shapes to variables that immediately lead to a
--- refutation. So, if this maps @x :-> [3]@, then trying to solve a 'TmVarCt'
--- like @x ~ 3@ immediately leads to a contradiction.
+-- refutation. So, if this maps @x :-> [Just]@, then trying to solve a
+-- 'TmVarCt' like @x ~ Just False@ immediately leads to a contradiction.
+-- Additionally, this stores the 'Type' from which to draw 'ConLike's from.
+--
 -- Determinism is important since we use this for warning messages in
 -- 'PmPpr.pprUncovered'. We don't do the same for 'TmVarCtEnv', so that is a plain
 -- 'NameEnv'.
 --
 -- See also Note [Refutable shapes] in TmOracle.
-type PmRefutEnv = DNameEnv [PmAltCon]
+type PmRefutEnv = DNameEnv (Type, [PmAltCon])
 
 -- | The state of the term oracle. Tracks all term-level facts of the form "x is
 -- @True@" ('tm_pos') and "x is not @5@" ('tm_neg').
@@ -81,13 +79,19 @@ data TmState = TmS
   -- advantage that when we update the solution for @y@ above, we automatically
   -- update the solution for @x@ in a union-find-like fashion.
   -- Invariant: Only maps to other variables ('PmExprVar') or to WHNFs
-  -- ('PmExprLit', 'PmExprCon'). Ergo, never maps to a 'PmExprOther'.
+  -- ('PmExprCon'). Ergo, never maps to a 'PmExprOther'.
   , tm_neg :: !PmRefutEnv
   -- ^ Maps each variable @x@ to a list of 'PmAltCon's that @x@ definitely
-  -- cannot match. Example, @x :-> [3, 4]@ means that @x@ cannot match a literal
-  -- 3 or 4. Should we later solve @x@ to a variable @y@
-  -- ('extendSubstAndSolve'), we merge the refutable shapes of @x@ into those of
-  -- @y@. See also Note [The Pos/Neg invariant].
+  -- cannot match. Example, assuming
+  --
+  -- @
+  --     data T = Leaf Int | Branch T T | Node Int T
+  -- @
+  --
+  -- then @x :-> [Leaf, Node]@ means that @x@ cannot match a @Leaf@ or @Node@,
+  -- and hence can only match @Branch@. Should we later solve @x@ to a variable
+  -- @y@ ('extendSubstAndSolve'), we merge the refutable shapes of @x@ into
+  -- those of @y@. See also Note [The Pos/Neg invariant].
   }
 
 {- Note [The Pos/Neg invariant]
@@ -113,7 +117,7 @@ instance Outputable TmState where
       pos   = map pos_eq (nonDetUFMToList (tm_pos state))
       neg   = map neg_eq (udfmToList (tm_neg state))
       pos_eq (l, r) = ppr l <+> char '~' <+> ppr r
-      neg_eq (l, r) = ppr l <+> char '≁' <+> ppr r
+      neg_eq (l, r) = ppr l <+> text "/~" <+> ppr r
 
 -- | Initial state of the oracle.
 initialTmState :: TmState
@@ -148,21 +152,23 @@ canDiverge x TmS{ tm_pos = pos, tm_neg = neg }
 -- | Check whether the equality @x ~ e@ leads to a refutation. Make sure that
 -- @x@ and @e@ are completely substituted before!
 isRefutable :: Name -> PmExpr -> PmRefutEnv -> Bool
-isRefutable x e env
-  = fromMaybe False $ elem <$> exprToAlt e <*> lookupDNameEnv env x
+isRefutable x e env = fromMaybe False $ do
+  alt <- exprToAlt e
+  (_, nalts) <- lookupDNameEnv env x
+  pure (elem alt nalts)
 
 -- | Solve an equality (top-level).
 solveOneEq :: TmState -> TmVarCt -> Maybe TmState
 solveOneEq solver_env (TVC x e) = unify solver_env (PmExprVar (idName x), e)
 
 exprToAlt :: PmExpr -> Maybe PmAltCon
-exprToAlt (PmExprLit l)    = Just (PmAltLit l)
-exprToAlt _                = Nothing
+exprToAlt (PmExprCon c _) = Just c
+exprToAlt _               = Nothing
 
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'TmState' and return @Nothing@ if that leads to a contradiction.
-addSolveRefutableAltCon :: TmState -> Id -> PmAltCon -> Maybe TmState
-addSolveRefutableAltCon original@TmS{ tm_pos = pos, tm_neg = neg } x nalt
+tryAddRefutableAltCon :: TmState -> Id -> PmAltCon -> Maybe TmState
+tryAddRefutableAltCon original@TmS{ tm_pos = pos, tm_neg = neg } x nalt
   = case exprToAlt e of
       -- We have to take care to preserve Note [The Pos/Neg invariant]
       Nothing         -> Just extended -- Not solved yet
@@ -172,20 +178,24 @@ addSolveRefutableAltCon original@TmS{ tm_pos = pos, tm_neg = neg } x nalt
   where                                --     refutation redundant
     (y, e) = varDeepLookup pos (idName x)
     extended = original { tm_neg = neg' }
-    neg' = alterDNameEnv (delNulls (insertNoDup nalt)) neg y
+    neg' = extendDNameEnv_C combineRefutEntries neg y (idType x, [nalt])
 
--- | When updating 'tm_neg', we want to delete any 'null' entries. This adapter
--- intends to provide a suitable interface for 'alterDNameEnv'.
-delNulls :: ([a] -> [a]) -> Maybe [a] -> Maybe [a]
-delNulls f mb_entry
-  | ret@(_:_) <- f (fromMaybe [] mb_entry) = Just ret
-  | otherwise                              = Nothing
+-- | Combines two entries in a 'PmRefutEnv' by merging the set of refutable
+-- 'PmAltCon's.
+combineRefutEntries :: (Type, [PmAltCon]) -> (Type, [PmAltCon]) -> (Type, [PmAltCon])
+combineRefutEntries (old_ty, old_nalts) (new_ty, new_nalts)
+  = ASSERT( eqType old_ty new_ty ) (old_ty, unionLists old_nalts new_nalts)
 
 -- | Return all 'PmAltCon' shapes that are impossible for 'Id' to take, i.e.
 -- would immediately lead to a refutation by the term oracle.
-lookupRefutableAltCons :: Id -> TmState -> [PmAltCon]
-lookupRefutableAltCons x TmS { tm_neg = neg }
-  = fromMaybe [] (lookupDNameEnv neg (idName x))
+--
+-- Note that because of Note [The Pos/Neg invariant], this will return an empty
+-- list of alt cons for 'Id's which already have a solution.
+lookupRefutableAltCons :: TmState -> Id -> (Type, [PmAltCon])
+lookupRefutableAltCons _tms@TmS{ tm_pos = pos, tm_neg = neg } x
+  = fromMaybe (idType x, []) (lookupDNameEnv neg y)
+  where
+    (y, _e) = varDeepLookup pos (idName x)
 
 -- | Is the given variable /rigid/ (i.e., we have a solution for it) or
 -- /flexible/ (i.e., no solution)? Returns the solution if /rigid/. A
@@ -196,6 +206,11 @@ isRigid TmS{ tm_pos = pos } x = lookupNameEnv pos x
 -- | @isFlexible tms = isNothing . 'isRigid' tms@
 isFlexible :: TmState -> Name -> Bool
 isFlexible tms = isNothing . isRigid tms
+
+-- | Is this a solution for a variable, i.e., something in WHNF?
+isSolution :: PmExpr -> Bool
+isSolution PmExprCon{} = True
+isSolution _           = False
 
 -- | Try to unify two 'PmExpr's and record the gained knowledge in the
 -- 'TmState'.
@@ -209,12 +224,8 @@ unify tms eq@(e1, e2) = case eq of
   (PmExprOther _,_)            -> boring
   (_,PmExprOther _)            -> boring
 
-  (PmExprLit l1, PmExprLit l2) -> case eqPmLit l1 l2 of
-    -- See Note [Undecidable Equality for Overloaded Literals]
-    True  -> boring
-    False -> unsat
-
   (PmExprCon c1 ts1, PmExprCon c2 ts2)
+    -- See Note [Undecidable Equality for Overloaded Literals]
     | c1 == c2  -> foldlM unify tms (zip ts1 ts2)
     | otherwise -> unsat
 
@@ -231,9 +242,6 @@ unify tms eq@(e1, e2) = case eq of
   (PmExprVar x, PmExprVar y)    -> Just (equate x y tms)
   (PmExprVar x, _)              -> trySolve x e2 tms
   (_, PmExprVar y)              -> trySolve y e1 tms
-
-  _ -> WARN( True, text "unify: Catch all" <+> ppr eq)
-       boring -- I HATE CATCH-ALLS
   where
     boring    = Just tms
     unsat     = Nothing
@@ -252,28 +260,25 @@ equate x y tms@TmS{ tm_pos = pos, tm_neg = neg }
     pos' = extendNameEnv pos x (PmExprVar y)
     -- Be careful to uphold Note [The Pos/Neg invariant] by merging the refuts
     -- of x into those of y
-    nalts = fromMaybe [] (lookupDNameEnv neg x)
-    neg'  = alterDNameEnv (delNulls (unionLists nalts)) neg y
-              `delFromDNameEnv` x
+    neg'  = case lookupDNameEnv neg x of
+      Nothing -> neg
+      Just entry -> extendDNameEnv_C combineRefutEntries neg y entry
+                      `delFromDNameEnv` x
     tms'  = TmS { tm_pos = pos', tm_neg = neg' }
 
 -- | Extend the substitution with a mapping @x: -> e@ if compatible with
 -- refutable shapes of @x@ and its solution, reject (@Nothing@) otherwise.
 --
 -- Precondition: @x@ is flexible (cf. 'isFlexible'/'isRigid').
--- Precondition: @e@ is a 'PmExprCon' or 'PmExprLit'
+-- Precondition: @e@ is a solution, i.e., 'PmExprCon' (cf. 'isSolution').
 trySolve:: Name -> PmExpr -> TmState -> Maybe TmState
 trySolve x e _tms@TmS{ tm_pos = pos, tm_neg = neg }
   | ASSERT( isFlexible _tms x )
-    ASSERT( _is_whnf e )
+    ASSERT( isSolution e )
     isRefutable x e neg
   = Nothing
   | otherwise
   = Just (TmS (extendNameEnv pos x e) (delFromDNameEnv neg x))
-  where
-    _is_whnf PmExprCon{} = True
-    _is_whnf PmExprLit{} = True
-    _is_whnf _           = False
 
 -- | When we know that a variable is fresh, we do not actually have to
 -- check whether anything changes, we know that nothing does. Hence,
@@ -303,7 +308,7 @@ varDeepLookup env x = case lookupNameEnv env x of
 exprDeepLookup :: TmVarCtEnv -> PmExpr -> PmExpr
 exprDeepLookup env (PmExprVar x)    = snd (varDeepLookup env x)
 exprDeepLookup env (PmExprCon c es) = PmExprCon c (map (exprDeepLookup env) es)
-exprDeepLookup _   other_expr       = other_expr -- PmExprLit, PmExprOther
+exprDeepLookup _   e@PmExprOther{}  = e
 
 -- | External interface to the term oracle.
 tmOracle :: TmState -> [TmVarCt] -> Maybe TmState
@@ -354,9 +359,17 @@ second clause and report the clause as redundant. After the third clause, the
 set of such *refutable* literals is again extended to `[0, 1]`.
 
 In general, we want to store a set of refutable shapes (`PmAltCon`) for each
-variable. That's the purpose of the `PmRefutEnv`. `addSolveRefutableAltCon` will
-add such a refutable mapping to the `PmRefutEnv` in the term oracles state and
-check if causes any immediate contradiction. Whenever we record a solution in
-the substitution via `extendSubstAndSolve`, the refutable environment is checked
-for any matching refutable `PmAltCon`.
+variable. That's the purpose of the `PmRefutEnv`. This extends to
+`ConLike`s, where all value arguments are universally quantified implicitly.
+So, if the `PmRefutEnv` contains an entry for `x` with `Just [Bool]`, then this
+corresponds to the fact that `forall y. x ≁ Just @Bool y`.
+
+`tryAddRefutableAltCon` will add such a refutable mapping to the `PmRefutEnv`
+in the term oracles state and check if it causes any immediate contradiction.
+Whenever we record a solution in the substitution via `extendSubstAndSolve`, the
+refutable environment is checked for any matching refutable `PmAltCon`.
+
+Note that `PmAltConLike` carries a list of type arguments. This purely for the
+purpose of being able to reconstruct all other constructors of the matching
+group the `ConLike` is part of through calling `allCompleteMatches` in Check.
 -}
