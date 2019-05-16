@@ -1,4 +1,4 @@
 
 completesig11.hs:14:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘m1’: Patterns not matched: BS
+    In an equation for ‘m1’: Patterns not matched: B
