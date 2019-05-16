@@ -82,11 +82,6 @@ defaults
 -- description fields should be legal latex. Descriptions can contain
 -- matched pairs of embedded curly brackets.
 
-#include "MachDeps.h"
-
--- We need platform defines (tests for mingw32 below).
-#include "ghc_boot_platform.h"
-
 section "The word size story."
         {Haskell98 specifies that signed integers (type {\tt Int})
          must contain at least 30 bits. GHC always implements {\tt
@@ -147,16 +142,15 @@ section "The word size story."
 
 -- Define synonyms for indexing ops.
 
-#define INT32 Int#
-#define WORD32 Word#
+$INT32 = Int#
+$WORD32 = Word#
 
-#if WORD_SIZE_IN_BITS < 64
-#define INT64 Int64#
-#define WORD64 Word64#
-#else
-#define INT64 Int#
-#define WORD64 Word#
-#endif
+$INT64 = $if $WORD_SIZE_IN_BITS < 64
+         $then Int64#
+         $else Int#
+$WORD64 = $if $WORD_SIZE_IN_BITS < 64
+          $then Word64#
+          $else Word#
 
 -- This type won't be exported directly (since there is no concrete
 -- syntax for this sort of export) so we'll have to manually patch
@@ -679,26 +673,24 @@ primop   Narrow16WordOp    "narrow16Word#"    Monadic   Word# -> Word#
 primop   Narrow32WordOp    "narrow32Word#"    Monadic   Word# -> Word#
 
 
-#if WORD_SIZE_IN_BITS < 64
-------------------------------------------------------------------------
-section "Int64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
+$guarded $WORD_SIZE_IN_BITS < 64
+  ------------------------------------------------------------------------
+  section "Int64#"
+          {Operations on 64-bit unsigned words. This type is only used
+           if plain {\tt Int\#} has less than 64 bits. In any case, the operations
+           are not primops; they are implemented (if needed) as ccalls instead.}
+  ------------------------------------------------------------------------
 
-primtype Int64#
+  primtype Int64#
 
-------------------------------------------------------------------------
-section "Word64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
+  ------------------------------------------------------------------------
+  section "Word64#"
+          {Operations on 64-bit unsigned words. This type is only used
+           if plain {\tt Word\#} has less than 64 bits. In any case, the operations
+           are not primops; they are implemented (if needed) as ccalls instead.}
+  ------------------------------------------------------------------------
 
-primtype Word64#
-
-#endif
+  primtype Word64#
 
 ------------------------------------------------------------------------
 section "Double#"
@@ -2153,16 +2145,16 @@ primop   AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
 primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
          {Return the remainder when the {\tt Addr\#} arg, treated like an {\tt Int\#},
           is divided by the {\tt Int\#} arg.}
-#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
-primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
-        {Coerce directly from address to int.}
-   with code_size = 0
-        deprecated_msg = { This operation is strongly deprecated. }
-primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
-        {Coerce directly from int to address.}
-   with code_size = 0
-        deprecated_msg = { This operation is strongly deprecated. }
-#endif
+
+$guarded ($WORD_SIZE_IN_BITS == 32 || $WORD_SIZE_IN_BITS == 64)
+  primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
+          {Coerce directly from address to int.}
+     with code_size = 0
+          deprecated_msg = { This operation is strongly deprecated. }
+  primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
+          {Coerce directly from int to address.}
+     with code_size = 0
+          deprecated_msg = { This operation is strongly deprecated. }
 
 primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Int#
 primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Int#
@@ -2777,29 +2769,27 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-#if defined(mingw32_TARGET_OS)
-primop  AsyncReadOp "asyncRead#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously read bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
+$guarded $OS = "mingw32"
+  primop  AsyncReadOp "asyncRead#" GenPrimOp
+     Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+     {Asynchronously read bytes from specified file descriptor.}
+     with
+     has_side_effects = True
+     out_of_line      = True
 
-primop  AsyncWriteOp "asyncWrite#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously write bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
+  primop  AsyncWriteOp "asyncWrite#" GenPrimOp
+     Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+     {Asynchronously write bytes from specified file descriptor.}
+     with
+     has_side_effects = True
+     out_of_line      = True
 
-primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
-   Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously perform procedure (first arg), passing it 2nd arg.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-#endif
+  primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
+     Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+     {Asynchronously perform procedure (first arg), passing it 2nd arg.}
+     with
+     has_side_effects = True
+     out_of_line      = True
 
 ------------------------------------------------------------------------
 section "Concurrency primitives"
@@ -3409,7 +3399,7 @@ section "SIMD Vectors"
         {Operations on SIMD vectors.}
 ------------------------------------------------------------------------
 
-#define ALL_VECTOR_TYPES \
+$ALL_VECTOR_TYPES = \
   [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
   ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
   ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
@@ -3420,7 +3410,7 @@ section "SIMD Vectors"
   ,<Float,Float#,8>,<Double,Double#,4> \
   ,<Float,Float#,16>,<Double,Double#,8>]
 
-#define SIGNED_VECTOR_TYPES \
+$define SIGNED_VECTOR_TYPES = \
   [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
   ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
   ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
@@ -3428,12 +3418,12 @@ section "SIMD Vectors"
   ,<Float,Float#,8>,<Double,Double#,4> \
   ,<Float,Float#,16>,<Double,Double#,8>]
 
-#define FLOAT_VECTOR_TYPES \
+$FLOAT_VECTOR_TYPES = \
   [<Float,Float#,4>,<Double,Double#,2> \
   ,<Float,Float#,8>,<Double,Double#,4> \
   ,<Float,Float#,16>,<Double,Double#,8>]
 
-#define INT_VECTOR_TYPES \
+$INT_VECTOR_TYPES = \
   [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
   ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
   ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \

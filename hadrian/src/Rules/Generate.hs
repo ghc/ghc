@@ -23,10 +23,7 @@ trackGenerateHs :: Expr ()
 trackGenerateHs = expr $ need [sourcePath -/- "Rules/Generate.hs"]
 
 primopsSource :: FilePath
-primopsSource = "compiler/prelude/primops.txt.pp"
-
-primopsTxt :: Stage -> FilePath
-primopsTxt stage = buildDir (vanillaContext stage compiler) -/- "primops.txt"
+primopsSource = "compiler/prelude/primops.txt"
 
 isGeneratedCmmFile :: FilePath -> Bool
 isGeneratedCmmFile file = takeBaseName file == "AutoApply"
@@ -119,11 +116,6 @@ generatePackageCode context@(Context stage pkg _) = do
             root <//> dir -/- "Version.hs" %> go generateVersionHs
 
     when (pkg == compiler) $ do
-        root -/- primopsTxt stage %> \file -> do
-            includes <- includesDependencies
-            need $ [primopsSource] ++ includes
-            build $ target context HsCpp [primopsSource] [file]
-
         root -/- stageString stage <//> "ghc_boot_platform.h" %>
             go generateGhcBootPlatformH
 
@@ -141,10 +133,9 @@ generatePackageCode context@(Context stage pkg _) = do
         copyFile (dir -/- takeFileName file) file
 
 genPrimopCode :: Context -> FilePath -> Action ()
-genPrimopCode context@(Context stage _pkg _) file = do
-    root <- buildRoot
-    need [root -/- primopsTxt stage]
-    build $ target context GenPrimopCode [root -/- primopsTxt stage] [file]
+genPrimopCode context file = do
+    need [primopsSource]
+    build $ target context GenPrimopCode [primopsSource] [file]
 
 copyRules :: Rules ()
 copyRules = do

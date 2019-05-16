@@ -132,7 +132,7 @@ Apparently, exception handling prim-ops didn't use to have any special
 strictness signatures, thus defaulting to topSig, which assumes they use their
 arguments lazily. Joachim was the first to realise that we could provide richer
 information. Thus, in 0558911f91c (Dec 13), he added signatures to
-primops.txt.pp indicating that functions like `catch#` and `catchRetry#` call
+primops.txt indicating that functions like `catch#` and `catchRetry#` call
 their argument, which is useful information for usage analysis. Still with a
 'Lazy' strictness demand (i.e. 'lazyApply1Dmd'), though, and the world was fine.
 

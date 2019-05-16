@@ -43,7 +43,46 @@ data Entry
                         opts  :: [Option] }   -- default overrides
     | Section { title :: String,         -- section title
                 desc  :: String }        -- description
-    deriving Show
+
+
+    | MacroDef MacroDef
+    deriving (Eq, Ord, Show)
+
+type MacroVar = String
+
+data MacroDef
+  -- | let-bind a macro variable for a type
+  = MacroDef_TyMacro MacroVar TyMacroBody
+  -- | Enties that are only conditionally available
+  | MacroDef_Guarded MacroCondition [Entry]
+  deriving (Eq, Ord, Show)
+
+data TyMacroBody
+  = TyMacroBody_Unquote TyVar
+  | TyMacroBody_If MacroCondition TyMacroBody TyMacroBody
+  deriving (Eq, Ord, Show)
+
+-- N.B Needs to lower to CPP
+data BinOp
+  = BinOp_LT
+  | BinOp_GT
+  | BinOp_EQ
+  | BinOp_LE
+  | BinOp_GE
+
+  | BinOp_And
+  | BinOp_Or
+  | BinOp_Not
+  deriving (Eq, Ord, Show)
+
+-- N.B Needs to lower to CPP
+data MacroCondition
+  = MacroCondition_OS
+  | MacroCondition_WordSize
+  | MacroCondition_StringLit
+  | MacroCondition_NumberLit
+  | MacroCondition_BinOp MacroCondition MacroCondition
+  deriving (Eq, Ord, Show)
 
 is_primop :: Entry -> Bool
 is_primop (PrimOpSpec _ _ _ _ _ _) = True
@@ -61,12 +100,12 @@ data Option
    | OptionInteger String Int     -- name = <int>
    | OptionVector [(String,String,Int)]  -- name = [(,...),...]
    | OptionFixity (Maybe Fixity)  -- fixity = infix{,l,r} <int> | Nothing
-     deriving Show
+   deriving (Eq, Ord, Show)
 
 -- categorises primops
 data Category
    = Dyadic | Monadic | Compare | GenPrimOp
-     deriving Show
+   deriving (Eq, Ord, Show)
 
 -- types
 data Ty
@@ -76,7 +115,8 @@ data Ty
    | TyVar  TyVar
    | TyUTup [Ty]   -- unboxed tuples; just a TyCon really, 
                    -- but convenient like this
-   deriving (Eq,Show)
+   | TyMacro MacroVar -- substitues for something else
+   deriving (Eq, Ord, Show)
 
 type TyVar = String
 
@@ -99,14 +139,14 @@ instance Show TyCon where
 -- The SourceText exists so that it matches the SourceText field in
 -- BasicTypes.Fixity
 data Fixity = Fixity SourceText Int FixityDirection
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data FixityDirection = InfixN | InfixL | InfixR
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data SourceText = SourceText String
                 | NoSourceText
-                deriving (Eq,Show)
+  deriving (Eq, Ord, Show)
 
 ------------------------------------------------------------------
 -- Sanity checking -----------------------------------------------
