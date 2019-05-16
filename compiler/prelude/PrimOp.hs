@@ -5,12 +5,15 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- The default is a bit too low for the quite large primOpInfo definition
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
 
 module PrimOp (
-        PrimOp(..), PrimOpVecCat(..), allThePrimOps,
+        PrimOp(..), PrimOpVecCat(..), PrimOpWithPatform (..),
+        allThePrimOps,
         primOpType, primOpSig,
         primOpTag, maxPrimOpTag, primOpOcc,
 
@@ -45,6 +48,7 @@ import Unique           ( Unique, mkPrimOpIdUnique )
 import Outputable
 import FastString
 import Module           ( UnitId )
+import Platform
 
 {-
 ************************************************************************
@@ -78,8 +82,13 @@ instance Ord PrimOp where
                       | op1 == op2 = EQ
                       | otherwise  = GT
 
-instance Outputable PrimOp where
-    ppr op = pprPrimOp op
+data PrimOpWithPatform a = PrimOpWithPatform
+  { primOpWithPatform_platform :: Platform
+  , primOpWithPatform_primOp :: PrimOp
+  }
+
+instance Outputable (PrimOpWithPatform PrimOp) where
+    ppr (PrimOpWithPatform platform op) = pprPrimOp platform op
 
 data PrimOpVecCat = IntVec
                   | WordVec
@@ -87,8 +96,8 @@ data PrimOpVecCat = IntVec
 
 -- An @Enum@-derived list would be better; meanwhile... (ToDo)
 
-allThePrimOps :: [PrimOp]
-allThePrimOps =
+allThePrimOps :: Platform -> [PrimOp]
+allThePrimOps platform = concat $
 #include "primop-list.hs-incl"
 
 tagToEnumKey :: Unique
@@ -170,9 +179,10 @@ primOpFixity :: PrimOp -> Maybe Fixity
 else, notably a type, can be constructed) for each @PrimOp@.
 -}
 
-primOpInfo :: PrimOp -> PrimOpInfo
+primOpInfo :: Platform -> PrimOp -> PrimOpInfo
+primOpInfo platform = \case
 #include "primop-primop-info.hs-incl"
-primOpInfo _ = error "primOpInfo: unknown primop"
+    _ -> error "primOpInfo: unknown primop"
 
 {-
 Here are a load of comments from the old primOp info:
@@ -534,9 +544,9 @@ primOpCodeSizeForeignCall = 4
 ************************************************************************
 -}
 
-primOpType :: PrimOp -> Type  -- you may want to use primOpSig instead
-primOpType op
-  = case primOpInfo op of
+primOpType :: Platform -> PrimOp -> Type  -- you may want to use primOpSig instead
+primOpType platform op
+  = case primOpInfo platform op of
     Dyadic  _occ ty -> dyadic_fun_ty ty
     Monadic _occ ty -> monadic_fun_ty ty
     Compare _occ ty -> compare_fun_ty ty
@@ -544,15 +554,15 @@ primOpType op
     GenPrimOp _occ tyvars arg_tys res_ty ->
         mkSpecForAllTys tyvars (mkVisFunTys arg_tys res_ty)
 
-primOpOcc :: PrimOp -> OccName
-primOpOcc op = case primOpInfo op of
+primOpOcc :: Platform -> PrimOp -> OccName
+primOpOcc platform op = case primOpInfo platform op of
                Dyadic    occ _     -> occ
                Monadic   occ _     -> occ
                Compare   occ _     -> occ
                GenPrimOp occ _ _ _ -> occ
 
-isComparisonPrimOp :: PrimOp -> Bool
-isComparisonPrimOp op = case primOpInfo op of
+isComparisonPrimOp :: Platform -> PrimOp -> Bool
+isComparisonPrimOp platform op = case primOpInfo platform op of
                           Compare {} -> True
                           _          -> False
 
@@ -560,13 +570,13 @@ isComparisonPrimOp op = case primOpInfo op of
 -- (type variables, argument types, result type)
 -- It also gives arity, strictness info
 
-primOpSig :: PrimOp -> ([TyVar], [Type], Type, Arity, StrictSig)
-primOpSig op
+primOpSig :: Platform -> PrimOp -> ([TyVar], [Type], Type, Arity, StrictSig)
+primOpSig platform op
   = (tyvars, arg_tys, res_ty, arity, primOpStrictness op arity)
   where
     arity = length arg_tys
     (tyvars, arg_tys, res_ty)
-      = case (primOpInfo op) of
+      = case (primOpInfo platform op) of
         Monadic   _occ ty                    -> ([],     [ty],    ty       )
         Dyadic    _occ ty                    -> ([],     [ty,ty], ty       )
         Compare   _occ ty                    -> ([],     [ty,ty], intPrimTy)
@@ -580,9 +590,9 @@ data PrimOpResultInfo
 -- (i.e. they might return a polymorphic value).  These PrimOps *must*
 -- be out of line, or the code generator won't work.
 
-getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
-getPrimOpResultInfo op
-  = case (primOpInfo op) of
+getPrimOpResultInfo :: Platform -> PrimOp -> PrimOpResultInfo
+getPrimOpResultInfo platform op
+  = case (primOpInfo platform op) of
       Dyadic  _ ty                        -> ReturnsPrim (typePrimRep1 ty)
       Monadic _ ty                        -> ReturnsPrim (typePrimRep1 ty)
       Compare _ _                         -> ReturnsPrim (tyConPrimRep1 intPrimTyCon)
@@ -615,8 +625,8 @@ compare_fun_ty ty = mkVisFunTys [ty, ty] intPrimTy
 
 -- Output stuff:
 
-pprPrimOp  :: PrimOp -> SDoc
-pprPrimOp other_op = pprOccName (primOpOcc other_op)
+pprPrimOp :: Platform -> PrimOp -> SDoc
+pprPrimOp platform other_op = pprOccName (primOpOcc platform other_op)
 
 {-
 ************************************************************************
