@@ -70,6 +70,7 @@ executable hadrian
                        , Rules.Selftest
                        , Rules.SimpleTargets
                        , Rules.SourceDist
+                       , Rules.TargetDirs
                        , Rules.Test
                        , Settings
                        , Settings.Builders.Alex

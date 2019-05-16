@@ -1,7 +1,8 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
     cmdProgressColour, cmdProgressInfo, cmdConfigure,
-    cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
+    cmdDocsArgs, cmdTargetDir, lookupBuildRoot,
+    TestArgs(..), TestSpeed(..), defaultTestArgs
     ) where
 
 import Data.Either
@@ -26,6 +27,7 @@ data CommandLineArgs = CommandLineArgs
     , progressColour :: UseColour
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
+    , targetDir      :: Maybe FilePath
     , testArgs       :: TestArgs
     , docTargets     :: DocTargets }
     deriving (Eq, Show)
@@ -40,6 +42,7 @@ defaultCommandLineArgs = CommandLineArgs
     , progressColour = Auto
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
+    , targetDir      = Nothing
     , testArgs       = defaultTestArgs
     , docTargets     = Set.fromList [minBound..maxBound] }
 
@@ -93,6 +96,10 @@ readBuildRoot ms =
     go = Just . BuildRoot
     set :: BuildRoot -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { buildRoot = flag }
+
+readTargetDir :: Maybe FilePath -> Either String (CommandLineArgs -> CommandLineArgs)
+readTargetDir mdir = Right $ \flags ->
+  flags { targetDir = mdir }
 
 readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
@@ -225,6 +232,8 @@ optDescrs =
       "Run the boot and configure scripts (if you do not want to run them manually)."
     , Option ['o'] ["build-root"] (OptArg readBuildRoot "BUILD_ROOT")
       "Where to store build artifacts. (Default _build)."
+    , Option ['t'] ["target-dir"] (OptArg readTargetDir "DIR")
+      "Make the default target be the package associated to the given directory, if any."
     , Option [] ["flavour"] (OptArg readFlavour "FLAVOUR")
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["freeze1"] (NoArg readFreeze1)
@@ -303,3 +312,6 @@ cmdProgressInfo = progressInfo <$> cmdLineArgs
 
 cmdDocsArgs :: Action DocTargets
 cmdDocsArgs = docTargets <$> cmdLineArgs
+
+cmdTargetDir :: Action (Maybe FilePath)
+cmdTargetDir = targetDir <$> cmdLineArgs

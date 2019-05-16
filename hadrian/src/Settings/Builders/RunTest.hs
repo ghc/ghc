@@ -6,6 +6,7 @@ import System.Environment
 import CommandLine
 import Oracles.TestSettings
 import Packages
+import Rules.TargetDirs (getTestDir)
 import Settings.Builders.Common
 
 getTestSetting :: TestSetting -> Expr String
@@ -86,12 +87,17 @@ runTestBuilderArgs = builder RunTest ? do
     top         <- expr $ topDirectory
     ghcFlags    <- expr runTestGhcFlags
     cmdrootdirs <- expr (testRootDirs <$> userSetting defaultTestArgs)
-    let defaultRootdirs = ("testsuite" -/- "tests") : libTests
-        rootdirs | null cmdrootdirs = defaultRootdirs
-                 | otherwise        = cmdrootdirs
+    mtestdir    <- expr getTestDir
     root        <- expr buildRoot
-    let timeoutProg = root -/- timeoutPath
+
     statsFilesDir <- expr haddockStatsFilesDir
+
+    let defaultRootdirs = ("testsuite" -/- "tests") : libTests
+        timeoutProg = root -/- timeoutPath
+
+        rootdirs | not (null cmdrootdirs) = cmdrootdirs
+                 | Just d <- mtestdir     = [d]
+                 | otherwise              = defaultRootdirs
 
     -- See #16087
     let ghcBuiltByLlvm = False -- TODO: Implement this check
