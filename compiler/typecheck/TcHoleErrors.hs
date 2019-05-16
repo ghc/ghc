@@ -516,21 +516,30 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) hf = hang display 2 provenance
           ty = hfType hf
           matches =  hfMatches hf
           wrap = hfWrap hf
-          tyApp = sep $ map ((text "@" <>) . pprParendType) wrap
+          tyApp = sep $ zipWithEqual "pprHoleFit" pprArg vars wrap
+            where pprArg b arg = case binderArgFlag b of
+                                   Specified -> text "@" <> pprParendType arg
+                                   -- Do not print type application for inferred
+                                   -- variables (#16456)
+                                   Inferred  -> empty
+                                   Required  -> pprPanic "pprHoleFit: bad Required"
+                                                         (ppr b <+> ppr arg)
           tyAppVars = sep $ punctuate comma $
-              map (\(v,t) -> ppr v <+> text "~" <+> pprParendType t) $
-                zip vars wrap
+              zipWithEqual "pprHoleFit" (\v t -> ppr (binderVar v) <+>
+                                                 text "~" <+> pprParendType t)
+                vars wrap
+
+          vars = unwrapTypeVars ty
             where
-              vars = unwrapTypeVars ty
               -- Attempts to get all the quantified type variables in a type,
               -- e.g.
-              -- return :: forall (m :: * -> *) Monad m => (forall a . a) -> m a
+              -- return :: forall (m :: * -> *) Monad m => (forall a . a -> m a)
               -- into [m, a]
-              unwrapTypeVars :: Type -> [TyVar]
+              unwrapTypeVars :: Type -> [TyCoVarBinder]
               unwrapTypeVars t = vars ++ case splitFunTy_maybe unforalled of
                                   Just (_, unfunned) -> unwrapTypeVars unfunned
                                   _ -> []
-                where (vars, unforalled) = splitForAllTys t
+                where (vars, unforalled) = splitForAllVarBndrs t
           holeVs = sep $ map (parens . (text "_" <+> dcolon <+>) . ppr) matches
           holeDisp = if sMs then holeVs
                      else sep $ replicate (length matches) $ text "_"
