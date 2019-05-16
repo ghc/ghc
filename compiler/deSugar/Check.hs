@@ -55,19 +55,18 @@ import TyCoRep
 import Type
 import UniqSupply
 import DsUtils       (isTrueLHsExpr)
-import Maybes        (expectJust)
+import Maybes        (MaybeT (..), expectJust)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List     (find)
 import Data.Maybe    (catMaybes, isJust, fromMaybe)
-import Control.Monad (forM, when, forM_, zipWithM, filterM)
+import Control.Monad (forM, when, guard, forM_, zipWithM, filterM)
+import Control.Monad.Trans.Class (lift)
 import Coercion
 import TcEvidence
 import TcSimplify    (tcNormalise)
 import IOEnv
 import qualified Data.Semigroup as Semi
-
-import ListT (ListT(..), fold, select)
 
 {-
 This module checks pattern matches for:
@@ -91,72 +90,33 @@ The algorithm is based on the paper:
 %************************************************************************
 -}
 
--- We use the non-determinism monad to apply the algorithm to several
--- possible sets of constructors. Users can specify complete sets of
--- constructors by using COMPLETE pragmas.
--- The algorithm only picks out constructor
--- sets deep in the bowels which makes a simpler `mapM` more difficult to
--- implement. The non-determinism is only used in one place, see the ConVar
--- case in `pmCheckHd`.
+type PmM = DsM
 
-type PmM a = ListT DsM a
-
-liftD :: DsM a -> PmM a
-liftD m = ListT $ \sk fk -> m >>= \a -> sk a fk
-
--- Pick the first match complete covered match or otherwise the "best" match.
--- The best match is the one with the least uncovered clauses, ties broken
--- by the number of inaccessible clauses followed by number of redundant
--- clauses.
---
--- This is specified in the
--- "Disambiguating between multiple ``COMPLETE`` pragmas" section of the
--- users' guide. If you update the implementation of this function, make sure
--- to update that section of the users' guide as well.
-getResult :: PmM PmResult -> DsM PmResult
-getResult ls
-  = do { res <- fold ls goM (pure Nothing)
-       ; case res of
-            Nothing -> panic "getResult is empty"
-            Just a  -> return a }
-  where
-    goM :: PmResult -> DsM (Maybe PmResult) -> DsM (Maybe PmResult)
-    goM mpm dpm = do { pmr <- dpm
-                     ; return $ Just $ go pmr mpm }
-
-    -- Careful not to force unecessary results
-    go :: Maybe PmResult -> PmResult -> PmResult
-    go Nothing rs = rs
-    go (Just old@(PmResult prov rs (UncoveredPatterns us) is)) new
-      | null us && null rs && null is = old
-      | otherwise =
-        let PmResult prov' rs' (UncoveredPatterns us') is' = new
-        in case compareLength us us'
-                `mappend` (compareLength is is')
-                `mappend` (compareLength rs rs')
-                `mappend` (compare prov prov') of
-              GT  -> new
-              EQ  -> new
-              LT  -> old
-    go (Just (PmResult _ _ (TypeOfUncovered _) _)) _new
-      = panic "getResult: No inhabitation candidates"
-
-data PatTy = PAT | VA -- Used only as a kind, to index PmPat
+-- | Used only as a kind, to index PmPat
+data PatTy = PAT | VA
 
 -- The *arity* of a PatVec [p1,..,pn] is
 -- the number of p1..pn that are not Guards
 
 data PmPat :: PatTy -> * where
+  -- | For the arguments' meaning see 'HsPat.ConPatOut'.
   PmCon  :: { pm_con_con     :: ConLike
             , pm_con_arg_tys :: [Type]
             , pm_con_tvs     :: [TyVar]
             , pm_con_dicts   :: [EvVar]
             , pm_con_args    :: [PmPat t] } -> PmPat t
-            -- For PmCon arguments' meaning see @ConPatOut@ in hsSyn/HsPat.hs
   PmVar  :: { pm_var_id   :: Id } -> PmPat t
-  PmLit  :: { pm_lit_lit  :: PmLit } -> PmPat t -- See Note [Literals in PmPat]
+  -- | See Note [Literals in PmPat]
+  PmLit  :: { pm_lit_lit  :: PmLit } -> PmPat t
+  -- | Literal values the wrapped 'Id' cannot take on.
+  -- See Note [PmNLit and PmNCon].
   PmNLit :: { pm_lit_id   :: Id
             , pm_lit_not  :: [PmLit] } -> PmPat 'VA
+  -- | Top-level 'ConLike's the wrapped 'Id' cannot take on.
+  -- See Note [PmNLit and PmNCon].
+  PmNCon :: { pm_con_id   :: Id
+            , pm_con_grps :: [[ConLike]]
+            , pm_con_not  :: [ConLike] } -> PmPat 'VA
   PmGrd  :: { pm_grd_pv   :: PatVec
             , pm_grd_expr :: PmExpr } -> PmPat 'PAT
   -- | A fake guard pattern (True <- _) used to represent cases we cannot handle.
@@ -199,8 +159,7 @@ data Covered = Covered | NotCovered
   deriving Show
 
 instance Outputable Covered where
-  ppr (Covered) = text "Covered"
-  ppr (NotCovered) = text "NotCovered"
+  ppr = text . show
 
 -- Like the or monoid for booleans
 -- Covered = True, Uncovered = False
@@ -217,8 +176,7 @@ data Diverged = Diverged | NotDiverged
   deriving Show
 
 instance Outputable Diverged where
-  ppr Diverged = text "Diverged"
-  ppr NotDiverged = text "NotDiverged"
+  ppr = text . show
 
 instance Semi.Semigroup Diverged where
   Diverged <> _ = Diverged
@@ -229,51 +187,26 @@ instance Monoid Diverged where
   mempty = NotDiverged
   mappend = (Semi.<>)
 
--- | When we learned that a given match group is complete
-data Provenance =
-                  FromBuiltin -- ^  From the original definition of the type
-                              --    constructor.
-                | FromComplete -- ^ From a user-provided @COMPLETE@ pragma
-  deriving (Show, Eq, Ord)
-
-instance Outputable Provenance where
-  ppr  = text . show
-
-instance Semi.Semigroup Provenance where
-  FromComplete <> _ = FromComplete
-  _ <> FromComplete = FromComplete
-  _ <> _ = FromBuiltin
-
-instance Monoid Provenance where
-  mempty = FromBuiltin
-  mappend = (Semi.<>)
-
 data PartialResult = PartialResult {
-                        presultProvenance :: Provenance
-                         -- keep track of provenance because we don't want
-                         -- to warn about redundant matches if the result
-                         -- is contaminated with a COMPLETE pragma
-                      , presultCovered :: Covered
+                        presultCovered :: Covered
                       , presultUncovered :: Uncovered
                       , presultDivergent :: Diverged }
 
 instance Outputable PartialResult where
-  ppr (PartialResult prov c vsa d)
-           = text "PartialResult" <+> ppr prov <+> ppr c
-                                  <+> ppr d <+> ppr vsa
+  ppr (PartialResult c vsa d)
+           = text "PartialResult" <+> ppr c <+> ppr d <+> ppr vsa
 
 
 instance Semi.Semigroup PartialResult where
-  (PartialResult prov1 cs1 vsa1 ds1)
-    <> (PartialResult prov2 cs2 vsa2 ds2)
-      = PartialResult (prov1 Semi.<> prov2)
-                      (cs1 Semi.<> cs2)
+  (PartialResult cs1 vsa1 ds1)
+    <> (PartialResult cs2 vsa2 ds2)
+      = PartialResult (cs1 Semi.<> cs2)
                       (vsa1 Semi.<> vsa2)
                       (ds1 Semi.<> ds2)
 
 
 instance Monoid PartialResult where
-  mempty = PartialResult mempty mempty [] mempty
+  mempty = PartialResult mempty [] mempty
   mappend = (Semi.<>)
 
 -- newtype ChoiceOf a = ChoiceOf [a]
@@ -291,15 +224,13 @@ instance Monoid PartialResult where
 --
 data PmResult =
   PmResult {
-      pmresultProvenance   :: Provenance
-    , pmresultRedundant    :: [Located [LPat GhcTc]]
+      pmresultRedundant    :: [Located [LPat GhcTc]]
     , pmresultUncovered    :: UncoveredCandidates
     , pmresultInaccessible :: [Located [LPat GhcTc]] }
 
 instance Outputable PmResult where
   ppr pmr = hang (text "PmResult") 2 $ vcat
-    [ text "pmresultProvenance" <+> ppr (pmresultProvenance pmr)
-    , text "pmresultRedundant" <+> ppr (pmresultRedundant pmr)
+    [ text "pmresultRedundant" <+> ppr (pmresultRedundant pmr)
     , text "pmresultUncovered" <+> ppr (pmresultUncovered pmr)
     , text "pmresultInaccessible" <+> ppr (pmresultInaccessible pmr)
     ]
@@ -324,11 +255,11 @@ instance Outputable UncoveredCandidates where
 
 -- | The empty pattern check result
 emptyPmResult :: PmResult
-emptyPmResult = PmResult FromBuiltin [] (UncoveredPatterns []) []
+emptyPmResult = PmResult [] (UncoveredPatterns []) []
 
 -- | Non-exhaustive empty case with unknown/trivial inhabitants
 uncoveredWithTy :: Type -> PmResult
-uncoveredWithTy ty = PmResult FromBuiltin [] (TypeOfUncovered ty) []
+uncoveredWithTy ty = PmResult [] (TypeOfUncovered ty) []
 
 {-
 %************************************************************************
@@ -341,8 +272,8 @@ uncoveredWithTy ty = PmResult FromBuiltin [] (TypeOfUncovered ty) []
 -- | Check a single pattern binding (let)
 checkSingle :: DynFlags -> DsMatchContext -> Id -> Pat GhcTc -> DsM ()
 checkSingle dflags ctxt@(DsMatchContext _ locn) var p = do
-  tracePmD "checkSingle" (vcat [ppr ctxt, ppr var, ppr p])
-  mb_pm_res <- tryM (getResult (checkSingle' locn var p))
+  tracePm "checkSingle" (vcat [ppr ctxt, ppr var, ppr p])
+  mb_pm_res <- tryM (checkSingle' locn var p)
   case mb_pm_res of
     Left  _   -> warnPmIters dflags ctxt
     Right res -> dsPmWarn dflags ctxt res
@@ -350,25 +281,25 @@ checkSingle dflags ctxt@(DsMatchContext _ locn) var p = do
 -- | Check a single pattern binding (let)
 checkSingle' :: SrcSpan -> Id -> Pat GhcTc -> PmM PmResult
 checkSingle' locn var p = do
-  liftD resetPmIterDs -- set the iter-no to zero
-  fam_insts <- liftD dsGetFamInstEnvs
-  clause    <- liftD $ translatePat fam_insts p
+  resetPmIterDs -- set the iter-no to zero
+  fam_insts <- dsGetFamInstEnvs
+  clause    <- translatePat fam_insts p
   missing   <- mkInitialUncovered [var]
   tracePm "checkSingle': missing" (vcat (map pprValVecDebug missing))
                                   -- no guards
-  PartialResult prov cs us ds <- runMany (pmcheckI clause []) missing
-  let us' = UncoveredPatterns us
+  PartialResult cs us ds <- runMany (pmcheckI clause []) missing
+  us' <- UncoveredPatterns <$> normaliseUncovered us
   return $ case (cs,ds) of
-    (Covered,  _    )         -> PmResult prov [] us' [] -- useful
-    (NotCovered, NotDiverged) -> PmResult prov m  us' [] -- redundant
-    (NotCovered, Diverged )   -> PmResult prov [] us' m  -- inaccessible rhs
+    (Covered,  _    )         -> PmResult [] us' [] -- useful
+    (NotCovered, NotDiverged) -> PmResult m  us' [] -- redundant
+    (NotCovered, Diverged )   -> PmResult [] us' m  -- inaccessible rhs
   where m = [cL locn [cL locn p]]
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions.
 checkGuardMatches :: HsMatchContext Name          -- Match context
                   -> GRHSs GhcTc (LHsExpr GhcTc)  -- Guarded RHSs
-                  -> DsM ()
+                  -> PmM ()
 checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
     dflags <- getDynFlags
     let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
@@ -383,14 +314,14 @@ checkGuardMatches _ (XGRHSs _) = panic "checkGuardMatches"
 
 -- | Check a matchgroup (case, functions, etc.)
 checkMatches :: DynFlags -> DsMatchContext
-             -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM ()
+             -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> PmM ()
 checkMatches dflags ctxt vars matches = do
-  tracePmD "checkMatches" (hang (vcat [ppr ctxt
+  tracePm "checkMatches" (hang (vcat [ppr ctxt
                                , ppr vars
                                , text "Matches:"])
                                2
                                (vcat (map ppr matches)))
-  mb_pm_res <- tryM $ getResult $ case matches of
+  mb_pm_res <- tryM $ case matches of
     -- Check EmptyCase separately
     -- See Note [Checking EmptyCase Expressions]
     [] | [var] <- vars -> checkEmptyCase' var
@@ -405,38 +336,36 @@ checkMatches' :: [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> PmM PmResult
 checkMatches' vars matches
   | null matches = panic "checkMatches': EmptyCase"
   | otherwise = do
-      liftD resetPmIterDs -- set the iter-no to zero
+      resetPmIterDs -- set the iter-no to zero
       missing    <- mkInitialUncovered vars
       tracePm "checkMatches': missing" (vcat (map pprValVecDebug missing))
-      (prov, rs,us,ds) <- go matches missing
+      (rs,us,ds) <- go matches missing
+      us' <- normaliseUncovered us
       return $ PmResult {
-                   pmresultProvenance   = prov
-                 , pmresultRedundant    = map hsLMatchToLPats rs
-                 , pmresultUncovered    = UncoveredPatterns us
+                   pmresultRedundant    = map hsLMatchToLPats rs
+                 , pmresultUncovered    = UncoveredPatterns us'
                  , pmresultInaccessible = map hsLMatchToLPats ds }
   where
     go :: [LMatch GhcTc (LHsExpr GhcTc)] -> Uncovered
-       -> PmM (Provenance
-              , [LMatch GhcTc (LHsExpr GhcTc)]
+       -> PmM ( [LMatch GhcTc (LHsExpr GhcTc)]
               , Uncovered
               , [LMatch GhcTc (LHsExpr GhcTc)])
-    go []     missing = return (mempty, [], missing, [])
+    go []     missing = return ([], missing, [])
     go (m:ms) missing = do
       tracePm "checkMatches': go" (ppr m $$ ppr missing)
-      fam_insts          <- liftD dsGetFamInstEnvs
-      (clause, guards)   <- liftD $ translateMatch fam_insts m
-      r@(PartialResult prov cs missing' ds)
+      fam_insts          <- dsGetFamInstEnvs
+      (clause, guards)   <- translateMatch fam_insts m
+      r@(PartialResult cs missing' ds)
         <- runMany (pmcheckI clause guards) missing
       tracePm "checkMatches': go: res" (ppr r)
-      (ms_prov, rs, final_u, is)  <- go ms missing'
-      let final_prov = prov `mappend` ms_prov
+      (rs, final_u, is)  <- go ms missing'
       return $ case (cs, ds) of
         -- useful
-        (Covered,  _    )        -> (final_prov,  rs, final_u,   is)
+        (Covered,  _    )        -> (rs, final_u,   is)
         -- redundant
-        (NotCovered, NotDiverged) -> (final_prov, m:rs, final_u,is)
+        (NotCovered, NotDiverged) -> (m:rs, final_u,is)
         -- inaccessible
-        (NotCovered, Diverged )   -> (final_prov,  rs, final_u, m:is)
+        (NotCovered, Diverged )   -> (rs, final_u, m:is)
 
     hsLMatchToLPats :: LMatch id body -> Located [LPat id]
     hsLMatchToLPats (dL->L l (Match { m_pats = pats })) = cL l pats
@@ -464,7 +393,7 @@ checkEmptyCase' var = do
         pure $ fmap (ValVec [va]) mb_sat
       return $ if null missing_m
         then emptyPmResult
-        else PmResult FromBuiltin [] (UncoveredPatterns missing_m) []
+        else PmResult [] (UncoveredPatterns missing_m) []
 
 -- | Returns 'True' if the argument 'Type' is a fully saturated application of
 -- a closed type constructor.
@@ -515,7 +444,7 @@ pmTopNormaliseType_maybe :: FamInstEnvs -> Bag EvVar -> Type
 -- is a type family with a variable result kind. I (Richard E) can't think
 -- of a way to cause trouble here, though.
 pmTopNormaliseType_maybe env ty_cs typ
-  = do (_, mb_typ') <- liftD $ initTcDsForSolver $ tcNormalise ty_cs typ
+  = do (_, mb_typ') <- initTcDsForSolver $ tcNormalise ty_cs typ
          -- Before proceeding, we chuck typ into the constraint solver, in case
          -- solving for given equalities may reduce typ some. See
          -- "Wrinkle: local equalities" in
@@ -578,8 +507,8 @@ pmTopNormaliseType_maybe env ty_cs typ
 -- for why this is done.)
 pmInitialTmTyCs :: PmM Delta
 pmInitialTmTyCs = do
-  ty_cs  <- liftD getDictsDs
-  tm_cs  <- map toComplex . bagToList <$> liftD getTmCsDs
+  ty_cs  <- getDictsDs
+  tm_cs  <- map toComplex . bagToList <$> getTmCsDs
   sat_ty <- tyOracle ty_cs
   let initTyCs = if sat_ty then ty_cs else emptyBag
       initTmState = fromMaybe initialTmState (tmOracle initialTmState tm_cs)
@@ -670,12 +599,53 @@ tmTyCsAreSatisfiable
                                                  , delta_tm_cs = term_cs }
            _unsat               -> Nothing
 
+-- | This weeds out patterns with 'PmNCon's where at least one COMPLETE set is
+-- rendered vacuous by equality constraints.
+normaliseUncovered :: Uncovered -> PmM Uncovered
+normaliseUncovered us = do
+  let valvec_inhabited p (ValVec vva delta) = runMaybeT $ do
+        vva' <- traverse (valabs_inhabited p delta) vva
+        pure (ValVec vva' delta)
+      valabs_inhabited p delta v = case v :: ValAbs of
+        -- TODO: There's no easy way to call allCompleteMatches only from
+        -- knowing x's idType. Maybe this doesn't matter.
+        -- PmVar x -> var_inh p delta x [] ???
+        PmNCon x grps ncons -> var_inh p delta x ncons grps
+        _ -> pure v
+      var_inh p delta x ncons grps = do
+        let grp_inh = filterM (p delta x) . filter (`notElem` ncons)
+        incomplete_grps <- traverse grp_inh grps
+        -- If all cons of any COMPLETE set are matched, the ValVec is vacuous.
+        guard (all notNull incomplete_grps)
+        -- If there's any singleton incomplete group, turn it into a `PmCon` for
+        -- better readability of warning messages.
+        case find isSingleton incomplete_grps of
+          Just [con] -> do
+            -- We don't want to simplify to a `PmCon` (which won't normalise any
+            -- further) when @p@ is just the @cheap_inh_test@. Thus, we have to
+            -- assert satisfiability here, even if @actual_inh_test@ already did
+            -- so.
+            ic <- MaybeT $ mkOneSatisfiableConFull delta x con
+            pure (ic_val_abs ic)
+          _        -> pure (PmNCon x grps ncons)
+
+  -- We'll first do a cheap sweep without consulting the oracles
+  let cheap_inh_test _ _ _ = pure True
+  us1 <- mapMaybeM (valvec_inhabited cheap_inh_test) us
+  -- Then we'll do another pass trying to weed out the rest with (in)equalities
+  let actual_inh_test delta x con = do
+        lift (tracePm "nrm" (ppr con <+> ppr x <+> ppr (delta_tm_cs delta)))
+        isJust <$> lift (mkOneSatisfiableConFull delta x con)
+  us2 <- mapMaybeM (valvec_inhabited actual_inh_test) us1
+  tracePm "normaliseUncovered" (vcat (map pprValVecDebug us2))
+  pure us2
+
 -- | Implements two performance optimizations, as described in the
 -- \"Strict argument type constraints\" section of
 -- @Note [Extensions to GADTs Meet Their Match]@.
 checkAllNonVoid :: RecTcChecker -> Delta -> [Type] -> PmM Bool
 checkAllNonVoid rec_ts amb_cs strict_arg_tys = do
-  fam_insts <- liftD dsGetFamInstEnvs
+  fam_insts <- dsGetFamInstEnvs
   let definitely_inhabited =
         definitelyInhabitedType fam_insts (delta_ty_cs amb_cs)
   tys_to_check <- filterOutM definitely_inhabited strict_arg_tys
@@ -832,7 +802,7 @@ equalities (such as i ~ Int) that may be in scope.
 inhabitationCandidates :: Bag EvVar -> Type
                        -> PmM (Either Type (TyCon, [InhabitationCandidate]))
 inhabitationCandidates ty_cs ty = do
-  fam_insts   <- liftD dsGetFamInstEnvs
+  fam_insts   <- dsGetFamInstEnvs
   mb_norm_res <- pmTopNormaliseType_maybe fam_insts ty_cs ty
   case mb_norm_res of
     Just (src_ty, dcs, core_ty) -> alts_to_check src_ty core_ty dcs
@@ -856,7 +826,7 @@ inhabitationCandidates ty_cs ty = do
         |  tc `elem` trivially_inhabited
         -> case dcs of
              []    -> return (Left src_ty)
-             (_:_) -> do var <- liftD $ mkPmId core_ty
+             (_:_) -> do var <- mkPmId core_ty
                          let va = build_tm (PmVar var) dcs
                          return $ Right (tc, [InhabitationCandidate
                            { ic_val_abs = va, ic_tm_ct = mkIdEq var
@@ -866,7 +836,7 @@ inhabitationCandidates ty_cs ty = do
            -- Don't consider abstract tycons since we don't know what their
            -- constructors are, which makes the results of coverage checking
            -- them extremely misleading.
-        -> liftD $ do
+        -> do
              var  <- mkPmId core_ty -- it would be wrong to unify x
              alts <- mapM (mkOneConFull var . RealDataCon) (tyConDataCons tc)
              return $ Right
@@ -932,7 +902,7 @@ truePattern = nullaryConPattern (RealDataCon trueDataCon)
 {-# INLINE truePattern #-}
 
 -- | Generate a `canFail` pattern vector of a specific type
-mkCanFailPmPat :: Type -> DsM PatVec
+mkCanFailPmPat :: Type -> PmM PatVec
 mkCanFailPmPat ty = do
   var <- mkPmVar ty
   return [var, PmFake]
@@ -967,7 +937,7 @@ mkLitPattern lit = PmLit { pm_lit_lit = PmSLit lit }
 -- -----------------------------------------------------------------------
 -- * Transform (Pat Id) into of (PmPat Id)
 
-translatePat :: FamInstEnvs -> Pat GhcTc -> DsM PatVec
+translatePat :: FamInstEnvs -> Pat GhcTc -> PmM PatVec
 translatePat fam_insts pat = case pat of
   WildPat  ty  -> mkPmVars [ty]
   VarPat _ id  -> return [PmVar (unLoc id)]
@@ -1179,12 +1149,12 @@ from translation in pattern matcher.
 
 -- | Translate a list of patterns (Note: each pattern is translated
 -- to a pattern vector but we do not concatenate the results).
-translatePatVec :: FamInstEnvs -> [Pat GhcTc] -> DsM [PatVec]
+translatePatVec :: FamInstEnvs -> [Pat GhcTc] -> PmM [PatVec]
 translatePatVec fam_insts pats = mapM (translatePat fam_insts) pats
 
 -- | Translate a constructor pattern
 translateConPatVec :: FamInstEnvs -> [Type] -> [TyVar]
-                   -> ConLike -> HsConPatDetails GhcTc -> DsM PatVec
+                   -> ConLike -> HsConPatDetails GhcTc -> PmM PatVec
 translateConPatVec fam_insts _univ_tys _ex_tvs _ (PrefixCon ps)
   = concat <$> translatePatVec fam_insts (map unLoc ps)
 translateConPatVec fam_insts _univ_tys _ex_tvs _ (InfixCon p1 p2)
@@ -1240,11 +1210,12 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
 
 -- Translate a single match
 translateMatch :: FamInstEnvs -> LMatch GhcTc (LHsExpr GhcTc)
-               -> DsM (PatVec,[PatVec])
+               -> PmM (PatVec,[PatVec])
 translateMatch fam_insts (dL->L _ (Match { m_pats = lpats, m_grhss = grhss })) =
   do
   pats'   <- concat <$> translatePatVec fam_insts pats
   guards' <- mapM (translateGuards fam_insts) guards
+  -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr guards, ppr guards'])
   return (pats', guards')
   where
     extractGuards :: LGRHS GhcTc (LHsExpr GhcTc) -> [GuardStmt GhcTc]
@@ -1259,11 +1230,11 @@ translateMatch _ _ = panic "translateMatch"
 -- * Transform source guards (GuardStmt Id) to PmPats (Pattern)
 
 -- | Translate a list of guard statements to a pattern vector
-translateGuards :: FamInstEnvs -> [GuardStmt GhcTc] -> DsM PatVec
+translateGuards :: FamInstEnvs -> [GuardStmt GhcTc] -> PmM PatVec
 translateGuards fam_insts guards = do
   all_guards <- concat <$> mapM (translateGuard fam_insts) guards
   let
-    shouldKeep :: Pattern -> DsM Bool
+    shouldKeep :: Pattern -> PmM Bool
     shouldKeep p
       | PmVar {} <- p = pure True
       | PmCon {} <- p = (&&)
@@ -1288,7 +1259,7 @@ translateGuards fam_insts guards = do
       pure (PmFake : kept)
 
 -- | Check whether a pattern can fail to match
-cantFailPattern :: Pattern -> DsM Bool
+cantFailPattern :: Pattern -> PmM Bool
 cantFailPattern PmVar {}      = pure True
 cantFailPattern PmCon { pm_con_con = c, pm_con_arg_tys = tys, pm_con_args = ps}
   = (&&) <$> singleMatchConstructor c tys <*> allM cantFailPattern ps
@@ -1296,7 +1267,7 @@ cantFailPattern (PmGrd pv _e) = allM cantFailPattern pv
 cantFailPattern _             = pure False
 
 -- | Translate a guard statement to Pattern
-translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> DsM PatVec
+translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> PmM PatVec
 translateGuard fam_insts guard = case guard of
   BodyStmt _   e _ _ -> translateBoolGuard e
   LetStmt  _   binds -> translateLet (unLoc binds)
@@ -1309,18 +1280,18 @@ translateGuard fam_insts guard = case guard of
   XStmtLR         {} -> panic "translateGuard RecStmt"
 
 -- | Translate let-bindings
-translateLet :: HsLocalBinds GhcTc -> DsM PatVec
+translateLet :: HsLocalBinds GhcTc -> PmM PatVec
 translateLet _binds = return []
 
 -- | Translate a pattern guard
-translateBind :: FamInstEnvs -> LPat GhcTc -> LHsExpr GhcTc -> DsM PatVec
+translateBind :: FamInstEnvs -> LPat GhcTc -> LHsExpr GhcTc -> PmM PatVec
 translateBind fam_insts (dL->L _ p) e = do
   ps <- translatePat fam_insts p
   g <- mkGuard ps (unLoc e)
   return [g]
 
 -- | Translate a boolean guard
-translateBoolGuard :: LHsExpr GhcTc -> DsM PatVec
+translateBoolGuard :: LHsExpr GhcTc -> PmM PatVec
 translateBoolGuard e
   | isJust (isTrueLHsExpr e) = return []
     -- The formal thing to do would be to generate (True <- True)
@@ -1421,10 +1392,17 @@ efficiently, which gave rise to #11276. The original approach translated
 
     pat |> co    ===>    x (pat <- (e |> co))
 
-Instead, we now check whether the coercion is a hole or if it is just refl, in
-which case we can drop it. Unfortunately, data families generate useful
-coercions so guards are still generated in these cases and checking data
-families is not really efficient.
+Why did we do this seemingly unnecessary expansion in the first place?
+The reason is that the type of @pat |> co@ (which is the type of the value
+abstraction we match against) might be different than that of @pat@. Data
+instances such as @Sing (a :: Bool)@ are a good example of this: If we would
+just drop the coercion, we'd get a type error when matching @pat@ against its
+value abstraction, with the result being that pmIsSatisfiable decides that every
+possible data constructor fitting @pat@ is rejected as uninhabitated, leading to
+a lot of false warnings.
+
+But we can check whether the coercion is a hole or if it is just refl, in
+which case we can drop it.
 
 %************************************************************************
 %*                                                                      *
@@ -1441,6 +1419,7 @@ families is not really efficient.
 pmPatType :: PmPat p -> Type
 pmPatType (PmCon { pm_con_con = con, pm_con_arg_tys = tys })
   = conLikeResTy con tys
+pmPatType (PmNCon { pm_con_id  = x }) = idType x
 pmPatType (PmVar  { pm_var_id  = x }) = idType x
 pmPatType (PmLit  { pm_lit_lit = l }) = pmLitType l
 pmPatType (PmNLit { pm_lit_id  = x }) = idType x
@@ -1471,10 +1450,13 @@ checker adheres to. Since the paper's publication, there have been some
 additional features added to the coverage checker which are not described in
 the paper. This Note serves as a reference for these new features.
 
------
--- Strict argument type constraints
------
+* Handling of uninhabited fields like `!Void`.
+  See Note [Strict argument type constraints]
+* Efficient handling of literal splitting, large enumerations and accurate
+  redundancy warnings for `COMPLETE` groups. See Note [PmNLit and PmNCon]
 
+Note [Strict argument type constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the ConVar case of clause processing, each conlike K traditionally
 generates two different forms of constraints:
 
@@ -1594,8 +1576,43 @@ intuition formal, we say that a type is definitely inhabitable (DI) if:
     1. C has no equality constraints (since they might be unsatisfiable)
     2. C has no strict argument types (since they might be uninhabitable)
 
-It's relatively cheap to cheap if a type is DI, so before we call `nonVoid`
+It's relatively cheap to check if a type is DI, so before we call `nonVoid`
 on a list of strict argument types, we filter out all of the DI ones.
+
+Note [PmNLit and PmNCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+TLDR:
+* 'PmNLit' is an efficient encoding of literals we already matched on.
+  Important for checking redundancy without blowing up the term oracle.
+* 'PmNCon' is an efficient encoding of all constructors we already matched on.
+  Important for proper redundancy and completeness checks while being more
+  efficient than the `ConVar` split in GADTs Meet Their Match.
+
+GADTs Meet Their Match handled literals by desugaring to guard expressions,
+effectively encoding the knowledge in the term oracle. As it turned out, this
+doesn't scale (#11303, cf. Note [Literals in PmPat]), so we adopted an approach
+that encodes negative information about literals as a 'PmNLit', which encodes
+literal values the carried variable may no longer take on.
+
+The counterpart for constructor values is 'PmNCon', where we associate
+with a variable the topmost 'ConLike's it surely can't be. This is in contrast
+to GADTs Meet Their Match, where instead the `ConVar` case would split the value
+vector abstraction on all possible constructors from a `COMPLETE` group.
+In fact, we used to do just that, but committing to a particular `COMPLETE`
+group in `ConVar`, even nondeterministically, led to misleading redundancy
+warnings (#13363).
+Apart from that, splitting on huge enumerations in the presence of a catch-all
+case is a huge waste of resources.
+
+Note that since we have pattern guards, the term oracle must also be able to
+cope with negative equations involving literals and constructors, cf.
+Note [Refutable shapes] in TmOracle. Since we don't want to put too much strain
+on the term oracle with repeated coverage checks against all `COMPLETE` groups,
+we only do so once at the end in 'normaliseUncovered'.
+
+Peter Sestoft was probably the first to describe positive and negative
+information about terms in this manner in ML Pattern Match Compilation and
+Partial Evaluation.
 -}
 
 instance Outputable InhabitationCandidate where
@@ -1610,7 +1627,7 @@ instance Outputable InhabitationCandidate where
 
 -- | Generate an 'InhabitationCandidate' for a given conlike (generate
 -- fresh variables of the appropriate type for arguments)
-mkOneConFull :: Id -> ConLike -> DsM InhabitationCandidate
+mkOneConFull :: Id -> ConLike -> PmM InhabitationCandidate
 --  *  x :: T tys, where T is an algebraic data type
 --     NB: in the case of a data family, T is the *representation* TyCon
 --     e.g.   data instance T (a,b) = T1 a b
@@ -1660,22 +1677,30 @@ mkOneConFull x con = do
            , ic_strict_arg_tys = strict_arg_tys
            }
 
+-- | 'mkOneConFull' and immediately check whether the resulting
+-- 'InhabitationCandidat' @ic@ is inhabited by consulting 'pmIsSatisfiable'.
+-- Return @Just ic@ if it is.
+mkOneSatisfiableConFull :: Delta -> Id -> ConLike -> PmM (Maybe InhabitationCandidate)
+mkOneSatisfiableConFull delta x con = do
+  ic <- mkOneConFull x con
+  (ic <$) <$> pmIsSatisfiable delta (ic_tm_ct ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
+
 -- ----------------------------------------------------------------------------
 -- * More smart constructors and fresh variable generation
 
 -- | Create a guard pattern
-mkGuard :: PatVec -> HsExpr GhcTc -> DsM Pattern
+mkGuard :: PatVec -> HsExpr GhcTc -> PmM Pattern
 mkGuard pv e = do
   res <- allM cantFailPattern pv
   let expr = hsExprToPmExpr e
-  tracePmD "mkGuard" (vcat [ppr pv, ppr e, ppr res, ppr expr])
+  tracePm "mkGuard" (vcat [ppr pv, ppr e, ppr res, ppr expr])
   if | res                    -> pure (PmGrd pv expr)
      | PmExprOther {} <- expr -> pure PmFake
      | otherwise              -> pure (PmGrd pv expr)
 
--- | Create a term equality of the form: `(x ~ lit)`
-mkPosEq :: Id -> PmLit -> ComplexEq
-mkPosEq x l = (PmExprVar (idName x), PmExprLit l)
+-- | Create a term equality of the form: `(x ~ e)`
+mkPosEq :: Id -> PmExpr -> ComplexEq
+mkPosEq x e = (PmExprVar (idName x), e)
 {-# INLINE mkPosEq #-}
 
 -- | Create a term equality of the form: `(x ~ x)`
@@ -1686,17 +1711,17 @@ mkIdEq x = (PmExprVar name, PmExprVar name)
 {-# INLINE mkIdEq #-}
 
 -- | Generate a variable pattern of a given type
-mkPmVar :: Type -> DsM (PmPat p)
+mkPmVar :: Type -> PmM (PmPat p)
 mkPmVar ty = PmVar <$> mkPmId ty
 {-# INLINE mkPmVar #-}
 
 -- | Generate many variable patterns, given a list of types
-mkPmVars :: [Type] -> DsM PatVec
+mkPmVars :: [Type] -> PmM PatVec
 mkPmVars tys = mapM mkPmVar tys
 {-# INLINE mkPmVars #-}
 
 -- | Generate a fresh `Id` of a given type
-mkPmId :: Type -> DsM Id
+mkPmId :: Type -> PmM Id
 mkPmId ty = getUniqueM >>= \unique ->
   let occname = mkVarOccFS $ fsLit "$pm"
       name    = mkInternalName unique occname noSrcSpan
@@ -1705,7 +1730,7 @@ mkPmId ty = getUniqueM >>= \unique ->
 -- | Generate a fresh term variable of a given and return it in two forms:
 -- * A variable pattern
 -- * A variable expression
-mkPmId2Forms :: Type -> DsM (Pattern, LHsExpr GhcTc)
+mkPmId2Forms :: Type -> PmM (Pattern, LHsExpr GhcTc)
 mkPmId2Forms ty = do
   x <- mkPmId ty
   return (PmVar x, noLoc (HsVar noExt (noLoc x)))
@@ -1717,6 +1742,7 @@ mkPmId2Forms ty = do
 vaToPmExpr :: ValAbs -> PmExpr
 vaToPmExpr (PmCon  { pm_con_con = c, pm_con_args = ps })
   = PmExprCon c (map vaToPmExpr ps)
+vaToPmExpr (PmNCon { pm_con_id  = x }) = PmExprVar (idName x)
 vaToPmExpr (PmVar  { pm_var_id  = x }) = PmExprVar (idName x)
 vaToPmExpr (PmLit  { pm_lit_lit = l }) = PmExprLit l
 vaToPmExpr (PmNLit { pm_lit_id  = x }) = PmExprVar (idName x)
@@ -1744,9 +1770,9 @@ coercePmPat PmFake     = [] -- drop the guards
 -- | Check whether a 'ConLike' has the /single match/ property, i.e. whether
 -- it is the only possible match in the given context. See also
 -- 'allCompleteMatches' and Note [Single match constructors].
-singleMatchConstructor :: ConLike -> [Type] -> DsM Bool
+singleMatchConstructor :: ConLike -> [Type] -> PmM Bool
 singleMatchConstructor cl tys =
-  any (isSingleton . snd) <$> allCompleteMatches cl tys
+  any isSingleton <$> allCompleteMatches cl tys
 
 {-
 Note [Single match constructors]
@@ -1781,20 +1807,18 @@ translation step. See #15753 for why this yields surprising results.
 --  2. From `COMPLETE` pragmas which have the same type as the result
 --     type constructor. Note that we only use `COMPLETE` pragmas
 --     *all* of whose pattern types match. See #14135
-allCompleteMatches :: ConLike -> [Type] -> DsM [(Provenance, [ConLike])]
+allCompleteMatches :: ConLike -> [Type] -> DsM [[ConLike]]
 allCompleteMatches cl tys = do
   let fam = case cl of
            RealDataCon dc ->
-            [(FromBuiltin, map RealDataCon (tyConDataCons (dataConTyCon dc)))]
+            [map RealDataCon (tyConDataCons (dataConTyCon dc))]
            PatSynCon _    -> []
       ty  = conLikeResTy cl tys
   pragmas <- case splitTyConApp_maybe ty of
                Just (tc, _) -> dsGetCompleteMatches tc
                Nothing      -> return []
-  let fams cm = (FromComplete,) <$>
-                mapM dsLookupConLike (completeMatchConLikes cm)
-  from_pragma <- filter (\(_,m) -> isValidCompleteMatch ty m) <$>
-                mapM fams pragmas
+  let fams cm = mapM dsLookupConLike (completeMatchConLikes cm)
+  from_pragma <- filter (isValidCompleteMatch ty) <$> mapM fams pragmas
   let final_groups = fam ++ from_pragma
   return final_groups
     where
@@ -1886,8 +1910,7 @@ nameType name ty = do
 -- | Check whether a set of type constraints is satisfiable.
 tyOracle :: Bag EvVar -> PmM Bool
 tyOracle evs
-  = liftD $
-    do { ((_warns, errs), res) <- initTcDsForSolver $ tcCheckSatisfiability evs
+  = do { ((_warns, errs), res) <- initTcDsForSolver $ tcCheckSatisfiability evs
        ; case res of
             Just sat -> return sat
             Nothing  -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc errs) }
@@ -1969,7 +1992,7 @@ mkInitialUncovered vars = do
 -- limit is not exceeded and call `pmcheck`
 pmcheckI :: PatVec -> [PatVec] -> ValVec -> PmM PartialResult
 pmcheckI ps guards vva = do
-  n <- liftD incrCheckPmIterDs
+  n <- incrCheckPmIterDs
   tracePm "pmCheck" (ppr n <> colon <+> pprPatVec ps
                         $$ hang (text "guards:") 2 (vcat (map pprPatVec guards))
                         $$ pprValVecDebug vva)
@@ -1981,7 +2004,7 @@ pmcheckI ps guards vva = do
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheckGuards`
 pmcheckGuardsI :: [PatVec] -> ValVec -> PmM PartialResult
-pmcheckGuardsI gvs vva = liftD incrCheckPmIterDs >> pmcheckGuards gvs vva
+pmcheckGuardsI gvs vva = incrCheckPmIterDs >> pmcheckGuards gvs vva
 {-# INLINE pmcheckGuardsI #-}
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
@@ -1989,7 +2012,7 @@ pmcheckGuardsI gvs vva = liftD incrCheckPmIterDs >> pmcheckGuards gvs vva
 pmcheckHdI :: Pattern -> PatVec -> [PatVec] -> ValAbs -> ValVec
            -> PmM PartialResult
 pmcheckHdI p ps guards va vva = do
-  n <- liftD incrCheckPmIterDs
+  n <- incrCheckPmIterDs
   tracePm "pmCheckHdI" (ppr n <> colon <+> pprPmPatDebug p
                         $$ pprPatVec ps
                         $$ hang (text "guards:") 2 (vcat (map pprPatVec guards))
@@ -2019,10 +2042,13 @@ pmcheck (PmFake : ps) guards vva =
 pmcheck (p : ps) guards (ValVec vas delta)
   | PmGrd { pm_grd_pv = pv, pm_grd_expr = e } <- p
   = do
-      y <- liftD $ mkPmId (pmPatType p)
+      tracePm "PmGrd: pmPatType" (hcat [ppr p, ppr (pmPatType p)])
+      y <- mkPmId (pmPatType p)
       let tm_state = extendSubst y e (delta_tm_cs delta)
           delta'   = delta { delta_tm_cs = tm_state }
-      utail <$> pmcheckI (pv ++ ps) guards (ValVec (PmVar y : vas) delta')
+      pr <- pmcheckI (pv ++ ps) guards (ValVec (PmVar y : vas) delta')
+      us <- normaliseUncovered (presultUncovered pr)
+      pure $ utail pr { presultUncovered = us }
 
 pmcheck [] _ (ValVec (_:_) _) = panic "pmcheck: nil-cons"
 pmcheck (_:_) _ (ValVec [] _) = panic "pmcheck: cons-nil"
@@ -2034,10 +2060,9 @@ pmcheck (p:ps) guards (ValVec (va:vva) delta)
 pmcheckGuards :: [PatVec] -> ValVec -> PmM PartialResult
 pmcheckGuards []       vva = return (usimple [vva])
 pmcheckGuards (gv:gvs) vva = do
-  (PartialResult prov1 cs vsa ds) <- pmcheckI gv [] vva
-  (PartialResult prov2 css vsas dss) <- runMany (pmcheckGuardsI gvs) vsa
-  return $ PartialResult (prov1 `mappend` prov2)
-                         (cs `mappend` css)
+  (PartialResult cs vsa ds) <- pmcheckI gv [] vva
+  (PartialResult css vsas dss) <- runMany (pmcheckGuardsI gvs) vsa
+  return $ PartialResult (cs `mappend` css)
                          vsas
                          (ds `mappend` dss)
 
@@ -2073,7 +2098,7 @@ pmcheckHd ( p@(PmCon { pm_con_con = c1, pm_con_tvs = ex_tvs1
           | otherwise  = Just <$> to_evvar tv1 tv2
     evvars <- (listToBag . catMaybes) <$>
               ASSERT(ex_tvs1 `equalLength` ex_tvs2)
-              liftD (zipWithM mb_to_evvar ex_tvs1 ex_tvs2)
+              (zipWithM mb_to_evvar ex_tvs1 ex_tvs2)
     let delta' = delta { delta_ty_cs = evvars `unionBags` delta_ty_cs delta }
     kcon c1 (pm_con_arg_tys p) (pm_con_tvs p) (pm_con_dicts p)
       <$> pmcheckI (args1 ++ ps) guards (ValVec (args2 ++ vva) delta')
@@ -2085,45 +2110,53 @@ pmcheckHd (PmLit l1) ps guards (va@(PmLit l2)) vva =
     False -> return $ ucon va (usimple [vva])
 
 -- ConVar
-pmcheckHd (p@(PmCon { pm_con_con = con, pm_con_arg_tys = tys }))
-          ps guards
-          (PmVar x) (ValVec vva delta) = do
-  (prov, complete_match) <- select =<< liftD (allCompleteMatches con tys)
+pmcheckHd p@PmCon{} ps guards (PmVar x) vva@(ValVec _ delta) = do
+  groups <- allCompleteMatches (pm_con_con p) (pm_con_arg_tys p)
+  force_if (canDiverge (idName x) (delta_tm_cs delta)) <$>
+    pmcheckHd p ps guards (PmNCon x groups []) vva
 
-  cons_cs <- mapM (liftD . mkOneConFull x) complete_match
+-- ConNCon
+pmcheckHd p@PmCon{} ps guards va@PmNCon{} (ValVec vva delta) = do
+  -- Split the value vector into two value vectors: One representing the current
+  -- constructor, the other representing everything but the current constructor
+  -- (and the already known impossible constructors).
+  let con   = pm_con_con p
+  let x     = pm_con_id va
+  let grps  = pm_con_grps va
+  let ncons = pm_con_not va
 
-  inst_vsa <- flip mapMaybeM cons_cs $
-      \InhabitationCandidate{ ic_val_abs = va, ic_tm_ct = tm_ct
-                            , ic_ty_cs = ty_cs
-                            , ic_strict_arg_tys = strict_arg_tys } -> do
-    mb_sat <- pmIsSatisfiable delta tm_ct ty_cs strict_arg_tys
-    pure $ fmap (ValVec (va:vva)) mb_sat
+  -- For the value vector of the current constructor, we directly recurse into
+  -- checking the the current case, so we get back a PartialResult
+  ic <- mkOneConFull x con
+  pr_con <- fmap (fromMaybe mempty) $ runMaybeT $ do
+    guard (con `notElem` ncons)
+    delta' <- MaybeT $ pmIsSatisfiable delta (ic_tm_ct ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
+    lift $ tracePm "success" (ppr (delta_tm_cs delta))
+    lift $ pmcheckHdI p ps guards (ic_val_abs ic) (ValVec vva delta')
 
-  set_provenance prov .
-    force_if (canDiverge (idName x) (delta_tm_cs delta)) <$>
-      runMany (pmcheckI (p:ps) guards) inst_vsa
+  let ncons' = con : ncons
+  let us_incomplete
+        | let nalt = PmAltConLike (pm_con_con p) (pm_con_arg_tys p)
+        , Just tm_state <- addSolveRefutableAltCon (delta_tm_cs delta) x nalt
+        = [ValVec (PmNCon x grps ncons' : vva) (delta { delta_tm_cs = tm_state })]
+        | otherwise = []
+  us_incomplete' <- normaliseUncovered us_incomplete
+  tracePm "ConNCon" (vcat [ppr p, ppr x, ppr ncons', ppr pr_con, ppr us_incomplete, ppr us_incomplete'])
+
+  -- Combine both into a single PartialResult
+  let pr_combined = mkUnion pr_con (usimple us_incomplete')
+  pure pr_combined
 
 -- LitVar
-pmcheckHd (p@(PmLit l)) ps guards (PmVar x) (ValVec vva delta)
+pmcheckHd p@PmLit{} ps guards (PmVar x) vva@(ValVec _ delta)
   = force_if (canDiverge (idName x) (delta_tm_cs delta)) <$>
-      mkUnion non_matched <$>
-        case solveOneEq (delta_tm_cs delta) (mkPosEq x l) of
-          Just tm_state -> pmcheckHdI p ps guards (PmLit l) $
-                             ValVec vva (delta {delta_tm_cs = tm_state})
-          Nothing       -> return mempty
-  where
-    -- See Note [Refutable shapes] in TmOracle
-    us | Just tm_state <- addSolveRefutableAltCon (delta_tm_cs delta) x (PmAltLit l)
-       = [ValVec (PmNLit x [l] : vva) (delta { delta_tm_cs = tm_state })]
-       | otherwise = []
-
-    non_matched = usimple us
+      pmcheckHd p ps guards (PmNLit x []) vva
 
 -- LitNLit
 pmcheckHd (p@(PmLit l)) ps guards
           (PmNLit { pm_lit_id = x, pm_lit_not = lits }) (ValVec vva delta)
   | all (not . eqPmLit l) lits
-  , Just tm_state <- solveOneEq (delta_tm_cs delta) (mkPosEq x l)
+  , Just tm_state <- solveOneEq (delta_tm_cs delta) (mkPosEq x (PmExprLit l))
     -- Both guards check the same so it would be sufficient to have only
     -- the second one. Nevertheless, it is much cheaper to check whether
     -- the literal is in the list so we check it first, to avoid calling
@@ -2149,7 +2182,7 @@ pmcheckHd (p@(PmLit l)) ps guards
 
 -- LitCon
 pmcheckHd p@PmLit{} ps guards va@PmCon{} (ValVec vva delta)
-  = do y <- liftD $ mkPmId (pmPatType va)
+  = do y <- mkPmId (pmPatType va)
        -- Analogous to the ConVar case, we have to case split the value
        -- abstraction on possible literals. We do so by introducing a fresh
        -- variable that is equated to the constructor. LitVar will then take
@@ -2160,7 +2193,7 @@ pmcheckHd p@PmLit{} ps guards va@PmCon{} (ValVec vva delta)
 
 -- ConLit
 pmcheckHd p@PmCon{} ps guards (PmLit l) (ValVec vva delta)
-  = do y <- liftD $ mkPmId (pmPatType p)
+  = do y <- mkPmId (pmPatType p)
        -- This desugars to the ConVar case by introducing a fresh variable that
        -- is equated to the literal via a constraint. ConVar will then properly
        -- case split on all possible constructors.
@@ -2170,6 +2203,10 @@ pmcheckHd p@PmCon{} ps guards (PmLit l) (ValVec vva delta)
 
 -- ConNLit
 pmcheckHd (p@(PmCon {})) ps guards (PmNLit { pm_lit_id = x }) vva
+  = pmcheckHdI p ps guards (PmVar x) vva
+
+-- LitNCon
+pmcheckHd (p@(PmLit {})) ps guards (PmNCon { pm_con_id = x }) vva
   = pmcheckHdI p ps guards (PmVar x) vva
 
 -- Impossible: handled by pmcheck
@@ -2355,9 +2392,6 @@ force_if :: Bool -> PartialResult -> PartialResult
 force_if True  pres = forces pres
 force_if False pres = pres
 
-set_provenance :: Provenance -> PartialResult -> PartialResult
-set_provenance prov pr = pr { presultProvenance = prov }
-
 -- ----------------------------------------------------------------------------
 -- * Propagation of term constraints inwards when checking nested matches
 
@@ -2365,7 +2399,7 @@ set_provenance prov pr = pr { presultProvenance = prov }
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When checking a match it would be great to have all type and term information
 available so we can get more precise results. For this reason we have functions
-`addDictsDs' and `addTmCsDs' in PmMonad that store in the environment type and
+`addDictsDs' and `addTmCsDs' in DsMonad that store in the environment type and
 term constraints (respectively) as we go deeper.
 
 The type constraints we propagate inwards are collected by `collectEvVarsPats'
@@ -2489,8 +2523,8 @@ substInValAbs subst = map (exprDeepLookup subst . vaToPmExpr)
 dsPmWarn :: DynFlags -> DsMatchContext -> PmResult -> DsM ()
 dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
   = when (flag_i || flag_u) $ do
-      let exists_r = flag_i && notNull redundant && onlyBuiltin
-          exists_i = flag_i && notNull inaccessible && onlyBuiltin && not is_rec_upd
+      let exists_r = flag_i && notNull redundant
+          exists_i = flag_i && notNull inaccessible && not is_rec_upd
           exists_u = flag_u && (case uncovered of
                                   TypeOfUncovered   _ -> True
                                   UncoveredPatterns u -> notNull u)
@@ -2507,8 +2541,7 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
           UncoveredPatterns candidates -> pprEqns candidates
   where
     PmResult
-      { pmresultProvenance = prov
-      , pmresultRedundant = redundant
+      { pmresultRedundant = redundant
       , pmresultUncovered = uncovered
       , pmresultInaccessible = inaccessible } = pm_result
 
@@ -2518,8 +2551,6 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
 
     is_rec_upd = case kind of { RecUpd -> True; _ -> False }
        -- See Note [Inaccessible warnings for record updates]
-
-    onlyBuiltin = prov == FromBuiltin
 
     maxPatterns = maxUncoveredPatterns dflags
 
@@ -2694,11 +2725,7 @@ involved.
 -- Debugging Infrastructre
 
 tracePm :: String -> SDoc -> PmM ()
-tracePm herald doc = liftD $ tracePmD herald doc
-
-
-tracePmD :: String -> SDoc -> DsM ()
-tracePmD herald doc = do
+tracePm herald doc = do
   dflags <- getDynFlags
   printer <- mkPrintUnqualifiedDs
   liftIO $ dumpIfSet_dyn_printer printer dflags
@@ -2708,6 +2735,8 @@ tracePmD herald doc = do
 pprPmPatDebug :: PmPat a -> SDoc
 pprPmPatDebug (PmCon cc _arg_tys _con_tvs _con_dicts con_args)
   = hsep [text "PmCon", ppr cc, hsep (map pprPmPatDebug con_args)]
+pprPmPatDebug (PmNCon x _ sets)
+  = hsep [text "PmNCon", ppr x, ppr sets]
 pprPmPatDebug (PmVar vid) = text "PmVar" <+> ppr vid
 pprPmPatDebug (PmLit li)  = text "PmLit" <+> ppr li
 pprPmPatDebug (PmNLit i nl) = text "PmNLit" <+> ppr i <+> ppr nl
@@ -2728,3 +2757,5 @@ pprValAbs ps = hang (text "ValAbs:") 2
 pprValVecDebug :: ValVec -> SDoc
 pprValVecDebug (ValVec vas _d) = text "ValVec" <+>
                                   parens (pprValAbs vas)
+                                  $$ (ppr (delta_tm_cs _d))
+                                  -- <not a haddock> $$ (ppr (delta_ty_cs _d))

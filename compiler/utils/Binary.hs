@@ -724,7 +724,6 @@ putTypeRep bh (Fun arg res) = do
     put_ bh (3 :: Word8)
     putTypeRep bh arg
     putTypeRep bh res
-putTypeRep _ _ = fail "Binary.putTypeRep: Impossible"
 
 getSomeTypeRep :: BinHandle -> IO SomeTypeRep
 getSomeTypeRep bh = do
