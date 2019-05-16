@@ -9,7 +9,7 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 
 module PmExpr (
         PmExpr(..), PmLit(..), PmAltCon(..), SimpleEq, ComplexEq, toComplex,
-        eqPmLit, isNotPmExprOther, lhsExprToPmExpr, hsExprToPmExpr,
+        eqPmLit, pmExprToAlt, isNotPmExprOther, lhsExprToPmExpr, hsExprToPmExpr,
         substComplexEq
     ) where
 
@@ -88,6 +88,13 @@ instance Eq PmAltCon where
   PmAltConLike cl1 _ == PmAltConLike cl2 _ = cl1 == cl2
   PmAltLit l1        == PmAltLit l2        = eqPmLit l1 l2
   _                  == _                  = False
+
+pmExprToAlt :: PmExpr -> Maybe PmAltCon
+-- Note how this deliberately chooses bogus argument types for PmAltConLike.
+-- This is only safe for doing lookup in a 'PmRefutEnv'!
+pmExprToAlt (PmExprCon cl _) = Just (PmAltConLike cl [])
+pmExprToAlt (PmExprLit l)    = Just (PmAltLit l)
+pmExprToAlt _                = Nothing
 
 {- Note [Undecidable Equality for Overloaded Literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
