@@ -1,0 +1,11 @@
+
+T11336b.hs:25:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘fun’:
+        Patterns not matched:
+            (PProxy p) where p is not one of {Proxy}
+            p where p is not one of {PProxy}
+
+T11336b.hs:26:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘fun’: fun (PProxy Proxy) = ...
