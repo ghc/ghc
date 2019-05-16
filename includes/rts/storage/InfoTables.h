@@ -189,7 +189,7 @@ typedef struct StgInfoTable_ {
     StgHalfWord     type;       /* closure type */
     StgSRTField     srt;
        /* In a CONSTR:
-            - the constructor tag
+            - the zero-based constructor tag
           In a FUN/THUNK
             - if USE_INLINE_SRT_FIELD
               - offset to the SRT (or zero if no SRT)
