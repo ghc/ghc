@@ -13,6 +13,7 @@ import Type
 import DataCon
 import Name
 import RdrName ( pprNameProvenance , GlobalRdrElt (..), globalRdrEnvElts )
+import Platform
 import PrelNames ( gHC_ERR )
 import Id
 import VarSet
@@ -593,7 +594,9 @@ findValidHoleFits :: TidyEnv        -- ^ The tidy_env for zonking
                   -> Ct -- ^ The hole constraint itself
                   -> TcM (TidyEnv, SDoc)
 findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
-  do { rdr_env <- getGlobalRdrEnv
+  do { dflags <- getDynFlags
+     ; let platform = targetPlatform dflags
+     ; rdr_env <- getGlobalRdrEnv
      ; lclBinds <- getLocalBindings tidy_env ct
      ; maxVSubs <- maxValidHoleFits <$> getDynFlags
      ; hfdc <- getHoleFitDispConfig
@@ -613,7 +616,7 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
            locals = removeBindingShadowing $
                       map IdHFCand lclBinds ++ map GreHFCand lcl
            globals = map GreHFCand gbl
-           syntax = map NameHFCand builtIns
+           syntax = map NameHFCand $ builtIns platform
            to_check = locals ++ syntax ++ globals
      ; (searchDiscards, subs) <-
         tcFilterHoleFits findVLimit implics relevantCts (hole_ty, []) to_check
@@ -671,8 +674,8 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
     hole_lvl = ctLocLevel $ ctEvLoc $ ctEvidence ct
 
     -- BuiltInSyntax names like (:) and []
-    builtIns :: [Name]
-    builtIns = filter isBuiltInSyntax knownKeyNames
+    builtIns :: Platform -> [Name]
+    builtIns platform = filter isBuiltInSyntax $ knownKeyNames platform
 
     -- We make a refinement type by adding a new type variable in front
     -- of the type of t h hole, going from e.g. [Integer] -> Integer

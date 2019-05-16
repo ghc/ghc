@@ -9,6 +9,7 @@ import SrcLoc
 import Module
 import FastString
 import Outputable
+import Platform
 
 import HieTypes
 import HieBin
@@ -50,15 +51,15 @@ ppInfo ni = hsep
 
 type Diff a = a -> a -> [SDoc]
 
-diffFile :: Diff HieFile
-diffFile = diffAsts eqDiff `on` (getAsts . hie_asts)
+diffFile :: Platform -> Diff HieFile
+diffFile platform = diffAsts platform eqDiff `on` (getAsts . hie_asts)
 
-diffAsts :: (Outputable a, Eq a) => Diff a -> Diff (M.Map FastString (HieAST a))
-diffAsts f = diffList (diffAst f) `on` M.elems
+diffAsts :: (Outputable a, Eq a) => Platform -> Diff a -> Diff (M.Map FastString (HieAST a))
+diffAsts platform f = diffList (diffAst platform f) `on` M.elems
 
-diffAst :: (Outputable a, Eq a) => Diff a -> Diff (HieAST a)
-diffAst diffType (Node info1 span1 xs1) (Node info2 span2 xs2) =
-    infoDiff ++ spanDiff ++ diffList (diffAst diffType) xs1 xs2
+diffAst :: (Outputable a, Eq a) => Platform -> Diff a -> Diff (HieAST a)
+diffAst platform diffType (Node info1 span1 xs1) (Node info2 span2 xs2) =
+    infoDiff ++ spanDiff ++ diffList (diffAst platform diffType) xs1 xs2
   where
     spanDiff
       | span1 /= span2 = [hsep ["Spans", ppr span1, "and", ppr span2, "differ"]]
@@ -67,7 +68,7 @@ diffAst diffType (Node info1 span1 xs1) (Node info2 span2 xs2) =
       = (diffList eqDiff `on` (S.toAscList . nodeAnnotations)) info1 info2
      ++ (diffList diffType `on` nodeType) info1 info2
      ++ (diffIdents `on` nodeIdentifiers) info1 info2
-    diffIdents a b = (diffList diffIdent `on` normalizeIdents) a b
+    diffIdents a b = (diffList diffIdent `on` normalizeIdents platform) a b
     diffIdent (a,b) (c,d) = diffName a c
                          ++ eqDiff b d
     diffName (Right a) (Right b) = case (a,b) of
@@ -78,8 +79,11 @@ diffAst diffType (Node info1 span1 xs1) (Node info2 span2 xs2) =
 
 type DiffIdent = Either ModuleName HieName
 
-normalizeIdents :: NodeIdentifiers a -> [(DiffIdent,IdentifierDetails a)]
-normalizeIdents = sortOn fst . map (first toHieName) . M.toList
+normalizeIdents
+    :: Platform
+    -> NodeIdentifiers a
+    -> [(DiffIdent,IdentifierDetails a)]
+normalizeIdents platform = sortOn fst . map (first $ toHieName platform) . M.toList
   where
     first f (a,b) = (fmap f a, b)
 
