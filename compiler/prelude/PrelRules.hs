@@ -13,6 +13,7 @@ ToDo:
 -}
 
 {-# LANGUAGE CPP, RankNTypes, PatternSynonyms, ViewPatterns, RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 
 module PrelRules
@@ -23,7 +24,6 @@ module PrelRules
 where
 
 #include "HsVersions.h"
-#include "../includes/MachDeps.h"
 
 import GhcPrelude
 
@@ -636,10 +636,11 @@ inversePrimOp primop = do
   return e
 
 subsumesPrimOp :: PrimOp -> PrimOp -> RuleM CoreExpr
-this `subsumesPrimOp` that = do
+subsumesPrimOp this that = do
+  dflags <- getDynFlags
   [Var primop_id `App` e] <- getArgs
   matchPrimOpId that primop_id
-  return (Var (mkPrimOpId this) `App` e)
+  return (Var (mkPrimOpId (targetPlatform dflags) this) `App` e)
 
 subsumedByPrimOp :: PrimOp -> RuleM CoreExpr
 subsumedByPrimOp primop = do
@@ -923,13 +924,14 @@ guardDoubleDiv = do
 
 strengthReduction :: Literal -> PrimOp -> RuleM CoreExpr
 strengthReduction two_lit add_op = do -- Note [Strength reduction]
+  dflags <- getDynFlags
   arg <- msum [ do [arg, Lit mult_lit] <- getArgs
                    guard (mult_lit == two_lit)
                    return arg
               , do [Lit mult_lit, arg] <- getArgs
                    guard (mult_lit == two_lit)
                    return arg ]
-  return $ Var (mkPrimOpId add_op) `App` arg `App` arg
+  return $ Var (mkPrimOpId (targetPlatform dflags) add_op) `App` arg `App` arg
 
 -- Note [Strength reduction]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1180,10 +1182,10 @@ rewriting so again we are fine.
 are explicit.)
 -}
 
-builtinRules :: [CoreRule]
+builtinRules :: Platform -> [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
-builtinRules
-  = [BuiltinRule { ru_name = fsLit "AppendLitString",
+builtinRules platform =
+    [BuiltinRule { ru_name = fsLit "AppendLitString",
                    ru_fn = unpackCStringFoldrName,
                    ru_nargs = 4, ru_try = match_append_lit },
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
@@ -1199,7 +1201,7 @@ builtinRules
           [arg, Lit (LitNumber LitNumInt d _)] <- getArgs
           Just n <- return $ exactLog2 d
           dflags <- getDynFlags
-          return $ Var (mkPrimOpId ISraOp) `App` arg `App` mkIntVal dflags n
+          return $ Var (mkPrimOpId platform ISraOp) `App` arg `App` mkIntVal dflags n
         ],
      mkBasicRule modIntName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 mod)
@@ -1208,7 +1210,7 @@ builtinRules
           [arg, Lit (LitNumber LitNumInt d _)] <- getArgs
           Just _ <- return $ exactLog2 d
           dflags <- getDynFlags
-          return $ Var (mkPrimOpId AndIOp)
+          return $ Var (mkPrimOpId platform AndIOp)
             `App` arg `App` mkIntVal dflags (d - 1)
         ]
      ]
@@ -1690,9 +1692,9 @@ match_XToIntegerToX n _ _ _ [App (Var x) y]
 match_XToIntegerToX _ _ _ _ _ = Nothing
 
 match_smallIntegerTo :: PrimOp -> RuleFun
-match_smallIntegerTo primOp _ _ _ [App (Var x) y]
+match_smallIntegerTo primOp dflags _ _ [App (Var x) y]
   | idName x == smallIntegerName
-  = Just $ App (Var (mkPrimOpId primOp)) y
+  = Just $ App (Var (mkPrimOpId (targetPlatform dflags) primOp)) y
 match_smallIntegerTo _ _ _ _ _ = Nothing
 
 
@@ -1799,10 +1801,11 @@ numFoldingRules :: PrimOp -> (DynFlags -> PrimOps) -> RuleM CoreExpr
 numFoldingRules op dict = do
   [e1,e2] <- getArgs
   dflags <- getDynFlags
+  let platform = targetPlatform dflags
   let PrimOps{..} = dict dflags
   if not (gopt Opt_NumConstantFolding dflags)
     then mzero
-    else case BinOpApp e1 op e2 of
+    else case mkBinOpApp platform e1 op e2 of
      -- R1) +/- simplification
      x    :++: (y :++: v)          -> return $ mkL (x+y)   `add` v
      x    :++: (L y :-: v)         -> return $ mkL (x+y)   `sub` v
@@ -1874,18 +1877,16 @@ numFoldingRules op dict = do
 
      _                             -> mzero
 
-
-
 -- | Match the application of a binary primop
 pattern BinOpApp  :: Arg CoreBndr -> PrimOp -> Arg CoreBndr -> CoreExpr
-pattern BinOpApp  x op y =  OpVal op `App` x `App` y
+pattern BinOpApp  x op y <- OpVal op `App` x `App` y
+
+mkBinOpApp :: Platform -> Arg CoreBndr -> PrimOp -> Arg CoreBndr -> CoreExpr
+mkBinOpApp platform x op y = Var (mkPrimOpId platform op) `App` x `App` y
 
 -- | Match a primop
 pattern OpVal   :: PrimOp  -> Arg CoreBndr
-pattern OpVal   op     <- Var (isPrimOpId_maybe -> Just op) where
-   OpVal op = Var (mkPrimOpId op)
-
-
+pattern OpVal   op     <- Var (isPrimOpId_maybe -> Just op)
 
 -- | Match a literal
 pattern L :: Integer -> Arg CoreBndr
@@ -1951,19 +1952,21 @@ data PrimOps = PrimOps
 
 intPrimOps :: DynFlags -> PrimOps
 intPrimOps dflags = PrimOps
-   { add = \x y -> BinOpApp x IntAddOp y
-   , sub = \x y -> BinOpApp x IntSubOp y
-   , mul = \x y -> BinOpApp x IntMulOp y
+   { add = \x y -> mkBinOpApp platform x IntAddOp y
+   , sub = \x y -> mkBinOpApp platform x IntSubOp y
+   , mul = \x y -> mkBinOpApp platform x IntMulOp y
    , mkL = intResult' dflags
    }
+  where platform = targetPlatform dflags
 
 wordPrimOps :: DynFlags -> PrimOps
 wordPrimOps dflags = PrimOps
-   { add = \x y -> BinOpApp x WordAddOp y
-   , sub = \x y -> BinOpApp x WordSubOp y
-   , mul = \x y -> BinOpApp x WordMulOp y
+   { add = \x y -> mkBinOpApp platform x WordAddOp y
+   , sub = \x y -> mkBinOpApp platform x WordSubOp y
+   , mul = \x y -> mkBinOpApp platform x WordMulOp y
    , mkL = wordResult' dflags
    }
+  where platform = targetPlatform dflags
 
 
 --------------------------------------------------------
