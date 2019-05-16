@@ -25,6 +25,7 @@ import GHCi.ResolvedBCO
 import GHCi.BreakArray
 import SizedSeq
 
+import DynFlags (targetPlatform, unsafeGlobalDynFlags)
 import GHCi
 import ByteCodeTypes
 import HscTypes
@@ -179,6 +180,9 @@ nameToCLabel n suffix = mkFastString label
 primopToCLabel :: PrimOp -> String -> String
 primopToCLabel primop suffix = concat
     [ "ghczmprim_GHCziPrimopWrappers_"
-    , zString (zEncodeFS (occNameFS (primOpOcc primop)))
+    -- TODO don't be unsafe like this. Thread 'DynFlags' or something instead.
+    , zString $ zEncodeFS $ occNameFS $ primOpOcc
+        (targetPlatform unsafeGlobalDynFlags)
+        primop
     , '_':suffix
     ]

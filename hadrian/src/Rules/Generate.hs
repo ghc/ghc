@@ -120,8 +120,7 @@ generatePackageCode context@(Context stage pkg _) = do
 
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
-            includes <- includesDependencies
-            need $ [primopsSource] ++ includes
+            need [primopsSource]
             build $ target context HsCpp [primopsSource] [file]
 
         root -/- stageString stage <//> "ghc_boot_platform.h" %>
