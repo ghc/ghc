@@ -27,7 +27,7 @@ module NameEnv (
         lookupDNameEnv,
         delFromDNameEnv,
         mapDNameEnv,
-        alterDNameEnv,
+        alterDNameEnv, extendDNameEnv_C,
         -- ** Dependency analysis
         depAnal
     ) where
@@ -156,3 +156,6 @@ mapDNameEnv = mapUDFM
 
 alterDNameEnv :: (Maybe a -> Maybe a) -> DNameEnv a -> Name -> DNameEnv a
 alterDNameEnv = alterUDFM
+
+extendDNameEnv_C :: (a -> a -> a) -> DNameEnv a -> Name -> a -> DNameEnv a
+extendDNameEnv_C = addToUDFM_C
