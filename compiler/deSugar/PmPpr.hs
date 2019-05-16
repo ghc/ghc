@@ -35,6 +35,9 @@ import TmOracle
 --     where p is not one of {3, 4}
 --           q is not one of {0, 5}
 -- @
+--
+-- When the set of refutable shapes contains more than 3 elements, the
+-- additional elements are indicated by "...".
 pprUncovered :: ([PmExpr], PmRefutEnv) -> SDoc
 pprUncovered (expr_vec, refuts)
   | null cs   = fsep vec -- there are no literal constraints
@@ -45,11 +48,15 @@ pprUncovered (expr_vec, refuts)
     (vec,cs) = runPmPpr sdoc_vec (prettifyRefuts refuts)
 
 -- | Output refutable shapes of a variable in the form of @var is not one of {2,
--- Nothing, 3}@.
+-- Nothing, 3}@. Will never print more than 3 refutable shapes, the tail is
+-- indicated by an ellipsis.
 pprRefutableShapes :: (SDoc,[PmAltCon]) -> SDoc
 pprRefutableShapes (var, alts)
-  = var <+> text "is not one of" <+> braces (pprWithCommas ppr_alt alts)
+  = var <+> text "is not one of" <+> format_alts alts
   where
+    format_alts = braces . fsep . punctuate comma . shorten . map ppr_alt
+    shorten (a:b:c:_:_) = a:b:c:[text "..."]
+    shorten xs          = xs
     ppr_alt (PmAltLit lit)      = ppr lit
     ppr_alt (PmAltConLike cl _) = ppr cl
 
