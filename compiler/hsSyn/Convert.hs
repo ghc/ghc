@@ -269,7 +269,7 @@ cvtDec (InstanceD o ctxt ty decs)
   = do  { let doc = text "an instance declaration"
         ; (binds', sigs', fams', ats', adts') <- cvt_ci_decs doc decs
         ; unless (null fams') (failWith (mkBadDecMsg doc fams'))
-        ; ctxt' <- cvtContext ctxt
+        ; ctxt' <- cvtContext funPrec ctxt
         ; (dL->L loc ty') <- cvtType ty
         ; let inst_ty' = mkHsQualTy ctxt loc ctxt' $ cL loc ty'
         ; returnJustL $ InstD noExt $ ClsInstD noExt $
@@ -365,7 +365,7 @@ cvtDec (TH.RoleAnnotD tc roles)
        ; returnJustL $ Hs.RoleAnnotD noExt (RoleAnnotDecl noExt tc' roles') }
 
 cvtDec (TH.StandaloneDerivD ds cxt ty)
-  = do { cxt' <- cvtContext cxt
+  = do { cxt' <- cvtContext funPrec cxt
        ; ds'  <- traverse cvtDerivStrategy ds
        ; (dL->L loc ty') <- cvtType ty
        ; let inst_ty' = mkHsQualTy cxt loc cxt' $ cL loc ty'
@@ -471,7 +471,7 @@ cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
                      , Located RdrName
                      , LHsQTyVars GhcPs)
 cvt_tycl_hdr cxt tc tvs
-  = do { cxt' <- cvtContext cxt
+  = do { cxt' <- cvtContext funPrec cxt
        ; tc'  <- tconNameL tc
        ; tvs' <- cvtTvs tvs
        ; return (cxt', tc', tvs')
@@ -483,7 +483,7 @@ cvt_datainst_hdr :: TH.Cxt -> Maybe [TH.TyVarBndr] -> TH.Type
                        , Maybe [LHsTyVarBndr GhcPs]
                        , HsTyPats GhcPs)
 cvt_datainst_hdr cxt bndrs tys
-  = do { cxt' <- cvtContext cxt
+  = do { cxt' <- cvtContext funPrec cxt
        ; bndrs' <- traverse (mapM cvt_tv) bndrs
        ; (head_ty, args) <- split_ty_app tys
        ; case head_ty of
@@ -573,7 +573,7 @@ cvtConstr (InfixC st1 c st2)
 
 cvtConstr (ForallC tvs ctxt con)
   = do  { tvs'      <- cvtTvs tvs
-        ; ctxt'     <- cvtContext ctxt
+        ; ctxt'     <- cvtContext funPrec ctxt
         ; (dL->L _ con')  <- cvtConstr con
         ; returnL $ add_forall tvs' ctxt' con' }
   where
@@ -1304,8 +1304,9 @@ cvtRole TH.RepresentationalR = Just Coercion.Representational
 cvtRole TH.PhantomR          = Just Coercion.Phantom
 cvtRole TH.InferR            = Nothing
 
-cvtContext :: TH.Cxt -> CvtM (LHsContext GhcPs)
-cvtContext tys = do { preds' <- mapM cvtPred tys; returnL preds' }
+cvtContext :: PprPrec -> TH.Cxt -> CvtM (LHsContext GhcPs)
+cvtContext p tys = do { preds' <- mapM cvtPred tys
+                      ; parenthesizeHsContext p <$> returnL preds' }
 
 cvtPred :: TH.Pred -> CvtM (LHsType GhcPs)
 cvtPred = cvtType
@@ -1313,7 +1314,7 @@ cvtPred = cvtType
 cvtDerivClause :: TH.DerivClause
                -> CvtM (LHsDerivingClause GhcPs)
 cvtDerivClause (TH.DerivClause ds ctxt)
-  = do { ctxt' <- fmap (map mkLHsSigType) <$> cvtContext ctxt
+  = do { ctxt' <- fmap (map mkLHsSigType) <$> cvtContext appPrec ctxt
        ; ds'   <- traverse cvtDerivStrategy ds
        ; returnL $ HsDerivingClause noExt ds' ctxt' }
 
@@ -1409,12 +1410,11 @@ cvtTypeKind ty_str ty
            ForallT tvs cxt ty
              | null tys'
              -> do { tvs' <- cvtTvs tvs
-                   ; cxt' <- cvtContext cxt
-                   ; let pcxt = parenthesizeHsContext funPrec cxt'
+                   ; cxt' <- cvtContext funPrec cxt
                    ; ty'  <- cvtType ty
                    ; loc <- getL
                    ; let hs_ty  = mkHsForAllTy tvs loc ForallInvis tvs' rho_ty
-                         rho_ty = mkHsQualTy cxt loc pcxt ty'
+                         rho_ty = mkHsQualTy cxt loc cxt' ty'
 
                    ; return hs_ty }
 
