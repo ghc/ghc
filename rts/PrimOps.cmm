@@ -1975,11 +1975,6 @@ stg_makeStableNamezh ( P_ obj )
         SET_HDR(sn_obj, stg_STABLE_NAME_info, CCCS);
         StgStableName_sn(sn_obj) = index;
         snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) = sn_obj;
-
-        // Concurrent GC write barrier
-        // We only need to push obj itself to the update remembered set
-        // since we know that sn_obj will be on the nursery anyways.
-        updateRemembSetPushPtr(obj);
     } else {
         sn_obj = snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry);
     }
