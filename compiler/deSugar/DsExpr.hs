@@ -60,6 +60,7 @@ import Util
 import Bag
 import Outputable
 import PatSyn
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 
@@ -955,28 +956,33 @@ dsDo stmts
                         { recS_bind_ty = bind_ty
                         , recS_rec_rets = rec_rets
                         , recS_ret_ty = body_ty} }) stmts
-      = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
+      = do { dflags <- getDynFlags
+           ; let -- If XStrict is enabled then in order to make things lazy
+                 -- again we must add a layer of laziness to the patterns we
+                 -- generate, the bind for the results of `mfix` and the bind
+                 -- in the function passed to `mfix`. This function reverses
+                 -- the effects of XStrict if it is enabled.
+                 not_strict    = if xopt LangExt.Strict dflags then LazyPat noExt else id
+           ; let bind_pat      = not_strict $ mkBigLHsPatTupId later_pats
+           ; let mfix_pat      = noLoc $ not_strict $ LazyPat noExt $
+                                   mkBigLHsPatTupId rec_tup_pats
+           ; let mfix_arg      = noLoc $ HsLam noExt
+                                     (MG { mg_alts = noLoc [mkSimpleMatch
+                                                              LambdaExpr
+                                                              [mfix_pat] body]
+                                         , mg_ext = MatchGroupTc [tup_ty] body_ty
+                                         , mg_origin = Generated })
+           ; let mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
+           ; let new_bind_stmt = cL loc $ BindStmt bind_ty bind_pat
+                                                   mfix_app bind_op
+                                                   noSyntaxExpr  -- Tuple cannot fail
+           ; goL (new_bind_stmt : stmts) } -- rec_ids can be empty; eg  rec { print 'x' }
       where
-        new_bind_stmt = cL loc $ BindStmt bind_ty bind_pat
-                                         mfix_app bind_op
-                                         noSyntaxExpr  -- Tuple cannot fail
-        -- If XStrict is enabled then this match is made strict, with the
-        -- programmer having no way of making it lazy. Make it an irrefutable
-        -- match here
-        bind_pat     = LazyPat noExt $ LazyPat noExt $ mkBigLHsPatTupId later_pats
         tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
         tup_ty       = mkBigCoreTupTy (map idType tup_ids) -- Deals with singleton case
         rec_tup_pats = map nlVarPat tup_ids
         later_pats   = rec_tup_pats
         rets         = map noLoc rec_rets
-        mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
-        mfix_arg     = noLoc $ HsLam noExt
-                           (MG { mg_alts = noLoc [mkSimpleMatch
-                                                    LambdaExpr
-                                                    [mfix_pat] body]
-                               , mg_ext = MatchGroupTc [tup_ty] body_ty
-                               , mg_origin = Generated })
-        mfix_pat     = noLoc $ LazyPat noExt $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo body_ty
                                 DoExpr (noLoc (rec_stmts ++ [ret_stmt]))
         ret_app      = nlHsSyntaxApps return_op [mkBigLHsTupId rets]
