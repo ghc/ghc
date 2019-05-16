@@ -12,9 +12,15 @@ import Data.List
 import Data.Maybe ( catMaybes )
 import System.Environment ( getArgs )
 
-vecOptions :: Entry -> [(String,String,Int)]
+vecOptions :: Entry -> [(String, Either MacroVar String, Int)]
 vecOptions i =
     concat [vecs | OptionVector vecs <- opts i]
+
+desugarVectorSpec' :: EntryOrMacroDef -> [EntryOrMacroDef]
+desugarVectorSpec' (Entry e) = Entry <$> desugarVectorSpec e
+desugarVectorSpec' (MacroDef md) = pure $ MacroDef $ case md of
+    MacroDef_Guarded c es -> MacroDef_Guarded c $ concatMap desugarVectorSpec es
+    MacroDef_Macro m d -> MacroDef_Macro m d
 
 desugarVectorSpec :: Entry -> [Entry]
 desugarVectorSpec i@(Section {}) = [i]
@@ -22,7 +28,7 @@ desugarVectorSpec i              = case vecOptions i of
                                      []  -> [i]
                                      vos -> map genVecEntry vos
   where
-    genVecEntry :: (String,String,Int) -> Entry
+    genVecEntry :: (String, Either MacroVar String, Int) -> Entry
     genVecEntry (con,repCon,n) =
         case i of
           PrimOpSpec {} ->
@@ -73,12 +79,16 @@ desugarVectorSpec i              = case vecOptions i of
         desugarTy :: Ty -> Ty
         desugarTy (TyF s d)           = TyF (desugarTy s) (desugarTy d)
         desugarTy (TyC s d)           = TyC (desugarTy s) (desugarTy d)
-        desugarTy (TyApp SCALAR [])   = TyApp (TyCon repCon) []
+        desugarTy (TyApp SCALAR [])   = TyApp tyCon' []
         desugarTy (TyApp VECTOR [])   = TyApp (VecTyCon vecCons vecTyName) []
-        desugarTy (TyApp VECTUPLE []) = TyUTup (replicate n (TyApp (TyCon repCon) []))
+        desugarTy (TyApp VECTUPLE []) = TyUTup (replicate n (TyApp tyCon' []))
         desugarTy (TyApp tycon ts)    = TyApp tycon (map desugarTy ts)
         desugarTy t@(TyVar {})        = t
         desugarTy (TyUTup ts)         = TyUTup (map desugarTy ts)
+
+        tyCon' = case repCon of
+          Left mu -> MacroUse mu
+          Right ty' -> TyCon ty'
 
     conCat :: String -> String
     conCat "Int8"   = "IntVec"
@@ -252,9 +262,14 @@ gen_hs_source (Info defaults entries) =
                 --   coerce = let x = x in x
                 -- and we don't want a complaint that the constraint is redundant
                 -- Remember, this silly file is only for Haddock's consumption
-
+        ++ "\n"
+                -- We need WORD_SIZE_IN_BITS
+        ++ "#include \"MachDeps.h\"\n"
+                -- We need platform defines (tests for mingw32 below).
+        ++ "#include \"ghc_boot_platform.h\"\n"
+        ++ "\n"
         ++ "module GHC.Prim (\n"
-        ++ unlines (map (("        " ++) . hdr) entries')
+        ++ unlines (map (("        " ++) . hdr') entries')
         ++ ") where\n"
     ++ "\n"
     ++ "{-\n"
@@ -274,9 +289,9 @@ gen_hs_source (Info defaults entries) =
                      -- the base package when haddocking ghc-prim
 
        -- Now the main payload
-    ++ "\n" ++ unlines (concatMap ent entries') ++ "\n\n\n"
+    ++ "\n" ++ unlines (concatMap eont entries') ++ "\n\n\n"
 
-     where entries' = concatMap desugarVectorSpec entries
+     where entries' = concatMap desugarVectorSpec' entries
 
            opt (OptionFalse n)    = n ++ " = False"
            opt (OptionTrue n)     = n ++ " = True"
@@ -284,6 +299,11 @@ gen_hs_source (Info defaults entries) =
            opt (OptionInteger n v) = n ++ " = " ++ show v
            opt (OptionVector _)    = ""
            opt (OptionFixity mf) = "fixity" ++ " = " ++ show mf
+
+           hdr' (Entry e) = hdr e
+           hdr' (MacroDef md) = case md of
+               MacroDef_Guarded _ es -> concatMap hdr es
+               MacroDef_Macro _ _ -> []
 
            hdr s@(Section {})                                    = sec s
            hdr (PrimOpSpec { name = n })                         = wrapOp n ++ ","
@@ -299,6 +319,15 @@ gen_hs_source (Info defaults entries) =
            sec s = "\n-- * " ++ escape (title s) ++ "\n"
                     ++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ desc s)
 
+           eont (Entry e) = ent e
+           eont (MacroDef md) = case md of
+               MacroDef_Macro name' body -> ("type " ++ name' ++ " = ") : cppBody 1 body
+               MacroDef_Guarded cond entries'' -> concat
+                   [ ["#if " ++ cppCond]
+                   , concatMap ent entries''
+                   , ["#endif // " ++ cppCond]
+                   ]
+                   where cppCond = cppExp cond
 
            ent   (Section {})         = []
            ent o@(PrimOpSpec {})      = spec o
@@ -376,6 +405,39 @@ gen_hs_source (Info defaults entries) =
            escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
                 where special = "/'`\"@<"
 
+cppBinOp :: MacroBinOp -> String
+cppBinOp MacroBinOp_LT = "<"
+cppBinOp MacroBinOp_GT = ">"
+cppBinOp MacroBinOp_EQ = "=="
+cppBinOp MacroBinOp_NEQ = "!="
+cppBinOp MacroBinOp_LE = "<="
+cppBinOp MacroBinOp_GE = ">="
+cppBinOp MacroBinOp_And = "&&"
+cppBinOp MacroBinOp_Or = "||"
+
+cppExp :: MacroExpr -> String
+cppExp e = case e of
+    MacroExpr_BinOp MacroBinOp_EQ MacroExpr_OS (MacroExpr_StringLit os) ->
+        "defined(" ++ os ++ "_HOST_OS)"
+    MacroExpr_OS -> error "cppBody: OS only valid in the form ` OS == ...`"
+    MacroExpr_WordSize -> "WORD_SIZE_IN_BITS"
+    MacroExpr_StringLit s -> show s
+    MacroExpr_NumberLit n -> show n
+    MacroExpr_BinOp op l r ->
+        "(" ++ cppExp l ++ " " ++ cppBinOp op ++ " " ++ cppExp r ++ ")"
+
+cppBody :: Word -> MacroBody -> [String]
+cppBody indent e = case e of
+    MacroBody_If if_ then_ else_ -> concat
+        [ ["#if " ++ cppCond]
+        , cppBody (indent + 1) then_
+        , ["#else // " ++ cppCond]
+        , cppBody (indent + 1) else_
+        , ["#endif // " ++ cppCond]
+        ]
+        where cppCond = cppExp if_
+    MacroBody_Unquote ty' -> [pprTy ty']
+
 -- | Extract a string representation of the name
 getName :: Entry -> Maybe String
 getName PrimOpSpec{ name = n } = Just n
@@ -437,7 +499,7 @@ gen_latex_doc (Info defaults entries)
    = "\\primopdefaults{"
          ++ mk_options defaults
          ++ "}\n"
-     ++ (concat (map mk_entry entries))
+     ++ (concat (map mk_entry [ e | Entry e <- entries])) -- TODO
      where mk_entry (PrimOpSpec {cons=constr,name=n,ty=t,cat=c,desc=d,opts=o}) =
                  "\\primopdesc{"
                  ++ latex_encode constr ++ "}{"
@@ -626,7 +688,7 @@ gen_wrappers (Info _ entries)
      where
         specs = filter (not.dodgy) $
                 filter (not.is_llvm_only) $
-                filter is_primop entries
+                filter is_primop [ e | Entry e <- entries, is_primop e ] -- TODO
         tycons = foldr union [] $ map (tyconsIn . ty) specs
         tycons' = filter (`notElem` [TyCon "()", TyCon "Bool"]) tycons
         types = concat $ intersperse ", " $ map show tycons'
@@ -662,7 +724,8 @@ gen_primop_list (Info _ entries)
         map (\p -> "   , " ++ cons p) rest
         ++
         [     "   ]"     ]
-     ) where (first:rest) = concatMap desugarVectorSpec (filter is_primop entries)
+     ) where (first:rest) = concatMap desugarVectorSpec (filter is_primop entries')
+             entries' = [ e | Entry e <- entries, is_primop e ] -- TODO
 
 mIN_VECTOR_UNIQUE :: Int
 mIN_VECTOR_UNIQUE = 300
@@ -672,7 +735,8 @@ gen_primop_vector_uniques (Info _ entries)
    = unlines $
      concatMap mkVecUnique (specs `zip` [mIN_VECTOR_UNIQUE..])
   where
-    specs = concatMap desugarVectorSpec (filter is_vector (filter is_primtype entries))
+    specs = concatMap desugarVectorSpec (filter is_vector (filter is_primtype entries'))
+    entries' = [ e | Entry e <- entries, is_primop e ] -- TODO
 
     mkVecUnique :: (Entry, Int) -> [String]
     mkVecUnique (i, unique) =
@@ -687,7 +751,8 @@ gen_primop_vector_tys (Info _ entries)
    = unlines $
      concatMap mkVecTypes specs
   where
-    specs = concatMap desugarVectorSpec (filter is_vector (filter is_primtype entries))
+    specs = concatMap desugarVectorSpec (filter is_vector (filter is_primtype entries'))
+    entries' = [ e | Entry e <- entries, is_primop e ] -- TODO
 
     mkVecTypes :: Entry -> [String]
     mkVecTypes i =
@@ -710,7 +775,8 @@ gen_primop_vector_tys_exports (Info _ entries)
    = unlines $
     map mkVecTypes specs
   where
-    specs = concatMap desugarVectorSpec (filter is_vector (filter is_primtype entries))
+    specs = concatMap desugarVectorSpec (filter is_vector (filter is_primtype entries'))
+    entries' = [ e | Entry e <- entries, is_primop e ] -- TODO
 
     mkVecTypes :: Entry -> String
     mkVecTypes i =
@@ -724,7 +790,8 @@ gen_primop_vector_tycons (Info _ entries)
    = unlines $
      map mkVecTypes specs
   where
-    specs = concatMap desugarVectorSpec (filter is_vector (filter is_primtype entries))
+    specs = concatMap desugarVectorSpec (filter is_vector (filter is_primtype entries'))
+    entries' = [ e | Entry e <- entries, is_primop e ] -- TODO
 
     mkVecTypes :: Entry -> String
     mkVecTypes i =
@@ -737,7 +804,8 @@ gen_primop_tag (Info _ entries)
    = unlines (max_def_type : max_def :
               tagOf_type : zipWith f primop_entries [1 :: Int ..])
      where
-        primop_entries = concatMap desugarVectorSpec $ filter is_primop entries
+        primop_entries = concatMap desugarVectorSpec $ filter is_primop entries'
+        entries' = [ e | Entry e <- entries, is_primop e ] -- TODO
         tagOf_type = "primOpTag :: PrimOp -> Int"
         f i n = "primOpTag " ++ cons i ++ " = " ++ show n
         max_def_type = "maxPrimOpTag :: Int"
@@ -748,7 +816,8 @@ gen_data_decl (Info _ entries) =
     "data PrimOp\n   = " ++ head conss ++ "\n"
      ++ unlines (map ("   | "++) (tail conss))
   where
-    conss = map genCons (filter is_primop entries)
+    conss = map genCons (filter is_primop entries')
+    entries' = [ e | Entry e <- entries, is_primop e ] -- TODO
 
     genCons :: Entry -> String
     genCons entry =
@@ -759,7 +828,8 @@ gen_data_decl (Info _ entries) =
 gen_switch_from_attribs :: String -> String -> Info -> String
 gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
    = let defv = lookup_attrib attrib_name defaults
-         alternatives = catMaybes (map mkAlt (filter is_primop entries))
+         alternatives = catMaybes (map mkAlt (filter is_primop entries'))
+         entries' = [ e | Entry e <- entries, is_primop e ] -- TODO
 
          getAltRhs (OptionFalse _)    = "False"
          getAltRhs (OptionTrue _)     = "True"
@@ -788,7 +858,9 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
 
 gen_primop_info :: Info -> String
 gen_primop_info (Info _ entries)
-   = unlines (map mkPOItext (concatMap desugarVectorSpec (filter is_primop entries)))
+   = unlines (map mkPOItext (concatMap desugarVectorSpec (filter is_primop entries')))
+   where
+     entries' = [ e | Entry e <- entries, is_primop e ] -- TODO
 
 mkPOItext :: Entry -> String
 mkPOItext i = mkPOI_LHS_text i ++ mkPOI_RHS_text i
@@ -838,6 +910,11 @@ ppTyVar _   = error "Unknown type var"
 ppType :: Ty -> String
 ppType (TyApp (TyCon "Any")         []) = "anyTy"
 ppType (TyApp (TyCon "Bool")        []) = "boolTy"
+
+ppType (TyApp (MacroUse "INT32")    []) = "macroInt32PrimTy"
+ppType (TyApp (MacroUse "INT64")    []) = "macroInt64PrimTy"
+ppType (TyApp (MacroUse "WORD32")   []) = "macroWord32PrimTy"
+ppType (TyApp (MacroUse "WORD64")   []) = "macroWord64PrimTy"
 
 ppType (TyApp (TyCon "Int#")        []) = "intPrimTy"
 ppType (TyApp (TyCon "Int8#")       []) = "int8PrimTy"

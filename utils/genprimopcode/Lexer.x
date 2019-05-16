@@ -9,6 +9,9 @@ import ParserM (ParserM (..), mkT, mkTv, Token(..), start_code,
 import qualified ParserM as ParserM (input)
 }
 
+@lowerIdent = [a-z][a-zA-Z0-9\#_]*
+@upperIdent = [A-Z][a-zA-Z0-9\#_]*
+
 words :-
 
     <0>         $white+             ;
@@ -58,8 +61,25 @@ words :-
     <0>         "SCALAR"            { mkT TSCALAR }
     <0>         "VECTOR"            { mkT TVECTOR }
     <0>         "VECTUPLE"          { mkT TVECTUPLE }
-    <0>         [a-z][a-zA-Z0-9\#_]* { mkTv TLowerName }
-    <0>         [A-Z][a-zA-Z0-9\#_]* { mkTv TUpperName }
+
+    <0>         "$let"              { mkT TMacroLet }
+    <0>         "if"                { mkT TMacroIf }
+    <0>         "then"              { mkT TMacroThen }
+    <0>         "else"              { mkT TMacroElse }
+    <0>         "$guarded"          { mkT TMacroCondSectionBegin }
+    <0>         "$endGuarded"       { mkT TMacroCondSectionEnd }
+    <0>         "=="                { mkT TMacroEQ }
+    <0>         "/="                { mkT TMacroNEQ }
+    <0>         "<="                { mkT TMacroLE }
+    <0>         ">="                { mkT TMacroGE }
+    <0>         "&&"                { mkT TMacroAnd }
+    <0>         "||"                { mkT TMacroOr }
+    <0>         "[|"                { mkT TMacroQuoteBegin }
+    <0>         "|]"                { mkT TMacroQuoteEnd }
+    <0>         "$" @upperIdent     { mkTv TMacroVar }
+
+    <0>         @lowerIdent         { mkTv TLowerName }
+    <0>         @upperIdent         { mkTv TUpperName }
     <0>         \-? [0-9][0-9]*     { mkTv (TInteger . read) }
     <0>         \" [^\"]* \"        { mkTv (TString . tail . init) }
     <in_braces> [^\{\}]+            { mkTv TNoBraces }
