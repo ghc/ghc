@@ -1,0 +1,11 @@
+
+T16456.hs:7:7: error:
+    • Found hole: _ :: T Int
+    • In the expression: _
+      In an equation for ‘foo’: foo = _
+    • Relevant bindings include foo :: T Int (bound at T16456.hs:7:1)
+      Valid hole fits include
+        foo :: T Int (bound at T16456.hs:7:1)
+        MkT :: forall {k} (p :: k). T p
+          with MkT @Int
+          (defined at T16456.hs:4:12)
