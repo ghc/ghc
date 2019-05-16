@@ -1,4 +1,5 @@
 #include "elf_got.h"
+#include <string.h>
 #if defined(OBJFORMAT_ELF)
 /*
  * Check if we need a global offset table slot for a
@@ -86,9 +87,13 @@ fillGot(ObjectCode * oc) {
                     if(0x0 == symbol->addr) {
                         symbol->addr = lookupSymbol_(symbol->name);
                         if(0x0 == symbol->addr) {
-                            errorBelch("Failed to lookup symbol: %s\n",
-                                       symbol->name);
-                            return EXIT_FAILURE;
+                            if(0 == strncmp(symbol->name,"_GLOBAL_OFFSET_TABLE_",21)) {
+                                symbol->addr = oc->info->got_start;
+                            } else {
+                                errorBelch("Failed to lookup symbol: %s\n",
+                                           symbol->name);
+                                return EXIT_FAILURE;
+                            }
                         }
                     } else {
                         // we already have the address.
