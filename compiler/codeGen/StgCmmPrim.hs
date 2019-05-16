@@ -119,7 +119,7 @@ cgOpApp (StgPrimOp primop) args res_ty = do
 
           | otherwise -> panic "cgPrimop"
           where
-             result_info = getPrimOpResultInfo primop
+             result_info = getPrimOpResultInfo (targetPlatform dflags) primop
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
   = do  { cmm_args <- getNonVoidArgAmodes args

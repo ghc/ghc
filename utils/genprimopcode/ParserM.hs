@@ -109,6 +109,23 @@ data Token = TEOF
            | TSCALAR
            | TVECTOR
            | TVECTUPLE
+
+           | TMacroLet
+           | TMacroIf
+           | TMacroThen
+           | TMacroElse
+           | TMacroCondSectionBegin
+           | TMacroCondSectionEnd
+           | TMacroEQ
+           | TMacroNEQ
+           | TMacroLE
+           | TMacroGE
+           | TMacroAnd
+           | TMacroOr
+           | TMacroNot
+           | TMacroQuoteBegin
+           | TMacroQuoteEnd
+           | TMacroVar String
     deriving Show
 
 -- Actions
