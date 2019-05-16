@@ -56,6 +56,22 @@ import Syntax
     integer         { TInteger $$ }
     noBraces        { TNoBraces $$ }
 
+    macroLet        { TMacroLet }
+    macroIf         { TMacroIf }
+    macroThen       { TMacroThen }
+    macroElse       { TMacroElse }
+    macroGuarded    { TMacroCondSectionBegin }
+    macroEndGuarded { TMacroCondSectionEnd }
+    '=='            { TMacroEQ }
+    '!='            { TMacroNEQ }
+    '<='            { TMacroLE }
+    '>='            { TMacroGE }
+    '&&'            { TMacroAnd }
+    '||'            { TMacroOr }
+    '[|'            { TMacroQuoteBegin }
+    '|]'            { TMacroQuoteEnd }
+    macroVar        { TMacroVar $$ }
+
 %%
 
 info :: { Info }
@@ -74,6 +90,7 @@ pOption : lowerName '=' false               { OptionFalse  $1 }
         | lowerName '=' pStuffBetweenBraces { OptionString $1 $3 }
         | lowerName '=' integer             { OptionInteger $1 $3 }
         | vector    '=' pVectorTemplate     { OptionVector $3 }
+        | vector    '=' macroVar            { OptionMacroUse $ tail $3 }
         | fixity    '=' pInfix              { OptionFixity $3 }
 
 pInfix :: { Maybe Fixity }
@@ -92,6 +109,7 @@ pEntry : pPrimOpSpec   { $1 }
        | pPrimTypeSpec { $1 }
        | pPseudoOpSpec { $1 }
        | pSection      { $1 }
+       | pMacroDef     { MacroDef $1 }
 
 pPrimOpSpec :: { Entry }
 pPrimOpSpec : primop upperName string pCategory pType
@@ -116,6 +134,57 @@ pPseudoOpSpec : pseudoop string pType pDesc pWithOptions
 
 pSection :: { Entry }
 pSection : section string pDesc { Section { title = $2, desc = $3 } }
+
+pMacroDef :: { MacroDef }
+pMacroDef : macroLet upperName '=' pMacroExpr
+            { MacroDef_Macro
+              { macroDef_tyMacro_name = $2
+              , macroDef_tyMacro_body = $4
+              }
+            }
+          | macroGuarded pMacroExpr pEntries macroEndGuarded
+            { MacroDef_Guarded
+              { macroDef_Guarded_condition = $2
+              , macroDef_Guarded_entities = $3
+              }
+            }
+
+pMacroExpr :: { MacroExpr }
+pMacroExpr : '(' pMacroExpr pMacroBinOp pMacroExpr ')'
+             { MacroExpr_BinOp
+               { macroCondition_binOp_left_operand = $2
+               , macroCondition_binOp_op = $3
+               , macroCondition_binOp_right_operand = $4
+               }
+             }
+           | macroIf pMacroExpr macroThen pMacroExpr macroElse pMacroExpr
+             { MacroExpr_If
+               { tyMacroExpr_if_cond = $2
+               , tyMacroExpr_if_then = $4
+               , tyMacroExpr_if_else = $6
+               }
+             }
+           | '[|' pType '|]' { MacroExpr_Unquote $ Left $2 }
+           | '[|' pVectorTemplate '|]' { MacroExpr_Unquote $ Right $2 }
+           | upperName
+             { %
+               case $1 of
+               "WORD_SIZE_IN_BITS" -> pure MacroExpr_WordSize
+               "OS" -> pure MacroExpr_OS
+               _ -> fail "Only special macro identifiers `OS` and `WORD_SIZE_IN_BITS` allowed in macro conditions."
+             }
+           | integer { MacroExpr_NumberLit $1 }
+           | string { MacroExpr_StringLit $1 }
+
+pMacroBinOp :: { MacroBinOp }
+pMacroBinOp : '<' { MacroBinOp_LT }
+            | '>' { MacroBinOp_GT }
+            | '==' { MacroBinOp_EQ }
+            | '!=' { MacroBinOp_NEQ }
+            | '<=' { MacroBinOp_LE }
+            | '>=' { MacroBinOp_GE }
+            | '&&' { MacroBinOp_And }
+            | '||' { MacroBinOp_Or }
 
 pWithOptions :: { [Option] }
 pWithOptions : with pOptions { $2 }
@@ -152,7 +221,7 @@ pVectors : pVector ',' pVectors { [$1] ++ $3 }
 
 pVector :: { (String, String, Int) }
 pVector : '<' upperName ',' upperName ',' integer '>' { ($2, $4, $6) }
- 
+
 pType :: { Ty }
 pType : paT '->' pType { TyF $1 $3 }
       | paT '=>' pType { TyC $1 $3 }
@@ -180,9 +249,10 @@ ppTs : ppT ppTs    { $1 : $2 }
 ppT :: { Ty }
 ppT : lowerName { TyVar $1 }
     | pTycon    { TyApp $1 [] }
+    | macroVar     { TyMacroUse $ tail $1 }
 
 pTycon :: { TyCon }
-pTycon : upperName { TyCon $1 }
+pTycon : upperName    { TyCon $1 }
        | '(' ')'      { TyCon "()" }
        | '(' '->' ')' { TyCon "->" }
        | SCALAR       { SCALAR }
@@ -193,4 +263,3 @@ pTycon : upperName { TyCon $1 }
 parse :: String -> Either String Info
 parse = run_parser parsex
 }
-

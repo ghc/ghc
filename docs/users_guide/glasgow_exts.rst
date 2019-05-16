@@ -83,7 +83,7 @@ case. And if it isn't, we'd like to know about it.
 All these primitive data types and operations are exported by the
 library ``GHC.Prim``, for which there is
 :ghc-prim-ref:`detailed online documentation <GHC.Prim.>`. (This
-documentation is generated from the file ``compiler/prelude/primops.txt.pp``.)
+documentation is generated from the file ``compiler/prelude/primops.txt``.)
 
 If you want to mention any of the primitive data types or operations in
 your program, you must first import ``GHC.Prim`` to bring them into
@@ -234,7 +234,7 @@ values, but they avoid the heap allocation normally associated with
 using fully-fledged tuples. When an unboxed tuple is returned, the
 components are put directly into registers or on the stack; the unboxed
 tuple itself does not have a composite representation. Many of the
-primitive operations listed in ``primops.txt.pp`` return unboxed tuples.
+primitive operations listed in ``primops.txt`` return unboxed tuples.
 In particular, the ``IO`` and ``ST`` monads use unboxed tuples to avoid
 unnecessary allocation during sequences of operations.
 

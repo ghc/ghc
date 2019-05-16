@@ -116,7 +116,7 @@ The ghcPrimIds
   * Either have a CompulsoryUnfolding (hence always inlined), or
         of an EvaldUnfolding and void representation (e.g. void#)
 
-  * Are (or should be) defined in primops.txt.pp as 'pseudoop'
+  * Are (or should be) defined in primops.txt as 'pseudoop'
     Reason: that's how we generate documentation for them
 
 Note [magicIds]

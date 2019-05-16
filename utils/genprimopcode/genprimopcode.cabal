@@ -8,7 +8,7 @@ Maintainer: XXX
 Synopsis: Generates various files implementing GHC's primitive operations.
 Description:
     This utility reads a textual description of GHC's primitive operations
-    (@primops.txt.pp@) and produces a number of outputs. These include,
+    (@primops.txt@) and produces a number of outputs. These include,
     .
     * the @GHC.Prim@ module included in the @ghc-prim@ package.
     * the @GHC.PrimopWrappers@ module included in the @ghc-prim@ package.
