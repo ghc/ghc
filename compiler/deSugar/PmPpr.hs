@@ -21,8 +21,9 @@ import TysWiredIn
 import Outputable
 import Control.Monad.Trans.State.Strict
 import Maybes
-import Util
+import Data.List.NonEmpty (toList)
 
+import PmExpr
 import TmOracle
 
 -- | Pretty-print the guts of an uncovered value vector abstraction, i.e., its
@@ -35,6 +36,9 @@ import TmOracle
 --     where p is not one of {3, 4}
 --           q is not one of {0, 5}
 -- @
+--
+-- When the set of refutable shapes contains more than 3 elements, the
+-- additional elements are indicated by "...".
 pprUncovered :: ([PmExpr], PmRefutEnv) -> SDoc
 pprUncovered (expr_vec, refuts)
   | null cs   = fsep vec -- there are no literal constraints
@@ -45,12 +49,17 @@ pprUncovered (expr_vec, refuts)
     (vec,cs) = runPmPpr sdoc_vec (prettifyRefuts refuts)
 
 -- | Output refutable shapes of a variable in the form of @var is not one of {2,
--- Nothing, 3}@.
+-- Nothing, 3}@. Will never print more than 3 refutable shapes, the tail is
+-- indicated by an ellipsis.
 pprRefutableShapes :: (SDoc,[PmAltCon]) -> SDoc
 pprRefutableShapes (var, alts)
-  = var <+> text "is not one of" <+> braces (pprWithCommas ppr_alt alts)
+  = var <+> text "is not one of" <+> format_alts alts
   where
-    ppr_alt (PmAltLit lit)      = ppr lit
+    format_alts = braces . fsep . punctuate comma . shorten . map ppr_alt
+    shorten (a:b:c:_:_)       = a:b:c:[text "..."]
+    shorten xs                = xs
+    ppr_alt (PmAltConLike cl) = ppr cl
+    ppr_alt (PmAltLit lit)    = ppr lit
 
 {- 1. Literals
 ~~~~~~~~~~~~~~
@@ -86,7 +95,7 @@ type PrettyPmRefutEnv = DNameEnv (SDoc, [PmAltCon])
 prettifyRefuts :: PmRefutEnv -> PrettyPmRefutEnv
 prettifyRefuts = listToUDFM . zipWith rename nameList . udfmToList
   where
-    rename new (old, lits) = (old, (new, lits))
+    rename new (old, ncons) = (old, (new, ncons))
     -- Try nice names p,q,r,s,t before using the (ugly) t_i
     nameList :: [SDoc]
     nameList = map text ["p","q","r","s","t"] ++
@@ -124,48 +133,37 @@ pprPmExpr (PmExprVar x) = do
     Just name -> addUsed x >> return name
     Nothing   -> return underscore
 pprPmExpr (PmExprCon con args) = pprPmExprCon con args
-pprPmExpr (PmExprLit l)        = return (ppr l)
 pprPmExpr (PmExprOther _)      = return underscore -- don't show
 
 needsParens :: PmExpr -> Bool
-needsParens (PmExprVar   {}) = False
-needsParens (PmExprLit    l) = isNegatedPmLit l
-needsParens (PmExprOther {}) = False -- will become a wildcard
-needsParens (PmExprCon (RealDataCon c) es)
-  | isTupleDataCon c
-  || isConsDataCon c || null es = False
-  | otherwise                   = True
-needsParens (PmExprCon (PatSynCon _) es) = not (null es)
+needsParens (PmExprVar   {})            = False
+needsParens (PmExprOther {})            = False -- will become a wildcard
+needsParens (PmExprCon (PmAltLit l) _)  = isNegatedPmLit l
+needsParens (PmExprCon (PmAltConLike (RealDataCon c)) _)
+  | isTupleDataCon c || isConsDataCon c = False
+needsParens (PmExprCon _ es)            = not (null es)
 
 pprPmExprWithParens :: PmExpr -> PmPprM SDoc
 pprPmExprWithParens expr
   | needsParens expr = parens <$> pprPmExpr expr
   | otherwise        =            pprPmExpr expr
 
-pprPmExprCon :: ConLike -> [PmExpr] -> PmPprM SDoc
-pprPmExprCon (RealDataCon con) args
-  | isTupleDataCon con = mkTuple <$> mapM pprPmExpr args
-  | isConsDataCon con  = pretty_list
-  where
-    mkTuple :: [SDoc] -> SDoc
-    mkTuple = parens     . fsep . punctuate comma
+pprPmExprCon :: PmAltCon -> [PmExpr] -> PmPprM SDoc
+pprPmExprCon (PmAltConLike cl) args = pprConLike cl args
+pprPmExprCon (PmAltLit l)      _    = pure (ppr l)
 
-    -- lazily, to be used in the list case only
-    pretty_list :: PmPprM SDoc
-    pretty_list = case isNilPmExpr (last list) of
-      True  -> brackets . fsep . punctuate comma <$> mapM pprPmExpr (init list)
-      False -> parens   . hcat . punctuate colon <$> mapM pprPmExpr list
-
-    list = list_elements args
-
-    list_elements [x,y]
-      | PmExprCon c es <- y,  RealDataCon nilDataCon == c
-          = ASSERT(null es) [x,y]
-      | PmExprCon c es <- y, RealDataCon consDataCon == c
-          = x : list_elements es
-      | otherwise = [x,y]
-    list_elements list  = pprPanic "list_elements:" (ppr list)
-pprPmExprCon cl args
+pprConLike :: ConLike -> [PmExpr] -> PmPprM SDoc
+pprConLike cl args
+  | Just pm_expr_list <- pmExprAsList (PmExprCon (PmAltConLike cl) args)
+  = case pm_expr_list of
+      NilTerminated list ->
+        brackets . fsep . punctuate comma <$> mapM pprPmExpr list
+      WcVarTerminated pref x ->
+        parens   . fcat . punctuate colon <$> mapM pprPmExpr (toList pref ++ [PmExprVar x])
+pprConLike (RealDataCon con) args
+  | isTupleDataCon con
+  = parens . fsep . punctuate comma <$> mapM pprPmExpr args
+pprConLike cl args
   | conLikeIsInfix cl = case args of
       [x, y] -> do x' <- pprPmExprWithParens x
                    y' <- pprPmExprWithParens y
@@ -180,11 +178,6 @@ pprPmExprCon cl args
 isNegatedPmLit :: PmLit -> Bool
 isNegatedPmLit (PmOLit b _) = b
 isNegatedPmLit _other_lit   = False
-
--- | Check whether a PmExpr is syntactically e
-isNilPmExpr :: PmExpr -> Bool
-isNilPmExpr (PmExprCon c _) = c == RealDataCon nilDataCon
-isNilPmExpr _other_expr     = False
 
 -- | Check if a DataCon is (:).
 isConsDataCon :: DataCon -> Bool
