@@ -202,11 +202,16 @@ INLINE_HEADER void *nonmovingSegmentGetBlock(struct NonmovingSegment *seg, nonmo
 
 // Get the segment which a closure resides in. Assumes that pointer points into
 // non-moving heap.
+INLINE_HEADER struct NonmovingSegment *nonmovingGetSegment_unchecked(StgPtr p)
+{
+    const uintptr_t mask = ~NONMOVING_SEGMENT_MASK;
+    return (struct NonmovingSegment *) (((uintptr_t) p) & mask);
+}
+
 INLINE_HEADER struct NonmovingSegment *nonmovingGetSegment(StgPtr p)
 {
     ASSERT(HEAP_ALLOCED_GC(p) && (Bdescr(p)->flags & BF_NONMOVING));
-    const uintptr_t mask = ~NONMOVING_SEGMENT_MASK;
-    return (struct NonmovingSegment *) (((uintptr_t) p) & mask);
+    return nonmovingGetSegment_unchecked(p);
 }
 
 INLINE_HEADER nonmoving_block_idx nonmovingGetBlockIdx(StgPtr p)
