@@ -1064,7 +1064,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
        } else {
            symbol = &stab->symbols[ELF_R_SYM(info)];
            /* First see if it is a local symbol. */
-           if (ELF_ST_BIND(symbol->elf_sym->st_info) == STB_LOCAL) {
+           if (ELF_ST_BIND(symbol->elf_sym->st_info) == STB_LOCAL || strncmp(symbol->name, "_GLOBAL_OFFSET_TABLE_", 21) == 0) {
                S = (Elf_Addr)symbol->addr;
            } else {
                S_tmp = lookupSymbol_( symbol->name );
