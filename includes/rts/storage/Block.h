@@ -102,6 +102,7 @@ typedef struct bdescr_ {
                                    // Unused by the non-moving allocator.
         struct NonmovingSegmentInfo {
             StgWord8 log_block_size;
+            StgWord16 next_free_snap;
         } nonmoving_segment;
     };
 
