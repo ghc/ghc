@@ -35,6 +35,20 @@ getProcessTimes(Time *user, Time *elapsed)
 }
 
 Time
+getCurrentThreadCPUTime(void)
+{
+    FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
+
+    if (!GetThreadTimes(GetCurrentThread(), &creationTime,
+                        &exitTime, &kernelTime, &userTime)) {
+        sysErrorBelch("getCurrentThreadCPUTime: Win32 error %lu", GetLastError());
+        return 0;
+    }
+
+    return fileTimeToRtsTime(userTime);
+}
+
+Time
 getProcessCPUTime(void)
 {
     FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
