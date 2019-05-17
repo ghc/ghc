@@ -205,13 +205,14 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 
 static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t log_block_size)
 {
+    bdescr *bd = Bdescr((P_) seg);
     seg->link = NULL;
     seg->todo_link = NULL;
     seg->next_free = 0;
     seg->next_free_snap = 0;
-    seg->log_block_size = log_block_size;
     nonmovingClearBitmap(seg);
-    Bdescr((P_)seg)->u.scan = nonmovingSegmentGetBlock(seg, 0);
+    bd->nonmoving_segment.log_block_size = log_block_size;
+    bd->u.scan = nonmovingSegmentGetBlock(seg, 0);
 }
 
 // Add a segment to the free list.
