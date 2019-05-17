@@ -500,7 +500,7 @@ static void checkNonmovingSegments (struct NonmovingSegment *seg)
             if (seg->bitmap[i] == nonmovingMarkEpoch) {
                 StgPtr p = nonmovingSegmentGetBlock(seg, i);
                 checkClosure((StgClosure *) p);
-            } else if (i < seg->next_free_snap){
+            } else if (i < nonmovingSegmentInfo(seg)->next_free_snap){
                 seg->bitmap[i] = 0;
             }
         }
