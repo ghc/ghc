@@ -50,8 +50,183 @@ Mutex concurrent_coll_finished_lock;
 /*
  * Note [Non-moving garbage collector]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The sources rts/NonMoving*.c implement GHC's non-moving garbage collector
+ * for the oldest generation. In contrast to the throughput-oriented moving
+ * collector, the non-moving collector is designed to achieve low GC latencies
+ * on large heaps. It accomplishes low-latencies by way of a concurrent
+ * mark-and-sweep collection strategy on a specially-designed heap structure.
+ * While the design is described in detail in the design document found in
+ * docs/storage/nonmoving-gc, we briefly summarize the structure here.
  *
- * TODO
+ *
+ * === Heap Structure ===
+ *
+ * The nonmoving heap (embodied by struct NonmovingHeap) consists of a family
+ * of allocators, each serving a range of allocation sizes. Each allocator
+ * consists of a set of *segments*, each of which contain fixed-size *blocks*
+ * (not to be confused with "blocks" provided by GHC's block allocator; this is
+ * admittedly an unfortunate overlap in terminology).  These blocks are the
+ * backing store for the allocator. In addition to blocks, the segment also
+ * contains some header information (see struct NonmovingSegment in
+ * NonMoving.h). This header contains a *bitmap* encoding one byte per block
+ * (used by the collector to record liveness), as well as the index of the next
+ * unallocated block (and a *snapshot* of this field which will be described in
+ * the next section).
+ *
+ * Each allocator maintains three sets of segments:
+ *
+ *  - A *current* segment for each capability; this is the segment which that
+ *    capability will allocate into.
+ *
+ *  - A pool of *active* segments, each of which containing at least one
+ *    unallocated block. The allocate will take a segment from this pool when
+ *    it fills its *current* segment.
+ *
+ *  - A set of *filled* segments, which contain no unallocated blocks and will
+ *    be collected during the next major GC cycle
+ *
+ * Storage for segments is allocated using the block allocator using an aligned
+ * group of NONMOVING_SEGMENT_BLOCKS blocks. This makes the task of locating
+ * the segment header for a clone a simple matter of bit-masking (as
+ * implemented by nonmovingGetSegment).
+ *
+ * In addition, to relieve pressure on the block allocator we keep a small pool
+ * of free blocks around (nonmovingHeap.free) which can be pushed/popped
+ * to/from in a lock-free manner.
+ *
+ *
+ * === Allocation ===
+ *
+ * The allocator (as implemented by nonmovingAllocate) starts by identifying
+ * which allocator the request should be made against. It then allocates into
+ * its local current segment and bumps the next_free pointer to point to the
+ * next unallocated block (as indicated by the bitmap). If it finds the current
+ * segment is now full it moves it to the filled list and looks for a new
+ * segment to make current from a few sources:
+ *
+ *  1. the allocator's active list (see pop_active_segment)
+ *  2. the nonmoving heap's free block pool (see nonmovingPopFreeSegment)
+ *  3. allocate a new segment from the block allocator (see
+ *     nonmovingAllocSegment)
+ *
+ * Note that allocation does *not* involve modifying the bitmap. The bitmap is
+ * only modified by the collector.
+ *
+ *
+ * === Snapshot invariant ===
+ *
+ * To safely collect in a concurrent setting, the collector relies on the
+ * notion of a *snapshot*. The snapshot is a hypothetical frozen state of the
+ * heap topology taken at the beginning of the major collection cycle.
+ * With this definition we require the following property of the mark phase,
+ * which we call the *snapshot invariant*,
+ *
+ *     All objects that were reachable at the time the snapshot was collected
+ *     must have their mark bits set at the end of the mark phase.
+ *
+ * As the mutator might change the topology of the heap while we are marking
+ * this property requires some cooperation from the mutator to maintain.
+ * Specifically, we rely on a write barrier as described in Note [Update
+ * remembered set].
+ *
+ * To determine which objects were existent when the snapshot was taken we
+ * record a snapshot of each segments next_free pointer at the beginning of
+ * collection.
+ *
+ *
+ * === Collection ===
+ *
+ * Collection happens in a few phases some of which occur during a
+ * stop-the-world period (marked with [STW]) and others which can occur
+ * concurrently with mutation and minor collection (marked with [CONC]):
+ *
+ *  1. [STW] Preparatory GC: Here we do a standard minor collection of the
+ *     younger generations (which may evacuate things to the nonmoving heap).
+ *     References from younger generations into the nonmoving heap are recorded
+ *     in the mark queue (see Note [Aging under the non-moving collector] in
+ *     this file).
+ *
+ *  2. [STW] Snapshot update: Here we update the segment snapshot metadata
+ *     (see nonmovingPrepareMark) and move the filled segments to
+ *     nonmovingHeap.sweep_list, which is the set of segments which we will
+ *     sweep this GC cycle.
+ *
+ *  3. [STW] Root collection: Here we walk over a variety of root sources
+ *     and add them to the mark queue (see nonmovingCollect).
+ *
+ *  4. [CONC] Concurrent marking: Here we do the majority of marking concurrently
+ *     with mutator execution (but with the write barrier enabled; see
+ *     Note [Update remembered set]).
+ *
+ *  5. [STW] Final sync: Here we interrupt the mutators, ask them to
+ *     flush their final update remembered sets, and mark any new references
+ *     we find.
+ *
+ *  6. [CONC] Sweep: Here we walk over the nonmoving segments on sweep_list
+ *     and place them back on either the active, current, or filled list,
+ *     depending upon how much live data they contain.
+ *
+ *
+ * === Marking ===
+ *
+ * Ignoring large and static objects, marking a closure is fairly
+ * straightforward (implemented in NonMovingMark.c:mark_closure):
+ *
+ *  1. Check whether the closure is in the non-moving generation; if not then
+ *     we ignore it.
+ *  2. Find the segment containing the closure's block.
+ *  3. Check whether the closure's block is above $seg->next_free_snap; if so
+ *     then the block was not allocated when we took the snapshot and therefore
+ *     we don't need to mark it.
+ *  4. Check whether the block's bitmap bits is equal to nonmovingMarkEpoch. If
+ *     so then we can stop as we have already marked it.
+ *  5. Push the closure's pointers to the mark queue.
+ *  6. Set the blocks bitmap bits to nonmovingMarkEpoch.
+ *
+ * Note that the ordering of (5) and (6) is rather important, as described in
+ * Note [StgStack dirtiness flags and concurrent marking].
+ *
+ *
+ * === Other references ===
+ *
+ * Apart from the design document in docs/storage/nonmoving-gc and the Ueno
+ * 2016 paper (TODO citation) from which it drew inspiration, there are a
+ * variety of other relevant Notes scattered throughout the tree:
+ *
+ *  - Note [Concurrent non-moving collection] (NonMoving.c) describes
+ *    concurrency control of the nonmoving collector
+ *
+ *  - Note [Live data accounting in nonmoving collector] (NonMoving.c)
+ *    describes how we track the quantity of live data in the nonmoving
+ *    generation.
+ *
+ *  - Note [Aging under the non-moving collector] (NonMoving.c) describes how
+ *    we accomodate aging
+ *
+ *  - Note [Large objects in the non-moving collector] (NonMovingMark.c)
+ *    describes how we track large objects.
+ *
+ *  - Note [Update remembered set] (NonMovingMark.c) describes the function and
+ *    implementation of the update remembered set used to realize the concurrent
+ *    write barrier.
+ *
+ *  - Note [Concurrent read barrier on deRefWeak#] (NonMovingMark.c) describes
+ *    the read barrier on Weak# objects.
+ *
+ *  - Note [Unintentional marking in resurrectThreads] (NonMovingMark.c) describes
+ *    a tricky interaction between the update remembered set flush and weak
+ *    finalization.
+ *
+ *  - Note [Origin references in the nonmoving collector] (NonMovingMark.h)
+ *    describes how we implement indirection short-cutting and the selector
+ *    optimisation.
+ *
+ *  - Note [StgStack dirtiness flags and concurrent marking] (TSO.h) describes
+ *    the protocol for concurrent marking of stacks.
+ *
+ *  - Note [Static objects under the nonmoving collector] (Storage.c) describes
+ *    treatment of static objects.
+ *
  *
  * Note [Concurrent non-moving collection]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -85,11 +260,12 @@ Mutex concurrent_coll_finished_lock;
  * was (unsurprisingly) also found to result in significant amounts of
  * unnecessary copying.
  *
- * Consequently, we now allow aging. We do this by teaching the moving
- * collector to "evacuate" objects it encounters in the non-moving heap by
- * adding them to the mark queue. Specifically, since each gc_thread holds a
- * capability we push to the capability's update remembered set (implemented
- * by markQueuePushClosureGC)
+ * Consequently, we now allow aging (i.e. allowing objects to remain in the
+ * young generation when preparing for a major collection). We do this by
+ * teaching the moving collector to "evacuate" objects it encounters in the
+ * non-moving heap by adding them to the mark queue. Specifically, since each
+ * gc_thread holds a capability we push to the capability's update remembered
+ * set (implemented by markQueuePushClosureGC)
  *
  *
  * Note [Live data accounting in nonmoving collector]
