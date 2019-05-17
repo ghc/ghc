@@ -33,7 +33,7 @@
 --
 -- The format of each primop entry is as follows:
 --
---      primop internal-name "name-in-program-text" type category {description} attributes
+--      primop internal-name "name-in-program-text" category type {description} attributes
 
 -- The default attribute values which apply if you don't specify
 -- other ones.  Attribute values can be True, False, or arbitrary
