@@ -92,6 +92,9 @@ struct NonmovingHeap {
 extern struct NonmovingHeap nonmovingHeap;
 
 extern uint64_t nonmoving_live_words;
+#if defined(THREADED_RTS)
+extern bool concurrent_coll_running;
+#endif
 
 void nonmovingInit(void);
 void nonmovingExit(void);
