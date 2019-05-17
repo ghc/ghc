@@ -39,12 +39,16 @@ struct NonmovingSegment {
     struct NonmovingSegment *todo_link; // NULL when not in todo list
     nonmoving_block_idx next_free;      // index of the next unallocated block
     nonmoving_block_idx next_free_snap; // snapshot of next_free
-    uint8_t log_block_size;             // log2 of block size in bytes
     uint8_t bitmap[];                   // liveness bitmap
     // After the liveness bitmap comes the data blocks. Note that we need to
     // ensure that the size of this struct (including the bitmap) is a multiple
     // of the word size since GHC assumes that all object pointers are
     // so-aligned.
+
+    // N.B. There are also bits of information which are stored in the
+    // NonmovingBlockInfo stored in the segment's block descriptor. Namely:
+    //
+    //  * the block size can be found in nonmovingBlockInfo(seg)->log_block_size.
 };
 
 // This is how we mark end of todo lists. Not NULL because todo_link == NULL
@@ -121,8 +125,13 @@ void *nonmovingAllocate(Capability *cap, StgWord sz);
 void nonmovingAddCapabilities(uint32_t new_n_caps);
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg);
 
+
+INLINE_HEADER struct NonmovingSegmentInfo *nonmovingSegmentInfo(struct NonmovingSegment *seg) {
+    return &Bdescr((StgPtr) seg)->nonmoving_segment;
+}
+
 INLINE_HEADER uint8_t nonmovingSegmentLogBlockSize(struct NonmovingSegment *seg) {
-    return seg->log_block_size;
+    return nonmovingSegmentInfo(seg)->log_block_size;
 }
 
 // Add a segment to the appropriate active list.
