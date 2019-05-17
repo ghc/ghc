@@ -38,7 +38,6 @@ struct NonmovingSegment {
     struct NonmovingSegment *link;     // for linking together segments into lists
     struct NonmovingSegment *todo_link; // NULL when not in todo list
     nonmoving_block_idx next_free;      // index of the next unallocated block
-    nonmoving_block_idx next_free_snap; // snapshot of next_free
     uint8_t bitmap[];                   // liveness bitmap
     // After the liveness bitmap comes the data blocks. Note that we need to
     // ensure that the size of this struct (including the bitmap) is a multiple
@@ -49,6 +48,11 @@ struct NonmovingSegment {
     // NonmovingBlockInfo stored in the segment's block descriptor. Namely:
     //
     //  * the block size can be found in nonmovingBlockInfo(seg)->log_block_size.
+    //  * the next_free snapshot can be found in
+    //    nonmovingBlockInfo(seg)->next_free_snap.
+    //
+    // This allows us to mark a nonmoving closure without bringing the
+    // NonmovingSegment header into cache.
 };
 
 // This is how we mark end of todo lists. Not NULL because todo_link == NULL
@@ -279,8 +283,9 @@ INLINE_HEADER bool nonmovingClosureMarked(StgPtr p)
 // segment is in the set of segments that will be swept this collection cycle.
 INLINE_HEADER bool nonmovingSegmentBeingSwept(struct NonmovingSegment *seg)
 {
-    unsigned int n = nonmovingSegmentBlockCount(seg);
-    return seg->next_free_snap >= n;
+    struct NonmovingSegmentInfo *seginfo = nonmovingSegmentInfo(seg);
+    unsigned int n = nonmovingBlockCountFromSize(seginfo->log_block_size);
+    return seginfo->next_free_snap >= n;
 }
 
 // Can be called during a major collection to determine whether a particular
