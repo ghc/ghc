@@ -1048,6 +1048,14 @@ memInventory (bool show)
   W_ live_blocks = 0, free_blocks = 0;
   bool leak;
 
+#if defined(THREADED_RTS)
+  // Can't easily do a memory inventory: We might race with the nonmoving
+  // collector. In principle we could try to take nonmoving_collection_mutex
+  // and do an inventory if we have it but we don't currently implement this.
+  if (RtsFlags.GcFlags.useNonmoving)
+    return;
+#endif
+
   // count the blocks we current have
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
