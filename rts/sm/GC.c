@@ -272,6 +272,18 @@ GarbageCollect (uint32_t collect_gen,
   /* See Note [Deadlock detection under nonmoving collector]. */
   deadlock_detect_gc = deadlock_detect;
 
+#if defined(THREADED_RTS)
+  if (major_gc && RtsFlags.GcFlags.useNonmoving && concurrent_coll_running) {
+      /* If there is already a concurrent major collection running then
+       * there is no benefit to starting another.
+       * TODO: Catch heap-size runaway.
+       */
+      N--;
+      collect_gen--;
+      major_gc = false;
+  }
+#endif
+
   /* N.B. The nonmoving collector works a bit differently. See
    * Note [Static objects under the nonmoving collector].
    */
