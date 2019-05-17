@@ -275,11 +275,13 @@ reparenTypePrec = go
   go p (HsKindSig x ty kind)
     = paren p PREC_SIG $ HsKindSig x (goL PREC_SIG ty) (goL PREC_SIG kind)
   go p (HsIParamTy x n ty)
-    = paren p PREC_CTX $ HsIParamTy x n (reparenLType ty)
+    = paren p PREC_SIG $ HsIParamTy x n (reparenLType ty)
   go p (HsForAllTy x tvs ty)
     = paren p PREC_CTX $ HsForAllTy x (map (fmap reparenTyVar) tvs) (reparenLType ty)
   go p (HsQualTy x ctxt ty)
-    = paren p PREC_FUN $ HsQualTy x (fmap (map reparenLType) ctxt) (reparenLType ty)
+    = let p' [_] = PREC_CTX
+          p' _   = PREC_TOP -- parens will get added anyways later...
+      in paren p PREC_CTX $ HsQualTy x (fmap (\xs -> map (goL (p' xs)) xs) ctxt) (goL PREC_TOP ty)
   go p (HsFunTy x ty1 ty2)
     = paren p PREC_FUN $ HsFunTy x (goL PREC_FUN ty1) (goL PREC_TOP ty2)
   go p (HsAppTy x fun_ty arg_ty)
