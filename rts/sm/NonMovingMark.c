@@ -1211,7 +1211,7 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
                 return;
 
             StgClosure *snapshot_loc =
-              (StgClosure *) nonmovingSegmentGetBlock(seg, seg->next_free_snap);
+              (StgClosure *) nonmovingSegmentGetBlock(seg, nonmovingSegmentInfo(seg)->next_free_snap);
             if (p >= snapshot_loc && mark == 0) {
                 /*
                  * In this case we are looking at a block that wasn't allocated
@@ -1616,7 +1616,7 @@ bool nonmovingIsAlive (StgClosure *p)
         struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
         nonmoving_block_idx i = nonmovingGetBlockIdx((StgPtr) p);
         uint8_t mark =  nonmovingGetMark(seg, i);
-        if (i >= seg->next_free_snap) {
+        if (i >= nonmovingSegmentInfo(seg)->next_free_snap) {
             // If the object is allocated after next_free_snap then one of the
             // following must be true:
             //

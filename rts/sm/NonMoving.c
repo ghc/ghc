@@ -209,9 +209,9 @@ static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t log_block
     seg->link = NULL;
     seg->todo_link = NULL;
     seg->next_free = 0;
-    seg->next_free_snap = 0;
     nonmovingClearBitmap(seg);
     bd->nonmoving_segment.log_block_size = log_block_size;
+    bd->nonmoving_segment.next_free_snap = 0;
     bd->u.scan = nonmovingSegmentGetBlock(seg, 0);
 }
 
@@ -387,7 +387,7 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
 
         // Update live data estimate.
         // See Note [Live data accounting in nonmoving collector].
-        unsigned int new_blocks = block_count - current->next_free_snap;
+        unsigned int new_blocks = block_count - nonmovingSegmentInfo(current)->next_free_snap;
         unsigned int block_size = 1 << log_block_size;
         atomic_inc(&oldest_gen->live_estimate, new_blocks * block_size / sizeof(W_));
 
@@ -508,7 +508,7 @@ static void nonmovingPrepareMark(void)
         // Update current segments' snapshot pointers
         for (uint32_t cap_n = 0; cap_n < n_capabilities; ++cap_n) {
             struct NonmovingSegment *seg = alloca->current[cap_n];
-            seg->next_free_snap = seg->next_free;
+            nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
         }
 
         // Update filled segments' snapshot pointers and move to sweep_list
@@ -524,7 +524,7 @@ static void nonmovingPrepareMark(void)
                 prefetchForWrite(seg->link->bitmap);
                 nonmovingClearBitmap(seg);
                 // Set snapshot
-                seg->next_free_snap = seg->next_free;
+                nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
                 if (seg->link)
                     seg = seg->link;
                 else
