@@ -41,7 +41,7 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
         } else if (!found_free) {
             found_free = true;
             seg->next_free = i;
-            seg->next_free_snap = i;
+            nonmovingSegmentInfo(seg)->next_free_snap = i;
             Bdescr((P_)seg)->u.scan = (P_)nonmovingSegmentGetBlock(seg, i);
             seg->bitmap[i] = 0;
         } else {
@@ -63,7 +63,7 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
         return SEGMENT_FILLED;
     } else {
         ASSERT(seg->next_free == 0);
-        ASSERT(seg->next_free_snap == 0);
+        ASSERT(nonmovingSegmentInfo(seg)->next_free_snap == 0);
         return SEGMENT_FREE;
     }
 }
