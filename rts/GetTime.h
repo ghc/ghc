@@ -13,6 +13,7 @@
 void initializeTimer       (void);
 
 Time getProcessCPUTime     (void);
+Time getCurrentThreadCPUTime (void);
 void getProcessTimes       (Time *user, Time *elapsed);
 
 /* Get the current date and time.
