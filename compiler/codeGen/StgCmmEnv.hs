@@ -109,6 +109,8 @@ maybeLetNoEscape _other                                      = Nothing
 addBindC :: CgIdInfo -> FCode ()
 addBindC stuff_to_bind = do
         binds <- getBinds
+        pprTraceM "this far new 1" empty
+
         setBinds $ extendVarEnv binds (cg_id stuff_to_bind) stuff_to_bind
 
 addBindsC :: [CgIdInfo] -> FCode ()
