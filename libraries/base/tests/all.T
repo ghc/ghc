@@ -231,5 +231,5 @@ test('T3474',
 test('T14425', normal, compile_and_run, [''])
 test('T10412', normal, compile_and_run, [''])
 test('T13896', normal, compile_and_run, [''])
-test('T13167', normal, compile_and_run, [''])
+test('T13167', expect_broken_for(16536, ['threaded2']), compile_and_run, [''])
 test('T15349', [exit_code(1), expect_broken_for(15349, 'ghci')], compile_and_run, [''])

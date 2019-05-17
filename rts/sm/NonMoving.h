@@ -160,22 +160,34 @@ INLINE_HEADER unsigned int nonmovingSegmentBlockSize(struct NonmovingSegment *se
     return 1 << seg->block_size;
 }
 
+// How many blocks does a segment with the given block size have?
+INLINE_HEADER unsigned int nonmovingBlockCount(uint8_t log_block_size)
+{
+  unsigned int segment_data_size = NONMOVING_SEGMENT_SIZE - sizeof(struct NonmovingSegment);
+  segment_data_size -= segment_data_size % SIZEOF_VOID_P;
+  unsigned int blk_size = 1 << log_block_size;
+  // N.B. +1 accounts for the byte in the mark bitmap.
+  return segment_data_size / (blk_size + 1);
+}
+
+unsigned int nonmovingBlockCountFromSize(uint8_t log_block_size);
+
 // How many blocks does the given segment contain? Also the size of the bitmap.
 INLINE_HEADER unsigned int nonmovingSegmentBlockCount(struct NonmovingSegment *seg)
 {
-  unsigned int sz = nonmovingSegmentBlockSize(seg);
-  unsigned int segment_data_size = NONMOVING_SEGMENT_SIZE - sizeof(struct NonmovingSegment);
-  segment_data_size -= segment_data_size % SIZEOF_VOID_P;
-  return segment_data_size / (sz + 1);
+  return nonmovingBlockCountFromSize(seg->block_size);
 }
 
-// Get a pointer to the given block index
-INLINE_HEADER void *nonmovingSegmentGetBlock(struct NonmovingSegment *seg, nonmoving_block_idx i)
+// Get a pointer to the given block index assuming that the block size is as
+// given (avoiding a potential cache miss when this information is already
+// available). The log_block_size argument must be equal to seg->block_size.
+INLINE_HEADER void *nonmovingSegmentGetBlock_(struct NonmovingSegment *seg, uint8_t log_block_size, nonmoving_block_idx i)
 {
+  ASSERT(log_block_size == seg->block_size);
   // Block size in bytes
-  unsigned int blk_size = nonmovingSegmentBlockSize(seg);
+  unsigned int blk_size = 1 << log_block_size;
   // Bitmap size in bytes
-  W_ bitmap_size = nonmovingSegmentBlockCount(seg) * sizeof(uint8_t);
+  W_ bitmap_size = nonmovingBlockCountFromSize(log_block_size) * sizeof(uint8_t);
   // Where the actual data starts (address of the first block).
   // Use ROUNDUP_BYTES_TO_WDS to align to word size. Note that
   // ROUNDUP_BYTES_TO_WDS returns in _words_, not in _bytes_, so convert it back
@@ -184,13 +196,24 @@ INLINE_HEADER void *nonmovingSegmentGetBlock(struct NonmovingSegment *seg, nonmo
   return (void*)(data + i*blk_size);
 }
 
+// Get a pointer to the given block index.
+INLINE_HEADER void *nonmovingSegmentGetBlock(struct NonmovingSegment *seg, nonmoving_block_idx i)
+{
+  return nonmovingSegmentGetBlock_(seg, seg->block_size, i);
+}
+
 // Get the segment which a closure resides in. Assumes that pointer points into
 // non-moving heap.
+INLINE_HEADER struct NonmovingSegment *nonmovingGetSegment_unchecked(StgPtr p)
+{
+    const uintptr_t mask = ~NONMOVING_SEGMENT_MASK;
+    return (struct NonmovingSegment *) (((uintptr_t) p) & mask);
+}
+
 INLINE_HEADER struct NonmovingSegment *nonmovingGetSegment(StgPtr p)
 {
     ASSERT(HEAP_ALLOCED_GC(p) && (Bdescr(p)->flags & BF_NONMOVING));
-    const uintptr_t mask = ~NONMOVING_SEGMENT_MASK;
-    return (struct NonmovingSegment *) (((uintptr_t) p) & mask);
+    return nonmovingGetSegment_unchecked(p);
 }
 
 INLINE_HEADER nonmoving_block_idx nonmovingGetBlockIdx(StgPtr p)

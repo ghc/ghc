@@ -43,9 +43,16 @@ enum EntryType {
  */
 
 typedef struct {
-    enum EntryType type;
-    // All pointers should be untagged
+    // Which kind of mark queue entry we have is determined by the low bits of
+    // the second word: they must be zero in the case of a mark_closure entry
+    // (since the second word of a mark_closure entry points to a pointer and
+    // pointers must be word-aligned).  In the case of a mark_array we set them
+    // to 0x3 (the value of start_index is shifted to the left to accomodate
+    // this). null_entry where p==NULL is used to indicate the end of the queue.
     union {
+        struct {
+            void *p;              // must be NULL
+        } null_entry;
         struct {
             StgClosure *p;        // the object to be marked
             StgClosure **origin;  // field where this reference was found.
@@ -53,10 +60,22 @@ typedef struct {
         } mark_closure;
         struct {
             const StgMutArrPtrs *array;
-            StgWord start_index;
+            StgWord start_index;  // start index is shifted to the left by 16 bits
         } mark_array;
     };
 } MarkQueueEnt;
+
+INLINE_HEADER enum EntryType nonmovingMarkQueueEntryType(MarkQueueEnt *ent)
+{
+    if (ent->null_entry.p == NULL) {
+        return NULL_ENTRY;
+    } else if (((uintptr_t) ent->mark_closure.origin & TAG_BITS) == 0) {
+        return MARK_CLOSURE;
+    } else {
+        ASSERT((ent->mark_array.start_index & TAG_BITS) == 0x3);
+        return MARK_ARRAY;
+    }
+}
 
 typedef struct {
     // index of first *unused* queue entry
@@ -64,6 +83,9 @@ typedef struct {
 
     MarkQueueEnt entries[];
 } MarkQueueBlock;
+
+// How far ahead in mark queue to prefetch?
+#define MARK_PREFETCH_QUEUE_DEPTH 5
 
 /* The mark queue is not capable of concurrent read or write.
  *
@@ -83,9 +105,12 @@ typedef struct MarkQueue_ {
     // Is this a mark queue or a capability-local update remembered set?
     bool is_upd_rem_set;
 
-    // Marked objects outside of nonmoving heap, namely large and static
-    // objects.
-    HashTable *marked_objects;
+#if MARK_PREFETCH_QUEUE_DEPTH > 0
+    // A ring-buffer of entries which we will mark next
+    MarkQueueEnt prefetch_queue[MARK_PREFETCH_QUEUE_DEPTH];
+    // The first free slot in prefetch_queue.
+    uint8_t prefetch_head;
+#endif
 } MarkQueue;
 
 /* While it shares its representation with MarkQueue, UpdRemSet differs in
@@ -97,8 +122,11 @@ typedef struct {
     MarkQueue queue;
 } UpdRemSet;
 
+// Number of blocks to allocate for a mark queue
+#define MARK_QUEUE_BLOCKS 16
+
 // The length of MarkQueueBlock.entries
-#define MARK_QUEUE_BLOCK_ENTRIES ((BLOCK_SIZE - sizeof(MarkQueueBlock)) / sizeof(MarkQueueEnt))
+#define MARK_QUEUE_BLOCK_ENTRIES ((MARK_QUEUE_BLOCKS * BLOCK_SIZE - sizeof(MarkQueueBlock)) / sizeof(MarkQueueEnt))
 
 extern bdescr *nonmoving_large_objects, *nonmoving_marked_large_objects;
 extern memcount n_nonmoving_large_blocks, n_nonmoving_marked_large_blocks;
@@ -143,8 +171,10 @@ void nonmovingResurrectThreads(struct MarkQueue_ *queue, StgTSO **resurrected_th
 bool nonmovingIsAlive(StgClosure *p);
 void nonmovingMarkDeadWeak(struct MarkQueue_ *queue, StgWeak *w);
 void nonmovingMarkLiveWeak(struct MarkQueue_ *queue, StgWeak *w);
+void nonmovingAddUpdRemSetBlocks(struct MarkQueue_ *rset);
 
 void markQueuePush(MarkQueue *q, const MarkQueueEnt *ent);
+void markQueuePushClosureGC(MarkQueue *q, StgClosure *p);
 void markQueuePushClosure(MarkQueue *q,
                              StgClosure *p,
                              StgClosure **origin);
