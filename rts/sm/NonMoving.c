@@ -203,13 +203,13 @@ static void* nonmovingConcurrentMark(void *mark_queue);
 static void nonmovingClearBitmap(struct NonmovingSegment *seg);
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads);
 
-static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t block_size)
+static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t log_block_size)
 {
     seg->link = NULL;
     seg->todo_link = NULL;
     seg->next_free = 0;
     seg->next_free_snap = 0;
-    seg->block_size = block_size;
+    seg->log_block_size = log_block_size;
     nonmovingClearBitmap(seg);
     Bdescr((P_)seg)->u.scan = nonmovingSegmentGetBlock(seg, 0);
 }
@@ -957,12 +957,13 @@ void assert_in_nonmoving_heap(StgPtr p)
 void nonmovingPrintSegment(struct NonmovingSegment *seg)
 {
     int num_blocks = nonmovingSegmentBlockCount(seg);
+    uint8_t log_block_size = nonmovingSegmentLogBlockSize(seg);
 
     debugBelch("Segment with %d blocks of size 2^%d (%d bytes, %lu words, scan: %p)\n",
                num_blocks,
-               seg->block_size,
-               1 << seg->block_size,
-               ROUNDUP_BYTES_TO_WDS(1 << seg->block_size),
+               log_block_size,
+               1 << log_block_size,
+               ROUNDUP_BYTES_TO_WDS(1 << log_block_size),
                (void*)Bdescr((P_)seg)->u.scan);
 
     for (nonmoving_block_idx p_idx = 0; p_idx < seg->next_free; ++p_idx) {
