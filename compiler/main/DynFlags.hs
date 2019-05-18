@@ -2812,7 +2812,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   let (dflags5, consistency_warnings) = makeDynFlagsConsistent dflags4
 
   -- Set timer stats & heap size
-  when (enableTimeStats dflags5) $ liftIO enableTimingStats
+--  when (enableTimeStats dflags5) $ liftIO enableTimingStats
   case (ghcHeapSize dflags5) of
     Just x -> liftIO (setHeapSize x)
     _      -> return ()
@@ -5967,8 +5967,12 @@ decodeSize str
         n      = readRational m
         pred c = isDigit c || c == '.'
 
-foreign import ccall unsafe "setHeapSize"       setHeapSize       :: Int -> IO ()
-foreign import ccall unsafe "enableTimingStats" enableTimingStats :: IO ()
+setHeapSize :: Int -> IO ()
+setHeapSize _ = return ()
+enableTimingStats :: IO ()
+enableTimingStats = return ()
+--foreign import ccall unsafe "setHeapSize"       setHeapSize       :: Int -> IO ()
+--foreign import ccall unsafe "enableTimingStats" enableTimingStats :: IO ()
 
 -- -----------------------------------------------------------------------------
 -- Types for managing temporary files.

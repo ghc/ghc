@@ -2,6 +2,8 @@
 
 module TcCanonical(
      canonicalize,
+     canEqNC,
+     can_eq_nc,
      unifyDerived,
      makeSuperClasses, maybeSym,
      StopOrContinue(..), stopWith, continueWith,
