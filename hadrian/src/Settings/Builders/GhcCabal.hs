@@ -1,52 +1,40 @@
-module Settings.Builders.Cabal (cabalBuilderArgs) where
+module Settings.Builders.GhcCabal (
+    ghcCabalBuilderArgs
+    ) where
 
-import Hadrian.Builder (getBuilderPath, needBuilder)
-import Hadrian.Haskell.Cabal
+import Data.Maybe (fromJust)
 
-import Builder
+import Builder ( ArMode ( Pack ) )
 import Context
 import Flavour
-import Packages
+import GHC.Packages
+import Hadrian.Builder (getBuilderPath, needBuilder )
+import Hadrian.Haskell.Cabal
 import Settings.Builders.Common
 
-cabalBuilderArgs :: Args
-cabalBuilderArgs = builder (Cabal Setup) ? do
+ghcCabalBuilderArgs :: Args
+ghcCabalBuilderArgs = mconcat
+  [ builder (GhcCabal Conf) ? do
     verbosity <- expr getVerbosity
     top       <- expr topDirectory
-    pkg       <- getPackage
     path      <- getContextPath
     stage     <- getStage
-    windows   <- expr windowsHost
-    pCabalFile <- expr $ pkgCabalFile pkg
-    let prefix = "${pkgroot}" ++ (if windows then "" else "/..")
     mconcat [ arg "configure"
-            -- Don't strip libraries when cross compiling.
-            -- TODO: We need to set @--with-strip=(stripCmdPath :: Action FilePath)@,
-            -- and if it's @:@ disable stripping as well. As it is now, I believe
-            -- we might have issues with stripping on Windows, as I can't see a
-            -- consumer of 'stripCmdPath'.
+            -- don't strip libraries when cross compiling.
+            -- XXX we need to set --with-strip= (stripCmdPath :: Action FilePath), and if it's ':' disable
+            --     stripping as well. As it is now, I believe we might have issues with stripping on
+            --     windows, as I can't see a consumer of `stripCmdPath`.
             -- TODO: See https://github.com/snowleopard/hadrian/issues/549.
             , flag CrossCompiling ? pure [ "--disable-executable-stripping"
                                          , "--disable-library-stripping" ]
             , arg "--cabal-file"
-            , arg $ pCabalFile
+            , arg =<< fromJust . pkgCabalFile <$> getPackage
             , arg "--distdir"
             , arg $ top -/- path
             , arg "--ipid"
             , arg "$pkg-$version"
             , arg "--prefix"
-            , arg prefix
-
-            -- NB: this is valid only because Hadrian puts the @docs@ and
-            -- @libraries@ folders in the same relative position:
-            --
-            --   * libraries in @_build/stageN/libraries@
-            --   * docs in @_build/docs/html/libraries@
-            --
-            -- This doesn't hold if we move the @docs@ folder anywhere else.
-            , arg "--htmldir"
-            , arg $ "${pkgroot}/../../docs/html/libraries/" ++ pkgName pkg
-
+            , arg "${pkgroot}/.."
             , withStaged $ Ghc CompileHs
             , withStaged (GhcPkg Update)
             , withBuilderArgs (GhcPkg Update stage)
@@ -61,35 +49,33 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
             , with Happy
             , verbosity < Chatty ?
               pure [ "-v0", "--configure-option=--quiet"
-                   , "--configure-option=--disable-option-checking" ] ]
+                   , "--configure-option=--disable-option-checking"
+                   ]
+            ]
+  ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
 -- TODO: should `elem` be `wayUnit`?
--- This approach still doesn't work. Previously libraries were build only in the
--- Default flavours and not using context.
+-- This approach still doesn't work. Previously libraries were build only in the 
+-- Default flavours and not using context. 
 libraryArgs :: Args
 libraryArgs = do
     flavourWays <- getLibraryWays
     contextWay  <- getWay
-    package     <- getPackage
     withGhci    <- expr ghcWithInterpreter
-    dynPrograms <- expr (flavour >>= dynamicGhcPrograms)
+    dynPrograms <- dynamicGhcPrograms <$> expr flavour
     let ways = flavourWays ++ [contextWay]
-        hasVanilla = vanilla `elem` ways
-        hasProfiling = any (wayUnit Profiling) ways
-        hasDynamic = any (wayUnit Dynamic) ways
-    pure [ if hasVanilla
+    pure [ if vanilla `elem` ways
            then  "--enable-library-vanilla"
            else "--disable-library-vanilla"
-         , if hasProfiling
-           then  "--enable-library-profiling"
-           else "--disable-library-profiling"
-         , if (hasVanilla || hasProfiling) &&
-              package /= rts && withGhci && not dynPrograms
+         , if vanilla `elem` ways && withGhci && not dynPrograms
            then  "--enable-library-for-ghci"
            else "--disable-library-for-ghci"
-         , if hasDynamic
+         , if or [Profiling `wayUnit` way | way <- ways]
+           then  "--enable-library-profiling"
+           else "--disable-library-profiling"
+         , if or [Dynamic `wayUnit` way | way <- ways]
            then  "--enable-shared"
            else "--disable-shared" ]
 
@@ -99,7 +85,6 @@ configureArgs = do
     top  <- expr topDirectory
     root <- getBuildRoot
     pkg  <- getPackage
-    pPath <- expr $ realPkgPath pkg
     let conf key expr = do
             values <- unwords <$> expr
             not (null values) ?
@@ -108,7 +93,7 @@ configureArgs = do
                            , getStagedSettingList ConfCcArgs
                            , arg $ "-I" ++ top -/- root -/- generatedDir
                            -- See https://github.com/snowleopard/hadrian/issues/523
-                           , arg $ "-I" ++ top -/- pPath
+                           , arg $ "-I" ++ top -/- pkgPath pkg
                            , arg $ "-I" ++ top -/- "includes" ]
         ldFlags  = ldArgs  <> (getStagedSettingList ConfGccLinkerArgs)
         cppFlags = cppArgs <> (getStagedSettingList ConfCppArgs)
@@ -131,9 +116,10 @@ bootPackageConstraints :: Args
 bootPackageConstraints = stage0 ? do
     bootPkgs <- expr $ stagePackages Stage0
     let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
-    constraints <- expr $ forM (sort pkgs) $ \pkg -> do
-        version <- pkgVersion pkg
-        return $ ((pkgName pkg ++ " == ") ++) version
+    ctx <- getContext
+    constraints <- expr $ fmap catMaybes $ forM (sort pkgs) $ \pkg -> do
+        version <- pkgVersion (ctx { Context.package = pkg})
+        return $ fmap ((pkgName pkg ++ " == ") ++) version
     pure $ concat [ ["--constraint", c] | c <- constraints ]
 
 cppArgs :: Args
@@ -152,7 +138,7 @@ withBuilderKey b = case b of
     GhcPkg _ _ -> "--with-ghc-pkg="
     _          -> error $ "withBuilderKey: not supported builder " ++ show b
 
--- | Add arguments to builders if needed.
+-- Adds arguments to builders if needed.
 withBuilderArgs :: Builder -> Args
 withBuilderArgs b = case b of
     GhcPkg _ stage -> do
@@ -161,14 +147,16 @@ withBuilderArgs b = case b of
       notStage0 ? arg ("--ghc-pkg-option=--global-package-db=" ++ top -/- pkgDb)
     _          -> return [] -- no arguments
 
--- | Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
+
+-- Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
 with :: Builder -> Args
 with b = do
     path <- getBuilderPath b
-    if null path then mempty else do
-        top <- expr topDirectory
+    if (null path) then mempty else do
+        top  <- expr topDirectory
         expr $ needBuilder b
-        arg  $ withBuilderKey b ++ unifyPath (top </> path)
+        arg $ withBuilderKey b ++ unifyPath (top </> path)
 
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = with . sb =<< getStage
+

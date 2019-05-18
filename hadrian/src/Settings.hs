@@ -85,6 +85,6 @@ unsafeFindPackageByName name = fromMaybe (error msg) $ findPackageByName name
     msg = "unsafeFindPackageByName: No package with name " ++ name
 
 unsafeFindPackageByPath :: FilePath -> Package
-unsafeFindPackageByPath path = err $ find (\pkg -> pkgPath pkg == path) knownPackages
+unsafeFindPackageByPath path = err $ find (\pkg -> resPkgPath pkg == path) knownPackages
   where
     err = fromMaybe $ error ("findPackageByPath: No package for path " ++ path)

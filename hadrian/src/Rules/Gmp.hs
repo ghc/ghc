@@ -18,8 +18,8 @@ gmpObjects = do
     map (unifyPath . (gmpPath -/-)) <$>
         liftIO (getDirectoryFilesIO gmpPath [gmpObjectsDir -/- "*.o"])
 
-gmpBase :: FilePath
-gmpBase = pkgPath integerGmp -/- "gmp"
+gmpBaseA :: Action FilePath
+gmpBaseA = realPkgPath integerGmp <&> (-/- "gmp")
 
 gmpLibraryInTreeH :: FilePath
 gmpLibraryInTreeH = "include/gmp.h"
@@ -62,6 +62,7 @@ gmpRules = do
     gmpPath <- gmpBuildPathRules
     gmpPath -/- gmpLibraryH %> \header -> do
         windows  <- windowsHost
+        gmpBase <- gmpBaseA
         configMk <- readFile' =<< (buildPath gmpContext <&> (-/- "config.mk"))
         if not windows && -- TODO: We don't use system GMP on Windows. Fix?
            any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
@@ -104,6 +105,7 @@ gmpRules = do
     -- Extract in-tree GMP sources and apply patches
     fmap (gmpPath -/-) ["Makefile.in", "configure"] &%> \_ -> do
         top <- topDirectory
+        gmpBase <- gmpBaseA
         removeDirectory gmpPath
         -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
         -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.

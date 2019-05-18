@@ -53,9 +53,10 @@ runTestGhcFlags = do
 runTestBuilderArgs :: Args
 runTestBuilderArgs = builder RunTest ? do
     pkgs     <- expr $ stagePackages Stage1
+    pPaths    <- expr $ sequence [realPkgPath pkg | pkg <- pkgs
+                                 , pkg /= rts, pkg /= libffi ]
     libTests <- expr $ filterM doesDirectoryExist $ concat
-            [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
-            | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
+            [ [ pPath -/- "tests", pPath -/- "tests-ghc" ] | pPath <- pPaths ]
 
     testGhc <- expr (testCompiler <$> userSetting defaultTestArgs)
     rtsWays <- expr testRTSSettings

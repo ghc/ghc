@@ -20,4 +20,10 @@ sysCabalBuilderArgs = mconcat
                 , arg "--ipid"
                 , arg "$pkg-$version"
 
-                , verbosity < Chatty ? arg "-v0" ] ]
+                , verbosity < Chatty ? arg "-v0" ]
+   , builder SysCabalGet ? do
+      p <- expr $ downloadedPath
+      mconcat [ arg "get"
+              , arg =<< getInput
+              , arg "--destdir"
+              , arg "/tmp" ] ]

@@ -55,8 +55,9 @@ import Settings
 -- "Hadrian.Oracles.TextFile.readPackageData" oracle.
 parsePackageData :: Package -> Action PackageData
 parsePackageData pkg = do
+    cFile <- pkgCabalFile pkg
     gpd <- traced "cabal-read" $
-        C.readGenericPackageDescription C.verbose (pkgCabalFile pkg)
+        C.readGenericPackageDescription C.verbose cFile
     let pd      = C.packageDescription gpd
         pkgId   = C.package pd
         name    = C.unPackageName (C.pkgName pkgId)
@@ -110,6 +111,7 @@ configurePackage :: Context -> Action ()
 configurePackage context@Context {..} = do
     putProgressInfo $ "| Configure package " ++ quote (pkgName package)
     gpd     <- pkgGenericDescription package
+    cFile <- pkgCabalFile package
     depPkgs <- packageDependencies <$> readPackageData package
 
     -- Stage packages are those we have in this stage.
@@ -127,7 +129,7 @@ configurePackage context@Context {..} = do
         -- 'C.Custom', but doesn't have a configure script.
         C.Custom -> do
             configureExists <- doesFileExist $
-                replaceFileName (pkgCabalFile package) "configure"
+                replaceFileName cFile "configure"
             pure $ if configureExists then C.autoconfUserHooks else C.simpleUserHooks
         -- Not quite right, but good enough for us:
         _ | package == rts ->
@@ -213,7 +215,8 @@ resolveContextData context@Context {..} = do
 
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
-    pdi <- liftIO $ getHookedBuildInfo [pkgPath package, cPath -/- "build"]
+    pPath <- realPkgPath package
+    pdi <- liftIO $ getHookedBuildInfo [pPath, cPath -/- "build"]
     let pd'  = C.updatePackageDescription pdi pd
         lbi' = lbi { C.localPkgDescr = pd' }
 
