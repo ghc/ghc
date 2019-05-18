@@ -23,9 +23,12 @@ module Base (
 
     -- * Paths
     hadrianPath, configPath, configFile, sourcePath, shakeFilesDir,
-    generatedDir, generatedPath, stageBinPath, stageLibPath, templateHscPath,
+    generatedDir, generatedPath, downloadedPath, stageBinPath, stageLibPath, templateHscPath,
     ghcDeps, includesDependencies, haddockDeps, relativePackageDbPath,
     packageDbPath, packageDbStamp, mingwStamp,
+
+    downloadedDir,
+    pkgCabalFile, realPkgPath, resPkgPath
     ) where
 
 import Control.Applicative
@@ -83,6 +86,12 @@ generatedDir = "generated"
 
 generatedPath :: Action FilePath
 generatedPath = buildRoot <&> (-/- generatedDir)
+
+downloadedDir :: FilePath
+downloadedDir = "dl"
+
+downloadedPath :: Action FilePath
+downloadedPath = buildRoot <&> (-/- downloadedDir)
 
 -- | Path to the package database for a given build stage, relative to the build
 -- root.
@@ -142,3 +151,25 @@ templateHscPath stage = stageLibPath stage <&> (-/- "template-hsc.h")
 --   Windows). See "Rules.Program".
 mingwStamp :: FilePath
 mingwStamp = "mingw" -/- ".stamp"
+
+-- | The path to the Cabal file of a Haskell package, e.g. @ghc/ghc-bin.cabal@.
+pkgCabalFile :: Package -> Action FilePath
+pkgCabalFile p = do
+  proot <- realPkgPath p
+  return $ proot -/- pkgName p <.> "cabal"
+
+-- | Path to location of package source files
+realPkgPath :: Package -> Action FilePath
+realPkgPath p = do
+  case pkgPath p of
+    Left f -> return f
+    Right v -> downloadedPath <&> (-/- (pkgName p ++ "-" ++ v))
+
+-- | Relative path to where to put result files
+resPkgPath :: Package -> FilePath
+resPkgPath p =
+  case pkgPath p of
+    Left f -> f
+    Right {} -> "gen" </>  pkgName p
+
+

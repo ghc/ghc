@@ -24,6 +24,7 @@ import Hadrian.Haskell.Cabal.Parse
 import Hadrian.Oracles.Cabal.Type
 import Hadrian.Package
 import Hadrian.Utilities
+import Base
 
 -- | These oracle rules are used to cache and track answers to the following
 -- queries, which are implemented via the Cabal library:
@@ -37,7 +38,7 @@ import Hadrian.Utilities
 cabalOracle :: Rules ()
 cabalOracle = do
     void $ addOracleCache $ \(PackageDataKey package) -> do
-        let file = pkgCabalFile package
+        file <- pkgCabalFile package
         need [file]
         putLoud $ "| PackageData oracle: parsing " ++ quote file ++ "..."
         parsePackageData package

@@ -24,6 +24,7 @@ import Development.Shake.Classes
 import GHC.Generics
 import Hadrian.Expression
 import Hadrian.Utilities
+import Debug.Trace
 
 -- | We support packing and unpacking archives with @ar@.
 data ArMode = Pack | Unpack deriving (Eq, Generic, Show)
@@ -49,7 +50,13 @@ arFlagsCount = 2
 -- should use 'runArWithoutTempFile' instead.
 runAr :: FilePath -> [String] -> Action ()
 runAr arPath argList = withTempFile $ \tmp -> do
-    writeFile' tmp $ unwords fileArgs
+    traceShowM fileArgs
+    doesFileExist (head fileArgs) >>= traceShowM
+    doesFileExist (head fileArgs) >>= traceShowM
+    liftIO $ getLine
+    liftIO $ writeFile tmp $ unwords fileArgs
+    liftIO $ getLine
+    doesFileExist (head fileArgs) >>= traceShowM
     cmd [arPath] flagArgs ('@' : tmp)
   where
     flagArgs = take arFlagsCount argList
