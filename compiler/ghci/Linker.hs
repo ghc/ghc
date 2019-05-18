@@ -387,6 +387,7 @@ linkCmdLineLibs' hsc_env pls =
                       in nub $ map normalise paths
       let lib_paths = nub $ lib_paths_base ++ gcc_paths
       all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
+      traceM "all_paths" (ppr all_paths_env)
       pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
 
       pls1 <- foldM (preloadLib hsc_env lib_paths framework_paths) pls
