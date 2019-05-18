@@ -12,6 +12,7 @@
 module HscTypes (
         -- * compilation state
         HscEnv(..), hscEPS,
+        HasHscEnv(..),
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
         HscStatus(..),
@@ -245,6 +246,9 @@ instance Monad Hsc where
 
 instance MonadIO Hsc where
     liftIO io = Hsc $ \_ w -> do a <- io; return (a, w)
+
+instance HasHscEnv Hsc where
+    getHscEnv = Hsc $ \e w -> return (e, w)
 
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
@@ -493,6 +497,10 @@ data IServ = IServ
 -- | Retrieve the ExternalPackageState cache.
 hscEPS :: HscEnv -> IO ExternalPackageState
 hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
+
+
+class Monad m => HasHscEnv m where
+    getHscEnv :: m HscEnv
 
 -- | A compilation target.
 --

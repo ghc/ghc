@@ -1906,8 +1906,8 @@ instance Monad BcM where
 instance HasDynFlags BcM where
     getDynFlags = BcM $ \st -> return (st, hsc_dflags (bcm_hsc_env st))
 
-getHscEnv :: BcM HscEnv
-getHscEnv = BcM $ \st -> return (st, bcm_hsc_env st)
+instance HasHscEnv BcM where
+    getHscEnv = BcM $ \st -> return (st, bcm_hsc_env st)
 
 emitBc :: ([FFIInfo] -> ProtoBCO Name) -> BcM (ProtoBCO Name)
 emitBc bco
