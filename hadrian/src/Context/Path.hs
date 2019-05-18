@@ -18,7 +18,7 @@ getStagePath = expr . stagePath =<< getContext
 
 -- | The directory in 'buildRoot' containing build artifacts of a given 'Context'.
 contextDir :: Context -> FilePath
-contextDir Context {..} = stageString stage -/- pkgPath package
+contextDir Context {..} = stageString stage -/- resPkgPath package
 
 -- | The path to the directory in 'buildRoot' containing build artifacts of a
 -- given 'Context'.

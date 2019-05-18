@@ -88,13 +88,13 @@ registerPackageRules rs stage = do
         let ctx = Context stage pkg vanilla
         case stage of
             Stage0 | isBoot -> copyConf  rs ctx conf
-            _      | isExternalLibrary pkg -> buildExternal rs ctx pkg conf
+--            _      | isExternalLibrary pkg -> buildExternal rs ctx pkg conf
             _      | isLibrary pkg -> buildConf rs ctx conf
 
 -- Install a package using the system cabal
 buildExternal :: [(Resource, Int)] -> Context -> Package -> FilePath -> Action ()
 buildExternal rs context Package{..} conf =
-  buildWithResources rs $ target context (SysCabal pkgPath) [pkgPath] []
+  buildWithResources rs $ target context SysCabalGet [] []
 
 buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildConf _ context@Context {..} conf = do

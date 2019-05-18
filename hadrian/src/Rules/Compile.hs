@@ -255,7 +255,7 @@ fullPathIfGenerated context file = interpretInContext context $ do
 obj2src :: String -> (FilePath -> Bool) -> Context -> FilePath -> Action FilePath
 obj2src extension isGenerated context@Context {..} obj
     | isGenerated src = return src
-    | otherwise       = (pkgPath package ++) <$> suffix
+    | otherwise       = (++) <$> realPkgPath package <*> suffix
   where
     src    = obj -<.> extension
     suffix = do

@@ -23,10 +23,13 @@ import qualified Rules.Program
 import qualified Rules.Register
 import qualified Rules.Rts
 import qualified Rules.SimpleTargets
+import qualified Rules.Download
 import Settings
 import Target
 import UserSettings
 import Utilities
+
+import Debug.Trace
 
 
 -- | @tool-args@ is used by tooling in order to get the arguments necessary
@@ -80,9 +83,12 @@ topLevelTargets = action $ do
             [ stageHeader "libraries" libNames
             , stageHeader "programs" pgmNames ]
     let buildStages = [ s | s <- [Stage0 ..], s < finalStage ]
+    putNormal "abc"
     targets <- concatForM buildStages $ \stage -> do
         packages <- stagePackages stage
+        traceShowM packages
         mapM (path stage) packages
+    putNormal (show (targets, buildStages))
 
     -- Why we need wrappers: https://gitlab.haskell.org/ghc/ghc/issues/16534.
     root <- buildRoot
@@ -165,6 +171,7 @@ buildRules = do
     Rules.Libffi.libffiRules
     Rules.Library.libraryRules
     Rules.Rts.rtsRules
+    Rules.Download.downloadRules
     packageRules
 
 oracleRules :: Rules ()

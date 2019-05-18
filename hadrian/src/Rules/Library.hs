@@ -14,7 +14,8 @@ import Rules.Gmp
 import Rules.Libffi (libffiDependencies)
 import Target
 import Utilities
-
+import Settings
+import Debug.Trace
 -- * Library 'Rules'
 
 libraryRules :: Rules ()
@@ -55,7 +56,12 @@ buildStaticLib root archivePath = do
                      archivePath
     let context = libAContext l
     objs <- libraryObjects context
-    removeFile archivePath
+    --removeFile archivePath
+    traceShowM objs
+    doesFileExist (head objs) >>= traceShowM
+    doesFileExist (head objs) >>= traceShowM
+    doesFileExist (head objs) >>= traceShowM
+    liftIO $ getLine
     build $ target context (Ar Pack stage) objs [archivePath]
     synopsis <- pkgSynopsis (package context)
     putSuccess $ renderLibrary
@@ -171,21 +177,21 @@ libAContext :: BuildPath LibA -> Context
 libAContext (BuildPath _ stage pkgpath (LibA pkgname _ way)) =
     Context stage pkg way
   where
-    pkg = library pkgname pkgpath
+    pkg = unsafeFindPackageByPath pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given GHCi library.
 libGhciContext :: BuildPath LibGhci -> Context
 libGhciContext (BuildPath _ stage pkgpath (LibGhci pkgname _ way)) =
     Context stage pkg way
   where
-    pkg = library pkgname pkgpath
+    pkg = unsafeFindPackageByPath pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given dynamic library.
 libDynContext :: BuildPath LibDyn -> Context
 libDynContext (BuildPath _ stage pkgpath (LibDyn pkgname _ way _)) =
     Context stage pkg way
   where
-    pkg = library pkgname pkgpath
+    pkg = unsafeFindPackageByPath pkgpath
 
 -- | Parse a path to a registered ghc-pkg static library to be built, making
 -- sure the path starts with the given build root.

@@ -53,6 +53,7 @@ executable hadrian
                        , Oracles.TestSettings
                        , Packages
                        , Rules
+                       , Rules.Download
                        , Rules.BinaryDist
                        , Rules.Clean
                        , Rules.Compile

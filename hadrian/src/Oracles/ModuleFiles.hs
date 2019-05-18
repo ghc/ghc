@@ -139,7 +139,8 @@ moduleFilesOracle = void $ do
                               Nothing       -> id
         modules <- fmap sort $ interpretInContext context (getContextData PD.modules)
         autogen <- autogenPath context
-        let dirs = autogen : map (pkgPath package -/-) srcDirs
+        pkgRoot <- realPkgPath package
+        let dirs = autogen : map (pkgRoot -/-) srcDirs
             -- Don't resolve the file path for module `Main` twice.
             modDirFiles = groupSort $ map decodeModule $ removeMain modules
         result <- concatForM dirs $ \dir -> do

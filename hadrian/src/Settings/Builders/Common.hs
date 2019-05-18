@@ -29,6 +29,7 @@ cIncludeArgs = do
     iconvIncludeDir <- getSetting IconvIncludeDir
     gmpIncludeDir   <- getSetting GmpIncludeDir
     ffiIncludeDir   <- getSetting FfiIncludeDir
+    pPath <- expr $ realPkgPath pkg
     mconcat [ notStage0 ||^ package compiler ? arg "-Iincludes"
             , arg $ "-I" ++ root -/- generatedDir
             , arg $ "-I" ++ path
@@ -39,7 +40,7 @@ cIncludeArgs = do
             , pure [ "-I" ++ path        -/- dir | dir <- incDirs ]
             -- Add @incDirs@ in the package directory for include files shipped
             -- with the package.
-            , pure [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
+            , pure [ "-I" ++ pPath -/- dir | dir <- incDirs ]
             , pure [ "-I" ++       unifyPath dir | dir <- depDirs ] ]
 
 ldArgs :: Args

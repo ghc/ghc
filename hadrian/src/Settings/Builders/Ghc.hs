@@ -187,12 +187,13 @@ includeGhcArgs = do
     context <- getContext
     srcDirs <- getContextData srcDirs
     autogen <- expr $ autogenPath context
+    pPath   <- expr $ realPkgPath pkg
     let cabalMacros = autogen -/- "cabal_macros.h"
     expr $ need [cabalMacros]
     mconcat [ arg "-i"
             , arg $ "-i" ++ path
             , arg $ "-i" ++ autogen
-            , pure [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
+            , pure [ "-i" ++ pPath -/- dir | dir <- srcDirs ]
             , cIncludeArgs
             , arg $      "-I" ++ root -/- generatedDir
             , arg $ "-optc-I" ++ root -/- generatedDir
