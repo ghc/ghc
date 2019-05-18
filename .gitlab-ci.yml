@@ -559,7 +559,7 @@ validate-x86_64-linux-fedora27:
   extends: .build-windows
   stage: full-build
   variables:
-    GHC_VERSION: "8.6.2
+    GHC_VERSION: "8.6.2"
   # due to #16574 this currently fails
   allow_failure: true
   script:
