@@ -42,10 +42,10 @@ instance Monad ParserM where
                                             Left err ->
                                                 Left err
     return a = ParserM $ \i s -> Right (i, s, a)
-    fail err = ParserM $ \_ _ -> Left err
+    --fail err = ParserM $ \_ _ -> Left err
 
---instance MonadFail ParserM where
---  fail err = ParserM $ \_ _ -> Left err
+instance MonadFail ParserM where
+  fail err = ParserM $ \_ _ -> Left err
 
 run_parser :: ParserM a -> (String -> Either String a)
 run_parser (ParserM f)

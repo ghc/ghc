@@ -6,6 +6,7 @@ import qualified Hadrian.Oracles.Cabal.Rules
 import qualified Hadrian.Oracles.DirectoryContents
 import qualified Hadrian.Oracles.Path
 import qualified Hadrian.Oracles.TextFile
+import Hadrian.Haskell.Cabal.Type
 
 import Expression
 import qualified Oracles.ModuleFiles
@@ -55,10 +56,16 @@ toolArgsTarget = do
     need [ root <//> dir -/- "CmmParse.hs" ]
     need [ root <//> dir -/- "CmmLex.hs" ]
 
+    let context = vanillaContext Stage0 compiler
+    cSrcs' <- interpretInContext (vanillaContext Stage0 compiler)
+                                (getContextData cSrcs)
+    cObjs <- mapM (objectPath context) cSrcs'
+    need cObjs
+
     -- Find out the arguments that are needed to load a module into the
     -- session
     arg_list <- interpret fake_target getArgs
-    liftIO $ putStrLn (intercalate " " arg_list)
+    liftIO $ putStrLn (intercalate " " (arg_list ++ cObjs))
 
 allStages :: [Stage]
 allStages = [minBound .. maxBound]

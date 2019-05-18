@@ -40,7 +40,7 @@ compileC = builder (Ghc CompileCWithGhc) ? do
     let ccArgs = [ getContextData ccOpts
                  , getStagedSettingList ConfCcArgs
                  , cIncludeArgs
-                 , Dynamic `wayUnit` way ? pure [ "-fPIC", "-DDYNAMIC" ] ]
+                 , pure [ "-fPIC", "-DDYNAMIC" ] ]
     mconcat [ arg "-Wall"
             , ghcLinkArgs
             , commonGhcArgs
