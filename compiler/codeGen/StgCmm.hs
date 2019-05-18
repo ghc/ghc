@@ -70,34 +70,24 @@ codeGen dflags this_mod data_tycons
         ; cgref <- liftIO $ newIORef =<< initC
         ; let cg :: FCode () -> Stream IO CmmGroup ()
               cg fcode = do
-                pprTraceM "cg" empty
                 cmm <- liftIO $ do
-                         putStrLn "start1"
                          st <- readIORef cgref
-                         putStrLn "start2"
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 
-                         putStrLn "start3"
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
                          writeIORef cgref $! st'{ cgs_tops = nilOL,
                                                   cgs_stmts = mkNop }
-                         putStrLn "start4"
                          return a
-                pprTraceM "cg2" empty
                 yield cmm
-                pprTraceM "cg3" empty
 
                -- Note [codegen-split-init] the cmm_init block must come
                -- FIRST.  This is because when -split-objs is on we need to
                -- combine this block with its initialisation routines; see
                -- Note [pipeline-split-init].
-        ; pprTraceM "this far" empty
         ; cg (mkModuleInit cost_centre_info this_mod hpc_info)
-        ; pprTraceM "this far2" empty
 
         ; mapM_ (cg . cgTopBinding dflags) stg_binds
-        ; pprTraceM "this far3" empty
 
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
@@ -130,11 +120,8 @@ variable. -}
 cgTopBinding :: DynFlags -> CgStgTopBinding -> FCode ()
 cgTopBinding dflags (StgTopLifted (StgNonRec id rhs))
   = do  { let (info, fcode) = cgTopRhs dflags NonRecursive id rhs
-        ; pprTraceM "this far 4" (ppr id)
         ; fcode
-        ; pprTraceM "this far 5" (ppr id)
         ; addBindC info
-        ; pprTraceM "this far 6" (ppr id)
         }
 
 cgTopBinding dflags (StgTopLifted (StgRec pairs))

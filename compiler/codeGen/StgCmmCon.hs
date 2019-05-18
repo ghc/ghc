@@ -77,7 +77,6 @@ cgTopRhsCon dflags id con args =
               MASSERT( not (isDllConApp dflags this_mod con (map fromNonVoid args)) )
         ; ASSERT( args `lengthIs` countConRepArgs con ) return ()
 
-        ; pprTraceM "this far 6" (ppr id)
         -- LAY IT OUT
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds
@@ -100,7 +99,6 @@ cgTopRhsCon dflags id con args =
             info_tbl = mkDataConInfoTable dflags con True ptr_wds nonptr_wds
 
 
-        ; pprTraceM "this far 7" (ppr id)
         ; payload <- mapM mk_payload nv_args_w_offsets
                 -- NB1: nv_args_w_offsets is sorted into ptrs then non-ptrs
                 -- NB2: all the amodes should be Lits!
@@ -114,9 +112,7 @@ cgTopRhsCon dflags id con args =
                              payload
 
                 -- BUILD THE OBJECT
-        ; pprTraceM "this far 8" (ppr id)
         ; emitDataLits closure_label closure_rep
-        ; pprTraceM "this far 9" (ppr id)
 
         ; return () }
 
