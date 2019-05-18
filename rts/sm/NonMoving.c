@@ -553,6 +553,7 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
     struct NonmovingSegment *current = alloca->current[cap->no];
     ASSERT(current); // current is never NULL
     void *ret = nonmovingSegmentGetBlock_(current, log_block_size, current->next_free);
+    prefetchForWrite(ret);
     ASSERT(GET_CLOSURE_TAG(ret) == 0); // check alignment
 
     // Advance the current segment's next_free or allocate a new segment if full
