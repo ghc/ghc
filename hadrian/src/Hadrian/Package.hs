@@ -13,11 +13,11 @@
 -----------------------------------------------------------------------------
 module Hadrian.Package (
     -- * Data types
-    Package (..), PackageName, PackageType,
+    Package (..), PackageName, PackageType, PackageLocation(..),
 
     -- * Construction and properties
     library, program, external, dummyPackage
-    , isLibrary, isProgram, isExternalLibrary,
+    , isLibrary, isProgram
 
     ) where
 
@@ -28,7 +28,11 @@ import GHC.Generics
 -- See https://github.com/snowleopard/hadrian/issues/12.
 data PackageType = Library | Program deriving (Eq, Generic, Ord, Show)
 
-data InternalExternal = Internal | External deriving (Eq, Generic, Ord, Show)
+data PackageLocation =
+          Internal FilePath -- ^ Path to the file contents relative to
+                            --   root directory.
+        | External String   -- ^ Version string to fetch package from Hackage.
+        deriving (Eq, Generic, Ord, Show)
 
 type PackageName = String
 
@@ -42,19 +46,19 @@ data Package = Package {
     -- | The path to the package source code relative to the root of the build
     -- system. For example, @libraries/Cabal/Cabal@ and @ghc@ are paths to the
     -- @Cabal@ and @ghc-bin@ packages in GHC.
-    pkgPath :: Either FilePath String
+    pkgLocation :: PackageLocation
     } deriving (Eq, Generic, Ord, Show)
 
 -- | Construct a library package.
 library :: PackageName -> FilePath -> Package
-library p fp = Package Library p (Left fp)
+library p fp = Package Library p (Internal fp)
 
 external :: PackageName -> String -> Package
-external p v = Package Library p (Right v)
+external p v = Package Library p (External v)
 
 -- | Construct a program package.
 program :: PackageName -> FilePath -> Package
-program p fp = Package Program p (Left fp)
+program p fp = Package Program p (Internal fp)
 
 -- TODO: Remove this hack.
 -- | A dummy package that we never try to build but use when we need a 'Package'
@@ -72,18 +76,13 @@ isProgram :: Package -> Bool
 isProgram (Package Program _ _) = True
 isProgram _ = False
 
-isExternalLibrary :: Package -> Bool
-isExternalLibrary (Package _ _ (Right{})) = True
-isExternalLibrary _ = False
-
-
 instance Binary   PackageType
 instance Hashable PackageType
 instance NFData   PackageType
 
-instance Binary   InternalExternal
-instance Hashable InternalExternal
-instance NFData   InternalExternal
+instance Binary   PackageLocation
+instance Hashable PackageLocation
+instance NFData   PackageLocation
 
 instance Binary   Package
 instance Hashable Package

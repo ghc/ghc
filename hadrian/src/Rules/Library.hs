@@ -15,7 +15,6 @@ import Rules.Libffi (libffiDependencies)
 import Target
 import Utilities
 import Settings
-import Debug.Trace
 -- * Library 'Rules'
 
 libraryRules :: Rules ()
@@ -56,12 +55,7 @@ buildStaticLib root archivePath = do
                      archivePath
     let context = libAContext l
     objs <- libraryObjects context
-    --removeFile archivePath
-    traceShowM objs
-    doesFileExist (head objs) >>= traceShowM
-    doesFileExist (head objs) >>= traceShowM
-    doesFileExist (head objs) >>= traceShowM
-    liftIO $ getLine
+    removeFile archivePath
     build $ target context (Ar Pack stage) objs [archivePath]
     synopsis <- pkgSynopsis (package context)
     putSuccess $ renderLibrary
@@ -174,21 +168,21 @@ data LibGhci = LibGhci String [Integer] Way deriving (Eq, Show)
 
 -- | Get the 'Context' corresponding to the build path for a given static library.
 libAContext :: BuildPath LibA -> Context
-libAContext (BuildPath _ stage pkgpath (LibA pkgname _ way)) =
+libAContext (BuildPath _ stage pkgpath (LibA _ _ way)) =
     Context stage pkg way
   where
     pkg = unsafeFindPackageByPath pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given GHCi library.
 libGhciContext :: BuildPath LibGhci -> Context
-libGhciContext (BuildPath _ stage pkgpath (LibGhci pkgname _ way)) =
+libGhciContext (BuildPath _ stage pkgpath (LibGhci _ _ way)) =
     Context stage pkg way
   where
     pkg = unsafeFindPackageByPath pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given dynamic library.
 libDynContext :: BuildPath LibDyn -> Context
-libDynContext (BuildPath _ stage pkgpath (LibDyn pkgname _ way _)) =
+libDynContext (BuildPath _ stage pkgpath (LibDyn _ _ way _)) =
     Context stage pkg way
   where
     pkg = unsafeFindPackageByPath pkgpath

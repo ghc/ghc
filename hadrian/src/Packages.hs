@@ -120,7 +120,7 @@ util name = program name ("utils" -/- name)
 
 -- | Amend a package path if it doesn't conform to a typical pattern.
 setPath :: Package -> FilePath -> Package
-setPath pkg path = pkg { pkgPath = Left path }
+setPath pkg path = pkg { pkgLocation = Internal path }
 
 -- | Given a 'Context', compute the name of the program that is built in it
 -- assuming that the corresponding package's type is 'Program'. For example, GHC

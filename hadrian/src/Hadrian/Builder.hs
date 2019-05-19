@@ -60,7 +60,6 @@ class ShakeValue b => Builder b where
         path <- builderPath builder
         let msg = if null args then "" else " (" ++ intercalate ", " args ++ ")"
         putBuild $ "| Run " ++ show builder ++ msg
-        liftIO $ getLine
         quietly $ cmd (buildOptions buildInfo) [path] args
 
 -- | Make sure a builder and its runtime dependencies are up-to-date.

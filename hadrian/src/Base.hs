@@ -161,15 +161,15 @@ pkgCabalFile p = do
 -- | Path to location of package source files
 realPkgPath :: Package -> Action FilePath
 realPkgPath p = do
-  case pkgPath p of
-    Left f -> return f
-    Right v -> downloadedPath <&> (-/- (pkgName p ++ "-" ++ v))
+  case pkgLocation p of
+    Internal f -> return f
+    External v -> downloadedPath <&> (-/- (pkgName p ++ "-" ++ v))
 
 -- | Relative path to where to put result files
 resPkgPath :: Package -> FilePath
 resPkgPath p =
-  case pkgPath p of
-    Left f -> f
-    Right {} -> "gen" </>  pkgName p
+  case pkgLocation p of
+    Internal f -> f
+    External {} -> "gen" </>  pkgName p
 
 
