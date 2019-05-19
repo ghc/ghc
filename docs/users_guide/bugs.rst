@@ -312,14 +312,6 @@ Multiply-defined array elements not checked
 In ``Prelude`` support
 ^^^^^^^^^^^^^^^^^^^^^^
 
-Arbitrary-sized tuples
-    Tuples are currently limited to size 100. However, standard
-    instances for tuples (``Eq``, ``Ord``, ``Bounded``, ``Ix``, ``Read``,
-    and ``Show``) are available *only* up to 16-tuples.
-
-    This limitation is easily subvertible, so please ask if you get
-    stuck on it.
-
 ``splitAt`` semantics
     ``Data.List.splitAt`` is more strict than specified in the Report.
     Specifically, the Report specifies that ::
@@ -480,6 +472,14 @@ Unchecked floating-point arithmetic
 
     .. index::
         single: floating-point exceptions.
+
+Large tuple support
+    The Haskell Report only requires implementations to provide tuple
+    types and their accompanying standard instances up to size 15. GHC
+    limits the size of tuple types to 62 and provides instances of
+    ``Eq``, ``Ord``, ``Bounded``, ``Read``, and ``Show`` for tuples up
+    to size 15. However, ``Ix`` instances are provided only for tuples
+    up to size 5.
 
 .. _bugs:
 
