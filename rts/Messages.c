@@ -262,6 +262,9 @@ loop:
 
         // point to the BLOCKING_QUEUE from the BLACKHOLE
         write_barrier(); // make the BQ visible
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            updateRemembSetPushClosure(cap, (StgClosure*)p);
+        }
         ((StgInd*)bh)->indirectee = (StgClosure *)bq;
         recordClosureMutated(cap,bh); // bh was mutated
 
@@ -290,7 +293,7 @@ loop:
         }
 #endif
 
-        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled)) {
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
             // We are about to overwrite bq->queue; make sure its current value
             // makes it into the update remembered set
             updateRemembSetPushClosure(cap, (StgClosure*)bq->queue);

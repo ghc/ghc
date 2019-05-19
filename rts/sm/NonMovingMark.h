@@ -143,6 +143,15 @@ extern StgIndStatic *debug_caf_list_snapshot;
 extern MarkQueue *current_mark_queue;
 extern bdescr *upd_rem_set_block_list;
 
+// A similar macro is defined in includes/Cmm.h for C-- code.
+#if defined(THREADED_RTS)
+#define IF_NONMOVING_WRITE_BARRIER_ENABLED \
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
+#else
+#define IF_NONMOVING_WRITE_BARRIER_ENABLED \
+    if (0)
+#endif
+
 void nonmovingMarkInitUpdRemSet(void);
 
 void init_upd_rem_set(UpdRemSet *rset);
