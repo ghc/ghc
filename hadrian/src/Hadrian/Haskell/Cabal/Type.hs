@@ -45,6 +45,7 @@ data ContextData = ContextData
     , otherModules       :: [String]
     , srcDirs            :: [String]
     , depIds             :: [String]
+    , pluginDepIds       :: [String]
     , depNames           :: [String]
     , includeDirs        :: [String]
     , includes           :: [String]

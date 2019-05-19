@@ -17,11 +17,14 @@ module Hadrian.Package (
 
     -- * Construction and properties
     library, program, external, dummyPackage
-    , isLibrary, isProgram
+    , isLibrary, isProgram,
+
+    Plugin(..), PluginArgs(..), addPlugin
 
     ) where
 
 import Development.Shake.Classes
+import Development.Shake
 import GHC.Generics
 
 -- TODO: Make PackageType more precise.
@@ -46,19 +49,22 @@ data Package = Package {
     -- | The path to the package source code relative to the root of the build
     -- system. For example, @libraries/Cabal/Cabal@ and @ghc@ are paths to the
     -- @Cabal@ and @ghc-bin@ packages in GHC.
-    pkgLocation :: PackageLocation
+    pkgLocation :: PackageLocation,
+
+    -- | Plugins to run when building the package
+    pkgPlugins :: [String]
     } deriving (Eq, Generic, Ord, Show)
 
 -- | Construct a library package.
 library :: PackageName -> FilePath -> Package
-library p fp = Package Library p (Internal fp)
+library p fp = Package Library p (Internal fp) []
 
 external :: PackageName -> String -> Package
-external p v = Package Library p (External v)
+external p v = Package Library p (External v) []
 
 -- | Construct a program package.
 program :: PackageName -> FilePath -> Package
-program p fp = Package Program p (Internal fp)
+program p fp = Package Program p (Internal fp) []
 
 -- TODO: Remove this hack.
 -- | A dummy package that we never try to build but use when we need a 'Package'
@@ -68,12 +74,12 @@ dummyPackage = library "dummy" "dummy/path/"
 
 -- | Is this a library package?
 isLibrary :: Package -> Bool
-isLibrary (Package (Library {}) _ _) = True
+isLibrary (Package (Library {}) _ _ _) = True
 isLibrary _ = False
 
 -- | Is this a program package?
 isProgram :: Package -> Bool
-isProgram (Package Program _ _) = True
+isProgram (Package Program _ _ _) = True
 isProgram _ = False
 
 instance Binary   PackageType
@@ -87,3 +93,19 @@ instance NFData   PackageLocation
 instance Binary   Package
 instance Hashable Package
 instance NFData   Package
+
+{- Plugins -}
+
+data Plugin = Plugin { pluginPackage :: Package
+                     , pluginName :: String
+                     , pluginOpts :: PluginArgs -> [String]
+                     , initPhase  :: PluginArgs -> Action ()
+                     , finalPhase :: PluginArgs -> Action ()
+                     }
+
+
+data PluginArgs = PluginArgs { pluginOutput :: FilePath
+                             , pluginTargetPackage :: Package }
+
+addPlugin :: Plugin -> Package -> Package
+addPlugin pl p = p { pkgPlugins = pkgName (pluginPackage pl) : pkgPlugins p }

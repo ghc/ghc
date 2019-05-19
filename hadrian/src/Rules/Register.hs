@@ -93,8 +93,10 @@ registerPackageRules rs stage = do
 buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildConf _ context@Context {..} conf = do
     depPkgIds <- cabalDependencies context
+    pluginDepPkgIds <- pluginDependencies context
     ensureConfigured context
-    need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
+    need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf"))
+              (depPkgIds ++ pluginDepPkgIds)
 
     ways <- interpretInContext context (getLibraryWays <> if package == rts then getRtsWays else mempty)
     need =<< concatMapM (libraryTargets True) [ context { way = w } | w <- ways ]

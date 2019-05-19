@@ -227,6 +227,7 @@ resolveContextData context@Context {..} = do
         depDirect    = map (fromMaybe (error "resolveContextData: depDirect failed")
                      . C.lookupUnitId (C.installedPkgs lbi') . fst) extDeps
         depIds       = map (C.display . Installed.installedUnitId) depDirect
+        pluginDepIds = pkgPlugins package
         Just ghcProg = C.lookupProgram C.ghcProgram (C.withPrograms lbi')
         depPkgs      = C.topologicalOrder (packageHacks (C.installedPkgs lbi'))
         forDeps f    = concatMap f depPkgs
@@ -265,6 +266,7 @@ resolveContextData context@Context {..} = do
           , otherModules    = map C.display $ C.otherModules buildInfo
           , srcDirs         = C.hsSourceDirs buildInfo
           , depIds          = depIds
+          , pluginDepIds    = pluginDepIds
           , depNames        = map (C.display . C.mungedName . snd) extDeps
           , includeDirs     = C.includeDirs     buildInfo
           , includes        = C.includes        buildInfo

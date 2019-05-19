@@ -8,7 +8,7 @@
 -- Please update doc/user-settings.md when committing changes to this file.
 module UserSettings (
     userFlavours, userPackages, userDefaultFlavour,
-    verboseCommand, buildProgressColour, successColour, finalStage
+    verboseCommand, buildProgressColour, successColour, finalStage, plugins
     ) where
 
 import Flavour
@@ -37,6 +37,9 @@ userFlavour = defaultFlavour { name = "user" } -- Modify other settings here.
 -- build flavour, modifying the list of packages that are built by default.
 userPackages :: [Package]
 userPackages = []
+
+plugins :: [Plugin]
+plugins = []
 
 -- | Set to 'True' to print full command lines during the build process. Note:
 -- this is a 'Predicate', hence you can enable verbose output only for certain

@@ -3,7 +3,7 @@ module Utilities (
     askWithResources,
     runBuilder, runBuilderWith,
     needLibrary, contextDependencies, stage1Dependencies, libraryTargets,
-    topsortPackages, cabalDependencies
+    topsortPackages, cabalDependencies, pluginDependencies
     ) where
 
 import qualified Hadrian.Builder as H
@@ -48,7 +48,11 @@ contextDependencies Context {..} = do
         return $ intersectOrd (compare . pkgName) active deps
 
 cabalDependencies :: Context -> Action [String]
-cabalDependencies ctx = interpretInContext ctx $ getContextData depIds
+cabalDependencies ctx =
+  interpretInContext ctx $ getContextData depIds
+
+pluginDependencies :: Context -> Action [String]
+pluginDependencies ctx = interpretInContext ctx $ getContextData pluginDepIds
 
 -- | Lookup dependencies of a 'Package' in the @vanilla Stage1 context@.
 stage1Dependencies :: Package -> Action [Package]
