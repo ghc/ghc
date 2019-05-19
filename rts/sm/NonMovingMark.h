@@ -115,6 +115,7 @@ extern StgIndStatic *debug_caf_list_snapshot;
 extern MarkQueue *current_mark_queue;
 extern bdescr *upd_rem_set_block_list;
 
+
 void nonmovingMarkInitUpdRemSet(void);
 
 void init_upd_rem_set(UpdRemSet *rset);

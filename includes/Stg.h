@@ -597,3 +597,21 @@ typedef union {
   c;                                            \
 })
 #endif
+
+/* -----------------------------------------------------------------------------
+   Nonmoving GC write barrier
+   -------------------------------------------------------------------------- */
+
+// Note that RTS code should not condition on this directly by rather
+// use the IF_NONMOVING_WRITE_BARRIER_ENABLED macro to ensure that
+// the barrier is eliminated in the non-threaded RTS.
+extern StgWord DLL_IMPORT_DATA_VAR(nonmoving_write_barrier_enabled);
+
+// A similar macro is defined in includes/Cmm.h for C-- code.
+#if defined(THREADED_RTS)
+#define IF_NONMOVING_WRITE_BARRIER_ENABLED \
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
+#else
+#define IF_NONMOVING_WRITE_BARRIER_ENABLED \
+    if (0)
+#endif

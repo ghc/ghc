@@ -20,5 +20,3 @@ void updateRemembSetPushClosure_(StgRegTable *reg, StgClosure *p);
 void updateRemembSetPushClosure(Capability *cap, StgClosure *p);
 
 void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *p);
-
-extern StgWord DLL_IMPORT_DATA_VAR(nonmoving_write_barrier_enabled);
