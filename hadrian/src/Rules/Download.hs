@@ -1,46 +1,38 @@
 module Rules.Download (downloadRules) where
 
 import Hadrian.BuildPath
-import Hadrian.Haskell.Cabal
-import Hadrian.Haskell.Cabal.Type
 import qualified Text.Parsec      as Parsec
 
 import Base
 import Context
 import Expression hiding (way, package)
-import Oracles.ModuleFiles
 import Packages
-import Rules.Gmp
-import Rules.Libffi (libffiDependencies)
 import Target
 import Utilities
-import Debug.Trace
 
--- * Library 'Rules'
+-- * Rules for downloading a package from an external source
 
 downloadRules :: Rules ()
 downloadRules = do
     root <- buildRootRules
     root -/- downloadedDir -/- "//*.cabal"  %> downloadLibrary
 
+-- | Parses root -/- downloadedDir -/- pkgname-version -/-
 parsePackage :: FilePath -> Parsec.Parsec String () String
 parsePackage root = do
-  Parsec.string root
-  Parsec.char '/'
-  Parsec.string downloadedDir
-  Parsec.char '/'
+  void $ Parsec.string root
+  void $ Parsec.char '/'
+  void $ Parsec.string downloadedDir
+  void $ Parsec.char '/'
   Parsec.manyTill Parsec.anyChar (Parsec.try $ Parsec.string "/")
 
-
-
+-- | Download a library using `cabal get`
 downloadLibrary :: FilePath -> Action ()
 downloadLibrary fp = do
-  traceShowM fp
   root <- buildRoot
   p <- parsePath (parsePackage  root) "package name" fp
-  traceShowM p
   dPath <- downloadedPath
   let ctx = Context Stage0 ghc vanilla
-  build $ target ctx (SysCabalGet) [p] []
+  build $ target ctx SysCabalGet [p] []
   copyDirectory ("/tmp" </> p) dPath
   removeDirectory ("/tmp" </> p)
