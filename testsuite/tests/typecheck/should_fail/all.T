@@ -141,7 +141,7 @@ test('tcfail155', normal, compile_fail, [''])
 test('tcfail156', normal, compile_fail, [''])
 test('tcfail157', normal, compile_fail, [''])
 # Skip tcfail158 until #15899 fixes the broken test
-test('tcfail158', skip, compile_fail, [''])
+test('tcfail158', normal, compile_fail, [''])
 test('tcfail159', normal, compile_fail, [''])
 test('tcfail160', normal, compile_fail, [''])
 test('tcfail161', normal, compile_fail, [''])
