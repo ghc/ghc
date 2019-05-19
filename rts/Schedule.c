@@ -2503,7 +2503,7 @@ resumeThread (void *task_)
     incall->suspended_tso = NULL;
     incall->suspended_cap = NULL;
     // we will modify tso->_link
-    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled)) {
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
         updateRemembSetPushClosure(cap, (StgClosure *)tso->_link);
     }
     tso->_link = END_TSO_QUEUE;
