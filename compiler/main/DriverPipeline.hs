@@ -52,7 +52,7 @@ import DynFlags
 import Config
 import Panic
 import Util
-import StringBuffer     ( hGetStringBuffer )
+import StringBuffer     ( StringBuffer, hGetStringBuffer, hPutStringBuffer )
 import BasicTypes       ( SuccessFlag(..) )
 import Maybes           ( expectJust )
 import SrcLoc
@@ -87,11 +87,14 @@ import Data.Time        ( UTCTime )
 -- of slurping in the OPTIONS pragmas
 
 preprocess :: HscEnv
-           -> (FilePath, Maybe Phase) -- ^ filename and starting phase
+           -> FilePath -- ^ input filename
+           -> Maybe StringBuffer
+           -- ^ optional buffer to use instead of reading input file
+           -> Maybe Phase -- ^ starting phase
            -> IO (DynFlags, FilePath)
-preprocess hsc_env (filename, mb_phase) =
-  ASSERT2(isJust mb_phase || isHaskellSrcFilename filename, text filename)
-  runPipeline anyHsc hsc_env (filename, fmap RealPhase mb_phase)
+preprocess hsc_env input_fn mb_input_buf mb_phase =
+  ASSERT2(isJust mb_phase || isHaskellSrcFilename input_fn, text input_fn)
+  runPipeline anyHsc hsc_env (input_fn, mb_input_buf, fmap RealPhase mb_phase)
         Nothing
         -- We keep the processed file for the whole session to save on
         -- duplicated work in ghci.
@@ -186,6 +189,7 @@ compileOne' m_tc_result mHscMessage
             -- handled properly
             _ <- runPipeline StopLn hsc_env
                               (output_fn,
+                               Nothing,
                                Just (HscOut src_flavour
                                             mod_name HscUpdateSig))
                               (Just basename)
@@ -223,6 +227,7 @@ compileOne' m_tc_result mHscMessage
             -- We're in --make mode: finish the compilation pipeline.
             _ <- runPipeline StopLn hsc_env
                               (output_fn,
+                               Nothing,
                                Just (HscOut src_flavour mod_name (HscRecomp cgguts summary)))
                               (Just basename)
                               Persistent
@@ -313,7 +318,7 @@ compileForeign hsc_env lang stub_c = do
               LangAsm    -> As True -- allow CPP
               RawObject  -> panic "compileForeign: should be unreachable"
         (_, stub_o) <- runPipeline StopLn hsc_env
-                       (stub_c, Just (RealPhase phase))
+                       (stub_c, Nothing, Just (RealPhase phase))
                        Nothing (Temporary TFL_GhcSession)
                        Nothing{-no ModLocation-}
                        []
@@ -335,7 +340,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   let src = text "int" <+> ppr (mkModule (thisPackage dflags) mod_name) <+> text "= 0;"
   writeFile empty_stub (showSDoc dflags (pprCode CStyle src))
   _ <- runPipeline StopLn hsc_env
-                  (empty_stub, Nothing)
+                  (empty_stub, Nothing, Nothing)
                   (Just basename)
                   Persistent
                   (Just location)
@@ -525,9 +530,10 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
         stop_phase' = case stop_phase of
                         As _ | split -> SplitAs
                         _            -> stop_phase
-
    ( _, out_file) <- runPipeline stop_phase' hsc_env
-                            (src, fmap RealPhase mb_phase) Nothing output
+                            (src, Nothing, fmap RealPhase mb_phase)
+                            Nothing
+                            output
                             Nothing{-no ModLocation-} []
    return out_file
 
@@ -560,13 +566,15 @@ doLink dflags stop_phase o_files
 runPipeline
   :: Phase                      -- ^ When to stop
   -> HscEnv                     -- ^ Compilation environment
-  -> (FilePath,Maybe PhasePlus) -- ^ Input filename (and maybe -x suffix)
+  -> (FilePath, Maybe StringBuffer, Maybe PhasePlus)
+                                -- ^ Pipeline input file name, optional
+                                -- buffer and maybe -x suffix
   -> Maybe FilePath             -- ^ original basename (if different from ^^^)
   -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> [FilePath]                 -- ^ foreign objects
   -> IO (DynFlags, FilePath)    -- ^ (final flags, output filename)
-runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
+runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
              mb_basename output maybe_loc foreign_os
 
     = do let
@@ -618,8 +626,22 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                                       ++ input_fn))
              HscOut {} -> return ()
 
+         -- Write input buffer to temp file if requested
+         input_fn' <- case (start_phase, mb_input_buf) of
+             (RealPhase real_start_phase, Just input_buf) -> do
+                 let suffix = phaseInputExt real_start_phase
+                 fn <- newTempName dflags TFL_CurrentModule suffix
+                 hdl <- openBinaryFile fn WriteMode
+                 -- Add a LINE pragma so reported source locations will
+                 -- mention the real input file, not this temp file.
+                 hPutStrLn hdl $ "{-# LINE 1 \""++ input_fn ++ "\"#-}"
+                 hPutStringBuffer hdl input_buf
+                 hClose hdl
+                 return fn
+             (_, _) -> return input_fn
+
          debugTraceMsg dflags 4 (text "Running the pipeline")
-         r <- runPipeline' start_phase hsc_env env input_fn
+         r <- runPipeline' start_phase hsc_env env input_fn'
                            maybe_loc foreign_os
 
          -- If we are compiling a Haskell module, and doing
@@ -633,7 +655,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                    (text "Running the pipeline again for -dynamic-too")
                let dflags' = dynamicTooMkDynamicDynFlags dflags
                hsc_env' <- newHscEnv dflags'
-               _ <- runPipeline' start_phase hsc_env' env input_fn
+               _ <- runPipeline' start_phase hsc_env' env input_fn'
                                  maybe_loc foreign_os
                return ()
          return r
