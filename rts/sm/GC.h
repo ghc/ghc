@@ -44,11 +44,17 @@ extern bool work_stealing;
 
 #define MUTLIST_DEBUG
 #if defined(MUTLIST_DEBUG)
-extern uint32_t mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS,
+extern uint32_t mutlist_MUTVARS,
+    mutlist_MUTARRS,
+    mutlist_MVARS,
     mutlist_TVAR,
     mutlist_TVAR_WATCH_QUEUE,
     mutlist_TREC_CHUNK,
-    mutlist_TREC_HEADER;
+    mutlist_TREC_HEADER,
+    mutlist_BLACKHOLE,
+    mutlist_TSO,
+    mutlist_STACK,
+    mutlist_OTHERS;
 #endif
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS)

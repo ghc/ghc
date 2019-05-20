@@ -1625,6 +1625,12 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                 else
                     mutlist_OTHERS++;
                 break;
+            case BLACKHOLE:
+                mutlist_BLACKHOLE++; break;
+            case TSO:
+                mutlist_TSO++; break;
+            case STACK:
+                mutlist_STACK++; break;
             default:
                 mutlist_OTHERS++; break;
             }

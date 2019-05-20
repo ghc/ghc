@@ -121,6 +121,9 @@ uint32_t mutlist_MUTVARS,
     mutlist_TVAR_WATCH_QUEUE,
     mutlist_TREC_CHUNK,
     mutlist_TREC_HEADER,
+    mutlist_BLACKHOLE,
+    mutlist_TSO,
+    mutlist_STACK,
     mutlist_OTHERS;
 #endif
 
@@ -251,6 +254,9 @@ GarbageCollect (uint32_t collect_gen,
   mutlist_TVAR_WATCH_QUEUE = 0;
   mutlist_TREC_CHUNK = 0;
   mutlist_TREC_HEADER = 0;
+  mutlist_BLACKHOLE = 0;
+  mutlist_TSO = 0;
+  mutlist_STACK = 0;
   mutlist_OTHERS = 0;
 #endif
 
@@ -610,11 +616,12 @@ GarbageCollect (uint32_t collect_gen,
 
 #if defined(MUTLIST_DEBUG)
         trace(TRACE_gc,
-              "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d others)",
+              "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d BLACKHOLEs, %d TSOs, %d STACKs, %d others)",
               (unsigned long)(mut_list_size * sizeof(W_)),
               mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS,
               mutlist_TVAR, mutlist_TVAR_WATCH_QUEUE,
               mutlist_TREC_CHUNK, mutlist_TREC_HEADER,
+              mutlist_BLACKHOLE, mutlist_TSO, mutlist_STACK,
               mutlist_OTHERS);
 #endif
     }
