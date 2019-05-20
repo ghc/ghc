@@ -2073,6 +2073,7 @@ loop:
             ASSERT(seg->todo_link);
             ws->todo_seg = seg->todo_link;
             seg->todo_link = NULL;
+            trace_dump_set_source("nonmoving");
             scavengeNonmovingSegment(seg);
             did_something = true;
             break;

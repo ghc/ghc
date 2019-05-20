@@ -24,7 +24,7 @@ trace_dump_start_gc(void)
     gc_n++;
 }
 
-void 
+void
 trace_dump_end_gc(void)
 {
     if (trace_dump) {
@@ -32,6 +32,14 @@ trace_dump_end_gc(void)
         fclose(trace_dump);
     }
     trace_dump = NULL;
+}
+
+void
+trace_dump_note(const char *s)
+{
+    if (!trace_dump)
+        return;
+    fprintf(trace_dump, "  # %s\n", s);
 }
 
 void
@@ -64,8 +72,19 @@ trace_dump_set_source_closure(StgClosure *c)
         type = closure_type_names[info->type];
     }
 
-    fprintf(trace_dump, "  \"%p\" [label=\"%p\\n%s\" info=\"%p\" type=\"%s\"];\n", 
-            UNTAG_CLOSURE(c), UNTAG_CLOSURE(c), type, info, type);
+    const char *where;
+    if (HEAP_ALLOCED(c)) {
+        if (Bdescr((StgPtr) c)->flags & BF_NONMOVING) {
+            where = "nonmoving";
+        } else {
+            where = "moving";
+        }
+    } else {
+        where = "static";
+    }
+
+    fprintf(trace_dump, "  \"%p\" [label=\"%p\\n%s\" info=\"%p\" type=\"%s\" where=\"%s\"];\n", 
+            UNTAG_CLOSURE(c), UNTAG_CLOSURE(c), type, info, type, where);
 }
 
 void

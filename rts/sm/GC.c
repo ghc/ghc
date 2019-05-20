@@ -266,8 +266,6 @@ GarbageCollect (uint32_t collect_gen,
    */
   N = collect_gen;
   major_gc = (N == RtsFlags.GcFlags.generations-1);
-  if (major_gc)
-      trace_dump_start_gc();
 
   /* See Note [Deadlock detection under nonmoving collector]. */
   deadlock_detect_gc = deadlock_detect;
@@ -393,6 +391,8 @@ GarbageCollect (uint32_t collect_gen,
   struct long_pause_ctx pause;
   LONG_PAUSE_START(&pause);
   if (n_gc_threads == 1) {
+      trace_dump_set_source("capabilities");
+      trace_dump_note("scavenging capability mut_lists");
       for (n = 0; n < n_capabilities; n++) {
 #if defined(THREADED_RTS)
           scavenge_capability_mut_Lists1(capabilities[n]);
@@ -402,6 +402,7 @@ GarbageCollect (uint32_t collect_gen,
       }
   } else {
       scavenge_capability_mut_lists(gct->cap);
+      trace_dump_note("scavenging capability mut_lists");
       for (n = 0; n < n_capabilities; n++) {
           if (idle_cap[n]) {
               markCapability(mark_root, gct, capabilities[n],
@@ -414,12 +415,15 @@ GarbageCollect (uint32_t collect_gen,
   trace(TRACE_gc, "done scavenging mut_lists");
 
   // follow roots from the CAF list (used by GHCi)
+  trace_dump_note("scavenging CAFs");
   LONG_PAUSE_START(&pause);
   gct->evac_gen_no = 0;
   markCAFs(mark_root, gct);
 
   // follow all the roots that the application knows about.
   gct->evac_gen_no = 0;
+  trace_dump_set_source("capabilities");
+  trace_dump_note("scavenging capability mut_lists again");
   if (n_gc_threads == 1) {
       for (n = 0; n < n_capabilities; n++) {
           markCapability(mark_root, gct, capabilities[n],
@@ -431,13 +435,19 @@ GarbageCollect (uint32_t collect_gen,
   LONG_PAUSE_END(&pause, 50, "mark caps&sched");
 
   LONG_PAUSE_START(&pause);
+  trace_dump_set_source("scheduler");
+  trace_dump_note("scavenging scheduler");
   markScheduler(mark_root, gct);
 
   // Mark the weak pointer list, and prepare to detect dead weak pointers.
+  trace_dump_set_source("weak ptr list");
+  trace_dump_note("weak ptr list");
   markWeakPtrList();
   initWeakForGC();
 
   // Mark the stable pointer table.
+  trace_dump_set_source("stable ptr table");
+  trace_dump_note("stable ptr table");
   markStablePtrTable(mark_root, gct);
 
   // Remember old stable name addresses.
@@ -452,6 +462,7 @@ GarbageCollect (uint32_t collect_gen,
   StgWeak *dead_weak_ptr_list = NULL;
   StgTSO *resurrected_threads = END_TSO_QUEUE;
 
+  trace_dump_note("main scavenging");
   LONG_PAUSE_START(&pause);
   for (;;)
   {

@@ -8,6 +8,7 @@
 #include "GCThread.h" // for GCUtils.h
 #include "GCUtils.h"
 #include "Printer.h"
+#include "TraceDump.h"
 #include "MarkWeak.h" // scavengeLiveWeak
 
 void
@@ -372,10 +373,12 @@ scavengeNonmovingSegment (struct NonmovingSegment *seg)
     StgPtr scan_end = (P_)nonmovingSegmentGetBlock(seg, seg->next_free);
     if (seg_block->u.scan == scan_end)
         return;
+    trace_dump_note("scavenging segment");
 
     nonmoving_block_idx p_idx = nonmovingGetBlockIdx(seg_block->u.scan);
     while (seg_block->u.scan < scan_end) {
         StgClosure *p = (StgClosure*)seg_block->u.scan;
+        trace_dump_set_source_closure(p);
 
         // bit set = was allocated in a previous GC, no need to scavenge
         // bit not set = new allocation, so scavenge
