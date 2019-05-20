@@ -181,7 +181,6 @@ x86_64-darwin	T10370	optasm	max_bytes_used	31808968
 x86_64-darwin	T10370	optasm	peak_megabytes_allocated	110
 x86_64-darwin	join004	optasm	bytes allocated	16050576
 x86_64-darwin	T15164	normal	bytes allocated	2033674256
-x86_64-darwin	T9630	normal	max_bytes_used	46749312
 x86_64-darwin	join003	optasm	bytes allocated	2000050712
 x86_64-darwin	join007	optasm	bytes allocated	50896
 x86_64-darwin	T5835	normal	max_bytes_used	44408
@@ -1214,7 +1213,6 @@ x86_64-darwin	T10370	optasm	max_bytes_used	31808968
 x86_64-darwin	T10370	optasm	peak_megabytes_allocated	110
 x86_64-darwin	join004	optasm	bytes allocated	16050576
 x86_64-darwin	T15164	normal	bytes allocated	2033674256
-x86_64-darwin	T9630	normal	max_bytes_used	46749344
 x86_64-darwin	join003	optasm	bytes allocated	2000050712
 x86_64-darwin	join007	optasm	bytes allocated	50896
 x86_64-darwin	T5835	normal	max_bytes_used	44408
@@ -2246,7 +2244,6 @@ x86_64-darwin	T10370	optasm	max_bytes_used	31808968
 x86_64-darwin	T10370	optasm	peak_megabytes_allocated	110
 x86_64-darwin	join002	optasm	bytes allocated	2000050712
 x86_64-darwin	join004	optasm	bytes allocated	16050576
-x86_64-darwin	T9630	normal	max_bytes_used	46749312
 x86_64-darwin	T15164	normal	bytes allocated	2033669856
 x86_64-darwin	join003	optasm	bytes allocated	2000050712
 x86_64-darwin	join007	optasm	bytes allocated	50896
@@ -3542,7 +3539,6 @@ x86_64-darwin	T15164	normal	bytes allocated	2033693568
 x86_64-darwin	haddock.base	normal	bytes allocated	23548527848
 x86_64-darwin	haddock.Cabal	normal	bytes allocated	23688325280
 x86_64-darwin	haddock.compiler	normal	bytes allocated	62458556144
-x86_64-darwin	T9630	normal	max_bytes_used	47894656
 x86_64-darwin	join002	optasm	bytes allocated	2000050712
 x86_64-darwin	join003	optasm	bytes allocated	2000050712
 x86_64-darwin	join004	optasm	bytes allocated	16050576
