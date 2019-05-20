@@ -210,7 +210,7 @@ simplifyEqExpr e1 e2 = case (e1, e2) of
             worst_case  = PmExprEq (PmExprCon c1 ts1') (PmExprCon c2 ts2')
         in  if | not (or bs1 || or bs2) -> (worst_case, False) -- no progress
                | all isTruePmExpr  tss  -> (truePmExpr, True)
-               | any isFalsePmExpr tss  -> (falsePmExpr, True)
+               | otherwise              -> (worst_case, or bs1 || or bs2)
                | otherwise              -> (worst_case, False)
     | otherwise -> (falsePmExpr, True)
 
