@@ -19,7 +19,7 @@ import collections
 import subprocess
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, TestResult
-from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, failBecauseStderr, str_fail, str_pass
+from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, failBecauseStderr, str_fail, str_pass, testing_metrics
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
 from perf_notes import MetricChange
@@ -383,9 +383,6 @@ def collect_compiler_stats(metric='all',deviation=20):
 
 def collect_stats(metric='all', deviation=20):
     return lambda name, opts, m=metric, d=deviation: _collect_stats(name, opts, m, d)
-
-def testing_metrics():
-    return ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used']
 
 # This is an internal function that is used only in the implementation.
 # 'is_compiler_stats_test' is somewhat of an unfortunate name.
