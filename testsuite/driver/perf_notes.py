@@ -9,6 +9,10 @@
 # (which defaults to 'local' if not given by --test-env).
 #
 
+import colorsys
+import tempfile
+import webbrowser
+import json
 import argparse
 import re
 import subprocess
@@ -18,7 +22,7 @@ import sys
 from collections import namedtuple
 from math import ceil, trunc
 
-from testutil import passed, failBecause
+from testutil import passed, failBecause, testing_metrics
 
 
 # Check if "git rev-parse" can be run successfully.
@@ -297,20 +301,23 @@ def baseline_commit_log(commit):
     global _baseline_depth_commit_log
     commit = commit_hash(commit)
     if not commit in _baseline_depth_commit_log:
-        n = BaselineSearchDepth
-        output = subprocess.check_output(['git', 'log', '--format=%H', '-n' + str(n), commit]).decode()
-        hashes = list(filter(is_commit_hash, output.split('\n')))
-
-        # We only got 10 results (expecting 75) in a CI pipeline (issue #16662).
-        # It's unclear from the logs what went wrong. Since no exception was
-        # thrown, we can assume the `git log` call above succeeded. The best we
-        # can do for now is improve logging.
-        actualN = len(hashes)
-        if actualN != n:
-            print("Expected " + str(n) + " hashes, but git gave " + str(actualN) + ":\n" + output)
-        _baseline_depth_commit_log[commit] = hashes
+        _baseline_depth_commit_log[commit] = commit_log(commit, BaselineSearchDepth)
 
     return _baseline_depth_commit_log[commit]
+
+def commit_log(commitOrRange, n=None):
+    nArgs = ['-n' + str(n)] if n != None else []
+    output = subprocess.check_output(['git', 'log', '--format=%H'] + nArgs + [commitOrRange]).decode()
+    hashes = list(filter(is_commit_hash, output.split('\n')))
+
+    # We only got 10 results (expecting 75) in a CI pipeline (issue #16662).
+    # It's unclear from the logs what went wrong. Since no exception was
+    # thrown, we can assume the `git log` call above succeeded. The best we
+    # can do for now is improve logging.
+    actualN = len(hashes)
+    if n != None and actualN != n:
+        print("Expected " + str(n) + " hashes, but git gave " + str(actualN) + ":\n" + output)
+    return hashes
 
 # Cache of baseline values. This is a dict of dicts indexed on:
 # (useCiNamespace, commit) -> (test_env, test, metric, way) -> baseline
@@ -355,7 +362,6 @@ def baseline_metric(commit, name, test_env, metric, way):
     # gets the metric of a given commit
     # (Bool, Int) -> (float | None)
     def commit_metric(useCiNamespace, depth):
-        global _commit_metric_cache
         currentCommit = depth_to_commit(depth)
 
         # Get test environment.
@@ -364,44 +370,7 @@ def baseline_metric(commit, name, test_env, metric, way):
             # This can happen when no best fit ci test is found.
             return None
 
-        # Check for cached value.
-        cacheKeyA = (useCiNamespace, currentCommit)
-        cacheKeyB = (effective_test_env, name, metric, way)
-        if cacheKeyA in _commit_metric_cache:
-            return _commit_metric_cache[cacheKeyA].get(cacheKeyB)
-
-        # Cache miss.
-        # Calculate baselines from the current commit's git note.
-        # Note that the git note may contain data for other tests. All tests'
-        # baselines will be collected and cached for future use.
-        allCommitMetrics = get_perf_stats(
-                                currentCommit,
-                                namespace(useCiNamespace))
-
-        # Collect recorded values by cacheKeyB.
-        values_by_cache_key_b = {}
-        for perfStat in allCommitMetrics:
-            currentCacheKey = (perfStat.test_env, perfStat.test, \
-                               perfStat.metric, perfStat.way)
-            currentValues = values_by_cache_key_b.setdefault(currentCacheKey, [])
-            currentValues.append(float(perfStat.value))
-
-        # Calculate and baseline (average of values) by cacheKeyB.
-        baseline_by_cache_key_b = {}
-        for currentCacheKey, currentValues in values_by_cache_key_b.items():
-            baseline_by_cache_key_b[currentCacheKey] = Baseline( \
-                PerfStat( \
-                    currentCacheKey[0],
-                    currentCacheKey[1],
-                    currentCacheKey[3],
-                    currentCacheKey[2],
-                    sum(currentValues) / len(currentValues)),
-                currentCommit,
-                depth)
-
-        # Save baselines to the cache.
-        _commit_metric_cache[cacheKeyA] = baseline_by_cache_key_b
-        return baseline_by_cache_key_b.get(cacheKeyB)
+        return get_commit_metric(namespace(useCiNamespace), currentCommit, effective_test_env, name, metric, way)
 
     # Searches through previous commits trying local then ci for each commit in.
     def search(useCiNamespace, depth):
@@ -414,7 +383,7 @@ def baseline_metric(commit, name, test_env, metric, way):
         # Check for a metric on this commit.
         current_metric = commit_metric(useCiNamespace, depth)
         if current_metric != None:
-            return current_metric
+            return Baseline(current_metric, depth_to_commit(depth), depth)
 
         # Metric is not available.
         # If tried local, now try CI.
@@ -432,6 +401,53 @@ def baseline_metric(commit, name, test_env, metric, way):
     # Start search from parent commit using local name space.
     return search(False, 1)
 
+
+def get_commit_metric_value_str_or_none(gitNoteRef, commit, test_env, name, metric, way):
+    metric = get_commit_metric(gitNoteRef, commit, test_env, name, metric, way)
+    if metric == None:
+        return None
+    return str(metric.value)
+
+# gets the metric of a given commit
+# (Bool, Int) -> (float | None)
+def get_commit_metric(gitNoteRef, commit, test_env, name, metric, way):
+    global _commit_metric_cache
+    assert test_env != None
+    commit = commit_hash(commit)
+
+    # Check for cached value.
+    cacheKeyA = (gitNoteRef, commit)
+    cacheKeyB = (test_env, name, metric, way)
+    if cacheKeyA in _commit_metric_cache:
+        return _commit_metric_cache[cacheKeyA].get(cacheKeyB)
+
+    # Cache miss.
+    # Calculate baselines from the current commit's git note.
+    # Note that the git note may contain data for other tests. All tests'
+    # baselines will be collected and cached for future use.
+    allCommitMetrics = get_perf_stats(commit, gitNoteRef)
+
+    # Collect recorded values by cacheKeyB.
+    values_by_cache_key_b = {}
+    for perfStat in allCommitMetrics:
+        currentCacheKey = (perfStat.test_env, perfStat.test, \
+                            perfStat.metric, perfStat.way)
+        currentValues = values_by_cache_key_b.setdefault(currentCacheKey, [])
+        currentValues.append(float(perfStat.value))
+
+    # Calculate and baseline (average of values) by cacheKeyB.
+    baseline_by_cache_key_b = {}
+    for currentCacheKey, currentValues in values_by_cache_key_b.items():
+        baseline_by_cache_key_b[currentCacheKey] = PerfStat( \
+                currentCacheKey[0],
+                currentCacheKey[1],
+                currentCacheKey[3],
+                currentCacheKey[2],
+                sum(currentValues) / len(currentValues))
+
+    # Save baselines to the cache.
+    _commit_metric_cache[cacheKeyA] = baseline_by_cache_key_b
+    return baseline_by_cache_key_b.get(cacheKeyB)
 
 # Check test stats. This prints the results for the user.
 # actual: the PerfStat with actual value.
@@ -492,18 +508,31 @@ def check_stats_change(actual, baseline, tolerance_dev, allowed_perf_changes = {
 
     return (change, result)
 
+def hash_rgb_str(x):
+    res = 10000.0
+    rgb = colorsys.hsv_to_rgb((abs(int(hash(x))) % res)/res, 1.0, 0.9)
+    return "rgb(" + str(int(rgb[0] * 255)) + ", " + str(int(rgb[1] * 255)) + ", " + str(int(rgb[2] * 255)) + ")"
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--test-env",
-                        help="The given test environment to be compared.")
-    parser.add_argument("--test-name",
-                        help="If given, filters table to include only \
-                        tests matching the given regular expression.")
     parser.add_argument("--add-note", nargs=3,
                         help="Development only. --add-note N commit seed \
                         Adds N fake metrics to the given commit using the random seed.")
+    parser.add_argument("--chart", action='store_true',
+                        help="Chart the results (opens in a browser).")
+    parser.add_argument("--ci", action='store_true',
+                        help="Use ci results. You must fetch these with:\n    " \
+                            + "$ git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/ci/perf")
+    parser.add_argument("--test-env",
+                        help="The given test environment to be compared. Use 'local' for localy run results. If using --ci, see .gitlab-ci file for TEST_ENV settings.")
+    parser.add_argument("--test-name",
+                        help="Filters for tests matching the given regular expression.")
+    parser.add_argument("--metric",
+                        help="Test metric (one of " + str(testing_metrics()) + ").")
+    parser.add_argument("--way",
+                        help="Test way (one of " + str(testing_metrics()) + ").")
     parser.add_argument("commits", nargs=argparse.REMAINDER,
-                        help="The rest of the arguments will be the commits that will be used.")
+                        help="Either a list of commits or a single commit range (e.g. HEAD~10..HEAD).")
     args = parser.parse_args()
 
     env = 'local'
@@ -517,16 +546,29 @@ if __name__ == '__main__':
     # Main logic of the program when called from the command-line.
     #
 
+    ref = 'perf'
+    if args.ci:
+        ref = 'ci/perf'
+    commits = args.commits
     if args.commits:
-        for c in args.commits:
-            metrics += [CommitAndStat(c, stat) for stat in get_perf_stats(c)]
+        # Commit range
+        if len(commits) == 1 and ".." in commits[0]:
+            commits = list(reversed(commit_log(commits[0])))
+        for c in commits:
+            metrics += [CommitAndStat(c, stat) for stat in get_perf_stats(c, ref)]
+
+    if args.metric:
+        metrics = [test for test in metrics if test.stat.metric == args.metric]
+
+    if args.way:
+        metrics = [test for test in metrics if test.stat.way == args.way]
 
     if args.test_env:
         metrics = [test for test in metrics if test.stat.test_env == args.test_env]
 
     if args.test_name:
         nameRe = re.compile(args.test_name)
-        metrics = [test for test in metrics if nameRe.search(test.test)]
+        metrics = [test for test in metrics if nameRe.search(test.stat.test)]
 
     if args.add_note:
         def note_gen(n, commit, delta=''):
@@ -548,66 +590,100 @@ if __name__ == '__main__':
         note_gen(args.add_note[0],args.add_note[1],args.add_note[2])
 
     #
+    # Chart
+    #
+    def metricAt(commit, testName, testMetric):
+        values2 = [float(t.stat.value) for t in metrics if t.commit == commit \
+                                                       and t.stat.test == testName \
+                                                       and t.stat.metric == testMetric]
+        if values2 == []:
+            return None
+        else:
+            return (sum(values2) / len(values2))
+
+    testSeries = list(set([(test.stat.test_env, test.stat.test, test.stat.metric, test.stat.way) for test in metrics]))
+
+    #
+    # Use Chart.js to visualize the data.
+    #
+
+    if args.chart:
+        chartData = {
+                'type': 'line',
+                'data': {
+                    'labels': commits,
+                    'datasets': [{
+                        'label': name + "(" + way + ") " + metric + " - " + env,
+                        'data': [get_commit_metric_value_str_or_none(ref, commit, env, name, metric, way) \
+                                        for commit in commits],
+
+                        'fill': 'false',
+                        'spanGaps': 'true',
+                        'lineTension': 0,
+                        'backgroundColor': hash_rgb_str((env, name, metric, way)),
+                        'borderColor': hash_rgb_str((env, name, metric, way))
+                    } for (env, name, metric, way) in testSeries]
+                },
+                'options': {}
+            }
+
+        # Try use local Chart.js file else use online version.
+        chartjsFilePath = sys.path[0] + "/js/Chart-2.8.0.min.js"
+        try:
+            chartjsFile = open(chartjsFilePath, "r")
+            chartjsTag = '<script>' + chartjsFile.read() + '</script>'
+            chartjsFile.close()
+        except:
+            print("Failed to load chartjsFilePath, reverting to online Chart.js.")
+            chartjsTag = '<script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0"></script>'
+
+        file = tempfile.NamedTemporaryFile(mode='w+t', suffix=".html", delete=False)
+        print(\
+            "<html>" + \
+                '<head>' + chartjsTag + '</head>' + \
+                '<body style="padding: 20px"><canvas id="myChart"></canvas><script>' + \
+                    "var ctx = document.getElementById('myChart').getContext('2d');" + \
+                    "var chart = new Chart(ctx, \n" + json.dumps(chartData, indent=2) + "\n);" + \
+                '</script></body>' + \
+            "</html>"\
+            , file=file)
+        file.close()
+        webbrowser.get(using='firefox').open(file.name)
+        exit(0)
+
+    #
     # String utilities for pretty-printing
     #
 
-    row_fmt = '{:18}' * len(args.commits)
-    commits = row_fmt.format(*[c[:10] for c in args.commits])
+    #                  T1234                 T1234
+    #              max_bytes             max_bytes
+    #                 normal                normal
+    # commit   x86_64-darwin       i386-linux-deb9
+    # --------------------------------------------
+    # HEAD              9123                  9123
+    # HEAD~1           10023                 10023
+    # HEAD~2           21234                 21234
+    # HEAD~3           20000                 20000
 
-    def cmtline(insert):
-        return row_fmt.format(*[insert for c in args.commits]).strip()
+    # Data is already in colum major format, so do that, calculate column widths
+    # then transpose and print each row.
+    def strMetric(x):
+        return '{:.2f}'.format(x.value) if x != None else ""
 
-    def header(unit):
-        first_line = "{:27}{:30}".format('    ','      ') + cmtline(unit)
-        second_line = ("{:27}{:30}".format('Test','Metric') + commits).strip()
+    headerCols = [ ["","","","Commit"] ] \
+                + [ [name, metric, way, env] for (env, name, metric, way) in testSeries ]
+    dataCols = [ commits ] \
+                + [ [strMetric(get_commit_metric(ref, commit, env, name, metric, way)) \
+                        for commit in commits ] \
+                        for (env, name, metric, way) in testSeries ]
+    colWidths = [max([2+len(cell) for cell in colH + colD]) for (colH,colD) in zip(headerCols, dataCols)]
+    col_fmts = ['{:>' + str(w) + '}' for w in colWidths]
 
-        # Test   Metric   c1   c2   c3 ...
-        print("-" * (len(second_line)+1))
-        print(first_line)
-        print(second_line)
-        print("-" * (len(second_line)+1))
+    def printCols(cols):
+        for row in zip(*cols):
+            # print(list(zip(col_fmts, row)))
+            print(''.join([f.format(cell) for (f,cell) in zip(col_fmts, row)]))
 
-    def commit_string(test, flag):
-        def delta(v1, v2):
-            return round((100 * (v1 - v2)/v2),2)
-
-        # Get the average value per commit (or None if that commit contains no metrics).
-        # Note: if the test environment is not set, this will combine metrics from all test environments.
-        averageValuesOrNones = []
-        for commit in args.commits:
-            values = [float(t.stat.value) for t in metrics if t.commit == commit and t.stat.test == test]
-            if values == []:
-                averageValuesOrNones.append(None)
-            else:
-                averageValuesOrNones.append(sum(values) / len(values))
-
-        if flag == 'metrics':
-            strings = [str(v) if v != None else '-' for v in averageValuesOrNones]
-        if flag == 'percentages':
-            # If the baseline commit has no stats, then we can not produce any percentages.
-            baseline = averageValuesOrNones[0]
-            if baseline == None:
-                strings = ['-' for v in averageValuesOrNones]
-            else:
-                baseline = float(baseline)
-                strings = ['-' if val == None else str(delta(baseline,float(val))) + '%' for val in averageValuesOrNones]
-
-        return row_fmt.format(*strings).strip()
-
-    #
-    # The pretty-printed output
-    #
-
-    header('commit')
-    # Printing out metrics.
-    all_tests = sorted(set([(test.stat.test, test.stat.metric) for test in metrics]))
-    for test, metric in all_tests:
-        print("{:27}{:30}".format(test, metric) + commit_string(test,'metrics'))
-
-    # Has no meaningful output if there is no commit to compare to.
-    if not singleton_commit:
-        header('percent')
-
-        # Printing out percentages.
-        for test, metric in all_tests:
-            print("{:27}{:30}".format(test, metric) + commit_string(test,'percentages'))
+    printCols(headerCols)
+    print('-'*(sum(colWidths)+2))
+    printCols(dataCols)
