@@ -22,7 +22,7 @@ import sys
 from collections import namedtuple
 from math import ceil, trunc
 
-from testutil import passed, failBecause
+from testutil import passed, failBecause, testing_metrics
 
 
 # Check if "git rev-parse" can be run successfully.
@@ -362,7 +362,6 @@ def baseline_metric(commit, name, test_env, metric, way):
     # gets the metric of a given commit
     # (Bool, Int) -> (float | None)
     def commit_metric(useCiNamespace, depth):
-        global _commit_metric_cache
         currentCommit = depth_to_commit(depth)
 
         # Get test environment.
@@ -371,44 +370,7 @@ def baseline_metric(commit, name, test_env, metric, way):
             # This can happen when no best fit ci test is found.
             return None
 
-        # Check for cached value.
-        cacheKeyA = (useCiNamespace, currentCommit)
-        cacheKeyB = (effective_test_env, name, metric, way)
-        if cacheKeyA in _commit_metric_cache:
-            return _commit_metric_cache[cacheKeyA].get(cacheKeyB)
-
-        # Cache miss.
-        # Calculate baselines from the current commit's git note.
-        # Note that the git note may contain data for other tests. All tests'
-        # baselines will be collected and cached for future use.
-        allCommitMetrics = get_perf_stats(
-                                currentCommit,
-                                namespace(useCiNamespace))
-
-        # Collect recorded values by cacheKeyB.
-        values_by_cache_key_b = {}
-        for perfStat in allCommitMetrics:
-            currentCacheKey = (perfStat.test_env, perfStat.test, \
-                               perfStat.metric, perfStat.way)
-            currentValues = values_by_cache_key_b.setdefault(currentCacheKey, [])
-            currentValues.append(float(perfStat.value))
-
-        # Calculate and baseline (average of values) by cacheKeyB.
-        baseline_by_cache_key_b = {}
-        for currentCacheKey, currentValues in values_by_cache_key_b.items():
-            baseline_by_cache_key_b[currentCacheKey] = Baseline( \
-                PerfStat( \
-                    currentCacheKey[0],
-                    currentCacheKey[1],
-                    currentCacheKey[3],
-                    currentCacheKey[2],
-                    sum(currentValues) / len(currentValues)),
-                currentCommit,
-                depth)
-
-        # Save baselines to the cache.
-        _commit_metric_cache[cacheKeyA] = baseline_by_cache_key_b
-        return baseline_by_cache_key_b.get(cacheKeyB)
+        return get_commit_metric(namespace(useCiNamespace), currentCommit, effective_test_env, name, metric, way)
 
     # Searches through previous commits trying local then ci for each commit in.
     def search(useCiNamespace, depth):
@@ -421,7 +383,7 @@ def baseline_metric(commit, name, test_env, metric, way):
         # Check for a metric on this commit.
         current_metric = commit_metric(useCiNamespace, depth)
         if current_metric != None:
-            return current_metric
+            return Baseline(current_metric, depth_to_commit(depth), depth)
 
         # Metric is not available.
         # If tried local, now try CI.
@@ -439,6 +401,53 @@ def baseline_metric(commit, name, test_env, metric, way):
     # Start search from parent commit using local name space.
     return search(False, 1)
 
+
+def get_commit_metric_value_str_or_none(gitNoteRef, commit, test_env, name, metric, way):
+    metric = get_commit_metric(gitNoteRef, commit, test_env, name, metric, way)
+    if metric == None:
+        return None
+    return str(metric.value)
+
+# gets the metric of a given commit
+# (Bool, Int) -> (float | None)
+def get_commit_metric(gitNoteRef, commit, test_env, name, metric, way):
+    global _commit_metric_cache
+    assert test_env != None
+    commit = commit_hash(commit)
+
+    # Check for cached value.
+    cacheKeyA = (gitNoteRef, commit)
+    cacheKeyB = (test_env, name, metric, way)
+    if cacheKeyA in _commit_metric_cache:
+        return _commit_metric_cache[cacheKeyA].get(cacheKeyB)
+
+    # Cache miss.
+    # Calculate baselines from the current commit's git note.
+    # Note that the git note may contain data for other tests. All tests'
+    # baselines will be collected and cached for future use.
+    allCommitMetrics = get_perf_stats(commit, gitNoteRef)
+
+    # Collect recorded values by cacheKeyB.
+    values_by_cache_key_b = {}
+    for perfStat in allCommitMetrics:
+        currentCacheKey = (perfStat.test_env, perfStat.test, \
+                            perfStat.metric, perfStat.way)
+        currentValues = values_by_cache_key_b.setdefault(currentCacheKey, [])
+        currentValues.append(float(perfStat.value))
+
+    # Calculate and baseline (average of values) by cacheKeyB.
+    baseline_by_cache_key_b = {}
+    for currentCacheKey, currentValues in values_by_cache_key_b.items():
+        baseline_by_cache_key_b[currentCacheKey] = PerfStat( \
+                currentCacheKey[0],
+                currentCacheKey[1],
+                currentCacheKey[3],
+                currentCacheKey[2],
+                sum(currentValues) / len(currentValues))
+
+    # Save baselines to the cache.
+    _commit_metric_cache[cacheKeyA] = baseline_by_cache_key_b
+    return baseline_by_cache_key_b.get(cacheKeyB)
 
 # Check test stats. This prints the results for the user.
 # actual: the PerfStat with actual value.
@@ -518,6 +527,10 @@ if __name__ == '__main__':
                         help="The given test environment to be compared. Use 'local' for localy run results. If using --ci, see .gitlab-ci file for TEST_ENV settings.")
     parser.add_argument("test_name",
                         help="Filters for tests matching the given regular expression.")
+    parser.add_argument("metric",
+                        help="Test metric (one of " + str(testing_metrics()) + ").")
+    parser.add_argument("way",
+                        help="Test way (one of " + str(testing_metrics()) + ").")
     parser.add_argument("commits", nargs=argparse.REMAINDER,
                         help="Either a list of commits or a single commit range (e.g. HEAD~10..HEAD).")
     args = parser.parse_args()
@@ -543,6 +556,12 @@ if __name__ == '__main__':
             commits = list(reversed(commit_log(commits[0])))
         for c in commits:
             metrics += [CommitAndStat(c, stat) for stat in get_perf_stats(c, ref)]
+
+    if args.metric:
+        metrics = [test for test in metrics if test.stat.metric == args.metric]
+
+    if args.way:
+        metrics = [test for test in metrics if test.stat.way == args.way]
 
     if args.test_env:
         metrics = [test for test in metrics if test.stat.test_env == args.test_env]
@@ -573,8 +592,10 @@ if __name__ == '__main__':
     #
     # Chart
     #
-    def metricAt(commit, testName):
-        values2 = [float(t.stat.value) for t in metrics if t.commit == commit and t.stat.test == testName]
+    def metricAt(commit, testName, testMetric):
+        values2 = [float(t.stat.value) for t in metrics if t.commit == commit \
+                                                       and t.stat.test == testName \
+                                                       and t.stat.metric == testMetric]
         if values2 == []:
             return None
         else:
@@ -588,7 +609,8 @@ if __name__ == '__main__':
                     'labels': commits,
                     'datasets': [{
                         'label': testName,
-                        'data': [metricAt(commit, testName) for commit in commits],
+                        'data': [get_commit_metric_value_str_or_none(ref, commit, args.test_env, testName, args.metric, args.way) \
+                                     for commit in commits],
 
                         'fill': 'false',
                         'spanGaps': 'true',
