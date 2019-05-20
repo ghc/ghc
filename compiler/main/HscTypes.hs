@@ -500,7 +500,11 @@ data Target
       targetId           :: TargetId, -- ^ module or filename
       targetAllowObjCode :: Bool,     -- ^ object code allowed?
       targetContents     :: Maybe (StringBuffer,UTCTime)
-                                        -- ^ in-memory text buffer?
+      -- ^ Optional in-memory buffer containing the source code GHC should
+      -- use for this target instead of reading it from disk.
+      --
+      -- Since GHC version 8.10 modules which require preprocessors such as
+      -- Literate Haskell or CPP to run are also supported.
     }
 
 data TargetId
