@@ -2475,34 +2475,12 @@ preprocessFile :: HscEnv
                -> Maybe Phase -- ^ Starting phase
                -> Maybe (StringBuffer,UTCTime)
                -> IO (DynFlags, FilePath, StringBuffer)
-preprocessFile hsc_env src_fn mb_phase Nothing
+preprocessFile hsc_env src_fn mb_phase maybe_buf
   = do
-        (dflags', hspp_fn) <- preprocess hsc_env (src_fn, mb_phase)
+        (dflags', hspp_fn)
+            <- preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
         buf <- hGetStringBuffer hspp_fn
         return (dflags', hspp_fn, buf)
-
-preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
-  = do
-        let dflags = hsc_dflags hsc_env
-        let local_opts = getOptions dflags buf src_fn
-
-        (dflags', leftovers, warns)
-            <- parseDynamicFilePragma dflags local_opts
-        checkProcessArgsResult dflags leftovers
-        handleFlagWarnings dflags' warns
-
-        let needs_preprocessing
-                | Just (Unlit _) <- mb_phase    = True
-                | Nothing <- mb_phase, Unlit _ <- startPhase src_fn  = True
-                  -- note: local_opts is only required if there's no Unlit phase
-                | xopt LangExt.Cpp dflags'      = True
-                | gopt Opt_Pp  dflags'          = True
-                | otherwise                     = False
-
-        when needs_preprocessing $
-           throwGhcExceptionIO (ProgramError "buffer needs preprocesing; interactive check disabled")
-
-        return (dflags', src_fn, buf)
 
 
 -----------------------------------------------------------------------------
