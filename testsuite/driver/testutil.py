@@ -57,6 +57,10 @@ def lndir(srcdir, dstdir):
             os.mkdir(dst)
             lndir(src, dst)
 
+# All possible test metric strings.
+def testing_metrics():
+    return ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used']
+
 # On Windows, os.symlink is not defined with Python 2.7, but is in Python 3
 # when using msys2, as GHC does. Unfortunately, only Administrative users have
 # the privileges necessary to create symbolic links by default. Consequently we
